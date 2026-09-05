@@ -1,0 +1,51 @@
+/* @openbuddy/ui-theme/styles — base tokens. Imported once at app root. */
+
+:root {
+  --wb-bg-primary: #ffffff;
+  --wb-bg-secondary: #f4f5f8;
+  --wb-bg-tertiary: #ebedf2;
+  --wb-fg-primary: #1f2328;
+  --wb-fg-secondary: #57606a;
+  --wb-fg-tertiary: #8c959f;
+  --wb-border: #d0d7de;
+  --wb-accent: #2f6feb;
+  --wb-danger: #cf222e;
+  --wb-success: #1a7f37;
+  --wb-warning: #9a6700;
+  --wb-shadow: 0 4px 12px rgba(15, 17, 21, 0.08);
+  --wb-radius: 6px;
+  --wb-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+             "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica,
+             Arial, sans-serif;
+  --wb-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+                  "Liberation Mono", monospace;
+}
+
+:root[data-theme="dark"] {
+  --wb-bg-primary: #0d1117;
+  --wb-bg-secondary: #161b22;
+  --wb-bg-tertiary: #21262d;
+  --wb-fg-primary: #e6edf3;
+  --wb-fg-secondary: #9da7b3;
+  --wb-fg-tertiary: #6e7681;
+  --wb-border: #30363d;
+  --wb-accent: #58a6ff;
+  --wb-danger: #f85149;
+  --wb-success: #3fb950;
+  --wb-warning: #d29922;
+  --wb-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme="light"] {
+  --wb-bg-primary: #ffffff;
+  --wb-bg-secondary: #f4f5f8;
+  --wb-bg-tertiary: #ebedf2;
+  --wb-fg-primary: #1f2328;
+  --wb-fg-secondary: #57606a;
+  --wb-fg-tertiary: #8c959f;
+  --wb-border: #d0d7de;
+  --wb-accent: #2f6feb;
+  --wb-danger: #cf222e;
+  --wb-success: #1a7f37;
+  --wb-warning: #9a6700;
+}
