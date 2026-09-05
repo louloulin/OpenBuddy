@@ -24,3 +24,5 @@ export { PinnedSection } from "./PinnedSection";
 export { WorkspaceGroup } from "./WorkspaceGroup";
 export { Sidebar } from "./Sidebar";
 export { SubagentIndicator, SessionRowWithSubagents } from "./SubagentIndicator";
+export { TaskItem, TASK_PHASES, taskPhaseLabel } from "./TaskItem";
+export type { TaskItemProps, TaskItemData, TaskPhase, TaskStatus } from "./TaskItem";
