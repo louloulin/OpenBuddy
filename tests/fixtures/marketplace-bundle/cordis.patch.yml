@@ -1,0 +1,5 @@
+- insert:
+    - id: marketplace-bundle-test
+      name: '@test/marketplace-bundle'
+      config:
+        source: marketplace-test
