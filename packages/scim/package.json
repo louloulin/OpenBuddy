@@ -1,0 +1,12 @@
+{
+  "name": "@openbuddy/scim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenBuddy SCIM v2 端点（企业 IdP 自动配置用户/组）",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}
