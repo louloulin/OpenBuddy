@@ -28,6 +28,7 @@ export { FindBar, isFindHit } from "./FindBar";
 export { InputAddMenu } from "./InputAddMenu";
 export { LoadingRow } from "./LoadingRow";
 export { MessageItem } from "./MessageItem";
+export { AnsiText } from "./AnsiText";
 export { QuestionInlineCard } from "./QuestionInlineCard";
 export { RewindBar } from "./RewindBar";
 export { ToolCallCard, ToolCallDetailBody } from "./ToolCallCard";

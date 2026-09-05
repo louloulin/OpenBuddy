@@ -11,6 +11,7 @@ import {
   rendererIcon,
   summarizeTool,
 } from "@/lib/markdown/tool-renderers";
+import { AnsiText } from "./AnsiText";
 
 type ToolCallCardProps = {
   tc: ToolCallView;
@@ -235,7 +236,7 @@ export function ToolCallDetailBody({
               {cmd.command}
             </pre>
           )}
-          {cmd.output && <pre className="toolcall__output">{cmd.output}</pre>}
+          {cmd.output && <pre className="toolcall__output"><AnsiText text={cmd.output} /></pre>}
         </div>
       )}
       {/* R1.4 — partial / streaming output. Shown when the tool is still
@@ -254,7 +255,7 @@ export function ToolCallDetailBody({
 
       {texts.map((t, i) => (
         <pre key={i} className="toolcall__text">
-          {t.text}
+          <AnsiText text={t.text} />
         </pre>
       ))}
 
@@ -334,7 +335,7 @@ function StreamingToolOutput({ tc }: { tc: ToolCallView }) {
         <span className="tool-detail__streaming-dot" aria-hidden="true" />
         <span className="tool-detail__streaming-label">实时输出</span>
       </div>
-      <pre className="tool-detail__streaming-body">{preview}</pre>
+      <pre className="tool-detail__streaming-body"><AnsiText text={preview} /></pre>
     </div>
   );
 }
