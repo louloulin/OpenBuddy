@@ -1,0 +1,18 @@
+.backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.dialog {
+  background: var(--wb-bg-primary, #fff);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  min-width: 320px;
+  max-width: 540px;
+  max-height: 80vh;
+  display: flex; flex-direction: column;
+}
+.header { padding: 12px 16px; border-bottom: 1px solid var(--wb-border, #d0d7de); font-weight: 600; }
+.body { padding: 16px; overflow: auto; }
+.footer { padding: 8px 16px; border-top: 1px solid var(--wb-border, #d0d7de); display: flex; gap: 8px; justify-content: flex-end; }
