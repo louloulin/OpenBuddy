@@ -163,27 +163,63 @@ Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 G
 
 ---
 
-## 🎬 演示与截图
+## 🎬 演示与截图(全部基于真实 MiniMax-M3 模型端到端运行)
 
-> 截图取自已运行的 dev 渲染器 (`http://127.0.0.1:1420/`),对应 commit `a9d240ff`。本地重新生成:`pnpm electron:dev`,然后用 `scripts/electron/screenshot.mjs` 里的 Playwright 流程。
+> 所有 AI Chat 截图均来自 **Electron + 真实 MiniMax-M3 模型** 的端到端运行(不是 mock、不是回放)。
+> 本机复现:`pnpm build && node scripts/electron/_screenshot-real-ui.mjs`
+> 需要环境变量 `OPENBUDDY_E2E_API_KEY` / `OPENBUDDY_E2E_BASE_URL=https://api.minimaxi.com/anthropic` / `OPENBUDDY_E2E_MODEL_ID=MiniMax-M3`。
+> 离线复现(用本地 echo provider):`node scripts/electron/launch-real-evals-echo.mjs`。
 
-### 主桌面壳层(简体中文 / 默认语言)
-
-<p align="center">
-  <img src="docs/screenshots/desktop-main.png" alt="OpenBuddy 主桌面壳层 — 侧边栏含任务 / 工作空间 / 设置,默认简体中文" width="1024" />
-</p>
-
-### 设置面板(简体中文)
+### 1. 冷启动 — 未配置 API Key
 
 <p align="center">
-  <img src="docs/screenshots/settings-zh.png" alt="OpenBuddy 设置面板 — 通用 / 快捷键 / 个性化 / 助理设置 / 智能体 / 模型 / 数据与安全 / 关于" width="1024" />
+  <img src="docs/screenshots/01-home-cold-start.png" alt="OpenBuddy 冷启动 — 侧边栏含任务 / 工作空间 / 设置,主区域显示正在本地初始化 agent,Composer 已禁用并提示请先配置 API Key" width="1024" />
 </p>
 
-### 权限对话框(简体中文)
+### 2. 配置 MiniMax 后 Composer 就绪
 
 <p align="center">
-  <img src="docs/screenshots/dialog-preview.png" alt="OpenBuddy 权限对话框 — 类型化、原子化、本地化感知" width="1024" />
+  <img src="docs/screenshots/02-composer-ready.png" alt="配置 MiniMax-M3 后 Composer 启用,模型选择器显示均衡 (MiniMax-M2.7),可输入提示词并发送" width="1024" />
 </p>
+
+### 3. 真实 MiniMax-M3 流式回答 — 中段
+
+<p align="center">
+  <img src="docs/screenshots/03-turn1-mid-stream.png" alt="真实 MiniMax-M3 模型流式回答中 — Buddy 显示自我介绍:我是 Pi,一个在 OpenBuddy 中运行的 AI 编程助手;深度思考块可展开" width="1024" />
+</p>
+
+### 4. 第一轮回答完成
+
+<p align="center">
+  <img src="docs/screenshots/04-turn1-settled.png" alt="第一轮回答完成 — 状态显示已完成 4s,Buddy 回复完整可读,可复制 / 重试 / 点赞" width="1024" />
+</p>
+
+### 5. 第二轮 — 多轮对话
+
+<p align="center">
+  <img src="docs/screenshots/05-turn2-settled.png" alt="第二轮对话 — 用户追问 Hello world 中文怎么说,Buddy 给出准确回答:你好,世界" width="1024" />
+</p>
+
+### 6. 第三轮 — 结构化输出(待办清单)
+
+<p align="center">
+  <img src="docs/screenshots/06-turn3-settled.png" alt="第三轮对话 — 用户要求三行中文待办清单,Buddy 输出完整三条:买菜 / 做饭 / 洗碗" width="1024" />
+</p>
+
+### 7. 三轮完整对话全貌
+
+<p align="center">
+  <img src="docs/screenshots/07-three-turns-full.png" alt="OpenBuddy AI Chat 三轮完整对话全貌 — 真实 MiniMax-M3 流式响应,每轮都带深度思考块,可重试、复制、点赞" width="1024" />
+</p>
+
+### 验证证据(全部通过)
+
+- `tests/electron/chat-ui-minimax-real.spec.ts` — 6/6 通过(54.7s),真实模型下文本/深度思考/重复 span/stop/follow-up/current-model 全验
+- `tests/electron/minimax-real-roundtrip.spec.ts` — 4/4 通过(46.1s),真实 agent:prompt/follow-up/steer/abort 完整 IPC 链
+- `tests/electron/chat-flow-echo.spec.ts` — 5/5 通过,echo upstream 下流式 + abort + steer + baseUrl 校验
+- `tests/electron/chat-ui-streaming.spec.ts` — 7/7 通过,多回合 / 隐藏窗口 / reload 全部健壮
+- `tests/electron/chat-flow.spec.ts` — 2/2 通过,无凭据冷启动 Composer 禁用
+- `tests/electron/session-history-load.spec.ts` — 2/2 通过,持久化对话历史回放
 
 ### 30 秒速览 — 你将获得什么
 

@@ -115,7 +115,6 @@
   color: var(--wb-text-medium);
   opacity: 0;
   transition: opacity 0.15s ease;
-  flex-shrink: 0;
   height: 24px;
 }
 .main-topbar__title-area:hover .main-topbar__title-edit,
@@ -509,6 +508,12 @@
   max-width: 800px;
   width: 100%;
   margin: 0 auto;
+  /* Pin to the bottom of `chatview__main` (flex-column). Without
+     `flex-shrink: 0` a tall transcript can compress the footer instead of
+     overflowing the scroll container — the composer would visibly shrink
+     rather than the transcript growing behind it. Keep the composer's
+     intrinsic height stable so input stays usable at any transcript length. */
+  flex-shrink: 0;
   /* 贴底:底部留出仅免责声明一行的间距(对齐 WB 24px→10px)。 */
   padding: 6px 24px 10px;
   box-sizing: border-box;

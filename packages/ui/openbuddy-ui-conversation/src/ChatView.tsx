@@ -1018,6 +1018,9 @@ export function ChatView({
             </button>
           )}
         </div>
+        {/* Pinned footer — composer + yield/permission cards always sit at
+            the bottom of `chatview__main`, not at the bottom of the
+            transcript. */}
         <div className="chatview__footer">
           {/* Inline permission / question cards: session-scoped, never block sidebar. */}
           <PermissionInlineCard sessionId={sessionId} />
