@@ -18,7 +18,16 @@
  * once during profile bootstrap (when `findCompatibilityAdapter` decides
  * each adapter's fate) and consulted by every later plugin mount. Tests
  * call `clearPassthroughRegistry` to reset between cases.
+ *
+ * The static capability→plugin-id mapping is NOT defined here anymore. It
+ * lives in `capability-ownership.ts` (the single authority for pi-native vs
+ * OpenBuddy ownership) and is re-exported below for back-compat.
  */
+
+import {
+  CAPABILITY_TO_PLUGIN_ID as AUTHORITY_CAPABILITY_TO_PLUGIN_ID,
+  pluginIdForCapability as authorityPluginIdForCapability,
+} from "./capability-ownership";
 
 const REGISTRY = new Map<string, { source: "opted-in" | "installed"; adapter: string; recordedAt: number }>();
 
@@ -45,45 +54,16 @@ export function clearPassthroughRegistry(): void {
 }
 
 /**
- * Map adapter capability identifiers to the Cordis plugin id that would
- * otherwise mount it. Used by `capability-plugins.ts` to decide which
- * plugins to skip when their underlying capability is passthrough'd.
+ * Map adapter capability identifiers to the plugin id that would otherwise
+ * mount it. Used by the capability plugins to decide which plugins to skip
+ * when their underlying capability is passthrough'd.
+ *
+ * Derived from the single authority in `capability-ownership.ts` so the
+ * pi-native vs OpenBuddy ownership decision cannot drift between the
+ * extension resolver and the Cordis capability plugins.
  */
-export const CAPABILITY_TO_PLUGIN_ID: ReadonlyMap<string, string> = new Map([
-  // G-2: "team" stays Cordis-owned for multi-buddy orchestration
-  // (openbuddy-team provides team_create / team_status / team_delete as
-  // real pi tools via createTeamTools() and the on-disk teams.json
-  // ledger). The subagent delegation path is fully owned by pi-subagents
-  // (no Cordis wrapper exists by design — see capability-plugins.ts:197),
-  // and the goal sub-capability is owned by pi-goal which exposes its
-  // own goal_* tools. We still track both installs here so diagnostics
-  // (listPassthroughed, getPassthroughInfo) can report the full surface.
-  ["team", "openbuddy-team"],
-  ["team-subagent", "pi-subagents"],
-  ["team-goal", "pi-goal"],
-  ["task", "openbuddy-task"],
-  // Stage H-4: openbuddy-automation removed (Stage G-1c); capability
-  // key "automation" is owned by pi-goal-list-loop-audit (npm 18,959
-  // downloads/month, source of truth for goal-loop queue + audit).
-  // The Cordis mount is skipped entirely — see misc.ts automations:*
-  // handlers which throw a migration message pointing users at this
-  // package, and AutomationPanel which surfaces the toast.
-  ["automation", "pi-goal-list-loop-audit"],
-  ["session", "openbuddy-session"],
-  ["fs", "openbuddy-fs-local"],
-  ["mcp", "openbuddy-mcp-client"],
-  // C7: extend the passthrough map for additional Pi packages whose Cordis
-  // counterparts in `capability-plugins.ts` already declare `passthroughCapability`.
-  // Each entry is the canonical adapter npm name as published on pi.dev.
-  ["plan", "pi-plan-mode"],
-  // OpenBuddy historically names this surface "web"; the test suite in
-  // capability-plugins.test.ts and pi-resource-loader exercises both
-  // spellings. We register the canonical short name "web" as the map key
-  // so the existing recordPassthrough("web", ...) call sites line up.
-  ["web", "pi-web-access"],
-  ["permission", "@gotgenes/pi-permission-system"],
-]);
+export const CAPABILITY_TO_PLUGIN_ID: ReadonlyMap<string, string> = AUTHORITY_CAPABILITY_TO_PLUGIN_ID;
 
 export function pluginIdForCapability(capability: string): string | undefined {
-  return CAPABILITY_TO_PLUGIN_ID.get(capability);
+  return authorityPluginIdForCapability(capability);
 }
