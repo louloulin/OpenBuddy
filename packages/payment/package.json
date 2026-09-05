@@ -1,0 +1,19 @@
+{
+  "name": "@openbuddy/payment",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenBuddy \u652f\u4ed8\u901a\u9053\u9002\u914d\u5668\uff08Stripe \u00b7 WeChat Pay \u00b7 Alipay \u00b7 \u5e73\u53f0\u65e0\u5173 HMAC\uff09",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./stripe": "./src/adapters/stripe.ts",
+    "./wechat-pay": "./src/adapters/wechat-pay.ts",
+    "./alipay": "./src/adapters/alipay.ts",
+    "./hmac": "./src/adapters/hmac.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}
