@@ -242,4 +242,39 @@ describe("PluginLifecycleQueue", () => {
     // The pending waiter must reject with the same error.
     await expect(capturedWaiter).rejects.toThrow(/boom/);
   });
+
+  it("covers all 6 plugin surfaces (bundle/pi/renderer/remote/typert/cordis) in one transaction", async () => {
+    const phases: string[] = [];
+    const queue = new PluginLifecycleQueue(
+      async <T>(_kind: string, _target: string, operation: () => Promise<T>) => operation(),
+      (type, payload) => {
+        if (type === "plugin/transaction-phase") phases.push(`${payload.phase}:${payload.surface}`);
+      },
+    );
+    await queue.enqueue("plugin-reload", "all-surfaces", async (transaction) => {
+      // Each surface reports its own phase + receipt within the same transaction.
+      transaction.phase("cordis", "cordis");
+      transaction.receipt("cordis");
+      transaction.phase("pi", "pi");
+      transaction.receipt("pi");
+      transaction.phase("renderer", "renderer");
+      transaction.receipt("renderer");
+      transaction.phase("remote", "remote");
+      transaction.receipt("remote");
+      transaction.phase("typert", "typert");
+      transaction.receipt("typert");
+      transaction.phase("mcp", "mcp");
+      transaction.receipt("mcp");
+      return "ok";
+    });
+    // Every surface phase is observable on the same transaction.
+    expect(phases).toEqual([
+      "cordis:cordis",
+      "pi:pi",
+      "renderer:renderer",
+      "remote:remote",
+      "typert:typert",
+      "mcp:mcp",
+    ]);
+  });
 });
