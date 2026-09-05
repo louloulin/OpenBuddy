@@ -1,0 +1,121 @@
+# Production deployment for the Casdoor Resource Gateway.
+#
+# Bring-up:
+#   docker compose -f docker-compose.production.yml --env-file .env.production up -d
+#
+# Required environment (place in .env.production):
+#   CASDOOR_ISSUER=https://casdoor.example.com
+#   CASDOOR_AUDIENCE=<the exact Casdoor application client ID>
+#   CASDOOR_JWKS_URI=https://casdoor.example.com/.well-known/jwks
+#   RESOURCE_GATEWAY_WEBHOOK_SECRET=<32-byte hex from `openssl rand -hex 32`>
+#   NEW_API_BASE_URL=https://new-api.example.com
+#   NEW_API_GROUP_TOKENS_JSON=<JSON Group→dedicated New API token map, injected from a secret manager>
+#   OPENBUDDY_ADMIN_EMAIL=admin@example.com
+#   POSTGRES_PASSWORD=<32-byte hex>
+#   ACME_EMAIL=admin@example.com
+#   GATEWAY_DOMAIN=gateway.example.com
+#
+# Postgres + the gateway share an internal network; Caddy fronts the gateway
+# with automatic Let's Encrypt TLS. Only Caddy exposes 80/443 to the host.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: openbuddy
+      POSTGRES_USER: openbuddy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - openbuddy-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openbuddy -d openbuddy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - openbuddy-net
+
+  resource-gateway:
+    build:
+      context: .
+      args:
+        INCLUDE_SQL_DRIVERS: "true"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8787"
+      RESOURCE_GATEWAY_VERSION: ${RESOURCE_GATEWAY_VERSION:-dev}
+      CASDOOR_ISSUER: ${CASDOOR_ISSUER}
+      CASDOOR_AUDIENCE: ${CASDOOR_AUDIENCE}
+      RESOURCE_GATEWAY_WEKNORA_EXCHANGE_SECRET: ${RESOURCE_GATEWAY_WEKNORA_EXCHANGE_SECRET:-}
+      RESOURCE_GATEWAY_WEKNORA_EXCHANGE_AUDIENCE: ${RESOURCE_GATEWAY_WEKNORA_EXCHANGE_AUDIENCE:-weknora}
+      RESOURCE_GATEWAY_WEKNORA_TENANT_MAP_JSON: ${RESOURCE_GATEWAY_WEKNORA_TENANT_MAP_JSON:-}
+      RESOURCE_GATEWAY_CASDOOR_PUBLIC_KEY: ${RESOURCE_GATEWAY_CASDOOR_PUBLIC_KEY:-}
+      RESOURCE_GATEWAY_STORE: postgres
+      RESOURCE_GATEWAY_SQL_PREFIX: casdoor_
+      POSTGRES_CONNECTION_STRING: postgres://openbuddy:${POSTGRES_PASSWORD}@postgres:5432/openbuddy
+      RESOURCE_GATEWAY_DATA_DIR: /var/lib/openbuddy-resource-gateway
+      RESOURCE_GATEWAY_WEBHOOK_SECRET: ${RESOURCE_GATEWAY_WEBHOOK_SECRET}
+      RESOURCE_GATEWAY_BILLING_CALLBACK_SECRET: ${RESOURCE_GATEWAY_BILLING_CALLBACK_SECRET}
+      RESOURCE_GATEWAY_BACKCHANNEL_LOGOUT_SECRET: ${RESOURCE_GATEWAY_BACKCHANNEL_LOGOUT_SECRET}
+      NEW_API_BASE_URL: ${NEW_API_BASE_URL}
+      NEW_API_GROUP: ${NEW_API_GROUP:-default}
+      NEW_API_GROUP_TOKENS_JSON: ${NEW_API_GROUP_TOKENS_JSON}
+      NEW_API_CAPABILITIES_JSON: ${NEW_API_CAPABILITIES_JSON}
+      NEW_API_CAPABILITY_MAX_AGE_HOURS: ${NEW_API_CAPABILITY_MAX_AGE_HOURS:-24}
+      NEW_API_ALLOW_ESTIMATED_USAGE: "0"
+      RESOURCE_GATEWAY_TARGET_GROSS_MARGIN_PERCENT: ${RESOURCE_GATEWAY_TARGET_GROSS_MARGIN_PERCENT:-70}
+      RESOURCE_GATEWAY_NEW_API_CIRCUIT_FAILURE_THRESHOLD: ${RESOURCE_GATEWAY_NEW_API_CIRCUIT_FAILURE_THRESHOLD:-5}
+      RESOURCE_GATEWAY_NEW_API_CIRCUIT_OPEN_MS: ${RESOURCE_GATEWAY_NEW_API_CIRCUIT_OPEN_MS:-30000}
+      RESOURCE_GATEWAY_AI_REPLAY_MAX_BYTES: ${RESOURCE_GATEWAY_AI_REPLAY_MAX_BYTES:-10000000}
+      RESOURCE_GATEWAY_AI_REQUEST_LEASE_MS: ${RESOURCE_GATEWAY_AI_REQUEST_LEASE_MS:-120000}
+      RESOURCE_GATEWAY_AI_REQUEST_REPLAY_TTL_MS: ${RESOURCE_GATEWAY_AI_REQUEST_REPLAY_TTL_MS:-86400000}
+      RESOURCE_GATEWAY_NEW_API_COST_IMPORT_SECRET: ${RESOURCE_GATEWAY_NEW_API_COST_IMPORT_SECRET}
+      RESOURCE_GATEWAY_SIEM: ${RESOURCE_GATEWAY_SIEM:-}
+      RESOURCE_GATEWAY_SIEM_ENDPOINT: ${RESOURCE_GATEWAY_SIEM_ENDPOINT:-}
+      RESOURCE_GATEWAY_RATE_LIMIT_REQUESTS: "120"
+      RESOURCE_GATEWAY_RATE_LIMIT_WINDOW_MS: "60000"
+      RESOURCE_GATEWAY_AUDIT_MAX_BYTES: "200000000"
+    volumes:
+      - openbuddy-resource-data:/var/lib/openbuddy-resource-gateway
+    networks:
+      - openbuddy-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8787/readyz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      resource-gateway:
+        condition: service_healthy
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+      GATEWAY_DOMAIN: ${GATEWAY_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - openbuddy-caddy-data:/data
+      - openbuddy-caddy-config:/config
+    networks:
+      - openbuddy-net
+
+volumes:
+  openbuddy-postgres:
+  openbuddy-resource-data:
+  openbuddy-caddy-data:
+  openbuddy-caddy-config:
+
+networks:
+  openbuddy-net:
+    driver: bridge

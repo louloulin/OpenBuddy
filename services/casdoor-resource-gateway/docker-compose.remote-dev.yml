@@ -1,0 +1,78 @@
+# Remote development/integration stack for the current HTTP Casdoor and New API
+# instances. Do not use this file as a production deployment; the production
+# stack requires HTTPS, SQL persistence, real secrets, and a verified capability
+# directory.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: openbuddy
+      POSTGRES_USER: openbuddy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - openbuddy-remote-dev-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openbuddy -d openbuddy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [openbuddy-remote-dev]
+
+  resource-gateway:
+    build:
+      context: .
+      args:
+        INCLUDE_SQL_DRIVERS: "true"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: "8787"
+      RESOURCE_GATEWAY_VERSION: ${RESOURCE_GATEWAY_VERSION:-dev}
+      CASDOOR_ISSUER: ${CASDOOR_ISSUER}
+      CASDOOR_AUDIENCE: ${CASDOOR_AUDIENCE:-openbuddy}
+      RESOURCE_GATEWAY_WEKNORA_EXCHANGE_SECRET: ${RESOURCE_GATEWAY_WEKNORA_EXCHANGE_SECRET:-}
+      RESOURCE_GATEWAY_WEKNORA_EXCHANGE_AUDIENCE: ${RESOURCE_GATEWAY_WEKNORA_EXCHANGE_AUDIENCE:-weknora}
+      RESOURCE_GATEWAY_WEKNORA_TENANT_MAP_JSON: ${RESOURCE_GATEWAY_WEKNORA_TENANT_MAP_JSON:-}
+      RESOURCE_GATEWAY_STORE: postgres
+      POSTGRES_CONNECTION_STRING: postgres://openbuddy:${POSTGRES_PASSWORD}@postgres:5432/openbuddy
+      RESOURCE_GATEWAY_DATA_DIR: /var/lib/openbuddy-resource-gateway
+      NEW_API_BASE_URL: ${NEW_API_BASE_URL}
+      NEW_API_TOKEN: ${NEW_API_TOKEN:-}
+      NEW_API_GROUP: ${NEW_API_GROUP:-default}
+      NEW_API_GROUP_TOKENS_JSON: ${NEW_API_GROUP_TOKENS_JSON:-}
+      NEW_API_CAPABILITIES_JSON: ${NEW_API_CAPABILITIES_JSON:-}
+      NEW_API_ALLOW_ESTIMATED_USAGE: "0"
+      RESOURCE_GATEWAY_TARGET_GROSS_MARGIN_PERCENT: "70"
+      RESOURCE_GATEWAY_NEW_API_CIRCUIT_FAILURE_THRESHOLD: ${RESOURCE_GATEWAY_NEW_API_CIRCUIT_FAILURE_THRESHOLD:-5}
+      RESOURCE_GATEWAY_NEW_API_CIRCUIT_OPEN_MS: ${RESOURCE_GATEWAY_NEW_API_CIRCUIT_OPEN_MS:-30000}
+      RESOURCE_GATEWAY_WEBHOOK_SECRET: ${RESOURCE_GATEWAY_WEBHOOK_SECRET:-}
+      RESOURCE_GATEWAY_BILLING_CALLBACK_SECRET: ${RESOURCE_GATEWAY_BILLING_CALLBACK_SECRET:-}
+      RESOURCE_GATEWAY_BACKCHANNEL_LOGOUT_SECRET: ${RESOURCE_GATEWAY_BACKCHANNEL_LOGOUT_SECRET:-}
+      RESOURCE_GATEWAY_NEW_API_COST_IMPORT_SECRET: ${RESOURCE_GATEWAY_NEW_API_COST_IMPORT_SECRET:-}
+      RESOURCE_GATEWAY_RATE_LIMIT_REQUESTS: "120"
+      RESOURCE_GATEWAY_RATE_LIMIT_WINDOW_MS: "60000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8787:8787"
+    volumes:
+      - openbuddy-remote-dev-data:/var/lib/openbuddy-resource-gateway
+    networks: [openbuddy-remote-dev]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8787/readyz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  openbuddy-remote-dev-postgres:
+  openbuddy-remote-dev-data:
+
+networks:
+  openbuddy-remote-dev:
+    driver: bridge

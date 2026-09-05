@@ -1,0 +1,1990 @@
+openapi: 3.1.0
+info:
+  title: Casdoor Resource Gateway
+  version: 1.0.0
+  description: |
+    Production-grade enterprise resource gateway. Validates Casdoor OIDC
+    access tokens, applies tenant + resource + action authorization,
+    persists tenant-scoped metadata, member revocations, runtime usage
+    and an append-only audit log. Exposes SIEM sinks and webhook
+    receivers for Casdoor to gateway synchronization.
+  contact:
+    name: OpenBuddy
+    url: https://openbuddy.local
+servers:
+  - url: https://gateway.openbuddy.local
+    description: Production deployment (TLS terminated upstream)
+  - url: http://127.0.0.1:8787
+    description: Local development
+security:
+  - bearerAuth: []
+tags:
+  - name: health
+  - name: resources
+  - name: tenant
+  - name: audit
+  - name: billing
+  - name: ai
+  - name: webhooks
+  - name: internal
+paths:
+  /internal/v1/credits/expire:
+    post:
+      tags: [internal]
+      security: []
+      summary: Run a signed tenant credit-expiry batch
+      description: Internal worker-only endpoint. Requires an explicit tenantIds list, Idempotency-Key, a fresh timestamp, and HMAC-SHA256 over timestamp + '.' + the exact JSON body using RESOURCE_GATEWAY_CREDIT_EXPIRY_SECRET. It never accepts a bearer token and refuses an unbounded all-tenant scan.
+      parameters:
+        - in: header
+          name: idempotency-key
+          required: true
+          schema: { type: string, pattern: "^[a-zA-Z0-9_.:-]{8,160}$" }
+        - in: header
+          name: x-openbuddy-credit-expiry-timestamp
+          required: true
+          schema: { type: string, pattern: "^[0-9]{10,16}$" }
+        - in: header
+          name: x-openbuddy-credit-expiry-signature
+          required: true
+          schema: { type: string, pattern: "^(sha256=)?[a-fA-F0-9]{64}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantIds]
+              properties:
+                tenantIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  uniqueItems: true
+                  items: { type: string, pattern: "^[a-zA-Z0-9_.:/-]{1,200}$" }
+      responses:
+        "200": { description: Expiry batch accepted or idempotent replay }
+        "401": { description: Missing, stale, or invalid HMAC }
+        "409": { description: Idempotency key reused with another tenant list }
+        "503": { description: Worker is disabled until a secret is provisioned }
+  /v1/token-exchange/weknora:
+    post:
+      summary: Exchange Casdoor bearer token for a short-lived WeKnora token (HS256, 5-minute)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant, weknoraTenantId]
+              properties:
+                tenant: { type: string }
+                weknoraTenantId: { oneOf: [{ type: integer, format: int64 }, { type: string }] }
+                sessionId: { type: string }
+      responses:
+        '200':
+          description: 5-minute HS256 exchange token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      access_token: { type: string }
+                      token_type: { type: string, enum: [Bearer] }
+                      expires_in: { type: integer, description: Seconds until exp }
+                      audience: { type: string }
+        '400':
+          description: TOKEN_EXCHANGE_REQUEST_INVALID — missing or invalid tenant binding.
+        '401':
+          description: AUTHENTICATION_REQUIRED (no Bearer) or INVALID_TOKEN (JWT parse/sig/exp).
+        '403':
+          description: |
+            One of: TOKEN_EXCHANGE_TENANT_MAPPING_REQUIRED (no mapping),
+            TENANT_MEMBERSHIP_REQUIRED (subject not in tenant),
+            WEKNORA_PERMISSION_REQUIRED (missing unified permission),
+            TENANT_MEMBER_REVOKED (revoked before issuance).
+  /v1/token-exchange/weknora/introspect:
+    post:
+      summary: Introspect a short-lived WeKnora exchange token (re-check membership + authorization_version)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Active exchange token claims
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      active: { type: boolean }
+                      subject: { type: string }
+                      oidc_subject: { type: string }
+                      casdoor_tenant: { type: string }
+                      tenant_id: { type: integer, format: int64 }
+                      session_id: { type: string }
+                      membership_version: { type: string }
+                      authorization_version: { type: integer }
+                      jti: { type: string }
+        '401':
+          description: Invalid or expired exchange token (HS256 fail, expired, or secret mismatch).
+        '403':
+          description: |
+            One of: TOKEN_EXCHANGE_TENANT_MAPPING_REQUIRED, TENANT_MEMBER_REVOKED,
+            AUTHORIZATION_VERSION_REVOKED (Casdoor webhook bumped version),
+            TENANT_MEMBERSHIP_REQUIRED, WEKNORA_PERMISSION_REQUIRED.
+  /healthz:
+    get:
+      tags: [health]
+      security: []
+      summary: Storage adapter health
+      responses:
+        "200":
+          description: Storage adapter reachable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  store: { type: string, enum: [json, postgres, mysql, memory] }
+                  latencyMs: { type: number }
+                  version: { type: string }
+  /readyz:
+    get:
+      tags: [health]
+      security: []
+      responses: { "200": { description: Ready } }
+  /metrics:
+    get:
+      tags: [health]
+      security: []
+      summary: Prometheus exposition (in-process counters)
+      responses:
+        "200":
+          description: Prometheus text format
+          content:
+            text/plain:
+              schema: { type: string }
+  /v1/tenants/{tenantId}/resources:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    get:
+      tags: [resources]
+      summary: List tenant resources
+      parameters:
+        - in: query
+          name: type
+          schema: { $ref: "#/components/schemas/ResourceType" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Resource" }
+        "403": { $ref: "#/components/responses/PermissionDenied" }
+        "423": { $ref: "#/components/responses/TenantLifecyle" }
+    post:
+      tags: [resources]
+      summary: Create tenant resource
+      parameters:
+        - in: header
+          name: idempotency-key
+          schema: { type: string, pattern: "^[a-zA-Z0-9_.:-]+$", maxLength: 120 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResourceCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Resource" }
+  /v1/tenants/{tenantId}/resources/{resourceId}:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: path
+        name: resourceId
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [resources]
+      summary: Update resource (optimistic concurrency)
+      parameters:
+        - in: header
+          name: if-match
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResourceUpdate" }
+      responses:
+        "200":
+          description: Updated
+        "409": { $ref: "#/components/responses/VersionConflict" }
+    delete:
+      tags: [resources]
+      parameters:
+        - in: header
+          name: if-match
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Deleted }
+  /v1/tenants/{tenantId}/policy:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    get:
+      tags: [tenant]
+      summary: Read tenant policy
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/TenantPolicy" }
+    patch:
+      tags: [tenant]
+      summary: Update tenant policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TenantPolicyPatch" }
+      responses:
+        "200":
+          description: Updated
+        "409": { $ref: "#/components/responses/VersionConflict" }
+  /v1/tenants/{tenantId}/runtime-policy:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    get:
+      tags: [tenant]
+      summary: Read effective runtime policy
+      responses:
+        "200":
+          description: OK
+  /v1/tenants/{tenantId}/runtime-usage:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    post:
+      tags: [tenant]
+      summary: Report additive runtime token usage for the current tenant (UTC day)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tokens]
+              properties:
+                tokens: { type: integer, minimum: 0, maximum: 10000000 }
+      responses:
+        "200":
+          description: Updated
+  /v1/tenants/{tenantId}/audit:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: query
+        name: limit
+        schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+    get:
+      tags: [audit]
+      summary: Read tenant-scoped audit events
+      responses:
+        "200":
+          description: OK
+  /v1/tenants/{tenantId}/audit-export:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: query
+        name: format
+        schema: { type: string, enum: [jsonl, csv], default: jsonl }
+      - in: query
+        name: since
+        schema: { type: string, format: date-time }
+      - in: query
+        name: limit
+        schema: { type: integer, minimum: 1, maximum: 50000, default: 5000 }
+    get:
+      tags: [audit]
+      summary: Stream tenant audit events for SIEM
+      responses:
+        "200":
+          description: OK
+  /v1/tenants/{tenantId}/audit-archive:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: query
+        name: before
+        required: true
+        schema: { type: string, format: date-time }
+    post:
+      tags: [audit]
+      summary: Rotate audit events older than the cutoff into archive
+      responses:
+        "200":
+          description: OK
+  /v1/tenants/{tenantId}/member-revocations:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    get:
+      tags: [tenant]
+      summary: List deny-listed subjects
+      responses:
+        "200":
+          description: OK
+  /v1/tenants/{tenantId}/ai/capabilities:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    get:
+      tags: [ai]
+      summary: List tenant-visible New API model protocol capabilities
+      responses:
+        "200":
+          description: Model capability directory
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+                  data:
+                    type: object
+                    required: [capabilitySource, models]
+                    properties:
+                      group: { type: string }
+                      capabilitySource: { type: string, enum: [gateway-config, unconfigured] }
+                      models:
+                        type: array
+                        items:
+                          type: object
+                          required: [id, capabilities]
+                          properties:
+                            id: { type: string }
+                            capabilities: { type: object, additionalProperties: true }
+  /v1/tenants/{tenantId}/member-revocations/{subject}:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: path
+        name: subject
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [tenant]
+      summary: Add or remove a member from the deny-list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revoked]
+              properties:
+                revoked: { type: boolean }
+                reason: { type: string, maxLength: 240 }
+      responses:
+        "200":
+          description: OK
+  /v1/tenants/{tenantId}/sessions:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: query
+        name: limit
+        schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }
+    get:
+      tags: [session]
+      summary: List active session bindings for the current tenant
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SessionBinding" }
+    post:
+      tags: [session]
+      summary: Register a new session binding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SessionBindingInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionBinding" }
+  /v1/tenants/{tenantId}/sessions/{sessionId}:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: path
+        name: sessionId
+        required: true
+        schema: { type: string, pattern: "^[a-zA-Z0-9_.:-]{1,128}$" }
+    delete:
+      tags: [session]
+      summary: Unregister an existing session binding
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  removed: { type: boolean }
+  /v1/tenants/{tenantId}/credits:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: query
+        name: subject
+        schema: { type: string }
+      - in: query
+        name: walletId
+        schema: { type: string }
+      - in: query
+        name: all
+        schema: { type: boolean, default: false }
+    get:
+      tags: [billing]
+      summary: Read the OpenBuddy credit account
+      description: Credits are integer OpenBuddy product points, separate from Casdoor identity tokens and New API gateway tokens.
+      responses:
+        "200":
+          description: Credit account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreditAccount" }
+  /v1/tenants/{tenantId}/credits/ledger:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: query
+        name: subject
+        schema: { type: string }
+      - in: query
+        name: limit
+        schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+    get:
+      tags: [billing]
+      summary: List immutable credit ledger entries
+      responses:
+        "200": { description: Ledger entries }
+  /v1/tenants/{tenantId}/credits/integrity:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: query
+        name: subject
+        schema: { type: string }
+    get:
+      tags: [billing]
+      summary: Verify the tamper-evident credit ledger hash chain
+      description: Read-only verification of the complete tenant ledger. The optional subject query is only used for the normal credit-read access check and does not narrow the verified chain. Legacy entries without hashes are reported as backfillable and are upgraded on the next successful ledger write; invalid chains fail closed on writes. The chain begins at creditLedgerAnchorHash when older entries have been removed by the retention window.
+      responses:
+        "200":
+          description: Ledger integrity result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenantId: { type: string }
+                  scope: { type: string, enum: [tenant] }
+                  status: { type: string, enum: [verified, backfillable, invalid] }
+                  checked: { type: integer, minimum: 0 }
+                  headHash: { type: string, pattern: "^[a-f0-9]{64}$" }
+                  firstInvalidId: { type: string }
+                  creditLedgerAnchorHash: { type: string, pattern: "^[a-f0-9]{64}$", description: Hash immediately before the retained ledger window. }
+  /v1/tenants/{tenantId}/credits/expire:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: query
+        name: subject
+        schema: { type: string }
+    post:
+      tags: [billing]
+      summary: Expire elapsed credit lots
+      description: Administrative or scheduled-worker operation. Only unreserved points are expired; the operation is idempotent and records an expire ledger entry per source grant or purchase lot. Set all=true to process every personal account and shared wallet in the tenant; all=true cannot be combined with subject or walletId.
+      responses:
+        "200":
+          description: Expiration result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+                  data:
+                    type: object
+                    required: [expired]
+                    properties:
+                      expired: { type: integer, minimum: 0 }
+                      accounts: { type: integer, minimum: 0, description: Number of personal accounts scanned in a batch operation. }
+                      wallets: { type: integer, minimum: 0, description: Number of shared wallets scanned in a batch operation. }
+                      entitlementsExpired: { type: boolean, description: Whether an expired subscription entitlement was converged. }
+                      account: { $ref: "#/components/schemas/CreditAccount" }
+  /v1/tenants/{tenantId}/credits/reconciliation:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: query
+        name: since
+        schema: { type: string, format: date-time }
+      - in: query
+        name: until
+        schema: { type: string, format: date-time }
+      - in: query
+        name: walletId
+        description: Restrict the statement to a shared wallet; caller must be a wallet viewer.
+        schema: { type: string, maxLength: 120 }
+    get:
+      tags: [billing]
+      summary: Aggregate tenant or shared-wallet OpenBuddy and imported New API cost reconciliation report
+      description: Read-only aggregation of settled OpenBuddy credit-ledger entries plus tenant-scoped records imported by the independent New API reconciliation Worker. externalNewApiCostFetched is true for provider-reported USD costs or provider-reported-quota costs whose New API QuotaPerUnit was verified before conversion; configured-pricing and legacy unknown records remain explicitly classified.
+      responses:
+        "200":
+          description: Reconciliation report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+                  data:
+                    type: object
+                    required: [commerce, economics, reportId, reportHash, generatedAt]
+                    properties:
+                      tenantId: { type: string }
+                      walletId: { type: string, description: Shared-wallet scope when supplied. }
+                      scope: { type: string, enum: [tenant, wallet] }
+                      reportId: { type: string, pattern: "^reconciliation_[a-f0-9]{24}$", description: Stable statement identifier for the same tenant or wallet scope and accounting window. }
+                      reportHash: { type: string, pattern: "^[a-f0-9]{64}$", description: SHA-256 hash of the stable report content excluding generatedAt. }
+                      generatedAt: { type: string, format: date-time, description: Report generation time; not included in reportHash. }
+                      commerce: { $ref: "#/components/schemas/CommerceReconciliation" }
+                      economics: { $ref: "#/components/schemas/CommerceEconomics" }
+                      byModel: { type: object, additionalProperties: { $ref: "#/components/schemas/ReconciliationBucket" } }
+                      bySubject: { type: object, additionalProperties: { $ref: "#/components/schemas/ReconciliationBucket" } }
+                      byActor: { type: object, additionalProperties: { $ref: "#/components/schemas/ReconciliationBucket" }, description: Usage grouped by the Casdoor member that initiated a shared-wallet request. }
+                      byAgent: { type: object, additionalProperties: { $ref: "#/components/schemas/ReconciliationBucket" }, description: Usage grouped by the OpenBuddy agent/workflow identifier. }
+                      bySession: { type: object, additionalProperties: { $ref: "#/components/schemas/ReconciliationBucket" }, description: Usage grouped by the OpenBuddy session identifier. }
+                      external:
+                        type: object
+                        description: Imported New API cost records, including the same attribution dimensions as the local ledger.
+                        properties:
+                          byActor: { type: object, additionalProperties: { $ref: "#/components/schemas/ReconciliationBucket" }, description: Imported cost grouped by the Casdoor member that initiated a shared-wallet request. }
+        "403": { description: Billing read permission denied }
+  /v1/tenants/{tenantId}/credits/reconciliation/export:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: query
+        name: since
+        schema: { type: string, format: date-time }
+      - in: query
+        name: until
+        schema: { type: string, format: date-time }
+      - in: query
+        name: walletId
+        description: Restrict the CSV statement to a shared wallet; caller must be a wallet viewer.
+        schema: { type: string, maxLength: 120 }
+      - in: query
+        name: format
+        required: false
+        schema: { type: string, enum: [csv], default: csv }
+    get:
+      tags: [billing]
+      summary: Export tenant or shared-wallet reconciliation report as CSV
+      description: Uses the same permission checks, date window, wallet scope, cost evidence, and report calculation as the JSON reconciliation endpoint. The response contains no access tokens, provider credentials, or API keys.
+      responses:
+        "200":
+          description: UTF-8 CSV reconciliation report
+          headers:
+            Content-Disposition: { schema: { type: string } }
+            X-OpenBuddy-Report-Id: { schema: { type: string, pattern: "^reconciliation_[a-f0-9]{24}$" } }
+            X-OpenBuddy-Report-Hash: { schema: { type: string, pattern: "^[a-f0-9]{64}$" } }
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        "400": { description: Invalid date range or export format }
+        "403": { description: Billing read permission denied }
+  /v1/tenants/{tenantId}/credits/reconciliation/import:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    post:
+      tags: [billing]
+      summary: Import idempotent New API external cost records
+      description: A protected Worker ingestion endpoint. Records are tenant-scoped and keyed by importKey. A newApiRequestId can be bound to only one external record, and when the corresponding OpenBuddy consume entry exists, subject/model/token usage must match exactly. Production requires RESOURCE_GATEWAY_NEW_API_COST_IMPORT_SECRET and an HMAC signature.
+      parameters:
+        - in: header
+          name: X-OpenBuddy-New-Api-Cost-Signature
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [records]
+              properties:
+                records:
+                  type: array
+                  minItems: 1
+                  maxItems: 1000
+                  items:
+                    type: object
+                    required: [subject, model, promptTokens, completionTokens, upstreamCost, externalId, usageAt, costBasis]
+                    properties:
+                      tenantId: { type: string }
+                      subject: { type: string }
+                      walletId: { type: string, maxLength: 120, description: Shared-wallet attribution when the external record already carries it. }
+                      actorSubject: { type: string, maxLength: 200, description: Casdoor member that initiated the shared-wallet request. }
+                      model: { type: string }
+                      promptTokens: { type: integer, minimum: 0 }
+                      completionTokens: { type: integer, minimum: 0 }
+                      upstreamCost: { type: number, minimum: 0 }
+                      currency: { type: string, pattern: "^[A-Z]{3}$", default: USD }
+                      source: { type: string, default: new-api-log }
+                      externalId: { type: string }
+                      importKey: { type: string, minLength: 8 }
+                      usageAt: { type: string, format: date-time }
+                      newApiRequestId: { type: string }
+                      newApiGroup: { type: string }
+                      agentId: { type: string, maxLength: 160, description: OpenBuddy agent/workflow identifier for cost attribution. }
+                      sessionId: { type: string, maxLength: 160, description: OpenBuddy session identifier for cost attribution. }
+                      channel:
+                        type: object
+                        description: New API channel routing for the underlying upstream call (id + display name from /api/channel/).
+                        properties:
+                          id: { type: string, maxLength: 40 }
+                          name: { type: string, maxLength: 120 }
+                      cache:
+                        type: object
+                        description: New API prompt cache telemetry (cache_ratio + cache_tokens from the usage log `other` payload).
+                        properties:
+                          ratio: { type: number, minimum: 0, maximum: 1, description: Cached prompt ratio reported by New API. }
+                          tokens: { type: integer, minimum: 0, description: Cached prompt tokens reported by New API. }
+                          cacheTokens: { type: integer, minimum: 0, description: Alias of tokens for compatibility with legacy cost workers. }
+                      costBasis: { type: string, enum: [provider-reported, provider-reported-quota, configured-pricing] }
+      responses:
+        "201": { description: Imported records }
+        "200": { description: All records were idempotent duplicates }
+        "403": { description: Reconciliation import permission denied }
+        "409": { description: Import key, New API request ID, or settled usage conflict }
+  /v1/tenants/{tenantId}/ai/catalog:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    get:
+      tags: [ai]
+      summary: Read the tenant commercial model catalog
+      description: Combines New API model discovery, verified protocol capabilities, tenant model policy, OpenBuddy points pricing, and provider-cost evidence. A model is sellable only when Chat Completions has required real usage and both provider cost rates are configured.
+      responses:
+        "200":
+          description: Commercial model catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, data]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  data:
+                    $ref: "#/components/schemas/CommercialModelCatalog"
+        "403": { description: Tenant membership or model policy denied }
+  /v1/tenants/{tenantId}/credits/pricing:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    get:
+      tags: [billing]
+      summary: List tenant model pricing in points
+      responses:
+        "200": { description: Pricing entries }
+    patch:
+      tags: [billing]
+      summary: Update tenant model pricing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreditPricingInput" }
+      responses:
+        "200": { description: Updated pricing }
+  /v1/tenants/{tenantId}/credits/quote:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [billing]
+      summary: Quote OpenBuddy points for a model request
+      description: |
+        Calculates a short-lived server-side estimate from the tenant's current
+        model pricing. The quote is advisory; final settlement always uses real
+        New API usage returned by the upstream response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreditQuoteInput" }
+      responses:
+        "200":
+          description: Point quote
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreditQuote" }
+        "403": { description: Tenant, model policy, or production commercial sellability gate denied }
+        "423": { description: Tenant runtime is disabled }
+  /v1/tenants/{tenantId}/credits/grant:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [billing]
+      summary: Grant points for a member (purchases require billing orders)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreditGrantInput" }
+      responses:
+        "201": { description: Idempotent grant result }
+  /v1/tenants/{tenantId}/credits/transfer:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [billing]
+      summary: Atomically transfer points between two accounts in the same tenant
+      description: |
+        Both source and destination must live within the calling tenant and be exactly one of
+        a personal subject account or a shared wallet. Personal accounts can only be moved
+        by the subject themselves or a tenant/global admin; shared wallets require the caller
+        to be the wallet owner (or an admin). The handler atomically appends two ledger
+        entries (one adjustment per side) linked by sourceLedgerId, updates both accounts,
+        and writes the same idempotency key across retries. The response includes
+        `replay: true` when the request is an idempotent retry.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreditTransferInput" }
+      responses:
+        "200": { description: Transfer settled or idempotent replay }
+        "201": { description: New transfer created }
+        "402": { description: Source account lacks sufficient available points }
+        "403": { description: Caller cannot debit source or credit destination }
+        "409": { description: Transfer idempotency conflict (partial replay) }
+  /v1/tenants/{tenantId}/credits/welcome:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [billing]
+      summary: Issue the tenant's Free welcome grant once
+      description: Server-side registration orchestrator endpoint. The amount and validity are taken from the active zero-price Free plan; callers cannot supply either value. A subject can receive this grant only once, and retries with the same idempotency key are safe.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreditWelcomeInput" }
+      responses:
+        "201": { description: Welcome grant issued or idempotent replay }
+        "409": { description: Free plan unavailable or welcome grant already issued }
+  /v1/tenants/{tenantId}/credits/reserve:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [billing]
+      summary: Reserve points before an AI request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreditReserveInput" }
+      responses:
+        "201": { description: Reservation result }
+  /v1/tenants/{tenantId}/credits/settle:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [billing]
+      summary: Settle a reservation using actual New API usage
+      description: If actual points exceed the reservation, the gateway charges the difference from the member's available balance after other reservations; it returns INSUFFICIENT_CREDITS_FOR_ACTUAL_USAGE only when that balance is insufficient. The response reports additionalCharged and refunded separately.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreditSettleInput" }
+      responses:
+        "200": { description: Settlement result }
+        "409": { description: New API request ID or settlement idempotency conflict }
+  /v1/tenants/{tenantId}/credits/release:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [billing]
+      summary: Release a failed or cancelled reservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reservationKey]
+              properties:
+                reservationKey: { type: string, minLength: 8, maxLength: 160 }
+      responses:
+        "200": { description: Release result }
+  /v1/tenants/{tenantId}/billing/plans:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    get:
+      tags: [billing]
+      summary: List active OpenBuddy point packages
+      responses:
+        "200": { description: Active billing plans }
+    patch:
+      tags: [billing]
+      summary: Create or update a billing plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BillingPlanInput" }
+      responses:
+        "200": { description: Updated billing plan }
+  /v1/tenants/{tenantId}/billing/orders:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    get:
+      tags: [billing]
+      summary: List tenant billing orders
+      parameters:
+        - in: query
+          name: subject
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        "200": { description: Billing orders }
+    post:
+      tags: [billing]
+      summary: Create an idempotent pending billing order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BillingOrderInput" }
+      responses:
+        "201": { description: Created or existing billing order }
+  /v1/tenants/{tenantId}/billing/subscription:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    get:
+      tags: [billing]
+      summary: Get the tenant's current paid subscription and entitlement snapshot
+      responses:
+        "200":
+          description: Current subscription, or null when no paid subscription exists
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/BillingSubscription"
+                  - type: "null"
+  /v1/tenants/{tenantId}/billing/orders/{orderNo}/refund:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: path
+        name: orderNo
+        required: true
+        schema: { type: string }
+    post:
+      tags: [billing]
+      summary: Refund a paid order and append a compensating ledger entry
+      responses:
+        "200": { description: Refunded order }
+        "409": { description: Order state, available balance, or consumed purchase-batch conflict }
+  /v1/tenants/{tenantId}/billing/orders/{orderNo}/expire:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: path
+        name: orderNo
+        required: true
+        schema: { type: string }
+    post:
+      tags: [billing]
+      summary: Expire a pending order
+      responses:
+        "200": { description: Expired order }
+  /v1/tenants/{tenantId}/wallets:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    get:
+      tags: [billing]
+      summary: List shared credit wallets visible to the caller
+      description: Returns every wallet in the tenant where the caller is a global admin, tenant admin, or named member (owner, spender, or viewer).
+      responses:
+        "200":
+          description: Wallet list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CreditWallet" }
+    post:
+      tags: [billing]
+      summary: Create a shared credit wallet
+      description: Tenant administrators and global administrators can create a wallet. The caller is automatically registered as the first owner. Idempotent on wallet id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreditWalletCreateInput" }
+      responses:
+        "201":
+          description: Created wallet
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [wallet]
+                properties:
+                  wallet: { $ref: "#/components/schemas/CreditWallet" }
+                  member: { $ref: "#/components/schemas/CreditWalletMember" }
+        "403": { description: Permission denied }
+        "409": { description: Idempotency conflict on wallet id }
+  /v1/tenants/{tenantId}/wallets/{walletId}:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: path
+        name: walletId
+        required: true
+        schema: { type: string, pattern: "^[a-zA-Z0-9_.:-]{1,120}$" }
+    get:
+      tags: [billing]
+      summary: Read a single shared wallet
+      responses:
+        "200":
+          description: Wallet detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreditWallet" }
+        "403": { description: Caller is not a member of the wallet }
+        "404": { description: Wallet does not exist }
+    patch:
+      tags: [billing]
+      summary: Update a shared wallet (owner / admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 120 }
+                status: { type: string, enum: [active, suspended, archived] }
+      responses:
+        "200": { description: Updated wallet }
+        "403": { description: Insufficient role }
+        "404": { description: Wallet does not exist }
+  /v1/tenants/{tenantId}/wallets/{walletId}/members:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: path
+        name: walletId
+        required: true
+        schema: { type: string, pattern: "^[a-zA-Z0-9_.:-]{1,120}$" }
+    get:
+      tags: [billing]
+      summary: List wallet members
+      responses:
+        "200":
+          description: Member list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CreditWalletMember" }
+  /v1/tenants/{tenantId}/wallets/{walletId}/members/{subject}:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: path
+        name: walletId
+        required: true
+        schema: { type: string, pattern: "^[a-zA-Z0-9_.:-]{1,120}$" }
+      - in: path
+        name: subject
+        required: true
+        schema: { type: string, pattern: "^[a-zA-Z0-9_.:/-]{1,200}$" }
+    put:
+      tags: [billing]
+      summary: Upsert a wallet member (owner / admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [owner, spender, viewer] }
+      responses:
+        "200":
+          description: Member upserted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreditWalletMember" }
+        "403": { description: Insufficient role }
+        "409": { description: Wallet must keep at least one owner }
+    delete:
+      tags: [billing]
+      summary: Remove a wallet member (owner / admin only)
+      responses:
+        "200":
+          description: Removal result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  removed: { type: boolean }
+        "409": { description: Wallet must keep at least one owner }
+  /v1/tenants/{tenantId}/wallets/{walletId}/credits:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: path
+        name: walletId
+        required: true
+        schema: { type: string, pattern: "^[a-zA-Z0-9_.:-]{1,120}$" }
+    get:
+      tags: [billing]
+      summary: Read wallet credit account
+      description: Returns the shared balance, reserved points, lifetimeGranted / lifetimeConsumed, and the available balance.
+      responses:
+        "200":
+          description: Wallet account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreditAccount" }
+  /v1/tenants/{tenantId}/wallets/{walletId}/ledger:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+      - in: path
+        name: walletId
+        required: true
+        schema: { type: string, pattern: "^[a-zA-Z0-9_.:-]{1,120}$" }
+      - in: query
+        name: limit
+        schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+    get:
+      tags: [billing]
+      summary: List wallet-scoped ledger entries
+      responses:
+        "200":
+          description: Wallet ledger entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CreditLedgerEntry" }
+  /v1/billing/callback:
+    post:
+      tags: [billing]
+      summary: Accept a signed platform-agnostic payment callback
+      description: The callback is authenticated with HMAC-SHA256 using RESOURCE_GATEWAY_BILLING_CALLBACK_SECRET and is idempotent by order state. A paid callback must include amountMinor and currency; the gateway compares both values with the immutable order snapshot before granting points.
+      parameters:
+        - in: header
+          name: x-openbuddy-billing-signature
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BillingCallbackInput" }
+      responses:
+        "200": { description: Callback accepted }
+        "401": { $ref: "#/components/responses/WebhookUnauthorized" }
+  /v1/tenants/{tenantId}/ai/chat/completions:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [ai]
+      summary: Proxy an OpenAI-compatible chat request through New API
+      description: The gateway validates Casdoor tenant policy, reserves OpenBuddy points, proxies to New API, and settles from upstream usage. New API credentials never reach the desktop renderer. The gateway adds server-derived tenant, subject, actor, and request headers plus validated agent, session, and wallet attribution headers for cost reconciliation; tenant/subject/actor/request values are never accepted from the client. In production, responses without real usage return NEW_API_USAGE_REQUIRED and release the reservation.
+      parameters:
+        - in: header
+          name: x-openbuddy-agent
+          required: false
+          schema: { type: string, maxLength: 160 }
+          description: Optional Agent/workflow attribution; forwarded only after Gateway validation.
+        - in: header
+          name: x-openbuddy-session
+          required: false
+          schema: { type: string, maxLength: 160 }
+          description: Optional session attribution; forwarded only after Gateway validation.
+        - in: header
+          name: x-openbuddy-wallet
+          required: false
+          schema: { type: string, maxLength: 120 }
+          description: Optional shared-wallet scope; requires wallet spender permission.
+        - in: header
+          name: idempotency-key
+          required: false
+          schema: { type: string, pattern: "^[a-zA-Z0-9_.:-]{8,160}$" }
+          description: Optional request key. If supplied, it must be valid and stable across retries; conflicting or malformed values return 400 INVALID_AI_IDEMPOTENCY_KEY instead of silently creating a new billable request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, messages]
+              properties:
+                model: { type: string }
+                messages: { type: array, items: { type: object } }
+                stream: { type: boolean }
+                max_tokens: { type: integer, minimum: 1 }
+      responses:
+        "200": { description: OpenAI-compatible JSON or SSE response }
+        "402": { description: Insufficient OpenBuddy credits }
+        "403": { description: Tenant or model policy denied }
+        "400": { description: Malformed or conflicting AI idempotency key }
+        "409": { description: Payment or billing state conflict or AI idempotency conflict }
+        "502": { description: New API response did not contain real usage and was not settled }
+        "429": { description: Tenant quota or upstream rate limit }
+        "503": { description: New API upstream is not configured }
+  /v1/tenants/{tenantId}/ai/models:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    get:
+      tags: [ai]
+      summary: List tenant-allowed models through New API
+      description: The gateway injects the server-side New API credential and Group, then filters the result using the tenant model allowlist.
+      responses:
+        "200": { description: OpenAI-compatible model list }
+        "403": { description: Tenant or model policy denied }
+        "503": { description: New API upstream is not configured }
+  /v1/tenants/{tenantId}/ai/responses:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [ai]
+      summary: Proxy an OpenAI Responses request through New API
+      description: The gateway first applies the tenant Group capability directory. A protocol marked unsupported or unverified returns 501 NEW_API_PROTOCOL_UNSUPPORTED and releases any reservation; otherwise it proxies non-streaming Responses requests and settles OpenBuddy points from usage.prompt_tokens and usage.completion_tokens. Streaming Responses is intentionally rejected until its terminal usage frame is covered by the settlement contract. The currently verified MiniMax-M3 channel does not support Responses.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model]
+              properties:
+                model: { type: string }
+                input: {}
+                stream: { type: boolean }
+      responses:
+        "200": { description: OpenAI-compatible Responses JSON }
+        "402": { description: Insufficient OpenBuddy credits }
+        "403": { description: Tenant or model policy denied }
+        "501": { description: Protocol unsupported/unverified or streaming Responses is not enabled; error code is NEW_API_PROTOCOL_UNSUPPORTED or AI_STREAM_UNSUPPORTED }
+        "502": { description: New API response did not contain real usage }
+        "503": { description: New API upstream is not configured }
+  /v1/tenants/{tenantId}/ai/completions:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [ai]
+      summary: Proxy a non-streaming OpenAI Completions request through New API
+      description: The gateway first applies the tenant Group capability directory. A protocol marked unsupported or unverified returns 501 NEW_API_PROTOCOL_UNSUPPORTED and releases any reservation; otherwise it settles OpenBuddy points from usage.prompt_tokens and usage.completion_tokens. Streaming Completions is rejected until terminal usage settlement is covered. The currently verified MiniMax-M3 channel does not support Completions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, prompt]
+              properties:
+                model: { type: string }
+                prompt: {}
+                max_tokens: { type: integer, minimum: 1 }
+                stream: { type: boolean }
+      responses:
+        "200": { description: OpenAI-compatible Completions JSON }
+        "402": { description: Insufficient OpenBuddy credits }
+        "403": { description: Tenant or model policy denied }
+        "501": { description: Protocol unsupported/unverified or streaming Completions is not enabled; error code is NEW_API_PROTOCOL_UNSUPPORTED or AI_STREAM_UNSUPPORTED }
+        "502": { description: New API response did not contain real usage }
+        "503": { description: New API upstream is not configured }
+  /v1/tenants/{tenantId}/ai/embeddings:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [ai]
+      summary: Proxy an OpenAI Embeddings request through New API
+      description: The gateway first applies the tenant Group capability directory. A protocol marked unsupported or unverified returns 501 NEW_API_PROTOCOL_UNSUPPORTED and releases any reservation; otherwise it settles OpenBuddy points from usage.prompt_tokens and usage.total_tokens returned by New API. The currently verified MiniMax-M3 channel does not support Embeddings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, input]
+              properties:
+                model: { type: string }
+                input: {}
+      responses:
+        "200": { description: OpenAI-compatible Embeddings JSON }
+        "402": { description: Insufficient OpenBuddy credits }
+        "403": { description: Tenant or model policy denied }
+        "501": { description: Protocol unsupported or unverified; error code is NEW_API_PROTOCOL_UNSUPPORTED }
+        "502": { description: New API response did not contain real usage }
+        "503": { description: New API upstream is not configured }
+  /v1/tenants/{tenantId}/ai/rerank:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [ai]
+      summary: Proxy a New API Rerank request through the tenant gateway
+      description: The gateway first applies the tenant Group capability directory. A protocol marked unsupported or unverified returns 501 NEW_API_PROTOCOL_UNSUPPORTED and releases any reservation; otherwise it settles OpenBuddy points from usage.prompt_tokens and usage.total_tokens returned by New API. Streaming Rerank is rejected and responses without real usage release the reservation. The currently verified MiniMax-M3 channel does not support Rerank.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, query, documents]
+              properties:
+                model: { type: string }
+                query: {}
+                documents: { type: array, items: {} }
+      responses:
+        "200": { description: New API Rerank JSON response }
+        "402": { description: Insufficient OpenBuddy credits }
+        "403": { description: Tenant or model policy denied }
+        "501": { description: Protocol unsupported/unverified or streaming Rerank is not enabled; error code is NEW_API_PROTOCOL_UNSUPPORTED or AI_STREAM_UNSUPPORTED }
+        "502": { description: New API response did not contain real usage }
+        "503": { description: New API upstream is not configured }
+  /v1/tenants/{tenantId}/ai/moderations:
+    parameters: [{ $ref: "#/components/parameters/TenantId" }]
+    post:
+      tags: [ai]
+      summary: Proxy a New API Moderations request through the tenant gateway
+      description: The gateway applies the tenant Group capability directory and settles OpenBuddy points from real input usage. Streaming Moderations is rejected and responses without real usage release the reservation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, input]
+              properties:
+                model: { type: string }
+                input: {}
+      responses:
+        "200": { description: OpenAI-compatible Moderations JSON response }
+        "402": { description: Insufficient OpenBuddy credits }
+        "403": { description: Tenant or model policy denied }
+        "501": { description: Protocol unsupported/unverified or streaming is not enabled; error code is NEW_API_PROTOCOL_UNSUPPORTED or AI_STREAM_UNSUPPORTED }
+        "502": { description: New API response did not contain real usage }
+        "503": { description: New API upstream is not configured }
+  /v1/tenants/{tenantId}/health:
+    parameters:
+      - $ref: "#/components/parameters/TenantId"
+    get:
+      tags: [tenant]
+      summary: Tenant observability summary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+                  data:
+                    type: object
+                    properties:
+                      tenantId: { type: string }
+                      policy: { $ref: "#/components/schemas/TenantPolicy" }
+                      budgets:
+                        type: object
+                        properties:
+                          tokens: { $ref: "#/components/schemas/TenantBudgetSummary" }
+                          points: { $ref: "#/components/schemas/TenantBudgetSummary" }
+                      resources: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+                      revokedMembers: { type: integer, minimum: 0 }
+                      activeSessions: { type: integer, minimum: 0 }
+                      at: { type: string, format: date-time }
+  /v1/webhooks/casdoor:
+    post:
+      tags: [webhooks]
+      security: []
+      summary: Casdoor to gateway webhook (HMAC-SHA256)
+      parameters:
+        - in: header
+          name: x-casdoor-signature
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, action]
+              properties:
+                type: { type: string, enum: [user, organization, group, role, permission] }
+                action: { type: string }
+                organization: { type: string }
+                user: { type: string }
+                object: { type: string, description: Casdoor Record.object value when the webhook uses the native Record payload shape. }
+                group: { type: string }
+                role: { type: string }
+                permission: { type: string }
+                target: { type: string }
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, received, action, impacted, revoked]
+                properties:
+                  ok: { type: boolean }
+                  received: { type: string }
+                  action: { type: string }
+                  impacted:
+                    type: array
+                    items: { type: string }
+                  revoked: { type: boolean }
+                  welcome:
+                    type: object
+                    properties:
+                      subject: { type: string }
+                      idempotencyKey: { type: string }
+                      issued: { type: boolean }
+        "401": { $ref: "#/components/responses/WebhookUnauthorized" }
+        "503": { $ref: "#/components/responses/WebhookDisabled" }
+  /v1/backchannel-logout/casdoor:
+    post:
+      tags: [webhooks]
+      security: []
+      summary: OIDC Back-Channel Logout (Casdoor pushes logout_token)
+      description: |
+        Casdoor posts a `logout_token` (HS256-signed JWT) to this endpoint when an
+        administrator signs a user out from the Casdoor console. The gateway verifies
+        the signature against `RESOURCE_GATEWAY_BACKCHANNEL_LOGOUT_SECRET`, validates
+        issuer/audience/events, and writes a `memberRevocations` entry that the
+        OpenBuddy main process picks up on its next polling cycle (kicking the user
+        out via `casdoorAuth.handleExternalRevocation`).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [logout_token]
+              properties:
+                logout_token:
+                  type: string
+                  description: OIDC Back-Channel Logout logout_token JWT
+      responses:
+        "200":
+          description: Logout accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, subject, revokedAt]
+                properties:
+                  ok: { type: boolean }
+                  subject: { type: string }
+                  revokedAt: { type: string, format: date-time }
+        "400":
+          description: Invalid logout_token (missing events / sub / unsupported algorithm)
+        "401":
+          description: Signature, issuer, or audience mismatch
+        "405": { description: Method not allowed (POST only) }
+        "415": { description: Content-Type must be application/x-www-form-urlencoded }
+        "503": { description: Gateway not configured with BACKCHANNEL_LOGOUT_SECRET }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    TenantId:
+      in: path
+      name: tenantId
+      required: true
+      schema: { type: string, pattern: "^[a-zA-Z0-9_.:\\/-]{1,200}$" }
+    Traceparent:
+      in: header
+      name: traceparent
+      required: false
+      description: W3C Trace Context header. When supplied, the gateway propagates the trace to audit events, SIEM events, and downstream calls. Malformed or zero-filled values are rejected and a fresh trace is minted.
+      schema:
+        type: string
+        pattern: "^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+
+  headers:
+    TraceparentEcho:
+      description: Echoed W3C traceparent (possibly regenerated by the gateway).
+      schema: { type: string, pattern: "^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$" }
+    XTraceId:
+      description: 128-bit trace id extracted from the W3C trace context.
+      schema: { type: string, pattern: "^[0-9a-f]{32}$" }
+  schemas:
+    SessionBinding:
+      type: object
+      required: [sessionId, subject, kind, scopes, startedAt, lastSeenAt]
+      properties:
+        sessionId: { type: string, pattern: "^[a-zA-Z0-9_.:-]{1,128}$" }
+        subject: { type: string }
+        deviceFingerprint: { type: string }
+        kind: { type: string, enum: [desktop, web, automation, team, session] }
+        scopes:
+          type: array
+          items: { type: string }
+        startedAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        metadata:
+          type: object
+          additionalProperties:
+            oneOf: [{ type: string }, { type: number }, { type: boolean }, { type: "null" }]
+    SessionBindingInput:
+      type: object
+      required: [sessionId]
+      properties:
+        sessionId: { type: string, pattern: "^[a-zA-Z0-9_.:-]{1,128}$" }
+        subject: { type: string }
+        deviceFingerprint: { type: string }
+        kind: { type: string, enum: [desktop, web, automation, team, session] }
+        scopes:
+          type: array
+          items: { type: string }
+        metadata:
+          type: object
+          additionalProperties:
+            oneOf: [{ type: string }, { type: number }, { type: boolean }, { type: "null" }]
+    AuditEvent:
+      type: object
+      required: [requestId, at, action, outcome]
+      properties:
+        requestId: { type: string }
+        at: { type: string, format: date-time }
+        subject: { type: string }
+        tenantId: { type: string }
+        resource: { type: string }
+        action: { type: string }
+        outcome: { type: string, enum: [success, deny, error] }
+        reason: { type: string, maxLength: 240 }
+        traceId: { type: string, description: "W3C trace id when the originating request supplied a traceparent header" }
+    ResourceType:
+      type: string
+      enum: [project, knowledge_base, storage_connection]
+    Resource:
+      type: object
+      required: [id, tenantId, ownerSubject, type, name, createdAt, updatedAt, version]
+      properties:
+        id: { type: string }
+        tenantId: { type: string }
+        ownerSubject: { type: string }
+        type: { $ref: "#/components/schemas/ResourceType" }
+        name: { type: string, maxLength: 200 }
+        metadata:
+          type: object
+          additionalProperties: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
+    ResourceCreate:
+      type: object
+      required: [type, name]
+      properties:
+        type: { $ref: "#/components/schemas/ResourceType" }
+        name: { type: string, maxLength: 200 }
+        metadata:
+          type: object
+          additionalProperties: { type: string }
+        idempotencyKey: { type: string, maxLength: 120 }
+    ResourceUpdate:
+      type: object
+      required: [expectedVersion]
+      properties:
+        name: { type: string, maxLength: 200 }
+        metadata:
+          type: object
+          additionalProperties: { type: string }
+        expectedVersion: { type: integer, minimum: 1 }
+    TenantPolicy:
+      type: object
+      required: [status, maxResources, version, updatedAt]
+      properties:
+        status: { type: string, enum: [active, suspended, archived] }
+        maxResources: { type: integer, minimum: 1, maximum: 1000000 }
+        version: { type: integer, minimum: 1 }
+        updatedAt: { type: string, format: date-time }
+        updatedBy: { type: string }
+        modelAllowlist: { type: array, items: { type: string } }
+        mcpAllowlist: { type: array, items: { type: string } }
+        killSwitch: { type: boolean }
+        maxTokensPerDay: { type: integer, minimum: 0 }
+        tokensUsedToday: { type: integer, minimum: 0 }
+        tokensReservedToday: { type: integer, minimum: 0 }
+        maxPointsPerDay: { type: integer, minimum: 0 }
+        pointsUsedToday: { type: integer, minimum: 0 }
+        pointsReservedToday: { type: integer, minimum: 0 }
+        newApiGroup: { type: string, pattern: '^[a-zA-Z0-9_.:-]{1,120}$' }
+    TenantBudgetSummary:
+      type: object
+      required: [used, reserved, committed, status]
+      properties:
+        limit: { type: integer, minimum: 0 }
+        used: { type: integer, minimum: 0 }
+        reserved: { type: integer, minimum: 0 }
+        committed: { type: integer, minimum: 0, description: Used plus currently reserved quota. }
+        remaining: { type: integer, minimum: 0 }
+        utilizationPercent: { type: number, minimum: 0 }
+        status: { type: string, enum: [unlimited, healthy, warning, critical, exhausted] }
+    TenantPolicyPatch:
+      type: object
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        status: { type: string, enum: [active, suspended, archived] }
+        maxResources: { type: integer, minimum: 1, maximum: 1000000 }
+        modelAllowlist: { type: array, items: { type: string } }
+        mcpAllowlist: { type: array, items: { type: string } }
+        killSwitch: { type: boolean }
+        maxTokensPerDay: { type: integer, minimum: 0 }
+        maxPointsPerDay: { type: integer, minimum: 0 }
+        newApiGroup: { type: string, pattern: '^[a-zA-Z0-9_.:-]{1,120}$' }
+    CreditAccount:
+      type: object
+      required: [tenantId, subject, plan, balance, reserved, available, lifetimeGranted, lifetimeConsumed, lifetimeRefunded, lifetimeExpired, updatedAt, version]
+      properties:
+        tenantId: { type: string }
+        subject: { type: string }
+        walletId: { type: string, maxLength: 120 }
+        plan: { type: string }
+        balance: { type: integer, minimum: 0 }
+        reserved: { type: integer, minimum: 0 }
+        available: { type: integer, minimum: 0 }
+        lifetimeGranted: { type: integer, minimum: 0 }
+        lifetimeConsumed: { type: integer, minimum: 0 }
+        lifetimeRefunded: { type: integer, minimum: 0, description: Paid-order points refunded to the member; reservation releases are excluded. }
+        lifetimeExpired: { type: integer, minimum: 0, description: Points removed after their source grant or purchase lot reached expiresAt. }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
+    CommerceReconciliation:
+      type: object
+      required: [grossOrders, refundedOrders, grossPoints, refundedPoints, netPoints, grossAmountMinorByCurrency, refundedAmountMinorByCurrency, netAmountMinorByCurrency]
+      description: Commerce summary in the original order currencies. Amounts are minor units and must not be converted to a single currency by the gateway.
+      properties:
+        grossOrders: { type: integer, minimum: 0 }
+        refundedOrders: { type: integer, minimum: 0 }
+        grossPoints: { type: integer, minimum: 0 }
+        refundedPoints: { type: integer, minimum: 0 }
+        netPoints: { type: integer }
+        grossAmountMinorByCurrency: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+        refundedAmountMinorByCurrency: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+        netAmountMinorByCurrency: { type: object, additionalProperties: { type: integer } }
+    CommerceEconomics:
+      type: object
+      required: [settledPoints, grossRevenueMinorByCurrency, refundedRevenueMinorByCurrency, netRevenueMinorByCurrency, verifiedExternalCostByCurrency, matchedVerifiedExternalCostByCurrency, unmatchedVerifiedExternalCostByCurrency, verifiedCostRecords, matchedVerifiedCostRecords, unmatchedVerifiedCostRecords, costCoveragePercent, contributionMarginMajorByCurrency, recognizedUsageRevenueMinorByCurrency, usageContributionMarginMajorByCurrency, recognizedRevenueCoveragePercent]
+      description: Unit economics summary. Revenue is integer minor units; verified costs are major currency units from provider-reported or verified-quota imports. The gateway never performs FX conversion.
+      properties:
+        settledPoints: { type: integer, minimum: 0 }
+        grossRevenueMinorByCurrency: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+        refundedRevenueMinorByCurrency: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+        netRevenueMinorByCurrency: { type: object, additionalProperties: { type: integer } }
+        verifiedExternalCostByCurrency: { type: object, additionalProperties: { type: number, minimum: 0 } }
+        matchedVerifiedExternalCostByCurrency: { type: object, additionalProperties: { type: number, minimum: 0 } }
+        unmatchedVerifiedExternalCostByCurrency: { type: object, additionalProperties: { type: number, minimum: 0 } }
+        verifiedCostRecords: { type: integer, minimum: 0 }
+        matchedVerifiedCostRecords: { type: integer, minimum: 0 }
+        unmatchedVerifiedCostRecords: { type: integer, minimum: 0 }
+        costCoveragePercent: { type: number, minimum: 0, maximum: 100 }
+        contributionMarginMajorByCurrency: { type: object, additionalProperties: { type: number } }
+        recognizedUsageRevenueMinorByCurrency: { type: object, additionalProperties: { type: integer } }
+        usageContributionMarginMajorByCurrency: { type: object, additionalProperties: { type: number } }
+        recognizedRevenueCoveragePercent: { type: number, minimum: 0, maximum: 100 }
+    ReconciliationBucket:
+      type: object
+      required: [requests, promptTokens, completionTokens, totalTokens, pointsSettled, upstreamCost, upstreamCostEntries, newApiUsageEntries, estimatedUsageEntries, externalCost, externalCostEntries, paidPointsConsumed, freePointsConsumed, recognizedRevenueMinorByCurrency]
+      properties:
+        requests: { type: integer, minimum: 0 }
+        promptTokens: { type: integer, minimum: 0 }
+        completionTokens: { type: integer, minimum: 0 }
+        totalTokens: { type: integer, minimum: 0 }
+        pointsSettled: { type: integer, minimum: 0 }
+        upstreamCost: { type: number, minimum: 0 }
+        upstreamCostEntries: { type: integer, minimum: 0 }
+        newApiUsageEntries: { type: integer, minimum: 0 }
+        estimatedUsageEntries: { type: integer, minimum: 0 }
+        externalCost: { type: number, minimum: 0 }
+        externalCostEntries: { type: integer, minimum: 0 }
+        paidPointsConsumed: { type: integer, minimum: 0 }
+        freePointsConsumed: { type: integer, minimum: 0 }
+        recognizedRevenueMinorByCurrency: { type: object, additionalProperties: { type: integer } }
+    CreditLedgerEntry:
+      type: object
+      required: [id, tenantId, subject, type, amount, unit, createdAt]
+      properties:
+        id: { type: string }
+        tenantId: { type: string }
+        subject: { type: string }
+        type: { type: string, enum: [grant, purchase, consume, refund, expire, adjustment, reservation, release] }
+        amount: { type: integer, minimum: 0 }
+        unit: { type: string, enum: [points] }
+        idempotencyKey: { type: string }
+        model: { type: string }
+        promptTokens: { type: integer, minimum: 0 }
+        completionTokens: { type: integer, minimum: 0 }
+        newApiRequestId: { type: string }
+        pricingSnapshot: { $ref: "#/components/schemas/CreditPricing" }
+        expiresAt: { type: string, format: date-time, description: Expiry timestamp for a grant or purchase lot. }
+        sourceLedgerId: { type: string, description: Source grant or purchase ledger entry for an expire record. }
+        previousHash: { type: string, pattern: "^(|[a-f0-9]{64})$", description: SHA-256 hash of the preceding ledger entry; empty for the chain root. }
+        entryHash: { type: string, pattern: "^[a-f0-9]{64}$", description: SHA-256 hash over this entry and previousHash. }
+        actorSubject: { type: string, description: Casdoor member that initiated a shared-wallet AI request. }
+        newApiGroup: { type: string }
+        usageSource: { type: string, enum: [new-api, estimated] }
+        requestId: { type: string }
+        agentId: { type: string }
+        sessionId: { type: string }
+        orderId: { type: string }
+        paymentId: { type: string }
+        paymentChannel: { type: string }
+        amountMinor: { type: integer, minimum: 0 }
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
+        upstreamCost: { type: number, minimum: 0 }
+        newApiUsageEntries: { type: integer, minimum: 0 }
+        estimatedUsageEntries: { type: integer, minimum: 0 }
+        pointsSettled: { type: integer }
+        reason: { type: string }
+        grossMarginPercent: { type: number, description: Conservative gross margin using the lowest active paid-plan revenue per point in the provider cost currency. }
+        marginCurrency: { type: string, pattern: "^[A-Z]{3}$" }
+        revenuePerPoint: { type: number, minimum: 0, description: Minimum paid-plan revenue represented by one OpenBuddy point in marginCurrency. }
+        createdAt: { type: string, format: date-time }
+        createdBy: { type: string }
+    CreditPricing:
+      type: object
+      required: [model, inputPointsPerThousand, outputPointsPerThousand, minimumPoints, updatedAt]
+      properties:
+        model: { type: string }
+        inputPointsPerThousand: { type: integer, minimum: 0 }
+        outputPointsPerThousand: { type: integer, minimum: 0 }
+        minimumPoints: { type: integer, minimum: 0 }
+        inputCostPerMillion: { type: number, minimum: 0, description: Supplier input cost per million tokens; not customer balance. }
+        outputCostPerMillion: { type: number, minimum: 0, description: Supplier output cost per million tokens; not customer balance. }
+        costCurrency: { type: string, pattern: "^[A-Z]{3}$" }
+        costSource: { type: string, enum: [configured-pricing, provider-reported, provider-reported-quota] }
+        updatedAt: { type: string, format: date-time }
+        updatedBy: { type: string }
+    CreditPricingInput:
+      type: object
+      required: [model, inputPointsPerThousand, outputPointsPerThousand, minimumPoints]
+      properties:
+        model: { type: string, maxLength: 200 }
+        inputPointsPerThousand: { type: integer, minimum: 0 }
+        outputPointsPerThousand: { type: integer, minimum: 0 }
+        minimumPoints: { type: integer, minimum: 0 }
+        inputCostPerMillion: { type: number, minimum: 0 }
+        outputCostPerMillion: { type: number, minimum: 0 }
+        costCurrency: { type: string, pattern: "^[A-Z]{3}$" }
+        costSource: { type: string, enum: [configured-pricing, provider-reported, provider-reported-quota] }
+    AiCapability:
+      type: object
+      required: [supported]
+      properties:
+        supported: { type: boolean }
+        streaming: { type: boolean }
+        usage: { type: string, enum: [required, optional, none] }
+        reason: { type: string }
+        verifiedAt: { type: string, format: date }
+    CommercialModelCatalogEntry:
+      type: object
+      required: [id, sellable, capabilities, pricing]
+      properties:
+        id: { type: string }
+        sellable: { type: boolean }
+        reason: { type: string }
+        capabilities:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/AiCapability" }
+        pricing: { $ref: "#/components/schemas/CreditPricing" }
+    CommercialModelCatalog:
+      type: object
+      required: [capabilitySource, pricingSource, generatedAt, models]
+      properties:
+        group: { type: string }
+        capabilitySource: { type: string, enum: [gateway-config, unconfigured] }
+        pricingSource: { type: string, enum: [gateway-pricing] }
+        generatedAt: { type: string, format: date-time }
+        models:
+          type: array
+          items: { $ref: "#/components/schemas/CommercialModelCatalogEntry" }
+    CreditQuoteInput:
+      type: object
+      required: [model, promptTokens, completionTokens]
+      properties:
+        model: { type: string, maxLength: 200 }
+        promptTokens: { type: integer, minimum: 0, maximum: 10000000 }
+        completionTokens: { type: integer, minimum: 0, maximum: 10000000 }
+    CreditQuote:
+      type: object
+      required: [model, promptTokens, completionTokens, totalTokens, estimatedPoints, unit, priceBasis, pricing, quoteValidUntil]
+      properties:
+        model: { type: string }
+        promptTokens: { type: integer, minimum: 0 }
+        completionTokens: { type: integer, minimum: 0 }
+        totalTokens: { type: integer, minimum: 0 }
+        estimatedPoints: { type: integer, minimum: 0 }
+        unit: { type: string, enum: [points] }
+        priceBasis: { type: string, enum: [gateway-pricing] }
+        pricing: { $ref: "#/components/schemas/CreditPricing" }
+        estimatedProviderCost: { type: number, minimum: 0 }
+        costCurrency: { type: string, pattern: "^[A-Z]{3}$" }
+        costBasis: { type: string, enum: [configured-pricing, provider-reported, provider-reported-quota] }
+        quoteValidUntil: { type: string, format: date-time }
+    CreditTransferInput:
+      type: object
+      required: [amount, idempotencyKey, source, destination]
+      properties:
+        amount: { type: integer, minimum: 1, maximum: 1000000000, description: Integer points to move from source to destination. }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 160, description: Same key on retries returns the existing transfer entries. }
+        reason: { type: string, maxLength: 240 }
+        source:
+          type: object
+          description: Exactly one of `subject` or `walletId` is required.
+          properties:
+            subject: { type: string, maxLength: 200 }
+            walletId: { type: string, maxLength: 120 }
+        destination:
+          type: object
+          description: Exactly one of `subject` or `walletId` is required.
+          properties:
+            subject: { type: string, maxLength: 200 }
+            walletId: { type: string, maxLength: 120 }
+    CreditGrantInput:
+      type: object
+      required: [amount, idempotencyKey]
+      properties:
+        subject: { type: string }
+        amount: { type: integer, minimum: 1 }
+        type: { type: string, enum: [grant], default: grant, description: Purchase credits only through a billing order and verified payment callback. }
+        reason: { type: string, maxLength: 240 }
+        validDays: { type: integer, minimum: 1, maximum: 3650, description: Optional validity period for an administrative grant. }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 160 }
+    CreditWelcomeInput:
+      type: object
+      required: [idempotencyKey]
+      properties:
+        subject: { type: string }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 160 }
+    CreditReserveInput:
+      type: object
+      required: [idempotencyKey]
+      properties:
+        amount: { type: integer, minimum: 1 }
+        model: { type: string }
+        promptTokens: { type: integer, minimum: 0 }
+        completionTokens: { type: integer, minimum: 0 }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 160 }
+        reason: { type: string, maxLength: 240 }
+    CreditSettleInput:
+      type: object
+      required: [reservationKey, amount]
+      properties:
+        reservationKey: { type: string, minLength: 8, maxLength: 160 }
+        amount: { type: integer, minimum: 0 }
+        model: { type: string }
+        promptTokens: { type: integer, minimum: 0 }
+        completionTokens: { type: integer, minimum: 0 }
+        newApiRequestId: { type: string }
+        reason: { type: string, maxLength: 240 }
+    BillingPlan:
+      type: object
+      required: [id, name, currency, priceMinor, points, active, features, updatedAt]
+      properties:
+        id: { type: string, pattern: "^[a-zA-Z0-9_.:-]{1,80}$" }
+        name: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
+        priceMinor: { type: integer, minimum: 0 }
+        points: { type: integer, minimum: 1 }
+        active: { type: boolean }
+        features: { type: array, items: { type: string, maxLength: 120 } }
+        maxTokensPerDay: { type: integer, minimum: 0, description: Tenant daily token entitlement applied when the order is paid. }
+        maxPointsPerDay: { type: integer, minimum: 0, description: Tenant daily points entitlement applied when the order is paid. }
+        modelAllowlist: { type: array, items: { type: string, maxLength: 200 } }
+        mcpAllowlist: { type: array, items: { type: string, maxLength: 200 } }
+        newApiGroup: { type: string, maxLength: 120 }
+        pointsValidDays: { type: integer, minimum: 1, maximum: 3650, description: Number of days purchased points remain valid. }
+        entitlementsValidDays: { type: integer, minimum: 1, maximum: 3650, description: Number of days purchased tenant entitlements remain active. }
+        updatedAt: { type: string, format: date-time }
+        updatedBy: { type: string }
+    BillingPlanInput:
+      type: object
+      required: [id, name, currency, priceMinor, points]
+      properties:
+        id: { type: string, pattern: "^[a-zA-Z0-9_.:-]{1,80}$" }
+        name: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 500 }
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
+        priceMinor: { type: integer, minimum: 0 }
+        points: { type: integer, minimum: 1 }
+        active: { type: boolean }
+        features: { type: array, items: { type: string, maxLength: 120 } }
+        maxTokensPerDay: { type: integer, minimum: 0 }
+        maxPointsPerDay: { type: integer, minimum: 0 }
+        modelAllowlist: { type: array, items: { type: string, maxLength: 200 } }
+        mcpAllowlist: { type: array, items: { type: string, maxLength: 200 } }
+        newApiGroup: { type: string, maxLength: 120 }
+        pointsValidDays: { type: integer, minimum: 1, maximum: 3650 }
+        entitlementsValidDays: { type: integer, minimum: 1, maximum: 3650 }
+    BillingOrder:
+      type: object
+      required: [id, orderNo, tenantId, subject, planId, points, amountMinor, currency, status, idempotencyKey, createdAt, updatedAt, expiresAt]
+      properties:
+        id: { type: string }
+        orderNo: { type: string }
+        tenantId: { type: string }
+        subject: { type: string }
+        planId: { type: string }
+        points: { type: integer, minimum: 0 }
+        amountMinor: { type: integer, minimum: 0, description: Required when status is paid; must equal the order amountMinor. }
+        currency: { type: string, pattern: "^[A-Z]{3}$", description: Required when status is paid; must equal the order currency. }
+        status: { type: string, enum: [pending, paid, failed, refunded, expired, cancelled] }
+        idempotencyKey: { type: string }
+        paymentChannel: { type: string }
+        paymentId: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        pointsValidDays: { type: integer, minimum: 1, maximum: 3650 }
+        pointsExpiresAt: { type: string, format: date-time, description: Expiry timestamp assigned when the order is paid. }
+        entitlementsValidDays: { type: integer, minimum: 1, maximum: 3650 }
+        entitlementsExpiresAt: { type: string, format: date-time, description: Expiry timestamp assigned when the order is paid. }
+        entitlements: { $ref: "#/components/schemas/BillingEntitlements" }
+        paidAt: { type: string, format: date-time }
+        refundedAt: { type: string, format: date-time }
+    BillingSubscription:
+      type: object
+      required: [tenantId, subject, planId, orderNo, status, entitlements, startedAt]
+      properties:
+        tenantId: { type: string }
+        subject: { type: string }
+        planId: { type: string }
+        orderNo: { type: string }
+        status: { type: string, enum: [active, cancelled] }
+        entitlements: { $ref: "#/components/schemas/BillingEntitlements" }
+        startedAt: { type: string, format: date-time }
+        entitlementsExpiresAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        appliedPolicyVersion: { type: integer, minimum: 1 }
+    BillingOrderInput:
+      type: object
+      required: [planId, idempotencyKey]
+      properties:
+        planId: { type: string }
+        subject: { type: string }
+        walletId: { type: string, maxLength: 120, description: Create the order against a shared wallet. }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 160 }
+        expiresInSeconds: { type: integer, minimum: 60, maximum: 86400 }
+    BillingEntitlements:
+      type: object
+      properties:
+        maxTokensPerDay: { type: integer, minimum: 0 }
+        maxPointsPerDay: { type: integer, minimum: 0 }
+        modelAllowlist: { type: array, items: { type: string, maxLength: 200 } }
+        mcpAllowlist: { type: array, items: { type: string, maxLength: 200 } }
+        newApiGroup: { type: string, maxLength: 120 }
+    CreditWallet:
+      type: object
+      required: [id, tenantId, name, status, createdAt, updatedAt, createdBy]
+      properties:
+        id: { type: string }
+        tenantId: { type: string }
+        name: { type: string, maxLength: 120 }
+        status: { type: string, enum: [active, suspended, archived] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        createdBy: { type: string }
+    CreditWalletMember:
+      type: object
+      required: [walletId, tenantId, subject, role, createdAt, updatedAt, createdBy]
+      properties:
+        walletId: { type: string }
+        tenantId: { type: string }
+        subject: { type: string }
+        role: { type: string, enum: [owner, spender, viewer] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        createdBy: { type: string }
+    CreditWalletCreateInput:
+      type: object
+      required: [name]
+      properties:
+        id: { type: string, pattern: "^[a-zA-Z0-9_.:-]{1,120}$" }
+        name: { type: string, maxLength: 120 }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 160 }
+    BillingCallbackInput:
+      type: object
+      required: [orderNo, status]
+      properties:
+        orderNo: { type: string }
+        status: { type: string, enum: [paid, failed, cancelled] }
+        paymentId: { type: string, maxLength: 200, description: Required when status is paid; the same paymentId and channel cannot settle another order. }
+        paymentChannel: { type: string, maxLength: 80, description: Required when status is paid; identifies the namespace in which paymentId is unique. }
+        amountMinor: { type: integer, minimum: 0 }
+        currency: { type: string, pattern: "^[A-Z]{3}$" }
+        failureReason: { type: string, maxLength: 240 }
+  responses:
+    PermissionDenied:
+      description: Permission denied for the action
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code: { type: string }
+    VersionConflict:
+      description: Optimistic concurrency conflict
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code: { type: string }
+    TenantLifecyle:
+      description: Tenant lifecycle blocks the operation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code: { type: string }
+    WebhookUnauthorized:
+      description: Webhook signature missing or invalid
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code: { type: string }
+    WebhookDisabled:
+      description: Webhook receiver not configured
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code: { type: string }

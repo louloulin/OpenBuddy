@@ -1,0 +1,31 @@
+services:
+  openbuddy-resource-gateway:
+    build: .
+    restart: unless-stopped
+    environment:
+      CASDOOR_ISSUER: https://casdoor.example.com
+      CASDOOR_AUDIENCE: openbuddy
+      NEW_API_BASE_URL: https://new-api.example.com
+      # Production multi-tenant deployments must use a secret Group→Token map.
+      NEW_API_GROUP_TOKENS_JSON: ${NEW_API_GROUP_TOKENS_JSON:-}
+      # Optional single-tenant development fallback only.
+      NEW_API_TOKEN: ${NEW_API_TOKEN:-}
+      NEW_API_GROUP: ${NEW_API_GROUP:-default}
+      NEW_API_ALLOW_ESTIMATED_USAGE: ${NEW_API_ALLOW_ESTIMATED_USAGE:-0}
+      RESOURCE_GATEWAY_TARGET_GROSS_MARGIN_PERCENT: ${RESOURCE_GATEWAY_TARGET_GROSS_MARGIN_PERCENT:-70}
+      RESOURCE_GATEWAY_NEW_API_CIRCUIT_FAILURE_THRESHOLD: ${RESOURCE_GATEWAY_NEW_API_CIRCUIT_FAILURE_THRESHOLD:-5}
+      RESOURCE_GATEWAY_NEW_API_CIRCUIT_OPEN_MS: ${RESOURCE_GATEWAY_NEW_API_CIRCUIT_OPEN_MS:-30000}
+      RESOURCE_GATEWAY_AI_REPLAY_MAX_BYTES: ${RESOURCE_GATEWAY_AI_REPLAY_MAX_BYTES:-10000000}
+      RESOURCE_GATEWAY_AI_REQUEST_LEASE_MS: ${RESOURCE_GATEWAY_AI_REQUEST_LEASE_MS:-120000}
+      RESOURCE_GATEWAY_AI_REQUEST_REPLAY_TTL_MS: ${RESOURCE_GATEWAY_AI_REQUEST_REPLAY_TTL_MS:-86400000}
+      RESOURCE_GATEWAY_NEW_API_COST_IMPORT_SECRET: ${RESOURCE_GATEWAY_NEW_API_COST_IMPORT_SECRET:-}
+      RESOURCE_GATEWAY_DATA_DIR: /var/lib/openbuddy-resource-gateway
+      RESOURCE_GATEWAY_RATE_LIMIT_REQUESTS: "120"
+      RESOURCE_GATEWAY_RATE_LIMIT_WINDOW_MS: "60000"
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - openbuddy-resource-data:/var/lib/openbuddy-resource-gateway
+
+volumes:
+  openbuddy-resource-data:

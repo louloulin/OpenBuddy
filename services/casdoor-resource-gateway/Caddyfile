@@ -1,0 +1,19 @@
+# Caddyfile for the OpenBuddy Casdoor Resource Gateway.
+# Replace `{$GATEWAY_DOMAIN}` with your fully-qualified hostname or set the
+# environment variable before running caddy.
+
+{$GATEWAY_DOMAIN:gateway.example.com} {
+    encode gzip
+    reverse_proxy resource-gateway:8787 {
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Request-Id {http.request_id}
+    }
+    log {
+        output file /data/access.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+    tls {$ACME_EMAIL}
+}
