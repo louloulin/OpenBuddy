@@ -14994,3 +14994,130 @@ body.dark .permission-picker__popover,
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 10px;
 }
+
+/* ===== ChatMinimap (phase 5) ===== */
+.chat-minimap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  width: 14px;
+  border-radius: var(--wb-radius);
+  background: var(--wb-bg-secondary);
+}
+.chat-minimap__block {
+  display: block;
+  width: 100%;
+  height: 6px;
+  border: none;
+  border-radius: 2px;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.12s ease;
+}
+.chat-minimap__block:hover {
+  opacity: 1;
+}
+.chat-minimap__block--active {
+  opacity: 1;
+}
+
+/* ===== BranchNavigator (phase 5) ===== */
+.branch-navigator {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+.branch-navigator__node-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--wb-fg-primary);
+  font-size: 12px;
+  text-align: left;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.branch-navigator__node-button:hover {
+  background: var(--wb-bg-tertiary);
+}
+.branch-navigator__node-button--active {
+  background: var(--wb-bg-tertiary);
+  outline: 1px solid var(--wb-accent);
+}
+.branch-navigator__node-icon {
+  flex: none;
+  font-size: 11px;
+}
+.branch-navigator__node-label {
+  flex: none;
+  color: var(--wb-fg-secondary);
+  font-size: 11px;
+}
+.branch-navigator__node-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--wb-fg-tertiary);
+  font-size: 11px;
+}
+
+/* ===== ExtensionStatusBar (phase 5) ===== */
+.extension-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--wb-fg-secondary);
+  border-top: 1px solid var(--wb-border);
+}
+.extension-status-bar__summary {
+  flex: none;
+}
+.extension-status-bar__list {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+.extension-status-bar__item-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--wb-fg-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+}
+.extension-status-bar__item-button:hover {
+  color: var(--wb-fg-primary);
+}
+.extension-status-bar__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.extension-status-bar__dot--ok {
+  background: var(--wb-success);
+}
+.extension-status-bar__dot--err {
+  background: var(--wb-danger);
+}
+.extension-status-bar__dot--off {
+  background: var(--wb-fg-tertiary);
+}
