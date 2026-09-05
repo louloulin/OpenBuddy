@@ -222,6 +222,37 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 | 跨进程 RPC | 完整 | remote/typert surface | 已接，需统一 commit | 3.5 |
 | renderer UI 贡献 | 完整 | renderer surface | 已接，需统一 commit | 3.5 |
 
+### 3.4 pi 原生 + OpenBuddy 插件结合矩阵（已实现为权威表）
+
+> 已落地为 `packages/runtime/openbuddy-plugin-host/src/capability-ownership.ts`
+> （commit `94f3fe2`）。每个能力声明 **pi 原生插件**（passthrough 时接管）与
+> **OpenBuddy 插件**（Cordis 兜底）双归属。
+
+| 能力 | pi 原生插件 | OpenBuddy 插件 | serviceKey | passthrough |
+|---|---|---|---|---|
+| mcp | pi-mcp-adapter | openbuddy-mcp-client | mcpClient | ✓ |
+| permission | pi-permission-system | openbuddy-authorization | permission | ✓ |
+| goal | pi-goal | openbuddy-team | team | ✓ |
+| plan | pi-plan-mode | pi-plan-mode | plan | ✓ |
+| task | @juicesharp/rpiv-todo | openbuddy-task | task | ✓ |
+| session | pi-session | openbuddy-session | sessions | ✓ |
+| fs | pi-fs | openbuddy-fs-local | fsLocal | ✓ |
+| lens | pi-lens | pi-lens | lens | ✓ |
+| simplify | pi-simplify | pi-simplify | simplify | ✓ |
+| hashline | pi-hashline-edit-pro | pi-hashline-edit-pro | hashline | ✓ |
+| worktree | @dietrichgebert/ponytail | @dietrichgebert/ponytail | worktree | ✓ |
+| automation | pi-goal-list-loop-audit | pi-goal-list-loop-audit | automation | ✓ |
+| team | pi-goal | openbuddy-team | team | ✗（Cordis 持有） |
+| team-subagent | pi-subagents | pi-subagents | - | ✓ |
+| team-goal | pi-goal | pi-goal | - | ✓ |
+| web | pi-web-access | pi-web-access | - | ✓ |
+
+**结合策略**：
+- **passthrough 能力**（12 个）：用户 opt-in 或检测到 pi 原生包安装时，pi 原生插件接管，
+  OpenBuddy Cordis mount 跳过（`pi-passthrough` 注册表记录）。
+- **Cordis 持有**（team）：多 buddy 编排保持 Cordis 持有，pi 仅提供 goal/subagent 子能力。
+- **纯 pi**（lens/simplify/hashline/worktree/automation/web）：无 Cordis 包装，直接 pi 原生。
+
 ---
 
 ## 4. 分阶段优化计划（从底层起）
@@ -289,15 +320,21 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 
 **目标**：把 pi 差距收敛到「pi 提供 agent 能力 + Cordis 提供服务骨架 + 统一 6-surface 事务」的整体插件体系。
 
-1. **修复文档漂移**：更新 `CAPABILITY_TO_PLUGIN_ID` 注释，把 `capability-plugins.ts` 引用改为实际位置（`openbuddy-core-plugin.ts` + `agent-host.ts`）。
-2. **统一事务提交点**：把 `PluginTransaction` 的 commit 阶段扩展到所有 surface（pi/mcp/remote/typert/renderer），让各面候选状态收敛到同一 transaction coordinator，产出共同 commit marker。
-3. **收敛能力归属单一权威**：把 `CAPABILITY_TO_PLUGIN_ID` 与 `pi-extensions.ts` 的 12 个 adapter 定义合并为单一权威表，消除重复。
-4. **`pi-passthrough` 注册表可测试化**：把进程级可变全局改为可注入的 registry（支持 reset/快照），便于插件体系测试。
-5. **插件体系文档**：产出 `docs/PLUGIN_SYSTEM.md`，描述 6-surface 架构、能力归属解析、事务协调器、如何写一个跨 surface 插件。
+**✅ 已完成（commit `94f3fe2`）**：
+- **能力归属单一权威表**：新增 `packages/runtime/openbuddy-plugin-host/src/capability-ownership.ts`，
+  把每个能力映射到 **pi 原生插件 + OpenBuddy 插件** 双归属（12 个 adapter + team/web 家族）。
+- **`CAPABILITY_TO_PLUGIN_ID` 从权威表派生**：`pi-passthrough.ts` 不再自持映射，消除双源漂移。
+- **修复文档漂移**：删除对已不存在的 `capability-plugins.ts` 的引用。
+- **新增测试**：`capability-ownership.test.ts`（8 测试），plugin-host 套件 214 全绿。
+
+**剩余**：
+1. **统一事务提交点**：把 `PluginTransaction` 的 commit 阶段扩展到所有 surface（pi/mcp/remote/typert/renderer），让各面候选状态收敛到同一 transaction coordinator，产出共同 commit marker。
+2. **`pi-passthrough` 注册表可测试化**：把进程级可变全局改为可注入的 registry（支持 reset/快照），便于插件体系测试。
+3. **插件体系文档**：产出 `docs/PLUGIN_SYSTEM.md`，描述 6-surface 架构、能力归属解析、事务协调器、如何写一个跨 surface 插件。
 
 **验收**：
 - `PluginTransaction` 覆盖全部 6 surface 的 commit
-- 能力归属单一权威表（无重复定义）
+- 能力归属单一权威表（无重复定义）✅
 - `pi-passthrough` 注册表可注入/可测试
 - 新增 `tests/electron/plugin-system.spec.ts`
 - 现有测试全绿
