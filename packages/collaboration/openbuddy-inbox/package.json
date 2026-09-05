@@ -1,0 +1,14 @@
+ {
+   "name": "@openbuddy/collaboration-inbox",
+   "version": "0.1.0",
+   "private": true,
+   "type": "module",
+   "main": "./src/index.ts",
+   "types": "./src/index.ts",
+   "exports": {
+     ".": "./src/index.ts"
+   },
+   "dependencies": {
+     "@openbuddy/collaboration-protocol": "workspace:*"
+   }
+ }
