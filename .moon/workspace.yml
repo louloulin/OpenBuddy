@@ -1,0 +1,12 @@
+projects:
+  globFormat: "source-path"
+  globs:
+    - "packages/*/*"
+    - "moon.yml"
+    - "electron/moon.yml"
+  sources:
+    "openbuddy": "."
+
+vcs:
+  defaultBranch: "main"
+  provider: "github"

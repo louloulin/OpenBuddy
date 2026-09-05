@@ -1,0 +1,9 @@
+node:
+  version: "24.15.0"
+
+pnpm:
+  version: "10.29.3"
+
+typescript:
+  version: "5.6.3"
+  syncProjectReferences: false
