@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "outDir": "./dist" },
+  "include": ["./src/**/*.ts", "./src/**/*.tsx"],
+  "exclude": [
+    "./src/**/*.test.ts",
+    "./src/**/*.test.tsx",
+    "../../electron/**/*",
+    "../../runtime/openbuddy-plugin-host/src/remote-codec.ts",
+    "../../runtime/openbuddy-plugin-host/src/rpc-contract.ts"
+  ]
+}
