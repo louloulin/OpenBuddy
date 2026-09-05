@@ -128,11 +128,13 @@ export class PiSessionEventBridge {
   /** Append an event produced by `session.subscribe`. */
   appendFromSession(event: { type: string; [key: string]: unknown }): SessionEventRecord {
     const sequence = this.allocateSequence();
+    const sessionId = typeof event.sessionId === "string" ? event.sessionId : undefined;
     const record: SessionEventRecord = {
       eventVersion: 1,
       sequence,
       timestamp: new Date().toISOString(),
       type: event.type,
+      ...(sessionId ? { sessionId } : {}),
       payload: event,
     };
     this.pushBounded(record);
