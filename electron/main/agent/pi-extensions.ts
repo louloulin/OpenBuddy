@@ -1,6 +1,7 @@
 import { isAbsolute, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { Type } from "@earendil-works/pi-ai";
+import { DEFAULT_COMPACTION_SETTINGS, shouldCompact } from "@earendil-works/pi-agent-core";
 import openBuddyApplyPatch, { type OpenBuddyApplyPatchConfig } from "./extensions/apply-patch";
 import { isPiPackageInstalled } from "./pi-package-installed";
 import {
@@ -1140,7 +1141,12 @@ export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResol
       if (tokens === null) return;
       const crossed = previousTokens !== null && previousTokens <= threshold && tokens > threshold;
       previousTokens = tokens;
-      if (!crossed || !context.compact) return;
+      // Reuse pi SDK's canonical compaction decision (level-triggered) instead
+      // of hand-rolling the threshold check. Combined with the edge-triggered
+      // `crossed` guard so we only request compaction once per crossing, not on
+      // every turn above the threshold. `threshold` is the context window here.
+      const shouldCompactNow = shouldCompact(tokens, threshold, DEFAULT_COMPACTION_SETTINGS);
+      if (!crossed || !shouldCompactNow || !context.compact) return;
       emit("pi/context-compaction-requested", { thresholdTokens: threshold, tokens });
       context.compact();
     });
