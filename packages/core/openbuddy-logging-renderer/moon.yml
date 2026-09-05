@@ -1,0 +1,8 @@
+language: typescript
+layer: library
+stack: frontend
+tasks:
+  typecheck:
+    command: "tsc --noEmit"
+    inputs: ["src/**/*", "tsconfig.json", "package.json"]
+    outputs: []
