@@ -48,10 +48,11 @@ try {
   await page.keyboard.press("Control+K");
   const searchDialog = page.locator('[role="dialog"][aria-label="全局搜索"]');
   await searchDialog.waitFor({ state: "visible", timeout: 15_000 });
-  const searchFocused = await page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
-  if (searchFocused !== "全局搜索") {
-    throw new Error(`Search input was not focused: ${String(searchFocused)}`);
-  }
+  await page.waitForFunction(
+    () => document.activeElement?.getAttribute("aria-label") === "全局搜索",
+    undefined,
+    { timeout: 15_000 },
+  );
 
   await page.keyboard.press("Escape");
   await searchDialog.waitFor({ state: "hidden", timeout: 15_000 });
