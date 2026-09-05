@@ -15266,3 +15266,88 @@ body.dark .permission-picker__popover,
   color: var(--wb-accent);
   font-weight: 600;
 }
+
+/* ===== WorkflowCanvas (phase 5) ===== */
+.workflow-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px;
+}
+.workflow-canvas__step {
+  display: flex;
+  flex-direction: column;
+}
+.workflow-canvas__connector {
+  width: 2px;
+  height: 12px;
+  margin-left: 20px;
+  background: var(--wb-border);
+}
+.workflow-canvas__node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius);
+  padding: 6px 8px;
+  background: var(--wb-bg-secondary);
+}
+.workflow-canvas__node--active {
+  outline: 1px solid var(--wb-accent);
+}
+.workflow-canvas__node-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--wb-fg-primary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+.workflow-canvas__kind {
+  flex: none;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: #fff;
+}
+.workflow-canvas__kind--trigger {
+  background: var(--wb-accent);
+}
+.workflow-canvas__kind--action {
+  background: var(--wb-success);
+}
+.workflow-canvas__kind--condition {
+  background: var(--wb-warning);
+}
+.workflow-canvas__kind--output {
+  background: var(--wb-fg-tertiary);
+}
+.workflow-canvas__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workflow-canvas__controls {
+  display: flex;
+  gap: 2px;
+}
+.workflow-canvas__move {
+  border: 1px solid var(--wb-border);
+  border-radius: 3px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-fg-secondary);
+  font-size: 11px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+.workflow-canvas__move:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
