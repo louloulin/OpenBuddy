@@ -1,0 +1,28 @@
+[Unit]
+Description=OpenBuddy tenant credit expiry worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=openbuddy
+Group=openbuddy
+WorkingDirectory=/opt/service/openbuddy
+EnvironmentFile=/etc/openbuddy/credit-expiry-worker.env
+ExecStart=/usr/bin/node /opt/service/openbuddy/scripts/credit-expiry-worker.mjs
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/openbuddy
+
+[Install]
+WantedBy=multi-user.target

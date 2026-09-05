@@ -1,0 +1,29 @@
+[Unit]
+Description=Check OpenBuddy New API reconciliation heartbeat
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=openbuddy
+Group=openbuddy
+WorkingDirectory=/opt/service/openbuddy
+ExecStart=/usr/bin/node /opt/service/openbuddy/scripts/check-reconciliation-heartbeat.mjs
+Environment=NEW_API_RECONCILIATION_STATUS_FILE=/var/lib/openbuddy/new-api-reconciliation-status.json
+Environment=NEW_API_RECONCILIATION_MAX_AGE_HOURS=26
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+ReadOnlyPaths=/var/lib/openbuddy
+
+[Install]
+WantedBy=multi-user.target

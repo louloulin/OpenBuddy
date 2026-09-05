@@ -1,0 +1,28 @@
+[Unit]
+Description=OpenBuddy New API reconciliation worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=openbuddy
+Group=openbuddy
+WorkingDirectory=/opt/service/openbuddy
+EnvironmentFile=/etc/openbuddy/new-api-reconciliation-worker.env
+ExecStart=/usr/bin/node /opt/service/openbuddy/scripts/new-api-reconciliation-worker.mjs
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/openbuddy
+
+[Install]
+WantedBy=multi-user.target

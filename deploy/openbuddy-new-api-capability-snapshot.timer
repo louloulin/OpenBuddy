@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh OpenBuddy New API capability snapshot hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=5m
+Unit=openbuddy-new-api-capability-snapshot.service
+
+[Install]
+WantedBy=timers.target

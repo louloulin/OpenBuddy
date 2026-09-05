@@ -1,0 +1,11 @@
+[Unit]
+Description=Run OpenBuddy tenant credit expiry worker daily
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=openbuddy-credit-expiry-worker.service
+
+[Install]
+WantedBy=timers.target

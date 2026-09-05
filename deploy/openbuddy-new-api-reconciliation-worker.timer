@@ -1,0 +1,11 @@
+[Unit]
+Description=Run OpenBuddy New API reconciliation hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=5m
+Unit=openbuddy-new-api-reconciliation-worker.service
+
+[Install]
+WantedBy=timers.target

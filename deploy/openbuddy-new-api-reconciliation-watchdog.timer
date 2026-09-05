@@ -1,0 +1,12 @@
+[Unit]
+Description=Check OpenBuddy New API reconciliation heartbeat every 15 minutes
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=15min
+Persistent=true
+RandomizedDelaySec=2m
+Unit=openbuddy-new-api-reconciliation-watchdog.service
+
+[Install]
+WantedBy=timers.target

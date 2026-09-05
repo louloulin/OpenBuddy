@@ -1,0 +1,67 @@
+{
+  "targetGrossMarginPercent": 70,
+  "scenarios": [
+    {
+      "name": "balanced-1m",
+      "promptTokens": 1000000,
+      "completionTokens": 1000000
+    },
+    {
+      "name": "agent-heavy-output",
+      "promptTokens": 250000,
+      "completionTokens": 1000000
+    }
+  ],
+  "plans": [
+    {
+      "id": "free",
+      "name": "Free",
+      "currency": "CNY",
+      "priceMinor": 0,
+      "points": 100,
+      "pointsValidDays": 30,
+      "entitlementsValidDays": 30,
+      "active": true
+    },
+    {
+      "id": "team",
+      "name": "Team",
+      "currency": "CNY",
+      "priceMinor": 9900,
+      "points": 10000,
+      "pointsValidDays": 90,
+      "entitlementsValidDays": 90,
+      "active": true
+    },
+    {
+      "id": "enterprise",
+      "name": "Enterprise",
+      "currency": "CNY",
+      "priceMinor": 99900,
+      "points": 150000,
+      "pointsValidDays": 365,
+      "entitlementsValidDays": 365,
+      "active": true
+    }
+  ],
+  "pricing": [
+    {
+      "model": "MiniMax-M3",
+      "inputPointsPerThousand": 12,
+      "outputPointsPerThousand": 40,
+      "inputCostPerMillion": 2.1,
+      "outputCostPerMillion": 8.4,
+      "costCurrency": "CNY"
+    }
+  ],
+  "excludedModels": [
+    {
+      "model": "deepseek-v4-flash",
+      "reason": "2026-08-30 target New API channel returned 401 during controlled usage verification; keep non-sellable until channel credentials are repaired"
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "reason": "2026-08-30 target New API channel returned 401 during controlled usage verification; keep non-sellable until channel credentials are repaired"
+    }
+  ]
+}
