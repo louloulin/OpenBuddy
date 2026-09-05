@@ -1,0 +1,20 @@
+language: typescript
+layer: library
+stack: backend
+
+tasks:
+  typecheck:
+    command: "tsc --noEmit"
+    inputs:
+      - "src/**/*"
+      - "tsconfig.json"
+      - "package.json"
+    outputs: []
+  test:
+    command: "pnpm exec vitest run --passWithNoTests"
+    inputs:
+      - "src/**/*"
+      - "package.json"
+    outputs: []
+    options:
+      runInCI: true
