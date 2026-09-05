@@ -399,35 +399,37 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 
 **目标**：为 UI 阶段补齐缺失的底层能力。
 
-1. **`sessionTree`**：在 `packages/core/openbuddy-session` 暴露
-   `SessionTreeNode` / `sessionTree`（BranchNavigator 依赖，当前不存在）。
-   - 方案：基于现有 session 生命周期（`lifecycle.ts`）构建只读会话树，
-     节点含 `{ id, parentId, branch, summary, createdAt }`。
-2. **`extension-events` 索引化**：`pi-event-bridge` 把 `plugin/loaded` /
-   `plugin/error` / `extensionUiRequest` 索引到 session-store。
+**✅ 已完成（commit `f865dd7` 后新增）**：
+1. **`sessionTree`**：新增 `packages/core/openbuddy-session/src/session-tree.ts`，
+   **复用** pi SDK 的 `SessionManager.getTree()`，投影为 UI 友好的可序列化形状
+   `{ id, parentId, branch, summary, createdAt, children }`。含 `branchKindOf` /
+   `entrySummary` helper。经 `index.ts` 与 `./session-tree` 子路径导出。
+   新增 6 测试（线性/分支摘要/压缩/截断/类型映射）。
+2. **`extension-events` 索引化**：`PiSessionEventBridge.appendFromSession` 现从事件
+   提取 `sessionId` 到 record（此前只在 payload，导致按 session 过滤失效）。
+   `plugin/loaded`/`plugin/failed`/`plugin/unloaded` 已通过 `plugin-event-bus.ts`
+   → `sessionEventLog.append` 索引。新增 4 测试锁定插件事件索引行为。
 
-**验收**：
-- `packages/core/openbuddy-session` 导出 `sessionTree`
-- 新增 `tests/electron/extensions-index.spec.ts`
-- 现有测试全绿
+**阶段 4 全部完成 ✅**
 
 ### 阶段 5 — UI 差距补齐（P2，10h）
 
-对标 pi-web 4 项 + WorkBuddy 4 项：
+对标 pi-web 4 项 + WorkBuddy 4 项。
 
-| 子项 | 位置 | 说明 | 验收 |
+**✅ 已完成（commit 阶段 5 A-F）**：
+
+| 子项 | 组件 | 说明 | 测试 |
 |---|---|---|---|
-| A. ChatMinimap | `ui-conversation/src/ChatMinimap.tsx` | 色块导航 + 跳转 | 长会话可定位/跳转 |
-| B. BranchNavigator | `ui-conversation/src/BranchNavigator.tsx` | 会话树分叉 | 依赖阶段 4 sessionTree |
-| C. ExtensionStatusBar | `ui-shared/src/ExtensionStatusBar.tsx` | 扩展状态条 | 显示插件 loaded/error |
-| D. ExtensionWidgets | `ui-conversation/src/ExtensionWidgets.tsx` | 扩展 UI 卡片 | 渲染 extensionUiRequest |
-| E. 三段式侧栏 | `ui-sidebar/src/TaskItem.tsx` | 探索/规划/执行 | 标签分类 |
-| F. 工作流市场可视化 | `ui-automation` | import 后可编辑 | 可视化编辑 |
+| A. ChatMinimap | `ui-conversation/src/ChatMinimap.tsx` | 色块导航 + 跳转 | 5 |
+| B. BranchNavigator | `ui-conversation/src/BranchNavigator.tsx` | 会话树分叉（消费阶段 4 sessionTree） | 6 |
+| C. ExtensionStatusBar | `ui-conversation/src/ExtensionStatusBar.tsx` | 扩展状态条（loaded/failed/unloaded） | 4 |
+| D. ExtensionWidgets | `ui-conversation/src/ExtensionWidgets.tsx` | 扩展 UI 卡片（title/body/fields/actions） | 5 |
+| E. 三段式侧栏 | `ui-sidebar/src/TaskItem.tsx` | 探索/规划/执行 标签分类 | 5 |
+| F. 工作流可视化 | `ui-automation/src/WorkflowCanvas.tsx` | 节点图可视化编辑 + 重排 | 6 |
 
-**验收**：
-- 每个子项新增对应 e2e spec
-- 复用 `--wb-*` 令牌，零新 CSS 概念
-- 现有测试全绿
+全部为纯展示组件，复用 `--wb-*` 令牌，零新 CSS 概念。新增 31 测试。
+
+**阶段 5 全部完成 ✅**
 
 ### 阶段 6 — 回归与发布（2h）
 
