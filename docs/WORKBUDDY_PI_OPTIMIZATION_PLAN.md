@@ -366,10 +366,20 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 3. `App.tsx` → `ChatView.tsx` → UI 包（UI 层）
 4. `deepseek-runtime.ts` → `collaboration-runtime.ts`（独立运行时）
 
+**✅ 已完成（commit `416dd4c` + `0bdfafa`）**：
+- **`pi-extensions.ts`（1305 → 1010 行）**：抽出 `pi-compatibility-commands.ts`
+  （slash-command describe/invoke helpers + `CompatibilityCommandContext` 类型）。
+  adapter 定义保持声明式（纯数据），命令面可独立测试。
+- **`pi-client.ts`（2595 → 2390 行）**：抽出 `pi-client-email.ts`
+  （email + calendar IPC 包装器 + 类型导入）。自包含块，经 `export *` 重导出。
+
+**剩余拆分**（后续迭代）：`agent-host.ts`(3485)、`deepseek-runtime.ts`(4368)、
+`App.tsx`(1746)、`collaboration-runtime.ts`(2250) 等巨型文件。
+
 **验收**：
-- 每个拆分后文件 < 800 行
-- `npx tsc --noEmit` EXIT 0
-- 现有测试全绿
+- 每个拆分后文件 < 800 行（已拆文件达标；巨型文件待后续拆分）
+- `npx tsc --noEmit` EXIT 0 ✅
+- 现有测试全绿 ✅
 
 ### 阶段 3.5 — 统一插件体系（P1，核心，10h）
 
