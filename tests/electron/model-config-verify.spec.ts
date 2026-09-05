@@ -77,7 +77,22 @@ test.describe.serial("model configuration — real Electron end-to-end (main bra
     const isDisabled = await saveBtn.isDisabled();
     console.log("DEBUG save button disabled:", isDisabled);
     await saveBtn.click();
+    // Give the IPC + write enough time to settle.
     await page.waitForTimeout(2500);
+    // Close the editor dialog so Electron teardown doesn't hang on
+    // an open modal. The cancel button is a sibling of the save
+    // button inside the dialog footer.
+    const cancelBtn = page.getByRole("button", { name: /取消|Cancel/ }).first();
+    if (await cancelBtn.count()) {
+      await cancelBtn.click({ force: true }).catch(() => undefined);
+    }
+    // Also dismiss the outer settings modal so fixture teardown is
+    // clean.
+    const closeBtn = page.locator(".settings-modal__close").first();
+    if (await closeBtn.count()) {
+      await closeBtn.click({ force: true }).catch(() => undefined);
+    }
+    await page.waitForTimeout(500);
 
     const afterExists = existsSync(modelsPath);
     console.log("DEBUG after-save file exists:", afterExists);
