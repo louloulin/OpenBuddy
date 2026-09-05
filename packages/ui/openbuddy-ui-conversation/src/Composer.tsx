@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { memo, useEffect, useMemo, useRef, useState, useCallback, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { MentionPicker } from "./MentionPicker";
 import { Mic, X, type LucideIcon } from "lucide-react";
 import { open as openDialog, type ElectronWindowApi } from "@/lib/platform/electron-api";
@@ -738,16 +738,23 @@ export function ComposerInner({
         "wb-composer-wrap" + (showMeta ? " wb-composer-wrap--home" : "")
       }
     >
-      <section
-        className={composerCls}
-        onClick={() => {
-          if (!apiReady) onOpenSettings?.();
-        }}
-      >
+      <section className={composerCls}>
         {!apiReady && (
-          <div className="wb-composer__setup-hint" role="button" tabIndex={0}>
+          <button
+            type="button"
+            className="wb-composer__setup-hint"
+            onKeyDown={(event: ReactKeyboardEvent<HTMLButtonElement>) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              onOpenSettings?.();
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenSettings?.();
+            }}
+          >
             请先配置 API Key 开始使用
-          </div>
+          </button>
         )}
 
         {/* 拖拽文件落区遮罩(对齐 WorkBuddy drop-zone) */}

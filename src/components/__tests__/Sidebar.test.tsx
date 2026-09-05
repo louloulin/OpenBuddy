@@ -60,6 +60,17 @@ describe("Sidebar", () => {
     useSessionsStore.getState().setIndependent([]);
   });
 
+  it("任务与空间折叠按钮暴露展开状态", () => {
+    render(<Sidebar {...base} />);
+    const tasks = screen.getByRole("button", { name: /^任务/ });
+    const spaces = screen.getByRole("button", { name: /^空间/ });
+    expect(tasks).toHaveAttribute("aria-expanded", "true");
+    expect(spaces).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(tasks);
+    expect(tasks).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("搜索按钮触发 onOpenSearch,设置按钮触发 onOpenSettings", () => {
     const onOpenSearch = vi.fn();
     const onOpenSettings = vi.fn();

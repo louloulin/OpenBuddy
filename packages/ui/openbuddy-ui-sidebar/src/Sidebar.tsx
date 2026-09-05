@@ -1349,7 +1349,11 @@ export function Sidebar({
 
       <div className="sidebar__content">
         {/* 任务分组: 收件箱(初始目录)下的会话 */}
-        <button className="sidebar__section-label" onClick={() => setTasksOpen(!tasksOpen)}>
+        <button
+          className="sidebar__section-label"
+          aria-expanded={tasksOpen}
+          onClick={() => setTasksOpen(!tasksOpen)}
+        >
           <span>任务 ({hasFilter ? `${filteredIndependent.length}/${independent.length}` : independent.length})</span>
           <ChevronDownIcon
             size="sm"
@@ -1369,7 +1373,11 @@ export function Sidebar({
         )}
 
         {/* 空间分组: 项目节点 + 本地工作目录节点 */}
-        <button className="sidebar__section-label" onClick={() => setSpacesOpen(!spacesOpen)}>
+        <button
+          className="sidebar__section-label"
+          aria-expanded={spacesOpen}
+          onClick={() => setSpacesOpen(!spacesOpen)}
+        >
           <span>空间 ({projects.length + spaceNodes.length})</span>
           <ChevronDownIcon
             size="sm"

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { Composer } from "@openbuddy/ui-conversation";
 
@@ -47,6 +48,15 @@ describe("Composer", () => {
     expect(screen.getByRole("textbox")).toBeDisabled();
     fireEvent.click(screen.getByText(/请先配置 API Key/));
     expect(onOpenSettings).toHaveBeenCalled();
+  });
+
+  it("配置提示是真实按钮,Enter 也能打开设置", async () => {
+    const onOpenSettings = vi.fn();
+    render(<Composer {...base} apiReady={false} onOpenSettings={onOpenSettings} />);
+    const hint = screen.getByRole("button", { name: /请先配置 API Key/ });
+    hint.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
   it("showMeta 时渲染权限模式选择器（PermissionPicker）", () => {
