@@ -130,7 +130,42 @@ facade、生命周期 owner、capability 装配点、事件桥接点。改动一
 导致整段重渲染。`ChatView.tsx`（1167 行）未拆分为 `MessageList` + `Composer` +
 `RightRail` 三个 memo 组件。
 
-### 2.5 【P2】对标 pi-web / WorkBuddy 的 UI 能力缺口
+### 2.5 【P1】插件体系：pi 差距 → 整体插件体系（结合 Cordis）
+
+**现状（已核实）**：OpenBuddy 已有一个 **6-surface 统一插件清单**：
+
+```
+UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cordis
+```
+
+| 组件 | 位置 | 职责 |
+|---|---|---|
+| `UnifiedPluginManifest` | `plugin-manifest.ts` | 声明每包的 surface |
+| `PluginSnapshot` | `plugin-snapshot.ts` | 每 surface 运行时状态 |
+| `pi-passthrough` 注册表 | `pi-passthrough.ts` | 能力归属（pi vs Cordis）单一事实源 |
+| `CAPABILITY_TO_PLUGIN_ID` | `pi-passthrough.ts:60-140` | 能力→插件 id 映射 |
+| `PluginTransaction` | `plugin-lifecycle.ts` | 事务协调器（prepare/cordis/artifacts/pi/mcp/renderer/rollback/commit） |
+| `openbuddy-cordis` | `packages/runtime/openbuddy-cordis` | @cordisjs/core 薄包装 |
+| `openbuddy-plugin-host` | `packages/runtime/openbuddy-plugin-host` | 插件宿主 |
+| `openbuddy-renderer-host` | `packages/renderer/openbuddy-renderer-host` | renderer 客户端模块系统 |
+
+**pi 作为插件系统的天然差距（Cordis 的补充作用）**：
+
+| pi 差距 | Cordis 补充 | 现状 |
+|---|---|---|
+| pi 扩展仅限 agent 运行时（tools/hooks/commands） | 服务容器 / DI / 生命周期 | ✅ 已接 |
+| pi 无跨进程 RPC | remote / typert surface | ✅ 已接 |
+| pi 无 renderer UI 贡献 | renderer surface | ✅ 已接 |
+| pi 无统一事务提交点 | `PluginTransaction` 协调器 | ⚠️ 未完全统一 |
+| pi 无能力归属解析 | `pi-passthrough` 注册表 | ⚠️ 进程级可变全局 |
+
+**问题**：
+1. **文档漂移**：`CAPABILITY_TO_PLUGIN_ID` 注释引用 `capability-plugins.ts`，但该文件**已不存在**（重构进 `openbuddy-core-plugin.ts` + `agent-host.ts`）。
+2. **事务协调器未完全统一**：`docs/pi-runtime-next-roadmap.md` P1 明确「Pi/MCP/Remote/Typert/Renderer 仍没有共同的最终 commit marker」，各 surface 候选状态未收敛到同一 transaction coordinator。
+3. **`pi-passthrough` 注册表是进程级可变全局**：`pi-passthrough.ts:30` 注释自述「intentionally process-global and mutable」，不利于插件体系的可测试性与可替换性。
+4. **能力归属解析分散**：`CAPABILITY_TO_PLUGIN_ID` 与 `pi-extensions.ts` 的 12 个 adapter 定义重复，缺少单一权威。
+
+### 2.6 【P2】对标 pi-web / WorkBuddy 的 UI 能力缺口
 
 **对标 pi-web 缺失 4 项**（`docs/AI_CHAT_PLAN.md` §2.2）：
 - ChatMinimap（长会话定位）
@@ -177,6 +212,15 @@ facade、生命周期 owner、capability 装配点、事件桥接点。改动一
 | 扩展状态条 | ExtensionStatusBar | 无 | 缺 | C |
 | 扩展 UI 卡片 | ExtensionWidgets | 无 | 缺 | D |
 | 长会话定位 | ChatMinimap | 无 | 缺 | A |
+
+### 3.3 插件体系差距（结合 Cordis）
+
+| 维度 | WorkBuddy | OpenBuddy | 差距 | 阶段 |
+|---|---|---|---|---|
+| 插件生态 | 完整 marketplace + 可视化编辑 | 6-surface 清单 + import | 事务未统一、能力归属分散 | 3.5 |
+| 服务容器 | 完整 DI/生命周期 | Cordis 薄包装 | 已接，需统一事务 | 3.5 |
+| 跨进程 RPC | 完整 | remote/typert surface | 已接，需统一 commit | 3.5 |
+| renderer UI 贡献 | 完整 | renderer surface | 已接，需统一 commit | 3.5 |
 
 ---
 
@@ -239,6 +283,23 @@ facade、生命周期 owner、capability 装配点、事件桥接点。改动一
 **验收**：
 - 每个拆分后文件 < 800 行
 - `npx tsc --noEmit` EXIT 0
+- 现有测试全绿
+
+### 阶段 3.5 — 统一插件体系（P1，核心，10h）
+
+**目标**：把 pi 差距收敛到「pi 提供 agent 能力 + Cordis 提供服务骨架 + 统一 6-surface 事务」的整体插件体系。
+
+1. **修复文档漂移**：更新 `CAPABILITY_TO_PLUGIN_ID` 注释，把 `capability-plugins.ts` 引用改为实际位置（`openbuddy-core-plugin.ts` + `agent-host.ts`）。
+2. **统一事务提交点**：把 `PluginTransaction` 的 commit 阶段扩展到所有 surface（pi/mcp/remote/typert/renderer），让各面候选状态收敛到同一 transaction coordinator，产出共同 commit marker。
+3. **收敛能力归属单一权威**：把 `CAPABILITY_TO_PLUGIN_ID` 与 `pi-extensions.ts` 的 12 个 adapter 定义合并为单一权威表，消除重复。
+4. **`pi-passthrough` 注册表可测试化**：把进程级可变全局改为可注入的 registry（支持 reset/快照），便于插件体系测试。
+5. **插件体系文档**：产出 `docs/PLUGIN_SYSTEM.md`，描述 6-surface 架构、能力归属解析、事务协调器、如何写一个跨 surface 插件。
+
+**验收**：
+- `PluginTransaction` 覆盖全部 6 surface 的 commit
+- 能力归属单一权威表（无重复定义）
+- `pi-passthrough` 注册表可注入/可测试
+- 新增 `tests/electron/plugin-system.spec.ts`
 - 现有测试全绿
 
 ### 阶段 4 — 补底层 API（P2，前置，3h）
@@ -312,8 +373,14 @@ facade、生命周期 owner、capability 装配点、事件桥接点。改动一
 
 ```
 阶段0(基线) → 阶段1(双轨收敛) → 阶段2(复用pi SDK)
-  → 阶段3(架构拆分) → 阶段4(补底层API) → 阶段5(UI补齐) → 阶段6(回归)
+  → 阶段3(架构拆分) → 阶段3.5(统一插件体系)
+  → 阶段4(补底层API) → 阶段5(UI补齐) → 阶段6(回归)
 ```
 
-阶段 1/2 是 P0（影响稳定性/资源），阶段 3 是 P1（影响可维护性），
+阶段 1/2 是 P0（影响稳定性/资源），阶段 3/3.5 是 P1（影响可维护性/插件生态），
 阶段 4/5 是 P2（影响产品力）。建议按此顺序推进，每阶段独立验收。
+
+**插件体系定位**：阶段 3.5 是「从 pi 差距到整体插件体系」的核心。它把 pi 的
+agent 能力、Cordis 的服务骨架、renderer 的 UI 贡献、remote/typert 的 RPC
+统一到一个 6-surface 清单 + 单一事务协调器下，是 OpenBuddy 作为
+WorkBuddy 替代者的差异化插件生态基础。
