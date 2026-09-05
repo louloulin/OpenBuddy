@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "paths": {
+      "@openbuddy/ui-*": ["./packages/ui/openbuddy-ui-*/src/index.ts"],
+      "@openbuddy/ui-*/client": ["./packages/ui/openbuddy-ui-*/src/client.tsx"],
+      "@openbuddy/ui-*/invariant": ["./packages/ui/openbuddy-ui-*/src/invariant.ts"]
+    }
+  }
+}

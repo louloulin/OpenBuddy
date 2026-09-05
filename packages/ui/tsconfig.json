@@ -1,0 +1,110 @@
+// =====================================================================
+// packages/ui/tsconfig.json — ui-* 子包聚合项目
+//
+// 给 IDE / type-checker 提供一个统一的入口扫描所有 ui-* 包,
+// 实际编译由 vite/electron-vite 处理。本文件本身 noEmit、不带 composite。
+//
+// - extends tsconfig.base.client.json:复用 ui-* 子包的编译选项基座
+// - references:每个 ui-* 包为一个独立 TS 子项目
+// - paths: 兜底 alias(给那些不走具体子包 tsconfig 的工具链使用)
+// =====================================================================
+{
+  "extends": "./tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "lib/types",
+    "baseUrl": "../..",
+    "paths": {
+      "@openbuddy/ui-*": [
+        "./packages/ui/openbuddy-ui-*/src/index.ts"
+      ],
+      "@openbuddy/ui-*/client": [
+        "./packages/ui/openbuddy-ui-*/src/client.ts"
+      ],
+      "@openbuddy/ui-*/invariant": [
+        "./packages/ui/openbuddy-ui-*/src/invariant.ts"
+      ]
+    }
+  },
+  "include": [],
+  "references": [
+    {
+      "path": "./openbuddy-ui-account"
+    },
+    {
+      "path": "./openbuddy-ui-automation"
+    },
+    {
+      "path": "./openbuddy-ui-billing"
+    },
+    {
+      "path": "./openbuddy-ui-collaboration"
+    },
+    {
+      "path": "./openbuddy-ui-conversation"
+    },
+    {
+      "path": "./openbuddy-ui-dialogs"
+    },
+    {
+      "path": "./openbuddy-ui-email"
+    },
+    {
+      "path": "./openbuddy-ui-experts"
+    },
+    {
+      "path": "./openbuddy-ui-files"
+    },
+    {
+      "path": "./openbuddy-ui-hmr"
+    },
+    {
+      "path": "./openbuddy-ui-home"
+    },
+    {
+      "path": "./openbuddy-ui-layout"
+    },
+    {
+      "path": "./openbuddy-ui-locale"
+    },
+    {
+      "path": "./openbuddy-ui-markdown"
+    },
+    {
+      "path": "./openbuddy-ui-mcp"
+    },
+    {
+      "path": "./openbuddy-ui-modules"
+    },
+    {
+      "path": "./openbuddy-ui-primitives"
+    },
+    {
+      "path": "./openbuddy-ui-runtime"
+    },
+    {
+      "path": "./openbuddy-ui-settings"
+    },
+    {
+      "path": "./openbuddy-ui-settings-models"
+    },
+    {
+      "path": "./openbuddy-ui-shared"
+    },
+    {
+      "path": "./openbuddy-ui-shell"
+    },
+    {
+      "path": "./openbuddy-ui-sidebar"
+    },
+    {
+      "path": "./openbuddy-ui-slots"
+    },
+    {
+      "path": "./openbuddy-ui-theme"
+    },
+    {
+      "path": "./openbuddy-ui-workbench"
+    }
+  ]
+}

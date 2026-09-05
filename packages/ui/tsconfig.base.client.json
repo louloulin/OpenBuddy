@@ -1,0 +1,29 @@
+{
+  // =====================================================================
+  // packages/ui/tsconfig.base.client.json — ui-* 子包的编译选项基座
+  //
+  // 每个 packages/ui/openbuddy-ui-<x>/tsconfig.json 都 extend 本文件,
+  // 然后通过 sync-ui-aliases.mjs 注入该包可见的兄弟包 / 工作区包 alias。
+  //
+  // 设计要点(参考 deepseek-harness `packages/client/*`):
+  //   - 不带 composite / declaration / declarationMap:ui-* 包只是源码层
+  //     组织,不直接 tsc emit,全部交给 electron-vite 处理。
+  //   - baseUrl 锚定到仓库根(../../):保证 paths 可以写相对仓库的绝对路径。
+  //   - paths["@/*"]:解析到本包 src/,便于 ui-* 包内部使用短别名。
+  //   - 各 ui-* 包 tsconfig.json 在此基础上再追加 @openbuddy/* 兄弟 alias。
+  // =====================================================================
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "baseUrl": "../../",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
+}
