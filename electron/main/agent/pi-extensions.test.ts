@@ -519,6 +519,8 @@ describe("OpenBuddy Pi extension resolution", () => {
       "openbuddy-pi-context-status",
       "openbuddy-pi-context-guard",
       "openbuddy-pi-telemetry-bridge",
+      "openbuddy-pi-compact-announce",
+      "openbuddy-extra-providers",
     ]);
   });
 
