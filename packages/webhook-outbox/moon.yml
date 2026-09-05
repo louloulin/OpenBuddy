@@ -1,0 +1,14 @@
+language: typescript
+# type: library (legacy syntax, removed for moon 2.x)
+
+tasks:
+  typecheck:
+    command: tsc --noEmit
+    inputs:
+      - "src/**/*.ts"
+      - "package.json"
+      - "tsconfig.json"
+  test:
+    command: "pnpm exec vitest run"
+    inputs:
+      - "src/**/*.ts"

@@ -1,0 +1,12 @@
+{
+  "name": "@openbuddy/webhook-outbox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenBuddy Webhook Outbox · 持久化重试队列 + 指数回退（Casdoor 同步 / SIEM / 第三方）",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}
