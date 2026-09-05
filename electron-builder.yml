@@ -1,0 +1,103 @@
+# ============================================================================
+# electron-builder configuration for OpenBuddy.
+#
+# electron-vite produces three bundles under `out/` (see electron.vite.config.ts):
+#   - out/main/index.js        Electron main process (ESM)
+#   - out/preload/index.js     Preload script (CJS)
+#   - out/renderer/index.html  React renderer
+#
+# The package.json `main` field points at `./out/main/index.js`, which is
+# what Electron loads when launched in production. Workspace packages are
+# inlined into the bundles by electron-vite; remaining dependencies are
+# packaged from `node_modules/`.
+# ============================================================================
+appId: com.openbuddy.desktop
+productName: OpenBuddy
+copyright: Copyright (c) 2026 OpenBuddy contributors
+
+protocols:
+  - name: Casdoor OAuth callback
+    schemes:
+      - casdoor
+
+directories:
+  buildResources: build
+  output: release
+
+# ---------------------------------------------------------------------------
+# Mirror configuration
+#
+# electron-builder downloads two things from GitHub releases by default:
+#   - Electron binaries (`github.com/electron/electron/releases`)
+#   - app-builder-bin (`github.com/develar/app-builder-bin/releases`)
+#
+# Both URLs are slow / unreliable from many networks (including most CN
+# networks). Point them at the npmmirror mirrors, which are CDN-backed and
+# reliably fast. `electronDownload.mirror` covers the Electron binary;
+# `app-builder-bin` is read from the `ELECTRON_BUILDER_BINARIES_MIRROR`
+# environment variable (set by `scripts/electron-builder.sh`).
+#
+# Override mirrors with the `ELECTRON_MIRROR` and
+# `ELECTRON_BUILDER_BINARIES_MIRROR` env vars if a different mirror is
+# preferred. Set `ELECTRON_MIRROR=` to an empty string to fall back to
+# GitHub.
+# ---------------------------------------------------------------------------
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/
+
+# electron-builder considers every file outside this list to be source and
+# prunes it. Anything electron-vite emits lives under `out/`; everything
+# else needed at runtime is resolved through node_modules / package.json.
+files:
+  - "out/**/*"
+  - "package.json"
+  - "!**/*.map"
+  - "!**/__tests__/**"
+  - "!**/*.test.*"
+  - "!**/.DS_Store"
+  - "!**/.git/**"
+
+asar: true
+# Workspace packages are not marked native, but unpacking them keeps the
+# pnpm symlink structure intact during dev builds. Production builds can
+# shrink this list once symlink hoisting is verified on each target.
+asarUnpack:
+  - "**/node_modules/.pnpm/**"
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
+  notarize: true
+  gatekeeperAssess: false
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Development
+  artifactName: ${productName}-${version}.${ext}
+
+publish:
+  provider: github
+  # Set explicitly: without these, electron-builder infers the release target
+  # from package.json "repository", which is easy to get wrong.
+  owner: louloulin
+  repo: OpenBuddy
+  releaseType: release
