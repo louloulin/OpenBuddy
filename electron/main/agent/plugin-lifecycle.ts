@@ -13,6 +13,8 @@ export type PluginTransactionPhase =
   | "pi"
   | "mcp"
   | "renderer"
+  | "remote"
+  | "typert"
   | "rollback"
   | "commit";
 
