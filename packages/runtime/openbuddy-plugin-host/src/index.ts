@@ -1301,11 +1301,13 @@ export {
 } from "./capability-ownership";
 export {
   CAPABILITY_TO_PLUGIN_ID,
+  PassthroughRegistry,
   clearPassthroughRegistry,
   getPassthroughInfo,
   isPassthroughed,
   listPassthroughed,
   pluginIdForCapability,
   recordPassthrough,
+  type PassthroughRecord,
   type PassthroughSource,
 } from "./pi-passthrough";

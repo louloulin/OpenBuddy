@@ -22,6 +22,11 @@
  * The static capability→plugin-id mapping is NOT defined here anymore. It
  * lives in `capability-ownership.ts` (the single authority for pi-native vs
  * OpenBuddy ownership) and is re-exported below for back-compat.
+ *
+ * The registry is exposed both as a module-level default (back-compat) and
+ * as an injectable `PassthroughRegistry` class so plugin-system tests and
+ * multi-instance hosts can own an isolated registry instead of mutating a
+ * process-global.
  */
 
 import {
@@ -29,28 +34,73 @@ import {
   pluginIdForCapability as authorityPluginIdForCapability,
 } from "./capability-ownership";
 
-const REGISTRY = new Map<string, { source: "opted-in" | "installed"; adapter: string; recordedAt: number }>();
-
 export type PassthroughSource = "opted-in" | "installed";
 
+export interface PassthroughRecord {
+  source: PassthroughSource;
+  adapter: string;
+  recordedAt: number;
+}
+
+/**
+ * Injectable passthrough registry. Owns the capability→decision map so a
+ * host or test can create an isolated instance instead of mutating the
+ * process-global default. The module-level functions below delegate to a
+ * shared default instance for back-compat.
+ */
+export class PassthroughRegistry {
+  private readonly registry = new Map<string, PassthroughRecord>();
+
+  record(capability: string, source: PassthroughSource, adapter: string): void {
+    this.registry.set(capability, { source, adapter, recordedAt: Date.now() });
+  }
+
+  isPassthroughed(capability: string): boolean {
+    return this.registry.has(capability);
+  }
+
+  get(capability: string): PassthroughRecord | undefined {
+    return this.registry.get(capability);
+  }
+
+  list(): readonly { capability: string; source: PassthroughSource; adapter: string }[] {
+    return Array.from(this.registry.entries()).map(([capability, info]) => ({
+      capability,
+      source: info.source,
+      adapter: info.adapter,
+    }));
+  }
+
+  clear(): void {
+    this.registry.clear();
+  }
+
+  get size(): number {
+    return this.registry.size;
+  }
+}
+
+/** Shared default instance backing the module-level functions (back-compat). */
+const defaultRegistry = new PassthroughRegistry();
+
 export function recordPassthrough(capability: string, source: PassthroughSource, adapter: string): void {
-  REGISTRY.set(capability, { source, adapter, recordedAt: Date.now() });
+  defaultRegistry.record(capability, source, adapter);
 }
 
 export function isPassthroughed(capability: string): boolean {
-  return REGISTRY.has(capability);
+  return defaultRegistry.isPassthroughed(capability);
 }
 
-export function getPassthroughInfo(capability: string): { source: PassthroughSource; adapter: string; recordedAt: number } | undefined {
-  return REGISTRY.get(capability);
+export function getPassthroughInfo(capability: string): PassthroughRecord | undefined {
+  return defaultRegistry.get(capability);
 }
 
 export function listPassthroughed(): readonly { capability: string; source: PassthroughSource; adapter: string }[] {
-  return Array.from(REGISTRY.entries()).map(([capability, info]) => ({ capability, source: info.source, adapter: info.adapter }));
+  return defaultRegistry.list();
 }
 
 export function clearPassthroughRegistry(): void {
-  REGISTRY.clear();
+  defaultRegistry.clear();
 }
 
 /**
