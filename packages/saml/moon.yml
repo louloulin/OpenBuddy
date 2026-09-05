@@ -1,0 +1,12 @@
+language: typescript
+layer: library
+stack: backend
+tags: ["library", "ts"]
+
+tasks:
+  typecheck:
+    script: "tsc --noEmit"
+    inputs:
+      - "src/**/*.ts"
+      - "package.json"
+      - "tsconfig.json"

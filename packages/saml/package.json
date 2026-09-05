@@ -1,0 +1,12 @@
+{
+  "name": "@openbuddy/saml",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenBuddy SAML 2.0 SSO 适配器（企业 IdP 联合登录）",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}
