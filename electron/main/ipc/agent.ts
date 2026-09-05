@@ -585,6 +585,71 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			const payload = await response.json() as { data?: Array<{ id: string; owned_by?: string }> };
 			return (payload.data ?? []).map((model) => ({ id: model.id, ownedBy: model.owned_by }));
 		});
+		ipcMain.handle("agent:providers-test", async (_e, args: unknown) => {
+			// Phase 2: provider test-connection IPC. Calls `${baseUrl}/models`
+			// with the correct auth header and returns a structured
+			// { status, latencyMs, modelsCount, httpStatus, errorCode?,
+			// errorMessage? } payload. The renderer (ProviderHealthBadge +
+			// ProviderEditor) renders status + a UI-friendly suggestion
+			// derived from errorCode via `suggestionForError`.
+			const input = recordValue(args, "provider test payload");
+			const baseUrl = httpUrl(input.baseUrl, "baseUrl");
+			const apiKey = optionalString(input.apiKey, "apiKey") ?? "";
+			const providerKind = optionalString(input.providerKind, "providerKind");
+			const isAnthropic = providerKind === "anthropic" || providerKind === "custom_anthropic" || providerKind === "minimax_cn";
+			const headers: Record<string, string> = isAnthropic
+				? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }
+				: { Authorization: apiKey ? `Bearer ${apiKey}` : "Bearer " };
+			const startedAt = Date.now();
+			try {
+				const response = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, { headers, signal: AbortSignal.timeout(10_000) });
+				const latencyMs = Date.now() - startedAt;
+				if (!response.ok) {
+					return {
+						status: response.status >= 500 ? "unreachable" : "degraded",
+						latencyMs,
+						httpStatus: response.status,
+						errorCode: String(response.status),
+						errorMessage: `HTTP ${response.status} ${response.statusText}`.trim(),
+						checkedAt: new Date().toISOString(),
+					};
+				}
+				const payload = await response.json().catch(() => ({})) as { data?: unknown[] };
+				const modelsCount = Array.isArray(payload.data) ? payload.data.length : undefined;
+				return {
+					status: latencyMs > 3000 ? "degraded" : "healthy",
+					latencyMs,
+					modelsCount,
+					httpStatus: response.status,
+					checkedAt: new Date().toISOString(),
+				};
+			} catch (error) {
+				const latencyMs = Date.now() - startedAt;
+				const err = error as NodeJS.ErrnoException;
+				// Prefer err.code (e.g. ENOTFOUND, EAI_AGAIN, ECONNREFUSED);
+				// fall back to err.cause.code for errors that wrap another
+				// (Node 18+ fetch throws TypeError with err.cause populated);
+				// fall back to AbortError name detection for timeouts.
+				let errorCode: string;
+				if (err.code && typeof err.code === "string") {
+					errorCode = err.code;
+				} else if (err.cause && typeof err.cause === "object" && "code" in err.cause && typeof (err.cause as { code: unknown }).code === "string") {
+					errorCode = (err.cause as { code: string }).code;
+				} else if (err.name === "AbortError") {
+					errorCode = "timeout";
+				} else {
+					errorCode = "unknown";
+				}
+				const errorMessage = err.message ?? "Provider test failed";
+				return {
+					status: "unreachable",
+					latencyMs,
+					errorCode,
+					errorMessage,
+					checkedAt: new Date().toISOString(),
+				};
+			}
+		});
 		ipcMain.handle("sessions:list", async (_e, cwd: string) => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			await ensureAgentHost();
