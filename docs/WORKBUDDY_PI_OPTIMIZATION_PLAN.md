@@ -17,8 +17,13 @@ OpenBuddy 是一个 **60% 已基于 pi** 的 WorkBuddy 风格桌面 AI 工作区
 同时存在大量巨型文件（最高 4368 行）破坏高内聚低耦合，以及若干对标
 WorkBuddy / pi-web 的 UI 能力缺口。
 
-本计划按 **从底层（运行时/架构）到上层（UI/产品）** 分 6 个阶段推进，
+本计划按 **从底层（运行时/架构）到上层（UI/产品）** 分 7 个阶段推进，
 每阶段都有明确的验收命令与"测试全绿"门槛。
+
+**⚠️ 已发现预先存在的测试失败**（非本次改动引入，需在阶段 0 记录并修复）：
+- `electron/main/agent/pi-extensions.test.ts:516` — `builtinPiExtensionIds()` 测试清单过期，
+  未包含 `openbuddy-pi-compact-announce` 和 `openbuddy-extra-providers`
+  （这两个工厂在 `pi-extensions.ts:1157,1195` 已定义但测试未更新）。
 
 ---
 
@@ -264,13 +269,21 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 
 - [ ] 记录当前测试基线：`pnpm workspace:test` + `pnpm test:electron` 全绿快照
 - [ ] 建立"改造前 vs 改造后"对比基准（测试数、构建通过、启动 smoke）
+- [ ] **记录并修复预先存在的测试失败**：`pi-extensions.test.ts:516` 的
+      `builtinPiExtensionIds()` 清单过期（缺 `openbuddy-pi-compact-announce`、
+      `openbuddy-extra-providers`）。这是基线的一部分，先修好再开始改造。
+
+**验收**：`npx vitest run` 全绿（含修复后的基线）。
 
 ### 阶段 1 — 双轨收敛（P0，核心，8h）
 
-**目标**：消除 pi 与 Cordis 重复运行。
+**目标**：消除 pi 与 Cordis 重复运行。**前置**：阶段 3.5 的能力归属权威表已就绪
+（`capability-ownership.ts`），本阶段用它驱动收敛。
 
 1. **审计真实双轨状态**：逐个检查 12 个 capability 的 Cordis 端是否声明
    `passthroughCapability`。对 permission/goal/session/fs/task 补 flag。
+   - 具体文件：`packages/capability/openbuddy-authorization`、
+     `packages/core/openbuddy-session`、`packages/fs/*`、`packages/capability/openbuddy-mcp-client`。
 2. **收敛 session/fs**：`pi-extensions.ts:434`(session) 与 `:491`(fs) 的 adapter
    已 `passthrough: true`，但 Cordis 端没 flag → 补 flag 后删 Cordis mount。
 3. **清理 task 孤儿**：`pi-extensions.ts:385`(task) 的 adapter 与 Cordis mount
@@ -287,6 +300,11 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 
 **目标**：消除自造轮子，行为与 pi 内置一致。
 
+**✅ 已验证**：pi SDK 0.84.3（`@earendil-works/pi-agent-core`）确实导出全部 compaction
+helper：`shouldCompact` / `findCutPoint` / `prepareCompaction` / `generateSummary` /
+`estimateContextTokens` / `calculateContextTokens` / `compact` / `DEFAULT_COMPACTION_SETTINGS`
+（`dist/index.d.ts:8`）。阶段 2 完全可行。
+
 1. **compaction**：`pi-extensions.ts:1143-1145` 改用 pi SDK 的
    `shouldCompact` / `findCutPoint` / `prepareCompaction` / `generateSummary`。
 2. **branch summary / fork**：若 `pi-agent-core` 提供，替换自实现。
@@ -299,17 +317,37 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 
 ### 阶段 3 — 架构高内聚低耦合（P1，12h）
 
-**目标**：拆分巨型文件，强化模块边界。
+**目标**：拆分巨型文件，强化模块边界。**按依赖顺序拆分**（先底层后上层）。
 
-1. **拆分 `agent-host.ts`（3485 行）**：
-   - 抽出 `AgentFacade`（104 字段的薄门面）
-   - 抽出 `CapabilityAssembler`（capability 装配点）
-   - 抽出 `EventBridge`（事件桥接）
-2. **拆分 `deepseek-runtime.ts`（4368 行）**：按职责分模块。
-3. **拆分 `pi-client.ts`（2595 行）**：事件客户端 / invoke / 状态。
-4. **拆分 `App.tsx`（1746 行）**：Shell 布局 / 路由 / 状态注入。
-5. **拆分 `ChatView.tsx`（1167 行）**：`MessageList` + `Composer` + `RightRail`
-   三个 memo 组件，消除 `useSubagentStore` 整段重渲染。
+**巨型文件清单（实测 top 20，按行数降序）**：
+
+| 文件 | 行数 | 拆分策略 | 优先级 |
+|---|---|---|---|
+| `electron/main/deepseek/deepseek-runtime.ts` | 4368 | 按职责分模块 | 高 |
+| `electron/main/agent/agent-host.ts` | 3485 | AgentFacade/CapabilityAssembler/EventBridge | 高 |
+| `src/lib/agent/pi-client.ts` | 2595 | 事件客户端/invoke/状态 | 高 |
+| `packages/ui/openbuddy-ui-settings/src/SettingsSections.tsx` | 2319 | 按设置分区 | 中 |
+| `electron/main/collaboration/collaboration-runtime.ts` | 2250 | 按协作能力 | 中 |
+| `electron/main/deepseek/deepseek-compat.test.ts` | 2025 | 测试拆分 | 低 |
+| `src/App.tsx` | 1746 | Shell/路由/状态注入 | 高 |
+| `packages/ui/openbuddy-ui-settings/src/SettingsPanel.tsx` | 1653 | 按面板 | 中 |
+| `packages/ui/openbuddy-ui-sidebar/src/Sidebar.tsx` | 1641 | 按侧栏分区 | 中 |
+| `packages/ui/openbuddy-ui-email/src/EmailPanel.tsx` | 1629 | 按邮件能力 | 中 |
+| `electron/main/deepseek/deepseek-generic.ts` | 1509 | 按职责 | 中 |
+| `electron/main/casdoor/casdoor-management.ts` | 1351 | 按管理能力 | 低 |
+| `electron/main/harness/harness-server.ts` | 1327 | HTTP/WS 拆分 | 中 |
+| `electron/main/agent/pi-extensions.ts` | 1305 | adapter/解析/工厂拆分 | 高 |
+| `packages/ui/openbuddy-ui-conversation/src/Composer.tsx` | 1273 | 输入区子组件 | 中 |
+| `packages/ui/openbuddy-ui-conversation/src/ChatView.tsx` | 1167 | MessageList/Composer/RightRail | 高 |
+| `packages/ui/openbuddy-ui-automation/src/AutomationPanel.tsx` | 1163 | 按自动化能力 | 中 |
+| `electron/main/agent/pi-resources/marketplace.ts` | 1148 | 注册表/目录/安装拆分 | 中 |
+| `src/lib/runtime/renderer-plugin-runtime.ts` | 1123 | 按运行时职责 | 中 |
+
+**拆分顺序**（先底层后上层）：
+1. `agent-host.ts` → `pi-extensions.ts`（agent 层，最高耦合）
+2. `pi-client.ts` → `renderer-plugin-runtime.ts`（renderer 层）
+3. `App.tsx` → `ChatView.tsx` → UI 包（UI 层）
+4. `deepseek-runtime.ts` → `collaboration-runtime.ts`（独立运行时）
 
 **验收**：
 - 每个拆分后文件 < 800 行
@@ -345,25 +383,28 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 
 1. **`sessionTree`**：在 `packages/core/openbuddy-session` 暴露
    `SessionTreeNode` / `sessionTree`（BranchNavigator 依赖，当前不存在）。
+   - 方案：基于现有 session 生命周期（`lifecycle.ts`）构建只读会话树，
+     节点含 `{ id, parentId, branch, summary, createdAt }`。
 2. **`extension-events` 索引化**：`pi-event-bridge` 把 `plugin/loaded` /
    `plugin/error` / `extensionUiRequest` 索引到 session-store。
 
 **验收**：
 - `packages/core/openbuddy-session` 导出 `sessionTree`
 - 新增 `tests/electron/extensions-index.spec.ts`
+- 现有测试全绿
 
 ### 阶段 5 — UI 差距补齐（P2，10h）
 
 对标 pi-web 4 项 + WorkBuddy 4 项：
 
-| 子项 | 位置 | 说明 |
-|---|---|---|
-| A. ChatMinimap | `ui-conversation/src/ChatMinimap.tsx` | 色块导航 + 跳转 |
-| B. BranchNavigator | `ui-conversation/src/BranchNavigator.tsx` | 会话树分叉 |
-| C. ExtensionStatusBar | `ui-shared/src/ExtensionStatusBar.tsx` | 扩展状态条 |
-| D. ExtensionWidgets | `ui-conversation/src/ExtensionWidgets.tsx` | 扩展 UI 卡片 |
-| E. 三段式侧栏 | `ui-sidebar/src/TaskItem.tsx` | 探索/规划/执行 |
-| F. 工作流市场可视化 | `ui-automation` | import 后可编辑 |
+| 子项 | 位置 | 说明 | 验收 |
+|---|---|---|---|
+| A. ChatMinimap | `ui-conversation/src/ChatMinimap.tsx` | 色块导航 + 跳转 | 长会话可定位/跳转 |
+| B. BranchNavigator | `ui-conversation/src/BranchNavigator.tsx` | 会话树分叉 | 依赖阶段 4 sessionTree |
+| C. ExtensionStatusBar | `ui-shared/src/ExtensionStatusBar.tsx` | 扩展状态条 | 显示插件 loaded/error |
+| D. ExtensionWidgets | `ui-conversation/src/ExtensionWidgets.tsx` | 扩展 UI 卡片 | 渲染 extensionUiRequest |
+| E. 三段式侧栏 | `ui-sidebar/src/TaskItem.tsx` | 探索/规划/执行 | 标签分类 |
+| F. 工作流市场可视化 | `ui-automation` | import 后可编辑 | 可视化编辑 |
 
 **验收**：
 - 每个子项新增对应 e2e spec
@@ -403,14 +444,49 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 | 巨型文件拆分可能引入回归 | 拆分与测试同步，小步提交 |
 | `sessionTree` 需从零实现 | 阶段 4 前置，先补底层 |
 | 文档漂移误导 | 阶段 1/6 同步更新文档 |
+| **预先存在测试失败（builtinPiExtensionIds）** | 阶段 0 先修复，作为基线 |
+| **pi SDK 升级（0.85+）可能改变 compaction 语义** | 阶段 2 锁定 pi SDK 版本，升级时回归 |
+
+### 6.1 阶段依赖关系图
+
+```
+阶段0(基线) ──► 阶段1(双轨收敛) ──► 阶段2(复用pi SDK)
+   │                ▲
+   │                │ 依赖权威表
+   │                └── 阶段3.5(统一插件体系) ◄── 阶段3(架构拆分)
+   │                        │
+   └──► 阶段4(补底层API) ◄──┘
+              │
+              ▼
+        阶段5(UI补齐) ──► 阶段6(回归)
+```
+
+**关键依赖**：
+- 阶段 1 依赖阶段 3.5 的权威表（已就绪）
+- 阶段 4 依赖阶段 3.5 的插件体系（sessionTree 是插件能力）
+- 阶段 5 依赖阶段 4 的底层 API
+- 阶段 3 与阶段 3.5 可并行（不同文件）
+
+### 6.2 验收自动化
+
+建议在 `package.json` 增加一个 `scripts/verify-plan.ts`，一键跑全部验收门槛：
+
+```ts
+// scripts/verify-plan.ts (阶段 0 时创建)
+// 1. npx tsc --noEmit
+// 2. npx vitest run
+// 3. 断言无巨型文件 > 800 行（阶段 3 后）
+// 4. 断言能力归属单一权威（阶段 3.5 后）
+// 5. 输出 PASS/FAIL 汇总
+```
 
 ---
 
 ## 7. 建议执行顺序
 
 ```
-阶段0(基线) → 阶段1(双轨收敛) → 阶段2(复用pi SDK)
-  → 阶段3(架构拆分) → 阶段3.5(统一插件体系)
+阶段0(基线+修预存失败) → 阶段1(双轨收敛) → 阶段2(复用pi SDK)
+  → 阶段3(架构拆分) ∥ 阶段3.5(统一插件体系)   ← 可并行
   → 阶段4(补底层API) → 阶段5(UI补齐) → 阶段6(回归)
 ```
 
