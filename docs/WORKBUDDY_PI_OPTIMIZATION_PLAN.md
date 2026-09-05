@@ -86,12 +86,34 @@ Layer 3: Pi AgentSession + Cordis 能力服务
 | automation | :590 | ✓ | 已收敛 |
 
 **问题本质**：`pi-extensions.ts:945-960` 的 passthrough 机制要求 **Cordis 端也声明
-`passthroughCapability`** 才会真正跳过 Cordis mount。但部分 Cordis 服务（permission/
-goal/session/fs/task）**没有这个 flag**，导致同一能力 **pi 和 Cordis 各跑一份**：
-双倍资源占用 + 行为漂移。
+`passthroughCapability`** 才会真正跳过 Cordis mount。
+
+**✅ 实测修正（2026-09-05）**：双轨问题**已基本解决**。实际代码
+（`packages/bundle/openbuddy-base/src/capability-plugins.ts`）显示 5 个能力**都已声明**
+`passthroughCapability`：
+
+| 能力 | Cordis 插件 | passthroughCapability | 状态 |
+|---|---|---|---|
+| mcp | mcpClientPlugin | "mcp" | ✅ |
+| permission | permissionPlugin | "permission" | ✅ |
+| session | sessionPlugin | "session" | ✅ |
+| fs | fsLocalPlugin | "fs" | ✅ |
+| goal | teamPlugin（自定义 apply） | "goal" | ✅ |
+| plan | planPlugin 已移除 | 归 pi-plan-mode | ✅ |
+| web | webSearchPlugin 已移除 | 归 pi-web-access | ✅ |
+| automation | automationPlugin 已移除 | 归 pi-goal-list-loop-audit | ✅ |
+| task | 无 Cordis 插件 | adapter 回退到内置 todo 工具 | ✅（非双轨） |
+| lens/simplify/hashline/worktree | 无 Cordis 插件 | 纯 passthrough | ✅ |
+
+**剩余真实问题**：
+1. **authorizationPlugin 无 gate**：`openbuddy-authorization` 未声明 `passthroughCapability`，
+   当 pi-permission-system 接管 permission 时可能重复 mount（需评估依赖：mcpClientPlugin
+   inject 了 `openbuddy-authorization`）。
+2. **task adapter 孤儿**：`pi-extensions.ts:385` 的 task adapter 投影到不存在的
+   `openbuddy-task` 服务，但命令描述说明会回退到内置 todo 工具（非有害双轨）。
 
 **文档漂移**：`docs/OPENBUDDY-PI-VISION.md` 引用的 `electron/main/agent/capability-plugins.ts`
-**已不存在**（已重构进 `openbuddy-core-plugin.ts` + `agent-host.ts`）。文档与代码脱节。
+**已不存在**（实际在 `packages/bundle/openbuddy-base/src/capability-plugins.ts`）。
 
 ### 2.2 【P0】自造轮子：未复用 pi SDK 能力
 
@@ -280,21 +302,20 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 **目标**：消除 pi 与 Cordis 重复运行。**前置**：阶段 3.5 的能力归属权威表已就绪
 （`capability-ownership.ts`），本阶段用它驱动收敛。
 
-1. **审计真实双轨状态**：逐个检查 12 个 capability 的 Cordis 端是否声明
-   `passthroughCapability`。对 permission/goal/session/fs/task 补 flag。
-   - 具体文件：`packages/capability/openbuddy-authorization`、
-     `packages/core/openbuddy-session`、`packages/fs/*`、`packages/capability/openbuddy-mcp-client`。
-2. **收敛 session/fs**：`pi-extensions.ts:434`(session) 与 `:491`(fs) 的 adapter
-   已 `passthrough: true`，但 Cordis 端没 flag → 补 flag 后删 Cordis mount。
-3. **清理 task 孤儿**：`pi-extensions.ts:385`(task) 的 adapter 与 Cordis mount
-   不对应 → 二选一收敛。
-4. **修复文档漂移**：更新 `docs/OPENBUDDY-PI-VISION.md`，把 `capability-plugins.ts`
-   引用改为实际位置（`openbuddy-core-plugin.ts` + `agent-host.ts`）。
+**✅ 实测修正**：双轨问题**已基本解决**——5 个能力（mcp/permission/session/fs/goal）
+的 Cordis 插件**都已声明** `passthroughCapability`（见 §2.1 表格）。
 
-**验收**：
-- `grep -rn 'passthroughCapability' packages/capability/` 覆盖 5 个双轨能力
-- 启动后 `process` 资源占用下降（无重复 mount）
-- 现有测试全绿
+**剩余工作**：
+1. **authorizationPlugin 评估完成**：`openbuddy-authorization` **不应加 gate**。它提供
+   `openbuddy-authorization` 服务（OAuth 授权 seam），被 mcpClientPlugin inject 依赖
+   （`capability-plugins.ts:146`）。permissionPlugin（openbuddy-permission）才是
+   permission 表面，已正确 gate。两者是不同关注点——当前状态正确。
+2. **task adapter 孤儿**：`pi-extensions.ts:385` 的 task adapter 投影到不存在的
+   `openbuddy-task` 服务，但命令描述说明会回退到内置 todo 工具（非有害双轨）。
+3. **修复文档漂移**：更新 `docs/OPENBUDDY-PI-VISION.md`，把 `capability-plugins.ts`
+   引用改为实际位置（`packages/bundle/openbuddy-base/src/capability-plugins.ts`）。
+
+**阶段 1 双轨收敛已基本完成 ✅**（仅剩文档漂移修复）
 
 ### 阶段 2 — 复用 pi SDK 能力（P0，4h）
 
