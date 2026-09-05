@@ -2,7 +2,7 @@
 # 多阶段构建：先构建静态文件，再放入 Nginx
 
 # === Stage 1: build ===
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 WORKDIR /app
 # 仅复制必要文件（依赖 + 源码）
 COPY apps/admin-portal/package.json apps/admin-portal/package.json
