@@ -181,3 +181,4 @@ test-results/
 # not a directory, so the trailing-slash pattern skips it).
 packages/*/node_modules
 packages/*/*/node_modules
+!docs/AI_CHAT_PLAN.md
