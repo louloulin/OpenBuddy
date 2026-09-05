@@ -134,7 +134,7 @@
     "katex": "^0.18.1",
     "linkify-it": "^6.0.0",
     "lowlight": "^3.3.0",
-    "lucide-react": "^0.460.0",
+    "lucide-react": "^1.39.0",
     "mermaid": "^11.16.0",
     "pi-goal-list-loop-audit": "^0.38.0",
     "qrcode": "^1.5.4",
