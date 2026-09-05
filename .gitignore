@@ -184,3 +184,4 @@ packages/*/*/node_modules
 !docs/AI_CHAT_PLAN.md
 !docs/WORKBUDDY_PI_OPTIMIZATION_PLAN.md
 !docs/PLUGIN_SYSTEM.md
+!docs/OPENBUDDY-PI-VISION.md
