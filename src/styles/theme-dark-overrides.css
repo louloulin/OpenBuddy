@@ -1,0 +1,109 @@
+/*
+ * Dark-theme legacy surface overrides.
+ *
+ * New components should use --wb-* semantic tokens directly.  This file is a
+ * small compatibility layer for the WorkBuddy email surfaces that were
+ * originally written against a white host theme.  Keeping it separate makes
+ * the remaining migration surface auditable instead of hiding hardcoded
+ * colors across thousands of lines of app.css.
+ */
+
+/* Inputs and buttons */
+[data-theme="dark"] .email-toolbar select,
+[data-theme="dark"] .email-toolbar input,
+[data-theme="dark"] .email-composer input,
+[data-theme="dark"] .email-composer textarea,
+[data-theme="dark"] .email-search-filters input,
+[data-theme="dark"] .email-search-filters select,
+[data-theme="dark"] .email-toolbar button,
+[data-theme="dark"] .email-composer button,
+[data-theme="dark"] .email-detail__actions button,
+[data-theme="dark"] .email-folders button,
+[data-theme="dark"] .email-composer__tools select,
+[data-theme="dark"] .email-composer__tools button,
+[data-theme="dark"] .email-message__attachments button,
+[data-theme="dark"] .email-provider-diagnostic__accounts span,
+[data-theme="dark"] .email-action-center__stats span,
+[data-theme="dark"] .email-action-center__filter-group button,
+[data-theme="dark"] .email-action-center__sort button {
+  color: var(--email-ink, var(--wb-text-strong));
+  background: var(--surface, var(--wb-bg-secondary));
+  border-color: var(--email-line, var(--wb-border-default));
+}
+
+/* Layout and list surfaces */
+[data-theme="dark"] .email-panel,
+[data-theme="dark"] .email-layout,
+[data-theme="dark"] .email-search-filters,
+[data-theme="dark"] .email-view-tabs,
+[data-theme="dark"] .email-bulk-toolbar,
+[data-theme="dark"] .email-list,
+[data-theme="dark"] .email-ai-actions,
+[data-theme="dark"] .email-message,
+[data-theme="dark"] .email-provider-onboarding,
+[data-theme="dark"] .email-provider-onboarding__grid article,
+[data-theme="dark"] .email-rules,
+[data-theme="dark"] .email-rule-editor,
+[data-theme="dark"] .email-rule-actions-editor,
+[data-theme="dark"] .email-processing-plan,
+[data-theme="dark"] .email-processing-plan__operations article,
+[data-theme="dark"] .email-action-center,
+[data-theme="dark"] .email-action-center__item,
+[data-theme="dark"] .email-composer__preview,
+[data-theme="dark"] .email-attachments span,
+[data-theme="dark"] .email-capability-status span,
+[data-theme="dark"] .email-composer__alert-action {
+  color: var(--email-ink, var(--wb-text-strong));
+  background: var(--surface, var(--wb-bg-secondary));
+  border-color: var(--email-line, var(--wb-border-default));
+}
+
+[data-theme="dark"] .email-folders {
+  background: var(--surface-secondary, var(--wb-bg-tertiary));
+  border-right-color: var(--email-line, var(--wb-border-default));
+}
+
+[data-theme="dark"] .email-thread,
+[data-theme="dark"] .email-thread:hover,
+[data-theme="dark"] .email-action-center__item:hover,
+[data-theme="dark"] .email-action-center__filter-group button:hover,
+[data-theme="dark"] .email-action-center__sort button:hover {
+  background: var(--surface-secondary, var(--wb-bg-hover));
+}
+
+/* Soft status chips stay legible without becoming solid alert colors. */
+[data-theme="dark"] .email-capability-status .is-ready,
+[data-theme="dark"] .email-provider-diagnostic__accounts span.is-ready,
+[data-theme="dark"] .email-action-center__review--is-accepted {
+  color: var(--wb-color-text-success-default);
+  background: var(--wb-status-success-soft);
+  border-color: color-mix(in srgb, var(--wb-status-success) 35%, transparent);
+}
+
+[data-theme="dark"] .email-capability-status .is-muted,
+[data-theme="dark"] .email-provider-diagnostic__accounts span.is-muted,
+[data-theme="dark"] .email-connection-warning,
+[data-theme="dark"] .email-action-center__review--is-pending {
+  color: var(--wb-color-text-warning-default);
+  background: var(--wb-status-warning-soft);
+  border-color: color-mix(in srgb, var(--wb-status-warning) 35%, transparent);
+}
+
+[data-theme="dark"] .email-error,
+[data-theme="dark"] .email-attachments button,
+[data-theme="dark"] .email-action-center__review--is-dismissed {
+  color: var(--wb-color-text-error-default);
+  background: var(--wb-status-error-soft);
+  border-color: color-mix(in srgb, var(--wb-status-error) 35%, transparent);
+}
+
+/* The blue accent buttons remain readable on both themes. */
+[data-theme="dark"] .email-primary,
+[data-theme="dark"] .email-connection-actions button,
+[data-theme="dark"] .email-connection-warning button,
+[data-theme="dark"] .email-action-center__filter-group button.is-active,
+[data-theme="dark"] .email-action-center__sort button.is-active {
+  color: var(--wb-text-on-primary, #fff);
+  background: var(--wb-brand-primary);
+  border-color: var(--wb-brand-primary);
+}

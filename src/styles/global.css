@@ -1,0 +1,125 @@
+/*
+ * OpenBuddy global stylesheet.
+ *
+ * The base reset / body / scrollbar rules live inline in index.html (ported
+ * from workbuddy/renderer/index.html). Design tokens (--wb-*) are loaded
+ * here from tokens.css so any ported WorkBuddy component resolves against
+ * the real palette rather than the VS Code fallbacks.
+ *
+ * Import order matters: tokens first, then app-level aliases.
+ */
+@import "./tokens.css";
+
+/* R5.5 — global focus ring baseline. Provides a visible keyboard focus
+ * indicator on every interactive control unless an explicit :focus-visible
+ * rule overrides it. The accent-tinted ring also helps mouse-only users
+ * spot which control is focused after pressing Tab. */
+:focus-visible {
+  outline: 2px solid var(--wb-accent, #3b82f6);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Foundation Icon base (ported from WorkBuddy agent-ui). */
+.wb-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.wb-icon--spin {
+  animation: wb-icon-spin 1.2s linear infinite;
+  transform-origin: center;
+}
+@keyframes wb-icon-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* themable monochrome brand assets: invert under dark theme. */
+.wb-icon--themable {
+  filter: none;
+  transition: filter var(--wb-motion-duration-fast, 160ms)
+    var(--wb-motion-easing-standard, ease);
+}
+.dark .wb-icon--themable,
+[data-theme="dark"] .wb-icon--themable,
+.wb-theme--dark .wb-icon--themable {
+  filter: brightness(0) invert(1);
+}
+
+/*
+ * Short-form aliases used by some WorkBuddy components and by OpenBuddy's
+ * own placeholder UI. These map onto the semantic tokens above and exist
+ * in both light (:root) and dark ([data-theme="dark"]) forms.
+ */
+:root {
+  --wb-bg-primary: var(--wb-color-bg-secondary-default, #ffffff);
+  --wb-bg-secondary: var(--wb-color-bg-primary-default, #fafafa);
+  --wb-bg-tertiary: var(--wb-color-bg-primary-hover, #f2f2f2);
+  --wb-text-strong: var(--wb-color-text-primary, #1a1a1a);
+  --wb-text-medium: var(--wb-color-text-secondary, #555);
+  --wb-text-weak: var(--wb-color-text-tertiary, #999);
+  --wb-brand: var(--wb-brand-primary, #00c29a);
+  --wb-border-default: var(--wb-color-border-primary, #e6e6e6);
+}
+
+[data-theme="dark"] {
+  --wb-bg-primary: var(--wb-color-bg-primary-default, #1f1f1f);
+  --wb-bg-secondary: var(--wb-color-bg-secondary-default, #292929);
+  --wb-bg-tertiary: var(--wb-color-bg-primary-hover, #2a2a2a);
+  --wb-text-strong: var(--wb-color-text-primary, rgba(255, 255, 255, 0.92));
+  --wb-text-medium: var(--wb-color-text-secondary, rgba(255, 255, 255, 0.65));
+  --wb-text-weak: var(--wb-color-text-tertiary, rgba(255, 255, 255, 0.45));
+  --wb-border-default: color-mix(in srgb, var(--wb-palette-white-100, #fff) 12%, transparent);
+}
+
+/*
+ * Legacy token bridge.
+ *
+ * The WorkBuddy port still uses some short aliases and the email workspace
+ * uses VS Code-like aliases. Keeping them in one bridge prevents a dark
+ * theme from silently falling back to white surfaces while text inherits
+ * the dark foreground.
+ */
+:root {
+  --wb-color-primary: var(--wb-brand-primary, #00c29a);
+  --wb-text-light: var(--wb-text-medium, rgba(0, 0, 0, 0.72));
+  --wb-bg-elevated: var(--wb-palette-white-100, #ffffff);
+  --wb-bg-panel: #fafbfc;
+  --wb-bg-input: var(--wb-palette-white-100, #ffffff);
+  --wb-border: var(--wb-color-border-primary, #e2e6ec);
+  --wb-line-color: var(--wb-color-border-primary, #e2e6ec);
+
+  --surface: var(--wb-palette-white-100, #ffffff);
+  --surface-secondary: #f8faff;
+  --background-primary: var(--wb-palette-white-100, #ffffff);
+  --border-color: var(--wb-color-border-primary, #e5e7eb);
+  --border-subtle: #eef2f7;
+  --text-primary: var(--wb-text-strong, #202124);
+  --text-secondary: var(--wb-text-medium, #6b7280);
+  --email-line: #e6ebf2;
+  --email-ink: #1f2937;
+  --email-muted: #6b7280;
+}
+
+[data-theme="dark"],
+.dark,
+.vscode-dark {
+  --wb-bg-elevated: #191a1c;
+  --wb-bg-panel: #141414;
+  --wb-bg-input: #242424;
+
+  --surface: #1d1d1f;
+  --surface-secondary: #242424;
+  --background-primary: #181818;
+  --border-color: #3a3a3a;
+  --border-subtle: #3a3a3a;
+  --text-primary: var(--wb-text-strong, rgba(255, 255, 255, 0.92));
+  --text-secondary: var(--wb-text-medium, rgba(255, 255, 255, 0.65));
+  --email-line: #3a3a3a;
+  --email-ink: var(--wb-text-strong, rgba(255, 255, 255, 0.92));
+  --email-muted: var(--wb-text-medium, rgba(255, 255, 255, 0.65));
+}

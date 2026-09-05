@@ -1,0 +1,126 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "refresh": "Refresh",
+    "search": "Search",
+    "loading": "Loading",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "close": "Close",
+    "open": "Open",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "permission": {
+    "title": "Permission Mode",
+    "modes": {
+      "default": "Always Ask",
+      "acceptEdits": "Auto-edit Files",
+      "dontAsk": "Trusted Tools",
+      "plan": "Plan Mode",
+      "bypassPermissions": "Full Access"
+    },
+    "descriptions": {
+      "default": "Auto-allow reads; ask before writes or shell calls.",
+      "acceptEdits": "Auto-allow reads and writes; ask before shell calls.",
+      "dontAsk": "Silent for trusted tools, ask for new ones.",
+      "plan": "Output a plan first; require approval before executing.",
+      "bypassPermissions": "Run every tool call without any approval prompt."
+    },
+    "mode_change_failed": "Permission mode change failed",
+    "lockedModeNone": "Not locked (user choice)",
+    "panelTitle": "Policy Settings",
+    "panelHint": "Local policy control (portable alternative to enterprise policy)",
+    "lockSection": "Locked Permission Mode"
+  },
+  "conversation": {
+    "title": "Conversations",
+    "newSession": "New session",
+    "pinnedSection": "Pinned",
+    "pinnedSection.empty": "No pinned sessions. Long-press or right-click a session to pin it.",
+    "searchPlaceholder": "Search conversations...",
+    "noConversations": "No conversations",
+    "sessionDeleted": "Session deleted",
+    "unpin": "Unpin"
+  },
+  "composer": {
+    "placeholder": "Send a message...",
+    "send": "Send",
+    "stop": "Stop",
+    "regenerate": "Regenerate",
+    "attachFile": "Attach file"
+  },
+  "skill": {
+    "title": "Skills",
+    "install": "Install",
+    "installed": "Installed",
+    "remove": "Remove",
+    "import": "Import",
+    "imported": "Imported",
+    "noSkills": "No skills available"
+  },
+  "marketplace": {
+    "title": "Marketplace",
+    "browse": "Browse",
+    "search": "Search marketplace...",
+    "noItems": "No items available",
+    "install": "Install"
+  },
+  "tenant": {
+    "members": "Members",
+    "addMember": "Add member",
+    "removeMember": "Remove member",
+    "roleAdmin": "Admin",
+    "roleMember": "Member",
+    "roleViewer": "Viewer",
+    "policy": "Policy",
+    "memberCount": "Member count"
+  },
+  "billing": {
+    "title": "Billing",
+    "credits": "Credits",
+    "recharge": "Recharge",
+    "history": "Billing history",
+    "currentPlan": "Current plan",
+    "noData": "No billing data"
+  },
+  "about": {
+    "title": "About OpenBuddy",
+    "version": "Version",
+    "license": "License",
+    "credits": "Credits",
+    "checkUpdate": "Check for updates",
+    "github": "GitHub repository"
+  },
+  "settings": {
+    "title": "Settings",
+    "providers": "Model Providers",
+    "appearance": "Appearance",
+    "language": "Language",
+    "advanced": "Advanced",
+    "save": "Save settings",
+    "saved": "Settings saved"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "sessionExpired": "Session expired",
+    "permissionDenied": "Permission denied"
+  },
+  "scene": {
+    "modes": {
+      "working": "Daily Work",
+      "coding": "Code Development",
+      "design": "Design Studio"
+    },
+    "fallback": "Daily Work"
+  }
+}
