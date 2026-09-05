@@ -167,6 +167,19 @@ System tray, native notifications, deep links (`casdoor://`), clipboard integrat
 
 > Captured from the live dev renderer at `http://127.0.0.1:1420/` against commit `a9d240ff`. To regenerate, run `pnpm electron:dev` and use the Playwright recipe in `scripts/electron/screenshot.mjs`.
 
+### AI chat with a real model — MiniMax-M3 over Anthropic Messages
+
+<p align="center">
+  <img src="docs/screenshots/chat-minimax.png" alt="OpenBuddy AI chat — real MiniMax-M3 turn rendered through the production transcript pipeline (深度思考 + Markdown + code block)" width="1024" />
+</p>
+
+> Two-turn conversation against the real `MiniMax-M3` model via
+> `https://api.minimaxi.com/anthropic`. Captured end-to-end by
+> `scripts/electron/capture-chat-screenshot.mjs`: register provider → save
+> model with `reasoning:true` → set thinking level `high` → type into the
+> composer → wait for the renderer to settle. Both turns exercise the
+> collapsible **深度思考** channel and the markdown/code render path.
+
 ### Main desktop shell (中文 / 简体中文 default)
 
 <p align="center">
