@@ -13,7 +13,7 @@ const allowedInvokeChannels = new Set([
   "agent:event-log", "agent:event-log-replay", "agent:extensions-reload", "agent:follow-up", "agent:init", "agent:ensure-new-session", "agent:load-session", "agent:new-session", "agent:plugin-config", "agent:plugin-enable",
   "agent:plugin-events", "agent:plugin-inventory", "agent:plugin-list", "agent:plugin-readiness", "agent:plugin-reload", "agent:plugin-snapshot", "agent:plugin-state-get", "agent:plugin-state-reset",
   "agent:preset-current", "agent:preset-default-save", "agent:preset-select", "agent:presets-list", "agent:profile-install", "agent:profile-install-default-pi", "agent:profile-packages", "agent:profile-remove", "agent:prompt",
-  "agent:providers-delete-model", "agent:providers-delete-provider", "agent:providers-fetch-models", "agent:providers-list", "agent:providers-save-model", "agent:providers-save-provider", "agent:remote-contributions", "agent:renderer-plugin-boot",
+  "agent:providers-delete-model", "agent:providers-delete-provider", "agent:providers-fetch-models", "agent:providers-list", "agent:providers-save-model", "agent:providers-save-provider", "agent:providers-test", "agent:remote-contributions", "agent:renderer-plugin-boot",
   "agent:renderer-plugin-entries", "agent:renderer-plugin-module", "agent:resolve-permission", "agent:resolve-question", "agent:resource-inventory", "agent:session-messages", "agent:session-info", "agent:session-metadata-clear", "agent:session-usage", "agent:tools-list",
   "agent:prompt-content", "agent:set-thinking-level", "agent:set-permission-mode", "agent:workspace-search",
   "agent:set-model", "agent:steer", "agent:transaction-list", "agent:transaction-receipt", "agents_defaults_get", "agents_defaults_save", "agents_delete", "agents_get",
