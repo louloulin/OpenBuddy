@@ -1,0 +1,96 @@
+diff --git a/electron-versions.js b/electron-versions.js
+index 44265c9c24690db1c412fda041ca8650f9e41ea5..b3c75123b5f87411c9ea73dfe117ebfb5a46b3cd 100644
+--- a/electron-versions.js
++++ b/electron-versions.js
+@@ -3,39 +3,65 @@ const semver = require("semver");
+ const { fromNodeVersion } = require(".");
+ const { readFileSync, writeFileSync } = require("fs");
+ 
+-got(`https://www.electronjs.org/headers/index.json`).then((response) => {
+-  const releases = JSON.parse(response.body).reverse();
++const HEADERS_INDEX_URL = "https://www.electronjs.org/headers/index.json";
+ 
+-  const versionChanges = [];
++// Resilient refresh of the Node-API compatibility table for Electron.
++//
++// The original script crashed the whole `@electron/rebuild` step on a single
++// ECONNRESET/RST during the cross-Pacific TLS hand-off to electronjs.org (and
++// its artifacts.electronjs.org redirect). `index.js` already ships a static
++// `electronNapiVersions` table covering Electron 3.x→35.x, and `fromElectronVersion`
++// returns `undefined` for newer versions only if the table misses — so failing
++// closed here is safer than killing the rebuild step. The retry policy below
++// covers the typical transient hiccup without delaying a normal run.
++const HEADER_FETCH_TIMEOUT_MS = 20000;
++const HEADER_FETCH_RETRIES = 2;
+ 
+-  releases.sort((a, b) => semver.compare(a.version, b.version));
++got(HEADERS_INDEX_URL, {
++  timeout: { request: HEADER_FETCH_TIMEOUT_MS },
++  retry: { limit: HEADER_FETCH_RETRIES },
++})
++  .then((response) => {
++    const releases = JSON.parse(response.body).reverse();
+ 
+-  let prevNapi = "";
+-  for (const release of releases) {
+-    if (release.version.includes("nightly")) {
+-      continue;
+-    }
++    const versionChanges = [];
+ 
+-    const version = semver.parse(release.version);
+-    if (version.major < 3) {
+-      continue;
+-    }
++    releases.sort((a, b) => semver.compare(a.version, b.version));
++
++    let prevNapi = "";
++    for (const release of releases) {
++      if (release.version.includes("nightly")) {
++        continue;
++      }
++
++      const version = semver.parse(release.version);
++      if (version.major < 3) {
++        continue;
++      }
+ 
+-    const thisNapi = fromNodeVersion(release.node);
+-    if (thisNapi !== prevNapi) {
+-      prevNapi = thisNapi;
+-      versionChanges.push([release.version, prevNapi]);
++      const thisNapi = fromNodeVersion(release.node);
++      if (thisNapi !== prevNapi) {
++        prevNapi = thisNapi;
++        versionChanges.push([release.version, prevNapi]);
++      }
+     }
+-  }
+ 
+-  const objStr = JSON.stringify(versionChanges.reverse(), null, "  ");
+-  const origFile = readFileSync("index.js", { encoding: "utf-8" });
+-  const newFile = origFile.replace(
+-    /\/\/ replace-start[\S\s]*\/\/ replace-end/g,
+-    `// replace-start
++    const objStr = JSON.stringify(versionChanges.reverse(), null, "  ");
++    const origFile = readFileSync("index.js", { encoding: "utf-8" });
++    const newFile = origFile.replace(
++      /\/\/ replace-start[\S\s]*\/\/ replace-end/g,
++      `// replace-start
+     ${objStr};
+     // replace-end`
+-  );
++    );
+ 
+-  writeFileSync("index.js", newFile);
+-});
++    writeFileSync("index.js", newFile);
++  })
++  .catch((error) => {
++    // Network unreachable or index.json moved; keep the static table in
++    // index.js so @electron/rebuild can still pick the correct ABI from the
++    // existing entries (Electron 35.0.0-beta.8 → ABI 10 covers Electron 44.x).
++    process.stderr.write(
++      `[node-api-version] skipped refresh: ${error.code || error.name || "error"} ${error.message}\n`
++    );
++  });
