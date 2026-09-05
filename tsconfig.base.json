@@ -1,0 +1,79 @@
+{
+  // =====================================================================
+  // tsconfig.base.json — OpenBuddy 公共编译选项基座
+  //
+  // 所有 ui-* 包与根项目 tsconfig.json 都应该 extends 本文件;
+  // 本文件只放跨包共用的 compilerOptions(目标、严格性、模块解析策略),
+  // 不放 paths / include — 那些是消费方各自决定的。
+  //
+  // 参考 deepseek-harness 的 `tsconfig.base.json` 设计:它把全部 paths
+  // 都集中在根,所有包 extend;OpenBuddy 由于 webpack/vite/electron-vite
+  // 三套构建体系共用,ui-* 包还需要 `paths` 才能跨包解析,因此在本文件
+  // 外再为每个 ui-* 包 tsconfig.json 提供独立的 paths(由 sync-ui-aliases.mjs
+  // 自动同步)。
+  // =====================================================================
+  "compilerOptions": {
+    // ─── 输出目标 ────────────────────────────────────────────────
+    // ES2022: 顶层 await / class fields / Error.cause 等现代语法都稳定可用;
+    // electron-vite / vite 直接 polyfill,不需要降级到 ES2017。
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
+    // ─── 模块系统 ────────────────────────────────────────────────
+    // ESNext + Bundler 解析:配合 vite/electron-vite 的 esbuild 解析,
+    // 允许 `.ts/.tsx` 后缀导入与 `package.json#exports` 条件导出。
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "force",
+
+    // ─── 类与 JSX ────────────────────────────────────────────────
+    "useDefineForClassFields": true,
+    "jsx": "react-jsx",
+
+    // ─── 互操作 ──────────────────────────────────────────────────
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+
+    // ─── 输出控制 ────────────────────────────────────────────────
+    // 所有构建都走 vite/electron-vite/tsc --noEmit;本项目从不直接 tsc emit,
+    // 所以这里统一关掉 emit + declaration 等,需要时由具体 tsconfig 覆盖。
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    // ─── 类型严格性 ──────────────────────────────────────────────
+    // 全仓库 strict 开启,但留出 strictPropertyInitialization 关闭的逃生口
+    // (ui-* 包大多使用 defineStore/RTK 风格的 immutable init,无需 DI 校验)。
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": false,
+    "alwaysStrict": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+
+    // ─── 一致性约束 ──────────────────────────────────────────────
+    "noFallthroughCasesInSwitch": true,
+
+    // ─── 进阶类型安全(2026 best practice,默认关闭,迁移后建议开)────
+    //   noUncheckedIndexedAccess           数组 / 记录取值显式标注 | undefined;会扩散影响 stores
+    //   noImplicitOverride                 class 子类方法显式 override;目前仅 ui-modules/styles 等少量类
+    //   noPropertyAccessFromIndexSignature 索引签名访问必须用 obj["key"];会影响大块 stores
+    //   verbatimModuleSyntax                强制 import type 与 runtime 分离;会扩散 ui-* 包
+    // (本期先在基座占位,迁移期不开;L4 子任务 2 拆完 stores 之后逐包打开。)
+    "noUncheckedIndexedAccess": false,
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "forceConsistentCasingInFileNames": true,
+
+    // ─── 未使用检测 ──────────────────────────────────────────────
+    // 由各包 tsconfig 决定是否开启;基座默认关闭,避免大块迁移期误报。
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  }
+}

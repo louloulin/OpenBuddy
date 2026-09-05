@@ -1,0 +1,260 @@
+language: typescript
+layer: application
+stack: frontend
+tags: ["app", "app-desktop"]
+
+fileGroups:
+  sources:
+    - "src/**/*"
+    - "electron/**/*"
+    # The Electron renderer resolves workspace packages from source. Keep
+    # their implementation files in the application build hash so a renderer
+    # host change cannot be hidden behind a stale `out/` bundle.
+    - "packages/renderer/openbuddy-renderer-host/src/**/*"
+    - "packages/ui/**/*"
+    - "packages/bundle/openbuddy-base/src/**/*"
+    - "*.{ts,tsx,js,mjs,cjs,json,html}"
+    - "electron.vite.config.ts"
+    - "index.html"
+    - "electron-builder.yml"
+
+# ---------------------------------------------------------------------------
+# Tasks are defined inline (not via `.moon/tasks/root.yml` inheritance) so
+# they only attach to this application project. Library packages under
+# `packages/*/*` MUST NOT see `build`, `electron.build`, `dev`, etc.
+#
+# The package manager (pnpm) and the dependency graph (DAG) live in moon —
+# pnpm is only used to install dependencies. All commands run via
+# `pnpm <script>` (each script in `package.json` forwards to `moon run openbuddy:<task>`).
+# ---------------------------------------------------------------------------
+tasks:
+  # Type-check the React renderer (`src/`) + the electron-vite config + the
+  # root tsconfig. Cascades to `app-desktop:typecheck` so the electron main
+  # + preload TypeScript in `electron/{main,preload}/**` is also checked.
+  typecheck:
+    script: "tsc --noEmit"
+    deps:
+      - "app-desktop:typecheck"
+    inputs:
+      - "@group(sources)"
+      - "tsconfig*.json"
+      - "package.json"
+    outputs: []
+
+  # Lint is the same effective command as typecheck in this codebase (tsc
+  # with --noEmit). Kept as a separate task so CI / `pnpm lint` can target
+  # it specifically.
+  lint:
+    script: "tsc --noEmit"
+    deps:
+      - "app-desktop:lint"
+    inputs:
+      - "@group(sources)"
+      - "tsconfig*.json"
+      - "package.json"
+    outputs: []
+
+  # electron-vite builds three bundles (main / preload / renderer) in one
+  # orchestration step. Depends on `~:typecheck` which cascades to
+  # `app-desktop:typecheck` so both projects are covered before bundling.
+  build:
+    deps:
+      - "~:typecheck"
+      - "~:build.bundle"
+
+  build.bundle:
+    script: "electron-vite build"
+    inputs:
+      - "@group(sources)"
+      - "electron.vite.config.ts"
+      - "index.html"
+    outputs:
+      - "out"
+
+  # Alias kept for callers that previously expected a flat renderer build
+  # task. Produces the same `out/` as `build.bundle`; the renderer is the
+  # largest bundle so it dominates wall time.
+  build.renderer:
+    script: "electron-vite build"
+    inputs:
+      - "@group(sources)"
+      - "electron.vite.config.ts"
+      - "index.html"
+    outputs:
+      - "out"
+    options:
+      runInCI: true
+
+  dev:
+    script: "node scripts/electron/dev.mjs"
+    options:
+      persistent: true
+      cache: false
+
+  dev.renderer:
+    script: "vite"
+    options:
+      persistent: true
+      cache: false
+
+  dev.electron:
+    script: "node scripts/electron/dev.mjs"
+    options:
+      persistent: true
+      cache: false
+
+  preview:
+    script: "electron-vite preview"
+    options:
+      persistent: true
+      cache: false
+
+  electron.start:
+    deps:
+      - "~:build"
+    script: "electron ."
+    options:
+      persistent: true
+      cache: false
+    inputs:
+      - "out/**/*"
+      - "package.json"
+
+  electron.smoke:
+    deps:
+      - "~:build"
+    script: "electron scripts/electron/smoke.mjs"
+    options:
+      cache: false
+    inputs:
+      - "scripts/electron/smoke.mjs"
+      - "out/**/*"
+      - "package.json"
+
+  electron.harness-smoke:
+    deps:
+      - "~:build"
+    script: "node scripts/electron/harness-smoke.mjs"
+    options:
+      cache: false
+    inputs:
+      - "scripts/electron/harness-smoke.mjs"
+      - "out/**/*"
+      - "package.json"
+
+  electron.build:
+    deps:
+      - "~:build"
+    script: "scripts/electron-builder.sh --config electron-builder.yml"
+    inputs:
+      - "scripts/electron-builder.sh"
+      - "electron-builder.yml"
+      - "out/**/*"
+      - "package.json"
+    outputs:
+      - "release"
+    options:
+      cache: false
+
+  electron.build.win:
+    deps:
+      - "~:build"
+    script: "scripts/electron-builder.sh --win --config electron-builder.yml"
+    options:
+      cache: false
+
+  electron.build.mac:
+    deps:
+      - "~:build"
+    script: "node scripts/check-macos-signing.mjs && scripts/electron-builder.sh --mac --config electron-builder.yml"
+    inputs:
+      - "scripts/check-macos-signing.mjs"
+      - "scripts/electron-builder.sh"
+      - "electron-builder.yml"
+      - "out/**/*"
+      - "package.json"
+    outputs:
+      - "release"
+    options:
+      cache: false
+
+  electron.build.linux:
+    deps:
+      - "~:build"
+    script: "scripts/electron-builder.sh --linux --config electron-builder.yml"
+    options:
+      cache: false
+
+  # Quick local preview without notarization preflight. Produces an unsigned
+  # `.app` bundle so developers can iterate without Apple Developer ID secrets.
+  # `:release:mac` is the alias that gates on `check-macos-signing.mjs`.
+  electron.build.mac.dir:
+    deps:
+      - "~:build"
+    script: "CSC_IDENTITY_AUTO_DISCOVERY=false scripts/electron-builder.sh --mac --dir --config electron-builder.yml"
+    inputs:
+      - "scripts/electron-builder.sh"
+      - "electron-builder.yml"
+      - "out/**/*"
+      - "package.json"
+    outputs:
+      - "release"
+    options:
+      cache: false
+
+  electron.build.win.dir:
+    deps:
+      - "~:build"
+    script: "scripts/electron-builder.sh --win --dir --config electron-builder.yml"
+    inputs:
+      - "scripts/electron-builder.sh"
+      - "electron-builder.yml"
+      - "out/**/*"
+      - "package.json"
+    outputs:
+      - "release"
+    options:
+      cache: false
+
+  electron.build.linux.dir:
+    deps:
+      - "~:build"
+    script: "scripts/electron-builder.sh --linux --dir --config electron-builder.yml"
+    inputs:
+      - "scripts/electron-builder.sh"
+      - "electron-builder.yml"
+      - "out/**/*"
+      - "package.json"
+    outputs:
+      - "release"
+    options:
+      cache: false
+
+  # Full distributable installers (NSIS / DMG / AppImage). Windows + Linux do
+  # not need notarization preflight, so they go straight through
+  # electron-builder. macOS release still gates on signing + notary.
+  electron.release.win:
+    deps:
+      - "~:build"
+    script: "scripts/electron-builder.sh --win --config electron-builder.yml"
+    options:
+      cache: false
+
+  electron.release.linux:
+    deps:
+      - "~:build"
+    script: "scripts/electron-builder.sh --linux --config electron-builder.yml"
+    options:
+      cache: false
+
+  # Cross-platform installer build. CI only (`runInCI: true`) so local
+  # developers don't accidentally produce signed artifacts they didn't intend.
+  electron.build.all:
+    deps:
+      - "~:build"
+    script: "scripts/electron-builder.sh -mwl --config electron-builder.yml"
+    options:
+      cache: false
+      runInCI: true
+
+

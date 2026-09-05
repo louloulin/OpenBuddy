@@ -1,0 +1,38 @@
+packages:
+  - '.'
+  - 'packages/auth/*'
+  - 'packages/bundle/*'
+  - 'packages/capability/*'
+  - 'packages/collaboration/*'
+  - 'packages/core/*'
+  - 'packages/fs/*'
+  - 'packages/payment/*'
+  - 'packages/renderer/*'
+  - 'packages/runtime/*'
+  - 'packages/saml/*'
+  - 'packages/scim/*'
+  - 'packages/shared/*'
+  - 'packages/team/*'
+  - 'packages/ui/*'
+  - 'packages/webhook-outbox/*'
+
+allowBuilds:
+  '@google/genai': set this to true or false
+  bufferutil: set this to true or false
+  electron: set this to true or false
+  electron-winstaller: set this to true or false
+  esbuild: set this to true or false
+  protobufjs: set this to true or false
+  utf-8-validate: set this to true or false
+
+# pnpm 10+ blocks dependency postinstall scripts by default for security.
+# These packages provide the native/runtime binaries required by the Electron
+# development path and must be explicitly allowlisted here.
+onlyBuiltDependencies:
+  - '@google/genai'
+  - electron
+  - electron-winstaller
+  - esbuild
+  - protobufjs
+  - bufferutil
+  - utf-8-validate
