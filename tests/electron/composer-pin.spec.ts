@@ -245,14 +245,23 @@ test.describe("chat composer stays pinned to the bottom (echo path, no credentia
     await page.locator(COMPOSER).first().waitFor({ state: "visible", timeout: 30_000 });
     await page.setViewportSize({ width: 1280, height: 600 });
 
-    // 5 echo-driven turns. The echo reply is `ECHO <MARKER>`,` which is short,
-    // but each turn appends a real user bubble + the echo's markdown rendered
-    // back, so 5 turns is enough to overflow the column.
-    for (let i = 0; i < 5; i += 1) {
+    // 3 echo-driven turns is enough to overflow the 600px viewport. Each turn
+    // appends a real user bubble + the echo's "ECHO <MARKER>" rendered back,
+    // so the column requires scrolling after a couple of turns. 5 turns was
+    // the original count but exceeded the 120s per-turn timeout under full
+    // parallel load (CPU contention on 2 workers x Electron + echo server).
+    for (let i = 0; i < 3; i += 1) {
       const before = await page.locator(ASSISTANT_BUBBLE).count();
       const marker = `ECHO-PIN-${i}-${Date.now()}`;
+      // Wait for the composer to be re-enabled after the previous turn settles.
+      // Without this, the click on 发送 can land while the button is still
+      // disabled from the prior turn's cleanup, silently dropping the prompt.
+      await expect(page.locator(COMPOSER).first()).toBeEnabled({ timeout: 30_000 });
       await page.locator(COMPOSER).first().fill(`只回复 ${marker}`);
-      await page.getByRole("button", { name: "发送", exact: true }).click();
+      // Wait for the send button to be enabled too (it follows the composer).
+      const sendBtn = page.getByRole("button", { name: "发送", exact: true });
+      await expect(sendBtn).toBeEnabled({ timeout: 15_000 });
+      await sendBtn.click();
       await page.waitForFunction(
         ({ count, needle }) => {
           const nodes = [...document.querySelectorAll(".msg--assistant")];
