@@ -35,7 +35,7 @@ if (process.platform !== "win32" || !existsSync(packagedExecutable)) {
 }
 
 console.log(`[windows-runtime] validating packaged executable: ${packagedExecutable}`);
-run(pnpmCommand, ["run", "test:electron"], {
+run(pnpmCommand, ["exec", "node", "scripts/windows-packaged-smoke.mjs"], {
   ...process.env,
   OPENBUDDY_ELECTRON_PATH: packagedExecutable,
 });
