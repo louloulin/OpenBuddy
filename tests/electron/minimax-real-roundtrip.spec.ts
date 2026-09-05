@@ -135,6 +135,13 @@ async function bootstrapMinimax(page: import("@playwright/test").Page): Promise<
   return { sessionId: sid, cwd };
 }
 
+// Raise the per-test budget above Playwright's 30s default. These specs boot
+// Electron and then do real network round-trips to MiniMax — the abort test
+// alone spends 15s waiting for an in-flight turn. At 30s they pass in isolation
+// but cross the deadline under parallel CPU contention, i.e. flake on load
+// rather than on logic. (Previously masked: the whole describe used to skip.)
+test.describe.configure({ timeout: 120_000 });
+
 test.describe("MiniMax real roundtrip (skipped without credentials)", () => {
   test.skip(!HAS_CREDS, "set OPENBUDDY_E2E_API_KEY + OPENBUDDY_E2E_BASE_URL to enable");
 

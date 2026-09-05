@@ -135,6 +135,10 @@ async function waitForComplete(readCap: () => Promise<CaptureBuffer>, timeoutMs:
   return last;
 }
 
+// Above Playwright's 30s default: these boot Electron and do a real MiniMax
+// turn plus a load-session round-trip, which crosses 30s under parallel load.
+test.describe.configure({ timeout: 120_000 });
+
 test.describe("Session history load (real MiniMax)", () => {
   test.skip(!HAS_CREDS, "MiniMax credentials not configured");
 

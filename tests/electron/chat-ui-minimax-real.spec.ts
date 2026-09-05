@@ -214,22 +214,31 @@ test.describe("real MiniMax turn renders in the transcript", () => {
   test("a multi-line answer accumulates without duplicating spans", async ({ page }) => {
     await prepareRealModel(page);
 
+    // Ask for a JSON array so the assertion is format-stable regardless of how
+    // the model phrases its output. Earlier wording ("每行以 LINE 开头…LINE1、LI
+    // NE2、LINE3") made the model echo the user's literal tokens back in its
+    // own prose — the test then asserted duplication that was actually model
+    // behavior, not a renderer bug.
     await sendThroughComposer(
       page,
-      "用中文分三行回答，每行以 LINE 开头并编号：LINE1、LINE2、LINE3，不要输出其他内容。",
+      "输出恰好一个 JSON 数组，3 个元素，值依次是 \"第一\"、\"第二\"、\"第三\"，不加任何解释、markdown 或多余文本。",
     );
 
     const bubble = page.locator(ASSISTANT_BUBBLE).last();
-    await expect(bubble).toContainText("LINE3", { timeout: 120_000 });
+    await expect(bubble).toContainText("第三", { timeout: 120_000 });
     await expect(page.locator(STOP_BUTTON)).toHaveCount(0, { timeout: 60_000 });
 
     const rendered = (await bubble.innerText()).trim();
-    for (const token of ["LINE1", "LINE2", "LINE3"]) {
+    for (const value of ["第一", "第二", "第三"]) {
       expect(
-        countOccurrences(rendered, token),
-        `${token} appeared ${countOccurrences(rendered, token)}x in:\n${rendered}`,
+        countOccurrences(rendered, value),
+        `${value} appeared ${countOccurrences(rendered, value)}x in:\n${rendered}`,
       ).toBe(1);
     }
+    // Adjacent-repeat sentinel — catches the original DIDIAG-OKAG-OK pattern
+    // where the renderer genuinely doubled the streamed text.
+    const repeat = /(.{4,})\1/su.exec(rendered);
+    expect(repeat, `transcript has an adjacent repeated run (${JSON.stringify(repeat?.[1])}):\n${rendered}`).toBeNull();
   });
 
   /**
@@ -254,10 +263,11 @@ test.describe("real MiniMax turn renders in the transcript", () => {
     // without `reasoning:true` reports no thinking support and clamps to off).
     await prepareRealModel(page, { reasoning: true, thinkingLevel: "high" });
 
-    await sendThroughComposer(
-      page,
-      "请先展示你的推理过程，再在最后单独一行输出：ANSWER=<24除以6的结果>。",
-    );
+    // Ask for a CONCISE visible answer. High thinking populates the separate
+    // thought channel; the answer body should stay short. (Asking the model to
+    // "show your reasoning" would put prose in the answer by design and is not
+    // what this test measures.)
+    await sendThroughComposer(page, "只输出一行：ANSWER=<24除以6的结果>，不要输出其他内容。");
 
     const bubble = page.locator(ASSISTANT_BUBBLE).last();
     await expect(bubble).toContainText("ANSWER=", { timeout: 120_000 });
