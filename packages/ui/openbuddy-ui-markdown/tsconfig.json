@@ -1,0 +1,324 @@
+{
+  "extends": "../tsconfig.base.client.json",
+  "compilerOptions": {
+    "baseUrl": "../../..",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ],
+      "@openbuddy/shared-types": [
+        "packages/shared/openbuddy-types/src/index.ts"
+      ],
+      "@openbuddy/files-kb": [
+        "packages/shared/openbuddy-files-kb/src/index.ts"
+      ],
+      "@openbuddy/cordis": [
+        "packages/runtime/openbuddy-cordis/src/index.ts"
+      ],
+      "@openbuddy/ui-automation": [
+        "packages/ui/openbuddy-ui-automation/src/index.ts"
+      ],
+      "@openbuddy/ui-automation/client": [
+        "./packages/ui/openbuddy-ui-automation/src/client.tsx"
+      ],
+      "@openbuddy/ui-automation/invariant": [
+        "./packages/ui/openbuddy-ui-automation/src/invariant.ts"
+      ],
+      "@openbuddy/ui-conversation": [
+        "packages/ui/openbuddy-ui-conversation/src/index.ts"
+      ],
+      "@openbuddy/ui-conversation/client": [
+        "packages/ui/openbuddy-ui-conversation/src/client.tsx"
+      ],
+      "@openbuddy/ui-conversation/invariant": [
+        "packages/ui/openbuddy-ui-conversation/src/invariant.ts"
+      ],
+      "@openbuddy/ui-dialogs": [
+        "packages/ui/openbuddy-ui-dialogs/src/index.ts"
+      ],
+      "@openbuddy/ui-dialogs/client": [
+        "packages/ui/openbuddy-ui-dialogs/src/client.tsx"
+      ],
+      "@openbuddy/ui-dialogs/invariant": [
+        "packages/ui/openbuddy-ui-dialogs/src/invariant.ts"
+      ],
+      "@openbuddy/ui-experts": [
+        "packages/ui/openbuddy-ui-experts/src/index.ts"
+      ],
+      "@openbuddy/ui-experts/client": [
+        "packages/ui/openbuddy-ui-experts/src/client.tsx"
+      ],
+      "@openbuddy/ui-experts/invariant": [
+        "packages/ui/openbuddy-ui-experts/src/invariant.ts"
+      ],
+      "@openbuddy/ui-hmr": [
+        "packages/ui/openbuddy-ui-hmr/src/index.ts"
+      ],
+      "@openbuddy/ui-hmr/client": [
+        "packages/ui/openbuddy-ui-hmr/src/client.tsx"
+      ],
+      "@openbuddy/ui-hmr/invariant": [
+        "packages/ui/openbuddy-ui-hmr/src/invariant.ts"
+      ],
+      "@openbuddy/ui-home": [
+        "packages/ui/openbuddy-ui-home/src/index.ts"
+      ],
+      "@openbuddy/ui-home/client": [
+        "packages/ui/openbuddy-ui-home/src/client.tsx"
+      ],
+      "@openbuddy/ui-home/invariant": [
+        "packages/ui/openbuddy-ui-home/src/invariant.ts"
+      ],
+      "@openbuddy/ui-layout": [
+        "packages/ui/openbuddy-ui-layout/src/index.ts"
+      ],
+      "@openbuddy/ui-layout/client": [
+        "packages/ui/openbuddy-ui-layout/src/client.tsx"
+      ],
+      "@openbuddy/ui-layout/invariant": [
+        "packages/ui/openbuddy-ui-layout/src/invariant.ts"
+      ],
+      "@openbuddy/ui-locale": [
+        "packages/ui/openbuddy-ui-locale/src/index.ts"
+      ],
+      "@openbuddy/ui-locale/client": [
+        "packages/ui/openbuddy-ui-locale/src/client.tsx"
+      ],
+      "@openbuddy/ui-locale/invariant": [
+        "packages/ui/openbuddy-ui-locale/src/invariant.ts"
+      ],
+      "@openbuddy/ui-markdown": [
+        "packages/ui/openbuddy-ui-markdown/src/index.ts"
+      ],
+      "@openbuddy/ui-markdown/client": [
+        "packages/ui/openbuddy-ui-markdown/src/client.tsx"
+      ],
+      "@openbuddy/ui-markdown/invariant": [
+        "packages/ui/openbuddy-ui-markdown/src/invariant.ts"
+      ],
+      "@openbuddy/ui-modules": [
+        "packages/ui/openbuddy-ui-modules/src/index.ts"
+      ],
+      "@openbuddy/ui-modules/client": [
+        "packages/ui/openbuddy-ui-modules/src/client.ts"
+      ],
+      "@openbuddy/ui-modules/invariant": [
+        "packages/ui/openbuddy-ui-modules/src/invariant.ts"
+      ],
+      "@openbuddy/ui-primitives": [
+        "packages/ui/openbuddy-ui-primitives/src/index.ts"
+      ],
+      "@openbuddy/ui-primitives/client": [
+        "packages/ui/openbuddy-ui-primitives/src/client.ts"
+      ],
+      "@openbuddy/ui-primitives/invariant": [
+        "packages/ui/openbuddy-ui-primitives/src/invariant.ts"
+      ],
+      "@openbuddy/ui-runtime": [
+        "packages/ui/openbuddy-ui-runtime/src/index.ts"
+      ],
+      "@openbuddy/ui-runtime/client": [
+        "packages/ui/openbuddy-ui-runtime/src/client.tsx"
+      ],
+      "@openbuddy/ui-runtime/invariant": [
+        "packages/ui/openbuddy-ui-runtime/src/invariant.ts"
+      ],
+      "@openbuddy/ui-settings": [
+        "packages/ui/openbuddy-ui-settings/src/index.ts"
+      ],
+      "@openbuddy/ui-settings/client": [
+        "packages/ui/openbuddy-ui-settings/src/client.tsx"
+      ],
+      "@openbuddy/ui-settings/invariant": [
+        "packages/ui/openbuddy-ui-settings/src/invariant.ts"
+      ],
+      "@openbuddy/ui-settings-models": [
+        "packages/ui/openbuddy-ui-settings-models/src/index.ts"
+      ],
+      "@openbuddy/ui-settings-models/client": [
+        "packages/ui/openbuddy-ui-settings-models/src/client.tsx"
+      ],
+      "@openbuddy/ui-settings-models/invariant": [
+        "packages/ui/openbuddy-ui-settings-models/src/invariant.ts"
+      ],
+      "@openbuddy/ui-shell": [
+        "packages/ui/openbuddy-ui-shell/src/index.ts"
+      ],
+      "@openbuddy/ui-shell/client": [
+        "packages/ui/openbuddy-ui-shell/src/client.tsx"
+      ],
+      "@openbuddy/ui-shell/invariant": [
+        "packages/ui/openbuddy-ui-shell/src/invariant.ts"
+      ],
+      "@openbuddy/ui-sidebar": [
+        "packages/ui/openbuddy-ui-sidebar/src/index.ts"
+      ],
+      "@openbuddy/ui-sidebar/client": [
+        "packages/ui/openbuddy-ui-sidebar/src/client.tsx"
+      ],
+      "@openbuddy/ui-sidebar/invariant": [
+        "packages/ui/openbuddy-ui-sidebar/src/invariant.ts"
+      ],
+      "@openbuddy/ui-slots": [
+        "packages/ui/openbuddy-ui-slots/src/index.ts"
+      ],
+      "@openbuddy/ui-slots/client": [
+        "packages/ui/openbuddy-ui-slots/src/client.ts"
+      ],
+      "@openbuddy/ui-slots/invariant": [
+        "packages/ui/openbuddy-ui-slots/src/invariant.ts"
+      ],
+      "@openbuddy/ui-theme": [
+        "packages/ui/openbuddy-ui-theme/src/index.ts"
+      ],
+      "@openbuddy/ui-theme/client": [
+        "packages/ui/openbuddy-ui-theme/src/client.tsx"
+      ],
+      "@openbuddy/ui-theme/invariant": [
+        "packages/ui/openbuddy-ui-theme/src/invariant.ts"
+      ],
+      "@openbuddy/ui-workbench": [
+        "packages/ui/openbuddy-ui-workbench/src/index.ts"
+      ],
+      "@openbuddy/ui-workbench/client": [
+        "packages/ui/openbuddy-ui-workbench/src/client.tsx"
+      ],
+      "@openbuddy/ui-workbench/invariant": [
+        "packages/ui/openbuddy-ui-workbench/src/invariant.ts"
+      ],
+      "@openbuddy/plugin-host": [
+        "packages/runtime/openbuddy-plugin-host/src/index.ts"
+      ],
+      "@openbuddy/storage": [
+        "packages/runtime/openbuddy-storage/src/index.ts"
+      ],
+      "@openbuddy/types": [
+        "packages/shared/openbuddy-types/src/index.ts"
+      ],
+      "@openbuddy/permission": [
+        "packages/auth/openbuddy-permission/src/index.ts"
+      ],
+      "@openbuddy/renderer-host": [
+        "packages/renderer/openbuddy-renderer-host/src/index.ts"
+      ],
+      "@openbuddy/team": [
+        "packages/team/openbuddy-team/src/index.ts"
+      ],
+      "@openbuddy/subagent": [
+        "packages/team/openbuddy-subagent/src/index.ts"
+      ],
+      "@openbuddy/memory": [
+        "packages/capability/openbuddy-memory/src/index.ts"
+      ],
+      "@openbuddy/notification": [
+        "packages/capability/openbuddy-notification/src/index.ts"
+      ],
+      "@openbuddy/task": [
+        "packages/capability/openbuddy-task/src/index.ts"
+      ],
+      "@openbuddy/plan": [
+        "packages/capability/openbuddy-plan/src/index.ts"
+      ],
+      "@openbuddy/email": [
+        "packages/capability/openbuddy-email/src/index.ts"
+      ],
+      "@openbuddy/authorization": [
+        "packages/capability/openbuddy-authorization/src/index.ts"
+      ],
+      "@openbuddy/web-search": [
+        "packages/capability/openbuddy-web-search/src/index.ts"
+      ],
+      "@openbuddy/inspiration": [
+        "packages/capability/openbuddy-inspiration/src/index.ts"
+      ],
+      "@openbuddy/folder-trust": [
+        "packages/capability/openbuddy-folder-trust/src/index.ts"
+      ],
+      "@openbuddy/automation": [
+        "packages/capability/openbuddy-automation/src/index.ts"
+      ],
+      "@openbuddy/calendar": [
+        "packages/capability/openbuddy-calendar/src/index.ts"
+      ],
+      "@openbuddy/mcp-client": [
+        "packages/capability/openbuddy-mcp-client/src/index.ts"
+      ],
+      "@openbuddy/fs-local": [
+        "packages/fs/openbuddy-fs-local/src/index.ts"
+      ],
+      "@openbuddy/policy": [
+        "packages/collaboration/openbuddy-policy/src/index.ts"
+      ],
+      "@openbuddy/protocol": [
+        "packages/collaboration/openbuddy-protocol/src/index.ts"
+      ],
+      "@openbuddy/evidence": [
+        "packages/collaboration/openbuddy-evidence/src/index.ts"
+      ],
+      "@openbuddy/room": [
+        "packages/collaboration/openbuddy-room/src/index.ts"
+      ],
+      "@openbuddy/inbox": [
+        "packages/collaboration/openbuddy-inbox/src/index.ts"
+      ],
+      "@openbuddy/coordinator": [
+        "packages/collaboration/openbuddy-coordinator/src/index.ts"
+      ],
+      "@openbuddy/network": [
+        "packages/collaboration/openbuddy-network/src/index.ts"
+      ],
+      "@openbuddy/auth-casdoor": [
+        "packages/auth/openbuddy-casdoor/src/index.ts"
+      ],
+      "@openbuddy/auth-permission": [
+        "packages/auth/openbuddy-permission/src/index.ts"
+      ],
+      "@openbuddy/bundle-base": [
+        "packages/bundle/openbuddy-base/src/index.ts"
+      ],
+      "@openbuddy/ui-automation/schedule-utils": [
+        "./packages/ui/openbuddy-ui-automation/src/schedule-utils.ts"
+      ],
+      "@openbuddy/ui-automation/template-config": [
+        "./packages/ui/openbuddy-ui-automation/src/template-config.ts"
+      ],
+      "@openbuddy/core-session": ["./packages/core/openbuddy-session/src/index.ts"],
+      "@openbuddy/ui-account": ["./packages/ui/openbuddy-ui-account/src/index.ts"],
+      "@openbuddy/ui-account/client": ["./packages/ui/openbuddy-ui-account/src/client.tsx"],
+      "@openbuddy/ui-account/invariant": ["./packages/ui/openbuddy-ui-account/src/invariant.ts"],
+      "@openbuddy/ui-billing": ["./packages/ui/openbuddy-ui-billing/src/index.ts"],
+      "@openbuddy/ui-billing/client": ["./packages/ui/openbuddy-ui-billing/src/client.tsx"],
+      "@openbuddy/ui-billing/invariant": ["./packages/ui/openbuddy-ui-billing/src/invariant.ts"],
+      "@openbuddy/ui-collaboration": ["./packages/ui/openbuddy-ui-collaboration/src/index.ts"],
+      "@openbuddy/ui-collaboration/client": ["./packages/ui/openbuddy-ui-collaboration/src/client.tsx"],
+      "@openbuddy/ui-collaboration/invariant": ["./packages/ui/openbuddy-ui-collaboration/src/invariant.ts"],
+      "@openbuddy/ui-email": ["./packages/ui/openbuddy-ui-email/src/index.ts"],
+      "@openbuddy/ui-email/client": ["./packages/ui/openbuddy-ui-email/src/client.tsx"],
+      "@openbuddy/ui-email/invariant": ["./packages/ui/openbuddy-ui-email/src/invariant.ts"],
+      "@openbuddy/ui-files": ["./packages/ui/openbuddy-ui-files/src/index.ts"],
+      "@openbuddy/ui-files/client": ["./packages/ui/openbuddy-ui-files/src/client.tsx"],
+      "@openbuddy/ui-files/invariant": ["./packages/ui/openbuddy-ui-files/src/invariant.ts"],
+      "@openbuddy/ui-mcp": ["./packages/ui/openbuddy-ui-mcp/src/index.ts"],
+      "@openbuddy/ui-mcp/client": ["./packages/ui/openbuddy-ui-mcp/src/client.tsx"],
+      "@openbuddy/ui-mcp/invariant": ["./packages/ui/openbuddy-ui-mcp/src/invariant.ts"],
+      "@openbuddy/ui-primitives/icons": ["./packages/ui/openbuddy-ui-primitives/src/icons/index.ts"],
+      "@openbuddy/ui-shared": ["./packages/ui/openbuddy-ui-shared/src/index.ts"],
+      "@openbuddy/ui-shared/client": ["./packages/ui/openbuddy-ui-shared/src/client.tsx"],
+      "@openbuddy/ui-shared/invariant": ["./packages/ui/openbuddy-ui-shared/src/invariant.ts"],
+      "@openbuddy/ui-theme/styles": ["./packages/ui/openbuddy-ui-theme/src/styles/index.css"],
+    
+      "@openbuddy/ui-markdown/components": ["./packages/ui/openbuddy-ui-markdown/src/components/index.ts"],
+      "@openbuddy/ui-markdown/components/CodeBlockActions": ["./packages/ui/openbuddy-ui-markdown/src/components/CodeBlockActions.tsx"],
+      "@openbuddy/ui-markdown/components/Markdown": ["./packages/ui/openbuddy-ui-markdown/src/components/Markdown.tsx"],
+      "@openbuddy/ui-markdown/components/MarkdownInlineCode": ["./packages/ui/openbuddy-ui-markdown/src/components/MarkdownInlineCode.tsx"],
+      "@openbuddy/ui-markdown/components/MarkdownPre": ["./packages/ui/openbuddy-ui-markdown/src/components/MarkdownPre.tsx"],
+      "@openbuddy/ui-markdown/components/MarkdownPreMermaid": ["./packages/ui/openbuddy-ui-markdown/src/components/MarkdownPreMermaid.tsx"],
+      "@openbuddy/ui-markdown/components/preprocess": ["./packages/ui/openbuddy-ui-markdown/src/components/preprocess.ts"],
+      "@openbuddy/ui-markdown/components/types": ["./packages/ui/openbuddy-ui-markdown/src/components/types.ts"]
+    }
+  },
+  "include": [
+    "src",
+    "../assets.d.ts"
+  ]
+}
