@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenBuddy 跨 Buddy 协作流</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0f17;
+      --panel: #161d28;
+      --panel-2: #1b2330;
+      --line: #2b3645;
+      --text: #eef2f7;
+      --muted: #98a4b5;
+      --dim: #6f7d90;
+      --alice: #57d7ff;
+      --bob: #ff96c7;
+      --relay: #f2bc66;
+      --green: #39d39f;
+      --red: #ff8d8d;
+      --violet: #b698ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 1280px;
+      background: radial-gradient(circle at 80% -10%, #20324b 0, transparent 42%), var(--bg);
+      color: var(--text);
+      font: 14px/1.5 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+    }
+    header {
+      padding: 36px 56px 28px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(11, 15, 23, .82);
+      backdrop-filter: blur(12px);
+    }
+    header h1 { margin: 0 0 10px; font-size: 28px; letter-spacing: -.02em; }
+    header h1 small { color: var(--alice); font-weight: 600; font-size: 13px; margin-left: 12px; letter-spacing: .04em; }
+    header p { margin: 0; max-width: 1100px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    header p code { background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 3px; color: var(--alice); }
+    main { padding: 28px 56px 60px; max-width: 1600px; margin: 0 auto; display: grid; gap: 22px; }
+    .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; color: var(--muted); font-size: 12px; }
+    .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: middle; }
+    .legend .alice::before { background: var(--alice); }
+    .legend .bob::before { background: var(--bob); }
+    .legend .relay::before { background: var(--relay); }
+    .legend .audit::before { background: var(--violet); }
+    .legend .fail::before { background: var(--red); }
+
+    .flow { padding: 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+    .flow h2 { margin: 0 0 16px; font-size: 17px; }
+    .flow-grid { display: grid; grid-template-columns: 1fr 80px 1fr; gap: 14px; align-items: stretch; }
+    .participant { padding: 18px; border-radius: 12px; background: var(--panel-2); }
+    .participant.alice { border-top: 4px solid var(--alice); }
+    .participant.bob { border-top: 4px solid var(--bob); }
+    .participant h3 { margin: 0 0 4px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .participant .role { padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 700; }
+    .participant.alice .role { background: rgba(87,215,255,.16); color: var(--alice); }
+    .participant.bob .role { background: rgba(255,150,199,.16); color: var(--bob); }
+    .participant .owner { font-size: 11px; color: var(--dim); margin-bottom: 8px; }
+    .participant ul { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.55; }
+    .participant li { margin-bottom: 4px; color: var(--text); }
+    .participant li code { background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 3px; color: var(--alice); font-size: 11px; }
+    .participant .stack { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 11px; color: var(--muted); }
+    .lane-arrow { display: grid; place-items: center; font-size: 22px; color: var(--dim); }
+
+    .steps { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: stretch; }
+    .step { padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); position: relative; }
+    .step h4 { margin: 0 0 4px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .step .num { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--alice); color: #06212a; font-size: 11px; font-weight: 800; }
+    .step p { margin: 6px 0 0; font-size: 11px; color: var(--muted); line-height: 1.55; }
+    .step .actor { font-size: 10px; padding: 2px 7px; border-radius: 99px; margin-top: 8px; display: inline-block; }
+    .step .actor.alice { background: rgba(87,215,255,.16); color: var(--alice); }
+    .step .actor.bob { background: rgba(255,150,199,.16); color: var(--bob); }
+    .step .actor.relay { background: rgba(242,188,102,.18); color: var(--relay); }
+    .step .actor.both { background: rgba(57,211,159,.16); color: var(--green); }
+    .step .actor.fail { background: rgba(255,141,141,.16); color: var(--red); }
+
+    .timeline { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .timeline h2 { margin: 0 0 14px; font-size: 17px; }
+    .timeline table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .timeline th, .timeline td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .timeline th { color: var(--dim); font-weight: 600; }
+    .timeline td code { background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 3px; color: var(--alice); font-size: 11px; }
+    .timeline td .actor-a { color: var(--alice); font-weight: 700; }
+    .timeline td .actor-b { color: var(--bob); font-weight: 700; }
+    .timeline td .actor-r { color: var(--relay); font-weight: 700; }
+
+    .inv { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .inv h2 { margin: 0 0 14px; font-size: 17px; }
+    .inv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .inv-card { padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel-2); }
+    .inv-card h4 { margin: 0 0 4px; font-size: 13px; color: var(--red); }
+    .inv-card p { margin: 0; font-size: 11px; color: var(--muted); line-height: 1.55; }
+    .inv-card code { color: var(--alice); }
+
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .compare-card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .compare-card h3 { margin: 0 0 8px; font-size: 15px; }
+    .compare-card.bad h3 { color: var(--red); }
+    .compare-card.good h3 { color: var(--green); }
+    .compare-card ul { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.6; color: var(--muted); }
+    .compare-card li code { color: var(--alice); }
+
+    footer { padding: 30px 56px 50px; color: var(--dim); font-size: 12px; text-align: center; border-top: 1px solid var(--line); margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>OpenBuddy 跨 Buddy 协作流 <small>v1 · 2026-08-31 · Alice 双向 Bob via Federated Room Grant</small></h1>
+    <p>两个用户的 OpenBuddy 如何端到端协作：发现 → 信任 → 授权 → 委托 → 验收。整套流程贯穿三层产品（personal / organization / network）、三平面（Experience / Control / Execution）和 10 条不变式。私钥 / 凭证 / 完整 session body 从不进入跨边界网络，所有副作用走 SideEffectIntent + Federated Room Grant + 独立 Verifier。</p>
+    <div class="legend">
+      <span class="alice">Alice 侧（请求方）</span>
+      <span class="bob">Bob 侧（提供方）</span>
+      <span class="relay">本地 Relay / 沙盒</span>
+      <span class="audit">审计与证据</span>
+      <span class="fail">失败 / 撤销</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="flow">
+      <h2>两位参与者与各自的 Buddy Control Plane</h2>
+      <div class="flow-grid">
+        <div class="participant alice">
+          <h3>Alice <span class="role">personal-buddy</span></h3>
+          <div class="owner">ownerUserId=user-alice · organizationId=org-acme</div>
+          <ul>
+            <li><strong>持久 Personal Buddy</strong>：日程 / 邮件 / 记忆 / 任务 / 本地连接器</li>
+            <li><strong>Organization Buddy</strong>：受 Acme Coordinator 管理，参与 project Room</li>
+            <li><strong>Trust Roots</strong>：本地 Ed25519 公钥；信任 Bob 的 Agent Card（已 verify）</li>
+            <li><strong>Federated Grants</strong>：持有指向 Bob 的 grant</li>
+          </ul>
+          <div class="stack">Experience → Assistant Workbench · Project Detail<br>Control → BuddyIdentity + OrgCoordinator + FederatedGrantList<br>Execution → Pi AgentSession + Provider + Capability</div>
+        </div>
+        <div class="lane-arrow">⇄</div>
+        <div class="participant bob">
+          <h3>Bob <span class="role">personal-buddy</span></h3>
+          <div class="owner">ownerUserId=user-bob · organizationId=org-beta</div>
+          <ul>
+            <li><strong>持久 Personal Buddy</strong>：日程 / 邮件 / 记忆 / 任务 / 本地连接器</li>
+            <li><strong>Organization Buddy</strong>：受 Beta Coordinator 管理，开放能力 research:brief</li>
+            <li><strong>Trust Roots</strong>：本地 Ed25519 公钥；信任 Alice 的 Agent Card（已 verify）</li>
+            <li><strong>Capability Offers</strong>：发布 research:brief 到 known_peers</li>
+          </ul>
+          <div class="stack">Experience → Assistant Workbench · Network Snapshot<br>Control → OpenNetworkCoordinator + LocalRelay<br>Execution → Pi AgentSession + WebSearch + Memory</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="flow">
+      <h2>七步端到端流程</h2>
+      <div class="steps">
+        <div class="step">
+          <h4><span class="num">1</span>发现</h4>
+          <p>Alice 在 助理·开放网络 看到 Bob 的 Agent Card（keyRef 已 verify）。Discovery 不等于 Authorization：仅展示。</p>
+          <span class="actor alice">alice</span>
+        </div>
+        <div class="step">
+          <h4><span class="num">2</span>信任根</h4>
+          <p>Alice 把 Bob 的 Ed25519 公钥加入本地 trust root。后续每条 envelope 必须由该 key 验签通过才能消费。</p>
+          <span class="actor alice">alice</span>
+        </div>
+        <div class="step">
+          <h4><span class="num">3</span>提案</h4>
+          <p>Alice 通过 buddy_network_propose 提出服务请求；Bob 通过 buddy_network_negotiate 计算 effectivePolicy 交集。</p>
+          <span class="actor both">both</span>
+        </div>
+        <div class="step">
+          <h4><span class="num">4</span>授权</h4>
+          <p>Alice 颁发 Federated Room Grant：allowedPrincipals 含 Bob，allowedCapabilities/dataScopes/actions/operations/expiry 显式。</p>
+          <span class="actor alice">alice</span>
+        </div>
+        <div class="step">
+          <h4><span class="num">5</span>委托</h4>
+          <p>Bob 接受 grant 并在自己的 Project Room 内执行；envelope 仅携带稳定 ID + digest + capability + refs。</p>
+          <span class="actor bob">bob</span>
+        </div>
+        <div class="step">
+          <h4><span class="num">6</span>验收</h4>
+          <p>独立 Verifier（不是 Provider）核对 Artifact/Evidence；只有 verify 通过才 accept；否则 fail / revise / dispute。</p>
+          <span class="actor both">both</span>
+        </div>
+        <div class="step">
+          <h4><span class="num">7</span>结算</h4>
+          <p>结算 / 支付 / 无人值守不可逆副作用仍 not_configured；后续独立评审后启动。</p>
+          <span class="actor fail">future</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="timeline">
+      <h2>端到端事件时间轴（含 trust 检查）</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 60px;">#</th>
+            <th style="width: 110px;">发起方</th>
+            <th>事件</th>
+            <th style="width: 130px;">关键检查</th>
+            <th style="width: 110px;">副作用</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>0</td><td><span class="actor-a">Alice</span></td><td>本地 EventStore.append 信任根 trust_root_add</td><td>—</td><td>本地落盘</td></tr>
+          <tr><td>1</td><td><span class="actor-a">Alice</span></td><td>buddy_network_propose capabilityId research:brief dataScopes public:brief artifactTypes brief expiresAt T+1h</td><td>policy 属于 effectivePolicy</td><td>—</td></tr>
+          <tr><td>2</td><td><span class="actor-b">Bob</span></td><td>buddy_network_negotiate 计算 intersection，发布 Bid</td><td>dataScopes 交集 非空</td><td>—</td></tr>
+          <tr><td>3</td><td><span class="actor-a">Alice</span></td><td>awardNetworkBid 后 issueFederatedRoomGrant</td><td>grant.providerOrganizationId 与 bob.organizationId 一致</td><td>LocalRelay.deliver</td></tr>
+          <tr><td>4</td><td><span class="actor-r">Relay</span></td><td>verifyFederatedRoomGrant + Ed25519 验签 + membership check</td><td>expected.scope 属于 grant + principal 属于 allowedPrincipals</td><td>envelope 入队</td></tr>
+          <tr><td>5</td><td><span class="actor-b">Bob</span></td><td>在 Project Room 内执行 research:brief；生成 Artifact + Evidence</td><td>Provider 不是 Verifier</td><td>SideEffectIntent（若需外部副作用）</td></tr>
+          <tr><td>6</td><td><span class="actor-r">Relay</span></td><td>把 Artifact digest + ref 回传给 Alice；envelope 仍只携带 digest</td><td>grantee 与 provider 双方记账</td><td>本地账本追加</td></tr>
+          <tr><td>7</td><td><span class="actor-a">Alice</span></td><td>独立 Verifier（不是 Bob）核对 Artifact/Evidence → accept / fail / revise / dispute</td><td>verifier.id 不属于 provider, requester</td><td>—</td></tr>
+          <tr><td>8</td><td><span class="actor-a">Alice</span></td><td>revokeFederatedRoomGrant（若接受则不需；超时自动撤销）</td><td>grant.status 变为 expired</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="flow">
+      <h2>反例 vs 正例：Discovery、Authority、Verifier 三处最容易出错</h2>
+      <div class="compare">
+        <div class="compare-card bad">
+          <h3>反例（破坏不变式）</h3>
+          <ul>
+            <li>把 private:prompt / credential:token / 完整 session body 放进 envelope → 私钥泄露</li>
+            <li>只看 Agent Card 展示就执行任务 → Discovery 当成 Authorization</li>
+            <li>Provider 自己 verify 自己交付的 artifact → Provider 等于 Verifier</li>
+            <li>Federated Room Grant 颁发后从不 revoke → 过期委托继续投递</li>
+            <li>用同一个 BuddyIdentity 跑 personal 和 org 任务 → AgentIdentity 与 AgentProfile 混淆</li>
+            <li>不读 trust root 直接信任 Agent Card 的 verified 标志 → 持久化信任被绕过</li>
+          </ul>
+        </div>
+        <div class="compare-card good">
+          <h3>正例（守住 10 条不变式）</h3>
+          <ul>
+            <li>envelope 仅携带 stableId + digest + capability + refs</li>
+            <li>Discovery 不等于 Authorization：每次执行都重新检查 grant + membership + expiry + nonce</li>
+            <li>独立 Verifier 强制 id 不属于 provider, requester</li>
+            <li>Federated Grant TTL + revoke 双向；过期自动撤销</li>
+            <li>BuddyIdentity 不等于 AgentProfile 不等于 Pi AgentSession 三层独立</li>
+            <li>每次 trust 验证都重读 trustRoots，不依赖持久化标志</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="inv">
+      <h2>跨 Buddy 协作必须强制的 10 条不变式</h2>
+      <div class="inv-grid">
+        <div class="inv-card"><h4>1 · effectivePolicy</h4><p>owner ∩ org ∩ task ∩ capability；任何 deny 不能被覆盖。</p></div>
+        <div class="inv-card"><h4>2 · EventStore 唯一事实源</h4><p>UI 是事件投影；跨 Buddy 也从本地 EventStore 重建。</p></div>
+        <div class="inv-card"><h4>3 · Discovery 不等于 Authorization</h4><p>Agent Card / Offer / Proposal 都不等于可执行授权；grant 必含 principal + scope + expiry。</p></div>
+        <div class="inv-card"><h4>4 · Provider 不是 Verifier</h4><p>verifier 必须独立；同 ID 视为 fail。</p></div>
+        <div class="inv-card"><h4>5 · 三层 Identity 分离</h4><p>BuddyIdentity 不等于 AgentProfile 不等于 Pi AgentSession。</p></div>
+        <div class="inv-card"><h4>6 · 私有不跨边界</h4><p>session / 凭证 / 完整 prompt / connector config 不进入 envelope。</p></div>
+        <div class="inv-card"><h4>7 · Wake 携带 ID + reason + nonce</h4><p>消费时重读 authority + 检查 membership / expiry / revocation / nonce。</p></div>
+        <div class="inv-card"><h4>8 · 副作用一次性消费</h4><p>每个不可逆外部副作用都有 SideEffectIntent 引用 + fingerprint。</p></div>
+        <div class="inv-card"><h4>9 · Federated Room Grant 必含</h4><p>跨组织 Project Room 必须有 Federated Room Grant 才能投递。</p></div>
+        <div class="inv-card"><h4>10 · 公网 Relay / 结算 not_configured</h4><p>deployment / payment / settlement / 无人值守不可逆副作用显式 not_configured。</p></div>
+      </div>
+    </section>
+
+    <section class="flow">
+      <h2>用户可观察的 UI 入口（OpenBuddy 助理工作台）</h2>
+      <ul style="margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.7;">
+        <li><strong>助理·开放网络</strong>：NetworkList + BuddyDirectory（本人 / 组织 / Peer 三栏）</li>
+        <li><strong>助理·Rooms</strong>：FederatedGrantList 跨/同组织徽章（橙 + 颁发方/主体/数据范围/动作/操作 显式）</li>
+        <li><strong>助理·证据与审计</strong>：独立 Verifier 高亮；每条 delivery 附 verifier.id 与 digest</li>
+        <li><strong>助理·副作用恢复</strong>：跨组织 SideEffectIntent 列表；revoke + 一次性消费</li>
+        <li><strong>项目详情 → 跨组织交付 / 工作流黑板</strong>：项目维度 Federated Grant + Workflow DAG</li>
+        <li><strong>Composer 斜杠命令</strong>：/buddy-propose、/federated-grant 两条 plugin-shipped 入口</li>
+        <li><strong>消息 footer</strong>：委托给 Buddy（replayable TaskEnvelope，不复制完整 prompt）</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    配套文档：openbuddy-distributed-buddy-vision.md · openbuddy-plugin-catalog.md · docs/diagrams/openbuddy-distributed-buddy-architecture.html<br>
+    源码实现：src/components/BuddyDirectory.tsx · packages/collaboration/openbuddy-network · electron/main/collaboration-runtime.ts
+  </footer>
+</body>
+</html>

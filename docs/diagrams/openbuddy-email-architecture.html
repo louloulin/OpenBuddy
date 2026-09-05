@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="OpenBuddy 邮件能力最小改造架构图：统一域模型、MCP provider、权限门禁与交付切片。">
+  <title>OpenBuddy Mail Architecture · Provider Readiness</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #09111f;
+      --panel: #101b2d;
+      --panel-2: #14243a;
+      --panel-3: #1a2d48;
+      --line: #2b4261;
+      --text: #eef6ff;
+      --muted: #9eb0c8;
+      --cyan: #5edbff;
+      --green: #51e0ad;
+      --amber: #ffca72;
+      --violet: #b89cff;
+      --red: #ff8e9d;
+      --blue: #6da9ff;
+      --shadow: 0 20px 60px rgba(0, 0, 0, .32);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 1100px;
+      color: var(--text);
+      background: radial-gradient(circle at 85% -10%, #1d4160 0, transparent 34%), var(--bg);
+      font: 14px/1.5 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+    }
+    button { color: inherit; font: inherit; cursor: pointer; }
+    header { padding: 34px 48px 24px; border-bottom: 1px solid var(--line); background: rgba(9, 17, 31, .82); backdrop-filter: blur(14px); }
+    header h1 { margin: 0 0 7px; font-size: 29px; letter-spacing: -.03em; }
+    header p { max-width: 980px; margin: 0; color: var(--muted); }
+    .header-meta { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 17px; }
+    .chip { padding: 5px 9px; border: 1px solid var(--line); border-radius: 999px; color: #cbd8e8; background: rgba(20, 36, 58, .72); font-size: 12px; }
+    .chip.green { border-color: #286c59; color: #a9f7db; }
+    .chip.amber { border-color: #735a2e; color: #ffdf9c; }
+    main { padding: 27px 48px 62px; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+    .tabs button { padding: 8px 13px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--panel); }
+    .tabs button.active, .tabs button:hover { color: var(--text); border-color: #4b78a5; background: var(--panel-3); }
+    .view { display: none; }
+    .view.active { display: block; }
+    .section-title { margin: 25px 0 12px; color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    .card { border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(145deg, rgba(20, 36, 58, .94), rgba(13, 25, 43, .94)); box-shadow: var(--shadow); }
+    .diagram-shell { overflow: hidden; padding: 18px; }
+    .diagram { display: grid; grid-template-columns: 1fr 44px 1fr 44px 1fr 44px 1fr; gap: 10px; align-items: stretch; min-height: 385px; }
+    .lane { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(9, 17, 31, .66); }
+    .lane h3 { margin: 0 0 2px; color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+    .lane small { display: block; margin-top: -4px; color: #71859f; }
+    .node { position: relative; padding: 11px; border: 1px solid #355477; border-radius: 10px; background: var(--panel-2); transition: transform .16s ease, border-color .16s ease, background .16s ease; }
+    .node:hover, .node.selected { transform: translateY(-2px); border-color: var(--cyan); background: #1b3552; }
+    .node b { display: block; margin-bottom: 3px; font-size: 13px; }
+    .node span { display: block; color: var(--muted); font-size: 12px; }
+    .node.ui { border-left: 3px solid var(--cyan); }
+    .node.main { border-left: 3px solid var(--green); }
+    .node.provider { border-left: 3px solid var(--violet); }
+    .node.mailbox { border-left: 3px solid var(--amber); }
+    .node.guard { border-left: 3px solid var(--red); }
+    .connector { display: grid; place-items: center; color: var(--cyan); font-size: 26px; }
+    .connector span { color: var(--muted); font-size: 11px; writing-mode: vertical-rl; letter-spacing: .06em; }
+    .detail { min-height: 74px; margin-top: 14px; padding: 13px 15px; border: 1px solid #355477; border-radius: 10px; color: var(--muted); background: #0c1727; }
+    .detail strong { color: var(--text); }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 13px; }
+    .info-card { padding: 17px; }
+    .info-card h3 { margin: 0 0 8px; font-size: 15px; }
+    .info-card p { margin: 0; color: var(--muted); }
+    .info-card ul { margin: 9px 0 0; padding-left: 18px; color: var(--muted); }
+    .info-card li + li { margin-top: 4px; }
+    .flow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: center; }
+    .flow-step { min-height: 104px; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); }
+    .flow-step b { display: block; margin-bottom: 7px; color: var(--green); font-size: 12px; }
+    .flow-step span { color: var(--muted); font-size: 12px; }
+    .flow-arrow { color: var(--cyan); text-align: center; font-size: 22px; }
+    table { width: 100%; border-collapse: collapse; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    th, td { padding: 11px 13px; border-bottom: 1px solid rgba(43, 66, 97, .72); text-align: left; vertical-align: top; }
+    th { color: #c5d5e8; background: #162942; font-size: 12px; }
+    td { color: var(--muted); }
+    tr:last-child td { border-bottom: 0; }
+    td strong { color: var(--text); }
+    .status { display: inline-block; padding: 3px 7px; border-radius: 999px; font-size: 11px; }
+    .status.p0 { color: #a9f7db; background: #174b3d; }
+    .status.p1 { color: #ffdf9c; background: #51401e; }
+    .status.later { color: #c9baff; background: #342a5e; }
+    .state-machine { display: flex; gap: 0; align-items: center; padding: 18px; overflow-x: auto; }
+    .state { min-width: 126px; padding: 12px; border: 1px solid #355477; border-radius: 10px; text-align: center; background: var(--panel-2); }
+    .state b { display: block; font-size: 12px; }
+    .state small { color: var(--muted); }
+    .state.confirm { border-color: var(--red); background: #3a2430; }
+    .state.sent { border-color: var(--green); background: #173d36; }
+    .state-arrow { min-width: 34px; color: var(--cyan); text-align: center; font-size: 22px; }
+    .file-tree { padding: 18px 21px; color: var(--muted); font: 13px/1.8 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+    .file-tree strong { color: var(--cyan); }
+    .footer { margin-top: 25px; color: #6f839e; font-size: 12px; }
+    @media (max-width: 1250px) {
+      body { min-width: 980px; }
+      main, header { padding-left: 28px; padding-right: 28px; }
+      .diagram { grid-template-columns: 1fr 30px 1fr 30px 1fr 30px 1fr; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>OpenBuddy Mail · 最小改造架构</h1>
+    <p>以现有 Electron + Pi + MCP 能力为基础，增加一个独立邮件 capability。首个可交付版本覆盖多账号统一收件箱、Workspace Tag、AI 阅读/起草和受控发送；不复制 Macro/WorkBuddy 私有实现，不自建邮件服务器，不破坏现有通知中心。</p>
+    <div class="header-meta">
+      <span class="chip green">P0 · Provider contract</span>
+      <span class="chip green">P0 · Read / Search / Thread</span>
+      <span class="chip amber">P0 · Draft first</span>
+      <span class="chip amber">P0 · Confirm before send</span>
+      <span class="chip amber">当前约 92% (第 11 轮 · 统一 AI 行动中心查询 + 联系人隐私投影 + 批量跟进提醒端到端 IPC + 本地 echo provider 跑通真实 harness + 邮件面板「批量跟进」UI) · 40 Pi 工具（18 只读）· 7th backend realE2E=true · openbuddy-agent-harness echo 2/51 case 5s exit 0 · noActionAccuracy=1 · citationCoverage=1 · 全量回归 213 文件 2273 通过 · +前 10 轮累计</span>
+      <span class="chip" style="border-color:#8b3d49;color:#ffb2bd">安全 · 暴露凭据不得使用</span>
+      <span class="chip">MCP-first</span>
+      <span class="chip">Local-first audit</span>
+    </div>
+  </header>
+  <main>
+    <nav class="tabs" aria-label="Architecture views">
+      <button class="active" data-view="overview">总览架构</button>
+      <button data-view="runtime">运行与数据流</button>
+      <button data-view="security">权限与安全</button>
+      <button data-view="delivery">最小交付</button>
+      <button data-view="permissions">实体权限投影</button>
+      <button data-view="registry">Provider Registry</button>
+      <button data-view="blindtest">AI 盲测</button>
+      <button data-view="keyboard">键盘工作流</button>
+    </nav>
+
+    <section class="view active" id="overview">
+      <p class="section-title">System boundary</p>
+      <div class="card diagram-shell">
+        <div class="diagram">
+          <div class="lane">
+            <h3>体验层</h3><small>Renderer / 用户可见</small>
+            <button class="node ui" data-detail="邮件工作区负责账号选择、Signal/Noise、AI 分诊分类队列、搜索、线程列表、正文与附件入口、AI 行动中心 + 批量跟进入口。分诊分类切换只改变本地列表投影，打开线程仍使用 accountId + threadId；全局 SearchOverlay 也会聚合邮件线程、当前会话任务、日程、本地项目/资产和助理协作 Inbox，并支持跳转回原邮件、项目或助理入口。它只调用 typed preload，不知道 provider 工具名。AI 行动中心 header 新增「批量跟进」按钮（`emailActionCenterCreateReminders`），按当前过滤条件先 dryRun 预览 → ConfirmDialog 单次确认 → 真正执行 + 反馈 created/skipped 计数，全程幂等。它只调用 typed preload，不知道 provider 工具名。"><b>Email Workspace</b><span>账号、收件箱、Signal/Noise、AI 分诊队列、AI 行动中心 + 批量跟进</span></button>
+            <button class="node ui" data-detail="统一搜索从本地 projects-store、collaboration:snapshot 和知识库 provider registry 读取项目/资产、助理 Inbox 与已保存知识源文档，只读过滤，不改变实体权限；项目、计划、任务的 Workspace Tag 会参与项目命中并展示，邮件结果按主题、发件人、正文、标签、未读和星标进行可解释排序，并显示线程状态；当查询命中邮件 Workspace Tag 时，SearchOverlay 通过 tags + tagMatch 二次查询邮件并按 accountId + threadId 去重；知识文档点击后回到原文件路径。下一步接入实体权限投影和协作 Inbox 标签过滤。"><b>Unified Workspace Search</b><span>邮件排序 · 标签检索 · 会话 · 任务 · 日程 · 项目 · 协作 Inbox · 知识库</span></button>
+            <button class="node ui" data-detail="项目详情页新增邮件页签：读取当前项目的关联线程摘要，点击线程后把 accountId/threadId 写入 openbuddy.email.inbox-target，再回到邮件工作区由 provider 重新读取正文。项目页不复制邮件正文，也不绕过邮件权限。"><b>Project Detail · Email Tab</b><span>项目 → 关联线程 → 邮件工作区</span></button>
+            <button class="node ui" data-detail="Composer 以 Markdown 作为编辑源，预览态使用 react-markdown、GFM 和 rehype-sanitize 渲染；保存草稿时同时生成清洗后的 bodyHtml，脚本与危险 HTML 不会进入预览或发送正文。发送按钮打开确认弹窗，展示发件账号、To/Cc/Bcc、正文摘要和附件；Main 的唯一授权发送出口把 bodyHtml 传给 provider，同时保留 Markdown 作为本地可编辑源。"><b>Composer</b><span>新建 / 回复 / 转发 / 双格式草稿 / 安全预览</span></button>
+            <button class="node ui" data-detail="会话内邮件卡片提供引用、摘要、生成回复草稿和行动项采纳入口；用户确认后可逐条写入当前会话任务或选定项目任务。项目任务使用 source=email、邮件行动项标签和 messageId 引用，仅回写 linkedProjectTaskIds，不复制邮件正文；分享线程到协作 Room 时只保留 emailAccountId + emailThreadId 身份引用，InboxProjection 可回到多账号原邮件；助理收件箱通过 accountId + threadId 本地回执维持已处理状态，不调用 Provider 写操作；不直接执行外发操作。AI 分诊还可保存 Noise 自动归档等规则；规则运行只生成可逆处理计划，必须先展示预览。"><b>AI Mail Cards</b><span>引用、项目任务、协作回链、收件箱回执</span></button>
+            <button class="node ui" data-detail="AI 邮件行动中心跨线程读取已保存的 EmailAnalysisRecord，汇总待审阅分析、回复草稿、行动项、会议提案和待确认处理计划；点击条目只回到原始 accountId/threadId 线程，外部写入仍必须从原有草稿、任务、日历或处理计划确认入口执行。"><b>AI Action Center</b><span>跨线程分析 · 待审阅 · 行动项 · 安全回链</span></button>
+          </div>
+          <div class="connector"><span>typed IPC</span>→</div>
+          <div class="lane">
+            <h3>Electron Main</h3><small>唯一信任边界</small>
+            <button class="node main" data-detail="Email IPC 暴露 accounts、threads、分页、Reply Zero、ack-inbox、digest、triage、sync、处理计划、analyses、AI 行动中心所需的分析列表、save-analysis、review-analysis、link-analysis、create-reminders-from-analysis、drafts、计划发送、撤回队列、thread、project-threads、labels、update、附件、createDraft、sendDraft、audit；输入在 Main 重新校验，邮件收件箱回执只保存 accountId、threadId、messageDate 和时间，不调用 Provider 写操作；AI 邮件引用必须属于当前线程消息，知识库引用必须属于已授权根目录并命中真实文件内容；分析回链区分 linkedTaskIds（会话任务）与 linkedProjectTaskIds（项目任务）。"><b>Email IPC Facade</b><span>同步 / 分诊 / 回执 / AI 行动中心 / 参数校验</span></button>
+            <button class="node guard" data-detail="发送、计划发送、删除、垃圾邮件和阻断发件人先由 Main 原生确认；批量管理先执行 dry-run 预览，删除/垃圾邮件在第二步再次确认，处理计划再绑定 fingerprint 和一次性 token。计划过期、指纹变化或 provider 不支持会 fail-closed；AI 处理计划禁止 trash/spam。"><b>Permission Gate</b><span>确认 · 一次性 token · dry-run · destructive bulk gate</span></button>
+            <button class="node main" data-detail="保存草稿索引、邮件 Workspace Tag、邮件规则、规则调度状态、处理计划、5 秒撤回窗口的 pending-send 状态和脱敏审计；项目、计划、任务标签由 projects-store 独立持久化。正文、token、附件内容不进入 telemetry 或错误快照。规则调度只记录周期、下次运行、最近状态和错误，不保存远端正文副本；命中后通过通知中心提醒用户，邮件面板启动时恢复 pending 计划，任何远端写操作仍必须经过处理计划确认。"><b>Draft + Rules + Audit</b><span>mail store + projects-store · 0600 · notification bridge</span></button>
+          </div>
+          <div class="connector"><span>domain API</span>→</div>
+          <div class="lane">
+            <h3>Capability</h3><small>可独立加载 / 卸载</small>
+            <button class="node main" data-detail="@openbuddy/capability-email 提供统一 EmailAccount、EmailThread、EmailDraft、EmailAttachment、Workspace Tag 和 EmailProvider 合同；CompositeEmailProvider 将多个已授权 provider 聚合为统一 Inbox，并用 provider:accountId 路由写入。projectThreads 通过本地项目关联索引反查线程，再从 provider 读取最新摘要和标签；解除关联会删除本地引用。项目、计划、任务和邮件线程可派生 WorkspaceTagRef（entityType/entityId/projectId/accountId/threadId/tags/updatedAt）；邮件正文和 provider Label 不被复制到这些实体，Provider 权限仍是正文读取边界。Renderer 另从已读取的线程参与者生成内存联系人索引，只保留姓名、地址、账户、最近联系时间和次数，用于 Composer 收件人补全，不保存正文或凭据。"><b>openbuddy-email + Workspace Projection</b><span>统一域模型 / 四类标签引用 / 联系人上下文 / 项目反查</span></button>
+            <button class="node main" data-detail="MCP adapter 通过 qq-agent-mail、gmail、outlook、imap-smtp、jmap、generic profile 映射厂商工具名、参数和结果；内置标准 IMAP/SMTP adapter 位于 scripts/email/imap-smtp-mcp-server.mjs，默认只读，写入、草稿和 SMTP 发信分别由环境开关控制。QQ 真实 MCP 只读验收已通过账号、6 个文件夹、分页、搜索和线程读取。兼容公开 Gmail MCP 的 connected_accounts、account/message_id、archive_email、apply_label 形状，也兼容 archive_message、mark_as_read、star_email 等拆分工具；账户保存 managementOperations，只有真实发现或显式声明的操作可用。IMAP 写入开启后，list_accounts 先读取远端 LIST，按真实 Archive/Deleted Messages/Junk 等文件夹别名动态声明 archive/trash/spam/restore，缺少目标文件夹自动降级。读取调用支持有界超时、瞬态错误指数退避和最多 4 次尝试，写操作保持单次调用，避免重复发送或重复变更；重复分页游标会被截断；MCP isError/error envelope、Retry-After、rate-limit reset、网络失败和 OAuth 过期统一为可恢复 provider_unavailable，并保留脱敏原因，UI 可提示重授权或稍后重试。写信与邮件管理能力分开声明，缺少 provider 工具时返回 operation_not_supported，不静默成功。诊断结果按稳定的 provider:accountId 聚合每个账户的读写、管理、附件和同步能力，并列出缺失工具与重授权原因，UI 以账户级 readiness chips 展示；真实验收脚本会校验 diagnostics 与 accounts 的能力一致性，profile 回归会锁定 Gmail/Graph/QQ/IMAP/JMAP 的关键工具映射。"><b>Provider Adapter</b><span>profile / IMAP-SMTP / readiness / retry-safe read</span></button>
+            <button class="node main" data-detail="Pi tools 覆盖 search、分页、线程、Reply Zero、digest、只读 email_triage、原生 email_sync、email_list_rules、email_save_rule、email_run_rule、email_delete_rule、email_list_processing_plans、处理计划、email_save_analysis、email_list_analyses、email_create_reminders_from_analysis、email_action_center_query（统一 AI 行动中心：triage + Reply Zero + 已保存分析 + workspace 标签 + 发送方域名五维过滤）、email_contact_projection（隐私感知联系人投影，自动排除账户自身、个人邮箱脱敏）、email_action_center_create_reminders（批量跟进提醒，默认 dry-run、单次确认、幂等）、草稿列表、计划列表、待发送队列、附件下载、更新、prepare-send 和 send-draft；40 个工具中 18 个只读；规则编辑器支持 provider 搜索语法、发件人/主题/未读/附件/AI 分类/邮件年龄条件，以及最多 5 个归档/恢复/已读/未读/星标/标签/延后动作；规则只能生成 preview → confirm → execute 计划，最多扫描 100 页并按 cursor 去重，返回匹配统计、计划 ID、审计 ID和 truncated 状态，禁止 trash/spam；调度命中后写入通知中心，面板启动时恢复 pending 计划；提醒创建要求未来 dueAt、用户确认且按 analysisId + actionIndex 幂等，结构化分析要求邮件 messageId 引用，背景资料使用独立 contextCitations，服务层校验双重引用归属，AI 分诊和分析不修改邮件，发送仍需确认。"><b>Pi Tools + AI Rules</b><span>分诊 · 规则调度 · AI 行动中心 · 通知 · 审计 · 受控写入</span></button>
+          </div>
+          <div class="connector"><span>MCP / OAuth</span>→</div>
+          <div class="lane">
+            <h3>外部事实</h3><small>provider-owned mailbox</small>
+            <button class="node provider" data-detail="首个目标：WorkBuddy Agent Mail / QQ Mail MCP；标准 QQ/企业邮箱也可通过内置 IMAP/SMTP adapter 接入。只通过 OpenBuddy 当前 MCP client 连接，不读取 WorkBuddy 本地 token。QQ/IMAP 读取现场可用 pnpm run eval:email-imap-readonly 复验。"><b>Agent Mail / QQ Mail</b><span>首个真实 provider</span></button>
+            <button class="node provider" data-detail="Gmail profile 对接 Gmail MCP 或 Gmail API adapter；需要真实 OAuth/测试账号验证标签、草稿、附件和分页。"><b>Gmail MCP / API</b><span>profile: gmail</span></button>
+            <button class="node provider" data-detail="Outlook profile 对接 Microsoft Graph MCP 或 Graph REST adapter；需要按最小 scope 验证邮件、文件夹、分类、草稿、附件和管理操作。"><b>Outlook / Graph</b><span>profile: outlook · REST/MCP</span></button>
+            <button class="node provider" data-detail="Fastmail/标准邮箱优先通过 JMAP REST adapter，亦可接入 jmap MCP；Session、Mailbox、Email、Submission 和附件 URL 均由 provider 管理，真实 OAuth/账号验收仍是外部证据。"><b>Fastmail / JMAP</b><span>profile: jmap · REST/MCP</span></button>
+            <button class="node mailbox" data-detail="邮件正文、线程状态和标签以 provider 为事实源。QQ/Agent Mail、Gmail、Outlook、163/企业 IMAP-SMTP 和 Fastmail/JMAP 都通过同一合同接入；真实 OAuth/账号验收仍是外部证据。"><b>Remote Mailbox</b><span>QQ · Gmail · Graph · IMAP · JMAP</span></button>
+          </div>
+        </div>
+        <div class="detail" id="node-detail"><strong>点击任意节点查看职责。</strong> 颜色代表边界：青色是 UI，绿色是 OpenBuddy 内部，紫色是 provider，琥珀色是外部邮箱，红色是安全门禁。</div>
+        <div class="card relation-note"><strong>双向工作区回链：</strong> Email Workspace → `email:move-to-project` → 本地项目关联；Project Detail · Email Tab → `email:project-threads` → provider 线程摘要 → 点击回到原邮件线程。项目关系只保存引用，邮件正文和远端状态始终由 provider 管理。批量恢复/未读/删除/垃圾邮件统一走 `dryRun → user confirm（危险操作）→ Main confirm（危险操作）→ provider update`。</div>
+      </div>
+
+      <p class="section-title">Core principles</p>
+      <div class="grid-3">
+        <article class="card info-card"><h3>Mail ≠ Notification</h3><p>邮件拥有独立的 account/thread/draft/attachment 领域模型；Reply Zero 待回复项以只读投影进入助理统一 Inbox，不伪造协作事件。</p></article>
+        <article class="card info-card"><h3>Label ≠ Workspace Tag</h3><p>Gmail/Graph 原生 Label 由 provider 同步；OpenBuddy Workspace Tag 保存业务上下文。邮件支持 Any/All 检索，项目/计划/任务支持本地标签编辑、统一搜索命中和 `WorkspaceTagRef` 派生；后续再扩展文档和协作对象，并由各自权限控制正文。</p></article>
+        <article class="card info-card"><h3>MCP-first, provider-neutral</h3><p>复用现有 MCP client、OAuth 和凭据边界。QQ Mail、Gmail、Graph 和 IMAP/SMTP 都是 adapter；写信与邮件管理能力分开声明，不侵入 UI。</p></article>
+        <article class="card info-card"><h3>Draft before send</h3><p>AI 默认只能读和起草。发送是高风险动作，需要展示完整摘要、用户确认、一次性 token 和审计 receipt。</p></article>
+      </div>
+    </section>
+
+    <section class="view" id="runtime">
+      <p class="section-title">Primary request path</p>
+      <div class="flow">
+        <div class="flow-step"><b>01 · Ask</b><span>用户说“找本周客户邮件并拟回复”，或在邮件工作区搜索。</span></div><div class="flow-arrow">→</div>
+        <div class="flow-step"><b>02 · Read / Triage</b><span>Pi tool 调用 Email domain，按账号和过滤条件查线程，并只读计算分诊。</span></div><div class="flow-arrow">→</div>
+        <div class="flow-step"><b>03 · Plan / Draft</b><span>AI 可提出归档/已读/星标/标签计划，或运行已保存规则；先 dry-run 预览；写信则先创建 draft。</span></div><div class="flow-arrow">→</div>
+        <div class="flow-step"><b>04 · Confirm</b><span>用户确认计划或草稿后获得一次性 token；过期、变更或 provider 不支持都会停止执行。</span></div><div class="flow-arrow">→</div>
+        <div class="flow-step"><b>05 · Undo window</b><span>Main 将已确认草稿写入持久队列；5 秒内可撤回，窗口结束后才调用 provider。</span></div><div class="flow-arrow">→</div>
+        <div class="flow-step"><b>06 · Send</b><span>队列 worker 验证指纹后调用 provider，记录 receipt；重启后继续处理。</span></div>
+      </div>
+      <p class="section-title">Domain contract</p>
+      <div class="card"><table><thead><tr><th>Contract</th><th>Input</th><th>Output</th><th>Side effect</th></tr></thead><tbody>
+        <tr><td><strong>accounts</strong></td><td>无</td><td>账号、状态、能力</td><td>无</td></tr>
+        <tr><td><strong>threads / search</strong></td><td>query、folder、provider label、Workspace Tag、Any/All、date、cursor</td><td>线程预览列表 + tags</td><td>无</td></tr>
+        <tr><td><strong>projectThreads</strong></td><td>projectId、limit</td><td>关联线程摘要、accountId、threadId、unread、messageCount</td><td>只读 provider；单条读取失败跳过；解除关联删除本地引用</td></tr>
+        <tr><td><strong>thread</strong></td><td>accountId、threadId</td><td>消息、正文、附件元数据</td><td>无</td></tr>
+        <tr><td><strong>update / workspaceTags</strong></td><td>threadId、mutation、dryRun；或 tagNames + add/remove/replace</td><td>matched、receipt、status；tag catalog</td><td>邮箱状态由 provider 管理，Workspace Tag 由 OpenBuddy 管理</td></tr>
+        <tr><td><strong>processingPlan</strong></td><td>按账户分组的可逆操作、threadIds、rationale</td><td>逐项动作、匹配数量、样本 ID、AI 理由和确认后 result</td><td>预览无写操作；trash/spam 排除；一次性 token + fingerprint</td></tr>
+        <tr><td><strong>meetingProposal</strong></td><td>时间、时区、地点、参与人、会议链接、message citations</td><td>OpenBuddy 日历创建提案</td><td>低置信度只展示；确认后进入审批 Inbox；链接不自动打开</td></tr>
+        <tr><td><strong>createDraft</strong></td><td>recipients、subject、body、attachments、draftId</td><td>本地/远端 draft</td><td>保存草稿，不外发；IMAP 使用稳定 draft ID 更新远端版本，避免重复副本</td></tr>
+        <tr><td><strong>queueSend / cancelPendingSend</strong></td><td>confirmed token + 1000–30000ms undo window</td><td>pending / cancelled / sent / failed</td><td>持久化撤回窗口；过期后由 worker 发送；AI 只读工具可查询队列</td></tr>
+        <tr><td><strong>sendDraft / scheduleSend</strong></td><td>Main 原生确认 + draft fingerprint + 一次性 token</td><td>provider receipt</td><td>直接发送或计划发送的受控路径</td></tr>
+      </tbody></table></div>
+      <p class="section-title">Source of truth</p>
+      <div class="grid-2">
+        <article class="card info-card"><h3>Provider-owned</h3><ul><li>邮件正文和原始 MIME</li><li>线程、标签、已读和归档状态</li><li>发送结果和服务端 message ID</li><li>OAuth token 和 provider 限流</li></ul></article>
+        <article class="card info-card"><h3>OpenBuddy-owned</h3><ul><li>草稿索引和本地编辑状态</li><li>权限确认状态和审计日志</li><li>UI 分页游标与缓存元数据</li><li>Signal/Noise 显示策略和自动化记录</li></ul></article>
+      </div>
+    </section>
+
+    <section class="view" id="security">
+      <p class="section-title">Send state machine</p>
+      <div class="card state-machine">
+        <div class="state"><b>requested</b><small>AI/UI 请求</small></div><div class="state-arrow">→</div>
+        <div class="state"><b>draft_created</b><small>无外发</small></div><div class="state-arrow">→</div>
+        <div class="state confirm"><b>user_review_required</b><small>展示完整摘要</small></div><div class="state-arrow">→</div>
+        <div class="state confirm"><b>confirmed</b><small>一次性 token</small></div><div class="state-arrow">→</div>
+        <div class="state confirm"><b>pending_send</b><small>持久化队列</small></div><div class="state-arrow">→</div>
+        <div class="state confirm"><b>undo_window</b><small>默认 5 秒</small></div><div class="state-arrow">→</div>
+        <div class="state"><b>sending</b><small>provider call</small></div><div class="state-arrow">→</div>
+        <div class="state sent"><b>sent</b><small>receipt + audit</small></div>
+      </div>
+      <div class="card state-machine"><div class="state"><b>undo_window</b><small>用户点击撤回</small></div><div class="state-arrow">→</div><div class="state sent"><b>cancelled</b><small>不触发 provider</small></div><div class="state-arrow">·</div><div class="state"><b>sending</b><small>窗口结束 / 重启恢复</small></div><div class="state-arrow">→</div><div class="state"><b>failed</b><small>保留草稿并审计</small></div></div>
+      <p class="section-title">Permission matrix</p>
+      <div class="card"><table><thead><tr><th>Operation</th><th>AI default</th><th>Confirmation</th><th>Audit</th><th>Failure policy</th></tr></thead><tbody>
+        <tr><td><strong>Search / read</strong></td><td>允许</td><td>不需要</td><td>不记录正文</td><td>显示 provider 错误并可重试</td></tr>
+        <tr><td><strong>Mark / archive / label</strong></td><td>允许单线程</td><td>批量需要 dryRun 确认</td><td>记录资源 ID</td><td>部分成功逐项返回</td></tr>
+        <tr><td><strong>Create / edit draft</strong></td><td>允许</td><td>不需要外发确认</td><td>记录 draft ID</td><td>保留本地草稿</td></tr>
+        <tr><td><strong>Send draft / undo</strong></td><td>拒绝直发</td><td>必须用户确认；默认 5 秒可撤回</td><td>请求/确认/队列/完成或撤回</td><td>失败仍保留 draft 和失败状态</td></tr>
+        <tr><td><strong>Trash / spam / block / unsubscribe</strong></td><td>拒绝默认执行</td><td>明确确认或授权策略</td><td>必须审计</td><td>不可静默重试；退订链接只作证据，不由 Renderer 直接打开</td></tr>
+      </tbody></table></div>
+      <p class="section-title">Threat boundaries</p>
+      <div class="grid-3">
+        <article class="card info-card"><h3>Prompt injection</h3><p>邮件正文和附件文本是外部不可信输入，不能改变系统策略、权限或发送确认。</p></article>
+        <article class="card info-card"><h3>Data minimization</h3><p>日志只保存 ID、provider、操作和状态；正文、token、附件内容禁止进入 telemetry。</p></article>
+        <article class="card info-card"><h3>Credential isolation</h3><p>只使用 OpenBuddy 的 MCP OAuth/凭据机制，不读取 WorkBuddy 私有 token 或数据库；profile 只映射工具名，不代表真实 OAuth 已验证。用户消息中暴露的 QQ 授权码不得使用，必须撤销并轮换。</p></article>
+      </div>
+    </section>
+
+    <section class="view" id="delivery">
+      <p class="section-title">Minimal delivery slices</p>
+      <div class="grid-3">
+        <article class="card info-card"><h3>当前完成度 · 86.0%（约 86%）</h3><p>基础读写与安全发送 90%，AI 工作流 91%，OpenBuddy 工作区融合 89%，Provider 生产就绪 63%。已加入 provider 原生增量同步、只读可解释 AI 分诊、跨线程 AI 邮件行动中心、可配置 AI 规则编辑/启停/分页扫描/运行审计、处理计划 preview → confirm → execute → cancel/expire、逐项处理计划证据预览（动作、匹配数、样本 ID、AI 理由）、待确认计划队列与数量徽标、通知中心到指定处理计划的跳转、AI 行动项 → 跟进提醒/项目任务的确认与回链、项目详情页反查关联邮件并回到原线程、项目/计划/任务的本地 Workspace Tag 编辑与标签搜索、统一搜索按邮件 Workspace Tag 查询并按 accountId + threadId 去重、逐项 Provider readiness 展示和无账号主流邮箱接入向导、批量归档/恢复/已读/未读/星标/删除/垃圾邮件的 dry-run 与危险操作双重确认、多 Provider 的账户级能力诊断、助理收件箱邮件投影的 accountId + threadId + messageDate 回执、多账号协作线程的 emailAccountId + emailThreadId 安全回链、从已读取线程生成的隐私受限联系人上下文和 Composer 收件人补全，以及 Markdown → 清洗 HTML 的双格式草稿链路；新增可注入 token/fetch 的 Gmail REST API provider，覆盖 Gmail query、线程/MIME 解析、标签、归档、草稿、受控发送和附件下载 fake 契约；新增 Microsoft Graph REST provider，覆盖 Outlook 文件夹、分类、conversationId 线程、Graph 搜索/过滤/分页、管理、草稿附件替换、发送和附件下载 fake 契约；新增 JMAP/Fastmail REST provider，覆盖 Session、Mailbox、Email query/get/set、标准 bodyStructure 草稿、附件 upload/download 和 EmailSubmission 发送 fake 契约；附件发送前已拒绝相对路径、缺失文件、目录和符号链接，并限制单文件/总量 25 MiB；新增标准 IMAP/SMTP MCP adapter，默认只读并拆分写入/草稿/SMTP 发信开关，补充 fake-server 协议回归、profile-aware provider readiness/执行门禁和受门禁的真实验收 runner，QQ 已有真实 MCP 账号、文件夹、分页、搜索和线程读取证据。当前未使用用户消息中暴露的 QQ 凭据；真实 Gmail OAuth/现场管理、QQ 管理、附件下载、草稿/受控发送、其他 provider OAuth、厂商限流现场行为、重授权恢复、文档/协作权限投影、可视化 HTML 编辑、联系人权限/CRM 联动和真实模型质量仍未验收。</p></article>
+        <article class="card info-card"><h3>统一搜索第一阶段</h3><p>现有 SearchOverlay 已聚合会话、邮件、当前会话任务、本地日程、本地项目/资产、助理协作 Inbox 和已保存知识源文档；项目、计划、任务标签会参与项目结果命中并展示，查询命中邮件 Workspace Tag 时按 tags + tagMatch 二次查询并按 accountId + threadId 去重，邮件结果按主题、发件人、正文、标签、未读和星标排序并显示线程状态，点击结果可回到原邮件、项目、助理入口或本地文档路径。真实 Provider 验收脚本现在输出 OAuth/读取/分页/增量同步/管理/附件/草稿/受控发送的 capabilityMatrix，并明确区分 passed、failed、not-run；下一步接入实体权限投影和协作 Inbox 标签过滤。</p></article>
+        <article class="card info-card"><h3>AI 最佳实践</h3><p>摘要、行动项、风险和回复草稿保存来源消息引用、结构化 schema、置信度和人工审阅状态；分诊结果可切换紧急、待回复、等待对方、噪声、普通队列，但只改变本地投影；噪声归档仍需 preview → confirm → execute。行动项经确认后可创建跟进提醒，服务层按分析与行动项索引幂等回链；质量评估输出 precision、recall、F1、截止日期准确率、引用准确率、无行动准确率、数据集 hash，并支持缺失预测 fail-closed 的发布门禁；fixture 结果不等同于真实模型质量。</p></article>
+      </div>
+      <div class="card"><table><thead><tr><th>Slice</th><th>Scope</th><th>Files</th><th>Exit criteria</th></tr></thead><tbody>
+        <tr><td><span class="status p0">P0</span></td><td><strong>Contract + fake provider</strong><br>域模型、错误码、tool map、audit schema</td><td><code>packages/capability/openbuddy-email/*</code></td><td>无真实邮箱即可覆盖读、写、失败和发送门禁</td></tr>
+        <tr><td><span class="status p0">P0</span></td><td><strong>Read MVP</strong><br>账号、搜索、线程、标签、附件元数据</td><td>capability + Pi tools + MCP adapter</td><td>可接一个真实 MCP provider 读取邮件</td></tr>
+        <tr><td><span class="status p0">P0</span></td><td><strong>Draft + safe send</strong><br>新建、回复、转发、确认发送、附件安全校验</td><td>Main IPC + preload + Composer + capability attachment gate</td><td>无确认永远发不出去；非法附件在 provider 调用前拒绝；真实验收还要确认 Drafts 远端可见、同一 draftId 更新不重复、Sent 可见；失败保留草稿</td></tr>
+        <tr><td><span class="status p1">P1</span></td><td><strong>Management + unified Inbox/Search/Tagging</strong><br>Signal/Noise、Workspace Tag、项目/计划/任务标签、批量归档/恢复/已读/未读/星标/删除/垃圾邮件、提醒、待回复邮件投影、项目/协作 Inbox/知识库搜索、项目双向邮件回链</td><td>UI projection + workspace tag store + projects-store + collaboration snapshot + knowledge-base registry + projectThreads IPC</td><td>标签与 provider label 分离；项目/计划/任务标签去重持久化并可搜索；所有批量写入 dryRun；删除/垃圾邮件需第二次确认；邮件、项目、协作项和知识文档可回到原工作区</td></tr>
+        <tr><td><span class="status later">P2</span></td><td><strong>Expansion</strong><br>Gmail/Graph/JMAP 真实 OAuth、CRM、团队共享</td><td>new adapters and projections</td><td>QQ 管理/草稿/发送证据、其他 provider evidence、跨实体搜索、联系人/日历/CRM 联动</td></tr>
+      </tbody></table></div>
+      <p class="section-title">File-level change map</p>
+      <div class="card file-tree"><strong>packages/capability/openbuddy-email/</strong>
+├── src/index.ts                 # domain + provider + facade + Pi tools
+├── src/index.test.ts            # fake provider / security / persistence
+├── package.json
+├── moon.yml
+└── tsconfig.json
+
+<strong>packages/bundle/openbuddy-base/</strong>
+├── src/capability-plugins.ts    # register capability and tools
+└── src/index.ts                 # profile entry and dependency order
+
+<strong>electron/</strong>
+├── main/ipc.ts                  # second slice: typed email IPC
+├── main/openbuddy-core-plugin.ts# legacy profile mount
+└── preload/index.ts             # allowlisted channels
+
+<strong>src/components/</strong>
+├── EmailPanel.tsx               # list / search / thread / contact context
+├── EmailComposer.tsx            # draft / confirmation / recipient completion
+└── ../lib/email-contacts.ts     # privacy-limited in-memory contact index
+</div>
+      <p class="section-title">Definition of done</p>
+      <div class="grid-3">
+        <article class="card info-card"><h3>Correctness</h3><p>线程、未读、标签和发送 receipt 与 provider 一致；重复刷新不重复写入。</p></article>
+        <article class="card info-card"><h3>Safety</h3><p>无 token 拒绝发送；正文不进入日志；HTML 和附件均有安全降级。</p></article>
+        <article class="card info-card"><h3>Extensibility</h3><p>第二 provider 只实现 adapter；关闭邮件 capability 不影响普通会话和通知中心。</p></article>
+      </div>
+    </section>
+    <section class="view" id="permissions">
+      <p class="section-title">实体级权限投影</p>
+      <div class="card diagram-shell">
+        <div class="diagram">
+          <div class="lane">
+            <h3>调用方</h3><small>UI / AI / 协作 / 项目</small>
+            <button class="node ui" data-detail="Email.withPermission(policy) 返回 EmailPermissionScopedView，覆盖 accounts / threads / thread / labels / attachments / share / reminder / project / triage / digest / audit 等 11 个子域；调用方不需要知道底层 capability 边界，所有读/写都被 policy 拦截。"><b>Email.withPermission()</b><span>UI / AI / 协作 / 项目统一入口</span></button>
+            <button class="node ui" data-detail="协作 Inbox、项目反查、AI 行动中心、SearchOverlay 都可以选择 owner / readonly / share policy；同一进程内多次创建 policy 实例互不影响，避免越权上下文泄漏。"><b>三方调用方</b><span>协作 Inbox / 项目反查 / AI 行动中心 / SearchOverlay</span></button>
+          </div>
+          <div class="connector"><span>policy → projection</span>→</div>
+          <div class="lane">
+            <h3>Policy</h3><small>声明式权限</small>
+            <button class="node main" data-detail="EmailPermissionPolicy.accounts / threads / labels / share / reminder / project / triage / digest / attachments / audit 共 10 个开关位；未列出的子域默认 deny；运行时组合 owner / readonly / share 三种 preset。"><b>Policy 声明</b><span>10 个细粒度开关位</span></button>
+            <button class="node main" data-detail="EmailPermissionResolver 在调用前校验 policy.subset 是否覆盖请求 method，自动降级并抛出 capability_denied / account_denied / scope_denied 错误码，类型安全。"><b>Resolver</b><span>capability_denied / account_denied / scope_denied</span></button>
+            <button class="node main" data-detail="预置三种 policy：owner() 全功能；readonly() 仅读 / 搜索 / 摘要；share() 分享线程 + 摘要 + 标签读，禁止写与分享外操作。"><b>三种 preset</b><span>owner / readonly / share</span></button>
+          </div>
+          <div class="connector"><span>scoped view</span>→</div>
+          <div class="lane">
+            <h3>底层能力</h3><small>Cap 隔离 + Provider 边界</small>
+            <button class="node provider" data-detail="邮件 capability 主入口：accounts / threads / labels / attachments / drafts / send / search / triage / digest。permission view 只暴露该 policy 允许的方法。"><b>Email 主入口</b><span>11 个子域 · 类型安全投影</span></button>
+            <button class="node provider" data-detail="底层 Pi tools + MCP adapter 仍由 provider 信任边界守卫，权限投影是第一层 UI 防线。"><b>Provider 边界</b><span>MCP / OAuth / 凭据</span></button>
+          </div>
+        </div>
+        <div class="detail" id="node-detail"><strong>点击任意节点查看职责。</strong> 颜色代表边界：青色是 UI，绿色是 OpenBuddy 内部，紫色是 provider，琥珀色是外部邮箱，红色是安全门禁。</div>
+      </div>
+      <p class="section-title">错误码语义</p>
+      <div class="grid-3">
+        <article class="card info-card"><h3>capability_denied</h3><p>请求方法不在 policy 允许集合中；返回时同步给出 reason 与 method 名称，方便 UI 给出明确提示。</p></article>
+        <article class="card info-card"><h3>account_denied</h3><p>policy.accountIds 不包含目标 accountId；用于协作 Inbox 跨账号分享场景。</p></article>
+        <article class="card info-card"><h3>scope_denied</h3><p>policy.scopes 不覆盖当前 method 的所需 scope（读 / 写 / 分享 / 提醒 / 摘要）。</p></article>
+      </div>
+      <p class="section-title">集成路径</p>
+      <div class="grid-3">
+        <article class="card info-card"><h3>协作 Inbox</h3><p>从 emailSharedRef 回链时使用 readonly() policy，避免协作面板误触发外发或修改。</p></article>
+        <article class="card info-card"><h3>项目反查</h3><p>project-threads 使用 readonly() policy 读取关联线程摘要，禁止在项目页签中发起 send / draft。</p></article>
+        <article class="card info-card"><h3>AI 行动中心</h3><p>跨线程读取 analyses / plans 使用 owner() policy，但 AI 自动执行 draft 仍需用户在 Composer 中确认。</p></article>
+      </div>
+    </section>
+
+    <section class="view" id="registry">
+      <p class="section-title">Provider Registry · 多连接管理</p>
+      <div class="card diagram-shell">
+        <div class="diagram">
+          <div class="lane">
+            <h3>UI</h3><small>用户可见</small>
+            <button class="node ui" data-detail="EmailPanel 顶部显示 registry 状态卡片：每张卡片对应一个 provider connection，显示 provider、displayName、status (configured / connected / failed / disabled)、lastSync、capabilities、诊断按钮、删除按钮。"><b>Provider Cards</b><span>status / capabilities / lastSync / 诊断</span></button>
+            <button class="node ui" data-detail="添加连接模态框：选择 provider 类型 (gmail / graph / jmap / imap_smtp)，填写 displayName，OAuth 走系统浏览器或本地 127.0.0.1 callback；IMAP/SMTP 走 MCP server 本地凭据入口。"><b>添加连接</b><span>4 种主流 provider · OAuth / MCP</span></button>
+            <button class="node ui" data-detail="键盘 g+i / g+s / g+d / g+t 一键跳转 Gmail / Graph / JMAP / IMAP 添加面板；删除 / 启用 / 重授权有独立确认。"><b>键盘快速添加</b><span>g+i · g+s · g+d · g+t</span></button>
+          </div>
+          <div class="connector"><span>IPC</span>→</div>
+          <div class="lane">
+            <h3>Capability</h3><small>Registry 核心</small>
+            <button class="node main" data-detail="EmailProviderRegistry 是单实例 registry，注册 / 注销 / 启用 / 停用 / 标记重授权 / 读取诊断 / 列出全部 7 个核心方法均覆盖测试。"><b>Registry</b><span>注册 · 启用 · 诊断 · 列表</span></button>
+            <button class="node main" data-detail="list(): readiness 字段包含 configured / connected / failed / disabled / awaiting-reauth 五种；输出顺序与启用状态稳定一致。"><b>readiness 五态</b><span>configured · connected · failed · disabled · awaiting-reauth</span></button>
+            <button class="node main" data-detail="diagnostics(accountId) 返回最近一次失败的 code / message / lastSuccessAt / reauthorizeHint；不泄露 token。"><b>Diagnostics</b><span>code · message · lastSuccess · hint</span></button>
+          </div>
+          <div class="connector"><span>Provider</span>→</div>
+          <div class="lane">
+            <h3>Provider 实现</h3><small>Adapter</small>
+            <button class="node provider" data-detail="Gmail API provider (227 行)：inject token / fetch，支持 query / threads / labels / drafts / send / attachments fake 契约。"><b>Gmail REST</b><span>227 行 · token + fetch 注入</span></button>
+            <button class="node provider" data-detail="Microsoft Graph provider (287 行)：folders / categories / conversationId / search / filter / drafts / send / attachments。"><b>Graph REST</b><span>287 行 · Outlook 完整路径</span></button>
+            <button class="node provider" data-detail="JMAP provider (328 行)：Session / Mailbox / Email query/get/set / bodyStructure / EmailSubmission。"><b>JMAP / Fastmail</b><span>328 行 · 标准 bodyStructure</span></button>
+            <button class="node mailbox" data-detail="标准 IMAP/SMTP MCP server：默认只读，写入/草稿/SMTP 发信独立开关；fake-server 协议回归覆盖。"><b>IMAP/SMTP MCP</b><span>本地 · profile-aware · 只读优先</span></button>
+          </div>
+        </div>
+        <div class="detail" id="node-detail"><strong>点击任意节点查看职责。</strong> 颜色代表边界：青色是 UI，绿色是 OpenBuddy 内部，紫色是 provider，琥珀色是外部邮箱，红色是安全门禁。</div>
+      </div>
+      <p class="section-title">readiness 五态语义</p>
+      <div class="grid-3">
+        <article class="card info-card"><h3>configured</h3><p>已注册但未尝试连接；用于离线编辑与本地索引。</p></article>
+        <article class="card info-card"><h3>connected</h3><p>已成功调用 listAccounts / listThreads 等读取操作；写入仍受 capability gate。</p></article>
+        <article class="card info-card"><h3>failed</h3><p>最近一次操作返回非授权错误码；UI 触发 diagnostics 并提示用户重授权。</p></article>
+        <article class="card info-card"><h3>disabled</h3><p>用户主动停用；registry 保留但不再调度。</p></article>
+        <article class="card info-card"><h3>awaiting-reauth</h3><p>OAuth token 失效，需要进入授权流程；保留 accountId 与历史数据。</p></article>
+        <article class="card info-card"><h3>测试覆盖</h3><p>5 个测试覆盖 register / list / enable / disable / reauthorize / remove / diagnostics 全路径。</p></article>
+      </div>
+    </section>
+
+    <section class="view" id="blindtest">
+      <p class="section-title">AI 邮件盲测集 · 51 case</p>
+      <div class="card diagram-shell">
+        <div class="diagram">
+          <div class="lane">
+            <h3>数据集</h3><small>fixtures</small>
+            <button class="node ui" data-detail="51 封真实邮件样本，覆盖 6 类典型业务：报价/合同 10、会议安排 10、任务/行动项 10、信息/无行动 8、投诉/问题 5、跟进/等待 5、个人/社交 3。每条 case 含 subject、body、from、attachments 与 expectedActions 期望。"><b>51 个 case</b><span>6 大类 · 真实邮件样本</span></button>
+            <button class="node ui" data-detail="数据集 hash 在测试运行前计算；变更数据集必须更新 hash，否则 fail-closed。"><b>Hash 校验</b><span>fail-closed · 阻止静默改动</span></button>
+          </div>
+          <div class="connector"><span>case × model</span>→</div>
+          <div class="lane">
+            <h3>Runner</h3><small>Node ESM</small>
+            <button class="node main" data-detail="run_email_ai_blind_test.mjs 支持 6 个 backend：mock、openai-compatible、anthropic-compatible、openbuddy-rules、openbuddy-agent、openbuddy-agent-harness。第 7 轮 openbuddy-agent 直接驱动真实 @openbuddy/capability-email；第 8 轮新增 openbuddy-agent-harness 通过 Electron harness RPC 启动真实 Pi Agent session，让 agent 自主调用 email_extract_action_candidates + email_save_analysis 完成端到端闭环，realE2E=true；第 11 轮把 openbuddy-agent-harness 加入 scripts/electron/launch-real-evals-echo.mjs，用本地 Anthropic Messages SSE echo provider 跑通 2/51 case（5s、exit 0、passed=1/failed=0、bridge stderr 抓到 pickModelId -> custom_anthropic/MiniMax-M3），证明 Electron → Main → Pi Agent → capability.email → evaluator 协议闭环已无凭据跑通，换 baseUrl + key + modelId 即可切真实 MiniMax M3；行动中心查询 / 联系人投影 / 批量提醒已纳入 capability.email 与 IPC 表面（action-center-query、contact-projection、action-center-create-reminders）。"><b>Runner</b><span>6 backend · openbuddy-agent[-harness]=real E2E · echo 链路已跑通</span></button>
+            <button class="node main" data-detail="evaluate_email_ai_quality.mjs 计算 precision / recall / F1 / 截止日期准确率 / 引用准确率 / 无行动准确率；支持发布门禁 fail-closed。"><b>Evaluator</b><span>precision · recall · F1 · 截止 · 引用 · 无行动</span></button>
+            <button class="node main" data-detail="7 个 runner 单元测试覆盖 dataset hash、mock backend、openbuddy-agent realE2E backend、openbuddy-agent-harness 缺失环境 fallback、缺失 case 的 fail-closed、并发与汇总；3 个新增 bridge stub 测试通过 node:http 模拟 harness RPC，验证模型回退、事件轮询和分析读回。"><b>Runner 测试</b><span>10 / 10 passed (7 runner + 3 bridge stub)</span></button>
+          </div>
+          <div class="connector"><span>report</span>→</div>
+          <div class="lane">
+            <h3>门禁</h3><small>发布守门</small>
+            <button class="node provider" data-detail="任何字段低于历史基线即 fail-closed；fixture 结果不进入真实质量评估。openbuddy-agent backend 不需要外部 LLM key，复用 OpenBuddy email 包的 extractEmailActionCandidates + saveAnalysis；接 MiniMax M3 时由 harness 注入 OPENBUDDY_E2E_API_KEY。"><b>发布门禁</b><span>基线对比 · fail-closed · 无 LLM key 也能跑</span></button>
+            <button class="node provider" data-detail="盲测结果可写入 evidence/email-ai-blind-test-report.json 作为持续证据；与 OAuth 验收报告并列归档。"><b>持续证据</b><span>evidence/ · 与 OAuth 报告并列</span></button>
+          </div>
+        </div>
+        <div class="detail" id="node-detail"><strong>点击任意节点查看职责。</strong> 颜色代表边界：青色是 UI，绿色是 OpenBuddy 内部，紫色是 provider，琥珀色是外部邮箱，红色是安全门禁。</div>
+      </div>
+      <p class="section-title">6 大类盲测样本</p>
+      <div class="grid-3">
+        <article class="card info-card"><h3>报价 / 合同 · 10</h3><p>关注金额、有效期、附件、合同编号等结构化字段抽取准确性。</p></article>
+        <article class="card info-card"><h3>会议安排 · 10</h3><p>关注时间、参会人、地点、Agenda、是否需要回复的判断。</p></article>
+        <article class="card info-card"><h3>任务 / 行动项 · 10</h3><p>关注可执行项抽取、负责人、截止日期、依赖任务。</p></article>
+        <article class="card info-card"><h3>信息 / 无行动 · 8</h3><p>关注过度抽取与误识别提醒的负样本；衡量 precision。</p></article>
+        <article class="card info-card"><h3>投诉 / 问题 · 5</h3><p>关注情绪判断、紧急度提升与客服跟进识别。</p></article>
+        <article class="card info-card"><h3>跟进 / 等待 / 个人 · 8</h3><p>覆盖等待回复、社交礼貌、个人事务三类；保证分类均衡。</p></article>
+      </div>
+    </section>
+
+    <section class="view" id="keyboard">
+      <p class="section-title">Macro 风格键盘工作流</p>
+      <div class="card diagram-shell">
+        <div class="diagram">
+          <div class="lane">
+            <h3>导航</h3><small>列表 · 详情</small>
+            <button class="node ui" data-detail="j / k 单条上下；J / K 跨折叠组上下；Enter 打开线程；Esc 返回列表；r 切到收件箱；e 切到已发送；s 切到星标；u 跳到未读。"><b>列表导航</b><span>j · k · J · K · Enter · Esc · r · e · s · u</span></button>
+            <button class="node ui" data-detail="# 删除线程（带确认）；? 打开键盘帮助 Modal；/ 进入搜索框；c+e 进入草稿编辑器。"><b>动作</b><span># · ? · / · c+e</span></button>
+          </div>
+          <div class="connector"><span>复合键</span>→</div>
+          <div class="lane">
+            <h3>AI</h3><small>一键 AI</small>
+            <button class="node main" data-detail="r 一键 AI 摘要；a 提取行动项；f 识别会议；c+r 生成回复草稿；c+a 创建跟进提醒。"><b>AI 触发</b><span>r · a · f · c+r · c+a</span></button>
+            <button class="node main" data-detail="u 一键标为未读 / 已读切换；x 多选线程批量操作；Space 在多选模式加入 / 移除当前线程。"><b>状态切换</b><span>u · x · Space</span></button>
+          </div>
+          <div class="connector"><span>g+*</span>→</div>
+          <div class="lane">
+            <h3>添加连接</h3><small>Provider 跳转</small>
+            <button class="node provider" data-detail="g+i 打开 IMAP 添加连接；g+s 打开 SMTP 添加连接（IMAP/SMTP 模式）；g+d 打开 Gmail 添加；g+t 打开 Graph 添加。"><b>g+* 跳转</b><span>g+i · g+s · g+d · g+t</span></button>
+            <button class="node mailbox" data-detail="快捷键面板 Modal 提供完整帮助：分组 · 描述 · 键名可视化（kbd）；可搜索。"><b>? 帮助</b><span>键盘帮助 Modal · 分组 · kbd</span></button>
+          </div>
+        </div>
+        <div class="detail" id="node-detail"><strong>点击任意节点查看职责。</strong> 颜色代表边界：青色是 UI，绿色是 OpenBuddy 内部，紫色是 provider，琥珀色是外部邮箱，红色是安全门禁。</div>
+      </div>
+      <p class="section-title">今日仪表板 · 一键过滤</p>
+      <div class="grid-3">
+        <article class="card info-card"><h3>紧急</h3><p>红色边框 · 数字 + 标签；点击直接过滤紧急分类队列；状态切换在 is-active 类上同步显示。</p></article>
+        <article class="card info-card"><h3>待回复</h3><p>琥珀色边框 · 切换 triageCategory=needs-reply；只读投影进入主列表。</p></article>
+        <article class="card info-card"><h3>等待对方</h3><p>靛蓝边框 · 等待对方回复队列；适合跟进提醒交叉验证。</p></article>
+        <article class="card info-card"><h3>噪音</h3><p>灰色边框 · 噪声归档目标；批量归档前需 preview → confirm。</p></article>
+        <article class="card info-card"><h3>is-active 状态</h3><p>active 卡片有阴影 + 边框高亮 + 浅色背景；其他卡片维持原状。</p></article>
+        <article class="card info-card"><h3>样式规范</h3><p>.email-today-dashboard__card 统一圆角、阴影、hover 抬起效果；遵循现有 email-* 视觉语言。</p></article>
+      </div>
+    </section>
+    <div class="footer">设计文件：<code>docs/openbuddy-email-support-plan.md</code> · 图表为单文件 HTML，无外部依赖，可直接离线打开。</div>
+  </main>
+  <script>
+    const buttons = [...document.querySelectorAll('[data-view]')];
+    const views = [...document.querySelectorAll('.view')];
+    buttons.forEach((button) => button.addEventListener('click', () => {
+      const id = button.dataset.view;
+      buttons.forEach((item) => item.classList.toggle('active', item === button));
+      views.forEach((view) => view.classList.toggle('active', view.id === id));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }));
+    const detail = document.querySelector('#node-detail');
+    document.querySelectorAll('[data-detail]').forEach((node) => node.addEventListener('click', () => {
+      document.querySelectorAll('[data-detail]').forEach((item) => item.classList.remove('selected'));
+      node.classList.add('selected');
+      detail.innerHTML = '<strong>' + node.querySelector('b').textContent + '</strong> · ' + node.dataset.detail;
+    }));
+  </script>
+</body>
+</html>

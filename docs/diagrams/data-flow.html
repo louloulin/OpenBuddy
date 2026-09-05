@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>OpenBuddy 数据流分析</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px; }
+  h1 { text-align: center; font-size: 28px; margin-bottom: 8px; color: #58a6ff; }
+  .subtitle { text-align: center; color: #8b949e; margin-bottom: 40px; font-size: 14px; }
+  .flow { max-width: 900px; margin: 0 auto; }
+  .step { display: flex; align-items: flex-start; margin-bottom: 4px; }
+  .step-num { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; margin-right: 16px; }
+  .step-content { flex: 1; background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 14px 18px; }
+  .step-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .step-desc { color: #8b949e; font-size: 12px; line-height: 1.5; }
+  .step-file { color: #7ee787; font-size: 11px; font-family: monospace; margin-top: 4px; }
+  .connector { width: 36px; display: flex; justify-content: center; color: #484f58; font-size: 16px; margin: 2px 0; margin-right: 16px; }
+  .n1 .step-num { background: #1f6feb33; color: #58a6ff; border: 1px solid #1f6feb; }
+  .n2 .step-num { background: #3fb95033; color: #3fb950; border: 1px solid #3fb950; }
+  .n3 .step-num { background: #d2992233; color: #d29922; border: 1px solid #d29922; }
+  .n4 .step-num { background: #f8514933; color: #f85149; border: 1px solid #f85149; }
+  .n5 .step-num { background: #bc8cff33; color: #bc8cff; border: 1px solid #bc8cff; }
+  .legend { max-width: 900px; margin: 40px auto 0; display: flex; gap: 20px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .events { max-width: 900px; margin: 40px auto 0; }
+  .events h2 { font-size: 18px; color: #f0f6fc; margin-bottom: 16px; border-bottom: 1px solid #21262d; padding-bottom: 8px; }
+  .event-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .event { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; }
+  .event-name { font-family: monospace; font-size: 13px; color: #79c0ff; font-weight: 600; }
+  .event-desc { color: #8b949e; font-size: 11px; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>🔄 OpenBuddy 数据流分析</h1>
+<p class="subtitle">用户 Prompt → LLM 响应 完整链路</p>
+
+<div class="flow">
+  <div class="step n1">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <div class="step-title">用户输入</div>
+      <div class="step-desc">用户在 Composer 组件中输入文本，可附带文件上下文、图片等</div>
+      <div class="step-file">src/App.tsx → Composer.tsx</div>
+    </div>
+  </div>
+  <div class="connector">│</div>
+
+  <div class="step n1">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <div class="step-title">IPC 调用</div>
+      <div class="step-desc">Composer 调用 window.api.invoke("agent:prompt", { text, context })，通过 contextBridge 安全传递到主进程</div>
+      <div class="step-file">src/lib/platform/electron-api.ts → electron/preload/index.ts</div>
+    </div>
+  </div>
+  <div class="connector">│</div>
+
+  <div class="step n2">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <div class="step-title">IPC 路由</div>
+      <div class="step-desc">ipc.ts 白名单处理器接收请求，验证参数，路由到 agent-host.ts</div>
+      <div class="step-file">electron/main/ipc/index.ts</div>
+    </div>
+  </div>
+  <div class="connector">│</div>
+
+  <div class="step n2">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <div class="step-title">Pi AgentSession</div>
+      <div class="step-desc">agent-host.ts 调用 Pi AgentSession.prompt()，Pi 运行时决策下一步动作（调用工具或直接回复）</div>
+      <div class="step-file">electron/main/agent/agent-host.ts</div>
+    </div>
+  </div>
+  <div class="connector">│</div>
+
+  <div class="step n3">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <div class="step-title">工具调用</div>
+      <div class="step-desc">Pi 决策调用工具（如 read_file），通过 Cordis 上下文查找对应的 Service 并执行</div>
+      <div class="step-file">packages/fs/openbuddy-fs-local/ → @openbuddy/storage</div>
+    </div>
+  </div>
+  <div class="connector">│</div>
+
+  <div class="step n4">
+    <div class="step-num">6</div>
+    <div class="step-content">
+      <div class="step-title">权限检查</div>
+      <div class="step-desc">检查路径是否在用户已授权信任的文件夹内。未授权则发出 permission:request 事件，渲染端弹出模态框请求用户确认</div>
+      <div class="step-file">packages/capability/openbuddy-folder-trust/</div>
+    </div>
+  </div>
+  <div class="connector">│</div>
+
+  <div class="step n3">
+    <div class="step-num">7</div>
+    <div class="step-content">
+      <div class="step-title">LLM 调用</div>
+      <div class="step-desc">Pi 用工具结果调用 LLM（支持 Anthropic / OpenAI / NewAPI / 自定义 Provider），BYOK 模式</div>
+      <div class="step-file">@earendil-works/pi-ai → Provider Registry</div>
+    </div>
+  </div>
+  <div class="connector">│</div>
+
+  <div class="step n5">
+    <div class="step-num">8</div>
+    <div class="step-content">
+      <div class="step-title">流式响应</div>
+      <div class="step-desc">LLM 流式返回，AgentSession 发出 pi://message-delta 事件</div>
+      <div class="step-file">@earendil-works/pi-coding-agent</div>
+    </div>
+  </div>
+  <div class="connector">│</div>
+
+  <div class="step n2">
+    <div class="step-num">9</div>
+    <div class="step-content">
+      <div class="step-title">事件桥接</div>
+      <div class="step-desc">pi-event-bridge.ts 通过 webContents.send 将事件转发给渲染端</div>
+      <div class="step-file">electron/main/agent/pi-event-bridge.ts</div>
+    </div>
+  </div>
+  <div class="connector">│</div>
+
+  <div class="step n1">
+    <div class="step-num">10</div>
+    <div class="step-content">
+      <div class="step-title">UI 渲染</div>
+      <div class="step-desc">ChatView.tsx 监听 pi://* 事件，将增量内容追加到可见消息，支持 Markdown、代码高亮、数学公式、图表渲染</div>
+      <div class="step-file">src/stores/session-store.ts → @openbuddy/ui-conversation</div>
+    </div>
+  </div>
+  <div class="connector">│</div>
+
+  <div class="step n5">
+    <div class="step-num">11</div>
+    <div class="step-content">
+      <div class="step-title">持久化</div>
+      <div class="step-desc">完成时 AgentSession 发出 pi://done，结果存入 @openbuddy/capability-memory (SQLite)</div>
+      <div class="step-file">packages/runtime/openbuddy-storage/ → ~/.config/openbuddy/</div>
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div>渲染层</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3fb950"></div>主进程</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#d29922"></div>能力层</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f85149"></div>安全检查</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#bc8cff"></div>持久化</div>
+</div>
+
+<div class="events">
+  <h2>📡 Pi 事件类型</h2>
+  <div class="event-grid">
+    <div class="event">
+      <div class="event-name">pi://message-delta</div>
+      <div class="event-desc">消息增量内容，流式文本片段</div>
+    </div>
+    <div class="event">
+      <div class="event-name">pi://tool-call</div>
+      <div class="event-desc">工具调用请求（工具名 + 参数）</div>
+    </div>
+    <div class="event">
+      <div class="event-name">pi://tool-result</div>
+      <div class="event-desc">工具执行结果</div>
+    </div>
+    <div class="event">
+      <div class="event-name">pi://plan-update</div>
+      <div class="event-desc">计划模式更新</div>
+    </div>
+    <div class="event">
+      <div class="event-name">pi://permission</div>
+      <div class="event-desc">权限请求（文件夹信任等）</div>
+    </div>
+    <div class="event">
+      <div class="event-name">pi://done</div>
+      <div class="event-desc">任务完成</div>
+    </div>
+    <div class="event">
+      <div class="event-name">pi://error</div>
+      <div class="event-desc">错误事件</div>
+    </div>
+    <div class="event">
+      <div class="event-name">pi://ready</div>
+      <div class="event-desc">会话就绪（sessionId + cwd）</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

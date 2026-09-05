@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 920" font-family="ui-sans-serif, system-ui">
+<defs>
+  <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#0b1220"/>
+    <stop offset="100%" stop-color="#1a1f2e"/>
+  </linearGradient>
+  <linearGradient id="clientBg" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.15"/>
+    <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.05"/>
+  </linearGradient>
+  <linearGradient id="gatewayBg" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" stop-color="#a855f7" stop-opacity="0.15"/>
+    <stop offset="100%" stop-color="#9333ea" stop-opacity="0.05"/>
+  </linearGradient>
+  <linearGradient id="newapiBg" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" stop-color="#22c55e" stop-opacity="0.15"/>
+    <stop offset="100%" stop-color="#16a34a" stop-opacity="0.05"/>
+  </linearGradient>
+  <linearGradient id="casdoorBg" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" stop-color="#f97316" stop-opacity="0.15"/>
+    <stop offset="100%" stop-color="#ea580c" stop-opacity="0.05"/>
+  </linearGradient>
+  <linearGradient id="opsBg" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%" stop-color="#ec4899" stop-opacity="0.15"/>
+    <stop offset="100%" stop-color="#db2777" stop-opacity="0.05"/>
+  </linearGradient>
+  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+    <polygon points="0 0, 10 3, 0 6" fill="#94a3b8"/>
+  </marker>
+  <marker id="arrowSecure" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+    <polygon points="0 0, 10 3, 0 6" fill="#22c55e"/>
+  </marker>
+  <style>
+    .title { font-size: 24px; font-weight: 700; fill: #f8fafc; }
+    .subtitle { font-size: 13px; fill: #94a3b8; }
+    .zoneTitle { font-size: 14px; font-weight: 700; fill: #f1f5f9; }
+    .nodeTitle { font-size: 12px; font-weight: 600; fill: #f1f5f9; }
+    .nodeDesc { font-size: 10px; fill: #cbd5f5; }
+    .edge { stroke: #64748b; stroke-width: 1.5; fill: none; }
+    .edgeSecure { stroke: #22c55e; stroke-width: 1.8; fill: none; stroke-dasharray: 4 2; }
+    .edgeLabel { font-size: 9px; fill: #94a3b8; font-family: ui-monospace, monospace; }
+    .badge { font-size: 9px; fill: #f8fafc; font-family: ui-monospace, monospace; }
+  </style>
+</defs>
+
+<rect width="100%" height="100%" fill="url(#bg)"/>
+<text x="40" y="38" class="title">OpenBuddy 企业级 Agent 工作台 · v2 商业化架构</text>
+<text x="40" y="58" class="subtitle">Casdoor（身份/组织） · Resource Gateway（积分账本） · NewAPI（模型网关） · Admin Portal（Web 管理）· 4 systemd Workers · 端到端闭环</text>
+
+<!-- CLIENT ZONE -->
+<rect x="20" y="80" width="320" height="280" rx="14" fill="url(#clientBg)" stroke="#38bdf8" stroke-width="1.5"/>
+<text x="36" y="106" class="zoneTitle">Client Zone · OpenBuddy Desktop</text>
+<text x="36" y="122" class="subtitle">Electron + moon · Renderer ↔ Preload ↔ Pi Agent</text>
+
+<rect x="40" y="140" width="130" height="80" rx="8" fill="#0b1220" stroke="#38bdf8" stroke-opacity="0.4"/>
+<text x="50" y="158" class="nodeTitle">Renderer UI</text>
+<text x="50" y="175" class="nodeDesc">Settings · Chat</text>
+<text x="50" y="189" class="nodeDesc">Billing · Wallet</text>
+<text x="50" y="203" class="nodeDesc">Reconciliation</text>
+<text x="50" y="216" class="nodeDesc">WorkBuddy-style</text>
+
+<rect x="190" y="140" width="130" height="80" rx="8" fill="#0b1220" stroke="#38bdf8" stroke-opacity="0.4"/>
+<text x="200" y="158" class="nodeTitle">Preload Bridge</text>
+<text x="200" y="175" class="nodeDesc">contextBridge</text>
+<text x="200" y="189" class="nodeDesc">allowlist</text>
+<text x="200" y="203" class="nodeDesc">468 IPC</text>
+
+<rect x="40" y="240" width="280" height="100" rx="8" fill="#0b1220" stroke="#38bdf8" stroke-opacity="0.4"/>
+<text x="50" y="258" class="nodeTitle">Main Process</text>
+<text x="50" y="275" class="nodeDesc">casdoor-auth · casdoor-resources</text>
+<text x="50" y="291" class="nodeDesc">openbuddy-billing · enterprise-billing-headers</text>
+<text x="50" y="307" class="nodeDesc">OIDC/PKCE · IPC Gate · SecureStorage</text>
+<text x="50" y="325" class="badge" fill="#38bdf8">agents + 8 企业面板</text>
+
+<!-- GATEWAY ZONE -->
+<rect x="370" y="80" width="330" height="380" rx="14" fill="url(#gatewayBg)" stroke="#a855f7" stroke-width="1.5"/>
+<text x="386" y="106" class="zoneTitle">Resource Gateway · Node 22 :8787</text>
+<text x="386" y="122" class="subtitle">产品积分 · 租户策略 · 计费 · 审计 · SIEM</text>
+
+<rect x="390" y="140" width="140" height="60" rx="8" fill="#0b1220" stroke="#a855f7" stroke-opacity="0.4"/>
+<text x="400" y="158" class="nodeTitle">OIDC + PKCE</text>
+<text x="400" y="174" class="nodeDesc">JWKS Verify</text>
+<text x="400" y="188" class="nodeDesc">Backchannel Logout</text>
+
+<rect x="545" y="140" width="140" height="60" rx="8" fill="#0b1220" stroke="#a855f7" stroke-opacity="0.4"/>
+<text x="555" y="158" class="nodeTitle">Tenant Policy</text>
+<text x="555" y="174" class="nodeDesc">Kill Switch</text>
+<text x="555" y="188" class="nodeDesc">Allowlist · Quota</text>
+
+<rect x="390" y="215" width="140" height="60" rx="8" fill="#0b1220" stroke="#a855f7" stroke-opacity="0.4"/>
+<text x="400" y="233" class="nodeTitle">Shared Wallets</text>
+<text x="400" y="249" class="nodeDesc">owner/spender/viewer</text>
+<text x="400" y="263" class="nodeDesc">RBAC + 余额</text>
+
+<rect x="545" y="215" width="140" height="60" rx="8" fill="#0b1220" stroke="#a855f7" stroke-opacity="0.4"/>
+<text x="555" y="233" class="nodeTitle">Credit Ledger</text>
+<text x="555" y="249" class="nodeDesc">SHA-256 Hash Chain</text>
+<text x="555" y="263" class="nodeDesc">不可变 reservation/consume</text>
+
+<rect x="390" y="290" width="140" height="60" rx="8" fill="#0b1220" stroke="#a855f7" stroke-opacity="0.4"/>
+<text x="400" y="308" class="nodeTitle">Billing</text>
+<text x="400" y="324" class="nodeDesc">Plans · Orders · Subs</text>
+<text x="400" y="338" class="nodeDesc">HMAC 支付回调</text>
+
+<rect x="545" y="290" width="140" height="60" rx="8" fill="#0b1220" stroke="#a855f7" stroke-opacity="0.4"/>
+<text x="555" y="308" class="nodeTitle">AI Proxy</text>
+<text x="555" y="324" class="nodeDesc">chat · responses</text>
+<text x="555" y="338" class="nodeDesc">embeddings · rerank</text>
+
+<rect x="390" y="365" width="295" height="80" rx="8" fill="#0b1220" stroke="#a855f7" stroke-opacity="0.4"/>
+<text x="400" y="383" class="nodeTitle">REST API · 24 类路由</text>
+<text x="400" y="399" class="nodeDesc">POST /v1/tenants/{id}/credits/{reserve,settle,release,expire,transfer,grant,welcome}</text>
+<text x="400" y="413" class="nodeDesc">POST /v1/tenants/{id}/wallets · /billing · /ai/* · /credits/reconciliation</text>
+<text x="400" y="427" class="nodeDesc">POST /internal/v1/credits/{expire,reconciliation/import} (HMAC)</text>
+<text x="400" y="441" class="badge" fill="#a855f7">GET /healthz · /readyz · /metrics (Prometheus)</text>
+
+<!-- NEWAPI ZONE -->
+<rect x="730" y="80" width="280" height="380" rx="14" fill="url(#newapiBg)" stroke="#22c55e" stroke-width="1.5"/>
+<text x="746" y="106" class="zoneTitle">NewAPI · LumosAI v1.0.0-rc.22 :3000</text>
+<text x="746" y="122" class="subtitle">模型网关 · Group · Token · 渠道 · 上游成本</text>
+
+<rect x="750" y="140" width="120" height="60" rx="8" fill="#0b1220" stroke="#22c55e" stroke-opacity="0.4"/>
+<text x="760" y="158" class="nodeTitle">/api/status</text>
+<text x="760" y="174" class="nodeDesc">quota_per_unit</text>
+<text x="760" y="188" class="nodeDesc">500000</text>
+
+<rect x="880" y="140" width="120" height="60" rx="8" fill="#0b1220" stroke="#22c55e" stroke-opacity="0.4"/>
+<text x="890" y="158" class="nodeTitle">/api/group/</text>
+<text x="890" y="174" class="nodeDesc">default · vip</text>
+<text x="890" y="188" class="nodeDesc">svip</text>
+
+<rect x="750" y="215" width="120" height="60" rx="8" fill="#0b1220" stroke="#22c55e" stroke-opacity="0.4"/>
+<text x="760" y="233" class="nodeTitle">/api/channel/</text>
+<text x="760" y="249" class="nodeDesc">id=2 MiniMax-M3</text>
+<text x="760" y="263" class="nodeDesc">id=1 deepseek (401)</text>
+
+<rect x="880" y="215" width="120" height="60" rx="8" fill="#0b1220" stroke="#22c55e" stroke-opacity="0.4"/>
+<text x="890" y="233" class="nodeTitle">/api/token/</text>
+<text x="890" y="249" class="nodeDesc">Group Token</text>
+<text x="890" y="263" class="nodeDesc">id=57 service</text>
+
+<rect x="750" y="290" width="120" height="60" rx="8" fill="#0b1220" stroke="#22c55e" stroke-opacity="0.4"/>
+<text x="760" y="308" class="nodeTitle">/v1/models</text>
+<text x="760" y="324" class="nodeDesc">OpenAI 兼容</text>
+<text x="760" y="338" class="nodeDesc">Bearer auth</text>
+
+<rect x="880" y="290" width="120" height="60" rx="8" fill="#0b1220" stroke="#22c55e" stroke-opacity="0.4"/>
+<text x="890" y="308" class="nodeTitle">/api/log/</text>
+<text x="890" y="324" class="nodeDesc">quota · tokens</text>
+<text x="890" y="338" class="nodeDesc">cache · channel</text>
+
+<rect x="750" y="365" width="250" height="80" rx="8" fill="#0b1220" stroke="#22c55e" stroke-opacity="0.4"/>
+<text x="760" y="383" class="nodeTitle">/v1/chat/completions · /v1/responses</text>
+<text x="760" y="399" class="nodeDesc">→ api.minimaxi.com (MiniMax-M3)</text>
+<text x="760" y="413" class="nodeDesc">→ 各上游渠道 (Claude/OpenAI/Gemini)</text>
+<text x="760" y="427" class="nodeDesc">protocol: chat_completions · responses · embeddings · rerank</text>
+<text x="760" y="441" class="badge" fill="#22c55e">Usage: prompt_tokens + completion_tokens</text>
+
+<!-- CASDOOR ZONE -->
+<rect x="1040" y="80" width="340" height="280" rx="14" fill="url(#casdoorBg)" stroke="#f97316" stroke-width="1.5"/>
+<text x="1056" y="106" class="zoneTitle">Casdoor IDP · :8000</text>
+<text x="1056" y="122" class="subtitle">身份 · 组织 · RBAC · Session · 审计</text>
+
+<rect x="1060" y="140" width="140" height="60" rx="8" fill="#0b1220" stroke="#f97316" stroke-opacity="0.4"/>
+<text x="1070" y="158" class="nodeTitle">Organization</text>
+<text x="1070" y="174" class="nodeDesc">= Tenant 主数据</text>
+<text x="1070" y="188" class="nodeDesc">Multi-tenant</text>
+
+<rect x="1210" y="140" width="160" height="60" rx="8" fill="#0b1220" stroke="#f97316" stroke-opacity="0.4"/>
+<text x="1220" y="158" class="nodeTitle">User · Role · Permission</text>
+<text x="1220" y="174" class="nodeDesc">Casbin RBAC</text>
+<text x="1220" y="188" class="nodeDesc">Group · Rule</text>
+
+<rect x="1060" y="215" width="140" height="60" rx="8" fill="#0b1220" stroke="#f97316" stroke-opacity="0.4"/>
+<text x="1070" y="233" class="nodeTitle">OIDC + JWKS</text>
+<text x="1070" y="249" class="nodeDesc">/oauth/token</text>
+<text x="1070" y="263" class="nodeDesc">/.well-known/jwks</text>
+
+<rect x="1210" y="215" width="160" height="60" rx="8" fill="#0b1220" stroke="#f97316" stroke-opacity="0.4"/>
+<text x="1220" y="233" class="nodeTitle">WeChat · SMS · OAuth</text>
+<text x="1220" y="249" class="nodeDesc">Provider Bindings</text>
+<text x="1220" y="263" class="nodeDesc">verification_code</text>
+
+<rect x="1060" y="290" width="310" height="60" rx="8" fill="#0b1220" stroke="#f97316" stroke-opacity="0.4"/>
+<text x="1070" y="308" class="nodeTitle">Backchannel Logout · Webhook</text>
+<text x="1070" y="324" class="nodeDesc">踢下线 · HMAC 验签 · 自动 revoke · 审计入口</text>
+<text x="1070" y="338" class="nodeDesc">force_logout · user_lifecycle</text>
+
+<!-- ADMIN PORTAL ZONE -->
+<rect x="1040" y="380" width="340" height="120" rx="14" fill="#1e293b" stroke="#06b6d4" stroke-width="1.5"/>
+<text x="1056" y="406" class="zoneTitle">Admin Portal · 独立 Web</text>
+<text x="1056" y="422" class="subtitle">L3 财务 + 账户管理（对标 WorkBuddy 哲学）</text>
+<rect x="1060" y="435" width="310" height="55" rx="8" fill="#0b1220" stroke="#06b6d4" stroke-opacity="0.4"/>
+<text x="1070" y="453" class="nodeTitle">Billing / Pricing / Reconciliation / Wallet</text>
+<text x="1070" y="469" class="nodeDesc">Casdoor OIDC 复用 · Resource Gateway REST 直调</text>
+<text x="1070" y="483" class="badge" fill="#06b6d4">轻客户端 + 重云端（WorkBuddy 设计原则）</text>
+
+<!-- OPS ZONE -->
+<rect x="20" y="490" width="660" height="220" rx="14" fill="url(#opsBg)" stroke="#ec4899" stroke-width="1.5"/>
+<text x="36" y="516" class="zoneTitle">Ops · Observability · 4 systemd Workers</text>
+<text x="36" y="532" class="subtitle">定时任务 · 对账 · 过期 · 能力快照 · Watchdog</text>
+
+<rect x="40" y="545" width="155" height="80" rx="8" fill="#0b1220" stroke="#ec4899" stroke-opacity="0.4"/>
+<text x="50" y="563" class="nodeTitle">credit-expiry-worker</text>
+<text x="50" y="579" class="nodeDesc">OnCalendar=*-*-* 03:15</text>
+<text x="50" y="593" class="nodeDesc">HMAC + idempotencyKey</text>
+<text x="50" y="607" class="nodeDesc">tenant allowlist</text>
+<text x="50" y="621" class="nodeDesc">83 lines</text>
+
+<rect x="205" y="545" width="155" height="80" rx="8" fill="#0b1220" stroke="#ec4899" stroke-opacity="0.4"/>
+<text x="215" y="563" class="nodeTitle">new-api-reconciliation</text>
+<text x="215" y="579" class="nodeDesc">hourly ±5min</text>
+<text x="215" y="593" class="nodeDesc">HMAC import</text>
+<text x="215" y="607" class="nodeDesc">overlap replay</text>
+<text x="215" y="621" class="nodeDesc">572 lines</text>
+
+<rect x="370" y="545" width="155" height="80" rx="8" fill="#0b1220" stroke="#ec4899" stroke-opacity="0.4"/>
+<text x="380" y="563" class="nodeTitle">capability-snapshot</text>
+<text x="380" y="579" class="nodeDesc">hourly ±5min</text>
+<text x="380" y="593" class="nodeDesc">model 漂移检测</text>
+<text x="380" y="607" class="nodeDesc">schema=1</text>
+<text x="380" y="621" class="nodeDesc">180 lines</text>
+
+<rect x="535" y="545" width="135" height="80" rx="8" fill="#0b1220" stroke="#ec4899" stroke-opacity="0.4"/>
+<text x="545" y="563" class="nodeTitle">reconciliation-watchdog</text>
+<text x="545" y="579" class="nodeDesc">OnBootSec=15m</text>
+<text x="545" y="593" class="nodeDesc">OnUnitActiveSec=15m</text>
+<text x="545" y="607" class="nodeDesc">26h max age</text>
+
+<rect x="40" y="640" width="630" height="60" rx="8" fill="#0b1220" stroke="#ec4899" stroke-opacity="0.4"/>
+<text x="50" y="658" class="nodeTitle">Audit · SIEM · Prometheus</text>
+<text x="50" y="674" class="nodeDesc">audit.jsonl · SIEM 三模式 (syslog / webhook / csv) · /metrics 暴露 18 个指标</text>
+<text x="50" y="688" class="nodeDesc">openbuddy_gateway_* · _new_api_circuit_* · _rate_limited_total</text>
+
+<!-- Data flow arrows with labels -->
+<path d="M 340 175 L 370 175" class="edge" marker-end="url(#arrow)"/>
+<text x="345" y="167" class="edgeLabel">BIP</text>
+
+<path d="M 700 230 L 730 230" class="edgeSecure" marker-end="url(#arrowSecure)"/>
+<text x="703" y="222" class="edgeLabel" fill="#22c55e">x-new-api-group</text>
+<text x="703" y="248" class="edgeLabel" fill="#22c55e">server-only Token</text>
+
+<path d="M 340 175 L 1040 175" class="edge" marker-end="url(#arrow)"/>
+<text x="600" y="167" class="edgeLabel">OIDC code+PKCE</text>
+<text x="600" y="62" class="edgeLabel" fill="#f97316" text-anchor="middle">Authorization: Bearer access_token</text>
+
+<path d="M 1210 340 L 370 340" class="edge" marker-end="url(#arrow)"/>
+<text x="700" y="332" class="edgeLabel">HMAC-SHA256 · x-casdoor-signature</text>
+<text x="700" y="356" class="edgeLabel">backchannel logout_token (HS256)</text>
+
+<!-- Reconciliation flow -->
+<path d="M 535 625 L 380 625" class="edge" marker-end="url(#arrow)" stroke-dasharray="6 3"/>
+<text x="430" y="618" class="edgeLabel">HMAC import</text>
+<text x="430" y="640" class="edgeLabel">POST /credits/reconciliation/import</text>
+
+<path d="M 290 625 L 870 405" class="edge" marker-end="url(#arrow)" stroke-dasharray="6 3"/>
+<text x="500" y="620" class="edgeLabel">GET /api/log/?type=2 (admin)</text>
+
+<path d="M 130 625 L 615 290" class="edge" marker-end="url(#arrow)" stroke-dasharray="6 3"/>
+<text x="350" y="640" class="edgeLabel">POST /internal/v1/credits/expire (HMAC)</text>
+
+<!-- Call Sequence -->
+<rect x="20" y="740" width="1360" height="160" rx="14" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+<text x="40" y="765" class="zoneTitle">端到端 AI 调用 + 扣费时序（Chat Completions）</text>
+
+<rect x="60" y="790" width="80" height="40" rx="6" fill="#38bdf8" fill-opacity="0.2" stroke="#38bdf8"/>
+<text x="100" y="815" text-anchor="middle" fill="#f1f5f9" font-size="11">Renderer</text>
+
+<rect x="160" y="790" width="80" height="40" rx="6" fill="#38bdf8" fill-opacity="0.2" stroke="#38bdf8"/>
+<text x="200" y="815" text-anchor="middle" fill="#f1f5f9" font-size="11">Preload</text>
+
+<rect x="260" y="790" width="100" height="40" rx="6" fill="#38bdf8" fill-opacity="0.2" stroke="#38bdf8"/>
+<text x="310" y="815" text-anchor="middle" fill="#f1f5f9" font-size="11">Main</text>
+
+<rect x="380" y="790" width="120" height="40" rx="6" fill="#a855f7" fill-opacity="0.2" stroke="#a855f7"/>
+<text x="440" y="815" text-anchor="middle" fill="#f1f5f9" font-size="11">Gateway</text>
+
+<rect x="520" y="790" width="120" height="40" rx="6" fill="#22c55e" fill-opacity="0.2" stroke="#22c55e"/>
+<text x="580" y="815" text-anchor="middle" fill="#f1f5f9" font-size="11">NewAPI</text>
+
+<rect x="660" y="790" width="140" height="40" rx="6" fill="#22c55e" fill-opacity="0.2" stroke="#22c55e"/>
+<text x="730" y="815" text-anchor="middle" fill="#f1f5f9" font-size="11">MiniMax-M3</text>
+
+<rect x="820" y="790" width="180" height="40" rx="6" fill="#1e293b" stroke="#475569"/>
+<text x="910" y="815" text-anchor="middle" fill="#f1f5f9" font-size="11">Credit Ledger</text>
+
+<rect x="1020" y="790" width="180" height="40" rx="6" fill="#1e293b" stroke="#475569"/>
+<text x="1110" y="815" text-anchor="middle" fill="#f1f5f9" font-size="11">Reconciliation</text>
+
+<line x1="100" y1="845" x2="100" y2="880" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+<line x1="200" y1="845" x2="200" y2="880" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+<line x1="310" y1="845" x2="310" y2="880" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+<line x1="440" y1="845" x2="440" y2="880" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+<line x1="580" y1="845" x2="580" y2="880" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+<line x1="730" y1="845" x2="730" y2="880" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+<line x1="910" y1="845" x2="910" y2="880" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+<line x1="1110" y1="845" x2="1110" y2="880" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+
+<text x="60" y="870" class="edgeLabel" fill="#94a3b8">① chat()</text>
+<text x="170" y="870" class="edgeLabel" fill="#94a3b8">② IPC</text>
+<text x="275" y="870" class="edgeLabel" fill="#94a3b8">③ /ai/chat</text>
+<text x="395" y="870" class="edgeLabel" fill="#a855f7">④ reserve</text>
+<text x="535" y="870" class="edgeLabel" fill="#22c55e">⑤ /v1/chat</text>
+<text x="685" y="870" class="edgeLabel" fill="#22c55e">⑥ upstream</text>
+<text x="835" y="870" class="edgeLabel" fill="#94a3b8">⑦ settle</text>
+<text x="1025" y="870" class="edgeLabel" fill="#94a3b8">⑧ HMAC import</text>
+
+<text x="40" y="900" class="badge" fill="#94a3b8">x-openbuddy-agent · x-openbuddy-session · x-openbuddy-wallet 透传 → Gateway server-derived tenant/subject/actor/request_id → cost reconciliation</text>
+
+</svg>

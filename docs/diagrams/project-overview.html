@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>OpenBuddy 架构总览</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px; }
+  h1 { text-align: center; font-size: 28px; margin-bottom: 8px; color: #58a6ff; }
+  .subtitle { text-align: center; color: #8b949e; margin-bottom: 40px; font-size: 14px; }
+  .diagram { max-width: 1000px; margin: 0 auto 60px; }
+  .layer { border-radius: 12px; padding: 20px; margin-bottom: 16px; position: relative; }
+  .layer-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .layer-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+  .l1 { background: #161b22; border: 1px solid #1f6feb; }
+  .l1 .layer-title { color: #58a6ff; }
+  .l1 .layer-badge { background: #1f6feb33; color: #58a6ff; }
+  .l2 { background: #161b22; border: 1px solid #3fb950; }
+  .l2 .layer-title { color: #3fb950; }
+  .l2 .layer-badge { background: #3fb95033; color: #3fb950; }
+  .l3 { background: #161b22; border: 1px solid #d29922; }
+  .l3 .layer-title { color: #d29922; }
+  .l3 .layer-badge { background: #d2992233; color: #d29922; }
+  .arrow { text-align: center; color: #484f58; font-size: 20px; margin: 8px 0; letter-spacing: 4px; }
+  .boxes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .box { background: #21262d; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; font-size: 12px; min-width: 120px; flex: 1; }
+  .box-title { font-weight: 600; margin-bottom: 4px; color: #f0f6fc; }
+  .box-desc { color: #8b949e; font-size: 11px; line-height: 1.4; }
+  .stats { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .stat { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; text-align: center; }
+  .stat-num { font-size: 36px; font-weight: 700; color: #58a6ff; }
+  .stat-label { font-size: 12px; color: #8b949e; margin-top: 4px; }
+  .section-title { max-width: 1000px; margin: 0 auto 20px; font-size: 20px; color: #f0f6fc; border-bottom: 1px solid #21262d; padding-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<h1>🏗️ OpenBuddy 架构总览</h1>
+<p class="subtitle">三层 Electron 应用 · Cordis 能力网格 · 63 个 workspace 包 · 版本 0.14.0</p>
+
+<div class="diagram">
+
+  <!-- Layer 1: React Renderer -->
+  <div class="layer l1">
+    <div class="layer-title">
+      <span class="layer-badge">Layer 1</span>
+      React Renderer 渲染层
+    </div>
+    <div class="boxes">
+      <div class="box">
+        <div class="box-title">🎨 UI 组件 (26包)</div>
+        <div class="box-desc">Shell · Sidebar · Settings · Workbench · Conversation · Experts · Dialogs · Markdown · Primitives</div>
+      </div>
+      <div class="box">
+        <div class="box-title">📦 状态管理</div>
+        <div class="box-desc">Zustand Stores: session · sessions · permission · feedback · toast · projects · subagent</div>
+      </div>
+      <div class="box">
+        <div class="box-title">🔗 桥接层</div>
+        <div class="box-desc">electron-api.ts · pi-client.ts · renderer-plugin-runtime</div>
+      </div>
+      <div class="box">
+        <div class="box-title">🎯 设计系统</div>
+        <div class="box-desc">--wb-* tokens · 207 图标 · brand atoms · WorkBuddy 风格</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">▲ window.api (typed contextBridge) ▼</div>
+
+  <!-- Layer 2: Electron Main -->
+  <div class="layer l2">
+    <div class="layer-title">
+      <span class="layer-badge">Layer 2</span>
+      Electron Main + Preload 中间层
+    </div>
+    <div class="boxes">
+      <div class="box">
+        <div class="box-title">🖥️ 主进程</div>
+        <div class="box-desc">index.ts · window.ts · app-menu.ts · main-window.ts</div>
+      </div>
+      <div class="box">
+        <div class="box-title">🤖 Agent Host</div>
+        <div class="box-desc">agent-host.ts (3479行) · pi-event-bridge.ts · pi-resources.ts · pi-plan-mode.ts</div>
+      </div>
+      <div class="box">
+        <div class="box-title">🔌 IPC 白名单</div>
+        <div class="box-desc">ipc/index.ts (966行) · agent · casdoor · collaboration · email · storage</div>
+      </div>
+      <div class="box">
+        <div class="box-title">🔒 安全</div>
+        <div class="box-desc">casdoor-auth · mcp-authorization · sandbox · CSP</div>
+      </div>
+      <div class="box">
+        <div class="box-title">🤝 协作运行时</div>
+        <div class="box-desc">collaboration-runtime · a2a-runtime-adapter · workflow-worker</div>
+      </div>
+      <div class="box">
+        <div class="box-title">🧪 Harness</div>
+        <div class="box-desc">harness-server · harness-token · remote-dispatch</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">▲ Pi Session Events ▼</div>
+
+  <!-- Layer 3: Pi + Cordis -->
+  <div class="layer l3">
+    <div class="layer-title">
+      <span class="layer-badge">Layer 3</span>
+      Pi Agent + Cordis 能力网格 底层
+    </div>
+    <div class="boxes">
+      <div class="box">
+        <div class="box-title">⚙️ 运行时 (3包)</div>
+        <div class="box-desc">cordis · plugin-host · storage</div>
+      </div>
+      <div class="box">
+        <div class="box-title">🔑 认证 (2包)</div>
+        <div class="box-desc">auth-casdoor · auth-permission</div>
+      </div>
+      <div class="box">
+        <div class="box-title">🧩 能力 (6包)</div>
+        <div class="box-desc">authorization · calendar · email · folder-trust · mcp-client · web-search</div>
+      </div>
+      <div class="box">
+        <div class="box-title">🤝 协作 (8包)</div>
+        <div class="box-desc">protocol · room · inbox · policy · task · network · evidence · coordinator</div>
+      </div>
+      <div class="box">
+        <div class="box-title">🏢 企业 (4包)</div>
+        <div class="box-desc">payment · saml · scim · webhook-outbox</div>
+      </div>
+      <div class="box">
+        <div class="box-title">📁 核心 (4包)</div>
+        <div class="box-desc">session · fs-local · files-kb · shared-types</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 class="section-title">📊 项目统计</h2>
+<div class="stats">
+  <div class="stat">
+    <div class="stat-num">63</div>
+    <div class="stat-label">Workspace 包</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">309</div>
+    <div class="stat-label">测试文件</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">207</div>
+    <div class="stat-label">图标 (全实现)</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">3</div>
+    <div class="stat-label">平台支持</div>
+  </div>
+</div>
+
+</body>
+</html>

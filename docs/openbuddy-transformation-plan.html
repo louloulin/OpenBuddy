@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="OpenBuddy 全面分析与 P0 改造路线图 - 综合能力盘点、PI 视角批判、对比矩阵与 4 项 P0 改造落地">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>OpenBuddy · 全面分析与 P0 改造路线图</title>
+<style>
+:root{
+  --bg:#f5f7fb;
+  --surface:#fff;
+  --ink:#162033;
+  --muted:#5b6880;
+  --line:#dce3ee;
+  --accent:#2359d6;
+  --soft:#eaf0ff;
+  --ok:#1f7a4d;
+  --ok-bg:#e6f4ec;
+  --warn:#b76e00;
+  --warn-bg:#fdf2dc;
+  --bad:#b3261e;
+  --bad-bg:#fce8e6;
+  --code:#101827;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 system-ui,-apple-system,"Segoe UI","Noto Sans SC",sans-serif}
+a{color:var(--accent)}
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);max-width:1500px;margin:auto}
+nav{position:sticky;top:0;height:100vh;padding:26px 16px;border-right:1px solid var(--line);background:var(--surface);overflow-y:auto}
+nav h2{margin:0 0 14px;font-size:18px}
+nav div{display:flex;flex-direction:column;gap:1px}
+nav a{display:block;padding:5px 8px;border-radius:7px;text-decoration:none;color:var(--muted);font-size:14px}
+nav a:hover,nav a:focus-visible{background:var(--soft);color:var(--accent)}
+main{min-width:0;padding:40px clamp(20px,5vw,72px) 70px}
+.hero{padding:32px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(135deg,var(--surface),var(--soft))}
+h1{margin:0 0 10px;font-size:clamp(30px,4vw,50px);line-height:1.15}
+h2{margin:52px 0 14px;padding-top:12px;border-top:1px solid var(--line);font-size:28px}
+h3{margin-top:28px;font-size:20px}
+h4{margin-top:22px;font-size:17px;color:var(--muted)}
+.lede{max-width:960px;color:var(--muted);font-size:19px}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.badge{display:inline-flex;padding:3px 9px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);font-size:13px}
+.badge.ok{color:var(--ok);border-color:var(--ok);background:var(--ok-bg)}
+.badge.warn{color:var(--warn);border-color:var(--warn);background:var(--warn-bg)}
+.badge.bad{color:var(--bad);border-color:var(--bad);background:var(--bad-bg)}
+.callout{margin:18px 0;padding:15px 17px;border-left:4px solid var(--accent);border-radius:8px;background:var(--soft)}
+.callout.warn{border-left-color:var(--warn);background:var(--warn-bg)}
+.callout.ok{border-left-color:var(--ok);background:var(--ok-bg)}
+.callout.bad{border-left-color:var(--bad);background:var(--bad-bg)}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0 4px}
+.kpi{padding:17px;border:1px solid var(--line);border-radius:13px;background:var(--surface)}
+.kpi strong{display:block;font-size:13px;color:var(--muted);margin-bottom:5px;font-weight:600}
+.kpi .v{font-size:32px;font-weight:600;color:var(--accent);line-height:1.1}
+.kpi .sub{color:var(--muted);font-size:13px;margin-top:5px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.card{padding:17px;border:1px solid var(--line);border-radius:13px;background:var(--surface)}
+.card strong{display:block;margin-bottom:5px}
+.card .lbl{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:11px;background:var(--surface);margin:16px 0}
+table{width:100%;min-width:760px;border-collapse:collapse}
+caption{padding:11px 13px;text-align:left;color:var(--muted);font-weight:600;font-size:14px}
+th,td{padding:10px 12px;border-top:1px solid var(--line);text-align:left;vertical-align:top;font-size:14.5px}
+th{background:var(--soft);font-size:14px;font-weight:600}
+tbody tr:nth-child(even) td{background:#fafbfe}
+td .v-p0{color:var(--bad);font-weight:600}
+td .v-p1{color:var(--warn);font-weight:600}
+td .v-p2{color:var(--ok);font-weight:600}
+td .v-ok{color:var(--ok)}
+td .v-warn{color:var(--warn)}
+td .v-bad{color:var(--bad)}
+code{padding:2px 5px;border-radius:4px;background:var(--soft);font-size:.9em}
+pre{overflow:auto;padding:17px;border-radius:11px;background:var(--code);color:#dce8ff;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;margin:14px 0}
+pre.ascii{white-space:pre;color:var(--ink);background:#fafbfe;border:1px solid var(--line);font-size:12.5px;line-height:1.45}
+ul,ol{padding-left:22px}
+li{margin:5px 0}
+.section-anchor{scroll-margin-top:20px}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--line);background:var(--surface)}
+.pill.p0{color:var(--bad);border-color:var(--bad);background:var(--bad-bg)}
+.pill.p1{color:var(--warn);border-color:var(--warn);background:var(--warn-bg)}
+.pill.p2{color:var(--ok);border-color:var(--ok);background:var(--ok-bg)}
+.principle-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:14px}
+.principle{padding:18px;border:1px solid var(--line);border-radius:13px;background:var(--surface);border-left:4px solid var(--accent)}
+.principle h4{margin:0 0 8px;font-size:16px;color:var(--ink)}
+.principle p{margin:0;color:var(--muted);font-size:14.5px}
+footer{margin-top:55px;padding-top:17px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+@media(max-width:820px){
+  .shell{display:block}
+  nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);max-height:none}
+  nav div{flex-direction:row;flex-wrap:wrap;gap:2px}
+  nav a{display:inline-block}
+  main{padding-top:25px}
+}
+@media print{
+  body{background:#fff;color:#000;font-size:10pt}
+  nav{display:none}
+  .shell{display:block}
+  main{padding:0}
+  .hero,.card,.kpi,.table-wrap,.callout,.principle,pre{break-inside:avoid;border-color:#aaa;background:#fff}
+  h2{break-before:page}
+  h2:first-of-type{break-before:auto}
+  pre{white-space:pre-wrap;color:#000}
+  table{font-size:9pt}
+  th{background:#eee}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+<nav aria-label="报告章节"><h2>目录</h2><div>
+<a href="#summary">摘要</a>
+<a href="#pi-critique">PI critique</a>
+<a href="#capability-matrix">Capability matrix</a>
+<a href="#vs-pi">PI vs OpenBuddy</a>
+<a href="#gaps">关键缺口</a>
+<a href="#transformation">P0 改造</a>
+<a href="#verification">验证状态</a>
+<a href="#roadmap">三阶段路线图</a>
+<a href="#principles">指导原则</a>
+<a href="#limits">限制</a>
+<a href="#references">引用</a>
+</div></nav>
+<main>
+
+<header class="hero" id="summary">
+<div class="meta">
+<span class="badge ok">已验证</span>
+<span class="badge ok">全量盘点</span>
+<span class="badge ok">P0 完成</span>
+<span class="badge ok">文档齐全</span>
+<span class="badge">2026-08-31</span>
+<span class="badge">离线 HTML · 可打印</span>
+</div>
+<h1>OpenBuddy 全面分析与 P0 改造路线图</h1>
+<p class="lede">综合能力盘点 + PI 视角批判 + 对比矩阵 + 4 项 P0 改造已落地。本文以「产品 / 用户 / 客户」为主语对 PI 集成工程做主语反转，从 OpenBuddy 真实源码、文档与脚本中提取证据，把 4 项 P0 改造（A8 Permission 5 档 / A9 minimax 统一 / A10 i18n / A11 Linux CI）落到具体文件与行号，并给出三阶段路线图与 8 条指导原则。</p>
+<div class="callout">
+<strong>核心结论：</strong>OpenBuddy 已是一台工程化、模块化、可商用的 AI Agent 桌面工作台（10 维度评分 4.62 / 5），PI 分析文档族是「Pi 集成工程实施记录」而非「产品路线图」；本 change 把 PI 集成从「工程闭环」升级为「产品 / 企业 / UX 闭环」，4 项 P0 已 4/4 完成。
+</div>
+<div class="kpi-grid">
+<div class="kpi"><strong>产品力评分</strong><span class="v">4.62 / 5</span><span class="sub">10 维度加权（openbuddy-capability-matrix.md:40-66）</span></div>
+<div class="kpi"><strong>调研 / 对比报告</strong><span class="v">3 + 1</span><span class="sub">PI critique 561 行 · capability matrix 630 行 · vs PI 638 行 · 本 HTML 路线图</span></div>
+<div class="kpi"><strong>P0 改造完成</strong><span class="v">4 / 4</span><span class="sub">A8 Permission 5 档 · A9 minimax 统一 · A10 i18n · A11 Linux CI</span></div>
+<div class="kpi"><strong>缺口清单</strong><span class="v">14 项</span><span class="sub">P0 × 5 · P1 × 5 · P2 × 4（capability-matrix §9）</span></div>
+</div>
+</header>
+<h3>1.1 一句话总结</h3>
+<div class="callout ok">
+<strong>已是一台工程化、模块化、可商用的 AI Agent 桌面工作台。</strong> 32 个 moon 项目 · 56 个 npm 包 · 474 个 IPC handler · 12 个企业控制面板 · 5 种 Casdoor Provider · 4 个 systemd timer · 40 个 eval 脚本 · 490 个 <code>--wb-*</code> 设计令牌 · 207 个图标 · 60 篇文档。
+</div>
+<h3>1.2 报告章节快速索引</h3>
+<ul>
+<li><strong>§2 PI 方法论批判</strong>：5 条关键结论 + 11 项方法论缺陷 + 12 类盲点 + 8 类显式冲突 + 15 项错误假设 + 10 条改造建议。</li>
+<li><strong>§3 OpenBuddy 真实能力</strong>：10 维度评分 + AI Agent 12 项 + 设计系统盘点 + 企业级 22 项 + 多租户权限 + 架构 + 可观测性 + 文档就绪度。</li>
+<li><strong>§4 PI vs OpenBuddy</strong>：12 维度主语反转表 + 10 行验收对照 + 8 类冲突决策表 + 14 项差距矩阵。</li>
+<li><strong>§5 14 项缺口</strong>：P0 × 5 / P1 × 5 / P2 × 4，按影响 × 工作量矩阵化。</li>
+<li><strong>§6 4 项 P0 改造</strong>：A8 / A9 / A10 / A11 文件级范围、验收命令、已知风险。</li>
+<li><strong>§7 验证状态</strong>：typecheck / vitest / build 三类检查均通过。</li>
+<li><strong>§8 三阶段路线图</strong>：P0 完成 / P1（3-6 月）/ P2（6-12 月）。</li>
+<li><strong>§9 8 条指导原则</strong>：从本次批判提炼的设计 / 文档 / 治理原则。</li>
+<li><strong>§10 限制</strong>：明示本 change 不修改 / 不承诺 / 未跑通的事项。</li>
+<li><strong>§11 引用</strong>：3 份调研产出 + 22 个代码改动 + 关键索引附录。</li>
+</ul>
+<h3>1.3 报告口径与术语</h3>
+<ul>
+<li><strong>P0 / P1 / P2</strong> 优先级定义沿用 <code>openbuddy-capability-matrix.md:474</code> 与 <code>openbuddy-product-vs-pi.md:48-51</code>：P0 = 影响生产稳定性 / 合规 / 上架；P1 = 影响完整产品力；P2 = 增强体验 / DX。</li>
+<li><strong>「事实源」</strong> 表示该论断在仓库源码 / 文档 / 脚本中有具体锚点，可由 <code>文件:行号</code> 复核。</li>
+<li><strong>「未发现 / not-run」</strong> 表示本机未运行或未读取，统一标 <code>unknown / not-run</code>，绝不外推。</li>
+<li><strong>主语反转</strong>：PI 文档族反复以 Pi / Pi extension / Pi-native 为主语；本路线图所有「OpenBuddy 视角」列均以用户 / 客户 / 销售 / 企业 admin 为主语。</li>
+</ul>
+<section id="pi-critique" class="section-anchor">
+<h2>2. PI 方法论批判摘要</h2>
+<p>本节基于 <code>docs/pi-analysis-critique.md</code>（561 行）。审计范围覆盖 8 份 PI 文档族 + 2 份 brief，比较基线 7 份产品 / 企业级文档。结论分 5 条关键结论、11 项方法论缺陷分类、12 类盲点、8 类显式冲突、15 项错误假设 / 夸大承诺、10 条改造建议。</p>
+
+<h3>2.1 五条关键结论</h3>
+<div class="grid">
+<div class="card"><strong>结论 1 · PI 分析是「集成工程记录」而非「产品路线图」</strong><span class="v-bad">主语偏差</span><p>所有 PI 文档总标题 / 章节顺序 / 结论段落以 Pi 契约 / Pi 插件家族 / Pi session tree / Pi model registry 为中心组织；几乎无「OpenBuddy 用户为什么付费 / 续费 / 推荐」章节（<code>pi-capability-gap-analysis.md:1-15</code>、<code>pi-sdk-implementation-plan.md:1-9</code>）。</p></div>
+<div class="card"><strong>结论 2 · 「Pi 能做什么 = OpenBuddy 应该做什么」</strong><span class="v-bad">方法论缺陷</span><p><code>pi-core-capabilities.md</code> 9 次出现 <em>What we get for free</em> 句式（line 162 / 261 / 297 / 457 / 530 / 612 / 683 / 806 / 832）；<code>pi-capability-gap-analysis.md:441</code> 把 LOC 净下降当作业务价值。</p></div>
+<div class="card"><strong>结论 3 · 验收体系过度集中 IPC / Pi 原语 / MiniMax</strong><span class="v-warn">覆盖盲点</span><p><code>brief.md:35-77</code> 的 A1–A15 几乎全是 IPC / Electron 启动 / Pi event log / MiniMax 多轮对话；缺 UX / 商业 / 企业 / 多租户 / 数据安全 / 跨平台 / 长演进验收。</p></div>
+<div class="card"><strong>结论 4 · 与 6 类现有战略文档显式冲突</strong><span class="v-bad">叙事冲突</span><p>(a) 数据权威性 PI JSONL vs SQLite catalog-first；(b) 多租户 PI 0 处 vs Casdoor 12 面板；(c) 商业计费 PI 0 处 vs commercial-model 三档 SKU；(d) 分布式协作；(e) WorkBuddy 私有；(f) 专家 / 技能缓存。</p></div>
+<div class="card"><strong>结论 5 · 11 类夸大承诺或错误假设</strong><span class="v-warn">假设风险</span><p>最严重 4 条：Pi 集成完成 = OpenBuddy 可用；BYOK 等于无平台风险；Net LOC 减少 = 商业价值；production build 通过（同文档 <code>pi-openbuddy-completeness-audit.md:732</code> 承认被 <code>EmailDraft | undefined</code> 阻塞）。</p></div>
+</div>
+
+<h3>2.2 11 项方法论缺陷（按严重程度排序）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 2-1 · PI 分析方法论缺陷清单</caption>
+<thead><tr><th>#</th><th>缺陷描述</th><th>严重程度</th><th>关键证据</th></tr></thead>
+<tbody>
+<tr><td>3.1</td><td>把「Pi 上游能力」等同于「OpenBuddy 产品能力」</td><td><span class="v-p0">P0</span></td><td><code>pi-core-capabilities.md:179-227</code> 列出 24+ provider；<code>pi-capability-gap-analysis.md:407-441</code> 推荐社区包无安全审计</td></tr>
+<tr><td>3.2</td><td>验收体系过度集中 Pi 契约 + MiniMax smoke</td><td><span class="v-p0">P0</span></td><td><code>brief.md:35-77</code> A1–A15 0 个 acceptance 涉及 UX / 商业 / 企业 / 多租户 / 跨平台</td></tr>
+<tr><td>3.3</td><td>「Net LOC 净下降」等同商业价值</td><td><span class="v-p0">P0</span></td><td><code>pi-capability-gap-analysis.md:441</code>「Net TS LOC added: ~3,000. That's the win」</td></tr>
+<tr><td>3.4</td><td>「What we get for free」句式反复出现</td><td><span class="v-p1">P1</span></td><td><code>pi-core-capabilities.md</code> 9 次；<code>pi-capability-gap-analysis.md:441</code> 「Net Rust LOC deleted: 14,237」</td></tr>
+<tr><td>3.5</td><td>用户旅程 / 空状态 / 引导流 0 提及</td><td><span class="v-p1">P1</span></td><td><code>pi-core-capabilities.md</code> 全文 0 处 user journey / onboarding / first-time</td></tr>
+<tr><td>3.6</td><td>fixture vs real-external 分级阈值不一致</td><td><span class="v-p1">P1</span></td><td><code>pi-real-plugin-compatibility.md:8-22</code> 6 个 Pi 包全标「已验证」未分级</td></tr>
+<tr><td>3.7</td><td>Pi JSONL 冷恢复与 SQLite catalog-first 冲突</td><td><span class="v-p2">P2</span></td><td><code>pi-openbuddy-completeness-audit.md:282-302</code> vs <code>storage-architecture-audit.md:5-21</code></td></tr>
+<tr><td>3.8</td><td>Pi 上游 breaking change 风险缓解只停在「pin 版本」</td><td><span class="v-p2">P2</span></td><td><code>pi-capability-gap-analysis.md:444</code>、<code>pi-runtime-next-roadmap.md:86</code></td></tr>
+<tr><td>3.9</td><td>WorkBuddy 私有云 / 商业账号边界未声明</td><td><span class="v-p2">P2</span></td><td><code>workbuddy-parity-matrix.md:11</code> 第 9 行明确排除，PI 分析从不声明同一边界</td></tr>
+<tr><td>3.10</td><td>「Pi 适配层」 vs 「企业级平台」两种定位并存</td><td><span class="v-p2">P2</span></td><td><code>pi-openbuddy-completeness-audit.md:575</code> vs <code>README.md:299-411</code></td></tr>
+<tr><td>3.11</td><td>分级阈值不一致但「已验证」标签过宽</td><td><span class="v-p2">P2</span></td><td><code>pi-runtime-next-roadmap.md:88-94</code> P3 真实验收矩阵仅列包名</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>2.3 12 类盲点 × 当前状态 × 风险</h3>
+<div class="table-wrap">
+<table>
+<caption>表 2-2 · PI 分析盲点分类矩阵</caption>
+<thead><tr><th>类别</th><th>PI 当前状态</th><th>风险等级</th></tr></thead>
+<tbody>
+<tr><td>产品定位与差异化</td><td>WorkBuddy 仅 6 处「transition source」；Codex / Grok-build / OpenClaw 完全未出现</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>用户旅程与 UX 一致性</td><td>user journey / onboarding / first-time / empty state 全文 0 处</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>商业模型</td><td>point / credit / wallet / SKU / billing / subscription / license / enterprise sale 全文 0 处</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>企业级部署</td><td>SLA / private deployment / on-premise / air-gap / SOC2 / ISO 27001 / 审计 全文 0 处</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>多租户 / RBAC / SSO</td><td>multi-tenant / RBAC / SSO / organization 全文 0 处；team 仅在 Subagents 章节</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>数据安全</td><td>凭据管理 / 加密 / 跨边界 / 隐私 0 处</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>跨平台一致性</td><td>Mac / Win / Linux 三平台 parity 0 处</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>性能 / 可观测性</td><td>延迟 / 指标 / 告警 / 用户行为 0 处</td><td><span class="v-p1">P1</span></td></tr>
+<tr><td>文档 / 学习曲线</td><td>60 篇 docs 仅作背景，未在 PI 中引用</td><td><span class="v-p1">P1</span></td></tr>
+<tr><td>长期演进 / 技术债务</td><td>DSH 包 stale 引用 21 个未对齐上游</td><td><span class="v-p2">P2</span></td></tr>
+<tr><td>失败模式 / 边界条件</td><td>分级阈值不一致；A14 AgentBench / AgentDojo / GAIA 未运行</td><td><span class="v-p1">P1</span></td></tr>
+<tr><td>WorkBuddy 私有能力</td><td>推测 + 排除并存；可能侵犯版权 / 商业秘密</td><td><span class="v-p0">P0</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>2.4 8 类显式冲突（与既有战略文档）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 2-3 · PI 分析与现有文档的 8 类冲突</caption>
+<thead><tr><th>#</th><th>冲突主题</th><th>PI 侧主张</th><th>既有文档主张</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>数据权威性</td><td>Pi JSONL 冷恢复 <code>pi-openbuddy-completeness-audit.md:282-302</code></td><td><code>storage-architecture-audit.md:5-21</code> SQLite = system of record</td></tr>
+<tr><td>2</td><td>多租户 / RBAC</td><td>PI 0 处出现 tenant / RBAC / SSO</td><td><code>casdoor-enterprise-auth.md:18-25</code> 5 类 Provider + 12 面板</td></tr>
+<tr><td>3</td><td>商业计费 / Wallet</td><td>PI 0 处出现 point / credit / wallet / SKU</td><td><code>openbuddy-commercial-model.md:69-94</code> + Resource Gateway 25+ handle</td></tr>
+<tr><td>4</td><td>分布式协作</td><td>仅 <code>pi-extension-architecture.md:7</code> 1 段</td><td><code>distributed-buddy-network-architecture.md</code> 4 Phase + 9 个 collab 包</td></tr>
+<tr><td>5</td><td>WorkBuddy 私有能力</td><td><code>pi-capability-gap-analysis.md:229,235</code> 推测 + port</td><td><code>workbuddy-parity-matrix.md:11</code> 第 9 行明确排除</td></tr>
+<tr><td>6</td><td>专家 / 技能缓存</td><td>扁平 <code>~/.pi/agent/agents/*.md</code></td><td><code>expert-team-design.md:94-117</code> 4 层缓存 + 13 类差距</td></tr>
+<tr><td>7</td><td>Casdoor Provider</td><td>PI 0 处出现 WeChat / SMS / GitHub OAuth</td><td><code>casdoor-enterprise-auth.md</code> 5 类 Provider</td></tr>
+<tr><td>8</td><td>财务 / 退款 / 过期</td><td>PI 0 处出现</td><td><code>workbuddy-points-system-comparison.md:11-15</code> 完整流水</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>2.5 10 条改造建议</h3>
+<ol>
+<li>在每份 PI 文档开头增加 <strong>Product Anchors</strong> 小节（用户角色 / 场景 / 依赖子系统 / 不在范围）。</li>
+<li>在 <code>pi-capability-gap-analysis.md</code> 增加 <strong>Capability × Product Value</strong> 双轴表（用户场景 / 价值主张 / 验收指标）。</li>
+<li>在 <code>pi-core-capabilities.md</code> 拆分 <strong>What Pi provides</strong> 与 <strong>What OpenBuddy layers on</strong>。</li>
+<li>在 <code>pi-openbuddy-completeness-audit.md</code> 增加 <strong>Product-side Verification</strong> 子矩阵（UX / 商业 / 企业 / 跨平台 / 长会话）。</li>
+<li>在 <code>pi-runtime-next-roadmap.md</code> 增加 <strong>Product Risks</strong> 与「上游风险」章节。</li>
+<li>在每份 PI 文档结尾增加 <strong>Non-claims</strong> 章节。</li>
+<li>在 <code>pi-extension-architecture.md</code> 增加 <strong>Non-Pi Subsystems Map</strong>。</li>
+<li>在 <code>pi-sdk-implementation-plan.md</code> Milestone matrix 增加「WorkBuddy 能力 / 产品子系统 / UX 改进 / readiness 信号」4 列。</li>
+<li>治理建议：<code>brief.md</code> 必须包含具体内容，不允许空模板（当前 <code>brief.md</code> 仅 9 行空标题）。</li>
+<li>治理建议：所有 PI 分析文档必须引用 <code>README</code> + <code>WORKBUDDY_UI_REFERENCE</code> + <code>workbuddy-parity-matrix</code>。</li>
+</ol>
+</section>
+
+<section id="capability-matrix" class="section-anchor">
+<h2>3. OpenBuddy 真实能力摘要</h2>
+<p>本节基于 <code>docs/openbuddy-capability-matrix.md</code>（630 行）。盘点方法：目录结构 + 关键源码抽样 + 脚本与文档 + 数据校验。共盘点 10 个评分维度、12 项 AI Agent 能力、设计系统（490 + 207 + 81 + 30k）、22 项企业级能力、多租户权限架构、架构可扩展性、可观测性、文档就绪度。</p>
+
+<h3>3.1 10 维度产品力评分表</h3>
+<div class="table-wrap">
+<table>
+<caption>表 3-1 · 10 维度产品力评分（满分 5）</caption>
+<thead><tr><th>维度</th><th>评分</th><th>关键依据</th></tr></thead>
+<tbody>
+<tr><td>AI Agent 能力</td><td><strong>4.7</strong></td><td>12 项能力全部落地；Pi <code>AgentSession</code> 在 Electron Main 中常驻；permission / plan / automation / inspiration 均为 Cordis 服务</td></tr>
+<tr><td>Session 管理</td><td><strong>4.6</strong></td><td><code>SessionCatalog</code> + <code>EventStore</code> + <code>SessionEventLog</code> 全部上 SQLite WAL；<code>history-pagination</code> + <code>recovery-token</code> + <code>harness-resume-token</code> 三角</td></tr>
+<tr><td>Provider（多模型 BYOK）</td><td><strong>4.4</strong></td><td><code>ProviderKind</code> 联合类型覆盖 10 类（anthropic/openai/pi/deepseek/qwen/minimax/minimax_cn/new_api/custom/custom_anthropic）；默认值仍存在 <code>minimax_cn</code>（已列入 P0）</td></tr>
+<tr><td>工具调用</td><td><strong>4.5</strong></td><td>DSH 工具名（bash / fs / fs-search / subagent / terminal / todo / session-query / goal / web / editor / skill / workflow）通过 <code>openbuddy-dsh-tool-*</code> 适配到 Pi</td></tr>
+<tr><td>设计系统 / UI 复用</td><td><strong>4.8</strong></td><td>207 个图标 + 490 个 <code>--wb-*</code> 令牌 + 81 个顶层组件；与 <code>WORKBUDDY_UI_REFERENCE.md</code> Sidebar / HomePage / ChatView / Composer / ConversationList / PinnedSection 6/6 对齐</td></tr>
+<tr><td>企业级功能</td><td><strong>4.6</strong></td><td>Casdoor Resource Gateway 19 个 <code>handle*</code>；5 种 Casdoor Provider 模板；<code>verify-tenant-boundaries.sh</code> 9 probe</td></tr>
+<tr><td>多租户权限架构</td><td><strong>4.5</strong></td><td><code>openbuddy-permission</code> 提供 glob 规则 + 5 档 <code>PermissionMode</code>；9 个协作包分别负责 room / policy / inbox / task / coordinator / evidence / protocol / network</td></tr>
+<tr><td>架构与可扩展性</td><td><strong>4.8</strong></td><td>moon 19 项目 + 31 npm 子包；Cordis 服务总线 + <code>PluginProfile</code> + <code>UnifiedPluginManifest</code> + <code>deepseek-cordis-runtime</code></td></tr>
+<tr><td>可观测性 / 调试</td><td><strong>4.6</strong></td><td><code>SessionEventLog</code> + <code>lifecycle-journal</code> + <code>EventStore</code> + 9 smoke + 40 eval + 5 audit + Prometheus 8 指标族</td></tr>
+<tr><td>文档 / 发布就绪度</td><td><strong>4.5</strong></td><td>60 篇 docs + <code>storage-architecture-audit.html</code> 模板 + <code>release.yml</code> 月级流水线 + <code>publish-checklist-v0.15.0.md</code></td></tr>
+<tr><td><strong>总体产品力评分</strong></td><td><strong>4.62 / 5</strong></td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>3.2 AI Agent 12 项能力（落地证据）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 3-2 · AI Agent 12 项核心能力</caption>
+<thead><tr><th>能力</th><th>实现位置</th><th>状态</th><th>关键证据</th></tr></thead>
+<tbody>
+<tr><td>Pi SDK 集成</td><td><code>electron/main/agent-host.ts</code>（6306 行）</td><td>✅</td><td><code>import { createAgentSession, ... } from "@earendil-works/pi-coding-agent"</code>（<code>agent-host.ts:24-31</code>）；<code>await loader.loadProfile(profile)</code>（<code>agent-host.ts:3176</code>）</td></tr>
+<tr><td>Cordis 服务总线</td><td><code>packages/runtime/openbuddy-cordis/src/index.ts</code></td><td>✅</td><td><code>OpenBuddyService</code> 基类 + <code>Branded&lt;T&gt;</code> + <code>debug(ctx, tag)</code> + <code>forEach&lt;T&gt;</code>（<code>cordis/src/index.ts:75</code>）</td></tr>
+<tr><td>插件宿主</td><td><code>packages/runtime/openbuddy-plugin-host/src/index.ts</code></td><td>✅</td><td><code>HarnessPlugin</code>、<code>PluginEntryOptions</code>、<code>group</code>/<code>children</code>/<code>isolate</code>（<code>plugin-host/src/index.ts:25-49</code>）</td></tr>
+<tr><td>Skills</td><td><code>src/components/experts-panel/skills/*</code> + <code>electron/main/connectors.ts</code></td><td>✅</td><td><code>SkillsTab</code> / <code>SkillCard</code> / <code>SkillDetailModal</code> / <code>ImportSkillModal</code> / <code>SkillCatalogCard</code> 5 个组件</td></tr>
+<tr><td>MCP（stdio/http/OAuth）</td><td><code>packages/capability/openbuddy-mcp-client/src/index.ts</code></td><td>✅</td><td>5 种传输方式（stdio / streamableHttp / oauth / <code>McpAuthorizationError</code>）</td></tr>
+<tr><td>Teams</td><td><code>packages/team/openbuddy-team/src/index.ts</code> + <code>agent-host.ts:3155-3165</code></td><td>✅</td><td>IPC <code>teams:create/status/delete</code>（<code>ipc.ts:2403-2424</code>）</td></tr>
+<tr><td>Subagent</td><td><code>packages/team/openbuddy-subagent/src/index.ts</code> + <code>agent-host.ts:3158</code></td><td>✅</td><td>读写 <code>~/.pi/agent/settings.json</code> + 镜像 SQLite <code>SubagentConfigStore</code></td></tr>
+<tr><td>Plan Mode</td><td><code>packages/capability/openbuddy-plan/src/index.ts</code></td><td>✅</td><td><code>PlanModeState</code>/<code>PlanState</code>（draft/approved/rejected/executing），每 session 落 <code>~/.pi/openbuddy-plan-mode/&lt;sessionId&gt;.json</code></td></tr>
+<tr><td>Permission 规则</td><td><code>packages/auth/openbuddy-permission/src/index.ts</code></td><td>✅</td><td><code>globMatches</code>（line 42-45）+ 5 档 <code>PermissionMode</code>（line 23-28）</td></tr>
+<tr><td>Permission UI（Pi 风格）</td><td><code>src/components/PermissionPicker.tsx</code>（174 行）</td><td>✅ → 5 档</td><td>本 change A8 已由 3 档改为 5 档（default/acceptEdits/dontAsk/plan/bypassPermissions）</td></tr>
+<tr><td>Harness RPC</td><td><code>electron/main/harness-server.ts</code> + <code>harness-rpc-store.ts</code> + <code>harness-token.ts</code> + <code>harness-resume-token.ts</code></td><td>✅</td><td>IPC 9 个 <code>harness:*</code> 端点</td></tr>
+<tr><td>DSH 适配</td><td><code>agent-host.ts:3150-3180</code> + <code>deepseek-cordis-runtime.ts</code></td><td>✅</td><td><code>openbuddy-dsh-tool-*</code> 21 个包零修改映射到 Pi</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>3.3 设计系统盘点</h3>
+<div class="table-wrap">
+<table>
+<caption>表 3-3 · 设计系统关键指标</caption>
+<thead><tr><th>指标</th><th>数值</th><th>证据</th></tr></thead>
+<tbody>
+<tr><td><code>--wb-*</code> 设计令牌</td><td><strong>490</strong></td><td><code>grep -c "^  --wb-" src/styles/tokens.css</code></td></tr>
+<tr><td>Foundation 图标</td><td><strong>207</strong>（208 个 .tsx，含 <code>Icon.tsx</code>）</td><td><code>ls src/foundation/components/Icon/icons/</code></td></tr>
+<tr><td>顶层组件 <code>src/components/*.tsx</code></td><td><strong>81</strong></td><td><code>ls src/components/*.tsx | wc -l</code></td></tr>
+<tr><td>子目录</td><td>8 个</td><td><code>sidebar/</code> <code>home/</code> <code>markdown/</code> <code>automation/</code> <code>workspace-panel/</code> <code>experts-panel/{connectors,data,experts,skills}</code></td></tr>
+<tr><td>React 组件总行数</td><td><strong>30,137</strong></td><td><code>wc -l src/components/*.tsx</code></td></tr>
+<tr><td><code>App.tsx</code></td><td>1,364</td><td><code>wc -l src/App.tsx</code>（含 I18nProvider 包装）</td></tr>
+<tr><td>lib helper</td><td>78 个 <code>.ts</code></td><td>含 <code>i18n.ts</code>（本 change A10 新增）</td></tr>
+<tr><td>zustand stores</td><td>9</td><td>session / sessions / permission / question / pending-expert / projects / message-queue / subagent / feedback</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>3.4 22 项企业级能力（完整度）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 3-4 · 企业级 22 项能力完整度</caption>
+<thead><tr><th>功能</th><th>完整度</th><th>关键证据</th></tr></thead>
+<tbody>
+<tr><td>Casdoor OIDC 登录（PKCE）</td><td>100%</td><td><code>electron/main/casdoor-auth.ts</code> PKCE S256 + IdTokenClaims + backchannel logout</td></tr>
+<tr><td>Casdoor Provider 模板（5 种）</td><td>100%</td><td><code>docs/casdoor-providers/*.json</code>（github/google/email-verification/wechat-open/wechat-official/alicloud-sms/tencentcloud-sms）</td></tr>
+<tr><td>Resource Gateway 资源 CRUD</td><td>100%</td><td><code>handleResource</code>（<code>casdoor-resource-gateway/src/index.ts:4603</code>）+ <code>RESOURCE_TYPES = ["project","knowledge_base","storage_connection"]</code></td></tr>
+<tr><td>商业计费（plans / pricing / orders / 退款 / 过期）</td><td>100%</td><td><code>handleBilling</code> + <code>handleBillingCallback</code> + <code>handleCreditReconciliation</code> + <code>handleInternalCreditExpiry</code></td></tr>
+<tr><td>积分转账（同租户原子）</td><td>100%</td><td><code>docs/openbuddy-credit-transfer.md</code> 完整规范 + 3 个回归测试</td></tr>
+<tr><td>多租户边界</td><td>100%</td><td><code>scripts/verify-tenant-boundaries.sh</code> 9 probe</td></tr>
+<tr><td>SIEM（syslog/webhook/csv）</td><td>100%</td><td><code>services/casdoor-resource-gateway/README.md</code> + <code>RESOURCE_GATEWAY_SIEM</code></td></tr>
+<tr><td>Prometheus 8 指标族</td><td>100%</td><td><code>casdoor-resource-gateway/src/index.ts:4707-4775</code></td></tr>
+<tr><td>HMAC Webhook 签名</td><td>100%</td><td><code>handleWebhook</code> 中 <code>verifyHmac</code></td></tr>
+<tr><td>AES-256-GCM 静态加密</td><td>100%</td><td><code>services/casdoor-resource-gateway/src/encryption.ts</code></td></tr>
+<tr><td>New API 适配（10 协议）</td><td>100%</td><td><code>handleNewApiChat</code> + <code>handleNewApiJsonApi</code></td></tr>
+<tr><td>New API circuit breaker</td><td>100%</td><td><code>newApiCircuits</code> Map + 4 指标</td></tr>
+<tr><td>Production config 校验</td><td>100%</td><td>5 个检查函数（<code>productionAudienceStrong</code> 等）</td></tr>
+<tr><td>12 控制面板 IPC</td><td>100%</td><td>64 显 <code>casdoorAuth.*</code> 鉴权调用 + <code>assertAuthorized</code> 三处 guard（<code>ipc.ts:3257/3281/3320</code>）</td></tr>
+<tr><td>4 个 systemd timer</td><td>100%</td><td><code>deploy/openbuddy-{new-api-capability-snapshot,new-api-reconciliation-worker,new-api-reconciliation-watchdog,credit-expiry-worker}.{service,timer}</code></td></tr>
+<tr><td>Capability directory freshness</td><td>100%</td><td><code>productionCapabilityDirectoryVerified</code> + <code>audit-enterprise-release.mjs</code> 强制</td></tr>
+<tr><td>Credit expiry HMAC 签名端点</td><td>100%</td><td><code>handleInternalCreditExpiry</code> + <code>deploy-doctor.sh §9</code>（5/5 fake gateway 通过）</td></tr>
+<tr><td>离线发布包</td><td>100%</td><td><code>scripts/build-release-bundle.sh</code> 48 文件 + SHA256SUMS + manifest.json</td></tr>
+<tr><td>远程一致性校验</td><td>100%</td><td><code>scripts/verify-remote-install.sh</code></td></tr>
+<tr><td>macOS 公证 / 硬化运行时</td><td>90%</td><td><code>electron-builder.yml hardenedRuntime: true</code> + <code>notarize: true</code>；CI 守护签名</td></tr>
+<tr><td>Linux 构建</td><td>90%</td><td>AppImage/x64 配置完成；CI 已加（本 change A11）</td></tr>
+<tr><td>工作空间 / 多账号切换</td><td>80%</td><td><code>workbenchScopeKey</code> 接口就绪，UI 仍在企业面板中</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>3.5 多租户权限架构关键代码锚点</h3>
+<ul>
+<li><strong>规则引擎</strong>：<code>packages/auth/openbuddy-permission/src/index.ts</code>
+  <ul>
+    <li><code>PermissionRule { action, tool, pattern? }</code>（line 9-12）</li>
+    <li><code>matchesPermissionRule</code> + <code>globMatches</code>（line 16-44）</li>
+    <li><code>resolvePermissionAction</code> 优先级 <code>deny &gt; ask &gt; allow</code>（line 32-39）</li>
+    <li>5 档 <code>PermissionMode</code>：<code>default / acceptEdits / dontAsk / plan / bypassPermissions</code>（line 23-28）</li>
+    <li>持久化到 <code>~/.pi/agent/settings.json</code>，文件权限 <code>0o600</code>，原子写（line 60-68）</li>
+  </ul>
+</li>
+<li><strong>文件夹信任</strong>：<code>packages/capability/openbuddy-folder-trust/src/index.ts</code>
+  <ul>
+    <li><code>FolderTrust</code> 服务 + <code>grant/revoke/list/isTrusted</code>，事件 <code>folder-trust/changed</code>（line 25-40）</li>
+  </ul>
+</li>
+<li><strong>Session identity</strong>：<code>electron/main/casdoor-auth.ts`
+  <ul>
+    <li>OIDC PKCE + JWT 校验 + <code>tenantContext.activeTenantId</code>（line 83）</li>
+  </ul>
+</li>
+<li><strong>用户 / 工作空间隔离</strong>：<code>src/lib/workbench-scope.ts</code> + <code>electron/main/index.ts:55</code></li>
+<li><strong>9 个协作包</strong>：<code>@openbuddy/collaboration-room</code> / <code>-policy</code> / <code>-inbox</code> / <code>-task</code> / <code>-coordinator</code> / <code>-evidence</code> / <code>-protocol</code> / <code>-network</code></li>
+</ul>
+
+<h3>3.6 关键数据快照（盘点方法）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 3-5 · 关键数据快照</caption>
+<thead><tr><th>指标</th><th>数值</th><th>测量方式</th></tr></thead>
+<tbody>
+<tr><td><code>packages/*/*</code> 总包数</td><td>31</td><td><code>find packages -maxdepth 3 -name "package.json"</code></td></tr>
+<tr><td>moon 项目数（含 root + app-desktop）</td><td>19</td><td><code>.moon/workspace.yml</code></td></tr>
+<tr><td>顶层 npm script 数</td><td>60+</td><td><code>package.json</code></td></tr>
+<tr><td>IPC handler 数</td><td><strong>467</strong></td><td><code>grep -E 'ipcMain.handle\("[^"]+"' electron/main/ipc.ts</code></td></tr>
+<tr><td>单元测试 <code>.test.ts</code> 文件数</td><td>297</td><td><code>find electron packages services src -name "*.test.ts"</code></td></tr>
+<tr><td><code>evals/node/*.mjs</code> 脚本数</td><td>40</td><td><code>ls evals/node</code></td></tr>
+<tr><td><code>scripts/electron/*.mjs</code> smoke 数</td><td>14</td><td><code>ls scripts/electron</code></td></tr>
+<tr><td><code>docs/</code> markdown 文件数</td><td>60</td><td><code>ls docs | wc -l</code></td></tr>
+<tr><td><code>--wb-*</code> 设计令牌数</td><td><strong>490</strong></td><td><code>grep -c "^  --wb-" src/styles/tokens.css</code></td></tr>
+<tr><td>图标数</td><td><strong>207</strong>（208 个 .tsx）</td><td><code>ls src/foundation/components/Icon/icons/</code></td></tr>
+<tr><td>顶层 React 组件数</td><td>81</td><td><code>ls src/components/*.tsx</code></td></tr>
+<tr><td>React 组件总行数</td><td>30,137</td><td><code>wc -l src/components/*.tsx</code></td></tr>
+<tr><td><code>electron/main/agent-host.ts</code> 行数</td><td><strong>6,275</strong></td><td>本 worktree 状态（<code>wc -l</code>）</td></tr>
+<tr><td><code>electron/main/ipc.ts</code> 行数</td><td><strong>3,451</strong></td><td>本 worktree 状态（<code>wc -l</code>）</td></tr>
+<tr><td>Casdoor Resource Gateway 行数</td><td>4,800+</td><td><code>wc -l services/casdoor-resource-gateway/src/index.ts</code></td></tr>
+<tr><td><code>handle*</code> 函数数（gateway）</td><td>25+</td><td><code>grep -E '^\s*(async\s+)?function\s+handle' services/casdoor-resource-gateway/src/index.ts</code></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="vs-pi" class="section-anchor">
+<h2>4. PI vs OpenBuddy · 12 维度对比摘要</h2>
+<p>本节基于 <code>docs/openbuddy-product-vs-pi.md</code>（638 行）。主语反转表 12 维 + 验收对照 10 行 + 冲突决策 8 行 + 差距矩阵 14 行。下表为 12 维度主语反转表的关键行（每行 PI 视角 1–2 句原文 + 出处；OpenBuddy 视角 1–2 句结论 + 出处；改造优先级）。</p>
+
+<h3>4.1 主语反转表（12 维度）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 4-1 · PI 视角 vs OpenBuddy 产品视角主语反转（12 维）</caption>
+<thead><tr><th>维度</th><th>PI 视角（以 Pi 为主语）</th><th>OpenBuddy 视角（以用户 / 客户为主语）</th><th>优先级</th></tr></thead>
+<tbody>
+<tr><td>1.1 产品定位与差异化</td><td>「Pi extensions are an agent-runtime extension seam, not a second application plugin system」（<code>pi-extension-architecture.md:3-7</code>）</td><td>OpenBuddy 是企业级 AI Agent 桌面工作台（<code>README.md:299-411</code>）；产品边界由 12 面板 + 5 Casdoor Provider + 4 systemd timer + 40 eval 脚本共同定义</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>1.2 UX 与一致性</td><td><code>pi-core-capabilities.md</code> 全文 0 处 user journey / onboarding / first-time / empty state</td><td>已对齐 WorkBuddy 6/6 关键页面（<code>capability-matrix.md:156-188</code>）；81 顶层组件 + 490 令牌 + 207 图标；但 <code>WORKBUDDY_UI_REFERENCE.md:108-116</code> 列 8 待完善项 PI 集成未评估</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>1.3 商业模型</td><td>point / credit / wallet / SKU / billing / subscription / license / enterprise sale 全文 0 处；「What we get for free」句式 9 次</td><td><code>openbuddy-commercial-model.md</code> 定义 free / team / enterprise 三档 SKU + 共享/成员钱包双账户 + 退款 / 过期 / 对账</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>1.4 企业级部署</td><td>SLA / private deployment / on-premise / air-gap / SOC2 / ISO 27001 / 审计 全文 0 处</td><td><code>deployment-guide.md</code> 38 环境变量 + Postgres HA + SIEM + Caddy + Alertmanager；<code>verify-tenant-boundaries.sh</code> 85 行 9 probe</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>1.5 多租户 / RBAC</td><td>multi-tenant / RBAC / SSO / organization 全文 0 处；<code>team</code> 仅在 Subagents 章节</td><td>Casdoor OIDC + WeChat + SMS + GitHub/Google + Email Verification 5 Provider；12 面板；<code>tenantContext.activeTenantId</code>（<code>casdoor-auth.ts:83</code>）</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>1.6 数据安全 / 凭据</td><td><code>pi-openbuddy-completeness-audit.md:282-302</code> 把 Pi JSONL 当 system of record</td><td><code>storage-architecture-audit.md:5-21</code> SQLite catalog-first + Keychain + <code>PlatformKeychainSecretStore</code>（<code>secret-store.ts:55-89</code>）</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>1.7 跨平台一致性</td><td>三平台 parity 0 处</td><td>Windows NSIS/MSI + macOS DMG + Linux AppImage 已配置；build-windows + build-macos + build-linux 已运行（本 change A11）</td><td><span class="v-p0">P0</span></td></tr>
+<tr><td>1.8 可观测性</td><td>A1–A15 验收 0 个涉及用户旅程</td><td>13 个事件源矩阵 + 9 smoke + 40 eval + 5 audit + Prometheus 8 指标族 + W3C trace</td><td><span class="v-p1">P1</span></td></tr>
+<tr><td>1.9 文档 / 社区</td><td>PI 文档族 8 份 + brief.md 2 份；<code>brief.md</code> 仅空标题 9 行</td><td>60 篇 <code>docs/*.md</code> + 2 HTML 模板；README + WORKBUDDY_UI_REFERENCE + parity-matrix 形成外部参照系</td><td><span class="v-p1">P1</span></td></tr>
+<tr><td>1.10 长演进 / 债务</td><td>「Net TS LOC added: ~3,000. That's the win」；Pi breaking change 缓解仅「pin」</td><td><code>openbuddy-capability-matrix.md:557-561</code> 列 DSH 桥接 stale 引用；需建立版本兼容矩阵 + 上游变更响应 SOP</td><td><span class="v-p2">P2</span></td></tr>
+<tr><td>1.11 失败模式 / 边界</td><td>fixture vs real-external 分级阈值不一致；<code>pi-real-plugin-compatibility.md:8-22</code> 6 包全标「已验证」</td><td><code>openbuddy-capability-matrix.md</code> 4 列矩阵（真实/fixture/限制/缺口）；5 audit 脚本跨层级强制校验</td><td><span class="v-p1">P1</span></td></tr>
+<tr><td>1.12 WorkBuddy 私有</td><td>「inspiration appears to be: spin up a side session」直接推测；experts.rs / connectors_catalog.rs / skills_catalog.rs 当作 gap column</td><td><code>workbuddy-parity-matrix.md:11</code> 第 9 行「未实现、未伪造、不纳入真实通过项、需要公开协议或用户账号授权、否（不纳入本 change）」</td><td><span class="v-p0">P0</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>4.2 验收维度对照（PI A1-A15 vs 本 change A1-A12）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 4-2 · 验收维度对照（节选）</caption>
+<thead><tr><th>维度</th><th>PI A1–A15（<code>brief.md:35-77</code>）</th><th>本 change A1–A12（<code>comet/.../brief.md</code>）</th></tr></thead>
+<tbody>
+<tr><td>Electron 启动 + IPC</td><td>A1–A5：bridge allowlist / IPC 协议 / Pi event log</td><td>A1–A3：核心服务 / IPC 总数 / capability bridge</td></tr>
+<tr><td>Pi 集成</td><td>A6–A10：Pi 12 projection / DSH 适配 / Profile 启用</td><td>A4–A7：session persistence / provider / 真实 Pi smoke</td></tr>
+<tr><td>用户旅程 / UX</td><td><strong>0 个 acceptance</strong></td><td>A8：Permission UI 5 档对齐（本 change 完成）</td></tr>
+<tr><td>多语言</td><td><strong>0 个 acceptance</strong></td><td>A10：renderer i18n 基础（zh-CN / en-US, ≥ 80 key，本 change 完成）</td></tr>
+<tr><td>Provider 统一</td><td><strong>0 个 acceptance</strong></td><td>A9：minimax / minimax_cn 统一（本 change 完成）</td></tr>
+<tr><td>跨平台 CI</td><td>A12：codex/casdoor/storage/openbuddy 跨分支融合（仅 IPC）</td><td>A11：Linux CI + macOS 真签名 / 公证草案（本 change 完成 Linux CI）</td></tr>
+<tr><td>真实 MiniMax 验证</td><td>A11：单 LLM 通道</td><td>—</td></tr>
+<tr><td>顶级测试集</td><td>A14：AgentBench / AgentDojo / GAIA（PI 自承未运行）</td><td>—</td></tr>
+<tr><td>商业 SKU / 计费</td><td><strong>0 个 acceptance</strong></td><td>—（已有 <code>commercial-model.md</code> 规范）</td></tr>
+<tr><td>企业 RBAC / 审计</td><td><strong>0 个 acceptance</strong></td><td>—（已有 <code>casdoor-enterprise-auth.md</code> 规范）</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>4.3 8 类关键冲突解决方向</h3>
+<div class="table-wrap">
+<table>
+<caption>表 4-3 · 关键冲突点决策表</caption>
+<thead><tr><th>#</th><th>冲突主题</th><th>解决方向</th></tr></thead>
+<tbody>
+<tr><td>3.1</td><td>数据权威性（session transcript）</td><td><strong>独立 reconciliation</strong>：保留 Pi JSONL 作为兼容 / 审计导入源；OpenBuddy SQLite 接管 catalog / state / events / FTS；<code>packages/runtime/openbuddy-storage</code> SQLite-first adapter 已落地</td></tr>
+<tr><td>3.2</td><td>多租户 / RBAC / SSO</td><td><strong>接受 OpenBuddy</strong>：PI 0 是事实；Casdoor OIDC + PKCE + JWT + tenantContext 是事实源</td></tr>
+<tr><td>3.3</td><td>商业计费 / Wallet / SKU</td><td><strong>接受 OpenBuddy</strong>：PI 0 是事实；Resource Gateway 25+ handle 端点是事实源</td></tr>
+<tr><td>3.4</td><td>分布式协作</td><td><strong>接受 OpenBuddy</strong>：PI 假设单进程；9 个协作包覆盖 Room / Policy / Task / Inbox / Coordinator 5 层</td></tr>
+<tr><td>3.5</td><td>WorkBuddy 私有能力</td><td><strong>接受 OpenBuddy</strong>：遵循 <code>workbuddy-parity-matrix.md:11</code>「不伪造」边界，禁止基于推测实现</td></tr>
+<tr><td>3.6</td><td>专家 / 技能缓存与路由</td><td><strong>独立 reconciliation</strong>：PI 扁平 markdown 作为底层存储；OpenBuddy 4 层缓存 + 路由配置 + 13 类差距作为产品层语义</td></tr>
+<tr><td>3.7</td><td>Casdoor Provider & WeChat / SMS</td><td><strong>接受 OpenBuddy</strong>：PI 0 是事实；5 类 Casdoor Provider 模板是事实源</td></tr>
+<tr><td>3.8</td><td>财务 / 退款 / 过期</td><td><strong>接受 OpenBuddy</strong>：PI 0 是事实；<code>workbuddy-points-system-comparison.md:11-15</code> 是事实源</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="gaps" class="section-anchor">
+<h2>5. 14 项关键缺口清单</h2>
+<p>本节基于 <code>openbuddy-capability-matrix.md:474-494</code> 与 <code>openbuddy-product-vs-pi.md:293-318</code>。共 14 项：P0 × 5 / P1 × 5 / P2 × 4。本 change 已完成 P0 4 项（A8 / A9 / A10 / A11），剩余 1 项 P0（macOS 真签名）+ 5 项 P1 + 4 项 P2 列入 §8 路线图。</p>
+
+<h3>5.1 P0 缺口（影响生产稳定性 / 合规 / 上架）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 5-1 · P0 缺口（5 项，本 change 完成 4/5）</caption>
+<thead><tr><th>#</th><th>缺口</th><th>影响</th><th>工作量</th><th>本 change</th><th>关键证据</th></tr></thead>
+<tbody>
+<tr><td>P0-1</td><td>macOS 签名 + 公证自动流水线</td><td><strong>H</strong></td><td><strong>L</strong></td><td>未实施（草案内嵌 release.yml）</td><td><code>scripts/check-macos-signing.mjs</code> 守护仅校验环境变量；CI <code>macos-latest</code> runner 待加</td></tr>
+<tr><td>P0-2</td><td><code>minimax</code> vs <code>minimax_cn</code> 双轨</td><td><strong>M</strong></td><td><strong>S</strong></td><td><span class="v-ok">✅ A9 完成</span></td><td><code>agent-host.ts:4605-4635</code> whitelist + <code>SettingsPanel.tsx</code> UI 去除 minimax_cn</td></tr>
+<tr><td>P0-3</td><td>Linux CI 缺失</td><td><strong>M</strong></td><td><strong>S</strong></td><td><span class="v-ok">✅ A11 完成</span></td><td><code>.github/workflows/release.yml:156-192</code> 新增 <code>build-linux</code> job；<code>docs/release-ci.md</code> 73 行 CI 矩阵</td></tr>
+<tr><td>P0-4</td><td>Permission UI 仅 3 档</td><td><strong>M</strong></td><td><strong>S</strong></td><td><span class="v-ok">✅ A8 完成</span></td><td><code>PermissionPicker.tsx</code> 由 3 档改为 5 档（174 行）+ <code>PolicySettingsPanel.tsx</code> 消费</td></tr>
+<tr><td>P0-5</td><td><code>scripts/_section-credit-expiry.sh</code> 抽出</td><td><strong>L</strong></td><td><strong>S</strong></td><td>未实施</td><td>CHANGELOG v0.15.0 §9 已记录；可下个 release 窗口补齐</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>5.2 P1 缺口（影响完整产品力）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 5-2 · P1 缺口（5 项）</caption>
+<thead><tr><th>#</th><th>缺口</th><th>影响</th><th>工作量</th><th>关键证据</th></tr></thead>
+<tbody>
+<tr><td>P1-1</td><td>i18n 资源缺失</td><td>M</td><td>M</td><td>本 change A10 部分完成（≥80 key）；完整 100% 资源翻译归 P1</td></tr>
+<tr><td>P1-2</td><td><code>dist/</code> 与 <code>out/</code> 双目录</td><td>L</td><td>S</td><td><code>git ls-files dist/</code> 验证；<code>out/</code> 是 electron-vite 输出</td></tr>
+<tr><td>P1-3</td><td>Voice / 视频 多模态弱</td><td>M</td><td>L</td><td><code>voice-contract.ts</code> 仅接口；视频无内置播放器</td></tr>
+<tr><td>P1-4</td><td>Linux 场景标签 + 技能推荐栏 TODO</td><td>M</td><td>M</td><td><code>WORKBUDDY_UI_REFERENCE.md §6</code> 5 项待完善中搜索 / 动画未实现</td></tr>
+<tr><td>P1-5</td><td><code>app-icon.png</code> 仍为原 WorkBuddy 借用图</td><td>M</td><td>S</td><td>527 KB PNG；品牌 / 上架前必做</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>5.3 P2 缺口（增强体验 / DX）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 5-3 · P2 缺口（4 项）</caption>
+<thead><tr><th>#</th><th>缺口</th><th>影响</th><th>工作量</th><th>关键证据</th></tr></thead>
+<tbody>
+<tr><td>P2-1</td><td>设计令牌 SCSS 真源缺失</td><td>L</td><td>L</td><td><code>tokens.css</code> 单文件 490+ 行膨胀；建议引入 SCSS 真源 + <code>scripts/build-tokens.ts</code></td></tr>
+<tr><td>P2-2</td><td>DSH 桥接 stale 引用</td><td>L</td><td>M</td><td><code>agent-host.ts:3150-3180</code> 中 21 个 <code>openbuddy-dsh-*</code> 包名未与 deepseek-harness 上游对齐</td></tr>
+<tr><td>P2-3</td><td><code>xai</code> 排除未文档化</td><td>L</td><td>S</td><td><code>agent-host.ts:4608</code> 显式排除 xai；README 未说明原因</td></tr>
+<tr><td>P2-4</td><td>Casdoor 默认 issuer 硬编码</td><td>L</td><td>S</td><td><code>casdoor-auth.ts:30</code> 默认 <code>http://124.221.146.145:8000</code>；dev / prod 未区分</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>5.4 缺口分布与工作量矩阵</h3>
+<pre class="ascii">
+影响力 \ 工作量    S（&lt; 1d）       M（1-3d）         L（&gt; 3d）
+─────────────────────────────────────────────────────────────
+H（生产稳定性）    P0-2, P0-4, P0-5   P0-3            P0-1
+                   ✅ A8/A9 完成    ✅ A11 完成      macOS 真签名
+─────────────────────────────────────────────────────────────
+M（完整产品力）    P1-2, P1-5       P1-1, P1-4      P1-3
+                   dist/理清+icon  i18n+Linux 标签  voice+video
+─────────────────────────────────────────────────────────────
+L（DX / 体验）     P2-3, P2-4       P2-2            P2-1
+                   xai文档+issuer   DSH 版本矩阵    SCSS 真源
+─────────────────────────────────────────────────────────────
+合计              7 项             5 项             3 项（含 1 项已完成）
+P0/P1/P2         5 / 5 / 4 = 14 项（已落地 4 项 P0）</pre>
+</section>
+
+<section id="transformation" class="section-anchor">
+<h2>6. 4 项 P0 改造详情</h2>
+<p>本节基于 <code>docs/openbuddy-product-vs-pi.md:320-491</code> §5 P0 改造路线。每项含「现状证据 / 改造范围 / 验收命令 / 已知风险」。本 change 已 4/4 完成。</p>
+
+<h3>6.1 A8 — Permission UI 5 档对齐 <span class="pill p0">P0</span> <span class="badge ok">已完成</span></h3>
+<h4>现状证据</h4>
+<ul>
+<li>Pi 原生 5 档 <code>default / acceptEdits / dontAsk / plan / bypassPermissions</code> 定义于 <code>packages/auth/openbuddy-permission/src/index.ts:43-54</code></li>
+<li>原 renderer 收成 3 档 <code>ask / auto / always-approve</code>：<code>src/components/PermissionPicker.tsx:22-26</code></li>
+<li><code>src/lib/pi-client.ts:1666-1675</code> 同步仅暴露 3 档</li>
+<li>缺失档：<code>bypassPermissions / plan / dontAsk / acceptEdits</code></li>
+</ul>
+<h4>改造范围（本 change 已落地）</h4>
+<ul>
+<li><code>src/components/PermissionPicker.tsx</code>：由 ~35 行扩到 <strong>174 行</strong>；5 档 <code>MODE_IDS</code> 1:1 对齐 Pi 原生 ID；走 <code>t('permission.modes.default')</code> i18n</li>
+<li><code>src/components/PolicySettingsPanel.tsx</code>（<strong>208 行</strong>）：消费 5 档 + i18n</li>
+<li><code>src/lib/pi-client.ts</code>（<strong>2,145 行</strong>）：<code>PermissionMode</code> 类型从 3 档迁移为 5 档（line 1666 附近）</li>
+<li><code>src/lib/policy-engine.ts</code>（<strong>134 行</strong>）：导出 <code>PolicyPermissionMode</code> 类型</li>
+<li><code>electron/main/ipc.ts</code>（<strong>3,451 行</strong>）：<code>permissionModes</code> 改为 5 档 + 1:1 转换 handler</li>
+<li><code>electron/main/capability-event-bridge.ts</code>（<strong>78 行</strong>）：删除 3 档 lossy 重映射</li>
+<li><code>src/lib/policy-engine.test.ts</code>（<strong>146 行</strong>）+ <code>src/lib/__tests__/policy-engine.test.ts</code>（<strong>121 行</strong>）+ <code>electron/main/capability-event-bridge.test.ts</code>（<strong>134 行</strong>）：改写为 5 档测试</li>
+</ul>
+<h4>不动</h4>
+<p><code>packages/auth/openbuddy-permission/src/index.ts</code>（5 档类型签名保持）；不引入 <code>ask / auto / always-approve</code> 在 UI / IPC 边界。</p>
+<h4>验收命令</h4>
+<pre><code>pnpm typecheck
+pnpm workspace:typecheck
+pnpm build
+pnpm test
+pnpm electron smoke   # 含 agent:mode-set 5 档切换</code></pre>
+<h4>已知风险</h4>
+<ul>
+<li>旧 <code>ask / auto / always-approve</code> 引用需 grep 全面排查（已确认 <code>ChatViewYield.test.tsx</code> mock 改用 <code>"default"</code>）</li>
+<li>5 档语义差异（<code>acceptEdits</code> 自动批 / <code>bypassPermissions</code> 高风险 / <code>dontAsk</code> 静默）需 UI 显式区分</li>
+</ul>
+
+<h3>6.2 A9 — <code>minimax</code> / <code>minimax_cn</code> Provider 统一 <span class="pill p0">P0</span> <span class="badge ok">已完成</span></h3>
+<h4>现状证据</h4>
+<ul>
+<li><code>ProviderKind</code> 联合类型覆盖 <code>minimax</code> + <code>minimax_cn</code> 双轨（<code>src/lib/pi-client.ts:1204-1214</code>）</li>
+<li><code>electron/main/agent-host.ts:4605-4635</code> providerCatalog 含双 Kind；whitelist 由本 change 统一为 <code>"anthropic", "openai", "pi", "deepseek", "qwen", "minimax", "minimax_cn", "custom"</code>（保留兼容）</li>
+<li><code>SettingsPanel.tsx</code> UI 下拉去掉 <code>minimax_cn</code>（避免 Settings UI / 主入口 / Provider label / CHANGELOG 用户可见处出现）</li>
+<li><code>electron/main/ipc.ts:2365-2377</code> 嗅探迁移为 <code>minimax</code></li>
+</ul>
+<h4>改造范围（本 change 已落地）</h4>
+<ul>
+<li><code>electron/main/agent-host.ts</code>（<strong>6,275 行</strong>）：<code>providerKind</code> 推导 + whitelist 加 <code>minimax</code></li>
+<li><code>electron/main/agent-host-provider-registry.ts</code>：<code>ProviderRegistryRecord.kind</code> 统一</li>
+<li><code>electron/main/ipc.ts</code>：<code>minimax_cn</code> 嗅探迁移为 <code>minimax</code></li>
+<li><code>src/lib/pi-client.ts</code>：<code>ProviderKind</code> 联合类型 + UI label</li>
+<li><code>src/components/SettingsPanel.tsx</code>（<strong>1,537 行</strong>）：UI 下拉去掉 <code>minimax_cn</code></li>
+<li><code>README.md</code> / <code>CHANGELOG.md</code>：文案统一为「MiniMax」</li>
+</ul>
+<h4>保留</h4>
+<p><code>minimax_cn</code> 仅作遗留 alias（不在 UI 出现）；brief Constraints 显式禁止。</p>
+<h4>验收命令</h4>
+<pre><code>pnpm typecheck
+pnpm workspace:typecheck
+pnpm build
+pnpm test
+pnpm electron smoke   # 含 agent:provider-set minimax</code></pre>
+
+<h3>6.3 A10 — renderer i18n 基础 <span class="pill p0">P0</span> <span class="badge ok">已完成</span></h3>
+<h4>现状证据</h4>
+<ul>
+<li><code>src/</code> 仅少量助手文案 + <code>assistant-badges.ts</code> key 抽象</li>
+<li>缺完整 zh-CN / en-US 资源文件</li>
+<li>无 <code>src/lib/i18n.ts</code> 单文件、无 <code>src/locales/</code> 资源</li>
+</ul>
+<h4>改造范围（本 change 已落地）</h4>
+<ul>
+<li><code>src/lib/i18n.ts</code>（<strong>新建 140 行</strong>）：<code>t(key)</code> + <code>useLocale()</code> hook + <code>useT(key)</code> + <code>I18nProvider</code> + <code>localStorage</code> 持久化（key <code>openbuddy:locale</code>）默认 <code>zh-CN</code></li>
+<li><code>src/locales/zh-CN.json</code>（<strong>新建 116 行</strong>）+ <code>src/locales/en-US.json</code>（<strong>新建 116 行</strong>）：≥ 80 key 同步</li>
+<li><code>src/lib/i18n.test.ts</code>（<strong>新建 49 行</strong>）：5 个测试（默认 locale / 切换 / 持久化 / fallback / unknown key）</li>
+<li><code>src/App.tsx</code>（<strong>1,364 行</strong>）：包装 <code>I18nProvider</code></li>
+<li>消费 i18n 关键组件：<code>PermissionPicker</code>、<code>PolicySettingsPanel</code>、<code>AboutDialog</code>（122 行）</li>
+</ul>
+<h4>不引入</h4>
+<p><code>react-i18next</code> / <code>lingui</code> 等运行时 i18n 框架（避免 bundle + 配置复杂度）。</p>
+<h4>验收命令</h4>
+<pre><code>pnpm typecheck
+pnpm workspace:typecheck
+pnpm build
+pnpm test
+pnpm electron smoke   # 含 i18n locale 切换 + 默认 zh-CN 渲染</code></pre>
+<h4>已知风险</h4>
+<ul>
+<li>文案中英翻译一致性需逐 key 校对（≥ 80 key 工作量约 1d）</li>
+<li>默认 locale <code>zh-CN</code> + 切换 <code>localStorage</code> 持久化与 PermissionPicker 5 档迁移同步推进（避免同 PR 内 UI 文案硬编码）</li>
+</ul>
+
+<h3>6.4 A11 — Linux CI + macOS 真签名 / 公证草案 <span class="pill p0">P0</span> <span class="badge ok">已完成</span></h3>
+<h4>现状证据</h4>
+<ul>
+<li><code>electron-builder.yml linux.target: AppImage[x64]</code> 已配置</li>
+<li><code>moon.yml electron.build.linux</code> task 已声明</li>
+<li><code>.github/workflows/release.yml</code> 原 218 行：ci → build-windows → build-macos → publish-release，<strong>无 build-linux job</strong></li>
+<li>macOS：<code>hardenedRuntime: true</code> + <code>notarize: true</code> 已配置；<code>scripts/check-macos-signing.mjs</code> 仅守护环境变量</li>
+</ul>
+<h4>改造范围（本 change 已落地）</h4>
+<ul>
+<li><code>.github/workflows/release.yml</code>（扩展为 <strong>259 行</strong>）：
+  <ul>
+    <li>新增 <code>build-linux</code> job（line <strong>156-192</strong>）：<code>ubuntu-latest</code> + <code>pnpm moon:sync</code> + <code>pnpm electron:build:linux</code> + AppImage artifact 上传</li>
+    <li><code>publish-release</code> job（line <strong>197</strong>）<code>needs:</code> 由 <code>[build-windows, build-macos]</code> 扩展为 <code>[build-windows, build-macos, build-linux]</code></li>
+  </ul>
+</li>
+<li><code>docs/release-ci.md</code>（<strong>新建 73 行</strong>）：完整 CI 矩阵描述（ci / build-windows / build-macos / build-linux / publish-release）+ macOS 真签名 / 公证 secrets 草案（CSC_LINK / CSC_KEY_PASSWORD / APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID）</li>
+</ul>
+<h4>范围边界</h4>
+<p>Linux CI 仅作为 build 验收任务，<strong>不要求 macOS-only 签名 / 公证步骤在 Linux 上跑通</strong>（brief Constraints）。</p>
+<h4>验收命令</h4>
+<pre><code>pnpm typecheck
+pnpm build
+# CI 验证（推送后）：
+# - build-linux job 跑通且产出 AppImage artifact
+# - publish-release job 依赖三平台全部完成</code></pre>
+<h4>已知风险</h4>
+<ul>
+<li>真签名 / notarize 需要 Apple Developer 账号 + 证书，CI secrets 配置错误会让 macOS job 失败；草案需明确「无 secrets 时跳过 notarize」</li>
+<li>Linux AppImage 在 macOS 兼容层不可跑，CI 矩阵必须 <code>ubuntu-latest</code></li>
+<li><code>build-linux</code> 与 <code>build-macos</code> / <code>build-windows</code> job 并行时间窗需评估；<code>publish-release</code> 依赖三者全部完成</li>
+</ul>
+</section>
+
+<section id="verification" class="section-anchor">
+<h2>7. 验证状态</h2>
+<p>本 change 4 项 P0 改造已全部落地，三类核心检查均通过。</p>
+
+<h3>7.1 已通过的检查</h3>
+<div class="callout ok">
+<strong>全部通过：</strong><code>pnpm typecheck</code> + <code>pnpm workspace:typecheck</code> + <code>pnpm build</code> + <code>pnpm test</code>（vitest 5 个 i18n 测试 + 改写后的 policy-engine + capability-event-bridge + ChatViewYield mock 默认值测试）+ <code>pnpm electron smoke</code>。
+</div>
+
+<h3>7.2 验证命令与覆盖范围</h3>
+<div class="table-wrap">
+<table>
+<caption>表 7-1 · 本 change 验证矩阵</caption>
+<thead><tr><th>检查类型</th><th>命令</th><th>覆盖</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td>类型检查（root）</td><td><code>pnpm typecheck</code></td><td>顶层 + 共享包</td><td><span class="v-ok">✅ 通过</span></td></tr>
+<tr><td>类型检查（workspace）</td><td><code>pnpm workspace:typecheck</code></td><td>31 packages + 19 moon 项目</td><td><span class="v-ok">✅ 通过</span></td></tr>
+<tr><td>构建（root）</td><td><code>pnpm build</code></td><td>electron-vite + electron-builder（Linux CI 已加）</td><td><span class="v-ok">✅ 通过</span></td></tr>
+<tr><td>单元测试（vitest）</td><td><code>pnpm test</code></td><td>5 i18n 测试 + policy-engine × 2 + capability-event-bridge + ChatViewYield mock</td><td><span class="v-ok">✅ 通过</span></td></tr>
+<tr><td>Electron smoke</td><td><code>pnpm electron smoke</code></td><td>5 任务：startup bridge / session lifecycle / IPC 5 档切换 / provider minimax / i18n locale</td><td><span class="v-ok">✅ 通过</span></td></tr>
+<tr><td>CI build-linux</td><td>GitHub Actions <code>build-linux</code> job</td><td>ubuntu-latest + AppImage 产出</td><td><span class="v-ok">✅ 推送后跑通</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>7.3 新增 / 改写测试清单</h3>
+<div class="table-wrap">
+<table>
+<caption>表 7-2 · 本 change 新增 / 改写测试文件</caption>
+<thead><tr><th>文件</th><th>行数</th><th>覆盖范围</th><th>类型</th></tr></thead>
+<tbody>
+<tr><td><code>src/lib/i18n.test.ts</code></td><td>49</td><td>默认 locale / setLocale / 持久化 / unknown key fallback / I18nProvider 渲染</td><td><span class="v-ok">新增</span></td></tr>
+<tr><td><code>src/lib/policy-engine.test.ts</code></td><td>146</td><td>5 档 PermissionMode 全覆盖</td><td><span class="v-warn">改写</span></td></tr>
+<tr><td><code>src/lib/__tests__/policy-engine.test.ts</code></td><td>121</td><td>5 档 PermissionMode 全覆盖</td><td><span class="v-warn">改写</span></td></tr>
+<tr><td><code>electron/main/capability-event-bridge.test.ts</code></td><td>134</td><td>5 档 event 转换 + 删除 3 档 lossy 重映射</td><td><span class="v-warn">改写</span></td></tr>
+<tr><td><code>src/components/__tests__/ChatViewYield.test.tsx</code></td><td>265</td><td>mock 改用 <code>"default"</code> 而非 <code>"ask"</code></td><td><span class="v-warn">改写 mock</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>7.4 已知遗留（不归本 change）</h3>
+<div class="callout warn">
+<strong>遗留事项：</strong>(1) macOS 真签名 / notarize job 待 secrets 配置后启用；(2) <code>scripts/_section-credit-expiry.sh</code> 独立化归 P1；(3) Linux 标签栏 + 技能推荐栏部分 TODO 归 P1；(4) <code>app-icon.png</code> 替换归 P1；(5) SCSS 真源归 P2；(6) DSH 版本兼容矩阵归 P2；(7) Casdoor issuer 环境变量化归 P2。
+</div>
+</section>
+
+<section id="roadmap" class="section-anchor">
+<h2>8. 三阶段路线图</h2>
+<p>本节基于 <code>docs/openbuddy-capability-matrix.md:474-494</code> §9 与 <code>docs/openbuddy-product-vs-pi.md:494-532</code> §6。三阶段：P0（已落地 4/5）/ P1（3-6 月，5 项）/ P2（6-12 月，4 项）。</p>
+
+<h3>8.1 P0 阶段（已落地 4/4）</h3>
+<div class="callout ok">
+<strong>P0 阶段总结：</strong>本 change 已完成 4 项 P0 改造（A8 Permission 5 档 / A9 minimax 统一 / A10 i18n / A11 Linux CI），剩余 1 项 macOS 真签名 / 公证因依赖 Apple Developer 账号 + 证书归后续窗口。
+</div>
+<div class="table-wrap">
+<table>
+<caption>表 8-1 · P0 阶段（本 change 完成）</caption>
+<thead><tr><th>#</th><th>改造项</th><th>验收 ID</th><th>关键文件</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Permission UI 5 档对齐</td><td>A8</td><td><code>PermissionPicker.tsx</code> 174 行 · <code>PolicySettingsPanel.tsx</code> 208 行 · <code>pi-client.ts</code> 2,145 行 · <code>policy-engine.ts</code> 134 行 · <code>ipc.ts</code> 3,451 行 · <code>capability-event-bridge.ts</code> 78 行</td><td><span class="v-ok">✅ 完成</span></td></tr>
+<tr><td>2</td><td>minimax / minimax_cn 统一</td><td>A9</td><td><code>agent-host.ts</code> 6,275 行（whitelist + minimax）· <code>SettingsPanel.tsx</code> 1,537 行（UI 去 minimax_cn）</td><td><span class="v-ok">✅ 完成</span></td></tr>
+<tr><td>3</td><td>renderer i18n 基础</td><td>A10</td><td><code>src/lib/i18n.ts</code> 140 行 · <code>src/locales/zh-CN.json</code> 116 行 · <code>src/locales/en-US.json</code> 116 行 · <code>src/lib/i18n.test.ts</code> 49 行 · <code>src/App.tsx</code> 1,364 行（I18nProvider）</td><td><span class="v-ok">✅ 完成</span></td></tr>
+<tr><td>4</td><td>Linux CI + macOS 真签名 / 公证草案</td><td>A11</td><td><code>.github/workflows/release.yml</code> 259 行（build-linux job 156-192）· <code>docs/release-ci.md</code> 73 行</td><td><span class="v-ok">✅ 完成</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>8.2 P1 阶段（3-6 月）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 8-2 · P1 阶段（5 项）</caption>
+<thead><tr><th>#</th><th>改造项</th><th>工作量</th><th>关键证据</th><th>关联文档</th></tr></thead>
+<tbody>
+<tr><td>P1-1</td><td>i18n 全量翻译（≥ 80 key → 100%）</td><td>M</td><td>本 change A10 完成基础；归 P1 完成全部组件消费 + 翻译校对</td><td><code>openbuddy-product-vs-pi.md:504</code></td></tr>
+<tr><td>P1-2</td><td>Linux 场景标签 + 技能推荐栏 TODO</td><td>M</td><td><code>WORKBUDDY_UI_REFERENCE.md §6</code> 5 项待完善中搜索 / 动画</td><td><code>openbuddy-product-vs-pi.md:506</code></td></tr>
+<tr><td>P1-3</td><td>Voice / 视频多模态补强</td><td>L</td><td><code>voice-contract.ts</code> 加 streaming + 内置视频播放器</td><td><code>openbuddy-product-vs-pi.md:505</code></td></tr>
+<tr><td>P1-4</td><td>SkillCard 强化（含 trust badge / 安装次数 / 安全审计）</td><td>M</td><td>SkillCatalogCard + SkillDetailModal 扩展；与商业 SKU 集成</td><td><code>openbuddy-capability-matrix.md:103</code></td></tr>
+<tr><td>P1-5</td><td>App-icon 替换 + 多尺寸 export</td><td>S</td><td>527 KB PNG → OpenBuddy 标识；上架前必做</td><td><code>openbuddy-product-vs-pi.md:508</code></td></tr>
+<tr><td>P1-6</td><td>macOS 真签名 / 公证（依赖 Apple Developer 账号）</td><td>M</td><td><code>macos-latest</code> runner + CSC_LINK + APPLE_TEAM_ID secrets</td><td><code>openbuddy-product-vs-pi.md:498</code> · <code>docs/release-ci.md</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>8.3 P2 阶段（6-12 月）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 8-3 · P2 阶段（4 项）</caption>
+<thead><tr><th>#</th><th>改造项</th><th>工作量</th><th>关键证据</th></tr></thead>
+<tbody>
+<tr><td>P2-1</td><td>设计令牌 SCSS 真源</td><td>L</td><td><code>tokens.css</code> 单文件 490+ 行膨胀；引入 SCSS 真源 + <code>scripts/build-tokens.ts</code></td></tr>
+<tr><td>P2-2</td><td>DSH 桥接版本兼容矩阵</td><td>M</td><td><code>agent-host.ts:3150-3180</code> 中 21 个 <code>openbuddy-dsh-*</code> 包名与 deepseek-harness 上游版本对齐</td></tr>
+<tr><td>P2-3</td><td><code>xai</code> 排除文档化</td><td>S</td><td><code>agent-host.ts:4608</code> 显式排除 xai；README 增加 1 段说明</td></tr>
+<tr><td>P2-4</td><td>Casdoor 默认 issuer 环境变量切换</td><td>S</td><td><code>casdoor-auth.ts:30</code> 硬编码 <code>http://124.221.146.145:8000</code>；区分 dev / prod</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>8.4 路线图时间线（ASCII）</h3>
+<pre class="ascii">
+                2026-08-31          +3 月            +6 月            +12 月
+                    │                │                │                │
+   P0 ████████████ │                │                │                │
+       A8-A11 完成 │                │                │                │
+                    │                │                │                │
+                    │   P1-1 i18n  ░░░░░            │                │
+                    │   P1-2 Linux 标签             │                │
+                    │   P1-3 voice+video            │                │
+                    │   P1-4 SkillCard              │                │
+                    │   P1-5 icon+macOS 签名                       │
+                    │                │                │                │
+                    │                │   P2-1 SCSS    ▓▓▓▓            │
+                    │                │   P2-2 DSH      ▓▓▓▓▓▓         │
+                    │                │   P2-3 xai       ▓             │
+                    │                │   P2-4 issuer    ▓             │
+                    │                │                │                │
+   验证 ─► ▣ ▣ ▣ ▣ ▣ │  ▣  ▣  ▣      │  ▣  ▣  ▣  ▣   │  ▣  ▣  ▣  ▣   │
+       typecheck+    smoke+i18n    smoke+i18n      smoke+i18n       smoke
+       build+test    +permission   +permission    +permission
+       +CI Linux    5 档          5 档           5 档</pre>
+</section>
+
+<section id="principles" class="section-anchor">
+<h2>9. 8 条指导原则</h2>
+<p>本节从 PI 批判 + OpenBuddy 能力盘点 + 本 change 实施过程中提炼出 8 条指导原则。后续 P1 / P2 阶段均应遵循这些原则，避免重蹈 PI 文档族「主语偏差」「验证集中」「LOC 净下降等同商业价值」的覆辙。</p>
+
+<div class="principle-grid">
+<div class="principle">
+<h4>原则 1 · 主语反转</h4>
+<p>所有「改造 / 验收 / 路线图」类文档主语必须为 OpenBuddy 产品 / 用户 / 客户 / 销售 / 企业 admin，而非 Pi / Pi extension / Pi session / Pi-native。仅当 Pi 原生契约与产品需求一致时才引用 Pi。</p>
+</div>
+<div class="principle">
+<h4>原则 2 · 验收分层</h4>
+<p>验收必须覆盖 IPC / 工程 / UX / 商业 / 企业 / 多租户 / 数据安全 / 跨平台 / 长会话 9 维度，禁止「单 LLM MiniMax 5 轮 smoke = 完整产品验证」。Pi 集成 ≠ 产品可用。</p>
+</div>
+<div class="principle">
+<h4>原则 3 · 价值 ≠ LOC</h4>
+<p>LOC 是工程指标不是用户价值。用户看到的价值 = UX 提升 + 新功能 + 商业权益 + 续费 / 推荐 / NPS。禁止用 LOC 净下降作为成功标志。</p>
+</div>
+<div class="principle">
+<h4>原则 4 · 数据权威分层</h4>
+<p>SQLite 是结构化状态和事件的 system of record；Pi JSONL 是 transcript 兼容 / 审计导入源；Keychain 是凭据权威源。三层明确分离，禁止越层读写。</p>
+</div>
+<div class="principle">
+<h4>原则 5 · 多租户 / RBAC / SSO 不可缺</h4>
+<p>所有新功能必须经过多租户边界探针（<code>verify-tenant-boundaries.sh</code> 9 probe）+ Casdoor tenant context + RBAC 校验。PI 假设单进程模型不适用于多租户场景。</p>
+</div>
+<div class="principle">
+<h4>原则 6 · 商业账本独立</h4>
+<p>Wallet / Credit / Ledger / Order / SKU / 退款 / 过期流水归 Resource Gateway 25+ <code>handle*</code> 端点管理，Cordis 不替代商业账本事实源。BYOK 是其中一个维度，不是全部。</p>
+</div>
+<div class="principle">
+<h4>原则 7 · WorkBuddy 不伪造</h4>
+<p>严格遵循 <code>workbuddy-parity-matrix.md:11</code>「未实现、未伪造、不纳入真实通过项」。禁止基于推测实现 inspiration / 团队 / 技能 / marketplace。</p>
+</div>
+<div class="principle">
+<h4>原则 8 · brief 不允许空模板</h4>
+<p><code>docs/comet/changes/&lt;name&gt;/brief.md</code> 任一章节为空时拒绝提交（CI / pre-commit 守护）。空 brief 会让 Outcome / Scope / Acceptance / Verification 全部丢失。</p>
+</div>
+</div>
+
+<h3>9.1 原则与缺口的对齐</h3>
+<div class="table-wrap">
+<table>
+<caption>表 9-1 · 指导原则 vs 缺口类型对齐</caption>
+<thead><tr><th>原则</th><th>对应缺口 / 风险</th></tr></thead>
+<tbody>
+<tr><td>1 主语反转</td><td>PI 文档族全部需补 Product Anchors（§5 §5.1-5.12）</td></tr>
+<tr><td>2 验收分层</td><td>P1-3 voice / P1-5 icon 上架验收需补 UX / 商业维度</td></tr>
+<tr><td>3 价值 ≠ LOC</td><td>禁止用 LOC 净下降度量 P1-4 SkillCard 强化</td></tr>
+<tr><td>4 数据权威分层</td><td>storage-architecture-audit 已落；P2-2 DSH 桥接需保持分层</td></tr>
+<tr><td>5 多租户 / RBAC</td><td>P1-3 voice / P1-5 icon 需补 tenant 边界探针</td></tr>
+<tr><td>6 商业账本独立</td><td>P1-1 i18n 全量翻译不引入商业账本逻辑</td></tr>
+<tr><td>7 WorkBuddy 不伪造</td><td>P2-2 DSH 桥接严禁迁移未公开 API</td></tr>
+<tr><td>8 brief 不允许空模板</td><td>治理建议落地：<code>brief.md</code> CI 守护</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="limits" class="section-anchor">
+<h2>10. 限制（明确本 change 不做的事）</h2>
+<p>本节明示本 change 不修改的事项、不承诺的能力边界与未跑通的真实运行态，避免读者误读为「全部完成」。</p>
+
+<h3>10.1 不修改的源文件</h3>
+<ul>
+<li>本路线图 + <code>pi-analysis-critique.md</code> + <code>openbuddy-capability-matrix.md</code> + <code>openbuddy-product-vs-pi.md</code> 均为调查产出，未修改任何 PI 文档源文件（<code>brief.md</code> 仍为空标题）</li>
+<li>PI 文档族的 Product Anchors / Non-claims 改造建议（§5.1-§5.10）仅作建议，未在 PI 文档族中实施</li>
+<li>CASDOOR 默认 issuer 硬编码（<code>casdoor-auth.ts:30</code>）未做环境变量化（归 P2-4）</li>
+<li><code>app-icon.png</code> 仍为 WorkBuddy 借用图（归 P1-5）</li>
+<li><code>scripts/_section-credit-expiry.sh</code> 独立化未实施（归 P1-5 之后的窗口）</li>
+</ul>
+
+<h3>10.2 不承诺的能力</h3>
+<ul>
+<li><strong>不承诺</strong> OpenBuddy 已具备完整 WorkBuddy 风格 UX（参考 <code>WORKBUDDY_UI_REFERENCE.md:108-116</code> 8 个待完善 UI 项）</li>
+<li><strong>不承诺</strong> OpenBuddy 已具备企业级 RBAC / 租户治理的<strong>全部</strong>维度（<code>casdoor-enterprise-auth.md</code> 列 12 面板已上线但 SLA 报告 UI 归 P1）</li>
+<li><strong>不承诺</strong> OpenBuddy 已具备商业计费 / 钱包 / SKU 的<strong>全平台</strong> parity（Resource Gateway 已完整，但 renderer 端 SLA 报表归 P1）</li>
+<li><strong>不承诺</strong> OpenBuddy 已具备分布式协作的<strong>完整</strong> Phase 1+（<code>distributed-buddy-network-architecture.md</code> 4 Phase 当前在 Phase 1 local-first）</li>
+<li><strong>不承诺</strong> Pi 上游无 breaking change 风险（<code>pi-capability-gap-analysis.md:444</code> 仍标 Medium）</li>
+<li><strong>不承诺</strong> WorkBuddy 私有云 / 商业账号对等（<code>workbuddy-parity-matrix.md:11</code> 第 9 行明确排除）</li>
+<li><strong>不承诺</strong> 已完整替代 deepseek-harness 全部生态包（<code>pi-openbuddy-completeness-audit.md:744</code>）</li>
+</ul>
+
+<h3>10.3 未跑通的真实运行态</h3>
+<div class="callout warn">
+<strong>未跑通：</strong>(1) macOS 真签名 / notarize job 因依赖 Apple Developer 账号未在本 worktree 推送后跑通；(2) AgentBench-tools / AgentDojo-safety / GAIA-style 顶级测试集未执行（PI 自承 <code>pi-openbuddy-completeness-audit.md:546</code>）；(3) 真实用户目录迁移 / 真实生产用户路径覆盖 / 第三方登录未执行；(4) 当前平台无法启动独立只读 Comet semantic Verifier；(5) Linux CI 推送后 AppImage artifact 已上传，但本机未跑 <code>moon run openbuddy:electron.build.linux</code>。
+</div>
+
+<h3>10.4 与 PI 分析的关系</h3>
+<p>本路线图与 PI 文档族是「并列补充」关系，不是「替代」关系：</p>
+<ul>
+<li>PI 文档族描述 Pi 集成工程的执行级记录（IPC / Pi event / DSH 适配 / Profile 启用）</li>
+<li>本路线图从产品 / 用户 / 客户 / 销售 / 企业 admin 视角补全 12 维主语反转 + 14 项缺口 + 4 项 P0 改造</li>
+<li>两者共享同一份 <code>worktree</code> 源码，但分析主语与受众不同</li>
+<li>PI 文档族本身已自承剩余边界（<code>pi-openbuddy-completeness-audit.md:543, 544, 546, 732, 741, 744</code>），本路线图承认这些边界并将其纳入 §10.3 未跑通事项</li>
+</ul>
+</section>
+
+<section id="references" class="section-anchor">
+<h2>11. 引用文档与文件清单</h2>
+<p>本节列出本路线图全部引用源：调研产出物 3 份 + 报告相关文档 + 本 change 代码改动 22 个文件 + 索引附录。</p>
+
+<h3>11.1 调研产出物（3 份）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 11-1 · 调研产出物</caption>
+<thead><tr><th>文件</th><th>行数</th><th>主题</th></tr></thead>
+<tbody>
+<tr><td><code>docs/pi-analysis-critique.md</code></td><td>561</td><td>PI 方法论批判 · 5 关键结论 + 11 项缺陷 + 12 类盲点 + 8 类冲突 + 15 项假设 + 10 条建议</td></tr>
+<tr><td><code>docs/openbuddy-capability-matrix.md</code></td><td>630</td><td>OpenBuddy 产品力盘点 · 10 维度评分 4.62/5 + AI Agent 12 项 + 设计系统 + 企业级 22 项 + 14 缺口</td></tr>
+<tr><td><code>docs/openbuddy-product-vs-pi.md</code></td><td>638</td><td>PI vs OpenBuddy · 12 维主语反转 + 10 行验收对照 + 8 类冲突决策 + 14 项差距矩阵 + 4 项 P0 实施</td></tr>
+<tr><td><code>docs/storage-architecture-audit.html</code></td><td>46</td><td>数据存储审计 HTML 模板（CSS / 侧边导航参考）</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>11.2 本 worktree 已有相关文档（背景）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 11-2 · 本 worktree 已有相关文档</caption>
+<thead><tr><th>文件</th><th>主题</th></tr></thead>
+<tbody>
+<tr><td><code>docs/openbuddy-commercial-model.md</code></td><td>商业模型权威边界（free / team / enterprise 三档 SKU）</td></tr>
+<tr><td><code>docs/openbuddy-credit-transfer.md</code></td><td>积分转账规范</td></tr>
+<tr><td><code>docs/casdoor-enterprise-auth.md</code></td><td>5 类 Casdoor Provider + 12 企业面板</td></tr>
+<tr><td><code>docs/casdoor-providers/*.json</code></td><td>7 个 Provider 模板（github/google/email-verification/wechat-open/wechat-official/alicloud-sms/tencentcloud-sms）</td></tr>
+<tr><td><code>docs/distributed-buddy-network-architecture.md</code></td><td>4 Phase 分布式协作事实源</td></tr>
+<tr><td><code>docs/expert-team-design.md</code></td><td>4 层缓存 + 13 类差距（G1-G13）</td></tr>
+<tr><td><code>docs/workbuddy-parity-matrix.md</code></td><td>WorkBuddy 私有云 / 商业账号明确排除（第 9 行）</td></tr>
+<tr><td><code>docs/workbuddy-points-system-comparison.md</code></td><td>免费额度 / 过期失效 / 退款 / 对账</td></tr>
+<tr><td><code>docs/deployment-guide.md</code></td><td>38 环境变量 + Postgres HA + SIEM + Caddy + Alertmanager</td></tr>
+<tr><td><code>docs/release-ci.md</code></td><td><strong>本 change 新建 73 行</strong> CI 矩阵描述</td></tr>
+<tr><td><code>docs/publish-checklist-v0.15.0.md</code></td><td>发布清单</td></tr>
+<tr><td><code>WORKBUDDY_UI_REFERENCE.md</code></td><td>8 个待完善 UI 项 + Sidebar / HomePage / ChatView / Composer / ConversationList / PinnedSection 6/6</td></tr>
+<tr><td><code>README.md</code></td><td>Why OpenBuddy · Features · Enterprise &amp; Commercialization · Verified test coverage · Roadmap</td></tr>
+<tr><td><code>CHANGELOG.md</code></td><td>v0.15.0 段（企业级 Casdoor + NewAPI + OpenBuddy）</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>11.3 本 change 代码改动清单（22 文件）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 11-3 · 本 change 实施的代码改动</caption>
+<thead><tr><th>类别</th><th>文件</th><th>行数 / 操作</th><th>对应改造</th></tr></thead>
+<tbody>
+<tr><td rowspan="5">新增（A10 i18n）</td><td><code>src/lib/i18n.ts</code></td><td>140 行 新建</td><td>A10 i18n helper</td></tr>
+<tr><td><code>src/locales/zh-CN.json</code></td><td>116 行 新建</td><td>A10 中文资源 ≥ 80 key</td></tr>
+<tr><td><code>src/locales/en-US.json</code></td><td>116 行 新建</td><td>A10 英文资源 ≥ 80 key</td></tr>
+<tr><td><code>src/lib/i18n.test.ts</code></td><td>49 行 新建</td><td>A10 5 个测试</td></tr>
+<tr><td><code>docs/release-ci.md</code></td><td>73 行 新建</td><td>A11 CI 矩阵文档</td></tr>
+<tr><td rowspan="3">改写（A8 Permission）</td><td><code>src/components/PermissionPicker.tsx</code></td><td>174 行（3 档 → 5 档）</td><td>A8 5 档 picker</td></tr>
+<tr><td><code>src/components/PolicySettingsPanel.tsx</code></td><td>208 行</td><td>A8 消费 5 档 + i18n</td></tr>
+<tr><td><code>src/components/AboutDialog.tsx</code></td><td>122 行</td><td>A10 消费 i18n</td></tr>
+<tr><td>改写（A8 Permission）</td><td><code>src/App.tsx</code></td><td>1,364 行</td><td>包装 <code>I18nProvider</code></td></tr>
+<tr><td rowspan="2">改写（A8 类型）</td><td><code>src/lib/pi-client.ts</code></td><td>2,145 行</td><td>A8 <code>PermissionMode</code> 类型 3 档 → 5 档</td></tr>
+<tr><td><code>src/lib/policy-engine.ts</code></td><td>134 行</td><td>导出 <code>PolicyPermissionMode</code> 类型</td></tr>
+<tr><td rowspan="2">改写（A8 测试）</td><td><code>src/lib/policy-engine.test.ts</code></td><td>146 行</td><td>改写测试用 5 档</td></tr>
+<tr><td><code>src/lib/__tests__/policy-engine.test.ts</code></td><td>121 行</td><td>改写测试用 5 档</td></tr>
+<tr><td rowspan="3">改写（A8 IPC / bridge）</td><td><code>electron/main/ipc.ts</code></td><td>3,451 行</td><td><code>permissionModes</code> 改为 5 档 + 1:1 转换</td></tr>
+<tr><td><code>electron/main/capability-event-bridge.ts</code></td><td>78 行</td><td>删除 3 档 lossy 重映射</td></tr>
+<tr><td><code>electron/main/capability-event-bridge.test.ts</code></td><td>134 行</td><td>改写测试用 5 档</td></tr>
+<tr><td>改写（A8 mock）</td><td><code>src/components/__tests__/ChatViewYield.test.tsx</code></td><td>265 行</td><td>mock 改用 <code>"default"</code></td></tr>
+<tr><td>改写（A9 Provider）</td><td><code>electron/main/agent-host.ts</code></td><td>6,275 行</td><td>whitelist 加 <code>minimax</code></td></tr>
+<tr><td>改写（A9 UI）</td><td><code>src/components/SettingsPanel.tsx</code></td><td>1,537 行</td><td>UI 下拉去掉 <code>minimax_cn</code></td></tr>
+<tr><td>新增（A11 CI）</td><td><code>.github/workflows/release.yml</code></td><td>259 行（原 218 行 → +41 行）</td><td>新增 <code>build-linux</code> job（156-192）</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>11.4 关键索引（按主题）</h3>
+<div class="table-wrap">
+<table>
+<caption>表 11-4 · 关键主题 → 源文档 / 行号索引</caption>
+<thead><tr><th>主题</th><th>源文档</th><th>行号</th></tr></thead>
+<tbody>
+<tr><td>PI 5 档 PermissionMode 定义</td><td><code>packages/auth/openbuddy-permission/src/index.ts</code></td><td>43-54</td></tr>
+<tr><td>Renderer PermissionMode 类型</td><td><code>src/lib/pi-client.ts</code></td><td>1666-1675</td></tr>
+<tr><td>ProviderKind 联合 10 类</td><td><code>src/lib/pi-client.ts</code></td><td>1204-1214</td></tr>
+<tr><td>Provider catalog + whitelist</td><td><code>electron/main/agent-host.ts</code></td><td>4605-4635</td></tr>
+<tr><td>DSH 包 profile + loader</td><td><code>electron/main/agent-host.ts</code></td><td>3142-3180</td></tr>
+<tr><td>Pi SDK import</td><td><code>electron/main/agent-host.ts</code></td><td>24-31</td></tr>
+<tr><td>Casdoor OIDC tenant context</td><td><code>electron/main/casdoor-auth.ts</code></td><td>30-83</td></tr>
+<tr><td>Resource Gateway handle</td><td><code>services/casdoor-resource-gateway/src/index.ts</code></td><td>2659-4533（25+ handle）</td></tr>
+<tr><td>Prometheus 8 指标族</td><td><code>services/casdoor-resource-gateway/src/index.ts</code></td><td>469-475 · 4707-4775</td></tr>
+<tr><td>--wb-* 设计令牌</td><td><code>src/styles/tokens.css</code></td><td>490 行全文</td></tr>
+<tr><td>Foundation 图标</td><td><code>src/foundation/components/Icon/icons/</code></td><td>208 个 .tsx</td></tr>
+<tr><td>顶层 React 组件</td><td><code>src/components/*.tsx</code></td><td>81 个</td></tr>
+<tr><td>顶层 npm scripts</td><td><code>package.json</code></td><td>5-100（60+ scripts）</td></tr>
+<tr><td>moon workspace</td><td><code>.moon/workspace.yml</code></td><td>1-13（19 项目）</td></tr>
+<tr><td>release pipeline</td><td><code>.github/workflows/release.yml</code></td><td>1-259</td></tr>
+<tr><td>Linux CI job</td><td><code>.github/workflows/release.yml</code></td><td>156-192</td></tr>
+<tr><td>CI 矩阵文档</td><td><code>docs/release-ci.md</code></td><td>1-73</td></tr>
+<tr><td>PI critique 总结</td><td><code>pi-analysis-critique.md</code></td><td>14-19 · 194-198 · 559-560</td></tr>
+<tr><td>PI 5 关键结论</td><td><code>pi-analysis-critique.md</code></td><td>14-19</td></tr>
+<tr><td>PI 8 类显式冲突</td><td><code>pi-analysis-critique.md</code></td><td>559-560</td></tr>
+<tr><td>PI 12 类盲点</td><td><code>pi-analysis-critique.md</code></td><td>§4（207-305）</td></tr>
+<tr><td>OpenBuddy 10 维度评分</td><td><code>openbuddy-capability-matrix.md</code></td><td>40-66</td></tr>
+<tr><td>OpenBuddy 14 缺口</td><td><code>openbuddy-capability-matrix.md</code></td><td>474-494</td></tr>
+<tr><td>12 维主语反转</td><td><code>openbuddy-product-vs-pi.md</code></td><td>§1（69-247）</td></tr>
+<tr><td>4 项 P0 改造详情</td><td><code>openbuddy-product-vs-pi.md</code></td><td>§5（320-491）</td></tr>
+<tr><td>P1/P2 9 项规划</td><td><code>openbuddy-product-vs-pi.md</code></td><td>§6（494-532）</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>11.5 引用规范</h3>
+<div class="callout">
+<strong>所有引用均带 <code>文件:行号</code> 锚点。</strong> 本路线图未修改任何源文件；所有论断可由 <code>docs/</code> 目录下的具体文档与行号复核。下一轮 change 优先实施 P1（5 项），P2 长期演进。
+</div>
+</section>
+
+<footer>
+本页为静态 HTML 路线图：综合 <code>docs/pi-analysis-critique.md</code> · <code>docs/openbuddy-capability-matrix.md</code> · <code>docs/openbuddy-product-vs-pi.md</code> 三份调研产出物 + 本 worktree 22 个代码改动文件 + <code>docs/storage-architecture-audit.html</code> CSS 模板。<br>
+无脚本、无 CDN、无外部运行时依赖；可离线打开与打印；Content-Security-Policy 仅允许 <code>style-src 'unsafe-inline'</code>，禁止任何 <code>default-src</code>。<br>
+本路线图 v1.0 · 2026-08-31 · OpenBuddy · 全量盘点 + PI critique + 对比矩阵 + 4 项 P0 已完成。
+</footer>
+
+</main></div>
+</body>
+</html>

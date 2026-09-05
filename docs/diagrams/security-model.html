@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>OpenBuddy 安全模型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px; }
+  h1 { text-align: center; font-size: 28px; margin-bottom: 8px; color: #f85149; }
+  .subtitle { text-align: center; color: #8b949e; margin-bottom: 40px; font-size: 14px; }
+  .container { max-width: 1000px; margin: 0 auto; }
+  .section { margin-bottom: 40px; }
+  .section-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #21262d; display: flex; align-items: center; gap: 8px; }
+  .layers { display: flex; flex-direction: column; gap: 12px; }
+  .layer { background: #161b22; border-radius: 12px; padding: 20px; position: relative; overflow: hidden; }
+  .layer::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+  .l-renderer::before { background: #58a6ff; }
+  .l-preload::before { background: #3fb950; }
+  .l-main::before { background: #d29922; }
+  .l-pi::before { background: #f85149; }
+  .layer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .layer-name { font-weight: 700; font-size: 15px; }
+  .layer-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+  .tag-green { background: #3fb95033; color: #3fb950; }
+  .tag-yellow { background: #d2992233; color: #d29922; }
+  .tag-red { background: #f8514933; color: #f85149; }
+  .tag-blue { background: #1f6feb33; color: #58a6ff; }
+  .checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .check { display: flex; align-items: flex-start; gap: 8px; background: #21262d; border-radius: 8px; padding: 10px 12px; }
+  .check-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .check-text { font-size: 12px; line-height: 1.5; }
+  .check-title { font-weight: 600; color: #f0f6fc; }
+  .check-desc { color: #8b949e; }
+  .gate { background: #161b22; border: 2px dashed #f85149; border-radius: 12px; padding: 20px; text-align: center; }
+  .gate-title { font-weight: 700; color: #f85149; font-size: 16px; margin-bottom: 8px; }
+  .gate-desc { color: #8b949e; font-size: 13px; }
+  .arrow-box { text-align: center; padding: 8px; color: #484f58; font-size: 18px; }
+  .ipc-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  .ipc-table th { text-align: left; padding: 8px 12px; background: #21262d; color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .ipc-table td { padding: 8px 12px; border-bottom: 1px solid #21262d; font-size: 12px; }
+  .ipc-table tr:hover { background: #161b22; }
+  .channel { font-family: monospace; color: #79c0ff; }
+</style>
+</head>
+<body>
+
+<h1>🔒 OpenBuddy 安全模型</h1>
+<p class="subtitle">纵深防御 · 最小权限 · 本地优先</p>
+
+<div class="container">
+
+  <div class="section">
+    <div class="section-title">🛡️ 四层安全边界</div>
+    <div class="layers">
+
+      <div class="layer l-renderer">
+        <div class="layer-head">
+          <span class="layer-name">Layer 1: React Renderer</span>
+          <span class="layer-tag tag-blue">沙箱化</span>
+        </div>
+        <div class="checks">
+          <div class="check">
+            <span class="check-icon">🚫</span>
+            <div class="check-text">
+              <div class="check-title">无 Node 集成</div>
+              <div class="check-desc">nodeIntegration: false, contextIsolation: true, sandbox: true</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">🚫</span>
+            <div class="check-text">
+              <div class="check-title">无 Provider SDK</div>
+              <div class="check-desc">所有 LLM 调用必须经过主进程 Pi 运行时</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">🚫</span>
+            <div class="check-text">
+              <div class="check-title">无直接文件访问</div>
+              <div class="check-desc">必须通过 IPC 调用 shellfs:read-text 等处理器</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">CSP 策略</div>
+              <div class="check-desc">Content-Security-Policy 限制脚本和资源来源</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-box">▼ window.api (typed contextBridge) ▼</div>
+
+      <div class="layer l-preload">
+        <div class="layer-head">
+          <span class="layer-name">Layer 2: Preload Bridge</span>
+          <span class="layer-tag tag-green">白名单</span>
+        </div>
+        <div class="checks">
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">IPC 白名单</div>
+              <div class="check-desc">allowedInvokeChannels 显式枚举所有允许的通道，未列出的调用抛错</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">参数验证</div>
+              <div class="check-desc">ipc/validation.ts 对所有入参进行类型和范围检查</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">桥接健康监控</div>
+              <div class="check-desc">recordBridgeFailure/Success 跟踪桥接状态，中毒时断开</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">超时保护</div>
+              <div class="check-desc">invokeWithTimeout 防止 IPC 调用无限等待</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-box">▼ typed Pi session events ▼</div>
+
+      <div class="layer l-main">
+        <div class="layer-head">
+          <span class="layer-name">Layer 3: Electron Main</span>
+          <span class="layer-tag tag-yellow">策略执行</span>
+        </div>
+        <div class="checks">
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">存储边界</div>
+              <div class="check-desc">能力代码不能读其他能力的数据，自动化验证脚本检查边界</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">MCP 授权</div>
+              <div class="check-desc">mcp-authorization.ts 审查 MCP 服务器连接</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">能力策略</div>
+              <div class="check-desc">assertPolicyModelAllowed / assertPolicySkillUploadAllowed 检查</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">审计日志</div>
+              <div class="check-desc">JSONL append-only + 哈希链，不可篡改</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-box">▼ Cordis service calls ▼</div>
+
+      <div class="layer l-pi">
+        <div class="layer-head">
+          <span class="layer-name">Layer 4: Pi Agent + Cordis</span>
+          <span class="layer-tag tag-red">权限控制</span>
+        </div>
+        <div class="checks">
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">文件夹信任</div>
+              <div class="check-desc">@openbuddy/capability-folder-trust 逐文件夹授权</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">工具权限</div>
+              <div class="check-desc">Pi AgentSession 的 permission 系统控制工具调用</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">内容寻址存储</div>
+              <div class="check-desc">ContentAddressedObjectStore 防止数据篡改</div>
+            </div>
+          </div>
+          <div class="check">
+            <span class="check-icon">✅</span>
+            <div class="check-text">
+              <div class="check-title">Schema 版本化</div>
+              <div class="check-desc">自动迁移 + 迁移问题跟踪</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🔐 认证与联邦</div>
+    <div class="gate">
+      <div class="gate-title">Casdoor OIDC + SAML 2.0 + SCIM v2</div>
+      <div class="gate-desc">
+        PKCE + refresh token 轮换 · 租户策略 · 审计日志<br>
+        SAML AuthnRequest/Response/LogoutRequest · SCIM RFC 7644 用户/组供应
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📋 IPC 白名单分类</div>
+    <table class="ipc-table">
+      <thead>
+        <tr><th>类别</th><th>通道示例</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Agent 控制</td><td class="channel">agent:abort, agent:init, agent:prompt</td><td>会话生命周期</td></tr>
+        <tr><td>会话管理</td><td class="channel">session:list, session:fork, session:rewind</td><td>会话 CRUD</td></tr>
+        <tr><td>认证</td><td class="channel">casdoor:authorize, casdoor:login</td><td>OIDC 流程</td></tr>
+        <tr><td>文件系统</td><td class="channel">shellfs:read-text, shellfs:write-text</td><td>沙箱化文件访问</td></tr>
+        <tr><td>记忆</td><td class="channel">memory:get, memory:save, memory:recall</td><td>长期记忆</td></tr>
+        <tr><td>协作</td><td class="channel">collaboration:snapshot, collaboration:task-control</td><td>多代理协作</td></tr>
+        <tr><td>企业</td><td class="channel">email:send, calendar:create</td><td>邮件/日历</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+</body>
+</html>

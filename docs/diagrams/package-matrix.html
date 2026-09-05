@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>OpenBuddy 包矩阵</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px; }
+  h1 { text-align: center; font-size: 28px; margin-bottom: 8px; color: #58a6ff; }
+  .subtitle { text-align: center; color: #8b949e; margin-bottom: 40px; font-size: 14px; }
+  .matrix { max-width: 1100px; margin: 0 auto; }
+  .group { margin-bottom: 32px; }
+  .group-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #21262d; }
+  .group-icon { font-size: 20px; }
+  .group-title { font-size: 18px; font-weight: 700; }
+  .group-count { font-size: 12px; background: #21262d; padding: 2px 8px; border-radius: 10px; color: #8b949e; }
+  .pkgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .pkg { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px; transition: border-color 0.2s; }
+  .pkg:hover { border-color: #58a6ff; }
+  .pkg-name { font-family: monospace; font-size: 12px; color: #79c0ff; font-weight: 600; margin-bottom: 6px; }
+  .pkg-desc { color: #8b949e; font-size: 11px; line-height: 1.5; }
+  .pkg-deps { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .dep { font-size: 10px; background: #21262d; padding: 1px 6px; border-radius: 4px; color: #8b949e; }
+  .g-runtime .group-title { color: #f85149; }
+  .g-runtime .pkg { border-left: 3px solid #f85149; }
+  .g-auth .group-title { color: #d29922; }
+  .g-auth .pkg { border-left: 3px solid #d29922; }
+  .g-capability .group-title { color: #3fb950; }
+  .g-capability .pkg { border-left: 3px solid #3fb950; }
+  .g-collab .group-title { color: #58a6ff; }
+  .g-collab .pkg { border-left: 3px solid #58a6ff; }
+  .g-core .group-title { color: #bc8cff; }
+  .g-core .pkg { border-left: 3px solid #bc8cff; }
+  .g-enterprise .group-title { color: #f778ba; }
+  .g-enterprise .pkg { border-left: 3px solid #f778ba; }
+  .g-shared .group-title { color: #79c0ff; }
+  .g-shared .pkg { border-left: 3px solid #79c0ff; }
+  .g-ui .group-title { color: #a5d6ff; }
+  .g-ui .pkg { border-left: 3px solid #a5d6ff; }
+  .summary { max-width: 1100px; margin: 40px auto 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .sum-item { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px; text-align: center; }
+  .sum-num { font-size: 28px; font-weight: 700; }
+  .sum-label { font-size: 11px; color: #8b949e; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>📦 OpenBuddy 包矩阵</h1>
+<p class="subtitle">63 个 workspace 包 · 9 个分组 · Cordis 能力网格</p>
+
+<div class="matrix">
+
+  <div class="group g-runtime">
+    <div class="group-header">
+      <span class="group-icon">⚙️</span>
+      <span class="group-title">运行时层</span>
+      <span class="group-count">3 包</span>
+    </div>
+    <div class="pkgs">
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/cordis</div>
+        <div class="pkg-desc">Cordis 框架封装，OpenBuddyService 基类，Branded ID 工具</div>
+        <div class="pkg-deps"><span class="dep">@cordisjs/core</span></div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/plugin-host</div>
+        <div class="pkg-desc">插件发现、加载、热重载，HarnessPluginLoader，RendererPluginLoader</div>
+        <div class="pkg-deps"><span class="dep">cordis</span><span class="dep">storage</span></div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/storage</div>
+        <div class="pkg-desc">SQLite 持久化，SessionCatalog，MemoryIndex，TaskCatalog，EventStore</div>
+        <div class="pkg-deps"><span class="dep">cordis</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="group g-auth">
+    <div class="group-header">
+      <span class="group-icon">🔑</span>
+      <span class="group-title">认证层</span>
+      <span class="group-count">2 包</span>
+    </div>
+    <div class="pkgs">
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/auth-casdoor</div>
+        <div class="pkg-desc">Casdoor OIDC 客户端，PKCE + refresh token，管理 REST API</div>
+        <div class="pkg-deps"><span class="dep">cordis</span><span class="dep">storage</span></div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/auth-permission</div>
+        <div class="pkg-desc">权限提示 UI，策略引擎，用户确认流程</div>
+        <div class="pkg-deps"><span class="dep">cordis</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="group g-capability">
+    <div class="group-header">
+      <span class="group-icon">🧩</span>
+      <span class="group-title">能力层</span>
+      <span class="group-count">6 包</span>
+    </div>
+    <div class="pkgs">
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/capability-authorization</div>
+        <div class="pkg-desc">能力级策略引擎，模型/技能上传策略检查</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/capability-calendar</div>
+        <div class="pkg-desc">日历集成，事件创建/查询/更新</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/capability-email</div>
+        <div class="pkg-desc">IMAP/SMTP + Gmail/Graph/JMAP API，多 Provider 配置文件</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/capability-folder-trust</div>
+        <div class="pkg-desc">文件夹级权限授权，per-folder trust grants</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/capability-mcp-client</div>
+        <div class="pkg-desc">MCP 连接器治理，OAuth 状态管理</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/capability-web-search</div>
+        <div class="pkg-desc">提供者可插拔的 Web 搜索能力</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="group g-collab">
+    <div class="group-header">
+      <span class="group-icon">🤝</span>
+      <span class="group-title">协作层</span>
+      <span class="group-count">8 包</span>
+    </div>
+    <div class="pkgs">
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/collaboration-protocol</div>
+        <div class="pkg-desc">A2A 消息信封，共享词汇表（BuddyIdentity, BuddyTaskEnvelope 等）</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/collaboration-room</div>
+        <div class="pkg-desc">共享房间，成员管理，消息广播</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/collaboration-inbox</div>
+        <div class="pkg-desc">跨代理收件箱投影，通知聚合</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/collaboration-policy</div>
+        <div class="pkg-desc">跨代理策略，任务授权</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/collaboration-task</div>
+        <div class="pkg-desc">跨代理任务图，任务生命周期管理</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/collaboration-network</div>
+        <div class="pkg-desc">网络拓扑，对等发现，信任级别，Agent Card 认证</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/collaboration-evidence</div>
+        <div class="pkg-desc">审计证据包，摘要验证，签名</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/collaboration-coordinator</div>
+        <div class="pkg-desc">协调层，整合 protocol + task + evidence</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="group g-core">
+    <div class="group-header">
+      <span class="group-icon">📁</span>
+      <span class="group-title">核心层</span>
+      <span class="group-count">4 包</span>
+    </div>
+    <div class="pkgs">
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/core-session</div>
+        <div class="pkg-desc">会话生命周期，分叉、回退、元数据管理</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/fs-fs-local</div>
+        <div class="pkg-desc">本地文件系统 Cordis 服务，沙箱化路径</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/files-kb</div>
+        <div class="pkg-desc">知识库文件索引，Provider 注册表</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/logging-*</div>
+        <div class="pkg-desc">日志系统 (main + renderer + shared)，追踪 ID，脱敏</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="group g-enterprise">
+    <div class="group-header">
+      <span class="group-icon">🏢</span>
+      <span class="group-title">企业层</span>
+      <span class="group-count">4 包</span>
+    </div>
+    <div class="pkgs">
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/payment</div>
+        <div class="pkg-desc">Stripe / 微信支付 / 支付宝 / HMAC 适配器</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/saml</div>
+        <div class="pkg-desc">SAML 2.0 原语：AuthnRequest / Response / LogoutRequest</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/scim</div>
+        <div class="pkg-desc">SCIM v2 端点 (RFC 7644)，用户/组供应</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/webhook-outbox</div>
+        <div class="pkg-desc">事务性发件箱，指数退避重试，不丢失事件</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="group g-shared">
+    <div class="group-header">
+      <span class="group-icon">🔗</span>
+      <span class="group-title">共享层</span>
+      <span class="group-count">2 包</span>
+    </div>
+    <div class="pkgs">
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/shared-types</div>
+        <div class="pkg-desc">跨包类型定义：AgentEntry, Plan, ToolCallContent, SessionUpdate 等</div>
+      </div>
+      <div class="pkg">
+        <div class="pkg-name">@openbuddy/renderer-host</div>
+        <div class="pkg-desc">渲染器侧插件运行时，WebSocket/SSE 传输，贡献点注册</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="group g-ui">
+    <div class="group-header">
+      <span class="group-icon">🎨</span>
+      <span class="group-title">UI 层</span>
+      <span class="group-count">26 包</span>
+    </div>
+    <div class="pkgs">
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-shell</div><div class="pkg-desc">应用外壳，TitleBar，TopbarActions</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-sidebar</div><div class="pkg-desc">侧边栏导航，会话列表</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-conversation</div><div class="pkg-desc">对话视图，ChatView，消息渲染</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-settings</div><div class="pkg-desc">设置面板，HomePage</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-workbench</div><div class="pkg-desc">工作台，SearchOverlay，ModelOption</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-experts</div><div class="pkg-desc">专家管理，ThumbImg</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-dialogs</div><div class="pkg-desc">对话框：About, FolderTrust, KeyboardShortcuts</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-markdown</div><div class="pkg-desc">Markdown 渲染，代码高亮，数学公式</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-primitives</div><div class="pkg-desc">基础 UI 原语，Toast，图标</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-theme</div><div class="pkg-desc">主题系统，暗色/亮色模式</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-runtime</div><div class="pkg-desc">UI 运行时，SlotProvider</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-automation</div><div class="pkg-desc">自动化任务面板，TasksPanel</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-locale</div><div class="pkg-desc">国际化：English + 简体中文</div></div>
+      <div class="pkg"><div class="pkg-name">@openbuddy/ui-hmr</div><div class="pkg-desc">热模块替换支持</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="sum-item"><div class="sum-num" style="color:#f85149">3</div><div class="sum-label">运行时</div></div>
+  <div class="sum-item"><div class="sum-num" style="color:#d29922">2</div><div class="sum-label">认证</div></div>
+  <div class="sum-item"><div class="sum-num" style="color:#3fb950">6</div><div class="sum-label">能力</div></div>
+  <div class="sum-item"><div class="sum-num" style="color:#58a6ff">8</div><div class="sum-label">协作</div></div>
+  <div class="sum-item"><div class="sum-num" style="color:#a5d6ff">26</div><div class="sum-label">UI</div></div>
+</div>
+
+</body>
+</html>

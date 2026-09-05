@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenBuddy 助理工作台架构</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1118;
+      --panel: #151b25;
+      --panel-2: #1b2330;
+      --line: #354154;
+      --text: #eef2f7;
+      --muted: #98a4b5;
+      --cyan: #57d7ff;
+      --green: #39d39f;
+      --amber: #f2bc66;
+      --violet: #b698ff;
+      --red: #ff8d8d;
+      --shadow: 0 18px 50px rgba(0, 0, 0, .28);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 1180px;
+      background: radial-gradient(circle at 80% -10%, #20324b 0, transparent 42%), var(--bg);
+      color: var(--text);
+      font: 14px/1.45 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+    }
+    header {
+      padding: 34px 52px 26px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(13, 17, 24, .76);
+      backdrop-filter: blur(12px);
+    }
+    header h1 { margin: 0 0 8px; font-size: 27px; letter-spacing: -.02em; }
+    header p { margin: 0; max-width: 900px; color: var(--muted); }
+    .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 18px; color: var(--muted); font-size: 12px; }
+    .legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; background: var(--line); }
+    .legend .experience::before { background: var(--cyan); }
+    .legend .kernel::before { background: var(--green); }
+    .legend .runtime::before { background: var(--amber); }
+    .legend .network::before { background: var(--violet); }
+    .legend .guard::before { background: var(--red); }
+    main { padding: 28px 52px 62px; }
+    .section-title { margin: 0 0 13px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .workbench {
+      display: grid;
+      grid-template-columns: 205px 1fr 300px;
+      min-height: 660px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #111721;
+      box-shadow: var(--shadow);
+    }
+    .rail { padding: 19px 13px; border-right: 1px solid var(--line); background: #101620; }
+    .brand { display: flex; align-items: center; gap: 9px; margin: 0 7px 24px; font-weight: 750; }
+    .brand-mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; color: #06212a; background: var(--cyan); font-weight: 900; }
+    .rail-group { margin: 20px 0; }
+    .rail-label { padding: 0 9px 7px; color: #6f7d90; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
+    .nav-item { display: flex; align-items: center; gap: 9px; padding: 9px; margin: 3px 0; border-radius: 8px; color: #b8c2d0; }
+    .nav-item.active { color: white; background: #223143; box-shadow: inset 3px 0 var(--cyan); }
+    .nav-item.nav-child { min-height: 25px; margin-left: 18px; padding-top: 5px; padding-bottom: 5px; color: #8e9daf; font-size: 12px; }
+    .nav-item.nav-child.active-child { color: white; background: #1d2a39; }
+    .nav-item small { margin-left: auto; color: #6f7d90; }
+    .mini-buddy { display: flex; align-items: center; gap: 8px; padding: 8px 9px; color: #b8c2d0; }
+    .avatar { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; color: #08231d; background: var(--green); font-size: 11px; font-weight: 800; }
+    .avatar.remote { color: #1d133a; background: var(--violet); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+    .content { display: grid; grid-template-rows: 58px 1fr; min-width: 0; }
+    .topbar { display: flex; align-items: center; gap: 12px; padding: 0 23px; border-bottom: 1px solid var(--line); }
+    .crumb { color: var(--muted); }
+    .crumb strong { color: var(--text); }
+    .top-actions { display: flex; gap: 8px; margin-left: auto; }
+    button { border: 0; color: inherit; font: inherit; cursor: pointer; }
+    .ghost, .primary { padding: 7px 11px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: #c5cfdb; }
+    .primary { border-color: transparent; color: #06231c; background: var(--green); font-weight: 750; }
+    .main-pane { padding: 28px 32px; overflow: hidden; }
+    .headline { display: flex; align-items: flex-start; justify-content: space-between; gap: 25px; margin-bottom: 22px; }
+    h2 { margin: 0 0 5px; font-size: 22px; }
+    .sub { margin: 0; color: var(--muted); }
+    .mode-tabs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; max-width: 760px; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: #10151d; }
+    .mode-tabs button { padding: 7px 10px; border-radius: 6px; color: var(--muted); background: transparent; }
+    .mode-tabs button.active { color: white; background: #293646; }
+    .subnav-note { display: flex; gap: 10px; align-items: center; margin: -9px 0 18px; padding: 9px 11px; border: 1px solid #34465a; border-radius: 8px; color: var(--muted); background: #172230; font-size: 12px; }
+    .subnav-note strong { color: var(--cyan); }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+    .metric { padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+    .metric b { display: block; font-size: 20px; }
+    .metric span { color: var(--muted); font-size: 12px; }
+    .mission { padding: 16px; border: 1px solid #385169; border-radius: 12px; background: linear-gradient(120deg, #172432, #151b25); }
+    .mission-head { display: flex; justify-content: space-between; gap: 14px; }
+    .mission-title { font-weight: 750; }
+    .status { color: var(--green); font-size: 12px; }
+    .progress { height: 6px; margin: 13px 0; overflow: hidden; border-radius: 99px; background: #2a3442; }
+    .progress i { display: block; width: 62%; height: 100%; background: var(--green); }
+    .mission-meta { display: flex; gap: 17px; color: var(--muted); font-size: 12px; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .card { padding: 15px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); }
+    .card h3 { margin: 0 0 12px; font-size: 14px; }
+    .task { display: flex; align-items: center; gap: 9px; padding: 9px 0; border-top: 1px solid #283241; }
+    .task:first-of-type { border-top: 0; }
+    .task .check { display: grid; place-items: center; width: 17px; height: 17px; border: 1px solid #536277; border-radius: 5px; color: #071d17; font-size: 11px; }
+    .task.done .check { border-color: var(--green); background: var(--green); }
+    .task small { display: block; color: var(--muted); }
+    .event { display: grid; grid-template-columns: 30px 1fr; gap: 8px; padding: 8px 0; border-top: 1px solid #283241; }
+    .event:first-of-type { border-top: 0; }
+    .event p { margin: 0; }
+    .event small { color: var(--muted); }
+    .inspector { padding: 19px; border-left: 1px solid var(--line); background: #121923; }
+    .inspector h3 { margin: 0 0 16px; font-size: 15px; }
+    .inspector-section { padding: 15px 0; border-top: 1px solid var(--line); }
+    .inspector-section:first-of-type { padding-top: 0; border-top: 0; }
+    .label { margin-bottom: 6px; color: #77869a; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .value { color: #d6dee8; }
+    .pill { display: inline-block; margin: 3px 3px 0 0; padding: 3px 7px; border: 1px solid #405067; border-radius: 99px; color: #b8c7d8; font-size: 11px; }
+    .policy { padding: 10px; border-radius: 8px; color: #c9d6e4; background: #1a2634; font-size: 12px; }
+    .policy strong { display: block; color: var(--green); margin-bottom: 4px; }
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; align-items: center; margin-top: 17px; }
+    .flow-step { min-height: 86px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+    .flow-step b { display: block; margin-bottom: 5px; color: var(--cyan); font-size: 12px; }
+    .flow-step span { color: var(--muted); font-size: 12px; }
+    .arrow { color: #65758b; text-align: center; font-size: 22px; }
+    .architecture { margin-top: 35px; }
+    .layers { display: grid; gap: 10px; }
+    .layer { display: grid; grid-template-columns: 150px 1fr; gap: 13px; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); }
+    .layer-name { font-weight: 750; }
+    .layer-name small { display: block; margin-top: 3px; color: var(--muted); font-weight: 400; }
+    .layer-items { display: flex; flex-wrap: wrap; gap: 7px; }
+    .layer-item { padding: 6px 9px; border-radius: 6px; background: var(--panel-2); color: #c8d2df; }
+    .layer.experience { border-left: 3px solid var(--cyan); }
+    .layer.kernel { border-left: 3px solid var(--green); }
+    .layer.runtime { border-left: 3px solid var(--amber); }
+    .layer.data { border-left: 3px solid var(--violet); }
+    .layer.guard { border-left: 3px solid var(--red); }
+    .decision { margin-top: 26px; padding: 17px 19px; border: 1px solid #42627d; border-radius: 12px; background: #152331; }
+    .decision h3 { margin: 0 0 8px; }
+    .decision p { margin: 0; color: #bfccda; }
+    .decision strong { color: var(--cyan); }
+    .topology { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 17px; }
+    .topology-column { min-height: 190px; padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); }
+    .topology-column h3 { margin: 0 0 8px; font-size: 14px; }
+    .topology-column p { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+    .topology-node { display: block; margin-top: 7px; padding: 7px 9px; border-radius: 7px; background: var(--panel-2); color: #c8d2df; font-size: 12px; }
+    .topology-node strong { color: var(--text); }
+    .matrix { width: 100%; border-collapse: collapse; margin-top: 17px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; }
+    .matrix th, .matrix td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .matrix th { color: var(--text); background: var(--panel-2); }
+    .matrix td { color: var(--muted); background: var(--panel); }
+    .matrix tr:last-child td { border-bottom: 0; }
+    .contract { margin-top: 17px; padding: 15px 17px; border: 1px solid #526b57; border-radius: 11px; background: #17231f; }
+    .contract h3 { margin: 0 0 8px; color: var(--green); }
+    .contract pre { margin: 0; overflow: auto; color: #c9e9d9; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    @media (max-width: 900px) { .topology { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { .topology { grid-template-columns: 1fr; } .matrix { display: block; overflow-x: auto; } }
+    @media (max-width: 1200px) { body { min-width: 0; } main, header { padding-left: 24px; padding-right: 24px; } .workbench { grid-template-columns: 180px 1fr 260px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>OpenBuddy 助理工作台：UI 与分布式 Buddy 协作统一架构</h1>
+    <p>建议把“协作”融入现有“助理”工作台，但不要把它做成一个普通聊天页。助理工作台应成为统一入口：既能选择个人助理，也能查看多个 Buddy 组成的任务、审批、证据与 Room；聊天只是其中一个执行面。</p>
+    <div class="legend">
+      <span class="experience">体验层</span><span class="kernel">协作协议内核</span><span class="runtime">执行运行时</span><span class="network">组织与开放网络</span><span class="guard">安全与审计约束</span>
+    </div>
+  </header>
+  <main>
+    <p class="section-title">Recommended UI shell · preserve existing top-level navigation</p>
+    <section class="workbench" aria-label="助理工作台示意">
+      <aside class="rail">
+        <div class="brand"><span class="brand-mark">B</span><span>OpenBuddy</span></div>
+        <div class="rail-group">
+          <div class="rail-label">工作台</div>
+          <div class="nav-item">＋ <span>新建任务</span></div>
+          <div class="nav-item active">◈ <span>助理</span></div>
+          <div class="nav-item">◇ <span>项目</span><small>Buddy 协作</small></div>
+          <div class="nav-item">✦ <span>专家·技能·连接器</span></div>
+          <div class="nav-item">↻ <span>自动化</span></div>
+          <div class="nav-item">✉ <span>邮件</span></div>
+        </div>
+        <div class="rail-group">
+          <div class="rail-label">资源</div>
+          <div class="nav-item">⋯ <span>更多</span></div>
+        </div>
+        <div class="rail-group">
+          <div class="rail-label">在线 Buddy</div>
+          <div class="mini-buddy"><span class="avatar">P</span><span>Personal Buddy</span><span class="dot"></span></div>
+          <div class="mini-buddy"><span class="avatar">R</span><span>Researcher</span><span class="dot"></span></div>
+          <div class="mini-buddy"><span class="avatar remote">A</span><span>Acme Buddy</span></div>
+        </div>
+      </aside>
+      <section class="content">
+        <div class="topbar"><div class="crumb">工作台 / <strong>个人生产力</strong></div><div class="top-actions"><button class="ghost">搜索 ⌘K</button><button class="ghost">设置</button><button class="primary">+ 新建任务</button></div></div>
+        <div class="main-pane">
+          <div class="headline">
+            <div><h2>助理工作台</h2><p class="sub">从一个请求开始，让一个或多个 Buddy 协作完成并交付可验收结果。</p></div>
+            <div class="mode-tabs"><button class="active">总览</button><button>收件箱</button><button>日程</button><button>跨项目任务</button><button>工作流</button><button>Rooms</button><button>助理与 Buddy</button><button>开放网络</button><button>能力与策略</button><button>证据与审计</button><button>副作用恢复</button></div>
+          </div>
+          <div class="subnav-note"><strong>助理子菜单位于工作台顶部</strong><span>左侧只保留一级导航；插件扩展也以同一 Tab 体系注册。</span></div>
+          <div class="metrics"><div class="metric"><b>3</b><span>待处理收件箱</span></div><div class="metric"><b>5</b><span>运行中任务</span></div><div class="metric"><b>8</b><span>可用能力</span></div><div class="metric"><b>92%</b><span>证据覆盖率</span></div></div>
+          <div class="mission">
+            <div class="mission-head"><div><div class="mission-title">整理本周竞品研究并生成评审稿</div><div class="sub">Personal Buddy → Researcher → Reviewer</div></div><div class="status">● 运行中</div></div>
+            <div class="progress"><i></i></div>
+            <div class="mission-meta"><span>Room: /market-research</span><span>阶段 3 / 5</span><span>需审批：外部发布</span><span>截止：今天 18:00</span></div>
+          </div>
+          <div class="split">
+            <div class="card"><h3>我的任务</h3><div class="task done"><span class="check">✓</span><div>收集来源与链接<small>Researcher · 已交付证据</small></div></div><div class="task done"><span class="check">✓</span><div>提炼竞品差异<small>Personal Buddy · 已完成</small></div></div><div class="task"><span class="check"></span><div>生成评审稿<small>Writer Buddy · 进行中</small></div></div><div class="task"><span class="check"></span><div>人工验收并发布<small>需要你的批准</small></div></div></div>
+            <div class="card"><h3>协作活动</h3><div class="event"><span class="avatar">R</span><p>Researcher 上传了 6 个来源<small>2 分钟前 · evidence.created</small></p></div><div class="event"><span class="avatar">P</span><p>Personal Buddy 请求调用“外部发布”<small>5 分钟前 · approval.pending</small></p></div><div class="event"><span class="avatar remote">A</span><p>Acme Buddy 已离线，任务保持可恢复<small>12 分钟前 · presence.expired</small></p></div></div>
+          </div>
+        </div>
+      </section>
+      <aside class="inspector">
+        <h3>任务检查器</h3>
+        <div class="inspector-section"><div class="label">Task Contract</div><div class="value">输入 / 输出 / 验收条件</div><span class="pill">brief</span><span class="pill">report</span><span class="pill">citations</span></div>
+        <div class="inspector-section"><div class="label">Effective Policy</div><div class="policy"><strong>允许本地执行</strong>user ∩ org ∩ task ∩ capability<br>外部发布：必须人工审批<br>上下文：仅共享已授权 refs</div></div>
+        <div class="inspector-section"><div class="label">Buddy Members</div><div class="mini-buddy"><span class="avatar">P</span><span>Requester · owner</span></div><div class="mini-buddy"><span class="avatar">R</span><span>Provider · working</span></div><div class="mini-buddy"><span class="avatar">V</span><span>Verifier · pending</span></div></div>
+        <div class="inspector-section"><div class="label">Evidence</div><div class="value">6 source · 2 execution · 1 test</div><div style="margin-top:8px;color:var(--green);font-size:12px">● 可验收 · provider 不能自我验证</div></div>
+        <div class="inspector-section"><div class="label">开放网络 · 本地信任根</div><div class="value">Ed25519 public key only</div><div style="margin-top:8px;color:var(--violet);font-size:12px">✓ 3 个已配置 · 可撤销 · 非公网目录</div></div>
+      </aside>
+    </section>
+
+    <section class="architecture">
+      <p class="section-title">Project context projection</p>
+      <div class="flow">
+        <div class="flow-step"><b>项目详情 / Buddy 协作</b><span>按 projectId 过滤当前项目任务；个人/组织模式生成独立 Project Room。</span></div><div class="arrow">→</div>
+        <div class="flow-step"><b>统一 Task Contract</b><span>只发送受控 context refs，不复制项目全文、凭证或会话历史。</span></div><div class="arrow">→</div>
+        <div class="flow-step"><b>Assistant Control Plane</b><span>复用 Inbox、Policy、Provider、Verifier、Evidence 和全局审计。</span></div>
+      </div>
+    </section>
+
+    <section class="architecture">
+      <p class="section-title">System layers</p>
+      <p class="architecture-note">所有不可逆外部动作统一使用 <strong>SideEffectIntent</strong>：关联 Task 与 Approval，按 fingerprint 一次性消费，执行后记录完成/失败；取消、拒绝和过期均 fail-closed。</p>
+      <div class="layers">
+        <div class="layer experience"><div class="layer-name">体验层<small>统一助理工作台</small></div><div class="layer-items"><span class="layer-item">Personal / Org / Open 模式</span><span class="layer-item">Inbox</span><span class="layer-item">Rooms</span><span class="layer-item">Mission Control</span><span class="layer-item">审批</span><span class="layer-item">Artifacts / Evidence</span><span class="layer-item">Project Collaboration 投影</span><span class="layer-item">Assistant Extension Contribution</span><span class="layer-item">assistantFacade.onUpdate</span></div></div>
+        <div class="layer kernel"><div class="layer-name">协议内核<small>三层产品共享</small></div><div class="layer-items"><span class="layer-item">Buddy Identity</span><span class="layer-item">collaboration/1 Manifest</span><span class="layer-item">Agent Card / Capability Directory</span><span class="layer-item">Ed25519 Card + public-key trust store</span><span class="layer-item">JsonAgentCardTrustStore（Main-owned）</span><span class="layer-item">JsonAgentDirectoryAdapter（local projection）</span><span class="layer-item">A2A Card / Task facade（local）</span><span class="layer-item">Room / Channel / DM</span><span class="layer-item">Capability Contract</span><span class="layer-item">NetworkCapabilityAgreement（scope/action/artifact/approval intersection）</span><span class="layer-item">Task Envelope + capabilityInput</span><span class="layer-item">Policy Intersection</span><span class="layer-item">Federated Room Grant</span><span class="layer-item">Workflow DAG / Checkpoint</span><span class="layer-item">Independent Verifier</span></div></div>
+        <div class="layer runtime"><div class="layer-name">执行层<small>可替换 Provider / Plugin</small></div><div class="layer-items"><span class="layer-item">Task Coordinator</span><span class="layer-item">Personal Provider Registry</span><span class="layer-item">Calendar Capability（读 + 审批写）</span><span class="layer-item">Memory / Email / Automation callbacks</span><span class="layer-item">Organization Provider</span><span class="layer-item">Workflow DAG</span><span class="layer-item">独立 AgentSession</span><span class="layer-item">Pi ExtensionAPI</span><span class="layer-item">MCP Tools / Resources（scope governance）</span><span class="layer-item">A2A adapter（IPC facade；wire future）</span><span class="layer-item">Approval Gate</span><span class="layer-item">Independent Verifier</span><span class="layer-item">Cordis / Pi / Renderer Plugin surfaces</span><span class="layer-item">openbuddy-collaboration plugin</span><span class="layer-item">typed redacted update event</span><span class="layer-item">Skills / Subagents</span><span class="layer-item">Local Tools</span></div></div>
+        <div class="layer data"><div class="layer-name">事实与网络<small>local-first → federation</small></div><div class="layer-items"><span class="layer-item">Append-only EventStore</span><span class="layer-item">Inbox / Room Projections</span><span class="layer-item">Project Room（projectId + mode）</span><span class="layer-item">Artifact Store</span><span class="layer-item">Private Vault</span><span class="layer-item">Org Coordinator</span><span class="layer-item">LocalRelay</span><span class="layer-item">Delivery retry / replay</span><span class="layer-item">RemoteRelayWire</span><span class="layer-item">WebSocket carrier seam</span><span class="layer-item">Credential / cursor replay</span><span class="layer-item">A2A request/nonce replay（persistent）</span><span class="layer-item">Nonce replay cache（persistent）</span><span class="layer-item">Revocation digest / Grant ID（persistent）</span><span class="layer-item">Revoke propagation（future）</span><span class="layer-item">Public Relay deployment（future）</span><span class="layer-item">Directory / Remote Body（future）</span></div></div>
+        <div class="layer guard"><div class="layer-name">横切约束<small>每次读写都执行</small></div><div class="layer-items"><span class="layer-item">Scope-first Authorization</span><span class="layer-item">发现 ≠ 授权</span><span class="layer-item">Nonce / Dedup</span><span class="layer-item">Expiry / Revoke</span><span class="layer-item">Presence Lease</span><span class="layer-item">Approval / Human interrupt</span><span class="layer-item">Audit</span><span class="layer-item">Data Minimization</span></div></div>
+      </div>
+    </section>
+
+    <section class="architecture">
+      <p class="section-title">Primary user journey</p>
+      <div class="flow">
+        <div class="flow-step"><b>01 · Request</b><span>用户在助理工作台描述目标，选择个人 / 组织 / 开放模式。</span></div><div class="arrow">→</div>
+        <div class="flow-step"><b>02 · Contract</b><span>Buddy 生成任务合同，展示能力、数据范围、预算和验收条件。</span></div><div class="arrow">→</div>
+        <div class="flow-step"><b>03 · Delegate</b><span>发现并委托一个或多个 Buddy，策略引擎计算最小权限。</span></div><div class="arrow">→</div>
+        <div class="flow-step"><b>04 · Execute</b><span>独立 Session 执行，Room 只看到授权摘要与状态。</span></div><div class="arrow">→</div>
+        <div class="flow-step"><b>05 · Verify</b><span>产物进入证据包，人工或独立 verifier 验收；所有事件可重放。</span></div>
+      </div>
+    </section>
+
+    <section class="architecture">
+      <p class="section-title">Complete product topology · one runtime, three trust levels</p>
+      <div class="topology" aria-label="三层产品拓扑">
+        <div class="topology-column">
+          <h3>个人生产力网络</h3>
+          <p>本机优先，Personal Buddy 代表用户推进日常工作。</p>
+          <span class="topology-node"><strong>Personal Buddy</strong> · persistent identity</span>
+          <span class="topology-node">Calendar / Email / Memory / Automation providers</span>
+          <span class="topology-node">personal-room · approval before side effect</span>
+        </div>
+        <div class="topology-column">
+          <h3>团队 / 企业协作</h3>
+          <p>组织目录、Project Room、委托和人工治理。</p>
+          <span class="topology-node"><strong>Organization Coordinator</strong> · Workflow DAG</span>
+          <span class="topology-node">Member Buddy · isolated Pi AgentSession</span>
+          <span class="topology-node">delegation / approval / takeover / audit</span>
+        </div>
+        <div class="topology-column">
+          <h3>开放 Buddy 网络</h3>
+          <p>先发现和谈判，再签发 Grant；默认不结算。</p>
+          <span class="topology-node"><strong>Agent Card / Directory</strong> · discovery only</span>
+          <span class="topology-node">A2A task adapter · Relay event transport</span>
+          <span class="topology-node">trust root / scope / nonce / expiry / revoke</span>
+        </div>
+        <div class="topology-column">
+          <h3>统一事实源</h3>
+          <p>所有页面都是脱敏投影，不复制执行状态。</p>
+          <span class="topology-node"><strong>CollaborationRuntime</strong> · Main-owned</span>
+          <span class="topology-node">Task / Room / Capability / Policy / Event</span>
+          <span class="topology-node">Artifact / Evidence / Independent Verifier</span>
+        </div>
+      </div>
+      <table class="matrix" aria-label="协议边界矩阵">
+        <thead><tr><th>边界</th><th>负责什么</th><th>不负责什么</th><th>OpenBuddy 位置</th></tr></thead>
+        <tbody>
+          <tr><td>Pi ExtensionAPI</td><td>AgentSession、tool、command、event、reload</td><td>跨 Buddy 授权、Room membership、结算</td><td>Electron Main / `openbuddy-collaboration` plugin</td></tr>
+          <tr><td>MCP</td><td>工具、资源和 prompt 的互操作</td><td>Buddy 身份、任务事实源、组织审批</td><td>Capability Provider + scope governance</td></tr>
+          <tr><td>A2A</td><td>跨框架 Agent Card、长任务、stream/push</td><td>本地 Policy、Project Room Grant 的最终裁决</td><td>Main-owned A2A adapter，未来接 wire</td></tr>
+          <tr><td>Renderer contribution</td><td>助理子菜单、项目 Tab、脱敏 UI projection</td><td>访问 Pi session/token、绕过 IPC/Runtime</td><td>`AssistantTopTabs` + `ProjectDetailView`</td></tr>
+        </tbody>
+      </table>
+      <div class="contract">
+        <h3>可插拔协作 UI contract</h3>
+        <pre>{
+  kind: "assistant",
+  id: "plugin-assistant-network-inspector",
+  payload: {
+    route: "助理·网络检查",
+    label: "网络检查",
+    order: 240,
+    modes: ["network"],
+    requiredTrust: "known_peer",
+    capabilityIds: ["directory", "relay"]
+  }
+}
+
+// order 只排序；modes/trust/capabilities 不是授权。
+// 真正授权：assistantFacade → typed IPC → CollaborationRuntime → Policy。
+        </pre>
+      </div>
+    </section>
+
+    <div class="decision"><h3>结论：全局控制面在“助理”，项目协作做上下文投影</h3><p><strong>不改变：</strong>现有 Sidebar 一级导航、项目任务/资产、ChatView、专家·技能·连接器、自动化和邮件路径。<strong>全局新增：</strong>在“助理”下提供总览、收件箱、日程、跨项目任务、Rooms、助理与 Buddy、开放网络、能力与策略、证据与审计；未来能力通过受校验的 Assistant Renderer Contribution 注册为“助理·子菜单”，不增加新的一级菜单。<strong>项目新增：</strong>项目详情页提供“Buddy 协作”Tab，只显示当前 projectId 的任务、执行、交付和验证；个人/组织项目任务分别进入独立 Project Room，Provider、Artifact、Evidence 复用同一 Room 边界。两处复用同一 collaboration:propose / collaboration:execute、Coordinator、Provider 与 Verifier，不复制第二套执行状态。Personal Provider Registry 可组合 TeamRunner、记忆、邮件摘要、自动化快照和 Calendar Capability；日程写入必须变成审批后的协作任务。<strong>授权链：</strong>Agent Card 只用于发现，A2A 请求必须重新进入 Main-owned Runtime；Relay 每次按 credential、scope、Grant、capability token、expiry、presence lease 和持久化 nonce 校验，失败消息可经 outbox 重试但不同 message 不得复用 nonce。当前本地 facade/RemoteRelay/WebSocket seam 已有测试证据；本地 Relay 重启可以恢复撤销索引，但这不等于公网 revoke propagation。公网 Relay、签名 Agent Card、公钥信任、公共目录、支付、结算和开放网络 Project Room 仍保持关闭。</p></div>
+  </main>
+</body>
+</html>
