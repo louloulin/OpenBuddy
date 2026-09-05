@@ -1,0 +1,180 @@
+/**
+ * ConnectionBanner — WorkBuddy 风格 Empty State
+ *
+ * 完全对齐 WorkBuddy 设计系统:
+ *   - 背景: --wb-bg-elevated
+ *   - 边框: --wb-border-default
+ *   - 主按钮: --wb-button-primary (品牌色 --wb-brand-primary #00c29a)
+ *   - 次按钮: --wb-button-secondary (ghost)
+ *   - 字体: inherit(--wb-font-family)
+ *   - 圆角: --wb-radius-md (8px)
+ *   - 间距: --wb-spacing-3 (12px) / --wb-spacing-4 (16px)
+ *   - 暗色: data-theme=dark 自动覆盖
+ */
+
+.wb-connection-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--wb-spacing-4, 16px);
+  padding: var(--wb-spacing-4, 16px) var(--wb-spacing-5, 20px);
+  background: var(--wb-bg-elevated, #ffffff);
+  border: 1px solid var(--wb-border-default, #e6e6e6);
+  border-radius: var(--wb-radius-md, 8px);
+  box-shadow: var(--wb-shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+  color: var(--wb-text-strong, #1a1a1a);
+  margin: var(--wb-spacing-4, 16px) 0;
+  /* 在 EmailPanel 顶部独占一行,不被 thread list 遮挡 */
+  grid-column: 1 / -1;
+}
+
+.wb-connection-banner__icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--wb-radius-md, 8px);
+  font-size: 22px;
+  background: var(--wb-bg-tertiary, #f2f2f2);
+}
+
+.wb-connection-banner--no-provider .wb-connection-banner__icon {
+  background: var(--wb-color-control-warning-bg, #fff8e1);
+  color: var(--wb-text-warning, #b45309);
+}
+
+.wb-connection-banner--partial .wb-connection-banner__icon {
+  background: var(--wb-color-control-warning-bg, #fff8e1);
+  color: var(--wb-text-warning, #b45309);
+}
+
+.wb-connection-banner--reauthorize .wb-connection-banner__icon {
+  background: var(--wb-color-control-danger-bg, #fee2e2);
+  color: var(--wb-text-danger, #b91c1c);
+}
+
+.wb-connection-banner__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wb-connection-banner__title {
+  margin: 0 0 var(--wb-spacing-1, 4px);
+  font-size: var(--wb-font-size-md, 14px);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--wb-text-strong, #1a1a1a);
+}
+
+.wb-connection-banner__description {
+  margin: 0;
+  font-size: var(--wb-font-size-sm, 13px);
+  line-height: 1.5;
+  color: var(--wb-text-medium, #555);
+}
+
+.wb-connection-banner__actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-2, 8px);
+}
+
+.wb-connection-banner__primary {
+  /* WorkBuddy primary button tokens */
+  background: var(--wb-button-primary-bg, #00c29a);
+  color: var(--wb-button-primary-fg, #ffffff);
+  border: 1px solid var(--wb-button-primary-border, transparent);
+  border-radius: var(--wb-radius-md, 8px);
+  padding: 8px 14px;
+  font-weight: 500;
+  font-size: var(--wb-font-size-sm, 13px);
+  cursor: pointer;
+  transition: background-color var(--wb-motion-duration-fast, 160ms) var(--wb-motion-easing-standard, ease);
+}
+
+.wb-connection-banner__primary:hover {
+  background: var(--wb-button-primary-bg-hover, #00a884);
+}
+
+.wb-connection-banner__primary:active {
+  background: var(--wb-button-primary-bg-active, #008f72);
+}
+
+.wb-connection-banner__primary:focus-visible {
+  outline: 2px solid var(--wb-accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+.wb-connection-banner__secondary {
+  background: var(--wb-button-secondary-bg, transparent);
+  color: var(--wb-button-secondary-fg, var(--wb-text-strong, #1a1a1a));
+  border: 1px solid var(--wb-border-default, #e6e6e6);
+  border-radius: var(--wb-radius-md, 8px);
+  padding: 8px 14px;
+  font-size: var(--wb-font-size-sm, 13px);
+  cursor: pointer;
+}
+
+.wb-connection-banner__secondary:hover {
+  background: var(--wb-bg-tertiary, #f2f2f2);
+}
+
+.wb-connection-banner__dismiss {
+  background: transparent;
+  color: var(--wb-text-medium, #555);
+  border: none;
+  border-radius: var(--wb-radius-sm, 4px);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.wb-connection-banner__dismiss:hover {
+  background: var(--wb-bg-tertiary, #f2f2f2);
+  color: var(--wb-text-strong, #1a1a1a);
+}
+
+/* Dark theme overrides — WorkBuddy 标准做法 */
+[data-theme="dark"] .wb-connection-banner,
+.wb-theme--dark .wb-connection-banner,
+.dark .wb-connection-banner {
+  background: var(--wb-bg-elevated, #1f1f1f);
+  border-color: var(--wb-border-default, #3a3a3a);
+  color: var(--wb-text-strong, rgba(255, 255, 255, 0.92));
+}
+
+[data-theme="dark"] .wb-connection-banner__description,
+.wb-theme--dark .wb-connection-banner__description,
+.dark .wb-connection-banner__description {
+  color: var(--wb-text-medium, rgba(255, 255, 255, 0.65));
+}
+
+[data-theme="dark"] .wb-connection-banner__icon,
+.wb-theme--dark .wb-connection-banner__icon,
+.dark .wb-connection-banner__icon {
+  background: var(--wb-bg-tertiary, #2a2a2a);
+}
+
+[data-theme="dark"] .wb-connection-banner__secondary,
+.wb-theme--dark .wb-connection-banner__secondary,
+.dark .wb-connection-banner__secondary {
+  border-color: var(--wb-border-default, #3a3a3a);
+  color: var(--wb-text-strong, rgba(255, 255, 255, 0.92));
+}
+
+/* Responsive — 在 700px 以下 actions 换行 */
+@media (max-width: 700px) {
+  .wb-connection-banner {
+    flex-direction: column;
+  }
+  .wb-connection-banner__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
