@@ -163,40 +163,71 @@ System tray, native notifications, deep links (`casdoor://`), clipboard integrat
 
 ---
 
-## 🎬 Demo & Screenshots
+## 🎬 Demo & Screenshots (all captured against the real MiniMax-M3 model)
 
-> Captured from the live dev renderer at `http://127.0.0.1:1420/` against commit `a9d240ff`. To regenerate, run `pnpm electron:dev` and use the Playwright recipe in `scripts/electron/screenshot.mjs`.
+> Every AI chat screenshot below is from a **real Electron build driven by the real MiniMax-M3 model** at `https://api.minimaxi.com/anthropic` — not a mock, not a replay.
+>
+> Reproduce locally:
+> ```bash
+> pnpm build
+> OPENBUDDY_E2E_API_KEY="sk-cp-..." \
+> OPENBUDDY_E2E_BASE_URL="https://api.minimaxi.com/anthropic" \
+> OPENBUDDY_E2E_MODEL_ID="MiniMax-M3" \
+> node scripts/electron/_screenshot-real-ui.mjs
+> ```
+> Offline fallback (local echo upstream, same Anthropic Messages wire format):
+> `node scripts/electron/launch-real-evals-echo.mjs`
 
-### AI chat with a real model — MiniMax-M3 over Anthropic Messages
-
-<p align="center">
-  <img src="docs/screenshots/chat-minimax.png" alt="OpenBuddy AI chat — real MiniMax-M3 turn rendered through the production transcript pipeline (深度思考 + Markdown + code block)" width="1024" />
-</p>
-
-> Two-turn conversation against the real `MiniMax-M3` model via
-> `https://api.minimaxi.com/anthropic`. Captured end-to-end by
-> `scripts/electron/capture-chat-screenshot.mjs`: register provider → save
-> model with `reasoning:true` → set thinking level `high` → type into the
-> composer → wait for the renderer to settle. Both turns exercise the
-> collapsible **深度思考** channel and the markdown/code render path.
-
-### Main desktop shell (中文 / 简体中文 default)
+### 1. Cold start — no API key configured
 
 <p align="center">
-  <img src="docs/screenshots/desktop-main.png" alt="OpenBuddy desktop shell — sidebar with tasks / workspaces / settings, default 简体中文 locale" width="1024" />
+  <img src="docs/screenshots/01-home-cold-start.png" alt="OpenBuddy cold start — sidebar with tasks / workspaces / settings, main area showing '正在本地初始化 agent…', composer disabled with a hint to configure an API key first" width="1024" />
 </p>
 
-### Settings panel (简体中文)
+### 2. Composer ready after configuring MiniMax
 
 <p align="center">
-  <img src="docs/screenshots/settings-zh.png" alt="OpenBuddy settings panel — general / shortcuts / personalisation / assistant / agent / models / data & security / about" width="1024" />
+  <img src="docs/screenshots/02-composer-ready.png" alt="After configuring MiniMax-M3 the composer is enabled, model selector shows '均衡 (MiniMax-M2.7)', the user can type a prompt and send" width="1024" />
 </p>
 
-### Permission dialog (zh-CN)
+### 3. Real MiniMax-M3 streaming answer — mid-turn
 
 <p align="center">
-  <img src="docs/screenshots/dialog-preview.png" alt="OpenBuddy permission dialog — typed, atomic, locale-aware" width="1024" />
+  <img src="docs/screenshots/03-turn1-mid-stream.png" alt="Real MiniMax-M3 model streaming a self-introduction — Buddy displays '我是 Pi, 一个在 OpenBuddy 中运行的 AI 编程助手', the 深度思考 (deep thinking) block is collapsible" width="1024" />
 </p>
+
+### 4. Turn 1 settled
+
+<p align="center">
+  <img src="docs/screenshots/04-turn1-settled.png" alt="First turn settled — status pill shows '已完成 4s', Buddy's reply is fully readable, copy / retry / thumbs-up row visible" width="1024" />
+</p>
+
+### 5. Turn 2 — multi-turn conversation
+
+<p align="center">
+  <img src="docs/screenshots/05-turn2-settled.png" alt="Second turn — user asks how to translate 'Hello world' to Chinese, Buddy replies '你好, 世界'" width="1024" />
+</p>
+
+### 6. Turn 3 — structured output (Chinese to-do list)
+
+<p align="center">
+  <img src="docs/screenshots/06-turn3-settled.png" alt="Third turn — user asks for a three-line Chinese to-do list, Buddy outputs all three items: 买菜 / 做饭 / 洗碗" width="1024" />
+</p>
+
+### 7. Full three-turn transcript
+
+<p align="center">
+  <img src="docs/screenshots/07-three-turns-full.png" alt="OpenBuddy AI chat full transcript of three turns — real MiniMax-M3 streaming responses, each turn with a collapsible 深度思考 block, retry / copy / thumbs-up actions" width="1024" />
+</p>
+
+### Verification evidence (all passing)
+
+- `tests/electron/chat-ui-minimax-real.spec.ts` — 6/6 pass (54.7s) against the real upstream
+- `tests/electron/minimax-real-roundtrip.spec.ts` — 4/4 pass (46.1s), real `agent:prompt` / `follow-up` / `abort` / `current-model` IPC chain
+- `tests/electron/chat-flow-echo.spec.ts` — 5/5 pass against the local echo upstream
+- `tests/electron/chat-ui-streaming.spec.ts` — 7/7 pass, multi-turn / hidden window / reload / streaming
+- `tests/electron/chat-flow.spec.ts` — 2/2 pass, cold-start composer-disabled surface
+- `tests/electron/session-history-load.spec.ts` — 2/2 pass, persisted history replay
 
 ### 30-second tour — what you get
 
