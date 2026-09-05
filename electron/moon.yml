@@ -1,0 +1,63 @@
+# ---------------------------------------------------------------------------
+# The Electron main + preload project.
+#
+# This is an *application* project (the Electron shell that hosts the React
+# renderer from `openbuddy`). Its tasks are intentionally minimal:
+#
+#   typecheck / lint   — `tsc --noEmit` against `electron/tsconfig.json`
+#                        (the root tsconfig only covers `src/`).
+#   build / dev / start — do NOT exist here. Bundling happens at the root
+#                        via `electron-vite` (see `moon.yml` `openbuddy:*`),
+#                        because electron-vite orchestrates three bundles
+#                        (main + preload + renderer) from a single config
+#                        at the repo root.
+#
+# All commands run through moon. pnpm is only used to install dependencies.
+# `script:` is used so moon routes through pnpm, which finds `tsc` in
+# `node_modules/.bin/` automatically.
+# ---------------------------------------------------------------------------
+id: app-desktop
+language: typescript
+layer: application
+stack: backend
+tags: ["app", "app-electron"]
+
+dependsOn:
+  - "packages/runtime/openbuddy-cordis"
+  - "packages/runtime/openbuddy-plugin-host"
+  - "packages/bundle/openbuddy-base"
+  - "packages/renderer/openbuddy-renderer-host"
+  - "packages/core/openbuddy-session"
+  - "packages/auth/openbuddy-permission"
+  - "packages/fs/openbuddy-fs-local"
+  - "packages/team/openbuddy-team"
+
+fileGroups:
+  sources:
+    - "main/**/*"
+    - "preload/**/*"
+    - "tsconfig.json"
+    - "moon.yml"
+
+tasks:
+  # Type-check the Electron main process (`electron/main/**/*.ts`) and the
+  # preload script (`electron/preload/index.ts`) using the local
+  # `electron/tsconfig.json`. Run explicitly via:
+  #
+  #   pnpm app:typecheck
+  #
+  # The root `pnpm typecheck` task cascades to this via `deps`, so running
+  # it once covers both projects.
+  typecheck:
+    script: "tsc --noEmit -p tsconfig.json"
+    inputs:
+      - "@group(sources)"
+    outputs: []
+
+  # Same effect as `typecheck` — the codebase uses tsc for both. Kept as a
+  # separate task so CI/scripts can target lint specifically.
+  lint:
+    script: "tsc --noEmit -p tsconfig.json"
+    inputs:
+      - "@group(sources)"
+    outputs: []

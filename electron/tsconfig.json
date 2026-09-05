@@ -1,0 +1,72 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "paths": {
+      "@openbuddy/cordis": [
+        "./../packages/runtime/openbuddy-cordis/src/index.ts"
+      ],
+      "@openbuddy/shared-types": [
+        "./../packages/shared/openbuddy-types/src/index.ts"
+      ],
+      "@openbuddy/files-kb": [
+        "./../packages/shared/openbuddy-files-kb/src/index.ts"
+      ],
+      "@openbuddy/plugin-host": [
+        "./../packages/runtime/openbuddy-plugin-host/src/index.ts"
+      ],
+      "@openbuddy/bundle-base": [
+        "./../packages/bundle/openbuddy-base/src/index.ts"
+      ],
+      "@openbuddy/renderer-host": [
+        "./../packages/renderer/openbuddy-renderer-host/src/index.ts"
+      ],
+      "@openbuddy/core-session": [
+        "./../packages/core/openbuddy-session/src/index.ts"
+      ],
+      "@openbuddy/core-session/lifecycle": [
+        "./../packages/core/openbuddy-session/src/lifecycle.ts"
+      ],
+      "@openbuddy/auth-permission": [
+        "./../packages/auth/openbuddy-permission/src/index.ts"
+      ],
+      "@openbuddy/auth-casdoor": [
+        "./../packages/auth/openbuddy-casdoor/src/index.ts"
+      ],
+      "@openbuddy/fs-fs-local": [
+        "./../packages/fs/openbuddy-fs-local/src/index.ts"
+      ],
+      "@openbuddy/team-team": [
+        "./../packages/team/openbuddy-team/src/index.ts"
+      ],
+      "@openbuddy/collaboration-protocol": [
+        "./../packages/collaboration/openbuddy-protocol/src/index.ts"
+      ],
+      "@openbuddy/collaboration-room": [
+        "./../packages/collaboration/openbuddy-room/src/index.ts"
+      ],
+      "@openbuddy/collaboration-inbox": [
+        "./../packages/collaboration/openbuddy-inbox/src/index.ts"
+      ],
+      "@openbuddy/collaboration-coordinator": [
+        "./../packages/collaboration/openbuddy-coordinator/src/index.ts"
+      ]
+    },
+    "types": [
+      "node",
+      "electron"
+    ]
+  },
+  "include": [
+    "main/**/*.ts",
+    "preload/**/*.ts"
+  ]
+}
