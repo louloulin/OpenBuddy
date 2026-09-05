@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Email Dialog Style Preview</title>
+<link rel="stylesheet" href="src/styles/global.css">
+<link rel="stylesheet" href="src/styles/tokens.css">
+<link rel="stylesheet" href="src/styles/app.css">
+<style>
+body { padding: 40px; background: linear-gradient(180deg, #f4f5f7, #e9eaee); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+h1 { font-size: 24px; font-weight: 700; color: #202124; margin-bottom: 8px; }
+h2 { font-size: 16px; font-weight: 600; color: #555; margin: 32px 0 12px; }
+.preview-overlay {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  animation: none !important;
+  margin-bottom: 24px !important;
+  border-radius: 16px !important;
+}
+</style>
+</head>
+<body>
+<h1>Email Dialog Style Preview (新设计)</h1>
+
+<h2>1. ConfirmDialog — info tone (默认)</h2>
+<div class="preview-overlay">
+<div class="request-modal-overlay" role="presentation"><div class="request-modal request-modal--info request-modal--sm request-modal--prompt request-modal--confirm" role="alertdialog" aria-modal="true" aria-label="标记已读"><div class="request-modal__head"><div class="request-modal__identity"><span class="request-modal__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.5 a2.5 2.5 0 1 1 4.5 1.5 c-1.5 1 -2 1.7 -2 3"></path><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle></svg></span><div class="request-modal__heading"><span class="request-modal__eyebrow">提示</span><div class="request-modal__title-row"><h2 class="request-modal__title">标记已读</h2></div></div></div><div class="request-modal__head-meta"></div></div><div class="request-modal__body"><p class="request-modal__description">将此线程标记为已读？已读状态会同步到你的邮箱服务商。</p></div><div class="request-modal__footer"><span class="request-modal__hint">按 Esc 取消 · Enter 确认</span><div class="request-modal__actions"><button type="button" class="btn btn--ghost">取消</button><button type="button" class="btn btn--primary" autofocus="">确认标记已读</button></div></div></div></div>
+</div>
+
+<h2>2. ConfirmDialog — danger tone (删除)</h2>
+<div class="preview-overlay">
+<div class="request-modal-overlay" role="presentation"><div class="request-modal request-modal--danger request-modal--sm request-modal--prompt request-modal--confirm" role="alertdialog" aria-modal="true" aria-label="移入垃圾箱"><div class="request-modal__head"><div class="request-modal__identity"><span class="request-modal__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 L22 20 L2 20 Z"></path><line x1="12" y1="10" x2="12" y2="14"></line><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle></svg></span><div class="request-modal__heading"><span class="request-modal__eyebrow">危险操作</span><div class="request-modal__title-row"><h2 class="request-modal__title">移入垃圾箱</h2></div></div></div><div class="request-modal__head-meta"></div></div><div class="request-modal__body"><p class="request-modal__description">确认将此线程移入垃圾箱？此操作会改变远端邮箱状态。</p></div><div class="request-modal__footer"><span class="request-modal__hint">按 Esc 取消 · Enter 确认</span><div class="request-modal__actions"><button type="button" class="btn btn--ghost">取消</button><button type="button" class="btn btn--danger" autofocus="">移入垃圾箱</button></div></div></div></div>
+</div>
+
+<h2>3. ConfirmDialog — warning tone (批量操作)</h2>
+<div class="preview-overlay">
+<div class="request-modal-overlay" role="presentation"><div class="request-modal request-modal--warning request-modal--sm request-modal--prompt request-modal--confirm" role="alertdialog" aria-modal="true" aria-label="批量「归档」"><div class="request-modal__head"><div class="request-modal__identity"><span class="request-modal__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 L22 20 L2 20 Z"></path><line x1="12" y1="10" x2="12" y2="14"></line><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle></svg></span><div class="request-modal__heading"><span class="request-modal__eyebrow">需要确认</span><div class="request-modal__title-row"><h2 class="request-modal__title">批量「归档」</h2></div></div></div><div class="request-modal__head-meta"></div></div><div class="request-modal__body"><p class="request-modal__description">确认对 5 个线程执行「归档»?</p></div><div class="request-modal__footer"><span class="request-modal__hint">按 Esc 取消 · Enter 确认</span><div class="request-modal__actions"><button type="button" class="btn btn--ghost">取消</button><button type="button" class="btn btn--primary" autofocus="">归档</button></div></div></div></div>
+</div>
+
+<h2>4. PromptDialog — 添加标签</h2>
+<div class="preview-overlay">
+<div class="request-modal-overlay" role="presentation"><div class="request-modal request-modal--info request-modal--sm request-modal--prompt" role="dialog" aria-modal="true" aria-label="添加标签"><div class="request-modal__head"><div class="request-modal__identity"><span class="request-modal__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.5 a2.5 2.5 0 1 1 4.5 1.5 c-1.5 1 -2 1.7 -2 3"></path><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle></svg></span><div class="request-modal__heading"><span class="request-modal__eyebrow">请输入</span><div class="request-modal__title-row"><h2 class="request-modal__title">添加标签</h2></div></div></div><div class="request-modal__head-meta"></div></div><div class="request-modal__body"><p class="request-modal__description">为这个线程添加一个新标签</p><input type="text" class="request-modal__input" placeholder="例如：重要客户" autofocus="" value=""/><p class="request-modal__hint-inline">提示：标签会同步到你的邮箱账户</p></div><div class="request-modal__footer"><span class="request-modal__hint">按 Esc 取消 · Enter 确认</span><div class="request-modal__actions"><button type="button" class="btn btn--ghost">取消</button><button type="button" class="btn btn--primary">添加</button></div></div></div></div>
+</div>
+
+</body>
+</html>
