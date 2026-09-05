@@ -1,0 +1,183 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+
+# Build output
+dist/
+dist-ssr/
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.local
+*.log
+
+# Tauri dev / build artifacts
+*.tsbuildinfo
+
+# Local debugging / inspection artifacts
+.cdp-inspect/
+.workbuddy-ref/
+.zcode/plans/
+nul
+test-grok-connection.mjs
+
+# Documentation (allowlist specific files below)
+docs/*
+!docs/storage-verification-report.md
+!docs/distributed-buddy-network-architecture.md
+!docs/migration-pi-electron.md
+!docs/pi-capability-gap-analysis.md
+!docs/pi-sdk-implementation-plan.md
+!docs/pi-core-capabilities.md
+!docs/moon-monorepo-refactor.md
+!docs/grok-to-pi-replacement-audit.md
+!docs/workbuddy-points-system-comparison.md
+!docs/enterprise-live-verification-2026-08-31.md
+!docs/publish-checklist-v0.15.0.md
+!docs/enterprise-live-verification-2026-08-30.md
+!docs/enterprise-live-verification-2026-08-29.md
+!docs/tauri-grok-removal-and-cordis-adoption.md
+!docs/macos-signing.md
+!docs/CODEBASE_ANALYSIS.md
+!docs/CODEBASE_ANALYSIS.zh-CN.md
+!docs/screenshots/
+!docs/full-pluginization-plan.md
+!docs/new-api-casdoor-openbuddy.md
+!docs/deployment-guide.md
+!docs/casdoor-providers/*
+!docs/casdoor-new-api-openbuddy-commercial-architecture.md
+!docs/openbuddy-credit-transfer.md
+
+
+# Electron build artifacts (in addition to dist/ above)
+release/
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.snap
+electron/dist/
+
+# Sensitive certificates / keys
+*.p12
+*.p12.base64
+*.p8
+p12-password.txt
+
+# One-off debugging / inspection scripts under scripts/
+scripts/check-*.js
+scripts/debug-*.js
+scripts/deep-dom-check.js
+scripts/detailed-dom-check.js
+scripts/direct-check.js
+scripts/dom-only-check.js
+scripts/final-check.js
+scripts/get-*.js
+scripts/inspect-*.js
+scripts/quick-test.js
+scripts/simple-*.js
+scripts/test-*.js
+scripts/compare-dom-structure.js
+scripts/cdp-audit.py
+screenshot.png
+.moon/cache/
+out/
+!docs/pi-extension-architecture.md
+!docs/electron-testing.md
+!docs/ai-agent-test-plan.md
+!docs/workbuddy-parity-matrix.md
+!docs/expert-team-design.md
+!docs/diagrams/
+!docs/diagrams/expert-team-architecture.md
+!docs/openbuddy-email-support-plan.md
+!docs/diagrams/openbuddy-email-architecture.html
+
+# comet-native analysis artifacts (openbuddy-product-enterprise-audit, 2026-08-31)
+!docs/openbuddy-capability-matrix.md
+!docs/openbuddy-product-vs-pi.md
+!docs/openbuddy-transformation-plan.html
+!docs/pi-analysis-critique.md
+!docs/release-ci.md
+!docs/dsh-version-compatibility-matrix.md  # P2-2 DSH matrix (openbuddy-p2-documentation-impl, 2026-08-31)
+!docs/build-output-conventions.md  # P1-2 build output conventions (openbuddy-p1-skill-integrate, 2026-08-31)
+!docs/event-channel-matrix.md
+!docs/PERFORMANCE.md
+!docs/perf/REGRESSION_MATRIX.md
+
+# User-facing documentation set. These were missing from the allowlist above,
+# so `docs/*` hid them: README.md linked to docs/README.md, GETTING_STARTED,
+# ARCHITECTURE, FAQ and I18N, and every one of those links 404'd on a fresh
+# clone. Internal working notes under docs/ stay ignored on purpose — only the
+# docs we publish belong here.
+!docs/README.md
+!docs/GETTING_STARTED.md
+!docs/ARCHITECTURE.md
+!docs/FAQ.md
+!docs/I18N.md
+!docs/ACCESSIBILITY.md
+!docs/COMMUNITY.md
+!docs/COMPARISON.md
+!docs/ENVIRONMENT.md
+!docs/EXAMPLES.md
+!docs/GLOSSARY.md
+!docs/OPERATIONS.md
+!docs/PLUGIN_DEVELOPMENT.md
+!docs/RELEASING.md
+!docs/ROADMAP.md
+!docs/TESTING.md
+!docs/cli-reference.md
+!docs/SECURITY-PGP.md
+!docs/WORKBUDDY_MIGRATION.md
+
+# Every translation ships with its English original — never ignore one half of
+# a doc pair, or the language switcher points at a 404.
+!docs/*.zh-CN.md
+
+# Stray dev-server logs written into the repo root
+/dev-renderer.log
+/vite*.log
+
+# Comet runtime (machine-local state, must not be committed)
+.comet/
+
+# Symlinks to host project dependencies (worktree shortcut)
+/node_modules
+build/
+
+# Playwright MCP server runtime artifacts (machine-local state)
+.playwright-mcp/
+playwright-report/
+
+# Git worktree checkouts (machine-local)
+.worktrees/
+
+# Local evidence artifacts (machine-local, not for commit)
+evidence/
+
+# pi-goal runtime state (machine-local, not for commit)
+.pi-glla/
+
+# test artifacts
+test-results/
+
+# Agent workflow config + runtime state (machine-local, not for commit).
+# .superpowers/ additionally holds live session tokens and pids — never commit.
+.agents/
+.arts/
+.claude/
+.codex/
+.superpowers/
+
+# pnpm workspace symlink that `node_modules/` does not match (it is a symlink,
+# not a directory, so the trailing-slash pattern skips it).
+packages/*/node_modules
+packages/*/*/node_modules
