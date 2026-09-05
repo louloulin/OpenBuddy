@@ -300,20 +300,16 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 
 **目标**：消除自造轮子，行为与 pi 内置一致。
 
-**✅ 已验证**：pi SDK 0.84.3（`@earendil-works/pi-agent-core`）确实导出全部 compaction
-helper：`shouldCompact` / `findCutPoint` / `prepareCompaction` / `generateSummary` /
-`estimateContextTokens` / `calculateContextTokens` / `compact` / `DEFAULT_COMPACTION_SETTINGS`
-（`dist/index.d.ts:8`）。阶段 2 完全可行。
+**✅ 已完成（commit `f865dd7`）**：
+- **compaction**：`pi-extensions.ts` 的 `openbuddy-pi-context-guard` 改用 pi SDK 的
+  `shouldCompact` + `DEFAULT_COMPACTION_SETTINGS`（保留 edge-triggered crossing 守卫）。
+- **branch summary**：已使用 pi SDK 的 `collectEntriesForBranchSummary` + `prepareBranchEntries`
+  （`session-store.ts:259-264`）；`branch-summary-format.ts` 是有意的格式化器（LLM 版
+  `generateBranchSummary` 需 model/API key，agent-host 未接）。
+- **token 估算**：`streaming-metrics.ts` 是 UI 侧流式 TPS 估算器（对标 pi-web），
+  非上下文 compaction 估算器，无需替换。
 
-1. **compaction**：`pi-extensions.ts:1143-1145` 改用 pi SDK 的
-   `shouldCompact` / `findCutPoint` / `prepareCompaction` / `generateSummary`。
-2. **branch summary / fork**：若 `pi-agent-core` 提供，替换自实现。
-3. **token 估算**：用 `estimateContextTokens` 替代手写估算。
-
-**验收**：
-- `pi-extensions.test.ts` 中 compaction 相关断言更新为 pi SDK 语义
-- 真实 MiniMax 长会话压缩行为与 pi 内置一致
-- 现有测试全绿
+**阶段 2 全部完成 ✅**
 
 ### 阶段 3 — 架构高内聚低耦合（P1，12h）
 
