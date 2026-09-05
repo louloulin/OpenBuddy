@@ -1,0 +1,41 @@
+name: Stale Issue / PR Handler
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-stale: 60
+          days-before-close: 14
+          stale-issue-label: 'status: stale'
+          close-issue-label: 'status: closed-stale'
+          stale-pr-label: 'status: stale'
+          close-pr-label: 'status: closed-stale'
+          exempt-issue-labels: 'priority: critical,priority: high,rfc:,good first issue,help wanted'
+          exempt-pr-labels: 'priority: critical,priority: high'
+          operations: |
+            operations: |
+              close: { days-before-close: 14 }
+              stale: { days-before-stale: 60 }
+              delete: { days-before-delete: false }
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          only: issues
+      - uses: actions/stale@v9
+        with:
+          days-before-stale: 30
+          days-before-close: 7
+          stale-pr-label: 'status: stale'
+          close-pr-label: 'status: closed-stale'
+          exempt-pr-labels: 'priority: critical,priority: high'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          only: pulls

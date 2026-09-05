@@ -1,0 +1,22 @@
+name: ❓ Q&A
+description: Ask the community a question.
+title: ""
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for "how do I…?" questions. For confirmed bugs, please open an **Issue**
+        with the bug report template instead.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: What have you tried?
+      description: Links, snippets, screenshots — anything that helps others help you.
+    validations:
+      required: false

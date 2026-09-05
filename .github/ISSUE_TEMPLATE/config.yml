@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Community Discussion
+    url: https://github.com/louloulin/OpenBuddy/discussions
+    about: Ask questions, share ideas, or get help
+  - name: 🔏 Security Disclosure
+    url: https://github.com/louloulin/OpenBuddy/security/advisories/new
+    about: Report security vulnerabilities privately
+  - name: 📖 Contributing Guide
+    url: https://github.com/louloulin/OpenBuddy/blob/main/CONTRIBUTING.md
+    about: Read this before opening an issue or PR
+  - name: 📚 Documentation
+    url: https://github.com/louloulin/OpenBuddy/blob/main/docs/README.md
+    about: Browse the full documentation index

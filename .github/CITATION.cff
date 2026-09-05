@@ -1,0 +1,47 @@
+cff-version: 1.2.0
+message: >-
+  If you use OpenBuddy in academic work, please cite it as below.
+title: "OpenBuddy: An Open Desktop AI Workspace"
+abstract: >-
+  OpenBuddy is an MIT-licensed desktop AI workspace built on Electron
+  and the Pi coding agent. It features a 30+ package Cordis capability
+  mesh, enterprise-grade Casdoor × NewAPI integration, multi-agent
+  A2A protocol support, and a fully visible test suite.
+type: software
+license: MIT
+license-url: https://github.com/louloulin/OpenBuddy/blob/main/LICENSE
+repository-code: https://github.com/louloulin/OpenBuddy
+url: https://openbuddy.dev
+
+authors:
+  - family-names: OpenBuddy
+    given-names: Contributors
+    email: hello@openbuddy.dev
+
+keywords:
+  - ai
+  - agent
+  - desktop
+  - electron
+  - cordis
+  - pi
+  - workbuddy
+  - mcp
+  - casdoor
+  - newapi
+  - multi-agent
+  - open-source
+
+references:
+  - type: article
+    title: "OpenBuddy Technical Whitepaper"
+    url: https://github.com/louloulin/OpenBuddy/blob/main/docs/ARCHITECTURE.md
+  - type: software
+    title: "Pi coding agent"
+    url: https://github.com/badlogic/pi-mono
+  - type: software
+    title: "Cordis"
+    url: https://github.com/cordisjs/cordis
+
+version: 0.15.0
+date-released: 2026-09-01

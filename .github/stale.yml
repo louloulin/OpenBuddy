@@ -1,0 +1,36 @@
+# Stale bot configuration (complement to .github/workflows/stale.yml)
+
+# Issues
+issues:
+  daysUntilStale: 60
+  markStale: true
+  staleLabel: status: stale
+  closeLabel: status: closed-stale
+  exemptLabels:
+    - priority: critical
+    - priority: high
+    - rfc:
+    - good first issue
+    - help wanted
+  daysUntilClose: 14
+  markClose: true
+  comment: >
+    This issue has been auto-marked stale because it has not had
+    activity in 60 days. It will be closed in 14 days if no further
+    activity occurs. Please update with new information, or mark as
+    exempt with a `priority:` label.
+
+# Pull Requests
+pulls:
+  daysUntilStale: 30
+  markStale: true
+  staleLabel: status: stale
+  closeLabel: status: closed-stale
+  exemptLabels:
+    - priority: critical
+    - priority: high
+  daysUntilClose: 7
+  markClose: true
+  comment: >
+    This PR has been auto-marked stale because it has not had
+    activity in 30 days. Please rebase and ping a reviewer.

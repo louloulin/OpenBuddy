@@ -1,0 +1,62 @@
+# GitHub Discussions templates for OpenBuddy.
+# These appear when a user clicks "New discussion" on the Discussions tab.
+
+name: 📜 RFC — Request for Comments
+description: Propose a substantial change to OpenBuddy that warrants community input before implementation.
+title: "[RFC] "
+labels: ["rfc"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for considering a significant change to OpenBuddy. RFCs are tracked in our
+        [public roadmap process](https://github.com/louloulin/OpenBuddy/blob/main/GOVERNANCE.md#major-changes-rfc-process).
+
+        Please fill out the sections below. A maintainer will assign a shepherd within 7 days.
+  - type: dropdown
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem are you solving?
+      options:
+        - New feature
+        - Behavior change
+        - Performance
+        - Security
+        - Developer experience
+        - Architecture / refactor
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What do you want to do? Be concrete.
+      placeholder: |
+        - Touched packages: ...
+        - New IPC channels: ...
+        - Schema migrations: ...
+        - Affected docs: ...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other designs did you consider, and why is this one better?
+    validations:
+      required: false
+  - type: textarea
+    id: drawbacks
+    attributes:
+      label: Drawbacks
+      description: Be honest — what are the downsides or risks?
+    validations:
+      required: false
+  - type: input
+    id: shepherd
+    attributes:
+      label: Suggested shepherd
+      description: A maintainer or reviewer who you think should drive the discussion.
+    validations:
+      required: false

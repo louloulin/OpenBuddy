@@ -1,0 +1,12 @@
+# OpenBuddy funding configuration
+#
+# Add funding links to make it easy for users to support the project.
+# GitHub displays these on the repo sidebar under "Sponsors".
+
+github: [louloulin]
+open_collective: openbuddy
+ko_fi: openbuddy
+tidelift: openbuddy
+custom:
+  - https://openbuddy.dev/sponsor
+  - https://patreon.com/openbuddy

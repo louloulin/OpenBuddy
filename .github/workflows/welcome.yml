@@ -1,0 +1,33 @@
+name: First-time Contributor Welcome
+
+on:
+  pull_request:
+    types: [opened]
+    branches: [master]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' || github.event.pull_request.author_association == 'CONTRIBUTOR'
+    steps:
+      - name: Welcome comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: openbuddy-welcome
+          message: |
+            👋 Welcome to OpenBuddy!
+
+            Thanks for opening this PR. A maintainer will review within 48h.
+
+            While you wait, please make sure:
+            - [ ] `pnpm workspace:typecheck` passes locally
+            - [ ] `pnpm workspace:test` passes locally
+            - [ ] You've added or updated relevant docs in `docs/`
+            - [ ] Your commits follow [Conventional Commits](https://www.conventionalcommits.org/)
+
+            See [CONTRIBUTING.md](https://github.com/louloulin/OpenBuddy/blob/main/CONTRIBUTING.md) for the full workflow.
+
+            Need help? Drop a comment and ping a maintainer.

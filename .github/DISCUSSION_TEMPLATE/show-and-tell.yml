@@ -1,0 +1,35 @@
+name: 🎉 Show and tell
+description: Share something cool you built on top of OpenBuddy.
+title: ""
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Plugins, themes, dashboards, integrations — share what you made. The community
+        loves seeing what people build with OpenBuddy.
+  - type: input
+    id: name
+    attributes:
+      label: Project name
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: URL
+      placeholder: https://github.com/your-name/your-plugin
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What does it do?
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or demo
+      description: Drag a screenshot here, or paste a Markdown image.
+    validations:
+      required: false

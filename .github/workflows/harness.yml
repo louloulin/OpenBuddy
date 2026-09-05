@@ -1,0 +1,58 @@
+name: harness
+
+# Curated AI Agent Harness eval subset. Runs the no-external-creds tier so
+# it stays cheap enough for push-to-master. External provider credentials
+# are NOT required; OPENBUDDY_E2E_REQUIRED is forced to 0.
+#
+# Push trigger only — no pull_request trigger to keep CI fast. Manual run
+# via workflow_dispatch for ad-hoc validation before a release cut.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  harness:
+    name: harness-eval
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OPENBUDDY_E2E_REQUIRED: "0"
+      OPENBUDDY_E2E_EXTERNAL: "0"
+      OPENBUDDY_E2E_EVIDENCE_LEVEL: "real-local"
+      OPENBUDDY_FILESYSTEM_SMOKE: "0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: pnpm/action-setup@v10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Sync moon workspace
+        run: pnpm moon:sync
+        continue-on-error: true
+      - name: Run curated harness subset
+        run: |
+          OPENBUDDY_EVAL_ONLY=local-smoke,electron-real-ui-smoke,expert-graph-smoke \
+            pnpm real-evals:echo
+      - name: Run channel matrix consistency test
+        run: |
+          npx vitest run electron/main/agent/__tests__/event-channel-matrix.test.ts
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-evidence
+          path: |
+            evidence/closed-loop/**
+            evidence/local-evidence-evals/**
+            evidence/**/*-summary.json
+          retention-days: 14
+          if-no-files-found: warn

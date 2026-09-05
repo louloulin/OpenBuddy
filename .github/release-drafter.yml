@@ -1,0 +1,64 @@
+# Release Drafter configuration for OpenBuddy
+# https://github.com/release-drafter/release-drafter
+#
+# Drafts the next GitHub Release notes automatically from merged PRs
+# using labels. Trigger: opened, reopened, or synchronized PR + push to master.
+# The actual GitHub Release is still published by .github/workflows/release.yml
+# when a v* tag is pushed.
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+version-resolver:
+  major:
+    labels: ["breaking", "💥 breaking change"]
+  minor:
+    labels: ["feature", "✨ feature", "enhancement"]
+  patch:
+    labels: ["bug", "🐛 bug", "fix", "documentation", "📖 documentation"]
+  default: patch
+categories:
+  - title: "🚀 Features"
+    labels: ["feature", "✨ feature", "enhancement"]
+  - title: "🐛 Bug Fixes"
+    labels: ["bug", "🐛 bug", "fix"]
+  - title: "🧰 Maintenance"
+    labels: ["chore", "refactor", "build", "ci", "dependencies"]
+  - title: "📖 Documentation"
+    labels: ["documentation", "📖 documentation", "docs"]
+  - title: "🔏 Security"
+    labels: ["security", "🔏 security"]
+  - title: "🌍 i18n"
+    labels: ["i18n", "l10n", "translation"]
+  - title: "💥 Breaking Changes"
+    labels: ["breaking", "💥 breaking change"]
+    order: -1
+change-template: "- $TITLE (#$NUMBER) @$AUTHOR"
+template: |
+  ## Changes
+
+  $CHANGES
+
+  ## How to install
+
+  Download the appropriate installer for your platform below.
+
+  ## Verification
+
+  | Asset | SHA-256 |
+  |-------|---------|
+  | macOS arm64 | _auto-generated after upload_ |
+  | macOS x64 | _auto-generated after upload_ |
+  | Windows x64 | _auto-generated after upload_ |
+  | Linux x64 (AppImage) | _auto-generated after upload_ |
+
+  > Full hash list is in `release.yml` artifact `*-sha256.txt`.
+
+  ---
+
+  This release was drafted automatically by [release-drafter](https://github.com/release-drafter/release-drafter)
+  and finalized by the [release workflow](.github/workflows/release.yml).
+exclude-labels:
+  - "skip-changelog"
+  - "duplicate"
+  - "invalid"
+  - "wontfix"
+  - "question"

@@ -1,0 +1,31 @@
+name: 💡 Idea
+description: Suggest a small enhancement that doesn't need a full RFC.
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For ideas that fit on a single page. If your idea needs an architectural change,
+        spans many packages, or breaks public APIs, please use the **RFC** template instead.
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: Describe the idea in 2–4 sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why?
+      description: What's the user value? Who benefits?
+    validations:
+      required: true
+  - type: input
+    id: package
+    attributes:
+      label: Affected package(s)
+      description: e.g. `@openbuddy/capability-email`, `electron/main`, `docs/`
+    validations:
+      required: false

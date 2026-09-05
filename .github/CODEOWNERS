@@ -1,0 +1,122 @@
+# OpenBuddy CODEOWNERS
+#
+# This file assigns code review responsibility to specific teams or individuals.
+# GitHub will automatically request reviews from the listed owners when a PR
+# touches the matching path. The first matching rule wins.
+#
+# To claim ownership of a path, file a PR adding your GitHub handle.
+# Wildcards: * matches anything except /, ** matches across directories.
+#
+# Order matters: top-to-bottom, first match wins.
+
+# --- Default owners ---
+*                                       @louloulin
+
+# --- Top-level documentation ---
+/README.md                              @louloulin
+/README.zh-CN.md                        @louloulin
+/CONTRIBUTING.md                        @louloulin
+/CODE_OF_CONDUCT.md                     @louloulin
+/SECURITY.md                            @louloulin
+/SUPPORT.md                             @louloulin
+/CHANGELOG.md                           @louloulin
+/LICENSE                                @louloulin
+/docs/                                  @louloulin
+
+# --- Build & tooling ---
+/.moon/                                 @louloulin
+/moon.yml                               @louloulin
+/electron/moon.yml                      @louloulin
+/electron-builder.yml                   @louloulin
+/electron.vite.config.ts                @louloulin
+/vite.config.ts                         @louloulin
+/vitest.config.ts                       @louloulin
+/tsconfig.json                          @louloulin
+/package.json                           @louloulin
+/pnpm-workspace.yaml                    @louloulin
+
+# --- CI / GitHub ---
+/.github/workflows/                     @louloulin
+/.github/ISSUE_TEMPLATE/                @louloulin
+/.github/PULL_REQUEST_TEMPLATE.md       @louloulin
+/.github/CODEOWNERS                     @louloulin
+
+# --- Electron main + preload (security-critical) ---
+/electron/main/                         @louloulin
+/electron/preload/                      @louloulin
+/electron/main/security/                @louloulin
+/electron/main/ipc/                     @louloulin
+
+# --- Renderer (UI) ---
+/src/                                   @louloulin
+
+# --- Cordis runtime ---
+/packages/runtime/openbuddy-cordis/     @louloulin
+/packages/runtime/openbuddy-plugin-host/ @louloulin
+/packages/runtime/openbuddy-storage/    @louloulin
+
+# --- Renderer host ---
+/packages/renderer/openbuddy-renderer-host/ @louloulin
+
+# --- Bundle ---
+/packages/bundle/openbuddy-base/        @louloulin
+
+# --- Authentication ---
+/packages/auth/openbuddy-casdoor/       @louloulin
+/packages/auth/openbuddy-permission/    @louloulin
+
+# --- Multi-agent team ---
+/packages/team/openbuddy-team/          @louloulin
+/packages/team/openbuddy-subagent/      @louloulin
+
+# --- Capabilities ---
+/packages/capability/openbuddy-notification/ @louloulin
+/packages/capability/openbuddy-plan/    @louloulin
+/packages/capability/openbuddy-task/    @louloulin
+/packages/capability/openbuddy-automation/ @louloulin
+/packages/capability/openbuddy-inspiration/ @louloulin
+/packages/capability/openbuddy-folder-trust/ @louloulin
+/packages/capability/openbuddy-authorization/ @louloulin
+/packages/capability/openbuddy-mcp-client/ @louloulin
+/packages/capability/openbuddy-calendar/ @louloulin
+/packages/capability/openbuddy-email/   @louloulin
+
+# --- Filesystem ---
+/packages/fs/openbuddy-fs-local/        @louloulin
+
+# --- Shared ---
+/packages/shared/openbuddy-files-kb/    @louloulin
+/packages/shared/openbuddy-types/       @louloulin
+
+# --- Core ---
+/packages/core/openbuddy-session/       @louloulin
+
+# --- Collaboration (multi-agent) ---
+/packages/collaboration/                @louloulin
+
+# --- Enterprise ---
+/packages/payment/                      @louloulin
+/packages/saml/                         @louloulin
+/packages/scim/                         @louloulin
+/packages/webhook-outbox/               @louloulin
+
+# --- UI primitives ---
+/packages/ui/                           @louloulin
+
+# --- Admin Portal (separate web SPA) ---
+/apps/admin-portal/                     @louloulin
+
+# --- Deployment ---
+/deploy/                                @louloulin
+/scripts/                               @louloulin
+
+# --- Evals ---
+/evals/                                 @louloulin
+
+# --- Evidence & analysis ---
+/evidence/                              @louloulin
+/docs/analysis/                         @louloulin
+
+# --- Submodules (third-party — no ownership) ---
+/extensions/                            @louloulin
+/vendor/                                @louloulin

@@ -1,0 +1,51 @@
+# Dependabot configuration
+# Keeps dependencies current and surfaces vulnerabilities.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "louloulin"
+    labels:
+      - "ci"
+      - "chore"
+    groups:
+      patch-and-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "louloulin"
+    labels:
+      - "ci"
+
+  - package-ecosystem: "docker"
+    directory: "/apps/admin-portal"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "louloulin"
+    labels:
+      - "ci"
+
+  - package-ecosystem: "npm"
+    directory: "/apps/admin-portal"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "louloulin"
+    labels:
+      - "ci"

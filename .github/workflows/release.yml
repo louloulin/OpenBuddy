@@ -1,0 +1,259 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: OpenBuddy
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Sync moon workspace
+        run: pnpm moon:sync
+
+      # `pnpm typecheck` runs `openbuddy:typecheck` which cascades to
+      # `app-desktop:typecheck`. `pnpm workspace:typecheck` runs the wildcard
+      # `*:typecheck` to fan out across the 17 library packages in parallel.
+      - name: Typecheck all projects
+        run: pnpm typecheck && pnpm workspace:typecheck
+
+      - name: Test renderer
+        run: pnpm test
+
+      - name: Build renderer + main + preload (electron-vite)
+        run: pnpm build
+
+  build-windows:
+    needs: [ci]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Sync moon workspace
+        run: pnpm moon:sync
+
+      - name: Build Windows installer (electron-vite + electron-builder)
+        run: pnpm electron:build:win
+
+      - name: List artifacts
+        run: ls release/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-nsis
+          path: release/*.exe
+
+  build-macos:
+    needs: [ci]
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Sync moon workspace
+        run: pnpm moon:sync
+
+      - name: Import macOS Developer ID certificate
+        env:
+          MACOS_CSC_LINK_BASE64: ${{ secrets.MACOS_CSC_LINK_BASE64 }}
+          MACOS_CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+        run: |
+          test -n "$MACOS_CSC_LINK_BASE64"
+          test -n "$MACOS_CSC_KEY_PASSWORD"
+          printf '%s' "$MACOS_CSC_LINK_BASE64" | base64 --decode > "$RUNNER_TEMP/developer-id-application.p12"
+          echo "CSC_LINK=$RUNNER_TEMP/developer-id-application.p12" >> "$GITHUB_ENV"
+          echo "CSC_KEY_PASSWORD=$MACOS_CSC_KEY_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Import App Store Connect notarization key
+        env:
+          MACOS_API_KEY_BASE64: ${{ secrets.MACOS_API_KEY_BASE64 }}
+          MACOS_API_KEY_ID: ${{ secrets.MACOS_API_KEY_ID }}
+          MACOS_API_ISSUER: ${{ secrets.MACOS_API_ISSUER }}
+        run: |
+          test -n "$MACOS_API_KEY_BASE64"
+          test -n "$MACOS_API_KEY_ID"
+          test -n "$MACOS_API_ISSUER"
+          printf '%s' "$MACOS_API_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey_$MACOS_API_KEY_ID.p8"
+          echo "APPLE_API_KEY=$RUNNER_TEMP/AuthKey_$MACOS_API_KEY_ID.p8" >> "$GITHUB_ENV"
+          echo "APPLE_API_KEY_ID=$MACOS_API_KEY_ID" >> "$GITHUB_ENV"
+          echo "APPLE_API_ISSUER=$MACOS_API_ISSUER" >> "$GITHUB_ENV"
+
+      - name: Build signed and notarized macOS DMG
+        run: pnpm electron:release:mac
+
+      - name: List artifacts
+        run: ls release/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: release/*.dmg
+
+  build-linux:
+    needs: [ci]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Sync moon workspace
+        run: pnpm moon:sync
+
+      # Linux 上不需要 macOS-only 的签名 / 公证步骤;
+      # AppImage 本身就是自包含可执行文件,只需构建并产出 .AppImage 即可。
+      # 任何 Linux-specific 的运行时 patch 应放在 .github/actions/build-linux/*。
+      - name: Build Linux AppImage (electron-vite + electron-builder)
+        run: pnpm electron:build:linux
+
+      - name: List artifacts
+        run: ls release/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: release/*.AppImage
+
+  publish-release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (CHANGELOG for release notes)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          sparse-checkout: |
+            CHANGELOG.md
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List downloaded artifacts
+        run: find artifacts -type f
+
+      - name: Extract release notes
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          VER="${TAG#v}"
+          NOTES=""
+          if [[ -f CHANGELOG.md ]]; then
+            NOTES="$(awk -v ver="## ${TAG#v}" '
+              $0 ~ "^## v" {
+                if (found) exit
+                if (index($0, ver) == 1) { found = 1; next }
+              }
+              found { print }
+            ' CHANGELOG.md | sed '/^---$/d' | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba} -e '}')"
+          fi
+          {
+            echo "body<<RELEASE_NOTES_EOF"
+            if [[ -n "$NOTES" ]]; then
+              echo "$NOTES"
+            else
+              echo "（CHANGELOG.md 未包含 ${TAG} 段落，以下为自动生成的提交列表）"
+              echo ""
+            fi
+            echo "RELEASE_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "=== Release body for ${TAG} ==="
+          echo "$NOTES" | head -20
+
+      - name: Create/Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          name: ${{ env.APP_NAME }} ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          body: ${{ steps.notes.outputs.body }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/windows-nsis/*.exe
+            artifacts/macos-dmg/*.dmg
+            artifacts/linux-appimage/*.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

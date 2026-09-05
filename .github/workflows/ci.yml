@@ -1,0 +1,201 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: OpenBuddy
+
+jobs:
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync moon workspace
+        run: pnpm moon:sync
+
+      - name: Typecheck all 32 projects
+        run: |
+          pnpm typecheck
+          pnpm workspace:typecheck
+
+  test:
+    name: Unit Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync moon workspace
+        run: pnpm moon:sync
+
+      - name: Vitest
+        run: pnpm workspace:test
+
+  storage-boundaries:
+    name: Storage Boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm storage:boundaries
+      - run: pnpm storage:acceptance
+
+  ipc-surface:
+    name: IPC Surface
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm moon:sync
+      - run: pnpm test:electron:ipc-surface
+      - run: pnpm test:electron:surface
+
+  perf-budget:
+    name: Performance Budget Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm moon:sync
+      - name: Build renderer
+        run: pnpm exec electron-vite build
+      - name: Verify bundle budgets
+        # P3-01: CI gate that fails the PR if entry chunk > 1.5MB,
+        # total > 12MB, or any heavy chunk (markdown/katex/mermaid/cytoscape/
+        # cynefin) leaks into the initial <link rel="modulepreload">.
+        # Uses --strict so warnings become failures in CI.
+        run: node scripts/perf/bundle-topology.mjs --strict
+
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - run: pnpm install --frozen-lockfile
+      - name: Audit
+        run: pnpm audit --prod --audit-level=high
+        continue-on-error: true
+      - name: Outdated
+        run: pnpm outdated --format=json | tee outdated.json
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: outdated-report
+          path: outdated.json
+          retention-days: 30
+
+  docs-link-check:
+    name: Docs Link Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - run: pnpm install --frozen-lockfile
+      - name: Check markdown links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress --exclude-loopback --exclude-mail --max-concurrency 16
+          fail: true
+
+  build-summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [typecheck, test, storage-boundaries, ipc-surface, audit, docs-link-check, perf-budget]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "typecheck: ${{ needs.typecheck.result }}"
+          echo "test: ${{ needs.test.result }}"
+          echo "storage-boundaries: ${{ needs.storage-boundaries.result }}"
+          echo "ipc-surface: ${{ needs.ipc-surface.result }}"
+          echo "audit: ${{ needs.audit.result }}"
+          echo "docs-link-check: ${{ needs.docs-link-check.result }}"
+          echo "perf-budget: ${{ needs.perf-budget.result }}"
+          if [ "${{ needs.typecheck.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.storage-boundaries.result }}" != "success" ] || \
+             [ "${{ needs.ipc-surface.result }}" != "success" ] || \
+             [ "${{ needs.perf-budget.result }}" != "success" ]; then
+            exit 1
+          fi
