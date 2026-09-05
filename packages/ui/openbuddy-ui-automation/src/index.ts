@@ -38,6 +38,8 @@ export type { QueuePanelProps } from "./QueuePanel";
 
 // -------- edit / template sub-views --------
 export { AutomationEditPage } from "./AutomationEditPage";
+export { WorkflowCanvas, workflowStepLabel } from "./WorkflowCanvas";
+export type { WorkflowCanvasProps, WorkflowStep, WorkflowStepKind } from "./WorkflowCanvas";
 export type { ModelOption } from "./AutomationEditPage";
 export { AutomationTemplateGrid } from "./AutomationTemplateGrid";
 export { AutomationPermissionConfirmDialog } from "./AutomationPermissionConfirmDialog";
