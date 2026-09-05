@@ -21,9 +21,15 @@ WorkBuddy / pi-web 的 UI 能力缺口。
 每阶段都有明确的验收命令与"测试全绿"门槛。
 
 **⚠️ 已发现预先存在的测试失败**（非本次改动引入，需在阶段 0 记录并修复）：
-- `electron/main/agent/pi-extensions.test.ts:516` — `builtinPiExtensionIds()` 测试清单过期，
-  未包含 `openbuddy-pi-compact-announce` 和 `openbuddy-extra-providers`
-  （这两个工厂在 `pi-extensions.ts:1157,1195` 已定义但测试未更新）。
+全量基线实测 **5 个测试文件、17 个测试失败**（5160 通过 / 15 跳过）：
+
+| 失败文件 | 失败数 | 原因 |
+|---|---|---|
+| `electron/main/__tests__/_smoke.test.ts` | 1 | agentHost 导入 smoke，重构后测试过期 |
+| `electron/main/__tests__/agent-host-public-surface-realserver.test.ts` | 多 | 需真实服务器环境 |
+| `electron/main/__tests__/agent-host-workbench-scope-realserver.test.ts` | 多 | 需真实服务器环境 |
+| `electron/main/__tests__/ipc-agent-event-sessionid.test.ts` | 2 | sessionId 转发断言过期 |
+| `electron/main/agent/pi-extensions.test.ts` | 1 | `builtinPiExtensionIds()` 清单过期（缺 `openbuddy-pi-compact-announce`、`openbuddy-extra-providers`） |
 
 ---
 
