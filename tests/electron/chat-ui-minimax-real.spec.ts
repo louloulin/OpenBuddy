@@ -285,12 +285,16 @@ test.describe("real MiniMax turn renders in the transcript", () => {
     ).toBe(1);
     expect(bodyText).toContain("4");
 
-    // The English/analysis reasoning the model streams into the thought channel
-    // must not also be present verbatim in the answer body. Assert the thought
-    // block has real content and the answer body is short (a one-line answer),
-    // which together rule out the merge-into-answer failure.
-    const thoughtText = (await thought.innerText()).trim();
-    expect(thoughtText.length, "thought block should contain the reasoning").toBeGreaterThan("深度思考".length);
+    // The reasoning the model streams into the thought channel must not also be
+    // spliced into the answer body. Read the thought BODY via textContent, not
+    // innerText: the `<details>` is collapsed by default so innerText would only
+    // return the "深度思考" summary. `.msg__thought-body` holds the reasoning
+    // regardless of collapsed state.
+    const thoughtBody = thought.locator(".msg__thought-body");
+    const thoughtText = ((await thoughtBody.textContent()) ?? "").trim();
+    expect(thoughtText.length, "thought block should contain the streamed reasoning").toBeGreaterThan(0);
+    // The answer body is a one-line answer, so it must be far shorter than the
+    // reasoning — if the reasoning had merged into it, this would blow up.
     expect(
       bodyText.length,
       `answer body looks like it absorbed the reasoning (too long):\n${bodyText}`,
