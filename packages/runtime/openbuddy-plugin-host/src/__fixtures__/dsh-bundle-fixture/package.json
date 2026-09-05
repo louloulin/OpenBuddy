@@ -1,0 +1,1 @@
+{"name": "@test/dsh-bundle-fixture", "type": "module", "main": "./index.js", "dsh": {"bundle": {"patch": "./openbuddy.patch.yml"}}}

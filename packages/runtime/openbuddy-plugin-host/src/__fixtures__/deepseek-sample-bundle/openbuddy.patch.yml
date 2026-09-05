@@ -1,0 +1,47 @@
+# Sample deepseek-harness-style bundle patch.
+#
+# This is a minimal but realistic analogue of
+# `vendor/loader` `cordis.patch.yml` files: it exercises the three row
+# kinds the OpenBuddy loader must understand (`insert:`, keyed `id:`,
+# and `group: true` parents that own child entries) plus the
+# dependency-via-`inject:` mechanism so the E2E test can assert that
+# load order matches deepseek-harness semantics.
+- insert:
+    - id: settings
+      name: '@scope/openbuddy-settings'
+      config:
+        version: 1
+
+    - id: llm
+      name: '@scope/openbuddy-llm'
+      config:
+        provider: deepseek-official
+        model: deepseek-v4-flash
+
+    - id: agent
+      name: '@scope/openbuddy-agent'
+      inject: ['llm']
+
+    - id: transport
+      name: '@scope/openbuddy-transport'
+      inject: ['settings', 'llm']
+
+    # Parent group + children: namespaced as `${groupId}:${childId}` once
+    # applied through `composePluginPatches`, mirroring the deepseek
+    # `EntryTree` convention.
+    - id: extensions
+      name: '@scope/openbuddy-extensions'
+      group: true
+      children:
+        - id: logger
+          name: '@scope/openbuddy-ext-logger'
+        - id: tracer
+          name: '@scope/openbuddy-ext-tracer'
+          inject: ['logger']
+
+# A second layer that applies a keyed update against the `agent` row from
+# the first layer. With deepseek-harness semantics, the second write
+# wins — we assert the resulting config in the E2E test.
+- id: agent
+  config:
+    persona: comet

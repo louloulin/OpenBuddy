@@ -1,0 +1,1 @@
+{"name": "@test/openbuddy-bundle", "main": "./index.js", "openbuddy": {"bundle": {"patch": "./openbuddy.patch.yml"}}}

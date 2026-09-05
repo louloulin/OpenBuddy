@@ -1,0 +1,1 @@
+- insert:\n    - id: logger\n      name: '@scope/logger'\n
