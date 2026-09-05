@@ -364,24 +364,19 @@ helper：`shouldCompact` / `findCutPoint` / `prepareCompaction` / `generateSumma
 
 **目标**：把 pi 差距收敛到「pi 提供 agent 能力 + Cordis 提供服务骨架 + 统一 6-surface 事务」的整体插件体系。
 
-**✅ 已完成（commit `94f3fe2`）**：
+**✅ 已完成（commit `94f3fe2` + `f37d332` + `ba15026` + `2052a6f`）**：
 - **能力归属单一权威表**：新增 `packages/runtime/openbuddy-plugin-host/src/capability-ownership.ts`，
   把每个能力映射到 **pi 原生插件 + OpenBuddy 插件** 双归属（12 个 adapter + team/web 家族）。
 - **`CAPABILITY_TO_PLUGIN_ID` 从权威表派生**：`pi-passthrough.ts` 不再自持映射，消除双源漂移。
+- **`pi-passthrough` 注册表可测试化**：新增可注入的 `PassthroughRegistry` 类（多实例/测试隔离），
+  保留模块级默认函数兼容。
+- **统一事务提交点**：`PluginTransactionPhase` 补全 `remote`/`typert`，
+  全部 6 surface 收敛到同一 `PluginLifecycleQueue` 事务协调器。
 - **修复文档漂移**：删除对已不存在的 `capability-plugins.ts` 的引用。
-- **新增测试**：`capability-ownership.test.ts`（8 测试），plugin-host 套件 214 全绿。
+- **插件体系文档**：产出 `docs/PLUGIN_SYSTEM.md`（6-surface 架构、能力归属、事务协调器、跨 surface 插件写法）。
+- **新增测试**：`capability-ownership.test.ts`（8）+ `pi-passthrough` 可注入（5）+ `plugin-lifecycle` 6-surface（1）。
 
-**剩余**：
-1. **统一事务提交点**：把 `PluginTransaction` 的 commit 阶段扩展到所有 surface（pi/mcp/remote/typert/renderer），让各面候选状态收敛到同一 transaction coordinator，产出共同 commit marker。
-2. **`pi-passthrough` 注册表可测试化**：把进程级可变全局改为可注入的 registry（支持 reset/快照），便于插件体系测试。
-3. **插件体系文档**：产出 `docs/PLUGIN_SYSTEM.md`，描述 6-surface 架构、能力归属解析、事务协调器、如何写一个跨 surface 插件。
-
-**验收**：
-- `PluginTransaction` 覆盖全部 6 surface 的 commit
-- 能力归属单一权威表（无重复定义）✅
-- `pi-passthrough` 注册表可注入/可测试
-- 新增 `tests/electron/plugin-system.spec.ts`
-- 现有测试全绿
+**阶段 3.5 全部完成 ✅**
 
 ### 阶段 4 — 补底层 API（P2，前置，3h）
 
