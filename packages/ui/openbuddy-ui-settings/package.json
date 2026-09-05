@@ -1,0 +1,27 @@
+{
+  "name": "@openbuddy/ui-settings",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.tsx",
+    "./invariant": "./src/invariant.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@openbuddy/auth-casdoor": "workspace:*",
+    "@openbuddy/cordis": "workspace:*",
+    "@openbuddy/shared-types": "workspace:*",
+    "@openbuddy/ui-conversation": "workspace:*",
+    "@openbuddy/ui-sidebar": "workspace:*",
+    "@openbuddy/ui-slots": "workspace:*",
+    "@openbuddy/ui-theme": "workspace:*",
+    "@openbuddy/ui-workbench": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}
