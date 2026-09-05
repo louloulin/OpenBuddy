@@ -1,0 +1,241 @@
+{
+  "schema": "openbuddy.benchmark-manifest.v1",
+  "policy": {
+    "officialPassRequires": [
+      "officialDatasetInstalled",
+      "officialRunnerOrEnvironmentExecuted",
+      "officialOracleOrScorerExecuted",
+      "redactedEvidenceArtifact"
+    ],
+    "fixtureIsExternalEvidence": false,
+    "filesystemSmoke": "disabled-by-policy",
+    "goldenSnapshotSchema": "openbuddy.golden-snapshot.v1",
+    "goldenPolicy": {
+      "dir": "evals/golden/core-regression",
+      "schemaVersion": "openbuddy.golden-snapshot.v1",
+      "requireMatch": true
+    }
+  },
+  "benchmarks": [
+    {
+      "id": "browsergym",
+      "name": "BrowserGym / WebArena",
+      "kind": "environment-and-tasks",
+      "officialUrl": "https://github.com/ServiceNow/BrowserGym",
+      "officialObject": "browser interaction trajectories and task reward",
+      "oracle": "task-specific environment evaluator",
+      "adapter": null,
+      "status": "not-run",
+      "limitation": "OpenBuddy has web-search/fetch and Electron UI smoke, not the official browser environment or task runner."
+    },
+    {
+      "id": "webarena",
+      "name": "WebArena",
+      "kind": "browser-environment-and-tasks",
+      "officialUrl": "https://github.com/web-arena-x/webarena",
+      "officialObject": "self-hosted websites, browser actions, task success state",
+      "oracle": "official website/task state evaluator",
+      "adapter": null,
+      "status": "not-run",
+      "limitation": "The official websites, browser environment, task data and evaluator are not installed in this workspace."
+    },
+    {
+      "id": "osworld",
+      "name": "OSWorld",
+      "kind": "vm-and-gui-tasks",
+      "officialUrl": "https://github.com/xlang-ai/OSWorld",
+      "officialObject": "multi-application desktop tasks in a virtual machine",
+      "oracle": "task-specific VM state and file/UI checks",
+      "adapter": null,
+      "status": "not-run",
+      "limitation": "agent-cu and Playwright do not constitute the official VM/task environment."
+    },
+    {
+      "id": "swe-bench-verified",
+      "name": "SWE-bench Verified",
+      "kind": "repository-patch-benchmark",
+      "officialUrl": "https://github.com/SWE-bench/SWE-bench",
+      "officialObject": "real GitHub issue repositories and gold patch tests",
+      "oracle": "official Docker test harness",
+      "adapter": "evals/node/run_repo_fix.mjs",
+      "status": "adapter-only",
+      "limitation": "The adapter uses a synthetic temporary repository; it is not the official SWE-bench dataset or leaderboard run."
+    },
+    {
+      "id": "terminal-bench",
+      "name": "Terminal-Bench / Harbor",
+      "kind": "terminal-tasks",
+      "officialUrl": "https://github.com/harbor-framework/terminal-bench-1",
+      "officialObject": "containerized terminal tasks with task tests",
+      "oracle": "official task test scripts and harness result",
+      "adapter": "evals/node/run_repo_fix.mjs",
+      "status": "adapter-only",
+      "limitation": "The adapter proves a local repo-fix loop only; it does not execute Harbor or official Terminal-Bench tasks."
+    },
+    {
+      "id": "mle-bench",
+      "name": "MLE-bench",
+      "kind": "machine-learning-engineering",
+      "officialUrl": "https://github.com/openai/mle-bench",
+      "officialObject": "real Kaggle-style ML engineering tasks and reproducible artifacts",
+      "oracle": "official task tests and leaderboard/evaluation procedure",
+      "adapter": null,
+      "status": "not-run",
+      "limitation": "No official MLE-bench task data, container environment or scorer is installed."
+    },
+    {
+      "id": "tau-bench",
+      "name": "\u03c4-bench / \u03c4\u00b3-bench",
+      "kind": "stateful-business-tools",
+      "officialUrl": "https://github.com/sierra-research/tau2-bench",
+      "officialObject": "multi-turn user simulation, policy and business tool state",
+      "oracle": "environment state and policy reward",
+      "adapter": "evals/node/run_regression.mjs",
+      "status": "adapter-only",
+      "limitation": "Internal JSONL tasks are \u03c4-bench-shaped; official domains, simulator and scorer are not installed."
+    },
+    {
+      "id": "toolsandbox",
+      "name": "ToolSandbox",
+      "kind": "stateful-tool-trajectories",
+      "officialUrl": "https://github.com/apple/ToolSandbox",
+      "officialObject": "stateful tools, user simulator and milestone checks",
+      "oracle": "dynamic milestone and world-state scorer",
+      "adapter": "evals/node/run_agent_benchmark.mjs",
+      "status": "adapter-only",
+      "limitation": "OpenBuddy validates Pi event traces and tool pairing, not the official scenarios or scorer."
+    },
+    {
+      "id": "agentdojo",
+      "name": "AgentDojo (Local Safety Adapter)",
+      "kind": "prompt-injection-safety",
+      "officialUrl": "https://github.com/ethz-spylab/agentdojo",
+      "officialObject": "prompt injection and tool misuse defense",
+      "oracle": "attack success rate / utility score",
+      "adapter": "evals/node/run_agentdojo_safety.mjs",
+      "status": "adapter-only",
+      "limitation": "Local safety scenarios only; not the official AgentDojo suite/scorer."
+    },
+    {
+      "id": "bfcl",
+      "name": "Berkeley Function-Calling Leaderboard",
+      "kind": "function-calling",
+      "officialUrl": "https://github.com/ShishirPatil/gorilla",
+      "officialObject": "function-call arguments, parallel calls and multi-turn tool use",
+      "oracle": "official execution-based scorer",
+      "adapter": "evals/node/run_agent_benchmark.mjs",
+      "status": "adapter-only",
+      "limitation": "The adapter uses one OpenBuddy extension tool and marker assertions; BFCL cases and scorer are not executed."
+    },
+    {
+      "id": "inspect-ai",
+      "name": "Inspect AI",
+      "kind": "evaluation-framework",
+      "officialUrl": "https://inspect.aisi.org.uk/",
+      "officialObject": "dataset, solver, scorer and evaluation logs",
+      "oracle": "configured scorer",
+      "adapter": "evals/inspect_ai/openbuddy_task.py",
+      "status": "adapter-only",
+      "limitation": "The Python adapter is executable against the real harness, but Inspect AI is not installed in this workspace."
+    },
+    {
+      "id": "deepeval",
+      "name": "DeepEval",
+      "kind": "evaluation-framework",
+      "officialUrl": "https://github.com/confident-ai/deepeval",
+      "officialObject": "pytest-compatible LLM and trace metrics",
+      "oracle": "DeepEval metric thresholds",
+      "adapter": "evals/deepeval/test_openbuddy_chat.py",
+      "status": "adapter-only",
+      "limitation": "The adapter is present but the third-party package and a real-provider run are not current evidence."
+    },
+    {
+      "id": "promptfoo",
+      "name": "Promptfoo",
+      "kind": "evaluation-framework",
+      "officialUrl": "https://www.promptfoo.dev/docs/",
+      "officialObject": "provider and prompt matrix assertions",
+      "oracle": "configured assertions and graders",
+      "adapter": "evals/promptfoo/promptfooconfig.yaml",
+      "status": "adapter-only",
+      "limitation": "The custom provider config exists; Promptfoo is not installed and no real-provider matrix run is recorded."
+    },
+    {
+      "id": "langfuse",
+      "name": "Langfuse",
+      "kind": "trace-observability",
+      "officialUrl": "https://langfuse.com/docs",
+      "officialObject": "generation, span and tool trace observability",
+      "oracle": "trace schema and downstream assertions",
+      "adapter": "evals/langfuse/trace_realtime.py",
+      "status": "adapter-only",
+      "limitation": "The adapter projects real event logs but no Langfuse server export is currently executed."
+    },
+    {
+      "id": "gaia",
+      "name": "GAIA (Local Multi-step Reasoning Adapter)",
+      "kind": "multi-step-reasoning",
+      "officialUrl": "https://huggingface.co/datasets/gaia-benchmark/GAIA",
+      "officialObject": "multi-step reasoning, tool use, web browsing",
+      "oracle": "task-specific oracle answers",
+      "adapter": "evals/node/run_gaia_local.mjs",
+      "status": "adapter-only",
+      "limitation": "Local multi-step reasoning tasks only; not the official GAIA dataset/evaluator. Use as adapter-shaped smoke until the official dataset is integrated."
+    },
+    {
+      "id": "agentbench-toolbench",
+      "name": "AgentBench / ToolBench (Local Tool Selection Adapter)",
+      "kind": "tool-selection",
+      "officialUrl": "https://github.com/THUDM/AgentBench",
+      "officialObject": "tool selection accuracy and call pairing",
+      "oracle": "task-specific tool selection correctness",
+      "adapter": "evals/node/run_agentbench_tools.mjs",
+      "status": "adapter-only",
+      "limitation": "Local tool selection scenarios only; not the official AgentBench/ToolBench dataset/evaluator."
+    },
+    {
+      "id": "mt-bench",
+      "name": "MT-bench (Local Multi-turn Dialog Adapter)",
+      "kind": "multi-turn-dialog",
+      "officialUrl": "https://github.com/lm-sys/FastChat/tree/main/fastchat/llm_judge",
+      "officialObject": "multi-turn dialog quality and instruction following",
+      "oracle": "GPT-4 judge or per-category rubric",
+      "adapter": "evals/node/run_mt_bench_style.mjs",
+      "status": "adapter-only",
+      "limitation": "Local multi-turn dialog scenarios only; not the official MT-bench dataset or LLM judge."
+    },
+    {
+      "id": "nl2bash",
+      "name": "NL2Bash (Local Shell Command Translation Adapter)",
+      "kind": "terminal-command-translation",
+      "officialUrl": "https://github.com/Tellmewhat2do/nl2bash",
+      "officialObject": "natural language \u2192 bash command pairs",
+      "oracle": "execution-based equivalence scorer",
+      "adapter": "evals/node/run_nl2bash_style.mjs",
+      "status": "adapter-only",
+      "limitation": "Local shell command generation scenarios only; not the official NL2Bash dataset."
+    },
+    {
+      "id": "swe-bench-style-multi",
+      "name": "SWE-bench-style Multi-file Edit (Local Adapter)",
+      "kind": "repository-patch-benchmark",
+      "officialUrl": "https://github.com/SWE-bench/SWE-bench",
+      "officialObject": "real GitHub issue repositories and gold patch tests",
+      "oracle": "official Docker test harness",
+      "adapter": "evals/node/run_swe_bench_style.mjs",
+      "status": "adapter-only",
+      "limitation": "The adapter validates initial files and oracle marker shape across multiple files; it does not run the official SWE-bench Docker harness."
+    },
+    {
+      "id": "openbuddy-strict-agent",
+      "name": "OpenBuddy strict real-agent suite",
+      "kind": "project-native",
+      "officialUrl": null,
+      "officialObject": "real Electron Main, Pi session, provider metadata and event trace",
+      "oracle": "evals/node/run_agent_benchmark.mjs",
+      "adapter": "evals/node/run_agent_benchmark.mjs",
+      "status": "ready-not-run",
+      "limitation": "Requires new temporary provider credentials and a live Electron harness."
+    }
+  ]
+}

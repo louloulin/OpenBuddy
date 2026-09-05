@@ -1,0 +1,771 @@
+[
+  {
+    "id": "quote-request-customer-a",
+    "subject": "Re: 2026 Q3 产品报价咨询",
+    "from": {
+      "address": "alice@partner.example.com",
+      "name": "Alice Wang"
+    },
+    "body": "您好，附件是我方对贵司 A100 产品的正式询价单（含 50 件、目标交付 9 月 15 日）。请于本周内反馈含税报价与付款条款。如方便，请同时提供两个参考客户名单。",
+    "expectedActions": [
+      {
+        "content": "回复报价单与付款条款",
+        "owner": "我",
+        "dueAt": "2026-09-04",
+        "messageId": "m-quote-a"
+      }
+    ]
+  },
+  {
+    "id": "quote-followup-b",
+    "subject": "催促：9/2 已发出的报价",
+    "from": {
+      "address": "bob@enterprise.example.com",
+      "name": "Bob Liu"
+    },
+    "body": "Hi，上周三已发报价单，不知道是否收到？客户希望本周五前确认，否则他们会选择另一家供应商。",
+    "expectedActions": [
+      {
+        "content": "回复报价是否确认",
+        "owner": "我",
+        "dueAt": "2026-09-04",
+        "messageId": "m-quote-b"
+      }
+    ]
+  },
+  {
+    "id": "contract-approval-pending",
+    "subject": "Fwd: 框架协议 v3 待审批",
+    "from": {
+      "address": "legal@partner.example.com",
+      "name": "法律部"
+    },
+    "body": "附件为我方法务修订后的框架协议 v3，请审批后回签。条款第 5.2 条关于数据归属的部分已按贵司意见修改。",
+    "expectedActions": [
+      {
+        "content": "审批框架协议 v3 并回签",
+        "owner": "我",
+        "dueAt": "2026-09-05",
+        "messageId": "m-contract-a"
+      }
+    ]
+  },
+  {
+    "id": "quote-negotiation",
+    "subject": "Re: 关于 A100 单价",
+    "from": {
+      "address": "carol@buyer.example.com",
+      "name": "Carol Zhang"
+    },
+    "body": "贵司报价偏高 8%，能否降至 9200 元/件？如可以，我方本周内可下 30 件 PO。",
+    "expectedActions": [
+      {
+        "content": "回复是否接受降价",
+        "owner": "我",
+        "dueAt": "2026-09-04",
+        "messageId": "m-quote-c"
+      }
+    ]
+  },
+  {
+    "id": "contract-renewal",
+    "subject": "服务合同到期续签",
+    "from": {
+      "address": "ops@enterprise.example.com",
+      "name": "Operations"
+    },
+    "body": "我方与贵司的服务合同将于 9/30 到期，希望提前两周完成续签。请告知续签流程及新一年报价。",
+    "expectedActions": [
+      {
+        "content": "回复续签流程与新报价",
+        "owner": "我",
+        "dueAt": "2026-09-15",
+        "messageId": "m-contract-b"
+      }
+    ]
+  },
+  {
+    "id": "purchase-order-confirm",
+    "subject": "PO #2026-09-001 已下",
+    "from": {
+      "address": "buyer@chainstore.example.com",
+      "name": "Buyer Team"
+    },
+    "body": "我方 PO #2026-09-001 已审批通过，请确认交付日期与联系人信息。",
+    "expectedActions": [
+      {
+        "content": "确认 PO 交付日期",
+        "owner": "我",
+        "dueAt": "2026-09-06",
+        "messageId": "m-po-a"
+      }
+    ]
+  },
+  {
+    "id": "invoice-dispute",
+    "subject": "Re: 8 月发票存在异议",
+    "from": {
+      "address": "finance@customer.example.com",
+      "name": "Finance Dept"
+    },
+    "body": "8 月发票 INV-088 金额与我方收货记录不一致，差额 1200 元。请核对并回复。",
+    "expectedActions": [
+      {
+        "content": "核对发票并回复差额",
+        "owner": "我",
+        "dueAt": "2026-09-04",
+        "messageId": "m-inv-a"
+      }
+    ]
+  },
+  {
+    "id": "rfi-product-spec",
+    "subject": "RFI: 产品规格与认证",
+    "from": {
+      "address": "engineer@enterprise.example.com",
+      "name": "Tech Eval"
+    },
+    "body": "请提供产品 CE/FCC 认证证书、测试报告、详细规格书（含功耗、温度范围）。",
+    "expectedActions": [
+      {
+        "content": "回复认证证书与规格书",
+        "owner": "我",
+        "dueAt": "2026-09-07",
+        "messageId": "m-rfi-a"
+      }
+    ]
+  },
+  {
+    "id": "quote-rejected",
+    "subject": "Re: 报价回复",
+    "from": {
+      "address": "decision@enterprise.example.com",
+      "name": "Decision Maker"
+    },
+    "body": "经过评估，贵司报价高于预算 15%，本期暂不采购。未来有需要再联系。",
+    "expectedActions": []
+  },
+  {
+    "id": "quote-accepted",
+    "subject": "Re: 报价确认 - 选定贵司",
+    "from": {
+      "address": "winner@enterprise.example.com",
+      "name": "Winner Team"
+    },
+    "body": "经过比价，决定选用贵司方案。请尽快提供采购合同与发票模板。",
+    "expectedActions": [
+      {
+        "content": "提供采购合同与发票模板",
+        "owner": "我",
+        "dueAt": "2026-09-04",
+        "messageId": "m-quote-win"
+      }
+    ]
+  },
+  {
+    "id": "meeting-proposal-1",
+    "subject": "项目启动会议邀请",
+    "from": {
+      "address": "pm@partner.example.com",
+      "name": "PM Office"
+    },
+    "body": "建议 9/4（周三）下午 2 点召开项目启动会议，时长 1 小时。请确认是否可参加，议程稍后发出。",
+    "expectedActions": [
+      {
+        "content": "回复是否可参加启动会",
+        "owner": "我",
+        "dueAt": "2026-09-03",
+        "messageId": "m-meet-a"
+      }
+    ]
+  },
+  {
+    "id": "meeting-reschedule-conflict",
+    "subject": "Re: 周三会议需要改期",
+    "from": {
+      "address": "lead@partner.example.com",
+      "name": "Tech Lead"
+    },
+    "body": "周三下午我方临时有事，能否改到周四同一时间？请告知。",
+    "expectedActions": [
+      {
+        "content": "回复改期时间",
+        "owner": "我",
+        "dueAt": "2026-09-03",
+        "messageId": "m-meet-b"
+      }
+    ]
+  },
+  {
+    "id": "meeting-accept",
+    "subject": "Re: 周二评审会议",
+    "from": {
+      "address": "reviewer@enterprise.example.com",
+      "name": "Review Board"
+    },
+    "body": "周二评审会议我方 3 人参加，议程已阅。请提前发送评审材料。",
+    "expectedActions": [
+      {
+        "content": "发送评审材料",
+        "owner": "我",
+        "dueAt": "2026-09-02",
+        "messageId": "m-meet-c"
+      }
+    ]
+  },
+  {
+    "id": "meeting-cancel",
+    "subject": "取消：原定周四的方案评审",
+    "from": {
+      "address": "lead@partner.example.com",
+      "name": "Tech Lead"
+    },
+    "body": "由于前置数据未到位，原定周四的方案评审取消，新时间稍后通知。",
+    "expectedActions": []
+  },
+  {
+    "id": "meeting-join-info",
+    "subject": "会议链接与议程",
+    "from": {
+      "address": "ops@enterprise.example.com",
+      "name": "Meeting Ops"
+    },
+    "body": "周三同步会议链接：https://meet.example.com/abc-123 密码：998877。议程见附件。",
+    "expectedActions": [
+      {
+        "content": "加入周三会议",
+        "owner": "我",
+        "dueAt": "2026-09-03",
+        "messageId": "m-meet-d"
+      }
+    ]
+  },
+  {
+    "id": "meeting-recap",
+    "subject": "Fwd: 周一会议纪要",
+    "from": {
+      "address": "assistant@partner.example.com",
+      "name": "Assistant"
+    },
+    "body": "附件为周一会议纪要，请确认行动项分配。如有异议请在周四前回复。",
+    "expectedActions": [
+      {
+        "content": "审阅会议纪要并确认行动项",
+        "owner": "我",
+        "dueAt": "2026-09-04",
+        "messageId": "m-meet-e"
+      }
+    ]
+  },
+  {
+    "id": "meeting-customer-on-site",
+    "subject": "现场拜访：9/10 周四上午",
+    "from": {
+      "address": "vp@customer.example.com",
+      "name": "VP Customer"
+    },
+    "body": "希望贵司技术团队 9/10（周四）上午到客户现场确认部署细节。地点：上海张江。",
+    "expectedActions": [
+      {
+        "content": "回复现场拜访安排",
+        "owner": "我",
+        "dueAt": "2026-09-05",
+        "messageId": "m-meet-f"
+      }
+    ]
+  },
+  {
+    "id": "meeting-demo",
+    "subject": "Demo 演示请求",
+    "from": {
+      "address": "eval@enterprise.example.com",
+      "name": "Evaluation Team"
+    },
+    "body": "希望贵司提供 30 分钟的 demo，演示 AI 邮件分诊能力。建议时间 9/8（周一）或 9/9（周二）。",
+    "expectedActions": [
+      {
+        "content": "回复 demo 时间",
+        "owner": "我",
+        "dueAt": "2026-09-04",
+        "messageId": "m-meet-g"
+      }
+    ]
+  },
+  {
+    "id": "meeting-quarterly-review",
+    "subject": "Q3 季度评审会议",
+    "from": {
+      "address": "exec@enterprise.example.com",
+      "name": "Executive"
+    },
+    "body": "Q3 季度评审会议定于 9/15（周二）全天，请准备 OKR 完成情况与 Q4 规划。",
+    "expectedActions": [
+      {
+        "content": "准备 Q3 评审材料",
+        "owner": "我",
+        "dueAt": "2026-09-13",
+        "messageId": "m-meet-h"
+      }
+    ]
+  },
+  {
+    "id": "meeting-training",
+    "subject": "产品培训会议邀请",
+    "from": {
+      "address": "training@partner.example.com",
+      "name": "Training Team"
+    },
+    "body": "9/22（周二）下午 3 点进行产品培训会议，介绍新版本功能。会议时长 1.5 小时。",
+    "expectedActions": [
+      {
+        "content": "回复是否参加培训",
+        "owner": "我",
+        "dueAt": "2026-09-20",
+        "messageId": "m-meet-i"
+      }
+    ]
+  },
+  {
+    "id": "task-urgent-deploy",
+    "subject": "[紧急] 生产环境需要立即回滚",
+    "from": {
+      "address": "oncall@team.example.com",
+      "name": "On-call"
+    },
+    "body": "生产环境 P1 告警：v2.3.1 部署后订单服务报错率 12%。请立即回滚到 v2.3.0 并回执。",
+    "expectedActions": [
+      {
+        "content": "回滚生产到 v2.3.0",
+        "owner": "我",
+        "dueAt": "2026-09-02",
+        "messageId": "m-urgent-a"
+      }
+    ]
+  },
+  {
+    "id": "task-review-pr",
+    "subject": "PR #1248 待 review",
+    "from": {
+      "address": "dev@team.example.com",
+      "name": "Dev Team"
+    },
+    "body": "麻烦 review 一下 PR #1248（OAuth 集成优化），EOD 前需要反馈。",
+    "expectedActions": [
+      {
+        "content": "Review PR #1248",
+        "owner": "我",
+        "dueAt": "2026-09-03",
+        "messageId": "m-pr-a"
+      }
+    ]
+  },
+  {
+    "id": "task-data-export",
+    "subject": "数据导出请求",
+    "from": {
+      "address": "analyst@team.example.com",
+      "name": "Data Analyst"
+    },
+    "body": "需要 9 月的 AI 分诊结果 JSON 与 SQLite，麻烦导出发送到数据共享盘。",
+    "expectedActions": [
+      {
+        "content": "导出 9 月分诊数据",
+        "owner": "我",
+        "dueAt": "2026-09-08",
+        "messageId": "m-data-a"
+      }
+    ]
+  },
+  {
+    "id": "task-bug-triage",
+    "subject": "Bug #891: 邮件附件下载失败",
+    "from": {
+      "address": "qa@team.example.com",
+      "name": "QA Team"
+    },
+    "body": "重现率 100%，附件 > 10MB 时下载报错。请定位修复，优先级 P1。",
+    "expectedActions": [
+      {
+        "content": "修复 Bug #891 附件下载",
+        "owner": "我",
+        "dueAt": "2026-09-05",
+        "messageId": "m-bug-a"
+      }
+    ]
+  },
+  {
+    "id": "task-doc-update",
+    "subject": "请更新 API 文档",
+    "from": {
+      "address": "pm@team.example.com",
+      "name": "PM"
+    },
+    "body": "新增的批量管理接口 /api/email/batch 请补充到 OpenAPI 文档，方便外部集成。",
+    "expectedActions": [
+      {
+        "content": "补充批量管理 API 文档",
+        "owner": "我",
+        "dueAt": "2026-09-06",
+        "messageId": "m-doc-a"
+      }
+    ]
+  },
+  {
+    "id": "task-translate",
+    "subject": "英文化 README",
+    "from": {
+      "address": "marketing@team.example.com",
+      "name": "Marketing"
+    },
+    "body": "请将 README.md 翻译成英文版本，以便海外用户快速上手。",
+    "expectedActions": [
+      {
+        "content": "翻译 README 为英文",
+        "owner": "我",
+        "dueAt": "2026-09-15",
+        "messageId": "m-translate-a"
+      }
+    ]
+  },
+  {
+    "id": "task-perf-review",
+    "subject": "性能评审请求",
+    "from": {
+      "address": "perf@team.example.com",
+      "name": "Perf Team"
+    },
+    "body": "邮件列表首屏加载在 500 封时达到 2.3 秒，建议优化。请提交优化方案。",
+    "expectedActions": [
+      {
+        "content": "提交邮件列表性能优化方案",
+        "owner": "我",
+        "dueAt": "2026-09-09",
+        "messageId": "m-perf-a"
+      }
+    ]
+  },
+  {
+    "id": "task-release-notes",
+    "subject": "v2.4 Release Notes 撰写",
+    "from": {
+      "address": "release@team.example.com",
+      "name": "Release Manager"
+    },
+    "body": "v2.4 计划 9/20 发布，请本周内完成 release notes 草稿。",
+    "expectedActions": [
+      {
+        "content": "撰写 v2.4 Release Notes",
+        "owner": "我",
+        "dueAt": "2026-09-05",
+        "messageId": "m-release-a"
+      }
+    ]
+  },
+  {
+    "id": "task-onboard",
+    "subject": "新员工账号开通",
+    "from": {
+      "address": "hr@team.example.com",
+      "name": "HR"
+    },
+    "body": "新员工 Zhang San 9/7 入职，请为其开通邮箱、企业微信、代码仓库权限。",
+    "expectedActions": [
+      {
+        "content": "为新员工开通邮箱与权限",
+        "owner": "我",
+        "dueAt": "2026-09-07",
+        "messageId": "m-onboard-a"
+      }
+    ]
+  },
+  {
+    "id": "task-vendor-renew",
+    "subject": "云服务续费提醒",
+    "from": {
+      "address": "ops@team.example.com",
+      "name": "Ops"
+    },
+    "body": "AWS 账号将于 10/1 自动续费，预计 $2,400。请确认预算或调整实例。",
+    "expectedActions": [
+      {
+        "content": "确认 AWS 续费预算",
+        "owner": "我",
+        "dueAt": "2026-09-20",
+        "messageId": "m-renew-a"
+      }
+    ]
+  },
+  {
+    "id": "info-newsletter-industry",
+    "subject": "InfoQ 中文站 - 本周精选",
+    "from": {
+      "address": "newsletter@infoq.example.com",
+      "name": "InfoQ"
+    },
+    "body": "本周精选：1) OpenAI 发布 GPT-5 评测；2) Cloudflare Workers AI 价格调整；3) Rust 1.81 发布。",
+    "expectedActions": []
+  },
+  {
+    "id": "info-build-notification",
+    "subject": "Build #4821 succeeded",
+    "from": {
+      "address": "ci@team.example.com",
+      "name": "CI Bot"
+    },
+    "body": "Build #4821 on main succeeded in 4m 12s. View details at https://ci.example.com/builds/4821",
+    "expectedActions": []
+  },
+  {
+    "id": "info-monitoring",
+    "subject": "Daily System Report - 2026-09-02",
+    "from": {
+      "address": "monitoring@team.example.com",
+      "name": "Monitoring"
+    },
+    "body": "过去 24 小时系统指标：CPU 平均 32%、内存 58%、请求成功率 99.97%、P95 延迟 124ms。",
+    "expectedActions": []
+  },
+  {
+    "id": "info-team-announce",
+    "subject": "[公告] 公司 9 月 8 日团建",
+    "from": {
+      "address": "hr@team.example.com",
+      "name": "HR"
+    },
+    "body": "公司将于 9/8（周二）组织西湖团建，全员参加。上午 9 点公司楼下集合。",
+    "expectedActions": []
+  },
+  {
+    "id": "info-blog-post",
+    "subject": "New Blog Post: AI 邮件的未来",
+    "from": {
+      "address": "blog@vendor.example.com",
+      "name": "Vendor Blog"
+    },
+    "body": "我们发布了新文章《AI 邮件的未来：从分诊到主动决策》，详细介绍 AI 在邮件场景的演进。",
+    "expectedActions": []
+  },
+  {
+    "id": "info-webinar-invite",
+    "subject": "Webinar 邀请：AI 在企业知识管理中的实践",
+    "from": {
+      "address": "events@vendor.example.com",
+      "name": "Events"
+    },
+    "body": "诚邀参加 9/15（周二）下午 3 点的线上 webinar，主题：AI 在企业知识管理中的实践。",
+    "expectedActions": []
+  },
+  {
+    "id": "info-version-release",
+    "subject": "v2.3.2 已发布",
+    "from": {
+      "address": "release@vendor.example.com",
+      "name": "Vendor"
+    },
+    "body": "我们发布了 v2.3.2，修复了 5 个 bug，建议升级。详细 changelog 见官网。",
+    "expectedActions": []
+  },
+  {
+    "id": "info-thanks",
+    "subject": "感谢贵司的支持",
+    "from": {
+      "address": "customer@enterprise.example.com",
+      "name": "Customer"
+    },
+    "body": "非常感谢贵司技术团队在这次升级中的专业支持，整个过程顺畅无误。下次有项目继续合作。",
+    "expectedActions": []
+  },
+  {
+    "id": "complaint-service-slow",
+    "subject": "服务响应太慢",
+    "from": {
+      "address": "angry@customer.example.com",
+      "name": "Customer"
+    },
+    "body": "上周提交的工单 #4421 已经过了 5 天仍未回复，严重影响我方业务。请立即处理。",
+    "expectedActions": [
+      {
+        "content": "回复工单 #4421",
+        "owner": "我",
+        "dueAt": "2026-09-03",
+        "messageId": "m-comp-a"
+      }
+    ]
+  },
+  {
+    "id": "complaint-quality-issue",
+    "subject": "产品质量问题反馈",
+    "from": {
+      "address": "qa@customer.example.com",
+      "name": "QA"
+    },
+    "body": "批次 #202608 中 5% 单元存在外壳开胶问题，已附照片与视频。请安排 RMA。",
+    "expectedActions": [
+      {
+        "content": "安排 RMA 流程",
+        "owner": "我",
+        "dueAt": "2026-09-04",
+        "messageId": "m-comp-b"
+      }
+    ]
+  },
+  {
+    "id": "complaint-billing-error",
+    "subject": "账单金额错误",
+    "from": {
+      "address": "finance@customer.example.com",
+      "name": "Finance"
+    },
+    "body": "9 月账单金额与我方实际使用量不符，相差约 30%。请提供明细。",
+    "expectedActions": [
+      {
+        "content": "提供 9 月账单明细",
+        "owner": "我",
+        "dueAt": "2026-09-05",
+        "messageId": "m-comp-c"
+      }
+    ]
+  },
+  {
+    "id": "complaint-spam-from-us",
+    "subject": "Re: 贵司邮件被标记为垃圾邮件",
+    "from": {
+      "address": "postmaster@recipient.example.com",
+      "name": "Postmaster"
+    },
+    "body": "贵司近期发送的营销邮件被多家收件方标记为垃圾邮件，建议检查发件域名信誉与 SPF/DKIM 配置。",
+    "expectedActions": [
+      {
+        "content": "检查发件域名信誉与认证",
+        "owner": "我",
+        "dueAt": "2026-09-04",
+        "messageId": "m-comp-d"
+      }
+    ]
+  },
+  {
+    "id": "complaint-security",
+    "subject": "Re: 数据安全事件报告",
+    "from": {
+      "address": "security@partner.example.com",
+      "name": "Security Team"
+    },
+    "body": "我们检测到贵司 9/1 的 API 调用存在异常模式（高频访问单一租户数据），请 24 小时内确认。",
+    "expectedActions": [
+      {
+        "content": "回复安全事件调查",
+        "owner": "我",
+        "dueAt": "2026-09-03",
+        "messageId": "m-comp-e"
+      }
+    ]
+  },
+  {
+    "id": "followup-pending-decision",
+    "subject": "Re: 等候决策中",
+    "from": {
+      "address": "stakeholder@enterprise.example.com",
+      "name": "Stakeholder"
+    },
+    "body": "上个月提出的方案仍在评审中，预计下周三前给到结论。请耐心等待。",
+    "expectedActions": []
+  },
+  {
+    "id": "followup-payment-overdue",
+    "subject": "Re: 7 月份账款已逾期",
+    "from": {
+      "address": "finance@customer.example.com",
+      "name": "Finance"
+    },
+    "body": "贵司 7 月份账款 INV-077 已逾期 30 天，请尽快安排付款。",
+    "expectedActions": [
+      {
+        "content": "跟进 7 月账款付款",
+        "owner": "我",
+        "dueAt": "2026-09-04",
+        "messageId": "m-fu-a"
+      }
+    ]
+  },
+  {
+    "id": "followup-quote-pending",
+    "subject": "Re: 报价单审核中",
+    "from": {
+      "address": "reviewer@customer.example.com",
+      "name": "Reviewer"
+    },
+    "body": "贵司报价单已进入我方法务终审阶段，结果预计本周五前发出。",
+    "expectedActions": []
+  },
+  {
+    "id": "followup-shipment",
+    "subject": "Re: 物流更新",
+    "from": {
+      "address": "logistics@supplier.example.com",
+      "name": "Logistics"
+    },
+    "body": "您的订单 #A2026-882 已发货，运单号 SF1234567890，预计 9/4 送达。",
+    "expectedActions": []
+  },
+  {
+    "id": "followup-onboarding-progress",
+    "subject": "Re: 新员工入职进度",
+    "from": {
+      "address": "manager@team.example.com",
+      "name": "Manager"
+    },
+    "body": "新员工 Zhang San 入职流程进行中，目前还差邮箱开通与门禁卡，请本周内完成。",
+    "expectedActions": [
+      {
+        "content": "完成 Zhang San 邮箱与门禁",
+        "owner": "我",
+        "dueAt": "2026-09-04",
+        "messageId": "m-fu-b"
+      }
+    ]
+  },
+  {
+    "id": "social-invite-conference",
+    "subject": "邀请：年度技术大会",
+    "from": {
+      "address": "speaker@conference.example.com",
+      "name": "Conf Committee"
+    },
+    "body": "诚挚邀请您作为演讲嘉宾参加 11 月的年度技术大会，议题自拟，往返差旅由大会承担。",
+    "expectedActions": [
+      {
+        "content": "回复演讲邀请",
+        "owner": "我",
+        "dueAt": "2026-09-15",
+        "messageId": "m-soc-a"
+      }
+    ]
+  },
+  {
+    "id": "social-thanks-birthday",
+    "subject": "生日快乐！",
+    "from": {
+      "address": "friend@personal.example.com",
+      "name": "Friend"
+    },
+    "body": "生日快乐！希望新的一岁一切顺利，期待下次见面。",
+    "expectedActions": []
+  },
+  {
+    "id": "social-referral",
+    "subject": "推荐候选人",
+    "from": {
+      "address": "referrer@partner.example.com",
+      "name": "Referrer"
+    },
+    "body": "推荐一位候选人 Li Si 给贵司高级工程师岗位，简历见附件。如有合适机会麻烦告知。",
+    "expectedActions": [
+      {
+        "content": "审阅候选人简历",
+        "owner": "我",
+        "dueAt": "2026-09-08",
+        "messageId": "m-soc-b"
+      }
+    ]
+  }
+]

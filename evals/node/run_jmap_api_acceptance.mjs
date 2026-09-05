@@ -1,0 +1,48 @@
+import { createHash } from "node:crypto";
+import { mkdirSync, realpathSync, lstatSync, statSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { createServer } from "vite";
+
+const enabled = process.env.OPENBUDDY_EMAIL_JMAP_API_ACCEPTANCE === "1";
+const token = String(process.env.OPENBUDDY_EMAIL_JMAP_ACCESS_TOKEN ?? "").trim();
+const evidenceDir = String(process.env.OPENBUDDY_EVIDENCE_DIR ?? "").trim();
+const requested = { management: process.env.OPENBUDDY_EMAIL_EXTERNAL_MANAGE === "1", write: process.env.OPENBUDDY_EMAIL_EXTERNAL_WRITE === "1", send: process.env.OPENBUDDY_EMAIL_EXTERNAL_SEND === "1", attachments: process.env.OPENBUDDY_EMAIL_EXTERNAL_ATTACHMENTS === "1", attachmentDownload: process.env.OPENBUDDY_EMAIL_EXTERNAL_ATTACHMENT_DOWNLOAD === "1" };
+const writeConfirm = "I_UNDERSTAND_MAILBOX_MUTATIONS";
+const sendConfirm = "I_UNDERSTAND_EXTERNAL_EMAIL_SEND";
+if (!enabled || !token) { console.error("JMAP acceptance is fail-closed: set OPENBUDDY_EMAIL_JMAP_API_ACCEPTANCE=1 and a temporary JMAP OAuth/app token."); process.exit(2); }
+if (requested.management && process.env.OPENBUDDY_EMAIL_EXTERNAL_CONFIRM !== writeConfirm) { console.error(`management mode requires OPENBUDDY_EMAIL_EXTERNAL_CONFIRM=${writeConfirm}`); process.exit(2); }
+if ((requested.write || requested.send) && !process.env.OPENBUDDY_EMAIL_JMAP_TEST_RECIPIENT?.trim()) { console.error("JMAP write/send mode requires OPENBUDDY_EMAIL_JMAP_TEST_RECIPIENT."); process.exit(2); }
+if (requested.send && (!requested.write || process.env.OPENBUDDY_EMAIL_EXTERNAL_SEND_CONFIRM !== sendConfirm)) { console.error(`send mode requires write mode and OPENBUDDY_EMAIL_EXTERNAL_SEND_CONFIRM=${sendConfirm}`); process.exit(2); }
+if (requested.attachmentDownload && !path.isAbsolute(String(process.env.OPENBUDDY_EMAIL_ATTACHMENT_DIR ?? ""))) { console.error("attachment download requires an absolute OPENBUDDY_EMAIL_ATTACHMENT_DIR"); process.exit(2); }
+
+const digest = (value) => createHash("sha256").update(String(value)).digest("hex").slice(0, 12);
+const safeError = (error) => String(error?.message ?? error ?? "unknown error").replace(/(authorization|bearer|password|auth[_ -]?code|token|secret)[=:][^\s,}]+/gi, "$1=[redacted]").slice(0, 300);
+const checks = [];
+const check = async (name, fn, shouldRun = true) => { if (!shouldRun) { checks.push({ name, status: "not-run", reason: "not requested" }); return undefined; } try { const result = await fn(); checks.push({ name, status: "passed", result }); return result; } catch (error) { checks.push({ name, status: "failed", error: safeError(error), errorDigest: digest(error) }); return undefined; } };
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const subject = `OpenBuddy JMAP acceptance ${Date.now().toString(36)}`;
+const recipient = String(process.env.OPENBUDDY_EMAIL_JMAP_TEST_RECIPIENT ?? "").trim();
+const vite = await createServer({ configFile: path.resolve("vitest.config.ts"), server: { middlewareMode: true }, appType: "custom" });
+const { JmapEmailProvider } = await vite.ssrLoadModule(path.resolve("packages/capability/openbuddy-email/src/jmap-provider.ts"));
+const provider = new JmapEmailProvider({ accessToken: token, sessionUrl: process.env.OPENBUDDY_EMAIL_JMAP_SESSION_URL, apiUrl: process.env.OPENBUDDY_EMAIL_JMAP_API_URL, downloadUrl: process.env.OPENBUDDY_EMAIL_JMAP_DOWNLOAD_URL, uploadUrl: process.env.OPENBUDDY_EMAIL_JMAP_UPLOAD_URL, maxResults: 20 });
+let account;
+let firstPage;
+let firstThread;
+let firstDetail;
+let draft;
+try {
+  const accounts = await check("profile", async () => { const result = await provider.accounts(); if (!result[0]?.address) throw new Error("JMAP account profile is empty"); account = result[0]; return { accountDomain: account.address.split("@")[1] ?? "unknown", capabilities: account.capabilities }; });
+  await check("provider-diagnostics", async () => { const result = await provider.diagnostics(); if (result.readiness !== "ready") throw new Error(`JMAP readiness is ${result.readiness}`); return { readiness: result.readiness, availableCapabilities: result.availableCapabilities }; }, Boolean(accounts));
+  firstPage = await check("thread-list-search", async () => { const page = await provider.threadsPage({ query: process.env.OPENBUDDY_EMAIL_JMAP_QUERY?.trim() || undefined, limit: 10 }); firstThread = page.items[0]; return { count: page.items.length, hasNextPage: Boolean(page.nextCursor), firstThread: firstThread ? digest(firstThread.id) : undefined }; }, Boolean(accounts));
+  await check("pagination", async () => { if (!firstPage?.nextCursor) return { status: "not-run", reason: "selected result has no next page" }; const next = await provider.threadsPage({ cursor: firstPage.nextCursor, limit: 10 }); if (next.nextCursor === firstPage.nextCursor) throw new Error("JMAP returned a repeated cursor"); return { count: next.items.length, cursorAdvanced: true }; }, Boolean(accounts));
+  await check("mailboxes-and-thread", async () => { const labels = await provider.labels(account.id); if (!labels.length) throw new Error("JMAP returned no mailboxes"); if (firstThread) { firstDetail = await provider.thread(account.id, firstThread.id); if (firstDetail.id !== firstThread.id) throw new Error("JMAP thread identity mismatch"); } return { mailboxes: labels.length, thread: firstThread ? digest(firstThread.id) : undefined, messages: firstDetail?.messages.length ?? 0 }; }, Boolean(accounts));
+  await check("reversible-management", async () => { if (!firstThread) return { status: "not-run", reason: "no thread available" }; const originalStarred = firstThread.starred === true; try { await provider.update({ accountId: account.id, threadId: firstThread.id, kind: "star", value: !originalStarred }); return { thread: digest(firstThread.id), operation: "flag-roundtrip" }; } finally { await provider.update({ accountId: account.id, threadId: firstThread.id, kind: "star", value: originalStarred }); } }, requested.management);
+  await check("draft-write-and-idempotent-update", async () => { const input = { accountId: account.id, to: [{ address: recipient }], subject, body: "OpenBuddy JMAP acceptance draft." }; draft = await provider.createDraft(input); const updated = await provider.createDraft({ ...input, draftId: draft.id, body: "OpenBuddy JMAP acceptance draft updated." }); if (updated.id !== draft.id) throw new Error("JMAP draft update returned a different id"); const visible = await provider.threadsPage({ folder: "drafts", query: subject, limit: 20 }); if (!visible.items.some((item) => item.subject === subject)) throw new Error("JMAP Drafts did not show the draft"); return { draft: digest(draft.id), remoteVisible: true, idempotent: true }; }, requested.write);
+  await check("controlled-send-and-sent-visibility", async () => { if (!draft) throw new Error("send requires a draft created in this run"); await provider.sendDraft(draft); for (let attempt = 0; attempt < 10; attempt += 1) { const sent = await provider.threadsPage({ folder: "sent", query: subject, limit: 20 }); if (sent.items.some((item) => item.subject === subject)) return { draft: digest(draft.id), sentVisible: true }; await wait(500); } throw new Error("sent message was not visible in JMAP Sent mailbox"); }, requested.send);
+  await check("attachment-list-and-download", async () => { if (!firstDetail) return { status: "not-run", reason: "no readable thread" }; const attachment = firstDetail.messages.flatMap((message) => message.attachments).at(0); if (!attachment) return { status: "not-run", reason: "selected thread has no attachment" }; const listed = await provider.listAttachments(account.id, attachment.messageId); if (!listed.some((item) => item.id === attachment.id)) throw new Error("JMAP attachment listing did not contain selected attachment"); if (!requested.attachmentDownload) return { count: listed.length, attachment: digest(attachment.id), download: "not requested" }; const destination = path.resolve(process.env.OPENBUDDY_EMAIL_ATTACHMENT_DIR); mkdirSync(destination, { recursive: true }); const downloaded = await provider.downloadAttachment(account.id, attachment.id, attachment.messageId, destination); const root = realpathSync(destination); const target = realpathSync(downloaded.localPath); const relative = path.relative(root, target); if (!relative || relative.startsWith("..") || path.isAbsolute(relative) || lstatSync(downloaded.localPath).isSymbolicLink() || !statSync(target).isFile()) throw new Error("downloaded attachment escaped selected directory"); return { count: listed.length, attachment: digest(attachment.id), downloaded: true, bytes: statSync(target).size }; }, requested.attachments);
+} catch (error) { checks.push({ name: "runner", status: "failed", error: safeError(error), errorDigest: digest(error) }); } finally { await vite.close(); }
+const failed = checks.filter((item) => item.status === "failed");
+const report = { schema: "openbuddy.jmap-api-acceptance.v1", evidenceLevel: "real-external", provider: "jmap-api", requested, accountDomain: account?.address?.split("@")[1] ?? "unknown", checks, passed: checks.filter((item) => item.status === "passed").length, failed: failed.length, notRun: checks.filter((item) => item.status === "not-run").length };
+if (evidenceDir) { mkdirSync(evidenceDir, { recursive: true }); writeFileSync(path.join(evidenceDir, "jmap-api-acceptance.json"), `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 }); }
+console.log(JSON.stringify({ ...report, evidenceArtifact: evidenceDir ? path.join(evidenceDir, "jmap-api-acceptance.json") : null }, null, 2));
+process.exit(failed.length ? 1 : 0);
