@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "composite": true,
+    "types": ["node"],
+    "paths": {
+      "@openbuddy/cordis": ["../runtime/openbuddy-cordis/src/index.ts"],
+      "@openbuddy/collaboration-protocol": ["../collaboration/openbuddy-protocol/src/index.ts"],
+      "@openbuddy/collaboration-policy": ["../collaboration/openbuddy-policy/src/index.ts"],
+      "@openbuddy/collaboration-task": ["../collaboration/openbuddy-task/src/index.ts"],
+      "@openbuddy/collaboration-evidence": ["../collaboration/openbuddy-evidence/src/index.ts"],
+      "@openbuddy/collaboration-room": ["../collaboration/openbuddy-room/src/index.ts"],
+      "@openbuddy/collaboration-inbox": ["../collaboration/openbuddy-inbox/src/index.ts"],
+      "@openbuddy/collaboration-coordinator": ["../collaboration/openbuddy-coordinator/src/index.ts"]
+      ,"@openbuddy/collaboration-network": ["../collaboration/openbuddy-network/src/index.ts"],
+      "@openbuddy/storage": ["../runtime/openbuddy-storage/src/index.ts"],
+      "@openbuddy/shared-types": ["../shared/openbuddy-types/src/index.ts"],
+      "@openbuddy/auth-casdoor": ["../auth/openbuddy-casdoor/src/index.ts"]
+    }
+  }
+}
