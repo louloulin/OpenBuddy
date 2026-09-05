@@ -419,3 +419,6 @@ export function mountSession(ctx: Context): Session {
 
 export { brand }
 export type { Branded }
+
+export { sessionTree, branchKindOf, entrySummary } from "./session-tree"
+export type { SessionTreeBranch, SessionTreeBranchKind, SessionTreeNode } from "./session-tree"
