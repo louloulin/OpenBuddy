@@ -6279,6 +6279,11 @@ textarea.mshell-field__control { resize: vertical; min-height: 96px; font-family
   color: var(--wb-text-tertiary);
   cursor: pointer;
   border-radius: 16px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  width: 100%;
 }
 /* 拖拽文件落区遮罩(对齐 WorkBuddy drop-zone) */
 .wb-composer__dropzone {
@@ -7656,10 +7661,10 @@ body.dark .permission-picker__popover,
 .home__activity-banner-cta:hover { background: #d97706; }
 .home__activity-banner-close {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
+  top: 5px;
+  right: 5px;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 50%;
   background: transparent;
@@ -7703,6 +7708,7 @@ body.dark .permission-picker__popover,
 }
 @media (max-width: 900px) {
   .home__practices-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home__activity-banner { display: none; }
 }
 @media (max-width: 560px) {
   .home__practices-grid { grid-template-columns: 1fr; }
@@ -7796,13 +7802,13 @@ body.dark .permission-picker__popover,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 32px;
+  height: 32px;
   border: none;
   background: none;
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 6px;
   padding: 0;
 }
 .wb-composer__scene-tag-remove:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
@@ -8775,6 +8781,36 @@ body.dark .permission-picker__popover,
   background: var(--wb-bg-hover);
   color: var(--wb-text-strong);
 }
+.conversation-search-modal__scopes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--wb-border-subtle, rgba(0, 0, 0, 0.06));
+  flex-shrink: 0;
+}
+.conversation-search-modal__scope {
+  flex: none;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--wb-text-medium);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.conversation-search-modal__scope:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.conversation-search-modal__scope--active {
+  border-color: color-mix(in srgb, var(--wb-brand, #00a884) 45%, transparent);
+  background: color-mix(in srgb, var(--wb-brand, #00a884) 12%, transparent);
+  color: var(--wb-text-strong);
+}
 .conversation-search-modal__body {
   flex: 1;
   overflow-y: auto;
@@ -8806,6 +8842,10 @@ body.dark .permission-picker__popover,
 }
 .conversation-search-modal__item:hover {
   background: var(--wb-bg-hover);
+}
+.conversation-search-modal__item--active,
+.conversation-search-modal__item--active:hover {
+  background: var(--wb-bg-active, var(--wb-bg-hover));
 }
 .conversation-search-modal__item-icon {
   color: var(--wb-text-weak);

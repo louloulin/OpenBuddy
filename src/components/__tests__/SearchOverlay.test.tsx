@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { SearchOverlay } from "@openbuddy/ui-workbench";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useProjectsStore } from "@/stores/projects-store";
@@ -47,6 +47,86 @@ describe("SearchOverlay unified search", () => {
     expect(screen.getByText("客户报价")).toBeInTheDocument();
     fireEvent.click(screen.getByText("客户报价"));
     expect(onSelectEmail).toHaveBeenCalledWith("gmail:a1", "thread-1");
+  });
+
+  it("labels the search input and supports keyboard result selection", async () => {
+    const onSelectEmail = vi.fn();
+    mocks.emailListThreadsPage.mockResolvedValue({ items: [{ id: "thread-keyboard", accountId: "gmail:a1", subject: "键盘选择邮件", snippet: "报价", from: { address: "customer@example.com" }, date: "2026-08-30T10:00:00Z", messageCount: 1, unread: false, labels: [] }] });
+    render(<SearchOverlay open onClose={vi.fn()} onSelect={vi.fn()} onSelectEmail={onSelectEmail} />);
+    const input = screen.getByRole("combobox", { name: "全局搜索" });
+    fireEvent.change(input, { target: { value: "键盘" } });
+
+    expect(await screen.findByText("键盘选择邮件")).toBeInTheDocument();
+    expect(input).toHaveAttribute("aria-activedescendant", "conversation-search-result-email-gmail-a1-thread-keyboard");
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSelectEmail).toHaveBeenCalledWith("gmail:a1", "thread-keyboard");
+  });
+
+  it("keeps Tab focus inside the modal and restores the trigger on close", async () => {
+    const trigger = document.createElement("button");
+    trigger.textContent = "打开搜索";
+    document.body.append(trigger);
+    trigger.focus();
+
+    const { rerender } = render(
+      <SearchOverlay open={false} onClose={vi.fn()} onSelect={vi.fn()} />,
+    );
+    rerender(<SearchOverlay open onClose={vi.fn()} onSelect={vi.fn()} />);
+    const input = screen.getByRole("combobox", { name: "全局搜索" });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "全局搜索" }), { key: "Tab" });
+    expect(screen.getByRole("button", { name: "关闭" })).toHaveFocus();
+
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "全局搜索" }), { key: "Tab", shiftKey: true });
+    expect(input).toHaveFocus();
+
+    rerender(<SearchOverlay open={false} onClose={vi.fn()} onSelect={vi.fn()} />);
+    expect(trigger).toHaveFocus();
+    trigger.remove();
+  });
+
+  it("narrows remote requests to the selected scope", async () => {
+    render(<SearchOverlay open onClose={vi.fn()} onSelect={vi.fn()} />);
+    const input = screen.getByRole("combobox", { name: "全局搜索" });
+    fireEvent.change(input, { target: { value: "报价" } });
+    fireEvent.click(screen.getByRole("button", { name: "邮件" }));
+
+    await waitFor(() => expect(mocks.emailListThreadsPage).toHaveBeenCalledWith({ query: "报价", limit: 20 }));
+    expect(mocks.sessionSearch).not.toHaveBeenCalled();
+    expect(mocks.tasksListForSession).not.toHaveBeenCalled();
+    expect(mocks.calendarList).not.toHaveBeenCalled();
+    expect(mocks.searchStoredKnowledge).not.toHaveBeenCalled();
+  });
+
+  it("ignores a stale response after the query changes", async () => {
+    vi.useFakeTimers();
+    const oldResult = { sessionId: "old", title: "旧查询结果", snippet: "old" };
+    const newResult = { sessionId: "new", title: "新查询结果", snippet: "new" };
+    let resolveOld: (value: typeof oldResult[]) => void = () => {};
+    let resolveNew: (value: typeof newResult[]) => void = () => {};
+    mocks.sessionSearch
+      .mockReturnValueOnce(new Promise<typeof oldResult[]>((resolve) => { resolveOld = resolve; }))
+      .mockReturnValueOnce(new Promise<typeof newResult[]>((resolve) => { resolveNew = resolve; }));
+
+    try {
+      render(<SearchOverlay open onClose={vi.fn()} onSelect={vi.fn()} />);
+      const input = screen.getByRole("combobox", { name: "全局搜索" });
+      fireEvent.change(input, { target: { value: "旧查询" } });
+      act(() => vi.advanceTimersByTime(250));
+
+      fireEvent.change(input, { target: { value: "新查询" } });
+      act(() => vi.advanceTimersByTime(250));
+      await act(async () => {
+        resolveNew([newResult]);
+        resolveOld([oldResult]);
+      });
+
+      expect(screen.getByText("新查询结果")).toBeInTheDocument();
+      expect(screen.queryByText("旧查询结果")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("ranks email subject matches before weaker body matches and exposes thread state", async () => {

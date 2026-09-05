@@ -244,10 +244,7 @@ function Shell() {
         e.preventDefault();
         setShortcutsOpen((v) => !v);
       }
-      // R1.4 — Cmd+K opens the search overlay (matches advertised binding in
-      // KeyboardShortcutsDialog). Skip when typing — Cmd+K inside inputs is
-      // usually a browser shortcut anyway.
-      if (!isEditable && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === "k" || e.key === "K")) {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
         setSearchOpen(true);
       }
