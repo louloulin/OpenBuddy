@@ -79,4 +79,22 @@ describe("openbuddy-extra-providers — MVP-6 first-class providers", () => {
     // model list should be fetched on demand, not statically defined.
     expect(body).toMatch(/models:\s*\[\s*\]/);
   });
+
+  it("registers an Orcarouter.ai provider pointing at api.orcarouter.ai/v1", () => {
+    expect(body).toMatch(
+      /api\.registerProvider\(\s*"orcarouter"[\s\S]*?baseUrl:\s*orcarouterBaseUrl/,
+    );
+  });
+
+  it("honors ORCAROUTER_BASE_URL env var with https://api.orcarouter.ai/v1 default", () => {
+    expect(body).toMatch(
+      /process\.env\.ORCAROUTER_BASE_URL\s*\?\?\s*"https:\/\/api\.orcarouter\.ai\/v1"/,
+    );
+  });
+
+  it("only registers orcarouter when ORCAROUTER_API_KEY is set (no default dummy)", () => {
+    // Same guard shape as corp-proxy: env-var check precedes registerProvider.
+    const guardRe = /if\s*\(\s*orcarouterApiKey\s*\)\s*\{[\s\S]*?api\.registerProvider\(\s*"orcarouter"/;
+    expect(body).toMatch(guardRe);
+  });
 });

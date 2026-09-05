@@ -1215,6 +1215,20 @@ export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResol
         models: [],
       });
     }
+    // Orcarouter.ai gateway — OpenAI Chat-Completions compatible aggregator
+    // with 200+ upstream models and an `orcarouter/auto` routing mode.
+    // Only registered when ORCAROUTER_API_KEY is set so the default
+    // OpenBuddy install doesn't ship a placeholder. ORCAROUTER_BASE_URL
+    // overrides the default endpoint for self-hosted Orcarouter instances.
+    const orcarouterApiKey = process.env.ORCAROUTER_API_KEY;
+    if (orcarouterApiKey) {
+      const orcarouterBaseUrl = (process.env.ORCAROUTER_BASE_URL ?? "https://api.orcarouter.ai/v1").replace(/\/+$/, "");
+      api.registerProvider("orcarouter", {
+        baseUrl: orcarouterBaseUrl,
+        apiKey: orcarouterApiKey,
+        models: [],
+      });
+    }
   },
 };
 

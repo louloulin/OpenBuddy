@@ -302,6 +302,17 @@ const PRESETS: Record<ProviderKind, Preset> = {
     placeholderKey: "sk-...",
     helpUrl: "platform.minimaxi.com",
   },
+  orcarouter: {
+    label: "Orcarouter.ai (OpenAI 兼容网关)",
+    baseUrl: "https://api.orcarouter.ai/v1",
+    apiBackend: "chat_completions",
+    authScheme: "bearer",
+    // Routing aliases that let the gateway pick a model per request; users
+    // can also type any concrete id (`openai/gpt-5.6-luna`, etc.).
+    models: ["orcarouter/auto", "orcarouter/cheapest", "orcarouter/balanced", "orcarouter/quality"],
+    placeholderKey: "sk-orca-...",
+    helpUrl: "orcarouter.ai",
+  },
   new_api: {
     label: "New API（OpenAI 兼容网关）",
     // New API is self-hosted; the instance URL must be supplied by the user.
@@ -1126,6 +1137,7 @@ function ProviderEditor({
                     "minimax",
                     "minimax_openai",
                     "new_api",
+                    "orcarouter",
                     "custom",
                     "custom_anthropic",
                   ] as ProviderKind[]

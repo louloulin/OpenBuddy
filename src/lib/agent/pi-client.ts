@@ -1660,6 +1660,7 @@ export type ProviderKind =
   | "minimax"
   | "minimax_openai"
   | "new_api"
+  | "orcarouter"
   | "minimax_cn"
   | "custom"
   | "custom_anthropic";
