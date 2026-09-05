@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# OpenBuddy CLI launcher.
+# Resolves the actual Node.js entrypoint (bin/openbuddy-cli.mjs) and forwards
+# all CLI args to it. Honors a sibling `openbuddy-cli.mjs` even when invoked
+# from $PATH or via npm bin linking.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CLI_JS="$SCRIPT_DIR/openbuddy-cli.mjs"
+
+if [[ ! -f "$CLI_JS" ]]; then
+  # Fallback: dev install layout — node_modules/openbuddy/bin/openbuddy-cli.mjs
+  NPM_PKG_DIR="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd)"
+  if [[ -f "$NPM_PKG_DIR/../openbuddy-cli.mjs" ]]; then
+    CLI_JS="$NPM_PKG_DIR/../openbuddy-cli.mjs"
+  fi
+fi
+
+if [[ ! -f "$CLI_JS" ]]; then
+  echo "openbuddy: cannot locate bin/openbuddy-cli.mjs near $SCRIPT_DIR" >&2
+  exit 127
+fi
+
+exec node "$CLI_JS" "$@"
