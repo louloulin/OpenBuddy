@@ -25,6 +25,7 @@ export interface ElectronWindowApi {
     writeText: (text: string) => Promise<void>;
   };
   events: {
+    openPiStream: (handler: (payload: unknown) => void) => Promise<UnlistenFn | null>;
     on: (channel: string, handler: (payload: unknown) => void) => UnlistenFn;
   };
   dialog: {
@@ -288,6 +289,17 @@ export async function listen<T = unknown>(
   handler: (event: ElectronEvent<T>) => void,
 ): Promise<UnlistenFn> {
   return getApi().events.on(channel, (payload) => handler({ type: channel, payload: payload as T }));
+}
+
+/**
+ * Subscribe to the high-frequency Pi stream via a transferred MessagePort.
+ * Returns `null` when the bridge does not expose the port API; callers keep
+ * the legacy IPC `pi://update` subscription as the fallback in that case.
+ */
+export async function openPiStream(handler: (payload: unknown) => void): Promise<UnlistenFn | null> {
+  const api = getApi();
+  if (!api.events || typeof api.events.openPiStream !== "function") return null;
+  return api.events.openPiStream(handler);
 }
 
 export async function open(options: Record<string, unknown> = {}): Promise<string | string[] | null> {

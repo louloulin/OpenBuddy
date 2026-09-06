@@ -1,11 +1,15 @@
 import { app, shell } from "electron";
-import { watch, type FSWatcher } from "node:fs";
 import { readFile, writeFile, mkdir, rename, rm, unlink, readdir, stat, open } from "node:fs/promises";
 import { homedir } from "node:os";
-import { agentHome } from "./agent-home";
 import { casdoorAuth } from "../casdoor/casdoor-auth";
 import { randomUUID } from "node:crypto";
-import { resolve, join, dirname, relative, sep, isAbsolute, basename } from "node:path";
+import { resolve, join, dirname, basename } from "node:path";
+// Path/path-security helpers (piHome / isPathWithin / piSessionDir) are owned
+// by host-modules/_host-paths.ts. Imported here for local use (passed into
+// installHostModules) and re-exported so existing callers and feature modules
+// keep one canonical implementation (no duplicate drift).
+import { piHome, isPathWithin, piSessionDir } from "./host-modules/_host-paths";
+export { piHome, isPathWithin, piSessionDir };
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -41,7 +45,6 @@ import {
   type PluginCommitMarker,
   type PluginPatch,
   type PluginProfile,
-  discoverRendererPluginEntries,
   discoverRemoteManifestEntries,
   discoverTypertManifestEntries,
   validateTypertHostContribution,
@@ -71,7 +74,6 @@ import {
 } from "@openbuddy/plugin-host";
 import {
   createOpenBuddyProfile,
-  openBuddyDeepSeekRendererEntries,
   openBuddyCapabilityPluginIndex,
 } from "@openbuddy/bundle-base";
 import * as openBuddyCorePlugin from "./openbuddy-core-plugin";
@@ -98,11 +100,25 @@ import { bindCapabilityEventBridge } from "../capability-event-bridge";
 import { getDeepSeekRemoteMethods, resolveDeepSeekModule } from "../deepseek/deepseek-compat";
 import { DeepSeekTypertService, deepSeekSessionQueryRemote, type DeepSeekPiAgentRuntime, type DeepSeekPiToolHooks, type DeepSeekToolDecision, type DeepSeekToolExecution } from "../deepseek/deepseek-runtime";
 import { DeepSeekCordisRuntime, type DeepSeekCordisInvocation, type DeepSeekCordisPluginEntry, type DeepSeekCordisRuntimeSnapshot } from "@openbuddy/plugin-host";
-import { deepSeekCapabilityDefinitions, deepSeekCapabilityPackageForService, deepSeekCapabilityRemote } from "../deepseek/deepseek-capabilities";
+import { deepSeekCapabilityPackageForService, deepSeekCapabilityRemote } from "../deepseek/deepseek-capabilities";
 import { SessionEventLog, type SessionEventRecord } from "../session/session-event-log";
 import { RemoteDispatcher, type RemoteContribution, type RemoteDescriptor } from "../harness/remote-dispatch";
 import { invokeRemoteWithGateway } from "../harness/remote-invocation";
 import { serializeRemoteContribution } from "@openbuddy/plugin-host";
+import {
+  normalizePublishedRemoteContribution as normalizePublishedRemoteContributionPure,
+  disposeProfileTypertRegistrations,
+  type ProfileTypertRegistration,
+} from "./host-modules/profile/contributions-pure";
+import {
+  discoverRendererPluginManifest as discoverRendererPluginManifestImpl,
+  discoverRendererPluginManifestUncached as discoverRendererPluginManifestUncachedImpl,
+} from "./host-modules/profile/renderer-manifest";
+import {
+  startProfileWatchers as startProfileWatchersImpl,
+  stopProfileWatchers as stopProfileWatchersImpl,
+} from "./host-modules/profile/watchers";
+import { syncMarketplacePiExtensionStatuses as syncMarketplacePiExtensionStatusesImpl } from "./host-modules/profile/marketplace-status";
 import { createDshHostRunner } from "../deepseek/dsh-host-runner";
 import {
   applyPiExtensionOverrides,
@@ -193,6 +209,7 @@ export interface PiAgentRuntime {
 }
 
 export type { AgentHostState } from "./host-modules/_state-shape";
+import { createDefaultAgentHostState } from "./host-modules/_default-state";
 
 
 
@@ -207,69 +224,12 @@ function questionAnswer(value: UiRequestValue, questionKey?: string): string | u
 }
 
 export const state: AgentHostState = {
-  session: null,
-  cwd: null,
-  model: undefined,
-  sessionUnsubscribe: null,
-  /**
-   * Phase 5 — see `_state-shape.ts:extensionsBound`. Initialized to null
-   * because no bind is in flight at module load; `rebindSession` /
-   * `initialize` set it to the live Promise returned by `bindExtensions`.
-   */
+  ...createDefaultAgentHostState(),
+  // Phase 5 — see `_state-shape.ts:extensionsBound`. Initialized to null
+  // because no bind is in flight at module load; `rebindSession` / `initialize`
+  // set it to the live Promise returned by `bindExtensions`.
   extensionsBound: null,
-  eventHandlers: new Set(),
-  pluginEventHandlers: new Set(),
-  context: null,
-  loader: null,
-  deepSeekCordisRuntime: null,
-  deepSeekCordisSnapshot: null,
-  deepSeekPiToolSync: null,
-  sessionEventLog: null,
-  harnessCursorStore: undefined,
-  scopeKey: undefined,
-  sessionTenantBindings: undefined,
-  eventSequence: 0,
-  sessionSequences: new Map(),
   toolRegistry: createToolRegistry(),
-  pluginState: null,
-  modelRuntime: null,
-  piResourceLoader: null,
-  piRefreshPromise: Promise.resolve(),
-  profileWatchers: [],
-  profileReloadTimer: null,
-  profileReloadPromise: Promise.resolve(),
-  profileArtifactGeneration: 0,
-  activePluginTransactions: new Map<string, PluginTransactionContext>(),
-  rendererPluginManifestCache: null,
-  profileOptions: null,
-  profileBundle: null,
-  activePluginProfile: null,
-  profilePackageJson: undefined,
-  profilePackagePaths: [],
-  profilePiExtensions: [],
-  profilePiPackagePaths: [],
-  profilePiResourcePaths: { extensions: [], skills: [], prompts: [], themes: [] },
-  piNativeResourcePaths: { skills: [], prompts: [], themes: [] },
-  piMarketplaceResourcePaths: { extensions: [], skills: [], prompts: [], themes: [] },
-  piMarketplaceAgentFiles: [],
-  piExtensionPaths: [],
-  piExtensionFactories: [],
-  hookConfigs: [],
-  piExtensionStatuses: [],
-  piExtensionOverrides: {},
-  baseProfile: null,
-  storedLayers: [],
-  toolRegistryRevision: 0,
-  pendingUiRequests: new Map(),
-  hookPermissionSessionRules: new Map(),
-  extensionEditorText: new Map(),
-  extensionToolsExpanded: new Map(),
-  runningTasks: new Map(),
-  jobsRegistry: new Map(),
-  continuableSubagents: new Map(),
-  deepSeekAgents: new Map(),
-  capabilityEventBridgeUnsubscribe: null,
-  typertRegistryUnsubscribe: null,
   remoteDispatcher: new RemoteDispatcher((context) => {
     const props = (context as unknown as { reflect?: { props?: Record<string, { type?: string }> } }).reflect?.props ?? {};
     const discovered: Array<{ package: string; descriptors: RemoteDescriptor[] }> = [];
@@ -289,17 +249,7 @@ export const state: AgentHostState = {
     }
     return discovered;
   }),
-  profileRemoteContributions: new Map(),
-  profileTypertContributions: new Map(),
-  pluginCommitGeneration: 0,
-  lastPluginCommitMarker: undefined,
-  pluginReadiness: { phase: "idle", generation: 0 },
-  providerRegistry: new Map(),
-  queueMirror: null,
   attachmentStore: new SessionAttachmentStore(join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent"), "openbuddy-attachments")),
-  presetSessionRuntime: null,
-  terminalRuntime: null,
-  subprocessRuntime: null,
 };
 
 export const lifecycleAppendQueues = new Map<string, Promise<void>>();
@@ -364,6 +314,20 @@ import {
 const capturePiProfileSnapshot = capturePiProfileSnapshotImpl;
 const restorePiProfileSnapshot = restorePiProfileSnapshotImpl;
 export type { PiProfileSnapshot };
+
+// ----------------------------------------------------------------------------
+// Batch A — provider/model persistence domain lives in host-modules/models-config.
+// We bind the impls here so the facade + installHostModules deps keep importing
+// from this file unchanged. installModelConfig wires `state`/`piHome` at module
+// load (see the install call next to the re-export below).
+import {
+  installModelConfig,
+  readModelsConfig as readModelsConfigImpl,
+  saveProvider as saveProviderImpl,
+  saveModel as saveModelImpl,
+  deleteModel as deleteModelImpl,
+  deleteProvider as deleteProviderImpl,
+} from "./host-modules/models-config";
 
 function invokeRemote(request: unknown): Promise<unknown> {
   return invokeRemoteImpl({
@@ -698,17 +662,6 @@ function isCurrentSessionPath(sessionPath: string | undefined, cwd: string | und
   return state.session.sessionManager.getSessionFile() === sessionPath;
 }
 
-export function isPathWithin(root: string, candidate: string): boolean {
-  const relativePath = relative(resolve(root), resolve(candidate));
-  return relativePath === "" || (relativePath !== ".." && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath));
-}
-
-export function piHome(): string {
-  // Shared resolver with pi-resources.ts so MCP config, session cursors, and
-  // model/auth JSON all resolve to the same directory.
-  return agentHome();
-}
-
 export function setProfilePiResourcePaths(paths: {
   extensions: readonly string[];
   skills: readonly string[];
@@ -754,86 +707,7 @@ export async function refreshHookConfigs(): Promise<void> {
 }
 
 export async function syncMarketplacePiExtensionStatuses(): Promise<void> {
-  const plugins = await piResources.listPlugins(state.cwd);
-  const marketplaceRoots = new Set(plugins.map((plugin) => resolve(plugin.root)));
-  const profileRoots = new Set([...state.profilePackagePaths, ...state.profilePiPackagePaths].map((path) => resolve(path)));
-  state.piExtensionStatuses = state.piExtensionStatuses.map((status) => {
-    const root = status.sourceBaseDir ? resolve(status.sourceBaseDir) : undefined;
-    const plugin = plugins.find((entry) => root === resolve(entry.root) || (status.source ? isPathWithin(entry.root, status.source) : false));
-    if (!plugin) return status;
-    if (!plugin.enabled) {
-      return {
-        ...status,
-        state: "disabled" as const,
-        managed: true,
-        packageName: plugin.name,
-        ...(plugin.version ? { version: plugin.version } : {}),
-        sourceScope: plugin.scope,
-        sourceOrigin: "package" as const,
-        sourceBaseDir: plugin.root,
-        health: "degraded" as const,
-        disabledReason: "user" as const,
-        commands: [],
-        toolCount: 0,
-        error: undefined,
-      };
-    }
-    const nextStatus: PiExtensionStatus = {
-      ...status,
-      managed: true,
-      packageName: plugin.name,
-      ...(plugin.version ? { version: plugin.version } : {}),
-      ...(plugin.version ? { version: plugin.version } : {}),
-      sourceScope: plugin.scope,
-      sourceOrigin: "package" as const,
-      sourceBaseDir: plugin.root,
-      health: status.health ?? (status.state === "failed" ? "failed" : "healthy"),
-    };
-    return nextStatus;
-  }).filter((status) => {
-    if (!status.sourceBaseDir) return true;
-    const root = resolve(status.sourceBaseDir);
-    if (profileRoots.has(root)) return true;
-    if (marketplaceRoots.has(root)) return true;
-    return status.managed === false;
-  });
-  // Stat each disabled plugin\'s `extensions/` directory in parallel rather
-  // than serially through `statSync`, which would block the main-process
-  // event loop on every startup.
-  const disabledPlugins = plugins.filter((entry) => !entry.enabled);
-  const extensionsPresence = await Promise.all(
-    disabledPlugins.map(async (plugin) => {
-      const packageRoot = resolve(plugin.root);
-      let isDir = false;
-      try {
-        isDir = (await stat(join(packageRoot, "extensions"))).isDirectory();
-      } catch {
-        isDir = false;
-      }
-      return { plugin, packageRoot, hasExtensions: isDir };
-    }),
-  );
-  for (const { plugin, packageRoot, hasExtensions } of extensionsPresence) {
-    if (!hasExtensions || state.piExtensionStatuses.some((status) => status.sourceBaseDir && resolve(status.sourceBaseDir) === packageRoot)) continue;
-    state.piExtensionStatuses.push({
-      id: plugin.id ?? plugin.name,
-      name: plugin.name,
-      kind: "pi",
-      state: "disabled",
-      source: packageRoot,
-      builtIn: false,
-      managed: true,
-      packageName: plugin.name,
-      sourceScope: plugin.scope,
-      sourceOrigin: "package",
-      sourceBaseDir: packageRoot,
-      health: "degraded",
-      disabledReason: "user",
-      commands: [],
-      toolCount: 0,
-      hookCount: plugin.hookCount,
-    });
-  }
+  return syncMarketplacePiExtensionStatusesImpl(state);
 }
 
 function syncPiNativeResourcePaths(): void {
@@ -948,11 +822,6 @@ function createPiSessionFacade(): PiSessionFacade {
   };
 }
 
-export function piSessionDir(cwd: string): string {
-  const encoded = resolve(cwd).replace(/^[/\\]/, "").replace(/[\\/:]/g, "-");
-  return join(piHome(), "sessions", `--${encoded}--`);
-}
-
 export async function listAllPiSessions(): Promise<Awaited<ReturnType<typeof SessionManager.listAll>>> {
   const root = piHome();
   const sessionRoots = [root, join(root, "sessions")];
@@ -1015,10 +884,7 @@ async function artifactPackagePaths(): Promise<string[]> {
 
 
 function stopProfileWatchers(): void {
-  if (state.profileReloadTimer) clearTimeout(state.profileReloadTimer);
-  state.profileReloadTimer = null;
-  for (const watcher of state.profileWatchers) watcher.close();
-  state.profileWatchers = [];
+  stopProfileWatchersImpl(state);
 }
 
 // Stage F-2: PiProfileSnapshot + capturePiProfileSnapshot + restorePiProfileSnapshot
@@ -1196,38 +1062,7 @@ async function discoverProfileRemoteContributions(): Promise<Map<string, RemoteC
 }
 
 function normalizePublishedRemoteContribution(contribution: RemoteContribution): RemoteContribution {
-  const definition = deepSeekCapabilityDefinitions.find((candidate) => candidate.packageName === contribution.package);
-  if (!definition) return contribution;
-  const descriptors = [...contribution.descriptors];
-  const endpoints = new Set(descriptors.map((descriptor) => `${descriptor.namespace}/${descriptor.method}`));
-  for (const descriptor of [...descriptors]) {
-    const remoteExportMatch = /^remoteExport([A-Z][A-Za-z0-9_$.-]*)$/.exec(descriptor.method);
-    const canonicalMethod = remoteExportMatch
-      ? `${remoteExportMatch[1]![0]!.toLowerCase()}${remoteExportMatch[1]!.slice(1)}`
-      : descriptor.implementation?.startsWith("remoteExport")
-        ? descriptor.implementation.replace(/^remoteExport([A-Z])/, (_, first: string) => first.toLowerCase())
-        : undefined;
-    if (!canonicalMethod || !definition.methods.includes(canonicalMethod)) continue;
-    const canonical = { ...descriptor, method: canonicalMethod, implementation: canonicalMethod, service: definition.serviceKey };
-    const canonicalEndpoint = `${canonical.namespace}/${canonical.method}`;
-    const existingCanonical = descriptors.find((candidate) => `${candidate.namespace}/${candidate.method}` === canonicalEndpoint);
-    if (existingCanonical) {
-      Object.assign(existingCanonical, { implementation: canonicalMethod, service: definition.serviceKey });
-    } else {
-      descriptors.push(canonical);
-      endpoints.add(canonicalEndpoint);
-    }
-    const alias = { ...descriptor, implementation: canonicalMethod, service: definition.serviceKey };
-    const aliasEndpoint = `${alias.namespace}/${alias.method}`;
-    if (!endpoints.has(aliasEndpoint)) {
-      descriptors.push(alias);
-      endpoints.add(aliasEndpoint);
-    } else {
-      const existingAlias = descriptors.find((candidate) => `${candidate.namespace}/${candidate.method}` === aliasEndpoint);
-      if (existingAlias) Object.assign(existingAlias, { implementation: canonicalMethod, service: definition.serviceKey });
-    }
-  }
-  return { ...contribution, descriptors };
+  return normalizePublishedRemoteContributionPure(contribution);
 }
 
 async function discoverProfileTypertContributions(): Promise<Map<string, TypertHostContribution>> {
@@ -1252,19 +1087,6 @@ async function discoverProfileTypertContributions(): Promise<Map<string, TypertH
     result.set(entry.packageName, validateTypertHostContribution(entry.packageName, module.TYPERT ?? module.default));
   }
   return result;
-}
-
-type ProfileTypertRegistration = {
-  contribution: TypertHostContribution;
-  dispose: () => void;
-  remoteDispose?: () => void;
-};
-
-function disposeProfileTypertRegistrations(registrations: Iterable<ProfileTypertRegistration>): void {
-  for (const entry of [...registrations].reverse()) {
-    entry.remoteDispose?.();
-    entry.dispose();
-  }
 }
 
 function clearProfileArtifacts(): void {
@@ -1397,13 +1219,9 @@ export async function profilePackages(): Promise<ProfilePackageInfo[]> {
   });
 }
 
-async function installProfileBundle(sourcePath: string): Promise<ProfilePackageInfo> {
-  return installProfileBundleImpl(sourcePath);
-}
+async function installProfileBundle(sourcePath: string) : Promise<ProfilePackageInfo> { return installProfileBundleImpl(sourcePath); }
 
-async function removeProfileBundle(name: string): Promise<void> {
-  return removeProfileBundleImpl(name);
-}
+async function removeProfileBundle(name: string) : Promise<void> { return removeProfileBundleImpl(name); }
 
 /**
  * C6: Install the curated default Pi package bundle into the current profile.
@@ -1423,30 +1241,7 @@ export async function installDefaultPiPackages(options?: { force?: boolean }): P
 }
 
 export async function startProfileWatchers(): Promise<void> {
-  stopProfileWatchers();
-  const targets = profileResourceWatchPaths();
-  // Probe each target asynchronously so the main process event loop stays
-  // free during profile reloads. `stat()` with `throwIfNoEntry: false`
-  // would require an extra try/catch per call, so we use `stat()` and
-  // normalize the failure shape below.
-  const probes = await Promise.all(
-    targets.map(async (target) => {
-      try {
-        const stats = await stat(target);
-        return { target, stats };
-      } catch {
-        return { target, stats: null };
-      }
-    }),
-  );
-  for (const { target, stats } of probes) {
-    if (!stats) continue;
-    try {
-      state.profileWatchers.push(watch(target, { persistent: false, recursive: stats.isDirectory() }, () => scheduleProfileReload()));
-    } catch (error) {
-      console.warn(`[openbuddy] failed to watch ${target}:`, error);
-    }
-  }
+  return startProfileWatchersImpl(state, () => scheduleProfileReload(), () => profileResourceWatchPaths());
 }
 
 // Stage F-2: ElectronHarnessPluginLoader moved to host-modules/profile/loader.ts.
@@ -1508,15 +1303,11 @@ import { provideRpcUiContext } from "./host-modules/bootstrap/provide-rpc-ui-con
 import { wireContextServices, type WireContextServicesDeps } from "./host-modules/bootstrap/wire-context-services";
 import type { ProvideRpcUiContextDeps } from "./host-modules/bootstrap/provide-rpc-ui-context";
 import { wireDshServices, type WireDshServicesDeps } from "./host-modules/bootstrap/wire-dsh-services";
-export function emitPluginEvent(type: string, payload: unknown) {
-  return emitPluginEventImpl(type, payload);
-}
+export function emitPluginEvent(type: string, payload: unknown) { return emitPluginEventImpl(type, payload); }
 export function pluginReadinessSnapshot() {
   return pluginReadinessSnapshotImpl();
 }
-export function pluginReadiness() {
-  return pluginReadinessImpl();
-}
+export function pluginReadiness() { return pluginReadinessImpl(); }
 export { pluginLifecycleQueue } from "./host-modules/plugin-event-bus";
 
 function selectedProfileDirectory(): string {
@@ -1679,9 +1470,7 @@ function createPiPlanModeFactory(): ExtensionFactory {
 import {
   requestHookPermission as requestHookPermissionImpl,
 } from "./host-modules/hook-permission";
-async function requestHookPermission(title: string, message: string, request?: HookPermissionRequest) {
-  return requestHookPermissionImpl(title, message, request);
-}
+async function requestHookPermission(title: string, message: string, request?: HookPermissionRequest) { return requestHookPermissionImpl(title, message, request); }
 
 export function configurePiExtensions(manifestSpecs: readonly OpenBuddyPiExtensionSpec[]): void {
   const specs = applyPiExtensionOverrides(manifestSpecs, state.piExtensionOverrides);
@@ -2515,9 +2304,7 @@ import {
   assistantMessageText as assistantMessageTextImpl,
   createTeamRunner as createTeamRunnerImpl,
 } from "./host-modules/team-runner";
-function assistantMessageText(messages: unknown): string {
-  return assistantMessageTextImpl(messages);
-}
+function assistantMessageText(messages: unknown) : string { return assistantMessageTextImpl(messages); }
 function createTeamRunner(modelRuntime: ModelRuntime, cwd: string, getModel: () => Model<any> | undefined): TeamRunner {
   return createTeamRunnerImpl(modelRuntime, cwd, getModel);
 }
@@ -2588,13 +2375,9 @@ function getModel() { return getModelImpl(); }
 function getModelRuntime() { return getModelRuntimeImpl(); }
 function getCwd() { return getCwdImpl(); }
 
-function listCommands() {
-  return listCommandsImpl();
-}
+function listCommands() { return listCommandsImpl(); }
 
-function listRunningTasks() {
-  return listRunningTasksImpl();
-}
+function listRunningTasks() { return listRunningTasksImpl(); }
 
 type HarnessSubagentEntry = {
   kind: "child";
@@ -2618,13 +2401,9 @@ type HarnessJobView = {
 
 
 
-export async function listSubagentChildren(parentSessionId: string): Promise<HarnessSubagentEntry[]> {
-  return listSubagentChildrenImpl(parentSessionId);
-}
+export async function listSubagentChildren(parentSessionId: string) : Promise<HarnessSubagentEntry[]> { return listSubagentChildrenImpl(parentSessionId); }
 
-function listSessionJobs(sessionId: string): HarnessJobView[] {
-  return listSessionJobsImpl(sessionId);
-}
+function listSessionJobs(sessionId: string) : HarnessJobView[] { return listSessionJobsImpl(sessionId); }
 
 async function subagentHistory(
   parentSessionId: string,
@@ -2704,13 +2483,9 @@ async function createDeepSeekAgentRuntime(options: {
   return (options.resume ? resumeDeepSeekAgentImpl : createDeepSeekAgentImpl)(options);
 }
 
-async function createDeepSeekAgent(options: Parameters<typeof createDeepSeekAgentRuntime>[0]): Promise<DeepSeekPiAgentRuntime> {
-  return createDeepSeekAgentImpl(options);
-}
+async function createDeepSeekAgent(options: Parameters<typeof createDeepSeekAgentRuntime>[0]) : Promise<DeepSeekPiAgentRuntime> { return createDeepSeekAgentImpl(options); }
 
-async function resumeDeepSeekAgent(options: Parameters<typeof createDeepSeekAgentRuntime>[0]): Promise<DeepSeekPiAgentRuntime> {
-  return resumeDeepSeekAgentImpl(options);
-}
+async function resumeDeepSeekAgent(options: Parameters<typeof createDeepSeekAgentRuntime>[0]) : Promise<DeepSeekPiAgentRuntime> { return resumeDeepSeekAgentImpl(options); }
 
 async function promptSubagent(
   parentSessionId: string,
@@ -2724,27 +2499,17 @@ async function interruptSubagent(parentSessionId: string, childSessionId: string
   return interruptSubagentImpl(parentSessionId, childSessionId);
 }
 
-async function killTask(taskId: string): Promise<void> {
-  return killTaskImpl(taskId);
-}
+async function killTask(taskId: string) : Promise<void> { return killTaskImpl(taskId); }
 async function authStatus() { return authStatusImpl(); }
 async function providerCatalog() { return providerCatalogImpl(); }
 
-async function loadSession(sessionId: string, cwd: string, options?: { traceId?: string; sessionId?: string }): Promise<void> {
-  return loadSessionImpl(sessionId, cwd, options);
-}
+async function loadSession(sessionId: string, cwd: string, options?: { traceId?: string; sessionId?: string }) : Promise<void> { return loadSessionImpl(sessionId, cwd, options); }
 
-function sessionInfo(sessionId: string) {
-  return sessionInfoImpl(sessionId);
-}
+function sessionInfo(sessionId: string) { return sessionInfoImpl(sessionId); }
 
-function sessionUsage(sessionId: string) {
-  return sessionUsageImpl(sessionId);
-}
+function sessionUsage(sessionId: string) { return sessionUsageImpl(sessionId); }
 
-function sessionFile(sessionId: string): string {
-  return sessionFileImpl(sessionId);
-}
+function sessionFile(sessionId: string) : string { return sessionFileImpl(sessionId); }
 
 async function rewindSession(sessionId: string, targetPromptIndex: number, mode = "conversation"): Promise<void> {
   return rewindSessionImpl(sessionId, targetPromptIndex, mode);
@@ -2790,161 +2555,32 @@ function mcpCapabilityGovernance(): Array<{
   return mcpCapabilityGovernanceImpl(state);
 }
 
-async function renameSession(sessionId: string, title: string, cwd: string): Promise<void> {
-  return renameSessionImpl(sessionId, title, cwd);
-}
+async function renameSession(sessionId: string, title: string, cwd: string) : Promise<void> { return renameSessionImpl(sessionId, title, cwd); }
 
-async function deleteSession(sessionId: string, cwd: string): Promise<void> {
-  return deleteSessionImpl(sessionId, cwd);
-}
+async function deleteSession(sessionId: string, cwd: string) : Promise<void> { return deleteSessionImpl(sessionId, cwd); }
 
 async function inspirationGenerate(category: string, count: number, cwd?: string): Promise<{ sessionId: string; category: string; count: number }> {
   return inspirationGenerateImpl(category, count, cwd);
 }
 
 
-type ProviderDraft = { id: string; providerKind: string; label?: string; apiKey?: string; baseUrl?: string; apiBackend?: string; authScheme?: string; contextWindow?: number };
-type ModelDraft = { modelId: string; providerId: string; name?: string; contextWindow?: number; reasoning?: boolean };
+// ----------------------------------------------------------------------------
+// Batch A — provider/model persistence domain lives in host-modules/models-config
+// (functions bound via the import above). agent-host keeps the public export
+// `readModelsConfig` and the facade bindings for saveProvider/saveModel/
+// deleteProvider/deleteModel; `installModelConfig` wires state+piHome at module
+// load so these stay callable at runtime without agent-host owning the logic.
+export const readModelsConfig = readModelsConfigImpl;
+const saveProvider = saveProviderImpl;
+const saveModel = saveModelImpl;
+const deleteModel = deleteModelImpl;
+const deleteProvider = deleteProviderImpl;
+installModelConfig({ state, piHome });
 
-export async function readModelsConfig(): Promise<{ providers: Record<string, any>; [key: string]: any }> {
-  try { return JSON.parse(await readFile(join(piHome(), "models.json"), "utf8")); }
-  catch { return { providers: {} }; }
-}
+// syncAuthCredentials: dead copy removed (canonical impl lives in
+// host-modules/bootstrap/model-runtime.ts).
 
-async function writeModelsConfig(config: { providers: Record<string, any>; [key: string]: any }): Promise<void> {
-  await mkdir(piHome(), { recursive: true });
-  const file = join(piHome(), "models.json");
-  const temporary = `${file}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(config, null, 2)}\n`, "utf8");
-  await rename(temporary, file);
-  // Keep the runtime instance that was injected into the active AgentSession.
-  // Replacing it here leaves the session checking credentials against the old
-  // runtime while setModel() resolves the model from the new one.
-  if (state.modelRuntime) {
-    await state.modelRuntime.refresh({ allowNetwork: false });
-  }
-}
-
-async function updateStoredApiKey(providerId: string, apiKey: string | undefined): Promise<void> {
-  const authPath = join(piHome(), "auth.json");
-  let auth: Record<string, unknown> = {};
-  try { auth = JSON.parse(await readFile(authPath, "utf8")); } catch { /* first credential */ }
-  if (apiKey) auth[providerId] = { type: "api_key", key: apiKey };
-  else delete auth[providerId];
-  await mkdir(piHome(), { recursive: true });
-  const temporary = `${authPath}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(auth, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-  await rename(temporary, authPath);
-}
-
-async function saveProvider(provider: ProviderDraft): Promise<void> {
-  const config = await readModelsConfig();
-  const current = config.providers[provider.id] ?? {};
-  config.providers[provider.id] = {
-    ...current,
-    name: provider.label || current.name,
-    baseUrl: provider.baseUrl || current.baseUrl,
-    api: provider.apiBackend === "messages" ? "anthropic-messages" : provider.apiBackend === "responses" ? "openai-responses" : "openai-completions",
-    // `authHeader` is the pi-ai switch for Authorization/Bearer. Native
-    // Anthropic Messages providers use x-api-key and therefore leave it off.
-    authHeader: provider.authScheme === "bearer",
-    models: current.models ?? [],
-  };
-  await writeModelsConfig(config);
-  if (provider.apiKey && !provider.apiKey.startsWith("•")) {
-    await updateStoredApiKey(provider.id, provider.apiKey);
-    await state.modelRuntime?.setRuntimeApiKey(provider.id, provider.apiKey);
-  }
-  if (state.modelRuntime) {
-    try { await state.modelRuntime.refresh({ allowNetwork: false, providers: [provider.id] }); }
-    catch (error) { console.error(`[openbuddy] runtime refresh after save-provider failed`, error); }
-  }
-}
-
-async function saveModel(model: ModelDraft): Promise<void> {
-  const config = await readModelsConfig();
-  const provider = config.providers[model.providerId];
-  if (!provider) throw new Error(`Pi provider not found: ${model.providerId}`);
-  const models = Array.isArray(provider.models) ? provider.models.filter((item: any) => item.id !== model.modelId) : [];
-  // Preserve a previously-stored `reasoning` flag when the draft doesn't carry
-  // one, so re-saving a model (e.g. renaming it) can't silently strip reasoning
-  // support and clamp thinking to "off". An explicit draft value always wins.
-  const previous = Array.isArray(provider.models)
-    ? provider.models.find((item: any) => item.id === model.modelId)
-    : undefined;
-  const reasoning = model.reasoning ?? previous?.reasoning ?? false;
-  models.push({
-    id: model.modelId,
-    name: model.name ?? model.modelId,
-    contextWindow: model.contextWindow ?? 128000,
-    maxTokens: 16384,
-    reasoning,
-  });
-  provider.models = models;
-  await writeModelsConfig(config);
-  if (state.modelRuntime) {
-    try { await state.modelRuntime.refresh({ allowNetwork: false, providers: [model.providerId] }); }
-    catch (error) { console.error(`[openbuddy] runtime refresh after save-model failed`, error); }
-  }
-}
-
-async function deleteModel(providerId: string, modelId: string): Promise<void> {
-  const config = await readModelsConfig();
-  const provider = config.providers[providerId];
-  if (provider) provider.models = (provider.models ?? []).filter((item: any) => item.id !== modelId);
-  await writeModelsConfig(config);
-  if (state.modelRuntime) {
-    try { await state.modelRuntime.refresh({ allowNetwork: false, providers: [providerId] }); }
-    catch (error) { console.error(`[openbuddy] runtime refresh after delete-model failed`, error); }
-    await restoreActiveModelAfterMutation(providerId, modelId);
-  }
-}
-
-async function restoreActiveModelAfterMutation(providerId: string, modelId?: string): Promise<void> {
-  if (!state.session || !state.model || state.model.provider !== providerId || (modelId && state.model.id !== modelId)) return;
-  const fallback = state.modelRuntime?.getAvailableSnapshot().find((candidate) => candidate.provider !== providerId || candidate.id !== modelId);
-  if (!fallback) {
-    state.model = undefined;
-    return;
-  }
-  try {
-    await state.session.setModel(fallback);
-    state.model = fallback;
-  } catch (error) {
-    console.error(`[openbuddy] failed to restore active model after provider mutation`, error);
-    state.model = undefined;
-  }
-}
-
-async function syncAuthCredentials(runtime: ModelRuntime): Promise<void> {
-  const authPath = join(piHome(), "auth.json");
-  let entries: Record<string, unknown> = {};
-  try { entries = JSON.parse(await readFile(authPath, "utf8")); } catch { /* no auth file yet */ }
-  for (const [providerId, credential] of Object.entries(entries)) {
-    const value = credential as { type?: string; key?: string };
-    if (value?.type === "api_key" && typeof value.key === "string" && value.key.length > 0) {
-      try { await runtime.setRuntimeApiKey(providerId, value.key); }
-      catch (error) { console.error(`[openbuddy] failed to sync credential for ${providerId}`, error); }
-    }
-  }
-}
-
-async function deleteProvider(id: string): Promise<void> {
-  const config = await readModelsConfig();
-  delete config.providers[id];
-  await writeModelsConfig(config);
-  await state.modelRuntime?.removeRuntimeApiKey(id).catch(() => undefined);
-  await updateStoredApiKey(id, undefined);
-  if (state.modelRuntime) {
-    try { await state.modelRuntime.refresh({ allowNetwork: false, providers: [id] }); }
-    catch (error) { console.error(`[openbuddy] runtime refresh after delete-provider failed`, error); }
-    await restoreActiveModelAfterMutation(id);
-  }
-}
-
-export async function listSessions(cwd: string) {
-  return listSessionsImpl(cwd);
-}
+export async function listSessions(cwd: string) { return listSessionsImpl(cwd); }
 
 async function updateSessionMetadata(sessionId: string, update: (metadata: {
   pinned: string[];
@@ -2954,44 +2590,26 @@ async function updateSessionMetadata(sessionId: string, update: (metadata: {
   return updateSessionMetadataImpl(sessionId, update);
 }
 
-async function clearSessionMetadata(): Promise<void> {
-  return clearSessionMetadataImpl();
-}
+async function clearSessionMetadata() : Promise<void> { return clearSessionMetadataImpl(); }
 
-function harnessCursorPath(): string {
-  return harnessCursorPathImpl();
-}
+function harnessCursorPath() : string { return harnessCursorPathImpl(); }
 function getHarnessCursorStore(): HarnessCursorStore {
   return getHarnessCursorStoreImpl();
 }
 
-function harnessResumeTokenPath(): string {
-  return harnessResumeTokenPathImpl();
-}
+function harnessResumeTokenPath() : string { return harnessResumeTokenPathImpl(); }
 
-async function getHarnessResumeToken(): Promise<string | undefined> {
-  return getHarnessResumeTokenImpl();
-}
+async function getHarnessResumeToken() : Promise<string | undefined> { return getHarnessResumeTokenImpl(); }
 
-async function setHarnessResumeToken(token: unknown): Promise<string | undefined> {
-  return setHarnessResumeTokenImpl(token);
-}
+async function setHarnessResumeToken(token: unknown) : Promise<string | undefined> { return setHarnessResumeTokenImpl(token); }
 
-async function readHarnessSessionCursors(): Promise<Record<string, number>> {
-  return readHarnessSessionCursorsImpl();
-}
+async function readHarnessSessionCursors() : Promise<Record<string, number>> { return readHarnessSessionCursorsImpl(); }
 
-async function writeHarnessSessionCursors(cursors: Record<string, unknown>): Promise<void> {
-  return writeHarnessSessionCursorsImpl(cursors);
-}
+async function writeHarnessSessionCursors(cursors: Record<string, unknown>) : Promise<void> { return writeHarnessSessionCursorsImpl(cursors); }
 
-async function getHarnessSessionCursors(): Promise<Record<string, number>> {
-  return getHarnessSessionCursorsImpl();
-}
+async function getHarnessSessionCursors() : Promise<Record<string, number>> { return getHarnessSessionCursorsImpl(); }
 
-async function setHarnessSessionCursors(cursors: unknown): Promise<Record<string, number>> {
-  return setHarnessSessionCursorsImpl(cursors);
-}
+async function setHarnessSessionCursors(cursors: unknown) : Promise<Record<string, number>> { return setHarnessSessionCursorsImpl(cursors); }
 
 async function setSessionPinned(sessionId: string, pinned: boolean): Promise<boolean> {
   const sessions = await listAllPiSessions();
@@ -3003,29 +2621,21 @@ async function setSessionPinned(sessionId: string, pinned: boolean): Promise<boo
   return pinned;
 }
 
-async function setSessionArchived(sessionId: string, archived: boolean): Promise<boolean> {
-  return setSessionArchivedImpl(sessionId, archived);
-}
+async function setSessionArchived(sessionId: string, archived: boolean) : Promise<boolean> { return setSessionArchivedImpl(sessionId, archived); }
 
 async function setAllArchived(archived: boolean): Promise<{ updated: number }> {
   return setAllArchivedImpl(archived);
 }
 
-async function setSessionExpert(sessionId: string, expert: { expertId: string; expertName: string; avatarLocal?: string } | null): Promise<void> {
-  return setSessionExpertImpl(sessionId, expert);
-}
+async function setSessionExpert(sessionId: string, expert: { expertId: string; expertName: string; avatarLocal?: string } | null) : Promise<void> { return setSessionExpertImpl(sessionId, expert); }
 
 function getToolRegistry(): PiToolRegistry {
   return state.toolRegistry;
 }
 
-async function listSkills(requestedCwd?: string | null) {
-  return listSkillsImpl(requestedCwd);
-}
+async function listSkills(requestedCwd?: string | null) { return listSkillsImpl(requestedCwd); }
 
-async function resourceInventory() {
-  return resourceInventoryImpl();
-}
+async function resourceInventory() { return resourceInventoryImpl(); }
 
 function listPlugins(): PluginStatus[] {
   return state.loader?.list() ?? [];
@@ -3049,13 +2659,9 @@ async function listPluginInventory(): Promise<{
   return listPluginInventoryImpl();
 }
 
-async function pluginSnapshot(): Promise<PluginSnapshot> {
-  return pluginSnapshotImpl();
-}
+async function pluginSnapshot() : Promise<PluginSnapshot> { return pluginSnapshotImpl(); }
 
-function pluginEvents(query?: { sessionId?: string; sinceSequence?: number; limit?: number }): SessionEventRecord[] {
-  return pluginEventsImpl(query);
-}
+function pluginEvents(query?: { sessionId?: string; sinceSequence?: number; limit?: number }) : SessionEventRecord[] { return pluginEventsImpl(query); }
 
 async function sessionBaselines(): Promise<Array<{ sessionId: string; lastSeq: number }>> {
   const latest = new Map<string, number>();
@@ -3096,24 +2702,16 @@ async function sessionProjectionBaseline(sessionId: string): Promise<{ asOfSeq: 
 }
 
 /** Toggle a single plugin on/off without restarting the agent session. */
-async function setPluginEnabledInternal(id: string, enabled: boolean, transaction?: PluginTransactionContext): Promise<PluginStatus | null> {
-  return setPluginEnabledInternalImpl(id, enabled, transaction);
-}
+async function setPluginEnabledInternal(id: string, enabled: boolean, transaction?: PluginTransactionContext) : Promise<PluginStatus | null> { return setPluginEnabledInternalImpl(id, enabled, transaction); }
 
 /** Re-import and re-apply a plugin through the same loader lifecycle. */
-async function reloadPluginInternal(id: string, transaction?: PluginTransactionContext): Promise<PluginStatus | null> {
-  return reloadPluginInternalImpl(id, transaction);
-}
+async function reloadPluginInternal(id: string, transaction?: PluginTransactionContext) : Promise<PluginStatus | null> { return reloadPluginInternalImpl(id, transaction); }
 
 /** Re-materialize the profile and reload Pi resources without recreating the AgentSession. */
-async function reloadPiExtensionsInternal(transaction?: PluginTransactionContext): Promise<PiExtensionStatus[]> {
-  return reloadPiExtensionsInternalImpl(transaction);
-}
+async function reloadPiExtensionsInternal(transaction?: PluginTransactionContext) : Promise<PiExtensionStatus[]> { return reloadPiExtensionsInternalImpl(transaction); }
 
 /** Update a plugin's runtime config; non-disabled entries go through Cordis update. */
-async function updatePluginConfigInternal(id: string, config: unknown, transaction?: PluginTransactionContext): Promise<PluginStatus | null> {
-  return updatePluginConfigInternalImpl(id, config, transaction);
-}
+async function updatePluginConfigInternal(id: string, config: unknown, transaction?: PluginTransactionContext) : Promise<PluginStatus | null> { return updatePluginConfigInternalImpl(id, config, transaction); }
 
 /** Snapshot the persisted plugin-state overrides for UI / IPC inspection. */
 async function getStoredPluginState() {
@@ -3121,33 +2719,21 @@ async function getStoredPluginState() {
 }
 
 /** Clear a single plugin's persisted override (revert to profile defaults). */
-async function resetPluginStateInternal(id: string, transaction?: PluginTransactionContext) {
-  return resetPluginStateInternalImpl(id, transaction);
-}
+async function resetPluginStateInternal(id: string, transaction?: PluginTransactionContext) { return resetPluginStateInternalImpl(id, transaction); }
 
-function setPluginEnabled(id: string, enabled: boolean): Promise<PluginStatus | null> {
-  return setPluginEnabledImpl(id, enabled);
-}
+function setPluginEnabled(id: string, enabled: boolean) : Promise<PluginStatus | null> { return setPluginEnabledImpl(id, enabled); }
 
-function reloadPlugin(id: string): Promise<PluginStatus | null> {
-  return reloadPluginImpl(id);
-}
+function reloadPlugin(id: string) : Promise<PluginStatus | null> { return reloadPluginImpl(id); }
 
-function reloadPiExtensions(): Promise<PiExtensionStatus[]> {
-  return reloadPiExtensionsImpl();
-}
+function reloadPiExtensions() : Promise<PiExtensionStatus[]> { return reloadPiExtensionsImpl(); }
 
 async function reloadPiRuntime(reason = "internal-reload"): Promise<void> {
   return reloadPiRuntimeImpl(reason);
 }
 
-function updatePluginConfig(id: string, config: unknown): Promise<PluginStatus | null> {
-  return updatePluginConfigImpl(id, config);
-}
+function updatePluginConfig(id: string, config: unknown) : Promise<PluginStatus | null> { return updatePluginConfigImpl(id, config); }
 
-function resetPluginState(id: string) {
-  return resetPluginStateImpl(id);
-}
+function resetPluginState(id: string) { return resetPluginStateImpl(id); }
 
 function enqueuePluginStateTransaction<T>(
   kind: "plugin-enable" | "plugin-config" | "plugin-reset",
@@ -3158,46 +2744,11 @@ function enqueuePluginStateTransaction<T>(
 }
 
 export async function discoverRendererPluginManifest(): Promise<RendererPluginManifestEntry[]> {
-  const cached = state.rendererPluginManifestCache;
-  if (cached && cached.generation === state.profileArtifactGeneration) return cached.promise;
-  const generation = state.profileArtifactGeneration;
-  const promise = discoverRendererPluginManifestUncached();
-  state.rendererPluginManifestCache = { generation, promise };
-  try {
-    return await promise;
-  } catch (error) {
-    if (state.rendererPluginManifestCache?.promise === promise) state.rendererPluginManifestCache = null;
-    throw error;
-  }
+  return discoverRendererPluginManifestImpl(state, profileArtifactModuleUrl);
 }
 
 async function discoverRendererPluginManifestUncached(): Promise<RendererPluginManifestEntry[]> {
-  const loader = state.loader;
-  if (!loader) return [];
-  const additionalPackageJson = await artifactPackageJsonByName(state.profilePackagePaths, state.cwd);
-  const additionalPackages = [...additionalPackageJson.keys()];
-  const resolvers = createProfileArtifactResolvers({
-    packageJsonByName: additionalPackageJson,
-    profilePackageJson: state.profilePackageJson,
-  });
-  const discovered = await discoverRendererPluginEntries(
-    [...loader.entries()].map((entry) => entry.options),
-    {
-      additionalPackages,
-      resolvePackageJson: resolvers.resolvePackageJson,
-      resolveModule: async (specifier, packageJson) => profileArtifactModuleUrl(await resolvers.resolveModule(specifier, packageJson)),
-    },
-  );
-  const existing = new Set(discovered.map((entry) => entry.id));
-  const builtinClientEntries: RendererPluginManifestEntry[] = openBuddyDeepSeekRendererEntries.map((entry) => ({
-    id: entry.id,
-    moduleId: entry.name,
-    moduleKey: entry.id,
-    name: entry.name,
-    ...(Array.isArray(entry.inject) ? { inject: [...entry.inject] } : {}),
-    moduleUrl: `openbuddy:static/${entry.id}`,
-  }));
-  return [...discovered, ...builtinClientEntries.filter((entry) => !existing.has(entry.id))];
+  return discoverRendererPluginManifestUncachedImpl(state, profileArtifactModuleUrl);
 }
 
 async function listRendererPluginEntries(): Promise<RendererPluginManifestEntry[]> {
@@ -3362,6 +2913,7 @@ export const agentHost = buildAgentHostFacade({
   resetPluginState,
   getToolRegistry,
   profilePackages,
+  installDefaultPiPackages,
   installProfileBundle,
   removeProfileBundle,
   listRendererPluginEntries,
@@ -3428,6 +2980,11 @@ export const agentHost = buildAgentHostFacade({
   readSessionAttachment,
   reportActivePluginTransaction,
   listActivePluginTransactions,
+  // Keep the workbench lifecycle methods on the public facade. These methods
+  // are intentionally safe before Pi session initialization so the renderer
+  // can establish its scope during cold boot.
+  syncWorkbenchScope,
+  bindCurrentSessionToTenant: () => bindCurrentSessionToTenant(),
 });
 
 

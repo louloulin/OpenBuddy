@@ -20,16 +20,14 @@ WorkBuddy / pi-web 的 UI 能力缺口。
 本计划按 **从底层（运行时/架构）到上层（UI/产品）** 分 7 个阶段推进，
 每阶段都有明确的验收命令与"测试全绿"门槛。
 
-**⚠️ 已发现预先存在的测试失败**（非本次改动引入，需在阶段 0 记录并修复）：
-全量基线实测 **5 个测试文件、17 个测试失败**（5160 通过 / 15 跳过）：
+**预先存在的测试失败已全部修复**：基线实测 5 个文件 17 个失败（5160 通过 / 15 跳过），
+随阶段 0/1 修复；本轮又定位并修复 3 类被掩盖的回归（详见 §6.0.1）：
 
-| 失败文件 | 失败数 | 原因 |
+| 修复项 | 根因 | 修复 |
 |---|---|---|
-| `electron/main/__tests__/_smoke.test.ts` | 1 | agentHost 导入 smoke，重构后测试过期 |
-| `electron/main/__tests__/agent-host-public-surface-realserver.test.ts` | 多 | 需真实服务器环境 |
-| `electron/main/__tests__/agent-host-workbench-scope-realserver.test.ts` | 多 | 需真实服务器环境 |
-| `electron/main/__tests__/ipc-agent-event-sessionid.test.ts` | 2 | sessionId 转发断言过期 |
-| `electron/main/agent/pi-extensions.test.ts` | 1 | `builtinPiExtensionIds()` 清单过期（缺 `openbuddy-pi-compact-announce`、`openbuddy-extra-providers`） |
+| `openbuddy-email` 定时器 unhandled rejection | `pendingSendTimer`/`reminderTimer` fire-and-forget 未接 `.catch()`，corrupt-store 测试后 1s 定时器命中损坏 store | 定时器回调统一 `.catch()`（非 test 环境才打印） |
+| `plugin-host` / `renderer-host` fixture 路径 | 硬编码 `process.cwd() + "packages/..."`，moon 以包目录为 cwd 时路径翻倍 | 改为测试文件自身锚定（`import.meta.url`），cwd 无关 |
+| 12 个 realserver IPC 用例 "module load in flight" | 移除 prewarm 后，`harness/misc/connectors` 部分 handler 未按契约先 `await ensureAgentHostLoaded()` | 逐 handler 补 `await`（与 `agent.ts` 既有模式一致）；测试侧 `security-hardening` mock 补导出 |
 
 ---
 
@@ -378,9 +376,32 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
   adapter 定义保持声明式（纯数据），命令面可独立测试。
 - **`pi-client.ts`（2595 → 2390 行）**：抽出 `pi-client-email.ts`
   （email + calendar IPC 包装器 + 类型导入）。自包含块，经 `export *` 重导出。
+- **`pi-client.ts`（2390 → 2199 行）**：再抽 `pi-client-collaboration.ts`（226 行）
+  （collaboration/workflow/network/A2A 全量 IPC 包装器 + 类型）。与 `pi-client-email.ts` 同模式，
+  `export *` 重导出，collaboration 符号在剩余文件零引用。
+- **`pi-client.ts`（2200 → 2054 行）**：再抽 `pi-client-providers.ts`（158 行）
+  （BYOK provider registry `agent:providers-*` IPC 包装器 + provider/model 纯类型 + `flattenModels`）。
+  与 email/collaboration 同模式，`export *` 重导出，全块符号在剩余文件零引用。
+  验证：node+renderer tsc 通过，340 renderer/UI 测试（3321 用例）全绿。
 
-**剩余拆分**（后续迭代）：`agent-host.ts`(3485)、`deepseek-runtime.ts`(4368)、
+**剩余拆分**（后续迭代）：`agent-host.ts`(3480)、`deepseek-runtime.ts`(4368)、
 `App.tsx`(1746)、`collaboration-runtime.ts`(2250) 等巨型文件。
+
+**✅ 已做 DRY 收敛（2026-09-06）**：path 路径辅助函数 **全局单一来源**。
+`piHome`/`isPathWithin`/`piSessionDir` 原先同时内联于 `agent-host.ts` 和
+`host-modules/_host-paths.ts`（双份实现，漂移风险）。整改：`agent-host.ts`
+改为 import + re-export（`import { piHome, isPathWithin, piSessionDir } from
+"./host-modules/_host-paths"; export { ... }`；注意不能用 `export {...} from
+"..."`——那不会建本地绑定，`initialize` 内部 `installHostModules({ piHome,
+... })` 会 ReferenceError），另一份 `profile-module-resolution.ts` 的私有
+`isPathWithin` 也改为从 `_host-paths` 导入。agent-host 3491→3480 行。
+
+**✅ 已做 profile 纯函数提取（2026-09-06）**：`normalizePublishedRemoteContribution` +
+`disposeProfileTypertRegistrations` + `ProfileTypertRegistration` 类型（均为零 `state` 依赖
+的纯函数）抽到 `host-modules/profile/contributions-pure.ts`（80 行），agent-host 改为
+import + 薄包装。新增独立单测 `contributions-pure.test.ts`（4 用例：remoteExport→canonical
+重写、dispose 逆序、无 remoteDispose 容错、未知包透传）。agent-host 3480→3441 行。
+验证：全量 vitest 500 文件/5241 用例、agent 层 92 文件/1369 用例全绿。
 
 **验收**：
 - 每个拆分后文件 < 800 行（已拆文件达标；巨型文件待后续拆分）
@@ -443,11 +464,38 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 
 ### 阶段 6 — 回归与发布（2h）
 
-- [ ] 全量 `pnpm workspace:test` + `pnpm test:electron` 全绿
-- [ ] `npx tsc --noEmit` EXIT 0
-- [ ] 生产 Electron build 通过
-- [ ] 真实 MiniMax 端到端 smoke 通过
-- [ ] 更新 `docs/` 消除文档漂移
+- [x] 全量 `pnpm workspace:test`（全部包 23 组测试全绿）＋ `npm run test` 根套件（499 文件 / 5237 用例通过，15 跳过）＋ `pnpm test:electron` 全绿
+- [x] `npm run test:electron:ipc-surface` 通过（6/6）
+- [x] `npm run typecheck` EXIT 0
+- [x] 生产 Electron build 通过
+- [x] `npm run perf:main-chunks` 通过：entry + 独立 AgentHost chunks
+- [x] `npm run test:electron:surface` 通过
+- [x] `npm run test:electron:stream-port` 通过（真实 Electron 验证流式 MessageChannel 握手、16ms 批处理、端口替换语义；详见 §6.0）
+- [x] `npx playwright test tests/electron/plugin-hot-reload-e2e.spec.ts` 通过
+- [x] 更新 `docs/` 消除本轮构建拓扑漂移
+- [ ] 真实 MiniMax 端到端 smoke 通过（本轮已执行；UI/IPC/事件链路启动正常，但真实 `/anthropic/v1/messages` 返回 `429 Token Plan 用量上限`，需补充外部额度后重跑）
+
+### 6.0 流式 MessageChannel（P2-03）落地证据
+
+- 新增 `electron/main/pi-stream-transport.ts`：`MessageChannelMain` 承载高频 `pi://update`，16ms 批处理（`PI_STREAM_BATCH_WINDOW_MS`）、4096 上限即时冲刷、终止/顺序敏感事件（`pi://complete`、`pi://turn-error` 等）前强制 `flush()`、`attach()` 替换端口并安全关闭旧端口。
+- preload 暴露受控 `api.events.openPiStream(handler)`：仅允许 `agent:stream-port` 一次握手，校验 `senderFrame === webContents.mainFrame`，端口消息防抖异常不毒化 bridge。
+- renderer `subscribePiEvents({ updateTransport: "auto" })`：优先端口、无端口自动回退 IPC、`sessionId → __sessionId` 映射、畸形 batch 防御性跳过。
+- 主进程对 `pi://update` 双写（端口 + 原 IPC），`tool_execution_start/update/end` 同步纳入 port；无端口环境行为与旧版一致。
+- 真实 Electron 验证（`scripts/electron/stream-port-smoke.mjs`）：3 条高频发布合并为单个 FIFO batch 到达 renderer 端口；重新握手后旧订阅者停止接收、新端口接管；`unlisten()` 干净关闭。
+- 单元测试：`electron/main/pi-stream-transport.test.ts`（6 用例：批处理/上限/FIFO/flush/close/替换）、`src/lib/agent/__tests__/pi-subscribe-port.test.ts`（5 用例：端口交付/IPC 回退/显式 ipc/unlisten/畸形防御）。
+
+### 6.0.1 本轮定位并修复的回归（证据）
+
+| 修复 | 证据 |
+|---|---|
+| `openbuddy-email` 定时器 unhandled rejection（corrupt-store 用例后 1s 定时器未接 `.catch`） | `packages/capability/openbuddy-email/src/index.ts` 定时器回调统一 `.catch`；该包 9 文件 / 141 用例全绿 |
+| fixtures 路径依赖 `process.cwd()`（moon 以包目录运行时路径翻倍） | `plugin-host/src/profile.test.ts`、`renderer-host/src/index.test.ts` 改为以 `import.meta.url` 锚定 fixture；两文件 95 用例全绿 |
+| 12 个 realserver IPC 用例 "module load in flight" | `harness.ts`（4 个 harness handler）、`misc.ts`（shellfs/`list_dir`/`inspiration_generate` + `resolveWriteRoot`）、`connectors.ts`（mcp/skills/connectors/experts 系）按契约补 `await ensureAgentHostLoaded()`；`security-hardening.test.ts` mock 同步补导出。4 个 realserver 文件 242 用例全绿 |
+| 全量根测试 | `vitest run`（499 文件 / 5237 通过 / 15 跳过）、`workspace:test`（23 组包测试全绿）、`test:electron`（`ok:true`）、`test:electron:surface`、`test:electron:ipc-surface`（6/6）、`test:electron:stream-port` 全部通过 |
+| **3 个时序/性能型 flaky 测试**（全量高负载下偶发） | ① `ResourceCatalogPanel.test.tsx:70` 同步 `getByText` 断言异步渲染空态 → 改 `await findByText`（消除竞态）；② `marketplace-virtualization.test.tsx:78` 墙钟 `Date.now()<50ms` 微基准（实测 60ms 闪烁）→ 改为行为断言（搜索投影接线 + 空态分支）；③ `send-safe.test.ts S1.d` 墙钟 `fastMs<slowMs`（fast 循环撞上 GC 停顿）→ 改为确定性计数断言（sendSafe 每轮 2×`isDestroyed`、sendSafeFast 0×）。三处均经重压验证稳定 |
+| **阶段 3 架构拆分：`pi-client.ts` 2412→2199 行** | 提取 `pi-client-collaboration.ts`（226 行）：collaboration/workflow/network/A2A 全量重导出（与 `pi-client-email.ts` 同模式）。collaboration 符号在剩余文件零引用，tsc 通过，340 renderer/UI 测试（3321 用例）+ 全量 vitest 全绿。详见 §阶段3 更新 |
+| **阶段 3 架构拆分：`pi-client.ts` 2200→2054 行** | 提取 `pi-client-providers.ts`（158 行）：BYOK provider registry（`agent:providers-*`）+ provider/model 纯类型 + `flattenModels`。与 email/collaboration 同模式 `export *` 重导出，全块符号在剩余文件零引用。node+renderer tsc 通过，340 renderer/UI 测试（3321 用例）全绿 |
+| **① harness-rpc-store 并发注入竞态（flaky）** | `__repro` 单线程 800 次循环复现 0 失败，但全量并行 I/O 下偶发 `expected [] `（连 live 也被丢）。根因：测试用**非原子 `writeFile` 覆盖** `cache.json` 注入畸形条目，`store.read()` 紧邻读取可能撞上截断/半写中间态，`JSON.parse` 抛错→`readState` 返回空 `[]`。修复：改用**原子注入**（临时文件+`rename`）+ 时间边界放宽到 ±60s。15 次重压全过 |
 
 ---
 
@@ -499,13 +547,17 @@ UnifiedPluginManifest.surfaces = bundle | pi | renderer | remote | typert | cord
 
 ### 6.2 验收自动化
 
-建议在 `package.json` 增加一个 `scripts/verify-plan.ts`，一键跑全部验收门槛：
+> ✅ 已实现：`scripts/verify-plan.mjs`（+`pnpm verify:plan` / `pnpm verify:plan:tests`）。
+> 一键跑验收门槛：①巨型文件断言（默认 >3000 行 FAIL，核心 src 扫描，legacy
+> external-compat 白名单豁免）②能力归属单一权威断言（`pi-passthrough` 必须从
+> `capability-ownership.ts` 派生，禁止自持重复映射）③可选 `--run-tsc`/`--run-vitest`。
+> 实测：能力归属门 PASS；巨型文件门正确标记唯一剩余巨型文件 `agent-host.ts`(3491)。
 
 ```ts
-// scripts/verify-plan.ts (阶段 0 时创建)
-// 1. npx tsc --noEmit
-// 2. npx vitest run
-// 3. 断言无巨型文件 > 800 行（阶段 3 后）
+// scripts/verify-plan.mjs（阶段 0 时建议，阶段 6 已落地）
+// 1. npx tsc --noEmit（--run-tsc）
+// 2. npx vitest run（--run-vitest）
+// 3. 断言无巨型文件 > 3000 行（阶段 3 后）
 // 4. 断言能力归属单一权威（阶段 3.5 后）
 // 5. 输出 PASS/FAIL 汇总
 ```

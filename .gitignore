@@ -185,3 +185,6 @@ packages/*/*/node_modules
 !docs/WORKBUDDY_PI_OPTIMIZATION_PLAN.md
 !docs/PLUGIN_SYSTEM.md
 !docs/OPENBUDDY-PI-VISION.md
+
+# pi agent task output
+.pi/

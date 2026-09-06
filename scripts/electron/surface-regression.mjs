@@ -107,20 +107,25 @@ try {
       throw new Error(`recovery, A2A, or workflow boundary regression failed: ${JSON.stringify({ recoveryStatus, recoveryList, recoveryClaimRejected, recoveryResolveRejected, a2aAgentCard, a2aTaskSubmitRejected, a2aTaskGetRejected, workflowControlRejected })}`);
     }
 
-    const memoryId = `surface-memory-${Date.now()}`;
-    const savedMemory = await window.api.invoke("memory:save", { id: memoryId, title: "Surface memory", body: "first", tags: ["surface"] });
-    const listedMemory = await window.api.invoke("memory:list");
-    const fetchedMemory = await window.api.invoke("memory:get", memoryId);
-    const rewrittenMemory = await window.api.invoke("memory:rewrite", { id: memoryId, body: "rewritten" });
-    const deletedMemory = await window.api.invoke("memory:delete", memoryId);
-    if (savedMemory?.id !== memoryId || !listedMemory.some((entry) => entry.id === memoryId) || fetchedMemory?.body.trim() !== "first" || rewrittenMemory?.body.trim() !== "rewritten" || deletedMemory !== undefined) {
-      throw new Error(`memory compatibility aliases failed: ${JSON.stringify({ savedMemory, fetchedMemory, rewrittenMemory, deletedMemory })}`);
+    const memoryAliasErrors = [];
+    for (const channel of ["memory:save", "memory:list", "memory:get", "memory:rewrite", "memory:delete"]) {
+      try {
+        await window.api.invoke(channel, channel === "memory:get" || channel === "memory:delete" ? "surface-memory" : {});
+      } catch (error) {
+        memoryAliasErrors.push(String(error));
+      }
+    }
+    if (memoryAliasErrors.length !== 5 || !memoryAliasErrors.every((message) => message.includes("owned by pi-hermes-memory"))) {
+      throw new Error(`memory legacy boundary failed: ${JSON.stringify(memoryAliasErrors)}`);
+    }
+    const pluginInventory = await window.api.invoke("agent:plugin-inventory");
+    const commandInventory = await window.api.invoke("agent:commands-list");
+    if (!Array.isArray(pluginInventory?.entries) || !Array.isArray(commandInventory)) {
+      throw new Error(`pi plugin surface unavailable: ${JSON.stringify({ pluginInventory, commandInventory })}`);
     }
 
-    const automationPassthroughRegistry = await import("@openbuddy/plugin-host");
-    automationPassthroughRegistry.recordPassthrough("automation", "installed", "pi-background-tasks");
-    if (!automationPassthroughRegistry.isPassthroughed("automation") || automationPassthroughRegistry.getPassthroughInfo("automation")?.adapter !== "pi-background-tasks") {
-      throw new Error(`automation passthrough registry missing pi-background-tasks adapter`);
+    if (pluginInventory.entries.some((entry) => entry.id === "openbuddy-automation")) {
+      throw new Error(`removed automation plugin must not be mounted: ${JSON.stringify(pluginInventory.entries)}`);
     }
     // Stage G-1c: openbuddy-automation removed; automation is owned
     // by pi-background-tasks + pi-goal (passthrough). The legacy
@@ -167,7 +172,7 @@ try {
       runtime: "electron+pi",
       sessionId: session.sessionId,
       covered: [
-        "memory-legacy-aliases", "automation-legacy-aliases", "experts-assets-and-linking",
+        "memory-legacy-boundary", "pi-plugin-and-command-surface", "automation-legacy-aliases", "experts-assets-and-linking",
         "session-expert-binding", "connector-assets-and-config", "mcp-auth-cancel-boundary",
         "task-kill-idempotency", "external-url-validation", "native-window-state",
       ],

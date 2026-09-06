@@ -6,7 +6,7 @@
 import { clipboard, dialog, ipcMain, shell, type BrowserWindow } from "electron";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import * as fs from "node:fs/promises";
-import { agentHost, bindRendererEventEmitter } from "./agent-host-proxy";
+import { agentHost, bindRendererEventEmitter, ensureAgentHostLoaded } from "./agent-host-proxy";
 import * as resources from "../agent/pi-resources";
 import { dispatchMainNotifications } from "../notifications";
 import { casdoorAuth } from "../casdoor/casdoor-auth";
@@ -54,7 +54,7 @@ import {
 
 export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 	const ensureAgentHost = async () => {
-		await agentHost.waitUntilReady();
+		await ensureAgentHostLoaded();
 	};
 	const currentWindow = () => getWindow();
 
@@ -81,6 +81,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 	// reject any workspaceRoot that is neither the active agent cwd nor a
 	// registered storage source.
 	const resolveWriteRoot = async (candidate: unknown): Promise<string> => {
+		await ensureAgentHost();
 		const root = resolve(writeAllowedRoot(absolutePath(candidate, "workspaceRoot")));
 		const allowed = new Set<string>([resolve(agentHost.getCwd())]);
 		for (const source of await resources.readStorageSources()) {
@@ -369,16 +370,19 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			return shellFsHandlers.openPath(requiredString(input.path, "path"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"));
 		});
 		ipcMain.handle("shellfs:reveal", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "reveal payload");
 			return shellFsHandlers.reveal(requiredString(input.path, "path"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"));
 		});
 		ipcMain.handle("shellfs:stat", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "stat payload");
 			return shellFsHandlers.stat(requiredString(input.path, "path"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"));
 		});
 		ipcMain.handle("shellfs:read-text", async (_e, args: { path: string; cwd?: string; maxBytes?: number }) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "read text payload");
 			const pathValue = requiredString(input.path, "path");
@@ -390,6 +394,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			return shellFsHandlers.readTextFile(pathValue, cwd, maxBytes);
 		});
 		ipcMain.handle("shellfs:read-file-base64", async (_e, args: { path: string; cwd?: string; maxBytes?: number }) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "read file payload");
 			const cwd = input.cwd === undefined || input.cwd === null ? agentHost.getCwd() : absolutePath(input.cwd, "cwd");
@@ -428,6 +433,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			return { ok: true };
 		});
 		ipcMain.handle("inspiration_generate", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const input = recordValue(args, "inspiration payload");
 			const request = input.request === undefined ? {} : recordValue(input.request, "request");
 			const count = optionalFiniteInteger(request.count, "count", 1, 1, 20);
@@ -443,17 +449,20 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			return shellFsHandlers.makeDirectory(requiredString(input.path, "path"), await resolveWriteRoot(input.workspaceRoot));
 		});
 		ipcMain.handle("shellfs:list-dir", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "list directory payload");
 			return shellFsHandlers.listDir(requiredString(input.path, "path"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"), optionalFiniteInteger(input.maxEntries, "maxEntries", 2000, 1, 10000));
 		});
 		ipcMain.handle("shellfs:browse-directory", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			if (typeof args === "string") return shellFsHandlers.browseDirectory(requiredString(args, "path"), agentHost.getCwd());
 			const input = recordValue(args, "browse directory payload");
 			return shellFsHandlers.browseDirectory(requiredString(input.path, "path"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"));
 		});
 		ipcMain.handle("list_dir", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "list directory payload");
 			return shellFsHandlers.listDir(requiredString(input.path, "path"), input.cwd === null || input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"), optionalFiniteInteger(input.maxEntries, "maxEntries", 2000, 1, 10000));

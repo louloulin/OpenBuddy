@@ -17,24 +17,24 @@
 | 指标 | 当前实测 | Codex 标杆 | 差距 | 状态 |
 |---|---|---|---|---|
 | **冷启动（cold start to interactive）** | 估计 ≥ 3.5s | ≤ 1.5s | **2.3×** | ❌ |
-| 渲染端 bundle（unzipped） | **14 MB**（预算 8MB） | ≤ 4 MB | **3.5×** | ❌ |
-| 渲染端入口 chunk | 3.1 MB | ≤ 600 KB | **5.2×** | ❌ |
-| 主进程 bundle | 3.4 MB（单文件） | ≤ 4 MB（多 chunk） | 形状错 | ⚠️ |
-| Markdown chunk | 2.2 MB（强制 preload） | 按需 lazy | — | ❌ |
-| Mermaid chunk | 1.3 MB（强制 preload） | 按需 lazy | — | ❌ |
-| 流式 delta 批量 | **未实现**（每 token 一次 IPC） | 16 ms batch | — | ❌ |
+| 渲染端 bundle（unzipped） | **12.06 MB**（`scripts/perf/bundle-topology.mjs` 实测） | ≤ 4 MB | **3.0×** | ❌ |
+| 渲染端入口 chunk | 3.12 MB | ≤ 600 KB | **5.2×** | ❌ |
+| 主进程 bundle | 1.54 MB entry + 24 个 ESM chunks | ≤ 4 MB（多 chunk） | entry 仍偏大，已完成拓扑拆分 | ⚠️ |
+| Markdown chunk | 2.20 MB（lazy，无 modulepreload） | 按需 lazy | — | ✅ |
+| Mermaid chunk | 1.28 MB（lazy，无 modulepreload） | 按需 lazy | — | ✅ |
+| 流式 delta 批量 | **已完成**：`pi://update` 走 MessageChannelMain 16ms 批处理（P2-03，见 §四 #2 与 WORKBUDDY 计划 §6.0） | 16 ms batch | — | ✅ |
 | 流式首 token（TTFT 感受） | 未测，估计 ≥ 500ms | ≤ 200ms | — | ⚠️ |
 | IPC 延迟（p95） | 未测，估计 ≥ 50ms | ≤ 20ms | — | ⚠️ |
 | 内存基线（idle） | 未测 | ≤ 150MB | — | ⚠️ |
 | 流式 ChatView FPS | 估计 30~45fps | ≥ 60fps | — | ⚠️ |
 | 长会话 O(n²) 风险 | 存在（见 §四 F-03） | 局部 patch | — | ❌ |
 
-**核心症结**：当前所有性能问题指向**同一条根因**——**缺乏边界**。
+**核心症结**：当前剩余性能问题主要指向**边界仍不完整**。
 
-- 主进程：13 个 Cordis 能力包在 main/index.ts 顶层 import 时全部解析（agent-host.ts 140 个顶层依赖），注释里写 "lazy-loaded" 实际失效。
+- 主进程：AgentHost 已从 entry 拆为独立 ESM chunk，且取消了 IPC proxy 预热；仍需继续减少 entry 中的同步 IPC/能力依赖。
 - 渲染端：src/App.tsx 完全没有 React.lazy / Suspense；`__vitePreload(true)` 把 markdown/katex/mermaid 在首屏并行抓取，绕过 manualChunks。
 - 流式：`mergeStreamingDelta` 每个 rAF 帧做 `s.messages.map(...)` + parts 数组浅拷贝，长会话 O(n²)。
-- IPC：`ipc/index.ts:790` 每 token 一次 IPC，与 docs/PERFORMANCE.md 声明的 16ms 批量完全不符。
+- IPC：`pi://update` 已迁移至 MessageChannel 16ms 批量（`electron/main/pi-stream-transport.ts`，P2-03）；其余 `pi://*` 仍为逐条 IPC，量级低、不构成热路径。
 
 ### 1.2 改造总投入
 
@@ -82,11 +82,11 @@
 | 内存基线（idle） | **≤ 150MB** | `process.memoryUsage().rss` 启动 5s 后 | 估计 280MB |
 | 内存峰值（单会话 1000 turns） | **≤ 350MB** | 流式期间 RSS | 估计 600MB |
 | 每活跃会话内存 | **≤ 35MB** | `process.memoryUsage()` | 估计 ≤ 50MB |
-| 渲染端 bundle（unzipped） | **≤ 4 MB** | `electron-vite build` 输出 + `du -sh` | 14MB |
-| 入口 chunk | **≤ 600 KB**（gzip 前 ≤ 1.5MB） | `vite-bundle-visualizer` | 3.1MB |
+| 渲染端 bundle（unzipped） | **≤ 4 MB** | `scripts/perf/bundle-topology.mjs` | 12.06MB（实测） |
+| 入口 chunk | **≤ 600 KB**（gzip 前 ≤ 1.5MB） | `scripts/perf/bundle-topology.mjs` | 3.12MB |
 | 主进程 bundle | **≤ 4 MB（可多 chunk）** | `du -sh out/main` | 3.4MB 单文件 |
-| Markdown chunk | 按需 lazy | - | 2.2MB（强制 preload） |
-| Mermaid chunk | 按需 lazy | - | 1.3MB（强制 preload） |
+| Markdown chunk | 按需 lazy | - | 2.2MB（lazy） |
+| Mermaid chunk | 按需 lazy | - | 1.28MB（lazy） |
 | SQLite 事务/条 mutation | = 1（批量合并） | openbuddy-storage driver 计数器 | 3 次独立事务 |
 | Tool fsync/调用 | = 0（写时 async） | fs trace | 同步 writeFileSync |
 | 长会话 messages selector 重渲染次数 | 0（按 id 选择） | React Profiler | 60×/秒 |
@@ -118,7 +118,7 @@
 |---|---|---|---|---|---|---|
 | P0-01 | 主窗口改 `ready-to-show` | main-window.ts:68 `did-finish-load` | 改为 `ready-to-show`/首帧即显示 | 冷启动录制 | S | F3 |
 | P0-02 | 关闭 entry `__vitePreload(true)` | out/renderer/index.html modulepreload markdown+mermaid | 移除 modulepreload 链接，让 manualChunks 自然按需 | 渲染端 chunk 加载序列 | S | F4 |
-| P0-03 | 流式 IPC 16ms 批量 | ipc/index.ts:790 每 token 立即 IPC | 引入 coalescer（≥ 4 token 或 ≥ 16ms flush） | 流式 TTFT + IPC bench | M | F-IPC-1 |
+| P0-03 | 流式 IPC 16ms 批量 | **已完成（P2-03）**：`pi://update` 走 MessageChannelMain 16ms 批处理，IPC 双写保留为兼容/回退 | — | 流式 TTFT + IPC bench | M | F-IPC-1 |
 | P0-04 | 移除 ipc/index 顶层 import agentHost | ipc/index.ts:14 | 改为 handler 内 `await import('../agent/agent-host')` | 启动 trace 对比 | M | F2 |
 | P0-05 | 移除 casdoor-auth 顶层实例化 | casdoor-auth.ts:984 | `casdoorAuth` 改 getter/工厂 | cold-start trace | S | F6 |
 | P0-06 | mergeStreamingDelta 局部 patch | session-store.ts:143-159 | findIndex + 局部 path update | 流式 FPS | S | F-03 |
@@ -183,9 +183,9 @@
 
 | # | 任务 | 现状 | 方案 | 验证 | 工作量 | 来源 |
 |---|---|---|---|---|---|---|
-| P2-01 | 主进程切 multi-chunk | main 单文件 3.4MB | Rollup code-split（agent / ipc / harness / collab） | cold-start trace | L | F1 |
+| P2-01 | 主进程切 multi-chunk | 已完成：`out/main/index.js` + `agent-host-*.js` 等 chunks | 冷启动 trace 与按需加载监控 | cold-start trace | L | F1 |
 | P2-02 | renderer 引入 VirtualizedMessageList + 窗口化 | pi-web ChatMinimap 模式 | 长会话只渲染最近 100 条，触顶懒加载 | 长会话 FPS | M | Learn-1 |
-| P2-03 | 流式走 MessageChannel | ipcRenderer 流式 | 渲染端 window.postMessage + MessageChannel | 流式 TTFT | M | Learn-codex |
+| P2-03 | 流式走 MessageChannel | **已完成**：MessageChannelMain 16ms 批处理 + IPC 双写回退 + preload `openPiStream` 握手（见 §四 #2、WORKBUDDY 计划 §6.0） | 渲染端 window.postMessage + MessageChannel | 流式 TTFT | M | Learn-codex |
 | P2-04 | deepseek-runtime append 局部 patch | deepseek-runtime.ts:1543/2197/2204 | 取消全树 freeze，改用 immer patch + 局部引用 | 流式内存 + GC | M | F-Deep-1/2/3 |
 | P2-05 | stream watcher 走 rAF | main.tsx setInterval | 改 requestIdleCallback + change-detect | 闲置 CPU | S | F-Watch-2 |
 | P2-06 | ipc handler 注册表 drift 治理 | ipc/index.ts 大量 handler | 自动登记表 + 启动校验 + 单元测试 | handler 数量 | M | F-IPC-Reg |
@@ -223,7 +223,7 @@
 
 ### #1 主进程解耦：agent-host 静态依赖
 
-**问题**：`electron/main/index.ts:35` 静态导入 `./ipc/index`，后者 `electron/main/ipc/index.ts:14` 静态导入 `agent-host`，agent-host.ts 自身 140 个顶层 import 包含 `@earendil-works/pi-coding-agent`、deepseek-runtime（4321 行）、pi-resources（2129 行）、plugin-host、bundle-base、harness-server 等。注释 `electron/main/index.ts:47-53` 声称 lazy-loaded，但 rollup `inlineDynamicImports: true` 把动态 import 强制内联到 main chunk（`out/main/index.js` 3.4MB），模块求值阶段已执行。
+**当前状态**：`electron.vite.config.ts` 已设置 `inlineDynamicImports: false`，AgentHost 通过独立 `agent-host-*.js` chunk 加载；`agent-host-proxy.ts` 不再在模块导入时预热，`registerIpc()` 先注册 handler，事件桥在后台显式加载后绑定。剩余工作是继续拆分同步 IPC 依赖并增加 cold-start trace 的硬门槛。
 
 **Codex / pi-web 等参考**：
 - Codex-cli：Rust 主进程按需 spawn 子进程（feature flag 控制），主进程仅负责 dispatch。
@@ -236,7 +236,7 @@
 **落地步骤（PR 序列）**：
 1. PR-A：把 `agentHost` 在 ipc/index.ts 改为函数内 `await import`
 2. PR-B：把 casdoor-resources / connectors / notifications 同样按需 import
-3. PR-C：rollup 关闭 `inlineDynamicImports`，改 dynamic chunk
+3. PR-C：rollup 关闭 `inlineDynamicImports`，改 dynamic chunk（已完成）
 4. PR-D：electron.vite.config.ts 加 `output.manualChunks` 拆分 main
 5. PR-E：electron-builder.yml 修正 main 入口为多 chunk 索引
 
@@ -246,7 +246,7 @@
 
 ### #2 流式 IPC 16ms 批处理
 
-**问题**：`electron/main/ipc/index.ts:790`（及周边）流式 channel 每个 token 立即触发 `webContents.send('pi://update', ...)`，渲染端 `src/App.tsx:844/1119` 立即调用 `updateCoalescerRef.current?.push(...)`，最终 `session-store.ts:143-159 mergeStreamingDelta` 在 rAF 帧合并。**批处理只发生在渲染端到 React 状态之间**，主进程到渲染端仍每 token 一次 `structuredClone` + IPC 开销。docs/PERFORMANCE.md 公开声明的 16ms 批量与代码完全不符。
+**问题（已修复 P2-03）**：`pi://update` 曾每 token 立即触发 `webContents.send(...)`；渲染端 rAF 合并只覆盖 React 状态层，主进程到渲染端仍每 token 一次 `structuredClone` + IPC。现已由 `MessageChannelMain` 批处理（`electron/main/pi-stream-transport.ts`，16ms/4096 上限/flush-on-terminal）承担热路径，原 IPC 仅作兼容双写；真实 Electron smoke 验证 3 条高频发布合并为 1 个 FIFO batch。
 
 **Codex / pi-web 参考**：
 - codex-cli：Rust 内部用 channel + 16ms ticker 聚合，AppServer 把 N 个 ResponseEvent 合并成一个 message frame。
@@ -268,7 +268,9 @@
 
 ### #3 渲染端 React.lazy 路由级拆分
 
-**问题**：`src/App.tsx` 2171 行无任何 `React.lazy` / `Suspense`（grep 0 命中）。`src/App.tsx:1-50` 顶层静态 import `ChatView`、`SettingsPanel`、`SearchOverlay`、`TasksPanel`、`AssistantWorkspacePanel`、`PermissionPicker` 等全部 ui-* 包；`packages/ui/openbuddy-ui-markdown/src/index.ts` 在 ui-conversation 通过 `MessageItem` 静态引入，把 markdown 渲染层也拉进首屏。`out/renderer/assets/index-*.js` = 3.1MB，仅入口。
+**问题**：改造前 `src/App.tsx` 2171 行无任何 `React.lazy` / `Suspense`（grep 0 命中）。`src/App.tsx:1-50` 顶层静态 import `ChatView`、`SettingsPanel`、`SearchOverlay`、`TasksPanel`、`AssistantWorkspacePanel`、`PermissionPicker` 等全部 ui-* 包；`packages/ui/openbuddy-ui-markdown/src/index.ts` 在 ui-conversation 通过 `MessageItem` 静态引入，把 markdown 渲染层也拉进首屏。
+
+**现状（已部分落地）**：`src/App.tsx` 已引入 P1-01 路由级 `React.lazy` + `Suspense`（HomePage / SettingsPanel / SearchOverlay / AboutDialog / FolderTrustDialog / TasksPanel 等）；markdown / katex / mermaid / cytoscape / cynefin 均为 lazy chunk，`index.html` 已无 `modulepreload`。`bundle-topology` 实测 entry 仍为 3.12 MB——对话壳（`@openbuddy/ui-conversation`）+ React/Zustand 基座仍在入口，后续按 P1/P2-09 目标把基座移出入口、entry 收敛到 ≤ 1.5 MB。
 
 **Codex / pi-web 参考**：
 - pi-web：Next.js App Router 每条路由独立 chunk；ChatWindow / ChatInput / ModelsConfig 各为 dynamic import。
@@ -384,9 +386,11 @@ return {
 
 ### #12 Vite `__vitePreload(true)` 移除
 
-**问题**：`out/renderer/index.html` 内 `<link rel="modulepreload" href="./assets/markdown-BAmhsvX4.js">` 和 `<link rel="modulepreload" href="./assets/mermaid-Fpinuh74.js">` 强制首屏并行下载 2.2MB + 1.3MB。源码侧 `src/App.tsx` 内 Vite 编译产物 `__vitePreload(..., true)` 在 entry 求值时立即 fetch。
+**问题**：改造前 `out/renderer/index.html` 内 `<link rel="modulepreload" href="./assets/markdown-BAmhsvX4.js">` 和 `<link rel="modulepreload" href="./assets/mermaid-Fpinuh74.js">` 强制首屏并行下载 2.2MB + 1.3MB。源码侧 `src/App.tsx` 内 Vite 编译产物 `__vitePreload(..., true)` 在 entry 求值时立即 fetch。
 
 **改造**：移除 index.html 内的手动 modulepreload（vite-plugin-html 自动优化即可）；移除 App.tsx 内静态引入 mermaid/katex 路径（应只在 Markdown 组件内 dynamic import）。
+
+**现状（已完成）**：`out/renderer/index.html` 已无任何 `modulepreload` 链接；entry 内 `__vitePreload` 全部为 lazy `import()`（无 `true` 急切标志），bundle-topology 校验 markdown/katex/mermaid/cytoscape/cynefin 均为 lazy chunk。
 
 ---
 
@@ -622,7 +626,7 @@ activeCount = independent.length + Object.values(workspaceSessions).reduce((a, l
 1. ✅ CONFIRMED — deepseek-runtime.ts:1543 — freezeToolResultSnapshot 每 tool 全树 freeze
 2. ✅ CONFIRMED — deepseek-runtime.ts:2197 — events/messages getter 全表复制无缓存
 3. ✅ CONFIRMED — deepseek-runtime.ts:2204 — append/pi-entry 投影每次深拷贝
-4. ✅ CONFIRMED — ipc/index.ts:790 — 流式 delta 无 16ms 批量，违反 PERFORMANCE.md
+4. ✅ CONFIRMED（P2-03 已修复）— ipc/index.ts:790 — 流式 delta 曾无 16ms 批量；现 MessageChannelMain 16ms 批处理 + IPC 双写，真实 Electron smoke 通过。
 5. ⚠️ PLAUSIBLE — electron/main/index.ts:35 — agent-host 静态依赖（SQLite 子论断 REFUTED：实际 lazy 打开）
 6. ⚠️ PLAUSIBLE — ipc/index.ts:14 — IPC 顶层 import agentHost（同上 SQLite 子论断 REFUTED）
 7. ✅ CONFIRMED — main-window.ts:68 — did-finish-load 才 show
@@ -709,7 +713,7 @@ scripts/perf/
 |---|---|---|
 | **PR1.1** | agent-host.ts 拆 core/bootstrap/capabilities | 纯 refactor，无行为变更 |
 | **PR1.10** | 移除 `__vitePreload(..., true)` | 立即节省首屏 7MB JS |
-| **PR2.1** | ipc/index.ts:790 ring buffer + 16ms flush | 流式 IPC 频率降 60% |
+| **PR2.1** | ipc/index.ts MessageChannel ring buffer + 16ms flush（P2-03 已落地） | 流式 IPC 频率降 60% |
 | **PR2.3** | text_delta 扁平 payload `{sessionId, type, delta}` | IPC 序列化体积减半 |
 | **PR3.1** | session-store 拆 messagesById + streaming/history 子组件 | ChatView 重渲染 60→0 |
 | **PR3.7** | App.tsx 全链路 useCallback | Composer memo 命中率 0→95% |

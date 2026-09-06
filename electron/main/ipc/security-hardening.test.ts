@@ -16,6 +16,7 @@ const handlers = new Map<string, (event: unknown, args: unknown) => Promise<unkn
 
 vi.doMock("./agent-host-proxy", () => ({
   agentHost: { getCwd: () => "/workspace", waitUntilReady: async () => undefined },
+  ensureAgentHostLoaded: async () => ({ getCwd: () => "/workspace", waitUntilReady: async () => undefined }),
   bindRendererEventEmitter: vi.fn(),
 }));
 

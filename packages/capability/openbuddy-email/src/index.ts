@@ -2032,9 +2032,20 @@ export class Email extends OpenBuddyService {
 			else if (injectedGraphProvider) this.provider = injectedGraphProvider
 			else if (injectedJmapProvider) this.provider = injectedJmapProvider
 		} catch { /* optional direct Gmail API provider */ }
-		this.reminderTimer = setInterval(() => { void this.dispatchDueReminders(); void this.dispatchDueScheduledSends(); void this.runScheduledRules() }, 30_000)
+		this.reminderTimer = setInterval(() => {
+			const swallow = (label: string) => (cause: unknown) => {
+				if (process.env.NODE_ENV !== "test") console.error(`[openbuddy-email] ${label} failed`, cause)
+			}
+			void this.dispatchDueReminders().catch(swallow("reminder dispatch"))
+			void this.dispatchDueScheduledSends().catch(swallow("scheduled send dispatch"))
+			void this.runScheduledRules().catch(swallow("scheduled rule run"))
+		}, 30_000)
 		this.reminderTimer.unref?.()
-		this.pendingSendTimer = setInterval(() => { void this.dispatchDuePendingSends() }, 1_000)
+		this.pendingSendTimer = setInterval(() => {
+			void this.dispatchDuePendingSends().catch((cause) => {
+				if (process.env.NODE_ENV !== "test") console.error("[openbuddy-email] pending send dispatch failed", cause)
+			})
+		}, 1_000)
 		this.pendingSendTimer.unref?.()
 		void this.runScheduledRules().catch((cause) => {
 			if (process.env.NODE_ENV !== "test") console.error("[openbuddy-email] scheduled rule startup failed", cause)

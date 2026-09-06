@@ -7,9 +7,9 @@
 #   - out/renderer/index.html  React renderer
 #
 # The package.json `main` field points at `./out/main/index.js`, which is
-# what Electron loads when launched in production. Workspace packages are
-# inlined into the bundles by electron-vite; remaining dependencies are
-# packaged from `node_modules/`.
+# what Electron loads when launched in production. Main-process workspace
+# packages are compiled into the entry and its adjacent ESM chunks by
+# electron-vite; remaining dependencies are packaged from `node_modules/`.
 # ============================================================================
 appId: com.openbuddy.desktop
 productName: OpenBuddy

@@ -4,7 +4,7 @@
  * Split out of `./index.ts`.
  */
 import { ipcMain, type BrowserWindow } from "electron";
-import { agentHost, bindRendererEventEmitter } from "./agent-host-proxy";
+import { agentHost, bindRendererEventEmitter, ensureAgentHostLoaded } from "./agent-host-proxy";
 import { hostReceived, hostDispatched, hostFailed } from "../agent/agent-host-log";
 import { generateTraceId } from "@openbuddy/logging-shared";
 import * as resources from "../agent/pi-resources";
@@ -68,10 +68,12 @@ const awaitExtensionsBound = async () => {
 
 export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 	const ensureAgentHost = async () => {
+		await ensureAgentHostLoaded();
 		await agentHost.waitUntilReady();
 	};
 
 		ipcMain.handle("agent:new-session", async (_e, input?: string | { cwd?: string; modelId?: string; traceId?: string }) => {
+			await ensureAgentHost();
 			const payload = typeof input === "string" ? undefined : recordValue(input, "agent:new-session payload");
 			// preload allows {modelId}-only payloads; fall back to the active cwd.
 			const cwd = typeof input === "string"
@@ -95,6 +97,7 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 		// id (e.g. extension methods, double-clicks of "新建任务"). The returned
 		// sessionId is indistinguishable from a `agent:new-session` result.
 		ipcMain.handle("agent:ensure-new-session", async (_e, input?: string | { cwd?: string; modelId?: string; traceId?: string }) => {
+			await ensureAgentHost();
 			const payload = typeof input === "string" ? undefined : recordValue(input, "agent:ensure-new-session payload");
 			const cwd = typeof input === "string"
 				? absolutePath(input, "cwd")
@@ -112,6 +115,7 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			}
 		});
 		ipcMain.handle("agent:prompt", async (_e, input: string | { sessionId?: string; text: string; traceId?: string }) => {
+			await ensureAgentHost();
 			const payload = typeof input === "string" ? undefined : recordValue(input, "agent:prompt payload");
 			const sessionId = payload?.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
 			const activeSessionId = agentHost.getSession()?.sessionId;
@@ -130,6 +134,7 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			}
 		});
 		ipcMain.handle("agent:steer", async (_e, input: { sessionId?: string; text: string; traceId?: string }) => {
+			await ensureAgentHost();
 			const payload = recordValue(input, "agent:steer payload");
 			const sessionId = payload.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
 			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
@@ -146,6 +151,7 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			}
 		});
 		ipcMain.handle("agent:follow-up", async (_e, input: { sessionId?: string; text: string; traceId?: string }) => {
+			await ensureAgentHost();
 			const payload = recordValue(input, "agent:follow-up payload");
 			const sessionId = payload.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
 			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
@@ -162,6 +168,7 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			}
 		});
 		ipcMain.handle("agent:abort", async (_e, input?: { sessionId?: string; traceId?: string }) => {
+			await ensureAgentHost();
 			let sessionId: string | undefined;
 			const traceId = optionalString(input?.traceId, "traceId") ?? generateTraceId();
 			if (input !== undefined) {
@@ -181,6 +188,7 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			}
 		});
 		ipcMain.handle("agent:set-model", async (_e, input: string | { sessionId?: string; modelId: string; traceId?: string }) => {
+			await ensureAgentHost();
 			const payload = typeof input === "string" ? undefined : recordValue(input, "agent:set-model payload");
 			const sessionId = payload?.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
 			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
@@ -198,12 +206,12 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 				throw err;
 			}
 		});
-		ipcMain.handle("agent:current-model", async () => agentHost.getModel());
+		ipcMain.handle("agent:current-model", async () => { await ensureAgentHost(); return agentHost.getModel(); });
 		ipcMain.handle("agent:presets-list", async (_e, input?: unknown) => {
 			const cwd = input === undefined || input === null ? agentHost.getCwd() : absolutePath(String(input), "cwd");
 			return agentHost.listAgentPresets(cwd);
 		});
-		ipcMain.handle("agent:preset-current", async () => ({ id: agentHost.currentAgentPreset() }));
+		ipcMain.handle("agent:preset-current", async () => { await ensureAgentHost(); return { id: agentHost.currentAgentPreset() }; });
 		ipcMain.handle("agent:preset-select", async (_e, input?: unknown) => {
 			const payload = recordValue(input, "preset selection payload");
 			const id = requiredString(payload.id, "id");
@@ -214,9 +222,10 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			const id = payload.id === undefined || payload.id === null ? undefined : requiredString(payload.id, "id");
 			return resources.writeAgentPresetDefault(id);
 		});
-		ipcMain.handle("agent:plugin-list", async () => agentHost.listPlugins());
-		ipcMain.handle("agent:plugin-inventory", async () => agentHost.pluginInventory());
+		ipcMain.handle("agent:plugin-list", async () => { await ensureAgentHost(); return agentHost.listPlugins(); });
+		ipcMain.handle("agent:plugin-inventory", async () => { await ensureAgentHost(); return agentHost.pluginInventory(); });
 		ipcMain.handle("agent:tools-list", async () => {
+			await ensureAgentHost();
 			// Surface every tool the active pi runtime exposes (G-1d
 			// compatibilityAdapter tools + built-in pi tools), tagged with
 			// source + piPackageHint so the renderer can group / disable
@@ -241,10 +250,10 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 				};
 			});
 		});
-		ipcMain.handle("agent:plugin-snapshot", async () => agentHost.pluginSnapshot());
-		ipcMain.handle("agent:plugin-readiness", async () => agentHost.pluginReadiness());
-		ipcMain.handle("agent:deepseek-cordis-snapshot", async () => agentHost.deepSeekCordisSnapshot());
-		ipcMain.handle("agent:deepseek-pi-describe", async () => agentHost.deepSeekPiBridgeDescription());
+		ipcMain.handle("agent:plugin-snapshot", async () => { await ensureAgentHost(); return agentHost.pluginSnapshot(); });
+		ipcMain.handle("agent:plugin-readiness", async () => { await ensureAgentHost(); return agentHost.pluginReadiness(); });
+		ipcMain.handle("agent:deepseek-cordis-snapshot", async () => { await ensureAgentHost(); return agentHost.deepSeekCordisSnapshot(); });
+		ipcMain.handle("agent:deepseek-pi-describe", async () => { await ensureAgentHost(); return agentHost.deepSeekPiBridgeDescription(); });
 		ipcMain.handle("agent:deepseek-cordis-invoke", async (_e, args: unknown) => {
 			const payload = recordValue(args, "DeepSeek Cordis invocation payload");
 			return agentHost.invokeDeepSeekCordis({
@@ -276,7 +285,7 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			await agentHost.removeProfileBundle(requiredString(input.name, "name"));
 			return { ok: true };
 		});
-		ipcMain.handle("agent:plugin-events", async () => agentHost.pluginEvents());
+		ipcMain.handle("agent:plugin-events", async () => { await ensureAgentHost(); return agentHost.pluginEvents(); });
 		ipcMain.handle("agent:transaction-receipt", async (_e, args: unknown) => {
 			const input = recordValue(args, "transaction-receipt payload");
 			const transactionId = requiredString(input.transactionId, "transactionId");
@@ -284,7 +293,7 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			const details = input.details === undefined ? undefined : recordValue(input.details, "details");
 			return agentHost.reportActivePluginTransaction(transactionId, surface, details);
 		});
-		ipcMain.handle("agent:transaction-list", async () => agentHost.listActivePluginTransactions());
+		ipcMain.handle("agent:transaction-list", async () => { await ensureAgentHost(); return agentHost.listActivePluginTransactions(); });
 		ipcMain.handle("agent:event-log", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "event log payload");
 			return agentHost.pluginEvents({
@@ -323,10 +332,10 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 		ipcMain.handle("agent:plugin-state-reset", async (_e, args: { id: string }) => {
 			return agentHost.resetPluginState(requiredString(recordValue(args, "plugin-state-reset payload").id, "plugin id"));
 		});
-		ipcMain.handle("agent:renderer-plugin-entries", async () => agentHost.listRendererPluginEntries());
-		ipcMain.handle("agent:renderer-plugin-boot", async () => agentHost.rendererPluginBootGraph());
-		ipcMain.handle("agent:renderer-plugin-module", async (_e, args: unknown) => agentHost.resolveRendererPluginModule(requiredString(recordValue(args, "renderer plugin module payload").moduleKey, "moduleKey")));
-		ipcMain.handle("agent:remote-contributions", async () => agentHost.listProfileRemoteContributions());
+		ipcMain.handle("agent:renderer-plugin-entries", async () => { await ensureAgentHost(); return agentHost.listRendererPluginEntries(); });
+		ipcMain.handle("agent:renderer-plugin-boot", async () => { await ensureAgentHost(); return agentHost.rendererPluginBootGraph(); });
+		ipcMain.handle("agent:renderer-plugin-module", async (_e, args: unknown) => { await ensureAgentHost(); return agentHost.resolveRendererPluginModule(requiredString(recordValue(args, "renderer plugin module payload").moduleKey, "moduleKey")); });
+		ipcMain.handle("agent:remote-contributions", async () => { await ensureAgentHost(); return agentHost.listProfileRemoteContributions(); });
 		ipcMain.handle("agent:init", async (_e, cwd?: string | { cwd?: string; traceId?: string }) => {
 			const opts = typeof cwd === "object" && cwd !== null ? cwd : undefined;
 			const normalizedCwd = (typeof cwd === "string" ? cwd : opts?.cwd) === undefined ? undefined : absolutePath(typeof cwd === "string" ? cwd : opts?.cwd, "cwd");
@@ -412,8 +421,8 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			if (defaults.rememberToolApprovals !== undefined) patch.rememberToolApprovals = requiredBoolean(defaults.rememberToolApprovals, "rememberToolApprovals");
 			return resources.writeAgentDefaults(patch);
 		});
-		ipcMain.handle("tasks_list", async () => agentHost.listRunningTasks());
-		ipcMain.handle("task_kill", async (_e, args: { taskId: string }) => agentHost.killTask(requiredString(recordValue(args, "task kill payload").taskId, "task id")));
+		ipcMain.handle("tasks_list", async () => { await ensureAgentHost(); return agentHost.listRunningTasks(); });
+		ipcMain.handle("task_kill", async (_e, args: { taskId: string }) => { await ensureAgentHost(); return agentHost.killTask(requiredString(recordValue(args, "task kill payload").taskId, "task id")); });
 		ipcMain.handle("agent:load-session", async (_e, args: { sessionId: string; cwd: string; traceId?: string }) => {
 			await ensureAgentHost();
 			const input = recordValue(args, "load session payload");
@@ -460,8 +469,8 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			await agentHost.clearSessionMetadata();
 			return { ok: true };
 		});
-		ipcMain.handle("agent:commands-list", async () => agentHost.listCommands());
-		ipcMain.handle("agent:resource-inventory", async () => agentHost.resourceInventory());
+		ipcMain.handle("agent:commands-list", async () => { await ensureAgentHost(); return agentHost.listCommands(); });
+		ipcMain.handle("agent:resource-inventory", async () => { await ensureAgentHost(); return agentHost.resourceInventory(); });
 		ipcMain.handle("prompt_history", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "prompt history payload");
 			// P2-13: readPromptHistory lives in the memory module, which pulls
