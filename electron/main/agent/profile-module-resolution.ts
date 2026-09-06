@@ -1,10 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-
-function isPathWithin(root: string, candidate: string): boolean {
-  const relativePath = relative(resolve(root), resolve(candidate));
-  return relativePath === "" || (relativePath !== ".." && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath));
-}
+import { dirname, join, resolve } from "node:path";
+import { isPathWithin } from "./host-modules/_host-paths";
 
 async function existingFileCandidates(candidates: readonly string[]): Promise<string | undefined> {
   for (const candidate of candidates) {

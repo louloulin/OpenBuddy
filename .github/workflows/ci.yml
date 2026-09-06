@@ -127,11 +127,15 @@ jobs:
       - name: Build renderer
         run: pnpm exec electron-vite build
       - name: Verify bundle budgets
-        # P3-01: CI gate that fails the PR if entry chunk > 1.5MB,
-        # total > 12MB, or any heavy chunk (markdown/katex/mermaid/cytoscape/
+        # P3-01: CI gate that fails the PR if renderer entry/total exceeds
+        # its measured budget, or any heavy chunk (markdown/katex/mermaid/cytoscape/
         # cynefin) leaks into the initial <link rel="modulepreload">.
         # Uses --strict so warnings become failures in CI.
         run: node scripts/perf/bundle-topology.mjs --strict
+      - name: Verify main process chunks
+        # Keep AgentHost and other heavy main-process capabilities out of the
+        # startup entry while retaining Rollup-generated ESM chunks.
+        run: pnpm run perf:main-chunks
 
   audit:
     name: Dependency Audit

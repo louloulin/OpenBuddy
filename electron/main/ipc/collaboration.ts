@@ -4,7 +4,7 @@
  * Split out of `./index.ts`.
  */
 import { ipcMain, type BrowserWindow } from "electron";
-import { agentHost, bindRendererEventEmitter } from "./agent-host-proxy";
+import { agentHost, bindRendererEventEmitter, ensureAgentHostLoaded } from "./agent-host-proxy";
 import * as resources from "../agent/pi-resources";
 import {
 	absolutePath,
@@ -49,6 +49,7 @@ import {
 // dynamic: @openbuddy/collaboration-protocol
 
 export function registerCollaborationIpc(getWindow: () => BrowserWindow | null): void {
+	const ensureAgentHost = async () => { await ensureAgentHostLoaded(); };
 		ipcMain.handle("collaboration:a2a-agent-card", async () => {
 			await syncCollaborationCapabilityCards();
 			const { collaborationRuntime } = await import("../collaboration/collaboration-runtime");
@@ -379,6 +380,7 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 		ipcMain.handle("collaboration:network-retry", async () => (await import("../collaboration/collaboration-runtime")).collaborationRuntime.retryPendingNetworkDeliveries());
 	async function syncCollaborationCapabilityCards(): Promise<Awaited<ReturnType<typeof agentHost.resourceInventory>>> {
 		const { collaborationRuntime } = await import("../collaboration/collaboration-runtime");
+		await ensureAgentHost();
 		const resources = await agentHost.resourceInventory();
 		collaborationRuntime.setCapabilityCards([
 			...resources.skills.map((entry: any) => ({ id: `pi-skill:${entry.name}`, name: entry.name, source: "pi-skill" as const, visibility: "local" as const, status: "available" as const, contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const } })),

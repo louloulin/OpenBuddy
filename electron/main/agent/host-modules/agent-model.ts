@@ -44,8 +44,8 @@ import { createDefaultAgentHostState } from "./_default-state";
 
 let state: AgentHostState = createDefaultAgentHostState();
 let emitRendererEvent: (channel: string, payload: unknown) => void;
-let piHome: () => string;
-let readModelsConfig: () => Promise<{ providers: Record<string, unknown> }>;
+let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd();
+let readModelsConfig: () => Promise<{ providers: Record<string, unknown> }> = async () => ({ providers: {} });
 
 export function installAgentModel(deps: {
 	state: AgentHostState;

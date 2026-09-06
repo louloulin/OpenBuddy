@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { HarnessRpcRevisionConflict, HarnessRpcStore, harnessRpcIdentity } from "./harness-rpc-store";
@@ -29,12 +29,18 @@ describe("HarnessRpcStore", () => {
 		const path = join(root, "cache.json");
 		const store = new HarnessRpcStore(path, "identity");
 		await store.write([
-			{ rpcId: "expired", fingerprint: "old", expiresAt: Date.now() - 1, result: { ok: true, value: null } },
-			{ rpcId: "live", fingerprint: "new", expiresAt: Date.now() + 10_000, result: { ok: false, error: { code: "internal", message: "x", details: {} } } },
+			{ rpcId: "expired", fingerprint: "old", expiresAt: Date.now() - 60_000, result: { ok: true, value: null } },
+			{ rpcId: "live", fingerprint: "new", expiresAt: Date.now() + 60_000, result: { ok: false, error: { code: "internal", message: "x", details: {} } } },
 		]);
 		const parsed = JSON.parse(await readFile(path, "utf8")) as { entries: unknown[] };
 		parsed.entries.push({ rpcId: "bad", fingerprint: 1, expiresAt: "never", result: null });
-		writeFile(path, `${JSON.stringify(parsed)}\n`, "utf8");
+		// Inject the tampered file atomically (temp + rename) so a concurrent
+		// reader can never observe a truncated/half-written JSON that would
+		// throw in readState() and collapse read() to []. The old in-place
+		// writeFile flaked under full-suite parallel I/O load.
+		const injected = join(root, "cache.json.inject");
+		await writeFile(injected, `${JSON.stringify(parsed)}\n`, "utf8");
+		await rename(injected, path);
 		expect((await store.read()).map((entry) => entry.rpcId)).toEqual(["live"]);
 	});
 

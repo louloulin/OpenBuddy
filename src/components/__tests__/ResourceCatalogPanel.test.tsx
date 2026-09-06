@@ -67,7 +67,9 @@ describe("ResourceCatalogPanel", () => {
   it("renders an empty state when no resources match the filter", async () => {
     render(<ResourceCatalogPanel />);
     expect(await screen.findByTestId("resource-catalog-list")).toBeTruthy();
-    expect(screen.getByText(/当前类型下没有资源/)).toBeTruthy();
+    // The empty-state message is rendered in a later tick than the list root;
+    // use the async findByText to avoid a flaky sync-get race under load.
+    expect(await screen.findByText(/当前类型下没有资源/)).toBeTruthy();
   });
 
   it("renders resource rows with type labels", async () => {

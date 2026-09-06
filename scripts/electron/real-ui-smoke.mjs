@@ -159,6 +159,17 @@ async function waitForTrace(sessionId, prompt, marker, cursor, timeoutMs = 180_0
       && (event.payload?.text === prompt || event.payload?.text?.sha256 === hash(prompt)));
     const assistant = post.filter((event) => ["assistant/start", "assistant/update", "assistant/end"].includes(event.type));
     const settled = post.some((event) => event.type === "agent/settled");
+    const terminalError = post.find((event) => event.type === "turn/error"
+      || (event.type === "auto_retry_end" && event.success === false)
+      || (event.type === "assistant/end" && event.payload?.message?.stopReason === "error"));
+    if (terminalError) {
+      const detail = terminalError.payload?.detail
+        ?? terminalError.payload?.error
+        ?? terminalError.finalError
+        ?? terminalError.payload?.message?.errorMessage
+        ?? terminalError.type;
+      throw new Error(`real UI turn failed: ${safeError(detail)}`);
+    }
     const rendered = await page.locator(".msg--assistant").allTextContents();
     if (input && assistant.length > 0 && settled && rendered.some((text) => text.includes(marker))) {
       return { events: post, allEvents: latest };

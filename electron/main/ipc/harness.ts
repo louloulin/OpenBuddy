@@ -4,7 +4,7 @@
  * Split out of `./index.ts`.
  */
 import { ipcMain, type BrowserWindow } from "electron";
-import { agentHost, bindRendererEventEmitter } from "./agent-host-proxy";
+import { agentHost, bindRendererEventEmitter, ensureAgentHostLoaded } from "./agent-host-proxy";
 import { getActiveHarnessServer, getHarnessServerAddress } from "../harness/harness-server";
 import {
 	absolutePath,
@@ -46,10 +46,20 @@ import {
 
 export function registerHarnessIpc(getWindow: () => BrowserWindow | null): void {
 		ipcMain.handle("harness:address", () => getHarnessServerAddress());
-		ipcMain.handle("harness:session-cursors", async () => agentHost.getHarnessSessionCursors());
-		ipcMain.handle("harness:session-cursors-set", async (_e, args: unknown) => agentHost.setHarnessSessionCursors(args));
-		ipcMain.handle("harness:resume-token", async () => agentHost.getHarnessResumeToken());
+		ipcMain.handle("harness:session-cursors", async () => {
+			await ensureAgentHostLoaded();
+			return agentHost.getHarnessSessionCursors();
+		});
+		ipcMain.handle("harness:session-cursors-set", async (_e, args: unknown) => {
+			await ensureAgentHostLoaded();
+			return agentHost.setHarnessSessionCursors(args);
+		});
+		ipcMain.handle("harness:resume-token", async () => {
+			await ensureAgentHostLoaded();
+			return agentHost.getHarnessResumeToken();
+		});
 		ipcMain.handle("harness:resume-token-set", async (_e, args: unknown) => {
+			await ensureAgentHostLoaded();
 			const token = args && typeof args === "object" && !Array.isArray(args) && "token" in args
 				? (args as { token?: unknown }).token
 				: args;
