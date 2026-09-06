@@ -87,11 +87,13 @@ export function entrySummary(entry: SessionEntry): string | undefined {
   }
 }
 
-function messageText(message: { content?: unknown }): string | undefined {
-  if (typeof message.content === "string") return message.content;
-  if (Array.isArray(message.content)) {
+function messageText(message: unknown): string | undefined {
+  if (!message || typeof message !== "object" || !("content" in message)) return undefined;
+  const content = (message as { content?: unknown }).content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
     const parts: string[] = [];
-    for (const part of message.content) {
+    for (const part of content) {
       if (part && typeof part === "object" && (part as { type?: unknown }).type === "text") {
         const text = (part as { text?: unknown }).text;
         if (typeof text === "string") parts.push(text);

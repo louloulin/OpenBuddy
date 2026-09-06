@@ -87,6 +87,11 @@ describe("sessionTree projection", () => {
     } as never);
     expect(summary).toBe("structured text");
   });
+
+  it("entrySummary tolerates non-object messages and malformed structured content", () => {
+    expect(entrySummary({ type: "message", id: "a", parentId: null, timestamp: "t", message: null } as never)).toBeUndefined();
+    expect(entrySummary({ type: "message", id: "a", parentId: null, timestamp: "t", message: { role: "user", content: [42, null, { type: "text" }] } } as never)).toBeUndefined();
+  });
 });
 
 function flatten(nodes: ReturnType<typeof sessionTree>): Array<{ branch: string; summary?: string }> {

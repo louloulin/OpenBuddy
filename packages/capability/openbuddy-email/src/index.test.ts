@@ -1,4 +1,4 @@
-import { mkdtemp, rm, readFile, writeFile, symlink, mkdir as fsMkdir } from "node:fs/promises"
+import { mkdtemp, readdir, rm, readFile, writeFile, symlink, mkdir as fsMkdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -1252,6 +1252,18 @@ describe.sequential("email capability", () => {
     expect(ctx.accountId).toBe("acc-1")
     expect(ctx.capability).toBe("read")
     expect(ctx.scope).toBe("room:personal-room")
+  })
+
+  it("backs up a corrupt email store without breaking background rules", async () => {
+    const corrupt = join(dir, "openbuddy-email.json")
+    await writeFile(corrupt, "{not-json", "utf8")
+    const service = setup()
+    await expect(service.listAnalyses()).rejects.toThrow("openbuddy-email store is corrupt")
+    const backup = (await readdir(dir)).find((name) => name.startsWith("openbuddy-email.json.corrupt-"))
+    expect(backup).toBeTruthy()
+    await expect(readFile(join(dir, backup!), "utf8")).resolves.toBe("{not-json")
+    await new Promise((resolve) => setImmediate(resolve))
+    await new Promise((resolve) => setImmediate(resolve))
   })
 
   // R7.1 — 授权完成 / MCP 状态变化后,renderer 必须能丢弃缓存的 provider。

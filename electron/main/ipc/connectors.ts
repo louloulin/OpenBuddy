@@ -49,6 +49,17 @@ import {
 } from "./validation";
 
 export function registerConnectorsIpc(getWindow: () => BrowserWindow | null): void {
+	// cli.json at a connector root carries shell commands that cli_auth /
+	// cli_status / cli_unauth execute. Constrain the root to the main-process
+	// candidate list so a compromised renderer cannot point these channels at
+	// an arbitrary directory it just wrote.
+	const assertConnectorRoot = (candidate: unknown): string => {
+		const root = resolve(absolutePath(candidate, "root"));
+		const allowed = connectors.candidateRoots(agentHost.getCwd()).map((candidateRoot) => resolve(candidateRoot));
+		const contained = allowed.some((candidateRoot) => root === candidateRoot || root.startsWith(candidateRoot + sep));
+		if (!contained) throw new Error("connector root 不在允许的连接器目录内");
+		return root;
+	};
 	const currentWindow = () => getWindow();
 	const emitConnectorEvent = (channel: string, payload: unknown) => {
 		const win = currentWindow();
@@ -142,10 +153,10 @@ export function registerConnectorsIpc(getWindow: () => BrowserWindow | null): vo
 			return connectors.readImageData(absolutePath(input.path, "path"), root);
 		});
 		ipcMain.handle("connectors_read_mcp_config", async (_e, args: unknown) => { const input = recordValue(args, "connector mcp payload"); return connectors.readMcpConfig(absolutePath(input.root, "root"), requiredString(input.source, "source")); });
-		ipcMain.handle("connectors_cli_status", async (_e, args: unknown) => { const input = recordValue(args, "connector status payload"); return connectors.cliStatus(absolutePath(input.root, "root"), requiredString(input.source, "source")); });
-		ipcMain.handle("connectors_cli_auth", async (_e, args: unknown) => { const input = recordValue(args, "connector auth payload"); return connectors.cliAuth(absolutePath(input.root, "root"), requiredString(input.source, "source"), emitConnectorEvent); });
+		ipcMain.handle("connectors_cli_status", async (_e, args: unknown) => { const input = recordValue(args, "connector status payload"); return connectors.cliStatus(assertConnectorRoot(input.root), requiredString(input.source, "source")); });
+		ipcMain.handle("connectors_cli_auth", async (_e, args: unknown) => { const input = recordValue(args, "connector auth payload"); return connectors.cliAuth(assertConnectorRoot(input.root), requiredString(input.source, "source"), emitConnectorEvent); });
 		ipcMain.handle("connectors_cli_auth_cancel", async (_e, args: unknown) => connectors.cliCancel(requiredString(recordValue(args, "connector auth cancel payload").source, "source")));
-		ipcMain.handle("connectors_cli_unauth", async (_e, args: unknown) => { const input = recordValue(args, "connector unauth payload"); return connectors.cliUnauth(absolutePath(input.root, "root"), requiredString(input.source, "source")); });
+		ipcMain.handle("connectors_cli_unauth", async (_e, args: unknown) => { const input = recordValue(args, "connector unauth payload"); return connectors.cliUnauth(assertConnectorRoot(input.root), requiredString(input.source, "source")); });
 		ipcMain.handle("connectors_cli_skills_dir", async (_e, args: unknown) => { const input = recordValue(args, "connector skills payload"); return connectors.cliSkillsDir(absolutePath(input.root, "root"), requiredString(input.source, "source")); });
 		ipcMain.handle("experts_default_root", async () => resources.expertDefaultRoot(agentHost.getCwd()));
 		ipcMain.handle("experts_list_roots", async (_e, args: unknown) => resources.expertListRoots(absolutePath(recordValue(args, "expert roots payload").root, "root")));

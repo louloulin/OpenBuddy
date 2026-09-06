@@ -73,7 +73,10 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 
 		ipcMain.handle("agent:new-session", async (_e, input?: string | { cwd?: string; modelId?: string; traceId?: string }) => {
 			const payload = typeof input === "string" ? undefined : recordValue(input, "agent:new-session payload");
-			const cwd = absolutePath(typeof input === "string" ? input : payload?.cwd, "cwd");
+			// preload allows {modelId}-only payloads; fall back to the active cwd.
+			const cwd = typeof input === "string"
+				? absolutePath(input, "cwd")
+				: payload?.cwd === undefined || payload?.cwd === null ? agentHost.getCwd() : absolutePath(payload.cwd, "cwd");
 			const modelId = payload?.modelId === undefined ? undefined : requiredString(payload.modelId, "modelId");
 			const traceId = optionalString((typeof input === "string" ? undefined : payload?.traceId), "traceId") ?? generateTraceId();
 			hostReceived("agent:new-session", traceId);
@@ -93,7 +96,9 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 		// sessionId is indistinguishable from a `agent:new-session` result.
 		ipcMain.handle("agent:ensure-new-session", async (_e, input?: string | { cwd?: string; modelId?: string; traceId?: string }) => {
 			const payload = typeof input === "string" ? undefined : recordValue(input, "agent:ensure-new-session payload");
-			const cwd = absolutePath(typeof input === "string" ? input : payload?.cwd, "cwd");
+			const cwd = typeof input === "string"
+				? absolutePath(input, "cwd")
+				: payload?.cwd === undefined || payload?.cwd === null ? agentHost.getCwd() : absolutePath(payload.cwd, "cwd");
 			const modelId = payload?.modelId === undefined ? undefined : requiredString(payload.modelId, "modelId");
 			const traceId = optionalString((typeof input === "string" ? undefined : payload?.traceId), "traceId") ?? generateTraceId();
 			hostReceived("agent:ensure-new-session", traceId);

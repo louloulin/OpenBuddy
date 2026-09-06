@@ -126,9 +126,45 @@ export function createMainWindow(opts: CreateMainWindowOptions): BrowserWindow {
   });
   win.setTitle("OpenBuddy");
 
-  // External links open in the default browser, not in-app.
+  // Keep the preload bridge away from remote content: only the app's own
+  // documents (file:// in production, the dev server origin in dev) may be
+  // navigated to in-window; everything else stays out or goes to the OS browser.
+  const devOrigin = (() => {
+    if (!devRendererUrl) return null;
+    try {
+      return new URL(devRendererUrl).origin;
+    } catch {
+      return null;
+    }
+  })();
+  win.webContents.on("will-navigate", (event, url) => {
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(url);
+    } catch {
+      parsed = null;
+    }
+    const isOwnDocument = parsed?.protocol === "file:" || (devOrigin !== null && parsed?.origin === devOrigin);
+    if (isOwnDocument) return;
+    event.preventDefault();
+    if (parsed && (parsed.protocol === "http:" || parsed.protocol === "https:")) {
+      shell.openExternal(url).catch(() => undefined);
+    }
+  });
+
+  // External links open in the default browser, not in-app — but only real
+  // web URLs (matches the `shell:open-external` IPC policy); file:// and
+  // custom protocols must never reach the OS handler from renderer content.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(url);
+    } catch {
+      parsed = null;
+    }
+    if (parsed && (parsed.protocol === "http:" || parsed.protocol === "https:")) {
+      shell.openExternal(url).catch(() => undefined);
+    }
     return { action: "deny" };
   });
 
