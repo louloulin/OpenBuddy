@@ -58,6 +58,18 @@ let state: AgentHostState;
 let createSubagentResourceLoader:
 	(cwd: string) => Promise<{ getSystemPrompt(): string } | undefined>;
 let modelFacingPresetTools: () => unknown[];
+let createTaskAwareToolLocal: (
+  tool: unknown,
+  signalFor: (toolCallId: string) => AbortSignal | undefined,
+) => unknown;
+
+/**
+ * Continuable subagent record type — formerly inlined in agent-host.ts.
+ * Kept here so agent-host.ts no longer carries DSH subagent type definitions.
+ */
+export type ContinuableSubagentRecord = NonNullable<
+  AgentHostState["continuableSubagents"] extends Map<string, infer V> ? V : never
+>;
 
 export function installDeepSeekAgentRuntime(deps: {
 	listAllPiSessions: <T = unknown>() => any;
@@ -69,6 +81,10 @@ export function installDeepSeekAgentRuntime(deps: {
 		cwd: string,
 	) => Promise<{ getSystemPrompt(): string } | undefined>;
 	modelFacingPresetTools: () => unknown[];
+	createTaskAwareTool?: (
+		tool: unknown,
+		signalFor: (toolCallId: string) => AbortSignal | undefined,
+	) => unknown;
 }): void {
 	listAllPiSessions = deps.listAllPiSessions as any;
 	persistedSessionPath = deps.persistedSessionPath;
@@ -77,6 +93,7 @@ export function installDeepSeekAgentRuntime(deps: {
 	state = deps.state;
 	createSubagentResourceLoader = deps.createSubagentResourceLoader;
 	modelFacingPresetTools = deps.modelFacingPresetTools;
+	createTaskAwareToolLocal = deps.createTaskAwareTool ?? (() => undefined);
 }
 import { createTaskAwareTool, harnessToolErrorResult, harnessToolFailureResult, normalizeHarnessPostResult } from "../../../task-aware-tool";
 import type { DeepSeekPiAgentRuntime, DeepSeekPiToolHooks, DeepSeekToolDecision, DeepSeekToolExecution } from "../../../deepseek/deepseek-runtime";
@@ -376,3 +393,109 @@ export {
   createDeepSeekAgent,
   resumeDeepSeekAgent,
 };
+
+/**
+ * Phase 8.3 Batch C 收尾 — ensureContinuableSubagent moved from agent-host.ts.
+ *
+ * Resumes (or initialises) the continuable-subagent record for `childSessionId`.
+ * A continuable subagent is a child Pi session that the parent agent can keep
+ * prompting across multiple user turns (vs. one-shot `task` calls that run
+ * a single turn and return). The function is the single source of truth for:
+ *   - looking up an in-memory `state.continuableSubagents` record
+ *   - opening the on-disk session file when the child was started in a previous
+ *     process and only persists as JSONL
+ *   - rebuilding the live `AgentSession` + custom-tools set when the in-memory
+ *     record has been collected
+ *   - re-binding the parent's preset, model, resource loader, and tool registry
+ *     so the child session sees the same capabilities as the parent
+ *
+ * Reverse-dep invariant: this module imports nothing from agent-host.ts.
+ */
+export async function ensureContinuableSubagent(
+  parentSessionId: string,
+  childSessionId: string,
+): Promise<ContinuableSubagentRecord> {
+  const live = state.continuableSubagents.get(childSessionId);
+  if (live) {
+    if (live.parentSessionId !== parentSessionId || live.mode !== "continuable") {
+      throw Object.assign(new Error("subagent address does not match"), { code: "session-not-found" });
+    }
+    return live as ContinuableSubagentRecord;
+  }
+  const sessions = await listAllPiSessions();
+  const sessionInfo = sessions.find((entry: { id?: string }) => entry.id === childSessionId);
+  const parent = sessionInfo
+    ? sessions.find((entry: { path?: string }) => entry.path === sessionInfo.parentSessionPath)
+    : undefined;
+  if (!sessionInfo || parent?.id !== parentSessionId) {
+    throw Object.assign(
+      new Error(`continuable subagent not found: ${childSessionId}`),
+      { code: "lookup-not-found" },
+    );
+  }
+  const manager = SessionManager.open(sessionInfo.path);
+  const marker = manager.getEntries().find(
+    (entry: { type?: string; customType?: unknown }) =>
+      entry.type === "custom" && entry.customType === "openbuddy/subagent",
+  ) as { data?: unknown } | undefined;
+  const data = marker?.data && typeof marker.data === "object"
+    ? ( marker.data as Record<string, unknown> )
+    : undefined;
+  if (data?.mode !== "continuable") {
+    throw Object.assign(new Error("subagent is not continuable"), { code: "method-unavailable" });
+  }
+  const modelRuntime = state.modelRuntime;
+  const model = state.model;
+  if (!modelRuntime || !model) {
+    throw Object.assign(new Error("Pi model runtime is unavailable"), { code: "service-unavailable" });
+  }
+  const presetId = typeof data?.presetId === "string" ? data.presetId : undefined;
+  const activePresetId = state.presetSessionRuntime?.id ?? undefined;
+  if (presetId && presetId !== activePresetId) {
+    throw Object.assign(
+      new Error(`subagent preset does not match active preset: ${presetId}`),
+      { code: "session-not-found" },
+    );
+  }
+  const resourceLoader = await createSubagentResourceLoader(sessionInfo.cwd);
+  const presetTools = modelFacingPresetTools();
+  const customTools = (presetTools as unknown[])
+    .map((tool) =>
+      createTaskAwareToolLocal(
+        tool,
+        (toolCallId: string) => state.runningTasks.get(toolCallId)?.abortController?.signal,
+      ),
+    )
+    .filter((tool): tool is { name: string } => Boolean(tool));
+  const customToolNames = customTools.map((tool) => tool.name);
+  // resourceLoader is the resource-loader returned by createSubagentResourceLoader;
+  // its type is structurally narrower than pi-coding-agent's ResourceLoader but
+  // is a real ResourceLoader-compatible object at runtime. Cast through `unknown`
+  // so TypeScript does not require us to enumerate every method.
+  const resourceLoaderForPi = resourceLoader
+    ? (resourceLoader as unknown as Parameters<typeof createAgentSession>[0] extends infer O ? (O extends { resourceLoader?: infer R } ? R : never) : never)
+    : undefined;
+  const { session } = await createAgentSession({
+    cwd: sessionInfo.cwd,
+    agentDir: piHome(),
+    model,
+    modelRuntime,
+    sessionManager: manager,
+    tools: customToolNames,
+    customTools: customTools as unknown as never,
+    ...(resourceLoaderForPi ? { resourceLoader: resourceLoaderForPi } : {}),
+  } as Parameters<typeof createAgentSession>[0]);
+  const controller = new AbortController();
+  const record = {
+    id: childSessionId,
+    parentSessionId,
+    session,
+    role: typeof data?.role === "string" ? (data.role as string) : "Subagent",
+    mode: "continuable" as const,
+    startedAt: Date.now(),
+    controller,
+    unsubscribe: session.subscribe(() => undefined),
+  };
+  state.continuableSubagents.set(childSessionId, record);
+  return record as ContinuableSubagentRecord;
+}

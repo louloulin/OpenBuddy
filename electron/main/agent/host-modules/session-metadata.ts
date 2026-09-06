@@ -224,3 +224,26 @@ export {
   setAllArchived,
   setSessionExpert,
 };
+
+/**
+ * Phase 8.3 Batch C 收尾 — setSessionPinned moved from agent-host.ts.
+ *
+ * Toggles a session's pinned status. Mirrors `setSessionArchived`:
+ *   - read metadata JSON
+ *   - apply the diff via the in-memory update callback
+ *   - re-emit `session/metadata-updated` for renderer/UI sync
+ *
+ * Throws if `sessionId` is not in the persisted session list (no silent
+ * no-op — callers want to surface a meaningful IPC error).
+ */
+export async function setSessionPinned(sessionId: string, pinned: boolean): Promise<boolean> {
+  const sessions = await listAllPiSessions();
+  if (!sessions.some((entry: { id?: string }) => entry.id === sessionId)) {
+    throw new Error(`Pi session not found: ${sessionId}`);
+  }
+  await updateSessionMetadata(sessionId, (metadata) => {
+    metadata.pinned = metadata.pinned.filter((id: string) => id !== sessionId);
+    if (pinned) metadata.pinned.push(sessionId);
+  });
+  return pinned;
+}

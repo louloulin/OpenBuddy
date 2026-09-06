@@ -101,6 +101,10 @@ import { getDeepSeekRemoteMethods, resolveDeepSeekModule } from "../deepseek/dee
 import { DeepSeekTypertService, deepSeekSessionQueryRemote, type DeepSeekPiAgentRuntime, type DeepSeekPiToolHooks, type DeepSeekToolDecision, type DeepSeekToolExecution } from "../deepseek/deepseek-runtime";
 import { DeepSeekCordisRuntime, type DeepSeekCordisInvocation, type DeepSeekCordisPluginEntry, type DeepSeekCordisRuntimeSnapshot } from "@openbuddy/plugin-host";
 import { deepSeekCapabilityPackageForService, deepSeekCapabilityRemote } from "../deepseek/deepseek-capabilities";
+import {
+  ensureContinuableSubagent as ensureContinuableSubagentImpl,
+  type ContinuableSubagentRecord,
+} from "./host-modules/deepseek/agent-runtime";
 import { SessionEventLog, type SessionEventRecord } from "../session/session-event-log";
 import { RemoteDispatcher, type RemoteContribution, type RemoteDescriptor } from "../harness/remote-dispatch";
 import { invokeRemoteWithGateway } from "../harness/remote-invocation";
@@ -510,6 +514,7 @@ import {
   setSessionArchived as setSessionArchivedImpl,
   setAllArchived as setAllArchivedImpl,
   setSessionExpert as setSessionExpertImpl,
+  setSessionPinned as setSessionPinnedImpl,
 } from "./host-modules/session-metadata";
 
 // Phase 8.3 Batch C: file rewind snapshot store (captureFileSnapshot /
@@ -1303,6 +1308,7 @@ import { provideRpcUiContext } from "./host-modules/bootstrap/provide-rpc-ui-con
 import { wireContextServices, type WireContextServicesDeps } from "./host-modules/bootstrap/wire-context-services";
 import type { ProvideRpcUiContextDeps } from "./host-modules/bootstrap/provide-rpc-ui-context";
 import { wireDshServices, type WireDshServicesDeps } from "./host-modules/bootstrap/wire-dsh-services";
+import { initProfile } from "./host-modules/bootstrap/init-profile";
 export function emitPluginEvent(type: string, payload: unknown) { return emitPluginEventImpl(type, payload); }
 export function pluginReadinessSnapshot() {
   return pluginReadinessSnapshotImpl();
@@ -1803,41 +1809,16 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
       console.warn("[openbuddy] default Pi bundle install failed:", error);
     });
   }
-  state.profileOptions = profileOptions ? {
-    ...profileOptions,
-    anchors: [fileURLToPath(import.meta.url), join(resolvedProfile.profileDir, "package.json")],
-    scope: {
-      dshHomePath: (sub: string) => join(piHome(), sub),
-      process: { platform: process.platform, env: process.env },
-    },
-  } : null;
-  let profileBundle: PluginProfile | undefined;
-  if (profileOptions) {
-    try {
-      const materialized = await materializeOpenBuddyProfile(state.profileOptions!);
-      const runtimeBundle = await runtimeProfileBundle(materialized.bundle);
-      profilePackageJson = materialized.profile.packageJson;
-      state.profilePackageJson = profilePackageJson;
-      state.profilePackagePaths.splice(0, state.profilePackagePaths.length, ...materialized.profile.packagePaths);
-      profileBundle = {
-        entries: [...runtimeBundle.entries],
-        patches: runtimeBundle.patches,
-      };
-      state.profileBundle = profileBundle;
-      state.profilePiExtensions = materialized.profile.piExtensions;
-      state.profilePiPackagePaths.splice(0, state.profilePiPackagePaths.length, ...materialized.profile.piPackagePaths);
-      setProfilePiResourcePaths(materialized.profile.piResourcePaths);
-      await startProfileWatchers();
-      emitPluginEvent("profile/loaded", {
-        name: materialized.profile.name,
-        bundles: materialized.profile.bundles,
-        piExtensions: materialized.profile.piExtensions.map((extension) => extension.id),
-      });
-    } catch (error) {
-      emitPluginEvent("profile/failed", { name: resolvedProfile.profileName, error: String(error), profileDir: resolvedProfile.profileDir });
-      throw error;
-    }
-  }
+  const { profileBundle, profilePackageJson: materializedProfilePackageJson } = await initProfile({
+    state,
+    resolvedProfile,
+    profileOptions,
+    piHome,
+    emitPluginEvent,
+    setProfilePiResourcePaths,
+    startProfileWatchers,
+  });
+  profilePackageJson = materializedProfilePackageJson;
   const loader = new ElectronHarnessPluginLoader({
     context,
     baseUrl: import.meta.url,
@@ -2415,57 +2396,15 @@ async function subagentHistory(
   return subagentHistoryImpl(parentSessionId, childSessionId, mode, beforeSeq, maxMessages);
 }
 
-export async function ensureContinuableSubagent(parentSessionId: string, childSessionId: string): Promise<NonNullable<typeof state.continuableSubagents extends Map<string, infer V> ? V : never>> {
-  const live = state.continuableSubagents.get(childSessionId);
-  if (live) {
-    if (live.parentSessionId !== parentSessionId || live.mode !== "continuable") throw Object.assign(new Error("subagent address does not match"), { code: "session-not-found" });
-    return live;
-  }
-  const sessions = await listAllPiSessions();
-  const sessionInfo = sessions.find((entry) => entry.id === childSessionId);
-  const parent = sessionInfo ? sessions.find((entry) => entry.path === sessionInfo.parentSessionPath) : undefined;
-  if (!sessionInfo || parent?.id !== parentSessionId) throw Object.assign(new Error(`continuable subagent not found: ${childSessionId}`), { code: "lookup-not-found" });
-  const manager = SessionManager.open(sessionInfo.path);
-  const marker = manager.getEntries().find((entry) => entry.type === "custom" && (entry as { customType?: unknown }).customType === "openbuddy/subagent") as { data?: unknown } | undefined;
-  const data = marker?.data && typeof marker.data === "object" ? marker.data as Record<string, unknown> : undefined;
-  if (data?.mode !== "continuable") throw Object.assign(new Error("subagent is not continuable"), { code: "method-unavailable" });
-  const modelRuntime = state.modelRuntime;
-  const model = state.model;
-  if (!modelRuntime || !model) throw Object.assign(new Error("Pi model runtime is unavailable"), { code: "service-unavailable" });
-  const presetId = typeof data?.presetId === "string" ? data.presetId : undefined;
-  const activePresetId = state.presetSessionRuntime?.id ?? undefined;
-  if (presetId && presetId !== activePresetId) {
-    throw Object.assign(new Error(`subagent preset does not match active preset: ${presetId}`), { code: "session-not-found" });
-  }
-  const resourceLoader = await createSubagentResourceLoader(sessionInfo.cwd);
-  const customTools = modelFacingPresetTools().map((tool) => createTaskAwareTool(
-    tool,
-    (toolCallId) => state.runningTasks.get(toolCallId)?.abortController?.signal,
-  ));
-  const customToolNames = customTools.map((tool) => tool.name);
-  const { session } = await createAgentSession({
-    cwd: sessionInfo.cwd,
-    agentDir: piHome(),
-    model,
-    modelRuntime,
-    sessionManager: manager,
-    tools: customToolNames,
-    customTools,
-    ...(resourceLoader ? { resourceLoader } : {}),
-  });
-  const controller = new AbortController();
-  const record = {
-    id: childSessionId,
-    parentSessionId,
-    session,
-    role: typeof data.role === "string" ? data.role : "Subagent",
-    mode: "continuable" as const,
-    startedAt: Date.now(),
-    controller,
-    unsubscribe: session.subscribe(() => undefined),
-  };
-  state.continuableSubagents.set(childSessionId, record);
-  return record;
+/**
+ * Forwarder for ensureContinuableSubagent. Real implementation now lives in
+ * `host-modules/deepseek/agent-runtime.ts` (Batch C 收尾).
+ */
+export async function ensureContinuableSubagent(
+  parentSessionId: string,
+  childSessionId: string,
+): Promise<ContinuableSubagentRecord> {
+  return ensureContinuableSubagentImpl(parentSessionId, childSessionId);
 }
 
 async function createDeepSeekAgentRuntime(options: {
@@ -2611,14 +2550,9 @@ async function getHarnessSessionCursors() : Promise<Record<string, number>> { re
 
 async function setHarnessSessionCursors(cursors: unknown) : Promise<Record<string, number>> { return setHarnessSessionCursorsImpl(cursors); }
 
+/** Forwarder for setSessionPinned (real impl in host-modules/session-metadata.ts). */
 async function setSessionPinned(sessionId: string, pinned: boolean): Promise<boolean> {
-  const sessions = await listAllPiSessions();
-  if (!sessions.some((entry) => entry.id === sessionId)) throw new Error(`Pi session not found: ${sessionId}`);
-  await updateSessionMetadataImpl(sessionId, (metadata) => {
-    metadata.pinned = metadata.pinned.filter((id) => id !== sessionId);
-    if (pinned) metadata.pinned.push(sessionId);
-  });
-  return pinned;
+  return setSessionPinnedImpl(sessionId, pinned);
 }
 
 async function setSessionArchived(sessionId: string, archived: boolean) : Promise<boolean> { return setSessionArchivedImpl(sessionId, archived); }
@@ -2629,6 +2563,7 @@ async function setAllArchived(archived: boolean): Promise<{ updated: number }> {
 
 async function setSessionExpert(sessionId: string, expert: { expertId: string; expertName: string; avatarLocal?: string } | null) : Promise<void> { return setSessionExpertImpl(sessionId, expert); }
 
+/** Forwarder for getToolRegistry (real impl lives in tool-registry owner). */
 function getToolRegistry(): PiToolRegistry {
   return state.toolRegistry;
 }
@@ -2637,6 +2572,7 @@ async function listSkills(requestedCwd?: string | null) { return listSkillsImpl(
 
 async function resourceInventory() { return resourceInventoryImpl(); }
 
+/** Forwarder for listPlugins (real impl lives in plugin-state). */
 function listPlugins(): PluginStatus[] {
   return state.loader?.list() ?? [];
 }

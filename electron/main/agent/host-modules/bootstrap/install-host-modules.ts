@@ -201,7 +201,7 @@ export function installHostModules(state: AgentHostState, deps: InstallHostModul
   installWorkbenchScope({ state, listAllPiSessions: deps.listAllPiSessions as never });
   // agent-model
   installAgentModel({ state, emitRendererEvent: deps.emitRendererEvent, piHome: deps.piHome, readModelsConfig: deps.readModelsConfig as never });
-  // deepseek/agent-runtime
+  // deepseek/agent-runtime (DSH subagent write paths; ensureContinuableSubagent lives here too)
   installDeepSeekAgentRuntime({
     listAllPiSessions: deps.listAllPiSessions,
     persistedSessionPath: deps.persistedSessionPath,
@@ -210,6 +210,7 @@ export function installHostModules(state: AgentHostState, deps: InstallHostModul
     state,
     createSubagentResourceLoader: deps.createSubagentResourceLoader as never,
     modelFacingPresetTools: deps.modelFacingPresetTools as never,
+    createTaskAwareTool: deps.createTaskAwareTool as never,
     }
   );
   // plugin-mutations (largest dep set)
