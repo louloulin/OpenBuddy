@@ -58,7 +58,9 @@ export function registerStorageIpc(getWindow: () => BrowserWindow | null): void 
 		ipcMain.handle("storage-sources:save", async (_e, args: unknown) => {
 			const input = recordValue(args, "storage sources save payload");
 			if (!Array.isArray(input.sources)) throw new Error("sources must be an array");
-			const sources = input.sources.map((source, index) => absolutePath(source, `sources[${index}]`));
+			// writeAllowedRoot rejects the filesystem root, preventing a
+			// "register / as workspace" bypass of shellfs write containment.
+			const sources = input.sources.map((source, index) => writeAllowedRoot(absolutePath(source, `sources[${index}]`)));
 			return resources.writeStorageSources([...new Set(sources)]);
 		});
 		ipcMain.handle("storage:renderer-read", async (_e, args: unknown) => {

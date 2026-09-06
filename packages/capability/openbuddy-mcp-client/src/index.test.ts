@@ -252,4 +252,14 @@ describe("openbuddy MCP client", () => {
 		});
 		expect(provider?.tokens()).toBeUndefined();
 	});
+
+	it("keeps each OAuth authorization verifier isolated instead of reusing a predictable value", async () => {
+		const provider = createMcpOAuthProvider({ clientId: "id" }, { accessToken: "access", tokenType: "Bearer" })!;
+		expect(() => provider.codeVerifier()).toThrow("code verifier is missing");
+		await provider.saveCodeVerifier("first-verifier");
+		expect(provider.codeVerifier()).toBe("first-verifier");
+		await provider.saveCodeVerifier("second-verifier");
+		expect(provider.codeVerifier()).toBe("second-verifier");
+		expect(provider.clientMetadata.response_types).toContain("code");
+	});
 });
