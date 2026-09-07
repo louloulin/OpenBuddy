@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.84.3",
-    "@modelcontextprotocol/sdk": "1.25.2",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@openbuddy/capability-authorization": "workspace:*",
     "@openbuddy/cordis": "workspace:*"
   }
