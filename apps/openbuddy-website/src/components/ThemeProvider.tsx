@@ -22,7 +22,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('light');
 
   useEffect(() => {
-    const stored = (typeof window !== 'undefined' && localStorage.getItem('openbuddy-theme')) as ? : Theme;
+    const stored = (typeof window !== 'undefined' && (localStorage.getItem('openbuddy-theme') as Theme | null));
     if (stored === 'light' || stored === 'dark') {
       setThemeState(stored);
     } else if (typeof window !== 'undefined') {

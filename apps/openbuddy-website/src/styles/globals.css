@@ -5,36 +5,132 @@
 /* =========================================================================
  * OpenBuddy Website —— 全局基础样式
  * 继承 src/styles/tokens.css 的 --wb-* 令牌体系
+ * 支持 light / dark 主题，所有颜色均通过 CSS variables 映射
  * ========================================================================= */
 
-:root {
-  /* Light theme —— 默认 */
+:root,
+[data-theme='light'] {
+  /* ===== Surface ===== */
   --wb-bg: #FFFFFF;
-  --wb-bg-dark: #0E1117;
+  --wb-bg-soft: #FAFAFA;
+  --wb-bg-soft-2: #F2F2F2;
+  --wb-bg-tertiary: #F7F7F7;
+  --wb-bg-elevated: #FFFFFF;
+  --wb-bg-overlay: rgba(0, 0, 0, 0.04);
+  --wb-bg-hover: rgba(0, 0, 0, 0.04);
+  --wb-bg-active: rgba(0, 0, 0, 0.06);
+
+  /* ===== Text ===== */
   --wb-fg: #1F2328;
   --wb-fg-muted: #656D76;
+  --wb-fg-faint: #8B949E;
+  --wb-fg-inverse: #FFFFFF;
+
+  /* ===== Border ===== */
   --wb-border: #D0D7DE;
-  --wb-border-dark: #30363D;
+  --wb-border-soft: #E6E6E6;
+  --wb-border-strong: #D0D7DE;
+  --wb-border-focus: #5B6CFF;
+
+  /* ===== Accent / Brand ===== */
   --wb-accent: #5B6CFF;
   --wb-accent-hover: #4858E0;
+  --wb-brand: #00C29A;
+  --wb-brand-deep: #00614D;
+  --wb-brand-soft: rgba(0, 194, 154, 0.08);
+  --wb-brand-soft-2: rgba(0, 194, 154, 0.12);
+  --wb-brand-border: rgba(0, 194, 154, 0.20);
+
+  /* ===== Status ===== */
   --wb-success: #1F883D;
   --wb-warning: #9A6700;
   --wb-error: #CF222E;
 
-  /* Surface gradient (Hero 背景) */
+  /* ===== Code / Terminal ===== */
+  --wb-code-bg: #0E1117;
+  --wb-code-fg: #E6EDF3;
+  --wb-code-muted: #8B949E;
+  --wb-code-line: rgba(255, 255, 255, 0.08);
+  --wb-code-window-bg: #161B22;
+
+  /* ===== Window decorations ===== */
+  --wb-window-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px -8px rgba(15, 23, 42, 0.12);
+  --wb-window-shadow-hover: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.06);
+
+  /* ===== Effects ===== */
   --wb-grid-color: rgba(0, 0, 0, 0.04);
   --wb-glow-1: rgba(0, 194, 154, 0.18);
   --wb-glow-2: rgba(91, 108, 255, 0.15);
+  --wb-mask: rgba(0, 0, 0, 0.4);
+
+  /* ===== Focus ring ===== */
+  --wb-ring: 0 0 0 2px var(--wb-bg), 0 0 0 4px var(--wb-accent);
+
+  /* ===== Fonts ===== */
+  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+    'Segoe UI', system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+    'Segoe UI', system-ui, sans-serif;
+  --font-jetbrains: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Menlo',
+    'Monaco', 'Consolas', monospace;
 }
 
 [data-theme='dark'] {
+  /* ===== Surface ===== */
   --wb-bg: #0E1117;
+  --wb-bg-soft: #161B22;
+  --wb-bg-soft-2: #1C2128;
+  --wb-bg-tertiary: #21262D;
+  --wb-bg-elevated: #1C2128;
+  --wb-bg-overlay: rgba(255, 255, 255, 0.05);
+  --wb-bg-hover: rgba(255, 255, 255, 0.06);
+  --wb-bg-active: rgba(255, 255, 255, 0.10);
+
+  /* ===== Text ===== */
   --wb-fg: #E6EDF3;
   --wb-fg-muted: #8B949E;
+  --wb-fg-faint: #6E7681;
+  --wb-fg-inverse: #0E1117;
+
+  /* ===== Border ===== */
   --wb-border: #30363D;
+  --wb-border-soft: #21262D;
+  --wb-border-strong: #484F58;
+  --wb-border-focus: #6E7681;
+
+  /* ===== Accent / Brand ===== */
+  --wb-accent: #8B95FF;
+  --wb-accent-hover: #A5ADFF;
+  --wb-brand: #4cf0ce;
+  --wb-brand-deep: #22cba8;
+  --wb-brand-soft: rgba(76, 240, 206, 0.08);
+  --wb-brand-soft-2: rgba(76, 240, 206, 0.12);
+  --wb-brand-border: rgba(76, 240, 206, 0.25);
+
+  /* ===== Status ===== */
+  --wb-success: #43f08f;
+  --wb-warning: #f1854d;
+  --wb-error: #f07aa2;
+
+  /* ===== Code / Terminal ===== */
+  --wb-code-bg: #010409;
+  --wb-code-fg: #E6EDF3;
+  --wb-code-muted: #8B949E;
+  --wb-code-line: rgba(255, 255, 255, 0.08);
+  --wb-code-window-bg: #161B22;
+
+  /* ===== Window decorations ===== */
+  --wb-window-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  --wb-window-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+
+  /* ===== Effects ===== */
   --wb-grid-color: rgba(255, 255, 255, 0.04);
-  --wb-glow-1: rgba(0, 194, 154, 0.22);
-  --wb-glow-2: rgba(91, 108, 255, 0.18);
+  --wb-glow-1: rgba(0, 194, 154, 0.25);
+  --wb-glow-2: rgba(139, 149, 255, 0.20);
+  --wb-mask: rgba(0, 0, 0, 0.7);
+
+  /* ===== Focus ring ===== */
+  --wb-ring: 0 0 0 2px var(--wb-bg), 0 0 0 4px var(--wb-accent);
 }
 
 @layer base {
@@ -52,18 +148,19 @@
   body {
     background: var(--wb-bg);
     color: var(--wb-fg);
-    font-family: var(--font-inter), 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-inter), system-ui, sans-serif;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     min-height: 100vh;
     overflow-x: hidden;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   ::selection {
-    background: rgba(0, 194, 154, 0.25);
+    background: var(--wb-brand-soft-2);
     color: var(--wb-fg);
   }
 
-  /* 滚动条 —— 极简 */
+  /* Scrollbar */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -90,26 +187,24 @@
     background-size: 48px 48px;
   }
 
-  /* 渐变光晕 (Hero) */
+  /* 渐变光晕 */
   .bg-radial-glow {
     background-image:
       radial-gradient(ellipse 80% 60% at 50% 0%, var(--wb-glow-1), transparent 60%),
       radial-gradient(ellipse 60% 40% at 80% 30%, var(--wb-glow-2), transparent 60%);
   }
 
-  /* 编辑器风色窗口框 */
+  /* 编辑器窗口 */
   .wb-window {
     background: var(--wb-bg);
     border: 1px solid var(--wb-border);
     border-radius: 12px;
     overflow: hidden;
-    box-shadow:
-      0 1px 2px rgba(15, 23, 42, 0.04),
-      0 12px 32px -8px rgba(15, 23, 42, 0.12);
+    box-shadow: var(--wb-window-shadow);
   }
 
   .wb-window-titlebar {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0));
+    background: var(--wb-bg-soft);
     border-bottom: 1px solid var(--wb-border);
     padding: 10px 14px;
     display: flex;
@@ -159,12 +254,8 @@
     transition: background 0.15s ease, border-color 0.15s ease;
   }
   .btn-secondary:hover {
-    background: rgba(0, 0, 0, 0.03);
+    background: var(--wb-bg-hover);
     border-color: var(--wb-fg-muted);
-  }
-
-  [data-theme='dark'] .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.05);
   }
 
   /* 卡片 */
@@ -178,48 +269,43 @@
   .wb-card:hover {
     transform: translateY(-2px);
     border-color: var(--wb-fg-muted);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    box-shadow: var(--wb-window-shadow-hover);
   }
 
-  /* 标签 (chip) */
+  /* Chip */
   .wb-chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(0, 194, 154, 0.08);
-    color: #00614D;
+    background: var(--wb-brand-soft);
+    color: var(--wb-brand-deep);
     padding: 4px 10px;
     border-radius: 999px;
     font-size: 12px;
     font-weight: 500;
-    border: 1px solid rgba(0, 194, 154, 0.2);
+    border: 1px solid var(--wb-brand-border);
   }
   [data-theme='dark'] .wb-chip {
-    color: #4cf0ce;
-    background: rgba(76, 240, 206, 0.08);
-    border-color: rgba(76, 240, 206, 0.2);
+    color: var(--wb-brand);
   }
 
-  /* 关键标签 kbd */
+  /* kbd */
   .wb-kbd {
     display: inline-flex;
     align-items: center;
     padding: 2px 6px;
     border-radius: 4px;
-    background: rgba(0, 0, 0, 0.05);
+    background: var(--wb-bg-overlay);
     border: 1px solid var(--wb-border);
     font-family: var(--font-jetbrains), monospace;
     font-size: 11px;
     color: var(--wb-fg-muted);
     line-height: 1;
   }
-  [data-theme='dark'] .wb-kbd {
-    background: rgba(255, 255, 255, 0.06);
-  }
 
   /* 渐变文字 */
   .text-gradient-brand {
-    background: linear-gradient(120deg, #00614D 0%, #00C29A 50%, #5B6CFF 100%);
+    background: linear-gradient(120deg, var(--wb-brand-deep) 0%, var(--wb-brand) 50%, var(--wb-accent) 100%);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -232,11 +318,32 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(0, 194, 154, 0.15),
+      var(--wb-brand-soft-2),
       transparent
     );
     background-size: 200% 100%;
     animation: shimmer 3s linear infinite;
+  }
+
+  /* Section tag (decorative dashed lines + uppercase label) */
+  .section-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--wb-fg-muted);
+    font-family: var(--font-jetbrains), monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+  }
+  .section-tag::before,
+  .section-tag::after {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 1px;
+    background: var(--wb-fg-muted);
+    opacity: 0.4;
   }
 }
 
@@ -248,7 +355,6 @@
     text-wrap: pretty;
   }
 
-  /* Skip link —— 可访问性 */
   .skip-link {
     position: absolute;
     top: -40px;
@@ -263,5 +369,43 @@
   }
   .skip-link:focus {
     top: 0;
+  }
+
+  /* Card / surface tokens */
+  .surface-bg {
+    background: var(--wb-bg);
+  }
+  .surface-bg-soft {
+    background: var(--wb-bg-soft);
+  }
+  .surface-bg-soft-2 {
+    background: var(--wb-bg-soft-2);
+  }
+  .surface-border {
+    border-color: var(--wb-border);
+  }
+  .text-fg {
+    color: var(--wb-fg);
+  }
+  .text-fg-muted {
+    color: var(--wb-fg-muted);
+  }
+  .text-fg-faint {
+    color: var(--wb-fg-faint);
+  }
+  .text-brand {
+    color: var(--wb-brand);
+  }
+  .text-brand-deep {
+    color: var(--wb-brand-deep);
+  }
+  .bg-brand-soft {
+    background: var(--wb-brand-soft);
+  }
+  .border-brand {
+    border-color: var(--wb-brand);
+  }
+  .ring-wb {
+    box-shadow: var(--wb-ring);
   }
 }

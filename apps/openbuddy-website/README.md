@@ -12,7 +12,7 @@ The official marketing website for **OpenBuddy** — built with **Next.js 14 App
 | Framework | Next.js 14.2 (App Router, Server Components, Turbopack) |
 | Language | TypeScript 5.6 |
 | Styling | Tailwind CSS 3.4 + custom CSS variables (`--wb-*`) |
-| Font | Inter (UI), JetBrains Mono (code) via `next/font/google` |
+| Font | System font stack via CSS variables (no Google Fonts dependency — offline-friendly) |
 | Icons | lucide-react |
 | Deployment | Vercel (auto-detected via `vercel.json`) |
 
@@ -51,21 +51,32 @@ apps/openbuddy-website/
 │   │       ├── docs/page.tsx
 │   │       └── sponsors/page.tsx
 │   ├── components/             # Reusable React components
-│   │   ├── SiteHeader.tsx      # Sticky header w/ backdrop blur
+│   │   ├── SiteHeader.tsx      # Sticky header w/ backdrop blur + locale switcher
 │   │   ├── SiteFooter.tsx
+│   │   ├── LocaleSwitcher.tsx  # EN/中 dropdown with keyboard a11y
+│   │   ├── ThemeSwitcher.tsx   # Light/dark toggle button
+│   │   ├── GitHubStars.tsx     # Real-time star count with localStorage cache
+│   │   ├── BackToTop.tsx       # Floating back-to-top button
+│   │   ├── RevealOnScroll.tsx  # IntersectionObserver-based reveal animation
+│   │   ├── CopyButton.tsx      # Copy-to-clipboard w/ navigator.clipboard
 │   │   ├── Hero.tsx            # Editor-style hero + animated terminal
 │   │   ├── ShowcaseSection.tsx # Tabbed screenshot viewer (mock + real)
 │   │   ├── FeaturesSection.tsx # 6 feature cards
 │   │   ├── ArchitectureSection.tsx
+│   │   ├── StatsSection.tsx    # 6 dark-themed stat cards
 │   │   ├── ComparisonSection.tsx
 │   │   ├── CapabilitiesSection.tsx
 │   │   ├── CLISection.tsx      # Dark terminal demo
+│   │   ├── TestimonialsSection.tsx # 3 user quotes
+│   │   ├── FAQSection.tsx      # Accordion FAQ
 │   │   ├── CommunitySection.tsx
 │   │   ├── CTASection.tsx
 │   │   ├── DownloadView.tsx    # Shared download view (en/zh)
 │   │   ├── DocsView.tsx        # Shared docs view
 │   │   ├── SponsorsView.tsx    # Shared sponsors view
-│   │   └── ThemeProvider.tsx   # next-themes wrapper
+│   │   ├── ChangelogView.tsx   # Release history timeline
+│   │   ├── RoadmapView.tsx     # 3-column roadmap
+│   │   └── ThemeProvider.tsx   # Light/dark theme w/ localStorage
 │   ├── lib/i18n.ts             # EN / zh-CN dictionaries + helpers
 │   └── styles/globals.css      # Tailwind base + --wb-* tokens
 ├── public/favicon.svg          # Shiba mascot mark

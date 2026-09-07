@@ -1,19 +1,9 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import CookieConsent from '@/components/CookieConsent';
+import KeyboardShortcuts from '@/components/KeyboardShortcuts';
+import BackToTop from '@/components/BackToTop';
 import '../styles/globals.css';
-
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter'
-});
-
-const jetbrains = JetBrains_Mono({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-jetbrains'
-});
 
 export const viewport: Viewport = {
   themeColor: [
@@ -77,29 +67,57 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={ `${inter.variable} ${jetbrains.variable}` } suppressHydrationWarning>
+    <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
-        {/* 字体预加载 + JSON-LD 结构化数据 */}
+        {/* JSON-LD: SoftwareApplication (基础) + Organization (用于 SEO 知识面板) */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={ {
             __html: JSON.stringify({
               '@context': 'https://schema.org',
-              '@type': 'SoftwareApplication',
-              name: 'OpenBuddy',
-              applicationCategory: 'DeveloperApplication',
-              operatingSystem: 'Windows, macOS, Linux',
-              description:
-                'OpenBuddy is a 100% open source (MIT) desktop AI workspace rebuilt on Electron + Pi.',
-              offers: {
-                '@type': 'Offer',
-                price: '0',
-                priceCurrency: 'USD'
-              },
-              license: 'https://github.com/louloulin/OpenBuddy/blob/main/LICENSE',
-              url: 'https://openbuddy.dev',
-              downloadUrl: 'https://github.com/lougoulin/OpenBuddy/releases'
+              '@graph': [
+                {
+                  '@type': 'SoftwareApplication',
+                  name: 'OpenBuddy',
+                  applicationCategory: 'DeveloperApplication',
+                  operatingSystem: 'Windows, macOS, Linux',
+                  description:
+                    'OpenBuddy is a 100% open source (MIT) desktop AI workspace rebuilt on Electron + Pi.',
+                  offers: {
+                    '@type': 'Offer',
+                    price: '0',
+                    priceCurrency: 'USD'
+                  },
+                  license: 'https://github.com/louloulin/OpenBuddy/blob/main/LICENSE',
+                  url: 'https://openbuddy.dev',
+                  downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases'
+                },
+                {
+                  '@type': 'Organization',
+                  name: 'OpenBuddy',
+                  url: 'https://openbuddy.dev',
+                  logo: 'https://openbuddy.dev/favicon.svg',
+                  sameAs: [
+                    'https://github.com/louloulin/OpenBuddy',
+                    'https://github.com/louloulin/OpenBuddy/discussions',
+                    'https://discord.gg/openbuddy',
+                    'https://youtube.com/@openbuddy'
+                  ]
+                },
+                {
+                  '@type': 'WebSite',
+                  name: 'OpenBuddy',
+                  url: 'https://openbuddy.dev',
+                  inLanguage: ['en-US', 'zh-CN']
+                }
+              ]
             })
+          } }
+        />
+        <script
+          // 注入初始 theme，避免 FOUC
+          dangerouslySetInnerHTML={ {
+            __html: `(function(){try{var t=localStorage.getItem('openbuddy-theme');var d=t==='light'||t==='dark'?t:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',d);}catch(e){}})();`
           } }
         />
       </head>
@@ -107,7 +125,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
-        <ThemeProvider>{ children }</ThemeProvider>
+        <ThemeProvider>
+          { children }
+          <BackToTop />
+          <CookieConsent />
+          <KeyboardShortcuts />
+        </ThemeProvider>
       </body>
     </html>
   );

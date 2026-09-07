@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
-import { Monitor, Apple, Terminal, Github, ArrowRight, Copy, Check } from 'lucide-react';
+import { Monitor, Apple, Terminal, Github, ArrowRight, Check } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
-import { defaultLocale, getDictionary, type Dict, type Locale } from '@/lib/i18n';
+import CopyButton from '@/components/CopyButton';
+import { defaultLocale, getDictionary, type Locale } from '@/lib/i18n';
 import { localizedPath } from '@/lib/i18n';
 import Link from 'next/link';
 
@@ -209,7 +210,7 @@ export function DownloadView({ locale }: { locale: Locale }) {
             <div className="mx-auto mt-10 flex max-w-2xl items-center justify-center gap-2 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-4 py-3">
               <Terminal className="h-4 w-4 text-[var(--wb-fg-muted)]" />
               <code className="font-mono text-[13px] text-[var(--wb-fg)]">{ copy.brewFormula }</code>
-              <CopyButton />
+              <CopyButton text={ copy.brewFormula } className="ml-auto" />
             </div>
 
             {/* Source build */}
@@ -296,17 +297,5 @@ export function DownloadView({ locale }: { locale: Locale }) {
       </main>
       <SiteFooter dict={ dict } />
     </>
-  );
-}
-
-function CopyButton() {
-  return (
-    <button
-      type="button"
-      aria-label="Copy command"
-      className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--wb-border)] bg-[var(--wb-bg)] text-[var(--wb-fg-muted)] transition-colors hover:text-[var(--wb-fg)]"
-    >
-      <Copy className="h-3.5 w-3.5" />
-    </button>
   );
 }

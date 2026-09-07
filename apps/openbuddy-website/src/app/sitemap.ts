@@ -5,7 +5,7 @@ const SITE_URL = 'https://openbuddy.dev';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  const routes = ['', '/download', '/docs', '/sponsors'];
+  const routes = ['', '/download', '/docs', '/sponsors', '/changelog', '/roadmap', '/pricing'];
 
   return routes.flatMap((route) =>
     locales.map((locale) => ({

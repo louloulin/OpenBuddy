@@ -6,7 +6,9 @@ import typography from '@tailwindcss/typography';
  *
  * 设计策略：复用根仓库 `src/styles/tokens.css` 中的 --wb-* 令牌，
  * 将其映射到 Tailwind 的 color/spacing/radius，便于在 Tailwind 类中直接使用。
- * 任何对令牌值本身的修改请先修改 src/styles/tokens.css 再同步此处。
+ *
+ * 颜色使用 CSS function 形式 `var(--wb-*)` —— 这样 dark mode 切换时
+ * 所有颜色自动跟随 theme 变化，无需 `dark:` 前缀。
  */
 const config: Config = {
   content: ['./src/**/*.{ts,tsx,md,mdx}'],
@@ -14,50 +16,80 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Brand palette (--wb-palette-*)
+        // 全部通过 CSS variable，让 dark 模式自动适配
         brand: {
-          1: '#DFF7F2',
-          2: '#BFF0E6',
-          3: '#9FE8D9',
-          4: '#80E1CD',
-          5: '#60D9C0',
-          7: '#40D1B3',
-          8: '#00C29A',
-          9: '#009273',
-          10: '#00614D'
+          1: 'var(--wb-brand-soft)',
+          2: 'var(--wb-brand-soft-2)',
+          3: 'var(--wb-brand)',
+          4: 'var(--wb-brand)',
+          5: 'var(--wb-brand)',
+          7: 'var(--wb-brand)',
+          8: 'var(--wb-brand)',
+          9: 'var(--wb-brand)',
+          10: 'var(--wb-brand-deep)',
+          DEFAULT: 'var(--wb-brand)',
+          deep: 'var(--wb-brand-deep)'
         },
-        // Accent (品牌强调色，复用 --wb-accent #5B6CFF 用于强调链接/CTA)
         accent: {
-          DEFAULT: '#5B6CFF',
-          hover: '#4858E0',
-          active: '#3547C2'
+          DEFAULT: 'var(--wb-accent)',
+          hover: 'var(--wb-accent-hover)'
         },
-        // Surface tokens (light)
+        // 语义化 surface tokens
         surface: {
-          bg: '#FFFFFF',
-          'bg-soft': '#FAFAFA',
-          'bg-soft-2': '#F2F2F2',
-          border: '#E6E6E6',
-          'border-strong': '#D0D7DE',
-          text: '#1F2328',
-          'text-muted': '#656D76',
-          'text-faint': '#8B949E'
+          bg: 'var(--wb-bg)',
+          'bg-soft': 'var(--wb-bg-soft)',
+          'bg-soft-2': 'var(--wb-bg-soft-2)',
+          'bg-tertiary': 'var(--wb-bg-tertiary)',
+          border: 'var(--wb-border)',
+          'border-soft': 'var(--wb-border-soft)',
+          'border-strong': 'var(--wb-border-strong)',
+          text: 'var(--wb-fg)',
+          'text-muted': 'var(--wb-fg-muted)',
+          'text-faint': 'var(--wb-fg-faint)'
         },
-        // Status
-        success: '#1F883D',
-        warning: '#9A6700',
-        error: '#CF222E'
+        // 状态
+        success: 'var(--wb-success)',
+        warning: 'var(--wb-warning)',
+        error: 'var(--wb-error)',
+        // 红色 (用于 ✗ cell) - 通过 opacity 在两套主题下都可见
+        red: {
+          1: 'rgba(220, 50, 70, 0.10)',
+          3: 'rgba(220, 50, 70, 0.20)',
+          7: '#dc143c',
+          9: '#dc143c',
+          10: '#dc143c'
+        },
+        // 琥珀色
+        amber: {
+          1: 'rgba(245, 158, 11, 0.10)',
+          2: 'rgba(245, 158, 11, 0.12)',
+          3: 'rgba(245, 158, 11, 0.20)',
+          9: '#f59e0b',
+          10: '#f59e0b'
+        },
+        // 天蓝
+        sky: {
+          1: 'rgba(14, 165, 233, 0.10)',
+          2: 'rgba(14, 165, 233, 0.12)',
+          3: 'rgba(14, 165, 233, 0.20)',
+          9: '#0ea5e9',
+          10: '#0ea5e9'
+        },
+        // 玫红
+        rose: {
+          1: 'rgba(244, 63, 94, 0.10)',
+          2: 'rgba(244, 63, 94, 0.12)',
+          3: 'rgba(244, 63, 94, 0.20)',
+          9: '#f43f5e',
+          10: '#f43f5e'
+        }
       },
       fontFamily: {
-        // Inter 作为正文，SF Pro / Segoe UI 系统回退
-        sans: ['var(--font-inter)', 'SF Pro Text', 'Segoe UI', 'system-ui', 'sans-serif'],
-        // Cal Sans Display (替代品) + Inter 用于 Hero 大字标题
-        display: ['var(--font-cal)', 'var(--font-inter)', 'system-ui', 'sans-serif'],
-        // 等宽字体 —— 代码与终端元素
-        mono: ['var(--font-jetbrains)', 'SF Mono', 'JetBrains Mono', 'Cascadia Code', 'monospace']
+        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'var(--font-inter)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-jetbrains)', 'monospace']
       },
       fontSize: {
-        // 编辑器级字号阶梯 (1.25 黄金比例)
         'display-xl': ['clamp(3.5rem, 7vw, 5.5rem)', { lineHeight: '0.95', letterSpacing: '-0.04em', fontWeight: '600' }],
         'display-lg': ['clamp(2.5rem, 5vw, 4rem)', { lineHeight: '1.0', letterSpacing: '-0.03em', fontWeight: '600' }],
         'display-md': ['clamp(2rem, 3.5vw, 2.75rem)', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '600' }],
@@ -90,13 +122,17 @@ const config: Config = {
         'gradient-pan': {
           '0%, 100%': { backgroundPosition: '0% 50%' },
           '50%': { backgroundPosition: '100% 50%' }
+        },
+        'spin-slow': {
+          to: { transform: 'rotate(360deg)' }
         }
       },
       animation: {
         'fade-up': 'fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both',
         'cursor-blink': 'cursor-blink 1.1s steps(1) infinite',
         'shimmer': 'shimmer 3s linear infinite',
-        'gradient-pan': 'gradient-pan 8s ease infinite'
+        'gradient-pan': 'gradient-pan 8s ease infinite',
+        'spin-slow': 'spin-slow 12s linear infinite'
       }
     }
   },

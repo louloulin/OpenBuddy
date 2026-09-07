@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { Menu, X, Github, Star } from 'lucide-react';
+import { Menu, X, Github } from 'lucide-react';
+import LocaleSwitcher from '@/components/LocaleSwitcher';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
+import GitHubStars from '@/components/GitHubStars';
 import type { Dict, Locale } from '@/lib/i18n';
-import { localizedPath, localeFlags } from '@/lib/i18n';
+import { localizedPath } from '@/lib/i18n';
 
 interface SiteHeaderProps {
   dict: Dict;
@@ -24,7 +26,6 @@ interface SiteHeaderProps {
 export default function SiteHeader({ dict, locale }: SiteHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const pathname = usePathname();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -37,13 +38,12 @@ export default function SiteHeader({ dict, locale }: SiteHeaderProps) {
     { href: localizedPath('/#architecture', locale), label: dict.nav.architecture },
     { href: localizedPath('/#comparison', locale), label: dict.nav.comparison },
     { href: localizedPath('/#showcase', locale), label: dict.nav.showcase },
-    { href: localizedPath('/docs', locale), label: dict.nav.docs },
-    { href: localizedPath('/#community', locale), label: dict.nav.community }
+    { href: localizedPath('/pricing', locale), label: dict.nav.pricing },
+    { href: localizedPath('/changelog', locale), label: dict.nav.changelog },
+    { href: localizedPath('/docs', locale), label: dict.nav.docs }
   ];
 
-  const otherLocale = locale === 'en' ? 'zh-CN' : 'en';
-  const strippedPath = pathname.replace(/^\/zh-CN/, '') || '/';
-  const langSwitchHref = otherLocale === 'en' ? strippedPath : `/${otherLocale}${strippedPath === '/' ? '' : strippedPath}`;
+  // (LocaleSwitcher handles language routing internally)
 
   return (
     <header
@@ -87,14 +87,10 @@ export default function SiteHeader({ dict, locale }: SiteHeaderProps) {
         </nav>
 
         <div className="flex items-center gap-2">
-          {/* Language switcher */}
-          <Link
-            href={ langSwitchHref }
-            className="hidden items-center gap-1 rounded-md px-2 py-1.5 text-[12px] font-medium text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)] md:inline-flex"
-            aria-label={ `Switch language to ${otherLocale}` }
-          >
-            <span className="font-mono text-[11px]">{ localeFlags[otherLocale] }</span>
-          </Link>
+          {/* Language switcher (dropdown) */}
+          <div className="hidden md:block">
+            <LocaleSwitcher />
+          </div>
 
           {/* GitHub CTA */}
           <a
@@ -104,9 +100,9 @@ export default function SiteHeader({ dict, locale }: SiteHeaderProps) {
             className="hidden items-center gap-1.5 rounded-md border border-[var(--wb-border)] bg-[var(--wb-bg)] px-3 py-1.5 text-[13px] font-medium text-[var(--wb-fg)] transition-all hover:bg-[var(--wb-fg)] hover:text-[var(--wb-bg)] sm:inline-flex"
           >
             <Github className="h-3.5 w-3.5" />
-            <Star className="h-3 w-3 fill-current" />
-            <span className="font-mono text-[11px] tabular-nums">12.8k</span>
+            <GitHubStars repo="louloulin/OpenBuddy" />
           </a>
+          <ThemeSwitcher />
 
           <Link
             href={ localizedPath('/download', locale) }
@@ -141,13 +137,12 @@ export default function SiteHeader({ dict, locale }: SiteHeaderProps) {
                 { link.label }
               </Link>
             )) }
-            <Link
-              href={ langSwitchHref }
-              className="rounded-md px-3 py-2 text-[14px] font-medium text-[var(--wb-fg-muted)] hover:bg-[var(--wb-bg-soft-2)]"
-              onClick={ () => setMobileOpen(false) }
-            >
-              🌐 { otherLocale === 'en' ? 'English' : '简体中文' }
-            </Link>
+            <div className="mt-2 border-t border-[var(--wb-border)] px-3 pt-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--wb-fg-muted)]">
+                Language
+              </p>
+              <LocaleSwitcher />
+            </div>
           </nav>
         </div>
       ) : null }

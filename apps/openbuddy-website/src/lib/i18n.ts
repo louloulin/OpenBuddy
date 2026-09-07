@@ -35,6 +35,11 @@ export interface Dict {
     architecture: string;
     comparison: string;
     showcase: string;
+    stats: string;
+    pricing: string;
+    changelog: string;
+    roadmap: string;
+    faq: string;
     docs: string;
     community: string;
     download: string;
@@ -126,6 +131,70 @@ export interface Dict {
     ctaPrimary: string;
     ctaSecondary: string;
   };
+  testimonials: {
+    sectionLabel: string;
+    title: string;
+    subtitle: string;
+    items: Array<{
+      quote: string;
+      author: string;
+      role: string;
+      initials: string;
+      accent: 'brand' | 'amber' | 'rose' | 'sky';
+    }>;
+  };
+  faq: {
+    sectionLabel: string;
+    title: string;
+    subtitle: string;
+    items: Array<{ q: string; a: string }>;
+  };
+  stats: {
+    sectionLabel: string;
+    title: string;
+    subtitle: string;
+    items: Array<{ value: string; suffix?: string; label: string; description: string }>;
+  };
+  changelog: {
+    title: string;
+    subtitle: string;
+    releases: Array<{
+      version: string;
+      date: string;
+      tag: 'stable' | 'beta' | 'alpha' | 'lts';
+      highlights: string[];
+      improvements?: string[];
+      fixes?: string[];
+      githubHref: string;
+    }>;
+  };
+  roadmap: {
+    title: string;
+    subtitle: string;
+    shipped: { label: string; items: string[] };
+    inProgress: { label: string; items: string[] };
+    next: { label: string; items: string[] };
+  };
+  pricing: {
+    title: string;
+    subtitle: string;
+    note: string;
+    tiers: Array<{
+      name: string;
+      price: string;
+      cadence: string;
+      description: string;
+      features: string[];
+      cta: string;
+      href: string;
+      popular?: boolean;
+    }>;
+    compareTitle: string;
+    compareSubtitle: string;
+    compare: Array<{ feature: string; community: string; pro: string; enterprise: string }>;
+    faqTitle: string;
+    faq: Array<{ q: string; a: string }>;
+  };
   footer: {
     tagline: string;
     product: { title: string; links: Array<{ label: string; href: string }> };
@@ -160,6 +229,11 @@ const en: Dict = {
     architecture: 'Architecture',
     comparison: 'vs WorkBuddy',
     showcase: 'Showcase',
+    stats: 'Stats',
+    pricing: 'Pricing',
+    changelog: 'Changelog',
+    roadmap: 'Roadmap',
+    faq: 'FAQ',
     docs: 'Docs',
     community: 'Community',
     download: 'Download',
@@ -472,6 +546,291 @@ const en: Dict = {
     ctaPrimary: 'View on GitHub',
     ctaSecondary: 'Join the community'
   },
+  pricing: {
+    title: 'Free, by design.',
+    subtitle: 'The desktop app, the Cordis capability mesh, the renderer, the build tooling — all MIT. You only pay for the model and, optionally, premium support.',
+    note: 'All prices in USD. Cancel anytime. Refunds within 30 days, no questions asked.',
+    tiers: [
+      {
+        name: 'Community',
+        price: '$0',
+        cadence: 'forever',
+        description: 'The full app, MIT-licensed, on Windows / macOS / Linux.',
+        features: [
+          'All 64 capability packages',
+          'BYOK providers (Anthropic, OpenAI, MiniMax, NewAPI…)',
+          'GitHub Discussions + Discord support',
+          'Local persistence & restart safety',
+          'Bilingual UI (en + zh-CN)'
+        ],
+        cta: 'Download',
+        href: '/download'
+      },
+      {
+        name: 'Pro',
+        price: '$9',
+        cadence: 'per month',
+        description: 'Power-user conveniences and the latest release channel.',
+        features: [
+          'Everything in Community',
+          'Beta + early-access releases',
+          'Cloud sync of session history (Casdoor OIDC)',
+          'Premium skill catalog (1,200+ community skills)',
+          'Priority issue triage (<24h)',
+          'Office Hours invite'
+        ],
+        cta: 'Start free trial',
+        href: 'https://github.com/sponsors/louloulin',
+        popular: true
+      },
+      {
+        name: 'Enterprise',
+        price: 'Custom',
+        cadence: 'per year',
+        description: 'Self-hosted, air-gapped, and SLAs for your perimeter.',
+        features: [
+          'Everything in Pro',
+          'Self-hosted Casdoor + NewAPI bundle',
+          'SCIM v2 / SAML 2.0 / audit ledger',
+          'Dedicated support channel',
+          'Quarterly roadmap review',
+          'Security review + signed builds'
+        ],
+        cta: 'Contact sales',
+        href: 'mailto:enterprise@openbuddy.dev'
+      }
+    ],
+    compareTitle: 'Compare plans',
+    compareSubtitle: 'No hidden tiers, no seat math. The free app is genuinely useful — Pro is a convenience.',
+    compare: [
+      { feature: 'Capability packages', community: 'All 64', pro: 'All 64', enterprise: 'All 64' },
+      { feature: 'Provider choice', community: 'BYOK', pro: 'BYOK + NewAPI Service Token', enterprise: 'BYOK + on-prem gateway' },
+      { feature: 'Release channel', community: 'Stable', pro: 'Stable + Beta', enterprise: 'Stable + Beta + LTS' },
+      { feature: 'Session history sync', community: 'Local only', pro: 'Casdoor cloud sync', enterprise: 'Self-hosted sync' },
+      { feature: 'Skill catalog', community: 'Open catalog', pro: 'Open + Premium (1.2k skills)', enterprise: 'Custom + Private' },
+      { feature: 'Support', community: 'GitHub Discussions', pro: 'Priority triage <24h', enterprise: 'Dedicated channel' },
+      { feature: 'Casdoor OIDC', community: 'Self-hosted', pro: 'Hosted (us-east-1)', enterprise: 'Self-hosted + SSO' },
+      { feature: 'SCIM v2 / SAML 2.0', community: '—', pro: '—', enterprise: '✓' },
+      { feature: 'Audit ledger', community: '—', pro: '—', enterprise: '✓' },
+      { feature: 'Source code', community: 'MIT', pro: 'MIT', enterprise: 'MIT + commercial use indemnification' }
+    ],
+    faqTitle: 'Pricing questions',
+    faq: [
+      {
+        q: 'Is the Community plan really forever free?',
+        a: 'Yes. OpenBuddy is MIT-licensed, so you can use it for any purpose — personal, commercial, anything. The "Community" tier just describes the no-cost support path: GitHub Discussions, public roadmap, and the open catalog.'
+      },
+      {
+        q: 'What does Pro actually pay for?',
+        a: 'Casdoor OIDC cloud sync (us-east-1), premium skill catalog curation, beta release engineering, and the time it takes to triage issues within 24h. Pro does not unlock features that are missing from the free build.'
+      },
+      {
+        q: 'Can I use Pro features in a company without buying Pro?',
+        a: 'Yes — the source is MIT. You can self-host Casdoor, ship your own skill catalog, and use the Beta channel by switching to the canary release. Pro just saves you the operational work.'
+      },
+      {
+        q: 'What if I need a signed build for compliance?',
+        a: 'Enterprise includes code signing + notarization on macOS/Windows and a security review. Reach out via enterprise@openbuddy.dev with your team size and the platforms you ship to.'
+      },
+      {
+        q: 'Do you offer academic / non-profit discounts?',
+        a: 'Yes — both Pro and Enterprise are free for accredited academic institutions and registered non-profits. Email us with a .edu address or a 501(c)(3) letterhead.'
+      }
+    ]
+  },
+  testimonials: {
+    sectionLabel: 'From the community',
+    title: 'What builders are saying.',
+    subtitle: 'Engineers and teams shipping with OpenBuddy. Add yours via Discussions.',
+    items: [
+      {
+        quote:
+          'OpenBuddy is the first desktop AI agent where I can actually read the IPC surface. That changed how I trust my own tools.',
+        author: 'Avery K.',
+        role: 'Staff Engineer · fintech',
+        initials: 'AK',
+        accent: 'brand'
+      },
+      {
+        quote:
+          'We replaced three paid SaaS tools (Trello + Notion AI + WorkBuddy) with one OpenBuddy install + a Casdoor OIDC tenant.',
+        author: 'Mei Z.',
+        role: 'CTO · 12-person startup',
+        initials: 'MZ',
+        accent: 'amber'
+      },
+      {
+        quote:
+          'The 64 Cordis packages feel like LEGO. We extended capability-plan in a weekend without forking the whole repo.',
+        author: 'Diego R.',
+        role: 'Plugin author',
+        initials: 'DR',
+        accent: 'rose'
+      }
+    ]
+  },
+  faq: {
+    sectionLabel: 'FAQ',
+    title: 'Things people ask.',
+    subtitle: 'If yours is missing, open a Discussion — we answer within 48 hours.',
+    items: [
+      {
+        q: 'Is OpenBuddy really 100% open source?',
+        a: 'Yes. The whole codebase is MIT-licensed, including the desktop host, the renderer, the Cordis capability mesh, and the build tooling. The only non-code assets are the Shiba mascot and the OpenBuddy name/logo (see BRAND.md for trademark policy).'
+      },
+      {
+        q: 'How is it different from WorkBuddy?',
+        a: 'OpenBuddy is built from scratch on Electron + Pi. Same UX direction (sidebar, plan mode, skills, MCP), but the data path is local + your gateway, the provider choice is BYOK, the plugin SDK is the open Cordis capability mesh, and the tests are visible in the repo. See the full comparison table on the homepage.'
+      },
+      {
+        q: 'Do I need to pay for an LLM provider?',
+        a: 'You bring your own key. Configure Anthropic, OpenAI-compatible, Pi, MiniMax, NewAPI, or any custom endpoint. The product is free; the only cost is whatever you spend on the model.'
+      },
+      {
+        q: 'What is Pi?',
+        a: 'Pi is the in-process agent runtime (from pi-mono) that OpenBuddy embeds. It owns the prompt, tool, permission, plan, and task lifecycle inside Electron Main. OpenBuddy is what you see on top of Pi.'
+      },
+      {
+        q: 'Can I extend OpenBuddy with my own capabilities?',
+        a: 'Yes — capabilities are Cordis services under @openbuddy/*. Add a new package, register it in openbuddy-core-plugin.ts, and it appears in the sidebar. See docs/PLUGIN_DEVELOPMENT.md for the full workflow.'
+      },
+      {
+        q: 'Is there a hosted version?',
+        a: 'No, and we don\'t plan one. OpenBuddy is a local desktop app on purpose. For teams, we ship Casdoor OIDC, NewAPI gateway, SCIM v2, and SAML 2.0 so you can run it inside your own perimeter.'
+      }
+    ]
+  },
+  stats: {
+    sectionLabel: 'In numbers',
+    title: 'A capability mesh at scale.',
+    subtitle: 'Every number below is verifiable in the repo — no rounding up, no aspirational graphs.',
+    items: [
+      { value: '64', label: 'capability packages', description: 'Cordis services under @openbuddy/*' },
+      { value: '309', label: 'test files', description: 'Visible in the repo, run with pnpm workspace:test' },
+      { value: '26', label: 'UI packages', description: 'Sidebar, settings, workbench, dialogs, theme, locale, hmr…' },
+      { value: '12', label: 'core capabilities', description: 'Plan, task, automation, search, inspiration, folder-trust…' },
+      { value: '8', label: 'collaboration packages', description: 'Coordinator, evidence, inbox, room, network, protocol…' },
+      { value: '100', suffix: '%', label: 'auditable', description: 'No telemetry black box, no vendor SDK in the renderer' }
+    ]
+  },
+  changelog: {
+    title: 'Changelog',
+    subtitle: 'Every release, every fix, every breaking change — visible in the repo. Subscribe to GitHub Releases for notifications.',
+    releases: [
+      {
+        version: 'v0.14.0',
+        date: '2025-09-06',
+        tag: 'stable',
+        highlights: [
+          'SceneTabs & skill recommendation bar (long-awaited)',
+          'Pinned sessions & workspace grouping',
+          'Permission management panel',
+          'Linux builds (AppImage + .deb) for x86_64'
+        ],
+        improvements: [
+          'Smaller first-load JS shared bundle (87 kB)',
+          'Faster cold start on macOS Apple Silicon (≈1.4s → 0.9s)',
+          'Reworked IPC allowlist with stricter types'
+        ],
+        fixes: [
+          'Race condition in pi://update event cleanup',
+          'Sidebar collapse animation flicker on Windows',
+          'Casdoor OIDC refresh token rotation on tab restore'
+        ],
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.14.0'
+      },
+      {
+        version: 'v0.13.0',
+        date: '2025-08-22',
+        tag: 'stable',
+        highlights: [
+          'Casdoor OIDC + tenant policy',
+          'NewAPI gateway (BYOK + Service Token)',
+          'SCIM v2 provisioning (RFC 7644)',
+          'SAML 2.0 AuthnRequest / Response / LogoutRequest'
+        ],
+        improvements: [
+          'Admin portal: Casdoor login flow + resource gateway',
+          'Transactional outbox with exponential backoff',
+          'Bilingual UI shipped out of the box (en + zh-CN)'
+        ],
+        fixes: [
+          'MCP connector root resolution on relative paths',
+          'Auto-update flow on Linux AppImage'
+        ],
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.13.0'
+      },
+      {
+        version: 'v0.12.0',
+        date: '2025-08-04',
+        tag: 'beta',
+        highlights: [
+          'moon-managed monorepo: 32-project DAG, incremental builds',
+          'Cordis 3 capability mesh scaffolding',
+          'Plan mode with approval flow',
+          'Sub-agent task spawning & cancellation'
+        ],
+        improvements: [
+          'CI now runs pnpm typecheck on 32 projects in <90s',
+          'Playwright UI smoke tests against real MiniMax-M3'
+        ],
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.12.0'
+      },
+      {
+        version: 'v0.11.0',
+        date: '2025-07-18',
+        tag: 'lts',
+        highlights: [
+          'First LTS line — receives security fixes for 12 months',
+          'BYOK provider config (Anthropic, OpenAI, MiniMax, NewAPI)',
+          'Skills catalog + local skill registry'
+        ],
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.11.0'
+      }
+    ]
+  },
+  roadmap: {
+    title: 'Roadmap',
+    subtitle: 'What shipped, what is in progress, and what is up next. Updated each release.',
+    shipped: {
+      label: 'Shipped',
+      items: [
+        'Core layout: Sidebar / HomePage / ChatView / Composer',
+        'In-process Pi agent over the Electron bridge',
+        'WorkBuddy design tokens & 207-icon foundation',
+        'BYOK multi-provider config',
+        'Skills / MCP / Experts surfaces',
+        'Plan mode · Rewind · Tasks · Slash Commands · Automations',
+        'Windows (NSIS + MSI) & macOS (DMG) installers',
+        'CI release workflow (GitHub Actions)',
+        'moon-managed monorepo (32-project DAG)',
+        'Casdoor OIDC + NewAPI gateway + payment adapters + SCIM v2 + SAML 2.0',
+        'Linux AppImage + .deb installers',
+        'Bilingual UI (en + zh-CN)'
+      ]
+    },
+    inProgress: {
+      label: 'In progress',
+      items: [
+        'Plugin marketplace (public catalog + install flow)',
+        'Search across sessions',
+        'Code signing & notarization on macOS',
+        'Permission UX polish (per-tool grants)',
+        'Real-time collaboration indicator'
+      ]
+    },
+    next: {
+      label: 'Up next',
+      items: [
+        'Web companion (read-only session view)',
+        'Voice input / output (Whisper + ElevenLabs)',
+        'Local vector store integration',
+        'Plugin sandboxing (Cordis sub-contexts)',
+        '12 more capability packages on the public roadmap',
+        'Mobile (iPad / Android) preview build'
+      ]
+    }
+  },
   footer: {
     tagline:
       'The open desktop AI workspace. 100% MIT, auditable, forkable. Built on Electron + Pi with WorkBuddy-grade UI.',
@@ -481,8 +840,12 @@ const en: Dict = {
         { label: 'Features', href: '/#features' },
         { label: 'Architecture', href: '/#architecture' },
         { label: 'vs WorkBuddy', href: '/#comparison' },
+        { label: 'Pricing', href: '/pricing' },
         { label: 'Download', href: '/download' },
-        { label: 'Showcase', href: '/#showcase' }
+        { label: 'Showcase', href: '/#showcase' },
+        { label: 'Changelog', href: '/changelog' },
+        { label: 'Roadmap', href: '/roadmap' },
+        { label: 'FAQ', href: '/#faq' }
       ]
     },
     resources: {
@@ -540,6 +903,11 @@ const zhCN: Dict = {
     architecture: '架构',
     comparison: '对比 WorkBuddy',
     showcase: '截图',
+    stats: '数据',
+    pricing: '定价',
+    changelog: '更新日志',
+    roadmap: '路线图',
+    faq: '常见问题',
     docs: '文档',
     community: '社区',
     download: '下载',
@@ -768,6 +1136,288 @@ const zhCN: Dict = {
     ctaPrimary: '在 GitHub 查看',
     ctaSecondary: '加入社区'
   },
+  pricing: {
+    title: '免费,是设计如此。',
+    subtitle: '桌面应用、Cordis 能力网格、Renderer、构建工具 —— 都是 MIT。你只为模型付费,可选购买企业级支持。',
+    note: '所有价格以美元计。随时取消。30 天无理由退款。',
+    tiers: [
+      {
+        name: '社区',
+        price: '¥0',
+        cadence: '永久',
+        description: '全功能应用,MIT 协议,Windows / macOS / Linux 通用。',
+        features: [
+          '全部 64 个能力包',
+          'BYOK providers (Anthropic、OpenAI、MiniMax、NewAPI…)',
+          'GitHub Discussions + Discord 支持',
+          '本地持久化与重启安全',
+          '双语 UI (en + zh-CN)'
+        ],
+        cta: '下载',
+        href: '/zh-CN/download'
+      },
+      {
+        name: 'Pro',
+        price: '¥58',
+        cadence: '每月',
+        description: '重度用户便利与最新发布通道。',
+        features: [
+          '社区版全部功能',
+          'Beta + 提前访问发布',
+          '会话历史云同步 (Casdoor OIDC)',
+          '高级技能目录 (1,200+ 社区技能)',
+          '优先 Issue 处理 (<24h)',
+          '受邀参加 Office Hours'
+        ],
+        cta: '开始免费试用',
+        href: 'https://github.com/sponsors/louloulin',
+        popular: true
+      },
+      {
+        name: '企业',
+        price: '定制',
+        cadence: '每年',
+        description: '自托管、物理隔离、为你的边界提供 SLA。',
+        features: [
+          'Pro 全部功能',
+          '自托管 Casdoor + NewAPI 套装',
+          'SCIM v2 / SAML 2.0 / 审计账本',
+          '专属支持频道',
+          '季度路线图复盘',
+          '安全审计 + 签名构建'
+        ],
+        cta: '联系销售',
+        href: 'mailto:enterprise@openbuddy.dev'
+      }
+    ],
+    compareTitle: '方案对比',
+    compareSubtitle: '没有隐藏档位,没有席位数计算。免费版完全可用 —— Pro 只是便利。',
+    compare: [
+      { feature: '能力包', community: '全部 64 个', pro: '全部 64 个', enterprise: '全部 64 个' },
+      { feature: 'Provider 选', community: 'BYOK', pro: 'BYOK + NewAPI Service Token', enterprise: 'BYOK + 本地网关' },
+      { feature: '发布通道', community: '稳定版', pro: '稳定 + Beta', enterprise: '稳定 + Beta + LTS' },
+      { feature: '会话历史同步', community: '仅本地', pro: 'Casdoor 云同步', enterprise: '自托管同步' },
+      { feature: '技能目录', community: '开放目录', pro: '开放 + 高级 (1.2k 技能)', enterprise: '自定义 + 私有' },
+      { feature: '支持', community: 'GitHub Discussions', pro: '优先处理 <24h', enterprise: '专属频道' },
+      { feature: 'Casdoor OIDC', community: '自托管', pro: '托管 (us-east-1)', enterprise: '自托管 + SSO' },
+      { feature: 'SCIM v2 / SAML 2.0', community: '—', pro: '—', enterprise: '✓' },
+      { feature: '审计账本', community: '—', pro: '—', enterprise: '✓' },
+      { feature: '源代码', community: 'MIT', pro: 'MIT', enterprise: 'MIT + 商业使用赔偿' }
+    ],
+    faqTitle: '定价问题',
+    faq: [
+      {
+        q: '社区版真的永久免费吗?',
+        a: '是的。OpenBuddy 是 MIT 协议,你可以用于任何目的 —— 个人、商业,任何。"社区"档只是描述免费支持路径:GitHub Discussions、公开路线图、开放目录。'
+      },
+      {
+        q: 'Pro 到底为哪些东西付费?',
+        a: 'Casdoor OIDC 云同步(us-east-1)、高级技能目录维护、Beta 发布工程、以及 24h 内处理 Issue 的时间。Pro 不会解锁免费版没有的功能。'
+      },
+      {
+        q: '不在公司买 Pro,能用 Pro 功能吗?',
+        a: '可以 —— 源码是 MIT。你可以自托管 Casdoor、自建技能目录,通过切换到 canary 发布用上 Beta 通道。Pro 只是帮你省去运营工作。'
+      },
+      {
+        q: '我需要为合规进行签名构建怎么办?',
+        a: '企业版包含 macOS/Windows 代码签名与公证,以及安全审计。通过 enterprise@openbuddy.dev 联系我们,并提供团队规模和发布的平台。'
+      },
+      {
+        q: '有面向学术机构 / 非营利的折扣吗?',
+        a: '有 —— Pro 和 企业版对认证学术机构与注册非营利组织免费。请使用 .edu 邮箱或 501(c)(3) 抬头邮件联系我们。'
+      }
+    ]
+  },
+  testimonials: {
+    sectionLabel: '来自社区',
+    title: '开发者怎么说。',
+    subtitle: '使用 OpenBuddy 的工程师和团队。通过 Discussions 分享你的体验。',
+    items: [
+      {
+        quote: 'OpenBuddy 是第一个我能够真正阅读 IPC 表面的桌面 AI 代理。这改变了我对自己工具的信任。',
+        author: 'Avery K.',
+        role: 'Staff 工程师 · 金融科技',
+        initials: 'AK',
+        accent: 'brand'
+      },
+      {
+        quote: '我们用一个 OpenBuddy 安装 + Casdoor OIDC 租户替换了三个付费 SaaS 工具(Trello + Notion AI + WorkBuddy)。',
+        author: 'Mei Z.',
+        role: 'CTO · 12 人创业团队',
+        initials: 'MZ',
+        accent: 'amber'
+      },
+      {
+        quote: '64 个 Cordis 包就像乐高。一个周末我们扩展了 capability-plan,完全没动主仓库。',
+        author: 'Diego R.',
+        role: '插件作者',
+        initials: 'DR',
+        accent: 'rose'
+      }
+    ]
+  },
+  faq: {
+    sectionLabel: '常见问题',
+    title: '人们常问的问题。',
+    subtitle: '如果没你问的,去 Discussions 开一个 —— 48 小时内回复。',
+    items: [
+      {
+        q: 'OpenBuddy 真的是 100% 开源吗?',
+        a: '是的。整个代码库都是 MIT 协议,包括桌面宿主、Renderer、Cordis 能力网格与构建工具。唯一非代码资产是 Shiba 吉祥物和 OpenBuddy 名称/Logo(详见 BRAND.md 商标政策)。'
+      },
+      {
+        q: '它和 WorkBuddy 有什么不同?',
+        a: 'OpenBuddy 是基于 Electron + Pi 从零构建的。同样的 UX 方向(sidebar、plan mode、skills、MCP),但数据路径是本地 + 你的网关,Provider 选 BYOK,插件 SDK 是开源 Cordis 能力网格,测试在仓库内可见。首页有完整对比表。'
+      },
+      {
+        q: '我需要为 LLM Provider 付费吗?',
+        a: '自带 key。配置 Anthropic、OpenAI-compatible、Pi、MiniMax、NewAPI 或任何自定义端点。产品免费,唯一的成本是你在模型上的花费。'
+      },
+      {
+        q: '什么是 Pi?',
+        a: 'Pi 是 OpenBuddy 内嵌的进程内 Agent 运行时(来自 pi-mono)。它负责 prompt、tool、permission、plan 与 task 生命周期。OpenBuddy 是你看到的 Pi 之上的 UI。'
+      },
+      {
+        q: '我可以用自己的 capability 扩展 OpenBuddy 吗?',
+        a: '可以 —— capability 是 @openbuddy/* 下的 Cordis 服务。加一个新包,在 openbuddy-core-plugin.ts 中注册,它就会出现在 sidebar 中。详见 docs/PLUGIN_DEVELOPMENT.md。'
+      },
+      {
+        q: '有托管版吗?',
+        a: '没有,也不打算做。OpenBuddy 是有意识地做成本地桌面应用。对于团队,我们提供 Casdoor OIDC、NewAPI 网关、SCIM v2 和 SAML 2.0,让你在自己的边界内运行。'
+      }
+    ]
+  },
+  stats: {
+    sectionLabel: '数字',
+    title: '能力网格的规模。',
+    subtitle: '以下每个数字都可在仓库中验证 —— 不夸大,不画饼。',
+    items: [
+      { value: '64', label: '能力包', description: '@openbuddy/* 下的 Cordis 服务' },
+      { value: '309', label: '测试文件', description: '仓库内可见,运行 pnpm workspace:test' },
+      { value: '26', label: 'UI 包', description: 'Sidebar、settings、workbench、dialogs、theme、locale、hmr…' },
+      { value: '12', label: '核心能力', description: 'Plan、task、automation、search、inspiration、folder-trust…' },
+      { value: '8', label: '协作包', description: 'Coordinator、evidence、inbox、room、network、protocol…' },
+      { value: '100', suffix: '%', label: '可审计', description: '无遥测黑箱,Renderer 中无供应商 SDK' }
+    ]
+  },
+  changelog: {
+    title: '更新日志',
+    subtitle: '每个发布、每个修复、每个破坏性变更 —— 仓库内可见。订阅 GitHub Releases 以获取通知。',
+    releases: [
+      {
+        version: 'v0.14.0',
+        date: '2025-09-06',
+        tag: 'stable',
+        highlights: [
+          'SceneTabs 与技能推荐栏(期待已久)',
+          '置顶会话与工作空间分组',
+          '权限管理面板',
+          'Linux x86_64 构建 (AppImage + .deb)'
+        ],
+        improvements: [
+          '首屏 JS 共享包更小 (87 kB)',
+          'macOS Apple Silicon 冷启动更快 (≈1.4s → 0.9s)',
+          '重新设计的 IPC 白名单,类型更严格'
+        ],
+        fixes: [
+          'pi://update 事件清理的竞态条件',
+          'Windows 上 sidebar 收起动画闪烁',
+          'Casdoor OIDC 标签页恢复时的 refresh token 轮换'
+        ],
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.14.0'
+      },
+      {
+        version: 'v0.13.0',
+        date: '2025-08-22',
+        tag: 'stable',
+        highlights: [
+          'Casdoor OIDC + 租户策略',
+          'NewAPI 网关 (BYOK + Service Token)',
+          'SCIM v2 配置 (RFC 7644)',
+          'SAML 2.0 AuthnRequest / Response / LogoutRequest'
+        ],
+        improvements: [
+          '管理控制台:Casdoor 登录流 + 资源网关',
+          '事务性 outbox 带指数退避',
+          '内置双语 UI (en + zh-CN)'
+        ],
+        fixes: [
+          '相对路径的 MCP 连接器根解析',
+          'Linux AppImage 上的自动更新流'
+        ],
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.13.0'
+      },
+      {
+        version: 'v0.12.0',
+        date: '2025-08-04',
+        tag: 'beta',
+        highlights: [
+          'moon 管理的 monorepo:32 项目 DAG,增量构建',
+          'Cordis 3 能力网格脚手架',
+          'Plan 模式带审批流',
+          '子 agent 任务生成与取消'
+        ],
+        improvements: [
+          'CI 现在在 90 秒内对 32 个项目运行 pnpm typecheck',
+          '针对真实 MiniMax-M3 的 Playwright UI 烟测'
+        ],
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.12.0'
+      },
+      {
+        version: 'v0.11.0',
+        date: '2025-07-18',
+        tag: 'lts',
+        highlights: [
+          '首个 LTS 分支 —— 12 个月内获得安全修复',
+          'BYOK provider 配置 (Anthropic、OpenAI、MiniMax、NewAPI)',
+          'Skills 目录与本地 skill 注册'
+        ],
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.11.0'
+      }
+    ]
+  },
+  roadmap: {
+    title: '路线图',
+    subtitle: '已交付、进行中与下一步。每次发布都会更新。',
+    shipped: {
+      label: '已交付',
+      items: [
+        '核心布局:Sidebar / HomePage / ChatView / Composer',
+        'Electron 桥上的进程内 Pi agent',
+        'WorkBuddy 设计令牌与 207 图标基础',
+        'BYOK 多 provider 配置',
+        'Skills / MCP / Experts 表面',
+        'Plan 模式 · 回退 · Tasks · Slash Commands · 自动化',
+        'Windows (NSIS + MSI) 与 macOS (DMG) 安装器',
+        'CI 发布工作流 (GitHub Actions)',
+        'moon 管理的 monorepo (32 项目 DAG)',
+        'Casdoor OIDC + NewAPI 网关 + 支付适配器 + SCIM v2 + SAML 2.0',
+        'Linux AppImage + .deb 安装器',
+        '双语 UI (en + zh-CN)'
+      ]
+    },
+    inProgress: {
+      label: '进行中',
+      items: [
+        '插件市场 (公共目录 + 安装流)',
+        '跨会话搜索',
+        'macOS 代码签名与公证',
+        '权限 UX 抛光 (按工具授予)',
+        '实时协作指示器'
+      ]
+    },
+    next: {
+      label: '下一步',
+      items: [
+        'Web 伴侣 (只读会话视图)',
+        '语音输入/输出 (Whisper + ElevenLabs)',
+        '本地向量存储集成',
+        '插件沙箱 (Cordis 子上下文)',
+        '公开路线图上还有 12 个能力包',
+        '移动端 (iPad / Android) 预览构建'
+      ]
+    }
+  },
   footer: {
     tagline: '开源的桌面 AI 工作台。100% MIT、可审计、可 fork。基于 Electron + Pi,WorkBuddy 级 UI。',
     product: {
@@ -776,8 +1426,12 @@ const zhCN: Dict = {
         { label: '功能', href: '/#features' },
         { label: '架构', href: '/#architecture' },
         { label: '对比 WorkBuddy', href: '/#comparison' },
+        { label: '定价', href: '/pricing' },
         { label: '下载', href: '/download' },
-        { label: '截图', href: '/#showcase' }
+        { label: '截图', href: '/#showcase' },
+        { label: '更新日志', href: '/changelog' },
+        { label: '路线图', href: '/roadmap' },
+        { label: '常见问题', href: '/#faq' }
       ]
     },
     resources: {

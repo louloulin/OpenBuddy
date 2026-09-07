@@ -3,9 +3,13 @@ import Hero from '@/components/Hero';
 import ShowcaseSection from '@/components/ShowcaseSection';
 import FeaturesSection from '@/components/FeaturesSection';
 import ArchitectureSection from '@/components/ArchitectureSection';
+import StatsSection from '@/components/StatsSection';
 import ComparisonSection from '@/components/ComparisonSection';
 import CapabilitiesSection from '@/components/CapabilitiesSection';
+import TechStackSection from '@/components/TechStackSection';
 import CLISection from '@/components/CLISection';
+import TestimonialsSection from '@/components/TestimonialsSection';
+import FAQSection from '@/components/FAQSection';
 import CommunitySection from '@/components/CommunitySection';
 import CTASection from '@/components/CTASection';
 import SiteHeader from '@/components/SiteHeader';
@@ -49,9 +53,13 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
         <ShowcaseSection dict={ dict } />
         <FeaturesSection dict={ dict } />
         <ArchitectureSection dict={ dict } />
+        <StatsSection dict={ dict } />
         <ComparisonSection dict={ dict } />
         <CapabilitiesSection dict={ dict } />
+        <TechStackSection dict={ dict } />
         <CLISection dict={ dict } />
+        <TestimonialsSection dict={ dict } />
+        <FAQSection dict={ dict } />
         <CommunitySection dict={ dict } />
         <CTASection dict={ dict } />
       </main>
