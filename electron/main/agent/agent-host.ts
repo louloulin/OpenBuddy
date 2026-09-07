@@ -213,6 +213,20 @@ export interface PiAgentRuntime {
 }
 
 export type { AgentHostState } from "./host-modules/_state-shape";
+import {
+  abortBash as abortBashImpl,
+  abortRetry as abortRetryImpl,
+  compactSession as compactSessionImpl,
+  forkSession as forkSessionImpl,
+  getAvailableThinkingLevels as getAvailableThinkingLevelsImpl,
+  getCompactionSettings as getCompactionSettingsImpl,
+  getSessionStats as getSessionStatsImpl,
+  getSessionTree as getSessionTreeImpl,
+  setAutoCompactionEnabled as setAutoCompactionEnabledImpl,
+  setAutoRetryEnabled as setAutoRetryEnabledImpl,
+  setFollowUpMode as setFollowUpModeImpl,
+  setSteeringMode as setSteeringModeImpl,
+} from "./host-modules/pi-session-capabilities";
 import { createDefaultAgentHostState } from "./host-modules/_default-state";
 
 
@@ -892,6 +906,43 @@ function stopProfileWatchers(): void {
   stopProfileWatchersImpl(state);
 }
 
+function compact(customInstructions?: string) {
+  return compactSessionImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, customInstructions);
+}
+function setAutoCompaction(enabled: boolean) {
+  return setAutoCompactionEnabledImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, enabled);
+}
+function setAutoRetry(enabled: boolean) {
+  return setAutoRetryEnabledImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, enabled);
+}
+function abortRetryFn() {
+  return abortRetryImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir });
+}
+function abortBashFn() {
+  return abortBashImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir });
+}
+function setSteeringModeFn(mode: "all" | "one-at-a-time") {
+  return setSteeringModeImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, mode);
+}
+function setFollowUpModeFn(mode: "all" | "one-at-a-time") {
+  return setFollowUpModeImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, mode);
+}
+function getSessionStatsFn() {
+  return getSessionStatsImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir });
+}
+function getAvailableThinkingLevelsFn(): string[] {
+  return getAvailableThinkingLevelsImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }) as string[];
+}
+function forkSessionFn(entryId: string) {
+  return forkSessionImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, entryId);
+}
+function getSessionTreeFn() {
+  return getSessionTreeImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir });
+}
+function getCompactionSettingsFn() {
+  return getCompactionSettingsImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir });
+}
+
 // Stage F-2: PiProfileSnapshot + capturePiProfileSnapshot + restorePiProfileSnapshot
 // have moved to host-modules/profile/snapshot.ts. The local bindings
 // `capturePiProfileSnapshot` / `restorePiProfileSnapshot` are re-imported
@@ -910,273 +961,29 @@ export function restoreCapturedContextServices(captured: Map<string, unknown>): 
     if (state.context.get(serviceKey) === undefined) state.context.set(serviceKey, service);
   }
 }
+// Stage F-5: scheduleProfileReload + rollbackPiProfile moved to
+// host-modules/profile-reload-transaction.ts. The facade re-exports
+// the module-level functions so legacy callers (startProfileWatchers
+// wrapper, plugin-mutations installHostModules deps, etc.) keep
+// working unchanged.
+import { scheduleProfileReload, rollbackPiProfile } from "./host-modules/profile-reload-transaction";
+export { scheduleProfileReload, rollbackPiProfile };
+/**
+ * Stage F-5: profile artifact reconciler functions (discoverProfileRemoteContributions,
+ * discoverProfileTypertContributions, clearProfileArtifacts, installProfileArtifacts,
+ * reconcileProfileArtifacts) moved to host-modules/profile-artifact-reconciler.ts.
+ */
+import {
+  reconcileProfileArtifacts,
+  discoverProfileRemoteContributions,
+  discoverProfileTypertContributions,
+} from "./host-modules/profile-artifact-reconciler";
+export {
+  reconcileProfileArtifacts,
+  discoverProfileRemoteContributions,
+  discoverProfileTypertContributions,
+};
 
-export async function rollbackPiProfile(snapshot: PiProfileSnapshot, capturedServices = new Map<string, unknown>()): Promise<void> {
-  restorePiProfileSnapshot(snapshot);
-  await startProfileWatchers();
-  if (snapshot.activePluginProfile) await state.loader?.replaceProfile(snapshot.activePluginProfile);
-  const rollbackProfile = snapshot.activePluginProfile;
-  await syncDeepSeekCordisRuntime(deepSeekCoreRuntimeEntries(composePluginPatches(
-    rollbackProfile?.entries ?? [],
-    rollbackProfile?.patches ?? [],
-  )));
-  await reconcileProfileArtifacts();
-  await piRuntimeCoordinator.reload("profile-rollback");
-  await reloadMcp();
-  await restoreDeepSeekCapabilityServices();
-  restoreCapturedContextServices(capturedServices);
-  reportPiExtensionErrors();
-}
-
-export function scheduleProfileReload(): void {
-  if (!state.loader) return;
-  if (state.profileReloadTimer) clearTimeout(state.profileReloadTimer);
-  state.profileReloadTimer = setTimeout(() => {
-    state.profileReloadTimer = null;
-    state.profileReloadPromise = pluginLifecycleQueue.enqueue("profile-reload", "profile", async (transaction) => {
-      const previous = capturePiProfileSnapshot();
-      const capturedServices = captureReloadableContextServices();
-      try {
-      transaction.phase("prepare", "profile");
-      const materialized = state.profileOptions ? await materializeOpenBuddyProfile(state.profileOptions) : null;
-      const runtimeBundle = materialized ? await runtimeProfileBundle(materialized.bundle) : null;
-        if (materialized) {
-          state.profilePackageJson = materialized.profile.packageJson;
-          state.profilePackagePaths.splice(0, state.profilePackagePaths.length, ...materialized.profile.packagePaths);
-        }
-        if (materialized) {
-          state.profilePiExtensions = materialized.profile.piExtensions;
-          state.profilePiPackagePaths.splice(0, state.profilePiPackagePaths.length, ...materialized.profile.piPackagePaths);
-          setProfilePiResourcePaths(materialized.profile.piResourcePaths);
-          configurePiExtensions(materialized.profile.piExtensions);
-          await startProfileWatchers();
-        }
-        const baseProfile = state.baseProfile ?? createOpenBuddyProfile();
-        const overrideLayers = await readOverridePatches();
-        if (overrideLayers === undefined) throw new Error("openbuddy-profile: override patch reload was rejected");
-        await state.loader?.replaceProfile({
-          entries: [...baseProfile.entries, ...(runtimeBundle?.entries ?? [])],
-          patches: [
-            ...(baseProfile.patches ?? []),
-            ...(runtimeBundle?.patches ?? []),
-            ...state.storedLayers,
-            ...overrideLayers,
-          ],
-        });
-        const nextProfileEntries = [...baseProfile.entries, ...(runtimeBundle?.entries ?? [])];
-        const nextProfilePatches = [
-          ...(baseProfile.patches ?? []),
-          ...(runtimeBundle?.patches ?? []),
-          ...state.storedLayers,
-          ...overrideLayers,
-        ];
-        transaction.phase("cordis", "deepseek-cordis");
-        await syncDeepSeekCordisRuntime(deepSeekCoreRuntimeEntries(composePluginPatches(nextProfileEntries, nextProfilePatches)));
-        transaction.receipt("cordis", { profileEntries: nextProfileEntries.length });
-        state.activePluginProfile = {
-          entries: [...baseProfile.entries, ...(runtimeBundle?.entries ?? [])],
-          patches: [
-            ...(baseProfile.patches ?? []),
-            ...(runtimeBundle?.patches ?? []),
-            ...state.storedLayers,
-            ...overrideLayers,
-          ],
-        };
-        state.profileBundle = runtimeBundle ?? null;
-        const capturedCapabilities = captureDeepSeekCapabilityServices();
-        transaction.phase("artifacts", "typert-remote");
-        await reconcileProfileArtifacts();
-        transaction.receipt("artifacts", {
-          remote: state.profileRemoteContributions.size,
-          typert: state.profileTypertContributions.size,
-        });
-        await refreshHookConfigs();
-        if (state.session && state.piResourceLoader) {
-          transaction.phase("pi", "pi-resource-loader");
-          await piRuntimeCoordinator.reload("profile-reload");
-          transaction.phase("mcp", "mcp");
-          await reloadMcp();
-          transaction.receipt("mcp");
-          await restoreDeepSeekCapabilityServices(capturedCapabilities);
-          restoreCapturedContextServices(capturedServices);
-          reportPiExtensionErrors();
-          transaction.receipt("pi", { extensions: state.piExtensionStatuses.filter((entry) => entry.state === "loaded").length });
-        }
-        transaction.phase("renderer", "renderer-module-graph");
-        transaction.requireReceipt("renderer");
-        transaction.receipt("rollback-previous", {
-          piEntries: previous.piExtensionStatuses.length,
-          capturedServices: capturedServices.size,
-        });
-        await transaction.awaitSurfaceReceipt("renderer", 5000);
-        emitPluginEvent("profile/reloaded", {
-          name: materialized?.profile.name ?? "desktop",
-          piExtensions: materialized?.profile.piExtensions.map((extension) => extension.id) ?? [],
-        });
-      } catch (error) {
-        try {
-          transaction.phase("rollback", "profile");
-          await rollbackPiProfile(previous, capturedServices);
-          emitPluginEvent("profile/reload-failed", { error: String(error), rolledBack: true });
-        } catch (rollbackError) {
-          emitPluginEvent("profile/reload-failed", { error: String(error), rolledBack: false, rollbackError: String(rollbackError) });
-          throw error;
-        }
-        throw markPluginTransactionRolledBack(error);
-      }
-    });
-    // Watcher-triggered reloads have no caller waiting on the promise. Attach
-    // a rejection handler without replacing the shared promise, so manual
-    // callers still receive the transaction failure and can retry explicitly.
-    void state.profileReloadPromise.catch(() => undefined);
-  }, 100);
-}
-
-async function discoverProfileRemoteContributions(): Promise<Map<string, RemoteContribution>> {
-  const packageJsonByName = await artifactPackageJsonByName(state.profilePackagePaths, state.cwd);
-  const additionalPackages = [...new Set([
-    ...packageJsonByName.keys(),
-    ...(state.loader
-      ? [...state.loader.entries()]
-        .map((entry) => packageRootForLoaderSpecifierImpl(entry.options.name, packageJsonByName.keys()))
-        .filter((name): name is string => Boolean(name))
-      : []),
-  ])];
-  const resolvers = createProfileArtifactResolvers({ packageJsonByName, profilePackageJson: state.profilePackageJson });
-  const entries = await discoverRemoteManifestEntries({
-    additionalPackages,
-    resolvePackageJson: resolvers.resolvePackageJson,
-    resolveModule: async (specifier, packageJson) => profileArtifactModuleUrl(await resolvers.resolveModule(specifier, packageJson)),
-  });
-  const result = new Map<string, RemoteContribution>();
-  for (const entry of entries) {
-    if (!entry.moduleUrl) throw new Error(`openbuddy-remote: module URL missing for ${entry.packageName}`);
-    const module = await import(/* @vite-ignore */ entry.moduleUrl);
-    const exported = module.TYPERT_REMOTE ?? module.default;
-    if (!exported || typeof exported !== "object" || Array.isArray(exported)) {
-      throw new Error(`openbuddy-remote: ${entry.packageName} remote artifact has no TYPERT_REMOTE export`);
-    }
-    const packageName = (exported as { package?: unknown }).package;
-    if (packageName !== entry.packageName) {
-      throw new Error(`openbuddy-remote: ${entry.packageName} artifact names package ${JSON.stringify(packageName)}`);
-    }
-    const contribution = normalizePublishedRemoteContribution(serializeRemoteContribution(exported) as RemoteContribution);
-    result.set(entry.packageName, contribution);
-  }
-  return result;
-}
-
-function normalizePublishedRemoteContribution(contribution: RemoteContribution): RemoteContribution {
-  return normalizePublishedRemoteContributionPure(contribution);
-}
-
-async function discoverProfileTypertContributions(): Promise<Map<string, TypertHostContribution>> {
-  const packageJsonByName = await artifactPackageJsonByName(state.profilePackagePaths, state.cwd);
-  const resolvers = createProfileArtifactResolvers({ packageJsonByName, profilePackageJson: state.profilePackageJson });
-  const entries = await discoverTypertManifestEntries({
-    additionalPackages: [...new Set([
-      ...packageJsonByName.keys(),
-      ...(state.loader
-        ? [...state.loader.entries()]
-          .map((entry) => packageRootForLoaderSpecifierImpl(entry.options.name, packageJsonByName.keys()))
-          .filter((name): name is string => Boolean(name))
-        : []),
-    ])],
-    resolvePackageJson: resolvers.resolvePackageJson,
-    resolveModule: async (specifier, packageJson) => profileArtifactModuleUrl(await resolvers.resolveModule(specifier, packageJson)),
-  });
-  const result = new Map<string, TypertHostContribution>();
-  for (const entry of entries) {
-    if (!entry.moduleUrl) throw new Error(`openbuddy-typert: module URL missing for ${entry.packageName}`);
-    const module = await import(/* @vite-ignore */ entry.moduleUrl);
-    result.set(entry.packageName, validateTypertHostContribution(entry.packageName, module.TYPERT ?? module.default));
-  }
-  return result;
-}
-
-function clearProfileArtifacts(): void {
-  disposeProfileTypertRegistrations(state.profileTypertContributions.values());
-  state.profileTypertContributions.clear();
-  for (const packageName of state.profileRemoteContributions.keys()) state.remoteDispatcher.unregister(packageName);
-  state.profileRemoteContributions.clear();
-}
-
-function installProfileArtifacts(
-  remoteContributions: Map<string, RemoteContribution>,
-  typertContributions: Map<string, TypertHostContribution>,
-): void {
-  const typert = state.context?.get("typert") as { register?: (contribution: unknown) => () => void } | undefined;
-  if (!typert?.register && typertContributions.size > 0) throw new Error("openbuddy-typert: registry is unavailable");
-
-  const installedRemote = new Map<string, RemoteContribution>();
-  const installedTypert = new Map<string, ProfileTypertRegistration>();
-  try {
-    for (const contribution of remoteContributions.values()) {
-      state.remoteDispatcher.register(contribution, remoteServiceContext());
-      installedRemote.set(contribution.package, contribution);
-    }
-    if (typert?.register) {
-      for (const contribution of typertContributions.values()) {
-        const remote = remoteContributions.get(contribution.package);
-        let remoteDispose: (() => void) | undefined;
-        if (!remote && contribution.invocations.length > 0) {
-          const generated = serializeRemoteContribution({ package: contribution.package, descriptors: contribution.invocations }) as RemoteContribution;
-          state.remoteDispatcher.register(generated, remoteServiceContext());
-          remoteDispose = () => { state.remoteDispatcher.unregister(contribution.package); };
-        }
-        installedTypert.set(contribution.package, {
-          contribution,
-          dispose: typert.register(contribution),
-          remoteDispose,
-        });
-      }
-    }
-  } catch (error) {
-    disposeProfileTypertRegistrations(installedTypert.values());
-    for (const packageName of installedRemote.keys()) state.remoteDispatcher.unregister(packageName);
-    throw error;
-  }
-  state.profileRemoteContributions = installedRemote;
-  state.profileTypertContributions = installedTypert;
-}
-
-export async function reconcileProfileArtifacts(): Promise<void> {
-  state.profileArtifactGeneration += 1;
-  state.rendererPluginManifestCache = null;
-  const typert = state.context?.get("typert") as {
-    register?: (contribution: unknown) => () => void;
-    subscribe?: (listener: (change: unknown) => void) => () => void;
-    beginTransaction?: () => { commit: () => void; rollback: () => void };
-  } | undefined;
-  if (!state.typertRegistryUnsubscribe && typert?.subscribe) {
-    state.typertRegistryUnsubscribe = typert.subscribe((change) => {
-      emitPluginEvent("typert/registry-changed", change);
-    });
-  }
-  // Import and validate every generated artifact before touching the live registries.
-  const [nextRemote, nextTypert] = await Promise.all([
-    discoverProfileRemoteContributions(),
-    discoverProfileTypertContributions(),
-  ]);
-  const transaction = typert?.beginTransaction?.();
-  const previousRemote = new Map(state.profileRemoteContributions);
-  const previousTypert = new Map(state.profileTypertContributions);
-  clearProfileArtifacts();
-  try {
-    installProfileArtifacts(nextRemote, nextTypert);
-    transaction?.commit();
-  } catch (error) {
-    try {
-      clearProfileArtifacts();
-      installProfileArtifacts(previousRemote, new Map([...previousTypert].map(([packageName, entry]) => [packageName, entry.contribution])));
-      transaction?.rollback();
-    } catch (rollbackError) {
-      transaction?.rollback();
-      throw new AggregateError([error, rollbackError], "openbuddy-profile: artifact reconciliation and rollback failed");
-    }
-    throw error;
-  }
-}
 
 function listProfileRemoteContributions(): RemoteContribution[] {
   return [...state.profileRemoteContributions.values()].map((contribution) => ({
@@ -1297,7 +1104,18 @@ import {
 import { bootstrapSessionEventLog } from "./host-modules/bootstrap/session-event-log";
 import { bootstrapModelRuntime } from "./host-modules/bootstrap/model-runtime";
 import { bootstrapProfileOptions, resolveProfileOptions } from "./host-modules/bootstrap/profile-options";
-import { installHostModules } from "./host-modules/bootstrap/install-host-modules";
+// installMicrokernelHost is the single entry point that wires every
+// host-module via installHostModules() under the hood. It also records
+// which modules are installed so diagnostics + tests can introspect.
+import { installMicrokernelHost } from "./host-modules/bootstrap/microkernel-host";
+// v4 sub-stage extractors — initialize() is now an 8-stage orchestrator
+// instead of a 300-line wall. Each helper owns one stage of the bootstrap.
+import { wireForwardedEvents } from "./host-modules/bootstrap/wire-forwarded-events";
+import { setupProfileOptions } from "./host-modules/bootstrap/profile-options-setup";
+import { initPluginLoader } from "./host-modules/bootstrap/init-plugin-loader";
+import { initDeepSeek } from "./host-modules/bootstrap/init-deepseek";
+import { computeActiveAdapterIds } from "./host-modules/bootstrap/compute-active-adapter-ids";
+import { createJobsRegistry } from "./host-modules/bootstrap/jobs-registry";
 import { buildAgentHostFacade } from "./host-modules/bootstrap/build-agent-host-facade";
 import type { InstallHostModuleDeps } from "./host-modules/bootstrap/install-host-modules";
 
@@ -1335,7 +1153,7 @@ function createPiToolExtension(): ExtensionFactory {
   };
 }
 
-async function sessionPresetSelection(sessionPath?: string): Promise<string | null | undefined> {
+async function sessionPresetSelection(sessionPath?: string | null): Promise<string | null | undefined> {
   if (!sessionPath) return undefined;
   try {
     const entries = SessionManager.open(sessionPath).getEntries();
@@ -1344,100 +1162,15 @@ async function sessionPresetSelection(sessionPath?: string): Promise<string | nu
     return undefined;
   }
 }
+/**
+ * Stage F-5: mountConfiguredAgentPreset + selectAgentPreset moved to
+ * host-modules/agent-preset-runtime.ts. The facade re-exports the
+ * module-level functions so legacy callers (init-session stage and
+ * agentHost.selectAgentPreset IPC) keep working unchanged.
+ */
+import { mountConfiguredAgentPreset, selectAgentPreset } from "./host-modules/agent-preset-runtime";
+export { mountConfiguredAgentPreset, selectAgentPreset };
 
-async function mountConfiguredAgentPreset(cwd: string, hostContext: Context, hostLoader: HarnessPluginLoader, selectedId?: string | null): Promise<string | null> {
-  const configured = selectedId === undefined ? await piResources.readAgentPresetDefaults() : undefined;
-  const presetId = selectedId === undefined ? configured?.default?.trim() : selectedId;
-  if (!presetId) return null;
-  const preset = (await piResources.listAgentPresets(cwd)).find((entry) => entry.id === presetId);
-  // The configured preset id may be stale (preset deleted, renamed, or set
-  // by an old user action). Surfacing this as a fatal error would block
-  // every `agent:init`/`agent:new-session` call until the user manually
-  // clears `agent-presets.json`. Treat it as a recoverable warning, drop the
-  // stale default, and let the rest of init proceed so the agent host stays
-  // usable. The same applies to presets whose source file is broken: log it,
-  // clear the default, and continue without the preset runtime.
-  if (!preset) {
-    console.warn(`[openbuddy-agent] configured preset "${presetId}" was not found; clearing stale default`);
-    await piResources.writeAgentPresetDefault(undefined).catch(() => undefined);
-    return null;
-  }
-  if (preset.broken) {
-    console.warn(`[openbuddy-agent] configured preset "${presetId}" is broken: ${preset.broken}; clearing stale default`);
-    await piResources.writeAgentPresetDefault(undefined).catch(() => undefined);
-    return null;
-  }
-  const source = await piResources.readAgentPreset(presetId, cwd);
-  const runtime = new PresetSessionRuntime({
-    hostContext,
-    hostLoader,
-    toolRegistry: state.toolRegistry,
-    cwd,
-  });
-  try {
-    await runtime.mount({ id: presetId, source, path: preset.path });
-    state.presetSessionRuntime = runtime;
-    emitPluginEvent("agent-preset/selected", { id: presetId, path: preset.path });
-    return presetId;
-  } catch (error) {
-    await runtime.dispose().catch(() => undefined);
-    throw error;
-  }
-}
-
-async function selectAgentPreset(id: string): Promise<{ id: string; path: string }> {
-  const requestedId = id.trim();
-  if (!requestedId) throw new Error("agent-presets: preset id must be non-empty");
-  return pluginLifecycleQueue.enqueue("plugin-reload", `agent-preset:${requestedId}`, async (transaction) => {
-    const session = state.session;
-    const hostContext = state.context;
-    const hostLoader = state.loader;
-    const cwd = state.cwd;
-    if (!session || !hostContext || !hostLoader || !cwd) throw new Error("agent-presets: Pi session is not initialized");
-    if (state.presetSessionRuntime?.id === requestedId) {
-      const current = (await piResources.listAgentPresets(cwd)).find((entry) => entry.id === requestedId);
-      if (!current) throw new Error(`agent-presets: preset "${requestedId}" was not found`);
-      return { id: requestedId, path: current.path };
-    }
-    if (sessionHasConversation(session.sessionManager.getEntries())) {
-      throw new Error("agent-presets: preset selection is only allowed before the first conversation turn");
-    }
-    const preset = (await piResources.listAgentPresets(cwd)).find((entry) => entry.id === requestedId);
-    if (!preset) throw new Error(`agent-presets: preset "${requestedId}" was not found`);
-    if (preset.broken) throw new Error(`agent-presets: preset "${requestedId}" is broken: ${preset.broken}`);
-    const source = await piResources.readAgentPreset(requestedId, cwd);
-    const previous = state.presetSessionRuntime;
-    const candidate = new PresetSessionRuntime({
-      hostContext,
-      hostLoader,
-      toolRegistry: state.toolRegistry,
-      cwd,
-    });
-
-    transaction.phase("prepare", "agent-preset");
-    await session.waitForIdle();
-    await candidate.mount({ id: requestedId, source, path: preset.path });
-    state.presetSessionRuntime = candidate;
-    try {
-      transaction.phase("pi", "agent-preset");
-      await piRuntimeCoordinator.reload("agent-preset-switch");
-      session.sessionManager.appendCustomEntry("agent-preset/selected", { agentPreset: requestedId, version: 1 });
-      await previous?.dispose();
-      emitPluginEvent("agent-preset/selected", { id: requestedId, path: preset.path });
-      return { id: requestedId, path: preset.path };
-    } catch (error) {
-      state.presetSessionRuntime = previous;
-      await candidate.dispose().catch(() => undefined);
-      try {
-        transaction.phase("rollback", "agent-preset");
-        await piRuntimeCoordinator.reload("agent-preset-rollback");
-      } catch (rollbackError) {
-        console.warn("[openbuddy] failed to reload previous agent preset after switch failure", rollbackError);
-      }
-      throw new Error(`agent-presets: failed to select "${requestedId}": ${error instanceof Error ? error.message : String(error)}`, { cause: error });
-    }
-  });
-}
 
 export function modelFacingPresetTools(): ToolDefinition[] {
   return state.presetSessionRuntime?.modelFacingTools ?? state.toolRegistry.list();
@@ -1470,6 +1203,14 @@ function createPiPlanModeFactory(): ExtensionFactory {
 	});
 }
 
+// Stage F-5: configurePiExtensions + reportPiExtensionErrors moved to
+// host-modules/pi-extension-configure.ts. The facade re-exports the
+// module-level functions so legacy callers (init-session stage,
+// profile-reload-transaction installHostModules deps, etc.) keep
+// working unchanged.
+import { configurePiExtensions, reportPiExtensionErrors } from "./host-modules/pi-extension-configure";
+export { configurePiExtensions, reportPiExtensionErrors };
+
 // Phase 8.3 Batch L: hook permission request handler moved to
 // host-modules/hook-permission.ts. Wrapper preserves (title, message,
 // request) signature used by configurePiExtensions.confirm binding.
@@ -1478,108 +1219,6 @@ import {
 } from "./host-modules/hook-permission";
 async function requestHookPermission(title: string, message: string, request?: HookPermissionRequest) { return requestHookPermissionImpl(title, message, request); }
 
-export function configurePiExtensions(manifestSpecs: readonly OpenBuddyPiExtensionSpec[]): void {
-  const specs = applyPiExtensionOverrides(manifestSpecs, state.piExtensionOverrides);
-  const telemetry = telemetrySink();
-  const resolution = resolvePiExtensions(specs, {
-    profileDir: selectedProfileDirectory(),
-    resolveSource: (source) => {
-      if (!state.profilePackageJson) throw new Error("Pi extension profile is not initialized");
-      return createRequire(state.profilePackageJson).resolve(source);
-    },
-    emit: emitPluginEvent,
-    resolveService: (owner) => state.context?.get(owner),
-    ...(telemetry ? { telemetrySink: telemetry } : {}),
-  });
-  state.piExtensionStatuses = [
-    ...specs.filter((spec) => spec.enabled === false).map((spec) => ({ id: spec.id, name: spec.id, kind: "pi" as const, state: "disabled" as const, ...(spec.source ? { source: spec.source } : {}), builtIn: !spec.source, managed: true })),
-    ...resolution.resolved.map((entry) => ({ id: entry.id, name: entry.id, kind: "pi" as const, state: "pending" as const, source: entry.source, builtIn: entry.builtIn, managed: true, ...(entry.mode ? { mode: entry.mode } : {}), ...(entry.adapter ? { adapter: entry.adapter } : {}), ...(entry.commands ? { commands: entry.commands } : {}) })),
-    ...resolution.diagnostics.filter((diagnostic) => diagnostic.state === "failed").map((diagnostic) => ({ id: diagnostic.id, name: diagnostic.id, kind: "pi" as const, state: "failed" as const, managed: true, ...(diagnostic.error ? { error: diagnostic.error } : {}) })),
-  ];
-  state.piExtensionPaths.splice(0, state.piExtensionPaths.length, ...state.profilePiResourcePaths.extensions, ...state.piMarketplaceResourcePaths.extensions, ...resolution.paths, ...discoveredPiPackagePaths());
-	const toolExtension = state.piExtensionFactories.find((extension) => extension.name === "openbuddy-pi-tools") ?? {
-		name: "openbuddy-pi-tools",
-		factory: createPiToolExtension(),
-		hidden: true as const,
-	};
-  const planExtension = state.piExtensionFactories.find((extension) => extension.name === "openbuddy-pi-plan-mode") ?? {
-		name: "openbuddy-pi-plan-mode",
-		factory: createPiPlanModeFactory(),
-		hidden: true as const,
-	};
-	const hooksExtension = state.piExtensionFactories.find((extension) => extension.name === "openbuddy-pi-hooks") ?? {
-		name: "openbuddy-pi-hooks",
-		factory: createPiHooksExtension(() => state.hookConfigs, emitPluginEvent, {
-			confirm: requestHookPermission,
-			resolveShellRunner: () => state.context?.get("hookShell") as HookShellRunner | undefined,
-		}),
-		hidden: true as const,
-	};
-	// R1 — openbuddy-apply-patch: built-in unified-diff + structured shell tools.
-	// Registered as a hidden factory so it ships with every session and the
-	// user does not need to enable it in the Plugins panel. Mirrors the
-	// Codex App standard `apply_patch` / `apply_command` protocol.
-	const applyPatchExtension = state.piExtensionFactories.find((extension) => extension.name === "openbuddy-apply-patch") ?? (() => {
-		const applyPatchFactory = builtinPiExtensionFactories["openbuddy-apply-patch"];
-		if (!applyPatchFactory) return null;
-		const telemetry = telemetrySink();
-		return {
-			name: "openbuddy-apply-patch",
-			factory: applyPatchFactory(emitPluginEvent, { trustedCwd: state.cwd ?? process.cwd() }, {
-				profileDir: selectedProfileDirectory(),
-				resolveSource: (source) => {
-					if (!state.profilePackageJson) throw new Error("Pi extension profile is not initialized");
-					return createRequire(state.profilePackageJson).resolve(source);
-				},
-				emit: emitPluginEvent,
-				resolveService: (owner) => state.context?.get(owner),
-				...(telemetry ? { telemetrySink: telemetry } : {}),
-			} satisfies PiExtensionResolutionOptions),
-			hidden: true as const,
-		};
-	})();
-	const builtIns = [toolExtension, planExtension, hooksExtension];
-	if (applyPatchExtension) builtIns.push(applyPatchExtension);
-	state.piExtensionFactories.splice(0, state.piExtensionFactories.length, ...builtIns, ...resolution.factories);
-  for (const diagnostic of resolution.diagnostics) {
-    emitPluginEvent(diagnostic.state === "disabled" ? "pi/extension-disabled" : "pi/extension-failed", diagnostic);
-  }
-  emitPluginEvent("pi/extensions-resolved", piExtensionsResolvedPayload(resolution));
-}
-
-export function reportPiExtensionErrors(): void {
-  const errors = new Map<string, string>();
-  for (const error of state.piResourceLoader?.getExtensions().errors ?? []) {
-    errors.set(error.path, error.error);
-    emitPluginEvent("pi/extension-failed", {
-      id: error.path,
-      state: "failed",
-      path: error.path,
-      error: error.error,
-    });
-  }
-  state.piExtensionStatuses = state.piExtensionStatuses.map((status) => {
-    if (status.state === "disabled" || status.state === "failed") return status;
-    const error = status.source ? errors.get(status.source) : undefined;
-    return error
-      ? { ...status, state: "failed" as const, health: "failed" as const, disabledReason: "load-failed" as const, diagnostics: [error], error }
-      : { ...status, state: "loaded" as const, health: "healthy" as const, disabledReason: undefined, diagnostics: undefined, loadedAt: status.loadedAt ?? new Date().toISOString() };
-  });
-  state.piExtensionStatuses = mergePiExtensionStatuses(
-    state.piExtensionStatuses,
-    (state.piResourceLoader?.getExtensions().extensions ?? []).map((extension) => ({
-      path: extension.path,
-      resolvedPath: extension.resolvedPath,
-      hidden: extension.hidden,
-      sourceInfo: extension.sourceInfo ? {
-        scope: extension.sourceInfo.scope,
-        origin: extension.sourceInfo.origin,
-        ...(extension.sourceInfo.baseDir ? { baseDir: extension.sourceInfo.baseDir } : {}),
-      } : undefined,
-    })),
-    [...errors.entries()].map(([path, error]) => ({ path, error })),
-  );
-}
 
 export async function initialize(opts?: { cwd?: string; sessionPath?: string; force?: boolean }): Promise<void> {
   if (!opts?.force && state.session && (!opts?.cwd || opts.cwd === state.cwd)
@@ -1611,7 +1250,7 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
   // agent-host.ts:initialize() free of 17 inline install calls and gives us
   // one place to document / test the install order. The deps parameter
   // carries every closure variable that used to be referenced inline.
-  installHostModules(state, {
+  installMicrokernelHost(state, {
     piHome,
     isPathWithin,
     piSessionDir,
@@ -1640,6 +1279,46 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     setProfilePiResourcePaths,
     refreshMarketplacePiResourcePaths,
     refreshHookConfigs,
+    sessionPresetSelection,
+    replaceSession: ((opts: any) => piSessionRuntime.replace(opts)) as any,
+    sessionManagerOpen: ((sessionPath: string, options: any, cwd: string) => SessionManager.open(sessionPath, options, cwd)) as any,
+    agentHome: piHome,
+    provideRpcUiContext,
+    questionAnswer,
+    createOpenBuddyRpcUiContext,
+    telemetrySink,
+    resolveProfileDirectory: selectedProfileDirectory,
+    requestHookPermission,
+    createRequire,
+    createPiToolExtension,
+    listAgentPresets: ((cwd: string) => piResources.listAgentPresets(cwd)) as any,
+    readAgentPresetDefaults: (() => piResources.readAgentPresetDefaults()) as any,
+    writeAgentPresetDefault: ((id?: string) => piResources.writeAgentPresetDefault(id)) as any,
+    readAgentPreset: ((id: string, cwd: string) => piResources.readAgentPreset(id, cwd)) as any,
+    createPresetSessionRuntime: ((opts: any) => new PresetSessionRuntime(opts)) as any,
+    sessionHasConversation,
+    piRuntimeCoordinatorReload: ((reason: string) => piRuntimeCoordinator.reload(reason)),
+    // dispose-internal
+    piSessionRuntimeDispose: () => piSessionRuntime.dispose(),
+    stopProfileWatchers,
+    disposeProfileTypertRegistrations,
+    disposeActiveHookProcesses,
+    drainActiveHookProcesses,
+    // workbench-scope-sync
+    casdoorStatus: () => casdoorAuth.status(),
+    // ui-request-resolver
+    permissionReadRules: () => permissionHandlers.readRules(),
+    permissionWriteRules: (rules: any) => permissionHandlers.writeRules(rules),
+    capturePiProfileSnapshot,
+    restorePiProfileSnapshot,
+    captureDeepSeekCapabilityServices,
+    restoreDeepSeekCapabilityServices,
+    materializeOpenBuddyProfile,
+    createOpenBuddyProfile,
+    composePluginPatches,
+    syncDeepSeekCordisRuntime,
+    deepSeekCoreRuntimeEntries,
+    reloadMcp,
     syncMarketplacePiExtensionStatuses,
     startProfileWatchers,
     readOverridePatches,
@@ -1675,26 +1354,11 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     list: (query?: { sessionId?: string; sinceSequence?: number; limit?: number }) => state.sessionEventLog?.snapshot(query) ?? [],
     lastSequence: () => state.sessionEventLog?.lastSequence() ?? state.eventSequence,
   });
-  const jobs = {
-    register: (job: Omit<HostJobRecord, "finishedAt">) => {
-      state.jobsRegistry.set(job.id, { ...job });
-      if (job.sessionId) emitPluginEvent("session/jobs", { sessionId: job.sessionId });
-      return () => {
-        state.jobsRegistry.delete(job.id);
-        if (job.sessionId) emitPluginEvent("session/jobs", { sessionId: job.sessionId });
-      };
-    },
-    update: (id: string, patch: Partial<HostJobRecord>) => {
-      const current = state.jobsRegistry.get(id);
-      if (!current) return;
-      Object.assign(current, patch);
-      if (current.sessionId) emitPluginEvent("session/jobs", { sessionId: current.sessionId });
-    },
-    list: (sessionId?: string) => [...state.jobsRegistry.values()]
-      .filter((job) => sessionId === undefined || job.sessionId === sessionId)
-      .map(({ controller, stop, output, error, ...job }) => job),
-    get: (id: string) => state.jobsRegistry.get(id),
-  };
+  // Phase 8.3 §33.5.4: jobs registry extracted to host-modules/bootstrap/jobs-registry.ts.
+  // createJobsRegistry returns the same facade the 22-line inline object used to
+  // expose — register / update / list / get — without the composition root
+  // having to carry the closures.
+  const jobs = createJobsRegistry({ state, emitPluginEvent });
   // Phase 8.3 §38: the 15 "core services" context.provide calls now live in
   // host-modules/bootstrap/wire-context-services.ts. They are pure declarative
   // registrations (no inline closure state) so they belong in one helper.
@@ -1749,35 +1413,10 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     transitionDshGoal,
   } as unknown as WireDshServicesDeps);
   state.context = context;
-  const forwardedRemoteEvents = [
-    "agent-preset/selected",
-    "commands/change",
-    "credentials/reference-updated",
-    "cordis/request-run",
-    "cordis/request-run-resolved",
-    "cordis/dynamic-package",
-    "cordis/dynamic-retract",
-    "cordis/inspect-query",
-    "cordis/inspect-query-resolved",
-    "llm/adapters-updated",
-    "settings/document-updated",
-    "workspace/changed",
-  ] as const;
-  for (const eventName of forwardedRemoteEvents) {
-    context.on(eventName, (...args: unknown[]) => {
-      emitRendererEvent("openbuddy://plugin-event", {
-        eventVersion: 1,
-        type: eventName,
-        payload: { args: clonePayload(args) },
-      });
-    });
-  }
-  state.capabilityEventBridgeUnsubscribe = bindCapabilityEventBridge({
-    context,
-    getSessionId: () => state.session?.sessionId,
-    emitPluginEvent,
-    emitRendererEvent,
-  });
+  // Phase 8.3 §33.5.5: forwarded-events bus + capability event bridge extracted
+  // to host-modules/bootstrap/wire-forwarded-events.ts. The forwarder list
+  // (FORWARDED_REMOTE_EVENTS) and the bridge binding both live there.
+  wireForwardedEvents({ state, context, emitRendererEvent, emitPluginEvent });
   // Stage G-1c: openbuddy-automation removed; automation is owned by
   // pi-background-tasks + pi-goal (passthrough). The legacy
   // `automation/run` Cordis event no longer exists; pi-native
@@ -1785,12 +1424,10 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
   await context.start();
 
   let profilePackageJson: string | undefined;
-  // Phase 8.3 Batch L3: profile path resolution extracted to
-  // host-modules/bootstrap/profile-options.ts. The resolved profileOptions
-  // are passed to ensureOpenBuddyProfile exactly as before.
-  const resolvedProfile = resolveProfileOptions(process.env);
-  const profileOptions = bootstrapProfileOptions(process.env);
-  await ensureOpenBuddyProfile(profileOptions);
+  // Phase 8.3 §33.5.6: profile-options trio collapsed to a single stage call.
+  // setupProfileOptions() runs resolveProfileOptions + bootstrapProfileOptions
+  // + ensureOpenBuddyProfile, returning the resolved + bootstrapped objects.
+  const { resolvedProfile, profileOptions } = await setupProfileOptions({ env: process.env });
   // C6: opt-in install of the curated default Pi package bundle.
   // Controlled by `OPENBUDDY_INSTALL_DEFAULT_PI=1` so the default install path
   // is untouched unless the host integrator opts in. Failures are logged as
@@ -1819,101 +1456,45 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     startProfileWatchers,
   });
   profilePackageJson = materializedProfilePackageJson;
-  const loader = new ElectronHarnessPluginLoader({
+  // Phase 8.3 §33.5.7: ElectronHarnessPluginLoader + PluginStateStore bootstrap
+  // extracted to host-modules/bootstrap/init-plugin-loader.ts. Returns the
+  // loader (so DSH + session stages can reuse it) and the hydrated
+  // pluginState (commit markers already loaded into state).
+  const { loader, pluginState } = await initPluginLoader({
+    state,
+    cwd,
     context,
     baseUrl: import.meta.url,
-    importer: async (specifier, baseUrl) => {
-      const compatibilityModule = resolveDeepSeekModule(specifier);
-      if (compatibilityModule !== undefined) return compatibilityModule;
-      if (specifier === "openbuddy:core") return openBuddyCorePlugin;
-      const capability = openBuddyCapabilityPluginIndex.get(specifier);
-      if (capability) return capability;
-      if (specifier.startsWith(".")) return import(/* @vite-ignore */ new URL(specifier, baseUrl ?? import.meta.url).href);
-      if (state.profilePackageJson) {
-        try {
-          const resolved = createRequire(state.profilePackageJson).resolve(specifier);
-          return import(/* @vite-ignore */ pathToFileURL(resolved).href);
-        } catch {
-          try {
-            const packageJsonByName = await artifactPackageJsonByName(state.profilePackagePaths, state.cwd);
-            const packageJson = packageJsonByName.get(specifier.split("/").slice(0, specifier.startsWith("@") ? 2 : 1).join("/"));
-            if (packageJson) {
-              const resolver = createProfileArtifactResolvers({ packageJsonByName, profilePackageJson: state.profilePackageJson });
-              const resolved = await resolver.resolveModule(specifier, packageJson);
-              return import(/* @vite-ignore */ pathToFileURL(resolved).href);
-            }
-          } catch {
-            // Fall through to the host's normal dependency graph.
-          }
-        }
-      }
-      return import(/* @vite-ignore */ specifier);
-    },
-    logger: (level, message) => {
-      console[level](message);
-      emitPluginEvent(`plugin/${level}`, { message });
-    },
-    onEvent: emitPluginEvent,
+    emitPluginEvent,
+    resolveDeepSeekModule,
+    openBuddyCorePlugin,
+    openBuddyCapabilityPluginIndex,
   });
   state.loader = loader;
-  state.pluginState = createPluginStateStore();
-  try {
-    const stored = await state.pluginState.read();
-    state.piExtensionOverrides = stored?.piExtensions ?? {};
-    state.pluginCommitGeneration = stored?.commit?.generation ?? 0;
-    state.lastPluginCommitTransactionId = stored?.commit?.transactionId;
-    state.lastPluginCommitMarker = stored?.commit;
-  } catch (error) {
-    console.warn("[openbuddy] failed to load Pi extension overrides", error);
-  }
+  state.pluginState = pluginState;
 
-  let storedLayers: PluginPatch[][] = [];
-  try {
-    storedLayers = await state.pluginState.composePatches();
-  } catch (error) {
-    console.warn("[openbuddy] failed to load stored plugin overrides", error);
-  }
-  const baseProfile = createOpenBuddyProfile();
-  state.storedLayers = storedLayers;
-  state.baseProfile = baseProfile;
-  const overrideLayers = await readOverridePatches();
-  // Phase 8.3 Batch K: 40 个默认 DSH 入口搬到 host-modules/deepseek/host-runner-entries.ts,
-  // 这里只组合 baseProfile.entries / profileBundle.entries + normalize。
-  const profile: PluginProfile = {
-    entries: composeHostRunnerEntries(
-      baseProfile.entries,
-      profileBundle?.entries ?? [],
-    ),
-    patches: [
-      ...(baseProfile.patches ?? []),
-      ...(profileBundle?.patches ?? []),
-      ...storedLayers,
-      ...(overrideLayers ?? []),
-    ],
-  };
+  // Phase 8.3 §33.5.8: DSH (DeepSeek Host) assembly extracted to
+  // host-modules/bootstrap/init-deepseek.ts. Owns baseProfile composition,
+  // profile.loadProfile + syncDeepSeekCordisRuntime, capability service
+  // restore + typert ready, 7 @deepseek-ai/* core package registrations,
+  // and reconcileProfileArtifacts — all under a single named call.
+  await initDeepSeek({
+    state,
+    context,
+    loader,
+    profileBundle,
+    baseUrl: import.meta.url,
+    emitPluginEvent,
+    emitRendererEvent,
+    remoteServiceContext,
+    reconcileProfileArtifacts,
+  });
 
-  try {
-    await loader.loadProfile(profile);
-    state.activePluginProfile = profile;
-    await syncDeepSeekCordisRuntime(deepSeekCoreRuntimeEntries(composePluginPatches(profile.entries, profile.patches ?? [])));
-  } catch (error) {
-    emitPluginEvent("plugin/failed", { id: "openbuddy-core", error: String(error) });
-    throw error;
-  }
-  await restoreDeepSeekCapabilityServices();
-  await ensureTypertReady();
-  state.remoteDispatcher.register(deepSeekSessionQueryRemote(), remoteServiceContext());
-
-  // Phase 8.3 §45: workspace-instructions + adapter-commands markdown
-  // injection extracted to injectSystemPromptSections(deps). The activeAdapterIds
-  // computation stays inline because it walks state.piExtensionStatuses which
-  // is the canonical source of truth (not safe to mock in the helper).
-  const activeAdapterIds = new Set<string>();
-  for (const entry of state.piExtensionStatuses) {
-    if (entry.mode !== "adapter") continue;
-    activeAdapterIds.add(entry.id);
-    if (entry.adapter) activeAdapterIds.add(entry.adapter.replace(/^openbuddy-/, ""));
-  }
+  // Phase 8.3 §33.5.9: activeAdapterIds computation extracted to
+  // host-modules/bootstrap/compute-active-adapter-ids.ts. Walks
+  // state.piExtensionStatuses (canonical source of truth) and returns the
+  // deduped set the system-prompt injection needs.
+  const activeAdapterIds = computeActiveAdapterIds({ state });
   await injectSystemPromptSections({
     cwd,
     context: state.context!,
@@ -1921,21 +1502,6 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     describeCompatibilityAdapterCommandsMarkdown,
     activeAdapterIds,
   });
-
-  for (const packageName of [
-    "@deepseek-ai/dsh-commands",
-    "@deepseek-ai/dsh-goal",
-    "@deepseek-ai/dsh-file-reference",
-    "@deepseek-ai/dsh-host-plugin-inventory",
-    "@deepseek-ai/dsh-message-feedback",
-    "@deepseek-ai/dsh-session-reference",
-    "@deepseek-ai/dsh-cordis-host-runner",
-  ]) {
-    const remote = deepSeekCapabilityRemote(packageName);
-    if (remote) state.remoteDispatcher.register(serializeRemoteContribution(remote), remoteServiceContext());
-  }
-  await ensureTypertReady();
-  await reconcileProfileArtifacts();
 
   const persistedPresetId = await sessionPresetSelection(opts?.sessionPath);
   const mountedPresetId = await mountConfiguredAgentPreset(cwd, context, loader, persistedPresetId);
@@ -2080,6 +1646,8 @@ function waitUntilReady(): Promise<void> {
 }
 
 /**
+ * Stage F-5: rebindSession moved to host-modules/session-rebind.ts.
+ *
  * Pi-native fast session switch: reuse the warm host (plugin loader,
  * resource loader, typert, remote dispatcher, event log — none of which
  * depend on which session is open) and swap only the AgentSession via
@@ -2088,159 +1656,14 @@ function waitUntilReady(): Promise<void> {
  * loaded one, because those are baked into the resource loader / preset
  * runtime and cannot be swapped cheaply.
  */
-export async function rebindSession(sessionPath: string, cwd: string): Promise<void> {
-  const context = state.context;
-  const modelRuntime = state.modelRuntime;
-  const resourceLoader = state.piResourceLoader;
-  if (!state.session || !context || !modelRuntime || !resourceLoader) {
-    await initialize({ cwd, sessionPath });
-    return;
-  }
-  if (state.cwd !== cwd) {
-    await initialize({ cwd, sessionPath });
-    return;
-  }
-  // Empty / unreadable session files carry no preset hint. Treat them as
-  // "inherit whatever is already mounted" instead of falling back to a
-  // full initialize() — otherwise every "新建会话" click with a default
-  // preset configured would re-bootstrap the entire agent host (~2-5s)
-  // instead of taking the ~50ms warm-host rebind path.
-  const mountedPresetId = state.presetSessionRuntime?.id ?? null;
-  const probedPreset = await sessionPresetSelection(sessionPath);
-  const targetPresetId = (probedPreset === undefined || probedPreset === null)
-    ? mountedPresetId
-    : probedPreset;
-  if (targetPresetId !== mountedPresetId) {
-    await initialize({ cwd, sessionPath });
-    return;
-  }
-  const session = await piSessionRuntime.replace({
-    cwd,
-    agentDir: piHome(),
-    noTools: "builtin",
-    modelRuntime,
-    sessionManager: SessionManager.open(sessionPath, undefined, cwd),
-    resourceLoader,
-  });
-  state.session = session;
-  state.model = session.model;
-  state.queueMirror = [];
-  context.provide("piSessionRaw", session);
-  context.provide("piExtensionApi", session);
-  const uiContext = provideRpcUiContext({
-    context,
-    session,
-    state,
-    emitPluginEvent,
-    emitRendererEvent,
-    questionAnswer,
-    createOpenBuddyRpcUiContext,
-  } as unknown as ProvideRpcUiContextDeps);
-  // Phase 5 — fire-and-forget the bind so `agent:new-session` IPC returns
-  // the sessionId immediately. Mutating IPCs await `state.extensionsBound`
-  // before issuing their own RPC. See line 217 for the slot contract.
-  state.extensionsBound = session
-    .bindExtensions({ uiContext, mode: "rpc" })
-    .catch((err) => {
-      console.warn("[openbuddy] bindExtensions failed", err);
-    });
-  context.emit("pi/ready", { sessionId: session.sessionId, cwd });
-  emitPluginEvent("session/created", { sessionId: session.sessionId, cwd });
-  try {
-    if (!session.sessionManager.getSessionName()) session.setSessionName("OpenBuddy");
-  } catch {
-    // Session naming is optional across Pi releases.
-  }
-}
+import { rebindSession } from "./host-modules/session-rebind";
+export { rebindSession };
+/**
+ * Stage F-5: disposeInternal moved to host-modules/dispose-internal.ts.
+ * The facade re-exports it as part of the lifecycle path.
+ */
+import { disposeInternal } from "./host-modules/dispose-internal";
 
-async function disposeInternal(): Promise<void> {
-  disposeActiveHookProcesses();
-  await drainActiveHookProcesses();
-  // Stage G-1c: openbuddy-automation removed; nothing to stop here.
-  // pi-background-tasks disposes itself with the pi session.
-  const session = state.session;
-  try {
-    if (session) {
-      state.context?.emit("pi/dispose", { sessionId: session.sessionId });
-      emitPluginEvent("session/dispose", { sessionId: session.sessionId });
-      await piSessionRuntime.dispose();
-    }
-  } catch (error) {
-    console.warn("[openbuddy] abort on dispose failed", error);
-  }
-  stopProfileWatchers();
-  await state.profileReloadPromise.catch(() => undefined);
-  state.capabilityEventBridgeUnsubscribe?.();
-  state.capabilityEventBridgeUnsubscribe = null;
-  state.typertRegistryUnsubscribe?.();
-  state.typertRegistryUnsubscribe = null;
-  state.remoteDispatcher.clear();
-  await state.presetSessionRuntime?.dispose().catch((error) => {
-    console.warn("[openbuddy] preset runtime dispose failed", error);
-  });
-  state.presetSessionRuntime = null;
-  state.profileRemoteContributions.clear();
-  disposeProfileTypertRegistrations(state.profileTypertContributions.values());
-  state.profileTypertContributions.clear();
-  await state.loader?.dispose();
-  await state.terminalRuntime?.dispose();
-  state.terminalRuntime = null;
-  await state.subprocessRuntime?.dispose();
-  state.subprocessRuntime = null;
-  await state.deepSeekCordisRuntime?.dispose();
-  state.deepSeekCordisRuntime = null;
-  state.deepSeekCordisSnapshot = null;
-  await state.sessionEventLog?.flush();
-  state.sessionUnsubscribe = null;
-  state.loader = null;
-  state.sessionEventLog?.clear();
-  state.eventSequence = 0;
-  state.sessionSequences.clear();
-  state.sessionEventLog = null;
-  state.context = null;
-  state.session = null;
-  state.queueMirror = null;
-  state.cwd = null;
-  state.model = undefined;
-  state.pluginState = null;
-  state.pluginCommitGeneration = 0;
-  state.lastPluginCommitTransactionId = undefined;
-  state.lastPluginCommitMarker = undefined;
-  state.modelRuntime = null;
-  state.piResourceLoader = null;
-  state.piMarketplaceResourcePaths.extensions = [];
-  state.piMarketplaceResourcePaths.skills = [];
-  state.piMarketplaceResourcePaths.prompts = [];
-  state.piMarketplaceResourcePaths.themes = [];
-  state.piMarketplaceAgentFiles = [];
-  state.hookConfigs = [];
-  state.piRefreshPromise = Promise.resolve();
-  state.profileOptions = null;
-  state.profileBundle = null;
-  state.profilePackageJson = undefined;
-  state.profilePackagePaths = [];
-  state.baseProfile = null;
-  state.activePluginProfile = null;
-  state.storedLayers = [];
-  state.profileReloadPromise = Promise.resolve();
-  state.pluginReadiness = { phase: "idle", generation: 0 };
-  state.runningTasks.clear();
-  state.jobsRegistry.clear();
-  for (const child of state.continuableSubagents.values()) {
-    child.controller.abort();
-    void child.session.abort().catch(() => undefined);
-    child.unsubscribe();
-    child.session.dispose();
-  }
-  await Promise.allSettled([...state.deepSeekAgents.values()].map((agent) => agent.dispose()));
-  state.deepSeekAgents.clear();
-  state.continuableSubagents.clear();
-  state.hookPermissionSessionRules.clear();
-  for (const request of state.pendingUiRequests.values()) request.resolve(undefined);
-  state.pendingUiRequests.clear();
-  state.extensionEditorText.clear();
-  state.extensionToolsExpanded.clear();
-}
 
 export function dispose(): Promise<void> {
   return enqueueLifecycle(disposeInternal);
@@ -2289,46 +1712,12 @@ function assistantMessageText(messages: unknown) : string { return assistantMess
 function createTeamRunner(modelRuntime: ModelRuntime, cwd: string, getModel: () => Model<any> | undefined): TeamRunner {
   return createTeamRunnerImpl(modelRuntime, cwd, getModel);
 }
+/**
+ * Stage F-5: resolveUiRequest moved to host-modules/ui-request-resolver.ts.
+ */
+import { resolveUiRequest } from "./host-modules/ui-request-resolver";
+export { resolveUiRequest };
 
-function resolveUiRequest(requestId: string, value: UiRequestValue): boolean {
-  const request = state.pendingUiRequests.get(requestId);
-  if (!request) return false;
-  state.pendingUiRequests.delete(requestId);
-  if (request.kind === "permission" && request.permission) {
-    const decision = value && typeof value === "object" && "decision" in value
-      ? value.decision
-      : value === true ? "allow" : "deny";
-    if (decision === "allow_always") {
-      void permissionHandlers.readRules().then((rules) => permissionHandlers.writeRules([
-        ...rules,
-        { action: "allow", tool: request.permission?.toolName ?? "", ...(request.permission?.pattern ? { pattern: request.permission.pattern } : {}) },
-      ])).catch((error) => console.warn("[openbuddy] failed to persist hook permission", error));
-    } else if (decision === "allow") {
-      const sessionRules = state.hookPermissionSessionRules.get(request.sessionId) ?? [];
-      state.hookPermissionSessionRules.set(request.sessionId, [...sessionRules, {
-        action: "allow",
-        tool: request.permission.toolName,
-        ...(request.permission.pattern ? { pattern: request.permission.pattern } : {}),
-      }]);
-    }
-  }
-  const permissionDecision = request.kind === "permission"
-    ? value && typeof value === "object" && "decision" in value
-      ? value.decision
-      : value === true ? "allow" : "deny"
-    : undefined;
-  emitPluginEvent(request.kind === "permission" ? "session/permission-resolved" : "session/question-resolved", {
-    requestId,
-    sessionId: request.sessionId,
-    answered: value !== undefined,
-    ...(typeof value === "boolean" ? { approved: value } : {}),
-    ...(permissionDecision ? { approved: permissionDecision !== "deny", decision: permissionDecision } : {}),
-    ...(typeof value === "string" ? { answerLength: value.length } : {}),
-    ...(value && typeof value === "object" && "answers" in value ? { answerCount: Object.keys(value.answers).length } : {}),
-  });
-  request.resolve(value);
-  return true;
-}
 
 function getSession() { return getSessionImpl(); }
 function onEvent(handler: EventHandler) { return onEventImpl(handler); }
@@ -2921,25 +2310,30 @@ export const agentHost = buildAgentHostFacade({
   // can establish its scope during cold boot.
   syncWorkbenchScope,
   bindCurrentSessionToTenant: () => bindCurrentSessionToTenant(),
+  // Phase 8.3 Batch D-11: pi-web RPC capability forwards. These 12 thin
+  // wrappers let the IPC layer talk to OpenBuddy `agentHost` as if it were
+  // a pi-web `RpcClient` — the renderer side can adopt pi-web patterns
+  // (compact, fork, getTree, etc.) without changes.
+  compact,
+  setAutoCompaction,
+  setAutoRetry,
+  abortRetry: abortRetryFn,
+  abortBash: abortBashFn,
+  setSteeringMode: setSteeringModeFn,
+  setFollowUpMode: setFollowUpModeFn,
+  getSessionStats: getSessionStatsFn,
+  getAvailableThinkingLevels: getAvailableThinkingLevelsFn,
+  forkSession: forkSessionFn,
+  getSessionTree: getSessionTreeFn,
+  getCompactionSettings: getCompactionSettingsFn,
 });
 
 
-
-export async function syncWorkbenchScope(force = false): Promise<void> {
-  // Minimal real implementation: derive the current Casdoor workbench scope,
-  // skip work when nothing changed, and publish a renderer event so the UI
-  // can react to scope switches without depending on casdoor branch helpers.
-  try {
-    const status = casdoorAuth.status();
-    const desiredScope = `${status.config.configured ? 'configured' : 'local'}:${status.tenantContext.activeTenantId ?? 'none'}:${status.identity?.subject ?? 'anonymous'}`;
-    if (!force && state.scopeKey === desiredScope) return;
-    state.scopeKey = desiredScope;
-    process.env.OPENBUDDY_WORKBENCH_SCOPE = desiredScope;
-    emitRendererEvent("openbuddy://workbench-scope", { scope: desiredScope, at: new Date().toISOString() });
-  } catch (error) {
-    console.error("[openbuddy] syncWorkbenchScope failed", error);
-  }
-}
+/**
+ * Stage F-5: syncWorkbenchScope moved to host-modules/workbench-scope.ts.
+ */
+import { syncWorkbenchScope } from "./host-modules/workbench-scope-sync";
+export { syncWorkbenchScope };
 
 export type { AgentSession };
 

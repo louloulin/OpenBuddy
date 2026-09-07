@@ -39,6 +39,13 @@ import { installDeepSeekAgentRuntime } from "../deepseek/agent-runtime";
 import { installDeepSeekCordisRuntime } from "../deepseek/cordis-runtime";
 import { installTeamRunner } from "../team-runner";
 import { installProviderRegistryTracker } from "../../agent-host-provider-registry";
+import { installProfileReloadTransaction } from "../profile-reload-transaction";
+import { installSessionRebind } from "../session-rebind";
+import { installPiExtensionConfigure } from "../pi-extension-configure";
+import { installAgentPresetRuntime } from "../agent-preset-runtime";
+import { installDisposeInternal } from "../dispose-internal";
+import { installWorkbenchScopeSync } from "../workbench-scope-sync";
+import { installUiRequestResolver } from "../ui-request-resolver";
 
 import type { AgentHostState } from "../_state-shape";
 
@@ -99,8 +106,52 @@ export interface InstallHostModuleDeps {
   reportPiExtensionErrors: () => void;
   captureReloadableContextServices: () => Map<string, unknown>;
   restoreCapturedContextServices: (...args: any[]) => any;
+  // profile-reload-transaction helpers
+  capturePiProfileSnapshot: () => any;
+  restorePiProfileSnapshot: (snapshot: any) => void;
+  captureDeepSeekCapabilityServices: () => Map<string, unknown>;
+  restoreDeepSeekCapabilityServices: (captured?: Map<string, unknown>) => Promise<void>;
+  materializeOpenBuddyProfile: (options: any) => Promise<{ profile: any; bundle: any }>;
+  createOpenBuddyProfile: () => any;
+  composePluginPatches: (entries: readonly any[], patches: readonly any[][]) => any[];
+  syncDeepSeekCordisRuntime: (entries: readonly any[]) => Promise<void>;
+  deepSeekCoreRuntimeEntries: (patches: readonly any[]) => any[];
+  reloadMcp: () => Promise<void>;
   rollbackPiProfile: (...args: any[]) => any;
   scheduleProfileReload: () => void;
+  // dispose-internal
+  piSessionRuntimeDispose: () => Promise<void>;
+  stopProfileWatchers: () => void;
+  disposeProfileTypertRegistrations: (values: Iterable<any>) => void;
+  disposeActiveHookProcesses: () => void;
+  drainActiveHookProcesses: () => Promise<void>;
+  // workbench-scope
+  casdoorStatus: () => any;
+  // ui-request-resolver
+  permissionReadRules: () => Promise<any[]>;
+  permissionWriteRules: (rules: any[]) => Promise<void>;
+  // agent-preset-runtime
+  listAgentPresets: (cwd: string) => Promise<any[]>;
+  readAgentPresetDefaults: () => Promise<{ default?: string } | undefined>;
+  writeAgentPresetDefault: (defaultId?: string) => Promise<void>;
+  readAgentPreset: (presetId: string, cwd: string) => Promise<string>;
+  createPresetSessionRuntime: (opts: any) => any;
+  sessionHasConversation: (entries: any[]) => boolean;
+  piRuntimeCoordinatorReload: (reason: string) => Promise<void>;
+  // session-rebind (warm-host fast path)
+  sessionPresetSelection: (sessionPath?: string | null) => Promise<string | null | undefined>;
+  replaceSession: (opts: any) => Promise<any>;
+  sessionManagerOpen: (sessionPath: string, options: any, cwd: string) => any;
+  agentHome: () => string;
+  provideRpcUiContext: (deps: any) => any;
+  questionAnswer: (value: any, key?: string) => string | undefined;
+  createOpenBuddyRpcUiContext: (deps: any) => any;
+  // pi-extension-configure (built-in factories + extension diagnostics)
+  telemetrySink: () => any;
+  resolveProfileDirectory: () => string;
+  requestHookPermission: (title: string, message: string, request?: any) => Promise<any>;
+  createRequire: (path: string) => { resolve: (id: string) => string };
+  createPiToolExtension: () => any;
   artifactPackageJsonByName: (...args: any[]) => any;
   discoverRendererPluginManifest: () => Promise<unknown[]>;
   // Cordis runtime helpers
@@ -261,5 +312,94 @@ export function installHostModules(state: AgentHostState, deps: InstallHostModul
     interruptSubagent: deps.interruptSubagentImpl as never,
     piHome: deps.piHome,
     profileArtifactModuleUrl: deps.profileArtifactModuleUrl,
+  });
+  // profile-reload-transaction (own install pattern, before plugin-mutations
+  // is installed so the scheduleProfileReload / rollbackPiProfile injected
+  // below is the freshly-installed module-level function).
+  installProfileReloadTransaction({
+    state,
+    pluginLifecycleQueue: deps.pluginLifecycleQueue as never,
+    piRuntimeCoordinator: deps.piRuntimeCoordinator as never,
+    emitPluginEvent: deps.emitPluginEvent,
+    capturePiProfileSnapshot: deps.capturePiProfileSnapshot as never,
+    restorePiProfileSnapshot: deps.restorePiProfileSnapshot as never,
+    captureReloadableContextServices: deps.captureReloadableContextServices,
+    restoreCapturedContextServices: deps.restoreCapturedContextServices as never,
+    captureDeepSeekCapabilityServices: deps.captureDeepSeekCapabilityServices,
+    restoreDeepSeekCapabilityServices: deps.restoreDeepSeekCapabilityServices,
+    materializeOpenBuddyProfile: deps.materializeOpenBuddyProfile,
+    runtimeProfileBundle: deps.runtimeProfileBundle as never,
+    createOpenBuddyProfile: deps.createOpenBuddyProfile,
+    composePluginPatches: deps.composePluginPatches,
+    syncDeepSeekCordisRuntime: deps.syncDeepSeekCordisRuntime,
+    deepSeekCoreRuntimeEntries: deps.deepSeekCoreRuntimeEntries,
+    reconcileProfileArtifacts: deps.reconcileProfileArtifacts as never,
+    refreshHookConfigs: deps.refreshHookConfigs as never,
+    reloadMcp: deps.reloadMcp as never,
+    reportPiExtensionErrors: deps.reportPiExtensionErrors,
+    readOverridePatches: deps.readOverridePatches as never,
+    setProfilePiResourcePaths: deps.setProfilePiResourcePaths as never,
+    startProfileWatchers: deps.startProfileWatchers as never,
+    configurePiExtensions: deps.configurePiExtensions as never,
+  });
+  // session-rebind (warm-host fast path)
+  installSessionRebind({
+    state,
+    initialize: deps.initialize as never,
+    sessionPresetSelection: deps.sessionPresetSelection as never,
+    replaceSession: deps.replaceSession as never,
+    sessionManagerOpen: deps.sessionManagerOpen as never,
+    agentHome: deps.agentHome,
+    provideRpcUiContext: deps.provideRpcUiContext as never,
+    emitPluginEvent: deps.emitPluginEvent,
+    emitRendererEvent: deps.emitRendererEvent,
+    questionAnswer: deps.questionAnswer as never,
+    createOpenBuddyRpcUiContext: deps.createOpenBuddyRpcUiContext,
+  });
+  // pi-extension-configure (built-in factories + extension diagnostics)
+  installPiExtensionConfigure({
+    state,
+    emitPluginEvent: deps.emitPluginEvent,
+    telemetrySink: deps.telemetrySink,
+    resolveProfileDirectory: deps.resolveProfileDirectory,
+    requestHookPermission: deps.requestHookPermission,
+    createRequire: deps.createRequire,
+    createPiToolExtension: deps.createPiToolExtension,
+  });
+  // agent-preset-runtime (mountConfiguredAgentPreset + selectAgentPreset)
+  installAgentPresetRuntime({
+    state,
+    emitPluginEvent: deps.emitPluginEvent,
+    listAgentPresets: deps.listAgentPresets as never,
+    readAgentPresetDefaults: deps.readAgentPresetDefaults as never,
+    writeAgentPresetDefault: deps.writeAgentPresetDefault as never,
+    readAgentPreset: deps.readAgentPreset as never,
+    createPresetSessionRuntime: deps.createPresetSessionRuntime as never,
+    pluginLifecycleQueue: deps.pluginLifecycleQueue as never,
+    sessionHasConversation: deps.sessionHasConversation as never,
+    piRuntimeCoordinatorReload: deps.piRuntimeCoordinatorReload,
+  });
+  // dispose-internal (lifecycle cleanup path)
+  installDisposeInternal({
+    state,
+    emitPluginEvent: deps.emitPluginEvent,
+    piSessionRuntimeDispose: deps.piSessionRuntimeDispose as never,
+    stopProfileWatchers: deps.stopProfileWatchers as never,
+    disposeProfileTypertRegistrations: deps.disposeProfileTypertRegistrations as never,
+    disposeActiveHookProcesses: deps.disposeActiveHookProcesses as never,
+    drainActiveHookProcesses: deps.drainActiveHookProcesses as never,
+  });
+  // workbench-scope-sync (syncWorkbenchScope)
+  installWorkbenchScopeSync({
+    state,
+    emitRendererEvent: deps.emitRendererEvent,
+    casdoorStatus: deps.casdoorStatus,
+  });
+  // ui-request-resolver (resolveUiRequest)
+  installUiRequestResolver({
+    state,
+    emitPluginEvent: deps.emitPluginEvent,
+    permissionReadRules: deps.permissionReadRules,
+    permissionWriteRules: deps.permissionWriteRules,
   });
 }

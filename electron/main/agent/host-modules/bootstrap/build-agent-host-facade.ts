@@ -53,6 +53,20 @@ export interface AgentHostFacade {
   // ---- model control ----
   setModel: (modelId: string, options?: { traceId?: string; sessionId?: string }) => Promise<unknown>;
   setThinkingLevel: (level: unknown, options?: { traceId?: string; sessionId?: string }) => Promise<unknown>;
+  getAvailableThinkingLevels: () => readonly string[];
+  getSessionStats: () => unknown;
+  getCompactionSettings: () => unknown;
+
+  // ---- pi-web RPC capability parity (Phase 8.3 Batch D-11) ----
+  compact: (customInstructions?: string) => Promise<unknown>;
+  setAutoCompaction: (enabled: boolean) => void;
+  setAutoRetry: (enabled: boolean) => void;
+  abortRetry: () => void;
+  abortBash: () => void;
+  setSteeringMode: (mode: "all" | "one-at-a-time") => void;
+  setFollowUpMode: (mode: "all" | "one-at-a-time") => void;
+  forkSession: (entryId: string) => Promise<{ ok: boolean; error?: string; sessionPath?: string; entryId?: string }>;
+  getSessionTree: () => readonly unknown[];
 
   // ---- preset / auth / provider ----
   listAgentPresets: (cwd?: string | null) => any;
