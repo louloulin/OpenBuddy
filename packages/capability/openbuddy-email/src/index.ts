@@ -2815,7 +2815,9 @@ export class Email extends OpenBuddyService {
 					const result = await this.enqueue(() => provider.shareThread!(input))
 					await this.audit({ accountId: input.accountId, operation: result.operation, status: result.ok ? "completed" : "failed", resourceId: input.threadId, provider: result.provider })
 					return result
-				} catch { }
+				} catch (err) {
+					console.warn(`[openbuddy-email] shareThread provider call failed; falling back to local`, err instanceof Error ? err.message : err)
+				}
 			}
 		await this.notify("邮件线程已分享", `${input.threadId} 已分享至协作频道 ${input.channelId}`)
 		return { ok: true, provider: "openbuddy-local", operation: "share-thread", threadId: input.threadId, receipt: id("local-share") }
@@ -2830,7 +2832,9 @@ export class Email extends OpenBuddyService {
 				const result = await this.enqueue(() => provider.createReminder!(input))
 				await this.audit({ accountId: input.accountId, operation: result.operation, status: result.ok ? "completed" : "failed", resourceId: input.threadId, provider: result.provider })
 				return result
-			} catch { }
+			} catch (err) {
+				console.warn(`[openbuddy-email] createReminder provider call failed; falling back to local`, err instanceof Error ? err.message : err)
+			}
 		}
 		await this.notify("邮件跟进提醒已创建", `${input.description} · ${input.remindAt}`)
 		return { ok: true, provider: "openbuddy-local", operation: "create-reminder", threadId: input.threadId, receipt: reminder.id }
@@ -2848,7 +2852,9 @@ export class Email extends OpenBuddyService {
 				const result = await this.enqueue(() => provider.moveToProject!(input))
 				await this.audit({ accountId: input.accountId, operation: result.operation, status: result.ok ? "completed" : "failed", resourceId: input.threadId, provider: result.provider })
 				return result
-			} catch { }
+			} catch (err) {
+				console.warn(`[openbuddy-email] moveToProject provider call failed; falling back to local`, err instanceof Error ? err.message : err)
+			}
 		}
 		return { ok: true, provider: "openbuddy-local", operation: "move-to-project", threadId: input.threadId, receipt: id("local-project") }
 	}
@@ -3234,7 +3240,9 @@ export class Email extends OpenBuddyService {
 			try {
 				const provider = this.getProvider()
 				if (provider.createReminder) await this.enqueue(() => provider.createReminder!({ accountId: prepared.result.analysis.accountId, threadId: prepared.result.analysis.threadId, description: `邮件行动项：${action.content}${action.owner ? `；负责人：${action.owner}` : ""}`, remindAt: action.dueAt! }))
-			} catch { }
+			} catch (err) {
+				console.warn(`[openbuddy-email] analysis-create-reminders loop iteration failed (action ${index})`, err instanceof Error ? err.message : err)
+			}
 		}
 		for (const reminder of prepared.result.reminders) await this.notify("邮件跟进提醒已创建", `${reminder.threadId} · ${reminder.receipt ?? ""}`)
 		await this.audit({ accountId: prepared.result.analysis.accountId, operation: "analysis-create-reminders", status: "completed", resourceId: prepared.result.analysis.threadId, provider: "openbuddy-local" })
