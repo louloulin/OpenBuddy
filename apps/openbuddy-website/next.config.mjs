@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  output: 'standalone',
   // 允许 deep links 到 docs/* 等静态资源（GitHub README 截图直接访问）
   async rewrites() {
     return [
