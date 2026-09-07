@@ -68,6 +68,8 @@
     "commercial:audit": "node scripts/audit-commercial-model.mjs --config deploy/openbuddy-commercial-model.example.json",
     "enterprise:release-audit": "node scripts/audit-enterprise-release.mjs",
     "tenant:boundary-audit": "bash scripts/verify-tenant-boundaries.sh",
+    "verify:plan": "node scripts/verify-plan.mjs",
+    "verify:plan:json": "node scripts/verify-plan.mjs --json",
     "moon:sync": "moon sync projects",
     "moon:graph": "moon project-graph --json",
     "moon:query": "moon query projects",
