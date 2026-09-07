@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="badge" x1="120" y1="90" x2="900" y2="940" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#13665C"/><stop offset=".52" stop-color="#0C4A48"/><stop offset="1" stop-color="#083034"/>
+    </linearGradient>
+    <linearGradient id="coat" x1="290" y1="210" x2="750" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFCB86"/><stop offset=".5" stop-color="#FCA23F"/><stop offset="1" stop-color="#EF7E27"/>
+    </linearGradient>
+    <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
+  </defs>
+  <g clip-path="url(#clip)">
+    <rect x="38" y="38" width="948" height="948" rx="224" fill="url(#badge)"/>
+    <g transform="matrix(1.05 0 0 1.05 -25.6 -15.1)">
+      <!-- head -->
+      <path d="M512 356C660 356 748 452 748 574C748 704 646 792 512 792C378 792 276 704 276 574C276 452 364 356 512 356Z" fill="url(#coat)"/>
+      <!-- eyes -->
+      <ellipse cx="426" cy="506" rx="34" ry="38" fill="#2B1A11"/>
+      <ellipse cx="598" cy="506" rx="34" ry="38" fill="#2B1A11"/>
+      <circle cx="415" cy="494" r="11" fill="#FFFFFF"/>
+      <circle cx="587" cy="494" r="11" fill="#FFFFFF"/>
+      <!-- nose + smile -->
+      <path d="M466 622C466 606 484 598 512 598C540 598 558 606 558 622C558 648 534 674 512 674C490 674 466 648 466 622Z" fill="#2B1A11"/>
+    </g>
+  </g>
+</svg>

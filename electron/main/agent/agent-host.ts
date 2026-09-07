@@ -332,10 +332,15 @@ import {
   deleteProvider as deleteProviderImpl,
 } from "./host-modules/models-config";
 
+/**
+ * 转发到 harness/remote-invocation.invokeRemoteImpl, 注入当前 state 的 context
+ * + remoteDispatcher + service context.
+ */
+import { invokeRemote as invokeRemoteFn } from "../harness/remote-invocation";
 function invokeRemote(request: unknown): Promise<unknown> {
-  return invokeRemoteImpl({
+  return invokeRemoteFn({
     context: state.context as { get?: (key: string) => unknown } | null,
-    remoteDispatcher: state.remoteDispatcher as unknown as Parameters<typeof invokeRemoteImpl>[0]["remoteDispatcher"],
+    remoteDispatcher: state.remoteDispatcher as unknown as Parameters<typeof invokeRemoteFn>[0]["remoteDispatcher"],
     remoteServiceContext,
     request,
   });
