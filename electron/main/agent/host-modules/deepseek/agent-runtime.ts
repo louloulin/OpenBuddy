@@ -40,6 +40,16 @@ import type { Model } from "@earendil-works/pi-ai";
 
 import type { AgentHostState } from "../_state-shape";
 
+// A-3: module-level lazy logger so listener-fanout failures (and any future
+// warnings in this file) land in the main-process rotating log file rather
+// than vanishing. Created once on first use.
+import { createMainLogger, type MainLogger } from "@openbuddy/logging-main";
+let _logger: MainLogger | null = null;
+function log(): MainLogger {
+  _logger ??= createMainLogger({ serviceName: "openbuddy-deepseek-agent" });
+  return _logger;
+}
+
 /**
  * Phase 8.3 Architectural Refactor: 顶部 from "../../agent-host" 反向依赖消除。
  * 所有运行时依赖通过 installDeepSeekAgentRuntime() 注入。
@@ -329,7 +339,19 @@ async function createDeepSeekAgentRuntime(options: {
   const session = created.session;
   const listeners = new Set<(event: unknown) => void>();
   const unsubscribe = session.subscribe((event: any) => {
-    for (const listener of [...listeners]) listener(event);
+    // A-3: wrap each listener call in try/catch so a single throwing listener
+    // (e.g. renderer-channel send failure) does not break the event chain for
+    // every other listener attached to the same session.
+    for (const listener of [...listeners]) {
+      try {
+        listener(event);
+      } catch (err) {
+        log().warn(
+          { err: err instanceof Error ? { name: err.name, message: err.message } : String(err) },
+          "deepseek session listener threw; continuing with remaining listeners",
+        );
+      }
+    }
   });
   if (options.seed && options.seed.length > 0 && !persisted) {
     session.sessionManager.appendCustomEntry("deepseek/seed", options.seed);
