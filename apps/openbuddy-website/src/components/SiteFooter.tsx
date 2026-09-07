@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Github } from 'lucide-react';
+import { Github, Twitter, Youtube, MessageCircle } from 'lucide-react';
 import type { Dict } from '@/lib/i18n';
 
 interface SiteFooterProps {
@@ -7,10 +7,7 @@ interface SiteFooterProps {
 }
 
 /**
- * SiteFooter —— tutti 风格
- *
- * - 4 列简洁链接
- * - 极简底部条
+ * SiteFooter —— tutti 风格极简版 (跟随 global theme)
  */
 export default function SiteFooter({ dict }: SiteFooterProps) {
   const sections = [
@@ -21,47 +18,68 @@ export default function SiteFooter({ dict }: SiteFooterProps) {
   ];
 
   return (
-    <footer className="mt-32 border-t border-[var(--wb-border)] bg-[var(--wb-bg-soft)]">
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-5 md:gap-12">
-          {/* Brand column */}
-          <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="inline-flex items-center gap-2 text-[var(--wb-fg)]" aria-label="OpenBuddy">
-              <span className="relative inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-md">
-                <span
-                  className="absolute inset-0"
-                  style={ { background: 'linear-gradient(135deg, #13665C 0%, #0C4A48 100%)' } }
-                />
-                <span className="relative text-sm">🐕</span>
-              </span>
-              <span className="font-display-serif text-[18px] tracking-tight">OpenBuddy</span>
-            </Link>
-            <p className="mt-4 max-w-xs text-[13px] leading-relaxed text-[var(--wb-fg-muted)]">
-              { dict.footer.tagline }
-            </p>
-            <a
-              href="https://github.com/louloulin/OpenBuddy"
-              target="_blank"
-              rel="noreferrer"
-              className="mt-5 inline-flex items-center gap-1.5 font-mono text-[12px] text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)]"
-            >
-              <Github className="h-3.5 w-3.5" />
-              <span>louloulin/OpenBuddy</span>
-            </a>
-          </div>
+    <footer className="border-t border-[var(--wb-border)] bg-[var(--wb-bg-soft)]">
+      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
+        {/* 顶部: 大 logo + tagline + 社交 */}
+        <div className="border-b border-[var(--wb-border)] pb-12">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2.5 text-[var(--wb-fg)]"
+            aria-label="OpenBuddy"
+          >
+            <span className="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-md">
+              <span
+                className="absolute inset-0"
+                style={ { background: 'linear-gradient(135deg, #5266E8 0%, #3F4FD8 100%)' } }
+              />
+              <span className="relative text-[14px]">🐕</span>
+            </span>
+            <span className="text-[20px] font-medium tracking-tight">
+              OpenBuddy
+            </span>
+          </Link>
 
-          {/* Link columns */}
+          <p className="mt-6 max-w-md text-body-lg text-[var(--wb-fg-muted)]">
+            { dict.footer.tagline }
+          </p>
+
+          <div className="mt-8 flex items-center gap-4">
+            <SocialLink
+              href="https://github.com/louloulin/OpenBuddy"
+              icon={ Github }
+              label="GitHub"
+            />
+            <SocialLink
+              href="https://x.com/openbuddy"
+              icon={ Twitter }
+              label="X"
+            />
+            <SocialLink
+              href="https://discord.gg/openbuddy"
+              icon={ MessageCircle }
+              label="Discord"
+            />
+            <SocialLink
+              href="https://youtube.com/@openbuddy"
+              icon={ Youtube }
+              label="YouTube"
+            />
+          </div>
+        </div>
+
+        {/* 链接 4 列 */}
+        <div className="grid grid-cols-2 gap-x-8 gap-y-12 py-12 md:grid-cols-4">
           { sections.map((section) => (
             <div key={ section.title }>
-              <h3 className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--wb-fg-faint)]">
+              <h3 className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
                 { section.title }
               </h3>
-              <ul className="mt-4 space-y-2">
+              <ul className="mt-5 space-y-3">
                 { section.links.map((link) => (
                   <li key={ link.href + link.label }>
                     <Link
                       href={ link.href }
-                      className="text-[13px] text-[var(--wb-fg-muted)] transition-colors hover:text-[var(--wb-fg)]"
+                      className="text-[14px] text-[var(--wb-fg-muted)] transition-colors hover:text-[var(--wb-fg)]"
                     >
                       { link.label }
                     </Link>
@@ -72,12 +90,38 @@ export default function SiteFooter({ dict }: SiteFooterProps) {
           )) }
         </div>
 
-        {/* Bottom row */}
-        <div className="mt-12 flex flex-col gap-3 border-t border-[var(--wb-border)] pt-8 md:flex-row md:items-center md:justify-between">
-          <p className="font-mono text-[11px] text-[var(--wb-fg-muted)]">{ dict.footer.copyright }</p>
-          <p className="font-mono text-[11px] text-[var(--wb-fg-faint)]">{ dict.footer.madeWith }</p>
+        {/* 底部版权 */}
+        <div className="flex flex-col gap-3 border-t border-[var(--wb-border)] pt-8 md:flex-row md:items-center md:justify-between">
+          <p className="font-mono text-[11.5px] text-[var(--wb-fg-muted)]">
+            { dict.footer.copyright }
+          </p>
+          <p className="font-mono text-[11.5px] text-[var(--wb-fg-faint)]">
+            { dict.footer.madeWith }
+          </p>
         </div>
       </div>
     </footer>
+  );
+}
+
+function SocialLink({
+  href,
+  icon: Icon,
+  label
+}: {
+  href: string;
+  icon: typeof Github;
+  label: string;
+}) {
+  return (
+    <a
+      href={ href }
+      target="_blank"
+      rel="noreferrer"
+      className="group flex h-9 w-9 items-center justify-center rounded-full border border-[var(--wb-border)] text-[var(--wb-fg-muted)] transition-colors hover:border-[var(--wb-border-strong)] hover:text-[var(--wb-fg)]"
+      aria-label={ label }
+    >
+      <Icon className="h-4 w-4" />
+    </a>
   );
 }

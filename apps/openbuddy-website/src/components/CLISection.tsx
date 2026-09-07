@@ -6,68 +6,64 @@ interface CLISectionProps {
 }
 
 /**
- * CLISection —— tutti 风格 (深色海军面板)
+ * CLISection —— 跟随 global theme (终端框保留深色作为 UI 元素)
  */
 export default function CLISection({ dict }: CLISectionProps) {
   return (
-    <section className="relative bg-[#0A0F1E] py-24 text-white sm:py-32">
+    <section className="relative section-pad">
       <div className="absolute inset-0 -z-10 opacity-15 bg-editor-grid" />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid items-end gap-8 md:grid-cols-[auto_1fr] md:gap-16">
-          <div className="flex flex-col gap-2">
-            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/40">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="grid items-end gap-6 md:grid-cols-[100px_1fr] md:gap-10">
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--wb-fg-faint)]">
+              § 08
+            </span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
               { dict.cli.sectionLabel }
             </span>
-            <span className="font-mono text-[11px] text-white/40">06</span>
           </div>
-          <h2 className="font-display-serif text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-balance text-white">
+          <h2 className="text-display-xl text-[var(--wb-fg)] text-balance">
             { dict.cli.title }
           </h2>
         </div>
+        { dict.cli.subtitle ? (
+          <p className="mt-6 max-w-2xl text-body-lg text-[var(--wb-fg-muted)] text-pretty md:ml-[120px]">
+            { dict.cli.subtitle }
+          </p>
+        ) : null }
 
-        <p className="mt-6 max-w-2xl text-pretty text-[15px] leading-relaxed text-white/60">
-          { dict.cli.subtitle }
-        </p>
-
-        {/* Terminal */}
-        <div className="mt-16 overflow-hidden rounded-lg border border-white/10 bg-[#010409]">
-          <div className="flex items-center gap-2 border-b border-white/10 bg-[#111827] px-4 py-2.5">
+        {/* Terminal 框 —— 作为 UI 元素, 始终深色, 这是真实终端的样式 */}
+        <div className="mt-16 overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[#0A0A0A]">
+          <div className="flex items-center gap-2 border-b border-white/10 bg-[#111113] px-4 py-3">
             <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
             <span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
             <span className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
-            <span className="ml-3 flex items-center gap-1.5 font-mono text-[11px] text-white/40">
+            <span className="ml-3 flex items-center gap-1.5 font-mono text-[11.5px] text-white/65">
               <Terminal className="h-3 w-3" />
               ~/openbuddy — pnpm electron:dev
             </span>
-            <span className="ml-auto flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-white/30">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22C55E] opacity-75" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
-              </span>
-              live
-            </span>
           </div>
 
-          <div className="space-y-6 p-6 font-mono text-[13px]">
+          <div className="space-y-6 p-7 font-mono text-[13px]">
             { dict.cli.commands.map((cmd, idx) => (
-              <div key={ idx } className="space-y-2">
-                <div className="flex items-start gap-2">
+              <div key={ idx } className="space-y-2.5">
+                <div className="flex items-start gap-2.5">
                   <span className="select-none text-[#22C55E]">❯</span>
                   <span className="text-white">{ cmd.prompt }</span>
                 </div>
-                <pre className="ml-5 whitespace-pre-wrap text-[12.5px] leading-relaxed text-white/55">
+                <pre className="ml-6 whitespace-pre-wrap text-[12.5px] leading-relaxed text-white/65">
                   { cmd.response }
                 </pre>
                 { idx < dict.cli.commands.length - 1 ? (
-                  <div className="ml-5 h-px w-12 bg-white/10" />
+                  <div className="ml-6 h-px w-12 bg-white/10" />
                 ) : null }
               </div>
             )) }
 
-            <div className="flex items-center gap-2 pt-2">
+            <div className="flex items-center gap-2.5 pt-2">
               <span className="select-none text-[#22C55E]">❯</span>
-              <span className="inline-block h-3.5 w-2 animate-cursor-blink bg-white" />
+              <span className="inline-block h-4 w-2 animate-cursor-blink bg-white" />
             </div>
           </div>
         </div>

@@ -8,6 +8,7 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import type { Dict } from '@/lib/i18n';
+import { SharedHeader } from './SharedHeader';
 
 interface CapabilitiesSectionProps {
   dict: Dict;
@@ -23,65 +24,61 @@ const ICON_MAP: Record<string, LucideIcon> = {
 };
 
 /**
- * CapabilitiesSection —— tutti 风格重做
+ * CapabilitiesSection —— tutti 严格对标
  *
- * - 不再是 6 张大卡片，而是 6 个 group 列表
- * - 每个 group: 编号 + icon + 名称 + 紧凑的 package 列表
- * - 信息密度高
+ * - cream 背景, 暗/亮交替
+ * - 6 组紧凑卡片
+ * - 更大的间距和字号
  */
 export default function CapabilitiesSection({ dict }: CapabilitiesSectionProps) {
   return (
-    <section id="capabilities" className="relative section-pad">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="grid items-end gap-8 md:grid-cols-[auto_1fr] md:gap-16">
-          <div className="flex flex-col gap-2">
-            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
-              { dict.capabilities.sectionLabel }
-            </span>
-            <span className="font-mono text-[11px] text-[var(--wb-fg-faint)]">05</span>
-          </div>
-          <h2 className="font-display-serif text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-balance text-[var(--wb-fg)]">
-            { dict.capabilities.title }
-          </h2>
-        </div>
+    <section
+      id="capabilities"
+      data-section-theme="cream"
+      className="relative section-pad bg-[var(--wb-bg)]"
+    >
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <SharedHeader
+          number="02"
+          label={ dict.capabilities.sectionLabel }
+          title={ dict.capabilities.title }
+          subtitle={ dict.capabilities.subtitle }
+        />
 
-        <p className="mt-6 max-w-2xl text-pretty text-[15px] leading-relaxed text-[var(--wb-fg-muted)]">
-          { dict.capabilities.subtitle }
-        </p>
-
-        {/* Capability groups — 2-col grid for desktop, single-col mobile */}
-        <div className="mt-16 grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           { dict.capabilities.groups.map((group, idx) => {
             const Icon = ICON_MAP[group.icon] ?? Cpu;
             return (
               <div
                 key={ group.name }
-                className="group flex flex-col gap-4 bg-[var(--wb-bg-pure)] p-6 transition-colors hover:bg-[var(--wb-bg-soft)]"
+                className="group relative rounded-xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-7 transition-all hover:border-[var(--wb-border-strong)] hover:-translate-y-0.5"
               >
-                {/* Group header */}
-                <div className="flex items-center justify-between border-b border-[var(--wb-border)] pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <Icon className="h-4 w-4 text-[var(--wb-fg-faint)]" />
-                    <h3 className="font-display-serif text-[17px] leading-tight text-[var(--wb-fg)]">
+                <div className="flex items-center justify-between border-b border-[var(--wb-border)] pb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--wb-bg-soft)]">
+                      <Icon className="h-4 w-4 text-[var(--wb-fg)]" />
+                    </span>
+                    <h3 className="font-display-serif text-[18px] leading-tight text-[var(--wb-fg)]">
                       { group.name }
                     </h3>
                   </div>
-                  <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">
+                  <span className="font-mono text-[11px] text-[var(--wb-fg-faint)]">
                     { String(group.packages.length).padStart(2, '0') }
                   </span>
                 </div>
 
-                {/* Package list — compact, monospace */}
-                <ul className="space-y-2">
+                <ul className="mt-5 space-y-3">
                   { group.packages.map((pkg) => (
-                    <li key={ pkg.name } className="group/pkg">
-                      <code className="font-mono text-[12px] font-medium text-[var(--wb-fg)] group-hover/pkg:text-[var(--wb-accent)]">
-                        { pkg.name }
-                      </code>
-                      <p className="mt-0.5 text-[12px] leading-snug text-[var(--wb-fg-muted)]">
-                        { pkg.description }
-                      </p>
+                    <li key={ pkg.name } className="flex items-start gap-3">
+                      <span className="mt-2 inline-block h-1 w-1 flex-shrink-0 rounded-full bg-[var(--wb-fg-faint)]" />
+                      <div className="min-w-0">
+                        <code className="font-mono text-[12.5px] font-medium text-[var(--wb-fg)]">
+                          { pkg.name }
+                        </code>
+                        <p className="mt-0.5 text-[13px] leading-snug text-[var(--wb-fg-muted)]">
+                          { pkg.description }
+                        </p>
+                      </div>
                     </li>
                   )) }
                 </ul>
@@ -95,9 +92,10 @@ export default function CapabilitiesSection({ dict }: CapabilitiesSectionProps) 
             href="https://github.com/louloulin/OpenBuddy/tree/main/packages"
             target="_blank"
             rel="noreferrer"
-            className="font-mono text-[13px] text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)]"
+            className="cta-link text-[var(--wb-fg)]"
           >
-            Browse 63 packages on GitHub →
+            <span>Browse 63 packages on GitHub</span>
+            <span className="cta-link-arrow">→</span>
           </a>
         </div>
       </div>

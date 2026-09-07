@@ -2,13 +2,12 @@ import type { Config } from 'tailwindcss';
 import typography from '@tailwindcss/typography';
 
 /**
- * OpenBuddy Website —— Tailwind preset。
+ * OpenBuddy Website —— Tailwind preset (tutti 严格对标版)
  *
- * 设计策略：复用根仓库 `src/styles/tokens.css` 中的 --wb-* 令牌，
- * 将其映射到 Tailwind 的 color/spacing/radius，便于在 Tailwind 类中直接使用。
- *
- * 颜色使用 CSS function 形式 `var(--wb-*)` —— 这样 dark mode 切换时
- * 所有颜色自动跟随 theme 变化，无需 `dark:` 前缀。
+ * 关键变化:
+ * - 字体: Source Serif 4 (display) + Inter (UI) + JetBrains Mono (code)
+ * - 字号: 更大、更紧的 letter-spacing
+ * - 颜色: 全 CSS variable, dark mode 自动适配
  */
 const config: Config = {
   content: ['./src/**/*.{ts,tsx,md,mdx}'],
@@ -37,6 +36,7 @@ const config: Config = {
         // 语义化 surface tokens
         surface: {
           bg: 'var(--wb-bg)',
+          'bg-pure': 'var(--wb-bg-pure)',
           'bg-soft': 'var(--wb-bg-soft)',
           'bg-soft-2': 'var(--wb-bg-soft-2)',
           'bg-tertiary': 'var(--wb-bg-tertiary)',
@@ -90,25 +90,34 @@ const config: Config = {
         mono: ['var(--font-jetbrains)', 'monospace']
       },
       fontSize: {
-        'display-xl': ['clamp(3.5rem, 7vw, 5.5rem)', { lineHeight: '0.95', letterSpacing: '-0.04em', fontWeight: '600' }],
-        'display-lg': ['clamp(2.5rem, 5vw, 4rem)', { lineHeight: '1.0', letterSpacing: '-0.03em', fontWeight: '600' }],
-        'display-md': ['clamp(2rem, 3.5vw, 2.75rem)', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '600' }],
-        'display-sm': ['1.5rem', { lineHeight: '1.2', letterSpacing: '-0.01em', fontWeight: '600' }]
+        // tutti 严格对标的字号阶梯
+        // H1: 51px tutti, 我们提到 56-72px (Hero)
+        // H2: 39px tutti
+        // 正文: 25.8px tutti (大正文, 18px 普通正文)
+        'display-2xl': ['clamp(3.25rem, 6.5vw, 4.75rem)', { lineHeight: '1.02', letterSpacing: '-0.035em', fontWeight: '500' }],
+        'display-xl': ['clamp(2.75rem, 5vw, 3.75rem)', { lineHeight: '1.05', letterSpacing: '-0.03em', fontWeight: '500' }],
+        'display-lg': ['clamp(2rem, 3.5vw, 2.75rem)', { lineHeight: '1.1', letterSpacing: '-0.025em', fontWeight: '500' }],
+        'display-md': ['clamp(1.5rem, 2.5vw, 2rem)', { lineHeight: '1.2', letterSpacing: '-0.02em', fontWeight: '500' }],
+        'display-sm': ['clamp(1.25rem, 1.75vw, 1.5rem)', { lineHeight: '1.3', letterSpacing: '-0.015em', fontWeight: '500' }],
+        // 正文层级 (tutti 25.8px = text-lg-xl)
+        'body-lg': ['1.125rem', { lineHeight: '1.6', letterSpacing: '-0.005em' }],     // 18px
+        'body-xl': ['1.375rem', { lineHeight: '1.55', letterSpacing: '-0.01em' }],      // 22px (tutti 副标)
+        'body-2xl': ['1.625rem', { lineHeight: '1.5', letterSpacing: '-0.015em' }]      // 26px (tutti 副标最大值)
       },
       borderRadius: {
-        'wb-sm': '4px',
-        'wb-md': '8px',
-        'wb-lg': '12px',
-        'wb-xl': '16px'
+        'wb-sm': '6px',
+        'wb-md': '10px',
+        'wb-lg': '14px',
+        'wb-xl': '20px'
       },
       boxShadow: {
-        'wb-card': '0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06)',
-        'wb-card-hover': '0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.06)',
-        'wb-glow-brand': '0 0 0 1px rgba(0, 194, 154, 0.15), 0 8px 24px -8px rgba(0, 194, 154, 0.45)'
+        'wb-card': 'none',
+        'wb-card-hover': 'none',
+        'wb-glow-brand': 'none'
       },
       keyframes: {
         'fade-up': {
-          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '0%': { opacity: '0', transform: 'translateY(12px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' }
         },
         'cursor-blink': {
@@ -125,14 +134,19 @@ const config: Config = {
         },
         'spin-slow': {
           to: { transform: 'rotate(360deg)' }
+        },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' }
         }
       },
       animation: {
-        'fade-up': 'fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'fade-up': 'fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both',
         'cursor-blink': 'cursor-blink 1.1s steps(1) infinite',
         'shimmer': 'shimmer 3s linear infinite',
         'gradient-pan': 'gradient-pan 8s ease infinite',
-        'spin-slow': 'spin-slow 12s linear infinite'
+        'spin-slow': 'spin-slow 12s linear infinite',
+        'fade-in': 'fade-in 0.4s ease-out both'
       }
     }
   },

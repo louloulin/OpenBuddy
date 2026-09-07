@@ -1,6 +1,6 @@
 import { Code2 } from 'lucide-react';
 import type { Dict } from '@/lib/i18n';
-import { SectionHeader } from './FeaturesSection';
+import { SharedHeader } from './SharedHeader';
 
 interface TechStackSectionProps {
   dict: Dict;
@@ -50,13 +50,7 @@ const COPY_ZH = {
 };
 
 /**
- * TechStackSection —— 技术栈展示
- *
- * 设计要点：
- * - 12 个技术卡片，4×3 网格
- * - 每个卡片：技术名 + 一行描述
- * - hover 轻微上浮 + border 变深
- * - 简洁 grid 风格
+ * TechStackSection —— 12 个技术卡片 (cream 背景)
  */
 export default function TechStackSection({ dict }: TechStackSectionProps) {
   const isZh = dict.meta.title.includes('开源');
@@ -64,27 +58,34 @@ export default function TechStackSection({ dict }: TechStackSectionProps) {
   const copy = isZh ? COPY_ZH : COPY_EN;
 
   return (
-    <section className="relative py-24 sm:py-32">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeader
+    <section
+      data-section-theme="cream"
+      className="relative section-pad bg-[var(--wb-bg)]"
+    >
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <SharedHeader
+          number="07"
           label={ copy.badge }
           title={ copy.title }
           subtitle={ copy.subtitle }
         />
 
-        <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          { stack.map((tech) => (
+        <div className="mt-16 grid gap-px overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[var(--wb-border)] sm:grid-cols-2 lg:grid-cols-4">
+          { stack.map((tech, idx) => (
             <article
               key={ tech.name }
-              className="group relative flex flex-col gap-1 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg)] p-4 transition-all hover:-translate-y-0.5 hover:border-[var(--wb-fg-muted)] hover:shadow-wb-card-hover"
+              className="group flex flex-col gap-2 bg-[var(--wb-bg-pure)] p-5 transition-colors hover:bg-[var(--wb-bg-soft)]"
             >
-              <div className="flex items-center gap-2">
-                <Code2 className="h-3.5 w-3.5 text-[var(--wb-fg-muted)]" />
-                <h3 className="font-mono text-[13.5px] font-semibold text-[var(--wb-fg)]">
+              <div className="flex items-center gap-2.5">
+                <span className="font-mono text-[10.5px] text-[var(--wb-fg-faint)]">
+                  { String(idx + 1).padStart(2, '0') }
+                </span>
+                <Code2 className="h-3.5 w-3.5 text-[var(--wb-fg-faint)]" />
+                <h3 className="font-mono text-[13px] font-semibold text-[var(--wb-fg)]">
                   { tech.name }
                 </h3>
               </div>
-              <p className="text-[12px] leading-snug text-[var(--wb-fg-muted)]">
+              <p className="text-[12.5px] leading-snug text-[var(--wb-fg-muted)]">
                 { tech.desc }
               </p>
             </article>

@@ -1,24 +1,41 @@
 import type { Metadata } from 'next';
-import { Check, X, CreditCard, Tag, Sparkles, Building2 } from 'lucide-react';
+import { Check } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
-import SharedHeader from '@/components/SharedHeader';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import Link from 'next/link';
-import RevealOnScroll from '@/components/RevealOnScroll';
-import BackToTop from '@/components/BackToTop';
-import FAQSection from '@/components/FAQSection';
 
 export const metadata: Metadata = {
   title: 'Pricing',
   description:
-    'OpenBuddy is free, MIT-licensed, forever. Pro is a convenience for power users. Enterprise is self-hosted with SLAs.'
+    'OpenBuddy is free, MIT-licensed, forever. Enterprise is self-hosted with SLAs.'
 };
-
-const TIER_ICONS = [Tag, Sparkles, Building2];
 
 export function PricingView({ locale }: { locale: Locale }) {
   const dict = getDictionary(locale);
+
+  const tiers = [
+    {
+      name: dict.pricing.tiers[0]?.name ?? 'Community',
+      price: '$0',
+      cadence: dict.pricing.tiers[0]?.cadence ?? 'forever',
+      description: dict.pricing.tiers[0]?.description ?? '',
+      features: dict.pricing.tiers[0]?.features ?? [],
+      cta: dict.pricing.tiers[0]?.cta ?? 'Download',
+      href: dict.pricing.tiers[0]?.href ?? '/download',
+      popular: false
+    },
+    {
+      name: dict.pricing.tiers[2]?.name ?? 'Enterprise',
+      price: dict.pricing.tiers[2]?.price ?? 'Custom',
+      cadence: dict.pricing.tiers[2]?.cadence ?? 'self-hosted',
+      description: dict.pricing.tiers[2]?.description ?? '',
+      features: dict.pricing.tiers[2]?.features ?? [],
+      cta: dict.pricing.tiers[2]?.cta ?? 'Contact',
+      href: dict.pricing.tiers[2]?.href ?? 'mailto:business@openbuddy.dev',
+      popular: true
+    }
+  ];
 
   return (
     <>
@@ -26,106 +43,117 @@ export function PricingView({ locale }: { locale: Locale }) {
       <main id="main-content" className="pt-12">
         <section className="relative section-pad">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <SharedHeader
-              label="Pricing"
-              number="01"
-              title={ dict.pricing.title }
-              subtitle={ dict.pricing.subtitle }
-            />
-            <p className="-mt-12 mb-12 font-mono text-[12px] text-[var(--wb-fg-faint)]">{ dict.pricing.note }</p>
+            <header className="grid items-end gap-6 md:grid-cols-[100px_1fr] md:gap-10">
+              <div className="flex flex-col gap-1">
+                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--wb-fg-faint)]">
+                  § 01
+                </span>
+                <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
+                  Pricing
+                </span>
+              </div>
+              <h1 className="text-display-xl text-[var(--wb-fg)] text-balance">
+                { dict.pricing.title }
+              </h1>
+            </header>
+            <p className="mt-6 max-w-2xl text-body-lg text-[var(--wb-fg-muted)] text-pretty md:ml-[120px]">
+              { dict.pricing.subtitle }
+            </p>
+            <p className="mt-3 max-w-2xl font-mono text-[12px] text-[var(--wb-fg-faint)] md:ml-[120px]">
+              { dict.pricing.note }
+            </p>
 
-            {/* Tier grid — list style */}
-            <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-3">
-              { dict.pricing.tiers.map((tier, idx) => {
-                const Icon = TIER_ICONS[idx] ?? Tag;
-                const accent = tier.popular ? 'var(--wb-accent)' : 'var(--wb-fg-faint)';
-                return (
-                  <RevealOnScroll key={ tier.name } delay={ idx * 100 }>
-                    <article className="group relative flex h-full flex-col gap-4 bg-[var(--wb-bg-pure)] p-7 transition-colors hover:bg-[var(--wb-bg-soft)]">
-                      { tier.popular ? (
-                        <span className="absolute right-4 top-4 rounded-full bg-[var(--wb-accent)] px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-white">
-                          popular
-                        </span>
-                      ) : null }
+            {/* 2 tier — tutti 极简风格 */}
+            <div className="mt-16 grid gap-6 md:grid-cols-2">
+              { tiers.map((tier) => (
+                <article
+                  key={ tier.name }
+                  className={ `group relative flex flex-col gap-6 rounded-xl p-8 transition-all hover:-translate-y-0.5 ${
+                    tier.popular
+                      ? 'border border-[var(--wb-accent)]/30 bg-[var(--wb-bg-pure)] shadow-[0_0_0_4px_rgba(82,102,232,0.08)]'
+                      : 'border border-[var(--wb-border)] bg-[var(--wb-bg-pure)]'
+                  }` }
+                >
+                  { tier.popular ? (
+                    <span className="absolute right-6 top-6 rounded-full bg-[var(--wb-accent)] px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white">
+                      for teams
+                    </span>
+                  ) : null }
 
-                      {/* Header */}
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">
-                          { String(idx + 1).padStart(2, '0') }
-                        </span>
-                        <Icon className="h-4 w-4" style={ { color: accent } } />
-                        <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-[var(--wb-fg)]">
-                          { tier.name }
-                        </span>
-                      </div>
+                  <div>
+                    <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-[var(--wb-fg-muted)]">
+                      { tier.name }
+                    </span>
+                    <div className="mt-3 flex items-baseline gap-1">
+                      <span className="font-display-serif text-[56px] leading-none tracking-tight text-[var(--wb-fg)]">
+                        { tier.price }
+                      </span>
+                      <span className="ml-1 font-mono text-[12px] text-[var(--wb-fg-muted)]">
+                        / { tier.cadence }
+                      </span>
+                    </div>
+                    <p className="mt-3 text-[14px] leading-relaxed text-[var(--wb-fg-muted)]">
+                      { tier.description }
+                    </p>
+                  </div>
 
-                      {/* Price — serif */}
-                      <div className="mt-3 flex items-baseline gap-1">
-                        <span className="font-display-serif text-[44px] leading-none tracking-tight text-[var(--wb-fg)] sm:text-[52px]">
-                          { tier.price }
-                        </span>
-                        <span className="ml-1 font-mono text-[11px] text-[var(--wb-fg-muted)]">
-                          / { tier.cadence }
-                        </span>
-                      </div>
-
-                      {/* Description */}
-                      <p className="text-[13.5px] leading-relaxed text-[var(--wb-fg-muted)]">
-                        { tier.description }
-                      </p>
-
-                      {/* Features */}
-                      <ul className="mt-4 flex-1 space-y-2.5 border-t border-[var(--wb-border)] pt-5">
-                        { tier.features.map((feature) => (
-                          <li
-                            key={ feature }
-                            className="flex items-start gap-2 text-[13px] leading-snug text-[var(--wb-fg-muted)]"
-                          >
-                            <Check className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--wb-working)]" />
-                            <span>{ feature }</span>
-                          </li>
-                        )) }
-                      </ul>
-
-                      {/* CTA */}
-                      <Link
-                        href={ tier.href }
-                        target={ tier.href.startsWith('http') || tier.href.startsWith('mailto') ? '_blank' : undefined }
-                        rel={ tier.href.startsWith('http') ? 'noreferrer' : undefined }
-                        className={ `mt-6 inline-flex items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-[13.5px] font-semibold transition-colors ${
-                          tier.popular
-                            ? 'bg-[var(--wb-accent)] text-white hover:bg-[var(--wb-accent-hover)]'
-                            : 'border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] text-[var(--wb-fg)] hover:bg-[var(--wb-bg-soft)]'
-                        }` }
+                  <ul className="flex-1 space-y-3 border-t border-[var(--wb-border)] pt-6">
+                    { tier.features.map((feature) => (
+                      <li
+                        key={ feature }
+                        className="flex items-start gap-3 text-[14px] leading-snug text-[var(--wb-fg-muted)]"
                       >
-                        <span>{ tier.cta }</span>
-                        { !tier.href.startsWith('mailto') ? <span aria-hidden="true">→</span> : null }
-                      </Link>
-                    </article>
-                  </RevealOnScroll>
-                );
-              }) }
+                        <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--wb-working)]" />
+                        <span>{ feature }</span>
+                      </li>
+                    )) }
+                  </ul>
+
+                  <Link
+                    href={ tier.href }
+                    target={ tier.href.startsWith('http') || tier.href.startsWith('mailto') ? '_blank' : undefined }
+                    rel={ tier.href.startsWith('http') ? 'noreferrer' : undefined }
+                    className={ `cta-link text-[15px] ${
+                      tier.popular
+                        ? 'text-[var(--wb-accent)]'
+                        : 'text-[var(--wb-fg)]'
+                    }` }
+                  >
+                    <span>{ tier.cta }</span>
+                    <span className="cta-link-arrow">→</span>
+                  </Link>
+                </article>
+              )) }
             </div>
 
             {/* Compare table */}
-            <div className="mt-20">
-              <SharedHeader
-                label="Compare"
-                number="02"
-                title={ dict.pricing.compareTitle }
-                subtitle={ dict.pricing.compareSubtitle }
-              />
+            <div className="mt-24">
+              <header className="grid items-end gap-6 md:grid-cols-[100px_1fr] md:gap-10">
+                <div className="flex flex-col gap-1">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--wb-fg-faint)]">
+                    § 02
+                  </span>
+                  <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
+                    Compare
+                  </span>
+                </div>
+                <h2 className="text-display-lg text-[var(--wb-fg)] text-balance">
+                  { dict.pricing.compareTitle }
+                </h2>
+              </header>
+              <p className="mt-6 max-w-2xl text-body-lg text-[var(--wb-fg-muted)] text-pretty md:ml-[120px]">
+                { dict.pricing.compareSubtitle }
+              </p>
 
-              <div className="overflow-x-auto rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)]">
-                <table className="w-full text-left text-[13px]">
+              <div className="mt-12 overflow-x-auto rounded-xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)]">
+                <table className="w-full text-left text-[14px]">
                   <thead>
                     <tr className="border-b border-[var(--wb-border)] bg-[var(--wb-bg-soft)]">
-                      <th className="px-4 py-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--wb-fg-faint)] sm:px-6">
+                      <th className="px-6 py-4 font-mono text-[11px] font-medium uppercase tracking-wider text-[var(--wb-fg-faint)]">
                         { locale === 'zh-CN' ? '功能' : 'Feature' }
                       </th>
-                      <th className="px-4 py-3 text-center font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--wb-fg-faint)] sm:px-6">Community</th>
-                      <th className="px-4 py-3 text-center font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--wb-fg-faint)] sm:px-6">Pro</th>
-                      <th className="px-4 py-3 text-center font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--wb-fg-faint)] sm:px-6">Enterprise</th>
+                      <th className="px-6 py-4 text-center font-mono text-[11px] font-medium uppercase tracking-wider text-[var(--wb-fg-faint)]">Community</th>
+                      <th className="px-6 py-4 text-center font-mono text-[11px] font-medium uppercase tracking-wider text-[var(--wb-fg-faint)]">Enterprise</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -134,18 +162,21 @@ export function PricingView({ locale }: { locale: Locale }) {
                         key={ row.feature }
                         className="border-b border-[var(--wb-border)] last:border-b-0"
                       >
-                        <td className="px-4 py-3 font-medium text-[var(--wb-fg)] sm:px-6">{ row.feature }</td>
-                        { [row.community, row.pro, row.enterprise].map((v, i) => (
-                          <td key={ i } className="px-4 py-3 text-center text-[var(--wb-fg-muted)] sm:px-6">
-                            { v === '✓' ? (
-                              <Check className="mx-auto h-3.5 w-3.5 text-[var(--wb-working)]" />
-                            ) : v === '—' || v === '-' ? (
-                              <X className="mx-auto h-3 w-3 text-[var(--wb-fg-faint)]" />
-                            ) : (
-                              <span className="font-mono text-[11.5px]">{ v }</span>
-                            ) }
-                          </td>
-                        )) }
+                        <td className="px-6 py-3.5 font-medium text-[var(--wb-fg)]">{ row.feature }</td>
+                        <td className="px-6 py-3.5 text-center text-[var(--wb-fg-muted)]">
+                          { row.community === '✓' ? (
+                            <Check className="mx-auto h-4 w-4 text-[var(--wb-working)]" />
+                          ) : (
+                            <span className="font-mono text-[12px]">{ row.community }</span>
+                          ) }
+                        </td>
+                        <td className="px-6 py-3.5 text-center text-[var(--wb-fg-muted)]">
+                          { row.enterprise === '✓' ? (
+                            <Check className="mx-auto h-4 w-4 text-[var(--wb-working)]" />
+                          ) : (
+                            <span className="font-mono text-[12px]">{ row.enterprise }</span>
+                          ) }
+                        </td>
                       </tr>
                     )) }
                   </tbody>
@@ -154,26 +185,59 @@ export function PricingView({ locale }: { locale: Locale }) {
             </div>
 
             {/* Pricing FAQ */}
-            <div className="mt-20">
-              <FAQSection
-                dict={ { ...dict, faq: { ...dict.faq, sectionLabel: dict.pricing.faqTitle, title: dict.pricing.faqTitle, subtitle: '', items: dict.pricing.faq } } }
-              />
+            <div className="mt-24">
+              <header className="grid items-end gap-6 md:grid-cols-[100px_1fr] md:gap-10">
+                <div className="flex flex-col gap-1">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--wb-fg-faint)]">
+                    § 03
+                  </span>
+                  <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
+                    FAQ
+                  </span>
+                </div>
+                <h2 className="text-display-lg text-[var(--wb-fg)] text-balance">
+                  { dict.pricing.faqTitle }
+                </h2>
+              </header>
+
+              <div className="mt-12 space-y-px overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[var(--wb-border)]">
+                { dict.pricing.faq.map((item, idx) => (
+                  <details
+                    key={ item.q }
+                    className="group bg-[var(--wb-bg-pure)]"
+                    { ...(idx === 0 ? { open: true } : {}) }
+                  >
+                    <summary className="flex w-full cursor-pointer items-center gap-5 px-6 py-5 text-left transition-colors hover:bg-[var(--wb-bg-soft)]">
+                      <span className="font-mono text-[11px] font-medium text-[var(--wb-fg-faint)]">
+                        { String(idx + 1).padStart(2, '0') }
+                      </span>
+                      <span className="flex-1 text-[15.5px] font-medium text-[var(--wb-fg)]">
+                        { item.q }
+                      </span>
+                      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-[var(--wb-border)] text-[var(--wb-fg-muted)] transition-colors group-open:border-[var(--wb-accent)] group-open:bg-[var(--wb-accent)] group-open:text-white">
+                        <span className="block text-[18px] leading-none">+</span>
+                      </span>
+                    </summary>
+                    <p className="px-6 pb-5 pl-16 text-[14px] leading-relaxed text-[var(--wb-fg-muted)]">
+                      { item.a }
+                    </p>
+                  </details>
+                )) }
+              </div>
             </div>
 
-            {/* Back link */}
-            <div className="mt-12 text-center">
+            <div className="mt-16 text-center">
               <Link
                 href={ locale === 'zh-CN' ? '/zh-CN' : '/' }
-                className="inline-flex items-center gap-2 text-[13px] text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)]"
+                className="cta-link text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)] text-[14px]"
               >
-                ← { locale === 'zh-CN' ? '返回首页' : 'Back to home' }
+                <span>← { locale === 'zh-CN' ? '返回首页' : 'Back to home' }</span>
               </Link>
             </div>
           </div>
         </section>
       </main>
       <SiteFooter dict={ dict } />
-      <BackToTop />
     </>
   );
 }

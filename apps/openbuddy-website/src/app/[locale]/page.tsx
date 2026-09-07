@@ -17,7 +17,8 @@ import SiteFooter from '@/components/SiteFooter';
 import { locales, getDictionary, type Locale } from '@/lib/i18n';
 
 /**
- * /[locale] —— 国际化首页
+ * /[locale] —— 国际化首页 (tutti 严格对标版)
+ *
  * 根 `/` 是英文版；`/zh-CN` 是中文版
  */
 export function generateStaticParams() {
@@ -51,11 +52,11 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
       <main id="main-content">
         <Hero dict={ dict } locale={ locale as Locale } />
         <ShowcaseSection dict={ dict } />
+        <CapabilitiesSection dict={ dict } />
         <FeaturesSection dict={ dict } />
+        <ComparisonSection dict={ dict } />
         <ArchitectureSection dict={ dict } />
         <StatsSection dict={ dict } />
-        <ComparisonSection dict={ dict } />
-        <CapabilitiesSection dict={ dict } />
         <TechStackSection dict={ dict } />
         <CLISection dict={ dict } />
         <TestimonialsSection dict={ dict } />

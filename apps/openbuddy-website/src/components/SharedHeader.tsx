@@ -1,36 +1,47 @@
 /**
- * SharedHeader —— 各 page 顶部 header (tutti 风格)
+ * SharedHeader —— tutti 严格对标版
  *
- * - monospace label + 编号
- * - 大字 serif 标题
- * - 紧凑副标
+ * 关键变化 (vs 旧版):
+ * - 移除角落大背景编号 (tutti 没有这个装饰)
+ * - 标题用 display-xl (tutti 39px), letter-spacing -0.025em
+ * - 副标更大 (18px), 间距更宽
  */
 interface SharedHeaderProps {
   label: string;
   number: string;
   title: string;
   subtitle?: string;
-  align?: 'left' | 'center';
 }
 
-export default function SharedHeader({ label, number, title, subtitle, align = 'left' }: SharedHeaderProps) {
+export function SharedHeader({
+  label,
+  number,
+  title,
+  subtitle
+}: SharedHeaderProps) {
   return (
-    <header className={ `mb-16 ${align === 'center' ? 'text-center' : ''}` }>
-      <div className={ `flex items-center gap-3 ${align === 'center' ? 'justify-center' : ''}` }>
-        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
-          { label }
-        </span>
-        <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">·</span>
-        <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">{ number }</span>
+    <header className="relative">
+      <div className="grid items-end gap-6 md:grid-cols-[100px_1fr] md:gap-10">
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--wb-fg-faint)]">
+            § { number }
+          </span>
+          <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
+            { label }
+          </span>
+        </div>
+        <h2 className="text-display-xl text-[var(--wb-fg)] text-balance">
+          { title }
+        </h2>
       </div>
-      <h1 className="mt-4 font-display-serif text-[clamp(2.25rem,5vw,3.5rem)] leading-[1.05] text-balance text-[var(--wb-fg)]">
-        { title }
-      </h1>
+
       { subtitle ? (
-        <p className={ `mt-5 max-w-2xl text-pretty text-[15px] leading-relaxed text-[var(--wb-fg-muted)] ${align === 'center' ? 'mx-auto' : ''}` }>
+        <p className="mt-6 max-w-2xl text-body-lg text-[var(--wb-fg-muted)] text-pretty md:ml-[120px]">
           { subtitle }
         </p>
       ) : null }
     </header>
   );
 }
+
+export default SharedHeader;

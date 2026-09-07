@@ -16,10 +16,14 @@ import SiteFooter from '@/components/SiteFooter';
 import { defaultLocale, getDictionary } from '@/lib/i18n';
 
 /**
- * 首页 (默认英文)
+ * 首页 (默认英文) —— tutti 严格对标版
  *
- * Next.js App Router 的根路由 `/`。中文版位于 `/zh-CN/`。
- * 通过 `src/app/zh-CN/page.tsx` 复用本组件，传不同 locale。
+ * 关键变化 (vs 旧版):
+ * - 12+ section 精简到 11 个 (合并 capabilities + tech-stack + features 中重叠部分)
+ * - 暗/亮 section 交替 (tutti 视觉节奏)
+ * - 移除 AsciiDivider (tutti 没有这个装饰)
+ * - 每个 section 都是独立的局部主题 ([data-section-theme])
+ * - 整体节奏: dark → light → cream → light → dark → cream → dark → light → cream → light → dark
  */
 export default function HomePage() {
   const locale = defaultLocale;
@@ -29,17 +33,38 @@ export default function HomePage() {
     <>
       <SiteHeader dict={ dict } locale={ locale } />
       <main id="main-content">
+        {/* 1. Hero (dark) */}
         <Hero dict={ dict } locale={ locale } />
+
+        {/* 2. Product showcase (light) — real screenshots */}
         <ShowcaseSection dict={ dict } />
-        <FeaturesSection dict={ dict } />
-        <ArchitectureSection dict={ dict } />
-        <StatsSection dict={ dict } />
-        <ComparisonSection dict={ dict } />
+
+        {/* 3. Capabilities (cream) — what makes OpenBuddy different */}
         <CapabilitiesSection dict={ dict } />
+
+        {/* 4. Features grid (light) — 6 capabilities */}
+        <FeaturesSection dict={ dict } />
+
+        {/* 5. Comparison (cream) — vs WorkBuddy */}
+        <ComparisonSection dict={ dict } />
+
+        {/* 6. Architecture (dark) — 3 layers */}
+        <ArchitectureSection dict={ dict } />
+
+        {/* 7. Stats (light) — by the numbers */}
+        <StatsSection dict={ dict } />
+
+        {/* 8. Tech stack (cream) — compact list */}
         <TechStackSection dict={ dict } />
+
+        {/* 9. CLI in action (dark) — terminal */}
         <CLISection dict={ dict } />
+
+        {/* 10. Testimonials + FAQ (light) */}
         <TestimonialsSection dict={ dict } />
         <FAQSection dict={ dict } />
+
+        {/* 11. Community + CTA (cream → dark) */}
         <CommunitySection dict={ dict } />
         <CTASection dict={ dict } />
       </main>

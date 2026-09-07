@@ -1,76 +1,101 @@
 import { Check, X, Minus } from 'lucide-react';
 import type { Dict } from '@/lib/i18n';
+import { SharedHeader } from './SharedHeader';
 
 interface ComparisonSectionProps {
   dict: Dict;
 }
 
 /**
- * ComparisonSection —— tutti 风格重做
+ * ComparisonSection —— tutti 严格对标版
  *
- * - 单列行，每行: capability 名称 + OpenBuddy 状态 + WorkBuddy 状态
- * - 状态色: ✓=绿, ✗=红, 空=灰
- * - 简洁边框
- * - 更紧凑、信息密度高
+ * 关键变化 (vs 旧版):
+ * - 双栏 side-by-side 大字对比 (tutti 风格)
+ * - 不再使用繁复的 table 布局
+ * - 用 serif 突出关键比较点
+ * - cream 背景, 暗/亮交替
  */
 export default function ComparisonSection({ dict }: ComparisonSectionProps) {
   return (
-    <section id="comparison" className="relative section-pad">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="grid items-end gap-8 md:grid-cols-[auto_1fr] md:gap-16">
-          <div className="flex flex-col gap-2">
-            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
-              { dict.comparison.sectionLabel }
-            </span>
-            <span className="font-mono text-[11px] text-[var(--wb-fg-faint)]">04</span>
+    <section
+      id="comparison"
+      data-section-theme="cream"
+      className="relative section-pad bg-[var(--wb-bg)]"
+    >
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <SharedHeader
+          number="04"
+          label={ dict.comparison.sectionLabel }
+          title={ dict.comparison.title }
+          subtitle={ dict.comparison.subtitle }
+        />
+
+        {/* 双栏大字对比 */}
+        <div className="mt-16 grid gap-8 lg:grid-cols-2">
+          {/* OpenBuddy 栏 */}
+          <div className="rounded-xl border border-[var(--wb-accent)]/20 bg-[var(--wb-bg-pure)] p-8">
+            <div className="flex items-center gap-3 border-b border-[var(--wb-border)] pb-5">
+              <span className="flex h-3 w-3 rounded-full bg-[var(--wb-accent)]" />
+              <h3 className="font-display-serif text-[28px] leading-tight text-[var(--wb-fg)]">
+                { dict.comparison.openbuddyLabel }
+              </h3>
+              <span className="ml-auto rounded-full bg-[var(--wb-accent)]/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-[var(--wb-accent)]">
+                100% MIT
+              </span>
+            </div>
+            <ul className="mt-6 space-y-4">
+              { dict.comparison.rows.map((row) => (
+                <li key={ row.capability } className="flex items-start gap-3">
+                  <Check className="mt-1 h-4 w-4 flex-shrink-0 text-[var(--wb-working)]" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-mono text-[12px] uppercase tracking-wider text-[var(--wb-fg-faint)]">
+                      { row.capability }
+                    </div>
+                    <div className="mt-1 text-[14.5px] leading-snug text-[var(--wb-fg)]">
+                      { stripMarker(row.openbuddy) }
+                    </div>
+                  </div>
+                </li>
+              )) }
+            </ul>
           </div>
-          <h2 className="font-display-serif text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-balance text-[var(--wb-fg)]">
-            { dict.comparison.title }
-          </h2>
+
+          {/* WorkBuddy 栏 */}
+          <div className="rounded-xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-8 opacity-90">
+            <div className="flex items-center gap-3 border-b border-[var(--wb-border)] pb-5">
+              <span className="flex h-3 w-3 rounded-full bg-[var(--wb-idle)]" />
+              <h3 className="font-display-serif text-[28px] leading-tight text-[var(--wb-fg-muted)]">
+                { dict.comparison.workbuddyLabel }
+              </h3>
+              <span className="ml-auto rounded-full bg-[var(--wb-bg-soft)] px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-[var(--wb-fg-muted)]">
+                proprietary
+              </span>
+            </div>
+            <ul className="mt-6 space-y-4">
+              { dict.comparison.rows.map((row) => (
+                <li key={ row.capability } className="flex items-start gap-3">
+                  { row.advantage === 'workbuddy' ? (
+                    <Check className="mt-1 h-4 w-4 flex-shrink-0 text-[var(--wb-fg-muted)]" />
+                  ) : row.advantage === 'tie' ? (
+                    <Minus className="mt-1 h-4 w-4 flex-shrink-0 text-[var(--wb-fg-faint)]" />
+                  ) : (
+                    <X className="mt-1 h-4 w-4 flex-shrink-0 text-[var(--wb-blocked)]" />
+                  ) }
+                  <div className="flex-1 min-w-0">
+                    <div className="font-mono text-[12px] uppercase tracking-wider text-[var(--wb-fg-faint)]">
+                      { row.capability }
+                    </div>
+                    <div className="mt-1 text-[14.5px] leading-snug text-[var(--wb-fg-muted)]">
+                      { stripMarker(row.workbuddy) }
+                    </div>
+                  </div>
+                </li>
+              )) }
+            </ul>
+          </div>
         </div>
 
-        <p className="mt-6 max-w-2xl text-pretty text-[15px] leading-relaxed text-[var(--wb-fg-muted)]">
-          { dict.comparison.subtitle }
-        </p>
-
-        {/* Compare table — clean & readable */}
-        <div className="mt-16 overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)]">
-          {/* Header row */}
-          <div className="grid grid-cols-[1.5fr_1fr_1fr] gap-4 border-b border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-5 py-3 text-[11px] font-mono uppercase tracking-wider text-[var(--wb-fg-faint)] sm:grid-cols-[2fr_1.5fr_1.5fr]">
-            <div>Capability</div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--wb-working)]" />
-              <span className="text-[var(--wb-fg)]">{ dict.comparison.openbuddyLabel }</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--wb-idle)]" />
-              <span>{ dict.comparison.workbuddyLabel }</span>
-            </div>
-          </div>
-
-          {/* Body */}
-          { dict.comparison.rows.map((row, idx) => {
-            const isWin = row.advantage === 'openbuddy';
-            const isTie = row.advantage === 'tie';
-            return (
-              <div
-                key={ row.capability }
-                className={ `grid grid-cols-[1.5fr_1fr_1fr] gap-4 border-b border-[var(--wb-border)] px-5 py-3.5 text-[13px] last:border-b-0 sm:grid-cols-[2fr_1.5fr_1.5fr] ${
-                  isWin ? 'bg-[var(--wb-working-soft)]/40' : ''
-                }` }
-              >
-                <div className="font-medium text-[var(--wb-fg)]">
-                  { row.capability }
-                </div>
-                <Cell value={ row.openbuddy } highlight isTie={ isTie } />
-                <Cell value={ row.workbuddy } muted isTie={ isTie } />
-              </div>
-            );
-          }) }
-        </div>
-
-        <p className="mt-6 text-center text-[12px] text-[var(--wb-fg-muted)]">
+        <p className="mt-12 text-center text-[13px] text-[var(--wb-fg-muted)]">
           Only rows we can publicly substantiate.{ ' ' }
           <a
             href="https://github.com/louloulin/OpenBuddy/blob/main/docs/workbuddy-parity-matrix.md"
@@ -86,38 +111,7 @@ export default function ComparisonSection({ dict }: ComparisonSectionProps) {
   );
 }
 
-function Cell({
-  value,
-  highlight = false,
-  muted = false,
-  isTie = false
-}: {
-  value: string;
-  highlight?: boolean;
-  muted?: boolean;
-  isTie?: boolean;
-}) {
-  const isYes = value.startsWith('✓') || value === '✓';
-  const isNo = value.startsWith('✗') || value === '✗';
-
-  return (
-    <div
-      className={ `flex items-center gap-2 ${
-        highlight ? 'text-[var(--wb-fg)]' : muted ? 'text-[var(--wb-fg-muted)]' : 'text-[var(--wb-fg)]'
-      } ${isTie ? 'italic' : ''}` }
-    >
-      { isYes ? (
-        <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-[var(--wb-working)] text-white">
-          <Check className="h-2.5 w-2.5" />
-        </span>
-      ) : isNo ? (
-        <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-[var(--wb-blocked)] text-white">
-          <X className="h-2.5 w-2.5" />
-        </span>
-      ) : (
-        <span className="h-4 w-4 flex-shrink-0" />
-      ) }
-      <span className="text-balance">{ value }</span>
-    </div>
-  );
+function stripMarker(value: string): string {
+  // 移除前缀的 ✓ / ✗ 符号 (用于 visual icon)
+  return value.replace(/^[✓✗]\s*/, '').trim();
 }

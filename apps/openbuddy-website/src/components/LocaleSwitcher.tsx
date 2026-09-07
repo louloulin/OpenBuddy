@@ -71,7 +71,8 @@ export default function LocaleSwitcher() {
         aria-expanded={ open }
         aria-label="Select language"
         onClick={ () => setOpenState(!open) }
-        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium text-[var(--wb-fg-muted)] transition-colors hover:bg-[var(--wb-bg-soft-2)] hover:text-[var(--wb-fg)]"
+        style={ { color: 'inherit' } }
+        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium transition-colors hover:bg-current/10"
       >
         <Globe className="h-3.5 w-3.5" />
         <span className="font-mono text-[11px] uppercase">{ localeFlags[currentLocale] }</span>

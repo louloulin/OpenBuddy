@@ -1,43 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Check } from 'lucide-react';
+import { Plus, Minus } from 'lucide-react';
 import type { Dict } from '@/lib/i18n';
+import { SharedHeader } from './SharedHeader';
 
 interface FAQSectionProps {
   dict: Dict;
 }
 
 /**
- * FAQSection —— tutti 风格
- *
- * - accordion (一次只展开一个)
- * - 编号 + 简洁答案
- * - 状态色 ✓ (绿) 标记
+ * FAQSection —— accordion 列表 (tutti 严格对标)
  */
 export default function FAQSection({ dict }: FAQSectionProps) {
   const [openIdx, setOpenIdx] = useState<number | null>(0);
 
   return (
-    <section className="relative section-pad">
+    <section data-section-theme="light" className="relative section-pad bg-[var(--wb-bg)]">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-        <div className="grid items-end gap-8 md:grid-cols-[auto_1fr] md:gap-16">
-          <div className="flex flex-col gap-2">
-            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
-              { dict.faq.sectionLabel }
-            </span>
-            <span className="font-mono text-[11px] text-[var(--wb-fg-faint)]">08</span>
-          </div>
-          <h2 className="font-display-serif text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-balance text-[var(--wb-fg)]">
-            { dict.faq.title }
-          </h2>
-        </div>
+        <SharedHeader
+          label={ dict.faq.sectionLabel }
+          number="10"
+          title={ dict.faq.title }
+          subtitle={ dict.faq.subtitle }
+        />
 
-        <p className="mt-6 max-w-2xl text-pretty text-[15px] leading-relaxed text-[var(--wb-fg-muted)]">
-          { dict.faq.subtitle }
-        </p>
-
-        <div className="mt-12 space-y-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)]">
+        <div className="mt-12 space-y-px overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[var(--wb-border)]">
           { dict.faq.items.map((item, idx) => {
             const isOpen = openIdx === idx;
             return (
@@ -46,22 +34,22 @@ export default function FAQSection({ dict }: FAQSectionProps) {
                   type="button"
                   onClick={ () => setOpenIdx(isOpen ? null : idx) }
                   aria-expanded={ isOpen }
-                  className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-[var(--wb-bg-soft)]"
+                  className="flex w-full items-center gap-5 px-6 py-5 text-left transition-colors hover:bg-[var(--wb-bg-soft)]"
                 >
                   <span className="font-mono text-[11px] font-medium text-[var(--wb-fg-faint)]">
                     { String(idx + 1).padStart(2, '0') }
                   </span>
-                  <span className="flex-1 text-[15px] font-semibold text-[var(--wb-fg)]">
+                  <span className="flex-1 text-[15.5px] font-medium text-[var(--wb-fg)]">
                     { item.q }
                   </span>
                   <span
-                    className={ `flex h-6 w-6 flex-shrink-0 items-center justify-center rounded transition-all ${
+                    className={ `flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                       isOpen
-                        ? 'bg-[var(--wb-accent)] text-white'
-                        : 'border border-[var(--wb-border)] text-[var(--wb-fg-faint)]'
+                        ? 'border-[var(--wb-accent)] bg-[var(--wb-accent)] text-white'
+                        : 'border-[var(--wb-border)] text-[var(--wb-fg-muted)]'
                     }` }
                   >
-                    { isOpen ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" /> }
+                    { isOpen ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" /> }
                   </span>
                 </button>
                 <div
@@ -70,7 +58,7 @@ export default function FAQSection({ dict }: FAQSectionProps) {
                   }` }
                 >
                   <div className="min-h-0">
-                    <p className="px-5 pb-5 pl-12 text-[13.5px] leading-relaxed text-[var(--wb-fg-muted)]">
+                    <p className="px-6 pb-5 pl-16 text-[14px] leading-relaxed text-[var(--wb-fg-muted)]">
                       { item.a }
                     </p>
                   </div>
