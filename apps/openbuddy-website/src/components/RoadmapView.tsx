@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
-import { CheckCircle2, Circle, ArrowRight, MapIcon } from 'lucide-react';
+import { CheckCircle2, ArrowRight, MapIcon } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
+import SharedHeader from '@/components/SharedHeader';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import Link from 'next/link';
 import RevealOnScroll from '@/components/RevealOnScroll';
@@ -12,28 +13,10 @@ export const metadata: Metadata = {
   description: 'What OpenBuddy has shipped, what is in progress, and what is up next.'
 };
 
-const STATUS_STYLES = {
-  shipped: {
-    bg: 'bg-brand-2',
-    border: 'border-brand-3',
-    text: 'text-brand-9',
-    icon: CheckCircle2,
-    label: 'Done'
-  },
-  inProgress: {
-    bg: 'bg-amber-2',
-    border: 'border-amber-3',
-    text: 'text-amber-9',
-    icon: Circle,
-    label: 'WIP'
-  },
-  next: {
-    bg: 'bg-sky-2',
-    border: 'border-sky-3',
-    text: 'text-sky-9',
-    icon: ArrowRight,
-    label: 'Next'
-  }
+const STATUS = {
+  shipped: { dot: 'var(--wb-working)', label: 'Shipped' },
+  inProgress: { dot: 'var(--wb-warning)', label: 'In progress' },
+  next: { dot: 'var(--wb-accent)', label: 'Up next' }
 } as const;
 
 export function RoadmapView({ locale }: { locale: Locale }) {
@@ -48,65 +31,50 @@ export function RoadmapView({ locale }: { locale: Locale }) {
     <>
       <SiteHeader dict={ dict } locale={ locale } />
       <main id="main-content" className="pt-12">
-        <section className="relative isolate overflow-hidden">
-          <div className="absolute inset-0 -z-10 bg-radial-glow opacity-40" />
-          <div className="mx-auto max-w-6xl px-4 pb-16 pt-12 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 justify-center text-[var(--wb-fg-muted)]">
-                <MapIcon className="h-4 w-4" />
-                <span className="font-mono text-[11px] uppercase tracking-[0.16em]">
-                  { dict.roadmap.title }
-                </span>
-              </div>
-              <h1 className="mt-4 font-display text-display-lg text-balance text-[var(--wb-fg)]">
-                { dict.roadmap.title }
-              </h1>
-              <p className="mx-auto mt-4 max-w-2xl text-pretty text-[15px] leading-relaxed text-[var(--wb-fg-muted)] sm:text-[16px]">
-                { dict.roadmap.subtitle }
-              </p>
-            </div>
+        <section className="relative section-pad">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <SharedHeader
+              label={ dict.roadmap.title }
+              number="01"
+              title={ dict.roadmap.title }
+              subtitle={ dict.roadmap.subtitle }
+            />
 
-            {/* 3 columns */}
-            <div className="mt-16 grid gap-5 lg:grid-cols-3">
+            <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-3">
               { groups.map((g, idx) => {
-                const style = STATUS_STYLES[g.key];
-                const Icon = style.icon;
+                const status = STATUS[g.key];
                 return (
                   <RevealOnScroll key={ g.key } delay={ idx * 100 }>
-                    <article
-                      className={ `group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-[var(--wb-bg)] p-6 transition-all hover:shadow-wb-card-hover ${style.border}` }
-                    >
-                      {/* Status header */}
-                      <header className="flex items-center justify-between border-b border-[var(--wb-border)] pb-4">
+                    <article className="group flex h-full flex-col gap-4 bg-[var(--wb-bg-pure)] p-6 transition-colors hover:bg-[var(--wb-bg-soft)]">
+                      <header className="flex items-center justify-between border-b border-[var(--wb-border)] pb-3">
                         <div className="flex items-center gap-2">
-                          <div
-                            className={ `flex h-8 w-8 items-center justify-center rounded-lg ${style.bg} ${style.text}` }
-                          >
-                            <Icon className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <h2 className="font-display text-[16px] font-semibold tracking-tight text-[var(--wb-fg)]">
-                              { g.data.label }
-                            </h2>
-                            <p className="font-mono text-[10px] uppercase tracking-wider text-[var(--wb-fg-muted)]">
-                              { style.label } · { g.data.items.length } { locale === 'zh-CN' ? '项' : 'items' }
-                            </p>
-                          </div>
+                          <span
+                            className="h-1.5 w-1.5 rounded-full"
+                            style={ { background: status.dot } }
+                          />
+                          <h2 className="font-display-serif text-[18px] leading-tight text-[var(--wb-fg)]">
+                            { g.data.label }
+                          </h2>
                         </div>
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--wb-fg-faint)]">
+                          { String(g.data.items.length).padStart(2, '0') }
+                        </span>
                       </header>
 
-                      {/* Item list */}
-                      <ul className="mt-5 space-y-2.5">
+                      <ul className="space-y-2">
                         { g.data.items.map((item, i) => (
                           <li
                             key={ i }
-                            className="flex items-start gap-2.5 text-[13.5px] leading-relaxed text-[var(--wb-fg-muted)]"
+                            className="flex items-start gap-2 text-[13.5px] leading-relaxed text-[var(--wb-fg-muted)]"
                           >
-                            <span className={ `mt-0.5 flex-shrink-0 ${style.text}` }>
+                            <span
+                              className="mt-1 flex-shrink-0"
+                              style={ { color: status.dot } }
+                            >
                               { g.key === 'shipped' ? (
                                 <CheckCircle2 className="h-3.5 w-3.5" />
                               ) : g.key === 'inProgress' ? (
-                                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-current" />
+                                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
                               ) : (
                                 <ArrowRight className="h-3.5 w-3.5" />
                               ) }

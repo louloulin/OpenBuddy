@@ -6,70 +6,71 @@ interface CTASectionProps {
 }
 
 /**
- * CTASection —— 页面底部号召性用语
+ * CTASection —— tutti 风格重做
  *
- * 设计要点：
- * - 大块背景 + brand 色光晕
- * - 双 CTA：主 GitHub + 次社区
+ * - 简洁标题 + 描述
+ * - 黑色 primary CTA + ghost secondary
+ * - 4 个关键数字 (monospace tabular-nums)
  */
 export default function CTASection({ dict }: CTASectionProps) {
   return (
-    <section className="relative py-24 sm:py-32">
+    <section className="relative section-pad">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-3xl border border-[var(--wb-border)] bg-gradient-to-br from-[#0E1117] via-[#0C4A48] to-[#00614D] p-10 sm:p-16">
-          {/* Background glow */}
-          <div className="absolute -right-20 -z-10 h-60 w-60 rounded-full bg-brand-8 opacity-30 blur-3xl" />
-          <div className="absolute -left-10 top-1/2 -z-10 h-40 w-40 rounded-full bg-brand-7 opacity-20 blur-3xl" />
-
-          <div className="relative max-w-2xl">
-            <h2 className="font-display text-display-md text-balance text-white">
-              { dict.cta.title }
-            </h2>
-            <p className="mt-5 text-pretty text-[16px] leading-relaxed text-white/80">
-              { dict.cta.subtitle }
-            </p>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a
-                href="https://github.com/louloulin/OpenBuddy"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-[14px] font-semibold text-[#0E1117] transition-all hover:bg-white/90 hover:shadow-xl"
-              >
-                <Github className="h-4 w-4" />
-                <span>{ dict.cta.ctaPrimary }</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </a>
-              <a
-                href="https://github.com/louloulin/OpenBuddy/discussions"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/30 bg-white/10 px-5 py-3 text-[14px] font-medium text-white backdrop-blur transition-colors hover:bg-white/15"
-              >
-                <UsersIcon className="h-4 w-4" />
-                <span>{ dict.cta.ctaSecondary }</span>
-              </a>
-            </div>
-
-            {/* Stat row */}
-            <div className="mt-10 grid grid-cols-2 gap-4 border-t border-white/15 pt-8 sm:grid-cols-4">
-              { [
-                { value: '12.8k', label: 'GitHub stars' },
-                { value: '64', label: 'capability packages' },
-                { value: '455', label: 'tests in repo' },
-                { value: 'MIT', label: 'forkable' }
-              ].map((s) => (
-                <div key={ s.label }>
-                  <div className="font-mono text-[24px] font-semibold tabular-nums text-white sm:text-[28px]">
-                    { s.value }
-                  </div>
-                  <div className="mt-1 text-[11px] uppercase tracking-wider text-white/60">
-                    { s.label }
-                  </div>
-                </div>
-              )) }
-            </div>
+        <div className="grid items-end gap-8 md:grid-cols-[auto_1fr] md:gap-16">
+          <div className="flex flex-col gap-2">
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
+              10 · Get started
+            </span>
           </div>
+          <h2 className="font-display-serif text-[clamp(2.5rem,5vw,4rem)] leading-[1.05] text-balance text-[var(--wb-fg)]">
+            { dict.cta.title }
+          </h2>
+        </div>
+
+        <p className="mt-6 max-w-2xl text-pretty text-[15px] leading-relaxed text-[var(--wb-fg-muted)]">
+          { dict.cta.subtitle }
+        </p>
+
+        {/* CTAs */}
+        <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+          <a
+            href="https://github.com/louloulin/OpenBuddy"
+            target="_blank"
+            rel="noreferrer"
+            className="btn-primary group !px-5 !py-3"
+          >
+            <Github className="h-4 w-4" />
+            <span>{ dict.cta.ctaPrimary }</span>
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </a>
+          <a
+            href="https://github.com/louloulin/OpenBuddy/discussions"
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary !px-5 !py-3"
+          >
+            <UsersIcon className="h-4 w-4" />
+            <span>{ dict.cta.ctaSecondary }</span>
+          </a>
+        </div>
+
+        {/* Stat row — bordered, monospace */}
+        <div className="mt-16 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] sm:grid-cols-4">
+          { [
+            { value: '12.8k', label: 'GitHub stars' },
+            { value: '64', label: 'capability packages' },
+            { value: '455', label: 'tests in repo' },
+            { value: 'MIT', label: 'forkable' }
+          ].map((s) => (
+            <div key={ s.label } className="bg-[var(--wb-bg-pure)] p-5">
+              <div className="font-display-serif text-[32px] leading-none tabular-nums text-[var(--wb-fg)] sm:text-[40px]">
+                { s.value }
+              </div>
+              <div className="mt-2 font-mono text-[10px] uppercase tracking-wider text-[var(--wb-fg-faint)]">
+                { s.label }
+              </div>
+            </div>
+          )) }
         </div>
       </div>
     </section>

@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
-import { Heart, Github, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Heart, ArrowRight, CheckCircle2 } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
+import SharedHeader from '@/components/SharedHeader';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import Link from 'next/link';
+import RevealOnScroll from '@/components/RevealOnScroll';
+import BackToTop from '@/components/BackToTop';
 
 export const metadata: Metadata = {
   title: 'Sponsors',
@@ -114,78 +117,86 @@ export function SponsorsView({ locale }: { locale: Locale }) {
     <>
       <SiteHeader dict={ dict } locale={ locale } />
       <main id="main-content" className="pt-12">
-        <section className="relative isolate overflow-hidden">
-          <div className="absolute inset-0 -z-10 bg-radial-glow opacity-40" />
-          <div className="mx-auto max-w-7xl px-4 pb-16 pt-12 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 justify-center text-[var(--wb-fg-muted)]">
-                <Heart className="h-4 w-4 text-brand-9" />
-                <span className="font-mono text-[11px] uppercase tracking-[0.16em]">
-                  { copy.title }
-                </span>
-              </div>
-              <h1 className="mt-4 font-display text-display-lg text-balance text-[var(--wb-fg)]">
-                { copy.title }
-              </h1>
-              <p className="mx-auto mt-4 max-w-2xl text-pretty text-[16px] leading-relaxed text-[var(--wb-fg-muted)]">
-                { copy.subtitle }
-              </p>
+        <section className="relative section-pad">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+            <SharedHeader
+              label="Sponsor"
+              number="01"
+              title={ copy.title }
+              subtitle={ copy.subtitle }
+            />
+
+            <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-3">
+              { tiers.map((tier) => {
+                const accent = tier.popular ? 'var(--wb-accent)' : 'var(--wb-fg-faint)';
+                return (
+                  <RevealOnScroll key={ tier.name }>
+                    <article
+                      className="group flex h-full flex-col gap-4 bg-[var(--wb-bg-pure)] p-6 transition-colors hover:bg-[var(--wb-bg-soft)]"
+                    >
+                      <header className="flex items-center justify-between border-b border-[var(--wb-border)] pb-4">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="h-1.5 w-1.5 rounded-full"
+                            style={ { background: accent } }
+                          />
+                          <h3 className="font-display-serif text-[20px] leading-tight text-[var(--wb-fg)]">
+                            { tier.name }
+                          </h3>
+                        </div>
+                        { tier.popular ? (
+                          <span className="rounded-full bg-[var(--wb-accent)] px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-white">
+                            popular
+                          </span>
+                        ) : null }
+                      </header>
+
+                      <div className="font-display-serif text-[36px] leading-none tracking-tight text-[var(--wb-fg)]">
+                        { tier.amount }
+                      </div>
+
+                      <ul className="mt-2 flex-1 space-y-2.5 border-t border-[var(--wb-border)] pt-4">
+                        { tier.perks.map((perk) => (
+                          <li
+                            key={ perk }
+                            className="flex items-start gap-2 text-[13px] leading-relaxed text-[var(--wb-fg-muted)]"
+                          >
+                            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--wb-working)]" />
+                            <span>{ perk }</span>
+                          </li>
+                        )) }
+                      </ul>
+
+                      <a
+                        href="https://github.com/sponsors/louloulin"
+                        target="_blank"
+                        rel="noreferrer"
+                        className={ `mt-4 inline-flex items-center justify-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition-colors ${
+                          tier.popular
+                            ? 'bg-[var(--wb-accent)] text-white hover:bg-[var(--wb-accent-hover)]'
+                            : 'border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] text-[var(--wb-fg)] hover:bg-[var(--wb-bg-soft)]'
+                        }` }
+                      >
+                        <Heart className="h-3.5 w-3.5" />
+                        <span>{ copy.ctaPrimary }</span>
+                      </a>
+                    </article>
+                  </RevealOnScroll>
+                );
+              }) }
             </div>
 
-            {/* Tier grid */}
-            <div className="mt-16 grid md:grid-cols-3">
-              { tiers.map((tier, idx) => (
-                <article
-                  key={ tier.name }
-                  className={ `relative flex flex-col rounded-2xl border p-8 transition-all ${
-                    tier.popular
-                      ? 'border-brand-9 bg-[var(--wb-bg)] shadow-wb-glow-brand md:-my-4 md:scale-105'
-                      : 'border-[var(--wb-border)] bg-[var(--wb-bg)]'
-                  } ${idx > 0 ? 'md:ml-[-1px]' : ''}` }
-                >
-                  { tier.popular ? (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-9 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
-                      { locale === 'zh-CN' ? '热门' : 'Most popular' }
-                    </span>
-                  ) : null }
-                  <h3 className="font-display text-[20px] font-semibold tracking-tight text-[var(--wb-fg)]">
-                    { tier.name }
-                  </h3>
-                  <p className="mt-1 font-mono text-[14px] text-brand-9">{ tier.amount }</p>
-                  <ul className="mt-6 flex-1 space-y-3 border-t border-[var(--wb-border)] pt-5">
-                    { tier.perks.map((perk) => (
-                      <li key={ perk } className="flex items-start gap-2 text-[13px] text-[var(--wb-fg-muted)]">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-8" />
-                        <span>{ perk }</span>
-                      </li>
-                    )) }
-                  </ul>
-                  <a
-                    href="https://github.com/sponsors/louloulin"
-                    target="_blank"
-                    rel="noreferrer"
-                    className={ `mt-6 inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[13px] font-semibold transition-colors ${
-                      tier.popular
-                        ? 'bg-brand-9 text-white hover:bg-brand-10'
-                        : 'border border-[var(--wb-border)] bg-[var(--wb-bg)] text-[var(--wb-fg)] hover:bg-[var(--wb-bg-soft-2)]'
-                    }` }
-                  >
-                    <Heart className="h-3.5 w-3.5" />
-                    <span>{ copy.ctaPrimary }</span>
-                  </a>
-                </article>
-              )) }
-            </div>
-
-            {/* Why */}
-            <div className="mx-auto mt-20 max-w-3xl rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-8">
-              <h2 className="font-display text-[20px] font-semibold tracking-tight text-[var(--wb-fg)]">
+            <div className="mt-12 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6">
+              <h2 className="font-display-serif text-[20px] leading-tight text-[var(--wb-fg)]">
                 { copy.whyTitle }
               </h2>
-              <ul className="mt-4 space-y-3">
+              <ul className="mt-4 space-y-2">
                 { copy.whyItems.map((item) => (
-                  <li key={ item } className="flex items-start gap-2 text-[14px] text-[var(--wb-fg-muted)]">
-                    <span className="mt-1.5 inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-8" />
+                  <li key={ item } className="flex items-start gap-2 text-[13.5px] leading-relaxed text-[var(--wb-fg-muted)]">
+                    <span
+                      className="mt-2 inline-block h-1 w-1 flex-shrink-0 rounded-full"
+                      style={ { background: 'var(--wb-working)' } }
+                    />
                     <span>{ item }</span>
                   </li>
                 )) }
@@ -194,7 +205,7 @@ export function SponsorsView({ locale }: { locale: Locale }) {
                 href="https://github.com/louloulin/OpenBuddy/blob/main/SPONSORS.md"
                 target="_blank"
                 rel="noreferrer"
-                className="mt-6 inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-9 hover:underline"
+                className="mt-5 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--wb-accent)] hover:underline"
               >
                 { copy.ctaSecondary }
                 <ArrowRight className="h-3 w-3" />
@@ -213,6 +224,7 @@ export function SponsorsView({ locale }: { locale: Locale }) {
         </section>
       </main>
       <SiteFooter dict={ dict } />
+      <BackToTop />
     </>
   );
 }

@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
-import { Monitor, Apple, Terminal, Github, ArrowRight, Check } from 'lucide-react';
+import { Monitor, Apple, Terminal, Github, ArrowRight, Check, Copy } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import CopyButton from '@/components/CopyButton';
+import SharedHeader from '@/components/SharedHeader';
 import { defaultLocale, getDictionary, type Locale } from '@/lib/i18n';
 import { localizedPath } from '@/lib/i18n';
 import Link from 'next/link';
@@ -70,7 +71,7 @@ const PLATFORMS_ZH: DownloadPlatform[] = [
     size: '108 MB',
     arch: 'x64 · NSIS 安装器',
     installHint: '运行安装器。SmartScreen 警告?点击"更多信息" → "仍要运行"。',
-    downloadUrl: 'https://github.com/lougoulin/OpenBuddy/releases/latest'
+    downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest'
   },
   {
     icon: Terminal,
@@ -79,7 +80,7 @@ const PLATFORMS_ZH: DownloadPlatform[] = [
     size: '102 MB',
     arch: 'x86_64 · AppImage + .deb',
     installHint: 'sudo dpkg -i openbuddy_0.14.0_amd64.deb · 或直接运行 AppImage',
-    downloadUrl: 'https://github.com/lougoulin/OpenBuddy/releases/latest'
+    downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest'
   }
 ];
 
@@ -148,55 +149,54 @@ export function DownloadView({ locale }: { locale: Locale }) {
     <>
       <SiteHeader dict={ dict } locale={ locale } />
       <main id="main-content" className="pt-12">
-        <section className="relative isolate overflow-hidden">
-          <div className="absolute inset-0 -z-10 bg-radial-glow opacity-50" />
-          <div className="mx-auto max-w-7xl px-4 pb-16 pt-12 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 justify-center text-[var(--wb-fg-muted)]">
-                <span className="h-px w-6 bg-[var(--wb-fg-muted)]" />
-                <span className="font-mono text-[11px] uppercase tracking-[0.16em]">
-                  { copy.title }
-                </span>
-                <span className="h-px w-6 bg-[var(--wb-fg-muted)]" />
-              </div>
-              <h1 className="mt-4 font-display text-display-lg text-balance text-[var(--wb-fg)]">
-                { copy.title }
-              </h1>
-              <p className="mx-auto mt-4 max-w-2xl text-pretty text-[16px] leading-relaxed text-[var(--wb-fg-muted)]">
-                { copy.subtitle }
-              </p>
-            </div>
+        <section className="relative section-pad">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <SharedHeader
+              label="Download"
+              number="01"
+              title={ copy.title }
+              subtitle={ copy.subtitle }
+            />
 
-            {/* Platform cards */}
-            <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              { platforms.map((p) => {
+            {/* Platform cards — list style */}
+            <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-3">
+              { platforms.map((p, idx) => {
                 const Icon = p.icon;
                 return (
                   <article
                     key={ p.name }
-                    className="group flex flex-col rounded-xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-6 transition-all hover:-translate-y-1 hover:border-[var(--wb-fg-muted)] hover:shadow-wb-card-hover"
+                    className="group flex flex-col gap-3 bg-[var(--wb-bg-pure)] p-6 transition-colors hover:bg-[var(--wb-bg-soft)]"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-brand-2 to-brand-4 text-brand-10 transition-transform group-hover:scale-110 dark:text-brand-8">
-                        <Icon className="h-5 w-5" />
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">
+                          { String(idx + 1).padStart(2, '0') }
+                        </span>
+                        <Icon className="h-4 w-4 text-[var(--wb-fg-faint)]" />
+                        <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-[var(--wb-fg)]">
+                          { p.name }
+                        </span>
                       </div>
-                      <span className="font-mono text-[10px] text-[var(--wb-fg-muted)]">{ p.size }</span>
+                      <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">{ p.size }</span>
                     </div>
-                    <h3 className="mt-5 font-display text-[22px] font-semibold tracking-tight text-[var(--wb-fg)]">
+
+                    <h3 className="font-display-serif text-[22px] leading-tight text-[var(--wb-fg)]">
                       { p.name }
                     </h3>
-                    <p className="mt-1 text-[12px] text-[var(--wb-fg-muted)]">{ p.arch }</p>
-                    <code className="mt-3 rounded-md border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-2 py-1.5 font-mono text-[11px] text-[var(--wb-fg)]">
+                    <p className="font-mono text-[11px] text-[var(--wb-fg-muted)]">{ p.arch }</p>
+
+                    <code className="rounded border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-2 py-1.5 font-mono text-[10.5px] text-[var(--wb-fg)]">
                       { p.file }
                     </code>
-                    <p className="mt-4 text-[13px] leading-snug text-[var(--wb-fg-muted)]">
+                    <p className="text-[12.5px] leading-snug text-[var(--wb-fg-muted)]">
                       { p.installHint }
                     </p>
+
                     <a
                       href={ p.downloadUrl }
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-5 inline-flex items-center justify-center gap-1.5 rounded-md bg-[var(--wb-fg)] px-3 py-2 text-[13px] font-medium text-[var(--wb-bg)] transition-colors hover:opacity-90"
+                      className="mt-3 inline-flex items-center justify-center gap-1.5 rounded-md bg-[var(--wb-fg)] px-3 py-2 text-[13px] font-medium text-[var(--wb-bg)] transition-opacity hover:opacity-90"
                     >
                       <span>Download</span>
                       <ArrowRight className="h-3.5 w-3.5" />
@@ -207,31 +207,31 @@ export function DownloadView({ locale }: { locale: Locale }) {
             </div>
 
             {/* Brew badge */}
-            <div className="mx-auto mt-10 flex max-w-2xl items-center justify-center gap-2 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-4 py-3">
+            <div className="mt-8 flex items-center justify-center gap-2 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-4 py-3">
               <Terminal className="h-4 w-4 text-[var(--wb-fg-muted)]" />
               <code className="font-mono text-[13px] text-[var(--wb-fg)]">{ copy.brewFormula }</code>
               <CopyButton text={ copy.brewFormula } className="ml-auto" />
             </div>
 
             {/* Source build */}
-            <div className="mx-auto mt-16 max-w-3xl rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-6 sm:p-8">
+            <div className="mt-16 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 sm:p-7">
               <div className="flex items-center gap-2 text-[var(--wb-fg-muted)]">
                 <Github className="h-4 w-4" />
-                <span className="font-mono text-[11px] uppercase tracking-[0.16em]">{ copy.sourceLabel }</span>
+                <span className="font-mono text-[11px] uppercase tracking-[0.12em]">{ copy.sourceLabel }</span>
               </div>
-              <p className="mt-3 text-[15px] leading-relaxed text-[var(--wb-fg-muted)]">{ copy.sourceDesc }</p>
+              <p className="mt-3 text-[14px] leading-relaxed text-[var(--wb-fg-muted)]">{ copy.sourceDesc }</p>
 
-              <div className="mt-5 overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-dark)]">
-                <div className="flex items-center gap-1.5 border-b border-white/10 bg-[#161B22] px-4 py-2">
+              <div className="mt-5 overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[#0A0F1E]">
+                <div className="flex items-center gap-1.5 border-b border-white/10 bg-[#111827] px-4 py-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
                   <span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
                   <span className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
-                  <span className="ml-3 font-mono text-[11px] text-[#8B949E]">~/openbuddy</span>
+                  <span className="ml-3 font-mono text-[11px] text-white/40">~/openbuddy</span>
                 </div>
                 <pre className="overflow-x-auto p-4 font-mono text-[12.5px] leading-relaxed text-white">
                   { copy.sourceSteps.map((step, idx) => (
                     <div key={ idx } className={ idx > 0 ? 'mt-1' : '' }>
-                      <span className="select-none text-brand-8 mr-2">❯</span>
+                      <span className="select-none text-[#22C55E] mr-2">❯</span>
                       { step }
                     </div>
                   )) }
@@ -240,14 +240,14 @@ export function DownloadView({ locale }: { locale: Locale }) {
             </div>
 
             {/* Verifications */}
-            <div className="mx-auto mt-16 max-w-3xl rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-6 sm:p-8">
-              <h2 className="font-display text-[18px] font-semibold tracking-tight text-[var(--wb-fg)]">
+            <div className="mt-12 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 sm:p-7">
+              <h2 className="font-display-serif text-[20px] leading-tight text-[var(--wb-fg)]">
                 { copy.verifications }
               </h2>
               <ul className="mt-4 space-y-2">
                 { copy.verificationsList.map((v) => (
-                  <li key={ v } className="flex items-start gap-2 text-[14px] text-[var(--wb-fg-muted)]">
-                    <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-8" />
+                  <li key={ v } className="flex items-start gap-2 text-[13.5px] leading-relaxed text-[var(--wb-fg-muted)]">
+                    <Check className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--wb-working)]" />
                     <span>{ v }</span>
                   </li>
                 )) }
@@ -255,8 +255,8 @@ export function DownloadView({ locale }: { locale: Locale }) {
             </div>
 
             {/* Checksums */}
-            <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-6 sm:p-8">
-              <h2 className="font-display text-[18px] font-semibold tracking-tight text-[var(--wb-fg)]">
+            <div className="mt-8 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 sm:p-7">
+              <h2 className="font-display-serif text-[20px] leading-tight text-[var(--wb-fg)]">
                 { copy.checksumLabel }
               </h2>
               <table className="mt-4 w-full text-[13px]">
@@ -272,9 +272,9 @@ export function DownloadView({ locale }: { locale: Locale }) {
                           href="https://github.com/louloulin/OpenBuddy/releases/latest"
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[12px] text-brand-9 hover:underline"
+                          className="font-mono text-[11px] text-[var(--wb-accent)] hover:underline"
                         >
-                          Verify →
+                          verify →
                         </a>
                       </td>
                     </tr>
@@ -283,7 +283,6 @@ export function DownloadView({ locale }: { locale: Locale }) {
               </table>
             </div>
 
-            {/* Back link */}
             <div className="mt-12 text-center">
               <Link
                 href={ localizedPath('/', locale) }

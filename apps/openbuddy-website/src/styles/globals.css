@@ -4,120 +4,147 @@
 
 /* =========================================================================
  * OpenBuddy Website —— 全局基础样式
- * 继承 src/styles/tokens.css 的 --wb-* 令牌体系
- * 支持 light / dark 主题，所有颜色均通过 CSS variables 映射
+ * 设计哲学：开发者控制台美学 (受 tutti.sh 启发)
+ * - Instrument Serif (display) — 品牌区、Hero 标题
+ * - DM Sans (UI) — 正文、UI 元素
+ * - JetBrains Mono (code) — 代码、终端、状态数字
+ * - 配色：深海军 + 翠绿工作色 + 琥珀警告 + 红色阻塞 + 靛蓝仅交互
+ * 支持 light / dark 主题
  * ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,100..700;1,9..40,100..700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
 
 :root,
 [data-theme='light'] {
-  /* ===== Surface ===== */
-  --wb-bg: #FFFFFF;
-  --wb-bg-soft: #FAFAFA;
-  --wb-bg-soft-2: #F2F2F2;
-  --wb-bg-tertiary: #F7F7F7;
+  /* ===== Surface (tutti-inspired 工厂控制台浅色版) ===== */
+  --wb-bg: #FAFAF7;                       /* tutti cream 偏白 */
+  --wb-bg-pure: #FFFFFF;                  /* 纯白面板 */
+  --wb-bg-soft: #F4F2EC;                  /* tutti 偏暖灰 */
+  --wb-bg-soft-2: #EDEAE0;                /* 偏暖深灰 */
+  --wb-bg-tertiary: #E8E5DA;
   --wb-bg-elevated: #FFFFFF;
-  --wb-bg-overlay: rgba(0, 0, 0, 0.04);
-  --wb-bg-hover: rgba(0, 0, 0, 0.04);
-  --wb-bg-active: rgba(0, 0, 0, 0.06);
+  --wb-bg-overlay: rgba(15, 23, 42, 0.04);
+  --wb-bg-hover: rgba(15, 23, 42, 0.05);
+  --wb-bg-active: rgba(15, 23, 42, 0.08);
 
   /* ===== Text ===== */
-  --wb-fg: #1F2328;
-  --wb-fg-muted: #656D76;
-  --wb-fg-faint: #8B949E;
-  --wb-fg-inverse: #FFFFFF;
+  --wb-fg: #1A1F2E;                       /* 偏蓝黑 */
+  --wb-fg-muted: #5C6273;
+  --wb-fg-faint: #8A8F9C;
+  --wb-fg-inverse: #FAFAF7;
 
   /* ===== Border ===== */
-  --wb-border: #D0D7DE;
-  --wb-border-soft: #E6E6E6;
-  --wb-border-strong: #D0D7DE;
-  --wb-border-focus: #5B6CFF;
+  --wb-border: #DCD8CB;                   /* 暖灰 */
+  --wb-border-soft: #E8E5DA;
+  --wb-border-strong: #C7C2B0;
+  --wb-border-focus: #4F46E5;             /* indigo 焦点 */
 
-  /* ===== Accent / Brand ===== */
-  --wb-accent: #5B6CFF;
-  --wb-accent-hover: #4858E0;
+  /* ===== State colors (tutti 分层: Blocked > Working > Warning > Idle, Accent=交互 only) ===== */
+  --wb-accent: #4F46E5;                   /* indigo — 仅按钮/链接/focus */
+  --wb-accent-hover: #4338CA;
+
+  /* Working — 翠绿 (工厂机器健康) */
+  --wb-working: #16A34A;
+  --wb-working-soft: rgba(22, 163, 74, 0.10);
+  --wb-working-border: rgba(22, 163, 74, 0.25);
+  --wb-working-fg: #15803D;
+
+  /* Blocked — 红色 */
+  --wb-blocked: #DC2626;
+  --wb-blocked-soft: rgba(220, 38, 38, 0.10);
+
+  /* Warning — 琥珀 */
+  --wb-warning: #D97706;
+  --wb-warning-soft: rgba(217, 119, 6, 0.10);
+
+  /* Idle — 灰 */
+  --wb-idle: #6B7280;
+  --wb-idle-soft: rgba(107, 114, 128, 0.10);
+
+  /* Brand (兼容旧的 brand 命名 — OpenBuddy deep-green) */
   --wb-brand: #00C29A;
   --wb-brand-deep: #00614D;
   --wb-brand-soft: rgba(0, 194, 154, 0.08);
   --wb-brand-soft-2: rgba(0, 194, 154, 0.12);
   --wb-brand-border: rgba(0, 194, 154, 0.20);
 
-  /* ===== Status ===== */
-  --wb-success: #1F883D;
-  --wb-warning: #9A6700;
-  --wb-error: #CF222E;
-
   /* ===== Code / Terminal ===== */
-  --wb-code-bg: #0E1117;
-  --wb-code-fg: #E6EDF3;
-  --wb-code-muted: #8B949E;
-  --wb-code-line: rgba(255, 255, 255, 0.08);
-  --wb-code-window-bg: #161B22;
+  --wb-code-bg: #0A0F1E;                  /* tutti 海军 */
+  --wb-code-fg: #E8E5DA;
+  --wb-code-muted: #8A8F9C;
+  --wb-code-line: rgba(255, 255, 255, 0.06);
+  --wb-code-window-bg: #111827;
 
   /* ===== Window decorations ===== */
-  --wb-window-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px -8px rgba(15, 23, 42, 0.12);
-  --wb-window-shadow-hover: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.06);
+  --wb-window-shadow: 0 1px 2px rgba(10, 15, 30, 0.04), 0 12px 32px -8px rgba(10, 15, 30, 0.10);
+  --wb-window-shadow-hover: 0 4px 12px rgba(10, 15, 30, 0.06), 0 2px 4px rgba(10, 15, 30, 0.04);
 
   /* ===== Effects ===== */
-  --wb-grid-color: rgba(0, 0, 0, 0.04);
-  --wb-glow-1: rgba(0, 194, 154, 0.18);
-  --wb-glow-2: rgba(91, 108, 255, 0.15);
-  --wb-mask: rgba(0, 0, 0, 0.4);
+  --wb-grid-color: rgba(26, 31, 46, 0.05);
+  --wb-glow-1: rgba(22, 163, 74, 0.10);
+  --wb-glow-2: rgba(79, 70, 229, 0.08);
+  --wb-mask: rgba(10, 15, 30, 0.4);
 
   /* ===== Focus ring ===== */
   --wb-ring: 0 0 0 2px var(--wb-bg), 0 0 0 4px var(--wb-accent);
 
   /* ===== Fonts ===== */
-  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
-    'Segoe UI', system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display',
-    'Segoe UI', system-ui, sans-serif;
-  --font-jetbrains: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Menlo',
-    'Monaco', 'Consolas', monospace;
+  --font-display: 'Instrument Serif', 'Times New Roman', serif;
+  --font-inter: 'DM Sans', -apple-system, BlinkMacSystemFont, system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-jetbrains: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Menlo', monospace;
 }
 
 [data-theme='dark'] {
-  /* ===== Surface ===== */
-  --wb-bg: #0E1117;
-  --wb-bg-soft: #161B22;
-  --wb-bg-soft-2: #1C2128;
-  --wb-bg-tertiary: #21262D;
-  --wb-bg-elevated: #1C2128;
+  /* ===== Surface (tutti 海军深色) ===== */
+  --wb-bg: #0A0F1E;
+  --wb-bg-pure: #0A0F1E;
+  --wb-bg-soft: #111827;
+  --wb-bg-soft-2: #1A2236;
+  --wb-bg-tertiary: #1F2937;
+  --wb-bg-elevated: #1A2236;
   --wb-bg-overlay: rgba(255, 255, 255, 0.05);
   --wb-bg-hover: rgba(255, 255, 255, 0.06);
   --wb-bg-active: rgba(255, 255, 255, 0.10);
 
   /* ===== Text ===== */
-  --wb-fg: #E6EDF3;
-  --wb-fg-muted: #8B949E;
-  --wb-fg-faint: #6E7681;
-  --wb-fg-inverse: #0E1117;
+  --wb-fg: #F9FAFB;
+  --wb-fg-muted: #9CA3AF;
+  --wb-fg-faint: #6B7280;
+  --wb-fg-inverse: #0A0F1E;
 
   /* ===== Border ===== */
-  --wb-border: #30363D;
-  --wb-border-soft: #21262D;
-  --wb-border-strong: #484F58;
-  --wb-border-focus: #6E7681;
+  --wb-border: #1F2937;
+  --wb-border-soft: #1A2236;
+  --wb-border-strong: #374151;
+  --wb-border-focus: #818CF8;
 
-  /* ===== Accent / Brand ===== */
-  --wb-accent: #8B95FF;
-  --wb-accent-hover: #A5ADFF;
-  --wb-brand: #4cf0ce;
-  --wb-brand-deep: #22cba8;
+  /* ===== State colors (slightly brightened for dark) ===== */
+  --wb-accent: #818CF8;
+  --wb-accent-hover: #A5B4FC;
+  --wb-working: #22C55E;
+  --wb-working-soft: rgba(34, 197, 94, 0.10);
+  --wb-working-border: rgba(34, 197, 94, 0.30);
+  --wb-working-fg: #4ADE80;
+  --wb-blocked: #EF4444;
+  --wb-blocked-soft: rgba(239, 68, 68, 0.10);
+  --wb-warning: #F59E0B;
+  --wb-warning-soft: rgba(245, 158, 11, 0.10);
+  --wb-idle: #6B7280;
+  --wb-idle-soft: rgba(107, 114, 128, 0.10);
+
+  /* Brand (dark) */
+  --wb-brand: #4CF0CE;
+  --wb-brand-deep: #22CBA8;
   --wb-brand-soft: rgba(76, 240, 206, 0.08);
   --wb-brand-soft-2: rgba(76, 240, 206, 0.12);
   --wb-brand-border: rgba(76, 240, 206, 0.25);
 
-  /* ===== Status ===== */
-  --wb-success: #43f08f;
-  --wb-warning: #f1854d;
-  --wb-error: #f07aa2;
-
   /* ===== Code / Terminal ===== */
   --wb-code-bg: #010409;
-  --wb-code-fg: #E6EDF3;
-  --wb-code-muted: #8B949E;
-  --wb-code-line: rgba(255, 255, 255, 0.08);
-  --wb-code-window-bg: #161B22;
+  --wb-code-fg: #E8E5DA;
+  --wb-code-muted: #8A8F9C;
+  --wb-code-line: rgba(255, 255, 255, 0.06);
+  --wb-code-window-bg: #111827;
 
   /* ===== Window decorations ===== */
   --wb-window-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
@@ -125,8 +152,8 @@
 
   /* ===== Effects ===== */
   --wb-grid-color: rgba(255, 255, 255, 0.04);
-  --wb-glow-1: rgba(0, 194, 154, 0.25);
-  --wb-glow-2: rgba(139, 149, 255, 0.20);
+  --wb-glow-1: rgba(34, 197, 94, 0.18);
+  --wb-glow-2: rgba(129, 140, 248, 0.12);
   --wb-mask: rgba(0, 0, 0, 0.7);
 
   /* ===== Focus ring ===== */
@@ -156,14 +183,13 @@
   }
 
   ::selection {
-    background: var(--wb-brand-soft-2);
-    color: var(--wb-fg);
+    background: var(--wb-accent);
+    color: white;
   }
 
-  /* Scrollbar */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
@@ -171,7 +197,6 @@
   ::-webkit-scrollbar-thumb {
     background: var(--wb-border);
     border-radius: 999px;
-    border: 2px solid var(--wb-bg);
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--wb-fg-muted);
@@ -179,26 +204,25 @@
 }
 
 @layer components {
-  /* Hero 背景网格 */
+  /* 编辑器风色背景网格 (tutti 工业感) */
   .bg-editor-grid {
     background-image:
       linear-gradient(to right, var(--wb-grid-color) 1px, transparent 1px),
       linear-gradient(to bottom, var(--wb-grid-color) 1px, transparent 1px);
-    background-size: 48px 48px;
+    background-size: 56px 56px;
   }
 
-  /* 渐变光晕 */
-  .bg-radial-glow {
+  /* 状态色发光 (克制使用) */
+  .bg-state-glow {
     background-image:
-      radial-gradient(ellipse 80% 60% at 50% 0%, var(--wb-glow-1), transparent 60%),
-      radial-gradient(ellipse 60% 40% at 80% 30%, var(--wb-glow-2), transparent 60%);
+      radial-gradient(ellipse 60% 50% at 50% 0%, var(--wb-glow-1), transparent 70%);
   }
 
   /* 编辑器窗口 */
   .wb-window {
-    background: var(--wb-bg);
+    background: var(--wb-bg-pure);
     border: 1px solid var(--wb-border);
-    border-radius: 12px;
+    border-radius: 8px;     /* tutti: 小圆角 */
     overflow: hidden;
     box-shadow: var(--wb-window-shadow);
   }
@@ -216,13 +240,13 @@
   }
 
   .wb-dot {
-    width: 11px;
-    height: 11px;
+    width: 10px;
+    height: 10px;
     border-radius: 999px;
     display: inline-block;
   }
 
-  /* 按钮 */
+  /* 按钮 — 较少装饰 */
   .btn-primary {
     display: inline-flex;
     align-items: center;
@@ -230,14 +254,15 @@
     background: var(--wb-fg);
     color: var(--wb-bg);
     padding: 10px 18px;
-    border-radius: 8px;
+    border-radius: 6px;
     font-weight: 500;
     font-size: 14px;
+    font-family: var(--font-inter);
     transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   }
   .btn-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   }
 
   .btn-secondary {
@@ -248,9 +273,10 @@
     color: var(--wb-fg);
     border: 1px solid var(--wb-border);
     padding: 10px 18px;
-    border-radius: 8px;
+    border-radius: 6px;
     font-weight: 500;
     font-size: 14px;
+    font-family: var(--font-inter);
     transition: background 0.15s ease, border-color 0.15s ease;
   }
   .btn-secondary:hover {
@@ -258,38 +284,74 @@
     border-color: var(--wb-fg-muted);
   }
 
+  .btn-accent {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--wb-accent);
+    color: white;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 14px;
+    font-family: var(--font-inter);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-accent:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.30);
+  }
+
   /* 卡片 */
   .wb-card {
-    background: var(--wb-bg);
+    background: var(--wb-bg-pure);
     border: 1px solid var(--wb-border);
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 24px;
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   }
   .wb-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--wb-fg-muted);
+    transform: translateY(-1px);
+    border-color: var(--wb-border-strong);
     box-shadow: var(--wb-window-shadow-hover);
   }
 
-  /* Chip */
+  /* Chip — 状态色系统 */
   .wb-chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: var(--wb-brand-soft);
-    color: var(--wb-brand-deep);
+    background: var(--wb-working-soft);
+    color: var(--wb-working-fg);
     padding: 4px 10px;
     border-radius: 999px;
     font-size: 12px;
     font-weight: 500;
-    border: 1px solid var(--wb-brand-border);
-  }
-  [data-theme='dark'] .wb-chip {
-    color: var(--wb-brand);
+    border: 1px solid var(--wb-working-border);
+    font-family: var(--font-jetbrains), monospace;
   }
 
-  /* kbd */
+  .wb-chip-idle {
+    background: var(--wb-idle-soft);
+    color: var(--wb-fg-muted);
+    border-color: var(--wb-border);
+  }
+  .wb-chip-warn {
+    background: var(--wb-warning-soft);
+    color: var(--wb-warning);
+    border-color: rgba(217, 119, 6, 0.30);
+  }
+  .wb-chip-blocked {
+    background: var(--wb-blocked-soft);
+    color: var(--wb-blocked);
+    border-color: rgba(220, 38, 38, 0.30);
+  }
+  .wb-chip-accent {
+    background: rgba(79, 70, 229, 0.10);
+    color: var(--wb-accent);
+    border-color: rgba(79, 70, 229, 0.30);
+  }
+
   .wb-kbd {
     display: inline-flex;
     align-items: center;
@@ -303,29 +365,29 @@
     line-height: 1;
   }
 
-  /* 渐变文字 */
-  .text-gradient-brand {
-    background: linear-gradient(120deg, var(--wb-brand-deep) 0%, var(--wb-brand) 50%, var(--wb-accent) 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-size: 200% 100%;
-    animation: gradient-pan 8s ease infinite;
+  /* Section 编号 + 标签 (tutti 风格) */
+  .section-number {
+    font-family: var(--font-jetbrains), monospace;
+    font-size: 11px;
+    color: var(--wb-fg-faint);
+    letter-spacing: 0.04em;
   }
 
-  /* Shimmer 渐变 */
-  .shimmer-bg {
-    background: linear-gradient(
-      90deg,
-      transparent,
-      var(--wb-brand-soft-2),
-      transparent
-    );
-    background-size: 200% 100%;
-    animation: shimmer 3s linear infinite;
+  /* 工业感状态指示器 (pulse) */
+  .state-pulse-working {
+    position: relative;
+  }
+  .state-pulse-working::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 999px;
+    background: var(--wb-working);
+    opacity: 0.4;
+    animation: state-pulse 2s ease-in-out infinite;
+    z-index: -1;
   }
 
-  /* Section tag (decorative dashed lines + uppercase label) */
   .section-tag {
     display: inline-flex;
     align-items: center;
@@ -334,7 +396,7 @@
     font-family: var(--font-jetbrains), monospace;
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.12em;
   }
   .section-tag::before,
   .section-tag::after {
@@ -345,15 +407,18 @@
     background: var(--wb-fg-muted);
     opacity: 0.4;
   }
+
+  /* serif 标题 — 品牌区使用 */
+  .font-display-serif {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+  }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-  .text-pretty {
-    text-wrap: pretty;
-  }
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
 
   .skip-link {
     position: absolute;
@@ -367,45 +432,36 @@
     font-size: 13px;
     transition: top 0.15s ease;
   }
-  .skip-link:focus {
-    top: 0;
+  .skip-link:focus { top: 0; }
+
+  /* Section spacing (tutti-style: 大量留白) */
+  .section-pad {
+    padding-top: clamp(80px, 10vw, 140px);
+    padding-bottom: clamp(80px, 10vw, 140px);
   }
 
-  /* Card / surface tokens */
-  .surface-bg {
-    background: var(--wb-bg);
+  /* Decorative dotted line (separator) */
+  .border-dotted {
+    background-image: linear-gradient(to right, var(--wb-border) 50%, transparent 50%);
+    background-size: 6px 1px;
+    background-repeat: repeat-x;
+    background-position: bottom;
+    border: 0;
+    height: 1px;
   }
-  .surface-bg-soft {
-    background: var(--wb-bg-soft);
-  }
-  .surface-bg-soft-2 {
-    background: var(--wb-bg-soft-2);
-  }
-  .surface-border {
-    border-color: var(--wb-border);
-  }
-  .text-fg {
-    color: var(--wb-fg);
-  }
-  .text-fg-muted {
-    color: var(--wb-fg-muted);
-  }
-  .text-fg-faint {
-    color: var(--wb-fg-faint);
-  }
-  .text-brand {
-    color: var(--wb-brand);
-  }
-  .text-brand-deep {
-    color: var(--wb-brand-deep);
-  }
-  .bg-brand-soft {
-    background: var(--wb-brand-soft);
-  }
-  .border-brand {
-    border-color: var(--wb-brand);
-  }
-  .ring-wb {
-    box-shadow: var(--wb-ring);
-  }
+}
+
+@keyframes state-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+
+@keyframes fade-up {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
 }

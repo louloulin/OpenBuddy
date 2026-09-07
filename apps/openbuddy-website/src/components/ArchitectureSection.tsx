@@ -1,104 +1,146 @@
-import { ArrowDown, Cpu, Layers, MonitorSmartphone } from 'lucide-react';
+import { ArrowDown, Cpu, Layers, MonitorSmartphone, ArrowUpRight } from 'lucide-react';
 import type { Dict } from '@/lib/i18n';
-import { SectionHeader } from './FeaturesSection';
 
 interface ArchitectureSectionProps {
   dict: Dict;
 }
 
 const LAYER_ICONS = [MonitorSmartphone, Layers, Cpu];
-const LAYER_ACCENTS = ['from-brand-3 to-brand-7', 'from-brand-7 to-brand-9', 'from-brand-9 to-brand-10'];
+const LAYER_ACCENTS = ['#4F46E5', '#22C55E', '#D97706']; // accent, working, warning
 
 /**
- * ArchitectureSection —— 三层架构图
+ * ArchitectureSection —— tutti 风格重做
  *
- * 设计要点：
- * - 三层堆叠 (Renderer / Preload / Electron+Pi)
- * - 每层：图标 + 名称 + 描述 + tech tags
- * - 层间连接线 + 双向箭头，标注数据流
- * - 编辑器美学：等宽字体 tech tags、单色 border、阴影分层
+ * - 三个 horizontal layer cards (不再垂直堆叠)
+ * - 颜色用 state system: indigo=interactive, green=working, amber=warning
+ * - 中间用 dashed line + label 表示协议
+ * - 整体克制、紧凑、有节奏
  */
 export default function ArchitectureSection({ dict }: ArchitectureSectionProps) {
   return (
-    <section id="architecture" className="relative py-24 sm:py-32">
+    <section id="architecture" className="relative section-pad">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          label={ dict.architecture.sectionLabel }
-          title={ dict.architecture.title }
-          subtitle={ dict.architecture.subtitle }
-        />
+        {/* Header */}
+        <div className="grid items-end gap-8 md:grid-cols-[auto_1fr] md:gap-16">
+          <div className="flex flex-col gap-2">
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
+              { dict.architecture.sectionLabel }
+            </span>
+            <span className="font-mono text-[11px] text-[var(--wb-fg-faint)]">02</span>
+          </div>
+          <h2 className="font-display-serif text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-balance text-[var(--wb-fg)]">
+            { dict.architecture.title }
+          </h2>
+        </div>
 
-        <div className="mx-auto mt-16 max-w-4xl">
-          { dict.architecture.layers.map((layer, idx) => {
-            const Icon = LAYER_ICONS[idx] ?? Layers;
-            const accent = LAYER_ACCENTS[idx] ?? LAYER_ACCENTS[0];
-            return (
-              <div key={ layer.name } className="relative">
-                {/* Connector */}
-                { idx < dict.architecture.layers.length - 1 ? (
-                  <div className="flex flex-col items-center py-3 text-[var(--wb-fg-muted)]">
-                    <ArrowDown className="h-4 w-4 opacity-50" />
-                    <span className="mt-1 font-mono text-[10px] uppercase tracking-wider">
-                      { idx === 0 ? 'contextBridge · allowlisted IPC' : 'typed Pi session events' }
-                    </span>
-                    <ArrowDown className="mt-1 h-4 w-4 opacity-50" />
-                  </div>
-                ) : null }
+        <p className="mt-6 max-w-2xl text-pretty text-[15px] leading-relaxed text-[var(--wb-fg-muted)]">
+          { dict.architecture.subtitle }
+        </p>
 
-                {/* Layer card */}
+        {/* Three layers — horizontal layout */}
+        <div className="mt-20">
+          <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-3">
+            { dict.architecture.layers.map((layer, idx) => {
+              const Icon = LAYER_ICONS[idx] ?? Layers;
+              const accent = LAYER_ACCENTS[idx] ?? LAYER_ACCENTS[0];
+              return (
                 <div
-                  className={ `group relative overflow-hidden rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg)] transition-all hover:border-[var(--wb-fg-muted)] hover:shadow-wb-card-hover` }
+                  key={ layer.name }
+                  className="group relative flex flex-col gap-5 bg-[var(--wb-bg-pure)] p-7 transition-colors hover:bg-[var(--wb-bg-soft)]"
                 >
-                  {/* Top accent bar */}
-                  <div className={ `absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accent}` } />
-
-                  <div className="grid items-center gap-6 p-6 sm:grid-cols-[auto_1fr] sm:p-8">
-                    {/* Icon block */}
-                    <div
-                      className={ `flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${accent} text-white shadow-wb-glow-brand` }
-                    >
-                      <Icon className="h-6 w-6" />
+                  {/* Top: layer number + accent dot */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={ { background: accent } }
+                      />
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--wb-fg-faint)]">
+                        Layer { String(idx + 1).padStart(2, '0') }
+                      </span>
                     </div>
-
-                    {/* Content */}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-[11px] uppercase tracking-wider text-[var(--wb-fg-muted)]">
-                          Layer { String(idx + 1).padStart(2, '0') }
-                        </span>
-                        <span className="h-1 w-1 rounded-full bg-[var(--wb-fg-muted)]" />
-                      </div>
-                      <h3 className="mt-1 font-display text-[22px] font-semibold tracking-tight text-[var(--wb-fg)]">
-                        { layer.name }
-                      </h3>
-                      <p className="mt-2 text-[14px] leading-relaxed text-[var(--wb-fg-muted)]">
-                        { layer.description }
-                      </p>
-
-                      {/* Tech tags */}
-                      <div className="mt-4 flex flex-wrap gap-1.5">
-                        { layer.tech.map((t) => (
-                          <span
-                            key={ t }
-                            className="rounded-md border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-2 py-1 font-mono text-[11px] text-[var(--wb-fg-muted)]"
-                          >
-                            { t }
-                          </span>
-                        )) }
-                      </div>
-                    </div>
+                    <Icon className="h-4 w-4 text-[var(--wb-fg-faint)]" />
                   </div>
+
+                  {/* Title */}
+                  <h3 className="font-display-serif text-[24px] leading-tight text-[var(--wb-fg)]">
+                    { layer.name }
+                  </h3>
+
+                  {/* Description */}
+                  <p className="text-[13.5px] leading-relaxed text-[var(--wb-fg-muted)]">
+                    { layer.description }
+                  </p>
+
+                  {/* Tech tags */}
+                  <div className="mt-auto flex flex-wrap gap-1.5">
+                    { layer.tech.map((t) => (
+                      <span
+                        key={ t }
+                        className="rounded border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-2 py-0.5 font-mono text-[10.5px] text-[var(--wb-fg-muted)]"
+                      >
+                        { t }
+                      </span>
+                    )) }
+                  </div>
+
+                  {/* Hover arrow */}
+                  <ArrowUpRight className="absolute right-4 top-4 h-3.5 w-3.5 text-[var(--wb-fg-faint)] opacity-0 transition-opacity group-hover:opacity-100" />
                 </div>
-              </div>
-            );
-          }) }
+              );
+            }) }
+          </div>
+
+          {/* Data flow lines between layers */}
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
+            <FlowIndicator
+              from={ 0 }
+              to={ 1 }
+              label={ 'contextBridge · allowlisted IPC' }
+              tone="indigo"
+            />
+            <FlowIndicator
+              from={ 1 }
+              to={ 2 }
+              label={ 'typed pi://* events' }
+              tone="green"
+            />
+          </div>
         </div>
 
         {/* Footer caption */}
-        <p className="mt-10 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--wb-fg-muted)]">
-          The renderer never sees a Node or provider SDK
+        <p className="mt-12 text-center font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--wb-fg-faint)]">
+          The renderer never sees a Node or provider SDK.
         </p>
       </div>
     </section>
+  );
+}
+
+function FlowIndicator({
+  from,
+  to,
+  label,
+  tone
+}: {
+  from: number;
+  to: number;
+  label: string;
+  tone: 'indigo' | 'green' | 'amber';
+}) {
+  const color = tone === 'green' ? 'var(--wb-working)' : tone === 'amber' ? 'var(--wb-warning)' : 'var(--wb-accent)';
+  return (
+    <div className="flex flex-1 items-center gap-2 px-3">
+      <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">L{ String(from + 1).padStart(2, '0') }</span>
+      <div className="relative h-px flex-1 overflow-hidden bg-[var(--wb-border)]">
+        <div
+          className="absolute inset-y-0 left-0 w-1/2"
+          style={ { background: `repeating-linear-gradient(to right, ${color} 0 4px, transparent 4px 8px)` } }
+        />
+      </div>
+      <ArrowDown className="h-3 w-3 -rotate-90" style={ { color } } />
+      <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">L{ String(to + 1).padStart(2, '0') }</span>
+      <span className="ml-2 font-mono text-[10.5px] text-[var(--wb-fg-muted)]">{ label }</span>
+    </div>
   );
 }

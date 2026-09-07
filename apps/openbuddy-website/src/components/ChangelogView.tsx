@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Calendar, Tag, GitCommit, Sparkles, Wrench, Bug, ExternalLink } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
+import SharedHeader from '@/components/SharedHeader';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import Link from 'next/link';
 import RevealOnScroll from '@/components/RevealOnScroll';
@@ -13,11 +14,11 @@ export const metadata: Metadata = {
     'Every OpenBuddy release — highlights, improvements, fixes. Subscribe to GitHub Releases for notifications.'
 };
 
-const TAG_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  stable: { bg: 'bg-brand-2', text: 'text-brand-10 dark:text-brand-8', border: 'border-brand-3' },
-  beta: { bg: 'bg-amber-2', text: 'text-amber-10', border: 'border-amber-3' },
-  alpha: { bg: 'bg-rose-2', text: 'text-rose-10', border: 'border-rose-3' },
-  lts: { bg: 'bg-sky-2', text: 'text-sky-10', border: 'border-sky-3' }
+const TAG_STYLES: Record<string, { dot: string; chip: string }> = {
+  stable: { dot: 'var(--wb-working)', chip: 'bg-[var(--wb-working-soft)] text-[var(--wb-working-fg)] border-[var(--wb-working-border)]' },
+  beta: { dot: 'var(--wb-warning)', chip: 'bg-[var(--wb-warning-soft)] text-[var(--wb-warning)] border-[rgba(217,119,6,0.30)]' },
+  alpha: { dot: 'var(--wb-blocked)', chip: 'bg-[var(--wb-blocked-soft)] text-[var(--wb-blocked)] border-[rgba(220,38,38,0.30)]' },
+  lts: { dot: 'var(--wb-accent)', chip: 'bg-[rgba(79,70,229,0.10)] text-[var(--wb-accent)] border-[rgba(79,70,229,0.30)]' }
 };
 
 export function ChangelogView({ locale }: { locale: Locale }) {
@@ -27,30 +28,20 @@ export function ChangelogView({ locale }: { locale: Locale }) {
     <>
       <SiteHeader dict={ dict } locale={ locale } />
       <main id="main-content" className="pt-12">
-        <section className="relative isolate overflow-hidden">
-          <div className="absolute inset-0 -z-10 bg-radial-glow opacity-40" />
-          <div className="mx-auto max-w-5xl px-4 pb-16 pt-12 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 justify-center text-[var(--wb-fg-muted)]">
-                <GitCommit className="h-4 w-4" />
-                <span className="font-mono text-[11px] uppercase tracking-[0.16em]">
-                  { dict.changelog.title }
-                </span>
-              </div>
-              <h1 className="mt-4 font-display text-display-lg text-balance text-[var(--wb-fg)]">
-                { dict.changelog.title }
-              </h1>
-              <p className="mx-auto mt-4 max-w-2xl text-pretty text-[15px] leading-relaxed text-[var(--wb-fg-muted)] sm:text-[16px]">
-                { dict.changelog.subtitle }
-              </p>
-            </div>
+        <section className="relative section-pad">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+            <SharedHeader
+              label={ dict.changelog.title }
+              number="01"
+              title={ dict.changelog.title }
+              subtitle={ dict.changelog.subtitle }
+            />
 
             {/* Timeline */}
-            <div className="relative mt-16">
-              {/* Vertical line */}
-              <div className="absolute left-[19px] top-2 bottom-2 hidden w-px bg-gradient-to-b from-brand-8 via-[var(--wb-border)] to-transparent sm:block" />
+            <div className="relative">
+              <div className="absolute left-[19px] top-2 bottom-2 hidden w-px bg-gradient-to-b from-[var(--wb-working)] via-[var(--wb-border)] to-transparent sm:block" />
 
-              <div className="space-y-10">
+              <div className="space-y-12">
                 { dict.changelog.releases.map((r, idx) => {
                   const tag = TAG_STYLES[r.tag] ?? TAG_STYLES.stable;
                   return (
@@ -58,27 +49,34 @@ export function ChangelogView({ locale }: { locale: Locale }) {
                       <article className="relative sm:pl-14">
                         {/* Timeline dot */}
                         <div
-                          className={ `absolute left-0 top-4 hidden h-10 w-10 items-center justify-center rounded-full border-2 sm:flex ${tag.bg} ${tag.border}` }
+                          className="absolute left-0 top-3 hidden h-10 w-10 items-center justify-center rounded-full border-2 bg-[var(--wb-bg-pure)] sm:flex"
+                          style={ { borderColor: tag.dot } }
                         >
-                          <Tag className={ `h-3.5 w-3.5 ${tag.text}` } />
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={ { background: tag.dot } }
+                          />
                         </div>
 
-                        {/* Card */}
-                        <div className="rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-6 transition-all hover:border-[var(--wb-fg-muted)] hover:shadow-wb-card-hover sm:p-8">
+                        <div className="rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 transition-colors hover:border-[var(--wb-border-strong)] sm:p-7">
                           <header className="flex flex-wrap items-baseline gap-x-4 gap-y-2 border-b border-[var(--wb-border)] pb-5">
                             <div className="flex items-center gap-3">
-                              <h2 className="font-display text-[24px] font-semibold tracking-tight text-[var(--wb-fg)] sm:text-[28px]">
+                              <h2 className="font-display-serif text-[24px] leading-tight text-[var(--wb-fg)] sm:text-[28px]">
                                 { r.version }
                               </h2>
                               <span
-                                className={ `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${tag.bg} ${tag.text} ${tag.border}` }
+                                className={ `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${tag.chip}` }
                               >
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full"
+                                  style={ { background: tag.dot } }
+                                />
                                 { r.tag }
                               </span>
                             </div>
-                            <div className="ml-auto flex items-center gap-1.5 text-[12px] text-[var(--wb-fg-muted)]">
+                            <div className="ml-auto flex items-center gap-1.5 font-mono text-[12px] text-[var(--wb-fg-muted)]">
                               <Calendar className="h-3.5 w-3.5" />
-                              <span className="font-mono">{ r.date }</span>
+                              <span>{ r.date }</span>
                             </div>
                           </header>
 
@@ -87,14 +85,12 @@ export function ChangelogView({ locale }: { locale: Locale }) {
                               icon={ Sparkles }
                               title={ locale === 'zh-CN' ? '亮点' : 'Highlights' }
                               items={ r.highlights }
-                              accent="text-brand-9"
                             />
                             { r.improvements ? (
                               <Block
                                 icon={ Wrench }
                                 title={ locale === 'zh-CN' ? '改进' : 'Improvements' }
                                 items={ r.improvements }
-                                accent="text-amber-9"
                               />
                             ) : null }
                             { r.fixes ? (
@@ -102,7 +98,6 @@ export function ChangelogView({ locale }: { locale: Locale }) {
                                 icon={ Bug }
                                 title={ locale === 'zh-CN' ? '修复' : 'Fixes' }
                                 items={ r.fixes }
-                                accent="text-sky-9"
                               />
                             ) : null }
                           </div>
@@ -112,7 +107,7 @@ export function ChangelogView({ locale }: { locale: Locale }) {
                               href={ r.githubHref }
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-brand-9 hover:underline"
+                              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--wb-accent)] hover:underline"
                             >
                               { locale === 'zh-CN' ? '在 GitHub 查看完整发布说明' : 'View full release notes on GitHub' }
                               <ExternalLink className="h-3 w-3" />
@@ -146,24 +141,22 @@ export function ChangelogView({ locale }: { locale: Locale }) {
 function Block({
   icon: Icon,
   title,
-  items,
-  accent
+  items
 }: {
   icon: typeof Sparkles;
   title: string;
   items: string[];
-  accent: string;
 }) {
   return (
     <div>
-      <div className={ `mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider ${accent}` }>
+      <div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-[var(--wb-fg-faint)]">
         <Icon className="h-3.5 w-3.5" />
         <span>{ title }</span>
       </div>
       <ul className="space-y-1.5">
         { items.map((item, idx) => (
-          <li key={ idx } className="flex items-start gap-2 text-[14px] leading-relaxed text-[var(--wb-fg-muted)]">
-            <span className="mt-1.5 inline-block h-1 w-1 flex-shrink-0 rounded-full bg-current opacity-60" />
+          <li key={ idx } className="flex items-start gap-2 text-[13.5px] leading-relaxed text-[var(--wb-fg-muted)]">
+            <span className="mt-1.5 inline-block h-1 w-1 flex-shrink-0 rounded-full bg-[var(--wb-fg-faint)]" />
             <span>{ item }</span>
           </li>
         )) }

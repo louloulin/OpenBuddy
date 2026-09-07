@@ -1,25 +1,24 @@
 import type { Metadata } from 'next';
 import {
-  BookOpen,
   Rocket,
+  BookOpen,
   Layers,
   Puzzle,
   GitBranch,
   Building2,
   ArrowRight,
-  ExternalLink,
-  Github
+  Github,
+  ExternalLink
 } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
-import { getDictionary, type Dict, type Locale } from '@/lib/i18n';
-import { localizedPath } from '@/lib/i18n';
+import SharedHeader from '@/components/SharedHeader';
+import { getDictionary, type Locale } from '@/lib/i18n';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Documentation',
-  description:
-    'OpenBuddy documentation — getting started, architecture, plugin development, deployment, and API references.'
+  description: 'OpenBuddy documentation — getting started, architecture, plugin development, deployment, and API references.'
 };
 
 interface DocLink {
@@ -136,21 +135,11 @@ const DOCS_ZH: DocLink[][] = [
 ];
 
 const COPY_EN = {
-  title: 'Documentation',
-  subtitle: 'Every doc lives in the repo as Markdown. Edit it, open a PR, ship.',
-  primaryAction: 'Browse on GitHub',
-  startLabel: 'Start here',
-  deepLabel: 'Deep dive',
-  enterpriseLabel: 'Enterprise'
+  primaryAction: 'Browse on GitHub'
 };
 
 const COPY_ZH = {
-  title: '文档',
-  subtitle: '每个文档都以 Markdown 形式存放在仓库中。修改它,提 PR,发布。',
-  primaryAction: '在 GitHub 浏览',
-  startLabel: '从这里开始',
-  deepLabel: '深入阅读',
-  enterpriseLabel: '企业级'
+  primaryAction: '在 GitHub 浏览'
 };
 
 export function DocsView({ locale }: { locale: Locale }) {
@@ -162,85 +151,73 @@ export function DocsView({ locale }: { locale: Locale }) {
     <>
       <SiteHeader dict={ dict } locale={ locale } />
       <main id="main-content" className="pt-12">
-        <section className="relative isolate overflow-hidden">
-          <div className="absolute inset-0 -z-10 bg-radial-glow opacity-40" />
-          <div className="mx-auto max-w-7xl px-4 pb-16 pt-12 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 justify-center text-[var(--wb-fg-muted)]">
-                <span className="h-px w-6 bg-[var(--wb-fg-muted)]" />
-                <span className="font-mono text-[11px] uppercase tracking-[0.16em]">Docs</span>
-                <span className="h-px w-6 bg-[var(--wb-fg-muted)]" />
-              </div>
-              <h1 className="mt-4 font-display text-display-lg text-balance text-[var(--wb-fg)]">
-                { copy.title }
-              </h1>
-              <p className="mx-auto mt-4 max-w-2xl text-pretty text-[16px] leading-relaxed text-[var(--wb-fg-muted)]">
-                { copy.subtitle }
-              </p>
-            </div>
+        <section className="relative section-pad">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <SharedHeader
+              label="Docs"
+              number="01"
+              title="Documentation"
+              subtitle="Every doc lives in the repo as Markdown. Edit it, open a PR, ship."
+            />
 
-            {/* Doc groups */}
-            <div className="mx-auto mt-16 max-w-5xl space-y-10">
-              { docs.map((group, gIdx) => (
-                <div key={ gIdx } className="grid gap-5 md:grid-cols-3">
-                  { group.map((doc) => {
-                    const Icon = doc.icon;
-                    return (
-                      <a
-                        key={ doc.title }
-                        href={ doc.href }
-                        target={ doc.external ? '_blank' : undefined }
-                        rel={ doc.external ? 'noreferrer' : undefined }
-                        className="group relative flex flex-col rounded-xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-6 transition-all hover:-translate-y-1 hover:border-[var(--wb-fg-muted)] hover:shadow-wb-card-hover"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-brand-2 to-brand-4 text-brand-10 transition-transform group-hover:scale-110 dark:text-brand-8">
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          { doc.external ? (
-                            <ExternalLink className="h-3.5 w-3.5 text-[var(--wb-fg-muted)] opacity-0 transition-opacity group-hover:opacity-100" />
-                          ) : null }
-                        </div>
-                        <h3 className="mt-4 font-display text-[16px] font-semibold tracking-tight text-[var(--wb-fg)]">
-                          { doc.title }
-                        </h3>
-                        <p className="mt-2 flex-1 text-[13px] leading-snug text-[var(--wb-fg-muted)]">
-                          { doc.description }
-                        </p>
-                        { doc.tag ? (
-                          <span className={ `mt-4 inline-flex items-center gap-1 self-start rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                            doc.tag === 'start'
-                              ? 'bg-brand-2 text-brand-9'
-                              : doc.tag === 'enterprise'
-                              ? 'bg-amber-2 text-amber-9'
-                              : 'bg-accent/10 text-accent'
-                          }` }>
-                            { doc.tag === 'start' ? copy.startLabel : doc.tag === 'enterprise' ? copy.enterpriseLabel : copy.deepLabel }
-                          </span>
-                        ) : null }
-                      </a>
-                    );
-                  }) }
-                </div>
-              )) }
+            <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-2 lg:grid-cols-3">
+              { docs.flat().map((doc, idx) => {
+                const Icon = doc.icon;
+                const tagColor = doc.tag === 'start' ? 'var(--wb-working)' : doc.tag === 'enterprise' ? 'var(--wb-warning)' : 'var(--wb-accent)';
+                return (
+                  <a
+                    key={ doc.title }
+                    href={ doc.href }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group flex flex-col gap-4 bg-[var(--wb-bg-pure)] p-5 transition-colors hover:bg-[var(--wb-bg-soft)]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">
+                          { String(idx + 1).padStart(2, '0') }
+                        </span>
+                        <Icon className="h-4 w-4 text-[var(--wb-fg-faint)] transition-colors group-hover:text-[var(--wb-fg)]" />
+                      </div>
+                      { doc.tag ? (
+                        <span
+                          className="rounded-full border border-[var(--wb-border)] px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider"
+                          style={ { background: 'transparent', color: tagColor, borderColor: tagColor } }
+                        >
+                          { doc.tag }
+                        </span>
+                      ) : null }
+                    </div>
+                    <h3 className="font-display-serif text-[18px] leading-snug text-[var(--wb-fg)]">
+                      { doc.title }
+                    </h3>
+                    <p className="flex-1 text-[12.5px] leading-snug text-[var(--wb-fg-muted)]">
+                      { doc.description }
+                    </p>
+                    <div className="mt-auto flex items-center justify-end">
+                      <ExternalLink className="h-3.5 w-3.5 text-[var(--wb-fg-faint)] opacity-0 transition-opacity group-hover:opacity-100" />
+                    </div>
+                  </a>
+                );
+              }) }
             </div>
 
             {/* Code example */}
-            <div className="mx-auto mt-20 max-w-4xl">
-              <h2 className="font-display text-[22px] font-semibold tracking-tight text-[var(--wb-fg)]">
+            <div className="mt-20">
+              <h2 className="font-display-serif text-[24px] leading-tight text-[var(--wb-fg)]">
                 { locale === 'zh-CN' ? '代码示例' : 'Code example' }
               </h2>
-              <p className="mt-2 text-[14px] text-[var(--wb-fg-muted)]">
+              <p className="mt-3 text-[14px] text-[var(--wb-fg-muted)]">
                 { locale === 'zh-CN'
                   ? '这是构建一个 Cordis 插件所需的最少代码 —— 一个 provider + 一个 UI 路由。'
                   : 'Here is the minimum code to ship a Cordis plugin — one provider and one UI route.' }
               </p>
-              <div className="mt-6 overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[var(--wb-bg-dark)] shadow-2xl">
-                <div className="flex items-center gap-1.5 border-b border-white/10 bg-[#161B22] px-4 py-2.5">
+              <div className="mt-6 overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[#0A0F1E] shadow-2xl">
+                <div className="flex items-center gap-1.5 border-b border-white/10 bg-[#111827] px-4 py-2.5">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
                   <span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
                   <span className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
-                  <span className="ml-3 font-mono text-[11px] text-[#8B949E]">
+                  <span className="ml-3 font-mono text-[11px] text-white/40">
                     packages/capability/openbuddy-hello/src/index.ts
                   </span>
                 </div>
@@ -250,13 +227,12 @@ export function DocsView({ locale }: { locale: Locale }) {
               </div>
             </div>
 
-            {/* Big button */}
             <div className="mt-16 text-center">
               <a
                 href="https://github.com/louloulin/OpenBuddy/tree/main/docs"
                 target="_blank"
                 rel="noreferrer"
-                className="btn-primary group !px-6 !py-3"
+                className="btn-primary group !px-5 !py-3"
               >
                 <Github className="h-4 w-4" />
                 <span>{ copy.primaryAction }</span>
@@ -264,10 +240,9 @@ export function DocsView({ locale }: { locale: Locale }) {
               </a>
             </div>
 
-            {/* Back link */}
-            <div className="mt-12 text-center">
+            <div className="mt-10 text-center">
               <Link
-                href={ localizedPath('/', locale) }
+                href={ locale === 'zh-CN' ? '/zh-CN' : '/' }
                 className="inline-flex items-center gap-2 text-[13px] text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)]"
               >
                 ← { locale === 'zh-CN' ? '返回首页' : 'Back to home' }
@@ -282,7 +257,6 @@ export function DocsView({ locale }: { locale: Locale }) {
 }
 
 function CodeBlock() {
-  // 用纯文本 + span 着色，避免引入 shiki
   return (
     <>
       <div>

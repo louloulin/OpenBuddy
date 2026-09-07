@@ -8,7 +8,6 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import type { Dict } from '@/lib/i18n';
-import { SectionHeader } from './FeaturesSection';
 
 interface CapabilitiesSectionProps {
   dict: Dict;
@@ -24,63 +23,69 @@ const ICON_MAP: Record<string, LucideIcon> = {
 };
 
 /**
- * CapabilitiesSection —— 能力网格
+ * CapabilitiesSection —— tutti 风格重做
  *
- * 设计要点：
- * - 6 个分组 (Core agent / Files / Multi-agent / Enterprise / Email / MCP & Security)
- * - 每组：icon + 名称 + 包列表
- * - 包：monospace 名称 + 一行描述
- * - hover 时分组卡片轻微上浮
+ * - 不再是 6 张大卡片，而是 6 个 group 列表
+ * - 每个 group: 编号 + icon + 名称 + 紧凑的 package 列表
+ * - 信息密度高
  */
 export default function CapabilitiesSection({ dict }: CapabilitiesSectionProps) {
   return (
-    <section id="capabilities" className="relative py-24 sm:py-32">
+    <section id="capabilities" className="relative section-pad">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          label={ dict.capabilities.sectionLabel }
-          title={ dict.capabilities.title }
-          subtitle={ dict.capabilities.subtitle }
-        />
+        {/* Header */}
+        <div className="grid items-end gap-8 md:grid-cols-[auto_1fr] md:gap-16">
+          <div className="flex flex-col gap-2">
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
+              { dict.capabilities.sectionLabel }
+            </span>
+            <span className="font-mono text-[11px] text-[var(--wb-fg-faint)]">05</span>
+          </div>
+          <h2 className="font-display-serif text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-balance text-[var(--wb-fg)]">
+            { dict.capabilities.title }
+          </h2>
+        </div>
 
-        <div className="mt-16 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          { dict.capabilities.groups.map((group) => {
+        <p className="mt-6 max-w-2xl text-pretty text-[15px] leading-relaxed text-[var(--wb-fg-muted)]">
+          { dict.capabilities.subtitle }
+        </p>
+
+        {/* Capability groups — 2-col grid for desktop, single-col mobile */}
+        <div className="mt-16 grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-2 lg:grid-cols-3">
+          { dict.capabilities.groups.map((group, idx) => {
             const Icon = ICON_MAP[group.icon] ?? Cpu;
             return (
-              <article
+              <div
                 key={ group.name }
-                className="group flex flex-col rounded-xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-5 transition-all hover:-translate-y-0.5 hover:border-[var(--wb-fg-muted)] hover:shadow-wb-card-hover"
+                className="group flex flex-col gap-4 bg-[var(--wb-bg-pure)] p-6 transition-colors hover:bg-[var(--wb-bg-soft)]"
               >
-                {/* Header */}
-                <div className="flex items-center justify-between border-b border-[var(--wb-border)] pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-brand-2 to-brand-4 text-brand-10 dark:text-brand-8">
-                      <Icon className="h-4.5 w-4.5" />
-                    </div>
-                    <h3 className="font-display text-[15px] font-semibold tracking-tight text-[var(--wb-fg)]">
+                {/* Group header */}
+                <div className="flex items-center justify-between border-b border-[var(--wb-border)] pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <Icon className="h-4 w-4 text-[var(--wb-fg-faint)]" />
+                    <h3 className="font-display-serif text-[17px] leading-tight text-[var(--wb-fg)]">
                       { group.name }
                     </h3>
                   </div>
-                  <span className="font-mono text-[10px] text-[var(--wb-fg-muted)]">
-                    { String(group.packages.length).padStart(2, '0') } pkgs
+                  <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">
+                    { String(group.packages.length).padStart(2, '0') }
                   </span>
                 </div>
 
-                {/* Package list */}
-                <ul className="mt-4 space-y-2.5">
+                {/* Package list — compact, monospace */}
+                <ul className="space-y-2">
                   { group.packages.map((pkg) => (
-                    <li key={ pkg.name }>
-                      <div className="flex items-baseline gap-2">
-                        <code className="font-mono text-[11.5px] font-medium text-brand-9">
-                          { pkg.name }
-                        </code>
-                      </div>
-                      <p className="ml-1 mt-0.5 text-[12px] leading-snug text-[var(--wb-fg-muted)]">
+                    <li key={ pkg.name } className="group/pkg">
+                      <code className="font-mono text-[12px] font-medium text-[var(--wb-fg)] group-hover/pkg:text-[var(--wb-accent)]">
+                        { pkg.name }
+                      </code>
+                      <p className="mt-0.5 text-[12px] leading-snug text-[var(--wb-fg-muted)]">
                         { pkg.description }
                       </p>
                     </li>
                   )) }
                 </ul>
-              </article>
+              </div>
             );
           }) }
         </div>
@@ -90,7 +95,7 @@ export default function CapabilitiesSection({ dict }: CapabilitiesSectionProps) 
             href="https://github.com/louloulin/OpenBuddy/tree/main/packages"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--wb-border)] bg-[var(--wb-bg)] px-4 py-2 text-[12px] font-medium text-[var(--wb-fg)] transition-colors hover:bg-[var(--wb-bg-soft-2)]"
+            className="font-mono text-[13px] text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)]"
           >
             Browse 63 packages on GitHub →
           </a>

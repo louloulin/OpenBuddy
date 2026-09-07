@@ -9,7 +9,6 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import type { Dict } from '@/lib/i18n';
-import { SectionHeader } from './FeaturesSection';
 
 interface CommunitySectionProps {
   dict: Dict;
@@ -25,25 +24,33 @@ const ICON_MAP: Record<string, LucideIcon> = {
 };
 
 /**
- * CommunitySection —— 社区渠道网格
+ * CommunitySection —— tutti 风格重做
  *
- * 设计要点：
- * - 6 个卡片，每个代表一个社区渠道
- * - 卡片：icon + 名称 + 描述 + 右上角箭头
- * - hover 时卡片显示 brand 色光晕
+ * - 简洁列表式
+ * - 编号 + icon + 名称 + 描述 + 箭头
  */
 export default function CommunitySection({ dict }: CommunitySectionProps) {
   return (
-    <section id="community" className="relative py-24 sm:py-32">
+    <section id="community" className="relative section-pad">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          label={ dict.community.sectionLabel }
-          title={ dict.community.title }
-          subtitle={ dict.community.subtitle }
-        />
+        <div className="grid items-end gap-8 md:grid-cols-[auto_1fr] md:gap-16">
+          <div className="flex flex-col gap-2">
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
+              { dict.community.sectionLabel }
+            </span>
+            <span className="font-mono text-[11px] text-[var(--wb-fg-faint)]">09</span>
+          </div>
+          <h2 className="font-display-serif text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-balance text-[var(--wb-fg)]">
+            { dict.community.title }
+          </h2>
+        </div>
 
-        <div className="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          { dict.community.channels.map((channel) => {
+        <p className="mt-6 max-w-2xl text-pretty text-[15px] leading-relaxed text-[var(--wb-fg-muted)]">
+          { dict.community.subtitle }
+        </p>
+
+        <div className="mt-12 grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-2 lg:grid-cols-3">
+          { dict.community.channels.map((channel, idx) => {
             const Icon = ICON_MAP[channel.icon] ?? MessageCircle;
             const isExternal = channel.href.startsWith('http');
             return (
@@ -52,23 +59,23 @@ export default function CommunitySection({ dict }: CommunitySectionProps) {
                 href={ channel.href }
                 target={ isExternal ? '_blank' : undefined }
                 rel={ isExternal ? 'noreferrer' : undefined }
-                className="group relative flex items-start gap-4 overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-5 transition-all hover:-translate-y-0.5 hover:border-[var(--wb-fg-muted)] hover:shadow-wb-card-hover"
+                className="group relative flex items-start gap-3 bg-[var(--wb-bg-pure)] p-5 transition-colors hover:bg-[var(--wb-bg-soft)]"
               >
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-2 to-brand-4 text-brand-10 transition-transform group-hover:scale-110 dark:text-brand-8">
-                  <Icon className="h-5 w-5" />
-                </div>
+                <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">
+                  { String(idx + 1).padStart(2, '0') }
+                </span>
+                <Icon className="h-4 w-4 flex-shrink-0 text-[var(--wb-fg-faint)] transition-colors group-hover:text-[var(--wb-fg)]" />
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-display text-[15px] font-semibold tracking-tight text-[var(--wb-fg)]">
+                  <h3 className="font-display-serif text-[16px] leading-snug text-[var(--wb-fg)]">
                     { channel.name }
                   </h3>
-                  <p className="mt-1 text-[13px] leading-snug text-[var(--wb-fg-muted)]">
+                  <p className="mt-1 text-[12.5px] leading-snug text-[var(--wb-fg-muted)]">
                     { channel.description }
                   </p>
                 </div>
                 { isExternal ? (
-                  <ArrowUpRight className="h-4 w-4 flex-shrink-0 text-[var(--wb-fg-muted)] opacity-0 transition-opacity group-hover:opacity-100" />
+                  <ArrowUpRight className="h-3.5 w-3.5 flex-shrink-0 text-[var(--wb-fg-faint)] opacity-0 transition-opacity group-hover:opacity-100" />
                 ) : null }
-                <div className="absolute -right-8 -top-8 h-20 w-20 rounded-full bg-gradient-to-br from-brand-3 to-brand-8 opacity-0 blur-2xl transition-opacity group-hover:opacity-40" />
               </a>
             );
           }) }

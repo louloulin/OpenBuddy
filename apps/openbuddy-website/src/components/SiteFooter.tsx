@@ -7,12 +7,10 @@ interface SiteFooterProps {
 }
 
 /**
- * SiteFooter —— 全站底部
+ * SiteFooter —— tutti 风格
  *
- * 设计要点：
- * - 4 列 (产品/资源/社区/法律) + 品牌 Logo + 简洁宣言
- * - 背景：浅灰表面 + 顶部 1px border 与主区分割
- * - 移动端：列折叠为 2 列网格
+ * - 4 列简洁链接
+ * - 极简底部条
  */
 export default function SiteFooter({ dict }: SiteFooterProps) {
   const sections = [
@@ -29,15 +27,14 @@ export default function SiteFooter({ dict }: SiteFooterProps) {
           {/* Brand column */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2 text-[var(--wb-fg)]" aria-label="OpenBuddy">
-              <span className="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg">
+              <span className="relative inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-md">
                 <span
                   className="absolute inset-0"
                   style={ { background: 'linear-gradient(135deg, #13665C 0%, #0C4A48 100%)' } }
                 />
-                <span className="absolute inset-[2px] rounded-md bg-[#13665C]" />
-                <span className="relative text-base">🐕</span>
+                <span className="relative text-sm">🐕</span>
               </span>
-              <span className="font-display text-[15px] font-semibold tracking-tight">OpenBuddy</span>
+              <span className="font-display-serif text-[18px] tracking-tight">OpenBuddy</span>
             </Link>
             <p className="mt-4 max-w-xs text-[13px] leading-relaxed text-[var(--wb-fg-muted)]">
               { dict.footer.tagline }
@@ -46,7 +43,7 @@ export default function SiteFooter({ dict }: SiteFooterProps) {
               href="https://github.com/louloulin/OpenBuddy"
               target="_blank"
               rel="noreferrer"
-              className="mt-5 inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)]"
+              className="mt-5 inline-flex items-center gap-1.5 font-mono text-[12px] text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)]"
             >
               <Github className="h-3.5 w-3.5" />
               <span>louloulin/OpenBuddy</span>
@@ -56,7 +53,7 @@ export default function SiteFooter({ dict }: SiteFooterProps) {
           {/* Link columns */}
           { sections.map((section) => (
             <div key={ section.title }>
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--wb-fg)]">
+              <h3 className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--wb-fg-faint)]">
                 { section.title }
               </h3>
               <ul className="mt-4 space-y-2">
@@ -77,8 +74,8 @@ export default function SiteFooter({ dict }: SiteFooterProps) {
 
         {/* Bottom row */}
         <div className="mt-12 flex flex-col gap-3 border-t border-[var(--wb-border)] pt-8 md:flex-row md:items-center md:justify-between">
-          <p className="text-[12px] text-[var(--wb-fg-muted)]">{ dict.footer.copyright }</p>
-          <p className="text-[11px] text-[var(--wb-fg-muted)]">{ dict.footer.madeWith }</p>
+          <p className="font-mono text-[11px] text-[var(--wb-fg-muted)]">{ dict.footer.copyright }</p>
+          <p className="font-mono text-[11px] text-[var(--wb-fg-faint)]">{ dict.footer.madeWith }</p>
         </div>
       </div>
     </footer>

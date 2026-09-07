@@ -1,75 +1,78 @@
 import { Quote } from 'lucide-react';
 import type { Dict } from '@/lib/i18n';
-import { SectionHeader } from './FeaturesSection';
 
 interface TestimonialsSectionProps {
   dict: Dict;
 }
 
-const ACCENT_CLASS: Record<string, { bg: string; text: string; border: string }> = {
-  brand: { bg: 'bg-brand-2', text: 'text-brand-10 dark:text-brand-8', border: 'border-brand-3' },
-  amber: { bg: 'bg-amber-2', text: 'text-amber-10', border: 'border-amber-3' },
-  rose: { bg: 'bg-rose-2', text: 'text-rose-10', border: 'border-rose-3' },
-  sky: { bg: 'bg-sky-2', text: 'text-sky-10', border: 'border-sky-3' }
+const ACCENT_CLASS: Record<string, string> = {
+  brand: 'border-[var(--wb-working-border)] text-[var(--wb-working-fg)]',
+  amber: 'border-[rgba(217,119,6,0.30)] text-[var(--wb-warning)]',
+  rose: 'border-[rgba(225,29,72,0.30)] text-[#e11d48]',
+  sky: 'border-[rgba(14,165,233,0.30)] text-[#0ea5e9]'
 };
 
 /**
- * TestimonialsSection —— 用户证言
+ * TestimonialsSection —— tutti 风格重做
  *
- * 设计要点：
- * - 3 张证言卡片，desktop 3 列，移动端 1 列
- * - 顶部装饰引号 (Quote icon) + 渐变背景
- * - 作者头像：initials + brand 色背景
- * - hover 轻微上浮
+ * - 3 张简洁 quote 卡片
+ * - 用 monospace 编号 + state 色边框
+ * - 大字 serif 加重 quote 重点
  */
 export default function TestimonialsSection({ dict }: TestimonialsSectionProps) {
   return (
-    <section className="relative bg-[var(--wb-bg-soft)] py-24 sm:py-32">
+    <section className="relative section-pad">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          label={ dict.testimonials.sectionLabel }
-          title={ dict.testimonials.title }
-          subtitle={ dict.testimonials.subtitle }
-        />
+        {/* Header */}
+        <div className="grid items-end gap-8 md:grid-cols-[auto_1fr] md:gap-16">
+          <div className="flex flex-col gap-2">
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
+              { dict.testimonials.sectionLabel }
+            </span>
+            <span className="font-mono text-[11px] text-[var(--wb-fg-faint)]">07</span>
+          </div>
+          <h2 className="font-display-serif text-[clamp(2rem,4vw,3rem)] leading-[1.05] text-balance text-[var(--wb-fg)]">
+            { dict.testimonials.title }
+          </h2>
+        </div>
 
-        <div className="mt-16 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <p className="mt-6 max-w-2xl text-pretty text-[15px] leading-relaxed text-[var(--wb-fg-muted)]">
+          { dict.testimonials.subtitle }
+        </p>
+
+        <div className="mt-16 grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-2 lg:grid-cols-3">
           { dict.testimonials.items.map((t, idx) => {
             const accent = ACCENT_CLASS[t.accent] ?? ACCENT_CLASS.brand;
             return (
               <figure
                 key={ t.author }
-                className="group relative flex flex-col overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-6 transition-all hover:-translate-y-1 hover:shadow-wb-card-hover"
+                className="group relative flex flex-col gap-4 bg-[var(--wb-bg-pure)] p-6 transition-colors hover:bg-[var(--wb-bg-soft)]"
               >
-                {/* Background glow on hover */}
-                <div
-                  className={ `absolute -right-12 -top-12 h-32 w-32 rounded-full opacity-0 blur-3xl transition-opacity group-hover:opacity-50 ${accent.bg}` }
-                />
+                {/* Top row */}
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">
+                    { String(idx + 1).padStart(2, '0') }
+                  </span>
+                  <Quote className={ `h-3.5 w-3.5 ${accent.split(' ')[1]}` } />
+                </div>
 
-                {/* Quote icon */}
-                <Quote className={ `h-6 w-6 ${accent.text}` } />
-
-                {/* Quote text */}
-                <blockquote className="mt-4 flex-1 text-[15px] leading-relaxed text-[var(--wb-fg)]">
+                {/* Quote */}
+                <blockquote className="font-display-serif text-[17px] leading-snug text-[var(--wb-fg)]">
                   "{ t.quote }"
                 </blockquote>
 
                 {/* Author */}
-                <figcaption className="mt-6 flex items-center gap-3 border-t border-[var(--wb-border)] pt-5">
+                <figcaption className="mt-auto flex items-center gap-3 border-t border-[var(--wb-border)] pt-4">
                   <div
-                    className={ `flex h-10 w-10 items-center justify-center rounded-full font-mono text-[12px] font-semibold ${accent.bg} ${accent.text} border ${accent.border}` }
+                    className={ `flex h-9 w-9 items-center justify-center rounded-full border font-mono text-[11px] font-semibold ${accent} bg-[var(--wb-bg-soft)]` }
                   >
                     { t.initials }
                   </div>
                   <div>
-                    <div className="text-[13px] font-semibold text-[var(--wb-fg)]">{ t.author }</div>
+                    <div className="text-[12.5px] font-semibold text-[var(--wb-fg)]">{ t.author }</div>
                     <div className="text-[11px] text-[var(--wb-fg-muted)]">{ t.role }</div>
                   </div>
                 </figcaption>
-
-                {/* Index marker */}
-                <span className="absolute right-3 top-3 font-mono text-[10px] text-[var(--wb-fg-muted)] opacity-30 transition-opacity group-hover:opacity-60">
-                  { String(idx + 1).padStart(2, '0') }
-                </span>
               </figure>
             );
           }) }
