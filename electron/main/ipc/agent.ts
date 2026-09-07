@@ -50,6 +50,16 @@ import {
 } from "./validation";
 // dynamic: @openbuddy/auth-permission
 
+// A-5: AbortSignal plumbing for prompt/steer/follow-up.
+//
+// The most recent in-flight request per sessionId is registered here so
+// `agent:abort` can cancel it without the renderer needing to round-trip
+// a controller through the IPC channel (AbortSignal is not
+// structured-cloneable). The map is keyed by sessionId so concurrent
+// sessions each have their own cancel target. A handler clears its own
+// entry once the request resolves.
+const inflightAbortControllers = new Map<string, AbortController>();
+
 /**
  * Phase 5 — module-scope helper. Mutating IPCs (`agent:prompt`,
  * `agent:set-model`, `agent:prompt-content`, …) call this before
@@ -123,14 +133,23 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			const text = requiredString(typeof input === "string" ? input : payload?.text, "prompt");
 			const traceId = optionalString((typeof input === "string" ? undefined : payload?.traceId), "traceId") ?? generateTraceId();
 			hostReceived("agent:prompt", traceId, sessionId);
+			// A-5: register a per-request AbortController so agent:abort can
+			// cancel the in-flight prompt. If an earlier prompt is still
+			// running for the same session, abort it first (back-pressure).
+			const key = activeSessionId ?? traceId;
+			inflightAbortControllers.get(key)?.abort();
+			const controller = new AbortController();
+			inflightAbortControllers.set(key, controller);
 			try {
 				await awaitExtensionsBound();
-				await agentHost.prompt(text, { traceId, sessionId });
+				await agentHost.prompt(text, { traceId, sessionId, signal: controller.signal });
 				hostDispatched("agent:prompt", traceId, sessionId);
 				return { ok: true };
 			} catch (err) {
 				hostFailed("agent:prompt", traceId, err);
 				throw err;
+			} finally {
+				if (inflightAbortControllers.get(key) === controller) inflightAbortControllers.delete(key);
 			}
 		});
 		ipcMain.handle("agent:steer", async (_e, input: { sessionId?: string; text: string; traceId?: string }) => {
@@ -140,14 +159,20 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
 			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
 			hostReceived("agent:steer", traceId, sessionId);
+			const key = sessionId ?? traceId;
+			inflightAbortControllers.get(key)?.abort();
+			const controller = new AbortController();
+			inflightAbortControllers.set(key, controller);
 			try {
 				await awaitExtensionsBound();
-				await agentHost.steer(requiredString(payload.text, "text"), { traceId, sessionId });
+				await agentHost.steer(requiredString(payload.text, "text"), { traceId, sessionId, signal: controller.signal });
 				hostDispatched("agent:steer", traceId, sessionId);
 				return { ok: true };
 			} catch (err) {
 				hostFailed("agent:steer", traceId, err);
 				throw err;
+			} finally {
+				if (inflightAbortControllers.get(key) === controller) inflightAbortControllers.delete(key);
 			}
 		});
 		ipcMain.handle("agent:follow-up", async (_e, input: { sessionId?: string; text: string; traceId?: string }) => {
@@ -157,14 +182,20 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
 			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
 			hostReceived("agent:follow-up", traceId, sessionId);
+			const key = sessionId ?? traceId;
+			inflightAbortControllers.get(key)?.abort();
+			const controller = new AbortController();
+			inflightAbortControllers.set(key, controller);
 			try {
 				await awaitExtensionsBound();
-				await agentHost.followUp(requiredString(payload.text, "text"), { traceId, sessionId });
+				await agentHost.followUp(requiredString(payload.text, "text"), { traceId, sessionId, signal: controller.signal });
 				hostDispatched("agent:follow-up", traceId, sessionId);
 				return { ok: true };
 			} catch (err) {
 				hostFailed("agent:follow-up", traceId, err);
 				throw err;
+			} finally {
+				if (inflightAbortControllers.get(key) === controller) inflightAbortControllers.delete(key);
 			}
 		});
 		ipcMain.handle("agent:abort", async (_e, input?: { sessionId?: string; traceId?: string }) => {
@@ -177,6 +208,12 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 				if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
 			}
 			hostReceived("agent:abort", traceId, sessionId);
+			// A-5: abort the in-flight controller for this session (or traceId)
+			// and delegate the heavier abort to the existing agentHost.abort.
+			const key = sessionId ?? agentHost.getSession()?.sessionId ?? traceId;
+			const inflight = inflightAbortControllers.get(key);
+			inflight?.abort();
+			if (inflight) inflightAbortControllers.delete(key);
 			try {
 				await awaitExtensionsBound();
 				await agentHost.abort({ traceId, sessionId });
