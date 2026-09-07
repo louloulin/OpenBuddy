@@ -188,7 +188,19 @@ declare module "@openbuddy/cordis" {
 let serviceRef: Authorization | null = null
 
 export function mountAuthorization(ctx: Context): Authorization {
+	// 显式 ctx.set: OpenBuddyService / CordisService 构造函数把 ctx.set(name, self)
+	// 推迟到 ctx 'ready' 事件. 但 mountAuthorization 是在 plugin apply 阶段被调用,
+	// 此时 context.start() 已经触发过 'ready', 那个 deferred set 通过 scope.ensure()
+	// 异步排队, 等到紧跟着同步调用的 mountMcpClient 运行时还没执行, 所以
+	// 后续 service 看不到 authorization. 显式同步 set 解决这个 race.
 	const service = new Authorization(ctx)
+	try {
+		ctx.set("authorization", service);
+	} catch (err) {
+		// 重复注册 (同一个 ctx 上 mountAuthorization 被调用了两次) — 让原先的
+		// instance 继续生效, 不要 throw 把整个 plugin apply 拖垮.
+		if (!String(err).includes("has been registered")) throw err;
+	}
 	serviceRef = service
 	return service
 }

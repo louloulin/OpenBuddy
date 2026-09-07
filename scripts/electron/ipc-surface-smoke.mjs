@@ -75,6 +75,8 @@ try {
       OPENBUDDY_FILESYSTEM_SMOKE: "0",
     },
   });
+  app.process().stdout?.on("data", (b) => process.stdout.write(`[main:stdout] ${b}`));
+  app.process().stderr?.on("data", (b) => process.stderr.write(`[main:stderr] ${b}`));
   const page = await app.firstWindow();
   await page.waitForLoadState("domcontentloaded", { timeout: 30_000 });
   await page.locator("#root").waitFor({ state: "attached", timeout: 30_000 });

@@ -54,15 +54,17 @@ let createPiToolExtensionImpl: () => ExtensionFactory = () => () => undefined;
 export interface InstallPiExtensionConfigureDeps {
   state: AgentHostState;
   emitPluginEvent: (type: string, payload: unknown) => void;
-  telemetrySink: () => unknown;
-  resolveProfileDirectory: () => string;
-  requestHookPermission: (
+  /** Optional: defaults to no-op telemetry sink. */
+  telemetrySink?: () => unknown;
+  /** Optional: defaults to empty string. */
+  resolveProfileDirectory?: () => string;
+  requestHookPermission?: (
     title: string,
     message: string,
     request?: HookPermissionRequest,
   ) => Promise<unknown>;
-  createRequire: (path: string) => { resolve: (id: string) => string };
-  createPiToolExtension: () => ExtensionFactory;
+  createRequire?: (path: string) => { resolve: (id: string) => string };
+  createPiToolExtension?: () => ExtensionFactory;
 }
 
 /**
@@ -73,11 +75,14 @@ export interface InstallPiExtensionConfigureDeps {
 export function installPiExtensionConfigure(deps: InstallPiExtensionConfigureDeps): void {
   state = deps.state;
   emitPluginEventImpl = deps.emitPluginEvent;
-  telemetrySinkImpl = deps.telemetrySink;
-  resolveProfileDirectoryImpl = deps.resolveProfileDirectory;
-  requestHookPermissionImpl = deps.requestHookPermission;
-  createRequireImpl = deps.createRequire;
-  createPiToolExtensionImpl = deps.createPiToolExtension;
+  // Optional deps: 保留模块级 stub 默认值, 调用方不传也不要 overwrite 成 undefined,
+  // 否则后续 telemetrySinkImpl() 这种 throw `is not a function`. 同样的 chicken-and-egg
+  // 模式已在 profile-artifact-reconciler.ts 修过一次.
+  if (deps.telemetrySink) telemetrySinkImpl = deps.telemetrySink;
+  if (deps.resolveProfileDirectory) resolveProfileDirectoryImpl = deps.resolveProfileDirectory;
+  if (deps.requestHookPermission) requestHookPermissionImpl = deps.requestHookPermission;
+  if (deps.createRequire) createRequireImpl = deps.createRequire;
+  if (deps.createPiToolExtension) createPiToolExtensionImpl = deps.createPiToolExtension;
 }
 
 /** 测试/调试用: 重置模块级单例回到 stub. 不在生产代码调用. */

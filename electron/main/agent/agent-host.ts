@@ -10,6 +10,13 @@ import { resolve, join, dirname, basename } from "node:path";
 // keep one canonical implementation (no duplicate drift).
 import { piHome, isPathWithin, piSessionDir } from "./host-modules/_host-paths";
 export { piHome, isPathWithin, piSessionDir };
+
+// v6-G M1: facade aliases for plugin lifecycle + profile + session lifecycle + deepseek
+import { buildPluginLifecycleFacade } from "./host-modules/facade/plugin-lifecycle-facade";
+import { buildProfileFacade } from "./host-modules/facade/profile-facade";
+import { buildSessionLifecycleFacade } from "./host-modules/facade/session-lifecycle-facade";
+import { buildDeepseekFacade } from "./host-modules/facade/deepseek-facade";
+
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -170,8 +177,6 @@ import type {
 type PromptResult = { itemId?: string };
 
 
-
-
 export interface WorkspaceProjection {
   workspaceId: string;
   cwd: string;
@@ -213,25 +218,14 @@ export interface PiAgentRuntime {
 }
 
 export type { AgentHostState } from "./host-modules/_state-shape";
-import {
-  abortBash as abortBashImpl,
-  abortRetry as abortRetryImpl,
-  compactSession as compactSessionImpl,
-  forkSession as forkSessionImpl,
-  getAvailableThinkingLevels as getAvailableThinkingLevelsImpl,
-  getCompactionSettings as getCompactionSettingsImpl,
-  getSessionStats as getSessionStatsImpl,
-  getSessionTree as getSessionTreeImpl,
-  setAutoCompactionEnabled as setAutoCompactionEnabledImpl,
-  setAutoRetryEnabled as setAutoRetryEnabledImpl,
-  setFollowUpMode as setFollowUpModeImpl,
-  setSteeringMode as setSteeringModeImpl,
-} from "./host-modules/pi-session-capabilities";
+// v6-G M1 收尾: 12 个 session capability thin wrapper 搬到 session-capability-wrappers.ts.
+// 这里不再 import single-*Impl, 直接通过 buildSessionCapabilityWrappers 解构.
+import { buildSessionCapabilityWrappers } from "./host-modules/bootstrap/session-capability-wrappers";
 import { createDefaultAgentHostState } from "./host-modules/_default-state";
 
 
-
-
+import { registerLifecycleDefaultState } from "./host-modules/bootstrap/lifecycle-public";
+import { installInitOrchestration } from "./host-modules/init-orchestration";
 
 export const state: AgentHostState = {
   ...createDefaultAgentHostState(),
@@ -262,7 +256,42 @@ export const state: AgentHostState = {
   attachmentStore: new SessionAttachmentStore(join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent"), "openbuddy-attachments")),
 };
 
+// v6-G M1 收尾: module-load 时把 state 注入 lifecycle-public / dsh-bridge-helpers
+// 的 default singletons, 这样 syncWorkbenchScope 等 module-load 调用无需等
+// installMicrokernelHost 也能工作 (agent-host-workbench-scope-realserver test 用).
+registerLifecycleDefaultState(state);
+
+// v6-G M1 收尾 (fix): 必须 module-load 时就把 `initialize` + `enqueueLifecycle`
+// 装进 init-orchestration 的 module-level singleton, 否则 IPC handler
+// `agent:new-session` 的 ensureAgentHost → waitUntilReady → init() 第一次
+// 走到 initializeImpl 时, 它还是 placeholder (async () => undefined),
+// pipeline 根本没跑, session-swap / dsh-bridge-helpers 等 host-module 也
+// 不会被 installMicrokernelHost 装上. 后续 host-module install 仍然走
+// installMicrokernelHost(stage 3), 那里 installInitOrchestration 是 idempotent
+// 重写 (覆盖 placeholder).
+//
+// 这里用 queueMicrotask 延迟到 module body 末尾执行, 此时 `initialize` 和
+// `enqueueLifecycle` 已经绑定 (它们是 `const` / `function`, 不参与 hoisting).
+queueMicrotask(() => {
+  installInitOrchestration({ initialize, enqueueLifecycle });
+});
+
 export const lifecycleAppendQueues = new Map<string, Promise<void>>();
+
+// v6-G M1: facade instantiation (zero reverse-dependency)
+const pluginLifecycleFacade = buildPluginLifecycleFacade(state);
+const profileFacade = buildProfileFacade(state);
+const sessionLifecycleFacade = buildSessionLifecycleFacade(state);
+const deepseekFacade = buildDeepseekFacade(state);
+const { installProfileBundle, removeProfileBundle } = pluginLifecycleFacade;
+const {
+  profilePatchPaths,
+  profileResourceWatchPaths,
+  marketplaceArtifactPackagePaths,
+  artifactPackagePaths,
+  stopProfileWatchers,
+  listProfileRemoteContributions,
+} = profileFacade;
 
 const piSessionRuntime = new PiSessionRuntime();
 
@@ -553,6 +582,7 @@ import {
 import {
   captureFileSnapshot as captureFileSnapshotImpl,
 } from "./host-modules/rewind-snapshot";
+const captureFileSnapshot = captureFileSnapshotImpl;
 
 // Phase 8.3 Batch D (D1): subagent + harness task READ surface extracted.
 // Write paths (ensureContinuableSubagent / createDeepSeekAgentRuntime /
@@ -584,6 +614,8 @@ import {
   reportActivePluginTransaction as reportActivePluginTransactionImpl,
   listActivePluginTransactions as listActivePluginTransactionsImpl,
 } from "./host-modules/plugin-state";
+const pluginSnapshot = () => pluginSnapshotImpl();
+const pluginEvents = (query?: any) => pluginEventsImpl(query);
 
 // Phase 8.3 Batch D3: plugin runtime READ surface extracted (4 fns).
 // Write paths stay in agent-host.ts — entwined with state.pluginState /
@@ -596,6 +628,7 @@ import {
   rendererPluginBootGraph as rendererPluginBootGraphImpl,
   resolveRendererPluginModule as resolveRendererPluginModuleImpl,
 } from "./host-modules/plugin-runtime";
+const getStoredPluginState = () => getStoredPluginStateImpl(state);
 
 // Phase 8.3 Batch E: plugin-state 写路径 + plugin-runtime 写路径
 // (setPluginEnabledInternal / reloadPluginInternal / reloadPiExtensionsInternal /
@@ -785,60 +818,24 @@ import {
   artifactPackageJsonByName,
   packageRootForLoaderSpecifier as packageRootForLoaderSpecifierImpl,
 } from "./host-modules/profile/paths";
-function profilePatchPaths(): string[] {
-  return profilePatchPathsImpl(state.profileOptions, piHome);
-}
-function profileResourceWatchPaths(): string[] {
-  return profileResourceWatchPathsImpl(state.profileOptions, state.profilePackagePaths, piHome);
-}
-async function marketplaceArtifactPackagePaths(): Promise<string[]> {
-  return marketplaceArtifactPackagePathsImpl(state.cwd);
-}
-async function artifactPackagePaths(): Promise<string[]> {
-  return artifactPackagePathsImpl(state.profilePackagePaths, state.cwd);
-}
-
-
-function stopProfileWatchers(): void {
-  stopProfileWatchersImpl(state);
-}
-
-function compact(customInstructions?: string) {
-  return compactSessionImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, customInstructions);
-}
-function setAutoCompaction(enabled: boolean) {
-  return setAutoCompactionEnabledImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, enabled);
-}
-function setAutoRetry(enabled: boolean) {
-  return setAutoRetryEnabledImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, enabled);
-}
-function abortRetryFn() {
-  return abortRetryImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir });
-}
-function abortBashFn() {
-  return abortBashImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir });
-}
-function setSteeringModeFn(mode: "all" | "one-at-a-time") {
-  return setSteeringModeImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, mode);
-}
-function setFollowUpModeFn(mode: "all" | "one-at-a-time") {
-  return setFollowUpModeImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, mode);
-}
-function getSessionStatsFn() {
-  return getSessionStatsImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir });
-}
-function getAvailableThinkingLevelsFn(): string[] {
-  return getAvailableThinkingLevelsImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }) as string[];
-}
-function forkSessionFn(entryId: string) {
-  return forkSessionImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir }, entryId);
-}
-function getSessionTreeFn() {
-  return getSessionTreeImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir });
-}
-function getCompactionSettingsFn() {
-  return getCompactionSettingsImpl({ state, cwd: () => state.cwd ?? process.cwd(), piSessionDir });
-}
+// v6-G M1 收尾: 12 个 session capability thin wrapper (compact / fork / etc.)
+// 提到 host-modules/bootstrap/session-capability-wrappers.ts, agent-host.ts
+// 只剩一行解构 + facade 直接 spread.
+const sessionCapabilityWrappers = buildSessionCapabilityWrappers({ state, piSessionDir });
+const {
+  compact,
+  setAutoCompaction,
+  setAutoRetry,
+  abortRetry: abortRetryFn,
+  abortBash: abortBashFn,
+  setSteeringMode: setSteeringModeFn,
+  setFollowUpMode: setFollowUpModeFn,
+  getSessionStats: getSessionStatsFn,
+  getAvailableThinkingLevels: getAvailableThinkingLevelsFn,
+  forkSession: forkSessionFn,
+  getSessionTree: getSessionTreeFn,
+  getCompactionSettings: getCompactionSettingsFn,
+} = sessionCapabilityWrappers;
 
 // Stage F-2: PiProfileSnapshot + capturePiProfileSnapshot + restorePiProfileSnapshot
 // have moved to host-modules/profile/snapshot.ts. The local bindings
@@ -885,13 +882,6 @@ export {
 };
 
 
-function listProfileRemoteContributions(): RemoteContribution[] {
-  return [...state.profileRemoteContributions.values()].map((contribution) => ({
-    ...contribution,
-    descriptors: contribution.descriptors.map((descriptor) => ({ ...descriptor })),
-  }));
-}
-
 export async function reloadProfile(): Promise<void> {
   scheduleProfileReload();
   await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 160));
@@ -906,10 +896,6 @@ import { profilePackages as profilePackagesImpl } from "./host-modules/profile/u
 export async function profilePackages() {
   return profilePackagesImpl();
 }
-
-async function installProfileBundle(sourcePath: string) : Promise<ProfilePackageInfo> { return installProfileBundleImpl(sourcePath); }
-
-async function removeProfileBundle(name: string) : Promise<void> { return removeProfileBundleImpl(name); }
 
 /**
  * C6: Install the curated default Pi package bundle into the current profile.
@@ -984,6 +970,12 @@ import { bootstrapProfileOptions, resolveProfileOptions } from "./host-modules/b
 // host-module via installHostModules() under the hood. It also records
 // which modules are installed so diagnostics + tests can introspect.
 import { installMicrokernelHost } from "./host-modules/bootstrap/microkernel-host";
+import { installHostModules } from "./host-modules/bootstrap/install-host-modules";
+import { buildInstallHostModuleDeps } from "./host-modules/bootstrap/install-host-modules-deps";
+import { runInitPipeline, type InitPipelineDeps } from "./host-modules/bootstrap/init-pipeline";
+import { syncWorkbenchScope, __registerDefaultState, __registerDefaultCasdoorStatus } from "./host-modules/workbench-scope-sync";
+import { __registerDefaultState as __registerDefaultDshState } from "./host-modules/dsh-bridge-helpers";
+import { buildInitPipelineDeps } from "./host-modules/bootstrap/init-pipeline-builder";
 // v4 sub-stage extractors — initialize() is now an 8-stage orchestrator
 // instead of a 300-line wall. Each helper owns one stage of the bootstrap.
 import { wireForwardedEvents } from "./host-modules/bootstrap/wire-forwarded-events";
@@ -1005,10 +997,6 @@ import type { ProvideRpcUiContextDeps } from "./host-modules/bootstrap/provide-r
 import { wireDshServices, type WireDshServicesDeps } from "./host-modules/bootstrap/wire-dsh-services";
 import { initProfile } from "./host-modules/bootstrap/init-profile";
 export function emitPluginEvent(type: string, payload: unknown) { return emitPluginEventImpl(type, payload); }
-export function pluginReadinessSnapshot() {
-  return pluginReadinessSnapshotImpl();
-}
-export function pluginReadiness() { return pluginReadinessImpl(); }
 export { pluginLifecycleQueue } from "./host-modules/plugin-event-bus";
 
 /**
@@ -1081,352 +1069,68 @@ import {
 async function requestHookPermission(title: string, message: string, request?: HookPermissionRequest) { return requestHookPermissionImpl(title, message, request); }
 
 
+const installMicrokernelDepsClosures = {
+  piHome, isPathWithin, piSessionDir, emitPluginEvent, emitRendererEvent,
+  listAllPiSessions, persistedSessionPath, enqueueLifecycle, lifecycleAppendQueues,
+  initialize, rebindSession, dispose, piRuntimeCoordinator, piSessionRuntime,
+  publicQueueItems, workspaceRegistry, readModelsConfigImpl,
+  canonicalEventNamespace, eventNamespace, createSubagentResourceLoader,
+  createTaskAwareTool, modelFacingPresetTools, runHookPoint,
+  profileArtifactModuleUrl, profilePackages, pluginLifecycleQueue,
+  setProfilePiResourcePaths, refreshMarketplacePiResourcePaths, sessionPresetSelection,
+  provideRpcUiContext, questionAnswer, createOpenBuddyRpcUiContext, requestHookPermission,
+  createPiToolExtension, sessionHasConversation,
+  capturePiProfileSnapshot, restorePiProfileSnapshot,
+  captureDeepSeekCapabilityServices, restoreDeepSeekCapabilityServices,
+  materializeOpenBuddyProfile, createOpenBuddyProfile, composePluginPatches,
+  syncDeepSeekCordisRuntime, deepSeekCoreRuntimeEntries, reloadMcpImpl,
+  syncMarketplacePiExtensionStatusesImpl, startProfileWatchers, readOverridePatches,
+  runtimeProfileBundle, reconcileProfileArtifacts, configurePiExtensions,
+  reportPiExtensionErrors, captureReloadableContextServices,
+  restoreCapturedContextServices, rollbackPiProfile, scheduleProfileReload,
+  artifactPackageJsonByName, discoverRendererPluginManifest,
+  promptImpl, abortImpl, listSessionsImpl, listSubagentChildrenImpl,
+  promptSubagentImpl, interruptSubagentImpl, ensureContinuableSubagentImpl,
+  setModelImpl, getSessionImpl, getModelImpl, setThinkingLevelImpl, promptContentImpl,
+  onEventImpl, persistPiSessionHeaderImpl, stopProfileWatchers,
+  disposeProfileTypertRegistrations, disposeActiveHookProcesses,
+  drainActiveHookProcesses, permissionHandlers,
+};
+const buildMicrokernelHostDeps = () => buildInstallHostModuleDeps(installMicrokernelDepsClosures);
+
+// v6-G M1 收尾 (架构修复): module-load 时立即 installHostModules 一次,
+// 消除 "IPC handler 在 stage 3 之前调用 host-module singleton" 的 race condition.
+// 后续 installMicrokernelHost(stage 3) 仍然会 idempotent 重装 (microkernel-host 的
+// installMicrokernelHost 自己 disposeMicrokernelHost 后再 installHostModules).
+// 这里用 queueMicrotask 是为了让 module body 全部跑完 (initialize function 等
+// 较后定义的 binding 已初始化) 再 install.
+queueMicrotask(() => {
+  installHostModules(state, buildMicrokernelHostDeps());
+});
+
 export async function initialize(opts?: { cwd?: string; sessionPath?: string; force?: boolean }): Promise<void> {
   if (!opts?.force && state.session && (!opts?.cwd || opts.cwd === state.cwd)
     && (!opts?.sessionPath || isCurrentSessionPath(opts.sessionPath, opts.cwd))) return;
   if (state.session) await disposeInternal();
-
   const cwd = opts?.cwd ?? process.cwd();
-  // Phase 8.3 Batch L1: SessionEventLog bootstrap extracted to
-  // host-modules/bootstrap/session-event-log.ts. Hydrating from disk is
-  // required for the harness server's `since=` replay across Electron
-  // restarts; without `load()`, the new process starts with an empty
-  // ring buffer and the harness client never sees events written before
-  // the previous shutdown.
-  await bootstrapSessionEventLog(state, cwd);
-  // Phase 8.3 Batch L2: ModelRuntime + auth sync + provider registry
-  // tracker extracted to host-modules/bootstrap/model-runtime.ts. The
-  // provider-registry tracker keeps emitting `plugin/provider-registry-changed`
-  // events as Pi extensions register/unregister providers, so the host UI
-  // can refresh its model picker without polling.
-  await bootstrapModelRuntime(state);
-  // Establish local alias so the legacy `modelRuntime` shorthand used by
-  // context.provide/agentHost payloads inside this function remains valid.
-  // Pre-Phase 8.3, this was the closure variable created by the inline
-  // ModelRuntime bootstrap. After migration, the same value lives in
-  // state.modelRuntime — keep the local alias for backwards source compatibility.
-  const modelRuntime = state.modelRuntime;
-  // Phase 8.3 §33.5.3: every host-module's install() is now wired in a single
-  // call via host-modules/bootstrap/install-host-modules.ts. This keeps
-  // agent-host.ts:initialize() free of 17 inline install calls and gives us
-  // one place to document / test the install order. The deps parameter
-  // carries every closure variable that used to be referenced inline.
-  installMicrokernelHost(state, {
+  await runInitPipeline(buildInitPipelineDeps({
+    state,
+    cwd,
     piHome,
     isPathWithin,
     piSessionDir,
     emitPluginEvent,
     emitRendererEvent,
-    listAllPiSessions,
-    persistedSessionPath,
-    enqueueLifecycle,
-    lifecycleAppendQueues,
-    initialize,
-    rebindSession,
-    dispose,
-    piRuntimeCoordinator,
-    publicQueueItems: publicQueueItems as any,
-    workspaceRegistry,
-    readModelsConfig,
-    canonicalEventNamespace,
-    eventNamespace,
-    createSubagentResourceLoader,
-    createTaskAwareTool,
-    modelFacingPresetTools,
-    runHookPoint,
-    profileArtifactModuleUrl,
-    profilePackages,
-    pluginLifecycleQueue,
-    setProfilePiResourcePaths,
-    refreshMarketplacePiResourcePaths,
-    sessionPresetSelection,  // refreshHookConfigs: not provided (optional in InstallHostModuleDeps)
-
-    replaceSession: ((opts: any) => piSessionRuntime.replace(opts)) as any,
-    sessionManagerOpen: ((sessionPath: string, options: any, cwd: string) => SessionManager.open(sessionPath, options, cwd)) as any,
-    // agentHome alias removed — piHome is already in the deps object (line 1114)
-    provideRpcUiContext,
-    questionAnswer,
-    createOpenBuddyRpcUiContext,
-    // telemetrySink removed — not in InstallHostModuleDeps
-    requestHookPermission,
-    createPiToolExtension,
-    listAgentPresets: ((cwd: string) => piResources.listAgentPresets(cwd)) as any,
-    readAgentPresetDefaults: (() => piResources.readAgentPresetDefaults()) as any,
-    writeAgentPresetDefault: ((id?: string) => piResources.writeAgentPresetDefault(id)) as any,
-    readAgentPreset: ((id: string, cwd: string) => piResources.readAgentPreset(id, cwd)) as any,
-    createPresetSessionRuntime: ((opts: any) => new PresetSessionRuntime(opts)) as any,
-    sessionHasConversation: sessionHasConversation as any,
-    piRuntimeCoordinatorReload: ((reason: string) => piRuntimeCoordinator.reload(reason)),
-    // dispose-internal
-    piSessionRuntimeDispose: () => piSessionRuntime.dispose(),
-    stopProfileWatchers,
-    disposeProfileTypertRegistrations: disposeProfileTypertRegistrations as any,
-    disposeActiveHookProcesses,
-    drainActiveHookProcesses,
-    // workbench-scope-sync
-    casdoorStatus: () => casdoorAuth.status(),
-    // ui-request-resolver
-    permissionReadRules: () => permissionHandlers.readRules(),
-    permissionWriteRules: (rules: any) => permissionHandlers.writeRules(rules),
-    capturePiProfileSnapshot: capturePiProfileSnapshot as any,
-    restorePiProfileSnapshot: restorePiProfileSnapshot as any,
-    captureDeepSeekCapabilityServices,
-    restoreDeepSeekCapabilityServices,
-    materializeOpenBuddyProfile,
-    createOpenBuddyProfile: createOpenBuddyProfile as any,
-    composePluginPatches,
-    syncDeepSeekCordisRuntime,
-    deepSeekCoreRuntimeEntries,
-    reloadMcp,
-    syncMarketplacePiExtensionStatuses: syncMarketplacePiExtensionStatusesImpl as any,
-    startProfileWatchers,
-    readOverridePatches,
-    runtimeProfileBundle: runtimeProfileBundle as any,
-    reconcileProfileArtifacts,
-    configurePiExtensions: configurePiExtensions as any,
-    reportPiExtensionErrors,
-    captureReloadableContextServices,
-    restoreCapturedContextServices,
-    rollbackPiProfile: rollbackPiProfile as any,
-    scheduleProfileReload,
-    artifactPackageJsonByName,
-    discoverRendererPluginManifest,
-    promptImpl,
-    abortImpl,
-    listSessionsImpl,
-    listSubagentChildrenImpl,
-    promptSubagentImpl,
-    interruptSubagentImpl,
-    ensureContinuableSubagent,
-    // session-swap (host-modules/session-swap.ts)
-    setModel,
-    // host-functions required by installPiRuntimeFactories
-    getSession,
-    getModel,
-    prompt,
-    abort,
-    setThinkingLevel,
-    promptContent,
-    onEvent,
-    persistPiSessionHeaderImpl,
-  } as unknown as Parameters<typeof installMicrokernelHost>[1]);
-  // Phase 8.3 §33.5.3 fixup: restore context wiring that the previous
-  // install-host-modules extraction accidentally consumed. The order is
-  // preserved from the pre-refactor parent commit (23b79110^): tool
-  // registry + pi runtime + eventLog + jobs all come AFTER every
-  // host-module's install() but BEFORE context.provide("jobs", jobs).
-  const context = new Context();
-  state.toolRegistry = createToolRegistry(refreshPiExtensions);
-  state.toolRegistryRevision = 0;
-  const piRuntime = createPiRuntime();
-  const piSession = createPiSessionFacade();
-  context.provide("eventLog", {
-    list: (query?: { sessionId?: string; sinceSequence?: number; limit?: number }) => state.sessionEventLog?.snapshot(query) ?? [],
-    lastSequence: () => state.sessionEventLog?.lastSequence() ?? state.eventSequence,
-  });
-  // Phase 8.3 §33.5.4: jobs registry extracted to host-modules/bootstrap/jobs-registry.ts.
-  // createJobsRegistry returns the same facade the 22-line inline object used to
-  // expose — register / update / list / get — without the composition root
-  // having to carry the closures.
-  const jobs = createJobsRegistry({ state, emitPluginEvent });
-  // Phase 8.3 §38: the 15 "core services" context.provide calls now live in
-  // host-modules/bootstrap/wire-context-services.ts. They are pure declarative
-  // registrations (no inline closure state) so they belong in one helper.
-  // The DSH cluster (dshRemotes / dshRemote / dshGoalState) stays inline
-  // because it owns large Maps that don't fit a clean deps interface.
-  wireContextServices({
-    cwd,
-    state,
-    context,
-    modelRuntime,
-    piRuntime,
-    piSession,
-    jobs,
-    prompt,
-    steer,
-    followUp,
-    abort,
-    getModel: () => state.model,
-    setModel,
-    newSession,
-    loadSession,
-    listSessions,
-    listAllPiSessions,
-    listPersistedSessionHeadersImpl,
-    appendPersistedSessionEntriesImpl,
-    appendLifecycleSessionEntryImpl,
-    reserveDeepSeekPreparation: reserveDeepSeekPreparationImpl,
-    reserveDeepSeekAgent: reserveDeepSeekAgentImpl,
-    createDeepSeekAgent,
-    resumeDeepSeekAgent,
-    createTeamRunner,
-    openBuddyCorePlugin,
-    listSubagentChildren,
-  } as unknown as WireContextServicesDeps);
-  // Phase 8.3 §39: the DSH (DeepSeek-Host) cluster (dshGoalState,
-  // dshFeedbackState, sessionKey helpers, dshHostRunner, dshRemotes,
-  // dshRemote) was 188 lines inline. Extract it to
-  // host-modules/bootstrap/wire-dsh-services.ts so agent-host.ts
-  // :initialize() stays a thin orchestrator.
-  wireDshServices({
-    context,
-    state,
-    cwd,
-    listCommands,
-    listPluginInventory,
-    listPlugins: listPlugins as any,
-    listDshFileReferences,
-    listSessions,
-    listRunningTasks,
-    killTask,
-    remoteServiceContext,
-    transitionDshGoal,
-  } as unknown as WireDshServicesDeps);
-  state.context = context;
-  // Phase 8.3 §33.5.5: forwarded-events bus + capability event bridge extracted
-  // to host-modules/bootstrap/wire-forwarded-events.ts. The forwarder list
-  // (FORWARDED_REMOTE_EVENTS) and the bridge binding both live there.
-  wireForwardedEvents({ state, context, emitRendererEvent, emitPluginEvent });
-  // Stage G-1c: openbuddy-automation removed; automation is owned by
-  // pi-background-tasks + pi-goal (passthrough). The legacy
-  // `automation/run` Cordis event no longer exists; pi-native
-  // background-task scheduling fires directly from the pi session.
-  await context.start();
-
-  let profilePackageJson: string | undefined;
-  // Phase 8.3 §33.5.6: profile-options trio collapsed to a single stage call.
-  // setupProfileOptions() runs resolveProfileOptions + bootstrapProfileOptions
-  // + ensureOpenBuddyProfile, returning the resolved + bootstrapped objects.
-  const { resolvedProfile, profileOptions } = await setupProfileOptions({ env: process.env });
-  // C6: opt-in install of the curated default Pi package bundle.
-  // Controlled by `OPENBUDDY_INSTALL_DEFAULT_PI=1` so the default install path
-  // is untouched unless the host integrator opts in. Failures are logged as
-  // warnings so an upstream registry hiccup never blocks session bootstrap.
-  if (process.env.OPENBUDDY_INSTALL_DEFAULT_PI === "1" && profileOptions?.profileDir) {
-    void ensureDefaultPiPackages({ profileDir: profileOptions.profileDir }).then((results) => {
-      const failed = results.filter((r) => r.status === "failed");
-      const installed = results.filter((r) => r.status === "installed");
-      if (installed.length || failed.length) {
-        console.log(
-          `[openbuddy] default Pi bundle: installed=${installed.length} skipped=${results.filter((r) => r.status === "skipped").length} failed=${failed.length}`,
-          failed.map((r) => `${r.spec}: ${r.error}`),
-        );
-      }
-    }).catch((error) => {
-      console.warn("[openbuddy] default Pi bundle install failed:", error);
-    });
-  }
-  const { profileBundle, profilePackageJson: materializedProfilePackageJson } = await initProfile({
-    state,
-    resolvedProfile,
-    profileOptions,
-    piHome,
-    emitPluginEvent,
-    setProfilePiResourcePaths,
-    startProfileWatchers,
-  });
-  profilePackageJson = materializedProfilePackageJson;
-  // Phase 8.3 §33.5.7: ElectronHarnessPluginLoader + PluginStateStore bootstrap
-  // extracted to host-modules/bootstrap/init-plugin-loader.ts. Returns the
-  // loader (so DSH + session stages can reuse it) and the hydrated
-  // pluginState (commit markers already loaded into state).
-  const { loader, pluginState } = await initPluginLoader({
-    state,
-    cwd,
-    context,
-    baseUrl: import.meta.url,
-    emitPluginEvent,
-    resolveDeepSeekModule,
-    openBuddyCorePlugin,
-    openBuddyCapabilityPluginIndex,
-  });
-  state.loader = loader;
-  state.pluginState = pluginState;
-
-  // Phase 8.3 §33.5.8: DSH (DeepSeek Host) assembly extracted to
-  // host-modules/bootstrap/init-deepseek.ts. Owns baseProfile composition,
-  // profile.loadProfile + syncDeepSeekCordisRuntime, capability service
-  // restore + typert ready, 7 @deepseek-ai/* core package registrations,
-  // and reconcileProfileArtifacts — all under a single named call.
-  await initDeepSeek({
-    state,
-    context,
-    loader,
-    profileBundle,
-    baseUrl: import.meta.url,
-    emitPluginEvent,
-    emitRendererEvent,
-    remoteServiceContext,
-    reconcileProfileArtifacts,
-  });
-
-  // Phase 8.3 §33.5.9: activeAdapterIds computation extracted to
-  // host-modules/bootstrap/compute-active-adapter-ids.ts. Walks
-  // state.piExtensionStatuses (canonical source of truth) and returns the
-  // deduped set the system-prompt injection needs.
-  const activeAdapterIds = computeActiveAdapterIds({ state });
-  await injectSystemPromptSections({
-    cwd,
-    context: state.context!,
-    piResources,
-    describeCompatibilityAdapterCommandsMarkdown,
-    activeAdapterIds,
-  });
-
-  // Phase 8.3 §33.5.10: the entire session bootstrap (preset mount, profile
-  // watchers, marketplace refresh, Pi extension configure, resource loader,
-  // session create, ui context, extensionsBound, session/created event,
-  // session-event subscriber, session naming) extracted to
-  // host-modules/bootstrap/init-session.ts. Composition root reads as a
-  // single named call with the dep contract.
-  await initSession({
-    state,
-    context,
-    loader,
-    cwd,
-    modelRuntime,
-    sessionPath: opts?.sessionPath,
-    emitPluginEvent,
-    emitRendererEvent,
-    emitPiSessionEvent,
-    captureFileSnapshot,
-    sessionPresetSelection,
-    mountConfiguredAgentPreset,
-    startProfileWatchers,
-    refreshMarketplacePiResourcePaths,
-    configurePiExtensions,
-    reportPiExtensionErrors,
-    syncMarketplacePiExtensionStatuses: syncMarketplacePiExtensionStatusesImpl,
-    nativePiResourcePaths,
-    persistPiSessionHeaderImpl,
     piSessionRuntime,
-    publicQueueItems,
-    eventNamespace,
-    canonicalEventNamespace,
-    createOpenBuddyRpcUiContext,
-    questionAnswer,
-    piHome,
-    piSessionDir,
-    createTeamRunner,
-  });
-
-  emitPluginEvent("plugin/ready", { count: loader.list().length });
-  // Stage G-1c: openbuddy-automation removed; automation is owned by
-  // pi-background-tasks + pi-goal (passthrough). The Cordis ticker
-  // (`automationsHandlers.startTicking`) is gone; pi-native
-  // background-task scheduling fires directly from the pi session.
+    installMicrokernelHost: (deps) => installMicrokernelHost(state, deps),
+    getMicrokernelHostDeps: buildMicrokernelHostDeps,
+    openBuddyCorePlugin,
+    baseUrl: import.meta.url,
+    reportPiExtensionErrors,
+  }, { sessionPath: opts?.sessionPath }));
 }
-
-/**
- * IPC facade over initialize() — lifecycle queue + in-flight promise tracking.
- * 实现搬到 host-modules/init-orchestration.ts (Phase v4 §L-8 抽取).
- */
-import {
-  init as initImpl,
-} from "./host-modules/init-orchestration";
-function init(opts?: { cwd?: string; sessionPath?: string; force?: boolean; traceId?: string; sessionId?: string }): Promise<void> {
-  return initImpl(opts);
-}
+import { init } from "./host-modules/bootstrap/lifecycle-public";
+export { init } from "./host-modules/bootstrap/lifecycle-public";
 
 
 function waitUntilReady(): Promise<void> {
@@ -1434,19 +1138,8 @@ function waitUntilReady(): Promise<void> {
   return getInitialisationPromise() ?? init();
 }
 
-/**
- * Stage F-5: rebindSession moved to host-modules/session-rebind.ts.
- *
- * Pi-native fast session switch: reuse the warm host (plugin loader,
- * resource loader, typert, remote dispatcher, event log — none of which
- * depend on which session is open) and swap only the AgentSession via
- * PiSessionRuntime.replace(). Falls back to a full initialize() whenever
- * any cwd-scoped or preset-scoped host state differs from the currently
- * loaded one, because those are baked into the resource loader / preset
- * runtime and cannot be swapped cheaply.
- */
-import { rebindSession } from "./host-modules/session-rebind";
-export { rebindSession };
+import { rebindSession } from "./host-modules/bootstrap/lifecycle-public";
+export { rebindSession } from "./host-modules/bootstrap/lifecycle-public";
 /**
  * Stage F-5: disposeInternal moved to host-modules/dispose-internal.ts.
  * The facade re-exports it as part of the lifecycle path.
@@ -1454,61 +1147,26 @@ export { rebindSession };
 import { disposeInternal } from "./host-modules/dispose-internal";
 
 
-export function dispose(): Promise<void> {
-  return enqueueLifecycle(disposeInternal);
-}
+import { dispose } from "./host-modules/bootstrap/lifecycle-public";
+export { dispose } from "./host-modules/bootstrap/lifecycle-public";
 
-let rendererEventEmitter: ((channel: string, payload: unknown) => void) | null = null;
-export function bindRendererEventEmitter(emitter: (channel: string, payload: unknown) => void): () => void {
-    rendererEventEmitter = emitter;
-    return () => { if (rendererEventEmitter === emitter) rendererEventEmitter = null; };
-}
-export function emitRendererEvent(channel: string, payload: unknown): void {
-    rendererEventEmitter?.(channel, payload);
-}
-// 桥接到 workbench-scope-sync 的 module-level emit registry,
-// 这样 module-load 后立即可用 (不必等 installMicrokernelHost → installWorkbenchScopeSync).
-__registerDefaultRendererEventEmitter(emitRendererEvent);
-__registerDefaultState(state);
-__registerDefaultCasdoorStatus(() => casdoorAuth.status());
-__registerDefaultDshState(state);
+import { bindRendererEventEmitter, emitRendererEvent } from "./host-modules/bootstrap/lifecycle-public";
+export { bindRendererEventEmitter, emitRendererEvent } from "./host-modules/bootstrap/lifecycle-public";
 
 /**
  * Sink the bridge forwards pi span events into. Always non-null after
  * `bindRendererEventEmitter` has run; we still null-guard so cold boot
  * (before the renderer registers) cannot crash the agent runtime.
  */
-/**
- * 主进程 telemetry sink 工厂. 实现搬到 host-modules/telemetry-sink.ts
- * (Phase v4 §L-9 抽取).
- */
-import { telemetrySink as telemetrySinkImpl } from "./host-modules/telemetry-sink";
-function telemetrySink(): OpenBuddyTelemetrySink | undefined {
-  return telemetrySinkImpl();
-}
+import { telemetrySink } from "./host-modules/bootstrap/lifecycle-public";
+export { telemetrySink } from "./host-modules/bootstrap/lifecycle-public";
 
-// Phase 8.3 Batch K: team runner factory moved to host-modules/team-runner.ts.
-// Wrappers preserve the (modelRuntime, cwd, getModel) / (messages) call
-// signatures used by initialize() (Cordis context.provide("teamRunner"))
-// and host-modules/team-runner itself.
-import {
-  assistantMessageText as assistantMessageTextImpl,
-  createTeamRunner as createTeamRunnerImpl,
-} from "./host-modules/team-runner";
-function assistantMessageText(messages: unknown) : string { return assistantMessageTextImpl(messages); }
-function createTeamRunner(modelRuntime: ModelRuntime, cwd: string, getModel: () => Model<any> | undefined): TeamRunner {
-  return createTeamRunnerImpl(modelRuntime, cwd, getModel);
-}
-/**
- * Stage F-5: resolveUiRequest moved to host-modules/ui-request-resolver.ts.
- */
-import { resolveUiRequest } from "./host-modules/ui-request-resolver";
-export { resolveUiRequest };
+import { assistantMessageText, createTeamRunner } from "./host-modules/bootstrap/lifecycle-public";
+export { assistantMessageText, createTeamRunner } from "./host-modules/bootstrap/lifecycle-public";
+import { resolveUiRequest } from "./host-modules/bootstrap/lifecycle-public";
+export { resolveUiRequest } from "./host-modules/bootstrap/lifecycle-public";
 
 
-function getSession() { return getSessionImpl(); }
-function onEvent(handler: EventHandler) { return onEventImpl(handler); }
-function onPluginEvent(handler: PluginEventHandler) { return onPluginEventImpl(handler); }
 /**
  * Phase 5 — getter for the `state.extensionsBound` Promise. IPC handlers
  * (`agent:prompt`, `agent:set-model`, …) call this and await the result
@@ -1519,69 +1177,12 @@ function onPluginEvent(handler: PluginEventHandler) { return onPluginEventImpl(h
  * for" and proceed).
  */
 function extensionsBound() { return state.extensionsBound; }
-export async function prompt(text: string, options?: { traceId?: string; sessionId?: string }) { return promptImpl(text, options); }
-async function promptContent(content: readonly PiPromptContentPart[], mode: "queue" | "steer" = "queue") { return promptContentImpl(content, mode); }
-async function updateSessionQueue(sessionId: string, itemId: string, action: { kind: "edit" | "remove" | "steer"; content?: readonly PiPromptContentPart[] }) { return updateSessionQueueImpl(sessionId, itemId, action); }
-async function readSessionAttachment(sessionId: string, attachmentId: string) { return readSessionAttachmentImpl(sessionId, attachmentId); }
-async function steer(text: string, options?: { traceId?: string; sessionId?: string }) { return steerImpl(text, options); }
-async function followUp(text: string, options?: { traceId?: string; sessionId?: string }) { return followUpImpl(text, options); }
-export async function abort(options?: { traceId?: string; sessionId?: string }) { return abortImpl(options); }
-async function setModel(modelId: string, options?: { traceId?: string; sessionId?: string }) { return setModelImpl(modelId, options); }
-async function setThinkingLevel(level: OpenBuddyThinkingLevel, options?: { traceId?: string; sessionId?: string }) { return setThinkingLevelImpl(level, options); }
-function getModel() { return getModelImpl(); }
-function getModelRuntime() { return getModelRuntimeImpl(); }
-function getCwd() { return getCwdImpl(); }
 
-function listCommands() { return listCommandsImpl(); }
-
-function listRunningTasks() { return listRunningTasksImpl(); }
-
-type HarnessSubagentEntry = {
-  kind: "child";
-  id: string;
-  mode: "one-shot" | "continuable";
-  activity: "running" | "inactive";
-  label?: string;
-  hasChildren: boolean;
-};
-
-type HarnessJobView = {
-  id: string;
-  kind: string;
-  label: string;
-  sessionId?: string;
-  status: "running" | "stopping" | "completed" | "killed" | "failed";
-  startedAt: number;
-  finishedAt?: number;
-  detail?: string;
-};
-
-
-
-export async function listSubagentChildren(parentSessionId: string) : Promise<HarnessSubagentEntry[]> { return listSubagentChildrenImpl(parentSessionId); }
-
-function listSessionJobs(sessionId: string) : HarnessJobView[] { return listSessionJobsImpl(sessionId); }
-
-async function subagentHistory(
-  parentSessionId: string,
-  childSessionId: string,
-  mode: "one-shot" | "continuable",
-  beforeSeq?: number,
-  maxMessages?: number,
-): Promise<{ entries: unknown[]; hasMore: boolean }> {
-  return subagentHistoryImpl(parentSessionId, childSessionId, mode, beforeSeq, maxMessages);
-}
 
 /**
  * Forwarder for ensureContinuableSubagent. Real implementation now lives in
  * `host-modules/deepseek/agent-runtime.ts` (Batch C 收尾).
  */
-export async function ensureContinuableSubagent(
-  parentSessionId: string,
-  childSessionId: string,
-): Promise<ContinuableSubagentRecord> {
-  return ensureContinuableSubagentImpl(parentSessionId, childSessionId);
-}
 
 async function createDeepSeekAgentRuntime(options: {
   sessionId: string;
@@ -1598,37 +1199,6 @@ async function createDeepSeekAgentRuntime(options: {
   return (options.resume ? resumeDeepSeekAgentImpl : createDeepSeekAgentImpl)(options);
 }
 
-async function createDeepSeekAgent(options: Parameters<typeof createDeepSeekAgentRuntime>[0]) : Promise<DeepSeekPiAgentRuntime> { return createDeepSeekAgentImpl(options); }
-
-async function resumeDeepSeekAgent(options: Parameters<typeof createDeepSeekAgentRuntime>[0]) : Promise<DeepSeekPiAgentRuntime> { return resumeDeepSeekAgentImpl(options); }
-
-async function promptSubagent(
-  parentSessionId: string,
-  childSessionId: string,
-  content: readonly PiPromptContentPart[],
-): Promise<{ messageId: string }> {
-  return promptSubagentImpl(parentSessionId, childSessionId, content);
-}
-
-async function interruptSubagent(parentSessionId: string, childSessionId: string): Promise<{ accepted: true }> {
-  return interruptSubagentImpl(parentSessionId, childSessionId);
-}
-
-async function killTask(taskId: string) : Promise<void> { return killTaskImpl(taskId); }
-async function authStatus() { return authStatusImpl(); }
-async function providerCatalog() { return providerCatalogImpl(); }
-
-async function loadSession(sessionId: string, cwd: string, options?: { traceId?: string; sessionId?: string }) : Promise<void> { return loadSessionImpl(sessionId, cwd, options); }
-
-function sessionInfo(sessionId: string) { return sessionInfoImpl(sessionId); }
-
-function sessionUsage(sessionId: string) { return sessionUsageImpl(sessionId); }
-
-function sessionFile(sessionId: string) : string { return sessionFileImpl(sessionId); }
-
-async function rewindSession(sessionId: string, targetPromptIndex: number, mode = "conversation"): Promise<void> {
-  return rewindSessionImpl(sessionId, targetPromptIndex, mode);
-}
 
 function formatBranchSummaryText(
   messages: ReadonlyArray<{ role?: string; content?: unknown }>,
@@ -1637,42 +1207,6 @@ function formatBranchSummaryText(
   return formatBranchSummaryTextImpl(messages, options);
 }
 
-async function reloadMcp(): Promise<void> {
-  return reloadMcpImpl(state);
-}
-
-async function runMcpAuthorization(serverName: string, signal?: AbortSignal): Promise<{ status: "authenticated" } | { status: "setup_required" | "cancelled" | "failed"; error: string }> {
-  return runMcpAuthorizationImpl(state, serverName, signal);
-}
-
-async function authorizeMcp(serverName: string, signal?: AbortSignal): Promise<{ status: "authenticated" } | { status: "setup_required" | "cancelled" | "failed"; error: string }> {
-  return authorizeMcpImpl(state, serverName, signal);
-}
-
-function cancelMcpAuthorization(serverName: string): boolean {
-  return cancelMcpAuthorizationImpl(state, serverName);
-}
-
-function mcpStatus(): Array<{ serverName: string; status: string; toolCount: number; emailProfile?: string; error?: string }> {
-  return mcpStatusImpl(state);
-}
-
-function mcpCapabilityGovernance(): Array<{
-  serverName: string;
-  toolName: string;
-  providerId: string;
-  roomId: string;
-  dataScopes: string[];
-  allowedActions: string[];
-  approval: "before_external_commit";
-  status: string;
-}> {
-  return mcpCapabilityGovernanceImpl(state);
-}
-
-async function renameSession(sessionId: string, title: string, cwd: string) : Promise<void> { return renameSessionImpl(sessionId, title, cwd); }
-
-async function deleteSession(sessionId: string, cwd: string) : Promise<void> { return deleteSessionImpl(sessionId, cwd); }
 
 async function inspirationGenerate(category: string, count: number, cwd?: string): Promise<{ sessionId: string; category: string; count: number }> {
   return inspirationGenerateImpl(category, count, cwd);
@@ -1695,85 +1229,26 @@ installModelConfig({ state, piHome });
 // syncAuthCredentials: dead copy removed (canonical impl lives in
 // host-modules/bootstrap/model-runtime.ts).
 
-export async function listSessions(cwd: string) { return listSessionsImpl(cwd); }
 
-async function updateSessionMetadata(sessionId: string, update: (metadata: {
-  pinned: string[];
-  archived: string[];
-  experts: Record<string, { expertId: string; expertName: string; avatarLocal?: string }>;
-}) => void): Promise<void> {
-  return updateSessionMetadataImpl(sessionId, update);
-}
-
-async function clearSessionMetadata() : Promise<void> { return clearSessionMetadataImpl(); }
-
-function harnessCursorPath() : string { return harnessCursorPathImpl(); }
 function getHarnessCursorStore(): HarnessCursorStore {
   return getHarnessCursorStoreImpl();
 }
 
-function harnessResumeTokenPath() : string { return harnessResumeTokenPathImpl(); }
-
-async function getHarnessResumeToken() : Promise<string | undefined> { return getHarnessResumeTokenImpl(); }
-
-async function setHarnessResumeToken(token: unknown) : Promise<string | undefined> { return setHarnessResumeTokenImpl(token); }
-
-async function readHarnessSessionCursors() : Promise<Record<string, number>> { return readHarnessSessionCursorsImpl(); }
-
-async function writeHarnessSessionCursors(cursors: Record<string, unknown>) : Promise<void> { return writeHarnessSessionCursorsImpl(cursors); }
-
-async function getHarnessSessionCursors() : Promise<Record<string, number>> { return getHarnessSessionCursorsImpl(); }
-
-async function setHarnessSessionCursors(cursors: unknown) : Promise<Record<string, number>> { return setHarnessSessionCursorsImpl(cursors); }
 
 /** Forwarder for setSessionPinned (real impl in host-modules/session-metadata.ts). */
-async function setSessionPinned(sessionId: string, pinned: boolean): Promise<boolean> {
-  return setSessionPinnedImpl(sessionId, pinned);
-}
 
-async function setSessionArchived(sessionId: string, archived: boolean) : Promise<boolean> { return setSessionArchivedImpl(sessionId, archived); }
-
-async function setAllArchived(archived: boolean): Promise<{ updated: number }> {
-  return setAllArchivedImpl(archived);
-}
-
-async function setSessionExpert(sessionId: string, expert: { expertId: string; expertName: string; avatarLocal?: string } | null) : Promise<void> { return setSessionExpertImpl(sessionId, expert); }
 
 /** Forwarder for getToolRegistry (real impl lives in tool-registry owner). */
 function getToolRegistry(): PiToolRegistry {
   return state.toolRegistry;
 }
 
-async function listSkills(requestedCwd?: string | null) { return listSkillsImpl(requestedCwd); }
-
-async function resourceInventory() { return resourceInventoryImpl(); }
 
 /** Forwarder for listPlugins (real impl lives in plugin-state). */
 function listPlugins(): PluginStatus[] {
   return state.loader?.list() ?? [];
 }
 
-async function refreshStoredPluginLayers(updateActiveProfile = false): Promise<void> {
-  return refreshStoredPluginLayersImpl(updateActiveProfile);
-}
-
-async function listPluginInventory(): Promise<{
-  entries: PluginStatus[];
-  piExtensions: PiExtensionStatus[];
-  renderers: RendererPluginManifestEntry[];
-  packages: ProfilePackageInfo[];
-  providers: ProviderInventoryEntry[];
-  terminals: {
-    backends: string[];
-    sessionCount: number;
-  };
-}> {
-  return listPluginInventoryImpl();
-}
-
-async function pluginSnapshot() : Promise<PluginSnapshot> { return pluginSnapshotImpl(); }
-
-function pluginEvents(query?: { sessionId?: string; sinceSequence?: number; limit?: number }) : SessionEventRecord[] { return pluginEventsImpl(query); }
 
 /**
  * session projection baseline (sessionBaselines / sessionProjectionBaseline).
@@ -1784,47 +1259,18 @@ import {
   sessionProjectionBaseline as sessionProjectionBaselineImpl,
 } from "./host-modules/session-projection";
 
-async function sessionBaselines() {
-  return sessionBaselinesImpl();
-}
-
-async function sessionProjectionBaseline(sessionId: string) {
-  return sessionProjectionBaselineImpl(sessionId);
-}
 
 /** Toggle a single plugin on/off without restarting the agent session. */
-async function setPluginEnabledInternal(id: string, enabled: boolean, transaction?: PluginTransactionContext) : Promise<PluginStatus | null> { return setPluginEnabledInternalImpl(id, enabled, transaction); }
 
 /** Re-import and re-apply a plugin through the same loader lifecycle. */
-async function reloadPluginInternal(id: string, transaction?: PluginTransactionContext) : Promise<PluginStatus | null> { return reloadPluginInternalImpl(id, transaction); }
 
 /** Re-materialize the profile and reload Pi resources without recreating the AgentSession. */
-async function reloadPiExtensionsInternal(transaction?: PluginTransactionContext) : Promise<PiExtensionStatus[]> { return reloadPiExtensionsInternalImpl(transaction); }
 
 /** Update a plugin's runtime config; non-disabled entries go through Cordis update. */
-async function updatePluginConfigInternal(id: string, config: unknown, transaction?: PluginTransactionContext) : Promise<PluginStatus | null> { return updatePluginConfigInternalImpl(id, config, transaction); }
 
 /** Snapshot the persisted plugin-state overrides for UI / IPC inspection. */
-async function getStoredPluginState() {
-  return getStoredPluginStateImpl(state);
-}
-
 /** Clear a single plugin's persisted override (revert to profile defaults). */
-async function resetPluginStateInternal(id: string, transaction?: PluginTransactionContext) { return resetPluginStateInternalImpl(id, transaction); }
 
-function setPluginEnabled(id: string, enabled: boolean) : Promise<PluginStatus | null> { return setPluginEnabledImpl(id, enabled); }
-
-function reloadPlugin(id: string) : Promise<PluginStatus | null> { return reloadPluginImpl(id); }
-
-function reloadPiExtensions() : Promise<PiExtensionStatus[]> { return reloadPiExtensionsImpl(); }
-
-async function reloadPiRuntime(reason = "internal-reload"): Promise<void> {
-  return reloadPiRuntimeImpl(reason);
-}
-
-function updatePluginConfig(id: string, config: unknown) : Promise<PluginStatus | null> { return updatePluginConfigImpl(id, config); }
-
-function resetPluginState(id: string) { return resetPluginStateImpl(id); }
 
 function enqueuePluginStateTransaction<T>(
   kind: "plugin-enable" | "plugin-config" | "plugin-reset",
@@ -1868,10 +1314,6 @@ async function newSession(cwd: string, modelId?: string, options?: { traceId?: s
 async function ensureNewSession(cwd: string, modelId?: string, options?: { traceId?: string }): Promise<{ sessionId?: string; sessionFile?: string; cwd: string; model?: { provider?: string; id?: string } }> {
   return ensureNewSessionImpl(cwd, modelId, options);
 }
-async function captureFileSnapshot(sessionId: string, toolCallId: string, toolName: string, args: unknown) {
-  return captureFileSnapshotImpl(state, sessionId, toolCallId, toolName, args);
-}
-
 export function reportActivePluginTransaction(
   transactionId: string,
   surface: string,
@@ -1901,39 +1343,39 @@ export const agentHost = buildAgentHostFacade({
   init,
   waitUntilReady,
   dispose,
-  getSession,
+  getSession: getSessionImpl,
   extensionsBound,
-  onEvent,
-  onPluginEvent,
-  prompt,
-  promptContent,
-  steer,
-  followUp,
-  abort,
-  setModel,
-  setThinkingLevel,
-  getModel,
-  getModelRuntime,
-  getCwd,
+  onEvent: onEventImpl,
+  onPluginEvent: onPluginEventImpl,
+  prompt: promptImpl,
+  promptContent: promptContentImpl,
+  steer: steerImpl,
+  followUp: followUpImpl,
+  abort: abortImpl,
+  setModel: setModelImpl,
+  setThinkingLevel: setThinkingLevelImpl,
+  getModel: getModelImpl,
+  getModelRuntime: getModelRuntimeImpl,
+  getCwd: getCwdImpl,
   selectAgentPreset,
-  authStatus,
-  providerCatalog,
+  authStatus: authStatusImpl,
+  providerCatalog: providerCatalogImpl,
   listPlugins,
-  pluginInventory: listPluginInventory,
-  pluginSnapshot,
-  pluginEvents,
-  setPluginEnabled,
-  reloadPlugin,
-  reloadPiExtensions,
-  reloadPiRuntime,
-  updatePluginConfig,
-  getStoredPluginState,
-  resetPluginState,
+  pluginInventory: listPluginInventoryImpl,
+  pluginSnapshot: pluginSnapshotImpl,
+  pluginEvents: pluginEventsImpl,
+  setPluginEnabled: setPluginEnabledImpl,
+  reloadPlugin: reloadPluginImpl,
+  reloadPiExtensions: reloadPiExtensionsImpl,
+  reloadPiRuntime: reloadPiRuntimeImpl,
+  updatePluginConfig: updatePluginConfigImpl,
+  getStoredPluginState: () => getStoredPluginStateImpl(state),
+  resetPluginState: resetPluginStateImpl,
   getToolRegistry,
   profilePackages,
   installDefaultPiPackages,
-  installProfileBundle,
-  removeProfileBundle,
+  installProfileBundle: installProfileBundleImpl,
+  removeProfileBundle: removeProfileBundleImpl,
   listRendererPluginEntries,
   rendererPluginBootGraph,
   resolveRendererPluginModule,
@@ -1941,29 +1383,29 @@ export const agentHost = buildAgentHostFacade({
   ensureTypertReady,
   newSession,
   ensureNewSession,
-  loadSession,
-  sessionInfo,
-  sessionUsage,
-  sessionFile,
-  rewindSession,
-  reloadMcp,
-  authorizeMcp,
-  cancelMcpAuthorization,
-  mcpStatus,
-  mcpCapabilityGovernance,
+  loadSession: loadSessionImpl,
+  sessionInfo: sessionInfoImpl,
+  sessionUsage: sessionUsageImpl,
+  sessionFile: sessionFileImpl,
+  rewindSession: rewindSessionImpl,
+  reloadMcp: () => reloadMcpImpl(state),
+  authorizeMcp: (serverName, signal) => authorizeMcpImpl(state, serverName, signal),
+  cancelMcpAuthorization: (serverName) => cancelMcpAuthorizationImpl(state, serverName),
+  mcpStatus: () => mcpStatusImpl(state),
+  mcpCapabilityGovernance: () => mcpCapabilityGovernanceImpl(state),
   resolveUiRequest,
-  renameSession,
-  deleteSession,
-  setSessionPinned,
-  setSessionArchived,
-  setAllArchived,
-  setSessionExpert,
-  clearSessionMetadata,
-  saveProvider,
-  saveModel,
-  deleteProvider,
-  deleteModel,
-  listSessions,
+  renameSession: renameSessionImpl,
+  deleteSession: deleteSessionImpl,
+  setSessionPinned: setSessionPinnedImpl,
+  setSessionArchived: setSessionArchivedImpl,
+  setAllArchived: setAllArchivedImpl,
+  setSessionExpert: setSessionExpertImpl,
+  clearSessionMetadata: clearSessionMetadataImpl,
+  saveProvider: saveProviderImpl,
+  saveModel: saveModelImpl,
+  deleteProvider: deleteProviderImpl,
+  deleteModel: deleteModelImpl,
+  listSessions: listSessionsImpl,
   listWorkspaces,
   createWorkspace,
   renameWorkspace,
@@ -1976,26 +1418,26 @@ export const agentHost = buildAgentHostFacade({
   deepSeekPiBridgeDescription,
   invokeDeepSeekCordis,
   invokeConnection,
-  sessionBaselines,
-  sessionProjectionBaseline,
-  listCommands,
-  listSkills,
-  resourceInventory,
-  pluginReadiness,
-  listRunningTasks,
-  listSubagentChildren,
-  listSessionJobs,
-  subagentHistory,
-  promptSubagent,
-  interruptSubagent,
-  killTask,
+  sessionBaselines: sessionBaselinesImpl,
+  sessionProjectionBaseline: sessionProjectionBaselineImpl,
+  listCommands: listCommandsImpl,
+  listSkills: listSkillsImpl,
+  resourceInventory: resourceInventoryImpl,
+  pluginReadiness: pluginReadinessImpl,
+  listRunningTasks: listRunningTasksImpl,
+  listSubagentChildren: listSubagentChildrenImpl,
+  listSessionJobs: listSessionJobsImpl,
+  subagentHistory: subagentHistoryImpl,
+  promptSubagent: promptSubagentImpl,
+  interruptSubagent: interruptSubagentImpl,
+  killTask: killTaskImpl,
   inspirationGenerate,
-  getHarnessSessionCursors,
-  setHarnessSessionCursors,
-  getHarnessResumeToken,
-  setHarnessResumeToken,
-  updateSessionQueue,
-  readSessionAttachment,
+  getHarnessSessionCursors: getHarnessSessionCursorsImpl,
+  setHarnessSessionCursors: setHarnessSessionCursorsImpl,
+  getHarnessResumeToken: getHarnessResumeTokenImpl,
+  setHarnessResumeToken: setHarnessResumeTokenImpl,
+  updateSessionQueue: updateSessionQueueImpl,
+  readSessionAttachment: readSessionAttachmentImpl,
   reportActivePluginTransaction,
   listActivePluginTransactions,
   // Keep the workbench lifecycle methods on the public facade. These methods
@@ -2022,50 +1464,22 @@ export const agentHost = buildAgentHostFacade({
 });
 
 
-/**
- * Stage F-5: syncWorkbenchScope moved to host-modules/workbench-scope.ts.
- */
+// syncWorkbenchScope + workbench-scope-sync moved to host-modules/workbench-scope-sync.ts
+// before-quit handler + filesystem capability policy moved to host-modules/bootstrap/
+import { installBeforeQuitHandler } from "./host-modules/bootstrap/before-quit-handler";
 import {
-  syncWorkbenchScope,
-  __registerDefaultRendererEventEmitter,
-  __registerDefaultState,
-  __registerDefaultCasdoorStatus,
-} from "./host-modules/workbench-scope-sync";
-import { __registerDefaultState as __registerDefaultDshState } from "./host-modules/dsh-bridge-helpers";
-export { syncWorkbenchScope };
+  evaluateFilesystemCapabilityPolicy as evaluateFilesystemCapabilityPolicyImpl,
+  DEFAULT_FILESYSTEM_POLICY as DEFAULT_FILESYSTEM_POLICY_IMPL,
+  type FilesystemCapabilityPolicy as FilesystemCapabilityPolicyImpl,
+} from "./host-modules/bootstrap/filesystem-capability-policy";
 
 export type { AgentSession };
 
-let quitting = false;
-let disposedForQuit = false;
+// v6-G M1 收尾: 把 Electron before-quit + filesystem policy 抽到独立模块,
+// agent-host.ts 只剩一行 register. Register 在 module-load 即触发, 等价
+// 原 inline `app.on("before-quit", ...)` 在模块初始化时的副作用.
+installBeforeQuitHandler({ dispose });
 
-app.on("before-quit", (event) => {
-  if (disposedForQuit) return;
-  if (quitting) {
-    event.preventDefault();
-    return;
-  }
-  quitting = true;
-  event.preventDefault();
-  void dispose().finally(() => {
-    disposedForQuit = true;
-    app.exit(0);
-  });
-});
-
-// Filesystem capability policy — single source of truth for whether the
-// harness may run filesystem smoke. Delegates to the canonical helper under
-// evals/node so Node.mjs runners and the Electron main process return the
-// same answer. Keep this name stable; callers grep for it.
-export type FilesystemCapabilityPolicy = {
-  allowed: boolean;
-  reason: string;
-  source: "env" | "manifest" | "default";
-};
-export const DEFAULT_FILESYSTEM_POLICY = "disabled-by-policy";
-export function evaluateFilesystemCapabilityPolicy(
-  overrides: { env?: NodeJS.ProcessEnv; manifestPolicy?: string } = {},
-): FilesystemCapabilityPolicy {
-  const helper = require("../../evals/node/_filesystem-capability-policy.mjs");
-  return helper.evaluateFilesystemCapabilityPolicy(overrides);
-}
+export const evaluateFilesystemCapabilityPolicy = evaluateFilesystemCapabilityPolicyImpl;
+export const DEFAULT_FILESYSTEM_POLICY = DEFAULT_FILESYSTEM_POLICY_IMPL;
+export type FilesystemCapabilityPolicy = FilesystemCapabilityPolicyImpl;

@@ -105,12 +105,17 @@ export async function disposeInternal(): Promise<void> {
   // Stage G-1c: openbuddy-automation removed; nothing to stop here.
   // pi-background-tasks disposes itself with the pi session.
   const session = state.session;
+  // 注意: piSessionRuntimeDisposeImpl 必须在 session 守卫之外调用 — 之前的版本
+  // 只在 session 非空时 dispose, 当 __runInitialize 半成功 (create 完但 state.session
+  // 赋值前抛错) 会让 piSessionRuntime.current 残留, 下一次 init 的 create() 会抛
+  // "pi-session-runtime: session is already active". dispose() 自身就是
+  // null-safe: piSessionRuntime.dispose() 检测 current 为 null 就 early-return.
   try {
     if (session) {
       state.context?.emit("pi/dispose", { sessionId: session.sessionId });
       emitPluginEventImpl("session/dispose", { sessionId: session.sessionId });
-      await piSessionRuntimeDisposeImpl();
     }
+    await piSessionRuntimeDisposeImpl();
   } catch (error) {
     console.warn("[openbuddy] abort on dispose failed", error);
   }

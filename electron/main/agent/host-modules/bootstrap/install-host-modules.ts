@@ -217,7 +217,7 @@ export interface InstallHostModuleDeps {
  *       上下文服务快照 → 默认包安装器.
  */
 function installProfileDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
-  const d = deps as unknown as never;
+  const d = { ...deps, state } as unknown as never;
   installOverridePatches(d);
   installProfileSnapshot(d);
   installProfileBundles(d);
@@ -283,7 +283,7 @@ function installPluginDomain(state: AgentHostState, deps: InstallHostModuleDeps)
  * 先注入完闭包, 再让 runtime 串起来.
  */
 function installRuntimeDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
-  const d = deps as unknown as never;
+  const d = { ...deps, state } as unknown as never;
   installProfileReloadTransaction(d);
   installSessionRebind(d);
   installSessionProjection(d);
@@ -298,7 +298,7 @@ function installRuntimeDomain(state: AgentHostState, deps: InstallHostModuleDeps
 }
 
 /**
- * Install 全部 39 个 host-module, 按 4 域分组:
+ * Install 全部 4 域 host-module (所有域共享同一 deps + state):
  *   - Profile 域  (9 modules)
  *   - Session 域  (9 modules)
  *   - Plugin 域   (11 modules)

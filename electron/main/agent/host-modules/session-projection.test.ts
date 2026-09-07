@@ -18,7 +18,6 @@ afterEach(() => {
 describe("session-projection", () => {
   it("sessionBaselines aggregates event sequences + persists IDs", async () => {
     installSessionProjection({
-      state: createDefaultAgentHostState(),
       pluginEvents: () => [
         { sessionId: "s1", sessionSequence: 5, sequence: 5 } as any,
         { sessionId: "s1", sessionSequence: 10, sequence: 10 } as any,
@@ -38,7 +37,6 @@ describe("session-projection", () => {
 
   it("sessionBaselines tolerates persisted session info throwing", async () => {
     installSessionProjection({
-      state: createDefaultAgentHostState(),
       pluginEvents: () => [{ sessionId: "s1", sessionSequence: 5, sequence: 5 } as any],
       listPersistedSessionInfos: async () => { throw new Error("disk gone"); },
       readPersistedSessionHeader: async () => ({}),
@@ -49,7 +47,6 @@ describe("session-projection", () => {
 
   it("sessionProjectionBaseline reads session/projection entries, last-write-wins", async () => {
     installSessionProjection({
-      state: createDefaultAgentHostState(),
       pluginEvents: (q: any) => {
         if (q?.sessionId !== "s1") return [];
         return [
@@ -69,7 +66,6 @@ describe("session-projection", () => {
 
   it("sessionProjectionBaseline falls back to persisted header.title", async () => {
     installSessionProjection({
-      state: createDefaultAgentHostState(),
       pluginEvents: () => [],
       listPersistedSessionInfos: async () => [],
       readPersistedSessionHeader: async () => ({ title: "MySession" }),

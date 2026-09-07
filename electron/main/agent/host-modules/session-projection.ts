@@ -16,13 +16,11 @@
  */
 
 import { type SessionEventRecord } from "../../session/session-event-log";
-import { type AgentHostState } from "./_state-shape";
 
 // ---------------------------------------------------------------------------
 // Module-level singleton deps (install pattern)
 // ---------------------------------------------------------------------------
 
-let state: AgentHostState | null = null;
 let pluginEventsImpl: (query?: { sessionId?: string; sinceSequence?: number; limit?: number }) => SessionEventRecord[] = () => [];
 let listPersistedSessionInfosImpl: () => Promise<Array<{ id: string }>> = async () => [];
 let readPersistedSessionHeaderImpl: (sessionId: string) => Promise<{ title?: string; name?: string }> = async () => ({});
@@ -32,7 +30,6 @@ let readPersistedSessionHeaderImpl: (sessionId: string) => Promise<{ title?: str
 // ---------------------------------------------------------------------------
 
 export interface InstallSessionProjectionDeps {
-  state: AgentHostState;
   /** session-event-log snapshot */
   pluginEvents: (query?: { sessionId?: string; sinceSequence?: number; limit?: number }) => SessionEventRecord[];
   /** session-store.listPersistedSessionInfos */
@@ -42,15 +39,18 @@ export interface InstallSessionProjectionDeps {
 }
 
 export function installSessionProjection(deps: InstallSessionProjectionDeps): void {
-  state = deps.state;
-  pluginEventsImpl = deps.pluginEvents;
-  listPersistedSessionInfosImpl = deps.listPersistedSessionInfos;
-  readPersistedSessionHeaderImpl = deps.readPersistedSessionHeader;
+  // v6-G M1 defensive install: 只在 deps 提供有效值时才覆盖 module-level 单例.
+  // 如果 deps.pluginEvents / listPersistedSessionInfos / readPersistedSessionHeader
+  // 未提供 (例如上游 agent-host.ts 的 installMicrokernelDepsClosures 还没把这
+  // 些 closure 透传过来), 保留默认 placeholder, 否则 IPC handler 在 init()
+  // 之前调用 sessionBaselines() 会拿到 undefined 报错.
+  if (deps.pluginEvents) pluginEventsImpl = deps.pluginEvents;
+  if (deps.listPersistedSessionInfos) listPersistedSessionInfosImpl = deps.listPersistedSessionInfos;
+  if (deps.readPersistedSessionHeader) readPersistedSessionHeaderImpl = deps.readPersistedSessionHeader;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */
 export function __resetSessionProjectionForTest(): void {
-  state = null;
   pluginEventsImpl = () => [];
   listPersistedSessionInfosImpl = async () => [];
   readPersistedSessionHeaderImpl = async () => ({});

@@ -75,7 +75,7 @@ export function createOpenBuddyRendererProfile(
 }
 
 export function createOpenBuddyProfile(
-  entries: readonly PluginEntryOptions[] = openBuddyCapabilityEntries,
+  entries: readonly PluginEntryOptions[] = [...openBuddyBaseEntries, ...openBuddyCapabilityEntries],
   patches: readonly import("@openbuddy/plugin-host").PluginPatch[][] = [],
 ): PluginProfile {
   return { entries: [...entries], patches };

@@ -43,26 +43,32 @@ let remoteServiceContextImpl: () => any = () => ({});
 export interface InstallProfileArtifactReconcilerDeps {
   state: AgentHostState;
   emitPluginEvent: (type: string, payload: unknown) => void;
-  /** discoverProfileRemoteContributions — full profile scan */
-  discoverRemote: () => Promise<Map<string, RemoteContribution>>;
-  /** discoverProfileTypertContributions — full profile scan */
-  discoverTypert: () => Promise<Map<string, TypertHostContribution>>;
-  /** serializeRemoteContribution helper from plugin-host */
-  serializeRemote: (contribution: any) => RemoteContribution;
-  /** remoteServiceContext() — closure with current state */
-  remoteServiceContext: () => any;
+  /** discoverProfileRemoteContributions — full profile scan. Optional: defaults to no-op. */
+  discoverRemote?: () => Promise<Map<string, RemoteContribution>>;
+  /** discoverProfileTypertContributions — full profile scan. Optional: defaults to no-op. */
+  discoverTypert?: () => Promise<Map<string, TypertHostContribution>>;
+  /** serializeRemoteContribution helper from plugin-host. Optional: defaults to identity. */
+  serializeRemote?: (contribution: any) => RemoteContribution;
+  /** remoteServiceContext() — closure with current state. Optional: defaults to empty. */
+  remoteServiceContext?: () => any;
 }
 
 /**
  * 一次性 install 所有 profile-artifact-reconciler 依赖.
+ *
+ * 修复: 之前要求所有 deps 必填, 但 `discoverRemote` 实际上就是本模块导出的
+ * `discoverProfileRemoteContributions` (会再 delegate 回 `discoverRemoteImpl`),
+ * 形成 chicken-and-egg, 调用方忘了传 → 第二次跑就 throw `is not a function`.
+ * 现在把不常用的 deps 全部 optional, 默认值从 __reset...ForTest 复用, 让
+ * 不调用 reconciler 的 code path (e.g. smoke test 的 agent:init) 也能干净跑通.
  */
 export function installProfileArtifactReconciler(deps: InstallProfileArtifactReconcilerDeps): void {
   state = deps.state;
   emitPluginEventImpl = deps.emitPluginEvent;
-  discoverRemoteImpl = deps.discoverRemote;
-  discoverTypertImpl = deps.discoverTypert;
-  serializeRemoteImpl = deps.serializeRemote;
-  remoteServiceContextImpl = deps.remoteServiceContext;
+  if (deps.discoverRemote) discoverRemoteImpl = deps.discoverRemote;
+  if (deps.discoverTypert) discoverTypertImpl = deps.discoverTypert;
+  if (deps.serializeRemote) serializeRemoteImpl = deps.serializeRemote;
+  if (deps.remoteServiceContext) remoteServiceContextImpl = deps.remoteServiceContext;
 }
 
 /** 测试/调试用: 重置模块级单例. */
