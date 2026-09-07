@@ -64,7 +64,7 @@ export function installWorkbenchScope(deps: {
 	state: AgentHostState;
 	listAllPiSessions: <T = unknown>() => any;
 }): void {
-	state = deps.state;
+	if (deps.state) state = deps.state;
 	listAllPiSessions = deps.listAllPiSessions as any;
 }
 

@@ -43,8 +43,8 @@ let hostPiHome: () => string = () => "";
  * runtime. Idempotent.
  */
 export function installModelConfig(deps: { state: AgentHostState; piHome: () => string }): void {
-  hostState = deps.state;
-  hostPiHome = deps.piHome;
+  if (deps.state) hostState = deps.state;
+  if (deps.piHome) hostPiHome = deps.piHome;
 }
 
 function modelsFile(): string {

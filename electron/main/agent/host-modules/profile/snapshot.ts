@@ -45,8 +45,8 @@ export function installProfileSnapshot(deps: {
     themes: string[];
   }) => void;
 }): void {
-  state = deps.state;
-  setProfilePiResourcePaths = deps.setProfilePiResourcePaths;
+  if (deps.state) state = deps.state;
+  if (deps.setProfilePiResourcePaths) setProfilePiResourcePaths = deps.setProfilePiResourcePaths;
 }
 
 export type PiProfileSnapshot = {

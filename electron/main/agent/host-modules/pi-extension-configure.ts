@@ -73,8 +73,8 @@ export interface InstallPiExtensionConfigureDeps {
  * 必须在 `agent-host.ts:initialize()` 早期 (state 已初始化) 调用.
  */
 export function installPiExtensionConfigure(deps: InstallPiExtensionConfigureDeps): void {
-  state = deps.state;
-  emitPluginEventImpl = deps.emitPluginEvent;
+  if (deps.state) state = deps.state;
+  if (deps.emitPluginEvent) emitPluginEventImpl = deps.emitPluginEvent;
   // Optional deps: 保留模块级 stub 默认值, 调用方不传也不要 overwrite 成 undefined,
   // 否则后续 telemetrySinkImpl() 这种 throw `is not a function`. 同样的 chicken-and-egg
   // 模式已在 profile-artifact-reconciler.ts 修过一次.

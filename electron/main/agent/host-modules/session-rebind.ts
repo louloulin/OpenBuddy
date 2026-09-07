@@ -69,17 +69,17 @@ export interface InstallSessionRebindDeps {
  * 已构造) 调用.
  */
 export function installSessionRebind(deps: InstallSessionRebindDeps): void {
-  state = deps.state;
-  initializeImpl = deps.initialize;
-  sessionPresetSelectionImpl = deps.sessionPresetSelection;
-  replaceSessionImpl = deps.replaceSession;
-  sessionManagerOpenImpl = deps.sessionManagerOpen;
-  agentHomeImpl = deps.agentHome;
-  provideRpcUiContextImpl = deps.provideRpcUiContext;
-  emitPluginEventImpl = deps.emitPluginEvent;
-  emitRendererEventImpl = deps.emitRendererEvent;
-  questionAnswerImpl = deps.questionAnswer;
-  createOpenBuddyRpcUiContextImpl = deps.createOpenBuddyRpcUiContext;
+  if (deps.state) state = deps.state;
+  if (deps.initialize) initializeImpl = deps.initialize;
+  if (deps.sessionPresetSelection) sessionPresetSelectionImpl = deps.sessionPresetSelection;
+  if (deps.replaceSession) replaceSessionImpl = deps.replaceSession;
+  if (deps.sessionManagerOpen) sessionManagerOpenImpl = deps.sessionManagerOpen;
+  if (deps.agentHome) agentHomeImpl = deps.agentHome;
+  if (deps.provideRpcUiContext) provideRpcUiContextImpl = deps.provideRpcUiContext;
+  if (deps.emitPluginEvent) emitPluginEventImpl = deps.emitPluginEvent;
+  if (deps.emitRendererEvent) emitRendererEventImpl = deps.emitRendererEvent;
+  if (deps.questionAnswer) questionAnswerImpl = deps.questionAnswer;
+  if (deps.createOpenBuddyRpcUiContext) createOpenBuddyRpcUiContextImpl = deps.createOpenBuddyRpcUiContext;
 }
 
 /** 测试/调试用: 重置模块级单例回到 stub. */

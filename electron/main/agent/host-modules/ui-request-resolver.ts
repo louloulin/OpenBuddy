@@ -47,10 +47,10 @@ export interface InstallUiRequestResolverDeps {
  * 一次性 install 所有 ui-request-resolver 依赖.
  */
 export function installUiRequestResolver(deps: InstallUiRequestResolverDeps): void {
-  state = deps.state;
-  emitPluginEventImpl = deps.emitPluginEvent;
-  permissionReadRulesImpl = deps.permissionReadRules;
-  permissionWriteRulesImpl = deps.permissionWriteRules;
+  if (deps.state) state = deps.state;
+  if (deps.emitPluginEvent) emitPluginEventImpl = deps.emitPluginEvent;
+  if (deps.permissionReadRules) permissionReadRulesImpl = deps.permissionReadRules;
+  if (deps.permissionWriteRules) permissionWriteRulesImpl = deps.permissionWriteRules;
 }
 
 /** 测试/调试用: 重置模块级单例. */

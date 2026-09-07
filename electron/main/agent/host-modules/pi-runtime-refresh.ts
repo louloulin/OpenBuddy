@@ -34,8 +34,8 @@ export interface InstallPiRuntimeRefreshDeps {
 }
 
 export function installPiRuntimeRefresh(deps: InstallPiRuntimeRefreshDeps): void {
-  state = deps.state;
-  piRuntimeCoordinatorImpl = deps.piRuntimeCoordinator;
+  if (deps.state) state = deps.state;
+  if (deps.piRuntimeCoordinator) piRuntimeCoordinatorImpl = deps.piRuntimeCoordinator;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */

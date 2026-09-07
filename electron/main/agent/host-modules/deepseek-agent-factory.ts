@@ -73,8 +73,8 @@ export interface InstallDeepSeekAgentFactoryDeps {
 }
 
 export function installDeepSeekAgentFactory(deps: InstallDeepSeekAgentFactoryDeps): void {
-  createDeepSeekAgentImpl = deps.createDeepSeekAgent;
-  resumeDeepSeekAgentImpl = deps.resumeDeepSeekAgent;
+  if (deps.createDeepSeekAgent) createDeepSeekAgentImpl = deps.createDeepSeekAgent;
+  if (deps.resumeDeepSeekAgent) resumeDeepSeekAgentImpl = deps.resumeDeepSeekAgent;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */

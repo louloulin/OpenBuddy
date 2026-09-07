@@ -42,9 +42,9 @@ export function installHookPermission(deps: {
   emitPluginEvent: (type: string, payload: unknown) => void;
   emitRendererEvent: (channel: string, payload: unknown) => void;
 }): void {
-  state = deps.state;
-  emitPluginEvent = deps.emitPluginEvent;
-  emitRendererEvent = deps.emitRendererEvent;
+  if (deps.state) state = deps.state;
+  if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
+  if (deps.emitRendererEvent) emitRendererEvent = deps.emitRendererEvent;
 }
 
 async function requestHookPermission(title: string, message: string, request?: any): Promise<any> {

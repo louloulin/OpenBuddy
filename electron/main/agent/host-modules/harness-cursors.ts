@@ -43,9 +43,9 @@ export function installHarnessCursors(deps: {
   piHome: () => string;
   isPathWithin: (root: string, candidate: string) => boolean;
 }): void {
-  state = deps.state;
-  piHome = deps.piHome;
-  isPathWithin = deps.isPathWithin;
+  if (deps.state) state = deps.state;
+  if (deps.piHome) piHome = deps.piHome;
+  if (deps.isPathWithin) isPathWithin = deps.isPathWithin;
 }
 import { listProfilePackages } from "@openbuddy/plugin-host";
 import { hookConfigSummary } from "../agent-hooks";

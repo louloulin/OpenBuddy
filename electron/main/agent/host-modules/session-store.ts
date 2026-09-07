@@ -76,18 +76,18 @@ export function installSessionStore(deps: {
   persistedSessionPath: (id: string | undefined) => Promise<string | undefined>;
   piRuntimeCoordinator: { reload: (reason: string) => Promise<void> };
 }): void {
-  state = deps.state;
-  piSessionDir = deps.piSessionDir;
-  emitPluginEvent = deps.emitPluginEvent;
-  emitRendererEvent = deps.emitRendererEvent;
-  enqueueLifecycle = deps.enqueueLifecycle;
-  initialize = deps.initialize;
-  rebindSession = deps.rebindSession;
-  dispose = deps.dispose;
-  lifecycleAppendQueues = deps.lifecycleAppendQueues;
+  if (deps.state) state = deps.state;
+  if (deps.piSessionDir) piSessionDir = deps.piSessionDir;
+  if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
+  if (deps.emitRendererEvent) emitRendererEvent = deps.emitRendererEvent;
+  if (deps.enqueueLifecycle) enqueueLifecycle = deps.enqueueLifecycle;
+  if (deps.initialize) initialize = deps.initialize;
+  if (deps.rebindSession) rebindSession = deps.rebindSession;
+  if (deps.dispose) dispose = deps.dispose;
+  if (deps.lifecycleAppendQueues) lifecycleAppendQueues = deps.lifecycleAppendQueues;
   listAllPiSessions = deps.listAllPiSessions as any;
-  persistedSessionPath = deps.persistedSessionPath;
-  piRuntimeCoordinator = deps.piRuntimeCoordinator;
+  if (deps.persistedSessionPath) persistedSessionPath = deps.persistedSessionPath;
+  if (deps.piRuntimeCoordinator) piRuntimeCoordinator = deps.piRuntimeCoordinator;
 }
 import { restoreFileSnapshots } from "./rewind-snapshot";
 

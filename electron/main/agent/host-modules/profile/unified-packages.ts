@@ -52,8 +52,8 @@ export interface InstallUnifiedPackagesDeps {
 }
 
 export function installUnifiedPackages(deps: InstallUnifiedPackagesDeps): void {
-  state = deps.state;
-  discoverRendererPluginManifestImpl = deps.discoverRendererPluginManifest;
+  if (deps.state) state = deps.state;
+  if (deps.discoverRendererPluginManifest) discoverRendererPluginManifestImpl = deps.discoverRendererPluginManifest;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */

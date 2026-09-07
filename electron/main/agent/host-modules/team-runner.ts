@@ -78,17 +78,17 @@ export function installTeamRunner(deps: {
     shell: any | undefined,
   ) => Promise<{ decision: string; reason?: string; additionalContext: string[] }>;
 }): void {
-  _state = deps.state;
-  _emitPluginEvent = deps.emitPluginEvent;
-  _canonicalEventNamespace = deps.canonicalEventNamespace;
-  _createSubagentResourceLoader = deps.createSubagentResourceLoader;
-  _createTaskAwareTool = deps.createTaskAwareTool;
-  _eventNamespace = deps.eventNamespace;
-  _modelFacingPresetTools = deps.modelFacingPresetTools;
-  _persistedSessionPath = deps.persistedSessionPath;
-  _piHome = deps.piHome;
-  _piSessionDir = deps.piSessionDir;
-  _runHookPoint = deps.runHookPoint;
+  if (deps.state) _state = deps.state;
+  if (deps.emitPluginEvent) _emitPluginEvent = deps.emitPluginEvent;
+  if (deps.canonicalEventNamespace) _canonicalEventNamespace = deps.canonicalEventNamespace;
+  if (deps.createSubagentResourceLoader) _createSubagentResourceLoader = deps.createSubagentResourceLoader;
+  if (deps.createTaskAwareTool) _createTaskAwareTool = deps.createTaskAwareTool;
+  if (deps.eventNamespace) _eventNamespace = deps.eventNamespace;
+  if (deps.modelFacingPresetTools) _modelFacingPresetTools = deps.modelFacingPresetTools;
+  if (deps.persistedSessionPath) _persistedSessionPath = deps.persistedSessionPath;
+  if (deps.piHome) _piHome = deps.piHome;
+  if (deps.piSessionDir) _piSessionDir = deps.piSessionDir;
+  if (deps.runHookPoint) _runHookPoint = deps.runHookPoint;
 }
 
 /* ---------- Helpers: throw cleanly if called before install ---------- */

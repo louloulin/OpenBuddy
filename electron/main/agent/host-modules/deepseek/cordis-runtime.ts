@@ -66,16 +66,16 @@ export function installDeepSeekCordisRuntime(deps: {
 	piHome: () => string;
 	profileArtifactModuleUrl: (id: string) => string;
 }): void {
-	state = deps.state;
-	emitPluginEvent = deps.emitPluginEvent;
-	promptFn = deps.prompt;
-	abortFn = deps.abort;
-	listSessions = deps.listSessions;
-	listSubagentChildren = deps.listSubagentChildren;
-	promptSubagent = deps.promptSubagent;
-	interruptSubagent = deps.interruptSubagent;
-	piHome = deps.piHome;
-	profileArtifactModuleUrl = deps.profileArtifactModuleUrl;
+	if (deps.state) state = deps.state;
+	if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
+	if (deps.prompt) promptFn = deps.prompt;
+	if (deps.abort) abortFn = deps.abort;
+	if (deps.listSessions) listSessions = deps.listSessions;
+	if (deps.listSubagentChildren) listSubagentChildren = deps.listSubagentChildren;
+	if (deps.promptSubagent) promptSubagent = deps.promptSubagent;
+	if (deps.interruptSubagent) interruptSubagent = deps.interruptSubagent;
+	if (deps.piHome) piHome = deps.piHome;
+	if (deps.profileArtifactModuleUrl) profileArtifactModuleUrl = deps.profileArtifactModuleUrl;
 }
 import { listWorkspaces } from "../workbench-scope";
 import { SubprocessRuntime, SandboxPolicyService, SandboxRuntime } from "../../../deepseek/subprocess-runtime";

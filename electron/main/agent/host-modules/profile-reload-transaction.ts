@@ -153,31 +153,30 @@ export interface InstallProfileReloadTransactionDeps {
 export function installProfileReloadTransaction(
   deps: InstallProfileReloadTransactionDeps,
 ): void {
-  state = deps.state;
-  pluginLifecycleQueue = deps.pluginLifecycleQueue;
-  piRuntimeCoordinator = deps.piRuntimeCoordinator;
-  emitPluginEvent = deps.emitPluginEvent;
-
-  capturePiProfileSnapshotImpl = deps.capturePiProfileSnapshot;
-  restorePiProfileSnapshotImpl = deps.restorePiProfileSnapshot;
-  captureReloadableContextServicesImpl = deps.captureReloadableContextServices;
-  restoreCapturedContextServicesImpl = deps.restoreCapturedContextServices;
-  captureDeepSeekCapabilityServicesImpl = deps.captureDeepSeekCapabilityServices;
-  restoreDeepSeekCapabilityServicesImpl = deps.restoreDeepSeekCapabilityServices;
-  materializeOpenBuddyProfileImpl = deps.materializeOpenBuddyProfile;
-  runtimeProfileBundleImpl = deps.runtimeProfileBundle;
-  createOpenBuddyProfileImpl = deps.createOpenBuddyProfile;
-  composePluginPatchesImpl = deps.composePluginPatches;
-  syncDeepSeekCordisRuntimeImpl = deps.syncDeepSeekCordisRuntime;
-  deepSeekCoreRuntimeEntriesImpl = deps.deepSeekCoreRuntimeEntries;
-  reconcileProfileArtifactsImpl = deps.reconcileProfileArtifacts;
-  refreshHookConfigsImpl = deps.refreshHookConfigs;
-  reloadMcpImpl = deps.reloadMcp;
-  reportPiExtensionErrorsImpl = deps.reportPiExtensionErrors;
-  readOverridePatchesImpl = deps.readOverridePatches;
-  setProfilePiResourcePathsImpl = deps.setProfilePiResourcePaths;
-  startProfileWatchersImpl = deps.startProfileWatchers;
-  configurePiExtensionsImpl = deps.configurePiExtensions;
+  if (deps.state) state = deps.state;
+  if (deps.pluginLifecycleQueue) pluginLifecycleQueue = deps.pluginLifecycleQueue;
+  if (deps.piRuntimeCoordinator) piRuntimeCoordinator = deps.piRuntimeCoordinator;
+  if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
+  if (deps.capturePiProfileSnapshot) capturePiProfileSnapshotImpl = deps.capturePiProfileSnapshot;
+  if (deps.restorePiProfileSnapshot) restorePiProfileSnapshotImpl = deps.restorePiProfileSnapshot;
+  if (deps.captureReloadableContextServices) captureReloadableContextServicesImpl = deps.captureReloadableContextServices;
+  if (deps.restoreCapturedContextServices) restoreCapturedContextServicesImpl = deps.restoreCapturedContextServices;
+  if (deps.captureDeepSeekCapabilityServices) captureDeepSeekCapabilityServicesImpl = deps.captureDeepSeekCapabilityServices;
+  if (deps.restoreDeepSeekCapabilityServices) restoreDeepSeekCapabilityServicesImpl = deps.restoreDeepSeekCapabilityServices;
+  if (deps.materializeOpenBuddyProfile) materializeOpenBuddyProfileImpl = deps.materializeOpenBuddyProfile;
+  if (deps.runtimeProfileBundle) runtimeProfileBundleImpl = deps.runtimeProfileBundle;
+  if (deps.createOpenBuddyProfile) createOpenBuddyProfileImpl = deps.createOpenBuddyProfile;
+  if (deps.composePluginPatches) composePluginPatchesImpl = deps.composePluginPatches;
+  if (deps.syncDeepSeekCordisRuntime) syncDeepSeekCordisRuntimeImpl = deps.syncDeepSeekCordisRuntime;
+  if (deps.deepSeekCoreRuntimeEntries) deepSeekCoreRuntimeEntriesImpl = deps.deepSeekCoreRuntimeEntries;
+  if (deps.reconcileProfileArtifacts) reconcileProfileArtifactsImpl = deps.reconcileProfileArtifacts;
+  if (deps.refreshHookConfigs) refreshHookConfigsImpl = deps.refreshHookConfigs;
+  if (deps.reloadMcp) reloadMcpImpl = deps.reloadMcp;
+  if (deps.reportPiExtensionErrors) reportPiExtensionErrorsImpl = deps.reportPiExtensionErrors;
+  if (deps.readOverridePatches) readOverridePatchesImpl = deps.readOverridePatches;
+  if (deps.setProfilePiResourcePaths) setProfilePiResourcePathsImpl = deps.setProfilePiResourcePaths;
+  if (deps.startProfileWatchers) startProfileWatchersImpl = deps.startProfileWatchers;
+  if (deps.configurePiExtensions) configurePiExtensionsImpl = deps.configurePiExtensions;
 }
 
 /** 测试/调试用: 重置模块级单例回到 stub. 不在生产代码调用. */

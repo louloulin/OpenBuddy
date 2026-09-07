@@ -42,7 +42,7 @@ export interface InstallDshBridgeHelpersDeps {
 }
 
 export function installDshBridgeHelpers(deps: InstallDshBridgeHelpersDeps): void {
-  state = deps.state;
+  if (deps.state) state = deps.state;
   __registerDefaultState(deps.state);
 }
 

@@ -63,8 +63,8 @@ export interface InstallProfileArtifactReconcilerDeps {
  * 不调用 reconciler 的 code path (e.g. smoke test 的 agent:init) 也能干净跑通.
  */
 export function installProfileArtifactReconciler(deps: InstallProfileArtifactReconcilerDeps): void {
-  state = deps.state;
-  emitPluginEventImpl = deps.emitPluginEvent;
+  if (deps.state) state = deps.state;
+  if (deps.emitPluginEvent) emitPluginEventImpl = deps.emitPluginEvent;
   if (deps.discoverRemote) discoverRemoteImpl = deps.discoverRemote;
   if (deps.discoverTypert) discoverTypertImpl = deps.discoverTypert;
   if (deps.serializeRemote) serializeRemoteImpl = deps.serializeRemote;

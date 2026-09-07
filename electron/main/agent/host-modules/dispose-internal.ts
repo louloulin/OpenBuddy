@@ -49,13 +49,13 @@ export interface InstallDisposeInternalDeps {
  * 一次性 install 所有 dispose-internal 依赖.
  */
 export function installDisposeInternal(deps: InstallDisposeInternalDeps): void {
-  state = deps.state;
-  emitPluginEventImpl = deps.emitPluginEvent;
-  piSessionRuntimeDisposeImpl = deps.piSessionRuntimeDispose;
-  stopProfileWatchersImpl = deps.stopProfileWatchers;
-  disposeProfileTypertRegistrationsImpl = deps.disposeProfileTypertRegistrations;
-  disposeActiveHookProcessesImpl = deps.disposeActiveHookProcesses;
-  drainActiveHookProcessesImpl = deps.drainActiveHookProcesses;
+  if (deps.state) state = deps.state;
+  if (deps.emitPluginEvent) emitPluginEventImpl = deps.emitPluginEvent;
+  if (deps.piSessionRuntimeDispose) piSessionRuntimeDisposeImpl = deps.piSessionRuntimeDispose;
+  if (deps.stopProfileWatchers) stopProfileWatchersImpl = deps.stopProfileWatchers;
+  if (deps.disposeProfileTypertRegistrations) disposeProfileTypertRegistrationsImpl = deps.disposeProfileTypertRegistrations;
+  if (deps.disposeActiveHookProcesses) disposeActiveHookProcessesImpl = deps.disposeActiveHookProcesses;
+  if (deps.drainActiveHookProcesses) drainActiveHookProcessesImpl = deps.drainActiveHookProcesses;
 }
 
 /** 测试/调试用: 重置模块级单例. */

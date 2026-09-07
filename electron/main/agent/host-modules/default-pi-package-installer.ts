@@ -32,7 +32,7 @@ export interface InstallDefaultPiPackageInstallerDeps {
 }
 
 export function installDefaultPiPackageInstaller(deps: InstallDefaultPiPackageInstallerDeps): void {
-  state = deps.state;
+  if (deps.state) state = deps.state;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */

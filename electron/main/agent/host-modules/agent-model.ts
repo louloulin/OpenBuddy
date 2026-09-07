@@ -54,10 +54,13 @@ export function installAgentModel(deps: {
 	piHome: () => string;
 	readModelsConfig: () => Promise<{ providers: Record<string, unknown> }>;
 }): void {
-	state = deps.state;
-	emitRendererEvent = deps.emitRendererEvent;
-	piHome = deps.piHome;
-	readModelsConfig = deps.readModelsConfig;
+	// v6-G M1 defensive install: 只在 deps 提供有效值时才覆盖 module-level 单例.
+	// 否则保留默认 placeholder (async () => ({ providers: {} })), 避免 IPC handler
+	// 在 init() 之前调用 setModel() 等时拿到 undefined → "X is not a function".
+	if (deps.state) state = deps.state;
+	if (deps.emitRendererEvent) emitRendererEvent = deps.emitRendererEvent;
+	if (deps.piHome) piHome = deps.piHome;
+	if (deps.readModelsConfig) readModelsConfig = deps.readModelsConfig;
 }
 
 async function setModel(modelId: string, options?: { traceId?: string; sessionId?: string }): Promise<void> {

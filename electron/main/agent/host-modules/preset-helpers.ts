@@ -42,8 +42,8 @@ export interface InstallPresetHelpersDeps {
 }
 
 export function installPresetHelpers(deps: InstallPresetHelpersDeps): void {
-  state = deps.state;
-  piHomeImpl = deps.piHome;
+  if (deps.state) state = deps.state;
+  if (deps.piHome) piHomeImpl = deps.piHome;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */

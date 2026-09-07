@@ -95,7 +95,7 @@ export interface InstallWorkbenchScopeSyncDeps {
  * 一次性 install 所有 workbench-scope-sync 依赖.
  */
 export function installWorkbenchScopeSync(deps: InstallWorkbenchScopeSyncDeps): void {
-  state = deps.state;
+  if (deps.state) state = deps.state;
   __registerDefaultState(deps.state);
   __registerDefaultRendererEventEmitter(deps.emitRendererEvent);
   __registerDefaultCasdoorStatus(deps.casdoorStatus);

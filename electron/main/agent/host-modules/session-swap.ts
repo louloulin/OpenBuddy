@@ -62,12 +62,12 @@ export interface InstallSessionSwapDeps {
 }
 
 export function installSessionSwap(deps: InstallSessionSwapDeps): void {
-  state = deps.state;
-  initializeImpl = deps.initialize;
-  rebindSessionImpl = deps.rebindSession;
-  persistPiSessionHeaderImpl = deps.persistPiSessionHeader;
-  setModelImpl = deps.setModel;
-  piSessionDirImpl = deps.piSessionDir;
+  if (deps.state) state = deps.state;
+  if (deps.initialize) initializeImpl = deps.initialize;
+  if (deps.rebindSession) rebindSessionImpl = deps.rebindSession;
+  if (deps.persistPiSessionHeader) persistPiSessionHeaderImpl = deps.persistPiSessionHeader;
+  if (deps.setModel) setModelImpl = deps.setModel;
+  if (deps.piSessionDir) piSessionDirImpl = deps.piSessionDir;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */

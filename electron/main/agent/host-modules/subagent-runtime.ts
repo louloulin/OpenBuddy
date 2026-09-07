@@ -61,11 +61,11 @@ export function installSubagentRuntime(deps: {
   ) => Promise<unknown>;
   listAllPiSessions: <T = unknown>() => any;
 }): void {
-  state = deps.state;
-  piHome = deps.piHome;
-  emitPluginEvent = deps.emitPluginEvent;
-  emitRendererEvent = deps.emitRendererEvent;
-  ensureContinuableSubagent = deps.ensureContinuableSubagent;
+  if (deps.state) state = deps.state;
+  if (deps.piHome) piHome = deps.piHome;
+  if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
+  if (deps.emitRendererEvent) emitRendererEvent = deps.emitRendererEvent;
+  if (deps.ensureContinuableSubagent) ensureContinuableSubagent = deps.ensureContinuableSubagent;
   listAllPiSessions = deps.listAllPiSessions as any;
 }
 type SessionEventRecord = any;

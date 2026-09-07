@@ -29,8 +29,7 @@ let disposedForQuit = false;
 export function installBeforeQuitHandler(deps: { dispose: () => Promise<void> }): void {
   if (installed) return;
   installed = true;
-  disposeImpl = deps.dispose;
-
+  if (deps.dispose) disposeImpl = deps.dispose;
   app.on("before-quit", (event) => {
     if (disposedForQuit) return;
     if (quitting) {

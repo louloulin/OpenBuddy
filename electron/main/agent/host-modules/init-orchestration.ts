@@ -49,8 +49,8 @@ export interface InstallInitOrchestrationDeps {
 }
 
 export function installInitOrchestration(deps: InstallInitOrchestrationDeps): void {
-  initializeImpl = deps.initialize;
-  enqueueLifecycleImpl = deps.enqueueLifecycle;
+  if (deps.initialize) initializeImpl = deps.initialize;
+  if (deps.enqueueLifecycle) enqueueLifecycleImpl = deps.enqueueLifecycle;
   getCurrentSessionIdImpl = deps.getCurrentSessionId ?? (() => undefined);
 }
 

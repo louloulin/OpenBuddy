@@ -58,12 +58,12 @@ export function installSessionMetadata(deps: {
   listAllPiSessions: () => Promise<unknown>;
   workspaceRegistry: () => unknown;
 }): void {
-  state = deps.state;
-  piHome = deps.piHome;
-  piSessionDir = deps.piSessionDir;
-  emitPluginEvent = deps.emitPluginEvent;
+  if (deps.state) state = deps.state;
+  if (deps.piHome) piHome = deps.piHome;
+  if (deps.piSessionDir) piSessionDir = deps.piSessionDir;
+  if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
   listAllPiSessions = deps.listAllPiSessions as any;
-  workspaceRegistry = deps.workspaceRegistry;
+  if (deps.workspaceRegistry) workspaceRegistry = deps.workspaceRegistry;
 }
 
 export async function listSessions(cwd: string) {

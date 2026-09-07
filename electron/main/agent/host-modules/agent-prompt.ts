@@ -75,16 +75,16 @@ export function installAgentPrompt(deps: {
   emitRendererEvent: (channel: string, payload: unknown) => void;
   publicQueueItems: (session: unknown) => readonly unknown[];
 }): void {
-  state = deps.state;
+  if (deps.state) state = deps.state;
   // Migrate pre-install handlers and rebind to the real agent-host Sets so
   // agent-host.ts:2803 (event broadcast loop) sees the same Set references.
   for (const h of eventHandlers) deps.state.eventHandlers.add(h);
   for (const h of pluginEventHandlers) deps.state.pluginEventHandlers.add(h);
   eventHandlers = deps.state.eventHandlers;
   pluginEventHandlers = deps.state.pluginEventHandlers;
-  emitPluginEvent = deps.emitPluginEvent;
-  emitRendererEvent = deps.emitRendererEvent;
-  publicQueueItems = deps.publicQueueItems;
+  if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
+  if (deps.emitRendererEvent) emitRendererEvent = deps.emitRendererEvent;
+  if (deps.publicQueueItems) publicQueueItems = deps.publicQueueItems;
 }
 
 type EventHandler = (event: AgentSessionEvent) => void;

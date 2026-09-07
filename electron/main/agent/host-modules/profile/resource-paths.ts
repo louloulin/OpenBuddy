@@ -39,9 +39,9 @@ export interface InstallProfileResourcePathsDeps {
 }
 
 export function installProfileResourcePaths(deps: InstallProfileResourcePathsDeps): void {
-  state = deps.state;
-  isPathWithinImpl = deps.isPathWithin;
-  toModuleUrlImpl = deps.toModuleUrl;
+  if (deps.state) state = deps.state;
+  if (deps.isPathWithin) isPathWithinImpl = deps.isPathWithin;
+  if (deps.toModuleUrl) toModuleUrlImpl = deps.toModuleUrl;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */

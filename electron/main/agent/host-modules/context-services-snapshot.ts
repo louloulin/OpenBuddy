@@ -38,9 +38,9 @@ export interface InstallContextServicesSnapshotDeps {
 }
 
 export function installContextServicesSnapshot(deps: InstallContextServicesSnapshotDeps): void {
-  state = deps.state;
-  captureDeepSeekCapabilityServicesImpl = deps.captureDeepSeekCapabilityServices;
-  restoreDeepSeekCapabilityServicesImpl = deps.restoreDeepSeekCapabilityServices;
+  if (deps.state) state = deps.state;
+  if (deps.captureDeepSeekCapabilityServices) captureDeepSeekCapabilityServicesImpl = deps.captureDeepSeekCapabilityServices;
+  if (deps.restoreDeepSeekCapabilityServices) restoreDeepSeekCapabilityServicesImpl = deps.restoreDeepSeekCapabilityServices;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */

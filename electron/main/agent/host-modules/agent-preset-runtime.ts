@@ -59,16 +59,16 @@ export interface InstallAgentPresetRuntimeDeps {
  * 一次性 install 所有 agent-preset-runtime 依赖.
  */
 export function installAgentPresetRuntime(deps: InstallAgentPresetRuntimeDeps): void {
-  state = deps.state;
-  emitPluginEventImpl = deps.emitPluginEvent;
-  listAgentPresetsImpl = deps.listAgentPresets;
-  readAgentPresetDefaultsImpl = deps.readAgentPresetDefaults;
-  writeAgentPresetDefaultImpl = deps.writeAgentPresetDefault;
-  readAgentPresetImpl = deps.readAgentPreset;
-  createPresetSessionRuntimeImpl = deps.createPresetSessionRuntime;
-  pluginLifecycleQueueImpl = deps.pluginLifecycleQueue;
-  sessionHasConversationImpl = deps.sessionHasConversation;
-  piRuntimeCoordinatorReloadImpl = deps.piRuntimeCoordinatorReload;
+  if (deps.state) state = deps.state;
+  if (deps.emitPluginEvent) emitPluginEventImpl = deps.emitPluginEvent;
+  if (deps.listAgentPresets) listAgentPresetsImpl = deps.listAgentPresets;
+  if (deps.readAgentPresetDefaults) readAgentPresetDefaultsImpl = deps.readAgentPresetDefaults;
+  if (deps.writeAgentPresetDefault) writeAgentPresetDefaultImpl = deps.writeAgentPresetDefault;
+  if (deps.readAgentPreset) readAgentPresetImpl = deps.readAgentPreset;
+  if (deps.createPresetSessionRuntime) createPresetSessionRuntimeImpl = deps.createPresetSessionRuntime;
+  if (deps.pluginLifecycleQueue) pluginLifecycleQueueImpl = deps.pluginLifecycleQueue;
+  if (deps.sessionHasConversation) sessionHasConversationImpl = deps.sessionHasConversation;
+  if (deps.piRuntimeCoordinatorReload) piRuntimeCoordinatorReloadImpl = deps.piRuntimeCoordinatorReload;
 }
 
 /** 测试/调试用: 重置模块级单例. */

@@ -49,7 +49,7 @@ export function installPluginState(deps: {
   state: AgentHostState;
   profilePackages: () => Promise<unknown[]>;
 }): void {
-  state = deps.state;
+  if (deps.state) state = deps.state;
   profilePackages = deps.profilePackages as () => Promise<unknown[]>;
 }
 

@@ -64,16 +64,16 @@ export interface InstallPiRuntimeFactoriesDeps {
 }
 
 export function installPiRuntimeFactories(deps: InstallPiRuntimeFactoriesDeps): void {
-  state = deps.state;
-  piHomeImpl = deps.piHome;
-  getSessionImpl = deps.getSession;
-  getModelImpl = deps.getModel;
-  promptImpl = deps.prompt;
-  abortImpl = deps.abort;
-  setModelImpl = deps.setModel;
-  setThinkingLevelImpl = deps.setThinkingLevel;
-  promptContentImpl = deps.promptContent;
-  onEventImpl = deps.onEvent;
+  if (deps.state) state = deps.state;
+  if (deps.piHome) piHomeImpl = deps.piHome;
+  if (deps.getSession) getSessionImpl = deps.getSession;
+  if (deps.getModel) getModelImpl = deps.getModel;
+  if (deps.prompt) promptImpl = deps.prompt;
+  if (deps.abort) abortImpl = deps.abort;
+  if (deps.setModel) setModelImpl = deps.setModel;
+  if (deps.setThinkingLevel) setThinkingLevelImpl = deps.setThinkingLevel;
+  if (deps.promptContent) promptContentImpl = deps.promptContent;
+  if (deps.onEvent) onEventImpl = deps.onEvent;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */

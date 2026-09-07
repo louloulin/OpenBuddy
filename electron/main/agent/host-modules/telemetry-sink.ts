@@ -36,8 +36,8 @@ export interface InstallTelemetrySinkDeps {
 }
 
 export function installTelemetrySink(deps: InstallTelemetrySinkDeps): void {
-  hasRendererEventEmitter = deps.hasRendererEventEmitter;
-  emitRendererEventImpl = deps.emitRendererEvent;
+  if (deps.hasRendererEventEmitter) hasRendererEventEmitter = deps.hasRendererEventEmitter;
+  if (deps.emitRendererEvent) emitRendererEventImpl = deps.emitRendererEvent;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */
