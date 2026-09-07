@@ -4,7 +4,7 @@
   "private": true,
   "description": "OpenBuddy 官方网站 —— 基于 Next.js 14 App Router 的多页面营销站点",
   "scripts": {
-    "dev": "next dev --turbopack -p 3001",
+    "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",

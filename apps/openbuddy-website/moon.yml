@@ -7,7 +7,6 @@ layer: application
 stack: frontend
 tags: ['app', 'app-website']
 
-type: 'application'
 
 fileGroups:
   sources:
@@ -38,7 +37,7 @@ tasks:
       - '!.next/cache/**'
 
   dev:
-    script: 'next dev --turbopack -p 3001'
+    script: 'next dev -p 3001'
     inputs:
       - '@group(sources)'
     outputs: []
