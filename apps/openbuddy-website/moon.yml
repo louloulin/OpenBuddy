@@ -1,0 +1,58 @@
+# OpenBuddy Website moon project —— Next.js 14 App Router 官网
+#
+# 该子包在根 moon.yml 注册为 `openbuddy-website:*`。
+# 由 `pnpm workspace:typecheck` / `pnpm workspace:test` 等通配符任务自动覆盖。
+language: typescript
+layer: application
+stack: frontend
+tags: ['app', 'app-website']
+
+type: 'application'
+
+fileGroups:
+  sources:
+    - 'src/**/*'
+    - 'public/**/*'
+    - '*.{ts,tsx,js,mjs,cjs,json,md}'
+    - 'next.config.mjs'
+    - 'tailwind.config.ts'
+    - 'postcss.config.mjs'
+
+tasks:
+  typecheck:
+    script: 'tsc --noEmit'
+    inputs:
+      - '@group(sources)'
+      - 'tsconfig.json'
+      - 'package.json'
+    outputs: []
+
+  build:
+    script: 'next build'
+    inputs:
+      - '@group(sources)'
+      - 'next.config.mjs'
+      - 'tsconfig.json'
+    outputs:
+      - '.next/**'
+      - '!.next/cache/**'
+
+  dev:
+    script: 'next dev --turbopack -p 3001'
+    inputs:
+      - '@group(sources)'
+    outputs: []
+    options:
+      runInCI: false
+      cache: false
+
+  start:
+    script: 'next start -p 3001'
+    inputs: []
+    outputs: []
+
+  lint:
+    script: 'next lint'
+    inputs:
+      - '@group(sources)'
+    outputs: []

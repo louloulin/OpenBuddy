@@ -2,10 +2,12 @@ projects:
   globFormat: "source-path"
   globs:
     - "packages/*/*"
+    - "apps/*/moon.yml"
     - "moon.yml"
     - "electron/moon.yml"
   sources:
     "openbuddy": "."
+    "openbuddy-website": "apps/openbuddy-website"
 
 vcs:
   defaultBranch: "main"

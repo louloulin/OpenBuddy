@@ -1,0 +1,267 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================================
+ * OpenBuddy Website —— 全局基础样式
+ * 继承 src/styles/tokens.css 的 --wb-* 令牌体系
+ * ========================================================================= */
+
+:root {
+  /* Light theme —— 默认 */
+  --wb-bg: #FFFFFF;
+  --wb-bg-dark: #0E1117;
+  --wb-fg: #1F2328;
+  --wb-fg-muted: #656D76;
+  --wb-border: #D0D7DE;
+  --wb-border-dark: #30363D;
+  --wb-accent: #5B6CFF;
+  --wb-accent-hover: #4858E0;
+  --wb-success: #1F883D;
+  --wb-warning: #9A6700;
+  --wb-error: #CF222E;
+
+  /* Surface gradient (Hero 背景) */
+  --wb-grid-color: rgba(0, 0, 0, 0.04);
+  --wb-glow-1: rgba(0, 194, 154, 0.18);
+  --wb-glow-2: rgba(91, 108, 255, 0.15);
+}
+
+[data-theme='dark'] {
+  --wb-bg: #0E1117;
+  --wb-fg: #E6EDF3;
+  --wb-fg-muted: #8B949E;
+  --wb-border: #30363D;
+  --wb-grid-color: rgba(255, 255, 255, 0.04);
+  --wb-glow-1: rgba(0, 194, 154, 0.22);
+  --wb-glow-2: rgba(91, 108, 255, 0.18);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--wb-bg);
+    color: var(--wb-fg);
+    font-family: var(--font-inter), 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: rgba(0, 194, 154, 0.25);
+    color: var(--wb-fg);
+  }
+
+  /* 滚动条 —— 极简 */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--wb-border);
+    border-radius: 999px;
+    border: 2px solid var(--wb-bg);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--wb-fg-muted);
+  }
+}
+
+@layer components {
+  /* Hero 背景网格 */
+  .bg-editor-grid {
+    background-image:
+      linear-gradient(to right, var(--wb-grid-color) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--wb-grid-color) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* 渐变光晕 (Hero) */
+  .bg-radial-glow {
+    background-image:
+      radial-gradient(ellipse 80% 60% at 50% 0%, var(--wb-glow-1), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 30%, var(--wb-glow-2), transparent 60%);
+  }
+
+  /* 编辑器风色窗口框 */
+  .wb-window {
+    background: var(--wb-bg);
+    border: 1px solid var(--wb-border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 12px 32px -8px rgba(15, 23, 42, 0.12);
+  }
+
+  .wb-window-titlebar {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0));
+    border-bottom: 1px solid var(--wb-border);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-jetbrains), monospace;
+    font-size: 12px;
+    color: var(--wb-fg-muted);
+  }
+
+  .wb-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 999px;
+    display: inline-block;
+  }
+
+  /* 按钮 */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--wb-fg);
+    color: var(--wb-bg);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    color: var(--wb-fg);
+    border: 1px solid var(--wb-border);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .btn-secondary:hover {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: var(--wb-fg-muted);
+  }
+
+  [data-theme='dark'] .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  /* 卡片 */
+  .wb-card {
+    background: var(--wb-bg);
+    border: 1px solid var(--wb-border);
+    border-radius: 12px;
+    padding: 24px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .wb-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--wb-fg-muted);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  /* 标签 (chip) */
+  .wb-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 194, 154, 0.08);
+    color: #00614D;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid rgba(0, 194, 154, 0.2);
+  }
+  [data-theme='dark'] .wb-chip {
+    color: #4cf0ce;
+    background: rgba(76, 240, 206, 0.08);
+    border-color: rgba(76, 240, 206, 0.2);
+  }
+
+  /* 关键标签 kbd */
+  .wb-kbd {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--wb-border);
+    font-family: var(--font-jetbrains), monospace;
+    font-size: 11px;
+    color: var(--wb-fg-muted);
+    line-height: 1;
+  }
+  [data-theme='dark'] .wb-kbd {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  /* 渐变文字 */
+  .text-gradient-brand {
+    background: linear-gradient(120deg, #00614D 0%, #00C29A 50%, #5B6CFF 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 200% 100%;
+    animation: gradient-pan 8s ease infinite;
+  }
+
+  /* Shimmer 渐变 */
+  .shimmer-bg {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(0, 194, 154, 0.15),
+      transparent
+    );
+    background-size: 200% 100%;
+    animation: shimmer 3s linear infinite;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Skip link —— 可访问性 */
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    padding: 8px 12px;
+    background: var(--wb-fg);
+    color: var(--wb-bg);
+    border-radius: 0 0 8px 0;
+    z-index: 100;
+    font-size: 13px;
+    transition: top 0.15s ease;
+  }
+  .skip-link:focus {
+    top: 0;
+  }
+}

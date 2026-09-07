@@ -100,6 +100,11 @@
     "electron:release:win": "moon run openbuddy:electron.release.win",
     "electron:release:linux": "moon run openbuddy:electron.release.linux",
     "electron:build:all": "moon run openbuddy:electron.build.all",
+    "website:dev": "moon run openbuddy-website:dev",
+    "website:build": "moon run openbuddy-website:build",
+    "website:start": "moon run openbuddy-website:start",
+    "website:typecheck": "moon run openbuddy-website:typecheck",
+    "website:lint": "moon run openbuddy-website:lint",
     "clean:build": "node scripts/clean-build-artifacts.mjs",
     "postinstall": "moon sync projects || true",
     "sync:ui-aliases": "node scripts/sync-ui-aliases.mjs"

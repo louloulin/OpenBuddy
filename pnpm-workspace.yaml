@@ -1,5 +1,6 @@
 packages:
   - '.'
+  - 'apps/*'
   - 'packages/auth/*'
   - 'packages/bundle/*'
   - 'packages/capability/*'

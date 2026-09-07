@@ -60,8 +60,10 @@ export function questionAnswer(value: UiRequestValue, questionKey?: string): str
   if (!value || typeof value !== "object" || !("answers" in value)) return undefined;
   const answer = (questionKey ? value.answers[questionKey] : undefined) ?? Object.values(value.answers)[0];
   if (Array.isArray(answer)) return answer[0];
-  const note = (questionKey ? value.annotations?.[questionKey]?.notes : undefined)
-    ?? Object.values(value.annotations).map((entry) => entry.notes).find((entry): entry is string => Boolean(entry));
+  const note = value.annotations
+    ? (questionKey ? value.annotations[questionKey]?.notes : undefined)
+      ?? Object.values(value.annotations).map((entry) => entry.notes).find((entry): entry is string => Boolean(entry))
+    : undefined;
   return note || answer;
 }
 
