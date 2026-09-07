@@ -58,7 +58,7 @@ export type WorkspaceProjection = {
 };
 
 let state: AgentHostState = createDefaultAgentHostState();
-let listAllPiSessions: <T = unknown>() => any;
+let listAllPiSessions: <T = unknown>() => any = async () => [];
 
 export function installWorkbenchScope(deps: {
 	state: AgentHostState;

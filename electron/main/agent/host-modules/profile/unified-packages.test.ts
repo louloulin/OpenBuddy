@@ -37,15 +37,14 @@ describe("profile/unified-packages", () => {
     const state = installState();
     state.profileOptions = {
       profileDir: "/fake/profile",
-      profile: {} as any,
     };
     state.piExtensionStatuses = [
       { packageName: "pkg-a", state: "loaded" } as any,
       { packageName: "pkg-a", state: "failed" } as any,
       { packageName: "pkg-b", state: "loaded" } as any,
     ];
-    state.profileRemoteContributions = new Set(["pkg-c"]);
-    state.profileTypertContributions = new Set(["pkg-d"]);
+    (state as unknown as Record<string, unknown>).profileRemoteContributions = new Set(["pkg-c"]);
+    (state as unknown as Record<string, unknown>).profileTypertContributions = new Set(["pkg-d"]);
 
     // Stub plugin-host functions
     const pluginHost = await import("@openbuddy/plugin-host");

@@ -46,17 +46,17 @@ import { type AgentHostState } from "./_state-shape";
 import { createDefaultAgentHostState } from "./_default-state";
 
 let state: AgentHostState = createDefaultAgentHostState();
-let piSessionDir: (cwd: string) => string;
-let emitPluginEvent: (type: string, payload: unknown) => void;
-let emitRendererEvent: (channel: string, payload: unknown) => void;
-let enqueueLifecycle: <T>(op: () => Promise<T>) => Promise<T>;
-let initialize: (opts?: { cwd?: string; sessionPath?: string; force?: boolean }) => Promise<void>;
-let rebindSession: (sessionPath: string, cwd: string) => Promise<void>;
-let dispose: () => Promise<void>;
-let lifecycleAppendQueues: Map<string, Promise<void>>;
-let listAllPiSessions: <T = unknown>() => any;
-let persistedSessionPath: (id: string | undefined) => Promise<string | undefined>;
-let piRuntimeCoordinator: { reload: (reason: string) => Promise<void> };
+let piSessionDir: (cwd: string) => string = (cwd) => "";
+let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
+let emitRendererEvent: (channel: string, payload: unknown) => void = () => undefined;
+let enqueueLifecycle: <T>(op: () => Promise<T>) => Promise<T> = async (op) => op();
+let initialize: (opts?: { cwd?: string; sessionPath?: string; force?: boolean }) => Promise<void> = async () => undefined;
+let rebindSession: (sessionPath: string, cwd: string) => Promise<void> = async () => undefined;
+let dispose: () => Promise<void> = async () => undefined;
+let lifecycleAppendQueues: Map<string, Promise<void>> = new Map();
+let listAllPiSessions: <T = unknown>() => any = async () => [];
+let persistedSessionPath: (id: string | undefined) => Promise<string | undefined> = async () => undefined;
+let piRuntimeCoordinator: { reload: (reason: string) => Promise<void> } = { reload: async () => undefined };
 
 /**
  * Bind session-store dependencies. Called once from

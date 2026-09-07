@@ -536,10 +536,12 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			}
 		});
 		ipcMain.handle("rewind_points", async (_e, args: { sessionId: string }) => {
-			// P2-13: rewindPoints lives in memory.ts — same NAPI cost.
-			const { rewindPoints } = await import("../agent/pi-resources/memory");
-			return rewindPoints(await agentHost.sessionFile(requiredString(recordValue(args, "rewind points payload").sessionId, "session id")));
-		});
+    // P2-13: rewindPoints lives in memory.ts — same NAPI cost.
+    const { rewindPoints } = await import("../agent/pi-resources/memory");
+    const sessionFileResult = await agentHost.sessionFile(requiredString(recordValue(args, "rewind points payload").sessionId, "session id"));
+    if (!sessionFileResult.path) throw new Error("rewind_points: session file path unavailable");
+    return rewindPoints(sessionFileResult.path);
+  });
 		ipcMain.handle("rewind_execute", async (_e, args: { sessionId: string; targetPromptIndex: number; mode?: string; force?: boolean }) => {
 			const input = recordValue(args, "rewind execute payload");
 			if (input.force !== undefined) requiredBoolean(input.force, "force");

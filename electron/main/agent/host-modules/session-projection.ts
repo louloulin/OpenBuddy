@@ -15,7 +15,7 @@
  * 设计: 沿用 module-level singleton + install pattern.
  */
 
-import { type SessionEventRecord } from "../session/session-event-log";
+import { type SessionEventRecord } from "../../session/session-event-log";
 import { type AgentHostState } from "./_state-shape";
 
 // ---------------------------------------------------------------------------

@@ -60,18 +60,18 @@ function log(): MainLogger {
  * 修复后: 只 import 类型,运行时依赖经 DI 注入,可独立单测。
  */
 
-let listAllPiSessions: <T = unknown>() => any;
-let persistedSessionPath: (id: string | undefined) => Promise<string | undefined>;
-let piHome: () => string;
-let piSessionDir: (cwd: string) => string;
+let listAllPiSessions: <T = unknown>() => any = async () => [];
+let persistedSessionPath: (id: string | undefined) => Promise<string | undefined> = async () => undefined;
+let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd();
+let piSessionDir: (cwd: string) => string = (cwd) => "";
 let state: AgentHostState;
 let createSubagentResourceLoader:
-	(cwd: string) => Promise<{ getSystemPrompt(): string } | undefined>;
-let modelFacingPresetTools: () => unknown[];
+	(cwd: string) => Promise<{ getSystemPrompt(): string } | undefined> = async () => undefined;
+let modelFacingPresetTools: () => unknown[] = () => [];
 let createTaskAwareToolLocal: (
   tool: unknown,
   signalFor: (toolCallId: string) => AbortSignal | undefined,
-) => unknown;
+) => unknown = () => undefined;
 
 /**
  * Continuable subagent record type — formerly inlined in agent-host.ts.

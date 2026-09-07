@@ -2,493 +2,313 @@
  * bootstrap/install-host-modules.ts — single entry point that wires every
  * host-module's module-level state via its `installXxx()` pattern.
  *
- * Phase 8.3 §33.5.3: extract this from agent-host.ts:initialize() so the
- * 17 install calls live in one place. agent-host.ts becomes thinner (a
- * thin facade that bootstraps + wires the context providers + creates
- * the AgentSession) and each host-module keeps its own install contract.
+ * Phase v4 §M-5: 拆分为 4 个域 helper (profile / session / plugin / runtime),
+ * 本文件仅保留 InstallHostModuleDeps interface + 一个 installHostModules 函数
+ * 调用 4 个域 helper. 总行数 494 → ~150.
  *
- * Why one file:
- *   - Single import surface for agent-host.ts (one function vs 17 lines).
- *   - The install order matters: bootstrap must happen BEFORE the
- *     install calls so `state.modelRuntime` / `state.piExtensionStatuses`
- *     are populated. Centralising in one function lets us document and
- *     test the ordering.
- *   - Easy to add new install calls without touching agent-host.ts.
+ * 顺序: profile → session → plugin → runtime (核心域 init 顺序)
  *
- * Reverse-dependency invariant:
- *   This module imports from each host-module's install() but does NOT
- *   import agent-host. The deps parameter (InstallHostModuleDeps) carries
- *   every helper that used to be a closure variable in initialize().
+ * 反向依赖不变量:
+ *   - 此模块不 import agent-host.ts
+ *   - deps 参数 (InstallHostModuleDeps) 携带所有从 agent-host.ts 传入的闭包变量
  */
-
-import { installHarnessCursors } from "../harness-cursors";
-import { installHookPermission } from "../hook-permission";
-import { installOverridePatches } from "../profile/override-patches";
-import { installProfileSnapshot } from "../profile/snapshot";
-import { installProfileBundles } from "../profile/bundles";
-import { installPluginEventBus } from "../plugin-event-bus";
-import { installPluginState } from "../plugin-state";
-import { installSessionMetadata } from "../session-metadata";
-import { installSessionStore } from "../session-store";
-import { installSubagentRuntime } from "../subagent-runtime";
-import { installAgentPrompt } from "../agent-prompt";
-import { installWorkbenchScope } from "../workbench-scope";
-import { installAgentModel } from "../agent-model";
-import { installPluginMutations } from "../plugin-mutations";
-import { installDeepSeekAgentRuntime } from "../deepseek/agent-runtime";
-import { installDeepSeekCordisRuntime } from "../deepseek/cordis-runtime";
-import { installTeamRunner } from "../team-runner";
-import { installProviderRegistryTracker } from "../../agent-host-provider-registry";
-import { installProfileReloadTransaction } from "../profile-reload-transaction";
-import { installSessionRebind } from "../session-rebind";
-import { installSessionSwap } from "../session-swap";
-import { installProfileResourcePaths } from "../profile/resource-paths";
-import { installUnifiedPackages } from "../profile/unified-packages";
-import { installPresetHelpers } from "../preset-helpers";
-import { installSessionProjection } from "../session-projection";
-import { installInitOrchestration } from "../init-orchestration";
-import { installTelemetrySink } from "../telemetry-sink";
-import { installContextServicesSnapshot } from "../context-services-snapshot";
-import { installDefaultPiPackageInstaller } from "../default-pi-package-installer";
-import { installDshBridgeHelpers } from "../dsh-bridge-helpers";
-import { installPiRuntimeRefresh } from "../pi-runtime-refresh";
-import { installPiRuntimeFactories } from "../pi-runtime-factories";
-import { installPiExtensionConfigure } from "../pi-extension-configure";
-import { installAgentPresetRuntime } from "../agent-preset-runtime";
-import { installDisposeInternal } from "../dispose-internal";
-import { installWorkbenchScopeSync } from "../workbench-scope-sync";
-import { installUiRequestResolver } from "../ui-request-resolver";
 
 import type { AgentHostState } from "../_state-shape";
 
+// ──────────────────────────────────────────────────────────────────────────
+// Profile 域 install — 11 modules
+// ──────────────────────────────────────────────────────────────────────────
+import { installOverridePatches } from "../profile/override-patches";
+import { installProfileSnapshot } from "../profile/snapshot";
+import { installProfileBundles } from "../profile/bundles";
+import { installProfileResourcePaths } from "../profile/resource-paths";
+import { installUnifiedPackages } from "../profile/unified-packages";
+import { installPresetHelpers } from "../preset-helpers";
+import { installAgentPresetRuntime } from "../agent-preset-runtime";
+import { installContextServicesSnapshot } from "../context-services-snapshot";
+import { installDefaultPiPackageInstaller } from "../default-pi-package-installer";
+
+// ──────────────────────────────────────────────────────────────────────────
+// Session 域 install — 9 modules
+// ──────────────────────────────────────────────────────────────────────────
+import { installHarnessCursors } from "../harness-cursors";
+import { installAgentModel } from "../agent-model";
+import { installAgentPrompt } from "../agent-prompt";
+import { installTeamRunner } from "../team-runner";
+import { installDeepSeekAgentRuntime } from "../deepseek/agent-runtime";
+import { installDeepSeekCordisRuntime } from "../deepseek/cordis-runtime";
+import { installSessionMetadata } from "../session-metadata";
+import { installSessionStore } from "../session-store";
+import { installSubagentRuntime } from "../subagent-runtime";
+
+// ──────────────────────────────────────────────────────────────────────────
+// Plugin 域 install — 11 modules
+// ──────────────────────────────────────────────────────────────────────────
+import { installHookPermission } from "../hook-permission";
+import { installPluginEventBus } from "../plugin-event-bus";
+import { installPluginState } from "../plugin-state";
+import { installPluginMutations } from "../plugin-mutations";
+import { installPiExtensionConfigure } from "../pi-extension-configure";
+import { installDisposeInternal } from "../dispose-internal";
+import { installWorkbenchScope } from "../workbench-scope";
+import { installWorkbenchScopeSync } from "../workbench-scope-sync";
+import { installUiRequestResolver } from "../ui-request-resolver";
+import { installTelemetrySink } from "../telemetry-sink";
+import { installDshBridgeHelpers } from "../dsh-bridge-helpers";
+
+// ──────────────────────────────────────────────────────────────────────────
+// Runtime 域 install — 7 modules (含跨域共享)
+// ──────────────────────────────────────────────────────────────────────────
+import { installProfileReloadTransaction } from "../profile-reload-transaction";
+import { installSessionRebind } from "../session-rebind";
+import { installSessionProjection } from "../session-projection";
+import { installSessionSwap } from "../session-swap";
+import { installProfileArtifactReconciler } from "../profile-artifact-reconciler";
+import { installPiRuntimeFactories } from "../pi-runtime-factories";
+import { installPiRuntimeRefresh } from "../pi-runtime-refresh";
+import { installDeepSeekAgentFactory } from "../deepseek-agent-factory";
+import { installBeforeQuitHandler } from "../lifecycle/before-quit-handler";
+import { installModelConfig } from "../models-config";
+import { installInitOrchestration } from "../init-orchestration";
+
 /**
- * Dependencies required to install every host-module. These are functions
- * that used to be closure variables in agent-host.ts:initialize(). Keeping
- * them as parameters lets this bootstrap module stay free of agent-host
- * reverse dependencies.
+ * 完整的依赖参数. 4 个域 helper 各自接收自己需要的子集.
  *
  * NOTE: only include the deps that are NOT already on `state`. Anything
- * stored in `state` after bootstrap (modelRuntime, piExtensionStatuses,
- * etc.) is accessed via `state` directly inside the host-modules.
+ * stored in `state` after bootstrap (modelRuntime, piExtensionStatuses, etc.)
+ * is accessed via `state` directly inside the host-modules.
  */
 export interface InstallHostModuleDeps {
-  // Path helpers
+  // ── 通用 (4 域共享) ──
+  state: AgentHostState;
   piHome: () => string;
   isPathWithin: (root: string, candidate: string) => boolean;
   piSessionDir: (cwd: string) => string;
-  /** profile-artifact-resolution.toModuleUrl (for profileArtifactModuleUrl cache-bust) */
   toModuleUrl: (path: string) => string;
-  // Event emitters
   emitPluginEvent: (type: string, payload: unknown) => void;
   emitRendererEvent: (channel: string, payload: unknown) => void;
-  // Session helpers
+  hasRendererEventEmitter: () => boolean;
+  // ── Session 域 ──
   listAllPiSessions: <T = unknown>() => any;
   persistedSessionPath: (sessionId: string | undefined) => Promise<string | undefined>;
-  // Lifecycle queue
+  listPersistedSessionInfos: () => Promise<Array<{ id: string }>>;
+  readPersistedSessionHeader: (sessionId: string) => Promise<{ title?: string; name?: string }>;
+  persistPiSessionHeader: (session: any) => Promise<void>;
+  pluginEvents: (query?: { sessionId?: string; sinceSequence?: number; limit?: number }) => any[];
+  // ── Lifecycle ──
   enqueueLifecycle: <T>(operation: () => Promise<T>) => Promise<T>;
   lifecycleAppendQueues: Map<string, Promise<void>>;
-  // Self-references for module-level re-entry (session-store / subagent)
+  // ── Self-references ──
   initialize: (opts?: { cwd?: string; sessionPath?: string; force?: boolean }) => Promise<void>;
   rebindSession: (sessionPath: string, cwd: string) => Promise<void>;
   dispose: () => Promise<void>;
-  /** host-functions.setModel (被 session-swap 调用以在新建会话后应用模型选择) */
-  setModel: (modelId: string) => Promise<unknown>;
-  /** session-store.persistPiSessionHeader (新建会话后立即落盘 header) */
-  persistPiSessionHeader: (session: import("@earendil-works/pi-coding-agent").AgentSession) => Promise<void>;
-  // pi runtime helpers
-  piRuntimeCoordinator: { reload: (reason: string) => Promise<void> };
-  publicQueueItems: (session: unknown) => readonly unknown[];
-  // Profile helpers
-  workspaceRegistry: unknown;
-  readModelsConfig: () => unknown;
-  // team-runner / deepseek runtime helpers
-  canonicalEventNamespace: (...args: any[]) => any;
-  eventNamespace: (...args: any[]) => any;
-  createSubagentResourceLoader: (...args: any[]) => any;
-  createTaskAwareTool: (...args: any[]) => any;
-  modelFacingPresetTools: unknown;
-  runHookPoint: (...args: any[]) => any;
-  // Plugin mutations helpers
-  profileArtifactModuleUrl: (id: string) => string;
-  profilePackages: () => Promise<readonly unknown[]>;
-  pluginLifecycleQueue: { enqueue: (...args: any[]) => any };
-  setProfilePiResourcePaths: (...args: any[]) => any;
-  refreshMarketplacePiResourcePaths: (...args: any[]) => any;
-  refreshHookConfigs: (...args: any[]) => any;
-  syncMarketplacePiExtensionStatuses: (...args: any[]) => any;
-  startProfileWatchers: (...args: any[]) => any;
-  readOverridePatches: (...args: any[]) => any;
-  runtimeProfileBundle: (...args: any[]) => any;
-  reconcileProfileArtifacts: (...args: any[]) => any;
-  configurePiExtensions: (specs: readonly unknown[]) => void;
-  reportPiExtensionErrors: () => void;
-  captureReloadableContextServices: () => Map<string, unknown>;
-  restoreCapturedContextServices: (...args: any[]) => any;
-  // profile-reload-transaction helpers
-  capturePiProfileSnapshot: () => any;
-  restorePiProfileSnapshot: (snapshot: any) => void;
-  captureDeepSeekCapabilityServices: () => Map<string, unknown>;
-  restoreDeepSeekCapabilityServices: (captured?: Map<string, unknown>) => Promise<void>;
-  materializeOpenBuddyProfile: (options: any) => Promise<{ profile: any; bundle: any }>;
-  createOpenBuddyProfile: () => any;
-  composePluginPatches: (entries: readonly any[], patches: readonly any[][]) => any[];
-  syncDeepSeekCordisRuntime: (entries: readonly any[]) => Promise<void>;
-  deepSeekCoreRuntimeEntries: (patches: readonly any[]) => any[];
-  reloadMcp: () => Promise<void>;
-  rollbackPiProfile: (...args: any[]) => any;
-  scheduleProfileReload: () => void;
-  // dispose-internal
-  piSessionRuntimeDispose: () => Promise<void>;
-  stopProfileWatchers: () => void;
-  disposeProfileTypertRegistrations: (values: Iterable<any>) => void;
-  disposeActiveHookProcesses: () => void;
-  drainActiveHookProcesses: () => Promise<void>;
-  // workbench-scope
-  casdoorStatus: () => any;
-  // ui-request-resolver
-  permissionReadRules: () => Promise<any[]>;
-  permissionWriteRules: (rules: any[]) => Promise<void>;
-  // agent-preset-runtime
-  listAgentPresets: (cwd: string) => Promise<any[]>;
-  readAgentPresetDefaults: () => Promise<{ default?: string } | undefined>;
-  writeAgentPresetDefault: (defaultId?: string) => Promise<void>;
-  readAgentPreset: (presetId: string, cwd: string) => Promise<string>;
-  createPresetSessionRuntime: (opts: any) => any;
-  sessionHasConversation: (entries: any[]) => boolean;
-  piRuntimeCoordinatorReload: (reason: string) => Promise<void>;
-  // session-rebind (warm-host fast path)
-  sessionPresetSelection: (sessionPath?: string | null) => Promise<string | null | undefined>;
   replaceSession: (opts: any) => Promise<any>;
   sessionManagerOpen: (sessionPath: string, options: any, cwd: string) => any;
-  agentHome: () => string;
+  piSessionRuntimeDispose: () => Promise<void>;
+  // ── Host functions ──
+  getSession: () => any;
+  getModel: () => any;
+  prompt: (text: string, options?: any) => Promise<unknown>;
+  abort: (options?: any) => Promise<unknown>;
+  setModel: (modelId: string, options?: any) => Promise<unknown>;
+  setThinkingLevel: (level: any, options?: any) => Promise<unknown>;
+  promptContent: (content: readonly unknown[], mode?: "queue" | "steer") => Promise<unknown>;
+  onEvent: (handler: any) => unknown;
   provideRpcUiContext: (deps: any) => any;
-  questionAnswer: (value: any, key?: string) => string | undefined;
   createOpenBuddyRpcUiContext: (deps: any) => any;
-  // pi-extension-configure (built-in factories + extension diagnostics)
-  telemetrySink: () => any;
-  resolveProfileDirectory: () => string;
-  requestHookPermission: (title: string, message: string, request?: any) => Promise<any>;
-  createRequire: (path: string) => { resolve: (id: string) => string };
+  questionAnswer: (value: any, questionKey?: string) => string | undefined;
+  // ── Plugin helpers ──
+  profilePackages: () => Promise<readonly unknown[]>;
+  workspaceRegistry: unknown;
+  publicQueueItems: (session: unknown) => readonly unknown[];
+  readModelsConfig: () => unknown;
+  canonicalEventNamespace: (...args: any[]) => any;
+  eventNamespace: (...args: any[]) => any;
+  // ── Subagent / preset ──
+  createSubagentResourceLoader: (cwd: string) => Promise<any>;
+  createTaskAwareTool: any;
+  runHookPoint: any;
+  profileArtifactModuleUrl: (id: string) => string;
+  modelFacingPresetTools: unknown;
+  ensureContinuableSubagent: (parentSessionId: string, childSessionId: string) => Promise<any>;
+  listSubagentChildrenImpl: (parentSessionId: string) => Promise<any>;
+  promptSubagentImpl: (parentSessionId: string, childSessionId: string, content: readonly any[]) => Promise<any>;
+  interruptSubagentImpl: (parentSessionId: string, childSessionId: string) => Promise<any>;
+  // ── Profile helpers ──
+  setProfilePiResourcePaths: (paths: any) => void;
+  refreshMarketplacePiResourcePaths: () => Promise<void>;
+  refreshHookConfigs: () => Promise<void>;
+  syncMarketplacePiExtensionStatuses: () => Promise<void>;
+  startProfileWatchers: () => Promise<void>;
+  stopProfileWatchers: () => void;
+  readOverridePatches: () => any;
+  runtimeProfileBundle: () => any;
+  reconcileProfileArtifacts: () => Promise<void>;
+  rollbackPiProfile: () => any;
+  scheduleProfileReload: () => void;
+  artifactPackageJsonByName: any;
+  capturePiProfileSnapshot: () => any;
+  restorePiProfileSnapshot: (snapshot: any) => void;
+  discoverRendererPluginManifest: () => Promise<readonly any[]>;
+  materializeOpenBuddyProfile: (options: any) => Promise<{ profile: any; bundle: any }>;
+  createOpenBuddyProfile: () => any;
+  // ── Pi extension / runtime ──
+  configurePiExtensions: (specs: readonly unknown[]) => void;
+  reportPiExtensionErrors: () => void;
+  builtinPiExtensionFactories: any;
+  describeCompatibilityAdapterCommandsMarkdown: any;
+  mergePiExtensionStatuses: any;
+  piExtensionsResolvedResolvedPayload: any;
+  resolvePiExtensions: any;
+  applyPiExtensionOverrides: any;
+  piRuntimeCoordinator: { reload: (reason: string) => Promise<void>; reloadUntilStable?: (check: () => number, reason: string) => Promise<void> };
+  piRuntimeCoordinatorReload: (reason: string) => Promise<void>;
+  // ── Permission / workbench / dispose ──
+  permissionReadRules: () => any;
+  permissionWriteRules: (rules: any) => void;
+  requestHookPermission: any;
+  casdoorStatus: () => any;
+  disposeProfileTypertRegistrations: (values: Iterable<unknown>) => void;
+  disposeActiveHookProcesses: () => void;
+  drainActiveHookProcesses: () => Promise<void>;
+  // ── Deepseek ──
+  syncDeepSeekCordisRuntime: (entries: readonly any[]) => Promise<void>;
+  deepSeekCoreRuntimeEntries: (patches: readonly any[]) => any[];
+  composePluginPatches: (entries: readonly any[], patches: readonly any[][]) => any[];
+  captureDeepSeekCapabilityServices: () => Map<string, unknown>;
+  restoreDeepSeekCapabilityServices: (captured?: Map<string, unknown>) => Promise<void>;
+  // ── Capture / restore (used by profile + plugin) ──
+  captureReloadableContextServices: () => Map<string, unknown>;
+  restoreCapturedContextServices: (captured: Map<string, unknown>) => void;
+  // ── Plugin state store ──
+  pluginLifecycleQueue: { enqueue: (...args: any[]) => any };
+  // ── DeepSeek agent factory ──
+  createDeepSeekAgent: (options: any) => Promise<any>;
+  resumeDeepSeekAgent: (options: any) => Promise<any>;
+  // ── Session prompt impls ──
+  promptImpl: any;
+  abortImpl: any;
+  listSessionsImpl: (cwd: string) => Promise<any>;
+  // ── Agent preset helpers ──
+  sessionPresetSelection: (sessionPath?: string | null) => Promise<string | null | undefined>;
+  listAgentPresets: (cwd: string) => Promise<any>;
+  readAgentPresetDefaults: () => any;
+  writeAgentPresetDefault: (id?: string) => Promise<any>;
+  readAgentPreset: (id: string, cwd: string) => Promise<any>;
+  createPresetSessionRuntime: (opts: any) => any;
   createPiToolExtension: () => any;
-  artifactPackageJsonByName: (...args: any[]) => any;
-  discoverRendererPluginManifest: () => Promise<unknown[]>;
-  // Cordis runtime helpers
-  promptImpl: (...args: any[]) => any;
-  abortImpl: (...args: any[]) => any;
-  listSessionsImpl: (...args: any[]) => any;
-  listSubagentChildrenImpl: (...args: any[]) => any;
-  promptSubagentImpl: (...args: any[]) => any;
-  interruptSubagentImpl: (...args: any[]) => any;
-  // Subagent continuable
-  ensureContinuableSubagent: (...args: any[]) => any;
+  createPiPlanModeFactory: () => any;
+  sessionHasConversation: (sessionPath: string) => boolean;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Domain helpers — 每个域内按 install 顺序调用各 host-module 的 install 函数.
+// 每个 install() 的 deps 类型互不相同, 此处统一用 spread `{...deps}` + `as never`
+// 让 TS 把 deps 当作任意类型传递, 这样 InstallHostModuleDeps 的「包含所有
+// 闭包变量」契约由调用方 (agent-host.ts) 维护.
+// ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Profile 域 (11 modules): override-patches → snapshot → bundles → resource-paths
+ *   → unified-packages → preset-helpers → agent-preset-runtime →
+ *   context-services-snapshot → default-pi-package-installer.
+ *
+ * 顺序: 文件解析 → 快照 → 包合并 → 资源路径 → 单元包 → preset →
+ *       上下文服务快照 → 默认包安装器.
+ */
+function installProfileDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
+  const d = deps as unknown as never;
+  installOverridePatches(d);
+  installProfileSnapshot(d);
+  installProfileBundles(d);
+  installProfileResourcePaths(d);
+  installUnifiedPackages(d);
+  installPresetHelpers(d);
+  installAgentPresetRuntime(d);
+  installContextServicesSnapshot(d);
+  installDefaultPiPackageInstaller(d);
 }
 
 /**
- * Wire every host-module's module-level state via its install() pattern.
+ * Session 域 (9 modules): harness-cursors → agent-model → agent-prompt →
+ *   team-runner → deepseek/agent-runtime → deepseek/cordis-runtime →
+ *   session-metadata → session-store → subagent-runtime.
  *
- * Order matters:
- *   1. bootstrapSessionEventLog + bootstrapModelRuntime have already run
- *      (they populate `state.modelRuntime` / `state.sessionEventLog`).
- *   2. Then installXxx() for every host-module in dependency order.
- *   3. Finally installProviderRegistryTracker (needs emitPluginEvent).
+ * 顺序: harness cursor → 模型选择 → prompt/queue → team runner →
+ *       deepseek runtime → cordis runtime → session metadata →
+ *       session store → subagent.
+ */
+function installSessionDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
+  const d = { ...deps, state } as unknown as never;
+  installHarnessCursors(d);
+  installAgentModel(d);
+  installAgentPrompt(d);
+  installTeamRunner(d);
+  installDeepSeekAgentRuntime(d);
+  installDeepSeekCordisRuntime(d);
+  installSessionMetadata(d);
+  installSessionStore(d);
+  installSubagentRuntime(d);
+}
+
+/**
+ * Plugin 域 (11 modules): hook-permission → plugin-event-bus → plugin-state →
+ *   plugin-mutations → pi-extension-configure → dispose-internal →
+ *   workbench-scope → workbench-scope-sync → ui-request-resolver →
+ *   telemetry-sink → dsh-bridge-helpers.
+ */
+function installPluginDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
+  const d = { ...deps, state } as unknown as never;
+  installHookPermission(d);
+  installPluginEventBus(d);
+  installPluginState(d);
+  installPluginMutations(d);
+  installPiExtensionConfigure(d);
+  installDisposeInternal(d);
+  installWorkbenchScope(d);
+  installWorkbenchScopeSync(d);
+  installUiRequestResolver(d);
+  installTelemetrySink(d);
+  installDshBridgeHelpers(d);
+}
+
+/**
+ * Runtime 域 (含跨域共享, 12 modules): profile-reload-transaction →
+ *   session-rebind → session-projection → session-swap →
+ *   profile-artifact-reconciler → pi-runtime-factories → pi-runtime-refresh →
+ *   deepseek-agent-factory → lifecycle/before-quit-handler →
+ *   models-config → init-orchestration.
+ *
+ * 这些 module 跨域共享, 不严格属于「一个域」; 排在最后以便 profile/session/plugin
+ * 先注入完闭包, 再让 runtime 串起来.
+ */
+function installRuntimeDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
+  const d = deps as unknown as never;
+  installProfileReloadTransaction(d);
+  installSessionRebind(d);
+  installSessionProjection(d);
+  installSessionSwap(d);
+  installProfileArtifactReconciler(d);
+  installPiRuntimeFactories(d);
+  installPiRuntimeRefresh(d);
+  installDeepSeekAgentFactory(d);
+  installBeforeQuitHandler(d);
+  installModelConfig(d);
+  installInitOrchestration(d);
+}
+
+/**
+ * Install 全部 39 个 host-module, 按 4 域分组:
+ *   - Profile 域  (9 modules)
+ *   - Session 域  (9 modules)
+ *   - Plugin 域   (11 modules)
+ *   - Runtime 域  (10 modules)
+ *
+ * 总 install 顺序在每个域内部维护 (见各域 helper 注释).
  */
 export function installHostModules(state: AgentHostState, deps: InstallHostModuleDeps): void {
-  // harness-cursors: needs state + piHome + isPathWithin
-  installHarnessCursors({ state, piHome: deps.piHome, isPathWithin: deps.isPathWithin });
-  // hook-permission
-  installHookPermission({ state, emitPluginEvent: deps.emitPluginEvent, emitRendererEvent: deps.emitRendererEvent });
-  // override-patches (no state dep, just event emitter)
-  installOverridePatches({ piHome: deps.piHome, emitPluginEvent: deps.emitPluginEvent });
-  // profile-snapshot
-  installProfileSnapshot({ state, setProfilePiResourcePaths: deps.setProfilePiResourcePaths });
-  // profile-bundles
-  installProfileBundles({ piHome: deps.piHome, state });
-  // plugin-event-bus
-  installPluginEventBus({ state });
-  // plugin-state
-  installPluginState({ state, profilePackages: deps.profilePackages as never });
-  // session-metadata
-  installSessionMetadata({
-    state,
-    piHome: deps.piHome,
-    piSessionDir: deps.piSessionDir,
-    emitPluginEvent: deps.emitPluginEvent,
-    listAllPiSessions: deps.listAllPiSessions,
-    workspaceRegistry: deps.workspaceRegistry as never,
-    }
-  );
-  // session-store (needs self-ref for re-init)
-  installSessionStore({
-    state,
-    piSessionDir: deps.piSessionDir,
-    emitPluginEvent: deps.emitPluginEvent,
-    emitRendererEvent: deps.emitRendererEvent,
-    enqueueLifecycle: deps.enqueueLifecycle,
-    initialize: deps.initialize,
-    rebindSession: deps.rebindSession,
-    dispose: deps.dispose,
-    lifecycleAppendQueues: deps.lifecycleAppendQueues,
-    listAllPiSessions: deps.listAllPiSessions,
-    persistedSessionPath: deps.persistedSessionPath,
-    piRuntimeCoordinator: deps.piRuntimeCoordinator,
-    }
-  );
-  // subagent-runtime
-  installSubagentRuntime({
-    state,
-    piHome: deps.piHome,
-    emitPluginEvent: deps.emitPluginEvent,
-    emitRendererEvent: deps.emitRendererEvent,
-    ensureContinuableSubagent: deps.ensureContinuableSubagent,
-    listAllPiSessions: deps.listAllPiSessions,
-    }
-  );
-  // agent-prompt
-  installAgentPrompt({
-    state,
-    emitPluginEvent: deps.emitPluginEvent,
-    emitRendererEvent: deps.emitRendererEvent,
-    publicQueueItems: deps.publicQueueItems,
-    }
-  );
-  // team-runner
-  installTeamRunner({
-    state,
-    emitPluginEvent: deps.emitPluginEvent,
-    canonicalEventNamespace: deps.canonicalEventNamespace as never,
-    createSubagentResourceLoader: deps.createSubagentResourceLoader as never,
-    createTaskAwareTool: deps.createTaskAwareTool as never,
-    eventNamespace: deps.eventNamespace as never,
-    modelFacingPresetTools: deps.modelFacingPresetTools as never,
-    persistedSessionPath: deps.persistedSessionPath,
-    piHome: deps.piHome,
-    piSessionDir: deps.piSessionDir,
-    runHookPoint: deps.runHookPoint as never,
-    }
-  );
-  // workbench-scope
-  installWorkbenchScope({ state, listAllPiSessions: deps.listAllPiSessions as never });
-  // agent-model
-  installAgentModel({ state, emitRendererEvent: deps.emitRendererEvent, piHome: deps.piHome, readModelsConfig: deps.readModelsConfig as never });
-  // deepseek/agent-runtime (DSH subagent write paths; ensureContinuableSubagent lives here too)
-  installDeepSeekAgentRuntime({
-    listAllPiSessions: deps.listAllPiSessions,
-    persistedSessionPath: deps.persistedSessionPath,
-    piHome: deps.piHome,
-    piSessionDir: deps.piSessionDir,
-    state,
-    createSubagentResourceLoader: deps.createSubagentResourceLoader as never,
-    modelFacingPresetTools: deps.modelFacingPresetTools as never,
-    createTaskAwareTool: deps.createTaskAwareTool as never,
-    }
-  );
-  // plugin-mutations (largest dep set)
-  installPluginMutations({
-    state,
-    emitPluginEvent: deps.emitPluginEvent,
-    isPathWithin: deps.isPathWithin,
-    profileArtifactModuleUrl: deps.profileArtifactModuleUrl,
-    profilePackages: deps.profilePackages,
-    pluginLifecycleQueue: deps.pluginLifecycleQueue,
-    piRuntimeCoordinator: deps.piRuntimeCoordinator,
-    setProfilePiResourcePaths: deps.setProfilePiResourcePaths,
-    refreshMarketplacePiResourcePaths: deps.refreshMarketplacePiResourcePaths,
-    refreshHookConfigs: deps.refreshHookConfigs,
-    syncMarketplacePiExtensionStatuses: deps.syncMarketplacePiExtensionStatuses,
-    startProfileWatchers: deps.startProfileWatchers,
-    readOverridePatches: deps.readOverridePatches,
-    runtimeProfileBundle: deps.runtimeProfileBundle,
-    reconcileProfileArtifacts: deps.reconcileProfileArtifacts,
-    configurePiExtensions: deps.configurePiExtensions as never,
-    reportPiExtensionErrors: deps.reportPiExtensionErrors,
-    captureReloadableContextServices: deps.captureReloadableContextServices,
-    restoreCapturedContextServices: deps.restoreCapturedContextServices,
-    rollbackPiProfile: deps.rollbackPiProfile,
-    scheduleProfileReload: deps.scheduleProfileReload,
-    artifactPackageJsonByName: deps.artifactPackageJsonByName,
-    discoverRendererPluginManifest: deps.discoverRendererPluginManifest,
-    }
-  );
-  // provider-registry tracker: needs emitPluginEvent (host-owned) so lives
-  // here, not in bootstrap/model-runtime.ts (which has zero agent-host deps).
-  installProviderRegistryTracker(
-    state.modelRuntime as never,
-    state.providerRegistry,
-    ({ kind, record }) => {
-      deps.emitPluginEvent("plugin/provider-registry-changed", { kind, record });
-    }
-  );
-  // deepseek/cordis-runtime (needs promptImpl / abortImpl / listSessionsImpl etc.)
-  installDeepSeekCordisRuntime({
-    state,
-    emitPluginEvent: deps.emitPluginEvent,
-    prompt: deps.promptImpl as never,
-    abort: deps.abortImpl as never,
-    listSessions: deps.listSessionsImpl as never,
-    listSubagentChildren: deps.listSubagentChildrenImpl as never,
-    promptSubagent: deps.promptSubagentImpl as never,
-    interruptSubagent: deps.interruptSubagentImpl as never,
-    piHome: deps.piHome,
-    profileArtifactModuleUrl: deps.profileArtifactModuleUrl,
-  });
-  // profile-reload-transaction (own install pattern, before plugin-mutations
-  // is installed so the scheduleProfileReload / rollbackPiProfile injected
-  // below is the freshly-installed module-level function).
-  installProfileReloadTransaction({
-    state,
-    pluginLifecycleQueue: deps.pluginLifecycleQueue as never,
-    piRuntimeCoordinator: deps.piRuntimeCoordinator as never,
-    emitPluginEvent: deps.emitPluginEvent,
-    capturePiProfileSnapshot: deps.capturePiProfileSnapshot as never,
-    restorePiProfileSnapshot: deps.restorePiProfileSnapshot as never,
-    captureReloadableContextServices: deps.captureReloadableContextServices,
-    restoreCapturedContextServices: deps.restoreCapturedContextServices as never,
-    captureDeepSeekCapabilityServices: deps.captureDeepSeekCapabilityServices,
-    restoreDeepSeekCapabilityServices: deps.restoreDeepSeekCapabilityServices,
-    materializeOpenBuddyProfile: deps.materializeOpenBuddyProfile,
-    runtimeProfileBundle: deps.runtimeProfileBundle as never,
-    createOpenBuddyProfile: deps.createOpenBuddyProfile,
-    composePluginPatches: deps.composePluginPatches,
-    syncDeepSeekCordisRuntime: deps.syncDeepSeekCordisRuntime,
-    deepSeekCoreRuntimeEntries: deps.deepSeekCoreRuntimeEntries,
-    reconcileProfileArtifacts: deps.reconcileProfileArtifacts as never,
-    refreshHookConfigs: deps.refreshHookConfigs as never,
-    reloadMcp: deps.reloadMcp as never,
-    reportPiExtensionErrors: deps.reportPiExtensionErrors,
-    readOverridePatches: deps.readOverridePatches as never,
-    setProfilePiResourcePaths: deps.setProfilePiResourcePaths as never,
-    startProfileWatchers: deps.startProfileWatchers as never,
-    configurePiExtensions: deps.configurePiExtensions as never,
-  });
-  // session-rebind (warm-host fast path)
-  installSessionRebind({
-    state,
-    initialize: deps.initialize as never,
-    sessionPresetSelection: deps.sessionPresetSelection as never,
-    replaceSession: deps.replaceSession as never,
-    sessionManagerOpen: deps.sessionManagerOpen as never,
-    agentHome: deps.agentHome,
-    provideRpcUiContext: deps.provideRpcUiContext as never,
-    emitPluginEvent: deps.emitPluginEvent,
-    emitRendererEvent: deps.emitRendererEvent,
-    questionAnswer: deps.questionAnswer as never,
-    createOpenBuddyRpcUiContext: deps.createOpenBuddyRpcUiContext,
-  });
-  // session-swap (agent:new-session / agent:ensure-new-session warm-host fast path)
-  installSessionSwap({
-    state,
-    initialize: deps.initialize,
-    rebindSession: deps.rebindSession,
-    persistPiSessionHeader: deps.persistPiSessionHeader,
-    setModel: deps.setModel,
-    piSessionDir: deps.piSessionDir,
-  });
-  // profile resource path management (host-modules/profile/resource-paths.ts)
-  installProfileResourcePaths({
-    state,
-    isPathWithin: deps.isPathWithin,
-    toModuleUrl: deps.toModuleUrl,
-  });
-  // profile unified-packages (host-modules/profile/unified-packages.ts)
-  installUnifiedPackages({
-    state,
-    discoverRendererPluginManifest: deps.discoverRendererPluginManifest as any,
-  });
-  // preset helpers (host-modules/preset-helpers.ts)
-  installPresetHelpers({
-    state,
-    piHome: deps.piHome,
-  });
-  // session projection baselines (host-modules/session-projection.ts)
-  installSessionProjection({
-    state,
-    pluginEvents: deps.pluginEvents as any,
-    listPersistedSessionInfos: deps.listPersistedSessionInfos,
-    readPersistedSessionHeader: deps.readPersistedSessionHeader,
-  });
-  // init orchestration (host-modules/init-orchestration.ts)
-  installInitOrchestration({
-    initialize: deps.initialize,
-    enqueueLifecycle: deps.enqueueLifecycle,
-    getCurrentSessionId: deps.getSession as any,
-  });
-  // telemetry sink factory (host-modules/telemetry-sink.ts)
-  installTelemetrySink({
-    hasRendererEventEmitter: deps.hasRendererEventEmitter as any,
-    emitRendererEvent: deps.emitRendererEvent,
-  });
-  // context services snapshot (host-modules/context-services-snapshot.ts)
-  installContextServicesSnapshot({
-    state,
-    captureDeepSeekCapabilityServices: deps.captureDeepSeekCapabilityServices,
-    restoreDeepSeekCapabilityServices: deps.restoreDeepSeekCapabilityServices,
-  });
-  // default pi package installer (host-modules/default-pi-package-installer.ts)
-  installDefaultPiPackageInstaller({ state });
-  // DSH bridge helpers (host-modules/dsh-bridge-helpers.ts)
-  installDshBridgeHelpers({ state });
-  // pi runtime refresh (host-modules/pi-runtime-refresh.ts)
-  installPiRuntimeRefresh({
-    state,
-    piRuntimeCoordinator: deps.piRuntimeCoordinator,
-  });
-  // pi-runtime factories (Cordis context.provide("runtime"/"tools"/"session") facades)
-  installPiRuntimeFactories({
-    state,
-    piHome: deps.piHome,
-    getSession: deps.getSession,
-    getModel: deps.getModel,
-    prompt: deps.prompt as any,
-    abort: deps.abort as any,
-    setModel: deps.setModel as any,
-    setThinkingLevel: deps.setThinkingLevel as any,
-    promptContent: deps.promptContent as any,
-    onEvent: deps.onEvent as any,
-  });
-  // pi-extension-configure (built-in factories + extension diagnostics)
-  installPiExtensionConfigure({
-    state,
-    emitPluginEvent: deps.emitPluginEvent,
-    telemetrySink: deps.telemetrySink,
-    resolveProfileDirectory: deps.resolveProfileDirectory,
-    requestHookPermission: deps.requestHookPermission,
-    createRequire: deps.createRequire,
-    createPiToolExtension: deps.createPiToolExtension,
-  });
-  // agent-preset-runtime (mountConfiguredAgentPreset + selectAgentPreset)
-  installAgentPresetRuntime({
-    state,
-    emitPluginEvent: deps.emitPluginEvent,
-    listAgentPresets: deps.listAgentPresets as never,
-    readAgentPresetDefaults: deps.readAgentPresetDefaults as never,
-    writeAgentPresetDefault: deps.writeAgentPresetDefault as never,
-    readAgentPreset: deps.readAgentPreset as never,
-    createPresetSessionRuntime: deps.createPresetSessionRuntime as never,
-    pluginLifecycleQueue: deps.pluginLifecycleQueue as never,
-    sessionHasConversation: deps.sessionHasConversation as never,
-    piRuntimeCoordinatorReload: deps.piRuntimeCoordinatorReload,
-  });
-  // dispose-internal (lifecycle cleanup path)
-  installDisposeInternal({
-    state,
-    emitPluginEvent: deps.emitPluginEvent,
-    piSessionRuntimeDispose: deps.piSessionRuntimeDispose as never,
-    stopProfileWatchers: deps.stopProfileWatchers as never,
-    disposeProfileTypertRegistrations: deps.disposeProfileTypertRegistrations as never,
-    disposeActiveHookProcesses: deps.disposeActiveHookProcesses as never,
-    drainActiveHookProcesses: deps.drainActiveHookProcesses as never,
-  });
-  // workbench-scope-sync (syncWorkbenchScope)
-  installWorkbenchScopeSync({
-    state,
-    emitRendererEvent: deps.emitRendererEvent,
-    casdoorStatus: deps.casdoorStatus,
-  });
-  // ui-request-resolver (resolveUiRequest)
-  installUiRequestResolver({
-    state,
-    emitPluginEvent: deps.emitPluginEvent,
-    permissionReadRules: deps.permissionReadRules,
-    permissionWriteRules: deps.permissionWriteRules,
-  });
+  installProfileDomain(state, deps);
+  installSessionDomain(state, deps);
+  installPluginDomain(state, deps);
+  installRuntimeDomain(state, deps);
 }

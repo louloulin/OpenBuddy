@@ -37,14 +37,14 @@ import { createDefaultAgentHostState } from "./_default-state";
 import type { HostJobRecord, PiPromptContentPart } from "./_state-shape";
 
 let state: AgentHostState = createDefaultAgentHostState();
-let piHome: () => string;
-let emitPluginEvent: (type: string, payload: unknown) => void;
-let emitRendererEvent: (channel: string, payload: unknown) => void;
+let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd();
+let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
+let emitRendererEvent: (channel: string, payload: unknown) => void = () => undefined;
 let ensureContinuableSubagent: (
   parentSessionId: string,
   childSessionId: string,
-) => Promise<unknown>;
-let listAllPiSessions: <T = unknown>() => any;
+) => Promise<unknown> = async () => undefined;
+let listAllPiSessions: <T = unknown>() => any = async () => [];
 
 /**
  * Bind subagent-runtime dependencies. Called once from

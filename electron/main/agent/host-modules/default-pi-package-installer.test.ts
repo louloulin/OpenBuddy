@@ -28,7 +28,6 @@ describe("default-pi-package-installer", () => {
     const state = createDefaultAgentHostState();
     state.profileOptions = {
       profileDir: "/fake",
-      profile: {} as any,
       profileName: "p",
       home: "/h",
     };

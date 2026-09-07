@@ -19,13 +19,19 @@
 import type { DeepSeekCordisInvocation, DeepSeekCordisRuntimeSnapshot } from "@openbuddy/plugin-host";
 import { DEEPSEEK_PI_BRIDGE_PROTOCOL, DEEPSEEK_PI_CAPABILITIES } from "../../deepseek/deepseek-pi-bridge";
 import { type AgentHostState } from "./_state-shape";
-import type { UiRequestValue } from "./_state-shape";
+import type { AgentHostUiRequestValue as UiRequestValue } from "./_state-shape";
+import { createDefaultAgentHostState } from "./_default-state";
 
 // ---------------------------------------------------------------------------
-// Module-level singleton deps (install pattern)
+// Module-level singleton deps (install pattern + globalThis-keyed defaults)
 // ---------------------------------------------------------------------------
 
+// state 默认 null — 单元测试 reset 后调用 throw "not installed".
+// Module-load 阶段 (agent-host.ts) 会调用 __registerDefaultState 把默认
+// state 注入到 globalThis, 让 realserver 测试在 installMicrokernelHost
+// 跑之前也能用.
 let state: AgentHostState | null = null;
+const DSH_DEFAULT_STATE_KEY = "__openbuddyDshDefaultState__";
 
 // ---------------------------------------------------------------------------
 // Install API
@@ -37,11 +43,20 @@ export interface InstallDshBridgeHelpersDeps {
 
 export function installDshBridgeHelpers(deps: InstallDshBridgeHelpersDeps): void {
   state = deps.state;
+  __registerDefaultState(deps.state);
+}
+
+/** Module-load (agent-host.ts) 时调用, 把默认 state 桥接到 globalThis. */
+export function __registerDefaultState(s: AgentHostState): void {
+  const g = globalThis as unknown as Record<string, AgentHostState>;
+  g[DSH_DEFAULT_STATE_KEY] = s;
 }
 
 /** 测试 / 调试: 把 module-level singleton 还原成 stub. */
 export function __resetDshBridgeHelpersForTest(): void {
   state = null;
+  const g = globalThis as unknown as Record<string, unknown>;
+  delete g[DSH_DEFAULT_STATE_KEY];
 }
 
 // ---------------------------------------------------------------------------
@@ -72,8 +87,11 @@ export function questionAnswer(value: UiRequestValue, questionKey?: string): str
  * 用于 IPC `deepSeekCordisSnapshot` 让 renderer 展示 plugin 健康状态.
  */
 export function deepSeekCordisSnapshot(): DeepSeekCordisRuntimeSnapshot | null {
-  if (!state) throw new Error("dsh-bridge-helpers: not installed");
-  return state.deepSeekCordisSnapshot;
+  const resolved = state
+    ?? (globalThis as unknown as Record<string, AgentHostState | undefined>)[DSH_DEFAULT_STATE_KEY]
+    ?? null;
+  if (!resolved) throw new Error("dsh-bridge-helpers: not installed");
+  return resolved.deepSeekCordisSnapshot;
 }
 
 /**

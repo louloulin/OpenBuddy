@@ -232,3 +232,22 @@ export async function persistedSessionPath(sessionId: string | undefined): Promi
     return undefined;
   }
 }
+
+/**
+ * 用于 module-load createDefaultAgentHostState() 阶段的 stub 实现.
+ * state 还未 install (installMicrokernelHost 在 initialize() 内被调用),
+ * 但 agent-host.ts 的 module-level `export const state` 需要一个占位
+ * toolRegistry 才能完成 module 初始化. 真值会在 installMicrokernelHost 后
+ * 通过 installPiRuntimeFactories 替换.
+ */
+export function createToolRegistryStub(): PiToolRegistry {
+  const stubTools = new Map<string, ToolDefinition>();
+  return {
+    registerTool: (tool) => {
+      stubTools.set(tool.name, tool);
+      return () => stubTools.delete(tool.name);
+    },
+    list: () => [...stubTools.values()],
+    listLocal: () => [...stubTools.values()],
+  } as PiToolRegistry;
+}

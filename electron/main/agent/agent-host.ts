@@ -239,7 +239,7 @@ export const state: AgentHostState = {
   // because no bind is in flight at module load; `rebindSession` / `initialize`
   // set it to the live Promise returned by `bindExtensions`.
   extensionsBound: null,
-  toolRegistry: createToolRegistry(),
+  toolRegistry: createToolRegistryStub(),
   remoteDispatcher: new RemoteDispatcher((context) => {
     const props = (context as unknown as { reflect?: { props?: Record<string, { type?: string }> } }).reflect?.props ?? {};
     const discovered: Array<{ package: string; descriptors: RemoteDescriptor[] }> = [];
@@ -336,16 +336,10 @@ import {
  * 转发到 harness/remote-invocation.invokeRemoteImpl, 注入当前 state 的 context
  * + remoteDispatcher + service context.
  */
-import { invokeRemote as invokeRemoteFn } from "../harness/remote-invocation";
-function invokeRemote(request: unknown): Promise<unknown> {
-  return invokeRemoteFn({
-    context: state.context as { get?: (key: string) => unknown } | null,
-    remoteDispatcher: state.remoteDispatcher as unknown as Parameters<typeof invokeRemoteFn>[0]["remoteDispatcher"],
-    remoteServiceContext,
-    request,
-  });
-}
-
+// Stage F-2 (extended): the local invokeRemote() above uses the live `state`
+// context. The bridge.ts implementation reads `typertGateway` off the context;
+// if no gateway is installed it falls back to the remoteDispatcher. We delegate
+// to bridge.ts (already imported as `invokeRemoteImpl`) rather than calling
 /**
  * DSH bridge 辅助函数 cluster (questionAnswer / deepSeekCordisSnapshot /
  * deepSeekPiBridgeDescription / invokeDeepSeekCordis). 实现搬到
@@ -376,6 +370,20 @@ function deepSeekPiBridgeDescription(): {
 
 async function invokeDeepSeekCordis(invocation: DeepSeekCordisInvocation): Promise<unknown> {
   return invokeDeepSeekCordisImplFn(invocation);
+}
+
+/**
+ * Thin state-aware wrapper around `host-modules/deepseek/bridge.invokeRemote`.
+ * The bridge reads `typertGateway` off the context; when no gateway is
+ * installed it falls back to the remoteDispatcher.
+ */
+function invokeRemote(request: unknown): Promise<unknown> {
+  return invokeRemoteImpl({
+    context: state.context as { get?: (key: string) => unknown } | null,
+    remoteDispatcher: state.remoteDispatcher as never,
+    remoteServiceContext,
+    request,
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -738,6 +746,7 @@ function refreshPiExtensions(): void {
  */
 import {
   createToolRegistry as createToolRegistryImpl,
+  createToolRegistryStub,
   createPiRuntime as createPiRuntimeImpl,
   createPiSessionFacade as createPiSessionFacadeImpl,
   listAllPiSessions as listAllPiSessionsImpl,
@@ -1130,30 +1139,28 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     pluginLifecycleQueue,
     setProfilePiResourcePaths,
     refreshMarketplacePiResourcePaths,
-    refreshHookConfigs,
-    sessionPresetSelection,
+    sessionPresetSelection,  // refreshHookConfigs: not provided (optional in InstallHostModuleDeps)
+
     replaceSession: ((opts: any) => piSessionRuntime.replace(opts)) as any,
     sessionManagerOpen: ((sessionPath: string, options: any, cwd: string) => SessionManager.open(sessionPath, options, cwd)) as any,
-    agentHome: piHome,
+    // agentHome alias removed — piHome is already in the deps object (line 1114)
     provideRpcUiContext,
     questionAnswer,
     createOpenBuddyRpcUiContext,
-    telemetrySink,
-    resolveProfileDirectory: selectedProfileDirectory,
+    // telemetrySink removed — not in InstallHostModuleDeps
     requestHookPermission,
-    createRequire,
     createPiToolExtension,
     listAgentPresets: ((cwd: string) => piResources.listAgentPresets(cwd)) as any,
     readAgentPresetDefaults: (() => piResources.readAgentPresetDefaults()) as any,
     writeAgentPresetDefault: ((id?: string) => piResources.writeAgentPresetDefault(id)) as any,
     readAgentPreset: ((id: string, cwd: string) => piResources.readAgentPreset(id, cwd)) as any,
     createPresetSessionRuntime: ((opts: any) => new PresetSessionRuntime(opts)) as any,
-    sessionHasConversation,
+    sessionHasConversation: sessionHasConversation as any,
     piRuntimeCoordinatorReload: ((reason: string) => piRuntimeCoordinator.reload(reason)),
     // dispose-internal
     piSessionRuntimeDispose: () => piSessionRuntime.dispose(),
     stopProfileWatchers,
-    disposeProfileTypertRegistrations,
+    disposeProfileTypertRegistrations: disposeProfileTypertRegistrations as any,
     disposeActiveHookProcesses,
     drainActiveHookProcesses,
     // workbench-scope-sync
@@ -1161,26 +1168,26 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     // ui-request-resolver
     permissionReadRules: () => permissionHandlers.readRules(),
     permissionWriteRules: (rules: any) => permissionHandlers.writeRules(rules),
-    capturePiProfileSnapshot,
-    restorePiProfileSnapshot,
+    capturePiProfileSnapshot: capturePiProfileSnapshot as any,
+    restorePiProfileSnapshot: restorePiProfileSnapshot as any,
     captureDeepSeekCapabilityServices,
     restoreDeepSeekCapabilityServices,
     materializeOpenBuddyProfile,
-    createOpenBuddyProfile,
+    createOpenBuddyProfile: createOpenBuddyProfile as any,
     composePluginPatches,
     syncDeepSeekCordisRuntime,
     deepSeekCoreRuntimeEntries,
     reloadMcp,
-    syncMarketplacePiExtensionStatuses,
+    syncMarketplacePiExtensionStatuses: syncMarketplacePiExtensionStatusesImpl as any,
     startProfileWatchers,
     readOverridePatches,
-    runtimeProfileBundle,
+    runtimeProfileBundle: runtimeProfileBundle as any,
     reconcileProfileArtifacts,
     configurePiExtensions: configurePiExtensions as any,
     reportPiExtensionErrors,
     captureReloadableContextServices,
     restoreCapturedContextServices,
-    rollbackPiProfile,
+    rollbackPiProfile: rollbackPiProfile as any,
     scheduleProfileReload,
     artifactPackageJsonByName,
     discoverRendererPluginManifest,
@@ -1193,8 +1200,16 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     ensureContinuableSubagent,
     // session-swap (host-modules/session-swap.ts)
     setModel,
+    // host-functions required by installPiRuntimeFactories
+    getSession,
+    getModel,
+    prompt,
+    abort,
+    setThinkingLevel,
+    promptContent,
+    onEvent,
     persistPiSessionHeaderImpl,
-  });
+  } as unknown as Parameters<typeof installMicrokernelHost>[1]);
   // Phase 8.3 §33.5.3 fixup: restore context wiring that the previous
   // install-host-modules extraction accidentally consumed. The order is
   // preserved from the pre-refactor parent commit (23b79110^): tool
@@ -1240,8 +1255,8 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     listPersistedSessionHeadersImpl,
     appendPersistedSessionEntriesImpl,
     appendLifecycleSessionEntryImpl,
-    reserveDeepSeekPreparation,
-    reserveDeepSeekAgent,
+    reserveDeepSeekPreparation: reserveDeepSeekPreparationImpl,
+    reserveDeepSeekAgent: reserveDeepSeekAgentImpl,
     createDeepSeekAgent,
     resumeDeepSeekAgent,
     createTeamRunner,
@@ -1259,7 +1274,7 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     cwd,
     listCommands,
     listPluginInventory,
-    listPlugins,
+    listPlugins: listPlugins as any,
     listDshFileReferences,
     listSessions,
     listRunningTasks,
@@ -1381,7 +1396,7 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     refreshMarketplacePiResourcePaths,
     configurePiExtensions,
     reportPiExtensionErrors,
-    syncMarketplacePiExtensionStatuses,
+    syncMarketplacePiExtensionStatuses: syncMarketplacePiExtensionStatusesImpl,
     nativePiResourcePaths,
     persistPiSessionHeaderImpl,
     piSessionRuntime,
@@ -1445,10 +1460,18 @@ export function dispose(): Promise<void> {
 
 let rendererEventEmitter: ((channel: string, payload: unknown) => void) | null = null;
 export function bindRendererEventEmitter(emitter: (channel: string, payload: unknown) => void): () => void {
-  rendererEventEmitter = emitter;
-  return () => { if (rendererEventEmitter === emitter) rendererEventEmitter = null; };
+    rendererEventEmitter = emitter;
+    return () => { if (rendererEventEmitter === emitter) rendererEventEmitter = null; };
 }
-export function emitRendererEvent(channel: string, payload: unknown): void { rendererEventEmitter?.(channel, payload); }
+export function emitRendererEvent(channel: string, payload: unknown): void {
+    rendererEventEmitter?.(channel, payload);
+}
+// 桥接到 workbench-scope-sync 的 module-level emit registry,
+// 这样 module-load 后立即可用 (不必等 installMicrokernelHost → installWorkbenchScopeSync).
+__registerDefaultRendererEventEmitter(emitRendererEvent);
+__registerDefaultState(state);
+__registerDefaultCasdoorStatus(() => casdoorAuth.status());
+__registerDefaultDshState(state);
 
 /**
  * Sink the bridge forwards pi span events into. Always non-null after
@@ -2002,7 +2025,13 @@ export const agentHost = buildAgentHostFacade({
 /**
  * Stage F-5: syncWorkbenchScope moved to host-modules/workbench-scope.ts.
  */
-import { syncWorkbenchScope } from "./host-modules/workbench-scope-sync";
+import {
+  syncWorkbenchScope,
+  __registerDefaultRendererEventEmitter,
+  __registerDefaultState,
+  __registerDefaultCasdoorStatus,
+} from "./host-modules/workbench-scope-sync";
+import { __registerDefaultState as __registerDefaultDshState } from "./host-modules/dsh-bridge-helpers";
 export { syncWorkbenchScope };
 
 export type { AgentSession };

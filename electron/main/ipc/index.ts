@@ -504,9 +504,9 @@ export async function dispatchTypedRpc(request: ClientRequest, source: "renderer
 				plan: null,
 				planOwner: "pi-plan-mode",
 				tasks: { sessionId, source: "pi-native", note: "todo list is owned by pi's @juicesharp/rpiv-todo when installed; otherwise the bundled pi todo tool." },
-				mcp: mcp.map((entry: { serverName: string; status: string; toolCount: number }) => ({ serverName: entry.serverName, status: entry.status, toolCount: entry.toolCount })),
+				mcp: mcp.map((entry: { serverName?: string; status?: string; toolCount?: number }) => ({ serverName: entry.serverName, status: entry.status, toolCount: entry.toolCount })),
 				plugins: plugins.map((entry: { id?: string; enabled?: boolean; status?: string }) => ({ id: entry.id, enabled: entry.enabled, status: entry.status })),
-				resources: { extensions: (pluginInventory as any)?.piExtensions?.length, skills: resources.skills?.length ?? 0, prompts: resources.prompts?.length ?? 0, themes: resources.themes?.length ?? 0, diagnostics: resources.diagnostics?.length ?? 0 },
+				resources: { extensions: (pluginInventory as any)?.piExtensions?.length, skills: resources.skills?.length ?? 0, prompts: resources.prompts?.length ?? 0, themes: resources.themes?.length ?? 0, diagnostics: Object.keys(resources.diagnostics ?? {}).length },
 				commands: Array.isArray(commands) ? commands.length : 0,
 				contextReady: Boolean(context),
 				pluginReadiness: readiness,
@@ -984,7 +984,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 				status: "available" as const,
 				contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const },
 			})),
-			...resources.extensions.map((entry: any) => ({
+			...(resources.extensions ?? []).map((entry: any) => ({
 				id: `pi-extension:${entry.id}`,
 				name: entry.name,
 				source: "pi-extension" as const,
@@ -992,7 +992,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 				status: entry.health === "failed" ? "degraded" as const : "available" as const,
 				contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const },
 			})),
-			...resources.prompts.map((entry: any) => ({
+			...(resources.prompts ?? []).map((entry: any) => ({
 				id: `prompt:${entry.name}`,
 				name: entry.name,
 				source: "prompt" as const,
@@ -1032,8 +1032,8 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 			capabilities: {
 				local: resources.skills.length,
 				room: 0,
-				organization: resources.extensions.filter((entry: any) => entry.sourceScope === "project").length,
-				directory: resources.prompts.length,
+				organization: (resources.extensions ?? []).filter((entry: any) => entry.sourceScope === "project").length,
+				directory: (resources.prompts ?? []).length,
 			},
 		};
 	});

@@ -19,25 +19,25 @@ afterEach(() => {
 
 describe("dsh-bridge-helpers", () => {
   it("questionAnswer passes through string values", () => {
-    expect(questionAnswer("hello")).toBe("hello");
+    expect(questionAnswer("hello" as any)).toBe("hello");
   });
 
   it("questionAnswer returns undefined for null/non-object", () => {
-    expect(questionAnswer(null)).toBeUndefined();
-    expect(questionAnswer(undefined)).toBeUndefined();
-    expect(questionAnswer(42 as any)).toBeUndefined();
+    expect(questionAnswer(null as any)).toBeUndefined();
+    expect(questionAnswer(undefined as any)).toBeUndefined();
+    expect(questionAnswer(42 as any as any)).toBeUndefined();
   });
 
   it("questionAnswer picks by questionKey from answers", () => {
-    expect(questionAnswer({ answers: { q1: "first", q2: "second" } }, "q2")).toBe("second");
+    expect(questionAnswer({ answers: { q1: "first", q2: "second" } } as any, "q2")).toBe("second");
   });
 
   it("questionAnswer falls back to first answer when no key", () => {
-    expect(questionAnswer({ answers: { a: "x" } })).toBe("x");
+    expect(questionAnswer({ answers: { a: "x" } } as any)).toBe("x");
   });
 
   it("questionAnswer unwraps single-element arrays", () => {
-    expect(questionAnswer({ answers: { a: ["only"] } })).toBe("only");
+    expect(questionAnswer({ answers: { a: ["only"] } } as any)).toBe("only");
   });
 
   it("questionAnswer falls back to annotations notes", () => {

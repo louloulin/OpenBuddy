@@ -31,7 +31,6 @@ describe("preset-helpers", () => {
     const state = makeStubState();
     state.profileOptions = {
       profileDir: "/abs/profile",
-      profile: {} as any,
       profileName: "x",
       home: "/x",
     };
@@ -43,7 +42,6 @@ describe("preset-helpers", () => {
     const state = makeStubState();
     state.profileOptions = {
       profileDir: undefined as any,
-      profile: {} as any,
       profileName: "myprof",
       home: "/h",
     };

@@ -318,3 +318,4 @@ export interface HostJobRecord {
   output?: string;
   error?: string;
 }
+export type { ToolDefinition } from "@earendil-works/pi-coding-agent";

@@ -61,9 +61,9 @@ let state: AgentHostState = createDefaultAgentHostState();
 let eventHandlers: Set<EventHandler> = new Set();
 let pluginEventHandlers: Set<PluginEventHandler> = new Set();
 
-let emitPluginEvent: (type: string, payload: unknown) => void;
-let emitRendererEvent: (channel: string, payload: unknown) => void;
-let publicQueueItems: (session: unknown) => readonly unknown[];
+let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
+let emitRendererEvent: (channel: string, payload: unknown) => void = () => undefined;
+let publicQueueItems: (session: unknown) => readonly unknown[] = () => [];
 
 /**
  * Bind agent-prompt dependencies. Called once from

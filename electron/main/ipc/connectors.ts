@@ -131,7 +131,7 @@ export function registerConnectorsIpc(getWindow: () => BrowserWindow | null): vo
 			await ensureAgentHost();
 			const serverName = requiredString(recordValue(args, "MCP auth payload").serverName, "serverName");
 			const result = await agentHost.authorizeMcp(serverName);
-			return result.status === "authenticated" ? result : { ...result, status: result.status };
+			return result.status === "authorized" ? result : { ...result, status: result.status };
 		});
 		ipcMain.handle("mcp_auth_cancel", async (_e, args: unknown) => {
 			await ensureAgentHost();

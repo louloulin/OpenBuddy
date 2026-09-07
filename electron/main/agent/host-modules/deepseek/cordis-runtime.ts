@@ -23,6 +23,7 @@ import { join } from "node:path";
 import { type PluginBundle, type PluginEntryOptions, DeepSeekCordisRuntime, type DeepSeekCordisPluginEntry, type DeepSeekCordisRuntimeSnapshot } from "@openbuddy/plugin-host";
 
 import type { AgentHostState } from "../_state-shape";
+import { createDefaultAgentHostState } from "../_default-state";
 
 /**
  * Phase 8.3 Architectural Refactor: deepseek/cordis-runtime 反向依赖消除。
@@ -34,20 +35,20 @@ import type { AgentHostState } from "../_state-shape";
  * 修复后: 运行时依赖通过 installDeepSeekCordisRuntime() 注入,模块仅 import 类型。
  */
 
-let state: AgentHostState;
-let emitPluginEvent: (type: string, payload: unknown) => void;
-let promptFn: any;
-let abortFn: any;
-let listSessions: (cwd: string) => Promise<readonly unknown[]>;
-let listSubagentChildren: (parentSessionId: string) => Promise<readonly unknown[]>;
+let state: AgentHostState = createDefaultAgentHostState();
+let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
+let promptFn: any = async () => undefined;
+let abortFn: any = () => undefined;
+let listSessions: (cwd: string) => Promise<readonly unknown[]> = async () => [];
+let listSubagentChildren: (parentSessionId: string) => Promise<readonly unknown[]> = async () => [];
 let promptSubagent: (
 	parentSessionId: string,
 	childSessionId: string,
 	parts: readonly unknown[],
-) => Promise<unknown>;
-let interruptSubagent: (parentSessionId: string, childSessionId: string) => Promise<unknown>;
-let piHome: () => string;
-let profileArtifactModuleUrl: (id: string) => string;
+) => Promise<unknown> = async () => undefined;
+let interruptSubagent: (parentSessionId: string, childSessionId: string) => Promise<unknown> = async () => undefined;
+let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd();
+let profileArtifactModuleUrl: (id: string) => string = (id) => id;
 
 export function installDeepSeekCordisRuntime(deps: {
 	state: AgentHostState;

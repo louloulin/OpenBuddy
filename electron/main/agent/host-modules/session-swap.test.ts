@@ -67,7 +67,7 @@ describe("session-swap", () => {
 
     expect(deps.initialize).toHaveBeenCalledWith({ cwd: "/tmp/work" });
     expect(deps.rebindSession).toHaveBeenCalledTimes(1);
-    expect(deps.rebindSession.mock.calls[0]?.[1]).toBe("/tmp/work");
+    expect((deps.rebindSession.mock.calls[0] as unknown as [string, string] | undefined)?.[1]).toBe("/tmp/work");
     expect(deps.persistPiSessionHeader).toHaveBeenCalledWith(state.session);
     expect(deps.setModel).toHaveBeenCalledWith("prov/model-x");
 

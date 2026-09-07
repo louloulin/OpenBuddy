@@ -44,7 +44,7 @@ describe("pi-runtime-refresh", () => {
     });
     refreshPiExtensions();
     expect(reloadUntilStable).toHaveBeenCalledTimes(1);
-    const [check, reason] = reloadUntilStable.mock.calls[0]!;
+    const [check, reason] = (reloadUntilStable.mock.calls[0] as unknown as [() => number, string]);
     expect(check()).toBe(5);
     expect(reason).toBe("tool-registry");
     expect(state.piRefreshPromise).toBeDefined();

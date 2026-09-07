@@ -19,7 +19,7 @@ afterEach(() => {
 describe("init-orchestration", () => {
   it("calls install.initialize() through the lifecycle queue", async () => {
     const initialize = vi.fn(async () => undefined);
-    const enqueueLifecycle = vi.fn(async <T>(op: () => Promise<T>) => op());
+    const enqueueLifecycle = vi.fn(async (op: () => Promise<unknown>) => op()) as unknown as <T>(operation: () => Promise<T>) => Promise<T>;
     installInitOrchestration({ initialize, enqueueLifecycle });
 
     await init({ cwd: "/tmp" });

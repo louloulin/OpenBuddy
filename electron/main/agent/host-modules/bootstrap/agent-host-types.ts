@@ -38,7 +38,7 @@ export interface AgentSessionInfo {
   /** Provider name from models.json (e.g. "anthropic", "openai"). */
   provider?: string;
   /** Model identifier within the provider. */
-  modelId?: ModelId;
+  modelId: ModelId;
   title?: string;
   pinned?: boolean;
   archived?: boolean;
@@ -47,7 +47,7 @@ export interface AgentSessionInfo {
 
 export interface AgentModelRef {
   provider: ProviderId;
-  id: ModelId;
+  id?: ModelId;
   /** Optional display label. */
   label?: string;
 }
@@ -105,15 +105,22 @@ export interface ProviderConfig {
   id: ProviderId;
   baseUrl?: string;
   apiKey?: string;
+  label?: string;
+  providerKind?: string;
+  apiBackend?: string;
+  authScheme?: string;
   /** Opaque metadata. The shape is owned by the provider descriptor registry. */
   meta?: Record<string, unknown>;
   enabled?: boolean;
 }
 
 export interface ModelConfig {
-  id: ModelId;
+  id?: ModelId;
+  modelId: ModelId;
   providerId: ProviderId;
+  name?: string;
   displayName?: string;
+  reasoning?: boolean;
   contextWindow?: number;
   maxOutputTokens?: number;
   enabled?: boolean;
@@ -128,7 +135,7 @@ export interface ProviderMutationResult {
 
 export interface ModelMutationResult {
   ok: boolean;
-  modelId?: ModelId;
+  modelId: ModelId;
   error?: { code: string; message: string };
 }
 
@@ -203,8 +210,12 @@ export type McpAuthStatus = "authorized" | "declined" | "pending" | "expired" | 
 
 export interface McpServerStatus {
   name: string;
+  serverName?: string;
   status: "connecting" | "ready" | "error" | "disabled";
   lastError?: string;
+  toolCount?: number;
+  emailProfile?: string;
+  error?: string;
   tools: ReadonlyArray<ToolEntry>;
 }
 
@@ -442,6 +453,9 @@ export interface ResourceInventory {
   skills: ReadonlyArray<SkillInfo>;
   commands: ReadonlyArray<CommandInfo>;
   themes: ReadonlyArray<{ name: string; source: "user" | "profile" | "built-in" }>;
+  extensions?: ReadonlyArray<{ id: string; name: string; sourceScope?: "user" | "project" | "profile"; health?: string }>;
+  prompts?: ReadonlyArray<{ name: string; sourceScope?: string }>;
+  diagnostics?: { lastReloadAt?: number; lastReloadStatus?: string; lastReloadError?: string };
 }
 
 export interface PluginReadinessInfo {

@@ -162,23 +162,21 @@ import type { ProviderRegistrySource } from "../agent-host-provider-registry";
 // profile / bundle helpers
 // ---------------------------------------------------------------------------
 
-export async function reloadProfile(): Promise<void> {
-  scheduleProfileReload();
-  await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 160));
-  await state.profileReloadPromise;
-}
+// v7-A: 3-stage pipeline extracted to _surface/reload-profile. Same logic, testable.
+import { reloadProfile } from "./_surface/reload-profile";
+export { reloadProfile };
 
 export async function installProfileBundle(sourcePath: string): Promise<ProfilePackageInfo> {
   if (!state.profileOptions) throw new Error("openbuddy-profile: profile is not initialized");
   const result = await installProfilePackage(state.profileOptions, sourcePath);
-  await reloadProfile();
+  await reloadProfile(state, scheduleProfileReload);
   return result;
 }
 
 export async function removeProfileBundle(name: string): Promise<void> {
   if (!state.profileOptions) throw new Error("openbuddy-profile: profile is not initialized");
   await removeProfilePackage(state.profileOptions, name);
-  await reloadProfile();
+  await reloadProfile(state, scheduleProfileReload);
 }
 
 // ---------------------------------------------------------------------------

@@ -62,10 +62,7 @@ export function microkernelReady(): boolean {
  * from scratch. The host-module `__reset*ForTest()` helpers stay
  * available for unit tests that need finer control.
  */
-export function installMicrokernelHost(
-  state: Parameters<typeof installHostModules>[0],
-  deps: InstallHostModuleDeps,
-): void {
+export function installMicrokernelHost(state: Parameters<typeof installHostModules>[0], deps: InstallHostModuleDeps): void {
   if (INSTALLED_MODULES.size > 0) {
     disposeMicrokernelHost();
   }

@@ -384,8 +384,8 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 		const resources = await agentHost.resourceInventory();
 		collaborationRuntime.setCapabilityCards([
 			...resources.skills.map((entry: any) => ({ id: `pi-skill:${entry.name}`, name: entry.name, source: "pi-skill" as const, visibility: "local" as const, status: "available" as const, contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const } })),
-			...resources.extensions.map((entry: any) => ({ id: `pi-extension:${entry.id}`, name: entry.name, source: "pi-extension" as const, visibility: entry.sourceScope === "project" ? "organization" as const : "local" as const, status: entry.health === "failed" ? "degraded" as const : "available" as const, contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const } })),
-			...resources.prompts.map((entry: any) => ({ id: `prompt:${entry.name}`, name: entry.name, source: "prompt" as const, visibility: "local" as const, status: "available" as const, contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const } })),
+			...(resources.extensions ?? []).map((entry: any) => ({ id: `pi-extension:${entry.id}`, name: entry.name, source: "pi-extension" as const, visibility: entry.sourceScope === "project" ? "organization" as const : "local" as const, status: entry.health === "failed" ? "degraded" as const : "available" as const, contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const } })),
+			...(resources.prompts ?? []).map((entry: any) => ({ id: `prompt:${entry.name}`, name: entry.name, source: "prompt" as const, visibility: "local" as const, status: "available" as const, contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const } })),
 		]);
 		return resources;
 	}

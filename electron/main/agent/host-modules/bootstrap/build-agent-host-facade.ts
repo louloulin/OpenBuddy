@@ -32,6 +32,7 @@
  *   interface IS the contract; consumers see the typed shape.
  */
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import type { StoredSessionAttachment } from "../../../session/session-attachments";
 import type {
   AgentModelRef,
   AgentModelRuntimeInfo,
@@ -130,7 +131,7 @@ export interface AgentHostFacade {
   followUp: (text: string, options?: { traceId?: TraceId; sessionId?: SessionId; signal?: AbortSignal }) => Promise<PromptDispatchResult>;
   abort: (options?: { traceId?: TraceId; sessionId?: SessionId }) => Promise<MutationAck>;
   updateSessionQueue: (sessionId: SessionId, itemId: string, action: unknown, options?: { traceId?: TraceId }) => Promise<MutationAck>;
-  readSessionAttachment: (sessionId: SessionId, attachmentId: string, options?: { traceId?: TraceId }) => Promise<SessionAttachmentReadResultUnion>;
+  readSessionAttachment: (sessionId: SessionId, attachmentId: string, options?: { traceId?: TraceId }) => Promise<StoredSessionAttachment>;
 
   // ---- model control ----
   setModel: (modelId: ModelId, options?: { traceId?: TraceId; sessionId?: SessionId }) => Promise<MutationAck>;
@@ -159,7 +160,7 @@ export interface AgentHostFacade {
     method: "api-key" | "session" | "none";
     error?: string;
   };
-  providerCatalog: () => Promise<ReadonlyArray<ProviderConfig>>;
+  providerCatalog: () => Promise<{ providers: readonly ProviderConfig[]; models: readonly ModelConfig[] }>;
   saveProvider: (provider: ProviderConfig, id?: ProviderId) => Promise<ProviderMutationResult>;
   saveModel: (model: ModelConfig, providerId?: ProviderId) => Promise<ModelMutationResult>;
   deleteProvider: (providerId: ProviderId) => Promise<ProviderMutationResult>;
@@ -170,7 +171,7 @@ export interface AgentHostFacade {
   listTools: () => ReadonlyArray<ToolEntry>;
   pluginInventory: () => Promise<ReadonlyArray<PluginInventoryEntry>>;
   pluginSnapshot: () => PluginSnapshot;
-  pluginEvents: (filter?: { type?: string; sinceId?: string; limit?: number }) => Promise<ReadonlyArray<PluginEventRecord>>;
+  pluginEvents: (query?: { sessionId?: string; sinceSequence?: number; limit?: number }) => Promise<ReadonlyArray<PluginEventRecord>>;
   setPluginEnabled: (id: string, enabled: boolean) => Promise<MutationAck>;
   reloadPlugin: (id: string) => Promise<MutationAck>;
   reloadPiExtensions: () => Promise<MutationAck>;
@@ -228,8 +229,8 @@ export interface AgentHostFacade {
   archiveWorkspaceSession: (sessionId: SessionId, archived?: boolean) => Promise<MutationAck>;
 
   // ---- cordis / deepseek ----
-  registerRemote: (contribution: RemoteContribution) => MutationAck;
-  unregisterRemote: (packageName: string) => MutationAck;
+  registerRemote: (contribution: unknown) => MutationAck;
+  unregisterRemote: (packageName: unknown) => MutationAck;
   invokeRemote: (request: unknown) => Promise<RemoteDispatchResult>;
   deepSeekCordisSnapshot: () => DeepSeekCordisSnapshotInfo;
   deepSeekPiBridgeDescription: () => DeepSeekPiBridgeDescription;
