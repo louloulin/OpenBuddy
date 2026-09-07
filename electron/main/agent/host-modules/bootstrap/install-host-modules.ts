@@ -41,6 +41,18 @@ import { installTeamRunner } from "../team-runner";
 import { installProviderRegistryTracker } from "../../agent-host-provider-registry";
 import { installProfileReloadTransaction } from "../profile-reload-transaction";
 import { installSessionRebind } from "../session-rebind";
+import { installSessionSwap } from "../session-swap";
+import { installProfileResourcePaths } from "../profile/resource-paths";
+import { installUnifiedPackages } from "../profile/unified-packages";
+import { installPresetHelpers } from "../preset-helpers";
+import { installSessionProjection } from "../session-projection";
+import { installInitOrchestration } from "../init-orchestration";
+import { installTelemetrySink } from "../telemetry-sink";
+import { installContextServicesSnapshot } from "../context-services-snapshot";
+import { installDefaultPiPackageInstaller } from "../default-pi-package-installer";
+import { installDshBridgeHelpers } from "../dsh-bridge-helpers";
+import { installPiRuntimeRefresh } from "../pi-runtime-refresh";
+import { installPiRuntimeFactories } from "../pi-runtime-factories";
 import { installPiExtensionConfigure } from "../pi-extension-configure";
 import { installAgentPresetRuntime } from "../agent-preset-runtime";
 import { installDisposeInternal } from "../dispose-internal";
@@ -64,6 +76,8 @@ export interface InstallHostModuleDeps {
   piHome: () => string;
   isPathWithin: (root: string, candidate: string) => boolean;
   piSessionDir: (cwd: string) => string;
+  /** profile-artifact-resolution.toModuleUrl (for profileArtifactModuleUrl cache-bust) */
+  toModuleUrl: (path: string) => string;
   // Event emitters
   emitPluginEvent: (type: string, payload: unknown) => void;
   emitRendererEvent: (channel: string, payload: unknown) => void;
@@ -77,6 +91,10 @@ export interface InstallHostModuleDeps {
   initialize: (opts?: { cwd?: string; sessionPath?: string; force?: boolean }) => Promise<void>;
   rebindSession: (sessionPath: string, cwd: string) => Promise<void>;
   dispose: () => Promise<void>;
+  /** host-functions.setModel (被 session-swap 调用以在新建会话后应用模型选择) */
+  setModel: (modelId: string) => Promise<unknown>;
+  /** session-store.persistPiSessionHeader (新建会话后立即落盘 header) */
+  persistPiSessionHeader: (session: import("@earendil-works/pi-coding-agent").AgentSession) => Promise<void>;
   // pi runtime helpers
   piRuntimeCoordinator: { reload: (reason: string) => Promise<void> };
   publicQueueItems: (session: unknown) => readonly unknown[];
@@ -355,6 +373,77 @@ export function installHostModules(state: AgentHostState, deps: InstallHostModul
     emitRendererEvent: deps.emitRendererEvent,
     questionAnswer: deps.questionAnswer as never,
     createOpenBuddyRpcUiContext: deps.createOpenBuddyRpcUiContext,
+  });
+  // session-swap (agent:new-session / agent:ensure-new-session warm-host fast path)
+  installSessionSwap({
+    state,
+    initialize: deps.initialize,
+    rebindSession: deps.rebindSession,
+    persistPiSessionHeader: deps.persistPiSessionHeader,
+    setModel: deps.setModel,
+    piSessionDir: deps.piSessionDir,
+  });
+  // profile resource path management (host-modules/profile/resource-paths.ts)
+  installProfileResourcePaths({
+    state,
+    isPathWithin: deps.isPathWithin,
+    toModuleUrl: deps.toModuleUrl,
+  });
+  // profile unified-packages (host-modules/profile/unified-packages.ts)
+  installUnifiedPackages({
+    state,
+    discoverRendererPluginManifest: deps.discoverRendererPluginManifest as any,
+  });
+  // preset helpers (host-modules/preset-helpers.ts)
+  installPresetHelpers({
+    state,
+    piHome: deps.piHome,
+  });
+  // session projection baselines (host-modules/session-projection.ts)
+  installSessionProjection({
+    state,
+    pluginEvents: deps.pluginEvents as any,
+    listPersistedSessionInfos: deps.listPersistedSessionInfos,
+    readPersistedSessionHeader: deps.readPersistedSessionHeader,
+  });
+  // init orchestration (host-modules/init-orchestration.ts)
+  installInitOrchestration({
+    initialize: deps.initialize,
+    enqueueLifecycle: deps.enqueueLifecycle,
+    getCurrentSessionId: deps.getSession as any,
+  });
+  // telemetry sink factory (host-modules/telemetry-sink.ts)
+  installTelemetrySink({
+    hasRendererEventEmitter: deps.hasRendererEventEmitter as any,
+    emitRendererEvent: deps.emitRendererEvent,
+  });
+  // context services snapshot (host-modules/context-services-snapshot.ts)
+  installContextServicesSnapshot({
+    state,
+    captureDeepSeekCapabilityServices: deps.captureDeepSeekCapabilityServices,
+    restoreDeepSeekCapabilityServices: deps.restoreDeepSeekCapabilityServices,
+  });
+  // default pi package installer (host-modules/default-pi-package-installer.ts)
+  installDefaultPiPackageInstaller({ state });
+  // DSH bridge helpers (host-modules/dsh-bridge-helpers.ts)
+  installDshBridgeHelpers({ state });
+  // pi runtime refresh (host-modules/pi-runtime-refresh.ts)
+  installPiRuntimeRefresh({
+    state,
+    piRuntimeCoordinator: deps.piRuntimeCoordinator,
+  });
+  // pi-runtime factories (Cordis context.provide("runtime"/"tools"/"session") facades)
+  installPiRuntimeFactories({
+    state,
+    piHome: deps.piHome,
+    getSession: deps.getSession,
+    getModel: deps.getModel,
+    prompt: deps.prompt as any,
+    abort: deps.abort as any,
+    setModel: deps.setModel as any,
+    setThinkingLevel: deps.setThinkingLevel as any,
+    promptContent: deps.promptContent as any,
+    onEvent: deps.onEvent as any,
   });
   // pi-extension-configure (built-in factories + extension diagnostics)
   installPiExtensionConfigure({

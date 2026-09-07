@@ -154,7 +154,9 @@ export async function initSession(deps: InitSessionDeps): Promise<string> {
   try {
     await piResourceLoader.reload();
     state.piResourceLoader = piResourceLoader;
-    const created = await piSessionRuntime.create({
+    // piSessionRuntime.create() returns Promise<AgentSession> (not { session })
+    // per the canonical signature in electron/main/agent/pi-session-runtime.ts.
+    session = await piSessionRuntime.create({
       cwd,
       agentDir: piHome(),
       noTools: "builtin",
@@ -164,7 +166,6 @@ export async function initSession(deps: InitSessionDeps): Promise<string> {
         : SessionManager.create(cwd, piSessionDir(cwd)),
       resourceLoader: piResourceLoader,
     });
-    session = created.session;
     if (!sessionPath) await persistPiSessionHeaderImpl(session);
   } catch (error) {
     await state.presetSessionRuntime?.dispose().catch(() => undefined);

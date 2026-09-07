@@ -70,7 +70,7 @@ export interface WireForwardedEventsDeps {
  *
  * Side effects on `state`:
  *   - `state.capabilityEventBridgeUnsubscribe` — `bindCapabilityEventBridge`
- *     dispose function; cleared by `disposeHost`.
+ *     dispose function; cleared by `disposeInternal`.
  *
  * No return value — the function is purely declarative wiring. To remove
  * the handlers, call `state.capabilityEventBridgeUnsubscribe?.()` then
