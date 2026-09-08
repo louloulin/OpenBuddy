@@ -77,8 +77,14 @@ describe("Electron IPC contract", () => {
   });
   it("keeps the complete preload allowlist and Main handler registry in sync", async () => {
     const preload = await readFile(resolve(process.cwd(), "electron/preload/index.ts"), "utf8");
+    // Phase A.1: pi-bridge handlers live under electron/main/agent/pi-bridge/,
+    // not under electron/main/ipc/. Scan both directories so the regression
+    // guard still covers the full handler registry.
     const ipcFiles = await sourceFiles(resolve(process.cwd(), "electron/main/ipc"));
-    const mainSources = await Promise.all(ipcFiles.map((file) => readFile(file, "utf8")));
+    const bridgeFiles = await sourceFiles(resolve(process.cwd(), "electron/main/agent/pi-bridge"));
+    const mainSources = await Promise.all(
+      [...ipcFiles, ...bridgeFiles].map((file) => readFile(file, "utf8")),
+    );
     const main = mainSources.join("\n");
     const allowBlock = preload.match(/const allowedInvokeChannels = new Set\(\[([\s\S]*?)\]\);/)?.[1] ?? "";
     const allowlisted = new Set([...allowBlock.matchAll(/"([^"]+)"/g)].map((match) => match[1]));

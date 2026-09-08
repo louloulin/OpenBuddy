@@ -46,6 +46,20 @@ Status legend:
 | `casdoor://member-revocation` | `electron/main/casdoor/*` | `src/stores/member-store.ts` | live |
 | `casdoor://casdoor-webhook` | `electron/main/casdoor/*` | `src/stores/casdoor-store.ts` | live |
 | `electron-bridge-status` | `electron/preload/index.ts:145` | `src/stores/bridge-health-store.ts` | live (PR 5) |
+| `pi-bridge-text:parse-frontmatter` | `electron/main/agent/pi-bridge/index.ts:31` | `src/lib/agent/pi-bridge-client.ts` `text.parseFrontmatter` | live (Phase A.1) |
+| `pi-bridge-text:strip-frontmatter` | `electron/main/agent/pi-bridge/index.ts:34` | `src/lib/agent/pi-bridge-client.ts` `text.stripFrontmatter` | live (Phase A.1) |
+| `pi-bridge-text:truncate-head` | `electron/main/agent/pi-bridge/index.ts:37` | `src/lib/agent/pi-bridge-client.ts` `text.truncateHead` | live (Phase A.1) |
+| `pi-bridge-text:truncate-tail` | `electron/main/agent/pi-bridge/index.ts:43` | `src/lib/agent/pi-bridge-client.ts` `text.truncateTail` | live (Phase A.1) |
+| `pi-bridge-text:truncate-line` | `electron/main/agent/pi-bridge/index.ts:49` | `src/lib/agent/pi-bridge-client.ts` `text.truncateLine` | live (Phase A.1) |
+| `pi-bridge-text:generate-diff` | `electron/main/agent/pi-bridge/index.ts:55` | `src/lib/agent/pi-bridge-client.ts` `text.generateDiff` | live (Phase A.1) |
+| `pi-bridge-text:generate-patch` | `electron/main/agent/pi-bridge/index.ts:64` | `src/lib/agent/pi-bridge-client.ts` `text.generatePatch` | live (Phase A.1) |
+| `pi-bridge-image:detect-mime` | `electron/main/agent/pi-bridge/index.ts:74` | `src/lib/agent/pi-bridge-client.ts` `image.detectMime` | live (Phase A.1) |
+| `pi-bridge-image:resize` | `electron/main/agent/pi-bridge/index.ts:78` | `src/lib/agent/pi-bridge-client.ts` `image.resize` | live (Phase A.1) |
+| `pi-bridge-image:resize-file` | `electron/main/agent/pi-bridge/index.ts:91` | `src/lib/agent/pi-bridge-client.ts` `image.resizeFile` | live (Phase A.1) |
+| `pi-bridge-image:convert-to-png` | `electron/main/agent/pi-bridge/index.ts:98` | `src/lib/agent/pi-bridge-client.ts` `image.convertToPng` | live (Phase A.1) |
+| `pi-bridge-skills:load` | `electron/main/agent/pi-bridge/index.ts:103` | `src/lib/agent/pi-bridge-client.ts` `skills.load` | live (Phase A.1) |
+| `pi-bridge-skills:load-from-dir` | `electron/main/agent/pi-bridge/index.ts:108` | `src/lib/agent/pi-bridge-client.ts` `skills.loadFromDir` | live (Phase A.1) |
+| `pi-bridge-skills:format-for-prompt` | `electron/main/agent/pi-bridge/index.ts:112` | `src/lib/agent/pi-bridge-client.ts` `skills.formatForPrompt` | live (Phase A.1) |
 
 ## Replay channel
 

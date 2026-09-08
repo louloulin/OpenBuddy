@@ -49,6 +49,20 @@ import {
 	type RecordValue,
 } from "./validation";
 // dynamic: @openbuddy/auth-permission
+// Phase B.1 round 3 — per-capability IPC modules. Each owns a self-contained
+// subset of the handlers that used to live in this file's giant
+// registerAgentIpc() body.
+import { registerPresetIpc } from "./preset";
+import { registerTaskIpc } from "./task";
+import { registerPermissionIpc } from "./permission";
+import { registerSessionMiscIpc } from "./session-misc";
+import { registerAgentInfoIpc } from "./agent-info";
+import { registerPluginIpc } from "./plugin";
+import { registerProfileIpc } from "./profile";
+import { registerDeepSeekIpc } from "./deepseek";
+import { registerProvidersIpc } from "./providers";
+import { registerModelIpc } from "./model";
+import { registerCompactionIpc } from "./compaction";
 
 // A-5: AbortSignal plumbing for prompt/steer/follow-up.
 //
@@ -81,6 +95,30 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 		await ensureAgentHostLoaded();
 		await agentHost.waitUntilReady();
 	};
+
+	// Phase B.1 round 3 — per-capability IPC modules receive a deps bag
+	// so the local closures of ensureAgentHost / casdoorAuth / agentHost
+	// are still accessible to handlers that live in their own files.
+	// Each module returns immediately and registers its own subset.
+	const sharedDeps = {
+		agentHost,
+		casdoorAuth,
+		ensureAgentHost,
+		awaitExtensionsBound,
+		inflightAbortControllers,
+		getWindow,
+	};
+	registerPresetIpc(sharedDeps);
+	registerTaskIpc(sharedDeps);
+	registerPermissionIpc(sharedDeps);
+	registerSessionMiscIpc(sharedDeps);
+	registerAgentInfoIpc(sharedDeps);
+	registerPluginIpc(sharedDeps);
+	registerProfileIpc(sharedDeps);
+	registerDeepSeekIpc(sharedDeps);
+	registerProvidersIpc(sharedDeps);
+	registerModelIpc(sharedDeps);
+	registerCompactionIpc(sharedDeps);
 
 		ipcMain.handle("agent:new-session", async (_e, input?: string | { cwd?: string; modelId?: string; traceId?: string }) => {
 			await ensureAgentHost();
@@ -243,136 +281,6 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 				throw err;
 			}
 		});
-		ipcMain.handle("agent:current-model", async () => { await ensureAgentHost(); return agentHost.getModel(); });
-		ipcMain.handle("agent:presets-list", async (_e, input?: unknown) => {
-			const cwd = input === undefined || input === null ? agentHost.getCwd() : absolutePath(String(input), "cwd");
-			return agentHost.listAgentPresets(cwd);
-		});
-		ipcMain.handle("agent:preset-current", async () => { await ensureAgentHost(); return { id: agentHost.currentAgentPreset() }; });
-		ipcMain.handle("agent:preset-select", async (_e, input?: unknown) => {
-			const payload = recordValue(input, "preset selection payload");
-			const id = requiredString(payload.id, "id");
-			return agentHost.selectAgentPreset(id);
-		});
-		ipcMain.handle("agent:preset-default-save", async (_e, input?: unknown) => {
-			const payload = input === undefined || input === null ? {} : recordValue(input, "preset default payload");
-			const id = payload.id === undefined || payload.id === null ? undefined : requiredString(payload.id, "id");
-			return resources.writeAgentPresetDefault(id);
-		});
-		ipcMain.handle("agent:plugin-list", async () => { await ensureAgentHost(); return agentHost.listPlugins(); });
-		ipcMain.handle("agent:plugin-inventory", async () => { await ensureAgentHost(); return agentHost.pluginInventory(); });
-		ipcMain.handle("agent:tools-list", async () => {
-			await ensureAgentHost();
-			// Surface every tool the active pi runtime exposes (G-1d
-			// compatibilityAdapter tools + built-in pi tools), tagged with
-			// source + piPackageHint so the renderer can group / disable
-			// them and the user can tell pi-native from openbuddy-styled.
-			//
-			// Classifier: a tool is "openbuddy" if any of these match —
-			//   (a) G-1d adapter naming: `openbuddy_<verb>`
-			//   (b) Cordis capability namespace: `calendar_`, `team_`,
-			//       `buddy_`, `email_`, `mcp_` (see capability-plugins.ts)
-			// Everything else is treated as a pi built-in / extension tool.
-			const openbuddyPrefix = /^(openbuddy_|calendar_|team_|buddy_|email_|mcp_)/;
-			const tools = agentHost.listTools();
-			return tools.map((tool) => {
-				const name = tool.name;
-				const isOpenbuddyOrigin = openbuddyPrefix.test(name);
-				return {
-					name,
-					label: tool.label,
-					description: tool.description,
-					source: isOpenbuddyOrigin ? "openbuddy" : "pi",
-					piPackageHint: isOpenbuddyOrigin ? null : name,
-				};
-			});
-		});
-		ipcMain.handle("agent:plugin-snapshot", async () => { await ensureAgentHost(); return agentHost.pluginSnapshot(); });
-		ipcMain.handle("agent:plugin-readiness", async () => { await ensureAgentHost(); return agentHost.pluginReadiness(); });
-		ipcMain.handle("agent:deepseek-cordis-snapshot", async () => { await ensureAgentHost(); return agentHost.deepSeekCordisSnapshot(); });
-		ipcMain.handle("agent:deepseek-pi-describe", async () => { await ensureAgentHost(); return agentHost.deepSeekPiBridgeDescription(); });
-		ipcMain.handle("agent:deepseek-cordis-invoke", async (_e, args: unknown) => {
-			const payload = recordValue(args, "DeepSeek Cordis invocation payload");
-			return agentHost.invokeDeepSeekCordis({
-				service: requiredString(payload.service, "service"),
-				method: requiredString(payload.method, "method"),
-				...(payload.args === undefined ? {} : { args: payload.args as readonly unknown[] | Record<string, unknown> }),
-				...(payload.parameters === undefined ? {} : { parameters: payload.parameters as string[] }),
-			});
-		});
-		ipcMain.handle("agent:profile-packages", async () => agentHost.profilePackages());
-		ipcMain.handle("agent:profile-install", async (_e, args: unknown) => {
-			const input = recordValue(args, "profile install payload");
-			const source = input.source !== undefined
-				? requiredString(input.source, "source")
-				: absolutePath(input.sourcePath, "sourcePath");
-			return agentHost.installProfileBundle(source);
-		});
-		// C6: Opt-in install of the curated default Pi package bundle. The
-		// renderer UI calls this when the user presses "Enable Default Pi Bundle"
-		// in OpenBuddyPluginPanel. Force flag re-installs already-present
-		// packages, otherwise existing installs are skipped.
-		ipcMain.handle("agent:profile-install-default-pi", async (_e, args: unknown) => {
-			const input = recordValue(args, "profile install default pi payload") as { force?: unknown } | Record<string, unknown>;
-			const force = (input as { force?: unknown }).force === true;
-			return agentHost.installDefaultPiPackages({ force });
-		});
-		ipcMain.handle("agent:profile-remove", async (_e, args: unknown) => {
-			const input = recordValue(args, "profile remove payload");
-			await agentHost.removeProfileBundle(requiredString(input.name, "name"));
-			return { ok: true };
-		});
-		ipcMain.handle("agent:plugin-events", async () => { await ensureAgentHost(); return agentHost.pluginEvents(); });
-		ipcMain.handle("agent:transaction-receipt", async (_e, args: unknown) => {
-			const input = recordValue(args, "transaction-receipt payload");
-			const transactionId = requiredString(input.transactionId, "transactionId");
-			const surface = requiredString(input.surface, "surface");
-			const details = input.details === undefined ? undefined : recordValue(input.details, "details");
-			return agentHost.reportActivePluginTransaction(transactionId, surface, details);
-		});
-		ipcMain.handle("agent:transaction-list", async () => { await ensureAgentHost(); return agentHost.listActivePluginTransactions(); });
-		ipcMain.handle("agent:event-log", async (_e, args?: unknown) => {
-			const input = args === undefined || args === null ? {} : recordValue(args, "event log payload");
-			return agentHost.pluginEvents({
-				...(input.sessionId === undefined ? {} : { sessionId: requiredString(input.sessionId, "sessionId") }),
-				...(input.sinceSequence === undefined ? {} : { sinceSequence: optionalFiniteInteger(input.sinceSequence, "sinceSequence", 0, 0, Number.MAX_SAFE_INTEGER) }),
-				...(input.limit === undefined ? {} : { limit: optionalFiniteInteger(input.limit, "limit", 2000, 1, 2000) }),
-			});
-		});
-		ipcMain.handle("agent:event-log-replay", async (_e, args?: unknown) => {
-			// Cursor-based replay used after bridge recovery. Returns events
-			// from `fromSequence` forward so the renderer can rehydrate
-			// stores without a full reload. Gated by
-			// OPENBUDDY_REPLAY_ON_SUBSCRIBE.
-			const input = args === undefined || args === null ? {} : recordValue(args, "event-log-replay payload");
-			const sessionId = requiredString(input.sessionId, "sessionId");
-			const fromSequence = input.fromSequence === undefined ? 0 : optionalFiniteInteger(input.fromSequence, "fromSequence", 0, 0, Number.MAX_SAFE_INTEGER);
-			const limit = input.limit === undefined ? 500 : optionalFiniteInteger(input.limit, "limit", 500, 1, 2000);
-			const entries = await agentHost.pluginEvents({ sessionId, sinceSequence: fromSequence, limit });
-			return { sessionId, fromSequence, count: Array.isArray(entries) ? entries.length : 0, entries };
-		});
-		ipcMain.handle("agent:plugin-enable", async (_e, args: { id: string; enabled: boolean }) => {
-			const input = recordValue(args, "plugin-enable payload");
-			return agentHost.setPluginEnabled(requiredString(input.id, "plugin id"), requiredBoolean(input.enabled, "enabled"));
-		});
-		ipcMain.handle("agent:plugin-reload", async (_e, args: { id: string }) => {
-			return agentHost.reloadPlugin(requiredString(recordValue(args, "plugin-reload payload").id, "plugin id"));
-		});
-		ipcMain.handle("agent:extensions-reload", async () => agentHost.reloadPiExtensions());
-		ipcMain.handle("agent:plugin-config", async (_e, args: { id: string; config: unknown }) => {
-			const input = recordValue(args, "plugin-config payload");
-			return agentHost.updatePluginConfig(requiredString(input.id, "plugin id"), input.config);
-		});
-		ipcMain.handle("agent:plugin-state-get", async () => {
-			return agentHost.getStoredPluginState();
-		});
-		ipcMain.handle("agent:plugin-state-reset", async (_e, args: { id: string }) => {
-			return agentHost.resetPluginState(requiredString(recordValue(args, "plugin-state-reset payload").id, "plugin id"));
-		});
-		ipcMain.handle("agent:renderer-plugin-entries", async () => { await ensureAgentHost(); return agentHost.listRendererPluginEntries(); });
-		ipcMain.handle("agent:renderer-plugin-boot", async () => { await ensureAgentHost(); return agentHost.rendererPluginBootGraph(); });
-		ipcMain.handle("agent:renderer-plugin-module", async (_e, args: unknown) => { await ensureAgentHost(); return agentHost.resolveRendererPluginModule(requiredString(recordValue(args, "renderer plugin module payload").moduleKey, "moduleKey")); });
-		ipcMain.handle("agent:remote-contributions", async () => { await ensureAgentHost(); return agentHost.listProfileRemoteContributions(); });
 		ipcMain.handle("agent:init", async (_e, cwd?: string | { cwd?: string; traceId?: string }) => {
 			const opts = typeof cwd === "object" && cwd !== null ? cwd : undefined;
 			const normalizedCwd = (typeof cwd === "string" ? cwd : opts?.cwd) === undefined ? undefined : absolutePath(typeof cwd === "string" ? cwd : opts?.cwd, "cwd");
@@ -398,170 +306,6 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			await agentHost.dispose();
 			return { ok: true };
 		});
-		ipcMain.handle("agent:resolve-permission", async (_e, args: { requestId: string; optionId?: string; cancelled?: boolean }) => {
-			const input = recordValue(args, "permission response payload");
-			const cancelled = input.cancelled === undefined ? false : requiredBoolean(input.cancelled, "cancelled");
-			const optionId = input.optionId === undefined || input.optionId === null ? undefined : requiredString(input.optionId, "optionId");
-			const value = cancelled || optionId === undefined || optionId === "deny" ? false : optionId === "allow_always" ? { decision: "allow_always" as const } : optionId === "allow" ? true : false;
-			return { ok: agentHost.resolveUiRequest(requiredString(input.requestId, "requestId"), value) };
-		});
-		ipcMain.handle("agent:resolve-question", async (_e, args: { requestId: string; answers?: Record<string, string | string[]>; annotations?: Record<string, { preview?: string; notes?: string }>; cancelled?: boolean }) => {
-			const input = recordValue(args, "question response payload");
-			const cancelled = input.cancelled === undefined ? false : requiredBoolean(input.cancelled, "cancelled");
-			const answers = input.answers === undefined ? {} : recordValue(input.answers, "answers");
-			const annotations = input.annotations === undefined ? {} : recordValue(input.annotations, "annotations");
-			const normalizedAnswers = Object.fromEntries(Object.entries(answers).map(([key, value]) => [key, typeof value === "string" || (Array.isArray(value) && value.every((item) => typeof item === "string")) ? value : String(value)]));
-			const normalizedAnnotations = Object.fromEntries(Object.entries(annotations).map(([key, value]) => [key, recordValue(value, `annotations.${key}`)]));
-			return { ok: agentHost.resolveUiRequest(requiredString(input.requestId, "requestId"), cancelled ? undefined : { answers: normalizedAnswers as Record<string, string | string[]>, annotations: normalizedAnnotations as Record<string, { preview?: string; notes?: string }> }) };
-		});
-		ipcMain.handle("agent:auth-status", async () => {
-			await ensureAgentHost();
-			return agentHost.authStatus();
-		});
-		ipcMain.handle("agent:providers-list", async () => {
-			await ensureAgentHost();
-			return agentHost.providerCatalog();
-		});
-		ipcMain.handle("internal_reload", async (_event, args?: { kind?: string }) => {
-			if (args !== undefined) recordValue(args, "internal_reload payload");
-			await ensureAgentHost();
-			if (args?.kind === "skills" || args?.kind === "mcp_all" || args?.kind === "mcp_project") await agentHost.reloadPiRuntime(`internal-reload:${args.kind}`);
-			return { ok: true, kind: args?.kind ?? "unknown" };
-		});
-		ipcMain.handle("agents_list", async (_e, args?: unknown) => {
-			const input = args === undefined || args === null ? {} : recordValue(args, "agents list payload");
-			return resources.listAgents(optionalCwd(input));
-		});
-		ipcMain.handle("agents_get", async (_e, args: { path: string; cwd?: string | null }) => {
-			const input = recordValue(args, "agent get payload");
-			return resources.getAgent(requiredString(input.path, "agent path"), input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"));
-		});
-		ipcMain.handle("agents_save", async (_e, args: { name: string; raw: string; cwd?: string | null }) => {
-			const input = recordValue(args, "agent save payload");
-			return resources.saveAgent(requiredString(input.name, "agent name"), requiredString(input.raw, "agent content"), input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"));
-		});
-		ipcMain.handle("agents_delete", async (_e, args: { path: string; cwd?: string | null }) => {
-			const input = recordValue(args, "agent delete payload");
-			return resources.deleteAgent(requiredString(input.path, "agent path"), input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"));
-		});
-		ipcMain.handle("agents_template", async (_e, args: { name: string; description: string; systemPrompt: string }) => {
-			const input = recordValue(args, "agent template payload");
-			return resources.agentTemplate(requiredString(input.name, "agent name"), requiredString(input.description, "agent description"), requiredString(input.systemPrompt, "agent prompt"));
-		});
-		ipcMain.handle("agents_defaults_get", async () => resources.readAgentDefaults());
-		ipcMain.handle("agents_defaults_save", async (_e, args: unknown) => {
-			const input = recordValue(args, "agents defaults payload");
-			const defaults = input.defaults === undefined ? {} : recordValue(input.defaults, "defaults");
-			const patch: Partial<resources.AgentDefaults> = {};
-			if (defaults.defaultModel !== undefined) patch.defaultModel = stringValue(defaults.defaultModel, "defaultModel");
-			if (defaults.defaultPermission !== undefined) patch.defaultPermission = stringValue(defaults.defaultPermission, "defaultPermission");
-			if (defaults.rememberToolApprovals !== undefined) patch.rememberToolApprovals = requiredBoolean(defaults.rememberToolApprovals, "rememberToolApprovals");
-			return resources.writeAgentDefaults(patch);
-		});
-		ipcMain.handle("tasks_list", async () => { await ensureAgentHost(); return agentHost.listRunningTasks(); });
-		ipcMain.handle("task_kill", async (_e, args: { taskId: string }) => { await ensureAgentHost(); return agentHost.killTask(requiredString(recordValue(args, "task kill payload").taskId, "task id")); });
-		ipcMain.handle("agent:load-session", async (_e, args: { sessionId: string; cwd: string; traceId?: string }) => {
-			await ensureAgentHost();
-			const input = recordValue(args, "load session payload");
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			const sessionId = requiredString(input.sessionId, "session id");
-			const traceId = optionalString(input.traceId, "traceId") ?? generateTraceId();
-			hostReceived("agent:load-session", traceId, sessionId);
-			try {
-				const result = await agentHost.loadSession(sessionId, input.cwd ? absolutePath(input.cwd, "cwd") : "", { traceId, sessionId });
-				hostDispatched("agent:load-session", traceId, sessionId);
-				return result;
-			} catch (err) {
-				hostFailed("agent:load-session", traceId, err);
-				throw err;
-			}
-		});
-		ipcMain.handle("agent:session-info", async (_e, args: { sessionId: string }) => {
-			await ensureAgentHost();
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			try {
-				return agentHost.sessionInfo(requiredString(recordValue(args, "session info payload").sessionId, "session id"));
-			} catch (error) {
-				if (error instanceof Error && /^Pi session is not loaded:/u.test(error.message)) return null;
-				throw error;
-			}
-		});
-		ipcMain.handle("agent:session-messages", async (_e, args: { sessionId: string }) => {
-			await ensureAgentHost();
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			const input = recordValue(args, "session messages payload");
-			return agentHost.readSessionEntries(requiredString(input.sessionId, "session id"));
-		});
-		ipcMain.handle("agent:session-usage", async (_e, args: { sessionId: string }) => {
-			await ensureAgentHost();
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			try {
-				return agentHost.sessionUsage(requiredString(recordValue(args, "session usage payload").sessionId, "session id"));
-			} catch (error) {
-				if (error instanceof Error && /^Pi session is not loaded:/u.test(error.message)) return null;
-				throw error;
-			}
-		});
-		ipcMain.handle("agent:session-metadata-clear", async () => {
-			await agentHost.clearSessionMetadata();
-			return { ok: true };
-		});
-		ipcMain.handle("agent:commands-list", async () => { await ensureAgentHost(); return agentHost.listCommands(); });
-		ipcMain.handle("agent:resource-inventory", async () => { await ensureAgentHost(); return agentHost.resourceInventory(); });
-		ipcMain.handle("prompt_history", async (_e, args?: unknown) => {
-			const input = args === undefined || args === null ? {} : recordValue(args, "prompt history payload");
-			// P2-13: readPromptHistory lives in the memory module, which pulls
-			// in SessionManager (Rust-backed NAPI). Lazy-load on demand.
-			const { readPromptHistory } = await import("../agent/pi-resources/memory");
-			return readPromptHistory(optionalFiniteInteger(input.limit, "limit", 100, 1, 500));
-		});
-		ipcMain.handle("session_search", async (_e, args: { query: string; cwd?: string | null; limit?: number | null }) => {
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			const input = recordValue(args, "session search payload");
-			// P2-13: searchSessions is in the memory module — same NAPI cost.
-			const { searchSessions } = await import("../agent/pi-resources/memory");
-			return searchSessions(requiredString(input.query, "query"), input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"), optionalFiniteInteger(input.limit, "limit", 50, 1, 200));
-		});
-		ipcMain.handle("session_fork", async (_e, args: { sessionId: string; cwd?: string | null }) => {
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			const input = recordValue(args, "session fork payload");
-			const sessionId = requiredString(input.sessionId, "session id");
-			const cwd = input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd");
-			// P2-13: forkSession + forkSessionFromFile both live in memory.ts.
-			const { forkSession, forkSessionFromFile } = await import("../agent/pi-resources/memory");
-			try {
-				return await forkSessionFromFile(await agentHost.sessionFile(sessionId) as any, cwd);
-			} catch {
-				return forkSession(sessionId, cwd);
-			}
-		});
-		ipcMain.handle("rewind_points", async (_e, args: { sessionId: string }) => {
-    // P2-13: rewindPoints lives in memory.ts — same NAPI cost.
-    const { rewindPoints } = await import("../agent/pi-resources/memory");
-    const sessionFileResult = await agentHost.sessionFile(requiredString(recordValue(args, "rewind points payload").sessionId, "session id"));
-    if (!sessionFileResult.path) throw new Error("rewind_points: session file path unavailable");
-    return rewindPoints(sessionFileResult.path);
-  });
-		ipcMain.handle("rewind_execute", async (_e, args: { sessionId: string; targetPromptIndex: number; mode?: string; force?: boolean }) => {
-			const input = recordValue(args, "rewind execute payload");
-			if (input.force !== undefined) requiredBoolean(input.force, "force");
-			return agentHost.rewindSession(requiredString(input.sessionId, "session id"), optionalFiniteInteger(input.targetPromptIndex, "targetPromptIndex", -1, 0, 100000), input.mode === undefined ? undefined : requiredString(input.mode, "rewind mode"));
-		});
-		ipcMain.handle("permission_list", async () => {
-			await ensureAgentHost();
-			return (await import("@openbuddy/auth-permission")).permissionHandlers.readRules();
-		});
-		ipcMain.handle("permission_save", async (_e, args: { rules: unknown }) => {
-			await ensureAgentHost();
-			const input = recordValue(args, "permission_save payload");
-			return (await import("@openbuddy/auth-permission")).permissionHandlers.writeRules(permissionRules(input.rules) as never);
-		});
-		// subagent config moved to pi-subagents (122k weekly downloads, native pi).
-		ipcMain.handle("plugins_list", async () => {
-			// P2-13: listPlugins lives in the heavy marketplace module.
-			const { listPlugins } = await import("../agent/pi-resources/marketplace");
-			return { plugins: await listPlugins(agentHost.getCwd()) };
-		});
 		ipcMain.handle("plugins_action", async (_e, args: unknown) => {
 			const input = recordValue(args, "plugins action payload");
 			const action = recordValue(input.action, "action");
@@ -584,124 +328,6 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			const input = recordValue(args, "session delete payload");
 			return agentHost.deleteSession(requiredString(input.sessionId, "sessionId"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"));
-		});
-		ipcMain.handle("agent:providers-save-provider", async (_e, args: unknown) => {
-			const input = recordValue(args, "provider save payload");
-			const provider = recordValue(input.provider, "provider");
-			const normalized = {
-				...provider,
-				id: providerId(provider.id),
-				providerKind: requiredString(provider.providerKind, "providerKind"),
-				...(provider.label === undefined ? {} : { label: requiredString(provider.label, "label") }),
-				...(provider.apiKey === undefined ? {} : { apiKey: requiredString(provider.apiKey, "apiKey") }),
-				...(provider.baseUrl === undefined ? {} : { baseUrl: httpUrl(provider.baseUrl, "baseUrl") }),
-				...(provider.apiBackend === undefined ? {} : { apiBackend: enumValue(provider.apiBackend, "apiBackend", ["messages", "responses", "chat_completions"] as const) }),
-				...(provider.authScheme === undefined ? {} : { authScheme: enumValue(provider.authScheme, "authScheme", ["bearer", "x_api_key"] as const) }),
-				...(provider.contextWindow === undefined ? {} : { contextWindow: optionalFiniteInteger(provider.contextWindow, "contextWindow", 128000, 1, 10_000_000) }),
-			};
-			return agentHost.saveProvider(normalized);
-		});
-		ipcMain.handle("agent:providers-save-model", async (_e, args: unknown) => {
-			const input = recordValue(args, "model save payload");
-			const model = recordValue(input.model, "model");
-			return agentHost.saveModel({
-				...model,
-				providerId: providerId(model.providerId),
-				modelId: modelId(model.modelId),
-				...(model.name === undefined ? {} : { name: requiredString(model.name, "name") }),
-				...(model.contextWindow === undefined ? {} : { contextWindow: optionalFiniteInteger(model.contextWindow, "contextWindow", 128000, 1, 10_000_000) }),
-				// `reasoning` gates the entire thinking-level surface. Pi's Model
-				// type requires it, and `session.setThinkingLevel(...)` clamps any
-				// request to "off" when the active model reports no reasoning
-				// support — which silently kills the `agent_thought_chunk` channel
-				// and the collapsible 深度思考 block for every custom provider that
-				// omits it (e.g. a hand-added MiniMax-M3, which does reason).
-				...(model.reasoning === undefined ? {} : { reasoning: Boolean(model.reasoning) }),
-			});
-		});
-		ipcMain.handle("agent:providers-delete-provider", async (_e, args: unknown) => agentHost.deleteProvider(providerId(recordValue(args, "provider delete payload").id)));
-		ipcMain.handle("agent:providers-delete-model", async (_e, args: unknown) => {
-			const input = recordValue(args, "model delete payload");
-			return agentHost.deleteModel(providerId(input.providerId), modelId(input.modelId));
-		});
-		ipcMain.handle("agent:providers-fetch-models", async (_e, args: unknown) => {
-			const input = recordValue(args, "model discovery payload");
-			const baseUrl = httpUrl(input.baseUrl, "baseUrl");
-			const apiKey = requiredString(input.apiKey, "apiKey");
-			const providerKind = optionalString(input.providerKind, "providerKind");
-	        const isAnthropic = providerKind === "anthropic" || providerKind === "custom_anthropic" || providerKind === "minimax_cn";
-			const headers: Record<string, string> = isAnthropic
-				? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }
-				: { Authorization: `Bearer ${apiKey}` };
-			const response = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, { headers });
-			if (!response.ok) throw new Error(`Model catalog request failed (${response.status})`);
-			const payload = await response.json() as { data?: Array<{ id: string; owned_by?: string }> };
-			return (payload.data ?? []).map((model) => ({ id: model.id, ownedBy: model.owned_by }));
-		});
-		ipcMain.handle("agent:providers-test", async (_e, args: unknown) => {
-			// Phase 2: provider test-connection IPC. Calls `${baseUrl}/models`
-			// with the correct auth header and returns a structured
-			// { status, latencyMs, modelsCount, httpStatus, errorCode?,
-			// errorMessage? } payload. The renderer (ProviderHealthBadge +
-			// ProviderEditor) renders status + a UI-friendly suggestion
-			// derived from errorCode via `suggestionForError`.
-			const input = recordValue(args, "provider test payload");
-			const baseUrl = httpUrl(input.baseUrl, "baseUrl");
-			const apiKey = optionalString(input.apiKey, "apiKey") ?? "";
-			const providerKind = optionalString(input.providerKind, "providerKind");
-			const isAnthropic = providerKind === "anthropic" || providerKind === "custom_anthropic" || providerKind === "minimax_cn";
-			const headers: Record<string, string> = isAnthropic
-				? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }
-				: { Authorization: apiKey ? `Bearer ${apiKey}` : "Bearer " };
-			const startedAt = Date.now();
-			try {
-				const response = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, { headers, signal: AbortSignal.timeout(10_000) });
-				const latencyMs = Date.now() - startedAt;
-				if (!response.ok) {
-					return {
-						status: response.status >= 500 ? "unreachable" : "degraded",
-						latencyMs,
-						httpStatus: response.status,
-						errorCode: String(response.status),
-						errorMessage: `HTTP ${response.status} ${response.statusText}`.trim(),
-						checkedAt: new Date().toISOString(),
-					};
-				}
-				const payload = await response.json().catch(() => ({})) as { data?: unknown[] };
-				const modelsCount = Array.isArray(payload.data) ? payload.data.length : undefined;
-				return {
-					status: latencyMs > 3000 ? "degraded" : "healthy",
-					latencyMs,
-					modelsCount,
-					httpStatus: response.status,
-					checkedAt: new Date().toISOString(),
-				};
-			} catch (error) {
-				const latencyMs = Date.now() - startedAt;
-				const err = error as NodeJS.ErrnoException;
-				// Prefer err.code (e.g. ENOTFOUND, EAI_AGAIN, ECONNREFUSED);
-				// fall back to err.cause.code for errors that wrap another
-				// (Node 18+ fetch throws TypeError with err.cause populated);
-				// fall back to AbortError name detection for timeouts.
-				let errorCode: string;
-				if (err.code && typeof err.code === "string") {
-					errorCode = err.code;
-				} else if (err.cause && typeof err.cause === "object" && "code" in err.cause && typeof (err.cause as { code: unknown }).code === "string") {
-					errorCode = (err.cause as { code: string }).code;
-				} else if (err.name === "AbortError") {
-					errorCode = "timeout";
-				} else {
-					errorCode = "unknown";
-				}
-				const errorMessage = err.message ?? "Provider test failed";
-				return {
-					status: "unreachable",
-					latencyMs,
-					errorCode,
-					errorMessage,
-					checkedAt: new Date().toISOString(),
-				};
-			}
 		});
 		ipcMain.handle("sessions:list", async (_e, cwd: string) => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
@@ -804,17 +430,9 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 				? { expertId: requiredString(input.expertId, "expert id"), expertName: requiredString(input.expertName, "expert name"), avatarLocal: optionalString(input.avatarLocal, "avatarLocal") }
 				: null;
 			return agentHost.setSessionExpert(id, binding);
-		});
-		ipcMain.handle("pi_set_session_expert", async (_e, args: { sessionId: string; expertId: string; expertName: string; avatarLocal?: string }) => {
-			const input = recordValue(args, "session expert payload");
-			await awaitExtensionsBound();
-			return agentHost.setSessionExpert(requiredString(input.sessionId, "session id"), { expertId: requiredString(input.expertId, "expert id"), expertName: requiredString(input.expertName, "expert name"), avatarLocal: optionalString(input.avatarLocal, "avatarLocal") });
-		});
-		ipcMain.handle("pi_clear_session_expert", async (_e, args: { sessionId: string }) => {
-			await awaitExtensionsBound();
 			return agentHost.setSessionExpert(requiredString(recordValue(args, "session expert payload").sessionId, "session id"), null);
 		});
-		
+
 // ─────────────────────────────────────────────────────────────────────
 		// Phase 8.3 Batch D-11 — pi-web RPC API parity.
 		// Each handler below corresponds to one method on the pi-web
@@ -944,25 +562,6 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			}
 		});
 
-		ipcMain.handle("agent:session-stats", async () => {
-			await ensureAgentHost();
-			return agentHost.getSessionStats();
-		});
-
-		ipcMain.handle("agent:thinking-levels", async () => {
-			await ensureAgentHost();
-			return agentHost.getAvailableThinkingLevels();
-		});
-
-		ipcMain.handle("agent:compaction-settings", async () => {
-			await ensureAgentHost();
-			return agentHost.getCompactionSettings();
-		});
-
-		ipcMain.handle("agent:session-tree", async () => {
-			await ensureAgentHost();
-			return agentHost.getSessionTree();
-		});
 
 		ipcMain.handle("agent:fork-session", async (_e, input: { sessionId?: string; entryId: string; traceId?: string }) => {
 			await ensureAgentHost();

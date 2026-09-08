@@ -144,8 +144,14 @@ import { registerEmailIpc } from "./email";
 import { registerCollaborationIpc } from "./collaboration";
 import { registerHarnessIpc } from "./harness";
 import { registerAgentIpc } from "./agent";
+import { registerAgentsIpc } from "./agents";
 import { registerConnectorsIpc } from "./connectors";
 import { registerMiscIpc } from "./misc";
+
+// Phase A.1 — pi-bridge exposes pi-coding-agent text / image / skill
+// helpers to the renderer via typed IPC channels. See
+// docs/OPENBUDDY_PI_NATIVE_PLAN.md §A.1.
+import { registerPiBridgeIpc } from "../agent/pi-bridge";
 
 
 function rpcPayload(value: unknown): RecordValue {
@@ -1084,6 +1090,10 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	registerCollaborationIpc(getWindow);
 	registerHarnessIpc(getWindow);
 	registerAgentIpc(getWindow);
+	registerAgentsIpc();
 	registerConnectorsIpc(getWindow);
 	registerMiscIpc(getWindow);
+
+	// Phase A.1 — pi-bridge IPC surface (pi text / image / skill helpers).
+	registerPiBridgeIpc();
 }

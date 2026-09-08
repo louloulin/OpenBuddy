@@ -58,6 +58,12 @@ const allowedInvokeChannels = new Set([
   "weknora:ask", "weknora:list-knowledge-bases", "weknora:status",
   // skills
   "skills:add", "skills:list", "skills:remove", "skills:toggle",
+  // pi-bridge (Phase A.1 — see docs/OPENBUDDY_PI_NATIVE_PLAN.md)
+  "pi-bridge-text:parse-frontmatter", "pi-bridge-text:strip-frontmatter",
+  "pi-bridge-text:truncate-head", "pi-bridge-text:truncate-tail", "pi-bridge-text:truncate-line",
+  "pi-bridge-text:generate-diff", "pi-bridge-text:generate-patch",
+  "pi-bridge-image:detect-mime", "pi-bridge-image:resize", "pi-bridge-image:resize-file", "pi-bridge-image:convert-to-png",
+  "pi-bridge-skills:load", "pi-bridge-skills:load-from-dir", "pi-bridge-skills:format-for-prompt",
   // task-policy
   "calendar:create", "calendar:delete", "calendar:list", "calendar:update", "knowledge-sources:list", "knowledge-sources:save", "notify-channels:list", "notify-channels:save",
   "notify:dispatch", "plan-mode:approve", "plan-mode:get", "plan-mode:reject", "plan-mode:set-enabled", "plan-mode:set-plan", "policy:get", "policy:save",
@@ -515,6 +521,55 @@ const api = {
       };
       ipcRenderer.on("pi://telemetry", wrapped);
       return () => ipcRenderer.off("pi://telemetry", wrapped);
+    },
+  },
+
+  /**
+   * pi-bridge — typed wrapper around the Electron `window.pi` surface
+   * that exposes pi-coding-agent text / image / skill helpers to the
+   * renderer via IPC. See docs/OPENBUDDY_PI_NATIVE_PLAN.md §A.1.
+   *
+   * The renderer never imports the Node-only pi-coding-agent bundle
+   * directly (it pulls in photon-node WASM + shell-quote transitive
+   * deps that are inappropriate for the renderer bundle).
+   *
+   * NOTE: uses `ipcRenderer.invoke` directly (not the api.invoke wrapper)
+   * because we're inside the api object itself.
+   */
+  pi: {
+    text: {
+      parseFrontmatter: (content: string) =>
+        ipcRenderer.invoke("pi-bridge-text:parse-frontmatter", { content }) as Promise<{ frontmatter: Record<string, unknown>; body: string }>,
+      stripFrontmatter: (content: string) =>
+        ipcRenderer.invoke("pi-bridge-text:strip-frontmatter", { content }) as Promise<string>,
+      truncateHead: (content: string, opts?: { maxLines?: number; maxBytes?: number }) =>
+        ipcRenderer.invoke("pi-bridge-text:truncate-head", { content, ...opts }) as Promise<string>,
+      truncateTail: (content: string, opts?: { maxLines?: number; maxBytes?: number }) =>
+        ipcRenderer.invoke("pi-bridge-text:truncate-tail", { content, ...opts }) as Promise<string>,
+      truncateLine: (content: string, opts?: { maxLines?: number; maxBytes?: number }) =>
+        ipcRenderer.invoke("pi-bridge-text:truncate-line", { content, ...opts }) as Promise<string>,
+      generateDiff: (oldStr: string, newStr: string, opts?: { filePath?: string; context?: number }) =>
+        ipcRenderer.invoke("pi-bridge-text:generate-diff", { oldStr, newStr, ...opts }) as Promise<string>,
+      generatePatch: (oldStr: string, newStr: string, opts?: { filePath?: string; context?: number }) =>
+        ipcRenderer.invoke("pi-bridge-text:generate-patch", { oldStr, newStr, ...opts }) as Promise<string>,
+    },
+    image: {
+      detectMime: (filePath: string) =>
+        ipcRenderer.invoke("pi-bridge-image:detect-mime", { filePath }) as Promise<string | null>,
+      resize: (bytes: Uint8Array, mimeType: string, opts?: { maxWidth?: number; maxHeight?: number; maxBytes?: number; jpegQuality?: number }) =>
+        ipcRenderer.invoke("pi-bridge-image:resize", { bytes: Array.from(bytes), mimeType, ...opts }) as Promise<unknown>,
+      resizeFile: (filePath: string, opts?: { maxWidth?: number; maxHeight?: number; maxBytes?: number; jpegQuality?: number }) =>
+        ipcRenderer.invoke("pi-bridge-image:resize-file", { filePath, ...opts }) as Promise<unknown>,
+      convertToPng: (base64Data: string, mimeType: string) =>
+        ipcRenderer.invoke("pi-bridge-image:convert-to-png", { base64Data, mimeType }) as Promise<{ data: string; mimeType: string } | null>,
+    },
+    skills: {
+      load: (opts?: { cwd?: string; agentDir?: string; skillPaths?: string[]; includeDefaults?: boolean }) =>
+        ipcRenderer.invoke("pi-bridge-skills:load", opts ?? {}) as Promise<{ skills: unknown[]; diagnostics: unknown[] }>,
+      loadFromDir: (dir: string, source: string) =>
+        ipcRenderer.invoke("pi-bridge-skills:load-from-dir", { dir, source }) as Promise<{ skills: unknown[]; diagnostics: unknown[] }>,
+      formatForPrompt: (skills: unknown[], fileReadTool?: "read" | "bash") =>
+        ipcRenderer.invoke("pi-bridge-skills:format-for-prompt", { skills, fileReadTool }) as Promise<string>,
     },
   },
 
