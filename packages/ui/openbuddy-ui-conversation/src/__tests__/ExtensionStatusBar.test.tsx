@@ -46,4 +46,19 @@ describe("ExtensionStatusBar — extension status strip (phase 5)", () => {
     render(<ExtensionStatusBar extensions={[{ id: "a", status: "loaded" }]} />);
     expect(screen.queryByTestId("extension-status-failed")).toBeNull();
   });
+
+  // PC-2: skeleton state when extensions is undefined (plugin discovery
+  // still in flight). The skeleton must NOT render the "无扩展" empty
+  // string, must mark the region aria-busy, and must be distinguishable
+  // from a real empty list via data-skeleton.
+  it("renders a skeleton placeholder when extensions is undefined", () => {
+    render(<ExtensionStatusBar />);
+    const bar = screen.getByTestId("extension-status-bar");
+    expect(bar).toHaveAttribute("data-skeleton", "true");
+    expect(bar).toHaveAttribute("aria-busy", "true");
+    expect(bar).toHaveAttribute("aria-label", "扩展状态（加载中）");
+    // Skeleton lines (shimmer placeholders), NOT the empty summary.
+    expect(screen.getAllByTestId("extension-status-skeleton").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("extension-status-summary")).toBeNull();
+  });
 });

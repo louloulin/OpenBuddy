@@ -7,6 +7,14 @@
  *
  * 纯展示组件：输入为 `extensions`（纯数据），输出为状态条。颜色复用 `--wb-*`
  * 令牌，零新 CSS 概念。
+ *
+ * PC-2: `extensions` is now optional. Three explicit states are
+ * distinguished so the consumer can show a *skeleton* while plugin
+ * discovery is in flight (avoids the "no extensions" empty state
+ * flashing during boot):
+ *   - `undefined` → loading, render skeleton placeholders.
+ *   - `[]`       → discovery complete, no extensions registered.
+ *   - `[...]`    → list of extension entries to render.
  */
 import type { ReactNode } from "react";
 
@@ -20,14 +28,37 @@ export interface ExtensionStatusEntry {
 }
 
 export interface ExtensionStatusBarProps {
-  /** Extension status entries (loaded / failed / unloaded). */
-  extensions: ExtensionStatusEntry[];
+  /**
+   * Extension status entries. `undefined` means plugin discovery is
+   * still in flight (render a skeleton); `[]` means discovery completed
+   * with no extensions; non-empty renders the summary + failed list.
+   */
+  extensions?: ExtensionStatusEntry[];
   /** Called when the user clicks a failed extension to retry/inspect. */
   onInspect?: (id: string) => void;
   className?: string;
 }
 
 export function ExtensionStatusBar({ extensions, onInspect, className }: ExtensionStatusBarProps) {
+  // PC-2 skeleton path: undefined → render shimmer placeholders. The
+  // container still carries role/aria-label so screen readers announce
+  // the upcoming status strip instead of a silent region.
+  if (extensions === undefined) {
+    return (
+      <div
+        className={"extension-status-bar extension-status-bar--skeleton" + (className ? ` ${className}` : "")}
+        role="status"
+        aria-busy="true"
+        aria-label="扩展状态（加载中）"
+        data-testid="extension-status-bar"
+        data-skeleton="true"
+      >
+        <span className="extension-status-bar__skeleton-line" data-testid="extension-status-skeleton" />
+        <span className="extension-status-bar__skeleton-line extension-status-bar__skeleton-line--short" />
+      </div>
+    );
+  }
+
   const loaded = extensions.filter((e) => e.status === "loaded").length;
   const failed = extensions.filter((e) => e.status === "failed").length;
   const unloaded = extensions.filter((e) => e.status === "unloaded").length;

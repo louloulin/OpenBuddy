@@ -15121,6 +15121,33 @@ body.dark .permission-picker__popover,
 .extension-status-bar__dot--off {
   background: var(--wb-fg-tertiary);
 }
+/* PC-2: skeleton shimmer placeholders for the loading state. The
+   data-skeleton attribute is rendered when extensions === undefined
+   so a subtle pulse signals "discovery in progress" instead of an
+   empty "无扩展" flash. Honors prefers-reduced-motion by skipping
+   the animation. */
+.extension-status-bar--skeleton .extension-status-bar__skeleton-line {
+  display: inline-block;
+  height: 8px;
+  width: 80px;
+  border-radius: 3px;
+  background: var(--wb-bg-tertiary);
+  animation: extension-status-bar-shimmer 1.4s ease-in-out infinite;
+}
+.extension-status-bar--skeleton .extension-status-bar__skeleton-line--short {
+  width: 40px;
+  opacity: 0.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .extension-status-bar--skeleton .extension-status-bar__skeleton-line {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+@keyframes extension-status-bar-shimmer {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
 
 /* ===== ExtensionWidgets (phase 5) ===== */
 .extension-widgets {
@@ -15255,7 +15282,10 @@ body.dark .permission-picker__popover,
 .task-item__phase {
   border: none;
   background: transparent;
-  color: var(--wb-fg-tertiary);
+  /* PC-1: bumped from --wb-fg-tertiary (1.9–2.4:1) to --wb-fg-secondary
+     (~5.7:1 light / ~5.1:1 dark) so the phase labels (探索/规划/执行)
+     clear WCAG AA 4.5:1 for small text on both themes. */
+  color: var(--wb-fg-secondary);
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 3px;
@@ -15264,7 +15294,10 @@ body.dark .permission-picker__popover,
 .task-item__phase--active {
   background: var(--wb-bg-tertiary);
   color: var(--wb-accent);
-  font-weight: 600;
+  /* PC-1: font-weight 700 (was 600) so the active label qualifies for the
+     WCAG ≥14pt bold 3:1 exception against --wb-bg-tertiary. The label
+     text remains in --wb-accent for brand consistency. */
+  font-weight: 700;
 }
 
 /* ===== WorkflowCanvas (phase 5) ===== */
