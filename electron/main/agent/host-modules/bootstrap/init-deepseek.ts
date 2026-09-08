@@ -16,6 +16,7 @@
  *   This module imports nothing from agent-host.ts. All deps are passed in.
  */
 
+import { join } from "node:path";
 import type { Context } from "@openbuddy/cordis";
 import {
   composePluginPatches,
@@ -35,6 +36,7 @@ import { composeHostRunnerEntries } from "../deepseek/host-runner-entries";
 import type { ElectronHarnessPluginLoader } from "../profile/loader";
 import {
   ensureTypertReady,
+  restoreDeepSeekCapabilityServices,
   remoteServiceContext,
 } from "../workbench-scope";
 
@@ -126,6 +128,8 @@ export async function initDeepSeek(deps: InitDeepSeekDeps): Promise<void> {
   try {
     await loader.loadProfile(profile);
     state.activePluginProfile = profile;
+    const sessionQueryEntries = loader.list().filter((e) => e.id === "openbuddy-dsh-session-query" || e.name === "@deepseek-ai/dsh-session-query");
+    const sessionServiceEntries = loader.list().filter((e) => e.id === "openbuddy-dsh-session" || e.name === "@deepseek-ai/dsh-session");
     await syncDeepSeekCordisRuntime(
       deepSeekCoreRuntimeEntries(composePluginPatches(profile.entries, profile.patches ?? [])),
     );
@@ -133,24 +137,53 @@ export async function initDeepSeek(deps: InitDeepSeekDeps): Promise<void> {
     emitPluginEvent("plugin/failed", { id: "openbuddy-core", error: String(error) });
     throw error;
   }
-
-  // Capability services restoration happens upstream — this stage assumes
-  // they are already registered on `state` via workbench-scope.
+  await restoreDeepSeekCapabilityServices();
   await ensureTypertReady();
-  state.remoteDispatcher.register(
-    deepSeekSessionQueryRemote(),
-    remoteServiceContext() as never,
-  );
+
+  try {
+    state.remoteDispatcher.register(
+      deepSeekSessionQueryRemote(),
+      remoteServiceContext() as never,
+    );
+  } catch (error) {
+    throw error;
+  }
 
   for (const packageName of DEEPSEEK_CORE_CAPABILITY_PACKAGES) {
     const remote = deepSeekCapabilityRemote(packageName);
     if (remote) {
-      state.remoteDispatcher.register(
-        serializeRemoteContribution(remote),
-        remoteServiceContext() as never,
-      );
+      try {
+        state.remoteDispatcher.register(
+          serializeRemoteContribution(remote),
+          remoteServiceContext() as never,
+        );
+      } catch (error) {
+        throw error;
+      }
     }
   }
   await ensureTypertReady();
   await reconcileProfileArtifacts();
+
+  // reconcileProfileArtifacts clears `state.profileRemoteContributions`
+  // and re-installs whatever `discoverRemoteImpl()` returns. If the
+  // discovery closure returns an empty Map (the default install when no
+  // concrete discoverer was wired in), the capability remotes that we
+  // just registered are now gone. Re-register the core capability set so
+  // renderer-side invocations like `agent:new-session` always find the
+  // expected services, even after an artifact reconciliation that wiped
+  // them out.
+  reRegisterCoreCapabilityRemotes();
+
+  function reRegisterCoreCapabilityRemotes(): void {
+    const context = state.context;
+    if (!context) return;
+    const ctx = remoteServiceContext();
+    state.remoteDispatcher.register(deepSeekSessionQueryRemote(), ctx as never);
+    for (const packageName of DEEPSEEK_CORE_CAPABILITY_PACKAGES) {
+      const remote = deepSeekCapabilityRemote(packageName);
+      if (!remote) continue;
+      state.remoteDispatcher.register(serializeRemoteContribution(remote), ctx as never);
+    }
+  }
 }

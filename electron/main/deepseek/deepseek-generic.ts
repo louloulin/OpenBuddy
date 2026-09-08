@@ -1445,10 +1445,26 @@ function genericPlugin(packageName: string, serviceKey: string): HarnessPlugin {
         return () => { for (const dispose of toolDisposers.reverse()) dispose(); };
       }
       const existing = ctx.get(serviceKey);
-      const service = existing !== undefined ? contextService(ctx, serviceKey) ?? createGenericService(ctx, packageName, serviceKey, config) : createGenericService(ctx, packageName, serviceKey, config);
-      const ownsService = existing === undefined;
-      const serviceDispose = existing === undefined ? ctx.set(serviceKey, service) : () => undefined;
-      if (existing === undefined) ctx.provide(serviceKey);
+      let service: DeepSeekGenericService;
+      if (existing !== undefined) {
+        service = contextService(ctx, serviceKey) ?? createGenericService(ctx, packageName, serviceKey, config);
+      } else {
+        const cached = readGenericService(serviceKey);
+        if (cached) {
+          service = cached;
+        } else {
+          service = createGenericService(ctx, packageName, serviceKey, config);
+          writeGenericService(serviceKey, service);
+        }
+      }
+      const ownsService = existing === undefined && readGenericService(serviceKey) === service;
+      try { ctx.set(serviceKey, service); } catch (error) {
+        // slot already taken (e.g. another plugin owns the namespace) — leave it.
+        if (!(error instanceof Error) || !/service .* has been registered/u.test(error.message)) {
+          // ignore other errors so a bad ctx.set never aborts the apply path.
+        }
+      }
+      try { ctx.provide(serviceKey); } catch { /* ignore */ }
       if (isObject(service) && service.ready && typeof (service.ready as Promise<unknown>).then === "function") await service.ready;
       const remoteRegistry = contextService(ctx, "dshRemote");
       const remote = genericRemote(packageName, serviceKey, service);
@@ -1466,7 +1482,12 @@ function genericPlugin(packageName: string, serviceKey: string): HarnessPlugin {
       return async () => {
         for (const dispose of toolDisposers.reverse()) dispose();
         remoteDispose();
-        serviceDispose();
+        // Keep the service in `genericServiceRegistry` so renderer-side
+        // remote dispatchers can still resolve the binding across profile
+        // reloads (cordis's `ctx.set` registers a fiber-scoped effect that
+        // wipes the slot on unload). The module-level registry outlives the
+        // fiber and serves as the authoritative source for the
+        // `remoteServiceContext.get` lookup.
         if (ownsService && isObject(service) && typeof service.dispose === "function") {
           await Promise.resolve(service.dispose()).catch(() => undefined);
         }
@@ -1474,6 +1495,21 @@ function genericPlugin(packageName: string, serviceKey: string): HarnessPlugin {
     },
   };
   return plugin;
+}
+
+const genericServiceRegistry = new Map<string, DeepSeekGenericService>();
+
+export function readGenericService(serviceKey: string): DeepSeekGenericService | undefined {
+  return genericServiceRegistry.get(serviceKey);
+}
+
+export function writeGenericService(serviceKey: string, service: DeepSeekGenericService): void {
+  genericServiceRegistry.set(serviceKey, service);
+}
+
+/** Test helper: wipe the persistent generic-service registry. */
+export function __resetGenericServiceRegistryForTest(): void {
+  genericServiceRegistry.clear();
 }
 
 export function isGenericDeepSeekSpecifier(specifier: string): boolean {

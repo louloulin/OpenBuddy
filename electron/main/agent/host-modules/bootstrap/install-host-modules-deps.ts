@@ -127,7 +127,12 @@ export function buildInstallHostModuleDeps(
     persistedSessionPath: closures.persistedSessionPath,
     enqueueLifecycle: closures.enqueueLifecycle,
     lifecycleAppendQueues: closures.lifecycleAppendQueues,
-    initialize: closures.initialize,
+    // CRITICAL: session-swap/session-rebind 直接调 initialize() 会绕过
+    // enqueueLifecycle 队列, 导致与 init() (init-orchestration) 并行触发,
+    // 在 newSession 的 runInitPipeline 中途被 waitUntilReady → init() 覆盖 state.cwd.
+    // 包一层 enqueueLifecycle 让 newSession/rebind 路径也串行化, 与 init() 一致.
+    initialize: ((opts?: Parameters<typeof closures.initialize>[0]) =>
+      closures.enqueueLifecycle(() => closures.initialize(opts))) as typeof closures.initialize,
     rebindSession: closures.rebindSession,
     dispose: closures.dispose,
     piRuntimeCoordinator: closures.piRuntimeCoordinator,
@@ -146,7 +151,7 @@ export function buildInstallHostModuleDeps(
     setProfilePiResourcePaths: closures.setProfilePiResourcePaths,
     refreshMarketplacePiResourcePaths: closures.refreshMarketplacePiResourcePaths,
     sessionPresetSelection: closures.sessionPresetSelection,
-    replaceSession: ((opts: any) => closures.piRuntimeCoordinator.replace(opts)) as any,
+    replaceSession: ((opts: any) => closures.piSessionRuntime.replace(opts)) as any,
     sessionManagerOpen: ((sessionPath: string, options: any, cwd: string) =>
       SessionManager.open(sessionPath, options, cwd)) as any,
     provideRpcUiContext: closures.provideRpcUiContext,

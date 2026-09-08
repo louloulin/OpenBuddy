@@ -21,11 +21,6 @@ export interface PiSessionRuntimeDisposeOptions {
 
 /**
  * Owns the lifetime of OpenBuddy's primary Pi AgentSession.
- *
- * The host may keep a compatibility reference to the current session, but
- * creation, event attachment, and disposal must go through this boundary.
- * Generation checks make an event from a replaced session harmless even if a
- * Pi release delivers it after unsubscribe has been requested.
  */
 export class PiSessionRuntime {
   private readonly factory: PiSessionRuntimeFactory;
@@ -51,7 +46,9 @@ export class PiSessionRuntime {
   }
 
   async create(options: CreateAgentSessionOptions): Promise<AgentSession> {
-    if (this.current) throw new Error("pi-session-runtime: session is already active");
+    if (this.current) {
+      throw new Error("pi-session-runtime: session is already active");
+    }
     const created = await this.factory.create(options);
     this.current = created.session;
     this.generation += 1;

@@ -7,6 +7,8 @@ import { Context, Service } from "@openbuddy/cordis";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { HarnessPluginLoader, parseCordisPatch } from "@openbuddy/plugin-host";
 import { resolveDeepSeekModule } from "./deepseek-compat";
+import { __resetGenericServiceRegistryForTest } from "./deepseek-generic";
+import { beforeEach as _beforeEachCompat } from "vitest";
 import {
   DeepSeekAgentService,
   DeepSeekSessionQueryService,
@@ -19,6 +21,9 @@ import {
 import { discoverHookConfigs } from "../agent/agent-hooks";
 
 describe("DeepSeek module compatibility", () => {
+  _beforeEachCompat(() => {
+    __resetGenericServiceRegistryForTest();
+  });
   it("maps the DeepSeek sessionPersistence seam to Pi JSONL without a second agent store", async () => {
     const entries = new Map<string, unknown[]>([["session-a", []]]);
     const host = {
