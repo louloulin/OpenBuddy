@@ -88,12 +88,12 @@ export function entrySummary(entry: SessionEntry): string | undefined {
   }
 }
 
-function messageText(message: AgentMessage): string | undefined {
+function messageText(message: AgentMessage | unknown): string | undefined {
   // Discriminated union narrowing: only UserMessage / AssistantMessage / ToolResultMessage
   // (and similar LLM-shaped messages) carry a `content` field. Custom types such as
   // BashExecutionMessage do not — return undefined for those.
-  if (!("content" in message) || message.content == null) return undefined;
-  const content = message.content;
+  if (!message || typeof message !== "object" || !("content" in message)) return undefined;
+  const content = (message as { content?: unknown }).content;
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     const parts: string[] = [];
