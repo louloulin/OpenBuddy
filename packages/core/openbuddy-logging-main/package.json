@@ -8,6 +8,6 @@
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
     "@openbuddy/logging-shared": "workspace:*",
-    "pino": "9.14.0"
+    "pino": "10.3.1"
   }
 }
