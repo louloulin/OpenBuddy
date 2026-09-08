@@ -601,9 +601,9 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
 - ✅ **已完成：v5 plan 更新 — §26 DSH 退役分析 + Phase L 路线图（5 轮，-9037 LOC 退役）**（同 commit `3d7b5c6`）
 - ✅ **已完成：Phase L.1 — DSH commands 迁 PI + 删 pi-bridge / pi-capabilities**（本轮 commit）：删 `electron/main/deepseek/deepseek-pi-bridge.ts` (349) + `deepseek-pi-capabilities.ts` (198)，代码 relocate 到 `electron/main/agent/host-modules/deepseek/cordis-runtime.ts`（其唯一调用者），协议常量 relocate 到 `electron/main/agent/host-modules/dsh-bridge-helpers.ts`（其唯一使用者），wire-dsh-services.ts commands 部分删除（已被 PI extensionRunner 直调替代）；**-547 LOC 退役** + 测试也 relocate 到 `cordis-bridge.test.ts` (11 tests pass)
 - ✅ **已完成：Phase L.2 partial — DSH remote-invocation 删除**（本轮 commit）：删 `electron/main/harness/remote-invocation.ts` (26) + 测试 (30)；inline `isNamedRemoteRequest` + gateway 分支到 `electron/main/agent/host-modules/deepseek/bridge.ts`（其唯一真消费者），agent-host.ts 删除未使用的 import；**-56 LOC 退役**
-- ✅ **已完成：v6 plan 更新 — 「基于 PI 实现 OpenBuddy, DSH 全删除」** 加速策略（v6 vs v5）：§3.4 PI 优先 / DSH 清除原则；§24.4 DSH 残余 1:1 迁移表；路线图重排序（L.2 提前；K.1/K.2 推到 round 4/5）
-- 🟡 **下一轮 — Phase L.2 完成 — `remote-dispatch.ts` 极简化**（v6 §3.4.3）：471 LOC → 80 LOC 极简 shim（保留 register/unregister/invoke/list/describe API；删 codec/lookup/signal cancellation 等无调用方的边缘 feature）；**-390 LOC 退役**
-- ⚪ **第三轮 — Phase L.3 — DSH 通用装载器删除**（v5 §26.4）：`deepseek-compat.ts` (445) + `deepseek-generic.ts` (1545) → PI `discoverAndLoadExtensions`；**-1990 LOC 退役**
+- ✅ **已完成：Phase L.2 完成 — `remote-dispatch.ts` 极简化**（本轮 commit）：471 LOC → 298 LOC 极简 shim，**-173 LOC**（含功能缩减：删 codec / lookup / scoped context / cancellation / 14-error-code taxonomy → 5 个 actionable codes）；测试 249 → 126 LOC（-123），20 个高级 feature test → 9 个核心 API test + 2 个新 test (clear / list)；**总计 -296 LOC**
+- 🟡 **下一轮 — Phase L.3 — DSH 通用装载器删除**（v5 §26.4）：`deepseek-compat.ts` (445) + `deepseek-generic.ts` (1545) → PI `discoverAndLoadExtensions`；**-1990 LOC 退役**
+- ⚪ **第三轮 — Phase L.4 — DSH runtime facade 精简**（v5 §26.4）：`deepseek-runtime.ts:1-2200` 中除 TypertService 之外的 facade 精简 + `deepseek-pi-bridge` 剩余部分 + `init-deepseek.ts` 重写；**-1000 LOC 退役**
 
 每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
 
