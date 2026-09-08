@@ -618,6 +618,20 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
 
 **v7 升级要点**：经过 v6 K.1+K.2 验证 `openbuddy-plugin-manifest.ts` SDK 已经把 manifest 形状统一到 `openbuddy.plugin.v1`，L.3 可以放心做「**shim-first delete**」分两步走，每步 1 个 commit，避免一次性 -1990 LOC 大爆炸。
 
+**SDK seam — `serializeAllTracks`**：commit `d055087` 在 `openbuddy-plugin-host` 加了 `serializeAllTracks(manifest)` aggregate helper（commit `d055087`），L.3 的 core capability manifest 投影路径会走它。例如 L.3 step 2 删 `deepseek-compat.ts` 后：
+
+```typescript
+// L.3 step 2 — init-deepseek.ts 接 PI loadExtensions()
+import { serializeAllTracks, validateOpenBuddyPluginManifest } from "@openbuddy/plugin-host";
+
+const aggregate = serializeAllTracks(validateOpenBuddyPluginManifest(coreCapabilityManifest));
+for (const piRow of aggregate.pi) {
+  await loadExtensions([piRow.source], cwd, eventBus);
+}
+```
+
+（详细代码是 L.3 step 2 的内容，本轮 commit 只是把 seam 加好。）
+
 **步骤 1 — `deepseek-generic.ts` 极简化（-1000 LOC）**：
 
 | 现状 | 1545 LOC, 复杂 service registry + Proxy 兼容层 |
