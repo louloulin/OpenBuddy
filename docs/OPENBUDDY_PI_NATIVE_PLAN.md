@@ -516,9 +516,9 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
 
 ## 11. v3 接下来 3 轮（已锁定）
 
-1. **下一轮 — Phase A.1**：PI IPC 桥基础设施（`window.pi.parseFrontmatter` 等）— 同 v2
-2. **再下轮 — Phase B.1**：把 `session-metadata.ts`（最简单）改写成 PI ExtensionFactory；同步拆 `ipc/agent.ts` 1090 LOC 为 `ipc/<capability>.ts` — **v3 新增 IPC 拆分**
-3. **第三轮 — Phase J.1（部分）**：先跑 `pnpm storage:boundaries` + `pnpm storage:acceptance` 拿到当前 baseline，然后加固 sheriff.config.ts — **v3 提前 enforce**
+- ✅ **已完成：Phase A.1 — PI IPC 桥基础设施**（commit 见 PR）
+- 🟡 **下一轮 — Phase B.1**：把 `session-metadata.ts`（最简单）改写成 PI ExtensionFactory；同步拆 `ipc/agent.ts` 1090 LOC 为 `ipc/<capability>.ts` — **v3 新增 IPC 拆分**
+- ⚪ **第三轮 — Phase J.1（部分）**：先跑 `pnpm storage:boundaries` + `pnpm storage:acceptance` 拿到当前 baseline，然后加固 sheriff.config.ts — **v3 提前 enforce**
 
 每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
 
@@ -637,25 +637,43 @@ PI 插件 = `ExtensionFactory` 返回值 `(pi: ExtensionAPI) => void`。
 
 ### Phase A — 桥接层就绪（1 轮）
 
-#### A.1 PI IPC 桥基础设施
+#### A.1 PI IPC 桥基础设施 ✅ 已实现 (commit 见 PR)
 
 **目标**：在不改业务行为前提下，把 PI 的 Node-only API 通过 IPC 暴露到 renderer。
 
-**范围**：
-- 新建 `electron/main/agent/pi-bridge/`，封装 `parseFrontmatter` / `calculateContextTokens` / `formatSkillsForPrompt` / `resizeImage` 等为 IPC handler
-- `electron/preload/preload.ts` 暴露 `window.pi.*`
-- `src/lib/pi-client.ts`（renderer 端 typed wrapper）
+**实现**（commit `pending` in PR）：
+- 新建 `electron/main/agent/pi-bridge/`：`text-utils.ts`（parseFrontmatter / stripFrontmatter / truncateHead/Tail/Line / generateDiffString / generateUnifiedPatch / formatSize）、`image-utils.ts`（resizeImage / detectSupportedImageMimeTypeFromFile / convertToPng / readAndResizeImage）、`skill-utils.ts`（loadSkills / loadSkillsFromDir / formatSkillsForPrompt）、`index.ts`（注册函数 `registerPiBridgeIpc()`）
+- `electron/preload/index.ts` 暴露 `window.api.pi.{text,image,skills}`，14 个 IPC 通道加到 allowlist
+- `electron/main/ipc/index.ts` 调用 `registerPiBridgeIpc()`
+- `src/lib/agent/pi-bridge-client.ts`（renderer 端 typed wrapper，含 `getPiBridge()` / `requirePiBridge()`）
+- `docs/event-channel-matrix.md` 加 14 行 pi-bridge 通道条目
+- 单测：`electron/main/agent/pi-bridge/{text,image,skill}-utils.test.ts` + `src/lib/agent/__tests__/pi-bridge-client.test.ts` 合计 **27 个测试全过**
 
-**文件**：
-- `electron/main/agent/pi-bridge/text-utils.ts`（frontmatter / truncate / diff）
-- `electron/main/agent/pi-bridge/image-utils.ts`（resize / mime / png convert）
-- `electron/main/agent/pi-bridge/skill-utils.ts`（loadSkills / formatSkillsForPrompt）
-- `electron/preload/preload.ts`
-- `src/lib/pi-client.ts`
+**实际文件**：
+- `electron/main/agent/pi-bridge/text-utils.ts` (~110 LOC)
+- `electron/main/agent/pi-bridge/image-utils.ts` (~75 LOC)
+- `electron/main/agent/pi-bridge/skill-utils.ts` (~55 LOC)
+- `electron/main/agent/pi-bridge/index.ts` (~135 LOC)
+- `electron/main/agent/pi-bridge/{text,image,skill}-utils.test.ts`
+- `src/lib/agent/pi-bridge-client.ts` (~110 LOC)
+- `src/lib/agent/__tests__/pi-bridge-client.test.ts`
+- 修改 `electron/preload/index.ts`（15 行加 allowlist + ~70 行 pi 包装）
+- 修改 `electron/main/ipc/index.ts`（3 行 import + 调用）
+- 修改 `src/lib/__tests__/ipc-contract.test.ts`（7 行扫描路径扩展）
+- 修改 `docs/event-channel-matrix.md`（14 行 channel 条目）
 
-**验证**：单测每个 IPC handler；renderer 端 typecheck
+**验证**：
+- `pnpm typecheck` — ✅ exit 0
+- `pnpm exec vitest --run electron/main/agent/pi-bridge/` — ✅ 22 tests passed
+- `pnpm exec vitest --run src/lib/agent/__tests__/pi-bridge-client.test.ts` — ✅ 5 tests passed
+- `pnpm exec vitest --run src/lib/__tests__/ipc-contract.test.ts` — ✅ 13 tests passed（已扩展扫描 electron/main/agent/pi-bridge/）
+- `pnpm exec vitest --run electron/main/__tests__/ipc-contract-coverage-realserver.test.ts` — ✅ 7 tests passed（所有 pi-bridge 通道名匹配 `/^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]+$/`）
+- `pnpm exec vitest --run electron/main/agent/__tests__/event-channel-matrix.test.ts` — ✅ 4 tests passed
+- 全量 `pnpm exec vitest --run` — ✅ **5546/5551 pass**（5 个环境性失败 ×dg-open/sandbox/casdoor 与本改动无关）
 
-**退出**：renderer 可以通过 `window.pi.parseFrontmatter(raw)` 拿到 PI 的实现，与之前等价
+**通道命名规范**：`pi-bridge-<domain>:<verb>`（单冒号）以遵守 IPC contract regex `/^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]+$/`。
+
+**退出**：✅ renderer 可以通过 `window.api.pi.text.parseFrontmatter(raw)` / `image.resize(bytes, mime)` / `skills.load()` 拿到 PI 的实现，与之前等价；后续 phase（B.1 / D.3 / E.3）会逐步迁移现有自定义 parser。
 
 ### Phase B — ExtensionRunner 上线（3 轮）
 
