@@ -143,6 +143,36 @@ jobs:
         # the analyzer itself from regressing under future edits.
         run: pnpm run perf:cold-start:test
 
+      - name: Chat-render pure-helper unit tests
+        # PC-5 (WU-E): pure-helper tests for the chat-render benchmark's
+        # data factories and frame-budget math. Keeps the JSX-render
+        # bench's helpers from regressing under future edits without
+        # requiring the full jsdom render path on every PR.
+        run: pnpm run perf:chat-render:test
+
+      - name: Chat-render 60fps benchmark (PC-5)
+        # PC-5 (WU-E): exercise ChatMinimap + BranchNavigator + 200-msg
+        # long-session render path through the real react-dom/server
+        # pipeline. Strict mode fails the PR if the chat surface blows
+        # the 60fps budget.
+        run: pnpm run perf:chat-render:strict
+
+      - name: Verify-plan gate
+        # PC-6 (WU-E): single authoritative gate that checks both
+        # (a) all WU-B P0 closure invariants (macOS signing path,
+        # scripts extraction, release.yml wiring) and
+        # (b) WU-C architecture invariants (giant-file-limit, capability-
+        # ownership single source).
+        # Failing here means a previously-closed P0 gap regressed.
+        run: pnpm run verify:plan
+
+      - name: Check-macos-signing unit tests
+        # PC-6 (WU-E): pure-helper tests for the macOS signing verifier
+        # (codesign/spctl/stapler wrappers). Keeps the verifier's
+        # helpers from regressing under future edits on platforms that
+        # don't have macOS tooling installed.
+        run: sh node_modules/.bin/vitest run scripts/check-macos-signing.test.mjs --reporter=dot
+
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
