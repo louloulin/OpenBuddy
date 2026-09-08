@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Composer } from "@openbuddy/ui-conversation";
 
@@ -195,27 +195,21 @@ export function HomePage({
     setExternalTextNonce((n) => n + 1);
   };
 
-  // 切换场景 tab:换 chip 列表,并清空选中/标签/输入。
   const handleModeChange = (next: HomeModeId) => {
     setModeId(next);
     setSelectedCategoryId(undefined);
     setExpanded(false);
     setSceneTag(null);
-    fillComposer("");
   };
 
-  // 点击能力 chip:选中则插标签 + 显示模板行;再点一次则取消。
   const handleCategoryClick = (cat: HomeCategory) => {
     if (selectedCategoryId === cat.id) {
-      // 取消选中:清空标签与输入,回到能力行。
       setSelectedCategoryId(undefined);
       setSceneTag(null);
-      fillComposer("");
       return;
     }
     setSelectedCategoryId(cat.id);
     setSceneTag({ label: cat.label, icon: cat.icon });
-    fillComposer(""); // 选中分类时清空旧输入,只留标签(匹配 WorkBuddy)
   };
 
   // 点击模板 chip:把 prompt 填入输入框(保留操作类型标签)。
@@ -223,11 +217,9 @@ export function HomePage({
     fillComposer(tpl.prompt);
   };
 
-  // 输入框标签的 ×:清空标签、选中态与输入。
   const handleClearSceneTag = () => {
     setSceneTag(null);
     setSelectedCategoryId(undefined);
-    fillComposer("");
   };
 
   // 能力行:未选中且未展开时,折叠为前 N 个 + "更多"。
@@ -250,6 +242,25 @@ export function HomePage({
 
   const sceneCls = (id: HomeModeId) =>
     "home__scene" + (modeId === id ? " home__scene--active" : "");
+  const sceneTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const handleSceneTabKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    index: number
+  ) => {
+    const lastIndex = HOME_MODES.length - 1;
+    let nextIndex = index;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % HOME_MODES.length;
+    else if (event.key === "ArrowLeft") nextIndex = index === 0 ? lastIndex : index - 1;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = lastIndex;
+    else return;
+
+    event.preventDefault();
+    const nextTab = sceneTabRefs.current[nextIndex];
+    nextTab?.focus();
+    nextTab?.click();
+  };
 
   /** 最佳实践案例 —— 对齐 WorkBuddy 的"不知道做什么，试试最佳实践案例"。 */
   const bestPractices = useMemo(() => BEST_PRACTICES, []);
@@ -314,14 +325,20 @@ export function HomePage({
         ))}
 
         <div className="home__scenes" role="tablist" aria-label="场景">
-          {HOME_MODES.map((m) => (
+          {HOME_MODES.map((m, index) => (
             <button
               key={m.id}
               role="tab"
               aria-selected={modeId === m.id}
+              aria-controls="home-mode-panel"
               aria-label={m.label}
+              tabIndex={modeId === m.id ? 0 : -1}
               className={sceneCls(m.id)}
+              ref={(element) => {
+                sceneTabRefs.current[index] = element;
+              }}
               onClick={() => handleModeChange(m.id)}
+              onKeyDown={(event) => handleSceneTabKeyDown(event, index)}
             >
               <m.icon size={14} />
               <span>{m.label}</span>
@@ -329,7 +346,13 @@ export function HomePage({
           ))}
         </div>
 
-        <section className="home__composer-area">
+        <section
+          id="home-mode-panel"
+          role="tabpanel"
+          aria-label={mode.label}
+          tabIndex={-1}
+          className="home__composer-area"
+        >
           {/* 二级:能力 chip 行(选中分类后隐藏,替换为三级模板行) */}
           {!selectedCategory && (
             <div
