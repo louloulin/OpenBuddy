@@ -10,8 +10,15 @@ fileGroups:
     # The Electron renderer resolves workspace packages from source. Keep
     # their implementation files in the application build hash so a renderer
     # host change cannot be hidden behind a stale `out/` bundle.
+    # Note: `packages/ui/**/*` (without `/src/`) is intentionally NOT
+    # included — that pattern also matches `packages/ui/<pkg>/node_modules/`
+    # (which contains hundreds of symlinks + cache files), and moon would
+    # log 80+ warnings per build about hashing symlinks. The
+    # `vite.config.ts` alias map already resolves every workspace package
+    # entry to its `src/index.ts`, so we only need the implementation
+    # files here, not the package's build metadata.
     - "packages/renderer/openbuddy-renderer-host/src/**/*"
-    - "packages/ui/**/*"
+    - "packages/ui/**/src/**/*"
     - "packages/bundle/openbuddy-base/src/**/*"
     - "*.{ts,tsx,js,mjs,cjs,json,html}"
     - "electron.vite.config.ts"

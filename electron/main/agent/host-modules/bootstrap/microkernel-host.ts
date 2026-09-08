@@ -64,7 +64,15 @@ export function microkernelReady(): boolean {
  */
 export function installMicrokernelHost(state: Parameters<typeof installHostModules>[0], deps: InstallHostModuleDeps): void {
   if (INSTALLED_MODULES.size > 0) {
-    disposeMicrokernelHost();
+    // Already installed. The agent-host dual-install path (module-load
+    // queueMicrotask + init-pipeline stage=3) used to call this twice in
+    // a row, which threw "service X has been registered" inside the deep
+    // installHostModules() sub-installers because Cordis + many
+    // host-module singletons (e.g. the RPC events bus, the audit log,
+    // pi-runtime caches) don't survive disposeMicrokernelHost() cleanly.
+    // Returning here is a no-op idempotent re-install: the second caller
+    // gets the same already-installed state the first one set up.
+    return;
   }
   installHostModules(state, deps);
   for (const moduleTag of MICROKERNEL_MODULE_TAGS) INSTALLED_MODULES.add(moduleTag);
