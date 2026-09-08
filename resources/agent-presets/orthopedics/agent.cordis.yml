@@ -1,4 +1,5 @@
-- name: orthopedics-system-prompt
+- id: orthopedics-system-prompt
+  name: ../agent.js
   package: "@openbuddy/capability-clinical-neuro"
   provide: orthoPrompt
   config:

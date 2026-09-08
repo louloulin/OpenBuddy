@@ -1,4 +1,5 @@
-- name: cardiovascular-system-prompt
+- id: cardiovascular-system-prompt
+  name: ../agent.js
   package: "@openbuddy/capability-clinical-neuro"
   provide: cardioPrompt
   config:

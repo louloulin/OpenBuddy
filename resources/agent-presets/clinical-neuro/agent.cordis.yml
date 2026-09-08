@@ -1,4 +1,5 @@
-- name: clinical-neuro-system-prompt
+- id: clinical-neuro-system-prompt
+  name: ../agent.js
   package: "@openbuddy/capability-clinical-neuro"
   provide: clinicalPrompt
   config:
@@ -33,7 +34,8 @@
         text: |
           > 本输出仅为辅助诊断参考,不构成最终诊断。最终诊断和治疗方案以主诊医师意见为准。
 
-- name: clinical-neuro-tools
+- id: clinical-neuro-tools
+  name: ../agent.js
   package: "@openbuddy/capability-clinical-neuro"
   provide: clinicalTools
   config:
@@ -63,7 +65,8 @@
         description: 查询临床操作审计日志
         input: query
 
-- name: clinical-neuro-knowledge
+- id: clinical-neuro-knowledge
+  name: ../agent.js
   package: "@openbuddy/capability-clinical-neuro"
   provide: clinicalKnowledge
   config:

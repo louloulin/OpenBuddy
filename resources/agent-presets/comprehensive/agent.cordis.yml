@@ -1,4 +1,5 @@
-- name: comprehensive-system-prompt
+- id: comprehensive-system-prompt
+  name: ../agent.js
   package: "@openbuddy/capability-clinical-neuro"
   provide: comprehensivePrompt
   config:

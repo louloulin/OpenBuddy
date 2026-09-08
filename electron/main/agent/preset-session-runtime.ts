@@ -166,7 +166,8 @@ export class PresetSessionRuntime {
       .isolate("toolRegistry")
       .isolate("systemPrompt")
       .isolate("dshRemote")
-      .isolate("agentPresets");
+      .isolate("agentPresets")
+      .isolate("presetSessionRuntime");
     context.set("toolRegistry", this.createLocalToolRegistry());
     context.set("systemPrompt", createPromptService());
     context.set("dshRemote", {
