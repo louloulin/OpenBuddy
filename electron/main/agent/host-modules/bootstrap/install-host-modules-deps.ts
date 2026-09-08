@@ -12,6 +12,8 @@ import { PresetSessionRuntime } from "../../preset-session-runtime";
 import { casdoorAuth } from "../../../casdoor/casdoor-auth";
 import { permissionHandlers } from "@openbuddy/auth-permission";
 import * as piResources from "../../pi-resources";
+import type { PiSessionRuntime } from "../../pi-session-runtime";
+import type { PiRuntimeCoordinator } from "../../pi-runtime-coordinator";
 import type { InstallHostModuleDeps } from "./install-host-modules";
 
 export interface InstallHostModuleDepsClosures {
@@ -23,26 +25,21 @@ export interface InstallHostModuleDepsClosures {
   emitPluginEvent: (type: string, payload: unknown) => void;
   emitRendererEvent: (channel: string, payload: unknown) => void;
   // Lifecycle
-  listAllPiSessions: <T = unknown>() => Promise<T>;
+  listAllPiSessions: () => Promise<unknown>;
   persistedSessionPath: (sessionId: string | undefined) => Promise<string | undefined>;
   enqueueLifecycle: <T>(operation: () => Promise<T>) => Promise<T>;
   lifecycleAppendQueues: Map<string, Promise<void>>;
   initialize: (opts?: { cwd?: string; sessionPath?: string; force?: boolean }) => Promise<void>;
-  rebindSession: (opts: any) => Promise<void>;
+  rebindSession: (sessionPath: string, cwd: string) => Promise<void>;
   dispose: () => Promise<void>;
-  piRuntimeCoordinator: {
-    session: unknown;
-    replace: (opts: any) => any;
-    reload: (reason: string) => void;
-    dispose: () => void;
-  };
-  piSessionRuntime: { dispose: () => void };
+  piRuntimeCoordinator: PiRuntimeCoordinator;
+  piSessionRuntime: PiSessionRuntime;
   // Public API helpers
   publicQueueItems: (activeSession: any) => readonly unknown[];
   workspaceRegistry: () => any;
   readModelsConfig: () => Promise<unknown>;
-  canonicalEventNamespace: string;
-  eventNamespace: string;
+  canonicalEventNamespace: (type: string) => string | undefined;
+  eventNamespace: (type: string) => string;
   // Subagent + hook + tools
   createSubagentResourceLoader: (cwd: string) => Promise<unknown>;
   createTaskAwareTool: (...args: any[]) => any;
@@ -61,7 +58,7 @@ export interface InstallHostModuleDepsClosures {
   createOpenBuddyRpcUiContext: (...args: any[]) => any;
   requestHookPermission: (...args: any[]) => any;
   createPiToolExtension: (...args: any[]) => any;
-  sessionHasConversation: (sessionId: string) => Promise<boolean>;
+  sessionHasConversation: (...args: any[]) => any;
   // Auth + permissions
   permissionHandlers: any;
   // Profile snapshot
@@ -108,7 +105,7 @@ export interface InstallHostModuleDepsClosures {
   onEvent: (handler: any) => any;
   persistPiSessionHeaderImpl: (...args: any[]) => any;
   // dispose-internal
-  stopProfileWatchers: () => Promise<void>;
+  stopProfileWatchers: () => void;
   disposeProfileTypertRegistrations: (...args: any[]) => any;
   disposeActiveHookProcesses: (...args: any[]) => any;
   drainActiveHookProcesses: (...args: any[]) => any;

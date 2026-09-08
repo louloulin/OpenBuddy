@@ -9,7 +9,7 @@
  * Reverse-dep invariant: this module does NOT import agent-host.ts.
  */
 import type { InstallHostModuleDeps } from "./install-host-modules";
-import { ensureDefaultPiPackages } from "@openbuddy/plugin-host";
+import { ensureDefaultPiPackages, type PluginStatus } from "@openbuddy/plugin-host";
 import type { InitPipelineDeps } from "./init-pipeline";
 
 import { bootstrapSessionEventLog } from "./session-event-log";
@@ -202,6 +202,6 @@ export function buildInitPipelineDeps(
     sessionPath: opts.sessionPath,
     setProfilePiResourcePaths: setProfilePiResourcePathsImpl,
     reconcileProfileArtifacts,
-    emitPluginReadyEvent: (payload) => closures.emitPluginEvent("plugin/ready", payload),
-  } as InitPipelineDeps;
+    emitPluginReadyEvent: (payload: { count: number }) => closures.emitPluginEvent("plugin/ready", payload),
+  } as unknown as InitPipelineDeps;
 }

@@ -27,6 +27,7 @@ import {
 } from "../workbench-scope-sync";
 import { __registerDefaultState as __registerDefaultDshState } from "../dsh-bridge-helpers";
 import type { OpenBuddyTelemetrySink } from "../../pi-telemetry-bridge";
+import type { AgentHostState } from "../_state-shape";
 
 // Module-level singleton for the renderer event emitter
 let rendererEventEmitter: ((channel: string, payload: unknown) => void) | null = null;
@@ -46,7 +47,7 @@ __registerDefaultRendererEventEmitter(emitRendererEvent);
 __registerDefaultCasdoorStatus(() => casdoorAuth.status());
 
 // These need state passed in
-export function registerLifecycleDefaultState(state: unknown, getInitialisationPromise: () => Promise<void> | null): void {
+export function registerLifecycleDefaultState(state: AgentHostState): void {
   __registerDefaultState(state);
   __registerDefaultDshState(state);
 }

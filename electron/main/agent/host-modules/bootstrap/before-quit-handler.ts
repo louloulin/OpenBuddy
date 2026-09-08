@@ -9,7 +9,6 @@
  * 反向依赖不变量: 此模块不 import agent-host.ts.
  */
 import { app } from "electron";
-import type { DisposeFn } from "./lifecycle-public";
 
 export interface BeforeQuitHandlerDeps {
   /** Reference to the lifecycle dispose() thunk (dispose returns a Promise). */

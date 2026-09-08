@@ -1072,8 +1072,8 @@ async function requestHookPermission(title: string, message: string, request?: H
 const installMicrokernelDepsClosures = {
   piHome, isPathWithin, piSessionDir, emitPluginEvent, emitRendererEvent,
   listAllPiSessions, persistedSessionPath, enqueueLifecycle, lifecycleAppendQueues,
-  initialize, rebindSession, dispose, piRuntimeCoordinator, piSessionRuntime,
-  publicQueueItems, workspaceRegistry, readModelsConfigImpl,
+  initialize, rebindSession, dispose: dispose(enqueueLifecycle), piRuntimeCoordinator, piSessionRuntime,
+  publicQueueItems, workspaceRegistry, readModelsConfig: readModelsConfigImpl,
   canonicalEventNamespace, eventNamespace, createSubagentResourceLoader,
   createTaskAwareTool, modelFacingPresetTools, runHookPoint,
   profileArtifactModuleUrl, profilePackages, pluginLifecycleQueue,
@@ -1083,16 +1083,18 @@ const installMicrokernelDepsClosures = {
   capturePiProfileSnapshot, restorePiProfileSnapshot,
   captureDeepSeekCapabilityServices, restoreDeepSeekCapabilityServices,
   materializeOpenBuddyProfile, createOpenBuddyProfile, composePluginPatches,
-  syncDeepSeekCordisRuntime, deepSeekCoreRuntimeEntries, reloadMcpImpl,
+  syncDeepSeekCordisRuntime, deepSeekCoreRuntimeEntries, reloadMcp: () => reloadMcpImpl(state),
   syncMarketplacePiExtensionStatusesImpl, startProfileWatchers, readOverridePatches,
-  runtimeProfileBundle, reconcileProfileArtifacts, configurePiExtensions,
+  runtimeProfileBundle, reconcileProfileArtifacts, configurePiExtensionsImpl: configurePiExtensions,
   reportPiExtensionErrors, captureReloadableContextServices,
   restoreCapturedContextServices, rollbackPiProfile, scheduleProfileReload,
   artifactPackageJsonByName, discoverRendererPluginManifest,
   promptImpl, abortImpl, listSessionsImpl, listSubagentChildrenImpl,
   promptSubagentImpl, interruptSubagentImpl, ensureContinuableSubagentImpl,
-  setModelImpl, getSessionImpl, getModelImpl, setThinkingLevelImpl, promptContentImpl,
-  onEventImpl, persistPiSessionHeaderImpl, stopProfileWatchers,
+  setModel: setModelImpl, getSession: getSessionImpl, getModel: getModelImpl,
+  setThinkingLevel: setThinkingLevelImpl, promptContent: promptContentImpl,
+  onEvent: onEventImpl, prompt: promptImpl, abort: abortImpl,
+  persistPiSessionHeaderImpl, stopProfileWatchers,
   disposeProfileTypertRegistrations, disposeActiveHookProcesses,
   drainActiveHookProcesses, permissionHandlers,
 };
@@ -1127,6 +1129,7 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     openBuddyCorePlugin,
     baseUrl: import.meta.url,
     reportPiExtensionErrors,
+    listPlugins,
   }, { sessionPath: opts?.sessionPath }));
 }
 import { init } from "./host-modules/bootstrap/lifecycle-public";
@@ -1478,7 +1481,7 @@ export type { AgentSession };
 // v6-G M1 收尾: 把 Electron before-quit + filesystem policy 抽到独立模块,
 // agent-host.ts 只剩一行 register. Register 在 module-load 即触发, 等价
 // 原 inline `app.on("before-quit", ...)` 在模块初始化时的副作用.
-installBeforeQuitHandler({ dispose });
+installBeforeQuitHandler({ dispose: dispose(enqueueLifecycle) });
 
 export const evaluateFilesystemCapabilityPolicy = evaluateFilesystemCapabilityPolicyImpl;
 export const DEFAULT_FILESYSTEM_POLICY = DEFAULT_FILESYSTEM_POLICY_IMPL;

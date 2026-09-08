@@ -14,18 +14,16 @@ import type { AgentHostState } from "../_state-shape";
 import type { TeamRunner } from "@openbuddy/team-team";
 import type { Model } from "@earendil-works/pi-ai";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import type { OpenBuddyTelemetrySink } from "../pi-telemetry-bridge";
+import type { OpenBuddyTelemetrySink } from "../../pi-telemetry-bridge";
 
 import { telemetrySink as telemetrySinkImpl } from "../telemetry-sink";
 import {
-  assistantMessage as assistantMessageImpl,
+  assistantMessageText as assistantMessageTextImpl,
   createTeamRunner as createTeamRunnerImpl,
 } from "../team-runner";
 import { disposeInternal } from "../dispose-internal";
 
 import {
-  bindRendererEventEmitter as bindRendererEventEmitterImpl,
-  emitRendererEvent as emitRendererEventImpl,
   __registerDefaultRendererEventEmitter,
   __registerDefaultState,
   __registerDefaultCasdoorStatus,
@@ -60,6 +58,6 @@ export function buildLifecycleEmitterFacade(state: AgentHostState) {
     telemetrySink: (): OpenBuddyTelemetrySink | undefined => telemetrySinkImpl(),
     createTeamRunner: (modelRuntime: ModelRuntime, cwd: string, getModel: () => Model<any> | undefined): TeamRunner =>
       createTeamRunnerImpl(modelRuntime, cwd, getModel),
-    assistantMessageText: (messages: unknown): string => assistantMessageImpl(messages),
+    assistantMessageText: (messages: unknown): string => assistantMessageTextImpl(messages),
   };
 }
