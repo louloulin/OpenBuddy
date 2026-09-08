@@ -57,12 +57,84 @@ files:
   - "!**/.DS_Store"
   - "!**/.git/**"
 
-asar: true
-# Workspace packages are not marked native, but unpacking them keeps the
-# pnpm symlink structure intact during dev builds. Production builds can
-# shrink this list once symlink hoisting is verified on each target.
+asar: false
+# asar: false is a workaround for the pnpm + electron-builder
+# "duplicate dependency references" + "cannot find path for dependency"
+# chain — asar symlinks don't survive Electron's runtime fs, so any
+# transitive dep that only lives in .pnpm/<hash>/node_modules/<pkg>/
+# silently drops at packaging time and the runtime throws
+# ERR_MODULE_NOT_FOUND on the first import. Until that interaction
+# is fixed upstream, building without asar (each file unpacked) is
+# the only reliable way to ship a working desktop binary. The
+# trade-off: ~2x install footprint and slightly slower cold start.
+# See commit message for the longer-term followup.
+# Keep the entire pnpm virtual store unpacked (alongside app.asar) so
+# Electron's Node loader can resolve the symlinks that pnpm creates
+# between `node_modules/<pkg>` and `node_modules/.pnpm/<hash>/node_modules/<pkg>/`.
+# Without this, every transitive dep of @earendil-works/pi-coding-agent
+# (cross-spawn, cors, ajv, express, openai, debug, ...) silently drops
+# out of the asar at packaging time, and the runtime throws
+# ERR_MODULE_NOT_FOUND on first import.
 asarUnpack:
   - "**/node_modules/.pnpm/**"
+  - "**/node_modules/cross-spawn/**"
+  - "**/node_modules/cors/**"
+  - "**/node_modules/express/**"
+  - "**/node_modules/ajv/**"
+  - "**/node_modules/ajv-formats/**"
+  - "**/node_modules/express-rate-limit/**"
+  - "**/node_modules/eventsource/**"
+  - "**/node_modules/openai/**"
+  - "**/node_modules/http-proxy-agent/**"
+  - "**/node_modules/https-proxy-agent/**"
+  - "**/node_modules/raw-body/**"
+  - "**/node_modules/zod-to-json-schema/**"
+  - "**/node_modules/loose-envify/**"
+  - "**/node_modules/unist-util-visit-parents/**"
+  - "**/node_modules/debug/**"
+  - "**/node_modules/chalk/**"
+  - "**/node_modules/diff/**"
+  - "**/node_modules/ignore/**"
+  - "**/node_modules/jiti/**"
+  - "**/node_modules/minimatch/**"
+  - "**/node_modules/semver/**"
+  - "**/node_modules/yaml/**"
+  - "**/node_modules/undici/**"
+  - "**/node_modules/partial-json/**"
+  - "**/node_modules/proper-lockfile/**"
+  - "**/node_modules/hosted-git-info/**"
+  - "**/node_modules/grok-mermaid/**"
+  - "**/node_modules/highlight.js/**"
+  - "**/node_modules/@anthropic-ai/**"
+  - "**/node_modules/@aws-sdk/**"
+  - "**/node_modules/@google/**"
+  - "**/node_modules/@smithy/**"
+  - "**/node_modules/@hono/**"
+  - "**/node_modules/@silvia-odwyer/**"
+  - "**/node_modules/@earendil-works/**"
+  - "**/node_modules/which/**"
+  - "**/node_modules/shell-quote/**"
+  - "**/node_modules/isexe/**"
+  - "**/node_modules/yallist/**"
+  - "**/node_modules/colorette/**"
+  - "**/node_modules/form-data/**"
+  - "**/node_modules/mime-db/**"
+  - "**/node_modules/mime-types/**"
+  - "**/node_modules/ms/**"
+  - "**/node_modules/get-stream/**"
+  - "**/node_modules/pump/**"
+  - "**/node_modules/has-flag/**"
+  - "**/node_modules/shebang-command/**"
+  - "**/node_modules/shebang-regex/**"
+  - "**/node_modules/json5/**"
+  - "**/node_modules/lodash/**"
+  - "**/node_modules/lodash.merge/**"
+  - "**/node_modules/ltgt/**"
+  - "**/node_modules/proto-list/**"
+  - "**/node_modules/strnum/**"
+  - "**/node_modules/long/**"
+  - "**/node_modules/protobufjs/**"
+  - "**/node_modules/bytebuffer.js/**"
 
 win:
   target:
