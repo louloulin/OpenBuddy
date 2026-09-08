@@ -28,6 +28,7 @@ const workspacePackageAliases: Array<{ find: string; replacement: string }> = [
   { find: "@openbuddy/cordis", replacement: resolve(__dirname, "packages/runtime/openbuddy-cordis/src/index.ts") },
   { find: "@openbuddy/bundle-base/renderer", replacement: resolve(__dirname, "packages/bundle/openbuddy-base/src/renderer.ts") },
   { find: "@openbuddy/plugin-host", replacement: resolve(__dirname, "packages/runtime/openbuddy-plugin-host/src/index.ts") },
+  { find: "@openbuddy/plugin-sdk", replacement: resolve(__dirname, "packages/runtime/openbuddy-plugin-sdk/src/index.ts") },
   { find: "@openbuddy/bundle-base", replacement: resolve(__dirname, "packages/bundle/openbuddy-base/src/index.ts") },
   { find: "@openbuddy/renderer-host", replacement: resolve(__dirname, "packages/renderer/openbuddy-renderer-host/src/index.ts") },
   { find: "@openbuddy/core-session/lifecycle", replacement: resolve(__dirname, "packages/core/openbuddy-session/src/lifecycle.ts") },

@@ -1,0 +1,15 @@
+{
+  "name": "@openbuddy/sample-plugin",
+  "version": "0.1.0",
+  "description": "Sample fixture for the OpenBuddyPlugin SDK manifest serializer. Exercises every track: pi (handlers / tools / commands), ui (slot contributions) and harness (DSH-compatible declaration).",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./plugin.json": "./plugin.json"
+  },
+  "files": [
+    "plugin.json",
+    "index.js"
+  ]
+}
