@@ -45,6 +45,15 @@
       "@openbuddy/capability-authorization": [
         "./packages/capability/openbuddy-authorization/src/index.ts"
       ],
+      "@openbuddy/capability-clinical-neuro": [
+        "./packages/capability/openbuddy-clinical-neuro/src/index.ts"
+      ],
+      "@openbuddy/capability-clinical-neuro/src/universal-import": [
+        "./packages/capability/openbuddy-clinical-neuro/src/universal-import.ts"
+      ],
+      "@openbuddy/capability-clinical-neuro/src/import-template": [
+        "./packages/capability/openbuddy-clinical-neuro/src/import-template.ts"
+      ],
       "@openbuddy/capability-calendar": [
         "./packages/capability/openbuddy-calendar/src/index.ts"
       ],

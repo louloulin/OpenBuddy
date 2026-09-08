@@ -89,6 +89,9 @@ const allowedInvokeChannels = new Set([
   "email:sender-policy", "email:share-thread", "email:sync", "email:sync-states", "email:thread", "email:threads", "email:threads-page", "email:triage",
   "email:unsubscribe", "email:update", "email:update-workspace-tags", "email:workspace-tags",
   "email:invalidate-provider",
+  // clinical
+  "clinical:import-templates", "clinical:import-detect-template", "clinical:import-preview", "clinical:differential-diagnosis", "clinical:score", "clinical:redact", "clinical:audit-trail",
+  "clinical:kb-search", "clinical:kb-add-drug", "clinical:kb-add-lab", "clinical:kb-stats",
   // workbuddy
   "workbuddy_import_confirm", "workbuddy_import_preview", "workbuddy_import_rollback", "workbuddy_import_status",
   // other

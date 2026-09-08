@@ -10744,6 +10744,26 @@ body.dark .permission-picker__popover,
 .agent-list__item--muted {
   opacity: 0.55;
 }
+.agent-list__item--preset {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.agent-preset__main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 260px;
+}
+.agent-preset__actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.agent-preset__actions .settings-btn {
+  padding: 5px 10px;
+  white-space: nowrap;
+}
 .agent-list__name {
   font-weight: 500;
   color: var(--wb-text-strong);

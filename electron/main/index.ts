@@ -57,6 +57,7 @@ const __dirname = dirname(__filename);
 const execFileAsync = promisify(execFile);
 
 app.setName("OpenBuddy");
+process.env.OPENBUDDY_BUILTIN_PRESETS_DIR ||= join(app.getAppPath(), "resources", "agent-presets");
 
 let mainLogger: ReturnType<typeof createMainLogger> | null = null;
 function ensureMainLogger(): ReturnType<typeof createMainLogger> {
@@ -262,4 +263,3 @@ async function bootBackgroundServices(): Promise<void> {
     console.error("[openbuddy-pi] agent host init failed:", err);
   }
 }
-

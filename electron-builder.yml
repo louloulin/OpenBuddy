@@ -50,6 +50,7 @@ electronDownload:
 # else needed at runtime is resolved through node_modules / package.json.
 files:
   - "out/**/*"
+  - "resources/agent-presets/**/*"
   - "package.json"
   - "!**/*.map"
   - "!**/__tests__/**"

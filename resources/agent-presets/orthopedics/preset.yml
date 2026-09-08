@@ -1,0 +1,3 @@
+name: 骨科辅助诊断
+description: 面向骨科医生的垂域智能体 — 骨折分型、关节功能评估、病理性骨折风险、手术指征辅助。含Harris Hip/Garden/Mirels/AO-OTA/Oxford Knee评分。
+order: 30

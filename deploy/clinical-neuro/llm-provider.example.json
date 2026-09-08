@@ -1,0 +1,24 @@
+{
+  "$comment": "OpenBuddyDoctor 临床 LLM Provider 配置。当前指向 token.yueming.xin 用于个人测试；医院部署时替换 baseUrl 为内网模型网关。",
+  "providers": {
+    "yueming-token": {
+      "name": "Yueming Token Gateway (个人测试)",
+      "baseUrl": "https://token.yueming.xin/v1",
+      "api": "openai-completions",
+      "authHeader": true,
+      "models": [
+        { "id": "gpt-5.2", "name": "GPT-5.2 (via token.yueming.xin)", "contextWindow": 200000, "maxTokens": 16384, "reasoning": true },
+        { "id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5", "contextWindow": 200000, "maxTokens": 16384, "reasoning": true }
+      ]
+    },
+    "hospital-internal": {
+      "$comment": "医院内网模型模板 — 迁移时启用并填入内网地址",
+      "name": "Hospital Internal LLM",
+      "baseUrl": "http://内网模型地址:端口/v1",
+      "api": "openai-completions",
+      "authHeader": true,
+      "disabled": true,
+      "models": []
+    }
+  }
+}

@@ -33,6 +33,10 @@ import {
   internalReload,
   mcpList,
   permissionList,
+  piCurrentAgentPreset,
+  piListAgentPresets,
+  piSaveAgentPresetDefault,
+  piSelectAgentPreset,
   providersList,
   flattenModels,
   skillsList,
@@ -1884,6 +1888,11 @@ export function AgentSettingsPanel() {
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [servers, setServers] = useState<McpServerEntry[]>([]);
   const [commands, setCommands] = useState<SlashCommand[]>([]);
+  const [presets, setPresets] = useState<Awaited<ReturnType<typeof piListAgentPresets>>>([]);
+  const [currentPresetId, setCurrentPresetId] = useState<string | null>(null);
+  const [presetBusyId, setPresetBusyId] = useState<string | null>(null);
+  const [presetMessage, setPresetMessage] = useState<string | null>(null);
+  const [presetError, setPresetError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -1896,13 +1905,48 @@ export function AgentSettingsPanel() {
         mcpList().catch(() => [] as McpServerEntry[]),
         commandsList().catch(() => [] as SlashCommand[]),
       ]);
+      const [presetList, currentPreset] = await Promise.all([
+        piListAgentPresets().catch(() => []),
+        piCurrentAgentPreset().catch(() => ({ id: null })),
+      ]);
       setSkills(sk);
       setServers(mc);
       setCommands(cmd);
+      setPresets(presetList);
+      setCurrentPresetId(currentPreset.id);
     } catch (e) {
       setError(String(e).replace(/^Error:\s*/, ""));
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const switchPreset = useCallback(async (presetId: string) => {
+    setPresetBusyId(presetId);
+    setPresetError(null);
+    setPresetMessage(null);
+    try {
+      await piSelectAgentPreset(presetId);
+      setCurrentPresetId(presetId);
+      setPresetMessage(`已切换到当前会话：${presetId}`);
+    } catch (e) {
+      setPresetError(String(e).replace(/^Error:\s*/, ""));
+    } finally {
+      setPresetBusyId(null);
+    }
+  }, []);
+
+  const savePresetDefault = useCallback(async (presetId: string) => {
+    setPresetBusyId(presetId);
+    setPresetError(null);
+    setPresetMessage(null);
+    try {
+      await piSaveAgentPresetDefault(presetId);
+      setPresetMessage(`已设为默认场景：${presetId}（新会话生效）`);
+    } catch (e) {
+      setPresetError(String(e).replace(/^Error:\s*/, ""));
+    } finally {
+      setPresetBusyId(null);
     }
   }, []);
 
@@ -1934,6 +1978,62 @@ export function AgentSettingsPanel() {
       </div>
 
       {error && <p className="settings-msg settings-msg--warn">加载失败：{error}</p>}
+      {presetError && <p className="settings-msg settings-msg--warn">场景切换失败：{presetError}</p>}
+      {presetMessage && <p className="settings-msg">{presetMessage}</p>}
+
+      {/* 垂域智能体场景 */}
+      <details className="agent-section" open>
+        <summary className="agent-section__title">
+          垂域智能体场景（{presets.length}）
+        </summary>
+        <div className="agent-section__body">
+          {presets.length === 0 ? (
+            <p className="settings-hint">暂无场景。可安装场景包或在 ~/.pi/agent/agent-presets/ 添加。</p>
+          ) : (
+            <ul className="agent-list">
+              {presets.map((preset) => {
+                const active = preset.id === currentPresetId;
+                return (
+                  <li
+                    key={preset.id}
+                    className={`agent-list__item agent-list__item--preset ${preset.broken ? "agent-list__item--muted" : ""}`}
+                  >
+                    <div className="agent-preset__main">
+                      <span className="agent-list__name">{preset.name ?? preset.id}</span>
+                      <span className="agent-list__badge">{preset.trust === "system" ? "内置" : "本地"}</span>
+                      <span className={`agent-list__status ${active ? "agent-list__status--on" : "agent-list__status--off"}`}>
+                        {active ? "当前会话" : "可用"}
+                      </span>
+                      {(preset.description || preset.broken) && (
+                        <span className="agent-list__desc">{preset.broken ?? preset.description}</span>
+                      )}
+                    </div>
+                    <div className="agent-preset__actions">
+                      <button
+                        type="button"
+                        className="settings-btn"
+                        onClick={() => void switchPreset(preset.id)}
+                        disabled={Boolean(preset.broken) || presetBusyId === preset.id || active}
+                      >
+                        {presetBusyId === preset.id ? "切换中…" : active ? "已启用" : "本会话启用"}
+                      </button>
+                      <button
+                        type="button"
+                        className="settings-btn"
+                        onClick={() => void savePresetDefault(preset.id)}
+                        disabled={Boolean(preset.broken) || presetBusyId === preset.id}
+                      >
+                        设为默认
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="settings-hint">本会话启用仅允许在首轮对话前切换；设为默认会在新会话生效。</p>
+        </div>
+      </details>
 
       {/* 汇总统计 */}
       <div className="agent-stats">
