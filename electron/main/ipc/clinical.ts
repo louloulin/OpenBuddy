@@ -1,4 +1,8 @@
-import { ipcMain } from "electron";
+import { ipcMain, net } from "electron";
+import { Context } from "@openbuddy/cordis";
+import { mkdir, readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 interface RecordValue {
 	[key: string]: unknown;
@@ -15,7 +19,8 @@ function requiredString(value: unknown, field: string): string {
 }
 
 export function registerClinicalIpc(): void {
-	const handlers = async () => await import("@openbuddy/capability-clinical-neuro");
+	let clinicalModule: Promise<typeof import("@openbuddy/capability-clinical-neuro")> | null = null;
+	const handlers = async () => clinicalModule ??= initializeClinicalModule();
 	const importer = async () => await import("@openbuddy/capability-clinical-neuro/src/universal-import");
 
 	ipcMain.handle("clinical:import-templates", async (_e, args: unknown) => {
@@ -101,4 +106,42 @@ export function registerClinicalIpc(): void {
 		const { clinicalHandlers } = await handlers();
 		return clinicalHandlers.medicalKbStats();
 	});
+}
+
+async function initializeClinicalModule(): Promise<typeof import("@openbuddy/capability-clinical-neuro")> {
+	const module = await import("@openbuddy/capability-clinical-neuro");
+	const agentHome = process.env.PI_CODING_AGENT_DIR
+		?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent");
+	const auditDir = join(homedir(), ".openbuddy");
+	await mkdir(auditDir, { recursive: true });
+	module.mountClinicalAuditLog(join(auditDir, "clinical-audit.json"));
+	const service = module.mountClinicalNeuro(new Context());
+	await configureClinicalLlm(module, service, agentHome);
+	return module;
+}
+
+async function configureClinicalLlm(
+	module: typeof import("@openbuddy/capability-clinical-neuro"),
+	service: import("@openbuddy/capability-clinical-neuro").ClinicalNeuro,
+	agentHome: string,
+): Promise<void> {
+	const providerId = process.env.OPENBUDDY_CLINICAL_PROVIDER_ID ?? "yueming-token";
+	try {
+		const modelsConfig = JSON.parse(await readFile(join(agentHome, "models.json"), "utf8")) as {
+			providers?: Record<string, { baseUrl?: string; models?: Array<{ id?: string }> }>;
+		};
+		const authConfig = JSON.parse(await readFile(join(agentHome, "auth.json"), "utf8")) as Record<string, unknown>;
+		const provider = modelsConfig.providers?.[providerId];
+		const auth = authConfig[providerId];
+		const apiKey = typeof auth === "string" ? auth : typeof auth === "object" && auth !== null
+			? String((auth as { key?: unknown }).key ?? "")
+			: "";
+		const baseUrl = provider?.baseUrl;
+		const modelId = process.env.OPENBUDDY_CLINICAL_MODEL_ID ?? provider?.models?.[0]?.id;
+		if (!baseUrl || !apiKey || !modelId) return;
+		const electronFetch = (input: string, init?: RequestInit) => net.fetch(input, init);
+		service.setLlmProvider(new module.OpenAiCompatibleClinicalLlm(baseUrl, apiKey, modelId, undefined, electronFetch));
+	} catch {
+		// Clinical deterministic scoring and knowledge search remain available when the LLM config is absent.
+	}
 }

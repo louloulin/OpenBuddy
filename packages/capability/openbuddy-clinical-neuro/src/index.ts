@@ -18,6 +18,7 @@ import {
 import { scoreClinicalScale, type ScaleInput, type ScaleScore } from "./scoring";
 import { checkDifferentialSafety, type DiagnosisGuardResult } from "./diagnosis-guard";
 import { getMedicalKnowledgeBase, type MedicalKbQuery, type MedicalKbSearchResult, type DrugRecord, type LabExamRecord, type DiseaseRecord } from "./medical-knowledge-base";
+export { mountClinicalAuditLog } from "./audit-log";
 
 // ============================================================================
 // Types
@@ -75,6 +76,9 @@ export interface ClinicalLlmProvider {
 	readonly modelId: string;
 }
 
+type ClinicalFetchInit = Parameters<typeof fetch>[1];
+type ClinicalFetchLike = (input: string, init?: ClinicalFetchInit) => Promise<Response>;
+
 /**
  * OpenAI-compatible chat completions provider.
  * Works with token.yueming.xin (test), vLLM, Ollama, or hospital internal gateways.
@@ -85,25 +89,32 @@ export class OpenAiCompatibleClinicalLlm implements ClinicalLlmProvider {
 		private readonly apiKey: string,
 		readonly modelId: string,
 		private readonly systemPrompt = DEFAULT_DIFFERENTIAL_SYSTEM_PROMPT,
+		private readonly fetchImpl: ClinicalFetchLike = (input, init) => fetch(input, init),
 	) {}
 
 	async generateDifferential(redactedText: string, specialty?: string): Promise<DifferentialDiagnosisItem[]> {
-		const response = await fetch(`${this.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${this.apiKey}`,
-			},
-			body: JSON.stringify({
-				model: this.modelId,
-				messages: [
-					{ role: "system", content: this.systemPrompt },
-					{ role: "user", content: `科室: ${specialty ?? "神经内科/神经外科"}\n\n病历摘要(已脱敏):\n${redactedText}` },
-				],
-				temperature: 0.1,
-				max_tokens: 4096,
-			}),
-		});
+		let response: Response;
+		try {
+			response = await this.fetchImpl(`${this.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${this.apiKey}`,
+				},
+				body: JSON.stringify({
+					model: this.modelId,
+					messages: [
+						{ role: "system", content: this.systemPrompt },
+						{ role: "user", content: `科室: ${specialty ?? "神经内科/神经外科"}\n\n病历摘要(已脱敏):\n${redactedText}` },
+					],
+					temperature: 0.1,
+					max_tokens: 4096,
+				}),
+			});
+		} catch (error) {
+			const reason = error instanceof Error ? error.message : String(error);
+			throw new ClinicalNeuroError("llm_unavailable", `无法连接临床 LLM 网关: ${reason}`);
+		}
 		if (!response.ok) {
 			const detail = await response.text().catch(() => "");
 			throw new ClinicalNeuroError("llm_unavailable", `LLM 请求失败 (${response.status}): ${detail.slice(0, 200)}`);

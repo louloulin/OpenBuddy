@@ -49,6 +49,9 @@ describe("Electron IPC contract", () => {
     const invoked = new Set(rendererSources.flatMap((source) => [...literalChannels(source, /(?:invoke|ipcRenderer\.invoke)(?:<[^>]+>)?\(\s*["']([^"']+)["']/g)]));
     const allowlisted = literalChannels(preload, /\s["']([^"']+)["'],?/g);
     const handlers = literalChannels(main, /ipcMain\.handle\(\s*["']([^"']+)["']/g);
+    for (const channel of handlers) {
+      expect(allowlisted.has(channel), `preload allowlist missing ${channel}`).toBe(true);
+    }
     for (const rawChannel of invoked) {
       const channel = channelAliases[rawChannel] ?? rawChannel;
       expect(allowlisted.has(channel), `preload allowlist missing ${channel}`).toBe(true);

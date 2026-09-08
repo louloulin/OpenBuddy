@@ -94,9 +94,11 @@ if (models.length > 0) {
   }
 }
 
-// Write provider config to Pi-compatible location.
-const piHome = process.env.PI_HOME ?? join(os.homedir(), ".pi");
-const modelsConfigPath = join(piHome, "models.json");
+// Write provider config to the Pi agent home used by OpenBuddyDoctor.
+const piAgentHome = process.env.PI_CODING_AGENT_DIR
+  ?? join(process.env.PI_HOME ?? os.homedir(), ".pi", "agent");
+const modelsConfigPath = join(piAgentHome, "models.json");
+const authConfigPath = join(piAgentHome, "auth.json");
 let config = { providers: {} };
 try {
   if (existsSync(modelsConfigPath)) config = JSON.parse(readFileSync(modelsConfigPath, "utf8"));
@@ -118,8 +120,16 @@ config.providers[providerId] = {
   })),
 };
 
-mkdirSync(piHome, { recursive: true });
+mkdirSync(piAgentHome, { recursive: true });
 writeFileSync(modelsConfigPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+
+let auth = {};
+try {
+  if (existsSync(authConfigPath)) auth = JSON.parse(readFileSync(authConfigPath, "utf8"));
+} catch { /* fresh */ }
+auth[providerId] = { type: "api_key", key: apiKey };
+writeFileSync(authConfigPath, JSON.stringify(auth, null, 2) + "\n", { mode: 0o600 });
 console.log(`[clinical] ✓ Provider 配置已写入: ${modelsConfigPath}`);
+console.log(`[clinical] ✓ API key 配置已写入: ${authConfigPath}`);
 console.log(`[clinical] Provider ID: ${providerId}`);
 console.log(`[clinical] 重启 OpenBuddyDoctor 后在模型选择器中即可看到。`);
