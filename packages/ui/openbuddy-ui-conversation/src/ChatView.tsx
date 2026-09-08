@@ -516,6 +516,15 @@ export function ChatView({
     setPanelOpen(true);
   }, []);
 
+  // P1-04 (WU-E): stable FindBar onClose so the memoized FindBar
+  // (FindBar.tsx:findBarPropsAreEqual) sees a stable callback identity
+  // and short-circuits on streaming deltas.
+  const handleCloseFind = useCallback(() => {
+    setFindOpen(false);
+    setFindHits([]);
+    setFindCurrent(null);
+  }, []);
+
   // Stable wrapper around the imported findToolCall so ToolSidePanel's
   // memo comparator sees a stable identity. The body is recomputed each
   // call (so messages/activeTool changes are still reflected) but the
@@ -908,11 +917,7 @@ export function ChatView({
         <FindBar
           messages={messages}
           open={findOpen}
-          onClose={() => {
-            setFindOpen(false);
-            setFindHits([]);
-            setFindCurrent(null);
-          }}
+          onClose={handleCloseFind}
           onHitsChange={setFindHits}
           onActiveChange={setFindCurrent}
         />
