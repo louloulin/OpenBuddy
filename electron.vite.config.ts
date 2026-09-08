@@ -73,6 +73,7 @@ const workspacePackageAliases = [
   // "自动化ui保留不要删除". The UI shells are preserved; automation
   // is owned by pi-background-tasks + pi-goal (passthrough).
   { find: "@openbuddy/capability-plan",            replacement: resolve(repoRoot, "packages/capability/openbuddy-plan/src/index.ts") },
+  { find: "@openbuddy/capability-clinical-neuro",  replacement: resolve(repoRoot, "packages/capability/openbuddy-clinical-neuro/src/index.ts") },
   { find: "@openbuddy/capability-authorization",   replacement: resolve(repoRoot, "packages/capability/openbuddy-authorization/src/index.ts") },
   { find: "@openbuddy/capability-mcp-client",       replacement: resolve(repoRoot, "packages/capability/openbuddy-mcp-client/src/index.ts") },
   { find: "@openbuddy/auth-permission",            replacement: resolve(repoRoot, "packages/auth/openbuddy-permission/src/index.ts") },

@@ -145,6 +145,7 @@ import { registerHarnessIpc } from "./harness";
 import { registerAgentIpc } from "./agent";
 import { registerConnectorsIpc } from "./connectors";
 import { registerMiscIpc } from "./misc";
+import { registerClinicalIpc } from "./clinical";
 
 
 function rpcPayload(value: unknown): RecordValue {
@@ -1045,4 +1046,5 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	registerAgentIpc(getWindow);
 	registerConnectorsIpc(getWindow);
 	registerMiscIpc(getWindow);
+	registerClinicalIpc();
 }

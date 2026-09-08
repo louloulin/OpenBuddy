@@ -89,6 +89,8 @@
     "eval:bfcl-style": "node evals/node/run_bfcl_style.mjs",
     "test:closed-loop:full": "node scripts/electron/closed-loop-capability-eval-full.mjs",
     "eval:nl2bash-style": "node evals/node/run_nl2bash_style.mjs",
+    "clinical:test": "vitest run packages/capability/openbuddy-clinical-neuro --reporter=verbose",
+    "clinical:setup-llm": "node scripts/clinical/setup-llm-provider.mjs",
     "eval:swe-bench-style": "node evals/node/run_swe_bench_style.mjs",
     "electron:dir:mac": "moon run openbuddy:electron.build.mac.dir",
     "electron:dir:win": "moon run openbuddy:electron.build.win.dir",
@@ -131,6 +133,7 @@
     "@openbuddy/storage": "workspace:*",
     "@openbuddy/team-team": "workspace:*",
     "bufferutil": "^4.1.0",
+    "cross-spawn": "^7.0.6",
     "katex": "^0.18.1",
     "linkify-it": "^6.0.0",
     "lowlight": "^3.3.0",
@@ -150,6 +153,7 @@
     "remark-math": "^6.0.0",
     "unist-util-visit": "^5.1.0",
     "utf-8-validate": "^6.0.6",
+    "xlsx": "^0.18.5",
     "zustand": "^4.5.5"
   },
   "devDependencies": {

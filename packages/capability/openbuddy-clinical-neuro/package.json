@@ -1,0 +1,24 @@
+{
+  "name": "@openbuddy/capability-clinical-neuro",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "pi": {
+    "skills": [
+      "./skills/differential-neuro.md",
+      "./skills/stroke-triage.md",
+      "./skills/gcs-nihss.md"
+    ],
+    "prompts": [
+      "./prompts/clinical-system.md"
+    ]
+  },
+  "dependencies": {
+    "@openbuddy/cordis": "workspace:*"
+  }
+}
