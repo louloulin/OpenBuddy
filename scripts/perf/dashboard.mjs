@@ -108,10 +108,11 @@ async function collect(prefix, dir) {
   return result;
 }
 
-const [ipcLatencies, baselines, topologies, coverageReport] = await Promise.all([
+const [ipcLatencies, baselines, topologies, coldStarts, coverageReport] = await Promise.all([
   collect("ipc-latency-", perfDir),
   collect("bundle-baseline-", perfDir),
   collect("bundle-topology-", perfDir),
+  collect("cold-start-", perfDir),
   safeReadJSON(coveragePath),
 ]);
 
@@ -204,6 +205,45 @@ function renderTopology() {
   return `  latest: ${latest.file}\n  (raw payload available in source file)`;
 }
 
+function renderColdStart() {
+  if (coldStarts.length === 0) {
+    return "  (no cold-start samples — run `node scripts/perf/cold-start.mjs --json=evidence/perf/cold-start-<date>.json`)";
+  }
+  const latest = coldStarts[coldStarts.length - 1];
+  const previous = coldStarts.length > 1 ? coldStarts[coldStarts.length - 2] : null;
+  const t = latest.json;
+  const m = t.metrics ?? {};
+  const lines = [
+    `  latest: ${latest.file}`,
+    `  measuredAt: ${t.measuredAt}`,
+    ``,
+    `  ready (ready-to-show):     ${m.readyMs ?? "n/a"} ms`,
+    `  paint (first-paint):       ${m.paintMs ?? "n/a"} ms`,
+    `  harness spawn:             ${m.harnessMs ?? "n/a"} ms`,
+    `  agent-host load:           ${m.agentHostMs ?? "n/a"} ms`,
+    `  connectors register:       ${m.connectorsMs ?? "n/a"} ms`,
+    `  marks seen:                ${m.counts?.total ?? 0} (${m.counts?.uniqueNames ?? 0} unique)`,
+  ];
+  if (t.budgets?.readyMs !== undefined) {
+    const over = m.readyMs !== null && m.readyMs > t.budgets.readyMs;
+    lines.push(`  budget readyMs:            ${t.budgets.readyMs} ms ${over ? "⚠️" : "✅"}`);
+  }
+  if (t.budgets?.paintMs !== undefined) {
+    const over = m.paintMs !== null && m.paintMs > t.budgets.paintMs;
+    lines.push(`  budget paintMs:            ${t.budgets.paintMs} ms ${over ? "⚠️" : "✅"}`);
+  }
+  if (previous) {
+    const dt = trend(m, previous.json.metrics, "readyMs");
+    if (dt !== null) {
+      const flag = status(m, previous.json.metrics, "readyMs") === "regressed" ? "⚠️" : "✅";
+      lines.push(`  Δ readyMs vs prev:         ${dt > 0 ? "+" : ""}${dt.toFixed(1)}% ${flag}`);
+    }
+  }
+  lines.push("");
+  lines.push(`  runs sampled: ${coldStarts.length}`);
+  return lines.join("\n");
+}
+
 function renderCoverage() {
   if (!coverageReport) return "  (no coverage report at evidence/coverage-report/coverage-report.json)";
   const summary = coverageReport.summary ?? coverageReport;
@@ -237,6 +277,10 @@ const md = [
   `## Bundle topology (P2-11)`,
   ``,
   renderTopology(),
+  ``,
+  `## Cold start (P3-02)`,
+  ``,
+  renderColdStart(),
   ``,
   `## Test coverage (informational)`,
   ``,

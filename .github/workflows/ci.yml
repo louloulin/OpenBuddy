@@ -136,6 +136,12 @@ jobs:
         # Keep AgentHost and other heavy main-process capabilities out of the
         # startup entry while retaining Rollup-generated ESM chunks.
         run: pnpm run perf:main-chunks
+      - name: Cold-start analyzer unit tests
+        # P3-02: pure-function tests for the cold-start JSONL parser +
+        # budget evaluator. The actual Electron launch is a separate
+        # long-running job (out of scope for this PR); this step keeps
+        # the analyzer itself from regressing under future edits.
+        run: pnpm run perf:cold-start:test
 
   audit:
     name: Dependency Audit

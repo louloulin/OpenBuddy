@@ -292,10 +292,25 @@ function mergeStreamingDelta(text: string, kind: StreamingDeltaKind = "text") {
     // Merge into the tail only when it is the same kind, otherwise open a new
     // part. This is what keeps a reasoning block and the answer that follows it
     // as two separate parts instead of one concatenated blob.
-    const newParts =
-      last && last.kind === kind
-        ? target.parts.slice(0, -1).concat({ kind, text: last.text + text })
-        : target.parts.concat({ kind, text });
+    //
+    // P0-06/hardening: when we ARE merging into the tail (the hot path —
+    // every text chunk during sustained text streaming), mutate the last
+    // part in place instead of `slice(0, -1).concat(...)`. The last part
+    // is owned by `target.parts`, which is owned by `target`, which is
+    // owned by this store — nothing outside the reducer has a reference
+    // to it, so the mutation is safe and we save an O(parts) allocation
+    // per frame. We still create a new `messages` array (so subscribers
+    // fire) and a new message wrapper object (so React.memo on the
+    // MessageItem sees a change), but the inner part is shared.
+    const sameKindMerge = last && last.kind === kind;
+    let newParts;
+    if (sameKindMerge) {
+      // Safe in-place mutation: last is owned by target.parts.
+      (last as { kind: typeof kind; text: string }).text = last.text + text;
+      newParts = target.parts;
+    } else {
+      newParts = target.parts.concat({ kind, text });
+    }
     const newMessages = s.messages.slice();
     newMessages[idx] = { ...target, parts: newParts };
     // Drive the new reducer in lockstep so streamState stays a referentially
