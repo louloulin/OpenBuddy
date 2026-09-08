@@ -1,0 +1,33 @@
+{
+  "name": "@fixture/sample-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./remote": "./remote.js",
+    "./package.json": "./package.json"
+  },
+  "openbuddy": {
+    "profile": {
+      "bundles": ["@fixture/sample-plugin"]
+    },
+    "plugin": {
+      "$ref": "./plugin.json"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  },
+  "pi": {
+    "extensions": ["./extensions/index.js"],
+    "skills": ["./skills"]
+  }
+}

@@ -1311,3 +1311,27 @@ export {
   type PassthroughRecord,
   type PassthroughSource,
 } from "./pi-passthrough";
+// Phase K.1 — OpenBuddyPlugin SDK (manifest serialization helper).
+// Phase K.2 routes pi-extensions / init-deepseek / slot-apply through this
+// SDK so the three tracks share one manifest shape. Real loading still
+// goes through PI `loadExtensions()` per v6 §3.4 of OPENBUDDY_PI_NATIVE_PLAN.md.
+export {
+  applyOpenBuddyPluginManifestPassthrough,
+  listOpenBuddyPluginManifestTracks,
+  openbuddyPluginManifestSchema,
+  OpenBuddyPluginManifestError,
+  serializeCordisTrack,
+  serializeHarnessTrack,
+  serializePiTrack,
+  serializeSlotTrack,
+  validateOpenBuddyPluginManifest,
+  type OpenBuddyPluginManifest,
+  type OpenBuddyPluginTrack,
+  type OpenBuddyPluginTrackConfig,
+  type OpenBuddyPluginTrackKind,
+  type SerializedCordisTrack,
+  type SerializedHarnessTrack,
+  type SerializedPiTrack,
+  type SerializedSlotTrack,
+  type SerializedTrack,
+} from "./openbuddy-plugin-manifest";
