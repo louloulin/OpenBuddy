@@ -614,6 +614,87 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
 - 🟡 **下一轮 — Phase L.3 — DSH 通用装载器删除**（v5 §26.4）：`deepseek-compat.ts` (445) + `deepseek-generic.ts` (1545) → PI `discoverAndLoadExtensions`；**-1990 LOC 退役**。K.2 的 manifest 序列化路径已经在 `init-deepseek.ts` 接入，L.3 可以直接把 `loader.loadProfile(profile)` 换成 PI `loadExtensions()`。
 - ⚪ **第三轮 — Phase L.4 — DSH runtime facade 精简**（v5 §26.4）：`deepseek-runtime.ts:1-2200` 中除 TypertService 之外的 facade 精简 + `deepseek-pi-bridge` 剩余部分 + `init-deepseek.ts` 进一步精简；**-1000 LOC 退役**
 
+#### 11.2 Phase L.3 — DSH 通用装载器删除（详细计划 v7）
+
+**v7 升级要点**：经过 v6 K.1+K.2 验证 `openbuddy-plugin-manifest.ts` SDK 已经把 manifest 形状统一到 `openbuddy.plugin.v1`，L.3 可以放心做「**shim-first delete**」分两步走，每步 1 个 commit，避免一次性 -1990 LOC 大爆炸。
+
+**步骤 1 — `deepseek-generic.ts` 极简化（-1000 LOC）**：
+
+| 现状 | 1545 LOC, 复杂 service registry + Proxy 兼容层 |
+|---|---|
+| 目标 | ≤ 200 LOC, 只保留 `resolveDeepSeekGenericModule` 极简 shim + `concretePlanTools` no-op + `readGenericService`/`writeGenericService`/`__resetGenericServiceRegistryForTest` 内存 registry |
+| 入口 | `electron/main/agent/host-modules/bootstrap/init-plugin-loader.ts:89` (唯一真消费者) |
+| 副作用 | `electron/main/deepseek/deepseek-generic.test.ts` (10 tests) 需要更新：删除依赖 `createSettingsService`/`createCredentialsService`/`createSystemPromptService`/`createWorkflowEngineService` 等具体 service 实现的高级 test，保留 4 个核心 API test (`resolveDeepSeekGenericModule` 对 `@deepseek-ai/dsh-tool-terminal` 等的最小返回 + `readGenericService` 读写 + 极简 `__resetGenericServiceRegistryForTest`) |
+
+**步骤 2 — `deepseek-compat.ts` 删除（-445 LOC + 14 调用方迁移）**：
+
+| 现状 | 445 LOC, `resolveDeepSeekModule` 是 14 个调用点的 central entrypoint |
+|---|---|
+| 目标 | 删除整个文件；`resolveDeepSeekModule` 改成 `init-plugin-loader.ts` 的 inline stub（返回 undefined，因为 `node_modules/@deepseek-ai/` 不存在，所有调用都 fall through 到 PI `loadExtensions` 路径） |
+| 入口 | 14 个调用点：<br>1. `electron/main/agent/host-modules/bootstrap/init-pipeline-builder.ts:92`<br>2. `electron/main/agent/host-modules/deepseek/cordis-runtime.ts:83`<br>3. `electron/main/agent/agent-host.ts:107`<br>4. `electron/main/agent/host-modules/bootstrap/init-pipeline.ts:100,232`<br>5. `electron/main/agent/host-modules/bootstrap/init-plugin-loader.ts:56,80,89`<br>6. `electron/main/agent/host-modules/bootstrap/init-plugin-loader.test.ts:62-173`（5 处 mock）<br>7. `electron/main/agent/host-modules/bootstrap/init-pipeline.test.ts:102`<br>8. `electron/main/deepseek/deepseek-compat.test.ts:9,25-1001`（72 tests，**整文件删除**）<br>9. `electron/main/deepseek/deepseek-agentloop-pi-smoke.test.ts:10`<br>10. `packages/runtime/openbuddy-plugin-host/src/include.ts:48,54,69,72`（error string literal in error messages — keep but rename） |
+| 迁移规则 | `resolveDeepSeekModule(specifier)` → `undefined`；调用方 fall through：`importer` 链继续走 `openbuddy:core` / `openBuddyCapabilityPluginIndex.get(specifier)` / `await resolvers.resolveModule(specifier, packageJson)` (PI `loadExtensions()` 路径) |
+| 测试 | `deepseek-compat.test.ts` 整文件删除（72 tests 覆盖 DSH-specific aliasing，现在没有真实 DSH 包可 aliasing）；保留 `deepseek-agentloop-pi-smoke.test.ts`（PI loop smoke） |
+| 验证 | `pnpm typecheck` ✅ + `pnpm exec vitest --run` 0 新回归（`deepseek-generic.test.ts` 从 10 → 4 个测试，-6；`deepseek-compat.test.ts` -72；总计 -78 tests） |
+
+**步骤 3 — `electron/main/deepseek/deepseek-agentloop-pi-smoke.test.ts` 改名 + 检查**：
+
+- 833 LOC 测试覆盖 DSH-specific 行为
+- 提取 PI-specific subtests 到新文件 `electron/main/agent/__tests__/agent-loop-pi-smoke.test.ts`（~400 LOC）；剩余 DSH-specific 部分删除
+- 节省 ~430 LOC
+
+**L.3 预期收益**：
+
+| 文件 | 现状 | 目标 | 节省 |
+|---|---|---|---|
+| `electron/main/deepseek/deepseek-generic.ts` | 1545 | 200 | **-1345** |
+| `electron/main/deepseek/deepseek-generic.test.ts` | 446 | 100 | **-346** |
+| `electron/main/deepseek/deepseek-compat.ts` | 445 | 0 | **-445** |
+| `electron/main/deepseek/deepseek-compat.test.ts` | 2039 | 0 | **-2039** |
+| `electron/main/deepseek/deepseek-agentloop-pi-smoke.test.ts` | 833 | 400 | **-433** |
+| **总计** | 5308 | 700 | **-4608** |
+
+> 远超 v6 §26.4 预算 -1990 LOC；多删的 -2618 LOC 来自 `deepseek-agentloop-pi-smoke.test.ts` (DSH-specific subtests) + `deepseek-compat.test.ts` 整文件。
+
+#### 11.3 Phase L.4 — DSH runtime facade 精简（详细计划 v7）
+
+L.3 完成后剩下的 DSH 残余集中在 `electron/main/deepseek/deepseek-runtime.ts` (4368 LOC) + bootstrap facade 文件。L.4 的目标是把这个文件从 facade-spaghetti 变成「**薄薄一层 PI/Cordis 桥**」。
+
+**当前结构（`deepseek-runtime.ts`）**：
+
+| 区段 | LOC | 现状 | L.4 目标 |
+|---|---|---|---|
+| `:1-2200` | ~2200 | 多套 facade（remote RPC infra + TypertService + adapters） | 删；保留 TypertService 薄层（357-450） |
+| `:2201-4368` | ~2168 | 已 minimal shim（被 L.2 替代），保留为 stub | 删 |
+| 独立文件 `deepseek-execution-adapters.ts` | 69 | sandbox 直调 facade | 改 inline 到 sandbox 路径 |
+| 独立文件 `dsh-host-runner.ts` | 43 | PI EventBus 兼容 | 删；改用 PI EventBus |
+
+**L.4 预期收益**：
+
+| 文件 | 现状 | 目标 | 节省 |
+|---|---|---|---|
+| `electron/main/deepseek/deepseek-runtime.ts` | 4368 | 600 (薄 TypertService + 必要 facade) | **-3768** |
+| `electron/main/deepseek/deepseek-execution-adapters.ts` | 69 | 0 (inline) | **-69** |
+| `electron/main/deepseek/dsh-host-runner.ts` | 43 | 0 (PI EventBus) | **-43** |
+| `electron/main/agent/host-modules/bootstrap/init-deepseek.ts` | 254 | 100 (K.2 manifest 已接管大半) | **-154** |
+| `electron/main/agent/host-modules/bootstrap/wire-dsh-services.ts` | 313 | 50 (只剩 goal/feedback 状态机) | **-263** |
+| `electron/main/agent/host-modules/bootstrap/wire-context-services.ts` | ~200 | 50 | **-150** |
+| `electron/main/agent/host-modules/facade/deepseek-facade.ts` | ~150 | 30 | **-120** |
+| **总计** | ~5400 | ~830 | **-4570** |
+
+> 远超 v6 §26.4 预算 -1000 LOC；多删的 -3570 LOC 来自 `deepseek-runtime.ts`（v6 当时没看完整的 4368 LOC）+ bootstrap facade 简化。
+
+#### 11.4 v7 总预算 vs v6
+
+| 轮 | v6 预算 | v7 实算 | 累计 |
+|---|---|---|---|
+| A.1 + B.1 rounds 1-5 + L.1 + L.2 | -1160 | -1160 | -1160 |
+| **L.3 (本规划)** | **-1990** | **-4608** | **-5768** |
+| **L.4 (本规划)** | **-1000** | **-4570** | **-10338** |
+| v6 总预算 | -6470 | -6470 | -6470 |
+| **v7 完成度（仅 L.3+L.4）** | 46% | **142%** | **159%** |
+
+> v7 把剩余 DSH 残余从 -2990 提升到 -9178 LOC（3x 多删），总进度从 46% 跳到 142%。**这是 v6 当时没看到 deepseek-runtime.ts 真实 4368 LOC 的下算**。
+
 每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
 
 ### 11.1 B.1 round 5 验证记录
