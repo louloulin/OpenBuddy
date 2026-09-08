@@ -38,7 +38,7 @@ import { createProfileArtifactResolvers, toModuleUrl } from "./profile-artifact-
 import { createDeepSeekExecutionAdapter, createDeepSeekExecutionServices, DEEPSEEK_EXECUTION_PACKAGES } from "../deepseek/deepseek-execution-adapters";
 
 const packageName = "@fixture/generated";
-const zodRoot = realpathSync(join(process.cwd(), "node_modules/.pnpm/zod@4.4.3/node_modules/zod"));
+const zodRoot = realpathSync(join(process.cwd(), "node_modules/zod"));
 
 function artifactSource(): { host: string; remote: string } {
   const shared = `
