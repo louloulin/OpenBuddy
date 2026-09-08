@@ -14,11 +14,11 @@
 
 | 阶段 | 周数 | 数量 | 主要交付 | 当前状态 |
 |---|---|---|---|---|
-| **P0 Quick Wins** | 2-3 周 | 8 findings | 冷启动 ≤ 2.5s，TTFT ≤ 400ms | 🟡 5/8 完成（round 3 闭合 P0-01） |
+| **P0 Quick Wins** | 2-3 周 | 8 findings | 冷启动 ≤ 2.5s，TTFT ≤ 400ms | 🟢 **7/8 完成**（round 5 闭合 P0-05 + P0-08） |
 | **P1 核心重构** | 4-6 周 | 34 findings | 流式 60fps，bundle ≤ 8MB | 🟡 0/34 |
 | **P2 架构升级** | 4-6 周 | 36 findings | bundle ≤ 4MB，内存 ≤ 150MB | ⏳ 0/36 |
 | **P3 度量治理** | 2-3 周 | — | perf budget gate 入 CI | 🟢 PC-5/PC-6 已入闸（round 4） |
-| **合计** | **12-18 周** | **78** | **对齐 Codex 标杆** | 🟡 **3/78 = 3.8%**（+ P0-02 修正 + PC-5/PC-6 gates ✅） |
+| **合计** | **12-18 周** | **78** | **对齐 Codex 标杆** | 🟡 **5/78 = 6.4%**（+ P0-05 + P0-08 + PC-5/PC-6 gates ✅） |
 
 > v6g-facade 已闭合 7 项 findings（per WU-A merge plan §10），剩余 **71 项待本 WU 落地**。
 > 已闭合项：P0-03 流式 16ms 节流（WU-C `0272216` MessageChannel）/ P0-04 顶层 import 拆分（WU-C）/ multi-chunk 流式（WU-C）/ microkernel 拆分（WU-C `8bafa55`）/ ts-error A 修复（WU-D `63b26e3` + WU-C hardening）。
@@ -28,8 +28,10 @@
 ## 2. 本 WU 累计提交（branch ahead of `agent/lumos-ts-coder/88e5e009acf2`）
 
 ```
-<round 4 commit>  perf(ci): PC-5 chat-render 60fps bench + PC-6 verify-plan/check-macos-signing CI integration (WU-E round 4)
-<round 4 commit>  docs(wiki): record WU-E round 4 — PC-5/PC-6 closure (LUM-561)
+<round 5 commit>  perf(storage+dsh): P0-08 CoalescedStorageGateway + P0-05 deepseek 全树 deep-freeze (WU-E round 5)
+<round 5 commit>  docs(wiki): record WU-E round 5 — P0-05 + P0-08 closure (LUM-561)
+cc0bba5 docs(wiki): record WU-E round 4 — PC-5 chat-render bench + PC-6 CI gate closure (LUM-561)
+a1e97ee perf(ci): PC-5 chat-render 60fps bench + PC-6 verify-plan/check-macos-signing CI integration (WU-E round 4)
 f8cf14d perf(renderer): lazy-load Sidebar + ChatView for P0-01 (WU-E round 3)
 c872b3c docs(wiki): record WU-E first two rounds + zod followup cleanup (LUM-561)
 4452e96 chore(gitignore): track docs/WU-E_PROGRESS.md so WU-E wiki ships in repo
@@ -39,7 +41,65 @@ ba25623 fix(ui+review): PC-1 color contrast + PC-2 skeleton API + PC-3 e2e specs
 ```
 
 > 父 WU-C 累计 **40 commits / 124 files / +10,637 / -2,028 行** ahead of main。
-> WU-E 增量 **6 commits / 11 files / ~+800 / ~-30 行** ahead of WU-C（round 4 新增 2 commit / 5 文件，CI integration + chat-render bench）。
+> WU-E 增量 **8 commits / 15 files / ~+1,400 / ~-50 行** ahead of WU-C（round 5 新增 2 commit / 4 文件，P0-08 coalesced-storage + P0-05 deep-freeze）。
+
+---
+
+## 4.3. 第五轮交付（commits round 5）— P0-05 + P0-08 闭合
+
+PERFORMANCE_TRANSFORMATION_PLAN §三 阶段 P0 第 5 条 + 第 8 条；reviewer 在 wiki §8.2 列为 priority 2 剩余项。本轮一次性补齐。
+
+### 4.3.1 P0-05 deepseek-runtime 全树 freeze
+
+| 维度 | 实现 |
+|---|---|
+| 新文件 1 | `electron/main/agent/host-modules/deepseek/_deep-freeze.ts` (62 行) — 递归 deepFreeze helper：跳过 class 实例 / 函数 / Date / Map / RegExp；处理 plain object + array + Set |
+| 新文件 2 | `electron/main/agent/host-modules/deepseek/_deep-freeze.test.ts` (84 行) — **9 个 vitest**：覆盖 flat / nested / array / Set / 已 frozen 子树 / class 跳过 / 函数跳过 / primitives / 模块加载后导入集成验证 |
+| 改动 1 | `host-runner-entries.ts` 末尾 `deepFreeze(BASE_HOST_RUNNER_ENTRIES)` — 41 个 DSH 默认入口（含嵌套 `config` / `inject`）全树 frozen |
+| 改动 2 | `cordis-runtime.ts` `deepFreeze(DEEPSEEK_CORE_PACKAGE_NAMES)` + `Object.freeze(deepSeekCordisInvocationMethods)` + 循环冻结内部 string[] — 9 个核心包名 Set + 14 个 service 路由表全树 frozen |
+
+**为什么是 P0-05**：PERFORMANCE_TRANSFORMATION_PLAN §三 阶段 P0 第 5 条列出 "deepseek-runtime 全树 freeze"。原 `BASE_HOST_RUNNER_ENTRIES` 用 `as const` 只让 TS 推 readonly，但嵌套对象实际可变 — 任何 `entry.config.root = ["."]` 都会 silently 改全局默认。本轮 `deepFreeze` 在模块加载时一次性 walk + freeze，让 future mutation attempt 在 strict mode throw / sloppy mode silently no-op。
+
+**Set 冻结语义说明**：V8 不拦截 `Set.prototype.add` / `delete` / `clear` 即使 Set 本身被 `Object.freeze`。Set 的 protection 边界是 "binding 不可重赋值" — 内部成员仍可变。本轮在测试中明确记录这一 caveat；future 周如果需要 strict element immutability，可换 `Object.freeze([...set])` 转 array 或换 `ReadonlySet` 类型。
+
+### 4.3.2 P0-08 SQLite 事务批量合并（CoalescedStorageGateway）
+
+| 维度 | 实现 |
+|---|---|
+| 新文件 1 | `packages/runtime/openbuddy-storage/src/driver/coalesced-storage.ts` (180 行) — `createCoalescedStorageGateway(gateway, options)` + `createCoalescedGatewayFromDriver(driver, options)` |
+| 新文件 2 | `packages/runtime/openbuddy-storage/src/__tests__/coalesced-storage.test.ts` (220 行) — **7 个 vitest**：3 合一事务 / idempotency 短路 / 单条失败隔离 / onFlush callback / flush 立即排空 / dispose 拒绝 / 无调度时无事务 |
+| 行为 | N 条 `gateway.execute()` 落在 `windowMs`（默认 5ms）→ 合并为 1 个 `driver.transaction()`，per-call 结果 / 错误仍归原 caller |
+| 幂等性 | 单条事务内仍走 `findIdempotentResult → apply → appendEvent → saveIdempotentResult → applyProjection` 完整 pipeline（用 `createStorageEvent` 重新构建 envelope，含 redact + hash） |
+| 失败语义 | 单条 apply 失败 → 该 caller 拒绝，**siblings 继续完成**（外层 transaction 仍 commit）；外层 transaction 失败 → 所有 pending 拒绝 |
+
+**为什么是 P0-08**：PERFORMANCE_TRANSFORMATION_PLAN §三 阶段 P0 第 8 条 "SQLite 事务批量合并"。原 `createWriteCoalescer` (driver.ts:340) 只在 `(tx) => Promise<T>` 层面 coalesce，调用方要自己写 idempotency-result store。`CoalescedStorageGateway` 包成完整 `StorageGateway.execute()` 的语义等价物，让 `execute()` callers 不感知 batching；同时给 call site 提供 `flush()` / `pendingCount()` / `dispose()` 控制能力。
+
+**典型受益场景**：单个 tool result 触发 N 条 catalog writes（EventStore.append + CursorStore.update + TaskCatalog.replace + IdempotentResult.save + …）时，从 N fsync 变成 1 fsync。在 WAL 模式下 fsync 是 hot path 的主瓶颈。
+
+### 4.3.3 本轮验证
+
+```bash
+$ sh node_modules/.bin/vitest run packages/runtime/openbuddy-storage --reporter=dot
+Test Files  26 passed (26)
+Tests       132 passed (132)
+
+$ sh node_modules/.bin/vitest run electron/main/agent/host-modules/deepseek --reporter=dot
+Test Files  3 passed (3)
+Tests       26 passed (26)
+
+$ sh node_modules/.bin/vitest run --reporter=dot
+Test Files  6 failed | 503 passed (509)
+Tests       7 failed | 5307 passed | 16 skipped (5330)
+```
+
+> 全量 vitest：5291 → 5307 passed（+16 = 9 deep-freeze + 7 coalesced-storage）。7 fail pre-existing（与 round 4 完全一致，0 新增 regression）。
+> `npx tsc --noEmit -p tsconfig.json` clean。
+> `node scripts/verify-plan.mjs` 16/16 PASS。
+> `node --test _cold-start-lib _chat-render-lib` 34/34 PASS。
+
+### 4.3.4 P0 quick wins 剩余 1 项
+
+P0-05 + P0-08 闭合后，P0 阶段只剩 P0-07（Cordis 能力包静态 import 拆除收尾，范围 L，工作量 ≥ round 5 的 2 倍），建议下轮单独 PR。
 
 ---
 
@@ -250,7 +310,9 @@ node scripts/check-macos-signing.mjs --allow-unsigned --self-test  # ⏳ 尚未�
 | PC-5 60fps 完整 perf benchmark | P3 | ✅ **round 4 完成** | `scripts/perf/chat-render-bench.mjs` + `_chat-render-jsdom.test.ts` + `_chat-render-lib.mjs` + `.github/workflows/ci.yml` |
 | PC-6 verify-plan + check-macos-signing CI 入闸 | P3 | ✅ **round 4 完成** | `.github/workflows/ci.yml` perf-budget job 新增 4 步骤 |
 | zod followup (3 paths) | followup | ✅ round 2 完成 | commit `3a35273` |
-| 其余 ~67 项 P0/P1/P2/P3 | 各阶段 | ⏳ 待后续多轮 WU-E | — |
+| P0-05 deepseek-runtime 全树 freeze | P0 | ✅ **round 5 完成** | `electron/main/agent/host-modules/deepseek/_deep-freeze.ts` + 改动 `host-runner-entries.ts` + `cordis-runtime.ts` |
+| P0-08 SQLite 事务批量合并（CoalescedStorageGateway） | P0 | ✅ **round 5 完成** | `packages/runtime/openbuddy-storage/src/driver/coalesced-storage.ts` |
+| 其余 ~65 项 P0/P1/P2/P3 | 各阶段 | ⏳ 待后续多轮 WU-E | — |
 
 ---
 
@@ -324,15 +386,15 @@ $ npx vitest run
 | **PC-5** 60fps 完整 perf benchmark | ChatMinimap + BranchNavigator + 长会话 200 消息 | ✅ round 4 — `scripts/perf/chat-render-bench.mjs` (jsdom + react-dom/server) Σ=5.9ms / budget=16.6ms |
 | **PC-6** verify-plan + check-macos-signing CI 入闸 | `.github/workflows/ci.yml` `perf-budget` job 新增 4 步骤 | ✅ round 4 — verify-plan 16/16 + check-macos-signing 24/24 unit + chat-render:test + chat-render:strict |
 
-### 8.2 优先级 2：P0 quick wins 剩余 3 项
+### 8.2 优先级 2：P0 quick wins 剩余 1 项
 
 | # | 项 | 工作量 | 文件 |
 |---|---|---|---|
 | P0-01 | 渲染端 chunk 化（React.lazy + Suspense） | ✅ round 3 完成（Sidebar + ChatView 拆分） | `src/App.tsx` (commit `f8cf14d`) |
 | P0-02 | 移除 markdown/katex/mermaid 的 `__vitePreload(true)` | ✅ 实际已在 `electron.vite.config.ts:238-249` 完成（`modulePreload.polyfill: false` + heavy-chunk filter） | `electron.vite.config.ts` |
-| P0-05 | deepseek-runtime 全树 freeze | M | `electron/main/agent/host-modules/deepseek/` |
-| P0-07 | Cordis 能力包静态 import 拆除（部分已在 WU-C 完成） | L | `electron/main/index.ts` |
-| P0-08 | SQLite 事务批量合并 | M | `packages/runtime/openbuddy-storage/` |
+| P0-05 | deepseek-runtime 全树 freeze | ✅ **round 5 完成**（`deepFreeze` helper + host-runner-entries / cordis-runtime 集成 + 9 unit tests） | `electron/main/agent/host-modules/deepseek/_deep-freeze.ts` |
+| P0-07 | Cordis 能力包静态 import 拆除（部分已在 WU-C 完成） | L（剩余范围） | `electron/main/index.ts` |
+| P0-08 | SQLite 事务批量合并 | ✅ **round 5 完成**（`CoalescedStorageGateway` + 7 unit tests） | `packages/runtime/openbuddy-storage/src/driver/coalesced-storage.ts` |
 
 ### 8.3 优先级 3：P1 核心重构首批
 
@@ -391,9 +453,10 @@ LUM-556 (parent, in_progress)
      ├─ [stage 3] ✅ LUM-559 WU-C ─────────── in_review (40 commits / reviewer PASS ✓)
      │
      └─ [stage 4] 🟢 LUM-561 WU-E ─────────── in_progress (本文件)
-                  └─ 6 commits: 267317a (P3-02 + P0-06) + 3a35273 (zod followup)
+                  └─ 8 commits: 267317a (P3-02 + P0-06) + 3a35273 (zod followup)
                                 + c872b3c/4452e96 (wiki) + f8cf14d (P0-01 Sidebar+ChatView)
-                                + round 4 (PC-5 chat-render bench + PC-6 CI integration)
+                                + a1e97ee/cc0bba5 (round 4: PC-5/PC-6)
+                                + round 5 (P0-08 CoalescedStorageGateway + P0-05 deep-freeze)
 
 [SECURITY] 🟡 LUM-575 ─────────────────── in_progress (audit 收口中)
 [push]    🚧 LUM-578 3 branches ─────────── blocked (§0 + 无凭据, 与协调解耦)
@@ -403,13 +466,11 @@ LUM-556 (parent, in_progress)
 
 ## 12. 下次 turn 触发
 
-- **PC-5 / PC-6 ✅ round 4 闭合** — 下轮 PR 可不再背负这两个 reviewer 强必填项
+- **PC-5 / PC-6 ✅ round 4 闭合 + P0-05 / P0-08 ✅ round 5 闭合** — 下轮 PR 剩余 priority 2 仅 P0-07
 - ts-coder WU-E 下一轮 PR 优先级：
+  - **P0-07 Cordis 能力包静态 import 拆除收尾**（priority 2 唯一剩余项，L 工作量）
   - **P1-04 ChatView memo 全覆盖**（priority 3）
   - **P2-13 pi-resources.ts 拆分**（priority 4，2129 行）
-  - **P0-05 deepseek-runtime 全树 freeze**（priority 2 剩余项）
-  - **P0-07 Cordis 能力包静态 import 拆除收尾**（priority 2 剩余项）
-  - **P0-08 SQLite 事务批量合并**（priority 2 剩余项）
 - WU-E 完成后 → status=in_review → 队长 dispatch reviewer 独立验收（可重点关注 P1/P2 实际收益）
 - lumos-security-reviewer LUM-575 audit 收口
 - 人类 close LUM-557 / LUM-558 / LUM-560 / LUM-559
