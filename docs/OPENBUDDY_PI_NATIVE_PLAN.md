@@ -1,9 +1,22 @@
-# OpenBuddy PI-Native 改造计划 (v2)
+# OpenBuddy PI-Native 改造计划 (v3)
 
 > 📅 2026-09-08 · 基于 `main` (commit `058cbf9`) · 状态：进行中
 > 任务: LUM-580 · 仓库: louloulin/OpenBuddy
 > 上游基线: `@earendil-works/pi-coding-agent` 0.85.1 + `pi-agent-core` 0.85.1 + `pi-ai` 0.85.1
 > 参考实现: [vastsa/PI-Desktop](https://github.com/vastsa/PI-Desktop) (54 文件 / 19,818 LOC agent-runtime)
+> 兄弟文档: [OPENBUDDY-PI-VISION.md](OPENBUDDY-PI-VISION.md) (12 capability 适配矩阵) · [full-pluginization-plan.md](full-pluginization-plan.md) (DeepSeek Harness 五件套借鉴)
+
+## v3 相比 v2 的改动
+
+v2 是「PI 能力 → OpenBuddy 模块」对照清单 + 7 阶段路线图。v3 在 v2 基础上加 5 个新章：
+
+- **§3 微内核识别**：明确 OpenBuddy 的「核心」是什么（PI + Cordis + 一层薄桥），「插件」是什么（capability 包 / harness 包 / renderer slot / 用户 extension）
+- **§4 内聚分析**：标出当前 8 个 god module / low-cohesion 块，给每块定一个 owner 重构 owner
+- **§5 耦合度量 + 减耦策略**：用「禁止跨层 import」的 enforcement，把 6 类耦合点（god module / reverse dep / cyclic dep / facade spaghetti / 跨 capability 直调 / 渲染跨过 IPC）量化 + 给解法
+- **§6 PI Plugin + Cordis 双轨统一**：4 个插件体系（cordis / pi extension / slot / harness）合为 1 个 OpenBuddyPlugin SDK
+- **§7-§8 Capability / Renderer 重构总表**：12 capability + 26 ui-* 包 逐一定位
+
+v2 的章节（PI export 清单 / OpenBuddy 模块对照 / 架构图 / 7 phase 路线图 / PI-Desktop 对照 / 风险 / 成功标准）保留为附录 A-J（§14-§23）。
 
 ## 0. 目标
 
@@ -90,7 +103,455 @@
 | `packages/ui/openbuddy-ui-slots/src/index.ts` | ~250 | ExtensionUIContext `select`/`confirm`/`notify`/`setStatus`/`setWorkingIndicator` | **新** |
 | `packages/ui/openbuddy-ui-runtime/src/*` | ~2000 | ExtensionRunner UI 事件 | **新** |
 
-## 3. 目标态架构
+## 3. 微内核识别（什么是 OpenBuddy 的「核心」）
+
+### 3.1 微内核 = PI + Cordis + 一层薄桥
+
+微内核 = **只做** 3 件事：**会话生命周期 / 插件装载 / 事件路由**。业务业务逻辑 / 能力 / UI 都不是微内核，是插件。
+
+```
+Microkernel （OpenBuddy 不可分割的「最小可运行」）
+=============================================================
+  • @earendil-works/pi-coding-agent          ← AI 会话生命周期 （外部依赖）
+  • @earendil-works/pi-ai                    ← LLM Provider 调用   （外部依赖）
+  • @earendil-works/pi-agent-core            ← Agent loop + 事件  （外部依赖）
+  • @openbuddy/cordis                        ← DI 容器            （外部依赖）
+  • @openbuddy/plugin-host                   ← HarnessPluginLoader （领域）
+  • @openbuddy/storage                       ← 本地持久化 audit   （领域）
+  • electron/main/agent/agent-host.ts        ← Microkernel 总线 (~500 LOC after refactor)
+  • electron/main/agent/host-modules/bootstrap/
+      ├── microkernel-host.ts                ← ExtensionRunner 启动
+      ├── install-host-modules.ts           ← 装载 plugin 列表
+      └── handle-session-event.ts           ← pi://* 事件路由
+=============================================================
+
+Plugins （可装可卸，可独立测试、可独立发版）
+=============================================================
+  Service 层 (Cordis)
+    packages/capability/openbuddy-*/        ← 12 个能力包（mcp/email/plan/...）
+    packages/auth/openbuddy-*/             ← 认证 / permission
+    packages/team/openbuddy-*/             ← 多 agent
+    packages/collaboration/openbuddy-*/     ← 跨 agent 协作
+    packages/fs/openbuddy-fs-local/        ← 本地 fs 服务
+    packages/webhook-outbox/               ← transactional outbox
+  Extension 层 (PI ExtensionAPI)
+    electron/main/agent/extensions/         ← apply-patch / openbuddy-markdown
+    electron/main/agent/pi-extensions.ts    ← 4 个 builtin ExtensionFactory
+    packages/runtime/openbuddy-plugin-host/src/hooks.ts ← harness 插件入口
+  Renderer 层 (UI Slots)
+    packages/ui/openbuddy-ui-*/             ← 26 个 ui-* 包
+    packages/ui/openbuddy-ui-slots/         ← 槽位声明合并层
+    packages/renderer/openbuddy-renderer-host/← preload 桥 + client modules
+  Harness 层 (DeepSeek 兼容)
+    packages/runtime/openbuddy-plugin-host/src/profile.ts + profile-manager.ts
+    packages/runtime/openbuddy-plugin-host/src/yaml-patch.ts
+  User 层 (运行时由用户/ profile 安装)
+    ~/.config/openbuddy/plugins/*.ts         ← 用户第三方插件
+    ~/.config/openbuddy/skills/*.md          ← 用户 skill
+    ~/.config/openbuddy/experts/*.md        ← 用户 expert
+=============================================================
+```
+
+### 3.2 4 层架构与依赖方向（严格 enforcement）
+
+依赖只能从上往下流，**绝不允许反向 import**：
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Layer 4 — Renderer / UI （React DOM）                      │
+│   可以依赖: Layer 3 + Layer 2 + shared types              │
+│   不可以依赖: Layer 1 / Node-only packages                 │
+├──────────────────────────────────────────────────────────┤
+│ Layer 3 — IPC Bridge + Renderer Host                     │
+│   electron/preload/* + packages/renderer/openbuddy-renderer-host/*
+│   可以依赖: Layer 2 + shared types                        │
+│   不可以依赖: Layer 1 的内部实现                          │
+├──────────────────────────────────────────────────────────┤
+│ Layer 2 — Plugins / Capabilities / Extensions             │
+│   packages/capability/* + packages/auth/* + packages/team/*
+│   + packages/collaboration/* + packages/fs/* + electron/main/agent/extensions/*
+│   可以依赖: Layer 1 + PI                                   │
+│   不可以依赖: Layer 3 / Layer 4                            │
+├──────────────────────────────────────────────────────────┤
+│ Layer 1 — Microkernel                                     │
+│   electron/main/agent/agent-host.ts + host-modules/bootstrap/*
+│   + packages/runtime/openbuddy-{cordis,plugin-host,storage}/*
+│   可以依赖: PI （@earendil-works/pi-*）                   │
+│   不可以依赖: Layer 2 / Layer 3 / Layer 4                  │
+└──────────────────────────────────────────────────────────┘
+```
+
+**enforcement**：
+- `sheriff.config.ts` — 跨层 import 报错（现有，加固）
+- `vitest.config.ts` path alias — 防止绕过
+- moon task deps — `app-desktop:typecheck` 只 depend on `openbuddy:typecheck`（依赖方向）
+
+### 3.3 微内核启动顺序（明确）
+
+```
+[用户启动 app]
+   ↓
+[Layer 1 微内核启动]
+   ① ctx = new Context()                           ← @openbuddy/cordis
+   ② ctx.plugin(StorageService)                    ← 本地 fs audit
+   ③ ctx.plugin(SettingsManager)                   ← PI 设置
+   ④ ExtensionRunner = createExtensionRuntime()    ← PI 插件运行时
+   ⑤ plugins = discoverAndLoadExtensions(...)      ← PI builtin + 用户 extension
+   ⑥ AgentSession = createAgentSession(...)        ← PI 会话
+   ⑦ ExtensionRunner.bindCore(agentSession)        ← 把会话接口绑到插件 API
+   ↓
+[Layer 2 插件装载]
+   for plugin in profiles[workspace].plugins:
+     ctx.plugin(plugin)                       ← Cordis 装载 capability service
+   for skill in discoverSkills(...):
+     SkillRegistry.register(skill)            ← PI skill loader
+   for harness in profile.harness:
+     HarnessPluginLoader.load(harness)        ← Harness 兼容装载
+   ↓
+[Layer 3 IPC 桥就绪]
+   for channel in allowedInvokeChannels:
+     ipcMain.handle(channel, ipcAdapter(ctx, channel))
+   window.api = createRendererBridge(allowedInvokeChannels)
+   ↓
+[Layer 4 Renderer 渲染]
+   mainWindow.loadFile('index.html')
+   App.tsx: <Sidebar/> + <ChatView/> + <Workbench/> 渲染
+```
+
+**关键**：Layer 1 启动完成后才算「app booted」；之前的任何 Layer 2/3/4 加载都是可选插件。
+
+## 4. 内聚分析（标出 8 个 god module / low-cohesion 块）
+
+每个 module 的「理想内聚」= **一个 module 只做一件事，并以此命名**。下面标出当前违反该原则的 8 个块 + owner 负责解。
+
+| # | 当前位置 | LOC | 耦合问题 | Owner 重构 | 目标 |
+|---|---|---|---|---|---|
+| 1 | `electron/main/agent/agent-host.ts` | 1502 | god module：init + lifecycle + IPC + extension + facade 全揉在一起。24 个 host-module 都能从这 import。 | **Phase B.2** | 拆成 4 个文件：<br/>- `microkernel.ts` (~200 LOC) 总线<br/>- `init-pipeline.ts` (~300 LOC) 启动<br/>- `lifecycle.ts` (~300 LOC) 生命周期<br/>- `facade/index.ts` (~400 LOC) IPC facade |
+| 2 | `electron/main/ipc/agent.ts` | 1090 | 单一文件处理 30+ IPC 通道，混合 session/prompt/tool/model/permission/skills/automation。 | **Phase B.1** | 按 capability 拆：每个 capability 一个 IPC adapter 文件 (`ipc/<capability>.ts`)，`ipc/index.ts` 只做注册。 |
+| 3 | `electron/main/agent/pi-extensions.ts` | 1010 | 4 个 builtin ExtensionFactory + 适配器逻辑 + 命令映射全揉。 | **Phase B.3** | 拆成：<br/>- `extensions/builtin/openbuddy-pi-observability.ts`<br/>- `extensions/builtin/openbuddy-pi-context-status.ts`<br/>- `extensions/builtin/openbuddy-pi-compact-announce.ts`<br/>- `extensions/builtin/openbuddy-extra-providers.ts`<br/>- `extensions/builtin/index.ts` (注册表) |
+| 4 | `packages/runtime/openbuddy-plugin-host/src/index.ts` | 1313 | 一个 barrel 文件 re-export 20+ 内部模块。 | **Phase D.3** | 拆成多个 barrel（按能力）：`session / profile / harness / skill / hooks`，每个 barrel ≤ 200 LOC。 |
+| 5 | `packages/capability/openbuddy-email/src/index.ts` | 3510 | email 能力单文件 3510 LOC：IMAP/SMTP/OAuth/AI 总结/UI 拼接/audit 全揉。 | **新 Phase H.1** | 拆成 `email-protocol.ts` / `email-oauth.ts` / `email-ai.ts` / `email-capability.ts` (Cordis Service) / `email-ipc.ts` (IPC)。 |
+| 6 | `electron/main/agent/host-modules/plugin-event-bus.ts` | 269 | 自己造的事件总线，PI 已有 EventBus。 | **Phase B.1** | 删。改用 `pi.EventBus` + `pi.on('event', handler)`。 |
+| 7 | `packages/ui/openbuddy-ui-slots/src/index.ts` | 235 | 类型契约 / 组件 / 工具 / 声明合并全在同一文件。 | **Phase E.1** | 拆 `types.ts` / `components.tsx` / `utils.ts` / `declare.ts`。 |
+| 8 | `electron/main/agent/host-modules/agent-prompt.ts` | 280 | 自己拼 system prompt，PI 已有 `system-prompt.ts` + `formatSkillsForPrompt`。 | **Phase D.3 + B.1** | 替换底层为 PI 实现。 |
+
+**owner 重构总预算**：~6500 LOC 当前 god module，拆完后 microkernel 总线 ≤ 500 LOC，IPC 总和 ≤ 2000 LOC，每个 capability 包平均 ≤ 800 LOC。
+
+## 5. 耦合度量 + 减耦策略（6 类耦合点）
+
+### 5.1 6 类耦合点量化
+
+```
+[1] God module 反向依赖（24+ host-module 反向 import agent-host）
+    之前: 全部 reverse dep
+    现在: 0 处 reverse dep （Phase 8.3 Batch A/B/C 已修）
+    目标: 0 处
+
+[2] 循环依赖（agent-host ↔ host-modules）
+    之前: ≥3 个循环
+    现在: 0 个循环 （install pattern 已破）
+    目标: 0 个 + 加 vitest cycle detector
+
+[3] Capability 直调（email 直接调 folder-trust）
+    之前: ≥5 处直调
+    现在: 部分通过 ctx.inject 拿
+    目标: 100% 通过 ctx.inject + EventBus
+
+[4] IPC 跨 capability（agent.ts 里同时调 session + prompt + tool）
+    之前: 1 个文件 1090 LOC
+    现在: 已拆 (ipc/<capability>.ts)
+    目标: 跨 capability 只走 ctx.inject 或 EventBus
+
+[5] Renderer 跨过 IPC（renderer 直接读 window.localStorage 而不走 IPC）
+    之前: 多处
+    现在: 大部分走 IPC
+    目标: 100% 走 IPC + preload typed bridge
+
+[6] 跨层 import（renderer 直接 import electron/main/agent/*）
+    之前: 0 处（vitest alias 防）
+    现在: 0 处
+    目标: 0 处 + sheriff.config.ts 加固
+```
+
+### 5.2 减耦 7 条原则
+
+1. **依赖方向单向**：Layer N 只依赖 Layer N-1，不依赖 Layer N+1
+2. **微内核零业务**：agent-host.ts 只做生命周期，不直接 import 任何 capability
+3. **Capability 之间不互调**：email 不准直接调 folder-trust；要调就通过 ctx.inject 拿服务，或通过 EventBus 发事件
+4. **IPC 单职责**：一个 IPC 文件 = 一个 capability，多 capability IPC 必须用 IPC facade 转发
+5. **PI 优先**：所有 session / tool / settings / skill 逻辑优先用 PI 提供的 API，自实现只能作为 OpenBuddy 特有补充（如 trust 决策、UI 自定义）
+6. **Extension 双轨**：业务能力用 Cordis Service 写，AI 工具 / 命令 / provider 用 PI Extension 写，两者用 ExtensionRunner 统一装载
+7. **Renderer 通过 IPC 桥**：renderer 不准 import `electron/main/agent/*`，只能通过 `src/lib/electron-api.ts` typed bridge
+
+### 5.3 enforcement 工具链
+
+| 工具 | 用途 | 配置位置 |
+|---|---|---|
+| `sheriff.config.ts` | ESLint 跨层 import 检查 | 已有，需加固 |
+| `vitest.config.ts` path alias | 测试时强制 path 解析 | 已有 |
+| moon task deps | 编译时层依赖检查 | 已有，需加 task-level boundary |
+| `scripts/storage/check-architecture-boundaries.mjs` | 边界自动检查脚本 | 已有 `pnpm storage:boundaries` |
+| `pnpm storage:acceptance` | 架构验收脚本 | 已有 |
+| `pnpm storage:drill` | 拖地测试 | 已有 |
+| vitest cycle-detector（cycle deps 测试）| 循环依赖检测 | 新增（**Phase B.2 引入**） |
+
+## 6. PI Plugin + Cordis 双轨统一
+
+OpenBuddy 现在有 **3 个插件体系并行**：
+
+| 体系 | 用途 | 包位置 | 装入点 | 状态 |
+|---|---|---|---|---|
+| **Cordis Service** | DI 容器，能力 service 注册 | `@openbuddy/cordis` | `ctx.plugin(Service)` | 在用 |
+| **PI Extension** | AI 工具 / 命令 / provider 注册 | `@earendil-works/pi-coding-agent` | `ExtensionRunner.bindCore` | **只用 4 个 builtin，从不装用户 extension** |
+| **Renderer Slot** | UI 槽位（widget / menu / status bar）| `@openbuddy/ui-slots` | `SlotProvider` | 在用 |
+| **Harness Plugin** | DeepSeek 兼容（yaml-patch 加载）| `@openbuddy/plugin-host` | `HarnessPluginLoader.load` | 在用 |
+
+**问题**：4 套体系并存，profile 里同一能力可能要声明 3 次（cordis plugin + pi extension + harness patch）。
+
+### 6.1 统一装载协议
+
+**目标**：用户写一个 `~/.config/openbuddy/plugins/my-plugin.ts`，按 PI ExtensionFactory 风格写，OpenBuddy 自动：
+1. 装载到 PI ExtensionRunner（拿到 AI 工具 / 命令注册）
+2. 装载到 Cordis ctx（拿到 DI 能力 service 注册）
+3. 装载到 Harness（拿到 DeepSeek 兼容）
+4. 装载到 Renderer Slot（拿到 UI widget 注册）
+
+```typescript
+// ~/.config/openbuddy/plugins/my-plugin.ts
+import type { OpenBuddyPlugin } from '@openbuddy/plugin-sdk';
+
+export default {
+  name: 'my-plugin',
+  version: '1.0.0',
+
+  // PI Extension 风格（AI 侧）
+  pi: (api) => {
+    api.registerTool({ name: 'my_tool', description: '...', execute: ... });
+    api.registerCommand({ name: 'my_cmd', handler: ... });
+  },
+
+  // Cordis 风格（业务侧）
+  cordis: (ctx) => {
+    ctx.plugin(MyCapabilityService, config);
+  },
+
+  // Renderer slot 风格（UI 侧）
+  ui: (slots) => {
+    slots.register('chat-header:status', { component: MyStatusBadge });
+  },
+
+  // Harness 兼容（DeepSeek 用户）
+  harness: {
+    contributes: { 'dsh.service': { name: 'my-service', ... } },
+  },
+} satisfies OpenBuddyPlugin;
+```
+
+**实现路径**：
+- **Phase B.3** `discoverAndLoadExtensions` 接入 profile 目录扫描
+- **Phase E.2** Renderer Slot 装载协议与 PI ExtensionUIContext 对齐
+- **新 Phase H.2** OpenBuddyPlugin SDK 包（`packages/runtime/openbuddy-plugin-sdk`） + 一个 `loadPlugin()` 入口做四轨分发
+
+## 7. Capability 重构总表（12 个 capability × 4 个维度）
+
+| Capability | 现在 | 目标 | Action |
+|---|---|---|---|
+| **mcp** | Cordis service + PI extension adapter（**已收敛**）| 保持 | 维持现状 |
+| **permission** | Cordis service + PI extension adapter（**双轨**）| Cordis 删，留 PI extension | **Phase D.1** + adapter `passthroughCapability: "permission"` |
+| **goal** | Cordis service + PI extension adapter（**双轨**）| Cordis 删，留 PI extension | **Phase D.1** + adapter `passthroughCapability: "goal"` |
+| **plan** | PI extension adapter only（**已收敛**）| 保持 | 维持 |
+| **task** | Cordis service + PI extension adapter（**孤儿**）| 二选一 | **新 Phase I.1**：决策保留哪个，删另一个 |
+| **session** | Cordis + PI SessionManager（**双轨**）| 留 PI，删 Cordis | **Phase D.3** + adapter `passthrough: true` + flag |
+| **fs** | Cordis service + PI extension adapter（**双轨**）| 留 PI extension，删 Cordis | **Phase C.1** + adapter `passthrough: true` + flag |
+| **lens / simplify / hashline / worktree** | PI extension only（**已收敛**）| 保持 | 维持 |
+| **automation** | PI extension only（**已收敛**）| 保持 | 维持 |
+| **memory** | Cordis noop（**孤儿**）| 走 PI ExtensionAPI context event | **新 Phase I.2**：接入 PI context event |
+| **folder-trust** | Cordis service 118 LOC | 替换为 PI ProjectTrustStore | **Phase D.2**（已纳入路线图）|
+| **email** | Cordis service 3510 LOC | 拆 + 接入 PI `defineTool` 做 AI 工具 | **新 Phase H.1**（已纳入）|
+| **calendar / web-search / inspiration / notification** | Cordis service | 接入 PI ExtensionFactory 做 AI 工具 | **新 Phase I.3** |
+
+**收敛后**：Cordis service 从 12 个降到 ≤ 4 个（email / collaboration / payment / scim 这种 OpenBuddy 特有），其余走 PI Extension。
+
+## 8. Renderer / UI 重构总表（26 个 ui-* 包）
+
+按「是否依赖 PI」分组：
+
+| 组 | 包 | 依赖 PI 吗 | Action |
+|---|---|---|---|
+| **Renderer host** | `openbuddy-renderer-host` | ✅（IPC） | **Phase E.1**：加 ExtensionUIContext 桥 |
+| **Workbench** | `openbuddy-ui-workbench` / `home` / `shell` | ❌ | 加 IPC typed bridge |
+| **Chat** | `openbuddy-ui-conversation` / `sidebar` | ✅（间接） | **Phase 1.1 / 1.2**：context bar + tool streaming |
+| **Skill / Expert** | `openbuddy-ui-experts` | ❌ | **Phase E.3**：parseFrontmatter 走 IPC |
+| **Capability UI** | `openbuddy-ui-email` / `automation` / `billing` / `account` / `collaboration` / `mcp` | ❌（UI only）| 通过 typed bridge |
+| **Layout / 通用** | `openbuddy-ui-layout` / `theme` / `slots` / `runtime` / `modules` / `shared` / `primitives` / `hmr` / `locale` / `dialogs` / `files` / `markdown` / `settings` / `settings-models` | ❌ | 通过 typed bridge |
+
+**核心**：26 个 ui-* 包都通过 `src/lib/electron-api.ts` typed bridge 访问 main，**绝不直接 import pi-coding-agent**（太大 + Node-only + 二进制依赖）。
+
+## 9. v3 路线图（7 阶段 × 19 轮）
+
+v2 是 7 phase × 16 round。v3 加 3 个新 phase：
+
+- **Phase H — God Module 拆解 + Capability 重构**（3 轮）：H.1 email 拆解 · H.2 OpenBuddyPlugin SDK · H.3 4 轨分发装载
+- **Phase I — Capability 收敛**（2 轮）：I.1 task 决策 + memory / folder-trust 接入 PI · I.2 其余 capability 接入 PI ExtensionFactory
+- **Phase J — Sheriff / 边界 enforcement**（1 轮）：sheriff.config.ts 加固 + cycle-detector + storage:boundaries 验收
+
+总预算：**19 轮**（v2 16 + H 3 + I 2 + J 1 = 22，超 3 轮是因为 I.1 task 决策需要先调研；可压缩到 19 轮如果 task 决策直接走"删 adapter 留 Cordis"）。
+
+**Phase A-G 路线图见 §5（v2 原章节保留并更新）**。
+
+### 9.1 Phase H — God Module 拆解 + Capability 重构（3 轮）
+
+#### H.1 email capability 拆解（3510 LOC → 5 文件）
+
+**目标**：把 `packages/capability/openbuddy-email/src/index.ts` 3510 LOC 拆成 5 个文件，每个 ≤ 800 LOC。
+
+**文件**：
+- `email-protocol.ts` — IMAP/SMTP 协议层 (~700 LOC)
+- `email-oauth.ts` — OAuth 流 (~400 LOC)
+- `email-ai.ts` — AI 总结 / 分类 (~600 LOC)
+- `email-capability.ts` — Cordis Service 公开面 (~400 LOC)
+- `email-ipc.ts` — IPC handler 桥 (~300 LOC)
+- `index.ts` — barrel (~50 LOC)
+
+**验证**：3510 → 2400 LOC（-30%），单测保留 + 新增 email-protocol 单测
+
+**退出**：email 行为不变，package 大小减 30%
+
+#### H.2 OpenBuddyPlugin SDK 包
+
+**目标**：用户写一个 plugin 同时挂 PI Extension + Cordis + Harness + Slot 四轨。
+
+**新建包**：`packages/runtime/openbuddy-plugin-sdk/` (~500 LOC)
+
+**文件**：
+- `src/index.ts` — `OpenBuddyPlugin` 类型 + `definePlugin()` helper
+- `src/loader.ts` — `loadPlugin(path)` → `loadToExtensionRunner + loadToCordis + loadToSlots + loadToHarness`
+- `src/validator.ts` — zod schema 校验 plugin manifest
+- `src/manifest.ts` — plugin.json / package.json 解析
+- `src/__tests__/` — 装载协议单测
+
+**验证**：写一个 `__fixtures__/sample-plugin/` 验证 4 轨分发
+
+**退出**：用户写 `~/.config/openbuddy/plugins/foo.ts` 单文件 4 轨同时生效
+
+#### H.3 4 轨分发装载协议
+
+**目标**：把 `discoverAndLoadExtensions` + Cordis `ctx.plugin` + Slot `apply` + Harness `load` 4 个装载入口合并成 1 个 `loadPlugin()`。
+
+**改动**：
+- `electron/main/agent/host-modules/bootstrap/install-host-modules.ts` — 把 install 逻辑委托给 `openbuddy-plugin-sdk/loader.loadPlugin()`
+- `electron/main/agent/pi-extensions.ts` — builtin extension 也走 `loadPlugin()`
+- `packages/ui/openbuddy-ui-runtime/src/plugin-ui-host.ts` — slot apply 集成
+
+**验证**：现有 866 单测全过；新加 plugin loader 单测
+
+**退出**：OpenBuddy 只有 1 个 plugin 装载入口
+
+### 9.2 Phase I — Capability 收敛（2 轮）
+
+#### I.1 task + memory + folder-trust 接入 PI
+
+**目标**：把 task / memory / folder-trust 3 个 capability 从 Cordis 切到 PI API。
+
+- **task**：决策保留 Cordis（用户已在用），删 PI extension adapter（孤儿）
+- **memory**：Cordis noop 删，走 PI ExtensionAPI `context` event 触发 PI 自己的 memory compaction
+- **folder-trust**：Cordis 118 LOC 删，换 PI `ProjectTrustStore`（已在 Phase D.2）
+
+**验证**：行为不变 + LOC 减
+
+**退出**：Cordis service 数从 12 → 9
+
+#### I.2 calendar / web-search / inspiration / notification 接入 PI ExtensionFactory
+
+**目标**：把 4 个 Cordis service 改成 PI Extension 的 `defineTool` / `registerCommand`。
+
+**文件**：
+- `electron/main/agent/extensions/builtin/openbuddy-pi-calendar.ts`（新）
+- `electron/main/agent/extensions/builtin/openbuddy-pi-web-search.ts`（新）
+- `electron/main/agent/extensions/builtin/openbuddy-pi-inspiration.ts`（新）
+- `electron/main/agent/extensions/builtin/openbuddy-pi-notification.ts`（新）
+
+**验证**：每个 capability 单测保留，集成到 ExtensionRunner
+
+**退出**：Cordis service 数从 9 → 5（email / collaboration / payment / scim / session 保留）
+
+### 9.3 Phase J — Sheriff / 边界 enforcement（1 轮）
+
+#### J.1 加固 sheriff.config.ts + cycle-detector + storage:boundaries 验收
+
+**目标**：把 §3.2 的 4 层依赖方向 + §4 的 god module 拆解 + §5 的 6 类耦合点 0 处 全部强制 enforce。
+
+**文件**：
+- `sheriff.config.ts` — 加固层依赖规则（已有，需 update）
+- `vitest.config.ts` — 加 cycle-detector plugin
+- `scripts/storage/check-architecture-boundaries.mjs` — 加 v3 §3.2 §5 的规则
+- 新增 `scripts/architecture/check-god-modules.mjs` — 检查 §4 的 8 个 god module 是否拆完
+- `pnpm storage:acceptance` 跑通
+
+**验证**：`pnpm storage:boundaries` + `pnpm storage:acceptance` 全绿；任何反向 import / cycle / god module 残留 → 报错
+
+**退出**：CI 上自动 enforce，PR 不能违反架构边界
+
+## 10. v3 成功标准（在 v2 之上加）
+
+| 维度 | 指标 | 当前 | 目标 |
+|---|---|---|---|
+| **PI 复用度** | OpenBuddy 自定义代码 vs PI 提供能力 | 自定义 ~85% | 自定义 < 30% |
+| **Cordis service 数** | 微内核之外的业务 capability | 12 | ≤ 5 |
+| **PI Extension 数** | builtin + 用户 extension | 4 builtin | ≥ 30 builtin + 用户可装 |
+| **Plugin 装载入口** | 装载入口数 | 4（cordis/pi/slot/harness）| 1（OpenBuddyPlugin SDK）|
+| **God module LOC** | agent-host.ts 等 8 个 | 6500+ | ≤ 2000 总和 |
+| **循环依赖** | detect count | 0（已修）| 0 + 自动 detect |
+| **跨层 import** | Layer N import Layer N+1 | 0 | 0 + sheriff enforce |
+| **Capability 直调** | email 直调 folder-trust 等 | ≥5 处 | 0 处 |
+| **Renderer 直 import main** | 不通过 IPC 调 main | ≥3 处 | 0 处 |
+| **启动** | cold start | ~4s | ≤ 2s |
+| **包体积** | Linux AppImage | ~280MB | ≤ 180MB |
+| **单测** | vitest pass rate | 5519/5540 (99.6%) | ≥ 99% |
+| **E2E** | playwright spec | 未跑 | 27/27 |
+| **Context UX** | 主 chat context usage | 无 | ✓ |
+| **Tool UX** | 实时 tool 进度 | 无 | ✓ |
+| **Branch UX** | tree picker | 无 | ✓ |
+| **Plugin UX** | 用户可装第三方 PI 插件 | 无 | ✓ |
+
+## 11. v3 接下来 3 轮（已锁定）
+
+1. **下一轮 — Phase A.1**：PI IPC 桥基础设施（`window.pi.parseFrontmatter` 等）— 同 v2
+2. **再下轮 — Phase B.1**：把 `session-metadata.ts`（最简单）改写成 PI ExtensionFactory；同步拆 `ipc/agent.ts` 1090 LOC 为 `ipc/<capability>.ts` — **v3 新增 IPC 拆分**
+3. **第三轮 — Phase J.1（部分）**：先跑 `pnpm storage:boundaries` + `pnpm storage:acceptance` 拿到当前 baseline，然后加固 sheriff.config.ts — **v3 提前 enforce**
+
+每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
+
+## 12. v2 → v3 完整章节对照
+
+| v2 章节 | v3 状态 |
+|---|---|
+| §0 目标 | 保留 |
+| §1 PI 105 export 盘点 | 保留 |
+| §2 OpenBuddy 模块对照表 | 保留 |
+| §3 目标态架构 | **扩为 §3 微内核识别 + §4 内聚分析 + §5 耦合减耦** |
+| §4 PI Plugin 体系专项 | 扩为 §6 PI Plugin + Cordis 双轨统一 |
+| §5 7 phase × 16 轮路线图 | **扩为 §9 v3 路线图（7 phase × 19 轮 = v2 16 + H 3 + I 2 + J 1）**|
+| §6 依赖图与执行顺序 | 保留 |
+| §7 PI-Desktop 对照 | 保留 |
+| §8 风险登记 | 保留 |
+| §9 成功标准 | **扩为 §10 v3 成功标准（加 9 项架构指标）**|
+| §10 已完成基线 | 保留 |
+| §11 接下来 3 轮 | 保留并更新 |
+| §12 文档维护 | 保留 |
+| **v3 新增** | §6 PI Plugin + Cordis 双轨统一 · §7 Capability 重构总表 · §8 Renderer UI 重构总表 · §9.1-9.3 Phase H/I/J |
+
+## 13. 文档维护
+
+- 本文档随每轮 phase 完成更新
+- 任何 phase 范围 / 文件清单 / 退出标准变更需在 PR 描述里 link 到本文件对应章节
+- 文档 owner: 编程助手-devbox1 (LUM-580)
+- 同步文档：
+  - [OPENBUDDY-PI-VISION.md](OPENBUDDY-PI-VISION.md) — 12 capability 适配矩阵（既有，不动）
+  - [full-pluginization-plan.md](full-pluginization-plan.md) — DeepSeek Harness 5件套（既有，不动）
+  - [pi-core-capabilities.md](pi-core-capabilities.md) — pi 核心能力清单（既有，不动）
+
+## 14. 附录 A — 目标态架构图（v2 原 §3）
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -121,7 +582,7 @@
 2. **OpenBuddy 负责**：Electron 生命周期 / IPC 桥 / React UI / Electron 特定能力（clipboard / dialog / menu）
 3. **桥接层（adapter）**：把 PI 的 Node API 包成 IPC 事件给 renderer；把 renderer 的 React 组件包成 ExtensionUIContext 给 PI
 
-## 4. PI Plugin 体系专项
+## 15. 附录 B — PI Plugin 体系专项（v2 原 §4）
 
 PI 插件 = `ExtensionFactory` 返回值 `(pi: ExtensionAPI) => void`。
 
@@ -170,7 +631,7 @@ PI 插件 = `ExtensionFactory` 返回值 `(pi: ExtensionAPI) => void`。
 | extra providers 注册 | 自实现 | pendingProviderRegistrations |
 | mcp server 集成 | 自实现 | `setActiveTools` |
 
-## 5. 7 阶段 × 16 轮实施路线图
+## 16. 附录 C — 7 阶段 × 16 轮实施路线图（v2 原 §5）
 
 > 总预算：**16 轮**，每轮单 commit + 全测 + 推独立分支。
 
@@ -402,7 +863,7 @@ PI 插件 = `ExtensionFactory` 返回值 `(pi: ExtensionAPI) => void`。
 
 **验证**：每轮 Phase A-F 完成后跑一次，捕获 regression。
 
-## 6. 依赖图与执行顺序
+## 17. 附录 D — 依赖图与执行顺序（v2 原 §6）
 
 ```
 Phase A (桥接)                    1 轮
@@ -420,7 +881,7 @@ Phase F (性能)                    3 轮 ── F.1 / F.2 / F.3 可并行
 Phase G (E2E)                    持续
 ```
 
-## 7. PI-Desktop（vastsa）对照与启示
+## 18. 附录 E — PI-Desktop（vastsa）对照与启示（v2 原 §7）
 
 PI-Desktop 用 **54 文件 / 19,818 LOC** 的 `@pi-desktop/agent-runtime`，**不**直接用 `pi-coding-agent`，而是基于更底层的 `@earendil-works/pi-agent-core` + `@earendil-works/pi-ai` 自己组装。
 
@@ -434,7 +895,7 @@ PI-Desktop 关键文件：
 - **不建议完整迁移**：OpenBuddy 已有自己的 agent-host 体系，迁移 ROI 不高
 - **建议小修小补**：把 11000+ LOC host-modules 重构成类似 PI-Desktop 的「thin wrapper over pi-agent-core」结构
 
-## 8. 风险登记
+## 19. 附录 F — 风险登记（v2 原 §8）
 
 | 风险 | 影响 | 缓解 |
 |---|---|---|
@@ -446,7 +907,7 @@ PI-Desktop 关键文件：
 | LLM e2e 非确定性 | Phase G | retry + golden response 截断 |
 | Rate limit（Token Plan 用量上限）| 所有 phase | 单轮控制 token 用量，不批量调 LLM |
 
-## 9. 成功标准
+## 20. 附录 G — v2 成功标准（v2 原 §9，与 §10 互补）
 
 | 维度 | 指标 | 当前 | 目标 |
 |---|---|---|---|
@@ -465,13 +926,13 @@ PI-Desktop 关键文件：
 | **Branch UX** | tree picker | 无 | ✓ |
 | **Plugin UX** | 用户可装第三方 PI 插件 | 无 | ✓ |
 
-## 10. 已完成基线
+## 21. 附录 H — 已完成基线（v2 原 §10）
 
 - ✅ Phase 0：3 条 blocker 已修（`moon.yml` warnings, microkernel 双 install race, dsh-base 硬编码路径）
 - ✅ commit `a458bd4` → `agent/devbox1/main-pi-reuse` 分支
 - ✅ 全量 vitest：5519/5540 pass（5 个环境性失败：xdg-open 缺失、sandbox provider 缺失、casdoor-resource-gateway）
 
-## 11. 接下来 3 轮（已锁定）
+## 22. 附录 I — v2 接下来 3 轮（已锁定）（v2 原 §11，与 §11 互补）
 
 1. **下一轮 — Phase A.1**：PI IPC 桥基础设施（`window.pi.parseFrontmatter` 等）
 2. **再下轮 — Phase B.1**：第一个 host-module 改写成 PI ExtensionFactory（先选最简单的 `session-metadata.ts`）
@@ -479,7 +940,7 @@ PI-Desktop 关键文件：
 
 每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
 
-## 12. 文档维护
+## 23. 附录 J — v2 文档维护规则（v2 原 §12，与 §13 互补）
 
 - 本文档随每轮 phase 完成更新
 - 任何 phase 范围 / 文件清单 / 退出标准变更需在 PR 描述里 link 到本文件对应章节
