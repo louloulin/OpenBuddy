@@ -14,11 +14,11 @@
 
 | 阶段 | 周数 | 数量 | 主要交付 | 当前状态 |
 |---|---|---|---|---|
-| **P0 Quick Wins** | 2-3 周 | 8 findings | 冷启动 ≤ 2.5s，TTFT ≤ 400ms | 🟢 **7/8 完成**（round 5 闭合 P0-05 + P0-08） |
-| **P1 核心重构** | 4-6 周 | 34 findings | 流式 60fps，bundle ≤ 8MB | 🟡 0/34 |
+| **P0 Quick Wins** | 2-3 周 | 8 findings | 冷启动 ≤ 2.5s，TTFT ≤ 400ms | 🟢 **7/8 完成**（P0-07 剩余） |
+| **P1 核心重构** | 4-6 周 | 34 findings | 流式 60fps，bundle ≤ 8MB | 🟡 **1/34**（round 6 闭合 P1-04） |
 | **P2 架构升级** | 4-6 周 | 36 findings | bundle ≤ 4MB，内存 ≤ 150MB | ⏳ 0/36 |
 | **P3 度量治理** | 2-3 周 | — | perf budget gate 入 CI | 🟢 PC-5/PC-6 已入闸（round 4） |
-| **合计** | **12-18 周** | **78** | **对齐 Codex 标杆** | 🟡 **5/78 = 6.4%**（+ P0-05 + P0-08 + PC-5/PC-6 gates ✅） |
+| **合计** | **12-18 周** | **78** | **对齐 Codex 标杆** | 🟡 **6/78 = 7.7%**（+ P1-04） |
 
 > v6g-facade 已闭合 7 项 findings（per WU-A merge plan §10），剩余 **71 项待本 WU 落地**。
 > 已闭合项：P0-03 流式 16ms 节流（WU-C `0272216` MessageChannel）/ P0-04 顶层 import 拆分（WU-C）/ multi-chunk 流式（WU-C）/ microkernel 拆分（WU-C `8bafa55`）/ ts-error A 修复（WU-D `63b26e3` + WU-C hardening）。
@@ -28,10 +28,12 @@
 ## 2. 本 WU 累计提交（branch ahead of `agent/lumos-ts-coder/88e5e009acf2`）
 
 ```
-<round 5 commit>  perf(storage+dsh): P0-08 CoalescedStorageGateway + P0-05 deepseek 全树 deep-freeze (WU-E round 5)
-<round 5 commit>  docs(wiki): record WU-E round 5 — P0-05 + P0-08 closure (LUM-561)
-cc0bba5 docs(wiki): record WU-E round 4 — PC-5 chat-render bench + PC-6 CI gate closure (LUM-561)
+<round 6 commit>  perf(renderer): memoize FindBar + FileChangesPanel for streaming-delta short-circuit (P1-04, WU-E round 6)
+<round 6 commit>  docs(wiki): record WU-E round 6 — P1-04 ChatView memo 全覆盖 (LUM-561)
+1bff988 perf(storage+dsh): P0-08 CoalescedStorageGateway + P0-05 deepseek 全树 deep-freeze (WU-E round 5)
+acc579a docs(wiki): record WU-E round 5 — P0-05 + P0-08 closure (LUM-561)
 a1e97ee perf(ci): PC-5 chat-render 60fps bench + PC-6 verify-plan/check-macos-signing CI integration (WU-E round 4)
+cc0bba5 docs(wiki): record WU-E round 4 — PC-5 chat-render bench + PC-6 CI gate closure (LUM-561)
 f8cf14d perf(renderer): lazy-load Sidebar + ChatView for P0-01 (WU-E round 3)
 c872b3c docs(wiki): record WU-E first two rounds + zod followup cleanup (LUM-561)
 4452e96 chore(gitignore): track docs/WU-E_PROGRESS.md so WU-E wiki ships in repo
@@ -41,7 +43,56 @@ ba25623 fix(ui+review): PC-1 color contrast + PC-2 skeleton API + PC-3 e2e specs
 ```
 
 > 父 WU-C 累计 **40 commits / 124 files / +10,637 / -2,028 行** ahead of main。
-> WU-E 增量 **8 commits / 15 files / ~+1,400 / ~-50 行** ahead of WU-C（round 5 新增 2 commit / 4 文件，P0-08 coalesced-storage + P0-05 deep-freeze）。
+> WU-E 增量 **10 commits / 18 files / ~+1,800 / ~-80 行** ahead of WU-C（round 6 新增 2 commit / 4 文件，P1-04 FindBar + FileChangesPanel memo + ChatView onClose useCallback）。
+
+---
+
+## 4.2. 第六轮交付（commits round 6）— P1-04 ChatView memo 全覆盖
+
+PERFORMANCE_TRANSFORMATION_PLAN §四 TOP 15 #5 / §三 P1 阶段 / wiki §8.3 priority 3。本轮落实 streaming-delta 下 chat surface 子组件的 re-render 短路。
+
+### 4.2.1 FindBar memo + custom comparator
+
+| 维度 | 实现 |
+|---|---|
+| 改动 1 | `packages/ui/openbuddy-ui-conversation/src/FindBar.tsx`：函数定义改名为 `FindBarInner`；新增 `findBarPropsAreEqual`（检查 `open` / `onClose` / `onActiveChange` / `onHitsChange` ref equality + `messages` length + first/last id fingerprint）；新增 `export const FindBar = memo(FindBarInner, findBarPropsAreEqual)` |
+| 改动 2 | `packages/ui/openbuddy-ui-conversation/src/ChatView.tsx`：新增 `handleCloseFind = useCallback(...)`；`onClose` 改为引用 `handleCloseFind` 让 memo 看到 stable callback identity |
+| 新文件 | `packages/ui/openbuddy-ui-conversation/src/__tests__/P1-04-memo.test.tsx` (210 行) — **6 个 vitest**：streaming-text-delta skip / length change re-render / first-id change re-render / last-id change re-render / open=false short-circuit / onClose identity change |
+
+**为什么是 P1-04**：FindBar 之前是不带 memo 的函数组件，streaming reducer（round 1 P0-06）在每次 delta 产生新的 `messages` 数组 ref，导致 FindBar 每次都执行 `useMemo([messages, query])` 重算 `hitIds`，即使 `open === false`。Round 6 加 `memo` + 自定义 comparator，只检查 `messages.length` + first/last id，避免浅比较 O(N) 数组。
+
+### 4.2.2 FileChangesPanel memo + custom comparator
+
+| 维度 | 实现 |
+|---|---|
+| 改动 | `packages/ui/openbuddy-ui-conversation/src/FileChangesPanel.tsx`：函数定义改名为 `FileChangesPanelInner`；新增 `fileChangesPropsAreEqual`（messages ref equality 短路 + length/last-id 检查）；新增 `export const FileChangesPanel = memo(FileChangesPanelInner, fileChangesPropsAreEqual)` |
+| 新增测试 | 同上 `P1-04-memo.test.tsx` **+4 个 vitest**：renders nothing when no diff / renders panel with diffs / streaming-text-delta skip / length change re-render |
+
+**为什么是 P1-04**：FileChangesPanel 同样不带 memo，`aggregateFileChanges` useMemo 在每次 delta 重跑，浪费 CPU。Custom comparator 把"长度 + 末尾 id"作为 fingerprint，避免 text-delta 触发。
+
+### 4.2.3 本轮验证
+
+```bash
+$ sh node_modules/.bin/vitest run packages/ui/openbuddy-ui-conversation/src/__tests__/P1-04-memo.test.tsx
+Test Files  1 passed (1)
+Tests       10 passed (10)
+
+$ sh node_modules/.bin/vitest run packages/ui/openbuddy-ui-conversation --reporter=dot
+Test Files  15 passed (15)
+Tests       141 passed (141)
+
+$ sh node_modules/.bin/vitest run --reporter=dot
+Test Files  6 failed | 504 passed (510)
+Tests       7 failed | 5317 passed | 16 skipped (5340)
+```
+
+> 全量 vitest：5307 → 5317 passed（+10 = 10 个 P1-04 memo tests）。7 fail pre-existing（与 round 5 完全一致，0 新增 regression）。
+> `npx tsc --noEmit -p tsconfig.json` clean。
+> 验证 PC-5 chat-render bench Σ=5.9ms / within60Fps=true 未变（本轮未改重组件，只优化 memo 短路）。
+
+### 4.2.4 与 PC-5 chat-render bench 关系
+
+本轮未扩展 PC-5 bench 加入 FindBar/FileChangesPanel 的 per-render 测量；memoization 验证通过对比单元测试（streaming-text-delta scenario 下 `useMemo` 不重算）而非 perf benchmark 完成。如果后续轮次需要 perf 证据，可加 4-5 项 bench：FindBar closed vs open × 200 messages × 100 iterations。
 
 ---
 
@@ -312,7 +363,8 @@ node scripts/check-macos-signing.mjs --allow-unsigned --self-test  # ⏳ 尚未�
 | zod followup (3 paths) | followup | ✅ round 2 完成 | commit `3a35273` |
 | P0-05 deepseek-runtime 全树 freeze | P0 | ✅ **round 5 完成** | `electron/main/agent/host-modules/deepseek/_deep-freeze.ts` + 改动 `host-runner-entries.ts` + `cordis-runtime.ts` |
 | P0-08 SQLite 事务批量合并（CoalescedStorageGateway） | P0 | ✅ **round 5 完成** | `packages/runtime/openbuddy-storage/src/driver/coalesced-storage.ts` |
-| 其余 ~65 项 P0/P1/P2/P3 | 各阶段 | ⏳ 待后续多轮 WU-E | — |
+| **P1-04 ChatView memo 全覆盖** | P1 | ✅ **round 6 完成**（FindBar + FileChangesPanel memo + custom comparator） | `packages/ui/openbuddy-ui-conversation/src/{FindBar,FileChangesPanel}.tsx` + `__tests__/P1-04-memo.test.tsx` |
+| 其余 ~64 项 P0/P1/P2/P3 | 各阶段 | ⏳ 待后续多轮 WU-E | — |
 
 ---
 
@@ -396,11 +448,11 @@ $ npx vitest run
 | P0-07 | Cordis 能力包静态 import 拆除（部分已在 WU-C 完成） | L（剩余范围） | `electron/main/index.ts` |
 | P0-08 | SQLite 事务批量合并 | ✅ **round 5 完成**（`CoalescedStorageGateway` + 7 unit tests） | `packages/runtime/openbuddy-storage/src/driver/coalesced-storage.ts` |
 
-### 8.3 优先级 3：P1 核心重构首批
+### 8.3 优先级 3：~~P1-04 ChatView memo 全覆盖~~ ✅ round 6 闭合
 
-- **P1-04 ChatView memo 全覆盖**：现有 `messagesRef` 模式扩展到 FindBar / ToolSidePanel 子组件
-- **P1-09 projects-store 写入 debounce**：250ms → 500ms（如需要）
-- **P1-05 mergeStreamingDelta** 已 O(1)（本轮），无需再做
+- **P1-04 ChatView memo 全覆盖** | ✅ **round 6 完成**（FindBar + FileChangesPanel memo + custom comparator + 10 unit tests） | `packages/ui/openbuddy-ui-conversation/src/{FindBar,FileChangesPanel}.tsx`
+- P1-09 projects-store 写入 debounce：250ms → 500ms（如需要）
+- P1-05 mergeStreamingDelta 已 O(1)（round 1），无需再做
 - 流式协议变更消费者同步（per WU-C `0272216`）
 
 ### 8.4 优先级 4：P2 架构升级首批
@@ -453,10 +505,11 @@ LUM-556 (parent, in_progress)
      ├─ [stage 3] ✅ LUM-559 WU-C ─────────── in_review (40 commits / reviewer PASS ✓)
      │
      └─ [stage 4] 🟢 LUM-561 WU-E ─────────── in_progress (本文件)
-                  └─ 8 commits: 267317a (P3-02 + P0-06) + 3a35273 (zod followup)
+                  └─ 10 commits: 267317a (P3-02 + P0-06) + 3a35273 (zod followup)
                                 + c872b3c/4452e96 (wiki) + f8cf14d (P0-01 Sidebar+ChatView)
                                 + a1e97ee/cc0bba5 (round 4: PC-5/PC-6)
-                                + round 5 (P0-08 CoalescedStorageGateway + P0-05 deep-freeze)
+                                + 1bff988/acc579a (round 5: P0-08 + P0-05)
+                                + round 6 (P1-04 FindBar + FileChangesPanel memo)
 
 [SECURITY] 🟡 LUM-575 ─────────────────── in_progress (audit 收口中)
 [push]    🚧 LUM-578 3 branches ─────────── blocked (§0 + 无凭据, 与协调解耦)
@@ -466,13 +519,13 @@ LUM-556 (parent, in_progress)
 
 ## 12. 下次 turn 触发
 
-- **PC-5 / PC-6 ✅ round 4 闭合 + P0-05 / P0-08 ✅ round 5 闭合** — 下轮 PR 剩余 priority 2 仅 P0-07
+- **6 轮落地：PC-5/PC-6 ✅ + P0-05/08 ✅ + P1-04 ✅** — 闭合 6 项 finding + 2 项 reviewer 强必填
 - ts-coder WU-E 下一轮 PR 优先级：
-  - **P0-07 Cordis 能力包静态 import 拆除收尾**（priority 2 唯一剩余项，L 工作量）
-  - **P1-04 ChatView memo 全覆盖**（priority 3）
-  - **P2-13 pi-resources.ts 拆分**（priority 4，2129 行）
-- WU-E 完成后 → status=in_review → 队长 dispatch reviewer 独立验收（可重点关注 P1/P2 实际收益）
+  - **P0-07 Cordis 能力包静态 import 拆除收尾**（P0 唯一剩余，L 工作量）
+  - **P2-13 pi-resources.ts 拆分**（priority 4，2129 行 → 4 chunk）
+  - P1-09 projects-store 写入 debounce（如需要）
+- WU-E 完成后 → status=in_review → 队长 dispatch reviewer 独立验收（重点关注 P1/P2 实际收益）
 - lumos-security-reviewer LUM-575 audit 收口
 - 人类 close LUM-557 / LUM-558 / LUM-560 / LUM-559
 - LUM-562 (WU-F) 待独立 promote 评估
-- 用户从 push A/B/C 路径选择（LUM-578）
+- **用户从 push A/B/C 路径选择（LUM-578）** — 当前 C 等 admin 响应
