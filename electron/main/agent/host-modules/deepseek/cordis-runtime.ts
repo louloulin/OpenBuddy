@@ -23,6 +23,7 @@ import { join } from "node:path";
 import { type PluginBundle, type PluginEntryOptions, DeepSeekCordisRuntime, type DeepSeekCordisPluginEntry, type DeepSeekCordisRuntimeSnapshot } from "@openbuddy/plugin-host";
 
 import type { AgentHostState } from "../_state-shape";
+import { deepFreeze } from "./_deep-freeze";
 
 /**
  * Phase 8.3 Architectural Refactor: deepseek/cordis-runtime 反向依赖消除。
@@ -110,6 +111,20 @@ const deepSeekCordisInvocationMethods: Readonly<Record<string, readonly string[]
 	subagents: ["list", "getProvider", "run"],
 	web: ["search", "fetch", "status"],
 };
+
+/**
+ * P0-05 (WU-E): runtime deep-freeze of the module-level static tables.
+ * `Set` and `Record` need separate treatment — `deepFreeze` walks
+ * objects/arrays but skips Set/Map prototypes, so we manually freeze
+ * the Set and the outer Record. The nested string-array values are
+ * also frozen so a caller's `methods.push(...)` on a returned reference
+ * can't sneak a write in.
+ */
+deepFreeze(DEEPSEEK_CORE_PACKAGE_NAMES);
+Object.freeze(deepSeekCordisInvocationMethods);
+for (const methods of Object.values(deepSeekCordisInvocationMethods)) {
+  Object.freeze(methods);
+}
 
 function isDeepSeekCorePackage(name: string): boolean {
 	return DEEPSEEK_CORE_PACKAGE_NAMES.has(name);
