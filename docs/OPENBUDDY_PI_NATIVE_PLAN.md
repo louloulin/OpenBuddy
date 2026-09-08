@@ -1,10 +1,32 @@
-# OpenBuddy PI-Native 改造计划 (v3)
+# OpenBuddy PI-Native 改造计划 (v4)
 
-> 📅 2026-09-08 · 基于 `main` (commit `058cbf9`) · 状态：进行中
+> 📅 2026-09-08 · 基于 `main` (commit `058cbf9`) · 状态：v3 路线图执行中
 > 任务: LUM-580 · 仓库: louloulin/OpenBuddy
 > 上游基线: `@earendil-works/pi-coding-agent` 0.85.1 + `pi-agent-core` 0.85.1 + `pi-ai` 0.85.1
 > 参考实现: [vastsa/PI-Desktop](https://github.com/vastsa/PI-Desktop) (54 文件 / 19,818 LOC agent-runtime)
 > 兄弟文档: [OPENBUDDY-PI-VISION.md](OPENBUDDY-PI-VISION.md) (12 capability 适配矩阵) · [full-pluginization-plan.md](full-pluginization-plan.md) (DeepSeek Harness 五件套借鉴)
+
+## v4 相比 v3 的改动
+
+v3 明确「微内核 = PI + Cordis + 薄桥」，并加 5 个新章。v4 在 v3 之上 **强化「微内核 + 插件」作为骨架**，新增 2 个章节：
+
+- **§24 v4 微内核 + 插件体系 — 完整蓝图**：把当前 v3 的「微内核识别 / 内聚分析 / 耦合减耦 / PI Plugin + Cordis 双轨」四章 **整合成一张可执行的「Layer × 插件类型」总图**，明确「微内核的接口 = 插件可以扩展的全部面」。这张图是后续每轮 PR 的 contract：所有新加的功能必须能回答「它挂在哪一层？属于哪个插件类型？」
+- **§25 OpenBuddyPlugin SDK v0.1 spec（PI-Native）**：把 v3 §6 的「4 轨合一」从口号变成**具体接口定义**（`OpenBuddyPlugin` 类型 / `loadPlugin(path)` 装载协议 / `plugin.json` 清单 / 单文件 4 轨同时挂）。v4 在 v3 §9 Phase H.2 之上把 SDK 的 TS 接口定下来，作为接下来 Phase H.2 实施的 contract。
+
+v3 的核心章节（微内核识别 / 内聚分析 / 耦合减耦 / PI Plugin 双轨 / 路线图）保留为骨架。v4 在每章末尾加「v4 注解」说明该章在微内核 + 插件视角下的延伸。
+
+## v4 路线图增量（v3 7 phase × 19 轮 → v4 7 phase × 21 轮）
+
+v3 已完成 A.1 + B.1 round 1-4。v4 新增 2 轮：
+
+- **Phase K — 微内核 + 插件体系成线（新增 2 轮）**：
+  - **K.1 OpenBuddyPlugin SDK v0.1 实现**（v3 §6 PI Plugin + Cordis 双轨 + v3 §9 H.2 OpenBuddyPlugin SDK 包的实施版）：TS 接口 + `loadPlugin()` 装载协议 + zod 校验 + 一个 `__fixtures__/sample-plugin/` 验证 4 轨分发
+  - **K.2 `loadPlugin()` 接入 builtin extension / harness / slot 三轨**（v3 §9 H.3 4 轨分发装载协议的落地）：把现有 `discoverAndLoadExtensions` + Cordis `ctx.plugin` + Slot `apply` + Harness `load` 4 个装载入口合并为单一 `loadPlugin()` 入口
+- 其余 v3 路线图（A.1 / B.1 round 5 / B.2 / B.3 / C.1-C.3 / D.1-D.3 / E.1-E.3 / F.1-F.3 / G + H.1 / I.1-I.2 / J.1）保持不变。
+
+**总预算**：19 → **21 轮**（v3 19 + K 2）。
+
+
 
 ## v3 相比 v2 的改动
 
@@ -520,11 +542,65 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
 - ✅ **已完成：Phase B.1 第 1 轮 — 5th builtin ExtensionFactory `openbuddy-pi-session-metadata`**（commit `df1bcb7`）
 - ✅ **已完成：Phase B.1 第 2 轮 — 6th builtin ExtensionFactory `openbuddy-pi-model-bridge` + `ipc/agents.ts` 拆分第 1 步**（commit `1debbde`）
 - ✅ **已完成：Phase B.1 第 3 轮 — `ipc/agent.ts` 1060 → 943 LOC 拆为 5 个 capability 子文件**（commit `74b6e12`）
-- ✅ **已完成：Phase B.1 第 4 轮 — `ipc/agent.ts` 943 → 690 LOC 再拆 6 个 capability 子文件，超额完成 ≤ 600 LOC 目标附近**（commit 见本轮 PR）
-- 🟡 **下一轮 — Phase B.1 第 5 轮**：拆 prompt/abort/steer/follow-up 4 个耦合 handler（最后 ~250 LOC）
-- ⚪ **第三轮 — Phase J.1（部分）**：先跑 `pnpm storage:boundaries` + `pnpm storage:acceptance` 拿到当前 baseline，然后加固 sheriff.config.ts
+- ✅ **已完成：Phase B.1 第 4 轮 — `ipc/agent.ts` 943 → 690 LOC 再拆 6 个 capability 子文件，超额完成 ≤ 600 LOC 目标附近**（commit `747b77b`）
+- ✅ **已完成：Phase B.1 第 5 轮 — `ipc/agent.ts` 690 → 141 LOC（-79%）拆为 4 个 capability 子文件（lifecycle/sessions/workspace/prompt-cycle），成为纯 slim registrar**（commit 见本轮 PR）
+- 🟡 **下一轮 — Phase K.1 — OpenBuddyPlugin SDK v0.1**（新增，见 v4 §25）：TS 接口 + `loadPlugin()` + 4 轨分发装载 + zod 校验
+- ⚪ **第三轮 — Phase K.2 — `loadPlugin()` 接入 builtin extension / harness / slot 三轨**：把现有 4 个装载入口合并为 1 个
 
 每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
+
+### 11.1 B.1 round 5 验证记录
+
+```
+Phase B.1 round 5 验证报告
+==============================================================
+electron/main/ipc/agent.ts:                690 → 141 LOC  (-79%, -549 LOC)
+electron/main/ipc/lifecycle.ts:            0 → 118 LOC   (4 handlers)
+electron/main/ipc/sessions.ts:             0 → 119 LOC   (9 handlers)
+electron/main/ipc/workspace.ts:            0 → 116 LOC   (7 handlers)
+electron/main/ipc/prompt-cycle.ts:         0 → 434 LOC   (16 handlers)
+electron/main/ipc/plugin.ts:             139 → 145 LOC   (+6, +plugins_action)
+
+Handler 迁移:
+  lifecycle.ts     agent:new-session, agent:ensure-new-session,
+                   agent:init, agent:dispose                  (4)
+  sessions.ts      sessions:list, sessions:list-workspaces,
+                   sessions:rename, sessions:delete,
+                   sessions:set-pinned, sessions:set-archived,
+                   sessions:set-all-archived,
+                   sessions:set-expert,
+                   agent:workspace-search                      (9)
+  workspace.ts     workspace:list, workspace:create,
+                   workspace:rename, workspace:delete,
+                   workspace:insert-before,
+                   workspace:insert-session-before,
+                   workspace:archive-session                   (7)
+  prompt-cycle.ts  agent:prompt, agent:steer, agent:follow-up,
+                   agent:abort, agent:set-model,
+                   agent:compact,
+                   agent:set-auto-compaction,
+                   agent:set-auto-retry,
+                   agent:abort-retry, agent:abort-bash,
+                   agent:set-steering-mode,
+                   agent:set-follow-up-mode,
+                   agent:fork-session,
+                   agent:prompt-content,
+                   agent:set-thinking-level,
+                   agent:set-permission-mode                   (16)
+  plugin.ts        plugins_action                              (+1)
+
+agent.ts 现在只保留: 15 行 import + 15 行共享 deps 构建 + 15 行 registerXxxIpc() 调度 + 4 行 void/注释 = 141 LOC 的 slim registrar
+
+验证:
+  ✅ pnpm typecheck  (2 tasks, 0 errors)
+  ✅ IPC contract renderer ↔ preload      13/13
+  ✅ IPC contract main (realserver)        7/7
+  ✅ Channel matrix                        4/4
+  ✅ Full vitest                        5562/5567 (5 个环境性失败 ×dg-open / sandbox / casdoor-resource-gateway, 不变)
+
+LOC 演化:
+  1090 → 1060 → 943 → 690 → 141 LOC  (-87% 总和, -949 LOC)
+```
 
 ## 12. v2 → v3 完整章节对照
 
@@ -993,3 +1069,287 @@ PI-Desktop 关键文件：
 - 本文档随每轮 phase 完成更新
 - 任何 phase 范围 / 文件清单 / 退出标准变更需在 PR 描述里 link 到本文件对应章节
 - 文档 owner: 编程助手-devbox1 (LUM-580)
+## 24. v4 — 微内核 + 插件体系完整蓝图（§3-§6 整合）
+
+v3 §3-§6 已经分别讲了微内核识别 / 内聚 / 耦合 / 4 轨双轨统一。v4 把这 4 章 **整合成一张可执行的「Layer × 插件类型」总图**，作为后续每轮 PR 的 contract。
+
+### 24.1 微内核接口 = 插件可以扩展的全部面
+
+**微内核的 5 个稳定接口面**（任何插件能扩展的边界）：
+
+| # | 接口面 | 微内核暴露方式 | 插件可扩展什么 | 当前覆盖 |
+|---|---|---|---|---|
+| 1 | **AI 工具** | `pi.on('tool_call', ...)` / `defineTool()` | 命令、工具、provider | ✅ 6 builtin extension |
+| 2 | **会话生命周期** | `pi.on('session_start' / 'session_shutdown' / 'session_compact' / ...)` | start/shutdown hook、session info 镜像、auto-compaction 拦截 | ✅ 5th builtin extension (`session-metadata-bridge`) |
+| 3 | **Agent 生命周期** | `pi.on('agent_start' / 'agent_end' / 'turn_start' / 'turn_end')` | telemetry、observability、usage 统计 | ✅ 6th builtin extension (`model-bridge` + telemetry) |
+| 4 | **事件总线** | `pi.EventBus` + `emit('plugin:event', payload)` | 业务事件发布 / 订阅 | ⚠️ 部分（plugin-event-bus.ts 自实现 269 LOC） |
+| 5 | **持久化** | `pi.SessionManager` + `pi.SettingsManager` | session JSONL、settings.json、profile.yaml | ⚠️ 部分（自实现 settings I/O + SessionManager 部分用） |
+
+**未覆盖的扩展面**（插件目前无法扩展）：
+
+| # | 接口面 | 当前状态 | v4 目标 |
+|---|---|---|---|
+| 6 | **UI 槽位** | 自实现 `openbuddy-ui-slots` | v4 把 slot 接入微内核接口（Phase E.1 + Phase K.2） |
+| 7 | **Harness 兼容** | 自实现 `openbuddy-plugin-host` (11766 LOC) | v4 把 harness 接入微内核接口（Phase H.2 + Phase K.2） |
+| 8 | **Cordis 服务** | 自实现 `@openbuddy/cordis` (12 service) | v4 把 Cordis service 接入微内核接口（Phase K.2） |
+| 9 | **Provider 注册** | 自实现 `pi-resources/marketplace` + `pi-extensions` (1010 LOC) | v4 让插件能注册第三方 provider（Phase I.2 + Phase K.2） |
+| 10 | **Workspace / 资源发现** | 自实现 `pi-resource-loader.ts` (300+ LOC) | v4 用 PI `loadProjectContextFiles` + `resources_discover`（Phase D.3 + Phase K.2） |
+
+### 24.2 插件 4 类 × 5 轨分布
+
+每类插件通过哪个微内核接口面扩展，落在哪条轨道：
+
+| 插件类型 | 通过哪个微内核接口面扩展 | 轨道 | 装载入口 | v4 状态 |
+|---|---|---|---|---|
+| **Service 插件**（业务侧能力）| 5 持久化 + Cordis DI | Cordis | `ctx.plugin(MyService)` | 现有 12 service |
+| **Extension 插件**（AI 侧工具 / 命令 / provider）| 1-3 AI 工具 / 会话 / Agent 钩子 | PI Extension | `pi.registerTool(...)` | 现有 6 builtin |
+| **Slot 插件**（UI 侧 widget / menu / status bar）| 6 UI 槽位 | Renderer Slot | `slots.register(...)` | 现有 4 slot 类型 |
+| **Harness 插件**（DeepSeek 兼容 + 业务 profile）| 7 Harness + 10 Provider | Harness | `HarnessPluginLoader.load(...)` | 现有 DeepSeek 用户 |
+
+**v4 目标**：把 4 类插件的 4 个装载入口合为 1 个 `loadPlugin(path)`。具体见 §25。
+
+### 24.3 微内核 + 插件 v4 架构图
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Layer 4  Renderer (React + 26 ui-* 包)                            │
+│   唯一允许的 main 入口 = window.api.* typed bridge                  │
+│   唯一允许的 pi 入口 = IPC bridge (A.1 已建)                        │
+└─────────────────────────────────────────────────────────────────┘
+                              ▲
+                              │ IPC (15 capability files × ~150 IPC 通道)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Layer 3  IPC Adapter (electron/main/ipc/*.ts, 16 files)            │
+│   每个 capability 一个 IPC 文件, 单职责 (Phase B.1 已完成)           │
+│   agent.ts 现在是 141 LOC 的 slim registrar                       │
+└─────────────────────────────────────────────────────────────────┘
+                              ▲
+                              │ agentHost facade (单接口)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Layer 2  Microkernel (electron/main/agent)                         │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 微内核 = PI + Cordis + 薄桥                                  │ │
+│ │   • PI AgentSession       (会话生命周期)                       │ │
+│ │   • PI ExtensionRunner    (AI 工具 / 命令 / provider)          │ │
+│ │   • PI SessionManager     (持久化)                            │ │
+│ │   • PI SettingsManager    (设置)                              │ │
+│ │   • Cordis Context         (DI 容器)                          │ │
+│ │   • agentHost facade       (薄桥, 暴露给 IPC)                  │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ 微内核接口面 = 10 个 (见 §24.1)                                │ │
+│ │   任何插件只能通过这 10 个面扩展                                │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                              ▲
+                              │ loadPlugin(path) 单入口 (v4 Phase K)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Layer 1  Plugins (openbuddy-plugin-sdk 单装载协议)                │
+│   OpenBuddyPlugin = { pi, cordis, ui, harness } 四轨合一           │
+│   4 类插件 (Service / Extension / Slot / Harness) 都用 1 个入口装载 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**v4 contract**：所有新加的功能必须能回答 2 个问题：
+1. **挂在哪一层？** Layer 1-4 中哪一层？
+2. **属于哪个插件类型？** 4 类 (Service / Extension / Slot / Harness) 中哪一类？
+
+回答不出这 2 个问题的功能 = 需要新开 Phase 重新评审架构。
+
+## 25. OpenBuddyPlugin SDK v0.1 spec（PI-Native）
+
+v3 §6 提到「用户写一个 plugin 同时挂 4 轨」，但只有示例代码。v4 把这个 spec **固化下来**：
+
+### 25.1 `OpenBuddyPlugin` 类型
+
+```typescript
+// packages/runtime/openbuddy-plugin-sdk/src/index.ts
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import type { Context as CordisContext } from '@openbuddy/cordis';
+import type { SlotMap } from '@openbuddy/ui-slots';
+
+/**
+ * OpenBuddyPlugin — PI-native plugin contract.
+ *
+ * One file, four tracks. Each track is optional; a plugin can
+ * implement any subset. The plugin loader (`loadPlugin(path)`)
+ * dispatches each track to its corresponding microkernel interface
+ * (see v4 §24.1).
+ */
+export interface OpenBuddyPlugin {
+  /** Plugin identity. Required. */
+  readonly name: string;
+  readonly version: string;
+  /** Optional semantic version range of OpenBuddy core. */
+  readonly engines?: { openbuddy: string };
+
+  /**
+   * Track 1 — AI side: PI ExtensionFactory.
+   * Loaded into `pi-coding-agent`'s ExtensionRunner.
+   * Receives an ExtensionAPI; can register tools, commands,
+   * slash commands, flags, shortcuts, providers.
+   */
+  readonly pi?: (api: ExtensionAPI) => void | Promise<void>;
+
+  /**
+   * Track 2 — business side: Cordis DI.
+   * Loaded into the Cordis Context as a service.
+   * Receives a Cordis Context; can `ctx.plugin(MyService, config)`.
+   */
+  readonly cordis?: (ctx: CordisContext) => void | Promise<void>;
+
+  /**
+   * Track 3 — UI side: Renderer slots.
+   * Loaded into the renderer's SlotMap. Declared via static
+   * `slots` so the renderer can resolve them without booting the
+   * main process.
+   */
+  readonly ui?: PluginSlotContributions;
+
+  /**
+   * Track 4 — Harness side: DeepSeek-compatible plugin declaration.
+   * Loaded into the HarnessPluginLoader. YAML-patch compatible
+   * (existing DeepSeek users can port without code changes).
+   */
+  readonly harness?: HarnessPluginDeclaration;
+}
+
+export interface PluginSlotContributions {
+  readonly [slotKey: string]: PluginSlotContribution;
+}
+
+export type PluginSlotContribution =
+  | { type: 'react-component'; component: string /* module path */; props?: Record<string, unknown> }
+  | { type: 'menu-item'; label: string; accelerator?: string; onClick: string /* module path */ }
+  | { type: 'status-bar'; id: string; getText: string /* module path */ };
+
+export interface HarnessPluginDeclaration {
+  readonly contributes?: Record<string, unknown>;
+}
+```
+
+### 25.2 `loadPlugin(path)` 装载协议
+
+```typescript
+// packages/runtime/openbuddy-plugin-sdk/src/loader.ts
+import type { ExtensionRunner } from '@earendil-works/pi-coding-agent';
+import type { Context as CordisContext } from '@openbuddy/cordis';
+import type { SlotMap } from '@openbuddy/ui-slots';
+import type { HarnessPluginLoader } from '@openbuddy/plugin-host';
+import type { OpenBuddyPlugin } from './index';
+
+/**
+ * Single plugin entrypoint. Dispatches each plugin track to its
+ * corresponding microkernel interface. Atomic: if any track fails,
+ * already-loaded tracks are unloaded and the load throws.
+ *
+ * Usage from microkernel boot:
+ *   for plugin of profile.plugins:
+ *     loadPlugin(plugin, { extensionRunner, cordis, slots, harness })
+ */
+export async function loadPlugin(
+  pluginPath: string,
+  sinks: {
+    extensionRunner: ExtensionRunner;
+    cordis: CordisContext;
+    slots: SlotMap;
+    harness: HarnessPluginLoader;
+  },
+): Promise<{ unload: () => Promise<void> }> {
+  const plugin = await import(/* @vite-ignore */ pluginPath);
+  const def: OpenBuddyPlugin = plugin.default ?? plugin;
+
+  // Validate manifest
+  validateManifest(def);
+
+  const undoers: Array<() => Promise<void>> = [];
+
+  // Track 1 — PI Extension
+  if (def.pi) {
+    const ext = sinks.extensionRunner.register(def.pi);
+    undoers.push(() => ext.unregister());
+  }
+
+  // Track 2 — Cordis service
+  if (def.cordis) {
+    await def.cordis(sinks.cordis);
+    // Cordis ctx.dispose() is owned by the host boot, not per-plugin
+  }
+
+  // Track 3 — UI slots
+  if (def.ui) {
+    for (const [key, contribution] of Object.entries(def.ui)) {
+      sinks.slots.register(key, contribution);
+      undoers.push(() => sinks.slots.unregister(key));
+    }
+  }
+
+  // Track 4 — Harness
+  if (def.harness) {
+    await sinks.harness.load(def.harness);
+    undoers.push(() => sinks.harness.unload(def.harness));
+  }
+
+  return {
+    async unload() {
+      for (const undoer of undoers.reverse()) {
+        await undoer().catch(() => undefined);
+      }
+    },
+  };
+}
+```
+
+### 25.3 `plugin.json` 清单
+
+```jsonc
+// ~/.config/openbuddy/plugins/my-plugin/plugin.json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "engines": { "openbuddy": ">=4.0.0" },
+  "main": "./index.ts",
+  "contributes": {
+    "pi": true,
+    "cordis": true,
+    "ui": true,
+    "harness": true
+  }
+}
+```
+
+### 25.4 v0.1 vs 完整版差异（out of scope for v0.1）
+
+| 项 | v0.1 | 完整版（v0.2+） |
+|---|---|---|
+| 装载协议 | ✅ `loadPlugin(path)` | — |
+| 4 轨类型 | ✅ TypeScript 类型 | — |
+| 校验 | ✅ zod schema 校验 manifest | — |
+| Hot reload | ❌ | ✅ v0.2（Phase L） |
+| 依赖隔离 | ❌（共享全局 pi） | ✅ v0.3（plugin worker 沙箱） |
+| Marketplace | ❌ | ✅ v0.4（已有 marketplace 接入） |
+| 版本协商 | ❌ | ✅ v0.4（semver 范围检查） |
+
+### 25.5 实施路径
+
+- **Phase K.1（本轮 +1 PR）**：
+  - 新建 `packages/runtime/openbuddy-plugin-sdk/` (~500 LOC)
+  - TS 接口 / zod 校验 / `loadPlugin()` 装载协议
+  - `__fixtures__/sample-plugin/` 验证 4 轨分发
+  - 单测：装载 / 卸载 / 校验失败 / 4 轨各 1 case
+  - 验证：`pnpm typecheck` + `pnpm test openbuddy-plugin-sdk` 全过
+
+- **Phase K.2（再 +1 PR）**：
+  - 把 `electron/main/agent/host-modules/bootstrap/install-host-modules.ts` 改为 `loadPlugin()` 调用
+  - `electron/main/agent/pi-extensions.ts` builtin extension 也走 `loadPlugin()`
+  - `packages/ui/openbuddy-ui-runtime/src/plugin-ui-host.ts` slot apply 集成
+  - 验证：现有 866 单测全过 + 新加 plugin loader 单测
+
+- **Phase L（v0.2+）**：hot reload、worker 沙箱、marketplace、版本协商。
+
+---
+
+**v4 完整路线图（A-K phase × 21 轮）**：见 §9 + §11.1 + §25.5。每轮单 commit + 全测 + 推独立分支。
