@@ -3,6 +3,7 @@ import {
   applyOpenBuddyPluginManifestPassthrough,
   openbuddyPluginManifestSchema,
   OpenBuddyPluginManifestError,
+  serializeAllTracks,
   serializeCordisTrack,
   serializeHarnessTrack,
   serializePiTrack,
@@ -276,6 +277,61 @@ describe("openbuddy plugin manifest (Phase K.1 SDK)", () => {
       const row = { id: "x", trackKind: "pi" as const, source: "y" };
       const result = applyOpenBuddyPluginManifestPassthrough(row, manifest);
       expect(result).toEqual(row);
+    });
+  });
+
+  describe("serializeAllTracks", () => {
+    it("bundles pi/harness/slot/cordis rows from a 4-track manifest", () => {
+      const manifest = validateOpenBuddyPluginManifest({
+        schema: openbuddyPluginManifestSchema,
+        id: "openbuddy-all-tracks",
+        tracks: [
+          { kind: "pi", inline: "openbuddy-all-tracks:pi" },
+          { kind: "harness", source: "./cordis.patch.yml", name: "harness-row" },
+          { kind: "slot", source: "./client.js" },
+          { kind: "cordis", source: "@openbuddy/all-tracks" },
+        ],
+      });
+      const result = serializeAllTracks(manifest);
+      expect(result.id).toBe("openbuddy-all-tracks");
+      expect(result.pi).toHaveLength(1);
+      expect(result.harness).toHaveLength(1);
+      expect(result.slot).toHaveLength(1);
+      expect(result.cordis).toHaveLength(1);
+      expect(result.passthroughApplied).toBe(false);
+    });
+
+    it("returns empty arrays for tracks the manifest does not declare", () => {
+      const manifest = makeManifest({});
+      const result = serializeAllTracks(manifest);
+      expect(result.pi).toHaveLength(1);
+      expect(result.harness).toEqual([]);
+      expect(result.slot).toEqual([]);
+      expect(result.cordis).toEqual([]);
+    });
+
+    it("reports passthroughApplied when flags.passthrough is true", () => {
+      const manifest = makeManifest({ flags: { passthrough: true } });
+      const result = serializeAllTracks(manifest);
+      expect(result.passthroughApplied).toBe(true);
+    });
+
+    it("matches the union of the four single-track serializers", () => {
+      const manifest = validateOpenBuddyPluginManifest({
+        schema: openbuddyPluginManifestSchema,
+        id: "openbuddy-all-tracks-union",
+        tracks: [
+          { kind: "pi", inline: "x:pi" },
+          { kind: "harness", source: "./x.yml", name: "x-harness" },
+          { kind: "slot", source: "./x-client.js" },
+          { kind: "cordis", source: "x" },
+        ],
+      });
+      const aggregate = serializeAllTracks(manifest);
+      expect(aggregate.pi).toEqual(serializePiTrack(manifest));
+      expect(aggregate.harness).toEqual(serializeHarnessTrack(manifest));
+      expect(aggregate.slot).toEqual(serializeSlotTrack(manifest));
+      expect(aggregate.cordis).toEqual(serializeCordisTrack(manifest));
     });
   });
 });

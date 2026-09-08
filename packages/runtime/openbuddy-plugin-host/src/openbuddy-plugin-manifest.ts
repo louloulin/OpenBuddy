@@ -351,3 +351,50 @@ export function applyOpenBuddyPluginManifestPassthrough<T extends object>(
       : { config: { passthrough: true } }),
   } as T;
 }
+
+/** Aggregate shape returned by `serializeAllTracks`. Bundles every track
+ *  type so callers (e.g. `init-deepseek.ts` in L.3) can pick whichever
+ *  shape the host loader expects without running each serializer in turn. */
+export interface SerializedOpenBuddyPluginTracks {
+  /** Manifest id, surfaced for diagnostics / inventory. */
+  readonly id: string;
+  /** All PI extension rows the manifest contributes (one per pi track). */
+  readonly pi: readonly SerializedPiTrack[];
+  /** All Harness plugin rows the manifest contributes (one per harness track). */
+  readonly harness: readonly SerializedHarnessTrack[];
+  /** All UI slot rows the manifest contributes (one per slot track). */
+  readonly slot: readonly SerializedSlotTrack[];
+  /** All Cordis plugin rows the manifest contributes (one per cordis track). */
+  readonly cordis: readonly SerializedCordisTrack[];
+  /** Manifest-level passthrough was applied to any row whose source track
+   *  did not already opt in via `track.config.passthrough`. Useful for
+   *  inventory snapshots that surface opt-in counts. */
+  readonly passthroughApplied: boolean;
+}
+
+/** Run all four track serializers on a manifest in one call. The returned
+ *  shape is a shallow snapshot — host loaders should treat each list as
+ *  immutable and apply their own transactional wrapper if needed.
+ *
+ *  This is the L.3 / K.2 seam: builtin extension manifests, core DSH
+ *  capability manifests, and renderer UI slot manifests can all be
+ *  projected through this single helper, removing the four hand-rolled
+ *  serializer invocations the previous wiring required.
+ */
+export function serializeAllTracks(
+  manifest: OpenBuddyPluginManifest,
+): SerializedOpenBuddyPluginTracks {
+  const pi = serializePiTrack(manifest);
+  const harness = serializeHarnessTrack(manifest);
+  const slot = serializeSlotTrack(manifest);
+  const cordis = serializeCordisTrack(manifest);
+  const passthrough = manifest.flags?.passthrough === true;
+  return {
+    id: manifest.id,
+    pi,
+    harness,
+    slot,
+    cordis,
+    passthroughApplied: passthrough,
+  };
+}
