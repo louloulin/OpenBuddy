@@ -28,13 +28,34 @@
 ## 2. 本 WU 累计提交（branch ahead of `agent/lumos-ts-coder/88e5e009acf2`）
 
 ```
+f8cf14d perf(renderer): lazy-load Sidebar + ChatView for P0-01 (WU-E round 3)
+c872b3c docs(wiki): record WU-E first two rounds + zod followup cleanup (LUM-561)
+4452e96 chore(gitignore): track docs/WU-E_PROGRESS.md so WU-E wiki ships in repo
 3a35273 fix(test): unbreak 3 pre-existing zod hardcoded paths after zod 4.4.3 → 4.5.4 bump (WU-E followup #1)
 267317a feat(perf): cold-start analyzer + O(1) streaming delta hot path (WU-E P3-02 + P0-06 hardening)
 ba25623 fix(ui+review): PC-1 color contrast + PC-2 skeleton API + PC-3 e2e specs (来自 WU-C reviewer 移交)
 ```
 
 > 父 WU-C 累计 **40 commits / 124 files / +10,637 / -2,028 行** ahead of main。
-> WU-E 增量 **2 commits / 5 files / +17 / -7 行** ahead of WU-C。
+> WU-E 增量 **5 commits / 6 files / +73 / -45 行** ahead of WU-C。
+
+---
+
+## 4.5. 第三轮交付（commit `f8cf14d`）
+
+### 4.5.1 P0-01 渲染端 chunk 化（Sidebar + ChatView）
+
+| 维度 | 实现 |
+|---|---|
+| 文件 | `src/App.tsx`（仅 +56 / -38 行） |
+| 改动 | Sidebar (1641 行) 和 ChatView (1167 行) 改为 `React.lazy` + `Suspense`；default-export adapter 与 P1-01 (HomePage/SettingsPanel/SearchOverlay/AboutDialog/FolderTrustDialog/TasksPanel) 完全一致 |
+| Suspense fallback | Sidebar: `<aside className="sidebar sidebar--skeleton" aria-busy="true" aria-label="侧边栏加载中" />`；ChatView: `<section className="app__main app__main--skeleton" aria-busy="true" />` |
+| 保留行为 | ErrorBoundary 包裹维持不变 — chunk 加载失败仍走原错误 UI；既有 `<Suspense fallback={null}>` 边界（HomePage 等）不动 |
+| 验证 | `tsc --noEmit -p tsconfig.json` clean；`vitest run src/lib/__tests__/distributed-buddy-kernel.test.ts` 6/6 PASS；`vitest run packages/ui/openbuddy-ui-conversation/src` 131/131 PASS；全量 vitest 5287 PASS / 7 fail（**与上一轮完全一致，0 新增 regression**） |
+
+**为什么这是 P0-01**：PERFORMANCE_TRANSFORMATION_PLAN §四 #3 / §三 P0 第 2 条列出"渲染端 React.lazy 路由级拆分"。App.tsx 之前的 P1-01 已经把 6 个次级页面（SettingsPanel/SearchOverlay/AboutDialog/FolderTrustDialog/TasksPanel/HomePage）拆出去，但**两个最大组件 Sidebar + ChatView 仍是 eager import** — 它们 + 它们传递依赖的 ui-* 包一直在 entry chunk 里。本轮把这两个核心组件也拆出去，与 P1-01 形成完整闭环。
+
+**Bundle 影响预期**：entry chunk 应该会显著下降（Sidebar + ChatView + Composer/MessageItem/Markdown host 等传递依赖从 entry chunk 移除），但完整数字需要 `node scripts/perf/bundle-topology.mjs --strict` 才能拿到（本环境无 `out/renderer/assets/`，需要先 build electron-vite，超出本轮范围 — 留给 PC-6 集成 CI 时一起跑）。
 
 ---
 
@@ -132,6 +153,7 @@ node scripts/check-macos-signing.mjs --allow-unsigned --self-test  # ⏳ 尚未�
 
 | Finding | 阶段 | 状态 | commit / 文件 |
 |---|---|---|---|
+| P0-01 渲染端 React.lazy 路由级拆分（完整闭环：Sidebar + ChatView + 6 个次级页面） | P0 | ✅ 本轮完成 | `src/App.tsx`（commit `f8cf14d`） |
 | P0-03 流式 16ms 节流 | P0 | ✅ 已在 WU-C (`0272216`) | `electron/main/pi-stream-transport.ts` |
 | P0-04 顶层 import 拆分 | P0 | ✅ 已在 WU-C | `electron/main/agent/host-modules/` 20 facade |
 | P0-06 streaming delta hot path | P0 | ✅ 本轮完成（in-place mutation） | `src/stores/session-store.ts:285-330` |
@@ -170,7 +192,7 @@ Tests       7 passed (7)
 $ npx vitest run
 Test Files  6 failed | 500 passed (506)
 Tests       7 failed | 5287 passed | 16 skipped (5310)
-Duration    227.68s
+Duration    226.59s
 ```
 
 **7 个失败均为 pre-existing**（与本轮改动无关，详见 §4.1 末尾）：
@@ -185,6 +207,22 @@ Duration    227.68s
 | `packages/runtime/openbuddy-plugin-host/src/yaml-patch.test.ts` | deepseek-harness fixture 路径不存在 |
 
 > 这些 pre-existing 失败需要单独的 WU 处理（深度 fixture mock + linux OS 适配），不属于 WU-E 性能改造的范围。
+
+### 7.4 round 3 P0-01 验证
+
+```bash
+$ npx tsc --noEmit -p tsconfig.json
+# clean
+
+$ npx vitest run src/lib/__tests__/distributed-buddy-kernel.test.ts
+✓ 6 tests passed
+
+$ npx vitest run packages/ui/openbuddy-ui-conversation/src
+✓ 14 test files / 131 tests passed
+
+$ npx vitest run
+# 与上一轮完全一致：5287 pass / 7 fail pre-existing — 0 新增 regression
+```
 
 ---
 
@@ -201,7 +239,7 @@ Duration    227.68s
 
 | # | 项 | 工作量 | 文件 |
 |---|---|---|---|
-| P0-01 | 渲染端 chunk 化（React.lazy + Suspense — **App.tsx 已部分落地，可继续收紧**） | S | `src/App.tsx` |
+| P0-01 | 渲染端 chunk 化（React.lazy + Suspense） | ✅ round 3 完成（Sidebar + ChatView 拆分） | `src/App.tsx` (commit `f8cf14d`) |
 | P0-02 | 移除 markdown/katex/mermaid 的 `__vitePreload(true)` — **App.tsx:238 已部分落地** | S | `electron.vite.config.ts` |
 | P0-05 | deepseek-runtime 全树 freeze | M | `electron/main/agent/host-modules/deepseek/` |
 | P0-07 | Cordis 能力包静态 import 拆除（部分已在 WU-C 完成） | L | `electron/main/index.ts` |
