@@ -264,6 +264,7 @@ OpenBuddy 原生提供 **`zh-CN`(默认)** 与 **`en-US`** 双语界面。翻译
 | 文档索引 | [`docs/README.md`](docs/README.md) | [`docs/README.zh-CN.md`](docs/README.zh-CN.md) |
 | 入门指南 | [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) | [`docs/GETTING_STARTED.zh-CN.md`](docs/GETTING_STARTED.zh-CN.md) |
 | 架构 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | [`docs/ARCHITECTURE.zh-CN.md`](docs/ARCHITECTURE.zh-CN.md) |
+| 微内核差距基线 | — | [`docs/ARCHITECTURE_MICROKERNEL.zh-CN.md`](docs/ARCHITECTURE_MICROKERNEL.zh-CN.md) |
 | 常见问题 | [`docs/FAQ.md`](docs/FAQ.md) | [`docs/FAQ.zh-CN.md`](docs/FAQ.zh-CN.md) |
 | 性能 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | [`docs/PERFORMANCE.zh-CN.md`](docs/PERFORMANCE.zh-CN.md) |
 | 贡献指南 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | [`CONTRIBUTING.zh-CN.md`](CONTRIBUTING.zh-CN.md) |
@@ -557,6 +558,7 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 | **[`docs/README.md`](docs/README.md)** | 完整文档索引 |
 | **[`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md)** | 30 分钟开发者入门 |
 | **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** | 逐层架构深度剖析 |
+| **[`docs/ARCHITECTURE_MICROKERNEL.zh-CN.md`](docs/ARCHITECTURE_MICROKERNEL.zh-CN.md)** | WorkBuddy 对比、Pi/pi-web 差距、模块化计划与架构图 |
 | **[`docs/CODEBASE_ANALYSIS.zh-CN.md`](docs/CODEBASE_ANALYSIS.zh-CN.md)** | 2026-09-05 已核验的包清单与构建/运行时架构 |
 | **[`docs/PLUGIN_DEVELOPMENT.md`](docs/PLUGIN_DEVELOPMENT.md)** | 编写你的第一个 Cordis 能力 |
 | **[`docs/FAQ.md`](docs/FAQ.md)** | 常见问题 |

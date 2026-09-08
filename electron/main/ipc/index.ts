@@ -45,6 +45,7 @@ import { casdoorResources } from "../casdoor/casdoor-resources";
 import { askWeKnora, listWeKnoraKnowledgeBases, weknoraStatus } from "../casdoor/weknora-client";
 import { hasCasdoorCapability } from "@openbuddy/auth-casdoor";
 import { sendSafe } from "../collaboration/send-safe";
+import { createPiStreamTransport } from "../pi-stream-transport";
 import {
 	listCasdoorGroups,
 	listCasdoorOrganizations,
@@ -503,9 +504,9 @@ export async function dispatchTypedRpc(request: ClientRequest, source: "renderer
 				plan: null,
 				planOwner: "pi-plan-mode",
 				tasks: { sessionId, source: "pi-native", note: "todo list is owned by pi's @juicesharp/rpiv-todo when installed; otherwise the bundled pi todo tool." },
-				mcp: mcp.map((entry: { serverName: string; status: string; toolCount: number }) => ({ serverName: entry.serverName, status: entry.status, toolCount: entry.toolCount })),
+				mcp: mcp.map((entry: { serverName?: string; status?: string; toolCount?: number }) => ({ serverName: entry.serverName, status: entry.status, toolCount: entry.toolCount })),
 				plugins: plugins.map((entry: { id?: string; enabled?: boolean; status?: string }) => ({ id: entry.id, enabled: entry.enabled, status: entry.status })),
-				resources: { extensions: (pluginInventory as any)?.piExtensions?.length, skills: resources.skills?.length ?? 0, prompts: resources.prompts?.length ?? 0, themes: resources.themes?.length ?? 0, diagnostics: resources.diagnostics?.length ?? 0 },
+				resources: { extensions: (pluginInventory as any)?.piExtensions?.length, skills: resources.skills?.length ?? 0, prompts: resources.prompts?.length ?? 0, themes: resources.themes?.length ?? 0, diagnostics: Object.keys(resources.diagnostics ?? {}).length },
 				commands: Array.isArray(commands) ? commands.length : 0,
 				contextReady: Boolean(context),
 				pluginReadiness: readiness,
@@ -699,9 +700,6 @@ export async function dispatchHarnessRpc(request: ClientRequest, context: DeepSe
  * module is fully bound and sync access is O(1).
  */
 export async function registerIpc(getWindow: () => BrowserWindow | null): Promise<void> {
-  // P1-04: block until agent-host module is loaded so the Proxy access below
-  // resolves to a real binding instead of throwing "load in flight".
-  await ensureAgentHostLoaded();
 	const pendingServerRequests = new Map<string, { method: string; timer: ReturnType<typeof setTimeout> }>();
 	void import("../collaboration/collaboration-runtime").then(({ collaborationRuntime }) => {
 		collaborationRuntime.onUpdate((update) => {
@@ -726,6 +724,26 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		pendingServerRequests.set(rpcId, { method, timer });
 		sendSafe(win, "dsh://rpc", { type: "server-request", rpcId, method, payload });
 	};
+	const piStream = createPiStreamTransport();
+	ipcMain.handle("agent:stream-port", (event) => {
+		if (!event.senderFrame || event.senderFrame !== getWindow()?.webContents.mainFrame) {
+			throw new Error("pi stream port is only available to the main frame");
+		}
+		const win = getWindow();
+		if (!win || win.isDestroyed()) return { attached: false };
+		piStream.attach(win);
+		return { attached: true };
+	});
+	// Smoke-only publication hook for the real-Electron stream-port smoke
+	// (scripts/electron/stream-port-smoke.mjs). Registered only when the
+	// environment gate is on; in production this handler does not exist and
+	// the renderer invoke fails cleanly instead of touching the stream.
+	if (process.env.OPENBUDDY_STREAM_SMOKE === "1") {
+		ipcMain.handle("stream-smoke:publish", (_event, payload) => {
+			piStream.publish(payload);
+			return { ok: true };
+		});
+	}
 	for (const channel of [
 		"agent:new-session", "agent:prompt", "agent:steer", "agent:follow-up", "agent:abort", "agent:set-model", "agent:current-model",
 		"agent:plugin-list", "agent:plugin-inventory", "agent:plugin-snapshot", "agent:plugin-readiness", "agent:tools-list", "agent:deepseek-cordis-snapshot", "agent:deepseek-pi-describe", "agent:deepseek-cordis-invoke", "agent:plugin-events", "agent:event-log",
@@ -819,6 +837,9 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 			return serverResponse(message.rpcId, rpcError(error));
 		}
 	});
+	const bindAgentEventBridge = async (): Promise<void> => {
+		await ensureAgentHostLoaded();
+
 	// Streaming text/thinking deltas are NOT emitted here.
 	//
 	// This block used to hold a 16ms `textDeltaCoalescer` (P0-03) that
@@ -855,7 +876,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	// force buffered text out before tool output so ordering stayed correct.
 	// The remaining bridge emits deltas synchronously, so ordering is now
 	// guaranteed by construction with nothing to flush.
-	agentHost.onEvent((event: any) => {
+		agentHost.onEvent((event: any) => {
 		const win = getWindow();
 		if (!win || win.isDestroyed()) return;
 		const contents = win.webContents;
@@ -874,7 +895,9 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		// above `agentHost.onEvent`. `handle-session-event.ts` owns the whole
 		// AssistantMessageEvent surface (text, thinking, tool-call deltas).
 		if (payload.type === "tool_execution_start") {
-			sendSafe(win, "pi://update", { sessionId, type: "tool_call", toolCallId: payload.toolCallId, title: payload.toolName, kind: payload.toolName, status: "in_progress", rawInput: payload.args, content: [] });
+			const update = { sessionId, type: "tool_call", toolCallId: payload.toolCallId, title: payload.toolName, kind: payload.toolName, status: "in_progress", rawInput: payload.args, content: [] };
+			sendSafe(win, "pi://update", update);
+			piStream.publish(update);
 		}
 		// R-ToolStream-1 — forward incremental tool output (bash logs, build
 		// progress, etc.) to the renderer so ToolCallCard.StreamingToolOutput
@@ -884,13 +907,17 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		// The renderer side handler at useAgentSession.ts:523-555 already reads
 		// `update.partial / update.partialResult`, so this is the missing wire.
 		if (payload.type === "tool_execution_update") {
-			sendSafe(win, "pi://update", { sessionId, type: "tool_call_update", toolCallId: payload.toolCallId, update: { partial: true, partialResult: payload.partialResult } });
+			const update = { sessionId, type: "tool_call_update", toolCallId: payload.toolCallId, update: { partial: true, partialResult: payload.partialResult } };
+			sendSafe(win, "pi://update", update);
+			piStream.publish(update);
 		}
 		if (payload.type === "tool_execution_end") {
 			// F3 perf: result stays as a structured-clone-able object instead of
 			// being JSON.stringified on the hot path. The renderer can lazily
 			// stringify if it needs to display it.
-			sendSafe(win, "pi://update", { sessionId, type: "tool_call_update", toolCallId: payload.toolCallId, status: payload.isError ? "failed" : "completed", content: payload.result !== undefined ? [{ type: "text", text: typeof payload.result === "string" ? payload.result : JSON.stringify(payload.result) }] : [] });
+			const update = { sessionId, type: "tool_call_update", toolCallId: payload.toolCallId, status: payload.isError ? "failed" : "completed", content: payload.result !== undefined ? [{ type: "text", text: typeof payload.result === "string" ? payload.result : JSON.stringify(payload.result) }] : [] };
+			sendSafe(win, "pi://update", update);
+			piStream.publish(update);
 		}
 		// `agent_end` no longer emits `pi://complete` here. It was one of four
 		// completes the renderer received per prompt: `handle-session-event.ts`
@@ -923,9 +950,22 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	winForNativeEvents?.once("closed", onWindowClosed);
 	const unbindRendererEmitter = bindRendererEventEmitter((channel, payload) => {
 		const win = currentWindow();
-		if (win) sendSafe(win, channel, payload);
+		if (channel === "pi://update") {
+			piStream.publish(payload);
+			if (win) sendSafe(win, channel, payload);
+		} else {
+			// Flush buffered stream deltas before any ordering-sensitive
+			// terminal/renderer event (pi://complete, pi://turn-error, ...) so
+			// the port batch cannot land after the event that follows it.
+			piStream.flush();
+			if (win) sendSafe(win, channel, payload);
+		}
 	});
 	void unbindRendererEmitter;
+	};
+	void bindAgentEventBridge().catch((error) => {
+		console.error("[openbuddy-ipc] agent event bridge bind failed", error);
+	});
 
 	// === Session lifecycle (Pi SDK) ===
 	// Compatibility bridge for legacy renderer refresh calls. Pi provider/model
@@ -933,6 +973,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	// remaining renderer refresh path deterministic without a second backend.
 	ipcMain.handle("collaboration:snapshot", async () => {
 		const { collaborationRuntime } = await import("../collaboration/collaboration-runtime");
+		await ensureAgentHostLoaded();
 		const resources = await agentHost.resourceInventory();
 		collaborationRuntime.setCapabilityCards([
 			...resources.skills.map((entry: any) => ({
@@ -943,7 +984,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 				status: "available" as const,
 				contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const },
 			})),
-			...resources.extensions.map((entry: any) => ({
+			...(resources.extensions ?? []).map((entry: any) => ({
 				id: `pi-extension:${entry.id}`,
 				name: entry.name,
 				source: "pi-extension" as const,
@@ -951,7 +992,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 				status: entry.health === "failed" ? "degraded" as const : "available" as const,
 				contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const },
 			})),
-			...resources.prompts.map((entry: any) => ({
+			...(resources.prompts ?? []).map((entry: any) => ({
 				id: `prompt:${entry.name}`,
 				name: entry.name,
 				source: "prompt" as const,
@@ -985,14 +1026,14 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 			// 邮箱未连接时不影响协作 Inbox；邮件面板仍显示连接/授权入口。
 		}
 		return {
-			...snapshot,
+			...data,
 			mcpCapabilities: agentHost.mcpCapabilityGovernance(),
 			inbox: [...data.inbox, ...emailInboxItems].sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
 			capabilities: {
 				local: resources.skills.length,
 				room: 0,
-				organization: resources.extensions.filter((entry: any) => entry.sourceScope === "project").length,
-				directory: resources.prompts.length,
+				organization: (resources.extensions ?? []).filter((entry: any) => entry.sourceScope === "project").length,
+				directory: (resources.prompts ?? []).length,
 			},
 		};
 	});

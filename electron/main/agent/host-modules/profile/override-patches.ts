@@ -33,8 +33,8 @@ export function installOverridePatches(deps: {
   piHome: () => string;
   emitPluginEvent: (type: string, payload: unknown) => void;
 }): void {
-  piHome = deps.piHome;
-  emitPluginEvent = deps.emitPluginEvent;
+  if (deps.piHome) piHome = deps.piHome;
+  if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
 }
 
 export const OVERRIDE_PATCH_FILE = "openbuddy.overrides.patch.yml" as const;

@@ -16,17 +16,25 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+
+// Electron's `app.getPath("logs")` defaults to a platform-specific directory:
+//   - macOS: ~/Library/Logs/<appName> (capitalised productName).
+//   - Linux: ~/.config/<appName>/logs (snap variants differ).
+//   - Windows: %APPDATA%/<appName>/logs.
+// On CI we launch with --user-data-dir=<tmp>, which causes app.getPath("logs")
+// to resolve INSIDE the user-data dir (`<tmp>/logs`). We probe the known
+// platform defaults plus the current user-data dir so the smoke can find the
+// log on any host without re-implementing Electron's path resolver here.
 const userData = mkdtempSync(join(tmpdir(), "openbuddy-chat-smoke-"));
 mkdirSync(userData, { recursive: true });
 writeFileSync(join(userData, "pi-env.json"), JSON.stringify({ model: "smoke" }, null, 2));
 const electronBin = join(root, "node_modules", ".bin", "electron");
-
-// Both directories need to be checked because Electron's app.getPath("logs")
-// returns ~/Library/Logs/OpenBuddy on macOS by default (capital O), while our
-// smoke was originally looking for ~/Library/Logs/openbuddy (lowercase).
 const candidateLogDirs = [
+  userData,
   join(homedir(), "Library", "Logs", "OpenBuddy"),
   join(homedir(), "Library", "Logs", "openbuddy"),
+  join(homedir(), ".config", "OpenBuddy", "logs"),
+  join(homedir(), ".config", "openbuddy", "logs"),
 ];
 
 function log(label, value) { console.log(`[smoke:${label}]`, value); }
@@ -38,13 +46,22 @@ async function readMergedLog() {
   let largest = 0;
   for (const dir of candidateLogDirs) {
     if (!existsSync(dir)) continue;
-    const here = readdirSync(dir).filter((f) => f.endsWith(".log")).sort();
-    for (const f of here) {
-      const full = join(dir, f);
+    // Search one level deep so userData/logs/openbuddy.log (Electron's default
+    // when launched with --user-data-dir) and userData/openbuddy.log both hit.
+    const here = readdirSync(dir, { withFileTypes: true });
+    const candidates = [];
+    for (const entry of here) {
+      if (entry.isFile() && entry.name.endsWith(".log")) candidates.push(join(dir, entry.name));
+      else if (entry.isDirectory()) {
+        const nested = readdirSync(join(dir, entry.name)).filter((f) => f.endsWith(".log"));
+        for (const f of nested) candidates.push(join(dir, entry.name, f));
+      }
+    }
+    for (const full of candidates.sort()) {
       const size = statSync(full).size;
       largest = Math.max(largest, size);
       merged += readFileSync(full, "utf8");
-      files.push(`${dir}/${f}`);
+      files.push(full);
     }
   }
   return { merged, files, largest };

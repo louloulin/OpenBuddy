@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Context } from "@openbuddy/cordis";
 import { ClientModuleSystem, createDeepSeekClientCompatibilityModules, DeepSeekLayoutController, DeepSeekSessionsService, DeepSeekSlotRegistry, DeepSeekThemeService, DeepSeekWorkspaceService, RendererContributionRegistry, RendererPluginLoader, createRendererContext, DeepSeekSlotCore, type RendererAgentEvent } from "./index";
 
@@ -861,7 +861,7 @@ describe("RendererPluginLoader", () => {
 		await remotes.apply(context);
 		await context.start();
 		const remote = context.get("remote") as { $mount: (contribution: unknown) => Promise<() => Promise<void>> };
-		const { z } = await import("../../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/index.js");
+		const { z } = await import("zod");
 		const stop = await remote.$mount({
 			package: "strict-fixture",
 			descriptors: [{
@@ -1177,10 +1177,7 @@ describe("RendererPluginLoader", () => {
   it("loads the external dsh client face and registers a WorkBuddy contribution", async () => {
     const context = createRendererContext(new Context());
     const loader = new RendererPluginLoader(context);
-    const module = await import(pathToFileURL(join(
-      process.cwd(),
-      "packages/runtime/openbuddy-plugin-host/src/__fixtures__/external-dsh-plugin/client.js",
-    )).href);
+    const module = await import(pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "runtime", "openbuddy-plugin-host", "src", "__fixtures__", "external-dsh-plugin", "client.js")).href);
     await loader.load([{ id: "external-dsh", name: "@fixture/external-dsh-plugin/client", inject: ["rendererContributions"] }], new Map([
       ["external-dsh", module.default],
     ]));

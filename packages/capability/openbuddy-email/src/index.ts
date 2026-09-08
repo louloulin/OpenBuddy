@@ -1568,7 +1568,47 @@ interface EmailStore {
 	rules: EmailRule[]
 }
 function storePath(): string { return path.join(process.env.PI_CODING_AGENT_DIR ?? path.join(process.env.PI_HOME ?? os.homedir(), ".pi", "agent"), "openbuddy-email.json") }
-async function readStore(): Promise<EmailStore> { try { const item = JSON.parse(await readFile(storePath(), "utf8")) as Partial<EmailStore>; return { drafts: Array.isArray(item.drafts) ? item.drafts : [], audit: Array.isArray(item.audit) ? item.audit : [], connections: Array.isArray(item.connections) ? item.connections : [], senderPolicies: Array.isArray(item.senderPolicies) ? item.senderPolicies : [], shares: Array.isArray(item.shares) ? item.shares : [], reminders: Array.isArray(item.reminders) ? item.reminders : [], projects: Array.isArray(item.projects) ? item.projects : [], tags: Array.isArray(item.tags) ? item.tags : [], threadTags: Array.isArray(item.threadTags) ? item.threadTags : [], scheduledSends: Array.isArray(item.scheduledSends) ? item.scheduledSends : [], pendingSends: Array.isArray(item.pendingSends) ? item.pendingSends : [], analyses: Array.isArray(item.analyses) ? item.analyses : [], inboxReceipts: Array.isArray(item.inboxReceipts) ? item.inboxReceipts : [], syncStates: Array.isArray(item.syncStates) ? item.syncStates : [], processingPlans: Array.isArray(item.processingPlans) ? item.processingPlans : [], rules: Array.isArray(item.rules) ? item.rules : [] } } catch { return { drafts: [], audit: [], connections: [], senderPolicies: [], shares: [], reminders: [], projects: [], tags: [], threadTags: [], scheduledSends: [], pendingSends: [], analyses: [], inboxReceipts: [], syncStates: [], processingPlans: [], rules: [] } } }
+function emptyEmailStore(): EmailStore { return { drafts: [], audit: [], connections: [], senderPolicies: [], shares: [], reminders: [], projects: [], tags: [], threadTags: [], scheduledSends: [], pendingSends: [], analyses: [], inboxReceipts: [], syncStates: [], processingPlans: [], rules: [] } }
+async function readStore(): Promise<EmailStore> {
+	let raw: string
+	try {
+		raw = await readFile(storePath(), "utf8")
+	} catch (error) {
+		// Only a missing file is an empty store; transient IO errors (EACCES,
+		// EMFILE, …) must not masquerade as "no data" — a later writeStore()
+		// would then permanently wipe every draft/rule/audit entry.
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return emptyEmailStore()
+		throw error
+	}
+	try {
+		const item = JSON.parse(raw) as Partial<EmailStore>
+		const empty = emptyEmailStore()
+		return {
+			drafts: Array.isArray(item.drafts) ? item.drafts : empty.drafts,
+			audit: Array.isArray(item.audit) ? item.audit : empty.audit,
+			connections: Array.isArray(item.connections) ? item.connections : empty.connections,
+			senderPolicies: Array.isArray(item.senderPolicies) ? item.senderPolicies : empty.senderPolicies,
+			shares: Array.isArray(item.shares) ? item.shares : empty.shares,
+			reminders: Array.isArray(item.reminders) ? item.reminders : empty.reminders,
+			projects: Array.isArray(item.projects) ? item.projects : empty.projects,
+			tags: Array.isArray(item.tags) ? item.tags : empty.tags,
+			threadTags: Array.isArray(item.threadTags) ? item.threadTags : empty.threadTags,
+			scheduledSends: Array.isArray(item.scheduledSends) ? item.scheduledSends : empty.scheduledSends,
+			pendingSends: Array.isArray(item.pendingSends) ? item.pendingSends : empty.pendingSends,
+			analyses: Array.isArray(item.analyses) ? item.analyses : empty.analyses,
+			inboxReceipts: Array.isArray(item.inboxReceipts) ? item.inboxReceipts : empty.inboxReceipts,
+			syncStates: Array.isArray(item.syncStates) ? item.syncStates : empty.syncStates,
+			processingPlans: Array.isArray(item.processingPlans) ? item.processingPlans : empty.processingPlans,
+			rules: Array.isArray(item.rules) ? item.rules : empty.rules,
+		}
+	} catch (error) {
+		// Corrupt store: preserve the raw bytes for recovery instead of letting
+		// the next write overwrite them with an empty store.
+		const backup = `${storePath()}.corrupt-${Date.now()}`
+		await writeFile(backup, raw, { encoding: "utf8", mode: 0o600 }).catch(() => undefined)
+		throw new Error(`openbuddy-email store is corrupt; a copy was preserved at ${backup} (${String(error)})`)
+	}
+}
 let storeWriteQueue: Promise<void> = Promise.resolve()
 function writeStore(store: EmailStore): Promise<void> {
 	const operation = storeWriteQueue.then(async () => {
@@ -1992,11 +2032,24 @@ export class Email extends OpenBuddyService {
 			else if (injectedGraphProvider) this.provider = injectedGraphProvider
 			else if (injectedJmapProvider) this.provider = injectedJmapProvider
 		} catch { /* optional direct Gmail API provider */ }
-		this.reminderTimer = setInterval(() => { void this.dispatchDueReminders(); void this.dispatchDueScheduledSends(); void this.runScheduledRules() }, 30_000)
+		this.reminderTimer = setInterval(() => {
+			const swallow = (label: string) => (cause: unknown) => {
+				if (process.env.NODE_ENV !== "test") console.error(`[openbuddy-email] ${label} failed`, cause)
+			}
+			void this.dispatchDueReminders().catch(swallow("reminder dispatch"))
+			void this.dispatchDueScheduledSends().catch(swallow("scheduled send dispatch"))
+			void this.runScheduledRules().catch(swallow("scheduled rule run"))
+		}, 30_000)
 		this.reminderTimer.unref?.()
-		this.pendingSendTimer = setInterval(() => { void this.dispatchDuePendingSends() }, 1_000)
+		this.pendingSendTimer = setInterval(() => {
+			void this.dispatchDuePendingSends().catch((cause) => {
+				if (process.env.NODE_ENV !== "test") console.error("[openbuddy-email] pending send dispatch failed", cause)
+			})
+		}, 1_000)
 		this.pendingSendTimer.unref?.()
-		void this.runScheduledRules()
+		void this.runScheduledRules().catch((cause) => {
+			if (process.env.NODE_ENV !== "test") console.error("[openbuddy-email] scheduled rule startup failed", cause)
+		})
 		ctx.effect(() => () => { clearInterval(this.reminderTimer); clearInterval(this.pendingSendTimer); for (const off of this.registryPersistListeners.splice(0)) off(); if (serviceRef === this) serviceRef = null })
 		const injected = ctx.get("emailProviderRegistry") as EmailProviderRegistry | undefined
 		if (injected) this.registry = injected
@@ -2762,7 +2815,9 @@ export class Email extends OpenBuddyService {
 					const result = await this.enqueue(() => provider.shareThread!(input))
 					await this.audit({ accountId: input.accountId, operation: result.operation, status: result.ok ? "completed" : "failed", resourceId: input.threadId, provider: result.provider })
 					return result
-				} catch { }
+				} catch (err) {
+					console.warn(`[openbuddy-email] shareThread provider call failed; falling back to local`, err instanceof Error ? err.message : err)
+				}
 			}
 		await this.notify("邮件线程已分享", `${input.threadId} 已分享至协作频道 ${input.channelId}`)
 		return { ok: true, provider: "openbuddy-local", operation: "share-thread", threadId: input.threadId, receipt: id("local-share") }
@@ -2777,7 +2832,9 @@ export class Email extends OpenBuddyService {
 				const result = await this.enqueue(() => provider.createReminder!(input))
 				await this.audit({ accountId: input.accountId, operation: result.operation, status: result.ok ? "completed" : "failed", resourceId: input.threadId, provider: result.provider })
 				return result
-			} catch { }
+			} catch (err) {
+				console.warn(`[openbuddy-email] createReminder provider call failed; falling back to local`, err instanceof Error ? err.message : err)
+			}
 		}
 		await this.notify("邮件跟进提醒已创建", `${input.description} · ${input.remindAt}`)
 		return { ok: true, provider: "openbuddy-local", operation: "create-reminder", threadId: input.threadId, receipt: reminder.id }
@@ -2795,7 +2852,9 @@ export class Email extends OpenBuddyService {
 				const result = await this.enqueue(() => provider.moveToProject!(input))
 				await this.audit({ accountId: input.accountId, operation: result.operation, status: result.ok ? "completed" : "failed", resourceId: input.threadId, provider: result.provider })
 				return result
-			} catch { }
+			} catch (err) {
+				console.warn(`[openbuddy-email] moveToProject provider call failed; falling back to local`, err instanceof Error ? err.message : err)
+			}
 		}
 		return { ok: true, provider: "openbuddy-local", operation: "move-to-project", threadId: input.threadId, receipt: id("local-project") }
 	}
@@ -3181,7 +3240,9 @@ export class Email extends OpenBuddyService {
 			try {
 				const provider = this.getProvider()
 				if (provider.createReminder) await this.enqueue(() => provider.createReminder!({ accountId: prepared.result.analysis.accountId, threadId: prepared.result.analysis.threadId, description: `邮件行动项：${action.content}${action.owner ? `；负责人：${action.owner}` : ""}`, remindAt: action.dueAt! }))
-			} catch { }
+			} catch (err) {
+				console.warn(`[openbuddy-email] analysis-create-reminders loop iteration failed (action ${index})`, err instanceof Error ? err.message : err)
+			}
 		}
 		for (const reminder of prepared.result.reminders) await this.notify("邮件跟进提醒已创建", `${reminder.threadId} · ${reminder.receipt ?? ""}`)
 		await this.audit({ accountId: prepared.result.analysis.accountId, operation: "analysis-create-reminders", status: "completed", resourceId: prepared.result.analysis.threadId, provider: "openbuddy-local" })

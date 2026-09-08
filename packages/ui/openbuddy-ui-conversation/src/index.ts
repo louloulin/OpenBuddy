@@ -21,6 +21,14 @@ export type { SlotMap };
 
 export { ChatView } from "./ChatView";
 export { ChatRail } from "./ChatRail";
+export { ChatMinimap, minimapColor } from "./ChatMinimap";
+export type { ChatMinimapProps, ChatMinimapSegment, ChatMinimapSegmentKind } from "./ChatMinimap";
+export { BranchNavigator, branchLabel } from "./BranchNavigator";
+export type { BranchNavigatorProps, BranchNode } from "./BranchNavigator";
+export { ExtensionStatusBar } from "./ExtensionStatusBar";
+export type { ExtensionStatusBarProps, ExtensionStatus, ExtensionStatusEntry } from "./ExtensionStatusBar";
+export { ExtensionWidgets, widgetBodyText } from "./ExtensionWidgets";
+export type { ExtensionWidgetsProps, ExtensionWidget, ExtensionWidgetAction } from "./ExtensionWidgets";
 export { Composer } from "./Composer";
 export { ContextUsagePill } from "./ContextUsagePill";
 export { FileChangesPanel } from "./FileChangesPanel";

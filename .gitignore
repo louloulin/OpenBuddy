@@ -6,6 +6,7 @@ package-lock.json
 # Build output
 dist/
 dist-ssr/
+.next/
 
 # Tauri / Rust
 src-tauri/target/
@@ -182,3 +183,9 @@ test-results/
 packages/*/node_modules
 packages/*/*/node_modules
 !docs/AI_CHAT_PLAN.md
+!docs/WORKBUDDY_PI_OPTIMIZATION_PLAN.md
+!docs/PLUGIN_SYSTEM.md
+!docs/OPENBUDDY-PI-VISION.md
+
+# pi agent task output
+.pi/

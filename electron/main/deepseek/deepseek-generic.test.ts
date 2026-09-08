@@ -1,7 +1,7 @@
 import { Context } from "@openbuddy/cordis";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HarnessPluginLoader } from "@openbuddy/plugin-host";
-import { resolveDeepSeekGenericModule } from "./deepseek-generic";
+import { resolveDeepSeekGenericModule, __resetGenericServiceRegistryForTest } from "./deepseek-generic";
 
 vi.mock("electron", () => ({
   app: { getPath: () => "/tmp/openbuddy-deepseek-generic-test" },
@@ -13,6 +13,9 @@ vi.mock("../casdoor/casdoor-auth", () => ({
 }));
 
 describe("DeepSeek generic compatibility", () => {
+  beforeEach(() => {
+    __resetGenericServiceRegistryForTest();
+  });
   it("loads the official terminal package graph through HarnessPluginLoader and rolls back safely", async () => {
     const context = new Context();
     const tools = new Map<string, { name?: string; execute?: (...args: unknown[]) => Promise<unknown> }>();

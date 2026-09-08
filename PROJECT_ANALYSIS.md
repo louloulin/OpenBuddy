@@ -96,6 +96,12 @@ OpenBuddy/
 
 ## 3. 三层架构详解
 
+### 3.1 微内核增量基线（2026-09-07）
+
+OpenBuddy 当前采用“微内核 + 领域模块 + Pi 兼容运行时”方向。完整的差距矩阵、目标架构图、WorkBuddy 现场观察和分阶段计划见 [`docs/ARCHITECTURE_MICROKERNEL.zh-CN.md`](docs/ARCHITECTURE_MICROKERNEL.zh-CN.md)。
+
+当前 composition root 为 `electron/main/agent/agent-host.ts`；行为分别落在 profile、session、plugin、runtime 四个领域。初始化统一经过 `electron/main/agent/host-modules/bootstrap/init-pipeline.ts`，通过 `microkernel-host.ts` 安装 host-modules。`InstallHostModuleDeps`、`InitPipelineDeps` 和 facade 是下一阶段需要进一步收紧的契约。
+
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  Layer 1: React Renderer (src/, packages/ui/*)                   │

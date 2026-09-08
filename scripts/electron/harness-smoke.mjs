@@ -137,12 +137,12 @@ async function run() {
     throw new Error(`Pi parent fixture was not discovered: ${JSON.stringify(fixtureSessions)}`);
   }
   await window.locator(".sidebar__conv", { hasText: "Harness Parent" }).click();
-  await window.locator("button[title='子代理运行时']").waitFor({ state: "visible", timeout: 10_000 });
-  const shareToggle = window.locator("button[title='导出 / 分享本会话']");
+  await window.locator("button[aria-label='子代理运行时']").waitFor({ state: "visible", timeout: 10_000 });
+  const shareToggle = window.locator("button[aria-label='导出 / 分享本会话']");
   if (await shareToggle.count() > 0 && (await shareToggle.getAttribute("class"))?.includes("--active")) {
     await shareToggle.evaluate((button) => button.click());
   }
-  await window.locator("button[title='子代理运行时']").evaluate((button) => button.click());
+  await window.locator("button[aria-label='子代理运行时']").evaluate((button) => button.click());
   const subagentPanel = window.locator(".subagent-panel");
   try {
     await subagentPanel.getByRole("button", { name: "Harness One Shot" }).waitFor({ state: "visible", timeout: 10_000 });

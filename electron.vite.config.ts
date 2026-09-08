@@ -20,9 +20,9 @@
  *     packages AND runtime deps like react / katex / mermaid / pi-coding-agent
  *     - gets bundled into `out/main/index.js` so the runtime never has to
  *     resolve them.
- *   - `output.inlineDynamicImports: true` force-inlines the lazy
- *     `await import(...)` plugin loader calls into the main chunk, for
- *     the same reason.
+ *   - Main-process workspace dependencies are bundled into the generated
+ *     chunks. Dynamic imports stay as relative chunks so the agent host and
+ *     optional plugin graph are not evaluated during cold boot.
  *   - The renderer is unaffected (Vite bundles everything by default).
  *   - `@openbuddy/<pkg>/<subpath>` exports (e.g. `./yaml-patch`) get
  *     their own alias entries; Vite's alias is prefix-matching, so the
@@ -186,14 +186,11 @@ export default defineConfig({
           /^@earendil-works\/pi-/,
         ],
         output: {
-          // Force-bundle every dynamic import (`await import(...)`) into
-          // the main chunk. The source uses dynamic imports to lazily
-          // load plugins (see electron/main/openbuddy-core-plugin.ts),
-          // but the Node ESM loader cannot resolve those runtime
-          // `import()` calls when their specifier points at `.ts`
-          // source. Inlining them trades a slightly bigger initial
-          // bundle for a working app.
-          inlineDynamicImports: true,
+          // Keep `await import(...)` boundaries as real ESM chunks. All
+          // workspace TypeScript dependencies are still resolved through
+          // the aliases above and compiled by Rollup, so emitted chunks do
+          // not depend on Node loading `.ts` files at runtime.
+          inlineDynamicImports: false,
         },
       },
     },

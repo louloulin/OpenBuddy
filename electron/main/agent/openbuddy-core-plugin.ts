@@ -220,25 +220,18 @@ export function collaborationRuntimeBridge(): { mount: (ctx: Context) => () => v
 }
 
 export async function apply(ctx: Context): Promise<() => void> {
-  const { mountSession } = await import("@openbuddy/core-session");
-  const { mountAuthorization } = await import("@openbuddy/capability-authorization");
-  const { mountPermission } = await import("@openbuddy/auth-permission");
-  // openbuddy-plan removed; plan-mode is delegated to pi-plan-mode (passthrough).
-  // openbuddy-automation removed; automation is delegated to pi-background-tasks + pi-goal (passthrough).
-  const { mountCalendar } = await import("@openbuddy/capability-calendar");
-  const { mountFsLocal } = await import("@openbuddy/fs-fs-local");
-  const { mountTeam } = await import("@openbuddy/team-team");
-  const { mountMcpClient } = await import("@openbuddy/capability-mcp-client");
+  // mountSession / mountAuthorization / mountPermission / mountCalendar / mountFsLocal /
+  // mountTeam / mountMcpClient 都由对应的 capability plugin (capability-plugins.ts)
+  // 加载, 这里不再重复调用, 否则同一个 ctx 上同一个 service 会被 set 两次.
   const { mountEmail, EmailProviderRegistry } = await import("@openbuddy/capability-email");
   const { defaultTaskService } = await import("./host-modules/task-service");
 
-  mountSession(ctx);
-  mountAuthorization(ctx);
-  mountPermission(ctx);
-  mountCalendar(ctx);
-  mountFsLocal(ctx);
-  mountTeam(ctx);
-  mountMcpClient(ctx);
+  // NOTE: mountSession / mountAuthorization / mountPermission / mountCalendar
+  //       / mountFsLocal / mountTeam / mountMcpClient 都由对应的 capability plugin
+  //       (capability-plugins.ts 中的 sessionPlugin / authorizationPlugin /
+  //        permissionPlugin / calendarPlugin / fsLocalPlugin / teamPlugin /
+  //        mcpClientPlugin) 加载, 不在这里重复调用, 否则同一个 ctx 上同一个
+  //        service 会被 set 两次, 第二次 Cordis 抛 `service X has been registered`.
   // Phase R3.0 (Stage G-1d) — mount the task Cordis service so the
   // `pi-todo` adapter's real-tool path stops no-op'ing in production.
   // Previously `ctx.get("task")` returned undefined because the service
@@ -270,7 +263,8 @@ export async function apply(ctx: Context): Promise<() => void> {
     credentialResolver: { resolve: resolveEmailCredential, authorize: authorizeEmailCredential },
   });
   ctx.provide("emailProviderRegistry", emailRegistry);
-  mountEmail(ctx);
+  // mountEmail 不在这里调用, 由 emailPlugin (capability-plugins.ts) 加载, 否则同一个
+  // ctx 上 `email` service 会被 set 两次, 抛 `service email has been registered`.
   const cleanupCollaboration = mountCollaborationRuntime(ctx);
 
   // Optionally expose BuddyCapability cards as MCP tools over stdio when the

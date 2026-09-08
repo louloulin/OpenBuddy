@@ -302,6 +302,17 @@ const PRESETS: Record<ProviderKind, Preset> = {
     placeholderKey: "sk-...",
     helpUrl: "platform.minimaxi.com",
   },
+  orcarouter: {
+    label: "Orcarouter.ai (OpenAI 兼容网关)",
+    baseUrl: "https://api.orcarouter.ai/v1",
+    apiBackend: "chat_completions",
+    authScheme: "bearer",
+    // Routing aliases that let the gateway pick a model per request; users
+    // can also type any concrete id (`openai/gpt-5.6-luna`, etc.).
+    models: ["orcarouter/auto", "orcarouter/cheapest", "orcarouter/balanced", "orcarouter/quality"],
+    placeholderKey: "sk-orca-...",
+    helpUrl: "orcarouter.ai",
+  },
   new_api: {
     label: "New API（OpenAI 兼容网关）",
     // New API is self-hosted; the instance URL must be supplied by the user.
@@ -1043,6 +1054,40 @@ function ProviderEditor({
   const [showKey, setShowKey] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(draft.providerKind === "custom" || draft.providerKind === "new_api");
   const [error, setError] = useState<string | null>(null);
+  // Test connection status (separate from save `error` so a red save-error
+  // banner doesn't get overwritten by a later test result, and vice versa).
+  type TestStatus = "idle" | "testing" | "ok" | "degraded" | "unreachable" | "error";
+  const [testStatus, setTestStatus] = useState<TestStatus>("idle");
+  const [testMessage, setTestMessage] = useState<string>("");
+
+  const handleTestConnection = async () => {
+    setTestStatus("testing");
+    setTestMessage("Testing…");
+    try {
+      const w = window as unknown as { api: { invoke: (ch: string, args: unknown) => Promise<unknown> } };
+      const snap = (await w.api.invoke("agent:providers-test", {
+        baseUrl: form.baseUrl,
+        apiKey: form.apiKey,
+        providerKind: form.providerKind,
+      })) as { status?: string; modelsCount?: number; latencyMs?: number; errorCode?: string; errorMessage?: string };
+      if (snap.status === "healthy") {
+        setTestStatus("ok");
+        setTestMessage(`✓ ${snap.modelsCount ?? 0} models reachable (${snap.latencyMs ?? "?"} ms)`);
+      } else if (snap.status === "degraded") {
+        setTestStatus("degraded");
+        setTestMessage(`⚠ ${snap.errorCode ?? "?"} — ${snap.errorMessage ?? "Provider returned a non-2xx status"}`);
+      } else if (snap.status === "unreachable") {
+        setTestStatus("unreachable");
+        setTestMessage(`✗ ${snap.errorCode ?? "?"} — ${snap.errorMessage ?? "Cannot reach provider"}`);
+      } else {
+        setTestStatus("error");
+        setTestMessage(`? Unexpected status: ${snap.status}`);
+      }
+    } catch (err) {
+      setTestStatus("error");
+      setTestMessage(`IPC bridge error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
 
   const preset = PRESETS[form.providerKind];
   // "Custom-like" kinds have no preset baseUrl → the user must supply one, so
@@ -1126,6 +1171,7 @@ function ProviderEditor({
                     "minimax",
                     "minimax_openai",
                     "new_api",
+                    "orcarouter",
                     "custom",
                     "custom_anthropic",
                   ] as ProviderKind[]
@@ -1264,6 +1310,15 @@ function ProviderEditor({
           )}
 
           {error && <div className="models-settings-panel__editor-error">{error}</div>}
+          {testStatus !== "idle" && (
+            <div
+              className="models-settings-panel__editor-error"
+              data-testid="provider-test-result"
+              data-status={testStatus}
+            >
+              {testMessage}
+            </div>
+          )}
         </div>
 
         <footer className="models-settings-panel__editor-footer">
@@ -1272,6 +1327,17 @@ function ProviderEditor({
             onClick={onCancel}
           >
             <span className="cb-button__content">取消</span>
+          </button>
+          <button
+            type="button"
+            className="cb-button cb-button--secondary cb-button--medium models-settings-panel__editor-test"
+            onClick={handleTestConnection}
+            disabled={testStatus === "testing" || !form.baseUrl}
+            data-testid="provider-test-button"
+          >
+            <span className="cb-button__content">
+              {testStatus === "testing" ? "Testing…" : "Test connection"}
+            </span>
           </button>
           <button
             className="cb-button cb-button--primary cb-button--medium models-settings-panel__editor-save"

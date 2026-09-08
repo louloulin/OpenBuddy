@@ -32,6 +32,7 @@ import type { ProviderRegistrySource } from "../agent-host-provider-registry";
 import type { OpenBuddyThinkingLevel } from "../../ipc/validation";
 import { type AgentHostState, } from "./_state-shape";
 import { createDefaultAgentHostState } from "./_default-state";
+import type { ProviderConfig, ModelConfig } from "./bootstrap/agent-host-types";
 
 /**
  * Phase 8.3 Architectural Refactor: 顶部 from "../agent-host" 反向依赖消除。
@@ -43,9 +44,9 @@ import { createDefaultAgentHostState } from "./_default-state";
  */
 
 let state: AgentHostState = createDefaultAgentHostState();
-let emitRendererEvent: (channel: string, payload: unknown) => void;
-let piHome: () => string;
-let readModelsConfig: () => Promise<{ providers: Record<string, unknown> }>;
+let emitRendererEvent: (channel: string, payload: unknown) => void = () => undefined;
+let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd(); // fallback kept for back-compat; init will replace with real agentHome()
+let readModelsConfig: () => Promise<{ providers: Record<string, unknown> }> = async () => ({ providers: {} });
 
 export function installAgentModel(deps: {
 	state: AgentHostState;
@@ -53,10 +54,13 @@ export function installAgentModel(deps: {
 	piHome: () => string;
 	readModelsConfig: () => Promise<{ providers: Record<string, unknown> }>;
 }): void {
-	state = deps.state;
-	emitRendererEvent = deps.emitRendererEvent;
-	piHome = deps.piHome;
-	readModelsConfig = deps.readModelsConfig;
+	// v6-G M1 defensive install: 只在 deps 提供有效值时才覆盖 module-level 单例.
+	// 否则保留默认 placeholder (async () => ({ providers: {} })), 避免 IPC handler
+	// 在 init() 之前调用 setModel() 等时拿到 undefined → "X is not a function".
+	if (deps.state) state = deps.state;
+	if (deps.emitRendererEvent) emitRendererEvent = deps.emitRendererEvent;
+	if (deps.piHome) piHome = deps.piHome;
+	if (deps.readModelsConfig) readModelsConfig = deps.readModelsConfig;
 }
 
 async function setModel(modelId: string, options?: { traceId?: string; sessionId?: string }): Promise<void> {
@@ -165,7 +169,7 @@ async function authStatus() {
   };
 }
 
-async function providerCatalog() {
+async function providerCatalog(): Promise<{ providers: readonly ProviderConfig[]; models: readonly ModelConfig[] }> {
   const runtime = state.modelRuntime;
   if (!runtime) return { providers: [], models: [] };
   // getRegisteredProviderIds() does not list custom providers loaded from
@@ -251,7 +255,7 @@ async function providerCatalog() {
     // thinking to "off". Pi's Model type always carries the field.
     return [{ modelId, providerId, name: value.name ?? modelId, contextWindow: value.contextWindow, reasoning: value.reasoning ?? false }];
   });
-  return { providers, models };
+  return { providers: providers as unknown as readonly ProviderConfig[], models: models as unknown as readonly ModelConfig[] };
 }
 
 export {

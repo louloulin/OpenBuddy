@@ -16,6 +16,7 @@
  */
 import { app, BrowserWindow } from "electron";
 import { perfTraceMark } from "../observability/perf-trace";
+import { installProcessGuards } from "./process-guards";
 
 export interface AppLifecycleDeps {
   /**
@@ -55,6 +56,11 @@ export interface AppLifecycleDeps {
  * actual UI boot happens inside it.
  */
 export function installAppLifecycle(deps: AppLifecycleDeps): void {
+  // A-2: install global process-level error guards (unhandledRejection /
+  // uncaughtException) BEFORE any other app wiring so dropped promises from
+  // the very first tick of the main process are captured.
+  installProcessGuards();
+
   const {
     createMainWindow,
     installAppMenu,

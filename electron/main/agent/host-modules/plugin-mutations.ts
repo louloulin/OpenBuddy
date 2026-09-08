@@ -105,29 +105,29 @@ export function installPluginMutations(deps: {
 	artifactPackageJsonByName: (...args: unknown[]) => unknown;
 	discoverRendererPluginManifest: (...args: any[]) => any;
 }): void {
-	state = deps.state;
-	emitPluginEvent = deps.emitPluginEvent;
-	isPathWithin = deps.isPathWithin;
-	profileArtifactModuleUrl = deps.profileArtifactModuleUrl;
-	profilePackages = deps.profilePackages;
-	pluginLifecycleQueue = deps.pluginLifecycleQueue;
-	piRuntimeCoordinator = deps.piRuntimeCoordinator;
-	setProfilePiResourcePaths = deps.setProfilePiResourcePaths;
-	refreshMarketplacePiResourcePaths = deps.refreshMarketplacePiResourcePaths;
-	refreshHookConfigs = deps.refreshHookConfigs;
-	syncMarketplacePiExtensionStatuses = deps.syncMarketplacePiExtensionStatuses;
-	startProfileWatchers = deps.startProfileWatchers;
-	readOverridePatches = deps.readOverridePatches;
-	runtimeProfileBundle = deps.runtimeProfileBundle;
-	reconcileProfileArtifacts = deps.reconcileProfileArtifacts;
-	configurePiExtensions = deps.configurePiExtensions;
-	reportPiExtensionErrors = deps.reportPiExtensionErrors;
-	captureReloadableContextServices = deps.captureReloadableContextServices;
-	restoreCapturedContextServices = deps.restoreCapturedContextServices;
-	rollbackPiProfile = deps.rollbackPiProfile;
-	scheduleProfileReload = deps.scheduleProfileReload;
-	artifactPackageJsonByName = deps.artifactPackageJsonByName;
-	discoverRendererPluginManifest = deps.discoverRendererPluginManifest;
+	if (deps.state) state = deps.state;
+	if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
+	if (deps.isPathWithin) isPathWithin = deps.isPathWithin;
+	if (deps.profileArtifactModuleUrl) profileArtifactModuleUrl = deps.profileArtifactModuleUrl;
+	if (deps.profilePackages) profilePackages = deps.profilePackages;
+	if (deps.pluginLifecycleQueue) pluginLifecycleQueue = deps.pluginLifecycleQueue;
+	if (deps.piRuntimeCoordinator) piRuntimeCoordinator = deps.piRuntimeCoordinator;
+	if (deps.setProfilePiResourcePaths) setProfilePiResourcePaths = deps.setProfilePiResourcePaths;
+	if (deps.refreshMarketplacePiResourcePaths) refreshMarketplacePiResourcePaths = deps.refreshMarketplacePiResourcePaths;
+	if (deps.refreshHookConfigs) refreshHookConfigs = deps.refreshHookConfigs;
+	if (deps.syncMarketplacePiExtensionStatuses) syncMarketplacePiExtensionStatuses = deps.syncMarketplacePiExtensionStatuses;
+	if (deps.startProfileWatchers) startProfileWatchers = deps.startProfileWatchers;
+	if (deps.readOverridePatches) readOverridePatches = deps.readOverridePatches;
+	if (deps.runtimeProfileBundle) runtimeProfileBundle = deps.runtimeProfileBundle;
+	if (deps.reconcileProfileArtifacts) reconcileProfileArtifacts = deps.reconcileProfileArtifacts;
+	if (deps.configurePiExtensions) configurePiExtensions = deps.configurePiExtensions;
+	if (deps.reportPiExtensionErrors) reportPiExtensionErrors = deps.reportPiExtensionErrors;
+	if (deps.captureReloadableContextServices) captureReloadableContextServices = deps.captureReloadableContextServices;
+	if (deps.restoreCapturedContextServices) restoreCapturedContextServices = deps.restoreCapturedContextServices;
+	if (deps.rollbackPiProfile) rollbackPiProfile = deps.rollbackPiProfile;
+	if (deps.scheduleProfileReload) scheduleProfileReload = deps.scheduleProfileReload;
+	if (deps.artifactPackageJsonByName) artifactPackageJsonByName = deps.artifactPackageJsonByName;
+	if (deps.discoverRendererPluginManifest) discoverRendererPluginManifest = deps.discoverRendererPluginManifest;
 }
 import * as piResources from "../pi-resources";
 import { providerCatalog } from "./agent-model";
@@ -162,23 +162,21 @@ import type { ProviderRegistrySource } from "../agent-host-provider-registry";
 // profile / bundle helpers
 // ---------------------------------------------------------------------------
 
-export async function reloadProfile(): Promise<void> {
-  scheduleProfileReload();
-  await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 160));
-  await state.profileReloadPromise;
-}
+// v7-A: 3-stage pipeline extracted to _surface/reload-profile. Same logic, testable.
+import { reloadProfile } from "./_surface/reload-profile";
+export { reloadProfile };
 
 export async function installProfileBundle(sourcePath: string): Promise<ProfilePackageInfo> {
   if (!state.profileOptions) throw new Error("openbuddy-profile: profile is not initialized");
   const result = await installProfilePackage(state.profileOptions, sourcePath);
-  await reloadProfile();
+  await reloadProfile(state, scheduleProfileReload);
   return result;
 }
 
 export async function removeProfileBundle(name: string): Promise<void> {
   if (!state.profileOptions) throw new Error("openbuddy-profile: profile is not initialized");
   await removeProfilePackage(state.profileOptions, name);
-  await reloadProfile();
+  await reloadProfile(state, scheduleProfileReload);
 }
 
 // ---------------------------------------------------------------------------

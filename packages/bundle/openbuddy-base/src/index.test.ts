@@ -44,9 +44,9 @@ describe("openbuddy-bundle-base", () => {
     }
   });
 
-  it("createOpenBuddyProfile defaults to the per-capability entries", () => {
+  it("createOpenBuddyProfile defaults to base + capability entries (so openbuddy-core is always loaded)", () => {
     const profile = createOpenBuddyProfile();
-    expect(profile.entries).toEqual(openBuddyCapabilityEntries);
+    expect(profile.entries).toEqual([...openBuddyBaseEntries, ...openBuddyCapabilityEntries]);
   });
 
   it("loads the per-capability profile end-to-end through HarnessPluginLoader", async () => {
@@ -78,6 +78,9 @@ describe("openbuddy-bundle-base", () => {
     const loader = new HarnessPluginLoader({
       context,
       importer: async (specifier) => {
+        if (specifier === "openbuddy:core") {
+          return { name: "openbuddy-core", apply: (ctx: Context) => { ctx.provide("teamRunner", { runMember: () => undefined }); return () => undefined; } };
+        }
         const plugin = openBuddyCapabilityPluginIndex.get(specifier);
         if (!plugin) throw new Error(`test-importer: unknown specifier ${specifier}`);
         return plugin;
@@ -87,7 +90,7 @@ describe("openbuddy-bundle-base", () => {
     });
     await loader.loadProfile(createOpenBuddyProfile());
     const loaded = loader.list().filter((entry) => entry.state === "loaded");
-    expect(loaded.length).toBe(openBuddyCapabilityPlugins.length);
+    expect(loaded.length).toBe(openBuddyCapabilityPlugins.length + 1); // +1 for openbuddy-core
     for (const status of loaded) {
       expect(status.error).toBeUndefined();
     }
@@ -121,7 +124,12 @@ describe("openbuddy-bundle-base", () => {
     context.provide("pi", { tools: { registerTool: (tool: { name: string }) => { const dispose = () => registered.delete(tool.name); registered.set(tool.name, dispose); return dispose; } } });
     const loader = new HarnessPluginLoader({
       context,
-      importer: async (specifier) => openBuddyCapabilityPluginIndex.get(specifier) ?? null,
+      importer: async (specifier) => {
+        if (specifier === "openbuddy:core") {
+          return { name: "openbuddy-core", apply: (ctx: Context) => { ctx.provide("teamRunner", { runMember: () => undefined }); return () => undefined; } };
+        }
+        return openBuddyCapabilityPluginIndex.get(specifier) ?? null;
+      },
       baseUrl: import.meta.url,
       logger: () => undefined,
     });
@@ -148,7 +156,12 @@ describe("openbuddy-bundle-base", () => {
     });
     const loader = new HarnessPluginLoader({
       context,
-      importer: async (specifier) => openBuddyCapabilityPluginIndex.get(specifier) ?? null,
+      importer: async (specifier) => {
+        if (specifier === "openbuddy:core") {
+          return { name: "openbuddy-core", apply: (ctx: Context) => { ctx.provide("teamRunner", { runMember: () => undefined }); return () => undefined; } };
+        }
+        return openBuddyCapabilityPluginIndex.get(specifier) ?? null;
+      },
       baseUrl: import.meta.url,
       logger: () => undefined,
     });
@@ -156,7 +169,7 @@ describe("openbuddy-bundle-base", () => {
     await loader.loadProfile(profile);
     const email = loader.list().find((entry) => entry.id === "openbuddy-email");
     expect(email?.state).toBe("disabled");
-    expect(loader.list().filter((entry) => entry.state === "loaded").length).toBe(openBuddyCapabilityPlugins.length - 1);
+    expect(loader.list().filter((entry) => entry.state === "loaded").length).toBe(openBuddyCapabilityPlugins.length);
   });
 });
 

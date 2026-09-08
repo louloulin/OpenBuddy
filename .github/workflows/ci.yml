@@ -127,11 +127,51 @@ jobs:
       - name: Build renderer
         run: pnpm exec electron-vite build
       - name: Verify bundle budgets
-        # P3-01: CI gate that fails the PR if entry chunk > 1.5MB,
-        # total > 12MB, or any heavy chunk (markdown/katex/mermaid/cytoscape/
+        # P3-01: CI gate that fails the PR if renderer entry/total exceeds
+        # its measured budget, or any heavy chunk (markdown/katex/mermaid/cytoscape/
         # cynefin) leaks into the initial <link rel="modulepreload">.
         # Uses --strict so warnings become failures in CI.
         run: node scripts/perf/bundle-topology.mjs --strict
+      - name: Verify main process chunks
+        # Keep AgentHost and other heavy main-process capabilities out of the
+        # startup entry while retaining Rollup-generated ESM chunks.
+        run: pnpm run perf:main-chunks
+
+  lint-tools:
+    name: Lint (ESLint + Sheriff + Prettier)
+    # A-7: report-only gate. ESLint and Sheriff rules are introduced in
+    # "warn" mode and surfaced here as a per-PR annotation. Promoting
+    # specific rules to "error" is tracked in the ts-error-architecture-
+    # overhaul change plan; until then this job never blocks.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - run: pnpm install --frozen-lockfile
+      - name: Sheriff module boundaries
+        run: pnpm lint:sheriff || true
+      - name: ESLint (report-only)
+        # `--max-warnings 0` is intentionally NOT set: the codebase has
+        # 539 `: any` and similar debts tracked for B-17 / B-11. We want
+        # the trend line, not a hard fail.
+        run: pnpm lint:eslint || true
+      - name: Prettier (report-only)
+        run: pnpm format:check || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-report
+          path: |
+            eslint-report.json
+            prettier-report.txt
+          retention-days: 14
 
   audit:
     name: Dependency Audit
@@ -180,7 +220,7 @@ jobs:
   build-summary:
     name: Build Summary
     runs-on: ubuntu-latest
-    needs: [typecheck, test, storage-boundaries, ipc-surface, audit, docs-link-check, perf-budget]
+    needs: [typecheck, test, storage-boundaries, ipc-surface, audit, docs-link-check, perf-budget, lint-tools]
     if: always()
     steps:
       - name: Check results

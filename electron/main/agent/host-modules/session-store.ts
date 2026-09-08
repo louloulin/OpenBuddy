@@ -46,17 +46,17 @@ import { type AgentHostState } from "./_state-shape";
 import { createDefaultAgentHostState } from "./_default-state";
 
 let state: AgentHostState = createDefaultAgentHostState();
-let piSessionDir: (cwd: string) => string;
-let emitPluginEvent: (type: string, payload: unknown) => void;
-let emitRendererEvent: (channel: string, payload: unknown) => void;
-let enqueueLifecycle: <T>(op: () => Promise<T>) => Promise<T>;
-let initialize: (opts?: { cwd?: string; sessionPath?: string; force?: boolean }) => Promise<void>;
-let rebindSession: (sessionPath: string, cwd: string) => Promise<void>;
-let dispose: () => Promise<void>;
-let lifecycleAppendQueues: Map<string, Promise<void>>;
-let listAllPiSessions: <T = unknown>() => any;
-let persistedSessionPath: (id: string | undefined) => Promise<string | undefined>;
-let piRuntimeCoordinator: { reload: (reason: string) => Promise<void> };
+let piSessionDir: (cwd: string) => string = (cwd) => "";
+let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
+let emitRendererEvent: (channel: string, payload: unknown) => void = () => undefined;
+let enqueueLifecycle: <T>(op: () => Promise<T>) => Promise<T> = async (op) => op();
+let initialize: (opts?: { cwd?: string; sessionPath?: string; force?: boolean }) => Promise<void> = async () => undefined;
+let rebindSession: (sessionPath: string, cwd: string) => Promise<void> = async () => undefined;
+let dispose: () => Promise<void> = async () => undefined;
+let lifecycleAppendQueues: Map<string, Promise<void>> = new Map();
+let listAllPiSessions: <T = unknown>() => any = async () => [];
+let persistedSessionPath: (id: string | undefined) => Promise<string | undefined> = async () => undefined;
+let piRuntimeCoordinator: { reload: (reason: string) => Promise<void> } = { reload: async () => undefined };
 
 /**
  * Bind session-store dependencies. Called once from
@@ -76,18 +76,18 @@ export function installSessionStore(deps: {
   persistedSessionPath: (id: string | undefined) => Promise<string | undefined>;
   piRuntimeCoordinator: { reload: (reason: string) => Promise<void> };
 }): void {
-  state = deps.state;
-  piSessionDir = deps.piSessionDir;
-  emitPluginEvent = deps.emitPluginEvent;
-  emitRendererEvent = deps.emitRendererEvent;
-  enqueueLifecycle = deps.enqueueLifecycle;
-  initialize = deps.initialize;
-  rebindSession = deps.rebindSession;
-  dispose = deps.dispose;
-  lifecycleAppendQueues = deps.lifecycleAppendQueues;
+  if (deps.state) state = deps.state;
+  if (deps.piSessionDir) piSessionDir = deps.piSessionDir;
+  if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
+  if (deps.emitRendererEvent) emitRendererEvent = deps.emitRendererEvent;
+  if (deps.enqueueLifecycle) enqueueLifecycle = deps.enqueueLifecycle;
+  if (deps.initialize) initialize = deps.initialize;
+  if (deps.rebindSession) rebindSession = deps.rebindSession;
+  if (deps.dispose) dispose = deps.dispose;
+  if (deps.lifecycleAppendQueues) lifecycleAppendQueues = deps.lifecycleAppendQueues;
   listAllPiSessions = deps.listAllPiSessions as any;
-  persistedSessionPath = deps.persistedSessionPath;
-  piRuntimeCoordinator = deps.piRuntimeCoordinator;
+  if (deps.persistedSessionPath) persistedSessionPath = deps.persistedSessionPath;
+  if (deps.piRuntimeCoordinator) piRuntimeCoordinator = deps.piRuntimeCoordinator;
 }
 import { restoreFileSnapshots } from "./rewind-snapshot";
 

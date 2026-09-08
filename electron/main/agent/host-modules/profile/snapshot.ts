@@ -24,13 +24,13 @@ import type { PiExtensionStatus } from "../../pi-extensions";
 //   修复后: 通过 installProfileSnapshot() 一次性注入, 本模块零 agent-host 导入.
 import { type AgentHostState } from "../_state-shape";
 
-let state: AgentHostState;
+let state: AgentHostState | null = null;
 let setProfilePiResourcePaths: (paths: {
   extensions: string[];
   skills: string[];
   prompts: string[];
   themes: string[];
-}) => void;
+}) => void = () => undefined;
 
 /**
  * Bind profile-snapshot dependencies. Called once from
@@ -45,8 +45,8 @@ export function installProfileSnapshot(deps: {
     themes: string[];
   }) => void;
 }): void {
-  state = deps.state;
-  setProfilePiResourcePaths = deps.setProfilePiResourcePaths;
+  if (deps.state) state = deps.state;
+  if (deps.setProfilePiResourcePaths) setProfilePiResourcePaths = deps.setProfilePiResourcePaths;
 }
 
 export type PiProfileSnapshot = {
@@ -81,6 +81,24 @@ export type PiProfileSnapshot = {
 };
 
 export function capturePiProfileSnapshot(): PiProfileSnapshot {
+  if (!state) {
+    return {
+      profilePackageJson: undefined,
+      profilePackagePaths: [],
+      profileBundle: null,
+      activePluginProfile: null,
+      profilePiExtensions: [],
+      profilePiPackagePaths: [],
+      profilePiResourcePaths: { extensions: [], skills: [], prompts: [], themes: [] },
+      piNativeResourcePaths: { skills: [], prompts: [], themes: [] },
+      piMarketplaceResourcePaths: { extensions: [], skills: [], prompts: [], themes: [] },
+      piMarketplaceAgentFiles: [],
+      piExtensionPaths: [],
+      piExtensionFactories: [],
+      hookConfigs: [],
+      piExtensionStatuses: [],
+    };
+  }
   return {
     profilePackageJson: state.profilePackageJson,
     profilePackagePaths: [...state.profilePackagePaths],
@@ -114,6 +132,7 @@ export function capturePiProfileSnapshot(): PiProfileSnapshot {
 }
 
 export function restorePiProfileSnapshot(snapshot: PiProfileSnapshot): void {
+  if (!state) return;
   state.profilePackageJson = snapshot.profilePackageJson;
   state.profilePackagePaths.splice(
     0,

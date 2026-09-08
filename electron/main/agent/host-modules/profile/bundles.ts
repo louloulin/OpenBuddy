@@ -41,8 +41,8 @@ export function installProfileBundles(deps: {
   piHome: () => string;
   state: AgentHostState;
 }): void {
-  piHome = deps.piHome;
-  state = deps.state;
+  if (deps.piHome) piHome = deps.piHome;
+  if (deps.state) state = deps.state;
 }
 import { filterPublishedCoreBundle } from "../deepseek/cordis-runtime";
 import { marketplaceArtifactPackagePaths as marketplaceArtifactPackagePathsImpl } from "./paths";

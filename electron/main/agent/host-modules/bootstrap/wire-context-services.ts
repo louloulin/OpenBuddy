@@ -118,6 +118,13 @@ export function wireContextServices(deps: WireContextServicesDeps): void {
   const { context, state, cwd, modelRuntime, piRuntime, piSession, jobs } = deps;
 
   context.provide("jobs", jobs);
+  // Phase 8.3 Batch D-7: eventLog service was inline in agent-host.ts.
+  // Move it here so wire-context-services owns all 30+ core services
+  // and the initialize() function is fully orchestrator-shaped.
+  context.provide("eventLog", {
+    list: (query?: { sessionId?: string; sinceSequence?: number; limit?: number }) => state.sessionEventLog?.snapshot(query) ?? [],
+    lastSequence: () => state.sessionEventLog?.lastSequence() ?? state.eventSequence,
+  });
   context.provide("agentHost", {
     getSessionId: () => state.session?.sessionId,
     prompt: deps.prompt,

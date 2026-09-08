@@ -386,24 +386,38 @@ describe("sendSafeFast (P2-07)", () => {
     expect(typeof result).toBe("boolean");
   });
 
-  it("S1.d in a 100k-call loop is significantly faster than sendSafe (smoke)", () => {
+  it("S1.d skips validation on the hot path (sendSafeFast does zero isDestroyed checks)", () => {
+    // Deterministic behavioral assertion of the P2-07 perf premise: sendSafeFast
+    // is faster because it skips the two isDestroyed() system calls (window +
+    // webContents) and the logger warn path that sendSafe performs per call.
+    //
+    // A wall-clock `fastMs < slowMs` smoke flipped under shared-CI load when a
+    // GC pause landed inside the 100k fast loop — the assertion is about *why*
+    // fast is fast, not about raw scheduler timing — so we assert the cause
+    // directly by counting isDestroyed invocations.
     const contents = makeContents();
-    // Baseline: sendSafe does isDestroyed twice + try/catch + log namespace.
-    const startSlow = performance.now();
-    for (let i = 0; i < 100_000; i += 1) {
-      sendSafe(makeWindow({ contents }), "x:y", { i });
-    }
-    const slowMs = performance.now() - startSlow;
+    const windowIsDestroyed = vi.fn(() => false);
+    const contentsIsDestroyed = vi.fn(() => false);
+    const win = {
+      isDestroyed: windowIsDestroyed,
+      webContents: { ...contents, isDestroyed: contentsIsDestroyed },
+    } as unknown as BrowserWindow;
 
-    const startFast = performance.now();
-    for (let i = 0; i < 100_000; i += 1) {
-      sendSafeFast(contents, "x:y", { i });
-    }
-    const fastMs = performance.now() - startFast;
+    const N = 10_000;
+    windowIsDestroyed.mockClear();
+    contentsIsDestroyed.mockClear();
+    for (let i = 0; i < N; i += 1) sendSafe(win, "x:y", { i });
+    // sendSafe: win.isDestroyed() + contents.isDestroyed() per call, and both
+    // pass, so exactly 2N validation calls hit the fast mock path.
+    expect(windowIsDestroyed).toHaveBeenCalledTimes(N);
+    expect(contentsIsDestroyed).toHaveBeenCalledTimes(N);
 
-    // Both should be sub-millisecond per call; sendSafeFast should be
-    // noticeably faster because of the skipped validation. Generous
-    // bound to avoid CI flake.
-    expect(fastMs).toBeLessThan(slowMs);
+    const fastWin = {
+      webContents: { ...contents, isDestroyed: contentsIsDestroyed },
+    } as unknown as BrowserWindow;
+    const before = contentsIsDestroyed.mock.calls.length;
+    for (let i = 0; i < N; i += 1) sendSafeFast(fastWin.webContents, "x:y", { i });
+    // sendSafeFast performs zero additional isDestroyed calls.
+    expect(contentsIsDestroyed.mock.calls.length).toBe(before);
   });
 });

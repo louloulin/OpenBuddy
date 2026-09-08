@@ -30,6 +30,7 @@ import { casdoorAuth } from "../../casdoor/casdoor-auth";
 import { DeepSeekTypertService, WorkspaceOrderInvalidError } from "../../deepseek/deepseek-runtime";
 import type { DeepSeekWorkspace, DeepSeekWorkspaceId } from "../../deepseek/deepseek-runtime";
 import { deepSeekCapabilityDefinitions, deepSeekCapabilityRemote } from "../../deepseek/deepseek-capabilities";
+import { readGenericService } from "../../deepseek/deepseek-generic";
 
 import { type AgentHostState, } from "./_state-shape";
 import { createDefaultAgentHostState } from "./_default-state";
@@ -58,13 +59,13 @@ export type WorkspaceProjection = {
 };
 
 let state: AgentHostState = createDefaultAgentHostState();
-let listAllPiSessions: <T = unknown>() => any;
+let listAllPiSessions: <T = unknown>() => any = async () => [];
 
 export function installWorkbenchScope(deps: {
 	state: AgentHostState;
 	listAllPiSessions: <T = unknown>() => any;
 }): void {
-	state = deps.state;
+	if (deps.state) state = deps.state;
 	listAllPiSessions = deps.listAllPiSessions as any;
 }
 
@@ -137,6 +138,11 @@ function remoteServiceContext() {
 	const context = state.context;
 	return {
 		get(name: string): unknown {
+			// Generic services live in a persistent module-level registry so they
+			// survive cordis fiber dispose/reload cycles (cordis's `ctx.set`
+			// registers an effect whose cleanup wipes the slot on unload).
+			const generic = readGenericService(name);
+			if (generic !== undefined) return generic;
 			const current = context?.get(name);
 			const definition = deepSeekCapabilityDefinitions.find((entry) => entry.serviceKey === name);
 			if (current !== undefined) return definition ? ensureCapabilityServiceAliases(current, definition) : current;

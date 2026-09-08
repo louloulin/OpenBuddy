@@ -23,6 +23,7 @@ import { join } from "node:path";
 import { type PluginBundle, type PluginEntryOptions, DeepSeekCordisRuntime, type DeepSeekCordisPluginEntry, type DeepSeekCordisRuntimeSnapshot } from "@openbuddy/plugin-host";
 
 import type { AgentHostState } from "../_state-shape";
+import { createDefaultAgentHostState } from "../_default-state";
 
 /**
  * Phase 8.3 Architectural Refactor: deepseek/cordis-runtime 反向依赖消除。
@@ -34,20 +35,20 @@ import type { AgentHostState } from "../_state-shape";
  * 修复后: 运行时依赖通过 installDeepSeekCordisRuntime() 注入,模块仅 import 类型。
  */
 
-let state: AgentHostState;
-let emitPluginEvent: (type: string, payload: unknown) => void;
-let promptFn: any;
-let abortFn: any;
-let listSessions: (cwd: string) => Promise<readonly unknown[]>;
-let listSubagentChildren: (parentSessionId: string) => Promise<readonly unknown[]>;
+let state: AgentHostState = createDefaultAgentHostState();
+let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
+let promptFn: any = async () => undefined;
+let abortFn: any = () => undefined;
+let listSessions: (cwd: string) => Promise<readonly unknown[]> = async () => [];
+let listSubagentChildren: (parentSessionId: string) => Promise<readonly unknown[]> = async () => [];
 let promptSubagent: (
 	parentSessionId: string,
 	childSessionId: string,
 	parts: readonly unknown[],
-) => Promise<unknown>;
-let interruptSubagent: (parentSessionId: string, childSessionId: string) => Promise<unknown>;
-let piHome: () => string;
-let profileArtifactModuleUrl: (id: string) => string;
+) => Promise<unknown> = async () => undefined;
+let interruptSubagent: (parentSessionId: string, childSessionId: string) => Promise<unknown> = async () => undefined;
+let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd();
+let profileArtifactModuleUrl: (id: string) => string = (id) => id;
 
 export function installDeepSeekCordisRuntime(deps: {
 	state: AgentHostState;
@@ -65,16 +66,16 @@ export function installDeepSeekCordisRuntime(deps: {
 	piHome: () => string;
 	profileArtifactModuleUrl: (id: string) => string;
 }): void {
-	state = deps.state;
-	emitPluginEvent = deps.emitPluginEvent;
-	promptFn = deps.prompt;
-	abortFn = deps.abort;
-	listSessions = deps.listSessions;
-	listSubagentChildren = deps.listSubagentChildren;
-	promptSubagent = deps.promptSubagent;
-	interruptSubagent = deps.interruptSubagent;
-	piHome = deps.piHome;
-	profileArtifactModuleUrl = deps.profileArtifactModuleUrl;
+	if (deps.state) state = deps.state;
+	if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
+	if (deps.prompt) promptFn = deps.prompt;
+	if (deps.abort) abortFn = deps.abort;
+	if (deps.listSessions) listSessions = deps.listSessions;
+	if (deps.listSubagentChildren) listSubagentChildren = deps.listSubagentChildren;
+	if (deps.promptSubagent) promptSubagent = deps.promptSubagent;
+	if (deps.interruptSubagent) interruptSubagent = deps.interruptSubagent;
+	if (deps.piHome) piHome = deps.piHome;
+	if (deps.profileArtifactModuleUrl) profileArtifactModuleUrl = deps.profileArtifactModuleUrl;
 }
 import { listWorkspaces } from "../workbench-scope";
 import { SubprocessRuntime, SandboxPolicyService, SandboxRuntime } from "../../../deepseek/subprocess-runtime";

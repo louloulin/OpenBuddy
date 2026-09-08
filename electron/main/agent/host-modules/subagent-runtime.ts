@@ -37,14 +37,14 @@ import { createDefaultAgentHostState } from "./_default-state";
 import type { HostJobRecord, PiPromptContentPart } from "./_state-shape";
 
 let state: AgentHostState = createDefaultAgentHostState();
-let piHome: () => string;
-let emitPluginEvent: (type: string, payload: unknown) => void;
-let emitRendererEvent: (channel: string, payload: unknown) => void;
+let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd();
+let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
+let emitRendererEvent: (channel: string, payload: unknown) => void = () => undefined;
 let ensureContinuableSubagent: (
   parentSessionId: string,
   childSessionId: string,
-) => Promise<unknown>;
-let listAllPiSessions: <T = unknown>() => any;
+) => Promise<unknown> = async () => undefined;
+let listAllPiSessions: <T = unknown>() => any = async () => [];
 
 /**
  * Bind subagent-runtime dependencies. Called once from
@@ -61,11 +61,11 @@ export function installSubagentRuntime(deps: {
   ) => Promise<unknown>;
   listAllPiSessions: <T = unknown>() => any;
 }): void {
-  state = deps.state;
-  piHome = deps.piHome;
-  emitPluginEvent = deps.emitPluginEvent;
-  emitRendererEvent = deps.emitRendererEvent;
-  ensureContinuableSubagent = deps.ensureContinuableSubagent;
+  if (deps.state) state = deps.state;
+  if (deps.piHome) piHome = deps.piHome;
+  if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
+  if (deps.emitRendererEvent) emitRendererEvent = deps.emitRendererEvent;
+  if (deps.ensureContinuableSubagent) ensureContinuableSubagent = deps.ensureContinuableSubagent;
   listAllPiSessions = deps.listAllPiSessions as any;
 }
 type SessionEventRecord = any;

@@ -53,7 +53,7 @@ let state: AgentHostState = createDefaultAgentHostState();
  * agent-host.ts:initialize(). Idempotent.
  */
 export function installPluginEventBus(deps: { state: AgentHostState }): void {
-  state = deps.state;
+  if (deps.state) state = deps.state;
 }
 
 function eventNamespace(type: string): string {

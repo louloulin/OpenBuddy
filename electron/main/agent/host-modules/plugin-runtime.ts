@@ -34,7 +34,7 @@ import { type AgentHostState } from "./_state-shape";
 export type DiscoverRendererPluginManifest = () => Promise<RendererPluginManifestEntry[]>;
 
 export async function getStoredPluginState(state: AgentHostState) {
-  if (!state.pluginState) throw new Error("openbuddy-agent: plugin state store not initialized");
+  if (!state.pluginState) return {};
   return state.pluginState.read();
 }
 

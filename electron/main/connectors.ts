@@ -76,7 +76,7 @@ async function fileIfExists(file: string): Promise<string | undefined> {
   try { await access(file); return file; } catch { return undefined; }
 }
 
-function candidateRoots(cwd: string): string[] {
+export function candidateRoots(cwd: string): string[] {
   const scopedPiRoot = process.env.PI_CODING_AGENT_DIR?.trim();
   const enterpriseScope = Boolean(process.env.OPENBUDDY_WORKBENCH_SCOPE?.trim() && process.env.OPENBUDDY_WORKBENCH_SCOPE !== "local");
   const roots = [

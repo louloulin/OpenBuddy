@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   CAPABILITY_TO_PLUGIN_ID,
+  PassthroughRegistry,
   clearPassthroughRegistry,
   getPassthroughInfo,
   isPassthroughed,
@@ -78,5 +79,47 @@ describe("pi-passthrough registry", () => {
     // recordPassthrough("plan", ...). The remaining keys are mcp, session,
     // fs, team, memory, automation.
     expect(CAPABILITY_TO_PLUGIN_ID.size).toBeGreaterThanOrEqual(6);
+  });
+});
+
+describe("PassthroughRegistry (injectable)", () => {
+  it("starts empty and reports no passthrough", () => {
+    const reg = new PassthroughRegistry();
+    expect(reg.isPassthroughed("plan")).toBe(false);
+    expect(reg.list()).toEqual([]);
+    expect(reg.size).toBe(0);
+  });
+
+  it("records and reads a decision", () => {
+    const reg = new PassthroughRegistry();
+    reg.record("plan", "opted-in", "pi-plan-mode");
+    expect(reg.isPassthroughed("plan")).toBe(true);
+    expect(reg.get("plan")?.source).toBe("opted-in");
+    expect(reg.get("plan")?.adapter).toBe("pi-plan-mode");
+    expect(typeof reg.get("plan")?.recordedAt).toBe("number");
+  });
+
+  it("is isolated from the module-level default registry", () => {
+    const reg = new PassthroughRegistry();
+    reg.record("fs", "installed", "openbuddy-fs-local");
+    // The module-level default must NOT see the instance's record.
+    expect(isPassthroughed("fs")).toBe(false);
+    expect(reg.isPassthroughed("fs")).toBe(true);
+  });
+
+  it("clear wipes only its own entries", () => {
+    const reg = new PassthroughRegistry();
+    reg.record("plan", "installed", "pi-plan-mode");
+    reg.clear();
+    expect(reg.size).toBe(0);
+    expect(reg.list()).toEqual([]);
+  });
+
+  it("tracks multiple capabilities independently", () => {
+    const reg = new PassthroughRegistry();
+    reg.record("plan", "installed", "pi-plan-mode");
+    reg.record("team", "installed", "openbuddy-team");
+    expect(reg.size).toBe(2);
+    expect(reg.list().map((entry) => entry.capability).sort()).toEqual(["plan", "team"]);
   });
 });

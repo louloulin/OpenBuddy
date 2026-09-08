@@ -1289,12 +1289,25 @@ export {
 export * from "./rpc-contract";
 export * from "./hooks";
 export {
+  CAPABILITY_OWNERSHIP,
+  CAPABILITY_TO_PLUGIN_ID as AUTHORITY_CAPABILITY_TO_PLUGIN_ID,
+  listOpenBuddyOwned,
+  listPassthroughEligible,
+  openbuddyPluginForCapability,
+  ownershipForCapability,
+  piPluginForCapability,
+  pluginIdForCapability as authorityPluginIdForCapability,
+  type CapabilityOwnership,
+} from "./capability-ownership";
+export {
   CAPABILITY_TO_PLUGIN_ID,
+  PassthroughRegistry,
   clearPassthroughRegistry,
   getPassthroughInfo,
   isPassthroughed,
   listPassthroughed,
   pluginIdForCapability,
   recordPassthrough,
+  type PassthroughRecord,
   type PassthroughSource,
 } from "./pi-passthrough";

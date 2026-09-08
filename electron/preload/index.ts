@@ -11,11 +11,15 @@ const allowedInvokeChannels = new Set([
   // agent-runtime
   "agent:abort", "agent:auth-status", "agent:commands-list", "agent:current-model", "agent:deepseek-cordis-invoke", "agent:deepseek-cordis-snapshot", "agent:deepseek-pi-describe", "agent:dispose",
   "agent:event-log", "agent:event-log-replay", "agent:extensions-reload", "agent:follow-up", "agent:init", "agent:ensure-new-session", "agent:load-session", "agent:new-session", "agent:plugin-config", "agent:plugin-enable",
-  "agent:plugin-events", "agent:plugin-inventory", "agent:plugin-list", "agent:plugin-readiness", "agent:plugin-reload", "agent:plugin-snapshot", "agent:plugin-state-get", "agent:plugin-state-reset",
+  "agent:plugin-events", "agent:plugin-inventory", "agent:plugin-list", "agent:plugin-readiness", "agent:plugin-reload", "agent:plugin-snapshot", "agent:plugin-state-get", "agent:plugin-state-reset", "agent:stream-port",
   "agent:preset-current", "agent:preset-default-save", "agent:preset-select", "agent:presets-list", "agent:profile-install", "agent:profile-install-default-pi", "agent:profile-packages", "agent:profile-remove", "agent:prompt",
-  "agent:providers-delete-model", "agent:providers-delete-provider", "agent:providers-fetch-models", "agent:providers-list", "agent:providers-save-model", "agent:providers-save-provider", "agent:remote-contributions", "agent:renderer-plugin-boot",
+  "agent:providers-delete-model", "agent:providers-delete-provider", "agent:providers-fetch-models", "agent:providers-list", "agent:providers-save-model", "agent:providers-save-provider", "agent:providers-test", "agent:remote-contributions", "agent:renderer-plugin-boot",
   "agent:renderer-plugin-entries", "agent:renderer-plugin-module", "agent:resolve-permission", "agent:resolve-question", "agent:resource-inventory", "agent:session-messages", "agent:session-info", "agent:session-metadata-clear", "agent:session-usage", "agent:tools-list",
+  "stream-smoke:publish",
   "agent:prompt-content", "agent:set-thinking-level", "agent:set-permission-mode", "agent:workspace-search",
+  "agent:compact", "agent:set-auto-compaction", "agent:set-auto-retry", "agent:abort-retry", "agent:abort-bash",
+  "agent:set-steering-mode", "agent:set-follow-up-mode", "agent:session-stats", "agent:thinking-levels",
+  "agent:compaction-settings", "agent:session-tree", "agent:fork-session",
   "agent:set-model", "agent:steer", "agent:transaction-list", "agent:transaction-receipt", "agents_defaults_get", "agents_defaults_save", "agents_delete", "agents_get",
   "agents_list", "agents_save", "agents_template", "dsh:remote", "dsh:remote-register", "dsh:remote-unregister", "dsh:rpc", "harness:address",
   "harness:recovery-claim", "harness:recovery-list", "harness:recovery-resolve", "harness:recovery-status", "harness:resume-token", "harness:resume-token-set", "harness:session-cursors", "harness:session-cursors-set",
@@ -111,6 +115,7 @@ const allowedEventChannels = new Set([
   "openbuddy://agent-event",
   "openbuddy://plugin-event",
   "openbuddy://collaboration-update",
+  "openbuddy://pi-stream-port",
   "dsh://rpc",
   "pi://event",
   "pi://update",
@@ -332,6 +337,42 @@ const api = {
   },
 
   events: {
+    openPiStream: async (handler: (payload: unknown) => void) => {
+      let active = true;
+      let port: MessagePort | null = null;
+      const onPort = (event: Electron.IpcRendererEvent) => {
+        const transferred = event.ports?.[0];
+        if (!transferred) return;
+        port = transferred;
+        port.onmessage = (message) => {
+          if (!active) return;
+          try { handler(message.data); }
+          catch (error) { recordBridgeFailure(error); }
+        };
+        port.onmessageerror = () => recordBridgeFailure(new Error("Pi stream message could not be cloned"));
+        port.start();
+      };
+      ipcRenderer.once("openbuddy://pi-stream-port", onPort);
+      try {
+        await ipcRenderer.invoke("agent:stream-port");
+      } catch (error) {
+        ipcRenderer.off("openbuddy://pi-stream-port", onPort);
+        throw error;
+      }
+      if (!port) {
+        ipcRenderer.off("openbuddy://pi-stream-port", onPort);
+        return null;
+      }
+      return () => {
+        active = false;
+        if (port) {
+          port.onmessage = null;
+          port.onmessageerror = null;
+          try { port.close(); } catch { /* best effort */ }
+          port = null;
+        }
+      };
+    },
     onBridgeStatusChange: (handler: (status: { available: boolean; lastErrorMessage: string | null }) => void) => {
       const wrapped = (_event: unknown, payload: unknown) => {
         try { handler(payload as { available: boolean; lastErrorMessage: string | null }); }

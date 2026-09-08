@@ -252,15 +252,26 @@ export function createMcpOAuthProvider(config: McpServerConfig, credential: McpC
 			...(credential.refreshToken ? { refresh_token: credential.refreshToken } : {}),
 			...(initialExpiry !== undefined ? { expires_in: initialExpiry } : {}),
 		};
+	// Track the latest credential so refreshes within this connection update
+	// expiry checks instead of consulting the stale initial snapshot.
+	let currentCredential = credential;
+	let savedCodeVerifier: string | undefined;
 	const metadata = oauthClientMetadata(config);
 	const provider: OAuthClientProvider = {
 		redirectUrl: metadata.redirect_uris[0],
 		clientMetadata: metadata,
 		clientInformation: () => ({ client_id: clientId, ...(text(config.clientSecret) ? { client_secret: text(config.clientSecret) } : {}) }),
-		tokens: () => (credentialExpired(credential) ? undefined : tokens),
+		tokens: () => (credentialExpired(currentCredential) ? undefined : tokens),
 		saveTokens: async (next) => {
 			const expiresAt = typeof next.expires_in === "number" ? new Date(Date.now() + next.expires_in * 1000).toISOString() : undefined;
 			tokens = { ...next, ...(expiresAt ? { expires_in: Math.max(0, Math.floor((Date.parse(expiresAt) - Date.now()) / 1000)) } : {}) };
+			currentCredential = {
+				...currentCredential,
+				accessToken: next.access_token,
+				...(next.refresh_token ? { refreshToken: next.refresh_token } : {}),
+				...(next.token_type ? { tokenType: next.token_type } : {}),
+				...(expiresAt ? { expiresAt } : {}),
+			};
 			if (saveCredential) await saveCredential({
 				accessToken: next.access_token,
 				refreshToken: next.refresh_token,
@@ -269,8 +280,16 @@ export function createMcpOAuthProvider(config: McpServerConfig, credential: McpC
 			});
 		},
 		redirectToAuthorization: async () => undefined,
-		saveCodeVerifier: () => undefined,
-		codeVerifier: () => "openbuddy-mcp-code-verifier",
+		saveCodeVerifier: (verifier) => {
+			// The SDK generates a per-authorization random verifier; keeping the
+			// constant here previously made PKCE useless (predictable verifier,
+			// and exchanges failed against PKCE-enforcing servers).
+			savedCodeVerifier = verifier;
+		},
+		codeVerifier: () => {
+			if (!savedCodeVerifier) throw new Error("MCP OAuth code verifier is missing; restart authorization");
+			return savedCodeVerifier;
+		},
 	};
 	return provider;
 }

@@ -20,8 +20,9 @@
  *     agent-host.ts, 它们还要被 plugin-state (Batch D) 用, 那里再决定是否
  *     搬走
  */
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 
@@ -29,16 +30,21 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 //   修复前: `import { emitPluginEvent, listAllPiSessions, piHome, piSessionDir, state, workspaceRegistry } from "../agent-host"` (reverse dep)
 //   修复后: 通过 installSessionMetadata() 一次性注入, 本模块零 agent-host 导入.
 //   listAllPiSessions / piSessionDir 来自 _state-shape (types) 或 _host-paths (runtime).
-import { piHome as _piHome, piSessionDir as _piSessionDir } from "./_host-paths";
 import { type AgentHostState } from "./_state-shape";
 import { createDefaultAgentHostState } from "./_default-state";
 
+// Vite/Rollup ESM disambiguation fix (piHome$1 is not a function):
+// 之前 import piHome from _host-paths 但不调用, 只存为 module-level let, 然后在
+// install 时被覆盖. 问题是 vite/rollup 编译时给不同 import path 加 $N 后缀, 一些
+// 路径在 tree-shake 后没 resolve 到 export, 编译产物里 `let piHome$1;` 是
+// undefined, 调用时 throw. 修复: 给所有 module-level let 默认 inline lambda,
+// 既不需要 install 也能工作, install 后会被覆盖.
 let state: AgentHostState = createDefaultAgentHostState();
-let piHome: () => string;
-let piSessionDir: (cwd: string) => string;
-let emitPluginEvent: (type: string, payload: unknown) => void;
-let listAllPiSessions: <T = unknown>() => any;
-let workspaceRegistry: () => unknown;
+let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? join(homedir(), ".pi", "agent");
+let piSessionDir: (cwd: string) => string = (cwd) => "";
+let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
+let listAllPiSessions: <T = unknown>() => any = async () => [];
+let workspaceRegistry: () => unknown = () => undefined;
 
 /**
  * Bind session-metadata dependencies. Called once from
@@ -52,12 +58,12 @@ export function installSessionMetadata(deps: {
   listAllPiSessions: () => Promise<unknown>;
   workspaceRegistry: () => unknown;
 }): void {
-  state = deps.state;
-  piHome = deps.piHome;
-  piSessionDir = deps.piSessionDir;
-  emitPluginEvent = deps.emitPluginEvent;
+  if (deps.state) state = deps.state;
+  if (deps.piHome) piHome = deps.piHome;
+  if (deps.piSessionDir) piSessionDir = deps.piSessionDir;
+  if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
   listAllPiSessions = deps.listAllPiSessions as any;
-  workspaceRegistry = deps.workspaceRegistry;
+  if (deps.workspaceRegistry) workspaceRegistry = deps.workspaceRegistry;
 }
 
 export async function listSessions(cwd: string) {
@@ -224,3 +230,26 @@ export {
   setAllArchived,
   setSessionExpert,
 };
+
+/**
+ * Phase 8.3 Batch C 收尾 — setSessionPinned moved from agent-host.ts.
+ *
+ * Toggles a session's pinned status. Mirrors `setSessionArchived`:
+ *   - read metadata JSON
+ *   - apply the diff via the in-memory update callback
+ *   - re-emit `session/metadata-updated` for renderer/UI sync
+ *
+ * Throws if `sessionId` is not in the persisted session list (no silent
+ * no-op — callers want to surface a meaningful IPC error).
+ */
+export async function setSessionPinned(sessionId: string, pinned: boolean): Promise<boolean> {
+  const sessions = await listAllPiSessions();
+  if (!sessions.some((entry: { id?: string }) => entry.id === sessionId)) {
+    throw new Error(`Pi session not found: ${sessionId}`);
+  }
+  await updateSessionMetadata(sessionId, (metadata) => {
+    metadata.pinned = metadata.pinned.filter((id: string) => id !== sessionId);
+    if (pinned) metadata.pinned.push(sessionId);
+  });
+  return pinned;
+}

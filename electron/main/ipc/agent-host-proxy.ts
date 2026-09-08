@@ -9,9 +9,8 @@
  *   b) import `agentHost` from `./index` → circular import (index.ts imports
  *      the sub-modules to register their handlers).
  *
- * The Proxy exposes the same `agentHost` shape; the first property access
- * either returns the bound value (if `bindAgentHost` has been called) or
- * throws a descriptive error pointing at `ensureAgentHostLoaded`.
+ * The Proxy exposes the same `agentHost` shape. Callers that need the live
+ * host explicitly await `ensureAgentHostLoaded()` before accessing it.
  */
 import type * as AgentHostModule from "../agent/agent-host";
 
@@ -29,9 +28,7 @@ export function bindRendererEventEmitterFn(fn: typeof AgentHostModule.bindRender
 }
 
 /**
- * Ensure agentHost module is loaded. Self-bootstraps on first access so
- * registerIpc can register event handlers BEFORE bootBackgroundServices
- * has finished its dynamic import.
+ * Ensure agentHost module is loaded on an explicit lifecycle or IPC path.
  */
 export function ensureAgentHostLoaded(): Promise<typeof AgentHostModule.agentHost> {
   if (_agentHostBinding) return Promise.resolve(_agentHostBinding);
@@ -44,13 +41,6 @@ export function ensureAgentHostLoaded(): Promise<typeof AgentHostModule.agentHos
   })();
   return _agentHostLoadPromise;
 }
-
-// Pre-warm: kick off the dynamic import as soon as this module is loaded.
-// This lets the heavy 138-import graph parse & evaluate on a background
-// microtask while the main thread continues with window create + first
-// paint. By the time IPC handlers actually fire (user interaction),
-// the load has usually already completed.
-void ensureAgentHostLoaded();
 
 export const agentHost: typeof AgentHostModule.agentHost = new Proxy(
   {} as typeof AgentHostModule.agentHost,

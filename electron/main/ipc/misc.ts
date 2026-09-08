@@ -6,7 +6,7 @@
 import { clipboard, dialog, ipcMain, shell, type BrowserWindow } from "electron";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import * as fs from "node:fs/promises";
-import { agentHost, bindRendererEventEmitter } from "./agent-host-proxy";
+import { agentHost, bindRendererEventEmitter, ensureAgentHostLoaded } from "./agent-host-proxy";
 import * as resources from "../agent/pi-resources";
 import { dispatchMainNotifications } from "../notifications";
 import { casdoorAuth } from "../casdoor/casdoor-auth";
@@ -54,9 +54,42 @@ import {
 
 export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 	const ensureAgentHost = async () => {
-		await agentHost.waitUntilReady();
+		await ensureAgentHostLoaded();
 	};
 	const currentWindow = () => getWindow();
+
+	// Save-dialog-approved paths: `export_text_file` may only write where the
+	// user explicitly picked a destination in the native save dialog. Without
+	// this, a compromised renderer could write arbitrary absolute paths.
+	const dialogApprovedSavePaths = new Set<string>();
+	const approveSavePath = (candidate: string | null): string | null => {
+		if (!candidate) return null;
+		const resolved = resolve(candidate);
+		dialogApprovedSavePaths.add(resolved);
+		while (dialogApprovedSavePaths.size > 64) {
+			dialogApprovedSavePaths.delete(dialogApprovedSavePaths.values().next().value as string);
+		}
+		return candidate;
+	};
+	const requireApprovedSavePath = (candidate: string): string => {
+		const resolved = resolve(candidate);
+		if (!dialogApprovedSavePaths.has(resolved)) throw new Error("导出路径必须来自保存对话框");
+		dialogApprovedSavePaths.delete(resolved);
+		return resolved;
+	};
+	// Write containment only helps if the root is chosen by the main process:
+	// reject any workspaceRoot that is neither the active agent cwd nor a
+	// registered storage source.
+	const resolveWriteRoot = async (candidate: unknown): Promise<string> => {
+		await ensureAgentHost();
+		const root = resolve(writeAllowedRoot(absolutePath(candidate, "workspaceRoot")));
+		const allowed = new Set<string>([resolve(agentHost.getCwd())]);
+		for (const source of await resources.readStorageSources()) {
+			if (typeof source === "string" && source.trim()) allowed.add(resolve(source));
+		}
+		if (!allowed.has(root)) throw new Error("workspaceRoot 必须是已注册的工作区");
+		return root;
+	};
 
 		ipcMain.handle("clipboard:read-text", () => clipboard.readText());
 		ipcMain.handle("clipboard:write-text", (_event, text: unknown) => {
@@ -76,7 +109,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			const result = win
 				? await dialog.showSaveDialog(win, safeOptions)
 				: await dialog.showSaveDialog(safeOptions);
-			return result.canceled ? null : result.filePath ?? null;
+			return approveSavePath(result.canceled ? null : result.filePath ?? null);
 		});
 		ipcMain.handle("dialog:ask", async (_event, args: unknown) => {
 			const input = recordValue(args, "dialog ask payload");
@@ -337,16 +370,19 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			return shellFsHandlers.openPath(requiredString(input.path, "path"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"));
 		});
 		ipcMain.handle("shellfs:reveal", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "reveal payload");
 			return shellFsHandlers.reveal(requiredString(input.path, "path"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"));
 		});
 		ipcMain.handle("shellfs:stat", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "stat payload");
 			return shellFsHandlers.stat(requiredString(input.path, "path"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"));
 		});
 		ipcMain.handle("shellfs:read-text", async (_e, args: { path: string; cwd?: string; maxBytes?: number }) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "read text payload");
 			const pathValue = requiredString(input.path, "path");
@@ -358,6 +394,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			return shellFsHandlers.readTextFile(pathValue, cwd, maxBytes);
 		});
 		ipcMain.handle("shellfs:read-file-base64", async (_e, args: { path: string; cwd?: string; maxBytes?: number }) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "read file payload");
 			const cwd = input.cwd === undefined || input.cwd === null ? agentHost.getCwd() : absolutePath(input.cwd, "cwd");
@@ -366,12 +403,12 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		ipcMain.handle("shellfs:write-text", async (_e, args: unknown) => {
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "write text payload");
-			return shellFsHandlers.writeTextFile(requiredString(input.path, "path"), stringValue(input.content, "content"), writeAllowedRoot(absolutePath(input.workspaceRoot, "workspaceRoot")));
+			return shellFsHandlers.writeTextFile(requiredString(input.path, "path"), stringValue(input.content, "content"), await resolveWriteRoot(input.workspaceRoot));
 		});
 		ipcMain.handle("shellfs:export-text", async (_e, args: unknown) => {
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "export text payload");
-			return shellFsHandlers.exportTextFile(absolutePath(input.path, "path"), stringValue(input.content, "content"));
+			return shellFsHandlers.exportTextFile(requireApprovedSavePath(absolutePath(input.path, "path")), stringValue(input.content, "content"));
 		});
 		ipcMain.handle("shellfs:import-file", async (_e, args: unknown) => {
 			const input = recordValue(args, "import file payload");
@@ -388,7 +425,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		});
 		ipcMain.handle("shellfs:remove", async (_e, args: unknown) => {
 			const input = recordValue(args, "remove path payload");
-			const workspaceRoot = writeAllowedRoot(absolutePath(input.workspaceRoot, "workspaceRoot"));
+			const workspaceRoot = await resolveWriteRoot(input.workspaceRoot);
 			const target = resolve(workspaceRoot, requiredString(input.path, "path"));
 			const rel = relative(workspaceRoot, target);
 			if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) throw new Error("path is outside workspace");
@@ -396,6 +433,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			return { ok: true };
 		});
 		ipcMain.handle("inspiration_generate", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const input = recordValue(args, "inspiration payload");
 			const request = input.request === undefined ? {} : recordValue(input.request, "request");
 			const count = optionalFiniteInteger(request.count, "count", 1, 1, 20);
@@ -408,20 +446,23 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		ipcMain.handle("shellfs:mkdir", async (_e, args: unknown) => {
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "make directory payload");
-			return shellFsHandlers.makeDirectory(requiredString(input.path, "path"), writeAllowedRoot(absolutePath(input.workspaceRoot, "workspaceRoot")));
+			return shellFsHandlers.makeDirectory(requiredString(input.path, "path"), await resolveWriteRoot(input.workspaceRoot));
 		});
 		ipcMain.handle("shellfs:list-dir", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "list directory payload");
 			return shellFsHandlers.listDir(requiredString(input.path, "path"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"), optionalFiniteInteger(input.maxEntries, "maxEntries", 2000, 1, 10000));
 		});
 		ipcMain.handle("shellfs:browse-directory", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			if (typeof args === "string") return shellFsHandlers.browseDirectory(requiredString(args, "path"), agentHost.getCwd());
 			const input = recordValue(args, "browse directory payload");
 			return shellFsHandlers.browseDirectory(requiredString(input.path, "path"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"));
 		});
 		ipcMain.handle("list_dir", async (_e, args: unknown) => {
+			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "list directory payload");
 			return shellFsHandlers.listDir(requiredString(input.path, "path"), input.cwd === null || input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"), optionalFiniteInteger(input.maxEntries, "maxEntries", 2000, 1, 10000));
@@ -433,7 +474,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		ipcMain.handle("export_text_file", async (_e, args: unknown) => {
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "export text payload");
-			return shellFsHandlers.exportTextFile(absolutePath(input.path, "path"), stringValue(input.content, "content"));
+			return shellFsHandlers.exportTextFile(requireApprovedSavePath(absolutePath(input.path, "path")), stringValue(input.content, "content"));
 		});
 		ipcMain.handle("shell:open-external", async (_e, url: string) => {
 			await shell.openExternal(httpUrl(url, "url"));

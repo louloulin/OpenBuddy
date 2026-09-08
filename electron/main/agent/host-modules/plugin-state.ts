@@ -39,7 +39,7 @@ import { getActiveHarnessServer } from "../../harness/harness-server";
 import { createPluginSnapshot, type PluginSnapshot, type PluginSnapshotPackageInput } from "@openbuddy/plugin-host";
 
 let state: AgentHostState = createDefaultAgentHostState();
-let profilePackages: () => Promise<unknown[]>;
+let profilePackages: () => Promise<unknown[]> = async () => [];
 
 /**
  * Bind plugin-state dependencies. Called once from
@@ -49,7 +49,7 @@ export function installPluginState(deps: {
   state: AgentHostState;
   profilePackages: () => Promise<unknown[]>;
 }): void {
-  state = deps.state;
+  if (deps.state) state = deps.state;
   profilePackages = deps.profilePackages as () => Promise<unknown[]>;
 }
 
