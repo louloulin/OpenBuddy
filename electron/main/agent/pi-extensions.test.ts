@@ -521,6 +521,8 @@ describe("OpenBuddy Pi extension resolution", () => {
       "openbuddy-pi-telemetry-bridge",
       "openbuddy-pi-compact-announce",
       "openbuddy-extra-providers",
+      // Phase B.1 — 5th builtin ExtensionFactory for session metadata.
+      "openbuddy-pi-session-metadata",
     ]);
   });
 

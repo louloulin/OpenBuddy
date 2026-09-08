@@ -3,6 +3,7 @@ import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-a
 import { Type } from "@earendil-works/pi-ai";
 import { DEFAULT_COMPACTION_SETTINGS, shouldCompact } from "@earendil-works/pi-agent-core";
 import openBuddyApplyPatch, { type OpenBuddyApplyPatchConfig } from "./extensions/apply-patch";
+import { sessionMetadataBridgeFactory } from "./extensions/session-metadata-bridge";
 import { isPiPackageInstalled } from "./pi-package-installed";
 import {
   createTelemetryBridgeExtension,
@@ -935,6 +936,13 @@ export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResol
       });
     }
   },
+
+  // Phase B.1 — 5th builtin ExtensionFactory. Demonstrates the ExtensionAPI
+  // pattern for session metadata. Reads the JSON mirror at session_start,
+  // forwards info changes, leaves persistence to the existing host module.
+  // Future B.2+ rounds will gradually migrate session-metadata.ts functions
+  // to use this pattern directly.
+  "openbuddy-pi-session-metadata": (_emit, _config, _options) => sessionMetadataBridgeFactory,
 };
 
 export function resolvePiExtensions(

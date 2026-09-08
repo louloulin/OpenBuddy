@@ -516,9 +516,10 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
 
 ## 11. v3 接下来 3 轮（已锁定）
 
-- ✅ **已完成：Phase A.1 — PI IPC 桥基础设施**（commit 见 PR）
-- 🟡 **下一轮 — Phase B.1**：把 `session-metadata.ts`（最简单）改写成 PI ExtensionFactory；同步拆 `ipc/agent.ts` 1090 LOC 为 `ipc/<capability>.ts` — **v3 新增 IPC 拆分**
-- ⚪ **第三轮 — Phase J.1（部分）**：先跑 `pnpm storage:boundaries` + `pnpm storage:acceptance` 拿到当前 baseline，然后加固 sheriff.config.ts — **v3 提前 enforce**
+- ✅ **已完成：Phase A.1 — PI IPC 桥基础设施**（commit `6f6d612`）
+- ✅ **已完成：Phase B.1 第 1 轮 — 5th builtin ExtensionFactory `openbuddy-pi-session-metadata`**（commit 见本轮 PR）
+- 🟡 **下一轮 — Phase B.1 第 2 轮**：继续迁移 `agent-model.ts` / `agent-prompt.ts` / `plugin-event-bus.ts` 到 PI ExtensionFactory 模式；同步拆 `ipc/agent.ts` 1090 LOC 为 `ipc/<capability>.ts`
+- ⚪ **第三轮 — Phase J.1（部分）**：先跑 `pnpm storage:boundaries` + `pnpm storage:acceptance` 拿到当前 baseline，然后加固 sheriff.config.ts
 
 每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
 
@@ -677,7 +678,7 @@ PI 插件 = `ExtensionFactory` 返回值 `(pi: ExtensionAPI) => void`。
 
 ### Phase B — ExtensionRunner 上线（3 轮）
 
-#### B.1 把 host-module 改写成 PI ExtensionFactory
+#### B.1 把 host-module 改写成 PI ExtensionFactory ✅ B.1 第 1 轮完成（5th builtin extension）
 
 **目标**：把每个 host-module 包成 `(pi: ExtensionAPI) => { ... }` 工厂。
 
@@ -686,11 +687,29 @@ PI 插件 = `ExtensionFactory` 返回值 `(pi: ExtensionAPI) => void`。
 - 用 `pi.sendMessage` / `pi.appendEntry` 替代直接调 session API
 - 第一个 target：`session-metadata.ts`（最简单）
 
-**文件**：每个 `host-modules/*.ts`（约 20 个文件需要 wrapper）
+**本轮实现**（commit `pending` in PR）：**5th builtin ExtensionFactory** —— `openbuddy-pi-session-metadata`
 
-**验证**：vitest + agent-host 全套 e2e
+- 新建 `electron/main/agent/extensions/session-metadata-bridge.ts`（~115 LOC）
+  - `createSessionMetadataBridgeExtension()` 工厂
+  - 在 `session_start` 时读取 `~/.pi/openbuddy-state.json` JSON mirror（first-run 优雅处理）
+  - 在 `session_shutdown` 时返回空 mirror 标记（persistence 仍在 host module）
+  - 在 `session_info_changed` 时转发 payload
+  - 使用 `OPENBUDDY_BRIDGE_DEBUG=1` 环境变量启用 console 调试输出
+- `electron/main/agent/pi-extensions.ts`  `builtinPiExtensionFactories` 加第 5 个 key `openbuddy-pi-session-metadata`
+- `electron/main/agent/pi-extensions.test.ts` `builtinPiExtensionIds` 期望列表加上新 extension
+- 新建 `electron/main/agent/extensions/session-metadata-bridge.test.ts`（~130 LOC，8 个测试）
 
-**退出**：所有业务行为不变
+**架构意义**：现在 OpenBuddy 有 **5 个 builtin PI ExtensionFactory**（observability / context-status / context-guard / telemetry-bridge / compact-announce / session-metadata），与 PI ExtensionRunner 标准对齐。B.1 后续轮次会逐步把现有 host-module 迁到这个模式。
+
+**验证**：
+- `pnpm typecheck` — ✅ exit 0
+- `pnpm exec vitest --run electron/main/agent/extensions/session-metadata-bridge.test.ts` — ✅ 8/8
+- `pnpm exec vitest --run electron/main/agent/pi-extensions.test.ts` — ✅ 33/33
+- `pnpm exec vitest --run electron/main/agent/__tests__/event-channel-matrix.test.ts` — ✅ 4/4
+- `pnpm exec vitest --run electron/main/agent/__tests__/pi-plugin-reuse-batch.smoke.test.ts` — ✅ 2/2
+- 全量 `pnpm exec vitest --run` — ✅ **5554/5559 pass**（5 个环境性失败 ×dg-open / sandbox / casdoor-resource-gateway 与本次改动无关）
+
+**文件**：**未拆分 `ipc/agent.ts` 1090 LOC**（B.1 本轮聚焦 ExtensionFactory 模式；ipc 拆分随 B.3/Phase H 一起推进）
 
 #### B.2 用 ExtensionRunner.bindCore 替代 microkernel 启动序列
 
