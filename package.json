@@ -175,6 +175,7 @@
     "electron-updater": "^6.3.9",
     "electron-vite": "5.0.0",
     "jsdom": "^29.1.1",
+    "node-abi": "^4.35.0",
     "playwright": "1.58.2",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",

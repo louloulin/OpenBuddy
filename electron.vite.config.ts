@@ -55,6 +55,9 @@ const workspacePackageAliases = [
   { find: "@openbuddy/plugin-host/js-expr", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/js-expr.ts") },
   { find: "@openbuddy/team-team/pi", replacement: resolve(repoRoot, "packages/team/openbuddy-team/src/pi.ts") },
   { find: "@openbuddy/core-session/lifecycle", replacement: resolve(repoRoot, "packages/core/openbuddy-session/src/lifecycle.ts") },
+  // Clinical-neuro subpath aliases — must precede bare-package alias.
+  { find: "@openbuddy/capability-clinical-neuro/src/universal-import", replacement: resolve(repoRoot, "packages/capability/openbuddy-clinical-neuro/src/universal-import.ts") },
+  { find: "@openbuddy/capability-clinical-neuro/src/import-template", replacement: resolve(repoRoot, "packages/capability/openbuddy-clinical-neuro/src/import-template.ts") },
 
 
   // Bare-package aliases.
