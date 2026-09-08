@@ -144,6 +144,7 @@ import { registerEmailIpc } from "./email";
 import { registerCollaborationIpc } from "./collaboration";
 import { registerHarnessIpc } from "./harness";
 import { registerAgentIpc } from "./agent";
+import { registerAgentsIpc } from "./agents";
 import { registerConnectorsIpc } from "./connectors";
 import { registerMiscIpc } from "./misc";
 
@@ -1089,6 +1090,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	registerCollaborationIpc(getWindow);
 	registerHarnessIpc(getWindow);
 	registerAgentIpc(getWindow);
+	registerAgentsIpc();
 	registerConnectorsIpc(getWindow);
 	registerMiscIpc(getWindow);
 

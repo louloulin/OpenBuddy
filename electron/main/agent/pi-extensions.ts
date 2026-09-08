@@ -4,6 +4,7 @@ import { Type } from "@earendil-works/pi-ai";
 import { DEFAULT_COMPACTION_SETTINGS, shouldCompact } from "@earendil-works/pi-agent-core";
 import openBuddyApplyPatch, { type OpenBuddyApplyPatchConfig } from "./extensions/apply-patch";
 import { sessionMetadataBridgeFactory } from "./extensions/session-metadata-bridge";
+import { modelBridgeFactory } from "./extensions/model-bridge";
 import { isPiPackageInstalled } from "./pi-package-installed";
 import {
   createTelemetryBridgeExtension,
@@ -943,6 +944,12 @@ export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResol
   // Future B.2+ rounds will gradually migrate session-metadata.ts functions
   // to use this pattern directly.
   "openbuddy-pi-session-metadata": (_emit, _config, _options) => sessionMetadataBridgeFactory,
+
+  // Phase B.1 round 2 — 6th builtin ExtensionFactory for model lifecycle
+  // events. Demonstrates a second ExtensionAPI pattern that observes
+  // model_select / set_model / before_provider_request without breaking
+  // the legacy installAgentModel() provider CRUD path.
+  "openbuddy-pi-model-bridge": (_emit, _config, _options) => modelBridgeFactory,
 };
 
 export function resolvePiExtensions(
