@@ -151,8 +151,10 @@ import { markPluginTransactionRolledBack, PluginLifecycleQueue, type PluginTrans
 import { PiRuntimeCoordinator } from "./pi-runtime-coordinator";
 import { PiSessionRuntime } from "./pi-session-runtime";
 import { SessionAttachmentStore, type StoredSessionAttachment } from "../session/session-attachments";
-import { createDeepSeekPiBridge, createDeepSeekPiLlmInterceptor, createDeepSeekPiToolInterceptor, DEEPSEEK_PI_BRIDGE_PROTOCOL, DEEPSEEK_PI_CAPABILITIES, type DeepSeekPiBridgeRuntime } from "../deepseek/deepseek-pi-bridge";
-import { createDeepSeekPiCapabilityRuntime } from "../deepseek/deepseek-pi-capabilities";
+// Phase L.1 — DSH Pi bridge moved into `host-modules/deepseek/cordis-runtime.ts`;
+// only the protocol/capability constants survive (they're the IPC-visible
+// identity of the legacy bridge and live with the helpers that surface it).
+import { DEEPSEEK_PI_BRIDGE_PROTOCOL, DEEPSEEK_PI_CAPABILITIES } from "./host-modules/dsh-bridge-helpers";
 import { PresetSessionRuntime } from "./preset-session-runtime";
 import { resolveAgentPresetSelection, sessionHasConversation } from "./agent-preset-selection";
 import { createTerminalService, type TerminalRuntime } from "../deepseek/terminal-runtime";

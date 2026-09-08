@@ -81,10 +81,564 @@ import { listWorkspaces } from "../workbench-scope";
 import { SubprocessRuntime, SandboxPolicyService, SandboxRuntime } from "../../../deepseek/subprocess-runtime";
 import { createDeepSeekExecutionAdapter, provideDeepSeekExecutionServices, DEEPSEEK_EXECUTION_PACKAGES } from "../../../deepseek/deepseek-execution-adapters";
 import { resolveDeepSeekModule } from "../../../deepseek/deepseek-compat";
-import { createDeepSeekPiBridge, createDeepSeekPiLlmInterceptor, createDeepSeekPiToolInterceptor, type DeepSeekPiBridgeRuntime } from "../../../deepseek/deepseek-pi-bridge";
-import { createDeepSeekPiCapabilityRuntime } from "../../../deepseek/deepseek-pi-capabilities";
 import { artifactPackageJsonByName } from "../profile/paths";
 import { createProfileArtifactResolvers } from "../../profile-artifact-resolution";
+// Phase L.1 — DSH Pi bridge implementations moved in from
+// `electron/main/deepseek/deepseek-pi-bridge.ts` and
+// `electron/main/deepseek/deepseek-pi-capabilities.ts` (both deleted).
+// They had exactly one consumer (this file) and one protocol-constant
+// consumer (`dsh-bridge-helpers.ts`); keeping them here lets us delete
+// the two top-level files and remove a layer of indirection between
+// the Cordis runtime wiring and PI.
+import { streamSimple } from "@earendil-works/pi-ai/compat";
+import type { Model } from "@earendil-works/pi-ai";
+import { DEEPSEEK_PI_CAPABILITIES } from "../dsh-bridge-helpers";
+
+// ---------------------------------------------------------------------------
+// Phase L.1 — Pi bridge surface (relocated from deepseek-pi-bridge.ts)
+// ---------------------------------------------------------------------------
+
+type JsonRecord = Record<string, unknown>;
+
+export type DeepSeekPiCapabilityName = "session" | "web" | "subagent";
+
+export type DeepSeekPiCapabilityMethodMap = {
+	session: "get" | "list" | "listWorkspaces";
+	web: "status" | "search" | "fetch";
+	subagent: "list" | "prompt" | "interrupt";
+};
+
+export type DeepSeekPiCapabilityInvocationContext = {
+	signal: AbortSignal;
+	requestId?: string;
+	caller?: string;
+};
+
+export type DeepSeekPiCapabilityRuntime = {
+	capabilities: Readonly<Record<DeepSeekPiCapabilityName, readonly string[]>>;
+	invoke: (capability: DeepSeekPiCapabilityName, method: string, args?: unknown, context?: Partial<DeepSeekPiCapabilityInvocationContext>) => Promise<unknown>;
+};
+
+export interface DeepSeekPiBridgeRuntime {
+	getSession: () => { sessionId: string; cwd?: string; modelId?: string } | undefined;
+	listPersistedSessions: (cwd: string) => Promise<readonly unknown[]>;
+	getProviders: () => readonly { id: string; name: string }[];
+	getModels: (provider?: string) => readonly Model<any>[];
+	getModel: (provider: string, model: string) => Model<any> | undefined;
+	getCurrentModel: () => Model<any> | undefined;
+	listTools: () => readonly { name: string; label?: string; description?: string }[];
+	executeTool: (name: string, argumentsValue: unknown, signal?: AbortSignal) => Promise<unknown>;
+	prompt: (text: string) => Promise<void>;
+	abort: () => Promise<void>;
+	capability?: DeepSeekPiCapabilityRuntime;
+}
+
+export interface DeepSeekPiBridge {
+	runtime: "pi";
+	capabilities: Readonly<Record<DeepSeekPiCapabilityName, readonly string[]>>;
+	get: (id?: string) => JsonRecord | undefined;
+	listSessions: () => JsonRecord[];
+	listPersistedSessions: (cwd?: string) => Promise<readonly unknown[]>;
+	listProviders: () => readonly { id: string; name: string }[];
+	listModels: (provider?: string) => JsonRecord[];
+	complete: (options: { prompt?: string; system?: string; provider?: string; model?: string }) => Promise<JsonRecord>;
+	listTools: () => JsonRecord[];
+	executeTool: (name: string, argumentsValue?: unknown) => Promise<unknown>;
+	prompt: (text: string) => Promise<JsonRecord>;
+	abort: () => Promise<JsonRecord>;
+	invokeCapability: (capability: DeepSeekPiCapabilityName, method: string, args?: unknown, context?: Partial<DeepSeekPiCapabilityInvocationContext>) => Promise<unknown>;
+}
+
+export type DeepSeekGenerateOptions = {
+	provider?: unknown;
+	model?: unknown;
+	messages?: unknown;
+	system?: unknown;
+	tools?: unknown;
+	temperature?: unknown;
+	maxTokens?: unknown;
+	signal?: unknown;
+	sessionId?: unknown;
+};
+
+export type DeepSeekPiStream = (model: Model<any>, context: any, options?: any) => AsyncIterable<any>;
+
+// ---------------------------------------------------------------------------
+// Phase L.1 — Pi capability facade surface (relocated from
+// deepseek-pi-capabilities.ts). The capability runtime validates JSON-safe
+// arguments, dispatches to typed handlers, and emits audit entries. The
+// `web` handler is optional because OpenBuddy dropped the bespoke web
+// search backend in favour of `pi-web-access`.
+// ---------------------------------------------------------------------------
+
+export type DeepSeekPiCapabilityHandlers = {
+	session: {
+		get: (context: DeepSeekPiCapabilityInvocationContext) => unknown;
+		list: (cwd: string, context: DeepSeekPiCapabilityInvocationContext) => Promise<unknown>;
+		listWorkspaces: (context: DeepSeekPiCapabilityInvocationContext) => Promise<unknown>;
+	};
+	web?: {
+		status: (context: DeepSeekPiCapabilityInvocationContext) => Promise<unknown>;
+		search: (query: string, maxResults: number | undefined, context: DeepSeekPiCapabilityInvocationContext) => Promise<unknown>;
+		fetch: (url: string, context: DeepSeekPiCapabilityInvocationContext) => Promise<unknown>;
+	};
+	subagent: {
+		list: (parentSessionId: string, context: DeepSeekPiCapabilityInvocationContext) => Promise<unknown>;
+		prompt: (parentSessionId: string, childSessionId: string, text: string, context: DeepSeekPiCapabilityInvocationContext) => Promise<unknown>;
+		interrupt: (parentSessionId: string, childSessionId: string, context: DeepSeekPiCapabilityInvocationContext) => Promise<unknown>;
+	};
+};
+
+export type DeepSeekPiCapabilityAudit = {
+	capability: DeepSeekPiCapabilityName;
+	method: string;
+	outcome: "success" | "failure";
+	durationMs: number;
+	requestId?: string;
+	caller?: string;
+};
+
+// ---------------------------------------------------------------------------
+// Phase L.1 — Pi bridge + capability + interceptor implementations.
+// Code below is a verbatim relocation of the contents of
+// `electron/main/deepseek/deepseek-pi-bridge.ts` (349 LOC) +
+// `electron/main/deepseek/deepseek-pi-capabilities.ts` (198 LOC).
+// All `function` exports keep the same names and signatures so the
+// call sites in `syncDeepSeekCordisRuntime` below need no change.
+// ---------------------------------------------------------------------------
+
+function bridgeRecord(value: unknown): JsonRecord {
+	return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
+}
+
+function bridgeContentText(content: unknown): string {
+	if (typeof content === "string") return content;
+	if (!Array.isArray(content)) return content == null ? "" : String(content);
+	return content.map((part) => {
+		if (typeof part === "string") return part;
+		const item = bridgeRecord(part);
+		if (item.type === "text" && typeof item.text === "string") return item.text;
+		if (typeof item.content === "string") return item.content;
+		return "";
+	}).join("");
+}
+
+function bridgePiContent(content: unknown): unknown {
+	if (typeof content === "string") return content;
+	if (!Array.isArray(content)) return bridgeContentText(content);
+	return content.map((part) => {
+		const item = bridgeRecord(part);
+		if (item.type === "text" && typeof item.text === "string") return { type: "text", text: item.text };
+		if (item.type === "reasoning" && typeof item.text === "string") return { type: "thinking", thinking: item.text };
+		if (item.type === "tool-call") {
+			return {
+				type: "toolCall",
+				id: String(item.id ?? "dsh-tool"),
+				name: String(item.name ?? "tool"),
+				arguments: bridgeParseArguments(item.arguments),
+			};
+		}
+		return { type: "text", text: bridgeContentText(part) };
+	});
+}
+
+function bridgeParseArguments(value: unknown): JsonRecord {
+	if (value && typeof value === "object" && !Array.isArray(value)) return value as JsonRecord;
+	if (typeof value === "string") {
+		try {
+			const parsed = JSON.parse(value);
+			return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as JsonRecord : {};
+		} catch {
+			return {};
+		}
+	}
+	return {};
+}
+
+function bridgeToPiMessages(messages: unknown, model: Model<any>): unknown[] {
+	if (!Array.isArray(messages)) return [];
+	return messages.filter((raw) => bridgeRecord(raw).role !== "system").map((raw) => {
+		const message = bridgeRecord(raw);
+		const role = message.role;
+		const timestamp = typeof message.timestamp === "number" ? message.timestamp : Date.now();
+		if (role === "tool-result" || role === "tool") {
+			return {
+				role: "toolResult",
+				toolCallId: String(message.toolCallId ?? message.callId ?? "dsh-tool"),
+				toolName: String(message.toolName ?? "tool"),
+				content: [{ type: "text", text: bridgeContentText(message.content) }],
+				isError: Boolean(message.isError),
+				timestamp,
+			};
+		}
+		if (role === "assistant") {
+			return {
+				role: "assistant",
+				content: bridgePiContent(message.content),
+				api: model.api,
+				provider: model.provider,
+				model: model.id,
+				usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+				stopReason: "stop",
+				timestamp,
+			};
+		}
+		return { role: "user", content: bridgePiContent(message.content), timestamp };
+	});
+}
+
+function bridgeToolCallFromPartial(event: JsonRecord): JsonRecord {
+	const partial = bridgeRecord(event.partial);
+	const content = Array.isArray(partial.content) ? partial.content : [];
+	return bridgeRecord(content[Number(event.contentIndex)]);
+}
+
+function bridgeUsageFromMessage(message: unknown): JsonRecord {
+	const usage = bridgeRecord(bridgeRecord(message).usage);
+	return {
+		inputTokens: Number(usage.input ?? 0),
+		outputTokens: Number(usage.output ?? 0),
+		...(usage.cacheRead === undefined ? {} : { cacheReadTokens: Number(usage.cacheRead) }),
+		...(usage.cacheWrite === undefined ? {} : { cacheWriteTokens: Number(usage.cacheWrite) }),
+		...(usage.reasoning === undefined ? {} : { reasoningTokens: Number(usage.reasoning) }),
+	};
+}
+
+function bridgeFinishReason(reason: unknown): JsonRecord {
+	if (reason === "toolUse") return { kind: "tool-calls" };
+	if (reason === "length") return { kind: "max-tokens" };
+	return { kind: "stop" };
+}
+
+export function createDeepSeekPiBridge(runtime: DeepSeekPiBridgeRuntime): DeepSeekPiBridge {
+	const capabilities = runtime.capability?.capabilities ?? DEEPSEEK_PI_CAPABILITIES;
+	const invokeCapability = async (capability: DeepSeekPiCapabilityName, method: string, args?: unknown, context?: Partial<DeepSeekPiCapabilityInvocationContext>): Promise<unknown> => {
+		const methods = capabilities[capability];
+		if (!methods?.includes(method)) throw new Error(`pi bridge: capability method is unavailable: ${capability}/${method}`);
+		if (!runtime.capability) throw new Error("pi bridge: capability facade is unavailable");
+		return context === undefined
+			? runtime.capability.invoke(capability, method, args)
+			: runtime.capability.invoke(capability, method, args, context);
+	};
+	return {
+		runtime: "pi",
+		capabilities,
+		get: (id) => {
+			const session = runtime.getSession();
+			if (!session || (id && id !== session.sessionId)) return undefined;
+			return { sessionId: session.sessionId, ...(session.cwd ? { cwd: session.cwd } : {}), ...(session.modelId ? { modelId: session.modelId } : {}) };
+		},
+		listSessions: () => {
+			const session = runtime.getSession();
+			return session ? [{ sessionId: session.sessionId, ...(session.cwd ? { cwd: session.cwd } : {}), ...(session.modelId ? { modelId: session.modelId } : {}) }] : [];
+		},
+		listPersistedSessions: (cwd) => runtime.listPersistedSessions(cwd ?? process.cwd()),
+		listProviders: () => runtime.getProviders(),
+		listModels: (provider) => runtime.getModels(provider).map((model) => ({
+			id: model.id,
+			name: model.name,
+			provider: model.provider,
+			api: model.api,
+			contextWindow: model.contextWindow,
+			maxTokens: model.maxTokens,
+			reasoning: model.reasoning,
+		})),
+		complete: async (options) => {
+			const model = options.provider && options.model
+				? runtime.getModel(options.provider, options.model)
+				: runtime.getCurrentModel();
+			if (!model) throw new Error("pi bridge: no active model is configured");
+			const chunks: string[] = [];
+			for await (const event of streamSimple(model, {
+				systemPrompt: options.system,
+				messages: [{ role: "user", content: options.prompt ?? "", timestamp: Date.now() }],
+			})) {
+				if (event.type === "text_delta") chunks.push(event.delta);
+			}
+			return { text: chunks.join(""), provider: model.provider, model: model.id };
+		},
+		listTools: () => runtime.listTools().map((tool) => ({ name: tool.name, ...(tool.label ? { label: tool.label } : {}), ...(tool.description ? { description: tool.description } : {}) })),
+		executeTool: (name, argumentsValue) => runtime.executeTool(name, argumentsValue),
+		prompt: async (text) => { await runtime.prompt(text); return { sessionId: runtime.getSession()?.sessionId }; },
+		abort: async () => { await runtime.abort(); return { ok: true }; },
+		invokeCapability,
+	};
+}
+
+export function createDeepSeekPiLlmInterceptor(
+	runtime: Pick<DeepSeekPiBridgeRuntime, "getModel">,
+	stream: DeepSeekPiStream = streamSimple,
+): (options: DeepSeekGenerateOptions, next: () => AsyncIterable<unknown>) => AsyncIterable<unknown> {
+	return (options, next) => {
+		const provider = typeof options.provider === "string" ? options.provider : undefined;
+		const modelId = typeof options.model === "string" ? options.model : undefined;
+		const model = provider && modelId ? runtime.getModel(provider, modelId) : undefined;
+		if (!model) return next();
+		const context = {
+			systemPrompt: typeof options.system === "string" ? options.system : undefined,
+			messages: bridgeToPiMessages(options.messages, model),
+			tools: Array.isArray(options.tools) ? options.tools.map((tool) => {
+				const item = bridgeRecord(tool);
+				return { name: String(item.name ?? "tool"), description: String(item.description ?? ""), parameters: item.parameters ?? {} };
+			}) : undefined,
+		};
+		const streamOptions = {
+			temperature: typeof options.temperature === "number" ? options.temperature : undefined,
+			maxTokens: typeof options.maxTokens === "number" ? options.maxTokens : undefined,
+			signal: options.signal && typeof options.signal === "object" && "aborted" in options.signal
+				? options.signal
+				: undefined,
+			sessionId: typeof options.sessionId === "string" ? options.sessionId : undefined,
+		};
+		return bridgeMapPiStream(stream(model, context, streamOptions));
+	};
+}
+
+export function createDeepSeekPiToolInterceptor(
+	runtime: Pick<DeepSeekPiBridgeRuntime, "listTools" | "executeTool">,
+): (execution: JsonRecord, next: () => Promise<unknown>) => Promise<unknown> {
+	const names = () => new Set(runtime.listTools().map((tool) => tool.name));
+	return async (execution, next) => {
+		const name = typeof execution.name === "string" ? execution.name : undefined;
+		if (!name || !names().has(name)) return next();
+		try {
+			const result = bridgeRecord(await runtime.executeTool(name, execution.arguments, execution.signal as AbortSignal | undefined));
+			const content = Array.isArray(result.content)
+				? result.content.map((part) => {
+					const item = bridgeRecord(part);
+					return item.type === "text" && typeof item.text === "string"
+						? { type: "text", text: item.text }
+						: { type: "text", text: bridgeContentText(part) };
+				})
+				: [{ type: "text", text: JSON.stringify(result.details ?? result) }];
+			return {
+				isError: false,
+				value: result.details ?? null,
+				content,
+			};
+		} catch (error) {
+			return {
+				isError: true,
+				error: { message: error instanceof Error ? error.message : String(error) },
+				content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+			};
+		}
+	};
+}
+
+async function* bridgeMapPiStream(source: AsyncIterable<JsonRecord>): AsyncIterable<JsonRecord> {
+	for await (const raw of source) {
+		const event = bridgeRecord(raw);
+		switch (event.type) {
+			case "text_start":
+				yield { type: "block-start", index: Number(event.contentIndex ?? 0), blockType: "text" };
+				break;
+			case "text_delta":
+				yield { type: "text-delta", index: Number(event.contentIndex ?? 0), text: String(event.delta ?? "") };
+				break;
+			case "text_end":
+				yield { type: "block-end", index: Number(event.contentIndex ?? 0), block: { type: "text", text: String(event.content ?? "") } };
+				break;
+			case "thinking_start":
+				yield { type: "block-start", index: Number(event.contentIndex ?? 0), blockType: "reasoning" };
+				break;
+			case "thinking_delta":
+				yield { type: "reasoning-delta", index: Number(event.contentIndex ?? 0), text: String(event.delta ?? "") };
+				break;
+			case "thinking_end":
+				yield { type: "block-end", index: Number(event.contentIndex ?? 0), block: { type: "reasoning", text: String(event.content ?? "") } };
+				break;
+			case "toolcall_start": {
+				const call = bridgeToolCallFromPartial(event);
+				yield { type: "block-start", index: Number(event.contentIndex ?? 0), blockType: "tool-call" };
+				yield { type: "tool-call-delta", index: Number(event.contentIndex ?? 0), id: String(call.id ?? ""), name: String(call.name ?? ""), argumentsDelta: "" };
+				break;
+			}
+			case "toolcall_delta": {
+				const call = bridgeToolCallFromPartial(event);
+				yield { type: "tool-call-delta", index: Number(event.contentIndex ?? 0), id: String(call.id ?? ""), name: typeof call.name === "string" ? call.name : undefined, argumentsDelta: String(event.delta ?? "") };
+				break;
+			}
+			case "toolcall_end": {
+				const call = bridgeRecord(event.toolCall);
+				yield { type: "block-end", index: Number(event.contentIndex ?? 0), block: { type: "tool-call", id: String(call.id ?? ""), name: String(call.name ?? ""), arguments: JSON.stringify(call.arguments ?? {}) } };
+				break;
+			}
+			case "done":
+				yield { type: "usage", usage: bridgeUsageFromMessage(event.message) };
+				yield { type: "finish", reason: bridgeFinishReason(event.reason) };
+				break;
+			case "error": {
+				const aborted = event.reason === "aborted";
+				yield { type: "finish", reason: { kind: aborted ? "aborted" : "error", failure: { code: aborted ? "ABORTED" : "PI_PROVIDER_ERROR", message: String(event.errorMessage ?? "Pi provider error") } } };
+				break;
+			}
+			default:
+				break;
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Phase L.1 — Pi capability runtime implementation.
+// ---------------------------------------------------------------------------
+
+function capabilityIsJsonValue(value: unknown, ancestors = new Set<object>()): boolean {
+	if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+	if (typeof value === "number") return Number.isFinite(value);
+	if (!value || typeof value !== "object") return false;
+	if (ancestors.has(value)) return false;
+	ancestors.add(value);
+	try {
+		if (Array.isArray(value)) return value.every((item) => capabilityIsJsonValue(item, ancestors));
+		if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return false;
+		return Object.values(value as JsonRecord).every((item) => capabilityIsJsonValue(item, ancestors));
+	} finally {
+		ancestors.delete(value);
+	}
+}
+
+function capabilityAssertJsonResult(value: unknown, capability: string, method: string): unknown {
+	if (!capabilityIsJsonValue(value)) throw new Error(`pi bridge: ${capability}.${method} returned a non-JSON-safe value`);
+	return value;
+}
+
+function capabilityArgumentsRecord(value: unknown, capability: string, method: string): JsonRecord {
+	if (!value || typeof value !== "object" || Array.isArray(value) || !capabilityIsJsonValue(value)) {
+		throw new Error(`pi bridge: ${capability}.${method} arguments must be JSON-safe object`);
+	}
+	return value as JsonRecord;
+}
+
+function capabilityOptionalString(args: JsonRecord, key: string): string | undefined {
+	if (args[key] === undefined) return undefined;
+	if (typeof args[key] !== "string" || !args[key].trim()) throw new Error(`pi bridge: ${key} must be a non-empty string`);
+	return args[key];
+}
+
+function capabilityRequiredString(args: JsonRecord, key: string): string {
+	const value = capabilityOptionalString(args, key);
+	if (!value) throw new Error(`pi bridge: ${key} is required`);
+	return value;
+}
+
+function capabilityOptionalNumber(args: JsonRecord, key: string): number | undefined {
+	if (args[key] === undefined) return undefined;
+	if (typeof args[key] !== "number" || !Number.isFinite(args[key])) throw new Error(`pi bridge: ${key} must be a finite number`);
+	return args[key];
+}
+
+function capabilityEnsureKeys(args: JsonRecord, allowed: readonly string[], capability: string, method: string): void {
+	const allowedSet = new Set(allowed);
+	const unknown = Object.keys(args).find((key) => !allowedSet.has(key));
+	if (unknown) throw new Error(`pi bridge: ${capability}.${method} does not accept ${unknown}`);
+}
+
+function capabilityIsCapabilityName(value: unknown): value is DeepSeekPiCapabilityName {
+	return value === "session" || value === "web" || value === "subagent";
+}
+
+function capabilityAbortError(): Error {
+	return Object.assign(new Error("Pi capability invocation was cancelled"), { name: "AbortError", code: "cancelled" });
+}
+
+function capabilityCreateContext(input?: Partial<DeepSeekPiCapabilityInvocationContext>): DeepSeekPiCapabilityInvocationContext {
+	const controller = new AbortController();
+	if (input?.signal?.aborted) controller.abort(input.signal.reason);
+	else input?.signal?.addEventListener("abort", () => controller.abort(input.signal?.reason), { once: true });
+	return { signal: controller.signal, ...(input?.requestId ? { requestId: input.requestId } : {}), ...(input?.caller ? { caller: input.caller } : {}) };
+}
+
+async function capabilityWithTimeout<T>(task: (signal: AbortSignal) => Promise<T>, parent: AbortSignal, timeoutMs: number): Promise<T> {
+	if (parent.aborted) throw capabilityAbortError();
+	if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) throw new Error("pi bridge: timeout must be a positive safe integer");
+	const timeout = new AbortController();
+	const onAbort = () => timeout.abort(parent.reason);
+	parent.addEventListener("abort", onAbort, { once: true });
+	const timer = setTimeout(() => timeout.abort(new Error("Pi capability invocation timed out")), timeoutMs);
+	try {
+		return await Promise.race([
+			task(timeout.signal),
+			new Promise<T>((_, reject) => timeout.signal.addEventListener("abort", () => reject(timeout.signal.reason instanceof Error ? timeout.signal.reason : capabilityAbortError()), { once: true })),
+		]);
+	} finally {
+		clearTimeout(timer);
+		parent.removeEventListener("abort", onAbort);
+	}
+}
+
+export function createDeepSeekPiCapabilityRuntime(
+	handlers: DeepSeekPiCapabilityHandlers,
+	options: { onAudit?: (entry: DeepSeekPiCapabilityAudit) => void; timeoutMs?: number } = {},
+): DeepSeekPiCapabilityRuntime {
+	return {
+		capabilities: DEEPSEEK_PI_CAPABILITIES,
+		invoke: async (capability: DeepSeekPiCapabilityName, method: string, rawArgs?: unknown, inputContext?: Partial<DeepSeekPiCapabilityInvocationContext>): Promise<unknown> => {
+			const context = capabilityCreateContext(inputContext);
+			const startedAt = Date.now();
+			const audit = (outcome: "success" | "failure") => options.onAudit?.({ capability, method, outcome, durationMs: Math.max(0, Date.now() - startedAt), ...(context.requestId ? { requestId: context.requestId } : {}), ...(context.caller ? { caller: context.caller } : {}) });
+			try {
+				if (!capabilityIsCapabilityName(capability)) throw new Error(`pi bridge: capability is unavailable: ${String(capability)}`);
+				const args = capabilityArgumentsRecord(rawArgs ?? {}, capability, method);
+				if (!(DEEPSEEK_PI_CAPABILITIES[capability] as readonly string[]).includes(method)) throw new Error(`pi bridge: capability method is unavailable: ${capability}/${method}`);
+				if (capability === "session") {
+					if (method === "get") {
+						capabilityEnsureKeys(args, [], capability, method);
+						const result = capabilityAssertJsonResult(handlers.session.get(context), capability, method);
+						audit("success");
+						return result;
+					}
+					if (method === "list") {
+						capabilityEnsureKeys(args, ["cwd"], capability, method);
+						const result = capabilityAssertJsonResult(await capabilityWithTimeout((signal) => handlers.session.list(capabilityOptionalString(args, "cwd") ?? process.cwd(), { ...context, signal }), context.signal, options.timeoutMs ?? 30_000), capability, method);
+						audit("success");
+						return result;
+					}
+					capabilityEnsureKeys(args, [], capability, method);
+					const result = capabilityAssertJsonResult(await capabilityWithTimeout((signal) => handlers.session.listWorkspaces({ ...context, signal }), context.signal, options.timeoutMs ?? 30_000), capability, method);
+					audit("success");
+					return result;
+				}
+				if (capability === "web") {
+					if (!handlers.web) throw new Error("pi bridge: web capability is unavailable (use pi-web-access)");
+					if (method === "status") {
+						capabilityEnsureKeys(args, [], capability, method);
+						const result = capabilityAssertJsonResult(await capabilityWithTimeout((signal) => handlers.web!.status({ ...context, signal }), context.signal, options.timeoutMs ?? 30_000), capability, method);
+						audit("success");
+						return result;
+					}
+					if (method === "search") {
+						capabilityEnsureKeys(args, ["query", "maxResults"], capability, method);
+						const result = capabilityAssertJsonResult(await capabilityWithTimeout((signal) => handlers.web!.search(capabilityRequiredString(args, "query"), capabilityOptionalNumber(args, "maxResults"), { ...context, signal }), context.signal, options.timeoutMs ?? 30_000), capability, method);
+						audit("success");
+						return result;
+					}
+					capabilityEnsureKeys(args, ["url"], capability, method);
+					const result = capabilityAssertJsonResult(await capabilityWithTimeout((signal) => handlers.web!.fetch(capabilityRequiredString(args, "url"), { ...context, signal }), context.signal, options.timeoutMs ?? 30_000), capability, method);
+					audit("success");
+					return result;
+				}
+				if (method === "list") {
+					capabilityEnsureKeys(args, ["parentSessionId"], capability, method);
+					const result = capabilityAssertJsonResult(await capabilityWithTimeout((signal) => handlers.subagent.list(capabilityRequiredString(args, "parentSessionId"), { ...context, signal }), context.signal, options.timeoutMs ?? 30_000), capability, method);
+					audit("success");
+					return result;
+				}
+				capabilityEnsureKeys(args, ["parentSessionId", "childSessionId", "text"], capability, method);
+				const parentSessionId = capabilityRequiredString(args, "parentSessionId");
+				const childSessionId = capabilityRequiredString(args, "childSessionId");
+				const result = capabilityAssertJsonResult(await capabilityWithTimeout((signal) => method === "interrupt"
+					? handlers.subagent.interrupt(parentSessionId, childSessionId, { ...context, signal })
+					: handlers.subagent.prompt(parentSessionId, childSessionId, capabilityRequiredString(args, "text"), { ...context, signal }), context.signal, options.timeoutMs ?? 30_000), capability, method);
+				audit("success");
+				return result;
+			} catch (error) {
+				audit("failure");
+				throw error;
+			}
+		},
+	};
+}
 
 // --- Bundles / entries ------------------------------------------------------
 

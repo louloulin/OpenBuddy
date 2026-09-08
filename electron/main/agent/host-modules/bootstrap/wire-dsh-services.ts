@@ -161,36 +161,16 @@ export function wireDshServices(deps: WireDshServicesDeps): void {
 
   // ---------- context.provide("dshRemotes", ...) ----------
   context.provide("dshRemotes", {
-    commandsList: (_agent?: unknown) => deps.listCommands(),
-    commandsFind: (_agent: unknown, name: string) => {
-      if (typeof name !== "string" || name.length === 0) return undefined;
-      return deps.listCommands().find((command) => command.name === name) ?? undefined;
-    },
-    commandsParseCommand: (line: string) => {
-      // Mirror @deepseek-ai/dsh-commands parseCommand grammar: leading slash,
-      // name starts with a lowercase letter followed by [a-z0-9_-]*, then
-      // either end-of-input or a single whitespace separator. rawInput is
-      // the verbatim remainder after the matched prefix with any leading
-      // whitespace stripped so downstream consumers do not need to trim.
-      if (typeof line !== "string") return undefined;
-      const match = /^\/([a-z][a-z0-9_-]*)/u.exec(line);
-      if (match === null) return undefined;
-      const name = match[1];
-      if (name === undefined) return undefined;
-      const rest = line.slice(match[0].length);
-      if (rest.length > 0 && !/^[\t\n\r ]/u.test(rest)) return undefined;
-      return Object.freeze({ name, rawInput: rest.replace(/^[\t\n\r ]+/u, "") });
-    },
-    commandsExecute: async (_agent: unknown, input: string, _images: unknown[] = []) => {
-      const line = input.trim().replace(/^\/+/, "");
-      const [name, ...rest] = line.split(/\s+/);
-      const session = state.session;
-      if (!session) return undefined;
-      const command = session.extensionRunner.getCommand(name);
-      if (!command) return undefined;
-      await command.handler(rest.join(" "), session.extensionRunner.createCommandContext());
-      return { commandId: `pi-command-${Date.now()}`, result: { kind: "success" } };
-    },
+    // Phase L.1 — command dispatch is PI-direct. Renderer-side slash
+    // commands go through `src/lib/agent/pi-client.ts:commandsList`
+    // (an IPC that hits `agentHost.listCommands()` which already wraps
+    // `extensionRunner.getRegisteredCommands()`). The DSH indirection
+    // here would only matter if a DSH plugin invoked
+    // `ctx.get("dshRemotes")?.commandsList(...)`, and no DSH plugin
+    // exists today (`@deepseek-ai/dsh-*` packages are not in
+    // `node_modules`). Keeping the entries would be dead code; L.2
+    // (DSH remote RPC infra deletion) will delete the remaining
+    // `dshRemotes` block entirely.
     goalsCreate: async (agent: unknown, request: { objective?: string; maxGoalRounds?: number }) => {
       const current = dshGoal(agent);
       if (current && current.phase !== "complete") throw new Error("goal already exists");

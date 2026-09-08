@@ -567,9 +567,10 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
 - ✅ **已完成：Phase B.1 第 4 轮 — `ipc/agent.ts` 943 → 690 LOC 再拆 6 个 capability 子文件，超额完成 ≤ 600 LOC 目标附近**（commit `747b77b`）
 - ✅ **已完成：Phase B.1 第 5 轮 — `ipc/agent.ts` 690 → 141 LOC（-79%）拆为 4 个 capability 子文件（lifecycle/sessions/workspace/prompt-cycle），成为纯 slim registrar**（commit `e0ad111`）
 - ✅ **已完成：v4 plan 更新 — §24 微内核 + 插件体系完整蓝图 + §25 OpenBuddyPlugin SDK v0.1 spec**（同 commit `e0ad111`）
-- ✅ **已完成：v5 plan 更新 — §26 DSH 退役分析 + Phase L 路线图（5 轮，-9037 LOC 退役）**（同 commit `e0ad111`）
-- 🟡 **下一轮 — Phase L.1 — DSH commands 迁 PI + 删 pi-bridge / pi-capabilities**（v5 §26.4）：删 `electron/main/deepseek/deepseek-pi-bridge.ts` (349) + `deepseek-pi-capabilities.ts` (198)，wire-dsh-services.ts commands 部分改 PI extensionRunner 直调，-547 LOC
-- ⚪ **第三轮 — Phase K.1 — OpenBuddyPlugin SDK v0.1 实现**（v4 §25）：TS 接口 + `loadPlugin()` + 4 轨分发装载 + zod 校验 + sample-plugin fixture
+- ✅ **已完成：v5 plan 更新 — §26 DSH 退役分析 + Phase L 路线图（5 轮，-9037 LOC 退役）**（同 commit `3d7b5c6`）
+- ✅ **已完成：Phase L.1 — DSH commands 迁 PI + 删 pi-bridge / pi-capabilities**（本轮 commit）：删 `electron/main/deepseek/deepseek-pi-bridge.ts` (349) + `deepseek-pi-capabilities.ts` (198)，代码 relocate 到 `electron/main/agent/host-modules/deepseek/cordis-runtime.ts`（其唯一调用者），协议常量 relocate 到 `electron/main/agent/host-modules/dsh-bridge-helpers.ts`（其唯一使用者），wire-dsh-services.ts commands 部分删除（已被 PI extensionRunner 直调替代）；**-547 LOC 退役** + 测试也 relocate 到 `cordis-bridge.test.ts` (11 tests pass)
+- 🟡 **下一轮 — Phase K.1 — OpenBuddyPlugin SDK v0.1 实现**（v4 §25）：TS 接口 + `loadPlugin()` + 4 轨分发装载 + zod 校验 + sample-plugin fixture
+- ⚪ **第三轮 — Phase L.2 — DSH remote RPC infra 删除**（v5 §26.4）：remote RPC infra → PI EventBus；删 `deepseek-runtime.ts:2200-4368`；-2500 LOC
 
 每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
 

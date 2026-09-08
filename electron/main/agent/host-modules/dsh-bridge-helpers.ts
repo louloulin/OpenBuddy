@@ -17,10 +17,27 @@
  */
 
 import type { DeepSeekCordisInvocation, DeepSeekCordisRuntimeSnapshot } from "@openbuddy/plugin-host";
-import { DEEPSEEK_PI_BRIDGE_PROTOCOL, DEEPSEEK_PI_CAPABILITIES } from "../../deepseek/deepseek-pi-bridge";
 import { type AgentHostState } from "./_state-shape";
 import type { AgentHostUiRequestValue as UiRequestValue } from "./_state-shape";
 import { createDefaultAgentHostState } from "./_default-state";
+
+// ---------------------------------------------------------------------------
+// Phase L.1 — DSH Pi bridge constants moved in from `electron/main/deepseek/
+// deepseek-pi-bridge.ts` (deleted). These two strings are the only
+// remaining surface of the legacy Pi bridge — they identify the
+// protocol the IPC `agent:deepseek-pi-describe` handler advertises
+// and the method lists the DSH capability facade dispatches against.
+// The actual bridge implementation moved into
+// `host-modules/deepseek/cordis-runtime.ts`.
+// ---------------------------------------------------------------------------
+
+export const DEEPSEEK_PI_BRIDGE_PROTOCOL = "openbuddy.pi.v1" as const;
+
+export const DEEPSEEK_PI_CAPABILITIES = {
+	session: ["get", "list", "listWorkspaces"],
+	web: ["status", "search", "fetch"],
+	subagent: ["list", "prompt", "interrupt"],
+} as const;
 
 // ---------------------------------------------------------------------------
 // Module-level singleton deps (install pattern + globalThis-keyed defaults)
