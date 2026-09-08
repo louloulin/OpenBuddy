@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { Context } from "@openbuddy/cordis";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { HarnessPluginLoader } from "@openbuddy/plugin-host";
@@ -62,5 +64,40 @@ describe("PresetSessionRuntime", () => {
     await runtime.dispose();
     expect(runtime.tools.map((tool) => tool.name)).toEqual(["host_tool"]);
     expect(runtime.renderSystemPrompt()).toBe("");
+
+    const secondRuntime = new PresetSessionRuntime({
+      hostContext,
+      hostLoader,
+      toolRegistry: hostRegistry,
+      cwd: "/tmp/project",
+    });
+    await secondRuntime.mount({
+      id: "medical",
+      path: "/tmp/medical/agent.cordis.yml",
+      source: "- id: preset-plugin\n  name: preset-plugin\n",
+    });
+    expect(secondRuntime.renderSystemPrompt()).toContain("Preset instructions");
+    await secondRuntime.dispose();
+  });
+
+  it("mounts a bundled clinical preset from its packaged composition", async () => {
+    const hostContext = new Context();
+    const hostRegistry = { registerTool: () => () => undefined, list: () => [] };
+    const hostLoader = new HarnessPluginLoader({ context: hostContext });
+    const presetPath = resolve(process.cwd(), "resources/agent-presets/clinical-neuro/agent.cordis.yml");
+    const runtime = new PresetSessionRuntime({
+      hostContext,
+      hostLoader,
+      toolRegistry: hostRegistry,
+      cwd: "/tmp/project",
+    });
+
+    await runtime.mount({
+      id: "clinical-neuro",
+      path: presetPath,
+      source: await readFile(presetPath, "utf8"),
+    });
+    expect(runtime.renderSystemPrompt()).toContain("神经内科和神经外科医生的辅助诊断智能体");
+    await runtime.dispose();
   });
 });

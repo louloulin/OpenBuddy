@@ -74,6 +74,36 @@ describe("HomePage", () => {
     expect(screen.getByRole("button", { name: "日常开发" })).toBeInTheDocument();
   });
 
+  it("切换场景和分类不丢失用户正在输入的草稿", () => {
+    render(<HomePage {...base} />);
+    const input = screen.getByRole("textbox") as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "保留我的草稿" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "文档处理" }));
+    expect(input.value).toBe("保留我的草稿");
+
+    fireEvent.click(screen.getByRole("button", { name: /移除 文档处理/ }));
+    expect(input.value).toBe("保留我的草稿");
+
+    fireEvent.click(screen.getByRole("tab", { name: /代码开发/ }));
+    expect(input.value).toBe("保留我的草稿");
+  });
+
+  it("场景 tab 支持方向键和 Home/End 导航", () => {
+    render(<HomePage {...base} />);
+    const work = screen.getByRole("tab", { name: /日常办公/ });
+    const code = screen.getByRole("tab", { name: /代码开发/ });
+    work.focus();
+
+    fireEvent.keyDown(work, { key: "ArrowRight" });
+    expect(code).toHaveFocus();
+    expect(screen.getByText("你的开发超能力")).toBeInTheDocument();
+
+    fireEvent.keyDown(code, { key: "Home" });
+    expect(work).toHaveFocus();
+    expect(screen.getByText("你的职场超能力")).toBeInTheDocument();
+  });
+
   it("working 场景下 chip 数 == COLLAPSED_VISIBLE_COUNT,默认全部展开,没有'更多'", () => {
     render(<HomePage {...base} />);
     // 日常办公场景有 7 个能力分类,刚好等于 COLLAPSED_VISIBLE_COUNT,无需折叠。

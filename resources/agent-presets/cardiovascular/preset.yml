@@ -1,0 +1,3 @@
+name: 心血管科辅助诊断
+description: 面向心血管科医生的垂域智能体 — 胸痛分诊、ACS风险评估、房颤抗凝决策、心衰分级。含CHA2DS2-VASc/HAS-BLED/GRACE/Killip/NYHA评分。
+order: 20

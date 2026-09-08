@@ -77,7 +77,9 @@ export interface PiAgentPreset {
 }
 
 function presetRoots(cwd?: string | null): Array<{ path: string; trust: PiAgentPreset["trust"] }> {
+  const builtinPath = process.env.OPENBUDDY_BUILTIN_PRESETS_DIR?.trim();
   return [
+    ...(builtinPath ? [{ path: builtinPath, trust: "system" as const }] : []),
     { path: join(piRoot(), "agent-presets"), trust: "user" },
     { path: join(workspaceRoot(cwd), ".agent-presets"), trust: "user" },
   ];

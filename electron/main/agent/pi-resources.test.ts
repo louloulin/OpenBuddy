@@ -15,12 +15,15 @@ vi.mock("../casdoor/casdoor-auth", () => ({
 
 const originalPiHome = process.env.PI_HOME;
 const originalPiAgent = process.env.PI_CODING_AGENT_DIR;
+const originalBuiltinPresets = process.env.OPENBUDDY_BUILTIN_PRESETS_DIR;
 
 afterEach(() => {
   if (originalPiHome === undefined) delete process.env.PI_HOME;
   else process.env.PI_HOME = originalPiHome;
   if (originalPiAgent === undefined) delete process.env.PI_CODING_AGENT_DIR;
   else process.env.PI_CODING_AGENT_DIR = originalPiAgent;
+  if (originalBuiltinPresets === undefined) delete process.env.OPENBUDDY_BUILTIN_PRESETS_DIR;
+  else process.env.OPENBUDDY_BUILTIN_PRESETS_DIR = originalBuiltinPresets;
 });
 
 async function loadResources() {
@@ -113,10 +116,15 @@ describe("Pi resource adapters", () => {
 	it("discovers Pi-backed agent presets with precedence, metadata, and defaults", async () => {
 		const home = await mkdtemp(join(tmpdir(), "openbuddy-presets-home-"));
 		const project = await mkdtemp(join(tmpdir(), "openbuddy-presets-project-"));
+		const builtin = await mkdtemp(join(tmpdir(), "openbuddy-presets-builtin-"));
 		process.env.PI_CODING_AGENT_DIR = join(home, "agent");
+		process.env.OPENBUDDY_BUILTIN_PRESETS_DIR = join(builtin, "agent-presets");
+		await mkdir(join(builtin, "agent-presets", "builtin"), { recursive: true });
 		await mkdir(join(home, "agent", "agent-presets", "standard"), { recursive: true });
 		await mkdir(join(project, ".agent-presets", "standard"), { recursive: true });
 		await mkdir(join(project, ".agent-presets", "broken"), { recursive: true });
+		await writeFile(join(builtin, "agent-presets", "builtin", "agent.cordis.yml"), "- name: builtin\n", "utf8");
+		await writeFile(join(builtin, "agent-presets", "builtin", "preset.yml"), "name: Built-in\norder: -1\n", "utf8");
 		await writeFile(join(home, "agent", "agent-presets", "standard", "agent.cordis.yml"), "- name: system\n", "utf8");
 		await writeFile(join(home, "agent", "agent-presets", "standard", "preset.yml"), "name: Standard\ndescription: shipped\norder: 1\n", "utf8");
 		await writeFile(join(project, ".agent-presets", "standard", "agent.cordis.yml"), "- name: project\n", "utf8");
@@ -124,6 +132,7 @@ describe("Pi resource adapters", () => {
 		const resources = await loadResources();
 		const presets = await resources.listAgentPresets(project);
 		expect(presets).toEqual([
+			expect.objectContaining({ id: "builtin", trust: "system", name: "Built-in", order: -1 }),
 			expect.objectContaining({ id: "standard", trust: "user", name: "Standard", description: "shipped", order: 1 }),
 			expect.objectContaining({ id: "broken", broken: expect.stringContaining("missing") }),
 		]);

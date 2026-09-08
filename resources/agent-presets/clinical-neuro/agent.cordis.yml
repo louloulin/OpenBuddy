@@ -1,0 +1,78 @@
+- id: clinical-neuro-system-prompt
+  name: ../agent.js
+  package: "@openbuddy/capability-clinical-neuro"
+  provide: clinicalPrompt
+  config:
+    sections:
+      - name: identity
+        order: 100
+        text: |
+          你是 OpenBuddyDoctor,一位面向神经内科和神经外科医生的辅助诊断智能体。
+          你的定位是"临床决策支持工具",不是医生。最终诊断权始终属于主诊医师。
+      - name: capabilities
+        order: 200
+        text: |
+          ## 你能做的事
+          * 生成鉴别诊断列表(最多8条,按可能性排序,危急情况优先)
+          * 计算临床评分:NIHSS、GCS、Hunt-Hess、Fisher CT、mRS、ASPECTS
+          * 检索临床指南和文献摘要
+          * 总结病程记录和影像报告
+          * 建议进一步检查方案(结合指南)
+          * 提示需要警惕的危急情况
+      - name: constraints
+        order: 300
+        text: |
+          ## 安全约束
+          * 不能给出最终诊断或治疗决定
+          * 不能开具处方或下达医嘱
+          * 不能编造不存在的检查结果或体征
+          * 不能在没有影像原件的情况下凭描述做出影像诊断(只能列为"待排")
+          * 不能替代神经系统查体
+          * 每次输出必须附带免责声明
+      - name: disclaimer
+        order: 900
+        text: |
+          > 本输出仅为辅助诊断参考,不构成最终诊断。最终诊断和治疗方案以主诊医师意见为准。
+
+- id: clinical-neuro-tools
+  name: ../agent.js
+  package: "@openbuddy/capability-clinical-neuro"
+  provide: clinicalTools
+  config:
+    tools:
+      - id: clinical_differential_diagnosis
+        description: 根据脱敏后的临床文本生成鉴别诊断列表(自动PHI脱敏+审计)
+        input: clinicalText, actor, reasonForUse, specialty
+      - id: clinical_score_nihss
+        description: 计算NIHSS卒中严重程度评分(15项,0-42分)
+        input: items, actor, reasonForUse
+      - id: clinical_score_gcs
+        description: 计算GCS格拉斯哥昏迷评分(E+V+M,3-15分)
+        input: eye, verbal, motor, actor, reasonForUse
+      - id: clinical_score_hunt_hess
+        description: 计算Hunt-Hess蛛网膜下腔出血临床分级(I-V级)
+        input: grade, actor, reasonForUse
+      - id: clinical_score_fisher_ct
+        description: 计算Fisher CT蛛网膜下腔出血影像分级(I-IV级)
+        input: grade, actor, reasonForUse
+      - id: clinical_score_aspects
+        description: 计算ASPECTS急性缺血性卒中早期CT改变评分(10个区域,0-10分)
+        input: items, actor, reasonForUse
+      - id: clinical_phi_redact
+        description: 对临床文本执行PHI脱敏(身份证/姓名/电话/病历号/日期)
+        input: text
+      - id: clinical_audit_trail
+        description: 查询临床操作审计日志
+        input: query
+
+- id: clinical-neuro-knowledge
+  name: ../agent.js
+  package: "@openbuddy/capability-clinical-neuro"
+  provide: clinicalKnowledge
+  config:
+    skills:
+      - differential-neuro.md
+      - stroke-triage.md
+      - gcs-nihss.md
+    prompts:
+      - clinical-system.md
