@@ -79,7 +79,6 @@ export function installDeepSeekCordisRuntime(deps: {
 }
 import { listWorkspaces } from "../workbench-scope";
 import { SubprocessRuntime, SandboxPolicyService, SandboxRuntime } from "../../../deepseek/subprocess-runtime";
-import { createDeepSeekExecutionAdapter, provideDeepSeekExecutionServices, DEEPSEEK_EXECUTION_PACKAGES } from "../../../deepseek/deepseek-execution-adapters";
 import { resolveDeepSeekModule } from "../../../deepseek/deepseek-compat";
 import { artifactPackageJsonByName } from "../profile/paths";
 import { createProfileArtifactResolvers } from "../../profile-artifact-resolution";
@@ -642,6 +641,47 @@ export function createDeepSeekPiCapabilityRuntime(
 
 // --- Bundles / entries ------------------------------------------------------
 
+// Phase L.4: inlined from deepseek-execution-adapters (now deleted).
+// The three sandbox subprocess packages are still exposed as Cordis plugins
+// for DSH-compat profile compatibility, but the adapter shim is dead weight
+// in a PI-first world — we mount the services directly on the bootstrap
+// context, then route any DSH plugin loader that asks for these packages
+// through `importer` with a one-liner plugin stub.
+const DEEPSEEK_EXECUTION_PACKAGES = new Set([
+	"@deepseek-ai/dsh-subprocess-local",
+	"@deepseek-ai/dsh-sandbox-local",
+	"@deepseek-ai/dsh-sandbox-policy",
+]);
+
+interface DeepSeekExecutionServices {
+	subprocess: SubprocessRuntime;
+	sandboxPolicy: SandboxPolicyService;
+	sandbox: SandboxRuntime;
+}
+
+function createDshExecutionAdapter(packageName: string, services: DeepSeekExecutionServices) {
+	if (!DEEPSEEK_EXECUTION_PACKAGES.has(packageName)) return undefined;
+	const moduleName = packageName.replace(/^@deepseek-ai\//u, "");
+	return {
+		name: packageName,
+		package: moduleName,
+		async apply(context: { provide?: (name: string, value: unknown) => unknown }): Promise<() => Promise<void>> {
+			const disposers: Array<() => unknown> = [];
+			for (const [key, value] of [
+				["subprocess", services.subprocess],
+				["sandboxPolicy", services.sandboxPolicy],
+				["sandbox", services.sandbox],
+			] as const) {
+				const restore = context.provide?.(key, value);
+				if (typeof restore === "function") disposers.push(restore as () => unknown);
+			}
+			return async () => {
+				for (const dispose of disposers.reverse()) await dispose();
+			};
+		},
+	};
+}
+
 const DEEPSEEK_CORE_PACKAGE_NAMES = new Set([
 	"@deepseek-ai/dsh-typert-registry",
 	"@deepseek-ai/dsh-system-prompt",
@@ -914,7 +954,7 @@ async function syncDeepSeekCordisRuntime(entries: readonly { id: string; name: s
 		cordisModule,
 		importer: async (specifier) => {
 			const executionAdapter = DEEPSEEK_EXECUTION_PACKAGES.has(specifier)
-				? createDeepSeekExecutionAdapter(specifier, executionServices)
+				? createDshExecutionAdapter(specifier, executionServices)
 				: undefined;
 			if (executionAdapter) return { default: executionAdapter };
 			return importer(specifier);
@@ -926,8 +966,14 @@ async function syncDeepSeekCordisRuntime(entries: readonly { id: string; name: s
 			};
 			if (typeof target.provide !== "function") throw new Error("deepseek-cordis: Context.provide is unavailable for Pi bridge");
 			const disposers: Array<() => unknown> = [];
-			const executionCleanup = provideDeepSeekExecutionServices(target, executionServices);
-			disposers.push(executionCleanup);
+			for (const [key, value] of [
+				["subprocess", executionServices.subprocess],
+				["sandboxPolicy", executionServices.sandboxPolicy],
+				["sandbox", executionServices.sandbox],
+			] as const) {
+				const restore = target.provide?.(key, value);
+				if (typeof restore === "function") disposers.push(restore as () => unknown);
+			}
 			const provided = target.provide("pi", createDeepSeekPiBridge(piBridgeRuntime));
 			if (typeof provided === "function") disposers.push(provided as () => unknown);
 			const sessionsProvided = target.provide("sessions", {

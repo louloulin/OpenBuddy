@@ -33,7 +33,6 @@ import type { Context } from "@openbuddy/cordis";
 import {
   composePluginPatches,
   openbuddyPluginManifestSchema,
-  serializeRemoteContribution,
   serializeHarnessTrack,
   validateOpenBuddyPluginManifest,
   type PluginBundle,
@@ -46,23 +45,18 @@ import { createOpenBuddyProfile } from "@openbuddy/bundle-base";
 
 import { type AgentHostState } from "../_state-shape";
 import { deepSeekCoreRuntimeEntries, syncDeepSeekCordisRuntime } from "../deepseek/cordis-runtime";
-import { deepSeekCapabilityRemote } from "../../../deepseek/deepseek-capabilities";
-import { deepSeekSessionQueryRemote } from "../../../deepseek/deepseek-runtime";
 import { readOverridePatches } from "../profile/override-patches";
 import { composeHostRunnerEntries } from "../deepseek/host-runner-entries";
 import type { ElectronHarnessPluginLoader } from "../profile/loader";
-import {
-  ensureTypertReady,
-  restoreDeepSeekCapabilityServices,
-  remoteServiceContext,
-} from "../workbench-scope";
+import { ensureTypertReady } from "../workbench-scope";
 
 /**
- * Dependencies required to assemble the DSH Cordis runtime + capability services.
+ * Dependencies required to assemble the DSH Cordis runtime + manifest profile.
  *
- * Every emit/event/dispatcher closure that the previous inline implementation
- * captured from agent-host module scope is collected here. Keeps this module
- * free-free of agent-host reverse dependencies.
+ * Phase L.4 — stripped from the previous full-inline version: emitRendererEvent,
+ * remoteServiceContext, reconcileProfileArtifacts, and the 7-capability remote
+ * registration dance (PI's `RemoteDispatcher` owns remote dispatch now and the
+ * 7 DSH packages are no longer registered individually on bootstrap).
  */
 export interface InitDeepSeekDeps {
   state: AgentHostState;
@@ -74,9 +68,6 @@ export interface InitDeepSeekDeps {
   /** Resolved importer for `import(new URL(...))` calls (vite-ignore hint preserved at call sites). */
   baseUrl: string;
   emitPluginEvent: (type: string, payload: unknown) => void;
-  emitRendererEvent: (channel: string, payload: unknown) => void;
-  remoteServiceContext: () => unknown;
-  reconcileProfileArtifacts: () => Promise<void>;
 }
 
 /**
@@ -137,20 +128,16 @@ export function profileEntriesFromManifests(
 
 /**
  * The DSH assembly stage. Loads the composed plugin profile into the loader,
- * syncs the Cordis runtime, restores capability services, ensures typert,
- * and registers the 7 core capability packages on the remote dispatcher.
+ * syncs the Cordis runtime, and ensures typert is mounted.
  *
- * Returns nothing — all side effects land on `state`.
+ * Phase L.4 — stripped: no more restoreDeepSeekCapabilityServices, no more
+ * deepSeekSessionQueryRemote + 7-capability remote registration, no more
+ * reconcileProfileArtifacts re-register dance. PI owns remote dispatch via
+ * its own `RemoteDispatcher`, and the core capability remotes are discovered
+ * lazily by the loader rather than eagerly registered on bootstrap.
  */
 export async function initDeepSeek(deps: InitDeepSeekDeps): Promise<void> {
-  const {
-    state,
-    loader,
-    profileBundle,
-    emitPluginEvent,
-    remoteServiceContext,
-    reconcileProfileArtifacts,
-  } = deps;
+  const { state, loader, profileBundle, emitPluginEvent } = deps;
 
   // Hydrate stored plugin overrides BEFORE composing the profile so the
   // override layers land on top of base + bundle.
@@ -197,53 +184,5 @@ export async function initDeepSeek(deps: InitDeepSeekDeps): Promise<void> {
     emitPluginEvent("plugin/failed", { id: "openbuddy-core", error: String(error) });
     throw error;
   }
-  await restoreDeepSeekCapabilityServices();
   await ensureTypertReady();
-
-  try {
-    state.remoteDispatcher.register(
-      deepSeekSessionQueryRemote(),
-      remoteServiceContext() as never,
-    );
-  } catch (error) {
-    throw error;
-  }
-
-  for (const packageName of DEEPSEEK_CORE_CAPABILITY_PACKAGES) {
-    const remote = deepSeekCapabilityRemote(packageName);
-    if (remote) {
-      try {
-        state.remoteDispatcher.register(
-          serializeRemoteContribution(remote),
-          remoteServiceContext() as never,
-        );
-      } catch (error) {
-        throw error;
-      }
-    }
-  }
-  await ensureTypertReady();
-  await reconcileProfileArtifacts();
-
-  // reconcileProfileArtifacts clears `state.profileRemoteContributions`
-  // and re-installs whatever `discoverRemoteImpl()` returns. If the
-  // discovery closure returns an empty Map (the default install when no
-  // concrete discoverer was wired in), the capability remotes that we
-  // just registered are now gone. Re-register the core capability set so
-  // renderer-side invocations like `agent:new-session` always find the
-  // expected services, even after an artifact reconciliation that wiped
-  // them out.
-  reRegisterCoreCapabilityRemotes();
-
-  function reRegisterCoreCapabilityRemotes(): void {
-    const context = state.context;
-    if (!context) return;
-    const ctx = remoteServiceContext();
-    state.remoteDispatcher.register(deepSeekSessionQueryRemote(), ctx as never);
-    for (const packageName of DEEPSEEK_CORE_CAPABILITY_PACKAGES) {
-      const remote = deepSeekCapabilityRemote(packageName);
-      if (!remote) continue;
-      state.remoteDispatcher.register(serializeRemoteContribution(remote), ctx as never);
-    }
-  }
 }

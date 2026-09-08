@@ -15,7 +15,6 @@ export { piHome, isPathWithin, piSessionDir };
 import { buildPluginLifecycleFacade } from "./host-modules/facade/plugin-lifecycle-facade";
 import { buildProfileFacade } from "./host-modules/facade/profile-facade";
 import { buildSessionLifecycleFacade } from "./host-modules/facade/session-lifecycle-facade";
-import { buildDeepseekFacade } from "./host-modules/facade/deepseek-facade";
 
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -105,7 +104,7 @@ import { projectMcpCapabilityGovernance } from "../mcp-capability-governance";
 import { emitContextEvent, emitPiSessionEvent } from "./pi-event-bridge";
 import { bindCapabilityEventBridge } from "../capability-event-bridge";
 import { getDeepSeekRemoteMethods, resolveDeepSeekModule } from "../deepseek/deepseek-compat";
-import { DeepSeekTypertService, deepSeekSessionQueryRemote, type DeepSeekPiAgentRuntime, type DeepSeekPiToolHooks, type DeepSeekToolDecision, type DeepSeekToolExecution } from "../deepseek/deepseek-runtime";
+import { DeepSeekTypertService, type DeepSeekPiAgentRuntime, type DeepSeekPiToolHooks, type DeepSeekToolDecision, type DeepSeekToolExecution } from "../deepseek/deepseek-runtime";
 import { DeepSeekCordisRuntime, type DeepSeekCordisInvocation, type DeepSeekCordisPluginEntry, type DeepSeekCordisRuntimeSnapshot } from "@openbuddy/plugin-host";
 import { deepSeekCapabilityPackageForService, deepSeekCapabilityRemote } from "../deepseek/deepseek-capabilities";
 import {
@@ -129,7 +128,6 @@ import {
   stopProfileWatchers as stopProfileWatchersImpl,
 } from "./host-modules/profile/watchers";
 import { syncMarketplacePiExtensionStatuses as syncMarketplacePiExtensionStatusesImpl } from "./host-modules/profile/marketplace-status";
-import { createDshHostRunner } from "../deepseek/dsh-host-runner";
 import {
   applyPiExtensionOverrides,
   builtinPiExtensionFactories,
@@ -158,7 +156,6 @@ import { PresetSessionRuntime } from "./preset-session-runtime";
 import { resolveAgentPresetSelection, sessionHasConversation } from "./agent-preset-selection";
 import { createTerminalService, type TerminalRuntime } from "../deepseek/terminal-runtime";
 import { SandboxPolicyService, SandboxRuntime, SubprocessRuntime } from "../deepseek/subprocess-runtime";
-import { createDeepSeekExecutionAdapter, createDeepSeekExecutionServices, provideDeepSeekExecutionServices, DEEPSEEK_EXECUTION_PACKAGES } from "../deepseek/deepseek-execution-adapters";
 import { lifecycleEntry, lifecycleEvent, lifecycleRevisionFromEntries, OPENBUDDY_LIFECYCLE_CUSTOM_TYPE, type OpenBuddyLifecycleEvent } from "@openbuddy/core-session/lifecycle";
 import { generateTraceId } from "@openbuddy/logging-shared";
 import { hostReceived as hostReceivedLog, hostDispatched as hostDispatchedLog, hostFailed as hostFailedLog } from "./agent-host-log";
@@ -283,7 +280,6 @@ export const lifecycleAppendQueues = new Map<string, Promise<void>>();
 const pluginLifecycleFacade = buildPluginLifecycleFacade(state);
 const profileFacade = buildProfileFacade(state);
 const sessionLifecycleFacade = buildSessionLifecycleFacade(state);
-const deepseekFacade = buildDeepseekFacade(state);
 const { installProfileBundle, removeProfileBundle } = pluginLifecycleFacade;
 const {
   profilePatchPaths,

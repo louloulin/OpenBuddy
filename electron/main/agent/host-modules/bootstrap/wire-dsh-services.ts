@@ -1,63 +1,43 @@
 /**
- * bootstrap/wire-dsh-services.ts — single helper that wires the DSH
- * (DeepSeek-Host) service cluster into the Cordis context after
- * wireContextServices() in agent-host.ts:initialize().
+ * bootstrap/wire-dsh-services.ts — DSH (DeepSeek-Host) state-machine helpers.
  *
- * Phase 8.3 §39: the DSH cluster is ~188 lines of:
- *   - state maps (dshGoalState, dshFeedbackState)
- *   - helper closures (sessionKey, dshGoal, dshFeedback)
- *   - dshHostRunner instance (createDshHostRunner with inventory/invoke/stop/undefine)
- *   - two context.provide blocks: "dshRemotes" (commands, goals, file refs,
- *     plugin inventory, message feedback, session reference resolver,
- *     dynamic-cordis-runner shims) and "dshRemote" (remote dispatcher facade)
+ * Phase L.4 — strip the boot-time DSH service cluster down to the only state
+ * that survives after `initialize()`: the per-session DSH goal / message
+ * feedback records. Everything else (commands list/parse, file references,
+ * inventory / invoke / stopFromPanel / undefineFromPanel) moved to PI:
+ *   - commands*: `session.extensionRunner.getCommand()` (PI ExtensionRunner)
+ *   - fileReferences: `listDshFileReferences` helper, not a bootstrap concern
+ *   - pluginInventory / runHostHalf / define / undefine: PI plugin runtime
  *
- * All of this is purely DeepSeek-compat surface and has no Pi-native
- * counterpart. Extracting it lets agent-host.ts:initialize() read as
- * orchestration rather than as a giant plugin-compat layer.
+ * The remaining surface (`goalsGet / goalsCreate / goalsEdit / goalsPause /
+ * goalsResume / goalsComplete / goalsBlocked / goalsClear /
+ * messageFeedbackList / messageFeedbackPut / messageFeedbackDelete`) is
+ * consumed via `ctx.get("dshRemotes")` by DeepSeek-compat plugins and tests.
  *
- * Reverse-dependency invariant:
- *   This module imports nothing from agent-host. All dependencies flow
- *   through the WireDshServicesDeps interface.
+ * Reverse-dependency invariant: this module imports nothing from agent-host.
  */
 import type { Context } from "@openbuddy/cordis";
 import type { AgentHostState } from "../_state-shape";
-import { serializeRemoteContribution } from "@openbuddy/plugin-host";
-import { createDshHostRunner } from "../../../deepseek/dsh-host-runner";
 
 /**
- * Minimal read-only surface the DSH cluster needs from outside.
- * Anything that lives in `state` is read on-demand (no snapshot).
+ * Minimal deps for the goal + feedback state machines. Everything that used
+ * to live here (commands list, plugin inventory, running tasks, ...) has been
+ * hoisted out and resolved lazily via PI runtime surfaces.
  */
 export interface WireDshServicesDeps {
   context: Context;
   state: AgentHostState;
-  cwd: string;
-
-  // Read-only helpers (resolved on every call so plugin install/remove
-  // doesn't go stale between initialize() and the first plugin usage).
-  listCommands: () => Array<{ name: string }>;
-  listPluginInventory: () => unknown;
-  listPlugins: () => Array<{ id: string; name: string }>;
-  listDshFileReferences: (cwd: string, query: string) => unknown;
-  listSessions: (cwd: string) => Promise<Array<{
-    sessionId: string;
-    title?: string;
-    cwd?: string;
-    updatedAt: string;
-  }>>;
-  listRunningTasks: () => unknown;
-  killTask: (taskId: string) => unknown;
-
-  // Remote dispatcher helpers
-  remoteServiceContext: () => any;
-  transitionDshGoal: (goal: unknown, ref: unknown, phase: unknown) => unknown;
+  transitionDshGoal: (
+    goal: DshGoalRecord | undefined,
+    ref: { id?: string; revision?: number } | undefined,
+    phase: "active" | "paused" | "blocked" | "complete",
+  ) => DshGoalRecord | undefined;
 }
 
 /**
- * Goal shape stored in the local dshGoalState Map. Mirrors the original
- * inline type literal that lived in agent-host.ts.
+ * Goal shape stored in the local dshGoalState Map.
  */
-interface DshGoalRecord {
+export interface DshGoalRecord {
   id: string;
   revision: number;
   objective: string;
@@ -71,26 +51,29 @@ interface DshGoalRecord {
 /**
  * Message-feedback entry stored in the local dshFeedbackState Map.
  */
-interface DshFeedbackEntry {
+export interface DshFeedbackEntry {
   rating: string;
   note?: string;
   version: number;
 }
 
 /**
- * Wire the DSH cluster (dshRemotes + dshRemote) into the Cordis context.
- * Owns its own private state (dshGoalState, dshFeedbackState, sessionKey).
+ * Wire the DSH goal + message-feedback state machines into the Cordis context.
+ * Owns its own private state maps (dshGoalState, dshFeedbackState).
  */
 export function wireDshServices(deps: WireDshServicesDeps): void {
-  const { context, state, cwd } = deps;
+  const { context, state } = deps;
 
-  // ---------- private state ----------
   const dshGoalState = new Map<string, DshGoalRecord>();
   const dshFeedbackState = new Map<string, Map<string, DshFeedbackEntry>>();
   const sessionKey = (value: unknown): string => {
     if (typeof value === "string") return value;
-    if (value && typeof value === "object" && typeof (value as { id?: unknown }).id === "string") return (value as { id: string }).id;
-    if (value && typeof value === "object" && typeof (value as { sessionId?: unknown }).sessionId === "string") return (value as { sessionId: string }).sessionId;
+    if (value && typeof value === "object" && typeof (value as { id?: unknown }).id === "string") {
+      return (value as { id: string }).id;
+    }
+    if (value && typeof value === "object" && typeof (value as { sessionId?: unknown }).sessionId === "string") {
+      return (value as { sessionId: string }).sessionId;
+    }
     return state.session?.sessionId ?? "current";
   };
   const dshGoal = (value: unknown): DshGoalRecord | undefined => dshGoalState.get(sessionKey(value));
@@ -101,76 +84,7 @@ export function wireDshServices(deps: WireDshServicesDeps): void {
     return entries;
   };
 
-  // ---------- dshHostRunner ----------
-  const dshHostRunner = createDshHostRunner({
-    inventory: async () => {
-      const inventory = (await deps.listPluginInventory()) as {
-        entries: Array<{ id: string; name: string; state: string; error?: string }>;
-        piExtensions: Array<{ id: string; name: string; state: string; mode?: string; adapter?: string; error?: string }>;
-        packages: Array<{ name: string; bundle?: unknown; client?: unknown; pi?: unknown; remote?: unknown; typert?: unknown }>;
-        renderers: unknown;
-      };
-      return {
-        packages: [
-          ...inventory.entries.map((plugin) => ({
-            id: plugin.id,
-            name: plugin.name,
-            kind: "cordis" as const,
-            state: plugin.state,
-            ...(plugin.error ? { error: plugin.error } : {}),
-          })),
-          ...inventory.piExtensions.map((extension) => ({
-            id: extension.id,
-            name: extension.name,
-            kind: "pi" as const,
-            state: extension.state,
-            ...(extension.mode ? { mode: extension.mode } : {}),
-            ...(extension.adapter ? { adapter: extension.adapter } : {}),
-            ...(extension.error ? { error: extension.error } : {}),
-          })),
-          ...inventory.packages.map((pkg) => ({
-            id: pkg.name,
-            name: pkg.name,
-            kind: "package" as const,
-            state: "loaded" as const,
-            capabilities: [
-              ...(pkg.bundle ? ["bundle"] : []),
-              ...(pkg.client ? ["renderer"] : []),
-              ...(pkg.pi ? ["pi"] : []),
-              ...(pkg.remote ? ["remote"] : []),
-              ...(pkg.typert ? ["typert"] : []),
-            ],
-          })),
-        ],
-        renderers: inventory.renderers,
-        remotes: state.remoteDispatcher.list(),
-        tasks: deps.listRunningTasks(),
-      };
-    },
-    invoke: (request: unknown) => state.remoteDispatcher.invoke(request, state.context),
-    stop: (taskId: string) => deps.killTask(taskId) as any,
-    undefine: async (definitionId: string) => {
-      const remote = state.remoteDispatcher.unregister(definitionId);
-      if (remote.removed) return { ok: true, id: definitionId, kind: "remote" };
-      const plugin = deps.listPlugins().find((entry) => entry.id === definitionId || entry.name === definitionId);
-      if (!plugin || !state.loader) return { ok: false, code: "not-found", id: definitionId };
-      await state.loader.remove(plugin.id);
-      return { ok: true, id: plugin.id, kind: "plugin" };
-    },
-  });
-
-  // ---------- context.provide("dshRemotes", ...) ----------
   context.provide("dshRemotes", {
-    // Phase L.1 — command dispatch is PI-direct. Renderer-side slash
-    // commands go through `src/lib/agent/pi-client.ts:commandsList`
-    // (an IPC that hits `agentHost.listCommands()` which already wraps
-    // `extensionRunner.getRegisteredCommands()`). The DSH indirection
-    // here would only matter if a DSH plugin invoked
-    // `ctx.get("dshRemotes")?.commandsList(...)`, and no DSH plugin
-    // exists today (`@deepseek-ai/dsh-*` packages are not in
-    // `node_modules`). Keeping the entries would be dead code; L.2
-    // (DSH remote RPC infra deletion) will delete the remaining
-    // `dshRemotes` block entirely.
     goalsCreate: async (agent: unknown, request: { objective?: string; maxGoalRounds?: number }) => {
       const current = dshGoal(agent);
       if (current && current.phase !== "complete") throw new Error("goal already exists");
@@ -180,17 +94,22 @@ export function wireDshServices(deps: WireDshServicesDeps): void {
         objective: String(request?.objective ?? "").trim(),
         phase: "active",
         roundsStarted: 0,
-        maxGoalRounds: Number.isSafeInteger(request?.maxGoalRounds) && (request.maxGoalRounds ?? 0) > 0 ? request.maxGoalRounds! : 3,
+        maxGoalRounds:
+          Number.isSafeInteger(request?.maxGoalRounds) && (request.maxGoalRounds ?? 0) > 0
+            ? (request.maxGoalRounds as number)
+            : 3,
         activation: "armed",
       };
       if (!goal.objective) throw new Error("goal objective must be non-empty");
       dshGoalState.set(sessionKey(agent), goal);
       return { ref: { id: goal.id, revision: goal.revision } };
     },
-    goalsGet: async (agent: unknown) => dshGoal(agent) ? { ...dshGoal(agent) } : undefined,
+    goalsGet: async (agent: unknown) => (dshGoal(agent) ? { ...dshGoal(agent) } : undefined),
     goalsEdit: async (agent: unknown, ref: { id?: string; revision?: number }, patch: { objective?: string }) => {
       const goal = dshGoal(agent);
-      if (!goal || goal.id !== ref?.id || goal.revision !== ref?.revision) throw new Error("goal revision conflict");
+      if (!goal || goal.id !== ref?.id || goal.revision !== ref?.revision) {
+        throw new Error("goal revision conflict");
+      }
       goal.revision += 1;
       if (patch?.objective !== undefined) {
         goal.objective = patch.objective.trim();
@@ -198,29 +117,39 @@ export function wireDshServices(deps: WireDshServicesDeps): void {
       }
       return { ...goal };
     },
-    goalsPause: async (agent: unknown, ref: { id?: string; revision?: number }) => deps.transitionDshGoal(dshGoal(agent), ref, "paused"),
-    goalsResume: async (agent: unknown, ref: { id?: string; revision?: number }) => deps.transitionDshGoal(dshGoal(agent), ref, "active"),
-    goalsComplete: async (agent: unknown, ref: { id?: string; revision?: number }) => deps.transitionDshGoal(dshGoal(agent), ref, "complete"),
+    goalsPause: async (agent: unknown, ref: { id?: string; revision?: number }) =>
+      deps.transitionDshGoal(dshGoal(agent), ref, "paused"),
+    goalsResume: async (agent: unknown, ref: { id?: string; revision?: number }) =>
+      deps.transitionDshGoal(dshGoal(agent), ref, "active"),
+    goalsComplete: async (agent: unknown, ref: { id?: string; revision?: number }) =>
+      deps.transitionDshGoal(dshGoal(agent), ref, "complete"),
     goalsBlocked: async (agent: unknown, ref: { id?: string; revision?: number }, reason: string) => {
-      const goal = dshGoal(agent);
-      const next = deps.transitionDshGoal(goal, ref, "blocked") as DshGoalRecord | undefined;
+      const next = deps.transitionDshGoal(dshGoal(agent), ref, "blocked");
       if (next) next.blockedReason = { code: "MODEL_REPORTED_BLOCKED", message: String(reason).trim() };
       return next;
     },
     goalsClear: async (agent: unknown, ref: { id?: string; revision?: number }) => {
       const goal = dshGoal(agent);
-      if (!goal || goal.id !== ref?.id || goal.revision !== ref?.revision) throw new Error("goal revision conflict");
+      if (!goal || goal.id !== ref?.id || goal.revision !== ref?.revision) {
+        throw new Error("goal revision conflict");
+      }
       dshGoalState.delete(sessionKey(agent));
       return { id: goal.id, revision: goal.revision + 1 };
     },
-    fileReferencesList: async (agent: unknown, query = "") => deps.listDshFileReferences(state.cwd ?? cwd, String(query)),
-    pluginInventoryList: () => deps.listPluginInventory(),
     messageFeedbackList: async (request: { sessionId?: string }) =>
       [...dshFeedback(request?.sessionId).entries()].map(([messageId, value]) => ({ messageId, ...value })),
-    messageFeedbackPut: async (request: { sessionId?: string; messageId: string; rating: string; note?: string; ifVersion?: number | null }) => {
+    messageFeedbackPut: async (request: {
+      sessionId?: string;
+      messageId: string;
+      rating: string;
+      note?: string;
+      ifVersion?: number | null;
+    }) => {
       const entries = dshFeedback(request?.sessionId);
       const previous = entries.get(request.messageId);
-      if ((request.ifVersion ?? null) !== (previous?.version ?? null)) throw new Error("feedback version conflict");
+      if ((request.ifVersion ?? null) !== (previous?.version ?? null)) {
+        throw new Error("feedback version conflict");
+      }
       const value: DshFeedbackEntry = {
         rating: request.rating,
         ...(request.note ? { note: request.note } : {}),
@@ -237,57 +166,5 @@ export function wireDshServices(deps: WireDshServicesDeps): void {
       entries.delete(request.messageId);
       return { absent: false };
     },
-    sessionReferenceResolverCandidates: async (_agent: unknown, query = "") => {
-      const rows = await deps.listSessions(state.cwd ?? cwd);
-      const needle = String(query).toLowerCase();
-      return rows
-        .filter((row) => !needle || `${row.sessionId} ${row.title ?? ""} ${row.cwd ?? ""}`.toLowerCase().includes(needle))
-        .map((row) => ({
-          sessionId: row.sessionId,
-          label: row.title,
-          cwd: row.cwd,
-          createdAt: Date.parse(row.updatedAt) || Date.now(),
-          mention: `@[${row.title}](dsh-session:${row.sessionId})`,
-        }));
-    },
-    inventory: dshHostRunner.inventory,
-    invoke: dshHostRunner.invoke,
-    stopFromPanel: dshHostRunner.stopFromPanel,
-    undefineFromPanel: dshHostRunner.undefineFromPanel,
-    define: async () => { throw new Error("dynamicCordisRunner/define is not available in the OpenBuddy host adapter"); },
-    undefine: dshHostRunner.undefineFromPanel,
-    runHostHalf: async () => { throw new Error("dynamicCordisRunner/runHostHalf is not available in the OpenBuddy host adapter"); },
-    getClientCode: async () => { throw new Error("dynamicCordisRunner/getClientCode is not available in the OpenBuddy host adapter"); },
-    resolveRequestRun: async () => { throw new Error("dynamicCordisRunner/resolveRequestRun is not available in the OpenBuddy host adapter"); },
-    settleUserRun: async () => { throw new Error("dynamicCordisRunner/settleUserRun is not available in the OpenBuddy host adapter"); },
-    stop: async (request: unknown) => request === undefined || request === null ? undefined : dshHostRunner.stopFromPanel(request),
-    syncInspectManifest: async () => { throw new Error("dynamicCordisRunner/syncInspectManifest is not available in the OpenBuddy host adapter"); },
-    resolveInspectQuery: async () => { throw new Error("dynamicCordisRunner/resolveInspectQuery is not available in the OpenBuddy host adapter"); },
-    reportRenderFailure: async () => null,
-    reportClientGuardFailure: async () => null,
-  });
-
-  // ---------- context.provide("dshRemote", ...) ----------
-  // The remote dispatcher facade lets plugins register/unregister remote
-  // services through Cordis rather than calling the dispatcher directly.
-  // `register()` wraps `serializeRemoteContribution()` to normalize the
-  // contribution shape across package boundaries.
-  const remoteServiceContext = (): unknown => deps.remoteServiceContext() as any;
-  context.provide("dshRemote", {
-    register: (contribution: unknown) => {
-      const packageName = contribution && typeof contribution === "object" && !Array.isArray(contribution)
-        ? (contribution as { package?: unknown }).package
-        : undefined;
-      const result = state.remoteDispatcher.register(serializeRemoteContribution(contribution), remoteServiceContext() as any);
-      return () => {
-        if (typeof packageName === "string") state.remoteDispatcher.unregister(packageName);
-        return result;
-      };
-    },
-    unregister: (packageName: unknown) => state.remoteDispatcher.unregister(packageName),
-    invoke: (request: unknown) => state.remoteDispatcher.invoke(request, remoteServiceContext() as any),
-    list: () => state.remoteDispatcher.list(),
-    get: (endpoint: string) => state.remoteDispatcher.describe(endpoint),
-    descriptors: () => state.remoteDispatcher.describeAll(),
   });
 }

@@ -611,8 +611,10 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
   - **测试净增量**: `+38 个新单测`（K.1 SDK 21 + builtin pi manifest 5 + init-deepseek 4 + slot-plugin-manifest 5 + sample-plugin fixture 5 - 与 `__fixtures__/external-dsh-plugin/` 互不干扰）。
   - **LOC 净增**: `+761/-42 = +719`（SDK 352 + pi-extensions 184 + builtin-applies 87 + slot-plugin-manifest 67 + init-deepseek 68 + client.tsx 20 + tests + fixture file docs）。这是必要的成本：v6 §3.4 要求 SDK 是一个独立模块而不是埋在 pi-extensions.ts 里。
   - **K.2 不完成 DSH 装载入口的替换**：`loader.loadProfile(profile)` 在 `init-deepseek.ts` 保留（HarnessPluginLoader 路径仍在用）；真正切到 PI `loadExtensions()` 是 Phase L.3 的责任（v6 §24.4 表）。K.2 只把 manifest 形状统一到 `openbuddy.plugin.v1`，实际装载不在 K.2 范围。
+- ✅ **已完成：Phase L.4 — DSH runtime facade 精简 (-1000+ LOC)**（本轮 commit, task LUM-595）：`electron/main/deepseek/deepseek-runtime.ts` 从 4368 → 3888 LOC（删除 DeepSeekLlmService + DeepSeekTypertLoaderService + DeepSeekTypertGatewayService + DeepSeekAgentLoopService + DeepSeekAgentDefaultModelService + createDeepSeekPiAgentLoopPlugin + deepSeekSessionQueryRemote + 内部 gateway / agent-factory helpers）；删除 `electron/main/deepseek/dsh-host-runner.ts` (43) + `electron/main/deepseek/deepseek-execution-adapters.ts` (69) + `electron/main/agent/host-modules/facade/deepseek-facade.ts` (44) + `electron/main/deepseek/deepseek-agentloop-pi-smoke.test.ts` (833)；`wire-dsh-services.ts` 313 → 187 LOC，仅保留 goal + message-feedback 状态机；`init-deepseek.ts` 189 → 84 LOC，移除 7-capability remote 注册 + reconcileProfileArtifacts 重注册；**总计 -2324 LOC 退役**
 - 🟡 **下一轮 — Phase L.3 — DSH 通用装载器删除**（v5 §26.4）：`deepseek-compat.ts` (445) + `deepseek-generic.ts` (1545) → PI `discoverAndLoadExtensions`；**-1990 LOC 退役**。K.2 的 manifest 序列化路径已经在 `init-deepseek.ts` 接入，L.3 可以直接把 `loader.loadProfile(profile)` 换成 PI `loadExtensions()`。
-- ⚪ **第三轮 — Phase L.4 — DSH runtime facade 精简**（v5 §26.4）：`deepseek-runtime.ts:1-2200` 中除 TypertService 之外的 facade 精简 + `deepseek-pi-bridge` 剩余部分 + `init-deepseek.ts` 进一步精简；**-1000 LOC 退役**
+- ⚪ **第四轮 — Phase B.1 第 5 轮**：拆 prompt/abort/steer/follow-up 4 个耦合 handler（最后 ~250 LOC）
+- ⚪ **第五轮 — Phase J.1（部分）**：先跑 `pnpm storage:boundaries` + `pnpm storage:acceptance` 拿到当前 baseline，然后加固 sheriff.config.ts
 
 每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
 

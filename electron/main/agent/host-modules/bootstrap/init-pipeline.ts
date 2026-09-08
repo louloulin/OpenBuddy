@@ -184,11 +184,12 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
     listSubagentChildren: deps.listSubagentChildren,
   });
   deps.wireDshServices({
-    context, state: deps.state, cwd: deps.cwd(),
-    listCommands: deps.listCommands, listPluginInventory: deps.listPluginInventory, listPlugins: deps.listPlugins,
-    listDshFileReferences: deps.listDshFileReferences,
-    listSessions: deps.listSessions, listRunningTasks: deps.listRunningTasks, killTask: deps.killTask,
-    remoteServiceContext: deps.remoteServiceContext, transitionDshGoal: deps.transitionDshGoal,
+    context, state: deps.state,
+    transitionDshGoal: deps.transitionDshGoal as unknown as ((
+      goal: unknown,
+      ref: { id?: string; revision?: number } | undefined,
+      phase: "active" | "paused" | "blocked" | "complete",
+    ) => unknown),
   });
   deps.state.context = context;
   deps.wireForwardedEvents({ state: deps.state, context, emitRendererEvent: deps.emitRendererEvent, emitPluginEvent: deps.emitPluginEvent });
@@ -238,8 +239,7 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
   console.log("[openbuddy-diag] init-pipeline stage=6.5 ENTER (initDeepSeek)");
   await deps.initDeepSeek({
     state: deps.state, context, loader, profileBundle, baseUrl: deps.baseUrl,
-    emitPluginEvent: deps.emitPluginEvent, emitRendererEvent: deps.emitRendererEvent,
-    remoteServiceContext: deps.remoteServiceContext, reconcileProfileArtifacts: deps.reconcileProfileArtifacts,
+    emitPluginEvent: deps.emitPluginEvent,
   });
 
   // Stage 7: Compute active adapter IDs + inject system prompt + init session.
