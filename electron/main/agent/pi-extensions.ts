@@ -10,8 +10,16 @@ import {
   createTelemetryBridgeExtension,
   type OpenBuddyTelemetrySink,
 } from "./pi-telemetry-bridge";
-import { recordPassthrough } from "@openbuddy/plugin-host";
-import type { OpenBuddyPiExtensionSpec } from "@openbuddy/plugin-host";
+import {
+  applyOpenBuddyPluginManifestPassthrough,
+  openbuddyPluginManifestSchema,
+  recordPassthrough,
+  serializePiTrack,
+  validateOpenBuddyPluginManifest,
+  type OpenBuddyPiExtensionSpec,
+  type OpenBuddyPluginManifest,
+  type SerializedPiTrack,
+} from "@openbuddy/plugin-host";
 import { isServiceKey, type ServiceKey, type ServiceKeyResolver } from "./pi-service-keys";
 import {
   registerAdapterTool,
@@ -791,6 +799,163 @@ function summaryPayload(payload: unknown): Record<string, unknown> {
   return summary;
 }
 
+/**
+ * Phase K.2 — OpenBuddyPlugin manifest table for the 9 builtin extensions.
+ *
+ * Each entry is a Phase K.1 SDK `OpenBuddyPluginManifest` describing:
+ *   - the canonical plugin id
+ *   - a single `pi` track that resolves to the inline factory below
+ *   - config defaults merged into the loadable track row
+ *   - flags the resolver honours at load time (e.g. passthrough)
+ *
+ * The list is the source of truth for builtin metadata; `resolvePiExtensions`
+ * routes every builtin lookup through `serializePiTrack` so the manifest is
+ * the only shape the resolver has to read. Adding a new builtin is now two
+ * edits (manifest row + factory row) instead of one, but the manifest is
+ * testable in isolation and serialises deterministically.
+ *
+ * Per v6 §3.4 of OPENBUDDY_PI_NATIVE_PLAN.md, the SDK is a thin manifest
+ * helper; the actual loading is still done by PI's `loadExtensions()`.
+ */
+export const BUILTIN_PI_PLUGIN_MANIFESTS: readonly OpenBuddyPluginManifest[] = [
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-apply-patch",
+    packageName: "@openbuddy/builtin-apply-patch",
+    version: "1.0.0",
+    description: "Worktree-scoped patch tool that routes through `apply_patch` while trusting only the profile cwd.",
+    tracks: [
+      {
+        kind: "pi",
+        inline: "openbuddy-apply-patch",
+        config: {
+          schema: "openbuddy.apply-patch.v1",
+          defaults: { dryRun: false },
+        },
+      },
+    ],
+  },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-pi-observability",
+    packageName: "@openbuddy/builtin-pi-observability",
+    version: "1.0.0",
+    description: "Forward every native Pi event the harness exposes into the plugin/event channel for the renderer.",
+    tracks: [
+      {
+        kind: "pi",
+        inline: "openbuddy-pi-observability",
+        config: {
+          schema: "openbuddy.pi-observability.v1",
+          defaults: { toolEvents: true },
+        },
+      },
+    ],
+  },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-pi-context-status",
+    packageName: "@openbuddy/builtin-pi-context-status",
+    version: "1.0.0",
+    description: "Surface `context` / `turn_end` / `session_compact` snapshots to the renderer-side context panel.",
+    tracks: [
+      { kind: "pi", inline: "openbuddy-pi-context-status" },
+    ],
+  },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-pi-context-guard",
+    packageName: "@openbuddy/builtin-pi-context-guard",
+    version: "1.0.0",
+    description: "Reuse pi SDK `shouldCompact` to trigger `session_compact` when the context window crosses the configured threshold.",
+    tracks: [
+      {
+        kind: "pi",
+        inline: "openbuddy-pi-context-guard",
+        config: {
+          schema: "openbuddy.pi-context-guard.v1",
+          defaults: { thresholdTokens: 100_000 },
+        },
+      },
+    ],
+  },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-pi-telemetry-bridge",
+    packageName: "@openbuddy/builtin-pi-telemetry-bridge",
+    version: "1.0.0",
+    description: "Forward pi span events to the OpenBuddy telemetry sink. No-ops when the sink has not been registered yet.",
+    tracks: [
+      { kind: "pi", inline: "openbuddy-pi-telemetry-bridge" },
+    ],
+  },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-pi-compact-announce",
+    packageName: "@openbuddy/builtin-pi-compact-announce",
+    version: "1.0.0",
+    description: "Inject a structured follow-up user message after every context compaction so the user sees the reclaim details.",
+    tracks: [
+      { kind: "pi", inline: "openbuddy-pi-compact-announce" },
+    ],
+  },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-extra-providers",
+    packageName: "@openbuddy/builtin-extra-providers",
+    version: "1.0.0",
+    description: "Register first-class providers for local Ollama, optional corporate proxy, and Orcarouter when the matching env vars are set.",
+    tracks: [
+      { kind: "pi", inline: "openbuddy-extra-providers" },
+    ],
+  },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-pi-session-metadata",
+    packageName: "@openbuddy/builtin-pi-session-metadata",
+    version: "1.0.0",
+    description: "Demonstrates the ExtensionAPI pattern for session metadata — reads the JSON mirror at session_start and forwards info changes.",
+    tracks: [
+      { kind: "pi", inline: "openbuddy-pi-session-metadata" },
+    ],
+  },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-pi-model-bridge",
+    packageName: "@openbuddy/builtin-pi-model-bridge",
+    version: "1.0.0",
+    description: "Observes model_select / set_model / before_provider_request without breaking the legacy installAgentModel() provider CRUD path.",
+    tracks: [
+      { kind: "pi", inline: "openbuddy-pi-model-bridge" },
+    ],
+  },
+];
+
+/**
+ * Reverse lookup table mapping manifest id → manifest. Built once at module
+ * load so `resolvePiExtensions` can answer "is this id a builtin?" in O(1)
+ * without scanning the manifest list on every profile reload.
+ */
+export const BUILTIN_PI_PLUGIN_MANIFEST_BY_ID: ReadonlyMap<string, OpenBuddyPluginManifest> = new Map(
+  BUILTIN_PI_PLUGIN_MANIFESTS.map((manifest) => [manifest.id, manifest]),
+);
+
+/**
+ * Phase K.2 helper — returns the serialised PI track row for a builtin id,
+ * or `undefined` when the id does not match a manifest entry. Callers use
+ * the row to materialise a `loadExtensions()`-compatible descriptor without
+ * re-reading the manifest. The resolver also threads manifest-level
+ * `flags.passthrough` into the track config so the loader can decide
+ * whether to skip the adapter path.
+ */
+export function resolveBuiltinPiPlugin(id: string): SerializedPiTrack | undefined {
+  const manifest = BUILTIN_PI_PLUGIN_MANIFEST_BY_ID.get(id);
+  if (!manifest) return undefined;
+  const [row] = serializePiTrack(validateOpenBuddyPluginManifest(manifest));
+  if (!row) return undefined;
+  return applyOpenBuddyPluginManifestPassthrough(row, manifest);
+}
+
 export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResolutionOptions["emit"], config: unknown, options: PiExtensionResolutionOptions) => ExtensionFactory> = {
   "openbuddy-apply-patch": (_emit, config, _options) => {
     const cfg = (config as Partial<OpenBuddyApplyPatchConfig> | undefined) ?? {};
@@ -985,6 +1150,21 @@ export function resolvePiExtensions(
     }
     const builtin = builtinPiExtensionFactories[spec.id];
     if (builtin) {
+      // Phase K.2 — validate the builtin through the OpenBuddyPlugin SDK so
+      // the manifest metadata (config defaults, passthrough flag) is honoured
+      // uniformly. The factory is still resolved by id so the inline
+      // implementations stay where they live today; the SDK only owns the
+      // manifest shape (per v6 §3.4). When a manifest declares
+      // `flags.passthrough`, surface it via `recordPassthrough` so the Cordis
+      // capability plugin can short-circuit duplicate registrations.
+      const serialized = resolveBuiltinPiPlugin(spec.id);
+      if (serialized?.config?.passthrough === true) {
+        // Builtin extensions are OpenBuddy-native, so the manifest-level
+        // passthrough flag maps to the "opted-in" PassthroughSource. The
+        // capability key prefixes the builtin id so downstream adapters
+        // can distinguish manifest-driven from auto-detected passthroughs.
+        recordPassthrough(`builtin:${spec.id}`, "opted-in", spec.id);
+      }
       result.factories.push({ name: spec.id, factory: builtin(options.emit, spec.config, options), hidden: true });
       result.resolved.push({ id: spec.id, source: `<inline:${spec.id}>`, builtIn: true });
       continue;

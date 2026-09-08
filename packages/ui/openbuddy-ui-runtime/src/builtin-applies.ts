@@ -11,6 +11,16 @@
  *     apply,把"声明在 26 个包里"的 slot / theme / locale / store 真正合并
  *     到运行时。这是"包结构 -> 运行时装配"的桥梁。
  *
+ * Phase K.2 调整:
+ *   - 在原有 `pkg + apply` 二元组的基础上补充 `description + configDefaults`。
+ *   - 通过 `toBUILTIN_UI_PLUGIN_MANIFESTS()` 把表项投影为 OpenBuddyPlugin SDK
+ *     `serializeSlotTrack` 能吃的 manifest,这样三个 builtin 装载入口
+ *     (pi-extension / harness / slot) 在 Phase K.2 后共用同一份 manifest 形状
+ *     (`openbuddy.plugin.v1`)。SlotProvider 挂载时仍然调用
+ *     `BUILTIN_UI_APPLIES[i].apply`,只是 metadata 走 SDK 序列化。
+ *   - `slot-plugin-manifest.ts` 提供 `serializeBuiltinUiSlotTrack` 转换器,
+ *     便于 inventory / plugin panel / 动态加载场景复用同一份 metadata。
+ *
  * 添加新包流程(全自动):
  *   1. 在 packages/ui/openbuddy-ui-<name>/ 起目录,写 src/client.tsx
  *   2. 在下方数组增加一行 `apply as <name>Apply`
@@ -45,31 +55,54 @@ import { apply as shellApply } from "@openbuddy/ui-shell/client";
 import { apply as sidebarApply } from "@openbuddy/ui-sidebar/client";
 import { apply as workbenchApply } from "@openbuddy/ui-workbench/client";
 import type { UiPlugin } from "@openbuddy/ui-slots";
+import {
+  serializeBuiltinUiSlotTrack,
+  toOpenBuddyPluginManifest,
+  type BuiltinUiPluginSlotTrack,
+} from "./slot-plugin-manifest";
 
-/** builtin apply 列表(已剔除 ui-slots / ui-runtime / ui-theme / ui-locale,后者另走特殊通道) */
-export const BUILTIN_UI_APPLIES: ReadonlyArray<{
-  pkg: string;
-  apply: UiPlugin["apply"];
-}> = [
-  { pkg: "@openbuddy/ui-account", apply: accountApply },
-  { pkg: "@openbuddy/ui-automation", apply: automationApply },
-  { pkg: "@openbuddy/ui-billing", apply: billingApply },
-  { pkg: "@openbuddy/ui-collaboration", apply: collaborationApply },
-  { pkg: "@openbuddy/ui-conversation", apply: conversationApply },
-  { pkg: "@openbuddy/ui-dialogs", apply: dialogsApply },
-  { pkg: "@openbuddy/ui-email", apply: emailApply },
-  { pkg: "@openbuddy/ui-experts", apply: expertsApply },
-  { pkg: "@openbuddy/ui-files", apply: filesApply },
-  { pkg: "@openbuddy/ui-home", apply: homeApply },
-  { pkg: "@openbuddy/ui-layout", apply: layoutApply },
-  { pkg: "@openbuddy/ui-markdown", apply: markdownApply },
-  { pkg: "@openbuddy/ui-mcp", apply: mcpApply },
-  { pkg: "@openbuddy/ui-modules", apply: modulesApply },
-  { pkg: "@openbuddy/ui-primitives", apply: primitivesApply },
-  { pkg: "@openbuddy/ui-settings", apply: settingsApply },
-  { pkg: "@openbuddy/ui-settings-models", apply: settingsModelsApply },
-  { pkg: "@openbuddy/ui-shared", apply: sharedApply },
-  { pkg: "@openbuddy/ui-shell", apply: shellApply },
-  { pkg: "@openbuddy/ui-sidebar", apply: sidebarApply },
-  { pkg: "@openbuddy/ui-workbench", apply: workbenchApply },
-] as const;
+/** builtin apply 列表(已剔除 ui-slots / ui-runtime / ui-theme / ui-locale,后者另走特殊通道)
+ *  每项包含一份简短 description,Phase K.2 后会被投影到 OpenBuddyPlugin manifest,
+ *  供 inventory + plugin panel 显示。`as const` 在 tests 中需要重新赋值 apply,
+ *  因此保持 mutable;description 是只读 metadata。 */
+export const BUILTIN_UI_APPLIES: ReadonlyArray<BuiltinUiPluginSlotTrack> = [
+  { pkg: "@openbuddy/ui-account", apply: accountApply, description: "Account sidebar / profile / login surface." },
+  { pkg: "@openbuddy/ui-automation", apply: automationApply, description: "Automation rule list + triggers (delegates to PI). " },
+  { pkg: "@openbuddy/ui-billing", apply: billingApply, description: "Billing dashboard + plan / quota surface." },
+  { pkg: "@openbuddy/ui-collaboration", apply: collaborationApply, description: "Multi-user collaboration: rooms, inboxes, presence." },
+  { pkg: "@openbuddy/ui-conversation", apply: conversationApply, description: "Chat surface — composer, history, agent responses." },
+  { pkg: "@openbuddy/ui-dialogs", apply: dialogsApply, description: "Modal dialogs (confirm / input / form)." },
+  { pkg: "@openbuddy/ui-email", apply: emailApply, description: "Email capability surface (auth + provider + composer)." },
+  { pkg: "@openbuddy/ui-experts", apply: expertsApply, description: "Expert catalogue / configuration." },
+  { pkg: "@openbuddy/ui-files", apply: filesApply, description: "Workspace file browser + metadata." },
+  { pkg: "@openbuddy/ui-home", apply: homeApply, description: "Home / dashboard surface." },
+  { pkg: "@openbuddy/ui-layout", apply: layoutApply, description: "Layout chrome (panels, splits, resize). " },
+  { pkg: "@openbuddy/ui-markdown", apply: markdownApply, description: "Markdown renderer + editor primitives." },
+  { pkg: "@openbuddy/ui-mcp", apply: mcpApply, description: "MCP server picker / plugin panel." },
+  { pkg: "@openbuddy/ui-modules", apply: modulesApply, description: "Module registry + activation surface." },
+  { pkg: "@openbuddy/ui-primitives", apply: primitivesApply, description: "Shared design primitives (Button / Menu / Input)." },
+  { pkg: "@openbuddy/ui-settings", apply: settingsApply, description: "Generic settings surface (theme / language / privacy)." },
+  { pkg: "@openbuddy/ui-settings-models", apply: settingsModelsApply, description: "Model selection + provider CRUD surface." },
+  { pkg: "@openbuddy/ui-shared", apply: sharedApply, description: "Shared cross-package UI utilities." },
+  { pkg: "@openbuddy/ui-shell", apply: shellApply, description: "Outer shell chrome (titlebar / statusbar)." },
+  { pkg: "@openbuddy/ui-sidebar", apply: sidebarApply, description: "Sidebar nav + secondary actions." },
+  { pkg: "@openbuddy/ui-workbench", apply: workbenchApply, description: "Workbench view (split panes + tabs)." },
+];
+
+/** Phase K.2 — 把 builtin apply 表投影为 OpenBuddyPlugin manifest 列表。
+ *  每个 manifest 都经过 K.1 SDK 的 `validateOpenBuddyPluginManifest`,
+ *  以保证 `serializeSlotTrack` 能从单一来源输出所有 slot track 行。 */
+export function toBUILTIN_UI_PLUGIN_MANIFESTS(): readonly ReturnType<typeof toOpenBuddyPluginManifest>[] {
+  return BUILTIN_UI_APPLIES.map(toOpenBuddyPluginManifest);
+}
+
+/** Phase K.2 — 序列化为 slot track 行,直接交给 UiRuntime.registerBuiltinUi()。 */
+export function serializeBUILTIN_UI_PLUGIN_SLOT_TRACKS(): ReturnType<typeof serializeBuiltinUiSlotTrack>[] {
+  return BUILTIN_UI_APPLIES.map(serializeBuiltinUiSlotTrack);
+}
+
+/** 重新导出 builtin apply 表的形状,避免既有调用点破坏。 */
+export type BuiltinUiApplyEntry = UiPlugin & {
+  /** 包 id (e.g. `@openbuddy/ui-account`). Phase K.2 后与 BUILTIN_UI_APPLIES 表项的 `pkg` 字段一致。 */
+  name: string;
+};

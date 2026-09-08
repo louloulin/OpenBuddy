@@ -29,6 +29,7 @@ import { I18nProvider } from "@openbuddy/ui-locale/client";
 import type { SessionRecord, WorkspaceRecord, Observable, UiRuntime } from "./index";
 import type { UiPlugin, SlotCoreLike, UiRuntimeContext, SlotKind, SlotScope } from "@openbuddy/ui-slots";
 import { BUILTIN_UI_APPLIES } from "./builtin-applies";
+import { serializeBuiltinUiSlotTrack } from "./slot-plugin-manifest";
 
 // ---------- session/workspace store ---------------------------------------
 
@@ -392,6 +393,12 @@ export function applyUiRuntime(ctx: { ui?: UiRuntime; slots?: SlotCoreLike; sess
  * 返回的 disposer 数组按注册反序执行,HMR / teardown 时统一释放。
  *
  * 实现细节:
+ *   - Phase K.2: 通过 `serializeBuiltinUiSlotTrack()` 把每个 builtin 表项
+ *     投影成 OpenBuddyPlugin slot track (manifest schema `openbuddy.plugin.v1`),
+ *     令 inventory / plugin panel / 动态加载场景共享同一份 metadata。
+ *     实际 `apply()` 调用仍然走原本的 in-process reference —— v6 §3.4 把
+ *     "实际装载依然走 PI loadExtensions()" 作为 Phase K 的不变式;这里
+ *     的 `apply(ctx)` 已经是 in-process 装载,不需要再经过 PI。
  *   - ctx.ui / ctx.slots / ctx.events 由 getOrCreateSingleton() 提供
  *   - 失败的 apply 不影响后续包(per-listener error swallow,事件层同策略)
  *   - 包内 ctx.slots.register() 注册的内容会被 SlotCore 持有,dispose 由各包负责
@@ -404,9 +411,20 @@ export function registerAllBuiltinUis(): () => void {
     events: makeEvents(),
   };
   const disposers: Array<() => void> = [];
-  for (const { pkg, apply } of BUILTIN_UI_APPLIES) {
+  for (const { pkg, apply, ...rest } of BUILTIN_UI_APPLIES) {
     try {
       lastRegisteredCount++;
+      // Materialise the Phase K.1 SDK slot track row up front so any
+      // manifest-level validation errors surface before the apply() call.
+      // The serialised row is unused at runtime (the in-process apply()
+      // is the source of truth) but the manifest gives inventory + plugin
+      // panel a stable view of which packages are wired up.
+      const track = serializeBuiltinUiSlotTrack({
+        pkg,
+        apply,
+        ...(rest as { description?: string; configDefaults?: Record<string, unknown> }),
+      });
+      if (track.disabled) continue;
       const dispose = apply(ctx as never, undefined);
       if (typeof dispose === "function") disposers.push(() => dispose());
     } catch (err) {

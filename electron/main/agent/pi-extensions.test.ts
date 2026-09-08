@@ -926,3 +926,50 @@ function collectRegisteredTools(
   resolution.factories.forEach((entry) => entry.factory(api as never));
   return tools;
 }
+
+describe("Phase K.2 — OpenBuddyPlugin manifest for builtin extensions", () => {
+  it("declares a manifest for every builtin factory id", async () => {
+    const { BUILTIN_PI_PLUGIN_MANIFESTS, BUILTIN_PI_PLUGIN_MANIFEST_BY_ID, builtinPiExtensionIds, builtinPiExtensionFactories, resolveBuiltinPiPlugin } = await import("./pi-extensions");
+    const ids = builtinPiExtensionIds();
+    expect(BUILTIN_PI_PLUGIN_MANIFESTS).toHaveLength(ids.length);
+    for (const id of ids) {
+      expect(BUILTIN_PI_PLUGIN_MANIFEST_BY_ID.get(id), `manifest missing for ${id}`).toBeDefined();
+      expect(BUILTIN_PI_PLUGIN_MANIFEST_BY_ID.get(id)?.schema).toBe("openbuddy.plugin.v1");
+      expect(resolveBuiltinPiPlugin(id)).toMatchObject({ id, trackKind: "pi" });
+      expect(builtinPiExtensionFactories[id]).toBeTypeOf("function");
+    }
+  });
+
+  it("applies config defaults when serialising the pi track", async () => {
+    const { resolveBuiltinPiPlugin } = await import("./pi-extensions");
+    const observability = resolveBuiltinPiPlugin("openbuddy-pi-observability");
+    expect(observability?.config).toEqual({ toolEvents: true });
+    const applyPatch = resolveBuiltinPiPlugin("openbuddy-apply-patch");
+    expect(applyPatch?.config).toEqual({ dryRun: false });
+  });
+
+  it("returns undefined for unknown builtin ids", async () => {
+    const { resolveBuiltinPiPlugin } = await import("./pi-extensions");
+    expect(resolveBuiltinPiPlugin("not-a-builtin")).toBeUndefined();
+  });
+
+  it("threads manifest flags.passthrough into the serialized config", async () => {
+    const { resolveBuiltinPiPlugin } = await import("./pi-extensions");
+    const manifestId = "openbuddy-pi-observability";
+    const result = resolveBuiltinPiPlugin(manifestId);
+    // The default manifests do not declare passthrough; ensure the helper
+    // is correctly a no-op in that case.
+    expect(result?.config?.passthrough).toBeUndefined();
+  });
+
+  it("every builtin manifest declares exactly one pi track with inline source", async () => {
+    const { BUILTIN_PI_PLUGIN_MANIFESTS } = await import("./pi-extensions");
+    for (const manifest of BUILTIN_PI_PLUGIN_MANIFESTS) {
+      const piTracks = manifest.tracks.filter((track) => track.kind === "pi");
+      expect(piTracks, manifest.id).toHaveLength(1);
+      const track = piTracks[0];
+      expect(track?.inline, manifest.id).toBeTruthy();
+      expect(track?.source, manifest.id).toBeUndefined();
+    }
+  });
+});
