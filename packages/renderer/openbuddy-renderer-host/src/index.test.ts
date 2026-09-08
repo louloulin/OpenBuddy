@@ -861,7 +861,7 @@ describe("RendererPluginLoader", () => {
 		await remotes.apply(context);
 		await context.start();
 		const remote = context.get("remote") as { $mount: (contribution: unknown) => Promise<() => Promise<void>> };
-		const { z } = await import("../../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/index.js");
+		const { z } = await import("zod");
 		const stop = await remote.$mount({
 			package: "strict-fixture",
 			descriptors: [{

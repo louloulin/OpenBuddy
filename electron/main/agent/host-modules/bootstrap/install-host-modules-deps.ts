@@ -21,6 +21,8 @@ export interface InstallHostModuleDepsClosures {
   piHome: () => string;
   isPathWithin: (root: string, candidate: string) => boolean;
   piSessionDir: (cwd: string) => string;
+  /** profile-artifact-resolution.toModuleUrl — wraps a file path as a file:// URL. */
+  toModuleUrl: (path: string) => string;
   // Event emitters
   emitPluginEvent: (type: string, payload: unknown) => void;
   emitRendererEvent: (channel: string, payload: unknown) => void;
@@ -118,6 +120,7 @@ export function buildInstallHostModuleDeps(
     piHome: closures.piHome,
     isPathWithin: closures.isPathWithin,
     piSessionDir: closures.piSessionDir,
+    toModuleUrl: closures.toModuleUrl,
     emitPluginEvent: closures.emitPluginEvent,
     emitRendererEvent: closures.emitRendererEvent,
     listAllPiSessions: closures.listAllPiSessions,
