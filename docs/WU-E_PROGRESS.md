@@ -6,7 +6,7 @@
 > 来源计划：[`docs/PERFORMANCE_TRANSFORMATION_PLAN.md`](../../PERFORMANCE_TRANSFORMATION_PLAN.md) — 78 findings
 > 前置：[LUM-559 WU-C 模块化 (reviewer PASS)](./agent-host-microkernel-v2.md)
 >
-> **状态**：in_progress · ts-coder 自动接续中 · 第一轮 + 第二轮已落地
+> **状态**：in_progress · ts-coder 自动接续中 · 4 轮已落地（round 4 闭合 PC-5 / PC-6）
 
 ---
 
@@ -14,11 +14,11 @@
 
 | 阶段 | 周数 | 数量 | 主要交付 | 当前状态 |
 |---|---|---|---|---|
-| **P0 Quick Wins** | 2-3 周 | 8 findings | 冷启动 ≤ 2.5s，TTFT ≤ 400ms | 🟡 1/8 完成 |
+| **P0 Quick Wins** | 2-3 周 | 8 findings | 冷启动 ≤ 2.5s，TTFT ≤ 400ms | 🟡 5/8 完成（round 3 闭合 P0-01） |
 | **P1 核心重构** | 4-6 周 | 34 findings | 流式 60fps，bundle ≤ 8MB | 🟡 0/34 |
 | **P2 架构升级** | 4-6 周 | 36 findings | bundle ≤ 4MB，内存 ≤ 150MB | ⏳ 0/36 |
-| **P3 度量治理** | 2-3 周 | — | perf budget gate 入 CI | 🟡 1/N |
-| **合计** | **12-18 周** | **78** | **对齐 Codex 标杆** | 🟡 **2/78 = 2.6%** |
+| **P3 度量治理** | 2-3 周 | — | perf budget gate 入 CI | 🟢 PC-5/PC-6 已入闸（round 4） |
+| **合计** | **12-18 周** | **78** | **对齐 Codex 标杆** | 🟡 **3/78 = 3.8%**（+ P0-02 修正 + PC-5/PC-6 gates ✅） |
 
 > v6g-facade 已闭合 7 项 findings（per WU-A merge plan §10），剩余 **71 项待本 WU 落地**。
 > 已闭合项：P0-03 流式 16ms 节流（WU-C `0272216` MessageChannel）/ P0-04 顶层 import 拆分（WU-C）/ multi-chunk 流式（WU-C）/ microkernel 拆分（WU-C `8bafa55`）/ ts-error A 修复（WU-D `63b26e3` + WU-C hardening）。
@@ -28,6 +28,8 @@
 ## 2. 本 WU 累计提交（branch ahead of `agent/lumos-ts-coder/88e5e009acf2`）
 
 ```
+<round 4 commit>  perf(ci): PC-5 chat-render 60fps bench + PC-6 verify-plan/check-macos-signing CI integration (WU-E round 4)
+<round 4 commit>  docs(wiki): record WU-E round 4 — PC-5/PC-6 closure (LUM-561)
 f8cf14d perf(renderer): lazy-load Sidebar + ChatView for P0-01 (WU-E round 3)
 c872b3c docs(wiki): record WU-E first two rounds + zod followup cleanup (LUM-561)
 4452e96 chore(gitignore): track docs/WU-E_PROGRESS.md so WU-E wiki ships in repo
@@ -37,7 +39,93 @@ ba25623 fix(ui+review): PC-1 color contrast + PC-2 skeleton API + PC-3 e2e specs
 ```
 
 > 父 WU-C 累计 **40 commits / 124 files / +10,637 / -2,028 行** ahead of main。
-> WU-E 增量 **5 commits / 6 files / +73 / -45 行** ahead of WU-C。
+> WU-E 增量 **6 commits / 11 files / ~+800 / ~-30 行** ahead of WU-C（round 4 新增 2 commit / 5 文件，CI integration + chat-render bench）。
+
+---
+
+## 4.4. 第四轮交付（commits round 4）— PC-5 / PC-6 闭合
+
+reviewer 在 WU-C verdict 中将 **PC-5 (60fps 完整 perf benchmark)** + **PC-6 (verify-plan + check-macos-signing CI 入闸)** 列为强必填项，必须在 WU-E 第一个 PR 内或下轮 PR 中提交。本轮一次性补齐。
+
+### 4.4.1 PC-5 chat-render 60fps benchmark
+
+| 维度 | 实现 |
+|---|---|
+| 新文件 1 | `scripts/perf/_chat-render-lib.mjs` (160 行) — 纯函数 helpers：数据工厂 + 60fps frame-budget math + arg parser + summary builder |
+| 新文件 2 | `scripts/perf/_chat-render-lib.test.mjs` (114 行) — **16 个 `node:test`** 覆盖所有 helpers（工厂产出 / budget math / arg parsing / JSON schema stability） |
+| 新文件 3 | `scripts/perf/_chat-render-jsdom.test.ts` (157 行) — vitest + jsdom 实际 JSX 渲染 benchmark，使用 `react-dom/server.renderToString` 打通 react 真实渲染路径 |
+| 新文件 4 | `scripts/perf/chat-render-bench.mjs` (107 行) — CLI shim：spawn vitest → 读 JSON artifact → `--strict` 模式检查 `within60Fps` 违反即退出 1 |
+| 度量项 | 3 个：ChatMinimap 200 segments / BranchNavigator 平衡 3-level 4-ary 树（170 节点）/ Long-session 200 messages flat list |
+| 输出 artifact | `evidence/perf/chat-render-bench-<timestamp>.json` — v1 schema：per-render µs + ops/sec + frame budget |
+| CLI 入口 | `pnpm perf:chat-render` / `pnpm perf:chat-render:strict` / `pnpm perf:chat-render:test` |
+
+**为什么这是 PC-5**：PERFORMANCE_TRANSFORMATION_PLAN §三 P3 阶段 / reviewer verdict PC-5 要求"完整 60fps perf benchmark (ChatMinimap + BranchNavigator + 长会话)"。原 `streaming-bench.mjs` 只测 reducer（纯 Node 数值），不跑真实 JSX 渲染。本轮补齐 jsdom + react-dom/server 路径，让 reviewer 可以直接观察到 chat surface 三个重量级组件的 render cost。
+
+**实测数字**（本机 ubuntu-latest reference runner）：
+
+| Bench | per-render | ops/sec | 60fps 预算 |
+|---|---|---|---|
+| ChatMinimap 200 segments | ~1.4 ms | 716 | |
+| BranchNavigator 170-node tree | ~2.7 ms | 360 | |
+| Long-session 200 messages | ~1.7 ms | 578 | |
+| **Σ worst-case per frame** | **~5.9 ms** | — | **16.6 ms** |
+| **Frame headroom** | — | — | **+10.7 ms (64% headroom)** |
+| `within60Fps` | — | — | **true** |
+
+`--strict` 模式下，任何 future regression 触预算即 CI 红。
+
+### 4.4.2 PC-6 verify-plan + check-macos-signing CI 入闸
+
+| 维度 | 实现 |
+|---|---|
+| 改动文件 | `.github/workflows/ci.yml` — `perf-budget` job 新增 4 步 |
+| 步骤 1 | `pnpm run perf:chat-render:test` — PC-5 pure-helper 单元测试（不进 jsdom 重负担） |
+| 步骤 2 | `pnpm run perf:chat-render:strict` — PC-5 60fps 完整 benchmark |
+| 步骤 3 | `pnpm run verify:plan` — PC-6 单一权威 gate（涵盖 WU-B P0 closure 14 项 + WU-C arch 2 项 = 16 checks） |
+| 步骤 4 | `sh node_modules/.bin/vitest run scripts/check-macos-signing.test.mjs` — PC-6 macOS signing 单元测试（24 tests） |
+| 防回退 | 任何 reviewer-verified PASS 的 invariant 删除 / 改动 → verify-plan 红 |
+
+**为什么这是 PC-6**：verify-plan 是 WU-B (c0b2821) + WU-C (88e5e009acf2) 合并产物（16/16 checks 已在本地验证）。check-macos-signing 24/24 unit tests 已在本地验证。本轮让它们在 CI 中同步运行，避免 future PR 误删某个 critical invariant（例如从 `release.yml` 删除 `check-macos-signing.mjs --verify` 调用）绕过 P0 闭合。
+
+### 4.4.3 本轮验证
+
+```bash
+$ node --test scripts/perf/_cold-start-lib.test.mjs scripts/perf/_chat-render-lib.test.mjs
+ℹ tests 34
+ℹ pass 34
+ℹ fail 0
+
+$ node scripts/verify-plan.mjs
+verify-plan: 16/16 passed, 0 required failed, 0 nice failed
+
+$ sh node_modules/.bin/vitest run scripts/check-macos-signing.test.mjs --reporter=dot
+✓ scripts/check-macos-signing.test.mjs (24 tests) 9ms
+Test Files  1 passed (1)
+Tests       24 passed (24)
+
+$ node scripts/perf/chat-render-bench.mjs
+[chat-render-bench] minimap=1395.87µs branch=2775.388µs long=1728.698µs
+                    sum=5.9ms headroom=10.767ms within60Fps=true
+[chat-render-bench] OK — within 60fps: true
+
+$ sh node_modules/.bin/vitest run --reporter=dot
+Test Files  6 failed | 501 passed (507)
+Tests       7 failed | 5291 passed | 16 skipped (5314)
+```
+
+> 与 round 3 完全一致：5287 → 5291 passed（+4 来自 chat-render bench），7 fail pre-existing（xdg-open / deepseek-harness fixture / sandbox timing），**0 新增 regression**。
+> `tsc --noEmit -p tsconfig.json` clean。
+> `src/lib/__tests__/distributed-buddy-kernel.test.ts` 6/6 PASS（唯一 mount `<App />` 的测试）。
+
+### 4.4.4 P0-02 状态更新
+
+wiki 上轮标注 P0-02 = "App.tsx:238 部分落地，建议下一轮收紧"。复核发现：实际机制在 **`electron.vite.config.ts`**（不在 `src/App.tsx`）：
+
+- L238: `modulePreload: { polyfill: false, resolveDependencies: … }` — 已完全落地
+- L249: heavy-chunk filter (`markdown` / `katex` / `mermaid` / `cytoscape` / `cynefin`) — 已完全落地
+- `src/` 全树 `__vitePreload` / `vitePreload` 搜索结果：**0 调用**（pre-existing wiki 注释指的是 electron-vite config，不是源码）
+
+**修正**：P0-02 实际已闭合（与 WU-C v6-G 同步完成）。本轮不在此项目做新改动 — 调整 wiki 状态为 ✅ 已完成。
 
 ---
 
@@ -125,8 +213,8 @@ reviewer 在 WU-C verdict 中明确指出：
 | **PC-2** | ExtensionStatusBar skeleton API (三态 + aria-busy + shimmer) | WU-D guard_3 → WU-C ba25623 | ✅ 已满足 |
 | **PC-3** | 3 e2e specs (chat-minimap / branch-navigator / extension-status) | WU-D open_issue_3 → WU-C ba25623 | ✅ 已满足 |
 | **PC-4** | MessageChannel + sessionId 兼容 | WU-D open_issue_1 → WU-C `0272216` | ✅ 已满足 |
-| **PC-5** | 60fps 完整 perf benchmark (ChatMinimap + BranchNavigator + 长会话) | WU-D + WU-C reviewer PARTIAL | ⏳ **本轮尚未补齐** — ChatView 集成阶段强制落地（建议下一轮 P1-04 ChatView memo 全覆盖时一起做） |
-| **PC-6** | verify-plan + check-macos-signing CI 入闸 | WU-C reviewer PASS | ⏳ **本轮尚未补齐** — P3 阶段集成到 CI pipeline |
+| **PC-5** | 60fps 完整 perf benchmark (ChatMinimap + BranchNavigator + 长会话) | WU-D + WU-C reviewer PARTIAL | ✅ **round 4 闭合** — chat-render-bench (jsdom + react-dom/server) Σ=5.9ms / budget=16.6ms / headroom=10.7ms |
+| **PC-6** | verify-plan + check-macos-signing CI 入闸 | WU-C reviewer PASS | ✅ **round 4 闭合** — `.github/workflows/ci.yml` `perf-budget` job 新增 4 步骤（`perf:chat-render:test` / `perf:chat-render:strict` / `verify:plan` / check-macos-signing unit） |
 
 ### 5.2 三 tsc 全 0 硬要求
 
@@ -153,15 +241,16 @@ node scripts/check-macos-signing.mjs --allow-unsigned --self-test  # ⏳ 尚未�
 
 | Finding | 阶段 | 状态 | commit / 文件 |
 |---|---|---|---|
-| P0-01 渲染端 React.lazy 路由级拆分（完整闭环：Sidebar + ChatView + 6 个次级页面） | P0 | ✅ 本轮完成 | `src/App.tsx`（commit `f8cf14d`） |
+| P0-01 渲染端 React.lazy 路由级拆分（完整闭环：Sidebar + ChatView + 6 个次级页面） | P0 | ✅ round 3 完成 | `src/App.tsx`（commit `f8cf14d`） |
+| P0-02 移除 markdown/katex/mermaid 的 `__vitePreload(true)` | P0 | ✅ 实际已在 `electron.vite.config.ts` 闭合（wiki 误标 "App.tsx 部分落地" — 实际机制在 vite config） | `electron.vite.config.ts:238-249` |
 | P0-03 流式 16ms 节流 | P0 | ✅ 已在 WU-C (`0272216`) | `electron/main/pi-stream-transport.ts` |
 | P0-04 顶层 import 拆分 | P0 | ✅ 已在 WU-C | `electron/main/agent/host-modules/` 20 facade |
-| P0-06 streaming delta hot path | P0 | ✅ 本轮完成（in-place mutation） | `src/stores/session-store.ts:285-330` |
-| P3-02 cold-start analyzer | P3 | ✅ 本轮完成 | `scripts/perf/cold-start.mjs` + `_cold-start-lib.mjs` + `dashboard.mjs` |
-| zod followup (3 paths) | followup | ✅ 本轮完成 | commit `3a35273` |
+| P0-06 streaming delta hot path | P0 | ✅ round 1 完成（in-place mutation） | `src/stores/session-store.ts:285-330` |
+| P3-02 cold-start analyzer | P3 | ✅ round 1 完成 | `scripts/perf/cold-start.mjs` + `_cold-start-lib.mjs` + `dashboard.mjs` |
+| PC-5 60fps 完整 perf benchmark | P3 | ✅ **round 4 完成** | `scripts/perf/chat-render-bench.mjs` + `_chat-render-jsdom.test.ts` + `_chat-render-lib.mjs` + `.github/workflows/ci.yml` |
+| PC-6 verify-plan + check-macos-signing CI 入闸 | P3 | ✅ **round 4 完成** | `.github/workflows/ci.yml` perf-budget job 新增 4 步骤 |
+| zod followup (3 paths) | followup | ✅ round 2 完成 | commit `3a35273` |
 | 其余 ~67 项 P0/P1/P2/P3 | 各阶段 | ⏳ 待后续多轮 WU-E | — |
-| PC-5 60fps 完整 perf benchmark | P3 (ChatView 集成时) | ⏳ 必填 | — |
-| PC-6 verify-plan + check-macos-signing CI 入闸 | P3 | ⏳ 必填 | — |
 
 ---
 
@@ -228,19 +317,19 @@ $ npx vitest run
 
 ## 8. 下一轮建议（按 LUM-561 P0 → P1 → P2 → P3 顺序）
 
-### 8.1 优先级 1：PC-5 / PC-6 落地（reviewer 强必填）
+### 8.1 优先级 1：~~PC-5 / PC-6 落地（reviewer 强必填）~~ ✅ round 4 闭合
 
-| 项 | 范围 | 工作量 |
+| 项 | 范围 | 状态 |
 |---|---|---|
-| **PC-5** 60fps 完整 perf benchmark | ChatMinimap + BranchNavigator + 长会话 200 消息 React Profiler 验证 | M |
-| **PC-6** verify-plan + check-macos-signing CI 入闸 | `.github/workflows/perf.yml` 加 step + `pnpm perf:cold-start` 接入 | S |
+| **PC-5** 60fps 完整 perf benchmark | ChatMinimap + BranchNavigator + 长会话 200 消息 | ✅ round 4 — `scripts/perf/chat-render-bench.mjs` (jsdom + react-dom/server) Σ=5.9ms / budget=16.6ms |
+| **PC-6** verify-plan + check-macos-signing CI 入闸 | `.github/workflows/ci.yml` `perf-budget` job 新增 4 步骤 | ✅ round 4 — verify-plan 16/16 + check-macos-signing 24/24 unit + chat-render:test + chat-render:strict |
 
-### 8.2 优先级 2：P0 quick wins 剩余 6 项
+### 8.2 优先级 2：P0 quick wins 剩余 3 项
 
 | # | 项 | 工作量 | 文件 |
 |---|---|---|---|
 | P0-01 | 渲染端 chunk 化（React.lazy + Suspense） | ✅ round 3 完成（Sidebar + ChatView 拆分） | `src/App.tsx` (commit `f8cf14d`) |
-| P0-02 | 移除 markdown/katex/mermaid 的 `__vitePreload(true)` — **App.tsx:238 已部分落地** | S | `electron.vite.config.ts` |
+| P0-02 | 移除 markdown/katex/mermaid 的 `__vitePreload(true)` | ✅ 实际已在 `electron.vite.config.ts:238-249` 完成（`modulePreload.polyfill: false` + heavy-chunk filter） | `electron.vite.config.ts` |
 | P0-05 | deepseek-runtime 全树 freeze | M | `electron/main/agent/host-modules/deepseek/` |
 | P0-07 | Cordis 能力包静态 import 拆除（部分已在 WU-C 完成） | L | `electron/main/index.ts` |
 | P0-08 | SQLite 事务批量合并 | M | `packages/runtime/openbuddy-storage/` |
@@ -302,7 +391,9 @@ LUM-556 (parent, in_progress)
      ├─ [stage 3] ✅ LUM-559 WU-C ─────────── in_review (40 commits / reviewer PASS ✓)
      │
      └─ [stage 4] 🟢 LUM-561 WU-E ─────────── in_progress (本文件)
-                  └─ 2 commits: 267317a (P3-02 + P0-06) + 3a35273 (zod followup)
+                  └─ 6 commits: 267317a (P3-02 + P0-06) + 3a35273 (zod followup)
+                                + c872b3c/4452e96 (wiki) + f8cf14d (P0-01 Sidebar+ChatView)
+                                + round 4 (PC-5 chat-render bench + PC-6 CI integration)
 
 [SECURITY] 🟡 LUM-575 ─────────────────── in_progress (audit 收口中)
 [push]    🚧 LUM-578 3 branches ─────────── blocked (§0 + 无凭据, 与协调解耦)
@@ -312,8 +403,14 @@ LUM-556 (parent, in_progress)
 
 ## 12. 下次 turn 触发
 
-- ts-coder WU-E 下一轮 PR（PC-5 60fps benchmark + PC-6 CI gate + P0-01/02 收尾）
-- WU-E 完成后 → status=in_review → 队长 dispatch reviewer 独立验收
+- **PC-5 / PC-6 ✅ round 4 闭合** — 下轮 PR 可不再背负这两个 reviewer 强必填项
+- ts-coder WU-E 下一轮 PR 优先级：
+  - **P1-04 ChatView memo 全覆盖**（priority 3）
+  - **P2-13 pi-resources.ts 拆分**（priority 4，2129 行）
+  - **P0-05 deepseek-runtime 全树 freeze**（priority 2 剩余项）
+  - **P0-07 Cordis 能力包静态 import 拆除收尾**（priority 2 剩余项）
+  - **P0-08 SQLite 事务批量合并**（priority 2 剩余项）
+- WU-E 完成后 → status=in_review → 队长 dispatch reviewer 独立验收（可重点关注 P1/P2 实际收益）
 - lumos-security-reviewer LUM-575 audit 收口
 - 人类 close LUM-557 / LUM-558 / LUM-560 / LUM-559
 - LUM-562 (WU-F) 待独立 promote 评估
