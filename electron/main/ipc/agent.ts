@@ -49,6 +49,14 @@ import {
 	type RecordValue,
 } from "./validation";
 // dynamic: @openbuddy/auth-permission
+// Phase B.1 round 3 — per-capability IPC modules. Each owns a self-contained
+// subset of the handlers that used to live in this file's giant
+// registerAgentIpc() body.
+import { registerPresetIpc } from "./preset";
+import { registerTaskIpc } from "./task";
+import { registerPermissionIpc } from "./permission";
+import { registerSessionMiscIpc } from "./session-misc";
+import { registerAgentInfoIpc } from "./agent-info";
 
 // A-5: AbortSignal plumbing for prompt/steer/follow-up.
 //
@@ -81,6 +89,24 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 		await ensureAgentHostLoaded();
 		await agentHost.waitUntilReady();
 	};
+
+	// Phase B.1 round 3 — per-capability IPC modules receive a deps bag
+	// so the local closures of ensureAgentHost / casdoorAuth / agentHost
+	// are still accessible to handlers that live in their own files.
+	// Each module returns immediately and registers its own subset.
+	const sharedDeps = {
+		agentHost,
+		casdoorAuth,
+		ensureAgentHost,
+		awaitExtensionsBound,
+		inflightAbortControllers,
+		getWindow,
+	};
+	registerPresetIpc(sharedDeps);
+	registerTaskIpc(sharedDeps);
+	registerPermissionIpc(sharedDeps);
+	registerSessionMiscIpc(sharedDeps);
+	registerAgentInfoIpc(sharedDeps);
 
 		ipcMain.handle("agent:new-session", async (_e, input?: string | { cwd?: string; modelId?: string; traceId?: string }) => {
 			await ensureAgentHost();
@@ -244,21 +270,6 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			}
 		});
 		ipcMain.handle("agent:current-model", async () => { await ensureAgentHost(); return agentHost.getModel(); });
-		ipcMain.handle("agent:presets-list", async (_e, input?: unknown) => {
-			const cwd = input === undefined || input === null ? agentHost.getCwd() : absolutePath(String(input), "cwd");
-			return agentHost.listAgentPresets(cwd);
-		});
-		ipcMain.handle("agent:preset-current", async () => { await ensureAgentHost(); return { id: agentHost.currentAgentPreset() }; });
-		ipcMain.handle("agent:preset-select", async (_e, input?: unknown) => {
-			const payload = recordValue(input, "preset selection payload");
-			const id = requiredString(payload.id, "id");
-			return agentHost.selectAgentPreset(id);
-		});
-		ipcMain.handle("agent:preset-default-save", async (_e, input?: unknown) => {
-			const payload = input === undefined || input === null ? {} : recordValue(input, "preset default payload");
-			const id = payload.id === undefined || payload.id === null ? undefined : requiredString(payload.id, "id");
-			return resources.writeAgentPresetDefault(id);
-		});
 		ipcMain.handle("agent:plugin-list", async () => { await ensureAgentHost(); return agentHost.listPlugins(); });
 		ipcMain.handle("agent:plugin-inventory", async () => { await ensureAgentHost(); return agentHost.pluginInventory(); });
 		ipcMain.handle("agent:tools-list", async () => {
@@ -397,134 +408,6 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 		ipcMain.handle("agent:dispose", async () => {
 			await agentHost.dispose();
 			return { ok: true };
-		});
-		ipcMain.handle("agent:resolve-permission", async (_e, args: { requestId: string; optionId?: string; cancelled?: boolean }) => {
-			const input = recordValue(args, "permission response payload");
-			const cancelled = input.cancelled === undefined ? false : requiredBoolean(input.cancelled, "cancelled");
-			const optionId = input.optionId === undefined || input.optionId === null ? undefined : requiredString(input.optionId, "optionId");
-			const value = cancelled || optionId === undefined || optionId === "deny" ? false : optionId === "allow_always" ? { decision: "allow_always" as const } : optionId === "allow" ? true : false;
-			return { ok: agentHost.resolveUiRequest(requiredString(input.requestId, "requestId"), value) };
-		});
-		ipcMain.handle("agent:resolve-question", async (_e, args: { requestId: string; answers?: Record<string, string | string[]>; annotations?: Record<string, { preview?: string; notes?: string }>; cancelled?: boolean }) => {
-			const input = recordValue(args, "question response payload");
-			const cancelled = input.cancelled === undefined ? false : requiredBoolean(input.cancelled, "cancelled");
-			const answers = input.answers === undefined ? {} : recordValue(input.answers, "answers");
-			const annotations = input.annotations === undefined ? {} : recordValue(input.annotations, "annotations");
-			const normalizedAnswers = Object.fromEntries(Object.entries(answers).map(([key, value]) => [key, typeof value === "string" || (Array.isArray(value) && value.every((item) => typeof item === "string")) ? value : String(value)]));
-			const normalizedAnnotations = Object.fromEntries(Object.entries(annotations).map(([key, value]) => [key, recordValue(value, `annotations.${key}`)]));
-			return { ok: agentHost.resolveUiRequest(requiredString(input.requestId, "requestId"), cancelled ? undefined : { answers: normalizedAnswers as Record<string, string | string[]>, annotations: normalizedAnnotations as Record<string, { preview?: string; notes?: string }> }) };
-		});
-		ipcMain.handle("agent:auth-status", async () => {
-			await ensureAgentHost();
-			return agentHost.authStatus();
-		});
-		ipcMain.handle("agent:providers-list", async () => {
-			await ensureAgentHost();
-			return agentHost.providerCatalog();
-		});
-		ipcMain.handle("internal_reload", async (_event, args?: { kind?: string }) => {
-			if (args !== undefined) recordValue(args, "internal_reload payload");
-			await ensureAgentHost();
-			if (args?.kind === "skills" || args?.kind === "mcp_all" || args?.kind === "mcp_project") await agentHost.reloadPiRuntime(`internal-reload:${args.kind}`);
-			return { ok: true, kind: args?.kind ?? "unknown" };
-		});
-		ipcMain.handle("tasks_list", async () => { await ensureAgentHost(); return agentHost.listRunningTasks(); });
-		ipcMain.handle("task_kill", async (_e, args: { taskId: string }) => { await ensureAgentHost(); return agentHost.killTask(requiredString(recordValue(args, "task kill payload").taskId, "task id")); });
-		ipcMain.handle("agent:load-session", async (_e, args: { sessionId: string; cwd: string; traceId?: string }) => {
-			await ensureAgentHost();
-			const input = recordValue(args, "load session payload");
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			const sessionId = requiredString(input.sessionId, "session id");
-			const traceId = optionalString(input.traceId, "traceId") ?? generateTraceId();
-			hostReceived("agent:load-session", traceId, sessionId);
-			try {
-				const result = await agentHost.loadSession(sessionId, input.cwd ? absolutePath(input.cwd, "cwd") : "", { traceId, sessionId });
-				hostDispatched("agent:load-session", traceId, sessionId);
-				return result;
-			} catch (err) {
-				hostFailed("agent:load-session", traceId, err);
-				throw err;
-			}
-		});
-		ipcMain.handle("agent:session-info", async (_e, args: { sessionId: string }) => {
-			await ensureAgentHost();
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			try {
-				return agentHost.sessionInfo(requiredString(recordValue(args, "session info payload").sessionId, "session id"));
-			} catch (error) {
-				if (error instanceof Error && /^Pi session is not loaded:/u.test(error.message)) return null;
-				throw error;
-			}
-		});
-		ipcMain.handle("agent:session-messages", async (_e, args: { sessionId: string }) => {
-			await ensureAgentHost();
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			const input = recordValue(args, "session messages payload");
-			return agentHost.readSessionEntries(requiredString(input.sessionId, "session id"));
-		});
-		ipcMain.handle("agent:session-usage", async (_e, args: { sessionId: string }) => {
-			await ensureAgentHost();
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			try {
-				return agentHost.sessionUsage(requiredString(recordValue(args, "session usage payload").sessionId, "session id"));
-			} catch (error) {
-				if (error instanceof Error && /^Pi session is not loaded:/u.test(error.message)) return null;
-				throw error;
-			}
-		});
-		ipcMain.handle("agent:session-metadata-clear", async () => {
-			await agentHost.clearSessionMetadata();
-			return { ok: true };
-		});
-		ipcMain.handle("agent:commands-list", async () => { await ensureAgentHost(); return agentHost.listCommands(); });
-		ipcMain.handle("agent:resource-inventory", async () => { await ensureAgentHost(); return agentHost.resourceInventory(); });
-		ipcMain.handle("prompt_history", async (_e, args?: unknown) => {
-			const input = args === undefined || args === null ? {} : recordValue(args, "prompt history payload");
-			// P2-13: readPromptHistory lives in the memory module, which pulls
-			// in SessionManager (Rust-backed NAPI). Lazy-load on demand.
-			const { readPromptHistory } = await import("../agent/pi-resources/memory");
-			return readPromptHistory(optionalFiniteInteger(input.limit, "limit", 100, 1, 500));
-		});
-		ipcMain.handle("session_search", async (_e, args: { query: string; cwd?: string | null; limit?: number | null }) => {
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			const input = recordValue(args, "session search payload");
-			// P2-13: searchSessions is in the memory module — same NAPI cost.
-			const { searchSessions } = await import("../agent/pi-resources/memory");
-			return searchSessions(requiredString(input.query, "query"), input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"), optionalFiniteInteger(input.limit, "limit", 50, 1, 200));
-		});
-		ipcMain.handle("session_fork", async (_e, args: { sessionId: string; cwd?: string | null }) => {
-			casdoorAuth.authorize({ capability: "team.workspace" });
-			const input = recordValue(args, "session fork payload");
-			const sessionId = requiredString(input.sessionId, "session id");
-			const cwd = input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd");
-			// P2-13: forkSession + forkSessionFromFile both live in memory.ts.
-			const { forkSession, forkSessionFromFile } = await import("../agent/pi-resources/memory");
-			try {
-				return await forkSessionFromFile(await agentHost.sessionFile(sessionId) as any, cwd);
-			} catch {
-				return forkSession(sessionId, cwd);
-			}
-		});
-		ipcMain.handle("rewind_points", async (_e, args: { sessionId: string }) => {
-    // P2-13: rewindPoints lives in memory.ts — same NAPI cost.
-    const { rewindPoints } = await import("../agent/pi-resources/memory");
-    const sessionFileResult = await agentHost.sessionFile(requiredString(recordValue(args, "rewind points payload").sessionId, "session id"));
-    if (!sessionFileResult.path) throw new Error("rewind_points: session file path unavailable");
-    return rewindPoints(sessionFileResult.path);
-  });
-		ipcMain.handle("rewind_execute", async (_e, args: { sessionId: string; targetPromptIndex: number; mode?: string; force?: boolean }) => {
-			const input = recordValue(args, "rewind execute payload");
-			if (input.force !== undefined) requiredBoolean(input.force, "force");
-			return agentHost.rewindSession(requiredString(input.sessionId, "session id"), optionalFiniteInteger(input.targetPromptIndex, "targetPromptIndex", -1, 0, 100000), input.mode === undefined ? undefined : requiredString(input.mode, "rewind mode"));
-		});
-		ipcMain.handle("permission_list", async () => {
-			await ensureAgentHost();
-			return (await import("@openbuddy/auth-permission")).permissionHandlers.readRules();
-		});
-		ipcMain.handle("permission_save", async (_e, args: { rules: unknown }) => {
-			await ensureAgentHost();
-			const input = recordValue(args, "permission_save payload");
-			return (await import("@openbuddy/auth-permission")).permissionHandlers.writeRules(permissionRules(input.rules) as never);
 		});
 		// subagent config moved to pi-subagents (122k weekly downloads, native pi).
 		ipcMain.handle("plugins_list", async () => {

@@ -518,8 +518,9 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
 
 - ✅ **已完成：Phase A.1 — PI IPC 桥基础设施**（commit `6f6d612`）
 - ✅ **已完成：Phase B.1 第 1 轮 — 5th builtin ExtensionFactory `openbuddy-pi-session-metadata`**（commit `df1bcb7`）
-- ✅ **已完成：Phase B.1 第 2 轮 — 6th builtin ExtensionFactory `openbuddy-pi-model-bridge` + `ipc/agents.ts` 拆分第 1 步**（commit 见本轮 PR）
-- 🟡 **下一轮 — Phase B.1 第 3 轮**：继续拆 `ipc/agent.ts` 剩余 9 个 capability 组（session / prompt / preset / tool / model / plugin / compaction / workspace / permission / task）
+- ✅ **已完成：Phase B.1 第 2 轮 — 6th builtin ExtensionFactory `openbuddy-pi-model-bridge` + `ipc/agents.ts` 拆分第 1 步**（commit `1debbde`）
+- ✅ **已完成：Phase B.1 第 3 轮 — `ipc/agent.ts` 1060 → 943 LOC 拆为 5 个 capability 子文件**（commit 见本轮 PR）
+- 🟡 **下一轮 — Phase B.1 第 4 轮**：继续拆 6 个耦合 handler 组（plugin / profile / deepseek / providers / compaction / tools-list）
 - ⚪ **第三轮 — Phase J.1（部分）**：先跑 `pnpm storage:boundaries` + `pnpm storage:acceptance` 拿到当前 baseline，然后加固 sheriff.config.ts
 
 每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
