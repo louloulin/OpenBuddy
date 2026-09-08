@@ -108,6 +108,7 @@ out/
 !docs/pi-analysis-critique.md
 !docs/release-ci.md
 !docs/dsh-version-compatibility-matrix.md  # P2-2 DSH matrix (openbuddy-p2-documentation-impl, 2026-08-31)
+!docs/WU-E_PROGRESS.md  # WU-E 性能改造实施进度 wiki (LUM-561, 2026-09-08)
 !docs/build-output-conventions.md  # P1-2 build output conventions (openbuddy-p1-skill-integrate, 2026-08-31)
 !docs/event-channel-matrix.md
 !docs/PERFORMANCE.md
