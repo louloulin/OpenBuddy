@@ -124,12 +124,7 @@ export function buildInstallHostModuleDeps(
     persistedSessionPath: closures.persistedSessionPath,
     enqueueLifecycle: closures.enqueueLifecycle,
     lifecycleAppendQueues: closures.lifecycleAppendQueues,
-    // CRITICAL: session-swap/session-rebind 直接调 initialize() 会绕过
-    // enqueueLifecycle 队列, 导致与 init() (init-orchestration) 并行触发,
-    // 在 newSession 的 runInitPipeline 中途被 waitUntilReady → init() 覆盖 state.cwd.
-    // 包一层 enqueueLifecycle 让 newSession/rebind 路径也串行化, 与 init() 一致.
-    initialize: ((opts?: Parameters<typeof closures.initialize>[0]) =>
-      closures.enqueueLifecycle(() => closures.initialize(opts))) as typeof closures.initialize,
+    initialize: closures.initialize,
     rebindSession: closures.rebindSession,
     dispose: closures.dispose,
     piRuntimeCoordinator: closures.piRuntimeCoordinator,

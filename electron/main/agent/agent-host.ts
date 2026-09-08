@@ -1110,11 +1110,21 @@ queueMicrotask(() => {
   installHostModules(state, buildMicrokernelHostDeps());
 });
 
+let initializeInFlight: Promise<void> | null = null;
 export async function initialize(opts?: { cwd?: string; sessionPath?: string; force?: boolean }): Promise<void> {
-  if (!opts?.force && state.session && (!opts?.cwd || opts.cwd === state.cwd)
-    && (!opts?.sessionPath || isCurrentSessionPath(opts.sessionPath, opts.cwd))) return;
-  if (state.session) await disposeInternal();
-  const cwd = opts?.cwd ?? process.cwd();
+  // 串行化所有 initialize() 调用 — 防止 newSession/rebindSession 的 initialize
+  // 与 dsh:remote-register 的 waitUntilReady → init() 并发触发, 后者会用
+  // process.cwd() 覆盖 newSession 已设的 state.cwd.
+  while (initializeInFlight) {
+    try { await initializeInFlight; } catch { /* 让前一个 init 的错误被新 caller 处理 */ }
+  }
+  let releaseInFlight!: () => void;
+  initializeInFlight = new Promise<void>((r) => { releaseInFlight = r; });
+  try {
+    if (!opts?.force && state.session && (!opts?.cwd || opts.cwd === state.cwd)
+      && (!opts?.sessionPath || isCurrentSessionPath(opts.sessionPath, opts.cwd))) return;
+    if (state.session) await disposeInternal();
+    const cwd = opts?.cwd ?? process.cwd();
   await runInitPipeline(buildInitPipelineDeps({
     state,
     cwd,
@@ -1131,6 +1141,10 @@ export async function initialize(opts?: { cwd?: string; sessionPath?: string; fo
     reportPiExtensionErrors,
     listPlugins,
   }, { sessionPath: opts?.sessionPath }));
+  } finally {
+    releaseInFlight();
+    initializeInFlight = null;
+  }
 }
 import { init } from "./host-modules/bootstrap/lifecycle-public";
 export { init } from "./host-modules/bootstrap/lifecycle-public";

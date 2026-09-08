@@ -133,21 +133,29 @@ export interface InitPipelineDeps {
  * so the caller can attach extra services or call .start() with custom timing.
  */
 export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> {
+  // DIAG: stage marker
+  console.log("[openbuddy-diag] init-pipeline stage=1 ENTER (SessionEventLog)");
   // Stage 1: SessionEventLog hydration (disk replay required for harness
   // server's `since=` query across Electron restarts).
   await deps.bootstrapSessionEventLog(deps.state, deps.cwd());
+  console.log("[openbuddy-diag] init-pipeline stage=1 DONE");
 
+  console.log("[openbuddy-diag] init-pipeline stage=2 ENTER (ModelRuntime)");
   // Stage 2: ModelRuntime + auth sync + provider registry tracker.
   await deps.bootstrapModelRuntime(deps.state);
+  console.log("[openbuddy-diag] init-pipeline stage=2 DONE");
   const modelRuntime = deps.state.modelRuntime as ModelRuntime;
 
   // Stage 3: Install all 35 host-modules via the microkernel host.
+  console.log("[openbuddy-diag] init-pipeline stage=3 ENTER (installMicrokernelHost)");
   deps.installMicrokernelHost({
     ...deps.getMicrokernelHostDeps(),
     state: deps.state,
   } as unknown as InstallHostModuleDeps);
+  console.log("[openbuddy-diag] init-pipeline stage=3 DONE");
 
   // Stage 4: Create Cordis Context + wire core services.
+  console.log("[openbuddy-diag] init-pipeline stage=4 ENTER (Context)");
   const context = new (await import("@openbuddy/cordis")).Context();
   deps.state.toolRegistry = deps.createToolRegistry(deps.refreshPiExtensionsFn) as PiToolRegistry;
   deps.state.toolRegistryRevision = 0;
@@ -185,8 +193,10 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
   deps.state.context = context;
   deps.wireForwardedEvents({ state: deps.state, context, emitRendererEvent: deps.emitRendererEvent, emitPluginEvent: deps.emitPluginEvent });
   await context.start();
+  console.log("[openbuddy-diag] init-pipeline stage=4 DONE");
 
   // Stage 5: Profile options + opt-in default Pi package install.
+  console.log("[openbuddy-diag] init-pipeline stage=5 ENTER (ProfileOptions)");
   let profilePackageJson: string | undefined;
   const { resolvedProfile, profileOptions } = await deps.setupProfileOptions({ env: process.env });
   if (process.env.OPENBUDDY_INSTALL_DEFAULT_PI === "1" && (profileOptions as { profileDir?: string })?.profileDir) {
@@ -207,6 +217,8 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
   }
 
   // Stage 6: Materialize profile + load plugin loader + init DeepSeek bridge.
+  console.log("[openbuddy-diag] init-pipeline stage=5 DONE");
+  console.log("[openbuddy-diag] init-pipeline stage=6 ENTER (initProfile)");
   const { profileBundle, profilePackageJson: materializedProfilePackageJson } = await deps.initProfile({
     state: deps.state, resolvedProfile, profileOptions,
     piHome: deps.piHome, emitPluginEvent: deps.emitPluginEvent,
@@ -223,6 +235,7 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
   });
   deps.state.loader = loader as ElectronHarnessPluginLoader;
   deps.state.pluginState = pluginState as PluginStateStore;
+  console.log("[openbuddy-diag] init-pipeline stage=6.5 ENTER (initDeepSeek)");
   await deps.initDeepSeek({
     state: deps.state, context, loader, profileBundle, baseUrl: deps.baseUrl,
     emitPluginEvent: deps.emitPluginEvent, emitRendererEvent: deps.emitRendererEvent,
@@ -230,6 +243,8 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
   });
 
   // Stage 7: Compute active adapter IDs + inject system prompt + init session.
+  console.log("[openbuddy-diag] init-pipeline stage=6.5 DONE");
+  console.log("[openbuddy-diag] init-pipeline stage=7 ENTER (computeActiveAdapterIds + initSession)");
   const activeAdapterIds = deps.computeActiveAdapterIds({ state: deps.state });
   await deps.injectSystemPromptSections({
     cwd: deps.cwd(), context: deps.state.context!, piResources: deps.piResources,
@@ -260,7 +275,10 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
   });
 
   // Stage 8: emit plugin/ready event so renderer can subscribe.
+  console.log("[openbuddy-diag] init-pipeline stage=7 DONE");
+  console.log("[openbuddy-diag] init-pipeline stage=8 ENTER (emitPluginReadyEvent)");
   deps.emitPluginReadyEvent({ count: loader.list().length });
+  console.log("[openbuddy-diag] init-pipeline stage=8 DONE");
 
   return context;
 }
