@@ -64,7 +64,13 @@ export function microkernelReady(): boolean {
  */
 export function installMicrokernelHost(state: Parameters<typeof installHostModules>[0], deps: InstallHostModuleDeps): void {
   if (INSTALLED_MODULES.size > 0) {
-    disposeMicrokernelHost();
+    // Already installed. The agent-host dual-install path (module-load
+    // queueMicrotask + init-pipeline stage=3) used to call this twice in
+    // a row, which threw "service X has been registered" inside the deep
+    // installHostModules() sub-installers because Cordis + many
+    // host-module singletons don't survive disposeMicrokernelHost() cleanly.
+    // Make the second call a no-op: the registry is the source of truth.
+    return;
   }
   installHostModules(state, deps);
   for (const moduleTag of MICROKERNEL_MODULE_TAGS) INSTALLED_MODULES.add(moduleTag);

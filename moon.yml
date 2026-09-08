@@ -11,7 +11,7 @@ fileGroups:
     # their implementation files in the application build hash so a renderer
     # host change cannot be hidden behind a stale `out/` bundle.
     - "packages/renderer/openbuddy-renderer-host/src/**/*"
-    - "packages/ui/**/*"
+    - "packages/ui/**/src/**/*"
     - "packages/bundle/openbuddy-base/src/**/*"
     - "*.{ts,tsx,js,mjs,cjs,json,html}"
     - "electron.vite.config.ts"
