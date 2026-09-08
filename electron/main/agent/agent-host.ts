@@ -114,7 +114,6 @@ import {
 } from "./host-modules/deepseek/agent-runtime";
 import { SessionEventLog, type SessionEventRecord } from "../session/session-event-log";
 import { RemoteDispatcher, type RemoteContribution, type RemoteDescriptor } from "../harness/remote-dispatch";
-import { invokeRemoteWithGateway } from "../harness/remote-invocation";
 import { serializeRemoteContribution } from "@openbuddy/plugin-host";
 import {
   normalizePublishedRemoteContribution as normalizePublishedRemoteContributionPure,

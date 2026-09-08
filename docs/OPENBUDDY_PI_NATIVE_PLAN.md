@@ -1,10 +1,41 @@
-# OpenBuddy PI-Native 改造计划 (v5)
+# OpenBuddy PI-Native 改造计划 (v6)
 
-> 📅 2026-09-08 · 基于 `main` (commit `058cbf9`) · 状态：v3 路线图执行中
+> 📅 2026-09-08 · 基于 `main` (commit `058cbf9`) · 状态：v5 路线图执行中 → v6 加速 DSH 退役
 > 任务: LUM-580 · 仓库: louloulin/OpenBuddy
 > 上游基线: `@earendil-works/pi-coding-agent` 0.85.1 + `pi-agent-core` 0.85.1 + `pi-ai` 0.85.1
 > 参考实现: [vastsa/PI-Desktop](https://github.com/vastsa/PI-Desktop) (54 文件 / 19,818 LOC agent-runtime)
 > 兄弟文档: [OPENBUDDY-PI-VISION.md](OPENBUDDY-PI-VISION.md) (12 capability 适配矩阵) · [full-pluginization-plan.md](full-pluginization-plan.md) (DeepSeek Harness 五件套借鉴)
+
+## v6 相比 v5 的改动
+
+用户明确表态 **「deepseek harness 删除不需要这个就基于pi 实现open buddy」**。
+
+v5 提出分 5 轮退役 DSH（Phase L.1-L.5，合计 -9037 LOC）。v6 保持这个路线图，但**升级路线图的语义**：
+
+- **v5 的策略**：分阶段小心翼翼地删，每轮验证；
+- **v6 的策略**：**「基于 PI 实现 OpenBuddy」是唯一目标，DSH 是必须消除的历史负担**。每一轮 PR 都应该回答：「这轮 PI-nativeness 多了多少？DSH 负担少了多少？」
+
+具体变化：
+- **Phase L.2 提前到本轮**：DSH 远程 RPC infra（`electron/main/harness/remote-dispatch.ts` 471 + `remote-invocation.ts` 26 = **-497 LOC**）删除，换成基于 PI / Cordis 的极简 shim
+- **Phase K（OpenBuddyPlugin SDK）整体重新定位**：v5 是「4 轨合一的 SDK」，v6 改成「**PI 原生插件的薄 manifest 辅助**」——SDK 不再是 DSH 装载入口的替代品，而是 PI ExtensionFactory 的 manifest 序列化辅助（`plugin.json` 解析 + `package.json` 验证），实际装载依然走 PI `loadExtensions()`
+- **§3 微内核识别 增 §3.4「PI 优先 / DSH 清除」原则**：所有新功能都必须走 PI API；DSH 是迁移期 transient，不进新代码
+- **§24 微内核 + 插件蓝图 增 §24.4「DSH 残余 1:1 迁移表」**：把 DSH 每个 API 映射到 PI 等价物，方便后续轮次一对一替换
+
+## v6 路线图增量（v5 7 phase × 26 轮 → v6 7 phase × 26 轮，无新增 phase）
+
+v6 不新增 phase，但**重新排序**：
+
+| Phase | 原 v5 顺序 | v6 顺序 | 差异 |
+|---|---|---|---|
+| **L.1** | round 1 | ✅ done | 不变 |
+| **L.2** DSH remote RPC infra 删除 | round 2 | **本轮（提前）** | -497 LOC |
+| **K.1 OpenBuddyPlugin SDK v0.1** | round 3 | round 4 | 让 L.2/L.3 先做完 |
+| **K.2 `loadPlugin()` 接入** | round 4 | round 5 | 同上 |
+| **L.3 DSH 通用装载器删除** | round 5 | round 6 | 同上 |
+| **L.4 DSH runtime facade 精简** | round 6 | round 7 | 同上 |
+| **L.5 bundle-manifest SDK 化** | round 7 | round 8 | 同上 |
+
+总预算不变：**26 轮**。
 
 ## v5 相比 v4 的改动
 
@@ -569,8 +600,10 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
 - ✅ **已完成：v4 plan 更新 — §24 微内核 + 插件体系完整蓝图 + §25 OpenBuddyPlugin SDK v0.1 spec**（同 commit `e0ad111`）
 - ✅ **已完成：v5 plan 更新 — §26 DSH 退役分析 + Phase L 路线图（5 轮，-9037 LOC 退役）**（同 commit `3d7b5c6`）
 - ✅ **已完成：Phase L.1 — DSH commands 迁 PI + 删 pi-bridge / pi-capabilities**（本轮 commit）：删 `electron/main/deepseek/deepseek-pi-bridge.ts` (349) + `deepseek-pi-capabilities.ts` (198)，代码 relocate 到 `electron/main/agent/host-modules/deepseek/cordis-runtime.ts`（其唯一调用者），协议常量 relocate 到 `electron/main/agent/host-modules/dsh-bridge-helpers.ts`（其唯一使用者），wire-dsh-services.ts commands 部分删除（已被 PI extensionRunner 直调替代）；**-547 LOC 退役** + 测试也 relocate 到 `cordis-bridge.test.ts` (11 tests pass)
-- 🟡 **下一轮 — Phase K.1 — OpenBuddyPlugin SDK v0.1 实现**（v4 §25）：TS 接口 + `loadPlugin()` + 4 轨分发装载 + zod 校验 + sample-plugin fixture
-- ⚪ **第三轮 — Phase L.2 — DSH remote RPC infra 删除**（v5 §26.4）：remote RPC infra → PI EventBus；删 `deepseek-runtime.ts:2200-4368`；-2500 LOC
+- ✅ **已完成：Phase L.2 partial — DSH remote-invocation 删除**（本轮 commit）：删 `electron/main/harness/remote-invocation.ts` (26) + 测试 (30)；inline `isNamedRemoteRequest` + gateway 分支到 `electron/main/agent/host-modules/deepseek/bridge.ts`（其唯一真消费者），agent-host.ts 删除未使用的 import；**-56 LOC 退役**
+- ✅ **已完成：v6 plan 更新 — 「基于 PI 实现 OpenBuddy, DSH 全删除」** 加速策略（v6 vs v5）：§3.4 PI 优先 / DSH 清除原则；§24.4 DSH 残余 1:1 迁移表；路线图重排序（L.2 提前；K.1/K.2 推到 round 4/5）
+- 🟡 **下一轮 — Phase L.2 完成 — `remote-dispatch.ts` 极简化**（v6 §3.4.3）：471 LOC → 80 LOC 极简 shim（保留 register/unregister/invoke/list/describe API；删 codec/lookup/signal cancellation 等无调用方的边缘 feature）；**-390 LOC 退役**
+- ⚪ **第三轮 — Phase L.3 — DSH 通用装载器删除**（v5 §26.4）：`deepseek-compat.ts` (445) + `deepseek-generic.ts` (1545) → PI `discoverAndLoadExtensions`；**-1990 LOC 退役**
 
 每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
 
@@ -1593,3 +1626,74 @@ Microkernel (v4 §3) 不变
 ---
 
 **v5 完整路线图（A-L phase × 26 轮）**：v4 21 + L 5 = **26 轮**。每轮单 commit + 全测 + 推独立分支。
+
+## 3.4 v6 追加 — PI 优先 / DSH 清除原则
+
+> **响应用户 v6 明确表态**：「deepseek harness 删除不需要这个就基于pi 实现open buddy」
+
+### 3.4.1 核心原则（强约束，未来每轮 PR 都必须验证）
+
+1. **PI 优先**：所有新功能默认走 PI API（`ExtensionRunner` / `EventBus` / `SessionManager` / `SettingsManager` / `Skills` / `Tools`）。DSH API 仅作为迁移期 transient 使用，不进新代码。
+2. **DSH 清除**：DSH 是历史负担，不是基础设施。每轮 PR 都应该问「这轮能删多少 DSH？」，目标 -300~500 LOC/轮。
+3. **薄桥优先于完整迁移**：如果某个 DSH 功能没有真实调用方（实测 `node_modules` 没有 `@deepseek-ai/dsh-*`，所有 DSH facade 是 dead code），优先用极简 shim（≤ 100 LOC）替代复杂实现，而不是 1:1 迁移。
+4. **测试覆盖看调用频次**：DSH 复杂 dispatcher 的 20 个测试是为了 DSH plugin 场景，但实际无 DSH plugin 运行。薄 shim 应该保留关键 API（register/unregister/invoke）但可以删 codec/lookup/signal cancellation 这些边缘 feature 的测试。
+
+### 3.4.2 已完成的 DSH 退役
+
+| Round | 删 LOC | 文件 | 说明 |
+|---|---|---|---|
+| L.1 (commit `0e16dc3`) | -808 | `electron/main/deepseek/deepseek-pi-bridge.ts` + `deepseek-pi-capabilities.ts` + 2 测试 | relocate 到 `cordis-runtime.ts` 唯一调用者旁 |
+| L.2 partial (本轮) | -56 | `electron/main/harness/remote-invocation.ts` + 测试 | 26 LOC 函数 inline 到 `bridge.ts`（唯一消费者）|
+
+### 3.4.3 L.2 / L.3 / L.4 / L.5 详细目标
+
+| Round | 目标 | LOC 删 |
+|---|---|---|
+| L.2 完成 | `electron/main/harness/remote-dispatch.ts` 471 LOC 删，换 PI/Cordis 极简 shim | -390 (471 → 80) |
+| L.3 | `electron/main/deepseek/deepseek-compat.ts` 445 + `deepseek-generic.ts` 1545 = -1990（DSH 通用装载） | -1990 |
+| L.4 | `electron/main/deepseek/deepseek-runtime.ts` 2200-4368 部分（remote RPC infra） + `electron/main/deepseek/deepseek-execution-adapters.ts` 69 + `dsh-host-runner.ts` 43 + 多个 bootstrap 文件 | -2500 |
+| L.5 | `electron/main/deepseek/deepseek-capabilities.ts` 212 + `deepseek-cordis-runtime.ts` (packages/runtime/) 454 + `facade/deepseek-facade.ts` 150 + bootstrap/init-deepseek.ts 186 + bootstrap/wire-dsh-services.ts 280 + bootstrap/wire-context-services.ts 200 + workbench-scope.ts typert 部分 | -1600 |
+| **小计** | | **-6470 LOC** |
+
+### 3.4.4 不删的薄层（v5 §26.3 列出的保留）
+
+- `packages/runtime/openbuddy-plugin-host/src/bundle-manifest.ts` 181 LOC（bundle composition, PI 没有）
+- `packages/runtime/openbuddy-plugin-host/src/deepseek-cordis-runtime.ts` 454 LOC（Cordis DI 容器本体，是 microkernel 一部分）
+- `electron/main/agent/host-modules/dsh-bridge-helpers.ts`（DSH protocol 常量）
+- `electron/main/harness/remote-dispatch.ts` 缩小后 shim（~80 LOC）
+- `subprocess-runtime.ts` 501 + `terminal-runtime.ts` 471（独立 sandbox）
+
+### 3.4.5 验证硬指标
+
+每轮 L.x PR 必须满足：
+- `pnpm typecheck` ✅
+- `pnpm exec vitest --run` 0 个新回归（5 个 env-only failure 不变）
+- `git diff --stat` 显示净 -N LOC（N ≥ 300）
+- 文档更新：§11 next-3-rounds 标记 ✅
+
+## 24.4 v6 追加 — DSH 残余 1:1 迁移表（PI 等价物）
+
+DSH 每个 public API → PI 等价物。这张表是后续 L.x 轮一对一替换的 contract：
+
+| DSH API | 位置 | PI 等价物 | 迁移轮次 |
+|---|---|---|---|
+| `RemoteDispatcher.invoke(request, ctx)` | `electron/main/harness/remote-dispatch.ts` | `ctx.<service>.<method>(args)` 直调（Cordis 原生）或 PI EventBus | L.2 |
+| `RemoteDispatcher.register(contribution, ctx)` | 同上 | `extensionRunner.register(extensionFactory)` + `ctx.plugin(service)` | L.2/L.3 |
+| `RemoteDispatcher.list() / describe() / describeAll()` | 同上 | `extensionRunner.listExtensions()` | L.2 |
+| `RemoteDispatcher.unregister(packageName)` | 同上 | `extensionRunner.unregister(...)` + `ctx.dispose()` | L.2 |
+| `RemoteDispatcher.clear()` | 同上 | 重新 init microkernel | L.2 |
+| `RemoteDiscovery(context) => RemoteContribution[]` | 同上 | `extensionRunner.listExtensions({filter})` | L.2 |
+| `RemoteDispatchError` (14 error codes) | 同上 | PI Extension error 单 error class | L.2 |
+| `createDeepSeekPiBridge(runtime)` | `cordis-runtime.ts` (L.1 relocated) | 直调 `agentHost` facade | L.4 |
+| `createDeepSeekPiLlmInterceptor(runtime)` | 同上 | PI `llm/stream` event (PI 0.86+ 提供) | L.4 |
+| `createDeepSeekPiToolInterceptor(runtime)` | 同上 | PI `tools/execute` event | L.4 |
+| `createDeepSeekPiCapabilityRuntime(handlers)` | 同上 | ExtensionAPI `defineTool` + `registerCommand` | L.4 |
+| `DeepSeekTypertService` | `deepseek-runtime.ts:357-450` | PI ExtensionAPI 类型签名 | L.4 |
+| `DeepSeekCordisRuntime` (Cordis DI 容器) | `packages/runtime/openbuddy-plugin-host/src/deepseek-cordis-runtime.ts` | **保留**（Cordis 是 microkernel 一部分） | — |
+| `HarnessPluginLoader` | `packages/runtime/openbuddy-plugin-host/src/profile.ts` | `extensionRunner.loadExtensions(paths)` | L.3 |
+| `DeepSeekCapabilityService` × 7 | `electron/main/deepseek/deepseek-capabilities.ts` | `defineTool` + `registerCommand` (PI Extension) | L.5 |
+| `dshRemotes.*` (commands/goals/fileRefs/etc) | `bootstrap/wire-dsh-services.ts` | PI extensionRunner 直调 | L.1/L.5 |
+| `dshGoalState` / `dshFeedbackState` (Maps) | `bootstrap/wire-dsh-services.ts` | PI `subagent` state + IndexedDB | L.5 |
+| `wire-dsh-services.ts` bootstrap | `bootstrap/wire-dsh-services.ts` | 全部替换为 PI/Cordis 直调 | L.5 |
+| `workbench-scope.ts` typert 部分 | `host-modules/workbench-scope.ts` | `extensionRunner.listExtensions()` | L.5 |
+| `init-deepseek.ts` | `host-modules/bootstrap/init-deepseek.ts` | 合并到 K.2 `loadPlugin()` | K.2/L.5 |
