@@ -1697,3 +1697,47 @@ DSH 每个 public API → PI 等价物。这张表是后续 L.x 轮一对一替�
 | `wire-dsh-services.ts` bootstrap | `bootstrap/wire-dsh-services.ts` | 全部替换为 PI/Cordis 直调 | L.5 |
 | `workbench-scope.ts` typert 部分 | `host-modules/workbench-scope.ts` | `extensionRunner.listExtensions()` | L.5 |
 | `init-deepseek.ts` | `host-modules/bootstrap/init-deepseek.ts` | 合并到 K.2 `loadPlugin()` | K.2/L.5 |
+
+## 27. v6 并行化执行结构（响应用户「开启多个任务并行实现，实现后将代码合并在同一个分支」）
+
+> **2026-09-08 用户追加指令**：「开启多个任务并行实现，实现后将代码合并在同一个分支」
+
+### 27.1 子 issue 清单
+
+v6 路线图剩余 4 轮（K.1 / K.2 / L.3 / L.4）已拆为 4 个子 issue，全部派给 `编程助手-devbox1`（同一 agent，多 session 并行），全部 push 到 `origin/agent/devbox1/main-pi-reuse`（同一分支）：
+
+| 子 issue ID | 标识 | 标题 | LOC 目标 | 依赖 |
+|---|---|---|---|---|
+| `01a082fd-08ad-7153-a96f-f1a5a8b0e618` | **LUM-594** | Phase L.3 — DSH 通用装载器删除 | **-1990** | 无 |
+| `01a082fd-4bbe-7c67-8a3d-aa4fd7ec2afe` | **LUM-595** | Phase L.4 — DSH runtime facade 精简 | **-1000** | 可与 L.3 并行 |
+| `01a082fd-6b42-788c-9a30-ab12ce399be7` | **LUM-596** | Phase K.1 — OpenBuddyPlugin SDK v0.1 实现 | **+500（新包）** | 无 |
+| `01a082fd-81ff-7d65-91f2-ae3d1d63e56d` | **LUM-597** | Phase K.2 — OpenBuddyPlugin SDK 接入 builtin | **重构** | 依赖 K.1 |
+
+### 27.2 并行执行规则
+
+1. **同分支**：所有子任务 push 到 `agent/devbox1/main-pi-reuse`。每个 agent session 必须 `git pull --rebase` 后再 push，避免冲突。
+2. **冲突避免**：L.3 / L.4 都改 `electron/main/deepseek/` 和 `electron/main/agent/host-modules/`。为避免冲突：
+   - **L.3** 优先（先删除 dead-code，释放后续 round 的文件名空间）
+   - **L.4** 等 L.3 落地后再开始；如果 L.4 必须先开始，先 rebase L.3 commit
+3. **测试隔离**：每个 session 跑全量 vitest，确认 0 新回归才能 push
+4. **文档同步**：每个 session 末尾更新 `docs/OPENBUDDY_PI_NATIVE_PLAN.md` §11 next-3-rounds 标记 ✅，避免状态漂移
+
+### 27.3 合并策略
+
+由于 4 个 sub-issue 都 push 到同一分支，合并自然发生。Git 会按时间序记录 commit。如遇冲突：
+
+- **`electron/main/agent/host-modules/`** 改动冲突 → 看 §11 next-3-rounds 决定取舍（顺序：L.3 → L.4）
+- **`packages/runtime/openbuddy-plugin-sdk/`**（K.1 新增） → 无冲突
+- **`electron/main/agent/host-modules/deepseek/cordis-runtime.ts`**（L.1 已动过） → L.3 / L.4 改它时要 rebase L.1 commit
+
+### 27.4 完成度追踪
+
+每个 sub-issue 完成后，issue status 改为 `done`，并在父 issue LUM-580 §11 next-3-rounds 列表里标记 ✅。父 issue status 保持 `in_progress` 直到所有 sub-issue 完成。
+
+总预算：**v6 26 轮**不变。完成度追踪：
+- ✅ Phase A.1（round 1）+ Phase B.1 rounds 1-5（rounds 2-6）
+- ✅ Phase L.1（round 7）+ Phase L.2 partial（round 8）+ Phase L.2 complete（round 9）
+- 🟡 Phase L.3（LUM-594 并行启动）
+- 🟡 Phase L.4（LUM-595 并行启动）
+- 🟡 Phase K.1（LUM-596 并行启动）
+- ⚪ Phase K.2（LUM-597 等 K.1 完成后启动）
