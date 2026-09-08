@@ -38,7 +38,7 @@ describe("Remote codec", () => {
   });
 
   it("serializes generated Zod v4 codecs without sending runtime schema objects", async () => {
-    const { z } = await import("../../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/index.js");
+    const { z } = await import("zod");
     const codec = serializeRemoteCodec({
       mode: "strict",
       typeSymbol: "@fixture/remote/types#Request",
@@ -69,12 +69,12 @@ describe("Remote codec", () => {
   });
 
   it("rejects generated runtime schemas that cannot preserve wire semantics", async () => {
-    const { z } = await import("../../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/index.js");
+    const { z } = await import("zod");
     expect(() => serializeRemoteCodec({ mode: "strict", typeSymbol: "fixture/Date", schema: z.date() })).toThrow("unsupported Zod type date");
   });
 
   it("expands lazy schemas and bounds recursive lazy schemas", async () => {
-    const { z } = await import("../../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/index.js");
+    const { z } = await import("zod");
     const lazy = z.lazy(() => z.object({ value: z.string() }));
     expect(serializeRemoteCodec({ mode: "strict", typeSymbol: "fixture/Lazy", schema: z.array(lazy) })).toMatchObject({
       schema: { type: "array", items: { type: "object", properties: { value: { schema: { type: "string" } } } } },

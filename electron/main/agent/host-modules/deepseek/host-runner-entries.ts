@@ -26,6 +26,7 @@
 
 import type { PluginEntryOptions } from "@openbuddy/plugin-host";
 import { normalizeDeepSeekRuntimeEntry } from "./normalize-entry";
+import { deepFreeze } from "./_deep-freeze";
 
 /**
  * OpenBuddy 默认装配的 `@deepseek-ai/dsh-*` 入口。
@@ -89,6 +90,19 @@ const BASE_HOST_RUNNER_ENTRIES: ReadonlyArray<PluginEntryOptions> = [
   { id: "openbuddy-dsh-tool-workflow", name: "@deepseek-ai/dsh-tool-workflow", config: { maxTotalAgents: 32, maxResultChars: 50000 } },
   { id: "openbuddy-dsh-web", name: "@deepseek-ai/dsh-web" },
 ] as const;
+
+/**
+ * P0-05 (WU-E): runtime deep-freeze so any future mutation attempt on
+ * `BASE_HOST_RUNNER_ENTRIES` (including nested `config` objects) fails
+ * loudly in strict mode / silently in sloppy mode but never produces
+ * the kind of "I thought I'd changed the default" bugs that bit us in
+ * the pre-modularization code.
+ *
+ * Frozen at module load; `as const` makes the top-level shape immutable
+ * to TS but does not actually freeze nested objects — hence this
+ * runtime pass.
+ */
+deepFreeze(BASE_HOST_RUNNER_ENTRIES);
 
 /** Frozen view of the base entries — exposed for tests / introspection. */
 export function baseHostRunnerEntries(): readonly PluginEntryOptions[] {

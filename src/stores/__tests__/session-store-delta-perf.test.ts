@@ -105,4 +105,126 @@ describe("session-store perf smoke", () => {
     expect(after).toBe(before);
     expect(after[0]).toBe(beforeRef);
   });
+
+  // P0-06/hardening: when many text deltas land on the same kind, the hot
+  // path should NOT re-allocate the parts array. Mutating the last part in
+  // place keeps the allocation count constant per frame regardless of how
+  // many deltas land (sustained text streaming). The message wrapper
+  // object still gets a new reference so subscribers fire, but the inner
+  // `parts` array stays the same.
+  it("same-kind text deltas reuse the parts array reference (O(1) hot path)", async () => {
+    useSessionStore.setState({
+      sessionId: "s-hotpath",
+      streaming: true,
+      streamingMessageId: "m1",
+      messages: [
+        { id: "m1", role: "assistant" as const, parts: [{ kind: "text" as const, text: "" }], complete: false },
+      ],
+    });
+
+    // First delta: cold start (last part has empty text, but kind matches).
+    useSessionStore.getState().appendStreamingDelta("hello ");
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+    const afterFirst = useSessionStore.getState().messages;
+    const partsAfterFirst = afterFirst[0].parts;
+    const messageAfterFirst = afterFirst[0];
+
+    // Subsequent deltas: same kind → parts array must stay referentially stable.
+    useSessionStore.getState().appendStreamingDelta("world ");
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+    useSessionStore.getState().appendStreamingDelta("again");
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
+    const after = useSessionStore.getState().messages;
+    // Hot path optimization: parts array is NOT re-allocated when merging
+    // into the tail. The message wrapper IS (so subscribers fire), but the
+    // inner parts reference is stable across same-kind deltas.
+    expect(after[0].parts).toBe(partsAfterFirst);
+    expect(after[0]).not.toBe(messageAfterFirst);
+    // Content was actually appended to the same part instance.
+    const lastPart = after[0].parts[after[0].parts.length - 1];
+    expect(lastPart.kind).toBe("text");
+    if (lastPart.kind === "text") {
+      expect(lastPart.text).toBe("hello world again");
+    }
+  });
+
+  // P0-06/hardening: when the kind switches (text → thought), a new part
+  // is appended. The parts array IS re-allocated (concatenation) but the
+  // previous parts keep their references so React.memo on the older
+  // MessageItem siblings doesn't re-render.
+  it("kind switch appends a new part while keeping earlier parts stable", async () => {
+    useSessionStore.setState({
+      sessionId: "s-switch",
+      streaming: true,
+      streamingMessageId: "m1",
+      messages: [
+        { id: "m1", role: "assistant" as const, parts: [{ kind: "text" as const, text: "answer" }], complete: false },
+      ],
+    });
+
+    const before = useSessionStore.getState().messages;
+    const textPartBefore = before[0].parts[0];
+
+    // Switch to thought kind: must open a new part, not merge into text.
+    useSessionStore.getState().appendStreamingDelta("reasoning here", "thought");
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
+    const after = useSessionStore.getState().messages;
+    expect(after[0].parts.length).toBe(2);
+    // Earlier parts keep their identity so memo'd message siblings don't churn.
+    expect(after[0].parts[0]).toBe(textPartBefore);
+    expect(after[0].parts[1].kind).toBe("thought");
+    if (after[0].parts[1].kind === "thought") {
+      expect(after[0].parts[1].text).toBe("reasoning here");
+    }
+  });
+
+  // P0-06/hardening: 200-message long-session delta smoke. Confirms the
+  // same-kind hot path doesn't blow up on real-shaped input — the
+  // existing perf test covers throughput, this one covers correctness on
+  // a realistic transcript size.
+  it("hot path handles 200 sibling messages without losing references", async () => {
+    const messages = Array.from({ length: 200 }, (_, i) => ({
+      id: `m${i}`,
+      role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
+      parts: [{ kind: "text" as const, text: `seed ${i}` }],
+      complete: i % 2 === 1,
+    }));
+    // Last message is the one being streamed. Matches the real product shape
+    // (the user just hit send; the assistant is mid-stream of a turn).
+    const streamingMessageId = messages[messages.length - 1].id;
+    useSessionStore.setState({
+      sessionId: "s-long",
+      streaming: true,
+      streamingMessageId,
+      messages,
+    });
+
+    // Track every sibling reference so we can confirm none moved.
+    const beforeSiblings = useSessionStore
+      .getState()
+      .messages.map((m) => ({ id: m.id, msg: m }));
+
+    useSessionStore.getState().appendStreamingDelta("delta chunk");
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+
+    const after = useSessionStore.getState().messages;
+    for (const { id, msg } of beforeSiblings) {
+      if (id === streamingMessageId) continue;
+      const afterIdx = after.findIndex((m) => m.id === id);
+      expect(afterIdx).toBeGreaterThanOrEqual(0);
+      // Sibling messages must keep their reference so React.memo skips them.
+      expect(after[afterIdx]).toBe(msg);
+    }
+    // The targeted message's last text part got the delta appended.
+    const target = after.find((m) => m.id === streamingMessageId);
+    expect(target).toBeDefined();
+    const last = target!.parts[target!.parts.length - 1];
+    if (last.kind === "text") {
+      expect(last.text).toBe("seed 199delta chunk");
+    } else {
+      throw new Error("expected text part at tail");
+    }
+  });
 });

@@ -115,6 +115,15 @@ export default defineConfig({
     environmentMatchGlobs: [
       ["bin/__tests__/**", "node"],
     ],
-    exclude: ["**/node_modules/**", "**/.worktrees/**", "**/dist/**", "tests/electron/**"],
+    exclude: [
+      "**/node_modules/**",
+      "**/.worktrees/**",
+      "**/dist/**",
+      "tests/electron/**",
+      // `scripts/perf/*.test.mjs` use `node:test` and run via `pnpm perf:cold-start:test`.
+      // Vitest cannot discover their suites (no `describe/it` API surface), so we keep
+      // them out of the vitest discovery pass to avoid a noisy "No test suite found" failure.
+      "scripts/perf/**/*.test.mjs",
+    ],
   },
 });

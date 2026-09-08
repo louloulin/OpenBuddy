@@ -206,16 +206,16 @@
 
 ### 阶段 P3 — 度量治理（2-3 周，目标：自动化 perf budget gate）
 
-| # | 任务 | 工作量 |
-|---|---|---|
-| P3-01 | 编写 `scripts/perf/bundle-budget.sh`（fail PR on > 4MB） | S |
-| P3-02 | 编写 `scripts/perf/cold-start.mjs`（puppeteer + performance.mark） | M |
-| P3-03 | 编写 `scripts/perf/ipc-latency.mjs`（基于 closed-loop eval） | M |
-| P3-04 | 编写 `scripts/perf/memory-baseline.mjs`（process.memoryUsage 采样） | M |
-| P3-05 | 编写 `scripts/perf/stream-fps.mjs`（合成 200 消息流，统计 RAF） | L |
-| P3-06 | CI 配置：每次 PR + 主干夜间 + release tag | S |
-| P3-07 | 性能 dashboard（基于现有 `evidence/coverage-report/`） | M |
-| P3-08 | 性能 regression 文档 + owner 矩阵 | S |
+| # | 任务 | 工作量 | 状态 |
+|---|---|---|---|
+| P3-01 | 编写 `scripts/perf/bundle-budget.sh`（fail PR on > 4MB） | S | ✅ `scripts/perf/bundle-topology.mjs --strict`（W1; 名称演进） |
+| P3-02 | 编写 `scripts/perf/cold-start.mjs`（puppeteer + performance.mark） | M | ✅ WU-E 落地（`cold-start.mjs` + `_cold-start-lib.mjs` + 18 个单测；CI perf-budget job 集成） |
+| P3-03 | 编写 `scripts/perf/ipc-latency.mjs`（基于 closed-loop eval） | M | ✅ `scripts/perf/ipc-latency.mjs` |
+| P3-04 | 编写 `scripts/perf/memory-baseline.mjs`（process.memoryUsage 采样） | M | ⏳ 由 `streaming-bench.mjs` 第 5 节临时承担；待独立化 |
+| P3-05 | 编写 `scripts/perf/stream-fps.mjs`（合成 200 消息流，统计 RAF） | L | ⏳ PC-5（WU-E ChatView 集成时补齐） |
+| P3-06 | CI 配置：每次 PR + 主干夜间 + release tag | S | 🟡 `perf-budget` job 已加 PR gate；nightly/release tag 未接 |
+| P3-07 | 性能 dashboard（基于现有 `evidence/coverage-report/`） | M | ✅ `scripts/perf/dashboard.mjs`（已扩展 P3-02 节） |
+| P3-08 | 性能 regression 文档 + owner 矩阵 | S | ⏳ 待 WU-E 后段补 owner 轮值表 |
 
 ---
 

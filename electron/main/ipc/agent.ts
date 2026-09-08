@@ -50,16 +50,6 @@ import {
 } from "./validation";
 // dynamic: @openbuddy/auth-permission
 
-// A-5: AbortSignal plumbing for prompt/steer/follow-up.
-//
-// The most recent in-flight request per sessionId is registered here so
-// `agent:abort` can cancel it without the renderer needing to round-trip
-// a controller through the IPC channel (AbortSignal is not
-// structured-cloneable). The map is keyed by sessionId so concurrent
-// sessions each have their own cancel target. A handler clears its own
-// entry once the request resolves.
-const inflightAbortControllers = new Map<string, AbortController>();
-
 /**
  * Phase 5 — module-scope helper. Mutating IPCs (`agent:prompt`,
  * `agent:set-model`, `agent:prompt-content`, …) call this before
@@ -133,23 +123,14 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			const text = requiredString(typeof input === "string" ? input : payload?.text, "prompt");
 			const traceId = optionalString((typeof input === "string" ? undefined : payload?.traceId), "traceId") ?? generateTraceId();
 			hostReceived("agent:prompt", traceId, sessionId);
-			// A-5: register a per-request AbortController so agent:abort can
-			// cancel the in-flight prompt. If an earlier prompt is still
-			// running for the same session, abort it first (back-pressure).
-			const key = activeSessionId ?? traceId;
-			inflightAbortControllers.get(key)?.abort();
-			const controller = new AbortController();
-			inflightAbortControllers.set(key, controller);
 			try {
 				await awaitExtensionsBound();
-				await agentHost.prompt(text, { traceId, sessionId, signal: controller.signal });
+				await agentHost.prompt(text, { traceId, sessionId });
 				hostDispatched("agent:prompt", traceId, sessionId);
 				return { ok: true };
 			} catch (err) {
 				hostFailed("agent:prompt", traceId, err);
 				throw err;
-			} finally {
-				if (inflightAbortControllers.get(key) === controller) inflightAbortControllers.delete(key);
 			}
 		});
 		ipcMain.handle("agent:steer", async (_e, input: { sessionId?: string; text: string; traceId?: string }) => {
@@ -159,20 +140,14 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
 			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
 			hostReceived("agent:steer", traceId, sessionId);
-			const key = sessionId ?? traceId;
-			inflightAbortControllers.get(key)?.abort();
-			const controller = new AbortController();
-			inflightAbortControllers.set(key, controller);
 			try {
 				await awaitExtensionsBound();
-				await agentHost.steer(requiredString(payload.text, "text"), { traceId, sessionId, signal: controller.signal });
+				await agentHost.steer(requiredString(payload.text, "text"), { traceId, sessionId });
 				hostDispatched("agent:steer", traceId, sessionId);
 				return { ok: true };
 			} catch (err) {
 				hostFailed("agent:steer", traceId, err);
 				throw err;
-			} finally {
-				if (inflightAbortControllers.get(key) === controller) inflightAbortControllers.delete(key);
 			}
 		});
 		ipcMain.handle("agent:follow-up", async (_e, input: { sessionId?: string; text: string; traceId?: string }) => {
@@ -182,20 +157,14 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
 			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
 			hostReceived("agent:follow-up", traceId, sessionId);
-			const key = sessionId ?? traceId;
-			inflightAbortControllers.get(key)?.abort();
-			const controller = new AbortController();
-			inflightAbortControllers.set(key, controller);
 			try {
 				await awaitExtensionsBound();
-				await agentHost.followUp(requiredString(payload.text, "text"), { traceId, sessionId, signal: controller.signal });
+				await agentHost.followUp(requiredString(payload.text, "text"), { traceId, sessionId });
 				hostDispatched("agent:follow-up", traceId, sessionId);
 				return { ok: true };
 			} catch (err) {
 				hostFailed("agent:follow-up", traceId, err);
 				throw err;
-			} finally {
-				if (inflightAbortControllers.get(key) === controller) inflightAbortControllers.delete(key);
 			}
 		});
 		ipcMain.handle("agent:abort", async (_e, input?: { sessionId?: string; traceId?: string }) => {
@@ -208,12 +177,6 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 				if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
 			}
 			hostReceived("agent:abort", traceId, sessionId);
-			// A-5: abort the in-flight controller for this session (or traceId)
-			// and delegate the heavier abort to the existing agentHost.abort.
-			const key = sessionId ?? agentHost.getSession()?.sessionId ?? traceId;
-			const inflight = inflightAbortControllers.get(key);
-			inflight?.abort();
-			if (inflight) inflightAbortControllers.delete(key);
 			try {
 				await awaitExtensionsBound();
 				await agentHost.abort({ traceId, sessionId });
@@ -536,12 +499,10 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			}
 		});
 		ipcMain.handle("rewind_points", async (_e, args: { sessionId: string }) => {
-    // P2-13: rewindPoints lives in memory.ts — same NAPI cost.
-    const { rewindPoints } = await import("../agent/pi-resources/memory");
-    const sessionFileResult = await agentHost.sessionFile(requiredString(recordValue(args, "rewind points payload").sessionId, "session id"));
-    if (!sessionFileResult.path) throw new Error("rewind_points: session file path unavailable");
-    return rewindPoints(sessionFileResult.path);
-  });
+			// P2-13: rewindPoints lives in memory.ts — same NAPI cost.
+			const { rewindPoints } = await import("../agent/pi-resources/memory");
+			return rewindPoints(await agentHost.sessionFile(requiredString(recordValue(args, "rewind points payload").sessionId, "session id")));
+		});
 		ipcMain.handle("rewind_execute", async (_e, args: { sessionId: string; targetPromptIndex: number; mode?: string; force?: boolean }) => {
 			const input = recordValue(args, "rewind execute payload");
 			if (input.force !== undefined) requiredBoolean(input.force, "force");
@@ -814,174 +775,7 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 			await awaitExtensionsBound();
 			return agentHost.setSessionExpert(requiredString(recordValue(args, "session expert payload").sessionId, "session id"), null);
 		});
-		
-// ─────────────────────────────────────────────────────────────────────
-		// Phase 8.3 Batch D-11 — pi-web RPC API parity.
-		// Each handler below corresponds to one method on the pi-web
-		// `RpcClient` (see node_modules/@earendil-works/pi-coding-agent/dist/
-		// modes/rpc/rpc-client.d.ts). The agentHost facade forwards them to
-		// `host-modules/pi-session-capabilities.ts`.
-		// ─────────────────────────────────────────────────────────────────────
-
-		ipcMain.handle("agent:compact", async (_e, input?: { sessionId?: string; customInstructions?: string; traceId?: string }) => {
-			await ensureAgentHost();
-			const payload = input === undefined ? {} : recordValue(input, "agent:compact payload");
-			const sessionId = payload.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
-			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
-			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
-			hostReceived("agent:compact", traceId, sessionId);
-			try {
-				await awaitExtensionsBound();
-				const customInstructions = payload.customInstructions === undefined ? undefined : optionalString(payload.customInstructions, "customInstructions");
-				const result = await agentHost.compact(customInstructions);
-				hostDispatched("agent:compact", traceId, sessionId);
-				return { ok: true, result };
-			} catch (err) {
-				hostFailed("agent:compact", traceId, err);
-				throw err;
-			}
-		});
-
-		ipcMain.handle("agent:set-auto-compaction", async (_e, input: { sessionId?: string; enabled: boolean; traceId?: string }) => {
-			await ensureAgentHost();
-			const payload = recordValue(input, "agent:set-auto-compaction payload");
-			const sessionId = payload.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
-			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
-			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
-			hostReceived("agent:set-auto-compaction", traceId, sessionId);
-			try {
-				agentHost.setAutoCompaction(requiredBoolean(payload.enabled, "enabled"));
-				hostDispatched("agent:set-auto-compaction", traceId, sessionId);
-				return { ok: true, enabled: requiredBoolean(payload.enabled, "enabled") };
-			} catch (err) {
-				hostFailed("agent:set-auto-compaction", traceId, err);
-				throw err;
-			}
-		});
-
-		ipcMain.handle("agent:set-auto-retry", async (_e, input: { sessionId?: string; enabled: boolean; traceId?: string }) => {
-			await ensureAgentHost();
-			const payload = recordValue(input, "agent:set-auto-retry payload");
-			const sessionId = payload.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
-			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
-			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
-			hostReceived("agent:set-auto-retry", traceId, sessionId);
-			try {
-				agentHost.setAutoRetry(requiredBoolean(payload.enabled, "enabled"));
-				hostDispatched("agent:set-auto-retry", traceId, sessionId);
-				return { ok: true, enabled: requiredBoolean(payload.enabled, "enabled") };
-			} catch (err) {
-				hostFailed("agent:set-auto-retry", traceId, err);
-				throw err;
-			}
-		});
-
-		ipcMain.handle("agent:abort-retry", async (_e, input?: { sessionId?: string; traceId?: string }) => {
-			await ensureAgentHost();
-			const payload = input === undefined ? {} : recordValue(input, "agent:abort-retry payload");
-			const sessionId = payload.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
-			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
-			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
-			hostReceived("agent:abort-retry", traceId, sessionId);
-			try {
-				agentHost.abortRetry();
-				hostDispatched("agent:abort-retry", traceId, sessionId);
-				return { ok: true };
-			} catch (err) {
-				hostFailed("agent:abort-retry", traceId, err);
-				throw err;
-			}
-		});
-
-		ipcMain.handle("agent:abort-bash", async (_e, input?: { sessionId?: string; traceId?: string }) => {
-			await ensureAgentHost();
-			const payload = input === undefined ? {} : recordValue(input, "agent:abort-bash payload");
-			const sessionId = payload.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
-			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
-			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
-			hostReceived("agent:abort-bash", traceId, sessionId);
-			try {
-				agentHost.abortBash();
-				hostDispatched("agent:abort-bash", traceId, sessionId);
-				return { ok: true };
-			} catch (err) {
-				hostFailed("agent:abort-bash", traceId, err);
-				throw err;
-			}
-		});
-
-		ipcMain.handle("agent:set-steering-mode", async (_e, input: { sessionId?: string; mode: "all" | "one-at-a-time"; traceId?: string }) => {
-			await ensureAgentHost();
-			const payload = recordValue(input, "agent:set-steering-mode payload");
-			const sessionId = payload.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
-			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
-			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
-			hostReceived("agent:set-steering-mode", traceId, sessionId);
-			try {
-				agentHost.setSteeringMode(stringValue(payload.mode, "mode") as "all" | "one-at-a-time");
-				hostDispatched("agent:set-steering-mode", traceId, sessionId);
-				return { ok: true, mode: payload.mode };
-			} catch (err) {
-				hostFailed("agent:set-steering-mode", traceId, err);
-				throw err;
-			}
-		});
-
-		ipcMain.handle("agent:set-follow-up-mode", async (_e, input: { sessionId?: string; mode: "all" | "one-at-a-time"; traceId?: string }) => {
-			await ensureAgentHost();
-			const payload = recordValue(input, "agent:set-follow-up-mode payload");
-			const sessionId = payload.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
-			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
-			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
-			hostReceived("agent:set-follow-up-mode", traceId, sessionId);
-			try {
-				agentHost.setFollowUpMode(stringValue(payload.mode, "mode") as "all" | "one-at-a-time");
-				hostDispatched("agent:set-follow-up-mode", traceId, sessionId);
-				return { ok: true, mode: payload.mode };
-			} catch (err) {
-				hostFailed("agent:set-follow-up-mode", traceId, err);
-				throw err;
-			}
-		});
-
-		ipcMain.handle("agent:session-stats", async () => {
-			await ensureAgentHost();
-			return agentHost.getSessionStats();
-		});
-
-		ipcMain.handle("agent:thinking-levels", async () => {
-			await ensureAgentHost();
-			return agentHost.getAvailableThinkingLevels();
-		});
-
-		ipcMain.handle("agent:compaction-settings", async () => {
-			await ensureAgentHost();
-			return agentHost.getCompactionSettings();
-		});
-
-		ipcMain.handle("agent:session-tree", async () => {
-			await ensureAgentHost();
-			return agentHost.getSessionTree();
-		});
-
-		ipcMain.handle("agent:fork-session", async (_e, input: { sessionId?: string; entryId: string; traceId?: string }) => {
-			await ensureAgentHost();
-			const payload = recordValue(input, "agent:fork-session payload");
-			const sessionId = payload.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
-			if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
-			const traceId = optionalString(payload.traceId, "traceId") ?? generateTraceId();
-			const entryId = requiredString(payload.entryId, "entryId");
-			hostReceived("agent:fork-session", traceId, sessionId);
-			try {
-				const result = await agentHost.forkSession(entryId);
-				hostDispatched("agent:fork-session", traceId, sessionId);
-				return result;
-			} catch (err) {
-				hostFailed("agent:fork-session", traceId, err);
-				throw err;
-			}
-		});
-// subagent config IPC moved to pi-subagents; capability.snapshot no longer ships capability.subagents.
+		// subagent config IPC moved to pi-subagents; capability.snapshot no longer ships capability.subagents.
 }
 
 // R1 — content-based prompt (text + image). Mirrors the renderer `piSendContent`

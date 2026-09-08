@@ -44,9 +44,8 @@ import type { ProviderConfig, ModelConfig } from "./bootstrap/agent-host-types";
  */
 
 let state: AgentHostState = createDefaultAgentHostState();
-let emitRendererEvent: (channel: string, payload: unknown) => void = () => undefined;
-let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd(); // fallback kept for back-compat; init will replace with real agentHome()
-let readModelsConfig: () => Promise<{ providers: Record<string, unknown> }> = async () => ({ providers: {} });
+let emitRendererEvent: (channel: string, payload: unknown) => void;
+let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd();let readModelsConfig: () => Promise<{ providers: Record<string, unknown> }> = async () => ({ providers: {} });
 
 export function installAgentModel(deps: {
 	state: AgentHostState;

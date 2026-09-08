@@ -693,6 +693,8 @@ EXPECTED_VERSION=<git-short-sha> bash scripts/verify-remote-install.sh
 2. `scripts/credit-expiry-worker.mjs` 的 `expirySignature`
 3. `scripts/_section-credit-expiry.sh` 的 openssl HMAC 计算
 
+CI 通过 `pnpm verify:plan`(`scripts/verify-plan.mjs`)同时验证 §9 这条抽出路径仍然有效（脚本在仓库、声明了 `run_credit_expiry_check`、`deploy-doctor.sh` 与 `build-release-bundle.sh` 都引用它）。任何对以上三文件的破坏都会让发布流水线在 ci job 阶段红灯。
+
 最小集部署命令：
 
 ```bash

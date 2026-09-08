@@ -307,8 +307,141 @@ function installRuntimeDomain(state: AgentHostState, deps: InstallHostModuleDeps
  * 总 install 顺序在每个域内部维护 (见各域 helper 注释).
  */
 export function installHostModules(state: AgentHostState, deps: InstallHostModuleDeps): void {
-  installProfileDomain(state, deps);
-  installSessionDomain(state, deps);
-  installPluginDomain(state, deps);
-  installRuntimeDomain(state, deps);
-}
+  // harness-cursors: needs state + piHome + isPathWithin
+  installHarnessCursors({ state, piHome: deps.piHome, isPathWithin: deps.isPathWithin });
+  // hook-permission
+  installHookPermission({ state, emitPluginEvent: deps.emitPluginEvent, emitRendererEvent: deps.emitRendererEvent });
+  // override-patches (no state dep, just event emitter)
+  installOverridePatches({ piHome: deps.piHome, emitPluginEvent: deps.emitPluginEvent });
+  // profile-snapshot
+  installProfileSnapshot({ state, setProfilePiResourcePaths: deps.setProfilePiResourcePaths });
+  // profile-bundles
+  installProfileBundles({ piHome: deps.piHome, state });
+  // plugin-event-bus
+  installPluginEventBus({ state });
+  // plugin-state
+  installPluginState({ state, profilePackages: deps.profilePackages as never });
+  // session-metadata
+  installSessionMetadata({
+    state,
+    piHome: deps.piHome,
+    piSessionDir: deps.piSessionDir,
+    emitPluginEvent: deps.emitPluginEvent,
+    listAllPiSessions: deps.listAllPiSessions,
+    workspaceRegistry: deps.workspaceRegistry as never,
+    }
+  );
+  // session-store (needs self-ref for re-init)
+  installSessionStore({
+    state,
+    piSessionDir: deps.piSessionDir,
+    emitPluginEvent: deps.emitPluginEvent,
+    emitRendererEvent: deps.emitRendererEvent,
+    enqueueLifecycle: deps.enqueueLifecycle,
+    initialize: deps.initialize,
+    rebindSession: deps.rebindSession,
+    dispose: deps.dispose,
+    lifecycleAppendQueues: deps.lifecycleAppendQueues,
+    listAllPiSessions: deps.listAllPiSessions,
+    persistedSessionPath: deps.persistedSessionPath,
+    piRuntimeCoordinator: deps.piRuntimeCoordinator,
+    }
+  );
+  // subagent-runtime
+  installSubagentRuntime({
+    state,
+    piHome: deps.piHome,
+    emitPluginEvent: deps.emitPluginEvent,
+    emitRendererEvent: deps.emitRendererEvent,
+    ensureContinuableSubagent: deps.ensureContinuableSubagent,
+    listAllPiSessions: deps.listAllPiSessions,
+    }
+  );
+  // agent-prompt
+  installAgentPrompt({
+    state,
+    emitPluginEvent: deps.emitPluginEvent,
+    emitRendererEvent: deps.emitRendererEvent,
+    publicQueueItems: deps.publicQueueItems,
+    }
+  );
+  // team-runner
+  installTeamRunner({
+    state,
+    emitPluginEvent: deps.emitPluginEvent,
+    canonicalEventNamespace: deps.canonicalEventNamespace as never,
+    createSubagentResourceLoader: deps.createSubagentResourceLoader as never,
+    createTaskAwareTool: deps.createTaskAwareTool as never,
+    eventNamespace: deps.eventNamespace as never,
+    modelFacingPresetTools: deps.modelFacingPresetTools as never,
+    persistedSessionPath: deps.persistedSessionPath,
+    piHome: deps.piHome,
+    piSessionDir: deps.piSessionDir,
+    runHookPoint: deps.runHookPoint as never,
+    }
+  );
+  // workbench-scope
+  installWorkbenchScope({ state, listAllPiSessions: deps.listAllPiSessions as never });
+  // agent-model
+  installAgentModel({ state, emitRendererEvent: deps.emitRendererEvent, piHome: deps.piHome, readModelsConfig: deps.readModelsConfig as never });
+  // deepseek/agent-runtime (DSH subagent write paths; ensureContinuableSubagent lives here too)
+  installDeepSeekAgentRuntime({
+    listAllPiSessions: deps.listAllPiSessions,
+    persistedSessionPath: deps.persistedSessionPath,
+    piHome: deps.piHome,
+    piSessionDir: deps.piSessionDir,
+    state,
+    createSubagentResourceLoader: deps.createSubagentResourceLoader as never,
+    modelFacingPresetTools: deps.modelFacingPresetTools as never,
+    createTaskAwareTool: deps.createTaskAwareTool as never,
+    }
+  );
+  // plugin-mutations (largest dep set)
+  installPluginMutations({
+    state,
+    emitPluginEvent: deps.emitPluginEvent,
+    isPathWithin: deps.isPathWithin,
+    profileArtifactModuleUrl: deps.profileArtifactModuleUrl,
+    profilePackages: deps.profilePackages,
+    pluginLifecycleQueue: deps.pluginLifecycleQueue,
+    piRuntimeCoordinator: deps.piRuntimeCoordinator,
+    setProfilePiResourcePaths: deps.setProfilePiResourcePaths,
+    refreshMarketplacePiResourcePaths: deps.refreshMarketplacePiResourcePaths,
+    refreshHookConfigs: deps.refreshHookConfigs,
+    syncMarketplacePiExtensionStatuses: deps.syncMarketplacePiExtensionStatuses,
+    startProfileWatchers: deps.startProfileWatchers,
+    readOverridePatches: deps.readOverridePatches,
+    runtimeProfileBundle: deps.runtimeProfileBundle,
+    reconcileProfileArtifacts: deps.reconcileProfileArtifacts,
+    configurePiExtensions: deps.configurePiExtensions as never,
+    reportPiExtensionErrors: deps.reportPiExtensionErrors,
+    captureReloadableContextServices: deps.captureReloadableContextServices,
+    restoreCapturedContextServices: deps.restoreCapturedContextServices,
+    rollbackPiProfile: deps.rollbackPiProfile,
+    scheduleProfileReload: deps.scheduleProfileReload,
+    artifactPackageJsonByName: deps.artifactPackageJsonByName,
+    discoverRendererPluginManifest: deps.discoverRendererPluginManifest,
+    }
+  );
+  // provider-registry tracker: needs emitPluginEvent (host-owned) so lives
+  // here, not in bootstrap/model-runtime.ts (which has zero agent-host deps).
+  installProviderRegistryTracker(
+    state.modelRuntime as never,
+    state.providerRegistry,
+    ({ kind, record }) => {
+      deps.emitPluginEvent("plugin/provider-registry-changed", { kind, record });
+    }
+  );
+  // deepseek/cordis-runtime (needs promptImpl / abortImpl / listSessionsImpl etc.)
+  installDeepSeekCordisRuntime({
+    state,
+    emitPluginEvent: deps.emitPluginEvent,
+    prompt: deps.promptImpl as never,
+    abort: deps.abortImpl as never,
+    listSessions: deps.listSessionsImpl as never,
+    listSubagentChildren: deps.listSubagentChildrenImpl as never,
+    promptSubagent: deps.promptSubagentImpl as never,
+    interruptSubagent: deps.interruptSubagentImpl as never,
+    piHome: deps.piHome,
+    profileArtifactModuleUrl: deps.profileArtifactModuleUrl,
+  });}

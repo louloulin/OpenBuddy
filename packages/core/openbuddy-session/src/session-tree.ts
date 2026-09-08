@@ -12,6 +12,7 @@
  * The projection is pure data — no React, no store reads, no I/O. It is safe to
  * serialize across the IPC boundary to the renderer.
  */
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SessionEntry, SessionManager, SessionTreeNode } from "@earendil-works/pi-coding-agent";
 
 export type { SessionTreeNode } from "@earendil-works/pi-coding-agent";
@@ -87,7 +88,10 @@ export function entrySummary(entry: SessionEntry): string | undefined {
   }
 }
 
-function messageText(message: unknown): string | undefined {
+function messageText(message: AgentMessage | unknown): string | undefined {
+  // Discriminated union narrowing: only UserMessage / AssistantMessage / ToolResultMessage
+  // (and similar LLM-shaped messages) carry a `content` field. Custom types such as
+  // BashExecutionMessage do not — return undefined for those.
   if (!message || typeof message !== "object" || !("content" in message)) return undefined;
   const content = (message as { content?: unknown }).content;
   if (typeof content === "string") return content;

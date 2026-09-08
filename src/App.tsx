@@ -1,7 +1,21 @@
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
 import { TitleBar } from "@openbuddy/ui-shell";
-import { Sidebar } from "@openbuddy/ui-sidebar";
-import { ChatView } from "@openbuddy/ui-conversation";
+// P0-01 / WU-E round 3: Sidebar (1641 LOC) and ChatView (1167 LOC) are both
+// heavy unconditionally rendered components. Sidebar renders on every page
+// (folded or not), so it can't be fully lazy — but we can hoist the actual
+// `Sidebar` component module behind a default-export adapter so its chunk
+// only loads on the first render tick after `app__body` mounts, after the
+// entry chunk has painted the chrome. ChatView renders only when there is
+// a current session id, so we lazy it wholesale: it pulls Composer,
+// ToolSidePanel, VirtualizedMessageList, MessageItem, Markdown host, etc.
+// Both adapters use `default`-export shape so they slot into `lazy(...)`
+// without any caller-side change.
+const Sidebar = lazy(() =>
+  import("@openbuddy/ui-sidebar").then((m) => ({ default: m.Sidebar })),
+);
+const ChatView = lazy(() =>
+  import("@openbuddy/ui-conversation").then((m) => ({ default: m.ChatView })),
+);
 import { PlaceholderPage } from "./components/shared/PlaceholderPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Toast } from "@openbuddy/ui-primitives";
@@ -1535,22 +1549,24 @@ function Shell() {
       )}
       <div className={"app__body" + (sidebarCollapsed ? " app__body--collapsed" : "")}>
         <ErrorBoundary compact title="侧栏出现错误">
-          <Sidebar
-            onNewSession={handleNewSession}
-            onSelect={handleSelectSession}
-            onNavigate={handleNavigate}
-            onOpenSettings={openSettings}
-            onOpenAccount={openAccountSettings}
-            accountLabel={casdoorSession?.status === "signed_in" && casdoorSession.identity ? (casdoorSession.identity.displayName ?? casdoorSession.identity.email ?? casdoorSession.identity.subject) : undefined}
-            onToggleCollapse={() => setSidebarCollapsed(true)}
-            onToggleWorkspace={handleToggleWorkspace}
-            onOpenSearch={() => setSearchOpen(true)}
-            onPlaceholder={handlePlaceholder}
-            onToast={showToast}
-            onOpenProject={handleOpenProjectFromSidebar}
-            onStartProjectConversation={handleStartProjectConversation}
-            activeNav={activeNav}
-          />
+          <Suspense fallback={<aside className="sidebar sidebar--skeleton" aria-busy="true" aria-label="侧边栏加载中" />}>
+            <Sidebar
+              onNewSession={handleNewSession}
+              onSelect={handleSelectSession}
+              onNavigate={handleNavigate}
+              onOpenSettings={openSettings}
+              onOpenAccount={openAccountSettings}
+              accountLabel={casdoorSession?.status === "signed_in" && casdoorSession.identity ? (casdoorSession.identity.displayName ?? casdoorSession.identity.email ?? casdoorSession.identity.subject) : undefined}
+              onToggleCollapse={() => setSidebarCollapsed(true)}
+              onToggleWorkspace={handleToggleWorkspace}
+              onOpenSearch={() => setSearchOpen(true)}
+              onPlaceholder={handlePlaceholder}
+              onToast={showToast}
+              onOpenProject={handleOpenProjectFromSidebar}
+              onStartProjectConversation={handleStartProjectConversation}
+              activeNav={activeNav}
+            />
+          </Suspense>
         </ErrorBoundary>
         <main id="main-content" className="app__main">
           {/* 全局 topbar 仅对话页需要：会话标题 +（侧栏折叠时）展开/新建。
@@ -1669,26 +1685,28 @@ function Shell() {
             </ErrorBoundary>
           ) : currentSessionId ? (
             <ErrorBoundary compact title="对话视图出现错误">
-              <ChatView
-                onSend={handleSendCurrent}
-                onSendContent={handleSendContent}
-                onCancel={handleCancel}
-                modelId={currentModelId}
-                models={models}
-                onModelChange={handleModelChange}
-                cwd={cwdRef.current}
-                workspaces={workspaces}
-                onSelectWorkspace={handleSelectWorkspace}
-                onRewound={handleRewound}
-                onForked={handleForked}
-                onOpenSession={handleSelectSession}
-                onToast={showToast}
-                onSelectExpert={handleStartWithExpert}
-                onNavigateConnectors={() => setPlaceholderView("专家·技能·连接器")}
-              extensionText={extensionText}
-              extensionTextNonce={extensionTextNonce}
-              extensionUi={extensionUiBySession[currentSessionId ?? ""]}
-              />
+              <Suspense fallback={<section className="app__main app__main--skeleton" aria-busy="true" />}>
+                <ChatView
+                  onSend={handleSendCurrent}
+                  onSendContent={handleSendContent}
+                  onCancel={handleCancel}
+                  modelId={currentModelId}
+                  models={models}
+                  onModelChange={handleModelChange}
+                  cwd={cwdRef.current}
+                  workspaces={workspaces}
+                  onSelectWorkspace={handleSelectWorkspace}
+                  onRewound={handleRewound}
+                  onForked={handleForked}
+                  onOpenSession={handleSelectSession}
+                  onToast={showToast}
+                  onSelectExpert={handleStartWithExpert}
+                  onNavigateConnectors={() => setPlaceholderView("专家·技能·连接器")}
+                extensionText={extensionText}
+                extensionTextNonce={extensionTextNonce}
+                extensionUi={extensionUiBySession[currentSessionId ?? ""]}
+                />
+              </Suspense>
             </ErrorBoundary>
           ) : (
             <ErrorBoundary compact title="首页出现错误">

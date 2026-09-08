@@ -5,7 +5,7 @@
  * 提供上一个/下一个/关闭与计数。命中消息的容器高亮由调用方按 `hitIds` / `currentId`
  * 添加 className 实现(此处不深入 Markdown DOM,保持渲染稳定)。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -27,7 +27,42 @@ interface FindBarProps {
   onHitsChange?: (hitIds: string[]) => void;
 }
 
-export function FindBar({ messages, open, onClose, onActiveChange, onHitsChange }: FindBarProps) {
+/**
+ * P1-04 (WU-E): memoize FindBar so streaming deltas don't re-render it
+ * unless something it actually depends on changed.
+ *
+ * The streaming reducer mutates `messages` in place (round 1 P0-06
+ * optimization) but it still produces a new top-level array reference
+ * on every delta, so without memo the entire FindBar subtree would
+ * re-execute its `hitIds` useMemo even when `open === false` and
+ * nothing else changed.
+ *
+ * Custom comparator: skip the (potentially huge) `messages` shallow
+ * compare by checking only the high-cardinality fingerprint
+ * (`messages.length` + last-id + first-id) — re-rendering on a
+ * streaming delta inside the same length-N message log is wasted work
+ * because the user-typed `query` and `activeIdx` live in local state
+ * and don't depend on messages identity.
+ *
+ * `open === false` short-circuits to skip the messages compare entirely
+ * since the bar is unmounted via early-return anyway.
+ */
+function findBarPropsAreEqual(prev: FindBarProps, next: FindBarProps): boolean {
+  if (prev.open !== next.open) return false;
+  if (prev.onClose !== next.onClose) return false;
+  if (prev.onActiveChange !== next.onActiveChange) return false;
+  if (prev.onHitsChange !== next.onHitsChange) return false;
+  if (!prev.open) return true;
+  if (prev.messages === next.messages) return true;
+  const a = prev.messages;
+  const b = next.messages;
+  if (a.length !== b.length) return false;
+  if (a[0]?.id !== b[0]?.id) return false;
+  if (a[a.length - 1]?.id !== b[b.length - 1]?.id) return false;
+  return true;
+}
+
+const FindBarInner = function FindBar({ messages, open, onClose, onActiveChange, onHitsChange }: FindBarProps) {
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -147,3 +182,14 @@ function extractForSearch(m: ChatMessage): string {
 export function isFindHit(hitIds: string[], messageId: string): boolean {
   return hitIds.includes(messageId);
 }
+
+/**
+ * P1-04 (WU-E): memoized FindBar export. `findBarPropsAreEqual`
+ * ignores the (potentially huge) messages array shallow-compare by
+ * checking only length + first/last id — the hitIds computation only
+ * depends on query (local state) + message content shape, and the
+ * streaming reducer in `session-store.ts` produces new array refs on
+ * every delta but rarely changes the length or first/last id within
+ * one logical conversation turn.
+ */
+export const FindBar = memo(FindBarInner, findBarPropsAreEqual);

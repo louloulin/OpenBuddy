@@ -442,7 +442,7 @@ footer{margin-top:55px;padding-top:17px;border-top:1px solid var(--line);color:v
 <tr><td>用户旅程 / UX</td><td><strong>0 个 acceptance</strong></td><td>A8：Permission UI 5 档对齐（本 change 完成）</td></tr>
 <tr><td>多语言</td><td><strong>0 个 acceptance</strong></td><td>A10：renderer i18n 基础（zh-CN / en-US, ≥ 80 key，本 change 完成）</td></tr>
 <tr><td>Provider 统一</td><td><strong>0 个 acceptance</strong></td><td>A9：minimax / minimax_cn 统一（本 change 完成）</td></tr>
-<tr><td>跨平台 CI</td><td>A12：codex/casdoor/storage/openbuddy 跨分支融合（仅 IPC）</td><td>A11：Linux CI + macOS 真签名 / 公证草案（本 change 完成 Linux CI）</td></tr>
+<tr><td>跨平台 CI</td><td>A12：codex/casdoor/storage/openbuddy 跨分支融合（仅 IPC）</td><td>A11：Linux CI + macOS 真签名 / 公证草案（本 change 完成 Linux CI + macOS 真签名 / 公证 jobs；后置 <code>codesign -dv</code> 校验由 WU-B 加上）</td></tr>
 <tr><td>真实 MiniMax 验证</td><td>A11：单 LLM 通道</td><td>—</td></tr>
 <tr><td>顶级测试集</td><td>A14：AgentBench / AgentDojo / GAIA（PI 自承未运行）</td><td>—</td></tr>
 <tr><td>商业 SKU / 计费</td><td><strong>0 个 acceptance</strong></td><td>—（已有 <code>commercial-model.md</code> 规范）</td></tr>
@@ -472,19 +472,19 @@ footer{margin-top:55px;padding-top:17px;border-top:1px solid var(--line);color:v
 
 <section id="gaps" class="section-anchor">
 <h2>5. 14 项关键缺口清单</h2>
-<p>本节基于 <code>openbuddy-capability-matrix.md:474-494</code> 与 <code>openbuddy-product-vs-pi.md:293-318</code>。共 14 项：P0 × 5 / P1 × 5 / P2 × 4。本 change 已完成 P0 4 项（A8 / A9 / A10 / A11），剩余 1 项 P0（macOS 真签名）+ 5 项 P1 + 4 项 P2 列入 §8 路线图。</p>
+<p>本节基于 <code>openbuddy-capability-matrix.md:474-494</code> 与 <code>openbuddy-product-vs-pi.md:293-318</code>。共 14 项：P0 × 5 / P1 × 5 / P2 × 4。本 change 已完成 P0 5/5 项（A8 / A9 / A10 / A11 + WU-B macOS 真签名 + <code>_section-credit-expiry.sh</code> 抽出），剩余 5 项 P1 + 4 项 P2 列入 §8 路线图。</p>
 
 <h3>5.1 P0 缺口（影响生产稳定性 / 合规 / 上架）</h3>
 <div class="table-wrap">
 <table>
-<caption>表 5-1 · P0 缺口（5 项，本 change 完成 4/5）</caption>
+<caption>表 5-1 · P0 缺口（5 项，本 change 完成 5/5）</caption>
 <thead><tr><th>#</th><th>缺口</th><th>影响</th><th>工作量</th><th>本 change</th><th>关键证据</th></tr></thead>
 <tbody>
-<tr><td>P0-1</td><td>macOS 签名 + 公证自动流水线</td><td><strong>H</strong></td><td><strong>L</strong></td><td>未实施（草案内嵌 release.yml）</td><td><code>scripts/check-macos-signing.mjs</code> 守护仅校验环境变量；CI <code>macos-latest</code> runner 待加</td></tr>
+<tr><td>P0-1</td><td>macOS 签名 + 公证自动流水线</td><td><strong>H</strong></td><td><strong>L</strong></td><td><span class="v-ok">✅ WU-B 完成</span></td><td><code>scripts/check-macos-signing.mjs</code> 新增 <code>--verify &lt;artifact&gt;</code> 模式（<code>codesign -dv</code> + <code>spctl --assess</code> + <code>xcrun stapler validate</code>）；<code>.github/workflows/release.yml</code> <code>build-macos</code> job 在签名后调用该校验；<code>OPENBUDDY_ALLOW_UNSIGNED_MAC=1</code> 旁路允许 fork CI 在缺 secret 时跳过 notarize 仅记录 warning</td></tr>
 <tr><td>P0-2</td><td><code>minimax</code> vs <code>minimax_cn</code> 双轨</td><td><strong>M</strong></td><td><strong>S</strong></td><td><span class="v-ok">✅ A9 完成</span></td><td><code>agent-host.ts:4605-4635</code> whitelist + <code>SettingsPanel.tsx</code> UI 去除 minimax_cn</td></tr>
 <tr><td>P0-3</td><td>Linux CI 缺失</td><td><strong>M</strong></td><td><strong>S</strong></td><td><span class="v-ok">✅ A11 完成</span></td><td><code>.github/workflows/release.yml:156-192</code> 新增 <code>build-linux</code> job；<code>docs/release-ci.md</code> 73 行 CI 矩阵</td></tr>
 <tr><td>P0-4</td><td>Permission UI 仅 3 档</td><td><strong>M</strong></td><td><strong>S</strong></td><td><span class="v-ok">✅ A8 完成</span></td><td><code>PermissionPicker.tsx</code> 由 3 档改为 5 档（174 行）+ <code>PolicySettingsPanel.tsx</code> 消费</td></tr>
-<tr><td>P0-5</td><td><code>scripts/_section-credit-expiry.sh</code> 抽出</td><td><strong>L</strong></td><td><strong>S</strong></td><td>未实施</td><td>CHANGELOG v0.15.0 §9 已记录；可下个 release 窗口补齐</td></tr>
+<tr><td>P0-5</td><td><code>scripts/_section-credit-expiry.sh</code> 抽出</td><td><strong>L</strong></td><td><strong>S</strong></td><td><span class="v-ok">✅ WU-B 完成</span></td><td><code>scripts/verify-plan.mjs</code> + <code>pnpm verify:plan</code> 落地；脚本由 <code>scripts/deploy-doctor.sh</code> §9 与 <code>scripts/build-release-bundle.sh</code> 双向引用；CI 中 <code>Verify transformation-plan invariants (P0 closure guard)</code> 步骤在 ci job 里强制验证 <code>run_credit_expiry_check</code> 函数仍存在</td></tr>
 </tbody>
 </table>
 </div>
@@ -523,7 +523,8 @@ footer{margin-top:55px;padding-top:17px;border-top:1px solid var(--line);color:v
 影响力 \ 工作量    S（&lt; 1d）       M（1-3d）         L（&gt; 3d）
 ─────────────────────────────────────────────────────────────
 H（生产稳定性）    P0-2, P0-4, P0-5   P0-3            P0-1
-                   ✅ A8/A9 完成    ✅ A11 完成      macOS 真签名
+                   ✅ A8/A9/WU-B   ✅ A11 完成      ✅ WU-B macOS 真签名
+                   完成
 ─────────────────────────────────────────────────────────────
 M（完整产品力）    P1-2, P1-5       P1-1, P1-4      P1-3
                    dist/理清+icon  i18n+Linux 标签  voice+video
@@ -531,8 +532,8 @@ M（完整产品力）    P1-2, P1-5       P1-1, P1-4      P1-3
 L（DX / 体验）     P2-3, P2-4       P2-2            P2-1
                    xai文档+issuer   DSH 版本矩阵    SCSS 真源
 ─────────────────────────────────────────────────────────────
-合计              7 项             5 项             3 项（含 1 项已完成）
-P0/P1/P2         5 / 5 / 4 = 14 项（已落地 4 项 P0）</pre>
+合计              7 项             5 项             3 项（含 3 项已完成）
+P0/P1/P2         5 / 5 / 4 = 14 项（已落地 5 项 P0）</pre>
 </section>
 
 <section id="transformation" class="section-anchor">
@@ -702,17 +703,18 @@ pnpm build
 
 <h3>7.4 已知遗留（不归本 change）</h3>
 <div class="callout warn">
-<strong>遗留事项：</strong>(1) macOS 真签名 / notarize job 待 secrets 配置后启用；(2) <code>scripts/_section-credit-expiry.sh</code> 独立化归 P1；(3) Linux 标签栏 + 技能推荐栏部分 TODO 归 P1；(4) <code>app-icon.png</code> 替换归 P1；(5) SCSS 真源归 P2；(6) DSH 版本兼容矩阵归 P2；(7) Casdoor issuer 环境变量化归 P2。
+<strong>遗留事项：</strong>(1) macOS 真签名 / notarize 实际跑通依赖仓库 owner 配置 Apple Developer secrets（CI 脚本与 <code>--verify</code> 后置校验已落地，<code>OPENBUDDY_ALLOW_UNSIGNED_MAC=1</code> 旁路已开启）；(2) Linux 标签栏 + 技能推荐栏部分 TODO 归 P1；(3) <code>app-icon.png</code> 替换归 P1；(4) SCSS 真源归 P2；(5) DSH 版本兼容矩阵归 P2；(6) Casdoor issuer 环境变量化归 P2。
 </div>
 </section>
 
 <section id="roadmap" class="section-anchor">
 <h2>8. 三阶段路线图</h2>
-<p>本节基于 <code>docs/openbuddy-capability-matrix.md:474-494</code> §9 与 <code>docs/openbuddy-product-vs-pi.md:494-532</code> §6。三阶段：P0（已落地 4/5）/ P1（3-6 月，5 项）/ P2（6-12 月，4 项）。</p>
+<p>本节基于 <code>docs/openbuddy-capability-matrix.md:474-494</code> §9 与 <code>docs/openbuddy-product-vs-pi.md:494-532</code> §6。三阶段：P0（已落地 5/5）/ P1（3-6 月，5 项）/ P2（6-12 月，4 项）。</p>
 
-<h3>8.1 P0 阶段（已落地 4/4）</h3>
+<h3>8.1 P0 阶段（已落地 5/5）</h3>
 <div class="callout ok">
-<strong>P0 阶段总结：</strong>本 change 已完成 4 项 P0 改造（A8 Permission 5 档 / A9 minimax 统一 / A10 i18n / A11 Linux CI），剩余 1 项 macOS 真签名 / 公证因依赖 Apple Developer 账号 + 证书归后续窗口。
+<strong>P0 阶段总结：</strong>本 change 已完成 5 项 P0 改造（A8 Permission 5 档 / A9 minimax 统一 / A10 i18n / A11 Linux CI / WU-B macOS 真签名 + <code>_section-credit-expiry.sh</code> 抽出）。
+WU-B 在 <code>scripts/check-macos-signing.mjs</code> 加 <code>--verify</code> 后置校验 + <code>.github/workflows/release.yml</code> build-macos 同步接入 + <code>scripts/verify-plan.mjs</code> 作为 P0 闭合守卫。
 </div>
 <div class="table-wrap">
 <table>
@@ -865,7 +867,7 @@ pnpm build
 
 <h3>10.3 未跑通的真实运行态</h3>
 <div class="callout warn">
-<strong>未跑通：</strong>(1) macOS 真签名 / notarize job 因依赖 Apple Developer 账号未在本 worktree 推送后跑通；(2) AgentBench-tools / AgentDojo-safety / GAIA-style 顶级测试集未执行（PI 自承 <code>pi-openbuddy-completeness-audit.md:546</code>）；(3) 真实用户目录迁移 / 真实生产用户路径覆盖 / 第三方登录未执行；(4) 当前平台无法启动独立只读 Comet semantic Verifier；(5) Linux CI 推送后 AppImage artifact 已上传，但本机未跑 <code>moon run openbuddy:electron.build.linux</code>。
+<strong>未跑通：</strong>(1) macOS 真签名 / notarize job 因依赖 Apple Developer 账号未在本 worktree 推送后跑通；(2) AgentBench-tools / AgentDojo-safety / GAIA-style 顶级测试集未执行（PI 自承 <code>pi-openbuddy-completeness-audit.md:546</code>）；(3) 真实用户目录迁移 / 真实生产用户路径覆盖 / 第三方登录未执行；(4) 当前平台无法启动独立只读 Comet semantic Verifier；(5) Linux CI 推送后 AppImage artifact 已上传，但本机未跑 <code>moon run openbuddy:electron.build.linux</code>。<br><strong>补记（WU-B 闭合）：</strong><code>scripts/check-macos-signing.mjs --verify &lt;artifact&gt;</code> 后置校验 + <code>scripts/verify-plan.mjs</code> P0 闭合守卫已落地（24 + 10 = 34 个新单测全绿，<code>pnpm verify:plan</code> 14/14 passed）；CI 中跑 <code>pnpm verify:plan</code> + <code>node scripts/check-macos-signing.mjs --verify release/mac-*/OpenBuddy.app</code>，详见 <code>docs/release-ci.md</code> §2.3 / §3。
 </div>
 
 <h3>10.4 与 PI 分析的关系</h3>

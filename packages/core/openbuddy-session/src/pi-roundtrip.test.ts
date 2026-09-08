@@ -119,7 +119,7 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
       const catalog = new SessionCatalog(storage.driver);
       expect(catalog.get("session-r1")?.pinned).toBe(true);
     } finally {
-      await closeStorage(storage);
+      await closeStorage(storage as unknown as Promise<typeof storage>);
     }
 
     // Legacy JSON mirror must also contain the pin (it's the migration source).
@@ -163,7 +163,7 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
         expertId: "expert-z",
       });
     } finally {
-      await closeStorage(storage);
+      await closeStorage(storage as unknown as Promise<typeof storage>);
     }
   });
 });

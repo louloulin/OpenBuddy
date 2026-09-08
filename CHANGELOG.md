@@ -2,6 +2,36 @@
 
 **English** · [简体中文](CHANGELOG.zh-CN.md)
 
+### v0.15.1 (2026-09-07) — P0 缺口闭合 (macOS 真签名 + scripts 抽出)
+
+#### 🔐 macOS 真签名 / 公证自动流水线（P0-1）
+
+- `scripts/check-macos-signing.mjs` 新增 `--verify <artifact>` 模式：不仅守护环境变量存在，还对签名后产物跑 `codesign -dv`（检测 `Developer ID Application` authority + `runtime` hardened flag）→ `spctl --assess --type execute`（Gatekeeper 接受）→ `xcrun stapler validate`（仅 `.dmg` / `.pkg`）。失败码：`1` = 签名/公证失败，`2` = `codesign` 不在主机上。
+- 新增 `--allow-unsigned` 模式：fork CI 可以在缺 Apple secrets 时跳过公证，仅以 warning 允许通过。
+- `.github/workflows/release.yml` `build-macos` job 拆为 `import-cert` / `import-notary` 两个有输出的步骤；后续 `Build macOS DMG` / `Verify signed macOS artifact` / `Mark DMG as unsigned` 步骤根据两者输出动态决策。仓库级别 `vars.OPENBUDDY_ALLOW_UNSIGNED_MAC=1` 控制是否进入未签名分支。
+- `docs/release-ci.md` 重写：补全 secrets 草案 + 「在缺少 secret 时跳过 notarize 但记录 warning」行为矩阵 + codesign 后置校验详细说明 + Gatekeeper 拒绝后的回滚步骤。
+- `electron-builder.yml` 既有 `mac.hardenedRuntime: true` / `mac.notarize: true` 不变。
+
+#### 🧪 scripts 提取 + P0 闭合守卫（P0-5）
+
+- `scripts/verify-plan.mjs` 新建：14 项 transformation-plan 闭合检查（`scripts/check-macos-signing.mjs --verify` 接入、`docs/release-ci.md` 文档化、`.github/workflows/release.yml` 含 `OPENBUDDY_ALLOW_UNSIGNED_MAC`、`scripts/_section-credit-expiry.sh` 存在并声明 `run_credit_expiry_check` 等），可被 `pnpm verify:plan` / `pnpm verify:plan:json` 调用。
+- `.github/workflows/release.yml` `ci` job 加 `Verify transformation-plan invariants (P0 closure guard)` 步骤：在任何 build job 之前跑 `pnpm verify:plan`；一旦 `_section-credit-expiry.sh` 或任何 P0 闭合证据被破坏，发布流水线在 ci job 阶段红灯。
+- `package.json` 加 `verify:plan` / `verify:plan:json` 两个 npm script。
+- `scripts/check-macos-signing.test.mjs` 新增 24 个单测（环境变量探测 / `codesign` 输出解析 / `verifySignedArtifact` 各路径）。
+- `scripts/verify-plan.test.mjs` 新增 10 个单测（仓库现状 / 空仓库失败 / 回归检测 / `--only` 过滤）。
+- `docs/openbuddy-transformation-plan.html` 表 5-1 更新：P0-1 / P0-5 标记为「✅ WU-B 完成」；5/5 P0 全部闭环。
+- `docs/openbuddy-product-vs-pi.md` / `docs/deployment-guide.md` 同步更新。
+
+#### ✅ Quality
+
+- `pnpm verify:plan` → 14/14 passed。
+- `scripts/*.test.mjs` → 87/87 passed（新增 34 个，全部绿色）。
+- `pnpm typecheck -p tsconfig.json` / `pnpm typecheck -p electron/tsconfig.json` → 0 error。
+- `pnpm build` (`electron-vite build`) → `✓ built in 14.07s`。
+- 不引入新 npm 依赖。
+
+---
+
 ### v0.15.0 (2026-09-01) — Enterprise Casdoor × NewAPI × OpenBuddy integration
 
 #### 🎯 Commercial architecture

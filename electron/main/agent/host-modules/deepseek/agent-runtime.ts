@@ -66,13 +66,12 @@ let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.
 let piSessionDir: (cwd: string) => string = (cwd) => "";
 let state: AgentHostState;
 let createSubagentResourceLoader:
-	(cwd: string) => Promise<{ getSystemPrompt(): string } | undefined> = async () => undefined;
-let modelFacingPresetTools: () => unknown[] = () => [];
+	(cwd: string) => Promise<{ getSystemPrompt(): string } | undefined>;
+let modelFacingPresetTools: () => unknown[];
 let createTaskAwareToolLocal: (
   tool: unknown,
   signalFor: (toolCallId: string) => AbortSignal | undefined,
-) => unknown = () => undefined;
-
+) => unknown;
 /**
  * Continuable subagent record type — formerly inlined in agent-host.ts.
  * Kept here so agent-host.ts no longer carries DSH subagent type definitions.
@@ -97,13 +96,12 @@ export function installDeepSeekAgentRuntime(deps: {
 	) => unknown;
 }): void {
 	listAllPiSessions = deps.listAllPiSessions as any;
-	if (deps.persistedSessionPath) persistedSessionPath = deps.persistedSessionPath;
-	if (deps.piHome) piHome = deps.piHome;
-	if (deps.piSessionDir) piSessionDir = deps.piSessionDir;
-	if (deps.state) state = deps.state;
-	if (deps.createSubagentResourceLoader) createSubagentResourceLoader = deps.createSubagentResourceLoader;
-	if (deps.modelFacingPresetTools) modelFacingPresetTools = deps.modelFacingPresetTools;
-	createTaskAwareToolLocal = deps.createTaskAwareTool ?? (() => undefined);
+	persistedSessionPath = deps.persistedSessionPath;
+	piHome = deps.piHome;
+	piSessionDir = deps.piSessionDir;
+	state = deps.state;
+	createSubagentResourceLoader = deps.createSubagentResourceLoader;
+	modelFacingPresetTools = deps.modelFacingPresetTools;	createTaskAwareToolLocal = deps.createTaskAwareTool ?? (() => undefined);
 }
 import { createTaskAwareTool, harnessToolErrorResult, harnessToolFailureResult, normalizeHarnessPostResult } from "../../../task-aware-tool";
 import type { DeepSeekPiAgentRuntime, DeepSeekPiToolHooks, DeepSeekToolDecision, DeepSeekToolExecution } from "../../../deepseek/deepseek-runtime";

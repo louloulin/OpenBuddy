@@ -500,8 +500,11 @@ pnpm build
 ### 6.1 P1（5 项）
 
 1. **P1#5 `_section-credit-expiry.sh` 独立化**（`openbuddy-capability-matrix.md:480`）：
-   抽 CHANGELOG v0.15.0 §9 引用为 `scripts/section-credit-expiry.sh` 独立脚本 + 单测，
-   工作量 S；当前 `scripts/audit-commercial-model.mjs` 已兜底，可下个 release 窗口补齐。
+   抽 CHANGELOG v0.15.0 §9 引用为 `scripts/_section-credit-expiry.sh` 独立脚本 + 单测。
+   本 change（WU-B）已落地，落地后由 `scripts/verify-plan.mjs` 与 `pnpm verify:plan` 守卫：
+   `verify-plan.mjs` 会断言脚本仍在仓库、声明了 `run_credit_expiry_check` 函数，
+   并且 `scripts/deploy-doctor.sh`、`scripts/build-release-bundle.sh` 都仍引用它。
+   工作量 S；当前 `scripts/audit-commercial-model.mjs` 已兜底。
 2. **P1#8 Voice / 视频多模态补强**（`openbuddy-capability-matrix.md:486`）：
    `voice-contract.ts` 加 streaming 集成 + 内置视频播放器；工作量 L；需独立 change。
 3. **P1#9 Linux 场景标签 + 技能推荐栏 TODO**（`openbuddy-capability-matrix.md:487`）：
