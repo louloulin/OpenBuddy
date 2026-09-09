@@ -1291,6 +1291,7 @@ export * from "./plugin-security";
 export * from "./task-lifecycle";
 export * from "./generation-gate";
 export * from "./plugin-registry";
+export * from "./plugin-lifecycle";
 export {
   CAPABILITY_OWNERSHIP,
   CAPABILITY_TO_PLUGIN_ID as AUTHORITY_CAPABILITY_TO_PLUGIN_ID,
