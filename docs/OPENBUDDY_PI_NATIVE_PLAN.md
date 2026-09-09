@@ -2385,3 +2385,185 @@ Phase B.3 step 1         无          ✅          (124 LOC new + 76 LOC test)
 
 **v10 文档 owner**: 编程助手-devbox1 · v10 §30 B.3 step 1 验证 + 测试固化
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 已 done，LUM-601 (J.1 + B.3 step 1) 进行中
+
+## 31. v11 — Phase B.3 step 1 验收后 + B.3 step 2 路径（响应「并说明完成进度」）
+
+> 📅 2026-09-09 用户「最后推送到 main-pi-reuse 分支，并说明完成进度」要求
+> 本节聚焦：B.3 step 1 验证通过 + B.3 step 2 详细路径规划
+
+### 31.1 B.3 step 1 验收通过（commit `a248ecb`）
+
+| 测试范围 | 结果 |
+|---|---|
+| `init-pi-user-extensions.test.ts`（本轮新增 4 case）| ✅ 4/4 |
+| `init-pipeline.test.ts` | ✅ 4/4 |
+| `electron/main/agent/host-modules/`（112 files）| ✅ 790 tests pass |
+| `electron/main/harness/` | ✅ 65/65 |
+| `ipc-contract-coverage-realserver` | ✅ 7/7 |
+| `src/lib/__tests__/ipc-contract.test.ts` | ✅ 13/13 |
+| `packages/runtime/openbuddy-plugin-{host,sdk}/` | ✅ all |
+| `pnpm storage:boundaries` | ✅ 0 violations / 403 files |
+| `pnpm typecheck` | ✅ 2 tasks, 0 errors |
+
+### 31.2 B.3 step 2 路径（v6 §24.4 第二步）
+
+**目标**：把 7 个 DSH core capability packages 也改走 PI `discoverAndLoadExtensions`，移除 DSH `HarnessPluginLoader`。
+
+#### 当前 DSH core 状态
+
+| Package | specifier 形式 | 实际位置 |
+|---|---|---|
+| `@deepseek-ai/dsh-commands` | string | `deepseek-capabilities.ts` + `cordis-runtime.ts` runtime shim |
+| `@deepseek-ai/dsh-goal` | string | 同上 |
+| `@deepseek-ai/dsh-file-reference` | string | 同上 |
+| `@deepseek-ai/dsh-host-plugin-inventory` | string | 同上 |
+| `@deepseek-ai/dsh-message-feedback` | string | 同上 |
+| `@deepseek-ai/dsh-session-reference` | string | 同上 |
+| `@deepseek-ai/dsh-cordis-host-runner` | string | 同上 |
+
+7 个 DSH core 当前是 **string specifiers**（不是 file paths），通过 `loader.importer → resolveDeepSeekModule()` 解析到 `deepseek-runtime.ts` / `cordis-runtime.ts` 里的 shim。
+
+#### B.3 step 2 三阶段路径
+
+**Step 2a（next round）**：在 `init-deepseek.ts:178` 旁边加一条 **并行 PI 装载路径**：
+
+```ts
+// 现存 DSH loader.loadProfile（保留，B.3 step 3 才删）
+await loader.loadProfile(profile);
+
+// 新增 PI 装载路径（Step 2a：parallel load for transition）
+const dshCorePaths = state.profilePackagePaths;  // or new state field
+const piRuntime = createExtensionRuntime();
+const piResult = await discoverAndLoadExtensions(
+  dshCorePaths, cwd, undefined, undefined,
+);
+state.dshCoreExtensionResult = {
+  loaded: piResult.extensions.length,
+  failed: piResult.errors.length,
+  failedIds: piResult.errors.map(e => e.path),
+};
+```
+
+**Step 2b（next+1 round）**：把 7 个 DSH core shim 从 `deepseek-runtime.ts` 抽到独立 files：
+
+```
+packages/runtime/openbuddy-dsh-core/
+├── src/commands.ts           (was deepseek-capabilities.ts CapabilityService 'commands')
+├── src/goal.ts                (was CapabilityService 'goals')
+├── src/file-reference.ts      (was CapabilityService 'fileReferences')
+├── src/host-plugin-inventory.ts (was CapabilityService 'pluginInventory')
+├── src/message-feedback.ts   (was CapabilityService 'messageFeedback')
+├── src/session-reference.ts   (was CapabilityService 'sessionReferenceResolver')
+└── src/cordis-host-runner.ts (was CapabilityService 'dynamicCordisRunner')
+```
+
+每个导出 PI `ExtensionFactory`，直接注册到 `defineTool` / `registerCommand`。
+
+**Step 2c（next+2 rounds）**：删除 `ElectronHarnessPluginLoader` 在 agent-host bootstrap 中的引用，删 `loader.loadProfile(profile)` 调用，删 `state.loader` 字段。
+
+#### B.3 step 2 时间估算
+
+| 阶段 | 内容 | 预估 LOC | 预估 commit |
+|---|---|---|---|
+| 2a | parallel PI 装载 + 测试 | +80 LOC | round 16 |
+| 2b | 7 个 DSH core 抽 file | +800 LOC / -1200 LOC | rounds 17-19 |
+| 2c | 删除 HarnessPluginLoader | -400 LOC | round 20 |
+
+**总计**：-720 LOC 净 + 5 commits
+
+### 31.3 v6 路线图完成度（commit `a248ecb` + v11）
+
+| Phase | 内容 | 状态 | commit | LOC |
+|---|---|---|---|---|
+| A.1 | PI IPC 桥 | ✅ | `6f6d612` | +342 |
+| B.1 r1-r5 | 5 builtin + agent.ts slim | ✅ | `df1bcb7`..`e0ad111` | -1120 |
+| L.1 | 删 pi-bridge/capabilities | ✅ | `0e16dc3` | -547 |
+| L.2 partial | 删 remote-invocation | ✅ | `a22801a` | -56 |
+| L.2 complete | RemoteDispatcher 极简化 | ✅ | `16434c3` | -296 |
+| L.4 | runtime facade | ✅ | `b22fd17` | -2324 |
+| L.3 | 通用装载器 | ✅ | `97edf0f` | -5299 |
+| K.1 | OpenBuddyPlugin SDK v0.1 | ✅ | `04f41fe` | +719 |
+| K.2 | SDK 接入 builtin | ✅ | `0e7f354` | (累计) |
+| J.1 | sheriff.config.ts | ✅ | `6d44434` | +91 |
+| J.1.1 | tsconfig 路径 | ✅ | `4b7e193` | 0 |
+| **B.3 step 1** | PI-native user-extension | ✅ | `fb035e9` | +178 |
+| **B.3 step 1 测试** | 4 case mock | ✅ | `a248ecb` | +76 |
+| extra-providers 测试 | K.2 regex anchor | ✅ | `21510bf` | 0 |
+| ⚪ **B.3 step 2** | DSH core 走 PI loadExtensions | pending | — | -720 (net) |
+| ⚪ B.3 step 3 | user-ext 合并到 session | pending | — | — |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — | — |
+| ⚪ C.1-C.3 | Tools 工厂化 | pending | — | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — | — |
+| ⚪ H.1 | email capability 拆解 | pending | — | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — | — |
+
+**v6 路线图 26 轮中 15 轮完成（58%）**
+
+### 31.4 完成度速查（v3 baseline → HEAD `a248ecb`）
+
+```
+                          v3 baseline → v11 HEAD
+─────────────────────────────────────────────────────
+PI 复用度                 24%        ~72%        ↑
+Cordis service 数          12         ≤ 5 目标   (待 I.1-I.2)
+PI Extension 数           4          9 builtin + 9 user-loadable  ↑
+Plugin 装载入口            4          1 SDK + 1 PI load  ↑
+God module LOC          ~6500       ≤ 2000     ↑
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+架构边界 Sheriff         部分        ✅ 0 violations / 403 files
+Phase B.3 step 1         无          ✅          (124 LOC new + 76 LOC test)
+─────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+### 31.5 用户可见架构变化
+
+```
+Before B.3 step 1:
+  - 用户第三方 PI 插件没有加载路径
+  - 只支持 DSH HarnessPluginLoader 的 core packages
+  - profile.piExtensions 字段存在但无消费者
+
+After B.3 step 1:
+  - 用户第三方 PI 插件走 PI discoverAndLoadExtensions
+  - DSH core packages 仍走 HarnessPluginLoader
+  - profile.piExtensions 字段生效，state.userExtensionResult 提供 renderer 诊断
+
+After B.3 step 2 (next round):
+  - DSH core packages 也走 PI discoverAndLoadExtensions
+  - HarnessPluginLoader 移除（completed migration）
+  - 7 个 DSH core shim 抽到独立 file（packages/runtime/openbuddy-dsh-core/*）
+
+After B.3 step 3:
+  - user-ext + dsh-core Extensions 合并到 session 的 ExtensionRunner
+  - /commands 能看到第三方 PI 插件 + DSH core 提供的命令
+```
+
+### 31.6 完成度百分比速查（更新）
+
+```
+                          v3 baseline → v11 HEAD
+─────────────────────────────────────────────────────
+PI 复用度                 24%        ~72%        ↑
+PI Extension 数           4          9 builtin + 9 user-loadable
+Plugin 装载入口            4          1 SDK + 1 PI load
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+架构边界 Sheriff         部分        ✅ 0 violations / 403 files
+Phase B.3 step 1         无          ✅          (124 LOC new + 76 LOC test)
+─────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+---
+
+**v11 文档 owner**: 编程助手-devbox1 · v11 §31 B.3 step 2 详细路径规划
+**父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
