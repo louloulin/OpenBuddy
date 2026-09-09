@@ -8,6 +8,25 @@ import { OpenBuddyService } from "@openbuddy/cordis"
 import type { McpClient, McpToolCallResult } from "@openbuddy/capability-mcp-client"
 import { EmailProviderRegistry, type EmailConnection, type EmailConnectionReadiness, type EmailProviderRegistryDiagnostic, type EmailRegistryProviderType } from "./provider-registry"
 import { EmailPermissionResolver, type EmailPermission, type EmailPermissionAuditContext } from "./email-permissions"
+// Phase H.1 — classifier helpers + types extracted to keep index.ts focused
+// on persistence + the Email Cordis service. email-classifier.ts owns the
+// noise / rejected / cancelled / passive-followup rules + date extraction;
+// email-classifier-types.ts owns the LLM-action surface types.
+import {
+  extractDueDate,
+  getEmailActionTriggerPatterns,
+  isCancelledEmail,
+  isNoiseEmail,
+  isPassiveFollowupEmail,
+  isRejectedEmail,
+  resolveMessageId,
+  trimActionContent,
+} from "./email-classifier";
+import type { EmailActionCandidate, EmailActionCandidateInput } from "./email-classifier-types";
+
+// Re-export the LLM-action types so external callers (tests, downstream
+// consumers) keep importing them from "./index" unchanged.
+export type { EmailActionCandidate, EmailActionCandidateInput } from "./email-classifier-types";
 
 export type EmailFolder = "inbox" | "sent" | "drafts" | "archive" | "trash" | "spam" | "starred" | "important" | "snoozed" | "custom"
 export type EmailMutationKind = "mark-read" | "mark-unread" | "archive" | "restore" | "label" | "star" | "trash" | "spam" | "snooze"
@@ -1666,25 +1685,6 @@ function analysisActions(value: unknown): EmailAnalysisAction[] {
 	})
 }
 
-export interface EmailActionCandidateInput {
-	subject: string
-	body: string
-	messages: Array<{ id: string; from?: string; date?: string; text?: string; snippet?: string }>
-	phrases?: readonly string[]
-	baseDate?: Date
-	now?: Date
-}
-
-export interface EmailActionCandidate {
-	content: string
-	owner?: string
-	dueAt?: string
-	messageId: string
-	citations: EmailAnalysisCitation[]
-	confidence: number
-	source: "llm-phrase" | "heuristic-imperative" | "heuristic-deadline"
-}
-
 export interface EmailActionCandidateResult {
 	actions: EmailActionCandidate[]
 	summary: string
@@ -1693,145 +1693,16 @@ export interface EmailActionCandidateResult {
 	stats: { candidates: number; kept: number; droppedNoise: number; droppedNoCitation: number; droppedPassiveFollowup: number; droppedRejected: number }
 }
 
-const EMAIL_ACTION_TRIGGER_PATTERNS: ReadonlyArray<{ regex: RegExp; source: EmailActionCandidate["source"] }> = [
-	{ regex: /(?:请|麻烦|烦请|恳请|希望|期待)\s*([^\n。.!?！？;;；]{2,80})/g, source: "heuristic-imperative" },
-	{ regex: /\b(?:please|kindly|could you|can you|would you)\s+([^\n.!?]{2,80})/gi, source: "heuristic-imperative" },
-	{ regex: /(?:能否|可不可以|是否可以|方便|愿意)\s*([^\n。.!?！？;;；]{2,80})/g, source: "heuristic-imperative" },
-	{ regex: /(?:审批|审核|确认|签字|回签|签署|批准|agree|approve|sign)\s*([^\n。.!?！？;;；]{2,80})/g, source: "heuristic-imperative" },
-	{ regex: /(?:回复|反馈|提供|安排|发送|处理|完成|准备)\s*([^\n。.!?！？;;；]{2,80})/g, source: "heuristic-deadline" },
-]
-
-const EMAIL_NOISE_KEYWORDS = [
-	"newsletter", "no-reply", "noreply", "automated", "automatic",
-	"notification", "alert", "digest", "weekly", "每月精选", "本周精选",
-	"每日精选", "weekly summary", "build succeeded", "build failed",
-	"system report", "monitoring", "metrics", "p95", "延迟",
-	"生日快乐", "happy birthday", "节日快乐",
-	"感谢贵司", "感谢您的", "感谢你", "下次有项目", "下次见面",
-	"webinar 邀请", "blog post", "release notes", "changelog",
-	"团建", "公告", "[公告]",
-]
-
-const EMAIL_NOISE_SUBJECT_PATTERNS: RegExp[] = [
-	/^InfoQ/i, /^Daily/i, /^Build\s*#/i, /^New Blog Post/i,
-	/^v\d+\.\d+/, /^Webinar/i, /生日快乐/, /感谢/, /感谢贵司/,
-]
-
-const EMAIL_REJECTED_PATTERNS = [
-	/(?:暂不采购|暂不合作|本期不|不续签|不参与)/,
-	/(?:本期暂不|暂不考虑|暂未通过|拒绝|rejected|not proceeding)/i,
-]
-
-const EMAIL_CANCELLED_PATTERNS = [
-	/(?:取消|取消：|已取消|cancelled|已结束)/,
-]
-
-const EMAIL_PASSIVE_FOLLOWUP_PATTERNS = [
-	/已进入.*?(?:审核|终审|审批)/,
-	/已发货|运单号|预计.*?送达/,
-	/仍在.*?评审中/,
-	/正在.*?处理/,
-	/稍后通知|新时间稍后/,
-]
-
-function resolveMessageId(input: { messages: EmailActionCandidateInput["messages"]; fallback: string }): { id: string; from?: string; date?: string } {
-	if (input.messages.length === 0) return { id: input.fallback }
-	const head = input.messages[0]!
-	return { id: head.id || input.fallback, ...(head.from ? { from: head.from } : {}), ...(head.date ? { date: head.date } : {}) }
-}
-
-function extractAbsoluteDate(text: string, baseDate: Date): string | undefined {
-	let earliest: string | undefined
-	for (const m of text.matchAll(/\b(\d{4}-\d{2}-\d{2})\b/g)) {
-		const key = m[1]!
-		if (!earliest || key < earliest) earliest = key
-	}
-	for (const m of text.matchAll(/\b(\d{1,2})[/月-](\d{1,2})(?:[/月-](\d{2,4}))?\b/g)) {
-		const month = parseInt(m[1]!, 10)
-		const day = parseInt(m[2]!, 10)
-		let year = m[3] ? parseInt(m[3], 10) : baseDate.getFullYear()
-		if (year < 100) year += 2000
-		const candidate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-		if (!earliest || candidate < earliest) earliest = candidate
-	}
-	for (const m of text.matchAll(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]/g)) {
-		const month = parseInt(m[1]!, 10)
-		const day = parseInt(m[2]!, 10)
-		const candidate = `${baseDate.getFullYear()}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-		if (!earliest || candidate < earliest) earliest = candidate
-	}
-	return earliest
-}
-
-function extractRelativeDate(text: string, baseDate: Date): string | undefined {
-	const weekdayMap: Record<string, number> = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "日": 0, "天": 0 }
-	const targetWeekday = (text.match(/(?:本周|下周)([一二三四五六日天])/) ?? [])[1]
-	if (targetWeekday) {
-		const dow = weekdayMap[targetWeekday] ?? 0
-		const curDow = baseDate.getDay()
-		const delta = ((dow - curDow + 7) % 7) + (text.startsWith("下周") ? 7 : 0)
-		if (delta > 0) {
-			const d = new Date(baseDate)
-			d.setDate(d.getDate() + delta)
-			return d.toISOString().slice(0, 10)
-		}
-	}
-	const relativeMap: Array<{ regex: RegExp; offsetDays: number }> = [
-		{ regex: /本周内|本周/i, offsetDays: 4 },
-		{ regex: /下周内|下周/i, offsetDays: 11 },
-		{ regex: /本月底|月底/i, offsetDays: 28 },
-		{ regex: /尽快|asap|immediately/i, offsetDays: 0 },
-		{ regex: /今天|today/i, offsetDays: 0 },
-		{ regex: /明天|tomorrow/i, offsetDays: 1 },
-		{ regex: /后天/i, offsetDays: 2 },
-		{ regex: /两周内|两周/i, offsetDays: 14 },
-		{ regex: /一个月内|月内|一个月/i, offsetDays: 30 },
-		{ regex: /本周五/i, offsetDays: 4 },
-		{ regex: /下周五/i, offsetDays: 11 },
-	]
-	for (const entry of relativeMap) {
-		if (entry.regex.test(text)) {
-			const d = new Date(baseDate)
-			d.setDate(d.getDate() + entry.offsetDays)
-			return d.toISOString().slice(0, 10)
-		}
-	}
-	return undefined
-}
-
-function extractDueDate(text: string, baseDate: Date): string | undefined {
-	return extractAbsoluteDate(text, baseDate) ?? extractRelativeDate(text, baseDate)
-}
-
-function isNoiseEmail(input: EmailActionCandidateInput): boolean {
-	const subject = input.subject ?? ""
-	const body = input.body ?? ""
-	const haystack = `${subject}\n${body}`
-	for (const pattern of EMAIL_NOISE_SUBJECT_PATTERNS) {
-		if (pattern.test(subject)) return true
-	}
-	return EMAIL_NOISE_KEYWORDS.some((keyword) => haystack.includes(keyword))
-}
-
-function isRejectedEmail(input: EmailActionCandidateInput): boolean {
-	const haystack = `${input.subject ?? ""}\n${input.body ?? ""}`
-	return EMAIL_REJECTED_PATTERNS.some((pattern) => pattern.test(haystack))
-}
-
-function isCancelledEmail(input: EmailActionCandidateInput): boolean {
-	const haystack = `${input.subject ?? ""}\n${input.body ?? ""}`
-	return EMAIL_CANCELLED_PATTERNS.some((pattern) => pattern.test(haystack))
-}
-
-function isPassiveFollowupEmail(input: EmailActionCandidateInput): boolean {
-	return EMAIL_PASSIVE_FOLLOWUP_PATTERNS.some((pattern) => pattern.test(input.body ?? ""))
-}
-
-function trimActionContent(content: string): string {
-	const trimmed = content.replace(/\s+/g, " ").trim()
-	if (trimmed.length <= 30) return trimmed
-	return `${trimmed.slice(0, 28)}…`
-}
+// Phase H.1 — moved to email-classifier.ts. The
+// EMAIL_ACTION_TRIGGER_PATTERNS / EMAIL_NOISE_KEYWORDS /
+// EMAIL_NOISE_SUBJECT_PATTERNS / EMAIL_REJECTED_PATTERNS /
+// EMAIL_CANCELLED_PATTERNS / EMAIL_PASSIVE_FOLLOWUP_PATTERNS constants
+// and the resolveMessageId / extractAbsoluteDate / extractRelativeDate
+// / extractDueDate / isNoiseEmail / isRejectedEmail / isCancelledEmail /
+// isPassiveFollowupEmail / trimActionContent helpers now live in
+// email-classifier.ts and are imported at the top of this file.
+// The EmailActionCandidateInput / EmailActionCandidate types are
+// re-exported from email-classifier-types.
 
 /**
  * OpenBuddy AI Email · action-candidate extractor.
@@ -1878,7 +1749,7 @@ export function extractEmailActionCandidates(input: EmailActionCandidateInput): 
 			if (trimmed.length >= 2 && trimmed.length <= 120) phraseSource.set(trimmed, "llm-phrase")
 		}
 	}
-	for (const pattern of EMAIL_ACTION_TRIGGER_PATTERNS) {
+	for (const pattern of getEmailActionTriggerPatterns()) {
 		pattern.regex.lastIndex = 0
 		for (const match of text.matchAll(pattern.regex)) {
 			const captured = (match[1] ?? "").replace(/\s+/g, " ").trim()
