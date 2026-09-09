@@ -22,6 +22,7 @@
  * Reverse-dependency invariant:
  *   This module imports nothing from agent-host.ts. deps are passed in.
  */
+import { randomUUID } from "node:crypto";
 import type { AgentSession, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 
 export interface ProvideRpcUiContextDeps {
@@ -60,7 +61,7 @@ export interface ProvideRpcUiContextDeps {
 }
 
 function makeRequestId(sessionId: string, kind: string): string {
-  return `${sessionId}:${kind}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+  return `${sessionId}:${kind}:${randomUUID()}`;
 }
 
 /**

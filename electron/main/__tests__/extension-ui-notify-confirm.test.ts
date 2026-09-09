@@ -44,6 +44,11 @@ describe("MVP-10 — extension UI notify + confirm pipeline", () => {
       expect(uiContextSrc).toMatch(re);
     });
 
+    it("uses a cryptographically random request id component", () => {
+      expect(uiContextSrc).toContain('import { randomUUID } from "node:crypto"');
+      expect(uiContextSrc).toContain("${sessionId}:${kind}:${randomUUID()}");
+      expect(uiContextSrc).not.toContain("Math.random().toString");
+    });
     it("confirm supports an option list with allow + deny", () => {
       // The emitted permission payload must include both branches so the
       // renderer can render a real Allow / Deny dialog instead of just a
