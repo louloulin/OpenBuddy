@@ -988,7 +988,7 @@ import { computeActiveAdapterIds } from "./host-modules/bootstrap/compute-active
 import { initSession } from "./host-modules/bootstrap/init-session";
 import { createJobsRegistry } from "./host-modules/bootstrap/jobs-registry";
 import { buildAgentHostFacade } from "./host-modules/bootstrap/build-agent-host-facade";
-import type { InstallHostModuleDeps } from "./host-modules/bootstrap/install-host-modules";
+import type { InstallHostModuleDomainInput, InstallHostModuleDepsWithDomains } from "./host-modules/bootstrap/install-host-modules";
 
 import { buildSessionEventSubscriber } from "./host-modules/bootstrap/handle-session-event";
 import type { HandleSessionEventDeps } from "./host-modules/bootstrap/handle-session-event";
@@ -1100,7 +1100,7 @@ const installMicrokernelDepsClosures = {
   disposeProfileTypertRegistrations, disposeActiveHookProcesses,
   drainActiveHookProcesses, permissionHandlers,
 };
-const buildMicrokernelHostDeps = () => buildInstallHostModuleDeps(installMicrokernelDepsClosures);
+const buildMicrokernelHostDeps = (): InstallHostModuleDepsWithDomains => buildInstallHostModuleDeps(installMicrokernelDepsClosures);
 
 // v6-G M1 收尾 (架构修复): module-load 时立即 installHostModules 一次,
 // 消除 "IPC handler 在 stage 3 之前调用 host-module singleton" 的 race condition.
@@ -1109,7 +1109,13 @@ const buildMicrokernelHostDeps = () => buildInstallHostModuleDeps(installMicroke
 // 这里用 queueMicrotask 是为了让 module body 全部跑完 (initialize function 等
 // 较后定义的 binding 已初始化) 再 install.
 queueMicrotask(() => {
-  installHostModules(state, buildMicrokernelHostDeps());
+  installHostModules(state, {
+    profile: buildMicrokernelHostDeps().profile,
+    session: buildMicrokernelHostDeps().session,
+    plugin: buildMicrokernelHostDeps().plugin,
+    runtime: buildMicrokernelHostDeps().runtime,
+    state,
+  });
 });
 
 let initializeInFlight: Promise<void> | null = null;
