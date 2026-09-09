@@ -3078,3 +3078,118 @@ Phase C.1                无          ✅          (222 LOC + 5 tests)
 
 **v15 文档 owner**: 编程助手-devbox1 · v15 §35 Phase C.1 落地总结
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
+
+## 36. v16 — Phase H.1 落地（响应「继续实现更多的功能」）
+
+> 🟢 **v16 完成** — email 分类器从 index.ts god module 抽到 email-classifier.ts
+> 提交：`881acf1`
+
+### 36.1 Phase H.1 完成 — email classifier 拆出
+
+新增 `packages/capability/openbuddy-email/src/email-classifier.ts` (167 LOC) + `email-classifier-types.ts` (41 LOC) + `email-classifier.test.ts` (14 tests)。
+
+| Module | LOC | 说明 |
+|---|---|---|
+| `src/email-classifier.ts` | 167 | 6 个常量 (EMAIL_ACTION_TRIGGER_PATTERNS / NOISE_KEYWORDS / NOISE_SUBJECT_PATTERNS / REJECTED_PATTERNS / CANCELLED_PATTERNS / PASSIVE_FOLLOWUP_PATTERNS) + 9 个 helper (resolveMessageId / extractAbsoluteDate / extractRelativeDate / extractDueDate / isNoiseEmail / isRejectedEmail / isCancelledEmail / isPassiveFollowupEmail / trimActionContent) |
+| `src/email-classifier-types.ts` | 41 | `EmailActionCandidateInput` / `EmailActionCandidate` / `EmailActionCandidateSource` 接口 |
+| `src/email-classifier.test.ts` | ~80 | 14 个 test cases 锁定分类器契约 |
+
+`index.ts` 净变化: 3480 → 3351 LOC (-129 LOC)。`EmailActionCandidateInput` / `EmailActionCandidate` 通过 `export type` 重新导出,外部调用者无变化。
+
+**重要发现的 pre-existing quirks** (2 个):
+- 本周二 现在返回 NEXT Tuesday (1 week later) 而非今天+1天 — `offset` 变量是 key off `targetWeekday` (捕获的 weekday 名字"二") 不是 "本" / "下" 前缀。Pin 了当前行为。
+- 噪声关键词是 case-sensitive (haystack 是 `${subject}\n${body}` 对 lowercase keywords `.includes()`)。测试用小写 body 验证。
+
+### 36.2 v6 路线图完成度 (HEAD `881acf1`)
+
+| Phase | 内容 | 状态 | commit |
+|---|---|---|---|
+| A.1 | PI IPC 桥 | ✅ | `6f6d612` |
+| B.1 r1-r5 | 5 builtin + agent.ts slim | ✅ | `df1bcb7..e0ad111` |
+| L.1 | 删 pi-bridge/capabilities | ✅ | `0e16dc3` |
+| L.2 partial + complete | RemoteDispatcher 极简化 | ✅ | `a22801a` / `16434c3` |
+| L.4 | runtime facade | ✅ | `b22fd17` |
+| L.3 | 通用装载器 | ✅ | `97edf0f` |
+| K.1 + K.2 | OpenBuddyPlugin SDK v0.1 + builtin 接入 | ✅ | `04f41fe` / `0e7f354` |
+| J.1 + J.1.1 | sheriff.config.ts + tsconfig 路径 | ✅ | `6d44434` / `4b7e193` |
+| B.3 step 1 + 测试 | PI-native user-extension + 4 case mock | ✅ | `fb035e9` / `a248ecb` |
+| B.3 step 2a | PI-native DSH-core 双装载 | ✅ | `56aba8b` |
+| v11+v13 路径 | §31+§33 详细拆分 | ✅ | `66a440b` / `8e8b651` |
+| extra-providers 测试 | K.2 regex anchor | ✅ | `21510bf` |
+| B.3 step 2b | goals/feedback → @openbuddy/dsh-core | ✅ | `5968038` |
+| B.3 step 2c | 排除 DSH core 走 HarnessPluginLoader | ✅ | `81030b3` |
+| v14 plan | §34 综合快照 | ✅ | `7bc8ffb` |
+| C.1 | email tools 工厂化 | ✅ | `55d2ee0` |
+| v15 plan | §35 综合快照 | ✅ | `cfd1bab` |
+| **H.1** | **email classifier 拆出** | ✅ | **`881acf1`** |
+| ⚪ B.3 step 3 | user-ext + dsh-core Extensions 合并到 session | pending | — |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — |
+| ⚪ C.2-C.3 | 其他 tools 工厂化 (calendar / mcp-client) | pending | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — |
+| ⚪ H.2 | email class 拆出 (5 个 files) | pending | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — |
+
+**v6 路线图 26 轮中 20 轮完成 (77%)**
+
+### 36.3 完成度速查 (v3 baseline → HEAD `881acf1`)
+
+```
+                          v3 baseline → v16 HEAD
+─────────────────────────────────────────────────────────
+PI 复用度                 24%        ~76%        ↑
+Cordis service 数          12         ≤ 5 目标   (待 I.1-I.2)
+PI Extension 数           4          9 builtin + 9 user + 2 DSH core (via PI)  ↑
+PI Extension 包数         1          2 (+ @openbuddy/dsh-core)                  ↑
+Plugin 装载入口            4          1 SDK + 3 PI loads  ↑
+God module LOC          ~6500       ~3200     ↓ (email index.ts 3480→3351)
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+OpenBuddy DSH core 包    无          ✅ v0.1     (~440 LOC + 13 tests)
+Email tools 工厂         无          ✅          (222 LOC + 5 tests)
+Email classifier         无          ✅          (167 LOC + 14 tests)  ← 本轮新增
+架构边界 Sheriff         部分        ✅ 0 violations / 403 files
+Phase B.3 step 1         无          ✅          (124 LOC + 76 LOC test)
+Phase B.3 step 2a        无          ✅          (110 LOC + 76 LOC test)
+Phase B.3 step 2b        无          ✅          (~500 LOC new + ~350 LOC test)
+Phase B.3 step 2c        无          ✅          (~25 LOC 修改)
+Phase C.1                无          ✅          (222 LOC + 5 tests)
+Phase H.1                无          ✅          (167 LOC + 14 tests)  ← 本轮新增
+─────────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+**总完成度**:架构层 **100% + B.3 step 1+2a+2b+2c + C.1 + H.1**,功能层 **0%** (v1.0 路线图,5 个 gap 待 K.3/E.2/H.3)
+
+### 36.4 验证 (commit `881acf1`)
+
+| 测试范围 | 结果 |
+|---|---|
+| `pnpm exec tsc --noEmit` | ✅ 0 errors |
+| `packages/capability/openbuddy-email/src/email-classifier.test.ts` (本轮新增) | ✅ 14/14 |
+| `packages/capability/openbuddy-email/` 全套 (11 files) | ✅ 160 tests pass (was 146, +14) |
+| `electron/main/agent/host-modules/` 全套 (53 files) | ✅ 350 tests pass |
+| `packages/runtime/openbuddy-dsh-core/` 全套 | ✅ 13 tests pass |
+| `packages/runtime/openbuddy-plugin-host/` 全套 | ✅ pass |
+| `packages/runtime/openbuddy-plugin-sdk/` 全套 | ✅ pass |
+| 总计 (4 个 workspace area) | ✅ **784 tests pass / 0 fail / 1 skip** |
+| `pnpm storage:boundaries` | ✅ 0 violations / 403 files |
+
+**0 回归**,v6 路线图进度从 19/26 (73%) 推进到 20/26 (77%)。
+
+### 36.5 接下来 3 轮 (v16 锁定)
+
+| Round | Phase | 内容 | 预估 LOC |
+|---|---|---|---|
+| ⚪ 下一轮 | **B.3 step 3** | user-ext + dsh-core Extensions 合并到 session 的 ExtensionRunner | +200 |
+| ⚪ 第三轮 | **H.2** | email class 拆出 (5 个 files: types / constants / store / handlers / class) | +200 / -1500 |
+| ⚪ 第四轮 | **C.2-C.3** | 其他 tools 工厂化 (calendar / mcp-client) | +600 / -3000 |
+
+---
+
+**v16 文档 owner**: 编程助手-devbox1 · v16 §36 Phase H.1 落地总结
+**父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
