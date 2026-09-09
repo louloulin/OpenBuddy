@@ -36,6 +36,7 @@ import {
   searchGoalsByObjective,
   transitionGoal,
   advanceGoalRounds,
+  aggregateGoalStats,
   sessionKey,
 } from "./state";
 
@@ -129,6 +130,12 @@ function registerGoalCommands(api: ExtensionAPI, carrier: unknown, fallback: str
       const typed = (args ?? {}) as { id?: string; revision?: number };
       return advanceGoalRounds(carrier, fallback, typed);
     },
+  });
+
+  commands.registerCommand?.({
+    name: "goals.stats",
+    description: "Return aggregate goal stats across every session (Phase C.3 follow-up).",
+    handler: async () => aggregateGoalStats(),
   });
 
   commands.registerCommand?.({

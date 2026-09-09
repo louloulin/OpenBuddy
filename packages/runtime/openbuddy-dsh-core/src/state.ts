@@ -432,3 +432,39 @@ export function sessionSummary(
     feedbackEntries: [...entries.entries()].map(([messageId, value]) => ({ messageId, ...value })),
   };
 }
+/**
+ * Aggregate stats across every goal in the state. Phase C.3
+ * follow-up — powers the `goals.stats` slash command so the
+ * renderer can show a dashboard without walking `listAllGoals()`
+ * itself.
+ */
+export function aggregateGoalStats(): {
+  total: number;
+  byPhase: Record<DshGoalRecord["phase"], number>;
+  totalRoundsStarted: number;
+  averageRoundsStarted: number;
+  totalMaxRounds: number;
+} {
+  let total = 0;
+  let totalRoundsStarted = 0;
+  let totalMaxRounds = 0;
+  const byPhase: Record<DshGoalRecord["phase"], number> = {
+    active: 0,
+    paused: 0,
+    blocked: 0,
+    complete: 0,
+  };
+  for (const goal of dshGoalState.values()) {
+    total += 1;
+    byPhase[goal.phase] += 1;
+    totalRoundsStarted += goal.roundsStarted;
+    totalMaxRounds += goal.maxGoalRounds;
+  }
+  return {
+    total,
+    byPhase,
+    totalRoundsStarted,
+    averageRoundsStarted: total > 0 ? totalRoundsStarted / total : 0,
+    totalMaxRounds,
+  };
+}

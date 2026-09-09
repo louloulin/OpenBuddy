@@ -80,7 +80,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     __resetDshCoreStateForTests();
   });
 
-  it("registers 11 goals.* commands on init (Phase C.2: + goals.list, Phase C.3: + goals.search + goals.advance-rounds)", () => {
+  it("registers 12 goals.* commands on init (Phase C.2: + goals.list, Phase C.3: + goals.search + goals.advance-rounds, Phase C.3 follow-up: + goals.stats)", () => {
     const factory = createDshGoalsExtension();
     const { api, commands } = buildMockApi("session-1");
     factory(api);
@@ -95,6 +95,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     expect(commands.has("goals.list")).toBe(true);
     expect(commands.has("goals.search")).toBe(true);
     expect(commands.has("goals.advance-rounds")).toBe(true);
+    expect(commands.has("goals.stats")).toBe(true);
   });
 
   it("goals.create returns a ref and persists via the shared state map", async () => {
@@ -348,8 +349,8 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     const advanced = (await commands.get("goals.advance-rounds")!.handler(created.ref)) as DshGoalRecord;
     expect(advanced.roundsStarted).toBe(1);
 
-    // Confirm commands register the same 11 commands.
-    expect(commands.size).toBe(11);
+    // Confirm commands register the same 12 commands (11 + goals.stats).
+    expect(commands.size).toBe(12);
   });
 
   it("B.3 step 3 — multiple ForSession factories land goals in different sessions (no cross-talk)", async () => {
@@ -373,5 +374,47 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     const yGoal = (await mockB.commands.get("goals.get")!.handler({})) as DshGoalRecord | undefined;
     expect(xGoal?.objective).toBe("Goal in X");
     expect(yGoal?.objective).toBe("Goal in Y");
+  });
+
+  it("goals.stats returns aggregate stats across every session (Phase C.3 follow-up)", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-stats");
+    factory(api);
+    // Empty state.
+    const empty = (await commands.get("goals.stats")!.handler({})) as {
+      total: number;
+      byPhase: Record<string, number>;
+      totalRoundsStarted: number;
+      averageRoundsStarted: number;
+      totalMaxRounds: number;
+    };
+    expect(empty.total).toBe(0);
+    expect(empty.averageRoundsStarted).toBe(0);
+    expect(empty.totalMaxRounds).toBe(0);
+
+    // Add goals in this session + a separate session via state.ts directly.
+    await commands.get("goals.create")!.handler({ objective: "A", maxGoalRounds: 4 });
+    createGoal({ id: "session-other-stats" }, "current", { objective: "B", maxGoalRounds: 6 });
+
+    // Advance the first goal twice (chain so each call returns the
+    // updated record — spreading the original ref into the second
+    // call would trigger a revision conflict).
+    const created1 = (await commands.get("goals.get")!.handler({})) as DshGoalRecord;
+    const advanced1 = (await commands.get("goals.advance-rounds")!.handler(created1)) as DshGoalRecord;
+    const advanced2 = (await commands.get("goals.advance-rounds")!.handler(advanced1)) as DshGoalRecord;
+    expect(advanced2.roundsStarted).toBe(2);
+
+    const populated = (await commands.get("goals.stats")!.handler({})) as {
+      total: number;
+      byPhase: Record<string, number>;
+      totalRoundsStarted: number;
+      averageRoundsStarted: number;
+      totalMaxRounds: number;
+    };
+    expect(populated.total).toBe(2);
+    expect(populated.byPhase.active).toBe(2);
+    expect(populated.totalRoundsStarted).toBe(2);
+    expect(populated.averageRoundsStarted).toBe(1);
+    expect(populated.totalMaxRounds).toBe(10);
   });
 });
