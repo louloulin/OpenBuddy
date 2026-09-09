@@ -86,6 +86,14 @@ export default [
       //   - dependency-rule : assert depRules (UI ↔ core, microkernel ↔ plugin)
       //   - deep-import     : assert public-surface only (no skipping index.ts)
       //   - encapsulation   : assert tag isolation (no reverse-deps)
+      //
+      // J.1 follow-up (2026-09): baseline `pnpm storage:boundaries`
+      // reports 0 reverse-dep violations across 403 files, so the three
+      // rules are *ready* for `warn -> error` promotion. We keep them at
+      // `warn` for now because Sheriff 0.19.6 has a path-resolution quirk
+      // for `./../packages/...` aliases in `electron/tsconfig.json` that
+      // yields 3 false-positive SH-001 errors unrelated to the layer model.
+      // Promote after the path alias is normalised (J.1.1 follow-up).
       "sheriff/dependency-rule": "warn",
       "sheriff/deep-import": "warn",
       "sheriff/encapsulation": "warn",
