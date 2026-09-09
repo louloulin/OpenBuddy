@@ -228,6 +228,16 @@ export interface AgentHostState {
     failed: number;
     failedIds: string[];
   } | null;
+  /**
+   * Phase B.3 step 2b — override the default `@openbuddy/dsh-core`
+   * extension path resolution. When non-empty, the resolver uses
+   * this list verbatim instead of resolving the package source files.
+   * Used by tests and by profile-level overrides
+   * (`profile.piDshCorePaths`). Empty array = use defaults (B.3 step
+   * 2a baseline behaviour, which is no-op fast-path when the default
+   * source files are not present).
+   */
+  dshCoreExtensionPathsOverride: readonly string[];
   profilePackageJson: string | undefined;
   profilePackagePaths: string[];
   profilePiExtensions: readonly OpenBuddyPiExtensionSpec[];

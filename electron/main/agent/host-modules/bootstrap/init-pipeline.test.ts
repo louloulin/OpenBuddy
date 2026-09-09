@@ -25,6 +25,7 @@ function buildFakeDeps(): InitPipelineDeps {
     state: {
       toolRegistryRevision: 0,
       eventSequence: 0,
+      dshCoreExtensionPathsOverride: [],
     } as InitPipelineDeps["state"],
     cwd: () => "/fake/cwd",
     piHome: () => "/fake/pi-home",
@@ -63,7 +64,7 @@ function buildFakeDeps(): InitPipelineDeps {
     }),
     initDeepSeek: vi.fn(async () => {
       callOrder.push("initDeepSeek");
-    }),
+    }) as unknown as (deps: unknown) => Promise<void>,
     /**
      * Phase B.3 step 1 — PI-native user extension loader stub. The real
      * implementation lives in init-pi-user-extensions.ts and is wired in

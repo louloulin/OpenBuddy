@@ -272,17 +272,18 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
   });
   console.log("[openbuddy-diag] init-pipeline stage=6.6 DONE");
 
-  // Stage 6.7: Phase B.3 step 2a — parallel PI loader for DSH core
-  // packages. Until B.3 step 2b extracts the 7 DSH core shims to real
-  // files, `dshCorePaths` is empty (no-op fast-path). When 2b lands,
-  // this stage loads the DSH core entries alongside the existing
-  // HarnessPluginLoader (dual-track transition). Result stored in
-  // state.dshCoreExtensionResult.
+  // Stage 6.7: Phase B.3 step 2b — parallel PI loader for DSH core
+  // packages. `init-deepseek` has already populated
+  // `state.dshCoreExtensionPathsOverride` (via
+  // `resolveDshCoreExtensionPaths`); if non-empty, this stage loads
+  // the DSH core entries alongside the existing HarnessPluginLoader
+  // (dual-track transition). Result stored in
+  // state.dshCoreExtensionResult. Empty path list = no-op fast-path.
   console.log("[openbuddy-diag] init-pipeline stage=6.7 ENTER (initPiDshCoreExtensions)");
   deps.state.dshCoreExtensionResult = await deps.initPiDshCoreExtensions({
     state: deps.state, cwd: deps.cwd(),
     emitPluginEvent: deps.emitPluginEvent,
-    dshCorePaths: [], // Phase B.3 step 2b will populate this from extracted files
+    dshCorePaths: [...deps.state.dshCoreExtensionPathsOverride],
   });
   console.log("[openbuddy-diag] init-pipeline stage=6.7 DONE");
 

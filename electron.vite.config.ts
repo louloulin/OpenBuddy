@@ -53,6 +53,13 @@ const workspacePackageAliases = [
   { find: "@openbuddy/plugin-host/persistence", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/persistence.ts") },
   { find: "@openbuddy/plugin-host/yaml-patch", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/yaml-patch.ts") },
   { find: "@openbuddy/plugin-host/js-expr", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/js-expr.ts") },
+  // Phase B.3 step 2b — DSH core shared state + PI extensions. Subpath
+  // aliases must precede the bare-package alias below so the longer
+  // `@openbuddy/dsh-core/state` lookup wins over the bare
+  // `@openbuddy/dsh-core` fallback.
+  { find: "@openbuddy/dsh-core/state", replacement: resolve(repoRoot, "packages/runtime/openbuddy-dsh-core/src/state.ts") },
+  { find: "@openbuddy/dsh-core/goals", replacement: resolve(repoRoot, "packages/runtime/openbuddy-dsh-core/src/goals.ts") },
+  { find: "@openbuddy/dsh-core/message-feedback", replacement: resolve(repoRoot, "packages/runtime/openbuddy-dsh-core/src/message-feedback.ts") },
   { find: "@openbuddy/team-team/pi", replacement: resolve(repoRoot, "packages/team/openbuddy-team/src/pi.ts") },
   { find: "@openbuddy/core-session/lifecycle", replacement: resolve(repoRoot, "packages/core/openbuddy-session/src/lifecycle.ts") },
 
@@ -61,6 +68,7 @@ const workspacePackageAliases = [
   { find: "@deepseek-ai/cordis",    replacement: resolve(repoRoot, "packages/runtime/openbuddy-cordis/src/index.ts") },
   { find: "@openbuddy/cordis",         replacement: resolve(repoRoot, "packages/runtime/openbuddy-cordis/src/index.ts") },
   { find: "@openbuddy/plugin-host",    replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/index.ts") },
+  { find: "@openbuddy/dsh-core",       replacement: resolve(repoRoot, "packages/runtime/openbuddy-dsh-core/src/index.ts") },
   { find: "@openbuddy/bundle-base",    replacement: resolve(repoRoot, "packages/bundle/openbuddy-base/src/index.ts") },
   { find: "@openbuddy/renderer-host",  replacement: resolve(repoRoot, "packages/renderer/openbuddy-renderer-host/src/index.ts") },
   { find: "@openbuddy/core-session",   replacement: resolve(repoRoot, "packages/core/openbuddy-session/src/index.ts") },

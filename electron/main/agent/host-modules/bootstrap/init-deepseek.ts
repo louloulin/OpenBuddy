@@ -49,6 +49,7 @@ import { readOverridePatches } from "../profile/override-patches";
 import { composeHostRunnerEntries } from "../deepseek/host-runner-entries";
 import type { ElectronHarnessPluginLoader } from "../profile/loader";
 import { ensureTypertReady } from "../workbench-scope";
+import { resolveDshCoreExtensionPaths } from "./dsh-core-extension-paths";
 
 /**
  * Dependencies required to assemble the DSH Cordis runtime + manifest profile.
@@ -138,6 +139,18 @@ export function profileEntriesFromManifests(
  */
 export async function initDeepSeek(deps: InitDeepSeekDeps): Promise<void> {
   const { state, loader, profileBundle, emitPluginEvent } = deps;
+
+  // Phase B.3 step 2b — resolve the file-system paths to the PI-native
+  // DSH core extensions under `@openbuddy/dsh-core` so the parallel
+  // PI loader (`init-pi-dsh-core-extensions`) can pick them up via
+  // `discoverAndLoadExtensions`. The Cordis shim
+  // (`wire-dsh-services.ts`) already exposes the same data through
+  // `ctx.dshRemotes`; the PI loader exists so the slash commands
+  // (`/goals.create`, `/feedback.put`, ...) are wired into the
+  // ExtensionRunner alongside the Cordis shim. The default-resolution
+  // function honours `state.dshCoreExtensionPathsOverride` so tests can
+  // inject a virtual path without touching the real package layout.
+  const dshCorePaths = resolveDshCoreExtensionPaths(state);
 
   // Hydrate stored plugin overrides BEFORE composing the profile so the
   // override layers land on top of base + bundle.

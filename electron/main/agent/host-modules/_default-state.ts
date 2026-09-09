@@ -93,6 +93,7 @@ export function createDefaultAgentHostState(): AgentHostState {
     rendererPluginManifestCache: null,
     userExtensionResult: null,
     dshCoreExtensionResult: null,
+    dshCoreExtensionPathsOverride: [],
     profileOptions: null,
     profileBundle: null,
     activePluginProfile: null,
