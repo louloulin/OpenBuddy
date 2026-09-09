@@ -196,6 +196,7 @@ export async function initSession(deps: InitSessionDeps): Promise<string> {
     questionAnswer,
     createOpenBuddyRpcUiContext,
     piGeneration: state.piGeneration,
+  });
 
   // Capture which Pi extension registered which provider before bindExtensions
   // drains the pending queue. The tracker installed above captures live calls
