@@ -647,10 +647,27 @@ export interface EmailAnalysisLinkInput {
 	linkedCalendarEventId?: string
 }
 
-// Phase H.2 — EmailError extracted to ./email-error.ts. Re-exported
-// here so external callers keep importing from "./index" unchanged.
-export { EmailError, type EmailErrorCode } from "./email-error";
+// Phase H.2 (round 1) — EmailError extracted to ./email-error.ts.
+// Phase H.2 (round 2) — 6 analysis validators extracted to
+// ./email-validators.ts. Both are re-exported here so external
+// callers keep importing from "./index" unchanged.
 import { EmailError } from "./email-error";
+import {
+  analysisActions,
+  analysisContextCitations,
+  analysisFacts,
+  analysisMeetingProposal,
+  analysisReplyDraft,
+} from "./email-validators";
+export { EmailError, type EmailErrorCode } from "./email-error";
+export {
+  analysisCitations,
+  analysisContextCitations,
+  analysisFacts,
+  analysisActions,
+  analysisReplyDraft,
+  analysisMeetingProposal,
+} from "./email-validators";
 
 export interface EmailProvider {
 	readonly name: string
@@ -1638,50 +1655,24 @@ function writeStore(store: EmailStore): Promise<void> {
 	storeWriteQueue = operation.catch(() => undefined)
 	return operation
 }
-function id(prefix: string): string { return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}` }
-function analysisCitations(value: unknown): EmailAnalysisCitation[] {
-	if (!Array.isArray(value)) return []
-	return value.slice(0, 20).map((entry) => {
-		if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new EmailError("invalid_input", "AI 分析引用必须是对象")
-		const item = entry as Record<string, unknown>
-		if (typeof item.messageId !== "string" || !item.messageId.trim()) throw new EmailError("invalid_input", "AI 分析引用必须包含 messageId")
-		return { messageId: item.messageId.trim(), ...(typeof item.from === "string" ? { from: item.from.slice(0, 320) } : {}), ...(typeof item.date === "string" ? { date: item.date.slice(0, 80) } : {}), ...(typeof item.quote === "string" ? { quote: item.quote.slice(0, 500) } : {}) }
-	})
+
+// Local id helper used by the Email class + draft attachment
+// validation to mint new record IDs. Kept here because the class
+// uses it throughout.
+function id(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
-function analysisContextCitations(value: unknown): EmailAnalysisContextCitation[] {
-	if (!Array.isArray(value)) return []
-	return value.slice(0, 20).map((entry) => {
-		if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new EmailError("invalid_input", "AI 知识库引用必须是对象")
-		const item = entry as Record<string, unknown>
-		if (typeof item.sourceId !== "string" || !item.sourceId.trim()) throw new EmailError("invalid_input", "AI 知识库引用必须包含 sourceId")
-		return {
-			sourceId: item.sourceId.trim().slice(0, 500),
-			...(typeof item.sourceTitle === "string" ? { sourceTitle: item.sourceTitle.trim().slice(0, 500) } : {}),
-			...(typeof item.sourcePath === "string" ? { sourcePath: item.sourcePath.trim().slice(0, 2000) } : {}),
-			...(typeof item.quote === "string" ? { quote: item.quote.slice(0, 1000) } : {}),
-		}
-	})
-}
-function analysisFacts(value: unknown): EmailAnalysisFact[] {
-	if (!Array.isArray(value)) return []
-	return value.slice(0, 50).map((entry) => {
-		if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new EmailError("invalid_input", "AI 分析事实必须是对象")
-		const item = entry as Record<string, unknown>
-		if (typeof item.statement !== "string" || !item.statement.trim()) throw new EmailError("invalid_input", "AI 分析事实必须包含 statement")
-		const contextCitations = analysisContextCitations(item.contextCitations)
-		return { statement: item.statement.trim().slice(0, 2000), citations: analysisCitations(item.citations), ...(contextCitations.length ? { contextCitations } : {}) }
-	})
-}
-function analysisActions(value: unknown): EmailAnalysisAction[] {
-	if (!Array.isArray(value)) return []
-	return value.slice(0, 50).map((entry) => {
-		if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new EmailError("invalid_input", "AI 行动项必须是对象")
-		const item = entry as Record<string, unknown>
-		if (typeof item.content !== "string" || !item.content.trim()) throw new EmailError("invalid_input", "AI 行动项必须包含 content")
-		const contextCitations = analysisContextCitations(item.contextCitations)
-		return { content: item.content.trim().slice(0, 2000), ...(typeof item.owner === "string" ? { owner: item.owner.slice(0, 320) } : {}), ...(typeof item.dueAt === "string" ? { dueAt: item.dueAt.slice(0, 80) } : {}), citations: analysisCitations(item.citations), ...(contextCitations.length ? { contextCitations } : {}) }
-	})
-}
+
+// Phase H.2 (round 2) — 6 analysis validators extracted to
+// ./email-validators.ts:
+//   analysisCitations / analysisContextCitations
+//   analysisFacts / analysisActions
+//   analysisReplyDraft / analysisMeetingProposal
+// The remaining 6 helpers (searchableMessageText / citationQuoteMatches
+// / draftFingerprint / processingPlanFingerprint /
+// analysisContextCitationEntries / analysisCitationIds) stay in
+// this file for now — they have lighter dependencies and the next
+// H.2 rounds will pick them up.
 
 export interface EmailActionCandidateResult {
 	actions: EmailActionCandidate[]
@@ -1791,31 +1782,7 @@ export function extractEmailActionCandidates(input: EmailActionCandidateInput): 
 		stats: { candidates: candidates.length, kept: keptCandidates.length, droppedNoise: 0, droppedNoCitation: candidates.length - keptCandidates.length, droppedPassiveFollowup: 0, droppedRejected: 0 },
 	}
 }
-function analysisReplyDraft(value: unknown): EmailAnalysisReplyDraft | undefined {
-	if (value === undefined || value === null) return undefined
-	if (!value || typeof value !== "object" || Array.isArray(value)) throw new EmailError("invalid_input", "AI 回复草稿必须是对象")
-	const item = value as Record<string, unknown>
-	if (typeof item.subject !== "string" || typeof item.body !== "string") throw new EmailError("invalid_input", "AI 回复草稿必须包含 subject 和 body")
-	const tone = item.tone === "neutral" || item.tone === "warm" || item.tone === "formal" ? item.tone : undefined
-	const contextCitations = analysisContextCitations(item.contextCitations)
-	return { subject: item.subject.slice(0, 998), body: item.body.slice(0, 20000), ...(tone ? { tone } : {}), citations: analysisCitations(item.citations), ...(contextCitations.length ? { contextCitations } : {}) }
-}
-function analysisMeetingProposal(value: unknown): EmailAnalysisMeetingProposal | undefined {
-	if (value === undefined || value === null) return undefined
-	if (!value || typeof value !== "object" || Array.isArray(value)) throw new EmailError("invalid_input", "AI 会议提案必须是对象")
-	const item = value as Record<string, unknown>
-	if (typeof item.title !== "string" || !item.title.trim() || typeof item.start !== "string" || typeof item.end !== "string") throw new EmailError("invalid_input", "AI 会议提案必须包含 title、start 和 end")
-	const start = Date.parse(item.start)
-	const end = Date.parse(item.end)
-	if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new EmailError("invalid_input", "AI 会议提案时间范围无效")
-	const meetingUrl = typeof item.meetingUrl === "string" && item.meetingUrl.trim() ? item.meetingUrl.trim() : undefined
-	if (meetingUrl) {
-		try { const parsed = new URL(meetingUrl); if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("unsupported") } catch { throw new EmailError("invalid_input", "会议链接必须是 http(s) URL") }
-	}
-	const attendees = addresses(item.attendees ?? [])
-	const citations = analysisCitations(item.citations)
-	return { title: item.title.trim().slice(0, 500), start: new Date(start).toISOString(), end: new Date(end).toISOString(), ...(typeof item.timeZone === "string" && item.timeZone.trim() ? { timeZone: item.timeZone.trim().slice(0, 80) } : {}), ...(typeof item.location === "string" && item.location.trim() ? { location: item.location.trim().slice(0, 1000) } : {}), ...(meetingUrl ? { meetingUrl } : {}), attendees, ...(typeof item.description === "string" && item.description.trim() ? { description: item.description.trim().slice(0, 4000) } : {}), citations }
-}
+
 function analysisContextCitationEntries(facts: EmailAnalysisFact[], actions: EmailAnalysisAction[], risks: EmailAnalysisFact[], replyDraft?: EmailAnalysisReplyDraft): EmailAnalysisContextCitation[] {
 	return [...facts.flatMap((item) => item.contextCitations ?? []), ...actions.flatMap((item) => item.contextCitations ?? []), ...risks.flatMap((item) => item.contextCitations ?? []), ...(replyDraft?.contextCitations ?? [])]
 }
