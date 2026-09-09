@@ -2967,15 +2967,114 @@ Phase B.3 step 2c        无          ✅          (~25 LOC 修改)
 
 **0 回归**,v6 路线图进度从 16/26 (62%) 推进到 18/26 (69%)。
 
-### 34.6 接下来 3 轮 (v14 锁定)
+## 35. v15 — Phase C.1 落地（响应「继续实现更多的功能」）
+
+> 🟢 **v15 完成** — email tools 工厂化拆出 god module
+> 提交：`55d2ee0`
+
+### 35.1 Phase C.1 完成 — email tool 工厂从 index.ts 抽出
+
+新增 `packages/capability/openbuddy-email/src/email-tools.ts` (222 LOC) + 5 test cases。
+
+| Module | LOC | 说明 |
+|---|---|---|
+| `src/email-tools.ts` | 222 | `toolResult` / `ToolArgs` / `objectSchema` helpers + 4 个工具类别 (READ_ONLY / MUTATION / COMPOSE / ANALYSIS) + `createEmailToolDefinitions` 工厂 |
+| `src/email-tools.test.ts` | 80 | 5 个 test cases 锁定工厂契约 |
+
+**index.ts 净变化**: 3510 → 3480 LOC (-30 LOC, 但 -50 LOC 内部移动 + 20 LOC re-export boilerplate)。4 个 build* 工厂在 email-tools.ts 内部拆开,各任务单独可读。
+
+**架构创新**:
+- `EMAIL_READ_ONLY_TOOL_NAMES` 从 inline `.includes(...)` 列表变成 co-located const,以后添加只读工具只在一个地方修改 (在 `buildReadOnlyTools` 添加工具 + 在 NAME 列表添加名字)
+- `EmailToolHandlers` interface 在 email-tools.ts 内定义,避免与 index.ts 产生 circular dep
+- index.ts 依然导出 `createEmailPiTools()` 和 `createEmailReadOnlyPiTools()` (无参),与外部调用者保持兼容
+
+### 35.2 v6 路线图完成度 (HEAD `55d2ee0`)
+
+| Phase | 内容 | 状态 | commit |
+|---|---|---|---|
+| A.1 | PI IPC 桥 | ✅ | `6f6d612` |
+| B.1 r1-r5 | 5 builtin + agent.ts slim | ✅ | `df1bcb7..e0ad111` |
+| L.1 | 删 pi-bridge/capabilities | ✅ | `0e16dc3` |
+| L.2 partial | 删 remote-invocation | ✅ | `a22801a` |
+| L.2 complete | RemoteDispatcher 极简化 | ✅ | `16434c3` |
+| L.4 | runtime facade | ✅ | `b22fd17` |
+| L.3 | 通用装载器 | ✅ | `97edf0f` |
+| K.1 | OpenBuddyPlugin SDK v0.1 | ✅ | `04f41fe` |
+| K.2 | SDK 接入 builtin | ✅ | `0e7f354` |
+| J.1 | sheriff.config.ts | ✅ | `6d44434` |
+| J.1.1 | tsconfig 路径 | ✅ | `4b7e193` |
+| B.3 step 1 | PI-native user-extension | ✅ | `fb035e9` |
+| B.3 step 1 测试 | 4 case mock | ✅ | `a248ecb` |
+| B.3 step 2a | PI-native DSH-core 双装载 | ✅ | `56aba8b` |
+| v11 路径规划 | §31 B.3 step 2 详细路径 | ✅ | `66a440b` |
+| v13 详细拆分 | §33 B.3 step 2b/2c/3 | ✅ | `8e8b651` |
+| extra-providers 测试 | K.2 regex anchor | ✅ | `21510bf` |
+| B.3 step 2b | goals/feedback → @openbuddy/dsh-core | ✅ | `5968038` |
+| B.3 step 2c | 排除 DSH core 走 HarnessPluginLoader | ✅ | `81030b3` |
+| v14 plan | §34 综合快照 | ✅ | `7bc8ffb` |
+| **C.1** | **email tools 工厂化** | ✅ | **`55d2ee0`** |
+| ⚪ B.3 step 3 | user-ext + dsh-core Extensions 合并到 session | pending | — |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — |
+| ⚪ C.2-C.3 | 其他 tools 工厂化 (calendar / mcp-client) | pending | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — |
+| ⚪ H.1 | email capability 进一步拆解 | pending | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — |
+
+**v6 路线图 26 轮中 19 轮完成 (73%)**
+
+### 35.3 完成度速查 (v3 baseline → HEAD `55d2ee0`)
+
+```
+                          v3 baseline → v15 HEAD
+─────────────────────────────────────────────────────────
+PI 复用度                 24%        ~76%        ↑
+Cordis service 数          12         ≤ 5 目标   (待 I.1-I.2)
+PI Extension 数           4          9 builtin + 9 user + 2 DSH core (via PI)  ↑
+PI Extension 包数         1          2 (+ @openbuddy/dsh-core)                  ↑
+Plugin 装载入口            4          1 SDK + 3 PI loads  ↑
+God module LOC          ~6500       ~3500     ↓ (email index.ts 拆分中)
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+OpenBuddy DSH core 包    无          ✅ v0.1     (~440 LOC + 13 tests)
+Email tools 工厂         无          ✅          (222 LOC + 5 tests)
+架构边界 Sheriff         部分        ✅ 0 violations / 403 files
+Phase B.3 step 1         无          ✅          (124 LOC + 76 LOC test)
+Phase B.3 step 2a        无          ✅          (110 LOC + 76 LOC test)
+Phase B.3 step 2b        无          ✅          (~500 LOC new + ~350 LOC test)
+Phase B.3 step 2c        无          ✅          (~25 LOC 修改)
+Phase C.1                无          ✅          (222 LOC + 5 tests)
+─────────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+**总完成度**:架构层 **100% + B.3 step 1+2a+2b+2c + C.1**,功能层 **0%** (v1.0 路线图,5 个 gap 待 K.3/E.2/H.3)
+
+### 35.4 验证 (commit `55d2ee0`)
+
+| 测试范围 | 结果 |
+|---|---|
+| `pnpm exec tsc --noEmit` | ✅ 0 errors |
+| `packages/capability/openbuddy-email/src/email-tools.test.ts` (本轮新增) | ✅ 5/5 |
+| `packages/capability/openbuddy-email/` 全套 | ✅ 146 tests pass (was 141, +5) |
+| `electron/main/agent/host-modules/` 全套 (52 files) | ✅ 350 tests pass |
+| `pnpm storage:boundaries` | ✅ 0 violations / 403 files |
+
+**0 回归**,v6 路线图进度从 18/26 (69%) 推进到 19/26 (73%)。
+
+### 35.5 接下来 3 轮 (v15 锁定)
 
 | Round | Phase | 内容 | 预估 LOC |
 |---|---|---|---|
 | ⚪ 下一轮 | **B.3 step 3** | user-ext + dsh-core Extensions 合并到 session 的 ExtensionRunner | +200 |
-| ⚪ 第三轮 | **B.2** | ExtensionRunner.bindCore 替代 microkernel 启动序列 | -300 |
-| ⚪ 第四轮 | **C.1** | email tools 工厂化 (从 god module 拆分) | +200 / -1500 |
+| ⚪ 第三轮 | **C.2-C.3** | 其他 tools 工厂化 (calendar / mcp-client / folder-trust) | +600 / -3000 |
+| ⚪ 第四轮 | **H.1** | email capability 进一步拆解 (types / constants / store / class 拆 5 个 files) | +200 / -1500 |
 
 ---
 
-**v14 文档 owner**: 编程助手-devbox1 · v14 §34 B.3 step 2b+2c 落地总结
+**v15 文档 owner**: 编程助手-devbox1 · v15 §35 Phase C.1 落地总结
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
