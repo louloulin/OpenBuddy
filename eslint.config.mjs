@@ -88,12 +88,16 @@ export default [
       //   - encapsulation   : assert tag isolation (no reverse-deps)
       //
       // J.1 follow-up (2026-09): baseline `pnpm storage:boundaries`
-      // reports 0 reverse-dep violations across 403 files, so the three
-      // rules are *ready* for `warn -> error` promotion. We keep them at
-      // `warn` for now because Sheriff 0.19.6 has a path-resolution quirk
-      // for `./../packages/...` aliases in `electron/tsconfig.json` that
-      // yields 3 false-positive SH-001 errors unrelated to the layer model.
-      // Promote after the path alias is normalised (J.1.1 follow-up).
+      // reports 0 reverse-dep violations across 403 files. J.1.1 also
+      // normalized the 16 `"./../packages/..."` path aliases in
+      // `electron/tsconfig.json` to `../packages/...`, but Sheriff 0.19.6
+      // still surfaces 3 SH-001 false positives for paths that combine
+      // `baseUrl: "../../.."` with the `@openbuddy/cordis` alias
+      // (`packages/runtime/...`). The 3 errors are pre-existing on the
+      // 9 `packages/ui/openbuddy-ui-*/tsconfig.json` files. Kept at
+      // `warn` until those 9 configs migrate to root-relative paths
+      // (ui-* baseUrl collapse is a separate follow-up after v9 §28.2
+      // core-session / ui-state extraction).
       "sheriff/dependency-rule": "warn",
       "sheriff/deep-import": "warn",
       "sheriff/encapsulation": "warn",
