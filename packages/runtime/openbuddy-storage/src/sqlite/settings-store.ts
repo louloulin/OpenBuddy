@@ -166,6 +166,25 @@ export class SettingsStore {
     return out;
   }
 
+  /**
+   * Delete a single (namespace, key) row. Returns true when a row
+   * was removed. Phase F.2 — SessionMetadataStore relies on this to
+   * drop expert entries the update removed (the legacy JSON mirror
+   * encoded experts as a single object so deletions were implicit).
+   */
+  delete(namespace: string, key: string): boolean {
+    return this.registry.delete(namespace, key);
+  }
+
+  /**
+   * Delete every row in a namespace. Returns the count removed.
+   * Used by `clearAll()` in stores that need to nuke an entire
+   * namespace (e.g. session-metadata on full reset).
+   */
+  deleteNamespace(namespace: string): number {
+    return this.registry.deleteNamespace(namespace);
+  }
+
   private validate(namespace: string, value: unknown): void {
     const validator = this.validators.get(namespace);
     if (!validator) return;
