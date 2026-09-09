@@ -2236,3 +2236,152 @@ OpenBuddyPlugin SDK      无          ✅ v0.1    (352 LOC + 9 builtin)
 ---
 
 **v9 文档 owner**: 编程助手-devbox1 · v9 综合完成度快照 · 父任务 LUM-580 · 子任务链 LUM-594/595/596/597 + LUM-601
+
+## 30. v10 — Phase B.3 step 1 完成后快照（响应「并说明完成进度」）
+
+> 📅 2026-09-09 用户「最后推送到 main-pi-reuse 分支，并说明完成进度」要求
+> 本节聚焦 Phase B.3 step 1（commit `fb035e9`）+ 本轮 v10 §30 测试固化
+
+### 30.1 B.3 step 1 完成验证
+
+| 验证项 | 结果 |
+|---|---|
+| `pnpm typecheck` | ✅ 2 tasks, 0 errors |
+| `electron/main/agent/host-modules/bootstrap/init-pi-user-extensions.test.ts`（本轮新增 4 case）| ✅ 4/4 |
+| `electron/main/agent/host-modules/` 全套（含 init-pipeline）| ✅ 112 files / 790 tests pass |
+| `electron/main/harness/` 全套 | ✅ 65/65 pass |
+| `electron/main/__tests__/ipc-contract-coverage-realserver.test.ts` | ✅ 7/7 |
+| `src/lib/__tests__/ipc-contract.test.ts` | ✅ 13/13 |
+| `packages/runtime/openbuddy-plugin-{host,sdk}/` | ✅ all pass |
+| **总计核心 paths** | **无 1 个回归** |
+
+### 30.2 B.3 step 1 实际产出
+
+#### 新文件 `electron/main/agent/host-modules/bootstrap/init-pi-user-extensions.ts`（124 LOC）
+
+```ts
+export interface InitPiUserExtensionsDeps {
+  state: AgentHostState;
+  cwd: string;
+  emitPluginEvent: (type: string, payload: unknown) => void;
+}
+
+export interface PiUserExtensionLoadResult {
+  loaded: number;
+  failed: number;
+  failedIds: string[];
+}
+
+export async function initPiUserExtensions(deps): Promise<PiUserExtensionLoadResult> {
+  if (state.profilePiPackagePaths.length === 0) {
+    return { loaded: 0, failed: 0, failedIds: [] };  // no-op fast-path
+  }
+  const runtime = createExtensionRuntime();
+  const result = await discoverAndLoadExtensions(
+    [...state.profilePiPackagePaths], cwd, undefined, undefined,
+  );
+  // emit plugin/loaded / plugin/failed events
+  return { loaded: result.extensions.length, failed: ..., failedIds: ... };
+}
+```
+
+#### Pipeline integration
+
+```
+Stage 1: bootstrapSessionEventLog
+Stage 2: bootstrapModelRuntime
+Stage 3: installMicrokernelHost
+Stage 4: wireContextServices + wireDshServices + wireForwardedEvents
+Stage 5: setupProfileOptions + ensureDefaultPiPackages
+Stage 6: initProfile + initPluginLoader (DSH HarnessPluginLoader)
+Stage 6.5: initDeepSeek (DSH core packages via loader.loadProfile)
+Stage 6.6: initPiUserExtensions (PI discoverAndLoadExtensions) ← NEW
+Stage 7: computeActiveAdapterIds + injectSystemPromptSections + initSession
+Stage 8: emitPluginReadyEvent
+```
+
+#### State shape
+
+```ts
+AgentHostState.userExtensionResult: {
+  loaded: number;
+  failed: number;
+  failedIds: string[];
+} | null;
+```
+
+#### 测试 `init-pi-user-extensions.test.ts`（4 case）
+
+1. **no-op fast-path**: 空 profile → `{ loaded: 0, failed: 0, failedIds: [] }`，不发 emit，不调 `discoverAndLoadExtensions`
+2. **plugin/loaded emission**: 2 个 extension → 2 次 `emit('plugin/loaded', { id, source: 'pi-user-extensions', path })`
+3. **plugin/failed emission**: errors 数组 → 失败 IDs + `emit('plugin/failed', { id, source, error })`
+4. **defensive catch**: discoverAndLoadExtensions throw → 返回 `{ loaded: 0, failed: N, failedIds: ['pi-user-extensions'] }`
+
+### 30.3 v6 路线图完成度（HEAD `fb035e9` + v10 测试）
+
+| Phase | 内容 | 状态 | commit | LOC |
+|---|---|---|---|---|
+| A.1 | PI IPC 桥 | ✅ | `6f6d612` | +342 |
+| B.1 r1-r5 | 5 builtin + agent.ts slim | ✅ | `df1bcb7`..`e0ad111` | -1120 |
+| L.1 | 删 pi-bridge/capabilities | ✅ | `0e16dc3` | -547 |
+| L.2 partial | 删 remote-invocation | ✅ | `a22801a` | -56 |
+| L.2 complete | RemoteDispatcher 极简化 | ✅ | `16434c3` | -296 |
+| L.4 | runtime facade | ✅ | `b22fd17` | -2324 |
+| L.3 | 通用装载器 | ✅ | `97edf0f` | -5299 |
+| K.1 | OpenBuddyPlugin SDK v0.1 | ✅ | `04f41fe` | +719 |
+| K.2 | SDK 接入 builtin | ✅ | `0e7f354` | (累计) |
+| J.1 | sheriff.config.ts | ✅ | `6d44434` | +91 |
+| J.1.1 | tsconfig 路径 | ✅ | `4b7e193` | 0 |
+| **B.3 step 1** | PI-native user-extension | ✅ | `fb035e9` | +178 |
+| extra-providers 测试 | ✅ | `21510bf` | 0 |
+| ⚪ B.3 step 2 | DSH core 走 PI loadExtensions | pending | — | — |
+| ⚪ B.3 step 3 | user-ext 合并到 session | pending | — | — |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — | — |
+| ⚪ C.1-C.3 | Tools 工厂化 | pending | — | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — | — |
+| ⚪ H.1 | email capability 拆解 | pending | — | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — | — |
+
+**v6 路线图 26 轮中 15 轮完成（58%）**
+
+### 30.4 用户可见架构变化
+
+```
+Before B.3 step 1:
+  - 用户第三方 PI 插件没有加载路径
+  - 只支持 DSH HarnessPluginLoader 的 core packages
+  - profile.piExtensions 字段存在但无消费者
+
+After B.3 step 1:
+  - 用户第三方 PI 插件走 PI discoverAndLoadExtensions (canonical PI API)
+  - DSH core packages 仍走 HarnessPluginLoader (下一步 B.3 step 2 迁)
+  - profile.piExtensions 字段生效，state.userExtensionResult 提供 renderer 诊断
+```
+
+### 30.5 完成度速查
+
+```
+                          v3 baseline → v10 HEAD
+─────────────────────────────────────────────────────
+PI 复用度                 24%        ~72%        ↑
+Cordis service 数          12         ≤ 5 目标   (待 I.1-I.2)
+PI Extension 数           4          9 builtin + 9 user-loadable  ↑
+Plugin 装载入口            4          1 SDK + 1 PI load  ↑
+God module LOC          ~6500       ≤ 2000     ↑
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+架构边界 Sheriff         部分        ✅ 0 violations / 403 files
+Phase B.3 step 1         无          ✅          (124 LOC new + 76 LOC test)
+─────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+---
+
+**v10 文档 owner**: 编程助手-devbox1 · v10 §30 B.3 step 1 验证 + 测试固化
+**父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 已 done，LUM-601 (J.1 + B.3 step 1) 进行中
