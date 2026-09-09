@@ -257,6 +257,23 @@ export type RuntimeDomainDeps =
   & InstallerDeps<typeof installInitOrchestration>;
 
 /**
+ * Composition-root view of the installer bag. The legacy flat bag remains the
+ * public compatibility input, while domain helpers only receive their own
+ * grouped contract. Keeping this conversion at one boundary prevents a new
+ * domain dependency from leaking into the other three domains.
+ */
+export interface InstallHostModuleDomainDeps {
+  profile: ProfileDomainDeps;
+  session: SessionDomainDeps;
+  plugin: PluginDomainDeps;
+  runtime: RuntimeDomainDeps;
+}
+
+function groupDomainDeps(deps: InstallHostModuleDeps): InstallHostModuleDomainDeps {
+  return { profile: deps, session: deps, plugin: deps, runtime: deps };
+}
+
+/**
  * Profile 域 (11 modules): override-patches → snapshot → bundles → resource-paths
  *   → unified-packages → preset-helpers → agent-preset-runtime →
  *   context-services-snapshot → default-pi-package-installer.
@@ -355,8 +372,9 @@ function installRuntimeDomain(state: AgentHostState, deps: RuntimeDomainDeps): v
  * 总 install 顺序在每个域内部维护 (见各域 helper 注释).
  */
 export function installHostModules(state: AgentHostState, deps: InstallHostModuleDeps): void {
-  installProfileDomain(state, deps);
-  installSessionDomain(state, deps);
-  installPluginDomain(state, deps);
-  installRuntimeDomain(state, deps);
+  const domains = groupDomainDeps(deps);
+  installProfileDomain(state, domains.profile);
+  installSessionDomain(state, domains.session);
+  installPluginDomain(state, domains.plugin);
+  installRuntimeDomain(state, domains.runtime);
 }
