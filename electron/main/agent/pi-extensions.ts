@@ -426,31 +426,22 @@ const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
         invokeInvocation: invokeTasksCommand,
       },
     ],
-    // Stage G-1d: real pi tool so the LLM can drive the per-session task
-    // list from inside the agent loop.
-    tools: [
-      {
-        name: "openbuddy_tasks",
-        description: "Manage the per-session OpenBuddy task list: list, add, complete, remove, or clear tasks.",
-        parameters: Type.Object({
-          verb: Type.Union([
-            Type.Literal("list"),
-            Type.Literal("add"),
-            Type.Literal("done"),
-            Type.Literal("remove"),
-            Type.Literal("clear"),
-          ]),
-          content: Type.Optional(Type.String()),
-          taskId: Type.Optional(Type.String()),
-        }),
-        serializeArgs: (args: unknown) => {
-          const a = args as { verb: string; content?: string; taskId?: string };
-          if (a.verb === "add") return a.content ? `add ${a.content}` : "add";
-          if (a.verb === "done" || a.verb === "remove") return a.taskId ? `${a.verb} ${a.taskId}` : a.verb;
-          return a.verb;
-        },
-      },
-    ],
+    // Phase I.1 — task decision: keep Cordis, drop the orphan PI tool.
+    // The `openbuddy_tasks` tool was registered here as a Stage G-1d
+    // experiment so the LLM could drive the per-session task list from
+    // inside the agent loop, but every verb it delegated to already
+    // existed as a slash command (`/tasks list|add|done|remove|clear`)
+    // that users invoke directly. Keeping both surfaces confused the
+    // LLM and doubled the codebase paths to maintain. The Cordis
+    // `task` service (TaskService + openbuddy-core-plugin.ts `ctx.get("task")`)
+    // now owns the surface exclusively, so this `tools` block is gone.
+    //
+    // Refs: docs/OPENBUDDY_PI_NATIVE_PLAN.md v3 §I.1
+    // ("决策保留 Cordis（用户已在用），删 PI extension adapter（孤儿）").
+    //
+    // No `tools` here — the slash commands `/tasks` + `/todo` cover the
+    // user-visible surface, and the Cordis `task` service remains the
+    // canonical backend (see `electron/main/agent/host-modules/task-service.ts`).
   },
   {
     packageNames: ["pi-session", "pi-sessions", "pi-history", "pi-bookmark", "pi-session-manager", "@anthropic/pi-session"],

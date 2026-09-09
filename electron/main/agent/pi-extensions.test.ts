@@ -817,19 +817,18 @@ describe("OpenBuddy Pi extension resolution", () => {
     expect(listResult.content[0]?.text).toContain("2 active team(s)");
   });
 
-  // Stage G-1d: task adapter registers a real pi tool; sessionId flows through.
-  it("registers a real pi tool for the task adapter and forwards sessionId (Stage G-1d)", async () => {
-    const calls: Array<{ verb: string; sessionId?: string }> = [];
+  // Phase I.1 — task decision: keep Cordis, drop the orphan PI tool.
+  // The Stage G-1d `openbuddy_tasks` tool was retired in Phase I.1 because
+  // every verb it delegated to already exists as a slash command
+  // (`/tasks list|add|done|remove|clear`) that users invoke directly.
+  // The Cordis `task` service now owns the surface exclusively, so this
+  // test verifies the tool is NOT registered — only the slash commands
+  // `/tasks` and `/todo` (handled by the same adapter) project onto Pi.
+  it("Phase I.1: does NOT register an `openbuddy_tasks` pi tool (orphan removed)", async () => {
     const services: Record<string, unknown> = {
       "openbuddy-task": {
-        list: async (sessionId: string) => {
-          calls.push({ verb: "list", sessionId });
-          return [{ id: "t-1", status: "pending" }];
-        },
-        add: async (sessionId: string, content: string) => {
-          calls.push({ verb: "add", sessionId });
-          return { id: "t-2", content };
-        },
+        list: async () => [{ id: "t-1", status: "pending" }],
+        add: async () => ({ id: "t-2" }),
       },
     };
     const result = resolvePiExtensions(
@@ -842,12 +841,49 @@ describe("OpenBuddy Pi extension resolution", () => {
       },
     );
     const tools = collectRegisteredTools(result);
-    expect(tools.has("openbuddy_tasks")).toBe(true);
-    const tool = tools.get("openbuddy_tasks")!;
-    const ctx = { cwd: "/tmp/workspace", sessionManager: { getSessionId: () => "session-xyz" } } as never;
-    const listResult = await tool.execute("tc-1", { verb: "list" }, undefined, undefined, ctx);
-    expect(listResult.details.ok).toBe(true);
-    expect(listResult.content[0]?.text).toContain("t-1");
+    expect(tools.has("openbuddy_tasks")).toBe(false);
+  });
+
+  // Phase I.1 — task adapter still owns the slash commands `/tasks` and
+  // `/todo` (those are the user-facing surface). The Cordis service is the
+  // canonical backend, so the commands route to `openbuddy-task` as before.
+  it("Phase I.1: task adapter still projects slash commands `/tasks` + `/todo`", async () => {
+    const services: Record<string, unknown> = {
+      "openbuddy-task": {
+        list: async () => [],
+        add: async () => ({ id: "t-new" }),
+        update: async () => ({ id: "t-done" }),
+        remove: async () => undefined,
+        clear: async () => undefined,
+      },
+    };
+    const result = resolvePiExtensions(
+      [{ id: "pi-todo" }],
+      {
+        profileDir: "/tmp/profile",
+        resolveSource: () => { throw new Error("unused"); },
+        emit: () => undefined,
+        resolveService: (owner) => services[owner],
+      },
+    );
+    const commands = collectRegisteredCommands(result);
+    expect(commands.has("tasks")).toBe(true);
+    expect(commands.has("todo")).toBe(true);
+    // Run /tasks list through the command handler to confirm the
+    // Cordis service is still the canonical backend.
+    const ctx = {
+      cwd: "/tmp/workspace",
+      sessionManager: { getSessionId: () => "session-xyz" },
+      ui: { notify: () => undefined },
+    } as never;
+    const calls: Array<{ verb: string; sessionId?: string }> = [];
+    services["openbuddy-task"] = {
+      list: async (sessionId: string) => {
+        calls.push({ verb: "list", sessionId });
+        return [{ id: "t-1", status: "pending" }];
+      },
+    };
+    await commands.get("tasks")!("list", ctx);
     expect(calls).toEqual([{ verb: "list", sessionId: "session-xyz" }]);
   });
 
@@ -876,8 +912,10 @@ describe("OpenBuddy Pi extension resolution", () => {
     expect(readResult.content[0]?.text).toContain("// contents of README.md");
   });
 
-  // Stage G-1d: when service is unavailable, tool returns a graceful error.
-  it("returns a graceful error when adapter service is not mounted (Stage G-1d)", async () => {
+  // Phase I.1 — orphan `openbuddy_tasks` tool is gone; the Cordis path
+  // replaces it entirely. This test replaces the old "graceful error when
+  // service not mounted" test because that path no longer exists.
+  it("Phase I.1: pi-todo adapter ships zero tools (orphan removed, Cordis owns surface)", async () => {
     const result = resolvePiExtensions(
       [{ id: "pi-todo" }],
       {
@@ -888,12 +926,9 @@ describe("OpenBuddy Pi extension resolution", () => {
       },
     );
     const tools = collectRegisteredTools(result);
-    const tool = tools.get("openbuddy_tasks")!;
-    // verb=add with no service → invokeTasksCommand returns undefined → bridge
-    // produces a "completed without text summary" payload (not an error).
-    const result2 = await tool.execute("tc-1", { verb: "list" }, undefined, undefined, { cwd: "/tmp/workspace" } as never);
-    expect(result2.details.ok).toBe(true);
-    expect(result2.content[0]?.text).toContain("completed without text summary");
+    // No tools at all — the only surface the LLM has today is the
+    // slash commands `/tasks` and `/todo`, both owned by Cordis.
+    expect(tools.size).toBe(0);
   });
 });
 
@@ -925,6 +960,26 @@ function collectRegisteredTools(
   };
   resolution.factories.forEach((entry) => entry.factory(api as never));
   return tools;
+}
+
+/**
+ * Phase I.1 helper — collect every `pi.registerCommand` call so tests
+ * can assert slash-command projection. Mirrors the pattern in
+ * `collectRegisteredTools` above.
+ */
+function collectRegisteredCommands(
+  resolution: Pick<import("./pi-extensions").PiExtensionResolution, "factories">,
+): Map<string, (args: string, ctx: unknown) => Promise<void>> {
+  const commands = new Map<string, (args: string, ctx: unknown) => Promise<void>>();
+  const api = {
+    on: vi.fn(),
+    registerCommand: vi.fn((name: string, options: { handler: (args: string, ctx: unknown) => Promise<void> }) => {
+      commands.set(name, options.handler);
+    }),
+    registerTool: vi.fn(),
+  };
+  resolution.factories.forEach((entry) => entry.factory(api as never));
+  return commands;
 }
 
 describe("Phase K.2 — OpenBuddyPlugin manifest for builtin extensions", () => {
