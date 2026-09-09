@@ -97,6 +97,19 @@ describe("EventStore", () => {
 });
 
 describe("MigrationRunner", () => {
+  it("rejects duplicate, invalid, and undocumented migration steps before opening the database", () => {
+    expect(() => new MigrationRunner({ steps: [
+      { version: 1, description: "one", up: () => undefined },
+      { version: 1, description: "duplicate", up: () => undefined },
+    ] })).toThrow("Duplicate migration version: 1");
+    expect(() => new MigrationRunner({ steps: [
+      { version: 0, description: "zero", up: () => undefined },
+    ] })).toThrow("positive integer");
+    expect(() => new MigrationRunner({ steps: [
+      { version: 2, description: "   ", up: () => undefined },
+    ] })).toThrow("must have a description");
+  });
+
   it("applies forward migrations idempotently and records schema_meta", async () => {
     driver = new SqliteDriver({ filePath: join(workDir, "store.sqlite") });
     const runner = new MigrationRunner({ steps: DEFAULT_MIGRATIONS });

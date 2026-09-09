@@ -20,6 +20,7 @@ export class MigrationRunner {
   constructor(options: { steps: readonly MigrationStep[]; appVersion?: string }) {
     this.sortedSteps = [...options.steps].sort((a, b) => a.version - b.version);
     this.appVersion = options.appVersion ?? "openbuddy";
+    validateMigrationSteps(this.sortedSteps);
   }
 
   async run(driver: SqliteDriver, targetVersion = Number.POSITIVE_INFINITY): Promise<MigrationResult> {
@@ -80,6 +81,25 @@ export class MigrationRunner {
       applied += 1;
     }
     return { applied, finalVersion: current, history };
+  }
+}
+
+function validateMigrationSteps(steps: readonly MigrationStep[]): void {
+  const seen = new Set<number>();
+  for (const step of steps) {
+    if (!Number.isInteger(step.version) || step.version <= 0) {
+      throw new Error(`Migration version must be a positive integer: ${String(step.version)}`);
+    }
+    if (seen.has(step.version)) {
+      throw new Error(`Duplicate migration version: ${step.version}`);
+    }
+    if (!step.description.trim()) {
+      throw new Error(`Migration ${step.version} must have a description`);
+    }
+    if (typeof step.up !== "function") {
+      throw new Error(`Migration ${step.version} must define an up function`);
+    }
+    seen.add(step.version);
   }
 }
 
