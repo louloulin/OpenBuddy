@@ -1,3 +1,14 @@
+/**
+ * @deprecated Phase L.3 — see docs/OPENBUDDY_PI_NATIVE_PLAN.md §11.2.
+ * This entire module (445 LOC) is targeted for deletion in Phase L.3 step 2 of
+ * the v7/v8 plan. K.2 (commit 27f0280) replaced the manifest serialization
+ * entry point with `openbuddy-plugin-manifest.ts` + `serializeHarnessTrack`;
+ * L.3 removes this file and migrates the 14 call sites to PI
+ * `loadExtensions()` directly.
+ *
+ * Marking with @deprecated so ESLint and code review surface the migration
+ * targets. Remove this header and the file in the L.3 step 2 commit.
+ */
 import * as OpenBuddyCordis from "@openbuddy/cordis";
 import { OpenBuddyService } from "@openbuddy/cordis";
 import { stat } from "node:fs/promises";

@@ -1,3 +1,16 @@
+/**
+ * @deprecated Phase L.3 step 1 — see docs/OPENBUDDY_PI_NATIVE_PLAN.md §11.2.
+ * This file (1545 LOC) is targeted for slim-shim reduction to ~200 LOC in
+ * Phase L.3 step 1, and complete removal in step 2. The full removal chain:
+ *   - `electron/main/deepseek/deepseek-generic.ts`        1545 → 0 (L.3 step 1+2)
+ *   - `electron/main/deepseek/deepseek-compat.ts`         445 → 0 (L.3 step 2)
+ *   - `electron/main/deepseek/deepseek-compat.test.ts`    2039 → 0 (L.3 step 2)
+ *   - `electron/main/deepseek/deepseek-agentloop-pi-smoke.test.ts` 833 → 400 (L.3 step 3)
+ * Total -4608 LOC by end of L.3.
+ *
+ * The 3 call sites of this file (`workbench-scope.ts:144`, `init-plugin-loader.ts:89`,
+ * `deepseek-compat.ts:442`) will be migrated to PI `loadExtensions()` directly.
+ */
 import { OpenBuddyService, type Context } from "@openbuddy/cordis";
 import { Script } from "node:vm";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";

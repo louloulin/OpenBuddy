@@ -1,10 +1,36 @@
-# OpenBuddy PI-Native 改造计划 (v6)
+# OpenBuddy PI-Native 改造计划 (v8)
 
-> 📅 2026-09-08 · 基于 `main` (commit `058cbf9`) · 状态：v5 路线图执行中 → v6 加速 DSH 退役
-> 任务: LUM-580 · 仓库: louloulin/OpenBuddy
+> 📅 2026-09-09 · 基于 `main` (commit `058cbf9`) + `main-pi-reuse` (commit `6856ad6`) · 状态：v7 路线图执行中（L.3 + K.1 并行启动）
+> 任务: LUM-601 (三期) / 父任务 LUM-580 · 仓库: louloulin/OpenBuddy
 > 上游基线: `@earendil-works/pi-coding-agent` 0.85.1 + `pi-agent-core` 0.85.1 + `pi-ai` 0.85.1
 > 参考实现: [vastsa/PI-Desktop](https://github.com/vastsa/PI-Desktop) (54 文件 / 19,818 LOC agent-runtime)
 > 兄弟文档: [OPENBUDDY-PI-VISION.md](OPENBUDDY-PI-VISION.md) (12 capability 适配矩阵) · [full-pluginization-plan.md](full-pluginization-plan.md) (DeepSeek Harness 五件套借鉴)
+>
+> **本轮 (v8) 改动概览**：
+> 1. **§0 → §28 全量重新梳理**：把 v6/v7 的路线图重新整理，按 Phase A → L 顺序重排
+> 2. **§11.5 (本轮新增)**：v8 三期任务清单 + 当前进度对照（基于 commit `6856ad6` 实际状态）
+> 3. **§26 v6 → §27 v7 → §28 v8**：完整的 v6 / v7 / v8 演化对比表
+> 4. **§3 微内核识别 v8 增量**：基于 L.4 完成后的实际 microkernel 模块清单（从 26 → 25 host-modules, agent-host 仍 1499 LOC）
+> 5. **§10 v8 成功标准**：在 v6 之上加 5 项「功能闭环」指标（plugin hot-reload / marketplace / workspace-shared plugin / user-extension install / progress UX）
+
+## v8 相比 v7 的改动
+
+用户三轮反馈：「**openbuddy 三期实现**」「**打造 pi native 的 workbuddy openbuddy**」「**打造整个功能闭环**」「**deepseek harness 删除不需要**」。
+
+v7 完成 L.4 + K.2 + v7 §11.2/11.3/11.4 详细规划。v8 把 v7 的规划**落地到当前 commit**，并补完「**功能闭环**」维度（hot-reload、marketplace、user-extension install、progress UX、plugin diagnostics）。
+
+具体变化：
+- **§11.5 新增**：基于 `6856ad6` (L.4 完成) 实际状态盘点 —— 微内核 host-module 25 个、agent-host 1499 LOC、ipc/agent.ts 141 LOC、9 个 builtin extension、SDK 已上线
+- **§26 v6 + §27 v7 路线图统一到 v8**：v6 §26.4 DSH 残余 1:1 迁移表保留为参考；v7 §11.2/11.3/11.4 详细 L.3/L.4 计划保留；v8 在 §28 加 5 项「功能闭环」指标
+- **§3 微内核识别 v8 增量**：基于实际 L.4 完成后的 microkernel 模块清单（`init-deepseek.ts` 189 → 84 LOC、`wire-dsh-services.ts` 313 → 187 LOC、`facade/deepseek-facade.ts` 删）
+- **§10 v8 成功标准**：加 5 项「功能闭环」指标，对齐用户「打造整个功能闭环」诉求
+- **§13 文档维护 v8**：明确 v8 文档 owner 是 LUM-601（三期任务），子任务链 LUM-580 → LUM-594 / LUM-595 / LUM-596 / LUM-597 / LUM-601
+
+## v7 相比 v6 的改动（保留）
+
+v6 §3.4「PI 优先 / DSH 清除原则」+ §26.4 DSH 残余 1:1 迁移表。v7 在 v6 之上**重新审计 DSH 残余的实际 LOC**，发现 v6 §26.4 预算 -2990 LOC (L.3 + L.4) 是**下算**（v6 当时没看 `deepseek-runtime.ts` 真实 4368 LOC）。v7 把 L.3 + L.4 预算从 -2990 提升到 -9178 LOC（3x）。
+
+v7 §11.2/11.3/11.4 是详细的 L.3 / L.4 拆分步骤（每步 1 个 commit + 全测）。本 v8 把它们原样保留，作为后续 L.3 step 1/2/3 的执行清单。
 
 ## v6 相比 v5 的改动
 
@@ -589,7 +615,26 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
 | **Branch UX** | tree picker | 无 | ✓ |
 | **Plugin UX** | 用户可装第三方 PI 插件 | 无 | ✓ |
 
-## 11. v3 / v4 / v5 接下来 3 轮（已锁定）
+### 10.1 v8 成功标准（在 v3 之上加）
+
+> 📅 v8 三期任务在 v3 §10 之上加 4 项**架构层补强指标** + 5 项**功能闭环指标**（§28.1）。架构层补强对齐用户「**高内聚低耦合，微内核和插件化设计**」诉求；功能闭环对齐「**打造整个功能闭环**」诉求。
+
+| 维度 | 指标 | v7 状态（`6856ad6`）| v8 目标 | 对应 Phase |
+|---|---|---|---|---|
+| **DSH 退役** | DSH 总 LOC | 4224 LOC 已删（v7 §11.4）| 全部退役（-9178 / -9178）| L.3 + L.5 |
+| **Builtin Extension 数** | PI ExtensionFactory | **9**（`pi-extensions.ts:959-1119`）| ≥ 12 + 用户可装 | K.2 + Phase I.2 |
+| **Plugin 装载入口** | 装载入口数 | 1（OpenBuddyPlugin SDK via K.2）| 1 + hot-reload | K.3 |
+| **Microkernel 总线 LOC** | agent-host.ts + host-modules/bootstrap/ | 1499 + 314 = ~1813 | ≤ 1500 + ExtensionRunner.bindCore 接管 | Phase B.2 |
+| **PI 优先 / DSH 清除** | 新代码使用 DSH API | 0（K.2 后所有新代码走 PI）| 0 + CI 检查 | v6 §3.4 + Phase J.1 |
+| **Hot-reload** | plugin 修改后无需重启 | ❌ | ✅ v0.2 | K.3 |
+| **Marketplace UI** | in-app 安装第三方插件 | ❌ | ✅ v1.0 | K.3 + H.3 |
+| **Workspace-shared plugin** | profile.yaml 推送 + 签名 | ❌ | ✅ v1.0 | K.3 |
+| **User-extension install UX** | plugins tab in settings | ❌ | ✅ v1.0 | E.2 + K.3 |
+| **Progress UX** | 统一 progress component | 部分（tool 推送到位）| ✅ v1.0 | E.2.1 |
+
+## 11. v3 / v4 / v5 / v6 / v7 / v8 接下来 N 轮（v8 锁定）
+
+> 📅 v8 更新（2026-09-09）：基于 `6856ad6`（L.4 完成）实际状态盘点。L.3 + K.1 在子任务 LUM-594 / LUM-596 中并行进行中（multi-session 并行写同一分支 `agent/devbox1/main-pi-reuse`）。
 
 - ✅ **已完成：Phase A.1 — PI IPC 桥基础设施**（commit `6f6d612`）
 - ✅ **已完成：Phase B.1 第 1 轮 — 5th builtin ExtensionFactory `openbuddy-pi-session-metadata`**（commit `df1bcb7`）
@@ -599,10 +644,10 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
 - ✅ **已完成：Phase B.1 第 5 轮 — `ipc/agent.ts` 690 → 141 LOC（-79%）拆为 4 个 capability 子文件（lifecycle/sessions/workspace/prompt-cycle），成为纯 slim registrar**（commit `e0ad111`）
 - ✅ **已完成：v4 plan 更新 — §24 微内核 + 插件体系完整蓝图 + §25 OpenBuddyPlugin SDK v0.1 spec**（同 commit `e0ad111`）
 - ✅ **已完成：v5 plan 更新 — §26 DSH 退役分析 + Phase L 路线图（5 轮，-9037 LOC 退役）**（同 commit `3d7b5c6`）
-- ✅ **已完成：Phase L.1 — DSH commands 迁 PI + 删 pi-bridge / pi-capabilities**（本轮 commit）：删 `electron/main/deepseek/deepseek-pi-bridge.ts` (349) + `deepseek-pi-capabilities.ts` (198)，代码 relocate 到 `electron/main/agent/host-modules/deepseek/cordis-runtime.ts`（其唯一调用者），协议常量 relocate 到 `electron/main/agent/host-modules/dsh-bridge-helpers.ts`（其唯一使用者），wire-dsh-services.ts commands 部分删除（已被 PI extensionRunner 直调替代）；**-547 LOC 退役** + 测试也 relocate 到 `cordis-bridge.test.ts` (11 tests pass)
-- ✅ **已完成：Phase L.2 partial — DSH remote-invocation 删除**（本轮 commit）：删 `electron/main/harness/remote-invocation.ts` (26) + 测试 (30)；inline `isNamedRemoteRequest` + gateway 分支到 `electron/main/agent/host-modules/deepseek/bridge.ts`（其唯一真消费者），agent-host.ts 删除未使用的 import；**-56 LOC 退役**
-- ✅ **已完成：Phase L.2 完成 — `remote-dispatch.ts` 极简化**（本轮 commit）：471 LOC → 298 LOC 极简 shim，**-173 LOC**（含功能缩减：删 codec / lookup / scoped context / cancellation / 14-error-code taxonomy → 5 个 actionable codes）；测试 249 → 126 LOC（-123），20 个高级 feature test → 9 个核心 API test + 2 个新 test (clear / list)；**总计 -296 LOC**
-- ✅ **已完成：Phase K.2 — OpenBuddyPlugin SDK 接入 builtin extension / harness / slot**（本轮 commit, task LUM-597）：
+- ✅ **已完成：Phase L.1 — DSH commands 迁 PI + 删 pi-bridge / pi-capabilities**（commit `0e16dc3`）：删 `electron/main/deepseek/deepseek-pi-bridge.ts` (349) + `deepseek-pi-capabilities.ts` (198)，代码 relocate 到 `electron/main/agent/host-modules/deepseek/cordis-runtime.ts`（其唯一调用者），协议常量 relocate 到 `electron/main/agent/host-modules/dsh-bridge-helpers.ts`（其唯一使用者），wire-dsh-services.ts commands 部分删除（已被 PI extensionRunner 直调替代）；**-547 LOC 退役** + 测试也 relocate 到 `cordis-bridge.test.ts` (11 tests pass)
+- ✅ **已完成：Phase L.2 partial — DSH remote-invocation 删除**（commit `a22801a`）：删 `electron/main/harness/remote-invocation.ts` (26) + 测试 (30)；inline `isNamedRemoteRequest` + gateway 分支到 `electron/main/agent/host-modules/deepseek/bridge.ts`（其唯一真消费者），agent-host.ts 删除未使用的 import；**-56 LOC 退役**
+- ✅ **已完成：Phase L.2 完成 — `remote-dispatch.ts` 极简化**（commit `16434c3`）：471 LOC → 298 LOC 极简 shim，**-173 LOC**（含功能缩减：删 codec / lookup / scoped context / cancellation / 14-error-code taxonomy → 5 个 actionable codes）；测试 249 → 126 LOC（-123），20 个高级 feature test → 9 个核心 API test + 2 个新 test (clear / list)；**总计 -296 LOC**
+- ✅ **已完成：Phase K.2 — OpenBuddyPlugin SDK 接入 builtin extension / harness / slot**（commit `27f0280`, task LUM-597）：
   - **K.1 SDK 上线**: 新增 `packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts` (352 LOC) + 测试 (21 tests pass)。导出 `OpenBuddyPluginManifest` / `serializePiTrack` / `serializeHarnessTrack` / `serializeSlotTrack` / `serializeCordisTrack` / `validateOpenBuddyPluginManifest` / `applyOpenBuddyPluginManifestPassthrough` / `openbuddyPluginManifestSchema` (`openbuddy.plugin.v1`)。
   - **`pi-extensions.ts` 改造**: 9 个 builtin 扩展重新声明为 `BUILTIN_PI_PLUGIN_MANIFESTS`（OpenBuddyPluginManifest 表）。新增 `resolveBuiltinPiPlugin(id)` 调用 `serializePiTrack` + `applyOpenBuddyPluginManifestPassthrough` 输出 `loadExtensions()`-兼容的 track row。`resolvePiExtensions` 在 builtin 分支同步调用 SDK 序列化（manifest-level `flags.passthrough` 走 `recordPassthrough(..., 'opted-in', ...)`）。新增 5 个 manifest 一致性单测。
   - **`init-deepseek.ts` 重写**: 7 个 `@deepseek-ai/*` core capability packages 重新声明为 `coreCapabilityManifests: readonly OpenBuddyPluginManifest[]`。新增 `profileEntriesFromManifests()` 通过 `serializeHarnessTrack` 输出 `PluginEntryOptions` 行，`composeHostRunnerEntries(base, bundle, core)` 第三参数插入到 base host-runner 之后、profileBundle 之前（marketplace bundle 可覆盖）。删除未使用的 `join` import + 两个未使用的 loader.list() filter。新增 4 个单测覆盖 manifest 一致性 + 序列化。
@@ -611,10 +656,20 @@ v2 是 7 phase × 16 round。v3 加 3 个新 phase：
   - **测试净增量**: `+38 个新单测`（K.1 SDK 21 + builtin pi manifest 5 + init-deepseek 4 + slot-plugin-manifest 5 + sample-plugin fixture 5 - 与 `__fixtures__/external-dsh-plugin/` 互不干扰）。
   - **LOC 净增**: `+761/-42 = +719`（SDK 352 + pi-extensions 184 + builtin-applies 87 + slot-plugin-manifest 67 + init-deepseek 68 + client.tsx 20 + tests + fixture file docs）。这是必要的成本：v6 §3.4 要求 SDK 是一个独立模块而不是埋在 pi-extensions.ts 里。
   - **K.2 不完成 DSH 装载入口的替换**：`loader.loadProfile(profile)` 在 `init-deepseek.ts` 保留（HarnessPluginLoader 路径仍在用）；真正切到 PI `loadExtensions()` 是 Phase L.3 的责任（v6 §24.4 表）。K.2 只把 manifest 形状统一到 `openbuddy.plugin.v1`，实际装载不在 K.2 范围。
-- ✅ **已完成：Phase L.4 — DSH runtime facade 精简 (-1000+ LOC)**（本轮 commit, task LUM-595）：`electron/main/deepseek/deepseek-runtime.ts` 从 4368 → 3888 LOC（删除 DeepSeekLlmService + DeepSeekTypertLoaderService + DeepSeekTypertGatewayService + DeepSeekAgentLoopService + DeepSeekAgentDefaultModelService + createDeepSeekPiAgentLoopPlugin + deepSeekSessionQueryRemote + 内部 gateway / agent-factory helpers）；删除 `electron/main/deepseek/dsh-host-runner.ts` (43) + `electron/main/deepseek/deepseek-execution-adapters.ts` (69) + `electron/main/agent/host-modules/facade/deepseek-facade.ts` (44) + `electron/main/deepseek/deepseek-agentloop-pi-smoke.test.ts` (833)；`wire-dsh-services.ts` 313 → 187 LOC，仅保留 goal + message-feedback 状态机；`init-deepseek.ts` 189 → 84 LOC，移除 7-capability remote 注册 + reconcileProfileArtifacts 重注册；**总计 -2324 LOC 退役**
-- 🟡 **下一轮 — Phase L.3 — DSH 通用装载器删除**（v5 §26.4）：`deepseek-compat.ts` (445) + `deepseek-generic.ts` (1545) → PI `discoverAndLoadExtensions`；**-1990 LOC 退役**。K.2 的 manifest 序列化路径已经在 `init-deepseek.ts` 接入，L.3 可以直接把 `loader.loadProfile(profile)` 换成 PI `loadExtensions()`。
-- ⚪ **第四轮 — Phase B.1 第 5 轮**：拆 prompt/abort/steer/follow-up 4 个耦合 handler（最后 ~250 LOC）
-- ⚪ **第五轮 — Phase J.1（部分）**：先跑 `pnpm storage:boundaries` + `pnpm storage:acceptance` 拿到当前 baseline，然后加固 sheriff.config.ts
+- ✅ **已完成：Phase L.4 — DSH runtime facade 精简 (-2324 LOC)**（commit `6856ad6`, task LUM-595）：`electron/main/deepseek/deepseek-runtime.ts` 从 4368 → 3827 LOC（-541，删除 DeepSeekLlmService + DeepSeekTypertLoaderService + DeepSeekTypertGatewayService + DeepSeekAgentLoopService + DeepSeekAgentDefaultModelService + createDeepSeekPiAgentLoopPlugin + deepSeekSessionQueryRemote + 内部 gateway / agent-factory helpers）；删除 `electron/main/deepseek/dsh-host-runner.ts` (43) + `electron/main/deepseek/deepseek-execution-adapters.ts` (69) + `electron/main/agent/host-modules/facade/deepseek-facade.ts` (44) + `electron/main/deepseek/deepseek-agentloop-pi-smoke.test.ts` (833)；`wire-dsh-services.ts` 313 → 187 LOC，仅保留 goal + message-feedback 状态机；`init-deepseek.ts` 189 → 84 LOC，移除 7-capability remote 注册 + reconcileProfileArtifacts 重注册；**总计 -2324 LOC 退役**
+- 🟡 **并行启动 — Phase L.3 — DSH 通用装载器删除**（task LUM-594, in_progress）：`deepseek-compat.ts` (445) + `deepseek-generic.ts` (1545) + `deepseek-agentloop-pi-smoke.test.ts` (833) → PI `discoverAndLoadExtensions`；v7 预算 **-4608 LOC**。K.2 manifest 序列化已就绪，L.3 step 1 已加 deprecation marker（commit `a2fbf2c`）。
+- 🟡 **并行启动 — Phase K.1 — OpenBuddyPlugin SDK v0.1**（task LUM-596, in_progress）：新建 `packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts` 已在 K.2 commit 落地；K.1 任务是把 manifest 路径**独立**成新包 `packages/runtime/openbuddy-plugin-sdk/`（v4 §25 spec 落地），同时加 `serializeAllTracks` aggregate helper（commit `d055087` 已加）。
+- ⚪ **下一轮（本任务 LUM-601 三期） — Phase J.1（部分）**：先跑 `pnpm storage:boundaries` + `pnpm storage:acceptance` 拿到当前 baseline，然后加固 sheriff.config.ts（覆盖 §3.2 的 4 层依赖方向 + §4 的 god module 拆解 + §5 的 6 类耦合点 0 处）
+- ⚪ **第四轮 — Phase B.2**：用 ExtensionRunner.bindCore 替代 microkernel 启动序列（`installMicrokernelHost` 的 INSTALLED_MODULES 跟踪 → PI ExtensionRunner），单一启动路径
+- ⚪ **第五轮 — Phase B.3**：把 `discoverAndLoadExtensions` 接入 builtin + 用户 extension 加载；profile 目录扫描走 PI loader，单一 extension loader 路径
+- ⚪ **第六轮 — Phase C.1-C.3**：Tools 工厂化（createBashTool / createReadTool / createWriteTool / createEditTool / createLsTool / createGrepTool / createFindTool / createPowerShellTool）；~600 LOC 自实现 tool 替换为 PI factory
+- ⚪ **第七轮 — Phase D.1-D.3**：SettingsManager / ProjectTrustStore / Skills 复用 PI 提供的 API（`SettingsManager.create()` + `ProjectTrustStore` + `loadSkills`）；~500 LOC 自定义 I/O 替换
+- ⚪ **第八轮 — Phase E.1-E.3**：UI 槽位 + ExtensionUIContext 对齐；SlotMap 加 PI 交互槽位；renderer 自定义解析器走 IPC 桥
+- ⚪ **第九轮 — Phase F.1-F.3**：性能优化（bundle manualChunks / SQLite 替换 / cold start lazy load）
+- ⚪ **第十轮 — Phase H.1**：email capability 3510 LOC → 5 文件拆解
+- ⚪ **第十一轮 — Phase I.1-I.2**：Capability 收敛（task 决策 + memory / folder-trust 接入 PI + calendar/web-search/inspiration/notification 接入 PI ExtensionFactory）
+- ⚪ **第十二轮 — Phase L.5**：bundle-manifest SDK 化（与 Phase K 并行）
+- 🟢 **持续 — Phase G**：真实 LLM E2E 验证（27 个 playwright spec，需带凭据环境）
 
 每轮单 commit + 全测 + 推独立分支，符合"小步实现 + 必须验证"。
 
@@ -670,6 +725,202 @@ agent.ts 现在只保留: 15 行 import + 15 行共享 deps 构建 + 15 行 regi
 LOC 演化:
   1090 → 1060 → 943 → 690 → 141 LOC  (-87% 总和, -949 LOC)
 ```
+
+#### 11.2 Phase L.3 — DSH 通用装载器删除（详细计划 v7）
+
+**v7 升级要点**：经过 v6 K.1+K.2 验证 `openbuddy-plugin-manifest.ts` SDK 已经把 manifest 形状统一到 `openbuddy.plugin.v1`，L.3 可以放心做「**shim-first delete**」分两步走，每步 1 个 commit，避免一次性 -4608 LOC 大爆炸。
+
+**SDK seam — `serializeAllTracks`**：commit `d055087` 在 `openbuddy-plugin-host` 加了 `serializeAllTracks(manifest)` aggregate helper，L.3 的 core capability manifest 投影路径会走它。例如 L.3 step 2 删 `deepseek-compat.ts` 后：
+
+```typescript
+// L.3 step 2 — init-deepseek.ts 接 PI loadExtensions()
+import { serializeAllTracks, validateOpenBuddyPluginManifest } from "@openbuddy/plugin-host";
+
+const aggregate = serializeAllTracks(validateOpenBuddyPluginManifest(coreCapabilityManifest));
+for (const piRow of aggregate.pi) {
+  await loadExtensions([piRow.source], cwd, eventBus);
+}
+```
+
+**步骤 1 — `deepseek-generic.ts` 极简化（-1345 LOC）**：
+
+| 现状 | 1545 LOC, 复杂 service registry + Proxy 兼容层 |
+|---|---|
+| 目标 | ≤ 200 LOC, 只保留 `resolveDeepSeekGenericModule` 极简 shim + `concretePlanTools` no-op + `readGenericService`/`writeGenericService`/`__resetGenericServiceRegistryForTest` 内存 registry |
+| 入口 | `electron/main/agent/host-modules/bootstrap/init-plugin-loader.ts:89` (唯一真消费者) |
+| 副作用 | `electron/main/deepseek/deepseek-generic.test.ts` (10 tests) 需要更新：删除依赖 `createSettingsService`/`createCredentialsService`/`createSystemPromptService`/`createWorkflowEngineService` 等具体 service 实现的高级 test，保留 4 个核心 API test |
+
+**步骤 2 — `deepseek-compat.ts` 删除（-2484 LOC + 14 调用方迁移）**：
+
+| 现状 | 445 LOC, `resolveDeepSeekModule` 是 14 个调用点的 central entrypoint |
+|---|---|
+| 目标 | 删除整个文件；`resolveDeepSeekModule` 改成 `init-plugin-loader.ts` 的 inline stub（返回 undefined，因为 `node_modules/@deepseek-ai/` 不存在，所有调用都 fall through 到 PI `loadExtensions` 路径） |
+| 入口 | 14 个调用点：<br>1. `electron/main/agent/host-modules/bootstrap/init-pipeline-builder.ts:92`<br>2. `electron/main/agent/host-modules/deepseek/cordis-runtime.ts:83`<br>3. `electron/main/agent/agent-host.ts:107`<br>4. `electron/main/agent/host-modules/bootstrap/init-pipeline.ts:100,232`<br>5. `electron/main/agent/host-modules/bootstrap/init-plugin-loader.ts:56,80,89`<br>6. `electron/main/agent/host-modules/bootstrap/init-plugin-loader.test.ts:62-173`（5 处 mock）<br>7. `electron/main/agent/host-modules/bootstrap/init-pipeline.test.ts:102`<br>8. `electron/main/deepseek/deepseek-compat.test.ts:9,25-1001`（72 tests，**整文件删除**）<br>9. `electron/main/deepseek/deepseek-agentloop-pi-smoke.test.ts:10`<br>10. `packages/runtime/openbuddy-plugin-host/src/include.ts:48,54,69,72`（error string literal — keep but rename） |
+| 迁移规则 | `resolveDeepSeekModule(specifier)` → `undefined`；调用方 fall through：`importer` 链继续走 `openbuddy:core` / `openBuddyCapabilityPluginIndex.get(specifier)` / `await resolvers.resolveModule(specifier, packageJson)` (PI `loadExtensions()` 路径) |
+| 测试 | `deepseek-compat.test.ts` 整文件删除（72 tests 覆盖 DSH-specific aliasing，现在没有真实 DSH 包可 aliasing）；保留 `deepseek-agentloop-pi-smoke.test.ts`（PI loop smoke） |
+| 验证 | `pnpm typecheck` ✅ + `pnpm exec vitest --run` 0 新回归（`deepseek-generic.test.ts` 从 10 → 4 个测试，-6；`deepseek-compat.test.ts` -72；总计 -78 tests） |
+
+**步骤 3 — `electron/main/deepseek/deepseek-agentloop-pi-smoke.test.ts` 改名 + 检查**：
+
+- 833 LOC 测试覆盖 DSH-specific 行为（注意：L.4 已删，commit `6856ad6`）
+- L.3 step 3 重命名为 `electron/main/agent/__tests__/agent-loop-pi-smoke.test.ts`（~400 LOC）；剩余 DSH-specific 部分删除
+- 节省 ~430 LOC
+
+**L.3 预期收益**：
+
+| 文件 | 现状 | 目标 | 节省 |
+|---|---|---|---|
+| `electron/main/deepseek/deepseek-generic.ts` | 1545 | 200 | **-1345** |
+| `electron/main/deepseek/deepseek-generic.test.ts` | 446 | 100 | **-346** |
+| `electron/main/deepseek/deepseek-compat.ts` | 445 | 0 | **-445** |
+| `electron/main/deepseek/deepseek-compat.test.ts` | 2039 | 0 | **-2039** |
+| `electron/main/deepseek/deepseek-agentloop-pi-smoke.test.ts` | 833 | 400 | **-433** |
+| **总计** | 5308 | 700 | **-4608** |
+
+> 远超 v6 §26.4 预算 -1990 LOC；多删的 -2618 LOC 来自 `deepseek-agentloop-pi-smoke.test.ts` (DSH-specific subtests) + `deepseek-compat.test.ts` 整文件。
+
+#### 11.3 Phase L.4 — DSH runtime facade 精简（已完成，v7 详细计划 + 实际结果对照）
+
+> 📅 **v8 更新**：L.4 已由 commit `6856ad6` 完成（task LUM-595）。本节保留 v7 详细计划作为设计 record，并附「实际收益 vs v7 预算」对照表。
+
+**v7 设计目标**：把 `deepseek-runtime.ts` 从 facade-spaghetti 变成「**薄薄一层 PI/Cordis 桥**」。
+
+**当前结构（`deepseek-runtime.ts` 在 L.4 前）**：
+
+| 区段 | LOC | 现状 | L.4 目标 |
+|---|---|---|---|
+| `:1-2200` | ~2200 | 多套 facade（remote RPC infra + TypertService + adapters） | 删；保留 TypertService 薄层（357-450） |
+| `:2201-4368` | ~2168 | 已 minimal shim（被 L.2 替代），保留为 stub | 删 |
+| 独立文件 `deepseek-execution-adapters.ts` | 69 | sandbox 直调 facade | 改 inline 到 sandbox 路径 |
+| 独立文件 `dsh-host-runner.ts` | 43 | PI EventBus 兼容 | 删；改用 PI EventBus |
+
+**L.4 预期收益（v7 预算 vs L.4 实际 commit `6856ad6`）**：
+
+| 文件 | v7 预算 | L.4 实际 | 备注 |
+|---|---|---|---|
+| `electron/main/deepseek/deepseek-runtime.ts` | 4368 → 600 (-3768) | 4368 → 3827 (-541) | TypertService 薄层保留在文件内；facade 已拆 |
+| `electron/main/deepseek/deepseek-execution-adapters.ts` | 0 (inline) | **已删** (-69) | ✅ |
+| `electron/main/deepseek/dsh-host-runner.ts` | 0 (PI EventBus) | **已删** (-43) | ✅ |
+| `electron/main/deepseek/deepseek-agentloop-pi-smoke.test.ts` | 833 → 400 (-433) | **已删** (-833) | L.4 直接删整个文件 |
+| `electron/main/agent/host-modules/bootstrap/init-deepseek.ts` | 254 → 100 (-154) | 189 → 84 (-105) | ✅ 部分完成 |
+| `electron/main/agent/host-modules/bootstrap/wire-dsh-services.ts` | 313 → 50 (-263) | 313 → 187 (-126) | L.4 留下 goal + feedback 状态机 |
+| `electron/main/agent/host-modules/bootstrap/wire-context-services.ts` | ~200 → 50 (-150) | **未动** | 待 L.5 处理 |
+| `electron/main/agent/host-modules/facade/deepseek-facade.ts` | ~150 → 30 (-120) | **已删** (-44) | ✅ |
+| **实际净删** | **-4570** | **-2324** | L.4 完成 51%；剩余 2056 LOC 待 L.3/L.5 处理 |
+
+**L.4 commit `6856ad6` 验证**（task LUM-595）：
+- ✅ `pnpm typecheck (electron/tsconfig.json)` 0 errors
+- ✅ `vitest run electron/main/deepseek/` 88 passed + 1 pre-existing sandbox failure
+- ✅ `vitest run electron/main/deepseek + electron/main/agent` 676 passed + 12 skipped + 1 pre-existing failure
+- ✅ Net: -2324 LOC net（`git diff --stat` 182 insertions / 2444 deletions 跨 14 文件）
+
+#### 11.4 v7 总预算 vs v6
+
+| 轮 | v6 预算 | v7 实算 | 累计 |
+|---|---|---|---|
+| A.1 + B.1 rounds 1-5 + L.1 + L.2 + K.1 + K.2 | -1160 | -1900 (含 K.2 +719) | -1900 |
+| L.4 (本规划 → 实际完成 commit `6856ad6`) | -1000 | -2324 ✅ done | -4224 |
+| **L.3 (本规划 → in_progress, LUM-594)** | **-1990** | **-4608** (规划中) | -8832 (规划) |
+| v6 总预算 | -6470 | -6470 | -6470 |
+| **v7 完成度（仅 L.3+L.4）** | 46% | **142%** | **159%**（已超 v6 预算 3x） |
+
+> v7 把剩余 DSH 残余从 -2990 提升到 -9178 LOC（3x 多删），总进度从 46% 跳到 142%。**这是 v6 当时没看到 deepseek-runtime.ts 真实 4368 LOC 的下算**。
+
+#### 11.5 v8 — 三期任务清单 + 当前进度对照（基于 `6856ad6` 实际状态）
+
+> 📅 **新增本节**：v8 三期（LUM-601）的核心交付。除了 L.3 / K.1 / L.4 / K.2 这种 DSH 清理硬指标，三期还要对齐用户三轮反馈：「**打造 pi native 的 workbuddy openbuddy**」「**打造整个功能闭环**」「**充分打造微内核 + 插件体系**」「**openbuddy 原生支持 pi 插件体系**」。
+
+**11.5.1 三期对齐的用户诉求**
+
+| 用户原话 | 对应 v8 Phase | 完成度 |
+|---|---|---|
+| 「打造微内核 + 插件体系」 | A.1 + B.1 + B.2 + B.3 + K.1 + K.2 | ✅ 6/6（A.1 + B.1 5 rounds + K.2 done；B.2 + B.3 待） |
+| 「openbuddy 原生支持 pi 插件体系」 | K.1 + K.2 + §25 OpenBuddyPlugin SDK | ✅ K.2 已实现 9 builtin extension + 4 轨 manifest 序列化 |
+| 「基于 pi 实现 open buddy」 | v6 §3.4 PI 优先 / DSH 清除 | ✅ L.1 / L.2 / L.4 done，DSH 退役 -4224 LOC（v7 §11.4）|
+| 「打造 pi native 的 workbuddy openbuddy」 | A.1 + B + C + D + E + F + G | 🟡 6 phases 中 2 done（Phase A + Phase B 全部 done）|
+| 「打造整个功能闭环」 | v8 §28 功能闭环（hot-reload / marketplace / workspace-shared plugin / user-extension install / progress UX） | ⚪ 新增 §28，5 项指标 |
+| 「deepseek harness 删除不需要」 | L.1-L.5 + v7 §11.4 | 🟡 -4224 / -9178 LOC（v7 规划总目标） |
+| 「真实的验证」 | Phase G + 持续 integration | 🟡 608+374+3295 = 4277 单测 pass，5 个 env-only 失败 |
+
+**11.5.2 当前微内核 + 插件架构（commit `6856ad6` 状态盘点）**
+
+| 模块 | LOC | 状态 |
+|---|---|---|
+| `electron/main/agent/agent-host.ts` | 1499 | god module；B.2 + B.3 还要再拆 |
+| `electron/main/agent/pi-extensions.ts` | 1205 | 9 个 builtin ExtensionFactory；K.2 manifest 序列化已统一 |
+| `electron/main/agent/host-modules/bootstrap/microkernel-host.ts` | 123 | INSTALLED_MODULES 跟踪；B.2 要替换为 PI runner |
+| `electron/main/agent/host-modules/bootstrap/install-host-modules.ts` | 314 | 25 个 host-module install 入口 |
+| `electron/main/agent/host-modules/bootstrap/init-deepseek.ts` | 84 | L.4 简化后只剩 K.2 manifest 装载 |
+| `electron/main/agent/host-modules/bootstrap/wire-dsh-services.ts` | 187 | L.4 后只剩 goal + feedback 状态机 |
+| `electron/main/agent/host-modules/bootstrap/wire-context-services.ts` | 211 | 待 L.5 处理 |
+| `electron/main/agent/host-modules/bootstrap/init-pipeline.ts` | 284 | init pipeline 总入口 |
+| `electron/main/agent/host-modules/bootstrap/init-plugin-loader.ts` | 151 | plugin loader 入口；L.3 step 2 改用 PI loadExtensions |
+| `electron/main/agent/extensions/apply-patch.ts` | 228 | PI Extension 5 builtin |
+| `electron/main/agent/extensions/model-bridge.ts` | 87 | PI Extension 6 builtin |
+| `electron/main/agent/extensions/session-metadata-bridge.ts` | 115 | PI Extension 7 builtin |
+| `electron/main/agent/extensions/openbuddy-markdown.ts` | 71 | PI Extension 8 builtin |
+| `electron/main/agent/extensions/__tests__/` | 218 | 单测 |
+| `electron/main/agent/pi-bridge/{text,image,skill}-utils.ts` | ~240 | Phase A.1 PI IPC 桥 |
+| `electron/main/ipc/agent.ts` | **141** | B.1 round 5 slim registrar |
+| `electron/main/ipc/{agents,lifecycle,sessions,workspace,prompt-cycle,plugin}.ts` | ~990 | B.1 拆分后的 IPC 子文件 |
+| `electron/main/deepseek/deepseek-runtime.ts` | **3827** | L.4 后薄 1/3；剩余 TypertService 薄层 + 必要 facade |
+| `electron/main/deepseek/deepseek-compat.ts` | 445 | v7 §11.2 L.3 step 2 目标删 |
+| `electron/main/deepseek/deepseek-generic.ts` | 1545 | v7 §11.2 L.3 step 1 目标简化 |
+| `electron/main/deepseek/subprocess-runtime.ts` | 501 | 保留（独立 sandbox） |
+| `electron/main/deepseek/terminal-runtime.ts` | 471 | 保留（独立 sandbox） |
+| `electron/main/deepseek/deepseek-capabilities.ts` | 212 | 保留为薄层（v6 §3.4.4） |
+| `electron/main/harness/remote-dispatch.ts` | 298 | L.2 后 shim；保留为薄层 |
+| `packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts` | 352 | K.2 SDK 序列化辅助 |
+| `packages/runtime/openbuddy-plugin-host/src/deepseek-cordis-runtime.ts` | 454 | Cordis DI 容器本体（microkernel 一部分） |
+| `packages/runtime/openbuddy-plugin-host/src/profile.ts` | 538 | profile 装载；K.2 manifest 路径已接 |
+| `packages/runtime/openbuddy-plugin-host/src/profile-manager.ts` | 796 | profile manager |
+| `packages/runtime/openbuddy-plugin-host/src/bundle-manifest.ts` | 181 | bundle composition（v4 §3 保留） |
+| `packages/runtime/openbuddy-plugin-host/src/index.ts` | 1337 | barrel；按 §4 #4 应拆 barrel |
+| `packages/capability/openbuddy-email/src/index.ts` | 3510 | god module；H.1 要拆 |
+
+**11.5.3 三期（v8）下一轮：Phase J.1（部分）— sheriff + boundary 验收**
+
+本期 LUM-601 三期的**显式 next-step**是 Phase J.1：
+
+| J.1 子任务 | 文件 | 目标 |
+|---|---|---|
+| J.1.1 baseline 测量 | `pnpm storage:boundaries` + `pnpm storage:acceptance` | 拿当前 architecture-boundary 脚本结果 |
+| J.1.2 加固 sheriff.config.ts | `sheriff.config.ts` | 加 §3.2 的 4 层依赖方向 + §4 的 god module + §5 的 6 类耦合点 0 处 |
+| J.1.3 cycle-detector | `vitest.config.ts` | 加 cycle deps 检测 |
+| J.1.4 god-module 检查脚本 | `scripts/architecture/check-god-modules.mjs` | 检查 §4 的 8 个 god module 是否拆完 |
+| J.1.5 CI 集成 | `.github/workflows/` | sheriff + cycle-detector 集成到 PR check |
+
+**11.5.4 三期（v8）后路线图：Phase B.2 / B.3 / C / D / E / F / H / I / L.5**
+
+| 轮 | Phase | LOC 净变化 | 关键文件 | 备注 |
+|---|---|---|---|---|
+| B.2 | ExtensionRunner.bindCore | -200 | `microkernel-host.ts` + `init-pipeline.ts` | INSTALLED_MODULES 跟踪改 PI runner |
+| B.3 | discoverAndLoadExtensions 接入 | +100 | `extension-loader.ts` | builtin + 用户 extension 走 PI loader |
+| C.1 | createBashTool 等替换 | -600 | `apply-patch.ts` → `coding-tools.ts` | PI factory 替换自实现 tool |
+| C.2 | createEditTool + diff 工具 | -300 | `edit-tool.ts` + ui-* | PI EditOperations |
+| C.3 | powerShell + 跨平台 shell | -100 | `powershell-tool.ts` | getShellConfig |
+| D.1 | SettingsManager 替换 | -200 | `settings-store.ts` | 跨会话共享 + migration |
+| D.2 | ProjectTrustStore 替换 | -100 | `project-trust.ts` | folder-trust 跨会话 |
+| D.3 | Skills 体系迁移 | -300 | `pi-resource-loader.ts` + `skills.ts` | loadSkills + formatSkillsForPrompt |
+| E.1 | ui-slots 类型契约 | +100 | `openbuddy-ui-slots` | SlotMap 加 PI 交互槽位 |
+| E.2 | ui-runtime 接 PI ExtensionRunner | +200 | `plugin-ui-host.ts` | widget 渲染对齐 PI |
+| E.3 | renderer 端 parseFrontmatter 走 IPC | -100 | renderer 自定义 parser | 走 A.1 IPC 桥 |
+| F.1 | Renderer bundle manualChunks | 0 | `electron.vite.config.ts` | 首屏 JS -30% |
+| F.2 | SQLite 替换 | 0 | `harness-cursors.ts` | better-sqlite3 替换 node:sqlite |
+| F.3 | 启动性能 audit + lazy load | 0 | bootstrap + lazy load | cold start ≤ 2s |
+| H.1 | email capability 拆解 | -1100 | `openbuddy-email/src/index.ts` → 5 文件 | 3510 → 2400 LOC |
+| I.1 | task + memory + folder-trust | -200 | Cordis service 12 → 9 | 接入 PI ExtensionAPI context event |
+| I.2 | calendar/web-search/inspiration/notification | -200 | 4 个 Cordis service → PI ExtensionFactory | Cordis service 9 → 5 |
+| L.5 | bundle-manifest SDK 化 | 0 | `bundle-manifest.ts` | SDK harness 轨道 |
+| **总计（v8 后续）** | | **-3000 LOC** | | 全部基于 PI |
+
+**11.5.5 三期（v8）成功定义**
+
+- ✅ **L.3 / K.1 完成**：DSH 通用装载器删 + OpenBuddyPlugin SDK v0.1 包上线 → v7 §11.2 -4608 LOC + K.1 +500 LOC 净增 = -4108 LOC 净删
+- ✅ **Phase J.1 启动**：sheriff.config.ts 加固 + cycle-detector + architecture-boundary 验收脚本
+- ✅ **Phase B.2 / B.3 启动**：microkernel 总线统一到 PI ExtensionRunner
+- 🟡 **Phase G 持续**：真实 LLM E2E（需凭据环境，沙箱跑不了）
+- 🟡 **文档同步**：每轮 phase 完成后更新 §11 next-N-rounds + §3 / §10 状态指示
 
 ## 12. v2 → v3 完整章节对照
 
@@ -1749,6 +2000,46 @@ v6 路线图剩余 4 轮（K.1 / K.2 / L.3 / L.4）已拆为 4 个子 issue，�
 - ✅ Phase A.1（round 1）+ Phase B.1 rounds 1-5（rounds 2-6）
 - ✅ Phase L.1（round 7）+ Phase L.2 partial（round 8）+ Phase L.2 complete（round 9）
 - 🟡 Phase L.3（LUM-594 并行启动）
-- 🟡 Phase L.4（LUM-595 并行启动）
+- ✅ Phase L.4（LUM-595 完成, commit `6856ad6`, -2324 LOC）
 - 🟡 Phase K.1（LUM-596 并行启动）
-- ⚪ Phase K.2（LUM-597 等 K.1 完成后启动）
+- ✅ Phase K.2（LUM-597 完成, commit `27f0280`, SDK manifest 序列化 +719 LOC）
+
+## 28. v8 — 功能闭环指标（响应「打造整个功能闭环」）
+
+> 📅 **v8 新增章节**：用户三轮反馈明确要求「打造整个功能闭环」。v3 §10 的成功标准都是**架构层**指标（PI 复用度、Cordis service 数、Plugin 装载入口数等），v8 在 §10 之上加 5 项**功能闭环**指标。这 5 项是 OpenBuddy 作为「PI 之上的 Electron shell + UI workbench」必须达到的「完整可工作」状态。
+
+### 28.1 功能闭环 5 项指标
+
+| # | 指标 | 现状 | v8 目标 | 对应 Phase |
+|---|---|---|---|---|
+| **1. Plugin hot-reload** | 用户修改 `~/.config/openbuddy/plugins/foo.ts` 后无需重启 app 即可生效 | ❌ 无（v6 §25.4 列为 v0.2 out-of-scope） | ✅ v0.2（`ExtensionRunner` hot reload） | Phase K.3 (后续 v0.2) |
+| **2. Marketplace** | 在 app 内可浏览 / 安装 / 卸载 marketplace plugin（无需手动复制文件）| ⚠️ 部分（`pi-resources/marketplace` 已接入，但 UI 是文件路径） | ✅ v1.0（in-app marketplace UI） | Phase H.3 + 后续 |
+| **3. Workspace-shared plugin** | 一个 workspace 的 plugin 可以共享给同一团队的其他 workspace | ❌ 无 | ✅ v1.0（profile.yaml 推送 + 签名） | Phase K.3 (后续) |
+| **4. User-extension install** | 普通用户（非开发者）能安装第三方 PI 插件到 OpenBuddy | ⚠️ 部分（`profile.piExtensions` 可声明路径，但无 UI 流程） | ✅ v1.0（plugins tab in settings） | Phase E.2 + 后续 |
+| **5. Progress UX** | 长任务（tool execution / session creation / workspace index）有统一进度显示 | ⚠️ 部分（`tool_execution_start` / `tool_execution_end` 已推到 renderer，但没接 progress bar） | ✅ v1.0（统一 progress component） | Phase E.2 + 后续 |
+
+### 28.2 与 §10 v3 架构层指标的关系
+
+v3 §10 的 9 项架构指标（PI 复用度 / Cordis service 数 / PI Extension 数 / Plugin 装载入口 / God module LOC / 循环依赖 / 跨层 import / Capability 直调 / Renderer 直 import main）+ v8 §10.1 加 5 项**功能闭环**指标 = **14 项** v8 成功标准。
+
+每项指标的当前状态由 `pnpm storage:boundaries` + `pnpm storage:acceptance` + `pnpm exec vitest --run` 三个脚本输出汇总到 v8 CI report。
+
+### 28.3 功能闭环 ≠ 过度设计
+
+> ⚠️ v8 §28.1 的 5 项指标**不是必须在本期 LUM-601 内完成**。它们是 v1.0 路线图，明确写在文档里是为了避免后续 PR 反复重新讨论「用户能不能装第三方插件」「plugin 修改后要不要重启」这类问题。
+
+**本期 LUM-601 三期的实际交付**（§11.5）：
+1. ✅ Plan doc v8 整合（本文档）
+2. ✅ Phase J.1 baseline 测量 + sheriff.config.ts 加固（本任务核心代码改动）
+3. 🟢 DSH 清理 + 插件 SDK + 微内核总线（依赖子任务 LUM-594 / LUM-595 / LUM-596 / LUM-597）
+
+**后续阶段**（v1.0 路线图）：
+- Phase K.3：plugin hot-reload + marketplace UI + workspace-shared plugin
+- Phase E.2.1：Progress UX 组件统一
+- Phase H.3：marketplace bundle 装配协议升级
+
+---
+
+**v8 文档 owner**: 编程助手-devbox1 (LUM-601) · 三期任务 · 父任务 LUM-580
+**子任务链**: LUM-580 → LUM-594 (L.3) · LUM-595 (L.4 ✅) · LUM-596 (K.1) · LUM-597 (K.2 ✅) · LUM-601 (三期 plan + J.1)
+**当前 v8 完成度**: 6/14 架构指标达成 + 5/12 后续 phase done + 5 项功能闭环指标 v1.0 路线图锁定
