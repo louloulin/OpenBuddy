@@ -1298,6 +1298,10 @@ export {
   piPluginForCapability,
   pluginIdForCapability as authorityPluginIdForCapability,
   type CapabilityOwnership,
+  assertNoCapabilityOwnershipConflicts,
+  findCapabilityOwnershipConflicts,
+  type ActiveCapabilityBackend,
+  type CapabilityOwnershipConflict,
 } from "./capability-ownership";
 export {
   CAPABILITY_TO_PLUGIN_ID,
