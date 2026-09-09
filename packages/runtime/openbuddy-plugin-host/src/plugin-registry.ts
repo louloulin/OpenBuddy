@@ -42,6 +42,7 @@ export class PluginRegistryError extends Error {
 }
 
 function assertManifest(manifest: PluginRegistryManifest): void {
+  if (!manifest || typeof manifest !== "object") throw new PluginRegistryError("manifest must be an object");
   if (manifest.schema !== pluginRegistrySchema) throw new PluginRegistryError("unsupported manifest schema");
   for (const [name, value] of [["id", manifest.id], ["version", manifest.version], ["apiVersion", manifest.apiVersion]] as const) {
     if (typeof value !== "string" || !value.trim()) throw new PluginRegistryError(`${name} is required`);
@@ -55,10 +56,37 @@ function assertManifest(manifest: PluginRegistryManifest): void {
   if (new Set(manifest.surfaces).size !== manifest.surfaces.length) {
     throw new PluginRegistryError("manifest contains duplicate surfaces");
   }
-  for (const dependency of manifest.dependencies ?? []) {
-    if (!dependency.id?.trim() || !dependency.range?.trim()) throw new PluginRegistryError("dependency id and range are required");
-    if (dependency.id === manifest.id) throw new PluginRegistryError("plugin cannot depend on itself");
+  if (manifest.dependencies !== undefined && !Array.isArray(manifest.dependencies)) {
+    throw new PluginRegistryError("dependencies must be an array");
   }
+  const dependencyIds = new Set<string>();
+  for (const dependency of manifest.dependencies ?? []) {
+    if (!dependency || typeof dependency !== "object" || typeof dependency.id !== "string" || typeof dependency.range !== "string" || !dependency.id.trim() || !dependency.range.trim()) {
+      throw new PluginRegistryError("dependency id and range are required");
+    }
+    if (dependency.id === manifest.id) throw new PluginRegistryError("plugin cannot depend on itself");
+    if (dependencyIds.has(dependency.id)) throw new PluginRegistryError(`manifest contains duplicate dependency ${dependency.id}`);
+    dependencyIds.add(dependency.id);
+    if (dependency.optional !== undefined && typeof dependency.optional !== "boolean") {
+      throw new PluginRegistryError("dependency optional must be a boolean");
+    }
+  }
+  if (manifest.permissions !== undefined && !Array.isArray(manifest.permissions)) {
+    throw new PluginRegistryError("permissions must be an array");
+  }
+  if (manifest.entrypoints !== undefined && (typeof manifest.entrypoints !== "object" || manifest.entrypoints === null || Array.isArray(manifest.entrypoints))) {
+    throw new PluginRegistryError("entrypoints must be an object");
+  }
+}
+
+function cloneManifest(manifest: PluginRegistryManifest): PluginRegistryManifest {
+  return {
+    ...manifest,
+    surfaces: [...manifest.surfaces],
+    ...(manifest.dependencies ? { dependencies: manifest.dependencies.map((dependency) => ({ ...dependency })) } : {}),
+    ...(manifest.permissions ? { permissions: [...manifest.permissions] } : {}),
+    ...(manifest.entrypoints ? { entrypoints: { ...manifest.entrypoints } } : {}),
+  };
 }
 
 export interface PluginRegistryOptions {
@@ -84,11 +112,11 @@ export class PluginRegistry {
 
   get generation(): number { return this.gate.current(); }
 
-  list(): readonly PluginRegistryEntry[] { return [...this.entries.values()].map((entry) => ({ ...entry, manifest: { ...entry.manifest } })); }
+  list(): readonly PluginRegistryEntry[] { return [...this.entries.values()].map((entry) => ({ ...entry, manifest: cloneManifest(entry.manifest) })); }
 
   get(pluginId: string): PluginRegistryEntry | undefined {
     const entry = this.entries.get(pluginId);
-    return entry ? { ...entry, manifest: { ...entry.manifest } } : undefined;
+    return entry ? { ...entry, manifest: cloneManifest(entry.manifest) } : undefined;
   }
 
   register(manifest: PluginRegistryManifest): Promise<PluginRegistryTransaction> {
@@ -97,7 +125,7 @@ export class PluginRegistry {
       if (this.entries.has(manifest.id)) throw new PluginRegistryError(`plugin ${manifest.id} is already registered`);
       this.assertDependencies(manifest);
       const generation = this.gate.advance();
-      this.entries.set(manifest.id, { manifest: { ...manifest, surfaces: [...manifest.surfaces] }, state: "staged", generation });
+      this.entries.set(manifest.id, { manifest: cloneManifest(manifest), state: "staged", generation });
       return this.transaction("register", manifest.id, generation);
     });
   }

@@ -26,6 +26,23 @@ describe("PluginRegistry", () => {
     await expect(registry.register(manifest("one"))).rejects.toThrow("already registered");
   });
 
+  it("rejects malformed nested manifest fields and protects registered manifests", async () => {
+    const registry = new PluginRegistry();
+    await expect(registry.register({ ...manifest("bad"), dependencies: [{ id: "dep", range: "^1" }, { id: "dep", range: "^1" }] })).rejects.toThrow("duplicate dependency");
+    await expect(registry.register({ ...manifest("bad"), permissions: "shell" as never })).rejects.toThrow("permissions must be an array");
+    await registry.register(manifest("dep"));
+    await registry.activate("dep");
+    const nested = { ...manifest("nested"), dependencies: [{ id: "dep", range: "^1" }] };
+    await registry.register(nested);
+    (nested.surfaces as PluginRegistrySurface[]).push("renderer");
+    nested.dependencies![0].id = "mutated";
+    const stored = registry.get("nested")?.manifest;
+    expect(stored?.surfaces).toEqual(["pi"]);
+    expect(stored?.dependencies?.[0].id).toBe("dep");
+    (stored?.surfaces as PluginRegistrySurface[] | undefined)?.push("renderer");
+    expect(registry.get("nested")?.manifest.surfaces).toEqual(["pi"]);
+  });
+
   it("rejects activating two backends for the same surface", async () => {
     const registry = new PluginRegistry();
     await registry.register(manifest("one"));
