@@ -72,6 +72,28 @@ describe("PiSessionRuntime", () => {
     expect(received).toEqual(["new"]);
   });
 
+  it("drops events from the replaced session and disposes both generations", async () => {
+    const first = createFakeSession("first");
+    const second = createFakeSession("second");
+    const runtime = new PiSessionRuntime({ factory: factory([first, second]) });
+    await runtime.create({});
+    const received: string[] = [];
+    runtime.subscribe((event, session) => received.push(`${session.sessionId}:${event.type}`));
+    const firstGeneration = runtime.currentGeneration;
+
+    await runtime.replace({});
+    expect(runtime.currentGeneration).toBeGreaterThan(firstGeneration);
+    first.emit({ type: "agent_end" } as AgentSessionEvent);
+    second.emit({ type: "agent_start" } as AgentSessionEvent);
+    await runtime.dispose({ abort: false });
+    second.emit({ type: "agent_end" } as AgentSessionEvent);
+
+    expect(received).toEqual(["second:agent_start"]);
+    expect(first.disposeCalls).toBe(1);
+    expect(second.disposeCalls).toBe(1);
+    expect(runtime.currentGeneration).toBeGreaterThan(firstGeneration + 1);
+  });
+
   it("does not publish a session when creation fails", async () => {
     const failingFactory: PiSessionRuntimeFactory = {
       create: async () => { throw new Error("create failed"); },

@@ -122,7 +122,7 @@ export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIC
     editor: async (title: string, prefill: string) =>
       new Promise<string | undefined>((resolve) => {
         const requestId = makeRequestId(session.sessionId, "editor");
-        state.pendingUiRequests.set(requestId, { kind: "question", sessionId: session.sessionId, resolve: (value) => resolve(questionAnswer(value, title)) });
+        state.pendingUiRequests.set(requestId, { kind: "question", sessionId: session.sessionId, generation, resolve: (value) => resolve(questionAnswer(value, title)) });
         emitPluginEvent("session/question", { requestId, sessionId: session.sessionId, title, questionCount: 1, optionCount: 0, input: true, editor: true, prefill });
         emitRendererEvent("pi://question", {
           requestId,
