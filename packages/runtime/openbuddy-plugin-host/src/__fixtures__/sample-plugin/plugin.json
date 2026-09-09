@@ -1,0 +1,38 @@
+{
+  "schema": "openbuddy.plugin.v1",
+  "id": "@fixture/sample-plugin",
+  "packageName": "@fixture/sample-plugin",
+  "version": "1.0.0",
+  "description": "Phase K.2 reference plugin that exercises all four tracks (pi / harness / slot / cordis) through the OpenBuddyPlugin SDK.",
+  "tracks": [
+    {
+      "kind": "pi",
+      "inline": "@fixture/sample-plugin:extension",
+      "config": {
+        "schema": "openbuddy.sample-plugin.v1",
+        "defaults": { "greeting": "hello from sample-plugin" }
+      }
+    },
+    {
+      "kind": "harness",
+      "source": "@fixture/sample-plugin",
+      "inject": ["openbuddy-session"]
+    },
+    {
+      "kind": "cordis",
+      "source": "@fixture/sample-plugin",
+      "inject": ["pi"]
+    },
+    {
+      "kind": "slot",
+      "source": "@fixture/sample-plugin",
+      "config": {
+        "defaults": { "slotName": "sample-plugin:badge" }
+      }
+    }
+  ],
+  "flags": {
+    "passthrough": false,
+    "phase": "K.2"
+  }
+}

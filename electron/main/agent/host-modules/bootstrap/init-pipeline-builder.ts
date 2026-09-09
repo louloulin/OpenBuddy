@@ -9,10 +9,8 @@
  * Reverse-dep invariant: this module does NOT import agent-host.ts.
  */
 import type { InstallHostModuleDeps } from "./install-host-modules";
-import { ensureDefaultPiPackages, type PluginStatus } from "@openbuddy/plugin-host";
+import { ensureDefaultPiPackages, type PluginStatus, type PluginBundle } from "@openbuddy/plugin-host";
 import type { InitPipelineDeps } from "./init-pipeline";
-
-import { bootstrapSessionEventLog } from "./session-event-log";
 import { bootstrapModelRuntime } from "./model-runtime";
 import { createJobsRegistry } from "./jobs-registry";
 import { wireContextServices } from "./wire-context-services";
@@ -22,6 +20,8 @@ import { setupProfileOptions } from "./profile-options-setup";
 import { initProfile } from "./init-profile";
 import { initPluginLoader } from "./init-plugin-loader";
 import { initDeepSeek } from "./init-deepseek";
+import { initPiUserExtensions, type PiUserExtensionLoadResult } from "./init-pi-user-extensions";
+import { initPiDshCoreExtensions, type PiDshCoreExtensionLoadResult } from "./init-pi-dsh-core-extensions";
 import { computeActiveAdapterIds } from "./compute-active-adapter-ids";
 import { injectSystemPromptSections } from "./inject-system-prompt-sections";
 import { initSession } from "./init-session";
@@ -89,7 +89,6 @@ import { createOpenBuddyRpcUiContext } from "../../pi-rpc-ui-context";
 import { emitPiSessionEvent } from "../../pi-event-bridge";
 import { remoteServiceContext, transitionDshGoal, listDshFileReferences } from "../workbench-scope";
 import { eventNamespace, canonicalEventNamespace } from "../plugin-event-bus";
-import { resolveDeepSeekModule } from "../../../deepseek/deepseek-compat";
 import { openBuddyCapabilityPluginIndex } from "@openbuddy/bundle-base";
 import * as piResources from "../../pi-resources";
 
@@ -144,7 +143,27 @@ export function buildInitPipelineDeps(
     ensureDefaultPiPackages,
     initProfile,
     initPluginLoader,
-    initDeepSeek,
+    initDeepSeek: (deps: { state: AgentHostState; context: Context; loader: ElectronHarnessPluginLoader; profileBundle: PluginBundle | undefined; baseUrl: string; emitPluginEvent: (type: string, payload: unknown) => void }) =>
+      initDeepSeek(deps),
+    /**
+     * Phase B.3 step 1 — PI-native user-extension loader. Runs after
+     * initDeepSeek so DSH core packages (HarnessPluginLoader) are already
+     * mounted. Result stored in state.userExtensionResult for renderer
+     * diagnostics.
+     */
+    initPiUserExtensions: (deps: { state: AgentHostState; cwd: string; emitPluginEvent: (type: string, payload: unknown) => void }): Promise<PiUserExtensionLoadResult> =>
+      initPiUserExtensions(deps),
+    /**
+     * Phase B.3 step 2a — parallel PI loader for DSH core packages.
+     * Since B.3 step 2b extracts the goals + message-feedback shims
+     * into `@openbuddy/dsh-core` (real files), the path list is
+     * resolved from `state.dshCoreExtensionPathsOverride` (set by
+     * `resolveDshCoreExtensionPaths` inside `init-deepseek`). The
+     * default resolution finds the TS source files under
+     * `packages/runtime/openbuddy-dsh-core/src/{goals,message-feedback}.ts`.
+     */
+    initPiDshCoreExtensions: (deps: { state: AgentHostState; cwd: string; emitPluginEvent: (type: string, payload: unknown) => void; dshCorePaths: readonly string[] }): Promise<PiDshCoreExtensionLoadResult> =>
+      initPiDshCoreExtensions(deps),
     computeActiveAdapterIds,
     injectSystemPromptSections,
     initSession,
@@ -176,7 +195,6 @@ export function buildInitPipelineDeps(
     killTask: killTaskImpl,
     remoteServiceContext,
     transitionDshGoal,
-    resolveDeepSeekModule,
     openBuddyCapabilityPluginIndex,
     baseUrl: closures.baseUrl,
     describeCompatibilityAdapterCommandsMarkdown,

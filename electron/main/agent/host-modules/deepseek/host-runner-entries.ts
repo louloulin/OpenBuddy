@@ -99,17 +99,20 @@ export function baseHostRunnerEntries(): readonly PluginEntryOptions[] {
  * Compose final entries array passed to `HarnessPluginLoader.loadProfile`.
  *
  * Order: baseProfile.entries (from `createOpenBuddyProfile`) → base host-runner
- * entries → profileBundle.entries (marketplace + runtime overrides). The merged
- * list is normalized via `normalizeDeepSeekRuntimeEntry` so `disabled` flags
- * and `config` shapes become Cordis-compatible.
+ * entries → core capability entries (Phase K.2 SDK-serialised) → profileBundle.entries
+ * (marketplace + runtime overrides). The merged list is normalized via
+ * `normalizeDeepSeekRuntimeEntry` so `disabled` flags and `config` shapes
+ * become Cordis-compatible.
  */
 export function composeHostRunnerEntries(
   baseProfileEntries: readonly PluginEntryOptions[] = [],
   profileBundleEntries: readonly PluginEntryOptions[] = [],
+  coreCapabilityEntries: readonly PluginEntryOptions[] = [],
 ): PluginEntryOptions[] {
   return [
     ...baseProfileEntries,
     ...BASE_HOST_RUNNER_ENTRIES,
+    ...coreCapabilityEntries,
     ...profileBundleEntries,
   ].map((entry) => normalizeDeepSeekRuntimeEntry(entry));
 }

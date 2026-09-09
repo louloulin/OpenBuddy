@@ -1,0 +1,49 @@
+{
+  "schema": "openbuddy.plugin.v1",
+  "name": "@openbuddy/sample-plugin",
+  "version": "0.1.0",
+  "engines": {
+    "openbuddy": ">=0.14.0"
+  },
+  "main": "./index.js",
+  "pi": {
+    "handlers": {
+      "session_start": "./handlers/session-start.js",
+      "session_before_compact": "./handlers/session-before-compact.js"
+    },
+    "tools": [
+      "./tools/sample-tool.js"
+    ],
+    "commands": [
+      "./commands/sample-cmd.js"
+    ]
+  },
+  "ui": {
+    "chat-header:status": {
+      "type": "react-component",
+      "component": "./components/StatusBadge.jsx",
+      "props": {
+        "label": "Sample Plugin"
+      }
+    },
+    "file-menu:open-sample": {
+      "type": "menu-item",
+      "label": "Open Sample",
+      "accelerator": "CmdOrCtrl+Shift+S",
+      "onClick": "./commands/open-sample.js"
+    },
+    "footer:status": {
+      "type": "status-bar",
+      "id": "sample-status",
+      "getText": "./components/status-text.js"
+    }
+  },
+  "harness": {
+    "contributes": {
+      "dsh.service": {
+        "name": "sample-service",
+        "version": "0.1.0"
+      }
+    }
+  }
+}

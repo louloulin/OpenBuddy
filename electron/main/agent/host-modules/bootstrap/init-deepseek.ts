@@ -12,40 +12,52 @@
  *   - registering the 7 @deepseek-ai/* core packages
  *   - reconciling profile artifacts (typert + remote contributions)
  *
+ * Phase K.2 — OpenBuddyPlugin SDK 接入:
+ *   - The 7 DSH core packages are now declared as `OpenBuddyPluginManifest`
+ *     entries (`coreCapabilityManifests`) and serialised via the K.1 SDK
+ *     before being materialised into `PluginEntryOptions` rows for the
+ *     existing `HarnessPluginLoader.loadProfile(...)` call. Real loading
+ *     still goes through `HarnessPluginLoader` for now (Phase L.3 will
+ *     route it through PI `loadExtensions()` per v6 §24.4).
+ *   - The base profile is now built from the SDK-serialised entry rows
+ *     (`profileEntriesFromManifests`) so adding a new DSH core package is
+ *     a single edit to `coreCapabilityManifests`.
+ *   - `loader.loadProfile(profile)` is kept as-is; Phase K.2 only owns
+ *     manifest shape, not the loader swap.
+ *
  * Reverse-dep invariant:
  *   This module imports nothing from agent-host.ts. All deps are passed in.
  */
 
-import { join } from "node:path";
 import type { Context } from "@openbuddy/cordis";
 import {
   composePluginPatches,
-  serializeRemoteContribution,
+  openbuddyPluginManifestSchema,
+  serializeHarnessTrack,
+  validateOpenBuddyPluginManifest,
   type PluginBundle,
+  type PluginEntryOptions,
   type PluginPatch,
   type PluginProfile,
+  type OpenBuddyPluginManifest,
 } from "@openbuddy/plugin-host";
 import { createOpenBuddyProfile } from "@openbuddy/bundle-base";
 
 import { type AgentHostState } from "../_state-shape";
 import { deepSeekCoreRuntimeEntries, syncDeepSeekCordisRuntime } from "../deepseek/cordis-runtime";
-import { deepSeekCapabilityRemote } from "../../../deepseek/deepseek-capabilities";
-import { deepSeekSessionQueryRemote } from "../../../deepseek/deepseek-runtime";
 import { readOverridePatches } from "../profile/override-patches";
 import { composeHostRunnerEntries } from "../deepseek/host-runner-entries";
 import type { ElectronHarnessPluginLoader } from "../profile/loader";
-import {
-  ensureTypertReady,
-  restoreDeepSeekCapabilityServices,
-  remoteServiceContext,
-} from "../workbench-scope";
+import { ensureTypertReady } from "../workbench-scope";
+import { resolveDshCoreExtensionPaths } from "./dsh-core-extension-paths";
 
 /**
- * Dependencies required to assemble the DSH Cordis runtime + capability services.
+ * Dependencies required to assemble the DSH Cordis runtime + manifest profile.
  *
- * Every emit/event/dispatcher closure that the previous inline implementation
- * captured from agent-host module scope is collected here. Keeps this module
- * free-free of agent-host reverse dependencies.
+ * Phase L.4 — stripped from the previous full-inline version: emitRendererEvent,
+ * remoteServiceContext, reconcileProfileArtifacts, and the 7-capability remote
+ * registration dance (PI's `RemoteDispatcher` owns remote dispatch now and the
+ * 7 DSH packages are no longer registered individually on bootstrap).
  */
 export interface InitDeepSeekDeps {
   state: AgentHostState;
@@ -57,9 +69,6 @@ export interface InitDeepSeekDeps {
   /** Resolved importer for `import(new URL(...))` calls (vite-ignore hint preserved at call sites). */
   baseUrl: string;
   emitPluginEvent: (type: string, payload: unknown) => void;
-  emitRendererEvent: (channel: string, payload: unknown) => void;
-  remoteServiceContext: () => unknown;
-  reconcileProfileArtifacts: () => Promise<void>;
 }
 
 /**
@@ -79,22 +88,69 @@ export const DEEPSEEK_CORE_CAPABILITY_PACKAGES = [
 ] as const;
 
 /**
+ * Phase K.2 — OpenBuddyPlugin manifests for the 7 DSH core capability packages.
+ * Each manifest declares a single `harness` track that resolves to the
+ * package's `name` field. The serializer emits a `PluginEntryOptions` row
+ * that `HarnessPluginLoader.loadProfile(...)` already understands, so adding
+ * a new DSH core package is one row in this table instead of two (one
+ * package row + one loader call).
+ */
+export const coreCapabilityManifests: readonly OpenBuddyPluginManifest[] = DEEPSEEK_CORE_CAPABILITY_PACKAGES.map((packageName) =>
+  validateOpenBuddyPluginManifest({
+    schema: openbuddyPluginManifestSchema,
+    id: packageName,
+    packageName,
+    version: "0.0.0",
+    description: `DSH core capability package: ${packageName}`,
+    tracks: [{ kind: "harness", source: packageName }],
+  }),
+);
+
+/** Materialise the core capability manifests into `PluginEntryOptions` rows
+ *  the loader can consume. Phase K.2 keeps this call to feed the existing
+ *  `loader.loadProfile(...)`; Phase L.3 will replace the loader with PI
+ *  `loadExtensions()` per v6 §24.4. */
+export function profileEntriesFromManifests(
+  manifests: readonly OpenBuddyPluginManifest[],
+): PluginEntryOptions[] {
+  const rows: PluginEntryOptions[] = [];
+  for (const manifest of manifests) {
+    for (const track of serializeHarnessTrack(manifest)) {
+      rows.push({
+        id: track.id,
+        name: track.name,
+        ...(track.inject ? { inject: [...track.inject] } : {}),
+        ...(track.disabled !== undefined ? { disabled: track.disabled } : {}),
+      });
+    }
+  }
+  return rows;
+}
+
+/**
  * The DSH assembly stage. Loads the composed plugin profile into the loader,
- * syncs the Cordis runtime, restores capability services, ensures typert,
- * and registers the 7 core capability packages on the remote dispatcher.
+ * syncs the Cordis runtime, and ensures typert is mounted.
  *
- * Returns nothing — all side effects land on `state`.
+ * Phase L.4 — stripped: no more restoreDeepSeekCapabilityServices, no more
+ * deepSeekSessionQueryRemote + 7-capability remote registration, no more
+ * reconcileProfileArtifacts re-register dance. PI owns remote dispatch via
+ * its own `RemoteDispatcher`, and the core capability remotes are discovered
+ * lazily by the loader rather than eagerly registered on bootstrap.
  */
 export async function initDeepSeek(deps: InitDeepSeekDeps): Promise<void> {
-  const {
-    state,
-    context,
-    loader,
-    profileBundle,
-    emitPluginEvent,
-    remoteServiceContext,
-    reconcileProfileArtifacts,
-  } = deps;
+  const { state, loader, profileBundle, emitPluginEvent } = deps;
+
+  // Phase B.3 step 2b — resolve the file-system paths to the PI-native
+  // DSH core extensions under `@openbuddy/dsh-core` so the parallel
+  // PI loader (`init-pi-dsh-core-extensions`) can pick them up via
+  // `discoverAndLoadExtensions`. The Cordis shim
+  // (`wire-dsh-services.ts`) already exposes the same data through
+  // `ctx.dshRemotes`; the PI loader exists so the slash commands
+  // (`/goals.create`, `/feedback.put`, ...) are wired into the
+  // ExtensionRunner alongside the Cordis shim. The default-resolution
+  // function honours `state.dshCoreExtensionPathsOverride` so tests can
+  // inject a virtual path without touching the real package layout.
+  const dshCorePaths = resolveDshCoreExtensionPaths(state);
 
   // Hydrate stored plugin overrides BEFORE composing the profile so the
   // override layers land on top of base + bundle.
@@ -112,10 +168,30 @@ export async function initDeepSeek(deps: InitDeepSeekDeps): Promise<void> {
   state.baseProfile = baseProfile;
   const overrideLayers = await readOverridePatches();
 
-  const profile: PluginProfile = {
+  // Phase K.2: prepend the SDK-serialised core capability entries to the
+  // base profile. The row order matches `DEEPSEEK_CORE_CAPABILITY_PACKAGES`
+  // so the loader sees them in the documented sequence. The base + bundle
+  // entries follow, with override patches layered on top.
+  const coreEntries = profileEntriesFromManifests(coreCapabilityManifests);
+
+  // Phase B.3 step 2c — the legacy `ElectronHarnessPluginLoader` no
+  // longer handles the 7 DSH core capability packages. They are
+  // loaded through PI's `discoverAndLoadExtensions()` in stage 6.7
+  // (`init-pi-dsh-core-extensions`) against the same `dshCorePaths`
+  // resolved above. The loader now handles ONLY user-declared
+  // plugins (base profile + bundle + overrides), so we pass the
+  // user-only profile to `loader.loadProfile` and keep the
+  // full-DSH-core profile in `state.activePluginProfile` only for
+  // the Cordis-runtime sync that `syncDeepSeekCordisRuntime`
+  // consumes (the Cordis services need to see every entry that ever
+  // landed in the loader, including those now loaded via PI, so
+  // plugin-mutations can still `replaceProfile` the canonical
+  // composition).
+  const userOnlyProfile: PluginProfile = {
     entries: composeHostRunnerEntries(
       baseProfile.entries,
       profileBundle?.entries ?? [],
+      [],
     ),
     patches: [
       ...(baseProfile.patches ?? []),
@@ -124,66 +200,24 @@ export async function initDeepSeek(deps: InitDeepSeekDeps): Promise<void> {
       ...(overrideLayers ?? []),
     ],
   };
+  const fullProfile: PluginProfile = {
+    entries: composeHostRunnerEntries(
+      baseProfile.entries,
+      profileBundle?.entries ?? [],
+      coreEntries,
+    ),
+    patches: userOnlyProfile.patches,
+  };
 
   try {
-    await loader.loadProfile(profile);
-    state.activePluginProfile = profile;
-    const sessionQueryEntries = loader.list().filter((e) => e.id === "openbuddy-dsh-session-query" || e.name === "@deepseek-ai/dsh-session-query");
-    const sessionServiceEntries = loader.list().filter((e) => e.id === "openbuddy-dsh-session" || e.name === "@deepseek-ai/dsh-session");
+    await loader.loadProfile(userOnlyProfile);
+    state.activePluginProfile = fullProfile;
     await syncDeepSeekCordisRuntime(
-      deepSeekCoreRuntimeEntries(composePluginPatches(profile.entries, profile.patches ?? [])),
+      deepSeekCoreRuntimeEntries(composePluginPatches(fullProfile.entries, fullProfile.patches ?? [])),
     );
   } catch (error) {
     emitPluginEvent("plugin/failed", { id: "openbuddy-core", error: String(error) });
     throw error;
   }
-  await restoreDeepSeekCapabilityServices();
   await ensureTypertReady();
-
-  try {
-    state.remoteDispatcher.register(
-      deepSeekSessionQueryRemote(),
-      remoteServiceContext() as never,
-    );
-  } catch (error) {
-    throw error;
-  }
-
-  for (const packageName of DEEPSEEK_CORE_CAPABILITY_PACKAGES) {
-    const remote = deepSeekCapabilityRemote(packageName);
-    if (remote) {
-      try {
-        state.remoteDispatcher.register(
-          serializeRemoteContribution(remote),
-          remoteServiceContext() as never,
-        );
-      } catch (error) {
-        throw error;
-      }
-    }
-  }
-  await ensureTypertReady();
-  await reconcileProfileArtifacts();
-
-  // reconcileProfileArtifacts clears `state.profileRemoteContributions`
-  // and re-installs whatever `discoverRemoteImpl()` returns. If the
-  // discovery closure returns an empty Map (the default install when no
-  // concrete discoverer was wired in), the capability remotes that we
-  // just registered are now gone. Re-register the core capability set so
-  // renderer-side invocations like `agent:new-session` always find the
-  // expected services, even after an artifact reconciliation that wiped
-  // them out.
-  reRegisterCoreCapabilityRemotes();
-
-  function reRegisterCoreCapabilityRemotes(): void {
-    const context = state.context;
-    if (!context) return;
-    const ctx = remoteServiceContext();
-    state.remoteDispatcher.register(deepSeekSessionQueryRemote(), ctx as never);
-    for (const packageName of DEEPSEEK_CORE_CAPABILITY_PACKAGES) {
-      const remote = deepSeekCapabilityRemote(packageName);
-      if (!remote) continue;
-      state.remoteDispatcher.register(serializeRemoteContribution(remote), ctx as never);
-    }
-  }
 }

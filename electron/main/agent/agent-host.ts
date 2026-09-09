@@ -15,7 +15,6 @@ export { piHome, isPathWithin, piSessionDir };
 import { buildPluginLifecycleFacade } from "./host-modules/facade/plugin-lifecycle-facade";
 import { buildProfileFacade } from "./host-modules/facade/profile-facade";
 import { buildSessionLifecycleFacade } from "./host-modules/facade/session-lifecycle-facade";
-import { buildDeepseekFacade } from "./host-modules/facade/deepseek-facade";
 
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -104,17 +103,14 @@ import { authorizeMcpServer } from "../mcp-authorization";
 import { projectMcpCapabilityGovernance } from "../mcp-capability-governance";
 import { emitContextEvent, emitPiSessionEvent } from "./pi-event-bridge";
 import { bindCapabilityEventBridge } from "../capability-event-bridge";
-import { getDeepSeekRemoteMethods, resolveDeepSeekModule } from "../deepseek/deepseek-compat";
-import { DeepSeekTypertService, deepSeekSessionQueryRemote, type DeepSeekPiAgentRuntime, type DeepSeekPiToolHooks, type DeepSeekToolDecision, type DeepSeekToolExecution } from "../deepseek/deepseek-runtime";
+import { DeepSeekTypertService, type DeepSeekPiAgentRuntime, type DeepSeekPiToolHooks, type DeepSeekToolDecision, type DeepSeekToolExecution } from "../deepseek/deepseek-runtime";
 import { DeepSeekCordisRuntime, type DeepSeekCordisInvocation, type DeepSeekCordisPluginEntry, type DeepSeekCordisRuntimeSnapshot } from "@openbuddy/plugin-host";
-import { deepSeekCapabilityPackageForService, deepSeekCapabilityRemote } from "../deepseek/deepseek-capabilities";
 import {
   ensureContinuableSubagent as ensureContinuableSubagentImpl,
   type ContinuableSubagentRecord,
 } from "./host-modules/deepseek/agent-runtime";
 import { SessionEventLog, type SessionEventRecord } from "../session/session-event-log";
-import { RemoteDispatcher, type RemoteContribution, type RemoteDescriptor } from "../harness/remote-dispatch";
-import { invokeRemoteWithGateway } from "../harness/remote-invocation";
+import { RemoteDispatcher } from "../harness/remote-dispatch";
 import { serializeRemoteContribution } from "@openbuddy/plugin-host";
 import {
   normalizePublishedRemoteContribution as normalizePublishedRemoteContributionPure,
@@ -130,7 +126,6 @@ import {
   stopProfileWatchers as stopProfileWatchersImpl,
 } from "./host-modules/profile/watchers";
 import { syncMarketplacePiExtensionStatuses as syncMarketplacePiExtensionStatusesImpl } from "./host-modules/profile/marketplace-status";
-import { createDshHostRunner } from "../deepseek/dsh-host-runner";
 import {
   applyPiExtensionOverrides,
   builtinPiExtensionFactories,
@@ -151,13 +146,14 @@ import { markPluginTransactionRolledBack, PluginLifecycleQueue, type PluginTrans
 import { PiRuntimeCoordinator } from "./pi-runtime-coordinator";
 import { PiSessionRuntime } from "./pi-session-runtime";
 import { SessionAttachmentStore, type StoredSessionAttachment } from "../session/session-attachments";
-import { createDeepSeekPiBridge, createDeepSeekPiLlmInterceptor, createDeepSeekPiToolInterceptor, DEEPSEEK_PI_BRIDGE_PROTOCOL, DEEPSEEK_PI_CAPABILITIES, type DeepSeekPiBridgeRuntime } from "../deepseek/deepseek-pi-bridge";
-import { createDeepSeekPiCapabilityRuntime } from "../deepseek/deepseek-pi-capabilities";
+// Phase L.1 — DSH Pi bridge moved into `host-modules/deepseek/cordis-runtime.ts`;
+// only the protocol/capability constants survive (they're the IPC-visible
+// identity of the legacy bridge and live with the helpers that surface it).
+import { DEEPSEEK_PI_BRIDGE_PROTOCOL, DEEPSEEK_PI_CAPABILITIES } from "./host-modules/dsh-bridge-helpers";
 import { PresetSessionRuntime } from "./preset-session-runtime";
 import { resolveAgentPresetSelection, sessionHasConversation } from "./agent-preset-selection";
 import { createTerminalService, type TerminalRuntime } from "../deepseek/terminal-runtime";
 import { SandboxPolicyService, SandboxRuntime, SubprocessRuntime } from "../deepseek/subprocess-runtime";
-import { createDeepSeekExecutionAdapter, createDeepSeekExecutionServices, provideDeepSeekExecutionServices, DEEPSEEK_EXECUTION_PACKAGES } from "../deepseek/deepseek-execution-adapters";
 import { lifecycleEntry, lifecycleEvent, lifecycleRevisionFromEntries, OPENBUDDY_LIFECYCLE_CUSTOM_TYPE, type OpenBuddyLifecycleEvent } from "@openbuddy/core-session/lifecycle";
 import { generateTraceId } from "@openbuddy/logging-shared";
 import { hostReceived as hostReceivedLog, hostDispatched as hostDispatchedLog, hostFailed as hostFailedLog } from "./agent-host-log";
@@ -234,25 +230,12 @@ export const state: AgentHostState = {
   // set it to the live Promise returned by `bindExtensions`.
   extensionsBound: null,
   toolRegistry: createToolRegistryStub(),
-  remoteDispatcher: new RemoteDispatcher((context) => {
-    const props = (context as unknown as { reflect?: { props?: Record<string, { type?: string }> } }).reflect?.props ?? {};
-    const discovered: Array<{ package: string; descriptors: RemoteDescriptor[] }> = [];
-    for (const [serviceKey, definition] of Object.entries(props)) {
-      if (definition.type !== "service") continue;
-      const service = context.get?.(serviceKey) as (Record<string, unknown> & { typertRemote?: { namespace?: string; serviceKey?: string } }) | undefined;
-      const namespace = service?.typertRemote?.namespace;
-      if (!service || typeof namespace !== "string") continue;
-      const descriptors = getDeepSeekRemoteMethods(service).map((marker) => ({
-        namespace,
-        method: marker.exportName ?? marker.method,
-        implementation: marker.method,
-        service: serviceKey,
-        invocation: marker.invocation,
-      }));
-      if (descriptors.length) discovered.push({ package: deepSeekCapabilityPackageForService(serviceKey) ?? `@openbuddy/discovered/${serviceKey}`, descriptors });
-    }
-    return discovered;
-  }),
+  // Phase L.3: DSH `@Remote` decorator markers are gone, so the legacy
+  // service-walking discovery callback has nothing to collect. The
+  // `RemoteDispatcher` constructor already ignores the argument (PI
+  // `ExtensionRunner` owns the active contribution surface), so we
+  // simply pass an empty-list closure to keep the call-site uniform.
+  remoteDispatcher: new RemoteDispatcher(() => []),
   attachmentStore: new SessionAttachmentStore(join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent"), "openbuddy-attachments")),
 };
 
@@ -282,7 +265,6 @@ export const lifecycleAppendQueues = new Map<string, Promise<void>>();
 const pluginLifecycleFacade = buildPluginLifecycleFacade(state);
 const profileFacade = buildProfileFacade(state);
 const sessionLifecycleFacade = buildSessionLifecycleFacade(state);
-const deepseekFacade = buildDeepseekFacade(state);
 const { installProfileBundle, removeProfileBundle } = pluginLifecycleFacade;
 const {
   profilePatchPaths,

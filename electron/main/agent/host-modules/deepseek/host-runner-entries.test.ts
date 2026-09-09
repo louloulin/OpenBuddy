@@ -70,8 +70,11 @@ describe("host-runner-entries / composeHostRunnerEntries", () => {
     { id: "marketplace-baz", name: "@deepseek-ai/dsh-baz" },
   ];
 
-  it("merges baseProfile → defaults → profileBundle in that exact order", () => {
-    const merged = composeHostRunnerEntries(baseProfileEntries, profileBundleEntries);
+  it("merges baseProfile → defaults → coreCapability → profileBundle in that exact order", () => {
+    const coreEntries: PluginEntryOptions[] = [
+      { id: "@deepseek-ai/dsh-commands", name: "@deepseek-ai/dsh-commands" },
+    ];
+    const merged = composeHostRunnerEntries(baseProfileEntries, profileBundleEntries, coreEntries);
     const ids = merged.map((entry) => entry.id);
     // baseProfile entries come first (e.g. addons beyond DSH defaults).
     expect(ids.indexOf("openbuddy-base-foo")).toBe(0);
@@ -79,12 +82,15 @@ describe("host-runner-entries / composeHostRunnerEntries", () => {
     // Then the 41 default DSH entries.
     expect(ids.indexOf("openbuddy-dsh-llm")).toBe(2);
     expect(ids.indexOf("openbuddy-dsh-web")).toBe(2 + baseHostRunnerEntries().length - 1);
+    // Phase K.2: core capability entries slot in between defaults and
+    // profileBundle so marketplace bundles can override them when needed.
+    expect(ids.indexOf("@deepseek-ai/dsh-commands")).toBe(2 + baseHostRunnerEntries().length);
     // profileBundle entries close out so they override earlier duplicates.
     expect(ids[ids.length - 1]).toBe("marketplace-baz");
   });
 
-  it("tolerates empty baseProfile and empty profileBundle", () => {
-    const merged = composeHostRunnerEntries([], []);
+  it("tolerates empty baseProfile, coreCapability, and empty profileBundle", () => {
+    const merged = composeHostRunnerEntries([], [], []);
     expect(merged.length).toBe(baseHostRunnerEntries().length);
     expect(merged[0]?.id).toBe("openbuddy-dsh-llm");
   });
@@ -93,7 +99,7 @@ describe("host-runner-entries / composeHostRunnerEntries", () => {
     // The @deepseek-ai/dsh-session-persistence-jsonl entry has a default
     // `root` of `<piHome>/sessions` injected by normalize. Without that,
     // the cordis loader would crash at boot.
-    const merged = composeHostRunnerEntries([], []);
+    const merged = composeHostRunnerEntries([], [], []);
     const persistence = merged.find(
       (entry) => entry.id === "openbuddy-dsh-session-persistence",
     );

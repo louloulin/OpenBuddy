@@ -302,7 +302,9 @@ export function handleSessionEvent(
   //   streaming. We map Pi's wire shape to OpenBuddy's SessionUpdate shape
   //   used by `src/stores/session-store.ts` + `useAgentSession.ts`.
   //
-  //   Pattern mirrors `subagent-runtime.ts:320-326` + `deepseek-pi-bridge.ts:298-348`
+  //   Pattern mirrors `subagent-runtime.ts:320-326` + `cordis-runtime.ts` (the
+  //   relocated bridgeMapPiStream, formerly `deepseek-pi-bridge.ts:298-348`,
+  //   deleted in Phase L.1)
   //   (which already cover the full AssistantMessageEvent surface). We extend
   //   the minimal mapping to all 12 variants so the renderer can:
   //     - track per-block timing (text_start / thinking_start carry stable `id`)

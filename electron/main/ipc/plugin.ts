@@ -9,6 +9,13 @@
  * The plugin registry is the largest single capability group in
  * agent.ts (~17 handlers). The split keeps each handler as a thin
  * 1-2 line facade over the agentHost facade.
+ *
+ * Round 5 added `plugins_action` (the enable/disable/reload mutator
+ * for marketplace-installed plugins) which originally lived in
+ * `agent.ts` between `agent:dispose` and `sessions:rename`. The
+ * handler does a dynamic `await import("../agent/pi-resources/marketplace")`
+ * for `setPluginEnabled` to keep the marketplace module out of the
+ * cold-start path (matches `plugins_list`).
  */
 import { ipcMain } from "electron";
 
@@ -136,5 +143,18 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     // P2-13: listPlugins lives in the heavy marketplace module.
     const { listPlugins } = await import("../agent/pi-resources/marketplace");
     return { plugins: await listPlugins(agentHost.getCwd()) };
+  });
+  ipcMain.handle("plugins_action", async (_e, args: unknown) => {
+    const input = recordValue(args, "plugins action payload");
+    const action = recordValue(input.action, "action");
+    const pluginName = requiredString(action.pluginName, "pluginName");
+    if (action.type === "enable" || action.type === "disable") {
+      // P2-13: same lazy-load as plugins_list.
+      const { setPluginEnabled } = await import("../agent/pi-resources/marketplace");
+      await setPluginEnabled(pluginName, action.type === "enable");
+      return agentHost.setPluginEnabled(pluginName, action.type === "enable");
+    }
+    if (action.type === "reload") return agentHost.reloadPlugin(pluginName);
+    throw new Error(`unsupported plugin action: ${action.type ?? "unknown"}`);
   });
 }

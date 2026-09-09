@@ -65,6 +65,25 @@ export interface InitPipelineDeps {
   initProfile: (deps: unknown) => Promise<{ profileBundle: unknown; profilePackageJson: string }>;
   initPluginLoader: (deps: unknown) => Promise<{ loader: { list(): unknown[] }; pluginState: unknown }>;
   initDeepSeek: (deps: unknown) => Promise<void>;
+  /**
+   * Phase B.3 — PI-native user extension loader. Runs after initDeepSeek
+   * so DSH core packages (HarnessPluginLoader) are already mounted.
+   */
+  initPiUserExtensions: (deps: unknown) => Promise<{
+    loaded: number;
+    failed: number;
+    failedIds: string[];
+  }>;
+  /**
+   * Phase B.3 step 2a — parallel PI loader for DSH core packages.
+   * Until B.3 step 2b extracts the 7 DSH core shims to real files,
+   * `dshCorePaths` is typically empty and the stage is a no-op fast-path.
+   */
+  initPiDshCoreExtensions: (deps: unknown) => Promise<{
+    loaded: number;
+    failed: number;
+    failedIds: string[];
+  }>;
   computeActiveAdapterIds: (deps: { state: AgentHostState }) => string[];
   injectSystemPromptSections: (deps: unknown) => Promise<void>;
   initSession: (deps: unknown) => Promise<void>;
@@ -97,7 +116,6 @@ export interface InitPipelineDeps {
   killTask: (taskId: string) => Promise<void>;
   remoteServiceContext: () => unknown;
   transitionDshGoal: (deps: unknown) => Promise<unknown>;
-  resolveDeepSeekModule: unknown;
   openBuddyCapabilityPluginIndex: unknown;
   baseUrl: string;
   describeCompatibilityAdapterCommandsMarkdown: () => string;
@@ -184,11 +202,12 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
     listSubagentChildren: deps.listSubagentChildren,
   });
   deps.wireDshServices({
-    context, state: deps.state, cwd: deps.cwd(),
-    listCommands: deps.listCommands, listPluginInventory: deps.listPluginInventory, listPlugins: deps.listPlugins,
-    listDshFileReferences: deps.listDshFileReferences,
-    listSessions: deps.listSessions, listRunningTasks: deps.listRunningTasks, killTask: deps.killTask,
-    remoteServiceContext: deps.remoteServiceContext, transitionDshGoal: deps.transitionDshGoal,
+    context, state: deps.state,
+    transitionDshGoal: deps.transitionDshGoal as unknown as ((
+      goal: unknown,
+      ref: { id?: string; revision?: number } | undefined,
+      phase: "active" | "paused" | "blocked" | "complete",
+    ) => unknown),
   });
   deps.state.context = context;
   deps.wireForwardedEvents({ state: deps.state, context, emitRendererEvent: deps.emitRendererEvent, emitPluginEvent: deps.emitPluginEvent });
@@ -229,7 +248,6 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
   const { loader, pluginState } = await deps.initPluginLoader({
     state: deps.state, cwd: deps.cwd(), context, baseUrl: deps.baseUrl,
     emitPluginEvent: deps.emitPluginEvent,
-    resolveDeepSeekModule: deps.resolveDeepSeekModule,
     openBuddyCorePlugin: deps.openBuddyCorePlugin,
     openBuddyCapabilityPluginIndex: deps.openBuddyCapabilityPluginIndex,
   });
@@ -238,12 +256,37 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
   console.log("[openbuddy-diag] init-pipeline stage=6.5 ENTER (initDeepSeek)");
   await deps.initDeepSeek({
     state: deps.state, context, loader, profileBundle, baseUrl: deps.baseUrl,
-    emitPluginEvent: deps.emitPluginEvent, emitRendererEvent: deps.emitRendererEvent,
-    remoteServiceContext: deps.remoteServiceContext, reconcileProfileArtifacts: deps.reconcileProfileArtifacts,
+    emitPluginEvent: deps.emitPluginEvent,
   });
 
   // Stage 7: Compute active adapter IDs + inject system prompt + init session.
   console.log("[openbuddy-diag] init-pipeline stage=6.5 DONE");
+
+  // Stage 6.6: Phase B.3 — load user PI plugins via PI's
+  // `loadExtensions()` API. Runs after initDeepSeek so DSH core is up.
+  // Result stored in state.userExtensionResult for renderer diagnostics.
+  console.log("[openbuddy-diag] init-pipeline stage=6.6 ENTER (initPiUserExtensions)");
+  deps.state.userExtensionResult = await deps.initPiUserExtensions({
+    state: deps.state, cwd: deps.cwd(),
+    emitPluginEvent: deps.emitPluginEvent,
+  });
+  console.log("[openbuddy-diag] init-pipeline stage=6.6 DONE");
+
+  // Stage 6.7: Phase B.3 step 2b — parallel PI loader for DSH core
+  // packages. `init-deepseek` has already populated
+  // `state.dshCoreExtensionPathsOverride` (via
+  // `resolveDshCoreExtensionPaths`); if non-empty, this stage loads
+  // the DSH core entries alongside the existing HarnessPluginLoader
+  // (dual-track transition). Result stored in
+  // state.dshCoreExtensionResult. Empty path list = no-op fast-path.
+  console.log("[openbuddy-diag] init-pipeline stage=6.7 ENTER (initPiDshCoreExtensions)");
+  deps.state.dshCoreExtensionResult = await deps.initPiDshCoreExtensions({
+    state: deps.state, cwd: deps.cwd(),
+    emitPluginEvent: deps.emitPluginEvent,
+    dshCorePaths: [...deps.state.dshCoreExtensionPathsOverride],
+  });
+  console.log("[openbuddy-diag] init-pipeline stage=6.7 DONE");
+
   console.log("[openbuddy-diag] init-pipeline stage=7 ENTER (computeActiveAdapterIds + initSession)");
   const activeAdapterIds = deps.computeActiveAdapterIds({ state: deps.state });
   await deps.injectSystemPromptSections({

@@ -78,6 +78,18 @@
       "@openbuddy/cordis": [
         "./packages/runtime/openbuddy-cordis/src/index.ts"
       ],
+      "@openbuddy/dsh-core": [
+        "./packages/runtime/openbuddy-dsh-core/src/index.ts"
+      ],
+      "@openbuddy/dsh-core/state": [
+        "./packages/runtime/openbuddy-dsh-core/src/state.ts"
+      ],
+      "@openbuddy/dsh-core/goals": [
+        "./packages/runtime/openbuddy-dsh-core/src/goals.ts"
+      ],
+      "@openbuddy/dsh-core/message-feedback": [
+        "./packages/runtime/openbuddy-dsh-core/src/message-feedback.ts"
+      ],
       "@openbuddy/core-session": [
         "./packages/core/openbuddy-session/src/index.ts"
       ],
@@ -101,6 +113,9 @@
       ],
       "@openbuddy/plugin-host/remote-codec": [
         "./packages/runtime/openbuddy-plugin-host/src/remote-codec.ts"
+      ],
+      "@openbuddy/plugin-sdk": [
+        "./packages/runtime/openbuddy-plugin-sdk/src/index.ts"
       ],
       "@openbuddy/renderer-host": [
         "./packages/renderer/openbuddy-renderer-host/src/index.ts"

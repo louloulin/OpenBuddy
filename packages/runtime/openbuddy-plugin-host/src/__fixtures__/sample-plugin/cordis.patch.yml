@@ -1,0 +1,10 @@
+# Phase K.2 — sample-plugin cordis patch.
+#
+# Loaded by `HarnessPluginLoader.loadCordisPatch(...)` when a profile
+# includes this fixture. The patch declares one Cordis entry that the
+# loader will import + apply on the host Cordis context.
+- insert:
+    - id: '@fixture/sample-plugin'
+      name: '@fixture/sample-plugin'
+      config:
+        greeting: hello from sample-plugin cordis patch

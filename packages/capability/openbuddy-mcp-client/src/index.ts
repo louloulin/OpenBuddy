@@ -157,46 +157,30 @@ function safeServerName(value: string): string {
 	return normalized.slice(0, 32) || "server";
 }
 
+// Phase C.3 — mcp tool factory moved to ./mcp-tools.ts. The legacy
+// mcpToolName + createMcpToolDefinitions are re-exported below so
+// external callers keep working unchanged.
+import { createMcpToolDefinitions as createMcpToolDefinitionsImpl, mcpToolName as mcpToolNameImpl, type McpConnectionLike } from "./mcp-tools";
+
+/** Phase C.3 — re-export mcpToolName with the original full type
+ *  signature (the index.ts declaration was more specific than the
+ *  mcp-tools.ts minimal subset; we cast through the loose shape so
+ *  the public API is preserved). */
 export function mcpToolName(serverName: string, toolName: string): string {
-	return `mcp__${safeServerName(serverName)}__${toolName.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+  return mcpToolNameImpl(serverName, toolName);
 }
 
-function toolResult(result: CallToolResult): AgentToolResult<CallToolResult> {
-	const content = result.content.map((item) => {
-		if (item.type === "text") return item;
-		if (item.type === "image") return { type: "text" as const, text: `[image ${item.mimeType}]` };
-		if (item.type === "audio") return { type: "text" as const, text: `[audio ${item.mimeType}]` };
-		return { type: "text" as const, text: JSON.stringify(item) };
-	});
-	return { content, details: result };
-}
-
+/** Phase C.3 — re-export createMcpToolDefinitions with the original
+ *  full type signature. Casts the connection through the loose
+ *  McpConnectionLike so external callers using McpConnection keep
+ *  working unchanged. */
 export function createMcpToolDefinitions(
-	serverName: string,
-	tools: readonly Tool[],
-	connection: Pick<McpConnection, "callTool">,
-	onCall?: McpToolCallObserver,
+  serverName: string,
+  tools: readonly Tool[],
+  connection: Pick<McpConnection, "callTool">,
+  onCall?: McpToolCallObserver,
 ): ToolDefinition[] {
-	return tools.map((tool) => ({
-		name: mcpToolName(serverName, tool.name),
-		label: `${serverName}: ${tool.name}`,
-		description: tool.description || `Call ${tool.name} on MCP server ${serverName}.`,
-		parameters: tool.inputSchema as ToolDefinition["parameters"],
-		execute: async (toolCallId, args, signal) => {
-			const piToolName = mcpToolName(serverName, tool.name);
-			const callId = typeof toolCallId === "string" && toolCallId ? toolCallId : `mcp-${Date.now().toString(36)}`;
-			const startedAt = Date.now();
-			onCall?.({ phase: "start", callId, serverName, toolName: tool.name, piToolName });
-			try {
-				const result = await connection.callTool(tool.name, record(args), signal);
-				onCall?.({ phase: "end", callId, serverName, toolName: tool.name, piToolName, durationMs: Date.now() - startedAt, ok: true });
-				return toolResult(result);
-			} catch (error) {
-				onCall?.({ phase: "end", callId, serverName, toolName: tool.name, piToolName, durationMs: Date.now() - startedAt, ok: false, error: error instanceof Error ? error.message : String(error) });
-				throw error;
-			}
-		},
-	}));
+  return createMcpToolDefinitionsImpl(serverName, tools, connection as unknown as McpConnectionLike, onCall);
 }
 
 export function buildMcpHttpHeaders(config: McpServerConfig, credential?: McpCredential): Record<string, string> {

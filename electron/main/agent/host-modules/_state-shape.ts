@@ -207,6 +207,37 @@ export interface AgentHostState {
   profileOptions: OpenBuddyProfileOptions | null;
   profileBundle: PluginProfile | null;
   activePluginProfile: PluginProfile | null;
+  /**
+   * Phase B.3 — PI-native user extension load summary.
+   * Set by `initPiUserExtensions` after `loadExtensions(state.profilePiPackagePaths, cwd)`
+   * returns. Renderer reads this to show "loaded N / failed M" diagnostics.
+   */
+  userExtensionResult: {
+    loaded: number;
+    failed: number;
+    failedIds: string[];
+  } | null;
+  /**
+   * Phase B.3 step 2a — PI-native DSH core extension load summary.
+   * Set by `initPiDshCoreExtensions` after `discoverAndLoadExtensions`
+   * returns. Empty until B.3 step 2b extracts the 7 DSH core shims into
+   * real files (v11 §31.2). Renderer reads this for DSH core load diagnostics.
+   */
+  dshCoreExtensionResult: {
+    loaded: number;
+    failed: number;
+    failedIds: string[];
+  } | null;
+  /**
+   * Phase B.3 step 2b — override the default `@openbuddy/dsh-core`
+   * extension path resolution. When non-empty, the resolver uses
+   * this list verbatim instead of resolving the package source files.
+   * Used by tests and by profile-level overrides
+   * (`profile.piDshCorePaths`). Empty array = use defaults (B.3 step
+   * 2a baseline behaviour, which is no-op fast-path when the default
+   * source files are not present).
+   */
+  dshCoreExtensionPathsOverride: readonly string[];
   profilePackageJson: string | undefined;
   profilePackagePaths: string[];
   profilePiExtensions: readonly OpenBuddyPiExtensionSpec[];

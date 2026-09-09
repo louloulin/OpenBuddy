@@ -1,0 +1,24 @@
+{
+  "name": "@openbuddy/plugin-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenBuddyPlugin SDK v0.1 — PI-native plugin manifest serializer. Parses plugin.json, validates it with zod, and converts it into PI ExtensionFactory descriptors. Actual plugin loading still happens through PI's loadExtensions().",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifest": "./src/manifest.ts",
+    "./serializer": "./src/serializer.ts",
+    "./types": "./src/types.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "^0.85.0",
+    "zod": "^4.5.4"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ]
+}

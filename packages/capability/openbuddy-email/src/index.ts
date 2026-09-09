@@ -8,6 +8,25 @@ import { OpenBuddyService } from "@openbuddy/cordis"
 import type { McpClient, McpToolCallResult } from "@openbuddy/capability-mcp-client"
 import { EmailProviderRegistry, type EmailConnection, type EmailConnectionReadiness, type EmailProviderRegistryDiagnostic, type EmailRegistryProviderType } from "./provider-registry"
 import { EmailPermissionResolver, type EmailPermission, type EmailPermissionAuditContext } from "./email-permissions"
+// Phase H.1 — classifier helpers + types extracted to keep index.ts focused
+// on persistence + the Email Cordis service. email-classifier.ts owns the
+// noise / rejected / cancelled / passive-followup rules + date extraction;
+// email-classifier-types.ts owns the LLM-action surface types.
+import {
+  extractDueDate,
+  getEmailActionTriggerPatterns,
+  isCancelledEmail,
+  isNoiseEmail,
+  isPassiveFollowupEmail,
+  isRejectedEmail,
+  resolveMessageId,
+  trimActionContent,
+} from "./email-classifier";
+import type { EmailActionCandidate, EmailActionCandidateInput } from "./email-classifier-types";
+
+// Re-export the LLM-action types so external callers (tests, downstream
+// consumers) keep importing them from "./index" unchanged.
+export type { EmailActionCandidate, EmailActionCandidateInput } from "./email-classifier-types";
 
 export type EmailFolder = "inbox" | "sent" | "drafts" | "archive" | "trash" | "spam" | "starred" | "important" | "snoozed" | "custom"
 export type EmailMutationKind = "mark-read" | "mark-unread" | "archive" | "restore" | "label" | "star" | "trash" | "spam" | "snooze"
@@ -1666,25 +1685,6 @@ function analysisActions(value: unknown): EmailAnalysisAction[] {
 	})
 }
 
-export interface EmailActionCandidateInput {
-	subject: string
-	body: string
-	messages: Array<{ id: string; from?: string; date?: string; text?: string; snippet?: string }>
-	phrases?: readonly string[]
-	baseDate?: Date
-	now?: Date
-}
-
-export interface EmailActionCandidate {
-	content: string
-	owner?: string
-	dueAt?: string
-	messageId: string
-	citations: EmailAnalysisCitation[]
-	confidence: number
-	source: "llm-phrase" | "heuristic-imperative" | "heuristic-deadline"
-}
-
 export interface EmailActionCandidateResult {
 	actions: EmailActionCandidate[]
 	summary: string
@@ -1693,145 +1693,16 @@ export interface EmailActionCandidateResult {
 	stats: { candidates: number; kept: number; droppedNoise: number; droppedNoCitation: number; droppedPassiveFollowup: number; droppedRejected: number }
 }
 
-const EMAIL_ACTION_TRIGGER_PATTERNS: ReadonlyArray<{ regex: RegExp; source: EmailActionCandidate["source"] }> = [
-	{ regex: /(?:请|麻烦|烦请|恳请|希望|期待)\s*([^\n。.!?！？;;；]{2,80})/g, source: "heuristic-imperative" },
-	{ regex: /\b(?:please|kindly|could you|can you|would you)\s+([^\n.!?]{2,80})/gi, source: "heuristic-imperative" },
-	{ regex: /(?:能否|可不可以|是否可以|方便|愿意)\s*([^\n。.!?！？;;；]{2,80})/g, source: "heuristic-imperative" },
-	{ regex: /(?:审批|审核|确认|签字|回签|签署|批准|agree|approve|sign)\s*([^\n。.!?！？;;；]{2,80})/g, source: "heuristic-imperative" },
-	{ regex: /(?:回复|反馈|提供|安排|发送|处理|完成|准备)\s*([^\n。.!?！？;;；]{2,80})/g, source: "heuristic-deadline" },
-]
-
-const EMAIL_NOISE_KEYWORDS = [
-	"newsletter", "no-reply", "noreply", "automated", "automatic",
-	"notification", "alert", "digest", "weekly", "每月精选", "本周精选",
-	"每日精选", "weekly summary", "build succeeded", "build failed",
-	"system report", "monitoring", "metrics", "p95", "延迟",
-	"生日快乐", "happy birthday", "节日快乐",
-	"感谢贵司", "感谢您的", "感谢你", "下次有项目", "下次见面",
-	"webinar 邀请", "blog post", "release notes", "changelog",
-	"团建", "公告", "[公告]",
-]
-
-const EMAIL_NOISE_SUBJECT_PATTERNS: RegExp[] = [
-	/^InfoQ/i, /^Daily/i, /^Build\s*#/i, /^New Blog Post/i,
-	/^v\d+\.\d+/, /^Webinar/i, /生日快乐/, /感谢/, /感谢贵司/,
-]
-
-const EMAIL_REJECTED_PATTERNS = [
-	/(?:暂不采购|暂不合作|本期不|不续签|不参与)/,
-	/(?:本期暂不|暂不考虑|暂未通过|拒绝|rejected|not proceeding)/i,
-]
-
-const EMAIL_CANCELLED_PATTERNS = [
-	/(?:取消|取消：|已取消|cancelled|已结束)/,
-]
-
-const EMAIL_PASSIVE_FOLLOWUP_PATTERNS = [
-	/已进入.*?(?:审核|终审|审批)/,
-	/已发货|运单号|预计.*?送达/,
-	/仍在.*?评审中/,
-	/正在.*?处理/,
-	/稍后通知|新时间稍后/,
-]
-
-function resolveMessageId(input: { messages: EmailActionCandidateInput["messages"]; fallback: string }): { id: string; from?: string; date?: string } {
-	if (input.messages.length === 0) return { id: input.fallback }
-	const head = input.messages[0]!
-	return { id: head.id || input.fallback, ...(head.from ? { from: head.from } : {}), ...(head.date ? { date: head.date } : {}) }
-}
-
-function extractAbsoluteDate(text: string, baseDate: Date): string | undefined {
-	let earliest: string | undefined
-	for (const m of text.matchAll(/\b(\d{4}-\d{2}-\d{2})\b/g)) {
-		const key = m[1]!
-		if (!earliest || key < earliest) earliest = key
-	}
-	for (const m of text.matchAll(/\b(\d{1,2})[/月-](\d{1,2})(?:[/月-](\d{2,4}))?\b/g)) {
-		const month = parseInt(m[1]!, 10)
-		const day = parseInt(m[2]!, 10)
-		let year = m[3] ? parseInt(m[3], 10) : baseDate.getFullYear()
-		if (year < 100) year += 2000
-		const candidate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-		if (!earliest || candidate < earliest) earliest = candidate
-	}
-	for (const m of text.matchAll(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]/g)) {
-		const month = parseInt(m[1]!, 10)
-		const day = parseInt(m[2]!, 10)
-		const candidate = `${baseDate.getFullYear()}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-		if (!earliest || candidate < earliest) earliest = candidate
-	}
-	return earliest
-}
-
-function extractRelativeDate(text: string, baseDate: Date): string | undefined {
-	const weekdayMap: Record<string, number> = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "日": 0, "天": 0 }
-	const targetWeekday = (text.match(/(?:本周|下周)([一二三四五六日天])/) ?? [])[1]
-	if (targetWeekday) {
-		const dow = weekdayMap[targetWeekday] ?? 0
-		const curDow = baseDate.getDay()
-		const delta = ((dow - curDow + 7) % 7) + (text.startsWith("下周") ? 7 : 0)
-		if (delta > 0) {
-			const d = new Date(baseDate)
-			d.setDate(d.getDate() + delta)
-			return d.toISOString().slice(0, 10)
-		}
-	}
-	const relativeMap: Array<{ regex: RegExp; offsetDays: number }> = [
-		{ regex: /本周内|本周/i, offsetDays: 4 },
-		{ regex: /下周内|下周/i, offsetDays: 11 },
-		{ regex: /本月底|月底/i, offsetDays: 28 },
-		{ regex: /尽快|asap|immediately/i, offsetDays: 0 },
-		{ regex: /今天|today/i, offsetDays: 0 },
-		{ regex: /明天|tomorrow/i, offsetDays: 1 },
-		{ regex: /后天/i, offsetDays: 2 },
-		{ regex: /两周内|两周/i, offsetDays: 14 },
-		{ regex: /一个月内|月内|一个月/i, offsetDays: 30 },
-		{ regex: /本周五/i, offsetDays: 4 },
-		{ regex: /下周五/i, offsetDays: 11 },
-	]
-	for (const entry of relativeMap) {
-		if (entry.regex.test(text)) {
-			const d = new Date(baseDate)
-			d.setDate(d.getDate() + entry.offsetDays)
-			return d.toISOString().slice(0, 10)
-		}
-	}
-	return undefined
-}
-
-function extractDueDate(text: string, baseDate: Date): string | undefined {
-	return extractAbsoluteDate(text, baseDate) ?? extractRelativeDate(text, baseDate)
-}
-
-function isNoiseEmail(input: EmailActionCandidateInput): boolean {
-	const subject = input.subject ?? ""
-	const body = input.body ?? ""
-	const haystack = `${subject}\n${body}`
-	for (const pattern of EMAIL_NOISE_SUBJECT_PATTERNS) {
-		if (pattern.test(subject)) return true
-	}
-	return EMAIL_NOISE_KEYWORDS.some((keyword) => haystack.includes(keyword))
-}
-
-function isRejectedEmail(input: EmailActionCandidateInput): boolean {
-	const haystack = `${input.subject ?? ""}\n${input.body ?? ""}`
-	return EMAIL_REJECTED_PATTERNS.some((pattern) => pattern.test(haystack))
-}
-
-function isCancelledEmail(input: EmailActionCandidateInput): boolean {
-	const haystack = `${input.subject ?? ""}\n${input.body ?? ""}`
-	return EMAIL_CANCELLED_PATTERNS.some((pattern) => pattern.test(haystack))
-}
-
-function isPassiveFollowupEmail(input: EmailActionCandidateInput): boolean {
-	return EMAIL_PASSIVE_FOLLOWUP_PATTERNS.some((pattern) => pattern.test(input.body ?? ""))
-}
-
-function trimActionContent(content: string): string {
-	const trimmed = content.replace(/\s+/g, " ").trim()
-	if (trimmed.length <= 30) return trimmed
-	return `${trimmed.slice(0, 28)}…`
-}
+// Phase H.1 — moved to email-classifier.ts. The
+// EMAIL_ACTION_TRIGGER_PATTERNS / EMAIL_NOISE_KEYWORDS /
+// EMAIL_NOISE_SUBJECT_PATTERNS / EMAIL_REJECTED_PATTERNS /
+// EMAIL_CANCELLED_PATTERNS / EMAIL_PASSIVE_FOLLOWUP_PATTERNS constants
+// and the resolveMessageId / extractAbsoluteDate / extractRelativeDate
+// / extractDueDate / isNoiseEmail / isRejectedEmail / isCancelledEmail /
+// isPassiveFollowupEmail / trimActionContent helpers now live in
+// email-classifier.ts and are imported at the top of this file.
+// The EmailActionCandidateInput / EmailActionCandidate types are
+// re-exported from email-classifier-types.
 
 /**
  * OpenBuddy AI Email · action-candidate extractor.
@@ -1878,7 +1749,7 @@ export function extractEmailActionCandidates(input: EmailActionCandidateInput): 
 			if (trimmed.length >= 2 && trimmed.length <= 120) phraseSource.set(trimmed, "llm-phrase")
 		}
 	}
-	for (const pattern of EMAIL_ACTION_TRIGGER_PATTERNS) {
+	for (const pattern of getEmailActionTriggerPatterns()) {
 		pattern.regex.lastIndex = 0
 		for (const match of text.matchAll(pattern.regex)) {
 			const captured = (match[1] ?? "").replace(/\s+/g, " ").trim()
@@ -3435,60 +3306,30 @@ export const emailHandlers = { accounts: () => service().accounts(), providerDia
 	registryRemove: (id: string) => service().registryRemove(id),
 	registryDiagnostics: () => service().registryDiagnostics() }
 
-function toolResult(value: unknown) { return { content: [{ type: "text" as const, text: JSON.stringify(value) }], details: value } }
-type ToolArgs = Record<string, any>
-const objectSchema = { type: "object", additionalProperties: false }
+// Phase C.1 — tool factory implementations moved to ./email-tools.ts
+// so index.ts (the god module) shrinks back to its core concern:
+// the Email Cordis service + permissions view + mount. Re-export the
+// same public surface here so external callers
+// (`createEmailPiTools()` / `createEmailReadOnlyPiTools()`) keep
+// working unchanged.
+export {
+  createEmailToolDefinitions,
+  createReadOnlyEmailToolDefinitions,
+  EMAIL_READ_ONLY_TOOL_NAMES,
+  type EmailToolHandlers,
+} from "./email-tools";
+
+import { createEmailToolDefinitions, createReadOnlyEmailToolDefinitions } from "./email-tools";
+
+/** Phase C.1 — PI tool factory. Delegates to ./email-tools with the
+ *  bound `emailHandlers` so the legacy no-arg API is preserved. */
 export function createEmailPiTools(): ToolDefinition[] {
-	return createEmailToolDefinitions()
+  return createEmailToolDefinitions(emailHandlers as unknown as Parameters<typeof createEmailToolDefinitions>[0]);
 }
 
+/** Phase C.1 — read-only PI tool factory. Same delegation pattern. */
 export function createEmailReadOnlyPiTools(): ToolDefinition[] {
-	return createEmailToolDefinitions().filter((tool) => ["email_list_accounts", "email_list_rules", "email_sync", "email_sync_states", "email_search", "email_threads_page", "email_workspace_tags", "email_reply_zero", "email_digest", "email_get_thread", "email_list_attachments", "email_list_scheduled_sends", "email_list_pending_sends", "email_save_analysis", "email_list_analyses", "email_extract_action_candidates", "email_action_center_query", "email_contact_projection"].includes(tool.name))
-}
-
-function createEmailToolDefinitions(): ToolDefinition[] {
-	return [
-		{ name: "email_list_accounts", label: "List email accounts", description: "列出已连接的邮箱账户和能力。", parameters: objectSchema as ToolDefinition["parameters"], execute: async () => toolResult(await emailHandlers.accounts()) },
-		{ name: "email_list_rules", label: "List email rules", description: "列出本地保存的 AI 邮件规则；规则只作用于可逆处理计划。", parameters: objectSchema as ToolDefinition["parameters"], execute: async () => toolResult(await emailHandlers.rules()) },
-		{ name: "email_save_rule", label: "Save email rule", description: "保存 AI 邮件规则。规则禁止删除/垃圾邮件动作，运行时只生成需确认的处理计划；可启用定时扫描，但不会自动执行远端写操作。", parameters: { ...objectSchema, required: ["name", "actions"], properties: { name: { type: "string" }, ruleId: { type: "string" }, enabled: { type: "boolean" }, condition: { type: "object" }, actions: { type: "array" }, schedule: { type: "object", properties: { intervalMinutes: { type: "integer", minimum: 15, maximum: 10080 }, nextRunAt: { type: "string" } } } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.saveRule(args as EmailRuleInput)) },
-		{ name: "email_run_rule", label: "Run email rule", description: "运行本地邮件规则，只返回匹配线程和 dry-run 处理计划，不会直接写入邮箱。", parameters: { ...objectSchema, required: ["ruleId"], properties: { ruleId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.runRule(args.ruleId)) },
-		{ name: "email_delete_rule", label: "Delete email rule", description: "删除本地邮件规则，不修改远端邮件。", parameters: { ...objectSchema, required: ["ruleId"], properties: { ruleId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.deleteRule(args.ruleId)) },
-		{ name: "email_sync", label: "Sync email", description: "调用邮箱 provider 原生增量同步；没有 sync 工具时明确返回不支持，不会把普通分页冒充同步。", parameters: { ...objectSchema, required: ["accountId"], properties: { accountId: { type: "string" }, cursor: { type: "string" }, limit: { type: "number" }, full: { type: "boolean" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.sync(args as EmailSyncInput)) },
-		{ name: "email_sync_states", label: "List email sync states", description: "列出本地保存的同步游标、状态、时间和计数，不包含邮件正文或 OAuth 凭据。", parameters: { ...objectSchema, properties: { accountId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.syncStates(args.accountId)) },
-		{ name: "email_triage", label: "Triage inbox", description: "只读对收件箱进行可解释优先级分诊，返回 urgent、needs-reply、waiting-for-reply、noise、normal；不会修改邮件。", parameters: { ...objectSchema, properties: { accountId: { type: "string" }, limit: { type: "number" }, query: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.triage(args as EmailSearchInput)) },
-		{ name: "email_extract_action_candidates", label: "Extract email action candidates", description: "从邮件正文抽取结构化行动项候选（content/owner/dueAt/messageId），可接受 LLM 已抽取的 phrases；不写邮件、不持久化分析，仅供 save-analysis 调用方使用。", parameters: { ...objectSchema, required: ["subject", "body", "messages"], properties: { subject: { type: "string" }, body: { type: "string" }, messages: { type: "array", items: { type: "object" } }, phrases: { type: "array", items: { type: "string" } }, baseDate: { type: "string" }, now: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(emailHandlers.extractActionCandidates(args as Parameters<typeof emailHandlers.extractActionCandidates>[0])) },
-		{ name: "email_prepare_processing_plan", label: "Prepare email processing plan", description: "根据 AI/用户建议生成只读处理预览；禁止删除和垃圾邮件操作，不会修改 provider。", parameters: { ...objectSchema, required: ["operations"], properties: { operations: { type: "array" }, expiresInMs: { type: "number" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.prepareProcessingPlan(args as EmailProcessingPlanInput)) },
-		{ name: "email_confirm_processing_plan", label: "Confirm email processing plan", description: "请求用户确认处理计划，返回一次性执行 token。", parameters: { ...objectSchema, required: ["planId"], properties: { planId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.confirmProcessingPlan(args.planId)) },
-		{ name: "email_execute_processing_plan", label: "Execute email processing plan", description: "使用确认 token 执行已预览的邮件管理计划；计划指纹变化或过期会失败。", parameters: { ...objectSchema, required: ["planId", "confirmationToken"], properties: { planId: { type: "string" }, confirmationToken: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.executeProcessingPlan(args.planId, args.confirmationToken)) },
-		{ name: "email_cancel_processing_plan", label: "Cancel email processing plan", description: "取消尚未执行的邮件处理计划，撤销其确认 token 并持久化取消状态。", parameters: { ...objectSchema, required: ["planId"], properties: { planId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.cancelProcessingPlan(args.planId)) },
-		{ name: "email_search", label: "Search email", description: "搜索邮件线程，只读操作。支持与 Gmail Label 分离的 OpenBuddy 工作区标签。", parameters: { ...objectSchema, properties: { query: { type: "string" }, accountId: { type: "string" }, folder: { type: "string" }, labelId: { type: "string" }, tags: { type: "array", items: { type: "string" } }, tagMatch: { type: "string", enum: ["any", "all"] }, from: { type: "string" }, to: { type: "string" }, unread: { type: "boolean" }, hasAttachment: { type: "boolean" }, since: { type: "string" }, until: { type: "string" }, limit: { type: "number" }, cursor: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.threads(args)) },
-		{ name: "email_threads_page", label: "Page email threads", description: "分页读取邮件线程；返回 items 和 nextCursor，适合分批处理大量邮件。", parameters: { ...objectSchema, properties: { query: { type: "string" }, accountId: { type: "string" }, folder: { type: "string" }, labelId: { type: "string" }, tags: { type: "array", items: { type: "string" } }, tagMatch: { type: "string", enum: ["any", "all"] }, from: { type: "string" }, to: { type: "string" }, unread: { type: "boolean" }, hasAttachment: { type: "boolean" }, since: { type: "string" }, until: { type: "string" }, limit: { type: "number" }, cursor: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.threadsPage(args)) },
-		{ name: "email_workspace_tags", label: "List workspace email tags", description: "列出 OpenBuddy 工作区标签；与邮箱 provider 原生 Label 分离。", parameters: objectSchema as ToolDefinition["parameters"], execute: async () => toolResult(await emailHandlers.workspaceTags()) },
-		{ name: "email_reply_zero", label: "Reply Zero", description: "只读分析收件箱，返回待我回复、等待对方和无需行动的结构化线程引用。", parameters: { ...objectSchema, properties: { accountId: { type: "string" }, query: { type: "string" }, since: { type: "string" }, until: { type: "string" }, limit: { type: "number" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.replyZero(args)) },
-		{ name: "email_action_center_query", label: "Query AI email action center", description: "统一查询 AI 邮件行动中心：合并 triage 优先级、reply-zero 状态、已保存 AI 分析、workspace 标签和发送方域名；一次调用替代 triage+reply_zero+list_analyses+workspace_tags 的组合。可按 category/reviewStates/owner/dueBefore/senderDomain/workspaceTagIds 过滤。", parameters: { ...objectSchema, properties: { accountId: { type: "string" }, folder: { type: "string" }, categories: { type: "array", items: { type: "string", enum: ["urgent", "needs-reply", "waiting-for-reply", "noise", "normal"] } }, reviewStates: { type: "array", items: { type: "string", enum: ["pending", "accepted", "dismissed"] } }, owner: { type: "string" }, dueBefore: { type: "string" }, senderDomain: { type: "string" }, workspaceTagIds: { type: "array", items: { type: "string" } }, query: { type: "string" }, limit: { type: "number" }, cursor: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.actionCenterQuery(args as EmailActionCenterQueryInput)) },
-		{ name: "email_action_center_create_reminders", label: "Create follow-up reminders from AI action center", description: "把 AI 行动中心匹配到的待办行动项批量转为本地跟进提醒。默认 dry-run；confirmed=true 才真正创建（一次性确认整批），重复执行幂等。只处理 kind=actions 且 dueAt 在未来的分析行动项。", parameters: { ...objectSchema, properties: { accountId: { type: "string" }, categories: { type: "array", items: { type: "string", enum: ["urgent", "needs-reply", "waiting-for-reply", "noise", "normal"] } }, owner: { type: "string" }, dueBefore: { type: "string" }, senderDomain: { type: "string" }, workspaceTagIds: { type: "array", items: { type: "string" } }, confirmed: { type: "boolean" }, dryRun: { type: "boolean" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.actionCenterCreateReminders(args as EmailActionCenterReminderInput)) },
-		{ name: "email_contact_projection", label: "Project inbox contacts", description: "从收件箱消息头聚合联系人频次、最近交互和关联线程/分析 ID；不返回邮件正文或主题。支持 includeDomains/excludeDomains/roles/since-until/limit 过滤，个人邮箱默认脱敏（保留域名与前两位字符）。", parameters: { ...objectSchema, properties: { accountId: { type: "string" }, folder: { type: "string", enum: ["inbox", "sent", "drafts", "archive", "trash", "spam", "starred", "important", "snoozed", "custom"] }, includeDomains: { type: "array", items: { type: "string" } }, excludeDomains: { type: "array", items: { type: "string" } }, includeRoles: { type: "array", items: { type: "string", enum: ["from", "to", "cc", "bcc"] } }, since: { type: "string" }, until: { type: "string" }, limit: { type: "number" }, maskPersonalAddresses: { type: "boolean" }, returnRawAddresses: { type: "boolean" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.projectContacts(args as EmailContactProjectionOptions)) },
-		{ name: "email_digest", label: "Email digest", description: "只读生成收件箱今日简报数据；模型可据此生成摘要，不执行邮件副作用。", parameters: { ...objectSchema, properties: { accountId: { type: "string" }, since: { type: "string" }, until: { type: "string" }, limit: { type: "number" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.digest(args)) },
-		{ name: "email_get_thread", label: "Read email thread", description: "读取一个邮件线程。", parameters: { ...objectSchema, required: ["accountId", "threadId"], properties: { accountId: { type: "string" }, threadId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.thread(args.accountId, args.threadId)) },
-		{ name: "email_update_thread", label: "Manage email thread", description: "管理邮件线程；批量操作先使用 dryRun，删除、垃圾邮件和延后处理必须确认或提供有效时间。", parameters: { ...objectSchema, required: ["accountId", "threadId", "kind"], properties: { accountId: { type: "string" }, threadId: { type: "string" }, threadIds: { type: "array", items: { type: "string" } }, kind: { type: "string", enum: ["mark-read", "mark-unread", "archive", "restore", "label", "star", "trash", "spam", "snooze"] }, labelId: { type: "string" }, value: { type: "boolean" }, snoozeUntil: { type: "string" }, dryRun: { type: "boolean" }, sampleLimit: { type: "number" }, confirmed: { type: "boolean" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.update(args as EmailMutationInput)) },
-		{ name: "email_set_sender_policy", label: "Set sender policy", description: "将发件人未来邮件归类为 Signal、Noise 或阻断；block 仍需要用户确认。", parameters: { ...objectSchema, required: ["senderEmail", "policy"], properties: { senderEmail: { type: "string" }, policy: { type: "string" }, accountId: { type: "string" }, threadId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.setSenderPolicy(args as EmailSenderPolicyInput)) },
-		{ name: "email_share_thread", label: "Share email thread", description: "将邮件线程分享到已授权的协作频道；分享副作用需要用户确认。", parameters: { ...objectSchema, required: ["accountId", "threadId", "channelId"], properties: { accountId: { type: "string" }, threadId: { type: "string" }, channelId: { type: "string" }, message: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.shareThread(args as EmailShareInput)) },
-		{ name: "email_create_followup", label: "Create email follow-up", description: "为邮件线程创建一次性跟进提醒。", parameters: { ...objectSchema, required: ["accountId", "threadId", "description", "remindAt"], properties: { accountId: { type: "string" }, threadId: { type: "string" }, description: { type: "string" }, remindAt: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.createReminder(args as EmailReminderInput)) },
-		{ name: "email_move_to_project", label: "Move email to project", description: "将邮件线程关联到项目；项目变更需要用户确认。", parameters: { ...objectSchema, required: ["accountId", "threadId"], properties: { accountId: { type: "string" }, threadId: { type: "string" }, projectId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.moveToProject(args as EmailProjectLinkInput)) },
-		{ name: "email_list_attachments", label: "List email attachments", description: "列出一条邮件消息的附件元数据。", parameters: { ...objectSchema, required: ["accountId", "messageId"], properties: { accountId: { type: "string" }, messageId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.listAttachments(args.accountId, args.messageId)) },
-		{ name: "email_download_attachment", label: "Download email attachment", description: "将附件下载到用户明确选择的绝对目录；不会写入未授权路径。", parameters: { ...objectSchema, required: ["accountId", "attachmentId", "messageId", "destinationDir"], properties: { accountId: { type: "string" }, attachmentId: { type: "string" }, messageId: { type: "string" }, destinationDir: { type: "string", description: "用户选择的绝对目录" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.downloadAttachment(args.accountId, args.attachmentId, args.messageId, args.destinationDir)) },
-		{ name: "email_list_drafts", label: "List email drafts", description: "列出本地持久化的未发送草稿。", parameters: { ...objectSchema, properties: { accountId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.drafts(args.accountId)) },
-		{ name: "email_list_scheduled_sends", label: "List scheduled email sends", description: "列出已确认但尚未到时间发送的邮件计划。", parameters: objectSchema as ToolDefinition["parameters"], execute: async () => toolResult(await emailHandlers.scheduledSends()) },
-		{ name: "email_list_pending_sends", label: "List pending email sends", description: "列出仍在撤回窗口内的待发送邮件；只读，不会触发发送。", parameters: objectSchema as ToolDefinition["parameters"], execute: async () => toolResult(await emailHandlers.pendingSends()) },
-		{ name: "email_prepare_schedule_send", label: "Prepare scheduled email send", description: "校验计划发送草稿和时间，并返回一次性用户确认凭证；不会发送邮件。", parameters: { ...objectSchema, required: ["draftId", "scheduledAt"], properties: { draftId: { type: "string" }, scheduledAt: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.prepareScheduleSend(args.draftId, args.scheduledAt)) },
-		{ name: "email_schedule_send", label: "Schedule email send", description: "只有用户确认后才能创建计划发送；confirmationToken 必须来自 email_prepare_schedule_send。", parameters: { ...objectSchema, required: ["draftId", "scheduledAt", "confirmationToken"], properties: { draftId: { type: "string" }, scheduledAt: { type: "string" }, confirmationToken: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.scheduleSend(args.draftId, args.scheduledAt, args.confirmationToken)) },
-		{ name: "email_create_draft", label: "Create email draft", description: "创建或更新邮件草稿；body 使用 Markdown，bodyHtml 可由 Composer 提供清洗后的 HTML，发送前仍需用户确认。", parameters: { ...objectSchema, required: ["accountId", "to", "subject", "body"], properties: { accountId: { type: "string" }, draftId: { type: "string" }, to: { type: "array", items: { type: "object" } }, cc: { type: "array", items: { type: "object" } }, bcc: { type: "array", items: { type: "object" } }, replyTo: { type: "array", items: { type: "object" } }, subject: { type: "string" }, body: { type: "string" }, bodyHtml: { type: "string" }, attachments: { type: "array", items: { type: "string" } }, threadId: { type: "string" }, messageId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.createDraft(args as EmailComposeInput)) },
-		{ name: "email_prepare_send", label: "Prepare email send", description: "为用户确认准备一次性发送凭证；不会发送邮件。", parameters: { ...objectSchema, required: ["draftId"], properties: { draftId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.prepareSend(args.draftId)) },
-		{ name: "email_send_draft", label: "Send email draft", description: "只有用户确认后才能发送；confirmationToken 必须为 send:<draftId>。", parameters: { ...objectSchema, required: ["draftId", "confirmationToken"], properties: { draftId: { type: "string" }, confirmationToken: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.sendDraft(args.draftId, args.confirmationToken)) },
-		{ name: "email_save_analysis", label: "Save email AI analysis", description: "保存结构化邮件分析（summary/actions/risks/reply/meeting），邮件事实必须带 messageId 引用，背景资料使用独立的 contextCitations 并由运行时校验；不会发送邮件，不会修改邮件原文。", parameters: { ...objectSchema, required: ["accountId", "threadId", "kind", "confidence"], properties: { accountId: { type: "string" }, threadId: { type: "string" }, kind: { type: "string", enum: ["summary", "actions", "risk", "reply", "meeting"] }, summary: { type: "string" }, confidence: { type: "number", description: "0 到 1 之间的置信度" }, facts: { type: "array" }, actions: { type: "array" }, risks: { type: "array" }, replyDraft: { type: "object" }, meetingProposal: { type: "object" }, linkedDraftId: { type: "string" }, linkedReminderId: { type: "string" }, linkedTaskControlId: { type: "string" }, linkedTaskIds: { type: "array", items: { type: "string" } }, linkedCalendarTaskId: { type: "string" }, linkedCalendarEventId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.saveAnalysis(args as Parameters<typeof emailHandlers.saveAnalysis>[0])) },
-		{ name: "email_list_analyses", label: "List email AI analyses", description: "列出已保存的邮件 AI 分析，可按 accountId 与 threadId 过滤。", parameters: { ...objectSchema, properties: { accountId: { type: "string" }, threadId: { type: "string" } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.listAnalyses(args)) },
-		{ name: "email_create_reminders_from_analysis", label: "Create email follow-up reminders", description: "将已保存 AI 行动项转换为本地跟进提醒；需要用户确认，行动项必须包含未来 dueAt，重复执行幂等。", parameters: { ...objectSchema, required: ["analysisId"], properties: { analysisId: { type: "string" }, actionIndexes: { type: "array", items: { type: "integer" } } } } as ToolDefinition["parameters"], execute: async (_id, args: ToolArgs) => toolResult(await emailHandlers.createRemindersFromAnalysis({ analysisId: args.analysisId, ...(args.actionIndexes === undefined ? {} : { actionIndexes: args.actionIndexes }) })) },
-	]
+  return createReadOnlyEmailToolDefinitions(emailHandlers as unknown as Parameters<typeof createEmailToolDefinitions>[0]);
 }
 
 declare module "@openbuddy/cordis" { interface Context { email: Email } }

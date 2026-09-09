@@ -59,7 +59,6 @@ describe("host-modules/bootstrap/init-plugin-loader", () => {
       context: makeStubContext() as never,
       baseUrl: import.meta.url,
       emitPluginEvent: () => undefined,
-      resolveDeepSeekModule: () => undefined,
       openBuddyCorePlugin: { name: "openbuddy-core-stub" },
       openBuddyCapabilityPluginIndex: new Map(),
     });
@@ -76,7 +75,6 @@ describe("host-modules/bootstrap/init-plugin-loader", () => {
       context: makeStubContext() as never,
       baseUrl: import.meta.url,
       emitPluginEvent: () => undefined,
-      resolveDeepSeekModule: () => undefined,
       openBuddyCorePlugin: { name: "openbuddy-core-stub" },
       openBuddyCapabilityPluginIndex: new Map(),
     });
@@ -98,7 +96,6 @@ describe("host-modules/bootstrap/init-plugin-loader", () => {
       context: makeStubContext() as never,
       baseUrl: import.meta.url,
       emitPluginEvent: () => undefined,
-      resolveDeepSeekModule: () => undefined,
       openBuddyCorePlugin: { name: "openbuddy-core-stub" },
       openBuddyCapabilityPluginIndex: new Map(),
     });
@@ -125,7 +122,6 @@ describe("host-modules/bootstrap/init-plugin-loader", () => {
       context: makeStubContext() as never,
       baseUrl: import.meta.url,
       emitPluginEvent: (type, payload) => events.push({ type, payload }),
-      resolveDeepSeekModule: () => undefined,
       openBuddyCorePlugin: { name: "openbuddy-core-stub" },
       openBuddyCapabilityPluginIndex: new Map(),
     });
@@ -149,7 +145,6 @@ describe("host-modules/bootstrap/init-plugin-loader", () => {
       context: makeStubContext() as never,
       baseUrl: import.meta.url,
       emitPluginEvent: () => undefined,
-      resolveDeepSeekModule: () => undefined,
       openBuddyCorePlugin: coreStub,
       openBuddyCapabilityPluginIndex: new Map(),
     });
@@ -160,9 +155,11 @@ describe("host-modules/bootstrap/init-plugin-loader", () => {
     expect(loader).toBeDefined();
   });
 
-  it("resolves DS compat aliases before openbuddy:core", async () => {
-    // resolveDeepSeekModule wins over openBuddyCorePlugin when both match.
-    const dsStub = { name: "ds-stub" };
+  it("uses openBuddyCapabilityPluginIndex before openbuddy:core", async () => {
+    // Phase L.3: capability index takes priority over the openbuddy:core
+    // alias when both match (matches the L.3 ordering documented in
+    // init-plugin-loader.ts).
+    const capabilityStub = { name: "capability-stub" };
     const state = makeStubState();
     const { loader } = await initPluginLoader({
       state,
@@ -170,14 +167,15 @@ describe("host-modules/bootstrap/init-plugin-loader", () => {
       context: makeStubContext() as never,
       baseUrl: import.meta.url,
       emitPluginEvent: () => undefined,
-      resolveDeepSeekModule: (specifier) => (specifier === "ds:foo" ? dsStub : undefined),
       openBuddyCorePlugin: { name: "openbuddy-core-stub" },
-      openBuddyCapabilityPluginIndex: new Map(),
+      openBuddyCapabilityPluginIndex: new Map([
+        ["openbuddy:test-capability", capabilityStub],
+      ]),
     });
 
     // The exact priority is asserted by the upstream importer test in
     // pi-resources; here we only assert construction succeeded.
     expect(loader).toBeDefined();
-    void dsStub;
+    void capabilityStub;
   });
 });

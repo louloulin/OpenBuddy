@@ -17,7 +17,6 @@ import type {
   DeepSeekCordisInvocation,
   DeepSeekCordisRuntimeSnapshot,
 } from "@openbuddy/plugin-host";
-import { invokeRemoteWithGateway } from "../../../harness/remote-invocation";
 
 export type BridgeContext = {
   get?: (key: string) => unknown;
@@ -29,6 +28,26 @@ export type BridgeRemoteDispatcher = {
 
 export type BridgeServiceContext = unknown;
 
+/**
+ * Phase L.2 (v6 plan) — `isNamedRemoteRequest` was previously a separate
+ * helper exported from `harness/remote-invocation.ts` (deleted). It gates
+ * whether a request is a "named" form (object args, not array) which is
+ * the only shape the legacy typert gateway accepted. The fallback path
+ * always passes the request through to the DSH `RemoteDispatcher` which
+ * accepts both array and named forms.
+ */
+function isNamedRemoteRequest(request: unknown): boolean {
+  if (!request || typeof request !== "object" || Array.isArray(request)) return false;
+  const value = request as Record<string, unknown>;
+  return typeof value.namespace === "string"
+    && typeof value.method === "string"
+    && value.args !== undefined
+    && Boolean(value.args)
+    && typeof value.args === "object"
+    && !Array.isArray(value.args)
+    && Object.getPrototypeOf(value.args) === Object.prototype;
+}
+
 export function invokeRemote(args: {
   context: BridgeContext;
   remoteDispatcher: BridgeRemoteDispatcher;
@@ -38,11 +57,16 @@ export function invokeRemote(args: {
   const gateway = args.context?.get?.("typertGateway") as
     | { invoke?: (value: unknown) => Promise<unknown> }
     | undefined;
-  return invokeRemoteWithGateway(
-    args.request,
-    typeof gateway?.invoke === "function" ? { invoke: gateway.invoke.bind(gateway) } : undefined,
-    (value: unknown) => args.remoteDispatcher.invoke(value, args.remoteServiceContext()),
-  );
+  // Phase L.2 (v6 plan) — inline replacement for the deleted
+  // `invokeRemoteWithGateway` helper: if the request is a named form
+  // and a typert gateway is wired, delegate to the gateway; otherwise
+  // fall back to the DSH RemoteDispatcher. The gateway is itself a
+  // DSH-only concept slated for deletion in Phase L.4; once it goes
+  // this conditional collapses to the fallback branch.
+  if (gateway && typeof gateway.invoke === "function" && isNamedRemoteRequest(args.request)) {
+    return gateway.invoke(args.request);
+  }
+  return args.remoteDispatcher.invoke(args.request, args.remoteServiceContext());
 }
 
 export function deepSeekCordisSnapshot(

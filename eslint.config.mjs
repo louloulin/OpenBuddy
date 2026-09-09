@@ -79,11 +79,28 @@ export default [
       "import/no-self-import": "error",
       "import/no-useless-path-segments": "warn",
       // ── sheriff (module boundaries) ──
-      // See sheriff.config.ts. A-7 promotes specific tags to "error".
-      "sheriff/ban-tags": "warn",
-      "sheriff/no-private": "warn",
-      "sheriff/no-relative": "warn",
-      "sheriff/exhaustive-deps": "warn",
+      // See sheriff.config.ts. Phase J.1 (v6 §26.4) promotes specific tag
+      // pairs to "error" once the v6 §3.4 layer model stabilizes. The
+      // three rules below are the ones shipped by @softarc/eslint-plugin-
+      // sheriff@0.19.6 (rule names renamed from earlier 0.15.x releases):
+      //   - dependency-rule : assert depRules (UI ↔ core, microkernel ↔ plugin)
+      //   - deep-import     : assert public-surface only (no skipping index.ts)
+      //   - encapsulation   : assert tag isolation (no reverse-deps)
+      //
+      // J.1 follow-up (2026-09): baseline `pnpm storage:boundaries`
+      // reports 0 reverse-dep violations across 403 files. J.1.1 also
+      // normalized the 16 `"./../packages/..."` path aliases in
+      // `electron/tsconfig.json` to `../packages/...`, but Sheriff 0.19.6
+      // still surfaces 3 SH-001 false positives for paths that combine
+      // `baseUrl: "../../.."` with the `@openbuddy/cordis` alias
+      // (`packages/runtime/...`). The 3 errors are pre-existing on the
+      // 9 `packages/ui/openbuddy-ui-*/tsconfig.json` files. Kept at
+      // `warn` until those 9 configs migrate to root-relative paths
+      // (ui-* baseUrl collapse is a separate follow-up after v9 §28.2
+      // core-session / ui-state extraction).
+      "sheriff/dependency-rule": "warn",
+      "sheriff/deep-import": "warn",
+      "sheriff/encapsulation": "warn",
     },
   },
   {

@@ -12,52 +12,52 @@
     "noEmit": true,
     "paths": {
       "@openbuddy/cordis": [
-        "./../packages/runtime/openbuddy-cordis/src/index.ts"
+        "../packages/runtime/openbuddy-cordis/src/index.ts"
       ],
       "@openbuddy/shared-types": [
-        "./../packages/shared/openbuddy-types/src/index.ts"
+        "../packages/shared/openbuddy-types/src/index.ts"
       ],
       "@openbuddy/files-kb": [
-        "./../packages/shared/openbuddy-files-kb/src/index.ts"
+        "../packages/shared/openbuddy-files-kb/src/index.ts"
       ],
       "@openbuddy/plugin-host": [
-        "./../packages/runtime/openbuddy-plugin-host/src/index.ts"
+        "../packages/runtime/openbuddy-plugin-host/src/index.ts"
       ],
       "@openbuddy/bundle-base": [
-        "./../packages/bundle/openbuddy-base/src/index.ts"
+        "../packages/bundle/openbuddy-base/src/index.ts"
       ],
       "@openbuddy/renderer-host": [
-        "./../packages/renderer/openbuddy-renderer-host/src/index.ts"
+        "../packages/renderer/openbuddy-renderer-host/src/index.ts"
       ],
       "@openbuddy/core-session": [
-        "./../packages/core/openbuddy-session/src/index.ts"
+        "../packages/core/openbuddy-session/src/index.ts"
       ],
       "@openbuddy/core-session/lifecycle": [
-        "./../packages/core/openbuddy-session/src/lifecycle.ts"
+        "../packages/core/openbuddy-session/src/lifecycle.ts"
       ],
       "@openbuddy/auth-permission": [
-        "./../packages/auth/openbuddy-permission/src/index.ts"
+        "../packages/auth/openbuddy-permission/src/index.ts"
       ],
       "@openbuddy/auth-casdoor": [
-        "./../packages/auth/openbuddy-casdoor/src/index.ts"
+        "../packages/auth/openbuddy-casdoor/src/index.ts"
       ],
       "@openbuddy/fs-fs-local": [
-        "./../packages/fs/openbuddy-fs-local/src/index.ts"
+        "../packages/fs/openbuddy-fs-local/src/index.ts"
       ],
       "@openbuddy/team-team": [
-        "./../packages/team/openbuddy-team/src/index.ts"
+        "../packages/team/openbuddy-team/src/index.ts"
       ],
       "@openbuddy/collaboration-protocol": [
-        "./../packages/collaboration/openbuddy-protocol/src/index.ts"
+        "../packages/collaboration/openbuddy-protocol/src/index.ts"
       ],
       "@openbuddy/collaboration-room": [
-        "./../packages/collaboration/openbuddy-room/src/index.ts"
+        "../packages/collaboration/openbuddy-room/src/index.ts"
       ],
       "@openbuddy/collaboration-inbox": [
-        "./../packages/collaboration/openbuddy-inbox/src/index.ts"
+        "../packages/collaboration/openbuddy-inbox/src/index.ts"
       ],
       "@openbuddy/collaboration-coordinator": [
-        "./../packages/collaboration/openbuddy-coordinator/src/index.ts"
+        "../packages/collaboration/openbuddy-coordinator/src/index.ts"
       ]
     },
     "types": [

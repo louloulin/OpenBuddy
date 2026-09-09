@@ -25,6 +25,7 @@ function buildFakeDeps(): InitPipelineDeps {
     state: {
       toolRegistryRevision: 0,
       eventSequence: 0,
+      dshCoreExtensionPathsOverride: [],
     } as InitPipelineDeps["state"],
     cwd: () => "/fake/cwd",
     piHome: () => "/fake/pi-home",
@@ -63,6 +64,24 @@ function buildFakeDeps(): InitPipelineDeps {
     }),
     initDeepSeek: vi.fn(async () => {
       callOrder.push("initDeepSeek");
+    }) as unknown as (deps: unknown) => Promise<void>,
+    /**
+     * Phase B.3 step 1 — PI-native user extension loader stub. The real
+     * implementation lives in init-pi-user-extensions.ts and is wired in
+     * by buildInitPipelineDeps (production); this test supplies a stub
+     * that pushes a marker so pipeline ordering assertions still pass.
+     */
+    initPiUserExtensions: vi.fn(async () => {
+      callOrder.push("initPiUserExtensions");
+      return { loaded: 0, failed: 0, failedIds: [] };
+    }),
+    /**
+     * Phase B.3 step 2a — parallel PI loader for DSH core packages stub.
+     * Until B.3 step 2b extracts the 7 DSH core shims, this is a no-op.
+     */
+    initPiDshCoreExtensions: vi.fn(async () => {
+      callOrder.push("initPiDshCoreExtensions");
+      return { loaded: 0, failed: 0, failedIds: [] };
     }),
     computeActiveAdapterIds: vi.fn(() => []),
     injectSystemPromptSections: vi.fn(async () => {
@@ -99,7 +118,6 @@ function buildFakeDeps(): InitPipelineDeps {
     killTask: vi.fn(async () => undefined),
     remoteServiceContext: vi.fn(() => ({})),
     transitionDshGoal: vi.fn(async () => undefined),
-    resolveDeepSeekModule: undefined,
     openBuddyCapabilityPluginIndex: undefined,
     baseUrl: "file:///fake/base",
     describeCompatibilityAdapterCommandsMarkdown: () => "",

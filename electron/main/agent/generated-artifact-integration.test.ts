@@ -35,7 +35,52 @@ import {
 import { DeepSeekTypertService } from "../deepseek/deepseek-runtime";
 import { RemoteDispatcher } from "../harness/remote-dispatch";
 import { createProfileArtifactResolvers, toModuleUrl } from "./profile-artifact-resolution";
-import { createDeepSeekExecutionAdapter, createDeepSeekExecutionServices, DEEPSEEK_EXECUTION_PACKAGES } from "../deepseek/deepseek-execution-adapters";
+import { SandboxPolicyService, SandboxRuntime, SubprocessRuntime } from "../deepseek/subprocess-runtime";
+
+// Phase L.4 — inlined from deleted deepseek-execution-adapters.ts.
+// Only used by the skipIf(OPENBUDDY_REAL_HARNESS_E2E) DSH-compat probes.
+const DEEPSEEK_EXECUTION_PACKAGES = new Set([
+  "@deepseek-ai/dsh-subprocess-local",
+  "@deepseek-ai/dsh-sandbox-local",
+  "@deepseek-ai/dsh-sandbox-policy",
+]);
+type DeepSeekExecutionServices = {
+  subprocess: SubprocessRuntime;
+  sandboxPolicy: SandboxPolicyService;
+  sandbox: SandboxRuntime;
+};
+function createDeepSeekExecutionServices(options: { cwd: string; mode?: string }): DeepSeekExecutionServices {
+  const mode = options.mode === "read-only" || options.mode === "danger-full-access" || options.mode === "workspace-write"
+    ? options.mode
+    : undefined;
+  const sandboxPolicy = new SandboxPolicyService({ mode, workspaceRoot: options.cwd });
+  return {
+    subprocess: new SubprocessRuntime(),
+    sandboxPolicy,
+    sandbox: new SandboxRuntime(sandboxPolicy),
+  };
+}
+function createDeepSeekExecutionAdapter(packageName: string, services: DeepSeekExecutionServices) {
+  if (!DEEPSEEK_EXECUTION_PACKAGES.has(packageName)) return undefined;
+  return {
+    name: packageName,
+    package: packageName.replace(/^@deepseek-ai\//u, ""),
+    async apply(context: { provide?: (name: string, value: unknown) => unknown }): Promise<() => Promise<void>> {
+      const disposers: Array<() => unknown> = [];
+      for (const [key, value] of [
+        ["subprocess", services.subprocess],
+        ["sandboxPolicy", services.sandboxPolicy],
+        ["sandbox", services.sandbox],
+      ] as const) {
+        const restore = context.provide?.(key, value);
+        if (typeof restore === "function") disposers.push(restore as () => unknown);
+      }
+      return async () => {
+        for (const dispose of disposers.reverse()) await dispose();
+      };
+    },
+  };
+}
 
 const packageName = "@fixture/generated";
 const zodRoot = realpathSync(join(process.cwd(), "node_modules/zod"));

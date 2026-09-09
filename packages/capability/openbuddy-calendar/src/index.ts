@@ -195,3 +195,32 @@ export const calendarHandlers = {
 	remove: (id: string) => serviceRef?.remove(id),
 	removeInRoom: (id: string, roomId: string) => serviceRef?.removeInRoom(id, roomId),
 }
+
+// Phase C.3 — PI tool factory implementations live in ./calendar-tools.ts
+// so index.ts (the calendar entry) stays focused on the Calendar Cordis
+// service + mount/handlers. Re-export the same public surface here so
+// external callers (createCalendarPiTools() / createCalendarReadOnlyPiTools())
+// keep working unchanged.
+export {
+	createCalendarToolDefinitions,
+	createReadOnlyCalendarToolDefinitions,
+	CALENDAR_READ_ONLY_TOOL_NAMES,
+	type CalendarToolHandlers,
+} from "./calendar-tools";
+
+import {
+	createCalendarToolDefinitions,
+	createReadOnlyCalendarToolDefinitions,
+	type CalendarToolHandlers,
+} from "./calendar-tools";
+
+/** Phase C.3 — PI tool factory. Delegates to ./calendar-tools with the
+ *  bound `calendarHandlers` so the legacy no-arg API is preserved. */
+export function createCalendarPiTools() {
+	return createCalendarToolDefinitions(calendarHandlers as unknown as CalendarToolHandlers);
+}
+
+/** Phase C.3 — read-only PI tool factory. Same delegation pattern. */
+export function createCalendarReadOnlyPiTools() {
+	return createReadOnlyCalendarToolDefinitions(calendarHandlers as unknown as CalendarToolHandlers);
+}
