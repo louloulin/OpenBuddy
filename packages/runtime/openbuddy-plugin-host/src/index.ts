@@ -6,6 +6,15 @@ export type JsonValue = null | boolean | number | string | JsonValue[] | { [key:
 export type PluginCleanup = void | (() => void | Promise<void>);
 
 export {
+  EVENT_ENVELOPE_SCHEMA_VERSION,
+  createEventEnvelope,
+  validateEventEnvelope,
+  type EventEnvelope,
+  type EventEnvelopeInput,
+  type EventEnvelopePayload,
+} from "./event-envelope";
+
+export {
   createPluginReadinessSnapshot,
   readinessCounts,
   type PluginReadinessCounts,
