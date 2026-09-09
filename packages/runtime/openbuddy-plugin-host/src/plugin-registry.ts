@@ -145,10 +145,29 @@ export function satisfiesPluginDependencyRange(version: string, range: string): 
       return comparatorParts.every((part) => satisfiesPluginDependencyRange(version, part));
     }
 
-    const operatorMatch = /^(\^|~|>=|<=|>|<|=)?\s*(\d+)\.(\d+)\.(\d+)$/.exec(expression);
+    const operatorMatch = /^(\^|~|>=|<=|>|<|=)?\s*(\d+)(?:\.(\d+)(?:\.(\d+))?)?$/.exec(expression);
     if (!operatorMatch) return false;
     const operator = operatorMatch[1] ?? "=";
-    const base = { major: Number(operatorMatch[2]), minor: Number(operatorMatch[3]), patch: Number(operatorMatch[4]) };
+    const hasMinor = operatorMatch[3] !== undefined;
+    const hasPatch = operatorMatch[4] !== undefined;
+    const base = {
+      major: Number(operatorMatch[2]),
+      minor: hasMinor ? Number(operatorMatch[3]) : 0,
+      patch: hasPatch ? Number(operatorMatch[4]) : 0,
+    };
+    if (!hasPatch && (operator === "=" || operator === "~")) {
+      const lowerBound = compareSemanticVersions(candidate, base) >= 0;
+      const upperBound = hasMinor
+        ? candidate.major === base.major && candidate.minor === base.minor
+        : candidate.major === base.major;
+      return lowerBound && upperBound;
+    }
+    if (!hasPatch && operator === "^") {
+      const upper = hasMinor
+        ? { major: base.major > 0 ? base.major + 1 : 0, minor: base.major > 0 ? 0 : base.minor + 1, patch: 0 }
+        : { major: base.major + 1, minor: 0, patch: 0 };
+      return compareSemanticVersions(candidate, base) >= 0 && compareSemanticVersions(candidate, upper) < 0;
+    }
     const comparison = compareSemanticVersions(candidate, base);
     if (operator === "=") return comparison === 0;
     if (operator === ">") return comparison > 0;
@@ -248,7 +267,7 @@ export class PluginRegistry {
     return this.enqueue(async () => {
       assertManifest(manifest);
       if (this.entries.has(manifest.id)) throw new PluginRegistryError(`plugin ${manifest.id} is already registered`);
-      this.assertDependencies(manifest);
+      this.assertDependencies(manifest, false);
       const generation = this.gate.advance();
       this.entries.set(manifest.id, { manifest: cloneManifest(manifest), state: "staged", generation });
       return this.transaction("register", manifest.id, generation);
@@ -259,7 +278,7 @@ export class PluginRegistry {
     return this.enqueue(async () => {
       const entry = this.require(pluginId);
       if (entry.state === "active") return this.transaction("activate", pluginId, entry.generation);
-      this.assertDependencies(entry.manifest);
+      this.assertDependencies(entry.manifest, true);
       this.assertCapabilityConflicts(pluginId);
       const generation = this.gate.advance();
       entry.state = "active";
@@ -319,13 +338,13 @@ export class PluginRegistry {
     return entry;
   }
 
-  private assertDependencies(manifest: PluginRegistryManifest): void {
+  private assertDependencies(manifest: PluginRegistryManifest, checkVersion = true): void {
     for (const dependency of manifest.dependencies ?? []) {
       const entry = this.entries.get(dependency.id);
       if (!entry || (entry.state !== "active" && !dependency.optional)) {
         throw new PluginRegistryError(`dependency ${dependency.id} is not active`);
       }
-      if (entry && entry.state === "active" && !satisfiesPluginDependencyRange(entry.manifest.version, dependency.range)) {
+      if (checkVersion && entry && entry.state === "active" && !satisfiesPluginDependencyRange(entry.manifest.version, dependency.range)) {
         throw new PluginRegistryError(`dependency ${dependency.id} version ${entry.manifest.version} does not satisfy ${dependency.range}`);
       }
     }
