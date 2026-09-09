@@ -1,3 +1,5 @@
+import { createGenerationGate, type GenerationGate } from "@openbuddy/plugin-host";
+
 export interface PiSessionLike {
   waitForIdle(): Promise<void>;
   reload(): Promise<void>;
@@ -10,12 +12,24 @@ export interface PiResourceLoaderLike {
 export interface PiRuntimeCoordinatorOptions {
   getSession: () => PiSessionLike | null;
   getResourceLoader: () => PiResourceLoaderLike | null;
+  /** Shared generation fence for session listeners and RPC UI requests. */
+  generationGate?: GenerationGate;
+  onReload?: (generation: number) => void;
 }
 
 export class PiRuntimeCoordinator {
+  private readonly generationGate: GenerationGate;
   private tail: Promise<void> = Promise.resolve();
 
-  constructor(private readonly options: PiRuntimeCoordinatorOptions) {}
+  constructor(private readonly options: PiRuntimeCoordinatorOptions) {
+    this.generationGate = options.generationGate ?? createGenerationGate();
+  }
+
+  get generation(): number { return this.generationGate.current(); }
+
+  captureGeneration(): { generation: number; isCurrent: () => boolean } {
+    return this.generationGate.capture();
+  }
 
   reload(reason: string): Promise<void> {
     return this.enqueue(() => this.reloadCurrent(reason));
@@ -44,8 +58,15 @@ export class PiRuntimeCoordinator {
       await session.waitForIdle();
       if (this.options.getSession() !== session) return;
       await session.reload();
+      const generation = this.generationGate.advance();
+      this.options.onReload?.(generation);
       return;
     }
-    await this.options.getResourceLoader()?.reload();
+    const loader = this.options.getResourceLoader();
+    if (loader) {
+      await loader.reload();
+      const generation = this.generationGate.advance();
+      this.options.onReload?.(generation);
+    }
   }
 }
