@@ -19,6 +19,7 @@
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 
 import {
+  bulkPutFeedbackEntries,
   deleteFeedbackEntry,
   feedbackEntryCount,
   feedbackSessionCount,
@@ -113,6 +114,15 @@ function registerFeedbackCommands(api: ExtensionAPI, carrier: unknown, fallback:
     name: "feedback.session-summary",
     description: "Return the goal (if any) + feedback entries for the active session in a single call (Phase C.3).",
     handler: async () => sessionSummary(carrier, fallback),
+  });
+
+  commands.registerCommand?.({
+    name: "feedback.bulk-put",
+    description: "Atomically put multiple feedback entries for the active session in one transaction (Phase C.3 follow-up).",
+    handler: async (args) => {
+      const typed = (args ?? {}) as { entries?: Array<{ messageId: string; rating: string; note?: string; ifVersion?: number | null }> };
+      return bulkPutFeedbackEntries(typed.entries ?? [], fallback);
+    },
   });
 
   commands.registerCommand?.({

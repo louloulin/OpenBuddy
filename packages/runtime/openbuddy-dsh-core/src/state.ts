@@ -320,6 +320,54 @@ export function putFeedbackEntry(
 }
 
 /**
+ * Atomically update multiple feedback entries for one session.
+ * Either all entries succeed (with version increments) or the
+ * whole batch is rejected and the session's state is unchanged.
+ *
+ * Use case: an agent batches several feedback submissions (e.g.
+ * when an LLM evaluates a thread with N replies) and wants
+ * them to commit together instead of one-by-one with the risk
+ * of partial success.
+ */
+export function bulkPutFeedbackEntries(
+  entries: Array<{
+    messageId: string;
+    rating: string;
+    note?: string;
+    ifVersion?: number | null;
+  }>,
+  sessionId: string,
+): Array<{ messageId: string } & DshFeedbackEntry> {
+  // First pass: validate every entry's version precondition before
+  // mutating anything. The strict version check makes the batch
+  // transactional.
+  const targets = entries.map((entry) => {
+    const map = entriesFor(sessionId, sessionId);
+    const previous = map.get(entry.messageId);
+    const previousVersion = previous?.version ?? null;
+    if ((entry.ifVersion ?? null) !== previousVersion) {
+      throw new Error(
+        `feedback batch entry ${entry.messageId} version conflict (expected ${entry.ifVersion ?? "null"}, found ${previousVersion})`,
+      );
+    }
+    return { entry, map, previousVersion };
+  });
+  // Second pass: apply the updates. Each call uses the freshest
+  // state from the first pass so chained updates to the same
+  // session don't double-bump the version.
+  return targets.map(({ entry, map, previousVersion }) => {
+    const previous = map.get(entry.messageId);
+    const value: DshFeedbackEntry = {
+      rating: entry.rating,
+      ...(entry.note ? { note: entry.note } : {}),
+      version: (previous?.version ?? previousVersion ?? 0) + 1,
+    };
+    map.set(entry.messageId, value);
+    return { ...value, messageId: entry.messageId };
+  });
+}
+
+/**
  * Delete a feedback entry. Returns `{ absent: true }` if no entry
  * existed, throws on version conflict.
  */
