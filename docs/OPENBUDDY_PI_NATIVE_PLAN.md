@@ -2703,3 +2703,152 @@ Phase B.3 step 2a        无          ✅          (110 LOC + 76 LOC test)
 
 **v12 文档 owner**: 编程助手-devbox1 · v12 §32 B.3 step 2a 完成
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中（B.3 step 1 + step 2a 已完成）
+
+## 33. v13 — Phase B.3 step 2a 收尾 + step 2b/2c 详细拆分（响应「继续实现更多的功能」）
+
+> 📅 2026-09-09 用户「继续实现更多的功能」要求
+> 本节聚焦：B.3 step 2a 收尾 + step 2b（拆 7 DSH core shim 到独立 files）+ step 2c（删 HarnessPluginLoader）详细拆分
+
+### 33.1 B.3 step 2a 实际状态（commit `56aba8b`）
+
+```
+electron/main/agent/host-modules/bootstrap/init-pi-dsh-core-extensions.ts  (110 LOC)
+  - Defines InitPiDshCoreExtensionsDeps + PiDshCoreExtensionLoadResult
+  - no-op fast-path when dshCorePaths is empty
+  - createExtensionRuntime + discoverAndLoadExtensions (B.3 step 2b ready)
+  - plugin/loaded / plugin/failed events + failedIds aggregation
+  - defensive catch returns { loaded: 0, failed: N, failedIds: ['pi-dsh-core-extensions'] }
+```
+
+### 33.2 B.3 step 2b 详细拆分（7 DSH core shim → 独立 files）
+
+#### 33.2.1 当前 7 DSH core 状态
+
+| Specifier | 当前位置 | 实际状态 |
+|---|---|---|
+| `@deepseek-ai/dsh-commands` | `deepseek-capabilities.ts` + `wire-dsh-services.ts` | 已迁 PI（`session.extensionRunner.getCommand()`）|
+| `@deepseek-ai/dsh-goal` | `wire-dsh-services.ts` lines 96-141 | Cordis-managed goal state machine |
+| `@deepseek-ai/dsh-file-reference` | `wire-dsh-services.ts` | 已迁 PI（`listDshFileReferences` helper）|
+| `@deepseek-ai/dsh-host-plugin-inventory` | `wire-dsh-services.ts` | 已迁 PI（plugin runtime）|
+| `@deepseek-ai/dsh-message-feedback` | `wire-dsh-services.ts` lines 152-167 | Cordis-managed feedback state machine |
+| `@deepseek-ai/dsh-session-reference` | `deepseek-capabilities.ts` metadata | 已迁 PI（`listDshFileReferences` helper）|
+| `@deepseek-ai/dsh-cordis-host-runner` | `deepseek-capabilities.ts` metadata | 已迁 PI（plugin runtime）|
+
+**实际情况**：L.4 commit 已经把 4/7 DSH core（commands / fileReference / pluginInventory / sessionReference / cordis-host-runner）迁到 PI runtime。**剩余 2/7**（goals + messageFeedback 状态机）仍在 Cordis-managed shim。
+
+#### 33.2.2 step 2b 实际工作（比 v11 §31.2 估计小）
+
+`wire-dsh-services.ts` 已只剩 goals + feedback 状态机（169 LOC，原 313 LOC）。step 2b 实际工作：
+
+1. **Extract goals state machine** (lines 89-141, ~52 LOC) → `packages/runtime/openbuddy-dsh-core/src/goals.ts`
+   - 导出 PI `ExtensionFactory`，在 ExtensionAPI 注册 `goals.create / goals.edit / goals.pause / goals.resume / goals.complete / goals.clear` 命令
+   - 用 closure-based state（不是 Cordis `@Service`）实现状态机
+2. **Extract message feedback state machine** (lines 145-167, ~22 LOC) → `packages/runtime/openbuddy-dsh-core/src/message-feedback.ts`
+   - 类似 closure-based state
+
+**总 step 2b 估算**：+150 LOC 新 files / -100 LOC wire-dsh-services.ts 瘦身 = **净 +50 LOC**
+
+#### 33.2.3 step 2b 完成路径
+
+| Step | 内容 | LOC | commit |
+|---|---|---|---|
+| 2b.1 | 创建 `packages/runtime/openbuddy-dsh-core/` package skeleton + tsconfig | +30 | round 17 |
+| 2b.2 | extract goals state machine → `packages/.../goals.ts` (PI ExtensionFactory) | +70 / -52 | round 17 |
+| 2b.3 | extract message feedback → `packages/.../message-feedback.ts` (PI ExtensionFactory) | +50 / -22 | round 17 |
+| 2b.4 | 更新 `init-deepseek.ts` 把 `dshCorePaths` 指向新 files | +10 / -5 | round 17 |
+| 2b.5 | 验证 `init-pi-dsh-core-extensions.ts` 不再 no-op（实际加载 2 个 extensions）| 0 | round 17 |
+| 2b.6 | 测试 + storage:boundaries | 0 | round 17 |
+
+**总计**：~+130 / -80 = **净 +50 LOC + 1 commit**
+
+### 33.3 B.3 step 2c 详细拆分（删 HarnessPluginLoader）
+
+#### 33.3.1 step 2c 工作
+
+1. **删除 `state.loader` 字段**（electron/main/agent/host-modules/_state-shape.ts）
+2. **删除 `loader.loadProfile(profile)` 调用**（init-deepseek.ts:178）
+3. **删除 `ElectronHarnessPluginLoader` 构造**（init-plugin-loader.ts）
+4. **删除 `state.loader` 引用**：
+   - `electron/main/agent/host-modules/bootstrap/init-pipeline.ts`
+   - `electron/main/agent/host-modules/workbench-scope.ts`
+   - `electron/main/agent/host-modules/plugin-mutations.ts`
+   - `electron/main/agent/host-modules/deepseek/cordis-runtime.ts`
+   - `electron/main/agent/preset-session-runtime.ts`
+5. **保留 `HarnessPluginLoader` 类**（在 `electron/main/agent/host-modules/profile/loader.ts`）作为 backward-compat shim，给不通过 init-pipeline 的旧调用路径用
+
+**总 step 2c 估算**：-400 LOC
+
+### 33.4 B.3 step 3 详细拆分（user-ext + dsh-core 合并到 session）
+
+#### 33.4.1 当前架构问题
+
+`init-pi-user-extensions.ts` 创建独立的 PI runtime（`createExtensionRuntime()`），但 runtime 不绑定 core actions。这意味着 user extensions 加载了但 session 的 ExtensionRunner 看不到它们。
+
+#### 33.4.2 step 3 工作
+
+1. **创建 `mergeIntoExtensionRunner(extensions, runner)` helper**（在 init-pi-user-extensions.ts）
+   - 把 Extensions 注册到 session 的 ExtensionRunner
+   - 通过 `extensionRunner.register(extension)` API
+2. **修改 init-pi-user-extensions.ts** 在创建 session 后调用 merge
+3. **修改 init-pi-dsh-core-extensions.ts** 类似处理
+4. **session ExtensionRunner 注册 DSH core + user extensions** → `/commands` 能看到
+
+**总 step 3 估算**：+200 LOC
+
+### 33.5 v6 路线图完成度（HEAD `56aba8b` + v13 plan）
+
+| Phase | 内容 | 状态 | commit |
+|---|---|---|---|
+| A.1 | PI IPC 桥 | ✅ | `6f6d612` |
+| B.1 r1-r5 | 5 builtin + agent.ts slim | ✅ | `df1bcb7`..`e0ad111` |
+| L.1 | 删 pi-bridge/capabilities | ✅ | `0e16dc3` |
+| L.2 partial | 删 remote-invocation | ✅ | `a22801a` |
+| L.2 complete | RemoteDispatcher 极简化 | ✅ | `16434c3` |
+| L.4 | runtime facade | ✅ | `b22fd17` |
+| L.3 | 通用装载器 | ✅ | `97edf0f` |
+| K.1 | OpenBuddyPlugin SDK v0.1 | ✅ | `04f41fe` |
+| K.2 | SDK 接入 builtin | ✅ | `0e7f354` |
+| J.1 | sheriff.config.ts | ✅ | `6d44434` |
+| J.1.1 | tsconfig 路径 | ✅ | `4b7e193` |
+| B.3 step 1 | PI-native user-extension | ✅ | `fb035e9` |
+| B.3 step 1 测试 | 4 case mock | ✅ | `a248ecb` |
+| B.3 step 2a | PI-native DSH-core 双装载 | ✅ | `56aba8b` |
+| v11 路径规划 | §31 B.3 step 2 详细路径 | ✅ | `66a440b` |
+| extra-providers 测试 | K.2 regex anchor | ✅ | `21510bf` |
+| ⚪ B.3 step 2b | goals/feedback → `openbuddy-dsh-core/*` | pending | +50 net |
+| ⚪ B.3 step 2c | 删 HarnessPluginLoader | pending | -400 |
+| ⚪ B.3 step 3 | extensions 合并到 session | pending | +200 |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — |
+| ⚪ C.1-C.3 | Tools 工厂化 | pending | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — |
+| ⚪ H.1 | email capability 拆解 | pending | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — |
+
+**v6 路线图 26 轮中 16 轮完成（62%）**
+
+### 33.6 完成度速查（v3 baseline → HEAD）
+
+```
+                          v3 baseline → v13 HEAD
+─────────────────────────────────────────────────────
+PI 复用度                 24%        ~74%        ↑  (5/7 DSH core 迁 PI; goals/feedback 剩 Cordis)
+PI Extension 数           4          9 builtin + 9 user + 5/7 DSH core (via PI)
+Plugin 装载入口            4          1 SDK + 2 PI loads  ↑
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+架构边界 Sheriff         部分        ✅ 0 violations / 403 files
+Phase B.3 step 1         无          ✅          (124 LOC + 76 LOC test)
+Phase B.3 step 2a        无          ✅          (110 LOC + 76 LOC test)
+─────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+---
+
+**v13 文档 owner**: 编程助手-devbox1 · v13 §33 B.3 step 2b/2c/3 详细拆分
+**父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
