@@ -26,19 +26,32 @@ const SRC_PATH = resolve(__dirname, "../agent/pi-extensions.ts");
 const src = readFileSync(SRC_PATH, "utf-8");
 
 function extractExtraProvidersBody(): string {
-  const start = src.indexOf('"openbuddy-extra-providers"');
-  if (start === -1) throw new Error("openbuddy-extra-providers factory not found");
-  // Anchor on the factory body opener.
-  const openBrace = src.indexOf(": ExtensionFactory => (pi) => {", start);
+  // Phase K.2 (v6 §25) restructured `pi-extensions.ts` to declare each
+  // builtin extension through a manifest entry first (`{ schema, id, tracks }`)
+  // then a separate factory body. The first `"openbuddy-extra-providers"`
+  // token now appears inside a manifest block, not inside the factory
+  // body. Anchor on the factory's open-paren of the return arrow instead.
+  const factoryAnchor = src.indexOf('"openbuddy-extra-providers": (_emit, _config, _options): ExtensionFactory =>');
+  if (factoryAnchor === -1) {
+    // Fallback for older single-token format (kept for safety).
+    const fallbackAnchor = src.indexOf('"openbuddy-extra-providers": ');
+    if (fallbackAnchor === -1) throw new Error("openbuddy-extra-providers factory not found");
+    return readFactoryBody(fallbackAnchor);
+  }
+  return readFactoryBody(factoryAnchor);
+}
+
+function readFactoryBody(anchor: number): string {
+  // Anchor on the factory body opener (the `{` after the `=>` arrow).
+  const openBrace = src.indexOf("{", anchor);
   if (openBrace === -1) throw new Error("extra-providers body opener not found");
-  const openIdx = src.indexOf("{", openBrace);
   let depth = 1;
-  for (let i = openIdx + 1; i < src.length; i++) {
+  for (let i = openBrace + 1; i < src.length; i++) {
     const ch = src[i];
     if (ch === "{") depth++;
     else if (ch === "}") {
       depth--;
-      if (depth === 0) return src.slice(openIdx, i + 1);
+      if (depth === 0) return src.slice(openBrace, i + 1);
     }
   }
   throw new Error("could not find end of extra-providers body");
