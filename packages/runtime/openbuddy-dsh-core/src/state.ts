@@ -244,6 +244,30 @@ export function advanceGoalRounds(
 }
 
 /**
+ * Bump the goal's revision without changing any other field. Useful
+ * for optimistic-concurrency conflict resolution: the caller can
+ * call this with the stale revision to detect that another writer
+ * updated the goal in between (the returned revision will differ
+ * from what the caller observed).
+ *
+ * Throws on revision conflict (stale ref) or missing goal. Does
+ * not modify goal phase / rounds / objective / etc.
+ */
+export function bumpGoalRevision(
+  carrier: unknown,
+  fallback: string,
+  ref: { id?: string; revision?: number } | undefined,
+): DshGoalRecord {
+  const key = sessionKey(carrier, fallback);
+  const goal = dshGoalState.get(key);
+  if (!goal || goal.id !== ref?.id || goal.revision !== ref?.revision) {
+    throw new Error("goal revision conflict");
+  }
+  goal.revision += 1;
+  return { ...goal };
+}
+
+/**
  * Get (and lazily create) the per-session feedback entries map.
  */
 export function entriesFor(carrier: unknown, fallback: string): Map<string, DshFeedbackEntry> {

@@ -36,6 +36,7 @@ import {
   searchGoalsByObjective,
   transitionGoal,
   advanceGoalRounds,
+  bumpGoalRevision,
   aggregateGoalStats,
   sessionKey,
 } from "./state";
@@ -136,6 +137,15 @@ function registerGoalCommands(api: ExtensionAPI, carrier: unknown, fallback: str
     name: "goals.stats",
     description: "Return aggregate goal stats across every session (Phase C.3 follow-up).",
     handler: async () => aggregateGoalStats(),
+  });
+
+  commands.registerCommand?.({
+    name: "goals.bump-revision",
+    description: "Bump the goal's revision without changing state (Phase C.3 follow-up). Useful for optimistic-concurrency conflict detection.",
+    handler: async (args) => {
+      const typed = (args ?? {}) as { id?: string; revision?: number };
+      return bumpGoalRevision(carrier, fallback, typed);
+    },
   });
 
   commands.registerCommand?.({

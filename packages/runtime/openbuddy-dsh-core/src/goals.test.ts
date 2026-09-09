@@ -80,7 +80,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     __resetDshCoreStateForTests();
   });
 
-  it("registers 12 goals.* commands on init (Phase C.2: + goals.list, Phase C.3: + goals.search + goals.advance-rounds, Phase C.3 follow-up: + goals.stats)", () => {
+  it("registers 13 goals.* commands on init (Phase C.2: + goals.list, Phase C.3: + goals.search + goals.advance-rounds, Phase C.3 follow-up: + goals.stats + goals.bump-revision)", () => {
     const factory = createDshGoalsExtension();
     const { api, commands } = buildMockApi("session-1");
     factory(api);
@@ -96,6 +96,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     expect(commands.has("goals.search")).toBe(true);
     expect(commands.has("goals.advance-rounds")).toBe(true);
     expect(commands.has("goals.stats")).toBe(true);
+    expect(commands.has("goals.bump-revision")).toBe(true);
   });
 
   it("goals.create returns a ref and persists via the shared state map", async () => {
@@ -350,7 +351,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     expect(advanced.roundsStarted).toBe(1);
 
     // Confirm commands register the same 12 commands (11 + goals.stats).
-    expect(commands.size).toBe(12);
+    expect(commands.size).toBe(13);
   });
 
   it("B.3 step 3 — multiple ForSession factories land goals in different sessions (no cross-talk)", async () => {
@@ -416,5 +417,32 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     expect(populated.totalRoundsStarted).toBe(2);
     expect(populated.averageRoundsStarted).toBe(1);
     expect(populated.totalMaxRounds).toBe(10);
+  });
+
+  it("goals.bump-revision increments revision without changing state (Phase C.3 follow-up)", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-bump");
+    factory(api);
+    const created = (await commands.get("goals.create")!.handler({ objective: "Bump test", maxGoalRounds: 3 })) as { ref: { id: string; revision: number } };
+
+    // First bump: revision 1 → 2, no other fields change.
+    const advanced = (await commands.get("goals.bump-revision")!.handler(created.ref)) as DshGoalRecord;
+    expect(advanced.revision).toBe(2);
+    expect(advanced.id).toBe(created.ref.id);
+    expect(advanced.objective).toBe("Bump test");
+    expect(advanced.maxGoalRounds).toBe(3);
+    expect(advanced.roundsStarted).toBe(0);
+
+    // Stale ref → revision conflict (the canonical optimistic-concurrency test).
+    await expect(
+      commands.get("goals.bump-revision")!.handler({ id: created.ref.id, revision: created.ref.revision }),
+    ).rejects.toThrow(/goal revision conflict/);
+
+    // Chain bumps from the up-to-date ref.
+    const a = (await commands.get("goals.bump-revision")!.handler(advanced)) as DshGoalRecord;
+    const b = (await commands.get("goals.bump-revision")!.handler(a)) as DshGoalRecord;
+    expect(b.revision).toBe(4);
+    expect(b.objective).toBe("Bump test");
+    expect(b.roundsStarted).toBe(0); // roundsStarted never changes
   });
 });
