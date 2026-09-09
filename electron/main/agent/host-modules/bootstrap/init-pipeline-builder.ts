@@ -8,7 +8,7 @@
  *
  * Reverse-dep invariant: this module does NOT import agent-host.ts.
  */
-import type { InstallHostModuleDeps } from "./install-host-modules";
+import type { InstallHostModuleDeps, InstallHostModuleDepsWithDomains } from "./install-host-modules";
 import { ensureDefaultPiPackages, type PluginStatus, type PluginBundle } from "@openbuddy/plugin-host";
 import type { InitPipelineDeps } from "./init-pipeline";
 import { bootstrapModelRuntime } from "./model-runtime";
@@ -102,7 +102,7 @@ export interface InitPipelineClosures {
   emitRendererEvent: (channel: string, payload: unknown) => void;
   piSessionRuntime: unknown;
   installMicrokernelHost: (deps: InstallHostModuleDeps) => void;
-  getMicrokernelHostDeps: () => InstallHostModuleDeps;
+  getMicrokernelHostDeps: () => InstallHostModuleDepsWithDomains;
   openBuddyCorePlugin: unknown;
   baseUrl: string;
   reportPiExtensionErrors: (...args: any[]) => any;
