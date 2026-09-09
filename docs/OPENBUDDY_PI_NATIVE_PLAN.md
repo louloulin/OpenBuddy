@@ -2850,5 +2850,132 @@ Phase B.3 step 2a        无          ✅          (110 LOC + 76 LOC test)
 
 ---
 
-**v13 文档 owner**: 编程助手-devbox1 · v13 §33 B.3 step 2b/2c/3 详细拆分
+## 34. v14 — Phase B.3 step 2b 落地 + step 2c 完成（响应「继续实现更多的功能」）
+
+> 🟢 **v14 完成** — B.3 step 2b 抽出目标状态机到独立 workspace package + B.3 step 2c 排除 DSH core 走 HarnessPluginLoader
+> 提交：`5968038` (B.3 step 2b) + `81030b3` (B.3 step 2c)
+
+### 34.1 B.3 step 2b 完成 — `@openbuddy/dsh-core` 包诞生
+
+新增 `packages/runtime/openbuddy-dsh-core/` (4 files: index.ts / state.ts / goals.ts / message-feedback.ts + 2 tests + moon.yml + package.json + tsconfig.json)。
+
+| Module | LOC | 说明 |
+|---|---|---|
+| `src/state.ts` | ~280 | **共享状态层**。`dshGoalState` + `dshFeedbackState` 两个 module-scope `Map`，所有状态读写函数纯函数化 |
+| `src/goals.ts` | ~100 | PI ExtensionFactory: 8 个 `goals.*` slash commands (`get/create/edit/pause/resume/complete/blocked/clear`) |
+| `src/message-feedback.ts` | ~60 | PI ExtensionFactory: 3 个 `feedback.*` slash commands (`list/put/delete`) |
+| `src/index.ts` | ~25 | 公共出口 (re-export 全部) |
+| `src/goals.test.ts` | ~180 | 8 个 test cases (commands registered / create ref / rejection guards / full lifecycle / blocked-reason 持久化 / clear / shared map contract) |
+| `src/message-feedback.test.ts` | ~120 | 5 个 test cases (commands registered / round-trip / version conflict / delete / shared map contract) |
+| `electron/main/agent/host-modules/bootstrap/dsh-core-extension-paths.ts` | ~75 | 路径解析: override field 优先,否则从 resolver 的 5 层 `..` 推到 repo root |
+| `electron/main/agent/host-modules/bootstrap/dsh-core-extension-paths.test.ts` | ~50 | 4 个 test cases (default / override / empty fallback / no aliasing) |
+
+**状态归属反转** (核心创新):
+- Pre-B.3 step 2b: `wire-dsh-services.ts` 用 closure-captured local Maps (`const dshGoalState = new Map(...)`)
+- Post-B.3 step 2b: `state.ts` 用 module-scope Maps, Cordis shim **和** PI extensions 都 import 同一份
+
+**修复的预先存在的 bug**: `goalsBlocked` 之前把 `blockedReason` 挂在返回的 copy 上 (`{...goal}`),后续 `getGoal` 看不到 reason。 B.3 step 2b 改成修改 canonical record。
+
+**PI ExtensionFactory shape**: `default export: (api: ExtensionAPI) => void`.PI 的 `discoverAndLoadExtensions` 会调一次 factory,而不是 OpenBuddy HOF 模式的 `(_emit, _config, _options) => (pi) => {...}`。这是 B.3 step 2b 的关键切换,后续 B.3 step 3 会通过 `api.context.get("sessionFallbackKey")` 绑定到 session。
+
+### 34.2 B.3 step 2c 完成 — HarnessPluginLoader 不再加载 DSH core
+
+`init-deepseek.ts` 现在构造两个 profile:
+- `userOnlyProfile` (无 core entries) → 传给 `loader.loadProfile(profile)`
+- `fullProfile` (含 core entries) → 写入 `state.activePluginProfile`,供 `syncDeepSeekCordisRuntime` + `plugin-mutations.replaceProfile` 使用
+
+变更点:
+- DSH core 7 个 `@deepseek-ai/dsh-*` packages 现在走 PI loader (stage 6.7 `init-pi-dsh-core-extensions`)
+- HarnessPluginLoader 只负责 user-declared plugins
+- `state.activePluginProfile` 保留完整 profile,以便 `replaceProfile` 重现完整 composition
+
+### 34.3 v6 路线图完成度 (HEAD `81030b3`)
+
+| Phase | 内容 | 状态 | commit |
+|---|---|---|---|
+| A.1 | PI IPC 桥 | ✅ | `6f6d612` |
+| B.1 r1-r5 | 5 builtin + agent.ts slim | ✅ | `df1bcb7..e0ad111` |
+| L.1 | 删 pi-bridge/capabilities | ✅ | `0e16dc3` |
+| L.2 partial | 删 remote-invocation | ✅ | `a22801a` |
+| L.2 complete | RemoteDispatcher 极简化 | ✅ | `16434c3` |
+| L.4 | runtime facade | ✅ | `b22fd17` |
+| L.3 | 通用装载器 | ✅ | `97edf0f` |
+| K.1 | OpenBuddyPlugin SDK v0.1 | ✅ | `04f41fe` |
+| K.2 | SDK 接入 builtin | ✅ | `0e7f354` |
+| J.1 | sheriff.config.ts | ✅ | `6d44434` |
+| J.1.1 | tsconfig 路径 | ✅ | `4b7e193` |
+| B.3 step 1 | PI-native user-extension | ✅ | `fb035e9` |
+| B.3 step 1 测试 | 4 case mock | ✅ | `a248ecb` |
+| B.3 step 2a | PI-native DSH-core 双装载 | ✅ | `56aba8b` |
+| v11 路径规划 | §31 B.3 step 2 详细路径 | ✅ | `66a440b` |
+| v13 详细拆分 | §33 B.3 step 2b/2c/3 | ✅ | `8e8b651` |
+| extra-providers 测试 | K.2 regex anchor | ✅ | `21510bf` |
+| **B.3 step 2b** | **goals/feedback → @openbuddy/dsh-core** | ✅ | **`5968038`** |
+| **B.3 step 2c** | **排除 DSH core 走 HarnessPluginLoader** | ✅ | **`81030b3`** |
+| ⚪ B.3 step 3 | user-ext + dsh-core Extensions 合并到 session | pending | — |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — |
+| ⚪ C.1-C.3 | Tools 工厂化 | pending | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — |
+| ⚪ H.1 | email capability 拆解 | pending | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — |
+
+**v6 路线图 26 轮中 18 轮完成 (69%)**
+
+### 34.4 完成度速查 (v3 baseline → HEAD `81030b3`)
+
+```
+                          v3 baseline → v14 HEAD
+─────────────────────────────────────────────────────────
+PI 复用度                 24%        ~76%        ↑
+Cordis service 数          12         ≤ 5 目标   (待 I.1-I.2)
+PI Extension 数           4          9 builtin + 9 user + 2 DSH core (via PI)  ↑
+PI Extension 包数         1          2 (+ @openbuddy/dsh-core)                  ↑
+Plugin 装载入口            4          1 SDK + 3 PI loads  ↑
+God module LOC          ~6500       ≤ 2000     ↑
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+OpenBuddy DSH core 包    无          ✅ v0.1     (~440 LOC + 13 tests)
+架构边界 Sheriff         部分        ✅ 0 violations / 403 files
+Phase B.3 step 1         无          ✅          (124 LOC + 76 LOC test)
+Phase B.3 step 2a        无          ✅          (110 LOC + 76 LOC test)
+Phase B.3 step 2b        无          ✅          (~500 LOC new + ~350 LOC test)
+Phase B.3 step 2c        无          ✅          (~25 LOC 修改)
+─────────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+**总完成度**:架构层 **100% + B.3 step 1+2a+2b+2c**,功能层 **0%** (v1.0 路线图,5 个 gap 待 K.3/E.2/H.3)
+
+### 34.5 验证 (commit `81030b3`)
+
+| 测试范围 | 结果 |
+|---|---|
+| `pnpm exec tsc --noEmit` | ✅ 0 errors |
+| `packages/runtime/openbuddy-dsh-core/src/goals.test.ts` (本轮新增) | ✅ 8/8 |
+| `packages/runtime/openbuddy-dsh-core/src/message-feedback.test.ts` (本轮新增) | ✅ 5/5 |
+| `electron/main/agent/host-modules/bootstrap/dsh-core-extension-paths.test.ts` (本轮新增) | ✅ 4/4 |
+| `electron/main/agent/host-modules/bootstrap/init-deepseek.test.ts` (B.3 step 2c + 3) | ✅ 7/7 |
+| `electron/main/agent/host-modules/bootstrap/init-pipeline.test.ts` | ✅ 4/4 |
+| `electron/main/agent/host-modules/` 全套 (52 files) | ✅ 350 tests pass |
+| `electron/main/harness/` 全套 | ✅ pass |
+| `pnpm storage:boundaries` | ✅ 0 violations / 403 files |
+
+**0 回归**,v6 路线图进度从 16/26 (62%) 推进到 18/26 (69%)。
+
+### 34.6 接下来 3 轮 (v14 锁定)
+
+| Round | Phase | 内容 | 预估 LOC |
+|---|---|---|---|
+| ⚪ 下一轮 | **B.3 step 3** | user-ext + dsh-core Extensions 合并到 session 的 ExtensionRunner | +200 |
+| ⚪ 第三轮 | **B.2** | ExtensionRunner.bindCore 替代 microkernel 启动序列 | -300 |
+| ⚪ 第四轮 | **C.1** | email tools 工厂化 (从 god module 拆分) | +200 / -1500 |
+
+---
+
+**v14 文档 owner**: 编程助手-devbox1 · v14 §34 B.3 step 2b+2c 落地总结
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
