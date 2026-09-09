@@ -57,11 +57,18 @@ describe("PluginRegistry", () => {
     expect(registry.inventory()[0]).toMatchObject({ id: "managed", version: "1.0.0", source: "profile", managed: true, state: "disabled", health: "healthy" });
     expect(events).toEqual(["register:managed:1:staged", "activate:managed:2:active", "disable:managed:3:disabled"]);
   });
-  it("rejects activating two backends for the same surface", async () => {
+  it("rejects activating two plugins that claim one canonical capability", async () => {
     const registry = new PluginRegistry();
-    await registry.register(manifest("one"));
-    await registry.register(manifest("two"));
+    await registry.register({ ...manifest("one"), capabilities: ["web"] });
+    await registry.register({ ...manifest("two", ["renderer"]), capabilities: ["web"] });
     await registry.activate("one");
-    await expect(registry.activate("two")).rejects.toThrow("active surface conflict");
+    await expect(registry.activate("two")).rejects.toThrow("active surface conflict: web");
+  });
+
+  it("rejects malformed capability declarations", async () => {
+    const registry = new PluginRegistry();
+    await expect(registry.register({ ...manifest("bad"), capabilities: "web" as never })).rejects.toThrow("capabilities must be a non-empty string array");
+    await expect(registry.register({ ...manifest("bad"), capabilities: ["web", " "] })).rejects.toThrow("capabilities must be a non-empty string array");
+    await expect(registry.register({ ...manifest("bad"), capabilities: ["web", "web"] })).rejects.toThrow("duplicate capabilities");
   });
 });

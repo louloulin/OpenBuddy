@@ -12,6 +12,9 @@ export interface PluginRegistryManifest {
   version: string;
   apiVersion: string;
   surfaces: readonly PluginRegistrySurface[];
+  /** Canonical capabilities backed by this plugin. Surfaces are transport/runtime
+   * boundaries and may be shared by many plugins; capabilities are exclusive. */
+  capabilities?: readonly string[];
   source?: string;
   managed?: boolean;
   disabledReason?: "user" | "policy" | "load-failed" | "dependency-failed";
@@ -79,6 +82,12 @@ function assertManifest(manifest: PluginRegistryManifest): void {
   if (new Set(manifest.surfaces).size !== manifest.surfaces.length) {
     throw new PluginRegistryError("manifest contains duplicate surfaces");
   }
+  if (manifest.capabilities !== undefined && (!Array.isArray(manifest.capabilities) || manifest.capabilities.length === 0 || manifest.capabilities.some((capability) => typeof capability !== "string" || !capability.trim()))) {
+    throw new PluginRegistryError("capabilities must be a non-empty string array");
+  }
+  if (manifest.capabilities && new Set(manifest.capabilities).size !== manifest.capabilities.length) {
+    throw new PluginRegistryError("manifest contains duplicate capabilities");
+  }
   if (manifest.dependencies !== undefined && !Array.isArray(manifest.dependencies)) {
     throw new PluginRegistryError("dependencies must be an array");
   }
@@ -106,6 +115,7 @@ function cloneManifest(manifest: PluginRegistryManifest): PluginRegistryManifest
   return {
     ...manifest,
     surfaces: [...manifest.surfaces],
+    ...(manifest.capabilities ? { capabilities: [...manifest.capabilities] } : {}),
     ...(manifest.dependencies ? { dependencies: manifest.dependencies.map((dependency) => ({ ...dependency })) } : {}),
     ...(manifest.permissions ? { permissions: [...manifest.permissions] } : {}),
     ...(manifest.entrypoints ? { entrypoints: { ...manifest.entrypoints } } : {}),
@@ -263,8 +273,8 @@ export class PluginRegistry {
     const backends: ActiveCapabilityBackend[] = [];
     for (const entry of this.entries.values()) {
       if (entry.state !== "active" && entry.manifest.id !== pluginId) continue;
-      for (const surface of entry.manifest.surfaces) {
-        backends.push({ capability: surface, backendId: entry.manifest.id, pluginId: entry.manifest.id });
+      for (const capability of entry.manifest.capabilities ?? []) {
+        backends.push({ capability, backendId: entry.manifest.id, pluginId: entry.manifest.id });
       }
     }
     const conflicts = findCapabilityOwnershipConflicts(backends);
