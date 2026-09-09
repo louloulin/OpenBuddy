@@ -51,6 +51,7 @@ import type { EmailProviderDiagnostic } from "@openbuddy/capability-email";
 export type { EmailProviderDiagnostic } from "@openbuddy/capability-email";
 
 export type { McpServerEntry } from "@openbuddy/shared-types";
+import { getPiBridge } from "./pi-bridge-client";
 
 const appLogger = createRendererLogger({
   devMode: ((typeof import.meta !== "undefined" && (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) || false),
@@ -1435,6 +1436,31 @@ export async function skillsCatalogLoad(
 /** Read the full SKILL.md text for a directory. */
 export async function skillsCatalogReadSkill(dir: string, root?: string, builtinRoot?: string): Promise<string> {
   return invoke<string>("skills_catalog_read_skill", { dir, root: root ?? null, builtinRoot: builtinRoot ?? null });
+}
+
+/**
+ * Parse SKILL.md frontmatter via the pi-bridge IPC (Phase E.3 of
+ * docs/OPENBUDDY_PI_NATIVE_PLAN.md). The renderer used to ship a
+ * hand-rolled YAML-ish parser inline; this re-uses pi-coding-agent's
+ * real YAML parser and lets the IPC layer own the (Node-only) import.
+ *
+ * Falls back to an empty `{ frontmatter: {}, body }` result when the
+ * bridge is unavailable (e.g. unit tests without a preload stub) so
+ * SkillDetailModal never crashes.
+ */
+export interface ParsedSkillFrontmatter {
+  frontmatter: Record<string, unknown>;
+  body: string;
+}
+
+export async function parseSkillFrontmatter(raw: string): Promise<ParsedSkillFrontmatter> {
+  const bridge = getPiBridge();
+  if (!bridge) return { frontmatter: {}, body: raw };
+  try {
+    return await bridge.text.parseFrontmatter(raw);
+  } catch {
+    return { frontmatter: {}, body: raw };
+  }
 }
 
 // ---------- expert marketplace (live local data dir) ----------
