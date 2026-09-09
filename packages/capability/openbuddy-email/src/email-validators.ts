@@ -27,6 +27,8 @@
  *   - imports `EmailError` (runtime) from ./email-error
  */
 
+import { createHash } from "node:crypto";
+
 import { EmailError } from "./email-error";
 import type {
   EmailAnalysisAction,
@@ -35,6 +37,9 @@ import type {
   EmailAnalysisFact,
   EmailAnalysisMeetingProposal,
   EmailAnalysisReplyDraft,
+  EmailDraft,
+  EmailMessage,
+  EmailProcessingPlanOperation,
 } from "./index";
 
 const CITATION_LIMIT = 20;
@@ -241,4 +246,72 @@ export function analysisMeetingProposal(value: unknown): EmailAnalysisMeetingPro
     ...(description ? { description } : {}),
     citations: analysisCitations(item.citations),
   };
+}
+// Round 3 (Phase H.2) — additional helpers needed by the Email
+// class. Round 2 only moved the 6 input validators; these 4 helpers
+// stayed in index.ts. They're added here now because the Email
+// class extraction requires them all locally.
+
+export function analysisContextCitationEntries(
+  facts: EmailAnalysisFact[],
+  actions: EmailAnalysisAction[],
+  risks: EmailAnalysisFact[],
+  replyDraft?: EmailAnalysisReplyDraft,
+): EmailAnalysisContextCitation[] {
+  return [
+    ...facts.flatMap((item) => item.contextCitations ?? []),
+    ...actions.flatMap((item) => item.contextCitations ?? []),
+    ...risks.flatMap((item) => item.contextCitations ?? []),
+    ...(replyDraft?.contextCitations ?? []),
+  ];
+}
+
+export function analysisCitationIds(
+  facts: EmailAnalysisFact[],
+  actions: EmailAnalysisAction[],
+  risks: EmailAnalysisFact[],
+  replyDraft?: EmailAnalysisReplyDraft,
+): string[] {
+  return [
+    ...new Set([
+      ...facts.flatMap((item) => item.citations.map((citation) => citation.messageId)),
+      ...actions.flatMap((item) => item.citations.map((citation) => citation.messageId)),
+      ...risks.flatMap((item) => item.citations.map((citation) => citation.messageId)),
+      ...(replyDraft ? replyDraft.citations.map((citation) => citation.messageId) : []),
+    ]),
+  ];
+}
+
+export function searchableMessageText(message: EmailMessage): string {
+  const htmlText = message.html?.replace(/<[^>]+>/g, " ") ?? "";
+  return [message.text ?? "", htmlText].join(" ").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+}
+
+export function citationQuoteMatches(message: EmailMessage, quote: string): boolean {
+  const normalizedQuote = quote.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+  return Boolean(normalizedQuote) && searchableMessageText(message).includes(normalizedQuote);
+}
+
+export function draftFingerprint(draft: EmailDraft): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        accountId: draft.accountId,
+        threadId: draft.threadId,
+        messageId: draft.messageId,
+        to: draft.to,
+        cc: draft.cc,
+        bcc: draft.bcc,
+        replyTo: draft.replyTo,
+        subject: draft.subject,
+        body: draft.body,
+        bodyHtml: draft.bodyHtml,
+        attachments: draft.attachments,
+      }),
+    )
+    .digest("hex");
+}
+
+export function processingPlanFingerprint(operations: EmailProcessingPlanOperation[]): string {
+  return createHash("sha256").update(JSON.stringify(operations)).digest("hex");
 }
