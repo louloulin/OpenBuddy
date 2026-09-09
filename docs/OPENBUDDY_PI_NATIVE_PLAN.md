@@ -3193,3 +3193,110 @@ Phase H.1                无          ✅          (167 LOC + 14 tests)  ← 本
 
 **v16 文档 owner**: 编程助手-devbox1 · v16 §36 Phase H.1 落地总结
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
+
+## 37. v17 — Phase C.2 跨会话 diagnostic slash commands（响应「继续实现更多」）
+
+> 🟢 **v17 完成** — @openbuddy/dsh-core 加 2 个跨会话 diagnostic slash commands
+> 提交：`ed93879`
+
+### 37.1 Phase C.2 完成 — 跨会话 diagnostic commands
+
+新增 2 个 slash command + 3 个 state helper：
+
+| Name | 类型 | 作用 |
+|---|---|---|
+| `goals.list` | slash command | 跨所有 session 返回 `{ sessionId, goal }[]`，可选 `phase` 过滤 |
+| `feedback.stats` | slash command | 返回 `{ sessions, entries }` 聚合 |
+| `listAllGoals(filter?)` | state helper | 跨 session goal iterator（返回拷贝）|
+| `feedbackSessionCount()` | state helper | 至少 1 个 feedback entry 的 session 数 |
+| `feedbackEntryCount()` | state helper | 所有 session 的 feedback entry 总数 |
+
+**用途**:
+1. Renderer-side 诊断面板（哪些 session 在跑中）
+2. PI TUI 的 `/commands` 自动补全
+3. admin / settings 页面的跨 session rollup
+
+**Phase C.2 增量 vs C.1**:
+- C.1 = per-session command surface
+- C.2 = 跨 session aggregate surface
+
+**Slash commands 总数** (dsh-core):
+- `goals.*`: 8 → 9（+ `goals.list`）
+- `feedback.*`: 3 → 4（+ `feedback.stats`）
+
+### 37.2 v6 路线图完成度 (HEAD `ed93879`)
+
+| Phase | 内容 | 状态 | commit |
+|---|---|---|---|
+| A.1 / B.1 / L.1-L.4 / K.1-K.2 / J.1 / B.3 step 1+2a-c / C.1 / H.1 | 历史 | ✅ | `6f6d612`..`881acf1` |
+| v14+v15+v16 plans | docs | ✅ | `7bc8ffb`/`cfd1bab`/`1abee7b` |
+| **C.2** | **dsh-core 跨会话 diagnostic** | ✅ | **`ed93879`** |
+| ⚪ B.3 step 3 | user-ext + dsh-core Extensions 合并到 session | pending | — |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — |
+| ⚪ C.3 | 其他 tools 工厂化 (calendar / mcp-client) | pending | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — |
+| ⚪ H.2 | email class 拆出 (5 个 files) | pending | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — |
+
+**v6 路线图 26 轮中 21 轮完成 (81%)**
+
+### 37.3 完成度速查 (v3 baseline → HEAD `ed93879`)
+
+```
+                          v3 baseline → v17 HEAD
+─────────────────────────────────────────────────────────
+PI 复用度                 24%        ~76%        ↑
+Cordis service 数          12         ≤ 5 目标   (待 I.1-I.2)
+PI Extension 数           4          9 builtin + 9 user + 2 DSH core (via PI)  ↑
+PI Extension 包数         1          2 (+ @openbuddy/dsh-core)                  ↑
+Plugin 装载入口            4          1 SDK + 3 PI loads  ↑
+God module LOC          ~6500       ~3200     ↓ (email index.ts 3480→3351)
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+OpenBuddy DSH core 包    无          ✅ v0.1     (~480 LOC + 17 tests, 本轮 +40/+4)
+Email tools 工厂         无          ✅          (222 LOC + 5 tests)
+Email classifier         无          ✅          (167 LOC + 14 tests)
+架构边界 Sheriff         部分        ✅ 0 violations / 403 files
+Phase B.3 step 1         无          ✅          (124 LOC + 76 LOC test)
+Phase B.3 step 2a        无          ✅          (110 LOC + 76 LOC test)
+Phase B.3 step 2b        无          ✅          (~500 LOC new + ~350 LOC test)
+Phase B.3 step 2c        无          ✅          (~25 LOC 修改)
+Phase C.1                无          ✅          (222 LOC + 5 tests)
+Phase C.2 (本轮)         无          ✅          (40 LOC + 4 tests)
+Phase H.1                无          ✅          (167 LOC + 14 tests)
+─────────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+**总完成度**:架构层 **100% + B.3 step 1+2a+2b+2c + C.1 + C.2 + H.1**,功能层 **0%** (v1.0 路线图,5 个 gap 待 K.3/E.2/H.3)
+
+### 37.4 验证 (commit `ed93879`)
+
+| 测试范围 | 结果 |
+|---|---|
+| `pnpm exec tsc --noEmit` | ✅ 0 errors |
+| `packages/runtime/openbuddy-dsh-core/src/goals.test.ts` (本轮 +3 cases) | ✅ 11/11 |
+| `packages/runtime/openbuddy-dsh-core/src/message-feedback.test.ts` (本轮 +1 case) | ✅ 6/6 |
+| `packages/runtime/openbuddy-dsh-core/` 全套 | ✅ **17 tests pass** (was 13, +4) |
+| 4 个 workspace area 全套 | ✅ **764 tests pass / 1 skip / 0 fail** |
+| `pnpm storage:boundaries` | ✅ 0 violations / 403 files |
+
+**0 回归**,v6 路线图进度从 20/26 (77%) 推进到 21/26 (81%)。
+
+### 37.5 接下来 3 轮 (v17 锁定)
+
+| Round | Phase | 内容 | 预估 LOC |
+|---|---|---|---|
+| ⚪ 下一轮 | **B.3 step 3** | user-ext + dsh-core Extensions 合并到 session 的 ExtensionRunner | +200 |
+| ⚪ 第三轮 | **C.3** | 其他 tools 工厂化 (calendar / mcp-client) | +600 / -3000 |
+| ⚪ 第四轮 | **H.2** | email class 拆出 (5 个 files) | +200 / -1500 |
+
+---
+
+**v17 文档 owner**: 编程助手-devbox1 · v17 §37 Phase C.2 落地总结
+**父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
