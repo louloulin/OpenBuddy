@@ -647,12 +647,10 @@ export interface EmailAnalysisLinkInput {
 	linkedCalendarEventId?: string
 }
 
-export class EmailError extends Error {
-	constructor(readonly code: "provider_unavailable" | "confirmation_required" | "invalid_input" | "operation_failed" | "operation_not_supported", message: string, readonly retryAfterMs?: number) {
-		super(message)
-		this.name = "EmailError"
-	}
-}
+// Phase H.2 — EmailError extracted to ./email-error.ts. Re-exported
+// here so external callers keep importing from "./index" unchanged.
+export { EmailError, type EmailErrorCode } from "./email-error";
+import { EmailError } from "./email-error";
 
 export interface EmailProvider {
 	readonly name: string
