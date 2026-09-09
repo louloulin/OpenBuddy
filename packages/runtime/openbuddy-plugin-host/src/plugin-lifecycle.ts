@@ -62,8 +62,9 @@ export class PluginLifecycleCoordinator {
     } catch (error) {
       this.record(manifest.id, "stage", error, transaction.id);
       await this.rollback(manifest, error);
+      const failed = await this.registry.fail(manifest.id, error);
       this.refresh();
-      return { transaction: { ...transaction, status: "rolled_back", error: message(error) }, diagnostics: this.getDiagnostics() };
+      return { transaction: { ...failed, status: "rolled_back", error: message(error) }, diagnostics: this.getDiagnostics() };
     }
   }
 

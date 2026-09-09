@@ -38,10 +38,10 @@ function isJsonValue(value: unknown, seen: Set<object> = new Set()): value is Ev
 	if (typeof value === "number") return Number.isFinite(value);
 	if (typeof value !== "object") return false;
 	if (seen.has(value)) return false;
-	seen.add(value);
+	seen.add(value as object);
 	if (Array.isArray(value)) return value.every((item) => isJsonValue(item, seen));
 	if (!isPlainObject(value)) return false;
-	return Object.values(value).every((item) => isJsonValue(item, seen));
+	return Object.values(value as Record<string, unknown>).every((item) => isJsonValue(item, seen));
 }
 
 function requireNonEmpty(value: unknown, field: string): asserts value is string {
@@ -51,7 +51,7 @@ function requireNonEmpty(value: unknown, field: string): asserts value is string
 }
 
 function requireCounter(value: unknown, field: string): asserts value is number {
-	if (!Number.isSafeInteger(value) || value < 0) {
+	if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
 		throw new TypeError(`event envelope ${field} must be a non-negative safe integer`);
 	}
 }

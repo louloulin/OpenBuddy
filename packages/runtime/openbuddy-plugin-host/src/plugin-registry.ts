@@ -26,7 +26,7 @@ export interface PluginRegistryEntry {
 
 export interface PluginRegistryTransaction {
   id: string;
-  kind: "register" | "activate" | "disable" | "dispose";
+  kind: "register" | "activate" | "disable" | "fail" | "dispose";
   pluginId: string;
   generation: number;
   status: "committed" | "rolled_back";
@@ -122,7 +122,19 @@ export class PluginRegistry {
       const generation = this.gate.advance();
       entry.state = "disabled";
       entry.generation = generation;
+      delete entry.error;
       return this.transaction("disable", pluginId, generation);
+    });
+  }
+
+  fail(pluginId: string, error: unknown): Promise<PluginRegistryTransaction> {
+    return this.enqueue(async () => {
+      const entry = this.require(pluginId);
+      const generation = this.gate.advance();
+      entry.state = "failed";
+      entry.generation = generation;
+      entry.error = error instanceof Error ? error.message : String(error);
+      return { ...this.transaction("fail", pluginId, generation), error: entry.error };
     });
   }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { PluginRegistry, type PluginRegistryManifest } from "./plugin-registry";
+import { PluginRegistry, type PluginRegistryManifest, type PluginRegistrySurface } from "./plugin-registry";
 
-const manifest = (id: string, surfaces = ["pi"] as const): PluginRegistryManifest => ({
+const manifest = (id: string, surfaces: PluginRegistrySurface[] = ["pi"]): PluginRegistryManifest => ({
   schema: "openbuddy.plugin.v1", id, version: "1.0.0", apiVersion: "1", surfaces,
 });
 

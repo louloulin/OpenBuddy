@@ -14,9 +14,11 @@ describe("PluginLifecycleCoordinator", () => {
       rollback: () => { rollback.push("rolled-back"); },
     });
     expect(result.transaction.status).toBe("rolled_back");
+    expect(registry.get("fixture")?.state).toBe("failed");
+    expect(coordinator.getReadiness().phase).toBe("failed");
     expect(rollback).toEqual(["rolled-back"]);
     expect(coordinator.getDiagnostics()[0].phase).toBe("stage");
-    expect(coordinator.getReadiness().generation).toBe(1);
+    expect(coordinator.getReadiness().generation).toBe(2);
   });
 
   it("does not apply stale fixture events after generation advances", async () => {
