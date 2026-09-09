@@ -88,16 +88,44 @@ export class PluginLifecycleCoordinator {
   }
 
   async disable(pluginId: string): Promise<PluginLifecycleResult> {
-    const entry = this.require(pluginId);
-    const adapter = this.adapters.get(pluginId) ?? {};
+    const root = this.require(pluginId);
+    const targets: PluginRegistryEntry[] = [];
+    const visit = (entry: PluginRegistryEntry) => {
+      for (const dependent of this.registry.dependentsOf(entry.manifest.id)) {
+        if (!targets.some((candidate) => candidate.manifest.id === dependent.manifest.id)) visit(dependent);
+      }
+      targets.push(entry);
+    };
+    visit(root);
+    const disposed: PluginRegistryEntry[] = [];
+    let current: PluginRegistryEntry | undefined;
     try {
-      await adapter.dispose?.(entry.manifest);
-      const transaction = await this.registry.disable(pluginId);
+      for (const entry of targets) {
+        current = entry;
+        await this.adapters.get(entry.manifest.id)?.dispose?.(entry.manifest);
+        disposed.push(entry);
+      }
+      let transaction: PluginRegistryTransaction = {
+        id: `disable-${this.registry.generation}`,
+        kind: "disable",
+        pluginId,
+        generation: this.registry.generation,
+        status: "committed",
+      };
+      for (const entry of targets) transaction = await this.registry.disable(entry.manifest.id);
       this.refresh();
       return { transaction, diagnostics: this.getDiagnostics() };
     } catch (error) {
-      this.record(pluginId, "dispose", error);
-      await this.rollback(entry.manifest, error);
+      const failed = current ?? disposed.at(-1) ?? root;
+      this.record(failed.manifest.id, "dispose", error);
+      const rollbackEntries = disposed.includes(failed) ? disposed : [...disposed, failed];
+      for (const entry of rollbackEntries.reverse()) {
+        try {
+          await this.adapters.get(entry.manifest.id)?.rollback?.(entry.manifest, error);
+        } catch (rollbackError) {
+          this.record(entry.manifest.id, "rollback", rollbackError);
+        }
+      }
       this.refresh();
       return {
         transaction: { id: `disable-rollback-${this.registry.generation}`, kind: "disable", pluginId, generation: this.registry.generation, status: "rolled_back", error: message(error) },

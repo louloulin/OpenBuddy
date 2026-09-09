@@ -202,6 +202,10 @@ export class PluginRegistry {
     });
   }
 
+  dependentsOf(pluginId: string): readonly PluginRegistryEntry[] {
+    return this.list().filter((entry) => entry.state === "active" && entry.manifest.dependencies?.some((dependency) => dependency.id === pluginId));
+  }
+
   disable(pluginId: string): Promise<PluginRegistryTransaction> {
     return this.enqueue(async () => {
       const entry = this.require(pluginId);

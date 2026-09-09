@@ -57,6 +57,21 @@ describe("PluginLifecycleCoordinator", () => {
     expect(coordinator.getDiagnostics().at(-1)).toMatchObject({ phase: "dispose", message: "dispose failed" });
   });
 
+  it("rolls back every already-disposed dependent when a dependency teardown fails", async () => {
+    const registry = new PluginRegistry();
+    const coordinator = new PluginLifecycleCoordinator(registry);
+    const calls: string[] = [];
+    await coordinator.stage(manifest, { stage: () => { calls.push("stage-base"); } });
+    await coordinator.activate("fixture");
+    const dependent: PluginRegistryManifest = { ...manifest, id: "dependent", surfaces: ["renderer"], dependencies: [{ id: "fixture", range: "^1" }] };
+    await coordinator.stage(dependent, { stage: () => { calls.push("stage-dependent"); }, dispose: () => { calls.push("dispose-dependent"); throw new Error("dependent dispose failed"); }, rollback: () => { calls.push("rollback-dependent"); } });
+    await coordinator.activate("dependent");
+    const result = await coordinator.disable("fixture");
+    expect(result.transaction.status).toBe("rolled_back");
+    expect(registry.get("fixture")?.state).toBe("active");
+    expect(registry.get("dependent")?.state).toBe("active");
+    expect(calls).toEqual(["stage-base", "stage-dependent", "dispose-dependent", "rollback-dependent"]);
+  });
   it("filters an explicitly replayed stale generation event", async () => {
     const registry = new PluginRegistry();
     const received: number[] = [];
