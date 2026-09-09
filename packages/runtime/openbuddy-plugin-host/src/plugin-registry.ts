@@ -296,6 +296,10 @@ export class PluginRegistry {
   disable(pluginId: string, reason: NonNullable<PluginRegistryManifest["disabledReason"]> = "user"): Promise<PluginRegistryTransaction> {
     return this.enqueue(async () => {
       const entry = this.require(pluginId);
+      const activeDependents = this.dependentsOf(pluginId);
+      if (activeDependents.length > 0) {
+        throw new PluginRegistryError(`cannot disable ${pluginId}: active dependents ${activeDependents.map((dependent) => dependent.manifest.id).join(", ")}`);
+      }
       const generation = this.gate.advance();
       entry.state = "disabled";
       entry.generation = generation;

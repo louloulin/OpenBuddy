@@ -83,6 +83,22 @@ describe("PluginRegistry", () => {
     await expect(registry.activate("two")).rejects.toThrow("active surface conflict: web");
   });
 
+  it("rejects disabling a plugin with active dependents", async () => {
+    const registry = new PluginRegistry();
+    await registry.register(manifest("provider"));
+    await registry.activate("provider");
+    await registry.register({ ...manifest("consumer"), dependencies: [{ id: "provider", range: "^1.0.0" }] });
+    await registry.activate("consumer");
+
+    await expect(registry.disable("provider")).rejects.toThrow("active dependents consumer");
+    expect(registry.get("provider")?.state).toBe("active");
+    expect(registry.get("consumer")?.state).toBe("active");
+
+    await registry.disable("consumer");
+    await expect(registry.disable("provider")).resolves.toMatchObject({ kind: "disable", status: "committed" });
+    expect(registry.get("provider")?.state).toBe("disabled");
+  });
+
   it("rejects malformed capability declarations", async () => {
     const registry = new PluginRegistry();
     await expect(registry.register({ ...manifest("bad"), capabilities: "web" as never })).rejects.toThrow("capabilities must be a non-empty string array");
