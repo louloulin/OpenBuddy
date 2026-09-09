@@ -3300,3 +3300,114 @@ Phase H.1                无          ✅          (167 LOC + 14 tests)
 
 **v17 文档 owner**: 编程助手-devbox1 · v17 §37 Phase C.2 落地总结
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
+
+## 38. v18 — Phase C.3 落地（calendar PI tools + dsh-core goals.search）
+
+> 🟢 **v18 完成** — calendar PI tool factory + dsh-core 11th slash command (goals.search)
+> 提交：`f256058` (calendar) + `dde8b75` (goals.search)
+
+### 38.1 Phase C.3 完成 — calendar 加上 PI tool surface
+
+新增 `packages/capability/openbuddy-calendar/src/calendar-tools.ts` (130 LOC) + `calendar-tools.test.ts` (6 cases) + `moon.yml`。
+
+| Tool | Category | 作用 |
+|---|---|---|
+| `calendar_list` | READ | 列出 events（按 from/to/roomId/contextRef 过滤）|
+| `calendar_create` | MUTATION | 创建 event (title/start/end/...) |
+| `calendar_update` | MUTATION | 按 eventId patch 字段 |
+| `calendar_remove` | MUTATION | 按 eventId 删除 event |
+
+**架构** (与 email-tools 对称):
+- `calendar-tools.ts` (130 LOC) — toolResult / objectSchema helpers + 2 build* functions (READ / MUTATION) + CalendarToolHandlers 本地 interface + `CALENDAR_READ_ONLY_TOOL_NAMES` co-located const
+- `index.ts` re-exports 给 legacy 调用者，公共 API 不变
+
+### 38.2 Phase C.3 续 — dsh-core `goals.search` slash command
+
+新增 `goals.search` slash command + `searchGoalsByObjective(query, filter?)` state helper：
+
+- Case-insensitive substring match on goal objective
+- 可选 `phase` 过滤
+- Empty / whitespace query → empty list (defensive)
+- 返回 `[{ sessionId, goal }]` 与 `goals.list` 同形
+
+**用途**: Renderer-side goal browser / 快速 filter，避免 caller 必须 walk `listAllGoals()` 后自己 filter。
+
+**Slash commands 总数** (dsh-core): 13 → **14**
+- `goals.*`: 9 → **10** (+ `goals.search`)
+
+### 38.3 v6 路线图完成度 (HEAD `dde8b75`)
+
+| Phase | 内容 | 状态 | commit |
+|---|---|---|---|
+| A.1 / B.1 / L.1-L.4 / K.1-K.2 / J.1 / B.3 step 1+2a-c / C.1 / C.2 / H.1 | 历史 | ✅ | `6f6d612`..`881acf1` |
+| v14+v15+v16+v17 plans | docs | ✅ | `7bc8ffb`/`cfd1bab`/`1abee7b`/`6e8077c` |
+| **C.3 (calendar)** | **calendar PI tool factory** | ✅ | **`f256058`** |
+| **C.3 (dsh-core)** | **goals.search** | ✅ | **`dde8b75`** |
+| ⚪ B.3 step 3 | user-ext + dsh-core Extensions 合并到 session | pending | — |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — |
+| ⚪ C.3 (mcp-client) | mcp-client 工厂化 | pending | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — |
+| ⚪ H.2 | email class 拆出 (5 个 files) | pending | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — |
+
+**v6 路线图 26 轮中 22 轮完成 (85%)**
+
+### 38.4 完成度速查 (v3 baseline → HEAD `dde8b75`)
+
+```
+                          v3 baseline → v18 HEAD
+─────────────────────────────────────────────────────────
+PI 复用度                 24%        ~78%        ↑ +54 pp
+God module LOC          ~6500       ~3050     ↓ -53%  (calendar +20/-15)
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+OpenBuddy DSH core 包    无          ✅ v0.1     (~550 LOC + 19 tests, 本轮 +30/+2)
+Email tools 工厂         无          ✅          (222 LOC + 5 tests)
+Email classifier         无          ✅          (167 LOC + 14 tests)
+Calendar tools 工厂      无          ✅          (130 LOC + 6 tests)  ← 本轮新增
+架构边界 Sheriff         部分        ✅ 0 violations / 403 files
+Phase B.3 step 1         无          ✅          (124 LOC + 76 LOC test)
+Phase B.3 step 2a        无          ✅          (110 LOC + 76 LOC test)
+Phase B.3 step 2b        无          ✅          (~500 LOC new + ~350 LOC test)
+Phase B.3 step 2c        无          ✅          (~25 LOC 修改)
+Phase C.1                无          ✅          (222 LOC + 5 tests)
+Phase C.2                无          ✅          (40 LOC + 4 tests)
+Phase C.3 (本轮)         无          ✅          (200 LOC + 8 tests)
+Phase H.1                无          ✅          (167 LOC + 14 tests)
+─────────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+**总完成度**:架构层 **100% + B.3 step 1+2a+2b+2c + C.1 + C.2 + C.3 + H.1**,功能层 **0%** (v1.0 路线图,5 个 gap 待 K.3/E.2/H.3)
+
+### 38.5 验证 (commit `dde8b75`)
+
+| 测试范围 | 结果 |
+|---|---|
+| `pnpm exec tsc --noEmit` | ✅ 0 errors |
+| `packages/capability/openbuddy-calendar/src/calendar-tools.test.ts` (本轮新增) | ✅ 6/6 |
+| `packages/capability/openbuddy-calendar/` 全套 (3 files) | ✅ 9 tests pass (was 3, +6) |
+| `packages/runtime/openbuddy-dsh-core/src/goals.test.ts` (本轮 +2 cases) | ✅ 13/13 |
+| `packages/runtime/openbuddy-dsh-core/` 全套 | ✅ **19 tests pass** (was 17, +2) |
+| 4 个 workspace area 全套 | ✅ **533 tests pass / 0 fail** |
+| `pnpm storage:boundaries` | ✅ 0 violations / 403 files |
+
+**0 回归**,v6 路线图进度从 21/26 (81%) 推进到 22/26 (85%)。
+
+### 38.6 接下来 3 轮 (v18 锁定)
+
+| Round | Phase | 内容 | 预估 LOC |
+|---|---|---|---|
+| ⚪ 下一轮 | **B.3 step 3** | user-ext + dsh-core Extensions 合并到 session 的 ExtensionRunner | +200 |
+| ⚪ 第三轮 | **H.2** | email class 拆出 (5 个 files) | +200 / -1500 |
+| ⚪ 第四轮 | **C.3 (mcp-client)** | mcp-client 工厂化 | +200 / -1000 |
+
+---
+
+**v18 文档 owner**: 编程助手-devbox1 · v18 §38 Phase C.3 落地总结
+**父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
