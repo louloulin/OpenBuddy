@@ -272,11 +272,6 @@ export interface InstallHostModuleDomainDeps {
 /** Flat compatibility bag plus the grouped views used by new composition roots. */
 export type InstallHostModuleDepsWithDomains = InstallHostModuleDeps & InstallHostModuleDomainDeps;
 export type InstallHostModuleDomainInput = InstallHostModuleDomainDeps & { state: AgentHostState };
-export type InstallHostModuleInput = InstallHostModuleDeps | InstallHostModuleDomainInput;
-
-function groupDomainDeps(deps: InstallHostModuleDeps): InstallHostModuleDomainDeps {
-  return { profile: deps, session: deps, plugin: deps, runtime: deps };
-}
 
 /**
  * Profile 域 (11 modules): override-patches → snapshot → bundles → resource-paths
@@ -376,11 +371,10 @@ function installRuntimeDomain(state: AgentHostState, deps: RuntimeDomainDeps): v
  *
  * 总 install 顺序在每个域内部维护 (见各域 helper 注释).
  */
-export function installHostModules(state: AgentHostState, deps: InstallHostModuleInput): void {
-  const domains = "profile" in deps ? deps : groupDomainDeps(deps);
-  if (domains.profile.state !== state) throw new Error("installHostModules received inconsistent state");
-  installProfileDomain(state, domains.profile);
-  installSessionDomain(state, domains.session);
-  installPluginDomain(state, domains.plugin);
-  installRuntimeDomain(state, domains.runtime);
+export function installHostModules(state: AgentHostState, deps: InstallHostModuleDomainInput): void {
+  if (deps.profile.state !== state) throw new Error("installHostModules received inconsistent state");
+  installProfileDomain(state, deps.profile);
+  installSessionDomain(state, deps.session);
+  installPluginDomain(state, deps.plugin);
+  installRuntimeDomain(state, deps.runtime);
 }

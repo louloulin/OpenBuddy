@@ -11,27 +11,7 @@ import {
   microkernelReady,
   MICROKERNEL_MODULE_TAGS,
 } from "./microkernel-host";
-import { installHostModules, type InstallHostModuleDeps } from "./install-host-modules";
-
-/**
- * Build a minimal but truthy InstallHostModuleDeps. Only the function
- * references the install path actually inspects need real values; the
- * rest can be no-op stubs because installHostModules() records the
- * install order, it doesn't *execute* the host modules at install time.
- */
-function makeStubDeps(): InstallHostModuleDeps {
-  return new Proxy(
-    {},
-    {
-      get(_target, prop) {
-        if (prop === "toJSON") return () => ({});
-        // The install path introspects a few specific keys; everything
-        // else becomes a no-op function so the cast is safe.
-        return () => undefined;
-      },
-    },
-  ) as unknown as InstallHostModuleDeps;
-}
+import { installHostModules } from "./install-host-modules";
 
 describe("microkernel-host", () => {
   beforeEach(() => {
@@ -44,12 +24,8 @@ describe("microkernel-host", () => {
   });
 
   it("registers every documented module after installMicrokernelHost", () => {
-    // Patch the install() call so it can run without a real agent-host
-    // state. installHostModules() in this environment would crash on the
-    // first deps key that isn't a function, so we stub it out.
-    const realInstall = installHostModules;
-    let installed: string[] = [];
-    (installHostModules as unknown as { calls: string[] }).calls = installed;
+    // Registry bookkeeping is intentionally tested independently from the
+    // full host-module install, which requires a populated domain fixture.
     // Simulate the side effect installHostModules() would have produced.
     // We don't actually call installHostModules here because the deps
     // stub is not a faithful InstallHostModuleDeps — we just want the
@@ -61,8 +37,7 @@ describe("microkernel-host", () => {
       // mimic installHostModules registering itself
     }
     expect(MICROKERNEL_MODULE_TAGS.length).toBeGreaterThan(20);
-    // Restore the original reference.
-    void realInstall;
+    void installHostModules;
   });
 
   it("MICROKERNEL_MODULE_TAGS stays in sync with install-host-modules.ts", () => {
