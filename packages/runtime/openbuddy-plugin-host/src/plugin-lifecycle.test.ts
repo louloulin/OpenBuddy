@@ -43,12 +43,29 @@ describe("PluginLifecycleCoordinator", () => {
     expect(calls).toEqual(["stage", "dispose"]);
   });
 
-  it("filters externally replayed events to the current generation", async () => {
+  it("keeps an active plugin and rolls back when dispose fails", async () => {
     const registry = new PluginRegistry();
-    const current: number[] = [];
-    registry.subscribeCurrent((event) => current.push(event.generation));
+    const coordinator = new PluginLifecycleCoordinator(registry);
+    const rollback: string[] = [];
+    await coordinator.stage(manifest, { stage: () => undefined, dispose: () => { throw new Error("dispose failed"); }, rollback: () => { rollback.push("rollback"); } });
+    await coordinator.activate("fixture");
+    const result = await coordinator.disable("fixture");
+    expect(result.transaction.status).toBe("rolled_back");
+    expect(result.transaction.error).toBe("dispose failed");
+    expect(registry.get("fixture")?.state).toBe("active");
+    expect(rollback).toEqual(["rollback"]);
+    expect(coordinator.getDiagnostics().at(-1)).toMatchObject({ phase: "dispose", message: "dispose failed" });
+  });
+
+  it("filters an explicitly replayed stale generation event", async () => {
+    const registry = new PluginRegistry();
+    const received: number[] = [];
+    registry.subscribeCurrent((event) => received.push(event.generation));
     await registry.register(manifest);
     await registry.activate("fixture");
-    expect(current).toEqual([1, 2]);
+    registry.publish({ kind: "activate", pluginId: "fixture", generation: 1, transactionId: "stale", state: "active" });
+    registry.publish({ kind: "activate", pluginId: "fixture", generation: 2, transactionId: "current", state: "active" });
+    expect(received).toEqual([1, 2, 2]);
   });
+
 });

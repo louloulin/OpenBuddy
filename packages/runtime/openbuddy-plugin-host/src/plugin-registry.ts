@@ -165,7 +165,12 @@ export class PluginRegistry {
     for (const listener of this.listeners) listener(event);
   }
 
-  /** Subscribe only to events from the registry's current generation. */
+  /** Deliver an externally observed event through the generation fence. */
+  publish(event: PluginRegistryEvent): void {
+    this.emit({ ...event });
+  }
+
+
   subscribeCurrent(listener: (event: PluginRegistryEvent) => void): () => void {
     return this.subscribe((event) => {
       if (event.generation === this.generation) listener(event);
