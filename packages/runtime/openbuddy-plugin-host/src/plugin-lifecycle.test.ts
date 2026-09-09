@@ -14,6 +14,7 @@ describe("PluginLifecycleCoordinator", () => {
       rollback: () => { rollback.push("rolled-back"); },
     });
     expect(result.transaction.status).toBe("rolled_back");
+    expect(result.receipts).toEqual([]);
     expect(registry.get("fixture")?.state).toBe("failed");
     expect(coordinator.getReadiness().phase).toBe("failed");
     expect(rollback).toEqual(["rolled-back"]);
@@ -39,6 +40,8 @@ describe("PluginLifecycleCoordinator", () => {
     await coordinator.stage(manifest, { stage: () => { calls.push("stage"); }, dispose: () => { calls.push("dispose"); } });
     const result = await coordinator.disable("fixture");
     expect(result.transaction.kind).toBe("disable");
+    expect(result.receipts).toHaveLength(1);
+    expect(result.receipts[0]).toMatchObject({ pluginId: "fixture", status: "committed" });
     expect(registry.get("fixture")?.state).toBe("disabled");
     expect(calls).toEqual(["stage", "dispose"]);
   });
@@ -51,6 +54,7 @@ describe("PluginLifecycleCoordinator", () => {
     await coordinator.activate("fixture");
     const result = await coordinator.disable("fixture");
     expect(result.transaction.status).toBe("rolled_back");
+    expect(result.receipts).toEqual([]);
     expect(result.transaction.error).toBe("dispose failed");
     expect(registry.get("fixture")?.state).toBe("active");
     expect(rollback).toEqual(["rollback"]);
@@ -68,10 +72,28 @@ describe("PluginLifecycleCoordinator", () => {
     await coordinator.activate("dependent");
     const result = await coordinator.disable("fixture");
     expect(result.transaction.status).toBe("rolled_back");
+    expect(result.receipts).toEqual([]);
     expect(registry.get("fixture")?.state).toBe("active");
     expect(registry.get("dependent")?.state).toBe("active");
     expect(calls).toEqual(["stage-base", "stage-dependent", "dispose-dependent", "rollback-dependent"]);
   });
+  it("commits dependency disable receipts in dependent-first order", async () => {
+    const registry = new PluginRegistry();
+    const coordinator = new PluginLifecycleCoordinator(registry);
+    const base: PluginRegistryManifest = { ...manifest, id: "base" };
+    const dependent: PluginRegistryManifest = { ...manifest, id: "dependent", surfaces: ["renderer"], dependencies: [{ id: "base", range: "^1" }] };
+    await coordinator.stage(base);
+    await coordinator.activate("base");
+    await coordinator.stage(dependent);
+    await coordinator.activate("dependent");
+
+    const result = await coordinator.disable("base");
+    expect(result.receipts.map((receipt) => receipt.pluginId)).toEqual(["dependent", "base"]);
+    expect(result.receipts.every((receipt) => receipt.status === "committed")).toBe(true);
+    expect(registry.get("base")?.state).toBe("disabled");
+    expect(registry.get("dependent")?.state).toBe("disabled");
+  });
+
   it("filters an explicitly replayed stale generation event", async () => {
     const registry = new PluginRegistry();
     const received: number[] = [];

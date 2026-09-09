@@ -25,6 +25,8 @@ export interface PluginLifecycleDiagnostic {
 
 export interface PluginLifecycleResult {
   transaction: PluginRegistryTransaction;
+  /** Registry receipts for every committed state transition in this operation. */
+  receipts: readonly PluginRegistryTransaction[];
   diagnostics: readonly PluginLifecycleDiagnostic[];
 }
 
@@ -58,13 +60,13 @@ export class PluginLifecycleCoordinator {
     try {
       await adapter.stage?.(manifest);
       this.refresh();
-      return { transaction, diagnostics: this.getDiagnostics() };
+      return { transaction, receipts: [transaction], diagnostics: this.getDiagnostics() };
     } catch (error) {
       this.record(manifest.id, "stage", error, transaction.id);
       await this.rollback(manifest, error);
       const failed = await this.registry.fail(manifest.id, error);
       this.refresh();
-      return { transaction: { ...failed, status: "rolled_back", error: message(error) }, diagnostics: this.getDiagnostics() };
+      return { transaction: { ...failed, status: "rolled_back", error: message(error) }, receipts: [], diagnostics: this.getDiagnostics() };
     }
   }
 
@@ -75,13 +77,14 @@ export class PluginLifecycleCoordinator {
       await adapter.activate?.(entry.manifest);
       const transaction = await this.registry.activate(pluginId);
       this.refresh();
-      return { transaction, diagnostics: this.getDiagnostics() };
+      return { transaction, receipts: [transaction], diagnostics: this.getDiagnostics() };
     } catch (error) {
       this.record(pluginId, "activate", error);
       await this.rollback(entry.manifest, error);
       this.refresh();
       return {
         transaction: { id: `rollback-${this.registry.generation}`, kind: "activate", pluginId, generation: this.registry.generation, status: "rolled_back", error: message(error) },
+        receipts: [],
         diagnostics: this.getDiagnostics(),
       };
     }
@@ -112,9 +115,13 @@ export class PluginLifecycleCoordinator {
         generation: this.registry.generation,
         status: "committed",
       };
-      for (const entry of targets) transaction = await this.registry.disable(entry.manifest.id);
+      const receipts: PluginRegistryTransaction[] = [];
+      for (const entry of targets) {
+        transaction = await this.registry.disable(entry.manifest.id);
+        receipts.push(transaction);
+      }
       this.refresh();
-      return { transaction, diagnostics: this.getDiagnostics() };
+      return { transaction, receipts, diagnostics: this.getDiagnostics() };
     } catch (error) {
       const failed = current ?? disposed.at(-1) ?? root;
       this.record(failed.manifest.id, "dispose", error);
@@ -129,6 +136,7 @@ export class PluginLifecycleCoordinator {
       this.refresh();
       return {
         transaction: { id: `disable-rollback-${this.registry.generation}`, kind: "disable", pluginId, generation: this.registry.generation, status: "rolled_back", error: message(error) },
+        receipts: [],
         diagnostics: this.getDiagnostics(),
       };
     }
@@ -141,11 +149,11 @@ export class PluginLifecycleCoordinator {
       await adapter.dispose?.(entry.manifest);
       const transaction = await this.registry.dispose(pluginId);
       this.refresh();
-      return { transaction, diagnostics: this.getDiagnostics() };
+      return { transaction, receipts: [transaction], diagnostics: this.getDiagnostics() };
     } catch (error) {
       this.record(pluginId, "dispose", error);
       this.refresh();
-      return { transaction: { id: `failed-${this.registry.generation}`, kind: "dispose", pluginId, generation: this.registry.generation, status: "rolled_back", error: message(error) }, diagnostics: this.getDiagnostics() };
+      return { transaction: { id: `failed-${this.registry.generation}`, kind: "dispose", pluginId, generation: this.registry.generation, status: "rolled_back", error: message(error) }, receipts: [], diagnostics: this.getDiagnostics() };
     }
   }
 
