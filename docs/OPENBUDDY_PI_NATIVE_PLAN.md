@@ -3411,3 +3411,115 @@ Phase H.1                无          ✅          (167 LOC + 14 tests)
 
 **v18 文档 owner**: 编程助手-devbox1 · v18 §38 Phase C.3 落地总结
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
+
+## 39. v19 — Phase C.3 mcp-client 工厂化 + dsh-core 跨会话 diagnostic 扩展
+
+> 🟢 **v19 完成** — mcp-client 工厂化 + dsh-core 2 个新 slash commands
+> 提交：`09dd88b`
+
+### 39.1 Phase C.3 (mcp-client) — tool factory 拆出 god module
+
+新增 `packages/capability/openbuddy-mcp-client/src/mcp-tools.ts` (~110 LOC) + `mcp-tools.test.ts` (10 cases)。
+
+| File | LOC | 说明 |
+|---|---|---|
+| `mcp-tools.ts` | ~110 | `mcpToolName` 辅助 + `createMcpToolDefinitions` 工厂 + `isTextItem` / `isMediaItem` type guard |
+| `mcp-tools.test.ts` | ~120 | 10 个 test cases (mcpToolName format / 工厂 canonical naming / fallback description / text/image/audio content normalization / onCall start+end 事件 / error 路径 / callId tracing) |
+
+**架构** (与 email/calendar-tools 对称):
+- `mcp-tools.ts` 独立可加载，import nothing from electron/main/ and nothing from index.ts
+- `McpToolCallObserver` 事件 + `McpToolCallResult` content union 都在 mcp-tools.ts 内重声明 (避免 circular dep)
+- `index.ts` re-exports 公共 API，external callers 无变化
+
+**Key insight** — 用 type guard functions (`isTextItem` / `isMediaItem`) 安全区分 `McpCallToolResult` 的 content union，避免 loose `unknown` 字段。
+
+### 39.2 dsh-core 跨会话 diagnostic 扩展 (Phase C.3 续)
+
+新增 2 个 slash commands + 2 个 state helpers：
+
+| Name | 类型 | 作用 |
+|---|---|---|
+| `feedback.search` | slash command | 跨 session 搜 feedback entries（rating + note 子串）|
+| `feedback.session-summary` | slash command | 返回 active session 的 `{ sessionId, goal?, feedbackEntries }` |
+| `searchFeedbackEntries(query, options?)` | state helper | feedback 搜子串 |
+| `sessionSummary(carrier, fallback)` | state helper | combined summary |
+
+**Slash commands 总数** (dsh-core): 14 → **16**
+- `feedback.*`: 4 → **6** (+ `feedback.search` + `feedback.session-summary`)
+
+### 39.3 v6 路线图完成度 (HEAD `09dd88b`)
+
+| Phase | 内容 | 状态 | commit |
+|---|---|---|---|
+| A.1 / B.1 / L.1-L.4 / K.1-K.2 / J.1 / B.3 step 1+2a-c / C.1 / C.2 / H.1 / C.3 (calendar+dsh-core) | 历史 | ✅ | `6f6d612`..`dde8b75` |
+| v14+v15+v16+v17+v18 plans | docs | ✅ | `7bc8ffb`..`bc51a98` |
+| **C.3 (mcp-client)** | **mcp-tools factory** | ✅ | **`09dd88b`** |
+| **dsh-core 扩展** | **feedback.search + session-summary** | ✅ | **`09dd88b`** |
+| ⚪ B.3 step 3 | user-ext + dsh-core Extensions 合并到 session | pending | — |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — |
+| ⚪ H.2 | email class 拆出 (5 个 files) | pending | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — |
+
+**v6 路线图 26 轮中 23 轮完成 (88%)**
+
+### 39.4 完成度速查 (v3 baseline → HEAD `09dd88b`)
+
+```
+                          v3 baseline → v19 HEAD
+─────────────────────────────────────────────────────────
+PI 复用度                 24%        ~79%        ↑ +55 pp
+God module LOC          ~6500       ~2940     ↓ -55%  (mcp-client -30, dsh-core +80)
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+OpenBuddy DSH core 包    无          ✅ v0.1     (~640 LOC + 22 tests, 本轮 +90/+3)
+Email tools 工厂         无          ✅          (222 LOC + 5 tests)
+Email classifier         无          ✅          (167 LOC + 14 tests)
+Calendar tools 工厂      无          ✅          (130 LOC + 6 tests)
+MCP client 工厂          无          ✅          (110 LOC + 10 tests)  ← 本轮新增
+架构边界 Sheriff         部分        ✅ 0 violations / 403 files
+Phase B.3 step 1         无          ✅          (124 LOC + 76 LOC test)
+Phase B.3 step 2a        无          ✅          (110 LOC + 76 LOC test)
+Phase B.3 step 2b        无          ✅          (~500 LOC new + ~350 LOC test)
+Phase B.3 step 2c        无          ✅          (~25 LOC 修改)
+Phase C.1                无          ✅          (222 LOC + 5 tests)
+Phase C.2                无          ✅          (40 LOC + 4 tests)
+Phase C.3                无          ✅          (~510 LOC + 19 tests)  ← 本轮扩展
+Phase H.1                无          ✅          (167 LOC + 14 tests)
+─────────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+**总完成度**:架构层 **100% + B.3 step 1+2a+2b+2c + C.1 + C.2 + C.3 + H.1**,功能层 **0%** (v1.0 路线图,5 个 gap 待 K.3/E.2/H.3)
+
+### 39.5 验证 (commit `09dd88b`)
+
+| 测试范围 | 结果 |
+|---|---|
+| `pnpm exec tsc --noEmit` | ✅ 0 errors |
+| `packages/capability/openbuddy-mcp-client/src/mcp-tools.test.ts` (本轮新增) | ✅ 10/10 |
+| `packages/capability/openbuddy-mcp-client/` 全套 | ✅ 24 tests pass (was 14, +10) |
+| `packages/runtime/openbuddy-dsh-core/src/message-feedback.test.ts` (本轮 +3 cases) | ✅ 9/9 |
+| `packages/runtime/openbuddy-dsh-core/` 全套 | ✅ **22 tests pass** (was 19, +3) |
+| 5 个 workspace area 全套 | ✅ **560 tests pass / 0 fail** |
+| `pnpm storage:boundaries` | ✅ 0 violations / 403 files |
+
+**0 回归**,v6 路线图进度从 22/26 (85%) 推进到 23/26 (88%)。
+
+### 39.6 接下来 3 轮 (v19 锁定)
+
+| Round | Phase | 内容 | 预估 LOC |
+|---|---|---|---|
+| ⚪ 下一轮 | **B.3 step 3** | user-ext + dsh-core Extensions 合并到 session 的 ExtensionRunner | +200 |
+| ⚪ 第三轮 | **H.2** | email class 拆出 (5 个 files) | +200 / -1500 |
+| ⚪ 第四轮 | **D.1-D.3** | Settings/ProjectTrust/Skills PI 复用 | +200 / -1000 |
+
+---
+
+**v19 文档 owner**: 编程助手-devbox1 · v19 §39 Phase C.3 mcp-client + dsh-core 扩展
+**父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
