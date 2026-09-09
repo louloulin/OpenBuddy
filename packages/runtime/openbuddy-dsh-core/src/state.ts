@@ -217,6 +217,33 @@ export function clearGoal(
 }
 
 /**
+ * Increment the goal's `roundsStarted` counter. Used by the agent
+ * loop to track how many rounds the model has attempted on a
+ * goal without auto-completing. The `maxGoalRounds` threshold
+ * (default 3, set on `createGoal`) gates auto-completion logic in
+ * the runtime; this helper just increments the counter and returns
+ * the updated record so the caller can decide whether to advance
+ * the phase.
+ */
+export function advanceGoalRounds(
+  carrier: unknown,
+  fallback: string,
+  ref: { id?: string; revision?: number } | undefined,
+): DshGoalRecord {
+  const key = sessionKey(carrier, fallback);
+  const goal = dshGoalState.get(key);
+  if (!goal || goal.id !== ref?.id || goal.revision !== ref?.revision) {
+    throw new Error("goal revision conflict");
+  }
+  if (goal.phase === "complete") {
+    throw new Error("cannot advance rounds on a complete goal");
+  }
+  goal.roundsStarted += 1;
+  goal.revision += 1;
+  return { ...goal };
+}
+
+/**
  * Get (and lazily create) the per-session feedback entries map.
  */
 export function entriesFor(carrier: unknown, fallback: string): Map<string, DshFeedbackEntry> {

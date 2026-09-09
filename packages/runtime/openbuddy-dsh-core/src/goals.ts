@@ -35,6 +35,7 @@ import {
   listAllGoals,
   searchGoalsByObjective,
   transitionGoal,
+  advanceGoalRounds,
 } from "./state";
 
 export type { DshGoalRecord } from "./state";
@@ -87,6 +88,15 @@ export default function createDshGoalsExtension(): ExtensionFactory {
         const typed = (args ?? {}) as { query?: string; phase?: "active" | "paused" | "blocked" | "complete" };
         const query = typeof typed.query === "string" ? typed.query : "";
         return searchGoalsByObjective(query, typed.phase ? { phase: typed.phase } : undefined);
+      },
+    });
+
+    commands.registerCommand?.({
+      name: "goals.advance-rounds",
+      description: "Increment the goal's roundsStarted counter; rejects on revision conflict or complete phase (Phase C.3).",
+      handler: async (args) => {
+        const typed = (args ?? {}) as { id?: string; revision?: number };
+        return advanceGoalRounds(carrier, fallback, typed);
       },
     });
 

@@ -18,6 +18,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import createDshGoalsExtension from "./goals";
 import {
   __resetDshCoreStateForTests,
+  advanceGoalRounds,
   createGoal,
   getGoal,
   listAllGoals,
@@ -79,7 +80,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     __resetDshCoreStateForTests();
   });
 
-  it("registers 10 goals.* commands on init (Phase C.2: + goals.list, Phase C.3: + goals.search)", () => {
+  it("registers 11 goals.* commands on init (Phase C.2: + goals.list, Phase C.3: + goals.search + goals.advance-rounds)", () => {
     const factory = createDshGoalsExtension();
     const { api, commands } = buildMockApi("session-1");
     factory(api);
@@ -93,6 +94,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     expect(commands.has("goals.clear")).toBe(true);
     expect(commands.has("goals.list")).toBe(true);
     expect(commands.has("goals.search")).toBe(true);
+    expect(commands.has("goals.advance-rounds")).toBe(true);
   });
 
   it("goals.create returns a ref and persists via the shared state map", async () => {
@@ -298,5 +300,32 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     const result = (await commands.get("goals.search")!.handler({ query: "audit" })) as Array<{ sessionId: string; goal: DshGoalRecord }>;
     expect(result).toHaveLength(1);
     expect(result[0]?.goal.objective).toBe("Audit v1.0 release");
+  });
+
+  it("goals.advance-rounds increments roundsStarted + revision; rejects on conflict / complete (Phase C.3)", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-advance");
+    factory(api);
+    const created = (await commands.get("goals.create")!.handler({ objective: "Ship v3", maxGoalRounds: 5 })) as { ref: { id: string; revision: number } };
+
+    const advanced1 = (await commands.get("goals.advance-rounds")!.handler(created.ref)) as DshGoalRecord;
+    expect(advanced1.roundsStarted).toBe(1);
+    expect(advanced1.revision).toBe(created.ref.revision + 1);
+
+    const advanced2 = (await commands.get("goals.advance-rounds")!.handler(advanced1)) as DshGoalRecord;
+    expect(advanced2.roundsStarted).toBe(2);
+    expect(advanced2.revision).toBe(advanced1.revision + 1);
+
+    // Wrong ref → revision conflict.
+    await expect(commands.get("goals.advance-rounds")!.handler({ id: created.ref.id, revision: 999 })).rejects.toThrow(/goal revision conflict/);
+
+    // Complete the goal and verify advance-rounds rejects.
+    const completed = (await commands.get("goals.complete")!.handler(advanced2)) as DshGoalRecord;
+    await expect(commands.get("goals.advance-rounds")!.handler(completed)).rejects.toThrow(/cannot advance rounds on a complete goal/);
+
+    // Sanity: state helper parity.
+    const finalGoal = getGoal({ id: "session-advance" }, "current");
+    expect(finalGoal?.roundsStarted).toBe(2);
+    expect(finalGoal?.phase).toBe("complete");
   });
 });
