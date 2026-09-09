@@ -1287,6 +1287,7 @@ export {
   type RemoteSchema,
 } from "./remote-codec";
 export * from "./rpc-contract";
+export * from "./plugin-security";
 export * from "./task-lifecycle";
 export * from "./generation-gate";
 export {
