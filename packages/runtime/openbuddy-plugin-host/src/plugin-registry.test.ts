@@ -45,6 +45,16 @@ describe("PluginRegistry", () => {
     expect(registry.get("nested")?.manifest.surfaces).toEqual(["pi"]);
   });
 
+  it("projects inventory and emits generation-fenced lifecycle events", async () => {
+    const registry = new PluginRegistry({ transactionId: (() => { let i = 0; return () => `tx-${++i}`; })() });
+    const events: string[] = [];
+    registry.subscribe((event) => events.push(`${event.kind}:${event.pluginId}:${event.generation}:${event.state}`));
+    await registry.register({ ...manifest("managed"), source: "profile", managed: true });
+    await registry.activate("managed");
+    await registry.disable("managed");
+    expect(registry.inventory()[0]).toMatchObject({ id: "managed", version: "1.0.0", source: "profile", managed: true, state: "disabled", health: "healthy" });
+    expect(events).toEqual(["register:managed:1:staged", "activate:managed:2:active", "disable:managed:3:disabled"]);
+  });
   it("rejects activating two backends for the same surface", async () => {
     const registry = new PluginRegistry();
     await registry.register(manifest("one"));

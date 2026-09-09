@@ -12,9 +12,32 @@ export interface PluginRegistryManifest {
   version: string;
   apiVersion: string;
   surfaces: readonly PluginRegistrySurface[];
+  source?: string;
+  managed?: boolean;
+  disabledReason?: "user" | "policy" | "load-failed" | "dependency-failed";
+  health?: "healthy" | "degraded" | "failed";
   dependencies?: readonly { id: string; range: string; optional?: boolean }[];
   permissions?: readonly string[];
   entrypoints?: Readonly<Record<string, string>>;
+}
+
+export interface PluginRegistryInventoryEntry {
+  id: string;
+  version: string;
+  source?: string;
+  managed: boolean;
+  state: PluginRegistryState;
+  health: "healthy" | "degraded" | "failed";
+  disabledReason?: PluginRegistryManifest["disabledReason"];
+  surfaces: readonly PluginRegistrySurface[];
+}
+
+export interface PluginRegistryEvent {
+  kind: PluginRegistryTransaction["kind"];
+  pluginId: string;
+  generation: number;
+  transactionId: string;
+  state: PluginRegistryState;
 }
 
 export interface PluginRegistryEntry {
@@ -103,6 +126,7 @@ export class PluginRegistry {
   private readonly entries = new Map<string, PluginRegistryEntry>();
   private readonly gate: GenerationGate;
   private readonly nextTransactionId: () => string;
+  private readonly listeners = new Set<(event: PluginRegistryEvent) => void>();
   private mutation: Promise<unknown> = Promise.resolve();
 
   constructor(options: PluginRegistryOptions = {}) {
@@ -118,6 +142,29 @@ export class PluginRegistry {
     const entry = this.entries.get(pluginId);
     return entry ? { ...entry, manifest: cloneManifest(entry.manifest) } : undefined;
   }
+
+  inventory(): readonly PluginRegistryInventoryEntry[] {
+    return this.list().map((entry) => ({
+      id: entry.manifest.id,
+      version: entry.manifest.version,
+      ...(entry.manifest.source ? { source: entry.manifest.source } : {}),
+      managed: entry.manifest.managed !== false,
+      state: entry.state,
+      health: entry.manifest.health ?? (entry.state === "failed" ? "failed" : "healthy"),
+      ...(entry.manifest.disabledReason ? { disabledReason: entry.manifest.disabledReason } : {}),
+      surfaces: [...entry.manifest.surfaces],
+    }));
+  }
+
+  subscribe(listener: (event: PluginRegistryEvent) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private emit(event: PluginRegistryEvent): void {
+    for (const listener of this.listeners) listener(event);
+  }
+
 
   register(manifest: PluginRegistryManifest): Promise<PluginRegistryTransaction> {
     return this.enqueue(async () => {
@@ -210,6 +257,9 @@ export class PluginRegistry {
   }
 
   private transaction(kind: PluginRegistryTransaction["kind"], pluginId: string, generation: number): PluginRegistryTransaction {
-    return { id: this.nextTransactionId(), kind, pluginId, generation, status: "committed" };
+    const transaction = { id: this.nextTransactionId(), kind, pluginId, generation, status: "committed" as const };
+    const entry = this.entries.get(pluginId);
+    if (entry) this.emit({ kind, pluginId, generation, transactionId: transaction.id, state: entry.state });
+    return transaction;
   }
 }
