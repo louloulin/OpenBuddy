@@ -79,11 +79,16 @@ export default [
       "import/no-self-import": "error",
       "import/no-useless-path-segments": "warn",
       // ── sheriff (module boundaries) ──
-      // See sheriff.config.ts. A-7 promotes specific tags to "error".
-      "sheriff/ban-tags": "warn",
-      "sheriff/no-private": "warn",
-      "sheriff/no-relative": "warn",
-      "sheriff/exhaustive-deps": "warn",
+      // See sheriff.config.ts. Phase J.1 (v6 §26.4) promotes specific tag
+      // pairs to "error" once the v6 §3.4 layer model stabilizes. The
+      // three rules below are the ones shipped by @softarc/eslint-plugin-
+      // sheriff@0.19.6 (rule names renamed from earlier 0.15.x releases):
+      //   - dependency-rule : assert depRules (UI ↔ core, microkernel ↔ plugin)
+      //   - deep-import     : assert public-surface only (no skipping index.ts)
+      //   - encapsulation   : assert tag isolation (no reverse-deps)
+      "sheriff/dependency-rule": "warn",
+      "sheriff/deep-import": "warn",
+      "sheriff/encapsulation": "warn",
     },
   },
   {
