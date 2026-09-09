@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PluginRegistry, type PluginRegistryManifest, type PluginRegistrySurface } from "./plugin-registry";
+import { PluginRegistry, satisfiesPluginDependencyRange, type PluginRegistryManifest, type PluginRegistrySurface } from "./plugin-registry";
 
 const manifest = (id: string, surfaces: PluginRegistrySurface[] = ["pi"]): PluginRegistryManifest => ({
   schema: "openbuddy.plugin.v1", id, version: "1.0.0", apiVersion: "1", surfaces,
@@ -17,6 +17,15 @@ describe("PluginRegistry", () => {
     expect(activated.generation).toBeGreaterThan(registered.generation);
     expect(second.generation).toBeGreaterThan(registered.generation);
     expect(registry.get("one")?.state).toBe("active");
+  });
+
+  it("matches supported dependency ranges", () => {
+    expect(satisfiesPluginDependencyRange("1.4.2", "^1.2.0")).toBe(true);
+    expect(satisfiesPluginDependencyRange("2.0.0", "^1.2.0")).toBe(false);
+    expect(satisfiesPluginDependencyRange("1.4.2", "~1.4.0")).toBe(true);
+    expect(satisfiesPluginDependencyRange("1.5.0", "~1.4.0")).toBe(false);
+    expect(satisfiesPluginDependencyRange("1.4.2", ">=1.0.0 <2.0.0")).toBe(true);
+    expect(satisfiesPluginDependencyRange("1.4.2", "not-a-range")).toBe(false);
   });
 
   it("rejects missing required dependencies and duplicate registration", async () => {
@@ -45,6 +54,12 @@ describe("PluginRegistry", () => {
     expect(stored?.dependencies?.[0].id).toBe("dep");
     (stored?.surfaces as PluginRegistrySurface[] | undefined)?.push("renderer");
     expect(registry.get("nested")?.manifest.surfaces).toEqual(["pi"]);
+
+    const incompatible = new PluginRegistry();
+    await incompatible.register({ ...manifest("dependency"), version: "2.0.0" });
+    await incompatible.activate("dependency");
+    await incompatible.register({ ...manifest("consumer"), dependencies: [{ id: "dependency", range: "^1.0.0" }] });
+    await expect(incompatible.activate("consumer")).rejects.toThrow("does not satisfy ^1.0.0");
   });
 
   it("projects inventory and emits generation-fenced lifecycle events", async () => {

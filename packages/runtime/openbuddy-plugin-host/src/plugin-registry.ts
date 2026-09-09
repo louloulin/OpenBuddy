@@ -111,6 +111,63 @@ function assertManifest(manifest: PluginRegistryManifest): void {
   }
 }
 
+interface SemanticVersion {
+  major: number;
+  minor: number;
+  patch: number;
+}
+
+function parseSemanticVersion(value: string): SemanticVersion | undefined {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.exec(value.trim());
+  if (!match) return undefined;
+  return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]) };
+}
+
+function compareSemanticVersions(left: SemanticVersion, right: SemanticVersion): number {
+  return left.major - right.major || left.minor - right.minor || left.patch - right.patch;
+}
+
+/**
+ * Supports the npm range forms used by OpenBuddy plugin manifests without
+ * pulling a runtime dependency into the small registry package.
+ */
+export function satisfiesPluginDependencyRange(version: string, range: string): boolean {
+  const candidate = parseSemanticVersion(version);
+  const normalized = range.trim();
+  if (!candidate || !normalized) return false;
+  if (normalized === "*" || normalized.toLowerCase() === "latest") return true;
+
+  return normalized.split("||").some((alternative) => {
+    const expression = alternative.trim();
+    if (!expression) return false;
+    const comparatorParts = expression.split(/\s+/).filter(Boolean);
+    if (comparatorParts.length > 1 && comparatorParts.every((part) => /^(?:[<>]=?|=)?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(part))) {
+      return comparatorParts.every((part) => satisfiesPluginDependencyRange(version, part));
+    }
+
+    const operatorMatch = /^(\^|~|>=|<=|>|<|=)?\s*(\d+)\.(\d+)\.(\d+)$/.exec(expression);
+    if (!operatorMatch) return false;
+    const operator = operatorMatch[1] ?? "=";
+    const base = { major: Number(operatorMatch[2]), minor: Number(operatorMatch[3]), patch: Number(operatorMatch[4]) };
+    const comparison = compareSemanticVersions(candidate, base);
+    if (operator === "=") return comparison === 0;
+    if (operator === ">") return comparison > 0;
+    if (operator === ">=") return comparison >= 0;
+    if (operator === "<") return comparison < 0;
+    if (operator === "<=") return comparison <= 0;
+    if (operator === "~") return candidate.major === base.major && candidate.minor === base.minor && comparison >= 0;
+    if (operator === "^") {
+      const upper = base.major > 0
+        ? { major: base.major + 1, minor: 0, patch: 0 }
+        : base.minor > 0
+          ? { major: 0, minor: base.minor + 1, patch: 0 }
+          : { major: 0, minor: 0, patch: base.patch + 1 };
+      return comparison >= 0 && compareSemanticVersions(candidate, upper) < 0;
+    }
+    return false;
+  });
+}
+
 function cloneManifest(manifest: PluginRegistryManifest): PluginRegistryManifest {
   return {
     ...manifest,
@@ -267,6 +324,9 @@ export class PluginRegistry {
       const entry = this.entries.get(dependency.id);
       if (!entry || (entry.state !== "active" && !dependency.optional)) {
         throw new PluginRegistryError(`dependency ${dependency.id} is not active`);
+      }
+      if (entry && entry.state === "active" && !satisfiesPluginDependencyRange(entry.manifest.version, dependency.range)) {
+        throw new PluginRegistryError(`dependency ${dependency.id} version ${entry.manifest.version} does not satisfy ${dependency.range}`);
       }
     }
   }
