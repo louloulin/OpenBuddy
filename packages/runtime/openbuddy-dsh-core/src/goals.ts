@@ -32,6 +32,7 @@ import {
   createGoal,
   editGoal,
   getGoal,
+  listAllGoals,
   transitionGoal,
 } from "./state";
 
@@ -67,6 +68,15 @@ export default function createDshGoalsExtension(): ExtensionFactory {
       name: "goals.get",
       description: "Return the current DSH goal for the active session (or undefined).",
       handler: async () => getGoal(carrier, fallback),
+    });
+
+    commands.registerCommand?.({
+      name: "goals.list",
+      description: "List all active DSH goals across every session, optionally filtered by phase.",
+      handler: async (args) => {
+        const typed = (args ?? {}) as { phase?: "active" | "paused" | "blocked" | "complete" };
+        return listAllGoals(typed.phase ? { phase: typed.phase } : undefined);
+      },
     });
 
     commands.registerCommand?.({

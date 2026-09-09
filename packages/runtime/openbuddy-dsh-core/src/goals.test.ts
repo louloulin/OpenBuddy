@@ -20,6 +20,8 @@ import {
   __resetDshCoreStateForTests,
   createGoal,
   getGoal,
+  listAllGoals,
+  transitionGoal,
   type DshGoalRecord,
 } from "./state";
 
@@ -76,7 +78,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     __resetDshCoreStateForTests();
   });
 
-  it("registers 8 goals.* commands on init", () => {
+  it("registers 9 goals.* commands on init (Phase C.2: + goals.list)", () => {
     const factory = createDshGoalsExtension();
     const { api, commands } = buildMockApi("session-1");
     factory(api);
@@ -88,6 +90,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     expect(commands.has("goals.complete")).toBe(true);
     expect(commands.has("goals.blocked")).toBe(true);
     expect(commands.has("goals.clear")).toBe(true);
+    expect(commands.has("goals.list")).toBe(true);
   });
 
   it("goals.create returns a ref and persists via the shared state map", async () => {
@@ -208,5 +211,55 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     // session so we don't trip the "goal already exists" guard.
     const directCreate = createGoal({ id: "session-direct" }, "current", { objective: "Direct call" });
     expect(directCreate.ref.revision).toBe(1);
+  });
+
+  it("goals.list returns all active goals across sessions (Phase C.2)", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-1");
+    factory(api);
+    await commands.get("goals.create")!.handler({ objective: "A" });
+    // Brand-new session so we can have a second goal without "already exists" guard.
+    const directB = createGoal({ id: "session-2" }, "current", { objective: "B" });
+    expect(directB.ref.revision).toBe(1);
+    // Complete the second one.
+    const ref2 = { id: directB.ref.id, revision: directB.ref.revision };
+    await commands.get("goals.complete")!.handler({ ...ref2 });
+    // But we are on session-1, so we'd hit "already exists" for session-2 — use state.ts directly.
+    listAllGoals; // type-only reference (import is at top)
+
+    const all = listAllGoals();
+    expect(all).toHaveLength(2);
+    const objectives = all.map((entry) => entry.goal.objective).sort();
+    expect(objectives).toEqual(["A", "B"]);
+    const sessionIds = all.map((entry) => entry.sessionId).sort();
+    expect(sessionIds).toEqual(["session-1", "session-2"]);
+  });
+
+  it("goals.list filter narrows by phase", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-active");
+    factory(api);
+    await commands.get("goals.create")!.handler({ objective: "active one" });
+    // Create a second goal via state.ts directly in a different session,
+    // then complete it via state.ts (the PI extension's commands are
+    // bound to the active session's carrier, not session-complete).
+    const ref = createGoal({ id: "session-complete" }, "current", { objective: "to be completed" });
+    transitionGoal({ id: "session-complete" }, "current", { id: ref.ref.id, revision: ref.ref.revision }, "complete");
+
+    const activeOnly = listAllGoals({ phase: "active" });
+    expect(activeOnly).toHaveLength(1);
+    expect(activeOnly[0]?.goal.objective).toBe("active one");
+
+    const completeOnly = listAllGoals({ phase: "complete" });
+    expect(completeOnly).toHaveLength(1);
+    expect(completeOnly[0]?.goal.objective).toBe("to be completed");
+  });
+
+  it("goals.list without filter returns goals in every phase", async () => {
+    // Empty state → empty list.
+    expect(listAllGoals()).toEqual([]);
+    // After creating one goal, list size is 1.
+    createGoal({ id: "session-x" }, "current", { objective: "X" });
+    expect(listAllGoals()).toHaveLength(1);
   });
 });

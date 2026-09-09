@@ -293,3 +293,43 @@ export function __resetDshCoreStateForTests(): void {
   dshGoalState.clear();
   dshFeedbackState.clear();
 }
+
+// ─── Cross-session diagnostic helpers (Phase C.2 follow-up) ──────────
+
+/**
+ * List all active goals across every session, optionally filtered by
+ * phase. Returns a copy so callers cannot mutate the canonical state.
+ *
+ * Useful for the `/goals.list` slash command — a renderer-side
+ * diagnostic that surfaces every in-flight goal at once, not just the
+ * one bound to the current session's `sessionFallbackKey`.
+ */
+export function listAllGoals(
+  filter?: { phase?: DshGoalRecord["phase"] },
+): Array<{ sessionId: string; goal: DshGoalRecord }> {
+  const out: Array<{ sessionId: string; goal: DshGoalRecord }> = [];
+  for (const [sessionId, goal] of dshGoalState) {
+    if (filter?.phase && goal.phase !== filter.phase) continue;
+    out.push({ sessionId, goal: { ...goal } });
+  }
+  return out;
+}
+
+/**
+ * Count of sessions that have at least one feedback entry. Useful for
+ * the `/feedback.stats` slash command — a renderer-side diagnostic
+ * showing how many sessions are using the message-feedback surface.
+ */
+export function feedbackSessionCount(): number {
+  return dshFeedbackState.size;
+}
+
+/**
+ * Count of total feedback entries across every session. Counts each
+ * messageId within each session as one entry.
+ */
+export function feedbackEntryCount(): number {
+  let total = 0;
+  for (const entries of dshFeedbackState.values()) total += entries.size;
+  return total;
+}

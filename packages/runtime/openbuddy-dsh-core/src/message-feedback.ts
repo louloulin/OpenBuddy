@@ -20,6 +20,8 @@ import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-a
 
 import {
   deleteFeedbackEntry,
+  feedbackEntryCount,
+  feedbackSessionCount,
   listFeedbackEntries,
   putFeedbackEntry,
 } from "./state";
@@ -54,6 +56,15 @@ export default function createDshMessageFeedbackExtension(): ExtensionFactory {
       name: "feedback.list",
       description: "List message-feedback entries for the active session.",
       handler: async (args) => listFeedbackEntries((args ?? {}) as { sessionId?: string }, fallback),
+    });
+
+    commands.registerCommand?.({
+      name: "feedback.stats",
+      description: "Return message-feedback surface stats: { sessions, entries } across every session.",
+      handler: async () => ({
+        sessions: feedbackSessionCount(),
+        entries: feedbackEntryCount(),
+      }),
     });
 
     commands.registerCommand?.({

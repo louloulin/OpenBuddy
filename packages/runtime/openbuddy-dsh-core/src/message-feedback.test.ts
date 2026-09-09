@@ -11,7 +11,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import createDshMessageFeedbackExtension from "./message-feedback";
-import { __resetDshCoreStateForTests, listFeedbackEntries, putFeedbackEntry } from "./state";
+import {
+  __resetDshCoreStateForTests,
+  feedbackEntryCount,
+  feedbackSessionCount,
+  listFeedbackEntries,
+  putFeedbackEntry,
+} from "./state";
 
 interface CapturedCommand {
   name: string;
@@ -61,13 +67,14 @@ describe("@openbuddy/dsh-core/message-feedback (Phase B.3 step 2b)", () => {
     __resetDshCoreStateForTests();
   });
 
-  it("registers 3 feedback.* commands on init", () => {
+  it("registers 4 feedback.* commands on init (Phase C.2: + feedback.stats)", () => {
     const factory = createDshMessageFeedbackExtension();
     const { api, commands } = buildMockApi("session-1");
     factory(api);
     expect(commands.has("feedback.list")).toBe(true);
     expect(commands.has("feedback.put")).toBe(true);
     expect(commands.has("feedback.delete")).toBe(true);
+    expect(commands.has("feedback.stats")).toBe(true);
   });
 
   it("feedback.put + feedback.list round-trip via the shared state map", async () => {
@@ -147,5 +154,27 @@ describe("@openbuddy/dsh-core/message-feedback (Phase B.3 step 2b)", () => {
     putFeedbackEntry({ messageId: "msg-direct", rating: "great" }, "session-shared");
     const list = (await commands.get("feedback.list")!.handler({})) as Array<{ messageId: string }>;
     expect(list.map((entry) => entry.messageId).sort()).toEqual(["msg-direct", "msg-shared"]);
+  });
+
+  it("feedback.stats returns { sessions, entries } across every session (Phase C.2)", async () => {
+    const factory = createDshMessageFeedbackExtension();
+    const { api, commands } = buildMockApi("session-stats");
+    factory(api);
+
+    // Empty state → zero sessions, zero entries.
+    const empty = (await commands.get("feedback.stats")!.handler({})) as { sessions: number; entries: number };
+    expect(empty).toEqual({ sessions: 0, entries: 0 });
+
+    // Put two entries in the bound session + one in a different session
+    // via state.ts directly (so the cross-session stats aggregate).
+    await commands.get("feedback.put")!.handler({ messageId: "msg-1", rating: "ok" });
+    await commands.get("feedback.put")!.handler({ messageId: "msg-2", rating: "great" });
+    putFeedbackEntry({ messageId: "msg-3", rating: "neutral" }, "session-other");
+
+    const populated = (await commands.get("feedback.stats")!.handler({})) as { sessions: number; entries: number };
+    expect(populated).toEqual({ sessions: 2, entries: 3 });
+    // Sanity-check the helpers directly.
+    expect(feedbackSessionCount()).toBe(2);
+    expect(feedbackEntryCount()).toBe(3);
   });
 });
