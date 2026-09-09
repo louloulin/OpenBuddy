@@ -97,7 +97,6 @@ export interface InitPipelineDeps {
   killTask: (taskId: string) => Promise<void>;
   remoteServiceContext: () => unknown;
   transitionDshGoal: (deps: unknown) => Promise<unknown>;
-  resolveDeepSeekModule: unknown;
   openBuddyCapabilityPluginIndex: unknown;
   baseUrl: string;
   describeCompatibilityAdapterCommandsMarkdown: () => string;
@@ -230,7 +229,6 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
   const { loader, pluginState } = await deps.initPluginLoader({
     state: deps.state, cwd: deps.cwd(), context, baseUrl: deps.baseUrl,
     emitPluginEvent: deps.emitPluginEvent,
-    resolveDeepSeekModule: deps.resolveDeepSeekModule,
     openBuddyCorePlugin: deps.openBuddyCorePlugin,
     openBuddyCapabilityPluginIndex: deps.openBuddyCapabilityPluginIndex,
   });

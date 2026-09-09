@@ -103,16 +103,14 @@ import { authorizeMcpServer } from "../mcp-authorization";
 import { projectMcpCapabilityGovernance } from "../mcp-capability-governance";
 import { emitContextEvent, emitPiSessionEvent } from "./pi-event-bridge";
 import { bindCapabilityEventBridge } from "../capability-event-bridge";
-import { getDeepSeekRemoteMethods, resolveDeepSeekModule } from "../deepseek/deepseek-compat";
 import { DeepSeekTypertService, type DeepSeekPiAgentRuntime, type DeepSeekPiToolHooks, type DeepSeekToolDecision, type DeepSeekToolExecution } from "../deepseek/deepseek-runtime";
 import { DeepSeekCordisRuntime, type DeepSeekCordisInvocation, type DeepSeekCordisPluginEntry, type DeepSeekCordisRuntimeSnapshot } from "@openbuddy/plugin-host";
-import { deepSeekCapabilityPackageForService, deepSeekCapabilityRemote } from "../deepseek/deepseek-capabilities";
 import {
   ensureContinuableSubagent as ensureContinuableSubagentImpl,
   type ContinuableSubagentRecord,
 } from "./host-modules/deepseek/agent-runtime";
 import { SessionEventLog, type SessionEventRecord } from "../session/session-event-log";
-import { RemoteDispatcher, type RemoteContribution, type RemoteDescriptor } from "../harness/remote-dispatch";
+import { RemoteDispatcher } from "../harness/remote-dispatch";
 import { serializeRemoteContribution } from "@openbuddy/plugin-host";
 import {
   normalizePublishedRemoteContribution as normalizePublishedRemoteContributionPure,
@@ -232,25 +230,12 @@ export const state: AgentHostState = {
   // set it to the live Promise returned by `bindExtensions`.
   extensionsBound: null,
   toolRegistry: createToolRegistryStub(),
-  remoteDispatcher: new RemoteDispatcher((context) => {
-    const props = (context as unknown as { reflect?: { props?: Record<string, { type?: string }> } }).reflect?.props ?? {};
-    const discovered: Array<{ package: string; descriptors: RemoteDescriptor[] }> = [];
-    for (const [serviceKey, definition] of Object.entries(props)) {
-      if (definition.type !== "service") continue;
-      const service = context.get?.(serviceKey) as (Record<string, unknown> & { typertRemote?: { namespace?: string; serviceKey?: string } }) | undefined;
-      const namespace = service?.typertRemote?.namespace;
-      if (!service || typeof namespace !== "string") continue;
-      const descriptors = getDeepSeekRemoteMethods(service).map((marker) => ({
-        namespace,
-        method: marker.exportName ?? marker.method,
-        implementation: marker.method,
-        service: serviceKey,
-        invocation: marker.invocation,
-      }));
-      if (descriptors.length) discovered.push({ package: deepSeekCapabilityPackageForService(serviceKey) ?? `@openbuddy/discovered/${serviceKey}`, descriptors });
-    }
-    return discovered;
-  }),
+  // Phase L.3: DSH `@Remote` decorator markers are gone, so the legacy
+  // service-walking discovery callback has nothing to collect. The
+  // `RemoteDispatcher` constructor already ignores the argument (PI
+  // `ExtensionRunner` owns the active contribution surface), so we
+  // simply pass an empty-list closure to keep the call-site uniform.
+  remoteDispatcher: new RemoteDispatcher(() => []),
   attachmentStore: new SessionAttachmentStore(join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent"), "openbuddy-attachments")),
 };
 

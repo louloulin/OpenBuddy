@@ -79,9 +79,15 @@ export function installDeepSeekCordisRuntime(deps: {
 }
 import { listWorkspaces } from "../workbench-scope";
 import { SubprocessRuntime, SandboxPolicyService, SandboxRuntime } from "../../../deepseek/subprocess-runtime";
-import { resolveDeepSeekModule } from "../../../deepseek/deepseek-compat";
+// Phase L.4 inlined `createDeepSeekExecutionAdapter` (renamed
+// `createDshExecutionAdapter`) and `DEEPSEEK_EXECUTION_PACKAGES` from
+// `electron/main/deepseek/deepseek-execution-adapters.ts` (now deleted)
+// directly into this file, so no import from that path is needed.
+// `provideDeepSeekExecutionServices` was also retired by L.4.
+import { resolveDeepSeekRuntimeModule } from "../../../deepseek/deepseek-runtime";
 import { artifactPackageJsonByName } from "../profile/paths";
 import { createProfileArtifactResolvers } from "../../profile-artifact-resolution";
+import * as OpenBuddyCordis from "@openbuddy/cordis";
 // Phase L.1 — DSH Pi bridge implementations moved in from
 // `electron/main/deepseek/deepseek-pi-bridge.ts` and
 // `electron/main/deepseek/deepseek-pi-capabilities.ts` (both deleted).
@@ -881,8 +887,14 @@ async function syncDeepSeekCordisRuntime(entries: readonly { id: string; name: s
 		profilePackageJson: state.profilePackageJson,
 	});
 	const importer = async (specifier: string): Promise<unknown> => {
-		const compatibilityModule = resolveDeepSeekModule(specifier);
-		if (compatibilityModule !== undefined) return compatibilityModule;
+		// Phase L.3: the legacy `resolveDeepSeekModule` is gone, but the
+		// slim DSH runtime alias surface (`resolveDeepSeekRuntimeModule`
+		// in `deepseek-runtime.ts`) survives so the cordis runtime can
+		// still resolve `@deepseek-ai/dsh-llm` / `@deepseek-ai/dsh-session`
+		// / ... to their local service shims without a node_modules entry.
+		if (specifier === "@deepseek-ai/cordis" || specifier === "@cordisjs/core") return OpenBuddyCordis;
+		const runtimeAlias = resolveDeepSeekRuntimeModule(specifier);
+		if (runtimeAlias !== undefined) return runtimeAlias;
 		const packageJson = packageJsonByName.get(specifier) ?? await resolvers.resolvePackageJson(specifier);
 		packageJsonByName.set(specifier, packageJson);
 		return import(/* @vite-ignore */ profileArtifactModuleUrl(await resolvers.resolveModule(specifier, packageJson)));
@@ -890,7 +902,7 @@ async function syncDeepSeekCordisRuntime(entries: readonly { id: string; name: s
 	const cordisModule = await importer("@deepseek-ai/cordis");
 	const runtimeEntries: DeepSeekCordisPluginEntry[] = [];
 	for (const entry of entries) {
-		if (resolveDeepSeekModule(entry.name) !== undefined) {
+		if (resolveDeepSeekRuntimeModule(entry.name) !== undefined) {
 			runtimeEntries.push(entry as DeepSeekCordisPluginEntry);
 			continue;
 		}

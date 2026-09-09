@@ -12,14 +12,19 @@
  *     `state.pluginCommitGeneration`, `state.lastPluginCommitTransactionId`,
  *     `state.lastPluginCommitMarker`
  *
- * The loader's `importer` closure carries a lot of knowledge (DeepSeek
- * compatibility modules, openbuddy:core alias, the capability plugin
- * index, profile-relative resolves, deepseek artifact resolver, plugin
- * store logging). We collect all of those in `InitPluginLoaderDeps` so
- * this module stays reverse-dep free.
+ * The loader's `importer` closure carries a lot of knowledge (openbuddy:core
+ * alias, the capability plugin index, profile-relative resolves, profile
+ * artifact resolver, plugin store logging). We collect all of those in
+ * `InitPluginLoaderDeps` so this module stays reverse-dep free.
  *
  * Reverse-dep invariant:
  *   This module imports nothing from agent-host.ts. All deps are passed in.
+ *
+ * Phase L.3: DSH compat-module resolution is gone — PI
+ * `discoverAndLoadExtensions` is the single source of plugin discovery and
+ * the OpenBuddy importer only handles openbuddy-internal aliases
+ * (`openbuddy:core`, capability plugin index, relative + profile-relative
+ * npm specifiers).
  */
 
 import { pathToFileURL } from "node:url";
@@ -34,6 +39,7 @@ import { type AgentHostState } from "../_state-shape";
 import { ElectronHarnessPluginLoader } from "../profile/loader";
 import { artifactPackageJsonByName } from "../profile/paths";
 import { createProfileArtifactResolvers } from "../../profile-artifact-resolution";
+import { resolveDeepSeekRuntimeModule } from "../../../deepseek/deepseek-runtime";
 
 /**
  * Dependencies required to build the plugin loader.
@@ -51,12 +57,9 @@ export interface InitPluginLoaderDeps {
   baseUrl: string;
   /** Emit hooks the loader forwards to the host. */
   emitPluginEvent: (type: string, payload: unknown) => void;
-  /** DS module resolution: returns a module if `specifier` matches a
-   *  DeepSeek-compat alias, otherwise undefined. */
-  resolveDeepSeekModule: (specifier: string) => unknown;
   /** The openbuddy-core plugin (aliased as `openbuddy:core`). */
   openBuddyCorePlugin: unknown;
-  /** Capability plugin index (DeepSeek-aliased capability packages). */
+  /** Capability plugin index (OpenBuddy-builtin capability packages). */
   openBuddyCapabilityPluginIndex: ReadonlyMap<string, unknown>;
 }
 
@@ -77,7 +80,6 @@ export async function initPluginLoader(deps: InitPluginLoaderDeps): Promise<{
     context,
     baseUrl,
     emitPluginEvent,
-    resolveDeepSeekModule,
     openBuddyCorePlugin,
     openBuddyCapabilityPluginIndex,
   } = deps;
@@ -86,11 +88,21 @@ export async function initPluginLoader(deps: InitPluginLoaderDeps): Promise<{
     context,
     baseUrl,
     importer: async (specifier, requestBaseUrl): Promise<unknown> => {
-      const compatibilityModule = resolveDeepSeekModule(specifier);
-      if (compatibilityModule !== undefined) return compatibilityModule;
+      // Phase L.3: DSH compat aliases are gone — `resolveDeepSeekModule`
+      // is no longer queried here. The order of resolution is now:
+      //   1. `openbuddy:core` (the OpenBuddy core alias)
+      //   2. `openBuddyCapabilityPluginIndex` (OpenBuddy builtin capabilities)
+      //   3. `resolveDeepSeekRuntimeModule` (DSH runtime aliases that
+      //      survive Phase L.3 because `deepseek-runtime.ts` is still
+      //      the home of the slim DSH service shims)
+      //   4. relative specifiers (handled by the harness)
+      //   5. profile-relative resolves against `state.profilePackageJson`
+      //   6. fallback dynamic import by specifier (may throw — see below)
       if (specifier === "openbuddy:core") return openBuddyCorePlugin;
       const capability = openBuddyCapabilityPluginIndex.get(specifier);
       if (capability) return capability;
+      const runtimeAlias = resolveDeepSeekRuntimeModule(specifier);
+      if (runtimeAlias !== undefined) return runtimeAlias;
       if (specifier.startsWith(".")) {
         return import(/* @vite-ignore */ new URL(specifier, requestBaseUrl ?? baseUrl).href);
       }
@@ -119,7 +131,22 @@ export async function initPluginLoader(deps: InitPluginLoaderDeps): Promise<{
           }
         }
       }
-      return import(/* @vite-ignore */ specifier);
+      try {
+        return await import(/* @vite-ignore */ specifier);
+      } catch (error) {
+        // Phase L.3: the legacy DSH universal loader (`deepseek-generic.ts`)
+        // is gone, so unresolved `@deepseek-ai/dsh-*` specifiers (e.g. the
+        // ones still listed in `host-runner-entries.ts` from earlier phases)
+        // can no longer resolve. Surface the failure to the renderer
+        // through the host's plugin-event bus and return a no-op plugin so
+        // the loader can mark the entry as loaded without crashing the
+        // whole bootstrap. Real DSH entry pruning lands in Phase L.4.
+        if (specifier.startsWith("@deepseek-ai/")) {
+          emitPluginEvent("plugin/failed", { id: specifier, name: specifier, error: String(error) });
+          return { name: specifier, apply: () => () => undefined };
+        }
+        throw error;
+      }
     },
     logger: (level, message) => {
       // The PluginLoader logs are surfaced as plugin/<level> events so the
