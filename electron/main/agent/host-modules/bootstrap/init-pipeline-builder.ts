@@ -101,8 +101,8 @@ export interface InitPipelineClosures {
   emitPluginEvent: (type: string, payload: unknown) => void;
   emitRendererEvent: (channel: string, payload: unknown) => void;
   piSessionRuntime: unknown;
-  installMicrokernelHost: (deps: InstallHostModuleDeps) => void;
   getMicrokernelHostDeps: () => InstallHostModuleDepsWithDomains;
+  installMicrokernelHost: (deps: InstallHostModuleDeps) => void;
   openBuddyCorePlugin: unknown;
   baseUrl: string;
   reportPiExtensionErrors: (...args: any[]) => any;
