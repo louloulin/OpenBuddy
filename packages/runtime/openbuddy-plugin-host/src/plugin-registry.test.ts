@@ -54,8 +54,11 @@ describe("PluginRegistry", () => {
     await registry.register({ ...manifest("managed"), source: "profile", managed: true });
     await registry.activate("managed");
     await registry.disable("managed");
-    expect(registry.inventory()[0]).toMatchObject({ id: "managed", version: "1.0.0", source: "profile", managed: true, state: "disabled", health: "healthy" });
-    expect(events).toEqual(["register:managed:1:staged", "activate:managed:2:active", "disable:managed:3:disabled"]);
+    expect(registry.inventory()[0]).toMatchObject({ id: "managed", version: "1.0.0", source: "profile", managed: true, state: "disabled", health: "healthy", disabledReason: "user" });
+    await registry.activate("managed");
+    expect(registry.inventory()[0]).toMatchObject({ state: "active" });
+    expect(registry.inventory()[0]).not.toHaveProperty("disabledReason");
+    expect(events).toEqual(["register:managed:1:staged", "activate:managed:2:active", "disable:managed:3:disabled", "activate:managed:4:active"]);
   });
   it("rejects activating two plugins that claim one canonical capability", async () => {
     const registry = new PluginRegistry();

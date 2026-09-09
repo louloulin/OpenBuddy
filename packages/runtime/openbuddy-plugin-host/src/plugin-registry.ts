@@ -208,6 +208,7 @@ export class PluginRegistry {
       entry.state = "active";
       entry.generation = generation;
       delete entry.error;
+      delete entry.manifest.disabledReason;
       return this.transaction("activate", pluginId, generation);
     });
   }
@@ -216,12 +217,13 @@ export class PluginRegistry {
     return this.list().filter((entry) => entry.state === "active" && entry.manifest.dependencies?.some((dependency) => dependency.id === pluginId));
   }
 
-  disable(pluginId: string): Promise<PluginRegistryTransaction> {
+  disable(pluginId: string, reason: NonNullable<PluginRegistryManifest["disabledReason"]> = "user"): Promise<PluginRegistryTransaction> {
     return this.enqueue(async () => {
       const entry = this.require(pluginId);
       const generation = this.gate.advance();
       entry.state = "disabled";
       entry.generation = generation;
+      entry.manifest.disabledReason = reason;
       delete entry.error;
       return this.transaction("disable", pluginId, generation);
     });
