@@ -540,3 +540,21 @@ export function aggregateGoalStats(): {
     totalMaxRounds,
   };
 }
+
+/**
+ * Per-session aggregate stats. Combines `aggregateGoalStats()` with
+ * feedback-session counts. Phase C.3 follow-up — powers a renderer
+ * dashboard that wants both signals in one call.
+ */
+export function sessionAggregateStats(): {
+  goals: ReturnType<typeof aggregateGoalStats>;
+  feedback: { sessionCount: number; entryCount: number };
+} {
+  return {
+    goals: aggregateGoalStats(),
+    feedback: {
+      sessionCount: feedbackSessionCount(),
+      entryCount: feedbackEntryCount(),
+    },
+  };
+}

@@ -23,9 +23,11 @@ import {
   getGoal,
   listAllGoals,
   searchGoalsByObjective,
+  sessionAggregateStats,
   transitionGoal,
   type DshGoalRecord,
 } from "./state";
+import { putFeedbackEntry } from "./state";
 
 interface CapturedCommand {
   name: string;
@@ -444,5 +446,25 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     expect(b.revision).toBe(4);
     expect(b.objective).toBe("Bump test");
     expect(b.roundsStarted).toBe(0); // roundsStarted never changes
+  });
+
+  it("sessionAggregateStats combines goals + feedback signals (Phase C.3 follow-up)", () => {
+    // Empty state.
+    const empty = sessionAggregateStats();
+    expect(empty.goals.total).toBe(0);
+    expect(empty.feedback.sessionCount).toBeGreaterThanOrEqual(0);
+    expect(empty.feedback.entryCount).toBeGreaterThanOrEqual(0);
+
+    // Add a goal in this session + feedback in another session.
+    createGoal({ id: "session-agg-A" }, "current", { objective: "A", maxGoalRounds: 3 });
+    putFeedbackEntry({ messageId: "m1", rating: "ok" }, "session-agg-B");
+    putFeedbackEntry({ messageId: "m2", rating: "good" }, "session-agg-B");
+
+    const populated = sessionAggregateStats();
+    expect(populated.goals.total).toBeGreaterThanOrEqual(1);
+    // Feedback from session-agg-B is counted regardless of which
+    // session the goal lives in — the aggregation is global.
+    expect(populated.feedback.entryCount).toBeGreaterThanOrEqual(2);
+    expect(populated.feedback.sessionCount).toBeGreaterThanOrEqual(1);
   });
 });
