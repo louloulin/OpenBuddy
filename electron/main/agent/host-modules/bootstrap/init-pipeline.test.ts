@@ -99,7 +99,6 @@ function buildFakeDeps(): InitPipelineDeps {
     killTask: vi.fn(async () => undefined),
     remoteServiceContext: vi.fn(() => ({})),
     transitionDshGoal: vi.fn(async () => undefined),
-    resolveDeepSeekModule: undefined,
     openBuddyCapabilityPluginIndex: undefined,
     baseUrl: "file:///fake/base",
     describeCompatibilityAdapterCommandsMarkdown: () => "",

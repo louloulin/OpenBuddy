@@ -89,7 +89,6 @@ import { createOpenBuddyRpcUiContext } from "../../pi-rpc-ui-context";
 import { emitPiSessionEvent } from "../../pi-event-bridge";
 import { remoteServiceContext, transitionDshGoal, listDshFileReferences } from "../workbench-scope";
 import { eventNamespace, canonicalEventNamespace } from "../plugin-event-bus";
-import { resolveDeepSeekModule } from "../../../deepseek/deepseek-compat";
 import { openBuddyCapabilityPluginIndex } from "@openbuddy/bundle-base";
 import * as piResources from "../../pi-resources";
 
@@ -176,7 +175,6 @@ export function buildInitPipelineDeps(
     killTask: killTaskImpl,
     remoteServiceContext,
     transitionDshGoal,
-    resolveDeepSeekModule,
     openBuddyCapabilityPluginIndex,
     baseUrl: closures.baseUrl,
     describeCompatibilityAdapterCommandsMarkdown,
