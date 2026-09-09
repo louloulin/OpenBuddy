@@ -1335,3 +1335,14 @@ export {
   type SerializedSlotTrack,
   type SerializedTrack,
 } from "./openbuddy-plugin-manifest";
+
+// Phase D.3 — Skills loading helpers. Re-export from ./skills
+// so callers can import from "@openbuddy/plugin-host" without
+// touching the underlying pi-coding-agent package.
+export {
+  loadSkills,
+  loadSkillsFromDir,
+  formatForAgentPrompt,
+  type LoadSkillsResult,
+  type Skill,
+} from "./skills";
