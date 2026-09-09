@@ -83,7 +83,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     __resetDshCoreStateForTests();
   });
 
-  it("registers 13 goals.* commands on init (Phase C.2: + goals.list, Phase C.3: + goals.search + goals.advance-rounds, Phase C.3 follow-up: + goals.stats + goals.bump-revision)", () => {
+  it("registers 14 goals.* commands on init (Phase C.2: + goals.list, Phase C.3: + goals.search + goals.advance-rounds, Phase C.3 follow-up: + goals.stats + goals.bump-revision + goals.stats-combined)", () => {
     const factory = createDshGoalsExtension();
     const { api, commands } = buildMockApi("session-1");
     factory(api);
@@ -100,6 +100,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     expect(commands.has("goals.advance-rounds")).toBe(true);
     expect(commands.has("goals.stats")).toBe(true);
     expect(commands.has("goals.bump-revision")).toBe(true);
+    expect(commands.has("goals.stats-combined")).toBe(true);
   });
 
   it("goals.create returns a ref and persists via the shared state map", async () => {
@@ -353,8 +354,8 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     const advanced = (await commands.get("goals.advance-rounds")!.handler(created.ref)) as DshGoalRecord;
     expect(advanced.roundsStarted).toBe(1);
 
-    // Confirm commands register the same 12 commands (11 + goals.stats).
-    expect(commands.size).toBe(13);
+    // Confirm commands register the same 14 commands (12 + goals.stats + goals.stats-combined).
+    expect(commands.size).toBe(14);
   });
 
   it("B.3 step 3 — multiple ForSession factories land goals in different sessions (no cross-talk)", async () => {
@@ -493,5 +494,26 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     const result = purgeSession({ id: "never-existed" }, "current");
     expect(result.goalsCleared).toBe(0);
     expect(result.feedbackEntriesCleared).toBe(0);
+  });
+
+
+  it("goals.stats-combined returns goals + feedback aggregates in one call (Phase C.3 follow-up)", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-combined");
+    factory(api);
+
+    // Empty state: zeros everywhere.
+    const empty = (await commands.get("goals.stats-combined")!.handler({})) as { goals: { total: number }; feedback: { sessionCount: number; entryCount: number } };
+    expect(empty.goals.total).toBe(0);
+    expect(empty.feedback.sessionCount).toBeGreaterThanOrEqual(0);
+    expect(empty.feedback.entryCount).toBeGreaterThanOrEqual(0);
+
+    // Populated state: create a goal + put a feedback entry.
+    commands.get("goals.create")!.handler({ objective: "combined", maxGoalRounds: 2 });
+    putFeedbackEntry({ messageId: "m1", rating: "ok" }, "session-combined");
+
+    const populated = (await commands.get("goals.stats-combined")!.handler({})) as { goals: { total: number }; feedback: { sessionCount: number; entryCount: number } };
+    expect(populated.goals.total).toBeGreaterThanOrEqual(1);
+    expect(populated.feedback.entryCount).toBeGreaterThanOrEqual(1);
   });
 });

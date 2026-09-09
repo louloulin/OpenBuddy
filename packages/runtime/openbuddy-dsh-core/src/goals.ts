@@ -1,5 +1,5 @@
 /**
- * @openbuddy/dsh-core/goals — PI-native goal state machine extension.
+ * @openbuddy/dsh-core/goals — PI ExtensionFactory for the goals state machine.
  *
  * Phase B.3 step 2b of docs/OPENBUDDY_PI_NATIVE_PLAN.md (v13 §33.2):
  *   Extracts the per-session goal state machine (formerly in
@@ -17,7 +17,7 @@
  *   `default export: (api: ExtensionAPI) => void | Promise<void>`
  *
  *   PI's loader calls the factory exactly once with the live
- *   ExtensionAPI. We register 7 slash commands on the API. State
+ *   ExtensionAPI. We register 11 slash commands on the API. State
  *   itself is module-scope (in state.ts) — no per-extension closure
  *   capture — so commands registered here see exactly the same data
  *   as the Cordis shim and the per-call `state.dshCoreExtensionResult`
@@ -38,8 +38,34 @@ import {
   advanceGoalRounds,
   bumpGoalRevision,
   aggregateGoalStats,
+  sessionAggregateStats,
   sessionKey,
 } from "./state";
+
+export type { DshGoalRecord } from "./state";
+
+/**
+ * Phase B.3 step 2b — PI-native goal state machine extension.
+ *
+ * Registers 11 slash commands (`goals.get/create/edit/pause/resume/
+ * complete/blocked/clear/list/search/advance-rounds/bump-revision`)
+ * plus 2 statistics commands (`goals.stats`,
+ * `goals.stats-combined`) on the live PI ExtensionAPI. Sessions are
+ * keyed off the carrier exposed through `ctx.sessionFallbackKey` if
+ * available (PI will set this once we wire session binding in B.3
+ * step 3); otherwise we fall back to `"current"` so the live
+ * `discoverAndLoadExtensions()` path still works.
+ */
+export default function createDshGoalsExtension(): ExtensionFactory {
+  return (api: ExtensionAPI): void => {
+    const carrier: unknown = (api as unknown as {
+      context?: { get?: (name: string) => unknown };
+    }).context?.get?.("sessionFallbackKey");
+    const fallback = typeof carrier === "string" ? carrier : "current";
+
+    registerGoalCommands(api, carrier, fallback);
+  };
+}
 
 /** B.3 step 3 — explicit session-bound factory. Returns an
  *  ExtensionFactory pre-bound to a specific session ID. The implicit
@@ -59,36 +85,13 @@ export function createDshGoalsExtensionForSession(sessionId: string): ExtensionF
   };
 }
 
-export type { DshGoalRecord } from "./state";
-
-/**
- * Phase B.3 step 2b — PI-native goal state machine extension.
- *
- * Registers 7 slash commands (`goals.create`, `goals.edit`,
- * `goals.pause`, `goals.resume`, `goals.complete`, `goals.blocked`,
- * `goals.clear`) plus `goals.get` for read access. Sessions are
- * keyed off the carrier exposed through `ctx.sessionFallbackKey` if
- * available (PI will set this once we wire session binding in B.3
- * step 3); otherwise we fall back to `"current"` so the live
- * `discoverAndLoadExtensions()` path still works.
- */
-export default function createDshGoalsExtension(): ExtensionFactory {
-  return (api: ExtensionAPI): void => {
-    const carrier: unknown = (api as unknown as {
-      context?: { get?: (name: string) => unknown };
-    }).context?.get?.("sessionFallbackKey");
-    const fallback = typeof carrier === "string" ? carrier : "current";
-    registerGoalCommands(api, carrier, fallback);
-  };
-}
-
 /**
  * B.3 step 3 — shared registration helper. Both the implicit
- * `createDshGoalsExtension()` (session-keyed via api.context) and
- * the explicit `createDshGoalsExtensionForSession(sessionId)` call
- * this helper. Splitting the registration out of the factory lets
- * the two entry points share the same command list without
- * duplicating the 11 registerCommand calls.
+ * createDshGoalsExtension() (session-keyed via api.context) and the
+ * explicit createDshGoalsExtensionForSession(sessionId) call this
+ * helper. Splitting the registration out of the factory lets the two
+ * entry points share the same command list without duplicating the
+ * 12 registerCommand calls.
  */
 function registerGoalCommands(api: ExtensionAPI, carrier: unknown, fallback: string): void {
   const commands = api as unknown as {
@@ -107,7 +110,7 @@ function registerGoalCommands(api: ExtensionAPI, carrier: unknown, fallback: str
 
   commands.registerCommand?.({
     name: "goals.list",
-    description: "List all active DSH goals across every session, optionally filtered by phase.",
+    description: "List all DSH goals across every session, optionally filtered by phase.",
     handler: async (args) => {
       const typed = (args ?? {}) as { phase?: "active" | "paused" | "blocked" | "complete" };
       return listAllGoals(typed.phase ? { phase: typed.phase } : undefined);
@@ -121,30 +124,6 @@ function registerGoalCommands(api: ExtensionAPI, carrier: unknown, fallback: str
       const typed = (args ?? {}) as { query?: string; phase?: "active" | "paused" | "blocked" | "complete" };
       const query = typeof typed.query === "string" ? typed.query : "";
       return searchGoalsByObjective(query, typed.phase ? { phase: typed.phase } : undefined);
-    },
-  });
-
-  commands.registerCommand?.({
-    name: "goals.advance-rounds",
-    description: "Increment the goal's roundsStarted counter; rejects on revision conflict or complete phase (Phase C.3).",
-    handler: async (args) => {
-      const typed = (args ?? {}) as { id?: string; revision?: number };
-      return advanceGoalRounds(carrier, fallback, typed);
-    },
-  });
-
-  commands.registerCommand?.({
-    name: "goals.stats",
-    description: "Return aggregate goal stats across every session (Phase C.3 follow-up).",
-    handler: async () => aggregateGoalStats(),
-  });
-
-  commands.registerCommand?.({
-    name: "goals.bump-revision",
-    description: "Bump the goal's revision without changing state (Phase C.3 follow-up). Useful for optimistic-concurrency conflict detection.",
-    handler: async (args) => {
-      const typed = (args ?? {}) as { id?: string; revision?: number };
-      return bumpGoalRevision(carrier, fallback, typed);
     },
   });
 
@@ -191,5 +170,35 @@ function registerGoalCommands(api: ExtensionAPI, carrier: unknown, fallback: str
     name: "goals.clear",
     description: "Clear a DSH goal from the active session.",
     handler: async (args) => clearGoal(carrier, fallback, (args ?? {}) as { id?: string; revision?: number }),
+  });
+
+  commands.registerCommand?.({
+    name: "goals.advance-rounds",
+    description: "Increment the goal's roundsStarted counter; rejects on revision conflict or complete phase (Phase C.3).",
+    handler: async (args) => {
+      const typed = (args ?? {}) as { id?: string; revision?: number };
+      return advanceGoalRounds(carrier, fallback, typed);
+    },
+  });
+
+  commands.registerCommand?.({
+    name: "goals.bump-revision",
+    description: "Bump the goal's revision without changing state (Phase C.3 follow-up). Useful for optimistic-concurrency conflict detection.",
+    handler: async (args) => {
+      const typed = (args ?? {}) as { id?: string; revision?: number };
+      return bumpGoalRevision(carrier, fallback, typed);
+    },
+  });
+
+  commands.registerCommand?.({
+    name: "goals.stats",
+    description: "Return aggregate goal stats across every session (Phase C.3 follow-up).",
+    handler: async () => aggregateGoalStats(),
+  });
+
+  commands.registerCommand?.({
+    name: "goals.stats-combined",
+    description: "Return combined goals + feedback aggregate stats (Phase C.3 follow-up). One call instead of two.",
+    handler: async () => sessionAggregateStats(),
   });
 }
