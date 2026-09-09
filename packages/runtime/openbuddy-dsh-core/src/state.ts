@@ -558,3 +558,30 @@ export function sessionAggregateStats(): {
     },
   };
 }
+
+/**
+ * Clear every goal + feedback entry for a single session. Phase
+ * C.3 follow-up — useful when the renderer wants a "reset session"
+ * affordance (e.g. user signed out, server switched).
+ *
+ * Returns a summary of what was cleared so the renderer can show
+ * a confirmation toast with concrete counts.
+ */
+export function purgeSession(carrier: unknown, fallback: string): {
+  goalsCleared: number;
+  feedbackEntriesCleared: number;
+} {
+  const key = sessionKey(carrier, fallback);
+  let goalsCleared = 0;
+  let feedbackEntriesCleared = 0;
+
+  if (dshGoalState.delete(key)) goalsCleared = 1;
+
+  const entries = dshFeedbackState.get(key);
+  if (entries) {
+    feedbackEntriesCleared = entries.size;
+    dshFeedbackState.delete(key);
+  }
+
+  return { goalsCleared, feedbackEntriesCleared };
+}

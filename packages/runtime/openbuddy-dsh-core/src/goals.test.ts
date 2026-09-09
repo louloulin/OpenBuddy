@@ -22,6 +22,7 @@ import {
   createGoal,
   getGoal,
   listAllGoals,
+  purgeSession,
   searchGoalsByObjective,
   sessionAggregateStats,
   transitionGoal,
@@ -466,5 +467,31 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     // session the goal lives in — the aggregation is global.
     expect(populated.feedback.entryCount).toBeGreaterThanOrEqual(2);
     expect(populated.feedback.sessionCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it("purgeSession clears the goal + feedback entries for a single session (Phase C.3 follow-up)", () => {
+    // Session X: 1 goal + 2 feedback entries.
+    createGoal({ id: "session-purge-X" }, "current", { objective: "X", maxGoalRounds: 3 });
+    putFeedbackEntry({ messageId: "x1", rating: "ok" }, "session-purge-X");
+    putFeedbackEntry({ messageId: "x2", rating: "good" }, "session-purge-X");
+
+    // Session Y: 1 goal + 1 feedback entry (unrelated — must survive).
+    createGoal({ id: "session-purge-Y" }, "current", { objective: "Y", maxGoalRounds: 3 });
+    putFeedbackEntry({ messageId: "y1", rating: "ok" }, "session-purge-Y");
+
+    const result = purgeSession({ id: "session-purge-X" }, "current");
+    expect(result.goalsCleared).toBe(1);
+    expect(result.feedbackEntriesCleared).toBe(2);
+
+    // Session X is gone.
+    expect(getGoal({ id: "session-purge-X" }, "current")).toBeUndefined();
+    // Session Y intact.
+    expect(getGoal({ id: "session-purge-Y" }, "current")?.objective).toBe("Y");
+  });
+
+  it("purgeSession on a fresh session is a no-op (Phase C.3 follow-up)", () => {
+    const result = purgeSession({ id: "never-existed" }, "current");
+    expect(result.goalsCleared).toBe(0);
+    expect(result.feedbackEntriesCleared).toBe(0);
   });
 });
