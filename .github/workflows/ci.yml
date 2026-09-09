@@ -40,10 +40,9 @@ jobs:
       - name: Sync moon workspace
         run: pnpm moon:sync
 
-      - name: Typecheck all 32 projects
-        run: |
-          pnpm typecheck
-          pnpm workspace:typecheck
+      - name: Agent host dependency boundaries
+        run: pnpm verify:agent-host-boundaries
+
 
   test:
     name: Unit Tests

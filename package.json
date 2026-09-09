@@ -43,6 +43,7 @@
     "perf:ipc": "node scripts/perf/ipc-latency.mjs",
     "perf": "node scripts/perf/streaming-bench.mjs && node scripts/perf/ipc-latency.mjs",
     "perf:main-chunks": "node scripts/perf/check-main-chunks.mjs",
+    "verify:agent-host-boundaries": "node scripts/architecture/check-agent-host-boundaries.mjs",
     "verify:plan": "node scripts/verify-plan.mjs",
     "verify:plan:tests": "node scripts/verify-plan.mjs --run-tsc --run-vitest",
     "eval:email-external": "node scripts/electron/launch-harness.mjs -- node evals/node/run_external_email_capability.mjs",
