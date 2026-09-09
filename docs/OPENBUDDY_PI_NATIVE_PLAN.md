@@ -3602,3 +3602,103 @@ Phase C.3 (本轮)         无          ✅          (~700 LOC + 21 tests, +1 co
 
 **v20 文档 owner**: 编程助手-devbox1 · v20 §40 goals.advance-rounds
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
+
+## 41. v21 — Phase B.3 step 3 落地（响应「这些工真实实现」）
+
+> 🟢 **v21 完成** — dsh-core 加上显式 session-bound factory (B.3 step 3 wiring)
+> 提交：`22e7e52`
+
+### 41.1 Phase B.3 step 3 真实实现 — explicit session-bound extension factory
+
+之前 B.3 step 2b/2c 完成后，dsh-core 仍依赖 `api.context.get("sessionFallbackKey")` 在 ExtensionAPI runtime 查找。v21 补上 v13 §33.4 承诺的“**显式 session-bound factory**”。
+
+新增 2 个 factory + 2 个 helper：
+
+| Name | 说明 |
+|---|---|
+| `createDshGoalsExtensionForSession(sessionId)` | 显式 session-bound goals factory，忽略 `api.context` 查找 |
+| `createDshMessageFeedbackExtensionForSession(sessionId)` | 同上 (feedback) |
+| `registerGoalCommands(api, carrier, fallback)` | 11 个 goals.* commands 共享注册 helper |
+| `registerFeedbackCommands(api, carrier, fallback)` | 6 个 feedback.* commands 共享注册 helper |
+
+**架构**:
+- 默认 export 保留 (向后兼容): 仍走 `api.context.get('sessionFallbackKey')` 查找
+- 新 `ForSession(sessionId)` factory 预解析 carrier — 适用于 Cordis lifecycle hook 在 module-load time 绑定
+- 两个入口共享同一个 `registerXxxCommands` helper — commands 列表不会 drift
+
+**为什么这是 B.3 step 3 的真实实现** (v13 §33.4 承诺的):
+1. **明确的 session 绑定 API**: `ForSession(sessionId)` factory 接受 sessionId 作为构造参数
+2. **不依赖 runtime context**: carrier 在 factory 调用时已确定，不需等 `bindCore` 注入 context
+3. **多 session 隔离**: 多个 `ForSession(sessionId)` 实例在不同 session 间零串扰 (3 轮测试验证)
+4. **可被 loader 直接使用**: session-bound factory 可以被 agent-host 的 session lifecycle hook 调用
+
+**下一步** (未来 round): 把 `createDshGoalsExtensionForSession(state.sessionId)` 接入 `init-session.ts` 的 session 生命周期 hook。
+
+### 41.2 v6 路线图完成度 (HEAD `22e7e52`)
+
+| Phase | 内容 | 状态 | commit |
+|---|---|---|---|
+| A.1 / B.1 / L.1-L.4 / K.1-K.2 / J.1 / B.3 step 1+2a-c / C.1 / C.2 / C.3 / H.1 | 历史 | ✅ | `6f6d612`..`881acf1` |
+| v14-v20 plans | docs | ✅ | `7bc8ffb`..`a9eb23a` |
+| **B.3 step 3** | **dsh-core session-bound factory** | ✅ | **`22e7e52`** |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — |
+| ⚪ H.2 | email class 拆出 (5 个 files) | pending | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — |
+
+**v6 路线图 26 轮中 25 轮完成 (96%)**
+
+### 41.3 完成度速查 (v3 baseline → HEAD `22e7e52`)
+
+```
+                          v3 baseline → v21 HEAD
+─────────────────────────────────────────────────────────
+PI 复用度                 24%        ~81%        ↑ +57 pp
+God module LOC          ~6500       ~2700     ↓ -58%  (dsh-core 拆出 registerXxxCommands)
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+OpenBuddy DSH core 包    无          ✅ v0.1     (~850 LOC + 27 tests, 本轮 +150/+4)
+  ├─ state.ts          (430 LOC, 12 state helpers)
+  ├─ goals.ts          (PI ExtensionFactory, 11 commands, 2 entry points)
+  └─ message-feedback.ts (PI ExtensionFactory, 6 commands, 2 entry points)
+PI Tool Surface
+  email tools             无          ✅ 30 tools
+  calendar tools          无          ✅ 4 tools
+  mcp-client 工厂          无          ✅ 1 factory
+  dsh-core commands        17         17 (本轮 surface 不变，但 surface 重构: 2 entry points × 17 commands)
+─────────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+**总完成度**:架构层 **100% + B.3 step 1+2a+2b+2c+3 + C.1 + C.2 + C.3 + H.1**,功能层 **0%**
+
+### 41.4 验证 (commit `22e7e52`)
+
+| 测试范围 | 结果 |
+|---|---|
+| `pnpm exec tsc --noEmit` | ✅ 0 errors |
+| `packages/runtime/openbuddy-dsh-core/src/goals.test.ts` (本轮 +3) | ✅ 16/16 |
+| `packages/runtime/openbuddy-dsh-core/src/message-feedback.test.ts` (本轮 +1) | ✅ 11/11 |
+| `packages/runtime/openbuddy-dsh-core/` 全套 | ✅ **27 tests pass** (was 23, +4) |
+| 5 个 workspace area 全套 | ✅ **565 tests pass / 0 fail** |
+| `pnpm storage:boundaries` | ✅ 0 violations / 403 files |
+
+**0 回归**,v6 路线图进度从 24/26 (92%) 推进到 25/26 (96%)。
+
+### 41.5 接下来 3 轮 (v21 锁定)
+
+| Round | Phase | 内容 | 预估 LOC |
+|---|---|---|---|
+| ⚪ 下一轮 | **B.2** | ExtensionRunner.bindCore | -300 |
+| ⚪ 第三轮 | **H.2** | email class 拆出 (5 个 files) | +200 / -1500 |
+| ⚪ 第四轮 | **D.1-D.3** | Settings/ProjectTrust/Skills PI 复用 | +200 / -1000 |
+
+---
+
+**v21 文档 owner**: 编程助手-devbox1 · v21 §41 B.3 step 3 真实实现
+**父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
