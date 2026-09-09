@@ -22,6 +22,7 @@ import { setupProfileOptions } from "./profile-options-setup";
 import { initProfile } from "./init-profile";
 import { initPluginLoader } from "./init-plugin-loader";
 import { initDeepSeek } from "./init-deepseek";
+import { initPiUserExtensions, type PiUserExtensionLoadResult } from "./init-pi-user-extensions";
 import { computeActiveAdapterIds } from "./compute-active-adapter-ids";
 import { injectSystemPromptSections } from "./inject-system-prompt-sections";
 import { initSession } from "./init-session";
@@ -144,6 +145,14 @@ export function buildInitPipelineDeps(
     initProfile,
     initPluginLoader,
     initDeepSeek,
+    /**
+     * Phase B.3 step 1 — PI-native user-extension loader. Runs after
+     * initDeepSeek so DSH core packages (HarnessPluginLoader) are already
+     * mounted. Result stored in state.userExtensionResult for renderer
+     * diagnostics.
+     */
+    initPiUserExtensions: (deps: { state: AgentHostState; cwd: string; emitPluginEvent: (type: string, payload: unknown) => void }): Promise<PiUserExtensionLoadResult> =>
+      initPiUserExtensions(deps),
     computeActiveAdapterIds,
     injectSystemPromptSections,
     initSession,

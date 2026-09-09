@@ -64,6 +64,16 @@ function buildFakeDeps(): InitPipelineDeps {
     initDeepSeek: vi.fn(async () => {
       callOrder.push("initDeepSeek");
     }),
+    /**
+     * Phase B.3 step 1 — PI-native user extension loader stub. The real
+     * implementation lives in init-pi-user-extensions.ts and is wired in
+     * by buildInitPipelineDeps (production); this test supplies a stub
+     * that pushes a marker so pipeline ordering assertions still pass.
+     */
+    initPiUserExtensions: vi.fn(async () => {
+      callOrder.push("initPiUserExtensions");
+      return { loaded: 0, failed: 0, failedIds: [] };
+    }),
     computeActiveAdapterIds: vi.fn(() => []),
     injectSystemPromptSections: vi.fn(async () => {
       callOrder.push("injectSystemPromptSections");

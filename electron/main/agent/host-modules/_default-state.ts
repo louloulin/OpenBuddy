@@ -91,6 +91,7 @@ export function createDefaultAgentHostState(): AgentHostState {
     profileArtifactGeneration: 0,
     activePluginTransactions: new Map(),
     rendererPluginManifestCache: null,
+    userExtensionResult: null,
     profileOptions: null,
     profileBundle: null,
     activePluginProfile: null,

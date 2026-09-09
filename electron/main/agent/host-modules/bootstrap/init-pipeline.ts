@@ -65,6 +65,15 @@ export interface InitPipelineDeps {
   initProfile: (deps: unknown) => Promise<{ profileBundle: unknown; profilePackageJson: string }>;
   initPluginLoader: (deps: unknown) => Promise<{ loader: { list(): unknown[] }; pluginState: unknown }>;
   initDeepSeek: (deps: unknown) => Promise<void>;
+  /**
+   * Phase B.3 — PI-native user extension loader. Runs after initDeepSeek
+   * so DSH core packages (HarnessPluginLoader) are already mounted.
+   */
+  initPiUserExtensions: (deps: unknown) => Promise<{
+    loaded: number;
+    failed: number;
+    failedIds: string[];
+  }>;
   computeActiveAdapterIds: (deps: { state: AgentHostState }) => string[];
   injectSystemPromptSections: (deps: unknown) => Promise<void>;
   initSession: (deps: unknown) => Promise<void>;
@@ -242,6 +251,17 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
 
   // Stage 7: Compute active adapter IDs + inject system prompt + init session.
   console.log("[openbuddy-diag] init-pipeline stage=6.5 DONE");
+
+  // Stage 6.6: Phase B.3 — load user PI plugins via PI's
+  // `loadExtensions()` API. Runs after initDeepSeek so DSH core is up.
+  // Result stored in state.userExtensionResult for renderer diagnostics.
+  console.log("[openbuddy-diag] init-pipeline stage=6.6 ENTER (initPiUserExtensions)");
+  deps.state.userExtensionResult = await deps.initPiUserExtensions({
+    state: deps.state, cwd: deps.cwd(),
+    emitPluginEvent: deps.emitPluginEvent,
+  });
+  console.log("[openbuddy-diag] init-pipeline stage=6.6 DONE");
+
   console.log("[openbuddy-diag] init-pipeline stage=7 ENTER (computeActiveAdapterIds + initSession)");
   const activeAdapterIds = deps.computeActiveAdapterIds({ state: deps.state });
   await deps.injectSystemPromptSections({

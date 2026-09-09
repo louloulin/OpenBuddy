@@ -207,6 +207,16 @@ export interface AgentHostState {
   profileOptions: OpenBuddyProfileOptions | null;
   profileBundle: PluginProfile | null;
   activePluginProfile: PluginProfile | null;
+  /**
+   * Phase B.3 — PI-native user extension load summary.
+   * Set by `initPiUserExtensions` after `loadExtensions(state.profilePiPackagePaths, cwd)`
+   * returns. Renderer reads this to show "loaded N / failed M" diagnostics.
+   */
+  userExtensionResult: {
+    loaded: number;
+    failed: number;
+    failedIds: string[];
+  } | null;
   profilePackageJson: string | undefined;
   profilePackagePaths: string[];
   profilePiExtensions: readonly OpenBuddyPiExtensionSpec[];
