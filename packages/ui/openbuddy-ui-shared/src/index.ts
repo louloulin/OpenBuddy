@@ -22,3 +22,8 @@ export * from "./home-scenes";
 export * from "./project-picker";
 export * from "./project-tabs";
 export * from "./use-horizontal-scroll";
+// Phase E.3 round 2 — frontmatter React hook for SKILL.md-style
+// markdown blobs. Used by SkillDetailModal and any other ui-* package
+// that needs to render a frontmatter header + body without re-doing
+// the IPC + useState/useEffect ceremony.
+export * from "./use-frontmatter";

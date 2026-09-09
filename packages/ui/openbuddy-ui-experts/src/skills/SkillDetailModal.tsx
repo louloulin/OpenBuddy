@@ -8,7 +8,8 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import type { SkillItem, SkillInfo } from "@openbuddy/shared-types";
-import { skillsCatalogReadSkill, skillsAdd } from "@/lib/agent/pi-client";
+import { parseSkillFrontmatter, skillsCatalogReadSkill, skillsAdd } from "@/lib/agent/pi-client";
+import { useFrontmatter } from "@openbuddy/ui-shared";
 import { Markdown } from "@openbuddy/ui-markdown";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 import { LetterAvatar } from "../shared/LetterAvatar";
@@ -44,7 +45,13 @@ export function SkillDetailModal({ skill, installed = [], onClose, onInstalled, 
   }, [skill.sourceDir, root]);
 
   // Parse frontmatter + body from the raw markdown.
-  const { meta, body } = useMemo(() => parseFrontmatter(rawMd), [rawMd]);
+  // Phase E.3 round 2 — delegate to the shared `useFrontmatter` hook
+  // (lives in `@openbuddy/ui-shared`) so any ui-* package can render
+  // SKILL.md-style frontmatter without re-implementing the IPC plumbing.
+  // The hook wraps `parseSkillFrontmatter` (pi-bridge IPC) and owns the
+  // useState/useEffect/race-condition cleanup ceremony. See
+  // docs/OPENBUDDY_PI_NATIVE_PLAN.md §E.3 for the IPC rationale.
+  const { meta, body } = useFrontmatter(rawMd, { parse: parseSkillFrontmatter });
 
   // Is this skill already installed in pi?
   const installedEntry = useMemo(
@@ -157,41 +164,4 @@ export function SkillDetailModal({ skill, installed = [], onClose, onInstalled, 
       </div>
     </div>
   );
-}
-
-/** Split raw SKILL.md into a frontmatter meta map + body markdown. */
-function parseFrontmatter(raw: string): { meta: Record<string, string>; body: string } {
-  const t = raw.trimStart();
-  if (!t.startsWith("---")) return { meta: {}, body: raw };
-  const afterOpen = t.slice(3);
-  const nl = afterOpen.indexOf("\n");
-  if (nl === -1) return { meta: {}, body: raw };
-  const rest = afterOpen.slice(nl + 1);
-  const closeIdx = rest.search(/\n---\s*(\n|$)/);
-  if (closeIdx === -1) return { meta: {}, body: raw };
-  const fm = rest.slice(0, closeIdx);
-  const bodyStart = rest.indexOf("\n", closeIdx + 1);
-  const body = bodyStart >= 0 ? rest.slice(bodyStart + 1).trim() : "";
-
-  const meta: Record<string, string> = {};
-  let currentKey = "";
-  for (const line of fm.split("\n")) {
-    // Top-level key: value
-    const m = line.match(/^([a-zA-Z0-9_-]+):\s*(.*)$/);
-    if (m && !line.startsWith(" ")) {
-      currentKey = m[1];
-      let v = m[2].trim();
-      // Strip quotes.
-      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-        v = v.slice(1, -1);
-      }
-      if (v && v !== "|" && v !== "|-" && v !== ">" && v !== ">-") {
-        meta[currentKey] = v;
-      }
-    } else if (currentKey && line.startsWith(" ") && meta[currentKey] !== undefined) {
-      // Continuation of a plain multi-line value — append.
-      meta[currentKey] += " " + line.trim();
-    }
-  }
-  return { meta, body };
 }

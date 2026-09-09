@@ -21,6 +21,32 @@ export type SlotScope = "root" | "session-maybe" | "session";
 /** SlotMap — owners extend via `declare module "@openbuddy/ui-slots"`. */
 export interface SlotMap {}
 
+/**
+ * E.1 — PI ExtensionUIContext slot keys. Phase E.1 of
+ * docs/OPENBUDDY_PI_NATIVE_PLAN.md (v3 §E.1): align ui-slots
+ * with PI ExtensionRunner's UI hooks. The renderer uses these
+ * slot keys to forward ExtensionRunner UI events to the OpenBuddy
+ * slot system, so plugin-host widgets can react to:
+ *
+ *   - `pi-ui-notify`           — notification toasts (e.g. model
+ *                                errors, plugin info messages)
+ *   - `pi-ui-select`           — chooser dialogs (multi-option picker)
+ *   - `pi-ui-confirm`          — yes/no confirmation prompts
+ *   - `pi-ui-set-status`       — status-bar updates (model name,
+ *                                context, tool activity)
+ *   - `pi-ui-set-working-indicator` — busy spinner toggle
+ *
+ * Each slot key is optional; consumers declare the ones they
+ * handle via `declare module "@openbuddy/ui-slots"` in their own
+ * ui-* package (mirroring how custom slots are added today).
+ */
+export type PiExtensionUISlotKey =
+  | "pi-ui-notify"
+  | "pi-ui-select"
+  | "pi-ui-confirm"
+  | "pi-ui-set-status"
+  | "pi-ui-set-working-indicator";
+
 /** LocaleNamespaceMap — mirrors SlotMap for i18n dictionaries. */
 export interface LocaleNamespaceMap {
   common: string;

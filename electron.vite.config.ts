@@ -83,6 +83,9 @@ const workspacePackageAliases = [
   { find: "@openbuddy/capability-plan",            replacement: resolve(repoRoot, "packages/capability/openbuddy-plan/src/index.ts") },
   { find: "@openbuddy/capability-authorization",   replacement: resolve(repoRoot, "packages/capability/openbuddy-authorization/src/index.ts") },
   { find: "@openbuddy/capability-mcp-client",       replacement: resolve(repoRoot, "packages/capability/openbuddy-mcp-client/src/index.ts") },
+  // Phase I.2 — calendar PI extension (electron/main/agent/extensions/calendar-pi-extension.ts)
+  // needs the live calendar handlers + createCalendarToolDefinitions factory.
+  { find: "@openbuddy/capability-calendar",         replacement: resolve(repoRoot, "packages/capability/openbuddy-calendar/src/index.ts") },
   { find: "@openbuddy/auth-permission",            replacement: resolve(repoRoot, "packages/auth/openbuddy-permission/src/index.ts") },
   { find: "@openbuddy/auth-casdoor",               replacement: resolve(repoRoot, "packages/auth/openbuddy-casdoor/src/index.ts") },
   { find: "@openbuddy/shared-types",               replacement: resolve(repoRoot, "packages/shared/openbuddy-types/src/index.ts") },
@@ -198,7 +201,126 @@ export default defineConfig({
           // workspace TypeScript dependencies are still resolved through
           // the aliases above and compiled by Rollup, so emitted chunks do
           // not depend on Node loading `.ts` files at runtime.
-          inlineDynamicImports: false,
+          //
+          // Phase F.1 — split the heaviest workspace packages into
+          // dedicated chunks so cold start only loads the entry. We use
+          // Rolldown's native `codeSplitting.groups[].test` regex form
+          // (NOT the `output.manualChunks` function form) because
+          // rolldown@1.2.7 has a bindingify bug where a function-form
+          // `manualChunks` is captured as `undefined` and crashes with
+          // `TypeError: manualChunks is not a function`. The regex form
+          // matches module ids by file path and works under both
+          // Vite 5 (Rollup) and Vite 8 (Rolldown). See
+          // docs/OPENBUDDY_PI_NATIVE_PLAN.md §F.1 for the perf rationale.
+          codeSplitting: {
+            groups: [
+              {
+                name: "capability-email",
+                test: /packages\/capability\/openbuddy-email\/src\//,
+                priority: 30,
+              },
+              {
+                name: "capability-calendar",
+                test: /packages\/capability\/openbuddy-calendar\/src\//,
+                priority: 30,
+              },
+              {
+                name: "capability-mcp-client",
+                test: /packages\/capability\/openbuddy-mcp-client\/src\//,
+                priority: 30,
+              },
+              {
+                name: "capability-authorization",
+                test: /packages\/capability\/openbuddy-authorization\/src\//,
+                priority: 30,
+              },
+              {
+                name: "collaboration-coordinator",
+                test: /packages\/collaboration\/openbuddy-coordinator\/src\//,
+                priority: 30,
+              },
+              {
+                name: "collaboration-policy",
+                test: /packages\/collaboration\/openbuddy-policy\/src\//,
+                priority: 30,
+              },
+              {
+                name: "collaboration-task",
+                test: /packages\/collaboration\/openbuddy-task\/src\//,
+                priority: 30,
+              },
+              {
+                name: "collaboration-evidence",
+                test: /packages\/collaboration\/openbuddy-evidence\/src\//,
+                priority: 30,
+              },
+              {
+                name: "collaboration-room",
+                test: /packages\/collaboration\/openbuddy-room\/src\//,
+                priority: 30,
+              },
+              {
+                name: "collaboration-inbox",
+                test: /packages\/collaboration\/openbuddy-inbox\/src\//,
+                priority: 30,
+              },
+              {
+                name: "collaboration-network",
+                test: /packages\/collaboration\/openbuddy-network\/src\//,
+                priority: 30,
+              },
+              {
+                name: "auth-casdoor",
+                test: /packages\/auth\/openbuddy-casdoor\/src\//,
+                priority: 30,
+              },
+              {
+                name: "auth-permission",
+                test: /packages\/auth\/openbuddy-permission\/src\//,
+                priority: 30,
+              },
+              {
+                name: "fs-fs-local",
+                test: /packages\/fs\/openbuddy-fs-local\/src\//,
+                priority: 30,
+              },
+              {
+                name: "team-team",
+                test: /packages\/team\/openbuddy-team\/src\//,
+                priority: 30,
+              },
+              {
+                name: "logging-main",
+                test: /packages\/core\/openbuddy-logging-main\/src\//,
+                priority: 30,
+              },
+              {
+                name: "dsh-core",
+                test: /packages\/runtime\/openbuddy-dsh-core\/src\//,
+                priority: 30,
+              },
+              {
+                name: "plugin-host",
+                test: /packages\/runtime\/openbuddy-plugin-host\/src\//,
+                priority: 30,
+              },
+              {
+                name: "bundle-base",
+                test: /packages\/bundle\/openbuddy-base\/src\//,
+                priority: 30,
+              },
+              {
+                name: "pi-bridge",
+                test: /electron\/main\/agent\/pi-bridge\//,
+                priority: 30,
+              },
+              {
+                name: "storage",
+                test: /packages\/runtime\/openbuddy-storage\/src\//,
+                priority: 30,
+              },
+            ],
+          },
         },
       },
     },
@@ -291,18 +413,32 @@ export default defineConfig({
       rollupOptions: {
         input: resolve(repoRoot, "index.html"),
         output: {
-          manualChunks: {
-            markdown: [
-              "react-markdown",
-              "remark-gfm",
-              "remark-breaks",
-              "remark-math",
-              "rehype-highlight",
-              "rehype-sanitize",
-              "lowlight",
+          // Phase F.1 — same migration as the main config. Use
+          // `codeSplitting.groups[].test` regex form instead of the
+          // `manualChunks` object form because rolldown@1.2.7 has the
+          // same bindingify bug for the renderer's manualChunks object.
+          // Module-name matching is replaced with module-path regex
+          // matching; semantically equivalent for our use case.
+          codeSplitting: {
+            groups: [
+              {
+                name: "markdown",
+                test: (id: string) =>
+                  /node_modules\/(react-markdown|remark-gfm|remark-breaks|remark-math|rehype-highlight|rehype-sanitize|lowlight)(\/|$)/.test(id),
+                priority: 30,
+              },
+              {
+                name: "katex",
+                test: (id: string) =>
+                  /node_modules\/(katex|rehype-katex)(\/|$)/.test(id),
+                priority: 30,
+              },
+              {
+                name: "mermaid",
+                test: (id: string) => /node_modules\/mermaid(\/|$)/.test(id),
+                priority: 30,
+              },
             ],
-            katex: ["katex", "rehype-katex"],
-            mermaid: ["mermaid"],
           },
         },
       },

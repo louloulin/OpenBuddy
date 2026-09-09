@@ -5,6 +5,7 @@ import { DEFAULT_COMPACTION_SETTINGS, shouldCompact } from "@earendil-works/pi-a
 import openBuddyApplyPatch, { type OpenBuddyApplyPatchConfig } from "./extensions/apply-patch";
 import { sessionMetadataBridgeFactory } from "./extensions/session-metadata-bridge";
 import { modelBridgeFactory } from "./extensions/model-bridge";
+import { calendarPiFactory } from "./extensions/calendar-pi-extension";
 import { isPiPackageInstalled } from "./pi-package-installed";
 import {
   createTelemetryBridgeExtension,
@@ -426,31 +427,22 @@ const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
         invokeInvocation: invokeTasksCommand,
       },
     ],
-    // Stage G-1d: real pi tool so the LLM can drive the per-session task
-    // list from inside the agent loop.
-    tools: [
-      {
-        name: "openbuddy_tasks",
-        description: "Manage the per-session OpenBuddy task list: list, add, complete, remove, or clear tasks.",
-        parameters: Type.Object({
-          verb: Type.Union([
-            Type.Literal("list"),
-            Type.Literal("add"),
-            Type.Literal("done"),
-            Type.Literal("remove"),
-            Type.Literal("clear"),
-          ]),
-          content: Type.Optional(Type.String()),
-          taskId: Type.Optional(Type.String()),
-        }),
-        serializeArgs: (args: unknown) => {
-          const a = args as { verb: string; content?: string; taskId?: string };
-          if (a.verb === "add") return a.content ? `add ${a.content}` : "add";
-          if (a.verb === "done" || a.verb === "remove") return a.taskId ? `${a.verb} ${a.taskId}` : a.verb;
-          return a.verb;
-        },
-      },
-    ],
+    // Phase I.1 — task decision: keep Cordis, drop the orphan PI tool.
+    // The `openbuddy_tasks` tool was registered here as a Stage G-1d
+    // experiment so the LLM could drive the per-session task list from
+    // inside the agent loop, but every verb it delegated to already
+    // existed as a slash command (`/tasks list|add|done|remove|clear`)
+    // that users invoke directly. Keeping both surfaces confused the
+    // LLM and doubled the codebase paths to maintain. The Cordis
+    // `task` service (TaskService + openbuddy-core-plugin.ts `ctx.get("task")`)
+    // now owns the surface exclusively, so this `tools` block is gone.
+    //
+    // Refs: docs/OPENBUDDY_PI_NATIVE_PLAN.md v3 §I.1
+    // ("决策保留 Cordis（用户已在用），删 PI extension adapter（孤儿）").
+    //
+    // No `tools` here — the slash commands `/tasks` + `/todo` cover the
+    // user-visible surface, and the Cordis `task` service remains the
+    // canonical backend (see `electron/main/agent/host-modules/task-service.ts`).
   },
   {
     packageNames: ["pi-session", "pi-sessions", "pi-history", "pi-bookmark", "pi-session-manager", "@anthropic/pi-session"],
@@ -929,6 +921,23 @@ export const BUILTIN_PI_PLUGIN_MANIFESTS: readonly OpenBuddyPluginManifest[] = [
       { kind: "pi", inline: "openbuddy-pi-model-bridge" },
     ],
   },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-pi-calendar",
+    packageName: "@openbuddy/builtin-pi-calendar",
+    version: "1.0.0",
+    description: "Phase I.2 — register the calendar capability's 4 PI tools (calendar_list / calendar_create / calendar_update / calendar_remove) so the LLM can drive calendar operations through first-class pi tools rather than only slash commands / IPC.",
+    tracks: [
+      {
+        kind: "pi",
+        inline: "openbuddy-pi-calendar",
+        config: {
+          schema: "openbuddy.pi-calendar.v1",
+          defaults: { readOnly: false },
+        },
+      },
+    ],
+  },
 ];
 
 /**
@@ -1115,6 +1124,14 @@ export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResol
   // model_select / set_model / before_provider_request without breaking
   // the legacy installAgentModel() provider CRUD path.
   "openbuddy-pi-model-bridge": (_emit, _config, _options) => modelBridgeFactory,
+
+  // Phase I.2 — 10th builtin ExtensionFactory. Registers the calendar
+  // capability's PI tools (calendar_list / calendar_create / calendar_update
+  // / calendar_remove) so the LLM can drive calendar operations through
+  // first-class pi tools. The Cordis `calendar` service (mounted by
+  // capability-plugins.ts) remains the canonical backend; the tools
+  // here just adapt the Cordis service surface to the PI ExtensionAPI.
+  "openbuddy-pi-calendar": (_emit, _config, _options) => calendarPiFactory,
 };
 
 export function resolvePiExtensions(

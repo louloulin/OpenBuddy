@@ -24,6 +24,12 @@ export { TeamCatalog, type TeamCatalogMember, type TeamCatalogRecord } from "./s
 export { DEFAULT_MIGRATIONS, MigrationRunner, type MigrationStep } from "./sqlite/migration";
 export { SessionCatalog, type SessionCatalogRecord, type SessionCatalogQuery } from "./sqlite/session-catalog";
 export { SettingsRegistry, type StoredSetting } from "./sqlite/settings";
+export {
+  SettingsStore,
+  type SettingsValidator,
+  type SettingsNamespaceStats,
+  type SettingsStoreOptions,
+} from "./sqlite/settings-store";
 export { SettingsDocumentStore, type SettingsDocument } from "./sqlite/settings-document";
 export { TaskCatalog, type TaskCatalogEntry, type TaskCatalogOptions } from "./sqlite/task-catalog";
 // Stage G-1c: AutomationCatalog removed; automation is owned by

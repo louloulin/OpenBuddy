@@ -217,6 +217,57 @@ export function clearGoal(
 }
 
 /**
+ * Increment the goal's `roundsStarted` counter. Used by the agent
+ * loop to track how many rounds the model has attempted on a
+ * goal without auto-completing. The `maxGoalRounds` threshold
+ * (default 3, set on `createGoal`) gates auto-completion logic in
+ * the runtime; this helper just increments the counter and returns
+ * the updated record so the caller can decide whether to advance
+ * the phase.
+ */
+export function advanceGoalRounds(
+  carrier: unknown,
+  fallback: string,
+  ref: { id?: string; revision?: number } | undefined,
+): DshGoalRecord {
+  const key = sessionKey(carrier, fallback);
+  const goal = dshGoalState.get(key);
+  if (!goal || goal.id !== ref?.id || goal.revision !== ref?.revision) {
+    throw new Error("goal revision conflict");
+  }
+  if (goal.phase === "complete") {
+    throw new Error("cannot advance rounds on a complete goal");
+  }
+  goal.roundsStarted += 1;
+  goal.revision += 1;
+  return { ...goal };
+}
+
+/**
+ * Bump the goal's revision without changing any other field. Useful
+ * for optimistic-concurrency conflict resolution: the caller can
+ * call this with the stale revision to detect that another writer
+ * updated the goal in between (the returned revision will differ
+ * from what the caller observed).
+ *
+ * Throws on revision conflict (stale ref) or missing goal. Does
+ * not modify goal phase / rounds / objective / etc.
+ */
+export function bumpGoalRevision(
+  carrier: unknown,
+  fallback: string,
+  ref: { id?: string; revision?: number } | undefined,
+): DshGoalRecord {
+  const key = sessionKey(carrier, fallback);
+  const goal = dshGoalState.get(key);
+  if (!goal || goal.id !== ref?.id || goal.revision !== ref?.revision) {
+    throw new Error("goal revision conflict");
+  }
+  goal.revision += 1;
+  return { ...goal };
+}
+
+/**
  * Get (and lazily create) the per-session feedback entries map.
  */
 export function entriesFor(carrier: unknown, fallback: string): Map<string, DshFeedbackEntry> {
@@ -266,6 +317,54 @@ export function putFeedbackEntry(
   };
   entries.set(request.messageId, value);
   return { ...value, messageId: request.messageId };
+}
+
+/**
+ * Atomically update multiple feedback entries for one session.
+ * Either all entries succeed (with version increments) or the
+ * whole batch is rejected and the session's state is unchanged.
+ *
+ * Use case: an agent batches several feedback submissions (e.g.
+ * when an LLM evaluates a thread with N replies) and wants
+ * them to commit together instead of one-by-one with the risk
+ * of partial success.
+ */
+export function bulkPutFeedbackEntries(
+  entries: Array<{
+    messageId: string;
+    rating: string;
+    note?: string;
+    ifVersion?: number | null;
+  }>,
+  sessionId: string,
+): Array<{ messageId: string } & DshFeedbackEntry> {
+  // First pass: validate every entry's version precondition before
+  // mutating anything. The strict version check makes the batch
+  // transactional.
+  const targets = entries.map((entry) => {
+    const map = entriesFor(sessionId, sessionId);
+    const previous = map.get(entry.messageId);
+    const previousVersion = previous?.version ?? null;
+    if ((entry.ifVersion ?? null) !== previousVersion) {
+      throw new Error(
+        `feedback batch entry ${entry.messageId} version conflict (expected ${entry.ifVersion ?? "null"}, found ${previousVersion})`,
+      );
+    }
+    return { entry, map, previousVersion };
+  });
+  // Second pass: apply the updates. Each call uses the freshest
+  // state from the first pass so chained updates to the same
+  // session don't double-bump the version.
+  return targets.map(({ entry, map, previousVersion }) => {
+    const previous = map.get(entry.messageId);
+    const value: DshFeedbackEntry = {
+      rating: entry.rating,
+      ...(entry.note ? { note: entry.note } : {}),
+      version: (previous?.version ?? previousVersion ?? 0) + 1,
+    };
+    map.set(entry.messageId, value);
+    return { ...value, messageId: entry.messageId };
+  });
 }
 
 /**
@@ -404,4 +503,85 @@ export function sessionSummary(
     goal: goal ? { ...goal } : undefined,
     feedbackEntries: [...entries.entries()].map(([messageId, value]) => ({ messageId, ...value })),
   };
+}
+/**
+ * Aggregate stats across every goal in the state. Phase C.3
+ * follow-up — powers the `goals.stats` slash command so the
+ * renderer can show a dashboard without walking `listAllGoals()`
+ * itself.
+ */
+export function aggregateGoalStats(): {
+  total: number;
+  byPhase: Record<DshGoalRecord["phase"], number>;
+  totalRoundsStarted: number;
+  averageRoundsStarted: number;
+  totalMaxRounds: number;
+} {
+  let total = 0;
+  let totalRoundsStarted = 0;
+  let totalMaxRounds = 0;
+  const byPhase: Record<DshGoalRecord["phase"], number> = {
+    active: 0,
+    paused: 0,
+    blocked: 0,
+    complete: 0,
+  };
+  for (const goal of dshGoalState.values()) {
+    total += 1;
+    byPhase[goal.phase] += 1;
+    totalRoundsStarted += goal.roundsStarted;
+    totalMaxRounds += goal.maxGoalRounds;
+  }
+  return {
+    total,
+    byPhase,
+    totalRoundsStarted,
+    averageRoundsStarted: total > 0 ? totalRoundsStarted / total : 0,
+    totalMaxRounds,
+  };
+}
+
+/**
+ * Per-session aggregate stats. Combines `aggregateGoalStats()` with
+ * feedback-session counts. Phase C.3 follow-up — powers a renderer
+ * dashboard that wants both signals in one call.
+ */
+export function sessionAggregateStats(): {
+  goals: ReturnType<typeof aggregateGoalStats>;
+  feedback: { sessionCount: number; entryCount: number };
+} {
+  return {
+    goals: aggregateGoalStats(),
+    feedback: {
+      sessionCount: feedbackSessionCount(),
+      entryCount: feedbackEntryCount(),
+    },
+  };
+}
+
+/**
+ * Clear every goal + feedback entry for a single session. Phase
+ * C.3 follow-up — useful when the renderer wants a "reset session"
+ * affordance (e.g. user signed out, server switched).
+ *
+ * Returns a summary of what was cleared so the renderer can show
+ * a confirmation toast with concrete counts.
+ */
+export function purgeSession(carrier: unknown, fallback: string): {
+  goalsCleared: number;
+  feedbackEntriesCleared: number;
+} {
+  const key = sessionKey(carrier, fallback);
+  let goalsCleared = 0;
+  let feedbackEntriesCleared = 0;
+
+  if (dshGoalState.delete(key)) goalsCleared = 1;
+
+  const entries = dshFeedbackState.get(key);
+  if (entries) {
+    feedbackEntriesCleared = entries.size;
+    dshFeedbackState.delete(key);
+  }
+
+  return { goalsCleared, feedbackEntriesCleared };
 }

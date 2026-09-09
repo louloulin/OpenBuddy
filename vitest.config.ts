@@ -39,6 +39,8 @@ const workspacePackageAliases: Array<{ find: string; replacement: string }> = [
   { find: "@openbuddy/core-session", replacement: resolve(__dirname, "packages/core/openbuddy-session/src/index.ts") },
   { find: "@openbuddy/capability-plan", replacement: resolve(__dirname, "packages/capability/openbuddy-plan/src/index.ts") },
   { find: "@openbuddy/capability-authorization", replacement: resolve(__dirname, "packages/capability/openbuddy-authorization/src/index.ts") },
+  // Phase I.2 — calendar PI extension reuses the calendar Cordis service.
+  { find: "@openbuddy/capability-calendar", replacement: resolve(__dirname, "packages/capability/openbuddy-calendar/src/index.ts") },
   { find: "@openbuddy/auth-permission", replacement: resolve(__dirname, "packages/auth/openbuddy-permission/src/index.ts") },
   { find: "@openbuddy/auth-casdoor", replacement: resolve(__dirname, "packages/auth/openbuddy-casdoor/src/index.ts") },
   { find: "@openbuddy/shared-types", replacement: resolve(__dirname, "packages/shared/openbuddy-types/src/index.ts") },

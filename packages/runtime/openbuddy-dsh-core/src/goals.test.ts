@@ -15,16 +15,20 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import createDshGoalsExtension from "./goals";
+import createDshGoalsExtension, { createDshGoalsExtensionForSession } from "./goals";
 import {
   __resetDshCoreStateForTests,
+  advanceGoalRounds,
   createGoal,
   getGoal,
   listAllGoals,
+  purgeSession,
   searchGoalsByObjective,
+  sessionAggregateStats,
   transitionGoal,
   type DshGoalRecord,
 } from "./state";
+import { putFeedbackEntry } from "./state";
 
 interface CapturedCommand {
   name: string;
@@ -79,7 +83,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     __resetDshCoreStateForTests();
   });
 
-  it("registers 10 goals.* commands on init (Phase C.2: + goals.list, Phase C.3: + goals.search)", () => {
+  it("registers 14 goals.* commands on init (Phase C.2: + goals.list, Phase C.3: + goals.search + goals.advance-rounds, Phase C.3 follow-up: + goals.stats + goals.bump-revision + goals.stats-combined)", () => {
     const factory = createDshGoalsExtension();
     const { api, commands } = buildMockApi("session-1");
     factory(api);
@@ -93,6 +97,10 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     expect(commands.has("goals.clear")).toBe(true);
     expect(commands.has("goals.list")).toBe(true);
     expect(commands.has("goals.search")).toBe(true);
+    expect(commands.has("goals.advance-rounds")).toBe(true);
+    expect(commands.has("goals.stats")).toBe(true);
+    expect(commands.has("goals.bump-revision")).toBe(true);
+    expect(commands.has("goals.stats-combined")).toBe(true);
   });
 
   it("goals.create returns a ref and persists via the shared state map", async () => {
@@ -298,5 +306,214 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     const result = (await commands.get("goals.search")!.handler({ query: "audit" })) as Array<{ sessionId: string; goal: DshGoalRecord }>;
     expect(result).toHaveLength(1);
     expect(result[0]?.goal.objective).toBe("Audit v1.0 release");
+  });
+
+  it("goals.advance-rounds increments roundsStarted + revision; rejects on conflict / complete (Phase C.3)", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-advance");
+    factory(api);
+    const created = (await commands.get("goals.create")!.handler({ objective: "Ship v3", maxGoalRounds: 5 })) as { ref: { id: string; revision: number } };
+
+    const advanced1 = (await commands.get("goals.advance-rounds")!.handler(created.ref)) as DshGoalRecord;
+    expect(advanced1.roundsStarted).toBe(1);
+    expect(advanced1.revision).toBe(created.ref.revision + 1);
+
+    const advanced2 = (await commands.get("goals.advance-rounds")!.handler(advanced1)) as DshGoalRecord;
+    expect(advanced2.roundsStarted).toBe(2);
+    expect(advanced2.revision).toBe(advanced1.revision + 1);
+
+    // Wrong ref → revision conflict.
+    await expect(commands.get("goals.advance-rounds")!.handler({ id: created.ref.id, revision: 999 })).rejects.toThrow(/goal revision conflict/);
+
+    // Complete the goal and verify advance-rounds rejects.
+    const completed = (await commands.get("goals.complete")!.handler(advanced2)) as DshGoalRecord;
+    await expect(commands.get("goals.advance-rounds")!.handler(completed)).rejects.toThrow(/cannot advance rounds on a complete goal/);
+
+    // Sanity: state helper parity.
+    const finalGoal = getGoal({ id: "session-advance" }, "current");
+    expect(finalGoal?.roundsStarted).toBe(2);
+    expect(finalGoal?.phase).toBe("complete");
+  });
+
+  it("B.3 step 3 — createDshGoalsExtensionForSession binds state to a specific sessionId (no api.context lookup)", async () => {
+    // Phase B.3 step 3 — the new factory takes a sessionId at
+    // construction time and pre-binds the carrier. It does NOT call
+    // api.context.get('sessionFallbackKey') because the session is
+    // already determined.
+    const factory = createDshGoalsExtensionForSession("session-A");
+    const { api, commands } = buildMockApi("ignored-by-step3-factory");
+    factory(api);
+
+    // Create a goal in session-A.
+    const created = (await commands.get("goals.create")!.handler({ objective: "Step 3 bound" })) as { ref: { id: string; revision: number } };
+    // The goal must be in the explicit session, not the mock session.
+    expect(getGoal({ id: "session-A" }, "current")?.objective).toBe("Step 3 bound");
+    expect(getGoal({ id: "ignored-by-step3-factory" }, "current")).toBeUndefined();
+
+    // Advance the rounds to confirm the binding.
+    const advanced = (await commands.get("goals.advance-rounds")!.handler(created.ref)) as DshGoalRecord;
+    expect(advanced.roundsStarted).toBe(1);
+
+    // Confirm commands register the same 14 commands (12 + goals.stats + goals.stats-combined).
+    expect(commands.size).toBe(14);
+  });
+
+  it("B.3 step 3 — multiple ForSession factories land goals in different sessions (no cross-talk)", async () => {
+    const factoryA = createDshGoalsExtensionForSession("session-X");
+    const factoryB = createDshGoalsExtensionForSession("session-Y");
+    const mockA = buildMockApi("ignored-A");
+    const mockB = buildMockApi("ignored-B");
+    factoryA(mockA.api);
+    factoryB(mockB.api);
+
+    await mockA.commands.get("goals.create")!.handler({ objective: "Goal in X" });
+    await mockB.commands.get("goals.create")!.handler({ objective: "Goal in Y" });
+
+    // Goals land in their respective sessions, no cross-talk.
+    expect(getGoal({ id: "session-X" }, "current")?.objective).toBe("Goal in X");
+    expect(getGoal({ id: "session-Y" }, "current")?.objective).toBe("Goal in Y");
+    // Each session's `goals.get` returns its own goal (verified via
+    // the mock API context) — confirms the carrier binding took
+    // effect for each session separately.
+    const xGoal = (await mockA.commands.get("goals.get")!.handler({})) as DshGoalRecord | undefined;
+    const yGoal = (await mockB.commands.get("goals.get")!.handler({})) as DshGoalRecord | undefined;
+    expect(xGoal?.objective).toBe("Goal in X");
+    expect(yGoal?.objective).toBe("Goal in Y");
+  });
+
+  it("goals.stats returns aggregate stats across every session (Phase C.3 follow-up)", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-stats");
+    factory(api);
+    // Empty state.
+    const empty = (await commands.get("goals.stats")!.handler({})) as {
+      total: number;
+      byPhase: Record<string, number>;
+      totalRoundsStarted: number;
+      averageRoundsStarted: number;
+      totalMaxRounds: number;
+    };
+    expect(empty.total).toBe(0);
+    expect(empty.averageRoundsStarted).toBe(0);
+    expect(empty.totalMaxRounds).toBe(0);
+
+    // Add goals in this session + a separate session via state.ts directly.
+    await commands.get("goals.create")!.handler({ objective: "A", maxGoalRounds: 4 });
+    createGoal({ id: "session-other-stats" }, "current", { objective: "B", maxGoalRounds: 6 });
+
+    // Advance the first goal twice (chain so each call returns the
+    // updated record — spreading the original ref into the second
+    // call would trigger a revision conflict).
+    const created1 = (await commands.get("goals.get")!.handler({})) as DshGoalRecord;
+    const advanced1 = (await commands.get("goals.advance-rounds")!.handler(created1)) as DshGoalRecord;
+    const advanced2 = (await commands.get("goals.advance-rounds")!.handler(advanced1)) as DshGoalRecord;
+    expect(advanced2.roundsStarted).toBe(2);
+
+    const populated = (await commands.get("goals.stats")!.handler({})) as {
+      total: number;
+      byPhase: Record<string, number>;
+      totalRoundsStarted: number;
+      averageRoundsStarted: number;
+      totalMaxRounds: number;
+    };
+    expect(populated.total).toBe(2);
+    expect(populated.byPhase.active).toBe(2);
+    expect(populated.totalRoundsStarted).toBe(2);
+    expect(populated.averageRoundsStarted).toBe(1);
+    expect(populated.totalMaxRounds).toBe(10);
+  });
+
+  it("goals.bump-revision increments revision without changing state (Phase C.3 follow-up)", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-bump");
+    factory(api);
+    const created = (await commands.get("goals.create")!.handler({ objective: "Bump test", maxGoalRounds: 3 })) as { ref: { id: string; revision: number } };
+
+    // First bump: revision 1 → 2, no other fields change.
+    const advanced = (await commands.get("goals.bump-revision")!.handler(created.ref)) as DshGoalRecord;
+    expect(advanced.revision).toBe(2);
+    expect(advanced.id).toBe(created.ref.id);
+    expect(advanced.objective).toBe("Bump test");
+    expect(advanced.maxGoalRounds).toBe(3);
+    expect(advanced.roundsStarted).toBe(0);
+
+    // Stale ref → revision conflict (the canonical optimistic-concurrency test).
+    await expect(
+      commands.get("goals.bump-revision")!.handler({ id: created.ref.id, revision: created.ref.revision }),
+    ).rejects.toThrow(/goal revision conflict/);
+
+    // Chain bumps from the up-to-date ref.
+    const a = (await commands.get("goals.bump-revision")!.handler(advanced)) as DshGoalRecord;
+    const b = (await commands.get("goals.bump-revision")!.handler(a)) as DshGoalRecord;
+    expect(b.revision).toBe(4);
+    expect(b.objective).toBe("Bump test");
+    expect(b.roundsStarted).toBe(0); // roundsStarted never changes
+  });
+
+  it("sessionAggregateStats combines goals + feedback signals (Phase C.3 follow-up)", () => {
+    // Empty state.
+    const empty = sessionAggregateStats();
+    expect(empty.goals.total).toBe(0);
+    expect(empty.feedback.sessionCount).toBeGreaterThanOrEqual(0);
+    expect(empty.feedback.entryCount).toBeGreaterThanOrEqual(0);
+
+    // Add a goal in this session + feedback in another session.
+    createGoal({ id: "session-agg-A" }, "current", { objective: "A", maxGoalRounds: 3 });
+    putFeedbackEntry({ messageId: "m1", rating: "ok" }, "session-agg-B");
+    putFeedbackEntry({ messageId: "m2", rating: "good" }, "session-agg-B");
+
+    const populated = sessionAggregateStats();
+    expect(populated.goals.total).toBeGreaterThanOrEqual(1);
+    // Feedback from session-agg-B is counted regardless of which
+    // session the goal lives in — the aggregation is global.
+    expect(populated.feedback.entryCount).toBeGreaterThanOrEqual(2);
+    expect(populated.feedback.sessionCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it("purgeSession clears the goal + feedback entries for a single session (Phase C.3 follow-up)", () => {
+    // Session X: 1 goal + 2 feedback entries.
+    createGoal({ id: "session-purge-X" }, "current", { objective: "X", maxGoalRounds: 3 });
+    putFeedbackEntry({ messageId: "x1", rating: "ok" }, "session-purge-X");
+    putFeedbackEntry({ messageId: "x2", rating: "good" }, "session-purge-X");
+
+    // Session Y: 1 goal + 1 feedback entry (unrelated — must survive).
+    createGoal({ id: "session-purge-Y" }, "current", { objective: "Y", maxGoalRounds: 3 });
+    putFeedbackEntry({ messageId: "y1", rating: "ok" }, "session-purge-Y");
+
+    const result = purgeSession({ id: "session-purge-X" }, "current");
+    expect(result.goalsCleared).toBe(1);
+    expect(result.feedbackEntriesCleared).toBe(2);
+
+    // Session X is gone.
+    expect(getGoal({ id: "session-purge-X" }, "current")).toBeUndefined();
+    // Session Y intact.
+    expect(getGoal({ id: "session-purge-Y" }, "current")?.objective).toBe("Y");
+  });
+
+  it("purgeSession on a fresh session is a no-op (Phase C.3 follow-up)", () => {
+    const result = purgeSession({ id: "never-existed" }, "current");
+    expect(result.goalsCleared).toBe(0);
+    expect(result.feedbackEntriesCleared).toBe(0);
+  });
+
+
+  it("goals.stats-combined returns goals + feedback aggregates in one call (Phase C.3 follow-up)", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-combined");
+    factory(api);
+
+    // Empty state: zeros everywhere.
+    const empty = (await commands.get("goals.stats-combined")!.handler({})) as { goals: { total: number }; feedback: { sessionCount: number; entryCount: number } };
+    expect(empty.goals.total).toBe(0);
+    expect(empty.feedback.sessionCount).toBeGreaterThanOrEqual(0);
+    expect(empty.feedback.entryCount).toBeGreaterThanOrEqual(0);
+
+    // Populated state: create a goal + put a feedback entry.
+    commands.get("goals.create")!.handler({ objective: "combined", maxGoalRounds: 2 });
+    putFeedbackEntry({ messageId: "m1", rating: "ok" }, "session-combined");
+
+    const populated = (await commands.get("goals.stats-combined")!.handler({})) as { goals: { total: number }; feedback: { sessionCount: number; entryCount: number } };
+    expect(populated.goals.total).toBeGreaterThanOrEqual(1);
+    expect(populated.feedback.entryCount).toBeGreaterThanOrEqual(1);
   });
 });

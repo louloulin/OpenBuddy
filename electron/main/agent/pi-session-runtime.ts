@@ -5,6 +5,11 @@ import {
   type CreateAgentSessionOptions,
 } from "@earendil-works/pi-coding-agent";
 
+import {
+  bindCoreForSession,
+  type BindCoreHostFunctions,
+} from "./host-modules/pi-extension-runner-bind-core";
+
 export type PiSessionEventHandler = (event: AgentSessionEvent, session: AgentSession) => void;
 
 export interface PiSessionRuntimeFactory {
@@ -13,6 +18,15 @@ export interface PiSessionRuntimeFactory {
 
 export interface PiSessionRuntimeOptions {
   factory?: PiSessionRuntimeFactory;
+  /**
+   * B.2 — host-functions bridge. When set, every new session
+   * immediately calls `extensionRunner.bindCore(host)` so the
+   * runner's action methods (sendMessage / setModel / etc.) stop
+   * throwing the default `not initialized` stub and start
+   * delegating to OpenBuddy's host functions. Set this from the
+   * agent-host lifecycle hook when the host is ready.
+   */
+  hostBridge?: BindCoreHostFunctions;
 }
 
 export interface PiSessionRuntimeDisposeOptions {
@@ -24,6 +38,7 @@ export interface PiSessionRuntimeDisposeOptions {
  */
 export class PiSessionRuntime {
   private readonly factory: PiSessionRuntimeFactory;
+  private readonly hostBridge: BindCoreHostFunctions | null;
   private current: AgentSession | null = null;
   private unsubscribe: (() => void) | null = null;
   private eventHandler: PiSessionEventHandler | null = null;
@@ -31,6 +46,7 @@ export class PiSessionRuntime {
 
   constructor(options: PiSessionRuntimeOptions = {}) {
     this.factory = options.factory ?? { create: createAgentSession };
+    this.hostBridge = options.hostBridge ?? null;
   }
 
   get session(): AgentSession | null {
@@ -52,6 +68,7 @@ export class PiSessionRuntime {
     const created = await this.factory.create(options);
     this.current = created.session;
     this.generation += 1;
+    this.bindCoreIfReady();
     return created.session;
   }
 
@@ -62,6 +79,7 @@ export class PiSessionRuntime {
     this.unsubscribe = null;
     this.current = created.session;
     this.generation += 1;
+    this.bindCoreIfReady();
     if (this.eventHandler) this.attach(this.eventHandler);
     if (previous) {
       try {
@@ -72,6 +90,41 @@ export class PiSessionRuntime {
       previous.dispose();
     }
     return created.session;
+  }
+
+  /**
+   * B.2 — if a hostBridge is installed, bind the new session's
+   * ExtensionRunner to the OpenBuddy host-functions. Called
+   * automatically from `create` and `replace`. Also exposed as a
+   * public method so external code (e.g. an init-session hook that
+   * wants to install a hostBridge AFTER the runtime was constructed)
+   * can invoke it directly.
+   */
+  bindCoreIfReady(): void {
+    if (!this.hostBridge || !this.current) return;
+    try {
+      bindCoreForSession(this.current.extensionRunner, this.hostBridge);
+    } catch (error) {
+      // bindCore failures shouldn't break session creation — the
+      // extension runner will keep working with the default no-op
+      // actions and the error is logged for diagnostics.
+      console.warn(
+        "[pi-session-runtime] bindCore failed; runner keeps default stubs:",
+        error,
+      );
+    }
+  }
+
+  /**
+   * B.2 — install a hostBridge after construction. Useful when the
+   * host-functions surface isn't ready at PiSessionRuntime
+   * construction time (e.g. awaiting Cordis context init).
+   * If a session is already active, also invokes bindCore on the
+   * current session so the live runner gets the real actions.
+   */
+  installHostBridge(hostBridge: BindCoreHostFunctions): void {
+    (this as { hostBridge: BindCoreHostFunctions | null }).hostBridge = hostBridge;
+    this.bindCoreIfReady();
   }
 
   subscribe(handler: PiSessionEventHandler): () => void {

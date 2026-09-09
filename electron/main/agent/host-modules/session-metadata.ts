@@ -22,9 +22,10 @@
  */
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 
 import { SessionManager } from "@earendil-works/pi-coding-agent";
+
+import { SessionMetadataStore, type SessionMetadataSnapshot } from "./session-metadata-store";
 
 // Phase 8.3 Architectural Refactor — Install Pattern:
 //   修复前: `import { emitPluginEvent, listAllPiSessions, piHome, piSessionDir, state, workspaceRegistry } from "../agent-host"` (reverse dep)
@@ -45,6 +46,7 @@ let piSessionDir: (cwd: string) => string = (cwd) => "";
 let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
 let listAllPiSessions: <T = unknown>() => any = async () => [];
 let workspaceRegistry: () => unknown = () => undefined;
+let metadataStore = new SessionMetadataStore();
 
 /**
  * Bind session-metadata dependencies. Called once from
@@ -64,14 +66,16 @@ export function installSessionMetadata(deps: {
   if (deps.emitPluginEvent) emitPluginEvent = deps.emitPluginEvent;
   listAllPiSessions = deps.listAllPiSessions as any;
   if (deps.workspaceRegistry) workspaceRegistry = deps.workspaceRegistry;
+  metadataStore = new SessionMetadataStore({
+    databasePath: join(deps.piHome(), "openbuddy.sqlite"),
+    legacyJsonPath: join(deps.piHome(), "openbuddy-state.json"),
+  });
 }
 
 export async function listSessions(cwd: string) {
-  const stateFile = join(piHome(), "openbuddy-state.json");
-  let metadata: { pinned?: string[]; archived?: string[]; experts?: Record<string, { expertId: string; expertName: string; avatarLocal?: string }> } = {};
-  try { metadata = JSON.parse(await readFile(stateFile, "utf8")); } catch { /* first run */ }
-  const pinned = new Set(metadata.pinned ?? []);
-  const archived = new Set(metadata.archived ?? []);
+  const metadata = await metadataStore.snapshot();
+  const pinned = new Set(metadata.pinned);
+  const archived = new Set(metadata.archived);
   const registryArchived = new Set((state.context?.get("workspaceRegistry") as { archivedSessionIds?: readonly string[] } | undefined)?.archivedSessionIds ?? []);
   const scopedSessions = await SessionManager.list(cwd, piSessionDir(cwd));
   const allSessions = await listAllPiSessions();
@@ -110,7 +114,7 @@ export async function listSessions(cwd: string) {
   return sessions.filter((entry: any) => !registryArchived.has(entry.id))
     .filter((entry: any) => entry.messageCount > 0 || entry.id === currentSessionId)
     .map((entry: any) => {
-    const expert = metadata.experts?.[entry.id];
+    const expert = metadata.experts[entry.id];
     return {
       sessionId: entry.id,
       title: entry.name ?? (entry.firstMessage || "Pi 会话").slice(0, 80),
@@ -133,34 +137,18 @@ export async function listSessions(cwd: string) {
   });
 }
 
-async function updateSessionMetadata(sessionId: string, update: (metadata: {
-  pinned: string[];
-  archived: string[];
-  experts: Record<string, { expertId: string; expertName: string; avatarLocal?: string }>;
-}) => void): Promise<void> {
-  const stateFile = join(piHome(), "openbuddy-state.json");
-  let metadata: {
-    pinned?: string[];
-    archived?: string[];
-    experts?: Record<string, { expertId: string; expertName: string; avatarLocal?: string }>;
-  } = {};
-  try { metadata = JSON.parse(await readFile(stateFile, "utf8")); } catch { /* first run */ }
-  const normalized = {
-    pinned: Array.isArray(metadata.pinned) ? metadata.pinned.filter((id): id is string => typeof id === "string") : [],
-    archived: Array.isArray(metadata.archived) ? metadata.archived.filter((id): id is string => typeof id === "string") : [],
-    experts: metadata.experts && typeof metadata.experts === "object" ? metadata.experts : {},
-  };
-  update(normalized);
-  await mkdir(piHome(), { recursive: true });
-  const temporary = `${stateFile}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(normalized, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-  await rename(temporary, stateFile);
-  if (state.session?.sessionId === sessionId) emitPluginEvent("session/metadata-updated", { sessionId });
+async function updateSessionMetadata(
+  sessionId: string,
+  update: (metadata: SessionMetadataSnapshot) => void,
+): Promise<void> {
+  await metadataStore.updateMetadata(update);
+  if (state.session?.sessionId === sessionId) {
+    emitPluginEvent("session/metadata-updated", { sessionId });
+  }
 }
 
 async function clearSessionMetadata(): Promise<void> {
-  const stateFile = join(piHome(), "openbuddy-state.json");
-  await rm(stateFile, { force: true });
+  await metadataStore.clearAll();
   emitPluginEvent("session/metadata-cleared", {});
 }
 
