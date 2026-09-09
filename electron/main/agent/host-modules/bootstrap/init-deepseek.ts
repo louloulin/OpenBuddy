@@ -173,11 +173,25 @@ export async function initDeepSeek(deps: InitDeepSeekDeps): Promise<void> {
   // so the loader sees them in the documented sequence. The base + bundle
   // entries follow, with override patches layered on top.
   const coreEntries = profileEntriesFromManifests(coreCapabilityManifests);
-  const profile: PluginProfile = {
+
+  // Phase B.3 step 2c — the legacy `ElectronHarnessPluginLoader` no
+  // longer handles the 7 DSH core capability packages. They are
+  // loaded through PI's `discoverAndLoadExtensions()` in stage 6.7
+  // (`init-pi-dsh-core-extensions`) against the same `dshCorePaths`
+  // resolved above. The loader now handles ONLY user-declared
+  // plugins (base profile + bundle + overrides), so we pass the
+  // user-only profile to `loader.loadProfile` and keep the
+  // full-DSH-core profile in `state.activePluginProfile` only for
+  // the Cordis-runtime sync that `syncDeepSeekCordisRuntime`
+  // consumes (the Cordis services need to see every entry that ever
+  // landed in the loader, including those now loaded via PI, so
+  // plugin-mutations can still `replaceProfile` the canonical
+  // composition).
+  const userOnlyProfile: PluginProfile = {
     entries: composeHostRunnerEntries(
       baseProfile.entries,
       profileBundle?.entries ?? [],
-      coreEntries,
+      [],
     ),
     patches: [
       ...(baseProfile.patches ?? []),
@@ -186,12 +200,20 @@ export async function initDeepSeek(deps: InitDeepSeekDeps): Promise<void> {
       ...(overrideLayers ?? []),
     ],
   };
+  const fullProfile: PluginProfile = {
+    entries: composeHostRunnerEntries(
+      baseProfile.entries,
+      profileBundle?.entries ?? [],
+      coreEntries,
+    ),
+    patches: userOnlyProfile.patches,
+  };
 
   try {
-    await loader.loadProfile(profile);
-    state.activePluginProfile = profile;
+    await loader.loadProfile(userOnlyProfile);
+    state.activePluginProfile = fullProfile;
     await syncDeepSeekCordisRuntime(
-      deepSeekCoreRuntimeEntries(composePluginPatches(profile.entries, profile.patches ?? [])),
+      deepSeekCoreRuntimeEntries(composePluginPatches(fullProfile.entries, fullProfile.patches ?? [])),
     );
   } catch (error) {
     emitPluginEvent("plugin/failed", { id: "openbuddy-core", error: String(error) });

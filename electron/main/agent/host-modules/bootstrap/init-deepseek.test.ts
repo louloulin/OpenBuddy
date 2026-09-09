@@ -65,3 +65,36 @@ describe("init-deepseek / Phase K.2 SDK integration", () => {
     expect(profileEntriesFromManifests([])).toEqual([]);
   });
 });
+
+describe("init-deepseek / Phase B.3 step 2c — DSH core excluded from HarnessPluginLoader", () => {
+  // The DSH core capability packages used to be loaded via the legacy
+  // `ElectronHarnessPluginLoader.loadProfile(...)` call inside
+  // `initDeepSeek`. After B.3 step 2a/2b they are loaded through PI's
+  // `discoverAndLoadExtensions` (parallel PI loader in stage 6.7).
+  // This set of tests pins the contract for that split.
+
+  it("coreCapabilityManifests and DEEPSEEK_CORE_CAPABILITY_PACKAGES stay in lockstep", () => {
+    expect(coreCapabilityManifests).toHaveLength(DEEPSEEK_CORE_CAPABILITY_PACKAGES.length);
+    expect(coreCapabilityManifests.map((manifest) => manifest.id)).toEqual([
+      ...DEEPSEEK_CORE_CAPABILITY_PACKAGES,
+    ]);
+  });
+
+  it("profileEntriesFromManifests emits 7 entries for the canonical DSH core list", () => {
+    const rows = profileEntriesFromManifests(coreCapabilityManifests);
+    expect(rows).toHaveLength(7);
+    expect(rows.map((row) => row.id).sort()).toEqual(
+      [...DEEPSEEK_CORE_CAPABILITY_PACKAGES].sort(),
+    );
+  });
+
+  it("the goals + message-feedback entries are still tracked in coreCapabilityManifests for SDK manifest parity", () => {
+    // The full DSH core capability manifest list still contains
+    // @deepseek-ai/dsh-goal + @deepseek-ai/dsh-message-feedback — the
+    // B.3 step 2a/2b refactor split state.ts out but did NOT remove
+    // them from the manifest list, since marketplace + override
+    // routing still uses them as named placeholders.
+    expect(DEEPSEEK_CORE_CAPABILITY_PACKAGES).toContain("@deepseek-ai/dsh-goal");
+    expect(DEEPSEEK_CORE_CAPABILITY_PACKAGES).toContain("@deepseek-ai/dsh-message-feedback");
+  });
+});
