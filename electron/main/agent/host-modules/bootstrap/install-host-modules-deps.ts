@@ -116,7 +116,7 @@ export interface InstallHostModuleDepsClosures {
 export function buildInstallHostModuleDeps(
   closures: InstallHostModuleDepsClosures,
 ): InstallHostModuleDepsWithDomains {
-  const deps = {
+  const flatDeps: InstallHostModuleDeps = {
     piHome: closures.piHome,
     isPathWithin: closures.isPathWithin,
     piSessionDir: closures.piSessionDir,
@@ -210,10 +210,9 @@ export function buildInstallHostModuleDeps(
     persistPiSessionHeaderImpl: closures.persistPiSessionHeaderImpl,
   };
   return {
-    ...deps,
-    profile: deps,
-    session: deps,
-    plugin: deps,
-    runtime: deps,
+    profile: flatDeps,
+    session: flatDeps,
+    plugin: flatDeps,
+    runtime: flatDeps,
   } as InstallHostModuleDepsWithDomains;
 }

@@ -269,8 +269,8 @@ export interface InstallHostModuleDomainDeps {
   runtime: RuntimeDomainDeps;
 }
 
-/** Flat compatibility bag plus the grouped views used by new composition roots. */
-export type InstallHostModuleDepsWithDomains = InstallHostModuleDeps & InstallHostModuleDomainDeps;
+/** Grouped composition-root contract; flat fields are intentionally not exported. */
+export type InstallHostModuleDepsWithDomains = InstallHostModuleDomainDeps;
 export type InstallHostModuleDomainInput = InstallHostModuleDomainDeps & { state: AgentHostState };
 
 /**
