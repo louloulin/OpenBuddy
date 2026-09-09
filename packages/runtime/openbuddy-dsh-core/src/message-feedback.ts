@@ -24,6 +24,8 @@ import {
   feedbackSessionCount,
   listFeedbackEntries,
   putFeedbackEntry,
+  searchFeedbackEntries,
+  sessionSummary,
 } from "./state";
 
 export type { DshFeedbackEntry } from "./state";
@@ -65,6 +67,25 @@ export default function createDshMessageFeedbackExtension(): ExtensionFactory {
         sessions: feedbackSessionCount(),
         entries: feedbackEntryCount(),
       }),
+    });
+
+    commands.registerCommand?.({
+      name: "feedback.search",
+      description: "Search feedback entries by case-insensitive substring of rating or note (Phase C.3).",
+      handler: async (args) => {
+        const typed = (args ?? {}) as { query?: string; sessionId?: string };
+        const query = typeof typed.query === "string" ? typed.query : "";
+        return searchFeedbackEntries(
+          query,
+          typed.sessionId ? { sessionId: typed.sessionId } : undefined,
+        );
+      },
+    });
+
+    commands.registerCommand?.({
+      name: "feedback.session-summary",
+      description: "Return the goal (if any) + feedback entries for the active session in a single call (Phase C.3).",
+      handler: async () => sessionSummary(carrier, fallback),
     });
 
     commands.registerCommand?.({

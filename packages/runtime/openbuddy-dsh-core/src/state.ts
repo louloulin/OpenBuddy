@@ -355,3 +355,53 @@ export function searchGoalsByObjective(
   }
   return out;
 }
+
+/**
+ * Search feedback entries by case-insensitive substring match on
+ * either the rating or the note. Returns matching entries across
+ * every session. Phase C.3 — pairs with `searchGoalsByObjective` so
+ * the renderer can offer a unified cross-session diagnostic search.
+ */
+export function searchFeedbackEntries(
+  query: string,
+  options?: { sessionId?: string },
+): Array<{ sessionId: string; messageId: string } & DshFeedbackEntry> {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  const out: Array<{ sessionId: string; messageId: string } & DshFeedbackEntry> = [];
+  for (const [sessionId, entries] of dshFeedbackState) {
+    if (options?.sessionId && sessionId !== options.sessionId) continue;
+    for (const [messageId, entry] of entries) {
+      const haystack = `${entry.rating}\n${entry.note ?? ""}`.toLowerCase();
+      if (haystack.includes(needle)) {
+        out.push({ sessionId, messageId, ...entry });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Per-session aggregate summary. Returns the goal (if any) and the
+ * feedback entries (if any) for the given session in a single call.
+ * Phase C.3 — the renderer uses this for a per-session diagnostic
+ * panel that doesn't need to walk `listAllGoals` + `listFeedbackEntries`
+ * separately.
+ */
+export function sessionSummary(
+  carrier: unknown,
+  fallback: string,
+): {
+  sessionId: string;
+  goal: DshGoalRecord | undefined;
+  feedbackEntries: Array<{ messageId: string } & DshFeedbackEntry>;
+} {
+  const key = sessionKey(carrier, fallback);
+  const goal = dshGoalState.get(key);
+  const entries = dshFeedbackState.get(key) ?? new Map<string, DshFeedbackEntry>();
+  return {
+    sessionId: key,
+    goal: goal ? { ...goal } : undefined,
+    feedbackEntries: [...entries.entries()].map(([messageId, value]) => ({ messageId, ...value })),
+  };
+}
