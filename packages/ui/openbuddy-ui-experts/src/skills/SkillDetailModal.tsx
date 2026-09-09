@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { SkillItem, SkillInfo } from "@openbuddy/shared-types";
 import { parseSkillFrontmatter, skillsCatalogReadSkill, skillsAdd } from "@/lib/agent/pi-client";
+import { useFrontmatter } from "@openbuddy/ui-shared";
 import { Markdown } from "@openbuddy/ui-markdown";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 import { LetterAvatar } from "../shared/LetterAvatar";
@@ -44,33 +45,13 @@ export function SkillDetailModal({ skill, installed = [], onClose, onInstalled, 
   }, [skill.sourceDir, root]);
 
   // Parse frontmatter + body from the raw markdown.
-  // Phase E.3 — delegate to the pi-bridge IPC so the renderer never
-  // ships a hand-rolled YAML parser. See docs/OPENBUDDY_PI_NATIVE_PLAN.md §E.3.
-  const [meta, setMeta] = useState<Record<string, string>>({});
-  const [body, setBody] = useState("");
-  useEffect(() => {
-    let disposed = false;
-    if (!rawMd) {
-      setMeta({});
-      setBody("");
-      return () => { disposed = true; };
-    }
-    parseSkillFrontmatter(rawMd).then((parsed) => {
-      if (disposed) return;
-      const flat: Record<string, string> = {};
-      for (const [k, v] of Object.entries(parsed.frontmatter ?? {})) {
-        if (typeof v === "string") flat[k] = v;
-        else if (v !== null && v !== undefined) flat[k] = String(v);
-      }
-      setMeta(flat);
-      setBody(parsed.body ?? "");
-    }).catch(() => {
-      if (disposed) return;
-      setMeta({});
-      setBody(rawMd);
-    });
-    return () => { disposed = true; };
-  }, [rawMd]);
+  // Phase E.3 round 2 — delegate to the shared `useFrontmatter` hook
+  // (lives in `@openbuddy/ui-shared`) so any ui-* package can render
+  // SKILL.md-style frontmatter without re-implementing the IPC plumbing.
+  // The hook wraps `parseSkillFrontmatter` (pi-bridge IPC) and owns the
+  // useState/useEffect/race-condition cleanup ceremony. See
+  // docs/OPENBUDDY_PI_NATIVE_PLAN.md §E.3 for the IPC rationale.
+  const { meta, body } = useFrontmatter(rawMd, { parse: parseSkillFrontmatter });
 
   // Is this skill already installed in pi?
   const installedEntry = useMemo(
