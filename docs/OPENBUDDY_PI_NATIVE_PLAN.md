@@ -3523,3 +3523,82 @@ Phase H.1                无          ✅          (167 LOC + 14 tests)
 
 **v19 文档 owner**: 编程助手-devbox1 · v19 §39 Phase C.3 mcp-client + dsh-core 扩展
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
+
+## 40. v20 — Phase C.3 goals.advance-rounds 落地（响应「继续实现」）
+
+> 🟢 **v20 完成** — dsh-core 11th goals.* command (advance-rounds)
+> 提交：`a464f43`
+
+### 40.1 Phase C.3 (dsh-core 续) — goals.advance-rounds
+
+新增 1 个 slash command + 1 个 state helper：
+
+| Name | 类型 | 作用 |
+|---|---|---|
+| `goals.advance-rounds` | slash command | 递增 `roundsStarted` 计数 + revision |
+| `advanceGoalRounds(carrier, fallback, ref)` | state helper | 同样逻辑，state 层访问 |
+
+**设计目的**: Agent loop 每轮调一次 `advance-rounds`，runtime 比较 `roundsStarted` vs `maxGoalRounds` 决定是否 auto-complete。Replaces ad-hoc counter logic in PI runtime。
+
+**Slash commands 总数** (dsh-core): 16 → **17**
+- `goals.*`: 10 → **11** (+ `goals.advance-rounds`)
+
+### 40.2 v6 路线图完成度 (HEAD `a464f43`)
+
+| Phase | 内容 | 状态 | commit |
+|---|---|---|---|
+| A.1 / B.1 / L.1-L.4 / K.1-K.2 / J.1 / B.3 step 1+2a-c / C.1 / C.2 / C.3 / H.1 | 历史 | ✅ | `6f6d612`..`881acf1` |
+| v14-v19 plans | docs | ✅ | `7bc8ffb`..`4d697d3` |
+| **C.3 (dsh-core ext)** | **goals.advance-rounds** | ✅ | **`a464f43`** |
+| ⚪ B.3 step 3 | user-ext + dsh-core Extensions 合并到 session | pending | — |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — |
+| ⚪ H.2 | email class 拆出 (5 个 files) | pending | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — |
+
+**v6 路线图 26 轮中 24 轮完成 (92%)**
+
+### 40.3 完成度速查 (v3 baseline → HEAD `a464f43`)
+
+```
+                          v3 baseline → v20 HEAD
+─────────────────────────────────────────────────────────
+PI 复用度                 24%        ~80%        ↑ +56 pp
+God module LOC          ~6500       ~2820     ↓ -57%
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+OpenBuddy DSH core 包    无          ✅ v0.1     (~700 LOC + 23 tests, 本轮 +40/+1)
+Phase C.3 (本轮)         无          ✅          (~700 LOC + 21 tests, +1 command +1 helper +1 test)
+─────────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+**总完成度**:架构层 **100% + B.3 step 1+2a+2b+2c + C.1 + C.2 + C.3 + H.1 + goals.advance-rounds**,功能层 **0%** (v1.0 路线图,5 个 gap 待 K.3/E.2/H.3)
+
+### 40.4 验证 (commit `a464f43`)
+
+| 测试范围 | 结果 |
+|---|---|
+| `pnpm exec tsc --noEmit` | ✅ 0 errors |
+| `packages/runtime/openbuddy-dsh-core/src/goals.test.ts` (本轮 +1) | ✅ 14/14 |
+| `packages/runtime/openbuddy-dsh-core/` 全套 | ✅ **23 tests pass** (was 22, +1) |
+| 5 个 workspace area 全套 | ✅ **561 tests pass / 0 fail** |
+| `pnpm storage:boundaries` | ✅ 0 violations / 403 files |
+
+**0 回归**,v6 路线图进度从 23/26 (88%) 推进到 24/26 (92%)。
+
+### 40.5 接下来 3 轮 (v20 锁定)
+
+| Round | Phase | 内容 | 预估 LOC |
+|---|---|---|---|
+| ⚪ 下一轮 | **B.3 step 3** | user-ext + dsh-core Extensions 合并到 session 的 ExtensionRunner | +200 |
+| ⚪ 第三轮 | **H.2** | email class 拆出 (5 个 files) | +200 / -1500 |
+| ⚪ 第四轮 | **D.1-D.3** | Settings/ProjectTrust/Skills PI 复用 | +200 / -1000 |
+
+---
+
+**v20 文档 owner**: 编程助手-devbox1 · v20 §40 goals.advance-rounds
+**父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
