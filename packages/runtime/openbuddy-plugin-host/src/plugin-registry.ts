@@ -165,6 +165,12 @@ export class PluginRegistry {
     for (const listener of this.listeners) listener(event);
   }
 
+  /** Subscribe only to events from the registry's current generation. */
+  subscribeCurrent(listener: (event: PluginRegistryEvent) => void): () => void {
+    return this.subscribe((event) => {
+      if (event.generation === this.generation) listener(event);
+    });
+  }
 
   register(manifest: PluginRegistryManifest): Promise<PluginRegistryTransaction> {
     return this.enqueue(async () => {

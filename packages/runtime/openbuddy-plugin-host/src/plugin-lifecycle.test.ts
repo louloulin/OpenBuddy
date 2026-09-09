@@ -31,4 +31,24 @@ describe("PluginLifecycleCoordinator", () => {
     if (captured === coordinator.getReadiness().generation) received.push("stale");
     expect(received).toEqual([]);
   });
+
+  it("disables through the adapter before committing the registry state", async () => {
+    const registry = new PluginRegistry();
+    const coordinator = new PluginLifecycleCoordinator(registry);
+    const calls: string[] = [];
+    await coordinator.stage(manifest, { stage: () => { calls.push("stage"); }, dispose: () => { calls.push("dispose"); } });
+    const result = await coordinator.disable("fixture");
+    expect(result.transaction.kind).toBe("disable");
+    expect(registry.get("fixture")?.state).toBe("disabled");
+    expect(calls).toEqual(["stage", "dispose"]);
+  });
+
+  it("filters externally replayed events to the current generation", async () => {
+    const registry = new PluginRegistry();
+    const current: number[] = [];
+    registry.subscribeCurrent((event) => current.push(event.generation));
+    await registry.register(manifest);
+    await registry.activate("fixture");
+    expect(current).toEqual([1, 2]);
+  });
 });

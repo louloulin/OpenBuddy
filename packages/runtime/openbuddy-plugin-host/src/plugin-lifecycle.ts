@@ -87,6 +87,25 @@ export class PluginLifecycleCoordinator {
     }
   }
 
+  async disable(pluginId: string): Promise<PluginLifecycleResult> {
+    const entry = this.require(pluginId);
+    const adapter = this.adapters.get(pluginId) ?? {};
+    try {
+      await adapter.dispose?.(entry.manifest);
+      const transaction = await this.registry.disable(pluginId);
+      this.refresh();
+      return { transaction, diagnostics: this.getDiagnostics() };
+    } catch (error) {
+      this.record(pluginId, "dispose", error);
+      await this.rollback(entry.manifest, error);
+      this.refresh();
+      return {
+        transaction: { id: `disable-rollback-${this.registry.generation}`, kind: "disable", pluginId, generation: this.registry.generation, status: "rolled_back", error: message(error) },
+        diagnostics: this.getDiagnostics(),
+      };
+    }
+  }
+
   async dispose(pluginId: string): Promise<PluginLifecycleResult> {
     const entry = this.require(pluginId);
     const adapter = this.adapters.get(pluginId) ?? {};
