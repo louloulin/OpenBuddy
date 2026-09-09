@@ -52,3 +52,47 @@ export function isTaskTerminal(status: TaskStatus): boolean {
 export function canRecoverTask(state: Pick<TaskLifecycleState, "status" | "generation">, currentGeneration: number): boolean {
   return state.generation === currentGeneration && (state.status === "queued" || state.status === "paused" || state.status === "failed" || state.status === "retrying");
 }
+
+export interface TaskLifecyclePersistence {
+  read(taskId: string): Promise<TaskLifecycleState | null>;
+  write(state: TaskLifecycleState): Promise<void>;
+}
+
+export interface TaskLifecycleStore {
+  create(state: TaskLifecycleState): Promise<TaskLifecycleState>;
+  get(taskId: string): Promise<TaskLifecycleState | null>;
+  transition(taskId: string, event: TaskLifecycleEvent, updatedAt: string): Promise<TaskLifecycleState>;
+  recover(taskId: string, currentGeneration: number): Promise<TaskLifecycleState | null>;
+}
+
+/**
+ * Write-through task state boundary. Product storage supplies the persistence
+ * adapter; this module owns transition validation and recovery fencing.
+ */
+export function createTaskLifecycleStore(persistence: TaskLifecyclePersistence): TaskLifecycleStore {
+  return {
+    async create(state) {
+      if (!state.taskId || !state.sessionId) throw new Error("taskId and sessionId are required");
+      const existing = await persistence.read(state.taskId);
+      if (existing) throw new Error(`task ${state.taskId} already exists`);
+      await persistence.write({ ...state });
+      return { ...state };
+    },
+    async get(taskId) {
+      const state = await persistence.read(taskId);
+      return state ? { ...state } : null;
+    },
+    async transition(taskId, event, updatedAt) {
+      const current = await persistence.read(taskId);
+      if (!current) throw new Error(`task ${taskId} does not exist`);
+      const next = transitionTask(current, event, updatedAt);
+      await persistence.write(next);
+      return { ...next };
+    },
+    async recover(taskId, currentGeneration) {
+      const state = await persistence.read(taskId);
+      if (!state || !canRecoverTask(state, currentGeneration)) return null;
+      return { ...state };
+    },
+  };
+}
