@@ -94,10 +94,10 @@ function assertManifest(manifest: PluginRegistryManifest): void {
       throw new PluginRegistryError("dependency optional must be a boolean");
     }
   }
-  if (manifest.permissions !== undefined && (!Array.isArray(manifest.permissions) || manifest.permissions.some((permission) => typeof permission !== "string" || !permission.trim()))) {
+  if (manifest.permissions !== undefined && (!Array.isArray(manifest.permissions) || manifest.permissions.length === 0 || manifest.permissions.some((permission) => typeof permission !== "string" || !permission.trim()))) {
     throw new PluginRegistryError("permissions must be a non-empty string array");
   }
-  if (manifest.entrypoints !== undefined && (typeof manifest.entrypoints !== "object" || manifest.entrypoints === null || Array.isArray(manifest.entrypoints) || Object.entries(manifest.entrypoints).some(([key, value]) => !key.trim() || typeof value !== "string" || !value.trim()))) {
+  if (manifest.entrypoints !== undefined && (typeof manifest.entrypoints !== "object" || manifest.entrypoints === null || Array.isArray(manifest.entrypoints) || Object.keys(manifest.entrypoints).length === 0 || Object.entries(manifest.entrypoints).some(([key, value]) => !key.trim() || typeof value !== "string" || !value.trim()))) {
     throw new PluginRegistryError("entrypoints must be a map of non-empty strings");
   }
 }

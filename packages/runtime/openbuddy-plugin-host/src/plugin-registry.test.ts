@@ -31,7 +31,9 @@ describe("PluginRegistry", () => {
     await expect(registry.register({ ...manifest("bad"), dependencies: [{ id: "dep", range: "^1" }, { id: "dep", range: "^1" }] })).rejects.toThrow("duplicate dependency");
     await expect(registry.register({ ...manifest("bad"), permissions: "shell" as never })).rejects.toThrow("permissions must be a non-empty string array");
     await expect(registry.register({ ...manifest("bad"), permissions: ["shell", " "] })).rejects.toThrow("permissions must be a non-empty string array");
+    await expect(registry.register({ ...manifest("bad"), permissions: [] })).rejects.toThrow("permissions must be a non-empty string array");
     await expect(registry.register({ ...manifest("bad"), entrypoints: { pi: " " } })).rejects.toThrow("entrypoints must be a map of non-empty strings");
+    await expect(registry.register({ ...manifest("bad"), entrypoints: {} })).rejects.toThrow("entrypoints must be a map of non-empty strings");
     await registry.register(manifest("dep"));
     await registry.activate("dep");
     const nested = { ...manifest("nested"), dependencies: [{ id: "dep", range: "^1" }] };
