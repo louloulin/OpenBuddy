@@ -73,7 +73,10 @@ export function __resetUiRequestResolverForTest(): void {
 export function resolveUiRequest(requestId: string, value: AgentHostUiRequestValue): boolean {
   if (!state) throw new Error("ui-request-resolver: not installed");
   const request = state.pendingUiRequests.get(requestId);
-  if (!request) return false;
+  if (!request || request.generation !== undefined && request.generation !== state.piGeneration) {
+    if (request) state.pendingUiRequests.delete(requestId);
+    return false;
+  }
   state.pendingUiRequests.delete(requestId);
   if (request.kind === "permission" && request.permission) {
     const decision = value && typeof value === "object" && "decision" in value

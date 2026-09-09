@@ -73,6 +73,7 @@ import {
   type PluginReadinessPhase,
   type PluginReadinessSnapshot,
   createPluginReadinessSnapshot,
+  createGenerationGate,
   createPluginSnapshot,
   type PluginSnapshot,
   updateUnifiedPluginManifest,
@@ -280,6 +281,8 @@ const piSessionRuntime = new PiSessionRuntime();
 const piRuntimeCoordinator = new PiRuntimeCoordinator({
   getSession: () => piSessionRuntime.session,
   getResourceLoader: () => state.piResourceLoader,
+  generationGate: createGenerationGate(),
+  onReload: (generation) => { state.piGeneration = generation; },
 });
 
 /**

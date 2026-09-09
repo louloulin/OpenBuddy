@@ -38,6 +38,7 @@ export interface ProvideRpcUiContextDeps {
     pendingUiRequests: Map<string, {
       kind: "question" | "permission";
       sessionId: string;
+      generation?: number;
       resolve: (value: unknown) => void;
     }>;
     extensionEditorText: Map<string, string>;
@@ -58,6 +59,7 @@ export interface ProvideRpcUiContextDeps {
    * passed in as a dep so this module stays independent of that import.
    */
   createOpenBuddyRpcUiContext: (args: unknown) => unknown;
+  piGeneration?: number;
 }
 
 function makeRequestId(sessionId: string, kind: string): string {
@@ -70,13 +72,14 @@ function makeRequestId(sessionId: string, kind: string): string {
  */
 export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIContext {
   const { context, session, state, emitPluginEvent, emitRendererEvent, questionAnswer, createOpenBuddyRpcUiContext } = deps;
+  const generation = deps.piGeneration ?? 0;
 
   const uiContext = (createOpenBuddyRpcUiContext as any)({
     sessionId: session.sessionId,
     select: async (title: string, options: ReadonlyArray<unknown>) =>
       new Promise<string | undefined>((resolve) => {
         const requestId = makeRequestId(session.sessionId, "select");
-        state.pendingUiRequests.set(requestId, { kind: "question", sessionId: session.sessionId, resolve: (value) => resolve(questionAnswer(value, title)) });
+        state.pendingUiRequests.set(requestId, { kind: "question", sessionId: session.sessionId, generation, resolve: (value) => resolve(questionAnswer(value, title)) });
         emitPluginEvent("session/question", { requestId, sessionId: session.sessionId, title, questionCount: 1, optionCount: options.length });
         emitRendererEvent("pi://question", {
           requestId,
@@ -89,7 +92,7 @@ export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIC
     confirm: async (title: string, message: string) =>
       new Promise<boolean>((resolve) => {
         const requestId = makeRequestId(session.sessionId, "confirm");
-        state.pendingUiRequests.set(requestId, { kind: "permission", sessionId: session.sessionId, resolve: (value) => resolve(value === true) });
+        state.pendingUiRequests.set(requestId, { kind: "permission", sessionId: session.sessionId, generation, resolve: (value) => resolve(value === true) });
         emitPluginEvent("session/permission", { requestId, sessionId: session.sessionId, title, hasMessage: Boolean(message), optionCount: 2 });
         emitRendererEvent("pi://permission", {
           requestId,
@@ -106,7 +109,7 @@ export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIC
     input: async (title: string, placeholder: string) =>
       new Promise<string | undefined>((resolve) => {
         const requestId = makeRequestId(session.sessionId, "input");
-        state.pendingUiRequests.set(requestId, { kind: "question", sessionId: session.sessionId, resolve: (value) => resolve(questionAnswer(value, placeholder || title)) });
+        state.pendingUiRequests.set(requestId, { kind: "question", sessionId: session.sessionId, generation, resolve: (value) => resolve(questionAnswer(value, placeholder || title)) });
         emitPluginEvent("session/question", { requestId, sessionId: session.sessionId, title, questionCount: 1, optionCount: 0, input: true });
         emitRendererEvent("pi://question", {
           requestId,
