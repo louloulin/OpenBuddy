@@ -1287,7 +1287,7 @@ export {
   type RemoteSchema,
 } from "./remote-codec";
 export * from "./rpc-contract";
-export * from "./hooks";
+export * from "./generation-gate";
 export {
   CAPABILITY_OWNERSHIP,
   CAPABILITY_TO_PLUGIN_ID as AUTHORITY_CAPABILITY_TO_PLUGIN_ID,
