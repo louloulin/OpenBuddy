@@ -125,4 +125,53 @@ describe("init-pi-dsh-core-extensions (Phase B.3 step 2a)", () => {
       error: "jiti blew up",
     });
   });
+
+  it("Phase B.3 step 2b — accepts real @openbuddy/dsh-core source paths", async () => {
+    // The whole point of B.3 step 2b is that `dshCorePaths` now points
+    // at real files (the goals.ts + message-feedback.ts from
+    // packages/runtime/openbuddy-dsh-core/src). The loader passes
+    // them through to discoverAndLoadExtensions verbatim; this test
+    // pins the contract by passing the actual source paths and
+    // asserting they're forwarded unchanged.
+    const state = makeState();
+    const emit = vi.fn();
+    vi.mocked(discoverAndLoadExtensions).mockResolvedValue({
+      extensions: [
+        { path: "/repo/packages/runtime/openbuddy-dsh-core/src/goals.ts", resolvedPath: "/repo/packages/runtime/openbuddy-dsh-core/src/goals.ts" },
+        { path: "/repo/packages/runtime/openbuddy-dsh-core/src/message-feedback.ts", resolvedPath: "/repo/packages/runtime/openbuddy-dsh-core/src/message-feedback.ts" },
+      ],
+      errors: [],
+      runtime: {} as never,
+    } as never);
+
+    const realPaths = [
+      "/repo/packages/runtime/openbuddy-dsh-core/src/goals.ts",
+      "/repo/packages/runtime/openbuddy-dsh-core/src/message-feedback.ts",
+    ];
+    const result = await initPiDshCoreExtensions({
+      state, cwd: "/work", emitPluginEvent: emit,
+      dshCorePaths: realPaths,
+    });
+
+    // The paths are forwarded to PI's discoverAndLoadExtensions unchanged.
+    expect(vi.mocked(discoverAndLoadExtensions)).toHaveBeenCalledWith(
+      realPaths,
+      "/work",
+      undefined,
+      undefined,
+    );
+    expect(result).toEqual({ loaded: 2, failed: 0, failedIds: [] });
+    // The emit events use the same path as the id so renderer-side
+    // diagnostics can correlate the load to a source file.
+    expect(emit).toHaveBeenNthCalledWith(1, "plugin/loaded", {
+      id: realPaths[0],
+      source: "pi-dsh-core-extensions",
+      path: realPaths[0],
+    });
+    expect(emit).toHaveBeenNthCalledWith(2, "plugin/loaded", {
+      id: realPaths[1],
+      source: "pi-dsh-core-extensions",
+      path: realPaths[1],
+    });
+  });
 });
