@@ -333,3 +333,25 @@ export function feedbackEntryCount(): number {
   for (const entries of dshFeedbackState.values()) total += entries.size;
   return total;
 }
+
+/**
+ * Search goals by case-insensitive substring match on the objective.
+ * Returns goals whose objective contains the query (after trimming).
+ * Phase C.3 — useful for renderer-side goal browsers / quick filters
+ * without the caller having to walk `listAllGoals()`.
+ */
+export function searchGoalsByObjective(
+  query: string,
+  filter?: { phase?: DshGoalRecord["phase"] },
+): Array<{ sessionId: string; goal: DshGoalRecord }> {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  const out: Array<{ sessionId: string; goal: DshGoalRecord }> = [];
+  for (const [sessionId, goal] of dshGoalState) {
+    if (filter?.phase && goal.phase !== filter.phase) continue;
+    if (goal.objective.toLowerCase().includes(needle)) {
+      out.push({ sessionId, goal: { ...goal } });
+    }
+  }
+  return out;
+}

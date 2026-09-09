@@ -33,6 +33,7 @@ import {
   editGoal,
   getGoal,
   listAllGoals,
+  searchGoalsByObjective,
   transitionGoal,
 } from "./state";
 
@@ -76,6 +77,16 @@ export default function createDshGoalsExtension(): ExtensionFactory {
       handler: async (args) => {
         const typed = (args ?? {}) as { phase?: "active" | "paused" | "blocked" | "complete" };
         return listAllGoals(typed.phase ? { phase: typed.phase } : undefined);
+      },
+    });
+
+    commands.registerCommand?.({
+      name: "goals.search",
+      description: "Search goals across every session by case-insensitive substring of objective (Phase C.3).",
+      handler: async (args) => {
+        const typed = (args ?? {}) as { query?: string; phase?: "active" | "paused" | "blocked" | "complete" };
+        const query = typeof typed.query === "string" ? typed.query : "";
+        return searchGoalsByObjective(query, typed.phase ? { phase: typed.phase } : undefined);
       },
     });
 

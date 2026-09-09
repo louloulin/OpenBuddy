@@ -21,6 +21,7 @@ import {
   createGoal,
   getGoal,
   listAllGoals,
+  searchGoalsByObjective,
   transitionGoal,
   type DshGoalRecord,
 } from "./state";
@@ -78,7 +79,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     __resetDshCoreStateForTests();
   });
 
-  it("registers 9 goals.* commands on init (Phase C.2: + goals.list)", () => {
+  it("registers 10 goals.* commands on init (Phase C.2: + goals.list, Phase C.3: + goals.search)", () => {
     const factory = createDshGoalsExtension();
     const { api, commands } = buildMockApi("session-1");
     factory(api);
@@ -91,6 +92,7 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     expect(commands.has("goals.blocked")).toBe(true);
     expect(commands.has("goals.clear")).toBe(true);
     expect(commands.has("goals.list")).toBe(true);
+    expect(commands.has("goals.search")).toBe(true);
   });
 
   it("goals.create returns a ref and persists via the shared state map", async () => {
@@ -261,5 +263,40 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     // After creating one goal, list size is 1.
     createGoal({ id: "session-x" }, "current", { objective: "X" });
     expect(listAllGoals()).toHaveLength(1);
+  });
+
+  it("goals.search filters by case-insensitive substring (Phase C.3)", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-search");
+    factory(api);
+    await commands.get("goals.create")!.handler({ objective: "Ship v1.0 release" });
+    createGoal({ id: "session-other-1" }, "current", { objective: "Fix payment bug" });
+    createGoal({ id: "session-other-2" }, "current", { objective: "Update SHIPPING docs" });
+    // No-op stub: createGoal needs unique sessions, so all 3 land.
+
+    // "ship" matches "Ship v1.0 release" and "Update SHIPPING docs"
+    // (case-insensitive). It does NOT match "Fix payment bug".
+    const shipMatches = searchGoalsByObjective("ship");
+    expect(shipMatches).toHaveLength(2);
+    const objectives = shipMatches.map((m) => m.goal.objective).sort();
+    expect(objectives).toEqual(["Ship v1.0 release", "Update SHIPPING docs"]);
+
+    // Empty query → empty list (defensive).
+    expect(searchGoalsByObjective("")).toEqual([]);
+    expect(searchGoalsByObjective("   ")).toEqual([]);
+
+    // No match → empty list.
+    expect(searchGoalsByObjective("nonexistent keyword xyzzy")).toEqual([]);
+  });
+
+  it("goals.search slash command returns the same shape as goals.list", async () => {
+    const factory = createDshGoalsExtension();
+    const { api, commands } = buildMockApi("session-slash");
+    factory(api);
+    await commands.get("goals.create")!.handler({ objective: "Audit v1.0 release" });
+
+    const result = (await commands.get("goals.search")!.handler({ query: "audit" })) as Array<{ sessionId: string; goal: DshGoalRecord }>;
+    expect(result).toHaveLength(1);
+    expect(result[0]?.goal.objective).toBe("Audit v1.0 release");
   });
 });
