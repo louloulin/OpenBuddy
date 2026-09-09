@@ -23,10 +23,12 @@
 
 export {
   default as createDshGoalsExtension,
+  createDshGoalsExtensionForSession,
 } from "./goals";
 
 export {
   default as createDshMessageFeedbackExtension,
+  createDshMessageFeedbackExtensionForSession,
 } from "./message-feedback";
 
 export * from "./state";

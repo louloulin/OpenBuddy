@@ -15,7 +15,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import createDshGoalsExtension from "./goals";
+import createDshGoalsExtension, { createDshGoalsExtensionForSession } from "./goals";
 import {
   __resetDshCoreStateForTests,
   advanceGoalRounds,
@@ -327,5 +327,51 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     const finalGoal = getGoal({ id: "session-advance" }, "current");
     expect(finalGoal?.roundsStarted).toBe(2);
     expect(finalGoal?.phase).toBe("complete");
+  });
+
+  it("B.3 step 3 — createDshGoalsExtensionForSession binds state to a specific sessionId (no api.context lookup)", async () => {
+    // Phase B.3 step 3 — the new factory takes a sessionId at
+    // construction time and pre-binds the carrier. It does NOT call
+    // api.context.get('sessionFallbackKey') because the session is
+    // already determined.
+    const factory = createDshGoalsExtensionForSession("session-A");
+    const { api, commands } = buildMockApi("ignored-by-step3-factory");
+    factory(api);
+
+    // Create a goal in session-A.
+    const created = (await commands.get("goals.create")!.handler({ objective: "Step 3 bound" })) as { ref: { id: string; revision: number } };
+    // The goal must be in the explicit session, not the mock session.
+    expect(getGoal({ id: "session-A" }, "current")?.objective).toBe("Step 3 bound");
+    expect(getGoal({ id: "ignored-by-step3-factory" }, "current")).toBeUndefined();
+
+    // Advance the rounds to confirm the binding.
+    const advanced = (await commands.get("goals.advance-rounds")!.handler(created.ref)) as DshGoalRecord;
+    expect(advanced.roundsStarted).toBe(1);
+
+    // Confirm commands register the same 11 commands.
+    expect(commands.size).toBe(11);
+  });
+
+  it("B.3 step 3 — multiple ForSession factories land goals in different sessions (no cross-talk)", async () => {
+    const factoryA = createDshGoalsExtensionForSession("session-X");
+    const factoryB = createDshGoalsExtensionForSession("session-Y");
+    const mockA = buildMockApi("ignored-A");
+    const mockB = buildMockApi("ignored-B");
+    factoryA(mockA.api);
+    factoryB(mockB.api);
+
+    await mockA.commands.get("goals.create")!.handler({ objective: "Goal in X" });
+    await mockB.commands.get("goals.create")!.handler({ objective: "Goal in Y" });
+
+    // Goals land in their respective sessions, no cross-talk.
+    expect(getGoal({ id: "session-X" }, "current")?.objective).toBe("Goal in X");
+    expect(getGoal({ id: "session-Y" }, "current")?.objective).toBe("Goal in Y");
+    // Each session's `goals.get` returns its own goal (verified via
+    // the mock API context) — confirms the carrier binding took
+    // effect for each session separately.
+    const xGoal = (await mockA.commands.get("goals.get")!.handler({})) as DshGoalRecord | undefined;
+    const yGoal = (await mockB.commands.get("goals.get")!.handler({})) as DshGoalRecord | undefined;
+    expect(xGoal?.objective).toBe("Goal in X");
+    expect(yGoal?.objective).toBe("Goal in Y");
   });
 });

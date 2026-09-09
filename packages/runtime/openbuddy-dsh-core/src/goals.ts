@@ -36,7 +36,26 @@ import {
   searchGoalsByObjective,
   transitionGoal,
   advanceGoalRounds,
+  sessionKey,
 } from "./state";
+
+/** B.3 step 3 — explicit session-bound factory. Returns an
+ *  ExtensionFactory pre-bound to a specific session ID. The implicit
+ *  createDshGoalsExtension() (no args) is kept for backward
+ *  compatibility — it relies on sessionFallbackKey from the
+ *  ExtensionAPI context.
+ */
+export function createDshGoalsExtensionForSession(sessionId: string): ExtensionFactory {
+  return (_api: ExtensionAPI): void => {
+    // Pre-resolve the carrier from the sessionId, so the registration
+    // closure below is fully decoupled from the ExtensionAPI context
+    // lookup. This is the canonical "session-bound" factory promised
+    // by B.3 step 3 §33.4.
+    const carrier = { sessionId };
+    const fallback = sessionKey(carrier, "current");
+    registerGoalCommands(_api, carrier, fallback);
+  };
+}
 
 export type { DshGoalRecord } from "./state";
 
@@ -57,92 +76,103 @@ export default function createDshGoalsExtension(): ExtensionFactory {
       context?: { get?: (name: string) => unknown };
     }).context?.get?.("sessionFallbackKey");
     const fallback = typeof carrier === "string" ? carrier : "current";
-
-    const commands = api as unknown as {
-      registerCommand?: (spec: {
-        name: string;
-        description: string;
-        handler: (args: unknown) => Promise<unknown> | unknown;
-      }) => void;
-    };
-
-    commands.registerCommand?.({
-      name: "goals.get",
-      description: "Return the current DSH goal for the active session (or undefined).",
-      handler: async () => getGoal(carrier, fallback),
-    });
-
-    commands.registerCommand?.({
-      name: "goals.list",
-      description: "List all active DSH goals across every session, optionally filtered by phase.",
-      handler: async (args) => {
-        const typed = (args ?? {}) as { phase?: "active" | "paused" | "blocked" | "complete" };
-        return listAllGoals(typed.phase ? { phase: typed.phase } : undefined);
-      },
-    });
-
-    commands.registerCommand?.({
-      name: "goals.search",
-      description: "Search goals across every session by case-insensitive substring of objective (Phase C.3).",
-      handler: async (args) => {
-        const typed = (args ?? {}) as { query?: string; phase?: "active" | "paused" | "blocked" | "complete" };
-        const query = typeof typed.query === "string" ? typed.query : "";
-        return searchGoalsByObjective(query, typed.phase ? { phase: typed.phase } : undefined);
-      },
-    });
-
-    commands.registerCommand?.({
-      name: "goals.advance-rounds",
-      description: "Increment the goal's roundsStarted counter; rejects on revision conflict or complete phase (Phase C.3).",
-      handler: async (args) => {
-        const typed = (args ?? {}) as { id?: string; revision?: number };
-        return advanceGoalRounds(carrier, fallback, typed);
-      },
-    });
-
-    commands.registerCommand?.({
-      name: "goals.create",
-      description: "Create a new DSH goal for the active session.",
-      handler: async (args) => createGoal(carrier, fallback, (args ?? {}) as { objective?: string; maxGoalRounds?: number }),
-    });
-
-    commands.registerCommand?.({
-      name: "goals.edit",
-      description: "Edit an existing DSH goal's objective.",
-      handler: async (args) => editGoal(carrier, fallback, (args ?? {}) as { id?: string; revision?: number }, (args ?? {}) as { objective?: string }),
-    });
-
-    commands.registerCommand?.({
-      name: "goals.pause",
-      description: "Pause an active DSH goal.",
-      handler: async (args) => transitionGoal(carrier, fallback, (args ?? {}) as { id?: string; revision?: number }, "paused"),
-    });
-
-    commands.registerCommand?.({
-      name: "goals.resume",
-      description: "Resume a paused DSH goal.",
-      handler: async (args) => transitionGoal(carrier, fallback, (args ?? {}) as { id?: string; revision?: number }, "active"),
-    });
-
-    commands.registerCommand?.({
-      name: "goals.complete",
-      description: "Complete an active DSH goal.",
-      handler: async (args) => transitionGoal(carrier, fallback, (args ?? {}) as { id?: string; revision?: number }, "complete"),
-    });
-
-    commands.registerCommand?.({
-      name: "goals.blocked",
-      description: "Mark a DSH goal as blocked with a reason.",
-      handler: async (args) => {
-        const typed = (args ?? {}) as { id?: string; revision?: number; reason?: string };
-        return blockGoal(carrier, fallback, typed, typed.reason ?? "");
-      },
-    });
-
-    commands.registerCommand?.({
-      name: "goals.clear",
-      description: "Clear a DSH goal from the active session.",
-      handler: async (args) => clearGoal(carrier, fallback, (args ?? {}) as { id?: string; revision?: number }),
-    });
+    registerGoalCommands(api, carrier, fallback);
   };
+}
+
+/**
+ * B.3 step 3 — shared registration helper. Both the implicit
+ * `createDshGoalsExtension()` (session-keyed via api.context) and
+ * the explicit `createDshGoalsExtensionForSession(sessionId)` call
+ * this helper. Splitting the registration out of the factory lets
+ * the two entry points share the same command list without
+ * duplicating the 11 registerCommand calls.
+ */
+function registerGoalCommands(api: ExtensionAPI, carrier: unknown, fallback: string): void {
+  const commands = api as unknown as {
+    registerCommand?: (spec: {
+      name: string;
+      description: string;
+      handler: (args: unknown) => Promise<unknown> | unknown;
+    }) => void;
+  };
+
+  commands.registerCommand?.({
+    name: "goals.get",
+    description: "Return the current DSH goal for the active session (or undefined).",
+    handler: async () => getGoal(carrier, fallback),
+  });
+
+  commands.registerCommand?.({
+    name: "goals.list",
+    description: "List all active DSH goals across every session, optionally filtered by phase.",
+    handler: async (args) => {
+      const typed = (args ?? {}) as { phase?: "active" | "paused" | "blocked" | "complete" };
+      return listAllGoals(typed.phase ? { phase: typed.phase } : undefined);
+    },
+  });
+
+  commands.registerCommand?.({
+    name: "goals.search",
+    description: "Search goals across every session by case-insensitive substring of objective (Phase C.3).",
+    handler: async (args) => {
+      const typed = (args ?? {}) as { query?: string; phase?: "active" | "paused" | "blocked" | "complete" };
+      const query = typeof typed.query === "string" ? typed.query : "";
+      return searchGoalsByObjective(query, typed.phase ? { phase: typed.phase } : undefined);
+    },
+  });
+
+  commands.registerCommand?.({
+    name: "goals.advance-rounds",
+    description: "Increment the goal's roundsStarted counter; rejects on revision conflict or complete phase (Phase C.3).",
+    handler: async (args) => {
+      const typed = (args ?? {}) as { id?: string; revision?: number };
+      return advanceGoalRounds(carrier, fallback, typed);
+    },
+  });
+
+  commands.registerCommand?.({
+    name: "goals.create",
+    description: "Create a new DSH goal for the active session.",
+    handler: async (args) => createGoal(carrier, fallback, (args ?? {}) as { objective?: string; maxGoalRounds?: number }),
+  });
+
+  commands.registerCommand?.({
+    name: "goals.edit",
+    description: "Edit an existing DSH goal's objective.",
+    handler: async (args) => editGoal(carrier, fallback, (args ?? {}) as { id?: string; revision?: number }, (args ?? {}) as { objective?: string }),
+  });
+
+  commands.registerCommand?.({
+    name: "goals.pause",
+    description: "Pause an active DSH goal.",
+    handler: async (args) => transitionGoal(carrier, fallback, (args ?? {}) as { id?: string; revision?: number }, "paused"),
+  });
+
+  commands.registerCommand?.({
+    name: "goals.resume",
+    description: "Resume a paused DSH goal.",
+    handler: async (args) => transitionGoal(carrier, fallback, (args ?? {}) as { id?: string; revision?: number }, "active"),
+  });
+
+  commands.registerCommand?.({
+    name: "goals.complete",
+    description: "Complete an active DSH goal.",
+    handler: async (args) => transitionGoal(carrier, fallback, (args ?? {}) as { id?: string; revision?: number }, "complete"),
+  });
+
+  commands.registerCommand?.({
+    name: "goals.blocked",
+    description: "Mark a DSH goal as blocked with a reason.",
+    handler: async (args) => {
+      const typed = (args ?? {}) as { id?: string; revision?: number; reason?: string };
+      return blockGoal(carrier, fallback, typed, typed.reason ?? "");
+    },
+  });
+
+  commands.registerCommand?.({
+    name: "goals.clear",
+    description: "Clear a DSH goal from the active session.",
+    handler: async (args) => clearGoal(carrier, fallback, (args ?? {}) as { id?: string; revision?: number }),
+  });
 }

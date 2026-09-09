@@ -25,19 +25,35 @@ import {
   listFeedbackEntries,
   putFeedbackEntry,
   searchFeedbackEntries,
+  sessionKey,
   sessionSummary,
 } from "./state";
 
 export type { DshFeedbackEntry } from "./state";
 
 /**
+ * B.3 step 3 — explicit session-bound factory. Returns an
+ * ExtensionFactory pre-bound to a specific session ID. The implicit
+ * createDshMessageFeedbackExtension() (no args) is kept for backward
+ * compatibility — it relies on sessionFallbackKey from the
+ * ExtensionAPI context.
+ */
+export function createDshMessageFeedbackExtensionForSession(sessionId: string): ExtensionFactory {
+  return (_api: ExtensionAPI): void => {
+    const carrier = { sessionId };
+    const fallback = sessionKey(carrier, "current");
+    registerFeedbackCommands(_api, carrier, fallback);
+  };
+}
+
+/**
  * Phase B.3 step 2b — PI-native message-feedback state machine extension.
  *
- * Registers 3 slash commands (`feedback.list`, `feedback.put`,
- * `feedback.delete`). Session keying mirrors `goals.ts`: prefer
- * `ctx.sessionFallbackKey` if exposed by PI (B.3 step 3 will fully
- * bind this); fall back to `"current"` so the live
- * `discoverAndLoadExtensions()` path still works.
+ * Registers 6 slash commands (`feedback.list / stats / search /
+ * session-summary / put / delete`). Session keying mirrors
+ * `goals.ts`: prefer `ctx.sessionFallbackKey` if exposed by PI
+ * (B.3 step 3 will fully bind this); fall back to `"current"` so
+ * the live `discoverAndLoadExtensions()` path still works.
  */
 export default function createDshMessageFeedbackExtension(): ExtensionFactory {
   return (api: ExtensionAPI): void => {
@@ -45,69 +61,79 @@ export default function createDshMessageFeedbackExtension(): ExtensionFactory {
       context?: { get?: (name: string) => unknown };
     }).context?.get?.("sessionFallbackKey");
     const fallback = typeof carrier === "string" ? carrier : "current";
-
-    const commands = api as unknown as {
-      registerCommand?: (spec: {
-        name: string;
-        description: string;
-        handler: (args: unknown) => Promise<unknown> | unknown;
-      }) => void;
-    };
-
-    commands.registerCommand?.({
-      name: "feedback.list",
-      description: "List message-feedback entries for the active session.",
-      handler: async (args) => listFeedbackEntries((args ?? {}) as { sessionId?: string }, fallback),
-    });
-
-    commands.registerCommand?.({
-      name: "feedback.stats",
-      description: "Return message-feedback surface stats: { sessions, entries } across every session.",
-      handler: async () => ({
-        sessions: feedbackSessionCount(),
-        entries: feedbackEntryCount(),
-      }),
-    });
-
-    commands.registerCommand?.({
-      name: "feedback.search",
-      description: "Search feedback entries by case-insensitive substring of rating or note (Phase C.3).",
-      handler: async (args) => {
-        const typed = (args ?? {}) as { query?: string; sessionId?: string };
-        const query = typeof typed.query === "string" ? typed.query : "";
-        return searchFeedbackEntries(
-          query,
-          typed.sessionId ? { sessionId: typed.sessionId } : undefined,
-        );
-      },
-    });
-
-    commands.registerCommand?.({
-      name: "feedback.session-summary",
-      description: "Return the goal (if any) + feedback entries for the active session in a single call (Phase C.3).",
-      handler: async () => sessionSummary(carrier, fallback),
-    });
-
-    commands.registerCommand?.({
-      name: "feedback.put",
-      description: "Submit a message-feedback entry.",
-      handler: async (args) => putFeedbackEntry((args ?? {}) as {
-        sessionId?: string;
-        messageId: string;
-        rating: string;
-        note?: string;
-        ifVersion?: number | null;
-      }, fallback),
-    });
-
-    commands.registerCommand?.({
-      name: "feedback.delete",
-      description: "Delete a message-feedback entry.",
-      handler: async (args) => deleteFeedbackEntry((args ?? {}) as {
-        sessionId?: string;
-        messageId: string;
-        ifVersion?: number | null;
-      }, fallback),
-    });
+    registerFeedbackCommands(api, carrier, fallback);
   };
+}
+
+/**
+ * B.3 step 3 — shared registration helper. Both the implicit
+ * createDshMessageFeedbackExtension() and the explicit
+ * createDshMessageFeedbackExtensionForSession() call this helper.
+ * Same pattern as goals.ts so the two entry points share the same
+ * command list without duplicating the 6 registerCommand calls.
+ */
+function registerFeedbackCommands(api: ExtensionAPI, carrier: unknown, fallback: string): void {
+  const commands = api as unknown as {
+    registerCommand?: (spec: {
+      name: string;
+      description: string;
+      handler: (args: unknown) => Promise<unknown> | unknown;
+    }) => void;
+  };
+
+  commands.registerCommand?.({
+    name: "feedback.list",
+    description: "List message-feedback entries for the active session.",
+    handler: async (args) => listFeedbackEntries((args ?? {}) as { sessionId?: string }, fallback),
+  });
+
+  commands.registerCommand?.({
+    name: "feedback.stats",
+    description: "Return message-feedback surface stats: { sessions, entries } across every session.",
+    handler: async () => ({
+      sessions: feedbackSessionCount(),
+      entries: feedbackEntryCount(),
+    }),
+  });
+
+  commands.registerCommand?.({
+    name: "feedback.search",
+    description: "Search feedback entries by case-insensitive substring of rating or note (Phase C.3).",
+    handler: async (args) => {
+      const typed = (args ?? {}) as { query?: string; sessionId?: string };
+      const query = typeof typed.query === "string" ? typed.query : "";
+      return searchFeedbackEntries(
+        query,
+        typed.sessionId ? { sessionId: typed.sessionId } : undefined,
+      );
+    },
+  });
+
+  commands.registerCommand?.({
+    name: "feedback.session-summary",
+    description: "Return the goal (if any) + feedback entries for the active session in a single call (Phase C.3).",
+    handler: async () => sessionSummary(carrier, fallback),
+  });
+
+  commands.registerCommand?.({
+    name: "feedback.put",
+    description: "Submit a message-feedback entry.",
+    handler: async (args) => putFeedbackEntry((args ?? {}) as {
+      sessionId?: string;
+      messageId: string;
+      rating: string;
+      note?: string;
+      ifVersion?: number | null;
+    }, fallback),
+  });
+
+  commands.registerCommand?.({
+    name: "feedback.delete",
+    description: "Delete a message-feedback entry.",
+    handler: async (args) => deleteFeedbackEntry((args ?? {}) as {
+      sessionId?: string;
+      messageId: string;
+      ifVersion?: number | null;
+    }, fallback),
+  });
 }
