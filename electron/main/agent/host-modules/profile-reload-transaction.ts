@@ -201,6 +201,7 @@ export function __resetProfileReloadTransactionForTest(): void {
 export async function rollbackPiProfile(
   snapshot: PiProfileSnapshot,
   capturedServices: Map<string, unknown> = new Map(),
+  capturedCapabilities?: Map<string, unknown>,
 ): Promise<void> {
   if (!state) throw new Error("profile-reload-transaction: not installed");
   restorePiProfileSnapshotImpl(snapshot);
@@ -220,7 +221,11 @@ export async function rollbackPiProfile(
   await reconcileProfileArtifactsImpl();
   await piRuntimeCoordinator!.reload("profile-rollback");
   await reloadMcpImpl();
-  await restoreDeepSeekCapabilityServicesImpl();
+  if (capturedCapabilities === undefined) {
+    await restoreDeepSeekCapabilityServicesImpl();
+  } else {
+    await restoreDeepSeekCapabilityServicesImpl(capturedCapabilities);
+  }
   restoreCapturedContextServicesImpl(capturedServices);
   reportPiExtensionErrorsImpl();
 }
@@ -250,6 +255,7 @@ export function scheduleProfileReload(): void {
       async (transaction) => {
         const previous = capturePiProfileSnapshotImpl();
         const capturedServices = captureReloadableContextServicesImpl();
+        const capturedCapabilities = captureDeepSeekCapabilityServicesImpl();
         try {
           const pluginTransactionId = typeof transaction.transactionId === "string" ? transaction.transactionId : undefined;
           const piGenerationBefore = state!.piGeneration;
@@ -322,7 +328,6 @@ export function scheduleProfileReload(): void {
           };
           state!.profileBundle = runtimeBundle ?? null;
 
-          const capturedCapabilities = captureDeepSeekCapabilityServicesImpl();
           transaction.phase("artifacts", "typert-remote");
           await reconcileProfileArtifactsImpl();
           transaction.receipt("artifacts", {
@@ -370,7 +375,7 @@ export function scheduleProfileReload(): void {
         } catch (error) {
           try {
             transaction.phase("rollback", "profile");
-            await rollbackPiProfile(previous, capturedServices);
+            await rollbackPiProfile(previous, capturedServices, capturedCapabilities);
             emitPluginEvent("profile/reload-failed", {
               error: String(error),
               rolledBack: true,
