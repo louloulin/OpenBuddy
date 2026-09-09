@@ -83,6 +83,9 @@ const workspacePackageAliases = [
   { find: "@openbuddy/capability-plan",            replacement: resolve(repoRoot, "packages/capability/openbuddy-plan/src/index.ts") },
   { find: "@openbuddy/capability-authorization",   replacement: resolve(repoRoot, "packages/capability/openbuddy-authorization/src/index.ts") },
   { find: "@openbuddy/capability-mcp-client",       replacement: resolve(repoRoot, "packages/capability/openbuddy-mcp-client/src/index.ts") },
+  // Phase I.2 — calendar PI extension (electron/main/agent/extensions/calendar-pi-extension.ts)
+  // needs the live calendar handlers + createCalendarToolDefinitions factory.
+  { find: "@openbuddy/capability-calendar",         replacement: resolve(repoRoot, "packages/capability/openbuddy-calendar/src/index.ts") },
   { find: "@openbuddy/auth-permission",            replacement: resolve(repoRoot, "packages/auth/openbuddy-permission/src/index.ts") },
   { find: "@openbuddy/auth-casdoor",               replacement: resolve(repoRoot, "packages/auth/openbuddy-casdoor/src/index.ts") },
   { find: "@openbuddy/shared-types",               replacement: resolve(repoRoot, "packages/shared/openbuddy-types/src/index.ts") },

@@ -525,6 +525,8 @@ describe("OpenBuddy Pi extension resolution", () => {
       "openbuddy-pi-session-metadata",
       // Phase B.1 round 2 — 6th builtin ExtensionFactory for model events.
       "openbuddy-pi-model-bridge",
+      // Phase I.2 — 7th builtin ExtensionFactory for calendar PI tools.
+      "openbuddy-pi-calendar",
     ]);
   });
 

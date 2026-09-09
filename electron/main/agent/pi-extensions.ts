@@ -5,6 +5,7 @@ import { DEFAULT_COMPACTION_SETTINGS, shouldCompact } from "@earendil-works/pi-a
 import openBuddyApplyPatch, { type OpenBuddyApplyPatchConfig } from "./extensions/apply-patch";
 import { sessionMetadataBridgeFactory } from "./extensions/session-metadata-bridge";
 import { modelBridgeFactory } from "./extensions/model-bridge";
+import { calendarPiFactory } from "./extensions/calendar-pi-extension";
 import { isPiPackageInstalled } from "./pi-package-installed";
 import {
   createTelemetryBridgeExtension,
@@ -920,6 +921,23 @@ export const BUILTIN_PI_PLUGIN_MANIFESTS: readonly OpenBuddyPluginManifest[] = [
       { kind: "pi", inline: "openbuddy-pi-model-bridge" },
     ],
   },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-pi-calendar",
+    packageName: "@openbuddy/builtin-pi-calendar",
+    version: "1.0.0",
+    description: "Phase I.2 — register the calendar capability's 4 PI tools (calendar_list / calendar_create / calendar_update / calendar_remove) so the LLM can drive calendar operations through first-class pi tools rather than only slash commands / IPC.",
+    tracks: [
+      {
+        kind: "pi",
+        inline: "openbuddy-pi-calendar",
+        config: {
+          schema: "openbuddy.pi-calendar.v1",
+          defaults: { readOnly: false },
+        },
+      },
+    ],
+  },
 ];
 
 /**
@@ -1106,6 +1124,14 @@ export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResol
   // model_select / set_model / before_provider_request without breaking
   // the legacy installAgentModel() provider CRUD path.
   "openbuddy-pi-model-bridge": (_emit, _config, _options) => modelBridgeFactory,
+
+  // Phase I.2 — 10th builtin ExtensionFactory. Registers the calendar
+  // capability's PI tools (calendar_list / calendar_create / calendar_update
+  // / calendar_remove) so the LLM can drive calendar operations through
+  // first-class pi tools. The Cordis `calendar` service (mounted by
+  // capability-plugins.ts) remains the canonical backend; the tools
+  // here just adapt the Cordis service surface to the PI ExtensionAPI.
+  "openbuddy-pi-calendar": (_emit, _config, _options) => calendarPiFactory,
 };
 
 export function resolvePiExtensions(
