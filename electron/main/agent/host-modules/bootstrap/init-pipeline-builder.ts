@@ -23,6 +23,7 @@ import { initProfile } from "./init-profile";
 import { initPluginLoader } from "./init-plugin-loader";
 import { initDeepSeek } from "./init-deepseek";
 import { initPiUserExtensions, type PiUserExtensionLoadResult } from "./init-pi-user-extensions";
+import { initPiDshCoreExtensions, type PiDshCoreExtensionLoadResult } from "./init-pi-dsh-core-extensions";
 import { computeActiveAdapterIds } from "./compute-active-adapter-ids";
 import { injectSystemPromptSections } from "./inject-system-prompt-sections";
 import { initSession } from "./init-session";
@@ -153,6 +154,13 @@ export function buildInitPipelineDeps(
      */
     initPiUserExtensions: (deps: { state: AgentHostState; cwd: string; emitPluginEvent: (type: string, payload: unknown) => void }): Promise<PiUserExtensionLoadResult> =>
       initPiUserExtensions(deps),
+    /**
+     * Phase B.3 step 2a — parallel PI loader for DSH core packages.
+     * Until B.3 step 2b extracts the 7 DSH core shims into real files,
+     * `dshCorePaths` is empty (no-op fast-path in `init-pi-dsh-core-extensions.ts`).
+     */
+    initPiDshCoreExtensions: (deps: { state: AgentHostState; cwd: string; emitPluginEvent: (type: string, payload: unknown) => void; dshCorePaths: readonly string[] }): Promise<PiDshCoreExtensionLoadResult> =>
+      initPiDshCoreExtensions(deps),
     computeActiveAdapterIds,
     injectSystemPromptSections,
     initSession,

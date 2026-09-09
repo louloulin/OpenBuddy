@@ -92,6 +92,7 @@ export function createDefaultAgentHostState(): AgentHostState {
     activePluginTransactions: new Map(),
     rendererPluginManifestCache: null,
     userExtensionResult: null,
+    dshCoreExtensionResult: null,
     profileOptions: null,
     profileBundle: null,
     activePluginProfile: null,

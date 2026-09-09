@@ -74,6 +74,14 @@ function buildFakeDeps(): InitPipelineDeps {
       callOrder.push("initPiUserExtensions");
       return { loaded: 0, failed: 0, failedIds: [] };
     }),
+    /**
+     * Phase B.3 step 2a — parallel PI loader for DSH core packages stub.
+     * Until B.3 step 2b extracts the 7 DSH core shims, this is a no-op.
+     */
+    initPiDshCoreExtensions: vi.fn(async () => {
+      callOrder.push("initPiDshCoreExtensions");
+      return { loaded: 0, failed: 0, failedIds: [] };
+    }),
     computeActiveAdapterIds: vi.fn(() => []),
     injectSystemPromptSections: vi.fn(async () => {
       callOrder.push("injectSystemPromptSections");

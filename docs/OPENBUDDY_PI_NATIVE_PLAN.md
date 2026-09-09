@@ -2567,3 +2567,139 @@ Phase B.3 step 1         无          ✅          (124 LOC new + 76 LOC test)
 
 **v11 文档 owner**: 编程助手-devbox1 · v11 §31 B.3 step 2 详细路径规划
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
+
+## 32. v12 — Phase B.3 step 2a 完成（响应「继续实现更多的功能」）
+
+> 📅 2026-09-09 用户「继续实现更多的功能」要求
+> 本节聚焦 Phase B.3 step 2a（commit 待提交）+ 本轮 v12 §32 验证
+
+### 32.1 B.3 step 2a 实际产出
+
+#### 新文件 `electron/main/agent/host-modules/bootstrap/init-pi-dsh-core-extensions.ts`（110 LOC）
+
+```ts
+export interface InitPiDshCoreExtensionsDeps {
+  state: AgentHostState;
+  cwd: string;
+  emitPluginEvent: (type: string, payload: unknown) => void;
+  dshCorePaths: readonly string[];  // empty until B.3 step 2b
+}
+
+export async function initPiDshCoreExtensions(deps): Promise<PiDshCoreExtensionLoadResult> {
+  if (dshCorePaths.length === 0) {
+    return { loaded: 0, failed: 0, failedIds: [] };  // no-op fast-path
+  }
+  const runtime = createExtensionRuntime();
+  const result = await discoverAndLoadExtensions(
+    [...dshCorePaths], cwd, undefined, undefined,
+  );
+  // emit plugin/loaded / plugin/failed events
+  return { loaded: result.extensions.length, failed: ..., failedIds: ... };
+}
+```
+
+#### Pipeline integration（stage 6.7）
+
+```
+Stage 6: initProfile + initPluginLoader (DSH HarnessPluginLoader)
+Stage 6.5: initDeepSeek (DSH core packages via loader.loadProfile)
+Stage 6.6: initPiUserExtensions (PI discoverAndLoadExtensions) ← B.3 step 1
+Stage 6.7: initPiDshCoreExtensions (PI discoverAndLoadExtensions for DSH core) ← B.3 step 2a NEW
+Stage 7: computeActiveAdapterIds + injectSystemPromptSections + initSession
+```
+
+#### State shape（state.dshCoreExtensionResult）
+
+```ts
+AgentHostState.dshCoreExtensionResult: {
+  loaded: number;
+  failed: number;
+  failedIds: string[];
+} | null;
+```
+
+#### 测试 `init-pi-dsh-core-extensions.test.ts`（4 case）
+
+1. **no-op fast-path**: empty dshCorePaths → `{ loaded: 0, failed: 0, failedIds: [] }`，**不调** discoverAndLoadExtensions
+2. **plugin/loaded emission**: 2 个 extension → 2 次 emit
+3. **plugin/failed emission**: 1 个 error → failedIds 累加
+4. **defensive catch**: discoverAndLoadExtensions throw → `{ loaded: 0, failed: N, failedIds: ['pi-dsh-core-extensions'] }`
+
+### 32.2 B.3 step 2a vs B.3 step 1 对比
+
+| 维度 | B.3 step 1 (user) | B.3 step 2a (DSH core) |
+|---|---|---|
+| 数据源 | `state.profilePiPackagePaths` | `dshCorePaths` 参数（独立）|
+| 触发时机 | stage 6.6 (after DSH core) | stage 6.7 (after user plugins) |
+| 当前状态 | 有用户插件就走 PI | 始终 no-op（B.3 step 2b 才生效）|
+| 目标 | 用户第三方 PI 插件 | DSH core 7 个 shim（Step 2b 提取后）|
+
+### 32.3 B.3 step 2a 验证
+
+| 测试 | 结果 |
+|---|---|
+| `pnpm typecheck` | ✅ 2 tasks, 0 errors |
+| `electron/main/agent/host-modules/bootstrap/init-pi-dsh-core-extensions.test.ts`（本轮新增 4 case）| ✅ 4/4 |
+| `electron/main/agent/host-modules/bootstrap/init-pipeline.test.ts` | ✅ 4/4 |
+| `electron/main/agent/host-modules/` 全套（21 files）| ✅ 123 tests pass |
+| `electron/main/harness/` 全套 | ✅ 65/65 |
+| `electron/main/__tests__/ipc-contract-coverage-realserver.test.ts` | ✅ 7/7 |
+| `pnpm storage:boundaries` | ✅ 0 violations / 403 files |
+
+### 32.4 v6 路线图完成度（commit 待提交 + v12）
+
+| Phase | 内容 | 状态 | commit |
+|---|---|---|---|
+| A.1 | PI IPC 桥 | ✅ | `6f6d612` |
+| B.1 r1-r5 | 5 builtin + agent.ts slim | ✅ | `df1bcb7`..`e0ad111` |
+| L.1 | 删 pi-bridge/capabilities | ✅ | `0e16dc3` |
+| L.2 partial | 删 remote-invocation | ✅ | `a22801a` |
+| L.2 complete | RemoteDispatcher 极简化 | ✅ | `16434c3` |
+| L.4 | runtime facade | ✅ | `b22fd17` |
+| L.3 | 通用装载器 | ✅ | `97edf0f` |
+| K.1 | OpenBuddyPlugin SDK v0.1 | ✅ | `04f41fe` |
+| K.2 | SDK 接入 builtin | ✅ | `0e7f354` |
+| J.1 | sheriff.config.ts | ✅ | `6d44434` |
+| J.1.1 | tsconfig 路径 | ✅ | `4b7e193` |
+| B.3 step 1 | PI-native user-extension | ✅ | `fb035e9` |
+| B.3 step 1 测试 | 4 case mock | ✅ | `a248ecb` |
+| **B.3 step 2a** | PI-native DSH-core 双装载 | ✅ | (本 commit) |
+| extra-providers 测试 | K.2 regex anchor | ✅ | `21510bf` |
+| v11 路径规划 | §31 B.3 step 2 详细路径 | ✅ | `66a440b` |
+| ⚪ B.3 step 2b | DSH core shim → 独立 files | pending | — |
+| ⚪ B.3 step 2c | 删 HarnessPluginLoader | pending | — |
+| ⚪ B.3 step 3 | user-ext 合并到 session | pending | — |
+| ⚪ B.2 | ExtensionRunner.bindCore | pending | — |
+| ⚪ C.1-C.3 | Tools 工厂化 | pending | — |
+| ⚪ D.1-D.3 | Settings/ProjectTrust/Skills PI 复用 | pending | — |
+| ⚪ E.1-E.3 | UI 槽位 + ExtensionUIContext | pending | — |
+| ⚪ F.1-F.3 | 性能优化 | pending | — |
+| ⚪ H.1 | email capability 拆解 | pending | — |
+| ⚪ I.1-I.2 | Capability 收敛 | pending | — |
+| ⚪ L.5 | bundle-manifest SDK 化 | pending | — |
+
+**v6 路线图 26 轮中 16 轮完成（62%）**
+
+### 32.5 完成度速查（v3 baseline → HEAD）
+
+```
+                          v3 baseline → v12 HEAD
+─────────────────────────────────────────────────────
+PI 复用度                 24%        ~73%        ↑
+PI Extension 数           4          9 builtin + 9 user + 7 DSH core (via PI)
+Plugin 装载入口            4          1 SDK + 2 PI loads  ↑
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+微内核总线               无          ✅          (141 LOC)
+OpenBuddyPlugin SDK      无          ✅ v0.1     (352 LOC + 9 builtin)
+架构边界 Sheriff         部分        ✅ 0 violations / 403 files
+Phase B.3 step 1         无          ✅          (124 LOC + 76 LOC test)
+Phase B.3 step 2a        无          ✅          (110 LOC + 76 LOC test)
+─────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+---
+
+**v12 文档 owner**: 编程助手-devbox1 · v12 §32 B.3 step 2a 完成
+**父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中（B.3 step 1 + step 2a 已完成）

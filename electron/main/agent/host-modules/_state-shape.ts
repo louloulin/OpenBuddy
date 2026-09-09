@@ -217,6 +217,17 @@ export interface AgentHostState {
     failed: number;
     failedIds: string[];
   } | null;
+  /**
+   * Phase B.3 step 2a — PI-native DSH core extension load summary.
+   * Set by `initPiDshCoreExtensions` after `discoverAndLoadExtensions`
+   * returns. Empty until B.3 step 2b extracts the 7 DSH core shims into
+   * real files (v11 §31.2). Renderer reads this for DSH core load diagnostics.
+   */
+  dshCoreExtensionResult: {
+    loaded: number;
+    failed: number;
+    failedIds: string[];
+  } | null;
   profilePackageJson: string | undefined;
   profilePackagePaths: string[];
   profilePiExtensions: readonly OpenBuddyPiExtensionSpec[];
