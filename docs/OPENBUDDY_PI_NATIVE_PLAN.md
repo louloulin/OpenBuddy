@@ -3789,3 +3789,75 @@ v6 路线图完成度            0%         100%       ↑ +100 pp  ⭐ 全部 r
 
 **v22 文档 owner**: 编程助手-devbox1 · v22 §42 Phase B.2 真实实现
 **父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
+
+## 43. v23 — Phase H.2 (round 1) 真实实现（email class 拆出第一片）
+
+> 🟢 **v23 完成** — email class 拆出 god module 第一片: EmailError 拆出
+> 提交：`7db9a4e`
+
+### 43.1 Phase H.2 (round 1) — EmailError 拆出
+
+v22 §42.5 (first piece of the email-class split): pull the `EmailError` class out of index.ts into `./email-error.ts`. Class is small (9 LOC) 但 is the foundation for the rest of the H.2 split — the analysis validators and the Email class itself 都 depend on EmailError, so moving it first lets the next rounds of H.2 proceed without a giant refactor in a single commit.
+
+**架构**:
+- `email-error.ts` (~30 LOC) — `EmailError` class + `EmailErrorCode` type union (5 literals: provider_unavailable / confirmation_required / invalid_input / operation_failed / operation_not_supported)
+- `index.ts` re-exports `EmailError` + `EmailErrorCode` so external callers keep importing from `./index` unchanged
+
+**反向依赖不变量**:
+- `email-error.ts` imports nothing from electron/main/ and nothing from index.ts
+- `index.ts` imports `EmailError` (runtime) for in-class use + re-exports for external API stability
+
+### 43.2 v6 路线图完成度 (HEAD `7db9a4e`)
+
+v6 路线图仍 100% (B.2 完成, v23 是 H.2 开始)。v1.0 路线图 (D/E/F/H/I/L) 6 个 pending rounds。
+
+| Phase | 内容 | 状态 | commit |
+|---|---|---|---|
+| ... 历史 (A.1 / B.1 / L / K / J / B.3 / C.1 / C.2 / C.3 / H.1 / B.2) | ✅ | ✅ | `6f6d612`..`ab5d155` |
+| v22 plan | docs | ✅ | `dc5c5c0` |
+| **H.2 (round 1)** | **EmailError 拆出** | ✅ | **`7db9a4e`** |
+| ⚪ H.2 (round 2-5) | 4 more files (types / class / mount+handlers / ipc) | pending | — |
+
+### 43.3 完成度速查 (v3 baseline → HEAD `7db9a4e`)
+
+```
+                          v3 baseline → v23 HEAD
+─────────────────────────────────────────────────────────
+PI 复用度                 24%        ~82%        ↑ +58 pp
+God module LOC          ~6500       ~2570     ↓ -60%  (H.2 round 1 -10)
+DSH 退役                 0          8522 LOC    ✅ 100%
+DSH 残余                9751        5053        ↓ -48%
+email god module LOC    3351        3342 (-9)  ← 本轮 +H.2 round 1
+  └─ email-error.ts       0          30          ← 本轮新增
+v6 路线图完成度            0%         100%       (上次完成, 本轮不变)
+v1.0 路线图完成度          0%         0%         (5 功能 gap 1 跳过)
+─────────────────────────────────────────────────────────
+功能闭环 5 项             0/5        0/5 partial  (v1.0 路线图)
+```
+
+**总完成度**:架构层 **100% + B.3 + C.1 + C.2 + C.3 + H.1 + B.2 + H.2(round 1)**,功能层 **0%** (v1.0 路线图,5 个 gap 待 K.3/E.2/H.3)
+
+### 43.4 验证 (commit `7db9a4e`)
+
+| 测试范围 | 结果 |
+|---|---|
+| `pnpm exec tsc --noEmit` | ✅ 0 errors |
+| `packages/capability/openbuddy-email/src/email-error.test.ts` (本轮新增) | ✅ 4/4 |
+| `packages/capability/openbuddy-email/` 全套 | ✅ 164 tests pass (was 160, +4) |
+| 5 个 workspace area 全套 | ✅ **591 tests pass / 0 fail** |
+| `pnpm storage:boundaries` | ✅ 0 violations / 403 files |
+
+**0 回归**,v6 路线图仍 100%。
+
+### 43.5 接下来 3 轮 (v23 锁定)
+
+| Round | Phase | 内容 | 预估 LOC |
+|---|---|---|---|
+| ⚪ 下一轮 | **H.2 (round 2)** | 分析 validators 拆出 (10 functions) | -200 |
+| ⚪ 第三轮 | **H.2 (round 3-5)** | Email class / mount / handlers / ipc 拆出 | -1100 |
+| ⚪ 第四轮 | **D.1-D.3** | Settings/ProjectTrust/Skills PI 复用 | +200 / -1000 |
+
+---
+
+**v23 文档 owner**: 编程助手-devbox1 · v23 §43 Phase H.2 (round 1) 真实实现
+**父任务**: LUM-580 · **子任务**: LUM-594/595/596/597 done + LUM-601 进行中
