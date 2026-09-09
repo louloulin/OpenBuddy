@@ -14,7 +14,7 @@ import { permissionHandlers } from "@openbuddy/auth-permission";
 import * as piResources from "../../pi-resources";
 import type { PiSessionRuntime } from "../../pi-session-runtime";
 import type { PiRuntimeCoordinator } from "../../pi-runtime-coordinator";
-import type { InstallHostModuleDeps } from "./install-host-modules";
+import type { InstallHostModuleDeps, InstallHostModuleDepsWithDomains } from "./install-host-modules";
 
 export interface InstallHostModuleDepsClosures {
   // Path helpers
@@ -115,8 +115,8 @@ export interface InstallHostModuleDepsClosures {
 
 export function buildInstallHostModuleDeps(
   closures: InstallHostModuleDepsClosures,
-): InstallHostModuleDeps {
-  return {
+): InstallHostModuleDepsWithDomains {
+  const deps = {
     piHome: closures.piHome,
     isPathWithin: closures.isPathWithin,
     piSessionDir: closures.piSessionDir,
@@ -208,5 +208,12 @@ export function buildInstallHostModuleDeps(
     promptContent: closures.promptContent,
     onEvent: closures.onEvent,
     persistPiSessionHeaderImpl: closures.persistPiSessionHeaderImpl,
-  } as unknown as InstallHostModuleDeps;
+  };
+  return {
+    ...deps,
+    profile: deps,
+    session: deps,
+    plugin: deps,
+    runtime: deps,
+  } as InstallHostModuleDepsWithDomains;
 }

@@ -269,6 +269,9 @@ export interface InstallHostModuleDomainDeps {
   runtime: RuntimeDomainDeps;
 }
 
+/** Flat compatibility bag plus the grouped views used by new composition roots. */
+export type InstallHostModuleDepsWithDomains = InstallHostModuleDeps & InstallHostModuleDomainDeps;
+
 function groupDomainDeps(deps: InstallHostModuleDeps): InstallHostModuleDomainDeps {
   return { profile: deps, session: deps, plugin: deps, runtime: deps };
 }
