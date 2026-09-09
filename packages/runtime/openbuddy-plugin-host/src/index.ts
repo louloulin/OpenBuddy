@@ -13,6 +13,11 @@ export {
   type EventEnvelopeInput,
   type EventEnvelopePayload,
 } from "./event-envelope";
+export {
+  EventEnvelopeBridge,
+  isCurrentEventGeneration,
+  type EventBridgeOptions,
+} from "./event-bridge";
 
 export {
   createPluginReadinessSnapshot,

@@ -41,7 +41,7 @@ function isJsonValue(value: unknown, seen: Set<object> = new Set()): value is Ev
 	seen.add(value);
 	if (Array.isArray(value)) return value.every((item) => isJsonValue(item, seen));
 	if (!isPlainObject(value)) return false;
-	return Object.values(value).every((item) => isJsonValue(item, seen));
+	return Object.values(value as Record<string, unknown>).every((item) => isJsonValue(item, seen));
 }
 
 function requireNonEmpty(value: unknown, field: string): asserts value is string {

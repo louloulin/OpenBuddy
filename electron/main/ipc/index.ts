@@ -33,7 +33,7 @@ import { getActiveHarnessServer, getHarnessServerAddress } from "../harness/harn
 import * as connectors from "../connectors";
 import * as resources from "../agent/pi-resources";
 import { dispatchMainNotifications } from "../notifications";
-import { createRpcId, parseRpcMessage, rpcError, rpcValue, RpcId, serverResponse, validateRpcRequestPayload, type ClientRequest } from "@openbuddy/plugin-host";
+import { createRpcId, EventEnvelopeBridge, parseRpcMessage, rpcError, rpcValue, RpcId, serverResponse, validateRpcRequestPayload, type ClientRequest } from "@openbuddy/plugin-host";
 import { remoteRequestFromHarnessRequest } from "../harness/harness-remote-request";
 import type { DeepSeekConnectionDispatchContext } from "../deepseek/deepseek-runtime";
 import { describeTypertCatalog } from "../agent/typert-catalog";
@@ -731,6 +731,20 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		sendSafe(win, "dsh://rpc", { type: "server-request", rpcId, method, payload });
 	};
 	const piStream = createPiStreamTransport();
+	const eventBridge = new EventEnvelopeBridge();
+	const emitEventEnvelope = (win: BrowserWindow, kind: string, payload: unknown, sessionId?: string): void => {
+		let safePayload: any;
+		try {
+			safePayload = JSON.parse(JSON.stringify(payload, (_key, value) => typeof value === "bigint" ? String(value) : value)) ?? null;
+		} catch {
+			safePayload = { value: String(payload) };
+		}
+		try {
+			sendSafe(win, "openbuddy://event-envelope", eventBridge.emit(kind, safePayload, sessionId ? { sessionId } : undefined));
+		} catch (error) {
+			console.warn("[openbuddy] event envelope rejected", error);
+		}
+	};
 	ipcMain.handle("agent:stream-port", (event) => {
 		if (!event.senderFrame || event.senderFrame !== getWindow()?.webContents.mainFrame) {
 			throw new Error("pi stream port is only available to the main frame");
@@ -896,6 +910,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		// clone per event. The `pi://event` channel name remains in the preload
 		// allowlist for backward compatibility.
 		win.webContents.send("openbuddy://agent-event", event);
+		emitEventEnvelope(win, String((event as { type?: unknown }).type ?? "agent/event"), event, sessionId);
 		const payload = event as unknown as Record<string, any>;
 		// `message_update` is deliberately not handled here — see the comment
 		// above `agentHost.onEvent`. `handle-session-event.ts` owns the whole
@@ -940,6 +955,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		else if (event.type === "session/question") emitServerRequest("session.question", payload, "question", requestId);
 		emitServerRequest("plugin.event", event, "plugin-event");
 		sendSafe(win, "openbuddy://plugin-event", event);
+		emitEventEnvelope(win, String(event.type ?? "plugin/event"), event.payload, typeof payload?.sessionId === "string" ? payload.sessionId : undefined);
 	});
 
 	const currentWindow = () => getWindow();

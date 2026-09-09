@@ -120,6 +120,7 @@ const allowedEventChannels = new Set([
   "openbuddy://window-resized",
   "openbuddy://agent-event",
   "openbuddy://plugin-event",
+  "openbuddy://event-envelope",
   "openbuddy://collaboration-update",
   "openbuddy://pi-stream-port",
   "dsh://rpc",
@@ -485,6 +486,13 @@ const api = {
       };
       ipcRenderer.on("pi://event", wrapped);
       return () => ipcRenderer.off("pi://event", wrapped);
+    },
+    onEventEnvelope: (handler: (event: unknown) => void) => {
+      const wrapped = (_event: unknown, payload: unknown) => {
+        try { handler(payload); } catch (error) { recordBridgeFailure(error); }
+      };
+      ipcRenderer.on("openbuddy://event-envelope", wrapped);
+      return () => ipcRenderer.off("openbuddy://event-envelope", wrapped);
     },
     onAgentEvent: (handler: (event: unknown) => void) => {
       const wrapped = (_event: unknown, payload: unknown) => {
