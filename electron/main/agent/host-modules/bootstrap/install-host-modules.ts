@@ -203,10 +203,58 @@ export interface InstallHostModuleDeps {
 
 // ──────────────────────────────────────────────────────────────────────────
 // Domain helpers — 每个域内按 install 顺序调用各 host-module 的 install 函数.
-// InstallHostModuleDeps 是 composition root 的完整依赖契约；各 install() 只声明
-// 自己需要的结构化子集，因此可以直接传递完整 deps，避免 `as unknown as never`
-// 掩盖缺失依赖或反向边界变更。
+// 每个 domain deps 都是该域 installer 参数的显式交集子契约：installer 新增
+// 依赖时，composition root 会在这里获得编译期提示，而不是通过 any/never 逃逸。
 // ──────────────────────────────────────────────────────────────────────────
+type InstallerDeps<T extends (deps: any) => void> = Parameters<T>[0];
+
+export type ProfileDomainDeps =
+  & InstallerDeps<typeof installOverridePatches>
+  & InstallerDeps<typeof installProfileSnapshot>
+  & InstallerDeps<typeof installProfileBundles>
+  & InstallerDeps<typeof installProfileResourcePaths>
+  & InstallerDeps<typeof installUnifiedPackages>
+  & InstallerDeps<typeof installPresetHelpers>
+  & InstallerDeps<typeof installAgentPresetRuntime>
+  & InstallerDeps<typeof installContextServicesSnapshot>
+  & InstallerDeps<typeof installDefaultPiPackageInstaller>;
+
+export type SessionDomainDeps =
+  & InstallerDeps<typeof installHarnessCursors>
+  & InstallerDeps<typeof installAgentModel>
+  & InstallerDeps<typeof installAgentPrompt>
+  & InstallerDeps<typeof installTeamRunner>
+  & InstallerDeps<typeof installDeepSeekAgentRuntime>
+  & InstallerDeps<typeof installDeepSeekCordisRuntime>
+  & InstallerDeps<typeof installSessionMetadata>
+  & InstallerDeps<typeof installSessionStore>
+  & InstallerDeps<typeof installSubagentRuntime>;
+
+export type PluginDomainDeps =
+  & InstallerDeps<typeof installHookPermission>
+  & InstallerDeps<typeof installPluginEventBus>
+  & InstallerDeps<typeof installPluginState>
+  & InstallerDeps<typeof installPluginMutations>
+  & InstallerDeps<typeof installPiExtensionConfigure>
+  & InstallerDeps<typeof installDisposeInternal>
+  & InstallerDeps<typeof installWorkbenchScope>
+  & InstallerDeps<typeof installWorkbenchScopeSync>
+  & InstallerDeps<typeof installUiRequestResolver>
+  & InstallerDeps<typeof installTelemetrySink>
+  & InstallerDeps<typeof installDshBridgeHelpers>;
+
+export type RuntimeDomainDeps =
+  & InstallerDeps<typeof installProfileReloadTransaction>
+  & InstallerDeps<typeof installSessionRebind>
+  & InstallerDeps<typeof installSessionProjection>
+  & InstallerDeps<typeof installSessionSwap>
+  & InstallerDeps<typeof installProfileArtifactReconciler>
+  & InstallerDeps<typeof installPiRuntimeFactories>
+  & InstallerDeps<typeof installPiRuntimeRefresh>
+  & InstallerDeps<typeof installDeepSeekAgentFactory>
+  & InstallerDeps<typeof installBeforeQuitHandler>
+  & InstallerDeps<typeof installModelConfig>
+  & InstallerDeps<typeof installInitOrchestration>;
 
 /**
  * Profile 域 (11 modules): override-patches → snapshot → bundles → resource-paths
@@ -216,7 +264,7 @@ export interface InstallHostModuleDeps {
  * 顺序: 文件解析 → 快照 → 包合并 → 资源路径 → 单元包 → preset →
  *       上下文服务快照 → 默认包安装器.
  */
-function installProfileDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
+function installProfileDomain(state: AgentHostState, deps: ProfileDomainDeps): void {
   if (deps.state !== state) throw new Error("installHostModules received inconsistent state");
   installOverridePatches(deps);
   installProfileSnapshot(deps);
@@ -238,7 +286,7 @@ function installProfileDomain(state: AgentHostState, deps: InstallHostModuleDeps
  *       deepseek runtime → cordis runtime → session metadata →
  *       session store → subagent.
  */
-function installSessionDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
+function installSessionDomain(state: AgentHostState, deps: SessionDomainDeps): void {
   if (deps.state !== state) throw new Error("installHostModules received inconsistent state");
   installHarnessCursors(deps);
   installAgentModel(deps);
@@ -257,7 +305,7 @@ function installSessionDomain(state: AgentHostState, deps: InstallHostModuleDeps
  *   workbench-scope → workbench-scope-sync → ui-request-resolver →
  *   telemetry-sink → dsh-bridge-helpers.
  */
-function installPluginDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
+function installPluginDomain(state: AgentHostState, deps: PluginDomainDeps): void {
   if (deps.state !== state) throw new Error("installHostModules received inconsistent state");
   installHookPermission(deps);
   installPluginEventBus(deps);
@@ -282,7 +330,7 @@ function installPluginDomain(state: AgentHostState, deps: InstallHostModuleDeps)
  * 这些 module 跨域共享, 不严格属于「一个域」; 排在最后以便 profile/session/plugin
  * 先注入完闭包, 再让 runtime 串起来.
  */
-function installRuntimeDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
+function installRuntimeDomain(state: AgentHostState, deps: RuntimeDomainDeps): void {
   if (deps.state !== state) throw new Error("installHostModules received inconsistent state");
   installProfileReloadTransaction(deps);
   installSessionRebind(deps);
