@@ -251,6 +251,8 @@ export function scheduleProfileReload(): void {
         const previous = capturePiProfileSnapshotImpl();
         const capturedServices = captureReloadableContextServicesImpl();
         try {
+          const pluginTransactionId = typeof transaction.transactionId === "string" ? transaction.transactionId : undefined;
+          const piGenerationBefore = state!.piGeneration;
           transaction.phase("prepare", "profile");
           const materialized = state!.profileOptions
             ? await materializeOpenBuddyProfileImpl(state!.profileOptions)
@@ -332,21 +334,23 @@ export function scheduleProfileReload(): void {
           if (state!.session && state!.piResourceLoader) {
             transaction.phase("pi", "pi-resource-loader");
             await piRuntimeCoordinator!.reload("profile-reload");
+            transaction.receipt("pi", {
+              generation: state!.piGeneration,
+              previousGeneration: piGenerationBefore,
+              ...(pluginTransactionId ? { transactionId: pluginTransactionId } : {}),
+              extensions: state!.piExtensionStatuses.filter(
+                (entry) => entry.state === "loaded",
+              ).length,
+            });
             transaction.phase("mcp", "mcp");
             await reloadMcpImpl();
             transaction.receipt("mcp");
             await restoreDeepSeekCapabilityServicesImpl(capturedCapabilities);
             restoreCapturedContextServicesImpl(capturedServices);
             reportPiExtensionErrorsImpl();
-            transaction.receipt("pi", {
-              extensions: state!.piExtensionStatuses.filter(
-                (entry) => entry.state === "loaded",
-              ).length,
-            });
           }
 
           transaction.phase("renderer", "renderer-module-graph");
-          transaction.requireReceipt("renderer");
           transaction.receipt("rollback-previous", {
             piEntries: previous.piExtensionStatuses.length,
             capturedServices: capturedServices.size,

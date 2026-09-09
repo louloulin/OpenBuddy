@@ -282,7 +282,24 @@ const piRuntimeCoordinator = new PiRuntimeCoordinator({
   getSession: () => piSessionRuntime.session,
   getResourceLoader: () => state.piResourceLoader,
   generationGate: createGenerationGate(),
-  onReload: (generation) => { state.piGeneration = generation; },
+  onReload: (generation, reason) => {
+    const previousGeneration = state.piGeneration;
+    state.piGeneration = generation;
+    for (const [requestId, request] of state.pendingUiRequests) {
+      if (request.generation !== undefined && request.generation !== generation) {
+        state.pendingUiRequests.delete(requestId);
+        request.resolve(undefined);
+        emitPluginEvent("pi/ui-request-cancelled", {
+          requestId,
+          sessionId: request.sessionId,
+          previousGeneration,
+          generation,
+          reason: reason ?? "pi-reload",
+          diagnostic: "stale-generation",
+        });
+      }
+    }
+  },
 });
 
 /**

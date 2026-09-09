@@ -14,7 +14,7 @@ export interface PiRuntimeCoordinatorOptions {
   getResourceLoader: () => PiResourceLoaderLike | null;
   /** Shared generation fence for session listeners and RPC UI requests. */
   generationGate?: GenerationGate;
-  onReload?: (generation: number) => void;
+  onReload?: (generation: number, reason?: string) => void;
 }
 
 export class PiRuntimeCoordinator {
@@ -59,14 +59,14 @@ export class PiRuntimeCoordinator {
       if (this.options.getSession() !== session) return;
       await session.reload();
       const generation = this.generationGate.advance();
-      this.options.onReload?.(generation);
+      this.options.onReload?.(generation, _reason);
       return;
     }
     const loader = this.options.getResourceLoader();
     if (loader) {
       await loader.reload();
       const generation = this.generationGate.advance();
-      this.options.onReload?.(generation);
+      this.options.onReload?.(generation, _reason);
     }
   }
 }
