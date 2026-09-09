@@ -52,6 +52,18 @@ export {
   type DeepSeekCordisRuntimeSnapshot,
 } from "./deepseek-cordis-runtime";
 
+export {
+  canRecoverTask,
+  createTaskLifecycleStore,
+  isTaskTerminal,
+  transitionTask,
+  TaskLifecycleError,
+  type TaskLifecycleEvent,
+  type TaskLifecyclePersistence,
+  type TaskLifecycleState,
+  type TaskLifecycleStore,
+  type TaskStatus,
+} from "./task-lifecycle";
 export interface HarnessPlugin {
   name?: string;
   inject?: readonly string[] | Record<string, unknown>;

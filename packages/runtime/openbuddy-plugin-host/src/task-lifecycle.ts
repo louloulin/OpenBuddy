@@ -70,24 +70,35 @@ export interface TaskLifecycleStore {
  * adapter; this module owns transition validation and recovery fencing.
  */
 export function createTaskLifecycleStore(persistence: TaskLifecyclePersistence): TaskLifecycleStore {
+  let mutation: Promise<unknown> = Promise.resolve();
+  const enqueue = <T>(operation: () => Promise<T>): Promise<T> => {
+    const result = mutation.then(operation, operation);
+    mutation = result.then(() => undefined, () => undefined);
+    return result;
+  };
+
   return {
-    async create(state) {
-      if (!state.taskId || !state.sessionId) throw new Error("taskId and sessionId are required");
-      const existing = await persistence.read(state.taskId);
-      if (existing) throw new Error(`task ${state.taskId} already exists`);
-      await persistence.write({ ...state });
-      return { ...state };
+    create(state) {
+      return enqueue(async () => {
+        if (!state.taskId || !state.sessionId) throw new Error("taskId and sessionId are required");
+        const existing = await persistence.read(state.taskId);
+        if (existing) throw new Error(`task ${state.taskId} already exists`);
+        await persistence.write({ ...state });
+        return { ...state };
+      });
     },
     async get(taskId) {
       const state = await persistence.read(taskId);
       return state ? { ...state } : null;
     },
-    async transition(taskId, event, updatedAt) {
-      const current = await persistence.read(taskId);
-      if (!current) throw new Error(`task ${taskId} does not exist`);
-      const next = transitionTask(current, event, updatedAt);
-      await persistence.write(next);
-      return { ...next };
+    transition(taskId, event, updatedAt) {
+      return enqueue(async () => {
+        const current = await persistence.read(taskId);
+        if (!current) throw new Error(`task ${taskId} does not exist`);
+        const next = transitionTask(current, event, updatedAt);
+        await persistence.write(next);
+        return { ...next };
+      });
     },
     async recover(taskId, currentGeneration) {
       const state = await persistence.read(taskId);
