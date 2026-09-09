@@ -50,6 +50,36 @@ describe("PiSessionEventBridge plugin/extension event indexing (phase 4)", () =>
     expect(bridge.lastSequence()).toBe(2);
   });
 
+  it("drops stale-generation events after a reload", () => {
+    const bridge = new PiSessionEventBridge();
+    const oldGeneration = bridge.generation();
+    bridge.append({
+      eventVersion: 1,
+      generation: oldGeneration,
+      sequence: 1,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      type: "plugin/old",
+      payload: {},
+    });
+    expect(bridge.advanceGeneration()).toBe(1);
+    bridge.append({
+      eventVersion: 1,
+      generation: oldGeneration,
+      sequence: 2,
+      timestamp: "2026-01-01T00:00:01.000Z",
+      type: "plugin/stale",
+      payload: {},
+    });
+    bridge.append({
+      eventVersion: 1,
+      generation: bridge.generation(),
+      sequence: 3,
+      timestamp: "2026-01-01T00:00:02.000Z",
+      type: "plugin/current",
+      payload: {},
+    });
+    expect(bridge.snapshot().map((event) => event.type)).toEqual(["plugin/old", "plugin/current"]);
+  });
   it("indexes session-scoped events and filters by sessionId", () => {
     const bridge = new PiSessionEventBridge();
     bridge.appendFromSession({ type: "session/start", sessionId: "s1" });
