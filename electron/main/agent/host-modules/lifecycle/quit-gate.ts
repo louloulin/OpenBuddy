@@ -1,38 +1,29 @@
 /**
  * quit-gate.ts — Phase 4.5 plan4.md (before-quit active-task guard).
  *
- * Main-process quit guard: intercepts the Electron "before-quit" event,
- * queries active harness tasks, and either proceeds with disposal or
- * blocks with a native quit-confirmation dialog.
+ * This is the ONE AND ONLY before-quit handler registered by the app.
+ * install-host-modules.ts checks `quitGateInstalled` before registering its
+ * own handler and skips it when this module is active.
  *
- * Three user choices (native dialog buttons):
- *   1. "取消退出"      — veto the quit entirely.
+ * Three user choices via native async dialog:
+ *   1. "取消退出"      — veto the quit entirely (window stays on macOS).
  *   2. "强制退出"      — abort all active tasks, then quit.
- *   3. "后台继续运行"  — keep app alive, close window only; drain tasks.
+ *   3. "后台继续运行"  — keep app alive in background, close window only.
  *
- * Background-continue behavior:
- *   The window is closed immediately. `app` stays alive (non-darwin
- *   platform: we prevent `window-all-closed` from calling `app.quit()`).
- *   The app will quit on the next explicit quit request or when the
- *   last active task drains (tracked by watching listActiveTasks until empty).
+ * Background-continue:
+ *   Sets `quitGateState.backgroundDraining = true`.  app-lifecycle.ts
+ *   checks this flag in `window-all-closed` and suppresses `app.quit()`.
+ *   A 1-second polling loop monitors `listActiveTasks()`; when all drain
+ *   it calls `dispose()` then `app.exit(0)`.
  *
- * Task abortion on force-quit:
- *   Each active task's id is passed to killTask so the harness fiber is
- *   torn down cleanly before dispose() runs.
- *
- * Timeout fallback:
- *   If the user dismisses the dialog without choosing (e.g. click X),
- *   Electron sends "closed" with buttonIndex -1. We treat that as "cancel"
- *   (veto the quit). After a 30-second timeout (dialog.detachedClose),
- *   we also veto and log a warning.
- *
- * Reverse-dependency invariant:
- *   This module imports from before-quit-handler.ts (the handler it wraps),
- *   harness-subagent-runtime (for killTask), and lifecycle/quit-task-policy.
- *   It does NOT import agent-host.ts directly — all deps are passed in.
+ * Fixes over v1:
+ *   - No duplicate handler: install-host-modules skips its own handler when
+ *     `quitGateInstalled` is true.
+ *   - No require() of non-existent exports — uses proper exported reset fn.
+ *   - Background drain is coordinated with app-lifecycle via shared state.
+ *   - Async dialog.showMessageBox() + Promise.race for genuine timeout.
  */
 import { app, dialog, BrowserWindow } from "electron";
-import { installBeforeQuitHandler } from "../bootstrap/before-quit-handler";
 import {
   classifyQuitTasks,
   formatQuitDialogBody,
@@ -44,44 +35,64 @@ import {
 } from "./quit-task-policy";
 import type { HarnessTaskSnapshot } from "./quit-task-policy";
 
+// ── Shared state ──────────────────────────────────────────────────────────────
+// Import the shared quit-gate state exported from install-host-modules.ts.
+// This module is loaded by both quit-gate (here) and app-lifecycle (via
+// install-host-modules dep graph). The state object is a plain mutable record
+// shared via the same module instance at runtime.
+import { quitGateState } from "../bootstrap/install-host-modules";
+
 export interface QuitGateDeps {
-  /**
-   * Snapshot of currently active harness tasks.
-   * Called synchronously at before-quit time.
-   */
+  /** Snapshot of currently active harness tasks. Called synchronously. */
   listActiveTasks: () => HarnessTaskSnapshot[];
-  /**
-   * Abort one harness task by id.
-   * Called for every active task on force-quit.
-   */
+  /** Abort one harness task by id. Called on force-quit. */
   killTask: (taskId: string) => Promise<void>;
-  /**
-   * Lifecycle disposal — must flush all Pi sessions, Cordis services,
-   * and release the harness. Same thunk used by the original before-quit
-   * handler before this gate was introduced.
-   */
+  /** Lifecycle disposal — flush Pi sessions, Cordis services, harness. */
   dispose: () => Promise<void>;
   /**
    * Return the main BrowserWindow (or null if not yet created).
-   * Used to close the window on background-continue quit.
    * Falls back to BrowserWindow.getAllWindows()[0] when omitted.
    */
   getMainWindow?: () => BrowserWindow | null;
-  /**
-   * Callback invoked when the quit gate decides to keep the app alive
-   * (user chose "cancel" or background-continue).
-   * Allows the caller to restore readiness signals for the reopened window.
-   */
-  onQuitVetoed?: (decision: "cancel" | "background") => void;
 }
 
-/** Installs the quit gate, replacing the plain before-quit handler. */
+// ── Quit gate singleton state ─────────────────────────────────────────────────
+
+/** Whether this quit-gate has already been triggered and is awaiting user input. */
+let quitInFlight = false;
+
+/** Whether a second quit attempt should re-show the dialog. */
+let rearmPending = false;
+
+// ── Install ───────────────────────────────────────────────────────────────────
+
+/**
+ * Register the ONE before-quit handler for the entire app.
+ * Must be called before `installHostModules()` so that install-host-modules.ts
+ * sees `quitGateInstalled = true` and skips its own basic handler.
+ *
+ * @param deps  Live dependencies (listActiveTasks / killTask / dispose / getMainWindow).
+ */
 export function installQuitGate(deps: QuitGateDeps): void {
-  const { listActiveTasks, killTask, dispose, getMainWindow: getMainWindow_, onQuitVetoed } = deps;
+  const { listActiveTasks, killTask, dispose, getMainWindow: getMainWindow_ } = deps;
   const getMainWindow = getMainWindow_ ?? (() => BrowserWindow.getAllWindows()[0] ?? null);
 
-  installBeforeQuitHandler({
-    dispose: async () => {
+  app.on("before-quit", async (event) => {
+    // Second quit attempt while a dialog is open → re-show the dialog.
+    if (rearmPending) {
+      rearmPending = false;
+    }
+
+    if (quitInFlight) {
+      // Dialog is already showing; prevent the default so the app stays alive
+      // while the existing dialog is resolved.
+      event.preventDefault();
+      return;
+    }
+
+    quitInFlight = true;
+
+    try {
       const tasks = listActiveTasks();
       const policy = classifyQuitTasks(tasks);
 
@@ -91,41 +102,34 @@ export function installQuitGate(deps: QuitGateDeps): void {
         return;
       }
 
-      // Active tasks exist — show native quit-confirmation dialog.
-      const { decision, timedOut } = await showQuitDialog(policy.activeTasks);
+      // Active tasks exist → show async quit-confirmation dialog.
+      event.preventDefault(); // block quit while dialog is shown
+      const result = await showQuitDialog(policy.activeTasks);
 
-      if (timedOut) {
-        // Timeout: veto the quit, let the app stay alive.
-        console.warn("[quit-gate] dialog timed out — vetoing quit");
-        onQuitVetoed?.("cancel");
-        // Do NOT dispose; re-enable quit for the next attempt.
-        rearmQuitForRetry();
+      // User dismissed dialog without choosing (X / Esc) → treat as cancel.
+      if (result.dismissed) {
+        console.warn("[quit-gate] dialog dismissed — vetoing quit");
+        vetoQuit();
         return;
       }
 
+      const { decision } = result;
+
       if (isBlockingDecision(decision)) {
-        // User chose "cancel" — veto the quit, keep app alive.
-        onQuitVetoed?.("cancel");
-        rearmQuitForRetry();
+        // User chose "cancel" — veto the quit.
+        vetoQuit();
         return;
       }
 
       if (isBackgroundQuit(decision)) {
-        // User chose "后台继续" — close window but keep app alive.
+        // User chose "后台继续" — close window, keep app alive, drain tasks.
         const win = getMainWindow();
         if (win && !win.isDestroyed()) {
           win.close();
-        } else {
-          // No window yet or already destroyed — nothing to close.
-          // App stays alive either way.
         }
-        // Keep app alive. Monitor tasks; quit when all drain.
-        onQuitVetoed?.("background");
-        monitorTasksForBackgroundDrain(listActiveTasks, async () => {
-          // All tasks drained — quit now.
-          console.log("[quit-gate] background tasks drained, initiating quit");
-          void dispose().then(() => app.exit(0));
-        });
+        // Signal app-lifecycle to suppress window-all-closed → app.quit().
+        quitGateState.backgroundDraining = true;
+        monitorTasksForBackgroundDrain(listActiveTasks, dispose, killTask);
         return;
       }
 
@@ -137,105 +141,134 @@ export function installQuitGate(deps: QuitGateDeps): void {
       }
 
       await dispose();
-    },
+    } finally {
+      quitInFlight = false;
+    }
   });
 }
 
-/** Re-arm the before-quit handler after a veto so the user can try again. */
-function rearmQuitForRetry(): void {
-  // The module-level singleton inside before-quit-handler.ts tracks its own
-  // "quitting / disposedForQuit" state. After a veto (cancel/background) we
-  // need to reset those flags so the next before-quit is processed again.
-  // We import and call the test-reset helper — this is intentional; the
-  // production re-arm path also needs this reset.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { __resetBeforeQuitHandlerForTest } = require("../bootstrap/before-quit-handler");
-  __resetBeforeQuitHandlerForTest();
+// ── Veto helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Called when the user cancels or the dialog times out.
+ * Re-arms the quit gate so the next quit attempt shows the dialog again.
+ * Does NOT exit the app.
+ */
+function vetoQuit(): void {
+  rearmPending = true;
+  // The app is still alive. The window may be closed (non-macOS).
+  // On the next quit attempt, the before-quit handler will run again
+  // with quitInFlight = false and rearmPending = true → clears the flag
+  // and shows the dialog normally.
 }
 
-// ---------------------------------------------------------------------------
-// Native dialog (platform-appropriate)
-// ---------------------------------------------------------------------------
+// ── Async dialog ─────────────────────────────────────────────────────────────
+
+const DIALOG_TIMEOUT_MS = 30_000;
 
 interface QuitDialogResult {
   decision: QuitDecision;
-  timedOut: boolean;
+  dismissed: boolean;
 }
 
+/**
+ * Show the quit-confirmation dialog asynchronously with a genuine timeout.
+ *
+ * Uses dialog.showMessageBox() (async) so that the setTimeout fires even
+ * while the dialog is displayed — unlike showMessageBoxSync which blocks
+ * the JS event loop and prevents timers from running.
+ */
 async function showQuitDialog(
   activeTasks: ReadonlyArray<{ id: string; description: string; status: string }>,
 ): Promise<QuitDialogResult> {
   const body = formatQuitDialogBody(activeTasks as never);
 
-  const DIALOG_TIMEOUT_MS = 30_000;
+  // Primary button (last in list, shown on the right): "Cancel" — safest default.
+  const DIALOG_BUTTONS = [
+    "强制退出（终止任务）",
+    "后台继续运行",
+    "取消退出",
+  ] as const;
+  // Index 2 = Cancel (veto).
+  const CANCEL_INDEX = 2;
 
-  return new Promise<QuitDialogResult>((resolve) => {
-    let finished = false;
-
-    const timeout = setTimeout(() => {
-      if (!finished) {
-        finished = true;
-        resolve({ decision: QUIT_DECISION_OPTIONS.CANCEL, timedOut: true });
-      }
-    }, DIALOG_TIMEOUT_MS);
-
-    // Determine button order: "Cancel" first (veto) then action buttons.
-    // Electron shows buttons in reverse label order (last button is primary).
-    // We want the primary button to be the safest choice (Cancel / 后台继续).
-    // Button indices: 0=CANCEL, 1=FORCE, 2=BACKGROUND (primary).
-    const result = dialog.showMessageBoxSync({
+  // Race: user choice vs. 30-second timeout.
+  const choice = await Promise.race<
+    | { kind: "timeout" }
+    | { kind: "result"; buttonIndex: number }
+  >([
+    // Timeout branch.
+    new Promise<{ kind: "timeout" }>((resolve) =>
+      setTimeout(() => resolve({ kind: "timeout" }), DIALOG_TIMEOUT_MS),
+    ),
+    // User choice branch — dialog.showMessageBox() returns when user acts
+    // or when the window is destroyed (buttonIndex = -1).
+    dialog.showMessageBox({
       type: "warning",
       title: "有任务正在运行",
       message: body,
-      buttons: [
-        "强制退出（终止任务）",
-        "后台继续运行",
-        "取消退出",
-      ],
-      // Default to "Cancel" (last button = index 2).
-      // Escape and X → cancelId = 2 → treated as cancel.
-      defaultId: 2,
-      cancelId: 2,
-    });
+      buttons: [...DIALOG_BUTTONS],
+      defaultId: CANCEL_INDEX,
+      cancelId: CANCEL_INDEX,
+    }).then((boxResult) => ({ kind: "result" as const, buttonIndex: boxResult.response })),
+  ]);
 
-    clearTimeout(timeout);
+  if (choice.kind === "timeout") {
+    console.warn("[quit-gate] dialog timed out after 30s — vetoing quit");
+    return { decision: QUIT_DECISION_OPTIONS.CANCEL, dismissed: true };
+  }
 
-    if (finished) return; // timed-out resolved first
-    finished = true;
+  // User acted (button or window-destroyed).
+  const { buttonIndex } = choice;
+  if (buttonIndex === -1) {
+    // Window was closed/destroyed while dialog was open → treat as cancel.
+    return { decision: QUIT_DECISION_OPTIONS.CANCEL, dismissed: true };
+  }
 
-    // Electron button order: 0=first button, 1=second, 2=third.
-    const decision: QuitDecision =
-      result === 2
-        ? QUIT_DECISION_OPTIONS.CANCEL
-        : result === 0
-          ? QUIT_DECISION_OPTIONS.FORCE
-          : QUIT_DECISION_OPTIONS.BACKGROUND;
+  const decision: QuitDecision =
+    buttonIndex === CANCEL_INDEX
+      ? QUIT_DECISION_OPTIONS.CANCEL
+      : buttonIndex === 0
+        ? QUIT_DECISION_OPTIONS.FORCE
+        : QUIT_DECISION_OPTIONS.BACKGROUND;
 
-    resolve({ decision, timedOut: false });
-  });
+  return { decision, dismissed: false };
 }
 
-// ---------------------------------------------------------------------------
-// Background-drain monitor
-// ---------------------------------------------------------------------------
+// ── Background drain monitor ──────────────────────────────────────────────────
 
 function monitorTasksForBackgroundDrain(
   listActiveTasks: () => HarnessTaskSnapshot[],
-  onAllDrained: () => void,
+  dispose: () => Promise<void>,
+  killTask: (id: string) => Promise<void>,
 ): void {
   const INTERVAL_MS = 1_000;
 
   const interval = setInterval(() => {
     const tasks = listActiveTasks();
-    const active = tasks.filter((t) => t.status === "running" || t.status === "stopping");
+    const active = tasks.filter(
+      (t) => t.status === "running" || t.status === "stopping",
+    );
     if (active.length === 0) {
       clearInterval(interval);
-      onAllDrained();
+      quitGateState.backgroundDraining = false;
+      console.log("[quit-gate] background tasks drained, initiating final quit");
+      void dispose().then(() => app.exit(0));
     }
   }, INTERVAL_MS);
 
-  // Stop monitoring if app is already quitting for another reason.
+  // If the user triggers quit again while in background-drain, abort monitoring.
   app.once("before-quit", () => {
     clearInterval(interval);
+    quitGateState.backgroundDraining = false;
   });
+}
+
+// ── Test helpers ─────────────────────────────────────────────────────────────
+
+/** Reset module-level singletons (for unit/integration tests). */
+export function __resetQuitGateForTest(): void {
+  quitInFlight = false;
+  rearmPending = false;
+  quitGateState.backgroundDraining = false;
 }

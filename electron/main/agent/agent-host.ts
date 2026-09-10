@@ -1498,8 +1498,9 @@ export const agentHost = buildAgentHostFacade({
 
 
 // syncWorkbenchScope + workbench-scope-sync moved to host-modules/workbench-scope-sync.ts
-// before-quit handler + quit gate + filesystem capability policy moved to host-modules/bootstrap/
+// quit gate in host-modules/lifecycle/; filesystem capability policy in bootstrap/
 import { installQuitGate } from "./host-modules/lifecycle/quit-gate";
+import { quitGateState } from "./host-modules/bootstrap/install-host-modules";
 import {
   evaluateFilesystemCapabilityPolicy as evaluateFilesystemCapabilityPolicyImpl,
   DEFAULT_FILESYSTEM_POLICY as DEFAULT_FILESYSTEM_POLICY_IMPL,
@@ -1508,14 +1509,12 @@ import {
 
 export type { AgentSession };
 
-// Phase 4.5: quit gate checks active tasks before exiting. Falls back to
-// plain dispose if no active tasks; shows native dialog otherwise with three
-// choices: cancel-quit / force-quit (abort tasks) / background-continue.
+// Phase 4.5: quit gate is the ONE and ONLY before-quit handler.
+// Setting quitGateInstalled BEFORE the queueMicrotask → installHostModules runs
+// and sees the flag; installRuntimeDomain skips the basic before-quit handler.
+quitGateState.quitGateInstalled = true;
+
 installQuitGate({
-  // listRunningTasksImpl returns { id, kind, description, status, sessionId }[] at
-  // runtime. The HarnessJobView return-type annotation in subagent-runtime.ts
-  // is stale (includes `label`/`startedAt` the function never returns). Cast
-  // to the correct shape so the quit gate's type expectations are satisfied.
   listActiveTasks: listRunningTasksImpl as () => import("./host-modules/lifecycle/quit-task-policy").HarnessTaskSnapshot[],
   killTask: killTaskImpl,
   dispose: dispose(enqueueLifecycle),
