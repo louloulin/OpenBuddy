@@ -399,6 +399,9 @@ describe("profile-reload-transaction", () => {
       expect(stub.restorePiProfileSnapshot).toHaveBeenCalledWith(
         stub.previousSnapshot,
       );
+      expect(stub.restoreDeepSeekCapabilityServices).toHaveBeenCalledWith(
+        stub.capturedCapabilities,
+      );
       const failureEvent = stub.events.find(
         (e) => e.type === "profile/reload-failed",
       );

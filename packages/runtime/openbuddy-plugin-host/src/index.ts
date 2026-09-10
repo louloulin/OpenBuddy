@@ -6,6 +6,15 @@ export type JsonValue = null | boolean | number | string | JsonValue[] | { [key:
 export type PluginCleanup = void | (() => void | Promise<void>);
 
 export {
+  EVENT_ENVELOPE_SCHEMA_VERSION,
+  createEventEnvelope,
+  validateEventEnvelope,
+  type EventEnvelope,
+  type EventEnvelopeInput,
+  type EventEnvelopePayload,
+} from "./event-envelope";
+
+export {
   createPluginReadinessSnapshot,
   readinessCounts,
   type PluginReadinessCounts,
@@ -42,7 +51,35 @@ export {
   type DeepSeekCordisRuntimeOptions,
   type DeepSeekCordisRuntimeSnapshot,
 } from "./deepseek-cordis-runtime";
+export {
+  decodeHookOutput,
+  matchesHookMatcher,
+  mergeHookOutputs,
+  parseHookConfig,
+  type CommandHook,
+  type HookConfig,
+  type HookDecision,
+  type HookDialect,
+  type HookDiagnostic,
+  type HookMatcherGroup,
+  type HookOutput,
+  type HookPoint,
+  type MergedHookOutcome,
+  type ParsedHookConfig,
+} from "./hooks";
 
+export {
+  canRecoverTask,
+  createTaskLifecycleStore,
+  isTaskTerminal,
+  transitionTask,
+  TaskLifecycleError,
+  type TaskLifecycleEvent,
+  type TaskLifecyclePersistence,
+  type TaskLifecycleState,
+  type TaskLifecycleStore,
+  type TaskStatus,
+} from "./task-lifecycle";
 export interface HarnessPlugin {
   name?: string;
   inject?: readonly string[] | Record<string, unknown>;
@@ -1287,7 +1324,11 @@ export {
   type RemoteSchema,
 } from "./remote-codec";
 export * from "./rpc-contract";
-export * from "./hooks";
+export * from "./plugin-security";
+export * from "./task-lifecycle";
+export * from "./generation-gate";
+export * from "./plugin-registry";
+export * from "./plugin-lifecycle";
 export {
   CAPABILITY_OWNERSHIP,
   CAPABILITY_TO_PLUGIN_ID as AUTHORITY_CAPABILITY_TO_PLUGIN_ID,
@@ -1298,6 +1339,10 @@ export {
   piPluginForCapability,
   pluginIdForCapability as authorityPluginIdForCapability,
   type CapabilityOwnership,
+  assertNoCapabilityOwnershipConflicts,
+  findCapabilityOwnershipConflicts,
+  type ActiveCapabilityBackend,
+  type CapabilityOwnershipConflict,
 } from "./capability-ownership";
 export {
   CAPABILITY_TO_PLUGIN_ID,

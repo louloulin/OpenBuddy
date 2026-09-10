@@ -27,7 +27,7 @@
  * 设计参考: pi-web/lib/rpc-manager.ts 的 startRpcSession / shutdown 风格.
  */
 
-import { installHostModules, type InstallHostModuleDeps } from "./install-host-modules";
+import { installHostModules, type InstallHostModuleDomainInput } from "./install-host-modules";
 
 // ---------------------------------------------------------------------------
 // Micro-kernel registry
@@ -62,7 +62,7 @@ export function microkernelReady(): boolean {
  * from scratch. The host-module `__reset*ForTest()` helpers stay
  * available for unit tests that need finer control.
  */
-export function installMicrokernelHost(state: Parameters<typeof installHostModules>[0], deps: InstallHostModuleDeps): void {
+export function installMicrokernelHost(state: Parameters<typeof installHostModules>[0], deps: InstallHostModuleDomainInput): void {
   if (INSTALLED_MODULES.size > 0) {
     // Already installed. The agent-host dual-install path (module-load
     // queueMicrotask + init-pipeline stage=3) used to call this twice in

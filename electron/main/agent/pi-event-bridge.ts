@@ -9,6 +9,8 @@ export type PiEventErrorHandler = (event: string, error: unknown) => void;
 
 export interface SessionEventRecord {
   eventVersion?: 1;
+  /** Plugin/session generation; stale generations are never replayed. */
+  generation?: number;
   sequence: number;
   sessionSequence?: number;
   timestamp: string;
@@ -120,6 +122,7 @@ export class PiSessionEventBridge {
   private readonly maxEntries: number;
   private readonly entries: SessionEventRecord[] = [];
   private nextSequence = 0;
+  private currentGeneration = 0;
 
   constructor(options: { maxEntries?: number } = {}) {
     this.maxEntries = Math.max(1, Math.floor(options.maxEntries ?? DEFAULT_RING_LIMIT));
@@ -131,6 +134,7 @@ export class PiSessionEventBridge {
     const sessionId = typeof event.sessionId === "string" ? event.sessionId : undefined;
     const record: SessionEventRecord = {
       eventVersion: 1,
+      generation: this.currentGeneration,
       sequence,
       timestamp: new Date().toISOString(),
       type: event.type,
@@ -147,8 +151,22 @@ export class PiSessionEventBridge {
    * stays monotonic with the previous on-disk log.
    */
   append(record: SessionEventRecord): void {
+    if (record.generation !== undefined && record.generation < this.currentGeneration) return;
     this.pushBounded(record);
     this.nextSequence = Math.max(this.nextSequence, record.sequence);
+  }
+
+  /** Advance the active plugin/session generation during a reload. */
+  advanceGeneration(): number {
+    if (this.currentGeneration === Number.MAX_SAFE_INTEGER) {
+      throw new RangeError("event bridge generation exhausted");
+    }
+    this.currentGeneration += 1;
+    return this.currentGeneration;
+  }
+
+  generation(): number {
+    return this.currentGeneration;
   }
 
   snapshot(query: SessionEventLogQuery = {}): SessionEventRecord[] {

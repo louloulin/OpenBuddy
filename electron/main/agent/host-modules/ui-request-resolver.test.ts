@@ -85,6 +85,36 @@ describe("ui-request-resolver", () => {
     });
   });
 
+  it("rejects and removes a request from an older Pi generation", () => {
+    const resolve = vi.fn();
+    stub.state.piGeneration = 4;
+    stub.state.pendingUiRequests.set("stale", {
+      kind: "question",
+      sessionId: "s1",
+      generation: 3,
+      resolve,
+    });
+
+    expect(resolveUiRequest("stale", "late answer" as any)).toBe(false);
+    expect(resolve).not.toHaveBeenCalled();
+    expect(stub.state.pendingUiRequests.has("stale")).toBe(false);
+    expect(stub.events).toHaveLength(0);
+  });
+
+  it("accepts a request from the active Pi generation", () => {
+    const resolve = vi.fn();
+    stub.state.piGeneration = 4;
+    stub.state.pendingUiRequests.set("current", {
+      kind: "question",
+      sessionId: "s1",
+      generation: 4,
+      resolve,
+    });
+
+    expect(resolveUiRequest("current", "answer" as any)).toBe(true);
+    expect(resolve).toHaveBeenCalledWith("answer");
+  });
+
   it("emits session/question-resolved for question requests", () => {
     stub.state.pendingUiRequests.set("r1", {
       kind: "question",

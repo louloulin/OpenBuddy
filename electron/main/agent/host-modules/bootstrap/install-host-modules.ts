@@ -203,10 +203,75 @@ export interface InstallHostModuleDeps {
 
 // ──────────────────────────────────────────────────────────────────────────
 // Domain helpers — 每个域内按 install 顺序调用各 host-module 的 install 函数.
-// 每个 install() 的 deps 类型互不相同, 此处统一用 spread `{...deps}` + `as never`
-// 让 TS 把 deps 当作任意类型传递, 这样 InstallHostModuleDeps 的「包含所有
-// 闭包变量」契约由调用方 (agent-host.ts) 维护.
+// 每个 domain deps 都是该域 installer 参数的显式交集子契约：installer 新增
+// 依赖时，composition root 会在这里获得编译期提示，而不是通过 any/never 逃逸。
 // ──────────────────────────────────────────────────────────────────────────
+type InstallerDeps<T extends (deps: any) => void> = Parameters<T>[0];
+
+export type ProfileDomainDeps =
+  & InstallerDeps<typeof installOverridePatches>
+  & InstallerDeps<typeof installProfileSnapshot>
+  & InstallerDeps<typeof installProfileBundles>
+  & InstallerDeps<typeof installProfileResourcePaths>
+  & InstallerDeps<typeof installUnifiedPackages>
+  & InstallerDeps<typeof installPresetHelpers>
+  & InstallerDeps<typeof installAgentPresetRuntime>
+  & InstallerDeps<typeof installContextServicesSnapshot>
+  & InstallerDeps<typeof installDefaultPiPackageInstaller>;
+
+export type SessionDomainDeps =
+  & InstallerDeps<typeof installHarnessCursors>
+  & InstallerDeps<typeof installAgentModel>
+  & InstallerDeps<typeof installAgentPrompt>
+  & InstallerDeps<typeof installTeamRunner>
+  & InstallerDeps<typeof installDeepSeekAgentRuntime>
+  & InstallerDeps<typeof installDeepSeekCordisRuntime>
+  & InstallerDeps<typeof installSessionMetadata>
+  & InstallerDeps<typeof installSessionStore>
+  & InstallerDeps<typeof installSubagentRuntime>;
+
+export type PluginDomainDeps =
+  & InstallerDeps<typeof installHookPermission>
+  & InstallerDeps<typeof installPluginEventBus>
+  & InstallerDeps<typeof installPluginState>
+  & InstallerDeps<typeof installPluginMutations>
+  & InstallerDeps<typeof installPiExtensionConfigure>
+  & InstallerDeps<typeof installDisposeInternal>
+  & InstallerDeps<typeof installWorkbenchScope>
+  & InstallerDeps<typeof installWorkbenchScopeSync>
+  & InstallerDeps<typeof installUiRequestResolver>
+  & InstallerDeps<typeof installTelemetrySink>
+  & InstallerDeps<typeof installDshBridgeHelpers>;
+
+export type RuntimeDomainDeps =
+  & InstallerDeps<typeof installProfileReloadTransaction>
+  & InstallerDeps<typeof installSessionRebind>
+  & InstallerDeps<typeof installSessionProjection>
+  & InstallerDeps<typeof installSessionSwap>
+  & InstallerDeps<typeof installProfileArtifactReconciler>
+  & InstallerDeps<typeof installPiRuntimeFactories>
+  & InstallerDeps<typeof installPiRuntimeRefresh>
+  & InstallerDeps<typeof installDeepSeekAgentFactory>
+  & InstallerDeps<typeof installBeforeQuitHandler>
+  & InstallerDeps<typeof installModelConfig>
+  & InstallerDeps<typeof installInitOrchestration>;
+
+/**
+ * Composition-root view of the installer bag. The legacy flat bag remains the
+ * public compatibility input, while domain helpers only receive their own
+ * grouped contract. Keeping this conversion at one boundary prevents a new
+ * domain dependency from leaking into the other three domains.
+ */
+export interface InstallHostModuleDomainDeps {
+  profile: ProfileDomainDeps;
+  session: SessionDomainDeps;
+  plugin: PluginDomainDeps;
+  runtime: RuntimeDomainDeps;
+}
+
+/** Grouped composition-root contract; flat fields are intentionally not exported. */
+export type InstallHostModuleDepsWithDomains = InstallHostModuleDomainDeps;
+export type InstallHostModuleDomainInput = InstallHostModuleDomainDeps & { state: AgentHostState };
 
 /**
  * Profile 域 (11 modules): override-patches → snapshot → bundles → resource-paths
@@ -216,17 +281,17 @@ export interface InstallHostModuleDeps {
  * 顺序: 文件解析 → 快照 → 包合并 → 资源路径 → 单元包 → preset →
  *       上下文服务快照 → 默认包安装器.
  */
-function installProfileDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
-  const d = { ...deps, state } as unknown as never;
-  installOverridePatches(d);
-  installProfileSnapshot(d);
-  installProfileBundles(d);
-  installProfileResourcePaths(d);
-  installUnifiedPackages(d);
-  installPresetHelpers(d);
-  installAgentPresetRuntime(d);
-  installContextServicesSnapshot(d);
-  installDefaultPiPackageInstaller(d);
+function installProfileDomain(state: AgentHostState, deps: ProfileDomainDeps): void {
+  if (deps.state !== state) throw new Error("installHostModules received inconsistent state");
+  installOverridePatches(deps);
+  installProfileSnapshot(deps);
+  installProfileBundles(deps);
+  installProfileResourcePaths(deps);
+  installUnifiedPackages(deps);
+  installPresetHelpers(deps);
+  installAgentPresetRuntime(deps);
+  installContextServicesSnapshot(deps);
+  installDefaultPiPackageInstaller(deps);
 }
 
 /**
@@ -238,17 +303,17 @@ function installProfileDomain(state: AgentHostState, deps: InstallHostModuleDeps
  *       deepseek runtime → cordis runtime → session metadata →
  *       session store → subagent.
  */
-function installSessionDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
-  const d = { ...deps, state } as unknown as never;
-  installHarnessCursors(d);
-  installAgentModel(d);
-  installAgentPrompt(d);
-  installTeamRunner(d);
-  installDeepSeekAgentRuntime(d);
-  installDeepSeekCordisRuntime(d);
-  installSessionMetadata(d);
-  installSessionStore(d);
-  installSubagentRuntime(d);
+function installSessionDomain(state: AgentHostState, deps: SessionDomainDeps): void {
+  if (deps.state !== state) throw new Error("installHostModules received inconsistent state");
+  installHarnessCursors(deps);
+  installAgentModel(deps);
+  installAgentPrompt(deps);
+  installTeamRunner(deps);
+  installDeepSeekAgentRuntime(deps);
+  installDeepSeekCordisRuntime(deps);
+  installSessionMetadata(deps);
+  installSessionStore(deps);
+  installSubagentRuntime(deps);
 }
 
 /**
@@ -257,19 +322,19 @@ function installSessionDomain(state: AgentHostState, deps: InstallHostModuleDeps
  *   workbench-scope → workbench-scope-sync → ui-request-resolver →
  *   telemetry-sink → dsh-bridge-helpers.
  */
-function installPluginDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
-  const d = { ...deps, state } as unknown as never;
-  installHookPermission(d);
-  installPluginEventBus(d);
-  installPluginState(d);
-  installPluginMutations(d);
-  installPiExtensionConfigure(d);
-  installDisposeInternal(d);
-  installWorkbenchScope(d);
-  installWorkbenchScopeSync(d);
-  installUiRequestResolver(d);
-  installTelemetrySink(d);
-  installDshBridgeHelpers(d);
+function installPluginDomain(state: AgentHostState, deps: PluginDomainDeps): void {
+  if (deps.state !== state) throw new Error("installHostModules received inconsistent state");
+  installHookPermission(deps);
+  installPluginEventBus(deps);
+  installPluginState(deps);
+  installPluginMutations(deps);
+  installPiExtensionConfigure(deps);
+  installDisposeInternal(deps);
+  installWorkbenchScope(deps);
+  installWorkbenchScopeSync(deps);
+  installUiRequestResolver(deps);
+  installTelemetrySink(deps);
+  installDshBridgeHelpers(deps);
 }
 
 /**
@@ -282,19 +347,19 @@ function installPluginDomain(state: AgentHostState, deps: InstallHostModuleDeps)
  * 这些 module 跨域共享, 不严格属于「一个域」; 排在最后以便 profile/session/plugin
  * 先注入完闭包, 再让 runtime 串起来.
  */
-function installRuntimeDomain(state: AgentHostState, deps: InstallHostModuleDeps): void {
-  const d = { ...deps, state } as unknown as never;
-  installProfileReloadTransaction(d);
-  installSessionRebind(d);
-  installSessionProjection(d);
-  installSessionSwap(d);
-  installProfileArtifactReconciler(d);
-  installPiRuntimeFactories(d);
-  installPiRuntimeRefresh(d);
-  installDeepSeekAgentFactory(d);
-  installBeforeQuitHandler(d);
-  installModelConfig(d);
-  installInitOrchestration(d);
+function installRuntimeDomain(state: AgentHostState, deps: RuntimeDomainDeps): void {
+  if (deps.state !== state) throw new Error("installHostModules received inconsistent state");
+  installProfileReloadTransaction(deps);
+  installSessionRebind(deps);
+  installSessionProjection(deps);
+  installSessionSwap(deps);
+  installProfileArtifactReconciler(deps);
+  installPiRuntimeFactories(deps);
+  installPiRuntimeRefresh(deps);
+  installDeepSeekAgentFactory(deps);
+  installBeforeQuitHandler(deps);
+  installModelConfig(deps);
+  installInitOrchestration(deps);
 }
 
 /**
@@ -306,9 +371,10 @@ function installRuntimeDomain(state: AgentHostState, deps: InstallHostModuleDeps
  *
  * 总 install 顺序在每个域内部维护 (见各域 helper 注释).
  */
-export function installHostModules(state: AgentHostState, deps: InstallHostModuleDeps): void {
-  installProfileDomain(state, deps);
-  installSessionDomain(state, deps);
-  installPluginDomain(state, deps);
-  installRuntimeDomain(state, deps);
+export function installHostModules(state: AgentHostState, deps: InstallHostModuleDomainInput): void {
+  if (deps.profile.state !== state) throw new Error("installHostModules received inconsistent state");
+  installProfileDomain(state, deps.profile);
+  installSessionDomain(state, deps.session);
+  installPluginDomain(state, deps.plugin);
+  installRuntimeDomain(state, deps.runtime);
 }

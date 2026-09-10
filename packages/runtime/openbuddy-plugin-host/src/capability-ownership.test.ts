@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   CAPABILITY_OWNERSHIP,
   CAPABILITY_TO_PLUGIN_ID,
+  assertNoCapabilityOwnershipConflicts,
+  findCapabilityOwnershipConflicts,
   listOpenBuddyOwned,
   listPassthroughEligible,
   openbuddyPluginForCapability,
@@ -63,6 +65,42 @@ describe("capability-ownership authority", () => {
     expect(openbuddyPluginForCapability("permission")).toBe("openbuddy-authorization");
   });
 
+  it("detects distinct active backends and ignores duplicate reports", () => {
+    const backends = [
+      { capability: "mcp", backendId: "openbuddy-mcp-client" },
+      { capability: "mcp", backendId: "pi-mcp-adapter" },
+      { capability: "mcp", backendId: "pi-mcp-adapter" },
+      { capability: "web", backendId: "pi-web-access" },
+    ];
+    expect(findCapabilityOwnershipConflicts(backends)).toEqual([
+      {
+        capability: "mcp",
+        backends: [backends[0], backends[1]],
+      },
+    ]);
+  });
+
+  it("rejects a graph with duplicate capability owners", () => {
+    expect(() =>
+      assertNoCapabilityOwnershipConflicts([
+        { capability: "task", backendId: "openbuddy-task" },
+        { capability: "task", backendId: "pi-task" },
+      ]),
+    ).toThrow("capability ownership conflict (task: openbuddy-task, pi-task)");
+    expect(() =>
+      assertNoCapabilityOwnershipConflicts([
+        { capability: "task", backendId: "openbuddy-task" },
+        { capability: "task", backendId: "openbuddy-task" },
+      ]),
+    ).not.toThrow();
+  });
+
+  it("ignores incomplete backend declarations", () => {
+    expect(findCapabilityOwnershipConflicts([
+      { capability: "", backendId: "a" },
+      { capability: "mcp", backendId: " " },
+    ])).toEqual([]);
+  });
   it("returns undefined for unknown capabilities", () => {
     expect(ownershipForCapability("nonexistent")).toBeUndefined();
     expect(piPluginForCapability("nonexistent")).toBeUndefined();

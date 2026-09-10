@@ -31,7 +31,7 @@
 import type { Context } from "@openbuddy/cordis";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import type { AgentHostState } from "../_state-shape";
-import type { InstallHostModuleDeps } from "./install-host-modules";
+import type { InstallHostModuleDeps, InstallHostModuleDepsWithDomains, InstallHostModuleDomainInput } from "./install-host-modules";
 import type { ElectronHarnessPluginLoader } from "../profile/loader";
 import type { PluginStateStore } from "@openbuddy/plugin-host";
 import type { PiToolRegistry } from "../_state-shape";
@@ -47,8 +47,8 @@ export interface InitPipelineDeps {
   emitPluginEvent: (type: string, payload: unknown) => void;
   emitRendererEvent: (channel: string, payload: unknown) => void;
   // Lifecycle
-  getMicrokernelHostDeps: () => Record<string, unknown>;
-  installMicrokernelHost: (deps: InstallHostModuleDeps) => void;
+  getMicrokernelHostDeps: () => InstallHostModuleDepsWithDomains;
+  installMicrokernelHost: (deps: InstallHostModuleDomainInput) => void;
   // Stage helpers
   bootstrapSessionEventLog: (state: AgentHostState, cwd: string) => Promise<void>;
   bootstrapModelRuntime: (state: AgentHostState) => Promise<void>;
@@ -167,9 +167,12 @@ export async function runInitPipeline(deps: InitPipelineDeps): Promise<Context> 
   // Stage 3: Install all 35 host-modules via the microkernel host.
   console.log("[openbuddy-diag] init-pipeline stage=3 ENTER (installMicrokernelHost)");
   deps.installMicrokernelHost({
-    ...deps.getMicrokernelHostDeps(),
+    profile: deps.getMicrokernelHostDeps().profile,
+    session: deps.getMicrokernelHostDeps().session,
+    plugin: deps.getMicrokernelHostDeps().plugin,
+    runtime: deps.getMicrokernelHostDeps().runtime,
     state: deps.state,
-  } as unknown as InstallHostModuleDeps);
+  });
   console.log("[openbuddy-diag] init-pipeline stage=3 DONE");
 
   // Stage 4: Create Cordis Context + wire core services.

@@ -221,6 +221,52 @@ export function listOpenBuddyOwned(): readonly CapabilityOwnership[] {
   return CAPABILITY_OWNERSHIP.filter((entry) => !entry.passthrough);
 }
 
+/** A runtime backend declaration used when assembling a plugin graph. */
+export interface ActiveCapabilityBackend {
+  capability: string;
+  backendId: string;
+  pluginId?: string;
+}
+
+/** A capability with more than one active backend cannot be safely activated. */
+export interface CapabilityOwnershipConflict {
+  capability: string;
+  backends: readonly ActiveCapabilityBackend[];
+}
+
+/**
+ * Return active-backend conflicts without mutating the registry. Inactive
+ * entries should be omitted by callers; duplicate declarations of the same
+ * backend are collapsed so repeated readiness reports remain idempotent.
+ */
+export function findCapabilityOwnershipConflicts(
+  backends: readonly ActiveCapabilityBackend[],
+): readonly CapabilityOwnershipConflict[] {
+  const grouped = new Map<string, Map<string, ActiveCapabilityBackend>>();
+  for (const backend of backends) {
+    if (!backend.capability.trim() || !backend.backendId.trim()) continue;
+    const byBackend = grouped.get(backend.capability) ?? new Map();
+    byBackend.set(backend.backendId, backend);
+    grouped.set(backend.capability, byBackend);
+  }
+  return [...grouped.entries()]
+    .filter(([, entries]) => entries.size > 1)
+    .map(([capability, entries]) => ({ capability, backends: [...entries.values()] }))
+    .sort((a, b) => a.capability.localeCompare(b.capability));
+}
+
+/** Throw a stable error when activating a graph with duplicate backends. */
+export function assertNoCapabilityOwnershipConflicts(
+  backends: readonly ActiveCapabilityBackend[],
+): void {
+  const conflicts = findCapabilityOwnershipConflicts(backends);
+  if (conflicts.length === 0) return;
+  const detail = conflicts
+    .map((conflict) => `${conflict.capability}: ${conflict.backends.map((backend) => backend.backendId).join(", ")}`)
+    .join("; ");
+  throw new Error(`capability ownership conflict (${detail})`);
+}
+
 /**
  * The capability → plugin-id map, derived from the authority. Kept as a
  * `ReadonlyMap` so existing consumers (`pi-passthrough.ts`) and tests see

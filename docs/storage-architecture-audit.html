@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenBuddy Storage Architecture Audit</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { max-width: 72rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; }
+    code { font-family: ui-monospace, monospace; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid currentColor; padding: .45rem; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>OpenBuddy Storage Architecture Audit</h1>
+  <p>This offline, static artifact records the storage ownership boundary used by the OpenBuddy acceptance checks.</p>
+  <h2>Ownership</h2>
+  <table>
+    <thead><tr><th>Data</th><th>Owner</th><th>Boundary</th></tr></thead>
+    <tbody>
+      <tr><td>Structured metadata, events, projections and migrations</td><td>OpenBuddy SQLite storage</td><td>Main-process storage package</td></tr>
+      <tr><td>Conversation transcript</td><td>Pi JSONL session store</td><td>Pi runtime/session boundary</td></tr>
+      <tr><td>Credential values</td><td>SecretStore / OS keychain</td><td>Never persisted in SQLite or renderer state</td></tr>
+      <tr><td>Large files and artifacts</td><td>Content-addressed object store</td><td>Explicit service/API access only</td></tr>
+    </tbody>
+  </table>
+  <h2>Safety invariants</h2>
+  <ul>
+    <li>SQLite access is centralized in the storage package and uses parameterized statements.</li>
+    <li>Transactions, migrations, backups and integrity checks fail closed on errors.</li>
+    <li>Renderer code accesses storage through typed Main-process contracts.</li>
+    <li>Secrets, tokens, passwords and cookies are excluded from diagnostics and projections.</li>
+    <li>OpenClaw runtime data is outside this local acceptance scope and remains not-run.</li>
+  </ul>
+  <p>Evidence and reproducible commands are recorded in <code>docs/storage-verification-report.md</code>.</p>
+</body>
+</html>

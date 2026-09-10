@@ -129,6 +129,7 @@ export type PiPromptContentPart =
 export type AgentHostPendingUiRequest = {
   kind: "question" | "permission";
   sessionId: string;
+  generation?: number;
   resolve: (value: AgentHostUiRequestValue) => void;
   permission?: HookPermissionRequest;
 };
@@ -268,6 +269,7 @@ export interface AgentHostState {
   baseProfile: PluginProfile | null;
   storedLayers: PluginPatch[][];
   toolRegistryRevision: number;
+  piGeneration?: number;
   pendingUiRequests: Map<string, AgentHostPendingUiRequest>;
   hookPermissionSessionRules: Map<string, PermissionRule[]>;
   extensionEditorText: Map<string, string>;

@@ -14,9 +14,12 @@ import { permissionHandlers } from "@openbuddy/auth-permission";
 import * as piResources from "../../pi-resources";
 import type { PiSessionRuntime } from "../../pi-session-runtime";
 import type { PiRuntimeCoordinator } from "../../pi-runtime-coordinator";
-import type { InstallHostModuleDeps } from "./install-host-modules";
+import type { AgentHostState } from "../_state-shape";
+import type { InstallHostModuleDeps, InstallHostModuleDepsWithDomains } from "./install-host-modules";
 
 export interface InstallHostModuleDepsClosures {
+  /** Shared composition-root state; every domain must observe this exact object. */
+  state: AgentHostState;
   // Path helpers
   piHome: () => string;
   isPathWithin: (root: string, candidate: string) => boolean;
@@ -115,8 +118,9 @@ export interface InstallHostModuleDepsClosures {
 
 export function buildInstallHostModuleDeps(
   closures: InstallHostModuleDepsClosures,
-): InstallHostModuleDeps {
-  return {
+): InstallHostModuleDepsWithDomains {
+  const flatDeps: InstallHostModuleDeps = {
+    state: closures.state,
     piHome: closures.piHome,
     isPathWithin: closures.isPathWithin,
     piSessionDir: closures.piSessionDir,
@@ -208,5 +212,11 @@ export function buildInstallHostModuleDeps(
     promptContent: closures.promptContent,
     onEvent: closures.onEvent,
     persistPiSessionHeaderImpl: closures.persistPiSessionHeaderImpl,
-  } as unknown as InstallHostModuleDeps;
+  };
+  return {
+    profile: flatDeps,
+    session: flatDeps,
+    plugin: flatDeps,
+    runtime: flatDeps,
+  } as InstallHostModuleDepsWithDomains;
 }

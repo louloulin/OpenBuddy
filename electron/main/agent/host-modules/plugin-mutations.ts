@@ -396,7 +396,7 @@ export async function reloadPiExtensionsInternal(transaction?: PluginTransaction
   } catch (error) {
     try {
       transaction?.phase("rollback", "pi-profile");
-      await rollbackPiProfile(previous, capturedServices);
+      await rollbackPiProfile(previous, capturedServices, capturedCapabilities);
       emitPluginEvent("pi/extensions-reload-failed", { error: String(error), rolledBack: true });
     } catch (rollbackError) {
       emitPluginEvent("pi/extensions-reload-failed", { error: String(error), rolledBack: false, rollbackError: String(rollbackError) });

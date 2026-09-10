@@ -77,6 +77,7 @@ export interface InitSessionDeps {
   canonicalEventNamespace: any;
   /** createRpcUiContext factory and question-answer helper. */
   createOpenBuddyRpcUiContext: any;
+  piGeneration?: number;
   questionAnswer: any;
   /** path helpers. */
   piHome: () => string;
@@ -194,7 +195,8 @@ export async function initSession(deps: InitSessionDeps): Promise<string> {
     emitRendererEvent,
     questionAnswer,
     createOpenBuddyRpcUiContext,
-  } as unknown as ProvideRpcUiContextDeps);
+    piGeneration: state.piGeneration,
+  });
 
   // Capture which Pi extension registered which provider before bindExtensions
   // drains the pending queue. The tracker installed above captures live calls
