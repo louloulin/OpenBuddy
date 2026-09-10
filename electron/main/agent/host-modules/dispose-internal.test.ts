@@ -140,6 +140,13 @@ describe("dispose-internal", () => {
     await expect(disposeInternal()).resolves.toBeUndefined();
   });
 
+  it("unsubscribes the session event bridge before clearing session state", async () => {
+    const unsubscribe = vi.fn();
+    stub.state.sessionUnsubscribe = unsubscribe;
+    await disposeInternal();
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(stub.state.sessionUnsubscribe).toBeNull();
+  });
   it("unsubscribes capability + typert event bridges", async () => {
     await disposeInternal();
     expect(stub.state.capabilityEventBridgeUnsubscribe).toBeNull();
@@ -172,6 +179,13 @@ describe("dispose-internal", () => {
     expect(stub.state.pendingUiRequests.size).toBe(0);
   });
 
+  it("clears extension diagnostics so a new session cannot show stale failures", async () => {
+    stub.state.userExtensionResult = { loaded: 1, failed: 2, failedIds: ["broken.ts"] };
+    stub.state.dshCoreExtensionResult = { loaded: 0, failed: 1, failedIds: ["dsh-core"] };
+    await disposeInternal();
+    expect(stub.state.userExtensionResult).toBeNull();
+    expect(stub.state.dshCoreExtensionResult).toBeNull();
+  });
   it("clears marketplace resource paths + agent files", async () => {
     stub.state.piMarketplaceResourcePaths.extensions = ["/keep/me"];
     stub.state.piMarketplaceAgentFiles = [{ path: "a", content: "b" }];

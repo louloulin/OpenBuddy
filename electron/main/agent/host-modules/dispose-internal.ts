@@ -142,6 +142,7 @@ export async function disposeInternal(): Promise<void> {
   state.deepSeekCordisRuntime = null;
   state.deepSeekCordisSnapshot = null;
   await state.sessionEventLog?.flush();
+  state.sessionUnsubscribe?.();
   state.sessionUnsubscribe = null;
   state.loader = null;
   state.sessionEventLog?.clear();
@@ -174,6 +175,8 @@ export async function disposeInternal(): Promise<void> {
   state.activePluginProfile = null;
   state.storedLayers = [];
   state.profileReloadPromise = Promise.resolve();
+  state.userExtensionResult = null;
+  state.dshCoreExtensionResult = null;
   state.pluginReadiness = { phase: "idle", generation: 0 };
   state.runningTasks.clear();
   state.jobsRegistry.clear();
