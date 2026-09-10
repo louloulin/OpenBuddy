@@ -63,7 +63,12 @@ const execFileAsync = promisify(execFile);
 const defaultProfilePackageManager: ProfilePackageManager = {
   async install(profileDir, source) {
     try {
-      await execFileAsync("pnpm", ["add", "--save-prod", "--ignore-workspace", "--ignore-scripts", "--", source], {
+      // pnpm 11 dropped the top-level `--ignore-scripts` option from
+      // `pnpm add` / `pnpm remove`. The replacement is the dot-config
+      // form `--config.ignore-scripts=true`, which still routes through
+      // the same pnpm settings machinery and keeps the global
+      // `~/.npmrc` `ignore-scripts=true` policy in force per-invocation.
+      await execFileAsync("pnpm", ["add", "--save-prod", "--ignore-workspace", "--config.ignore-scripts=true", "--", source], {
         cwd: profileDir,
         maxBuffer: 4 * 1024 * 1024,
       });
@@ -77,7 +82,12 @@ const defaultProfilePackageManager: ProfilePackageManager = {
   },
   async remove(profileDir, packageName) {
     try {
-      await execFileAsync("pnpm", ["remove", "--ignore-workspace", "--ignore-scripts", "--config.minimumReleaseAge=0", packageName], {
+      // pnpm 11 dropped the top-level `--ignore-scripts` option from
+      // `pnpm add` / `pnpm remove`. The replacement is the dot-config
+      // form `--config.ignore-scripts=true`, which still routes through
+      // the same pnpm settings machinery and keeps the global
+      // `~/.npmrc` `ignore-scripts=true` policy in force per-invocation.
+      await execFileAsync("pnpm", ["remove", "--ignore-workspace", "--config.ignore-scripts=true", "--config.minimumReleaseAge=0", packageName], {
         cwd: profileDir,
         maxBuffer: 4 * 1024 * 1024,
       });

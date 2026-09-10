@@ -310,7 +310,7 @@ export async function reloadPluginInternal(id: string, transaction?: PluginTrans
     transaction?.phase("pi", "pi-resource-loader");
     await piRuntimeCoordinator.reload(`plugin-reload:${id}`);
     reportPiExtensionErrors();
-    await syncMarketplacePiExtensionStatuses();
+    await syncMarketplacePiExtensionStatuses(state);
     return state.piExtensionStatuses.find((entry) => entry.id === id) ?? null;
   }
   if (!state.loader) throw new Error("openbuddy-agent: plugin host not initialized");
@@ -388,7 +388,7 @@ export async function reloadPiExtensionsInternal(transaction?: PluginTransaction
     restoreCapturedContextServices(capturedServices);
     reportPiExtensionErrors();
     transaction?.receipt("pi", { extensions: state.piExtensionStatuses.filter((entry) => entry.state === "loaded").length });
-    await syncMarketplacePiExtensionStatuses();
+    await syncMarketplacePiExtensionStatuses(state);
     emitPluginEvent("pi/extensions-reloaded", {
       extensions: state.piExtensionStatuses.map((extension) => ({ ...extension })),
     });
@@ -419,7 +419,7 @@ export async function updatePluginConfigInternal(id: string, config: unknown, tr
       transaction?.phase("pi", "pi-resource-loader");
       await piRuntimeCoordinator.reload(`plugin-config:${id}`);
     reportPiExtensionErrors();
-    await syncMarketplacePiExtensionStatuses();
+    await syncMarketplacePiExtensionStatuses(state);
     }
     return state.piExtensionStatuses.find((entry) => entry.id === id) ?? null;
   }
