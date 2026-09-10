@@ -402,3 +402,16 @@ Electron smoke 尝试及结果：`pnpm test:electron:ipc-surface` 无法启动 P
 - loader 隔离：`electron/main/index.ts` 原先的 entry-level `const __filename`/`__dirname` 改为 `mainFilename`/`mainDirname`，避免 bundled dependency 也声明 `__filename` 时产生 ESM duplicate binding。`pnpm build`、`pnpm typecheck` 均通过；构建产物检查 `rg -n "const __filename|var __filename|__filename =" out/main/index.js` 不再发现 entry 重复 binding。
 
 Electron 复验：`pnpm test:electron:stream-port` 已重新运行，之前的 `Identifier '__filename' has already been declared` 不再出现；当前唯一明确阻塞为 `[ERROR:ui/ozone/platform/x11/ozone_platform_x11.cc:257] Missing X server or $DISPLAY`，Electron 随后 SIGTRAP 退出。`pnpm test:electron:ipc-surface` 同样无法启动 Playwright Electron。`pnpm test:electron:real-ui` 仍按设计要求 `OPENBUDDY_E2E_REQUIRED=1` 与临时 provider credentials，本轮不绕过该门禁。复现命令已记录为上述三条。
+
+### 12.14 本轮增量：跨平台发布 preflight 与桌面 runner 诊断
+
+新增 `scripts/release-preflight.mjs` 和 `pnpm release:preflight`。该门禁是无凭据、无网络的本地静态/产物检查，不执行签名、公证、发布、provider 调用或 GitHub 写入：
+
+- 检查 `out/main/index.js`、`out/preload/index.cjs`、`out/renderer/index.html`、`electron-builder.yml` 和 release workflow 存在；
+- 检查 Windows NSIS、macOS DMG、Linux AppImage 三个 release job/target、CI typecheck/test/build、artifact upload 和 GitHub publish contract；
+- 对三个已构建输入生成 SHA-256 digest，记录版本、平台、架构和安全策略；
+- 检查本地是否具备 `DISPLAY`/`WAYLAND_DISPLAY`，明确报告桌面 smoke 是否 ready；real provider credentials 仍保持 opt-in，不被 preflight 消费。
+
+真实运行：`pnpm release:preflight --json=evidence/release/release-preflight-local.json` 通过 release/build checks，报告 `ok: true`、`desktopSmokeReady: false`；本机 `Linux x64` 无 `DISPLAY`/`WAYLAND_DISPLAY`，因此只记录阻塞而不伪造 smoke 结果。报告被 `.gitignore` 的 `evidence/` 规则忽略，命令和 schema 可复现。
+
+附加验证：`pnpm exec vitest run scripts/audit-enterprise-release.test.mjs electron/main/agent/pi-extensions.test.ts --reporter=dot`：2 files、48/48 通过；`pnpm typecheck`：通过；`git diff --check`：通过。跨平台实际签名/公证/installer 运行仍必须在 GitHub Actions 对应 Windows/macOS/Linux runner 执行，不能在当前 Linux 无桌面环境中宣称完成。

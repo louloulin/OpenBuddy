@@ -42,7 +42,7 @@
     "perf:streaming": "node scripts/perf/streaming-bench.mjs",
     "perf:ipc": "node scripts/perf/ipc-latency.mjs",
     "perf": "node scripts/perf/streaming-bench.mjs && node scripts/perf/ipc-latency.mjs",
-    "perf:main-chunks": "node scripts/perf/check-main-chunks.mjs",
+    "release:preflight": "node scripts/release-preflight.mjs",
     "verify:agent-host-boundaries": "node scripts/architecture/check-agent-host-boundaries.mjs",
     "verify:plan": "node scripts/verify-plan.mjs",
     "verify:plan:baseline": "node scripts/architecture/generate-plan4-baseline.mjs --write",

@@ -1,0 +1,98 @@
+#!/usr/bin/env node
+/**
+ * Local, credential-free release/smoke preflight.
+ *
+ * This is intentionally a static/local gate: it never signs, notarizes,
+ * publishes, contacts a provider, or contacts GitHub. It verifies that the
+ * checked-out release contract and built Electron inputs are complete, and
+ * records why desktop smoke can or cannot run in this environment.
+ */
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { platform, arch } from "node:os";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const reportPath = process.argv.find((arg) => arg.startsWith("--json="))?.slice(7)
+  ?? "evidence/release/release-preflight.json";
+const reportFile = resolve(root, reportPath);
+const checks = [];
+const check = (name, ok, details = {}) => {
+  checks.push({ name, ok, ...details });
+  return ok;
+};
+const fileText = (path) => existsSync(path) ? readFileSync(path, "utf8") : "";
+
+const packageJson = JSON.parse(fileText(join(root, "package.json")) || "{}");
+const builder = fileText(join(root, "electron-builder.yml"));
+const workflow = fileText(join(root, ".github/workflows/release.yml"));
+const requiredFiles = [
+  "out/main/index.js",
+  "out/preload/index.cjs",
+  "out/renderer/index.html",
+  "electron-builder.yml",
+  ".github/workflows/release.yml",
+];
+for (const relative of requiredFiles) {
+  const path = join(root, relative);
+  check(`file:${relative}`, existsSync(path), existsSync(path) ? { bytes: statSync(path).size } : { reason: "missing; run pnpm build" });
+}
+
+const targets = [
+  ["windows", /build-windows:/, /target:\s*nsis/],
+  ["macos", /build-macos:/, /target:\s*dmg/],
+  ["linux", /build-linux:/, /target:\s*AppImage/],
+];
+for (const [name, jobPattern, targetPattern] of targets) {
+  check(`release:${name}`, jobPattern.test(workflow) && targetPattern.test(builder), {
+    workflowJob: jobPattern.test(workflow),
+    builderTarget: targetPattern.test(builder),
+  });
+}
+check("release:ci-gates", /pnpm typecheck && pnpm workspace:typecheck/.test(workflow) && /pnpm test/.test(workflow) && /pnpm build/.test(workflow));
+check("release:artifact-upload", /actions\/upload-artifact@v4/.test(workflow) && /release\/\*\.(exe|dmg|AppImage)/.test(workflow));
+check("release:publishing-contract", /publish-release:/.test(workflow) && /provider:\s*github/.test(builder) && /owner:\s*louloulin/.test(builder) && /repo:\s*OpenBuddy/.test(builder));
+check("release:signing-is-ci-only", !process.env.CSC_LINK && !process.env.CSC_KEY_PASSWORD && !process.env.APPLE_API_KEY, {
+  reason: "local preflight never consumes signing/notarization credentials",
+});
+
+const digest = createHash("sha256");
+let hashedFiles = 0;
+for (const relative of ["out/main/index.js", "out/preload/index.cjs", "out/renderer/index.html"]) {
+  const path = join(root, relative);
+  if (!existsSync(path)) continue;
+  digest.update(relative);
+  digest.update(readFileSync(path));
+  hashedFiles += 1;
+}
+check("build:artifact-hash", hashedFiles === 3, { hashedFiles, sha256: digest.digest("hex") });
+
+const hasDisplay = Boolean(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);
+check("desktop:display", hasDisplay, {
+  platform: platform(),
+  arch: arch(),
+  display: process.env.DISPLAY || null,
+  waylandDisplay: process.env.WAYLAND_DISPLAY || null,
+  reason: hasDisplay ? undefined : "X server/Wayland display unavailable; Electron smoke must be run on a desktop runner",
+});
+check("desktop:credentials-gate", !process.env.OPENBUDDY_E2E_REQUIRED, {
+  reason: "real provider smoke remains opt-in and is not run by this preflight",
+});
+
+const report = {
+  schema: "openbuddy.release-preflight.v1",
+  generatedAt: new Date().toISOString(),
+  repository: packageJson.name ?? "openbuddy",
+  version: packageJson.version ?? null,
+  mode: "local-credential-free-static",
+  noNetwork: true,
+  checks,
+  ok: checks.filter((entry) => entry.name.startsWith("release:") || entry.name.startsWith("build:")).every((entry) => entry.ok),
+  desktopSmokeReady: checks.find((entry) => entry.name === "desktop:display")?.ok === true,
+};
+mkdirSync(dirname(reportFile), { recursive: true });
+writeFileSync(reportFile, `${JSON.stringify(report, null, 2)}\n`);
+console.log(JSON.stringify(report, null, 2));
+console.log(`wrote ${reportFile}`);
+if (!report.ok) process.exitCode = 2;
