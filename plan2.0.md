@@ -475,3 +475,9 @@ Electron 复验：`pnpm test:electron:stream-port` 已重新运行，之前的 `
 真实定向运行：`pnpm provider:e3:fixture --json=evidence/provider/provider-e3-fixture.json`，结果 `ok: true`、`evidenceLevel: E3-fixture`、`realProvider: false`、`realNetwork: false`、`credentialsUsed: false`、全部 8 项检查通过；报告明确 `blockedRealProviderE3: true` 及可复现 blocker。`pnpm typecheck`、`pnpm build`、`git diff --check` 通过。
 
 本轮计划进度达到 **18/18，约 100%（代码/contract 切片完成）**；发布/验收状态仍不是“所有外部结果已完成”：真实桌面 session reload/IPC、Windows NSIS、macOS 签名/公证、Linux artifact 运行和真实 provider E3 必须分别由专用 runner/安全临时凭据产生，后续计划保留这些阻塞项并严格区分 E3-fixture 与 real E3。
+
+### 12.24 验收状态维护：阻塞证据复核（不重复计数）
+
+按验收要求复核当前发布状态：本机仍为 Linux x64，无 `$DISPLAY`/`$WAYLAND_DISPLAY`，`OPENBUDDY_E2E_REQUIRED` 未设置；没有专用 Windows/macOS runner 或批准的临时 provider credentials。因此没有新增或重复计算 18/18 代码/contract 切片，也没有宣称真实桌面、签名/公证、产物安装或 real-provider E3 完成。
+
+复核命令：`node scripts/provider-e3-fixture-preflight.mjs --json=evidence/provider/provider-e3-fixture-audit.json`（E3-fixture 8/8，`realProvider:false`、`blockedRealProviderE3:true`）；`node scripts/release-preflight.mjs --json=evidence/release/release-preflight-audit.json`（静态 contract `ok:true`、`desktopSmokeReady:false`）。这些是新生成的本地审计证据，不改变完成百分比。后续操作手册保持为：取得专用 runner 后依次执行 IPC/stream smoke、各平台 installer/artifact 验证；取得批准临时 credentials 且满足 E2E 门禁后才执行 real-ui/provider E3，并分别记录 real 结果。
