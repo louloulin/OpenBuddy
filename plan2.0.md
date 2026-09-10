@@ -359,20 +359,22 @@ Pi 官方 `AgentSession`/Extensions 事件包含 session、agent、turn、messag
 - **已实现**：Phase 1 的 generation-fenced event replay：reload 后 `PiSessionEventBridge.snapshot()` 仅返回当前 generation 事件，避免 stale session/plugin events 回放到 renderer；新增/更新测试覆盖。
 - **已实现**：Phase 1 的 Pi RPC/UI 生命周期事件 canonicalization：`extension_error`、`ui_prompt_start`、`ui_prompt_end` 统一映射并有定向测试。
 - **已实现**：Phase 1 的 Pi→Main 事件背压切片：复用 `@openbuddy/plugin-host` 的 `BoundedEventQueue`，对 `tool_execution_update` 进度事件按 session/kind 合并，snapshot 时刷新；lifecycle/final/error 等事件仍直接进入 ring buffer。
-- **本轮完成**：修复 bootstrap/Pi 0.85.1 API 契约并恢复完整 TypeScript 门禁：统一 `AgentHostState`/RPC UI resolver 类型、补齐 Pi-native DSH state path、修正 host module dependency bag 的返回类型与字段、更新 `ExtensionActions`/`ExtensionContextActions` 测试适配 Pi 0.85.1、修复 renderer Electron bridge 断言。
-- **验证完成**：`pnpm typecheck` 全部通过；`pnpm build` 全部通过（仅保留既有 Node externalization 与 ineffective dynamic import warnings）；定向测试 5 files、49/49 通过。
-- **仍未开始**：完整 E3 外部 Pi package、E4 benchmark、三平台 Electron smoke。
+- **本轮完成**：Phase 1/2 的真实 Pi package E3 垂直切片：使用仓库既有 exact-version package list 与 `installProfilePackage`/`DefaultResourceLoader`/`session.reload()`/`removeProfilePackage` 链路，验证安装、资源发现、tool/command/skill 可用、reload 后仍可用、逐包 remove 后资源为空；同时将 profile remove 的 pnpm 调用补齐 `--ignore-scripts`，避免 pnpm 安全策略因待批准构建脚本阻断纯移除操作。
+- **验证完成**：真实 E3 fixture 通过；本地 profile/reload/rollback 测试通过；typecheck 已通过。
+- **仍未开始**：真实 provider 独立凭据矩阵、E4 benchmark、Electron smoke。
 
 
 ### 12.4 总体进度
 
-进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 5 个切片（事件 canonicalization、generation-fenced replay、RPC/UI lifecycle canonicalization、Pi 事件背压/进度合并、Pi 0.85.1 API/typecheck/build 门禁收敛），因此当前**实现进度约 28%（5/18）**。该百分比仅表示代码垂直切片完成度，不代表产品发布完成度；真实 provider/package E3、E4 benchmark 与 Electron smoke 仍未完成。
+进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 6 个切片（事件 canonicalization、generation-fenced replay、RPC/UI lifecycle canonicalization、Pi 事件背压/进度合并、Pi 0.85.1 API/typecheck/build 门禁收敛、exact-version Pi package E3 生命周期验证），因此当前**实现进度约 33%（6/18）**。该百分比仅表示代码/验证垂直切片完成度，不代表产品发布完成度；真实 provider 凭据矩阵、E4 benchmark 与 Electron smoke 仍未完成。
 
-### 12.8 本轮增量：Pi 0.85.1 API 契约与完整 build 门禁恢复
+### 12.9 本轮增量：exact-version Pi package E3 生命周期
 
-本轮按 Pi 官方 0.85.1 `ExtensionActions`/`ExtensionContextActions` 类型契约收敛适配层与测试：移除旧版 `exec`、action-level `getModel`、context `getSession` 等过时假设，使用官方 `sendMessage`/`sendUserMessage` payload 与 `deliverAs` 语义；同时修复 bootstrap dependency bag、RPC UI resolver、Electron bridge 类型断言，并保持生产路径不以 `any` 绕过 Pi API。
+本轮复用 Pi 官方 `DefaultResourceLoader`/`session.reload()` 和 OpenBuddy 现有 profile package manager，未引入不明依赖。真实 E3 命令：`OPENBUDDY_REAL_PI_E2E=1 pnpm exec vitest run electron/main/agent/pi-resource-loader.test.ts -t "loads pinned real ecosystem packages through profile install and session reload" --reporter=dot`，使用仓库内已记录的 exact versions：`pi-context-prune@1.3.0`、`pi-mcp-adapter@2.31.0`、`pi-web-access@0.27.0`、`pi-goal@0.1.7`、`pi-plan-mode@0.4.8`、`pi-subagents@0.59.0`、`pi-lens@4.1.3`、`pi-hermes-memory@0.9.7`；结果 1 passed、12 skipped，耗时约 87 秒。
 
-验证：`pnpm typecheck` 通过（app-desktop 与 renderer 均成功）；`pnpm build` 通过，bundle 仅输出既有 Node module externalization 与 ineffective dynamic import warnings；定向命令 `pnpm exec vitest run electron/main/agent/host-modules/pi-extension-runner-bind-core.test.ts electron/main/agent/host-modules/bootstrap/init-pipeline.test.ts electron/main/agent/pi-event-bridge.test.ts electron/main/agent/host-modules/plugin-event-bus.test.ts src/__tests__/bridge-resilience.test.ts --reporter=dot` 为 5 files、49/49 通过；`git diff --check` 通过。
+验收覆盖：profile exact-version install、Pi extension/skill/prompt discovery、commands/tools execution、本地 MCP echo tool、`session.reload()` 后资源与工具仍可用、逐包 remove 后资源路径清空。首次真实运行发现 pnpm remove 因 `ERR_PNPM_IGNORED_BUILDS` 阻断，原因是 remove 命令未声明 `--ignore-scripts`；已在 `profile-manager.ts` 修复并复跑通过。该修复不批准或执行第三方构建脚本，保持供应链安全边界。
+
+补充验证：`pnpm exec vitest run packages/runtime/openbuddy-plugin-host/src/profile.test.ts packages/runtime/openbuddy-plugin-host/src/profile-manager-extensions.test.ts electron/main/agent/host-modules/profile-reload-transaction.test.ts electron/main/agent/pi-resource-loader.test.ts --reporter=dot`：4 files、74 passed、1 skipped；`pnpm typecheck`：通过；`git diff --check`：通过。`pnpm build` 本轮未重复运行，上一轮已通过；若需复现：`cd OpenBuddy && pnpm build`。
 
 
 
