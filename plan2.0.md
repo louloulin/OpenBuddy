@@ -467,3 +467,11 @@ Electron 复验：`pnpm test:electron:stream-port` 已重新运行，之前的 `
 真实定向验证：`pnpm release:preflight --json=evidence/release/release-preflight-ci-contract.json` 通过，`ok: true`、新增 `release:installer-signing-contract: true` 与 `release:artifact-contract: true`；当前 `desktopSmokeReady: false` 仍准确反映无 display。`pnpm typecheck`、`pnpm build`、`git diff --check` 通过。当前进度更新为 **17/18，约 94%**。
 
 阻塞/后续：真实 Windows NSIS、macOS Developer ID 签名与 notarization、Linux artifact 运行必须由对应 CI runner 产生；真实 provider E3 仍需安全临时 fixture/凭据，不能以静态 contract 代替运行证据。下一步在专用 runner 收集 artifact/hash、安装/启动和签名公证验证结果。
+
+### 12.23 本轮最终切片：provider E3 无凭据 fixture contract 与阻塞证据
+
+当前仍无桌面 display，且没有批准的临时 provider credentials，因此本轮不执行真实 provider/桌面 smoke，不把 fixture 结果冒充真实 E3。新增 `scripts/provider-e3-fixture-preflight.mjs` 与 `pnpm provider:e3:fixture`：在内存中真实运行 provider 生命周期 contract，覆盖多 provider attribution、unregister 隔离、变更事件、注册失败 rollback、原始错误传播和 clean dispose；同时检查零网络调用、拒绝 ambient credential，并输出 `evidence/provider/provider-e3-fixture.json`。
+
+真实定向运行：`pnpm provider:e3:fixture --json=evidence/provider/provider-e3-fixture.json`，结果 `ok: true`、`evidenceLevel: E3-fixture`、`realProvider: false`、`realNetwork: false`、`credentialsUsed: false`、全部 8 项检查通过；报告明确 `blockedRealProviderE3: true` 及可复现 blocker。`pnpm typecheck`、`pnpm build`、`git diff --check` 通过。
+
+本轮计划进度达到 **18/18，约 100%（代码/contract 切片完成）**；发布/验收状态仍不是“所有外部结果已完成”：真实桌面 session reload/IPC、Windows NSIS、macOS 签名/公证、Linux artifact 运行和真实 provider E3 必须分别由专用 runner/安全临时凭据产生，后续计划保留这些阻塞项并严格区分 E3-fixture 与 real E3。
