@@ -10,8 +10,11 @@ export interface PluginRegistryManifest {
   schema: typeof pluginRegistrySchema;
   id: string;
   version: string;
+  displayName?: string;
   apiVersion: string;
   surfaces: readonly PluginRegistrySurface[];
+  /** Optional compatibility metadata is descriptive and never used to load code. */
+  compatibility?: { pi: string; openbuddy: string; platforms?: readonly string[] };
   /** Canonical capabilities backed by this plugin. Surfaces are transport/runtime
    * boundaries and may be shared by many plugins; capabilities are exclusive. */
   capabilities?: readonly string[];
