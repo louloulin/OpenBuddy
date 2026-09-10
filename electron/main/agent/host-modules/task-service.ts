@@ -44,26 +44,36 @@ export interface TaskServiceEntry {
  * wrapper just shapes the surface area the rest of the codebase calls.
  */
 export class TaskService {
+  private mutationQueue: Promise<void> = Promise.resolve();
+
   constructor(private readonly catalog: TaskCatalog) {}
 
   async list(sessionId: string): Promise<TaskServiceEntry[]> {
     return await this.catalog.list(sessionId);
   }
 
+  private enqueueMutation<T>(mutation: () => Promise<T>): Promise<T> {
+    const run = this.mutationQueue.then(mutation, mutation);
+    this.mutationQueue = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
   async add(sessionId: string, content: string): Promise<{ id: string }> {
-    const now = new Date().toISOString();
-    const id = `task-${randomUUID()}`;
-    const existing = await this.catalog.list(sessionId);
-    const entry: TaskCatalogEntry = {
-      id,
-      content,
-      status: "pending",
-      createdAt: now,
-      updatedAt: now,
-      order: existing.length,
-    };
-    await this.catalog.replace(sessionId, [...existing, entry]);
-    return { id };
+    return this.enqueueMutation(async () => {
+      const now = new Date().toISOString();
+      const id = `task-${randomUUID()}`;
+      const existing = await this.catalog.list(sessionId);
+      const entry: TaskCatalogEntry = {
+        id,
+        content,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+        order: existing.length,
+      };
+      await this.catalog.replace(sessionId, [...existing, entry]);
+      return { id };
+    });
   }
 
   async update(
@@ -71,40 +81,47 @@ export class TaskService {
     taskId: string,
     patch: { status?: string },
   ): Promise<{ id: string } | null> {
-    const existing = await this.catalog.list(sessionId);
-    const idx = existing.findIndex((entry) => entry.id === taskId);
-    if (idx === -1) return null;
-    const target = existing[idx]!;
-    const updated: TaskCatalogEntry = {
-      ...target,
-      ...(patch.status ? { status: patch.status } : {}),
-      updatedAt: new Date().toISOString(),
-    };
-    const next = [...existing];
-    next[idx] = updated;
-    await this.catalog.replace(sessionId, next);
-    return { id: target.id };
+    return this.enqueueMutation(async () => {
+      const existing = await this.catalog.list(sessionId);
+      const idx = existing.findIndex((entry) => entry.id === taskId);
+      if (idx === -1) return null;
+      const target = existing[idx]!;
+      const updated: TaskCatalogEntry = {
+        ...target,
+        ...(patch.status ? { status: patch.status } : {}),
+        updatedAt: new Date().toISOString(),
+      };
+      const next = [...existing];
+      next[idx] = updated;
+      await this.catalog.replace(sessionId, next);
+      return { id: target.id };
+    });
   }
 
   async remove(sessionId: string, taskId: string): Promise<void> {
-    const existing = await this.catalog.list(sessionId);
-    const next = existing.filter((entry) => entry.id !== taskId);
-    if (next.length !== existing.length) {
-      await this.catalog.replace(sessionId, next);
-    }
+    return this.enqueueMutation(async () => {
+      const existing = await this.catalog.list(sessionId);
+      const next = existing.filter((entry) => entry.id !== taskId);
+      if (next.length !== existing.length) {
+        await this.catalog.replace(sessionId, next);
+      }
+    });
   }
 
   async clear(sessionId: string): Promise<void> {
-    // Spec: "Completed tasks cleared." — keep only pending ones.
-    const existing = await this.catalog.list(sessionId);
-    const remaining = existing.filter((entry) => entry.status !== "completed");
-    if (remaining.length !== existing.length) {
-      await this.catalog.replace(sessionId, remaining);
-    }
+    return this.enqueueMutation(async () => {
+      // Spec: "Completed tasks cleared." — keep only pending ones.
+      const existing = await this.catalog.list(sessionId);
+      const remaining = existing.filter((entry) => entry.status !== "completed");
+      if (remaining.length !== existing.length) {
+        await this.catalog.replace(sessionId, remaining);
+      }
+    });
   }
 
   /** Release the SQLite driver when the owning Cordis plugin is torn down. */
   async close(): Promise<void> {
+    await this.mutationQueue;
     await this.catalog.close();
   }
 }

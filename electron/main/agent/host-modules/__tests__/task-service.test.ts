@@ -48,6 +48,15 @@ describe("TaskService", () => {
     });
   });
 
+  it("serializes concurrent adds instead of losing tasks", async () => {
+    const results = await Promise.all([
+      service.add(SESSION, "first"),
+      service.add(SESSION, "second"),
+    ]);
+    const list = await service.list(SESSION);
+    expect(list.map((entry) => entry.content)).toEqual(["first", "second"]);
+    expect(new Set(results.map(({ id }) => id)).size).toBe(2);
+  });
   it("update marks a task completed and returns its id", async () => {
     const { id } = await service.add(SESSION, "x");
     const updated = await service.update(SESSION, id, { status: "completed" });
