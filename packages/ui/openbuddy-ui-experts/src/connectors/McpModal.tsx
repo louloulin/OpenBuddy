@@ -51,7 +51,7 @@ export function McpModal({
     catch (e) { onToast?.(`切换失败：${String(e).replace(/^Error:\s*/, "")}`); }
   };
   const handleDelete = async (s: McpServerEntry) => {
-    if (!confirm(`确定删除 MCP 服务「${s.name}」？`)) return;
+    if (!await confirm(`确定删除 MCP 服务「${s.name}」？`, { tone: "danger" })) return;
     try { await mcpDelete(await ensureSession(), s.name); onToast?.("已删除"); reload(); }
     catch (e) { onToast?.(`删除失败：${String(e).replace(/^Error:\s*/, "")}`); }
   };

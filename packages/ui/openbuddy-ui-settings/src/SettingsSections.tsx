@@ -872,7 +872,7 @@ export function AccountSettingsPanel() {
 
   const deleteUser = useCallback(async (user: CasdoorUserSummary) => {
     if (user.owner === "built-in" && user.name === "admin") return setAdminError("不能删除 Casdoor 内置管理员");
-    if (!window.confirm(`确认删除用户 ${user.owner}/${user.name}？`)) return;
+    if (!await confirm(`确认删除用户 ${user.owner}/${user.name}？`, { tone: "danger" })) return;
     setAdminAction(`user-delete:${user.name}`);
     setAdminError(null);
     try {
@@ -940,7 +940,7 @@ export function AccountSettingsPanel() {
     const type = option.type?.trim() ?? "";
     const identifier = option.identifier?.trim() ?? "";
     if (!type || !identifier) return setAdminError("解绑请求缺少 type / identifier");
-    if (!window.confirm(`确认解绑 ${type} 凭据 ${identifier}？`)) return;
+    if (!await confirm(`确认解绑 ${type} 凭据 ${identifier}？`, { tone: "danger" })) return;
     setAccountLinkingAction(`${type}:${identifier}`);
     setAdminError(null);
     try {
@@ -991,7 +991,7 @@ export function AccountSettingsPanel() {
     if (!sessionId) return;
     if (!canManageUsers) return setAdminError("当前租户没有 users.write 权限");
     if (!sessions) return;
-    if (!window.confirm(`确认强制下线 session ${sessionId}？`)) return;
+    if (!await confirm(`确认强制下线 session ${sessionId}？`, { tone: "danger" })) return;
     setSessionAction(sessionId);
     setAdminError(null);
     try {
@@ -1006,7 +1006,7 @@ export function AccountSettingsPanel() {
 
   const revokeAllSessions = useCallback(async () => {
     if (!canManageUsers || !sessions) return;
-    if (!window.confirm("确认下线当前用户的全部 Casdoor Session？此操作可能也会使当前设备退出，需要重新登录。")) return;
+    if (!await confirm("确认下线当前用户的全部 Casdoor Session？", { tone: "danger", description: "此操作可能也会使当前设备退出，需要重新登录。" })) return;
     setBulkSessionLoading(true);
     setAdminError(null);
     try {
@@ -1185,7 +1185,7 @@ export function AccountSettingsPanel() {
   }, [loadAdminOverview, permissionDraft]);
 
   const deleteRole = useCallback(async (role: CasdoorRoleSummary) => {
-    if (!window.confirm(`确认删除角色 ${role.owner}/${role.name}？`)) return;
+    if (!await confirm(`确认删除角色 ${role.owner}/${role.name}？`, { tone: "danger" })) return;
     setAdminAction(`delete-role:${role.name}`);
     setAdminError(null);
     try {
@@ -1199,7 +1199,7 @@ export function AccountSettingsPanel() {
   }, [loadAdminOverview]);
 
   const deletePermission = useCallback(async (permission: CasdoorPermissionSummary) => {
-    if (!window.confirm(`确认删除权限 ${permission.owner}/${permission.name}？`)) return;
+    if (!await confirm(`确认删除权限 ${permission.owner}/${permission.name}？`, { tone: "danger" })) return;
     setAdminAction(`delete-permission:${permission.name}`);
     setAdminError(null);
     try {
@@ -1247,7 +1247,7 @@ export function AccountSettingsPanel() {
   }, [loadAdminOverview, organizationDraft]);
 
   const deleteOrganization = useCallback(async (organization: CasdoorOrganizationSummary) => {
-    if (!window.confirm(`确认删除组织 ${organization.owner}/${organization.name}？`)) return;
+    if (!await confirm(`确认删除组织 ${organization.owner}/${organization.name}？`, { tone: "danger" })) return;
     setAdminAction(`delete-organization:${organization.name}`);
     setAdminError(null);
     try {
@@ -1295,7 +1295,7 @@ export function AccountSettingsPanel() {
   }, [groupDraft, loadAdminOverview]);
 
   const deleteGroup = useCallback(async (group: CasdoorGroupSummary) => {
-    if (!window.confirm(`确认删除群组 ${group.owner}/${group.name}？`)) return;
+    if (!await confirm(`确认删除群组 ${group.owner}/${group.name}？`, { tone: "danger" })) return;
     setAdminAction(`delete-group:${group.name}`);
     setAdminError(null);
     try {
@@ -1343,7 +1343,7 @@ export function AccountSettingsPanel() {
   }, [loadAdminOverview, ruleDraft]);
 
   const deleteRule = useCallback(async (rule: CasdoorRuleSummary) => {
-    if (!window.confirm(`确认删除规则 ${rule.owner}/${rule.name}？`)) return;
+    if (!await confirm(`确认删除规则 ${rule.owner}/${rule.name}？`, { tone: "danger" })) return;
     setAdminAction(`delete-rule:${rule.name}`);
     setAdminError(null);
     try {

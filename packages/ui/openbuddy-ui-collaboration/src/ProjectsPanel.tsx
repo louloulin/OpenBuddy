@@ -22,7 +22,7 @@ import {
 import { ProjectDetailView } from "@openbuddy/ui-workbench";
 import { casdoorCreateResource, casdoorDeleteResource, casdoorListResources, casdoorStatus, casdoorUpdateResource } from "@/lib/casdoor/casdoor-client";
 import type { CasdoorSessionView } from "@/lib/casdoor/casdoor-client";
-import { listen } from "@/lib/platform/electron-api";
+import { confirm, listen } from "@/lib/platform/electron-api";
 import { ProjectConfirmDialog, ProjectInputDialog } from "@openbuddy/ui-dialogs";
 
 interface ProjectsPanelProps {
@@ -120,23 +120,28 @@ export function ProjectsPanel({ onToast, onStartProjectConversation, onNavigate 
     );
   }
 
-  const handleRename = async (p: ProjectMeta) => {
-    const next = window.prompt("重命名项目", p.name);
-    if (!next || !next.trim() || next.trim() === p.name) return;
+  const handleRename = (p: ProjectMeta) => {
+    // The actual rename runs inside the dialog's onConfirm handler so we
+    // can preserve the enterprise-resource update path that was previously
+    // hidden behind `window.prompt`'s implicit confirm/cancel.
+    setRenameTarget(p);
+  };
+
+  const performRename = async (p: ProjectMeta, nextName: string) => {
     try {
       if (p.enterpriseResourceId && p.enterpriseVersion) {
-        const updated = await casdoorUpdateResource(p.enterpriseResourceId, { name: next.trim(), expectedVersion: p.enterpriseVersion });
-        rename(p.id, next.trim());
+        const updated = await casdoorUpdateResource(p.enterpriseResourceId, { name: nextName, expectedVersion: p.enterpriseVersion });
+        rename(p.id, nextName);
         useProjectsStore.getState().updateEnterpriseBinding(p.id, updated.id, updated.version);
       } else {
-        rename(p.id, next.trim());
+        rename(p.id, nextName);
       }
     } catch (error) {
       onToast?.(`重命名失败：${String(error).replace(/^Error:\s*/, "")}`);
     }
   };
   const handleDelete = async (p: ProjectMeta) => {
-    if (window.confirm(`确定删除项目「${p.name}」？`)) {
+    if (await confirm(`确定删除项目「${p.name}」？`, { tone: "danger" })) {
       try {
         if (p.enterpriseResourceId && p.enterpriseVersion) await casdoorDeleteResource(p.enterpriseResourceId, p.enterpriseVersion);
         remove(p.id);
@@ -225,6 +230,7 @@ export function ProjectsPanel({ onToast, onStartProjectConversation, onNavigate 
           preset={create}
           enterpriseContext={enterpriseContext}
           onCancel={() => setCreate(null)}
+          onToast={onToast}
           onConfirm={(saved) => {
             setCreate(null);
             setOpenId(saved.id);
@@ -238,8 +244,9 @@ export function ProjectsPanel({ onToast, onStartProjectConversation, onNavigate 
           initialValue={renameTarget.name}
           onCancel={() => setRenameTarget(null)}
           onConfirm={(name) => {
-            if (name !== renameTarget.name) rename(renameTarget.id, name);
+            const target = renameTarget;
             setRenameTarget(null);
+            if (target && name !== target.name) void performRename(target, name);
           }}
         />
       )}
@@ -320,11 +327,12 @@ function ProjectCard({
 interface CreatePreset { templateId?: string }
 
 function CreateProjectDialog({
-  preset, enterpriseContext, onCancel, onConfirm,
+  preset, enterpriseContext, onCancel, onToast, onConfirm,
 }: {
   preset: CreatePreset;
   enterpriseContext: { tenantId: string; subject: string } | null;
   onCancel: () => void;
+  onToast?: (msg: string) => void;
   onConfirm: (saved: ProjectMeta) => void;
 }) {
   const add = useProjectsStore((s) => s.add);
@@ -381,7 +389,7 @@ function CreateProjectDialog({
       });
       onConfirm(saved);
     } catch (error) {
-      window.alert(`创建失败：${String(error).replace(/^Error:\s*/, "")}`);
+      onToast?.(`创建失败：${String(error).replace(/^Error:\s*/, "")}`);
     } finally {
       setBusy(false);
     }

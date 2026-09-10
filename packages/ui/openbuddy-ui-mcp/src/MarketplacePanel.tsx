@@ -91,7 +91,7 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
 
   const handleUninstall = useCallback(
     async (source: MarketplaceScanResult, plugin: MarketplacePluginEntry) => {
-      if (!confirm(`确定卸载「${plugin.name}」？`)) return;
+      if (!await confirm(`确定卸载「${plugin.name}」？`, { tone: "danger" })) return;
       const key = `${source.sourceName}/${plugin.name}`;
       setBusy(key);
       try {
@@ -153,7 +153,7 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
 
   const handleRemoveSource = useCallback(
     async (source: MarketplaceScanResult) => {
-      if (!confirm(`确定移除市场源「${source.sourceName}」？已安装的插件不会被删除。`)) return;
+      if (!await confirm(`确定移除市场源「${source.sourceName}」？`, { tone: "warning", description: "已安装的插件不会被删除。" })) return;
       setBusy(`remove:${source.sourceName}`);
       try {
         await marketplaceAction(null, {

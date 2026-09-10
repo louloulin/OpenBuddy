@@ -130,7 +130,7 @@ export function RewindBar({
   };
 
   const handleFork = async () => {
-    if (!confirm("分叉此会话？会复制到新会话，原会话保留。")) return;
+    if (!await confirm("分叉此会话？", { tone: "warning", description: "会复制到新会话，原会话保留。" })) return;
     setBusy(true);
     try {
       const newId = await sessionFork(sessionId, cwd);

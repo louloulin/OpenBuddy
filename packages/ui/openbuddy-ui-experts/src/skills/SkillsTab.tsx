@@ -150,7 +150,7 @@ export function SkillsTab({ pills, onToast }: Props) {
 
   const handleRemove = useCallback(async (s: SkillInfo) => {
     if (!s.path) { onToast?.("内置技能无法移除"); return; }
-    if (!confirm(`确定移除技能「${s.displayName || s.name}」？`)) return;
+    if (!await confirm(`确定移除技能「${s.displayName || s.name}」？`, { tone: "danger" })) return;
     try { await skillsRemove(s.path); onToast?.("已移除"); reloadLocals(); }
     catch (e) { onToast?.(`移除失败：${String(e).replace(/^Error:\s*/, "")}`); }
   }, [onToast, reloadLocals]);
