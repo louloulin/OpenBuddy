@@ -15,7 +15,9 @@ describe("Pi Cordis event bridge", () => {
 
   it("isolates a throwing Cordis listener and reports the event", () => {
     const onError = vi.fn();
-    const emit = vi.fn(() => { throw new Error("listener failed"); });
+    const emit = vi.fn(() => {
+      throw new Error("listener failed");
+    });
 
     expect(() => emitContextEvent({ emit }, "session/event", [], undefined, onError)).not.toThrow();
     expect(onError).toHaveBeenCalledWith("session/event", expect.any(Error));
@@ -46,7 +48,10 @@ describe("PiSessionEventBridge plugin/extension event indexing (phase 4)", () =>
 
     const snapshot = bridge.snapshot();
     expect(snapshot.map((e) => e.type)).toEqual(["plugin/loaded", "plugin/failed"]);
-    expect(snapshot[0]!.payload).toEqual({ id: "pi-goal-list-loop-audit", name: "goal loop audit" });
+    expect(snapshot[0]!.payload).toEqual({
+      id: "pi-goal-list-loop-audit",
+      name: "goal loop audit",
+    });
     expect(bridge.lastSequence()).toBe(2);
   });
 
@@ -95,9 +100,21 @@ describe("PiSessionEventBridge plugin/extension event indexing (phase 4)", () =>
 
   it("coalesces reconstructable Pi tool progress until snapshot delivery", () => {
     const bridge = new PiSessionEventBridge();
-    bridge.appendFromSession({ type: "tool_execution_update", sessionId: "s1", partialResult: "first" });
-    bridge.appendFromSession({ type: "tool_execution_update", sessionId: "s1", partialResult: "latest" });
-    expect(bridge.snapshot({ sessionId: "s1" }).map((entry) => (entry.payload as { partialResult?: string }).partialResult)).toEqual(["latest"]);
+    bridge.appendFromSession({
+      type: "tool_execution_update",
+      sessionId: "s1",
+      partialResult: "first",
+    });
+    bridge.appendFromSession({
+      type: "tool_execution_update",
+      sessionId: "s1",
+      partialResult: "latest",
+    });
+    expect(
+      bridge
+        .snapshot({ sessionId: "s1" })
+        .map((entry) => (entry.payload as { partialResult?: string }).partialResult),
+    ).toEqual(["latest"]);
   });
   it("bounded ring buffer drops oldest entries beyond maxEntries", () => {
     const bridge = new PiSessionEventBridge({ maxEntries: 3 });

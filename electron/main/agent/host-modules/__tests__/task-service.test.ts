@@ -6,7 +6,7 @@
  * implementation backed by TaskCatalog, the adapter's "real tool" path
  * was dead code in production.
  */
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,6 +26,10 @@ describe("TaskService", () => {
 
   beforeEach(() => {
     service = makeService();
+  });
+
+  afterEach(async () => {
+    await service.close();
   });
 
   it("list returns an empty array for a fresh session", async () => {

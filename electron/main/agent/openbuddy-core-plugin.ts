@@ -224,7 +224,7 @@ export async function apply(ctx: Context): Promise<() => void> {
   // mountTeam / mountMcpClient 都由对应的 capability plugin (capability-plugins.ts)
   // 加载, 这里不再重复调用, 否则同一个 ctx 上同一个 service 会被 set 两次.
   const { mountEmail, EmailProviderRegistry } = await import("@openbuddy/capability-email");
-  const { defaultTaskService } = await import("./host-modules/task-service");
+  const { defaultTaskService, type TaskService } = await import("./host-modules/task-service");
 
   // NOTE: mountSession / mountAuthorization / mountPermission / mountCalendar
   //       / mountFsLocal / mountTeam / mountMcpClient 都由对应的 capability plugin
@@ -238,7 +238,8 @@ export async function apply(ctx: Context): Promise<() => void> {
   // was never mounted (the only references to `task` were in tests and
   // the dead-adapter path). See `electron/main/agent/host-modules/
   // task-service.ts` for the wrapper shape.
-  ctx.provide("task", defaultTaskService());
+  const taskService: TaskService = defaultTaskService();
+  ctx.provide("task", taskService);
   ctx.provide("emailKnowledgeContextValidator", { validate: resources.validateKnowledgeContextCitation });
 
   const emailMcp = ctx.get("mcpClient") as { list?: () => unknown[]; listToolNames?: (serverName: string) => string[]; callTool?: (...args: unknown[]) => Promise<unknown> } | undefined;
@@ -295,5 +296,6 @@ export async function apply(ctx: Context): Promise<() => void> {
       try { await mcpAdapter.stop(); } catch { /* ignore */ }
     }
     cleanupCollaboration();
+    await taskService.close();
   };
 }

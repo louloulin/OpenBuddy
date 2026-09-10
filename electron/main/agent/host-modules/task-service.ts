@@ -102,6 +102,11 @@ export class TaskService {
       await this.catalog.replace(sessionId, remaining);
     }
   }
+
+  /** Release the SQLite driver when the owning Cordis plugin is torn down. */
+  async close(): Promise<void> {
+    await this.catalog.close();
+  }
 }
 
 /**
