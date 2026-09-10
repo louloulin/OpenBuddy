@@ -51,6 +51,22 @@ export {
   type DeepSeekCordisRuntimeOptions,
   type DeepSeekCordisRuntimeSnapshot,
 } from "./deepseek-cordis-runtime";
+export {
+  decodeHookOutput,
+  matchesHookMatcher,
+  mergeHookOutputs,
+  parseHookConfig,
+  type CommandHook,
+  type HookConfig,
+  type HookDecision,
+  type HookDialect,
+  type HookDiagnostic,
+  type HookMatcherGroup,
+  type HookOutput,
+  type HookPoint,
+  type MergedHookOutcome,
+  type ParsedHookConfig,
+} from "./hooks";
 
 export {
   canRecoverTask,
