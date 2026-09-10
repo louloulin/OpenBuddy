@@ -423,3 +423,9 @@ Electron 复验：`pnpm test:electron:stream-port` 已重新运行，之前的 `
 本轮真实验证：`pnpm build` 通过；`pnpm release:preflight --json=evidence/release/release-preflight-push-audit.json` 通过（`ok: true`，`desktopSmokeReady: false`，当前无 `DISPLAY`/`WAYLAND_DISPLAY`）；`pnpm exec vitest run scripts/audit-enterprise-release.test.mjs electron/main/agent/pi-extensions.test.ts --reporter=dot` 为 2 files、48/48 通过；`pnpm typecheck` 通过；`git diff --check` 通过。preflight JSON 位于被 `.gitignore` 忽略的 `evidence/`，不纳入提交。
 
 推送审计（本轮交付前后均确认）：当前分支 `agent/dfw-backend/0a7abd90eef6`；远端 `origin/agent/dfw-backend/0a7abd90eef6`；HEAD `56d7030b37125196cb8289299e32639ea6ff6515`；远端同值；`git rev-list --left-right --count HEAD...origin/agent/dfw-backend/0a7abd90eef6` 为 `0 0`。本轮未推送 main、未 force push、未覆盖未提交改动。
+
+### 12.16 本轮增量：Pi runtime reload failure recovery
+
+扩展 `PiRuntimeCoordinator` 的官方 Pi session/resource-loader reload adapter：reload 失败现在通过可选 `onReloadError(error, reason)` 诊断回调显式报告，generation 不会在失败时前进；串行 tail 会在失败后恢复为可用状态，后续 reload 仍可执行并在成功后推进 generation。这样不会把失败包装成成功，也不会让一次 Pi `AgentSession.reload()` 异常毒化后续 profile/plugin reload。
+
+新增定向测试覆盖：第一次 session reload 失败时错误和 reason 可观测、generation 保持旧值；第二次 reload 成功、generation 正确推进，证明 recovery queue 可继续工作。验证：`pnpm exec vitest run electron/main/agent/pi-runtime-coordinator.test.ts electron/main/agent/pi-event-bridge.test.ts --reporter=dot`：2 files、14/14 通过；`pnpm typecheck`：通过；`pnpm build`：通过；`git diff --check`：通过。未使用真实 provider、凭据或桌面 smoke。

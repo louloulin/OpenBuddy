@@ -46,6 +46,31 @@ describe("PiRuntimeCoordinator", () => {
     expect(log).toEqual([]);
   });
 
+  it("reports a failed reload and remains usable for the next queued reload", async () => {
+    const log: string[] = [];
+    const errors: string[] = [];
+    let attempts = 0;
+    const active: PiSessionLike = {
+      waitForIdle: async () => { log.push("idle"); },
+      reload: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error("fixture reload failed");
+        log.push("reload-ok");
+      },
+    };
+    const coordinator = new PiRuntimeCoordinator({
+      getSession: () => active,
+      getResourceLoader: () => null,
+      onReloadError: (error, reason) => errors.push(`${reason}:${String(error)}`),
+    });
+
+    await expect(coordinator.reload("broken-profile")).rejects.toThrow("fixture reload failed");
+    expect(coordinator.generation).toBe(0);
+    await expect(coordinator.reload("recovered-profile")).resolves.toBeUndefined();
+    expect(coordinator.generation).toBe(1);
+    expect(log).toEqual(["idle", "idle", "reload-ok"]);
+    expect(errors).toEqual(["broken-profile:Error: fixture reload failed"]);
+  });
   it("repeats reloads when the tool registry revision changes", async () => {
     const log: string[] = [];
     let revision = 0;
