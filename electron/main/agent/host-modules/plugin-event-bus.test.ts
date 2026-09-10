@@ -18,6 +18,9 @@ describe("Pi event namespace contract", () => {
     ["compaction_end", "session/compaction-end"],
     ["auto_retry_start", "turn/retry-start"],
     ["auto_retry_end", "turn/retry-end"],
+    ["extension_error", "extension/error"],
+    ["ui_prompt_start", "ui/prompt-start"],
+    ["ui_prompt_end", "ui/prompt-end"],
   ])("maps %s to canonical %s", (raw, canonical) => {
     expect(canonicalEventNamespace(raw)).toBe(canonical);
   });

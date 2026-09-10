@@ -107,6 +107,9 @@ function canonicalEventNamespace(type: string): string | undefined {
     auto_retry_start: "turn/retry-start",
     auto_retry_end: "turn/retry-end",
     agent_error: "agent/error",
+    extension_error: "extension/error",
+    ui_prompt_start: "ui/prompt-start",
+    ui_prompt_end: "ui/prompt-end",
   };
   return aliases[type];
 }

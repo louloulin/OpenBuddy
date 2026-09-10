@@ -341,7 +341,7 @@ Pi 官方 `AgentSession`/Extensions 事件包含 session、agent、turn、messag
 - session：`session_info_changed`、`session_before_switch`、`session_before_fork`、`session_before_compact`、`session_compact`、`session_compact_failed`、`session_before_tree`、`session_tree`；
 - agent/context/resources：`input`、`context`、`before_agent_start`、`resources_discover`；
 - model/provider：`thinking_level_select`、`before_provider_headers`、`before_provider_request`、`after_provider_response`；
-- tool/queue/retry/compaction：`tool_call`、`tool_result`、`queue_update`、`compaction_start`、`compaction_end`、`auto_retry_start`、`auto_retry_end`。
+- tool/queue/retry/compaction/UI：`tool_call`、`tool_result`、`queue_update`、`compaction_start`、`compaction_end`、`auto_retry_start`、`auto_retry_end`、`extension_error`、`ui_prompt_start`、`ui_prompt_end`。
 
 新增 `electron/main/agent/host-modules/plugin-event-bus.test.ts`，共 16 个断言，覆盖 canonical mapping 与未知事件的稳定 fallback。实现不改变 Pi 原始事件、不改变旧 namespace，只增加 canonical alias，属于低风险兼容增强。
 
@@ -357,12 +357,22 @@ Pi 官方 `AgentSession`/Extensions 事件包含 session、agent、turn、messag
 
 - **已实现**：Phase 1 的事件 canonicalization 垂直切片；对应 §4.1 的“事件/流式”与 §7.4 的 Pi event mapping。
 - **已实现**：Phase 1 的 generation-fenced event replay：reload 后 `PiSessionEventBridge.snapshot()` 仅返回当前 generation 事件，避免 stale session/plugin events 回放到 renderer；新增/更新测试覆盖。
+- **已实现**：Phase 1 的 Pi RPC/UI 生命周期事件 canonicalization：`extension_error`、`ui_prompt_start`、`ui_prompt_end` 统一映射并有定向测试。
 - **进行中**：single-owner tool/provider/session、agent-host 拆分、RPC/UI 全事件诊断。
 - **未开始**：完整 E3 外部 Pi package 验证、E4 streaming/IPC/reload/memory benchmark、三平台发布门禁。
 
 ### 12.4 总体进度
 
-进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 2 个切片（事件 canonicalization、generation-fenced replay），因此当前**实现进度约 11%（2/18）**。该百分比仅表示代码垂直切片完成度，不代表产品发布完成度；完整 typecheck/build/Electron smoke、真实 provider/package E3 与 E4 性能门禁仍未完成。
+进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 3 个切片（事件 canonicalization、generation-fenced replay、RPC/UI lifecycle canonicalization），因此当前**实现进度约 17%（3/18）**。该百分比仅表示代码垂直切片完成度，不代表产品发布完成度；完整 typecheck/build/Electron smoke、真实 provider/package E3 与 E4 性能门禁仍未完成。
+
+### 12.5 本轮增量：RPC/UI 生命周期事件
+
+依据 Pi Extensions/RPC 官方事件契约，本轮补齐 `extension_error`、`ui_prompt_start`、`ui_prompt_end` 三个 canonical namespace，并新增断言；不改变原始事件或既有通用 namespace。
+
+工作树在本轮开始前已存在未提交的 `packages/runtime/openbuddy-plugin-host/src/bounded-event-queue.ts`、对应测试及 `index.ts` 导出改动；这些改动不属于本轮，未覆盖、未修改、未纳入提交。
+
+验证：定向测试 27/27 通过；`pnpm typecheck` 未通过，失败来自 main 现有/并行改动的 `init-pipeline-builder.ts`、`init-session.ts`、`install-host-modules-deps.ts`、`wire-dsh-services.ts`、`pi-extension-runner-bind-core*`、`pi-session-runtime.ts` 等类型错误，未涉及本轮修改文件。可复现命令：`cd OpenBuddy && pnpm typecheck`。
+
 
 
 ## 13. 本版完成定义
