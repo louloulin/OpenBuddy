@@ -536,14 +536,14 @@ export const DEFAULT_MIGRATIONS: readonly MigrationStep[] = [
     },
   },
   {
-    version: 11,
-    description: "repair notification initialization marker for existing profiles",
+    version: 12,
+    description: "add durable task composer approval artifact citation projections",
     up: (driver) => {
       driver.database.exec(`
-        CREATE TABLE IF NOT EXISTS notification_state(
-          state_id INTEGER PRIMARY KEY CHECK (state_id = 1),
-          initialized_at TEXT NOT NULL
-        );
+        ALTER TABLE session_tasks ADD COLUMN composer_envelope_json TEXT;
+        ALTER TABLE session_tasks ADD COLUMN approval_json TEXT;
+        ALTER TABLE session_tasks ADD COLUMN artifacts_json TEXT;
+        ALTER TABLE session_tasks ADD COLUMN citations_json TEXT;
       `);
     },
   },

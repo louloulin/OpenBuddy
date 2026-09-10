@@ -10,6 +10,10 @@ export interface TaskCatalogEntry {
   createdAt: string;
   updatedAt: string;
   order: number;
+  composerEnvelopeJson?: string;
+  approvalJson?: string;
+  artifactsJson?: string;
+  citationsJson?: string;
 }
 
 export interface TaskCatalogOptions {
@@ -51,7 +55,7 @@ export class TaskCatalog {
   async list(sessionId: string): Promise<TaskCatalogEntry[]> {
     const driver = await this.driver();
     await this.importLegacyIfEmpty(driver);
-    return driver.database.prepare(`SELECT task_id AS id, content, status, created_at AS createdAt, updated_at AS updatedAt, task_order AS "order" FROM session_tasks WHERE session_id = ? ORDER BY task_order`).all(sessionId) as unknown as TaskCatalogEntry[];
+    return driver.database.prepare(`SELECT task_id AS id, content, status, created_at AS createdAt, updated_at AS updatedAt, task_order AS "order", composer_envelope_json AS composerEnvelopeJson, approval_json AS approvalJson, artifacts_json AS artifactsJson, citations_json AS citationsJson FROM session_tasks WHERE session_id = ? ORDER BY task_order`).all(sessionId) as unknown as TaskCatalogEntry[];
   }
 
   async hasSnapshot(sessionId: string): Promise<boolean> {
@@ -64,8 +68,8 @@ export class TaskCatalog {
     await driver.transaction(async () => {
       driver.database.prepare("DELETE FROM session_tasks WHERE session_id = ?").run(sessionId);
       driver.database.prepare("INSERT INTO session_task_snapshots(session_id, updated_at) VALUES (?, ?) ON CONFLICT(session_id) DO UPDATE SET updated_at = excluded.updated_at").run(sessionId, new Date().toISOString());
-      const statement = driver.database.prepare(`INSERT INTO session_tasks(session_id, task_id, content, status, created_at, updated_at, task_order) VALUES (?, ?, ?, ?, ?, ?, ?)`);
-      for (const task of tasks) statement.run(sessionId, task.id, task.content, task.status, task.createdAt, task.updatedAt, task.order);
+      const statement = driver.database.prepare(`INSERT INTO session_tasks(session_id, task_id, content, status, created_at, updated_at, task_order, composer_envelope_json, approval_json, artifacts_json, citations_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (const task of tasks) statement.run(sessionId, task.id, task.content, task.status, task.createdAt, task.updatedAt, task.order, task.composerEnvelopeJson ?? null, task.approvalJson ?? null, task.artifactsJson ?? null, task.citationsJson ?? null);
     });
   }
 

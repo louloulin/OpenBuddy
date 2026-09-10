@@ -25,6 +25,14 @@ describe("capability catalogs", () => {
     await catalog.close();
   });
 
+  it("persists durable task metadata columns through SQLite", async () => {
+    const root = await mkdtemp(join(tmpdir(), "openbuddy-task-metadata-"));
+    roots.push(root);
+    const catalog = new TaskCatalog({ databasePath: join(root, "openbuddy.sqlite") });
+    await catalog.replace("session-1", [{ id: "task-1", content: "ship", status: "awaiting_approval", createdAt: "2026-01-01", updatedAt: "2026-01-01", order: 0, composerEnvelopeJson: JSON.stringify({ envelopeId: "env-1" }), approvalJson: JSON.stringify({ approvalId: "approval-1", status: "pending" }), artifactsJson: JSON.stringify([{ artifactId: "artifact-1" }]), citationsJson: JSON.stringify([{ citationId: "citation-1", artifactId: "artifact-1" }]) }]);
+    expect(await catalog.list("session-1")).toMatchObject([{ composerEnvelopeJson: expect.stringContaining("env-1"), approvalJson: expect.stringContaining("pending"), artifactsJson: expect.stringContaining("artifact-1"), citationsJson: expect.stringContaining("citation-1") }]);
+    await catalog.close();
+  });
   it("keeps an explicitly empty task snapshot authoritative", async () => {
     const root = await mkdtemp(join(tmpdir(), "openbuddy-empty-task-catalog-"));
     roots.push(root);
