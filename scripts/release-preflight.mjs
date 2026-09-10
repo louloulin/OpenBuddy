@@ -51,6 +51,11 @@ for (const [name, jobPattern, targetPattern] of targets) {
   });
 }
 check("release:ci-gates", /pnpm typecheck && pnpm workspace:typecheck/.test(workflow) && /pnpm test/.test(workflow) && /pnpm build/.test(workflow));
+check("release:runner-matrix", /build-windows:[\s\S]*?runs-on: windows-latest/.test(workflow) && /build-macos:[\s\S]*?runs-on: macos-latest/.test(workflow) && /build-linux:[\s\S]*?runs-on: ubuntu-latest/.test(workflow), {
+  windows: /build-windows:[\s\S]*?runs-on: windows-latest/.test(workflow),
+  macos: /build-macos:[\s\S]*?runs-on: macos-latest/.test(workflow),
+  linux: /build-linux:[\s\S]*?runs-on: ubuntu-latest/.test(workflow),
+});
 check("release:artifact-upload", /actions\/upload-artifact@v4/.test(workflow) && /release\/\*\.(exe|dmg|AppImage)/.test(workflow));
 check("release:publishing-contract", /publish-release:/.test(workflow) && /provider:\s*github/.test(builder) && /owner:\s*louloulin/.test(builder) && /repo:\s*OpenBuddy/.test(builder));
 check("release:signing-is-ci-only", !process.env.CSC_LINK && !process.env.CSC_KEY_PASSWORD && !process.env.APPLE_API_KEY, {

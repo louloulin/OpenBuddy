@@ -415,3 +415,11 @@ Electron 复验：`pnpm test:electron:stream-port` 已重新运行，之前的 `
 真实运行：`pnpm release:preflight --json=evidence/release/release-preflight-local.json` 通过 release/build checks，报告 `ok: true`、`desktopSmokeReady: false`；本机 `Linux x64` 无 `DISPLAY`/`WAYLAND_DISPLAY`，因此只记录阻塞而不伪造 smoke 结果。报告被 `.gitignore` 的 `evidence/` 规则忽略，命令和 schema 可复现。
 
 附加验证：`pnpm exec vitest run scripts/audit-enterprise-release.test.mjs electron/main/agent/pi-extensions.test.ts --reporter=dot`：2 files、48/48 通过；`pnpm typecheck`：通过；`git diff --check`：通过。跨平台实际签名/公证/installer 运行仍必须在 GitHub Actions 对应 Windows/macOS/Linux runner 执行，不能在当前 Linux 无桌面环境中宣称完成。
+
+### 12.15 本轮增量：runner 矩阵与推送状态审计
+
+扩展 `scripts/release-preflight.mjs` 的无网络检查，显式验证 release workflow 的 runner 矩阵：Windows `windows-latest`、macOS `macos-latest`、Linux `ubuntu-latest`，并保留签名/公证仅在 CI secrets 可用时执行的边界。这样本地 Linux preflight 只证明 release contract 和构建输入完整，不把本机结果冒充跨平台 installer/sign/notarization 结果。
+
+本轮真实验证：`pnpm build` 通过；`pnpm release:preflight --json=evidence/release/release-preflight-push-audit.json` 通过（`ok: true`，`desktopSmokeReady: false`，当前无 `DISPLAY`/`WAYLAND_DISPLAY`）；`pnpm exec vitest run scripts/audit-enterprise-release.test.mjs electron/main/agent/pi-extensions.test.ts --reporter=dot` 为 2 files、48/48 通过；`pnpm typecheck` 通过；`git diff --check` 通过。preflight JSON 位于被 `.gitignore` 忽略的 `evidence/`，不纳入提交。
+
+推送审计（本轮交付前后均确认）：当前分支 `agent/dfw-backend/0a7abd90eef6`；远端 `origin/agent/dfw-backend/0a7abd90eef6`；HEAD `56d7030b37125196cb8289299e32639ea6ff6515`；远端同值；`git rev-list --left-right --count HEAD...origin/agent/dfw-backend/0a7abd90eef6` 为 `0 0`。本轮未推送 main、未 force push、未覆盖未提交改动。
