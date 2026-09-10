@@ -31,6 +31,7 @@ import type { PluginCommitMarker, PluginReadinessSnapshot } from "@openbuddy/plu
 type PluginTransactionContext = any;
 type SessionEventRecord = any;
 
+import { boundEventPayload } from "@openbuddy/plugin-host";
 import { createPluginReadinessSnapshot } from "@openbuddy/plugin-host";
 import { PluginLifecycleQueue } from "../plugin-lifecycle";
 
@@ -115,10 +116,7 @@ function canonicalEventNamespace(type: string): string | undefined {
 }
 
 function clonePayload(payload: unknown): unknown {
-  try { return structuredClone(payload); } catch {
-    try { return JSON.parse(JSON.stringify(payload, (_key, value) => typeof value === "bigint" ? Number(value) : value)); }
-    catch { return { value: String(payload) }; }
-  }
+  return boundEventPayload(payload).value;
 }
 
 function projectionMutation(type: string, payload: unknown): { key: string; value: unknown } | undefined {

@@ -1,6 +1,6 @@
 import { createMainLogger, withContext, type MainLogger } from "@openbuddy/logging-main";
 import { type LogContext } from "@openbuddy/logging-shared";
-import { BoundedEventQueue, type BoundedEvent, type EventDeliveryClass } from "@openbuddy/plugin-host";
+import { BoundedEventQueue, boundEventPayload, type BoundedEvent, type EventDeliveryClass } from "@openbuddy/plugin-host";
 
 export interface ContextEventSink {
   emit(event: string, ...args: unknown[]): unknown;
@@ -136,15 +136,19 @@ export class PiSessionEventBridge {
   /** Append an event produced by `session.subscribe`. */
   appendFromSession(event: { type: string; [key: string]: unknown }): SessionEventRecord {
     const sequence = this.allocateSequence();
-    const sessionId = typeof event.sessionId === "string" ? event.sessionId : undefined;
+    const bounded = boundEventPayload(event).value;
+    const safeEvent = bounded && typeof bounded === "object" && !Array.isArray(bounded)
+      ? bounded as { type: string; [key: string]: unknown }
+      : { type: event.type };
+    const sessionId = typeof safeEvent.sessionId === "string" ? safeEvent.sessionId : undefined;
     const record: SessionEventRecord = {
       eventVersion: 1,
       generation: this.currentGeneration,
       sequence,
       timestamp: new Date().toISOString(),
-      type: event.type,
+      type: safeEvent.type,
       ...(sessionId ? { sessionId } : {}),
-      payload: event,
+      payload: safeEvent,
     };
     // Pi tool progress is reconstructable from the next snapshot and may be
     // coalesced under pressure. Text/thinking deltas remain lossless because
@@ -177,7 +181,8 @@ export class PiSessionEventBridge {
    */
   append(record: SessionEventRecord): void {
     if (record.generation !== undefined && record.generation < this.currentGeneration) return;
-    this.pushBounded(record);
+    const payload = boundEventPayload(record.payload).value;
+    this.pushBounded({ ...record, payload });
     this.nextSequence = Math.max(this.nextSequence, record.sequence);
   }
 
