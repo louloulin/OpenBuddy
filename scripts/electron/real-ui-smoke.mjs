@@ -310,12 +310,30 @@ try {
   if (await composer.inputValue() !== pasteText) throw new Error("real Electron system clipboard paste did not preserve Unicode/multiline text");
   await composer.fill("");
 
-  const first = await sendFirstThroughUi("记住校验词 REAL-UI-CONTEXT-7314，只回复 REAL-UI-TURN-1。", "REAL-UI-TURN-1");
+  // Prompts are deliberately English-only with explicit "output exactly one
+  // token, no prose" constraints: the real-ui smoke has to pass against any
+  // model (Anthropic Claude, MiniMax-M3, ...), and Chinese "只回复" or "只
+  // 回答" phrasing is honored reliably by Claude but inconsistently by
+  // other providers — we observed MiniMax-M3 append "请问你接下来想做什
+  // 么?" after a Chinese "only reply" instruction and never emit the
+  // marker, which then hangs `waitForTrace` for the full 180s budget.
+  const first = await sendFirstThroughUi(
+    "Remember the token REAL-UI-CONTEXT-7314. Output the single word REAL-UI-TURN-1 with no other text, no punctuation, no greeting.",
+    "REAL-UI-TURN-1",
+  );
   const sessionId = first.sessionId;
   assertTrace(first.trace, { marker: "REAL-UI-TURN-1" });
-  const second = await sendThroughUi("不要重新询问，基于同一个 Pi session 只回复你刚才记住的校验词。", "REAL-UI-CONTEXT-7314", sessionId);
+  const second = await sendThroughUi(
+    "Reply with the token you were told to remember in the previous turn. Output only that token, no other text.",
+    "REAL-UI-CONTEXT-7314",
+    sessionId,
+  );
   assertTrace(second.trace, { marker: "REAL-UI-CONTEXT-7314" });
-  const third = await sendThroughUi("必须调用 openbuddy_real_ui_tool，参数 marker 填 REAL-UI-TOOL-3；工具返回后只回复 REAL-UI-TOOL-3。", "REAL-UI-TOOL-3", sessionId);
+  const third = await sendThroughUi(
+    "Call the openbuddy_real_ui_tool with parameter marker=\"REAL-UI-TOOL-3\". After the tool returns, output only REAL-UI-TOOL-3 with no other text.",
+    "REAL-UI-TOOL-3",
+    sessionId,
+  );
   assertTrace(third.trace, { marker: "REAL-UI-TOOL-3", requireTool: true });
 
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -324,7 +342,11 @@ try {
   await page.getByText("REAL-UI-CONTEXT-7314", { exact: false }).first().waitFor({ state: "visible", timeout: 90_000 });
   const afterReload = await activeSessionFromStorage();
   if (afterReload?.sessionId !== sessionId) throw new Error("renderer reload changed the active Pi session");
-  const fourth = await sendThroughUi("reload 后继续同一个 Pi session，只回复 REAL-UI-TURN-4。", "REAL-UI-TURN-4", sessionId);
+  const fourth = await sendThroughUi(
+    "After renderer reload, continue the same Pi session. Output only REAL-UI-TURN-4, no other text.",
+    "REAL-UI-TURN-4",
+    sessionId,
+  );
   assertTrace(fourth.trace, { marker: "REAL-UI-TURN-4" });
 
   await app.close();
@@ -349,7 +371,11 @@ try {
       ready: persisted.auth?.ready,
     })}`);
   }
-  const fifth = await sendThroughUi("Electron 重启后继续同一个 Pi session，只回复 REAL-UI-TURN-5。", "REAL-UI-TURN-5", sessionId);
+  const fifth = await sendThroughUi(
+    "After Electron restart, continue the same Pi session. Output only REAL-UI-TURN-5, no other text.",
+    "REAL-UI-TURN-5",
+    sessionId,
+  );
   assertTrace(fifth.trace, { marker: "REAL-UI-TURN-5" });
 
   const finalEvents = await eventLog(sessionId);
