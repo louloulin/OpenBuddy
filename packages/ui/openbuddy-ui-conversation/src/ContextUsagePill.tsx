@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { piSessionInfo, piSessionUsage } from "@/lib/agent/pi-client";
+import { piSessionInfo, piSessionUsage, agentOnPluginEvent } from "@/lib/agent/pi-client";
 import type { ContextInfo, SessionUsage } from "@openbuddy/shared-types";
 
 /**
@@ -84,6 +84,26 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
     void refresh();
   }, [sessionId, refresh]);
 
+  // Pi's native context/compaction events are the low-latency signal; keep
+  // the session IPC snapshot as the authoritative payload and use events only
+  // to refresh it. This avoids fabricating usage when a provider omits it.
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void agentOnPluginEvent((event) => {
+      if (disposed) return;
+      if (event.type === "pi/context" || event.type === "pi/context-status" || event.type === "pi/context-compacted" || event.type === "pi/context-compaction-requested") {
+        void refresh();
+      }
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    }).catch(() => { /* bridge may be unavailable before preload */ });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [refresh]);
   // Re-fetch when parent signals (e.g. pi://complete).
   useEffect(() => {
     if (onRefreshSignal !== undefined) void refresh();

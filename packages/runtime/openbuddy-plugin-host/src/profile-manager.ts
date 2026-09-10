@@ -77,7 +77,7 @@ const defaultProfilePackageManager: ProfilePackageManager = {
   },
   async remove(profileDir, packageName) {
     try {
-      await execFileAsync("pnpm", ["remove", "--ignore-workspace", "--config.minimumReleaseAge=0", packageName], {
+      await execFileAsync("pnpm", ["remove", "--ignore-workspace", "--ignore-scripts", "--config.minimumReleaseAge=0", packageName], {
         cwd: profileDir,
         maxBuffer: 4 * 1024 * 1024,
       });

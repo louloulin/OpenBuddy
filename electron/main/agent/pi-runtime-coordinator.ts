@@ -15,6 +15,8 @@ export interface PiRuntimeCoordinatorOptions {
   /** Shared generation fence for session listeners and RPC UI requests. */
   generationGate?: GenerationGate;
   onReload?: (generation: number, reason?: string) => void;
+  /** Receives reload failures without poisoning the serialized queue. */
+  onReloadError?: (error: unknown, reason?: string) => void;
 }
 
 export class PiRuntimeCoordinator {
@@ -32,7 +34,7 @@ export class PiRuntimeCoordinator {
   }
 
   reload(reason: string): Promise<void> {
-    return this.enqueue(() => this.reloadCurrent(reason));
+    return this.enqueue(() => this.reloadCurrent(reason), reason);
   }
 
   reloadUntilStable(readRevision: () => number, reason: string): Promise<void> {
@@ -46,10 +48,14 @@ export class PiRuntimeCoordinator {
     });
   }
 
-  private enqueue(operation: () => Promise<void>): Promise<void> {
+  private enqueue(operation: () => Promise<void>, reason?: string): Promise<void> {
     const run = this.tail.then(operation, operation);
-    this.tail = run.then(() => undefined, () => undefined);
-    return run;
+    const observed = run.catch((error) => {
+      this.options.onReloadError?.(error, reason);
+      throw error;
+    });
+    this.tail = observed.then(() => undefined, () => undefined);
+    return observed;
   }
 
   private async reloadCurrent(_reason: string): Promise<void> {

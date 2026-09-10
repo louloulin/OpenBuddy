@@ -11,6 +11,7 @@
 import type { InstallHostModuleDomainInput, InstallHostModuleDepsWithDomains } from "./install-host-modules";
 import { ensureDefaultPiPackages, type PluginStatus, type PluginBundle } from "@openbuddy/plugin-host";
 import type { InitPipelineDeps } from "./init-pipeline";
+import { bootstrapSessionEventLog } from "./session-event-log";
 import { bootstrapModelRuntime } from "./model-runtime";
 import { createJobsRegistry } from "./jobs-registry";
 import { wireContextServices } from "./wire-context-services";
@@ -110,6 +111,8 @@ export interface InitPipelineClosures {
 }
 
 import type { AgentHostState } from "../_state-shape";
+import type { Context } from "@openbuddy/cordis";
+import type { ElectronHarnessPluginLoader } from "../profile/loader";
 
 export interface InitPipelineOpts {
   sessionPath?: string;

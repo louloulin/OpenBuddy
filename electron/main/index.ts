@@ -52,8 +52,8 @@ import { installAppMenu } from "./app-menu";
 // reference.
 let agentHost!: typeof import("./agent/agent-host").agentHost;
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const mainFilename = fileURLToPath(import.meta.url);
+const mainDirname = dirname(mainFilename);
 const execFileAsync = promisify(execFile);
 
 app.setName("OpenBuddy");
@@ -92,10 +92,10 @@ if (developmentUserData || process.env.NODE_ENV_ELECTRON_VITE === "development")
 }
 
 const devRendererUrl = process.env.ELECTRON_RENDERER_URL;
-const rendererIndex = join(__dirname, "../../out/renderer/index.html");
+const rendererIndex = join(mainDirname, "../../out/renderer/index.html");
 const preloadCandidates = [
-  join(__dirname, "../preload/index.cjs"),
-  join(__dirname, "../preload/index.js"),
+  join(mainDirname, "../preload/index.cjs"),
+  join(mainDirname, "../preload/index.js"),
 ];
 const preloadPath = preloadCandidates.find((path) => existsSync(path)) ?? preloadCandidates[0];
 
@@ -142,7 +142,7 @@ async function ensureRendererBuild(): Promise<boolean> {
     return existsSync(rendererIndex) || Boolean(devRendererUrl);
   }
 
-  const projectRoot = join(__dirname, "../..");
+  const projectRoot = join(mainDirname, "../..");
   const electronVite = join(projectRoot, "node_modules", ".bin", "electron-vite");
   if (!existsSync(electronVite)) {
     console.error(`[openbuddy-pi] renderer build missing and electron-vite was not found: ${electronVite}`);

@@ -71,19 +71,21 @@ describe("installProviderRegistryTracker", () => {
     expect(harness.registry.get("acme-llm")?.registeredAt).toBeGreaterThan(0);
   });
 
-  it("records live registerNativeProvider calls when available", () => {
-    const provider = {
-      id: "native-acme",
-      baseUrl: "https://native.test",
-      models: [],
-    } as never;
-    const nativeRegister = (harness.runtime as unknown as { registerNativeProvider?: (p: never) => void }).registerNativeProvider;
-    if (typeof nativeRegister === "function") {
-      nativeRegister(provider);
-      expect(harness.registry.get("native-acme")?.source).toBe("pi-extension");
-    } else {
-      expect(true).toBe(true);
-    }
+  it("does not publish registry state or change events when Pi rejects registration", () => {
+    const events: Array<{ kind: "register" | "unregister"; record: ProviderRegistryChange }> = [];
+    const registry = new Map<string, ProviderRegistryRecord>();
+    const providers = new Set<string>();
+    const runtime = {
+      registerProvider: () => { throw new Error("fixture provider rejected"); },
+      unregisterProvider: (id: string) => { providers.delete(id); },
+      registerNativeProvider: undefined,
+    } as unknown as ModelRuntime;
+    installProviderRegistryTracker(runtime, registry, (event) => events.push(event));
+
+    expect(() => runtime.registerProvider("rejected-fixture", {} as never)).toThrow("fixture provider rejected");
+    expect(registry.has("rejected-fixture")).toBe(false);
+    expect(providers.has("rejected-fixture")).toBe(false);
+    expect(events).toEqual([]);
   });
 });
 

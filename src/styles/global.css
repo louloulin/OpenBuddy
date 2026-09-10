@@ -20,7 +20,54 @@
   border-radius: inherit;
 }
 
-/* Foundation Icon base (ported from WorkBuddy agent-ui). */
+/* Pi runtime recovery banner: visible in the conversation input stack. */
+.pi-reload-failure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(100% - 32px, 760px);
+  margin: 0 auto 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--wb-danger, #d14343) 35%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--wb-danger, #d14343) 9%, var(--wb-bg-secondary, #fff));
+  color: var(--wb-text-strong, #202124);
+  font-size: 13px;
+}
+.pi-reload-failure__body {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.pi-reload-failure__body span {
+  overflow: hidden;
+  color: var(--wb-text-medium, #555);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pi-reload-failure button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid var(--wb-danger, #d14343);
+  border-radius: 7px;
+  background: var(--wb-danger, #d14343);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+.pi-reload-failure button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+@media (max-width: 520px) {
+  .pi-reload-failure { align-items: stretch; flex-direction: column; width: calc(100% - 20px); }
+  .pi-reload-failure button { width: 100%; }
+}
+
+
 .wb-icon {
   display: inline-block;
   flex-shrink: 0;

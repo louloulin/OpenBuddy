@@ -78,7 +78,7 @@ describe("PiSessionEventBridge plugin/extension event indexing (phase 4)", () =>
       type: "plugin/current",
       payload: {},
     });
-    expect(bridge.snapshot().map((event) => event.type)).toEqual(["plugin/old", "plugin/current"]);
+    expect(bridge.snapshot().map((event) => event.type)).toEqual(["plugin/current"]);
   });
   it("indexes session-scoped events and filters by sessionId", () => {
     const bridge = new PiSessionEventBridge();
@@ -91,6 +91,12 @@ describe("PiSessionEventBridge plugin/extension event indexing (phase 4)", () =>
     expect(bridge.snapshot()).toHaveLength(2);
   });
 
+  it("coalesces reconstructable Pi tool progress until snapshot delivery", () => {
+    const bridge = new PiSessionEventBridge();
+    bridge.appendFromSession({ type: "tool_execution_update", sessionId: "s1", partialResult: "first" });
+    bridge.appendFromSession({ type: "tool_execution_update", sessionId: "s1", partialResult: "latest" });
+    expect(bridge.snapshot({ sessionId: "s1" }).map((entry) => (entry.payload as { partialResult?: string }).partialResult)).toEqual(["latest"]);
+  });
   it("bounded ring buffer drops oldest entries beyond maxEntries", () => {
     const bridge = new PiSessionEventBridge({ maxEntries: 3 });
     for (let i = 0; i < 5; i++) {

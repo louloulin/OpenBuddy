@@ -14,6 +14,7 @@ import {
 } from "@/lib/agent/session-artifacts";
 import { MessageItem } from "./MessageItem";
 import { Composer } from "./Composer";
+import { PiReloadFailureBanner } from "./PiReloadFailureBanner";
 import { PlanPanel } from "@openbuddy/ui-automation";
 import { RewindBar } from "./RewindBar";
 import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
@@ -1075,6 +1076,7 @@ export function ChatView({
           {sessionId && !readOnlySubagent && (
             <QueuePanel sessionId={sessionId} onSendNow={(t) => onSend(t)} />
           )}
+          <PiReloadFailureBanner />
           <Composer
             streaming={streaming}
             disabled={readOnlySubagent}

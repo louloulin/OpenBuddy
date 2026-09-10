@@ -1327,6 +1327,7 @@ export * from "./rpc-contract";
 export * from "./plugin-security";
 export * from "./task-lifecycle";
 export * from "./generation-gate";
+export * from "./bounded-event-queue";
 export * from "./plugin-registry";
 export * from "./plugin-lifecycle";
 export {

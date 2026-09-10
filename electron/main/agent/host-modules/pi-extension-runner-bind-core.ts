@@ -60,79 +60,55 @@ export function bindCoreForSession(
   host: BindCoreHostFunctions,
 ): void {
   const actions: ExtensionActions = {
-    sendMessage: async (message, options) => {
-      // PI's sendMessage contract returns `Promise<boolean>` (true on
-      // success). We coerce the host prompt result to boolean.
-      const result = await host.prompt(String(message.content ?? ""), options);
-      return Boolean(result);
+    sendMessage: (message, options) => {
+      void host.prompt(String(message.content ?? ""), options);
     },
-    sendUserMessage: async (content, options) => {
+    sendUserMessage: (content, options) => {
       if (host.promptContent) {
-        await host.promptContent(content as readonly unknown[], options?.trigger);
+        const parts = typeof content === "string" ? [{ type: "text", text: content }] : content;
+        void host.promptContent(parts, options?.deliverAs === "steer" ? "steer" : "queue");
       } else {
-        // Fallback: render the content array as plain text.
-        const text = (content as readonly unknown[])
-          .map((part) => (typeof part === "string" ? part : JSON.stringify(part)))
-          .join("\n");
-        await host.prompt(text, options);
+        const text = typeof content === "string"
+          ? content
+          : content.map((part) => part.type === "text" ? part.text : JSON.stringify(part)).join("\n");
+        void host.prompt(text, options);
       }
     },
-    appendEntry: async (customType, data) => {
-      // OpenBuddy doesn't have a generic "append custom entry to
-      // session" surface in the host functions today, so we
-      // intentionally no-op this and surface a structured log so
-      // callers know the host gap. (Future H.2 / I.1 work.)
-      console.debug(
-        `[pi-extension-runner-bind-core] appendEntry(${customType}) called; ` +
-        `no host bridge — payload: ${JSON.stringify(data)}`,
-      );
+    appendEntry: (customType, data) => {
+      console.debug(`[pi-extension-runner-bind-core] appendEntry(${customType}) called; no host bridge — payload: ${JSON.stringify(data)}`);
     },
-    setSessionName: async (name) => {
-      // Surface to host via the existing setThinkingLevel-style
-      // generic hook so session-name changes are visible to the
-      // session-event bus.
+    setSessionName: (name) => {
       console.debug(`[pi-extension-runner-bind-core] setSessionName(${name}) called`);
     },
     getSessionName: () => undefined,
-    setLabel: async (entryId, label) => {
-      console.debug(
-        `[pi-extension-runner-bind-core] setLabel(${entryId}, ${label}) called`,
-      );
-    },
-    exec: async (command, args, options) => {
-      // Host has no exec() surface today; throw a typed error so the
-      // extension knows the host gap. Future F.3 work.
-      throw new Error("pi-extension-runner-bind-core: host has no exec() surface");
+    setLabel: (entryId, label) => {
+      console.debug(`[pi-extension-runner-bind-core] setLabel(${entryId}, ${label}) called`);
     },
     getActiveTools: () => [],
     getAllTools: () => [],
-    setActiveTools: async (_toolNames) => {
-      // No-op until the host exposes a tool-allowlist surface.
-    },
+    setActiveTools: () => undefined,
+    refreshTools: () => undefined,
     getCommands: () => [],
     setModel: async (model) => {
       await host.setModel(String(model.id ?? ""), {});
+      return true;
     },
-    setThinkingLevel: async (level) => {
-      if (host.setThinkingLevel) {
-        await host.setThinkingLevel(level, {});
-      }
-    },
-    getThinkingLevel: () => undefined,
-    getModel: () => host.getModel(),
-    getLabel: () => undefined,
-    context: {
-      getContextUsage: () => undefined,
-      compact: async () => {
-        // Compact is a session-internal operation; the host doesn't
-        // have a manual-compact surface. Let the ExtensionRunner
-        // fall back to its default (no-op).
-      },
-    } as unknown as ExtensionContextActions["context"],
+    getThinkingLevel: () => "normal" as never,
+    setThinkingLevel: (level) => { void host.setThinkingLevel?.(level, {}); },
   };
 
   const contextActions: ExtensionContextActions = {
-    getSession: () => host.getSession(),
+    getModel: () => host.getModel() as ReturnType<ExtensionContextActions["getModel"]>,
+    getScopedModels: () => [],
+    isIdle: () => true,
+    isProjectTrusted: () => true,
+    getSignal: () => undefined,
+    abort: () => { void host.abort(); },
+    hasPendingMessages: () => false,
+    shutdown: () => undefined,
+    getContextUsage: () => undefined,
+    compact: () => undefined,
+    getSystemPrompt: () => "",
   };
 
   // providerActions omitted — the OpenBuddy model/provider registry

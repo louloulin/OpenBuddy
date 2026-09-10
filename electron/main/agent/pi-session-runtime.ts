@@ -38,7 +38,7 @@ export interface PiSessionRuntimeDisposeOptions {
  */
 export class PiSessionRuntime {
   private readonly factory: PiSessionRuntimeFactory;
-  private readonly hostBridge: BindCoreHostFunctions | null;
+  private hostBridge: BindCoreHostFunctions | null;
   private current: AgentSession | null = null;
   private unsubscribe: (() => void) | null = null;
   private eventHandler: PiSessionEventHandler | null = null;
@@ -123,7 +123,7 @@ export class PiSessionRuntime {
    * current session so the live runner gets the real actions.
    */
   installHostBridge(hostBridge: BindCoreHostFunctions): void {
-    (this as { hostBridge: BindCoreHostFunctions | null }).hostBridge = hostBridge;
+    this.hostBridge = hostBridge;
     this.bindCoreIfReady();
   }
 

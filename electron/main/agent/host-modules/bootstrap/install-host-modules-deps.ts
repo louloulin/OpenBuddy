@@ -52,7 +52,7 @@ export interface InstallHostModuleDepsClosures {
   runHookPoint: (...args: any[]) => any;
   // Profile artifacts + plugins
   profileArtifactModuleUrl: (path: string) => string;
-  profilePackages: () => Promise<unknown>;
+  profilePackages: () => Promise<readonly unknown[]>;
   pluginLifecycleQueue: any;
   setProfilePiResourcePaths: (paths: any) => void;
   refreshMarketplacePiResourcePaths: () => Promise<void>;
@@ -119,7 +119,7 @@ export interface InstallHostModuleDepsClosures {
 export function buildInstallHostModuleDeps(
   closures: InstallHostModuleDepsClosures,
 ): InstallHostModuleDepsWithDomains {
-  const flatDeps: InstallHostModuleDeps = {
+  const flatDeps = {
     state: closures.state,
     piHome: closures.piHome,
     isPathWithin: closures.isPathWithin,
@@ -182,7 +182,7 @@ export function buildInstallHostModuleDeps(
     composePluginPatches: closures.composePluginPatches,
     syncDeepSeekCordisRuntime: closures.syncDeepSeekCordisRuntime,
     deepSeekCoreRuntimeEntries: closures.deepSeekCoreRuntimeEntries,
-    reloadMcp: closures.reloadMcp,
+    // reloadMcp is consumed by the facade, not the host-module dependency bag.
     syncMarketplacePiExtensionStatuses: closures.syncMarketplacePiExtensionStatusesImpl as any,
     startProfileWatchers: closures.startProfileWatchers,
     readOverridePatches: closures.readOverridePatches,
@@ -193,9 +193,9 @@ export function buildInstallHostModuleDeps(
     captureReloadableContextServices: closures.captureReloadableContextServices,
     restoreCapturedContextServices: closures.restoreCapturedContextServices,
     rollbackPiProfile: closures.rollbackPiProfile as any,
-    scheduleProfileReload: closures.scheduleProfileReload,
+    scheduleProfileReload: () => { void closures.scheduleProfileReload(); },
     artifactPackageJsonByName: closures.artifactPackageJsonByName,
-    discoverRendererPluginManifest: closures.discoverRendererPluginManifest,
+    discoverRendererPluginManifest: async (...args: any[]) => Array.from(await closures.discoverRendererPluginManifest(...args)),
     promptImpl: closures.promptImpl,
     abortImpl: closures.abortImpl,
     listSessionsImpl: closures.listSessionsImpl,
@@ -211,12 +211,12 @@ export function buildInstallHostModuleDeps(
     setThinkingLevel: closures.setThinkingLevel,
     promptContent: closures.promptContent,
     onEvent: closures.onEvent,
-    persistPiSessionHeaderImpl: closures.persistPiSessionHeaderImpl,
+    persistPiSessionHeader: closures.persistPiSessionHeaderImpl,
   };
   return {
     profile: flatDeps,
     session: flatDeps,
     plugin: flatDeps,
     runtime: flatDeps,
-  } as InstallHostModuleDepsWithDomains;
+  } as unknown as InstallHostModuleDepsWithDomains;
 }

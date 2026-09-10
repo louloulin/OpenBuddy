@@ -929,7 +929,7 @@ export function ComposerInner({
                 }
               });
             };
-            const nativeReadText = (window as Window & { api?: ElectronWindowApi }).api?.clipboard?.readText;
+            const nativeReadText = (window as unknown as { api?: ElectronWindowApi }).api?.clipboard?.readText;
             if (typeof nativeReadText !== "function") {
               insert(eventText);
               return;

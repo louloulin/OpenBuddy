@@ -45,6 +45,11 @@ export function installProviderRegistryTracker(
     const id = typeof nameOrProvider === "string"
       ? nameOrProvider
       : ((nameOrProvider as { id?: string } | undefined)?.id ?? "");
+    if (typeof nameOrProvider === "string") {
+      (originalRegister as unknown as (name: string, cfg: unknown) => void)(nameOrProvider, config);
+    } else {
+      (originalRegister as unknown as (provider: unknown) => void)(nameOrProvider);
+    }
     if (id) {
       const existing = registry.get(id);
       const record: ProviderRegistryRecord = {
@@ -56,17 +61,14 @@ export function installProviderRegistryTracker(
       registry.set(id, record);
       onChange?.({ kind: "register", record });
     }
-    if (typeof nameOrProvider === "string") {
-      (originalRegister as unknown as (name: string, cfg: unknown) => void)(nameOrProvider, config);
-      return;
-    }
-    (originalRegister as unknown as (provider: unknown) => void)(nameOrProvider);
+    return;
   }) as typeof originalRegister;
   if (originalRegisterNative) {
     (runtime as unknown as { registerNativeProvider: typeof originalRegisterNative }).registerNativeProvider = ((
       provider: unknown,
     ): void => {
       const id = (provider as { id?: string } | undefined)?.id;
+      (originalRegisterNative as unknown as (provider: unknown) => void)(provider);
       if (id) {
         const existing = registry.get(id);
         const record: ProviderRegistryRecord = {
@@ -78,16 +80,16 @@ export function installProviderRegistryTracker(
         registry.set(id, record);
         onChange?.({ kind: "register", record });
       }
-      (originalRegisterNative as unknown as (provider: unknown) => void)(provider);
     }) as typeof originalRegisterNative;
   }
   (runtime as unknown as { unregisterProvider: (name: string) => void }).unregisterProvider = ((name: string) => {
     const existing = registry.get(name);
-    registry.delete(name);
+    const result = originalUnregister(name);
     if (existing) {
+      registry.delete(name);
       onChange?.({ kind: "unregister", record: { id: existing.id, source: existing.source, registeredAt: existing.registeredAt, ...(existing.extensionPath ? { extensionPath: existing.extensionPath } : {}) } });
     }
-    return originalUnregister(name);
+    return result;
   });
 }
 
