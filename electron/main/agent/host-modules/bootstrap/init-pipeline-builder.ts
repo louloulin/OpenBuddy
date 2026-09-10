@@ -209,7 +209,11 @@ export function buildInitPipelineDeps(
     refreshMarketplacePiResourcePaths: refreshMarketplacePiResourcePathsImpl,
     configurePiExtensions: configurePiExtensionsImpl,
     reportPiExtensionErrors: closures.reportPiExtensionErrors,
-    syncMarketplacePiExtensionStatuses: () => syncMarketplacePiExtensionStatusesImpl(closures.state),
+    // The closure forwards `state` (and any other args) directly. The
+    // call sites in plugin-mutations.ts pass `state` explicitly so the
+    // helper signature stays simple, and an old install of the host
+    // modules can still reach the impl by re-binding this closure.
+    syncMarketplacePiExtensionStatuses: ((...args: unknown[]) => (syncMarketplacePiExtensionStatusesImpl as (...a: unknown[]) => unknown)(...(args as Parameters<typeof syncMarketplacePiExtensionStatusesImpl>))),
     nativePiResourcePaths: nativePiResourcePathsImpl,
     persistPiSessionHeaderImpl,
     piSessionRuntime: closures.piSessionRuntime,

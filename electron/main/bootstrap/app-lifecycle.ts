@@ -17,6 +17,7 @@
 import { app, BrowserWindow } from "electron";
 import { perfTraceMark } from "../observability/perf-trace";
 import { installProcessGuards } from "./process-guards";
+import { quitGateState } from "../agent/host-modules/bootstrap/install-host-modules";
 
 export interface AppLifecycleDeps {
   /**
@@ -113,7 +114,14 @@ export function installAppLifecycle(deps: AppLifecycleDeps): void {
   });
 
   app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") app.quit();
+    // Phase 4.5: suppress automatic quit when background-draining is active.
+    // quit-gate.ts sets quitGateState.backgroundDraining = true when the user
+    // chose "后台继续".  In that mode the app stays alive after the window
+    // closes so that active tasks can drain.  We must NOT call app.quit() here
+    // otherwise the app exits even though tasks are still running.
+    if (process.platform !== "darwin" && !quitGateState.backgroundDraining) {
+      app.quit();
+    }
   });
 
   app.on("before-quit", () => {
