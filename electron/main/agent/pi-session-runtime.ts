@@ -123,7 +123,7 @@ export class PiSessionRuntime {
    * current session so the live runner gets the real actions.
    */
   installHostBridge(hostBridge: BindCoreHostFunctions): void {
-    (this as { hostBridge: BindCoreHostFunctions | null }).hostBridge = hostBridge;
+    this.hostBridge = hostBridge;
     this.bindCoreIfReady();
   }
 

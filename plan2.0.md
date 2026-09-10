@@ -359,20 +359,20 @@ Pi 官方 `AgentSession`/Extensions 事件包含 session、agent、turn、messag
 - **已实现**：Phase 1 的 generation-fenced event replay：reload 后 `PiSessionEventBridge.snapshot()` 仅返回当前 generation 事件，避免 stale session/plugin events 回放到 renderer；新增/更新测试覆盖。
 - **已实现**：Phase 1 的 Pi RPC/UI 生命周期事件 canonicalization：`extension_error`、`ui_prompt_start`、`ui_prompt_end` 统一映射并有定向测试。
 - **已实现**：Phase 1 的 Pi→Main 事件背压切片：复用 `@openbuddy/plugin-host` 的 `BoundedEventQueue`，对 `tool_execution_update` 进度事件按 session/kind 合并，snapshot 时刷新；lifecycle/final/error 等事件仍直接进入 ring buffer。
-- **本轮推进**：针对完整 typecheck 门禁，修复了 bootstrap builder 中缺失的 `bootstrapSessionEventLog`、`Context`、`ElectronHarnessPluginLoader` 依赖导入；补齐 Electron tsconfig 的 `@openbuddy/dsh-core/state` Pi-native DSH extension 路径；并将 `PiSessionRuntime.hostBridge` 改为可安装的可变 bridge，消除该运行时自类型转换错误。
-- **仍阻塞**：仓库当前 Pi 0.85.1 API 与并行重构的测试/类型契约尚未完全收敛，剩余错误集中在 `init-pipeline.test.ts`、`init-session.ts`、`install-host-modules-deps.ts`、`pi-extension-runner-bind-core.test.ts`/实现和旧测试假设；因此本轮不能宣称完整 typecheck/build 已恢复。
+- **本轮完成**：修复 bootstrap/Pi 0.85.1 API 契约并恢复完整 TypeScript 门禁：统一 `AgentHostState`/RPC UI resolver 类型、补齐 Pi-native DSH state path、修正 host module dependency bag 的返回类型与字段、更新 `ExtensionActions`/`ExtensionContextActions` 测试适配 Pi 0.85.1、修复 renderer Electron bridge 断言。
+- **验证完成**：`pnpm typecheck` 全部通过；`pnpm build` 全部通过（仅保留既有 Node externalization 与 ineffective dynamic import warnings）；定向测试 5 files、49/49 通过。
+- **仍未开始**：完整 E3 外部 Pi package、E4 benchmark、三平台 Electron smoke。
 
-- **未开始**：完整 E3 外部 Pi package 验证、E4 streaming/IPC/reload/memory benchmark、三平台发布门禁。
 
 ### 12.4 总体进度
 
-进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 4 个切片（事件 canonicalization、generation-fenced replay、RPC/UI lifecycle canonicalization、Pi 事件背压/进度合并），因此当前**实现进度约 22%（4/18）**。该百分比仅表示代码垂直切片完成度，不代表产品发布完成度；完整 typecheck/Electron smoke、真实 provider/package E3 与 E4 性能门禁仍未完成。
+进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 5 个切片（事件 canonicalization、generation-fenced replay、RPC/UI lifecycle canonicalization、Pi 事件背压/进度合并、Pi 0.85.1 API/typecheck/build 门禁收敛），因此当前**实现进度约 28%（5/18）**。该百分比仅表示代码垂直切片完成度，不代表产品发布完成度；真实 provider/package E3、E4 benchmark 与 Electron smoke 仍未完成。
 
-### 12.7 本轮增量：typecheck 阻塞收敛（未完全清零）
+### 12.8 本轮增量：Pi 0.85.1 API 契约与完整 build 门禁恢复
 
-本轮没有绕过 Pi 官方类型契约或以 `any` 隐藏错误：修复了 `init-pipeline-builder.ts` 遗漏的 stage helper/type imports，补齐 Electron 项目的 `@openbuddy/dsh-core/state` 路径映射，并修正 `PiSessionRuntime` 的 host bridge 生命周期声明。定向回归测试 3 files、32/32 通过。
+本轮按 Pi 官方 0.85.1 `ExtensionActions`/`ExtensionContextActions` 类型契约收敛适配层与测试：移除旧版 `exec`、action-level `getModel`、context `getSession` 等过时假设，使用官方 `sendMessage`/`sendUserMessage` payload 与 `deliverAs` 语义；同时修复 bootstrap dependency bag、RPC UI resolver、Electron bridge 类型断言，并保持生产路径不以 `any` 绕过 Pi API。
 
-`pnpm typecheck` 仍失败，当前剩余错误来自并行 bootstrap 重构与 Pi 0.85.1 API 漂移：`init-pipeline.test.ts` 的不完整 `AgentHostState` fixture、`init-session.ts` 的 `pendingUiRequests` resolver 类型、`install-host-modules-deps.ts` 的 readonly/domain cast、`pi-extension-runner-bind-core.test.ts` 仍按旧版 ExtensionActions/ContextActions API 编写，以及对应实现适配。可复现命令：`cd OpenBuddy && pnpm typecheck`。本轮未修改这些外部/并行改动文件，避免覆盖未提交工作。
+验证：`pnpm typecheck` 通过（app-desktop 与 renderer 均成功）；`pnpm build` 通过，bundle 仅输出既有 Node module externalization 与 ineffective dynamic import warnings；定向命令 `pnpm exec vitest run electron/main/agent/host-modules/pi-extension-runner-bind-core.test.ts electron/main/agent/host-modules/bootstrap/init-pipeline.test.ts electron/main/agent/pi-event-bridge.test.ts electron/main/agent/host-modules/plugin-event-bus.test.ts src/__tests__/bridge-resilience.test.ts --reporter=dot` 为 5 files、49/49 通过；`git diff --check` 通过。
 
 
 

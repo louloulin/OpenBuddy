@@ -26,7 +26,7 @@ function buildFakeDeps(): InitPipelineDeps {
       toolRegistryRevision: 0,
       eventSequence: 0,
       dshCoreExtensionPathsOverride: [],
-    } as InitPipelineDeps["state"],
+    } as unknown as InitPipelineDeps["state"],
     cwd: () => "/fake/cwd",
     piHome: () => "/fake/pi-home",
     isPathWithin: () => true,

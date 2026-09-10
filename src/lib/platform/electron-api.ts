@@ -141,7 +141,7 @@ function getApi(): ElectronWindowApi {
     const apiVer = (api as { apiVersion?: unknown }).apiVersion;
     throw new ElectronBridgeUnavailableError("unsupported-version", typeof apiVer === "number" ? apiVer : undefined);
   }
-  return api as ElectronWindowApi;
+  return api as unknown as ElectronWindowApi;
 }
 
 export async function invoke<T = unknown>(channel: string, args?: unknown): Promise<T> {

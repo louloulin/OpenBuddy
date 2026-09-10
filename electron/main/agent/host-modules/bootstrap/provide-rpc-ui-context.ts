@@ -24,6 +24,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type { AgentSession, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import type { AgentHostPendingUiRequest } from "../_state-shape";
 
 export interface ProvideRpcUiContextDeps {
   /** The Pi context — used for context.provide("piUi", uiContext). */
@@ -35,12 +36,7 @@ export interface ProvideRpcUiContextDeps {
    * callbacks resolve when the user answers via pi://question/permission.
    */
   state: {
-    pendingUiRequests: Map<string, {
-      kind: "question" | "permission";
-      sessionId: string;
-      generation?: number;
-      resolve: (value: unknown) => void;
-    }>;
+    pendingUiRequests: Map<string, AgentHostPendingUiRequest>;
     extensionEditorText: Map<string, string>;
     extensionToolsExpanded: Map<string, boolean>;
   };

@@ -9,9 +9,9 @@ import {
 
 const setBridge = (api?: unknown) => {
   if (api === undefined) {
-    delete (window as Window & { api?: unknown }).api;
+    delete (window as unknown as { api?: unknown }).api;
   } else {
-    (window as Window & { api?: unknown }).api = api;
+    (window as unknown as { api?: unknown }).api = api;
   }
 };
 

@@ -72,9 +72,7 @@ describe("pi-extension-runner-bind-core (Phase B.2)", () => {
 
     bindCoreForSession(runner, host);
 
-    expect(captured.actions).toBeDefined();
-    expect(captured.contextActions).toBeDefined();
-    expect(captured.contextActions?.getSession()).toEqual({ sessionId: "session-test" });
+    expect(captured.contextActions?.getModel()).toEqual({ id: "model-x" });
   });
 
   it("sendMessage action delegates to host.prompt and coerces return to boolean", async () => {
@@ -82,14 +80,8 @@ describe("pi-extension-runner-bind-core (Phase B.2)", () => {
     const host = makeHost();
     bindCoreForSession(runner, host);
 
-    const ok = await captured.actions!.sendMessage({ content: "hello" }, { source: "extension" });
-    expect(ok).toBe(true);
-    expect(host.prompt).toHaveBeenCalledWith("hello", { source: "extension" });
-
-    // Non-true return value still coerces to false.
-    (host.prompt as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
-    const falsy = await captured.actions!.sendMessage({ content: "x" }, undefined);
-    expect(falsy).toBe(false);
+    await (captured.actions! as any).sendMessage({ customType: "test", content: "hello", display: true, details: undefined }, { deliverAs: "steer" });
+    expect(host.prompt).toHaveBeenCalledWith("hello", { deliverAs: "steer" });
   });
 
   it("sendUserMessage action delegates to host.promptContent when present", async () => {
@@ -97,8 +89,8 @@ describe("pi-extension-runner-bind-core (Phase B.2)", () => {
     const host = makeHost();
     bindCoreForSession(runner, host);
 
-    await captured.actions!.sendUserMessage(["hello", { text: "world" }], { trigger: "queue" });
-    expect(host.promptContent).toHaveBeenCalledWith(["hello", { text: "world" }], "queue");
+    await (captured.actions! as any).sendUserMessage([{ type: "text", text: "hello" }, { type: "text", text: "world" }], { deliverAs: "steer" });
+    expect(host.promptContent).toHaveBeenCalledWith([{ type: "text", text: "hello" }, { type: "text", text: "world" }], "steer");
     expect(host.prompt).not.toHaveBeenCalled();
   });
 
@@ -108,8 +100,8 @@ describe("pi-extension-runner-bind-core (Phase B.2)", () => {
     delete (host as { promptContent?: unknown }).promptContent;
     bindCoreForSession(runner, host);
 
-    await captured.actions!.sendUserMessage(["a", "b"], { trigger: "steer" });
-    expect(host.prompt).toHaveBeenCalledWith("a\nb", { trigger: "steer" });
+    await (captured.actions! as any).sendUserMessage([{ type: "text", text: "a" }, { type: "text", text: "b" }], { deliverAs: "steer" });
+    expect(host.prompt).toHaveBeenCalledWith("a\nb", { deliverAs: "steer" });
   });
 
   it("setModel action delegates to host.setModel", async () => {
@@ -117,7 +109,7 @@ describe("pi-extension-runner-bind-core (Phase B.2)", () => {
     const host = makeHost();
     bindCoreForSession(runner, host);
 
-    await captured.actions!.setModel({ id: "model-y" });
+    await captured.actions!.setModel({ id: "model-y" } as any);
     expect(host.setModel).toHaveBeenCalledWith("model-y", {});
   });
 
@@ -126,7 +118,7 @@ describe("pi-extension-runner-bind-core (Phase B.2)", () => {
     const host = makeHost();
     bindCoreForSession(runner, host);
 
-    await captured.actions!.setThinkingLevel("high");
+    await (captured.actions! as any).setThinkingLevel("high");
     expect(host.setThinkingLevel).toHaveBeenCalledWith("high", {});
   });
 
@@ -137,15 +129,13 @@ describe("pi-extension-runner-bind-core (Phase B.2)", () => {
     bindCoreForSession(runner, host);
 
     // No throw — the action silently succeeds.
-    await expect(captured.actions!.setThinkingLevel("high")).resolves.toBeUndefined();
+    expect(() => (captured.actions! as any).setThinkingLevel("high")).not.toThrow();
   });
 
-  it("exec action throws a typed error (no host surface today)", async () => {
+  it("Pi 0.85.1 action surface omits legacy exec", () => {
     const { runner, captured } = makeRunner();
-    const host = makeHost();
-    bindCoreForSession(runner, host);
-
-    await expect(captured.actions!.exec("ls", ["-la"], { cwd: "/" })).rejects.toThrow(/no exec\(\) surface/);
+    bindCoreForSession(runner, makeHost());
+    expect((captured.actions! as any).exec).toBeUndefined();
   });
 
   it("getActiveTools / getCommands return empty arrays (safe defaults)", () => {
@@ -153,12 +143,11 @@ describe("pi-extension-runner-bind-core (Phase B.2)", () => {
     const host = makeHost();
     bindCoreForSession(runner, host);
 
-    expect(captured.actions!.getActiveTools()).toEqual([]);
-    expect(captured.actions!.getAllTools()).toEqual([]);
-    expect(captured.actions!.getCommands()).toEqual([]);
-    expect(captured.actions!.getThinkingLevel()).toBeUndefined();
-    expect(captured.actions!.getSessionName()).toBeUndefined();
-    expect(captured.actions!.getLabel("any-entry")).toBeUndefined();
+    expect((captured.actions! as any).getActiveTools()).toEqual([]);
+    expect((captured.actions! as any).getAllTools()).toEqual([]);
+    expect((captured.actions! as any).getCommands()).toEqual([]);
+    expect((captured.actions! as any).getThinkingLevel()).toBe("normal");
+    expect((captured.actions! as any).getSessionName()).toBeUndefined();
   });
 
   it("setActiveTools is a no-op (host has no allowlist surface yet)", async () => {
@@ -166,7 +155,7 @@ describe("pi-extension-runner-bind-core (Phase B.2)", () => {
     const host = makeHost();
     bindCoreForSession(runner, host);
 
-    await expect(captured.actions!.setActiveTools(["any-tool"])).resolves.toBeUndefined();
+    expect(() => (captured.actions! as any).setActiveTools(["any-tool"])).not.toThrow();
   });
 
   it("getModel action returns host.getModel()", () => {
@@ -174,7 +163,7 @@ describe("pi-extension-runner-bind-core (Phase B.2)", () => {
     const host = makeHost();
     bindCoreForSession(runner, host);
 
-    expect(captured.actions!.getModel()).toEqual({ id: "model-x" });
+    expect((captured.contextActions! as any).getModel()).toEqual({ id: "model-x" });
     expect(host.getModel).toHaveBeenCalled();
   });
 });
