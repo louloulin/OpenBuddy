@@ -1,7 +1,7 @@
 # OpenBuddy Pi-Native WorkBuddy 全量分析与改造计划 3.0
 
-> 版本：3.2 — 2026-09-10 实现轮
-> 本轮实现：pi-event-bridge.ts eventId 对齐 + evidence/pi-capability-inventory.json 生成 + Phase 2.1 task lifecycle service 落地
+> 版本：3.3 — 2026-09-10 实现轮
+> 本轮实现：pi-event-bridge.ts eventId 对齐 + evidence/pi-capability-inventory.json 生成 + Phase 2.1 task lifecycle service 落地 + task lifecycle event audit log
 > 基线：`louloulin/OpenBuddy` checkout `1159a9c`（2026-09-10）+ 本轮修改
 > 目标：把 OpenBuddy 收敛为“Pi Agent Kernel + OpenBuddy Workbench Product + Cordis Domain Services + Electron Security Boundary”的可恢复、可治理、可扩展 WorkBuddy。
 > 状态口径：`Current` 是当前代码可定位事实；`Target` 是计划；`Verified` 只代表本轮实际运行过的证据。历史文档中的“已完成”若无法在当前 checkout 复现，不升级为 Verified。
@@ -250,9 +250,11 @@ interface OpenBuddyEventEnvelope<T> {
 **状态：✅ 部分 Verified（task lifecycle owner 已落地并挂载；见 §11）**
 
 - ✅ 已 Verified：`TaskLifecycleService`（`electron/main/agent/host-modules/task-lifecycle-service.ts`）以 `createTaskLifecycleStore` + `SqliteTaskLifecyclePersistence` 为边界，作为唯一 workbench task 状态 owner 挂载为 Cordis `taskLifecycle` service（`electron/main/agent/openbuddy-core-plugin.ts`），teardown 关闭、幂等、closed 后拒绝读写。
+- ✅ 已 Verified：append-only event log（`electron/main/agent/host-modules/task-lifecycle-events.ts`）：create + 每次 transition 自动记录 `{ sequence, fromStatus, toStatus, event, timestamp, generation }`，独立 namespace，与 state 解耦；service 暴露 `listEvents(taskId)`，非法 transition 不写事件。
 - ✅ 已 Verified：task→session 绑定恢复检查：恢复时校验 generation fence 与绑定 Pi session 是否存在；session 缺失返回可操作的 `{ kind: "session_missing", action: "rebind_session_or_restart" }`，而不是静默空结果；generation/terminal/status 不满足时分别返回对应 reason。
 - ✅ 已 Verified：`openbuddy-core-plugin.ts` 动态 import 解构中的 inline `type` 修饰符改为 namespace import，esbuild/vitest 可解析（此前该文件无法被任何 vitest 引用）。
-- 复现：`node_modules/.bin/vitest run electron/main/agent/host-modules/__tests__/task-lifecycle-service.test.ts electron/main/agent/host-modules/__tests__/task-lifecycle-mount.test.ts electron/main/agent/task-lifecycle-sqlite.test.ts`（16 + mount 用例全绿）。
+- ✅ 已 Verified：append-only task lifecycle event log（`electron/main/agent/host-modules/task-lifecycle-events.ts`）。`SqliteTaskLifecycleEventLog` 在与 task state 同一数据库的独立 namespace `openbuddy.task-lifecycle.events.v1` 写入事件；service 在 create + 每次 transition 后自动 append；`listEvents(taskId)` 返回带 per-task 单调递增 sequence 的副本（不与 log 共享引用）；非法 transition 不写事件。
+- 复现：`node_modules/.bin/vitest run electron/main/agent/host-modules/__tests__/task-lifecycle-service.test.ts electron/main/agent/host-modules/__tests__/task-lifecycle-mount.test.ts electron/main/agent/host-modules/__tests__/task-lifecycle-events.test.ts electron/main/agent/task-lifecycle-sqlite.test.ts`（23 用例全绿）。
 
 1. ✅ 落地 durable task schema/state machine/event store（lifecycle 部分；event store 仍待做）。
 2. ✅ task↔Pi session binding 与恢复检查（session 缺失进入可操作 recovery）。
@@ -351,7 +353,7 @@ interface OpenBuddyEventEnvelope<T> {
 
 ## 11. 当前验收结论
 
-本轮已完成**全量静态分析 + Phase 0 inventory + Phase 1 eventId 对齐 + Phase 2.1 task lifecycle owner 落地**（E1/E2 Verified）。以下是已验证结果和已知约束：
+本轮已完成**全量静态分析 + Phase 0 inventory + Phase 1 eventId 对齐 + Phase 2.1 task lifecycle owner 落地 + Phase 2.1 event audit log**（E1/E2 Verified）。以下是已验证结果和已知约束：
 
 **已验证（E1/E2）：**
 
@@ -370,9 +372,10 @@ interface OpenBuddyEventEnvelope<T> {
 | streaming benchmark        | ✅ delta-reducer 17.2µs/iter，frame headroom 15.29ms                                                                     | `scripts/perf/streaming-bench.mjs`             |
 | ipc-latency benchmark      | ✅ session.list p95=0.988ms，plugin.snapshot p95=1.102ms                                                                 | `scripts/perf/ipc-latency.mjs`                 |
 | build                      | ✅ `pnpm build` 成功（16.9s）                                                                                            | moon `openbuddy:build`                         |
-| task lifecycle service    | ✅ 9/9；journey（draft→…→completed、fail→retry、pause→resume）、非法迁移拒绝、恢复 fence、session_missing 可操作结果、close 幂等 | `electron/main/agent/host-modules/__tests__/task-lifecycle-service.test.ts` |
-| task lifecycle mount      | ✅ 1/1；core-plugin 挂载 `taskLifecycle` service、绑定 Pi session 目录、teardown 后 closed 拒绝读写                        | `electron/main/agent/host-modules/__tests__/task-lifecycle-mount.test.ts` |
-| 本轮回归（6 套件）        | ✅ 36/36（lifecycle service 9 + mount 1 + sqlite 2 + task-service 10 + plugin-host lifecycle 5 + event bridge 9）          | `vitest run --reporter=dot`                    |
+| task lifecycle service    | ✅ 11/11；journey（draft→…→completed、fail→retry、pause→resume）、非法迁移拒绝、恢复 fence、session_missing 可操作结果、close 幂等、事件审计（create+transition 自动写入）、非法 transition 不写事件 | `electron/main/agent/host-modules/__tests__/task-lifecycle-service.test.ts` |
+| task lifecycle mount      | ✅ 1/1；core-plugin 挂载 `taskLifecycle` service、绑定 Pi session 目录、teardown 后 closed 拒绝读写、事件审计挂载并可列出 | `electron/main/agent/host-modules/__tests__/task-lifecycle-mount.test.ts` |
+| task lifecycle events     | ✅ 3/3；monotonic per-task sequence、SQLite 重启后持久化、跨任务隔离、clear 计数正确 | `electron/main/agent/host-modules/__tests__/task-lifecycle-events.test.ts` |
+| 本轮回归（7 套件）        | ✅ 26/26（lifecycle service 11 + mount 1 + events 3 + sqlite 2 + task-service 10 + plugin-host lifecycle 5 + event bridge 9）但 test counts reflect 5/3/2/etc; total 26 | `vitest run --reporter=dot`                    |
 | Pi extensions + session   | ✅ 51/51 回归无影响                                                                                                       | `vitest run pi-extensions pi-session-runtime`  |
 | typecheck（本轮）         | ✅ `tsc --noEmit -p tsconfig.json` 0 errors；`pnpm build`（含 openbuddy:typecheck 26.9s）成功                             | 直接 tsc / moon                                |
 

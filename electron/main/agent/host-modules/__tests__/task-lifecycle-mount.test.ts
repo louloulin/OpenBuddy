@@ -36,6 +36,9 @@ describe("openbuddy-core-plugin taskLifecycle mount", () => {
     // Draft is not a recoverable state; queue it before testing recovery.
     await service.transitionTask(state.taskId, "queue");
     expect(await service.recoverTask(state.taskId, 0)).toMatchObject({ kind: "recovered" });
+    // Mounted service has the audit log wired (Phase 2.1 event store).
+    const events = await service.listEvents(state.taskId);
+    expect(events.map((r) => `${r.event}:${r.toStatus}`)).toEqual(["create:draft", "queue:queued"]);
 
     // Bound session disappears → actionable outcome, not a silent empty result.
     sessions.length = 0;

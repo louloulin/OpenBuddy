@@ -10,6 +10,10 @@
  * Recovery semantics (plan3.0.md §6 Phase 2.1.2): a task whose bound Pi
  * session no longer exists must produce an *actionable* recovery outcome
  * (`session_missing` + next action), never a silent empty result.
+ *
+ * Audit semantics (plan3.0.md §6 Phase 2.1 "event store"): every create
+ * and transition is appended to an event log on a separate namespace so
+ * the history can be replayed or exported without touching task state.
  */
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
@@ -26,6 +30,13 @@ import {
   type TaskStatus,
 } from "@openbuddy/plugin-host";
 import { SqliteTaskLifecyclePersistence } from "../task-lifecycle-sqlite";
+import {
+  createEventRecord,
+  SqliteTaskLifecycleEventLog,
+  transitionEventRecord,
+  type TaskLifecycleEventLog,
+  type TaskLifecycleEventRecord,
+} from "./task-lifecycle-events";
 
 /** Task states a task may be born in. Terminal states are reached, never created. */
 const initialTaskStatuses: ReadonlySet<TaskStatus> = new Set<TaskStatus>(
@@ -51,6 +62,10 @@ export interface TaskLifecycleServiceOptions {
   /** Resolves whether a task's bound Pi session still exists. When omitted,
    *  recovery treats the binding as unverifiable and does not block on it. */
   sessionExists?: TaskLifecycleSessionResolver;
+  /** Append-only audit log. When provided, every successful create /
+   *  transition records an event. When omitted, the service stays
+   *  state-only and `listEvents` returns an empty array. */
+  events?: TaskLifecycleEventLog;
 }
 
 export interface CreateTaskInput {
@@ -92,7 +107,9 @@ export class TaskLifecycleService {
       status,
       updatedAt: new Date().toISOString(),
     };
-    return await this.store.create(state);
+    const persisted = await this.store.create(state);
+    await this.appendEventSafe(createEventRecord(persisted));
+    return persisted;
   }
 
   async getTask(taskId: string): Promise<TaskLifecycleState | null> {
@@ -100,9 +117,24 @@ export class TaskLifecycleService {
     return await this.store.get(taskId);
   }
 
-  async transitionTask(taskId: string, event: TaskLifecycleEvent): Promise<TaskLifecycleState> {
+  async transitionTask(taskId: string, event: TaskLifecycleEvent, options?: { reason?: string }): Promise<TaskLifecycleState> {
     this.assertOpen();
-    return await this.store.transition(taskId, event, new Date().toISOString());
+    const previous = await this.store.get(taskId);
+    const next = await this.store.transition(taskId, event, new Date().toISOString());
+    if (previous) {
+      await this.appendEventSafe(transitionEventRecord(taskId, previous, next, event, options));
+    }
+    return next;
+  }
+
+  async listEvents(taskId: string): Promise<TaskLifecycleEventRecord[]> {
+    this.assertOpen();
+    return await this.options.events?.list(taskId) ?? [];
+  }
+
+  private async appendEventSafe(record: Omit<TaskLifecycleEventRecord, "sequence">): Promise<void> {
+    if (!this.options.events) return;
+    await this.options.events.append(record);
   }
 
   /**
@@ -130,11 +162,16 @@ export class TaskLifecycleService {
     return { kind: "recovered", state };
   }
 
-  /** Release the SQLite driver when the owning Cordis plugin is torn down. */
+  /** Release the SQLite driver + event log when the owning Cordis plugin
+   *  is torn down. Idempotent. */
   async close(): Promise<void> {
     if (this.closePromise) return this.closePromise;
     this.closed = true;
-    this.closePromise = (this.persistence as { close?: () => Promise<void> }).close?.() ?? Promise.resolve();
+    this.closePromise = (async () => {
+      const persistenceClose = (this.persistence as { close?: () => Promise<void> }).close?.() ?? Promise.resolve();
+      const eventsClose = (this.options.events as { close?: () => Promise<void> } | undefined)?.close?.() ?? Promise.resolve();
+      await Promise.allSettled([persistenceClose, eventsClose]);
+    })();
     return this.closePromise;
   }
 
@@ -150,15 +187,22 @@ export function createTaskLifecycleService(
   return new TaskLifecycleService(createTaskLifecycleStore(persistence), persistence, options);
 }
 
+export interface DefaultTaskLifecycleServiceOptions extends TaskLifecycleServiceOptions {
+  databasePath?: string;
+}
+
 /**
  * Build a TaskLifecycleService over the current user's app-data folder,
  * mirroring the `core-session` SQLite path used by TaskService so the two
- * task stores stay on one database.
+ * task stores stay on one database. The audit event log is opened on the
+ * same database file under its own namespace.
  */
-export function defaultTaskLifecycleService(options: TaskLifecycleServiceOptions = {}): TaskLifecycleService {
-  const dbPath = join(
+export function defaultTaskLifecycleService(options: DefaultTaskLifecycleServiceOptions = {}): TaskLifecycleService {
+  const dbPath = options.databasePath ?? join(
     process.env.OPENBUDDY_DATA_DIR ?? join(homedir(), ".config", "openbuddy"),
     "sessions.db",
   );
-  return createTaskLifecycleService(new SqliteTaskLifecyclePersistence(dbPath), options);
+  const events = options.events ?? new SqliteTaskLifecycleEventLog({ databasePath: dbPath });
+  const persistence = new SqliteTaskLifecyclePersistence(dbPath);
+  return new TaskLifecycleService(createTaskLifecycleStore(persistence), persistence, { ...options, events });
 }

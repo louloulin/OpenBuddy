@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { TaskLifecyclePersistence, TaskLifecycleState } from "@openbuddy/plugin-host";
+import { InMemoryTaskLifecycleEventLog, type TaskLifecycleEventLog } from "../task-lifecycle-events";
 import { TaskLifecycleService, createTaskLifecycleService } from "../task-lifecycle-service";
 
 /** Deterministic in-memory persistence for journey tests. */
@@ -20,6 +21,7 @@ interface Fixture {
   service: TaskLifecycleService;
   persistence: MemoryTaskLifecyclePersistence;
   sessionIds: Set<string>;
+  events: TaskLifecycleEventLog;
 }
 
 const resources: Array<() => Promise<void>> = [];
@@ -28,9 +30,13 @@ afterEach(async () => { for (const close of resources.splice(0)) await close(); 
 
 function makeService(resolver?: (sessionId: string) => Promise<boolean>): Fixture {
   const persistence = new MemoryTaskLifecyclePersistence();
-  const service = createTaskLifecycleService(persistence, resolver ? { sessionExists: resolver } : {});
+  const events = new InMemoryTaskLifecycleEventLog();
+  const service = createTaskLifecycleService(persistence, {
+    sessionExists: resolver,
+    events,
+  });
   resources.push(() => service.close());
-  return { service, persistence, sessionIds: new Set(["session-1"]) };
+  return { service, persistence, sessionIds: new Set(["session-1"]), events };
 }
 
 async function seededService(resolver?: (sessionId: string) => Promise<boolean>) {
@@ -133,5 +139,42 @@ describe("TaskLifecycleService", () => {
     await service.transitionTask("worktask-1", "queue");
     const persisted = await persistence.read("worktask-1");
     expect(persisted).toMatchObject({ status: "queued", generation: 4, sessionId: "session-1" });
+  });
+
+  it("appends a create event and one event per transition with monotonic sequences", async () => {
+    const { service, events } = await seededService();
+    // createTask itself writes the first event.
+    expect(await events.list("worktask-1")).toHaveLength(1);
+    await service.transitionTask("worktask-1", "queue");
+    await service.transitionTask("worktask-1", "start");
+    await service.transitionTask("worktask-1", "complete");
+    const records = await service.listEvents("worktask-1");
+    expect(records.map((r) => `${r.event}:${r.toStatus}`)).toEqual([
+      "create:draft",
+      "queue:queued",
+      "start:running",
+      "complete:completed",
+    ]);
+    expect(records.map((r) => r.sequence)).toEqual([1, 2, 3, 4]);
+    expect(records[2]!.fromStatus).toBe("queued");
+    expect(records[2]!.toStatus).toBe("running");
+    // The listEvents API returns clones, not references to the log.
+    expect(records[0]).not.toBe((await events.list("worktask-1"))[0]);
+  });
+
+  it("rejected transitions do not append events", async () => {
+    const { service, events } = await seededService();
+    const before = (await service.listEvents("worktask-1")).length;
+    await expect(service.transitionTask("worktask-1", "complete")).rejects.toMatchObject({ code: "invalid_task_transition" });
+    expect((await service.listEvents("worktask-1")).length).toBe(before);
+    void events;
+  });
+
+  it("listEvents returns [] when no event log is wired", async () => {
+    const persistence = new MemoryTaskLifecyclePersistence();
+    const service = createTaskLifecycleService(persistence);
+    resources.push(() => service.close());
+    const state = await service.createTask({ sessionId: "session-x" });
+    expect(await service.listEvents(state.taskId)).toEqual([]);
   });
 });
