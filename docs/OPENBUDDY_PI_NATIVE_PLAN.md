@@ -6,6 +6,8 @@
 > 参考实现: [vastsa/PI-Desktop](https://github.com/vastsa/PI-Desktop) (54 文件 / 19,818 LOC agent-runtime)
 > 兄弟文档: [OPENBUDDY-PI-VISION.md](OPENBUDDY-PI-VISION.md) (12 capability 适配矩阵) · [full-pluginization-plan.md](full-pluginization-plan.md) (DeepSeek Harness 五件套借鉴)
 >
+> **当前事实入口（Plan 4 Phase 0）**：本文 v2–v24 章节保留为历史决策和实施记录，其中的 commit、LOC 与完成度不是当前 checkout 的自动事实。当前基线以 [`docs/architecture/PLAN4_PHASE0_BASELINE.md`](architecture/PLAN4_PHASE0_BASELINE.md) 和 §45 为准；可用 `pnpm verify:plan:baseline` 重新生成。
+>
 > **本轮 (v8) 改动概览**：
 > 1. **§0 → §28 全量重新梳理**：把 v6/v7 的路线图重新整理，按 Phase A → L 顺序重排
 > 2. **§11.5 (本轮新增)**：v8 三期任务清单 + 当前进度对照（基于 commit `6856ad6` 实际状态）
@@ -4004,3 +4006,53 @@ P2.2 + P2.3 + P2.5 ────────────────────�
 - P0 任务优先于新 capability；没有生命周期、错误、持久化和权限闭环，不扩展插件数量。
 
 **v24 文档 owner**：编程助手-devbox1 · 本节对应 LUM-580 当前代码审计与后续并行实施总计划
+
+## 45. v25 — Plan 4 Phase 0 当前 checkout 快照（LUM-649）
+
+> 本节是当前 checkout 的事实快照，不是新的业务实现。测量基于 `37aa15e3b6f3b025fd486f8b4714cdffd38173a3`（`origin/main`，2026-09-10），生成报告为 [`docs/architecture/PLAN4_PHASE0_BASELINE.md`](architecture/PLAN4_PHASE0_BASELINE.md)。后续结构变更后应重新运行 `pnpm verify:plan:baseline`，不要手工复制 LOC 或完成度。
+
+### 45.1 可复现源代码事实
+
+| Measurement | Current value |
+|---|---:|
+| Tracked files | 2366 |
+| Package version | 0.14.0 |
+| `electron/main/agent/agent-host.ts` | 1518 LOC |
+| `electron/main/agent/pi-extensions.ts` | 1222 LOC |
+| `electron/main/agent/host-modules/bootstrap/install-host-modules.ts` | 380 LOC |
+| `packages/runtime/openbuddy-plugin-host/src/index.ts` | 1394 LOC |
+| `packages/capability/openbuddy-email/src/index.ts` | 3316 LOC |
+
+辅助测量：`electron/main/ipc/agent.ts` 为 141 LOC 的 registrar；host-modules 下有 174 个 tracked TypeScript 文件；`deepseek-runtime.ts` 为 3827 LOC；`openbuddy-plugin-manifest.ts` 为 352 LOC。这些数字用于定位后续工作，不单独构成“已完成”或“性能达标”的声明。
+
+### 45.2 当前契约与 ownership 证据
+
+| Contract / owner | Current evidence | Target boundary |
+|---|---|---|
+| PI session、model、extension runtime | `electron/main/agent/` 中的 Pi runtime/factory/session 模块 | 不复制 Pi agent loop、session tree 或 provider runtime |
+| Plugin manifest / surface serialization | `packages/runtime/openbuddy-plugin-sdk/` 与 `packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts`；schema 为 `openbuddy.plugin.v1` | SDK 继续保持 manifest/serialization 薄层；各 surface 的生命周期仍由 PI、Cordis、Slot 各自负责 |
+| Plugin lifecycle、readiness、generation | `plugin-registry.ts`、`plugin-lifecycle.ts`、`generation-gate.ts`、`readiness.ts`、`plugin-lifecycle.test.ts` | 补齐跨 surface transaction 的失败/rollback/disable 证据，不把 manifest 序列化误报成 hot unload |
+| Capability ownership | `packages/runtime/openbuddy-plugin-host/src/capability-ownership.ts` 为单一 ownership 表，`pnpm verify:plan` 检查重复来源 | 新 capability 必须先声明唯一 owner；adapter 不能启动第二套 backend |
+| Event envelope / ordering | `plugin-event-bus.ts`、`handle-session-event.ts` 与 `rpc-contract.ts` 已包含 version、generation、sequence 或稳定 error code 边界 | 后续统一跨 IPC/HTTP/WS 的 wire 文档与 error taxonomy；本轮不新增第二套事件协议 |
+| Host-module composition | `install-host-modules.ts` 已按 profile/session/plugin/runtime 分域；`install-host-modules-deps.ts` 负责 composition-root 转换 | Phase 1.1 仍需移除剩余边界类型逃逸并补齐 grouped-deps contract tests |
+
+### 45.3 本轮验证记录
+
+| Command | Result |
+|---|---|
+| `pnpm verify:plan` | ✅ 2/2 architecture gates passed |
+| `pnpm typecheck` | ✅ 2 tasks completed, 0 errors |
+| `pnpm storage:boundaries` | ✅ `ok: true`; 420 files scanned; 0 violations |
+| `pnpm storage:acceptance` | ✅ `ok: true`; all 7 listed checks passed |
+| `pnpm verify:plan:baseline` | ✅ regenerated the reproducible report above |
+| `git diff --check` | ✅ no whitespace errors |
+
+### 45.4 Scope boundary and follow-up
+
+本轮只刷新 Phase 0 的事实基线和 Current/Target 说明，不修改 Electron、PI、Cordis、renderer 或 capability 运行时代码，也不把历史章节中的旧数字批量改写。Email H.1、marketplace、workspace sharing、progress UX 等产品闭环仍是后续目标；Phase 1.1 的 grouped-deps 类型收紧和 Phase 2.1 的 Pi fixture/reload/stale-context 验证也未在本轮宣称完成。
+
+下一步应在独立实现任务中先完成 Phase 1.1 的 contract/test 收紧，再做 Phase 2.1 fixture 与 reload 验证；每一步继续以本报告生成器、architecture gates、typecheck 和对应测试作为退出证据。
+
+**v25 文档 owner**：LUM-649 · Phase 0 baseline refresh；历史路线图 owner 与实现 owner 仍按各章节标注
+
+---

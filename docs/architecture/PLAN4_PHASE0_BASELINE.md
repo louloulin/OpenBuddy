@@ -1,22 +1,22 @@
 # Plan 4 Phase 0 baseline
 
-Generated from checkout b91afbdc6000c75ea5b5db8efee7a1ef01638030 on 2026-09-09T23:27:27.771Z.
+Generated from checkout 37aa15e3b6f3b025fd486f8b4714cdffd38173a3 on 2026-09-10T04:09:26.557Z.
 
 ## Reproducible facts
 
 | Measurement | Value |
 |---|---|
-| Tracked files | 2353 |
+| Tracked files | 2366 |
 | Package version | 0.14.0 |
 
 ## Key source line counts
 
 | File | Lines |
 |---|---:|
-| `electron/main/agent/agent-host.ts` | 1510 |
+| `electron/main/agent/agent-host.ts` | 1518 |
 | `electron/main/agent/pi-extensions.ts` | 1222 |
 | `electron/main/agent/host-modules/bootstrap/install-host-modules.ts` | 380 |
-| `packages/runtime/openbuddy-plugin-host/src/index.ts` | 1365 |
+| `packages/runtime/openbuddy-plugin-host/src/index.ts` | 1394 |
 | `packages/capability/openbuddy-email/src/index.ts` | 3316 |
 
 ## Verification commands
