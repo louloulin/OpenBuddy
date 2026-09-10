@@ -131,6 +131,7 @@ export type AgentHostPendingUiRequest = {
   sessionId: string;
   generation?: number;
   resolve: (value: AgentHostUiRequestValue) => void;
+  timeout?: ReturnType<typeof setTimeout>;
   permission?: HookPermissionRequest;
 };
 

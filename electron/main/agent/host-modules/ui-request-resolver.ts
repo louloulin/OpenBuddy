@@ -78,6 +78,7 @@ export function resolveUiRequest(requestId: string, value: AgentHostUiRequestVal
     return false;
   }
   state.pendingUiRequests.delete(requestId);
+  if (request.timeout) clearTimeout(request.timeout);
   if (request.kind === "permission" && request.permission) {
     const decision = value && typeof value === "object" && "decision" in value
       ? (value as any).decision

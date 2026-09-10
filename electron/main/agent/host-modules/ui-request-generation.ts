@@ -19,6 +19,7 @@ export function cancelStaleUiRequests(
   for (const [requestId, request] of state.pendingUiRequests) {
     if (request.generation === undefined || request.generation === generation) continue;
     state.pendingUiRequests.delete(requestId);
+    if (request.timeout) clearTimeout(request.timeout);
     request.resolve(undefined);
     emitPluginEvent("pi/ui-request-cancelled", {
       requestId,

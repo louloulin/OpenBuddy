@@ -190,7 +190,10 @@ export async function disposeInternal(): Promise<void> {
   state.deepSeekAgents.clear();
   state.continuableSubagents.clear();
   state.hookPermissionSessionRules.clear();
-  for (const request of state.pendingUiRequests.values()) request.resolve(undefined);
+  for (const request of state.pendingUiRequests.values()) {
+    if (request.timeout) clearTimeout(request.timeout);
+    request.resolve(undefined);
+  }
   state.pendingUiRequests.clear();
   state.extensionEditorText.clear();
   state.extensionToolsExpanded.clear();
