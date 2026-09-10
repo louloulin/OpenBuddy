@@ -359,22 +359,27 @@ Pi 官方 `AgentSession`/Extensions 事件包含 session、agent、turn、messag
 - **已实现**：Phase 1 的 generation-fenced event replay：reload 后 `PiSessionEventBridge.snapshot()` 仅返回当前 generation 事件，避免 stale session/plugin events 回放到 renderer；新增/更新测试覆盖。
 - **已实现**：Phase 1 的 Pi RPC/UI 生命周期事件 canonicalization：`extension_error`、`ui_prompt_start`、`ui_prompt_end` 统一映射并有定向测试。
 - **已实现**：Phase 1 的 Pi→Main 事件背压切片：复用 `@openbuddy/plugin-host` 的 `BoundedEventQueue`，对 `tool_execution_update` 进度事件按 session/kind 合并，snapshot 时刷新；lifecycle/final/error 等事件仍直接进入 ring buffer。
-- **本轮完成**：context/compaction usage 产品化切片：`ContextUsagePill` 继续以 `agent:session-info`/`agent:session-usage` 作为权威快照，并订阅 Pi observability 的 `pi/context`、`pi/context-status`、`pi/context-compacted`、`pi/context-compaction-requested` 事件触发刷新；卸载时安全取消订阅，bridge/reload 失败时保留上一次快照而不伪造 usage。
-- **验证完成**：Pi context/compaction extension tests、profile/reload regression、typecheck/build 均通过。
-- **仍未开始**：E4 benchmark、Electron smoke、真实 provider 网络调用。
+- **本轮完成**：ContextUsagePill 组件级验收门禁：新增真实 React/jsdom 测试，覆盖 Pi context/compaction 四类事件刷新、卸载时 listener 清理、agent reload 期间 refresh 失败保留最后快照，以及 sessionId reload 后清空旧快照并加载新快照。
+- **验证完成**：组件测试 3/3、Pi extension tests 39/39、session lifecycle/metadata recovery tests 5/5；streaming、IPC、main chunk/memory benchmark 已运行并写入 `evidence/perf/`。
+- **桌面门禁阻塞**：IPC surface/stream-port smoke 无法启动 Electron：环境缺少可用 `$DISPLAY`/X server，且当前 Electron loader 报 `Identifier '__filename' has already been declared`；real-ui smoke 按安全策略拒绝运行，要求 `OPENBUDDY_E2E_REQUIRED=1` 和临时 provider credentials。本轮未使用真实凭据。
 
 
 ### 12.4 总体进度
 
-进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 8 个切片（前 7 项、以及 context/compaction usage 产品化与 reload-safe UI 刷新），因此当前**实现进度约 44%（8/18）**。该百分比仅表示代码/验证垂直切片完成度，不代表产品发布完成度；E4 benchmark、Electron smoke 与真实 provider 网络调用仍未完成。
+进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 9 个切片（前 8 项、以及 ContextUsagePill 组件级事件/reload/失败恢复门禁），因此当前**实现进度约 50%（9/18）**。该百分比仅表示代码/验证垂直切片完成度，不代表产品发布完成度；Electron smoke、真实 provider 网络调用和跨平台发布门禁仍未完成。
 
-### 12.11 本轮增量：Pi context/compaction usage 产品化
+### 12.12 本轮增量：ContextUsagePill 组件级验收门禁与 E4 基线
 
-本轮复用 Pi 官方 session context/compaction 事件和既有 WorkBuddy UI bridge：`ContextUsagePill` 继续从 `agent:session-info`/`agent:session-usage` 获取权威 usage/context 快照，并订阅 `openbuddy://plugin-event` 上的 `pi/context`、`pi/context-status`、`pi/context-compacted`、`pi/context-compaction-requested` 事件，在 Pi 上下文变化、压缩完成或压缩请求时刷新 pill。事件只作为刷新信号，不把事件 payload 当作伪造 provider 结果；快照失败时保留当前显示，首次不可用则隐藏。
+新增 `packages/ui/openbuddy-ui-conversation/src/__tests__/ContextUsagePill.test.tsx`，在真实 React/jsdom 测试环境中 mock 现有 Pi client bridge，仅提供本地 context 快照 fixture，不调用 provider 或使用凭据。覆盖：
 
-reload/失败恢复：订阅 effect 在 session 变化和组件卸载时清理旧 listener；bridge 不可用或 refresh 失败只进入 best-effort catch，不破坏既有 snapshot，也不会写入凭据或调用 provider。
+- `pi/context`、`pi/context-status`、`pi/context-compacted`、`pi/context-compaction-requested` 事件均触发权威 `agent:session-info` 重新读取；
+- unmount 后取消 `agentOnPluginEvent` listener，late event 不再触发 IPC；
+- agent reload/refresh rejection 时保留最后有效 pill 快照；
+- sessionId reload 时清除旧快照并显示新 session 的真实读取结果。
 
-验证：`pnpm exec vitest run electron/main/agent/pi-extensions.test.ts packages/runtime/openbuddy-plugin-host/src/profile.test.ts --reporter=dot`：2 files、69/69 通过；`pnpm typecheck`：通过；`pnpm build`：通过，仅既有 Node externalization/ineffective dynamic import warnings；`git diff --check`：通过。Electron smoke/E4 本轮未运行，原因是未启动完整桌面运行环境；复现命令为 `cd OpenBuddy && pnpm build`（构建已通过），Electron smoke 需项目既有桌面 smoke runner。
+验证证据：`pnpm exec vitest run packages/ui/openbuddy-ui-conversation/src/__tests__/ContextUsagePill.test.tsx electron/main/agent/pi-extensions.test.ts --reporter=dot`：2 files、42/42 通过；`pnpm exec vitest run electron/main/__tests__/session-lifecycle-pi.test.ts electron/main/__tests__/session-metadata-pi.test.ts --reporter=dot`：2 files、5/5 通过；`pnpm perf:streaming`：完成 streaming/token/memory 基线并写入 `evidence/perf/streaming-bench-2026-09-10T02-06-22-479Z.json`；`pnpm perf:ipc`：完成 5000 samples IPC validation baseline 并写入 `evidence/perf/ipc-latency-1789005981850.json`；`pnpm perf:main-chunks`：完成 bundle chunk baseline；`pnpm typecheck`：通过。
+
+Electron smoke 尝试及结果：`pnpm test:electron:ipc-surface` 无法启动 Playwright Electron；`pnpm test:electron:stream-port` 启动失败，记录 `Identifier '__filename' has already been declared`，同时环境无 `$DISPLAY`/X server；`pnpm test:electron:real-ui` 按脚本安全门禁退出，要求 `OPENBUDDY_E2E_REQUIRED=1` 与临时 provider credentials。本轮不绕过门禁、不调用真实 provider。复现命令即上述三条；在具备桌面 display、修复 Electron loader 冲突并提供临时测试凭据后再执行。
 
 
 
