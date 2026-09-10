@@ -164,11 +164,27 @@ describe("renderer-plugin-runtime", () => {
     expect(seen).toEqual([{ type: "agent/prompt", payload: { text: "hi" } }]);
   });
 
-  it("starts and tears down the main → renderer event bridge", async () => {
-    const stop = await startRendererPluginEventBridge();
-    expect(typeof stop).toBe("function");
+  it("surfaces pi reload failures and recovers on the next reload event", async () => {
+    const mod = await import("../runtime/renderer-plugin-runtime");
+    const runtime = mod.getRendererPluginRuntime();
+    const seen: unknown[] = [];
+    runtime.events.on("renderer/pi-reload-failed", (payload) => seen.push(payload));
+    const stop = await mod.startRendererPluginEventBridge();
+    await vi.waitFor(() => expect(mocks.onPluginEvent).toBeTypeOf("function"));
+
+    mocks.onPluginEvent?.({
+      type: "pi/reload-failed",
+      sequence: 41,
+      payload: { reason: "profile", error: "fixture reload failed", generation: 3, diagnostic: "reload-failed" },
+    });
+    expect(seen).toEqual([{ reason: "profile", error: "fixture reload failed", generation: 3 }]);
+
+    mocks.onPluginEvent?.({ type: "profile/reloaded", sequence: 42, payload: { generation: 4 } });
+    await vi.waitFor(() => expect(mocks.invoke).toHaveBeenCalled());
+    expect(seen).toHaveLength(1);
     stop();
   });
+
 
   it("subscribes before replay and drops only already-replayed sequences", async () => {
     const mod = await import("../runtime/renderer-plugin-runtime");

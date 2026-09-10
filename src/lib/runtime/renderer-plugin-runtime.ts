@@ -845,6 +845,16 @@ export async function startRendererPluginEventBridge(): Promise<() => void> {
 
   const deliverLive = (event: OpenBuddyPluginEvent): void => {
     runtime.events.emit(event.type, event.payload);
+    if (event.type === "pi/reload-failed") {
+      const payload = event.payload && typeof event.payload === "object" ? event.payload as Record<string, unknown> : {};
+      const diagnostic = {
+        reason: typeof payload.reason === "string" ? payload.reason : "pi-reload",
+        error: typeof payload.error === "string" ? payload.error : "unknown reload failure",
+        generation: typeof payload.generation === "number" ? payload.generation : undefined,
+      };
+      recordRendererDiagnostic("pi-reload-failed", diagnostic);
+      runtime.events.emit("renderer/pi-reload-failed", diagnostic);
+    }
 		if (event.type === "profile/reloaded" || event.type === "pi/extensions-reloaded" || event.type === "typert/registry-changed") {
 			void runtime.reloadDiscoveredProfile().catch((error) => {
 				recordRendererDiagnostic("profile-reload-failed", { event: event.type, error: String(error) });
