@@ -193,3 +193,51 @@ describe("PiSessionRuntime (Phase B.2 — bindCore integration)", () => {
     warn.mockRestore();
   });
 });
+
+describe("PiSessionRuntime (Phase 5 — reload listener leak gate)", () => {
+  it("20 sequential session replacements keep the active subscription set at exactly one handler", async () => {
+    // Pre-build 21 sessions so create + 20 replaces is fully covered.
+    const sessions = Array.from({ length: 21 }, (_, i) => createFakeSession(`session-${i}`));
+    const runtime = new PiSessionRuntime({ factory: factory(sessions) });
+    await runtime.create({});
+
+    // Track every event the *active* subscriber actually receives.
+    const received: string[] = [];
+    runtime.subscribe((event, session) => received.push(`${session.sessionId}:${event.type}`));
+
+    // Establish the baseline: the session created above is live.
+    (runtime.session as FakeSession).emit({ type: "agent_start" } as AgentSessionEvent);
+
+    for (let i = 0; i < 20; i += 1) {
+      await runtime.replace({});
+      const live = runtime.session as FakeSession;
+      live.emit({ type: "agent_start" } as AgentSessionEvent);
+    }
+
+    // 21 distinct agent_start events — one per session, none duplicated.
+    expect(received).toHaveLength(21);
+    expect(new Set(received).size).toBe(21);
+
+    // Every replaced session must have been disposed exactly once (no orphan
+    // sessions left holding their subscription set alive).
+    for (const session of sessions) {
+      expect(session.disposeCalls).toBe(1);
+      expect(session.abortCalls).toBe(1);
+    }
+
+    await runtime.dispose({ abort: false });
+  });
+
+  it("unsubscribe before replacement leaves the new session with zero subscribers", async () => {
+    const sessions = [createFakeSession("first"), createFakeSession("second")];
+    const runtime = new PiSessionRuntime({ factory: factory(sessions) });
+    await runtime.create({});
+    const received: string[] = [];
+    const unsubscribe = runtime.subscribe((event, session) => received.push(session.sessionId));
+    unsubscribe();
+    await runtime.replace({});
+    const live = runtime.session as FakeSession;
+    live.emit({ type: "agent_start" } as AgentSessionEvent);
+    expect(received).toEqual([]);
+  });
+});

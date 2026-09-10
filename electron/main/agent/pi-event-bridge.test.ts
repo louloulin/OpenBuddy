@@ -114,4 +114,18 @@ describe("PiSessionEventBridge plugin/extension event indexing (phase 4)", () =>
     const after = bridge.snapshot({ sinceSequence: 2, limit: 2 });
     expect(after.map((e) => e.sequence)).toEqual([4, 5]);
   });
+
+  it("stamps every appended session event with a unique UUID eventId (plan3.0.md Phase 1)", () => {
+    const bridge = new PiSessionEventBridge();
+    bridge.appendFromSession({ type: "session/start", sessionId: "s1" });
+    bridge.appendFromSession({ type: "session/start", sessionId: "s1" });
+    bridge.appendFromSession({ type: "session/start", sessionId: "s2" });
+    const snapshot = bridge.snapshot();
+    const ids = snapshot.map((entry) => entry.eventId);
+    expect(ids).toHaveLength(3);
+    for (const id of ids) {
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    }
+    expect(new Set(ids).size).toBe(3);
+  });
 });

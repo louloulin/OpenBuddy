@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createMainLogger, withContext, type MainLogger } from "@openbuddy/logging-main";
 import { type LogContext } from "@openbuddy/logging-shared";
 import { BoundedEventQueue, boundEventPayload, type BoundedEvent, type EventDeliveryClass } from "@openbuddy/plugin-host";
@@ -10,6 +11,14 @@ export type PiEventErrorHandler = (event: string, error: unknown) => void;
 
 export interface SessionEventRecord {
   eventVersion?: 1;
+  /**
+   * Stable per-record identifier aligned with `plan3.0.md` canonical
+   * `OpenBuddyEventEnvelope.eventId`. Generated once when the record is
+   * appended so renderer-side dedup / replay detection can rely on a UUID.
+   * Older records may omit the field; the bridge tolerates the absence
+   * but every record appended after this commit will carry one.
+   */
+  eventId?: string;
   /** Plugin/session generation; stale generations are never replayed. */
   generation?: number;
   sequence: number;
@@ -143,6 +152,7 @@ export class PiSessionEventBridge {
     const sessionId = typeof safeEvent.sessionId === "string" ? safeEvent.sessionId : undefined;
     const record: SessionEventRecord = {
       eventVersion: 1,
+      eventId: randomUUID(),
       generation: this.currentGeneration,
       sequence,
       timestamp: new Date().toISOString(),
