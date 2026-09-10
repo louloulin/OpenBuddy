@@ -25,6 +25,11 @@ describe("task lifecycle", () => {
     const recovered = await store.recover("task-1", 2);
     expect(recovered?.composerEnvelope?.envelopeId).toBe("env-1");
     expect(recovered?.approval).toMatchObject({ approvalId: "approval-1", status: "pending" });
+    await store.appendArtifact("task-1", { artifactId: "artifact-1", kind: "document", title: "result", digest: "sha256:result" });
+    await store.appendCitation("task-1", { citationId: "citation-1", artifactId: "artifact-1", locator: "page:1", confidence: 0.9 });
+    const projected = await store.get("task-1");
+    expect(projected?.artifacts).toEqual([expect.objectContaining({ artifactId: "artifact-1" })]);
+    expect(projected?.citations).toEqual([expect.objectContaining({ citationId: "citation-1", artifactId: "artifact-1" })]);
   });
   it("persists transitions and fences recovery by generation", async () => {
     const persisted = new Map<string, TaskLifecycleState>();

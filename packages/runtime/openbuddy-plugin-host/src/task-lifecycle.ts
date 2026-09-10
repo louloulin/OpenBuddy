@@ -5,6 +5,20 @@ export const taskStatuses = [
 
 export type TaskStatus = (typeof taskStatuses)[number];
 
+export interface TaskArtifact {
+  artifactId: string;
+  kind: string;
+  title: string;
+  uri?: string;
+  digest: string;
+}
+
+export interface TaskCitation {
+  citationId: string;
+  artifactId: string;
+  locator?: string;
+  confidence?: number;
+}
 export interface TaskApprovalState {
   approvalId: string;
   status: "pending" | "approved" | "rejected";
@@ -20,6 +34,8 @@ export interface TaskLifecycleState {
   updatedAt: string;
   composerEnvelope?: ComposerEnvelope;
   approval?: TaskApprovalState;
+  artifacts?: readonly TaskArtifact[];
+  citations?: readonly TaskCitation[];
 }
 
 export type TaskLifecycleEvent =
@@ -72,6 +88,8 @@ export interface TaskLifecycleStore {
   get(taskId: string): Promise<TaskLifecycleState | null>;
   transition(taskId: string, event: TaskLifecycleEvent, updatedAt: string): Promise<TaskLifecycleState>;
   recover(taskId: string, currentGeneration: number): Promise<TaskLifecycleState | null>;
+  appendArtifact(taskId: string, artifact: TaskArtifact): Promise<TaskLifecycleState>;
+  appendCitation(taskId: string, citation: TaskCitation): Promise<TaskLifecycleState>;
 }
 
 /**
@@ -102,6 +120,8 @@ export function createTaskLifecycleStore(persistence: TaskLifecyclePersistence):
         ...state,
         ...(state.composerEnvelope ? { composerEnvelope: { ...state.composerEnvelope, attachments: [...state.composerEnvelope.attachments], references: [...state.composerEnvelope.references] } } : {}),
         ...(state.approval ? { approval: { ...state.approval } } : {}),
+        ...(state.artifacts ? { artifacts: [...state.artifacts] } : {}),
+        ...(state.citations ? { citations: [...state.citations] } : {}),
       } : null;
     },
     transition(taskId, event, updatedAt) {
@@ -117,6 +137,25 @@ export function createTaskLifecycleStore(persistence: TaskLifecyclePersistence):
       const state = await persistence.read(taskId);
       if (!state || !canRecoverTask(state, currentGeneration)) return null;
       return { ...state };
+    },
+    appendArtifact(taskId, artifact) {
+      return enqueue(async () => {
+        const current = await persistence.read(taskId);
+        if (!current) throw new Error(`task ${taskId} does not exist`);
+        const next = { ...current, artifacts: [...(current.artifacts ?? []), { ...artifact }], updatedAt: new Date().toISOString() };
+        await persistence.write(next);
+        return next;
+      });
+    },
+    appendCitation(taskId, citation) {
+      return enqueue(async () => {
+        const current = await persistence.read(taskId);
+        if (!current) throw new Error(`task ${taskId} does not exist`);
+        if (!(current.artifacts ?? []).some((artifact) => artifact.artifactId === citation.artifactId)) throw new Error(`artifact ${citation.artifactId} does not exist`);
+        const next = { ...current, citations: [...(current.citations ?? []), { ...citation }], updatedAt: new Date().toISOString() };
+        await persistence.write(next);
+        return next;
+      });
     },
   };
 }
