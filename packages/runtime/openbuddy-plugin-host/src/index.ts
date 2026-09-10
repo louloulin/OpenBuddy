@@ -69,6 +69,13 @@ export {
 } from "./hooks";
 
 export {
+  createComposerEnvelope,
+  type ComposerEnvelope,
+  type ComposerEnvelopeInput,
+  type ComposerAttachment,
+  type ComposerReference,
+} from "./composer-envelope";
+export {
   canRecoverTask,
   createTaskLifecycleStore,
   isTaskTerminal,
