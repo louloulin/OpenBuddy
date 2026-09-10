@@ -1072,7 +1072,7 @@ async function requestHookPermission(title: string, message: string, request?: H
 
 
 const installMicrokernelDepsClosures = {
-  piHome, isPathWithin, piSessionDir, toModuleUrl, emitPluginEvent, emitRendererEvent,
+  state, piHome, isPathWithin, piSessionDir, toModuleUrl, emitPluginEvent, emitRendererEvent,
   listAllPiSessions, persistedSessionPath, enqueueLifecycle, lifecycleAppendQueues,
   initialize, rebindSession, dispose: dispose(enqueueLifecycle), piRuntimeCoordinator, piSessionRuntime,
   publicQueueItems, workspaceRegistry, readModelsConfig: readModelsConfigImpl,
