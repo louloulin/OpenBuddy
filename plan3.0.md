@@ -229,6 +229,8 @@ interface OpenBuddyEventEnvelope<T> {
 
 **状态：✅ 部分 Verified（eventId 对齐完成；见 §11）**
 
+回归测试：`pi-event-bridge.test.ts` 已验证 eventId 生成、唯一性和 snapshot 保留（9/9）。
+
 1. `agent-host.ts` 只保留 composition root/facade；按域拆 `InstallHostModuleDeps`。
 2. `pi-extensions.ts` 拆 builtin registry、compatibility adapter、provider attribution、resource projection。
 3. ✅ 已 Verified：统一 Pi session event 到 canonical projection（SessionEventRecord.eventId 对齐 plan OpenBuddyEventEnvelope；randomUUID 生成；generation fence 已实现）。
@@ -348,6 +350,7 @@ interface OpenBuddyEventEnvelope<T> {
 | eventId 字段缺失           | ✅ 已修复：`SessionEventRecord.eventId?: string` + `randomUUID()`                                                        | `electron/main/agent/pi-event-bridge.ts:10-12` |
 | emit 返回类型 pre-existing | ✅ 已修复：`emit(): void`（替代 `unknown`）                                                                              | `electron/main/agent/pi-event-bridge.ts:7`     |
 | typecheck                  | ✅ `tsc --noEmit -p tsconfig.json` 0 errors                                                                              | 直接 tsc                                       |
+| event bridge regression   | ✅ 9/9；覆盖 eventId UUID 格式、唯一性和 snapshot 保留                     | `electron/main/agent/pi-event-bridge.test.ts` |
 | vitest Pi events + session | ✅ 82/82（pi-extensions 39 + pi-session-runtime 12 + plugin-event-bus 19 + observability 5 + lifecycle 4 + forwarded 3） | `vitest run --reporter=dot`                    |
 | streaming benchmark        | ✅ delta-reducer 17.2µs/iter，frame headroom 15.29ms                                                                     | `scripts/perf/streaming-bench.mjs`             |
 | ipc-latency benchmark      | ✅ session.list p95=0.988ms，plugin.snapshot p95=1.102ms                                                                 | `scripts/perf/ipc-latency.mjs`                 |

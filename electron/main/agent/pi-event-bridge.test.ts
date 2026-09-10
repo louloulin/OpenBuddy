@@ -88,6 +88,8 @@ describe("PiSessionEventBridge plugin/extension event indexing (phase 4)", () =>
     const s1 = bridge.snapshot({ sessionId: "s1" });
     expect(s1).toHaveLength(1);
     expect(s1[0]!.sessionId).toBe("s1");
+    expect(s1[0]!.eventId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(s1[0]!.eventId).not.toBe(bridge.snapshot({ sessionId: "s2" })[0]!.eventId);
     expect(bridge.snapshot()).toHaveLength(2);
   });
 
