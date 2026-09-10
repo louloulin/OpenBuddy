@@ -32,6 +32,8 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
+import { createGenerationGate } from "@openbuddy/plugin-host";
+import { cancelStaleUiRequests } from "./host-modules/ui-request-generation";
 import { createPiPlanModeExtension } from "./pi-plan-mode";
 import { formatBranchSummaryText as formatBranchSummaryTextExport } from "./branch-summary-format";
 import { Context } from "@openbuddy/cordis";
@@ -73,7 +75,6 @@ import {
   type PluginReadinessPhase,
   type PluginReadinessSnapshot,
   createPluginReadinessSnapshot,
-  createGenerationGate,
   createPluginSnapshot,
   type PluginSnapshot,
   updateUnifiedPluginManifest,
@@ -285,20 +286,7 @@ const piRuntimeCoordinator = new PiRuntimeCoordinator({
   onReload: (generation, reason) => {
     const previousGeneration = state.piGeneration;
     state.piGeneration = generation;
-    for (const [requestId, request] of state.pendingUiRequests) {
-      if (request.generation !== undefined && request.generation !== generation) {
-        state.pendingUiRequests.delete(requestId);
-        request.resolve(undefined);
-        emitPluginEvent("pi/ui-request-cancelled", {
-          requestId,
-          sessionId: request.sessionId,
-          previousGeneration,
-          generation,
-          reason: reason ?? "pi-reload",
-          diagnostic: "stale-generation",
-        });
-      }
-    }
+    cancelStaleUiRequests(state, generation, emitPluginEvent, previousGeneration, reason ?? "pi-reload");
   },
 });
 
