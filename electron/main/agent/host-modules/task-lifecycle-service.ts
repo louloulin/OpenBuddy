@@ -117,6 +117,23 @@ export class TaskLifecycleService {
     return await this.store.get(taskId);
   }
 
+  /**
+   * Return every persisted task, optionally filtered by status. The default
+   * is to include only non-terminal states so cold-start and exit-safety
+   * checks can surface actionable work without having to walk completed
+   * history. Pass `{ includeTerminal: true }` to include completed/cancelled.
+   */
+  async listTasks(options: { statuses?: readonly TaskStatus[]; includeTerminal?: boolean } = {}): Promise<TaskLifecycleState[]> {
+    this.assertOpen();
+    const all = await this.store.list();
+    const statusesFilter = options.statuses ? new Set<TaskStatus>(options.statuses) : undefined;
+    return all.filter((state) => {
+      if (statusesFilter && !statusesFilter.has(state.status)) return false;
+      if (!statusesFilter && !options.includeTerminal && isTaskTerminal(state.status)) return false;
+      return true;
+    });
+  }
+
   async transitionTask(taskId: string, event: TaskLifecycleEvent, options?: { reason?: string }): Promise<TaskLifecycleState> {
     this.assertOpen();
     const previous = await this.store.get(taskId);
@@ -228,6 +245,10 @@ export function registerTaskLifecycleService(instance: TaskLifecycleService): vo
 
 export function clearTaskLifecycleService(instance: TaskLifecycleService): void {
   if (activeInstance === instance) activeInstance = undefined;
+}
+
+export function isTaskLifecycleServiceMounted(): boolean {
+  return activeInstance !== undefined;
 }
 
 export function getTaskLifecycleService(): TaskLifecycleService {

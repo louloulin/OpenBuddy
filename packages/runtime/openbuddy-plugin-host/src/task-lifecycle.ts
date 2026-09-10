@@ -56,11 +56,18 @@ export function canRecoverTask(state: Pick<TaskLifecycleState, "status" | "gener
 export interface TaskLifecyclePersistence {
   read(taskId: string): Promise<TaskLifecycleState | null>;
   write(state: TaskLifecycleState): Promise<void>;
+  /**
+   * Return every persisted lifecycle state. Implementations should filter
+   * out malformed rows rather than corrupt the whole listing; entries are
+   * returned as deep-cloned objects so callers may mutate freely.
+   */
+  list(): Promise<TaskLifecycleState[]>;
 }
 
 export interface TaskLifecycleStore {
   create(state: TaskLifecycleState): Promise<TaskLifecycleState>;
   get(taskId: string): Promise<TaskLifecycleState | null>;
+  list(): Promise<TaskLifecycleState[]>;
   transition(taskId: string, event: TaskLifecycleEvent, updatedAt: string): Promise<TaskLifecycleState>;
   recover(taskId: string, currentGeneration: number): Promise<TaskLifecycleState | null>;
 }
@@ -90,6 +97,10 @@ export function createTaskLifecycleStore(persistence: TaskLifecyclePersistence):
     async get(taskId) {
       const state = await persistence.read(taskId);
       return state ? { ...state } : null;
+    },
+    async list() {
+      const states = await persistence.list();
+      return states.map((state) => ({ ...state }));
     },
     transition(taskId, event, updatedAt) {
       return enqueue(async () => {

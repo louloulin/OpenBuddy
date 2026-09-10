@@ -1,7 +1,7 @@
 # OpenBuddy Pi-Native WorkBuddy 全量分析与改造计划 3.0
 
-> 版本：3.4 — 2026-09-10 实现轮
-> 本轮实现：pi-event-bridge.ts eventId 对齐 + evidence/pi-capability-inventory.json 生成 + Phase 2.1 task lifecycle service 落地 + task lifecycle event audit log + Phase 2.1 worktask IPC 暴露
+> 版本：3.5 — 2026-09-10 实现轮
+> 本轮实现：pi-event-bridge.ts eventId 对齐 + evidence/pi-capability-inventory.json 生成 + Phase 2.1 task lifecycle service 落地 + task lifecycle event audit log + Phase 2.1 worktask IPC 暴露 + Phase 2.1 exit safety
 > 基线：`louloulin/OpenBuddy` checkout `1159a9c`（2026-09-10）+ 本轮修改
 > 目标：把 OpenBuddy 收敛为“Pi Agent Kernel + OpenBuddy Workbench Product + Cordis Domain Services + Electron Security Boundary”的可恢复、可治理、可扩展 WorkBuddy。
 > 状态口径：`Current` 是当前代码可定位事实；`Target` 是计划；`Verified` 只代表本轮实际运行过的证据。历史文档中的“已完成”若无法在当前 checkout 复现，不升级为 Verified。
@@ -251,11 +251,13 @@ interface OpenBuddyEventEnvelope<T> {
 
 - ✅ 已 Verified：`TaskLifecycleService`（`electron/main/agent/host-modules/task-lifecycle-service.ts`）以 `createTaskLifecycleStore` + `SqliteTaskLifecyclePersistence` 为边界，作为唯一 workbench task 状态 owner 挂载为 Cordis `taskLifecycle` service（`electron/main/agent/openbuddy-core-plugin.ts`），teardown 关闭、幂等、closed 后拒绝读写。
 - ✅ 已 Verified：append-only event log（`electron/main/agent/host-modules/task-lifecycle-events.ts`）：create + 每次 transition 自动记录 `{ sequence, fromStatus, toStatus, event, timestamp, generation }`，独立 namespace，与 state 解耦；service 暴露 `listEvents(taskId)`，非法 transition 不写事件。
-- ✅ 已 Verified：Phase 2.1 IPC 暴露（`electron/main/ipc/worktask.ts`）：5 个通道覆盖 create/transition/get/recover/events；模块级 registry 让 IPC 与 Cordis 解耦；preload allowlist 已加入；非法输入/未挂载/服务抛错均明确处理。
+- ✅ 已 Verified：Phase 2.1 IPC 暴露（`electron/main/ipc/worktask.ts`）：6 个通道覆盖 create/transition/get/recover/events/list；模块级 registry 让 IPC 与 Cordis 解耦；preload allowlist 已加入；非法输入/未挂载/服务抛错均明确处理。
+- ✅ 已 Verified：Phase 2.1 退出安全（`bootstrap/before-quit-handler.ts`）：可选 guard + onBlocked；agent-host.ts 注入 task lifecycle guard 拦截 `running` / `awaiting_approval` 任务；未挂载或 guard 抛错时不阻塞退出。
 - ✅ 已 Verified：task→session 绑定恢复检查：恢复时校验 generation fence 与绑定 Pi session 是否存在；session 缺失返回可操作的 `{ kind: "session_missing", action: "rebind_session_or_restart" }`，而不是静默空结果；generation/terminal/status 不满足时分别返回对应 reason。
 - ✅ 已 Verified：`openbuddy-core-plugin.ts` 动态 import 解构中的 inline `type` 修饰符改为 namespace import，esbuild/vitest 可解析（此前该文件无法被任何 vitest 引用）。
 - ✅ 已 Verified：append-only task lifecycle event log（`electron/main/agent/host-modules/task-lifecycle-events.ts`）。`SqliteTaskLifecycleEventLog` 在与 task state 同一数据库的独立 namespace `openbuddy.task-lifecycle.events.v1` 写入事件；service 在 create + 每次 transition 后自动 append；`listEvents(taskId)` 返回带 per-task 单调递增 sequence 的副本（不与 log 共享引用）；非法 transition 不写事件。
-- ✅ 已 Verified：`electron/main/ipc/worktask.ts` 5 个 IPC 通道（`worktask:create` / `worktask:transition` / `worktask:get` / `worktask:recover` / `worktask:events`）经 `electron/main/ipc/agent.ts` 注册并加入 preload allowlist；通过模块级 `registerTaskLifecycleService` / `getTaskLifecycleService` 让 IPC 与 Cordis 服务解耦，注册顺序无关；未挂载时调用抛明确错误，非法参数抛带 label 的描述性错误，service 抛错（如 `TaskLifecycleError`）原样透出；`registry-drift` 测试通过（通道名格式、唯一性、总数下限仍满足）。
+- ✅ 已 Verified：`electron/main/ipc/worktask.ts` 6 个 IPC 通道（`worktask:create` / `worktask:transition` / `worktask:get` / `worktask:recover` / `worktask:events` / `worktask:list`）经 `electron/main/ipc/agent.ts` 注册并加入 preload allowlist；通过模块级 `registerTaskLifecycleService` / `getTaskLifecycleService` / `isTaskLifecycleServiceMounted` 让 IPC 与 Cordis 服务解耦，注册顺序无关；未挂载时调用抛明确错误，非法参数抛带 label 的描述性错误，service 抛错（如 `TaskLifecycleError`）原样透出；`registry-drift` 测试通过。
+- ✅ 已 Verified：退出安全（plan3.0.md §6 Phase 2.1.3）：`bootstrap/before-quit-handler.ts` 新增可选 `guard` + `onBlocked`；`agent-host.ts` 注入 guard 通过 `getTaskLifecycleService().listTasks({ statuses: ["running", "awaiting_approval"] })` 拦截进行中任务；`isTaskLifecycleServiceMounted()` 让未挂载时 guard no-op 避免阻断启动期退出；guard 抛错时记录到 stderr 后继续 dispose，避免静默阻塞。
 - 复现：`node_modules/.bin/vitest run electron/main/agent/host-modules/__tests__/task-lifecycle-service.test.ts electron/main/agent/host-modules/__tests__/task-lifecycle-mount.test.ts electron/main/agent/host-modules/__tests__/task-lifecycle-events.test.ts electron/main/agent/task-lifecycle-sqlite.test.ts electron/main/ipc/__tests__/worktask.test.ts electron/main/ipc/__tests__/registry-drift.test.ts`（27 用例全绿）。
 
 1. ✅ 落地 durable task schema/state machine/event store（lifecycle 部分；event store 仍待做）。
@@ -355,7 +357,7 @@ interface OpenBuddyEventEnvelope<T> {
 
 ## 11. 当前验收结论
 
-本轮已完成**全量静态分析 + Phase 0 inventory + Phase 1 eventId 对齐 + Phase 2.1 task lifecycle owner 落地 + Phase 2.1 event audit log + Phase 2.1 worktask IPC 暴露**（E1/E2 Verified）。以下是已验证结果和已知约束：
+本轮已完成**全量静态分析 + Phase 0 inventory + Phase 1 eventId 对齐 + Phase 2.1 task lifecycle owner 落地 + Phase 2.1 event audit log + Phase 2.1 worktask IPC 暴露 + Phase 2.1 exit safety**（E1/E2 Verified）。以下是已验证结果和已知约束：
 
 **已验证（E1/E2）：**
 
@@ -377,9 +379,11 @@ interface OpenBuddyEventEnvelope<T> {
 | task lifecycle service    | ✅ 11/11；journey（draft→…→completed、fail→retry、pause→resume）、非法迁移拒绝、恢复 fence、session_missing 可操作结果、close 幂等、事件审计（create+transition 自动写入）、非法 transition 不写事件 | `electron/main/agent/host-modules/__tests__/task-lifecycle-service.test.ts` |
 | task lifecycle mount      | ✅ 1/1；core-plugin 挂载 `taskLifecycle` service、绑定 Pi session 目录、teardown 后 closed 拒绝读写、事件审计挂载并可列出 | `electron/main/agent/host-modules/__tests__/task-lifecycle-mount.test.ts` |
 | task lifecycle events     | ✅ 3/3；monotonic per-task sequence、SQLite 重启后持久化、跨任务隔离、clear 计数正确 | `electron/main/agent/host-modules/__tests__/task-lifecycle-events.test.ts` |
-| worktask IPC              | ✅ 5/5；5 通道注册唯一性、IPC 完整 journey（create→transition→recover→events）、参数校验、未挂载抛错、service 抛错透传                                    | `electron/main/ipc/__tests__/worktask.test.ts` |
+| worktask IPC              | ✅ 7/7；6 通道注册唯一性、IPC 完整 journey、参数校验、未挂载抛错、service 抛错透传、listTasks 过滤 + includeTerminal + 非法 status 抛错                                | `electron/main/ipc/__tests__/worktask.test.ts` |
 | IPC registry drift        | ✅ 1/1；worktask 通道未引入重复或命名违规                                                                                                                | `electron/main/ipc/__tests__/registry-drift.test.ts` |
-| 本轮回归（9 套件）        | ✅ 48/48（lifecycle service 11 + mount 1 + events 3 + sqlite 2 + IPC 5 + drift 1 + task-service 10 + plugin-host lifecycle 5 + event bridge 9 + others）| `vitest run --reporter=dot`                    |
+| before-quit guard | ✅ 4/4；guard 通过放行、guard 拒绝时 preventDefault + onBlocked、guard 抛错仍放行、并发 before-quit 不重复 dispose                                           | `electron/main/agent/host-modules/bootstrap/__tests__/before-quit-handler.test.ts` |
+| task lifecycle service（含 listTasks）| ✅ 13/13；journey、恢复 fence、session_missing、close 幂等、事件审计、listTasks 默认非终端过滤 + status + includeTerminal、克隆不与 store 共享引用 | `electron/main/agent/host-modules/__tests__/task-lifecycle-service.test.ts` |
+| 本轮回归（10 套件）       | ✅ 46/46                                                                                                                                                | `vitest run --reporter=dot`                    |
 | Pi extensions + session   | ✅ 51/51 回归无影响                                                                                                       | `vitest run pi-extensions pi-session-runtime`  |
 | typecheck（本轮）         | ✅ `tsc --noEmit -p tsconfig.json` 0 errors；`pnpm build`（含 openbuddy:typecheck 26.9s）成功                             | 直接 tsc / moon                                |
 

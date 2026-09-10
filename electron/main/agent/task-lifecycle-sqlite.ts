@@ -25,6 +25,18 @@ export class SqliteTaskLifecyclePersistence implements TaskLifecyclePersistence 
     await (await this.store()).setAsync(TASK_LIFECYCLE_NAMESPACE, state.taskId, state, 1);
   }
 
+  async list(): Promise<TaskLifecycleState[]> {
+    const entries = (await this.store()).list(TASK_LIFECYCLE_NAMESPACE);
+    const out: TaskLifecycleState[] = [];
+    for (const entry of entries) {
+      const value = entry.value;
+      if (value && typeof value === "object" && "taskId" in value && "status" in value) {
+        out.push({ ...(value as TaskLifecycleState) });
+      }
+    }
+    return out;
+  }
+
   async close(): Promise<void> {
     await closeStorage(this.storage);
     this.storage = undefined;

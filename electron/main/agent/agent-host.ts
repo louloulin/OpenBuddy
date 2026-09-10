@@ -1511,7 +1511,29 @@ export type { AgentSession };
 // v6-G M1 收尾: 把 Electron before-quit + filesystem policy 抽到独立模块,
 // agent-host.ts 只剩一行 register. Register 在 module-load 即触发, 等价
 // 原 inline `app.on("before-quit", ...)` 在模块初始化时的副作用.
-installBeforeQuitHandler({ dispose: dispose(enqueueLifecycle) });
+// Phase 2.1 exit safety (plan3.0.md §6 Phase 2.1.3): before-quit consults the
+// workbench task lifecycle service for in-flight tasks (running,
+// awaiting_approval). If any are present the quit is blocked and a renderer
+// event is emitted so the UI can prompt the user. The guard resolves the
+// service lazily — if it isn't mounted yet the guard no-ops.
+installBeforeQuitHandler({
+  dispose: dispose(enqueueLifecycle),
+  guard: async () => {
+    try {
+      const { getTaskLifecycleService, isTaskLifecycleServiceMounted } = await import("./host-modules/task-lifecycle-service");
+      if (!isTaskLifecycleServiceMounted()) return { ok: true };
+      const pending = await getTaskLifecycleService().listTasks({ statuses: ["running", "awaiting_approval"] });
+      if (pending.length === 0) return { ok: true };
+      return {
+        ok: false,
+        reason: `${pending.length} workbench task${pending.length === 1 ? "" : "s"} still in flight (running or awaiting approval). Cancel or finish them before quitting.`,
+      };
+    } catch (error) {
+      console.warn("[before-quit] task lifecycle guard skipped:", error);
+      return { ok: true };
+    }
+  },
+});
 
 export const evaluateFilesystemCapabilityPolicy = evaluateFilesystemCapabilityPolicyImpl;
 export const DEFAULT_FILESYSTEM_POLICY = DEFAULT_FILESYSTEM_POLICY_IMPL;

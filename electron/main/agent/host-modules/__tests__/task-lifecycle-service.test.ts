@@ -15,6 +15,10 @@ class MemoryTaskLifecyclePersistence implements TaskLifecyclePersistence {
   async write(state: TaskLifecycleState): Promise<void> {
     this.states.set(state.taskId, { ...state });
   }
+
+  async list(): Promise<TaskLifecycleState[]> {
+    return [...this.states.values()].map((state) => ({ ...state }));
+  }
 }
 
 interface Fixture {
@@ -176,5 +180,42 @@ describe("TaskLifecycleService", () => {
     resources.push(() => service.close());
     const state = await service.createTask({ sessionId: "session-x" });
     expect(await service.listEvents(state.taskId)).toEqual([]);
+  });
+
+  it("listTasks returns every persisted task by default and supports status / includeTerminal filters", async () => {
+    const { service } = makeService();
+    const draft = await service.createTask({ taskId: "task-draft", sessionId: "session-1" });
+    const queued = await service.createTask({ taskId: "task-queued", sessionId: "session-1" });
+    await service.transitionTask("task-queued", "queue");
+    const done = await service.createTask({ taskId: "task-done", sessionId: "session-1" });
+    await service.transitionTask("task-done", "queue");
+    await service.transitionTask("task-done", "start");
+    await service.transitionTask("task-done", "complete");
+
+    // Default: non-terminal only.
+    const live = await service.listTasks();
+    expect(live.map((s) => s.taskId).sort()).toEqual(["task-draft", "task-queued"]);
+
+    // Status filter narrows further.
+    expect(await service.listTasks({ statuses: ["running"] })).toEqual([]);
+    expect((await service.listTasks({ statuses: ["draft", "queued"] })).map((s) => s.taskId).sort()).toEqual(["task-draft", "task-queued"]);
+
+    // includeTerminal exposes completed/cancelled too.
+    const all = await service.listTasks({ includeTerminal: true });
+    expect(all.map((s) => s.taskId).sort()).toEqual(["task-done", "task-draft", "task-queued"]);
+    expect(all.find((s) => s.taskId === "task-done")!.status).toBe("completed");
+
+    // Defensive: returned objects are clones, not references to the store.
+    const snapshot = await service.listTasks();
+    snapshot[0]!.status = "cancelled" as never;
+    expect((await service.getTask(draft.taskId))!.status).toBe(draft.status);
+    expect((await service.getTask(queued.taskId))!.status).toBe("queued");
+  });
+
+  it("listTasks returns [] and rejects nothing on an empty store", async () => {
+    const persistence = new MemoryTaskLifecyclePersistence();
+    const service = createTaskLifecycleService(persistence);
+    resources.push(() => service.close());
+    expect(await service.listTasks()).toEqual([]);
   });
 });

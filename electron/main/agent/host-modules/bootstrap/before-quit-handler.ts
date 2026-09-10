@@ -10,9 +10,25 @@
  */
 import { app } from "electron";
 
+export interface BeforeQuitGuard {
+  /**
+   * Run before the dispose thunk on `before-quit`. Return `{ ok: true }`
+   * to proceed, or `{ ok: false, reason }` to abort the quit and surface
+   * `reason` to the renderer via the optional `onBlocked` callback. The
+   * guard must NOT block on long-running work synchronously; it is async
+   * so the Electron event loop can keep spinning.
+   */
+  (): Promise<{ ok: boolean; reason?: string }>;
+}
+
 export interface BeforeQuitHandlerDeps {
   /** Reference to the lifecycle dispose() thunk (dispose returns a Promise). */
   dispose: () => Promise<void>;
+  /** Optional exit-safety guard (e.g. workbench task in-flight check). */
+  guard?: BeforeQuitGuard;
+  /** Optional sink that receives a structured payload when the guard
+   *  blocks the quit. Implementations forward to renderer. */
+  onBlocked?: (payload: { reason: string }) => void;
 }
 
 export interface BeforeQuitHandlerHandle {
@@ -28,18 +44,39 @@ export interface BeforeQuitHandlerHandle {
 export function installBeforeQuitHandler(deps: BeforeQuitHandlerDeps): BeforeQuitHandlerHandle {
   let quitting = false;
   let disposedForQuit = false;
+  let blockedAt: number | undefined;
   const handler = (event: Electron.Event): void => {
     if (disposedForQuit) return;
     if (quitting) {
       event.preventDefault();
       return;
     }
-    quitting = true;
     event.preventDefault();
-    void deps.dispose().finally(() => {
-      disposedForQuit = true;
-      app.exit(0);
-    });
+    const proceed = async () => {
+      try {
+        if (deps.guard) {
+          const decision = await deps.guard();
+          if (!decision.ok) {
+            deps.onBlocked?.({ reason: decision.reason ?? "quit blocked by lifecycle guard" });
+            // Re-arm so the user can retry after addressing the block.
+            // Throttle repeated immediate retries so we don't spam events.
+            if (blockedAt === undefined || Date.now() - blockedAt > 1_000) {
+              blockedAt = Date.now();
+            }
+            return;
+          }
+        }
+      } catch (error) {
+        // Guard failures must never abort quit silently; log and proceed.
+        console.error("[before-quit] guard threw, proceeding with dispose:", error);
+      }
+      quitting = true;
+      void deps.dispose().finally(() => {
+        disposedForQuit = true;
+        app.exit(0);
+      });
+    };
+    void proceed();
   };
   app.on("before-quit", handler);
   return {

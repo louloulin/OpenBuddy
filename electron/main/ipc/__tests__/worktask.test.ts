@@ -33,7 +33,7 @@ async function mountService(): Promise<TaskLifecycleService> {
   return service;
 }
 
-async function invoke(channel: string, payload: unknown): Promise<unknown> {
+async function invoke(channel: string, payload?: unknown): Promise<unknown> {
   const handler = handlers.get(channel);
   if (!handler) throw new Error(`no handler registered for ${channel}`);
   return await handler({}, payload);
@@ -48,6 +48,7 @@ describe("worktask IPC", () => {
       "worktask:create",
       "worktask:events",
       "worktask:get",
+      "worktask:list",
       "worktask:recover",
       "worktask:transition",
     ]);
@@ -90,5 +91,29 @@ describe("worktask IPC", () => {
     const created = await invoke("worktask:create", { sessionId: "session-1" }) as { taskId: string };
     await expect(invoke("worktask:transition", { taskId: created.taskId, event: "complete" })).rejects.toMatchObject({ code: "invalid_task_transition" });
     await expect(invoke("worktask:transition", { taskId: "nonexistent", event: "queue" })).rejects.toThrow(/does not exist/);
+  });
+
+  it("worktask:list returns non-terminal by default and supports status + includeTerminal filters", async () => {
+    await mountService();
+    registerWorktaskIpc();
+    const a = await invoke("worktask:create", { sessionId: "session-1", taskId: "task-a" }) as { taskId: string };
+    const b = await invoke("worktask:create", { sessionId: "session-1", taskId: "task-b" }) as { taskId: string };
+    await invoke("worktask:transition", { taskId: b.taskId, event: "queue" });
+    const c = await invoke("worktask:create", { sessionId: "session-1", taskId: "task-c" }) as { taskId: string };
+    for (const event of ["queue", "start", "complete"] as const) {
+      await invoke("worktask:transition", { taskId: c.taskId, event });
+    }
+    const live = await invoke("worktask:list") as Array<{ taskId: string; status: string }>;
+    expect(live.map((t) => t.taskId).sort()).toEqual([a.taskId, b.taskId]);
+    const queued = await invoke("worktask:list", { statuses: ["queued"] }) as Array<{ taskId: string }>;
+    expect(queued.map((t) => t.taskId)).toEqual([b.taskId]);
+    const all = await invoke("worktask:list", { includeTerminal: true }) as Array<{ taskId: string }>;
+    expect(all.map((t) => t.taskId).sort()).toEqual([a.taskId, b.taskId, c.taskId]);
+  });
+
+  it("worktask:list rejects malformed statuses payloads", async () => {
+    await mountService();
+    registerWorktaskIpc();
+    await expect(invoke("worktask:list", { statuses: ["banana"] })).rejects.toThrow(/statuses\[0\]/);
   });
 });

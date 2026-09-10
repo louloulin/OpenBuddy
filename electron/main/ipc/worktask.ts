@@ -86,4 +86,16 @@ export function registerWorktaskIpc(): void {
     const taskId = requiredString(payload.taskId, "taskId");
     return await getTaskLifecycleService().listEvents(taskId);
   });
+
+  ipcMain.handle("worktask:list", async (_e, args?: unknown) => {
+    const payload = args === undefined ? {} : recordValue(args, "worktask:list payload");
+    const includeTerminal = payload.includeTerminal === true;
+    const statuses = Array.isArray(payload.statuses)
+      ? (payload.statuses as unknown[]).map((value, index) => enumValue(value, `statuses[${index}]`, taskStatuses))
+      : undefined;
+    return await getTaskLifecycleService().listTasks({
+      ...(statuses ? { statuses } : {}),
+      ...(includeTerminal ? { includeTerminal: true } : {}),
+    });
+  });
 }
