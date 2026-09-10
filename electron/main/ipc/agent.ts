@@ -80,7 +80,6 @@ import { casdoorAuth } from "../casdoor/casdoor-auth";
 // the handlers that used to live in this file's giant
 // registerAgentIpc() body.
 import { registerAgentInfoIpc } from "./agent-info";
-import { registerAgentsIpc } from "./agents";
 import { registerCompactionIpc } from "./compaction";
 import { registerDeepSeekIpc } from "./deepseek";
 import { registerLifecycleIpc } from "./lifecycle";
@@ -127,7 +126,12 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
   registerProvidersIpc(sharedDeps);
   registerModelIpc(sharedDeps);
   registerCompactionIpc(sharedDeps);
-  registerAgentsIpc();
+  // `registerAgentsIpc` is intentionally NOT called from here — `registerIpc`
+  // in `./index.ts` already invokes it as a separate registrar. Calling it
+  // twice triggers `Attempted to register a second handler for 'agents_list'`
+  // and tears down main with an unhandled rejection (which is the actual
+  // reason the renderer ended up showing a white screen — main never
+  // reaches `app.whenReady().then(...)`).
   registerSessionsIpc(sharedDeps);
   registerWorkspaceIpc(sharedDeps);
   registerLifecycleIpc(sharedDeps);
