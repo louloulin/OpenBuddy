@@ -45,14 +45,18 @@ export interface TaskServiceEntry {
  */
 export class TaskService {
   private mutationQueue: Promise<void> = Promise.resolve();
+  private closed = false;
+  private closePromise: Promise<void> | undefined;
 
   constructor(private readonly catalog: TaskCatalog) {}
 
   async list(sessionId: string): Promise<TaskServiceEntry[]> {
+    if (this.closed) throw new Error("task service is closed");
     return await this.catalog.list(sessionId);
   }
 
   private enqueueMutation<T>(mutation: () => Promise<T>): Promise<T> {
+    if (this.closed) return Promise.reject(new Error("task service is closed"));
     const run = this.mutationQueue.then(mutation, mutation);
     this.mutationQueue = run.then(() => undefined, () => undefined);
     return run;
@@ -121,8 +125,10 @@ export class TaskService {
 
   /** Release the SQLite driver when the owning Cordis plugin is torn down. */
   async close(): Promise<void> {
-    await this.mutationQueue;
-    await this.catalog.close();
+    if (this.closePromise) return this.closePromise;
+    this.closed = true;
+    this.closePromise = this.mutationQueue.then(() => this.catalog.close());
+    return this.closePromise;
   }
 }
 

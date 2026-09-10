@@ -83,6 +83,12 @@ describe("TaskService", () => {
     expect(await service.list(SESSION)).toHaveLength(1);
   });
 
+  it("rejects access after close and keeps close idempotent", async () => {
+    await service.add(SESSION, "before close");
+    await Promise.all([service.close(), service.close()]);
+    await expect(service.list(SESSION)).rejects.toThrow("task service is closed");
+    await expect(service.add(SESSION, "after close")).rejects.toThrow("task service is closed");
+  });
   it("clear removes completed tasks but keeps pending ones", async () => {
     const a = await service.add(SESSION, "todo");
     await service.add(SESSION, "done");

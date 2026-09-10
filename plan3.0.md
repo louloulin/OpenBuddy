@@ -232,6 +232,7 @@ interface OpenBuddyEventEnvelope<T> {
 回归测试：`pi-event-bridge.test.ts` 已验证 eventId 生成、唯一性和 snapshot 保留（9/9）。
 生命周期修复：`TaskService.close()` 已接入 `openbuddy-core-plugin.apply()` teardown，避免 reload 时遗留 SQLite storage 句柄。
 并发一致性修复：TaskService 的 add/update/remove/clear 通过串行 mutation queue 执行，避免并发 read-then-replace 覆盖任务。
+关闭契约修复：TaskService 进入 closed 状态后拒绝新的读写，close() 复用同一 Promise，保证 teardown 幂等。
 
 1. `agent-host.ts` 只保留 composition root/facade；按域拆 `InstallHostModuleDeps`。
 2. `pi-extensions.ts` 拆 builtin registry、compatibility adapter、provider attribution、resource projection。
@@ -355,6 +356,7 @@ interface OpenBuddyEventEnvelope<T> {
 | event bridge regression   | ✅ 9/9；覆盖 eventId UUID 格式、唯一性和 snapshot 保留                     | `electron/main/agent/pi-event-bridge.test.ts` |
 | task storage lifecycle    | ✅ 7/7；TaskService.close() 在 plugin teardown 释放 SQLite driver            | `electron/main/agent/host-modules/__tests__/task-service.test.ts` |
 | task mutation serialization | ✅ 8/8；并发 add 串行化，避免 read/replace lost update                 | `electron/main/agent/host-modules/__tests__/task-service.test.ts` |
+| task close contract        | ✅ 9/9；close 幂等，关闭后 list/mutation 明确拒绝                         | `electron/main/agent/host-modules/__tests__/task-service.test.ts` |
 | vitest Pi events + session | ✅ 82/82（pi-extensions 39 + pi-session-runtime 12 + plugin-event-bus 19 + observability 5 + lifecycle 4 + forwarded 3） | `vitest run --reporter=dot`                    |
 | streaming benchmark        | ✅ delta-reducer 17.2µs/iter，frame headroom 15.29ms                                                                     | `scripts/perf/streaming-bench.mjs`             |
 | ipc-latency benchmark      | ✅ session.list p95=0.988ms，plugin.snapshot p95=1.102ms                                                                 | `scripts/perf/ipc-latency.mjs`                 |
