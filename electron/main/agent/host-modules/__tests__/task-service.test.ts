@@ -57,6 +57,17 @@ describe("TaskService", () => {
     expect(list.map((entry) => entry.content)).toEqual(["first", "second"]);
     expect(new Set(results.map(({ id }) => id)).size).toBe(2);
   });
+  it("normalizes task order after removal before the next add", async () => {
+    const first = await service.add(SESSION, "first");
+    await service.add(SESSION, "second");
+    await service.remove(SESSION, first.id);
+    await service.add(SESSION, "third");
+    const list = await service.list(SESSION);
+    expect(list.map((entry) => [entry.content, entry.order])).toEqual([
+      ["second", 0],
+      ["third", 1],
+    ]);
+  });
   it("update marks a task completed and returns its id", async () => {
     const { id } = await service.add(SESSION, "x");
     const updated = await service.update(SESSION, id, { status: "completed" });

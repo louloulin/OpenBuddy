@@ -62,6 +62,10 @@ export class TaskService {
     return run;
   }
 
+  private static normalizeOrder(entries: readonly TaskCatalogEntry[]): TaskCatalogEntry[] {
+    return entries.map((entry, index) => ({ ...entry, order: index }));
+  }
+
   async add(sessionId: string, content: string): Promise<{ id: string }> {
     return this.enqueueMutation(async () => {
       const now = new Date().toISOString();
@@ -105,7 +109,7 @@ export class TaskService {
   async remove(sessionId: string, taskId: string): Promise<void> {
     return this.enqueueMutation(async () => {
       const existing = await this.catalog.list(sessionId);
-      const next = existing.filter((entry) => entry.id !== taskId);
+      const next = TaskService.normalizeOrder(existing.filter((entry) => entry.id !== taskId));
       if (next.length !== existing.length) {
         await this.catalog.replace(sessionId, next);
       }
@@ -116,8 +120,8 @@ export class TaskService {
     return this.enqueueMutation(async () => {
       // Spec: "Completed tasks cleared." — keep only pending ones.
       const existing = await this.catalog.list(sessionId);
-      const remaining = existing.filter((entry) => entry.status !== "completed");
-      if (remaining.length !== existing.length) {
+      const remaining = TaskService.normalizeOrder(existing.filter((entry) => entry.status !== "completed"));
+      if (remaining.length !== existing.length || remaining.some((entry, index) => entry.order !== existing[index]?.order)) {
         await this.catalog.replace(sessionId, remaining);
       }
     });
