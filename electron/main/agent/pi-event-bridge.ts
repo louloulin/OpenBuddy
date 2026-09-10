@@ -1,14 +1,21 @@
+import { randomUUID } from "node:crypto";
 import { createMainLogger, withContext, type MainLogger } from "@openbuddy/logging-main";
 import { type LogContext } from "@openbuddy/logging-shared";
-import { BoundedEventQueue, type BoundedEvent, type EventDeliveryClass } from "@openbuddy/plugin-host";
+import {
+  BoundedEventQueue,
+  type BoundedEvent,
+  type EventDeliveryClass,
+} from "@openbuddy/plugin-host";
 
 export interface ContextEventSink {
-  emit(event: string, ...args: unknown[]): unknown;
+  emit(event: string, ...args: unknown[]): void;
 }
 
 export type PiEventErrorHandler = (event: string, error: unknown) => void;
 
 export interface SessionEventRecord {
+  /** Canonical unique event id — aligns with OpenBuddyEventEnvelope (plan3.0.md §5). */
+  eventId?: string;
   eventVersion?: 1;
   /** Plugin/session generation; stale generations are never replayed. */
   generation?: number;
@@ -124,7 +131,8 @@ export class PiSessionEventBridge {
   private readonly entries: SessionEventRecord[] = [];
   private readonly pendingProgress = new BoundedEventQueue({
     capacity: 512,
-    coalesceKey: (event) => event.delivery === "progress" ? `${event.taskId ?? ""}:${event.kind}` : undefined,
+    coalesceKey: (event) =>
+      event.delivery === "progress" ? `${event.taskId ?? ""}:${event.kind}` : undefined,
   });
   private nextSequence = 0;
   private currentGeneration = 0;
@@ -138,6 +146,7 @@ export class PiSessionEventBridge {
     const sequence = this.allocateSequence();
     const sessionId = typeof event.sessionId === "string" ? event.sessionId : undefined;
     const record: SessionEventRecord = {
+      eventId: randomUUID(),
       eventVersion: 1,
       generation: this.currentGeneration,
       sequence,
@@ -196,11 +205,14 @@ export class PiSessionEventBridge {
 
   snapshot(query: SessionEventLogQuery = {}): SessionEventRecord[] {
     this.flushPendingProgress();
-    const limit = query.limit === undefined
-      ? this.maxEntries
-      : Math.max(1, Math.min(this.maxEntries, Math.floor(query.limit)));
+    const limit =
+      query.limit === undefined
+        ? this.maxEntries
+        : Math.max(1, Math.min(this.maxEntries, Math.floor(query.limit)));
     return this.entries
-      .filter((entry) => entry.generation === undefined || entry.generation >= this.currentGeneration)
+      .filter(
+        (entry) => entry.generation === undefined || entry.generation >= this.currentGeneration,
+      )
       .filter((entry) => query.sessionId === undefined || entry.sessionId === query.sessionId)
       .filter((entry) => query.sinceSequence === undefined || entry.sequence > query.sinceSequence)
       .slice(-limit)

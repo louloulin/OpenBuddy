@@ -1,0 +1,377 @@
+{
+  "version": "1.0.0",
+  "generated": "2026-09-10T09:15:00Z",
+  "checkout": "1159a9c",
+  "piSdkVersion": "0.85.1",
+  "source": "Static analysis of electron/main/agent/ and packages/runtime/openbuddy-plugin-host/src/",
+  "purpose": "Phase 0 baseline — machine-readable Pi capability inventory per plan3.0.md §Phase 0",
+
+  "builtinExtensions": {
+    "count": 10,
+    "items": [
+      {
+        "manifestId": "openbuddy-apply-patch",
+        "packageName": "@openbuddy/builtin-apply-patch",
+        "version": "1.0.0",
+        "owner": "OpenBuddy (builtin)",
+        "description": "Worktree-scoped patch tool",
+        "location": "electron/main/agent/extensions/apply-patch.ts",
+        "evidence": "E0",
+        "tests": "electron/main/agent/extensions/apply-patch.test.ts",
+        "reloadUnit": "Per profile load",
+        "notes": "Uses node:crypto randomUUID for tmp files"
+      },
+      {
+        "manifestId": "openbuddy-pi-observability",
+        "packageName": "@openbuddy/builtin-pi-observability",
+        "version": "1.0.0",
+        "owner": "OpenBuddy (builtin)",
+        "description": "Forward native Pi events into plugin/event channel",
+        "location": "builtinPiExtensionFactories in pi-extensions.ts",
+        "evidence": "E0",
+        "tests": "electron/main/__tests__/pi-observability-events.test.ts",
+        "reloadUnit": "Per profile load",
+        "notes": "Part of 146-passing vitest slice"
+      },
+      {
+        "manifestId": "openbuddy-pi-context-status",
+        "packageName": "@openbuddy/builtin-pi-context-status",
+        "version": "1.0.0",
+        "owner": "OpenBuddy (builtin)",
+        "description": "Surface context/turn_end/session_compact to renderer",
+        "location": "builtinPiExtensionFactories in pi-extensions.ts",
+        "evidence": "E0"
+      },
+      {
+        "manifestId": "openbuddy-pi-context-guard",
+        "packageName": "@openbuddy/builtin-pi-context-guard",
+        "version": "1.0.0",
+        "owner": "OpenBuddy (builtin)",
+        "description": "Trigger session_compact via SDK shouldCompact",
+        "location": "builtinPiExtensionFactories in pi-extensions.ts",
+        "evidence": "E0"
+      },
+      {
+        "manifestId": "openbuddy-pi-telemetry-bridge",
+        "packageName": "@openbuddy/builtin-pi-telemetry-bridge",
+        "version": "1.0.0",
+        "owner": "OpenBuddy (builtin)",
+        "description": "Forward pi span events to OpenBuddy telemetry sink",
+        "location": "builtinPiExtensionFactories in pi-extensions.ts",
+        "evidence": "E0"
+      },
+      {
+        "manifestId": "openbuddy-pi-compact-announce",
+        "packageName": "@openbuddy/builtin-pi-compact-announce",
+        "version": "1.0.0",
+        "owner": "OpenBuddy (builtin)",
+        "description": "Inject structured follow-up after context compaction",
+        "location": "builtinPiExtensionFactories in pi-extensions.ts",
+        "evidence": "E0"
+      },
+      {
+        "manifestId": "openbuddy-extra-providers",
+        "packageName": "@openbuddy/builtin-extra-providers",
+        "version": "1.0.0",
+        "owner": "OpenBuddy (builtin)",
+        "description": "Register Ollama/corp-proxy/Orcarouter providers",
+        "location": "builtinPiExtensionFactories in pi-extensions.ts",
+        "evidence": "E0"
+      },
+      {
+        "manifestId": "openbuddy-pi-session-metadata",
+        "packageName": "@openbuddy/builtin-pi-session-metadata",
+        "version": "1.0.0",
+        "owner": "OpenBuddy (builtin)",
+        "description": "ExtensionAPI pattern for session metadata bridge",
+        "location": "electron/main/agent/extensions/session-metadata-bridge.ts",
+        "evidence": "E0",
+        "tests": "electron/main/__tests__/session-metadata-pi.test.ts",
+        "reloadUnit": "Per profile load"
+      },
+      {
+        "manifestId": "openbuddy-pi-model-bridge",
+        "packageName": "@openbuddy/builtin-pi-model-bridge",
+        "version": "1.0.0",
+        "owner": "OpenBuddy (builtin)",
+        "description": "Observe model_select/set_model/before_provider_request",
+        "location": "electron/main/agent/extensions/model-bridge.ts",
+        "evidence": "E0"
+      },
+      {
+        "manifestId": "openbuddy-pi-calendar",
+        "packageName": "@openbuddy/builtin-pi-calendar",
+        "version": "1.0.0",
+        "owner": "OpenBuddy (builtin)",
+        "description": "Register 4 calendar tools via ExtensionAPI",
+        "location": "electron/main/agent/extensions/calendar-pi-extension.ts",
+        "evidence": "E0",
+        "notes": "Phase I.2 implementation — calls createCalendarToolDefinitions() + registerTool()"
+      }
+    ]
+  },
+
+  "piCompatibilityAdapters": {
+    "count": 12,
+    "items": [
+      {
+        "capability": "mcp",
+        "owner": "openbuddy-mcp-client",
+        "serviceKey": "mcpClient",
+        "passthrough": true,
+        "piPackageHint": "pi-mcp-adapter",
+        "packageNames": ["pi-mcp-adapter"],
+        "commands": ["mcp", "pi-mcp", "mcp-auth"],
+        "tools": ["openbuddy_mcp"],
+        "location": "pi-extensions.ts:268-320",
+        "evidence": "E0",
+        "toolConflict": false
+      },
+      {
+        "capability": "permission",
+        "owner": "openbuddy-authorization",
+        "serviceKey": "permission",
+        "passthrough": true,
+        "piPackageHint": "pi-permission-system",
+        "packageNames": ["pi-permission-system"],
+        "commands": ["permission-system"],
+        "tools": ["openbuddy_permissions"],
+        "location": "pi-extensions.ts:322-354",
+        "evidence": "E0",
+        "toolConflict": false
+      },
+      {
+        "capability": "goal",
+        "owner": "openbuddy-team",
+        "serviceKey": "team",
+        "passthrough": true,
+        "piPackageHint": "pi-goal",
+        "packageNames": ["pi-goal", "pi-goal-x", "@narumitw/pi-goal"],
+        "commands": ["goal"],
+        "tools": ["openbuddy_goals"],
+        "location": "pi-extensions.ts:356-393",
+        "evidence": "E0",
+        "toolConflict": false
+      },
+      {
+        "capability": "plan",
+        "owner": "pi-plan-mode",
+        "serviceKey": "plan",
+        "passthrough": true,
+        "piPackageHint": "pi-plan-mode",
+        "packageNames": ["pi-plan-mode", "@narumitw/pi-plan-mode", "@arvoretech/pi-plan-mode", "@plannotor/pi-extension"],
+        "commands": ["plan"],
+        "tools": [],
+        "location": "electron/main/agent/pi-plan-mode.ts + pi-extensions.ts:395-410",
+        "evidence": "E0",
+        "toolConflict": false
+      },
+      {
+        "capability": "task",
+        "owner": "openbuddy-task",
+        "serviceKey": "task",
+        "passthrough": true,
+        "piPackageHint": "@juicesharp/rpiv-todo",
+        "packageNames": ["pi-todo", "pi-tasks", "pi-tasklist", "@narumitw/pi-todo", "@anthropic/pi-todo"],
+        "commands": ["tasks", "todo"],
+        "tools": [],
+        "location": "pi-extensions.ts:411-448",
+        "evidence": "E0",
+        "notes": "Phase I.1 decision: Cordis owns surface, PI adapter tools removed as duplicate",
+        "toolConflict": false
+      },
+      {
+        "capability": "session",
+        "owner": "openbuddy-session",
+        "serviceKey": "sessions",
+        "passthrough": true,
+        "piPackageHint": "pi-session",
+        "packageNames": ["pi-session", "pi-sessions", "pi-history", "pi-bookmark", "pi-session-manager", "@anthropic/pi-session"],
+        "commands": ["sessions", "history"],
+        "tools": ["openbuddy_sessions"],
+        "location": "pi-extensions.ts:450-506",
+        "evidence": "E0",
+        "toolConflict": false
+      },
+      {
+        "capability": "fs",
+        "owner": "openbuddy-fs-local",
+        "serviceKey": "fsLocal",
+        "passthrough": true,
+        "piPackageHint": "pi-fs",
+        "packageNames": ["pi-fs", "pi-filesystem", "pi-fs-tools", "pi-file-tools", "pi-filetree", "@anthropic/pi-fs"],
+        "commands": ["fs", "files"],
+        "tools": ["openbuddy_fs"],
+        "location": "pi-extensions.ts:508-564",
+        "evidence": "E0",
+        "toolConflict": false
+      },
+      {
+        "capability": "lens",
+        "owner": "pi-lens",
+        "serviceKey": "lens",
+        "passthrough": true,
+        "piPackageHint": "pi-lens",
+        "packageNames": ["pi-lens"],
+        "commands": [],
+        "tools": [],
+        "location": "pi-extensions.ts:569-573",
+        "evidence": "E0",
+        "notes": "pi-plugin-reuse-batch whitelist — zero-cost passthrough"
+      },
+      {
+        "capability": "simplify",
+        "owner": "pi-simplify",
+        "serviceKey": "simplify",
+        "passthrough": true,
+        "piPackageHint": "pi-simplify",
+        "packageNames": ["pi-simplify"],
+        "commands": [],
+        "tools": [],
+        "location": "pi-extensions.ts:575-582",
+        "evidence": "E0"
+      },
+      {
+        "capability": "hashline",
+        "owner": "pi-hashline-edit-pro",
+        "serviceKey": "hashline",
+        "passthrough": true,
+        "piPackageHint": "pi-hashline-edit-pro",
+        "packageNames": ["pi-hashline-edit-pro", "pi-hashline-edit"],
+        "commands": [],
+        "tools": [],
+        "location": "pi-extensions.ts:584-591",
+        "evidence": "E0"
+      },
+      {
+        "capability": "worktree",
+        "owner": "@dietrichgebert/ponytail",
+        "serviceKey": "worktree",
+        "passthrough": true,
+        "piPackageHint": "@dietrichgebert/ponytail",
+        "packageNames": ["@dietrichgebert/ponytail", "ponytail"],
+        "commands": [],
+        "tools": [],
+        "location": "pi-extensions.ts:593-607",
+        "evidence": "E0"
+      },
+      {
+        "capability": "automation",
+        "owner": "pi-goal-list-loop-audit",
+        "serviceKey": "automation",
+        "passthrough": true,
+        "piPackageHint": "pi-goal-list-loop-audit",
+        "packageNames": ["pi-goal-list-loop-audit"],
+        "commands": [],
+        "tools": [],
+        "location": "pi-extensions.ts:609-638",
+        "evidence": "E0",
+        "notes": "Stage H-4: openbuddy-automation removed; pi-goal-list-loop-audit is now canonical"
+      }
+    ]
+  },
+
+  "piRuntimeApis": {
+    "sessionRuntime": {
+      "api": "createAgentSession / AgentSessionRuntime",
+      "location": "electron/main/agent/pi-session-runtime.ts",
+      "owner": "Pi (runtime)",
+      "evidence": "E1",
+      "tests": "electron/main/agent/pi-session-runtime.test.ts (12 tests, PASSING)",
+      "notes": "Has generation counter; calls Pi SDK directly"
+    },
+    "sessionManager": {
+      "api": "SessionManager (NAPI binding)",
+      "location": "electron/main/agent/pi-resources/memory.ts",
+      "owner": "Pi (runtime)",
+      "evidence": "E1",
+      "tests": "electron/main/__tests__/session-lifecycle-pi.test.ts (4 tests, PASSING)",
+      "notes": "Rust-backed NAPI; open/list/listAll/forkFrom methods used"
+    },
+    "modelRuntime": {
+      "api": "ModelRuntime / installAgentModel",
+      "location": "electron/main/agent/host-modules/agent-model.ts",
+      "owner": "OpenBuddy (profile) + Pi (runtime)",
+      "evidence": "E0"
+    },
+    "resourceLoader": {
+      "api": "DefaultResourceLoader",
+      "location": "electron/main/agent/pi-resources/",
+      "owner": "Pi (runtime)",
+      "evidence": "E0"
+    },
+    "extensionApi": {
+      "api": "ExtensionAPI (registerTool/registerCommand/registerProvider/on/sendMessage)",
+      "location": "pi-extensions.ts, pi-tool-bridge.ts",
+      "owner": "Pi (protocol) + OpenBuddy (adapter)",
+      "evidence": "E1",
+      "tests": "electron/main/agent/pi-extensions.test.ts (39 tests, PASSING)"
+    }
+  },
+
+  "eventSystem": {
+    "primaryEventBridge": {
+      "file": "electron/main/agent/pi-event-bridge.ts",
+      "class": "PiSessionEventBridge",
+      "envelopeFields": [
+        "eventVersion",
+        "generation",
+        "sequence",
+        "sessionSequence",
+        "timestamp",
+        "type",
+        "sessionId",
+        "payload"
+      ],
+      "missingFromPlanEnvelope": ["eventId"],
+      "generationFence": "IMPLEMENTED (currentGeneration field, advanceGeneration method)",
+      "boundedQueue": "IMPLEMENTED (BoundedEventQueue with capacity=512, coalescing)",
+      "evidence": "E1",
+      "tests": "Part of pi-extensions.test.ts (39 tests)"
+    },
+    "pluginEventBus": {
+      "file": "electron/main/agent/host-modules/plugin-event-bus.ts",
+      "canonicalNamespaces": 43,
+      "envelopeFields": ["eventVersion", "sequence", "sessionSequence", "timestamp", "type", "sessionId", "payload"],
+      "generationTracking": "pluginCommitGeneration + pluginReadiness.generation",
+      "evidence": "E1",
+      "tests": "electron/main/agent/host-modules/plugin-event-bus.test.ts (19 tests, PASSING)"
+    }
+  },
+
+  "toolRegistry": {
+    "registeredPiTools": [
+      {"name": "openbuddy_mcp", "source": "pi-extensions.ts:304 (MCP adapter)"},
+      {"name": "openbuddy_permissions", "source": "pi-extensions.ts:342 (permission adapter)"},
+      {"name": "openbuddy_goals", "source": "pi-extensions.ts:374 (goal/team adapter)"},
+      {"name": "openbuddy_sessions", "source": "pi-extensions.ts:482 (session adapter)"},
+      {"name": "openbuddy_fs", "source": "pi-extensions.ts:536 (fs adapter)"},
+      {"name": "calendar_list", "source": "calendar-pi-extension.ts (Phase I.2)"},
+      {"name": "calendar_create", "source": "calendar-pi-extension.ts (Phase I.2)"},
+      {"name": "calendar_update", "source": "calendar-pi-extension.ts (Phase I.2)"},
+      {"name": "calendar_remove", "source": "calendar-pi-extension.ts (Phase I.2)"}
+    ],
+    "duplicateNamesFound": false,
+    "silentOverwriteRisk": "LOW — Map-based registry with explicit set/delete"
+  },
+
+  "ownershipSummary": {
+    "piOwns": ["AgentSessionRuntime", "SessionManager (NAPI)", "ModelRuntime protocol", "ExtensionAPI", "DefaultResourceLoader", "builtin Pi tools"],
+    "openBuddyOwns": ["Task lifecycle", "Workspace/expert metadata", "Artifact/citation", "Enterprise policy", "Billing", "Audit", "electron/main/agent composition root"],
+    "cordisOwns": ["email", "calendar", "MCP domain", "team", "fs-local", "permission (OpenBuddy-owned service)"],
+    "sharedStateIssues": []
+  },
+
+  "gapsFromPlan3": {
+    "eventEnvelope": {
+      "issue": "SessionEventRecord缺少 eventId 字段（plan定义 OpenBuddyEventEnvelope.eventId）",
+      "severity": "P1",
+      "fix": "在 pi-event-bridge.ts SessionEventRecord 中添加 eventId: string 字段"
+    },
+    "toolConflictAudit": {
+      "issue": "工具名仅通过 Map 追踪，未记录来源/dispose",
+      "severity": "P2",
+      "fix": "在 tool registry 中添加 source 字段"
+    }
+  }
+}
