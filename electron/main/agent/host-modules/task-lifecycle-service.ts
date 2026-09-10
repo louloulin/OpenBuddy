@@ -206,3 +206,31 @@ export function defaultTaskLifecycleService(options: DefaultTaskLifecycleService
   const persistence = new SqliteTaskLifecyclePersistence(dbPath);
   return new TaskLifecycleService(createTaskLifecycleStore(persistence), persistence, { ...options, events });
 }
+
+/* ------------------------------------------------------------------ *
+ * Module-level active instance registry.                              *
+ *                                                                    *
+ * The Cordis plugin mounts the service inside `apply(ctx)`; IPC        *
+ * handlers and other product code live outside that Cordis context    *
+ * and need a way to resolve the live service. The core plugin calls   *
+ * `registerTaskLifecycleService(instance)` on mount and              *
+ * `clearTaskLifecycleService(instance)` on teardown. Handlers         *
+ * resolve through `getTaskLifecycleService()` at call time, so the    *
+ * registration ordering between IPC registration and plugin mount    *
+ * does not matter — the handler simply throws until a service is up.  *
+ * ------------------------------------------------------------------ */
+
+let activeInstance: TaskLifecycleService | undefined;
+
+export function registerTaskLifecycleService(instance: TaskLifecycleService): void {
+  activeInstance = instance;
+}
+
+export function clearTaskLifecycleService(instance: TaskLifecycleService): void {
+  if (activeInstance === instance) activeInstance = undefined;
+}
+
+export function getTaskLifecycleService(): TaskLifecycleService {
+  if (!activeInstance) throw new Error("task lifecycle service is not mounted");
+  return activeInstance;
+}

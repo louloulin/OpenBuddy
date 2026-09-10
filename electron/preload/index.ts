@@ -68,6 +68,8 @@ const allowedInvokeChannels = new Set([
   "calendar:create", "calendar:delete", "calendar:list", "calendar:update", "knowledge-sources:list", "knowledge-sources:save", "notify-channels:list", "notify-channels:save",
   "notify:dispatch", "plan-mode:approve", "plan-mode:get", "plan-mode:reject", "plan-mode:set-enabled", "plan-mode:set-plan", "policy:get", "policy:save",
   "storage-sources:list", "storage-sources:save", "task_kill", "tasks:add", "tasks:clear-completed", "tasks:delete", "tasks:list", "tasks:update",
+  // workbench task lifecycle (plan3.0.md §6 Phase 2.1 IPC exposure)
+  "worktask:create", "worktask:events", "worktask:get", "worktask:recover", "worktask:transition",
   "teams:create", "teams:delete", "teams:status",
   // automations-notifications
   "automation_records_archive", "automation_records_delete", "automations:archive", "automations:delete", "automations:run", "automations:save", "automations:set-status", "automations:snapshot",

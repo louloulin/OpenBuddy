@@ -262,6 +262,10 @@ export async function apply(ctx: Context): Promise<() => void> {
     : undefined;
   const taskLifecycleService = taskLifecycleModule.defaultTaskLifecycleService({ sessionExists });
   ctx.provide("taskLifecycle", taskLifecycleService);
+  // Register the active instance so IPC handlers and other product code
+  // can resolve the live task lifecycle service without holding a Cordis
+  // context. The teardown disposes the same instance back.
+  taskLifecycleModule.registerTaskLifecycleService(taskLifecycleService);
   ctx.provide("emailKnowledgeContextValidator", { validate: resources.validateKnowledgeContextCitation });
 
   const emailMcp = ctx.get("mcpClient") as { list?: () => unknown[]; listToolNames?: (serverName: string) => string[]; callTool?: (...args: unknown[]) => Promise<unknown> } | undefined;
@@ -319,6 +323,7 @@ export async function apply(ctx: Context): Promise<() => void> {
     }
     cleanupCollaboration();
     await taskService.close();
+    taskLifecycleModule.clearTaskLifecycleService(taskLifecycleService);
     await taskLifecycleService.close();
   };
 }

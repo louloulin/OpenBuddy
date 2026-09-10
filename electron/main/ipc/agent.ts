@@ -95,6 +95,7 @@ import { registerSessionMiscIpc } from "./session-misc";
 import { registerSessionsIpc } from "./sessions";
 import { registerTaskIpc } from "./task";
 import { registerWorkspaceIpc } from "./workspace";
+import { registerWorktaskIpc } from "./worktask";
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
 
 /**
@@ -132,6 +133,7 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
   registerWorkspaceIpc(sharedDeps);
   registerLifecycleIpc(sharedDeps);
   registerPromptCycleIpc(sharedDeps);
+  registerWorktaskIpc();
 
   // Touch ipcMain so the unused-import lint rule stays happy even if
   // every per-capability module becomes empty in a future split. The
