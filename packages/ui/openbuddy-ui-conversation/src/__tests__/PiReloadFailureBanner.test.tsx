@@ -13,6 +13,8 @@ describe("PiReloadFailureBanner", () => {
     mocks.reload.mockResolvedValue([]);
     render(<PiReloadFailureBanner />);
     act(() => { mocks.listeners.get("renderer/pi-reload-failed")?.({ reason: "profile", error: "broken", generation: 2 }); });
+    expect(screen.getByRole("alert")).toHaveAttribute("aria-live", "assertive");
+    expect(screen.getByRole("button", { name: "Retry" })).toHaveAttribute("aria-describedby", "pi-reload-failure-message");
     expect(screen.getByTestId("pi-reload-failure")).toBeTruthy();
     await act(async () => { fireEvent.click(screen.getByTestId("pi-reload-retry")); });
     expect(mocks.reload).toHaveBeenCalledTimes(1);

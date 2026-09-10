@@ -447,3 +447,9 @@ Electron 复验：`pnpm test:electron:stream-port` 已重新运行，之前的 `
 新增 `PiReloadFailureBanner` 组件并从 `@openbuddy/ui-conversation` 导出：消费 renderer runtime 的 `renderer/pi-reload-failed` 状态，显示失败原因/错误和 Retry 按钮；Retry 直接调用现有 Pi `reloadPiExtensions()` adapter，成功后清除状态，失败后保留 banner 并显示最新错误；重复点击在 in-flight 期间被禁用/去重，避免重复 reload。`profile/reloaded` 与 `pi/extensions-reloaded` 事件仍可清理失败状态。
 
 非桌面组件测试覆盖：失败状态呈现与真实 adapter 成功恢复、重复点击只产生一次 reload、reload 再失败时 affordance 保留且可再次操作。验证：`pnpm exec vitest run packages/ui/openbuddy-ui-conversation/src/__tests__/PiReloadFailureBanner.test.tsx --reporter=dot`：3/3 通过；`pnpm typecheck`：通过；`pnpm build`：通过；`git diff --check`：通过。未新增 transport、未使用真实凭据、未伪造桌面 smoke。
+
+### 12.20 本轮增量：reload failure 真实 conversation UI 接入
+
+将 `PiReloadFailureBanner` 接入 `ChatView` 的 composer 输入栈，故障发生时在真实 conversation UI 中展示，而非仅作为孤立组件。补充 WorkBuddy `--wb-*` 视觉令牌样式：危险态边框/背景、响应式窄屏布局、可见 focus ring、禁用/进行中状态和错误文本截断。无障碍契约使用 `role="alert"`、`aria-live="assertive"`、Retry 按钮 `aria-busy` 与 `aria-describedby`，并增加组件可访问性断言。
+
+验证：`pnpm exec vitest run packages/ui/openbuddy-ui-conversation/src/__tests__/PiReloadFailureBanner.test.tsx --reporter=dot`：3/3 通过；`pnpm typecheck`：通过；`pnpm build`：通过；`git diff --check`：通过。未新增 transport、未使用真实凭据、未伪造桌面 smoke。当前垂直切片进度更新为 **15/18，约 83%**。后续仍需桌面 runner 上的真实 session reload/IPC smoke、跨平台 installer/sign/notarization、真实 provider E3 与长期 benchmark 证据。

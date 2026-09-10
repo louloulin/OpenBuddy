@@ -47,12 +47,24 @@ export function PiReloadFailureBanner() {
   };
 
   return (
-    <div className="pi-reload-failure" role="alert" data-testid="pi-reload-failure">
+    <div
+      className="pi-reload-failure"
+      role="alert"
+      aria-live="assertive"
+      data-testid="pi-reload-failure"
+    >
       <div className="pi-reload-failure__body">
         <strong>Pi runtime reload failed</strong>
-        <span>{retryError ?? failure.error}</span>
+        <span id="pi-reload-failure-message">{retryError ?? failure.error}</span>
       </div>
-      <button type="button" onClick={() => void retry()} disabled={retrying} data-testid="pi-reload-retry">
+      <button
+        type="button"
+        onClick={() => void retry()}
+        disabled={retrying}
+        aria-busy={retrying}
+        aria-describedby="pi-reload-failure-message"
+        data-testid="pi-reload-retry"
+      >
         {retrying ? "Retrying…" : "Retry"}
       </button>
     </div>
