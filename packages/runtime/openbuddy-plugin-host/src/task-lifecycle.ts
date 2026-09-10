@@ -1,9 +1,16 @@
+import type { ComposerEnvelope } from "./composer-envelope";
 export const taskStatuses = [
   "draft", "queued", "running", "awaiting_approval", "completed", "failed", "retrying", "cancelled", "paused",
 ] as const;
 
 export type TaskStatus = (typeof taskStatuses)[number];
 
+export interface TaskApprovalState {
+  approvalId: string;
+  status: "pending" | "approved" | "rejected";
+  requestedAt: string;
+  decidedAt?: string;
+}
 export interface TaskLifecycleState {
   taskId: string;
   sessionId: string;
@@ -11,6 +18,8 @@ export interface TaskLifecycleState {
   generation: number;
   status: TaskStatus;
   updatedAt: string;
+  composerEnvelope?: ComposerEnvelope;
+  approval?: TaskApprovalState;
 }
 
 export type TaskLifecycleEvent =
@@ -89,7 +98,11 @@ export function createTaskLifecycleStore(persistence: TaskLifecyclePersistence):
     },
     async get(taskId) {
       const state = await persistence.read(taskId);
-      return state ? { ...state } : null;
+      return state ? {
+        ...state,
+        ...(state.composerEnvelope ? { composerEnvelope: { ...state.composerEnvelope, attachments: [...state.composerEnvelope.attachments], references: [...state.composerEnvelope.references] } } : {}),
+        ...(state.approval ? { approval: { ...state.approval } } : {}),
+      } : null;
     },
     transition(taskId, event, updatedAt) {
       return enqueue(async () => {

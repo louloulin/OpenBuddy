@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canRecoverTask, createTaskLifecycleStore, isTaskTerminal, transitionTask, TaskLifecycleError, type TaskLifecycleState } from "./task-lifecycle";
+import { createComposerEnvelope } from "./composer-envelope";
+
 
 const base = { taskId: "task-1", sessionId: "session-1", generation: 2, status: "draft" as const, updatedAt: "t0" };
 
@@ -14,6 +16,16 @@ describe("task lifecycle", () => {
     expect(isTaskTerminal(state.status)).toBe(true);
   });
 
+  it("persists composer envelope and approval metadata through recovery", async () => {
+    const persisted = new Map<string, TaskLifecycleState>();
+    const store = createTaskLifecycleStore({ read: async (id) => persisted.get(id) ?? null, write: async (state) => { persisted.set(state.taskId, state); } });
+    const composerEnvelope = createComposerEnvelope({ text: "ship", permissionMode: "approve" }, { envelopeId: "env-1", now: () => "2026-01-01T00:00:00.000Z" });
+    await store.create({ taskId: "task-1", sessionId: "session-1", generation: 2, status: "draft", updatedAt: "t0", composerEnvelope, approval: { approvalId: "approval-1", status: "pending", requestedAt: "t0" } });
+    await store.transition("task-1", "queue", "t1");
+    const recovered = await store.recover("task-1", 2);
+    expect(recovered?.composerEnvelope?.envelopeId).toBe("env-1");
+    expect(recovered?.approval).toMatchObject({ approvalId: "approval-1", status: "pending" });
+  });
   it("persists transitions and fences recovery by generation", async () => {
     const persisted = new Map<string, TaskLifecycleState>();
     const store = createTaskLifecycleStore({

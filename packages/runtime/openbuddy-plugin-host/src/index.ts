@@ -84,6 +84,7 @@ export {
   type TaskLifecycleEvent,
   type TaskLifecyclePersistence,
   type TaskLifecycleState,
+  type TaskApprovalState,
   type TaskLifecycleStore,
   type TaskStatus,
 } from "./task-lifecycle";
