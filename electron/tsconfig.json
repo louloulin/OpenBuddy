@@ -14,6 +14,9 @@
       "@openbuddy/cordis": [
         "../packages/runtime/openbuddy-cordis/src/index.ts"
       ],
+      "@openbuddy/dsh-core/state": [
+        "../packages/runtime/openbuddy-dsh-core/src/state.ts"
+      ],
       "@openbuddy/shared-types": [
         "../packages/shared/openbuddy-types/src/index.ts"
       ],

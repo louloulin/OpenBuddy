@@ -38,7 +38,7 @@ export interface PiSessionRuntimeDisposeOptions {
  */
 export class PiSessionRuntime {
   private readonly factory: PiSessionRuntimeFactory;
-  private readonly hostBridge: BindCoreHostFunctions | null;
+  private hostBridge: BindCoreHostFunctions | null;
   private current: AgentSession | null = null;
   private unsubscribe: (() => void) | null = null;
   private eventHandler: PiSessionEventHandler | null = null;
