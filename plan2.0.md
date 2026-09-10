@@ -359,22 +359,22 @@ Pi 官方 `AgentSession`/Extensions 事件包含 session、agent、turn、messag
 - **已实现**：Phase 1 的 generation-fenced event replay：reload 后 `PiSessionEventBridge.snapshot()` 仅返回当前 generation 事件，避免 stale session/plugin events 回放到 renderer；新增/更新测试覆盖。
 - **已实现**：Phase 1 的 Pi RPC/UI 生命周期事件 canonicalization：`extension_error`、`ui_prompt_start`、`ui_prompt_end` 统一映射并有定向测试。
 - **已实现**：Phase 1 的 Pi→Main 事件背压切片：复用 `@openbuddy/plugin-host` 的 `BoundedEventQueue`，对 `tool_execution_update` 进度事件按 session/kind 合并，snapshot 时刷新；lifecycle/final/error 等事件仍直接进入 ring buffer。
-- **本轮完成**：Phase 1/2 的真实 Pi package E3 垂直切片：使用仓库既有 exact-version package list 与 `installProfilePackage`/`DefaultResourceLoader`/`session.reload()`/`removeProfilePackage` 链路，验证安装、资源发现、tool/command/skill 可用、reload 后仍可用、逐包 remove 后资源为空；同时将 profile remove 的 pnpm 调用补齐 `--ignore-scripts`，避免 pnpm 安全策略因待批准构建脚本阻断纯移除操作。
-- **验证完成**：真实 E3 fixture 通过；本地 profile/reload/rollback 测试通过；typecheck 已通过。
-- **仍未开始**：真实 provider 独立凭据矩阵、E4 benchmark、Electron smoke。
+- **本轮完成**：无凭据 provider E3 切片：修复 Pi `registerProvider`/`registerNativeProvider` 追踪器的提交时序——只有底层 Pi 注册成功后才写入 provider registry 和发出 change event；底层注册异常时 registry、事件和 runtime 状态均保持回滚/无幽灵记录。现有多 provider attribution fixture 扩展为显式失败回滚与错误可观测性断言。
+- **验证完成**：provider registry 7 tests、Pi resource provider fixture 1 test 通过；完整 typecheck/build 通过。
+- **仍未开始**：真实凭据 provider 网络调用、E4 benchmark、Electron smoke。
 
 
 ### 12.4 总体进度
 
-进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 6 个切片（事件 canonicalization、generation-fenced replay、RPC/UI lifecycle canonicalization、Pi 事件背压/进度合并、Pi 0.85.1 API/typecheck/build 门禁收敛、exact-version Pi package E3 生命周期验证），因此当前**实现进度约 33%（6/18）**。该百分比仅表示代码/验证垂直切片完成度，不代表产品发布完成度；真实 provider 凭据矩阵、E4 benchmark 与 Electron smoke 仍未完成。
+进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 7 个切片（前 6 项、以及无凭据多-provider 注册/失败回滚/可观测性 E3），因此当前**实现进度约 39%（7/18）**。该百分比仅表示代码/验证垂直切片完成度，不代表产品发布完成度；真实凭据 provider、E4 benchmark 与 Electron smoke 仍未完成。
 
-### 12.9 本轮增量：exact-version Pi package E3 生命周期
+### 12.10 本轮增量：无凭据多-provider E3 与失败回滚
 
-本轮复用 Pi 官方 `DefaultResourceLoader`/`session.reload()` 和 OpenBuddy 现有 profile package manager，未引入不明依赖。真实 E3 命令：`OPENBUDDY_REAL_PI_E2E=1 pnpm exec vitest run electron/main/agent/pi-resource-loader.test.ts -t "loads pinned real ecosystem packages through profile install and session reload" --reporter=dot`，使用仓库内已记录的 exact versions：`pi-context-prune@1.3.0`、`pi-mcp-adapter@2.31.0`、`pi-web-access@0.27.0`、`pi-goal@0.1.7`、`pi-plan-mode@0.4.8`、`pi-subagents@0.59.0`、`pi-lens@4.1.3`、`pi-hermes-memory@0.9.7`；结果 1 passed、12 skipped，耗时约 87 秒。
+本轮严格不使用凭据、不调用生产 provider 网络：复用 Pi `ModelRuntime.registerProvider`/`registerNativeProvider` 官方机制，在内存/本地临时目录 fixture 中验证两个 provider 的独立 attribution、unregister 隔离、change event，以及底层注册失败时的回滚与诊断。
 
-验收覆盖：profile exact-version install、Pi extension/skill/prompt discovery、commands/tools execution、本地 MCP echo tool、`session.reload()` 后资源与工具仍可用、逐包 remove 后资源路径清空。首次真实运行发现 pnpm remove 因 `ERR_PNPM_IGNORED_BUILDS` 阻断，原因是 remove 命令未声明 `--ignore-scripts`；已在 `profile-manager.ts` 修复并复跑通过。该修复不批准或执行第三方构建脚本，保持供应链安全边界。
+实现修复：provider tracker 现在先调用 Pi 原始注册方法，成功后才提交 host registry 和 `register` change event；unregister 也在 Pi 原始注销成功后再删除 registry 并发出 `unregister` event。这样失败不会留下 registry 幽灵记录，错误仍原样向调用方传播，便于 UI/日志观察。
 
-补充验证：`pnpm exec vitest run packages/runtime/openbuddy-plugin-host/src/profile.test.ts packages/runtime/openbuddy-plugin-host/src/profile-manager-extensions.test.ts electron/main/agent/host-modules/profile-reload-transaction.test.ts electron/main/agent/pi-resource-loader.test.ts --reporter=dot`：4 files、74 passed、1 skipped；`pnpm typecheck`：通过；`git diff --check`：通过。`pnpm build` 本轮未重复运行，上一轮已通过；若需复现：`cd OpenBuddy && pnpm build`。
+验证：`pnpm exec vitest run electron/main/agent/agent-host-provider-registry.test.ts electron/main/agent/pi-resource-loader.test.ts -t "provider|Provider|registry" --reporter=dot`：2 files、8 passed、12 skipped；`pnpm typecheck`：通过；`pnpm build`：通过，仅既有 Node externalization/ineffective dynamic import warnings；`git diff --check`：通过。未运行真实凭据网络测试，避免 secret 泄露与生产写入。
 
 
 
