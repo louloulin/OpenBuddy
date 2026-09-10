@@ -1,4 +1,4 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3 — Phase A.1 落地 + 数字修正）
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.1 — Phase A 全栈审计落地 + A.3 backlog)
 
 > 📅 2026-09-10 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
@@ -241,9 +241,18 @@ JSON 形态（CI / verify:plan 直接消费）：
 
 **A.2 实测输出**：`total=29 / covered=0 / missing=29`（所有 29 个 CANONICAL_PI_PACKAGES 都没有 `tests/integration/real-pi-package-<name>.test.ts`，content-grep 兜底也 0 命中）。完整 missing list 在脚本 `--json` 输出里。
 
-**A.3 ⏳ 未做**：15 项 G 差距写入 `docs/PI_INTEGRATION_BACKLOG.md` 是文档工作，可在 dev-env 落 Phase B 时同步做。
+**A.3 ✅ 已实现**（docs 落地）：
+
+- `docs/PI_INTEGRATION_BACKLOG.md` — 15 项 G-gap（plan4.1 §2）每项 owner / 估时 / 依赖 / 验收命令 / 阻塞状态；与 3 个 audit 脚本的输出字段一一对应
+- §0 一页 backlog（P0 5 项 / P1 8 项 / P2 2 项 = 27 周）+ §6 owner 决策待办 + §7 进度更新契约
 
 **A.4 ⏳ 未做**：将两个 audit 接入 `pnpm verify:plan` 必跑项需要改动 `scripts/verify-plan.mjs`，等 vitest 环境就绪再补（verify-plan 现行为 `cd electron && pnpm exec tsc -p tsconfig.json --noEmit --incremental false`）。
+
+**v3.1 增量**（本次新增，2026-09-10 第二次跑）：
+
+- `scripts/audit/pi-bridge-dead-channels.{sh,mjs}` — 把 14 个 IPC 通道逐条映射到底层 pi 函数 + 当前消费者（grep 自动核对）+ 建议接入位置。Phase D 工作入口。实测 `utilizationPct=7`（1/14 覆盖；GA gate ≥80%）。
+- `docs/PI_NATIVE_AUDIT_BASELINE.md` — 把 3 个 audit 脚本的 JSON baseline 固化为可重读的 GA gate 表，包含 `jq` 一键断言命令。
+- `package.json:55-56` 加入 `audit:pi-bridge-dead` + `audit:pi-bridge-dead:json` 两个新脚本。
 
 **v3 已知限制**：
 
