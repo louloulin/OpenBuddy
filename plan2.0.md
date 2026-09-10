@@ -359,14 +359,14 @@ Pi 官方 `AgentSession`/Extensions 事件包含 session、agent、turn、messag
 - **已实现**：Phase 1 的 generation-fenced event replay：reload 后 `PiSessionEventBridge.snapshot()` 仅返回当前 generation 事件，避免 stale session/plugin events 回放到 renderer；新增/更新测试覆盖。
 - **已实现**：Phase 1 的 Pi RPC/UI 生命周期事件 canonicalization：`extension_error`、`ui_prompt_start`、`ui_prompt_end` 统一映射并有定向测试。
 - **已实现**：Phase 1 的 Pi→Main 事件背压切片：复用 `@openbuddy/plugin-host` 的 `BoundedEventQueue`，对 `tool_execution_update` 进度事件按 session/kind 合并，snapshot 时刷新；lifecycle/final/error 等事件仍直接进入 ring buffer。
-- **本轮完成**：ContextUsagePill 组件级验收门禁：新增真实 React/jsdom 测试，覆盖 Pi context/compaction 四类事件刷新、卸载时 listener 清理、agent reload 期间 refresh 失败保留最后快照，以及 sessionId reload 后清空旧快照并加载新快照。
-- **验证完成**：组件测试 3/3、Pi extension tests 39/39、session lifecycle/metadata recovery tests 5/5；streaming、IPC、main chunk/memory benchmark 已运行并写入 `evidence/perf/`。
-- **桌面门禁阻塞**：IPC surface/stream-port smoke 无法启动 Electron：环境缺少可用 `$DISPLAY`/X server，且当前 Electron loader 报 `Identifier '__filename' has already been declared`；real-ui smoke 按安全策略拒绝运行，要求 `OPENBUDDY_E2E_REQUIRED=1` 和临时 provider credentials。本轮未使用真实凭据。
+- **本轮完成**：E4 长时/高样本基线与 Electron loader 隔离：streaming 以 100,000 iterations、IPC 以 10,000 samples × 100 ops/sample 运行；补充 session lifecycle/metadata reload recovery 定向测试。`electron/main/index.ts` 将 main entry 自有 `__filename`/`__dirname` 改为 `mainFilename`/`mainDirname`，避免 Rollup 合并依赖模块时与依赖内部同名 binding 冲突。
+- **验证完成**：streaming、IPC、main chunk/memory benchmark 均真实运行并写入 `evidence/perf/`；构建后 `out/main/index.js` 不再包含 entry 自有重复 `__filename` binding；typecheck/build 和 44 个定向测试通过。
+- **桌面门禁仍阻塞**：重新运行 stream-port smoke 后 loader 的 `__filename` 冲突已不再出现，但环境缺少 `$DISPLAY`/X server，Electron 在初始化 X11 时退出；未绕过 smoke 安全门禁或使用真实凭据。
 
 
 ### 12.4 总体进度
 
-进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 9 个切片（前 8 项、以及 ContextUsagePill 组件级事件/reload/失败恢复门禁），因此当前**实现进度约 50%（9/18）**。该百分比仅表示代码/验证垂直切片完成度，不代表产品发布完成度；Electron smoke、真实 provider 网络调用和跨平台发布门禁仍未完成。
+进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 10 个切片（前 9 项、以及 E4 长时 benchmark 基线与 Electron loader 隔离修复），因此当前**实现进度约 56%（10/18）**。该百分比仅表示代码/验证垂直切片完成度，不代表产品发布完成度；完整 Electron smoke、真实 provider 网络调用和跨平台发布门禁仍未完成。
 
 ### 12.12 本轮增量：ContextUsagePill 组件级验收门禁与 E4 基线
 
@@ -391,3 +391,14 @@ Electron smoke 尝试及结果：`pnpm test:electron:ipc-surface` 无法启动 P
 - reload、package、RPC、IPC、session recovery 在失败和取消场景可解释、可恢复。
 - 至少一个真实 provider、一个真实外部 Pi package、三平台发布链路达到对应 E3；性能达到 E4。
 - 所有结论能回到代码、测试、原始 benchmark 或 CI artifact；文档不再把计划、fixture 和真实生产证据混为一谈。
+
+### 12.13 本轮增量：E4 长时 benchmark 与 Electron loader 隔离
+
+本轮不使用 provider 凭据、不伪造 provider 结果，运行可在本地完成的高样本/长时基线：
+
+- `node scripts/perf/streaming-bench.mjs --iterations=100000 --inner=500 --json evidence/perf/streaming-bench-2026-09-10T02-14-29-419Z.json`：delta reducer 0.398 µs/iter，token estimator 22.677 µs/iter，tool-card materialize 1000 msgs 80.092 µs/iter，1000-message heap baseline 1.05 MB，60fps headroom 16.63 ms；原始 JSON 已写入 `evidence/perf/streaming-bench-2026-09-10T02-14-29-419Z.json`。
+- `node scripts/perf/ipc-latency.mjs --iterations=10000 --inner=100 --json evidence/perf/ipc-long-20260910T021431Z.json`：使用 real transpiled validator；`session.list` mean 0.511 ms/sample（约 0.00511 ms/op），`plugin.snapshot` mean 0.520 ms/sample（约 0.00520 ms/op）；原始 JSON 已写入 `evidence/perf/ipc-long-20260910T021431Z.json`。
+- `pnpm perf:main-chunks`：完成当前 main entry/chunk 体积基线；`pnpm exec vitest run electron/main/__tests__/session-lifecycle-pi.test.ts electron/main/__tests__/session-metadata-pi.test.ts electron/main/agent/pi-extensions.test.ts --reporter=dot`：3 files、44/44 通过。
+- loader 隔离：`electron/main/index.ts` 原先的 entry-level `const __filename`/`__dirname` 改为 `mainFilename`/`mainDirname`，避免 bundled dependency 也声明 `__filename` 时产生 ESM duplicate binding。`pnpm build`、`pnpm typecheck` 均通过；构建产物检查 `rg -n "const __filename|var __filename|__filename =" out/main/index.js` 不再发现 entry 重复 binding。
+
+Electron 复验：`pnpm test:electron:stream-port` 已重新运行，之前的 `Identifier '__filename' has already been declared` 不再出现；当前唯一明确阻塞为 `[ERROR:ui/ozone/platform/x11/ozone_platform_x11.cc:257] Missing X server or $DISPLAY`，Electron 随后 SIGTRAP 退出。`pnpm test:electron:ipc-surface` 同样无法启动 Playwright Electron。`pnpm test:electron:real-ui` 仍按设计要求 `OPENBUDDY_E2E_REQUIRED=1` 与临时 provider credentials，本轮不绕过该门禁。复现命令已记录为上述三条。
