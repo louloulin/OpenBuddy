@@ -347,6 +347,31 @@ function installPluginDomain(state: AgentHostState, deps: PluginDomainDeps): voi
  * 这些 module 跨域共享, 不严格属于「一个域」; 排在最后以便 profile/session/plugin
  * 先注入完闭包, 再让 runtime 串起来.
  */
+
+// ── Quit-gate coordination (Phase 4.5) ───────────────────────────────────────
+//
+// quit-gate.ts and app-lifecycle.ts both need to coordinate the
+// before-quit and window-all-closed events.  quit-gate.ts imports
+// quitGateState from here; app-lifecycle.ts also reads it.
+//
+// quitGateInstalled: set to true by agent-host.ts BEFORE calling
+// installHostModules (which is inside a queueMicrotask), so that
+// installRuntimeDomain skips the basic before-quit handler when quit-gate
+// is active.  Stored as a property of quitGateState so the import is a
+// plain object (ESM forbids reassigning imported bindings).
+//
+// quitGateState: mutable shared record — backgroundDraining is written by
+// quit-gate (on BACKGROUND decision) and read by app-lifecycle
+// (to suppress window-all-closed → app.quit()).
+//
+export const quitGateState: {
+  backgroundDraining: boolean;
+  quitGateInstalled: boolean;
+} = {
+  backgroundDraining: false,
+  quitGateInstalled: false,
+};
+
 function installRuntimeDomain(state: AgentHostState, deps: RuntimeDomainDeps): void {
   if (deps.state !== state) throw new Error("installHostModules received inconsistent state");
   installProfileReloadTransaction(deps);
@@ -357,7 +382,13 @@ function installRuntimeDomain(state: AgentHostState, deps: RuntimeDomainDeps): v
   installPiRuntimeFactories(deps);
   installPiRuntimeRefresh(deps);
   installDeepSeekAgentFactory(deps);
-  installBeforeQuitHandler(deps);
+  // Only register the basic before-quit handler if the Phase 4.5 quit-gate
+  // has NOT been installed.  agent-host.ts sets quitGateInstalled = true
+  // synchronously before calling installHostModules (queued via queueMicrotask),
+  // so the flag is already set when this function runs.
+  if (!quitGateState.quitGateInstalled) {
+    installBeforeQuitHandler(deps);
+  }
   installModelConfig(deps);
   installInitOrchestration(deps);
 }

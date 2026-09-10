@@ -175,7 +175,7 @@ export async function initSession(deps: InitSessionDeps): Promise<string> {
   }
 
   reportPiExtensionErrors();
-  await syncMarketplacePiExtensionStatuses();
+  await syncMarketplacePiExtensionStatuses(state);
 
   state.session = session;
   state.model = session.model;
