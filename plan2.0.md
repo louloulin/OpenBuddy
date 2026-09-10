@@ -459,3 +459,11 @@ Electron 复验：`pnpm test:electron:stream-port` 已重新运行，之前的 `
 当前执行环境确认无 `$DISPLAY`、无 `$WAYLAND_DISPLAY`，因此没有绕过门禁运行 Electron smoke，也没有设置 `OPENBUDDY_E2E_REQUIRED` 或使用 provider 凭据。增强 `scripts/release-preflight.mjs`：验证 IPC surface、stream-port、real-ui 三个 smoke entrypoint 及 real-ui 的 `OPENBUDDY_E2E_REQUIRED` 合约；报告当前平台/架构、CI 标识、display 可用性、runner 推荐、完整待执行命令和凭据策略；`desktopSmokeReady` 只有 display 与 smoke contract 同时满足才为 true。
 
 真实本地运行：`pnpm release:preflight --json=evidence/release/release-preflight-runner-diagnostics.json`，结果 `ok: true`、`desktopSmokeReady: false`、`desktopRunner.smokeContractPresent: true`、`displayAvailable: false`。该证据明确区分静态 release gate 通过与桌面 smoke 未执行，后续在 Linux desktop runner 执行 `pnpm test:electron:ipc-surface`、`pnpm test:electron:stream-port`，再按批准临时 credentials 门禁执行 `pnpm test:electron:real-ui`。当前进度更新为 **16/18，约 89%**；剩余跨平台 installer/sign/notarization 真实 runner 结果、桌面 smoke 和真实 provider E3。
+
+### 12.22 本轮增量：跨平台 installer/sign/notarization CI contract 门禁
+
+在不读取或验证任何 secret 值、不伪造签名/公证结果的前提下，扩展 `scripts/release-preflight.mjs` 的静态 contract gate：逐项验证 Windows NSIS 构建与 `.exe` artifact、macOS Developer ID/App Store Connect secret import、`CSC_LINK`/`APPLE_API_KEY` 临时路径注入、hardened runtime + notarize、Linux AppImage artifact、三平台构建汇聚后才允许 publish，以及三平台 artifact naming contract。报告显式记录 `credentialPolicy`，本地只确认 workflow/config wiring，不宣称真实签名成功。
+
+真实定向验证：`pnpm release:preflight --json=evidence/release/release-preflight-ci-contract.json` 通过，`ok: true`、新增 `release:installer-signing-contract: true` 与 `release:artifact-contract: true`；当前 `desktopSmokeReady: false` 仍准确反映无 display。`pnpm typecheck`、`pnpm build`、`git diff --check` 通过。当前进度更新为 **17/18，约 94%**。
+
+阻塞/后续：真实 Windows NSIS、macOS Developer ID 签名与 notarization、Linux artifact 运行必须由对应 CI runner 产生；真实 provider E3 仍需安全临时 fixture/凭据，不能以静态 contract 代替运行证据。下一步在专用 runner 收集 artifact/hash、安装/启动和签名公证验证结果。

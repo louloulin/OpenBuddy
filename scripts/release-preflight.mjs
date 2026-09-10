@@ -58,6 +58,23 @@ check("release:runner-matrix", /build-windows:[\s\S]*?runs-on: windows-latest/.t
 });
 check("release:artifact-upload", /actions\/upload-artifact@v4/.test(workflow) && /release\/\*\.(exe|dmg|AppImage)/.test(workflow));
 check("release:publishing-contract", /publish-release:/.test(workflow) && /provider:\s*github/.test(builder) && /owner:\s*louloulin/.test(builder) && /repo:\s*OpenBuddy/.test(builder));
+const signingContract = {
+  windowsBuild: /pnpm electron:build:win/.test(workflow) && workflow.includes("path: release/*.exe"),
+  macSecrets: /MACOS_CSC_LINK_BASE64/.test(workflow) && /MACOS_CSC_KEY_PASSWORD/.test(workflow) && /MACOS_API_KEY_BASE64/.test(workflow) && /MACOS_API_KEY_ID/.test(workflow) && /MACOS_API_ISSUER/.test(workflow),
+  macImport: /CSC_LINK=\$RUNNER_TEMP/.test(workflow) && /APPLE_API_KEY=\$RUNNER_TEMP/.test(workflow),
+  macRelease: /pnpm electron:release:mac/.test(workflow) && /notarize:\s*true/.test(builder) && /hardenedRuntime:\s*true/.test(builder),
+  linuxBuild: /pnpm electron:build:linux/.test(workflow) && workflow.includes("path: release/*.AppImage"),
+  publishNeedsAll: /needs:\s*\[build-windows, build-macos, build-linux\]/.test(workflow),
+};
+check("release:installer-signing-contract", Object.values(signingContract).every(Boolean), {
+  ...signingContract,
+  credentialPolicy: "signing/notarization only on CI runners; local preflight never reads or validates secret values",
+});
+check("release:artifact-contract", /artifactName: \$\{productName\}-\$\{version\}-setup\.\$\{ext\}/.test(builder) && /artifactName: \$\{productName\}-\$\{version\}-\$\{arch\}\.\$\{ext\}/.test(builder) && /artifactName: \$\{productName\}-\$\{version\}\.\$\{ext\}/.test(builder), {
+  windows: /artifactName: \$\{productName\}-\$\{version\}-setup\.\$\{ext\}/.test(builder),
+  macos: /artifactName: \$\{productName\}-\$\{version\}-\$\{arch\}\.\$\{ext\}/.test(builder),
+  linux: /artifactName: \$\{productName\}-\$\{version\}\.\$\{ext\}/.test(builder),
+});
 check("release:signing-is-ci-only", !process.env.CSC_LINK && !process.env.CSC_KEY_PASSWORD && !process.env.APPLE_API_KEY, {
   reason: "local preflight never consumes signing/notarization credentials",
 });
