@@ -101,6 +101,7 @@ import type { AgentSessionEvent, ModelRuntime, ExtensionFactory, DefaultResource
 import type { Context } from "@openbuddy/cordis";
 import type { Model } from "@earendil-works/pi-ai";
 import type { SessionEventRecord } from "../../../session/session-event-log";
+import type { PiNativeInventorySnapshot } from "../plugin-pi-native-inventory";
 
 // ============================================================================
 // Facade interface
@@ -170,6 +171,7 @@ export interface AgentHostFacade {
   listPlugins: () => Promise<ReadonlyArray<PluginEntry>>;
   listTools: () => ReadonlyArray<ToolEntry>;
   pluginInventory: () => Promise<ReadonlyArray<PluginInventoryEntry>>;
+  listPiNativeInventory: () => Promise<PiNativeInventorySnapshot>;
   pluginSnapshot: () => PluginSnapshot;
   pluginEvents: (query?: { sessionId?: string; sinceSequence?: number; limit?: number }) => Promise<ReadonlyArray<PluginEventRecord>>;
   setPluginEnabled: (id: string, enabled: boolean) => Promise<MutationAck>;

@@ -266,7 +266,7 @@ export const lifecycleAppendQueues = new Map<string, Promise<void>>();
 const pluginLifecycleFacade = buildPluginLifecycleFacade(state);
 const profileFacade = buildProfileFacade(state);
 const sessionLifecycleFacade = buildSessionLifecycleFacade(state);
-const { installProfileBundle, removeProfileBundle } = pluginLifecycleFacade;
+const { installProfileBundle, removeProfileBundle, listPiNativeInventory } = pluginLifecycleFacade;
 const {
   profilePatchPaths,
   profileResourceWatchPaths,
@@ -1395,6 +1395,7 @@ export const agentHost = buildAgentHostFacade({
   providerCatalog: providerCatalogImpl,
   listPlugins,
   pluginInventory: listPluginInventoryImpl,
+  listPiNativeInventory,
   pluginSnapshot: pluginSnapshotImpl,
   pluginEvents: pluginEventsImpl,
   setPluginEnabled: setPluginEnabledImpl,

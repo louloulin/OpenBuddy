@@ -25,12 +25,15 @@ import {
   installProfileBundle as installProfileBundleImpl,
   removeProfileBundle as removeProfileBundleImpl,
 } from "../plugin-mutations";
+import { buildPiNativeInventory as buildPiNativeInventoryImpl } from "../plugin-pi-native-inventory";
 
-export function buildPluginLifecycleFacade(_state: AgentHostState) {
+export function buildPluginLifecycleFacade(state: AgentHostState) {
   return {
     refreshStoredPluginLayers: (updateActiveProfile = false) =>
       refreshStoredPluginLayersImpl(updateActiveProfile),
     listPluginInventory: () => listPluginInventoryImpl(),
+    listPiNativeInventory: () =>
+      buildPiNativeInventoryImpl({ state, cwd: state.cwd ?? process.cwd() }),
     setPluginEnabledInternal: (id: string, enabled: boolean, transaction?: any) =>
       setPluginEnabledInternalImpl(id, enabled, transaction),
     reloadPluginInternal: (id: string, transaction?: any) =>

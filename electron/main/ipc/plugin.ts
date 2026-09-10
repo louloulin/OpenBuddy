@@ -38,6 +38,13 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     await ensureAgentHost();
     return agentHost.pluginInventory();
   });
+  ipcMain.handle("agent:pi-native-inventory", async () => {
+    // Phase 7.2 of plan3.0.md — single-call aggregation of the 4
+    // PI-native surfaces (builtin extensions, user extensions, marketplace
+    // packages, skills + agents) for renderer settings tab / health pill.
+    await ensureAgentHost();
+    return agentHost.listPiNativeInventory();
+  });
   ipcMain.handle("agent:tools-list", async () => {
     await ensureAgentHost();
     // Surface every tool the active pi runtime exposes (G-1d
