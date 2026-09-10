@@ -74,14 +74,28 @@ for (const relative of ["out/main/index.js", "out/preload/index.cjs", "out/rende
 check("build:artifact-hash", hashedFiles === 3, { hashedFiles, sha256: digest.digest("hex") });
 
 const hasDisplay = Boolean(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);
+const smokeScripts = [
+  "scripts/electron/ipc-surface-smoke.mjs",
+  "scripts/electron/stream-port-smoke.mjs",
+  "scripts/electron/real-ui-smoke.mjs",
+];
+const smokeScriptsPresent = smokeScripts.every((relative) => existsSync(join(root, relative)));
+check("desktop:smoke-contract", smokeScriptsPresent && /OPENBUDDY_E2E_REQUIRED/.test(fileText(join(root, "scripts/electron/real-ui-smoke.mjs"))), {
+  scripts: smokeScripts,
+  realUiRequiresE2E: /OPENBUDDY_E2E_REQUIRED/.test(fileText(join(root, "scripts/electron/real-ui-smoke.mjs"))),
+  reason: smokeScriptsPresent ? undefined : "one or more desktop smoke entrypoints are missing",
+});
 check("desktop:display", hasDisplay, {
   platform: platform(),
   arch: arch(),
   display: process.env.DISPLAY || null,
   waylandDisplay: process.env.WAYLAND_DISPLAY || null,
+  ci: process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true",
+  runnerRecommendation: hasDisplay ? "run ipc-surface, stream-port, then real-ui with approved temporary credentials" : "use a Linux desktop runner with Xvfb/Wayland; do not set OPENBUDDY_E2E_REQUIRED locally",
   reason: hasDisplay ? undefined : "X server/Wayland display unavailable; Electron smoke must be run on a desktop runner",
 });
 check("desktop:credentials-gate", !process.env.OPENBUDDY_E2E_REQUIRED, {
+  requiredForRealUi: true,
   reason: "real provider smoke remains opt-in and is not run by this preflight",
 });
 
@@ -94,7 +108,13 @@ const report = {
   noNetwork: true,
   checks,
   ok: checks.filter((entry) => entry.name.startsWith("release:") || entry.name.startsWith("build:")).every((entry) => entry.ok),
-  desktopSmokeReady: checks.find((entry) => entry.name === "desktop:display")?.ok === true,
+  desktopSmokeReady: checks.find((entry) => entry.name === "desktop:display")?.ok === true && checks.find((entry) => entry.name === "desktop:smoke-contract")?.ok === true,
+  desktopRunner: {
+    displayAvailable: hasDisplay,
+    smokeContractPresent: smokeScriptsPresent,
+    requiredCommands: ["pnpm test:electron:ipc-surface", "pnpm test:electron:stream-port", "pnpm test:electron:real-ui"],
+    credentialPolicy: "OPENBUDDY_E2E_REQUIRED=1 plus temporary provider credentials only on approved runner",
+  },
 };
 mkdirSync(dirname(reportFile), { recursive: true });
 writeFileSync(reportFile, `${JSON.stringify(report, null, 2)}\n`);

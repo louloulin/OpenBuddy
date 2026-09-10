@@ -453,3 +453,9 @@ Electron 复验：`pnpm test:electron:stream-port` 已重新运行，之前的 `
 将 `PiReloadFailureBanner` 接入 `ChatView` 的 composer 输入栈，故障发生时在真实 conversation UI 中展示，而非仅作为孤立组件。补充 WorkBuddy `--wb-*` 视觉令牌样式：危险态边框/背景、响应式窄屏布局、可见 focus ring、禁用/进行中状态和错误文本截断。无障碍契约使用 `role="alert"`、`aria-live="assertive"`、Retry 按钮 `aria-busy` 与 `aria-describedby`，并增加组件可访问性断言。
 
 验证：`pnpm exec vitest run packages/ui/openbuddy-ui-conversation/src/__tests__/PiReloadFailureBanner.test.tsx --reporter=dot`：3/3 通过；`pnpm typecheck`：通过；`pnpm build`：通过；`git diff --check`：通过。未新增 transport、未使用真实凭据、未伪造桌面 smoke。当前垂直切片进度更新为 **15/18，约 83%**。后续仍需桌面 runner 上的真实 session reload/IPC smoke、跨平台 installer/sign/notarization、真实 provider E3 与长期 benchmark 证据。
+
+### 12.21 本轮增量：桌面 runner preflight/诊断增强
+
+当前执行环境确认无 `$DISPLAY`、无 `$WAYLAND_DISPLAY`，因此没有绕过门禁运行 Electron smoke，也没有设置 `OPENBUDDY_E2E_REQUIRED` 或使用 provider 凭据。增强 `scripts/release-preflight.mjs`：验证 IPC surface、stream-port、real-ui 三个 smoke entrypoint 及 real-ui 的 `OPENBUDDY_E2E_REQUIRED` 合约；报告当前平台/架构、CI 标识、display 可用性、runner 推荐、完整待执行命令和凭据策略；`desktopSmokeReady` 只有 display 与 smoke contract 同时满足才为 true。
+
+真实本地运行：`pnpm release:preflight --json=evidence/release/release-preflight-runner-diagnostics.json`，结果 `ok: true`、`desktopSmokeReady: false`、`desktopRunner.smokeContractPresent: true`、`displayAvailable: false`。该证据明确区分静态 release gate 通过与桌面 smoke 未执行，后续在 Linux desktop runner 执行 `pnpm test:electron:ipc-surface`、`pnpm test:electron:stream-port`，再按批准临时 credentials 门禁执行 `pnpm test:electron:real-ui`。当前进度更新为 **16/18，约 89%**；剩余跨平台 installer/sign/notarization 真实 runner 结果、桌面 smoke 和真实 provider E3。
