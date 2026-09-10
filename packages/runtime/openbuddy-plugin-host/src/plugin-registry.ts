@@ -1,8 +1,20 @@
 import { createGenerationGate, type GenerationGate } from "./generation-gate";
-import { findCapabilityOwnershipConflicts, type ActiveCapabilityBackend } from "./capability-ownership";
+import {
+  findCapabilityOwnershipConflicts,
+  type ActiveCapabilityBackend,
+} from "./capability-ownership";
 
 export const pluginRegistrySchema = "openbuddy.plugin.v1" as const;
-export const pluginRegistrySurfaces = ["pi", "cordis", "bundle", "renderer", "remote", "typert", "skills", "prompts"] as const;
+export const pluginRegistrySurfaces = [
+  "pi",
+  "cordis",
+  "bundle",
+  "renderer",
+  "remote",
+  "typert",
+  "skills",
+  "prompts",
+] as const;
 export type PluginRegistrySurface = (typeof pluginRegistrySurfaces)[number];
 export type PluginRegistryState = "staged" | "active" | "disabled" | "failed" | "disposed";
 
@@ -68,10 +80,17 @@ export class PluginRegistryError extends Error {
 }
 
 function assertManifest(manifest: PluginRegistryManifest): void {
-  if (!manifest || typeof manifest !== "object") throw new PluginRegistryError("manifest must be an object");
-  if (manifest.schema !== pluginRegistrySchema) throw new PluginRegistryError("unsupported manifest schema");
-  for (const [name, value] of [["id", manifest.id], ["version", manifest.version], ["apiVersion", manifest.apiVersion]] as const) {
-    if (typeof value !== "string" || !value.trim()) throw new PluginRegistryError(`${name} is required`);
+  if (!manifest || typeof manifest !== "object")
+    throw new PluginRegistryError("manifest must be an object");
+  if (manifest.schema !== pluginRegistrySchema)
+    throw new PluginRegistryError("unsupported manifest schema");
+  for (const [name, value] of [
+    ["id", manifest.id],
+    ["version", manifest.version],
+    ["apiVersion", manifest.apiVersion],
+  ] as const) {
+    if (typeof value !== "string" || !value.trim())
+      throw new PluginRegistryError(`${name} is required`);
   }
   if (!Array.isArray(manifest.surfaces) || manifest.surfaces.length === 0) {
     throw new PluginRegistryError("at least one surface is required");
@@ -82,22 +101,41 @@ function assertManifest(manifest: PluginRegistryManifest): void {
   if (new Set(manifest.surfaces).size !== manifest.surfaces.length) {
     throw new PluginRegistryError("manifest contains duplicate surfaces");
   }
-  if (manifest.capabilities !== undefined && (!Array.isArray(manifest.capabilities) || manifest.capabilities.length === 0 || manifest.capabilities.some((capability) => typeof capability !== "string" || !capability.trim()))) {
+  if (
+    manifest.capabilities !== undefined &&
+    (!Array.isArray(manifest.capabilities) ||
+      manifest.capabilities.length === 0 ||
+      manifest.capabilities.some(
+        (capability) => typeof capability !== "string" || !capability.trim(),
+      ))
+  ) {
     throw new PluginRegistryError("capabilities must be a non-empty string array");
   }
-  if (manifest.capabilities && new Set(manifest.capabilities).size !== manifest.capabilities.length) {
+  if (
+    manifest.capabilities &&
+    new Set(manifest.capabilities).size !== manifest.capabilities.length
+  ) {
     throw new PluginRegistryError("manifest contains duplicate capabilities");
   }
-  if (manifest.source !== undefined && (typeof manifest.source !== "string" || !manifest.source.trim())) {
+  if (
+    manifest.source !== undefined &&
+    (typeof manifest.source !== "string" || !manifest.source.trim())
+  ) {
     throw new PluginRegistryError("source must be a non-empty string");
   }
   if (manifest.managed !== undefined && typeof manifest.managed !== "boolean") {
     throw new PluginRegistryError("managed must be a boolean");
   }
-  if (manifest.health !== undefined && !["healthy", "degraded", "failed"].includes(manifest.health)) {
+  if (
+    manifest.health !== undefined &&
+    !["healthy", "degraded", "failed"].includes(manifest.health)
+  ) {
     throw new PluginRegistryError("health must be healthy, degraded, or failed");
   }
-  if (manifest.disabledReason !== undefined && !["user", "policy", "load-failed", "dependency-failed"].includes(manifest.disabledReason)) {
+  if (
+    manifest.disabledReason !== undefined &&
+    !["user", "policy", "load-failed", "dependency-failed"].includes(manifest.disabledReason)
+  ) {
     throw new PluginRegistryError("disabledReason is invalid");
   }
   if (manifest.dependencies !== undefined && !Array.isArray(manifest.dependencies)) {
@@ -105,20 +143,45 @@ function assertManifest(manifest: PluginRegistryManifest): void {
   }
   const dependencyIds = new Set<string>();
   for (const dependency of manifest.dependencies ?? []) {
-    if (!dependency || typeof dependency !== "object" || typeof dependency.id !== "string" || typeof dependency.range !== "string" || !dependency.id.trim() || !dependency.range.trim()) {
+    if (
+      !dependency ||
+      typeof dependency !== "object" ||
+      typeof dependency.id !== "string" ||
+      typeof dependency.range !== "string" ||
+      !dependency.id.trim() ||
+      !dependency.range.trim()
+    ) {
       throw new PluginRegistryError("dependency id and range are required");
     }
-    if (dependency.id === manifest.id) throw new PluginRegistryError("plugin cannot depend on itself");
-    if (dependencyIds.has(dependency.id)) throw new PluginRegistryError(`manifest contains duplicate dependency ${dependency.id}`);
+    if (dependency.id === manifest.id)
+      throw new PluginRegistryError("plugin cannot depend on itself");
+    if (dependencyIds.has(dependency.id))
+      throw new PluginRegistryError(`manifest contains duplicate dependency ${dependency.id}`);
     dependencyIds.add(dependency.id);
     if (dependency.optional !== undefined && typeof dependency.optional !== "boolean") {
       throw new PluginRegistryError("dependency optional must be a boolean");
     }
   }
-  if (manifest.permissions !== undefined && (!Array.isArray(manifest.permissions) || manifest.permissions.length === 0 || manifest.permissions.some((permission) => typeof permission !== "string" || !permission.trim()))) {
+  if (
+    manifest.permissions !== undefined &&
+    (!Array.isArray(manifest.permissions) ||
+      manifest.permissions.length === 0 ||
+      manifest.permissions.some(
+        (permission) => typeof permission !== "string" || !permission.trim(),
+      ))
+  ) {
     throw new PluginRegistryError("permissions must be a non-empty string array");
   }
-  if (manifest.entrypoints !== undefined && (typeof manifest.entrypoints !== "object" || manifest.entrypoints === null || Array.isArray(manifest.entrypoints) || Object.keys(manifest.entrypoints).length === 0 || Object.entries(manifest.entrypoints).some(([key, value]) => !key.trim() || typeof value !== "string" || !value.trim()))) {
+  if (
+    manifest.entrypoints !== undefined &&
+    (typeof manifest.entrypoints !== "object" ||
+      manifest.entrypoints === null ||
+      Array.isArray(manifest.entrypoints) ||
+      Object.keys(manifest.entrypoints).length === 0 ||
+      Object.entries(manifest.entrypoints).some(
+        ([key, value]) => !key.trim() || typeof value !== "string" || !value.trim(),
+      ))
+  ) {
     throw new PluginRegistryError("entrypoints must be a map of non-empty strings");
   }
 }
@@ -153,7 +216,10 @@ export function satisfiesPluginDependencyRange(version: string, range: string): 
     const expression = alternative.trim();
     if (!expression) return false;
     const comparatorParts = expression.split(/\s+/).filter(Boolean);
-    if (comparatorParts.length > 1 && comparatorParts.every((part) => /^(?:[<>]=?|=)?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(part))) {
+    if (
+      comparatorParts.length > 1 &&
+      comparatorParts.every((part) => /^(?:[<>]=?|=)?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(part))
+    ) {
       return comparatorParts.every((part) => satisfiesPluginDependencyRange(version, part));
     }
 
@@ -176,9 +242,16 @@ export function satisfiesPluginDependencyRange(version: string, range: string): 
     }
     if (!hasPatch && operator === "^") {
       const upper = hasMinor
-        ? { major: base.major > 0 ? base.major + 1 : 0, minor: base.major > 0 ? 0 : base.minor + 1, patch: 0 }
+        ? {
+            major: base.major > 0 ? base.major + 1 : 0,
+            minor: base.major > 0 ? 0 : base.minor + 1,
+            patch: 0,
+          }
         : { major: base.major + 1, minor: 0, patch: 0 };
-      return compareSemanticVersions(candidate, base) >= 0 && compareSemanticVersions(candidate, upper) < 0;
+      return (
+        compareSemanticVersions(candidate, base) >= 0 &&
+        compareSemanticVersions(candidate, upper) < 0
+      );
     }
     const comparison = compareSemanticVersions(candidate, base);
     if (operator === "=") return comparison === 0;
@@ -186,13 +259,15 @@ export function satisfiesPluginDependencyRange(version: string, range: string): 
     if (operator === ">=") return comparison >= 0;
     if (operator === "<") return comparison < 0;
     if (operator === "<=") return comparison <= 0;
-    if (operator === "~") return candidate.major === base.major && candidate.minor === base.minor && comparison >= 0;
+    if (operator === "~")
+      return candidate.major === base.major && candidate.minor === base.minor && comparison >= 0;
     if (operator === "^") {
-      const upper = base.major > 0
-        ? { major: base.major + 1, minor: 0, patch: 0 }
-        : base.minor > 0
-          ? { major: 0, minor: base.minor + 1, patch: 0 }
-          : { major: 0, minor: 0, patch: base.patch + 1 };
+      const upper =
+        base.major > 0
+          ? { major: base.major + 1, minor: 0, patch: 0 }
+          : base.minor > 0
+            ? { major: 0, minor: base.minor + 1, patch: 0 }
+            : { major: 0, minor: 0, patch: base.patch + 1 };
       return comparison >= 0 && compareSemanticVersions(candidate, upper) < 0;
     }
     return false;
@@ -204,7 +279,9 @@ function cloneManifest(manifest: PluginRegistryManifest): PluginRegistryManifest
     ...manifest,
     surfaces: [...manifest.surfaces],
     ...(manifest.capabilities ? { capabilities: [...manifest.capabilities] } : {}),
-    ...(manifest.dependencies ? { dependencies: manifest.dependencies.map((dependency) => ({ ...dependency })) } : {}),
+    ...(manifest.dependencies
+      ? { dependencies: manifest.dependencies.map((dependency) => ({ ...dependency })) }
+      : {}),
     ...(manifest.permissions ? { permissions: [...manifest.permissions] } : {}),
     ...(manifest.entrypoints ? { entrypoints: { ...manifest.entrypoints } } : {}),
   };
@@ -229,12 +306,21 @@ export class PluginRegistry {
 
   constructor(options: PluginRegistryOptions = {}) {
     this.gate = createGenerationGate(options.generation ?? 0);
-    this.nextTransactionId = options.transactionId ?? (() => `plugin-tx-${this.gate.current()}-${Date.now()}`);
+    let transactionSequence = 0;
+    this.nextTransactionId =
+      options.transactionId ?? (() => `plugin-tx-${++transactionSequence}-${Date.now()}`);
   }
 
-  get generation(): number { return this.gate.current(); }
+  get generation(): number {
+    return this.gate.current();
+  }
 
-  list(): readonly PluginRegistryEntry[] { return [...this.entries.values()].map((entry) => ({ ...entry, manifest: cloneManifest(entry.manifest) })); }
+  list(): readonly PluginRegistryEntry[] {
+    return [...this.entries.values()].map((entry) => ({
+      ...entry,
+      manifest: cloneManifest(entry.manifest),
+    }));
+  }
 
   get(pluginId: string): PluginRegistryEntry | undefined {
     const entry = this.entries.get(pluginId);
@@ -268,7 +354,6 @@ export class PluginRegistry {
     this.emit({ ...event });
   }
 
-
   subscribeCurrent(listener: (event: PluginRegistryEvent) => void): () => void {
     return this.subscribe((event) => {
       if (event.generation === this.generation) listener(event);
@@ -278,10 +363,19 @@ export class PluginRegistry {
   register(manifest: PluginRegistryManifest): Promise<PluginRegistryTransaction> {
     return this.enqueue(async () => {
       assertManifest(manifest);
-      if (this.entries.has(manifest.id)) throw new PluginRegistryError(`plugin ${manifest.id} is already registered`);
+      if (this.entries.has(manifest.id))
+        throw new PluginRegistryError(`plugin ${manifest.id} is already registered`);
+      // Registration resolves the graph, while activation resolves readiness.
+      // A dependency may therefore be staged first and activated later, but a
+      // missing dependency or cycle is rejected before this manifest is stored.
       this.assertDependencies(manifest, false);
+      this.assertDependencyGraph(manifest);
       const generation = this.gate.advance();
-      this.entries.set(manifest.id, { manifest: cloneManifest(manifest), state: "staged", generation });
+      this.entries.set(manifest.id, {
+        manifest: cloneManifest(manifest),
+        state: "staged",
+        generation,
+      });
       return this.transaction("register", manifest.id, generation);
     });
   }
@@ -302,23 +396,30 @@ export class PluginRegistry {
   }
 
   dependentsOf(pluginId: string): readonly PluginRegistryEntry[] {
-    return this.list().filter((entry) => entry.state === "active" && entry.manifest.dependencies?.some((dependency) => dependency.id === pluginId));
+    return this.list().filter(
+      (entry) =>
+        entry.state === "active" &&
+        entry.manifest.dependencies?.some((dependency) => dependency.id === pluginId),
+    );
   }
 
-  disable(pluginId: string, reason: NonNullable<PluginRegistryManifest["disabledReason"]> = "user"): Promise<PluginRegistryTransaction> {
-    return this.enqueue(async () => {
-      const entry = this.require(pluginId);
-      const activeDependents = this.dependentsOf(pluginId);
-      if (activeDependents.length > 0) {
-        throw new PluginRegistryError(`cannot disable ${pluginId}: active dependents ${activeDependents.map((dependent) => dependent.manifest.id).join(", ")}`);
-      }
-      const generation = this.gate.advance();
-      entry.state = "disabled";
-      entry.generation = generation;
-      entry.manifest.disabledReason = reason;
-      delete entry.error;
-      return this.transaction("disable", pluginId, generation);
-    });
+  disable(
+    pluginId: string,
+    reason: NonNullable<PluginRegistryManifest["disabledReason"]> = "user",
+  ): Promise<PluginRegistryTransaction> {
+    return this.enqueue(async () => (await this.disableManyInternal([pluginId], reason))[0]);
+  }
+
+  /**
+   * Disable a dependency tree as one registry mutation. Validation runs before
+   * any entry changes, so a concurrently activated external dependent cannot
+   * leave this graph half-disabled.
+   */
+  disableMany(
+    pluginIds: readonly string[],
+    reason: NonNullable<PluginRegistryManifest["disabledReason"]> = "user",
+  ): Promise<readonly PluginRegistryTransaction[]> {
+    return this.enqueue(() => this.disableManyInternal(pluginIds, reason));
   }
 
   fail(pluginId: string, error: unknown): Promise<PluginRegistryTransaction> {
@@ -344,7 +445,10 @@ export class PluginRegistry {
 
   private enqueue<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.mutation.then(operation, operation);
-    this.mutation = result.then(() => undefined, () => undefined);
+    this.mutation = result.then(
+      () => undefined,
+      () => undefined,
+    );
     return result;
   }
 
@@ -357,13 +461,89 @@ export class PluginRegistry {
   private assertDependencies(manifest: PluginRegistryManifest, checkVersion = true): void {
     for (const dependency of manifest.dependencies ?? []) {
       const entry = this.entries.get(dependency.id);
-      if (!entry || (entry.state !== "active" && !dependency.optional)) {
+      if (!entry) {
+        if (dependency.optional) continue;
         throw new PluginRegistryError(`dependency ${dependency.id} is not active`);
       }
-      if (checkVersion && entry && entry.state === "active" && !satisfiesPluginDependencyRange(entry.manifest.version, dependency.range)) {
-        throw new PluginRegistryError(`dependency ${dependency.id} version ${entry.manifest.version} does not satisfy ${dependency.range}`);
+      // Registration only needs a resolvable graph. Activation is the point at
+      // which every required dependency must have reached the active state.
+      if (
+        checkVersion &&
+        entry.state === "active" &&
+        !satisfiesPluginDependencyRange(entry.manifest.version, dependency.range)
+      ) {
+        throw new PluginRegistryError(
+          `dependency ${dependency.id} version ${entry.manifest.version} does not satisfy ${dependency.range}`,
+        );
+      }
+      if (checkVersion && entry.state !== "active" && !dependency.optional) {
+        throw new PluginRegistryError(`dependency ${dependency.id} is not active`);
+      }
+      if (!checkVersion && !["staged", "active"].includes(entry.state) && !dependency.optional) {
+        throw new PluginRegistryError(`dependency ${dependency.id} is not active`);
       }
     }
+  }
+
+  private assertDependencyGraph(candidate: PluginRegistryManifest): void {
+    const manifests = new Map<string, PluginRegistryManifest>();
+    for (const entry of this.entries.values()) manifests.set(entry.manifest.id, entry.manifest);
+    manifests.set(candidate.id, candidate);
+
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+    const path: string[] = [];
+    const visit = (pluginId: string): void => {
+      if (visited.has(pluginId)) return;
+      if (visiting.has(pluginId)) {
+        const cycleStart = path.indexOf(pluginId);
+        const cycle = [...path.slice(cycleStart), pluginId].join(" -> ");
+        throw new PluginRegistryError(`dependency cycle: ${cycle}`);
+      }
+      const manifest = manifests.get(pluginId);
+      if (!manifest) return;
+      visiting.add(pluginId);
+      path.push(pluginId);
+      for (const dependency of manifest.dependencies ?? []) {
+        if (manifests.has(dependency.id)) visit(dependency.id);
+      }
+      path.pop();
+      visiting.delete(pluginId);
+      visited.add(pluginId);
+    };
+
+    visit(candidate.id);
+  }
+
+  private async disableManyInternal(
+    pluginIds: readonly string[],
+    reason: NonNullable<PluginRegistryManifest["disabledReason"]>,
+  ): Promise<readonly PluginRegistryTransaction[]> {
+    const ids = [...new Set(pluginIds)];
+    if (ids.length === 0) return [];
+    const entries = ids.map((pluginId) => this.require(pluginId));
+    const targetIds = new Set(ids);
+    for (const pluginId of ids) {
+      const externalDependents = this.dependentsOf(pluginId).filter(
+        (dependent) => !targetIds.has(dependent.manifest.id),
+      );
+      if (externalDependents.length > 0) {
+        throw new PluginRegistryError(
+          `cannot disable ${pluginId}: active dependents ${externalDependents.map((dependent) => dependent.manifest.id).join(", ")}`,
+        );
+      }
+    }
+
+    const transactions: PluginRegistryTransaction[] = [];
+    for (const entry of entries) {
+      const generation = this.gate.advance();
+      entry.state = "disabled";
+      entry.generation = generation;
+      entry.manifest.disabledReason = reason;
+      delete entry.error;
+      transactions.push(this.transaction("disable", entry.manifest.id, generation));
+    }
+    return transactions;
   }
 
   private assertCapabilityConflicts(pluginId: string): void {
@@ -375,13 +555,25 @@ export class PluginRegistry {
       }
     }
     const conflicts = findCapabilityOwnershipConflicts(backends);
-    if (conflicts.length > 0) throw new PluginRegistryError(`active surface conflict: ${conflicts[0].capability}`);
+    if (conflicts.length > 0)
+      throw new PluginRegistryError(`active surface conflict: ${conflicts[0].capability}`);
   }
 
-  private transaction(kind: PluginRegistryTransaction["kind"], pluginId: string, generation: number): PluginRegistryTransaction {
-    const transaction = { id: this.nextTransactionId(), kind, pluginId, generation, status: "committed" as const };
+  private transaction(
+    kind: PluginRegistryTransaction["kind"],
+    pluginId: string,
+    generation: number,
+  ): PluginRegistryTransaction {
+    const transaction = {
+      id: this.nextTransactionId(),
+      kind,
+      pluginId,
+      generation,
+      status: "committed" as const,
+    };
     const entry = this.entries.get(pluginId);
-    if (entry) this.emit({ kind, pluginId, generation, transactionId: transaction.id, state: entry.state });
+    if (entry)
+      this.emit({ kind, pluginId, generation, transactionId: transaction.id, state: entry.state });
     return transaction;
   }
 }

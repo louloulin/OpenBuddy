@@ -16,7 +16,9 @@ export interface PluginLifecycleSurfaceAdapter {
 
 export interface PluginLifecycleAdapter extends PluginLifecycleSurfaceAdapter {
   /** Runtime-specific handlers. Keys must be declared in manifest.surfaces. */
-  surfaces?: Partial<Record<PluginRegistryManifest["surfaces"][number], PluginLifecycleSurfaceAdapter>>;
+  surfaces?: Partial<
+    Record<PluginRegistryManifest["surfaces"][number], PluginLifecycleSurfaceAdapter>
+  >;
 }
 
 export interface PluginLifecycleDiagnostic {
@@ -45,6 +47,7 @@ export class PluginLifecycleCoordinator {
   private readonly adapters = new Map<string, PluginLifecycleAdapter>();
   private readonly diagnostics: PluginLifecycleDiagnostic[] = [];
   private readiness: PluginReadinessSnapshot;
+  private mutation: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly registry: PluginRegistry) {
     this.readiness = this.snapshot();
@@ -58,9 +61,21 @@ export class PluginLifecycleCoordinator {
     return [...this.diagnostics];
   }
 
-  getReadiness(): PluginReadinessSnapshot { return this.readiness; }
+  getReadiness(): PluginReadinessSnapshot {
+    return this.readiness;
+  }
 
-  async stage(manifest: PluginRegistryManifest, adapter: PluginLifecycleAdapter = {}): Promise<PluginLifecycleResult> {
+  async stage(
+    manifest: PluginRegistryManifest,
+    adapter: PluginLifecycleAdapter = {},
+  ): Promise<PluginLifecycleResult> {
+    return this.enqueue(() => this.stageInternal(manifest, adapter));
+  }
+
+  private async stageInternal(
+    manifest: PluginRegistryManifest,
+    adapter: PluginLifecycleAdapter,
+  ): Promise<PluginLifecycleResult> {
     this.assertSurfaceAdapters(manifest, adapter);
     this.registerAdapter(manifest.id, adapter);
     const transaction = await this.registry.register(manifest);
@@ -74,11 +89,19 @@ export class PluginLifecycleCoordinator {
       await this.rollback(manifest, error);
       const failed = await this.registry.fail(manifest.id, error);
       this.refresh();
-      return { transaction: { ...failed, status: "rolled_back", error: message(error) }, receipts: [], diagnostics: this.getDiagnostics() };
+      return {
+        transaction: { ...failed, status: "rolled_back", error: message(error) },
+        receipts: [],
+        diagnostics: this.getDiagnostics(),
+      };
     }
   }
 
   async activate(pluginId: string): Promise<PluginLifecycleResult> {
+    return this.enqueue(() => this.activateInternal(pluginId));
+  }
+
+  private async activateInternal(pluginId: string): Promise<PluginLifecycleResult> {
     const entry = this.require(pluginId);
     const adapter = this.adapters.get(pluginId) ?? {};
     try {
@@ -92,7 +115,14 @@ export class PluginLifecycleCoordinator {
       await this.rollback(entry.manifest, error);
       this.refresh();
       return {
-        transaction: { id: `rollback-${this.registry.generation}`, kind: "activate", pluginId, generation: this.registry.generation, status: "rolled_back", error: message(error) },
+        transaction: {
+          id: `rollback-${this.registry.generation}`,
+          kind: "activate",
+          pluginId,
+          generation: this.registry.generation,
+          status: "rolled_back",
+          error: message(error),
+        },
         receipts: [],
         diagnostics: this.getDiagnostics(),
       };
@@ -100,11 +130,16 @@ export class PluginLifecycleCoordinator {
   }
 
   async disable(pluginId: string): Promise<PluginLifecycleResult> {
+    return this.enqueue(() => this.disableInternal(pluginId));
+  }
+
+  private async disableInternal(pluginId: string): Promise<PluginLifecycleResult> {
     const root = this.require(pluginId);
     const targets: PluginRegistryEntry[] = [];
     const visit = (entry: PluginRegistryEntry) => {
       for (const dependent of this.registry.dependentsOf(entry.manifest.id)) {
-        if (!targets.some((candidate) => candidate.manifest.id === dependent.manifest.id)) visit(dependent);
+        if (!targets.some((candidate) => candidate.manifest.id === dependent.manifest.id))
+          visit(dependent);
       }
       targets.push(entry);
     };
@@ -114,24 +149,27 @@ export class PluginLifecycleCoordinator {
     try {
       for (const entry of targets) {
         current = entry;
-        await this.forEachSurface(entry.manifest, this.adapters.get(entry.manifest.id) ?? {}, "dispose");
+        await this.forEachSurface(
+          entry.manifest,
+          this.adapters.get(entry.manifest.id) ?? {},
+          "dispose",
+        );
         await this.adapters.get(entry.manifest.id)?.dispose?.(entry.manifest);
         disposed.push(entry);
       }
-      let transaction: PluginRegistryTransaction = {
-        id: `disable-${this.registry.generation}`,
-        kind: "disable",
-        pluginId,
-        generation: this.registry.generation,
-        status: "committed",
-      };
-      const receipts: PluginRegistryTransaction[] = [];
-      for (const entry of targets) {
-        transaction = await this.registry.disable(entry.manifest.id);
-        receipts.push(transaction);
-      }
+      const receipts = await this.registry.disableMany(targets.map((entry) => entry.manifest.id));
       this.refresh();
-      return { transaction, receipts, diagnostics: this.getDiagnostics() };
+      return {
+        transaction: receipts.at(-1) ?? {
+          id: `disable-${this.registry.generation}`,
+          kind: "disable",
+          pluginId,
+          generation: this.registry.generation,
+          status: "committed",
+        },
+        receipts,
+        diagnostics: this.getDiagnostics(),
+      };
     } catch (error) {
       const failed = current ?? disposed.at(-1) ?? root;
       this.record(failed.manifest.id, "dispose", error);
@@ -145,7 +183,14 @@ export class PluginLifecycleCoordinator {
       }
       this.refresh();
       return {
-        transaction: { id: `disable-rollback-${this.registry.generation}`, kind: "disable", pluginId, generation: this.registry.generation, status: "rolled_back", error: message(error) },
+        transaction: {
+          id: `disable-rollback-${this.registry.generation}`,
+          kind: "disable",
+          pluginId,
+          generation: this.registry.generation,
+          status: "rolled_back",
+          error: message(error),
+        },
         receipts: [],
         diagnostics: this.getDiagnostics(),
       };
@@ -153,6 +198,10 @@ export class PluginLifecycleCoordinator {
   }
 
   async dispose(pluginId: string): Promise<PluginLifecycleResult> {
+    return this.enqueue(() => this.disposeInternal(pluginId));
+  }
+
+  private async disposeInternal(pluginId: string): Promise<PluginLifecycleResult> {
     const entry = this.require(pluginId);
     const adapter = this.adapters.get(pluginId) ?? {};
     try {
@@ -164,8 +213,28 @@ export class PluginLifecycleCoordinator {
     } catch (error) {
       this.record(pluginId, "dispose", error);
       this.refresh();
-      return { transaction: { id: `failed-${this.registry.generation}`, kind: "dispose", pluginId, generation: this.registry.generation, status: "rolled_back", error: message(error) }, receipts: [], diagnostics: this.getDiagnostics() };
+      return {
+        transaction: {
+          id: `failed-${this.registry.generation}`,
+          kind: "dispose",
+          pluginId,
+          generation: this.registry.generation,
+          status: "rolled_back",
+          error: message(error),
+        },
+        receipts: [],
+        diagnostics: this.getDiagnostics(),
+      };
     }
+  }
+
+  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.mutation.then(operation, operation);
+    this.mutation = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
 
   private async rollback(manifest: PluginRegistryManifest, cause: unknown): Promise<void> {
@@ -178,9 +247,12 @@ export class PluginLifecycleCoordinator {
     }
   }
 
-  private assertSurfaceAdapters(manifest: PluginRegistryManifest, adapter: PluginLifecycleAdapter): void {
+  private assertSurfaceAdapters(
+    manifest: PluginRegistryManifest,
+    adapter: PluginLifecycleAdapter,
+  ): void {
     for (const surface of Object.keys(adapter.surfaces ?? {})) {
-      if (!manifest.surfaces.includes(surface as typeof manifest.surfaces[number])) {
+      if (!manifest.surfaces.includes(surface as (typeof manifest.surfaces)[number])) {
         throw new Error(`plugin ${manifest.id} adapter declares undeclared surface ${surface}`);
       }
     }
@@ -192,15 +264,33 @@ export class PluginLifecycleCoordinator {
     phase: "stage" | "activate" | "rollback" | "dispose",
     cause?: unknown,
   ): Promise<void> {
-    const surfaces = phase === "rollback" || phase === "dispose" ? [...manifest.surfaces].reverse() : [...manifest.surfaces];
+    const surfaces =
+      phase === "rollback" || phase === "dispose"
+        ? [...manifest.surfaces].reverse()
+        : [...manifest.surfaces];
     for (const surface of surfaces) {
-      const handler = adapter.surfaces?.[surface]?.[phase] as ((manifest: PluginRegistryManifest, cause?: unknown) => void | Promise<void>) | undefined;
+      const handler = adapter.surfaces?.[surface]?.[phase] as
+        ((manifest: PluginRegistryManifest, cause?: unknown) => void | Promise<void>) | undefined;
       await handler?.(manifest, cause);
     }
   }
 
-  private record(pluginId: string, phase: PluginLifecycleDiagnostic["phase"], error: unknown, transactionId?: string, surface?: PluginRegistryManifest["surfaces"][number]): void {
-    this.diagnostics.push({ pluginId, phase, ...(surface ? { surface } : {}), code: "adapter_failed", message: message(error), generation: this.registry.generation, ...(transactionId ? { transactionId } : {}) });
+  private record(
+    pluginId: string,
+    phase: PluginLifecycleDiagnostic["phase"],
+    error: unknown,
+    transactionId?: string,
+    surface?: PluginRegistryManifest["surfaces"][number],
+  ): void {
+    this.diagnostics.push({
+      pluginId,
+      phase,
+      ...(surface ? { surface } : {}),
+      code: "adapter_failed",
+      message: message(error),
+      generation: this.registry.generation,
+      ...(transactionId ? { transactionId } : {}),
+    });
   }
 
   private require(pluginId: string): PluginRegistryEntry {
@@ -209,15 +299,26 @@ export class PluginLifecycleCoordinator {
     return entry;
   }
 
-  private refresh(): void { this.readiness = this.snapshot(); }
+  private refresh(): void {
+    this.readiness = this.snapshot();
+  }
 
   private snapshot(): PluginReadinessSnapshot {
     const entries = this.registry.list();
     return createPluginReadinessSnapshot({
-      phase: entries.some((entry) => entry.state === "failed") ? "failed" : entries.length ? "ready" : "idle",
+      phase: entries.some((entry) => entry.state === "failed")
+        ? "failed"
+        : entries.length
+          ? "ready"
+          : "idle",
       generation: this.registry.generation,
-      main: entries.map((entry) => ({ state: entry.state, health: entry.state === "failed" ? "failed" : undefined })),
-      pi: entries.filter((entry) => entry.manifest.surfaces.includes("pi")).map((entry) => ({ state: entry.state })),
+      main: entries.map((entry) => ({
+        state: entry.state,
+        health: entry.state === "failed" ? "failed" : undefined,
+      })),
+      pi: entries
+        .filter((entry) => entry.manifest.surfaces.includes("pi"))
+        .map((entry) => ({ state: entry.state })),
       error: this.diagnostics.at(-1)?.message,
     });
   }
