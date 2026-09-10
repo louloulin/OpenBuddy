@@ -40,13 +40,13 @@ export interface TaskLifecycleState {
 
 export type TaskLifecycleEvent =
   | "queue" | "start" | "approval_required" | "approve" | "complete" | "fail"
-  | "retry" | "cancel" | "pause" | "resume";
+  | "retry" | "cancel" | "pause" | "resume" | "reject";
 
 const transitions: Readonly<Record<TaskStatus, Readonly<Partial<Record<TaskLifecycleEvent, TaskStatus>>>>> = {
   draft: { queue: "queued", cancel: "cancelled" },
   queued: { start: "running", cancel: "cancelled" },
   running: { approval_required: "awaiting_approval", complete: "completed", fail: "failed", cancel: "cancelled", pause: "paused" },
-  awaiting_approval: { approve: "running", cancel: "cancelled" },
+  awaiting_approval: { approve: "running", reject: "cancelled", cancel: "cancelled" },
   failed: { retry: "retrying", cancel: "cancelled" },
   retrying: { start: "running", cancel: "cancelled" },
   paused: { resume: "queued", cancel: "cancelled" },
@@ -87,6 +87,7 @@ export interface TaskLifecycleStore {
   create(state: TaskLifecycleState): Promise<TaskLifecycleState>;
   get(taskId: string): Promise<TaskLifecycleState | null>;
   transition(taskId: string, event: TaskLifecycleEvent, updatedAt: string): Promise<TaskLifecycleState>;
+  decideApproval(taskId: string, decision: "approved" | "rejected", decidedAt: string): Promise<TaskLifecycleState>;
   recover(taskId: string, currentGeneration: number): Promise<TaskLifecycleState | null>;
   appendArtifact(taskId: string, artifact: TaskArtifact): Promise<TaskLifecycleState>;
   appendCitation(taskId: string, citation: TaskCitation): Promise<TaskLifecycleState>;
@@ -133,10 +134,24 @@ export function createTaskLifecycleStore(persistence: TaskLifecyclePersistence):
         return { ...next };
       });
     },
-    async recover(taskId, currentGeneration) {
-      const state = await persistence.read(taskId);
-      if (!state || !canRecoverTask(state, currentGeneration)) return null;
-      return { ...state };
+    decideApproval(taskId, decision, decidedAt) {
+      return enqueue(async () => {
+        const current = await persistence.read(taskId);
+        if (!current) throw new Error(`task ${taskId} does not exist`);
+        if (!current.approval || current.approval.status !== "pending") throw new Error(`task ${taskId} has no pending approval`);
+        const nextStatus: "approved" | "rejected" = decision === "approved" ? "approved" : "rejected";
+        const next = transitionTask(current, decision === "approved" ? "approve" : "reject", decidedAt);
+        const updated = { ...next, approval: { ...current.approval, status: nextStatus, decidedAt }, updatedAt: decidedAt };
+        await persistence.write(updated);
+        return updated;
+      });
+    },
+    recover(taskId, currentGeneration) {
+      return enqueue(async () => {
+        const state = await persistence.read(taskId);
+        if (!state || !canRecoverTask(state, currentGeneration)) return null;
+        return { ...state };
+      });
     },
     appendArtifact(taskId, artifact) {
       return enqueue(async () => {

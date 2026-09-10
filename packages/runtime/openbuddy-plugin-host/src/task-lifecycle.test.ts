@@ -31,6 +31,14 @@ describe("task lifecycle", () => {
     expect(projected?.artifacts).toEqual([expect.objectContaining({ artifactId: "artifact-1" })]);
     expect(projected?.citations).toEqual([expect.objectContaining({ citationId: "citation-1", artifactId: "artifact-1" })]);
   });
+  it("binds approval decisions to executor state and persists the decision", async () => {
+    const persisted = new Map<string, TaskLifecycleState>();
+    const store = createTaskLifecycleStore({ read: async (id) => persisted.get(id) ?? null, write: async (state) => { persisted.set(state.taskId, state); } });
+    await store.create({ ...base, status: "awaiting_approval", approval: { approvalId: "approval-1", status: "pending", requestedAt: "t0" } });
+    const running = await store.decideApproval("task-1", "approved", "t1");
+    expect(running).toMatchObject({ status: "running", approval: { approvalId: "approval-1", status: "approved", decidedAt: "t1" } });
+    await expect(store.decideApproval("task-1", "approved", "t2")).rejects.toThrow("no pending approval");
+  });
   it("persists transitions and fences recovery by generation", async () => {
     const persisted = new Map<string, TaskLifecycleState>();
     const store = createTaskLifecycleStore({

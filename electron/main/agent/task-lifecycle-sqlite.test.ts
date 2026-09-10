@@ -34,6 +34,16 @@ describe("SqliteTaskLifecyclePersistence", () => {
     expect(await reopened.get(base.taskId)).toMatchObject({ status: "failed", generation: 4 });
   });
 
+  it("recovers composer approval and artifact citations after reopening", async () => {
+    const { store: first, databasePath } = await makeStore();
+    await first.create({ ...base, status: "awaiting_approval", composerEnvelope: { schemaVersion: 1, envelopeId: "env-1", text: "ship", immutable: true, createdAt: "2026-01-01", permissionMode: "approve", attachments: [], references: [] }, approval: { approvalId: "approval-1", status: "pending", requestedAt: "t0" }, artifacts: [{ artifactId: "artifact-1", kind: "document", title: "result", digest: "sha256:x" }], citations: [{ citationId: "citation-1", artifactId: "artifact-1", locator: "p1" }] });
+    const original = resources.shift()!;
+    await original.persistence.close();
+    const reopenedPersistence = new SqliteTaskLifecyclePersistence(databasePath);
+    resources.push({ persistence: reopenedPersistence, dir: original.dir });
+    const reopened = createTaskLifecycleStore(reopenedPersistence);
+    expect(await reopened.get(base.taskId)).toMatchObject({ status: "awaiting_approval", composerEnvelope: { envelopeId: "env-1" }, approval: { status: "pending" }, artifacts: [{ artifactId: "artifact-1" }], citations: [{ citationId: "citation-1", artifactId: "artifact-1" }] });
+  });
   it("serializes concurrent transitions through the canonical SQLite adapter", async () => {
     const { store } = await makeStore();
     await store.create(base);
