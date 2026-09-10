@@ -97,8 +97,15 @@ export function installQuitGate(deps: QuitGateDeps): void {
       const policy = classifyQuitTasks(tasks);
 
       if (policy.kind === "proceed") {
-        // No active tasks — go straight to disposal.
-        await dispose();
+        // No active tasks. Prevent the default so dispose() runs before the process
+        // exits, then exit explicitly after dispose completes.
+        event.preventDefault();
+        try {
+          await dispose();
+        } catch (err) {
+          console.error("[quit-gate] dispose failed:", err);
+        }
+        app.exit(0);
         return;
       }
 
@@ -140,7 +147,14 @@ export function installQuitGate(deps: QuitGateDeps): void {
         await Promise.allSettled(active.map((t) => killTask(t.id)));
       }
 
-      await dispose();
+      // dispose() must complete before exiting.  If dispose() rejects we still
+      // must exit — use a try/catch so app.exit(0) is reached even on failure.
+      try {
+        await dispose();
+      } catch (err) {
+        console.error("[quit-gate] dispose failed:", err);
+      }
+      app.exit(0);
     } finally {
       quitInFlight = false;
     }

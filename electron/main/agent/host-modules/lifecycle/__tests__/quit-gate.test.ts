@@ -170,19 +170,19 @@ describe("installQuitGate", () => {
 });
 
 describe("no active tasks", () => {
-  it("calls dispose immediately without showing a dialog", async () => {
+  it("preventDefault + dispose + app.exit(0)", async () => {
     const dispose = vi.fn().mockResolvedValue(undefined);
     installQuitGate({ listActiveTasks: () => [], killTask: vi.fn(), dispose });
     fireBeforeQuit();
     await tick();
     expect(dispose).toHaveBeenCalled();
     expect(mockDialogShowBox).not.toHaveBeenCalled();
-    expect(appExitCodes).not.toContain(0);
+    expect(appExitCodes).toContain(0); // app.exit(0) called after dispose
   });
 });
 
 describe("FORCE quit", () => {
-  it("kills all active tasks then disposes", async () => {
+  it("kills all active tasks then disposes and exits", async () => {
     const killTask = vi.fn().mockResolvedValue(undefined);
     const dispose = vi.fn().mockResolvedValue(undefined);
     installQuitGate({
@@ -197,10 +197,23 @@ describe("FORCE quit", () => {
     await tick();
     expect(killTask).toHaveBeenCalledTimes(2);
     expect(dispose).toHaveBeenCalled();
-    // App does NOT exit on FORCE — dispose cleans up then quit completes.
-    // app.exit(0) is only called after dispose() returns in the FORCE branch,
-    // but we don't call app.exit in quit-gate — the app quits naturally after
-    // the before-quit handler completes. The test verifies dispose was called.
+    expect(appExitCodes).toContain(0); // app.exit(0) called after dispose
+  });
+
+  it("dispose rejection still calls app.exit(0)", async () => {
+    // Even if dispose() rejects, the process must exit to avoid hanging.
+    const dispose = vi.fn().mockRejectedValue(new Error("dispose failed"));
+    installQuitGate({
+      listActiveTasks: () => [makeTask("t1")],
+      killTask: vi.fn().mockResolvedValue(undefined),
+      dispose,
+    });
+    fireBeforeQuit();
+    await tick();
+    resolveDialog(0); // FORCE
+    await tick();
+    // dispose() rejected but app.exit(0) must still be called.
+    expect(appExitCodes).toContain(0);
   });
 });
 
