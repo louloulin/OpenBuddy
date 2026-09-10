@@ -88,6 +88,18 @@ function assertManifest(manifest: PluginRegistryManifest): void {
   if (manifest.capabilities && new Set(manifest.capabilities).size !== manifest.capabilities.length) {
     throw new PluginRegistryError("manifest contains duplicate capabilities");
   }
+  if (manifest.source !== undefined && (typeof manifest.source !== "string" || !manifest.source.trim())) {
+    throw new PluginRegistryError("source must be a non-empty string");
+  }
+  if (manifest.managed !== undefined && typeof manifest.managed !== "boolean") {
+    throw new PluginRegistryError("managed must be a boolean");
+  }
+  if (manifest.health !== undefined && !["healthy", "degraded", "failed"].includes(manifest.health)) {
+    throw new PluginRegistryError("health must be healthy, degraded, or failed");
+  }
+  if (manifest.disabledReason !== undefined && !["user", "policy", "load-failed", "dependency-failed"].includes(manifest.disabledReason)) {
+    throw new PluginRegistryError("disabledReason is invalid");
+  }
   if (manifest.dependencies !== undefined && !Array.isArray(manifest.dependencies)) {
     throw new PluginRegistryError("dependencies must be an array");
   }

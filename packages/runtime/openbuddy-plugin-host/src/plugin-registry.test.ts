@@ -104,5 +104,9 @@ describe("PluginRegistry", () => {
     await expect(registry.register({ ...manifest("bad"), capabilities: "web" as never })).rejects.toThrow("capabilities must be a non-empty string array");
     await expect(registry.register({ ...manifest("bad"), capabilities: ["web", " "] })).rejects.toThrow("capabilities must be a non-empty string array");
     await expect(registry.register({ ...manifest("bad"), capabilities: ["web", "web"] })).rejects.toThrow("duplicate capabilities");
+    await expect(registry.register({ ...manifest("bad"), source: " " })).rejects.toThrow("source must be a non-empty string");
+    await expect(registry.register({ ...manifest("bad"), managed: "yes" as never })).rejects.toThrow("managed must be a boolean");
+    await expect(registry.register({ ...manifest("bad"), health: "unknown" as never })).rejects.toThrow("health must be healthy, degraded, or failed");
+    await expect(registry.register({ ...manifest("bad"), disabledReason: "unknown" as never })).rejects.toThrow("disabledReason is invalid");
   });
 });
