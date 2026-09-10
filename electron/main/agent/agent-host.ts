@@ -300,6 +300,14 @@ const piRuntimeCoordinator = new PiRuntimeCoordinator({
       }
     }
   },
+  onReloadError: (error, reason) => {
+    emitPluginEvent("pi/reload-failed", {
+      reason: reason ?? "pi-reload",
+      error: String(error),
+      generation: state.piGeneration,
+      diagnostic: "reload-failed",
+    });
+  },
 });
 
 /**

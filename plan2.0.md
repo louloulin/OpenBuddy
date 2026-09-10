@@ -429,3 +429,9 @@ Electron 复验：`pnpm test:electron:stream-port` 已重新运行，之前的 `
 扩展 `PiRuntimeCoordinator` 的官方 Pi session/resource-loader reload adapter：reload 失败现在通过可选 `onReloadError(error, reason)` 诊断回调显式报告，generation 不会在失败时前进；串行 tail 会在失败后恢复为可用状态，后续 reload 仍可执行并在成功后推进 generation。这样不会把失败包装成成功，也不会让一次 Pi `AgentSession.reload()` 异常毒化后续 profile/plugin reload。
 
 新增定向测试覆盖：第一次 session reload 失败时错误和 reason 可观测、generation 保持旧值；第二次 reload 成功、generation 正确推进，证明 recovery queue 可继续工作。验证：`pnpm exec vitest run electron/main/agent/pi-runtime-coordinator.test.ts electron/main/agent/pi-event-bridge.test.ts --reporter=dot`：2 files、14/14 通过；`pnpm typecheck`：通过；`pnpm build`：通过；`git diff --check`：通过。未使用真实 provider、凭据或桌面 smoke。
+
+### 12.17 本轮增量：reload failure → Pi observability/UI bridge
+
+将 `PiRuntimeCoordinator.onReloadError` 接入 `agent-host.ts` 的既有 `emitPluginEvent` 链路，失败时发布 `pi/reload-failed`，携带 `reason`、错误字符串、当前 generation 和稳定 diagnostic 标识。该事件沿现有 `openbuddy://plugin-event` forwarded event bridge 到 renderer/plugin consumers，未新增第二套 transport，也不泄漏凭据或 provider payload；成功 reload 仍按既有 `onReload` generation fence 工作。
+
+非桌面验证：`pnpm exec vitest run electron/main/agent/pi-runtime-coordinator.test.ts electron/main/__tests__/pi-observability-events.test.ts electron/main/agent/host-modules/bootstrap/wire-forwarded-events.test.ts --reporter=dot`：3 files、13/13 通过；`pnpm typecheck`：通过；`pnpm build`：通过；`git diff --check`：通过。桌面 smoke 未运行：当前环境没有 X server/Wayland，继续保留现有 smoke 安全门禁。
