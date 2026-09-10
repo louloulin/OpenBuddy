@@ -349,13 +349,11 @@ describe("expanded IPC coverage 真实端到端", () => {
       const r = await callHandler("clipboard:write-text", "x");
       expect(r === undefined || r === null).toBe(true);
     });
-    it("dialog:ask 合法 → 返回 boolean", async () => {
-      const r = await callHandler<boolean>("dialog:ask", { message: "x", defaultId: 0 });
-      expect(typeof r === "boolean").toBe(true);
+    it("dialog:ask 已退订 → 抛 'no handler registered'", async () => {
+      await expectThrows("dialog:ask", { message: "x", defaultId: 0 });
     });
-    it("dialog:confirm 合法 → 返回 boolean", async () => {
-      const r = await callHandler<boolean>("dialog:confirm", { message: "x" });
-      expect(typeof r === "boolean").toBe(true);
+    it("dialog:confirm 已退订 → 抛 'no handler registered'", async () => {
+      await expectThrows("dialog:confirm", { message: "x" });
     });
     it("window:is-maximized 返回 boolean", async () => {
       const r = await callHandler<boolean>("window:is-maximized");

@@ -183,7 +183,7 @@ export function AssistantsPanel({ onUseAssistant, onToast }: AssistantsPanelProp
   }, [onToast, reload]);
 
   const handleDelete = useCallback(async (agent: AgentEntry) => {
-    if (!confirm(`确定删除助理「${agent.name}」？`)) return;
+    if (!await confirm(`确定删除助理「${agent.name}」？`, { tone: "danger" })) return;
     try {
       await agentsDelete(agent.path);
       onToast?.("已删除");

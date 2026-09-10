@@ -111,24 +111,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				: await dialog.showSaveDialog(safeOptions);
 			return approveSavePath(result.canceled ? null : result.filePath ?? null);
 		});
-		ipcMain.handle("dialog:ask", async (_event, args: unknown) => {
-			const input = recordValue(args, "dialog ask payload");
-			const options = { type: "question" as const, buttons: [optionalString(input.cancelLabel, "cancelLabel") ?? "取消", optionalString(input.okLabel, "okLabel") ?? "确定"], defaultId: 1, title: optionalString(input.title, "title"), message: requiredString(input.message, "message") };
-			const win = currentWindow();
-			const result = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
-			return result.response === 1;
-		});
-		ipcMain.handle("dialog:confirm", async (_event, args: unknown) => {
-			const options = { type: "question" as const, buttons: ["取消", "确定"], defaultId: 1, message: requiredString(recordValue(args, "dialog confirm payload").message, "message") };
-			const win = currentWindow();
-			const result = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
-			return result.response === 1;
-		});
-		ipcMain.handle("dialog:message", async (_event, args: unknown) => {
-			const options = { type: "info" as const, buttons: ["确定"], message: requiredString(recordValue(args, "dialog message payload").message, "message") };
-			const win = currentWindow();
-			await (win ? dialog.showMessageBox(win, options) : dialog.showMessageBox(options));
-		});
+		
 		ipcMain.handle("window:minimize", () => currentWindow()?.minimize());
 		ipcMain.handle("window:toggle-maximize", () => currentWindow()?.isMaximized() ? currentWindow()?.unmaximize() : currentWindow()?.maximize());
 		ipcMain.handle("window:close", () => currentWindow()?.close());

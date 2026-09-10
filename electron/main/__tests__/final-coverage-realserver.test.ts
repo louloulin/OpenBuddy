@@ -98,13 +98,11 @@ describe("final coverage 真实端到端", () => {
       const r = await callHandler<string>("clipboard:read-text");
       expect(typeof r === "string").toBe(true);
     });
-    it("dialog:ask 合法 → 返回 boolean", async () => {
-      const r = await callHandler<boolean>("dialog:ask", { message: "x", defaultId: 0 });
-      expect(typeof r === "boolean").toBe(true);
+    it("dialog:ask 已退订 → 抛 'no handler registered'", async () => {
+      await expectThrows("dialog:ask", { message: "x", defaultId: 0 });
     });
-    it("dialog:confirm 合法 → 返回 boolean", async () => {
-      const r = await callHandler<boolean>("dialog:confirm", { message: "x" });
-      expect(typeof r === "boolean").toBe(true);
+    it("dialog:confirm 已退订 → 抛 'no handler registered'", async () => {
+      await expectThrows("dialog:confirm", { message: "x" });
     });
     it("window:is-maximized 返回 boolean", async () => {
       const r = await callHandler<boolean>("window:is-maximized");
@@ -374,6 +372,16 @@ describe("final coverage 真实端到端", () => {
     it("email:unsubscribe 缺字段 → throw", async () => {
       await expectThrows("email:unsubscribe", {});
     });
+    it("email:unsubscribe 缺 confirmed → 抛 'confirmation_required'", async () => {
+      // The renderer owns confirmation through the workbuddy-style
+      // `ConfirmDialog` and must forward `confirmed: true`. Any unsanctioned
+      // call (no `confirmed` flag) must be rejected with a structured
+      // `confirmation_required` error instead of showing the legacy native
+      // dialog. This test pins the contract so a future regression can't
+      // silently regress to `dialog.showMessageBox`.
+      const error = await expectThrows("email:unsubscribe", { accountId: "a", messageId: "m" });
+      expect((error as Error & { code?: string }).code).toBe("confirmation_required");
+    });
     it("email:sender-policy 缺字段 → throw", async () => {
       await expectThrows("email:sender-policy", {});
     });
@@ -397,6 +405,10 @@ describe("final coverage 真实端到端", () => {
     });
     it("email:prepare-send 缺字段 → throw", async () => {
       await expectThrows("email:prepare-send", {});
+    });
+    it("email:prepare-send 缺 confirmed → 抛 'confirmation_required'", async () => {
+      const error = await expectThrows("email:prepare-send", { draftId: "d" });
+      expect((error as Error & { code?: string }).code).toBe("confirmation_required");
     });
     it("email:queue-send 缺字段 → throw", async () => {
       await expectThrows("email:queue-send", {});

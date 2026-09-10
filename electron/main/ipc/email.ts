@@ -3,7 +3,7 @@
  *
  * Split out of `./index.ts`.
  */
-import { dialog, ipcMain, type BrowserWindow } from "electron";
+import { ipcMain, type BrowserWindow } from "electron";
 import {
 	absolutePath,
 	assertPolicyModelAllowed,
@@ -79,8 +79,9 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 		ipcMain.handle("email:confirm-processing-plan", async (_e, args: unknown) => {
 			const input = recordValue(args, "email confirm processing plan payload");
 			const planId = requiredString(input.planId, "planId");
-			await confirmEmailAction(`确认执行邮件处理计划？\n计划：${planId}`);
-			return (await import("@openbuddy/capability-email")).emailHandlers.confirmProcessingPlan(planId, true);
+			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
+			requireConfirmation(confirmed, "执行邮件处理计划");
+			return (await import("@openbuddy/capability-email")).emailHandlers.confirmProcessingPlan(planId, confirmed === true);
 		});
 			ipcMain.handle("email:execute-processing-plan", async (_e, args: unknown) => {
 			const input = recordValue(args, "email execute processing plan payload");
@@ -207,14 +208,16 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 		});
 		ipcMain.handle("email:create-reminders-from-analysis", async (_e, args: unknown) => {
 			const input = recordValue(args, "email create-reminders-from-analysis payload");
-			await confirmEmailAction(`确认将邮件行动项创建为跟进提醒？\n分析：${requiredString(input.analysisId, "analysisId")}`);
+			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
+			requireConfirmation(confirmed, "创建跟进提醒");
 			const actionIndexes = optionalNonNegativeIntegerArray(input.actionIndexes, "actionIndexes");
-			return (await import("@openbuddy/capability-email")).emailHandlers.createRemindersFromAnalysis({ analysisId: requiredString(input.analysisId, "analysisId"), ...(actionIndexes === undefined ? {} : { actionIndexes }), confirmed: true });
+			return (await import("@openbuddy/capability-email")).emailHandlers.createRemindersFromAnalysis({ analysisId: requiredString(input.analysisId, "analysisId"), ...(actionIndexes === undefined ? {} : { actionIndexes }), confirmed: confirmed === true });
 		});
 		ipcMain.handle("email:prepare-schedule-send", async (_e, args: unknown) => {
 			const input = recordValue(args, "email prepare-schedule-send payload");
-			await confirmEmailAction(`确认创建计划发送？\n草稿：${requiredString(input.draftId, "draftId")}\n时间：${requiredString(input.scheduledAt, "scheduledAt")}`);
-			return (await import("@openbuddy/capability-email")).emailHandlers.prepareScheduleSend(requiredString(input.draftId, "draftId"), requiredString(input.scheduledAt, "scheduledAt"), true);
+			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
+			requireConfirmation(confirmed, "创建计划发送");
+			return (await import("@openbuddy/capability-email")).emailHandlers.prepareScheduleSend(requiredString(input.draftId, "draftId"), requiredString(input.scheduledAt, "scheduledAt"), confirmed === true);
 		});
 		ipcMain.handle("email:schedule-send", async (_e, args: unknown) => {
 			const input = recordValue(args, "email schedule-send payload");
@@ -244,21 +247,25 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 		ipcMain.handle("email:update-workspace-tags", async (_e, args: unknown) => (await import("@openbuddy/capability-email")).emailHandlers.updateWorkspaceTags(emailTagMutationPayload(args) as never));
 		ipcMain.handle("email:update", async (_e, args: unknown) => {
 			const input = emailMutationPayload(args);
-			if (input.kind === "trash" || input.kind === "spam") await confirmEmailAction(`确认${input.kind === "trash" ? "删除" : "标记垃圾邮件"}线程？\n线程：${String(input.threadId)}`);
-			return (await import("@openbuddy/capability-email")).emailHandlers.update({ ...input, confirmed: input.kind === "trash" || input.kind === "spam" ? true : input.confirmed } as never, input.kind === "trash" || input.kind === "spam");
+			const destructive = input.kind === "trash" || input.kind === "spam";
+			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
+			if (destructive) requireConfirmation(confirmed, input.kind === "trash" ? "删除线程" : "标记垃圾邮件");
+			return (await import("@openbuddy/capability-email")).emailHandlers.update({ ...input, confirmed: destructive ? confirmed === true : input.confirmed } as never, destructive && confirmed === true);
 		});
 		ipcMain.handle("email:unsubscribe", async (_e, args: unknown) => {
 			const input = recordValue(args, "email unsubscribe payload");
-			await confirmEmailAction(`确认退订邮件列表？\n消息：${requiredString(input.messageId, "messageId")}`);
-			return (await import("@openbuddy/capability-email")).emailHandlers.unsubscribe({ accountId: requiredString(input.accountId, "accountId"), messageId: requiredString(input.messageId, "messageId"), ...(input.threadId === undefined ? {} : { threadId: requiredString(input.threadId, "threadId") }), confirmed: true }, true);
+			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
+			requireConfirmation(confirmed, "退订邮件列表");
+			return (await import("@openbuddy/capability-email")).emailHandlers.unsubscribe({ accountId: requiredString(input.accountId, "accountId"), messageId: requiredString(input.messageId, "messageId"), ...(input.threadId === undefined ? {} : { threadId: requiredString(input.threadId, "threadId") }), confirmed: confirmed === true }, confirmed === true);
 		});
 		ipcMain.handle("email:sender-policy", async (_e, args: unknown) => {
 			const input = recordValue(args, "email sender-policy payload");
 			const policy = enumValue(input.policy, "policy", ["signal", "noise", "block"] as const);
 			const senderEmail = requiredString(input.senderEmail, "senderEmail");
 			if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail)) throw new Error("senderEmail must be a valid email address");
-			if (policy === "block") await confirmEmailAction(`确认阻断发件人？\n${senderEmail}`);
-			return (await import("@openbuddy/capability-email")).emailHandlers.setSenderPolicy({ senderEmail, policy, ...(input.accountId === undefined ? {} : { accountId: requiredString(input.accountId, "accountId") }), ...(input.threadId === undefined ? {} : { threadId: requiredString(input.threadId, "threadId") }), confirmed: true }, true);
+			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
+			if (policy === "block") requireConfirmation(confirmed, "阻断发件人");
+			return (await import("@openbuddy/capability-email")).emailHandlers.setSenderPolicy({ senderEmail, policy, ...(input.accountId === undefined ? {} : { accountId: requiredString(input.accountId, "accountId") }), ...(input.threadId === undefined ? {} : { threadId: requiredString(input.threadId, "threadId") }), confirmed: confirmed === true }, confirmed === true);
 		});
 		ipcMain.handle("email:share-thread", async (_e, args: unknown) => {
 			const input = recordValue(args, "email share-thread payload");
@@ -285,8 +292,9 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 		});
 		ipcMain.handle("email:prepare-send", async (_e, args: unknown) => {
 			const input = recordValue(args, "email prepare-send payload");
-			await confirmEmailAction(`确认发送邮件？\n草稿：${requiredString(input.draftId, "draftId")}`);
-			return (await import("@openbuddy/capability-email")).emailHandlers.prepareSend(requiredString(input.draftId, "draftId"), true);
+			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
+			requireConfirmation(confirmed, "发送邮件");
+			return (await import("@openbuddy/capability-email")).emailHandlers.prepareSend(requiredString(input.draftId, "draftId"), confirmed === true);
 		});
 		ipcMain.handle("email:queue-send", async (_e, args: unknown) => {
 			const input = recordValue(args, "email queue-send payload");
@@ -298,10 +306,22 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 		});
 		ipcMain.handle("email:invalidate-provider", async () => (await import("@openbuddy/capability-email")).emailHandlers.invalidateProvider());
 		ipcMain.handle("email:audit", async () => (await import("@openbuddy/capability-email")).emailHandlers.audit());
-		const confirmEmailAction = async (message: string): Promise<void> => {
-			const options = { type: "question" as const, buttons: ["取消", "确定"], defaultId: 1, cancelId: 0, message };
-			const win = currentWindow();
-			const result = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
-			if (result.response !== 1) throw new Error("用户取消了邮件操作");
+		/**
+		 * `requireConfirmation` replaces the previous native
+		 * `dialog.showMessageBox` confirmation. The renderer-side flows now
+		 * show the workbuddy-style `ConfirmDialog` (via `requestConfirm` in
+		 * EmailPanel / EmailComposer) BEFORE invoking these IPC handlers,
+		 * so the only remaining responsibility of the IPC layer is to verify
+		 * the renderer passed `confirmed: true` and reject any unsanctioned
+		 * call with a structured `confirmation_required` error.
+		 *
+		 * Defense-in-depth rationale: this keeps the harness / smoke paths
+		 * from accidentally triggering destructive email operations while
+		 * delivering the user a single, beautiful confirmation surface
+		 * (matching the rest of the openbuddy UI) instead of the legacy
+		 * native macOS / GTK dialog.
+		 */
+		const requireConfirmation = (confirmed: boolean | undefined, operation: string): void => {
+			if (confirmed !== true) throw Object.assign(new Error(`${operation}必须经过确认`), { code: "confirmation_required" });
 		};
 }

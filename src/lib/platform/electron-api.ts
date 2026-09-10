@@ -310,19 +310,30 @@ export async function save(options: Record<string, unknown> = {}): Promise<strin
   return getApi().dialog.save(options);
 }
 
-export async function ask(
-  message: string,
-  options?: { title?: string; okLabel?: string; cancelLabel?: string },
-): Promise<boolean> {
-  return getApi().dialog.ask({ message, ...options });
+/**
+ * `confirm(message)` / `ask(message)` now route through the workbuddy-style
+ * `ConfirmDialog` mounted by `GlobalConfirmHost`. The legacy native
+ * `dialog.showMessageBox` surface was retired in `electron/main/ipc/misc.ts`
+ * and `electron/preload/index.ts`.
+ *
+ * Body text follows the same call site as before (`确定卸载「${name}」？`),
+ * but the user now sees the tone-aware icon, eyebrow text, and Esc / Enter
+ * shortcut hint that the rest of the openbuddy UI already uses.
+ */
+export async function confirm(message: string, options?: { tone?: "info" | "warning" | "danger" | "neutral"; description?: string; confirmLabel?: string; cancelLabel?: string }): Promise<boolean> {
+  const { useGlobalConfirmStore } = await import("@/stores/global-confirm-store");
+  return useGlobalConfirmStore.getState().show({
+    title: message,
+    ...(options?.tone === undefined ? {} : { tone: options.tone }),
+    ...(options?.description === undefined ? {} : { description: options.description }),
+    ...(options?.confirmLabel === undefined ? {} : { confirmLabel: options.confirmLabel }),
+    ...(options?.cancelLabel === undefined ? {} : { cancelLabel: options.cancelLabel }),
+  });
 }
 
-export async function confirm(message: string): Promise<boolean> {
-  return getApi().dialog.confirm({ message });
-}
-
-export async function message(messageText: string): Promise<void> {
-  await getApi().dialog.message({ message: messageText });
+/** Alias for the legacy `ask()` helper (markdown host file-write flow). */
+export async function ask(message: string, options?: { tone?: "info" | "warning" | "danger" | "neutral"; description?: string; confirmLabel?: string; cancelLabel?: string }): Promise<boolean> {
+  return confirm(message, options);
 }
 
 export function getCurrentWindow(): ElectronWindowApi["window"] {

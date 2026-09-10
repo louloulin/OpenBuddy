@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
+import { GlobalConfirmHost } from "@/components/GlobalConfirmHost";
 import { TitleBar } from "@openbuddy/ui-shell";
 import { Sidebar } from "@openbuddy/ui-sidebar";
 import { ChatView } from "@openbuddy/ui-conversation";
@@ -220,6 +221,7 @@ export default function App() {
   return (
     <SlotProvider>
       <BuiltinUiPlugins />
+      <GlobalConfirmHost />
       <Shell />
     </SlotProvider>
   );

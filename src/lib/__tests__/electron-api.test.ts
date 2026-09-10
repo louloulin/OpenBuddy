@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { confirm, getCurrentWebview, getCurrentWindow, getElectronBridgeStatus, invoke, listen, open, save } from "@/lib/platform/electron-api";
+import { getCurrentWebview, getCurrentWindow, getElectronBridgeStatus, invoke, listen, open, save } from "@/lib/platform/electron-api";
 
 describe("Electron renderer API", () => {
   const unlisten = vi.fn();
@@ -10,9 +10,8 @@ describe("Electron renderer API", () => {
     dialog: {
       open: vi.fn(async () => ["/tmp/example.txt"]),
       save: vi.fn(async () => "/tmp/example.md"),
-      ask: vi.fn(async () => true),
-      confirm: vi.fn(async () => false),
-      message: vi.fn(async () => undefined),
+      // The legacy `ask` / `confirm` / `message` channels were retired — the
+      // renderer owns confirmation through `@openbuddy/ui-dialogs` instead.
     },
     window: {
       label: () => "main",
@@ -58,10 +57,9 @@ describe("Electron renderer API", () => {
     expect(unlisten).toHaveBeenCalled();
   });
 
-  it("exposes native dialogs and window controls", async () => {
+  it("exposes native file dialogs and window controls", async () => {
     await expect(open({ directory: true })).resolves.toEqual(["/tmp/example.txt"]);
     await expect(save({ defaultPath: "example.md" })).resolves.toBe("/tmp/example.md");
-    await expect(confirm("Continue?")).resolves.toBe(false);
     expect(getCurrentWindow().label()).toBe("main");
     expect(getCurrentWebview().label()).toBe("main");
   });

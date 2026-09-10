@@ -83,8 +83,7 @@ const allowedInvokeChannels = new Set([
   "shellfs:mkdir", "shellfs:open-path", "shellfs:open-url", "shellfs:read-file-base64", "shellfs:read-text", "shellfs:remove", "shellfs:reveal", "shellfs:stat",
   "shellfs:write-text",
   // ui-window
-  "clipboard:read-text", "clipboard:write-text", "debug:force-reload", "debug:info", "debug:reload", "debug:toggle-devtools", "dialog:ask", "dialog:confirm",
-  "dialog:message", "dialog:open", "dialog:save", "internal_reload", "window:close", "window:is-maximized", "window:minimize", "window:toggle-maximize",
+  "clipboard:read-text", "clipboard:write-text", "debug:force-reload", "debug:info", "debug:reload", "debug:toggle-devtools", "dialog:open", "dialog:save", "internal_reload", "window:close", "window:is-maximized", "window:minimize", "window:toggle-maximize",
   // email
   "email:accounts", "email:ack-inbox", "email:action-center-create-reminders", "email:action-center-query", "email:analyses", "email:attachment-download", "email:attachments", "email:audit",
   "email:cancel-pending-send", "email:cancel-processing-plan", "email:cancel-scheduled-send", "email:confirm-processing-plan", "email:contact-projection", "email:create-draft", "email:create-reminder", "email:create-reminders-from-analysis",
@@ -296,9 +295,7 @@ const api = {
   dialog: {
     open: (options?: unknown) => ipcRenderer.invoke("dialog:open", options),
     save: (options?: unknown) => ipcRenderer.invoke("dialog:save", options),
-    ask: (options: { message: string; title?: string; okLabel?: string; cancelLabel?: string }) => ipcRenderer.invoke("dialog:ask", options),
-    confirm: (options: { message: string }) => ipcRenderer.invoke("dialog:confirm", options),
-    message: (options: { message: string }) => ipcRenderer.invoke("dialog:message", options),
+    
   },
 
   window: {

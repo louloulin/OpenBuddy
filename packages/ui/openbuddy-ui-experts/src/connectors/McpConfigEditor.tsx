@@ -49,8 +49,8 @@ export function McpConfigEditor({
     if (gutterRef.current && taRef.current) gutterRef.current.scrollTop = taRef.current.scrollTop;
   };
 
-  const doBack = () => {
-    if (hasChanges && !confirm("有未保存的修改，确定放弃？")) return;
+  const doBack = async () => {
+    if (hasChanges && !await confirm("有未保存的修改，确定放弃？", { tone: "warning" })) return;
     onBack();
   };
 

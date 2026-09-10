@@ -26,7 +26,7 @@ const ipcSurfaceChannels = [
   "email:prepare-schedule-send", "email:schedule-send", "email:cancel-scheduled-send", "email:scheduled-sends", "email:pending-sends", "email:cancel-pending-send",
   "email:create-draft", "email:drafts", "email:prepare-send", "email:queue-send", "email:send-draft", "email:unsubscribe", "email:sender-policy",
   "email:save-analysis", "email:create-reminders-from-analysis", "email:analyses", "email:audit", "email:attachments", "email:attachment-download", "email:action-center-query", "email:contact-projection", "email:action-center-create-reminders",
-  "dialog:open", "dialog:save", "dialog:ask", "dialog:confirm", "dialog:message", "window:close",
+  "dialog:open", "dialog:save", "window:close",
 ];
 
 mkdirSync(piAgentDir, { recursive: true });
@@ -105,13 +105,21 @@ try {
   if (init?.ok !== true) throw new Error("agent:init failed");
 
   await check("native-dialogs", async () => {
-    const confirm = await confirmNative(page, "dialog:confirm", { message: "OpenBuddy IPC native confirm" });
-    const ask = await confirmNative(page, "dialog:ask", { title: "OpenBuddy IPC ask", message: "继续真实 native ask？", cancelLabel: "取消", okLabel: "确定" });
-    const messagePending = page.evaluate(() => window.api.invoke("dialog:message", { message: "OpenBuddy IPC native message" }));
-    const messageButton = await nativeButton(["Electron"], ["确定", "OK"], "OpenBuddy IPC native message");
-    await messagePending;
-    if (confirm.value !== true || ask.value !== true) throw new Error(`native dialog result mismatch: ${JSON.stringify({ confirm: confirm.value, ask: ask.value })}`);
-    return { confirm: confirm.button, ask: ask.button, message: messageButton };
+    // dialog:ask / dialog:confirm / dialog:message were retired because the
+    // workbuddy-style `ConfirmDialog` / `PromptDialog` now own every user-
+    // facing confirmation. Calling them must surface a structured error
+    // rather than the legacy native message-box.
+    const confirmRejected = await invoke("dialog:confirm", { message: "OpenBuddy IPC native confirm" })
+      .then(() => ({ ok: false, error: "expected rejection" }))
+      .catch((cause) => ({ ok: true, error: String(cause?.message ?? cause) }));
+    const askRejected = await invoke("dialog:ask", { title: "OpenBuddy IPC ask", message: "继续真实 native ask？", cancelLabel: "取消", okLabel: "确定" })
+      .then(() => ({ ok: false, error: "expected rejection" }))
+      .catch((cause) => ({ ok: true, error: String(cause?.message ?? cause) }));
+    const messageRejected = await invoke("dialog:message", { message: "OpenBuddy IPC native message" })
+      .then(() => ({ ok: false, error: "expected rejection" }))
+      .catch((cause) => ({ ok: true, error: String(cause?.message ?? cause) }));
+    if (!confirmRejected.ok || !askRejected.ok || !messageRejected.ok) throw new Error("legacy native dialog channels must reject");
+    return { confirmRejected: confirmRejected.error, askRejected: askRejected.error, messageRejected: messageRejected.error };
   });
 
   await check("file-dialogs-cancel", async () => {
@@ -164,30 +172,33 @@ try {
   await check("scheduled-send-confirm-and-cancel", async () => {
     const scheduledDraft = await invoke("email:create-draft", { accountId, draftId: `ipc-scheduled-${Date.now()}`, to: [{ address: "smoke@example.test" }], subject: "IPC scheduled", body: "scheduled" });
     const scheduledAt = new Date(Date.now() + 3_600_000).toISOString();
-    const token = await confirmNative(page, "email:prepare-schedule-send", { draftId: scheduledDraft.id, scheduledAt });
-    const scheduled = await invoke("email:schedule-send", { draftId: scheduledDraft.id, scheduledAt, confirmationToken: token.value });
+    // The renderer owns confirmation via the workbuddy `ConfirmDialog`;
+    // pass `confirmed: true` so the IPC layer skips its legacy native
+    // dialog and lets the capability handler proceed.
+    const token = await invoke("email:prepare-schedule-send", { draftId: scheduledDraft.id, scheduledAt, confirmed: true });
+    const scheduled = await invoke("email:schedule-send", { draftId: scheduledDraft.id, scheduledAt, confirmationToken: token });
     await invoke("email:cancel-scheduled-send", { scheduleId: scheduled.id });
     return { draft: digest(scheduledDraft.id), schedule: digest(scheduled.id), cancelled: true };
   });
 
   await check("pending-send-undo", async () => {
     const pendingDraft = await invoke("email:create-draft", { accountId, draftId: `ipc-pending-${Date.now()}`, to: [{ address: "smoke@example.test" }], subject: "IPC pending", body: "pending" });
-    const token = await confirmNative(page, "email:prepare-send", { draftId: pendingDraft.id });
-    const pending = await invoke("email:queue-send", { draftId: pendingDraft.id, confirmationToken: token.value, undoWindowMs: 1_000 });
+    const token = await invoke("email:prepare-send", { draftId: pendingDraft.id, confirmed: true });
+    const pending = await invoke("email:queue-send", { draftId: pendingDraft.id, confirmationToken: token, undoWindowMs: 1_000 });
     await invoke("email:cancel-pending-send", { pendingId: pending.id });
     return { draft: digest(pendingDraft.id), pending: digest(pending.id), cancelled: true };
   });
 
   await check("send-unsubscribe-policy-and-reminders", async () => {
     const sendDraft = await invoke("email:create-draft", { accountId, draftId: `ipc-send-${Date.now()}`, to: [{ address: "smoke@example.test" }], subject: "IPC send", body: "send" });
-    const sendToken = await confirmNative(page, "email:prepare-send", { draftId: sendDraft.id }, "确定", "确认发送邮件");
-    const sent = await invoke("email:send-draft", { draftId: sendDraft.id, confirmationToken: sendToken.value });
+    const sendToken = await invoke("email:prepare-send", { draftId: sendDraft.id, confirmed: true });
+    const sent = await invoke("email:send-draft", { draftId: sendDraft.id, confirmationToken: sendToken });
     const policySignal = await invoke("email:sender-policy", { accountId, senderEmail: "sender@example.test", policy: "signal" });
-    const policyBlock = await confirmNative(page, "email:sender-policy", { accountId, senderEmail: "sender@example.test", policy: "block" }, "确定", "确认阻断发件人");
-    const unsubscribed = await confirmNative(page, "email:unsubscribe", { accountId, messageId: "message-1", threadId: "thread-1" }, "确定", "确认退订邮件列表");
-    const reminders = await confirmNative(page, "email:create-reminders-from-analysis", { analysisId: analysis.id }, "确定", "创建为跟进");
-    if (sent.ok !== true || policySignal.ok !== true || policyBlock.value?.ok !== true || unsubscribed.value?.ok !== true || reminders.value?.reminders?.length !== 1) throw new Error("email confirmation lifecycle failed");
-    return { sent: true, policy: true, unsubscribed: true, reminders: reminders.value.reminders.length };
+    const policyBlock = await invoke("email:sender-policy", { accountId, senderEmail: "sender@example.test", policy: "block", confirmed: true });
+    const unsubscribed = await invoke("email:unsubscribe", { accountId, messageId: "message-1", threadId: "thread-1", confirmed: true });
+    const reminders = await invoke("email:create-reminders-from-analysis", { analysisId: analysis.id, confirmed: true });
+    if (sent.ok !== true || policySignal.ok !== true || policyBlock.ok !== true || unsubscribed.ok !== true || reminders.reminders?.length !== 1) throw new Error("email confirmation lifecycle failed");
+    return { sent: true, policy: true, unsubscribed: true, reminders: reminders.reminders.length };
   });
 
   const report = { framework: "openbuddy-electron-email-ipc-surface-smoke", schema: "openbuddy.redacted-evidence.v1", evidenceLevel: "real-local", runtime: "electron+pi+mcp", realE2E: true, capabilities: ["email", "native-dialogs", "desktop-dialogs"], filesystem: "not-run-by-policy", passed: checks.filter((entry) => entry.ok).length, failed: checks.filter((entry) => !entry.ok).length, checks };

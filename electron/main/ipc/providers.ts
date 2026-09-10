@@ -72,7 +72,40 @@ export function registerProvidersIpc(deps: AgentHostIpcDeps): void {
     const headers: Record<string, string> = isAnthropic
       ? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }
       : { Authorization: `Bearer ${apiKey}` };
-    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, { headers });
+    const normalizedBase = baseUrl.replace(/\/$/, "");
+    // Anthropic-Messages-compatible endpoints (Anthropic, custom_anthropic,
+    // minimax_cn, MiniMax's built-in `minimax` provider) do NOT expose a
+    // `/models` catalog — `https://api.minimaxi.com/anthropic/models` returns
+    // 404. They DO respond to a `count_tokens` probe with the same auth shape
+    // and `anthropic-version` header, so we fall back to that for the catalog
+    // discovery path. For OpenAI-compatible providers, the legacy `/models`
+    // endpoint is preserved.
+    if (isAnthropic) {
+      const probe = await fetch(`${normalizedBase}/v1/messages/count_tokens`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: "claude-haiku-4-5",
+          messages: [{ role: "user", content: "hi" }],
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (probe.status === 404) {
+        // Endpoint truly has no discovery surface — return an empty
+        // catalog rather than throwing so the UI can fall back to manual
+        // entry (the same path it took before this IPC existed).
+        return [];
+      }
+      if (probe.status === 401 || probe.status === 403) {
+        throw new Error(`Model catalog request failed (${probe.status})`);
+      }
+      // Count-tokens endpoint exists and auth shape is correct — return
+      // an empty array so callers know discovery succeeded without
+      // enumerating upstream's model list (which Anthropic does not
+      // expose over this surface either).
+      return [];
+    }
+    const response = await fetch(`${normalizedBase}/models`, { headers });
     if (!response.ok) throw new Error(`Model catalog request failed (${response.status})`);
     const payload = await response.json() as { data?: Array<{ id: string; owned_by?: string }> };
     return (payload.data ?? []).map((model) => ({ id: model.id, ownedBy: model.owned_by }));
@@ -88,9 +121,51 @@ export function registerProvidersIpc(deps: AgentHostIpcDeps): void {
       : { Authorization: apiKey ? `Bearer ${apiKey}` : "Bearer " };
     const startedAt = Date.now();
     try {
-      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, { headers, signal: AbortSignal.timeout(10_000) });
+      // Probe the same wire shape the chat path uses (`POST /v1/messages`,
+      // `max_tokens: 1`). Anthropic-Messages-compatible providers do not
+      // expose a `/models` catalog endpoint, and `GET /models` against
+      // `https://api.minimaxi.com/anthropic` returns 404 even when the
+      // key is valid. The chat endpoint, by contrast, answers with the
+      // same auth shape and serves as a faithful connectivity probe
+      // (real users care about chat reachability, not catalog presence).
+      //
+      // For OpenAI-compatible providers the legacy `/models` path is
+      // preserved — it answers 200 on every well-behaved OpenAI server.
+      const probeUrl = isAnthropic
+        ? `${baseUrl.replace(/\/$/, "")}/v1/messages`
+        : `${baseUrl.replace(/\/$/, "")}/models`;
+      const probeInit: RequestInit = isAnthropic
+        ? {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              model: "claude-haiku-4-5",
+              max_tokens: 1,
+              messages: [{ role: "user", content: "ok" }],
+            }),
+          }
+        : { headers };
+      const response = await fetch(probeUrl, { ...probeInit, signal: AbortSignal.timeout(10_000) });
       const latencyMs = Date.now() - startedAt;
       if (!response.ok) {
+        // For the chat-endpoint probe, a 400 with `invalid_request_error`
+        // (model id, prompt shape, etc.) still proves the host is
+        // reachable and the key authenticates — anything ≥ 400 other
+        // than 5xx and connection errors is a "degraded" success, not a
+        // hard failure.
+        if (isAnthropic && response.status === 400) {
+          const body = await response.json().catch(() => ({})) as { error?: { type?: string } };
+          const recoverable = body?.error?.type === "invalid_request_error";
+          if (recoverable) {
+            return {
+              status: latencyMs > 3000 ? "degraded" : "healthy",
+              latencyMs,
+              httpStatus: response.status,
+              probe: "messages",
+              checkedAt: new Date().toISOString(),
+            };
+          }
+        }
         return {
           status: response.status >= 500 ? "unreachable" : "degraded",
           latencyMs,
@@ -100,13 +175,25 @@ export function registerProvidersIpc(deps: AgentHostIpcDeps): void {
           checkedAt: new Date().toISOString(),
         };
       }
-      const payload = await response.json().catch(() => ({})) as { data?: unknown[] };
-      const modelsCount = Array.isArray(payload.data) ? payload.data.length : undefined;
+      // OpenAI-compatible `/models` returns {data: [...]} — preserve
+      // the `modelsCount` field that the ProviderHealthBadge renders.
+      if (!isAnthropic) {
+        const payload = await response.json().catch(() => ({})) as { data?: unknown[] };
+        const modelsCount = Array.isArray(payload.data) ? payload.data.length : undefined;
+        return {
+          status: latencyMs > 3000 ? "degraded" : "healthy",
+          latencyMs,
+          modelsCount,
+          httpStatus: response.status,
+          probe: "models",
+          checkedAt: new Date().toISOString(),
+        };
+      }
       return {
         status: latencyMs > 3000 ? "degraded" : "healthy",
         latencyMs,
-        modelsCount,
         httpStatus: response.status,
+        probe: "messages",
         checkedAt: new Date().toISOString(),
       };
     } catch (error) {

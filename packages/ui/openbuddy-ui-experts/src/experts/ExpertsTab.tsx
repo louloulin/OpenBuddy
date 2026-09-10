@@ -242,7 +242,7 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
   }, [onToast, reloadLocals]);
 
   const handleDeleteLocal = useCallback(async (a: AgentEntry) => {
-    if (!confirm(`确定删除专家「${a.name}」？`)) return;
+    if (!await confirm(`确定删除专家「${a.name}」？`, { tone: "danger" })) return;
     try { await agentsDelete(a.path); onToast?.("已删除"); reloadLocals(); }
     catch (e) { onToast?.(`删除失败：${String(e).replace(/^Error:\s*/, "")}`); }
   }, [onToast, reloadLocals]);

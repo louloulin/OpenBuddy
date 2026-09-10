@@ -232,32 +232,24 @@ describe("shellfs / fs IPC dispatch 真实端到端", () => {
     });
   });
 
-  describe("dialog:* 弹窗", () => {
-    it("dialog:ask 缺 message → throw", async () => {
-      await expectThrows("dialog:ask", {});
+  describe("dialog:* 弹窗 (legacy native channels retired)", () => {
+    // The legacy `dialog:ask` / `dialog:confirm` / `dialog:message`
+    // channels used to round-trip through `dialog.showMessageBox` and
+    // produced the unsightly native macOS / GTK confirmation dialog. The
+    // renderer now owns confirmation through the workbuddy-style
+    // `@openbuddy/ui-dialogs` components, so the IPC handlers were removed.
+    // Each channel must therefore be unregistered — any caller should see a
+    // structured "no handler registered" error instead of a silent no-op.
+    it("dialog:ask 已退订 → 抛 'no handler registered'", async () => {
+      await expectThrows("dialog:ask", { message: "ok?" });
     });
 
-    it("dialog:ask 合法 → 返回 boolean", async () => {
-      const r = await callHandler<boolean>("dialog:ask", { message: "ok?", defaultId: 0 });
-      expect(typeof r === "boolean").toBe(true);
+    it("dialog:confirm 已退订 → 抛 'no handler registered'", async () => {
+      await expectThrows("dialog:confirm", { message: "ok?" });
     });
 
-    it("dialog:confirm 缺 message → throw", async () => {
-      await expectThrows("dialog:confirm", {});
-    });
-
-    it("dialog:confirm 合法 → 返回 boolean", async () => {
-      const r = await callHandler<boolean>("dialog:confirm", { message: "ok?" });
-      expect(typeof r === "boolean").toBe(true);
-    });
-
-    it("dialog:message 缺 message → throw", async () => {
-      await expectThrows("dialog:message", {});
-    });
-
-    it("dialog:message 合法 → 不抛异常", async () => {
-      const r = await callHandler("dialog:message", { message: "x" });
-      expect(r === undefined || r === null).toBe(true);
+    it("dialog:message 已退订 → 抛 'no handler registered'", async () => {
+      await expectThrows("dialog:message", { message: "x" });
     });
 
     it("dialog:open 接受 options → 不抛异常", async () => {

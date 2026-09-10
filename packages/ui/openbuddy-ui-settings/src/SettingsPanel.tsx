@@ -678,7 +678,7 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
       count > 0
         ? `删除厂商「${p.label || p.providerKind}」及其 ${count} 个模型？`
         : `删除厂商「${p.label || p.providerKind}」？`;
-    if (!confirm(confirmText)) return;
+    if (!await confirm(confirmText, { tone: "danger" })) return;
     setMsg(null);
     try {
       await providersDeleteProvider(p.id);
@@ -719,7 +719,7 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
   };
 
   const handleDeleteModel = async (m: ModelEntry) => {
-    if (!confirm(`删除模型「${m.name || m.modelId}」？`)) return;
+    if (!await confirm(`删除模型「${m.name || m.modelId}」？`, { tone: "danger" })) return;
     setMsg(null);
     try {
       await providersDeleteModel(m.providerId, m.modelId);
@@ -1069,10 +1069,18 @@ function ProviderEditor({
         baseUrl: form.baseUrl,
         apiKey: form.apiKey,
         providerKind: form.providerKind,
-      })) as { status?: string; modelsCount?: number; latencyMs?: number; errorCode?: string; errorMessage?: string };
+      })) as { status?: string; modelsCount?: number; latencyMs?: number; errorCode?: string; errorMessage?: string; probe?: string };
       if (snap.status === "healthy") {
         setTestStatus("ok");
-        setTestMessage(`✓ ${snap.modelsCount ?? 0} models reachable (${snap.latencyMs ?? "?"} ms)`);
+        // Anthropic-Messages-compatible upstreams probe the chat endpoint,
+        // which has no catalog count to report. Show a connectivity-only
+        // success line so users don't see a misleading "0 models" — that
+        // number is genuinely zero for the chat-endpoint probe path and
+        // is not a failure.
+        const summary = snap.probe === "messages"
+          ? `✓ chat endpoint reachable (${snap.latencyMs ?? "?"} ms)`
+          : `✓ ${snap.modelsCount ?? 0} models reachable (${snap.latencyMs ?? "?"} ms)`;
+        setTestMessage(summary);
       } else if (snap.status === "degraded") {
         setTestStatus("degraded");
         setTestMessage(`⚠ ${snap.errorCode ?? "?"} — ${snap.errorMessage ?? "Provider returned a non-2xx status"}`);
