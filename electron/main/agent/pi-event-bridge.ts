@@ -1,5 +1,6 @@
 import { createMainLogger, withContext, type MainLogger } from "@openbuddy/logging-main";
 import { type LogContext } from "@openbuddy/logging-shared";
+import { BoundedEventQueue, type BoundedEvent, type EventDeliveryClass } from "@openbuddy/plugin-host";
 
 export interface ContextEventSink {
   emit(event: string, ...args: unknown[]): unknown;
@@ -121,6 +122,10 @@ export function emitPiSessionEvent(
 export class PiSessionEventBridge {
   private readonly maxEntries: number;
   private readonly entries: SessionEventRecord[] = [];
+  private readonly pendingProgress = new BoundedEventQueue({
+    capacity: 512,
+    coalesceKey: (event) => event.delivery === "progress" ? `${event.taskId ?? ""}:${event.kind}` : undefined,
+  });
   private nextSequence = 0;
   private currentGeneration = 0;
 
@@ -141,8 +146,28 @@ export class PiSessionEventBridge {
       ...(sessionId ? { sessionId } : {}),
       payload: event,
     };
-    this.pushBounded(record);
+    // Pi tool progress is reconstructable from the next snapshot and may be
+    // coalesced under pressure. Text/thinking deltas remain lossless because
+    // they are user-visible content rather than progress telemetry.
+    if (event.type === "tool_execution_update") {
+      this.pendingProgress.enqueue({
+        id: `${sequence}`,
+        kind: event.type,
+        delivery: "progress" satisfies EventDeliveryClass,
+        ...(sessionId ? { taskId: sessionId } : {}),
+        sequence,
+        payload: record,
+      } satisfies BoundedEvent);
+    } else {
+      this.pushBounded(record);
+    }
     return record;
+  }
+
+  private flushPendingProgress(): void {
+    for (const queued of this.pendingProgress.drain()) {
+      this.pushBounded(queued.payload as SessionEventRecord);
+    }
   }
 
   /**
@@ -170,6 +195,7 @@ export class PiSessionEventBridge {
   }
 
   snapshot(query: SessionEventLogQuery = {}): SessionEventRecord[] {
+    this.flushPendingProgress();
     const limit = query.limit === undefined
       ? this.maxEntries
       : Math.max(1, Math.min(this.maxEntries, Math.floor(query.limit)));
@@ -204,6 +230,7 @@ export class PiSessionEventBridge {
 
   clear(): void {
     this.entries.length = 0;
+    this.pendingProgress.drain();
     this.nextSequence = 0;
   }
 

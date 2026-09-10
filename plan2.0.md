@@ -358,20 +358,19 @@ Pi 官方 `AgentSession`/Extensions 事件包含 session、agent、turn、messag
 - **已实现**：Phase 1 的事件 canonicalization 垂直切片；对应 §4.1 的“事件/流式”与 §7.4 的 Pi event mapping。
 - **已实现**：Phase 1 的 generation-fenced event replay：reload 后 `PiSessionEventBridge.snapshot()` 仅返回当前 generation 事件，避免 stale session/plugin events 回放到 renderer；新增/更新测试覆盖。
 - **已实现**：Phase 1 的 Pi RPC/UI 生命周期事件 canonicalization：`extension_error`、`ui_prompt_start`、`ui_prompt_end` 统一映射并有定向测试。
+- **已实现**：Phase 1 的 Pi→Main 事件背压切片：复用 `@openbuddy/plugin-host` 的 `BoundedEventQueue`，对 `tool_execution_update` 进度事件按 session/kind 合并，snapshot 时刷新；lifecycle/final/error 等事件仍直接进入 ring buffer。
 - **进行中**：single-owner tool/provider/session、agent-host 拆分、RPC/UI 全事件诊断。
 - **未开始**：完整 E3 外部 Pi package 验证、E4 streaming/IPC/reload/memory benchmark、三平台发布门禁。
 
 ### 12.4 总体进度
 
-进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 3 个切片（事件 canonicalization、generation-fenced replay、RPC/UI lifecycle canonicalization），因此当前**实现进度约 17%（3/18）**。该百分比仅表示代码垂直切片完成度，不代表产品发布完成度；完整 typecheck/build/Electron smoke、真实 provider/package E3 与 E4 性能门禁仍未完成。
+进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 4 个切片（事件 canonicalization、generation-fenced replay、RPC/UI lifecycle canonicalization、Pi 事件背压/进度合并），因此当前**实现进度约 22%（4/18）**。该百分比仅表示代码垂直切片完成度，不代表产品发布完成度；完整 typecheck/Electron smoke、真实 provider/package E3 与 E4 性能门禁仍未完成。
 
-### 12.5 本轮增量：RPC/UI 生命周期事件
+### 12.6 本轮增量：Pi 事件背压与可重建进度合并
 
-依据 Pi Extensions/RPC 官方事件契约，本轮补齐 `extension_error`、`ui_prompt_start`、`ui_prompt_end` 三个 canonical namespace，并新增断言；不改变原始事件或既有通用 namespace。
+依据 Pi SDK 的 `tool_execution_update` 流式事件语义及 OpenBuddy 的事件桥边界，本轮复用已存在的 `@openbuddy/plugin-host` `BoundedEventQueue`，不重复实现队列：`tool_execution_update` 被视为可重建 progress，按 session/kind 合并并在 `snapshot()` 时刷新；session/plugin lifecycle、approval、error、final 等关键事件继续直接写入 ring buffer，避免静默丢失。
 
-工作树在本轮开始前已存在未提交的 `packages/runtime/openbuddy-plugin-host/src/bounded-event-queue.ts`、对应测试及 `index.ts` 导出改动；这些改动不属于本轮，未覆盖、未修改、未纳入提交。
-
-验证：定向测试 27/27 通过；`pnpm typecheck` 未通过，失败来自 main 现有/并行改动的 `init-pipeline-builder.ts`、`init-session.ts`、`install-host-modules-deps.ts`、`wire-dsh-services.ts`、`pi-extension-runner-bind-core*`、`pi-session-runtime.ts` 等类型错误，未涉及本轮修改文件。可复现命令：`cd OpenBuddy && pnpm typecheck`。
+验证：`pnpm exec vitest run electron/main/pi-event-bridge.test.ts electron/main/agent/host-modules/plugin-event-bus.test.ts --reporter=dot` 共 28/28 通过；`pnpm build` 的 bundle 阶段完成，但整体命令失败于既有 `app-desktop:typecheck` 类型错误，错误集中在 `init-pipeline-builder.ts`、`init-session.ts`、`install-host-modules-deps.ts`、`wire-dsh-services.ts`、`pi-extension-runner-bind-core*`、`pi-session-runtime.ts`，未涉及本轮修改文件。构建还输出既有 Node module externalization/ineffective dynamic import warnings。可复现命令：`cd OpenBuddy && pnpm build`。
 
 
 
