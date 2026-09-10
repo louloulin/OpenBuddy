@@ -224,7 +224,9 @@ export async function apply(ctx: Context): Promise<() => void> {
   // mountTeam / mountMcpClient 都由对应的 capability plugin (capability-plugins.ts)
   // 加载, 这里不再重复调用, 否则同一个 ctx 上同一个 service 会被 set 两次.
   const { mountEmail, EmailProviderRegistry } = await import("@openbuddy/capability-email");
-  const { defaultTaskService, type TaskService } = await import("./host-modules/task-service");
+  // NOTE: no inline `type` modifier inside a dynamic-import destructure —
+  // esbuild (vitest) cannot parse it; use the namespace object instead.
+  const taskServiceModule = await import("./host-modules/task-service");
 
   // NOTE: mountSession / mountAuthorization / mountPermission / mountCalendar
   //       / mountFsLocal / mountTeam / mountMcpClient 都由对应的 capability plugin
@@ -238,8 +240,28 @@ export async function apply(ctx: Context): Promise<() => void> {
   // was never mounted (the only references to `task` were in tests and
   // the dead-adapter path). See `electron/main/agent/host-modules/
   // task-service.ts` for the wrapper shape.
-  const taskService: TaskService = defaultTaskService();
+  const taskService = taskServiceModule.defaultTaskService();
   ctx.provide("task", taskService);
+  // Phase 2.1 (plan3.0.md §6) — mount the workbench task lifecycle owner so
+  // product code routes through transition validation + the generation fence
+  // instead of keeping an unowned second copy of task state. Recovery is
+  // bound to the Pi session catalog: a task whose session disappeared yields
+  // an actionable `session_missing` outcome instead of a silent empty result.
+  const taskLifecycleModule = await import("./host-modules/task-lifecycle-service");
+  const piFacade = ctx.get("pi") as { listSessions?: (cwd?: string) => Promise<ReadonlyArray<{ sessionId?: string }>> } | undefined;
+  const sessionExists: ((sessionId: string) => Promise<boolean>) | undefined = piFacade?.listSessions
+    ? async (sessionId) => {
+        try {
+          const sessions = await piFacade.listSessions!();
+          return sessions.some((entry) => entry?.sessionId === sessionId);
+        } catch {
+          // A resolver failure must never block recovery.
+          return true;
+        }
+      }
+    : undefined;
+  const taskLifecycleService = taskLifecycleModule.defaultTaskLifecycleService({ sessionExists });
+  ctx.provide("taskLifecycle", taskLifecycleService);
   ctx.provide("emailKnowledgeContextValidator", { validate: resources.validateKnowledgeContextCitation });
 
   const emailMcp = ctx.get("mcpClient") as { list?: () => unknown[]; listToolNames?: (serverName: string) => string[]; callTool?: (...args: unknown[]) => Promise<unknown> } | undefined;
@@ -297,5 +319,6 @@ export async function apply(ctx: Context): Promise<() => void> {
     }
     cleanupCollaboration();
     await taskService.close();
+    await taskLifecycleService.close();
   };
 }
