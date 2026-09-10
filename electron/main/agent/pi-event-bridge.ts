@@ -174,6 +174,7 @@ export class PiSessionEventBridge {
       ? this.maxEntries
       : Math.max(1, Math.min(this.maxEntries, Math.floor(query.limit)));
     return this.entries
+      .filter((entry) => entry.generation === undefined || entry.generation >= this.currentGeneration)
       .filter((entry) => query.sessionId === undefined || entry.sessionId === query.sessionId)
       .filter((entry) => query.sinceSequence === undefined || entry.sequence > query.sinceSequence)
       .slice(-limit)

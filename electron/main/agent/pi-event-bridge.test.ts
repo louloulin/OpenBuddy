@@ -78,7 +78,7 @@ describe("PiSessionEventBridge plugin/extension event indexing (phase 4)", () =>
       type: "plugin/current",
       payload: {},
     });
-    expect(bridge.snapshot().map((event) => event.type)).toEqual(["plugin/old", "plugin/current"]);
+    expect(bridge.snapshot().map((event) => event.type)).toEqual(["plugin/current"]);
   });
   it("indexes session-scoped events and filters by sessionId", () => {
     const bridge = new PiSessionEventBridge();

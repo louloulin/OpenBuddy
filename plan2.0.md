@@ -356,8 +356,13 @@ Pi 官方 `AgentSession`/Extensions 事件包含 session、agent、turn、messag
 ### 12.3 计划状态更新
 
 - **已实现**：Phase 1 的事件 canonicalization 垂直切片；对应 §4.1 的“事件/流式”与 §7.4 的 Pi event mapping。
+- **已实现**：Phase 1 的 generation-fenced event replay：reload 后 `PiSessionEventBridge.snapshot()` 仅返回当前 generation 事件，避免 stale session/plugin events 回放到 renderer；新增/更新测试覆盖。
 - **进行中**：single-owner tool/provider/session、agent-host 拆分、RPC/UI 全事件诊断。
 - **未开始**：完整 E3 外部 Pi package 验证、E4 streaming/IPC/reload/memory benchmark、三平台发布门禁。
+
+### 12.4 总体进度
+
+进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 2 个切片（事件 canonicalization、generation-fenced replay），因此当前**实现进度约 11%（2/18）**。该百分比仅表示代码垂直切片完成度，不代表产品发布完成度；完整 typecheck/build/Electron smoke、真实 provider/package E3 与 E4 性能门禁仍未完成。
 
 
 ## 13. 本版完成定义
