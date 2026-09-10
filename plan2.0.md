@@ -359,22 +359,22 @@ Pi 官方 `AgentSession`/Extensions 事件包含 session、agent、turn、messag
 - **已实现**：Phase 1 的 generation-fenced event replay：reload 后 `PiSessionEventBridge.snapshot()` 仅返回当前 generation 事件，避免 stale session/plugin events 回放到 renderer；新增/更新测试覆盖。
 - **已实现**：Phase 1 的 Pi RPC/UI 生命周期事件 canonicalization：`extension_error`、`ui_prompt_start`、`ui_prompt_end` 统一映射并有定向测试。
 - **已实现**：Phase 1 的 Pi→Main 事件背压切片：复用 `@openbuddy/plugin-host` 的 `BoundedEventQueue`，对 `tool_execution_update` 进度事件按 session/kind 合并，snapshot 时刷新；lifecycle/final/error 等事件仍直接进入 ring buffer。
-- **本轮完成**：无凭据 provider E3 切片：修复 Pi `registerProvider`/`registerNativeProvider` 追踪器的提交时序——只有底层 Pi 注册成功后才写入 provider registry 和发出 change event；底层注册异常时 registry、事件和 runtime 状态均保持回滚/无幽灵记录。现有多 provider attribution fixture 扩展为显式失败回滚与错误可观测性断言。
-- **验证完成**：provider registry 7 tests、Pi resource provider fixture 1 test 通过；完整 typecheck/build 通过。
-- **仍未开始**：真实凭据 provider 网络调用、E4 benchmark、Electron smoke。
+- **本轮完成**：context/compaction usage 产品化切片：`ContextUsagePill` 继续以 `agent:session-info`/`agent:session-usage` 作为权威快照，并订阅 Pi observability 的 `pi/context`、`pi/context-status`、`pi/context-compacted`、`pi/context-compaction-requested` 事件触发刷新；卸载时安全取消订阅，bridge/reload 失败时保留上一次快照而不伪造 usage。
+- **验证完成**：Pi context/compaction extension tests、profile/reload regression、typecheck/build 均通过。
+- **仍未开始**：E4 benchmark、Electron smoke、真实 provider 网络调用。
 
 
 ### 12.4 总体进度
 
-进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 7 个切片（前 6 项、以及无凭据多-provider 注册/失败回滚/可观测性 E3），因此当前**实现进度约 39%（7/18）**。该百分比仅表示代码/验证垂直切片完成度，不代表产品发布完成度；真实凭据 provider、E4 benchmark 与 Electron smoke 仍未完成。
+进度按本计划 6 个阶段、18 个可验收垂直切片统计：已完成 8 个切片（前 7 项、以及 context/compaction usage 产品化与 reload-safe UI 刷新），因此当前**实现进度约 44%（8/18）**。该百分比仅表示代码/验证垂直切片完成度，不代表产品发布完成度；E4 benchmark、Electron smoke 与真实 provider 网络调用仍未完成。
 
-### 12.10 本轮增量：无凭据多-provider E3 与失败回滚
+### 12.11 本轮增量：Pi context/compaction usage 产品化
 
-本轮严格不使用凭据、不调用生产 provider 网络：复用 Pi `ModelRuntime.registerProvider`/`registerNativeProvider` 官方机制，在内存/本地临时目录 fixture 中验证两个 provider 的独立 attribution、unregister 隔离、change event，以及底层注册失败时的回滚与诊断。
+本轮复用 Pi 官方 session context/compaction 事件和既有 WorkBuddy UI bridge：`ContextUsagePill` 继续从 `agent:session-info`/`agent:session-usage` 获取权威 usage/context 快照，并订阅 `openbuddy://plugin-event` 上的 `pi/context`、`pi/context-status`、`pi/context-compacted`、`pi/context-compaction-requested` 事件，在 Pi 上下文变化、压缩完成或压缩请求时刷新 pill。事件只作为刷新信号，不把事件 payload 当作伪造 provider 结果；快照失败时保留当前显示，首次不可用则隐藏。
 
-实现修复：provider tracker 现在先调用 Pi 原始注册方法，成功后才提交 host registry 和 `register` change event；unregister 也在 Pi 原始注销成功后再删除 registry 并发出 `unregister` event。这样失败不会留下 registry 幽灵记录，错误仍原样向调用方传播，便于 UI/日志观察。
+reload/失败恢复：订阅 effect 在 session 变化和组件卸载时清理旧 listener；bridge 不可用或 refresh 失败只进入 best-effort catch，不破坏既有 snapshot，也不会写入凭据或调用 provider。
 
-验证：`pnpm exec vitest run electron/main/agent/agent-host-provider-registry.test.ts electron/main/agent/pi-resource-loader.test.ts -t "provider|Provider|registry" --reporter=dot`：2 files、8 passed、12 skipped；`pnpm typecheck`：通过；`pnpm build`：通过，仅既有 Node externalization/ineffective dynamic import warnings；`git diff --check`：通过。未运行真实凭据网络测试，避免 secret 泄露与生产写入。
+验证：`pnpm exec vitest run electron/main/agent/pi-extensions.test.ts packages/runtime/openbuddy-plugin-host/src/profile.test.ts --reporter=dot`：2 files、69/69 通过；`pnpm typecheck`：通过；`pnpm build`：通过，仅既有 Node externalization/ineffective dynamic import warnings；`git diff --check`：通过。Electron smoke/E4 本轮未运行，原因是未启动完整桌面运行环境；复现命令为 `cd OpenBuddy && pnpm build`（构建已通过），Electron smoke 需项目既有桌面 smoke runner。
 
 
 
