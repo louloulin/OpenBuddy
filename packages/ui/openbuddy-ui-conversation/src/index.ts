@@ -30,7 +30,8 @@ export type { ExtensionStatusBarProps, ExtensionStatus, ExtensionStatusEntry } f
 export { ExtensionWidgets, widgetBodyText } from "./ExtensionWidgets";
 export type { ExtensionWidgetsProps, ExtensionWidget, ExtensionWidgetAction } from "./ExtensionWidgets";
 export { Composer } from "./Composer";
-export { ContextUsagePill } from "./ContextUsagePill";
+export { PiReloadFailureBanner } from "./PiReloadFailureBanner";
+export type { PiReloadFailureState } from "./PiReloadFailureBanner";
 export { FileChangesPanel } from "./FileChangesPanel";
 export { FindBar, isFindHit } from "./FindBar";
 export { InputAddMenu } from "./InputAddMenu";

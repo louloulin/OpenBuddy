@@ -441,3 +441,9 @@ Electron 复验：`pnpm test:electron:stream-port` 已重新运行，之前的 `
 在现有 `openbuddy://plugin-event` consumer `startRendererPluginEventBridge` 中增加 `pi/reload-failed` 专用状态投影：renderer runtime 继续先广播原始事件，同时提取并校验 `reason`、`error`、`generation`，记录 `pi-reload-failed` renderer diagnostic，并发布 `renderer/pi-reload-failed` 给 renderer/plugin consumer。该状态只消费现有 Pi observability bridge，不新增 transport；后续 `profile/reloaded` 事件仍按现有 recovery 路径触发 profile refresh，失败状态不会阻塞下一次事件。
 
 新增非桌面恢复测试：注入 `pi/reload-failed` 后断言 consumer 收到规范化失败状态，再注入后续 `profile/reloaded`，验证 bridge 仍可继续处理恢复事件。验证：`pnpm exec vitest run src/lib/__tests__/renderer-plugin-runtime.test.ts electron/main/agent/pi-runtime-coordinator.test.ts electron/main/__tests__/pi-observability-events.test.ts --reporter=dot`：3 files、40/40 通过；`pnpm typecheck`：通过；`pnpm build`：通过；`git diff --check`：通过。桌面 smoke 仍未运行，继续受 X server/Wayland 安全前置条件约束。
+
+### 12.19 本轮增量：Pi reload failure 用户恢复闭环
+
+新增 `PiReloadFailureBanner` 组件并从 `@openbuddy/ui-conversation` 导出：消费 renderer runtime 的 `renderer/pi-reload-failed` 状态，显示失败原因/错误和 Retry 按钮；Retry 直接调用现有 Pi `reloadPiExtensions()` adapter，成功后清除状态，失败后保留 banner 并显示最新错误；重复点击在 in-flight 期间被禁用/去重，避免重复 reload。`profile/reloaded` 与 `pi/extensions-reloaded` 事件仍可清理失败状态。
+
+非桌面组件测试覆盖：失败状态呈现与真实 adapter 成功恢复、重复点击只产生一次 reload、reload 再失败时 affordance 保留且可再次操作。验证：`pnpm exec vitest run packages/ui/openbuddy-ui-conversation/src/__tests__/PiReloadFailureBanner.test.tsx --reporter=dot`：3/3 通过；`pnpm typecheck`：通过；`pnpm build`：通过；`git diff --check`：通过。未新增 transport、未使用真实凭据、未伪造桌面 smoke。
