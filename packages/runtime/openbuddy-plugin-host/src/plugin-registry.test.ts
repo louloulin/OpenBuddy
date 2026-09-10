@@ -99,6 +99,25 @@ describe("PluginRegistry", () => {
     expect(registry.get("provider")?.state).toBe("disabled");
   });
 
+  it("rejects invalid displayName and compatibility metadata", async () => {
+    const registry = new PluginRegistry();
+    await expect(registry.register({ ...manifest("bad"), displayName: " " })).rejects.toThrow("displayName");
+    await expect(registry.register({ ...manifest("bad"), compatibility: { pi: "0.85.0", openbuddy: " " } })).rejects.toThrow("compatibility requires");
+    await expect(registry.register({ ...manifest("bad"), compatibility: { pi: "0.85.0", openbuddy: "0.14.0", platforms: [] } })).rejects.toThrow("platforms");
+    await expect(registry.register({ ...manifest("bad"), compatibility: { pi: "0.85.0", openbuddy: "0.14.0", platforms: ["linux", "linux"] } })).rejects.toThrow("duplicates");
+  });
+
+  it("keeps compatibility metadata immutable in registry projections", async () => {
+    const registry = new PluginRegistry();
+    const source = { ...manifest("compatible"), displayName: "Compatible", compatibility: { pi: "0.85.0", openbuddy: "0.14.0", platforms: ["linux"] } };
+    await registry.register(source);
+    source.compatibility.platforms.push("darwin");
+    const stored = registry.get("compatible")?.manifest;
+    expect(stored).toMatchObject({ displayName: "Compatible", compatibility: { pi: "0.85.0", openbuddy: "0.14.0", platforms: ["linux"] } });
+    (stored?.compatibility?.platforms as string[]).push("win32");
+    expect(registry.get("compatible")?.manifest.compatibility?.platforms).toEqual(["linux"]);
+  });
+
   it("rejects malformed capability declarations", async () => {
     const registry = new PluginRegistry();
     await expect(registry.register({ ...manifest("bad"), capabilities: "web" as never })).rejects.toThrow("capabilities must be a non-empty string array");

@@ -3,6 +3,12 @@
   "id": "@fixture/sample-plugin",
   "packageName": "@fixture/sample-plugin",
   "version": "1.0.0",
+  "displayName": "Sample Plugin",
+  "compatibility": {
+    "pi": ">=0.85.0 <0.86.0",
+    "openbuddy": ">=0.14.0",
+    "platforms": ["linux", "darwin", "win32"]
+  },
   "description": "Phase K.2 reference plugin that exercises all four tracks (pi / harness / slot / cordis) through the OpenBuddyPlugin SDK.",
   "tracks": [
     {

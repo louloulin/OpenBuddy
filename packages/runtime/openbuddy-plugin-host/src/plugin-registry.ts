@@ -76,6 +76,21 @@ function assertManifest(manifest: PluginRegistryManifest): void {
   for (const [name, value] of [["id", manifest.id], ["version", manifest.version], ["apiVersion", manifest.apiVersion]] as const) {
     if (typeof value !== "string" || !value.trim()) throw new PluginRegistryError(`${name} is required`);
   }
+  if (manifest.displayName !== undefined && (typeof manifest.displayName !== "string" || !manifest.displayName.trim())) {
+    throw new PluginRegistryError("displayName must be a non-empty string");
+  }
+  if (manifest.compatibility !== undefined) {
+    const compatibility = manifest.compatibility;
+    if (!compatibility || typeof compatibility !== "object" || typeof compatibility.pi !== "string" || !compatibility.pi.trim() || typeof compatibility.openbuddy !== "string" || !compatibility.openbuddy.trim()) {
+      throw new PluginRegistryError("compatibility requires non-empty pi and openbuddy strings");
+    }
+    if (compatibility.platforms !== undefined && (!Array.isArray(compatibility.platforms) || compatibility.platforms.length === 0 || compatibility.platforms.some((platform) => typeof platform !== "string" || !platform.trim()))) {
+      throw new PluginRegistryError("compatibility.platforms must be a non-empty string array");
+    }
+    if (compatibility.platforms && new Set(compatibility.platforms).size !== compatibility.platforms.length) {
+      throw new PluginRegistryError("compatibility.platforms must not contain duplicates");
+    }
+  }
   if (!Array.isArray(manifest.surfaces) || manifest.surfaces.length === 0) {
     throw new PluginRegistryError("at least one surface is required");
   }
@@ -205,6 +220,7 @@ export function satisfiesPluginDependencyRange(version: string, range: string): 
 function cloneManifest(manifest: PluginRegistryManifest): PluginRegistryManifest {
   return {
     ...manifest,
+    ...(manifest.compatibility ? { compatibility: { ...manifest.compatibility, ...(manifest.compatibility.platforms ? { platforms: [...manifest.compatibility.platforms] } : {}) } } : {}),
     surfaces: [...manifest.surfaces],
     ...(manifest.capabilities ? { capabilities: [...manifest.capabilities] } : {}),
     ...(manifest.dependencies ? { dependencies: manifest.dependencies.map((dependency) => ({ ...dependency })) } : {}),
