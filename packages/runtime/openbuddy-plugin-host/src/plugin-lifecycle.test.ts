@@ -94,6 +94,26 @@ describe("PluginLifecycleCoordinator", () => {
     expect(registry.get("dependent")?.state).toBe("disabled");
   });
 
+  it("runs declared surface adapters in lifecycle order and reverses them on rollback", async () => {
+    const registry = new PluginRegistry();
+    const coordinator = new PluginLifecycleCoordinator(registry);
+    const calls: string[] = [];
+    const result = await coordinator.stage(
+      { ...manifest, id: "multi", surfaces: ["pi", "renderer"] },
+      { surfaces: {
+        pi: { stage: () => { calls.push("pi-stage"); }, rollback: () => { calls.push("pi-rollback"); } },
+        renderer: { stage: () => { calls.push("renderer-stage"); throw new Error("renderer failed"); }, rollback: () => { calls.push("renderer-rollback"); } },
+      } },
+    );
+    expect(result.transaction.status).toBe("rolled_back");
+    expect(calls).toEqual(["pi-stage", "renderer-stage", "renderer-rollback", "pi-rollback"]);
+  });
+
+  it("rejects an adapter surface that is absent from the manifest", async () => {
+    const registry = new PluginRegistry();
+    const coordinator = new PluginLifecycleCoordinator(registry);
+    await expect(coordinator.stage(manifest, { surfaces: { renderer: {} } })).rejects.toThrow("undeclared surface renderer");
+  });
   it("filters an explicitly replayed stale generation event", async () => {
     const registry = new PluginRegistry();
     const received: number[] = [];
