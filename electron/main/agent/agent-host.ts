@@ -1,4 +1,4 @@
-import { app, shell } from "electron";
+import { app, shell, BrowserWindow } from "electron";
 import { readFile, writeFile, mkdir, rename, rm, unlink, readdir, stat, open } from "node:fs/promises";
 import { homedir } from "node:os";
 import { casdoorAuth } from "../casdoor/casdoor-auth";
@@ -1498,8 +1498,8 @@ export const agentHost = buildAgentHostFacade({
 
 
 // syncWorkbenchScope + workbench-scope-sync moved to host-modules/workbench-scope-sync.ts
-// before-quit handler + filesystem capability policy moved to host-modules/bootstrap/
-import { installBeforeQuitHandler } from "./host-modules/bootstrap/before-quit-handler";
+// before-quit handler + quit gate + filesystem capability policy moved to host-modules/bootstrap/
+import { installQuitGate } from "./host-modules/lifecycle/quit-gate";
 import {
   evaluateFilesystemCapabilityPolicy as evaluateFilesystemCapabilityPolicyImpl,
   DEFAULT_FILESYSTEM_POLICY as DEFAULT_FILESYSTEM_POLICY_IMPL,
@@ -1508,10 +1508,19 @@ import {
 
 export type { AgentSession };
 
-// v6-G M1 收尾: 把 Electron before-quit + filesystem policy 抽到独立模块,
-// agent-host.ts 只剩一行 register. Register 在 module-load 即触发, 等价
-// 原 inline `app.on("before-quit", ...)` 在模块初始化时的副作用.
-installBeforeQuitHandler({ dispose: dispose(enqueueLifecycle) });
+// Phase 4.5: quit gate checks active tasks before exiting. Falls back to
+// plain dispose if no active tasks; shows native dialog otherwise with three
+// choices: cancel-quit / force-quit (abort tasks) / background-continue.
+installQuitGate({
+  // listRunningTasksImpl returns { id, kind, description, status, sessionId }[] at
+  // runtime. The HarnessJobView return-type annotation in subagent-runtime.ts
+  // is stale (includes `label`/`startedAt` the function never returns). Cast
+  // to the correct shape so the quit gate's type expectations are satisfied.
+  listActiveTasks: listRunningTasksImpl as () => import("./host-modules/lifecycle/quit-task-policy").HarnessTaskSnapshot[],
+  killTask: killTaskImpl,
+  dispose: dispose(enqueueLifecycle),
+  getMainWindow: () => BrowserWindow.getAllWindows()[0] ?? null,
+});
 
 export const evaluateFilesystemCapabilityPolicy = evaluateFilesystemCapabilityPolicyImpl;
 export const DEFAULT_FILESYSTEM_POLICY = DEFAULT_FILESYSTEM_POLICY_IMPL;
