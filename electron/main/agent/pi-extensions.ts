@@ -6,6 +6,7 @@ import openBuddyApplyPatch, { type OpenBuddyApplyPatchConfig } from "./extension
 import { sessionMetadataBridgeFactory } from "./extensions/session-metadata-bridge";
 import { modelBridgeFactory } from "./extensions/model-bridge";
 import { calendarPiFactory } from "./extensions/calendar-pi-extension";
+import { flagShortcutBridgeFactory } from "./extensions/flag-shortcut-bridge";
 import { isPiPackageInstalled } from "./pi-package-installed";
 import {
   createTelemetryBridgeExtension,
@@ -938,6 +939,16 @@ export const BUILTIN_PI_PLUGIN_MANIFESTS: readonly OpenBuddyPluginManifest[] = [
       },
     ],
   },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-pi-flag-shortcut",
+    packageName: "@openbuddy/builtin-pi-flag-shortcut",
+    version: "1.0.0",
+    description: "Phase M.1 (plan3.0.md) — seeds the Pi native registerFlag / registerShortcut surface (--openbuddy-debug boolean flag + ctrl+shift+o abort-when-idle shortcut) so third-party extensions and the CLI can introspect a stable, OpenBuddy-owned flag/shortcut contract.",
+    tracks: [
+      { kind: "pi", inline: "openbuddy-pi-flag-shortcut" },
+    ],
+  },
 ];
 
 /**
@@ -1132,6 +1143,13 @@ export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResol
   // capability-plugins.ts) remains the canonical backend; the tools
   // here just adapt the Cordis service surface to the PI ExtensionAPI.
   "openbuddy-pi-calendar": (_emit, _config, _options) => calendarPiFactory,
+
+  // Phase M.1 (plan3.0.md) — 11th builtin ExtensionFactory. Seeds the Pi
+  // native `registerFlag` / `registerShortcut` surface that the rest of
+  // OpenBuddy has left unused. Exposes `--openbuddy-debug` for the CLI /
+  // renderer and `ctrl+shift+o` as an "abort when idle" keybinding. When
+  // either API is missing from the runtime the factory no-ops.
+  "openbuddy-pi-flag-shortcut": (_emit, _config, _options) => flagShortcutBridgeFactory,
 };
 
 export function resolvePiExtensions(

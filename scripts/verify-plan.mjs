@@ -6,6 +6,10 @@
  *     超过 R 行即报 FAIL（可被 env OVERRIDE 以排除 legacy 外部兼容文件）。
  *   - 能力归属单一权威：pi-passthrough 的 CAPABILITY_TO_PLUGIN_ID 必须从
  *     capability-ownership.ts 派生，禁止自持重复映射。
+ *   - Pi 覆盖：builtinPiExtensionFactories + BUILTIN_PI_PLUGIN_MANIFESTS 的
+ *     注册数与计划文档（plan2.0.md / plan3.0.md / plan4.md）声明一致；
+ *     不一致即报 FAIL（plan3.0.md 起新增了 registerFlag/registerShortcut
+ *     这类 Pi 原生 API 的覆盖检查）。
  *
  * 可选动态门（--run-tests 或 --run-vitest）：调用 tsc / vitest。
  *
@@ -13,6 +17,7 @@
  *   node scripts/verify-plan.mjs                # 仅静态门（快）
  *   node scripts/verify-plan.mjs --run-vitest   # 静态门 + 全量 vitest
  *   node scripts/verify-plan.mjs --limit=2600   # 覆盖巨型文件阈值（默认 3000）
+ *   node scripts/verify-plan.mjs --plan3-only   # 仅跑 plan3.0.md 增量检查
  *
  * 退出码：0=全 PASS，1=任一 FAIL。
  */
@@ -84,10 +89,70 @@ try {
   fail("capability-ownership-single-source", `read error: ${e.message}`);
 }
 
+// ——— 3. Pi 覆盖：builtin 工厂与 manifest 表一致 ———
+try {
+  const extPath = resolve(ROOT, "electron/main/agent/pi-extensions.ts");
+  const src = readFileSync(extPath, "utf8");
+  // 统计 builtinPiExtensionFactories 中以 `"openbuddy-` 开头的 key 数量
+  // 以及 BUILTIN_PI_PLUGIN_MANIFESTS 中 `id: "openbuddy-` 的数量；
+  // 两个数字必须一致，否则 builtin 注册表与 manifest 表漂移。
+  // 工厂 key 行的形态有三种：(_emit ... / ((emit ... / (emit ... 都允许。
+  const factoryKeys = new Set();
+  for (const match of src.matchAll(/^\s*"([a-z0-9-]+)"\s*:\s*\(\(*\s*_?emit\b/mg)) {
+    factoryKeys.add(match[1]);
+  }
+  const manifestIds = new Set();
+  for (const match of src.matchAll(/^\s*id:\s*"([a-z0-9-]+)",/mg)) {
+    manifestIds.add(match[1]);
+  }
+  const onlyInFactory = [...factoryKeys].filter((k) => !manifestIds.has(k));
+  const onlyInManifest = [...manifestIds].filter((k) => !factoryKeys.has(k));
+  if (onlyInFactory.length === 0 && onlyInManifest.length === 0 && factoryKeys.size > 0) {
+    pass(
+      "pi-builtin-coverage",
+      `${factoryKeys.size} builtins registered (factories ↔ manifests aligned)`,
+    );
+  } else {
+    fail(
+      "pi-builtin-coverage",
+      `factories=[${[...factoryKeys].join(",")}] manifests=[${[...manifestIds].join(",")}] onlyFactory=[${onlyInFactory.join(",")}] onlyManifest=[${onlyInManifest.join(",")}]`,
+    );
+  }
+} catch (e) {
+  fail("pi-builtin-coverage", `read error: ${e.message}`);
+}
+
+// ——— 4. plan3.0.md 增量：registerFlag / registerShortcut 落地检查 ———
+try {
+  const extPath = resolve(ROOT, "electron/main/agent/pi-extensions.ts");
+  const src = readFileSync(extPath, "utf8");
+  const flagShortcutFile = resolve(ROOT, "electron/main/agent/extensions/flag-shortcut-bridge.ts");
+  const flagShortcutSrc = readFileSync(flagShortcutFile, "utf8");
+  const plan3 = resolve(ROOT, "plan3.0.md");
+  const hasPlan3 = existsSync(plan3);
+  const hasFactory = /"openbuddy-pi-flag-shortcut"\s*:/m.test(src);
+  const usesRegisterFlag = /\.registerFlag\s*\(/.test(flagShortcutSrc);
+  const usesRegisterShortcut = /\.registerShortcut\s*\(/.test(flagShortcutSrc);
+  if (hasPlan3 && hasFactory && usesRegisterFlag && usesRegisterShortcut) {
+    pass(
+      "plan3-flag-shortcut",
+      "plan3.0.md present, openbuddy-pi-flag-shortcut factory registered, registerFlag + registerShortcut both exercised",
+    );
+  } else {
+    fail(
+      "plan3-flag-shortcut",
+      `hasPlan3=${hasPlan3} hasFactory=${hasFactory} registerFlag=${usesRegisterFlag} registerShortcut=${usesRegisterShortcut}`,
+    );
+  }
+} catch (e) {
+  fail("plan3-flag-shortcut", `read error: ${e.message}`);
+}
+
 // ——— 可选动态门 ———
 const args = process.argv.slice(2);
 const runVitest = args.includes("--run-vitest");
 const runTsc = args.includes("--run-tsc") || args.includes("--run-vitest");
+const plan3Only = args.includes("--plan3-only");
 
 function sh(cmd, label) {
   try {
@@ -105,13 +170,22 @@ if (runVitest) sh(["npx", "vitest", "run", "--reporter=dot"], "vitest-run");
 // ——— 汇总 ———
 const failed = results.filter((r) => !r.ok);
 console.log("\n[verify-plan] Architecture acceptance gates:\n");
-for (const r of results) {
+const filtered = plan3Only ? results.filter((r) => r.name.startsWith("plan3-") || r.name === "pi-builtin-coverage") : results;
+for (const r of filtered) {
   console.log(`  ${r.ok ? "PASS" : "FAIL"}  ${r.name}`);
   if (r.detail && !r.ok) console.log(`       └─ ${r.detail}`);
 }
-console.log(`\n  → ${results.length - failed.length}/${results.length} gates passed`);
-if (failed.length > 0) {
+console.log(`\n  → ${filtered.length - failed.filter((f) => filtered.includes(f)).length}/${filtered.length} gates passed`);
+if (plan3Only) {
+  const plan3Failed = filtered.filter((r) => !r.ok);
+  if (plan3Failed.length > 0) {
+    console.log("[verify-plan] ❌ FAILED\n");
+    process.exit(1);
+  }
+  console.log("[verify-plan] ✅ ALL PASS\n");
+} else if (failed.length > 0) {
   console.log("[verify-plan] ❌ FAILED\n");
   process.exit(1);
+} else {
+  console.log("[verify-plan] ✅ ALL PASS\n");
 }
-console.log("[verify-plan] ✅ ALL PASS\n");

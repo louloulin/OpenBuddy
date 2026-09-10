@@ -527,6 +527,9 @@ describe("OpenBuddy Pi extension resolution", () => {
       "openbuddy-pi-model-bridge",
       // Phase I.2 — 7th builtin ExtensionFactory for calendar PI tools.
       "openbuddy-pi-calendar",
+      // Phase M.1 (plan3.0.md) — 11th builtin ExtensionFactory that seeds
+      // the Pi native registerFlag / registerShortcut surface.
+      "openbuddy-pi-flag-shortcut",
     ]);
   });
 

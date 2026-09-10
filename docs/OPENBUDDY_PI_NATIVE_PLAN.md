@@ -922,6 +922,49 @@ for (const piRow of aggregate.pi) {
 - 🟡 **Phase G 持续**：真实 LLM E2E（需凭据环境，沙箱跑不了）
 - 🟡 **文档同步**：每轮 phase 完成后更新 §11 next-N-rounds + §3 / §10 状态指示
 
+#### 11.6 v9 — plan3.0.md 落地：Pi 原生 flag / shortcut surface 覆盖（LUM-687 七期完善）
+
+> 📅 v9 更新（2026-09-10）：plan3.0.md 进入实际落地阶段。聚焦"Pi 已经在 OpenBuddy 内部但未被用满"的 API 表面，把 §11.5.4 的路线图前置一轮可验证产物。
+
+**11.6.1 本轮范围**
+
+- 新增第 11 个 builtin ExtensionFactory `openbuddy-pi-flag-shortcut`，首次在 OpenBuddy 内消费 Pi 原生的 `registerFlag` + `registerShortcut` 表面（之前 10 个 builtin 全都未触达）。
+- `scripts/verify-plan.mjs` 扩展为 plan3.0.md aware：新增 `pi-builtin-coverage`（factory ↔ manifest 对齐）+ `plan3-flag-shortcut`（flag/shortcut 落地检查）两条静态门；新增 `--plan3-only` 过滤模式。
+- `plan3.0.md` 成为战略/执行之间的整合文件，引用本节作为 v9 锚点。
+
+**11.6.2 当前微内核 + 插件架构（plan3.0.md 完成状态）**
+
+- builtin ExtensionFactory 数：**10 → 11**（新增 `openbuddy-pi-flag-shortcut`）。
+- 微内核：`agent-host.ts` 1526 LOC、`pi-extensions.ts` ~1240 LOC、25 host-module 不变（本轮不拆，保留为 v9 后续 Phase B.2 的事）。
+- 新增静态验收门：`node scripts/verify-plan.mjs` → 4/4 passed：
+  - `giant-file-limit`（不变）
+  - `capability-ownership-single-source`（不变）
+  - `pi-builtin-coverage`（**新增**）：11 个 factory ↔ 11 个 manifest 完全对齐
+  - `plan3-flag-shortcut`（**新增**）：plan3.0.md 存在 + factory 注册 + `registerFlag` + `registerShortcut` 全部出现
+
+**11.6.3 新增 builtin ExtensionFactory 设计要点**
+
+`openbuddy-pi-flag-shortcut`（详见 `electron/main/agent/extensions/flag-shortcut-bridge.ts` + test）：
+
+- 注册 boolean CLI flag `--openbuddy-debug`（默认 false），供第三方 extension / renderer / support bundle 通过 `pi.getFlag()` 回读；
+- 注册 keybinding `ctrl+shift+o`，handler 在 `ctx.isIdle() === true` 时调用 `ctx.shutdown()`，busy 时 no-op（避免 strand 在飞工具调用）；
+- 两个 API 任意缺失时工厂 no-op（保持向后兼容老 Pi runtime）。
+
+**11.6.4 验证证据**
+
+- `pnpm typecheck`（`tsconfig.json`）：0 新增错误；
+- `pnpm exec vitest run electron/main/agent/extensions/flag-shortcut-bridge.test.ts` → **7 passed**；
+- `pnpm exec vitest run electron/main/agent/pi-extensions.test.ts` → **39 passed**（同步更新 `builtinPiExtensionIds()` 期望表加入第 11 项）；
+- `node scripts/verify-plan.mjs` → **4/4 gates passed**。
+
+**11.6.5 v9 → v10 next-step**
+
+- plan4.md §7 第二轮（Phase B.2）微内核总线统一到 PI ExtensionRunner；
+- plan4.md §7 第三轮（Phase B.3）`discoverAndLoadExtensions` 接入 builtin 与 profile 目录；
+- plan3.0.md §6 列表里其它 Phase C/D/E/F/H/I/L.5 保持 plan4 §7 后续轮次推进。
+
+---
+
 ## 12. v2 → v3 完整章节对照
 
 | v2 章节 | v3 状态 |
