@@ -69,6 +69,13 @@ export {
 } from "./hooks";
 
 export {
+  DEFAULT_EVENT_PAYLOAD_MAX_BYTES,
+  boundEventPayload,
+  type BoundedEventPayloadOptions,
+  type BoundedEventPayloadResult,
+} from "./bounded-event-payload";
+
+export {
   canRecoverTask,
   createTaskLifecycleStore,
   isTaskTerminal,

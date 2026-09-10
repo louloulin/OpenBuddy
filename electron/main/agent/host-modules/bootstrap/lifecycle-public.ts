@@ -10,6 +10,7 @@
  *
  * 反向依赖不变量: 此模块不 import agent-host.ts.
  */
+import { boundEventPayload } from "@openbuddy/plugin-host";
 import { casdoorAuth } from "../../../casdoor/casdoor-auth";
 import { disposeInternal } from "../dispose-internal";
 import { init as initImpl } from "../init-orchestration";
@@ -38,7 +39,7 @@ export function bindRendererEventEmitter(emitter: (channel: string, payload: unk
 }
 
 export function emitRendererEvent(channel: string, payload: unknown): void {
-  rendererEventEmitter?.(channel, payload);
+  rendererEventEmitter?.(channel, boundEventPayload(payload).value);
 }
 
 // Bridge to workbench-scope-sync's module-level emit registry so module-load

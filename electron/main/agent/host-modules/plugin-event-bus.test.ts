@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalEventNamespace, eventNamespace } from "./plugin-event-bus";
+import { canonicalEventNamespace, clonePayload, eventNamespace } from "./plugin-event-bus";
 
 describe("Pi event namespace contract", () => {
   it.each([
@@ -29,5 +29,11 @@ describe("Pi event namespace contract", () => {
     expect(eventNamespace("resources_discover")).toBe("agent/resources_discover");
     expect(eventNamespace("custom_extension_event")).toBe("agent/custom_extension_event");
     expect(eventNamespace("tool_result")).toBe("tool/tool_result");
+  });
+
+  it("bounds cloned plugin payloads before they enter the IPC/replay surface", () => {
+    const safe = clonePayload({ output: "x".repeat(100_000) }) as { output: string };
+    expect(safe.output).toContain("[truncated]");
+    expect(new TextEncoder().encode(JSON.stringify(safe)).byteLength).toBeLessThanOrEqual(64 * 1024);
   });
 });
