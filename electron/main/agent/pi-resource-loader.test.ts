@@ -531,6 +531,8 @@ describe("OpenBuddy Pi package resource loading", () => {
         }
       `);
       await session.reload();
+      expect(session.getToolDefinition("session_reload_before")).toBeUndefined();
+      expect(session.getToolDefinition("session_reload_after")).toBeDefined();
       expect(session.getAllTools().some((tool) => tool.name === "session_reload_before")).toBe(false);
       expect(session.getAllTools().some((tool) => tool.name === "session_reload_after")).toBe(true);
     } finally {
