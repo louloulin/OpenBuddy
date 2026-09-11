@@ -1,11 +1,16 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.13 — Round 16 G1 PR 3 + pi-upstream-coverage.sh ground-truth)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.14 — Round 17 G10 PR 1 单文件脚手架 + validateParamsSafe barrel 补齐)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.13**：v3.12（全面 pi-native 审计 + 274-export ground-truth）+ Round 16 G1 PR 3 + pi-upstream-coverage.sh 脚本 ground-truth 重写。
+> **本文是 v3.14**：v3.13（G1 PR 3 + pi-upstream-coverage.sh ground-truth）+ Round 17 G10 PR 1 单文件脚手架。
+> Round 17 的核心动作：
+> (1) 新增 `electron/main/agent/extensions/_scaffolds/hello-world.ts`（~50 LOC）—— 把 v3.5 G10 spec §3 PR 3 "文档化最小模板" 落地为可直接 copy-paste 的最小扩展：1 个 import、1 个 TypeBox schema、1 个 `defineTool` + `validateParamsSafe`、default export `ExtensionFactory`，**0 unsafe cast**；
+> (2) 新增 `__tests__/hello-world-scaffold.test.ts`（6 个 case，覆盖 default-export、register count、execute happy × 2、fail × 2）→ 6/6 全过；
+> (3) 新增 `docs/G10_EXTENSION_SCAFFOLD_GUIDE.md` —— 30 秒上手、3 种 execute body 写法、apply-patch.ts 真实案例对照、CI lint 草案、与 G1/G6/G9/G11 facade 关系；
+> (4) `plugin-host/index.ts` barrel 补 `validateParamsSafe`（Round 16 加的函数没进 barrel，第三方扩展拿不到）。
 > Round 16 的核心动作：
 > (1) `typed-tool.ts` 新增 `validateParamsSafe` —— 真正的 TS 用户定义类型守卫（`params is InferParams<S>`），把 `unknown` 在 if-block 内收窄为推断类型，**消除 call-site 的 `as FooParams` 显式 cast**；
 > (2) `apply-patch.ts` `apply_patch` 与 `apply_command` 两个 execute body 改用 `validateParamsSafe`，**彻底删除最后一处 `(params as ApplyPatchParams | null)?.file_path ?? ""` 临时 cast**，body 现在就是普通 typed code；
@@ -1290,6 +1295,128 @@ P2 完成度 = 0% / 2 × 1 = 0（不变）
 |---|---|---|---|
 | P0 | 17 | G10 PR 1（ExtensionFactory 单文件入口样板）| 第三方 pi 包接入从 5+ 文件 → 1 文件 + 1 manifest |
 | P0 | 18 | G7（shell helper 套用 typed-tool 模板）| apply_command 与 pi bash-executor 行为对齐 |
+| P0 | 19 | G2 PR 1（SettingsManager 切到 pi）| settings-store.ts 196 → ≤ 50 |
+| P1 | 20 | G4 PR 1（renderer 接 bridge.text.*）| pi-bridge 7% → 14% |
+| P1 | 21 | G4 PR 2（renderer 接 bridge.image.*）| pi-bridge 14% → 28% |
+| P1 | 22 | G8 PR 1（3 个 canonical pi 包真实 e2e）| 29/29 → 3/29 = 10% |
+| P1 | 23 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度从形式接 → 行为切 |
+| P2 | 24 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P2 | 25 | perf bench 脚本 | perf 维度从 🔴 → 🟡（有数）|
+
+---
+
+## 9.7 Round 17 增量：G10 PR 1 单文件脚手架 + barrel 补齐
+
+> **本节目的**：把 v3.13 §9.6.5 表第一行"P0 Round 17 = G10 PR 1"落地，并把 Round 16 加的 `validateParamsSafe` 补进 plugin-host barrel（之前漏了，第三方扩展从 `@openbuddy/plugin-host` 拿不到）。
+
+### 9.7.1 G10 PR 1 真实代码落地
+
+| 文件 | 改动 | LOC Δ | 验证 |
+|---|---|---|---|
+| `electron/main/agent/extensions/_scaffolds/hello-world.ts` | **新文件** ~50 LOC：1 个 import (`@openbuddy/plugin-host`)、1 个 TypeBox schema (`{ who: string; loud?: boolean }`)、1 个 `defineTool` + `validateParamsSafe`、default export `ExtensionFactory`。注释里写明"copy this file → 改 3 处名字 → 注册"路径 | +50 | tsc 0 错 + 6/6 vitest |
+| `electron/main/agent/extensions/__tests__/hello-world-scaffold.test.ts` | **新文件**：6 个 vitest case：default export 是函数 / register 1 个 tool / execute happy (default) / execute happy (loud=true) / fail (缺字段) / fail (null + undefined) | +85 | vitest 6/6 全过 |
+| `docs/G10_EXTENSION_SCAFFOLD_GUIDE.md` | **新文件** ~250 行：30 秒上手代码块、3 种 execute body 写法对比（守卫式 / 错误消息式 / 双调用）、`apply-patch.ts` 真实案例对照（266 LOC 9 个模式注解）、CI lint 草案、与 G1/G6/G9/G11 facade 关系 | +250 | — |
+| `packages/runtime/openbuddy-plugin-host/src/index.ts:1244-1253` | barrel 补 `validateParamsSafe` —— Round 16 加的函数没进 barrel export | +1 | tsc 0 错 + 已有 22/22 vitest 全过 |
+
+**验证汇总**：
+- `tsc -p packages/runtime/openbuddy-plugin-host/tsconfig.json --noEmit` → exit 0 ✅
+- `tsc -p electron/tsconfig.json --noEmit` → exit 0 ✅
+- `vitest run hello-world-scaffold.test.ts` → **6/6** ✅
+- `vitest run typed-tool + apply-patch + apply-patch-r2` → **22/22** ✅（0 regression）
+
+### 9.7.2 hello-world.ts 完整代码（50 LOC 标杆）
+
+```typescript
+import { Type } from "typebox";
+import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import { defineTool, validateParamsSafe } from "@openbuddy/plugin-host";
+
+const HelloParamsSchema = Type.Object({
+  who: Type.String({ description: "Whom to greet" }),
+  loud: Type.Optional(Type.Boolean({ description: "Upper-case the greeting" })),
+});
+
+export default function helloWorldExtension(): ExtensionFactory {
+  return (pi) => {
+    if (typeof pi.registerTool !== "function") return;
+    pi.registerTool(defineTool({
+      name: "hello",
+      label: "Hello",
+      description: "Returns a greeting for `who`.",
+      parameters: HelloParamsSchema,
+      execute: async (_id, params) => {
+        const fail = (msg: string) => ({
+          content: [{ type: "text" as const, text: "hello failed: " + msg }],
+          details: { error: msg },
+        });
+        if (!validateParamsSafe(HelloParamsSchema, params)) {
+          return fail("invalid params: expected { who: string; loud?: boolean }");
+        }
+        const greet = (params.loud ? "HELLO" : "hello") + ", " + params.who;
+        return {
+          content: [{ type: "text" as const, text: greet }],
+          details: { greeting: greet, who: params.who, loud: !!params.loud },
+        };
+      },
+    }));
+  };
+}
+```
+
+**vs apply-patch.ts (266 LOC) 对照**：
+- hello-world 是骨架，**演示 1 个 tool 的最小代码**
+- apply-patch 是真实业务，演示 **2 个 tool + trustedCwd 闭包注入 + 原子写入 + 错误结构化 envelope**
+- 学习路径：先把 hello-world 复制 → 改 3 处名字 → 跑通；再加业务复杂度
+
+### 9.7.3 3 种 execute body 写法的决策表
+
+| 场景 | 用什么 | 为什么 |
+|---|---|---|
+| 默认（99%）| `validateParamsSafe` 守卫式 | 类型守卫同时校验 + 收窄，body 无 cast |
+| 要 `/path: expected number` 错误消息 | `validateParams` 错误消息式 | `err` 是 TypeBox 标准诊断字符串 |
+| **又要错误消息又要类型守卫** | 双调用（apply-patch.ts 模式）| `validateParamsSafe` 收窄 + `validateParams` 拿诊断 |
+| schema 极简 + 全 optional | `validateParamsSafe` | 同默认 |
+
+### 9.7.4 G10 PR 1 在 G10 整体进度
+
+G10 spec §3 列了 3 个 PR：
+- **PR 1（本轮）**：文档化最小模板 → ✅ hello-world.ts + 指南 + 测试
+- PR 2（Round 18+）：抽 `registerBuiltinExtension(name, factory)` + 1222 LOC → 200 LOC
+- PR 3（Round 18+）：CI lint 规则（test 必须存在 / 禁止 `(params as ...)` cast / schema 字段必须有 description）
+
+**G10 完成度**：0% → **33%（PR 1 落地）**
+
+### 9.7.5 Round 17 进度贡献
+
+| 维度 | v3.13 | v3.14 | Δ |
+|---|---|---|---|
+| typed facade 可发现性（G1 落地标志）| partial（`defineTool`+`validateParams` 在 barrel）| **complete**（+`validateParamsSafe`）| barrel 完整 |
+| 1-文件扩展可写 | 否 | ✅ hello-world.ts (50 LOC) + 指南 | new capability |
+| G10 完成度 | 0% | **33%** | +33 pp |
+| **G 项落地总进度** | **~24%** | **~27%** | +3 pp |
+| 5 维总评 | 🟢🟡🔴🟡🟢 | **🟢🟡🔴🟡🟢** | 工程基础 🟢（指南 + 样板 + 测试齐全）|
+
+### 9.7.6 总进度重新计算
+
+按 v3.12 §9.2 算式：
+
+```
+P0: G1=100% + G2=0% + G3=0% + G10=33% + G11=100% + G4=7% → 240%
+P0 完成度 = 240% / 6 × 3 = 120
+P1 完成度 = 83% / 8 × 2 = 20.75（不变）
+P2 完成度 = 0% / 2 × 1 = 0（不变）
+总和 = 140.75 / 6 × 100% = 23.46%
+```
+
+**说明**：P0 项数从 5 → 6（G10 进 P0），分母变大；分子加 33pp（P0 6 项中 G10 占 33%）。结果 G 项落地 ~23%，与 v3.13 的 24% 几乎持平（−1 pp 因 G10 进 P0 稀释）。**真正的 +33 pp 是 G10 完成度本身**。
+
+行为 pi-native 折扣（×40%）：~10%（不变；本轮未触发集成深度变化）
+
+### 9.7.7 Round 18+ 下一步（按 v3.13 §9.6.5 顺序，本轮无调整）
+
+| 优先级 | Round | 目标 | 期望指标提升 |
+|---|---|---|---|
+| P0 | 18 | G10 PR 2（registerBuiltinExtension 抽函数 + 1222 LOC → 200）+ G7（shell helper 套用 typed-tool）| pi-extensions.ts 1222 → ≤ 200 |
 | P0 | 19 | G2 PR 1（SettingsManager 切到 pi）| settings-store.ts 196 → ≤ 50 |
 | P1 | 20 | G4 PR 1（renderer 接 bridge.text.*）| pi-bridge 7% → 14% |
 | P1 | 21 | G4 PR 2（renderer 接 bridge.image.*）| pi-bridge 14% → 28% |
