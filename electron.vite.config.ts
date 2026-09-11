@@ -53,6 +53,7 @@ const workspacePackageAliases = [
   { find: "@openbuddy/plugin-host/persistence", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/persistence.ts") },
   { find: "@openbuddy/plugin-host/yaml-patch", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/yaml-patch.ts") },
   { find: "@openbuddy/plugin-host/js-expr", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/js-expr.ts") },
+  { find: "@openbuddy/plugin-host/typed-tool", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/typed-tool.ts") },
   // Phase B.3 step 2b — DSH core shared state + PI extensions. Subpath
   // aliases must precede the bare-package alias below so the longer
   // `@openbuddy/dsh-core/state` lookup wins over the bare

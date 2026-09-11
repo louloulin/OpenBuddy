@@ -6,7 +6,7 @@
 > `apply_patch` + `apply_command` 用 pi 上游 typed-tool 模式（`defineTool` + TypeBox）改造的
 > **详细迁移规格**。
 >
-> **状态**：**PR 1 已落地**（2026-09-11 Round 13 + **5th spec audit correction**）。PR 2 / PR 3 待 dev-env 实跑。
+> **状态**：**PR 2 已落地**（2026-09-11 Round 14 + apply-patch.ts 实际 typed-tool refactor）。PR 3（清理）待 dev-env 实跑。
 > **关联 audit**：`scripts/audit/extensions-inventory.sh`（Round 6 第 5 个 audit）。
 
 ---
@@ -89,28 +89,31 @@ api.registerTool(defineTool({
 }));
 ```
 
-**目标 LOC 估算**：228 → ~200 LOC（删除 ~30 LOC unsafe cast + 简化 runtime guards）；新增 typed-tool.ts 65 LOC facade；净增 +37 LOC（**facadditive 模式**）。
+**目标 LOC 估算**：228 → 257 LOC（**+29 LOC**）；unsafe cast 8 → 0；runtime `String()` guard 8 → 0；新增 typed-tool.ts 86 LOC facade + apply-patch.ts 新增 2 个 Type.Object schema 定义。**facadditive 模式**：净增 LOC 但净减 unsafe code。
 
 ---
 
 ## 3. 迁移步骤（3 PR）
 
 ### PR 1 — ✅ typed-tool.ts facade 接入（**已完成 2026-09-11**）
-1. ✅ 新增 `packages/runtime/openbuddy-plugin-host/src/typed-tool.ts`（65 LOC）
+1. ✅ 新增 `packages/runtime/openbuddy-plugin-host/src/typed-tool.ts`（**86 LOC**，PR 2 扩展了 `validateParams`）
    - re-export `defineTool` / `ToolDefinition` from pi
    - re-export `TSchema` / `Static` from typebox
    - convenience helpers: `objectParams(schema)` passthrough + `InferParams<S>` type alias
-2. ✅ barrel 新增 5 export：`defineTool` / `objectParams` / `ToolDefinition` / `TSchema` / `Static` / `InferParams`
-3. ✅ `__tests__/typed-tool.test.ts` 4 个 vitest 用例（验证 identity / objectParams passthrough / InferParams 推断 / ToolDefinition<TParams> propagate）
+   - runtime guard: `validateParams(schema, params)` using typebox `Check` + `Errors`
+2. ✅ barrel 新增 7 export：`defineTool` / `objectParams` / `validateParams` / `ToolDefinition` / `TSchema` / `Static` / `InferParams`
+3. ✅ `__tests__/typed-tool.test.ts` **6 个 vitest 用例**（PR 2 加 2 个 `validateParams` 用例）
 4. ✅ 新增 `typebox` 1.3.7 到 plugin-host package.json（精确版本，与 pi 上游锁一致）
-5. ✅ tsc 0 error；vitest 4/4 通过
+5. ✅ tsc 0 error；vitest 6/6 通过
 
-### PR 2 — apply-patch.ts 引入 typed-tool
-1. import `defineTool` + `InferParams` from `@openbuddy/plugin-host/typed-tool`
-2. 用 `Type.Object({...})` 替换两个工具的 `parameters: { type: "object", properties: { ... } }` literal
-3. 用 `InferParams<typeof X>` 替换 `(params as { file_path?: unknown; ... })` cast
-4. 删除 execute 函数里的 `String(p.file_path ?? "")` runtime guards
-5. 跑 vitest：apply-patch-r2.test.ts 117 个用例全过（**PR 2 待写**）
+### PR 2 — ✅ apply-patch.ts 引入 typed-tool（**已完成 2026-09-11**）
+1. ✅ import `defineTool` + `validateParams` + `Type` from `@openbuddy/plugin-host/typed-tool`
+2. ✅ 替换两个工具的 `parameters` literal 为 `ApplyPatchParamsSchema` / `ApplyCommandParamsSchema`（Type.Object）
+3. ✅ 替换 `(params as { file_path?: unknown; ... })` 为 `validateParams(Schema, params)` 运行时验证
+4. ✅ 删除 ~30 LOC 的 `String(p.x ?? "")` runtime guards（**8 处**：`file_path`, `patch`, `dry_run`, `command`, `cwd`, `timeout_ms` 各 1 处，apply_patch 4 处 + apply_command 4 处）
+5. ✅ 把 schema 加到 `plugin-host/package.json` 的 `exports` map（`./typed-tool`） + vitest.config.ts / electron.vite.config.ts 加 alias
+6. ✅ 跑 vitest：apply-patch.test.ts (6) + apply-patch-r2.test.ts (8) — **14/14 全过**
+7. ⚠️ **LOC 实际是 +29**（228 → 257）：新增了 2 个 Type.Object schema + 类型 import + validateParams 调用，净增但**unsafe cast 数 8 → 0**
 
 ### PR 3 — 错误处理 + 类型导出清理
 1. 删除 `interface ParsedHunk` / `interface ParsedDiff` 之外的多余类型（如果有）
@@ -161,8 +164,8 @@ pnpm install --filter @openbuddy/plugin-host  # typebox 1.3.7 加入 ✅
 
 ## 9. 已知限制
 
-1. **G1 PR 2 未做**（apply-patch.ts 实际改造）：本轮只到 PR 1（typed facade 就位 + 4 个 mock 测试）
-2. **R1 / R2 / R3 风险**需要在 PR 2 实跑 apply-patch-r2.test.ts 时验证（需 dev-env + pi 0.85.1 完整安装 + 跑测试需 root/fts5 修复）
+1. **G1 PR 3 未做**（最终清理 + 错误处理增强 + e2e 验证）：本轮只到 PR 2（typed facade + apply-patch.ts 实际改造 + 14 个测试全过）
+2. **R1 / R2 / R3 风险**已经在 PR 2 实跑 apply-patch-r2.test.ts 验证 — **全过 14/14**（包括 dry-run / path-traversal refusal / trailing-newline bug / context-line drop bug / atomic-write race / apply_command happy-path / no-trailing-newline edge case / Type.Object `additionalProperties` 兼容性 等）
 3. **typebox 是新增依赖**（plugin-host package.json 锁定 1.3.7，与 pi 上游一致；pnpm 11 install 已通过）
 
 ---

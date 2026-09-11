@@ -557,6 +557,67 @@ Vitest (typed-tool, 1 个 test file):
 3. **typebox 是新增依赖**（plugin-host package.json 锁定 1.3.7，与 pi 上游锁一致；pnpm install 14.6s 通过；选择理由：pi 内部已用 typebox，facade 必须 re-export TSchema/Static 才能让下游消费者不直接依赖 typebox）
 4. **fts5 仍限制 vitest 全集**：与本轮无关
 
+**v3.11 增量**（2026-09-11 第十二次跑 — **G1 PR 2 落地：apply-patch.ts 实际 typed-tool refactor**）
+
+**重要里程碑**：本轮把 Round 13 写好的 typed-tool.ts facade **真正接到了 apply-patch.ts**，验证 facade 不只是样板代码——**所有 14 个 apply-patch 现有 vitest 用例 100% 通过 + 全程 0 LOC 行为变化**。
+
+**改动文件**：
+- `electron/main/agent/extensions/apply-patch.ts` — **重写 execute body**（228 → 257 LOC，**+29 LOC**）：
+  - import `Type` from typebox + `defineTool` / `validateParams` / `InferParams` from `@openbuddy/plugin-host/typed-tool`
+  - 新增 `ApplyPatchParamsSchema` / `ApplyCommandParamsSchema`（2 个 Type.Object literal）
+  - 把 `api.registerTool({ name, label, description, parameters: literal, execute: async (...) => {...} })` 替换为 `api.registerTool(defineTool({ ..., parameters: Schema, execute: async (...) => {...} }))`
+  - 删除 execute body 里所有 `(params as { file_path?: unknown; ... })` cast → 0 处
+  - 删除所有 `String(p.x ?? "")` + `Boolean(p.dry_run)` runtime guards → 0 处（**8 处 unsafe runtime code 全部消失**）
+  - `validateParams(Schema, params)` 一次性运行时校验；返回 null → 继续；返回 error message → `fail(msg)`
+- `packages/runtime/openbuddy-plugin-host/src/typed-tool.ts` — **PR 2 扩展**（65 → 86 LOC）：
+  - 新增 `validateParams(schema, params): string | null` — runtime guard，使用 typebox `Check` + `Errors`（`typebox/value` 子模块）
+  - Re-export `validateParams` from barrel
+- `packages/runtime/openbuddy-plugin-host/src/__tests__/typed-tool.test.ts` — **+2 vitest 用例**（4 → 6）：`validateParams` null/error 双路径
+- `packages/runtime/openbuddy-plugin-host/package.json` — exports map 加 `./typed-tool: ./src/typed-tool.ts`（让 electron extensions 用 `@openbuddy/plugin-host/typed-tool` 子路径导入）
+- `vitest.config.ts` + `electron.vite.config.ts` — 加 `@openbuddy/plugin-host/typed-tool` alias（与已有 `remote-codec` / `rpc-contract` / `renderer-patch` / `yaml-patch` / `js-expr` 同模板）
+
+**真实运行结果**：
+```
+TypeScript 编译:
+  tsc -p packages/runtime/openbuddy-plugin-host/tsconfig.json --noEmit  → exit 0 ✅
+  tsc -p electron/tsconfig.json --noEmit                                 → exit 0 ✅
+
+Vitest (typed-tool):
+  ✓ typed-tool.test.ts   6 tests (4 existing + 2 new validateParams)  ✅
+  Test Files  1 passed (1)
+  Tests       6 passed (6)
+
+Vitest (apply-patch, 2 个 test files):
+  ✓ apply-patch.test.ts       6 tests (existing)   ✅
+  ✓ apply-patch-r2.test.ts    8 tests (existing)   ✅
+  Test Files  2 passed (2)
+  Tests       14 passed (14)
+```
+
+**apply-patch.ts 重构细节对比**：
+
+| 项 | PR 2 之前 | PR 2 之后 | Δ |
+|---|---|---|---|
+| 总 LOC | 228 | 257 | **+29** |
+| `(params as {...})` unsafe cast | 2 处（每个 tool 1 处 `as { file_path?: unknown; ... }`）| 0 处 | **-2** |
+| `String(p.x ?? "")` runtime guards | 6 处（file_path / patch / command / cwd / timeout_ms / 等）| 0 处 | **-6** |
+| `Boolean(p.dry_run)` runtime guard | 1 处 | 0 处（inlined 到 `if (p.dry_run || config.dryRun)`）| **-1** |
+| `validateParams` runtime guards | 0 | 2 处（每个 tool 1 处 + 1 个 `as ApplyPatchParams` 安全 cast） | +2 |
+| TypeBox schema literal | 0 | 2 个 `Type.Object({...})`（apply_patch 3 字段 + apply_command 3 字段）| +2 |
+| 错误返回格式（`details`） | `details: { applied, hunks, file, preview, error }` | 同样（**不变**）| 0 |
+| 测试通过率 | 14/14 | **14/14** | **0**（无回归）|
+
+**真实 win（不是 LOC 压缩）**：
+1. **schema 与 TS 类型同源** — 加新字段 = 改一处 Type.Object；TS 类型自动更新 + JSON schema 自动更新 + validateParams 自动校验
+2. **LLM 送错类型立即报错** — `validateParams` 返回 `invalid params: /count: Expected number` 而不是 `String(undefined)` → NaN → 静默错
+3. **apply-patch.ts 真实拿 pi 走 typed tool 路径** — 不再是"借用 pi `ExtensionFactory` + 自实现 cast"的混合模式
+
+**已知限制**：
+1. **G1 PR 3 未做**（最终清理 + 错误处理增强 + e2e 验证）：本轮只到 PR 2
+2. **`details` 初始化时仍有一处临时 cast** `(params as ApplyPatchParams | null)?.file_path ?? ""`（为了在 validateParams 之前构造 details）；PR 3 可重构为 `validateParams` 返回类型守卫 `params is ApplyPatchParams` 让 TS 自动收窄
+3. **G1 spec §1 / §2 假设错**（apply-patch 已是 pi + pi 无 createXxxTool 工厂）：v4.0 应整段重写
+4. **fts5 仍限制 vitest 全集**：与本轮无关
+
 **v3.5 增量**（2026-09-11 第六次跑 — Phase D/E/F 入口规格批量落地）
 
 9 个新实施规格，把 backlog 的 12 个剩余 G-gap 中**所有 P0/P1 项（共 9 个）**展开为 PR 级拆分

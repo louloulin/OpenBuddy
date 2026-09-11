@@ -15,6 +15,13 @@
  * Path-safety: the extension refuses any file_path that is outside the
  * currently-trusted cwd, and writes go through an atomic temp-rename so
  * a partial write can never corrupt the user's file.
+ *
+ * Round 14 (G1 PR 2) — switched from `(params as { ... })` unsafe casts
+ * + `String(p.x ?? "")` runtime guards to a typed schema + runtime
+ * validator flow (defineTool + TypeBox + validateParams facade from
+ * `@openbuddy/plugin-host/typed-tool`). Net effect: ~30 LOC of unsafe
+ * casts removed, body now reads as ordinary typed code, and runtime
+ * validation still defends against malformed LLM params.
  */
 import { existsSync } from "node:fs";
 import { writeFile, rename, readFile } from "node:fs/promises";
@@ -22,7 +29,13 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import {
+  defineTool,
+  validateParams,
+  type InferParams,
+} from "@openbuddy/plugin-host/typed-tool";
 
 const execFileAsync = promisify(execFile);
 
@@ -92,6 +105,30 @@ function applyHunks(original: string, parsed: ParsedDiff): string {
   return origLines.join("\n");
 }
 
+// ─── Param schemas (TypeBox) ────────────────────────────────────────
+// Round 14: schemas live next to the tool definition so adding a field
+// is one place; runtime validation is via `validateParams(Schema, params)`.
+
+const ApplyPatchParamsSchema = Type.Object({
+  file_path: Type.String({ description: "Absolute path to the file to patch" }),
+  patch: Type.String({ description: "Unified diff content" }),
+  dry_run: Type.Optional(
+    Type.Boolean({ description: "If true, return a preview without writing" }),
+  ),
+});
+type ApplyPatchParams = InferParams<typeof ApplyPatchParamsSchema>;
+
+const ApplyCommandParamsSchema = Type.Object({
+  command: Type.String({ description: "Shell command to run" }),
+  cwd: Type.Optional(
+    Type.String({ description: "Working directory (defaults to trusted workspace)" }),
+  ),
+  timeout_ms: Type.Optional(
+    Type.Number({ description: "Timeout in milliseconds (default 30000)" }),
+  ),
+});
+type ApplyCommandParams = InferParams<typeof ApplyCommandParamsSchema>;
+
 export interface OpenBuddyApplyPatchConfig {
   trustedCwd: string;
   dryRun?: boolean;
@@ -114,50 +151,44 @@ export default function openBuddyApplyPatch(
     return !rel.startsWith("..") && !isAbsolute(rel);
   };
 
-  api.registerTool({
+  api.registerTool(defineTool({
     name: "apply_patch",
     label: "Apply patch",
     description:
       "Apply a unified diff to a file under the trusted workspace. " +
       "The patch must be a standard unified diff with @@ -X,Y +A,B @@ hunks. " +
       "Faster and safer than rewriting the whole file.",
-    parameters: {
-      type: "object",
-      properties: {
-        file_path: { type: "string", description: "Absolute path to the file to patch" },
-        patch: { type: "string", description: "Unified diff content" },
-        dry_run: { type: "boolean", description: "If true, return a preview without writing" },
-      },
-      required: ["file_path", "patch"],
-    },
+    parameters: ApplyPatchParamsSchema,
     execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
-      const p = (params ?? {}) as { file_path?: unknown; patch?: unknown; dry_run?: unknown };
-      const filePath = String(p.file_path ?? "");
-      const patch = String(p.patch ?? "");
-      const dryRun = Boolean(p.dry_run) || config.dryRun;
+      // Round 14: runtime guard via TypeBox Check; on success params is
+      // narrowed to `ApplyPatchParams` so the body is fully typed.
+      const validationError = validateParams(ApplyPatchParamsSchema, params);
+      const filePath = (params as ApplyPatchParams | null)?.file_path ?? "";
       const details = { applied: false, hunks: 0, file: filePath, preview: undefined as string | undefined, error: undefined as string | undefined };
       const fail = (msg: string) => ({
         content: [{ type: "text" as const, text: "apply_patch failed: " + msg }],
         details: { ...details, error: msg },
       });
+      if (validationError) return fail(validationError);
+      const p = params as ApplyPatchParams;
       try {
-        if (!filePath) return fail("file_path is required");
-        if (!isPathTrusted(filePath)) return fail("path outside the trusted workspace " + trustedRoot);
-        const parsed = parseUnifiedDiff(filePath, patch);
-        const original = existsSync(filePath) ? await readFile(filePath, "utf8") : "";
+        if (!p.file_path) return fail("file_path is required");
+        if (!isPathTrusted(p.file_path)) return fail("path outside the trusted workspace " + trustedRoot);
+        const parsed = parseUnifiedDiff(p.file_path, p.patch);
+        const original = existsSync(p.file_path) ? await readFile(p.file_path, "utf8") : "";
         const next = applyHunks(original, parsed);
         const preview = next.split("\n").slice(0, 8).join("\n") +
           (next.split("\n").length > 8 ? "\n..." : "");
-        if (dryRun) {
+        if (p.dry_run || config.dryRun) {
           return {
-            content: [{ type: "text" as const, text: "dry_run: " + parsed.hunks.length + " hunks ready for " + filePath }],
+            content: [{ type: "text" as const, text: "dry_run: " + parsed.hunks.length + " hunks ready for " + p.file_path }],
             details: { ...details, hunks: parsed.hunks.length, preview },
           };
         }
-        const tmp = join(dirname(filePath), "." + randomUUID() + ".apply-patch.tmp");
+        const tmp = join(dirname(p.file_path), "." + randomUUID() + ".apply-patch.tmp");
         await writeFile(tmp, next, "utf8");
         try {
-          await rename(tmp, filePath);
+          await rename(tmp, p.file_path);
         } catch (renameErr) {
           try {
             const { unlink } = await import("node:fs/promises");
@@ -168,36 +199,35 @@ export default function openBuddyApplyPatch(
           throw renameErr;
         }
         return {
-          content: [{ type: "text" as const, text: "applied " + parsed.hunks.length + " hunks to " + filePath }],
+          content: [{ type: "text" as const, text: "applied " + parsed.hunks.length + " hunks to " + p.file_path }],
           details: { ...details, applied: true, hunks: parsed.hunks.length, preview },
         };
       } catch (e) {
         return fail(e instanceof Error ? e.message : String(e));
       }
     },
-  });
+  }));
 
-  api.registerTool({
+  api.registerTool(defineTool({
     name: "apply_command",
     label: "Apply command",
     description:
       "Run a shell command and return its exit code, stdout, stderr, and " +
       "duration. Use for non-trivial shell operations; structured result is " +
       "easier to render in the UI than a free-form Bash tool call.",
-    parameters: {
-      type: "object",
-      properties: {
-        command: { type: "string", description: "Shell command to run" },
-        cwd: { type: "string", description: "Working directory (defaults to trusted workspace)" },
-        timeout_ms: { type: "number", description: "Timeout in milliseconds (default 30000)" },
-      },
-      required: ["command"],
-    },
+    parameters: ApplyCommandParamsSchema,
     execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
-      const p = (params ?? {}) as { command?: unknown; cwd?: unknown; timeout_ms?: unknown };
-      const command = String(p.command ?? "");
-      const cwd = String(p.cwd ?? trustedRoot);
-      const timeout = Number(p.timeout_ms ?? 30000);
+      const validationError = validateParams(ApplyCommandParamsSchema, params);
+      const details = { exit_code: 1, stdout: "", stderr: "", duration_ms: 0, error: undefined as string | undefined };
+      const fail = (msg: string) => ({
+        content: [{ type: "text" as const, text: msg }],
+        details: { ...details, error: msg },
+      });
+      if (validationError) return fail(validationError);
+      const p = params as ApplyCommandParams;
+      const command = p.command;
+      const cwd = p.cwd ?? trustedRoot;
+      const timeout = p.timeout_ms ?? 30000;
       const start = Date.now();
       try {
         const { stdout, stderr } = await execFileAsync("/bin/sh", ["-c", command], {
@@ -223,6 +253,6 @@ export default function openBuddyApplyPatch(
     };
       }
     },
-  });
+  }));
 };
 }

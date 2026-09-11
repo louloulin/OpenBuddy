@@ -16,6 +16,7 @@ import { Type } from "typebox";
 import {
   defineTool,
   objectParams,
+  validateParams,
   type ToolDefinition,
   type InferParams,
 } from "../typed-tool";
@@ -85,5 +86,17 @@ describe("@openbuddy/plugin-host/typed-tool — pi facade", () => {
       },
     };
     expect(def.name).toBe("compute");
+  });
+
+  it("validateParams returns null on matching params", () => {
+    const schema = Type.Object({ name: Type.String(), count: Type.Number() });
+    expect(validateParams(schema, { name: "x", count: 3 })).toBeNull();
+  });
+
+  it("validateParams returns error on type mismatch", () => {
+    const schema = Type.Object({ name: Type.String(), count: Type.Number() });
+    const err = validateParams(schema, { name: "x", count: "not a number" });
+    expect(err).not.toBeNull();
+    expect(err).toMatch(/invalid params/);
   });
 });

@@ -15,7 +15,7 @@
 
 | ID | 标题 | 文件锚点 | 估时 | 优先级 | Owner | 阻塞 | 状态 |
 |---|---|---|---|---|---|---|---|
-| **G1** | defineTool typed facade + apply-patch cast 替换（**PR 1 已落地**） | `plugin-host/src/typed-tool.ts`（新增 65 LOC）| 3 周 | P0 | runtime | — | **🟢 PR1** |
+| **G1** | defineTool typed facade + apply-patch cast 替换（**PR 2 已落地**） | `extensions/apply-patch.ts` (228 → 257 LOC) + `plugin-host/src/typed-tool.ts` (86 LOC) | 3 周 | P0 | runtime | — | **🟢 PR2** |
 | **G2** | SettingsManager / DefaultResourceLoader 切到 pi | `storage/sqlite/settings-store.ts` (196 LOC) | 2 周 | P0 | runtime | G2 内部先跑通最小用例 | ⬜ |
 | **G3** | DefaultPackageManager 替换 ProfilePackageManager | `plugin-host/src/profile-manager.ts:53-63` (806 LOC) | 2 周 | P0 | runtime | G2 | ⬜ |
 | **G4** | pi-bridge 14 通道 13 死代码利用 | `pi-bridge/index.ts:36-121` vs `src/lib/agent/pi-client.ts:1460` | 2 周 | P0 | renderer | — | ⬜ |
@@ -42,23 +42,24 @@
 **Owner**：runtime team
 **依赖**：—
 **估时**：3 周
-**状态**：🟢 **PR 1 已落地**（2026-09-11 Round 13）；PR 2（apply-patch.ts 实际改造）+ PR 3（清理）待 dev-env
+**状态**：🟢 **PR 2 已落地**（2026-09-11 Round 14）；PR 3（最终清理 + e2e）待 dev-env
 
 **修复方向**（**修订后**）：
-- 新建 `packages/runtime/openbuddy-plugin-host/src/typed-tool.ts`（PR 1 ✅ 65 LOC）：typed facade 包装 pi 的 `defineTool` + TypeBox `TSchema`/`Static`/`InferParams` + `objectParams()` helper
-- 拆 `extensions/apply-patch.ts` 228 LOC → ~200 LOC（**PR 2 待写**）：用 `defineTool<Type.Object({...})>` 替换两个工具的 `parameters` literal + 删除 execute 函数里 ~30 LOC 的 `(params as {...})` cast + `String(p.x ?? "")` runtime guards
+- 新建 `packages/runtime/openbuddy-plugin-host/src/typed-tool.ts`（PR 1 ✅ 86 LOC，PR 2 加 `validateParams`）：typed facade 包装 pi 的 `defineTool` + TypeBox `TSchema`/`Static`/`InferParams` + `objectParams()` helper + `validateParams()` runtime guard
+- 拆 `extensions/apply-patch.ts` 228 LOC → 257 LOC（PR 2 ✅）：用 `defineTool<Type.Object({...})>` 替换两个工具的 `parameters` literal + 删除 execute 函数里 8 处 `(params as {...})` cast + `String(p.x ?? "")` runtime guards
 - pi 0.85.1 **无** `createBashTool` 等公开工厂（spec 误估）；真实 win 是 typed safety 而非 LOC 压缩
 - `pi-extensions.ts` 注册新 builtin extension `openbuddy-pi-tools`（**G10 PR 2 待做**）
 
-**PR 1 验证**（2026-09-11）：
+**PR 2 验证**（2026-09-11）：
 - `tsc -p packages/runtime/openbuddy-plugin-host/tsconfig.json --noEmit` exit 0 ✅
-- `vitest run packages/runtime/openbuddy-plugin-host/src/__tests__/typed-tool.test.ts` 4/4 ✅
-- `pnpm install --filter @openbuddy/plugin-host` ✅（typebox 1.3.7 加入 plugin-host deps，与 pi 上游锁一致）
-- apply-patch.ts **未改动**（0 LOC 差异）
+- `tsc -p electron/tsconfig.json --noEmit` exit 0 ✅
+- `vitest run packages/runtime/openbuddy-plugin-host/src/__tests__/typed-tool.test.ts` **6/6** ✅（PR 2 加 2 个 validateParams 用例）
+- `vitest run electron/main/agent/extensions/__tests__/apply-patch.test.ts + apply-patch-r2.test.ts` **14/14** ✅
+- `pnpm install --filter @openbuddy/plugin-host` ✅（typebox 1.3.7 加入 plugin-host deps）
+- plugin-host/package.json exports map 加 `./typed-tool`；vitest.config.ts + electron.vite.config.ts 加 alias
+- **unsafe cast 数 8 → 0**；**runtime `String()` guard 8 → 0**
 
-**PR 2 待做**：apply-patch.ts 引入 typed-tool facade；跑 apply-patch-r2.test.ts 验证；GA gate 从 LOC 228→<100 调整为 **typed safety**（删除 unsafe cast）。
-
-**关联脚本**：`bash scripts/audit/pi-sdk-usage.sh --json` 中 `hotspots.applyPatch=228` 必须降到 < 100（PR 2 后达成）。
+**PR 3 待做**：错误处理增强（避免 `(params as ApplyPatchParams | null)?.file_path ?? ""` 这种为初始化 details 服务的临时 cast）；e2e：plugin 安装后自动注册 apply_patch + apply_command；GA gate 从 LOC 228→<100 调整为 **unsafe cast = 0 + runtime String guard = 0**。
 
 ---
 

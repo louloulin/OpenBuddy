@@ -26,6 +26,7 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { TSchema, Static } from "typebox";
+import { Check, Errors } from "typebox/value";
 
 /** Re-export pi's typed identity helper so callers do not need pi directly. */
 export const defineTool = piDefineTool;
@@ -78,3 +79,35 @@ export function objectParams<T extends TSchema>(schema: T): T {
  * ```
  */
 export type InferParams<S extends TSchema> = Static<S>;
+
+/**
+ * Runtime guard — TypeBox `Value.Check` for tool params. Returns `null`
+ * on success or a human-readable error message on failure. This is the
+ * runtime companion to the compile-time safety that `defineTool<TSchema>`
+ * provides: LLMs can send anything, so the tool body still needs to
+ * defend against malformed params before dereferencing fields.
+ *
+ * Usage:
+ * ```ts
+ * execute: async (_id, params) => {
+ *   const err = validateParams(MySchema, params);
+ *   if (err) return fail(err);
+ *   // params is now safe to dereference as { count: number }
+ *   return { content: [{ type: "text", text: String(params.count) }] };
+ * }
+ * ```
+ */
+export function validateParams<S extends TSchema>(
+  schema: S,
+  params: unknown,
+): string | null {
+  if (Check(schema, params)) return null;
+  const errors = [...Errors(schema, params)];
+  if (errors.length === 0) return "params did not match schema";
+  return (
+    "invalid params: " +
+    errors
+      .map((e) => `${e.instancePath || "/"}: ${e.message}`)
+      .join("; ")
+  );
+}

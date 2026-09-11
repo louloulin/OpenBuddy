@@ -1244,6 +1244,7 @@ export {
 export {
   defineTool,
   objectParams,
+  validateParams,
   type ToolDefinition,
   type TSchema,
   type Static,

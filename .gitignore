@@ -67,6 +67,8 @@ docs/*
 !docs/ROUND12_IMPLEMENTATION_REPORT.md
 # Round 13 G1 implementation + 5th spec audit report (LUM-785, 2026-09-11)
 !docs/ROUND13_IMPLEMENTATION_REPORT.md
+# Round 14 G1 PR 2 apply-patch typed-tool refactor report (LUM-785, 2026-09-11)
+!docs/ROUND14_IMPLEMENTATION_REPORT.md
 !docs/grok-to-pi-replacement-audit.md
 !docs/workbuddy-points-system-comparison.md
 !docs/enterprise-live-verification-2026-08-31.md
