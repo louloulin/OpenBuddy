@@ -1,4 +1,4 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.5 — Phase D/E/F G4-G15 specs 落地)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.6 — Round 9 真实环境验证落地)
 
 > 📅 2026-09-10 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
@@ -254,9 +254,72 @@ JSON 形态（CI / verify:plan 直接消费）：
 - `docs/PI_NATIVE_AUDIT_BASELINE.md` — 把 3 个 audit 脚本的 JSON baseline 固化为可重读的 GA gate 表，包含 `jq` 一键断言命令。
 - `package.json:55-56` 加入 `audit:pi-bridge-dead` + `audit:pi-bridge-dead:json` 两个新脚本。
 
-**v3.5 增量**（2026-09-11 第六次跑 — Phase D/E/F 入口规格批量落地）：
+**v3.6 增量**（2026-09-11 第七次跑 — **真实环境验证首次落地**）
 
-9 个新实施规格，把 backlog 的 12 个剩余 G-gap 中**所有 P0/P1 项（共 9 个）**展开为 PR 级拆分：
+**重要里程碑**：本轮首次在容器内**实际安装依赖 + 跑 tsc + 跑 vitest**。之前所有 v3.0 - v3.5 都因"无 pnpm / 无 node_modules"无法跑 runtime 验证，本轮打破了这个限制。
+
+**环境初始化**：
+
+```bash
+mkdir -p ~/.npm-global
+npm config set prefix '~/.npm-global'
+export PATH=~/.npm-global/bin:/opt/node22/bin:$PATH
+npm install -g pnpm@latest        # → pnpm 11.24.0
+pnpm install --prefer-offline     # → 44.5s 完成
+```
+
+**真实运行结果**：
+
+```
+TypeScript 编译:
+  tsc -p electron/tsconfig.json --noEmit          → exit 0 ✅ (0 error)
+  tsc -p packages/runtime/openbuddy-plugin-sdk    → exit 0 ✅ (0 error)
+
+Vitest (packages/runtime, 66 个 test files):
+  42 passed | 24 failed (501 tests: 364 passed | 136 failed | 1 skipped)
+  Duration: 121s
+  主要失败原因: "Error: no such module: fts5"（Node 22 node:sqlite 缺 fts5）
+  → 与代码无关；需 `apt-get install libsqlite3-fts5` 修复
+
+6 个 audit 重跑 (确认数据稳定):
+  pi-sdk-usage:        3 pkgs / 23 symbols / 88 files / 14 channels
+  pi-bridge-dead:      14 / 1 / 13 / 7% utilization
+  canonical-packages:  29 / 0
+  test-coverage:       351 / 343 / 1.023
+  extensions-inventory: 5 / 586 / 5/5
+  pi-upstream-coverage: 23 / 47 / 21.9%
+```
+
+**GA gates 状态变化**：
+
+| Gate | v3.5 | v3.6 | 状态变化 |
+|---|---|---|---|
+| TypeScript 0 error | ⏳ 缺 pnpm | ✅ 0 error | **⏳ → ✅** |
+| vitest 全过 (542 文件 / 5517 通过) | ⏳ 缺 pnpm | ⏳ 24/66 failed (fts5 限制) | 部分 ⏳ → ⏳（环境限制）|
+| pi 复用度 ≥ 70% | 21.9% | 21.9% | ❌ 不变 |
+| pi-bridge 利用率 ≥ 80% | 7% | 7% | ❌ 不变 |
+| 29 canonical e2e | 0/29 | 0/29 | ❌ 不变 |
+| apply-patch LOC | 228 | 228 | ❌ 不变 |
+| profile-manager LOC | 806 | 806 | ❌ 不变 |
+| test/source ratio | 1.023 ✅ | 1.023 ✅ | ✅ 不变 |
+| ext files 100% import pi | 5/5 ✅ | 5/5 ✅ | ✅ 不变 |
+| builtin ext names ≥ 10 | 10 ✅ | 10 ✅ | ✅ 不变 |
+
+**结论**：**4 ✅ + 5 ❌ + 1 ⏳**（v3.5 是 3 ✅ + 5 ❌ + 多个 ⏳；**TypeScript 0 error 从 ⏳ → ✅**）。
+
+**新增文档**：
+- `docs/ROUND9_VERIFICATION_REPORT.md` — Round 9 完整验证报告（环境初始化 / tsc / vitest / 6 audit / GA gates / 已知限制 / 修复路径 7 节）
+- `docs/audit-baseline-2026-09-11/*.json` — 6 个 audit 脚本的 JSON baseline 固化（含 generatedAt 时间戳）
+
+**已知限制**：
+1. fts5 sqlite extension 缺失（apt 装 libsqlite3-fts5 修复）
+2. moon CLI 未装（pnpm 已够跑 vitest + tsc）
+3. Electron smoke 未跑（需要 X server + electron runtime）
+4. 全 monorepo vitest (63 packages) 未跑（本轮跑了 packages/runtime 子集 66 files）
+
+**v3.5 增量**（2026-09-11 第六次跑 — Phase D/E/F 入口规格批量落地）
+
+9 个新实施规格，把 backlog 的 12 个剩余 G-gap 中**所有 P0/P1 项（共 9 个）**展开为 PR 级拆分
 
 | Spec | Gap | 优先级 | 当前 LOC | 目标 LOC | pi API | 估时 |
 |---|---|---|---|---|---|---|

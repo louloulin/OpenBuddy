@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-11T01:05:52Z",
+  "root": "/home/devbox/multica_workspaces/lumos-659117e3ca3d/lum-785-86efbd59c853/workdir/OpenBuddy",
+  "totals": {
+    "tests": 351,
+    "source": 343,
+    "ratio": 1.023
+  },
+  "perPackage": [{"package":"auth","tests":1,"source":9,"ratio":0.111},{"package":"bundle","tests":4,"source":9,"ratio":0.444},{"package":"capability","tests":20,"source":18,"ratio":1.111},{"package":"collaboration","tests":14,"source":18,"ratio":0.778},{"package":"core","tests":8,"source":7,"ratio":1.143},{"package":"fs","tests":1,"source":1,"ratio":1.000},{"package":"payment","tests":3,"source":5,"ratio":0.600},{"package":"renderer","tests":6,"source":7,"ratio":0.857},{"package":"runtime","tests":66,"source":81,"ratio":0.815},{"package":"saml","tests":1,"source":1,"ratio":1.000},{"package":"scim","tests":1,"source":1,"ratio":1.000},{"package":"shared","tests":2,"source":8,"ratio":0.250},{"package":"team","tests":1,"source":2,"ratio":0.500},{"package":"ui","tests":15,"source":87,"ratio":0.172},{"package":"webhook-outbox","tests":1,"source":1,"ratio":1.000}],
+  "perArea": {"electron/main":{"tests":194,"source":247},"electron/preload":{"tests":0,"source":1},"electron/renderer":{"tests":0,"source":0},"src":{"tests":130,"source":93},"tests/electron":{"tests":27,"source":2}},
+  "zeroTestPackages": [],
+  "g8GapNote": "29 CANONICAL_PI_PACKAGES e2e (plan4.1 §5 GA) 仍未覆盖；zero-test packages 是首选补测目标",
+  "gaGate": "vitest 全过 + 29/29 canonical e2e（待 dev-env）"
+}

@@ -56,6 +56,9 @@ docs/*
 !docs/G10_IMPLEMENTATION_SPEC.md
 !docs/G11_IMPLEMENTATION_SPEC.md
 !docs/G15_IMPLEMENTATION_SPEC.md
+# Round 9 real verification report + audit JSON baselines (LUM-785, 2026-09-11)
+!docs/ROUND9_VERIFICATION_REPORT.md
+!docs/audit-baseline-2026-09-11/
 !docs/grok-to-pi-replacement-audit.md
 !docs/workbuddy-points-system-comparison.md
 !docs/enterprise-live-verification-2026-08-31.md

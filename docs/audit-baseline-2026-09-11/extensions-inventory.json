@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-11T01:05:52Z",
+  "root": "/home/devbox/multica_workspaces/lumos-659117e3ca3d/lum-785-86efbd59c853/workdir/OpenBuddy",
+  "extensionFiles": {
+    "count": 5,
+    "totalLoc": 586,
+    "withPiImports": 5,
+    "details": [{"file":"electron/main/agent/extensions/apply-patch.ts","loc":228,"piImports":1},{"file":"electron/main/agent/extensions/calendar-pi-extension.ts","loc":85,"piImports":1},{"file":"electron/main/agent/extensions/model-bridge.ts","loc":87,"piImports":1},{"file":"electron/main/agent/extensions/openbuddy-markdown.ts","loc":71,"piImports":1},{"file":"electron/main/agent/extensions/session-metadata-bridge.ts","loc":115,"piImports":1}]
+  },
+  "factoryFunctions": {
+    "count": 11,
+    "lines": ["electron/main/agent/agent-hooks.ts:384:export function createPiHooksExtension(getConfigs: () => readonly HookRuntimeConfig[], emit: HookRuntimeEmitter, options: HookRuntimeOptions = {}): ExtensionFactory {","electron/main/agent/pi-plan-mode.ts:88:export function createPiPlanModeExtension(options: PiPlanModeOptions): ExtensionFactory {","electron/main/agent/pi-telemetry-bridge.ts:146:export function createTelemetryBridgeExtension(sink: OpenBuddyTelemetrySink): ExtensionFactory {","electron/main/agent/extensions/session-metadata-bridge.ts:61:export function createSessionMetadataBridgeExtension(): ExtensionFactory {","electron/main/agent/extensions/model-bridge.ts:49:export function createModelBridgeExtension(): ExtensionFactory {","electron/main/agent/extensions/calendar-pi-extension.ts:67:export function createCalendarPiExtension(): ExtensionFactory {","electron/main/agent/agent-host.ts:1027:function createPiToolExtension(): ExtensionFactory {","electron/main/agent/host-modules/preset-helpers.ts:80:export function createPiToolExtension(): ExtensionFactory {","electron/main/agent/extensions/session-metadata-bridge.ts:61:export function createSessionMetadataBridgeExtension(): ExtensionFactory {","electron/main/agent/extensions/model-bridge.ts:49:export function createModelBridgeExtension(): ExtensionFactory {","electron/main/agent/extensions/calendar-pi-extension.ts:67:export function createCalendarPiExtension(): ExtensionFactory {"]
+  },
+  "builtinExtensionNames": {
+    "count": 10,
+    "names": ["openbuddy-apply-patch","openbuddy-extra-providers","openbuddy-pi-calendar","openbuddy-pi-compact-announce","openbuddy-pi-context-guard","openbuddy-pi-context-status","openbuddy-pi-model-bridge","openbuddy-pi-observability","openbuddy-pi-session-metadata","openbuddy-pi-telemetry-bridge"]
+  },
+  "extensionApiConsumers": {
+    "count": 31,
+    "sample": ["electron/main/agent/agent-hooks.ts","electron/main/agent/agent-host.ts","electron/main/agent/extensions/apply-patch.ts","electron/main/agent/extensions/calendar-pi-extension.ts","electron/main/agent/extensions/model-bridge.ts","electron/main/agent/extensions/openbuddy-markdown.ts","electron/main/agent/extensions/session-metadata-bridge.ts","electron/main/agent/host-modules/_state-shape.ts","electron/main/agent/host-modules/bootstrap/build-agent-host-facade.ts","electron/main/agent/host-modules/bootstrap/init-pi-dsh-core-extensions.ts"]
+  },
+  "tests": {
+    "extensionDirTests": 6,
+    "piExtensionsTest": "./electron/main/agent/pi-extensions.test.ts",
+    "piExtensionsTestLoc": 1032
+  },
+  "hotspots": {
+    "applyPatch": 228,
+    "piExtensions": 1222,
+    "settingsStore": 196,
+    "profileManager": 806
+  },
+  "gMapping": {
+    "G1": "apply-patch.ts 228 LOC → pi-tool-factories.ts (target < 100)",
+    "G10": "pi-extensions.ts 1222 LOC → 单文件 registerBuiltinExtension factory 入口 (target ≤ 200)"
+  },
+  "gaGate": "apply-patch < 100 + pi-extensions ≤ 200 + 全部 builtin extension 有 ≥ 1 vitest"
+}
