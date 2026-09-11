@@ -22,6 +22,17 @@
  * `@openbuddy/plugin-host/typed-tool`). Net effect: ~30 LOC of unsafe
  * casts removed, body now reads as ordinary typed code, and runtime
  * validation still defends against malformed LLM params.
+ *
+ * G7 cross-reference: `apply_command` (registered below) is the
+ * canonical reference implementation of the G7 "typed shell helper"
+ * spec (see `docs/G7_IMPLEMENTATION_SPEC.md`). Pattern is reusable
+ * for any other pi extension that needs to run a shell command with
+ * structured input + structured output: TypeBox schema for params
+ * (`{ command, cwd?, timeout_ms? }`), `validateParamsSafe` for
+ * runtime + type narrowing, `execFile` for the actual shell call,
+ * structured `details` envelope (`{ exit_code, stdout, stderr,
+ * duration_ms, error? }`) so renderer-side ToolCallCard can render
+ * the result without re-parsing free-form text.
  */
 import { existsSync } from "node:fs";
 import { writeFile, rename, readFile } from "node:fs/promises";

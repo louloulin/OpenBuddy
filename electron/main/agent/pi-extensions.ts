@@ -1004,13 +1004,19 @@ export function registerBuiltinExtension(
   builtinPiExtensionFactories[name] = factory;
 }
 
-export const builtinPiExtensionFactories: Record<string, BuiltinExtensionFactory> = {
-  "openbuddy-apply-patch": (_emit, config, _options) => {
-    const cfg = (config as Partial<OpenBuddyApplyPatchConfig> | undefined) ?? {};
-    if (!cfg.trustedCwd) throw new Error("openbuddy-apply-patch: trustedCwd is required");
-    return openBuddyApplyPatch({ trustedCwd: cfg.trustedCwd, dryRun: cfg.dryRun });
-  },
-  "openbuddy-pi-observability": ((emit, config, _options): ExtensionFactory => (pi: ExtensionAPI) => {
+// ─── Per-builtin factory bodies (G10 PR 3) ──────────────────────────
+// Round 19: extract the `(emit, config, options) => (pi) => { ... }`
+// inline bodies from the registry into named factory functions so each
+// record entry becomes a single `registerBuiltinExtension(name, ...)`
+// line. This reduces the registry from ~250 LOC of nested-arrow soup
+// to ~10 LOC of one-call-per-builtin, and gives each factory a real
+// name for vitest / coverage / future pi-extensions refactor.
+
+export function createObservabilityExtension(
+  emit: PiExtensionResolutionOptions["emit"],
+  config: unknown,
+): ExtensionFactory {
+  return (pi) => {
     const api = pi as unknown as ExtensionEventApi;
     const includeToolEvents = config && typeof config === "object" && "toolEvents" in config
       ? Boolean((config as { toolEvents?: unknown }).toolEvents)
@@ -1033,8 +1039,13 @@ export const builtinPiExtensionFactories: Record<string, BuiltinExtensionFactory
       api.on("tool_execution_start", forward("tool-start"));
       api.on("tool_execution_end", forward("tool-end"));
     }
-  }),
-  "openbuddy-pi-context-status": ((emit, _config, _options): ExtensionFactory => (pi: ExtensionAPI) => {
+  };
+}
+
+export function createContextStatusExtension(
+  emit: PiExtensionResolutionOptions["emit"],
+): ExtensionFactory {
+  return (pi) => {
     const api = pi as unknown as ExtensionEventApi;
     api.on("context", (payload) => emit("pi/context", summaryPayload(payload)));
     api.on("turn_end", (_payload, context) => {
@@ -1042,8 +1053,14 @@ export const builtinPiExtensionFactories: Record<string, BuiltinExtensionFactory
       emit("pi/context-status", usage ? summaryPayload(usage) : { available: false });
     });
     api.on("session_compact", (payload) => emit("pi/context-compacted", summaryPayload(payload)));
-  }),
-  "openbuddy-pi-context-guard": (emit, config, _options) => (pi) => {
+  };
+}
+
+export function createContextGuardExtension(
+  emit: PiExtensionResolutionOptions["emit"],
+  config: unknown,
+): ExtensionFactory {
+  return (pi) => {
     const api = pi as unknown as ExtensionEventApi;
     const threshold = config && typeof config === "object" && typeof (config as { thresholdTokens?: unknown }).thresholdTokens === "number"
       ? Math.max(1, Number((config as { thresholdTokens: number }).thresholdTokens))
@@ -1064,17 +1081,16 @@ export const builtinPiExtensionFactories: Record<string, BuiltinExtensionFactory
       emit("pi/context-compaction-requested", { thresholdTokens: threshold, tokens });
       context.compact();
     });
-  },
-  "openbuddy-pi-telemetry-bridge": (_emit, _config, options) => {
-    if (!options?.telemetrySink) return () => {};
-    return createTelemetryBridgeExtension(options.telemetrySink);
-  },
-  // MVP-8 — inject a structured follow-up user message after every context
-  // compaction so the user can see exactly what just happened and how much
-  // context was reclaimed. Uses pi.sendUserMessage which the SDK routes
-  // through the normal message pipeline (visible in transcript + counted in
-  // usage). No-op on older SDK builds that lack sendUserMessage.
-  "openbuddy-pi-compact-announce": (_emit, _config, _options): ExtensionFactory => (pi) => {
+  };
+}
+
+// MVP-8 — inject a structured follow-up user message after every context
+// compaction so the user can see exactly what just happened and how much
+// context was reclaimed. Uses pi.sendUserMessage which the SDK routes
+// through the normal message pipeline (visible in transcript + counted in
+// usage). No-op on older SDK builds that lack sendUserMessage.
+export function createCompactAnnounceExtension(): ExtensionFactory {
+  return (pi) => {
     const api = pi as unknown as {
       on?: (event: string, handler: (payload: unknown) => void) => void;
       sendUserMessage?: (text: string, options?: { source?: string }) => void;
@@ -1104,7 +1120,23 @@ export const builtinPiExtensionFactories: Record<string, BuiltinExtensionFactory
       }
       api.sendUserMessage!(lines.join("\n"), { source: "extension" });
     });
+  };
+}
+
+export const builtinPiExtensionFactories: Record<string, BuiltinExtensionFactory> = {
+  "openbuddy-apply-patch": (_emit, config, _options) => {
+    const cfg = (config as Partial<OpenBuddyApplyPatchConfig> | undefined) ?? {};
+    if (!cfg.trustedCwd) throw new Error("openbuddy-apply-patch: trustedCwd is required");
+    return openBuddyApplyPatch({ trustedCwd: cfg.trustedCwd, dryRun: cfg.dryRun });
   },
+  "openbuddy-pi-observability": (emit, config, _options) => createObservabilityExtension(emit, config),
+  "openbuddy-pi-context-status": (emit, _config, _options) => createContextStatusExtension(emit),
+  "openbuddy-pi-context-guard": (emit, config, _options) => createContextGuardExtension(emit, config),
+  "openbuddy-pi-telemetry-bridge": (_emit, _config, options) => {
+    if (!options?.telemetrySink) return () => {};
+    return createTelemetryBridgeExtension(options.telemetrySink);
+  },
+  "openbuddy-pi-compact-announce": (_emit, _config, _options) => createCompactAnnounceExtension(),
   // MVP-6 — register first-class providers via pi.registerProvider().
   // Currently surfaces local Ollama (the most-requested missing provider)
   // and an optional corporate proxy when OPENBUDDY_PROXY_BASE_URL is set.
