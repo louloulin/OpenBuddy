@@ -52,14 +52,18 @@ import {
   type MutableRefObject,
 } from "react";
 import type { SessionUpdate } from "@openbuddy/shared-types";
+import type { PiEventDelivery } from "@/lib/agent/pi-client";
 import {
   subscribePiEvents,
+  dispatchPiEvent,
+  agentEventLogReplay,
   piSend,
   piCancel,
   piListWorkspaceRegistry,
   notificationAppend,
 } from "@/lib/agent/pi-client";
 import { isElectronBridgeUnavailable } from "@/lib/platform/electron-api";
+import { createPiEventReplayCoordinator } from "@/lib/agent/pi-event-replay";
 import { useSessionStore } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { usePermissionStore } from "@/stores/permission-store";
@@ -232,6 +236,8 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
   // The current subscription handle so the agent-died handler can tear down
   // and re-subscribe without re-running piInit (which would lose session state).
   const piUnlistenRef = useRef<(() => void) | null>(null);
+  /** Global event cursor used to recover renderer wire events after reconnect. */
+  const piReplayRef = useRef(createPiEventReplayCoordinator());
 
   // Phase R3.0 (pi-web-alignment) — BUG #4 root-cause guard:
   //   Tracks whether the in-flight turn was force-aborted by the cleanup
@@ -566,11 +572,46 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
     } as Parameters<typeof subscribePiEvents>[0];
   });
 
+  const gateLivePiEvent = useCallback((delivery: PiEventDelivery): void => {
+    piReplayRef.current.acceptLive(delivery.payload, delivery.dispatch);
+  }, []);
+
+  const replayMissedPiEvents = useCallback(async (handlers: Parameters<typeof subscribePiEvents>[0]): Promise<void> => {
+    const sessionId = useSessionStore.getState().sessionId;
+    if (!sessionId || sessionId.startsWith("__pending_")) {
+      piReplayRef.current.finish([]);
+      return;
+    }
+    const fromSequence = piReplayRef.current.cursor();
+    try {
+      const result = await agentEventLogReplay(sessionId, fromSequence, 2000);
+      const replayed = result.entries
+        .filter((entry) => entry.type.startsWith("renderer/"))
+        .map((entry) => ({
+          sequence: entry.sequence,
+          dispatch: () => dispatchPiEvent(
+            handlers,
+            entry.type.slice("renderer/".length),
+            entry.payload,
+          ),
+        }));
+      piReplayRef.current.finish(replayed);
+    } catch (error) {
+      piReplayRef.current.fail();
+      appLogger.warn("pi.replay.failed", {
+        msg: "pi.replay.failed",
+        sessionId,
+        fromSequence,
+        err: String(error),
+      });
+    }
+  }, []);
+
   const subscribeOnce = useCallback(async (): Promise<boolean> => {
     try {
       const handlers = buildHandlersRef.current();
       if (!handlers) return false;
-      const unlisten = await subscribePiEvents(handlers);
+      const unlisten = await subscribePiEvents(handlers, { eventGate: gateLivePiEvent });
       piUnlistenRef.current = () => {
         try { unlisten(); } catch { /* noop */ }
         piUnlistenRef.current = null;
@@ -587,7 +628,7 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
       }
       throw err;
     }
-  }, [notifyBridgeUnavailable]);
+  }, [notifyBridgeUnavailable, gateLivePiEvent]);
 
   useEffect(() => {
     if (updateCoalescerRef.current === null) {
@@ -855,20 +896,24 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
     // would leak on every agent-died cycle).
     try { piUnlistenRef.current?.(); } catch { /* noop */ }
     piUnlistenRef.current = null;
+    piReplayRef.current.begin();
     try {
       const handlers = buildHandlersRef.current();
-      if (!handlers) return;
-      const unlisten = await subscribePiEvents(handlers);
+      if (!handlers) {
+        piReplayRef.current.fail();
+        return;
+      }
+      const unlisten = await subscribePiEvents(handlers, { eventGate: gateLivePiEvent });
       piUnlistenRef.current = () => {
         try { unlisten(); } catch { /* noop */ }
         piUnlistenRef.current = null;
       };
-      // Successful resubscribe is also routine — only the catch path needs
-      // to log so HMR / dev-recovery chatter doesn't drown the console.
+      await replayMissedPiEvents(handlers);
     } catch (e) {
+      piReplayRef.current.fail();
       appLogger.warn("pi.resubscribe.failed", { msg: "pi.resubscribe.failed", err: String(e) });
     }
-  }, []);
+  }, [gateLivePiEvent, replayMissedPiEvents]);
 
   // `cwdRef` is closed over by `onComplete` (for `currentCwd` in usage
   // metrics). Touch it here so React's lint doesn't complain when the

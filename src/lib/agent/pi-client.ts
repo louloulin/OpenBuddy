@@ -927,6 +927,25 @@ export async function agentSessionEventLog(query?: { sessionId?: string; sinceSe
   return invoke<OpenBuddySessionEventRecord[]>("agent:event-log", query);
 }
 
+export interface AgentEventLogReplayResult {
+  sessionId: string;
+  fromSequence: number;
+  count: number;
+  entries: OpenBuddySessionEventRecord[];
+}
+
+export async function agentEventLogReplay(
+  sessionId: string,
+  fromSequence: number,
+  limit = 2000,
+): Promise<AgentEventLogReplayResult> {
+  return invoke<AgentEventLogReplayResult>("agent:event-log-replay", {
+    sessionId,
+    fromSequence,
+    limit,
+  });
+}
+
 export async function agentCurrentModel(): Promise<unknown> {
   return invoke("agent:current-model");
 }
@@ -1889,42 +1908,72 @@ export interface PiExtensionUiEvent {
   options?: unknown;
 }
 
-/** Subscribe to all pi events, dispatching into the provided callbacks. */
-export async function subscribePiEvents(handlers: {
-  onUpdate?: (u: SessionUpdate & { __sessionId?: string }) => void;
+export type SequencedPiPayload = {
+  sequence?: number;
+  sessionSequence?: number;
+  eventVersion?: 1;
+  timestamp?: string;
+};
+
+export interface PiEventHandlers {
+  onUpdate?: (u: SessionUpdate & { __sessionId?: string } & SequencedPiPayload) => void;
   onPermission?: (p: PermissionRequest) => void;
-  onComplete?: (p: PromptComplete) => void;
-  /** Fired when pi generates or renames a session title
-   *  (`x.ai/session_notification` → `SessionSummaryGenerated`). */
+  onComplete?: (p: PromptComplete & SequencedPiPayload) => void;
   onSummary?: (s: SessionSummaryEvent) => void;
-  /** Fired on MCP connector status / init-progress notifications. */
   onMcpStatus?: (p: unknown) => void;
-  /** Fired when pi asks us to trust a folder (`x.ai/folder_trust/request`). */
   onFolderTrust?: (p: unknown) => void;
-  /** Fired when plan mode is toggled (`x.ai/toggle_plan_mode`). */
   onPlanMode?: (p: unknown) => void;
-  /** Fired when the permission mode (auto/yolo) changes. */
   onPermissionMode?: (p: unknown) => void;
-  /** Fired when the model list updates. */
   onModelsUpdate?: (p: unknown) => void;
-  /** Fired on background task lifecycle (`task_backgrounded`/`task_completed`). */
   onTaskUpdate?: (p: unknown) => void;
-  /** Fired when the agent asks a question (`x.ai/question`). */
   onQuestion?: (q: QuestionRequest) => void;
-  /** Fired when the agent thread dies unexpectedly (panic/crash). */
   onAgentDied?: (p: { reason: string }) => void;
-  /** Fired on subagent lifecycle (spawned/progress/finished). */
   onSubagent?: (e: SubagentLiveEvent) => void;
-  /** Fired when a turn ends abnormally (`stopReason: "rate_limit" | "error"`).
-   *  pi reports mid-stream failures via `prompt_complete` with these stop
-   *  reasons rather than as a thrown error, so this event lets the UI show a
-   *  friendly message instead of silently marking the turn complete. */
-  onTurnError?: (e: TurnErrorEvent) => void;
+  onTurnError?: (e: TurnErrorEvent & SequencedPiPayload) => void;
   onExtensionUi?: (event: PiExtensionUiEvent) => void;
   onPluginEvent?: (event: OpenBuddyPluginEvent) => void;
-}, options?: { updateTransport?: "auto" | "ipc" | "port" }): Promise<UnlistenFn> {
+}
+
+export interface PiEventDelivery {
+  channel: string;
+  payload: unknown;
+  dispatch: () => void;
+}
+
+export interface SubscribePiEventsOptions {
+  updateTransport?: "auto" | "ipc" | "port";
+  eventGate?: (delivery: PiEventDelivery) => void;
+}
+
+function normalizedPiUpdate(raw: unknown): (SessionUpdate & { __sessionId?: string } & SequencedPiPayload) | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const asRecord = raw as Record<string, unknown>;
+  const { sessionId, traceId, ...update } = asRecord;
+  const sessionIdText = typeof sessionId === "string" ? sessionId : undefined;
+  const traceIdText = typeof traceId === "string" ? traceId : undefined;
+  recordReceipt("update", { sessionId: sessionIdText, traceId: traceIdText, ...update });
+  const out = update as SessionUpdate & { __sessionId?: string } & SequencedPiPayload;
+  out.__sessionId = sessionIdText;
+  return out;
+}
+
+export function dispatchPiEvent(handlers: PiEventHandlers, channel: string, payload: unknown): void {
+  if (channel === "pi://update") {
+    const update = normalizedPiUpdate(payload);
+    if (update) handlers.onUpdate?.(update);
+  } else if (channel === "pi://complete") {
+    handlers.onComplete?.(payload as PromptComplete & SequencedPiPayload);
+  } else if (channel === "pi://turn-error") {
+    handlers.onTurnError?.(payload as TurnErrorEvent & SequencedPiPayload);
+  }
+}
+
+export async function subscribePiEvents(handlers: PiEventHandlers, options?: SubscribePiEventsOptions): Promise<UnlistenFn> {
 	ensureRendererRpcChannel();
 	const unlisteners: UnlistenFn[] = [];
+  const deliver = (channel: string, payload: unknown, dispatch: () => void): void => {
+    options?.eventGate?.({ channel, payload, dispatch }) ?? dispatch();
+  };
   const wire = async <T>(event: string, cb: ((p: T) => void) | undefined) => {
     if (!cb) return;
     const eventName = event.replace(/^pi:\/\//, "");
@@ -1933,33 +1982,33 @@ export async function subscribePiEvents(handlers: {
         // R6.8 — handler 同步抛错不能让 IPC 通道死亡。listen() 内部已包了一层
         // try/catch(electron/preload/index.ts:324),但 `e.payload` 可能本身为
         // 异常结构 (例如 harness 反序列化失败),所以 cb 调用再套一层防御。
-        try {
-          recordReceipt(eventName, e.payload as { traceId?: string; sessionId?: string; [k: string]: unknown });
-          cb(e.payload);
-        } catch (error) {
-          console.error(`[OpenBuddy] ${event} handler threw:`, error);
-          // 不向用户弹 toast —— 这里失败通常是 harness 协议层 bug, 频繁弹会刷屏;
-          // 但要保证通道存活,后续事件继续投递。
-        }
+        const payload = e.payload;
+        deliver(event, payload, () => {
+          try {
+            recordReceipt(eventName, payload as { traceId?: string; sessionId?: string; [k: string]: unknown });
+            cb(payload);
+          } catch (error) {
+            console.error(`[OpenBuddy] ${event} handler threw:`, error);
+            // 不向用户弹 toast —— 这里失败通常是 harness 协议层 bug, 频繁弹会刷屏;
+            // 但要保证通道存活,后续事件继续投递。
+          }
+        });
       }),
     );
   };
 
   const acceptUpdate = (raw: unknown, source: "ipc" | "port"): void => {
     // R6.8 — 同步防御,确保 handler 抛错时通道不被掐断。
-    try {
-      if (!raw || typeof raw !== "object") return;
-      const asRecord = raw as { sessionId?: unknown; traceId?: unknown };
-      const { sessionId, traceId, ...update } = asRecord as Record<string, unknown>;
-      const sessionIdText = typeof sessionId === "string" ? sessionId : undefined;
-      const traceIdText = typeof traceId === "string" ? traceId : undefined;
-      recordReceipt("update", { sessionId: sessionIdText, traceId: traceIdText, ...update });
-      const out = update as SessionUpdate & { __sessionId?: string };
-      out.__sessionId = sessionIdText;
-      handlers.onUpdate!(out);
-    } catch (error) {
-      console.error(`[OpenBuddy] pi://update (${source}) handler threw:`, error);
-    }
+    if (!raw || typeof raw !== "object") return;
+    const payload = raw;
+    deliver("pi://update", payload, () => {
+      try {
+        const update = normalizedPiUpdate(payload);
+        if (update) handlers.onUpdate?.(update);
+      } catch (error) {
+        console.error(`[OpenBuddy] pi://update (${source}) handler threw:`, error);
+      }
+    });
   };
   if (handlers.onUpdate) {
     const transport = options?.updateTransport ?? "auto";

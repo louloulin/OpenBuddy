@@ -130,4 +130,20 @@ describe("subscribePiEvents — stream port transport", () => {
     expect(onUpdate).toHaveBeenCalledTimes(1);
     expect((onUpdate.mock.calls[0][0] as { __sessionId?: string }).__sessionId).toBe("s1");
   });
+
+  it("allows a reconnect coordinator to defer sequenced live updates", async () => {
+    const onUpdate = vi.fn();
+    const deliveries: Array<{ channel: string; dispatch: () => void }> = [];
+    await subscribePiEvents(
+      { onUpdate },
+      { eventGate: (delivery) => deliveries.push({ channel: delivery.channel, dispatch: delivery.dispatch }) },
+    );
+    emitPort({ version: 1, events: [{ sessionId: "s1", sequence: 7, type: "agent_message_chunk" }] });
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0].channel).toBe("pi://update");
+    deliveries[0].dispatch();
+    expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ __sessionId: "s1", sequence: 7 }));
+  });
+
 });

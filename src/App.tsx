@@ -1124,7 +1124,7 @@ function Shell() {
 
   // R1 — content-based send path used when Composer ships
   // content parts (text + image attachments) via the agent:prompt-content IPC.
-  const handleSendContent = async (content: Array<{ type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }>) => {
+  const handleSendContent = async (content: Array<{ type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string } | { type: "file"; mediaType: string; data: string; name?: string }>) => {
     const traceId = generateTrace();
     const log = withTrace(appLogger, traceId);
     const textPart = content.find((c) => c.type === "text");

@@ -41,6 +41,14 @@
 - 9 + 6 = 15 个生产级 spec（含清理后的核心 + 新增的多模态 + 100-turn + 上轮加的 resilience）
 - 6 张截图在 `docs/screenshots/2026-09-11-openbuddy-ai-chat/`（来自 plan4.1 的 cleanup 阶段）
 
+### 1.4 主聊天事件断线 replay（本轮新增）
+
+- 主进程对 `pi://update`、`pi://complete`、`pi://turn-error` 生成带全局 `sequence`、`sessionSequence`、`timestamp` 的 renderer records，并复用 bounded `SessionEventLog`。
+- renderer 订阅支持 event gate：重连时先建立 live subscription，再调用 `agent:event-log-replay`，将 replay 与重连期间暂存的 live events 按 sequence 合并并去重。
+- replay 只消费 `renderer/pi://*` records，不把 raw plugin/session records 误当成聊天 wire event；completion 仍经过既有 streaming 状态保护，避免重复 usage、通知和 queue 推进。
+- deterministic 覆盖：replay/live 排序与同序号去重、replay 失败时保留 live、renderer record 生成、subscription gate；相关定向测试 16/16 通过。
+- 当前是 bounded replay：ring buffer 已淘汰的历史事件无法恢复，且 replay 期间发生 renderer 崩溃仍需依赖 Pi session history 做最终一致性校正。
+
 ## 2. 已识别的 Trade-off（不阻塞，但需要在后续 plan 解决）
 
 ### 2.1 Pi upstream 不认 `type:"file"`
@@ -73,9 +81,17 @@ plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 
 
 **Plan 4.3** 需要做的：补 2 张截图（`07-document-attachment.png` + `08-100-turns-overview.png`）。详见 §3.5。
 
-## 3. Plan 4.3 待办（按优先级）
+### 2.5 bounded replay 的一致性边界
 
-### 3.1 [P1] 文档附件阅读器：PDF 文本提取
+主聊天已经能在短暂断线后恢复 renderer wire events，但 replay 查询仍受 2000 条 bounded ring buffer 限制；如果断线窗口超过保留范围，UI 只能恢复断线后的部分事件。下一步应增加 cursor gap 检测（最早可用 sequence / generation），一旦发现缺口就调用 `agent:session-messages` 重建当前 session transcript，而不是静默显示截断结果。
+
+
+### 3.0 [P1] replay gap 检测与 session history fallback
+
+- **为什么 P1**：当前 sequence replay 能覆盖短断线，但 bounded ring buffer 淘汰旧记录后如果静默继续，用户可能看到不完整 assistant transcript。
+- **范围**：在 `agent:event-log-replay` 响应中暴露 earliest available sequence / generation；renderer 检测 cursor gap 后调用 `agent:session-messages`，以 Pi session history 重建当前会话，再恢复 live subscription。
+- **验收**：模拟超过 ring buffer 容量的断线，UI 不显示静默截断；能记录 gap telemetry，并完成一次 transcript fallback；不重复 usage、notification 或 queue side effects。
+
 
 - **为什么 P1**：PDF 是用户最常见的文档附件类型；本轮已完成 PDF 主路径，后续仅补齐 docx 与大文档端到端覆盖。
 
@@ -211,7 +227,7 @@ plan4.1 (2026-09-10) ── cleanup: 28 → 9 生产级 spec + 6 张截图
 plan4.2 (2026-09-11) ── 1000 轮 + 多模态 ← 当前（已完成）
         │
         ▼
-plan4.3 (下一阶段) ── PDF 阅读器 + pi file part 真打 + cost profile + 截图补全
+plan4.3 (下一阶段) ── replay gap fallback + PDF 阅读器 + pi file part 真打 + cost profile + 截图补全
         │
         ▼
 plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
