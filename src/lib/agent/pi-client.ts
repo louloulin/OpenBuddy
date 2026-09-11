@@ -1463,6 +1463,29 @@ export async function parseSkillFrontmatter(raw: string): Promise<ParsedSkillFro
   }
 }
 
+/**
+ * Strip SKILL.md frontmatter via the pi-bridge IPC (Round 22 — G4 PR 1,
+ * plan4.1.md §9.12). Use this when a caller needs *just the body* and
+ * doesn't care about frontmatter parsing — e.g. previews, search
+ * snippets, or plugin README rendering. Cheaper than `parseSkillFrontmatter`
+ * for body-only consumers (one round-trip vs the same round-trip +
+ * a YAML parse).
+ *
+ * Falls back to the raw string when the bridge is unavailable so unit
+ * tests without a preload stub don't crash. The fallback is intentionally
+ * the original input — for these "no frontmatter" cases the raw text
+ * is what the caller would have wanted anyway.
+ */
+export async function stripSkillFrontmatter(raw: string): Promise<string> {
+  const bridge = getPiBridge();
+  if (!bridge?.text?.stripFrontmatter) return raw;
+  try {
+    return await bridge.text.stripFrontmatter(raw);
+  } catch {
+    return raw;
+  }
+}
+
 // ---------- expert marketplace (live local data dir) ----------
 
 /** First existing candidate data root ("" if none found). */

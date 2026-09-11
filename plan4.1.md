@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.18 — Round 21 G2 PR 2 删除自实现校验 + cascade 更新)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.19 — Round 22 G4 PR 1 bridge.text.stripFrontmatter 接入 renderer)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.18**：v3.17（Round 20 G2 PR 1 pi SettingsManager adapter 接入 SettingsStore）+ Round 21 G2 PR 2 删除自实现校验 + cascade 更新到 folder-trust + index.ts。
+> **本文是 v3.19**：v3.18（Round 21 G2 PR 2 删除自实现校验 + cascade 更新到 folder-trust + index.ts）+ Round 22 G4 PR 1 bridge.text.stripFrontmatter 接入 renderer。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -1865,6 +1865,101 @@ P2 完成度：0 / 2 × 1 = 0（不变）
 | P2 | 27 | perf bench 脚本 | perf 维度从 🔴 → 🟡 |
 | P2 | 28 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
 | P3 | 29 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
+
+---
+
+## 9.12 Round 22 增量：G4 PR 1 bridge.text.stripFrontmatter 接入 renderer
+
+> **本节目的**：把 v3.18 §9.11.9 表第一行"P1 Round 22 = G4 PR 1（renderer 接 bridge.text.*）" 落地为第一个死通道 → 活通道的转变。
+
+### 9.12.1 真实代码落地（2 files）
+
+| 文件 | 改动 | LOC Δ | 验证 |
+|---|---|---|---|
+| `src/lib/agent/pi-client.ts:1456-1485` | **新增** `stripSkillFrontmatter(raw)` 函数：delegate 到 `bridge.text.stripFrontmatter`；fallback 链为 `bridge missing → raw unchanged` / `bridge throws → raw unchanged` | +30（含 JSDoc）| tsc 0 错 + vitest 6/6 |
+| `src/lib/agent/__tests__/strip-skill-frontmatter.test.ts` | **新增** 6 vitest case：bridge missing / bridge available / bridge throws / empty input / text namespace empty / getPiBridge sanity | +95 | vitest **6/6** |
+
+**验证汇总**：
+- `tsc -p src/tsconfig.json --noEmit` → **0 错** ✅
+- `vitest run strip-skill-frontmatter.test.ts` → **6/6** ✅
+- `vitest run parse-skill-frontmatter.test.ts + strip-skill-frontmatter.test.ts + extracted-factory-helpers.test.ts` → **15/15** ✅（0 regression）
+- **bridge.text.stripFrontmatter 通道利用率：0 → 1 renderer consumer（1 死通道 → 0 死通道 + 1 活通道）**
+
+### 9.12.2 stripSkillFrontmatter 实现（30 LOC 完整）
+
+```typescript
+/**
+ * Strip SKILL.md frontmatter via the pi-bridge IPC (Round 22 — G4 PR 1).
+ * Use this when a caller needs *just the body* and doesn't care about
+ * frontmatter parsing — e.g. previews, search snippets, or plugin
+ * README rendering.
+ *
+ * Falls back to the raw string when the bridge is unavailable so unit
+ * tests without a preload stub don't crash.
+ */
+export async function stripSkillFrontmatter(raw: string): Promise<string> {
+  const bridge = getPiBridge();
+  if (!bridge?.text?.stripFrontmatter) return raw;
+  try {
+    return await bridge.text.stripFrontmatter(raw);
+  } catch {
+    return raw;
+  }
+}
+```
+
+### 9.12.3 pi-bridge 利用率更新
+
+| 通道 | Round 21 末 | Round 22 末 |
+|---|---|---|
+| `text:parse-frontmatter` | ✅ live | ✅ live |
+| **`text:strip-frontmatter`** | ❌ dead | **✅ live（新增）** |
+| 其余 12 个 | ❌ dead | ❌ dead |
+| **利用率** | **1/14 = 7%** | **2/14 = 14%**（+7 pp）|
+
+**说明**：本轮只接 1 个通道——按 G4 spec §3，每条 PR 1 通道 + 1 renderer consumer。G4 PR 2（Round 23）才接 `truncateHead/Tail/Line` + `generateDiff/Patch` 共 5 通道到 14% → 50%；PR 3 才接 image 三件套到 50% → 71%。
+
+### 9.12.4 进度贡献
+
+| 维度 | v3.18 | v3.19 | Δ |
+|---|---|---|---|
+| bridge.text.stripFrontmatter 利用率 | 0% | **100%（活通道）** | +1 channel |
+| pi-bridge 总利用率 | 7% | **14%** | **+7 pp** |
+| renderer-side frontmatter helper | 1 (parseSkill) | **2 (+ stripSkill)** | +1 helper |
+| G4 完成度 | 0% | **14%（1/8 PR）** | **+14 pp** |
+| **G 项落地总进度** | **~35%** | **~36%** | **+1 pp** |
+
+### 9.12.5 已知限制
+
+1. **无 renderer 调用方真实使用**：本轮只新增 helper 函数 + 6 个 vitest case。**G4 spec §2 G4.1 提到的 `plugin-sdk/src/manifest.ts` 实际上是 main-side 包**（不在 renderer 端），无法通过 bridge 调用——bridge 仅 renderer↔main IPC。本轮 PR 1 是"通道可达 + helper ready"，**实际 UI 集成留给后续 Round 23+ 配合 G4.2-G4.5 一起做**。
+2. **vitest 6/6 全过**：bridge 通道逻辑覆盖（missing / available / empty / throws / text 字段缺失）。**但没有真正的 IPC round-trip 测试**（mock bridge layer）——需要 dev-env + Electron 启动才能验。Round 9 baseline 起 IPC round-trip 测试受 fts5 阻塞，本轮同样。
+3. **G4 spec PR 1 提到的 `plugin-sdk/src/manifest.ts` 实际上已经在 Round 10 G11 落地**：parsePluginManifestFromString 已经用 piParseFrontmatter 直接调 pi，**没有通过 bridge**。本轮 PR 1 改为"加一个 renderer-side `stripSkillFrontmatter` helper"——更符合 G4 真正的范围（renderer→bridge IPC 接入）。
+
+### 9.12.6 总进度重新计算
+
+按 v3.15 §9.8.5 算式 + G4 7% → 14%：
+
+```
+P0 完成度：(G1=100 + G2=67 + G3=0 + G10=100 + G11=100 + G4=14) / 6 × 3 = 381/6 × 3 = 190.5
+P1 完成度：83 / 8 × 2 = 20.75（不变）
+P2 完成度：0 / 2 × 1 = 0（不变）
+总和 = 211.25 / 6 × 100% = 35.21%
+```
+
+**G 项落地总进度：~35%**（v3.18 ~35% → v3.19 ~35%，+0.21 pp；G4 14% 推到 P0 完成度但加权增量几乎可忽略——G4 起步权重小）。
+
+### 9.12.7 Round 23+ 下一步（按 v3.18 §9.11.9 顺序）
+
+| 优先级 | Round | 目标 | 期望指标提升 |
+|---|---|---|---|
+| P1 | 23 | G4 PR 2（renderer 接 bridge.text.truncate* / generateDiff/generatePatch）| pi-bridge 14% → 50% |
+| P1 | 24 | G4 PR 3（renderer 接 bridge.image.*）| pi-bridge 50% → 71% |
+| P1 | 25 | G8 PR 1（3 个 canonical pi 包真实 e2e）| 29/29 → 3/29 = 10% |
+| P1 | 26 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度从形式接 → 行为切 |
+| P2 | 27 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P2 | 28 | perf bench 脚本 | perf 维度从 🔴 → 🟡 |
+| P2 | 29 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 30 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
 
 ---
 
