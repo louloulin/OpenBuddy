@@ -248,7 +248,22 @@ export function createAnthropicEchoServer({ host = '127.0.0.1', port = 0, apiKey
   };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Entry-point guard.
+//
+// The previous form was `import.meta.url === \`file://${process.argv[1]}\``,
+// which only matched on POSIX. On Windows `process.argv[1]` is
+// `C:\path\to\file.mjs` (backslashes, drive letter) while `import.meta.url`
+// is `file:///C:/path/to/file.mjs` (forward slashes, leading slash), so the
+// comparison silently failed and the script did nothing when invoked via
+// `node anthropic-echo-provider.mjs` — `_echo-harness.ts` then sees no
+// stdout address banner, times out at 15s, and reports
+// "echo provider exited with code 0 before reporting an address". Use
+// `pathToFileURL` to canonicalize both sides so the guard works on every
+// platform. Imported lazily so the helper stays ESM-only.
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   const port = Number(process.env.OPENBUDDY_ECHO_PORT ?? 0);
   const host = process.env.OPENBUDDY_ECHO_HOST ?? '127.0.0.1';
   const apiKey = process.env.OPENBUDDY_ECHO_KEY ?? 'echo-key';
