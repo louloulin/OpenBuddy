@@ -26,8 +26,12 @@
  *     `websockets:boolean→transport:enum`, `skills:object→array`,
  *     `retry.maxDelayMs→retry.provider.maxRetryDelayMs`) and JSON
  *     round-trip sanity as the schema gate.
- *   - The strict typed validation (retry/image via `getRetrySettings()`)
- *     lands in G2 PR 3 (Round 28+).
+ *   - G2 PR 3 (Round 36) — typed retry/image accessors:
+ *     `getRetrySettings()` / `setRetrySettings(value)` /
+ *     `getImageSettings()` / `setImageSettings(value)` use pi's
+ *     `RetrySettings` and `ImageSettings` interfaces directly so
+ *     callers don't have to remember field shapes. Persisted via the
+ *     same `(namespace, key, value)` triple, so existing rows round-trip.
  *
  * G2 PR 2 (Round 21, plan4.1.md §9.11) — the hand-rolled custom validator
  * (`SettingsValidator` + `setSchema/clearSchema` + per-namespace validators
@@ -41,7 +45,11 @@
 
 import type { SqliteDriver } from "./driver";
 import { SettingsRegistry, type StoredSetting } from "./settings";
-import { SettingsManager } from "@earendil-works/pi-coding-agent";
+import {
+  type ImageSettings,
+  type RetrySettings,
+  SettingsManager,
+} from "@earendil-works/pi-coding-agent";
 
 export interface SettingsNamespaceStats {
   namespace: string;
@@ -163,6 +171,49 @@ export class SettingsStore {
     return this.registry.deleteNamespace(namespace);
   }
 
+  // -----------------------------------------------------------------
+  // G2 PR 3 (Round 36) — typed retry/image accessors.
+  //
+  // Each accessor round-trips through the existing pi-gated `set()`
+  // path so the SettingsManager migration pipeline still runs. We
+  // return a deep-cloned partial shape (only the keys we know pi
+  // cares about) to keep callers from accidentally poking at the
+  // full SettingsManager schema (which carries fields openbuddy does
+  // not own — e.g. `compaction`, `theme`).
+  // -----------------------------------------------------------------
+
+  /** Read the typed retry settings persisted under `settings:retry`.
+   *  Returns `{}` when nothing is persisted. */
+  getRetrySettings(): RetrySettings {
+    const stored = this.registry.get("settings", "retry");
+    if (!stored) return {};
+    const value = stored.value;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return coerceRetrySettings(value);
+  }
+
+  /** Persist typed retry settings under `settings:retry`. The pi
+   *  gate + migration pipeline run as a side-effect of `set()`. */
+  setRetrySettings(value: RetrySettings): StoredSetting {
+    return this.set("settings", "retry", value as unknown as Record<string, unknown>);
+  }
+
+  /** Read the typed image settings persisted under `settings:image`.
+   *  Returns `{}` when nothing is persisted. */
+  getImageSettings(): ImageSettings {
+    const stored = this.registry.get("settings", "image");
+    if (!stored) return {};
+    const value = stored.value;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return coerceImageSettings(value);
+  }
+
+  /** Persist typed image settings under `settings:image`. The pi
+   *  gate + migration pipeline run as a side-effect of `set()`. */
+  setImageSettings(value: ImageSettings): StoredSetting {
+    return this.set("settings", "image", value as unknown as Record<string, unknown>);
+  }
+
   private validate(namespace: string, value: unknown): void {
     // G2 PR 1 (Round 20) + G2 PR 2 (Round 21): pi SettingsManager is the
     // sole schema gate. A fresh in-memory manager is constructed with
@@ -192,4 +243,36 @@ export class SettingsStore {
       }
     }
   }
+}
+
+/**
+ * G2 PR 3 helpers — project a persisted value down to the typed
+ * `RetrySettings` shape. Pi already migrates legacy
+ * `retry.maxDelayMs` → `retry.provider.maxRetryDelayMs`, so by the
+ * time we read back the value only the canonical keys survive.
+ */
+function coerceRetrySettings(value: object): RetrySettings {
+  const out: RetrySettings = {};
+  const v = value as Record<string, unknown>;
+  if (typeof v.enabled === "boolean") out.enabled = v.enabled;
+  if (typeof v.maxRetries === "number") out.maxRetries = v.maxRetries;
+  if (typeof v.baseDelayMs === "number") out.baseDelayMs = v.baseDelayMs;
+  const provider = v.provider;
+  if (provider && typeof provider === "object" && !Array.isArray(provider)) {
+    const p = provider as Record<string, unknown>;
+    const providerOut: NonNullable<RetrySettings["provider"]> = {};
+    if (typeof p.timeoutMs === "number") providerOut.timeoutMs = p.timeoutMs;
+    if (typeof p.maxRetries === "number") providerOut.maxRetries = p.maxRetries;
+    if (typeof p.maxRetryDelayMs === "number") providerOut.maxRetryDelayMs = p.maxRetryDelayMs;
+    if (Object.keys(providerOut).length > 0) out.provider = providerOut;
+  }
+  return out;
+}
+
+function coerceImageSettings(value: object): ImageSettings {
+  const out: ImageSettings = {};
+  const v = value as Record<string, unknown>;
+  if (typeof v.autoResize === "boolean") out.autoResize = v.autoResize;
+  if (typeof v.blockImages === "boolean") out.blockImages = v.blockImages;
+  return out;
 }
