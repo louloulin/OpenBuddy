@@ -2,7 +2,9 @@
 
 > 📅 2026-09-11 · 父任务 LUM-785 · 对应 plan4.1.md §3 Phase D + backlog G6
 >
-> **状态**：规格已落地（2026-09-11 Round 8）。
+> **状态**：**PR 1 已落地（2026-09-11 Round 11）**：`theme-pi.ts` facade + 5 个 vitest 通过。
+>
+> **规格校对（重要发现，与 G11 同病）**：spec §2 假设 `initTheme({ baseTokens })` config 对象，但 pi 实际是 positional args；spec §2 假设 `getSettingsListTheme` 存在，但 pi 上游是 `getEditorTheme`；spec §1 假设 ui-theme 200 LOC 自实现 tokens + dark/light CSS，但实际只有 56 LOC 类型 + 130 LOC state mgmt（**没有** token 系统也没有 CSS 切换）。实现策略是**新增 facade** 而非替换：保留现有 ThemeService + client.tsx，新增 `theme-pi.ts` 作为 pi 接入入口。
 
 ---
 

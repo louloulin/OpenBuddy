@@ -54,3 +54,14 @@ declare module "@openbuddy/cordis" {
     theme: ThemeService;
   }
 }
+
+// G6 PR 1 — typed facade over pi's real theme exports.
+// See ./theme-pi.ts for the spec audit (initTheme signature mismatch;
+// getSettingsListTheme renamed to getEditorTheme upstream).
+export {
+  initTheme,
+  getMarkdownTheme,
+  getSelectListTheme,
+  getSettingsListTheme,
+  type ThemeColor,
+} from "./theme-pi";

@@ -20,7 +20,7 @@
 | **G3** | DefaultPackageManager 替换 ProfilePackageManager | `plugin-host/src/profile-manager.ts:53-63` (806 LOC) | 2 周 | P0 | runtime | G2 | ⬜ |
 | **G4** | pi-bridge 14 通道 13 死代码利用 | `pi-bridge/index.ts:36-121` vs `src/lib/agent/pi-client.ts:1460` | 2 周 | P0 | renderer | — | ⬜ |
 | **G5** | generateBranchSummary 接管 branch-summary-format 自实现 | `host-modules/branch-summary-format.ts` | 1 周 | P1 | runtime | G2 | ⬜ |
-| **G6** | initTheme / getMarkdownTheme 替换 ui-theme 自实现 | `packages/ui/openbuddy-ui-theme/` | 1 周 | P1 | ui | — | ⬜ |
+| **G6** | initTheme / getMarkdownTheme 替换 ui-theme 自实现 | `packages/ui/openbuddy-ui-theme/` | 1 周 | P1 | ui | — | **🟢 PR1** |
 | **G7** | shell helper 用 pi bash-executor + PowerShell config | `extensions/apply-patch.ts:39-40` | 1 周 | P1 | runtime | G1 | ⬜ |
 | **G8** | 29 个 CANONICAL_PI_PACKAGES e2e 全覆盖 | `pi-extension-discovery.ts:20-50` | 3 周 | P1 | runtime + QA | — | ⬜ |
 | **G9** | loadProjectContextFiles 接管 include.ts | `plugin-host/src/include.ts` (350 LOC) | 1 周 | P1 | runtime | — | ⬜ |
@@ -156,6 +156,7 @@
 **Owner**：ui team
 **依赖**：—
 **估时**：1 周
+**状态**：**🟢 PR 1 已落地（Round 11, 2026-09-11）** — `theme-pi.ts` typed facade + 5 个 vitest 用例通过。spec 校对：pi 实际 API 与 spec §2 不一致（`initTheme` positional args；`getSettingsListTheme` 不存在 → `getEditorTheme`）；ui-theme 实际只是 56 LOC 类型 + 130 LOC state mgmt（**没有** token 系统也没有 dark/light CSS 切换）。
 
 **修复方向**：`packages/ui/openbuddy-ui-theme/` 切到 pi `initTheme` + `getMarkdownTheme`，保留 `--wb-*` token 作为 base layer。
 
