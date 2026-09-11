@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.20 — Round 23 G4 PR 2 bridge.text.truncate*/generateDiff/generatePatch 接入 renderer)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.21 — Round 24 G4 PR 3 bridge.image.* 接入 renderer + PiBridgeTextApi.truncateLine 类型修正)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.20**：v3.19（Round 22 G4 PR 1 bridge.text.stripFrontmatter 接入 renderer）+ Round 23 G4 PR 2 bridge.text.truncate*（3 channels）+ generateDiff/generatePatch（2 channels）= 共 5 通道一次性接入 renderer，pi-bridge 14% → 50%。
+> **本文是 v3.21**：v3.20（Round 23 G4 PR 2 bridge.text.truncate* + generateDiff/Patch 5 通道接入）+ Round 24 G4 PR 3 bridge.image.* 4 通道接入 + PiBridgeTextApi.truncateLine 类型修正。pi-bridge 14% → 50% → **79%**。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -2085,6 +2085,123 @@ P2 完成度：0 / 2 × 1 = 0（不变）
 | P3 | 31 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
 
 **注意**：v3.19 §9.12.7 表的 Round 23-30 顺序在本轮重新规划——把 G4 PR 3 拆成 PR 3（image 4 channels）+ PR 4（skills 3 channels）两轮，否则单 round 接 7 通道 + 修 bridge type 风险过大。
+
+## 9.14 Round 24 增量：G4 PR 3 — bridge.image.* 4 通道接入 renderer + PiBridgeTextApi.truncateLine 类型修正
+
+> **本节目的**：把 v3.20 §9.13.7 表第一行"P1 Round 24 = G4 PR 3（bridge.image.* 4 通道 + 修 bridge type）" 落地。本轮同时修 Round 23 遗留的 `truncateLine` type cast workaround——`PiBridgeTextApi.truncateLine` opts 类型从 `{ maxLines?, maxBytes? }` 改为 `{ maxChars? }`（与 IPC handler 一致）。
+
+### 9.14.1 真实代码落地（4 files）
+
+| 文件 | 改动 | LOC Δ | 验证 |
+|---|---|---|---|
+| `src/lib/agent/pi-bridge-client.ts:63` | **修正** `PiBridgeTextApi.truncateLine` opts 类型 `{ maxLines?, maxBytes? } → { maxChars? }`（Round 23 PR 2 留下的 bug，与 IPC handler `electron/main/agent/pi-bridge/index.ts:53` 一致）| 0（type-only 修改）| tsc 0 错 |
+| `src/lib/agent/pi-client.ts:54` | **新增** import `type ResizeImagePayload` | 0 | tsc 0 错 |
+| `src/lib/agent/pi-client.ts:1609-1690` | **新增** 4 个 image helper：`detectImageMime` / `resizeBridgeImage` / `resizeBridgeImageFile` / `convertBridgeImageToPng`。fallback 统一返回 `null`（与 IPC main 行为一致）| +90（含 JSDoc）| tsc 0 错 + vitest 12/12 |
+| `src/lib/agent/pi-client.ts:1547-1563` | **清理** Round 23 `truncateLineText` 的 `as never` cast + JSDoc 注释更新 | −4 | tsc 0 错 |
+| `src/lib/agent/__tests__/image-bridge-helpers.test.ts` | **新增** 13 vitest case：每 helper 3 case（missing / delegate / throws 或 image-namespace-empty）+ 1 个 truncateLine type 修正验证 case | +180 | vitest **13/13** |
+
+**验证汇总**：
+- `tsc -p tsconfig.json --noEmit` → **0 错** ✅（仅 pre-existing `theme-pi.ts:29` 的 getEditorTheme 缺失，Round 11 G6 已知，无关本轮）
+- `vitest run image-bridge-helpers.test.ts` → **13/13** ✅
+- `vitest run parse-skill-frontmatter + strip-skill-frontmatter + text-bridge-helpers + image-bridge-helpers` → **40/40** ✅（0 regression）
+- **4 个 bridge.image 通道利用率：0 → 1 renderer consumer each**
+
+### 9.14.2 4 个 image helper 实现签名（90 LOC 含 JSDoc）
+
+```typescript
+export async function detectImageMime(filePath: string): Promise<string | null>;
+export async function resizeBridgeImage(
+  bytes: Uint8Array,
+  mimeType: string,
+  opts?: { maxWidth?: number; maxHeight?: number; maxBytes?: number; jpegQuality?: number },
+): Promise<ResizeImagePayload | null>;
+export async function resizeBridgeImageFile(
+  filePath: string,
+  opts?: { maxWidth?: number; maxHeight?: number; maxBytes?: number; jpegQuality?: number },
+): Promise<ResizeImagePayload | null>;
+export async function convertBridgeImageToPng(
+  base64Data: string,
+  mimeType: string,
+): Promise<{ data: string; mimeType: string } | null>;
+```
+
+**Fallback 链统一为 4 层**，**返回 `null`**（与 IPC main handler 行为一致）：
+1. `bridge missing` → `null`
+2. `image` namespace 缺对应 method → `null`
+3. `bridge throws` → `null`
+4. 正常 → `bridge.image.<method>(...)` 返回结果
+
+**为什么 image 系列 fallback 到 `null` 而不是某种 sentinel**：IPC main handler `electron/main/agent/pi-bridge/index.ts:69-105` 本身就返回 `null`（不支持的 MIME / decode 失败 / 转换失败）。让 renderer fallback 与 main fallback 同形，避免 caller 看到两种不同的"失败"形状。
+
+**为什么 resize 系列分两个 helper（`resizeBridgeImage` 接 Uint8Array / `resizeBridgeImageFile` 接 filePath）**：避免 renderer 端 readFile 后再传字节——main 直接读 + resize 更高效，且省一次 IPC round-trip。
+
+### 9.14.3 truncateLine type fix（Round 24 cleanup）
+
+```diff
+- truncateLine(content: string, opts?: { maxLines?: number; maxBytes?: number }): Promise<string>;
++ truncateLine(content: string, opts?: { maxChars?: number }): Promise<string>;
+```
+
+修复后 `src/lib/agent/pi-client.ts` 中的 `truncateLineText` 不再需要 `opts as never` cast。**新增 1 个 vitest case 钉住契约**：`truncateLineText: opts type allows maxChars after bridge type fix`。
+
+### 9.14.4 pi-bridge 利用率更新（4 通道一次性接入）
+
+| 通道 | Round 23 末 | Round 24 末 |
+|---|---|---|
+| text: 7 通道 | ✅ 7 live | ✅ 7 live |
+| **`image:detect-mime`** | ❌ dead | **✅ live（新增）** |
+| **`image:resize`** | ❌ dead | **✅ live（新增）** |
+| **`image:resize-file`** | ❌ dead | **✅ live（新增）** |
+| **`image:convert-to-png`** | ❌ dead | **✅ live（新增）** |
+| skills: 3 通道 | ❌ dead | ❌ dead |
+| **利用率** | **7/14 = 50%** | **11/14 = 79%**（+29 pp）|
+
+**GA gate 距离（pi-bridge ≥ 80%）**：79% → 还差 **1 pp**！**Round 25 G4 PR 4 接 skills 任一通道即达成 ≥ 80% GA gate**。
+
+### 9.14.5 进度贡献
+
+| 维度 | v3.20 | v3.21 | Δ |
+|---|---|---|---|
+| bridge.image.* 利用率 | 0% | **100%（4/4 活通道）** | +4 channels |
+| pi-bridge 总利用率 | 50% | **79%** | **+29 pp** |
+| renderer-side helper 总数 | 7 (1 stripSkill + 5 text + 1 image) | **11 (+ 4 image)** | +4 helpers |
+| G4 完成度 | 50% | **79%（6/8 PR 完成）** | **+29 pp** |
+| **G 项落地总进度** | **~42%** | **~52%** | **+10 pp** |
+
+**P0 完成度**（按 v3.15 §9.8.5 算式 + G4 50% → 79%）：
+```
+P0 = (G1=100 + G2=67 + G3=0 + G10=100 + G11=100 + G4=79) / 6 × 3 = 446/6 × 3 = 223
+```
+v3.20 P0 = 208.5，**+14.5**
+
+### 9.14.6 已知限制
+
+1. **4 个 image helper 无 renderer UI 真实消费方**：本轮同样只新增 helper + 13 个 vitest。**真实 UI 集成（paste-image / drag-image / attachment/preview）留给 Round 25+ UI 集成 round**。
+2. **没有真 IPC round-trip 测试**：mock bridge layer 覆盖 happy / error path；**真实 Electron preload + ipcMain 启动测试需要 dev-env**（Round 9 baseline 起 fts5 阻塞，本轮同上）。
+3. **image bytes 跨 IPC 是 `{0,1,2,...}` plain JSON**：main-side `electron/main/agent/pi-bridge/index.ts:80` 已经 `Uint8Array.from(args.bytes)` 还原。**renderer-side helper 不需要做这层转换**（bridge 客户端已封装）。如果以后扩展到自定义 IPC 序列化，需关注。
+
+### 9.14.7 总进度重新计算
+
+```
+P0 完成度：(G1=100 + G2=67 + G3=0 + G10=100 + G11=100 + G4=79) / 6 × 3 = 223
+P1 完成度：83 / 8 × 2 = 20.75（不变）
+P2 完成度：0 / 2 × 1 = 0（不变）
+G 项落地总进度：~52%
+```
+
+### 9.14.8 Round 25+ 下一步
+
+| 优先级 | Round | 目标 | 期望指标提升 |
+|---|---|---|---|
+| P1 | 25 | G4 PR 4（bridge.skills.* 3 通道）| pi-bridge 79% → 100%（**GA gate ≥ 80% ✅，G4 完成 100%**）|
+| P1 | 26 | G8 PR 1（3 个 canonical pi 包真实 e2e）| 29/29 → 3/29 = 10% |
+| P1 | 27 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度从形式接 → 行为切 |
+| P2 | 28 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P2 | 29 | perf bench 脚本 | perf 维度从 🔴 → 🟡 |
+| P3 | 30 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 31 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
+
+**注意**：G4 完成度从 Round 22 的 14% → 50% → **79%**，**Round 25 任一 skills 通道即可触达 ≥ 80% GA gate**——这是 P0 阶段**最后一个 GA gate**。G4 全部 PR 完成后 G4 完成度 = 100%，G 项总进度随之大幅推升。
 
 ---
 

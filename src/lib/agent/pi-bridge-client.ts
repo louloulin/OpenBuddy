@@ -60,7 +60,7 @@ export interface PiBridgeTextApi {
   stripFrontmatter(content: string): Promise<string>;
   truncateHead(content: string, opts?: { maxLines?: number; maxBytes?: number }): Promise<string>;
   truncateTail(content: string, opts?: { maxLines?: number; maxBytes?: number }): Promise<string>;
-  truncateLine(content: string, opts?: { maxLines?: number; maxBytes?: number }): Promise<string>;
+  truncateLine(content: string, opts?: { maxChars?: number }): Promise<string>;
   generateDiff(oldStr: string, newStr: string, opts?: { filePath?: string; context?: number }): Promise<string>;
   generatePatch(oldStr: string, newStr: string, opts?: { filePath?: string; context?: number }): Promise<string>;
 }

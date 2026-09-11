@@ -51,7 +51,7 @@ import type { EmailProviderDiagnostic } from "@openbuddy/capability-email";
 export type { EmailProviderDiagnostic } from "@openbuddy/capability-email";
 
 export type { McpServerEntry } from "@openbuddy/shared-types";
-import { getPiBridge } from "./pi-bridge-client";
+import { getPiBridge, type ResizeImagePayload } from "./pi-bridge-client";
 
 const appLogger = createRendererLogger({
   devMode: ((typeof import.meta !== "undefined" && (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) || false),
@@ -1542,14 +1542,8 @@ export async function truncateTailText(
 /**
  * Truncate a single line to `maxChars` (used by diff / preview components
  * to cap a single row's display width). Round 23 — G4 PR 2
- * (G4.3 in plan4.1.md §9.13).
- *
- * NOTE: the renderer-side `PiBridgeTextApi.truncateLine` type in
- * `pi-bridge-client.ts` is currently mis-typed as `{ maxLines?, maxBytes? }`
- * (copy-paste of truncateHead). The IPC handler at
- * `electron/main/agent/pi-bridge/index.ts:53` actually takes `maxChars`,
- * so we cast through `as never` here — fixing the bridge type to match
- * the IPC contract is a separate cleanup tracked outside this PR.
+ * (G4.3 in plan4.1.md §9.13). Bridge type for truncateLine was fixed in
+ * Round 24 (G4 PR 3) so the `as never` cast is no longer needed.
  */
 export async function truncateLineText(
   content: string,
@@ -1558,7 +1552,7 @@ export async function truncateLineText(
   const bridge = getPiBridge();
   if (!bridge?.text?.truncateLine) return content;
   try {
-    return await bridge.text.truncateLine(content, opts as never);
+    return await bridge.text.truncateLine(content, opts);
   } catch {
     return content;
   }
@@ -1598,6 +1592,95 @@ export async function generateBridgePatch(
     return await bridge.text.generatePatch(oldStr, newStr, opts);
   } catch {
     return newStr;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Round 24 — G4 PR 3: bridge.image.* helpers (plan4.1.md §9.14).
+//
+// Four helpers, one per remaining image channel. The image domain is the
+// trickiest one to defend because bytes cross the renderer↔main boundary
+// as plain JSON (Uint8Array → {0,1,2,...} plain object → Uint8Array.from
+// on the main side — see pi-bridge/index.ts:80). The fallback contracts
+// therefore differ from the text helpers:
+//
+//   - detectMime  → returns null on failure (matches IPC contract — main
+//                   already returns null for unsupported file types)
+//   - resize      → returns null on failure (matches IPC contract — main
+//                   returns null when the image can't be decoded)
+//   - resizeFile  → returns null on failure (same as resize)
+//   - convertToPng → returns null on failure (matches IPC contract)
+//
+// Callers should treat `null` as "fall back to your own heuristic" rather
+// than as an error — same shape as the underlying bridge contract.
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect a supported image MIME type from a file path on disk. Used by
+ * paste-image / drag-image upload handlers. Round 24 — G4 PR 3
+ * (G4.6 in plan4.1.md §9.14).
+ */
+export async function detectImageMime(filePath: string): Promise<string | null> {
+  const bridge = getPiBridge();
+  if (!bridge?.image?.detectMime) return null;
+  try {
+    return await bridge.image.detectMime(filePath);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resize raw image bytes (Uint8Array) to fit within maxWidth / maxHeight /
+ * maxBytes. Used by attachment upload pipelines. Round 24 — G4 PR 3
+ * (G4.7 in plan4.1.md §9.14).
+ */
+export async function resizeBridgeImage(
+  bytes: Uint8Array,
+  mimeType: string,
+  opts?: { maxWidth?: number; maxHeight?: number; maxBytes?: number; jpegQuality?: number },
+): Promise<ResizeImagePayload | null> {
+  const bridge = getPiBridge();
+  if (!bridge?.image?.resize) return null;
+  try {
+    return await bridge.image.resize(bytes, mimeType, opts);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read an image file from disk and resize it in one call (avoids the
+ * renderer-side read). Round 24 — G4 PR 3 (G4.7 in plan4.1.md §9.14).
+ */
+export async function resizeBridgeImageFile(
+  filePath: string,
+  opts?: { maxWidth?: number; maxHeight?: number; maxBytes?: number; jpegQuality?: number },
+): Promise<ResizeImagePayload | null> {
+  const bridge = getPiBridge();
+  if (!bridge?.image?.resizeFile) return null;
+  try {
+    return await bridge.image.resizeFile(filePath, opts);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convert an arbitrary image (base64 + mime) to PNG. Returns null on
+ * failure — callers should fall back to their own image decoder. Round 24
+ * — G4 PR 3 (G4.7 in plan4.1.md §9.14).
+ */
+export async function convertBridgeImageToPng(
+  base64Data: string,
+  mimeType: string,
+): Promise<{ data: string; mimeType: string } | null> {
+  const bridge = getPiBridge();
+  if (!bridge?.image?.convertToPng) return null;
+  try {
+    return await bridge.image.convertToPng(base64Data, mimeType);
+  } catch {
+    return null;
   }
 }
 
