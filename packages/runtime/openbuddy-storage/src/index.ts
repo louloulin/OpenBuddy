@@ -26,7 +26,6 @@ export { SessionCatalog, type SessionCatalogRecord, type SessionCatalogQuery } f
 export { SettingsRegistry, type StoredSetting } from "./sqlite/settings";
 export {
   SettingsStore,
-  type SettingsValidator,
   type SettingsNamespaceStats,
   type SettingsStoreOptions,
 } from "./sqlite/settings-store";

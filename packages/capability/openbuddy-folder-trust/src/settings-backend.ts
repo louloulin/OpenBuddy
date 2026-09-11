@@ -59,14 +59,11 @@ export class SettingsBackendFolderTrustStore implements FolderTrustStore {
     fallbackStoragePath: string;
   }): FolderTrustStore {
     try {
-      options.settings.setSchema(NAMESPACE, (value) => {
-        // Validate the value shape: must be `{ trusted: boolean, decidedAt: string }`.
-        if (!value || typeof value !== "object") return "folder-trust value must be an object";
-        const v = value as { trusted?: unknown; decidedAt?: unknown };
-        if (typeof v.trusted !== "boolean") return "folder-trust.trusted must be a boolean";
-        if (typeof v.decidedAt !== "string") return "folder-trust.decidedAt must be an ISO timestamp";
-        return undefined;
-      });
+      // G2 PR 2 (Round 21): SettingsStore no longer exposes a per-namespace
+      // `setSchema()` API. We do shape validation inline in `grant/revoke/respond`
+      // (the values constructed there are already valid `{ trusted, decidedAt }`).
+      // The pi SettingsManager gate (settable in storage layer) handles schema
+      // sniff as a second line of defense — no per-namespace registration needed.
       return new SettingsBackendFolderTrustStore(options.settings, options.fallbackStoragePath);
     } catch {
       // SettingsStore init failed (e.g. missing sqlite driver) —

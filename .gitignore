@@ -82,6 +82,8 @@ docs/*
 !docs/ROUND19_IMPLEMENTATION_REPORT.md
 # Round 20 G2 PR 1 — pi SettingsManager adapter wired into SettingsStore (LUM-785, 2026-09-11)
 !docs/ROUND20_IMPLEMENTATION_REPORT.md
+# Round 21 G2 PR 2 — delete custom validator API + cascade to folder-trust (LUM-785, 2026-09-11)
+!docs/ROUND21_IMPLEMENTATION_REPORT.md
 !docs/grok-to-pi-replacement-audit.md
 !docs/workbuddy-points-system-comparison.md
 !docs/enterprise-live-verification-2026-08-31.md

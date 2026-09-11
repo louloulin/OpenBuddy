@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.17 — Round 20 G2 PR 1 pi SettingsManager adapter 接入 SettingsStore)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.18 — Round 21 G2 PR 2 删除自实现校验 + cascade 更新)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.17**：v3.16（Round 19 G10 PR 3 提取 4 个 builtin helper + G7 cross-ref）+ Round 20 G2 PR 1 pi SettingsManager adapter 接入 SettingsStore。
+> **本文是 v3.18**：v3.17（Round 20 G2 PR 1 pi SettingsManager adapter 接入 SettingsStore）+ Round 21 G2 PR 2 删除自实现校验 + cascade 更新到 folder-trust + index.ts。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -1756,6 +1756,115 @@ P2 完成度：0 / 2 × 1 = 0（不变）
 | P2 | 26 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
 | P2 | 27 | perf bench 脚本 | perf 维度从 🔴 → 🟡（有数）|
 | P2 | 28 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+
+---
+
+## 9.11 Round 21 增量：G2 PR 2 删除自实现校验 + cascade 更新
+
+> **本节目的**：把 v3.17 §9.10.7 表第一行"P0 Round 21 = G2 PR 2（删 custom validator + models-config.ts retry/image 校验）" 落地为代码删除 + cascade 更新到 folder-trust + index.ts。
+
+### 9.11.1 真实代码落地（5 files，删除 + cascade）
+
+| 文件 | 改动 | LOC Δ | 验证 |
+|---|---|---|---|
+| `packages/runtime/openbuddy-storage/src/sqlite/settings-store.ts` | **删除**：`SettingsValidator` type / `setSchema()` / `clearSchema()` / `validators` Map / Layer 1 of validate()；保留 pi gate 作为唯一 schema gate | **−26**（221 → 195）| tsc 0 错（settings-store 单独）|
+| `packages/runtime/openbuddy-storage/src/index.ts:27-32` | **删除** barrel re-export of `SettingsValidator` | **−1** | tsc 0 错 |
+| `packages/runtime/openbuddy-storage/src/__tests__/settings-store.test.ts` | **重写**：删除 `setSchema/clearSchema/validator` 测试；新增 2 个 pi gate 测试（`websockets: boolean` migration + `retry.maxDelayMs` migration）| **rewrite**（原 8 个 case → 6 个新 case）| tsc 0 错 |
+| `packages/capability/openbuddy-folder-trust/src/settings-backend.ts:60-76` | **删除** `setSchema(NAMESPACE, ...)` 调用 + 4 行 inline validator；保留 `tryOpen()` 逻辑（注释块说明 inline validation 是 caller 责任）| **−9**（121 → 112）| tsc 0 错 |
+| `packages/capability/openbuddy-folder-trust/src/settings-backend.test.ts:116-125` | **重写** malformed-persistence 测试：不调 `clearSchema`，直接写 malformed value → list() 过滤 | **rewrite** | tsc 0 错 |
+
+**注**：G2 spec PR 2 提到"删除 models-config.ts 中 retry/image 校验代码（约 100 LOC）"，但当前 codebase 中 `electron/main/agent/host-modules/models-config/index.ts`（203 LOC）是 **provider/model 持久化**（saveProvider/saveModel/deleteModel/deleteProvider），**不是 retry/image 校验**。grep 整个 codebase 找不到第二个 retry/image 校验模块——所以 spec 这一项的"~100 LOC"是 stale 估算，本轮无对应 action。
+
+### 9.11.2 settings-store.ts 删除清单
+
+| 删除项 | 行数（删除前）| 说明 |
+|---|---|---|
+| `SettingsValidator` type alias | 10 LOC（45-55）| 自定义 per-namespace validator 函数签名 |
+| `SettingsStoreOptions.validators` 字段 | 1 LOC | per-namespace validator Map |
+| `setSchema()` 方法 | 3 LOC | 注册 validator |
+| `clearSchema()` 方法 | 3 LOC | 注销 validator |
+| `validators: Map<string, SettingsValidator>` 字段 | 1 LOC | instance state |
+| `constructor` 中 validators init | 1 LOC | `this.validators = options.validators ?? new Map()` |
+| Layer 1 of `validate()` | 6 LOC | custom validator 调用 + 错误抛出 |
+| 顶部 doc-block 中描述 "JSON schema validation via a per-namespace validator map" | 7 LOC | 已过时描述 |
+| **总删除** | **~32 LOC** | — |
+
+### 9.11.3 folder-trust cascade
+
+`folder-trust` 是唯一调用 `setSchema()` 的 OpenBuddy 内置消费者（`grep -rn "SettingsValidator\|setSchema\|clearSchema"` 只此一处）。删除调用后：
+
+- 旧的 4 行 inline validator：
+  ```typescript
+  if (!value || typeof value !== "object") return "folder-trust value must be an object";
+  if (typeof v.trusted !== "boolean") return "folder-trust.trusted must be a boolean";
+  if (typeof v.decidedAt !== "string") return "folder-trust.decidedAt must be an ISO timestamp";
+  ```
+  消失。`grant/revoke/respond` 直接构造合规值（`{ trusted: boolean; decidedAt: ISO }`），无需验证。
+
+- `list()` 过滤逻辑保留（已经是 `entry.trusted === boolean` 检查），所以 malformed-persistence 测试仍有效。
+
+### 9.11.4 真实验证
+
+- `tsc -p packages/runtime/openbuddy-storage/tsconfig.json --noEmit` → **settings-store.ts 0 错** ✅（其它 3 错在 `session-catalog-metadata.test.ts`，pre-existing）
+- `tsc -p packages/capability/openbuddy-folder-trust/tsconfig.json --noEmit` → **0 错** ✅
+- `vitest run settings-store.test.ts` → **12/12 fail on `no such module: fts5`**（env 限制）
+- `vitest run electron/main/agent/__tests__/extracted-factory-helpers.test.ts` → **3/3** ✅（Round 19 回归无破坏）
+- **settings-store.ts LOC：221 → 195**（−26），**仍未触 GA gate ≤ 50**（PR 4 范围）
+
+### 9.11.5 GA gate 距离诚实评估
+
+| Round | settings-store.ts LOC | GA gate ≤ 50 距离 |
+|---|---|---|
+| Round 17 baseline | 196 | −146 |
+| Round 20 PR 1（+ | pi gate）| 221（净 +25）| −171 |
+| **Round 21 PR 2（删 validator）** | **195**（净 −26）| **−145** |
+
+**为什么 PR 2 没把 settings-store.ts 砍到 ≤ 50**：删完 validator 后剩下的 ~195 LOC 全是 typed facade 本身（`set/get/list/listNamespaces/namespaceStats/bulkSet/bulkGet/delete/deleteNamespace`），都是 OpenBuddy 业务方消费 SQLite 的入口。要降到 ≤ 50 必须把这些 facade 也砍掉——那是 PR 4 范围（"GA gate 收口"），需要把 OpenBuddy 业务方切到直接用 `SettingsRegistry` 或 pi `SettingsManager`。本轮 PR 2 完成**自实现校验的删除**，但不强行做 facade 削减。
+
+### 9.11.6 进度贡献
+
+| 维度 | v3.17 | v3.18 | Δ |
+|---|---|---|---|
+| 自实现 schema validator | 有 | **删除（0 LOC）** | −10 LOC |
+| Pi gate | 唯一 schema gate | 唯一 schema gate | — |
+| `SettingsValidator` 公开类型 | 已 export | **删除** | cleaner API |
+| settings-store.ts LOC | 221 | 195（−12%）| −12% |
+| folder-trust setSchema 依赖 | 1 call site | **0 call site** | cascade complete |
+| **G2 完成度** | 33% | **67%（PR 1+2 落地）** | **+33 pp** |
+| **G 项落地总进度** | **~32%** | **~34%** | **+2 pp** |
+
+### 9.11.7 已知限制
+
+1. **vitest 12/12 fail on fts5**：env 限制，与本轮代码无关。6 个新 test case 写在文件里待 fts5 环境跑。
+2. **GA gate ≤ 50 未触**：PR 2 删了 validator 但没砍 facade。要 ≤ 50 必须再删 `listNamespaces/namespaceStats/bulkSet/bulkGet` 4 个方法 + 直接调底层 `SettingsRegistry`——属于 PR 4 范围（"GA gate 收口"）。
+3. **folder-trust 测试 1 个 case 行为变化**：malformed-persistence 测试以前要 `clearSchema` 才能写非法值，现在 pi gate 接受大部分对象所以可以直接写。功能等价（list() 仍过滤），但 test setup 不同。
+4. **stale spec 提示**：G2 spec §3 PR 2 提到"删除 models-config.ts 中 retry/image 校验代码（约 100 LOC）"——本轮 grep 全 codebase 未发现该模块，spec 估算已过时。
+
+### 9.11.8 总进度重新计算
+
+按 v3.15 §9.8.5 算式 + G2 33% → 67%：
+
+```
+P0 完成度：(G1=100 + G2=67 + G3=0 + G10=100 + G11=100 + G4=7) / 6 × 3 = 374/6 × 3 = 187
+P1 完成度：83 / 8 × 2 = 20.75（不变）
+P2 完成度：0 / 2 × 1 = 0（不变）
+总和 = 207.75 / 6 × 100% = 34.6%
+```
+
+**G 项落地总进度：~35%**（v3.17 ~32% → v3.18 ~35%，+3 pp；G2 67% 推升 P0 完成度）。
+
+### 9.11.9 Round 22+ 下一步（按 v3.17 §9.10.7 顺序）
+
+| 优先级 | Round | 目标 | 期望指标提升 |
+|---|---|---|---|
+| P1 | 22 | G4 PR 1（renderer 接 bridge.text.*）| pi-bridge 7% → 14% |
+| P1 | 23 | G4 PR 2（renderer 接 bridge.image.*）| pi-bridge 14% → 28% |
+| P1 | 24 | G8 PR 1（3 个 canonical pi 包真实 e2e）| 29/29 → 3/29 = 10% |
+| P1 | 25 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度从形式接 → 行为切 |
+| P2 | 26 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P2 | 27 | perf bench 脚本 | perf 维度从 🔴 → 🟡 |
+| P2 | 28 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 29 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
 
 ---
 

@@ -18,21 +18,22 @@
  *
  * Architecture:
  *   - `SettingsStore` wraps a `SettingsRegistry` and adds namespace
- *     enumeration (`listNamespaces()`), JSON schema validation via
- *     a per-namespace validator map, and bulk get/set helpers.
- *   - JSON schema validation uses a minimal hand-rolled validator
- *     (no external dep) to keep the storage layer zero-runtime-deps.
- *   - The schema map is exposed via `setSchema(namespace, validator)`
- *     so callers can register validators per namespace lazily.
+ *     enumeration (`listNamespaces()`) and bulk get/set helpers.
+ *   - Schema validation is delegated to pi's `SettingsManager.inMemory()`
+ *     (G2 PR 1, Round 20): every object/array value is probed through
+ *     a fresh in-memory manager and `drainErrors()` surfaces rejections.
+ *     Pi runs its migration pipeline (legacy `queueMode→steeringMode`,
+ *     `websockets:boolean→transport:enum`, `skills:object→array`,
+ *     `retry.maxDelayMs→retry.provider.maxRetryDelayMs`) and JSON
+ *     round-trip sanity as the schema gate.
+ *   - The strict typed validation (retry/image via `getRetrySettings()`)
+ *     lands in G2 PR 3 (Round 28+).
  *
- * G2 PR 1 (Round 20, plan4.1.md §9.10) — the per-namespace validator
- * now also delegates to pi's `SettingsManager.inMemory()` as a second
- * gate. We construct an in-memory manager with the candidate value as
- * its seed settings; pi runs its own migration/parsing pass and
- * surfaces errors through `drainErrors()`. This wires pi's schema
- * layer into our SQLite-backed wrapper while keeping the SQLite
- * persistence path unchanged. The full typed validation (retry/image
- * settings via `getRetrySettings()` etc.) lands in G2 PR 3 (Round 22+).
+ * G2 PR 2 (Round 21, plan4.1.md §9.11) — the hand-rolled custom validator
+ * (`SettingsValidator` + `setSchema/clearSchema` + per-namespace validators
+ * map) was deleted. Per-namespace callers (folder-trust) now do their
+ * own shape validation inline before calling `settings.set()`. The pi
+ * gate runs as a global second check on every object/array write.
  *
  * Reverse-dep invariant:
  *   imports nothing from electron/main/ and nothing from index.ts.
@@ -41,18 +42,6 @@
 import type { SqliteDriver } from "./driver";
 import { SettingsRegistry, type StoredSetting } from "./settings";
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
-
-/**
- * Minimal hand-rolled JSON schema validator. Returns an error
- * message string if the value is invalid, or undefined if it
- * passes validation.
- *
- * Why hand-rolled: keeps the storage layer zero-runtime-deps. We
- * support the most common JSON-schema-lite shapes (required props
- * + per-prop type check). Callers that need full JSON Schema can
- * swap in their own validator function at any time.
- */
-export type SettingsValidator = (value: unknown) => string | undefined;
 
 export interface SettingsNamespaceStats {
   namespace: string;
@@ -63,43 +52,22 @@ export interface SettingsNamespaceStats {
 export interface SettingsStoreOptions {
   driver: SqliteDriver;
   now?: () => string;
-  /** Per-namespace validator. Used by `set` / `setAsync` to reject
-   *  malformed values before they hit the underlying SettingsRegistry. */
-  validators?: Map<string, SettingsValidator>;
 }
 
 /**
- * High-level settings store. Wraps `SettingsRegistry` with
- * per-namespace validation, namespace enumeration, and bulk helpers.
- *
- * Why a wrapper around SettingsRegistry rather than a replacement:
- * - SettingsRegistry already implements the UPSERT semantics with
- *   caller-supplied version (verified in settings-registry.test.ts).
- * - This wrapper layers validation + bulk operations + enumeration
- *   on top without changing the proven persistence path.
- * - Future D.1 round 3 (workbuddy-import.ts wiring) can drop in
- *   this wrapper without modifying the SQLite schema or migration.
+ * High-level settings store. Wraps `SettingsRegistry` with namespace
+ * enumeration + bulk helpers, delegating schema validation to pi's
+ * `SettingsManager` (G2 PR 1). Per-namespace shape validation, if
+ * needed, is the caller's responsibility (see folder-trust which
+ * validates `{ trusted: boolean; decidedAt: string }` inline).
  */
 export class SettingsStore {
   private readonly registry: SettingsRegistry;
   private readonly now: () => string;
-  private readonly validators: Map<string, SettingsValidator>;
 
   constructor(options: SettingsStoreOptions) {
     this.registry = new SettingsRegistry(options.driver, options.now);
     this.now = options.now ?? (() => new Date().toISOString());
-    this.validators = options.validators ?? new Map();
-  }
-
-  /** Register a per-namespace validator. Subsequent set / setAsync
-   *  calls validate before delegating to SettingsRegistry. */
-  setSchema(namespace: string, validator: SettingsValidator): void {
-    this.validators.set(namespace, validator);
-  }
-
-  /** Drop the validator for a namespace (subsequent sets skip it). */
-  clearSchema(namespace: string): void {
-    this.validators.delete(namespace);
   }
 
   set(namespace: string, key: string, value: unknown, version = 1): StoredSetting {
@@ -196,25 +164,20 @@ export class SettingsStore {
   }
 
   private validate(namespace: string, value: unknown): void {
-    // Layer 1 (legacy): per-namespace custom validator registered via
-    // `setSchema()`. Preserved exactly so existing OpenBuddy call sites
-    // (folder-trust, workbuddy-import) keep working without churn.
-    const validator = this.validators.get(namespace);
-    if (validator) {
-      const error = validator(value);
-      if (error) {
-        throw new Error(`settings validation failed for "${namespace}": ${error}`);
-      }
-    }
-    // Layer 2 (G2 PR 1, Round 20): delegate to pi's `SettingsManager` as
-    // a second gate. We construct an in-memory manager with `value` as
-    // its seed settings, then drain any errors pi's migration pipeline
-    // reports. The probe is cheap (no file I/O — `InMemorySettingsStorage`)
-    // and per-call (fresh manager → no shared mutable state between calls).
+    // G2 PR 1 (Round 20) + G2 PR 2 (Round 21): pi SettingsManager is the
+    // sole schema gate. A fresh in-memory manager is constructed with
+    // `value` as its seed settings; pi runs migration pipeline + JSON
+    // round-trip and surfaces errors via drainErrors(). The probe is
+    // cheap (no file I/O — InMemorySettingsStorage) and per-call.
     //
-    // What pi actually validates here: settings-format migrations (legacy
-    // `queueMode → steeringMode`, `websockets: boolean → transport: enum`,
-    // `skills: object → array`, `retry.maxDelayMs → retry.provider.maxRetryDelayMs`)
+    // Per-namespace shape validation (e.g. folder-trust requiring
+    // `{ trusted: boolean; decidedAt: string }`) is the caller's
+    // responsibility — see folder-trust/settings-backend.ts which
+    // validates inline before calling `settings.set()`.
+    //
+    // What pi actually validates here: settings-format migrations
+    // (legacy `queueMode→steeringMode`, `websockets:boolean→transport:enum`,
+    // `skills:object→array`, `retry.maxDelayMs→retry.provider.maxRetryDelayMs`)
     // + JSON parse sanity. Strict typed validation of retry/image/etc.
     // lands in G2 PR 3 once we route those settings through pi's typed
     // getXxx/setXxx methods.

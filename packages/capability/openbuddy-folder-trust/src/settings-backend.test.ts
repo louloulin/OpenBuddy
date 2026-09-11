@@ -115,11 +115,11 @@ describe("SettingsBackendFolderTrustStore (Phase D.2 round 2)", () => {
 
   it("list() filters out malformed persisted values", () => {
     const store = newStore();
-    // Write a malformed value directly to the underlying SettingsStore,
-    // bypassing the per-namespace validator (by calling set on the
-    // SettingsStore instance that doesn't have the schema). We emulate
-    // that by clearing the schema and writing the bad value.
-    settings.clearSchema("folder-trust");
+    // G2 PR 2 (Round 21): SettingsStore no longer has clearSchema(). We
+    // bypass the per-namespace validation by writing directly through
+    // the SettingsStore instance with a malformed shape — pi gate accepts
+    // most objects, so the bad value persists to SQLite. The list()
+    // filter then drops it from the FolderTrustStore view.
     settings.set("folder-trust", "/bad", { trusted: "yes", decidedAt: "now" });
     expect(store.list()).toEqual([]); // bad entry filtered out
   });

@@ -2,15 +2,17 @@
  * @openbuddy/storage/sqlite/settings-store — Phase D.1 round 2 tests.
  *
  * Verifies the SettingsStore high-level wrapper on top of
- * SettingsRegistry: setSchema validators, listNamespaces,
- * namespaceStats, bulkSet atomic semantics, and bulkGet lookups.
+ * SettingsRegistry: listNamespaces, namespaceStats, bulkSet atomic
+ * semantics, and bulkGet lookups. Per-namespace validation is gone
+ * after G2 PR 2 (Round 21); pi's `SettingsManager.inMemory()` is
+ * the sole schema gate (G2 PR 1, Round 20).
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStorageSync } from "../sqlite/open-storage";
-import { SettingsStore, type SettingsValidator } from "../sqlite/settings-store";
+import { SettingsStore } from "../sqlite/settings-store";
 
 let root = "";
 let store: SettingsStore;
@@ -29,28 +31,6 @@ describe("SettingsStore (Phase D.1 round 2)", () => {
   it("delegates basic set + get to the underlying registry", () => {
     store.set("auth", "clientId", "abc");
     expect(store.get("auth", "clientId")?.value).toBe("abc");
-  });
-
-  it("runs per-namespace validators before delegating to set", () => {
-    const validator = vi.fn((value: unknown) => {
-      return typeof value !== "object" || value === null
-        ? "expected object"
-        : undefined;
-    }) satisfies SettingsValidator;
-    store.setSchema("auth", validator);
-    expect(() => store.set("auth", "config", "not-an-object")).toThrow(/expected object/);
-    expect(validator).toHaveBeenCalledTimes(1);
-    // Valid object passes.
-    store.set("auth", "config", { clientId: "abc", scopes: ["read"] });
-    expect(store.get("auth", "config")?.value).toMatchObject({ clientId: "abc" });
-  });
-
-  it("clearSchema removes the validator so subsequent sets skip validation", () => {
-    const validator = vi.fn(() => "fail") satisfies SettingsValidator;
-    store.setSchema("auth", validator);
-    store.clearSchema("auth");
-    expect(() => store.set("auth", "clientId", "anything")).not.toThrow();
-    expect(validator).not.toHaveBeenCalled();
   });
 
   it("listNamespaces returns sorted unique namespaces", () => {
@@ -76,21 +56,16 @@ describe("SettingsStore (Phase D.1 round 2)", () => {
     expect(settings?.versions).toEqual({ 2: 1 });
   });
 
-  it("bulkSet validates all entries first; rejects on any failure", () => {
-    store.setSchema("auth", (value) => (value && typeof value === "object" ? undefined : "auth requires object"));
-    store.setSchema("theme", (value) => (typeof value === "string" ? undefined : "theme requires string"));
-
-    // Mixed batch: one valid auth + one valid theme + one invalid auth.
+  it("bulkSet commits all entries on success", () => {
     expect(() => store.bulkSet([
       { namespace: "auth", key: "clientId", value: { id: "a" } },
       { namespace: "theme", key: "color", value: "dark" },
-      { namespace: "auth", key: "broken", value: "not-an-object" },
-    ])).toThrow(/auth requires object/);
+      { namespace: "auth", key: "issuer", value: "ok" },
+    ])).not.toThrow();
 
-    // None of the above should have been written.
-    expect(store.get("auth", "clientId")).toBeUndefined();
-    expect(store.get("theme", "color")).toBeUndefined();
-    expect(store.get("auth", "broken")).toBeUndefined();
+    expect(store.get("auth", "clientId")?.value).toEqual({ id: "a" });
+    expect(store.get("theme", "color")?.value).toBe("dark");
+    expect(store.get("auth", "issuer")?.value).toBe("ok");
   });
 
   it("bulkGet returns map keyed by `${namespace}:${key}`", () => {
@@ -104,41 +79,35 @@ describe("SettingsStore (Phase D.1 round 2)", () => {
     expect(result).toEqual({ "auth:clientId": "abc", "auth:issuer": "def", "auth:missing": undefined });
   });
 
-  it("setAsync delegates with the same validator path as sync set", async () => {
-    const validator = vi.fn(() => undefined) satisfies SettingsValidator;
-    store.setSchema("auth", validator);
+  it("setAsync delegates with the same registry path as sync set", async () => {
     await store.setAsync("auth", "clientId", "async");
-    expect(validator).toHaveBeenCalled();
     expect(store.get("auth", "clientId")?.value).toBe("async");
   });
 });
 
 /**
- * Round 20 — G2 PR 1 (plan4.1.md §9.10) — pi SettingsManager adapter gate.
+ * Round 20 — G2 PR 1 (plan4.1.md §9.10) + Round 21 — G2 PR 2 (§9.11)
+ * pi SettingsManager gate.
  *
- * Verifies the new `SettingsManager.inMemory()` second-gate in
- * `SettingsStore.validate()`. The legacy custom validator still runs
- * first (existing tests above); the pi gate adds JSON-round-trip
- * sanity + migration pass on top.
+ * After PR 2 the pi gate is the SOLE validator (custom validator API
+ * is gone). Tests verify the gate's accept/reject semantics against
+ * pi's migration pipeline + JSON round-trip.
  */
-describe("SettingsStore G2 PR 1 — pi SettingsManager gate", () => {
-  it("accepts a well-formed object via the pi gate when no custom validator is set", () => {
-    // No setSchema() called → only the pi gate runs. Pi's in-memory
-    // SettingsManager accepts arbitrary objects (Partial<Settings>)
-    // and runs no migrations unless legacy keys are present.
+describe("SettingsStore G2 PR 1+2 — pi SettingsManager gate", () => {
+  it("accepts a well-formed object via the pi gate", () => {
+    // Pi's in-memory SettingsManager accepts arbitrary objects
+    // (Partial<Settings>) and runs no migrations unless legacy keys are
+    // present.
     expect(() => store.set("auth", "clientId", { clientId: "abc", scopes: ["read"] })).not.toThrow();
     expect(store.get("auth", "clientId")?.value).toMatchObject({ clientId: "abc" });
   });
 
   it("accepts a primitive value (pi gate is a no-op for non-objects)", () => {
-    // Pi gate only fires for objects/arrays. A string value bypasses it
-    // and writes through to SQLite directly — preserves existing
-    // primitive-set callers (theme = "dark", etc.).
     expect(() => store.set("theme", "color", "dark")).not.toThrow();
     expect(store.get("theme", "color")?.value).toBe("dark");
   });
 
-  it("accepts a value with legacy `queueMode` and migrates it to `steeringMode` via pi's migration pipeline", () => {
+  it("accepts a value with legacy `queueMode` and runs pi's migration pipeline", () => {
     // Pi's migrateSettings() renames `queueMode` → `steeringMode`.
     // This proves the gate actually runs pi's migration code path
     // (not a no-op). The value still persists to SQLite as-given.
@@ -147,11 +116,22 @@ describe("SettingsStore G2 PR 1 — pi SettingsManager gate", () => {
     expect(store.get("settings", "pi")?.value).toMatchObject({ queueMode: "all" });
   });
 
-  it("runs both layers: custom validator (rejects) and pi gate (would accept)", () => {
-    // Custom validator rejects; pi gate never gets a chance to run.
-    store.setSchema("auth", (value) => (value && typeof value === "object" ? undefined : "auth requires object"));
-    expect(() => store.set("auth", "config", "not-an-object")).toThrow(/auth requires object/);
-    // Custom validator passes → pi gate runs → object is accepted.
-    expect(() => store.set("auth", "config", { clientId: "abc" })).not.toThrow();
+  it("accepts a value with legacy `websockets: boolean` (boolean→enum migration)", () => {
+    // Pi's migrateSettings() converts `websockets: true` → `transport: "websocket"`.
+    const legacy = { websockets: true };
+    expect(() => store.set("settings", "ws", legacy)).not.toThrow();
+    expect(store.get("settings", "ws")?.value).toMatchObject({ websockets: true });
+  });
+
+  it("accepts a value with legacy `retry.maxDelayMs` (nested-field migration)", () => {
+    // Pi's migrateSettings() converts `retry.maxDelayMs` → `retry.provider.maxRetryDelayMs`.
+    const legacy = { retry: { enabled: true, maxRetries: 3, maxDelayMs: 5000 } };
+    expect(() => store.set("settings", "retry", legacy)).not.toThrow();
+    expect(store.get("settings", "retry")?.value).toMatchObject({ retry: { enabled: true } });
+  });
+
+  it("accepts null value (pi gate skips non-objects)", () => {
+    expect(() => store.set("auth", "clientId", null)).not.toThrow();
+    expect(store.get("auth", "clientId")?.value).toBeNull();
   });
 });
