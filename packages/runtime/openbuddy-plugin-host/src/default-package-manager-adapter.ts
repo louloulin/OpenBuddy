@@ -25,10 +25,9 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { homedir as osHomedir } from "node:os";
 import { join } from "node:path";
 
-import { DefaultPackageManager } from "@earendil-works/pi-coding-agent";
+import { DefaultPackageManager, getAgentDir } from "@earendil-works/pi-coding-agent";
 
 import type { ProfilePackageManager } from "./profile-manager";
 
@@ -77,7 +76,7 @@ function agentDirFor(profileDir: string): string {
     if (parent === cursor) break;
     cursor = parent;
   }
-  return process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? osHomedir(), ".pi", "agent");
+  return process.env.PI_CODING_AGENT_DIR ?? getAgentDir();
 }
 
 async function settingsManagerFor(profileDir: string): Promise<ConstructorParameters<typeof DefaultPackageManager>[0]["settingsManager"]> {

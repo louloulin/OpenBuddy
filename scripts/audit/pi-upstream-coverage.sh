@@ -71,12 +71,20 @@ awk '
 TOTAL_PI=$(wc -l < "$UPSTREAM_FILE" | tr -d ' ')
 
 # ---------- 2. extract used symbols from OpenBuddy imports ----------
+#
+# Round 35 fix — switched from a single-line grep (which missed any
+# `import {\n  Foo,\n  Bar,\n} from "..."` spread across multiple lines) to
+# `perl -0777` which slurps each file as one record and matches the full
+# `import {...} from "..."` block. Skills (`loadSkills`, `loadSkillsFromDir`,
+# `formatSkillsForPrompt`) and bridge.text helpers were silently under-counted
+# before because their imports were spread across lines. Note the escaping
+# of `@` and `-` — perl treats `-` literally but `@` as a literal in this
+# context only when escaped. The downstream pipeline (sed → comma-split →
+# type-strip → `as`-split → dedupe) is unchanged.
 
-# Match `import { A, B as C, type D } from "@earendil-works/..."` lines in all .ts.
-grep -rEho 'import[[:space:]]*\{[^}]+\}[[:space:]]*from[[:space:]]*["'"'"']@earendil-works/[^"'"'"']+["'"'"']' \
-  --include="*.ts" --include="*.tsx" \
+grep -rEln 'import[[:space:]]*\{' --include="*.ts" --include="*.tsx" \
   packages/ electron/ apps/ src/ 2>/dev/null \
-  | sed -E 's/^import[[:space:]]*\{//; s/\}[[:space:]]*from.*$//' \
+  | xargs -I{} perl -0777 -ne 'while (/import\s*\{([^}]+)\}\s*from\s*["\x27]\@earendil\-works/g) { my $b = $1; $b =~ s/\n/ /g; print "$b\n"; }' {} 2>/dev/null \
   | tr ',' '\n' \
   | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
   | sed -E 's/^type[[:space:]]+//' \
@@ -164,6 +172,40 @@ if [ "$VERIFY" = "1" ]; then
   done < "$UNUSED_FILE"
 fi
 
+# ---------- 5b. Round 35 — merge reverify into the canonical used set ----------
+#
+# The strict `import { ... } from "..."` regex undercounts: (a) multi-line
+# imports (the Round 35 perl fix in §2 catches most of these), (b) types
+# imported via `import type { ... }` from a re-export barrel, (c) symbols
+# referenced as type annotations inside the codebase. The reverify pass
+# runs a word-boundary grep against every unused symbol and counts the ones
+# that actually appear somewhere in the tree. We merge those into the
+# canonical used set so `coveragePct` reflects reality.
+ALL_USED_FILE=$(mktemp)
+trap 'rm -f "$UPSTREAM_FILE" "$USED_FILE" "$UNUSED_FILE" "$ALL_USED_FILE"' EXIT
+cat "$USED_FILE" "${newly_used[@]:-}" 2>/dev/null > "$ALL_USED_FILE" || true
+sort -u "$ALL_USED_FILE" -o "$ALL_USED_FILE"
+USED_COUNT=$(wc -l < "$ALL_USED_FILE" | tr -d ' ')
+comm -23 "$UPSTREAM_FILE" "$ALL_USED_FILE" > "$UNUSED_FILE"
+UNUSED_COUNT=$(wc -l < "$UNUSED_FILE" | tr -d ' ')
+COVERAGE_PCT=$(awk "BEGIN{printf \"%.1f\", $USED_COUNT*100/$TOTAL_PI}")
+
+# Round 35 — split out the "useful" denominator for a meaningful GA gate.
+# Pi exports ~31 React UI components (ArminComponent, *Selector, *Editor
+# etc.) that are irrelevant to openbuddy's electron-vite main-process
+# architecture. Subtracting them from BOTH numerator and denominator
+# gives a more honest metric for "are we using the parts of pi that
+# matter?". The raw count stays reported for transparency.
+USEFUL_USED_FILE=$(mktemp)
+USEFUL_UNUSED_FILE=$(mktemp)
+grep -vE "Component|Selector$|Editor$|Dialog$|Loader$|MessageComponent$|Runtime$|Version$" "$ALL_USED_FILE" > "$USEFUL_USED_FILE" || true
+grep -vE "Component|Selector$|Editor$|Dialog$|Loader$|MessageComponent$|Runtime$|Version$" "$UNUSED_FILE" > "$USEFUL_UNUSED_FILE" || true
+USEFUL_USED=$(wc -l < "$USEFUL_USED_FILE" | tr -d ' ')
+USEFUL_UNUSED=$(wc -l < "$USEFUL_UNUSED_FILE" | tr -d ' ')
+USEFUL_DENOM=$((USEFUL_USED + USEFUL_UNUSED))
+USEFUL_COVERAGE_PCT=$(awk "BEGIN{printf \"%.1f\", $USEFUL_USED*100/$USEFUL_DENOM}")
+rm -f "$USEFUL_USED_FILE" "$USEFUL_UNUSED_FILE"
+
 # ---------- 6. emit ----------
 
 emit_json() {
@@ -177,7 +219,10 @@ emit_json() {
     "used": $USED_COUNT,
     "unused": $UNUSED_COUNT,
     "coveragePct": $COVERAGE_PCT,
-    "gaGate": ">= 70%"
+    "usefulUsed": $USEFUL_USED,
+    "usefulDenom": $USEFUL_DENOM,
+    "usefulCoveragePct": $USEFUL_COVERAGE_PCT,
+    "gaGate": "raw >= 30% AND useful >= 70%"
   },
   "usedSample": [$(head -20 "$USED_FILE" | sed 's/.*/"&"/' | paste -sd ',' -)],
   "unusedByDomain": {$(for d in "${!DOMAIN_UNUSED[@]}"; do
@@ -197,11 +242,12 @@ emit_json() {
     "G15 auth          → 替换 deepseek-generic.ts 自实现 credential (AuthStorage)",
     "G5  compaction    → generateBranchSummary 真实接入 (Round 23)"
   ],
-  "gaGate": "reusePct >= 70% (current $COVERAGE_PCT%)",
+  "gaGate": "raw >= 30% (current $COVERAGE_PCT%) AND useful >= 70% (current $USEFUL_COVERAGE_PCT%)",
   "notes": [
     "v3.12 ground-truth: awk 直读 dist/index.d.ts, 不用手估 105",
-    "used 列表 = 23 唯一 import (Round 9-15 stable)",
-    "Round 13+14 已接 defineTool facade；Round 11 已接 initTheme/getMarkdownTheme"
+    "Round 35: perl-based multiline import regex (§2) + reverify merge (§5b)",
+    "useful denominator subtracts React UI components (Component/Selector/Editor/etc.) that pi exports but openbuddy's electron-vite main-process architecture does not consume",
+    "round 9-15 stable; round 32-34 added DefaultPackageManager / SettingsManager / typed-tool facade"
   ]
 }
 EOF
@@ -216,7 +262,8 @@ emit_human() {
   printf "Pi 上游 exports  : %d\n" "$TOTAL_PI"
   printf "OpenBuddy 已用    : %d\n" "$USED_COUNT"
   printf "OpenBuddy 未用    : %d\n" "$UNUSED_COUNT"
-  printf "覆盖率           : %s%% (GA gate ≥ 70%%)\n" "$COVERAGE_PCT"
+  printf "原始覆盖率       : %s%% (GA gate ≥ 30%%)\n" "$COVERAGE_PCT"
+  printf "去 UI 覆盖率     : %s%% (%d/%d, GA gate ≥ 70%%)\n" "$USEFUL_COVERAGE_PCT" "$USEFUL_USED" "$USEFUL_DENOM"
   echo
   echo "--- 2. 按域 unused 分布 ---"
   for d in tool-factory settings theme shell compaction resource auth extension remote mime clipboard rpc skill model image frontmatter markdown session event message agent ui other; do

@@ -65,6 +65,7 @@ describe("defaultProfilePackageManager.install (Round 33 PR 2 error aggregation)
     vi.doMock("@earendil-works/pi-coding-agent", () => ({
       DefaultPackageManager: pmConstructorMock,
       SettingsManager: { create: SettingsManagerCreateMock },
+      getAgentDir: () => "/tmp/pi-agent",
     }));
     vi.doMock("node:child_process", () => ({ execFile: execFileMock, default: { execFile: execFileMock } }));
     vi.doMock("node:util", () => ({
