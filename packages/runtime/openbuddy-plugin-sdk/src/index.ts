@@ -36,12 +36,16 @@ export {
 export {
   detectTracks,
   parsePluginManifest,
+  parsePluginManifestFromString,
   parsePluginPackageJson,
   parseSlotContribution,
   PluginManifestError,
   pluginManifestSchema,
   packageJsonShapeSchema,
   manifestCoreSchema,
+  parseFrontmatter,
+  stripFrontmatter,
+  type ParsePluginManifestFromStringOptions,
   type PluginManifestInput,
   type PackageJsonInput,
 } from "./manifest";

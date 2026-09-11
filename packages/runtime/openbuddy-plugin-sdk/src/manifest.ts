@@ -1,7 +1,7 @@
 /**
  * @openbuddy/plugin-sdk — zod schema + manifest parsers.
  *
- * Two parsers are exposed:
+ * Three parsers are exposed:
  *
  *  1. `parsePluginManifest(raw)` — accepts a `plugin.json`-shaped object
  *     (the standalone file in the fixture, with `schema`, `main`, etc.
@@ -12,12 +12,21 @@
  *     shape. This is the recommended entry point for npm-distributed
  *     plugins that share `package.json` between npm and OpenBuddy.
  *
- * Both return a typed `OpenBuddySerializablePlugin` plus any diagnostic
- * messages the zod validator surfaced. The serializer is separate (see
- * `./serializer.ts`) so consumers can use the parsed manifest without
- * the in-memory side effects of registering a factory.
+ *  3. `parsePluginManifestFromString(content)` — accepts a markdown
+ *     file (e.g. `PLUGIN.md`) whose YAML frontmatter carries the
+ *     manifest fields. Uses pi's `parseFrontmatter` so the plugin
+ *     format stays aligned with pi's agent format.
+ *
+ * All three return a typed `OpenBuddySerializablePlugin` plus any
+ * diagnostic messages the zod validator surfaced. The serializer is
+ * separate (see `./serializer.ts`) so consumers can use the parsed
+ * manifest without the in-memory side effects of registering a factory.
  */
 import { z } from "zod";
+import {
+  parseFrontmatter as piParseFrontmatter,
+  stripFrontmatter as piStripFrontmatter,
+} from "@earendil-works/pi-coding-agent";
 import {
   OPENBUDDY_PLUGIN_PROTOCOL,
   OPENBUDDY_PLUGIN_SCHEMA,
@@ -30,6 +39,13 @@ import {
 // Re-export for tests / consumers that import directly from the
 // manifest module rather than the barrel.
 export { OPENBUDDY_PLUGIN_PROTOCOL, OPENBUDDY_PLUGIN_SCHEMA };
+
+// pi-native frontmatter helpers. Re-exported under the `pi*` prefix so
+// downstream callers can adopt pi's parser without taking on a hard
+// dependency on `@earendil-works/pi-coding-agent`. Mirrors the naming
+// used by `electron/main/agent/pi-bridge/text-utils.ts`.
+export const parseFrontmatter = piParseFrontmatter;
+export const stripFrontmatter = piStripFrontmatter;
 
 /**
  * The slot contribution union. Tagged `type` is the discriminator; the
@@ -280,4 +296,88 @@ export function parseSlotContribution(raw: unknown): OpenBuddySlotContribution {
     throw new PluginManifestError("<slot>", issuesToStrings(result.error));
   }
   return result.data as OpenBuddySlotContribution;
+}
+
+/**
+ * Options for `parsePluginManifestFromString`. The `sourcePath` is
+ * rendered in `PluginManifestError` so marketplace tooling can pin the
+ * failing file; `body` lets callers opt in to receiving the markdown
+ * body that followed the YAML frontmatter (suitable for rendering in
+ * the marketplace UI, for example).
+ */
+export interface ParsePluginManifestFromStringOptions {
+  sourcePath?: string;
+  /**
+   * When `true`, the returned object carries a `body` field with the
+   * markdown text after the YAML block. The default is `false` so the
+   * returned shape matches `OpenBuddySerializablePlugin` exactly.
+   */
+  withBody?: boolean;
+}
+
+/**
+ * Parse a markdown-style plugin manifest (`PLUGIN.md` / `plugin.md`)
+ * whose YAML frontmatter carries the manifest fields and whose body is
+ * the long-form description. Uses pi's `parseFrontmatter` under the
+ * hood so the OpenBuddy plugin format stays aligned with pi's agent
+ * format (frontmatter + body, single `.md` file per plugin).
+ *
+ * Mirrors `parsePluginManifest` exactly: same zod schema, same track
+ * detection, same `PluginManifestError`. Only the input shape differs
+ * (string with `---\n...\n---\n...` vs a JSON object).
+ *
+ * @example
+ * ```ts
+ * const content = `---
+ * name: my-plugin
+ * version: 1.0.0
+ * pi:
+ *   handlers:
+ *     session_start: ./handlers/session-start.js
+ * ---
+ * # my plugin
+ * Long-form markdown body.
+ * `;
+ * const manifest = parsePluginManifestFromString(content);
+ * ```
+ */
+export function parsePluginManifestFromString(
+  content: string,
+  options: ParsePluginManifestFromStringOptions = {},
+): OpenBuddySerializablePlugin {
+  const sourcePath = options.sourcePath ?? "<plugin.md>";
+  if (typeof content !== "string") {
+    throw new PluginManifestError(sourcePath, [
+      "content must be a string (markdown with YAML frontmatter); received " + typeof content,
+    ]);
+  }
+  const { frontmatter, body } = piParseFrontmatter(content);
+  // pi returns `{ frontmatter: {}, body: <original> }` when there is
+  // no `---` block (or no closing `---`). Surface a friendlier error
+  // in that case so plugin authors can tell the difference between
+  // "no frontmatter at all" and "frontmatter present but invalid".
+  if (!content.startsWith("---") || !content.includes("\n---")) {
+    throw new PluginManifestError(sourcePath, [
+      "content has no YAML frontmatter; expected a markdown file with `---` delimiters at the top.",
+    ]);
+  }
+  const result = manifestCoreSchema.safeParse(frontmatter);
+  if (!result.success) {
+    throw new PluginManifestError(sourcePath, issuesToStrings(result.error));
+  }
+  const parsed = result.data;
+  const tracks = detectTracks(parsed);
+  if (tracks.length === 0) {
+    throw new PluginManifestError(sourcePath, [
+      "manifest must declare at least one track (pi / ui / harness). The cordis track is runtime-only and cannot be statically declared.",
+    ]);
+  }
+  const serializable = toSerializable(parsed);
+  if (options.withBody) {
+    // The strict `OpenBuddySerializablePlugin` type does not declare
+    // `body`; cast through unknown so opt-in callers can read the
+    // markdown without us weakening the public contract.
+    return { ...(serializable as object), body } as unknown as OpenBuddySerializablePlugin;
+  }
+  return serializable;
 }

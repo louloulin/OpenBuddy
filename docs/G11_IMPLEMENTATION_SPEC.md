@@ -5,8 +5,13 @@
 > 本文档是 **Phase D 子项**，把 `packages/runtime/openbuddy-plugin-sdk/src/manifest.ts`
 > 自实现 YAML frontmatter 解析切到 pi `parseFrontmatter`。
 >
-> **状态**：规格已落地（2026-09-11 Round 8）。代码改动需 dev-env + 真实 plugin 安装链路。
-> **关联 audit**：`scripts/audit/pi-bridge-dead-channels.sh`（Round 4，G4.1 是 renderer 入口）。
+> **状态**：**PR 1 已落地（2026-09-11 Round 10）**：`parsePluginManifestFromString` + 8 个 vitest 通过。
+>
+> **规格校对**：spec §1 假设 "现有 ~80 LOC 自实现 YAML frontmatter"，但实际 `manifest.ts` **从未写过 YAML 解析**（只接 JSON 对象）。实现策略改为**新增能力**而非替换：
+> - 新增 `parsePluginManifestFromString(content: string)` 函数
+> - 现有 `parsePluginManifest(raw: unknown)` 签名不变（所有调用方零修改）
+> - manifest.ts: 277 → 347 LOC（**+70**，spec 反向）
+> - **关联 audit**：`scripts/audit/pi-bridge-dead-channels.sh`（Round 4，G4.1 是 renderer 入口）。
 
 ---
 

@@ -25,7 +25,7 @@
 | **G8** | 29 个 CANONICAL_PI_PACKAGES e2e 全覆盖 | `pi-extension-discovery.ts:20-50` | 3 周 | P1 | runtime + QA | — | ⬜ |
 | **G9** | loadProjectContextFiles 接管 include.ts | `plugin-host/src/include.ts` (350 LOC) | 1 周 | P1 | runtime | — | ⬜ |
 | **G10** | ExtensionFactory 注册简化（单文件入口） | `pi-extensions.ts` (1222 LOC) | 2 周 | P1 | runtime | G1 | ⬜ |
-| **G11** | plugin manifest 解析切到 pi parseFrontmatter | `plugin-sdk/src/manifest.ts` | 1 周 | P0 | runtime | G4 | ⬜ |
+| **G11** | plugin manifest 解析切到 pi parseFrontmatter | `plugin-sdk/src/manifest.ts` | 1 周 | P0 | runtime | G4 | **🟢 PR1** |
 | **G12** | pi-runtime-coordinator 复用 AgentSessionRuntime | `agent/pi-runtime-coordinator.ts` | 1 周 | P1 | runtime | G2 | ⬜ |
 | **G13** | pi-session-runtime 评估可移除部分 | `agent/pi-session-runtime.ts` (~300 LOC) | 1 周 | P2 | runtime | G12 | ⬜ |
 | **G14** | Harness server 评估 pi RPC 模式 | `electron/main/harness/harness-server.ts` (1327 LOC) | 2 周 | P2 | runtime | G2 | ⬜ |
@@ -123,6 +123,7 @@
 **Owner**：runtime team
 **依赖**：G4.1（先在 renderer 跑通）
 **估时**：1 周
+**状态**：**🟢 PR 1 已落地（Round 10, 2026-09-11）** — `parsePluginManifestFromString` 函数 + 8 个 vitest 用例通过，pi `parseFrontmatter` / `stripFrontmatter` 在 plugin-sdk 层首次 runtime 接入。
 
 **修复方向**：
 - `packages/runtime/openbuddy-plugin-sdk/src/manifest.ts` 自实现 YAML parser

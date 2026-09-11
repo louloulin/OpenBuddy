@@ -317,6 +317,73 @@ Vitest (packages/runtime, 66 个 test files):
 3. Electron smoke 未跑（需要 X server + electron runtime）
 4. 全 monorepo vitest (63 packages) 未跑（本轮跑了 packages/runtime 子集 66 files）
 
+**v3.7 增量**（2026-09-11 第八次跑 — **G11 首次代码落地 + 真实 vitest 验证**）
+
+**重要里程碑**：本轮首次按 G*_IMPLEMENTATION_SPEC.md **实际修改业务代码 + 真实 vitest 跑通**。G11（plugin manifest 切 pi parseFrontmatter）已 PR 1 落地。
+
+**改动文件**：
+- `packages/runtime/openbuddy-plugin-sdk/src/manifest.ts` — 新增 `parsePluginManifestFromString(content)` 函数（pi `parseFrontmatter` 接入），新增 `parseFrontmatter` + `stripFrontmatter` re-export，新增 `ParsePluginManifestFromStringOptions` 类型。**净增 ~70 LOC**。
+- `packages/runtime/openbuddy-plugin-sdk/src/index.ts` — barrel 新增 `parsePluginManifestFromString` + `parseFrontmatter` + `stripFrontmatter` + `ParsePluginManifestFromStringOptions` 导出。
+- `packages/runtime/openbuddy-plugin-sdk/src/__tests__/manifest.test.ts` — 新增 8 个 vitest 用例覆盖 markdown frontmatter 解析（最小 / 全 track / 无 frontmatter / 空 track / semver 校验 / 非字符串 / withBody / pi re-export sanity）。
+
+**真实运行结果**：
+```
+TypeScript 编译:
+  tsc -p packages/runtime/openbuddy-plugin-sdk/tsconfig.json --noEmit  → exit 0 ✅ (0 error)
+  tsc -p electron/tsconfig.json --noEmit                              → exit 0 ✅ (0 error)
+
+Vitest (plugin-sdk, 4 个 test files):
+  ✓ manifest.test.ts       19 tests (11 existing + 8 new)         ✅
+  ✓ serializer.test.ts      8 tests (existing)                     ✅
+  ✓ fixtures.test.ts        2 tests (existing)                     ✅
+  ✓ index.test.ts           3 tests (existing)                     ✅
+
+  Test Files  4 passed (4)
+  Tests       32 passed (32)
+  Duration    7.77s
+```
+
+**pi-native 利用增量**：
+- 之前 plugin-sdk 通过 pi 接入只有 `import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent"`（types-only）
+- 现在新增 **运行时** 调用 `parseFrontmatter(content)` + `stripFrontmatter(content)` 两个 pi 函数 — 让 plugin SDK 真正依赖 pi runtime
+- 与 `electron/main/agent/pi-bridge/text-utils.ts` 的模式对齐（同样 `as pi*` 重命名）
+
+**G11 规格校对**：spec 假设 "现有 ~80 LOC 自实现 YAML 解析"，但实际 `manifest.ts` **只有 zod schema，从未写过 YAML frontmatter 解析**（所有现有调用都传 JSON 对象）。所以 G11 实现策略是 **新增能力**而非 **重构**：
+
+| spec 假设 | 实际 | 影响 |
+|---|---|---|
+| "替换 80 LOC 自实现 YAML" | manifest.ts 无 YAML 代码 | 改为新增函数；0 LOC 删除 |
+| "PR 1 保留 facade" | facade 本来就在 | 直接添加新函数，facade 自动兼容 |
+| "parsePluginManifest(content: string) 改签名" | 现有签名是 `(raw: unknown)`，改签名会破坏所有调用方 | 新增 `parsePluginManifestFromString` 函数；旧 `parsePluginManifest` 不动 |
+
+**GA gates 状态变化**：
+
+| Gate | v3.6 | v3.7 | 状态变化 |
+|---|---|---|---|
+| TypeScript 0 error (plugin-sdk) | ✅ 0 error | ✅ 0 error | ✅ 不变 |
+| Vitest (plugin-sdk 4 files) | ✅ 11 + 8 + 2 + 3 = 24 | ✅ 19 + 8 + 2 + 3 = 32 | **+8 测试** |
+| pi runtime 函数调用数 | parseFrontmatter (pi-bridge) | +plugin-sdk 重新导出 | **+1 module** |
+| pi 复用度 ≥ 70% | 21.9% | 21.9%（* | ❌ 不变（audit 计数方式）|
+| pi-bridge 利用率 ≥ 80% | 7% | 7% | ❌ 不变 |
+| apply-patch LOC | 228 | 228 | ❌ 不变 |
+| profile-manager LOC | 806 | 806 | ❌ 不变 |
+| manifest.ts LOC | 277 | ~347 | ❌ +70（spec 反向：新增而非替换）|
+
+**新增 pi-native 函数**（plugin-sdk 层）：
+1. `parsePluginManifestFromString(content, options?)` — markdown frontmatter → typed manifest
+2. `parseFrontmatter(content)` — pi re-export
+3. `stripFrontmatter(content)` — pi re-export
+
+**解锁的下游能力**：
+- marketplace 安装链路可读 `PLUGIN.md`（frontmatter + body）作为 manifest source
+- plugin-sdk 消费方（electron/main）可直接用 `parsePluginManifestFromString` 替代 JS-对象解析路径
+- 与 pi `subagent/agents.ts` 解析 agent `.md` 文件的模式对齐 — OpenBuddy plugin SDK 与 pi agent SDK 共享同一 frontmatter 格式
+
+**已知限制**：
+1. G11 spec 的 LOC 估算（277 → 210）反向：实际是 277 → 347（**+70 LOC**），因为 spec 假设错了代码现状 — 后续 v3.8 应修正 G11 spec 的 §0 LOC 表
+2. G11 完整 PR（marketplace-install-e2e）待 dev-env 实跑
+3. 商业应用（marketplace UI 用 `body` 渲染 README）尚未对接，仅 SDK 层就位
+
 **v3.5 增量**（2026-09-11 第六次跑 — Phase D/E/F 入口规格批量落地）
 
 9 个新实施规格，把 backlog 的 12 个剩余 G-gap 中**所有 P0/P1 项（共 9 个）**展开为 PR 级拆分
