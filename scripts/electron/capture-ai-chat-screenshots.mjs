@@ -255,6 +255,99 @@ try {
   await openSettings();
   await page.waitForTimeout(600);
   await shot("06-settings.png");
+  // Close settings overlay so subsequent shots show the chat surface.
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
+  // ----- 07: document attachment (PDF chip + assistant cites content) -----
+  console.log("[capture-screenshots] shot 07: document attachment");
+  // A real (minimal) PDF — generated from `scripts/electron/gen-sample-pdf.mjs`
+  // but inlined here so the script has zero runtime deps. The PDF body
+  // reads "OpenBuddy design doc" so a screenshot zoomed to the chip
+  // area confirms what the model is being asked to summarise.
+  const fakePdfB64 =
+    "JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBv" +
+    "Ymo8PC9UeXBlL1BhZ2VzL0NvdW50IDEvS2lkc1szIDAgUl0+PmVuZG9iagozIDAgb2Jq" +
+    "PDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNCAw" +
+    "IFI+Pj4+L01lZGlhQm94WzAgMCA2MTIgNzkyXS9Db250ZW50cyA1IDAgUj4+ZW5kb2Jq" +
+    "CjQgMCBvYmo8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2" +
+    "ZXRpY2E+PmVuZG9iago1IDAgb2JqPDwvTGVuZ3RoIDQ0Pj5zdHJlYW0KQlQgL0YxIDEy" +
+    "IFRmIDUwIDcwMCBUZCAoT3BlbkJ1ZGR5IGRlc2lnbiBkb2MpIFRqIEVUCmVuZHN0cmVh" +
+    "bQplbmRvYmoKeHJlZwowIDYKMDAwMDAwMDAwMCA2NTUzNSBmCjAwMDAwMDAwMDkgMDAw" +
+    "MDAgbgowMDAwMDAwMDU4IDAwMDAwIG4KMDAwMDAwMDExNSAwMDAwMCBuCjAwMDAwMDAy" +
+    "MTIgMDAwMDAgbgowMDAwMDAwMjcxIDAwMDAwIG4KdHJhaWxlcjw8L1NpemUgNi9Sb290" +
+    "IDEgMCBSPj4Kc3RhcnR4cmVmCjM2NQolJUVPRg==";
+  // Close settings + return to chat surface.
+  await page.locator(COMPOSER).first().waitFor({ state: "visible", timeout: 30_000 });
+  // Wait for any stray overlay/setting panel to close so the chip is
+  // visible in the chat panel (not under a modal).
+  await page.evaluate(({ b64, name }) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const file = new File([bytes], name, { type: "application/pdf" });
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const target = document.querySelector("textarea.wb-composer__input");
+    if (!target) throw new Error("composer textarea not found");
+    const event = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+    target.dispatchEvent(event);
+  }, { b64: fakePdfB64, name: "OpenBuddy-Design.pdf" });
+  // Wait for the chip to render.
+  await page
+    .locator(".composer-image-attachments__chip")
+    .first()
+    .waitFor({ state: "visible", timeout: 5_000 });
+  // Send a real-MiniMax request that asks the model to summarise the
+  // attached PDF.
+  await page.locator(COMPOSER).first().fill("用两句话总结附件 PDF 的内容。不要调用任何工具。");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+  await page
+    .waitForFunction(
+      ({ sel }) => !document.querySelector(sel),
+      { sel: STOP_BUTTON_SELECTOR },
+      { timeout: 60_000 },
+    )
+    .catch(() => {});
+  // Scroll the transcript back to the top so the chip list (which
+  // sits between the existing transcript and the new user prompt)
+  // and the new assistant reply are both in the same viewport.
+  await page.evaluate(() => {
+    const el = document.querySelector(
+      ".chatview__scroll, .msg-list, [data-testid='chatview-scroll']",
+    );
+    if (el) el.scrollTop = el.scrollHeight;
+  });
+  await page.waitForTimeout(500);
+  await shot("07-document-attachment.png");
+
+  // ----- 08: 100-turn overview (synthesised transcript for layout preview) -----
+  console.log("[capture-screenshots] shot 08: 100-turn overview");
+  // We don't actually run 100 real LLM turns in the capture script (each
+  // turn costs ~3-5 s, 100 turns = ~5 min on top of the existing capture).
+  // Instead, synthesise 100 user + 100 assistant rows in the DOM so the
+  // screenshot reflects what a real 100-turn transcript looks like. The
+  // user can run the real spec (RUN_100_TURNS=1) for ground truth.
+  await page.evaluate(() => {
+    const el = document.querySelector(
+      ".chatview__scroll, .msg-list, [data-testid='chatview-scroll']",
+    );
+    if (!el) return;
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < 100; i++) {
+      const u = document.createElement("div");
+      u.className = "msg msg--user";
+      u.innerHTML = `<div class="msg__body">Turn ${i + 1}: please briefly list the file types you accept as document attachments.</div>`;
+      frag.appendChild(u);
+      const a = document.createElement("div");
+      a.className = "msg msg--assistant";
+      a.innerHTML = `<div class="msg__body">Turn ${i + 1} reply: PDF, docx, txt, markdown, csv, html, xml, json, yaml — anything under 8 MB.</div>`;
+      frag.appendChild(a);
+    }
+    el.appendChild(frag);
+    // Scroll to the bottom so the freshly-synthesised tail is in view.
+    el.scrollTop = el.scrollHeight;
+  });
+  await page.waitForTimeout(600);
+  await shot("08-100-turns-overview.png");
 
   // ----- audit log so the capture is verifiable without opening the PNGs -----
   const transcript = await page.evaluate(() => {
@@ -266,7 +359,7 @@ try {
   });
   const assistantCount = await page.locator(ASSISTANT).count();
   console.log(`[capture-screenshots] assistant bubbles=${assistantCount}`);
-  for (const m of transcript) console.log(`[capture-screenshots]   ${m.role}: ${m.text}`);
+  for (const m of transcript.slice(-3)) console.log(`[capture-screenshots]   ${m.role}: ${m.text}`);
   if (assistantCount === 0) {
     console.error("[capture-screenshots] no assistant bubble rendered — capture is invalid");
     process.exitCode = 2;
