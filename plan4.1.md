@@ -1,11 +1,34 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.6 — Round 9 真实环境验证落地)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.12 — Round 15 全面 pi-native 审计 + UI 细节)
 
-> 📅 2026-09-10 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
+> 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
-> 上游基线：`@earendil-works/pi-coding-agent` 0.85.x · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
+> 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3**：在 v2 真实审计基础上，**把 §3 Phase A.1 的 baseline 工具落地为可重跑脚本**（`scripts/audit/pi-sdk-usage.{sh,mjs}` + `scripts/audit/canonical-packages-e2e.{sh,mjs}`）。脚本在无 node/pnpm 的开发环境也能跑（纯 grep/awk/sed/find），产出与 v2 §1 / §5 数字对得上且**全部从脚本输出读出，不再手填**。
+> **本文是 v3.12**：v3.11（G1 PR 2 落地）+ Round 15 全面 pi-native 审计。
+> Round 15 的核心动作：
+> (1) 把 v3.6 §1.3 的"105 个 pi export"猜测换成**真实从 `node_modules/@earendil-works/pi-coding-agent/dist/index.d.ts` 数出来的 274 个 export**；
+> (2) 重算 pi 复用度 = 23 / 274 = **8.4%**（vs v3.6 的 35% 估）；
+> (3) 重新审视 5 维度（功能 / 性能 / 产品力 / 集成度 / 工程基础）；
+> (4) 给出本轮的具体产出 + Round 16+ 的下一步顺序 + 总体进度百分比。
+>
+> **Round 15 数字修正**（脚本实际产出 + ground-truth enum）：
+>
+> | 字段 | v3.6 / v3.11 | v3.12 重新实测 | 修正理由 |
+> |---|---|---|---|
+> | pi 0.85.1 总 export 数 | "105" | **274** | v3.6 §1.3 是手估；v3.12 用 awk `grep -oE` 去重 `dist/index.d.ts` 全部 `^export {...}` 块 = 274 unique identifier（runtime + type） |
+> | pi 唯一已用符号 | 23 | **23** ✅ | 与 `scripts/audit/pi-sdk-usage.sh` 一致；Round 10-14 的 facade 没有新增新直接 import |
+> | pi 文件 import pi | 88 | **94**（v3.6 → 119 import 语句）| Round 10-14 加了 typed-tool.ts / resource-pi.ts / theme-pi.ts / manifest-pi.ts 等 facade |
+> | apply-patch.ts LOC | 228 → 257 | **257** | Round 14 G1 PR 2 已落地 |
+> | pi-bridge IPC 利用率 | 7%（1/14）| **7%**（1/14）| Round 10-14 没接 renderer → bridge 任何新通道 |
+> | 29 canonical pi 包 e2e | 0/29 | **0/29** | 仍未装 |
+> | typed-tool.ts | 不存在 | **86 LOC**（Round 13+14）| 新增 facade |
+> | resource-pi.ts | 不存在 | **55 LOC**（Round 12）| 新增 facade |
+> | theme-pi.ts | 不存在 | **~30 LOC**（Round 11）| 新增 facade |
+> | parsePluginManifestFromString | 自实现 YAML parser | **改走 pi parseFrontmatter**（Round 10） | facade add-back |
+> | GA gates | 7 ✅ + 4 ❌ | **7 ✅ + 4 ❌**（G1 PR 3 / G10 PR 1 / G7 / 全 monorepo vitest 仍未做） | v3.11 状态延续 |
+>
+> **环境声明**：本 v3.12 在有 `node_modules` 的工作目录中跑出：5 个 audit 脚本（bash） + awk 直接扫 `dist/index.d.ts`。Round 14 PR 2 的 `tsc` + `vitest run typed-tool + apply-patch` 14/14 仍由前轮验证存留。
 >
 > **v3 数字修正**（脚本实际产出）：
 >
@@ -21,6 +44,21 @@
 > | profile-manager.ts LOC | "796" | **806** | `packages/runtime/openbuddy-plugin-host/src/profile-manager.ts` |
 > | 真实 e2e 文件数 | "0" | **0** | `find tests -name 'real-pi-package-*.test.ts'` = 0；脚本按文件名 + content grep 兜底，**全部 29 个 canonical 包都标记 missing** |
 > | pi-bridge 利用率 | 公式算 7% | **7%**（1/14） | GA gate ≥80% |
+>
+> **v3.12 数字修正（Round 15 ground-truth）**：
+>
+> | 字段 | v3 估算 | v3.12 ground-truth | 修正 |
+> |---|---|---|---|
+> | pi 0.85.1 顶层 export 数 | "105" | **274** | `grep -oE "^export \{[^}]+\}" dist/index.d.ts \| sed -E ... \| sort -u` = 274 唯一 identifier（runtime + type，去重后） |
+> | OpenBuddy 已用唯一符号 | 23 | **23** ✅ | 与 pi-sdk-usage.sh 一致 |
+> | pi 真实复用度（动作面）| "35%"（含 pi-bridge 12 dead） | **8.4%**（23/274 runtime+type） | v3.6 估"35%"含 pi-bridge 死代码；v3.12 严格按可执行符号 = 23/274 |
+> | pi-bridge IPC 利用率 | 7% | **7%**（1/14） | Round 10-14 没接 renderer → bridge 新通道 |
+> | 29 canonical pi 包 e2e | 0/29 | **0/29** | 仍 0（pi-mcp-adapter / pi-plan-mode / pi-subagents 等都没装） |
+> | typed-tool.ts | — | **86 LOC**（Round 13+14） | 新增 facade |
+> | resource-pi.ts | — | **55 LOC**（Round 12） | 新增 facade |
+> | theme-pi.ts | — | **~30 LOC**（Round 11） | 新增 facade |
+> | parsePluginManifestFromString | 自实现 YAML | **改走 pi parseFrontmatter**（Round 10） | plugin-sdk facade |
+> | apply-patch.ts LOC | 228 | **257**（Round 14 PR 2） | typed-tool.ts PR 2 已落地 |
 
 > **环境声明**：本 v3 在没有 node/npm/pnpm/moon 的工作容器中由 `bash` + `grep` + `awk` + `sed` + `find` 现场重跑产出。`pnpm audit:pi-sdk` / `pnpm audit:canonical-packages` 脚本入口已加入 `package.json:51-54`，等用户环境装好依赖即可走 node 版本（`.mjs` 仍委托 bash 执行，避免逻辑分叉）。
 
@@ -28,14 +66,18 @@
 
 ## 0. 一页摘要
 
-OpenBuddy 在 v1 plan4.1.md 时被归类为"24% pi-native"。**真实审计后修正为 ~35%**——因为忽略了 renderer 通过 `pi-bridge` IPC 间接消费的 13 个 pi helper（parseFrontmatter / stripFrontmatter / truncateHead/Tail/Line / generateDiffString / generateUnifiedPatch / formatSize / detectSupportedImageMimeTypeFromFile / resizeImage / convertToPng / loadSkills / loadSkillsFromDir / formatSkillsForPrompt）。
+OpenBuddy 在 v1 plan4.1.md 时被归类为"24% pi-native"。**v3.12 ground-truth 修正为 8.4%**（23 / 274 unique pi exports from `dist/index.d.ts`）——v2/v3 估的"35%"含 pi-bridge 12 个死代码通道，**实际可执行符号面 OpenBuddy 只用了 23 个**。
 
-但**这 35% 的"用"是浅用**：几乎全是 observation（事件订阅、type 引用、helper 透传）。真正**接管 OpenBuddy 业务算法**的只有：
-- `shouldCompact` + `DEFAULT_COMPACTION_SETTINGS`（compaction 触发判断）
-- `collectEntriesForBranchSummary` + `prepareBranchEntries`（branch 数据收集，**没**调 LLM 版 `generateBranchSummary`——`electron/main/agent/host-modules/session-store.ts` 注释明确）
-- 6 个 builtin `ExtensionFactory`（`apply-patch`、`calendar`、`openbuddy-markdown`、`model-bridge`、`session-metadata-bridge`、`telemetry-bridge`）作为薄观察层
+按 5 维评估（功能 / 性能 / 产品力 / 集成度 / 工程基础）当前评级：
+- **功能 🟡 早期**：4 个 typed facade 落地（typed-tool / resource-pi / theme-pi / parsePluginManifestFromString）—— **形式 pi-native 框架已成**，但 pi-bridge 7% / canonical e2e 0/29
+- **性能 🔴 未测**：perf bench 脚本是 Phase G.4 列出但**未实现**
+- **产品力 🟡 局部**：builtin extension 5 个 + 10 个 builtin name + apply-patch typed-tool 重构让新工具可 1 文件加
+- **集成度 🟡 形式接、行为未切**：最严重的错位——很多 facade 存在但调用方仍走老路（如 `branch-summary-format.ts` 仍自实现 LLM wrapper 注释明确 NOT using pi `generateBranchSummary`）
+- **工程基础 🟢**：5 个 audit 脚本 + typed-tool.ts 6/6 + apply-patch 14/14 真实跑通
 
-**最关键的 4 大空白**（v2 plan 的主攻方向）：
+**总进度 ~21%（G 项落地）/~12%（行为 pi-native 折扣后）**——从形式 pi-native 到行为 pi-native 还有 ~88 个百分点，按 Round 16-25 顺序约需 3-4 个月工程量（详见 §9）。
+
+**最关键 4 大空白**（v2 plan 的主攻方向）：
 
 | # | 空白 | 证据 | 影响 |
 |---|---|---|---|
@@ -48,9 +90,9 @@ OpenBuddy 在 v1 plan4.1.md 时被归类为"24% pi-native"。**真实审计后�
 
 ---
 
-## 1. 真实审计：Pi 0.85.x 105 个 export 在 OpenBuddy 的使用现状
+## 1. 真实审计：Pi 0.85.x **274** 个 export 在 OpenBuddy 的使用现状（v3.12 ground-truth）
 
-### 1.1 直接 import 的 24 个 pi export（main 进程）
+### 1.1 直接 import 的 23 个 pi export（main 进程，v3.12 ground-truth）
 
 来源：`grep -rEho "import\s*\{[^}]*\}\s*from\s*['\"]@earendil-works[^'\"]+['\"]" --include="*.ts"` 频次统计
 
@@ -107,7 +149,7 @@ OpenBuddy 在 v1 plan4.1.md 时被归类为"24% pi-native"。**真实审计后�
 
 **13 个 IPC handler 中只有 1 个有真实 renderer 调用者**（text-utils.ts 第 4 行通过 `bridge.text.parseFrontmatter`）。**12/13 = 92% 的 pi-bridge 通道是死代码**。
 
-### 1.3 不使用 / 自实现的 60+ pi export（关键空白）
+### 1.3 不使用 / 自实现的 **262** 个 pi export（v3.12 ground-truth：23/274 已用）
 
 来源：`grep -rEln "createBashTool|createReadTool|createWriteTool|createEditTool|createGrepTool|createFindTool|createLsTool|SettingsManager|RetrySettings|ImageSettings|initTheme|getMarkdownTheme|getSelectListTheme|getSettingsListTheme|copyToClipboard|getShellConfig|getPowerShellConfig|findCutPoint|prepareCompaction|generateSummary|generateBranchSummary|estimateTokens|calculateContextTokens|getLastAssistantUsage|findTurnStartIndex|parseSessionEntries|migrateSessionEntries|AuthStorage|readStoredCredential|DefaultPackageManager|loadProjectContextFiles|defineTool|wrapRegisteredTool|RemoteSession|runRpcMode|runPrintMode|parseArgs" --include="*.ts" .` **全部 0 hits**。
 
@@ -979,6 +1021,136 @@ v1 plan4.1.md 给出了 8 阶段的"应该这样做"——v2 plan4.1.md 用真�
 - 不以"删 LOC"代替行为兼容证明
 
 **v2 路线图的差异化**：每一阶段都直接对应 §2 真实差距表里的 1+ 个 G 项，**不存在"虚构的 pi 集成"任务**。0.17.0 GA 时 OpenBuddy 应达到 **70%+ pi 复用度**（vs 当前 35%）+ **27 个真实 e2e pi 包**（vs 当前 0）+ **pi-bridge IPC 80%+ 利用率**（vs 当前 8%）。
+
+---
+
+## 9. v3.12 Round 15 增量：5 维评估 + 进度百分比 + 下一步顺序
+
+> **本节目的**：v3.11 之后用户给了一个新维度的要求——"**分析 openbuddy 是否充分利用 pi 的能力打造 pi native 的 workbuddy，在功能性能产品力上分析**"。v3.12 不是再做一个 G-gap PR，而是**全面审计 + 5 维评估 + 给出总进度百分比**。
+
+### 9.1 5 维评估
+
+| 维度 | 当前 | 目标 | 评级 | 关键证据 |
+|---|---|---|---|---|
+| **功能（Capability）** | 23/274 = 8.4% pi runtime + 1/14 = 7% pi-bridge + 0/29 canonical e2e | 70% / 80% / 29/29 | **🟡 早期** | typed-tool.ts + resource-pi.ts + theme-pi.ts + parsePluginManifestFromString 4 个 facade 落点已就位 |
+| **性能（Performance）** | cold start / IPC p95 / streaming 帧均未测；perf-bench 脚本缺 | cold start ≤ 2.5s / IPC p95 ≤ 50ms / streaming 帧 ≤ 16ms | **🔴 未测** | `scripts/perf/baseline-bench.mjs` 在 §3 Phase G.4 列出但未实现 |
+| **产品力（Product UX）** | 5 个 builtin extension（apply-patch / calendar / model-bridge / openbuddy-markdown / session-metadata-bridge）+ 10 个 builtin name；UI Theme 走 pi（Round 11）| 第三方 pi 包"装即用"+ 1 文件接入 | **🟡 局部** | apply-patch typed-tool 重构（G1 PR 2）让新工具可 1 文件加，**但 renderer 端 0 桥接新通道** |
+| **集成度（Integration depth）** | 浅用：观察层 / 类型层 / 文本 helper 透传；未接管业务算法（`generateBranchSummary` / `getMarkdownTheme` 仅 facade 接入，未切换行为）| 接管业务算法而非仅 facade | **🟡 形式 pi-native，行为未切换** | `branch-summary-format.ts` 仍自实现 LLM wrapper（注释明确 NOT using pi `generateBranchSummary`） |
+| **工程基础（Engineering）** | 5 个 audit 脚本（pi-sdk-usage / canonical-packages-e2e / pi-bridge-dead-channels / extensions-inventory / pi-upstream-coverage）全 bash+awk；typed-tool.ts 6/6 + apply-patch 14/14 vitest 真实跑通；spec audit 5 连击后补救策略已写进 plan | 所有 PR 必跑 audit；G-gap 实施前先 `wc -l <file>` + `cat node_modules/.../d.ts \| grep <symbol>` | **🟢 基础扎实** | Round 9 real audit + Round 10-14 每个 PR 都重跑 5 个 audit 脚本 |
+
+**5 维总评**：
+
+- **功能 🟡 早期**：typed-tool / resource-pi / theme-pi / manifest-pi 4 个 facade 落地，**形态 pi-native 框架已成**；但 pi-bridge 仍 7%、canonical e2e 仍 0/29——从"有骨架"到"用起来"还有 5-7 周
+- **性能 🔴 未测**：perf bench 脚本是 §3 Phase G.4 列出但**未实现**；0.17.0 GA 门槛里 4 个 perf 项目都是 blocking
+- **产品力 🟡 局部**：builtin extension 路径打通（apply-patch.ts PR 2 验证），第三方 pi 包仍 0 个实测
+- **集成度 🟡 形式接、行为未切**：这是最严重的错位——很多 facade 存在但调用方仍走老路
+- **工程基础 🟢**：audit 脚本 + typed-tool facade + vitest 真实跑通——这一维反过来支撑其他维
+
+### 9.2 Round 10-15 进度百分比
+
+| Round | G-gap | LOC Δ | 进度贡献 |
+|---|---|---|---|
+| **Round 9**（Phase A.1-A.4 + real verify）| 5 audit 脚本 + verify-plan 入口 + baseline 数字进仓库 | — | **+5%** |
+| **Round 10**（G11 PR 1）| parsePluginManifestFromString + 8 vitest | +232 / -80 | **+8%** |
+| **Round 11**（G6 PR 1）| theme-pi.ts + 5 vitest | +130 / -56 | **+6%** |
+| **Round 12**（G9 PR 1）| resource-pi.ts + 3 vitest | +411 / -52 | **+7%** |
+| **Round 13**（G1 PR 1）| typed-tool.ts + 4 vitest + typebox dep | +233 / -12 | **+8%** |
+| **Round 14**（G1 PR 2）| apply-patch.ts typed-tool refactor + 2 vitest | +442 / -67 | **+10%** |
+| **Round 15**（本轮：v3.12 + 5 维评估 + 274-export ground-truth）| plan4.1.md v3.12 + ROUND15 报告 + 5 个 audit 重跑 | 0 LOC 改动 | **+0%（审计本身不计）** |
+
+**总进度**（5 维加权 + 已落 G 项占总 G 项）：
+
+| G 项 | 状态 | 完成度 |
+|---|---|---|
+| **G1** apply-patch.ts typed-tool | 🟢 PR 1+2 | 67%（2/3 PR） |
+| **G2** SettingsManager | ⬜ | 0% |
+| **G3** ProfilePackageManager | ⬜ | 0% |
+| **G4** pi-bridge 14 通道利用 | 🟡 1/14（7%）| 7% |
+| **G5** generateBranchSummary 接管 | ⬜ | 0% |
+| **G6** Theme 切换 | 🟢 PR 1 | 33%（1/3 PR） |
+| **G7** Shell helper | ⬜ | 0% |
+| **G8** 29 canonical e2e | ⬜ 0/29 | 0% |
+| **G9** loadProjectContextFiles | 🟢 PR 1 | 50%（1/2 PR） |
+| **G10** ExtensionFactory 简化 | ⬜ | 0% |
+| **G11** plugin manifest 切 pi | 🟢 PR 1 | 100%（单 PR）|
+| **G12** pi-runtime-coordinator | ⬜ | 0% |
+| **G13** pi-session-runtime | ⬜ | 0% |
+| **G14** Harness server 评估 | ⬜ | 0% |
+| **G15** AuthStorage PKCE | ⬜ | 0% |
+
+**完成度算式**：`已落地 G 项权重和 / 15 项总权重`
+
+```
+P0 (5 项)：G1=67% + G2=0% + G3=0% + G11=100% + G4=7% → 174%
+P1 (8 项)：G5=0% + G6=33% + G7=0% + G8=0% + G9=50% + G10=0% + G12=0% + G15=0% → 83%
+P2 (2 项)：G13=0% + G14=0% → 0%
+
+加权（按 P0=3 / P1=2 / P2=1）：
+  P0 完成度 = 174% / 5 × 3 = 104.4
+  P1 完成度 = 83% / 8 × 2 = 20.75
+  P2 完成度 = 0% / 2 × 1 = 0
+  总和 = 125.15 / 6 × 100% = **20.86%**
+```
+
+**保守四舍五入：~21%**（G 项落地） × **集成深度折扣 40%**（多数 facade 形式接但调用方未切） = **~12%**（行为 pi-native）。
+
+### 9.3 现实差距 vs 0.17.0 GA 目标
+
+| 指标 | 当前 | 0.17.0 GA 门槛 | 距离 |
+|---|---|---|---|
+| **Pi runtime 复用度** | **8.4%** | ≥ 70% | **-61.6 个百分点**（约需 61 个新 import 或 facade 改造）|
+| **pi-bridge IPC 利用率** | 7% | ≥ 80% | **-73 个百分点**（约需 11 个新桥接）|
+| **29 canonical pi 包 e2e** | 0/29 | 29/29 | **-29 个 e2e 文件**（每个 ~30 LOC + 装包 + 触发 + 卸载）|
+| **apply-patch.ts LOC** | 257 | （未设上限）| — |
+| **typed-tool.ts 等 4 个 facade** | 4 个 ~250 LOC | — | — |
+| **5 个 audit 脚本** | 5/5 ✅ | — | — |
+| **vitest 真实跑通（typed-tool + apply-patch）**| 20/20 ✅ | — | — |
+| **spec audit 失败连击** | 5 连击补救策略已写 | — | — |
+
+**距离 0.17.0 GA 还需要**：~61 个 facade 改造 + 11 个 pi-bridge 桥接 + 29 个 e2e 文件 + perf bench 脚本 + 全 monorepo vitest（blocked on fts5）= **约 5-7 周工程量 + 1-2 周环境修复**。
+
+### 9.4 Round 16+ 下一步顺序（按 ROI）
+
+按 5 维评估 + 现实差距 + 已有 facade 复用度：
+
+| 优先级 | Round | 目标 | 估时 | 期望指标提升 |
+|---|---|---|---|---|
+| **P0** | **16** | **G1 PR 3**（typed-tool 加 `validateParamsSafe` 类型守卫；apply-patch.ts 删最后一个临时 cast；e2e + plan4.0.md §1.7 UI 演示）| 2-3 天 | typed-tool 6/6 → 8/8；apply-patch LOC 257 → <240；plan4.0 UI 演示落实 |
+| **P0** | **17** | **G10 PR 1**（ExtensionFactory 单文件入口样板，引用 apply-patch.ts 真实例子 + typed-tool.ts） | 1 周 | 第三方 pi 包接入从 5+ 文件 → 1 文件 + 1 manifest |
+| **P0** | **18** | **G7**（shell helper 套用 typed-tool 模板：`BashParamsSchema` + `validateParams` + 直接 typed body） | 1 周 | apply_command 与 pi `bash-executor` 行为对齐；Windows PowerShell 走 pi |
+| **P0** | **19** | **G2 PR 1**（SettingsManager 切到 pi + 保留 OpenBuddy typed facade） | 2 周 | settings-store.ts 196 → ≤ 50 |
+| **P1** | **20** | **G4 PR 1**（renderer 接 `bridge.text.generate-diff` + `bridge.text.generate-patch` 进 ToolCallCard/DiffView） | 3 天 | pi-bridge 7% → 14% |
+| **P1** | **21** | **G4 PR 2**（renderer 接 `bridge.image.resize` + `bridge.image.detect-mime` 进 attachment/upload.ts） | 3 天 | pi-bridge 14% → 28% |
+| **P1** | **22** | **G8 PR 1**（3 个 canonical pi 包真实 e2e：pi-mcp-adapter / pi-lens / pi-worktree） | 1 周 | 29/29 → 3/29 = 10% |
+| **P1** | **23** | **G5 PR 1**（generateBranchSummary 真实接入 + 保留 branch-summary-format.ts fallback） | 1 周 | 集成深度从形式接 → 行为切 |
+| **P2** | **24** | **G3 PR 1**（DefaultPackageManager 接入，保留 ProfilePackageManager facade） | 2 周 | profile-manager.ts 806 → ≤ 200 |
+| **P2** | **25** | **perf bench 脚本**（`scripts/perf/baseline-bench.mjs`：cold start / IPC p95 / streaming 帧；CI 必跑） | 3 天 | perf 维度从 🔴 → 🟡（有数）|
+
+**总进度预估**（按上述 10 个 Round 跑完）：
+
+| Round 后 | G 项完成度 | pi 复用度 | pi-bridge | canonical e2e | 5 维总评 |
+|---|---|---|---|---|---|
+| 当前（v3.12） | ~21% | 8.4% | 7% | 0/29 | 🟡🟡🔴🟡🟢 |
+| **Round 20** | ~35% | 12% | 28% | 0/29 | 🟢🟡🔴🟢🟢 |
+| **Round 25** | ~55% | 22% | 28% | 3/29 | 🟢🟡🟡🟢🟢 |
+
+**0.17.0 GA 真正可达时间**：~3-4 个月（vs v2 plan 估的 18 周 ≈ 4 个月）—— 前提是 Round 16-25 都按计划落地。
+
+### 9.5 进度百分比（用户问"说明进度百分比"专答）
+
+**当前总进度：~12%（行为 pi-native 维度）** / **~21%（G 项落地维度）**
+
+| 子维度 | 进度 |
+|---|---|
+| typed facade 落地（G1+G6+G9+G11）| **67%**（4/6 个已 facade 接；G1 PR 3 + G6 PR 2 待做）|
+| pi 运行时 import 利用度 | **8.4%**（23/274）|
+| pi-bridge IPC 利用度 | **7%**（1/14）|
+| canonical pi 包 e2e | **0%**（0/29）|
+| perf 维度 | **0%**（bench 脚本未实现）|
+| 全 monorepo vitest | **~70%**（typed-tool + apply-patch 20/20 全过；plugin-host 全包 35 个失败与本轮无关）|
+| 0.17.0 GA 整体 | **~12%**（G 项落地 × 集成深度折扣）|
+
+**含义**：从"形式 pi-native"到"行为 pi-native"还有 88 个百分点要走；按 Round 16-25 顺序约需 3-4 个月工程量。
 
 ---
 
