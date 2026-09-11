@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.29 — Round 32 G3 PR 1 typed facade + DefaultPackageManager 接入)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.30 — Round 33 G3 PR 2 适配层补完)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.29**：v3.28（Round 31 G5 PR 2 token budget 接管 + perf bench）+ Round 32 **G3 PR 1 typed facade + DefaultPackageManager 接入**——`profile-manager.ts` **806 → 199 LOC（−607，−75%，≤ 200 GA gate ✅）**；新增 `default-package-manager-adapter.ts`（pi `DefaultPackageManager` 适配层）+ `profile-manager-internals.ts`（dependency diagnostics + manifest helpers）+ `profile-package-executor.ts`（install/remove 编排：rollback + bundle 自动激活 + 双命名空间 mirror）。公共 API（`ProfilePackageManager`/`installProfilePackage`/`removeProfilePackage`/`listProfilePackages`/`updateProfileExtensions`/`ensureDefaultPiPackages`）保持不变，3 个历史调用方 + 2 个测试文件 0 改动。
+> **本文是 v3.30**：v3.29（Round 32 G3 PR 1 typed facade + DefaultPackageManager 接入）+ Round 33 **G3 PR 2 适配层补完**——`default-package-manager-adapter.ts` 扩展到 223 LOC（+77），新增 `classifySpecifier(source)`（覆盖 8 类 SpecifierKind：npm/git-https/git-ssh/github/tarball-https/file/local-directory/unknown）+ `PackageInstallResult` + `lastInstallResult` 边信道 + `AggregateError` 错误聚合；新增 `default-package-manager-adapter.test.ts`（**21 vitest cases**：17 specifier + 4 install 编排）。`profile-manager.ts` 仍 **199 LOC ≤ 200 GA gate 维持 ✅**。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
