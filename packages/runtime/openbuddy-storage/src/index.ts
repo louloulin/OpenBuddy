@@ -26,9 +26,9 @@ export { SessionCatalog, type SessionCatalogRecord, type SessionCatalogQuery } f
 export { SettingsRegistry, type StoredSetting } from "./sqlite/settings";
 export {
   SettingsStore,
-  type SettingsNamespaceStats,
   type SettingsStoreOptions,
 } from "./sqlite/settings-store";
+export { coerceImageSettings, coerceRetrySettings } from "./sqlite/typed-settings";
 export { SettingsDocumentStore, type SettingsDocument } from "./sqlite/settings-document";
 export { TaskCatalog, type TaskCatalogEntry, type TaskCatalogOptions } from "./sqlite/task-catalog";
 // Stage G-1c: AutomationCatalog removed; automation is owned by
