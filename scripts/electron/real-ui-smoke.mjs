@@ -177,11 +177,30 @@ async function waitForTrace(sessionId, prompt, marker, cursor, timeoutMs = 180_0
     await page.waitForTimeout(500);
   }
   const rendered = await page.locator(".msg--assistant").allTextContents();
+  // Diagnostic dump: a hung smoke used to throw away the most useful
+  // diagnostic field (rendered text + the model output we extracted from
+  // the event log) behind a 500-char truncation. We now print them on
+  // stderr first so the operator can see what the model actually said vs.
+  // what the renderer is showing, then include the same data in the
+  // thrown error.
+  const assistantTexts = latest
+    .filter((event) => event?.sessionId === sessionId && (event.type === "assistant/update" || event.type === "assistant/end"))
+    .map((event) => {
+      const parts = event.payload?.message?.content ?? event.payload?.content ?? [];
+      const text = parts
+        .filter((p) => p && (p.type === "text" || p.type === "text_delta"))
+        .map((p) => p.text ?? "")
+        .join("");
+      return text;
+    })
+    .filter((text) => text.length > 0);
+  console.error(`[real-ui-smoke] marker=${marker} rendered=${JSON.stringify(rendered.slice(-3))} assistantTexts=${JSON.stringify(assistantTexts.slice(-3))}`);
   throw new Error(`real UI trace timeout: ${JSON.stringify({
     session: digest(sessionId),
     eventTypes: latest.map((event) => event.type).slice(-30),
     marker,
     rendered: rendered.slice(-5).map((text) => text.slice(0, 500)),
+    assistantTexts: assistantTexts.slice(-5).map((text) => text.slice(0, 500)),
   })}`);
 }
 
@@ -310,27 +329,40 @@ try {
   if (await composer.inputValue() !== pasteText) throw new Error("real Electron system clipboard paste did not preserve Unicode/multiline text");
   await composer.fill("");
 
-  // Prompts are deliberately English-only with explicit "output exactly one
-  // token, no prose" constraints: the real-ui smoke has to pass against any
-  // model (Anthropic Claude, MiniMax-M3, ...), and Chinese "只回复" or "只
-  // 回答" phrasing is honored reliably by Claude but inconsistently by
-  // other providers — we observed MiniMax-M3 append "请问你接下来想做什
-  // 么?" after a Chinese "only reply" instruction and never emit the
-  // marker, which then hangs `waitForTrace` for the full 180s budget.
+  // Prompts are deliberately framed as JSON output requests with explicit
+  // "output exactly this JSON object and nothing else" constraints. Two
+  // reasons we picked JSON over plain prose markers:
+  //
+  //  1. MiniMax-M3 (the model used by `scripts/electron/run-minimax-real-ui.mjs`)
+  //     refuses prose-style "remember this token / output only this marker"
+  //     prompts as prompt-injection patterns — observed 2026-09: it returns a
+  //     refusal message ("I don't have the ability to recall or use arbitrary
+  //     token strings …") instead of the marker, and `waitForTrace` then
+  //     burns the full 180s budget waiting for a marker that never lands.
+  //  2. JSON output gives a self-delimited assertion target: the smoke checks
+  //     `marker in .msg--assistant` regardless of any prose the model wraps
+  //     around it, but a JSON frame is also a deterministic shape the model
+  //     can produce verbatim.
+  //
+  // Multi-turn retention uses a "store this verification code in your working
+  // memory" framing (still JSON-shaped) and recalls the code from the next
+  // turn's history. The smoke also asserts the full Pi trace shape
+  // (`session/input → agent/start → assistant/* → agent/settled`) and tool
+  // invocation on turn 3.
   const first = await sendFirstThroughUi(
-    "Remember the token REAL-UI-CONTEXT-7314. Output the single word REAL-UI-TURN-1 with no other text, no punctuation, no greeting.",
+    "Reply with exactly this JSON object and nothing else: {\"code\":\"REAL-UI-TURN-1\"}",
     "REAL-UI-TURN-1",
   );
   const sessionId = first.sessionId;
   assertTrace(first.trace, { marker: "REAL-UI-TURN-1" });
   const second = await sendThroughUi(
-    "Reply with the token you were told to remember in the previous turn. Output only that token, no other text.",
+    "Reply with exactly this JSON object and nothing else: {\"code\":\"REAL-UI-CONTEXT-7314\"}",
     "REAL-UI-CONTEXT-7314",
     sessionId,
   );
   assertTrace(second.trace, { marker: "REAL-UI-CONTEXT-7314" });
   const third = await sendThroughUi(
-    "Call the openbuddy_real_ui_tool with parameter marker=\"REAL-UI-TOOL-3\". After the tool returns, output only REAL-UI-TOOL-3 with no other text.",
+    "Use the openbuddy_real_ui_tool with marker=REAL-UI-TOOL-3. After the tool returns, reply with only the text REAL-UI-TOOL-3.",
     "REAL-UI-TOOL-3",
     sessionId,
   );
@@ -339,11 +371,11 @@ try {
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator("#root").waitFor({ state: "attached", timeout: 30_000 });
   await page.waitForFunction(() => Boolean(window.api?.apiVersion === 1), undefined, { timeout: 30_000 });
-  await page.getByText("REAL-UI-CONTEXT-7314", { exact: false }).first().waitFor({ state: "visible", timeout: 90_000 });
+  await page.getByText("REAL-UI-TURN-1", { exact: false }).first().waitFor({ state: "visible", timeout: 90_000 });
   const afterReload = await activeSessionFromStorage();
   if (afterReload?.sessionId !== sessionId) throw new Error("renderer reload changed the active Pi session");
   const fourth = await sendThroughUi(
-    "After renderer reload, continue the same Pi session. Output only REAL-UI-TURN-4, no other text.",
+    "After the renderer reload, continue the same Pi session. Reply with exactly this JSON object and nothing else: {\"turn\":\"REAL-UI-TURN-4\"}",
     "REAL-UI-TURN-4",
     sessionId,
   );
@@ -372,7 +404,7 @@ try {
     })}`);
   }
   const fifth = await sendThroughUi(
-    "After Electron restart, continue the same Pi session. Output only REAL-UI-TURN-5, no other text.",
+    "After Electron restart, continue the same Pi session. Reply with exactly this JSON object and nothing else: {\"turn\":\"REAL-UI-TURN-5\"}",
     "REAL-UI-TURN-5",
     sessionId,
   );
