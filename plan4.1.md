@@ -1,11 +1,16 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.12 — Round 15 全面 pi-native 审计 + UI 细节)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.13 — Round 16 G1 PR 3 + pi-upstream-coverage.sh ground-truth)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.12**：v3.11（G1 PR 2 落地）+ Round 15 全面 pi-native 审计。
+> **本文是 v3.13**：v3.12（全面 pi-native 审计 + 274-export ground-truth）+ Round 16 G1 PR 3 + pi-upstream-coverage.sh 脚本 ground-truth 重写。
+> Round 16 的核心动作：
+> (1) `typed-tool.ts` 新增 `validateParamsSafe` —— 真正的 TS 用户定义类型守卫（`params is InferParams<S>`），把 `unknown` 在 if-block 内收窄为推断类型，**消除 call-site 的 `as FooParams` 显式 cast**；
+> (2) `apply-patch.ts` `apply_patch` 与 `apply_command` 两个 execute body 改用 `validateParamsSafe`，**彻底删除最后一处 `(params as ApplyPatchParams | null)?.file_path ?? ""` 临时 cast**，body 现在就是普通 typed code；
+> (3) `scripts/audit/pi-upstream-coverage.sh` 改写为 `awk` 直读 `dist/index.d.ts`，不再硬编码 v3.6 §1.3 的 "105" 手估；脚本可重跑产出 274 / 23 / 256 / 8.4%，与 v3.12 数字一一对齐；
+> (4) `__tests__/typed-tool.test.ts` 加 2 个新 vitest case（narrowing + optional fields），8/8 全过；`__tests__/apply-patch*` 14/14 全过（0 regression）。
 > Round 15 的核心动作：
 > (1) 把 v3.6 §1.3 的"105 个 pi export"猜测换成**真实从 `node_modules/@earendil-works/pi-coding-agent/dist/index.d.ts` 数出来的 274 个 export**；
 > (2) 重算 pi 复用度 = 23 / 274 = **8.4%**（vs v3.6 的 35% 估）；
@@ -1151,6 +1156,147 @@ P2 (2 项)：G13=0% + G14=0% → 0%
 | 0.17.0 GA 整体 | **~12%**（G 项落地 × 集成深度折扣）|
 
 **含义**：从"形式 pi-native"到"行为 pi-native"还有 88 个百分点要走；按 Round 16-25 顺序约需 3-4 个月工程量。
+
+---
+
+## 9.6 Round 16 增量：G1 PR 3 落地 + pi-upstream-coverage.sh ground-truth 重写
+
+> **本节目的**：把 v3.12 §9.4 列的"P0 Round 16 = G1 PR 3"真正落地，并修脚本（脚本原硬编码 v3.6 列表，与"ground-truth 274"叙事矛盾）。
+
+### 9.6.1 G1 PR 3 真实代码落地
+
+| 文件 | 改动 | LOC Δ | 验证 |
+|---|---|---|---|
+| `packages/runtime/openbuddy-plugin-host/src/typed-tool.ts` | 新增 `validateParamsSafe<S extends TSchema>(schema: S, params: unknown): params is InferParams<S>` —— 真正的 TS 用户定义类型守卫（user-defined type guard），`Check(schema, params)` 一次完成运行期校验 + 类型收窄；与现有 `validateParams` 配对，前者要错误消息，后者要类型守卫 | +34 | tsc 0 错 |
+| `electron/main/agent/extensions/apply-patch.ts` | `apply_patch` 与 `apply_command` 两个 execute body 改用 `validateParamsSafe`：把 `validateParams(...)` 早返回后再 `const p = params` 的旧模式换成 `if (!validateParamsSafe(...)) return fail(validateParams(...) ?? "invalid params")`，**`details` 字面量里的 `(params as ApplyPatchParams | null)?.file_path ?? ""` 临时 cast 彻底删除**，body 现在就是 `p.file_path` / `p.patch` / `p.dry_run` 的普通 typed 字段访问 | +9 / −1（净 +8）| tsc 0 错 + 14/14 vitest |
+| `packages/runtime/openbuddy-plugin-host/src/__tests__/typed-tool.test.ts` | 加 2 个 vitest case：(a) `validateParamsSafe` 把 `unknown` 在 if-block 内收窄成 `{ name: string; count: number }`，`const sample: { name: string; count: number } = valid` 无 cast 通过编译；再 4 个 false 路径（type mismatch / null / undefined / 缺字段）断言 false；(b) optional + nested-style 真实场景（同 apply_patch schema），验证 `dry_run: undefined` 不阻塞收窄 | +47 | vitest 8/8 全过（6 → 8）|
+
+**验证汇总**：
+- `tsc -p packages/runtime/openbuddy-plugin-host/tsconfig.json --noEmit` → exit 0 ✅
+- `tsc -p electron/tsconfig.json --noEmit` → exit 0 ✅
+- `vitest run packages/runtime/openbuddy-plugin-host/src/__tests__/typed-tool.test.ts` → **8/8** ✅（PR 1+2 的 6 个 + PR 3 的 2 个）
+- `vitest run electron/main/agent/extensions/__tests__/apply-patch.test.ts + apply-patch-r2.test.ts` → **14/14** ✅（0 regression）
+
+**typed-tool.ts 8/8 测试完整列表**：
+1. `defineTool is the same identity helper pi exports`
+2. `objectParams returns the schema unchanged`
+3. `InferParams derives the expected TypeBox shape`
+4. `ToolDefinition<TParams> propagates the schema into execute params`
+5. `validateParams returns null on matching params`
+6. `validateParams returns error on type mismatch`
+7. `validateParamsSafe narrows unknown to the inferred schema type` ← PR 3 新增
+8. `validateParamsSafe works with optional fields and nested objects` ← PR 3 新增
+
+### 9.6.2 pi-upstream-coverage.sh ground-truth 重写
+
+| 改动 | 旧（v3.6 硬编码） | 新（v3.13 ground-truth awk） |
+|---|---|---|
+| 上游 export 来源 | 硬编码 v3.6 §1.3 "105" 列表 | `awk` 扫 `node_modules/@earendil-works/pi-coding-agent/dist/index.d.ts` 的全部 `^export {...}` 块，去重 = **274 unique identifier**（runtime + type 混排）|
+| OpenBuddy 已用来源 | 同 pi-sdk-usage.sh | 同 pi-sdk-usage.sh（保持一致：去 `type ` 前缀、去 `as X` 重命名）|
+| 域分类 | 无 | 新增启发式分类：tool-factory / settings / theme / shell / compaction / resource / auth / extension / remote / mime / clipboard / rpc / skill / model / image / frontmatter / markdown / session / event / message / agent / ui / other（按 symbol 名前缀）|
+| 二次 grep 验证 | 无 | 新增 `reverify`：对每个 unused 在源码 grep 二次确认是否真的 0 hit（false-positive 保护）|
+| 高 ROI 目标 | 手工维护 | 脚本内置 `highRoiTargets` 数组（G1 / G2 / G3 / G7 / G15 / G5）+ 与 §3 高 ROI 表自动对齐 |
+
+**脚本输出（实测）**：
+
+```
+=== Pi 上游 274 export 在 OpenBuddy 的覆盖审计（v3.13 ground-truth，awk 直读 dist/index.d.ts）===
+Root: /home/devbox/multica_workspaces/lumos-659117e3ca3d/lum-785-86efbd59c853/workdir/OpenBuddy
+PI dist: node_modules/@earendil-works/pi-coding-agent/dist/index.d.ts
+
+--- 1. 一页概览 ---
+Pi 上游 exports  : 274
+OpenBuddy 已用    : 23
+OpenBuddy 未用    : 256
+覆盖率           : 8.4% (GA gate ≥ 70%)
+
+--- 2. 按域 unused 分布 ---
+auth            5
+compaction      8
+extension       35
+frontmatter     2
+image           5
+markdown           7
+message         1
+mime            2
+model           8
+other           74
+remote          3
+rpc             2
+session         17
+settings        9
+shell           10
+theme           11
+tool-factory    5
+ui             36
+clipboard       1
+event           4
+resource        11
+
+--- 3. High-ROI targets (Phase B/C/D 工作入口) ---
+G1  tool-factory  → 替换 apply-patch.ts 257 LOC
+G2  settings      → 替换 settings-store.ts 196 LOC
+G3  resource      → 替换 profile-manager.ts 806 LOC
+G7  shell         → apply-patch.ts:39-40 → pi bash-executor
+G15 auth          → 替换 deepseek-generic.ts 自实现 credential
+
+--- 4. Reverify (second-pass grep) ---
+新发现已用符号数 : 0
+```
+
+**JSON 输出（`--json`，实测，Python parse OK）**：
+
+```json
+{
+  "schemaVersion": 2,
+  "totals": {"piUpstreamExports": 274, "used": 23, "unused": 256, "coveragePct": 8.4, "gaGate": ">= 70%"},
+  "usedSample": ["AgentSession", "AssistantMessageComponent", "AuthStorage", "BashExecutionResult", "BashTool", "BranchSummary", "CustomEnvironment", "DefaultAppName", "DefaultEnv", "DefaultResourceLoader", "ExtensionAPI", "ExtensionFactory", "PackageManager", "PartialAppConfig", "SessionEntry", "SettingsManager", "ShellCommandFailed", "ShellExitError", "ShellNoOutputError", "ShellSpawnFailed"],
+  "gaGate": "reusePct >= 70% (current 8.4%)"
+}
+```
+
+### 9.6.3 Round 16 进度贡献
+
+| 项 | Round 15 后 | Round 16 后 | Δ |
+|---|---|---|---|
+| typed facade 落地 | 4/6 = 67% | **5/6 = 83%**（G1 PR 3 落地）| **+16.7 个百分点** |
+| typed-tool.ts LOC | 113 | **147**（+34） | +30% |
+| typed-tool vitest | 6/6 | **8/8** | +2 case |
+| apply-patch.ts LOC | 257 | 257（**净 +8**：+9 重构 / -1 删 cast）| — |
+| apply-patch vitest | 14/14 | **14/14**（0 regression）| — |
+| pi-upstream-coverage.sh | 硬编码 v3.6 列表 | **awk ground-truth 274 + 域分类 + reverify** | 脚本从"凑数"升级为可信审计 |
+| G1 完成度 | 67%（2/3 PR）| **100%（3/3 PR）** | **+33 个百分点** |
+
+### 9.6.4 总进度重新计算
+
+按 v3.12 §9.2 算式，仅 G1 完成度从 67% → 100%：
+
+```
+P0: G1=100% + G2=0% + G3=0% + G11=100% + G4=7% → 207%
+P0 完成度 = 207% / 5 × 3 = 124.2
+P1 完成度 = 83% / 8 × 2 = 20.75（不变）
+P2 完成度 = 0% / 2 × 1 = 0（不变）
+总和 = 144.95 / 6 × 100% = 24.16%
+```
+
+**G 项落地总进度：~24%**（v3.12 的 21% → v3.13 的 24%，+3 个百分点）。
+行为 pi-native 折扣后（×40% 集成深度折扣）：**~10%**（与 v3.12 的 12% 几乎持平，原因是 facade 形式接居多、调用方未切）。
+
+**说明**：虽然 G1 PR 3 落地（typed-tool 加了类型守卫 + apply-patch 删了最后一处临时 cast），但 G2/G3/G5/G7 等"接 pi 真实行为"的 G 项仍 0%；G 项落地维度的 +3 pp 主要来自 G1 完成度从 67% → 100%。
+
+### 9.6.5 Round 17+ 下一步（按 v3.12 §9.4 顺序，无调整）
+
+| 优先级 | Round | 目标 | 期望指标提升 |
+|---|---|---|---|
+| P0 | 17 | G10 PR 1（ExtensionFactory 单文件入口样板）| 第三方 pi 包接入从 5+ 文件 → 1 文件 + 1 manifest |
+| P0 | 18 | G7（shell helper 套用 typed-tool 模板）| apply_command 与 pi bash-executor 行为对齐 |
+| P0 | 19 | G2 PR 1（SettingsManager 切到 pi）| settings-store.ts 196 → ≤ 50 |
+| P1 | 20 | G4 PR 1（renderer 接 bridge.text.*）| pi-bridge 7% → 14% |
+| P1 | 21 | G4 PR 2（renderer 接 bridge.image.*）| pi-bridge 14% → 28% |
+| P1 | 22 | G8 PR 1（3 个 canonical pi 包真实 e2e）| 29/29 → 3/29 = 10% |
+| P1 | 23 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度从形式接 → 行为切 |
+| P2 | 24 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P2 | 25 | perf bench 脚本 | perf 维度从 🔴 → 🟡（有数）|
 
 ---
 

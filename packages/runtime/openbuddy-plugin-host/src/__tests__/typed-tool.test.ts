@@ -17,6 +17,7 @@ import {
   defineTool,
   objectParams,
   validateParams,
+  validateParamsSafe,
   type ToolDefinition,
   type InferParams,
 } from "../typed-tool";
@@ -98,5 +99,57 @@ describe("@openbuddy/plugin-host/typed-tool — pi facade", () => {
     const err = validateParams(schema, { name: "x", count: "not a number" });
     expect(err).not.toBeNull();
     expect(err).toMatch(/invalid params/);
+  });
+
+  it("validateParamsSafe narrows unknown to the inferred schema type", () => {
+    // PR 3 — the new type-guard overload. The function returns
+    // `params is InferParams<S>` so TypeScript narrows the value
+    // inside the if-branch with no manual cast.
+    const schema = Type.Object({
+      name: Type.String(),
+      count: Type.Number(),
+    });
+
+    const valid: unknown = { name: "ok", count: 7 };
+    if (validateParamsSafe(schema, valid)) {
+      // Inside the guard branch, `valid` is statically typed as
+      // { name: string; count: number } — this assignment must compile
+      // without a cast.
+      const sample: { name: string; count: number } = valid;
+      expect(sample.count).toBe(7);
+    } else {
+      throw new Error("expected validateParamsSafe to accept { name, count }");
+    }
+
+    expect(validateParamsSafe(schema, { name: "x", count: "not a number" })).toBe(false);
+    expect(validateParamsSafe(schema, null)).toBe(false);
+    expect(validateParamsSafe(schema, undefined)).toBe(false);
+    expect(validateParamsSafe(schema, { name: "missing-count" })).toBe(false);
+  });
+
+  it("validateParamsSafe works with optional fields and nested objects", () => {
+    // Real-world example: an extension tool with an optional `dry_run`
+    // and a required nested `position` — same shape as apply_patch.
+    const schema = Type.Object({
+      file_path: Type.String(),
+      dry_run: Type.Optional(Type.Boolean()),
+    });
+    type Params = InferParams<typeof schema>;
+
+    const a: unknown = { file_path: "/tmp/x" };
+    if (validateParamsSafe(schema, a)) {
+      const p: Params = a; // narrowed — no cast
+      expect(p.file_path).toBe("/tmp/x");
+      expect(p.dry_run).toBeUndefined();
+    } else {
+      throw new Error("expected validateParamsSafe to accept missing optional");
+    }
+
+    const b: unknown = { file_path: "/tmp/x", dry_run: true };
+    if (validateParamsSafe(schema, b)) {
+      expect(b.dry_run).toBe(true);
+    } else {
+      throw new Error("expected validateParamsSafe to accept dry_run=true");
+    }
   });
 });

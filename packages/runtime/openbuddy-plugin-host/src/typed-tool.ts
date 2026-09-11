@@ -111,3 +111,37 @@ export function validateParams<S extends TSchema>(
       .join("; ")
   );
 }
+
+/**
+ * Type-guard overload — when the caller wants TS to narrow `params`
+ * from `unknown` to `Static<S>` *inside the if-branch*, use
+ * `validateParamsSafe` instead of `validateParams`. Same runtime cost;
+ * the function is a real TypeScript user-defined type guard
+ * (`params is InferParams<S>`), so the cast disappears at the call
+ * site — no `const p = params as FooParams` line needed.
+ *
+ * Usage:
+ * ```ts
+ * execute: async (_id, params) => {
+ *   if (!validateParamsSafe(MySchema, params)) {
+ *     return fail("invalid params");
+ *   }
+ *   // params is now { count: number } — no cast.
+ *   return { content: [{ type: "text", text: String(params.count) }] };
+ * }
+ * ```
+ *
+ * Why a separate function instead of returning `{ ok: true, params }`?
+ * Returning `params is InferParams<S>` from a user-defined type guard
+ * is the idiomatic TypeScript way to communicate "I have proven
+ * runtime-correctness — you may treat the value as the inferred type
+ * now". The existing `validateParams(schema, params): string | null`
+ * keeps the error-message ergonomics for callers that want to surface
+ * the validation error in a `details` envelope.
+ */
+export function validateParamsSafe<S extends TSchema>(
+  schema: S,
+  params: unknown,
+): params is InferParams<S> {
+  return Check(schema, params);
+}

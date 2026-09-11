@@ -34,6 +34,7 @@ import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-a
 import {
   defineTool,
   validateParams,
+  validateParamsSafe,
   type InferParams,
 } from "@openbuddy/plugin-host/typed-tool";
 
@@ -160,17 +161,23 @@ export default function openBuddyApplyPatch(
       "Faster and safer than rewriting the whole file.",
     parameters: ApplyPatchParamsSchema,
     execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
-      // Round 14: runtime guard via TypeBox Check; on success params is
-      // narrowed to `ApplyPatchParams` so the body is fully typed.
-      const validationError = validateParams(ApplyPatchParamsSchema, params);
-      const filePath = (params as ApplyPatchParams | null)?.file_path ?? "";
-      const details = { applied: false, hunks: 0, file: filePath, preview: undefined as string | undefined, error: undefined as string | undefined };
+      // Round 16 (G1 PR 3): switch from `validateParams + as ApplyPatchParams`
+      // to `validateParamsSafe` — a real TS user-defined type guard
+      // (`params is ApplyPatchParams`) that narrows `unknown` to the
+      // inferred schema type *inside the if-block* without an explicit
+      // cast. The remaining "no-narrow" path is moved to a small `else`
+      // branch that still surfaces a useful error message via the
+      // existing `validateParams` helper (so the error string keeps
+      // /count: Expected number style diagnostics).
       const fail = (msg: string) => ({
         content: [{ type: "text" as const, text: "apply_patch failed: " + msg }],
-        details: { ...details, error: msg },
+        details: { applied: false, hunks: 0, file: "", preview: undefined, error: msg },
       });
-      if (validationError) return fail(validationError);
-      const p = params as ApplyPatchParams;
+      if (!validateParamsSafe(ApplyPatchParamsSchema, params)) {
+        return fail(validateParams(ApplyPatchParamsSchema, params) ?? "invalid params");
+      }
+      const p = params;
+      const details = { applied: false, hunks: 0, file: p.file_path, preview: undefined as string | undefined, error: undefined as string | undefined };
       try {
         if (!p.file_path) return fail("file_path is required");
         if (!isPathTrusted(p.file_path)) return fail("path outside the trusted workspace " + trustedRoot);
@@ -217,14 +224,16 @@ export default function openBuddyApplyPatch(
       "easier to render in the UI than a free-form Bash tool call.",
     parameters: ApplyCommandParamsSchema,
     execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
-      const validationError = validateParams(ApplyCommandParamsSchema, params);
-      const details = { exit_code: 1, stdout: "", stderr: "", duration_ms: 0, error: undefined as string | undefined };
+      // Round 16 (G1 PR 3): same pattern as apply_patch — `validateParamsSafe`
+      // narrows `unknown` to `ApplyCommandParams` so the cast disappears.
       const fail = (msg: string) => ({
         content: [{ type: "text" as const, text: msg }],
-        details: { ...details, error: msg },
+        details: { exit_code: 1, stdout: "", stderr: "", duration_ms: 0, error: msg },
       });
-      if (validationError) return fail(validationError);
-      const p = params as ApplyCommandParams;
+      if (!validateParamsSafe(ApplyCommandParamsSchema, params)) {
+        return fail(validateParams(ApplyCommandParamsSchema, params) ?? "invalid params");
+      }
+      const p = params;
       const command = p.command;
       const cwd = p.cwd ?? trustedRoot;
       const timeout = p.timeout_ms ?? 30000;
