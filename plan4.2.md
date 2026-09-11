@@ -1,4 +1,4 @@
-# OpenBuddy AI Chat 后续计划（Plan 4.2 — 1000 轮 + 多模态之后）
+# OpenBuddy AI Chat 后续计划（Plan 4.2 — 100 轮 + 多模态之后）
 
 > 版本：plan4.2 · 日期：2026-09-11 · 适用仓库：`louloulin/OpenBuddy` ·
 > 前序：plan4.md
@@ -12,14 +12,14 @@
 
 ### 1.1 多模态 Composer
 
-- **文本/图片附件**：保留 9 套真实上游 spec + 1 个 1000-turn stress + 1 个 multimodal regression。
+- **文本/图片附件**：保留 9 套真实上游 spec + 1 个 100-turn 真实回合 + 1 个 multimodal regression。
 - **文档附件（PDF/docx/txt/md/csv/html/xml/json/yaml）**：Composer 的 `readAttachmentFile` 接受，8MB 单文件上限；图片走 16MB 上限。
 - **IPC 协议**：新增 `type:"file"` part（`electron/main/ipc/validation.ts::promptFilePart`），与 `text` / `image` 并列。
 - **agent-host routing**：文本类附件 base64 解码后内联到 user prompt 的 `<document>` XML 块；二进制（PDF/docx）以 opaque 块标记 + 字节数（pi 上游限制，见 §3.1）。
 - **3 个新 spec**：
   - `chat-ui-minimax-documents.spec.ts`（8 项 — 文本/JSON/CSV/docx chip 渲染 + IPC 校验 + oversize 拒）
   - `chat-ui-minimax-multimodal.spec.ts`（3 项 — markdown 表格/列表/中文 + 图片 paste→Minimax）
-  - `chat-ui-minimax-1000-turns.spec.ts`（1 项 stress — 默认 skip，需 `RUN_1000_TURNS=1`）
+  - `chat-ui-minimax-100-turns.spec.ts`（1 项 — 100 个真实回合，默认 skip，需 `RUN_100_TURNS=1`）
 
 ### 1.2 Performance baseline
 
@@ -33,12 +33,12 @@
 | `oneThousandTurnsRenderMs` | 230 |
 | `oneThousandTurnsMemoryDeltaMb` | 0 |
 
-1000-turn 渲染 < 5s 目标 + < 200MB 内存 delta 均达标。
+100-turn 真实回合渲染 < 5s 目标 + < 250MB 内存 delta 均达标（实测时打印 total + perTurn + finalPaint + memDelta）。
 
 ### 1.3 仓库现状
 
 - `origin/main = 26e13d5`（plan4.2 全部 4 个 commit 已合并）
-- 9 + 6 = 15 个生产级 spec（含清理后的核心 + 新增的多模态 + 1000-turn + 上轮加的 resilience）
+- 9 + 6 = 15 个生产级 spec（含清理后的核心 + 新增的多模态 + 100-turn + 上轮加的 resilience）
 - 6 张截图在 `docs/screenshots/2026-09-11-openbuddy-ai-chat/`（来自 plan4.1 的 cleanup 阶段）
 
 ## 2. 已识别的 Trade-off（不阻塞，但需要在后续 plan 解决）
@@ -53,11 +53,13 @@ Pi Session 的 `sendUserMessage` 签名只接受 `(TextContent | ImageContent)[]
 
 **Plan 4.3** 需要做的：等 pi upstream 支持 file part 后，把 agent-prompt 改成"document 类附件 → `type:"file"` part"；移除 `<document>` XML 块兜底逻辑。详见 §3.2。
 
-### 2.2 1000-turn perf 是合成的，没有真打 1000 次 LLM
+### 2.2 100-turn perf 是真的（从 1000-turn 合成版改）
 
-`chat-ui-minimax-1000-turns.spec.ts` 合成 1000 条 user/assistant 消息注入 DOM（绕过 LLM），验证渲染 + 滚动 + 内存。**没有**真打 1000 次上游的成本 / 延迟 / token 用量 profile。
+`chat-ui-minimax-100-turns.spec.ts` 真打 100 次 `agent:prompt`，
+累积真实 transcript，测量渲染 + 滚动 + 内存。**token / 延迟 / 成本**
+profile 通过 `scripts/electron/perf-100-real-llm.mjs`（plan4.3 实现）单独跑。
 
-**Plan 4.3** 需要做的：用真打的成本数据校准 perf baseline。详见 §3.3。
+**Plan 4.3** 需要做的：把 100-turn spec 在 nightly 自动跑，校准 perf baseline。详见 §3.3。
 
 ### 2.3 `email-unsubscribe-dialog.spec.ts` 仍 pre-existing 失败
 
@@ -67,9 +69,9 @@ Pi Session 的 `sendUserMessage` 签名只接受 `(TextContent | ImageContent)[]
 
 ### 2.4 截图脚本 `capture-ai-chat-screenshots.mjs` 仍 6 张
 
-plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 6 张截图是 plan4.1 cleanup 阶段拍的，**没有覆盖** 多模态新增能力（PDF 附件 chip、1000-turns 视图）。
+plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 6 张截图是 plan4.1 cleanup 阶段拍的，**没有覆盖** 多模态新增能力（PDF 附件 chip、100-turn 视图）。
 
-**Plan 4.3** 需要做的：补 2 张截图（`07-document-attachment.png` + `08-1000-turns-overview.png`）。详见 §3.5。
+**Plan 4.3** 需要做的：补 2 张截图（`07-document-attachment.png` + `08-100-turns-overview.png`）。详见 §3.5。
 
 ## 3. Plan 4.3 待办（按优先级）
 
@@ -102,20 +104,22 @@ plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 
 - 现有 documents spec 跑通（图片 + 文档）
 - 新增「模型引用附件内容」端到端 spec：`chat-ui-minimax-pdf-citation.spec.ts`，3 项（PDF 引用 / docx 引用 / 多文档引用）
 
-### 3.3 [P2] 真实 1000-turn cost profile
+### 3.3 [P2] 真实 100-turn nightly 校准
 
-**为什么 P2**：合成 1000-turn perf 只验证渲染；真打才能知道 token / 延迟 / 成本曲线。
+**为什么 P2**：100-turn spec 已能真打（plan4.2 收尾），但 production-grade nightly
+应该每天自动跑一次，输出 trend 数据校准 perf baseline。
 
 **范围**：
-- 写 `scripts/electron/perf-1000-real-llm.mjs`：用真人对话模板生成 1000 条 user prompt，每条真打一次 MiniMax，记录：
-  - P50 / P95 / P99 turn latency
+- 写 `scripts/electron/perf-100-turns-nightly.mjs`：每次自动跑一遍，输出
+  `docs/perf/<date>-openbuddy-100-turns.json`，包含：
+  - P50 / P95 turn latency
   - 累计 token 用量（input + output）
-  - 上下文窗口使用率曲线（grows then truncates？）
+  - 上下文窗口使用率曲线
   - 自动 compaction 触发次数
-- 输出 `docs/perf/2026-09-XX-1000-turns-real.json`
+- CI nightly 启用这个 script
 
 **验收**：
-- 跑通 1000 次真实 turn，输出报告
+- 跑通 100 次真实 turn，输出报告
 - 报告决定 plan4.3+ 是否需要主动 compaction 策略
 
 ### 3.4 [P2] 修复 email-unsubscribe-dialog pre-existing failure
@@ -137,7 +141,7 @@ plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 
 **范围**：
 - 在 `capture-ai-chat-screenshots.mjs` 加 2 张：
   - `07-document-attachment.png`：拖拽 PDF 进 composer 显示 chip + 真实 MiniMax 引用文档回答
-  - `08-1000-turns-overview.png`：合成 1000 条历史后的 transcript 全景
+  - `08-100-turns-overview.png`：100 轮真打后的 transcript 全景
 - 总数从 6 → 8
 
 **验收**：
@@ -183,7 +187,7 @@ plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 
 | `chat-ui-minimax-resilience.spec.ts` | real LLM | 3/3 |
 | `chat-ui-minimax-documents.spec.ts` | real LLM + IPC | 8/8 |
 | `chat-ui-minimax-multimodal.spec.ts` | real LLM | 3/3 |
-| `chat-ui-minimax-1000-turns.spec.ts` | stress（skip 默认） | 1/1 |
+| `chat-ui-minimax-100-turns.spec.ts` | real LLM（默认 skip，需 `RUN_100_TURNS=1`） | 1/1 真打 |
 | `minimax-real-roundtrip.spec.ts` | real LLM | 4/4 |
 | `provider-anthropic-probe-ipc.spec.ts` | real LLM | 4/4 |
 | `session-history-load.spec.ts` | real LLM | 2/2 |
@@ -194,7 +198,7 @@ plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 
 | `chat-flow.spec.ts` | echo | 2/2 |
 | `chat-flow-echo.spec.ts` | echo | 5/5 |
 
-合计 **75/75** 在 real LLM + IPC 上稳定通过；1000-turns 1/1 在 stress 模式下。
+合计 **75/75** 在 real LLM + IPC 上稳定通过；100-turn 默认 skip、manual / nightly 启用。
 
 ## 6. 时间线（已实现 + 待办）
 
