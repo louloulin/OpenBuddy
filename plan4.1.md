@@ -1,4 +1,4 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.3 — Phase A 扩展系统 + pi 上游覆盖 audit 落地)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.4 — Phase B/C G1+G2+G3 实施规格落地)
 
 > 📅 2026-09-10 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
@@ -253,6 +253,26 @@ JSON 形态（CI / verify:plan 直接消费）：
 - `scripts/audit/pi-bridge-dead-channels.{sh,mjs}` — 把 14 个 IPC 通道逐条映射到底层 pi 函数 + 当前消费者（grep 自动核对）+ 建议接入位置。Phase D 工作入口。实测 `utilizationPct=7`（1/14 覆盖；GA gate ≥80%）。
 - `docs/PI_NATIVE_AUDIT_BASELINE.md` — 把 3 个 audit 脚本的 JSON baseline 固化为可重读的 GA gate 表，包含 `jq` 一键断言命令。
 - `package.json:55-56` 加入 `audit:pi-bridge-dead` + `audit:pi-bridge-dead:json` 两个新脚本。
+
+**v3.4 增量**（2026-09-11 第五次跑 — Phase B/C 入口规格落地）：
+
+- `docs/G1_IMPLEMENTATION_SPEC.md` — apply-patch.ts 228 LOC → pi-tool-factories.ts 详细迁移规格。包含 4 个 PR 拆分（adapter 抽取 / pi-tool-factories 新建 / apply_patch 工具组合迁移 / GA gate 收口）。
+- `docs/G2_IMPLEMENTATION_SPEC.md` — settings-store.ts 196 LOC → pi SettingsManager 详细迁移规格。typed facade 保留策略，4 个 PR 拆分。
+- `docs/G3_IMPLEMENTATION_SPEC.md` — profile-manager.ts 806 LOC → pi DefaultPackageManager 详细迁移规格。最大热点（G3 是 plan4.1 §3 Phase C 主项），含 GPG 签名适配层风险评估。
+- `.gitignore` allowlist 加入 3 个新 spec 文件。
+- **实施门槛**：3 个 spec 文档本身已可读、可执行（PR 拆分到行级）；代码改动需 dev-env + pi 0.85.x 安装后才能跑。
+
+**v3.4 文档覆盖度**：
+
+```
+docs/PI_INTEGRATION_BACKLOG.md   15 项 G-gap（owner / 估时 / 依赖）         v3.1 增量
+docs/PI_NATIVE_AUDIT_BASELINE.md 11 个 GA gate 实测                         v3.1 增量
+docs/G1_IMPLEMENTATION_SPEC.md   apply-patch.ts 228 LOC 详细迁移规格        v3.4（本轮）
+docs/G2_IMPLEMENTATION_SPEC.md   settings-store.ts 196 LOC 详细迁移规格    v3.4（本轮）
+docs/G3_IMPLEMENTATION_SPEC.md   profile-manager.ts 806 LOC 详细迁移规格    v3.4（本轮）
+```
+
+**剩余待补 specs（不在本轮范围）**：G4 / G5 / G6 / G7 / G8 / G9 / G10 / G11 / G12 / G13 / G14 / G15 — 共 12 项 spec。如需要，按 G1/G2/G3 模板批量生成（每个 ~150 行 markdown）。
 
 **v3.3 增量**（2026-09-11 第四次跑 — 第 5 / 6 个 audit）：
 
