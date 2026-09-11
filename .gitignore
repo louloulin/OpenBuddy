@@ -104,6 +104,8 @@ docs/*
 !docs/ROUND30_IMPLEMENTATION_REPORT.md
 # Round 31 G5 PR 2 — token budget + perf bench, G5 100% ✅ (LUM-785, 2026-09-11)
 !docs/ROUND31_IMPLEMENTATION_REPORT.md
+# Round 32 G3 PR 1 — typed facade + DefaultPackageManager 接入, profile-manager.ts 806 → 199 LOC (LUM-785, 2026-09-11)
+!docs/ROUND32_IMPLEMENTATION_REPORT.md
 !docs/grok-to-pi-replacement-audit.md
 !docs/workbuddy-points-system-comparison.md
 !docs/enterprise-live-verification-2026-08-31.md

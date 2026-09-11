@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.28 — Round 31 G5 PR 2 token budget 接管 + perf bench)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.29 — Round 32 G3 PR 1 typed facade + DefaultPackageManager 接入)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.28**：v3.27（Round 30 G5 PR 1 generateBranchSummary 真实接入）+ Round 31 G5 PR 2 **token budget 接管 + perf bench**——branch-summary-format.ts 导出 `DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS = 8_000`，session-store.rewindSession 改用 named constant；新增 `scripts/perf/branch-summary.mjs`（CI 可重跑 bench script）+ `tests/perf/branch-summary.test.ts`（vitest perf budget assertion：text-fallback ≤ 1.5x pi 默认）。**G5 完成 100%**。
+> **本文是 v3.29**：v3.28（Round 31 G5 PR 2 token budget 接管 + perf bench）+ Round 32 **G3 PR 1 typed facade + DefaultPackageManager 接入**——`profile-manager.ts` **806 → 199 LOC（−607，−75%，≤ 200 GA gate ✅）**；新增 `default-package-manager-adapter.ts`（pi `DefaultPackageManager` 适配层）+ `profile-manager-internals.ts`（dependency diagnostics + manifest helpers）+ `profile-package-executor.ts`（install/remove 编排：rollback + bundle 自动激活 + 双命名空间 mirror）。公共 API（`ProfilePackageManager`/`installProfilePackage`/`removeProfilePackage`/`listProfilePackages`/`updateProfileExtensions`/`ensureDefaultPiPackages`）保持不变，3 个历史调用方 + 2 个测试文件 0 改动。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -3063,6 +3063,137 @@ G 项落地总进度：~76% → **~81%**（+5 pp）
 | P3 | 34 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
 
 **G5 已 100% 完成**（第三 GA gate ✅）。剩余 GA gate：G3 / G2。
+
+---
+
+## 9.22 Round 32 增量：G3 PR 1 — typed facade + DefaultPackageManager 接入（profile-manager.ts 806 → 199 LOC，GA gate ✅）
+
+### 9.22.1 真实代码落地（4 files）
+
+| 文件 | 类型 | LOC Δ |
+|---|---|---|
+| `packages/runtime/openbuddy-plugin-host/src/profile-manager.ts` | 重写 typed facade | **806 → 199**（−607，GA gate 过）|
+| `packages/runtime/openbuddy-plugin-host/src/profile-manager-internals.ts` | new（dependency diagnostics + manifest helpers + bundle/extension mutators）| +466 |
+| `packages/runtime/openbuddy-plugin-host/src/default-package-manager-adapter.ts` | new（pi `DefaultPackageManager` 适配层）| +146 |
+| `packages/runtime/openbuddy-plugin-host/src/profile-package-executor.ts` | new（install/remove 编排：rollback + bundle 自动激活 + 双命名空间 mirror）| +198 |
+
+**净 LOC**：806 → 1009（含显式 typed facade + 模块边界注释；**单文件 199 ≤ 200 是真正的 GA gate**）
+
+### 9.22.2 typed facade（profile-manager.ts:1-199）
+
+**公共 API 保持不变**（3 个历史调用方 + 2 个测试文件 0 改动）：
+- `ProfilePackageManager` / `ProfilePackageInfo` / `ProfilePackageOptions` / `ProfileDependencyDiagnostic` / `ProfileDependencyHealth`
+- `installProfilePackage(options, sourcePath)`
+- `removeProfilePackage(options, name)`
+- `listProfilePackages(options)`
+- `updateProfileBundles` / `updateProfileExtensions`
+- `ensureDefaultPiPackages(options)` / `OPENBUDDY_DEFAULT_PI_PACKAGES`
+- `DefaultPiPackageResult`
+
+`installProfilePackage` / `removeProfilePackage` 现在只是 thin router，转发给 `executeInstall` / `executeRemove`。
+
+### 9.22.3 pi `DefaultPackageManager` 适配层（default-package-manager-adapter.ts:1-146）
+
+**双轨设计**：优先 pi `DefaultPackageManager.install/remove`，失败 fallback 到原 pnpm 子进程（保护 pre-0.85 specifier 如 `file:`/`git+https:`）：
+
+```typescript
+export const defaultProfilePackageManager: ProfilePackageManager = {
+  async install(profileDir, source) {
+    try {
+      const pm = await buildAdapter(profileDir);
+      await pm.install(source, { local: true });
+      return;
+    } catch (error) { adapterError = error; }
+    await fallbackPnpmInstall(profileDir, source);  // 双层兜底
+  },
+  // remove 同结构
+};
+```
+
+**`buildAdapter` 关键 3 件事**：
+1. `agentDirFor(profileDir)` 沿父目录向上找到 `.pi/agent`（openbuddy profile 在 `<agent>/profiles/<name>`）
+2. `settingsManagerFor(profileDir)` 用 pi `SettingsManager.create(profileDir, agentDir)` 拿共享 settings 实例，让 pi 侧持久化的 source / autoload 都对 adapter 可见
+3. `DefaultPackageManager({ cwd: profileDir, agentDir, settingsManager })`
+
+**环境变量**：`OPENBUDDY_PROFILE_PACKAGE_DEBUG=1` 时把 pi 拒绝的错误打到 stderr，不破坏 install 路径。
+
+### 9.22.4 dependency diagnostics + manifest helpers（profile-manager-internals.ts:1-466）
+
+**承载**（typed facade 单点暴露）：
+- `packageName` / `packageNameFromSpecifier` / `isPackageSpecifier` / `packageTarget` / `localDirectorySource`
+- `readManifest` / `PackageDependencyManifest`
+- `isBundleManifest` / `hasClient` / `hasPiManifest` / `hasRemoteExport` / `hasTypertExport` / `hasCordisPlugin` / `hasPiConventionDirectory`
+- `dependencyNames` / `dependencyKind` / `parsedVersion` / `compareVersions` / `satisfiesVersion`
+- `dependencyDiagnostics`（含 resolveDependencyPackage 走 createRequire）
+- `dependencyAnchors` / `materializeDependencyClosure` / `copyPackageTree` / `packageDirectories`
+- `buildProfilePackageInfo`（单一 `ProfilePackageInfo` 构造点）
+- `directProfileDependencyNames` / `manifestHasDeclaredDependency`
+- `updateProfileBundles` / `updateProfileExtensions`（dual-namespace mirror）
+
+### 9.22.5 install/remove 编排（profile-package-executor.ts:1-198）
+
+**`executeInstall` 三件事**：
+1. **lockfile + package.json 备份**：读 `pnpm-lock.yaml` + `package.json` 存 `before` 快照
+2. **manager.install 后回读**：refresh profile → 找新 dep → 找 package-info；找不到 throw
+3. **rollback**：失败时把新装的 dep 全 remove + 写回 before 快照 + 还原 lockfile；rollback 自身失败时抛 `AggregateError`
+
+**`executeInstall` local 路径**：staging copy → dependency closure materialization → rename into target → bundle auto-activate → 异常时整体回滚 target + 写回 manifest before。
+
+**`executeRemove` 三路径**：
+1. **declared alias**（package.json `dependencies`/`optionalDependencies` 直接有名）：manager.remove + bundle deactivate；失败时重 install + 还原 lockfile
+2. **target 不存在**：直接 manager.remove(name)
+3. **target 存在**：rename 到 backup → bundle deactivate → rm backup；失败时 rename backup back + 还原 manifest before
+
+### 9.22.6 真实验证结果
+
+- `tsc -p packages/runtime/openbuddy-plugin-host/tsconfig.json --noEmit` → **0 error** ✅
+- `bash scripts/audit/extensions-inventory.sh --json` → **`profileManager: 199` ≤ 200** ✅（**GA gate 过**）
+- `vitest run packages/runtime/openbuddy-plugin-host/` → **271 passed / 1 skipped / 35 pre-existing fails**（**0 新增失败**）
+  - 用 `git stash` 验证：baseline 同样 35 fails，**全部为 sqlite readonly DB + ENOENT 等环境问题**，非我的回归
+  - 受影响的 2 个测试文件（`profile.test.ts`、`profile-manager-extensions.test.ts`）公共 API 行为完全一致
+
+### 9.22.7 Audit 验证细节
+
+```bash
+$ bash scripts/audit/extensions-inventory.sh --json | jq '.hotspots, .gaGate'
+{
+  "applyPatch": 277,
+  "piExtensions": 1293,
+  "settingsStore": 195,
+  "profileManager": 199
+}
+"apply-patch < 100 + pi-extensions ≤ 200 + 全部 builtin extension 有 ≥ 1 vitest"
+```
+
+**profile-manager 目标 ≤ 200 已达成** ✅（806 → 199，**−607 LOC，−75%**）
+
+### 9.22.8 进度贡献
+
+| 项 | v3.28 | v3.29 |
+|---|---|---|
+| G1 / G4 / G5 / G8 / G10 / G11 | 100% | 100% |
+| **G3** | **0%** | **PR 1 完成（typed facade + DefaultPackageManager 接入；profile-manager.ts 199 ≤ 200 GA gate 过）** |
+| G2 | 67% | 67% |
+
+P1 完成度：39.75 → **44.75**（G3 PR 1 +5）
+G 项落地总进度：~81% → **~84%**（+3 pp）
+
+### 9.22.9 已知限制
+
+1. **双轨适配器**：`DefaultPackageManager` 安装失败时 fallback 到 pnpm 子进程，保护 pre-0.85 specifier。但 `OPENBUDDY_PROFILE_PACKAGE_DEBUG=1` 默认 off。
+2. **SettingsManager 共享**：adapter 走的是 `SettingsManager.create(profileDir, agentDir)`，每次 install/remove 重新创建。
+3. **`declared alias` 路径只判断 `dependencies`/`optionalDependencies` 是否有同名 key**：不解析 `npm:`/`git+` alias specifier。
+4. **35 个 vitest fail 仍是 pre-existing**：与本 PR 无关，留给 Round 33+ 单独治理。
+
+### 9.22.10 Round 33+ 下一步
+
+| 优先级 | Round | 目标 | 期望指标 |
+|---|---|---|---|
+| P1 | 33 | G3 PR 2 — 适配层补完（git/tarball specifier + 错误聚合）| default-package-manager-adapter.ts ≤ 180 LOC |
+| P3 | 34 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 35 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
+
+**G3 PR 1 完成**。profile-manager.ts **199 ≤ 200 GA gate ✅**（第四 GA gate hotspot 加入绿区）。剩余 GA gate：G2 / G3 PR 2-3。
 
 ---
 
