@@ -1,4 +1,4 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.1 — Phase A 全栈审计落地 + A.3 backlog)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.2 — Phase A 测试覆盖 audit 落地)
 
 > 📅 2026-09-10 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
@@ -248,11 +248,42 @@ JSON 形态（CI / verify:plan 直接消费）：
 
 **A.4 ⏳ 未做**：将两个 audit 接入 `pnpm verify:plan` 必跑项需要改动 `scripts/verify-plan.mjs`，等 vitest 环境就绪再补（verify-plan 现行为 `cd electron && pnpm exec tsc -p tsconfig.json --noEmit --incremental false`）。
 
-**v3.1 增量**（本次新增，2026-09-10 第二次跑）：
+**v3.1 增量**（2026-09-10 第二次跑）：
 
 - `scripts/audit/pi-bridge-dead-channels.{sh,mjs}` — 把 14 个 IPC 通道逐条映射到底层 pi 函数 + 当前消费者（grep 自动核对）+ 建议接入位置。Phase D 工作入口。实测 `utilizationPct=7`（1/14 覆盖；GA gate ≥80%）。
 - `docs/PI_NATIVE_AUDIT_BASELINE.md` — 把 3 个 audit 脚本的 JSON baseline 固化为可重读的 GA gate 表，包含 `jq` 一键断言命令。
 - `package.json:55-56` 加入 `audit:pi-bridge-dead` + `audit:pi-bridge-dead:json` 两个新脚本。
+
+**v3.2 增量**（2026-09-11 第三次跑 — 第 4 个 audit）：
+
+- `scripts/audit/test-coverage.{sh,mjs}` — 静态统计 `*.test.ts` / `*.spec.ts` 数量、源码规模、test/source 比；识别 zero-test 包；映射 G8 (29 个 CANONICAL_PI_PACKAGES e2e) 补测目标。
+- `package.json:57-58` 加入 `audit:test-coverage` + `audit:test-coverage:json`。
+- **v3.2 实测数字**（本容器，无 node_modules，但 node v22.13.0 可用——`mjs` 薄壳可执行；vitest 仍需 `pnpm install`）：
+  - Total `.test.ts`/`.spec.ts` : **351**
+  - Total source `.ts`         : **343**
+  - Overall test/source ratio  : **1.023**  (✅ ≥ 0.5 建议线)
+  - 零测试 packages            : **0 个**（所有 `packages/*` 都至少有 1 个测试）
+  - 低覆盖 packages（test/source < 0.5）：
+    - `packages/auth` (1/9 = 0.111)
+    - `packages/ui` (15/87 = 0.172)
+    - `packages/shared` (2/8 = 0.250)
+    - `packages/bundle` (4/9 = 0.444)
+    - `packages/team` (1/2 = 0.500)
+  - 高覆盖 packages（ratio ≥ 1.0）：
+    - `packages/core` (8/7 = 1.143)
+    - `packages/capability` (20/18 = 1.111)
+    - `packages/{webhook-outbox,scim,saml,fs}` (1/1 = 1.000)
+  - `tests/integration/` 与 `tests/unit/` 目录**不存在**（29 个 canonical e2e 待创建）
+  - `electron/preload` 0 测试（仅 1 源文件 `index.ts`）—— Phase D preload 改动需新增测试
+
+**v3.2 新增的 GA gate 候选**：
+
+| Gate | 当前 | 目标 | 距离 |
+|---|---|---|---|
+| `totals.ratio ≥ 0.5` | 1.023 | ≥ 0.5 | ✅ pass |
+| `zeroTestPackages == []` | 0 | 0 | ✅ pass |
+| `electron/preload.tests ≥ 5` | 0 | ≥ 5 | -5 ❌ |
+| `tests/integration/ 存在 + ≥ 29 e2e` | 不存在 | ≥ 29 | -29 ❌ |
 
 **v3 已知限制**：
 
