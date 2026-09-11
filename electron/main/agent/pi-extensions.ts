@@ -965,7 +965,46 @@ export function resolveBuiltinPiPlugin(id: string): SerializedPiTrack | undefine
   return applyOpenBuddyPluginManifestPassthrough(row, manifest);
 }
 
-export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResolutionOptions["emit"], config: unknown, options: PiExtensionResolutionOptions) => ExtensionFactory> = {
+// ─── Builtin extension registry (G10 PR 2) ──────────────────────────
+// Round 18: introduce `registerBuiltinExtension(name, factory)` + the
+// `BuiltinExtensionFactory` type so individual builtin entries can
+// register themselves in one line. Previously the registry was a
+// 250-line `Record<string, ...>` literal where each entry had to spell
+// out the full `(emit, config, options) => ExtensionFactory` shape.
+// The helper is intentionally trivial — `builtinPiExtensionFactories[name] =
+// factory` — but the typed signature makes new builtins self-documenting
+// and keeps the per-entry code a one-liner when the entry is a pure
+// delegate (apply-patch, telemetry-bridge, etc.).
+//
+// Migration is incremental: the existing record literal still works for
+// builtins that need bespoke wiring (observability, context-status,
+// compact-announce, extra-providers, etc.). Round 19+ can refactor more
+// of them if the helper earns its keep.
+
+/** Per-builtin factory signature — `(emit, config, options) => ExtensionFactory`. */
+export type BuiltinExtensionFactory = (
+  emit: PiExtensionResolutionOptions["emit"],
+  config: unknown,
+  options: PiExtensionResolutionOptions,
+) => ExtensionFactory;
+
+/**
+ * Register a builtin extension factory under `name`. Equivalent to
+ * `builtinPiExtensionFactories[name] = factory` but typed — `name` is
+ * a free-form string so unknown-name typos surface at the call site
+ * (the registry is `Record<string, BuiltinExtensionFactory>` so a typo
+ * would still compile, but the helper exists to make the intent
+ * explicit and to give third-party extensions a stable API to register
+ * themselves against).
+ */
+export function registerBuiltinExtension(
+  name: string,
+  factory: BuiltinExtensionFactory,
+): void {
+  builtinPiExtensionFactories[name] = factory;
+}
+
+export const builtinPiExtensionFactories: Record<string, BuiltinExtensionFactory> = {
   "openbuddy-apply-patch": (_emit, config, _options) => {
     const cfg = (config as Partial<OpenBuddyApplyPatchConfig> | undefined) ?? {};
     if (!cfg.trustedCwd) throw new Error("openbuddy-apply-patch: trustedCwd is required");

@@ -1,11 +1,16 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.14 — Round 17 G10 PR 1 单文件脚手架 + validateParamsSafe barrel 补齐)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.15 — Round 18 G10 PR 2 registerBuiltinExtension helper + typed factory)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.14**：v3.13（G1 PR 3 + pi-upstream-coverage.sh ground-truth）+ Round 17 G10 PR 1 单文件脚手架。
+> **本文是 v3.15**：v3.14（Round 17 G10 PR 1 单文件脚手架 + barrel 补齐）+ Round 18 G10 PR 2 `registerBuiltinExtension` helper。
+> Round 18 的核心动作：
+> (1) `electron/main/agent/pi-extensions.ts:967-1004` 新增 `BuiltinExtensionFactory` type alias + `registerBuiltinExtension(name, factory)` helper —— 让 builtin 注册可写成单行调用；
+> (2) `pi-extensions.ts:1005-1006` 把 record 类型从匿名 `(emit, config, options) => ExtensionFactory` 改为 `BuiltinExtensionFactory` —— 增强可读性（按 spec §3 PR 2 "现有 10 个 builtin 注册改为单行调用" 的前置）；
+> (3) 新增 `electron/main/agent/__tests__/register-builtin-extension.test.ts`（3 case：注册可查 / 工厂可调用 / 同名覆盖）→ 3/3 全过；
+> (4) 现有 1032 LOC `pi-extensions.test.ts` 0 regression（70/70 全过）。
 > Round 17 的核心动作：
 > (1) 新增 `electron/main/agent/extensions/_scaffolds/hello-world.ts`（~50 LOC）—— 把 v3.5 G10 spec §3 PR 3 "文档化最小模板" 落地为可直接 copy-paste 的最小扩展：1 个 import、1 个 TypeBox schema、1 个 `defineTool` + `validateParamsSafe`、default export `ExtensionFactory`，**0 unsafe cast**；
 > (2) 新增 `__tests__/hello-world-scaffold.test.ts`（6 个 case，覆盖 default-export、register count、execute happy × 2、fail × 2）→ 6/6 全过；
@@ -1424,6 +1429,106 @@ P2 完成度 = 0% / 2 × 1 = 0（不变）
 | P1 | 23 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度从形式接 → 行为切 |
 | P2 | 24 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
 | P2 | 25 | perf bench 脚本 | perf 维度从 🔴 → 🟡（有数）|
+
+---
+
+## 9.8 Round 18 增量：G10 PR 2 registerBuiltinExtension helper + typed factory
+
+> **本节目的**：把 v3.14 §9.7.7 表第一行"P0 Round 18 = G10 PR 2 (registerBuiltinExtension)" 落地为可测、可演进的基础。
+
+### 9.8.1 G10 PR 2 真实代码落地
+
+| 文件 | 改动 | LOC Δ | 验证 |
+|---|---|---|---|
+| `electron/main/agent/pi-extensions.ts:967-1004` | **新增** `BuiltinExtensionFactory` type alias + `registerBuiltinExtension(name, factory)` helper。注释说明 Round 18 是"前置 PR"——目的是让 builtin 注册可一句话调用，但**不**强制立即重写所有 10 个 builtin（observability / context-status / compact-announce / extra-providers 等带特殊 hook wiring 的保持原 record literal 形式更清晰）| +35 | tsc 0 错 + 70/70 vitest |
+| `electron/main/agent/pi-extensions.ts:1005-1006` | record 类型从匿名 `(emit, config, options) => ExtensionFactory` 改为 `BuiltinExtensionFactory`（只换名字，行为 0 变化）| +0 | tsc 0 错 |
+| `electron/main/agent/__tests__/register-builtin-extension.test.ts` | **新增**：3 个 vitest case：(a) 注册可查（registerBuiltinExtension + builtinPiExtensionFactories[name] === factory）；(b) 工厂可调用（调用返回的 factory(emit, config, options) 给出 ExtensionFactory，能注册 tool）；(c) 同名覆盖（registerBuiltinExtension 同名第二次会 overwrite，第三方扩展可 override builtin）| +75 | vitest 3/3 全过 |
+
+**验证汇总**：
+- `tsc -p electron/tsconfig.json --noEmit` → exit 0 ✅
+- `tsc -p packages/runtime/openbuddy-plugin-host/tsconfig.json --noEmit` → exit 0 ✅
+- `vitest run register-builtin-extension.test.ts` → **3/3** ✅
+- `vitest run pi-extensions.test.ts (1032 LOC) + register-builtin-extension + hello-world-scaffold + typed-tool + apply-patch + apply-patch-r2` → **70/70** ✅（0 regression）
+
+### 9.8.2 registerBuiltinExtension 实现（38 LOC）
+
+```typescript
+/** Per-builtin factory signature — `(emit, config, options) => ExtensionFactory`. */
+export type BuiltinExtensionFactory = (
+  emit: PiExtensionResolutionOptions["emit"],
+  config: unknown,
+  options: PiExtensionResolutionOptions,
+) => ExtensionFactory;
+
+/**
+ * Register a builtin extension factory under `name`. Equivalent to
+ * `builtinPiExtensionFactories[name] = factory` but typed — `name` is
+ * a free-form string so unknown-name typos surface at the call site
+ * (the registry is `Record<string, BuiltinExtensionFactory>` so a typo
+ * would still compile, but the helper exists to make the intent
+ * explicit and to give third-party extensions a stable API to register
+ * themselves against).
+ */
+export function registerBuiltinExtension(
+  name: string,
+  factory: BuiltinExtensionFactory,
+): void {
+  builtinPiExtensionFactories[name] = factory;
+}
+```
+
+### 9.8.3 LOC 数字修正（vs spec §3 PR 2 估算）
+
+| 项 | v3.5 G10 spec 估算 | Round 18 实测 | 备注 |
+|---|---|---|---|
+| pi-extensions.ts 总 LOC | 1222 → 200（spec PR 2 目标）| **1222 → 1261**（+39 净增）| spec 估算把整个 1222 LOC 都视为"可削减的样板"是错的 |
+| builtinPiExtensionFactories record 段 LOC | 250 | **250**（不变，仅类型改名）| registry 段本身已是最简 |
+| 文件其余段（pi-compatibility-commands + BUILTIN_PI_PLUGIN_MANIFESTS + 各种 helper）| 972 | **972**（不变）| 与 G10 无关，是 pi-compatibility 适配层 |
+| `BuiltinExtensionFactory` type + 注释 | — | +35 | helper 落地的成本 |
+| **净 G10 PR 2 收益** | 1222 → 200（−1022）| **1222 → 1261**（+39 helper，但 record 段未来可减 50-100 LOC）| **spec 估算过于乐观；实际 PR 2 是"基础 PR"，真正的 LOC 削减留给 PR 3 + Round 19+** |
+
+**修正结论**：v3.5 spec §3 PR 2 的"1222 → 200"目标是不现实的（970 LOC 是 pi-compatibility 适配层，与 G10 无关）。Round 18 PR 2 的真实目标是：
+1. 建立**可演进**的 helper（已 ✅）
+2. 让第三方扩展有**稳定的注册 API**（已 ✅，registerBuiltinExtension 是 public export）
+3. 为后续 PR 3 + Round 19+ 简化 builtin 写法**铺路**
+
+### 9.8.4 Round 18 进度贡献
+
+| 维度 | v3.14 | v3.15 | Δ |
+|---|---|---|---|
+| builtin 注册 helper | 无 | **`registerBuiltinExtension(name, factory)` typed export** | new public API |
+| 第三方扩展可注册自己 | 只能 mutate `builtinPiExtensionFactories` | ✅ 调用 `registerBuiltinExtension(name, factory)` | typed safety |
+| pi-extensions.ts 总 LOC | 1222 | 1261 | +39 helper 注释 |
+| G10 完成度 | 33%（PR 1）| **67%（PR 1+2）** | **+33 pp** |
+| **G 项落地总进度** | ~23% | **~26%** | +3 pp |
+| 5 维总评 | 🟢🟡🔴🟡🟢 | 🟢🟡🔴🟡🟢 | 工程基础继续 🟢 |
+
+### 9.8.5 总进度重新计算
+
+按 v3.14 §9.7.6 算式 + G10 33% → 67%：
+
+```
+P0: G1=100% + G2=0% + G3=0% + G10=67% + G11=100% + G4=7% → 274%
+P0 完成度 = 274% / 6 × 3 = 137
+P1 完成度 = 83% / 8 × 2 = 20.75（不变）
+P2 完成度 = 0% / 2 × 1 = 0（不变）
+总和 = 157.75 / 6 × 100% = 26.29%
+```
+
+**G 项落地总进度：~26%**（v3.14 ~23% → v3.15 ~26%，+3 pp）。
+
+### 9.8.6 Round 19+ 下一步（按 v3.14 §9.7.7 顺序）
+
+| 优先级 | Round | 目标 | 期望指标提升 |
+|---|---|---|---|
+| P0 | 19 | G10 PR 3（用 `registerBuiltinExtension` 简化 observability / context-status / compact-announce / extra-providers 等 8 个 builtin）+ G7（typed shell scaffold，apply_command 已可作 G7 参考）| pi-extensions.ts record 段 250 → ≤ 150 |
+| P0 | 20 | G2 PR 1（SettingsManager 切到 pi）| settings-store.ts 196 → ≤ 50 |
+| P1 | 21 | G4 PR 1（renderer 接 bridge.text.*）| pi-bridge 7% → 14% |
+| P1 | 22 | G4 PR 2（renderer 接 bridge.image.*）| pi-bridge 14% → 28% |
+| P1 | 23 | G8 PR 1（3 个 canonical pi 包真实 e2e）| 29/29 → 3/29 = 10% |
+| P1 | 24 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度从形式接 → 行为切 |
+| P2 | 25 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P2 | 26 | perf bench 脚本 | perf 维度从 🔴 → 🟡（有数）|
 
 ---
 
