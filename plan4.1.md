@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.22 — Round 25 G4 PR 4 bridge.skills.* 接入 renderer — G4 完成 100% / pi-bridge GA gate ≥ 80% ✅)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.23 — Round 26 G8 PR 1 tests/integration/ 创建 + 3 个 canonical pi 包真实 e2e)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.22**：v3.21（Round 24 G4 PR 3 bridge.image.* 4 通道接入 + PiBridgeTextApi.truncateLine 类型修正）+ Round 25 G4 PR 4 bridge.skills.* 3 通道接入 = **G4 全部 14 通道活，pi-bridge 14% → 100%，G4 100% / GA gate ≥ 80% ✅**。
+> **本文是 v3.23**：v3.22（Round 25 G4 PR 4 完成 100% / pi-bridge GA gate ≥ 80% ✅）+ Round 26 G8 PR 1 创建 `tests/integration/` + 3 个 canonical pi 包真实 e2e（pi-mcp-adapter / pi-plan-mode / pi-goal）。canonical pi 包 e2e 覆盖率 0/29 → **3/29 = 10%**。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -2344,6 +2344,122 @@ G 项落地总进度：~58%
 - G4 完成后**只剩 2-3 个 GA gate**待 P1-P3 阶段逐个翻转
 
 **注意**：本轮完成 G4 后，**P0 阶段 G1/G2/G3/G4/G10/G11 中只剩 G3 = 0%**（DefaultPackageManager 自实现最重）。G3 PR 1 是 P2 优先级最高 round——profile-manager.ts 806 → ≤ 200 是 P0 阶段**最大 LOC 削减**机会。
+
+## 9.16 Round 26 增量：G8 PR 1 — tests/integration/ 创建 + 3 个 canonical pi 包真实 e2e（pi-mcp-adapter / pi-plan-mode / pi-goal）
+
+> **本节目的**：把 v3.22 §9.15.9 表第一行"P1 Round 26 = G8 PR 1（3 个 canonical pi 包真实 e2e）" 落地。本轮把 G8 spec §3 PR 1 "创建 tests/integration/ 目录 + 模板 + 5 个 e2e 文件" 简化为 "创建目录 + 模板 + **3 个 e2e 文件**"（plan4.1.md v3.15 §9.8.5 算式只算 3 个）——实际跑了 3 个 npm 可达的包（pi-mcp-adapter / pi-plan-mode / pi-goal）。
+
+### 9.16.1 真实代码落地（5 files）
+
+| 文件 | 改动 | LOC Δ | 验证 |
+|---|---|---|---|
+| `src/test-integration-helpers/real-pi-package-template.ts` | **新建** helper：`tryInstallCanonicalPiPackage`（pnpm add + 404 检测）+ `inspectInstalledPackage`（hasEntry 检查）+ `cleanupTempDir` | +85（含 JSDoc）| vitest 12/12 |
+| `src/test-integration-helpers/index.ts` | **新建** barrel（vite 无法解析 `__helpers__/*.ts` import，移到 src/ 下走 vite alias 路径） | +1 | — |
+| `tests/integration/real-pi-package-pi-mcp-adapter.test.ts` | **新建** 4 vitest case：onRegistry / installed / hasNodeModules+name+version / hasEntry | +50 | vitest 4/4 |
+| `tests/integration/real-pi-package-pi-plan-mode.test.ts` | **新建** 同上模板 | +50 | vitest 4/4 |
+| `tests/integration/real-pi-package-pi-goal.test.ts` | **新建** 同上模板 | +50 | vitest 4/4 |
+| `vitest.config.ts:122-126` | **新增** `environmentMatchGlobs`：`["tests/integration/**", "node"]`（integration 测试需要 node env 跑 child_process） | +2 | tsc 0 错 |
+
+**验证汇总**：
+- `tsc -p tsconfig.json --noEmit` → **0 错** ✅（仅 pre-existing `theme-pi.ts:29` getEditorTheme，Round 11 G6 已知）
+- `vitest run tests/integration/` → **12/12** ✅（3 文件 × 4 case = 12 测试）
+- **真实 `pnpm add` 安装 3 个第三方 pi 包** —— 不是 mock，不是 stub
+
+### 9.16.2 真实安装证据
+
+```
+=== pi-mcp-adapter (2.33.0) ===     package.json: exports./types → "./index.ts"
+=== pi-plan-mode (0.4.8) ===        package.json: main → "./plan-mode.ts"
+=== pi-goal (0.1.7) ===             package.json: pi.extensions → ".pi/extensions/pi-goal"
+```
+
+**3 种典型 pi 包 entry 形式都覆盖了**：
+- `exports` map（pi-mcp-adapter，modern）
+- `main` field（pi-plan-mode，legacy）
+- `pi.extensions` field（pi-goal，canonical pi package convention）
+
+helper `inspectInstalledPackage.hasEntry` 把这 3 种 + `bin` 都视为有效入口。
+
+### 9.16.3 helper 关键设计（85 LOC）
+
+```typescript
+export function tryInstallCanonicalPiPackage(pkg: string, timeoutMs = 60_000): InstallResult {
+  // 1. pnpm view <pkg> name version  → 404? mark specOnly
+  // 2. pnpm add <pkg> --silent --ignore-scripts
+  //    (--ignore-scripts 避免 ERR_PNPM_IGNORED_BUILDS 阻塞；peer deps 不影响 e2e smoke)
+  // 3. 若 node_modules/<pkg>/package.json 存在 → installed=true
+  // 4. 否则 installed=false
+}
+
+export function inspectInstalledPackage(cwd: string, pkg: string): PackageMetadata {
+  // hasEntry: main | exports | bin | pi.extensions
+}
+
+export function cleanupTempDir(cwd: string): void {
+  // afterAll hook 清掉 /tmp/pi-e2e-XXX
+}
+```
+
+**为什么 helper 放在 `src/test-integration-helpers/` 而不是 `tests/integration/helpers/`**：vite alias 路径下 vite 能解析；`tests/integration/helpers/` vite 无法解析（vite 默认只 pick up `**/*.{test,spec}.?(c|m)[jt]s?(x)`，`helpers/*.ts` 不在白名单）。本轮尝试 `__helpers__/index.ts` 失败，移到 `src/test-integration-helpers/index.ts` 走 vite alias 路径成功。
+
+### 9.16.4 canonical pi 包 e2e 覆盖率更新
+
+| 状态 | 数量 |
+|---|---|
+| 全部 CANONICAL_PI_PACKAGES | 29 |
+| 已 e2e 覆盖（Round 26 末） | **3** |
+| 未覆盖 | 26 |
+| **覆盖率** | **3/29 = 10%**（v3.22 0% → v3.23 10%，+10 pp）|
+
+**为什么只跑 3 个**：plan4.1.md v3.15 §9.8.5 G8 算式只算 3 个 / round。**剩余 26 个留 Round 27+ G8 PR 2-4 逐 round 跑**。
+
+**为什么 spec 列的 5 个里只跑 3 个**：G8 spec §3 PR 1 列了 pi-mcp-adapter / pi-plan-mode / pi-folder-trust / pi-notification / pi-goal。本轮 grep registry 发现 **pi-folder-trust 和 pi-notification 在 npm 上 404**——是 spec 里的"文档占位包"，从未实际发布。Round 26 跑剩余 3 个 npm 可达的。
+
+### 9.16.5 进度贡献
+
+| 维度 | v3.22 | v3.23 | Δ |
+|---|---|---|---|
+| canonical-pi e2e 覆盖率 | 0% | **10%** | **+10 pp** |
+| tests/integration/ 目录 | 不存在 | 3 files | 新建 |
+| G8 完成度 | 0% | **10%（3/29 covered = PR 1 部分）** | +10 pp |
+| G 项落地总进度 | ~58% | **~59%** | +1 pp |
+
+**P0 完成度**（按 v3.15 §9.8.5 算式 + G8 0% → 10%）：
+```
+P0 = (G1=100 + G2=67 + G3=0 + G10=100 + G11=100 + G4=100 + G8=10) / 7 × 3 = 377/7 × 3 = 161.6
+```
+G8 从 0 加权 1（G8 是 P1 优先级，不在 P0 6 项内——按 v3.15 算式 P0 还是 G1/G2/G3/G4/G10/G11 6 项）。**G8 完成度 10% 反映在 G 项总进度 +1 pp 上**。
+
+### 9.16.6 已知限制
+
+1. **仅 3/29 个 pi 包跑了真 e2e**：剩余 26 个留 Round 27+ G8 PR 2-4。**本轮目标是 G8 PR 1 spec 收口**，不是一次跑完。
+2. **npm 网络依赖**：3 个包都需从 npm registry 拉。**如果 env 无 npm 网络，所有 e2e 退化为 specOnly**——helper 已经优雅处理（返回 `specOnly: true`，测试 skip）。
+3. **--ignore-scripts 跳过包自身构建脚本**：e2e 只验 "能装 + 有 entry"，不验"包功能完整运行"。如果包是 dist-only（如 pi-mcp-adapter 的 `./dist/types.js`），本 e2e 不验证 dist 内容。
+4. **pi-folder-trust / pi-notification 不在 npm**：spec 列了但实际未发布。**Round 27+ 处理时建议先 `pnpm view` 探测，不可达的标 specOnly 跳过**。
+
+### 9.16.7 总进度重新计算
+
+```
+P0 完成度：(G1=100 + G2=67 + G3=0 + G10=100 + G11=100 + G4=100) / 6 × 3 = 467/6 × 3 = 233.5
+P1 完成度：(G8=10) / 8 × 2 + 83 / 8 × 2 = (10 + 83) / 8 × 2 = 23.25（v3.22 = 20.75, +2.5）
+P2 完成度：0 / 2 × 1 = 0（不变）
+G 项落地总进度：~59%
+```
+
+### 9.16.8 Round 27+ 下一步（G8 PR 2-4 待续）
+
+| 优先级 | Round | 目标 | 期望指标提升 |
+|---|---|---|---|
+| P1 | 27 | G8 PR 2（+ 9 个 canonical pi 包 e2e：automation / workflow / cron / subagents / pi-subagents / etc.）| 3/29 → 12/29 = 41% |
+| P1 | 28 | G8 PR 3（+ 10 个：plan-mode / todo / web-access / etc.）| 12/29 → 22/29 = 76% |
+| P1 | 29 | G8 PR 4（+ 7 个收口 + GA gate）| 22/29 → 29/29 = 100%（**canonical-pi GA gate ✅**）|
+| P1 | 30 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度形式接 → 行为切 |
+| P2 | 31 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P2 | 32 | perf bench 脚本 | perf 维度 🔴 → 🟡 |
+| P3 | 33 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 34 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
+
+**注意**：G8 spec §3 PR 2-3 是 9 + 10 个，PR 4 是 5 个收口。本轮按 plan4.1.md v3.22 §9.15.9 表"3 个 / round"策略估算 4 round 完成 G8（PR 2=9、PR 3=10、PR 4=7+GA）。spec 的 5 PR 拆 4 round 完成。
 
 ---
 

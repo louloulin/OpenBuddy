@@ -92,6 +92,8 @@ docs/*
 !docs/ROUND24_IMPLEMENTATION_REPORT.md
 # Round 25 G4 PR 4 (final) — bridge.skills.* wired into renderer, G4 100%, pi-bridge GA gate ≥80% ✅ (LUM-785, 2026-09-11)
 !docs/ROUND25_IMPLEMENTATION_REPORT.md
+# Round 26 G8 PR 1 — tests/integration/ created + 3 canonical pi packages real e2e (LUM-785, 2026-09-11)
+!docs/ROUND26_IMPLEMENTATION_REPORT.md
 !docs/grok-to-pi-replacement-audit.md
 !docs/workbuddy-points-system-comparison.md
 !docs/enterprise-live-verification-2026-08-31.md

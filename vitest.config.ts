@@ -122,6 +122,9 @@ export default defineConfig({
     // helpers work without jsdom overhead.
     environmentMatchGlobs: [
       ["bin/__tests__/**", "node"],
+      // tests/integration/* spawn child processes (pnpm add) — node env
+      // avoids jsdom overhead and gives direct fs/child_process access.
+      ["tests/integration/**", "node"],
     ],
     exclude: [
       "**/node_modules/**",
