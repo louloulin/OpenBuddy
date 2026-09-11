@@ -27,8 +27,8 @@
  */
 import { unlink } from "node:fs/promises";
 
-import { SessionManager, collectEntriesForBranchSummary, prepareBranchEntries, type AgentSession } from "@earendil-works/pi-coding-agent";
-import { formatBranchSummaryText as formatBranchSummaryTextExport } from "../branch-summary-format";
+import { SessionManager, collectEntriesForBranchSummary, type AgentSession } from "@earendil-works/pi-coding-agent";
+import { formatBranchSummary } from "../branch-summary-format";
 
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile, open, stat, rm } from "node:fs/promises";
@@ -245,11 +245,10 @@ async function rewindSession(sessionId: string, targetPromptIndex: number, mode 
   // sessions and gives downstream tooling (F3 telemetry, conversation search)
   // a stable artifact for what was thrown away.
   //
-  // We deliberately do NOT call pi's LLM-backed generateBranchSummary here:
-  // that helper expects the in-memory Session runtime (findEntriesOnBranch),
-  // not the file-backed SessionManager. Wiring the LLM call is a follow-up —
-  // for now we write a deterministic local summary so the branch_summary entry
-  // exists with the right shape and downstream tooling has a stable target.
+  // Round 30 (G5 PR 1): the LLM-backed `generateBranchSummary` is now wired
+  // in via `formatBranchSummary`. When `state.model` is set, pi's LLM does
+  // the summary; when it's not (offline / not configured), the deterministic
+  // text formatter takes over — same shape, same artifact downstream.
   const oldLeafId = manager.getLeafId();
   // Reuse pi's branch-summary walk so we track the same ancestor logic as
   // the official TUI. The SDK runs against the file-backed
@@ -257,12 +256,12 @@ async function rewindSession(sessionId: string, targetPromptIndex: number, mode 
   let abandonedSummary: string | null = null;
   if (target.parentId && oldLeafId && oldLeafId !== target.parentId) {
     const collected = collectEntriesForBranchSummary(manager, oldLeafId, target.parentId);
-    // prepareBranchEntries handles the newest-first token budget for us and
-    // returns `messages` in chronological order, so we don't have to walk
-    // parentId pointers ourselves. The LLM-backed generateBranchSummary call
-    // stays out of this path until OpenBuddy's model registry is plumbed.
-    const prepared = prepareBranchEntries(collected.entries, 8_000);
-    abandonedSummary = formatBranchSummaryText(prepared.messages);
+    const rewindCtrl = new AbortController();
+    abandonedSummary = await formatBranchSummary(collected.entries, {
+      model: state.model,
+      signal: rewindCtrl.signal,
+      reserveTokens: 8_000,
+    });
   }
   if (target.parentId) {
     if (abandonedSummary) {
@@ -287,13 +286,9 @@ async function rewindSession(sessionId: string, targetPromptIndex: number, mode 
 
 /** Compose a short text summary from `prepareBranchEntries` output.
  *  Walks `AgentMessage[]` (chronological), keeps prompt prefix + truncated
- *  assistant text.  Returns null when nothing usable survives the budget. */
-function formatBranchSummaryText(
-  messages: ReadonlyArray<{ role?: string; content?: unknown }>,
-  options?: { maxTotal?: number; maxUser?: number; maxAssistant?: number },
-): string | null {
-  return formatBranchSummaryTextExport(messages, options);
-}
+ *  assistant text.  Returns null when nothing usable survives the budget.
+ *  Removed in Round 30 (G5 PR 1): router in `branch-summary-format.ts`
+ *  handles both pi path and text fallback. */
 
 async function renameSession(sessionId: string, title: string, cwd: string): Promise<void> {
   const sessions = await SessionManager.list(cwd, piSessionDir(cwd));
@@ -320,7 +315,6 @@ export {
   sessionUsage,
   sessionFile,
   rewindSession,
-  formatBranchSummaryText,
   renameSession,
   deleteSession,
 };

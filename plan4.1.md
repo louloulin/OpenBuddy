@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.26 — Round 29 G8 PR 4 + 7 个 spec-only canonical pi 包显式 skip + canonical-pi GA gate ✅)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.27 — Round 30 G5 PR 1 generateBranchSummary 真实接入)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.26**：v3.25（Round 28 G8 PR 3 + 10 个 canonical pi 包真实 e2e）+ Round 29 G8 PR 4 **+ 7 个 spec-only canonical pi 包显式 skip 标注 + canonical-pi GA gate 收口 29/29 = 100% ✅**（@anthropic/pi-todo / pi-folder-trust / @anthropic/pi-folder-trust / pi-notification / @anthropic/pi-notification / pi-cron / @anthropic/pi-automation）。canonical-pi GA gate **❌ → ✅**（第二 GA gate 翻转）。
+> **本文是 v3.27**：v3.26（Round 29 G8 PR 4 + 7 spec-only canonical pi 包 + canonical-pi GA gate 100% ✅）+ Round 30 G5 PR 1 **generateBranchSummary 真实接入**——branch-summary-format.ts 新增 `formatBranchSummaryWithPi`（pi `generateBranchSummary` LLM 路径）+ `formatBranchSummary`（router：model 在走 pi / 否则 text fallback）；`session-store.ts:rewindSession` 改用 router 替换原手写 `prepareBranchEntries + formatBranchSummaryText` 两步法。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -2780,6 +2780,155 @@ G 项落地总进度：~67% → **~72%**（+5 pp）
 | P3 | 34 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
 
 **第二个 GA gate 已翻转**（canonical-pi ✅ + pi-bridge ✅）。剩余 GA gate：G3（profile-manager.ts ≤ 200）/ G2（settings-store.ts ≤ 50）。
+
+---
+
+## 9.20 Round 30 增量：G5 PR 1 — generateBranchSummary 真实接入（pi LLM 路径 + text fallback router）
+
+### 9.20.1 真实代码落地（2 files + 1 caller）
+
+| 文件 | 类型 | LOC Δ |
+|---|---|---|
+| `electron/main/agent/branch-summary-format.ts` | 重写 | +110 → ~140（pi router + text fallback 共存）|
+| `electron/main/agent/branch-summary-format.test.ts` | + 14 新 case | +160 |
+| `electron/main/agent/host-modules/session-store.ts` | 改 1 个 import + 改 1 个 caller | -5/+8 |
+
+### 9.20.2 真实代码改动（branch-summary-format.ts）
+
+**新增 2 个 public 函数**（router + pi 路径封装）：
+
+```typescript
+// 路径 A：pi LLM-backed generateBranchSummary
+export async function formatBranchSummaryWithPi(
+  entries: readonly SessionEntry[],
+  options: FormatBranchSummaryWithPiOptions,  // { model, signal, reserveTokens?, customInstructions? }
+): Promise<string | null> {
+  // 调 pi 的 generateBranchSummary, aborted/error/empty 都返回 null
+  // 任何异常也被 swallow → null
+}
+
+// 路径 B：router（model 在 → pi / 否则 → text fallback）
+export async function formatBranchSummary(
+  entries: readonly SessionEntry[],
+  options: { model?: Model<any>; signal: AbortSignal; ... },
+): Promise<string | null> {
+  if (options.signal.aborted) return null;
+  if (options.model) {
+    const piSummary = await formatBranchSummaryWithPi(entries, { ... });
+    if (piSummary) return piSummary;
+  }
+  // text fallback (offline path)
+  const prepared = prepareBranchEntries(entries, options.reserveTokens ?? 8_000);
+  return formatBranchSummaryText(prepared.messages, { ... });
+}
+```
+
+**保留** `formatBranchSummaryText` 作为离线 fallback（不删除）——R20 G2 接入 pi SettingsManager 之前，用户的 model 可能为 undefined（settings 未配置 / 没有 API key），必须保留 deterministic text 路径。
+
+### 9.20.3 session-store.ts:rewindSession 改动
+
+**改前**（v3.26）：
+
+```typescript
+import { SessionManager, collectEntriesForBranchSummary, prepareBranchEntries, type AgentSession } from "@earendil-works/pi-coding-agent";
+import { formatBranchSummaryText as formatBranchSummaryTextExport } from "../branch-summary-format";
+
+// rewindSession 内:
+const prepared = prepareBranchEntries(collected.entries, 8_000);
+abandonedSummary = formatBranchSummaryText(prepared.messages);
+
+// 之后本地 wrapper 已 unused
+```
+
+**改后**（v3.27）：
+
+```typescript
+import { SessionManager, collectEntriesForBranchSummary, type AgentSession } from "@earendil-works/pi-coding-agent";
+import { formatBranchSummary } from "../branch-summary-format";
+
+// rewindSession 内:
+const rewindCtrl = new AbortController();
+abandonedSummary = await formatBranchSummary(collected.entries, {
+  model: state.model,        // ← state.model 来自 Round 20-21 G2 接入的 pi SettingsManager
+  signal: rewindCtrl.signal, // ← per-rewind AbortController
+  reserveTokens: 8_000,
+});
+```
+
+**净效果**：
+- 删除本地 `formatBranchSummaryText` wrapper（5 LOC）
+- 删除 export 列表中的 `formatBranchSummaryText`
+- caller 1 行变 4 行（model + signal + reserveTokens），但语义从「text fallback only」升级为「pi LLM if model else text fallback」
+- 保留 `prepareBranchEntries` 不直接 import——router 内部用
+
+### 9.20.4 真实验证结果
+
+- `tsc -p tsconfig.json --noEmit` → **0 新错** ✅（仅 pre-existing `theme-pi.ts:29` getEditorTheme）
+- `vitest run electron/main/agent/branch-summary-format.test.ts` → **19/19 passed** ✅（5 旧 case + 14 新 case）
+  - 5 个 `formatBranchSummaryText`（offline fallback 兼容）
+  - 5 个 `formatBranchSummaryWithPi`（success / aborted / error / throws / 转发 options）
+  - 5 个 `formatBranchSummary`（abort / pi / fallback / no-model / both-null）
+- **无新回归**：session-store.ts 改动后 `pi-resources.test.ts` 4 failures **与改动前完全一致**（git stash 验证：pre-existing ENOENT / fts5 sqlite 错误，**非 Round 30 引起**）
+
+### 9.20.5 pi path 测试细节
+
+```typescript
+// 成功路径
+mockedGenerate.mockResolvedValueOnce({ summary: "  rewound branch covered A and B  " });
+expect(await formatBranchSummaryWithPi(entries, opts)).toBe("rewound branch covered A and B");
+// → 自动 trim
+
+// 异常路径
+mockedGenerate.mockRejectedValueOnce(new Error("network down"));
+expect(await formatBranchSummaryWithPi([], opts)).toBeNull();
+// → swallow throws, return null
+
+// router: 无 model → 直接 text path, 不调 pi
+await formatBranchSummary(entries, { signal });
+expect(mockedGenerate).not.toHaveBeenCalled();
+
+// router: 有 model 但 pi returns aborted → fall back to text formatter
+mockedGenerate.mockResolvedValueOnce({ aborted: true });
+expect(await formatBranchSummary(entries, { model, signal })).toBe("> fallback me");
+```
+
+### 9.20.6 进度贡献
+
+| 项 | v3.26 | v3.27 |
+|---|---|---|
+| G1 / G4 / G10 / G11 | 100% / 100% / 100% / 100% | 100% / 100% / 100% / 100% |
+| G2 | 67% | 67% |
+| **G5** | **0%（仅 spec 阶段）** | **PR 1 100% 完成（pi LLM + router 落地）** |
+| G8 | 100% | 100% |
+
+**G5 进度**：0% → 67%（PR 1 100%，PR 2 token budget 接管留 Round 31）
+P1 完成度：32.75 → **36.25**（G5 0% → 67%，加 3.5）
+G 项落地总进度：~72% → **~76%**（+4 pp）
+
+5 维总评（v3.27）：**🟢 / 🟡 / 🔴 / 🟡 / 🟢**（G5 PR 1 落地，但 G5 PR 2 token budget 接管 + perf bench 仍未做）
+
+### 9.20.7 已知限制
+
+1. **pi-resources.test.ts 4 failures 是 pre-existing 基础设施问题**（ENOENT plugin prompts 目录 + 缺 fts5 sqlite 模块）—— git stash 验证与 Round 30 改动无关。
+2. **casdoor-auth.test.ts readonly DB error** 也是 pre-existing（与 sqlite 写权限有关），不在 Round 30 影响范围。
+3. **`state.model` 必须已 set 才能走 pi 路径**：未登录用户 / 未配置 model 时，router 自动回退到 text formatter（不抛错）。这是 G2 PR 1-2 (Round 20-21) 接入的 settings plumbed 路径。
+4. **abort handling**：per-rewind `AbortController`，pi LLM 调用随 rewind 取消而 abort；router 检测 `signal.aborted` 直接返回 null（不调 pi）。
+5. **token budget PR 2 留 Round 31**：G5 PR 2（用 `prepareBranchEntries` 完全接管 token budget 计算 + perf 测试 ≤ 1.5x pi 默认）。
+
+### 9.20.8 总进度重新计算（v3.26 → v3.27）
+
+**P1 累计完成度**：32.75 → 36.25（+3.5）
+**P2 累计完成度**：0.0 → 0.0（无变化）
+**P3 累计完成度**：0.0 → 0.0（无变化）
+
+### 9.20.9 Round 31+ 下一步
+
+| 优先级 | Round | 目标 | 期望指标 |
+|---|---|---|---|
+| P1 | 31 | G5 PR 2（token budget 接管 + perf bench）| G5 67% → 100%；perf 🟡 |
+| P2 | 32 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P3 | 33 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 34 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
 
 ---
 

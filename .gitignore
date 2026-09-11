@@ -100,6 +100,8 @@ docs/*
 !docs/ROUND28_IMPLEMENTATION_REPORT.md
 # Round 29 G8 PR 4 — 7 spec-only canonical pi packages explicit ledger + canonical-pi GA gate ✅ 100% (LUM-785, 2026-09-11)
 !docs/ROUND29_IMPLEMENTATION_REPORT.md
+# Round 30 G5 PR 1 — generateBranchSummary real wiring (pi LLM path + text fallback router) (LUM-785, 2026-09-11)
+!docs/ROUND30_IMPLEMENTATION_REPORT.md
 !docs/grok-to-pi-replacement-audit.md
 !docs/workbuddy-points-system-comparison.md
 !docs/enterprise-live-verification-2026-08-31.md

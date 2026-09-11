@@ -1,8 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  formatBranchSummary,
   formatBranchSummaryText,
+  formatBranchSummaryWithPi,
   textOfBranchSummaryMessageContent,
 } from "./branch-summary-format";
+
+// Mock the pi SDK so we can drive generateBranchSummary's behaviour from
+// the test without touching the network.
+vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@earendil-works/pi-coding-agent")>();
+  return {
+    ...actual,
+    generateBranchSummary: vi.fn(),
+    prepareBranchEntries: actual.prepareBranchEntries,
+  };
+});
+
+import { generateBranchSummary, prepareBranchEntries } from "@earendil-works/pi-coding-agent";
+
+const mockedGenerate = vi.mocked(generateBranchSummary);
 
 describe("formatBranchSummaryText", () => {
   it("quotes user prompts with > and caps assistant text", () => {
@@ -78,5 +95,112 @@ describe("textOfBranchSummaryMessageContent", () => {
         { type: "text", text: "b" },
       ]),
     ).toBe("a b");
+  });
+});
+
+describe("formatBranchSummaryWithPi", () => {
+  // Cast a sentinel object as pi's Model<any>. The pi path only forwards
+  // it through; the mocked generateBranchSummary intercepts before any
+  // real Model validation runs.
+  const fakeModel = { id: "fake/model", provider: "fake" } as unknown as Parameters<typeof formatBranchSummaryWithPi>[1]["model"];
+
+  beforeEach(() => {
+    mockedGenerate.mockReset();
+  });
+
+  it("returns the LLM summary when pi returns a non-empty summary", async () => {
+    mockedGenerate.mockResolvedValueOnce({ summary: "  rewound branch covered A and B  " } as never);
+    const out = await formatBranchSummaryWithPi(
+      [{ type: "message", id: "a", parentId: null, timestamp: 0, message: { role: "user", content: "hi", timestamp: 0 } }] as never,
+      { model: fakeModel, signal: new AbortController().signal },
+    );
+    expect(out).toBe("rewound branch covered A and B");
+  });
+
+  it("returns null when pi returns aborted=true", async () => {
+    mockedGenerate.mockResolvedValueOnce({ aborted: true } as never);
+    const out = await formatBranchSummaryWithPi([], { model: fakeModel, signal: new AbortController().signal });
+    expect(out).toBeNull();
+  });
+
+  it("returns null when pi returns an error string", async () => {
+    mockedGenerate.mockResolvedValueOnce({ error: "rate limited" } as never);
+    const out = await formatBranchSummaryWithPi([], { model: fakeModel, signal: new AbortController().signal });
+    expect(out).toBeNull();
+  });
+
+  it("returns null when pi throws", async () => {
+    mockedGenerate.mockRejectedValueOnce(new Error("network down"));
+    const out = await formatBranchSummaryWithPi([], { model: fakeModel, signal: new AbortController().signal });
+    expect(out).toBeNull();
+  });
+
+  it("forwards reserveTokens + customInstructions to pi", async () => {
+    mockedGenerate.mockResolvedValueOnce({ summary: "ok" } as never);
+    await formatBranchSummaryWithPi([], {
+      model: fakeModel,
+      signal: new AbortController().signal,
+      reserveTokens: 4096,
+      customInstructions: "be terse",
+    });
+    expect(mockedGenerate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ reserveTokens: 4096, customInstructions: "be terse" }),
+    );
+  });
+});
+
+describe("formatBranchSummary router (G5 PR 1)", () => {
+  const fakeModel = { id: "fake/model", provider: "fake" } as unknown as Parameters<typeof formatBranchSummaryWithPi>[1]["model"];
+
+  beforeEach(() => {
+    mockedGenerate.mockReset();
+  });
+
+  it("returns null immediately when signal is already aborted", async () => {
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const out = await formatBranchSummary([], { model: fakeModel, signal: ctrl.signal });
+    expect(out).toBeNull();
+    expect(mockedGenerate).not.toHaveBeenCalled();
+  });
+
+  it("uses pi path when model is provided and pi returns a summary", async () => {
+    mockedGenerate.mockResolvedValueOnce({ summary: "pi said hi" } as never);
+    const out = await formatBranchSummary(
+      [{ type: "message", id: "u1", parentId: null, timestamp: 0, message: { role: "user", content: "hi", timestamp: 0 } }] as never,
+      { model: fakeModel, signal: new AbortController().signal },
+    );
+    expect(out).toBe("pi said hi");
+  });
+
+  it("falls back to text formatter when pi returns null", async () => {
+    mockedGenerate.mockResolvedValueOnce({ aborted: true } as never);
+    const out = await formatBranchSummary(
+      [{ type: "message", id: "u1", parentId: null, timestamp: 0, message: { role: "user", content: "fallback me", timestamp: 0 } }] as never,
+      { model: fakeModel, signal: new AbortController().signal },
+    );
+    // prepareBranchEntries preserves the message in `messages`; the text
+    // formatter then wraps it with `> ` and caps it.
+    expect(out).toBe("> fallback me");
+  });
+
+  it("uses text formatter directly when no model is provided", async () => {
+    const out = await formatBranchSummary(
+      [{ type: "message", id: "u1", parentId: null, timestamp: 0, message: { role: "user", content: "offline path", timestamp: 0 } }] as never,
+      { signal: new AbortController().signal },
+    );
+    expect(out).toBe("> offline path");
+    expect(mockedGenerate).not.toHaveBeenCalled();
+  });
+
+  it("returns null when both pi and text fallback produce no output", async () => {
+    mockedGenerate.mockResolvedValueOnce({ summary: "" } as never);
+    const out = await formatBranchSummary([], {
+      model: fakeModel,
+      signal: new AbortController().signal,
+    });
+    // text fallback gets [] from prepareBranchEntries → null
+    expect(out).toBeNull();
   });
 });

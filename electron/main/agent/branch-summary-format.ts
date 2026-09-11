@@ -3,12 +3,19 @@
  * pi SDK's `prepareBranchEntries(...)` into a short, deterministic summary
  * string suitable for writing into a `branch_summary` entry.
  *
- * We deliberately do NOT call pi's LLM-backed `generateBranchSummary`
- * here: that helper requires a model + API key, which OpenBuddy's
- * agent-host has not yet plumbed. Until then this helper keeps the
- * `branch_summary` entry populated with the right shape so downstream
- * tooling (search, telemetry, file-tracking) has a stable artifact.
+ * Round 30 (G5 PR 1): pi's LLM-backed `generateBranchSummary` is wired in
+ * via `formatBranchSummaryWithPi` and routed by `formatBranchSummary`.
+ * The deterministic text formatter stays as the offline fallback (no model
+ * or no API credentials → text path).
  */
+import {
+  type BranchSummaryResult,
+  type Model,
+  generateBranchSummary,
+  prepareBranchEntries,
+  type SessionEntry,
+} from "@earendil-works/pi-coding-agent";
+
 export interface BranchSummaryMessage {
   role?: string;
   content?: unknown;
@@ -36,6 +43,9 @@ export function textOfBranchSummaryMessageContent(content: unknown): string {
  *  - assistant/system messages are capped at 400 chars
  *  - the joined result is capped at 1200 chars total so it fits
  *    comfortably inside `branch_summary.summary`
+ *
+ * This is the offline fallback when pi's LLM-backed generator is not
+ * available (no model set, no API key, or `signal` already aborted).
  */
 export function formatBranchSummaryText(
   messages: readonly BranchSummaryMessage[],
@@ -52,4 +62,97 @@ export function formatBranchSummaryText(
   }
   if (lines.length === 0) return null;
   return lines.join("\n").slice(0, maxTotal);
+}
+
+/**
+ * Options for the pi-backed `generateBranchSummary` path.
+ *
+ * - `model` is required; pi's Model carries provider auth via env or runtime.
+ * - `signal` is required; pass a per-rewind `AbortController.signal` so the
+ *   LLM call does not block indefinitely.
+ * - `reserveTokens` defaults to 8_000 to match the prior `prepareBranchEntries(entries, 8_000)`
+ *   budget used by the rewind path. Pi's SDK picks `entries` newest-first
+ *   until the budget is exhausted, then hands the survivor list to the LLM.
+ * - `customInstructions` is optional; if set, it's appended to pi's default
+ *   prompt unless `replaceInstructions` is true.
+ */
+export interface FormatBranchSummaryWithPiOptions {
+  model: Model<any>;
+  signal: AbortSignal;
+  reserveTokens?: number;
+  customInstructions?: string;
+  replaceInstructions?: boolean;
+}
+
+/**
+ * Run pi's LLM-backed `generateBranchSummary` against a SessionEntry[] and
+ * return its summary string. Returns null when:
+ *  - the call throws (offline, auth failure, provider error)
+ *  - pi returns an aborted/error result
+ *  - pi returns an empty summary
+ *
+ * This wrapper never throws — the caller can blindly treat `null` as
+ * "no summary available" and fall back to the text formatter.
+ */
+export async function formatBranchSummaryWithPi(
+  entries: readonly SessionEntry[],
+  options: FormatBranchSummaryWithPiOptions,
+): Promise<string | null> {
+  const entriesArr = entries as SessionEntry[];
+  try {
+    const result: BranchSummaryResult = await generateBranchSummary(entriesArr, {
+      model: options.model,
+      signal: options.signal,
+      reserveTokens: options.reserveTokens ?? 8_000,
+      customInstructions: options.customInstructions,
+      replaceInstructions: options.replaceInstructions,
+    });
+    if (result.aborted || result.error) return null;
+    const summary = result.summary?.trim();
+    return summary ? summary : null;
+  } catch {
+    // Swallow — caller decides whether to fall back.
+    return null;
+  }
+}
+
+/**
+ * Round 30 router: pick the pi path when a model is provided, else use the
+ * deterministic text formatter. Returns null only when both paths produce
+ * no usable output.
+ *
+ * The rewind path passes `state.model` directly, so any value other than
+ * `undefined` opts the call into pi's LLM summarizer. When `signal` is
+ * already aborted, the router returns null immediately (no work happens).
+ */
+export async function formatBranchSummary(
+  entries: readonly SessionEntry[],
+  options: {
+    model?: Model<any> | undefined;
+    signal: AbortSignal;
+    reserveTokens?: number;
+    customInstructions?: string;
+    maxTotal?: number;
+    maxUser?: number;
+    maxAssistant?: number;
+  },
+): Promise<string | null> {
+  if (options.signal.aborted) return null;
+  if (options.model) {
+    const piSummary = await formatBranchSummaryWithPi(entries, {
+      model: options.model,
+      signal: options.signal,
+      reserveTokens: options.reserveTokens,
+      customInstructions: options.customInstructions,
+    });
+    if (piSummary) return piSummary;
+    // Fall through to text fallback if pi returned null.
+  }
+  // Text fallback uses `prepareBranchEntries`'s messages output.
+  const prepared = prepareBranchEntries(entries as SessionEntry[], options.reserveTokens ?? 8_000);
+  return formatBranchSummaryText(prepared.messages, {
+    maxTotal: options.maxTotal,
+    maxUser: options.maxUser,
+    maxAssistant: options.maxAssistant,
+  });
 }
