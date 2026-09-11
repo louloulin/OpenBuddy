@@ -154,21 +154,58 @@ async function promptContent(content: readonly PiPromptContentPart[], mode: "que
   ) {
     throw new Error("openbuddy-agent: prompt content must not be empty");
   }
-  // The wire shape pi's `sendUserMessage` understands is:
-  //   { type: "text", text } | { type: "image", data, mimeType } |
-  //   { type: "file", data, mimeType }                (R2 — documents)
-  const parts = content.map((part) =>
-    part.type === "text"
-      ? { type: "text" as const, text: part.text }
-      : { type: part.type as "image" | "file", data: part.data, mimeType: part.mediaType },
-  );
+
+  // Pi's upstream `sendUserMessage` is typed against (TextContent |
+  // ImageContent)[] and at runtime does not recognise a `type:"file"`
+  // discriminator on the wire (its reader side filters parts by image /
+  // text only). To keep document attachments working without forking
+  // the upstream Session class, text-shaped documents (txt / md / csv /
+  // json / yaml / xml / html) are decoded from base64 and prepended to
+  // the text part as a clearly-delimited XML block. Binary documents
+  // (PDF / docx) ship as base64 in an opaque block — the model cannot
+  // read the bytes itself today, but the renderer keeps the chip for
+  // visual reference and a future reader-side upgrade can decode them.
+  const TEXT_DOC_MIME = /^(text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml))$/i;
+  const docBlocks: string[] = [];
+  for (const part of content) {
+    if (part.type !== "file") continue;
+    if (TEXT_DOC_MIME.test(part.mediaType)) {
+      let decoded: string;
+      try {
+        decoded = Buffer.from(part.data, "base64").toString("utf8");
+      } catch {
+        decoded = "";
+      }
+      const label = part.name || "document";
+      docBlocks.push(
+        `\n\n<document name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n${decoded}\n</document>`,
+      );
+    } else {
+      // PDF / docx and other binary types — ship base64 in an opaque
+      // block. The model cannot decode this today, but the wire format
+      // is forward-compatible with a future reader-side upgrade.
+      docBlocks.push(
+        `\n\n<document-binary name=${JSON.stringify(part.name ?? "")} mediaType=${JSON.stringify(part.mediaType)} bytes=${part.data.length / 4 * 3}>\n(base64 payload omitted in transcript; bytes=${part.data.length})\n</document-binary>`,
+      );
+    }
+  }
+  const effectiveText = text + docBlocks.join("");
+  const wireContent: Array<
+    { type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }
+  > = effectiveText.trim()
+    ? [{ type: "text", text: effectiveText }]
+    : [];
+  for (const part of content) {
+    if (part.type === "image") {
+      wireContent.push({ type: "image", mediaType: part.mediaType, data: part.data, ...(part.name ? { name: part.name } : {}) });
+    }
+  }
+  // Persist only images through the attachment store today (the store
+  // is image-only). Document bytes ship inline; pi's reader side
+  // never needs to re-display them.
   const attachmentRefs: Array<{ attachmentId: string; mediaType: string; bytes: number; sha256: string; name?: string }> = [];
   for (const part of content) {
-    // Images still need attachment-store persistence (the renderer may want
-    // to re-display them after reload). Documents follow the same path —
-    // pi's reader side resolves the attachment into text before shipping
-    // the upstream payload.
-    if (part.type !== "image" && part.type !== "file") continue;
+    if (part.type !== "image") continue;
     const attachment = await state.attachmentStore.save({
       sessionId: state.session.sessionId,
       mediaType: part.mediaType,
@@ -180,9 +217,16 @@ async function promptContent(content: readonly PiPromptContentPart[], mode: "que
   let attachmentIndex = 0;
   const publicContent = content.map((part) => {
     if (part.type === "text") return part;
+    if (part.type === "file") {
+      return {
+        type: "file",
+        mediaType: part.mediaType,
+        ...(part.name ? { name: part.name } : {}),
+      };
+    }
     const ref = attachmentRefs[attachmentIndex++];
     return {
-      type: part.type,
+      type: "image",
       mediaType: part.mediaType,
       ...(part.name ? { name: part.name } : {}),
       ...(ref ? { attachmentId: ref.attachmentId } : {}),
@@ -197,14 +241,7 @@ async function promptContent(content: readonly PiPromptContentPart[], mode: "que
   if (text.trim()) await writePromptHistory(text);
   try {
     void state.queueMirror;
-    // pi's upstream `sendUserMessage` is typed against (TextContent |
-    // ImageContent)[]. Document attachments reuse the same image wire
-    // shape today — the agent-host's reader side resolves the bytes into
-    // text before the upstream payload is assembled. Cast at the boundary.
-    await state.session!.sendUserMessage(
-      parts as unknown as Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }>,
-      mode === "steer" ? { deliverAs: "steer" } : { deliverAs: "followUp" },
-    );
+    await state.session!.sendUserMessage(wireContent, mode === "steer" ? { deliverAs: "steer" } : { deliverAs: "followUp" });
     return {};
   } catch (error) {
     emitPluginEvent("agent/error", { sessionId: state.session.sessionId, operation: "prompt", error: String(error) });

@@ -932,32 +932,44 @@ export function ComposerInner({
             // a screenshot is no longer silently dropped. We synthesize a
             // Markdown image placeholder with the original file name when
             // available; full image-upload pipeline is tracked separately.
-            const imageItem = Array.from(e.clipboardData.items ?? []).find(
-              (it) => it.kind === "file" && it.type.startsWith("image/")
+            //
+            // R2: Accept any file kind that `readImageFile` (now
+            // `readAttachmentFile`) accepts — image/* OR document/* types
+            // (PDF, plain text, markdown, csv, html, xml, json, yaml, docx).
+            // Documents skip the placeholder-text path (they ride through
+            // `piSendContent` as `type:"file"` parts instead of being
+            // inlined into the prompt body).
+            const fileItem = Array.from(e.clipboardData.items ?? []).find(
+              (it) => it.kind === "file" && (it.type.startsWith("image/") || /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/i.test(it.type)),
             );
-            if (imageItem) {
+            if (fileItem) {
               e.preventDefault();
-              const file = imageItem.getAsFile();
+              const file = fileItem.getAsFile();
               if (!file) return;
-              void readImageFile(file).then((img) => {
-                if (!img) return;
-                setImages((prev) => [...prev, img]);
-                // Mirror the old placeholder text so the user sees something
-                // appear in the textarea even though the real bytes ride
-                // through onSendContent.
-                const ph = img.name ? `![pasted image: ${img.name}]()` : "![pasted image]()";
-                const start = ref.current?.selectionStart ?? text.length;
-                const end = ref.current?.selectionEnd ?? text.length;
-                const next = text.slice(0, start) + ph + text.slice(end);
-                updateText(next);
-                const caret = start + ph.length;
-                setCursorPos(caret);
-                requestAnimationFrame(() => {
-                  if (ref.current) {
-                    ref.current.focus();
-                    ref.current.selectionStart = ref.current.selectionEnd = caret;
-                  }
-                });
+              void readImageFile(file).then((att) => {
+                if (!att) return;
+                setImages((prev) => [...prev, att]);
+                // Image attachments keep the legacy Markdown placeholder so
+                // the user sees something appear in the textarea even
+                // though the real bytes ride through `piSendContent`.
+                // Documents do not need a placeholder — they show up as a
+                // chip in `.composer-image-attachments` and ship as
+                // base64 alongside the user's prompt.
+                if (att.kind !== "file") {
+                  const ph = att.name ? `![pasted image: ${att.name}]()` : "![pasted image]()";
+                  const start = ref.current?.selectionStart ?? text.length;
+                  const end = ref.current?.selectionEnd ?? text.length;
+                  const next = text.slice(0, start) + ph + text.slice(end);
+                  updateText(next);
+                  const caret = start + ph.length;
+                  setCursorPos(caret);
+                  requestAnimationFrame(() => {
+                    if (ref.current) {
+                      ref.current.focus();
+                      ref.current.selectionStart = ref.current.selectionEnd = caret;
+                    }
+                  });
+                }
               });
               return;
             }
