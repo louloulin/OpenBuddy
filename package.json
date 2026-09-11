@@ -38,6 +38,7 @@
     "test:electron:real-chat:multiturn": "node scripts/electron/real-chat-multiturn.mjs",
     "test:electron:real-chat:reasoning": "node scripts/electron/real-chat-reasoning.mjs",
     "test:electron:real-chat:minimax": "node scripts/electron/run-minimax-real-ui.mjs",
+    "test:electron:real-chat:wide": "node scripts/electron/real-chat-wide-coverage.mjs",
     "test:electron:expert-graph": "node scripts/electron/expert-graph-smoke.mjs",
     "test:electron:ipc-surface": "node scripts/electron/ipc-surface-smoke.mjs",
     "test:electron:stream-port": "node scripts/electron/stream-port-smoke.mjs",
