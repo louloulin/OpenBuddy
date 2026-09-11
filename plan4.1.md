@@ -1,4 +1,4 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.2 — Phase A 测试覆盖 audit 落地)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.3 — Phase A 扩展系统 + pi 上游覆盖 audit 落地)
 
 > 📅 2026-09-10 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
@@ -253,6 +253,57 @@ JSON 形态（CI / verify:plan 直接消费）：
 - `scripts/audit/pi-bridge-dead-channels.{sh,mjs}` — 把 14 个 IPC 通道逐条映射到底层 pi 函数 + 当前消费者（grep 自动核对）+ 建议接入位置。Phase D 工作入口。实测 `utilizationPct=7`（1/14 覆盖；GA gate ≥80%）。
 - `docs/PI_NATIVE_AUDIT_BASELINE.md` — 把 3 个 audit 脚本的 JSON baseline 固化为可重读的 GA gate 表，包含 `jq` 一键断言命令。
 - `package.json:55-56` 加入 `audit:pi-bridge-dead` + `audit:pi-bridge-dead:json` 两个新脚本。
+
+**v3.3 增量**（2026-09-11 第四次跑 — 第 5 / 6 个 audit）：
+
+- `scripts/audit/extensions-inventory.{sh,mjs}` — OpenBuddy Extension 系统全量静态审计（ExtensionFactory / builtin 注册 / LOC / 测试）。Phase B + G10 工作入口。
+- `scripts/audit/pi-upstream-coverage.{sh,mjs}` — pi-coding-agent / pi-ai / pi-agent-core 上游 ~105 export 在 OpenBuddy 的覆盖审计，按 11 个域分类 unused + 二次 grep 找 newly-used。
+- `package.json:59-62` 加入 `audit:extensions-inventory` + `audit:extensions-inventory:json` + `audit:pi-upstream-coverage` + `audit:pi-upstream-coverage:json`。
+
+**v3.3 实测数字**：
+
+```
+extensions-inventory:
+  - 5 ext files in extensions/  (586 total LOC; 5/5 导入 pi)
+  - 11 create*Extension factory functions
+  - 10 builtin extension names  (openbuddy-apply-patch / openbuddy-extra-providers / openbuddy-pi-calendar
+                                openbuddy-pi-compact-announce / openbuddy-pi-context-guard / openbuddy-pi-context-status
+                                openbuddy-pi-model-bridge / openbuddy-pi-observability / openbuddy-pi-session-metadata
+                                openbuddy-pi-telemetry-bridge)
+  - 31 ExtensionAPI/ExtensionFactory consumers
+  - 6 .test.ts in extensions/ + pi-extensions.test.ts 1032 LOC
+  - hotspots: apply-patch 228 (G1), pi-extensions 1222 (G10), settings-store 196 (G2), profile-manager 806 (G3)
+
+pi-upstream-coverage:
+  - pi 上游 ~105 export
+  - OpenBuddy 已用 : 23
+  - OpenBuddy 未用 : 47
+  - 覆盖率        : 21.9% (GA gate ≥ 70%) ❌
+  - 新发现已用    : SettingsManager, exec, generateBranchSummary, estimateTokens, Snapshot, RpcClient
+                    （v3 plan4.1 §1.3 标 unused 但实际有 import；reverify 第二轮 grep 找到）
+  - unused by domain:
+      compaction  9 (findCutPoint / prepareCompaction / generateSummary / generateBranchSummary / estimateTokens
+                      calculateContextTokens / getLastAssistantUsage / findTurnStartIndex / generateSummaryWithUsage)
+      tool-factory 7 (createBashTool / ReadTool / WriteTool / EditTool / GrepTool / FindTool / LsTool)
+      remote      7 (RemoteSession / applyTranscriptProgress / Snapshot / runRpcMode / runPrintMode / parseArgs / RpcClient)
+      theme       4
+      shell       4
+      settings    4
+      resource    3 (DefaultPackageManager / PackageManager / loadProjectContextFiles)
+      extension   3 (defineTool / wrapRegisteredTool / createToolDefinition)
+      auth        3 (AuthStorage / readStoredCredential / runtime-credentials)
+      mime        2
+      clipboard   1
+```
+
+**v3.3 新增的 GA gate 候选**：
+
+| Gate | 当前 | 目标 | 来源 |
+|---|---|---|---|
+| `extensionFiles.withPiImports == extensionFiles.count` | 5/5 | 5/5 | extensions-inventory ✅ |
+| `builtinExtensionNames.count ≥ 10` | 10 | ≥ 10 | extensions-inventory ✅ |
+| `pi-extensions.test.ts.loc ≥ 1000` | 1032 | ≥ 1000 | extensions-inventory ✅ |
+| `piUpstreamCoverage.reused ≥ 70%` | 21.9% | ≥ 70% | pi-upstream-coverage ❌ |
 
 **v3.2 增量**（2026-09-11 第三次跑 — 第 4 个 audit）：
 
