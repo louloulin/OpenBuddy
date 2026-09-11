@@ -6,10 +6,17 @@
 > 搜索 **Univer** 集成实现 PDF / Word / XLSX / PPT 等多格式文档
 > 在 AI chat 内的**完整可视化**展示。
 >
-> **2026-09-11 决策修订**：用户在 issue LUM-642 第二十二轮明确要求
-> "**还是使用 univer 最佳实践，支持后续编辑的功能**"，放弃降级
-> 路径（react-pdf + xlsx + mammoth + pptxjs 只读），改走
+> **2026-09-11 决策修订 (round 22)**：用户在 issue LUM-642 第二十二
+> 轮明确要求"**还是使用 univer 最佳实践，支持后续编辑的功能**"，
+> 放弃降级路径（react-pdf + xlsx + mammoth + pptxjs 只读），改走
 > **Univer 路径**。本文档 §6 / §8 / §3 阶段 1-2 全部按 Univer 重写。
+>
+> **2026-09-11 决策补充 (round 23)**：用户进一步要求"**搜索 pdf 最佳
+> 的库，搜索顶级相关的 ai 工作台是如何实现，继续实现 pdf 预览
+> 功能**"。本文档新增 §9（PDF 库调研 + AI 工作台对比），并把阶段
+> 0-1 拆出"PDF 专项"，先用 **pdfjs-dist + react-pdf**（与 ChatGPT /
+> Claude.ai / Cursor 同一库）把 PDF 预览做出来，再走 Univer 完成
+> xlsx/docx/pptx 的编辑能力。
 
 ## 1. 背景与现状盘点
 
@@ -268,3 +275,91 @@ office1 优先于 plan4.3，因为：
 6. 2 张新截图（PDF + XLSX 预览）
 
 预计 stage 0 + stage 1 在 2-3 周完成 office1.0 → office1.2。
+
+## 9. PDF 渲染库调研 + AI 工作台对比
+
+### 9.1 用户触发（round 23）
+
+> "**搜索 pdf 最佳的库，搜索顶级相关的 ai 工作台是如何实现，
+> 继续实现 pdf 预览功能**"
+
+本节解决两个问题：
+
+1. 在 JS 生态里**最成熟的 PDF 渲染库**是什么
+2. ChatGPT / Claude.ai / Cursor 等顶级 AI 工作台**实际怎么实现**
+   PDF 预览
+
+### 9.2 JS 生态 PDF 库对比（2026 年）
+
+| 库 | 体积 (gzip) | 渲染方式 | 性能 | 文本选择 | 注释 | 维护 |
+|---|---|---|---|---|---|---|
+| **pdfjs-dist** (Mozilla, 官方 PDF.js) | ~1.2 MB + worker 0.5 MB | `<canvas>` 每页 | 优秀 | ✅ text layer | 自定义 | **活跃** |
+| **react-pdf**（基于 pdfjs-dist） | ~1.2 MB + worker | `<Document>` React 组件 | 优秀 | ✅ text layer | 自定义 | **活跃** |
+| `<iframe src="data:application/pdf">`（Electron 内置 PDFium） | 0 KB | Chromium 原生 | 最佳 | ✅ 原生 | ❌ 受限 | n/a（系统） |
+| WebViewer (PDFTron) | 12 MB+ | canvas + 自定义 | 商业最佳 | ✅ | ✅ 完整 | 商业 |
+| pdfium WASM (Foxit) | ~6 MB | canvas | 优秀 | ✅ | ✅ | 商业 |
+
+**推荐**：
+- **Electron 应用** → 直接用 `<iframe>` 走 Chromium PDFium（**0 KB JS**，
+  最佳性能，Chromium 本身优化过的 PDF 渲染管线）
+- **纯 Web 应用**或**需要 annotations / text layer** → 用 **`pdfjs-dist`** 或
+  **`react-pdf`**（与 ChatGPT / Claude / Cursor 同款）
+
+OpenBuddy 是 Electron 应用，**两条路都该走**：
+- **Plan A** (主)：`<iframe>` 简单通用场景
+- **Plan B** (高级)：`pdfjs-dist` 走自定义 text layer（用户可复制文本，模型可引用页码）
+
+### 9.3 顶级 AI 工作台 PDF 实现对比
+
+| 工具 | 渲染方式 | 文本层 | 重点 |
+|---|---|---|---|
+| **ChatGPT** | PDF.js canvas | 有限 | 忠实文档显示，研究论文/书 |
+| **Claude.ai** | PDF.js canvas | 有限 | 聊天集成阅读 |
+| **Cursor** | PDF.js + text layer | ✅ 完整 | 代码上下文参考，可复制代码 |
+
+**共同模式**：
+- 都用 **PDF.js**（Mozilla）
+- CDN 加载 `cdnjs.cloudflare.com/ajax/libs/pdf.js/`
+- 多 canvas 渲染（每页一个 canvas）
+- Web worker 解析（off main thread）
+- **没人用 `<iframe>` 或 native viewer** — 都需要 canvas 层的 UI 控制
+
+### 9.4 OpenBuddy 选型结论
+
+**PDF：两条路并行**
+- **v1 (1-2 天)**：`<iframe>` 走 Chromium PDFium — 0 KB JS 增量，最快交付
+- **v2 (3-5 天)**：`pdfjs-dist + react-pdf` 走 ChatGPT 同款 — text layer 可
+  复制 + 模型可引用页码
+
+**XLSX / DOCX / PPTX**：走 Univer（已锁定）— 完整编辑能力
+
+### 9.5 修订后的阶段 0 计划
+
+```
+阶段 0A: 1-2 天 — PDF iframe 走通（v1，Electron 原生）
+   - 在 FilePreview.tsx 加 kind === "pdf" 分支
+   - data:application/pdf;base64,... 赋给 <iframe src>
+   - 1 个新 spec 验证 iframe 渲染成功
+
+阶段 0B: 3-5 天 — PDF.js text layer (v2)
+   - 加依赖: pdfjs-dist ^4.0, react-pdf ^9.0
+   - 在 FilePreview.tsx 加 v2 分支（<Document> + <Page>）
+   - text layer 让用户可复制 PDF 文字
+   - 模型可引用 (页码, 内容) —— 加新 IPC 返回 page-level text
+
+阶段 1: 1.5 周 — FilePreview 加 Univer 分支（xlsx/docx/pptx）
+阶段 2: 1 周 — Composer → renderer 链路
+阶段 3: 3 天 — 截图 + perf
+阶段 4: 1.5 周 — 编辑器模式
+```
+
+**阶段 0A 立即可做**（不需要用户再确认）：
+- 1 个 PR
+- 1 个新 spec
+- 1 张新截图（PDF iframe 预览）
+- 2 天完成
+
+### 9.6 引用来源
+
+- [Web Search: best PDF rendering library JavaScript React 2025] — 体积 + 性能对比
+- [Web Search: ChatGPT Claude.ai Cursor PDF document preview implementation] — 顶级 AI 工具 PDF 实现对比
