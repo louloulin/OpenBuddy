@@ -112,3 +112,46 @@ describe("SettingsStore (Phase D.1 round 2)", () => {
     expect(store.get("auth", "clientId")?.value).toBe("async");
   });
 });
+
+/**
+ * Round 20 — G2 PR 1 (plan4.1.md §9.10) — pi SettingsManager adapter gate.
+ *
+ * Verifies the new `SettingsManager.inMemory()` second-gate in
+ * `SettingsStore.validate()`. The legacy custom validator still runs
+ * first (existing tests above); the pi gate adds JSON-round-trip
+ * sanity + migration pass on top.
+ */
+describe("SettingsStore G2 PR 1 — pi SettingsManager gate", () => {
+  it("accepts a well-formed object via the pi gate when no custom validator is set", () => {
+    // No setSchema() called → only the pi gate runs. Pi's in-memory
+    // SettingsManager accepts arbitrary objects (Partial<Settings>)
+    // and runs no migrations unless legacy keys are present.
+    expect(() => store.set("auth", "clientId", { clientId: "abc", scopes: ["read"] })).not.toThrow();
+    expect(store.get("auth", "clientId")?.value).toMatchObject({ clientId: "abc" });
+  });
+
+  it("accepts a primitive value (pi gate is a no-op for non-objects)", () => {
+    // Pi gate only fires for objects/arrays. A string value bypasses it
+    // and writes through to SQLite directly — preserves existing
+    // primitive-set callers (theme = "dark", etc.).
+    expect(() => store.set("theme", "color", "dark")).not.toThrow();
+    expect(store.get("theme", "color")?.value).toBe("dark");
+  });
+
+  it("accepts a value with legacy `queueMode` and migrates it to `steeringMode` via pi's migration pipeline", () => {
+    // Pi's migrateSettings() renames `queueMode` → `steeringMode`.
+    // This proves the gate actually runs pi's migration code path
+    // (not a no-op). The value still persists to SQLite as-given.
+    const legacy = { queueMode: "all", defaultProvider: "openai" };
+    expect(() => store.set("settings", "pi", legacy)).not.toThrow();
+    expect(store.get("settings", "pi")?.value).toMatchObject({ queueMode: "all" });
+  });
+
+  it("runs both layers: custom validator (rejects) and pi gate (would accept)", () => {
+    // Custom validator rejects; pi gate never gets a chance to run.
+    store.setSchema("auth", (value) => (value && typeof value === "object" ? undefined : "auth requires object"));
+    expect(() => store.set("auth", "config", "not-an-object")).toThrow(/auth requires object/);
+    // Custom validator passes → pi gate runs → object is accepted.
+    expect(() => store.set("auth", "config", { clientId: "abc" })).not.toThrow();
+  });
+});

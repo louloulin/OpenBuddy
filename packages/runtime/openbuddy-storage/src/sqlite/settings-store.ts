@@ -25,12 +25,22 @@
  *   - The schema map is exposed via `setSchema(namespace, validator)`
  *     so callers can register validators per namespace lazily.
  *
+ * G2 PR 1 (Round 20, plan4.1.md §9.10) — the per-namespace validator
+ * now also delegates to pi's `SettingsManager.inMemory()` as a second
+ * gate. We construct an in-memory manager with the candidate value as
+ * its seed settings; pi runs its own migration/parsing pass and
+ * surfaces errors through `drainErrors()`. This wires pi's schema
+ * layer into our SQLite-backed wrapper while keeping the SQLite
+ * persistence path unchanged. The full typed validation (retry/image
+ * settings via `getRetrySettings()` etc.) lands in G2 PR 3 (Round 22+).
+ *
  * Reverse-dep invariant:
  *   imports nothing from electron/main/ and nothing from index.ts.
  */
 
 import type { SqliteDriver } from "./driver";
 import { SettingsRegistry, type StoredSetting } from "./settings";
+import { SettingsManager } from "@earendil-works/pi-coding-agent";
 
 /**
  * Minimal hand-rolled JSON schema validator. Returns an error
@@ -186,11 +196,37 @@ export class SettingsStore {
   }
 
   private validate(namespace: string, value: unknown): void {
+    // Layer 1 (legacy): per-namespace custom validator registered via
+    // `setSchema()`. Preserved exactly so existing OpenBuddy call sites
+    // (folder-trust, workbuddy-import) keep working without churn.
     const validator = this.validators.get(namespace);
-    if (!validator) return;
-    const error = validator(value);
-    if (error) {
-      throw new Error(`settings validation failed for "${namespace}": ${error}`);
+    if (validator) {
+      const error = validator(value);
+      if (error) {
+        throw new Error(`settings validation failed for "${namespace}": ${error}`);
+      }
+    }
+    // Layer 2 (G2 PR 1, Round 20): delegate to pi's `SettingsManager` as
+    // a second gate. We construct an in-memory manager with `value` as
+    // its seed settings, then drain any errors pi's migration pipeline
+    // reports. The probe is cheap (no file I/O — `InMemorySettingsStorage`)
+    // and per-call (fresh manager → no shared mutable state between calls).
+    //
+    // What pi actually validates here: settings-format migrations (legacy
+    // `queueMode → steeringMode`, `websockets: boolean → transport: enum`,
+    // `skills: object → array`, `retry.maxDelayMs → retry.provider.maxRetryDelayMs`)
+    // + JSON parse sanity. Strict typed validation of retry/image/etc.
+    // lands in G2 PR 3 once we route those settings through pi's typed
+    // getXxx/setXxx methods.
+    if (value !== null && (typeof value === "object" || Array.isArray(value))) {
+      const probe = SettingsManager.inMemory(value as Record<string, unknown>);
+      const errors = probe.drainErrors();
+      if (errors.length > 0) {
+        const detail = errors.map((e) => e.error.message).join("; ");
+        throw new Error(
+          `settings validation failed for "${namespace}" (pi): ${detail}`,
+        );
+      }
     }
   }
 }

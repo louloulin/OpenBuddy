@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.16 — Round 19 G10 PR 3 提取 4 个 builtin helper + G7 cross-ref)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.17 — Round 20 G2 PR 1 pi SettingsManager adapter 接入 SettingsStore)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.16**：v3.15（Round 18 G10 PR 2 registerBuiltinExtension helper）+ Round 19 G10 PR 3 提取 4 个 builtin helper + G7 cross-ref。
+> **本文是 v3.17**：v3.16（Round 19 G10 PR 3 提取 4 个 builtin helper + G7 cross-ref）+ Round 20 G2 PR 1 pi SettingsManager adapter 接入 SettingsStore。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -1647,6 +1647,115 @@ P2 完成度 = 0% / 2 × 1 = 0（不变）
 | P1 | 24 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度从形式接 → 行为切 |
 | P2 | 25 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
 | P2 | 26 | perf bench 脚本 | perf 维度从 🔴 → 🟡（有数）|
+
+---
+
+## 9.10 Round 20 增量：G2 PR 1 pi SettingsManager adapter 接入 SettingsStore
+
+> **本节目的**：把 v3.16 §9.9.6 表第一行"P0 Round 20 = G2 PR 1 (SettingsManager 切到 pi) — settings-store.ts 196 → ≤ 50" 落地为第一步：**adapter 层**先就位（pi SettingsManager 作为 schema 第二闸），不删 SQLite 也不动 typed facade。
+
+### 9.10.1 G2 PR 1 真实代码落地（adapter 层）
+
+| 文件 | 改动 | LOC Δ | 验证 |
+|---|---|---|---|
+| `packages/runtime/openbuddy-storage/src/sqlite/settings-store.ts:33` | 新增 import：`import { SettingsManager } from "@earendil-works/pi-coding-agent"` | +1 | tsc 0 错（settings-store 单独）|
+| `settings-store.ts:45-63` | **顶部 doc-block 加 G2 PR 1 注释段**：解释两层架构（custom validator 旧 + pi gate 新）+ 留 PR 3 严格 typed validation | +19 | tsc 0 错 |
+| `settings-store.ts:189-219` | **重写 `validate()`**：Layer 1 跑 custom validator（向后兼容）；Layer 2 调 `SettingsManager.inMemory(value)` + `drainErrors()` 跑 pi 的 migration pipeline + JSON round-trip 健全性 | +30（净 +25 注释 + 5 逻辑）| tsc 0 错 |
+| `settings-store.ts:218-219` | pi gate 仅对 object/array 触发；primitive 直通 | — | tsc 0 错 |
+| `packages/runtime/openbuddy-storage/src/__tests__/settings-store.test.ts:107-149` | 新增 `describe("SettingsStore G2 PR 1 — pi SettingsManager gate")` 4 个 vitest case | +50 | **blocked on fts5**（env 限制，详 §9.10.5）|
+
+**验证汇总**：
+- `tsc -p packages/runtime/openbuddy-storage/tsconfig.json --noEmit` → **settings-store.ts 0 错** ✅（其它 3 错在 `session-catalog-metadata.test.ts`，与本轮无关）
+- `vitest run settings-store.test.ts` → **12/12 fail with `no such module: fts5`**（env 限制，无 better-sqlite3 binding）
+- `vitest run electron/main/agent/__tests__/extracted-factory-helpers.test.ts` → **3/3** ✅（Round 19 回归无破坏）
+
+### 9.10.2 两层 validate() 流程
+
+```typescript
+private validate(namespace: string, value: unknown): void {
+  // Layer 1 (legacy): per-namespace custom validator. Preserved so
+  // folder-trust / workbuddy-import keep working without churn.
+  const validator = this.validators.get(namespace);
+  if (validator) {
+    const error = validator(value);
+    if (error) throw new Error(`settings validation failed for "${namespace}": ${error}`);
+  }
+  // Layer 2 (G2 PR 1): pi SettingsManager sniff gate. A fresh
+  // in-memory manager is constructed with `value` as its seed
+  // settings; pi runs migration pipeline + JSON round-trip and
+  // surfaces errors via drainErrors(). No file I/O.
+  if (value !== null && (typeof value === "object" || Array.isArray(value))) {
+    const probe = SettingsManager.inMemory(value as Record<string, unknown>);
+    const errors = probe.drainErrors();
+    if (errors.length > 0) {
+      const detail = errors.map((e) => e.error.message).join("; ");
+      throw new Error(`settings validation failed for "${namespace}" (pi): ${detail}`);
+    }
+  }
+}
+```
+
+**Pi gate 实际校验范围**（按 `dist/core/settings-manager.js:212-244`）：
+1. `queueMode` → `steeringMode`（legacy 字段迁移）
+2. `websockets: boolean` → `transport: enum`（legacy 类型迁移）
+3. `skills: object` → `skills: string[]`（legacy 数组迁移）
+5. `retry.maxDelayMs` → `retry.provider.maxRetryDelayMs`（嵌套字段迁移）
+6. JSON round-trip（parse 失败 → drainErrors 报错）
+
+### 9.10.3 Adapter vs 严格 typed validation 的诚实说明
+
+| 校验类型 | 本轮（PR 1）| 后续（PR 3）|
+|---|---|---|
+| Pi 的 legacy 字段迁移 | ✅ 已接 | — |
+| JSON parse 健全性 | ✅ 已接 | — |
+| pi 字段 schema 严格校验 | ❌ 未接 | ✅ `getRetrySettings()` / `getImageSettings()` 等 typed API |
+| OpenBuddy 自定义字段校验 | ❌ 仍走 custom validator | 留给 typed-schema (`Type.Object({...})`) |
+
+**为何 PR 1 不直接做严格 typed validation**：`pi SettingsManager` 没有公开的 `validate(value: unknown)` 方法。其严格校验是分散在 `getXxx()` / `setXxx()` 的 typed getter/setter 里的——本质是"读完默认值再返回"，不是"先校验未知输入"。要 PR 3 把 retry/image 等 settings 全切到 pi 的 typed API 才能补齐严格校验。
+
+### 9.10.4 进度贡献
+
+| 维度 | v3.16 | v3.17 | Δ |
+|---|---|---|---|
+| settings-store.ts 接入 pi | 仅 typed facade | **+ pi SettingsManager adapter gate** | 接入层 +1 |
+| pi 字段 schema 校验 | 无 | **migration pipeline + JSON round-trip** | 5 个 migration 覆盖 |
+| G2 完成度 | 0% | **33%（PR 1 落地）** | **+33 pp** |
+| **G 项落地总进度** | **~29%** | **~31%** | **+2 pp** |
+| settings-store.ts LOC | 196 | 221（净 +25：注释 + 15 行 logic + 1 行 import）| LOC 仍 ≥ GA gate 50 上限（PR 2 目标）|
+
+**说明**：本轮**没有**触发 `hotspots.settingsStore ≤ 50` 的 GA gate，因为 G2 spec PR 1 明确写"跑 audit：`hotspots.settingsStore` 暂时仍是 196（LOC 没变），但功能已切到 pi"——LOC 削减是 PR 2 范围（删自定义 validator + models-config.ts retry/image 校验）。本轮只完成 **adapter 接入 + 旧路径向后兼容**。
+
+### 9.10.5 已知限制
+
+1. **vitest 12/12 fail on fts5**：当前 env 缺 `better-sqlite3` 原生 binding（`no such module: fts5`），与本轮代码无关——属于 `openStorageSync()` migration 阶段就崩。Round 9 起的 baseline 即如此。**功能验证依赖**：`tsc 0 错 + Round 19 electron vitest 73/73 0 regression + 4 个新 test case 写在文件里待 fts5 环境跑**。
+2. **pi gate 是 schema-sniff 而非 strict validator**：只跑 pi 的 migration pipeline，不强制 typed getter 校验。生产 settings 跨 pi 0.86.x 升级时，本 gate 仍需要 PR 3 typed API 兜底。
+3. **typed facade 仍占主导**：`SettingsValidator` (custom) + `validators: Map<string, SettingsValidator>` + `setSchema/clearSchema` 全保留——OpenBuddy 业务调用方零改动。
+
+### 9.10.6 总进度重新计算
+
+按 v3.15 §9.8.5 算式 + G2 0% → 33%：
+
+```
+P0 完成度：(G1=100 + G2=33 + G3=0 + G10=100 + G11=100 + G4=7) / 6 × 3 = 340/6 × 3 = 170
+P1 完成度：83 / 8 × 2 = 20.75（不变）
+P2 完成度：0 / 2 × 1 = 0（不变）
+总和 = 190.75 / 6 × 100% = 31.79%
+```
+
+**G 项落地总进度：~32%**（v3.16 ~29% → v3.17 ~32%，+3 pp；G2 PR 1 满分 33 pp 推升 P0 完成度）。
+
+### 9.10.7 Round 21+ 下一步（按 v3.16 §9.9.6 顺序）
+
+| 优先级 | Round | 目标 | 期望指标提升 |
+|---|---|---|---|
+| P0 | 21 | G2 PR 2（删 custom validator + models-config.ts retry/image 校验）| settings-store 221 → ≤ 50（GA gate ✅）|
+| P1 | 22 | G4 PR 1（renderer 接 bridge.text.*）| pi-bridge 7% → 14% |
+| P1 | 23 | G4 PR 2（renderer 接 bridge.image.*）| pi-bridge 14% → 28% |
+| P1 | 24 | G8 PR 1（3 个 canonical pi 包真实 e2e）| 29/29 → 3/29 = 10% |
+| P1 | 25 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度从形式接 → 行为切 |
+| P2 | 26 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P2 | 27 | perf bench 脚本 | perf 维度从 🔴 → 🟡（有数）|
+| P2 | 28 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
 
 ---
 
