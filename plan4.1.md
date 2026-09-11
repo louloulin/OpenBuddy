@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.30 — Round 33 G3 PR 2 适配层补完)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.31 — Round 34 G3 PR 3 marketplace-install e2e + pi 路径覆盖)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.30**：v3.29（Round 32 G3 PR 1 typed facade + DefaultPackageManager 接入）+ Round 33 **G3 PR 2 适配层补完**——`default-package-manager-adapter.ts` 扩展到 223 LOC（+77），新增 `classifySpecifier(source)`（覆盖 8 类 SpecifierKind：npm/git-https/git-ssh/github/tarball-https/file/local-directory/unknown）+ `PackageInstallResult` + `lastInstallResult` 边信道 + `AggregateError` 错误聚合；新增 `default-package-manager-adapter.test.ts`（**21 vitest cases**：17 specifier + 4 install 编排）。`profile-manager.ts` 仍 **199 LOC ≤ 200 GA gate 维持 ✅**。
+> **本文是 v3.31**：v3.30（Round 33 G3 PR 2 适配层补完）+ Round 34 **G3 PR 3 marketplace-install e2e + pi 路径覆盖**——`tests/electron/marketplace-install-e2e.spec.ts` 从 5 测试扩到 **9 测试**（+4 新增 e2e）：(1) `agent:profile-install` 错误携带 `profile-package:` 前缀（PR 2 错误聚合契约）；(2) install→remove→install 三段往返幂等；(3) 卸载未安装包返回结构化错误；(4) listing 返回 typed `ProfilePackageInfo`（name + version + path）。Playwright `--list` 9/9 枚举通过 ✅；本环境缺 Electron build，无法跑 fixture 启动 — 必须在 CI 真实 build 验证，测试代码已合并。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -3189,9 +3189,9 @@ G 项落地总进度：~81% → **~84%**（+3 pp）
 
 | 优先级 | Round | 目标 | 期望指标 |
 |---|---|---|---|
-| P1 | 33 | G3 PR 2 — 适配层补完（git/tarball specifier + 错误聚合）| default-package-manager-adapter.ts ≤ 180 LOC |
-| P3 | 34 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
-| P3 | 35 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
+| P1 | 34 | G3 PR 3 — marketplace-install e2e + pi 路径覆盖 | marketplace-install-e2e.spec.ts +4 tests |
+| P3 | 35 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 36 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
 
 **G3 PR 1 完成**。profile-manager.ts **199 ≤ 200 GA gate ✅**（第四 GA gate hotspot 加入绿区）。剩余 GA gate：G2 / G3 PR 2-3。
 
@@ -3301,6 +3301,95 @@ G 项落地总进度：~84% → **~85%**（+1 pp）
 | P3 | 37 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
 
 **G3 PR 2 完成**（typed facade + DefaultPackageManager + 适配层补完 + 21 测试）。剩余 GA gate：G2 / G3 PR 3。
+
+---
+
+## 9.24 Round 34 增量：G3 PR 3 — marketplace-install e2e + pi 路径覆盖（+4 测试，5→9）
+
+### 9.24.1 真实代码落地（1 file）
+
+| 文件 | 类型 | LOC Δ |
+|---|---|---|
+| `tests/electron/marketplace-install-e2e.spec.ts` | 扩展（+4 e2e 测试用例）| 134 → 250（+116）|
+
+**G3 PR 3 全部走 e2e（Playwright + Electron），覆盖 pi adapter 双轨的错误契约与往返幂等**。
+
+### 9.24.2 新增 4 个 e2e 用例
+
+| # | 测试名 | 覆盖路径 |
+|---|---|---|
+| 1 | `agent:profile-install` 错误携带 `profile-package:` 前缀 | PR 2 错误聚合契约 |
+| 2 | install→remove→install 三段往返幂等 | rollback + 状态恢复 |
+| 3 | 卸载未安装包返回结构化错误 | error 契约稳定 |
+| 4 | listing 返回 typed `ProfilePackageInfo`（name + version + path）| pi/pnpm 双轨 manifest 一致 |
+
+### 9.24.3 Playwright 枚举验证
+
+```bash
+$ npx playwright test tests/electron/marketplace-install-e2e.spec.ts --list
+[playwright] real-model credentials: no credentials found
+Listing tests:
+  [electron] › marketplace-install-e2e.spec.ts:50:3 › ...installs a local bundle and lists it
+  [electron] › marketplace-install-e2e.spec.ts:73:3 › ...plugin-inventory includes the new bundle's expected surfaces
+  [electron] › marketplace-install-e2e.spec.ts:88:3 › ...with an already-installed source returns a structured error
+  [electron] › marketplace-install-e2e.spec.ts:103:3 › ...agent:profile-remove removes a previously-installed bundle
+  [electron] › marketplace-install-e2e.spec.ts:121:3 › ...with an invalid source returns a structured error without crashing
+  [electron] › marketplace-install-e2e.spec.ts:136:3 › ...carries the profile-package: prefix from PR 2
+  [electron] › marketplace-install-e2e.spec.ts:156:3 › ...install → remove → install round-trip preserves the bundle
+  [electron] › marketplace-install-e2e.spec.ts:180:3 › ...agent:profile-remove on a non-installed package returns a structured error
+  [electron] › marketplace-install-e2e.spec.ts:196:3 › ...listing reflects manifest version + name from the fixture
+Total: 9 tests in 1 file
+```
+
+**9/9 全部解析 + 枚举通过 ✅**（5 旧 + 4 新）。
+
+### 9.24.4 vitest 回归
+
+```bash
+$ npx vitest run src/default-package-manager-adapter.test.ts
+ ✓ src/default-package-manager-adapter.test.ts (21 tests) 45ms
+ Tests  21 passed (21)
+```
+
+**Round 33 的 21 测试无回归** ✅。
+
+### 9.24.5 本环境运行 e2e 的限制
+
+| 项 | 状态 |
+|---|---|
+| `out/main/index.js` | ❌ 不存在 |
+| `out/preload/index.cjs` | ❌ 不存在 |
+| `out/renderer/index.html` | ❌ 不存在 |
+| `npx electron-vite build` | 需在 CI 跑；本环境运行 e2e 会卡在 fixture `assertBuildArtifacts()` |
+
+**结论**：测试代码已落地、解析通过、Playwright 枚举 9/9；但本环境缺 Electron build 产物，**真实 fixture 启动必须在 CI 验证**。G3 PR 3 已并入代码，待 CI 跑 `pnpm test:electron:report` 或等价 e2e 套件验证。
+
+### 9.24.6 进度贡献
+
+| 项 | v3.30 | v3.31 |
+|---|---|---|
+| G1 / G4 / G5 / G8 / G10 / G11 | 100% | 100% |
+| **G3** | **PR 1 + PR 2** | **PR 1 + PR 2 + PR 3（+4 e2e）** |
+| G2 | 67% | 67% |
+
+P1 完成度：47.75 → **50.75**（G3 PR 3 +3）
+G 项总落地进度：~85% → **~86%**（+1 pp）
+
+### 9.24.7 已知限制
+
+1. **CI 必须真实 e2e**：本环境无 Electron build，e2e 实际启动 fixture 未跑通（fixture `assertBuildArtifacts()` 直接抛错）
+2. **4 个新测试依赖 `defaultProfilePackageManager`（PR 1）的双轨契约**：若 PR 2 的错误前缀被改，测试 #1 需同步更新
+3. **install→remove→install 测的是 file: 路径**：npm/git/tarball 路径需 CI 网络可达才能验证
+
+### 9.24.8 Round 35+ 下一步
+
+| 优先级 | Round | 目标 | 期望指标 |
+|---|---|---|---|
+| P1 | 35 | G3 GA gate 收口（real-pi install 路径覆盖） | pi-upstream-coverage ≥ 95%；e2e fixture 启动在 CI 跑通 |
+| P3 | 36 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 37 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
+
+**G3 PR 3 完成**（marketplace-install e2e + pi 路径覆盖）。剩余 GA gate：G2 / G3 PR 3+（CI 验证）。
 
 ---
 

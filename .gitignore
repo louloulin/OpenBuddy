@@ -108,6 +108,8 @@ docs/*
 !docs/ROUND32_IMPLEMENTATION_REPORT.md
 # Round 33 G3 PR 2 — 适配层补完 (specifier 分类 + 错误聚合 + 21 测试) (LUM-785, 2026-09-11)
 !docs/ROUND33_IMPLEMENTATION_REPORT.md
+# Round 34 G3 PR 3 — marketplace-install e2e + pi 路径覆盖 (+4 测试, 5→9) (LUM-785, 2026-09-11)
+!docs/ROUND34_IMPLEMENTATION_REPORT.md
 !docs/grok-to-pi-replacement-audit.md
 !docs/workbuddy-points-system-comparison.md
 !docs/enterprise-live-verification-2026-08-31.md
