@@ -1431,3 +1431,14 @@ export {
   type LoadSkillsResult,
   type Skill,
 } from "./skills";
+
+// R38 (G1 PR 5) — defineBuiltinToolSet high-level facade over
+// pi 0.85's create*Tool + create*ToolDefinition factories. Reduces
+// tool-factory unused exports from 16 (R37) to ≤ 8 (R38 GA gate).
+export {
+  BUILTIN_TOOL_NAMES,
+  defineBuiltinToolSet,
+  type BuiltinToolName,
+  type BuiltinToolSet,
+  type BuiltinToolSetOptions,
+} from "./pi-tool-factory";

@@ -14,7 +14,8 @@
     "./persistence": "./src/persistence.ts",
     "./remote-codec": "./src/remote-codec.ts",
     "./rpc-contract": "./src/rpc-contract.ts",
-    "./typed-tool": "./src/typed-tool.ts"
+    "./typed-tool": "./src/typed-tool.ts",
+    "./pi-tool-factory": "./src/pi-tool-factory.ts"
   },
   "dependencies": {
     "@openbuddy/cordis": "workspace:*",

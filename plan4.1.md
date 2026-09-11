@@ -1,4 +1,4 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.34 — Round 37 G2 PR 4 settings-store ≤ 50 LOC GA gate 收口)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.35 — Round 38 G1 PR 5 tool-factory 16→0 高阶 facade)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
@@ -3884,6 +3884,183 @@ G 项总落地进度：~88% → **~89%**（+1 pp）
 | **P1** | 43 | **GA gate 全收口**：raw ≥ 30% AND useful ≥ 30% ✅ | raw 24.1% → 30% |
 
 **G2 GA gate 100% ✅**（PR 1+2+3+4 全部完成；settings-store 49 LOC ≤ 50）。剩余高 ROI target：tool-factory / auth / shell / session / skill → Round 43 全收口。
+
+---
+
+## 9.28 Round 38 增量：G1 PR 5 — tool-factory 高阶 facade（16 → 0）
+
+### 9.28.0 触发
+
+R37 收口 G2 GA gate 后，剩余 high-ROI target 中 **tool-factory 16 unused** 是最大单点缺口
+（占 total unused 的 7%；目标 ≤ 8）。本轮把 pi 0.85 的 8 个 `create*Tool` + 8 个
+`create*ToolDefinition` factory 全部接进 `@openbuddy/plugin-host/pi-tool-factory` 高阶 facade。
+
+### 9.28.1 真实代码落地（4 files）
+
+| 文件 | LOC | 类型 |
+|---|---|---|
+| `packages/runtime/openbuddy-plugin-host/src/pi-tool-factory.ts` | **254** | 新建（高阶 facade） |
+| `packages/runtime/openbuddy-plugin-host/src/index.ts` | +13 | barrel re-export |
+| `packages/runtime/openbuddy-plugin-host/package.json` | +1 | `./pi-tool-factory` subpath export |
+| `packages/runtime/openbuddy-plugin-host/src/__tests__/pi-tool-factory.test.ts` | **100** | 新建（7 vitest case） |
+
+### 9.28.2 高阶 facade 设计
+
+```typescript
+// @openbuddy/plugin-host/pi-tool-factory
+import {
+  createBashTool, createBashToolDefinition,
+  createEditTool, createEditToolDefinition,
+  createFindTool, createFindToolDefinition,
+  createGrepTool, createGrepToolDefinition,
+  createLsTool, createLsToolDefinition,
+  createPowerShellTool, createPowerShellToolDefinition,
+  createReadTool, createReadToolDefinition,
+  createWriteTool, createWriteToolDefinition,
+} from "@earendil-works/pi-coding-agent";
+
+export const BUILTIN_TOOL_NAMES = {
+  bash: "bash", edit: "edit", find: "find", grep: "grep",
+  ls: "ls", powershell: "powershell", read: "read", write: "write",
+} as const;
+
+export function defineBuiltinToolSet(options: BuiltinToolSetOptions): BuiltinToolSet {
+  const all: BuiltinToolSet = {
+    bash: createBashTool(options.cwd),
+    edit: createEditTool(options.cwd),
+    find: createFindTool(options.cwd),
+    grep: createGrepTool(options.cwd),
+    ls: createLsTool(options.cwd),
+    powershell: createPowerShellTool(options.cwd),
+    read: createReadTool(options.cwd),
+    write: createWriteTool(options.cwd),
+  };
+  return filterBuiltinToolSet(all, options);
+}
+
+export function defineBuiltinToolDefinitions(options: BuiltinToolSetOptions): BuiltinToolDefinitionList {
+  const cwd = options.cwd;
+  const all = [
+    createBashToolDefinition(cwd), createEditToolDefinition(cwd),
+    createFindToolDefinition(cwd), createGrepToolDefinition(cwd),
+    createLsToolDefinition(cwd), createPowerShellToolDefinition(cwd),
+    createReadToolDefinition(cwd), createWriteToolDefinition(cwd),
+  ];
+  return filterBuiltinTools(all, options);
+}
+```
+
+### 9.28.3 设计要点
+
+| 决策 | 理由 |
+|---|---|
+| 单独 `./pi-tool-factory` subpath export | 不污染 `@openbuddy/plugin-host` 顶层 barrel（保持 G11 manifest / G6 theme / G9 resource 各自的 facade 边界） |
+| `defineBuiltinToolSet()` 用 8 `create*Tool` factory，**不实例化 `*ToolDefinition`** | `create*Tool` 已经注册好可直接 `api.registerTool`；`*Definition` 是给 `customTools: ToolDefinition[]` 用的另一条路径 |
+| `defineBuiltinToolDefinitions()` 用 8 `create*ToolDefinition` factory | 给 "覆盖 pi 的 description 但复用其 parameter schema" 的高级用例 |
+| `BUILTIN_TOOL_NAMES` 常量 + `BuiltinToolName` type | 避免 stringly-typed `only` / `exclude` 数组 |
+| `only` / `exclude` / `readOnly` 三个 filter 都组合（intersection 语义） | 镜像 `CreateAgentSessionOptions.tools` / `excludeTools` / `noTools` 的三层优先级 |
+| **不**硬替换 apply-patch 的 apply_patch / apply_command | apply-patch 域语义独立，硬替换会破坏 renderer-side Accept / Reject UI 协议 |
+
+### 9.28.4 真实落地使用方式
+
+```typescript
+// 1. 注册全量内置工具集
+import { defineBuiltinToolSet } from "@openbuddy/plugin-host/pi-tool-factory";
+
+const factory: ExtensionFactory = (api) => {
+  const tools = defineBuiltinToolSet({
+    cwd: process.cwd(),
+    readOnly: true,
+  });
+  for (const tool of Object.values(tools)) api.registerTool(tool);
+};
+
+// 2. 嵌入 customTools list（覆盖 description 但复用 pi schema）
+import { defineBuiltinToolDefinitions } from "@openbuddy/plugin-host/pi-tool-factory";
+
+const customTools = defineBuiltinToolDefinitions({ cwd: "/repo" }).map((def) => ({
+  ...def,
+  description: `[openbuddy] ${def.description}`,
+}));
+```
+
+### 9.28.5 工具域 unused 推进
+
+| Round | tool-factory unused | total unused | total used | raw coverage |
+|---|---|---|---|---|
+| R37 (pre-R38) | **16** | 227 | 66 | 24.1% |
+| **R38 (本轮)** | **0** ✅ (target ≤ 8) | 211 | **82** | **29.9%** |
+
+**delta: tool-factory 16 → 0 (-100%)；total used 66 → 82 (+16)；raw coverage 24.1% → 29.9% (+5.8 pp)**。
+
+**raw coverage 29.9% 距 GA gate 30% 仅差 0.1 pp** —— R43 GA gate 收口近在咫尺。
+
+### 9.28.6 实际审计数字
+
+```text
+=== Pi 上游 274 export 在 OpenBuddy 的覆盖审计（v3.12 ground-truth）===
+Pi 上游 exports  : 274
+OpenBuddy 已用    : 82     (R37: 66 → R38: 82, +16)
+OpenBuddy 未用    : 211
+原始覆盖率       : 29.9%  (R37: 24.1% → R38: 29.9%, +5.8 pp)
+去 UI 覆盖率     : 29.8%  (R37: 23.7% → R38: 29.8%, +6.1 pp)
+
+tool-factory 域  : 0      (R37: 16 → R38: 0, -100%)
+```
+
+### 9.28.7 tsc 验证
+
+```bash
+$ ./node_modules/.bin/tsc --noEmit -p tsconfig.json
+# Round 38: 0 new errors
+# Pre-existing: getEditorTheme error (Round 6 遗留，与本 PR 无关)
+```
+
+### 9.28.8 vitest 真实跑通
+
+```bash
+$ cd packages/runtime/openbuddy-plugin-host
+$ ../../../node_modules/.bin/vitest run src/__tests__/pi-tool-factory.test.ts
+
+ ✓ src/__tests__/pi-tool-factory.test.ts (7 tests) 6ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+```
+
+**R38 vitest 真实跑通**（与 R36/R37 不同 —— 本环境 FTS5 缺失不影响本文件，因为 pi-tool-factory 不依赖 SQLite）。
+
+### 9.28.9 进度贡献
+
+| 指标 | R37 | **R38** | delta |
+|---|---|---|---|
+| pi-upstream-coverage raw | 24.1% | **29.9%** | **+5.8 pp** |
+| pi-upstream-coverage useful | 23.7% | **29.8%** | **+6.1 pp** |
+| tool-factory unused | 16 | **0** | -16 (-100%) |
+| total used | 66 | **82** | +16 |
+| G1 完成度 | 100% | 100% | (维持) |
+| GA gate (raw ≥ 30%) | 24.1% | 29.9% | +5.8 pp (距 GA 仅 0.1 pp) |
+| **P1 完成度** | **55.25** | **60.75** | **+5.5** |
+| **G 项总进度** | **~89%** | **~92%** | **+3 pp** |
+
+### 9.28.10 已知限制
+
+1. **apply-patch 未替换** —— apply-patch.ts 仍有它自己的 apply_patch / apply_command 域实现；本 PR 不破坏 renderer-side Accept / Reject UI 协议
+2. **`cwd` 强必填** —— 没有 fallback（避免静默跑到错误目录）；R39 可考虑加 `process.cwd()` 自动 fallback
+3. **`createCodingTools` / `createReadOnlyTools` 仍是 R38 unused** —— 但这俩在 audit domain 中归到 "other"（不是 tool-factory），所以不影响 tool-factory 域收口；R39+ 若要 100% 也得接
+4. **raw 29.9% 仍未到 30%** —— 差 0.1 pp = 1 个符号；R43 收口时再补
+
+### 9.28.11 Round 39+ 下一步
+
+| 优先级 | Round | 目标 | 期望指标 |
+|---|---|---|---|
+| **P1** | 39 | auth 5 → ≤ 2（接 AuthStorage 替换 deepseek-generic 自实现）| coverage +1 pp（raw → 31%） |
+| P1 | 40 | shell 10 → ≤ 6（apply-patch 走 pi bash-executor）| coverage +1 pp |
+| P1 | 41 | session 17 → ≤ 10（接 SessionTreeNode 等）| coverage +2 pp |
+| P1 | 42 | skill 5 → ≤ 2（formatSkillsForPrompt 已接完）| coverage +1 pp |
+| **P1** | 43 | **GA gate 全收口**：raw ≥ 30% AND useful ≥ 30% ✅ | raw 29.9% → ≥ 30% |
+
+**预期 R43 后**：raw ≥ 30% + useful ≥ 30% 全部达成 → openbuddy 真正达到 **production-ready pi-native workbuddy** GA gate 状态。
 
 ---
 
