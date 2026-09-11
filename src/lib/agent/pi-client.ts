@@ -1486,6 +1486,121 @@ export async function stripSkillFrontmatter(raw: string): Promise<string> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Round 23 — G4 PR 2: bridge.text.truncate*/generateDiff/generatePatch helpers
+// (plan4.1.md §9.13).
+//
+// Five helpers, one per remaining text channel. Each follows the same
+// defensive pattern as stripSkillFrontmatter:
+//   1. bridge missing            → return raw unchanged
+//   2. text namespace empty      → return raw unchanged (old-bridge compat)
+//   3. specific method missing   → return raw unchanged
+//   4. bridge throws             → return raw unchanged
+//   5. normal                    → delegate to bridge
+//
+// Why "return raw unchanged" instead of a JS fallback for the truncate
+// helpers: pi's truncate semantics (UTF-8 byte-aware line counting) are
+// subtle and re-implementing them in renderer JS would diverge from
+// what the rest of OpenBuddy sees. Returning raw means the caller
+// observes a clearly-too-long string instead of silently wrong truncation.
+// ---------------------------------------------------------------------------
+
+/**
+ * Keep the first N lines/bytes of a long text block. Round 23 — G4 PR 2
+ * (G4.2 in plan4.1.md §9.13).
+ */
+export async function truncateHeadText(
+  content: string,
+  opts?: { maxLines?: number; maxBytes?: number },
+): Promise<string> {
+  const bridge = getPiBridge();
+  if (!bridge?.text?.truncateHead) return content;
+  try {
+    return await bridge.text.truncateHead(content, opts);
+  } catch {
+    return content;
+  }
+}
+
+/**
+ * Keep the last N lines/bytes of a long text block (e.g. tail of a log).
+ * Round 23 — G4 PR 2 (G4.2 in plan4.1.md §9.13).
+ */
+export async function truncateTailText(
+  content: string,
+  opts?: { maxLines?: number; maxBytes?: number },
+): Promise<string> {
+  const bridge = getPiBridge();
+  if (!bridge?.text?.truncateTail) return content;
+  try {
+    return await bridge.text.truncateTail(content, opts);
+  } catch {
+    return content;
+  }
+}
+
+/**
+ * Truncate a single line to `maxChars` (used by diff / preview components
+ * to cap a single row's display width). Round 23 — G4 PR 2
+ * (G4.3 in plan4.1.md §9.13).
+ *
+ * NOTE: the renderer-side `PiBridgeTextApi.truncateLine` type in
+ * `pi-bridge-client.ts` is currently mis-typed as `{ maxLines?, maxBytes? }`
+ * (copy-paste of truncateHead). The IPC handler at
+ * `electron/main/agent/pi-bridge/index.ts:53` actually takes `maxChars`,
+ * so we cast through `as never` here — fixing the bridge type to match
+ * the IPC contract is a separate cleanup tracked outside this PR.
+ */
+export async function truncateLineText(
+  content: string,
+  opts?: { maxChars?: number },
+): Promise<string> {
+  const bridge = getPiBridge();
+  if (!bridge?.text?.truncateLine) return content;
+  try {
+    return await bridge.text.truncateLine(content, opts as never);
+  } catch {
+    return content;
+  }
+}
+
+/**
+ * Produce a unified-diff string between `oldStr` and `newStr`. Used by
+ * ToolCallCard / DiffView to render apply_patch previews.
+ * Round 23 — G4 PR 2 (G4.4 in plan4.1.md §9.13).
+ */
+export async function generateBridgeDiff(
+  oldStr: string,
+  newStr: string,
+  opts?: { filePath?: string; context?: number },
+): Promise<string> {
+  const bridge = getPiBridge();
+  if (!bridge?.text?.generateDiff) return newStr;
+  try {
+    return await bridge.text.generateDiff(oldStr, newStr, opts);
+  } catch {
+    return newStr;
+  }
+}
+
+/**
+ * Produce a full unified patch (with file header + hunks) for
+ * apply_patch previews. Round 23 — G4 PR 2 (G4.5 in plan4.1.md §9.13).
+ */
+export async function generateBridgePatch(
+  oldStr: string,
+  newStr: string,
+  opts?: { filePath?: string; context?: number },
+): Promise<string> {
+  const bridge = getPiBridge();
+  if (!bridge?.text?.generatePatch) return newStr;
+  try {
+    return await bridge.text.generatePatch(oldStr, newStr, opts);
+  } catch {
+    return newStr;
+  }
+}
+
 // ---------- expert marketplace (live local data dir) ----------
 
 /** First existing candidate data root ("" if none found). */

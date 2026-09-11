@@ -86,6 +86,8 @@ docs/*
 !docs/ROUND21_IMPLEMENTATION_REPORT.md
 # Round 22 G4 PR 1 — bridge.text.stripFrontmatter wired into renderer (LUM-785, 2026-09-11)
 !docs/ROUND22_IMPLEMENTATION_REPORT.md
+# Round 23 G4 PR 2 — bridge.text.truncate*/generateDiff/generatePatch wired into renderer (LUM-785, 2026-09-11)
+!docs/ROUND23_IMPLEMENTATION_REPORT.md
 !docs/grok-to-pi-replacement-audit.md
 !docs/workbuddy-points-system-comparison.md
 !docs/enterprise-live-verification-2026-08-31.md

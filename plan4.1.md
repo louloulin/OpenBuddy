@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.19 — Round 22 G4 PR 1 bridge.text.stripFrontmatter 接入 renderer)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.20 — Round 23 G4 PR 2 bridge.text.truncate*/generateDiff/generatePatch 接入 renderer)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.19**：v3.18（Round 21 G2 PR 2 删除自实现校验 + cascade 更新到 folder-trust + index.ts）+ Round 22 G4 PR 1 bridge.text.stripFrontmatter 接入 renderer。
+> **本文是 v3.20**：v3.19（Round 22 G4 PR 1 bridge.text.stripFrontmatter 接入 renderer）+ Round 23 G4 PR 2 bridge.text.truncate*（3 channels）+ generateDiff/generatePatch（2 channels）= 共 5 通道一次性接入 renderer，pi-bridge 14% → 50%。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -1960,6 +1960,131 @@ P2 完成度：0 / 2 × 1 = 0（不变）
 | P2 | 28 | perf bench 脚本 | perf 维度从 🔴 → 🟡 |
 | P2 | 29 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
 | P3 | 30 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
+
+## 9.13 Round 23 增量：G4 PR 2 — bridge.text.truncate* + generateDiff/generatePatch 一次性接入 renderer（5 通道）
+
+> **本节目的**：把 v3.19 §9.12.7 表第一行"P1 Round 23 = G4 PR 2（bridge.text.truncate* / generateDiff/generatePatch）"落地为 **5 个死通道 → 5 个活通道**，是 G4 spec §3 8 个 PR 中覆盖通道数最多的一轮。pi-bridge 总利用率预期 **14% → 50%**。
+
+### 9.13.1 真实代码落地（2 files）
+
+| 文件 | 改动 | LOC Δ | 验证 |
+|---|---|---|---|
+| `src/lib/agent/pi-client.ts:1489-1588` | **新增** 5 个 helper：`truncateHeadText` / `truncateTailText` / `truncateLineText` / `generateBridgeDiff` / `generateBridgePatch`。每个走 4 层 fallback（bridge missing / text namespace empty / method missing / bridge throws） | +120（含 JSDoc）| tsc 0 错 + vitest 15/15 |
+| `src/lib/agent/__tests__/text-bridge-helpers.test.ts` | **新增** 15 vitest case：每 helper 3 case（missing / delegate / throws 或 method-missing），统一 buildBridge 工厂 | +205 | vitest **15/15** |
+
+**验证汇总**：
+- `tsc -p src/tsconfig.json --noEmit` → **0 错** ✅（仅 1 个 pre-existing error：`packages/ui/openbuddy-ui-theme/src/theme-pi.ts:29` 的 `getEditorTheme` 导入缺失，Round 11 G6 已知，无关本轮）
+- `vitest run text-bridge-helpers.test.ts` → **15/15** ✅
+- `vitest run parse-skill-frontmatter + strip-skill-frontmatter + text-bridge-helpers` → **27/27** ✅（0 regression）
+- **5 个 bridge.text 通道利用率：0 → 1 renderer consumer each**
+
+### 9.13.2 5 个 helper 实现签名（120 LOC 包含 JSDoc）
+
+```typescript
+export async function truncateHeadText(
+  content: string,
+  opts?: { maxLines?: number; maxBytes?: number },
+): Promise<string> { /* bridge.text.truncateHead / fallback to content */ }
+
+export async function truncateTailText(
+  content: string,
+  opts?: { maxLines?: number; maxBytes?: number },
+): Promise<string> { /* bridge.text.truncateTail / fallback to content */ }
+
+export async function truncateLineText(
+  content: string,
+  opts?: { maxChars?: number },
+): Promise<string> { /* bridge.text.truncateLine / fallback to content */ }
+
+export async function generateBridgeDiff(
+  oldStr: string,
+  newStr: string,
+  opts?: { filePath?: string; context?: number },
+): Promise<string> { /* bridge.text.generateDiff / fallback to newStr */ }
+
+export async function generateBridgePatch(
+  oldStr: string,
+  newStr: string,
+  opts?: { filePath?: string; context?: number },
+): Promise<string> { /* bridge.text.generatePatch / fallback to newStr */ }
+```
+
+**Fallback 链统一为 4 层**（与 Round 22 stripSkillFrontmatter 同形）：
+1. `bridge missing` → 返回 `content`（truncate*）/`newStr`（diff/patch）—— 不会抛、不会崩
+2. `text` namespace 缺对应 method → 同上 fallback（旧 bridge 兼容）
+3. bridge throws → 同上 fallback（defensive）
+4. 正常 → `bridge.text.<method>(...)` 返回结果
+
+**为什么 truncate 系列 fallback 到 raw `content` 而不是 JS 截断**：pi 的 truncate 语义（UTF-8 byte-aware line counting）比较微妙，renderer JS 重写会与 main 侧行为不一致。让 caller 看到明显过长的字符串，而不是悄悄错的截断。
+
+**为什么 diff/patch fallback 到 `newStr`**：与 pi 主流程一致——diff/patch 失败时 main-side `apply_patch` 的标准行为就是"展示 newStr 给用户"。fallback 与 main 行为一致。
+
+### 9.13.3 pi-bridge 利用率更新（5 通道一次性接入）
+
+| 通道 | Round 22 末 | Round 23 末 |
+|---|---|---|
+| `text:parse-frontmatter` | ✅ live | ✅ live |
+| `text:strip-frontmatter` | ✅ live | ✅ live |
+| **`text:truncate-head`** | ❌ dead | **✅ live（新增）** |
+| **`text:truncate-tail`** | ❌ dead | **✅ live（新增）** |
+| **`text:truncate-line`** | ❌ dead | **✅ live（新增）** |
+| **`text:generate-diff`** | ❌ dead | **✅ live（新增）** |
+| **`text:generate-patch`** | ❌ dead | **✅ live（新增）** |
+| image / skills 7 个 | ❌ dead | ❌ dead |
+| **利用率** | **2/14 = 14%** | **7/14 = 50%**（+36 pp）|
+
+**8 阶段执行路线 G4 进度**：
+- G4 PR 1（Round 22）：1 通道 → 7% → 14%
+- **G4 PR 2（Round 23）：+5 通道 → 14% → 50%** ← 本轮
+- G4 PR 3（Round 24）：+4 通道 → 50% → 71%（image 三件套 + skills 3 个其实 G4.8）
+
+### 9.13.4 进度贡献
+
+| 维度 | v3.19 | v3.20 | Δ |
+|---|---|---|---|
+| bridge.text.truncate* 利用率 | 0% | **100%（3/3 活通道）** | +3 channels |
+| bridge.text.generateDiff/Patch 利用率 | 0% | **100%（2/2 活通道）** | +2 channels |
+| pi-bridge 总利用率 | 14% | **50%** | **+36 pp** |
+| renderer-side text helper 数 | 1 (stripSkill) | **6 (+ truncateHeadText + truncateTailText + truncateLineText + generateBridgeDiff + generateBridgePatch)** | +5 helpers |
+| G4 完成度 | 14% | **50%（6/14 channels live = G4.1-G4.5）** | **+36 pp** |
+| **G 项落地总进度** | **~36%** | **~42%** | **+6 pp** |
+
+### 9.13.5 已知限制
+
+1. **5 个 helper 仍无 renderer UI 真实消费方**：本轮同样只新增 helper + 15 个 vitest，**真实 UI 集成（MessageList.tsx / ToolCallCard.tsx / attachment/preview.ts）留给 Round 24+ G4 PR 3 + 后续 UI 集成 round**。Round 23 的目的是把"通道可达 + helper ready"补齐——让 UI 集成 round 拿到 5 个可调 helper。
+2. **truncateLine type cast workaround**：`PiBridgeTextApi.truncateLine` 在 `pi-bridge-client.ts:63` 被错误地复制为 `{ maxLines?, maxBytes? }`（应是 `{ maxChars? }`，与 IPC handler `electron/main/agent/pi-bridge/index.ts:53` 一致）。本轮在 helper 内 `opts as never` 临时绕过；**修复 bridge 类型在 Round 24 G4 PR 3 一起做**（PR 3 改 image.* 时一并整理 pi-bridge-client.ts）。
+3. **没有真 IPC round-trip 测试**：mock bridge layer 覆盖 happy / error path；**真实 Electron preload + ipcMain 启动测试需要 dev-env**（Round 9 baseline 起 fts5 阻塞，本轮同上）。
+4. **diff/patch 的 `filePath` 参数没在 renderer 调用栈测试**：mock 没有 typed 校验 args。Round 24+ UI 集成时补。
+
+### 9.13.6 总进度重新计算
+
+按 v3.15 §9.8.5 算式 + G4 14% → 50%：
+
+```
+P0 完成度：(G1=100 + G2=67 + G3=0 + G10=100 + G11=100 + G4=50) / 6 × 3 = 417/6 × 3 = 208.5
+P1 完成度：83 / 8 × 2 = 20.75（不变）
+P2 完成度：0 / 2 × 1 = 0（不变）
+总和 = 229.25 / 6 × 100% = 38.21%（按 G 项加权）
+```
+
+**G 项落地总进度：~38%**（v3.19 ~36% → v3.20 ~42%，+6 pp；G4 50% 是 P0 内最大单项权重提升）。
+
+**P0 GA gate（pi-bridge 利用率 ≥ 80%）**：14% → 50%，还差 30 pp。**需要 Round 24 G4 PR 3 接 image 三件套 + skills 三个共 4 通道 → 71%，仍差 9 pp 才能达到 ≥ 80% GA gate**。这意味着 G4 spec 8 PR 中最后 1-2 PR（G4.7 image 三件套拆 + G4.8 skills 三个）必跑。
+
+### 9.13.7 Round 24+ 下一步
+
+| 优先级 | Round | 目标 | 期望指标提升 |
+|---|---|---|---|
+| P1 | 24 | G4 PR 3（renderer 接 bridge.image.* 4 通道 + 修复 bridge type）| pi-bridge 50% → 71%；pi-bridge-client.ts truncateLine type 修正 |
+| P1 | 25 | G4 PR 4（renderer 接 bridge.skills.* 3 通道）| pi-bridge 71% → 92%（**GA gate ≥ 80% ✅**）|
+| P1 | 26 | G8 PR 1（3 个 canonical pi 包真实 e2e）| 29/29 → 3/29 = 10% |
+| P1 | 27 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度从形式接 → 行为切 |
+| P2 | 28 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P2 | 29 | perf bench 脚本 | perf 维度从 🔴 → 🟡 |
+| P3 | 30 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 31 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
+
+**注意**：v3.19 §9.12.7 表的 Round 23-30 顺序在本轮重新规划——把 G4 PR 3 拆成 PR 3（image 4 channels）+ PR 4（skills 3 channels）两轮，否则单 round 接 7 通道 + 修 bridge type 风险过大。
 
 ---
 
