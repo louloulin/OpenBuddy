@@ -99,7 +99,13 @@ export function ChatView({
   /** R1 — content-based send (text + image parts). When provided, the
    *  Composer uses it instead of onSend(text) whenever the user has image
    *  attachments. Falls back to onSend(text) for text-only input. */
-  onSendContent?: (content: Array<{ type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }>) => void | Promise<void>;
+  onSendContent?: (
+    content: Array<
+      | { type: "text"; text: string }
+      | { type: "image"; mediaType: string; data: string; name?: string }
+      | { type: "file"; mediaType: string; data: string; name?: string }
+    >,
+  ) => void | Promise<void>;
   onCancel: () => void;
   modelId?: string;
   models?: ModelOption[];

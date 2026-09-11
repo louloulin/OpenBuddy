@@ -373,6 +373,13 @@ export function permissionRules(value: unknown): Array<{ action: "allow" | "deny
 
 export const OPENBUDDY_MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 
+/** 8 MB cap on document attachments (PDF, docx, txt, md, json, xml). */
+export const OPENBUDDY_MAX_FILE_BYTES = 8 * 1024 * 1024;
+
+/** MIME types accepted as document attachments. Image attachments follow
+ *  their own allow-list (see `promptImagePart`). */
+const SUPPORTED_FILE_MIME = /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/i;
+
 export function promptImagePart(
 	input: RecordValue,
 	label: string,
@@ -395,21 +402,69 @@ export function promptImagePart(
 	};
 }
 
+/** Document attachment (PDF, plain text, markdown, json, xml, docx).
+ *  Same wire shape as image but with type:"file" so the agent side can
+ *  route to a reader (PDF text extraction, docx unzip, etc.). */
+export function promptFilePart(
+	input: RecordValue,
+	label: string,
+): { type: "file"; mediaType: string; data: string; name?: string } {
+	const mediaType = requiredString(input.mediaType, `${label}.mediaType`);
+	if (!SUPPORTED_FILE_MIME.test(mediaType)) {
+		throw new Error(
+			`${label}.mediaType must be application/pdf, text/{plain,markdown,csv,html,xml}, application/{json,xml,yaml}, or docx`,
+		);
+	}
+	const data = requiredString(input.data, `${label}.data`);
+	const approxBytes = Math.floor((data.length * 3) / 4);
+	if (approxBytes > OPENBUDDY_MAX_FILE_BYTES) {
+		throw new Error(`${label}.data exceeds ${OPENBUDDY_MAX_FILE_BYTES} bytes after decoding`);
+	}
+	return {
+		type: "file",
+		mediaType,
+		data,
+		...(input.name === undefined ? {} : { name: requiredString(input.name, `${label}.name`) }),
+	};
+}
+
 export function promptContentPart(
 	input: RecordValue,
 	label: string,
-): { type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string } {
-	const type = enumValue(input.type, `${label}.type`, ["text", "image"] as const);
+):
+	| { type: "text"; text: string }
+	| { type: "image"; mediaType: string; data: string; name?: string }
+	| { type: "file"; mediaType: string; data: string; name?: string } {
+	const type = enumValue(input.type, `${label}.type`, ["text", "image", "file"] as const);
 	if (type === "text") return { type, text: requiredString(input.text, `${label}.text`) };
+	if (type === "file") return promptFilePart(input, label);
 	return promptImagePart(input, label);
 }
 
-export function promptContent(value: unknown, label = "content"): Array<{ type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }> {
+export function promptContent(
+	value: unknown,
+	label = "content",
+): Array<
+	| { type: "text"; text: string }
+	| { type: "image"; mediaType: string; data: string; name?: string }
+	| { type: "file"; mediaType: string; data: string; name?: string }
+> {
 	if (!Array.isArray(value) || value.length === 0) throw new Error(`${label} must be a non-empty array`);
-	return value.map((part, index) => promptContentPart(recordValue(part, `${label}[${index}]`), `${label}[${index}]`));
+	return value.map((part, index) =>
+		promptContentPart(recordValue(part, `${label}[${index}]`), `${label}[${index}]`),
+	);
 }
 
-export function optionalPromptContent(value: unknown, label = "content"): Array<{ type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }> | undefined {
+export function optionalPromptContent(
+	value: unknown,
+	label = "content",
+):
+	| Array<
+			| { type: "text"; text: string }
+			| { type: "image"; mediaType: string; data: string; name?: string }
+			| { type: "file"; mediaType: string; data: string; name?: string }
+	  >
+	| undefined {
 	if (value === undefined || value === null) return undefined;
 	return promptContent(value, label);
 }

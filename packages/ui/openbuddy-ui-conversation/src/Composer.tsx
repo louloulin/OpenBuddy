@@ -40,18 +40,29 @@ import type { HomeModeId } from "@openbuddy/ui-shared";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import type { WorkspaceInfo } from "@/lib/agent/pi-client";
 
-/** Image attachment bundled into a `piSendContent` prompt. The renderer
- *  converts dropped/pasted images into base64 once at attach time so the
- *  IPC payload is a deterministic shape. */
+/** Single attachment bundled into a `piSendContent` prompt. The renderer
+ *  converts dropped/pasted files into base64 once at attach time so the IPC
+ *  payload is a deterministic shape.
+ *
+ *  Two flavours: `image` (png/jpeg/webp/gif, ≤16MB) and `file` (PDF /
+ *  plain text / markdown / json / xml / docx, ≤8MB). `file` attachments
+ *  are forwarded to the LLM as a single base64 part; the agent side
+ *  parses the type and either inlines the text content or hands the
+ *  binary to its own reader. */
 export type ImageAttachment = {
-  /** Stable id so React keys don't churn on re-render. */
   id: string;
-  /** MIME type — only image/{png,jpeg,webp,gif} are accepted. */
+  /** MIME type. For images: image/{png,jpeg,webp,gif}. For documents:
+   *  application/pdf, text/plain, text/markdown, application/json,
+   *  application/xml, or application/vnd.openxmlformats-officedocument.wordprocessingml.document. */
   mediaType: string;
-  /** Base64-encoded image data (no data: URL prefix). */
   data: string;
-  /** Original file name (for display only). */
   name?: string;
+  /** "image" for visual models, "file" for documents. The composer emits
+   *  one piSendContent part per attachment; the IPC contract maps both
+   *  to the same Anthropic `image` block today, but the discriminator
+   *  lets us route PDFs to a base64-PDF reader later without breaking
+   *  the wire format. */
+  kind: "image" | "file";
 };
 
 /**
@@ -126,7 +137,13 @@ export function ComposerInner({
   /** R1 — content-based send (text + image parts). When provided AND there
    *  are images attached, the composer calls this instead of onSend(text).
    *  This is the Codex/WorkBuddy-style image attachment path. */
-  onSendContent?: (content: Array<{ type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }>) => void | Promise<void>;
+  onSendContent?: (
+    content: Array<
+      | { type: "text"; text: string }
+      | { type: "image"; mediaType: string; data: string; name?: string }
+      | { type: "file"; mediaType: string; data: string; name?: string }
+    >,
+  ) => void | Promise<void>;
   onCancel: () => void;
   placeholder?: string;
   apiReady?: boolean;
@@ -426,18 +443,44 @@ export function ComposerInner({
 
   /** Read a File (from paste/drop/picker) and convert it to an ImageAttachment
    *  that piSendContent can ship through the agent prompt. Returns null when
-   *  the file is not a supported image MIME type or exceeds 16 MB. */
+   *  the file is not a supported MIME type or exceeds the per-flavour cap
+   *  (16MB for images, 8MB for documents).
+   *
+   *  The flavour (image vs file) is inferred from the MIME type:
+   *  - image/{png,jpeg,webp,gif}          -> kind: "image", cap 16MB
+   *  - application/pdf, text/*, json, xml -> kind: "file",  cap 8MB
+   *  - application/...wordprocessingml.document (docx) -> kind: "file"
+   *  - everything else (executables, archives) -> null + toast
+   */
   const readImageFile = (file: File): Promise<ImageAttachment | null> => {
     return new Promise((resolve) => {
-      if (!file.type.startsWith("image/")) return resolve(null);
-      if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.type)) return resolve(null);
-      if (file.size > 16 * 1024 * 1024) {
-        onToast?.("图片过大(>16MB),已拒绝");
+      const SUPPORTED_IMAGE = /^image\/(png|jpe?g|webp|gif)$/i;
+      const SUPPORTED_DOC =
+        /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/i;
+      const IMAGE_CAP = 16 * 1024 * 1024;
+      const FILE_CAP = 8 * 1024 * 1024;
+      let kind: "image" | "file";
+      let cap: number;
+      let capLabel: string;
+      if (SUPPORTED_IMAGE.test(file.type)) {
+        kind = "image";
+        cap = IMAGE_CAP;
+        capLabel = "16MB";
+      } else if (SUPPORTED_DOC.test(file.type)) {
+        kind = "file";
+        cap = FILE_CAP;
+        capLabel = "8MB";
+      } else {
+        onToast?.(`不支持的文件类型: ${file.type || "未知"}（图片/文档）`);
+        return resolve(null);
+      }
+      if (file.size > cap) {
+        onToast?.(`附件过大(>${capLabel}),已拒绝：${file.name || file.type}`);
         return resolve(null);
       }
       const reader = new FileReader();
       reader.onerror = () => {
-        onToast?.("读取图片失败");
+        onToast?.("读取附件失败");
         resolve(null);
       };
       reader.onload = () => {
@@ -449,10 +492,11 @@ export function ComposerInner({
         if (comma === -1) return resolve(null);
         const data = result.slice(comma + 1);
         resolve({
-          id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          id: `${kind}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           mediaType: file.type,
           data,
           name: file.name || undefined,
+          kind,
         });
       };
       reader.readAsDataURL(file);
@@ -483,12 +527,18 @@ export function ComposerInner({
     // existing "相关文件" prefix so the existing tools/read_file path keeps
     // working.
     if (imagesRef.current.length > 0 && onSendContent) {
-      const textPart = body || "请查看以下图片";
+      const textPart = body || "请查看以下附件";
       const content: Array<
-        { type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }
+        { type: "text"; text: string }
+        | { type: "image"; mediaType: string; data: string; name?: string }
+        | { type: "file"; mediaType: string; data: string; name?: string }
       > = [{ type: "text", text: textPart }];
-      for (const img of imagesRef.current) {
-        content.push({ type: "image", mediaType: img.mediaType, data: img.data, ...(img.name ? { name: img.name } : {}) });
+      for (const att of imagesRef.current) {
+        if (att.kind === "file") {
+          content.push({ type: "file", mediaType: att.mediaType, data: att.data, ...(att.name ? { name: att.name } : {}) });
+        } else {
+          content.push({ type: "image", mediaType: att.mediaType, data: att.data, ...(att.name ? { name: att.name } : {}) });
+        }
       }
       // Path attachments get appended as text the agent can resolve.
       if (attachments.length > 0) {

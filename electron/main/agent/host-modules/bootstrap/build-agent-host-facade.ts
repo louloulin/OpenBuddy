@@ -126,7 +126,14 @@ export interface AgentHostFacade {
   // ---- prompt / steer / follow-up / abort ----
   // A-5: signal propagated for renderer-initiated cancellation.
   prompt: (text: string, options?: { traceId?: TraceId; sessionId?: SessionId; signal?: AbortSignal }) => Promise<PromptDispatchResult>;
-  promptContent: (content: ReadonlyArray<{ type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }>, mode?: "queue" | "steer") => Promise<PromptDispatchResult>;
+  promptContent: (
+    content: ReadonlyArray<
+      | { type: "text"; text: string }
+      | { type: "image"; mediaType: string; data: string; name?: string }
+      | { type: "file"; mediaType: string; data: string; name?: string }
+    >,
+    mode?: "queue" | "steer",
+  ) => Promise<PromptDispatchResult>;
   steer: (text: string, options?: { traceId?: TraceId; sessionId?: SessionId; signal?: AbortSignal }) => Promise<PromptDispatchResult>;
   followUp: (text: string, options?: { traceId?: TraceId; sessionId?: SessionId; signal?: AbortSignal }) => Promise<PromptDispatchResult>;
   abort: (options?: { traceId?: TraceId; sessionId?: SessionId }) => Promise<MutationAck>;

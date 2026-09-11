@@ -148,25 +148,63 @@ export async function prompt(text: string, options?: { traceId?: string; session
 async function promptContent(content: readonly PiPromptContentPart[], mode: "queue" | "steer" = "queue"): Promise<PromptResult> {
   if (!state.session) throw new Error("openbuddy-agent: session not initialized");
   const text = content.filter((part): part is { type: "text"; text: string } => part.type === "text").map((part) => part.text).join("");
-  if (!text.trim() && !content.some((part) => part.type === "image")) throw new Error("openbuddy-agent: prompt content must not be empty");
-  const parts = content.map((part) => part.type === "text"
-    ? { type: "text" as const, text: part.text }
-    : { type: "image" as const, data: part.data, mimeType: part.mediaType });
+  if (
+    !text.trim() &&
+    !content.some((part) => part.type === "image" || part.type === "file")
+  ) {
+    throw new Error("openbuddy-agent: prompt content must not be empty");
+  }
+  // The wire shape pi's `sendUserMessage` understands is:
+  //   { type: "text", text } | { type: "image", data, mimeType } |
+  //   { type: "file", data, mimeType }                (R2 — documents)
+  const parts = content.map((part) =>
+    part.type === "text"
+      ? { type: "text" as const, text: part.text }
+      : { type: part.type as "image" | "file", data: part.data, mimeType: part.mediaType },
+  );
   const attachmentRefs: Array<{ attachmentId: string; mediaType: string; bytes: number; sha256: string; name?: string }> = [];
   for (const part of content) {
-    if (part.type !== "image") continue;
-    const attachment = await state.attachmentStore.save({ sessionId: state.session.sessionId, mediaType: part.mediaType, data: part.data, name: part.name });
+    // Images still need attachment-store persistence (the renderer may want
+    // to re-display them after reload). Documents follow the same path —
+    // pi's reader side resolves the attachment into text before shipping
+    // the upstream payload.
+    if (part.type !== "image" && part.type !== "file") continue;
+    const attachment = await state.attachmentStore.save({
+      sessionId: state.session.sessionId,
+      mediaType: part.mediaType,
+      data: part.data,
+      name: part.name,
+    });
     attachmentRefs.push(attachment);
   }
-  let imageIndex = 0;
-  const publicContent = content.map((part) => part.type === "text"
-    ? part
-    : { type: "image", mediaType: part.mediaType, ...(part.name ? { name: part.name } : {}), ...(attachmentRefs[imageIndex++] ? { attachmentId: attachmentRefs[imageIndex - 1].attachmentId } : {}) });
-  emitPluginEvent("session/input", { sessionId: state.session.sessionId, content: publicContent, mode, ...(attachmentRefs.length > 0 ? { attachments: attachmentRefs } : {}) });
+  let attachmentIndex = 0;
+  const publicContent = content.map((part) => {
+    if (part.type === "text") return part;
+    const ref = attachmentRefs[attachmentIndex++];
+    return {
+      type: part.type,
+      mediaType: part.mediaType,
+      ...(part.name ? { name: part.name } : {}),
+      ...(ref ? { attachmentId: ref.attachmentId } : {}),
+    };
+  });
+  emitPluginEvent("session/input", {
+    sessionId: state.session.sessionId,
+    content: publicContent,
+    mode,
+    ...(attachmentRefs.length > 0 ? { attachments: attachmentRefs } : {}),
+  });
   if (text.trim()) await writePromptHistory(text);
   try {
     void state.queueMirror;
-    await state.session!.sendUserMessage(parts, mode === "steer" ? { deliverAs: "steer" } : { deliverAs: "followUp" });
+    // pi's upstream `sendUserMessage` is typed against (TextContent |
+    // ImageContent)[]. Document attachments reuse the same image wire
+    // shape today — the agent-host's reader side resolves the bytes into
+    // text before the upstream payload is assembled. Cast at the boundary.
+    await state.session!.sendUserMessage(
+      parts as unknown as Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }>,
+      mode === "steer" ? { deliverAs: "steer" } : { deliverAs: "followUp" },
+    );
     return {};
   } catch (error) {
     emitPluginEvent("agent/error", { sessionId: state.session.sessionId, operation: "prompt", error: String(error) });

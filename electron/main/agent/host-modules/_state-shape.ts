@@ -123,7 +123,8 @@ export interface PiToolRegistry {
  */
 export type PiPromptContentPart =
   | { type: "text"; text: string }
-  | { type: "image"; mediaType: string; data: string; name?: string };
+  | { type: "image"; mediaType: string; data: string; name?: string }
+  | { type: "file"; mediaType: string; data: string; name?: string };
 
 // PendingUiRequest + UiRequestValue used by question/permission IPC plumbing.
 export type AgentHostPendingUiRequest = {

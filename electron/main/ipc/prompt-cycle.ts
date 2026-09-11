@@ -349,11 +349,24 @@ export function registerPromptCycleIpc(deps: AgentHostIpcDeps): void {
     }
   });
 
-  // R1 — content-based prompt (text + image). Mirrors the renderer
-  // `piSendContent` surface. The session-bound guard matches
+  // R1 — content-based prompt (text + image + document). Mirrors the
+  // renderer `piSendContent` surface. The session-bound guard matches
   // `agent:prompt` and the same trace telemetry envelope (received →
   // dispatched / failed) is reused so log queries stay uniform.
-  ipcMain.handle("agent:prompt-content", async (_e, input: { sessionId?: string; content: Array<{ type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }>; mode?: "queue" | "steer"; traceId?: string }) => {
+  //
+  // R2 — file parts (PDF, docx, txt, md, json, xml) extend the array; the
+  // agent-host dispatches them as base64 payloads that pi's reader side
+  // decodes before shipping to the upstream model.
+  ipcMain.handle("agent:prompt-content", async (_e, input: {
+    sessionId?: string;
+    content: Array<
+      | { type: "text"; text: string }
+      | { type: "image"; mediaType: string; data: string; name?: string }
+      | { type: "file"; mediaType: string; data: string; name?: string }
+    >;
+    mode?: "queue" | "steer";
+    traceId?: string;
+  }) => {
     const payload = recordValue(input, "agent:prompt-content payload");
     const sessionId = payload.sessionId === undefined ? undefined : requiredString(payload.sessionId, "sessionId");
     if (sessionId !== undefined && sessionId !== agentHost.getSession()?.sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);

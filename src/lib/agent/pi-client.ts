@@ -448,6 +448,7 @@ export async function piSendContent(
     content: Array<
         | { type: "text"; text: string }
         | { type: "image"; mediaType: string; data: string; name?: string }
+        | { type: "file"; mediaType: string; data: string; name?: string }
     >,
     options?: { traceId?: string; mode?: "queue" | "steer" },
 ): Promise<{ ok: true; itemId?: string }> {
