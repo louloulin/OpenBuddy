@@ -86,7 +86,15 @@ Object.assign(childEnv, {
 
 const COMPOSER = "textarea.wb-composer__input";
 const ASSISTANT = ".msg--assistant";
-const STOP_BUTTON = '[aria-label="停止生成"]';
+// IMPORTANT: every `waitForFunction` / `waitForSelector` predicate runs in
+// the renderer context. References to Node-scope constants inside the
+// predicate body become `ReferenceError` in the page; the renderer's
+// global unhandled-rejection handler then surfaces that as a misleading
+// production-error toast in the screenshot. Always pass any string the
+// predicate needs as an explicit argument, like `sel` below.
+
+// CSS selector for the producer's stop-button.
+const STOP_BUTTON_SELECTOR = '[aria-label="停止生成"]';
 const SETTINGS_PANEL = ".settings-panel, [data-testid='settings-panel'], aside.settings";
 
 const deadline = Date.now() + opts.timeoutSec * 1000;
@@ -112,9 +120,11 @@ async function sendAndAwaitFirstSettledBubble(prompt) {
     { sel: ASSISTANT, count: before },
     { timeout: remainingMs() },
   );
-  await page.waitForFunction(() => !document.querySelector(STOP_BUTTON), undefined, {
-    timeout: remainingMs(),
-  }).catch(() => {});
+  await page.waitForFunction(
+    ({ sel }) => !document.querySelector(sel),
+    { sel: STOP_BUTTON_SELECTOR },
+    { timeout: remainingMs() },
+  ).catch(() => {});
 }
 
 async function openSettings() {
@@ -151,6 +161,13 @@ try {
     env: childEnv,
   });
   page = await app.firstWindow();
+  page.on("pageerror", (err) => {
+    console.log(`[capture-screenshots][pageerror] ${err.message}`);
+    console.log(`[capture-screenshots][stack] ${err.stack ?? "(no stack)"}`);
+  });
+  page.on("console", (msg) => {
+    if (msg.type() === "error") console.log(`[capture-screenshots][console-error] ${msg.text()}`);
+  });
   await page.locator("#root").waitFor({ state: "attached", timeout: 60_000 });
   await page.setViewportSize({ width: 1280, height: 860 });
 
@@ -223,13 +240,15 @@ try {
     "请详细列出十条 Python 编程最佳实践，每条至少两句话，并给出一段示例代码。不要调用任何工具，直接回答。",
   );
   await page.getByRole("button", { name: "发送", exact: true }).click();
-  await page.waitForSelector(STOP_BUTTON, { timeout: remainingMs() });
+  await page.waitForSelector(STOP_BUTTON_SELECTOR, { timeout: remainingMs() });
   await page.waitForTimeout(800); // let partial stream render
   await shot("05-stop-interrupt.png");
   // Let the stream complete so the script exits cleanly.
-  await page.waitForFunction(() => !document.querySelector(STOP_BUTTON), undefined, {
-    timeout: remainingMs(),
-  }).catch(() => {});
+  await page.waitForFunction(
+    ({ sel }) => !document.querySelector(sel),
+    { sel: STOP_BUTTON_SELECTOR },
+    { timeout: remainingMs() },
+  ).catch(() => {});
 
   // ----- 06: settings (with retry-style action visible) -----
   console.log("[capture-screenshots] shot 06: settings");
