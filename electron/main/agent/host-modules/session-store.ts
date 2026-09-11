@@ -28,7 +28,7 @@
 import { unlink } from "node:fs/promises";
 
 import { SessionManager, collectEntriesForBranchSummary, type AgentSession } from "@earendil-works/pi-coding-agent";
-import { formatBranchSummary } from "../branch-summary-format";
+import { formatBranchSummary, DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS } from "../branch-summary-format";
 
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile, open, stat, rm } from "node:fs/promises";
@@ -260,7 +260,7 @@ async function rewindSession(sessionId: string, targetPromptIndex: number, mode 
     abandonedSummary = await formatBranchSummary(collected.entries, {
       model: state.model,
       signal: rewindCtrl.signal,
-      reserveTokens: 8_000,
+      reserveTokens: DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS,
     });
   }
   if (target.parentId) {

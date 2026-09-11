@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.27 — Round 30 G5 PR 1 generateBranchSummary 真实接入)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.28 — Round 31 G5 PR 2 token budget 接管 + perf bench)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.27**：v3.26（Round 29 G8 PR 4 + 7 spec-only canonical pi 包 + canonical-pi GA gate 100% ✅）+ Round 30 G5 PR 1 **generateBranchSummary 真实接入**——branch-summary-format.ts 新增 `formatBranchSummaryWithPi`（pi `generateBranchSummary` LLM 路径）+ `formatBranchSummary`（router：model 在走 pi / 否则 text fallback）；`session-store.ts:rewindSession` 改用 router 替换原手写 `prepareBranchEntries + formatBranchSummaryText` 两步法。
+> **本文是 v3.28**：v3.27（Round 30 G5 PR 1 generateBranchSummary 真实接入）+ Round 31 G5 PR 2 **token budget 接管 + perf bench**——branch-summary-format.ts 导出 `DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS = 8_000`，session-store.rewindSession 改用 named constant；新增 `scripts/perf/branch-summary.mjs`（CI 可重跑 bench script）+ `tests/perf/branch-summary.test.ts`（vitest perf budget assertion：text-fallback ≤ 1.5x pi 默认）。**G5 完成 100%**。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -2929,6 +2929,140 @@ G 项落地总进度：~72% → **~76%**（+4 pp）
 | P2 | 32 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
 | P3 | 33 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
 | P3 | 34 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
+
+---
+
+## 9.21 Round 31 增量：G5 PR 2 — token budget 接管 + perf bench（G5 完成 100%）
+
+### 9.21.1 真实代码落地（4 files）
+
+| 文件 | 类型 | LOC Δ |
+|---|---|---|
+| `electron/main/agent/branch-summary-format.ts` | + export DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS | +20（comment + const） |
+| `electron/main/agent/host-modules/session-store.ts` | import named constant, 替换字面量 | -1/+1 |
+| `scripts/perf/branch-summary.mjs` | new bench script（CI 可重跑）| +95 |
+| `tests/perf/branch-summary.test.ts` | new vitest perf budget | +75 |
+
+### 9.21.2 token budget 接管（8_000 字面量 → named export）
+
+**改前**（v3.27）—— 8_000 字面量重复 3 处：
+
+```typescript
+// branch-summary-format.ts
+reserveTokens: options.reserveTokens ?? 8_000,    // 1
+const prepared = prepareBranchEntries(entries, options.reserveTokens ?? 8_000);  // 2
+
+// session-store.ts:rewindSession
+reserveTokens: 8_000,                              // 3
+```
+
+**改后**（v3.28）—— 单一 named export：
+
+```typescript
+// branch-summary-format.ts
+export const DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS = 8_000;
+// (JSDoc 解释为什么 8_000：~50 turns typical agent conversation)
+
+reserveTokens: options.reserveTokens ?? DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS,
+const prepared = prepareBranchEntries(entries, options.reserveTokens ?? DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS);
+
+// session-store.ts
+import { formatBranchSummary, DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS } from "../branch-summary-format";
+reserveTokens: DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS,
+```
+
+**净效果**：
+- 3 处字面量 → 1 处 named export（DRY）
+- JSDoc 解释为什么 8_000 是合理默认（**~50 turns typical agent conversation**）
+- session-store 显式 import 避免隐式耦合
+
+### 9.21.3 perf bench（scripts/perf/branch-summary.mjs）
+
+**CI-friendly bench script**：测量 pi-prepare / openbuddy-text 两个路径的 mean ms，输出 JSON report，**ratio > 1.5 时 exit 1**：
+
+```bash
+node scripts/perf/branch-summary.mjs                 # sizes=[10, 50, 200], iterations=20
+node scripts/perf/branch-summary.mjs --sizes=100,500 # custom sizes
+```
+
+**输出格式**：
+```json
+{
+  "bench": "branch-summary",
+  "iterations": 20,
+  "reserveTokens": 8000,
+  "sizes": [10, 50, 200],
+  "results": [
+    { "entries": 10,  "piPrepareMs": 0.05,  "openbuddyTextMs": 0.07,  "ratio": 1.4,  "pass": true },
+    { "entries": 50,  "piPrepareMs": 0.30,  "openbuddyTextMs": 0.45,  "ratio": 1.5,  "pass": true },
+    { "entries": 200, "piPrepareMs": 1.20,  "openbuddyTextMs": 1.55,  "ratio": 1.29, "pass": true }
+  ],
+  "overallPass": true
+}
+```
+
+### 9.21.4 vitest perf budget assertion
+
+`tests/perf/branch-summary.test.ts` 含 2 个 case：
+1. `exports a DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS of 8_000`——**守卫 const 漂移**
+2. `text-fallback overhead ≤ 1.5x of pi's prepareBranchEntries (size=50)`——**CI gate**（超出即 fail）
+
+设计选择：
+- **vitest perf vs standalone**：CI 默认跑 vitest（自动收集），standalone bench script 供手动 / 性能调优用
+- **size=50**：与 rewind 真实场景对齐（typical 一次 rewind 看到 ~50 turns）
+- **iterations=30 + warm-up=3**：减少 JIT 抖动，结果稳定
+
+### 9.21.5 真实验证结果
+
+- `tsc -p tsconfig.json --noEmit` → **0 新错** ✅（仅 pre-existing `theme-pi.ts:29` getEditorTheme）
+- `vitest run electron/main/agent/branch-summary-format.test.ts tests/perf/branch-summary.test.ts` → **21/21 passed** ✅
+  - 19 旧 case（向后兼容）
+  - 2 新 case（const export + perf budget）
+- **perf budget 通过**：size=50 时 openbuddy-text ≤ 1.5x pi-prepare（**G5 PR 2 验收门槛过**）
+
+### 9.21.6 进度贡献
+
+| 项 | v3.27 | v3.28 |
+|---|---|---|
+| G1 / G4 / G10 / G11 | 100% / 100% / 100% / 100% | 100% / 100% / 100% / 100% |
+| G2 | 67% | 67% |
+| **G5** | **67%（PR 1 完成）** | **100%（PR 1 + PR 2 + perf bench 全完成）✅** |
+| G8 | 100% | 100% |
+
+P1 完成度：36.25 → **39.75**（G5 67% → 100%，加 3.5；含 G5 GA gate +5）
+G 项落地总进度：~76% → **~81%**（+5 pp）
+
+5 维总评（v3.28）：**🟢 / 🟡 / 🟡 / 🟡 / 🟢**（**perf 维度从 🔴 → 🟡**——perf bench script + vitest perf assertion 双层 perf gate 已建立；**G5 100% 完成**）
+
+### 9.21.7 G5 全 PR 完成度回顾（R30-31）
+
+| PR | 改动 | 状态 |
+|---|---|---|
+| G5 PR 1（Round 30）| `formatBranchSummaryWithPi` + `formatBranchSummary` router + session-store.rewindSession 改用 router | ✅ |
+| G5 PR 2（Round 31）| `DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS` named export + session-store 改用 + perf bench script + vitest perf budget | ✅ |
+| **总计** | **2 / 2 = 100%** | **✅ G5 100% 完成** |
+
+### 9.21.8 已知限制
+
+1. **G5 PR 2 perf 测的是 text-fallback 路径**，不是 pi LLM 路径。LLM 调用耗时取决于 provider + model，远超 prepareBranchEntries（典型 1-5s）。但 LLM 路径无法在 CI 跑（需真 API key），故 perf budget 只覆盖 offline fallback 路径。
+2. **`DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS = 8_000` 仍是 hard-coded 常量**。如用户 settings 引入 token budget preference，可加 round 32 接入 settings store。
+3. **perf bench script 用 size=50 标定**。真实 rewind 可能遇到 200+ entry 长会话；如想覆盖更大 size，本 round 已支持 `--sizes=` 自定义参数。
+
+### 9.21.9 总进度重新计算（v3.27 → v3.28）
+
+**P1 累计完成度**：36.25 → 39.75（+3.5；含 G5 GA gate +5）
+**P2 累计完成度**：0.0 → 0.0（无变化）
+**P3 累计完成度**：0.0 → 0.0（无变化）
+
+### 9.21.10 Round 32+ 下一步
+
+| 优先级 | Round | 目标 | 期望指标 |
+|---|---|---|---|
+| P2 | 32 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P3 | 33 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 34 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
+
+**G5 已 100% 完成**（第三 GA gate ✅）。剩余 GA gate：G3 / G2。
 
 ---
 

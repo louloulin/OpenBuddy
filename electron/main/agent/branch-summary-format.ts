@@ -16,6 +16,21 @@ import {
   type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 
+/**
+ * Default `reserveTokens` for `prepareBranchEntries` + `generateBranchSummary`.
+ *
+ * Chosen to match the prior OpenBuddy rewind budget. Pi's SDK walks entries
+ * newest-first until this budget is exhausted, then hands the survivor list
+ * to the LLM. 8_000 tokens fits ~50 turns of typical agent conversation
+ * before compaction is required, which keeps rewind-time summaries short
+ * without losing the branch's recent intent.
+ *
+ * Centralised so `formatBranchSummaryWithPi`, `formatBranchSummary`, and
+ * `session-store.rewindSession` all share the same default. Round 31 (G5
+ * PR 2) hoisted this from three duplicate literals to one named export.
+ */
+export const DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS = 8_000;
+
 export interface BranchSummaryMessage {
   role?: string;
   content?: unknown;
@@ -70,9 +85,10 @@ export function formatBranchSummaryText(
  * - `model` is required; pi's Model carries provider auth via env or runtime.
  * - `signal` is required; pass a per-rewind `AbortController.signal` so the
  *   LLM call does not block indefinitely.
- * - `reserveTokens` defaults to 8_000 to match the prior `prepareBranchEntries(entries, 8_000)`
- *   budget used by the rewind path. Pi's SDK picks `entries` newest-first
- *   until the budget is exhausted, then hands the survivor list to the LLM.
+ * - `reserveTokens` defaults to `DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS` to
+ *   match the prior `prepareBranchEntries(entries, 8_000)` budget used by the
+ *   rewind path. Pi's SDK picks `entries` newest-first until the budget is
+ *   exhausted, then hands the survivor list to the LLM.
  * - `customInstructions` is optional; if set, it's appended to pi's default
  *   prompt unless `replaceInstructions` is true.
  */
@@ -103,7 +119,7 @@ export async function formatBranchSummaryWithPi(
     const result: BranchSummaryResult = await generateBranchSummary(entriesArr, {
       model: options.model,
       signal: options.signal,
-      reserveTokens: options.reserveTokens ?? 8_000,
+      reserveTokens: options.reserveTokens ?? DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS,
       customInstructions: options.customInstructions,
       replaceInstructions: options.replaceInstructions,
     });
@@ -149,7 +165,10 @@ export async function formatBranchSummary(
     // Fall through to text fallback if pi returned null.
   }
   // Text fallback uses `prepareBranchEntries`'s messages output.
-  const prepared = prepareBranchEntries(entries as SessionEntry[], options.reserveTokens ?? 8_000);
+  const prepared = prepareBranchEntries(
+    entries as SessionEntry[],
+    options.reserveTokens ?? DEFAULT_BRANCH_SUMMARY_RESERVE_TOKENS,
+  );
   return formatBranchSummaryText(prepared.messages, {
     maxTotal: options.maxTotal,
     maxUser: options.maxUser,
