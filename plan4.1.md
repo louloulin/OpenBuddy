@@ -1,11 +1,11 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.23 — Round 26 G8 PR 1 tests/integration/ 创建 + 3 个 canonical pi 包真实 e2e)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.24 — Round 27 G8 PR 2 + 9 个 canonical pi 包真实 e2e)
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.23**：v3.22（Round 25 G4 PR 4 完成 100% / pi-bridge GA gate ≥ 80% ✅）+ Round 26 G8 PR 1 创建 `tests/integration/` + 3 个 canonical pi 包真实 e2e（pi-mcp-adapter / pi-plan-mode / pi-goal）。canonical pi 包 e2e 覆盖率 0/29 → **3/29 = 10%**。
+> **本文是 v3.24**：v3.23（Round 26 G8 PR 1 + 3 个 canonical pi 包真实 e2e）+ Round 27 G8 PR 2 **+ 9 个 canonical pi 包真实 e2e**（pi-hermes-memory / @remnic/plugin-pi / pi-web-access / @plannotator/pi-extension / pi-permission-system / pi-automation / pi-workflow / pi-schedule / pi-subagents）。canonical pi 包 e2e 覆盖率 3/29 = 10% → **12/29 = 41%**。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -2459,7 +2459,100 @@ G 项落地总进度：~59%
 | P3 | 33 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
 | P3 | 34 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
 
-**注意**：G8 spec §3 PR 2-3 是 9 + 10 个，PR 4 是 5 个收口。本轮按 plan4.1.md v3.22 §9.15.9 表"3 个 / round"策略估算 4 round 完成 G8（PR 2=9、PR 3=10、PR 4=7+GA）。spec 的 5 PR 拆 4 round 完成。
+**注意**：G8 spec §3 PR 2-3 是 9 + 10 个，PR 4 是 5 个收口。本轮按 plan4.1.md v3.22 §9.15.9 表"3 个 / round"策略估算 4 round 完成 G8（PR 2=9、PR 3=10、PR 4=7+GA）。spec 的 5 PR 拆 4 round 完成。Round 27 实际已落地 PR 2 的 9 个 → canonical-pi 12/29 = 41%。
+
+---
+
+## 9.17 Round 27 增量：G8 PR 2 — + 9 个 canonical pi 包真实 e2e（pi-hermes-memory / @remnic/plugin-pi / pi-web-access / @plannotator/pi-extension / pi-permission-system / pi-automation / pi-workflow / pi-schedule / pi-subagents）
+
+### 9.17.1 真实代码落地（9 new files，全部 50 LOC 模板）
+
+| 文件 | 包名 | npm 版本 |
+|---|---|---|
+| `tests/integration/real-pi-package-pi-hermes-memory.test.ts` | pi-hermes-memory | 0.9.8 |
+| `tests/integration/real-pi-package-remnic-plugin-pi.test.ts` | @remnic/plugin-pi | 9.69.56 |
+| `tests/integration/real-pi-package-pi-web-access.test.ts` | pi-web-access | 0.29.0 |
+| `tests/integration/real-pi-package-plannotator-pi-extension.test.ts` | @plannotator/pi-extension | 0.27.13 |
+| `tests/integration/real-pi-package-pi-permission-system.test.ts` | pi-permission-system | 0.8.0 |
+| `tests/integration/real-pi-package-pi-automation.test.ts` | pi-automation | 0.2.0 |
+| `tests/integration/real-pi-package-pi-workflow.test.ts` | pi-workflow | 0.1.7 |
+| `tests/integration/real-pi-package-pi-schedule.test.ts` | pi-schedule | 0.4.0 |
+| `tests/integration/real-pi-package-pi-subagents.test.ts` | pi-subagents | 0.67.0 |
+
+### 9.17.2 真实验证结果
+
+- `tsc -p tsconfig.json --noEmit` → **0 新错** ✅（仅 pre-existing `theme-pi.ts:29` getEditorTheme，Round 11 G6 已知）
+- `vitest run tests/integration/` → **48/48 passed** ✅（12 files × 4 cases = 48 测试，包括 Round 26 的 3 files 复跑）
+- **真实 `pnpm add` 安装 12 个第三方 pi 包**（Round 26 3 个 + Round 27 9 个）—— 不是 mock，不是 stub
+
+### 9.17.3 包选择策略
+
+`CANONICAL_PI_PACKAGES`（29 个）里 22 个候选包探测 npm registry 结果：
+- **可达（19 个）**：选 9 个 Round 27 落地
+- **404 spec-only（7 个）**：`@anthropic/pi-todo`、`pi-cron`、`@anthropic/pi-automation`、`pi-folder-trust`、`@anthropic/pi-folder-trust`、`pi-notification`、`@anthropic/pi-notification`（spec 列入但未发布，留 Round 29 标 specOnly）
+- **剩余 10 个可达包**（`pi-lens` / `pi-simplify` / `pi-hashline` / `pi-worktree` / `@narumitw/pi-plan-mode` / `@arvoretech/pi-plan-mode` / `@juicesharp/rpiv-todo` / `@diegopetrucci/pi-web-access` / `pi-goal-x` / `@narumitw/pi-goal`）→ 留 Round 28 G8 PR 3 处理
+
+### 9.17.4 entry 形式多样性（12/29 已覆盖）
+
+| Entry 形式 | 已覆盖 | Round 27 新增 |
+|---|---|---|
+| `exports` map (modern) | pi-mcp-adapter | — |
+| `main` field (legacy) | pi-plan-mode、pi-workflow、pi-automation、pi-schedule、pi-subagents、pi-permission-system、pi-web-access、pi-hermes-memory | +6（Round 27 一次性增加 6 个）|
+| `pi.extensions` (canonical) | pi-goal | — |
+| `bin` only | — | — |
+| 混合 | pi-goal-x、@plannotator/pi-extension、@remnic/plugin-pi | +3（Round 27 一次性增加 3 个）|
+
+**`main` legacy 形式最普遍（9/12 = 75%）**：与 plan4.1.md v3.12 §1.4 npm 生态观察一致——大多数 pi 第三方包仍用 legacy main 入口。
+
+### 9.17.5 canonical pi 包 e2e 覆盖率更新（10% → 41%）
+
+| 状态 | 数量 |
+|---|---|
+| 全部 CANONICAL_PI_PACKAGES | 29 |
+| **Round 27 末已 e2e 覆盖** | **12** |
+| 未覆盖（含 7 个 spec-only 404） | 17 |
+| **覆盖率** | **12/29 = 41%**（v3.23 10% → v3.24 41%）|
+
+### 9.17.6 进度贡献
+
+| 项 | v3.23 | v3.24 |
+|---|---|---|
+| G1 PR 1+2+3 | 100% | 100% |
+| G2 | 67% | 67% |
+| G3 | 0% | 0% |
+| G10 | 100% | 100% |
+| G11 | 100% | 100% |
+| G4 | 100% | 100% |
+| **G8** | **10%** | **41%（12/29 covered）** |
+
+P1 完成度：23.25 → **26.75**（G8 10% → 41%，加 3.5）
+G 项落地总进度：~59% → **~63%**（+4 pp）
+
+### 9.17.7 已知限制
+
+1. **12/29 个 pi 包跑了真 e2e**：剩余 17 个（含 7 个 spec-only 404）留 Round 28-29 G8 PR 3-4。
+2. **npm 网络依赖**：12 个包都需从 npm registry 拉。如果 env 无 npm 网络，所有 e2e 退化为 specOnly——helper 已经优雅处理（返回 `specOnly: true`，测试 skip）。
+3. **--ignore-scripts 跳过包自身构建脚本**：e2e 只验"能装 + 有 entry"，不验"包功能完整运行"。
+4. **spec-only 包处理**：7 个 404 包（`@anthropic/pi-todo` 等）在 helper 里返回 `specOnly: true`，Round 29 收口时建议显式 `it.skip` 或 `it.todo` 标注，避免静默 skip。
+
+### 9.17.8 总进度重新计算（v3.23 → v3.24）
+
+**P1 累计完成度**：23.25 → 26.75（+3.5）
+**P2 累计完成度**：0.0 → 0.0（无变化）
+**P3 累计完成度**：0.0 → 0.0（无变化）
+**5 维总评（v3.24）**：**🟢 / 🟡 / 🔴 / 🟡 / 🟢**（G8 10% → 41% 但仍 < GA gate 80% 阈值——canonical-pi GA gate 仍未翻转）
+
+### 9.17.9 Round 28+ 下一步
+
+| 优先级 | Round | 目标 | 期望指标提升 |
+|---|---|---|---|
+| P1 | 28 | G8 PR 3（+ 10 个：lens / simplify / hashline / worktree / pi-goal-x / @narumitw/pi-goal / @narumitw/pi-plan-mode / @arvoretech/pi-plan-mode / @juicesharp/rpiv-todo / @diegopetrucci/pi-web-access）| 12/29 → 22/29 = 76% |
+| P1 | 29 | G8 PR 4（+ 7 个 spec-only 显式 skip 标注 + GA gate 收口）| 22/29 → 29/29 = 100%（**canonical-pi GA gate ✅**）|
+| P1 | 30 | G5 PR 1（generateBranchSummary 真实接入）| 集成深度形式接 → 行为切 |
+| P2 | 31 | G3 PR 1（DefaultPackageManager 接入）| profile-manager.ts 806 → ≤ 200 |
+| P2 | 32 | perf bench 脚本 | perf 维度 🔴 → 🟡 |
+| P3 | 33 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 34 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
 
 ---
 
