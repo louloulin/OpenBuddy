@@ -50,6 +50,7 @@ docs/*
 !docs/CODEBASE_ANALYSIS.md
 !docs/CODEBASE_ANALYSIS.zh-CN.md
 !docs/screenshots/
+!docs/superpowers/
 !docs/full-pluginization-plan.md
 !docs/new-api-casdoor-openbuddy.md
 !docs/deployment-guide.md
