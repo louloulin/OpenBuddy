@@ -35,19 +35,58 @@
  * point is to capture what the upstream actually returns for the current
  * credential, so we want the probe to always run to completion.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const envText = readFileSync(".env.e2e.local", "utf8");
-const env = {};
-for (const line of envText.split(/\r?\n/)) {
-  const trimmed = line.trim();
-  if (trimmed === "" || trimmed.startsWith("#")) continue;
-  const eq = trimmed.indexOf("=");
-  if (eq <= 0) continue;
-  env[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
+const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+const dotEnvPath = join(root, ".env.e2e.local");
+
+/**
+ * Mirror `scripts/lib/e2e-credentials.mjs` resolution order so this probe
+ * agrees with the rest of the E2E suite: explicit env vars win, then the
+ * gitignored `.env.e2e.local`, then `~/.pi/agent/auth.json`. The probe used
+ * to throw ENOENT on any machine without `.env.e2e.local` (which is the
+ * common case — the file is gitignored). Falling through keeps the script
+ * useful as a sanity check whenever a developer has the key anywhere pi
+ * itself would find it.
+ */
+function parseDotEnv(text) {
+  const out = {};
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line === "" || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
+      (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
+    ) {
+      value = value.slice(1, -1);
+    }
+    out[key] = value;
+  }
+  return out;
 }
 
-const apiKey = env.OPENBUDDY_E2E_API_KEY;
+function readPiApiKey(provider) {
+  const authPath = join(process.env.USERPROFILE ?? process.env.HOME ?? "", ".pi", "agent", "auth.json");
+  if (!existsSync(authPath)) return undefined;
+  try {
+    const parsed = JSON.parse(readFileSync(authPath, "utf8"));
+    const entry = parsed?.[provider];
+    if (!entry) return undefined;
+    const key = typeof entry === "string" ? entry : (entry.key ?? entry.apiKey);
+    return typeof key === "string" && key.length > 0 ? key : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const localEnv = existsSync(dotEnvPath) ? parseDotEnv(readFileSync(dotEnvPath, "utf8")) : {};
+const apiKey = process.env.OPENBUDDY_E2E_API_KEY || localEnv.OPENBUDDY_E2E_API_KEY || readPiApiKey("minimax") || readPiApiKey("minimax-cn");
 const report = {
   schema: "openbuddy.minimax-probe.v1",
   generatedAt: new Date().toISOString(),
