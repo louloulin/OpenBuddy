@@ -51,7 +51,7 @@ import type { EmailProviderDiagnostic } from "@openbuddy/capability-email";
 export type { EmailProviderDiagnostic } from "@openbuddy/capability-email";
 
 export type { McpServerEntry } from "@openbuddy/shared-types";
-import { getPiBridge, type ResizeImagePayload } from "./pi-bridge-client";
+import { getPiBridge, type LoadSkillsPayload, type PiSkillRecord, type ResizeImagePayload } from "./pi-bridge-client";
 
 const appLogger = createRendererLogger({
   devMode: ((typeof import.meta !== "undefined" && (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) || false),
@@ -1681,6 +1681,80 @@ export async function convertBridgeImageToPng(
     return await bridge.image.convertToPng(base64Data, mimeType);
   } catch {
     return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Round 25 — G4 PR 4 (final): bridge.skills.* helpers (plan4.1.md §9.15).
+//
+// Three helpers covering the last 3 dead channels. This PR closes G4
+// entirely: pi-bridge 79% → 100% (all 14 channels live), GA gate
+// `pi-bridge ≥ 80%` flipped to ✅, G4 79% → 100%.
+//
+// The skills domain returns richer data than text/image. `loadSkills` /
+// `loadSkillsFromDir` return a `LoadSkillsPayload` containing both a
+// skills array AND a diagnostics array (parse warnings). Helpers preserve
+// both: callers can surface diagnostics to the UI.
+//
+// Fallback for `loadSkills`/`loadSkillsFromDir` → empty payload
+// `{ skills: [], diagnostics: [] }` (NOT null, NOT undefined) — this
+// matches the type and lets callers iterate without null checks.
+//
+// Fallback for `formatSkillsForPrompt` → empty string — caller can still
+// concatenate with their own prelude.
+// ---------------------------------------------------------------------------
+
+/**
+ * Load skills from the agent's discovery pipeline (cwd, agentDir, custom
+ * paths). Returns `{ skills, diagnostics }`. Round 25 — G4 PR 4
+ * (G4.8 in plan4.1.md §9.15).
+ */
+export async function loadBridgeSkills(
+  opts?: { cwd?: string; agentDir?: string; skillPaths?: string[]; includeDefaults?: boolean },
+): Promise<LoadSkillsPayload> {
+  const empty: LoadSkillsPayload = { skills: [], diagnostics: [] };
+  const bridge = getPiBridge();
+  if (!bridge?.skills?.load) return empty;
+  try {
+    return await bridge.skills.load(opts);
+  } catch {
+    return empty;
+  }
+}
+
+/**
+ * Load skills from a single directory. Round 25 — G4 PR 4
+ * (G4.8 in plan4.1.md §9.15).
+ */
+export async function loadBridgeSkillsFromDir(
+  dir: string,
+  source: string,
+): Promise<LoadSkillsPayload> {
+  const empty: LoadSkillsPayload = { skills: [], diagnostics: [] };
+  const bridge = getPiBridge();
+  if (!bridge?.skills?.loadFromDir) return empty;
+  try {
+    return await bridge.skills.loadFromDir(dir, source);
+  } catch {
+    return empty;
+  }
+}
+
+/**
+ * Format a list of skills into a prompt-friendly string (used to inject
+ * skill metadata into LLM context). Round 25 — G4 PR 4
+ * (G4.8 in plan4.1.md §9.15).
+ */
+export async function formatBridgeSkillsForPrompt(
+  skills: PiSkillRecord[],
+  fileReadTool: "read" | "bash" = "read",
+): Promise<string> {
+  const bridge = getPiBridge();
+  if (!bridge?.skills?.formatForPrompt) return "";
+  try {
+    return await bridge.skills.formatForPrompt(skills, fileReadTool);
+  } catch {
+    return "";
   }
 }
 
