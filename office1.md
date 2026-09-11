@@ -5,6 +5,11 @@
 > 触发：用户在 issue LUM-642 第二十一轮反馈"截图展示有问题"，要求
 > 搜索 **Univer** 集成实现 PDF / Word / XLSX / PPT 等多格式文档
 > 在 AI chat 内的**完整可视化**展示。
+>
+> **2026-09-11 决策修订**：用户在 issue LUM-642 第二十二轮明确要求
+> "**还是使用 univer 最佳实践，支持后续编辑的功能**"，放弃降级
+> 路径（react-pdf + xlsx + mammoth + pptxjs 只读），改走
+> **Univer 路径**。本文档 §6 / §8 / §3 阶段 1-2 全部按 Univer 重写。
 
 ## 1. 背景与现状盘点
 
@@ -18,6 +23,8 @@
 > "搜索 univer 集成整个展示 pdf word xlsx ppt 等，
 > 增加相关模块实现相关的文档功能展示。"
 
+> "还是使用 univer 最佳实践，支持后续编辑的功能。"
+
 ### 1.2 现状盘点
 
 | 能力 | 是否已有 | 证据 |
@@ -26,46 +33,37 @@
 | IPC 协议 `type:"file"` part | ✅ 已有 | `electron/main/ipc/validation.ts::promptFilePart` |
 | Agent-host 内联 `<document>` 块到 user prompt | ✅ 已有 | `electron/main/agent/host-modules/agent-prompt.ts` |
 | 真打 100 轮 LLM 验收 | ✅ 已有 | `tests/electron/chat-ui-minimax-100-turns.spec.ts`（默认 skip） |
-| **PDF 文本提取**（模型可读 PDF 内容） | ❌ 缺 | 当前 PDF 是 opaque base64 块 |
-| **docx 文本提取**（同上） | ⚠️ 半 | `@openbuddy/files-kb::extractDocxFromZip` 已有，但 Composer 没接 |
-| **xlsx 表格渲染** | ❌ 缺 | 没有 spreadsheet 渲染层 |
-| **pptx 幻灯片渲染** | ❌ 缺 | 没有 slide preview 层 |
-| **PDF 视觉预览**（在 chat 内嵌 PDF 第一页缩略图） | ❌ 缺 | 只有 chip |
+| **PDF/DOCX/XLSX/PPT 视觉预览** | ❌ 缺 | 当前 FilePreview 只支持 markdown/image/code/text |
+| **在线编辑 Office 文档** | ❌ 缺 | 没有 spreadsheet / document / slide 编辑层 |
 | **Univer 集成** | ❌ 缺 | 仓库无 `@univerjs/*` 依赖 |
 | **`FilePreview` 升级为 Office 文档可视化** | ⚠️ 半 | `packages/ui/openbuddy-ui-workbench/src/FilePreview.tsx` 只支持 markdown/image/code/text |
 | **plan4.2 提到的"PDF 阅读器"**（plan4.3 §3.1 P1） | 仍 open | 本计划合并到 office1 完成 |
 
-### 1.3 Univer 简介（候选 1）
+### 1.3 Univer 简介
 
 [Univer](https://github.com/dream-num/univer) 是开源的 office
 runtime，支持 spreadsheet（电子表格）、document（文字文档）、
 slide（演示文稿）三种类型，Apache-2.0 协议。基于 ES module + plugin
-架构，可以拆包：
+架构：
 
-| 库 | 用途 |
-|---|---|
-| `@univerjs/presets` | 一次性引入三件套（spreadsheet/document/slide） |
-| `@univerjs/sheets` | 单独引入 spreadsheet |
-| `@univerjs/docs` | 单独引入 document |
-| `@univerjs/slides` | 单独引入 slide |
-| `@univerjs/ui` | 渲染层（React/Vue 桥） |
-| `@univerjs/engine-*` | 公式引擎 / 渲染引擎 |
+| 库 | 用途 | 体积 (gzip) |
+|---|---|---|
+| `@univerjs/presets` | 三件套 preset（spreadsheet/document/slide） | ~3 MB |
+| `@univerjs/sheets` | 单独 spreadsheet 引擎 | ~400 KB |
+| `@univerjs/docs` | 单独 document 引擎 | ~350 KB |
+| `@univerjs/slides` | 单独 slide 引擎 | ~300 KB |
+| `@univerjs/ui` | React 渲染桥 | ~80 KB |
+| `@univerjs/engine-render` | 渲染引擎 | ~700 KB |
 
-gzip 后核心包约 2-3 MB（spreadsheet only）。本仓库当前 bundle 已
-是 5.3 MB（`src-CYPRYkjA.js`），加 Univer 后预估 8-10 MB。
+**核心包约 5-6 MB gzip（presets），加 UI 桥 ~5.8 MB**。本仓库当前
+bundle 是 5.3 MB，加 Univer 后预估 11-12 MB 主包 / **按需懒加载
+可以拆到 1-2 MB 增量（每个 format 单独拆）**。
 
-### 1.4 候选 2 — `react-pdf` + `xlsx` + `pptxjs`
+### 1.4 已有依赖
 
-如果 Univer 体积太大，**降级方案**：
-
-| 格式 | 库 | 体积 | 渲染质量 |
-|---|---|---|---|
-| PDF | `react-pdf` (基于 PDF.js) | ~600KB gzip | 高 |
-| XLSX | `xlsx` (SheetJS) | ~200KB | 静态转 HTML 表格，不能编辑 |
-| DOCX | `docx-preview` (基于 mammoth.js) | ~150KB | 仅文本提取后 HTML 渲染 |
-| PPTX | `pptxjs` | ~300KB | 仅静态缩略图 |
-
-降级方案总 ~1.3 MB，**但只能看不能编辑**。如果用户只要求"展示"，降级方案够用；如果要求"在线编辑"（WorkBuddy 风格），必须用 Univer。
+`@openbuddy/files-kb` 包已经实现了 docx/pptx/xlsx 的 zip 解析
+（`extractDocxFromZip` / `extractPptxFromZip` / `extractSheetFromZip`）。
+office1 阶段 1 复用这个 + 加 Univer 渲染层。
 
 ## 2. 目标与验收
 
@@ -94,60 +92,80 @@ chip 显示，而是**作为可交互的预览**：
 - `docs/perf/<date>-office1.json` 性能数据
 - 推到 main，0 force-push
 
-## 3. 实施分阶段（按风险 + 依赖排序）
+## 3. 实施分阶段（Univer 路径，按风险 + 依赖排序）
 
-### 3.1 [P0] 阶段 0：决策 Univer vs 降级方案
+### 3.1 [P0] 阶段 0：Univer spike + 体积基线
 
-**为什么 P0**：Univer 8-10MB 是 Web 体积翻倍，决策错了会回滚成本
-高。先用一周时间在 PR 之外做 spike：
-1. 在 `apps/admin-portal`（独立 app）做技术 demo
-2. 用一份真 PDF（5MB）+ 真 xlsx（1MB）+ 真 pptx（500KB）
+**为什么 P0**：Univer 5.8MB 是决策点，spike 在动手前完成：
+
+1. 在新分支 `agent/office-univer-spike` 建一个最小 demo：
+   - 1 个 `UniverSheetDemo.tsx` 组件，挂 spreadsheet
+   - 1 个 `UniverDocDemo.tsx` 组件，挂 document
+   - 1 个 `UniverSlideDemo.tsx` 组件，挂 slide
+2. 各 demo 加载一个真实文件：5MB PDF（先转图片）/ 1MB xlsx / 500KB pptx
 3. 测：首次加载时间 / bundle 增量 / 内存 / 编辑能力
-4. 决策：Univer 还是降级方案
+4. 输出 `docs/office-render-decision.md`
 
-**验收**：spike 报告 + 决策文件 `docs/office-render-decision.md`。
-预计 1 周。
+**验收**：spike 报告 + bundle 体积数据。预计 3-5 天。
 
-### 3.2 [P1] 阶段 1：FilePreview 升级
+### 3.2 [P1] 阶段 1：依赖注入 + Univer 集成
 
-**范围**（无论 Univer / 降级）：
+**范围**：
 
-- `packages/ui/openbuddy-ui-workbench/src/FilePreview.tsx` 加新分支：
-  - `kind === "pdf"` → `react-pdf` <Document> 渲染
-  - `kind === "xlsx"` → `xlsx.read()` → 二维数组 → `<table>`
-  - `kind === "docx"` → `mammoth.convertToHtml()` → `<div>`
-  - `kind === "pptx"` → `pptxjs` → 缩略图列表
-- 每个分支懒加载（dynamic import）保证不增加主包体积
-- 集成测试：`FilePreview.test.tsx` 加 4 个新 case
+- 加依赖到 `package.json`：
+  ```json
+  "@univerjs/presets": "^0.6.0",
+  "@univerjs/sheets": "^0.6.0",
+  "@univerjs/sheets-ui": "^0.6.0",
+  "@univerjs/docs": "^0.6.0",
+  "@univerjs/docs-ui": "^0.6.0",
+  "@univerjs/slides": "^0.6.0",
+  "@univerjs/slides-ui": "^0.6.0",
+  "@univerjs/ui": "^0.6.0",
+  "@univerjs/engine-render": "^0.6.0",
+  "rxjs": "^7.8.1"
+  ```
+- **懒加载**：每个 format 一个 dynamic import 入口
+  - `FilePreview.tsx` 改用 `<Suspense><LazyUniver kind={kind} ... /></Suspense>`
+- FilePreview 加 4 个新分支：
+  - `kind === "xlsx"` → `<UniverSheet data={base64} editable={true} />`
+  - `kind === "docx"` → `<UniverDoc data={base64} editable={true} />`
+  - `kind === "pptx"` → `<UniverSlide data={base64} editable={true} />`
+  - `kind === "pdf"` → 暂时用 `<iframe src="data:application/pdf;base64,...">` 走浏览器原生（Univer 不支持 PDF）
+- FilePreview 支持编辑：
+  - `onSave?: (newBase64: string) => void` 回调
+  - 编辑后 chip 显示 "已修改" + 重新上传按钮
 
 **验收**：
 - 现有 7 个 FilePreview test 仍 pass
-- 新加 4 个 test pass
-- 包大小增量 < 800KB gzip（懒加载 + 主包只放选择器）
+- 新加 4 个 Univer test pass
+- 主包增量 < 200KB（懒加载，Univer 在子 chunk）
+- 实测编辑：上传 xlsx → 在 FilePreview 中改 A1 单元格 → onSave 回调拿到新 base64
 
 ### 3.3 [P1] 阶段 2：Composer → renderer 链路
 
 **范围**：
-- Composer 发送时多带一个 `preview: string` 字段（base64 / URL）
+- Composer 发送时多带一个 `preview: string` 字段（base64）
 - IPC 协议 `PiPromptContentPart` 加 `preview?: string`
 - agent-host 转发时保留 preview 字段
-- transcript tree 在收到 `type:"file"` part 时，渲染 FilePreview 而非纯文字
+- transcript tree 在收到 `type:"file"` part 时，渲染 `<FilePreview>` 而非纯文字
+- 当用户编辑后：`onSave` 触发 → 上传到 attachment-store → 触发后续 message
 
 **验收**：
 - 现有 6 个真实 LLM spec（real / extras / resilience / documents
   / multimodal / 100-turns）全过
 - 1 个新增 `chat-ui-minimax-document-preview.spec.ts`：1 轮发送
-  PDF attachment，断言 transcript 出现 `<canvas>` 或 `<table>` 或
-  `<div class="docx-preview">` 节点
+  PDF attachment，断言 transcript 出现 `<canvas>` 或 Univer 编辑器
+  节点
 
 ### 3.4 [P2] 阶段 3：截图 + 性能 baseline
 
 **范围**：
 - 改 `scripts/electron/capture-ai-chat-screenshots.mjs` 加 2 张
   截图：
-  - `09-document-preview-pdf.png` — PDF 缩略图在 transcript 内
-  - `10-document-preview-xlsx.png` — 表格在 transcript 内
-- 写 `scripts/electron/perf-office1.mjs`：测 PDF/XLSX 加载时间
+  - `09-document-preview-pdf.png` — PDF iframe 在 transcript 内
+  - `10-document-preview-xlsx.png` — Univer 表格在 transcript 内
+- 写 `scripts/electron/perf-office1.mjs`：测 PDF / XLSX 加载时间
   + 内存 delta
 - 写 `tests/electron/chat-ui-minimax-document-preview-perf.spec.ts`
   （默认 skip，需 `RUN_OFFICE_PERF=1`）
@@ -155,24 +173,29 @@ chip 显示，而是**作为可交互的预览**：
 **验收**：
 - 10 张截图全部干净
 - 性能数据写入 `docs/perf/<date>-office1.json`
+- bundle 总增量 < 1MB gzip（Univer 在子 chunk）
 
-### 3.5 [P3] 阶段 4：编辑器模式（可选）
+### 3.5 [P2] 阶段 4：编辑器模式（Univer 编辑能力）
 
-**范围**（**仅** Univer 路径）：
+**范围**：
 - 文档 attachment chip 长按 → "在 OpenBuddy 中打开"
 - 打开新工作区，使用 Univer 完整编辑
 - 保存回原 attachment（base64 → xlsx/docx/pptx）
+- 在 WorkBuddy 风格的"任务"surface 集成
 
-**验收**：手动验证（生产 spec 覆盖不全，UI 路径多）
+**验收**：
+- 编辑 → 保存 → 重新出现在 chat transcript 的新版 message
+- spec 覆盖端到端流程
 
 ### 3.6 时间线
 
 ```
-office1.0  (2026-09-11)  本文件，决策点
-office1.1  (2026-09-18)  Spike 报告：Univer vs 降级方案
-office1.2  (2026-09-25)  FilePreview 升级（阶段 1+2）
+office1.0  (2026-09-11)  本文件，决策 A 锁定（Univer）
+office1.1  (2026-09-18)  Univer spike 报告 + 体积基线
+office1.2  (2026-09-25)  FilePreview Univer 集成（阶段 1+2）
 office1.3  (2026-10-02)  截图 + 性能 baseline（阶段 3）
-office1.4  (2026-10-09)  编辑器模式（阶段 4，可选）
+office1.4  (2026-10-09)  编辑器模式（阶段 4）
+office1.5  (2026-10-16)  上线 main / nightly
 ```
 
 ## 4. 风险登记
@@ -202,47 +225,46 @@ office1 优先于 plan4.3，因为：
 - plan4.2 残留的"PDF 阅读器" P1 任务（plan4.3 §3.1）合并到 office1
 - plan4.3 的 cost profile 跟 office1 独立，不阻塞
 
-## 6. 附录：Univer 选型对照
+## 6. Univer 选型（已锁定）
 
-| 维度 | Univer | 降级组合 (react-pdf + xlsx + mammoth + pptxjs) |
-|---|---|---|
-| 编辑能力 | ✅ 全功能 | ❌ 只读 |
-| 体积 | 8-10MB gzip | 1.3MB gzip |
-| Electron 启动影响 | +0.5s | +0.05s |
-| 渲染质量 | 高（矢量/光栅混合） | 中（PDF 矢量、表格静态、pptx 缩略图） |
-| 维护活跃度 | 活跃（2024-2026 持续发布） | 参差（mammoth 慢更、pptxjs 罕更） |
-| 中文支持 | ✅ | ✅ |
-| 风险 | 大包体 + 复杂 API | 多依赖 + 编辑缺失 |
+| 维度 | 评估 |
+|---|---|
+| 编辑能力 | ✅ 完整 WorkBuddy 风格（spreadsheet/document/slide 全套） |
+| 体积 | 5.8 MB gzip（presets 全套）；按 format 懒加载后子 chunk 1-2 MB |
+| Electron 启动影响 | +0.5-1.0s 首次 cold start（懒加载后可降到 +0.1s） |
+| 渲染质量 | 高（spreadsheet 矢量、document OOXML 兼容、slide 渲染） |
+| 维护活跃度 | 活跃（2024-2026 持续发布） |
+| 中文支持 | ✅ |
+| 风险 | 大包体 + 复杂 API（缓解：按 format 懒加载 + 子 chunk） |
 
-**默认推荐**：先用 **react-pdf + xlsx + mammoth + pptxjs 降级组合**
-做"只读预览"（阶段 1-3）。如用户后续要求"在线编辑"，再走
-**Univer 升级路径**（阶段 4 之后开新 plan office2）。
+**2026-09-11 用户决策**：选 Univer 路径，**不**走降级组合。
+
+替代方案（仅作记录）：react-pdf + xlsx + mammoth + pptxjs 降级组合，
+~1.3 MB gzip 但只读，不支持后续编辑能力。**已放弃**。
 
 ## 7. 时间投入预估
 
-| 阶段 | 工作量 | 谁 |
-|---|---|---|
-| 阶段 0（决策） | 1 周 | agent + 用户 review |
-| 阶段 1（FilePreview） | 1 周 | agent |
-| 阶段 2（链路） | 3 天 | agent |
-| 阶段 3（截图/perf） | 2 天 | agent |
-| 阶段 4（编辑器） | 1 周 | agent |
-| **合计** | **~4 周** | |
+| 阶段 | 工作量 |
+|---|---|
+| 阶段 0（Univer spike） | 3-5 天 |
+| 阶段 1（依赖 + FilePreview Univer 集成） | 1.5 周 |
+| 阶段 2（Composer 链路） | 1 周 |
+| 阶段 3（截图 + perf） | 3 天 |
+| 阶段 4（编辑器模式） | 1.5 周 |
+| **合计** | **~5-6 周** |
 
 每个阶段产出 1 个 commit + 1 个 PR 分支。等用户 review 后合 main。
 
 ## 8. 立即可启动的下一步
 
-**等您决定**（最简一行回）：
-- "**A**" — 走 Univer 路径（重，编辑能力）
-- "**B**" — 走降级路径（轻，只读预览）
-- "**C**" — 等我做 Univer spike 报告再决定（1 周）
-- "**D**" — 我现在没时间，先做别的
+**用户已确认（2026-09-11）**：选 **A** 路径（Univer）。
 
-我的推荐：**B（降级）**。理由：
-1. plan4.2 已经把"text extraction + XML block"做了，PDF/DOCX 真实
-   可读 + 降级预览合并起来，1-2 周完成
-2. Univer 风险高，spike 投入大，先把"能看"做到生产级
-3. 用户后续要求编辑能力时，再开 plan office2 走 Univer
+下一轮直接：
+1. 切到新分支 `agent/office-univer-spike`
+2. 加 `@univerjs/presets` 等依赖到 `package.json`
+3. 写 `docs/office-render-decision.md`（spike 报告）
+4. 在 `packages/ui/openbuddy-ui-workbench/src/FilePreview.tsx` 加 Univer 分支
+5. 写 `chat-ui-minimax-document-preview.spec.ts`（4 项验收）
+6. 2 张新截图（PDF + XLSX 预览）
 
-如果选 B，阶段 1+2 立即可以开工。
+预计 stage 0 + stage 1 在 2-3 周完成 office1.0 → office1.2。
