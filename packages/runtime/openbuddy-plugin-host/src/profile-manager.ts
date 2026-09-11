@@ -1,5 +1,5 @@
 import { cp, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
-import { execFile } from "node:child_process";
+import crossSpawn from "cross-spawn";
 import { createRequire } from "node:module";
 import { basename, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -58,7 +58,92 @@ export interface ProfilePackageManager {
   remove: (profileDir: string, packageName: string) => Promise<void>;
 }
 
-const execFileAsync = promisify(execFile);
+/**
+ * Spawn a child process in a way that survives Windows + Node 22's child
+ * process restrictions.
+ *
+ * Background
+ * ----------
+ * `child_process.execFile("pnpm", …)` works on macOS/Linux but fails on
+ * Windows in two distinct ways:
+ *
+ *   - `spawn("pnpm", …)` without `shell: true` returns ENOENT because Node
+ *     does not auto-resolve the `pnpm.cmd` shim that pnpm/npm/corepack
+ *     install on the PATH.
+ *   - `spawn("pnpm.cmd", …)` was locked down in Node 22 and now returns
+ *     `spawn EINVAL` for security reasons.
+ *
+ * The portable fix used here is `cross-spawn`, which on Windows transparently
+ * prepends `cmd.exe /c` (or, for Node 22+, resolves the `.cmd` shim with
+ * PATHEXT and uses `CreateProcess` directly). `cross-spawn` is already a
+ * root `package.json` dependency; we add it as a direct dep of the plugin
+ * host because the cross-spawn internals are part of the contract we rely
+ * on (see `cross-spawn` v7 README — Node 22+ behavior).
+ */
+function spawnAsync(
+  command: string,
+  args: readonly string[],
+  options: { cwd: string; maxBuffer?: number },
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = crossSpawn(command, args as string[], {
+      cwd: options.cwd,
+      maxBuffer: options.maxBuffer,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let stdoutLength = 0;
+    let stderrLength = 0;
+    let killed = false;
+    const maxBuffer = options.maxBuffer ?? 4 * 1024 * 1024;
+    child.stdout?.on("data", (chunk: Buffer) => {
+      stdoutLength += chunk.length;
+      if (stdoutLength > maxBuffer) {
+        killed = true;
+        child.kill();
+        reject(
+          Object.assign(new Error(`spawn ${command}: stdout exceeded maxBuffer=${maxBuffer}`), {
+            code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+          }),
+        );
+        return;
+      }
+      stdoutChunks.push(chunk);
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderrLength += chunk.length;
+      if (stderrLength > maxBuffer) {
+        killed = true;
+        child.kill();
+        reject(
+          Object.assign(new Error(`spawn ${command}: stderr exceeded maxBuffer=${maxBuffer}`), {
+            code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+          }),
+        );
+        return;
+      }
+      stderrChunks.push(chunk);
+    });
+    child.on("error", (error) => {
+      if (killed) return;
+      reject(error);
+    });
+    child.on("close", (code, signal) => {
+      if (killed) return;
+      const stdout = Buffer.concat(stdoutChunks).toString("utf8");
+      const stderr = Buffer.concat(stderrChunks).toString("utf8");
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        const message = `spawn ${command} ${args.join(" ")} failed with code=${code} signal=${signal ?? ""}`.trim();
+        const failure = Object.assign(new Error(message), { code, signal, stdout, stderr });
+        reject(failure);
+      }
+    });
+  });
+}
 
 const defaultProfilePackageManager: ProfilePackageManager = {
   async install(profileDir, source) {
@@ -68,7 +153,7 @@ const defaultProfilePackageManager: ProfilePackageManager = {
       // form `--config.ignore-scripts=true`, which still routes through
       // the same pnpm settings machinery and keeps the global
       // `~/.npmrc` `ignore-scripts=true` policy in force per-invocation.
-      await execFileAsync("pnpm", ["add", "--save-prod", "--ignore-workspace", "--config.ignore-scripts=true", "--", source], {
+      await spawnAsync("pnpm", ["add", "--save-prod", "--ignore-workspace", "--config.ignore-scripts=true", "--", source], {
         cwd: profileDir,
         maxBuffer: 4 * 1024 * 1024,
       });
@@ -76,7 +161,8 @@ const defaultProfilePackageManager: ProfilePackageManager = {
       const failure = error as { stderr?: unknown; stdout?: unknown; message?: unknown };
       const stderr = typeof failure.stderr === "string" ? failure.stderr.trim() : "";
       const stdout = typeof failure.stdout === "string" ? failure.stdout.trim() : "";
-      const details = [stderr, stdout].filter(Boolean).join("\n");
+      const message = typeof failure.message === "string" ? failure.message : "";
+      const details = [stderr, stdout, message].filter(Boolean).join("\n");
       throw new Error(`profile-package: pnpm add failed for ${source}${details ? `\n${details}` : ""}`, { cause: error });
     }
   },
@@ -87,15 +173,16 @@ const defaultProfilePackageManager: ProfilePackageManager = {
       // form `--config.ignore-scripts=true`, which still routes through
       // the same pnpm settings machinery and keeps the global
       // `~/.npmrc` `ignore-scripts=true` policy in force per-invocation.
-      await execFileAsync("pnpm", ["remove", "--ignore-workspace", "--config.ignore-scripts=true", "--config.minimumReleaseAge=0", packageName], {
+      await spawnAsync("pnpm", ["remove", "--ignore-workspace", "--config.ignore-scripts=true", "--config.minimumReleaseAge=0", packageName], {
         cwd: profileDir,
         maxBuffer: 4 * 1024 * 1024,
       });
     } catch (error) {
-      const failure = error as { stderr?: unknown; stdout?: unknown };
+      const failure = error as { stderr?: unknown; stdout?: unknown; message?: unknown };
       const stderr = typeof failure.stderr === "string" ? failure.stderr.trim() : "";
       const stdout = typeof failure.stdout === "string" ? failure.stdout.trim() : "";
-      const details = [stderr, stdout].filter(Boolean).join("\n");
+      const message = typeof failure.message === "string" ? failure.message : "";
+      const details = [stderr, stdout, message].filter(Boolean).join("\n");
       throw new Error(`profile-package: pnpm remove failed for ${packageName}${details ? `\n${details}` : ""}`, { cause: error });
     }
   },

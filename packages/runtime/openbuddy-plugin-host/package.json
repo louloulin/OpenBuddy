@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@openbuddy/cordis": "workspace:*",
+    "cross-spawn": "^7.0.6",
     "yaml": "2.9.0"
   }
 }
