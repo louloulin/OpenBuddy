@@ -5,6 +5,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 
+import { scrubProviderCredentials } from "../lib/e2e-credentials.mjs";
+
 const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const required = process.env.OPENBUDDY_E2E_REQUIRED === "1";
 const apiKey = process.env.OPENBUDDY_E2E_API_KEY ?? "";
@@ -50,10 +52,9 @@ const {
   OPENBUDDY_E2E_API_KEY: _e2eApiKey,
   OPENBUDDY_E2E_BASE_URL: _e2eBaseUrl,
   OPENBUDDY_E2E_MODEL_ID: _e2eModelId,
-  ...inheritedEnv
 } = process.env;
 const childEnv = {
-  ...inheritedEnv,
+  ...scrubProviderCredentials(process.env),
   ELECTRON_RENDERER_URL: "",
   PI_CODING_AGENT_DIR: piAgentDir,
   OPENBUDDY_FILESYSTEM_SMOKE: "0",

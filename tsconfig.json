@@ -411,7 +411,8 @@
   "include": [
     "src",
     "packages/ui/openbuddy-ui-runtime/src/client.tsx",
-    "packages/ui/openbuddy-ui-runtime/src/index.ts"
+    "packages/ui/openbuddy-ui-runtime/src/index.ts",
+    "packages/runtime/openbuddy-plugin-host/src/types/**/*.d.ts"
   ],
   // ── exclude ─────────────────────────────────────────────────────
   //   - **/lib/**            各工作区包的 tsc 输出目录

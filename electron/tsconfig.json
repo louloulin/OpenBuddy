@@ -70,6 +70,7 @@
   },
   "include": [
     "main/**/*.ts",
-    "preload/**/*.ts"
+    "preload/**/*.ts",
+    "../packages/runtime/openbuddy-plugin-host/src/types/**/*.d.ts"
   ]
 }
