@@ -1,4 +1,4 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.4 — Phase B/C G1+G2+G3 实施规格落地)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.5 — Phase D/E/F G4-G15 specs 落地)
 
 > 📅 2026-09-10 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
@@ -253,6 +253,45 @@ JSON 形态（CI / verify:plan 直接消费）：
 - `scripts/audit/pi-bridge-dead-channels.{sh,mjs}` — 把 14 个 IPC 通道逐条映射到底层 pi 函数 + 当前消费者（grep 自动核对）+ 建议接入位置。Phase D 工作入口。实测 `utilizationPct=7`（1/14 覆盖；GA gate ≥80%）。
 - `docs/PI_NATIVE_AUDIT_BASELINE.md` — 把 3 个 audit 脚本的 JSON baseline 固化为可重读的 GA gate 表，包含 `jq` 一键断言命令。
 - `package.json:55-56` 加入 `audit:pi-bridge-dead` + `audit:pi-bridge-dead:json` 两个新脚本。
+
+**v3.5 增量**（2026-09-11 第六次跑 — Phase D/E/F 入口规格批量落地）：
+
+9 个新实施规格，把 backlog 的 12 个剩余 G-gap 中**所有 P0/P1 项（共 9 个）**展开为 PR 级拆分：
+
+| Spec | Gap | 优先级 | 当前 LOC | 目标 LOC | pi API | 估时 |
+|---|---|---|---|---|---|---|
+| `G4_IMPLEMENTATION_SPEC.md` | G4 pi-bridge 14 通道利用 | P0 | 14 通道 / 7% 利用 | ≥ 12 通道 / ≥ 80% | 13 个 pi fn | 2 周 |
+| `G11_IMPLEMENTATION_SPEC.md` | G11 plugin manifest 切 pi | P0 | 277 LOC | 277 → ~210 | parseFrontmatter | 1 周 |
+| `G5_IMPLEMENTATION_SPEC.md` | G5 generateBranchSummary | P1 | ~150 LOC | → ~30 | generateBranchSummary | 1 周 |
+| `G6_IMPLEMENTATION_SPEC.md` | G6 initTheme/getMarkdownTheme | P1 | ~200 LOC | → ~80 | 4 个 theme fn | 1 周 |
+| `G7_IMPLEMENTATION_SPEC.md` | G7 shell helper | P1 | ~30 LOC | → ~15 | getShellConfig | 1 周 |
+| `G8_IMPLEMENTATION_SPEC.md` | G8 29 canonical e2e | P1 | 0/29 | → 29/29 | （install 测试）| 3 周 |
+| `G9_IMPLEMENTATION_SPEC.md` | G9 loadProjectContextFiles | P1 | 350 LOC | → ~50 | loadProjectContextFiles | 1 周 |
+| `G10_IMPLEMENTATION_SPEC.md` | G10 ExtensionFactory 简化 | P1 | 1222 LOC | → ~200 | ExtensionFactory | 2 周 |
+| `G15_IMPLEMENTATION_SPEC.md` | G15 AuthStorage PKCE | P1 | ~200 LOC | → ~50 | AuthStorage | 1 周 |
+
+**剩余未展开 specs（3 个 P2 评估项）**：G12 / G13 / G14 — 评估性任务，规格模板不直接适用，留待评审后再展开。
+
+**v3.5 文档覆盖度（已 12/15）**：
+
+```
+docs/PI_INTEGRATION_BACKLOG.md   15 项 G-gap（owner / 估时 / 依赖）         v3.1 增量
+docs/PI_NATIVE_AUDIT_BASELINE.md 11 个 GA gate 实测                         v3.1 增量
+docs/G1_IMPLEMENTATION_SPEC.md   apply-patch 228 LOC                       v3.4
+docs/G2_IMPLEMENTATION_SPEC.md   settings-store 196 LOC                    v3.4
+docs/G3_IMPLEMENTATION_SPEC.md   profile-manager 806 LOC                   v3.4
+docs/G4_IMPLEMENTATION_SPEC.md   pi-bridge 14 通道利用                     v3.5（本轮）
+docs/G5_IMPLEMENTATION_SPEC.md   generateBranchSummary                     v3.5（本轮）
+docs/G6_IMPLEMENTATION_SPEC.md   ui-theme 接管                             v3.5（本轮）
+docs/G7_IMPLEMENTATION_SPEC.md   shell helper                              v3.5（本轮）
+docs/G8_IMPLEMENTATION_SPEC.md   29 canonical e2e                          v3.5（本轮）
+docs/G9_IMPLEMENTATION_SPEC.md   loadProjectContextFiles                   v3.5（本轮）
+docs/G10_IMPLEMENTATION_SPEC.md  ExtensionFactory 简化                     v3.5（本轮）
+docs/G11_IMPLEMENTATION_SPEC.md  plugin manifest parseFrontmatter          v3.5（本轮）
+docs/G15_IMPLEMENTATION_SPEC.md  AuthStorage PKCE                          v3.5（本轮）
+```
+
+**12/15 G-gap 已具备 PR 级实施规格**。剩余 3 项为 P2 评估任务（G12/G13/G14）。
 
 **v3.4 增量**（2026-09-11 第五次跑 — Phase B/C 入口规格落地）：
 

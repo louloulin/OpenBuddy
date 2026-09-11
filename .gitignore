@@ -46,6 +46,16 @@ docs/*
 !docs/G1_IMPLEMENTATION_SPEC.md
 !docs/G2_IMPLEMENTATION_SPEC.md
 !docs/G3_IMPLEMENTATION_SPEC.md
+# plan4.1.md v3.5 Phase D/E/F G4-G15 specs (LUM-785, 2026-09-11)
+!docs/G4_IMPLEMENTATION_SPEC.md
+!docs/G5_IMPLEMENTATION_SPEC.md
+!docs/G6_IMPLEMENTATION_SPEC.md
+!docs/G7_IMPLEMENTATION_SPEC.md
+!docs/G8_IMPLEMENTATION_SPEC.md
+!docs/G9_IMPLEMENTATION_SPEC.md
+!docs/G10_IMPLEMENTATION_SPEC.md
+!docs/G11_IMPLEMENTATION_SPEC.md
+!docs/G15_IMPLEMENTATION_SPEC.md
 !docs/grok-to-pi-replacement-audit.md
 !docs/workbuddy-points-system-comparison.md
 !docs/enterprise-live-verification-2026-08-31.md
