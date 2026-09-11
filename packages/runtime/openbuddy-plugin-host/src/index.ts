@@ -1234,6 +1234,21 @@ export {
   type ResourceCollision,
   type ResourceDiagnostic,
 } from "./resource-pi";
+// G1 PR 1 — typed facade over pi's `defineTool` + TypeBox so extension
+// authors can register LLM-callable tools with end-to-end type safety
+// (no `(params as { ... })` casts). Existing
+// `electron/main/agent/extensions/apply-patch.ts` is intentionally NOT
+// migrated in PR 1 — that is G1 PR 2. See ./typed-tool.ts for the
+// Round 13 spec audit (apply-patch already uses pi `ExtensionFactory`;
+// the win is replacing ~30 LOC of unsafe casts, not a registration rewrite).
+export {
+  defineTool,
+  objectParams,
+  type ToolDefinition,
+  type TSchema,
+  type Static,
+  type InferParams,
+} from "./typed-tool";
 export {
   installProfilePackage,
   listProfilePackages,

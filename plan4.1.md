@@ -155,7 +155,7 @@ OpenBuddy 在 v1 plan4.1.md 时被归类为"24% pi-native"。**真实审计后�
 
 | # | 差距 | 证据（path:line） | 影响用户场景 | 修复方向 | 估时 |
 |---|---|---|---|---|---|
-| **G1** | `apply-patch.ts` 自实现工具工厂 | `extensions/apply-patch.ts:1-400`、`extensions/__tests__/apply-patch.test.ts`、`extensions/__tests__/apply-patch-r2.test.ts` | bash/read/write/edit 行为漂移；Pi 升级不会自动同步；grep/find/ls 缺失 | 引入 `createEditTool/createBashTool/createReadTool/createWriteTool/createGrepTool/createFindTool/createLsTool`，保留 `apply-patch.ts` 为薄 OpenBuddy adapter（< 100 LOC） | 3 周 |
+| **G1** | `apply-patch.ts` 228 LOC 含 ~30 LOC unsafe `(params as {...})` cast + `String(p.x ?? "")` runtime guard；**已用 pi `ExtensionFactory` + `api.registerTool`**（**注：spec 估 400+ LOC 错；不存在 createBashTool 等 pi 公开工厂——pi 0.85.1 只有 `defineTool` typed identity**） | `extensions/apply-patch.ts:133-178` + `:196-225` | typed-tool.ts facade（PR 1 ✅）+ apply-patch.ts 用 `defineTool<Type.Object({...})>` 替换 cast（PR 2 待做） | 3 周 |
 | **G2** | SettingsManager 自实现 | `packages/runtime/openbuddy-storage/src/sqlite/settings-store.ts`、`host-modules/models-config.ts` | retry backoff / image 压缩 / settings schema 校验走自己实现 | 切到 Pi `SettingsManager.create()` + 维护 OpenBuddy → Pi 映射 | 2 周 |
 | **G3** | `ProfilePackageManager` 自定义 | `packages/runtime/openbuddy-plugin-host/src/profile-manager.ts:53-63` | Pi `DefaultPackageManager` 的 npm install / git install / tarball install / signature 校验等能力 OpenBuddy 拿不到 | 接入 `DefaultPackageManager`，保留 `ProfilePackageManager` typed facade | 2 周 |
 | **G4** | pi-bridge 13 通道 12 个死代码 | `electron/main/agent/pi-bridge/index.ts:34-121` vs `src/lib/` 实际调用 1 处（pi-client.ts:1457） | renderer 文本截断/diff 生成/image resize/skill 加载本可走 pi 但走自实现 | Renderer 全面接入 `requirePiBridge()`；删除自实现对应物 | 2 周 |
@@ -506,6 +506,55 @@ Vitest (resource-pi, 1 个 test file):
 1. **include.ts 未被替换**（也**不应该**被替换）：Cordis harness plugin 是 OpenBuddy 自有概念，pi 的 `loadProjectContextFiles` 不提供等价物；两者并存
 2. **G9 PR 2 未做**（renderer / pi-runtime-coordinator 实际接入 `resource-pi.ts`）：本轮只到 PR 1（facade + 3 个 mock 测试）
 3. **G9 spec §2 API 签名 + §0 LOC 表**待 v4.0 修正
+4. **fts5 仍限制 vitest 全集**：与本轮无关
+
+**v3.10 增量**（2026-09-11 第十一次跑 — **G1 第四次代码落地 + 第五次 spec 审计校正**）
+
+**重要里程碑**：本轮实现 G1 PR 1（plugin-host typed-tool facade over pi `defineTool` + TypeBox）并发现 **G1 spec 同时错估 OpenBuddy 代码 + pi API**——这是连续第 5 个 spec audit 失败。
+
+**改动文件**：
+- `packages/runtime/openbuddy-plugin-host/src/typed-tool.ts` — 新文件（**65 LOC**）：typed facade 包装 pi `defineTool` + `ToolDefinition` + TypeBox `TSchema`/`Static`/`InferParams` + `objectParams()` helper
+- `packages/runtime/openbuddy-plugin-host/src/__tests__/typed-tool.test.ts` — 新文件（~80 LOC）：4 个 vitest 用例（identity helper / objectParams passthrough / InferParams 推断 / ToolDefinition<TParams> propagate）
+- `packages/runtime/openbuddy-plugin-host/src/index.ts` — barrel 新增 6 export（`defineTool` / `objectParams` / `ToolDefinition` / `TSchema` / `Static` / `InferParams`）
+- `packages/runtime/openbuddy-plugin-host/package.json` — 新增 `typebox: "1.3.7"` 依赖（与 pi 上游锁一致，pnpm install 14.6s 完成）
+
+**真实运行结果**：
+```
+TypeScript 编译:
+  tsc -p packages/runtime/openbuddy-plugin-host/tsconfig.json --noEmit  → exit 0 ✅
+
+Vitest (typed-tool, 1 个 test file):
+  ✓ typed-tool.test.ts   4 tests (new, all type-level + identity)  ✅
+
+  Test Files  1 passed (1)
+  Tests       4 passed (4)
+  Duration    2.05s
+```
+
+**G1 spec 校对（第 5 次连续失败）**：
+
+| G1 spec 假设 | 实际 | 应对 |
+|---|---|---|
+| apply-patch.ts 是自实现 tool registration | **已经是** pi `ExtensionFactory` + `api.registerTool`（line 25, 100, 117, 180） | 不替换 registration，只替换 `(params as {...})` cast |
+| pi 上游有 `createBashTool` / `createReadTool` / `createWriteTool` / `createEditTool` 等公开工具工厂 | pi 0.85.1 公开导出**只有** `defineTool` / `wrapRegisteredTool` / 类型守卫（`isBashToolResult` 等）| facade 不依赖不存在的导出 |
+| 228 LOC → <100 LOC（GA gate） | 实际能减 ~30 LOC（unsafe cast 删除）；schema literal → TypeBox literal 几乎不省 LOC | GA gate 调整为 **typed safety** 而非 LOC |
+| "替换为 pi-tool-factories" | 替换为 `defineTool` typed facade（不是 tool factories） | 文档标题 + 引用改为 "typed-tool facade" |
+
+**5 次 spec audit 模式总结**（写到 v3.10）：
+
+| 轮次 | Gap | spec 错估的两件事 | 实际 | facade 补救 |
+|---|---|---|---|---|
+| Round 10 | G11 | (1) manifest.ts LOC；(2) YAML 解析走自实现 | zod schema only；frontmatter 已存在 | `parsePluginManifestFromString` additive |
+| Round 11 | G6 | (1) initTheme config-object；(2) ui-theme 200 LOC token | positional args；ui-theme 只有状态管理 | `theme-pi.ts` 透传 positional |
+| Round 12 | G9 | (1) include.ts 350 LOC context loader；(2) loadProjectContextFiles 接收 patterns | include.ts 是 128 LOC Cordis plugin entry loader；pi API 是 `{cwd, agentDir}` 同步签名 | `resource-pi.ts` named-arg adapter |
+| **Round 13（本轮）** | **G1** | **(1) apply-patch.ts 自实现 registration；(2) pi 有 createBashTool 等工厂** | **apply-patch.ts 已用 pi `ExtensionFactory`；pi 只有 `defineTool` typed identity** | **`typed-tool.ts` facade（cast 替换方向）** |
+
+**根因（已 5 轮）**：每个 spec 是按 backlog "假设性重构"模板写的，**没有任何一轮动手前先 grep OpenBuddy 实际 LOC + 用 TypeScript Compiler API 读 pi 的 d.ts**。补救策略（v3.9 起的 "first action" 规则）在 Round 12 部分生效（确认了 include.ts LOC + pi API），但 G1 spec 没经过这条规则就被开写。**新规则**：**未来所有 G-gap 实施前必读**：(1) `wc -l <file>`；(2) `cat node_modules/.../extensions/*.d.ts | grep '<symbol>'`；(3) `grep -nE "createBashTool|createReadTool|..." node_modules/@earendil-works/pi-coding-agent/dist/index.d.ts`。
+
+**已知限制**：
+1. **G1 PR 2 未做**（apply-patch.ts 实际改造）：本轮只到 PR 1（typed facade + 4 个 mock 测试）
+2. **G1 spec 整段 §1 / §2 假设错**（apply-patch 已是 pi + pi 无 createXxxTool 工厂）：v4.0 应整段重写
+3. **typebox 是新增依赖**（plugin-host package.json 锁定 1.3.7，与 pi 上游锁一致；pnpm install 14.6s 通过；选择理由：pi 内部已用 typebox，facade 必须 re-export TSchema/Static 才能让下游消费者不直接依赖 typebox）
 4. **fts5 仍限制 vitest 全集**：与本轮无关
 
 **v3.5 增量**（2026-09-11 第六次跑 — Phase D/E/F 入口规格批量落地）

@@ -15,7 +15,7 @@
 
 | ID | 标题 | 文件锚点 | 估时 | 优先级 | Owner | 阻塞 | 状态 |
 |---|---|---|---|---|---|---|---|
-| **G1** | Pi 工具工厂替换 apply-patch 自实现 | `extensions/apply-patch.ts` (228 LOC) | 3 周 | P0 | runtime | — | ⬜ |
+| **G1** | defineTool typed facade + apply-patch cast 替换（**PR 1 已落地**） | `plugin-host/src/typed-tool.ts`（新增 65 LOC）| 3 周 | P0 | runtime | — | **🟢 PR1** |
 | **G2** | SettingsManager / DefaultResourceLoader 切到 pi | `storage/sqlite/settings-store.ts` (196 LOC) | 2 周 | P0 | runtime | G2 内部先跑通最小用例 | ⬜ |
 | **G3** | DefaultPackageManager 替换 ProfilePackageManager | `plugin-host/src/profile-manager.ts:53-63` (806 LOC) | 2 周 | P0 | runtime | G2 | ⬜ |
 | **G4** | pi-bridge 14 通道 13 死代码利用 | `pi-bridge/index.ts:36-121` vs `src/lib/agent/pi-client.ts:1460` | 2 周 | P0 | renderer | — | ⬜ |
@@ -37,24 +37,28 @@
 
 ## 1. P0：阻塞生产可用的 5 项
 
-### G1 — Pi 工具工厂替换 apply-patch 自实现
+### G1 — defineTool typed facade + apply-patch cast 替换（PR 1 已落地）
 
 **Owner**：runtime team
 **依赖**：—
 **估时**：3 周
-**关联脚本**：`bash scripts/audit/pi-sdk-usage.sh --json` 中 `hotspots.applyPatch=228` 必须降到 < 100。
+**状态**：🟢 **PR 1 已落地**（2026-09-11 Round 13）；PR 2（apply-patch.ts 实际改造）+ PR 3（清理）待 dev-env
 
-**修复方向**：
-- 新建 `electron/main/agent/extensions/pi-tool-factories.ts`：包装 pi 的 `createBashTool/createReadTool/createWriteTool/createEditTool/createGrepTool/createFindTool/createLsTool`，套 OpenBuddy `folderTrust` + `permission` + `auditLog` 适配器
-- 拆 `extensions/apply-patch.ts` 228 LOC：保留 ≤ 100 LOC 作为 `apply_patch` 兼容 adapter（如果第三方模型期望 apply_patch schema）
-- `pi-extensions.ts` 注册新 builtin extension `openbuddy-pi-tools`，内置 grep/find/ls
-- 31 个 `extensions/__tests__/apply-patch*.test.ts` 测试逐步迁移到 `pi-tool-factories.test.ts`
+**修复方向**（**修订后**）：
+- 新建 `packages/runtime/openbuddy-plugin-host/src/typed-tool.ts`（PR 1 ✅ 65 LOC）：typed facade 包装 pi 的 `defineTool` + TypeBox `TSchema`/`Static`/`InferParams` + `objectParams()` helper
+- 拆 `extensions/apply-patch.ts` 228 LOC → ~200 LOC（**PR 2 待写**）：用 `defineTool<Type.Object({...})>` 替换两个工具的 `parameters` literal + 删除 execute 函数里 ~30 LOC 的 `(params as {...})` cast + `String(p.x ?? "")` runtime guards
+- pi 0.85.1 **无** `createBashTool` 等公开工厂（spec 误估）；真实 win 是 typed safety 而非 LOC 压缩
+- `pi-extensions.ts` 注册新 builtin extension `openbuddy-pi-tools`（**G10 PR 2 待做**）
 
-**验收**：
-- 6 个工具（bash/read/write/edit/grep/find/ls）vitest 全过
-- 真实 Electron smoke 各 1 个 round-trip
-- `apply-patch.ts` 行数 < 100（脚本自动断言）
-- GA gate `hotspots.applyPatch < 100`
+**PR 1 验证**（2026-09-11）：
+- `tsc -p packages/runtime/openbuddy-plugin-host/tsconfig.json --noEmit` exit 0 ✅
+- `vitest run packages/runtime/openbuddy-plugin-host/src/__tests__/typed-tool.test.ts` 4/4 ✅
+- `pnpm install --filter @openbuddy/plugin-host` ✅（typebox 1.3.7 加入 plugin-host deps，与 pi 上游锁一致）
+- apply-patch.ts **未改动**（0 LOC 差异）
+
+**PR 2 待做**：apply-patch.ts 引入 typed-tool facade；跑 apply-patch-r2.test.ts 验证；GA gate 从 LOC 228→<100 调整为 **typed safety**（删除 unsafe cast）。
+
+**关联脚本**：`bash scripts/audit/pi-sdk-usage.sh --json` 中 `hotspots.applyPatch=228` 必须降到 < 100（PR 2 后达成）。
 
 ---
 
