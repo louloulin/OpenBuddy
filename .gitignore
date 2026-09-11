@@ -115,6 +115,7 @@ out/
 !docs/event-channel-matrix.md
 !docs/PERFORMANCE.md
 !docs/perf/REGRESSION_MATRIX.md
+!docs/perf/2026-09-11-openbuddy-ai-chat-perf.json
 
 # User-facing documentation set. These were missing from the allowlist above,
 # so `docs/*` hid them: README.md linked to docs/README.md, GETTING_STARTED,

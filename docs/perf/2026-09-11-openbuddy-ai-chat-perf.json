@@ -1,0 +1,12 @@
+{
+  "schema": "openbuddy.ai-chat-perf.v1",
+  "generatedAt": "2026-09-11T05:51:50.436Z",
+  "credentialSource": "~/.pi/agent/auth.json",
+  "model": "MiniMax-M3",
+  "baseUrl": "https://api.minimaxi.com/anthropic",
+  "coldStartPaintMs": 599,
+  "firstTurnLatencyMs": 3572,
+  "secondTurnLatencyMs": 1229,
+  "oneThousandTurnsRenderMs": 230,
+  "oneThousandTurnsMemoryDeltaMb": 0
+}
