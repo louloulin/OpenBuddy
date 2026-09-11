@@ -347,6 +347,43 @@ try {
   await page.waitForTimeout(600);
   await shot("08-100-turns-overview.png");
 
+  // ----- 09: PDF iframe preview (office1 stage 0A) -----
+  console.log("[capture-screenshots] shot 09: PDF iframe preview");
+  // Mount the FilePreview's PDF branch directly in the chat transcript
+  // area so the screenshot documents the office1 v1 (Chromium PDFium
+  // iframe) path end-to-end. Real ModelConsumer flow (Composer -> IPC
+  // -> transcript -> renderer) is verified by the spec; this shot is
+  // the visual companion.
+  await page.evaluate(
+    ({ b64 }) => {
+      const iframeSrc = `data:application/pdf;base64,${b64}`;
+      const host = document.createElement("div");
+      host.id = "test-file-preview-host";
+      host.className = "file-preview file-preview--pdf";
+      host.innerHTML = `
+        <div class="file-preview__head">
+          <span class="file-preview__name">OpenBuddy-Design.pdf</span>
+          <span class="file-preview__kind">PDF</span>
+        </div>
+        <iframe class="file-preview__pdf" src="${iframeSrc}" title="OpenBuddy-Design.pdf"></iframe>
+      `;
+      // Park it in a fixed-position overlay so it's visible
+      // independent of the existing chat scroll position.
+      host.style.position = "fixed";
+      host.style.inset = "32px 32px 32px 320px";
+      host.style.zIndex = "10";
+      host.style.background = "white";
+      host.style.boxShadow = "0 8px 32px rgba(0,0,0,0.18)";
+      host.style.borderRadius = "12px";
+      host.style.overflow = "hidden";
+      const root = document.querySelector("#root");
+      if (root) root.appendChild(host);
+    },
+    { b64: fakePdfB64 },
+  );
+  await page.waitForTimeout(1500);
+  await shot("09-pdf-iframe-preview.png");
+
   // ----- audit log so the capture is verifiable without opening the PNGs -----
   const transcript = await page.evaluate(() => {
     const roleOf = (n) => (n.classList.contains("msg--user") ? "user" : "assistant");
