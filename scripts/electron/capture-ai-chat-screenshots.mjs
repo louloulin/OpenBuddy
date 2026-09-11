@@ -292,12 +292,21 @@ try {
     target.dispatchEvent(event);
   }, { b64: fakePdfB64, name: "OpenBuddy-Design.pdf" });
   // Wait for the chip to render.
-  await page
-    .locator(".composer-image-attachments__chip")
-    .first()
-    .waitFor({ state: "visible", timeout: 5_000 });
-  // Send a real-MiniMax request that asks the model to summarise the
-  // attached PDF.
+  const chip = page.locator(".composer-image-attachments__chip").first();
+  await chip.waitFor({ state: "visible", timeout: 5_000 });
+  const chipTitle = await chip.getAttribute("title");
+  console.log(`[capture-screenshots] shot 07 chip title=${chipTitle}`);
+
+  // Take the screenshot NOW — with the chip rendered and visible but
+  // BEFORE pressing 发送. Previously this shot ran the assistant
+  // round-trip first, which scrolled the chip out of view and made
+  // the screenshot look like the producer was rejecting the PDF.
+  await page.locator(COMPOSER).first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
+  await shot("07-document-attachment.png");
+
+  // After the screenshot, complete the send + wait so subsequent
+  // shots (08) see a real assistant reply in the transcript.
   await page.locator(COMPOSER).first().fill("用两句话总结附件 PDF 的内容。不要调用任何工具。");
   await page.getByRole("button", { name: "发送", exact: true }).click();
   await page
@@ -307,17 +316,6 @@ try {
       { timeout: 60_000 },
     )
     .catch(() => {});
-  // Scroll the transcript back to the top so the chip list (which
-  // sits between the existing transcript and the new user prompt)
-  // and the new assistant reply are both in the same viewport.
-  await page.evaluate(() => {
-    const el = document.querySelector(
-      ".chatview__scroll, .msg-list, [data-testid='chatview-scroll']",
-    );
-    if (el) el.scrollTop = el.scrollHeight;
-  });
-  await page.waitForTimeout(500);
-  await shot("07-document-attachment.png");
 
   // ----- 08: 100-turn overview (synthesised transcript for layout preview) -----
   console.log("[capture-screenshots] shot 08: 100-turn overview");
