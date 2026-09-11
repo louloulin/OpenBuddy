@@ -22,10 +22,13 @@
  *   (none)
  */
 
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import {
+  syncRuntimeCredentials,
+  type CredentialSyncResult,
+} from "@openbuddy/plugin-host/pi-auth";
 
 import { type AgentHostState } from "../_state-shape";
 import { piHome } from "../_host-paths";
@@ -73,25 +76,43 @@ export async function bootstrapModelRuntime(
 }
 
 /**
- * Read auth.json and call `runtime.setRuntimeApiKey` for each API-key
- * credential. Mirrors the original agent-host.ts:syncAuthCredentials impl.
+ * Hydrate the runtime from auth.json (R39 — G15 pi-native path).
+ *
+ * Delegates to `@openbuddy/plugin-host/pi-auth`'s `syncRuntimeCredentials`,
+ * which reads each provider's credential through pi's own
+ * `readStoredCredential` (BOM strip + path normalization + "missing file
+ * ⇒ undefined") and classifies failures through pi's
+ * `CredentialSynchronizationError` instead of an opaque `unknown`.
+ *
+ * Behaviourally identical to the previous hand-rolled loop — every
+ * `type: "api_key"` credential is pushed into `setRuntimeApiKey`, a
+ * missing auth.json stays a no-op, and one bad provider never aborts
+ * the rest — but the credential shape is now pi's decision, not ours.
  */
 async function syncAuthCredentials(runtime: ModelRuntime): Promise<void> {
-  const authPath = join(piHome(), "auth.json");
-  let entries: Record<string, unknown> = {};
-  try {
-    entries = JSON.parse(await readFile(authPath, "utf8"));
-  } catch {
-    // No auth file yet — first-launch case.
-  }
-  for (const [providerId, credential] of Object.entries(entries)) {
-    const value = credential as { type?: string; key?: string };
-    if (value?.type === "api_key" && typeof value.key === "string" && value.key.length > 0) {
-      try {
-        await runtime.setRuntimeApiKey(providerId, value.key);
-      } catch (error) {
-        console.error(`[openbuddy] failed to sync credential for ${providerId}`, error);
-      }
-    }
-  }
+  const results = await syncRuntimeCredentials(runtime, join(piHome(), "auth.json"), {
+    onError: (providerId, error, operation) => {
+      console.error(
+        `[openbuddy] failed to sync credential for ${providerId}` +
+          (operation ? ` (operation=${operation})` : ""),
+        error,
+      );
+    },
+  });
+  reportCredentialSyncOutcome(results);
+}
+
+/**
+ * Surface a partially-hydrated runtime in the log. A provider that
+ * failed to sync keeps `hasConfiguredAuth` false for that provider, so
+ * the composer stays disabled with no other signal — this line is what
+ * makes that state diagnosable.
+ */
+function reportCredentialSyncOutcome(results: readonly CredentialSyncResult[]): void {
+  const failed = results.filter((result) => !result.ok);
+  if (failed.length === 0) return;
+  console.warn(
+    `[openbuddy] ${failed.length}/${results.length} provider credential(s) failed to hydrate: ` +
+      failed.map((result) => result.providerId).join(", "),
+  );
 }

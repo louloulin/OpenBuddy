@@ -26,6 +26,9 @@
       "@openbuddy/plugin-host": [
         "../packages/runtime/openbuddy-plugin-host/src/index.ts"
       ],
+      "@openbuddy/plugin-host/pi-auth": [
+        "../packages/runtime/openbuddy-plugin-host/src/pi-auth.ts"
+      ],
       "@openbuddy/bundle-base": [
         "../packages/bundle/openbuddy-base/src/index.ts"
       ],

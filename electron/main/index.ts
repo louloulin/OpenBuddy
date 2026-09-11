@@ -42,6 +42,7 @@ import { casdoorAuth } from "./casdoor/casdoor-auth";
 import { initCasdoorSecurity, type CasdoorSecurityController } from "./security/casdoor";
 import { perfTraceMark } from "./observability/perf-trace";
 import { createMainWindow as buildMainWindow } from "./main-window";
+import { installRendererProtocol, registerRendererScheme } from "./renderer-protocol";
 import { installAppMenu } from "./app-menu";
 
 // Heavy module (138 top-level imports including @earendil-works/pi-coding-agent and
@@ -92,7 +93,13 @@ if (developmentUserData || process.env.NODE_ENV_ELECTRON_VITE === "development")
 }
 
 const devRendererUrl = process.env.ELECTRON_RENDERER_URL;
-const rendererIndex = join(mainDirname, "../../out/renderer/index.html");
+const rendererDir = join(mainDirname, "../../out/renderer");
+const rendererIndex = join(rendererDir, "index.html");
+
+// R39: declare `openbuddy://` as a privileged scheme at module-init time —
+// Electron only honours registerSchemesAsPrivileged before app ready. The
+// handler itself is installed in createMainWindow (must run after ready).
+registerRendererScheme();
 const preloadCandidates = [
   join(mainDirname, "../preload/index.cjs"),
   join(mainDirname, "../preload/index.js"),
@@ -166,6 +173,12 @@ async function ensureRendererBuild(): Promise<boolean> {
 
 // P3-1: 主窗口工厂抽到 main-window.ts, 这里仅持有 mainWindow 引用并附加 closed 清理
 function createMainWindow(): BrowserWindow {
+  // Serve out/renderer over `openbuddy://` for the production (non-dev) path.
+  // Idempotent enough for the single-window app; dev mode ignores it because
+  // the window navigates to the vite dev server instead.
+  if (!devRendererUrl && existsSync(rendererIndex)) {
+    installRendererProtocol(rendererDir);
+  }
   const win = buildMainWindow({
     preloadPath,
     rendererIndex,

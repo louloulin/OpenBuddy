@@ -3,8 +3,8 @@
  *
  * The facade re-exports pi's theme fns. We assert the call shapes match
  * what pi actually exports (positional initTheme, no-arg getters) and
- * that the spec-named `getSettingsListTheme` correctly delegates to pi's
- * `getEditorTheme`.
+ * that `getSettingsListTheme` delegates to pi's own `getSettingsListTheme`
+ * (pi 0.85.1 has no `getEditorTheme` — see the R39 correction in theme-pi.ts).
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,7 +12,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   initTheme: vi.fn(),
   getMarkdownTheme: vi.fn(() => ({ token: "md" })),
   getSelectListTheme: vi.fn(() => ({ token: "select" })),
-  getEditorTheme: vi.fn(() => ({ token: "editor" })),
+  getSettingsListTheme: vi.fn(() => ({ token: "settings-list" })),
 }));
 
 import {
@@ -27,7 +27,7 @@ const piMock = pi as unknown as {
   initTheme: ReturnType<typeof vi.fn>;
   getMarkdownTheme: ReturnType<typeof vi.fn>;
   getSelectListTheme: ReturnType<typeof vi.fn>;
-  getEditorTheme: ReturnType<typeof vi.fn>;
+  getSettingsListTheme: ReturnType<typeof vi.fn>;
 };
 
 describe("@openbuddy/ui-theme/theme-pi — pi facade", () => {
@@ -55,11 +55,9 @@ describe("@openbuddy/ui-theme/theme-pi — pi facade", () => {
     expect(piMock.getSelectListTheme).toHaveBeenCalled();
   });
 
-  it("getSettingsListTheme delegates to pi's getEditorTheme (spec name vs pi name)", () => {
+  it("getSettingsListTheme delegates to pi's getSettingsListTheme", () => {
     const theme = getSettingsListTheme();
-    expect(theme).toEqual({ token: "editor" });
-    // Crucial: pi has `getEditorTheme`, not `getSettingsListTheme`. The
-    // spec used the friendly name; the adapter translates it.
-    expect(piMock.getEditorTheme).toHaveBeenCalled();
+    expect(theme).toEqual({ token: "settings-list" });
+    expect(piMock.getSettingsListTheme).toHaveBeenCalled();
   });
 });

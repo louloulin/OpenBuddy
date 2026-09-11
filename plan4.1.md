@@ -1,11 +1,15 @@
-# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.35 — Round 38 G1 PR 5 tool-factory 16→0 高阶 facade)
+# OpenBuddy 五期：Pi 原生整合到生产可用（Plan 4.1，v3.36 — Round 39 G15 auth 5→1 + 生产构建/白屏缺陷修复 + 真实截图验证）
 
 > 📅 2026-09-11 · 仓库 `louloulin/OpenBuddy` · 版本 `0.14.0` · 父任务 LUM-785
 >
 > 上游基线：`@earendil-works/pi-coding-agent` 0.85.1 · `pi-agent-core` 0.85.x · `pi-ai` 0.85.x
 > 配套：`plan4.md`（架构总纲） · `plan4.0.md`（UI 细节） · `docs/pi-analysis-critique.md`（方法论批判）
 >
-> **本文是 v3.34**：v3.33（Round 36 G2 PR 3 retry/image typed API）+ Round 37 **G2 PR 4 settings-store ≤ 50 LOC GA gate 收口**——`packages/runtime/openbuddy-storage/src/sqlite/settings-store.ts` 从 245 LOC 砍到 **49 LOC ≤ 50 GA gate ✅**。三个动作：(1) 删除未用方法（`listNamespaces` / `namespaceStats` / `bulkSet` / `bulkGet` / `SettingsNamespaceStats` interface，**全无 production caller**）；(2) 把 coerce helpers（`coerceRetrySettings` / `coerceImageSettings`）搬到新文件 `typed-settings.ts`（40 LOC）；(3) 极度压缩 docstring（45 行 → 1 行）。文件现在只剩 5 个生产级必需 method（`set` / `setAsync` / `get` / `getStrict` / `list` / `delete` / `deleteNamespace`）+ 4 个 typed accessor + 1 私有 `validate`，**纯 facade**。**pi-upstream-coverage 维持 24.1% raw / 23.7% useful**（typed-settings.ts 仍 import pi types，覆盖不变）。**G2 GA gate 现在 100% ✅**（PR 1+2+3+4 全完成）。
+**本文是 v3.36**：v3.35（Round 38 G1 PR 5 tool-factory 16→0 高阶 facade）+ Round 39 **G15 auth 5→1 + 3 个 production-blocking 缺陷修复**——(1) 新建 `@openbuddy/plugin-host/pi-auth`，把 `bootstrap/model-runtime.ts` 手写的 `JSON.parse(auth.json)` + credential 形状校验 + provider 同步循环整段换成 pi 的 `readStoredCredential` / `CredentialSynchronizationError`，**auth 域 unused 5 → 1**（目标 ≤2 ✅）；(2) 首次真实生产构建暴露出并修复 **3 个生产阻塞缺陷**：`agent-host.ts` 悬挂 import 导致 `electron-vite build` 直接失败、生产 `file://` 无法加载 ES module 导致**打包后白屏**（新增 `openbuddy://` privileged scheme）、3 处真实 tsc 错误（含 pi 0.85.1 并不存在的 `getEditorTheme`）；(3) 首次跑通**真实 Electron 截图验证**（Xvfb + Playwright `_electron`），并用真实应用 A/B 证明 `currentModel()` 确实由凭据水合决定。**pi-upstream-coverage raw 29.9% → 31.0%（≥30% ✅ 达成）**，useful 31.2%（GA gate ≥70% ❌ 未达标，见 §9.29.9 口径澄清）。**仓库首次 typecheck 全绿**（root + electron 双双 exit 0）。
+
+---
+
+> **上一版 v3.34 记录**：v3.33（Round 36 G2 PR 3 retry/image typed API）+ Round 37 **G2 PR 4 settings-store ≤ 50 LOC GA gate 收口**——`packages/runtime/openbuddy-storage/src/sqlite/settings-store.ts` 从 245 LOC 砍到 **49 LOC ≤ 50 GA gate ✅**。三个动作：(1) 删除未用方法（`listNamespaces` / `namespaceStats` / `bulkSet` / `bulkGet` / `SettingsNamespaceStats` interface，**全无 production caller**）；(2) 把 coerce helpers（`coerceRetrySettings` / `coerceImageSettings`）搬到新文件 `typed-settings.ts`（40 LOC）；(3) 极度压缩 docstring（45 行 → 1 行）。文件现在只剩 5 个生产级必需 method（`set` / `setAsync` / `get` / `getStrict` / `list` / `delete` / `deleteNamespace`）+ 4 个 typed accessor + 1 私有 `validate`，**纯 facade**。**pi-upstream-coverage 维持 24.1% raw / 23.7% useful**（typed-settings.ts 仍 import pi types，覆盖不变）。**G2 GA gate 现在 100% ✅**（PR 1+2+3+4 全完成）。
 > Round 19 的核心动作：
 > (1) `electron/main/agent/pi-extensions.ts:1015-1124` 提取 4 个 inline `(emit, config, options) => (pi) => { ... }` body 为命名函数：`createObservabilityExtension` / `createContextStatusExtension` / `createContextGuardExtension` / `createCompactAnnounceExtension`；
 > (2) `pi-extensions.ts:1126-1206` record 段从 ~250 LOC 嵌套箭头汤减为 **81 LOC**（每条 builtin 1 行委托）；
@@ -994,6 +998,8 @@ Phase C (4w) ─► Phase D (3w) ─► Phase E (3w) ─► Phase H (3w)
 | **Performance** | cold start ≤ 2.5s / tool IPC p95 ≤ 50ms / streaming 帧 ≤ 16ms | 任一回归 > 10% |
 | **Product** | Tasks / Projects / Assistants / Experts / Skills / Connectors / Automation / Artifacts 至少各有可运行闭环 | 任一缺失 |
 | **E2E** | 无凭据 deterministic smoke + 27 个真实 pi 包 e2e 全通过 | 任一失败 |
+| **生产构建**（R39 新增） | `electron-vite build` 成功产出 `out/{main,preload,renderer}` | 构建失败 |
+| **打包后渲染**（R39 新增） | 无 `ELECTRON_RENDERER_URL` 时真实窗口渲染（`openbuddy://`），渲染器 error = 0 | 白屏 / 渲染器 error > 0 |
 
 ---
 
@@ -4060,7 +4066,231 @@ $ ../../../node_modules/.bin/vitest run src/__tests__/pi-tool-factory.test.ts
 | P1 | 42 | skill 5 → ≤ 2（formatSkillsForPrompt 已接完）| coverage +1 pp |
 | **P1** | 43 | **GA gate 全收口**：raw ≥ 30% AND useful ≥ 30% ✅ | raw 29.9% → ≥ 30% |
 
-**预期 R43 后**：raw ≥ 30% + useful ≥ 30% 全部达成 → openbuddy 真正达到 **production-ready pi-native workbuddy** GA gate 状态。
+**预期 R43 后**：raw ≥ 30% 全部达成（useful ≥ 70% 见 §9.29.9 口径澄清，仍差 38.8 pp）。
+
+---
+
+### 9.29.0 触发
+
+R38 收口 tool-factory 后，§9.4 的 ROI 排序里 **auth 域 5 unused** 是最大单点缺口。本轮
+（Round 39）接 pi 的原生凭据 API，把 OpenBuddy 主进程里**自己手写的 auth.json 读取 +
+credential 形状校验 + provider 同步循环**整段替换成 pi 的 `readStoredCredential` +
+`CredentialSynchronizationError`。
+
+同时本轮执行了**首次真实生产构建 + 真实 Electron 截图验证**，由此暴露出 **3 个此前从未被
+发现的 production-blocking 缺陷**（详见 §9.29.6）——它们与 R39 的 auth 改动无关，是仓库既有
+问题，但都会让"打包后的应用不可用"，因此本轮一并修复。
+
+### 9.29.1 真实代码落地（9 files）
+
+| 文件 | LOC | 类型 |
+|---|---|---|
+| `packages/runtime/openbuddy-plugin-host/src/pi-auth.ts` | **283** | 新建（pi 原生凭据 facade） |
+| `packages/runtime/openbuddy-plugin-host/src/__tests__/pi-auth.test.ts` | **163** | 新建（10 vitest case） |
+| `packages/runtime/openbuddy-plugin-host/src/index.ts` | +17 | barrel re-export |
+| `packages/runtime/openbuddy-plugin-host/package.json` | +1 | `./pi-auth` subpath export |
+| `electron/main/agent/host-modules/bootstrap/model-runtime.ts` | 97 → 118 | 删手写 credential 循环，改委托 |
+| `electron.vite.config.ts` | +3 | `@openbuddy/plugin-host/pi-auth` vite alias |
+| `electron/tsconfig.json` | +3 | 同上（tsc paths） |
+| `electron/main/renderer-protocol.ts` | **新建 124** | `openbuddy://` 协议（§9.29.6 缺陷 2 修复） |
+| `electron/main/main-window.ts` / `electron/main/index.ts` | +12 / +9 | 生产加载路径切协议 |
+
+### 9.29.2 pi-auth facade 设计
+
+替换前 `bootstrap/model-runtime.ts` 的三段自实现：
+
+```typescript
+// 修复前 —— 自己 JSON.parse、自己判形状、自己 catch
+const raw = JSON.parse(await readFile(authPath, "utf8")) as Record<string, unknown>;
+for (const [providerId, value] of Object.entries(raw)) {
+  if (value?.type === "api_key" && typeof value.key === "string") {
+    try { await runtime.setRuntimeApiKey(providerId, value.key); }
+    catch (error) { console.error(String(error)); }   // 丢失 pi 的 operation 分类
+  }
+}
+```
+
+修复后（`@openbuddy/plugin-host/pi-auth`）：
+
+```typescript
+import {
+  CredentialSynchronizationError,
+  readStoredCredential,
+  type CredentialSynchronizationOperation,
+  type ModelRuntimeAuthOverrides,
+} from "@earendil-works/pi-coding-agent";
+
+export function readProviderCredential(providerId, authPath) {   // → pi readStoredCredential
+  return readStoredCredential(providerId, authPath) as StoredCredential | undefined;
+}
+export async function syncRuntimeCredentials(runtime, authPath, options?) {
+  // 逐 provider 水合；失败经 isCredentialSynchronizationError 分类后
+  // 落进 CredentialSyncResult{providerId, ok, operation?, error?}，
+  // 一个 provider 失败不影响其余（never throws）
+}
+export async function resolveProviderAuth(runtime, providerId, overrides?) {
+  return runtime.getAuth(providerId, overrides);   // typed ModelRuntimeAuthOverrides
+}
+```
+
+覆盖的 pi auth 符号：`readStoredCredential` / `CredentialSynchronizationError` /
+`CredentialSynchronizationOperation` / `ModelRuntimeAuthOverrides`。
+
+**诚实记录**：`OAuthSelectorComponent` 是 pi 的 TUI（ink / React-for-terminal）组件，
+electron-vite 架构下没有终端渲染层，强行 import 只会把 ink 拉进主进程 —— 本轮**明确不接**，
+登记在 §9.29.11 已知限制。
+
+### 9.29.3 auth 域 unused 5 → 1
+
+| 轮次 | auth 域 unused | 剩余符号 |
+|---|---|---|
+| R38 | **5** | `readStoredCredential` / `CredentialSynchronizationError` / `CredentialSynchronizationOperation` / `ModelRuntimeAuthOverrides` / `OAuthSelectorComponent` |
+| **R39** | **1** | 仅 `OAuthSelectorComponent`（故意不接） |
+
+目标 ≤ 2 **✅ 达成**。
+
+### 9.29.4 真实截图验证（本轮新增能力）
+
+本轮首次让**真实 Electron 截图**在容器内可跑通，路径：
+
+1. `sudo apt-get install -y xvfb fonts-noto-cjk` —— 容器无 `$DISPLAY`，且缺 CJK 字体；
+2. `electron-vite build` 产出真实 `out/{main,preload,renderer}`；
+3. Playwright `_electron.launch({ args: [ROOT, "--no-sandbox"] })` 启动**真实应用**，
+   `page.screenshot()` 抓真实窗口；
+4. 全部在 `xvfb-run -a -s "-screen 0 1600x1000x24"` 下执行。
+
+**关键坑（已记入脚本注释）**：Electron 会消费 `process.argv` 里的 `--flag`，位置参数会错位，
+截图脚本一律写**绝对硬编码输出路径**，不能用 `process.argv[2]`（曾把 PNG 写回脚本自身源码）。
+
+### 9.29.5 真实应用 A/B：`currentModel()` 由凭据水合决定
+
+在真实应用里调用真实 IPC `window.api.agent.currentModel()`，只改 `PI_CODING_AGENT_DIR/auth.json`：
+
+| auth.json | 真实返回 |
+|---|---|
+| `{deepseek: api_key, openai: api_key, anthropic: oauth, empty: api_key("")}` | `{"id":"gpt-5.5","provider":"openai","api":"openai-responses",…}` |
+| `{}` | `{"id":"unknown","provider":"unknown","baseUrl":"",…}` |
+
+UI 上同样可见：有凭据时 Composer 模型 chip 显示 **GPT-5.5**，无凭据时回落默认模型。
+这正是 `model-runtime.ts` 注释里那句"没有水合 → `hasConfiguredAuth` 为 false → Composer 卡死"
+的反面证据 —— **R39 的 `syncRuntimeCredentials` 真的在跑，并且真的生效**。
+
+### 9.29.6 顺带修复的 3 个 production-blocking 缺陷（本轮真实发现）
+
+> 这 3 个都是仓库既有问题，与 R39 的 auth 改动无关；**不修则"生产可用"不成立**。
+
+**缺陷 1 —— `electron-vite build` 直接失败（悬挂 import）**
+
+`electron/main/agent/agent-host.ts:565` 从 `./host-modules/session-store` 导入
+`formatBranchSummaryText`，但 R30 已把该实现搬到 `branch-summary-format.ts` 且 session-store
+不再 re-export。rolldown 报 `MISSING_EXPORT`，**整个生产构建无法产出**。
+修复：删掉悬挂 import，改用它文件顶部已有的 `formatBranchSummaryTextExport`
+（`agent-host.ts:36`，此前是 dead import）。同类悬挂引用 `host-modules/facade/telemetry-facade.ts:10`
+一并修正为 `../../branch-summary-format`。
+
+**缺陷 2 —— 打包后白屏：`file://` 不能加载 ES module（最严重）**
+
+`main-window.ts` 生产路径用 `win.loadFile(out/renderer/index.html)`，而 electron-vite 产出的
+renderer 是 `<script type="module">`。Chromium 拒绝从 `file://` 加载 ES module（opaque origin
+→ CORS 失败），控制台只留下若干 `net::ERR_FAILED`，**窗口永久白屏**。
+dev 模式（`ELECTRON_RENDERER_URL` → vite dev server）完全正常，所以这个缺陷只在生产路径暴露，
+长期未被发现。实测 `--allow-file-access-from-files` **无效**（该开关放宽的是 XHR/fetch，不改
+module script 的 origin 判定）。
+
+修复：新增 `electron/main/renderer-protocol.ts`，注册 privileged scheme `openbuddy://`
+（`standard + secure + supportFetchAPI + stream + corsEnabled`），用 `protocol.handle`
+把 `out/renderer/**` 映射到真实 origin `openbuddy://renderer/`，生产加载改
+`win.loadURL("openbuddy://renderer/index.html")`。**`webSecurity` 保持默认开启**（不降级安全策略），
+含路径穿越防护 + SPA fallback + 幂等安装（macOS `activate` 重建窗口不会重复注册）。
+实测：白屏 → `#root` 渲染 52076 字符、**渲染器 error 数 0**。
+
+**缺陷 3 —— 3 处 tsc 真实错误（仓库首次 typecheck 全绿）**
+
+| 文件 | 错误 | 修复 |
+|---|---|---|
+| `electron/main/agent/branch-summary-format.ts:13` | `Model` 不在 `pi-coding-agent` 导出 | 改从 `@earendil-works/pi-ai` 导入 |
+| `packages/ui/openbuddy-ui-theme/src/theme-pi.ts:29` | 导入 `getEditorTheme` —— pi 0.85.1 **没有**该导出（真实导出是 `getSettingsListTheme`；原注释把方向写反了） | 改导入 `getSettingsListTheme`，同步修 mock 与注释 |
+| `electron/main/agent/branch-summary-format.test.ts:107` | 用了 `beforeEach` 未 import | 补 `import { beforeEach } from "vitest"` |
+
+修完后 **root `tsconfig.json` 与 `electron/tsconfig.json` 双双 exit 0** —— 仓库首次 typecheck 全绿。
+
+### 9.29.7 实际审计数字
+
+```
+原始覆盖率       : 31.0%  (85/274, GA gate ≥ 30%)  ✅
+去 UI 覆盖率     : 31.2%  (81/260, GA gate ≥ 70%)  ❌ 未达标
+auth 域 unused   : 1      (R38 = 5, 目标 ≤ 2)      ✅
+settings 域      : 5      (R38 = 6)
+```
+
+> 说明：R38 记录为 raw 29.9% / useful 29.8%，本轮为 **31.0% / 31.2%**，但其中约 0.4 pp
+> 来自**修正后的诚实计数**——`Model`（并非 pi-coding-agent 导出）与 `getEditorTheme`
+> （pi 根本不存在的导出）此前被 audit 计入 used，属于**假阳性**，本轮随缺陷 3 一并清掉。
+> 净增量来自 auth 域真实接入 + `getSettingsListTheme` 真实接入。
+
+### 9.29.8 tsc + vitest + build 真实结果
+
+| 验证 | 命令 | 结果 |
+|---|---|---|
+| 类型检查（根） | `tsc --noEmit -p tsconfig.json` | **exit 0**（此前 1 error） |
+| 类型检查（electron） | `tsc --noEmit -p electron/tsconfig.json` | **exit 0**（此前 4 error） |
+| 单测 | `vitest run pi-auth + pi-tool-factory + typed-tool` | **25/25 passed** |
+| 单测 | `vitest run branch-summary-format + theme-pi` | **24/24 passed** |
+| 生产构建 | `electron-vite build` | **成功**（此前 MISSING_EXPORT 直接失败） |
+| 生产启动 | 真实 Electron + `openbuddy://` | `#root` 渲染 52076 字符，**渲染器 error 0** |
+
+### 9.29.9 GA gate 诚实状态
+
+| GA gate | 目标 | 当前 | 状态 |
+|---|---|---|---|
+| `profile-manager` LOC | ≤ 200 | — | ✅（Round 15） |
+| `settings-store` LOC | ≤ 50 | 49 | ✅（Round 37） |
+| pi-bridge 14 channel 利用率 | ≥ 80% | ≥ 80% | ✅（Round 24） |
+| pi-upstream **raw** coverage | ≥ 30% | **31.0%** | ✅ **本轮达成** |
+| pi-upstream **useful** coverage | ≥ 70% | **31.2%** | ❌ 差 38.8 pp |
+| 生产构建可产出 | — | ✅ | ✅ **本轮达成** |
+| 打包后界面可渲染 | — | ✅ | ✅ **本轮达成** |
+
+> 口径澄清：§9.25.7（Round 35）确立的 GA gate 是 **`raw ≥ 30% AND useful ≥ 70%`**；
+> §9.28.11 表格里写的 "useful ≥ 30%" 是笔误，以 §9.25.7 为准。**useful ≥ 70% 远未达成**，
+> 不做任何"双 gate 收口"的表述。
+
+### 9.29.10 进度贡献
+
+| 维度 | R38 | R39 | Δ |
+|---|---|---|---|
+| pi runtime raw 复用度 | 29.9% | **31.0%** | +1.1 pp |
+| pi runtime useful 复用度 | 29.8% | **31.2%** | +1.4 pp |
+| auth 域 unused | 5 | **1** | −4 |
+| 生产构建 | ❌ 失败 | **✅ 成功** | 阻塞解除 |
+| 打包后界面 | ❌ 白屏 | **✅ 渲染** | 阻塞解除 |
+| typecheck | 根 1 err / electron 4 err | **0 / 0** | 全绿 |
+| 真实 Electron 截图能力 | ❌ 无 | **✅ 有** | 新增 |
+
+### 9.29.11 已知限制
+
+1. **useful ≥ 70% 远未达成**（31.2%）—— 剩余大头是 `other` 104 / `session` 17 / `ui` 16
+2. **`OAuthSelectorComponent` 故意不接** —— pi TUI/ink 组件，electron 无终端渲染层
+3. **audit 的 §5b reverify 存在假阳性** —— 它在注释里匹配到 `OAuthSelectorComponent` /
+   `getSettingsListTheme` 等字符串并计入 "newlyUsed"；`unusedByDomain` 走的是主 pass，
+   数字（auth:1）本身正确，但 reverify 列表不可当证据
+4. **`renderer-protocol.ts` 未覆盖 range request** —— 当前 renderer 资源无需 206；未来若加
+   视频/大文件需补 `Range` 处理
+5. **截图依赖 Xvfb + fonts-noto-cjk** —— CI 上需显式安装，否则中文渲染成豆腐块
+
+### 9.29.12 Round 40+ 下一步
+
+| 优先级 | Round | 目标 | 期望指标 |
+|---|---|---|---|
+| **P1** | 40 | shell 10 → ≤ 6（apply-patch `apply_command` 走 pi bash-executor） | raw +1 pp |
+| **P1** | 41 | session 17 → ≤ 10（接 `SessionTreeNode` / `parseSessionEntries`） | raw +2 pp |
+| P1 | 42 | skill 5 → ≤ 2（`formatSkillsForPrompt` 等） | raw +1 pp |
+| P2 | 43 | `renderer-protocol` 加 Range/缓存头 + 打包产物 e2e | 生产健壮性 |
+| **P2** | 44 | **useful 覆盖率攻坚**：先给 `other` 104 做二级分类，找出真实可接项 | useful 目标重估 |
+
+> **关于 useful ≥ 70%**：R35 已承认"95% 不可达"，但 70% 是否可达尚未做过**分母级**复核。
+> R44 的第一步应是**把 `other` 104 拆成有意义的子域**，再判断 70% 是可达目标还是需要再次诚实下调
+> —— 不做没有分母依据的承诺。
 
 ---
 

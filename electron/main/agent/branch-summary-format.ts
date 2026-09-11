@@ -10,11 +10,14 @@
  */
 import {
   type BranchSummaryResult,
-  type Model,
   generateBranchSummary,
   prepareBranchEntries,
   type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
+// `Model` is owned by pi-ai, not pi-coding-agent — pi-coding-agent only
+// re-exports ModelRegistry / ScopedModel. Importing it from the coding-agent
+// barrel is a TS2305 that the bundler silently tolerates.
+import type { Model } from "@earendil-works/pi-ai";
 
 /**
  * Default `reserveTokens` for `prepareBranchEntries` + `generateBranchSummary`.

@@ -2,7 +2,7 @@
  * @openbuddy/ui-theme — pi-native theme adapter (G6 PR 1).
  *
  * Delegates to pi's real theme exports (`initTheme`, `getMarkdownTheme`,
- * `getSelectListTheme`, `getEditorTheme`) and exposes a typed facade that
+ * `getSelectListTheme`, `getSettingsListTheme`) and exposes a typed facade that
  * matches the G6 spec's intent without forcing consumers to import
  * `@earendil-works/pi-coding-agent` directly.
  *
@@ -26,7 +26,7 @@ import {
   initTheme as piInitTheme,
   getMarkdownTheme as piGetMarkdownTheme,
   getSelectListTheme as piGetSelectListTheme,
-  getEditorTheme as piGetEditorTheme,
+  getSettingsListTheme as piGetSettingsListTheme,
   type ThemeColor,
 } from "@earendil-works/pi-coding-agent";
 
@@ -57,13 +57,15 @@ export function getSelectListTheme() {
 }
 
 /**
- * Editor theme (settings-list / text-editor palette).
+ * Settings-list theme (settings-list / text-editor palette).
  *
- * Spec audit: the G6 doc named this `getSettingsListTheme`; pi's actual
- * export is `getEditorTheme`. We expose it under the spec's name so
- * downstream consumers do not have to change when they migrate, while
- * the underlying call is the pi-defined symbol.
+ * Spec audit (R39 correction): the earlier note here claimed pi's export was
+ * `getEditorTheme` and that we renamed it. That was inverted — pi 0.85.1
+ * exports `getSettingsListTheme` and has **no** `getEditorTheme`, so the
+ * import was a dangling TS2305 that only survived because the bundler does
+ * not typecheck and the test mocks the module. The facade name now matches
+ * the real pi symbol.
  */
 export function getSettingsListTheme() {
-  return piGetEditorTheme();
+  return piGetSettingsListTheme();
 }

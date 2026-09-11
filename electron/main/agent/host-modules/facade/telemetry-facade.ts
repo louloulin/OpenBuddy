@@ -7,7 +7,9 @@
  * 反向依赖不变: 此模块不 import agent-host.ts.
  */
 import { assistantMessageText as assistantMessageTextImpl } from "../team-runner";
-import { formatBranchSummaryText as formatBranchSummaryTextImpl } from "../session-store";
+// R30 moved the formatter out of session-store into ../branch-summary-format;
+// session-store no longer re-exports it, so this import must point at the owner.
+import { formatBranchSummaryText as formatBranchSummaryTextImpl } from "../../branch-summary-format";
 
 export function buildTelemetryFacade() {
   return {

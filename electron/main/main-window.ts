@@ -13,6 +13,7 @@
 import { BrowserWindow, shell } from "electron";
 import { existsSync } from "node:fs";
 import { installDragRegion } from "./window";
+import { RENDERER_SCHEME, RENDERER_ENTRY_URL } from "./renderer-protocol";
 
 export interface CreateMainWindowOptions {
   preloadPath: string;
@@ -144,7 +145,10 @@ export function createMainWindow(opts: CreateMainWindowOptions): BrowserWindow {
     } catch {
       parsed = null;
     }
-    const isOwnDocument = parsed?.protocol === "file:" || (devOrigin !== null && parsed?.origin === devOrigin);
+    const isOwnDocument =
+      parsed?.protocol === `${RENDERER_SCHEME}:` ||
+      parsed?.protocol === "file:" ||
+      (devOrigin !== null && parsed?.origin === devOrigin);
     if (isOwnDocument) return;
     event.preventDefault();
     if (parsed && (parsed.protocol === "http:" || parsed.protocol === "https:")) {
@@ -174,8 +178,12 @@ export function createMainWindow(opts: CreateMainWindowOptions): BrowserWindow {
     perfTraceMark("window-fire-load", { mode: "dev-url" });
     void win.loadURL(devRendererUrl);
   } else if (existsSync(rendererIndex)) {
-    perfTraceMark("window-fire-load", { mode: "file" });
-    void win.loadFile(rendererIndex);
+    // R39: serve the ESM bundle over the privileged `openbuddy://` scheme
+    // instead of `loadFile`. Chromium refuses to load `<script type="module">`
+    // from `file://` (opaque origin → CORS failure), which white-screened the
+    // packaged app. See renderer-protocol.ts for the full diagnosis.
+    perfTraceMark("window-fire-load", { mode: "protocol" });
+    void win.loadURL(RENDERER_ENTRY_URL);
   } else {
     const message = `Renderer build not found: ${rendererIndex}`;
     console.error(`[openbuddy-pi] ${message}`);

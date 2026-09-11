@@ -565,7 +565,6 @@ import {
   sessionUsage as sessionUsageImpl,
   sessionFile as sessionFileImpl,
   rewindSession as rewindSessionImpl,
-  formatBranchSummaryText as formatBranchSummaryTextImpl,
   renameSession as renameSessionImpl,
   deleteSession as deleteSessionImpl,
 } from "./host-modules/session-store";
@@ -1237,7 +1236,7 @@ function formatBranchSummaryText(
   messages: ReadonlyArray<{ role?: string; content?: unknown }>,
   options?: { maxTotal?: number; maxUser?: number; maxAssistant?: number },
 ): string | null {
-  return formatBranchSummaryTextImpl(messages, options);
+  return formatBranchSummaryTextExport(messages, options);
 }
 
 

@@ -1442,3 +1442,29 @@ export {
   type BuiltinToolSet,
   type BuiltinToolSetOptions,
 } from "./pi-tool-factory";
+
+// R39 (G15 PR) — pi-native credential read + ModelRuntime hydration
+// facade. Replaces bootstrap/model-runtime.ts's hand-rolled
+// `JSON.parse(auth.json)` + `type === "api_key"` credential check with
+// pi's readStoredCredential, and classifies sync failures through pi's
+// CredentialSynchronizationError. auth 域 unused 5 → 1.
+export {
+  apiKeyOf,
+  collectStoredApiKeys,
+  describeCredentialSyncOperation,
+  isApiKeyCredential,
+  isCredentialSynchronizationError,
+  listCredentialProviderIds,
+  readProviderCredential,
+  resolveProviderAuth,
+  syncRuntimeCredentials,
+  type CredentialRuntimePort,
+  type CredentialSyncResult,
+  type CredentialSynchronizationOperation,
+  type ModelRuntimeAuthOverrides,
+  type StoredApiKeyCredential,
+  type StoredApiKeyEntry,
+  type StoredCredential,
+  type StoredOAuthCredential,
+  type SyncRuntimeCredentialsOptions,
+} from "./pi-auth";
