@@ -43,11 +43,11 @@
  *   the only way the flow signals "we couldn't land on a real id"; the
  *   caller catches and runs the rollback block.
  */
-import { useSessionStore } from "@/stores/session-store";
+import { useSessionStore, type UserContentPart } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { usePendingExpertStore } from "@/stores/pending-expert-store";
 import { useProjectsStore } from "@/stores/projects-store";
-import { piSend, piSetSessionExpert } from "@/lib/agent/pi-client";
+import { piSend, piSendContent, piSetSessionExpert } from "@/lib/agent/pi-client";
 import { friendlyError } from "@/lib/platform/error-format";
 import { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "@/lib/agent/persona-markers";
 import type { AgentEntry } from "@openbuddy/shared-types";
@@ -108,6 +108,8 @@ export interface NewSessionFlowArgs {
   promise: Promise<string>;
   /** Text to send to the model. */
   text: string;
+  /** Optional structured content; when present it preserves attachments. */
+  content?: UserContentPart[];
   /** CWD for the session — currently unused by the flow itself, but
    *  threaded through so callers don't have to remember the field. */
   cwd: string;
@@ -193,7 +195,19 @@ export async function newSessionFlow(args: NewSessionFlowArgs): Promise<{ realId
     }
   }
 
-  await piSend(realId, textForPi);
+  const contentForPi = args.content
+    ? (() => {
+        let wrapped = false;
+        return args.content.map((part) => {
+          if (part.type !== "text" || wrapped) return part;
+          wrapped = true;
+          return { ...part, text: textForPi };
+        });
+      })()
+    : undefined;
+  await (contentForPi
+    ? piSendContent(realId, contentForPi)
+    : piSend(realId, textForPi));
   return { realId };
 }
 

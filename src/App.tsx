@@ -34,6 +34,7 @@ import { TopbarActions } from "@openbuddy/ui-shell";
 import { SidebarToggleIcon, WbNewTaskIcon } from "@openbuddy/ui-primitives/icons";
 import type { ModelOption } from "@openbuddy/ui-workbench";
 import { useSessionStore } from "./stores/session-store";
+import type { UserContentPart } from "./stores/session-store";
 import { useFeedbackStore } from "./stores/feedback-store";
 import { useSessionsStore } from "./stores/sessions-store";
 import { usePermissionStore } from "./stores/permission-store";
@@ -1031,14 +1032,15 @@ function Shell() {
   // handleLaunchDiscover, handleStartProject, handleStartProjectConversation)
   // share one implementation. Rollback on error stays here because it has
   // to undo the optimistic store mutations made *before* the IPC resolves.
-  const handleSendNew = async (text: string) => {
+  const handleSendNew = async (text: string, content?: UserContentPart[]) => {
     if (STREAM_DEBUG) console.log('[OpenBuddy] handleSendNew:', { text, cwd: cwdRef.current, modelId: currentModelId });
     setPlaceholderView(null);
     const { pendingId, promise } = optimisticSession.ensureNewSession(cwdRef.current, currentModelId);
     // Push the user message + start streaming *now* (before the backend
     // returns) so ChatView shows the user's bubble and the LoadingRow
     // immediately.
-    sessionStore.getState().pushOptimisticUser(text);
+    const optimisticContent = content ?? [{ type: "text" as const, text }];
+    sessionStore.getState().pushOptimisticUserContent(optimisticContent);
     sessionStore.getState().setStreaming(true);
     sessionsStore.getState().upsert({
       sessionId: pendingId,
@@ -1057,6 +1059,7 @@ function Shell() {
         pendingId,
         promise,
         text,
+        content: content ? optimisticContent : undefined,
         cwd: cwdRef.current,
         flowDeps: {
           awaitPendingNewSession: optimisticSession.awaitPendingNewSession,
@@ -1123,15 +1126,22 @@ function Shell() {
   };
 
   // R1 — content-based send path used when Composer ships
-  // content parts (text + image attachments) via the agent:prompt-content IPC.
-  const handleSendContent = async (content: Array<{ type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }>) => {
+  // content parts (text + image/file attachments) via the agent:prompt-content IPC.
+  const handleSendContent = async (content: UserContentPart[]) => {
     const traceId = generateTrace();
     const log = withTrace(appLogger, traceId);
     const textPart = content.find((c) => c.type === "text");
     const textForLog = textPart?.text ?? "";
     const imageCount = content.filter((c) => c.type === "image").length;
-    log.info("composer.send.content", { msg: "composer.send.content", sessionId: currentSessionId ?? undefined, textLength: textForLog.length, imageCount });
-    if (!currentSessionId) return handleSendNew(textForLog || "");
+    const fileCount = content.filter((c) => c.type === "file").length;
+    log.info("composer.send.content", {
+      msg: "composer.send.content",
+      sessionId: currentSessionId ?? undefined,
+      textLength: textForLog.length,
+      imageCount,
+      fileCount,
+    });
+    if (!currentSessionId) return handleSendNew(textForLog, content);
     if (sessionStore.getState().streaming) return;
     try {
       sessionsStore.getState().upsert({ sessionId: currentSessionId, status: "working" });
@@ -1141,7 +1151,7 @@ function Shell() {
         sessionsStore.getState().upsert({ sessionId: currentSessionId, title: derivedTitle });
         void piRenameSession(currentSessionId, derivedTitle, cwdRef.current).catch(() => undefined);
       }
-      sessionStore.getState().pushOptimisticUser(textForLog);
+      sessionStore.getState().pushOptimisticUserContent(content);
       sessionStore.getState().setStreaming(true);
       await piSendContent(currentSessionId, content, { traceId, mode: "queue" });
       log.info("composer.send.content.dispatched", { msg: "composer.send.content.dispatched", sessionId: currentSessionId });

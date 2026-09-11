@@ -9,7 +9,12 @@ import { useFeedbackStore, type FeedbackRating } from "@/stores/feedback-store";
 import type { ChatMessage, ToolCallView } from "@/stores/session-store";
 import { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "./persona-markers";
 import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
-import { RendererContributionView, RendererSlotView } from "@openbuddy/ui-workbench";
+import { RendererContributionView, RendererSlotView, FilePreview } from "@openbuddy/ui-workbench";
+
+function toPreviewDataUrl(mediaType: string, data: string): string {
+  if (data.startsWith("data:")) return data;
+  return `data:${mediaType || "application/octet-stream"};base64,${data}`;
+}
 
 /** Strip the hidden expert persona block from text (used on history replay). */
 function stripPersona(text: string): string {
@@ -100,9 +105,19 @@ function MessageItemInner({
       <div className="msg msg--user">
         <div>
           <div className="msg__bubble">
-            {message.parts.map((p, i) =>
-              p.kind === "text" ? <span key={i}>{stripPersona(p.text)}</span> : null
-            )}
+            {message.parts.map((p, i) => {
+              if (p.kind === "text") return <span key={i}>{stripPersona(p.text)}</span>;
+              if (p.kind === "file") {
+                return (
+                  <FilePreview
+                    key={i}
+                    filename={p.name || "attachment"}
+                    content={toPreviewDataUrl(p.mediaType, p.data)}
+                  />
+                );
+              }
+              return null;
+            })}
           </div>
           {/* Hover actions */}
           <div className="msg__actions">
@@ -185,6 +200,15 @@ function MessageItemInner({
                     )}
                   </div>
                 </details>
+              );
+            }
+            if (p.kind === "file") {
+              return (
+                <FilePreview
+                  key={i}
+                  filename={p.name || "attachment"}
+                  content={toPreviewDataUrl(p.mediaType, p.data)}
+                />
               );
             }
             if (p.kind !== "tool_call") return null;

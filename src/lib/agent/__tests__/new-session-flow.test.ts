@@ -27,10 +27,11 @@ import { useProjectsStore } from "@/stores/projects-store";
 // Mock pi-client — we don't want a real Electron round-trip in unit tests.
 vi.mock("@/lib/agent/pi-client", () => ({
   piSend: vi.fn().mockResolvedValue(undefined),
+  piSendContent: vi.fn().mockResolvedValue(undefined),
   piSetSessionExpert: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { piSend, piSetSessionExpert } from "@/lib/agent/pi-client";
+import { piSend, piSendContent, piSetSessionExpert } from "@/lib/agent/pi-client";
 
 function resetStores() {
   useSessionStore.setState({
@@ -102,6 +103,56 @@ describe("newSessionFlow", () => {
     expect(awaitPending).not.toHaveBeenCalled();
   });
 
+  it("structured content preserves attachments and uses piSendContent", async () => {
+    adoptPending("__pending_1");
+    const content = [
+      { type: "text" as const, text: "请看附件" },
+      { type: "file" as const, mediaType: "application/pdf", data: "cGRm", name: "brief.pdf" },
+      { type: "image" as const, mediaType: "image/png", data: "cG5n", name: "chart.png" },
+    ];
+    await newSessionFlow({
+      pendingId: "__pending_1",
+      promise: Promise.resolve("real-42"),
+      text: "请看附件",
+      content,
+      cwd: "/home/user/proj",
+    });
+    expect(piSend).not.toHaveBeenCalled();
+    expect(piSendContent).toHaveBeenCalledWith("real-42", content);
+  });
+
+  it("structured persona and project wrappers only rewrite the text part", async () => {
+    adoptPending("__pending_1");
+    useProjectsStore.setState({
+      projects: [{
+        id: "proj-1", name: "AI助手", cwd: "/home/user/proj", instructions: "用中文",
+        conversations: [], connectors: [], experts: [], skills: [], plans: [], tasks: [], assets: [],
+        dataSources: [], members: [], activities: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      }],
+      activeProjectId: null,
+    });
+    const content = [
+      { type: "text" as const, text: "你好" },
+      { type: "file" as const, mediaType: "application/pdf", data: "cGRm", name: "brief.pdf" },
+    ];
+    await newSessionFlow({
+      pendingId: "__pending_1",
+      promise: Promise.resolve("real-42"),
+      text: "你好",
+      content,
+      cwd: "/home/user/proj",
+      flowDeps: {
+        persona: { expertId: "e", name: "n", source: "s", prompt: "你是专家" },
+        projectSeed: { id: "proj-1", name: "AI助手", instructions: "用中文" },
+      },
+    });
+    const sent = vi.mocked(piSendContent).mock.calls[0][1];
+    expect(sent).toHaveLength(2);
+    expect(sent[0]).toMatchObject({ type: "text" });
+    expect(sent[0].type === "text" && sent[0].text).toContain("你是专家");
+    expect(sent[0].type === "text" && sent[0].text).toContain("项目「AI助手」背景与规范");
+    expect(sent[1]).toEqual(content[1]);
+  });
   it("supersede: first promise resolves to pending, awaitPending recovers", async () => {
     const awaitPending = vi.fn().mockResolvedValue("real-final");
     const pendingId = "__pending_1";

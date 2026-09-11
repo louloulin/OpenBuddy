@@ -44,6 +44,7 @@ import {
   piLoadSession,
   piSetModel,
   piInit,
+  sessionEntriesToChatMessages,
 } from "../pi-client";
 
 const FIXED = "fixed-trace-id-1234";
@@ -51,6 +52,30 @@ const FIXED = "fixed-trace-id-1234";
 function callsFor(channel: string) {
   return mocks.invokeMock.mock.calls.filter(([ch]) => ch === channel);
 }
+
+describe("session history attachment projection", () => {
+  it("projects persisted file parts with filename and payload", () => {
+    const result = sessionEntriesToChatMessages([
+      {
+        type: "message",
+        id: "entry-1",
+        parentId: null,
+        timestamp: "2026-09-11T00:00:00.000Z",
+        message: {
+          role: "user",
+          content: [
+            { type: "text", text: "请看" },
+            { type: "file", mediaType: "application/pdf", data: "cGRm", name: "brief.pdf" },
+          ],
+        },
+      },
+    ]);
+    expect(result.messages[0]?.parts).toEqual([
+      { kind: "text", text: "请看" },
+      { kind: "file", mediaType: "application/pdf", data: "cGRm", name: "brief.pdf" },
+    ]);
+  });
+});
 
 describe("pi-client trace propagation", () => {
   beforeEach(() => {

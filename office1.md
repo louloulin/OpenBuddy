@@ -40,11 +40,42 @@
 | IPC 协议 `type:"file"` part | ✅ 已有 | `electron/main/ipc/validation.ts::promptFilePart` |
 | Agent-host 内联 `<document>` 块到 user prompt | ✅ 已有 | `electron/main/agent/host-modules/agent-prompt.ts` |
 | 真打 100 轮 LLM 验收 | ✅ 已有 | `tests/electron/chat-ui-minimax-100-turns.spec.ts`（默认 skip） |
-| **PDF/DOCX/XLSX/PPT 视觉预览** | ❌ 缺 | 当前 FilePreview 只支持 markdown/image/code/text |
-| **在线编辑 Office 文档** | ❌ 缺 | 没有 spreadsheet / document / slide 编辑层 |
+| **PDF/DOCX/XLSX/PPT 视觉预览** | ✅ 已有(v1) | `FilePreview.tsx` 已支持 PDF iframe + docx/pptx/xlsx ZIP/XML 提取预览(2026-09-11 修复) |
+| **在线编辑 Office 文档** | ❌ 缺 | 没有 spreadsheet / document / slide 编辑层(阶段 4,接 Univer) |
 | **Univer 集成** | ❌ 缺 | 仓库无 `@univerjs/*` 依赖 |
-| **`FilePreview` 升级为 Office 文档可视化** | ⚠️ 半 | `packages/ui/openbuddy-ui-workbench/src/FilePreview.tsx` 只支持 markdown/image/code/text |
-| **plan4.2 提到的"PDF 阅读器"**（plan4.3 §3.1 P1） | 仍 open | 本计划合并到 office1 完成 |
+| **`FilePreview` 升级为 Office 文档可视化** | ✅ 已有(v1) | `FilePreview.tsx` 支持 pdf(iframe)/image/markdown/code/text/audio/video/docx/pptx/sheet;无解析器时降级占位 |
+| **plan4.2 提到的"PDF 阅读器"**（plan4.3 §3.1 P1） | ✅ v1 已落地 | PDF iframe 预览;PDF.js 升级版留 §9 |
+
+### 1.2.1 根因复盘(2026-09-11,展示问题真正的断点)
+
+用户多轮反馈"展示有问题"。排查结论:**不是 `FilePreview` 缺分支,
+而是附件没有完整穿过真实聊天 transcript 链路**。断点与修复:
+
+| # | 断点 | 修复 |
+|---|---|---|
+| 1 | `App.handleSendContent` 只调 `pushOptimisticUser(text)`,file part 进不了 optimistic transcript | `pushOptimisticUserContent(content)` |
+| 2 | `MessagePart` 无 `file` 类型 | 新增 `{ kind:"file"; name; mediaType; data }` |
+| 3 | `MessageItem.tsx` 只渲染 text/thought/tool_call,file part 被静默丢弃 | user/assistant 两个分支都渲染 `<FilePreview>` |
+| 4 | PDF iframe 收到裸 base64(非完整 `data:` URL)无法预览 | `toPreviewDataUrl()` 包装,已是 `data:` 则不重复包装 |
+| 5 | 历史 session projection 丢弃 provider 的 file/image part,reload 后附件消失 | `sessionEntriesToChatMessages()` 安全投影 file/image |
+| 6 | 新会话分支只把文字传给 `handleSendNew`,附件丢失 | `handleSendNew(text, content)` + `newSessionFlow.content` |
+| 7 | persona/project wrapper 改写整个 content,破坏附件 | 只替换第一个 text part |
+| 8 | Composer 只接受 docx,不接受 xlsx/pptx | `SUPPORTED_DOC` 正则扩展三种 OOXML MIME |
+| 9 | 搜索索引可能吞入 base64 | `extractPlainText()` 对 file part 只纳入文件名 |
+
+**真实验收路径**(不允许用手工 append iframe 的测试冒充):
+
+```
+Composer(paste PDF) → App.handleSendContent → pushOptimisticUserContent
+  → ChatView → MessageItem → FilePreview(.file-preview--pdf iframe)
+```
+
+- 单元/RTL 层:`MessageItem-file-preview.test.tsx`(4 项)、
+  `session-store-ui`、`extract-text`、`pi-client-trace`、
+  `new-session-flow`、`FilePreview` 共 70+ 用例。
+- Electron 层:`chat-ui-minimax-document-preview.spec.ts` 真实驱动
+  paste → 发送 → 断言 transcript 内 `.file-preview--pdf iframe` 的
+  `src`/`title`。无凭证或上游 429 时 skip,不声称通过。
 
 ### 1.3 Univer 简介
 

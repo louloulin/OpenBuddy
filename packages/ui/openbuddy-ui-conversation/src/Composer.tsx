@@ -449,14 +449,15 @@ export function ComposerInner({
    *  The flavour (image vs file) is inferred from the MIME type:
    *  - image/{png,jpeg,webp,gif}          -> kind: "image", cap 16MB
    *  - application/pdf, text/*, json, xml -> kind: "file",  cap 8MB
-   *  - application/...wordprocessingml.document (docx) -> kind: "file"
+   *  - application/...wordprocessingml.document (docx), spreadsheetml.sheet (xlsx),
+   *    presentationml.presentation (pptx) -> kind: "file"
    *  - everything else (executables, archives) -> null + toast
    */
   const readImageFile = (file: File): Promise<ImageAttachment | null> => {
     return new Promise((resolve) => {
       const SUPPORTED_IMAGE = /^image\/(png|jpe?g|webp|gif)$/i;
       const SUPPORTED_DOC =
-        /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/i;
+        /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation))$/i;
       const IMAGE_CAP = 16 * 1024 * 1024;
       const FILE_CAP = 8 * 1024 * 1024;
       let kind: "image" | "file";
@@ -940,7 +941,7 @@ export function ComposerInner({
             // `piSendContent` as `type:"file"` parts instead of being
             // inlined into the prompt body).
             const fileItem = Array.from(e.clipboardData.items ?? []).find(
-              (it) => it.kind === "file" && (it.type.startsWith("image/") || /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/i.test(it.type)),
+              (it) => it.kind === "file" && (it.type.startsWith("image/") || /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation))$/i.test(it.type)),
             );
             if (fileItem) {
               e.preventDefault();

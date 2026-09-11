@@ -20,6 +20,8 @@ export function extractPlainText(message: ChatMessage): string {
       segs.push(p.text);
     } else if (p.kind === "thought") {
       segs.push(p.text);
+    } else if (p.kind === "file") {
+      if (p.name) segs.push(p.name);
     } else if (p.kind === "tool_call") {
       segs.push(extractToolCallText(p.toolCall));
     }

@@ -40,6 +40,20 @@ describe("session-store UI state (Phase 6 e2e)", () => {
     expect(bubble!.parts[0]).toMatchObject({ kind: "text", text: "hello" });
   });
 
+  test("pushOptimisticUserContent keeps file attachments in the optimistic bubble", () => {
+    const id = useSessionStore.getState().pushOptimisticUserContent([
+      { type: "text", text: "请查看附件" },
+      { type: "file", mediaType: "application/pdf", data: "cGRm", name: "brief.pdf" },
+    ]);
+    const bubble = useSessionStore.getState().optimisticBubble;
+
+    expect(bubble?.id).toBe(id);
+    expect(bubble?.parts).toEqual([
+      { kind: "text", text: "请查看附件" },
+      { kind: "file", mediaType: "application/pdf", data: "cGRm", name: "brief.pdf" },
+    ]);
+  });
+
   test("popOptimistic clears the optimistic bubble", () => {
     useSessionStore.getState().pushOptimisticUser("hello");
     expect(useSessionStore.getState().optimisticBubble).not.toBeNull();

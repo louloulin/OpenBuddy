@@ -71,6 +71,21 @@ describe("extractPlainText", () => {
     expect(extractPlainText(m)).toBe("Edit src/app.ts\nsrc/app.ts");
   });
 
+  it("file part 只把文件名纳入搜索文本，不把 base64 纳入", () => {
+    expect(
+      extractPlainText(
+        msg([
+          {
+            kind: "file",
+            mediaType: "application/pdf",
+            data: "c2Vuc2l0aXZlLWJpbmFyeQ==",
+            name: "brief.pdf",
+          },
+        ]),
+      ),
+    ).toBe("brief.pdf");
+  });
+
   it("空消息返回空串", () => {
     expect(extractPlainText(msg([]))).toBe("");
   });

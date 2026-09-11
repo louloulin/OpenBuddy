@@ -128,55 +128,46 @@ test.describe("office1 stage 0A — document preview (PDF iframe)", () => {
     );
   });
 
-  test("FilePreview renders a PDF iframe when given a data: URL", async ({ page }) => {
-    const cwd = mkdtempSync(join(tmpdir(), "openbuddy-pdf-iframe-"));
+  test("a pasted PDF renders a real PDF preview in the chat transcript after send", async ({ page }) => {
+    const cwd = mkdtempSync(join(tmpdir(), "openbuddy-pdf-transcript-"));
     await setup(page, cwd);
 
-    // Render FilePreview's PDF branch directly inside the host page.
-    // We expose the existing app.module via the renderer process by
-    // mounting a minimal test harness inside an existing DOM node —
-    // simpler than driving the live composer because FilePreview is a
-    // pure React component that needs no provider setup.
-    const iframeSrc = `data:application/pdf;base64,${SAMPLE_PDF_BASE64}`;
-    const present = await page.evaluate(({ src }) => {
-      // Build the same DOM FilePreview produces for a PDF kind, so we
-      // can assert the iframe renders inline in the chat transcript
-      // surface area. This bypasses the React tree (we are testing
-      // display behaviour, not React reconciliation) but mirrors the
-      // exact markup FilePreview.tsx emits.
-      const host = document.createElement("div");
-      host.id = "test-file-preview-host";
-      host.className = "file-preview file-preview--pdf";
-      host.innerHTML = `
-        <div class="file-preview__head">
-          <span class="file-preview__name">OpenBuddy-Design.pdf</span>
-          <span class="file-preview__kind">PDF</span>
-        </div>
-        <iframe class="file-preview__pdf" src="${src}" title="OpenBuddy-Design.pdf"></iframe>
-      `;
-      const root = document.querySelector("#root");
-      if (!root) return false;
-      root.appendChild(host);
-      return true;
-    }, { src: iframeSrc });
-    expect(present, "could not mount test FilePreview host").toBe(true);
+    // Paste the PDF into the real Composer (same path as the chip test),
+    // then type a prompt and hit the real send button. The message must
+    // travel the production chain:
+    //   Composer.onSendContent → App.handleSendContent →
+    //   session-store.pushOptimisticUserContent → ChatView → MessageItem →
+    //   FilePreview (kind "pdf" → <iframe src="data:application/pdf;base64,...">)
+    await page.evaluate(
+      ({ b64, name }) => {
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        const file = new File([bytes], name, { type: "application/pdf" });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        const target = document.querySelector("textarea.wb-composer__input");
+        if (!target) throw new Error("composer textarea not found");
+        target.dispatchEvent(
+          new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }),
+        );
+      },
+      { b64: SAMPLE_PDF_BASE64, name: "OpenBuddy-Design.pdf" },
+    );
 
-    // The iframe should be in the DOM with the data URL on its src
-    // attribute. Chromium lazily loads the data: URL inside the iframe;
-    // we only assert the wire (DOM + src), not pixel rendering — visual
-    // confirmation is the responsibility of the capture-screenshots.mjs
-    // script (shot 09).
-    const iframe = page.locator("#test-file-preview-host iframe");
-    await iframe.waitFor({ state: "attached", timeout: 5_000 });
-    const src = await iframe.getAttribute("src");
-    expect(src, "iframe src should be a data: URL").toMatch(
-      /^data:application\/pdf;base64,/,
-    );
-    expect(src?.length ?? 0, "iframe src should carry the PDF base64").toBeGreaterThan(
-      SAMPLE_PDF_BASE64.length,
-    );
-    const title = await iframe.getAttribute("title");
-    expect(title, "iframe title should match the file name").toBe("OpenBuddy-Design.pdf");
+    const chip = page.locator(".composer-image-attachments__chip").first();
+    await chip.waitFor({ state: "visible", timeout: 5_000 });
+
+    const composer = page.locator(COMPOSER).first();
+    await composer.fill("请查看这个 PDF 附件");
+    await page.locator('button[aria-label="发送"]').first().click();
+
+    // The optimistic user bubble renders through the real React transcript
+    // tree — not a hand-built DOM host — so this asserts the full chain.
+    const preview = page.locator(".file-preview--pdf").first();
+    await preview.waitFor({ state: "visible", timeout: 15_000 });
+
+    const iframe = page.locator(".file-preview--pdf iframe").first();
+    await expect(iframe).toHaveAttribute("src", /^data:application\/pdf;base64,/);
+    await expect(iframe).toHaveAttribute("title", "OpenBuddy-Design.pdf");
   });
 
   test("rejected MIME (.zip) does NOT surface a chip (toast wording may vary)", async ({ page }) => {

@@ -876,6 +876,7 @@ export interface SessionEntriesProjection {
     parts: Array<
       | { kind: "text"; text: string }
       | { kind: "thought"; text: string }
+      | { kind: "file"; name: string; mediaType: string; data: string }
       | { kind: "tool_call"; toolCall: { toolCallId: string; title: string; kind: string; status: "completed" | "failed"; content: unknown[] } }
     >;
     complete: boolean;
@@ -896,6 +897,16 @@ export function sessionEntriesToChatMessages(entries: readonly PiSessionEntry[])
           parts.push({ kind: "text", text: (part as { text: string }).text });
         } else if (part.type === "thinking" && typeof (part as { text?: string }).text === "string") {
           parts.push({ kind: "thought", text: (part as { text: string }).text });
+        } else if ((part.type === "file" || part.type === "image") && typeof (part as { data?: string }).data === "string") {
+          const attachment = part as unknown as { name?: unknown; mediaType?: unknown; data: string };
+          parts.push({
+            kind: "file",
+            name: typeof attachment.name === "string" && attachment.name ? attachment.name : part.type === "image" ? "image" : "attachment",
+            mediaType: typeof attachment.mediaType === "string" && attachment.mediaType
+              ? attachment.mediaType
+              : "application/octet-stream",
+            data: attachment.data,
+          });
         } else if (part.type === "toolCall") {
           const tc = part as { id?: string; name?: string; arguments?: unknown; result?: unknown };
           const toolCallId = tc.id ?? `tc-${entry.id}-${parts.length}`;

@@ -31,7 +31,13 @@ export interface ChatMessage {
 export type MessagePart =
   | { kind: "text"; text: string }
   | { kind: "thought"; text: string }
+  | { kind: "file"; name: string; mediaType: string; data: string }
   | { kind: "tool_call"; toolCall: ToolCallView };
+
+export type UserContentPart =
+  | { type: "text"; text: string }
+  | { type: "image"; mediaType: string; data: string; name?: string }
+  | { type: "file"; mediaType: string; data: string; name?: string };
 
 /** A tool-call card rendered inline. Mirrors a subset of ToolCallUpdate. */
 export interface ToolCallView {
@@ -141,6 +147,8 @@ interface UiSessionActions {
   /** Push an optimistic user bubble; returns its id so the caller can
    *  `popOptimistic()` on rollback. */
   pushOptimisticUser: (text: string) => string;
+  /** Push text, image, and file content into the optimistic transcript. */
+  pushOptimisticUserContent: (content: UserContentPart[]) => string;
   /** Drop the optimistic user bubble (e.g. round-trip failed). */
   popOptimistic: () => void;
   setError: (e: string | null) => void;
@@ -491,6 +499,28 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
       parts: [{ kind: "text" as const, text }],
       complete: true,
     };
+    set((s) => ({
+      optimisticBubble: bubble,
+      messages: [...s.messages, bubble],
+    }));
+    return id;
+  },
+
+  pushOptimisticUserContent: (content) => {
+    const id = nextId();
+    const parts: MessagePart[] = content.flatMap((part): MessagePart[] => {
+      if (part.type === "text") return [{ kind: "text", text: part.text }];
+      if (part.type === "file" || part.type === "image") {
+        return [{
+          kind: "file",
+          name: part.name ?? (part.type === "image" ? "image" : "attachment"),
+          mediaType: part.mediaType,
+          data: part.data,
+        }];
+      }
+      return [];
+    });
+    const bubble: ChatMessage = { id, role: "user", parts, complete: true };
     set((s) => ({
       optimisticBubble: bubble,
       messages: [...s.messages, bubble],
