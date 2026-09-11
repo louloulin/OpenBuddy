@@ -15,7 +15,7 @@
 - **文本/图片附件**：保留 9 套真实上游 spec + 1 个 100-turn 真实回合 + 1 个 multimodal regression。
 - **文档附件（PDF/docx/txt/md/csv/html/xml/json/yaml）**：Composer 的 `readAttachmentFile` 接受，8MB 单文件上限；图片走 16MB 上限。
 - **IPC 协议**：新增 `type:"file"` part（`electron/main/ipc/validation.ts::promptFilePart`），与 `text` / `image` 并列。
-- **agent-host routing**：文本类附件 base64 解码后内联到 user prompt 的 `<document>` XML 块；二进制（PDF/docx）以 opaque 块标记 + 字节数（pi 上游限制，见 §3.1）。
+- **PDF 文本提取已落地（本轮）**：新增精确依赖 `pdfjs-dist@5.7.284`，在 Electron main 的 `host-modules/pdf-text-extractor.ts` 按页提取 PDF 文本，并由 `agent-prompt.ts` 生成 `<document page="N">` XML 文本块；非法/无法解析的 PDF 保留 `<document-binary>` fallback。定向 reader + prompt-routing 测试共 4/4 通过。
 - **3 个新 spec**：
   - `chat-ui-minimax-documents.spec.ts`（8 项 — 文本/JSON/CSV/docx chip 渲染 + IPC 校验 + oversize 拒）
   - `chat-ui-minimax-multimodal.spec.ts`（3 项 — markdown 表格/列表/中文 + 图片 paste→Minimax）
@@ -49,7 +49,7 @@ Pi Session 的 `sendUserMessage` 签名只接受 `(TextContent | ImageContent)[]
 当前 agent-host 通过把文档 base64 解码后内联到 user text 的 `<document>` 块绕开了这个问题，但这是**临时方案**：
 
 - 优点：端到端 pipeline 不需要 fork pi Session；renderer + IPC validator + agent-host 都是真实实现。
-- 缺点：模型看到的是「用户文本 + 内联 base64」，不是真正的「文件附件」。大文档会让 user prompt 膨胀；PDF/docx 的二进制内容对模型不可读。
+- 缺点：当前仍是「用户文本 + 提取后的 PDF 文本块」，不是真正的「文件附件」；大文档会让 user prompt 膨胀，docx 等未支持阅读的二进制内容对模型不可读。
 
 **Plan 4.3** 需要做的：等 pi upstream 支持 file part 后，把 agent-prompt 改成"document 类附件 → `type:"file"` part"；移除 `<document>` XML 块兜底逻辑。详见 §3.2。
 
@@ -77,11 +77,10 @@ plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 
 
 ### 3.1 [P1] 文档附件阅读器：PDF 文本提取
 
-**为什么 P1**：PDF 是用户最常见的文档附件类型，但当前 opaque 块对模型不可读。
+- **为什么 P1**：PDF 是用户最常见的文档附件类型；本轮已完成 PDF 主路径，后续仅补齐 docx 与大文档端到端覆盖。
 
-**范围**：
-- 选择一个 PDF 文本提取库（候选：`pdf-parse` 或 `pdfjs-dist`）
-- 在 agent-host 引入阅读器层：检测 `mediaType === "application/pdf"` 时，base64 → Uint8Array → 提取纯文本 → 内联到 `<document>` 块
+- **范围**：PDF 文本提取已在本轮完成；docx 解析与 Pi upstream `type:"file"` 真 wire 仍属于后续 4.3 工作。
+- 在 Electron main 引入阅读器层：检测 `mediaType === "application/pdf"` 时，base64 → Uint8Array → 提取纯文本 → 内联到 `<document>` 块
 - 大文档分页：`pdfjs` 默认按页给文本，agent-host 把每页作为子块 `<document page="N">...</document>`
 - 保留 docx 处理逻辑以同样模式落地（`jszip` 解析 `word/document.xml`）
 

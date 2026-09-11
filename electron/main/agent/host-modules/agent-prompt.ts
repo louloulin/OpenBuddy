@@ -34,10 +34,15 @@ import type { StoredSessionAttachment } from "../../session/session-attachments"
 import type { PiPromptContentPart } from "./_state-shape";
 import type { OpenBuddyThinkingLevel } from "../../ipc/validation";
 import { generateTraceId } from "@openbuddy/logging-shared";
-import { hostReceived as hostReceivedLog, hostDispatched as hostDispatchedLog, hostFailed as hostFailedLog } from "../agent-host-log";
+import {
+  hostReceived as hostReceivedLog,
+  hostDispatched as hostDispatchedLog,
+  hostFailed as hostFailedLog,
+} from "../agent-host-log";
 import { writePromptHistory } from "../pi-resources";
 import { type AgentHostState } from "./_state-shape";
 import { createDefaultAgentHostState } from "./_default-state";
+import { extractPdfTextByPage } from "./pdf-text-extractor";
 
 let state: AgentHostState = createDefaultAgentHostState();
 
@@ -105,7 +110,10 @@ function onPluginEvent(handler: PluginEventHandler): () => void {
   return () => pluginEventHandlers.delete(handler);
 }
 
-export async function prompt(text: string, options?: { traceId?: string; sessionId?: string }): Promise<void> {
+export async function prompt(
+  text: string,
+  options?: { traceId?: string; sessionId?: string },
+): Promise<void> {
   const traceId = options?.traceId ?? generateTraceId();
   const sessionId = options?.sessionId ?? state.session?.sessionId;
   hostReceivedLog("agent:prompt", traceId, sessionId);
@@ -118,8 +126,13 @@ export async function prompt(text: string, options?: { traceId?: string; session
   // hidden by a hardcoded stopReason in the IPC layer; this log makes the
   // resolved model identity visible so the next 404 (or any other upstream
   // failure) is trivial to diagnose from logs alone.
-  const sessionModel = (state.session as unknown as { model?: { provider?: string; id?: string; api?: string; baseUrl?: string } }).model;
-  const fallbackModel = state.model as { provider?: string; id?: string; api?: string; baseUrl?: string } | undefined;
+  const sessionModel = (
+    state.session as unknown as {
+      model?: { provider?: string; id?: string; api?: string; baseUrl?: string };
+    }
+  ).model;
+  const fallbackModel = state.model as
+    { provider?: string; id?: string; api?: string; baseUrl?: string } | undefined;
   const resolvedModel = sessionModel ?? fallbackModel;
   console.log("[openbuddy] pi prompt.start", {
     traceId,
@@ -138,72 +151,93 @@ export async function prompt(text: string, options?: { traceId?: string; session
     hostDispatchedLog("agent:prompt", traceId, sessionId);
   } catch (error) {
     console.error("[openbuddy] pi prompt.failed", { traceId, sessionId, error: String(error) });
-    emitPluginEvent("agent/error", { sessionId: state.session.sessionId, operation: "prompt", error: String(error) });
+    emitPluginEvent("agent/error", {
+      sessionId: state.session.sessionId,
+      operation: "prompt",
+      error: String(error),
+    });
     emitRendererEvent("pi://error", { sessionId: state.session.sessionId, error: String(error) });
     hostFailedLog("agent:prompt", traceId, error);
     throw error;
   }
 }
 
-async function promptContent(content: readonly PiPromptContentPart[], mode: "queue" | "steer" = "queue"): Promise<PromptResult> {
+async function promptContent(
+  content: readonly PiPromptContentPart[],
+  mode: "queue" | "steer" = "queue",
+): Promise<PromptResult> {
   if (!state.session) throw new Error("openbuddy-agent: session not initialized");
-  const text = content.filter((part): part is { type: "text"; text: string } => part.type === "text").map((part) => part.text).join("");
-  if (
-    !text.trim() &&
-    !content.some((part) => part.type === "image" || part.type === "file")
-  ) {
+  const text = content
+    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+    .map((part) => part.text)
+    .join("");
+  if (!text.trim() && !content.some((part) => part.type === "image" || part.type === "file")) {
     throw new Error("openbuddy-agent: prompt content must not be empty");
   }
 
   // Pi's upstream `sendUserMessage` is typed against (TextContent |
   // ImageContent)[] and at runtime does not recognise a `type:"file"`
-  // discriminator on the wire (its reader side filters parts by image /
-  // text only). To keep document attachments working without forking
-  // the upstream Session class, text-shaped documents (txt / md / csv /
-  // json / yaml / xml / html) are decoded from base64 and prepended to
-  // the text part as a clearly-delimited XML block. Binary documents
-  // (PDF / docx) ship as base64 in an opaque block — the model cannot
-  // read the bytes itself today, but the renderer keeps the chip for
-  // visual reference and a future reader-side upgrade can decode them.
+  // discriminator on the wire. Decode supported documents in the host,
+  // then send the extracted text through the normal Pi text part.
   const TEXT_DOC_MIME = /^(text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml))$/i;
   const docBlocks: string[] = [];
   for (const part of content) {
     if (part.type !== "file") continue;
-    if (TEXT_DOC_MIME.test(part.mediaType)) {
+    const label = part.name || "document";
+    if (part.mediaType.toLowerCase() === "application/pdf") {
+      try {
+        const pages = await extractPdfTextByPage(new Uint8Array(Buffer.from(part.data, "base64")));
+        pages.forEach((pageText, index) => {
+          docBlocks.push(
+            `\n\n<document name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)} page=${index + 1}>\n${pageText}\n</document>`,
+          );
+        });
+      } catch {
+        docBlocks.push(
+          `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(PDF text extraction failed; attachment kept in composer)\n</document-binary>`,
+        );
+      }
+    } else if (TEXT_DOC_MIME.test(part.mediaType)) {
       let decoded: string;
       try {
         decoded = Buffer.from(part.data, "base64").toString("utf8");
       } catch {
         decoded = "";
       }
-      const label = part.name || "document";
       docBlocks.push(
         `\n\n<document name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n${decoded}\n</document>`,
       );
     } else {
-      // PDF / docx and other binary types — ship base64 in an opaque
-      // block. The model cannot decode this today, but the wire format
-      // is forward-compatible with a future reader-side upgrade.
+      // Docx and other binary types remain opaque until a reader-side
+      // implementation is available for the corresponding media type.
       docBlocks.push(
-        `\n\n<document-binary name=${JSON.stringify(part.name ?? "")} mediaType=${JSON.stringify(part.mediaType)} bytes=${part.data.length / 4 * 3}>\n(base64 payload omitted in transcript; bytes=${part.data.length})\n</document-binary>`,
+        `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)} bytes=${(part.data.length / 4) * 3}>\n(base64 payload omitted in transcript; bytes=${part.data.length})\n</document-binary>`,
       );
     }
   }
   const effectiveText = text + docBlocks.join("");
   const wireContent: Array<
-    { type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }
-  > = effectiveText.trim()
-    ? [{ type: "text", text: effectiveText }]
-    : [];
+    { type: "text"; text: string } | { type: "image"; data: string; mimeType: string }
+  > = effectiveText.trim() ? [{ type: "text", text: effectiveText }] : [];
   for (const part of content) {
     if (part.type === "image") {
-      wireContent.push({ type: "image", mediaType: part.mediaType, data: part.data, ...(part.name ? { name: part.name } : {}) });
+      wireContent.push({
+        type: "image",
+        mimeType: part.mediaType,
+        data: part.data,
+      });
     }
   }
   // Persist only images through the attachment store today (the store
   // is image-only). Document bytes ship inline; pi's reader side
   // never needs to re-display them.
-  const attachmentRefs: Array<{ attachmentId: string; mediaType: string; bytes: number; sha256: string; name?: string }> = [];
+  const attachmentRefs: Array<{
+    attachmentId: string;
+    mediaType: string;
+    bytes: number;
+    sha256: string;
+    name?: string;
+  }> = [];
   for (const part of content) {
     if (part.type !== "image") continue;
     const attachment = await state.attachmentStore.save({
@@ -241,45 +275,94 @@ async function promptContent(content: readonly PiPromptContentPart[], mode: "que
   if (text.trim()) await writePromptHistory(text);
   try {
     void state.queueMirror;
-    await state.session!.sendUserMessage(wireContent, mode === "steer" ? { deliverAs: "steer" } : { deliverAs: "followUp" });
+    await state.session!.sendUserMessage(
+      wireContent,
+      mode === "steer" ? { deliverAs: "steer" } : { deliverAs: "followUp" },
+    );
     return {};
   } catch (error) {
-    emitPluginEvent("agent/error", { sessionId: state.session.sessionId, operation: "prompt", error: String(error) });
+    emitPluginEvent("agent/error", {
+      sessionId: state.session.sessionId,
+      operation: "prompt",
+      error: String(error),
+    });
     emitRendererEvent("pi://error", { sessionId: state.session.sessionId, error: String(error) });
     throw error;
   }
 }
 
-async function updateSessionQueue(sessionId: string, _itemId: string, action: { kind: "edit" | "remove" | "steer"; content?: readonly PiPromptContentPart[] }): Promise<{ accepted: true }> {
-  if (state.session?.sessionId !== sessionId) throw Object.assign(new Error(`session not found: ${sessionId}`), { code: "session-not-found" });
-  if (!state.session) throw Object.assign(new Error("session queue is unavailable"), { code: "service-unavailable" });
+async function updateSessionQueue(
+  sessionId: string,
+  _itemId: string,
+  action: { kind: "edit" | "remove" | "steer"; content?: readonly PiPromptContentPart[] },
+): Promise<{ accepted: true }> {
+  if (state.session?.sessionId !== sessionId)
+    throw Object.assign(new Error(`session not found: ${sessionId}`), {
+      code: "session-not-found",
+    });
+  if (!state.session)
+    throw Object.assign(new Error("session queue is unavailable"), { code: "service-unavailable" });
   if (action.kind === "remove") {
     state.session.clearQueue();
   } else if (action.kind === "steer") {
-    const text = (action.content ?? []).filter((part): part is { type: "text"; text: string } => part.type === "text").map((part) => part.text).join("\n").trim();
+    const text = (action.content ?? [])
+      .filter((part): part is { type: "text"; text: string } => part.type === "text")
+      .map((part) => part.text)
+      .join("\n")
+      .trim();
     if (text) await state.session.steer(text);
   } else if (action.kind === "edit") {
-    const text = (action.content ?? []).filter((part): part is { type: "text"; text: string } => part.type === "text").map((part) => part.text).join("\n").trim();
+    const text = (action.content ?? [])
+      .filter((part): part is { type: "text"; text: string } => part.type === "text")
+      .map((part) => part.text)
+      .join("\n")
+      .trim();
     state.session.clearQueue();
     if (text) await state.session.followUp(text);
   }
   const items = publicQueueItems(state.session);
-  if (state.queueMirror) state.queueMirror = items.map((value) => {
-    const item = value as { mode: "queue" | "steer"; content: Array<{ type: "text"; text: string } | { type: "image"; mediaType: string; data?: string; name?: string }> };
-    return { mode: item.mode, content: item.content.map((part) => part.type === "text"
-      ? { type: "text" as const, text: part.text }
-      : { type: "image" as const, mediaType: part.mediaType, data: part.data ?? "", ...(part.name ? { name: part.name } : {}) }) };
-  });
+  if (state.queueMirror)
+    state.queueMirror = items.map((value) => {
+      const item = value as {
+        mode: "queue" | "steer";
+        content: Array<
+          | { type: "text"; text: string }
+          | { type: "image"; mediaType: string; data?: string; name?: string }
+        >;
+      };
+      return {
+        mode: item.mode,
+        content: item.content.map((part) =>
+          part.type === "text"
+            ? { type: "text" as const, text: part.text }
+            : {
+                type: "image" as const,
+                mediaType: part.mediaType,
+                data: part.data ?? "",
+                ...(part.name ? { name: part.name } : {}),
+              },
+        ),
+      };
+    });
   emitPluginEvent("session/queue-updated", { sessionId, action: action.kind, items });
   return { accepted: true };
 }
 
-async function readSessionAttachment(sessionId: string, attachmentId: string): Promise<StoredSessionAttachment> {
-  if (!sessionId.trim() || !attachmentId.trim()) throw Object.assign(new Error("sessionId and attachmentId are required"), { code: "bad-request" });
+async function readSessionAttachment(
+  sessionId: string,
+  attachmentId: string,
+): Promise<StoredSessionAttachment> {
+  if (!sessionId.trim() || !attachmentId.trim())
+    throw Object.assign(new Error("sessionId and attachmentId are required"), {
+      code: "bad-request",
+    });
   return state.attachmentStore.read(sessionId, attachmentId);
 }
 
-async function steer(text: string, options?: { traceId?: string; sessionId?: string }): Promise<void> {
+async function steer(
+  text: string,
+  options?: { traceId?: string; sessionId?: string },
+): Promise<void> {
   const traceId = options?.traceId ?? generateTraceId();
   const sessionId = options?.sessionId ?? state.session?.sessionId;
   hostReceivedLog("agent:steer", traceId, sessionId);
@@ -304,7 +387,10 @@ async function steer(text: string, options?: { traceId?: string; sessionId?: str
   }
 }
 
-async function followUp(text: string, options?: { traceId?: string; sessionId?: string }): Promise<void> {
+async function followUp(
+  text: string,
+  options?: { traceId?: string; sessionId?: string },
+): Promise<void> {
   const traceId = options?.traceId ?? generateTraceId();
   const sessionId = options?.sessionId ?? state.session?.sessionId;
   hostReceivedLog("agent:follow-up", traceId, sessionId);
