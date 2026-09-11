@@ -191,13 +191,15 @@ async function promptContent(content: readonly PiPromptContentPart[], mode: "que
   }
   const effectiveText = text + docBlocks.join("");
   const wireContent: Array<
-    { type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }
+    { type: "text"; text: string } | { type: "image"; data: string; mimeType: string }
   > = effectiveText.trim()
     ? [{ type: "text", text: effectiveText }]
     : [];
   for (const part of content) {
     if (part.type === "image") {
-      wireContent.push({ type: "image", mediaType: part.mediaType, data: part.data, ...(part.name ? { name: part.name } : {}) });
+      // pi's wire ImageContent uses `mimeType` (not `mediaType`) and has no
+      // `name` field — map explicitly instead of spreading the IPC shape.
+      wireContent.push({ type: "image", data: part.data, mimeType: part.mediaType });
     }
   }
   // Persist only images through the attachment store today (the store

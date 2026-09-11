@@ -21,6 +21,7 @@ import {
   extractSheetFromZip,
 } from "@openbuddy/files-kb";
 import { readZipFromBase64, makeDocZipReader } from "@openbuddy/files-kb";
+import { PdfJsPreview } from "./PdfJsPreview";
 
 /**
  * 默认文档解压器:把 content(data: URL 或 base64)用内置 zip-reader 解压,
@@ -147,20 +148,27 @@ export function FilePreview({ filename, content, onCopyText, docExtractor }: Fil
     );
   }
 
-  // PDF:浏览器原生 <iframe> 内嵌预览(零依赖,大多数 WebView2/WKWebView 自带 PDF 渲染)。
+  // PDF:优先 PDF.js canvas 渲染(对齐 ChatGPT / Claude.ai,office1 §9);
+  // pdfjs 不可用或解析失败时 PdfJsPreview 内部降级为浏览器原生 iframe(v1)。
   if (kind === "pdf") {
     return (
-      <div className="file-preview file-preview--pdf">
-        <div className="file-preview__head">
-          <span className="file-preview__name">{filename}</span>
-          <span className="file-preview__kind">{previewKindLabel(kind)}</span>
-        </div>
-        <iframe
-          className="file-preview__pdf"
-          src={content}
-          title={filename}
-        />
-      </div>
+      <PdfJsPreview
+        filename={filename}
+        content={content}
+        fallback={
+          <div className="file-preview file-preview--pdf">
+            <div className="file-preview__head">
+              <span className="file-preview__name">{filename}</span>
+              <span className="file-preview__kind">{previewKindLabel(kind)}</span>
+            </div>
+            <iframe
+              className="file-preview__pdf"
+              src={content}
+              title={filename}
+            />
+          </div>
+        }
+      />
     );
   }
 

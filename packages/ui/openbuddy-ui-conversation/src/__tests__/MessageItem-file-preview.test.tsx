@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ChatMessage } from "@/stores/session-store";
 
@@ -12,6 +12,13 @@ vi.mock("@openbuddy/ui-theme/client", () => ({
     selector({ current: () => "light" }),
 }));
 
+// jsdom has no real canvas/worker — default to "pdfjs unavailable" so the
+// FilePreview PDF branch falls back to the iframe, which is what these
+// transcript assertions target.
+vi.mock("../../../../ui/openbuddy-ui-workbench/src/pdfjs-loader", () => ({
+  loadPdfJs: () => Promise.reject(new Error("pdfjs unavailable")),
+}));
+
 import { MessageItem } from "../MessageItem";
 
 function message(role: ChatMessage["role"], parts: ChatMessage["parts"]): ChatMessage {
@@ -19,7 +26,7 @@ function message(role: ChatMessage["role"], parts: ChatMessage["parts"]): ChatMe
 }
 
 describe("MessageItem file parts", () => {
-  it("renders a user PDF file part through FilePreview with a complete data URL", () => {
+  it("renders a user PDF file part through FilePreview with a complete data URL", async () => {
     const { container } = render(
       <MessageItem
         message={message("user", [
@@ -34,14 +41,13 @@ describe("MessageItem file parts", () => {
       />,
     );
 
-    const preview = container.querySelector(".file-preview--pdf");
-    const iframe = container.querySelector(".file-preview--pdf iframe");
-    expect(preview).not.toBeNull();
+    const iframe = (await screen.findByTitle("brief.pdf")) as HTMLIFrameElement;
+    expect(container.querySelector(".file-preview--pdf")).not.toBeNull();
     expect(iframe).toHaveAttribute("src", "data:application/pdf;base64,cGRm");
     expect(iframe).toHaveAttribute("title", "brief.pdf");
   });
 
-  it("keeps an existing data URL unchanged and preserves the filename", () => {
+  it("keeps an existing data URL unchanged and preserves the filename", async () => {
     const content = "data:application/pdf;base64,cGRm";
     const { container } = render(
       <MessageItem
@@ -58,7 +64,9 @@ describe("MessageItem file parts", () => {
     );
 
     expect(container.querySelector(".file-preview__name")).toHaveTextContent("report.pdf");
-    expect(container.querySelector("iframe")).toHaveAttribute("src", content);
+    await waitFor(() =>
+      expect(container.querySelector("iframe")).toHaveAttribute("src", content),
+    );
   });
 
   it("renders multiple office attachments in transcript order", () => {

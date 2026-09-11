@@ -150,18 +150,12 @@ chip 显示，而是**作为可交互的预览**：
 
 **范围**：
 
-- 加依赖到 `package.json`：
+- 加依赖到 `package.json`（2026-09-11 调研修订：协调版本线 0.25.1，
+  全部 `@univerjs/*` 精确同版本，preset 模式代替细粒度包）：
   ```json
-  "@univerjs/presets": "^0.6.0",
-  "@univerjs/sheets": "^0.6.0",
-  "@univerjs/sheets-ui": "^0.6.0",
-  "@univerjs/docs": "^0.6.0",
-  "@univerjs/docs-ui": "^0.6.0",
-  "@univerjs/slides": "^0.6.0",
-  "@univerjs/slides-ui": "^0.6.0",
-  "@univerjs/ui": "^0.6.0",
-  "@univerjs/engine-render": "^0.6.0",
-  "rxjs": "^7.8.1"
+  "@univerjs/presets": "0.25.1",
+  "@univerjs/preset-sheets-core": "0.25.1",
+  "@univerjs/preset-docs-core": "0.25.1"
   ```
 - **懒加载**：每个 format 一个 dynamic import 入口
   - `FilePreview.tsx` 改用 `<Suspense><LazyUniver kind={kind} ... /></Suspense>`
@@ -367,22 +361,42 @@ OpenBuddy 是 Electron 应用，**两条路都该走**：
 ### 9.5 修订后的阶段 0 计划
 
 ```
-阶段 0A: 1-2 天 — PDF iframe 走通（v1，Electron 原生）
-   - 在 FilePreview.tsx 加 kind === "pdf" 分支
-   - data:application/pdf;base64,... 赋给 <iframe src>
-   - 1 个新 spec 验证 iframe 渲染成功
+阶段 0A: ✅ 已完成 — PDF iframe 走通（v1，Electron 原生）
+   - FilePreview.tsx kind === "pdf" 分支 + chat-ui-minimax-document-preview.spec.ts
 
-阶段 0B: 3-5 天 — PDF.js text layer (v2)
-   - 加依赖: pdfjs-dist ^4.0, react-pdf ^9.0
-   - 在 FilePreview.tsx 加 v2 分支（<Document> + <Page>）
-   - text layer 让用户可复制 PDF 文字
-   - 模型可引用 (页码, 内容) —— 加新 IPC 返回 page-level text
+阶段 0B: ✅ 已完成 — PDF.js canvas 预览（v2，2026-09-11）
+   - 依赖: pdfjs-dist 6.3.289（精确锁定；v6 纯 ESM，要求 Node ≥ 22.13，
+     本仓库 Node 24 满足）
+   - 不用 react-pdf 包装层，直接 pdfjs-dist API（组件更轻、控制更全）：
+     packages/ui/openbuddy-ui-workbench/src/pdfjs-loader.ts —— 懒加载 +
+     `pdf.worker.min.mjs?url` 本地 worker（不用 CDN，electron-vite
+     file:// 构建稳定）
+   - PdfJsPreview.tsx —— 首屏最多 3 页 + devicePixelRatio 高分屏缩放 +
+     doc.destroy() 卸载清理；任何失败降级回 v1 iframe，永不白屏
+   - jsdom 单测 mock loader 驱动 canvas 成功路径与 iframe 降级路径
 
 阶段 1: 1.5 周 — FilePreview 加 Univer 分支（xlsx/docx/pptx）
 阶段 2: 1 周 — Composer → renderer 链路
 阶段 3: 3 天 — 截图 + perf
 阶段 4: 1.5 周 — 编辑器模式
 ```
+
+**阶段 1 Univer 依赖修订（2026-09-11 调研）**：原计划写 `^0.6.0` 已过时。
+当前协调版本线 **0.25.1**（2026-06 发布），规则：所有 `@univerjs/*`
+必须**精确同版本**。按 preset 模式（React 官方推荐）：
+
+```json
+"@univerjs/presets": "0.25.1",
+"@univerjs/preset-sheets-core": "0.25.1",
+"@univerjs/preset-docs-core": "0.25.1"
+```
+
+- 在 `useEffect` 里 `createUniver({ presets: [...] })`，卸载时
+  `univerAPI.dispose()`（内存泄漏防护）
+- 必须 `import '@univerjs/preset-sheets-core/lib/index.css'`
+- 需要 `Intl.Segmenter`（Node 24 / 现代 WebView2 自带）
+- xlsx → `UniverSheetsCorePreset`，docx → `preset-docs-core`，pptx →
+  slides preset；按 format dynamic import 拆 chunk
 
 **阶段 0A 立即可做**（不需要用户再确认）：
 - 1 个 PR

@@ -929,6 +929,37 @@
   border: none;
   display: block;
 }
+/* PDF.js canvas 预览(office1 §9 v2):滚动容器 + 页画布 */
+.file-preview--pdfjs {
+  display: flex;
+  flex-direction: column;
+}
+.file-preview__pdf-scroll {
+  max-height: 70vh;
+  overflow: auto;
+  background: var(--wb-bg-tertiary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+}
+.file-preview__pdf-page {
+  display: block;
+  max-width: 100%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+.file-preview__pdf-meta {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--wb-text-secondary, rgba(0, 0, 0, 0.55));
+}
+.file-preview__pdf-loading {
+  padding: 24px;
+  font-size: 13px;
+  color: var(--wb-text-secondary, rgba(0, 0, 0, 0.55));
+}
 /* 文档预览(docx/pptx/sheet) */
 .file-preview__doc-body {
   max-height: 60vh;

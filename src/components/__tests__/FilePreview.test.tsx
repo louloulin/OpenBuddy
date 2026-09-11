@@ -1,6 +1,41 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { FilePreview } from "@openbuddy/ui-workbench";
+
+// Mock the pdfjs lazy loader — jsdom has no real canvas/worker, so unit
+// tests drive either a fake pdfjs (canvas path) or a rejection (iframe
+// fallback). The loader module itself is never evaluated.
+const { loadPdfJsMock } = vi.hoisted(() => ({
+  loadPdfJsMock: vi.fn(),
+}));
+vi.mock("../../../packages/ui/openbuddy-ui-workbench/src/pdfjs-loader", () => ({
+  loadPdfJs: loadPdfJsMock,
+}));
+
+beforeEach(() => {
+  loadPdfJsMock.mockReset();
+  // Default: pdfjs unavailable → FilePreview falls back to the iframe.
+  loadPdfJsMock.mockRejectedValue(new Error("pdfjs unavailable"));
+});
+
+function fakePdfPage(width = 300, height = 400) {
+  return {
+    getViewport: ({ scale }: { scale: number }) => ({
+      width: width * scale,
+      height: height * scale,
+    }),
+    render: () => ({ promise: Promise.resolve() }),
+    cleanup: vi.fn(),
+  };
+}
+
+function fakePdfDoc(numPages: number) {
+  return {
+    numPages,
+    getPage: vi.fn(async () => fakePdfPage()),
+    destroy: vi.fn(async () => {}),
+  };
+}
 
 describe("FilePreview", () => {
   it("markdown 渲染文件名 + Markdown 标签 + 正文", () => {
@@ -61,12 +96,38 @@ describe("FilePreview", () => {
     expect(screen.queryByText(/暂不支持内嵌预览/)).toBeNull();
   });
 
-  it("pdf 渲染 <iframe>(浏览器原生 PDF 预览)", () => {
+  it("pdf 优先 PDF.js canvas 渲染并显示页数", async () => {
+    const doc = fakePdfDoc(2);
+    loadPdfJsMock.mockResolvedValue({
+      getDocument: () => ({ promise: Promise.resolve(doc) }),
+    } as never);
+    render(<FilePreview filename="doc.pdf" content="data:application/pdf;base64,eA==" />);
+
+    await waitFor(() =>
+      expect(
+        document.querySelectorAll("canvas.file-preview__pdf-page"),
+      ).toHaveLength(2),
+    );
+    expect(screen.getByText("共 2 页")).toBeInTheDocument();
+    expect(screen.getByText("doc.pdf")).toBeInTheDocument();
+    expect(document.querySelector("iframe")).toBeNull();
+  });
+
+  it("pdf 在 pdfjs 不可用时降级为 <iframe>(浏览器原生预览)", async () => {
     render(<FilePreview filename="doc.pdf" content="data:application/pdf;base64,xxx" />);
-    const iframe = document.querySelector("iframe") as HTMLIFrameElement;
-    expect(iframe).not.toBeNull();
+    const iframe = (await screen.findByTitle("doc.pdf")) as HTMLIFrameElement;
     expect(iframe.getAttribute("src")).toContain("data:application/pdf");
-    expect(iframe.title).toBe("doc.pdf");
+  });
+
+  it("pdf 解析损坏文件时同样降级 <iframe>", async () => {
+    loadPdfJsMock.mockResolvedValue({
+      getDocument: () => ({
+        promise: Promise.reject(new Error("Invalid PDF structure")),
+      }),
+    } as never);
+    render(<FilePreview filename="doc.pdf" content="data:application/pdf;base64,xxxx" />);
+    const iframe = (await screen.findByTitle("doc.pdf")) as HTMLIFrameElement;
+    expect(iframe.getAttribute("src")).toContain("data:application/pdf");
   });
 
   it("pdf 不走 binary 占位", () => {
