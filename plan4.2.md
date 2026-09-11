@@ -1,0 +1,215 @@
+# OpenBuddy AI Chat 后续计划（Plan 4.2 — 1000 轮 + 多模态之后）
+
+> 版本：plan4.2 · 日期：2026-09-11 · 适用仓库：`louloulin/OpenBuddy` ·
+> 前序：plan4.md
+>
+> 本计划是 plan4.md 之后聚焦 **AI Chat 长会话 + 多模态** 的实施跟进。
+> 它列出本轮（2026-09-11）已落地的功能、已识别的 trade-off 和
+> 下一阶段（plan4.3 起）需要补齐的能力。所有"已完成"均指
+> `origin/main` 当前 HEAD 上的代码 + spec + perf 数据。
+
+## 1. 本轮（plan4.2）已完成
+
+### 1.1 多模态 Composer
+
+- **文本/图片附件**：保留 9 套真实上游 spec + 1 个 1000-turn stress + 1 个 multimodal regression。
+- **文档附件（PDF/docx/txt/md/csv/html/xml/json/yaml）**：Composer 的 `readAttachmentFile` 接受，8MB 单文件上限；图片走 16MB 上限。
+- **IPC 协议**：新增 `type:"file"` part（`electron/main/ipc/validation.ts::promptFilePart`），与 `text` / `image` 并列。
+- **agent-host routing**：文本类附件 base64 解码后内联到 user prompt 的 `<document>` XML 块；二进制（PDF/docx）以 opaque 块标记 + 字节数（pi 上游限制，见 §3.1）。
+- **3 个新 spec**：
+  - `chat-ui-minimax-documents.spec.ts`（8 项 — 文本/JSON/CSV/docx chip 渲染 + IPC 校验 + oversize 拒）
+  - `chat-ui-minimax-multimodal.spec.ts`（3 项 — markdown 表格/列表/中文 + 图片 paste→Minimax）
+  - `chat-ui-minimax-1000-turns.spec.ts`（1 项 stress — 默认 skip，需 `RUN_1000_TURNS=1`）
+
+### 1.2 Performance baseline
+
+`scripts/electron/perf-baseline.mjs` + `docs/perf/2026-09-11-openbuddy-ai-chat-perf.json`：
+
+| 指标 | 实测 |
+|---|---|
+| `coldStartPaintMs` | 599 |
+| `firstTurnLatencyMs` | 3572 |
+| `secondTurnLatencyMs` | 1229 |
+| `oneThousandTurnsRenderMs` | 230 |
+| `oneThousandTurnsMemoryDeltaMb` | 0 |
+
+1000-turn 渲染 < 5s 目标 + < 200MB 内存 delta 均达标。
+
+### 1.3 仓库现状
+
+- `origin/main = 26e13d5`（plan4.2 全部 4 个 commit 已合并）
+- 9 + 6 = 15 个生产级 spec（含清理后的核心 + 新增的多模态 + 1000-turn + 上轮加的 resilience）
+- 6 张截图在 `docs/screenshots/2026-09-11-openbuddy-ai-chat/`（来自 plan4.1 的 cleanup 阶段）
+
+## 2. 已识别的 Trade-off（不阻塞，但需要在后续 plan 解决）
+
+### 2.1 Pi upstream 不认 `type:"file"`
+
+Pi Session 的 `sendUserMessage` 签名只接受 `(TextContent | ImageContent)[]`。
+当前 agent-host 通过把文档 base64 解码后内联到 user text 的 `<document>` 块绕开了这个问题，但这是**临时方案**：
+
+- 优点：端到端 pipeline 不需要 fork pi Session；renderer + IPC validator + agent-host 都是真实实现。
+- 缺点：模型看到的是「用户文本 + 内联 base64」，不是真正的「文件附件」。大文档会让 user prompt 膨胀；PDF/docx 的二进制内容对模型不可读。
+
+**Plan 4.3** 需要做的：等 pi upstream 支持 file part 后，把 agent-prompt 改成"document 类附件 → `type:"file"` part"；移除 `<document>` XML 块兜底逻辑。详见 §3.2。
+
+### 2.2 1000-turn perf 是合成的，没有真打 1000 次 LLM
+
+`chat-ui-minimax-1000-turns.spec.ts` 合成 1000 条 user/assistant 消息注入 DOM（绕过 LLM），验证渲染 + 滚动 + 内存。**没有**真打 1000 次上游的成本 / 延迟 / token 用量 profile。
+
+**Plan 4.3** 需要做的：用真打的成本数据校准 perf baseline。详见 §3.3。
+
+### 2.3 `email-unsubscribe-dialog.spec.ts` 仍 pre-existing 失败
+
+上一轮 plan4.1 清理时标记为 pre-existing 测试合约问题：测试期望 IPC handler 拒 `dialog:ask/confirm/message`，但 preload bridge 先一步用 `"invalid IPC channel"` 拦截。2/3 测试 fail。
+
+**Plan 4.3** 需要做的：要么修测试合约，要么改 preload allow-list 把 `dialog:*` 加进去。详见 §3.4。
+
+### 2.4 截图脚本 `capture-ai-chat-screenshots.mjs` 仍 6 张
+
+plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 6 张截图是 plan4.1 cleanup 阶段拍的，**没有覆盖** 多模态新增能力（PDF 附件 chip、1000-turns 视图）。
+
+**Plan 4.3** 需要做的：补 2 张截图（`07-document-attachment.png` + `08-1000-turns-overview.png`）。详见 §3.5。
+
+## 3. Plan 4.3 待办（按优先级）
+
+### 3.1 [P1] 文档附件阅读器：PDF 文本提取
+
+**为什么 P1**：PDF 是用户最常见的文档附件类型，但当前 opaque 块对模型不可读。
+
+**范围**：
+- 选择一个 PDF 文本提取库（候选：`pdf-parse` 或 `pdfjs-dist`）
+- 在 agent-host 引入阅读器层：检测 `mediaType === "application/pdf"` 时，base64 → Uint8Array → 提取纯文本 → 内联到 `<document>` 块
+- 大文档分页：`pdfjs` 默认按页给文本，agent-host 把每页作为子块 `<document page="N">...</document>`
+- 保留 docx 处理逻辑以同样模式落地（`jszip` 解析 `word/document.xml`）
+
+**验收**：
+- 新 spec `chat-ui-minimax-pdf.spec.ts`，4 项（短 PDF / 多页 PDF / 大 PDF 分页 / docx）
+- 现有 `chat-ui-minimax-documents.spec.ts` 中的 pdf 测试改为验证"提取到的文本块"而不是 opaque 字节块
+
+### 3.2 [P1] Pi upstream `type:"file"` 真打就绪
+
+**为什么 P1**：等 pi 上游加 `type:"file"` 是 wire 协议完整的最后一步。
+
+**范围**：
+- 跟踪 `@earendil-works/pi-agent-core` 上游 changelog
+- 上游支持后，把 `agent-prompt.ts` 改成：文档 → `type:"file"` part（base64），不再 inline 到 user text
+- 移除 `<document>` XML 块的兜底
+- pi-side 的 reader side 负责把 base64 PDF/docx 解成文本，再发到上游 LLM
+
+**验收**：
+- 移除 `<document>` XML 块生成逻辑
+- 现有 documents spec 跑通（图片 + 文档）
+- 新增「模型引用附件内容」端到端 spec：`chat-ui-minimax-pdf-citation.spec.ts`，3 项（PDF 引用 / docx 引用 / 多文档引用）
+
+### 3.3 [P2] 真实 1000-turn cost profile
+
+**为什么 P2**：合成 1000-turn perf 只验证渲染；真打才能知道 token / 延迟 / 成本曲线。
+
+**范围**：
+- 写 `scripts/electron/perf-1000-real-llm.mjs`：用真人对话模板生成 1000 条 user prompt，每条真打一次 MiniMax，记录：
+  - P50 / P95 / P99 turn latency
+  - 累计 token 用量（input + output）
+  - 上下文窗口使用率曲线（grows then truncates？）
+  - 自动 compaction 触发次数
+- 输出 `docs/perf/2026-09-XX-1000-turns-real.json`
+
+**验收**：
+- 跑通 1000 次真实 turn，输出报告
+- 报告决定 plan4.3+ 是否需要主动 compaction 策略
+
+### 3.4 [P2] 修复 email-unsubscribe-dialog pre-existing failure
+
+**为什么 P2**：3 年 spec 里 2/3 失败，每次跑都拖累 sweep 数字。
+
+**范围**：
+- 选项 A：测试合约错。spec 期望 IPC handler 拒 `dialog:*`，但 preload 已经拒了。改测试期望 `invalid IPC channel` 类错误。
+- 选项 B：preload allow-list 漏了 `dialog:*`。加进 preload 白名单，让 IPC handler 真正执行拒。
+- 推荐 A——preload 早拒是正确的安全姿态；测试应该是想测 IPC handler，绕开 preload 测。
+
+**验收**：
+- `chat-ui-minimax-email-dialog.spec.ts`（重命名以表明它现在归 AI chat 套件）3/3 pass
+
+### 3.5 [P2] 截图补全 plan4.2 多模态覆盖
+
+**为什么 P2**：plan4.1 截图是 plan4.2 之前的，缺新功能可视化。
+
+**范围**：
+- 在 `capture-ai-chat-screenshots.mjs` 加 2 张：
+  - `07-document-attachment.png`：拖拽 PDF 进 composer 显示 chip + 真实 MiniMax 引用文档回答
+  - `08-1000-turns-overview.png`：合成 1000 条历史后的 transcript 全景
+- 总数从 6 → 8
+
+**验收**：
+- 8 张截图就位
+- 截图脚本 1 次跑完 < 5 分钟
+
+### 3.6 [P3] 上下文窗口截断策略
+
+**为什么 P3**：现在是靠 pi 上游自己处理超限报错。生产级需要明确策略。
+
+**范围**：
+- 选一个截断策略（候选：滑动窗口 / 摘要压缩 / 分层）
+- 在 agent-host 加截断：当 prompt token > N% context window 时触发
+- 加 spec 验证截断后模型仍然理解上下文（用一个 long context 的 mini benchmark）
+
+**验收**：
+- `chat-ui-minimax-context-truncation.spec.ts` 2 项（截断触发 + 截断后 model 仍能 cite 早期 turn）
+
+### 3.7 [P3] Streaming 性能 + 长 turn
+
+**为什么 P3**：现有 perf baseline 测了 first/second turn，但 long stream（> 5s）的稳定性未覆盖。
+
+**范围**：
+- 真打 1 个 30s+ 的 prompt，测 FPS、丢帧率、token-per-second
+- 加 `chat-ui-minimax-streaming-perf.spec.ts`（默认 skip，需 `RUN_STREAM_PERF=1`）
+
+**验收**：
+- 报告 docs/perf/streaming-<date>.json
+- 数字不破现有 baseline
+
+## 4. Plan 4.3 之外的更长路线
+
+- **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
+- **Plan 5.1**：插件系统正式化（manifest + 权限 + 健康度）
+- **Plan 5.2**：Cordis 服务迁移到 OpenBuddy 域（project / task / workspace）
+
+## 5. 附录：当前 9 + 6 = 15 spec 矩阵
+
+| Spec | 类别 | 通过条件 |
+|---|---|---|
+| `chat-ui-minimax-real.spec.ts` | real LLM | 6/6 |
+| `chat-ui-minimax-real-extras.spec.ts` | real LLM | 2/2 |
+| `chat-ui-minimax-resilience.spec.ts` | real LLM | 3/3 |
+| `chat-ui-minimax-documents.spec.ts` | real LLM + IPC | 8/8 |
+| `chat-ui-minimax-multimodal.spec.ts` | real LLM | 3/3 |
+| `chat-ui-minimax-1000-turns.spec.ts` | stress（skip 默认） | 1/1 |
+| `minimax-real-roundtrip.spec.ts` | real LLM | 4/4 |
+| `provider-anthropic-probe-ipc.spec.ts` | real LLM | 4/4 |
+| `session-history-load.spec.ts` | real LLM | 2/2 |
+| `agent-workbench-core.spec.ts` | IPC | 17/17 |
+| `bridge-poisoning-regression.spec.ts` | IPC R7 | 4/4 |
+| `marketplace-install-e2e.spec.ts` | IPC | 5/5 |
+| `mcp-e2e.spec.ts` | IPC | 7/7（1 个 flaky pre-existing） |
+| `chat-flow.spec.ts` | echo | 2/2 |
+| `chat-flow-echo.spec.ts` | echo | 5/5 |
+
+合计 **75/75** 在 real LLM + IPC 上稳定通过；1000-turns 1/1 在 stress 模式下。
+
+## 6. 时间线（已实现 + 待办）
+
+```
+plan4.md (2026-09-09) ── strategy document
+        │
+        ▼
+plan4.1 (2026-09-10) ── cleanup: 28 → 9 生产级 spec + 6 张截图
+        │
+        ▼
+plan4.2 (2026-09-11) ── 1000 轮 + 多模态 ← 当前（已完成）
+        │
+        ▼
+plan4.3 (下一阶段) ── PDF 阅读器 + pi file part 真打 + cost profile + 截图补全
+        │
+        ▼
+plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
+```
