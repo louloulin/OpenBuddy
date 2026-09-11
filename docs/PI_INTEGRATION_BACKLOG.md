@@ -23,7 +23,7 @@
 | **G6** | initTheme / getMarkdownTheme 替换 ui-theme 自实现 | `packages/ui/openbuddy-ui-theme/` | 1 周 | P1 | ui | — | **🟢 PR1** |
 | **G7** | shell helper 用 pi bash-executor + PowerShell config | `extensions/apply-patch.ts:39-40` | 1 周 | P1 | runtime | G1 | ⬜ |
 | **G8** | 29 个 CANONICAL_PI_PACKAGES e2e 全覆盖 | `pi-extension-discovery.ts:20-50` | 3 周 | P1 | runtime + QA | — | ⬜ |
-| **G9** | loadProjectContextFiles 接管 include.ts | `plugin-host/src/include.ts` (350 LOC) | 1 周 | P1 | runtime | — | ⬜ |
+| **G9** | loadProjectContextFiles 接入（**PR 1 已落地**，include.ts 不动） | `plugin-host/src/resource-pi.ts`（新增 55 LOC）| 1 周 | P1 | runtime | **🟢 PR1** | ⬜ → 🟢 |
 | **G10** | ExtensionFactory 注册简化（单文件入口） | `pi-extensions.ts` (1222 LOC) | 2 周 | P1 | runtime | G1 | ⬜ |
 | **G11** | plugin manifest 解析切到 pi parseFrontmatter | `plugin-sdk/src/manifest.ts` | 1 周 | P0 | runtime | G4 | **🟢 PR1** |
 | **G12** | pi-runtime-coordinator 复用 AgentSessionRuntime | `agent/pi-runtime-coordinator.ts` | 1 周 | P1 | runtime | G2 | ⬜ |
@@ -185,13 +185,23 @@
 - 29 个 e2e 全过
 - 脚本断言 `covered == 29`
 
-### G9 — loadProjectContextFiles 接管 include.ts
+### G9 — loadProjectContextFiles 接入（PR 1 已落地，include.ts 不动）
 
 **Owner**：runtime team
 **依赖**：—
 **估时**：1 周
+**状态**：🟢 **PR 1 已落地**（2026-09-11 Round 12）；PR 2 待 pi-runtime-coordinator 接入
 
-**修复方向**：`packages/runtime/openbuddy-plugin-host/src/include.ts` 350 LOC → pi `loadProjectContextFiles` + typed wrapper。
+**修复方向**（**修订后**）：不替换 `include.ts`（**spec 错估——include.ts 实际是 128 LOC Cordis harness plugin entry loader，不是 350 LOC context loader**）。改为**新增** `resource-pi.ts` typed facade（55 LOC）：
+- re-export pi 的 `DefaultResourceLoader` + 6 个类型（`ResourceLoader` / `PathMetadata` / `ResolvedPaths` / `ResolvedResource` / `ResourceCollision` / `ResourceDiagnostic`）
+- named-arg adapter `loadProjectContextFiles(projectRoot, agentDir)` 映射到 pi 的 `loadProjectContextFiles({ cwd, agentDir })`（**spec 错估——pi 是同步 + 单 options bag + 无 patterns 参数**）
+
+**PR 1 验证**（2026-09-11）：
+- `tsc -p packages/runtime/openbuddy-plugin-host/tsconfig.json --noEmit` exit 0 ✅
+- `vitest run packages/runtime/openbuddy-plugin-host/src/__tests__/resource-pi.test.ts` 3/3 ✅
+- include.ts **未改动**（1 LOC 差异都没有）
+
+**PR 2 待做**：pi-runtime-coordinator 在多 session 启动时调用 `loadProjectContextFiles(projectRoot, agentDir)` 注入 pi AGENTS.md/CLAUDE.md 到 session 上下文。
 
 ### G10 — ExtensionFactory 注册简化
 

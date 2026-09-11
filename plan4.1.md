@@ -163,7 +163,7 @@ OpenBuddy 在 v1 plan4.1.md 时被归类为"24% pi-native"。**真实审计后�
 | **G6** | Theme 自实现 | `packages/ui/openbuddy-ui-theme/` 整包 | Pi 主题切换能力（明/暗/自定义 .json）OpenBuddy 拿不到 | 接入 pi `initTheme` + `getMarkdownTheme`；保留 `--wb-*` token 作为 base layer | 1 周 |
 | **G7** | Shell helper 自实现 | `extensions/apply-patch.ts:39-40` 直接用 `node:child_process.execFile` | shell 工具行为与 pi 内置不一致；Windows PowerShell 支持缺失 | 接入 pi `getShellConfig / getPowerShellConfig / bash-executor` | 1 周 |
 | **G8** | 27 个 CANONICAL_PI_PACKAGES 0 个真实 e2e | `electron/main/agent/pi-extension-discovery.ts:20-50` + 0 个 `tests/integration/real-pi-package-*.test.ts` 文件 | "装即用"叙事无证据 | 真实 `pnpm install pi-mcp-adapter` + 装 + 触发 + 卸载 e2e；至少 3 个真实包 | 3 周 |
-| **G9** | Context file loading 自实现 | `packages/runtime/openbuddy-plugin-host/src/include.ts` 350 LOC | Pi `loadProjectContextFiles` 已经有，OpenBuddy 不复用 | 切到 pi helper，保留 include.ts 作为 typed wrapper | 1 周 |
+| **G9** | Context file loading 自实现 | `packages/runtime/openbuddy-plugin-host/src/include.ts` 128 LOC（**注：spec 估 350 LOC 错，实际是 Cordis harness plugin entry loader，与 pi `loadProjectContextFiles` 是不同概念**） | Pi `loadProjectContextFiles` 已经有，OpenBuddy 不复用 | 新增 `resource-pi.ts` typed facade；保留 include.ts 不动 | 1 周 |
 | **G10** | ExtensionFactory 注册路径复杂 | `pi-extensions.ts` 1222 LOC（factories + adapters + compat + diag + resources）；`extensions/*.ts` 6 个 builtin factory | 第三方写一个 ExtensionFactory 进入 OpenBuddy 需要 5+ 文件改动 | 简化入口：单文件 `registerBuiltinExtension(factory)`；文档化最小模板 | 2 周 |
 | **G11** | Frontmatter 解析走 bridge 而非 pi-renderer | `pi-bridge/text-utils.ts:4` 有 `parseFrontmatter` 但 `packages/runtime/openbuddy-plugin-sdk/src/manifest.ts` 自实现 | plugin manifest schema 校验与 pi frontmatter 行为漂移 | 接入 pi `parseFrontmatter` 作为 manifest 解析底层 | 1 周 |
 | **G12** | pi-runtime-coordinator 单例化风险 | `electron/main/agent/pi-runtime-coordinator.ts` 自实现多 session 协调 | Pi 已提供 `AgentSessionRuntime.newSession/switchSession/fork`，OpenBuddy 可能重复实现 | 审查并最小化 `pi-runtime-coordinator.ts`，复用 `AgentSessionRuntime` | 1 周 |
@@ -462,6 +462,52 @@ Vitest (ui-theme, 2 个 test files):
 3. **G6 PR 2 未做**（Markdown / SelectList / SettingsList 真实替换）：本轮只到 PR 1（facade 就位），未替换 renderer 实际渲染路径
 4. **fts5 仍限制 vitest 全集**：与本轮无关；需 root + 重新编译 Node 才能解决
 
+**v3.9 增量**（2026-09-11 第十次跑 — **G9 第三次代码落地 + 第四次 spec 审计校正**）
+
+**重要里程碑**：本轮实现 G9 PR 1（plugin-host pi resource facade）并发现 **G9 spec 同时错估了 OpenBuddy 实际代码 + pi 上游 API 签名**——这是连续第 4 个 spec 在动手前都缺少真实代码核对。
+
+**改动文件**：
+- `packages/runtime/openbuddy-plugin-host/src/resource-pi.ts` — 新文件（55 LOC）：typed facade 包装 pi 的 `DefaultResourceLoader` / `loadProjectContextFiles` + 6 个类型 + 1 个 named-arg adapter（`projectRoot` → `cwd`）
+- `packages/runtime/openbuddy-plugin-host/src/__tests__/resource-pi.test.ts` — 新文件（~70 LOC）：3 个 vitest 用例（mock pi + 验证 spec 名 → pi 名字翻译 + 验证构造函数签名）
+- `packages/runtime/openbuddy-plugin-host/src/index.ts` — barrel 新增 6 个 re-export + `loadProjectContextFiles` adapter
+
+**真实运行结果**：
+```
+TypeScript 编译:
+  tsc -p packages/runtime/openbuddy-plugin-host/tsconfig.json --noEmit  → exit 0 ✅
+
+Vitest (resource-pi, 1 个 test file):
+  ✓ resource-pi.test.ts   3 tests (new, all mocked)  ✅
+
+  Test Files  1 passed (1)
+  Tests       3 passed (3)
+  Duration    1.38s
+```
+
+**G9 spec 校对（第 4 次 spec audit）**：
+
+| G9 spec 假设 | 实际 | 应对 |
+|---|---|---|
+| `packages/runtime/openbuddy-plugin-host/src/include.ts` 350 LOC | **128 LOC**（Cordis harness plugin：load / refresh plugin entry descriptors） | include.ts 与 `loadProjectContextFiles` 是**完全不同**的两个概念；不能替换——`loadProjectContextFiles` 加载 AGENTS.md / CLAUDE.md 等 pi 原生上下文，include.ts 加载 YAML/JSON/JS 形式的 OpenBuddy 插件入口 |
+| `loadProjectContextFiles(projectRoot, patterns, options)` 异步 + 接收 patterns 数组 | pi 真实签名：`loadProjectContextFiles({ cwd, agentDir }): Array<{ path, content }>` — **同步** + 无 patterns 参数 + 单 options bag | facade 改为 named-arg `(projectRoot, agentDir)` adapter 映射到 pi 的 `{ cwd, agentDir }` |
+| `respectGitignore` / `tokenBudget` / `onError` 等可选参数 | pi 上游无对应参数 | facade 移除这些参数（**不假装**自己支持 pi 没有的特性） |
+
+**Spec audit pattern 总结**（连续 4 次）：
+
+| 轮次 | Gap | spec 错估的两件事 | 实际 | facade 补救 |
+|---|---|---|---|---|
+| Round 10 | G11 | (1) manifest.ts LOC 估算；(2) YAML 解析走自实现 | manifest.ts 只有 zod schema；frontmatter 解析已存在 | `parsePluginManifestFromString` additive |
+| Round 11 | G6 | (1) initTheme config-object；(2) ui-theme 200 LOC token 系统 | positional args；ui-theme 只有状态管理没有 token | `theme-pi.ts` 透传 positional |
+| **Round 12（本轮）** | **G9** | (1) include.ts 是 350 LOC 上下文加载器；(2) loadProjectContextFiles 接收 patterns | include.ts 是 128 LOC Cordis plugin entry loader；pi API 是 `{ cwd, agentDir }` 同步签名 | `resource-pi.ts` named-arg adapter |
+
+**根因**：每个 spec 是按 backlog "假设性重构"模板写的，**没有任何一轮动手前先 grep OpenBuddy 实际 LOC + 用 TypeScript Compiler API 读 pi 的 d.ts**。下一步：所有未来 G-gap 实施前，**第一动作** 必须是 `wc -l <file>` + `cat node_modules/.../d.ts | grep '<symbol>'`。
+
+**已知限制**：
+1. **include.ts 未被替换**（也**不应该**被替换）：Cordis harness plugin 是 OpenBuddy 自有概念，pi 的 `loadProjectContextFiles` 不提供等价物；两者并存
+2. **G9 PR 2 未做**（renderer / pi-runtime-coordinator 实际接入 `resource-pi.ts`）：本轮只到 PR 1（facade + 3 个 mock 测试）
+3. **G9 spec §2 API 签名 + §0 LOC 表**待 v4.0 修正
+4. **fts5 仍限制 vitest 全集**：与本轮无关
+
 **v3.5 增量**（2026-09-11 第六次跑 — Phase D/E/F 入口规格批量落地）
 
 9 个新实施规格，把 backlog 的 12 个剩余 G-gap 中**所有 P0/P1 项（共 9 个）**展开为 PR 级拆分
@@ -474,7 +520,7 @@ Vitest (ui-theme, 2 个 test files):
 | `G6_IMPLEMENTATION_SPEC.md` | G6 initTheme/getMarkdownTheme | P1 | ~200 LOC | → ~80 | 4 个 theme fn | 1 周 |
 | `G7_IMPLEMENTATION_SPEC.md` | G7 shell helper | P1 | ~30 LOC | → ~15 | getShellConfig | 1 周 |
 | `G8_IMPLEMENTATION_SPEC.md` | G8 29 canonical e2e | P1 | 0/29 | → 29/29 | （install 测试）| 3 周 |
-| `G9_IMPLEMENTATION_SPEC.md` | G9 loadProjectContextFiles | P1 | 350 LOC | → ~50 | loadProjectContextFiles | 1 周 |
+| `G9_IMPLEMENTATION_SPEC.md` | G9 loadProjectContextFiles | P1 | 128 LOC (含 include.ts 真实 LOC) | resource-pi.ts facade | loadProjectContextFiles | 1 周 |
 | `G10_IMPLEMENTATION_SPEC.md` | G10 ExtensionFactory 简化 | P1 | 1222 LOC | → ~200 | ExtensionFactory | 2 周 |
 | `G15_IMPLEMENTATION_SPEC.md` | G15 AuthStorage PKCE | P1 | ~200 LOC | → ~50 | AuthStorage | 1 周 |
 

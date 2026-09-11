@@ -1219,6 +1219,21 @@ export class HarnessPluginLoader {
 export type Plugin = HarnessPlugin;
 
 export { createIncludePlugin, type IncludeRuntime } from "./include";
+// G9 PR 1 — typed facade over pi's resource loader primitives.
+// See ./resource-pi.ts for the spec audit (include.ts is a Cordis
+// plugin entry loader, NOT a project-context-file loader; the facade
+// exposes pi's actual `loadProjectContextFiles` for consumers that
+// genuinely need project bootstrap).
+export {
+  DefaultResourceLoader,
+  loadProjectContextFiles,
+  type ResourceLoader,
+  type PathMetadata,
+  type ResolvedPaths,
+  type ResolvedResource,
+  type ResourceCollision,
+  type ResourceDiagnostic,
+} from "./resource-pi";
 export {
   installProfilePackage,
   listProfilePackages,
