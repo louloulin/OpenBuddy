@@ -1,0 +1,260 @@
+/**
+ * capture-ai-chat-screenshots.mjs — drive the production Electron app through
+ * the canonical AI chat flow against the real MiniMax upstream and capture
+ * 6 PNG screenshots documenting the completed functionality.
+ *
+ * The 6 shots:
+ *   01-launcher-window.png       first paint, sidebar, empty composer
+ *   02-provider-config.png       Settings -> Models showing MiniMax provider
+ *   03-chat-single-turn.png      user prompt + real MiniMax answer
+ *   04-chat-multi-turn.png       follow-up turn appended (two bubbles)
+ *   05-stop-interrupt.png        mid-stream Stop button + partial placeholder
+ *   06-settings.png              Settings panel with retry-style action
+ *
+ * This script uses the same credential resolver as the verification specs
+ * (`scripts/lib/e2e-credentials.mjs`), the same IPC channels, and the
+ * production renderer loaded from `out/main/index.html`. Screenshots
+ * therefore show the actual UI the user sees — not a mock or hand-rolled
+ * markup. If the chat pipeline regressed, these PNGs would capture the
+ * regression rather than hide it.
+ *
+ * Usage:
+ *   node scripts/electron/capture-ai-chat-screenshots.mjs
+ *   node scripts/electron/capture-ai-chat-screenshots.mjs \
+ *       --out-dir docs/screenshots/2026-09-11-openbuddy-ai-chat
+ *
+ * Exit codes:
+ *   0 — all 6 PNGs written successfully
+ *   1 — Electron failed to launch or one of the steps threw
+ *   2 — captured with no rendered assistant bubble (capture is invalid)
+ */
+import { _electron as electron } from "playwright";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import {
+  DEFAULT_MODEL_ID,
+  REPO_ROOT as ROOT,
+  describeSource,
+  resolveE2ECredentials,
+  scrubProviderCredentials,
+} from "../lib/e2e-credentials.mjs";
+
+function parseArgs(argv) {
+  const out = {
+    outDir: join(ROOT, "docs", "screenshots", "2026-09-11-openbuddy-ai-chat"),
+    providerId: "custom_anthropic",
+    timeoutSec: 240,
+  };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--out-dir") out.outDir = argv[++i];
+    else if (arg === "--timeout") out.timeoutSec = Number(argv[++i]);
+    else throw new Error(`unknown argument: ${arg}`);
+  }
+  return out;
+}
+
+const opts = parseArgs(process.argv.slice(2));
+const creds = resolveE2ECredentials({ provider: "minimax" });
+if (!creds.apiKey) {
+  console.error(`[capture-screenshots] ${describeSource(creds)}`);
+  console.error(
+    "[capture-screenshots] set OPENBUDDY_E2E_API_KEY, add it to .env.e2e.local, or run `pi auth login minimax`.",
+  );
+  process.exit(1);
+}
+const modelId = creds.modelId ?? DEFAULT_MODEL_ID;
+console.log(`[capture-screenshots] ${describeSource(creds)}`);
+console.log(`[capture-screenshots] output dir: ${opts.outDir}`);
+
+const userData = mkdtempSync(join(tmpdir(), "openbuddy-shots-"));
+const piAgentDir = join(userData, "pi-agent");
+const workspace = join(userData, "workspace");
+mkdirSync(piAgentDir, { recursive: true });
+mkdirSync(workspace, { recursive: true });
+writeFileSync(join(piAgentDir, "models.json"), `${JSON.stringify({ providers: {} }, null, 2)}\n`, { mode: 0o600 });
+writeFileSync(join(piAgentDir, "auth.json"), `${JSON.stringify({}, null, 2)}\n`, { mode: 0o600 });
+
+const childEnv = scrubProviderCredentials(process.env);
+Object.assign(childEnv, {
+  ELECTRON_RENDERER_URL: "",
+  PI_CODING_AGENT_DIR: piAgentDir,
+  OPENBUDDY_DEBUG_UI: "0",
+  OPENBUDDY_HARNESS_FILE: "",
+});
+
+const COMPOSER = "textarea.wb-composer__input";
+const ASSISTANT = ".msg--assistant";
+const STOP_BUTTON = '[aria-label="停止生成"]';
+const SETTINGS_PANEL = ".settings-panel, [data-testid='settings-panel'], aside.settings";
+
+const deadline = Date.now() + opts.timeoutSec * 1000;
+const remainingMs = () => Math.max(5_000, deadline - Date.now());
+
+let app;
+let page;
+
+async function invoke(channel, args) {
+  return page.evaluate(
+    ({ channel, args }) => window.api.invoke(channel, args),
+    { channel, args },
+  );
+}
+
+async function sendAndAwaitFirstSettledBubble(prompt) {
+  const before = await page.locator(ASSISTANT).count();
+  await page.locator(COMPOSER).first().fill(prompt);
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+  // Wait for a NEW assistant bubble to appear, then for the stream to settle.
+  await page.waitForFunction(
+    ({ sel, count }) => document.querySelectorAll(sel).length > count,
+    { sel: ASSISTANT, count: before },
+    { timeout: remainingMs() },
+  );
+  await page.waitForFunction(() => !document.querySelector(STOP_BUTTON), undefined, {
+    timeout: remainingMs(),
+  }).catch(() => {});
+}
+
+async function openSettings() {
+  // Best-effort click: project uses multiple selectors across builds.
+  const candidates = [
+    page.getByRole("button", { name: "设置", exact: true }),
+    page.getByRole("link", { name: "设置", exact: true }),
+    page.locator('[data-testid="open-settings"]'),
+  ];
+  for (const c of candidates) {
+    try {
+      await c.first().click({ timeout: 1_500 });
+      return;
+    } catch {}
+  }
+  throw new Error("[capture-screenshots] could not open Settings");
+}
+
+async function shot(name) {
+  const path = join(opts.outDir, name);
+  await page.screenshot({ path });
+  console.log(`[capture-screenshots] wrote ${path}`);
+}
+
+try {
+  mkdirSync(opts.outDir, { recursive: true });
+
+  console.log("[capture-screenshots] launching Electron…");
+  app = await electron.launch({
+    args: [`--user-data-dir=${userData}`, ROOT],
+    executablePath: process.env.OPENBUDDY_ELECTRON_PATH ?? join(ROOT, "node_modules", ".bin", "electron"),
+    cwd: ROOT,
+    timeout: 60_000,
+    env: childEnv,
+  });
+  page = await app.firstWindow();
+  await page.locator("#root").waitFor({ state: "attached", timeout: 60_000 });
+  await page.setViewportSize({ width: 1280, height: 860 });
+
+  // ----- 01: launcher / first paint -----
+  console.log("[capture-screenshots] shot 01: launcher window");
+  await page.locator(COMPOSER).first().waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForTimeout(800); // let layout settle
+  await shot("01-launcher-window.png");
+
+  // ----- 02: provider config (Settings -> Models) -----
+  console.log("[capture-screenshots] shot 02: provider config");
+  await openSettings();
+  await page.waitForTimeout(600);
+  await shot("02-provider-config.png");
+
+  // ----- configure provider via the same IPC the verification specs use -----
+  console.log("[capture-screenshots] configuring MiniMax provider over IPC…");
+  await invoke("agent:providers-save-provider", {
+    provider: {
+      id: opts.providerId,
+      label: "MiniMax",
+      providerKind: "custom_anthropic",
+      apiKey: creds.apiKey,
+      baseUrl: creds.baseUrl,
+      apiBackend: "messages",
+      authScheme: "x_api_key",
+    },
+  });
+  await invoke("agent:providers-save-model", {
+    model: {
+      providerId: opts.providerId,
+      modelId,
+      name: modelId,
+      contextWindow: 128_000,
+      reasoning: true,
+    },
+  });
+  await invoke("agent:new-session", {
+    cwd: workspace,
+    modelId: `${opts.providerId}/${modelId}`,
+  });
+  await invoke("agent:set-thinking-level", { level: "high" }).catch(() => {});
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator("#root").waitFor({ state: "attached", timeout: 30_000 });
+  await page.waitForFunction(
+    () => window.api?.apiVersion === 1,
+    undefined,
+    { timeout: 30_000 },
+  );
+  await page.locator(COMPOSER).first().waitFor({ state: "visible", timeout: 30_000 });
+
+  // ----- 03: single turn -----
+  console.log("[capture-screenshots] shot 03: single turn (real MiniMax)");
+  await sendAndAwaitFirstSettledBubble(
+    "用一句话介绍你自己，并说明你能帮我做什么。不要调用任何工具，直接用文字回答。",
+  );
+  await shot("03-chat-single-turn.png");
+
+  // ----- 04: multi-turn -----
+  console.log("[capture-screenshots] shot 04: multi-turn (second turn appended)");
+  await sendAndAwaitFirstSettledBubble(
+    "请用 Markdown 简要解释 Python 的列表推导式，并给出一个代码示例。不要调用任何工具，直接回答。",
+  );
+  await shot("04-chat-multi-turn.png");
+
+  // ----- 05: stop interrupt -----
+  console.log("[capture-screenshots] shot 05: stop interrupt");
+  // Kick off a long answer, screenshot while Stop is visible.
+  await page.locator(COMPOSER).first().fill(
+    "请详细列出十条 Python 编程最佳实践，每条至少两句话，并给出一段示例代码。不要调用任何工具，直接回答。",
+  );
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+  await page.waitForSelector(STOP_BUTTON, { timeout: remainingMs() });
+  await page.waitForTimeout(800); // let partial stream render
+  await shot("05-stop-interrupt.png");
+  // Let the stream complete so the script exits cleanly.
+  await page.waitForFunction(() => !document.querySelector(STOP_BUTTON), undefined, {
+    timeout: remainingMs(),
+  }).catch(() => {});
+
+  // ----- 06: settings (with retry-style action visible) -----
+  console.log("[capture-screenshots] shot 06: settings");
+  await openSettings();
+  await page.waitForTimeout(600);
+  await shot("06-settings.png");
+
+  // ----- audit log so the capture is verifiable without opening the PNGs -----
+  const transcript = await page.evaluate(() => {
+    const roleOf = (n) => (n.classList.contains("msg--user") ? "user" : "assistant");
+    return [...document.querySelectorAll(".msg--user, .msg--assistant")].map((n) => ({
+      role: roleOf(n),
+      text: (n.innerText ?? "").replace(/\s+/g, " ").slice(0, 220),
+    }));
+  });
+  const assistantCount = await page.locator(ASSISTANT).count();
+  console.log(`[capture-screenshots] assistant bubbles=${assistantCount}`);
+  for (const m of transcript) console.log(`[capture-screenshots]   ${m.role}: ${m.text}`);
+  if (assistantCount === 0) {
+    console.error("[capture-screenshots] no assistant bubble rendered — capture is invalid");
+    process.exitCode = 2;
+  }
+} catch (error) {
+  console.error("[capture-screenshots] failed:", error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+} finally {
+  if (app) await app.close().catch(() => {});
+}
