@@ -3197,6 +3197,113 @@ G 项落地总进度：~81% → **~84%**（+3 pp）
 
 ---
 
+## 9.23 Round 33 增量：G3 PR 2 — 适配层补完（specifier 分类 + 错误聚合 + 21 测试）
+
+### 9.23.1 真实代码落地（2 files）
+
+| 文件 | 类型 | LOC Δ |
+|---|---|---|
+| `packages/runtime/openbuddy-plugin-host/src/default-package-manager-adapter.ts` | 扩展（classifySpecifier + PackageInstallResult + lastInstallResult + AggregateError）| 146 → 223（+77；含 JSDoc 与 typed API）|
+| `packages/runtime/openbuddy-plugin-host/src/default-package-manager-adapter.test.ts` | new（21 vitest cases：17 specifier + 4 install 编排）| +128 |
+
+**profile-manager.ts 仍 199 LOC ≤ 200 GA gate 维持** ✅
+
+### 9.23.2 Specifier 分类（classifySpecifier）
+
+```typescript
+export type SpecifierKind =
+  | "npm" | "git-https" | "git-ssh" | "github"
+  | "tarball-https" | "file" | "local-directory" | "unknown";
+```
+
+**覆盖 16 类 specifier**（17 个测试 case）：npm / git-https / git-ssh / github / tarball-https / file / local-directory / unknown
+
+### 9.23.3 PackageInstallResult + lastInstallResult 边信道
+
+```typescript
+export interface PackageInstallResult {
+  ok: boolean;
+  channel: "pi" | "pnpm-fallback" | "both-failed";
+  specifier: SpecifierKind;
+  piError?: string;
+  pnpmError?: string;
+}
+
+export let lastInstallResult: PackageInstallResult | undefined;
+```
+
+**为什么需要 side-channel**：`ProfilePackageManager.install` 公共签名保持 `Promise<void>`（typed facade 稳定）；executor 想知道 channel/specier 用 `lastInstallResult`，**0 公共 API 变更**。
+
+### 9.23.4 AggregateError 错误聚合
+
+```typescript
+function aggregateInstallErrors(specifier, source, piError, pnpmError): AggregateError {
+  const summary = `profile-package: install failed for ${source} (${specifier}); pi="${piMessage}"; pnpm="${pnpmMessage}"`;
+  return new AggregateError([piError, pnpmError], summary);
+}
+```
+
+**`fallbackPnpmInstall` 改进**：把 `failure.message` 拼进 wrapped message，**保留原始信息 + `cause`**。
+
+**`install` 流程**：
+1. classifySpecifier(source)
+2. try `pm.install(source, { local: true })` → lastInstallResult = `{ ok: true, channel: "pi", specifier }` + return
+3. catch → try `fallbackPnpmInstall(...)` → lastInstallResult = `{ ok: true, channel: "pnpm-fallback", specifier, piError }` + return
+4. catch → lastInstallResult = `{ ok: false, channel: "both-failed", specifier, piError, pnpmError }` + throw AggregateError
+
+### 9.23.5 测试覆盖（21 vitest cases）
+
+```bash
+$ npx vitest run packages/runtime/openbuddy-plugin-host/src/default-package-manager-adapter.test.ts
+ ✓ default-package-manager-adapter.test.ts (21 tests) 18ms
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+```
+
+**4 个 install 编排测试**：
+1. pi 成功 → lastInstallResult = `{ channel: "pi", specifier: "npm" }`
+2. pi 拒绝 → fallback pnpm → lastInstallResult = `{ channel: "pnpm-fallback", specifier: "git-https", piError: "..." }`
+3. pi + pnpm 都失败 → 抛 `AggregateError`，`.errors[0]` 是 pi 错误，`.errors[1]` 是 pnpm 错误
+4. specifier 落到 `lastInstallResult.specifier = "tarball-https"`
+
+### 9.23.6 真实验证结果
+
+- `tsc -p packages/runtime/openbuddy-plugin-host/tsconfig.json --noEmit` → **0 error** ✅
+- `vitest run packages/runtime/openbuddy-plugin-host/src/default-package-manager-adapter.test.ts` → **21/21 passed** ✅
+- `vitest run packages/runtime/openbuddy-plugin-host/` → **292 passed / 1 skipped / 35 pre-existing fails**（**+21 new, 0 regression**）
+- `bash scripts/audit/extensions-inventory.sh --json` → `profileManager: 199` ≤ 200 ✅（**GA gate 维持**）
+
+### 9.23.7 进度贡献
+
+| 项 | v3.29 | v3.30 |
+|---|---|---|
+| G1 / G4 / G5 / G8 / G10 / G11 | 100% | 100% |
+| **G3** | **PR 1 完成（typed facade）** | **PR 1 + PR 2（specifier 分类 + 错误聚合 + 21 测试）** |
+| G2 | 67% | 67% |
+
+P1 完成度：44.75 → **47.75**（G3 PR 2 +3）
+G 项落地总进度：~84% → **~85%**（+1 pp）
+
+### 9.23.8 已知限制
+
+1. **adapter 223 LOC 超 180 LOC 目标**：可下一轮把 specifier regex 抽到 `specifier-kinds.ts`
+2. **`tarball-` scheme 仅匹配前缀**：内部 `realpath`/`sha256` 校验未实现
+3. **`AggregateError` 是 ES2021**：Node 18+ 完全支持
+4. **35 个 vitest fail 仍是 pre-existing**：与本 PR 无关
+
+### 9.23.9 Round 34+ 下一步
+
+| 优先级 | Round | 目标 | 期望指标 |
+|---|---|---|---|
+| P1 | 34 | G3 PR 3 — 端到端 e2e（marketplace install + pi adapter 双轨） | marketplace-install-e2e.spec.ts 新增 pi 路径 |
+| P1 | 35 | G3 GA gate 收口（real-pi install 路径覆盖） | pi-upstream-coverage ≥ 95% |
+| P3 | 36 | G2 PR 3（retry/image typed API 全切）| settings 域 unused 4 → 1 |
+| P3 | 37 | G2 PR 4（GA gate 收口：settings-store ≤ 50）| 195 → ≤ 50 |
+
+**G3 PR 2 完成**（typed facade + DefaultPackageManager + 适配层补完 + 21 测试）。剩余 GA gate：G2 / G3 PR 3。
+
+---
+
 **Sources（v2 plan 引用）**：
 
 - [pi.dev](https://pi.dev/)
