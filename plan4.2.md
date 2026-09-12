@@ -212,6 +212,14 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 - 在 agent-host 加截断：当 prompt token > N% context window 时触发
 - 加 spec 验证截断后模型仍然理解上下文（用一个 long context 的 mini benchmark）
 
+**当前进度（本轮完成）**：
+- 策略落地为「文档块滑动窗口」：`electron/main/agent/host-modules/document-truncator.ts` 导出纯函数 `truncateDocumentBlocks(blocks, options)`。当总字符超过预算时保留首 `keepFirst` + 末 `keepLast` 块，中间插入 `<document-truncated dropped=… keptFirst=… keptLast=…>` marker 让模型知道中间块已掉，避免幻觉引用未提供的段落。`DEFAULT_TRUNCATION_OPTIONS` 默认 `maxChars=24_000 / keepFirst=4 / keepLast=4`，与 agent-host `contextWindow: 128_000` 对齐（文档附件单独占用 ~25% 上下文）。
+- 当 `keepFirst=0` 或 `keepLast=0` 时省略 marker（保留侧无歧义，模型不可能引用未提供的段落）；重复调用 idempotent：marker 计数不计 real block，下次 fast path 命中。
+- `electron/main/agent/host-modules/agent-prompt.ts` 在拼装 `effectiveText` 前调用 truncator；若 `truncation.truncated`，emit `session/input-truncated` plugin event 带 `dropped` / `totalChars` / `budget`，renderer 与未来 telemetry 可订阅。
+- 定向测试：`document-truncator.test.ts` 8 项（无截断 / 头尾保留 / marker 包含 dropped/keptFirst/keptLast / keepable>=blockCount no-op / keepFirst=0 / keepLast=0 / 二次 idempotent / 默认值）；`agent-prompt-truncation.test.ts` 2 项（不溢出时无 marker 且无 plugin event / truncator 仍可作纯函数 import）。合计 **10/10 通过**。
+- 当前未补 chat-ui-minimax-context-truncation.spec.ts——`chat-ui-minimax-documents.spec.ts` 现有 PDF/docx 测试已覆盖到 truncator 的真实 wire 路径；额外 spec 留到 plan4.4 与 office1 集成一起加。
+- 已知边界：truncator 目前只覆盖 PDF/docx 等 `<document>` 块，不裁 system prompt 与 Pi 上游 history（这部分仍由上游控制）。完整模型行为验证（截断后模型仍能引用早期 turn）需要真实 LLM，本地环境未跑。
+
 **验收**：
 - `chat-ui-minimax-context-truncation.spec.ts` 2 项（截断触发 + 截断后 model 仍能 cite 早期 turn）
 

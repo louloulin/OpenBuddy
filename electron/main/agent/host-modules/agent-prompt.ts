@@ -44,6 +44,7 @@ import { type AgentHostState } from "./_state-shape";
 import { createDefaultAgentHostState } from "./_default-state";
 import { extractPdfTextByPage } from "./pdf-text-extractor";
 import { extractDocxTextByParagraph } from "./docx-text-extractor";
+import { DEFAULT_TRUNCATION_OPTIONS, truncateDocumentBlocks } from "./document-truncator";
 
 let state: AgentHostState = createDefaultAgentHostState();
 
@@ -238,7 +239,21 @@ async function promptContent(
       );
     }
   }
-  const effectiveText = text + docBlocks.join("");
+  // plan4.3 §3.6 — sliding-window truncation of the assembled doc blocks.
+  // When many pages / paragraphs push the total text past the budget we
+  // keep the first + last few and emit a synthetic marker so the model
+  // doesn't fabricate citations for missing sections. Emitted as a plugin
+  // event so the renderer / future telemetry can surface it.
+  const truncation = truncateDocumentBlocks(docBlocks, DEFAULT_TRUNCATION_OPTIONS);
+  if (truncation.truncated) {
+    emitPluginEvent("session/input-truncated", {
+      sessionId: state.session.sessionId,
+      dropped: truncation.dropped,
+      totalChars: truncation.totalChars,
+      budget: DEFAULT_TRUNCATION_OPTIONS,
+    });
+  }
+  const effectiveText = text + truncation.blocks.join("");
   const wireContent: Array<
     { type: "text"; text: string } | { type: "image"; data: string; mimeType: string }
   > = effectiveText.trim() ? [{ type: "text", text: effectiveText }] : [];
