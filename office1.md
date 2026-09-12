@@ -541,3 +541,11 @@ Composer(paste/drop Office file)
 本阶段暂不改变 UI、IPC 或附件数据格式；A 阶段将把既有 `FilePreview`/Univer 作为 renderer，B 阶段再接入持久化 revision 和 onSave 回流。Office 原格式高保真保存仍受 Univer Pro/Server 授权边界约束。
 
 C 阶段验证：新增 artifact contract 测试 4/4 通过，覆盖 descriptor 校验、禁止内嵌内容、递归脱敏、事件单调序列和幂等；`git diff --check` 通过。
+
+### 11.5 Artifacts 阶段 A（2026-09-12）
+
+在 C 协议之上新增 `ArtifactRegistry`：以 descriptor 为唯一身份，按 `taskId/sessionId` 查询，upsert 时自动递增 revision，并生成可重放的 `artifact.created` / `artifact.versioned` 事件。该 registry 只保存元数据和摘要，不保存二进制正文，因而可安全作为右侧 Artifacts 面板的数据源；现有 `SessionArtifact`/`ToolSidePanel` 展示链路保持兼容，下一步接入 descriptor projection 和预览器路由。
+
+验证：artifact contract、registry、evidence 原有测试共 3 个文件、15/15 通过；`git diff --check` 通过。
+
+本轮 A 阶段边界：已完成 registry 查询/版本投影基础，尚未改 UI、IPC 和持久化；下一步将把 session tool/file parts 映射为 descriptor，再接入右侧面板的 PDF.js、Univer、代码和安全 HTML 预览。

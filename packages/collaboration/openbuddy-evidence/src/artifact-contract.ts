@@ -5,6 +5,40 @@ export const ARTIFACT_DESCRIPTOR_SCHEMA = {
   required: ["artifactId", "taskId", "sessionId", "kind", "name", "mediaType", "sizeBytes", "sha256", "source", "revision", "capabilities", "security"],
 } as const
 
+export class ArtifactRegistry {
+  private readonly descriptors = new Map<string, ArtifactDescriptor>()
+  private readonly eventLog = new ArtifactEventLog()
+
+  constructor(initial: ArtifactDescriptor[] = []) {
+    for (const item of initial) this.descriptors.set(item.artifactId, { ...item, capabilities: [...item.capabilities], security: { ...item.security } })
+  }
+
+  upsert(input: ArtifactDescriptor): ArtifactDescriptor {
+    const previous = this.descriptors.get(input.artifactId)
+    const revision = previous ? previous.revision + 1 : Math.max(1, input.revision)
+    const item = { ...input, revision, capabilities: [...input.capabilities], updatedAt: input.updatedAt ?? input.createdAt, security: { ...input.security } }
+    this.descriptors.set(item.artifactId, item)
+    this.eventLog.append({
+      eventId: `${item.artifactId}:${revision}`,
+      type: previous ? "artifact.versioned" : "artifact.created",
+      artifactId: item.artifactId,
+      taskId: item.taskId,
+      occurredAt: item.updatedAt ?? new Date(0).toISOString(),
+      payload: { revision: item.revision, sha256: item.sha256 },
+    })
+    return item
+  }
+
+  list(filter: { taskId?: string; sessionId?: string } = {}): ArtifactDescriptor[] {
+    return [...this.descriptors.values()].filter((item) =>
+      (filter.taskId === undefined || item.taskId === filter.taskId) &&
+      (filter.sessionId === undefined || item.sessionId === filter.sessionId),
+    )
+  }
+
+  events(): ArtifactEvent[] { return this.eventLog.list() }
+}
+
 export type ArtifactKind = "document" | "spreadsheet" | "slides" | "pdf" | "image" | "code" | "html" | "data" | "evidence"
 export type ArtifactSource = "user-upload" | "assistant-generated" | "tool-output" | "evidence"
 export type ArtifactCapability = "preview" | "edit-session" | "download" | "export" | "cite"
