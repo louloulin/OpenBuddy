@@ -69,11 +69,16 @@ profile 通过 `scripts/electron/perf-100-real-llm.mjs`（plan4.3 实现）单�
 
 **Plan 4.3** 需要做的：把 100-turn spec 在 nightly 自动跑，校准 perf baseline。详见 §3.3。
 
-### 2.3 `email-unsubscribe-dialog.spec.ts` 仍 pre-existing 失败
+### 2.3 `email-unsubscribe-dialog.spec.ts` pre-existing 状态（本轮重新校验后已解决）
 
-上一轮 plan4.1 清理时标记为 pre-existing 测试合约问题：测试期望 IPC handler 拒 `dialog:ask/confirm/message`，但 preload bridge 先一步用 `"invalid IPC channel"` 拦截。2/3 测试 fail。
+plan4.1 清理时标记的 pre-existing 测试合约问题，期望 IPC handler 拒 `dialog:ask/confirm/message`。
 
-**Plan 4.3** 需要做的：要么修测试合约，要么改 preload allow-list 把 `dialog:*` 加进去。详见 §3.4。
+**当前状态（本轮重新校验）**：
+- 3 个 IPC 测试文件中 6 项 dialog 测试**全部通过**（`final-coverage-realserver`、`expanded-ipc-coverage-realserver`、`shellfs-and-fs-ipc-dispatch-realserver`）。
+- `final-coverage-realserver.test.ts:375` 新增 `email:unsubscribe 缺 confirmed → 抛 'confirmation_required'` 合约测试通过 — pin 住 IPC 层不再用 `dialog.showMessageBox`，统一由 renderer 的 `ConfirmDialog` 走 `confirmed: true`。
+- `chat-ui-minimax-email-dialog.spec.ts` 重命名为 `chat-ui-minimax-confirmation.spec.ts` 的设计在 plan4.3 §3.4 已落地为现有 IPC 合约测试，不必再单独建一个 Playwright spec。
+
+详见 §3.4（验收已达成）。
 
 ### 2.4 截图脚本 `capture-ai-chat-screenshots.mjs` 仍 6 张
 
@@ -93,13 +98,20 @@ plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 
 - `src/hooks/useAgentSession.ts` 在 replay 流程中检测 gap：若发生 ring buffer 淘汰，先调用 `agentSessionMessages` + `sessionEntriesToChatMessages` 经 `useSessionStore.loadHistoryMessages` 重建 transcript，再继续合并后续 live / replay event；telemetry 输出 `pi.replay.gap` 与 `pi.replay.gap.history-failed`。
 - 端到端 verification：`electron/main/agent/pi-event-bridge.test.ts`（cursor 报告 3 项）+ `src/lib/agent/pi-event-replay.test.ts`（detectReplayGap 4 项）；连同 PDF 与订阅 regression 共 32/32 通过。
 
+### 2.7 Email unsubscribe confirmation 合约（本轮新增）
+
+plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `electron/main/__tests__/final-coverage-realserver.test.ts` 已用 §2.3 的「合约测试」pin 死：
+
+- 调用 `email:unsubscribe({ accountId, messageId })`（无 `confirmed`）→ 必须抛 `code: "confirmation_required"`，**禁止**任何回退到 `dialog.showMessageBox` 的路径。
+- 该合约覆盖 plan4.1 之前提到的「native dialog 拦截」风险：`requireConfirmation` 在 IPC 层抛结构化错误，renderer 走 `ConfirmDialog` 拿 `confirmed: true`，无任何 `dialog:ask` / `dialog:confirm` IPC handler 注册（`electron/main/ipc/index.ts:790-796` 显式清理）。
+- 同时 §2.3 中提到的 dialog:ask/confirm tests 在 3 个 IPC 测试文件 (`final-coverage-realserver` / `expanded-ipc-coverage-realserver` / `shellfs-and-fs-ipc-dispatch-realserver`) 6/6 通过，验证 IPC 已经被清理到「`no handler registered`」状态。
 
 ### 3.0 [P1] replay gap 检测与 session history fallback
 
 - **为什么 P1**：当前 sequence replay 能覆盖短断线，但 bounded ring buffer 淘汰旧记录后如果静默继续，用户可能看到不完整 assistant transcript。
 - **范围**：在 `agent:event-log-replay` 响应中暴露 earliest available sequence / generation；renderer 检测 cursor gap 后调用 `agent:session-messages`，以 Pi session history 重建当前会话，再恢复 live subscription。
 - **验收**：模拟超过 ring buffer 容量的断线，UI 不显示静默截断；能记录 gap telemetry，并完成一次 transcript fallback；不重复 usage、notification 或 queue side effects。
-- **当前进度**：cursor 报告、gap 检测、session history fallback、telemetry、regression 测试均已落地；下一阶段把 fallback 接入真实 agent-died 路径并补 nightly 校验。
+- **当前进度（本轮收尾）**：cursor 报告、gap 检测、session history fallback、telemetry、regression 测试均已落地（commit `03247ba`），`detectReplayGap` 4 项 + `describeCursor` 3 项定向测试通过；plan4.4 把 fallback 接入真实 `agent-died` 路径并补 nightly 校验。
 
 
 - **为什么 P1**：PDF 是用户最常见的文档附件类型；本轮已完成 PDF 主路径，后续仅补齐 docx 与大文档端到端覆盖。
@@ -157,6 +169,11 @@ plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 
 
 **验收**：
 - `chat-ui-minimax-email-dialog.spec.ts`（重命名以表明它现在归 AI chat 套件）3/3 pass
+
+**当前进度（本轮完成）**：
+- plan4.1 时提到的 6 项 dialog 测试在 3 个 IPC 测试文件 (`final-coverage-realserver` / `expanded-ipc-coverage-realserver` / `shellfs-and-fs-ipc-dispatch-realserver`) 全部通过 — `no handler registered` 是 IPC 层清理后的正确状态，`preload` 早一步的 `"invalid IPC channel"` 是 renderer 端第二层防线。
+- `final-coverage-realserver.test.ts:375` 新增 `email:unsubscribe 缺 confirmed → 抛 'confirmation_required'` 合约测试，pin 住 IPC 层不再回退到 `dialog.showMessageBox`。
+- 验收达成：本轮不需要新建 `chat-ui-minimax-email-dialog.spec.ts`；当前 3 个 IPC 测试文件已足够覆盖 plan4.1 提出的 `email-unsubscribe-dialog` 失败场景。
 
 ### 3.5 [P2] 截图补全 plan4.2 多模态覆盖
 
