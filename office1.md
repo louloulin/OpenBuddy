@@ -515,7 +515,7 @@ Composer(paste/drop Office file)
 
 ### 11.2 本轮验证结果
 
-- 文档预览、PDF canvas/iframe 降级、Univer bridge、消息 transcript、new-session content 保真、Pi trace 与 IPC validation：**6 个测试文件，75/75 通过**。
+- 文档预览、PDF canvas/iframe 降级、Univer bridge、消息 transcript、new-session content 保真、Pi trace 与 IPC validation：**6 个测试文件，76/76 通过**。
 - 新增 IPC 回归覆盖 DOCX/XLSX/PPTX 三种 Office MIME，确保后续不会再次出现“Composer 能选、IPC 不能发”的断点。
 - 根项目 TypeScript 检查仍有仓库既有 `cross-spawn` 类型声明和 `ImportMeta.env` 环境配置错误；本轮新增的 PDF.js `PDFDocumentProxy.destroy` 类型错误已修复。Electron 真实 LLM e2e 需要有效凭证与可用上游，不能用本地单测冒充通过。
 
