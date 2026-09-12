@@ -1,4 +1,6 @@
  import { stableDigest, type BuddyArtifact, type BuddyEvidence, type BuddyEvidenceBundle, type BuddyVerification } from "@openbuddy/collaboration-protocol"
+
+export * from "./artifact-contract"
  
  export interface VerificationInput {
  	taskId: string

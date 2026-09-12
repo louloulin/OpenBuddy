@@ -527,4 +527,17 @@ Composer(paste/drop Office file)
 4. **编辑结果回流**：在确认授权方案后设计 `onSave`/attachment-store/新 message 的闭环；未完成前不显示“已保存原文件”这类误导状态。
 5. **性能与资源治理**：长 transcript 默认对历史附件使用 `univerEditing={false}`；只对用户主动打开的文档挂载编辑器，卸载时必须 dispose，避免 100 轮会话创建大量 Univer render engine。
 
-本文件后续每次更新都必须同时记录：实际支持格式、授权边界、测试证据和未完成项，避免计划描述超过真实实现能力。
+### 11.4 Artifacts 阶段 C（2026-09-12）
+
+按 C → A → B 顺序先落地协议层。复用 `@openbuddy/collaboration-evidence`，新增
+`src/artifact-contract.ts`，保持纯 TypeScript、无新依赖、与现有 PDF/Office transcript
+链路解耦：
+
+- `ArtifactDescriptor`：统一 artifactId/taskId/sessionId、kind、媒体元数据、sha256、来源、revision、能力和 trust/redaction/sensitive 安全字段。
+- `ARTIFACT_DESCRIPTOR_SCHEMA`：固定 `$id=openbuddy.artifact-descriptor.v1`；校验禁止把 `data`、`content`、`prompt`、`apiKey` 等大对象或敏感字段内嵌进描述符。
+- `redactArtifactMetadata()`：递归脱敏 token、authorization、password、secret、prompt 等字段，保留安全计数和 provider 元数据。
+- `ArtifactEventLog`：支持 `created/updated/versioned/opened/failed` 事件，按序列递增并按 eventId 幂等重放。
+
+本阶段暂不改变 UI、IPC 或附件数据格式；A 阶段将把既有 `FilePreview`/Univer 作为 renderer，B 阶段再接入持久化 revision 和 onSave 回流。Office 原格式高保真保存仍受 Univer Pro/Server 授权边界约束。
+
+C 阶段验证：新增 artifact contract 测试 4/4 通过，覆盖 descriptor 校验、禁止内嵌内容、递归脱敏、事件单调序列和幂等；`git diff --check` 通过。
