@@ -3,6 +3,24 @@ export interface ReplayDispatch {
   dispatch: () => void;
 }
 
+export interface ReplayCursor {
+  earliestSequence: number;
+  latestSequence: number;
+  generation: number;
+  available: number;
+}
+
+export interface ReplayGapInfo {
+  /** The cursor the renderer held before asking for replay. */
+  requestedFromSequence: number;
+  /** First sequence still available in the bridge ring buffer. */
+  earliestSequence: number;
+  /** `requestedFromSequence > earliestSequence` means eviction happened. */
+  gap: boolean;
+  /** How many sequence numbers are missing from the renderer's view. */
+  missing: number;
+}
+
 export interface PiEventReplayCoordinator {
   readonly cursor: () => number;
   begin(): void;
@@ -19,6 +37,25 @@ export function eventSequence(payload: unknown): number | undefined {
   if (typeof payload !== "object" || payload === null) return undefined;
   const sequence = (payload as { sequence?: unknown }).sequence;
   return isFiniteSequence(sequence) ? sequence : undefined;
+}
+
+export function detectReplayGap(
+  fromSequence: number,
+  cursor: ReplayCursor | undefined,
+): ReplayGapInfo {
+  const earliest = cursor?.earliestSequence ?? 0;
+  const hasCursor = cursor !== undefined;
+  // When the renderer has not seen any events yet, `fromSequence === 0` is
+  // not a gap — only positive cursors that precede the bridge's earliest
+  // available sequence signal eviction.
+  const gap = hasCursor && fromSequence > 0 && fromSequence > earliest;
+  const missing = gap ? Math.max(0, fromSequence - earliest) : 0;
+  return {
+    requestedFromSequence: fromSequence,
+    earliestSequence: earliest,
+    gap,
+    missing,
+  };
 }
 
 /**

@@ -932,6 +932,12 @@ export interface AgentEventLogReplayResult {
   fromSequence: number;
   count: number;
   entries: OpenBuddySessionEventRecord[];
+  cursor?: {
+    earliestSequence: number;
+    latestSequence: number;
+    generation: number;
+    available: number;
+  };
 }
 
 export async function agentEventLogReplay(

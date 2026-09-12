@@ -114,4 +114,35 @@ describe("PiSessionEventBridge plugin/extension event indexing (phase 4)", () =>
     const after = bridge.snapshot({ sinceSequence: 2, limit: 2 });
     expect(after.map((e) => e.sequence)).toEqual([4, 5]);
   });
+
+  it("describeCursor reports earliest/latest sequence and current generation", () => {
+    const bridge = new PiSessionEventBridge({ maxEntries: 4 });
+    for (let i = 0; i < 6; i++) bridge.appendFromSession({ type: "agent/start", sessionId: "s1" });
+    const cursor = bridge.describeCursor({ sessionId: "s1" });
+    expect(cursor.earliestSequence).toBe(3);
+    expect(cursor.latestSequence).toBe(6);
+    expect(cursor.available).toBe(4);
+    expect(cursor.generation).toBe(0);
+  });
+
+  it("describeCursor returns zero values when the bridge is empty", () => {
+    const bridge = new PiSessionEventBridge();
+    expect(bridge.describeCursor({ sessionId: "missing" })).toEqual({
+      earliestSequence: 0,
+      latestSequence: 0,
+      generation: 0,
+      available: 0,
+    });
+  });
+
+  it("describeCursor scopes earliest/latest to the requested session", () => {
+    const bridge = new PiSessionEventBridge();
+    bridge.appendFromSession({ type: "agent/start", sessionId: "s1" });
+    bridge.appendFromSession({ type: "agent/start", sessionId: "s2" });
+    bridge.appendFromSession({ type: "agent/start", sessionId: "s1" });
+    const s1 = bridge.describeCursor({ sessionId: "s1" });
+    expect(s1.earliestSequence).toBe(1);
+    expect(s1.latestSequence).toBe(3);
+    expect(s1.available).toBe(2);
+  });
 });

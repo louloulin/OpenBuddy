@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPiEventReplayCoordinator, eventSequence } from "./pi-event-replay";
+import { createPiEventReplayCoordinator, detectReplayGap, eventSequence } from "./pi-event-replay";
 
 describe("pi event replay coordinator", () => {
   it("merges replay and live events in sequence order and de-duplicates", () => {
@@ -43,5 +43,42 @@ describe("pi event replay coordinator", () => {
     expect(eventSequence({ sequence: 6 })).toBe(6);
     expect(eventSequence({ sequence: 1.5 })).toBeUndefined();
     expect(eventSequence({})).toBeUndefined();
+  });
+
+  it("detectReplayGap reports a gap when the ring buffer evicted older entries", () => {
+    const gap = detectReplayGap(150, { earliestSequence: 100, latestSequence: 199, generation: 3, available: 100 });
+    expect(gap).toEqual({
+      requestedFromSequence: 150,
+      earliestSequence: 100,
+      gap: true,
+      missing: 50,
+    });
+  });
+
+  it("detectReplayGap returns gap=false when the cursor covers every requested event", () => {
+    expect(detectReplayGap(150, { earliestSequence: 150, latestSequence: 175, generation: 3, available: 26 })).toEqual({
+      requestedFromSequence: 150,
+      earliestSequence: 150,
+      gap: false,
+      missing: 0,
+    });
+  });
+
+  it("detectReplayGap treats a fresh start (cursor=0) as no gap", () => {
+    expect(detectReplayGap(0, { earliestSequence: 0, latestSequence: 0, generation: 1, available: 0 })).toEqual({
+      requestedFromSequence: 0,
+      earliestSequence: 0,
+      gap: false,
+      missing: 0,
+    });
+  });
+
+  it("detectReplayGap falls back gracefully when the cursor is missing", () => {
+    expect(detectReplayGap(120, undefined)).toEqual({
+      requestedFromSequence: 120,
+      earliestSequence: 0,
+      gap: false,
+      missing: 0,
+    });
   });
 });

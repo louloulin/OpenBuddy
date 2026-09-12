@@ -85,12 +85,21 @@ plan4.2 没新加截图——所有新功能用 Playwright spec 验证。但是 
 
 主聊天已经能在短暂断线后恢复 renderer wire events，但 replay 查询仍受 2000 条 bounded ring buffer 限制；如果断线窗口超过保留范围，UI 只能恢复断线后的部分事件。下一步应增加 cursor gap 检测（最早可用 sequence / generation），一旦发现缺口就调用 `agent:session-messages` 重建当前 session transcript，而不是静默显示截断结果。
 
+### 2.6 Replay gap detection 与 session history fallback（本轮新增）
+
+- `electron/main/agent/pi-event-bridge.ts` 新增 `describeCursor()`，返回 `earliestSequence` / `latestSequence` / `generation` / `available`；`host-modules/plugin-state.ts` 暴露 `pluginEventLogCursor` 并由 `agent-host` 透出。
+- `electron/main/ipc/plugin.ts` 的 `agent:event-log-replay` 响应增加 `cursor` 字段，renderer 拿到后可对比本地 cursor 决定是否触发 fallback。
+- `src/lib/agent/pi-event-replay.ts` 新增 `detectReplayGap(fromSequence, cursor)`：纯函数，给出 `gap` 与 `missing` 计数；`src/lib/agent/pi-client.ts` 把 cursor 类型扩展到 `AgentEventLogReplayResult.cursor`。
+- `src/hooks/useAgentSession.ts` 在 replay 流程中检测 gap：若发生 ring buffer 淘汰，先调用 `agentSessionMessages` + `sessionEntriesToChatMessages` 经 `useSessionStore.loadHistoryMessages` 重建 transcript，再继续合并后续 live / replay event；telemetry 输出 `pi.replay.gap` 与 `pi.replay.gap.history-failed`。
+- 端到端 verification：`electron/main/agent/pi-event-bridge.test.ts`（cursor 报告 3 项）+ `src/lib/agent/pi-event-replay.test.ts`（detectReplayGap 4 项）；连同 PDF 与订阅 regression 共 32/32 通过。
+
 
 ### 3.0 [P1] replay gap 检测与 session history fallback
 
 - **为什么 P1**：当前 sequence replay 能覆盖短断线，但 bounded ring buffer 淘汰旧记录后如果静默继续，用户可能看到不完整 assistant transcript。
 - **范围**：在 `agent:event-log-replay` 响应中暴露 earliest available sequence / generation；renderer 检测 cursor gap 后调用 `agent:session-messages`，以 Pi session history 重建当前会话，再恢复 live subscription。
 - **验收**：模拟超过 ring buffer 容量的断线，UI 不显示静默截断；能记录 gap telemetry，并完成一次 transcript fallback；不重复 usage、notification 或 queue side effects。
+- **当前进度**：cursor 报告、gap 检测、session history fallback、telemetry、regression 测试均已落地；下一阶段把 fallback 接入真实 agent-died 路径并补 nightly 校验。
 
 
 - **为什么 P1**：PDF 是用户最常见的文档附件类型；本轮已完成 PDF 主路径，后续仅补齐 docx 与大文档端到端覆盖。

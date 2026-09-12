@@ -57,13 +57,15 @@ import {
   subscribePiEvents,
   dispatchPiEvent,
   agentEventLogReplay,
+  agentSessionMessages,
+  sessionEntriesToChatMessages,
   piSend,
   piCancel,
   piListWorkspaceRegistry,
   notificationAppend,
 } from "@/lib/agent/pi-client";
 import { isElectronBridgeUnavailable } from "@/lib/platform/electron-api";
-import { createPiEventReplayCoordinator } from "@/lib/agent/pi-event-replay";
+import { createPiEventReplayCoordinator, detectReplayGap } from "@/lib/agent/pi-event-replay";
 import { useSessionStore } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { usePermissionStore } from "@/stores/permission-store";
@@ -585,6 +587,33 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
     const fromSequence = piReplayRef.current.cursor();
     try {
       const result = await agentEventLogReplay(sessionId, fromSequence, 2000);
+      const gap = detectReplayGap(fromSequence, result.cursor);
+      if (gap.gap) {
+        // Ring buffer eviction: replay cannot reconstruct the missing wire
+        // events. Rehydrate the persisted transcript via Pi's session
+        // history, then continue with whatever live/replay coverage remains.
+        appLogger.warn("pi.replay.gap", {
+          msg: "pi.replay.gap",
+          sessionId,
+          fromSequence,
+          earliestSequence: gap.earliestSequence,
+          missing: gap.missing,
+        });
+        try {
+          const entries = await agentSessionMessages(sessionId);
+          const { messages: history } = sessionEntriesToChatMessages(entries);
+          useSessionStore.getState().loadHistoryMessages(
+            sessionId,
+            history as unknown as import("@/stores/session-store").ChatMessage[],
+          );
+        } catch (historyError) {
+          appLogger.warn("pi.replay.gap.history-failed", {
+            msg: "pi.replay.gap.history-failed",
+            sessionId,
+            err: String(historyError),
+          });
+        }
+      }
       const replayed = result.entries
         .filter((entry) => entry.type.startsWith("renderer/"))
         .map((entry) => ({
