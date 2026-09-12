@@ -106,6 +106,12 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 - 该合约覆盖 plan4.1 之前提到的「native dialog 拦截」风险：`requireConfirmation` 在 IPC 层抛结构化错误，renderer 走 `ConfirmDialog` 拿 `confirmed: true`，无任何 `dialog:ask` / `dialog:confirm` IPC handler 注册（`electron/main/ipc/index.ts:790-796` 显式清理）。
 - 同时 §2.3 中提到的 dialog:ask/confirm tests 在 3 个 IPC 测试文件 (`final-coverage-realserver` / `expanded-ipc-coverage-realserver` / `shellfs-and-fs-ipc-dispatch-realserver`) 6/6 通过，验证 IPC 已经被清理到「`no handler registered`」状态。
 
+### 2.8 docx 文本提取与 100-turn nightly 校准（本轮新增）
+
+- **docx 文本提取**：`electron/main/agent/host-modules/docx-text-extractor.ts` 新增 `extractDocxTextByParagraph()`，纯 Node `zlib.inflateRawSync` 解析 zip Local File Header → `word/document.xml` → `<w:p>` 内 `<w:t>` 段落。`electron/main/agent/host-modules/agent-prompt.ts` 集成：在 `promptContent` 路径识别 `application/vnd.openxmlformats-officedocument.wordprocessingml.document`，对每个段落生成一个 `<document paragraph="N">…</document>` 子块；解析失败回退 `<document-binary>` 与 PDF 一致。`@openbuddy/files-kb::extractDocxText` 在 renderer 端早已具备，host 端补齐与 PDF reader 对称。
+- **100-turn nightly 校准**：`scripts/electron/perf-100-turns-nightly.mjs` 落地，跑 100 次真实 MiniMax turn（默认 100；可 `--turns=N` 覆盖），记录 P50 / P95 / max / min turn latency、errors 计数，输出 `docs/perf/<date>-openbuddy-100-turns.json`，结构稳定（`schema: openbuddy.100-turns-perf.v1`）。已挂 `pnpm perf:100-turns` script。
+- **定向验证**：`electron/main/agent/host-modules/docx-text-extractor.test.ts`（4 项：段落提取 / XML 实体 / 缺 entry 抛错 / 非 zip 抛错）+ `electron/main/agent/host-modules/agent-prompt-docx.test.ts`（2 项：docx 内联 / 失败回退 binary），加 PDF reader 共 10/10 通过；既有 32 项 replay / PDF / 订阅测试本轮无回归。
+
 ### 3.0 [P1] replay gap 检测与 session history fallback
 
 - **为什么 P1**：当前 sequence replay 能覆盖短断线，但 bounded ring buffer 淘汰旧记录后如果静默继续，用户可能看到不完整 assistant transcript。
@@ -124,6 +130,11 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 **验收**：
 - 新 spec `chat-ui-minimax-pdf.spec.ts`，4 项（短 PDF / 多页 PDF / 大 PDF 分页 / docx）
 - 现有 `chat-ui-minimax-documents.spec.ts` 中的 pdf 测试改为验证"提取到的文本块"而不是 opaque 字节块
+
+**当前进度（本轮完成）**：
+- PDF 文本提取（plan4.2 主路径）已落地：`pdf-text-extractor.ts` + agent-prompt 集成（commit `89ffcd8`），定向 reader + prompt-routing 4/4 通过。
+- docx 文本提取（本轮）已落地：`docx-text-extractor.ts` 用 `zlib.inflateRawSync` 解 zip Local File Header 并抽取 `<w:p>`/`<w:t>`，agent-prompt 同样生成 `<document paragraph="N">` 子块（commit `03247ba` 之后的下一轮）。docx + PDF + replay + 订阅共 42/42 定向测试通过。
+- 剩余：把 PDF / docx 路径纳入 nightly `chat-ui-minimax-pdf-citation.spec.ts` 端到端引用验证（待与 §3.2 上游 `type:"file"` 真 wire 一并处理）。
 
 ### 3.2 [P1] Pi upstream `type:"file"` 真打就绪
 
@@ -157,6 +168,9 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 **验收**：
 - 跑通 100 次真实 turn，输出报告
 - 报告决定 plan4.3+ 是否需要主动 compaction 策略
+
+**当前进度（本轮完成）**：
+- `scripts/electron/perf-100-turns-nightly.mjs` 落地，输出 `docs/perf/<date>-openbuddy-100-turns.json`（schema `openbuddy.100-turns-perf.v1`），记录 P50/P95/max/min turn latency + errors。已挂 `pnpm perf:100-turns` 入口；token 用量与上下文窗口曲线待与 §3.6 截断策略合并实现（renderer usage telemetry 已经具备，待 nightly 落地统计函数）。
 
 ### 3.4 [P2] 修复 email-unsubscribe-dialog pre-existing failure
 

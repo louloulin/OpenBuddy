@@ -45,6 +45,7 @@
     "test:electron:real-evals": "node scripts/electron/launch-real-evals-echo.mjs",
     "perf:streaming": "node scripts/perf/streaming-bench.mjs",
     "perf:ipc": "node scripts/perf/ipc-latency.mjs",
+    "perf:100-turns": "node scripts/electron/perf-100-turns-nightly.mjs",
     "perf": "node scripts/perf/streaming-bench.mjs && node scripts/perf/ipc-latency.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "provider:e3:fixture": "node scripts/provider-e3-fixture-preflight.mjs",

@@ -43,6 +43,7 @@ import { writePromptHistory } from "../pi-resources";
 import { type AgentHostState } from "./_state-shape";
 import { createDefaultAgentHostState } from "./_default-state";
 import { extractPdfTextByPage } from "./pdf-text-extractor";
+import { extractDocxTextByParagraph } from "./docx-text-extractor";
 
 let state: AgentHostState = createDefaultAgentHostState();
 
@@ -180,6 +181,7 @@ async function promptContent(
   // discriminator on the wire. Decode supported documents in the host,
   // then send the extracted text through the normal Pi text part.
   const TEXT_DOC_MIME = /^(text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml))$/i;
+  const DOCX_MIME = /^application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document$/i;
   const docBlocks: string[] = [];
   for (const part of content) {
     if (part.type !== "file") continue;
@@ -195,6 +197,27 @@ async function promptContent(
       } catch {
         docBlocks.push(
           `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(PDF text extraction failed; attachment kept in composer)\n</document-binary>`,
+        );
+      }
+    } else if (DOCX_MIME.test(part.mediaType)) {
+      try {
+        const paragraphs = await extractDocxTextByParagraph(
+          new Uint8Array(Buffer.from(part.data, "base64")),
+        );
+        if (paragraphs.length === 0) {
+          docBlocks.push(
+            `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(docx has no extractable paragraphs; attachment kept in composer)\n</document-binary>`,
+          );
+        } else {
+          paragraphs.forEach((paragraph) => {
+            docBlocks.push(
+              `\n\n<document name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)} paragraph=${paragraph.index + 1}>\n${paragraph.text}\n</document>`,
+            );
+          });
+        }
+      } catch {
+        docBlocks.push(
+          `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(docx text extraction failed; attachment kept in composer)\n</document-binary>`,
         );
       }
     } else if (TEXT_DOC_MIME.test(part.mediaType)) {
