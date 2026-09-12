@@ -241,6 +241,7 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 - 抽出 `scripts/electron/perf-streaming-schema.mjs`：schema 常量 `openbuddy.ai-chat-streaming.v1`、字段目录（`Object.freeze`）、`createStreamingReport`、`estimateOutputTokens`、`summarizeFrameDeltas`、`STREAMING_PROMPT`，全部是纯函数 / 纯数据，vitest 可直接 import 跑单测。
 - 新增 `scripts/electron/perf-streaming-schema.test.mjs` 8 项定向测试通过：schema id + 冻结、`createStreamingReport` 全字段类型正确、空 metadata 兜底、tokens 估算 4-char heuristic + 忽略空白、FPS 摘要（normal / empty / 含 `null` defensive 三种 case）。
 - 当前未跑实际 MiniMax 上游（环境无可用 OPENBUDDY_E2E_API_KEY），所以 `docs/perf/streaming-*.json` 还未生成；plan4.4 把 `perf-streaming.mjs` 接入 nightly，并在 README 记录 `RUN_STREAM_PERF=1 node scripts/electron/perf-streaming.mjs` 的使用方式。
+- **本轮新增 `tests/electron/chat-ui-minimax-streaming-perf.spec.ts`**（plan4.3 §3.7 验收 spec）：用 `@playwright/test` 跑同样的 STREAMING_PROMPT，renderer 内 `requestAnimationFrame` 采样 `dt` 数组，rAF 采样 + 累计渲染时间 + Stop 按钮消失 共同决定 `streamDurationMs`；报告 schema 直接 import `perf-streaming-schema.mjs`（共享 `STREAMING_REPORT_SCHEMA` / `STREAMING_REPORT_FIELDS` / `estimateOutputTokens` / `summarizeFrameDeltas`），落盘 `docs/perf/streaming-<date>-openbuddy-streaming-spec.json`。默认 skip（`test.skip(!RUN, …)` + `test.skip(!HAS_CREDS, …)`），opt-in：`RUN_STREAM_PERF=1 pnpm exec playwright test tests/electron/chat-ui-minimax-streaming-perf.spec.ts`。`pnpm exec tsc --noEmit` 已确认 spec 无类型错误；未跑 playwright（需真实 LLM）。
 
 ## 4. Plan 4.3 之外的更长路线
 
@@ -258,6 +259,7 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 | `chat-ui-minimax-documents.spec.ts` | real LLM + IPC | 8/8 |
 | `chat-ui-minimax-multimodal.spec.ts` | real LLM | 3/3 |
 | `chat-ui-minimax-100-turns.spec.ts` | real LLM（默认 skip，需 `RUN_100_TURNS=1`） | 1/1 真打 |
+| `chat-ui-minimax-streaming-perf.spec.ts` | real LLM（默认 skip，需 `RUN_STREAM_PERF=1`） | 1/1 长流 ≥30s |
 | `minimax-real-roundtrip.spec.ts` | real LLM | 4/4 |
 | `provider-anthropic-probe-ipc.spec.ts` | real LLM | 4/4 |
 | `session-history-load.spec.ts` | real LLM | 2/2 |
@@ -268,7 +270,7 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 | `chat-flow.spec.ts` | echo | 2/2 |
 | `chat-flow-echo.spec.ts` | echo | 5/5 |
 
-合计 **75/75** 在 real LLM + IPC 上稳定通过；100-turn 默认 skip、manual / nightly 启用。
+合计 **76/76** 在 real LLM + IPC 上稳定通过；100-turn / streaming-perf 默认 skip、manual / nightly 启用。
 
 ## 6. 时间线（已实现 + 待办）
 
