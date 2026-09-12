@@ -149,6 +149,23 @@ describe("FilePreview", () => {
     expect(document.querySelector("iframe")).toBeNull();
   });
 
+  it("pdf 首屏只渲染 3 页,点击加载更多后继续渲染剩余页面", async () => {
+    const doc = fakePdfDoc(4);
+    loadPdfJsMock.mockResolvedValue({
+      getDocument: () => ({ promise: Promise.resolve(doc) }),
+    } as never);
+    render(<FilePreview filename="doc.pdf" content="data:application/pdf;base64,eA==" />);
+
+    await waitFor(() =>
+      expect(document.querySelectorAll("canvas.file-preview__pdf-page")).toHaveLength(3),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "加载更多页面" }));
+    await waitFor(() =>
+      expect(document.querySelectorAll("canvas.file-preview__pdf-page")).toHaveLength(4),
+    );
+    expect(screen.queryByRole("button", { name: "加载更多页面" })).toBeNull();
+  });
+
   it("pdf 在 pdfjs 不可用时降级为 <iframe>(浏览器原生预览)", async () => {
     render(<FilePreview filename="doc.pdf" content="data:application/pdf;base64,xxx" />);
     const iframe = (await screen.findByTitle("doc.pdf")) as HTMLIFrameElement;

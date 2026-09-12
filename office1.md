@@ -522,7 +522,7 @@ Composer(paste/drop Office file)
 ### 11.3 后续最佳实现计划（按依赖顺序）
 
 1. **真实 Electron 文档验收**：用固定 fixture 通过 Composer 发送 PDF/DOCX/XLSX/PPTX，断言 transcript 内分别出现 PDF canvas/iframe、Univer host 或 OOXML 只读 fallback；补充 reload 后历史 projection 断言。
-2. **PDF 阅读器增强**：保留 PDF.js 本地 worker 和 iframe 永不白屏降级；下一步增加页码导航、按需渲染剩余页面、文本层/复制能力，再测 1 MB 以上文件首屏时间。
+2. **PDF 阅读器增强**：已完成首屏最多 3 页 + “加载更多页面”按需渲染；继续保留 PDF.js 本地 worker 和 iframe 永不白屏降级。下一阶段再增加页码导航、文本层/复制能力，并测量 1 MB 以上文件首屏时间。
 3. **Office 编辑边界**：Univer 开源 preset 继续支持 xlsx/docx 的会话内编辑；pptx 继续明确只读。若要求原始格式高保真保存，必须单独评估 Univer Pro exchange + Server + license，不能把开源 snapshot 当作完整 Office 往返编辑。
 4. **编辑结果回流**：在确认授权方案后设计 `onSave`/attachment-store/新 message 的闭环；未完成前不显示“已保存原文件”这类误导状态。
 5. **性能与资源治理**：长 transcript 默认对历史附件使用 `univerEditing={false}`；只对用户主动打开的文档挂载编辑器，卸载时必须 dispose，避免 100 轮会话创建大量 Univer render engine。
@@ -548,4 +548,10 @@ C 阶段验证：新增 artifact contract 测试 4/4 通过，覆盖 descriptor 
 
 验证：artifact contract、registry、evidence 原有测试共 3 个文件、15/15 通过；`git diff --check` 通过。
 
-本轮 A 阶段边界：已完成 registry 查询/版本投影基础，尚未改 UI、IPC 和持久化；下一步将把 session tool/file parts 映射为 descriptor，再接入右侧面板的 PDF.js、Univer、代码和安全 HTML 预览。
+
+### 11.6 本轮交付（2026-09-12，feature/doc0911）
+
+- PDF.js 预览保留本地 worker、损坏/运行时失败时 iframe 降级，并新增多页按需渲染：首屏最多 3 页，多页文件通过“加载更多页面”继续渲染，避免打开长 PDF 时一次性创建全部 canvas。
+- 新增 `FilePreview.test.tsx` 回归用例，验证 4 页 PDF 首屏 3 页、点击后补齐第 4 页，且全部页面仍由同一个 PDF 文档实例提供。
+- `@openbuddy/collaboration-evidence` 已合入 Artifacts C/A 阶段：descriptor 安全校验与递归脱敏、事件幂等日志、registry 版本投影；这些协议层能力不携带 PDF/Office 二进制正文，也不改变现有附件协议。
+- 当前 Artifacts 尚未接入右侧 UI、IPC 持久化和编辑结果回流；当前可交付边界是协议/registry 基础 + chat transcript 的 PDF.js/Univer/只读预览。PPTX 仍只读，Office 原格式高保真保存仍需单独评估 Univer Pro/Server 授权。

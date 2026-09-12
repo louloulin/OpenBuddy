@@ -960,7 +960,20 @@
   font-size: 13px;
   color: var(--wb-text-secondary, rgba(0, 0, 0, 0.55));
 }
-/* Univer 可编辑视图(office1 阶段 1):xlsx / docx */
+.file-preview__pdf-more {
+  margin: 4px auto 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--wb-border, rgba(0, 0, 0, 0.14));
+  border-radius: 6px;
+  background: var(--wb-bg-primary, #fff);
+  color: var(--wb-text-primary, inherit);
+  cursor: pointer;
+}
+.file-preview__pdf-more:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .file-preview--univer {
   display: flex;
   flex-direction: column;
