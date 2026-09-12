@@ -227,6 +227,13 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 - 报告 docs/perf/streaming-<date>.json
 - 数字不破现有 baseline
 
+**当前进度（本轮完成）**：
+- 新增 `scripts/electron/perf-streaming.mjs`：跑 `RUN_STREAM_PERF=1` 时启动 production Electron，配置 MiniMax 后发送一个固定中文 prompt（80 条 Python 最佳实践，要求 ≥30s 长流且禁用工具），renderer 侧通过 `requestAnimationFrame` 采样记录 `dt` 数组，主进程侧用 `summarizeFrameDeltas` 计算 FPS / 丢帧 / dropRate，按 4 字符约 1 token 的 heuristic 估算 `outputTokensEst` / `tokensPerSecond`，最后落盘 `docs/perf/streaming-<date>-openbuddy-streaming.json`。
+- 默认无 `RUN_STREAM_PERF` 时直接打印 `RUN_STREAM_PERF not set; skipping` 并 `exit 0`，避免 CI 不小心烧 token。
+- 抽出 `scripts/electron/perf-streaming-schema.mjs`：schema 常量 `openbuddy.ai-chat-streaming.v1`、字段目录（`Object.freeze`）、`createStreamingReport`、`estimateOutputTokens`、`summarizeFrameDeltas`、`STREAMING_PROMPT`，全部是纯函数 / 纯数据，vitest 可直接 import 跑单测。
+- 新增 `scripts/electron/perf-streaming-schema.test.mjs` 8 项定向测试通过：schema id + 冻结、`createStreamingReport` 全字段类型正确、空 metadata 兜底、tokens 估算 4-char heuristic + 忽略空白、FPS 摘要（normal / empty / 含 `null` defensive 三种 case）。
+- 当前未跑实际 MiniMax 上游（环境无可用 OPENBUDDY_E2E_API_KEY），所以 `docs/perf/streaming-*.json` 还未生成；plan4.4 把 `perf-streaming.mjs` 接入 nightly，并在 README 记录 `RUN_STREAM_PERF=1 node scripts/electron/perf-streaming.mjs` 的使用方式。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
