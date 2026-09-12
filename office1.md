@@ -41,8 +41,8 @@
 | Agent-host 内联 `<document>` 块到 user prompt | ✅ 已有 | `electron/main/agent/host-modules/agent-prompt.ts` |
 | 真打 100 轮 LLM 验收 | ✅ 已有 | `tests/electron/chat-ui-minimax-100-turns.spec.ts`（默认 skip） |
 | **PDF/DOCX/XLSX/PPT 视觉预览** | ✅ 已有(v1) | `FilePreview.tsx` 已支持 PDF iframe + docx/pptx/xlsx ZIP/XML 提取预览(2026-09-11 修复) |
-| **在线编辑 Office 文档** | ❌ 缺 | 没有 spreadsheet / document / slide 编辑层(阶段 4,接 Univer) |
-| **Univer 集成** | ❌ 缺 | 仓库无 `@univerjs/*` 依赖 |
+| **在线编辑 Office 文档** | ✅ 已有(xlsx/docx) | Univer 开源 preset 挂载可编辑视图;pptx 只读、完整往返编辑受 Pro 限制(§10) |
+| **Univer 集成** | ✅ 已有 | `@univerjs/presets` + `preset-sheets-core` + `preset-docs-core` 均锁 0.25.1 |
 | **`FilePreview` 升级为 Office 文档可视化** | ✅ 已有(v1) | `FilePreview.tsx` 支持 pdf(iframe)/image/markdown/code/text/audio/video/docx/pptx/sheet;无解析器时降级占位 |
 | **plan4.2 提到的"PDF 阅读器"**（plan4.3 §3.1 P1） | ✅ v1 已落地 | PDF iframe 预览;PDF.js 升级版留 §9 |
 
@@ -375,10 +375,16 @@ OpenBuddy 是 Electron 应用，**两条路都该走**：
      doc.destroy() 卸载清理；任何失败降级回 v1 iframe，永不白屏
    - jsdom 单测 mock loader 驱动 canvas 成功路径与 iframe 降级路径
 
-阶段 1: 1.5 周 — FilePreview 加 Univer 分支（xlsx/docx/pptx）
-阶段 2: 1 周 — Composer → renderer 链路
+阶段 1: ✅ 已完成 — FilePreview 接入 Univer 0.25.1（2026-09-11）
+   - xlsx → Univer 可编辑表格，docx → Univer 可编辑文档
+   - 绕开 Pro exchange：files-kb 解析 OOXML → 开源 createWorkbook /
+     createUniverDoc（授权边界与取舍见 §10）
+   - pptx 保持只读（无开源 slides preset，是 Pro 能力）
+   - 懒加载拆 chunk，主包零增量；univerEditing={false} 可强制只读
+
+阶段 2: 1 周 — Composer → renderer 链路（编辑结果回流会话）
 阶段 3: 3 天 — 截图 + perf
-阶段 4: 1.5 周 — 编辑器模式
+阶段 4: 1.5 周 — 完整往返编辑（阻塞：需 Univer Pro 许可决策，见 §10.3）
 ```
 
 **阶段 1 Univer 依赖修订（2026-09-11 调研）**：原计划写 `^0.6.0` 已过时。
@@ -395,16 +401,89 @@ OpenBuddy 是 Electron 应用，**两条路都该走**：
   `univerAPI.dispose()`（内存泄漏防护）
 - 必须 `import '@univerjs/preset-sheets-core/lib/index.css'`
 - 需要 `Intl.Segmenter`（Node 24 / 现代 WebView2 自带）
-- xlsx → `UniverSheetsCorePreset`，docx → `preset-docs-core`，pptx →
-  slides preset；按 format dynamic import 拆 chunk
-
-**阶段 0A 立即可做**（不需要用户再确认）：
-- 1 个 PR
-- 1 个新 spec
-- 1 张新截图（PDF iframe 预览）
-- 2 天完成
+- xlsx → `UniverSheetsCorePreset`，docx → `preset-docs-core`；
+  **pptx 无开源 slides preset**（见 §10）；按 format dynamic import 拆 chunk
 
 ### 9.6 引用来源
 
 - [Web Search: best PDF rendering library JavaScript React 2025] — 体积 + 性能对比
 - [Web Search: ChatGPT Claude.ai Cursor PDF document preview implementation] — 顶级 AI 工具 PDF 实现对比
+
+## 10. Univer 授权边界（2026-09-11 阶段 1 实施发现）
+
+### 10.1 关键发现：原生 Office 导入导出是 Pro 商业能力
+
+阶段 1 动手实施时核实了 Univer 的实际能力边界，**推翻了本计划
+前面几节的一个隐含假设**（"装上 Univer 就能直接打开 .xlsx"）：
+
+| 能力 | 包 | 授权 | 是否需服务端 |
+|---|---|---|---|
+| spreadsheet 编辑内核 + UI | `@univerjs/preset-sheets-core` | ✅ Apache-2.0 | ❌ 不需要 |
+| document 编辑内核 + UI | `@univerjs/preset-docs-core` | ✅ Apache-2.0 | ❌ 不需要 |
+| **xlsx / docx 二进制导入导出** | `@univerjs-pro/*-exchange-client` | ❌ **商业 Pro** | ✅ **需 Univer Server** |
+| **pptx 导入导出** | `@univerjs-pro/slides-exchange-client` | ❌ **商业 Pro** | ✅ **需 Univer Server** |
+| **slides（演示文稿）整体** | `@univerjs/slides` + Pro 插件 | ❌ **Pro，且无 preset** | 部分需要 |
+
+官方原话：
+- "The import and export functionality requires support from the Univer
+  server."（Sheets Import & Export 文档）
+- "There is currently no Slides preset, so create the application in
+  plugin mode."（Slides Installation 文档）
+- "Univer Slides is the presentation product in **Univer SDK Pro**."
+
+对 OpenBuddy 的含义：**不能**走 Pro 路线。OpenBuddy 是 BYOK 桌面应用，
+没有后端服务，也不该替用户做商业授权与部署决策。
+
+### 10.2 采用的方案：files-kb 解析 + Univer 开源内核
+
+绕开 Pro exchange，用仓库已有的 OOXML 解析器喂 Univer 开源 API：
+
+```
+xlsx ──extractSheetFromZip()──▶ SheetExtract{sheets:[{name,rows}]}
+        ──sheetSourceToWorkbookData()──▶ createWorkbook()  ← 开源 API
+docx ──extractDocxFromZip()───▶ text
+        ──docTextToDocumentData()────▶ createUniverDoc()   ← 开源 API
+pptx ──extractPptxFromZip()───▶ text（只读，无开源 slides preset）
+```
+
+实现文件：
+- `packages/ui/openbuddy-ui-workbench/src/univer-bridge.ts` — 纯函数
+  转换层（OOXML 提取结果 → Univer 快照结构），9 个单测
+- `.../univer-loader.ts` — 按 format 懒加载 preset + locale + CSS
+- `.../UniverEditor.tsx` — effect 内挂载 / 卸载 dispose / 失败降级
+- `FilePreview.tsx` — sheet/docx 分支优先 Univer，失败回落只读预览
+
+### 10.3 已知取舍（必须如实告知用户）
+
+| 项 | 现状 | 原因 |
+|---|---|---|
+| 单元格**值**还原 | ✅ | files-kb 解析 sharedStrings + worksheet XML |
+| 多 sheet、sheet 名、顺序 | ✅ | 桥接层保留 |
+| docx 段落文本 | ✅ | dataStream + paragraphs |
+| 单元格**样式**（字体/颜色/边框） | ❌ 丢失 | 需 Pro exchange 才能完整还原 |
+| **公式** | ❌ 丢为值 | 同上 |
+| 图表 / 图片 / 数据透视 | ❌ 丢失 | 同上 |
+| **编辑结果回写 .xlsx 文件** | ❌ 未实现 | 导出需 Pro exchange；可编辑但不能存回原格式 |
+| pptx 编辑 | ❌ 只读 | 无开源 slides preset |
+
+所以当前交付的是**"可视化 + 可交互编辑（会话内）"**，不是
+**"完整保真的 Office 往返编辑"**。后者必须购买 Univer Pro 许可并
+部署 Univer Server —— 这是需要用户拍板的商业决策，不由本实施代做。
+
+### 10.4 体积与性能
+
+- Univer preset 约 5-6 MB gzip，**全部落在按 format 拆分的懒加载
+  chunk**，主包零增量；只有用户真的打开 xlsx/docx 才付这个代价
+- `univerEditing={false}` 可强制只读，用于长 transcript 里的历史
+  附件（避免 100 轮会话挂 100 个渲染引擎）
+- 卸载必须 `univer.dispose()`，每个实例携带渲染引擎，泄漏一个即
+  数十 MB
+
+### 10.5 引用来源
+
+- [Univer Sheets Import & Export](https://docs.univer.ai/guides/sheets/features/import-export)
+- [Univer Slides Installation（无 preset）](https://docs.univer.ai/guides/slides/getting-started/installation)
+- [Univer Slides（Pro 产品定位）](https://docs.univer.ai/guides/slides)
+- [Univer Pro Server 部署与 License](https://docs.univer.ai/guides/pro/server)
+- [Univer React 集成官方指南](https://docs.univer.ai/guides/sheets/getting-started/integrations/react)
+- [@univerjs-pro/sheets-exchange-client](https://www.npmjs.com/package/@univerjs-pro/sheets-exchange-client)

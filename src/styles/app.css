@@ -960,6 +960,36 @@
   font-size: 13px;
   color: var(--wb-text-secondary, rgba(0, 0, 0, 0.55));
 }
+/* Univer 可编辑视图(office1 阶段 1):xlsx / docx */
+.file-preview--univer {
+  display: flex;
+  flex-direction: column;
+}
+.file-preview__univer-host {
+  width: 100%;
+  height: 60vh;
+  min-height: 320px;
+  position: relative;
+  background: var(--wb-bg-primary, #fff);
+  overflow: hidden;
+}
+.file-preview__univer-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--wb-text-secondary, rgba(0, 0, 0, 0.55));
+}
+.file-preview__univer-badge {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  background: var(--wb-accent-soft, rgba(0, 120, 212, 0.12));
+  color: var(--wb-accent, #0078d4);
+}
 /* 文档预览(docx/pptx/sheet) */
 .file-preview__doc-body {
   max-height: 60vh;

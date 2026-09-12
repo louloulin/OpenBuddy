@@ -22,6 +22,8 @@ import {
 } from "@openbuddy/files-kb";
 import { readZipFromBase64, makeDocZipReader } from "@openbuddy/files-kb";
 import { PdfJsPreview } from "./PdfJsPreview";
+import { UniverEditor } from "./UniverEditor";
+import { docTextToDocumentData, sheetSourceToWorkbookData } from "./univer-bridge";
 
 /**
  * 默认文档解压器:把 content(data: URL 或 base64)用内置 zip-reader 解压,
@@ -50,9 +52,15 @@ interface FilePreviewProps {
    * 未提供时 docx/pptx/sheet 降级为占位。
    */
   docExtractor?: (filename: string) => ZipReader | null;
+  /**
+   * office1 阶段 1 —— xlsx/docx 是否挂载 Univer 可编辑视图(默认挂载)。
+   * 传 `false` 强制只读文本/表格预览,用于不需要编辑器开销的场景
+   * (例如 100 轮长 transcript 里的历史附件)。
+   */
+  univerEditing?: boolean;
 }
 
-export function FilePreview({ filename, content, onCopyText, docExtractor }: FilePreviewProps) {
+export function FilePreview({ filename, content, onCopyText, docExtractor, univerEditing }: FilePreviewProps) {
   const kind = detectPreviewKind(filename);
 
   if (kind === "image") {
@@ -137,15 +145,46 @@ export function FilePreview({ filename, content, onCopyText, docExtractor }: Fil
       : zip && kind === "pptx" ? extractPptxFromZip(zip)
       : zip && kind === "sheet" ? extractSheetFromZip(zip)
       : null;
-    return (
+    const sheets =
+      kind === "sheet" && extracted
+        ? (extracted as { sheets: Array<{ name: string; rows: string[][] }> }).sheets
+        : undefined;
+    // 只读降级视图:Univer 拉取失败 / 解析不出内容时永远有东西可看。
+    const readOnly = (
       <DocPreview
         filename={filename}
         kind={kind}
         text={extracted?.text ?? null}
-        sheets={kind === "sheet" && extracted ? (extracted as { sheets: Array<{ name: string; rows: string[][] }> }).sheets : undefined}
+        sheets={sheets}
         onCopyText={onCopyText}
       />
     );
+    // office1 阶段 1 —— xlsx/docx 走 Univer 开源 preset 拿到可编辑视图。
+    // pptx 没有开源 slides preset(是 Pro 能力,见 office1.md §10),
+    // 继续用只读文本提取。
+    if (univerEditing !== false && extracted) {
+      if (kind === "sheet" && sheets && sheets.length > 0) {
+        return (
+          <UniverEditor
+            filename={filename}
+            kind="sheet"
+            data={sheetSourceToWorkbookData(filename, { sheets })}
+            fallback={readOnly}
+          />
+        );
+      }
+      if (kind === "docx" && extracted.text) {
+        return (
+          <UniverEditor
+            filename={filename}
+            kind="docx"
+            data={docTextToDocumentData(filename, extracted.text)}
+            fallback={readOnly}
+          />
+        );
+      }
+    }
+    return readOnly;
   }
 
   // PDF:优先 PDF.js canvas 渲染(对齐 ChatGPT / Claude.ai,office1 §9);
