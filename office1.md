@@ -487,3 +487,44 @@ pptx ──extractPptxFromZip()───▶ text（只读，无开源 slides pre
 - [Univer Pro Server 部署与 License](https://docs.univer.ai/guides/pro/server)
 - [Univer React 集成官方指南](https://docs.univer.ai/guides/sheets/getting-started/integrations/react)
 - [@univerjs-pro/sheets-exchange-client](https://www.npmjs.com/package/@univerjs-pro/sheets-exchange-client)
+
+## 11. 本轮修订（2026-09-12，feature/doc0911）
+
+### 11.1 已修复的真实展示断点
+
+本轮复现发现，前端 `Composer` 虽然已经识别 `.docx/.xlsx/.pptx`，但 Electron IPC 边界仍只允许 docx MIME，导致 xlsx/pptx 在发送阶段被拒绝，附件无法进入真实 transcript。这不是 `FilePreview` 的 CSS 问题，而是发送链路的协议不一致。
+
+已统一以下边界：
+
+- `normalizePromptContent()` 接受 `type: "file"`，保留 `mediaType/data/name`。
+- `promptFilePart()` 接受 PDF、DOCX、XLSX、PPTX 及既有文本格式，继续执行 8 MB 解码后大小限制。
+- PDF.js v6 使用 `PDFDocumentLoadingTask.destroy()` 清理 worker；测试 fake 没有该方法时兼容回退到 `PDFDocumentProxy.destroy()`。
+- `assets.d.ts` 声明 Vite `*.mjs?url` 本地 worker 资源，避免 workbench 子包类型检查漏报。
+
+真实链路现在固定为：
+
+```
+Composer(paste/drop Office file)
+  → App.handleSendContent
+  → agent:prompt-content IPC validation
+  → pushOptimisticUserContent
+  → ChatView / MessageItem
+  → FilePreview
+  → PDF.js canvas 或 Univer editor / read-only OOXML fallback
+```
+
+### 11.2 本轮验证结果
+
+- 文档预览、PDF canvas/iframe 降级、Univer bridge、消息 transcript、new-session content 保真、Pi trace 与 IPC validation：**6 个测试文件，75/75 通过**。
+- 新增 IPC 回归覆盖 DOCX/XLSX/PPTX 三种 Office MIME，确保后续不会再次出现“Composer 能选、IPC 不能发”的断点。
+- 根项目 TypeScript 检查仍有仓库既有 `cross-spawn` 类型声明和 `ImportMeta.env` 环境配置错误；本轮新增的 PDF.js `PDFDocumentProxy.destroy` 类型错误已修复。Electron 真实 LLM e2e 需要有效凭证与可用上游，不能用本地单测冒充通过。
+
+### 11.3 后续最佳实现计划（按依赖顺序）
+
+1. **真实 Electron 文档验收**：用固定 fixture 通过 Composer 发送 PDF/DOCX/XLSX/PPTX，断言 transcript 内分别出现 PDF canvas/iframe、Univer host 或 OOXML 只读 fallback；补充 reload 后历史 projection 断言。
+2. **PDF 阅读器增强**：保留 PDF.js 本地 worker 和 iframe 永不白屏降级；下一步增加页码导航、按需渲染剩余页面、文本层/复制能力，再测 1 MB 以上文件首屏时间。
+3. **Office 编辑边界**：Univer 开源 preset 继续支持 xlsx/docx 的会话内编辑；pptx 继续明确只读。若要求原始格式高保真保存，必须单独评估 Univer Pro exchange + Server + license，不能把开源 snapshot 当作完整 Office 往返编辑。
+4. **编辑结果回流**：在确认授权方案后设计 `onSave`/attachment-store/新 message 的闭环；未完成前不显示“已保存原文件”这类误导状态。
+5. **性能与资源治理**：长 transcript 默认对历史附件使用 `univerEditing={false}`；只对用户主动打开的文档挂载编辑器，卸载时必须 dispose，避免 100 轮会话创建大量 Univer render engine。
+
+本文件后续每次更新都必须同时记录：实际支持格式、授权边界、测试证据和未完成项，避免计划描述超过真实实现能力。

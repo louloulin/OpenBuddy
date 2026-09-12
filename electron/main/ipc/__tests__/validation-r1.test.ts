@@ -11,6 +11,7 @@
 import { describe, expect, it } from "vitest";
 import {
   promptContent,
+  normalizePromptContent,
   optionalPromptContent,
   thinkingLevel,
   optionalThinkingLevel,
@@ -31,6 +32,27 @@ describe("promptContent", () => {
     expect(out).toEqual([
       { type: "text", text: "what is in this image?" },
       { type: "image", mediaType: "image/png", data: "AAAA", name: "shot.png" },
+    ]);
+  });
+
+  it("accepts editable Office file parts used by the document preview", () => {
+    const out = promptContent([
+      { type: "file", mediaType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", data: "ZG9jeA==", name: "brief.docx" },
+      { type: "file", mediaType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data: "eGxzeA==", name: "data.xlsx" },
+      { type: "file", mediaType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", data: "cHB0eA==", name: "deck.pptx" },
+    ]);
+    expect(out).toEqual([
+      { type: "file", mediaType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", data: "ZG9jeA==", name: "brief.docx" },
+      { type: "file", mediaType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data: "eGxzeA==", name: "data.xlsx" },
+      { type: "file", mediaType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", data: "cHB0eA==", name: "deck.pptx" },
+    ]);
+  });
+
+  it("accepts Office file parts in the generic content normalizer", () => {
+    expect(normalizePromptContent([
+      { type: "file", mediaType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data: "eA==", name: "data.xlsx" },
+    ])).toEqual([
+      { type: "file", mediaType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data: "eA==", name: "data.xlsx" },
     ]);
   });
 

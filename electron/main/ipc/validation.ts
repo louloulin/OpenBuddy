@@ -71,16 +71,22 @@ export function numberValue(value: unknown, label: string): number {
 	return value;
 }
 
-export function normalizePromptContent(value: unknown): Array<{ type: "text"; text: string } | { type: "image"; mediaType: string; data: string; name?: string }> {
+export function normalizePromptContent(value: unknown): Array<
+	| { type: "text"; text: string }
+	| { type: "image"; mediaType: string; data: string; name?: string }
+	| { type: "file"; mediaType: string; data: string; name?: string }
+> {
 	if (!Array.isArray(value) || value.length === 0) throw new Error("action.content must be a non-empty array");
 	return value.map((part, index) => {
 		const entry = recordValue(part, `action.content[${index}]`);
-		const type = enumValue(entry.type, `action.content[${index}].type`, ["text", "image"] as const);
+		const type = enumValue(entry.type, `action.content[${index}].type`, ["text", "image", "file"] as const);
 		if (type === "text") return { type, text: requiredString(entry.text, `action.content[${index}].text`) };
+		const mediaType = requiredString(entry.mediaType, `action.content[${index}].mediaType`);
+		const data = requiredString(entry.data, `action.content[${index}].data`);
 		return {
 			type,
-			mediaType: requiredString(entry.mediaType, `action.content[${index}].mediaType`),
-			data: requiredString(entry.data, `action.content[${index}].data`),
+			mediaType,
+			data,
 			...(entry.name === undefined ? {} : { name: requiredString(entry.name, `action.content[${index}].name`) }),
 		};
 	});
@@ -373,12 +379,12 @@ export function permissionRules(value: unknown): Array<{ action: "allow" | "deny
 
 export const OPENBUDDY_MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 
-/** 8 MB cap on document attachments (PDF, docx, txt, md, json, xml). */
+/** 8 MB cap on document attachments (PDF, docx/xlsx/pptx, txt, md, json, xml). */
 export const OPENBUDDY_MAX_FILE_BYTES = 8 * 1024 * 1024;
 
 /** MIME types accepted as document attachments. Image attachments follow
  *  their own allow-list (see `promptImagePart`). */
-const SUPPORTED_FILE_MIME = /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document)$/i;
+const SUPPORTED_FILE_MIME = /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation))$/i;
 
 export function promptImagePart(
 	input: RecordValue,
@@ -402,9 +408,9 @@ export function promptImagePart(
 	};
 }
 
-/** Document attachment (PDF, plain text, markdown, json, xml, docx).
+/** Document attachment (PDF, plain text, markdown, json, xml, docx/xlsx/pptx).
  *  Same wire shape as image but with type:"file" so the agent side can
- *  route to a reader (PDF text extraction, docx unzip, etc.). */
+ *  route to a reader (PDF text extraction, OOXML unzip, etc.). */
 export function promptFilePart(
 	input: RecordValue,
 	label: string,
@@ -412,7 +418,7 @@ export function promptFilePart(
 	const mediaType = requiredString(input.mediaType, `${label}.mediaType`);
 	if (!SUPPORTED_FILE_MIME.test(mediaType)) {
 		throw new Error(
-			`${label}.mediaType must be application/pdf, text/{plain,markdown,csv,html,xml}, application/{json,xml,yaml}, or docx`,
+			`${label}.mediaType must be application/pdf, text/{plain,markdown,csv,html,xml}, application/{json,xml,yaml}, or docx/xlsx/pptx`,
 		);
 	}
 	const data = requiredString(input.data, `${label}.data`);

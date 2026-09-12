@@ -47,9 +47,13 @@ export function PdfJsPreview({
     (async () => {
       try {
         const pdfjs = await loadPdfJs();
-        const doc = await pdfjs.getDocument({ data: base64ToBytes(content) })
-          .promise;
-        destroy = () => void doc.destroy();
+        const loadingTask = pdfjs.getDocument({ data: base64ToBytes(content) });
+        const destroyTask = (loadingTask as unknown as { destroy?: () => Promise<void> | void }).destroy;
+        const doc = await loadingTask.promise;
+        destroy = () =>
+          void (typeof destroyTask === "function"
+            ? destroyTask.call(loadingTask)
+            : (doc as unknown as { destroy: () => Promise<void> | void }).destroy());
         if (cancelled) {
           destroy();
           return;
@@ -61,7 +65,10 @@ export function PdfJsPreview({
         const initial = Math.min(doc.numPages, MAX_INITIAL_PAGES);
         for (let n = 1; n <= initial; n++) {
           const page = await doc.getPage(n);
-          if (cancelled) return;
+          if (cancelled) {
+            destroy?.();
+            return;
+          }
           const base = page.getViewport({ scale: 1 });
           const scale = Math.min(
             1.6,
