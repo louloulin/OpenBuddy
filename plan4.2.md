@@ -557,6 +557,17 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 
 **验收**：全仓 `pnpm exec tsc --noEmit -p .` 通过。plugin-host 全套测试仍有 **35 个既有失败**，均来自 `profile.ts:407` 对测试临时 profile 缺失 `extensions` 目录抛出 ENOENT，未触及本轮改动；其余 260 个测试通过、1 个 skip。
 
+### 3.23 [plan4.3] plugin profile resource probing fail-soft（本轮新增）
+
+**问题**：profile 初始化与插件安装测试中，缺失的 `extensions` / `skills` / `prompts` / `themes` 目录被 `stat(..., { throwIfNoEntry: false })` 直接抛出 ENOENT，导致资源发现尚未返回空结果就中断 profile 组合；此前 plugin-host 全套测试因此出现 35 个级联失败。
+
+**修复**：
+- `packages/runtime/openbuddy-plugin-host/src/profile.ts` 增加 `directoryExists()`，统一捕获 ENOENT 并返回 `false`；
+- `packages/runtime/openbuddy-plugin-host/src/profile-manager.ts` 增加 `existingDirectory()` / `existingPath()`，覆盖 Pi convention 目录扫描、包目录枚举、安装替换和卸载判断；
+- 非 ENOENT 错误仍原样抛出，避免掩盖权限或 I/O 故障。
+
+**验收**：`profile-manager-extensions.test.ts` 9/9 通过；`profile.test.ts` 从 30 个全失败收敛到 21/30 通过，剩余 2 个是 Windows 短路径/URL fixture 兼容问题与 7 个 package-manager fixture 行为问题，需单独处理；全仓 `pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）

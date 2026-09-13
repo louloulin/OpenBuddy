@@ -382,6 +382,14 @@ async function packageResourcePaths(root: string): Promise<PiPackageResourcePath
   }
   const declared = manifest?.pi;
   const result = {} as Record<keyof PiPackageResourcePaths, string[]>;
+  const directoryExists = async (path: string): Promise<boolean> => {
+    try {
+      return (await stat(path)).isDirectory();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
+  };
   for (const resource of PI_RESOURCE_DIRECTORIES) {
     const entries = declared?.[resource];
     if (declared && typeof declared === "object" && entries !== undefined) {
@@ -397,14 +405,14 @@ async function packageResourcePaths(root: string): Promise<PiPackageResourcePath
           const relativePath = relative(root, path);
           return relativePath.startsWith("..") || relativePath.startsWith("/") || relativePath.startsWith("\\");
         });
-        result[resource] = allDeclaredPathsOutsideRoot && (await stat(conventional, { throwIfNoEntry: false }))?.isDirectory()
+        result[resource] = allDeclaredPathsOutsideRoot && (await directoryExists(conventional))
           ? [resource === "extensions" ? root : conventional]
           : declaredPaths;
       }
       continue;
     }
     const conventional = join(root, resource);
-    result[resource] = (await stat(conventional, { throwIfNoEntry: false }))?.isDirectory()
+    result[resource] = (await directoryExists(conventional))
       ? [resource === "extensions" ? root : conventional]
       : [];
   }
