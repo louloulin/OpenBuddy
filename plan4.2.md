@@ -547,6 +547,16 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 
 **验收**：新增“游标早于 ring buffer”与“下一条仍可用”的回归测试；replay coordinator、Pi event bridge、needs-review gate 共 **29/29** 通过，`git diff --check` 通过。
 
+### 3.22 [plan4.3] plugin-host typecheck unblock（本轮新增）
+
+**问题**：`packages/runtime/openbuddy-plugin-host/src/profile-manager.ts` 使用运行时依赖 `cross-spawn`，但包没有声明对应 TypeScript 类型；同时把 `maxBuffer`（Node `SpawnOptions` 不支持的字段）传入 `crossSpawn`，导致全局 `pnpm exec tsc --noEmit -p .` 失败。
+
+**修复**：
+- 在 `packages/runtime/openbuddy-plugin-host/package.json` 添加精确版本 devDependency `@types/cross-spawn@6.0.2`；
+- 移除不属于 `SpawnOptions` 的 `maxBuffer` 传参。进程输出上限仍由现有 stdout/stderr 手工计数逻辑执行，运行时行为不变。
+
+**验收**：全仓 `pnpm exec tsc --noEmit -p .` 通过。plugin-host 全套测试仍有 **35 个既有失败**，均来自 `profile.ts:407` 对测试临时 profile 缺失 `extensions` 目录抛出 ENOENT，未触及本轮改动；其余 260 个测试通过、1 个 skip。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）

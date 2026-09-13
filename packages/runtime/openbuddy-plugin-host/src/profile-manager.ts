@@ -88,7 +88,6 @@ function spawnAsync(
   return new Promise((resolve, reject) => {
     const child = crossSpawn(command, args as string[], {
       cwd: options.cwd,
-      maxBuffer: options.maxBuffer,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
