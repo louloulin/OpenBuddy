@@ -300,8 +300,41 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
     3. `plan-mode:set-enabled` + `plan-mode:get` round-trip 不抛错
     4. `plan-mode:set-plan` + `plan-mode:approve` + `plan-mode:reject` 三个 channel 都已注册
 - **Typecheck**: 0 新增错误（spec 文件 tsc 干净）
-- **回归**: spec 矩阵 **76 → 77**；plan4.4 候选 3/5 → **4/5**（80%）
-- **生产价值**：当未来有人重构 `electron/main/ipc/misc.ts` 把 plan-mode 那 5 行 stub 删除时，本 spec 会立刻 fail 提醒 —— 这是一条 pin 住「不破坏 plan-mode 入口」的契约测试。
+- **回归**: spec 矩阵 **76 → 77**；plan4.4 候选 3/5 → **4/5**（80%）- **生产价值**：当未来有人重构 `electron/main/ipc/misc.ts` 把 plan-mode 那 5 行 stub 删除时，本 spec 会立刻 fail 提醒 —— 这是一条 pin 住「不破坏 plan-mode 入口」的契约测试。
+
+### 3.12 [plan4.4 §E] Pi extension policy + audit trail（本轮新增）
+
+**问题**：`electron/main/agent/pi-extensions.ts::resolvePiExtensions` 已经做了三次决策：findCompatibilityAdapter、recordPassthrough、builtinPiExtensionFactories —— 但决策 rationale 分散在三处，渲染层无法回答「pi-foo 为何被允许 / 拒绝」。每加一条新兼容 npm 包都要手动 grep 多个 if 链。
+
+**方案**：把策略抽到一个纯函数工厂 + 报告聚合器，并把每次 resolve 的决策统一成一个 `pi/extension-policy-report` 事件。
+
+- 新增 `electron/main/agent/host-modules/extension-policy.ts`（纯函数，无 IPC / 无 Electron 依赖）：
+  - `ExtensionPolicyAction = "allow" | "deny" | "needs-review"`
+  - `createExtensionPolicy(options?)` —— total 函数（缺失字段不抛错），返回 `decide(input) -> ExtensionPolicyDecision`
+  - 决策顺序（denylist > needs-review > builtins > allowlist > 默认 deny）—— principle-of-least-privilege：allowlist 错误不能反过来 re-enable 一个 denylist 包
+  - `describeExtensionPolicyReport(decisions)` —— 冻结报告 `{ total, allowed, denied, needsReview, entries }`，渲染层不会因为再 render 而 crash
+- `resolvePiExtensions` 末尾 emit `pi/extension-policy-report`：
+  ```ts
+  options.emit("pi/extension-policy-report", {
+    generatedAt: new Date().toISOString(),
+    total, allowed, denied, needsReview,
+    decisions: report.entries.map(entry => ({
+      id: entry.input.id, packageName: entry.input.packageName,
+      builtIn: entry.input.builtIn, action: entry.decision.action,
+      reason: entry.decision.reason,
+    })),
+  });
+  ```
+- 12 个单元测试覆盖：allow builtins / 默认 deny / allowlist 通过 / denylist 覆盖 allowlist / needs-review (id + package) / 缺失字段不抛 / 防御性 options shape / 报告聚合 / 冻结报告 / 空输入 / 决策保留 entries
+- `pi-extensions.test.ts` 3 处 snapshot assertion 过滤到 `pi/extension-adapted` 事件，使新增的 policy-report 事件不干扰 per-spec 断言
+
+**验收**：
+- `pnpm exec vitest run electron/main/agent/host-modules/extension-policy.test.ts` —— **12/12 ✓**
+- `pnpm exec vitest run electron/main/agent/pi-extensions.test.ts` —— **39/39 ✓**
+- typecheck: 0 新增错误
+- 全 agent suite 回归：pre-existing 9 个 fail 测试文件与本轮无关（之前 commit `7d75ff6` 已存在）—— Round 10 净回归 = 0
+
+**生产价值**：渲染层 / Extension Audit 面板 / ops 工具现在可以订阅 `pi/extension-policy-report` 来回答「为什么允许 / 拒绝 / 需要 review」—— 而不需要重新实现一遍策略决策矩阵。renderer 也能用同一份纯函数渲染报告（不绕回 main）。
 
 ## 4. Plan 4.3 之外的更长路线
 
