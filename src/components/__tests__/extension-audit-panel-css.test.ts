@@ -31,11 +31,12 @@ describe("ExtensionAuditPanel CSS tones (plan4.5 §A)", () => {
     expect(css).toMatch(/\.extension-audit-panel__row\[data-action=["']allow["']\]/);
   });
 
-  it("declares per-tone metric tile colours (allow/deny/needs-review/total)", () => {
+  it("declares per-tone metric tile colours (allow/deny/needs-review/resolves/total)", () => {
     // The summary tiles use `data-tone` for the same reason.
     expect(css).toMatch(/\.extension-audit-panel__metric\[data-tone=["']deny["']\]/);
     expect(css).toMatch(/\.extension-audit-panel__metric\[data-tone=["']needs-review["']\]/);
     expect(css).toMatch(/\.extension-audit-panel__metric\[data-tone=["']allow["']\]/);
+    expect(css).toMatch(/\.extension-audit-panel__metric\[data-tone=["']resolves["']\]/);
     expect(css).toMatch(/\.extension-audit-panel__metric\[data-tone=["']total["']\]/);
   });
 

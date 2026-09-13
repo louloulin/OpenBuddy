@@ -105,6 +105,10 @@ function ExtensionAuditPanelInner({
                 {summary.totalNeedsReview}
               </dd>
             </div>
+            <div className="extension-audit-panel__metric" data-tone="resolves">
+              <dt>Resolves</dt>
+              <dd data-testid="extension-audit-resolves">{summary.reports}</dd>
+            </div>
             <div className="extension-audit-panel__metric" data-tone="total">
               <dt>Decisions</dt>
               <dd data-testid="extension-audit-last-decision-count">

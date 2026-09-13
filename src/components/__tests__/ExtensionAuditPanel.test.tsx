@@ -130,6 +130,28 @@ describe("ExtensionAuditPanel (plan4.5 §A — display-only consumer of useExten
     expect(screen.getByTestId("extension-audit-last-decision-count").textContent).toContain("4");
   });
 
+  it("renders the resolves tile from the cumulative report count", () => {
+    // Two reports → `summary.reports === 2`. The panel must surface
+    // this as a dedicated metric (not just `lastDecisionCount`) so ops
+    // can see how many resolves have happened across the session.
+    setHookState({
+      reports: [sampleReport, sampleReport],
+      summary: {
+        latest: sampleReport.generatedAt,
+        reports: 2,
+        totalAllowed: sampleReport.allowed,
+        totalDenied: sampleReport.denied,
+        totalNeedsReview: sampleReport.needsReview,
+        lastDecisionCount: sampleReport.decisions.length,
+      },
+    });
+    render(<ExtensionAuditPanel />);
+    expect(screen.getByTestId("extension-audit-resolves").textContent).toContain("2");
+    // Sanity: latest-only metrics still reflect the latest report.
+    expect(screen.getByTestId("extension-audit-allowed").textContent).toContain("1");
+    expect(screen.getByTestId("extension-audit-last-decision-count").textContent).toContain("4");
+  });
+
   it("renders one row per decision with an action badge", () => {
     setHookState({
       reports: [sampleReport],

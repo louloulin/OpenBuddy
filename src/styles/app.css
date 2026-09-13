@@ -15463,6 +15463,7 @@ body.dark .permission-picker__popover,
 .extension-audit-panel__metric[data-tone="allow"] dd { color: rgba(0, 168, 132, 0.95); }
 .extension-audit-panel__metric[data-tone="deny"] dd { color: rgba(229, 72, 77, 0.95); }
 .extension-audit-panel__metric[data-tone="needs-review"] dd { color: rgba(217, 130, 0, 0.95); }
+.extension-audit-panel__metric[data-tone="resolves"] dd { color: rgba(82, 132, 255, 0.95); }
 .extension-audit-panel__metric[data-tone="total"] dd { color: var(--wb-text-strong); }
 .extension-audit-panel__rows {
   list-style: none;
