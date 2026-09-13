@@ -5,6 +5,20 @@ export const ARTIFACT_DESCRIPTOR_SCHEMA = {
   required: ["artifactId", "taskId", "sessionId", "kind", "name", "mediaType", "sizeBytes", "sha256", "source", "revision", "capabilities", "security"],
 } as const
 
+export type ArtifactEditEditor = "univer-sheets" | "univer-docs"
+export type ArtifactEditState = "dirty" | "session-saved" | "export-blocked"
+export interface ArtifactEditRevisionInput {
+  artifactId: string
+  baseRevision: number
+  editor: ArtifactEditEditor
+  state: ArtifactEditState
+  snapshotHash: string
+  createdAt: string
+}
+export type ArtifactEditRevisionResult =
+  | { ok: true; revision: number; state: ArtifactEditState }
+  | { ok: false; reason: "artifact-not-found" | "stale-base-revision" | "edit-not-allowed"; currentRevision?: number }
+
 export class ArtifactRegistry {
   private readonly descriptors = new Map<string, ArtifactDescriptor>()
   private readonly eventLog = new ArtifactEventLog()
@@ -27,6 +41,32 @@ export class ArtifactRegistry {
       payload: { revision: item.revision, sha256: item.sha256 },
     })
     return item
+  }
+
+  recordEditRevision(input: ArtifactEditRevisionInput): ArtifactEditRevisionResult {
+    const previous = this.descriptors.get(input.artifactId)
+    if (!previous) return { ok: false, reason: "artifact-not-found" }
+    if (!previous.capabilities.includes("edit-session")) return { ok: false, reason: "edit-not-allowed", currentRevision: previous.revision }
+    if (input.baseRevision !== previous.revision) return { ok: false, reason: "stale-base-revision", currentRevision: previous.revision }
+    if (!/^[0-9a-f]{64}$/i.test(input.snapshotHash)) throw new Error("snapshotHash must be a 64-character hex digest")
+
+    const revision = previous.revision + 1
+    this.descriptors.set(input.artifactId, { ...previous, revision, updatedAt: input.createdAt })
+    this.eventLog.append({
+      eventId: `${input.artifactId}:edit:${revision}`,
+      type: "artifact.versioned",
+      artifactId: input.artifactId,
+      taskId: previous.taskId,
+      occurredAt: input.createdAt,
+      payload: {
+        baseRevision: input.baseRevision,
+        revision,
+        editor: input.editor,
+        state: input.state,
+        snapshotHash: input.snapshotHash,
+      },
+    })
+    return { ok: true, revision, state: input.state }
   }
 
   list(filter: { taskId?: string; sessionId?: string } = {}): ArtifactDescriptor[] {
