@@ -286,7 +286,41 @@ pnpm lint
 3. **Univer Pro**：若需要 `.xlsx/.docx/.pptx` 原格式高保真导出，需要明确商业 license、Univer Server 部署和数据边界；在决策前保持会话内编辑 + export-blocked 诚实状态。
 4. **PPTX 编辑**：当前开源路径无可用 Slides preset，继续只读，不通过伪造编辑按钮满足需求。
 
-## 10. 后续计划
+## 10. 本轮实现记录（2026-09-13）
+
+### 10.1 阶段 A：安全投影
+
+已完成 `ArtifactViewModel` 纯投影层（commit `0fb4c23`）：
+
+- 将 descriptor 转换为 UI 安全模型，保留 `artifactId/taskId/sessionId/revision`。
+- 统一输出 `ready/loading/failed/unavailable` 状态。
+- 按 `preview/download` capability 计算动作权限。
+- sensitive artifact 不提供预览、下载和摘要；非法 descriptor 安全降级。
+- 测试覆盖 PDF、DOCX、XLSX、PPTX 以及敏感/非法输入。
+
+### 10.2 阶段 B：预览路由
+
+已完成预览决策函数（commit `476560e`），并与现有 `FilePreview` renderer 边界对齐：
+
+- PDF → `PdfJsPreview`，失败时保留 iframe fallback。
+- DOCX/XLSX → `UniverEditor`，失败时回退 OOXML 只读视图。
+- PPTX → OOXML 只读视图，明确不提供编辑能力。
+- 不可用、无 preview capability、未知媒体类型均返回明确 unavailable 原因。
+
+当前路由函数作为 renderer 选择的单一契约；后续将把 Artifacts panel 的 descriptor projection 接入同一入口，避免面板重复实现媒体判断。
+
+### 10.3 阶段 C：会话内 revision
+
+已完成 `ArtifactRegistry.recordEditRevision()`（commit `177e3b7`）：
+
+- 仅允许 `univer-sheets` / `univer-docs` 会话内编辑事件。
+- 强制 `baseRevision` 校验，过期版本拒绝写入。
+- 只记录 `snapshotHash/editor/state/revision`，不保存二进制或完整 snapshot。
+- 支持 `dirty/session-saved/export-blocked`，未宣称 Univer Pro 原格式导出。
+
+本轮新增验证：Artifacts contract/registry、投影和路由共 4 个测试文件、21/21 通过；`git diff --check` 通过。FilePreview 全量相关测试仍有既存 React `act(...)` warning，但无失败。
+
+## 11. 后续计划
 
 本阶段完成后，下一版本重点是：
 
