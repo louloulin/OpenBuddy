@@ -41,5 +41,7 @@ export { WorkflowBlackboard, computeWorkflowLevels } from "./WorkflowBlackboard"
 export type { WorkflowBlackboardProps } from "./WorkflowBlackboard";
 
 export { ArtifactTabsBar } from "./ArtifactTabsBar";
+export { projectArtifact } from "./artifact-view-model";
+export type { ArtifactViewModel, ArtifactViewStatus } from "./artifact-view-model";
 export { FileTreeView } from "./FileTreeView";
 export { ViewSelector, defaultViews } from "./ViewSelector";
