@@ -365,6 +365,31 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 
 **生产价值**: 关闭 Round 10 留下的「main emits, renderer 没人接」的 gap。Extension Audit panel 现在可以直接基于 `useExtensionAuditPanel()` 落地「N allowed · M denied · K needs-review」实时面板，不需要重新实现策略决策矩阵。
 
+### 3.14 [plan4.5 §A] useExtensionAuditPanel hook contract spec（本轮新增）
+
+**问题**: Round 11 把 hook 落地了，但没有任何 spec 把 hook 的契约钉死 —— 未来重构 hook 时可能：
+- 漏掉 IPC 订阅 / 取消订阅
+- 把 "latest report wins" 改成 "sum 全部"（语义错误）
+- 在 malformed payload 上抛错（让 panel 崩溃）
+
+**方案**: vitest 单元 spec，mock `agentOnPluginEvent` 抓住 handler 后注入合成事件，跨 IPC → hook → React state 完整跑一次。
+
+- 新增 `src/hooks/useExtensionAuditPanel.test.tsx`（vitest + @testing-library/react）:
+  - 6 个 case：
+    1. mount 时订阅 `agentOnPluginEvent`
+    2. 第一份合法 report 填充 `reports[0]` + summary
+    3. 无关事件类型（`session/input-truncated`）被忽略
+    4. malformed payload（`null` / `{}` / `total=-1`）静默丢弃
+    5. summary 反映 LATEST report（re-resolve 覆盖）
+    6. `clear()` 清空 log + 重置 summary
+
+**验收**:
+- `pnpm exec vitest run src/hooks/useExtensionAuditPanel.test.tsx` —— **6/6 ✓**
+- 全 extension audit pipeline: parser (11) + accumulator (7) + hook (6) = **24/24 ✓**
+- 不依赖 OPENBUDDY_E2E_API_KEY —— 跟 Round 9 的 Playwright plan-mode spec 互补：那个验 IPC handler 注册，这个验 renderer 端 hook 状态
+
+**生产价值**: hook 契约现在端到端被钉住。任何人 refactor `useExtensionAuditPanel`（例如把 latest-wins 改成 sum，把 useEffect 改成 useLayoutEffect 触发 SSR 报错）都会立刻 fail 这个 spec。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
