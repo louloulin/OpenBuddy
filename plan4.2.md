@@ -566,7 +566,7 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 - `packages/runtime/openbuddy-plugin-host/src/profile-manager.ts` 增加 `existingDirectory()` / `existingPath()`，覆盖 Pi convention 目录扫描、包目录枚举、安装替换和卸载判断；
 - 非 ENOENT 错误仍原样抛出，避免掩盖权限或 I/O 故障。
 
-**验收**：`profile-manager-extensions.test.ts` 9/9 通过；`profile.test.ts` 从 30 个全失败收敛到 21/30 通过，剩余 2 个是 Windows 短路径/URL fixture 兼容问题与 7 个 package-manager fixture 行为问题，需单独处理；全仓 `pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过。
+**验收**：`profile-manager-extensions.test.ts` 9/9 通过；`profile.test.ts` 当前 28/30 通过，已从原先 30 个级联失败显著收敛；剩余 2 个是测试 fixture 的 Windows 短路径/URL 兼容问题（路径断言使用 POSIX 分隔符，以及 Vite 无法加载带 8.3 短路径编码的 fixture URL），不再是生产资源发现 ENOENT。全仓 `pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过；剩余 fixture 问题需单独做跨平台测试适配。
 
 ## 4. Plan 4.3 之外的更长路线
 
