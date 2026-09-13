@@ -85,7 +85,7 @@ mkdirSync(OUT_DIR, { recursive: true });
 const userData = mkdtempSync(join(tmpdir(), "openbuddy-shots-"));
 
 const app = await _electron.launch({
-  args: [`--user-data-dir=${userData}`, ROOT],
+  args: [`--user-data-dir=${userData}`, ROOT, "--disable-gpu"],
   executablePath: process.env.OPENBUDDY_ELECTRON_PATH ?? join(ROOT, "node_modules/.bin/electron"),
   cwd: ROOT,
   timeout: 60_000,

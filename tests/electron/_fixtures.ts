@@ -126,7 +126,7 @@ export const test = base.extend<ElectronAppFixture>({
       process.env.OPENBUDDY_ELECTRON_PATH ?? join(ROOT, "node_modules", ".bin", "electron");
 
     const app = await _electron.launch({
-      args: [`--user-data-dir=${userData}`, ROOT],
+      args: [`--user-data-dir=${userData}`, ROOT, "--disable-gpu"],
       executablePath: electronPath,
       cwd: ROOT,
       timeout: 30_000,

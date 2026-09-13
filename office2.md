@@ -331,7 +331,15 @@ pnpm lint
 
 本轮验证：Artifacts contract/registry、ArtifactViewModel、preview route 共 4 个测试文件、21/21 通过；`git diff --check` 通过。
 
-### 10.5 自动测试二期生命周期修复（2026-09-13）
+### 10.6 本轮真实 Electron 验证（2026-09-13）
+
+- 通过 `pnpm exec electron-vite build` 生成完整 `out/main`、`out/preload`、`out/renderer` 构建产物。
+- 通过真实 Electron + Playwright 运行 `chat-ui-minimax-document-preview.spec.ts`：PDF chip 用例通过，非法 `.zip` 拒绝用例通过；PDF 发送后的 transcript 预览仍失败，表现为 agent 开始响应后用户消息只保留文本、未出现 `.file-preview--pdf`。该结果已保留在 Playwright failure artifact，不能报告为 PDF 真实验收通过。
+- 定位到 Electron GPU 进程在当前 Windows runner 启动失败；测试 fixture 和真实截图脚本统一增加 `--disable-gpu`，之后 Electron 可启动。
+- `scripts/electron/screenshot.mjs` 在真实 compiled Electron 应用中成功生成 `desktop-main.png`、`settings-zh.png`。当前 runner 没有 ImageMagick，因此 blank-frame histogram 检查明确输出 skipped；截图仍通过 renderer 文本 readiness 检查。未生成 PDF canvas 截图，避免用错误链路冒充证据。
+- 本轮未提交未经真实验证的 session-store 修复；真实 PDF transcript 失败说明仍需继续追踪 session projection / optimistic bubble 生命周期，不能将此修复标记为最终闭环。
+
+本轮验证汇总：定向 Vitest 5 个测试文件、55/55 通过；Electron 文档预览 2/3 通过、1/3 失败；compiled Electron screenshot 脚本退出码 0（ImageMagick 检查 skipped）。
 
 本轮自动测试发现并修复 PDF.js loading task 的卸载竞态：当 `getDocument()` 已返回但 `loadingTask.promise` 尚未完成时，组件卸载原实现无法调用 task 的 `destroy()`，可能让 PDF worker 和加载任务继续存活。`PdfJsPreview` 现在在该阶段直接销毁 loading task；文档已完成加载时继续销毁 PDF document。
 
