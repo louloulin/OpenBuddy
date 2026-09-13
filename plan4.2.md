@@ -336,6 +336,35 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 
 **生产价值**：渲染层 / Extension Audit 面板 / ops 工具现在可以订阅 `pi/extension-policy-report` 来回答「为什么允许 / 拒绝 / 需要 review」—— 而不需要重新实现一遍策略决策矩阵。renderer 也能用同一份纯函数渲染报告（不绕回 main）。
 
+### 3.13 [plan4.5 §A] Extension Audit Panel（renderer，本轮新增）
+
+**问题**: Round 10 把 `pi/extension-policy-report` 从 main 端 emit 出来了，但 renderer 没有任何订阅者 —— 跟 Round 8 之前的 truncation panel 同样的「emit 但无 listener」状态。
+
+**方案**: 复用 Round 8 的 truncation panel 模式，建立 renderer-side 三件套（parser → accumulator → hook）。
+
+- 新增 `src/lib/agent/extension-audit-event-parser.ts`（纯函数）:
+  - `parseExtensionAuditReport(value)` —— top-level 严格 + per-decision 宽容：单个 malformed decision 不会让整个 panel 消失
+  - `isExtensionAuditReport(value)` —— 严格 type guard（每个 decision 的 action 必须是 `allow|deny|needs-review`）
+  - `summarizeExtensionAuditReports(reports)` —— "latest report wins" 聚合（每次 `resolvePiExtensions` emit 一份，重新 resolve 会覆盖）
+- 新增 `src/lib/agent/extension-audit-accumulator.ts`（纯 subscriber）:
+  - 过滤 `openbuddy://plugin-event` 流里 `pi/extension-policy-report` 类型
+  - `subscribe(listener)` 返回 unlisten；defensive: 吞 listener 异常，buggy panel 不会拖垮 host
+- 新增 `src/hooks/useExtensionAuditPanel.ts`（React hook）:
+  - 每个组件持有自己的 accumulator，SSR-safe（IPC 订阅放在 `useEffect` 里），暴露 `{ reports, summary, clear }`
+- 18 个 vitest case（11 parser + 7 accumulator）覆盖：
+  - payload 合法 / 缺字段 / 字段类型错 / action 字面量错
+  - 单个 decision malformed 不影响其他 decision
+  - `total === allowed + denied + needsReview` 不变量
+  - 多个 report 时 latest wins
+  - 事件类型过滤、listener 异常吞掉、defensive snapshot copy、`clear()` 重置
+
+**验收**:
+- `pnpm exec vitest run src/lib/agent/extension-audit-event-parser.test.ts src/lib/agent/extension-audit-accumulator.test.ts` —— **18/18 ✓**
+- `pnpm exec tsc --noEmit -p .` —— 0 新增错误（新文件均干净）
+- Round 10 baseline: `electron/main/agent/pi-extensions.test.ts` 仍 39/39 ✓（无回归）
+
+**生产价值**: 关闭 Round 10 留下的「main emits, renderer 没人接」的 gap。Extension Audit panel 现在可以直接基于 `useExtensionAuditPanel()` 落地「N allowed · M denied · K needs-review」实时面板，不需要重新实现策略决策矩阵。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
