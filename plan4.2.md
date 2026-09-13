@@ -272,6 +272,22 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 - **验证**：YAML 结构 parse 通过（3 jobs、7/7/6 steps、cron / workflow_dispatch / concurrency 全对）；streaming schema vitest 8/8 仍然 green；本地 dry-run 两个脚本确认 no-creds 路径不 panic。
 - **生产价值**：从「perf 脚本就位但 CI 没接」升级到「每晚 UTC 02:07 自动产 perf 数据 + 90 天 artifact 留痕」。这是从「workbuddy 名义上的 perf」走到「真实可观测 perf」的最后一步。
 
+### 3.10 [plan4.4 §C] Renderer truncation panel：本轮新增
+
+- **范围**：audit round 5 标出的 "session/input-truncated 只 emit 不消费" 缺口。本轮把 truncator → renderer 的 telemetry 闭环打通。
+- **3 个新模块**：
+  - `src/lib/agent/truncation-event-parser.ts`：纯函数 `isTruncationEvent(payload)` / `parseTruncationEvent(payload)` / `summarizeTruncationEvents(events)`，对 `session/input-truncated` payload 做白名单 + 类型守卫 + 整数归一化；malformed payload 返回 `null` 永不抛。
+  - `src/lib/agent/truncation-accumulator.ts`：纯对象 `createTruncationAccumulator()` —— `handle(event)` / `snapshot()` / `summary()` / `clear()` / `subscribe(listener)` 五个 method；过滤 `type !== "session/input-truncated"` 的事件，listener 抛错不影响 stream。
+  - `src/hooks/useTruncationPanel.ts`：React hook，挂载时 `agentOnPluginEvent` 订阅，触发 setState 重新渲染；提供 `events` / `summary` / `clear` 三个返回值；SSR-safe（subscription 在 `useEffect` 里）。
+- **测试**：17/17 vitest 覆盖
+  - `truncation-event-parser.test.ts` 9 项：type guard accept/reject、各种 malformed payload（null/empty/负值/wrong types）、整数归一化、summary 聚合（dropped/totalChars/sessions）、malformed entry 静默忽略
+  - `truncation-accumulator.test.ts` 8 项：非目标类型过滤、valid event 捕获、malformed payload 丢弃、clear 重置、subscribe/unlisten 双向、订阅转发顺序、订阅者抛错隔离
+- **回归**：4 个 truncation 相关 vitest 文件合计 27/27 全绿；typecheck 本轮 0 新增错误
+- **生产价值**：
+  - 用户可在 chat UI 看到"本会话已截断 N 个文档块"实时提示（未来 UI 工作）
+  - telemetry sink 可订阅 future 的 §A compaction 与 §C truncator 事件
+  - 把 audit 标出的 "telemetry only emit no consumer" 缺口从 5 个候选里关掉一个
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
