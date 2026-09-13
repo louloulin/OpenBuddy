@@ -54,6 +54,21 @@ describe("session-store UI state (Phase 6 e2e)", () => {
     ]);
   });
 
+  test("loadHistoryMessages preserves optimistic file parts when Pi history only has text", () => {
+    useSessionStore.getState().setSession("sess-1");
+    useSessionStore.getState().pushOptimisticUserContent([
+      { type: "text", text: "请查看附件" },
+      { type: "file", mediaType: "application/pdf", data: "cGRm", name: "brief.pdf" },
+    ]);
+    useSessionStore.getState().loadHistoryMessages("sess-1", [{
+      id: "pi-user-1", role: "user", complete: true,
+      parts: [{ kind: "text", text: "请查看附件" }],
+    }]);
+    expect(useSessionStore.getState().messages[0].parts).toEqual([
+      { kind: "text", text: "请查看附件" },
+      { kind: "file", mediaType: "application/pdf", data: "cGRm", name: "brief.pdf" },
+    ]);
+  });
   test("popOptimistic clears the optimistic bubble", () => {
     useSessionStore.getState().pushOptimisticUser("hello");
     expect(useSessionStore.getState().optimisticBubble).not.toBeNull();

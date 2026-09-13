@@ -527,14 +527,15 @@ export function ComposerInner({
     // string. Path-only attachments still flow through onSend(text) with the
     // existing "相关文件" prefix so the existing tools/read_file path keeps
     // working.
-    if (imagesRef.current.length > 0 && onSendContent) {
+    const inlineAttachments = images;
+    if (inlineAttachments.length > 0 && onSendContent) {
       const textPart = body || "请查看以下附件";
       const content: Array<
         { type: "text"; text: string }
         | { type: "image"; mediaType: string; data: string; name?: string }
         | { type: "file"; mediaType: string; data: string; name?: string }
       > = [{ type: "text", text: textPart }];
-      for (const att of imagesRef.current) {
+      for (const att of inlineAttachments) {
         if (att.kind === "file") {
           content.push({ type: "file", mediaType: att.mediaType, data: att.data, ...(att.name ? { name: att.name } : {}) });
         } else {

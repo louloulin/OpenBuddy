@@ -453,8 +453,22 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
       // in `streamingMessageId`, but the row it pointed to is gone from
       // `messages[]`. Wiping both views here closes the race.
       const cleaned = cleanupOrphanHistory(messages);
+      const attachmentSources = [
+        ...(s.optimisticBubble ? [s.optimisticBubble] : []),
+        ...s.messages,
+      ];
+      const merged = cleaned.map((message) => {
+        if (message.role !== "user") return message;
+        const messageText = message.parts.filter((part) => part.kind === "text").map((part) => part.text).join("\n");
+        if (!messageText || message.parts.some((part) => part.kind === "file")) return message;
+        const source = attachmentSources.find((candidate) => candidate.role === "user" &&
+          candidate.parts.filter((part) => part.kind === "text").map((part) => part.text).join("\n") === messageText);
+        if (!source) return message;
+        const files = source.parts.filter((part) => part.kind === "file");
+        return files.length > 0 ? { ...message, parts: [...message.parts, ...files] } : message;
+      });
       return {
-        messages: cleaned,
+        messages: merged,
         streamingMessageId: null,
         streamState: INITIAL_STREAMING_STATE,
       };

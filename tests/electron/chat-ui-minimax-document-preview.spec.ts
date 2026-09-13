@@ -1,11 +1,11 @@
 /**
  * chat-ui-minimax-document-preview.spec.ts — office1 stage 0A coverage.
  *
- * Verifies the existing `FilePreview` PDF iframe branch renders correctly
- * inside a real Electron renderer. The PDF mime path was added in
- * plan4.2 (chip rendering only); this spec confirms the **content
- * preview** layer (FilePreview's `<iframe src="data:application/pdf;...
- * base64,...">`) works end-to-end against a real PDF binary.
+ * Verifies the PDF.js canvas preview branch renders correctly inside a real
+ * Electron renderer. The PDF mime path was added in plan4.2 (chip rendering
+ * only); this spec confirms the content preview layer (FilePreview's
+ * PDF.js canvas with iframe fallback) works end-to-end against a real PDF
+ * binary.
  *
  * Skips when no real-model credentials are present (matches the
  * convention of the other real-MiniMax specs — even though this spec
@@ -84,7 +84,7 @@ async function setup(page: import("@playwright/test").Page, cwd: string) {
   await page.locator(COMPOSER).first().waitFor({ state: "visible", timeout: 30_000 });
 }
 
-test.describe("office1 stage 0A — document preview (PDF iframe)", () => {
+test.describe("office1 stage 0A — document preview (PDF.js canvas)", () => {
   test.beforeEach(() => {
     test.skip(!HAS_CREDS, "[chat-ui-minimax-document-preview] no real-model credentials");
   });
@@ -137,7 +137,7 @@ test.describe("office1 stage 0A — document preview (PDF iframe)", () => {
     // travel the production chain:
     //   Composer.onSendContent → App.handleSendContent →
     //   session-store.pushOptimisticUserContent → ChatView → MessageItem →
-    //   FilePreview (kind "pdf" → <iframe src="data:application/pdf;base64,...">)
+    //   FilePreview (kind "pdf" → PDF.js canvas, iframe fallback)
     await page.evaluate(
       ({ b64, name }) => {
         const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -165,9 +165,9 @@ test.describe("office1 stage 0A — document preview (PDF iframe)", () => {
     const preview = page.locator(".file-preview--pdf").first();
     await preview.waitFor({ state: "visible", timeout: 15_000 });
 
-    const iframe = page.locator(".file-preview--pdf iframe").first();
-    await expect(iframe).toHaveAttribute("src", /^data:application\/pdf;base64,/);
-    await expect(iframe).toHaveAttribute("title", "OpenBuddy-Design.pdf");
+    await expect(page.locator(".file-preview--pdfjs").first()).toBeVisible();
+    await expect(page.locator("canvas.file-preview__pdf-page").first()).toBeVisible();
+    await page.screenshot({ path: "docs/screenshots/10-pdfjs-canvas-preview.png", fullPage: false });
   });
 
   test("rejected MIME (.zip) does NOT surface a chip (toast wording may vary)", async ({ page }) => {

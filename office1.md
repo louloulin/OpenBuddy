@@ -548,6 +548,34 @@ C 阶段验证：新增 artifact contract 测试 4/4 通过，覆盖 descriptor 
 
 验证：artifact contract、registry、evidence 原有测试共 3 个文件、15/15 通过；`git diff --check` 通过。
 
+### 11.7 本轮交付与验收边界（2026-09-13）
+
+本轮继续沿用 Univer 官方 preset 的最佳实践，不引入第二套 Office 编辑器：
+
+- **PDF**：`pdfjs-dist` 本地 worker + canvas，首屏最多 3 页；点击“加载更多页面”按需继续渲染；解析失败保留 Chromium iframe 降级，避免白屏。
+- **XLSX / DOCX**：复用 `files-kb` 的 OOXML 提取结果，交给 Univer 开源 spreadsheet/document preset，支持会话内交互编辑；不宣称原格式高保真导入导出。
+- **PPTX**：继续使用安全的只读文本/结构预览。Univer Slides 没有可用的开源 preset，完整编辑和 Office 往返需要 Univer Pro exchange/server/license，不能在本项目中伪造实现。
+- **Artifacts**：descriptor、脱敏、安全校验、事件幂等日志和 registry revision 已完成；UI/IPC 持久化/onSave 原文件回写仍列为下一阶段，不把元数据 registry 描述成已完成的文件存储。
+- **真实链路**：Composer → content IPC → optimistic transcript → MessageItem → FilePreview 已覆盖 PDF/Office MIME；session projection 会保留附件，避免 reload 后预览消失。
+
+本轮本地验证（不含真实上游 LLM）：
+
+- `pnpm exec vitest run packages/collaboration/openbuddy-evidence/src/artifact-contract.test.ts packages/collaboration/openbuddy-evidence/src/artifact-registry.test.ts src/components/__tests__/FilePreview.test.tsx src/stores/__tests__/session-store-ui.test.ts --reporter=dot`：**4 个文件、45/45 通过**。
+- `git diff --check`：通过。
+- Electron MiniMax 文档预览 spec 已包含真实 Composer → transcript 断言，并在成功运行时输出 `docs/screenshots/10-pdfjs-canvas-preview.png`；当前环境未提供可验证的真实 provider 凭证/上游结果，因此不能将该截图或真实 LLM e2e 说成已通过。仓库已有的 `docs/screenshots/01-home-cold-start.png` 至 `07-three-turns-full.png` 是历史 Electron 证据，不冒充本轮 PDF 截图。
+
+### 11.8 Artifacts 对标结论与后续计划
+
+参考 WorkBuddy/Claude Code/Codex 类工作台的共同模式，本项目继续采用“artifact-first + 可追溯事件 + 渲染器按类型路由”的边界：模型/工具只产出脱敏 descriptor 和稳定引用，renderer 根据媒体类型选择 PDF.js、Univer 或只读 fallback，二进制正文不进入 descriptor 或日志。这样可以支持版本、预览、引用和后续审批，同时避免把完整 prompt、token 或文件内容写入审计数据。
+
+后续按以下顺序实施：
+
+1. **P0 真实 Electron 验收**：固定 PDF/DOCX/XLSX/PPTX fixture，逐类断言 transcript、reload projection 和错误降级；需要临时 provider 凭证，凭证只通过环境变量注入，不写入仓库。
+2. **P1 Artifacts UI 投影**：把 registry descriptor 投影到已有 Artifacts 面板，提供打开、预览、版本和失败状态；仍只引用 attachment-store，不复制二进制。
+3. **P1 编辑结果回流**：先定义 `onSave` 的会话内 revision 事件，再根据 Univer Pro 许可决策实现 xlsx/docx 原格式导出；许可未确认前只显示“会话内修改”，不显示“已保存原文件”。
+4. **P2 PDF 阅读器增强**：页码导航、文本层/复制、1MB+ 首屏性能指标和资源回收；继续保留 iframe fallback。
+5. **P2 截图与性能基线**：成功跑过真实 Electron 后再生成并提交 PDF/XLSX 截图及脱敏性能 JSON，截图只作为真实运行产物，不用静态 mock 替代。
+
 
 ### 11.6 本轮交付（2026-09-12，feature/doc0911）
 
