@@ -448,6 +448,25 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 
 **生产价值**: Extension Audit panel 现在**视觉上**真能扫 —— ops 不用读 reason 文本，一眼能看出「哪些扩展被拒 / 哪些等 sign-off」。CSS hook（data-action / data-tone）让未来设计系统迁移只改 CSS 规则、不改 component。
 
+### 3.17 [plan4.5 §A] ExtensionAuditPanel 'Resolves' tile（本轮新增）
+
+**问题**: Round 14 加了 4 个 metric tile（Allowed / Denied / Needs review / Decisions），但**没有**一个能直接告诉 ops「这个 session 已经 re-resolve 几次了」。每次 `resolvePiExtensions` 调用都会 emit 一份 `pi/extension-policy-report`（重新加载 / 重启插件 / 切换 profile 时），但 ops 只能通过 `summary.reports` 在 panel 底部一行隐约看到。诊断 startup churn / repeated reload 需要「session 内 resolve 次数」独立 metric。
+
+**方案**: parser 已经 expose `summary.reports`（整个 session 累计有效 report 数），只缺 panel 上一个独立 tile + CSS tone。
+
+- `src/components/ExtensionAuditPanel.tsx`：新增 `Resolves` metric tile，`data-testid="extension-audit-resolves"` + `data-tone="resolves"`，渲染在 Allowed/Denied/Needs review 之后、Decisions 之前
+- `src/styles/app.css`：新增 `.extension-audit-panel__metric[data-tone="resolves"] dd { color: rgba(82, 132, 255, 0.95); }` —— 蓝色调匹配 pi-native 蓝 accent，视觉上区分「session 计数」与 per-action 计数（绿/红/琥珀）
+- `src/components/__tests__/ExtensionAuditPanel.test.tsx`：新增 1 case 验证 `summary.reports === 2` 时 resolves tile 显示「2」，同时 sanity check 4 个 latest-only metric 仍反映 latest report
+- `src/components/__tests__/extension-audit-panel-css.test.ts`：per-tone assertion 加上 `resolves`
+
+**验收**:
+- `pnpm exec vitest run src/components/__tests__/ExtensionAuditPanel.test.tsx` —— **7/7 ✓**（was 6/6）
+- `pnpm exec vitest run src/components/__tests__/extension-audit-panel-css.test.ts` —— **5/5 ✓**
+- 全 extension audit pipeline: parser (11) + accumulator (7) + hook (6) + panel (7) + CSS guard (5) = **36/36 ✓**
+- `pnpm exec tsc --noEmit -p .` —— 0 新增错误
+
+**生产价值**: ops 现在能直接从 panel header 回答「这个 session 内 agent host re-resolve 几次了？」，对诊断 startup churn / 反复 reload（plugin 反复 reload 常见原因：marketplace 自动 update / profile 切换）有用，不需要 drop 进 main-side logs。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
