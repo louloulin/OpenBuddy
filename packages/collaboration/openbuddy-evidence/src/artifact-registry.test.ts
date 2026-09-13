@@ -31,6 +31,7 @@ describe("artifact registry", () => {
     const result = registry.recordEditRevision({ artifactId: "artifact-1", baseRevision: 1, editor: "univer-sheets", state: "session-saved", snapshotHash: "b".repeat(64), createdAt: "2026-09-13T00:00:00.000Z" })
     expect(result).toEqual({ ok: true, revision: 2, state: "session-saved" })
     expect(registry.list()[0].revision).toBe(2)
+    expect(registry.events().at(-1)?.type).toBe("artifact.edit-revision")
     expect(registry.events().at(-1)?.payload).toMatchObject({ baseRevision: 1, revision: 2, editor: "univer-sheets", state: "session-saved", snapshotHash: "b".repeat(64) })
   })
 

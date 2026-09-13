@@ -54,7 +54,7 @@ export class ArtifactRegistry {
     this.descriptors.set(input.artifactId, { ...previous, revision, updatedAt: input.createdAt })
     this.eventLog.append({
       eventId: `${input.artifactId}:edit:${revision}`,
-      type: "artifact.versioned",
+      type: "artifact.edit-revision",
       artifactId: input.artifactId,
       taskId: previous.taskId,
       occurredAt: input.createdAt,
@@ -146,7 +146,7 @@ export function redactArtifactMetadata(value: unknown): unknown {
   return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, entry]) => [key, sensitiveKey.test(key) ? "[redacted]" : redactArtifactMetadata(entry)]))
 }
 
-export type ArtifactEventType = "artifact.created" | "artifact.updated" | "artifact.versioned" | "artifact.opened" | "artifact.failed"
+export type ArtifactEventType = "artifact.created" | "artifact.updated" | "artifact.versioned" | "artifact.edit-revision" | "artifact.opened" | "artifact.failed"
 export interface ArtifactEventInput { eventId: string; type: ArtifactEventType; artifactId: string; taskId: string; occurredAt: string; payload: Record<string, unknown>; sequence?: number }
 export interface ArtifactEvent extends ArtifactEventInput { sequence: number }
 
