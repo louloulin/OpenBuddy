@@ -390,6 +390,35 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 
 **生产价值**: hook 契约现在端到端被钉住。任何人 refactor `useExtensionAuditPanel`（例如把 latest-wins 改成 sum，把 useEffect 改成 useLayoutEffect 触发 SSR 报错）都会立刻 fail 这个 spec。
 
+### 3.15 [plan4.5 §A] ExtensionAuditPanel React component（本轮新增）
+
+**问题**: Round 11/12 把 hook + spec 落地了，但没有真正的 React UI 组件 —— `useTruncationPanel` 也面临同样的「hook 已落地但 panel 还没建」状态。Extension Audit panel 必须能直接渲染给 ops 看到「N allowed · M denied · K needs-review」才算真正闭环。
+
+**方案**: 复用 `StatusPill` 的 display-only 模式（无 store 写入、无 timer、无 IPC callback），从 hook 拿数据 → 渲染。
+
+- 新增 `src/components/ExtensionAuditPanel.tsx`（~150 行）:
+  - Summary tile: Allowed / Denied / Needs-review / Decisions 四个 metric
+  - 每个 decision 一行：id + action badge + reason
+  - `data-action="allow|deny|needs-review"` 在每行上，方便 CSS tone（deny 红 / needs-review 琥珀 / allow 中性）
+  - 空态：timestamp + body 都写 "awaiting"，避免「last updated: null」的误导
+  - `Clear log` 按钮接 hook 的 `clear()`
+  - 可选 `hookResult` prop（Storybook / 确定性测试 snapshot 用）
+- 新增 `src/components/__tests__/ExtensionAuditPanel.test.tsx`（6 个 case）:
+  - 空态渲染
+  - summary tile 正确显示 latest report
+  - 每个 decision 一行 + action badge
+  - `data-action` 属性正确（视觉扫描）
+  - clear 按钮调用 hook.clear()
+  - 无报告时隐藏 clear 按钮
+- 测试基础设施：用 `vi.hoisted()` 共享 state（vitest 把 `vi.mock` hoist 到 import 之上，普通 `const` 在 mock factory 里捕获会是 `undefined`）
+
+**验收**:
+- `pnpm exec vitest run src/components/__tests__/ExtensionAuditPanel.test.tsx` —— **6/6 ✓**
+- 全 extension audit pipeline: parser (11) + accumulator (7) + hook (6) + panel (6) = **30/30 ✓**
+- `pnpm exec tsc --noEmit -p .` —— 0 新增错误
+
+**生产价值**: Extension Audit panel 现在可以作为一个真实组件挂载到 chat UI sidebar（`Settings → Extensions` 或 chat header chip），不需要重新实现策略决策矩阵。CSS 通过 `data-action` hook 就能 tone（deny 红 / needs-review 琥珀），视觉上一眼能扫到「哪些扩展被拒了 / 哪些需要 sign-off」。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
