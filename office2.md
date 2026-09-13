@@ -320,6 +320,17 @@ pnpm lint
 
 本轮新增验证：Artifacts contract/registry、投影和路由共 4 个测试文件、21/21 通过；`git diff --check` 通过。FilePreview 全量相关测试仍有既存 React `act(...)` warning，但无失败。
 
+### 10.4 编辑事件分类（2026-09-13）
+
+已在 `a92ecf1` 中将会话内编辑事件从普通版本事件中分离：
+
+- 事件类型为 `artifact.edit-revision`，不再误用 `artifact.versioned`。
+- 事件 payload 保留 `baseRevision/revision/editor/state/snapshotHash`，便于工作台重放会话内编辑状态。
+- 该事件仍只保存摘要和状态，不携带二进制正文、完整 Univer snapshot、prompt 或凭证。
+- 普通 descriptor 更新继续使用 `artifact.versioned`；两类事件可被 Artifacts/evidence 消费方分别统计。
+
+本轮验证：Artifacts contract/registry、ArtifactViewModel、preview route 共 4 个测试文件、21/21 通过；`git diff --check` 通过。
+
 ## 11. 后续计划
 
 本阶段完成后，下一版本重点是：
