@@ -331,6 +331,12 @@ pnpm lint
 
 本轮验证：Artifacts contract/registry、ArtifactViewModel、preview route 共 4 个测试文件、21/21 通过；`git diff --check` 通过。
 
+### 10.5 自动测试二期生命周期修复（2026-09-13）
+
+本轮自动测试发现并修复 PDF.js loading task 的卸载竞态：当 `getDocument()` 已返回但 `loadingTask.promise` 尚未完成时，组件卸载原实现无法调用 task 的 `destroy()`，可能让 PDF worker 和加载任务继续存活。`PdfJsPreview` 现在在该阶段直接销毁 loading task；文档已完成加载时继续销毁 PDF document。
+
+新增回归测试覆盖“加载中卸载立即销毁 task”，并保留 PDF.js、iframe fallback、Artifacts projection、preview route、session projection 和 Univer 生命周期测试。最终定向验证为 7 个测试文件、63/63 通过；Electron 文档预览 spec 可枚举 3 个真实链路用例。无 provider 凭证时不伪造 Electron 通过结果或截图。
+
 ## 11. 后续计划
 
 本阶段完成后，下一版本重点是：

@@ -17,6 +17,16 @@ const MAX_INITIAL_PAGES = 3;
 /** 渲染宽度上限(px),超出等比缩小,避免超大页面撑破聊天气泡。 */
 const MAX_PAGE_WIDTH = 720;
 
+type PdfDocument = {
+  numPages: number;
+  getPage: (pageNumber: number) => Promise<{
+    getViewport: (options: { scale: number }) => { width: number; height: number };
+    render: (options: { canvas: HTMLCanvasElement; viewport: unknown; transform?: [number, number, number, number, number, number] }) => { promise: Promise<void> };
+    cleanup: () => void;
+  }>;
+  destroy?: () => Promise<void> | void;
+};
+
 function base64ToBytes(content: string): Uint8Array {
   const comma = content.indexOf(",");
   const base64 = comma === -1 ? content : content.slice(comma + 1);
@@ -48,6 +58,7 @@ export function PdfJsPreview({
   useEffect(() => {
     let cancelled = false;
     let destroy: (() => void) | null = null;
+    let loadingTask: { promise: Promise<unknown>; destroy?: () => Promise<void> | void } | null = null;
     renderMoreRef.current = null;
     renderedPagesRef.current = 0;
     loadingMoreRef.current = false;
@@ -58,9 +69,10 @@ export function PdfJsPreview({
     (async () => {
       try {
         const pdfjs = await loadPdfJs();
-        const loadingTask = pdfjs.getDocument({ data: base64ToBytes(content) });
-        const destroyTask = (loadingTask as unknown as { destroy?: () => Promise<void> | void }).destroy;
-        const doc = await loadingTask.promise;
+        const task = pdfjs.getDocument({ data: base64ToBytes(content) });
+        loadingTask = task;
+        const destroyTask = task.destroy;
+        const doc = await task.promise as PdfDocument;
         destroy = () =>
           void (typeof destroyTask === "function"
             ? destroyTask.call(loadingTask)
@@ -133,7 +145,11 @@ export function PdfJsPreview({
     return () => {
       cancelled = true;
       renderMoreRef.current = null;
-      destroy?.();
+      if (loadingTask && typeof loadingTask.destroy === "function") {
+        void loadingTask.destroy();
+      } else {
+        destroy?.();
+      }
     };
   }, [content]);
 

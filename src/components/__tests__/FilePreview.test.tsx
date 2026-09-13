@@ -183,9 +183,32 @@ describe("FilePreview", () => {
     expect(iframe.getAttribute("src")).toContain("data:application/pdf");
   });
 
-  it("pdf 不走 binary 占位", () => {
+  it("pdf 不走 binary 占位", async () => {
     render(<FilePreview filename="doc.pdf" content="x" />);
     expect(screen.queryByText(/暂不支持内嵌预览/)).toBeNull();
+    await screen.findByTitle("doc.pdf");
+  });
+
+  it("卸载期间 PDF.js 仍在加载时立即销毁 loading task", async () => {
+    let resolveDocument!: (document: ReturnType<typeof fakePdfDoc>) => void;
+    const loadingTask = {
+      promise: new Promise<ReturnType<typeof fakePdfDoc>>((resolve) => {
+        resolveDocument = resolve;
+      }),
+      destroy: vi.fn(),
+    };
+    loadPdfJsMock.mockResolvedValue({
+      getDocument: () => loadingTask,
+    } as never);
+
+    const { unmount } = render(
+      <FilePreview filename="doc.pdf" content="data:application/pdf;base64,eA==" />,
+    );
+    await waitFor(() => expect(loadPdfJsMock).toHaveBeenCalled());
+    unmount();
+
+    expect(loadingTask.destroy).toHaveBeenCalledTimes(1);
+    resolveDocument(fakePdfDoc(1));
   });
 
   // ---------- 文档预览(docx/pptx/sheet)----------
