@@ -110,6 +110,7 @@ export function createDefaultAgentHostState(): AgentHostState {
     hookConfigs: [],
     piExtensionStatuses: [],
     piExtensionOverrides: {},
+    piExtensionNeedsReviewIds: [],
     baseProfile: null,
     storedLayers: [],
     toolRegistryRevision: 0,

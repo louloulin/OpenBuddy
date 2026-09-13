@@ -1833,6 +1833,64 @@ export async function reloadPiExtensions(): Promise<unknown[]> {
   return invoke<unknown[]>("agent:extensions-reload");
 }
 
+// ---------- needs-review approval gate (plan4.5 §B) ----------
+
+/**
+ * A Pi extension that the resolver classified as `needs-review` and
+ * is currently blocking the agent loop until the user signs off.
+ * Mirrors the `NeedsReviewEntry` shape from
+ * `electron/main/agent/host-modules/needs-review-gate.ts`.
+ */
+export interface NeedsReviewPendingEntry {
+  id: string;
+  packageName?: string;
+  reason: string;
+  requestedAt: string;
+}
+
+export interface NeedsReviewStateSummary {
+  pending: NeedsReviewPendingEntry[];
+  pendingCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+}
+
+/**
+ * Snapshot the needs-review gate. The renderer calls this on mount so
+ * the modal can rehydrate from the current process state instead of
+ * waiting for the next `pi/extension-needs-review-pending` event.
+ */
+export async function agentNeedsReviewState(): Promise<NeedsReviewStateSummary> {
+  return invoke<NeedsReviewStateSummary>("extension:needs-review-state");
+}
+
+export interface NeedsReviewDecisionResult {
+  ok: boolean;
+  id: string;
+  /** Current gate verdict after the call: `allow` | `deny` | `pending`. */
+  state: "allow" | "deny" | "pending";
+  summary: NeedsReviewStateSummary;
+}
+
+/**
+ * Approve a pending needs-review id. Main approves the gate entry
+ * and triggers `reloadPiExtensions` so the next agent loop sees the
+ * factory. Idempotent — an already-approved id returns the current
+ * state without reloading.
+ */
+export async function agentApproveNeedsReview(id: string): Promise<NeedsReviewDecisionResult> {
+  return invoke<NeedsReviewDecisionResult>("extension:approve-needs-review", { id });
+}
+
+/**
+ * Reject a pending needs-review id. Main rejects the gate entry and
+ * triggers `reloadPiExtensions` so the next agent loop confirms the
+ * factory stays out. Idempotent.
+ */
+export async function agentRejectNeedsReview(id: string): Promise<NeedsReviewDecisionResult> {
+  return invoke<NeedsReviewDecisionResult>("extension:reject-needs-review", { id });
+}
+
 /** List marketplace sources + plugins via `x.ai/marketplace/list`. */
 export async function marketplaceList(sessionId?: string): Promise<MarketplaceListResponse> {
   return invoke<MarketplaceListResponse>("marketplace_list", { sessionId: sessionId ?? null });

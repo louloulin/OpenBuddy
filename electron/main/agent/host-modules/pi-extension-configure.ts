@@ -33,6 +33,7 @@ import { createPiHooksExtension, type HookRuntimeConfig, type HookShellRunner } 
 import { createPiPlanModeExtension } from "../pi-plan-mode";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { HookPermissionRequest } from "../agent-hooks";
+import { getNeedsReviewGate } from "./needs-review-singleton";
 
 // ---------------------------------------------------------------------------
 // Module-level singleton deps (install pattern)
@@ -111,6 +112,15 @@ export function configurePiExtensions(
   if (!state) throw new Error("pi-extension-configure: not installed");
   const specs = applyPiExtensionOverrides(manifestSpecs, state.piExtensionOverrides);
   const telemetry = telemetrySinkImpl() as Parameters<typeof resolvePiExtensions>[1] extends infer _ ? never : never;
+  // plan4.5 §B — the gate is the same singleton exposed to IPC; the
+  // resolver consults it to block needs-review factories until the
+  // user signs off. `needsReviewIds` is derived from profile config
+  // (state.piExtensionNeedsReviewIds); the field is optional so older
+  // profiles without it still work.
+  const needsReviewGate = getNeedsReviewGate();
+  const needsReviewIds = Array.isArray(state.piExtensionNeedsReviewIds)
+    ? state.piExtensionNeedsReviewIds
+    : [];
   const resolutionOptions: PiExtensionResolutionOptions = {
     profileDir: resolveProfileDirectoryImpl(),
     resolveSource: (source) => {
@@ -122,6 +132,8 @@ export function configurePiExtensions(
     emit: emitPluginEventImpl,
     resolveService: (owner) => state!.context?.get(owner),
     ...(telemetry ? { telemetrySink: telemetry as any } : {}),
+    needsReviewGate,
+    ...(needsReviewIds.length > 0 ? { needsReviewIds } : {}),
   };
   const resolution = resolvePiExtensions(specs, resolutionOptions);
 

@@ -488,6 +488,46 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 
 **生产价值**: Extension Audit panel 现在即使 mount 比第一次 resolve 晚也能立刻显示最新状态（profile 切换 / plugin reload / fast agent-host restart 场景），不需要改 panel 本身 —— hook 透明地 hydrate。
 
+### 3.19 [plan4.5 §B] needs-review approval gate（本轮新增）
+
+**问题**: Round 8–16 把 `needs-review` 从一个 audit 标签变成 resolver 阶段会读取的 hint —— 但它只是「factory 不进 list，diagnostic 提示一下」的非阻塞挂起。用户没有任何 UI 入口去 approve / reject，导致配置被标记 `needs-review` 的扩展永远处于 blocked 状态、永远 reload 也只是重新落 blocked 诊断，不是「先 sign-off 再加载」。
+
+**方案**: 把 `needs-review` 升格成 active sign-off gate —— 纯工厂状态的 `createNeedsReviewGate()` 持有 pending / approved / rejected 三个集合，resolver 在产出 final resolution 时调用 `applyNeedsReviewGate()` 决定 factory 是否保留，main 端 IPC handler 把 approve / reject 转成 `reloadPiExtensions()` 让下一轮 agent loop 拿到新 factory 集合，renderer 用 hook 订阅 `pi/extension-needs-review-pending` event stream + 在 mount 时从 cached ring buffer / `extension:needs-review-state` snapshot hydrate。
+
+- `electron/main/agent/host-modules/needs-review-gate.ts`：
+  - 纯工厂：`createNeedsReviewGate()` 返回 `{ snapshot, gate, track, approve, reject, subscribe }`
+  - `gate({ id })` 对 tracked-but-undecided id → `pending`，对 approved id → `allow`，对 rejected id → `deny`，对未 tracked 或空字符串 id → `deny`（fail-closed，默认拒绝未登记请求）
+  - `approve(id)` / `reject(id)` 对未知 id 是 no-op（refuse to lift unknown id）
+  - `summarizeNeedsReviewState()` 把 internal snapshot 转 renderer 友好的 `{ pending, pendingCount, approvedCount, rejectedCount }`，用 `Object.freeze` 保护 pending 数组防外部 mutate
+- `electron/main/agent/host-modules/needs-review-gate.test.ts` —— **8 cases**：empty state / track idempotency / gate 分类 / approve-reject 语义 / unknown id no-op / subscribe listener 在每个 mutation 触发 / `summarizeNeedsReviewState` frozen
+- `electron/main/agent/host-modules/pi-extensions-needs-review.ts`：
+  - `applyNeedsReviewGate(resolution, decisions, gate, emit)` 后处理 resolver 产物：对 pending/deny 状态从 `factories` 移除并 push `blocked` 诊断；`emit` 总是被调用（即使 0 pending）让 renderer 显式收「no pending」事件确认 modal 关闭
+- `electron/main/agent/host-modules/pi-extensions-needs-review.test.ts` —— **6 cases**
+- `electron/main/agent/host-modules/needs-review-singleton.ts`：模块级 `let gate = createNeedsReviewGate()` + `installNeedsReviewGate(instance?)` / `getNeedsReviewGate()` / `__resetNeedsReviewGateForTest()`，匹配 `plugin-event-bus.ts` / `pi-extension-configure.ts` 的 install 模式
+- `electron/main/agent/__tests__/pi-extensions-needs-review-integration.test.ts` —— **4 cases** 验证 `resolvePiExtensions` 接 `needsReviewGate` 后 factory 被移除、approve 后 reload 又装回来、`pi/extension-needs-review-pending` 被 emit
+- `electron/main/agent/host-modules/_state-shape.ts` + `_default-state.ts`：新增 `piExtensionNeedsReviewIds: string[]` state 字段
+- `electron/main/agent/host-modules/pi-extension-configure.ts`：把 `needsReviewGate` 和 `needsReviewIds` 透传给 `resolvePiExtensions`
+- `electron/main/agent/pi-extensions.ts`：`PiExtensionResolutionOptions` 新增 `needsReviewGate?: NeedsReviewGate`、`needsReviewIds?: readonly string[]`、`needsReviewPackageNames?: readonly string[]`；resolver 完成后调 `applyNeedsReviewGate(result, decisions, options.needsReviewGate, options.emit)`
+- `electron/main/ipc/plugin.ts`：新增 3 个 handler —— `extension:needs-review-state`（snapshot）/ `extension:approve-needs-review`（mutate + reload）/ `extension:reject-needs-review`（mutate + reload），都对未知 id 返回 idempotent current state 不报错
+- `src/lib/agent/pi-client.ts`：导出 `NeedsReviewPendingEntry` / `NeedsReviewStateSummary` / `NeedsReviewDecisionResult` 类型 + 三个 wrapper：`agentNeedsReviewState()` / `agentApproveNeedsReview(id)` / `agentRejectNeedsReview(id)`
+- `src/hooks/useExtensionNeedsReviewApproval.tsx`：
+  - 拥有单一 summary `useState`，live event 直接 mutate summary in-place
+  - 操作顺序关键：live subscription FIRST → ring buffer catch-up → fresh IPC snapshot ONLY if `!sawAnyEvent && !userTouchedRef.current`
+  - `userTouchedRef` 在 approve/reject 立刻置 true，`sawAnyEvent` 任何 pending event 看到都置 true —— 双保险防 mount 时 snapshot round-trip 覆盖刚刚 user-mutate 的 state
+  - `approve(id)` / `reject(id)` 都先 flip `userTouchedRef` 再 await IPC，prevent race
+- `src/hooks/useExtensionNeedsReviewApproval.test.tsx` —— **6 cases**：mount subscribe / on-mount hydrate / live event 更新 / unrelated event 忽略 / approve IPC + summary 反映 / reject IPC + summary 反映
+
+**验收**:
+- `pnpm exec vitest run electron/main/agent/host-modules/needs-review-gate.test.ts` —— **8/8 ✓**
+- `pnpm exec vitest run electron/main/agent/host-modules/pi-extensions-needs-review.test.ts` —— **6/6 ✓**
+- `pnpm exec vitest run electron/main/agent/__tests__/pi-extensions-needs-review-integration.test.ts` —— **4/4 ✓**
+- `pnpm exec vitest run src/hooks/useExtensionNeedsReviewApproval.test.tsx` —— **6/6 ✓**
+- 全 extension needs-review pipeline: gate (8) + wiring (6) + integration (4) + hook (6) + Round 17 audit pipeline (38) = **62/62 ✓**
+- 总体（含现有 pi-extensions / state-shape / configure / audit panel / audit hook）：**91/91 ✓** 跨 9 个 test file
+- `pnpm exec tsc --noEmit -p .` —— 0 新增错误
+
+**生产价值**: needs-review 现在从「被动的 audit 标签」升级成「主动的 sign-off gate」—— 用户在 modal 里看到 `pi/extension-needs-review-pending` 列出的待审条目、点 Approve / Reject、main 端 gate mutate 后 `reloadPiExtensions()` 让下一轮 agent loop 真正加载（或永不加载）这些扩展。空字符串 / 未登记 id 全部 fail-closed 防绕过；modal 不再卡死、audit 不再 silently 挂起、配置可预测地 enforce。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）

@@ -26,6 +26,8 @@ import {
   requiredString,
 } from "./validation";
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
+import { getNeedsReviewGate } from "../agent/host-modules/needs-review-singleton";
+import { summarizeNeedsReviewState } from "../agent/host-modules/needs-review-gate";
 
 export function registerPluginIpc(deps: AgentHostIpcDeps): void {
   const { agentHost, ensureAgentHost } = deps;
@@ -165,5 +167,43 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     }
     if (action.type === "reload") return agentHost.reloadPlugin(pluginName);
     throw new Error(`unsupported plugin action: ${action.type ?? "unknown"}`);
+  });
+
+  // plan4.5 §B — needs-review approval gate. The gate is a process-wide
+  // singleton; the resolver consults it during `configurePiExtensions`
+  // (host-modules/pi-extension-configure.ts) so a `pending` verdict
+  // drops the factory from `factories` and pushes a `blocked` diagnostic.
+  // The renderer pops a modal off `pi/extension-needs-review-pending`
+  // (also emitted by the resolver) and replies through these three
+  // channels. After every approve / reject we call `reloadPiExtensions`
+  // so the next agent loop sees the new factory set.
+  ipcMain.handle("extension:needs-review-state", async () => {
+    return summarizeNeedsReviewState(getNeedsReviewGate().snapshot());
+  });
+  ipcMain.handle("extension:approve-needs-review", async (_e, args: unknown) => {
+    const input = recordValue(args, "needs-review approve payload");
+    const id = requiredString(input.id, "id");
+    const gate = getNeedsReviewGate();
+    if (gate.gate({ id }) !== "pending") {
+      // Idempotent: an already-approved / rejected / unknown id is
+      // not an error — the renderer's optimistic UI may have already
+      // applied the change. Return the current summary so the modal
+      // can reconcile without a second round-trip.
+      return { ok: true, id, state: gate.gate({ id }), summary: summarizeNeedsReviewState(gate.snapshot()) };
+    }
+    gate.approve(id);
+    await agentHost.reloadPiExtensions();
+    return { ok: true, id, state: "allow", summary: summarizeNeedsReviewState(gate.snapshot()) };
+  });
+  ipcMain.handle("extension:reject-needs-review", async (_e, args: unknown) => {
+    const input = recordValue(args, "needs-review reject payload");
+    const id = requiredString(input.id, "id");
+    const gate = getNeedsReviewGate();
+    if (gate.gate({ id }) !== "pending") {
+      return { ok: true, id, state: gate.gate({ id }), summary: summarizeNeedsReviewState(gate.snapshot()) };
+    }
+    gate.reject(id);
+    await agentHost.reloadPiExtensions();
+    return { ok: true, id, state: "deny", summary: summarizeNeedsReviewState(gate.snapshot()) };
   });
 }
