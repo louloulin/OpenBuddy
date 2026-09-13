@@ -256,6 +256,22 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 - **回归**：`pi-extensions.test.ts` 39/39 + `document-truncator.test.ts` 8/8 + `agent-prompt-truncation.test.ts` 2/2 全部保持绿色；typecheck 未引入新错误（4 个 pre-existing `cross-spawn` 类型错误与本轮无关）。
 - **价值**：plan4.3 §3.6 的 truncator 与 plan4.4 §A 的 compaction 现在用同一套 token budget 语义 —— truncator 知道自己的 6k 预算，compaction 知道要 reserve 16k，两个模块不再各自孤立读 pi 默认值。
 
+### 3.9 [plan4.4 §D] CI nightly perf 接入（本轮新增）
+
+- **范围**：新增 `.github/workflows/nightly-perf.yml`，把 `scripts/electron/perf-100-turns-nightly.mjs` + `scripts/electron/perf-streaming.mjs` 接入 GitHub Actions cron。
+- **触发**：
+  - `cron: '7 2 * * *'` —— 02:07 UTC 每日（避开 :00 / :30 的 fleet collision）
+  - `workflow_dispatch` —— 手动触发做 ad-hoc 校准
+  - `push` 到 `feature/pi0911` / `master` —— 改 perf 脚本立刻跑一次验证
+- **3 个 job**：
+  - `perf-100-turns`（90min timeout, `continue-on-error: true`）：跑 nightly 100 turns，输出 `docs/perf/*openbuddy-100-turns*.json`；artifact retention 90 天
+  - `perf-streaming`（90min timeout, `continue-on-error: true`）：跑 ≥30s 长流，输出 `docs/perf/*openbuddy-streaming*.json`；artifact retention 90 天
+  - `perf-streaming-schema`（5min, blocking）：跑 `perf-streaming-schema.test.mjs` 8 项 vitest；保证 schema 不漂移
+- **凭据**：从 `secrets.OPENBUDDY_E2E_API_KEY` / `secrets.OPENBUDDY_E2E_BASE_URL` / `vars.OPENBUDDY_E2E_MODEL_ID` 读 —— 没有就 `::warning::` 跳过，不让 cron 失败。
+- **并发**：`concurrency: { group: nightly-perf-${{github.ref}}, cancel-in-progress: true }` —— 新 run 自动 cancel 旧 run。
+- **验证**：YAML 结构 parse 通过（3 jobs、7/7/6 steps、cron / workflow_dispatch / concurrency 全对）；streaming schema vitest 8/8 仍然 green；本地 dry-run 两个脚本确认 no-creds 路径不 panic。
+- **生产价值**：从「perf 脚本就位但 CI 没接」升级到「每晚 UTC 02:07 自动产 perf 数据 + 90 天 artifact 留痕」。这是从「workbuddy 名义上的 perf」走到「真实可观测 perf」的最后一步。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
