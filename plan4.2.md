@@ -419,6 +419,35 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 
 **生产价值**: Extension Audit panel 现在可以作为一个真实组件挂载到 chat UI sidebar（`Settings → Extensions` 或 chat header chip），不需要重新实现策略决策矩阵。CSS 通过 `data-action` hook 就能 tone（deny 红 / needs-review 琥珀），视觉上一眼能扫到「哪些扩展被拒了 / 哪些需要 sign-off」。
 
+### 3.16 [plan4.5 §A] ExtensionAuditPanel CSS tones（本轮新增）
+
+**问题**: Round 13 落地了 component + data-action/data-tone hooks，但 CSS 还没接 —— 组件能 render 但视觉上 deny/needs-review 行没有强调，等于「半成品」。如果未来 refactor 时把 CSS 删了但保留 data-attr hooks（或者反过来），CI 不会 fail —— 这是个 silent regression。
+
+**方案**: 给 `data-action` / `data-tone` hooks 接入真实 CSS tone + 加一个 guard spec 读 `app.css` 防止 silent regression。
+
+- 新增 `src/styles/app.css` (~115 行追加，组件的 CSS hook 集中放在文件末尾的 `=== ExtensionAuditPanel (plan4.5 §A) ===` 块):
+  - `.extension-audit-panel` 容器（border + bg-surface + padding）
+  - `.extension-audit-panel__metric[data-tone="allow|deny|needs-review|total"]` 给 summary tile 数量上色：
+    - allow → 绿 `rgba(0, 168, 132, 0.95)`
+    - deny → 红 `rgba(229, 72, 77, 0.95)`
+    - needs-review → 琥珀 `rgba(217, 130, 0, 0.95)`
+    - total → 文本主色
+  - `.extension-audit-panel__row[data-action="..."]` 给每行加 tinted left border，deny / needs-review 视觉上一眼可辨
+  - `.extension-audit-panel__action[data-testid="extension-audit-action-allow|deny|needs-review"]` 给 action badge 加 chip
+  - `.extension-audit-panel__empty` + `.extension-audit-panel__clear` 空态 / 清空按钮
+- 新增 `src/components/__tests__/extension-audit-panel-css.test.ts`（5 个 case）:
+  - 读取 `src/styles/app.css`，断言期望的 selector 存在
+  - 捕获 silent regression：删 CSS 但保留 hooks（或反过来）CI 立刻 fail
+  - deny 颜色用 `rgba(150-299, ...)` 正则保证「红通道主导」，needs-review 用 `rgba(...)` 保证有色非中性
+  - 三种 action 的 chip variant 都要声明
+
+**验收**:
+- `pnpm exec vitest run src/components/__tests__/extension-audit-panel-css.test.ts` —— **5/5 ✓**
+- 全 extension audit pipeline: parser (11) + accumulator (7) + hook (6) + panel (6) + CSS guard (5) = **35/35 ✓**
+- `pnpm exec tsc --noEmit -p .` —— 0 新增错误
+
+**生产价值**: Extension Audit panel 现在**视觉上**真能扫 —— ops 不用读 reason 文本，一眼能看出「哪些扩展被拒 / 哪些等 sign-off」。CSS hook（data-action / data-tone）让未来设计系统迁移只改 CSS 规则、不改 component。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
