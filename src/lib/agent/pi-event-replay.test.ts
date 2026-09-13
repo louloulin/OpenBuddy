@@ -45,13 +45,22 @@ describe("pi event replay coordinator", () => {
     expect(eventSequence({})).toBeUndefined();
   });
 
-  it("detectReplayGap reports a gap when the ring buffer evicted older entries", () => {
-    const gap = detectReplayGap(150, { earliestSequence: 100, latestSequence: 199, generation: 3, available: 100 });
+  it("detectReplayGap reports a gap when the renderer cursor predates the ring buffer", () => {
+    const gap = detectReplayGap(50, { earliestSequence: 100, latestSequence: 199, generation: 3, available: 100 });
     expect(gap).toEqual({
-      requestedFromSequence: 150,
+      requestedFromSequence: 50,
       earliestSequence: 100,
       gap: true,
-      missing: 50,
+      missing: 49,
+    });
+  });
+
+  it("does not report a gap when the next event is still retained", () => {
+    expect(detectReplayGap(99, { earliestSequence: 100, latestSequence: 199, generation: 3, available: 100 })).toEqual({
+      requestedFromSequence: 99,
+      earliestSequence: 100,
+      gap: false,
+      missing: 0,
     });
   });
 

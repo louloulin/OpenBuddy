@@ -45,11 +45,12 @@ export function detectReplayGap(
 ): ReplayGapInfo {
   const earliest = cursor?.earliestSequence ?? 0;
   const hasCursor = cursor !== undefined;
-  // When the renderer has not seen any events yet, `fromSequence === 0` is
-  // not a gap — only positive cursors that precede the bridge's earliest
-  // available sequence signal eviction.
-  const gap = hasCursor && fromSequence > 0 && fromSequence > earliest;
-  const missing = gap ? Math.max(0, fromSequence - earliest) : 0;
+  // A replay asks for events strictly after `fromSequence`. If the
+  // earliest retained event is later than that next expected sequence,
+  // the ring buffer has already evicted at least one event. A cursor at
+  // `earliestSequence - 1` is still recoverable and is not a gap.
+  const gap = hasCursor && fromSequence > 0 && fromSequence < earliest - 1;
+  const missing = gap ? Math.max(0, earliest - fromSequence - 1) : 0;
   return {
     requestedFromSequence: fromSequence,
     earliestSequence: earliest,

@@ -57,6 +57,19 @@ describe("createNeedsReviewGate (plan4.5 §B — needs-review approval gate)", (
     expect(second.pending[0].requestedAt).toBe("2026-09-13T02:00:00.000Z");
   });
 
+  it("canonicalizes ids consistently across track, gate, approve, and reject", () => {
+    const gate = createNeedsReviewGate();
+    gate.track(entry({ id: "  pi-canonical  " }));
+
+    expect(gate.gate({ id: "pi-canonical" })).toBe("pending");
+    expect(gate.approve("  pi-canonical  ").approvedIds).toEqual(["pi-canonical"]);
+    expect(gate.gate({ id: "pi-canonical" })).toBe("allow");
+
+    gate.track(entry({ id: "pi-reject" }));
+    expect(gate.reject("  pi-reject  ").rejectedIds).toEqual(["pi-reject"]);
+    expect(gate.gate({ id: "pi-reject" })).toBe("deny");
+  });
+
   it("gate() classifies tracked/approved/rejected/unknown correctly", () => {
     const gate = createNeedsReviewGate();
     gate.track(entry({ id: "pi-pending" }));

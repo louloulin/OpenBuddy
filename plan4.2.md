@@ -528,6 +528,25 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 
 **生产价值**: needs-review 现在从「被动的 audit 标签」升级成「主动的 sign-off gate」—— 用户在 modal 里看到 `pi/extension-needs-review-pending` 列出的待审条目、点 Approve / Reject、main 端 gate mutate 后 `reloadPiExtensions()` 让下一轮 agent loop 真正加载（或永不加载）这些扩展。空字符串 / 未登记 id 全部 fail-closed 防绕过；modal 不再卡死、audit 不再 silently 挂起、配置可预测地 enforce。
 
+### 3.20 [plan4.5 §B] needs-review gate ID normalization（本轮修复）
+
+**问题**：审批门对 `gate()` 的输入做了 `trim()`，但 `track()` / `approve()` / `reject()` 使用未规范化的原始 id。来自 manifest、IPC 或 renderer 的首尾空白会导致同一个扩展出现「查询是 pending、批准却找不到」的不一致状态；重新 resolve 时也可能重复登记。
+
+**修复**：在 `needs-review-gate.ts` 集中使用 `normalizeId()`：
+- `track()` 以规范化 id 存储，并避免覆盖已批准/已拒绝的决策；
+- `approve()` / `reject()` 规范化输入后再执行状态迁移；
+- 无效 id 继续 fail-closed / no-op，不扩大授权面。
+
+**验收**：新增首尾空白 id 回归用例，覆盖 track → gate → approve/reject 全链路；needs-review gate、wiring、integration 共 **19/19** 通过。
+
+### 3.21 [plan4.3] renderer replay gap boundary 修复（本轮新增）
+
+**问题**：`detectReplayGap()` 原实现把 `fromSequence > earliestSequence` 当成 gap，方向相反；当 renderer 游标早于 ring buffer 保留范围时反而返回 `gap: false`，会静默丢失事件并跳过 fallback。另一个边界是 `fromSequence === earliestSequence - 1`，下一条事件仍可重放，不应报告 gap。
+
+**修复**：按 replay 语义统一判定：当 `fromSequence < earliestSequence - 1` 时才表示至少有一个事件已被淘汰；`missing = earliestSequence - fromSequence - 1`，保留 fresh start 和恰好连续游标的无 gap 行为。
+
+**验收**：新增“游标早于 ring buffer”与“下一条仍可用”的回归测试；replay coordinator、Pi event bridge、needs-review gate 共 **29/29** 通过，`git diff --check` 通过。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）

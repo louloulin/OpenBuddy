@@ -81,12 +81,17 @@ export function createNeedsReviewGate(): NeedsReviewGate {
   const rejected = new Set<string>();
   const listeners = new Set<NeedsReviewGateListener>();
 
+  const normalizeId = (value: unknown): string =>
+    typeof value === "string" ? value.trim() : "";
+
+  const currentSnapshot = (): NeedsReviewGateSnapshot => ({
+    pending: [...pending.values()],
+    approvedIds: [...approved],
+    rejectedIds: [...rejected],
+  });
+
   const emit = (): NeedsReviewGateSnapshot => {
-    const snapshot: NeedsReviewGateSnapshot = {
-      pending: [...pending.values()],
-      approvedIds: [...approved],
-      rejectedIds: [...rejected],
-    };
+    const snapshot = currentSnapshot();
     for (const listener of listeners) {
       try {
         listener(snapshot);
@@ -99,15 +104,10 @@ export function createNeedsReviewGate(): NeedsReviewGate {
 
   return {
     snapshot() {
-      return {
-        pending: [...pending.values()],
-        approvedIds: [...approved],
-        rejectedIds: [...rejected],
-      };
+      return currentSnapshot();
     },
     gate(input) {
-      const raw = typeof input?.id === "string" ? input.id : "";
-      const id = raw.trim();
+      const id = normalizeId(input?.id);
       if (id.length === 0) return "deny";
       if (approved.has(id)) return "allow";
       if (rejected.has(id)) return "deny";
@@ -117,27 +117,17 @@ export function createNeedsReviewGate(): NeedsReviewGate {
       return "pending";
     },
     track(entry) {
-      if (!entry || typeof entry.id !== "string" || entry.id.length === 0) {
-        return {
-          pending: [...pending.values()],
-          approvedIds: [...approved],
-          rejectedIds: [...rejected],
-        };
-      }
-      if (!pending.has(entry.id)) {
-        pending.set(entry.id, { ...entry });
+      const id = normalizeId(entry?.id);
+      if (id.length === 0) return currentSnapshot();
+      if (!pending.has(id) && !approved.has(id) && !rejected.has(id)) {
+        pending.set(id, { ...entry, id });
       }
       return emit();
     },
     approve(id) {
-      if (typeof id !== "string" || id.length === 0) {
-        return {
-          pending: [...pending.values()],
-          approvedIds: [...approved],
-          rejectedIds: [...rejected],
-        };
-      }
-      if (!pending.has(id)) {
+      const normalizedId = normalizeId(id);
+      if (normalizedId.length === 0) return currentSnapshot();
+      if (!pending.has(normalizedId)) {
         // Defensive: approve/reject on an unknown id is a no-op so a
         // misbehaving renderer cannot accidentally lift a never-tracked
         // spec into the allow list.
@@ -147,29 +137,24 @@ export function createNeedsReviewGate(): NeedsReviewGate {
           rejectedIds: [...rejected],
         };
       }
-      pending.delete(id);
-      approved.add(id);
-      rejected.delete(id);
+      pending.delete(normalizedId);
+      approved.add(normalizedId);
+      rejected.delete(normalizedId);
       return emit();
     },
     reject(id) {
-      if (typeof id !== "string" || id.length === 0) {
+      const normalizedId = normalizeId(id);
+      if (normalizedId.length === 0) return currentSnapshot();
+      if (!pending.has(normalizedId)) {
         return {
           pending: [...pending.values()],
           approvedIds: [...approved],
           rejectedIds: [...rejected],
         };
       }
-      if (!pending.has(id)) {
-        return {
-          pending: [...pending.values()],
-          approvedIds: [...approved],
-          rejectedIds: [...rejected],
-        };
-      }
-      pending.delete(id);
-      rejected.add(id);
-      approved.delete(id);
+      pending.delete(normalizedId);
+      rejected.add(normalizedId);
+      approved.delete(normalizedId);
       return emit();
     },
     subscribe(listener) {
