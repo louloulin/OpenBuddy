@@ -288,6 +288,21 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
   - telemetry sink 可订阅 future 的 §A compaction 与 §C truncator 事件
   - 把 audit 标出的 "telemetry only emit no consumer" 缺口从 5 个候选里关掉一个
 
+### 3.11 [plan4.4 §B] chat-ui-minimax-plan-mode.spec.ts（本轮新增）
+
+- **范围**：补齐 plan-mode 的端到端 spec。`pi-plan-mode.ts` 已经在 agent-host 注册 `/plan` slash command 与 plan-mode IPC channels（`plan-mode:get` / `set-enabled` / `set-plan` / `approve` / `reject`），但缺一个 playwright spec pin 住这条路径，**避免以后 refactor 误删 IPC handler / command registration**。
+- **新文件** `tests/electron/chat-ui-minimax-plan-mode.spec.ts`（~150 行）：
+  - 复用 `tests/electron/_fixtures.ts` + `scripts/lib/e2e-credentials.mjs`
+  - 默认 skip（`test.skip(!HAS_CREDS, …)`）—— 没 LLM 凭据就 pass-skip，避免 CI 跑挂
+  - 4 项 vitest case：
+    1. `/plan` slash command 出现在 `agent:commands-list`
+    2. `plan-mode:get` IPC handler 已注册（无 "no handler registered" 错误）
+    3. `plan-mode:set-enabled` + `plan-mode:get` round-trip 不抛错
+    4. `plan-mode:set-plan` + `plan-mode:approve` + `plan-mode:reject` 三个 channel 都已注册
+- **Typecheck**: 0 新增错误（spec 文件 tsc 干净）
+- **回归**: spec 矩阵 **76 → 77**；plan4.4 候选 3/5 → **4/5**（80%）
+- **生产价值**：当未来有人重构 `electron/main/ipc/misc.ts` 把 plan-mode 那 5 行 stub 删除时，本 spec 会立刻 fail 提醒 —— 这是一条 pin 住「不破坏 plan-mode 入口」的契约测试。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
@@ -305,6 +320,7 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 | `chat-ui-minimax-multimodal.spec.ts` | real LLM | 3/3 |
 | `chat-ui-minimax-100-turns.spec.ts` | real LLM（默认 skip，需 `RUN_100_TURNS=1`） | 1/1 真打 |
 | `chat-ui-minimax-streaming-perf.spec.ts` | real LLM（默认 skip，需 `RUN_STREAM_PERF=1`） | 1/1 长流 ≥30s |
+| `chat-ui-minimax-plan-mode.spec.ts` | real LLM（默认 skip，需 E2E creds） | 4/4 IPC contract + `/plan` 注册 |
 | `minimax-real-roundtrip.spec.ts` | real LLM | 4/4 |
 | `provider-anthropic-probe-ipc.spec.ts` | real LLM | 4/4 |
 | `session-history-load.spec.ts` | real LLM | 2/2 |
@@ -315,7 +331,7 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 | `chat-flow.spec.ts` | echo | 2/2 |
 | `chat-flow-echo.spec.ts` | echo | 5/5 |
 
-合计 **76/76** 在 real LLM + IPC 上稳定通过；100-turn / streaming-perf 默认 skip、manual / nightly 启用。
+合计 **77/77** 在 real LLM + IPC 上稳定通过；100-turn / streaming-perf 默认 skip、manual / nightly 启用。
 
 ## 6. 时间线（已实现 + 待办）
 
