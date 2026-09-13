@@ -31,6 +31,11 @@ import type { UseExtensionAuditPanelResult } from "./useExtensionAuditPanel";
 // the real `openbuddy://plugin-event` IPC channel.
 const handlers: Array<(event: OpenBuddyPluginEvent) => void> = [];
 const disposers: Array<() => void> = [];
+// `agentPluginEvents` is the on-demand cached-event read used by the
+// hook on mount to catch up on reports emitted before the panel
+// subscribed. Tests control its return value via `setCachedEvents`.
+let cachedEvents: OpenBuddyPluginEvent[] = [];
+let pluginEventsCalls = 0;
 
 vi.mock("../lib/agent/pi-client", () => ({
   agentOnPluginEvent: vi.fn(async (handler: (event: OpenBuddyPluginEvent) => void) => {
@@ -41,6 +46,10 @@ vi.mock("../lib/agent/pi-client", () => ({
     };
     disposers.push(dispose);
     return dispose;
+  }),
+  agentPluginEvents: vi.fn(async () => {
+    pluginEventsCalls += 1;
+    return cachedEvents;
   }),
 }));
 
@@ -96,6 +105,8 @@ describe("useExtensionAuditPanel (plan4.5 §A — renderer hook for pi/extension
   beforeEach(() => {
     handlers.length = 0;
     disposers.length = 0;
+    cachedEvents = [];
+    pluginEventsCalls = 0;
   });
 
   afterEach(() => {
@@ -202,5 +213,64 @@ describe("useExtensionAuditPanel (plan4.5 §A — renderer hook for pi/extension
     });
     expect(captured!.reports).toHaveLength(0);
     expect(captured!.summary.latest).toBeNull();
+  });
+
+  it("catches up on reports emitted before mount via agentPluginEvents()", async () => {
+    // The main-side ring buffer may already contain one or more
+    // `pi/extension-policy-report` events by the time the renderer
+    // mounts the panel. The hook must hydrate from that cache so the
+    // user doesn't see an empty panel until the next resolve.
+    cachedEvents = [
+      {
+        type: "session/input-truncated",
+        timestamp: "2026-09-13T01:59:00.000Z",
+        payload: {},
+      },
+      {
+        type: "pi/extension-policy-report",
+        timestamp: "2026-09-13T02:00:00.000Z",
+        payload: sampleReport,
+      },
+    ];
+    let captured: UseExtensionAuditPanelResult | undefined;
+    render(<Probe onReady={(api) => (captured = api)} />);
+    // Catch-up is async — wait for the next microtask + promise chain.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(captured).toBeDefined();
+    expect(pluginEventsCalls).toBeGreaterThanOrEqual(1);
+    // Only the policy-report is hydrated; session/input-truncated is
+    // filtered by the accumulator.
+    expect(captured!.reports).toHaveLength(1);
+    expect(captured!.summary.totalAllowed).toBe(1);
+    expect(captured!.summary.totalDenied).toBe(1);
+    expect(captured!.summary.latest).toBe("2026-09-13T02:00:00.000Z");
+  });
+
+  it("does not crash when agentPluginEvents() rejects (graceful)", async () => {
+    // The on-demand IPC call may fail (bridge down, etc.). The hook
+    // must NOT crash the host — it should still subscribe to live
+    // events and start from an empty log.
+    const failingModule = await import("../lib/agent/pi-client");
+    (failingModule.agentPluginEvents as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      async () => {
+        throw new Error("bridge down");
+      },
+    );
+    let captured: UseExtensionAuditPanelResult | undefined;
+    render(<Probe onReady={(api) => (captured = api)} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(captured).toBeDefined();
+    expect(captured!.reports).toHaveLength(0);
+    // Live subscription still works.
+    dispatch({
+      type: "pi/extension-policy-report",
+      timestamp: "2026-09-13T02:00:00.000Z",
+      payload: sampleReport,
+    });
+    expect(captured!.reports).toHaveLength(1);
   });
 });

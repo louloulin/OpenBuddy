@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { agentOnPluginEvent } from "../lib/agent/pi-client";
+import {
+  agentOnPluginEvent,
+  agentPluginEvents,
+} from "../lib/agent/pi-client";
 import {
   createExtensionAuditAccumulator,
   type ExtensionAuditAccumulator,
@@ -48,6 +51,10 @@ export function useExtensionAuditPanel(): UseExtensionAuditPanelResult {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let cancelled = false;
+    // Install the live subscription FIRST so synchronous dispatchers
+    // (and tests that don't `await` after `render`) still see a
+    // handler. The catch-up read below runs after the subscription
+    // is wired and feeds historical events into the same accumulator.
     (async () => {
       try {
         const dispose = await agentOnPluginEvent((event: ExtensionAuditPluginEvent) => {
@@ -62,6 +69,25 @@ export function useExtensionAuditPanel(): UseExtensionAuditPanelResult {
       } catch {
         // Subscription failure is non-fatal: the renderer simply won't
         // show extension audit telemetry until the IPC channel recovers.
+        return;
+      }
+      // 2. Catch up on reports emitted before the panel mounted.
+      //    The main-side ring buffer (`agentPluginEvents`) keeps the
+      //    last N events; if `resolvePiExtensions` already fired once,
+      //    the report is sitting in the cache. Hydrate from it so the
+      //    panel doesn't show "awaiting first report" until the next
+      //    resolve.
+      try {
+        const cached = await agentPluginEvents();
+        if (cancelled) return;
+        for (const event of cached) {
+          accumulator.handle(event as ExtensionAuditPluginEvent);
+        }
+        refresh();
+      } catch {
+        // Bridge down / IPC failure — non-fatal. The live subscription
+        // above still works once the bridge recovers; the panel just
+        // starts empty.
       }
     })();
     return () => {
