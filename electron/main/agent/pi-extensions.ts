@@ -1,7 +1,8 @@
 import { isAbsolute, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { Type } from "@earendil-works/pi-ai";
-import { DEFAULT_COMPACTION_SETTINGS, shouldCompact } from "@earendil-works/pi-agent-core";
+import { shouldCompact } from "@earendil-works/pi-agent-core";
+import { buildOpenbuddyCompactionSettings } from "./host-modules/openbuddy-compaction-settings";
 import openBuddyApplyPatch, { type OpenBuddyApplyPatchConfig } from "./extensions/apply-patch";
 import { sessionMetadataBridgeFactory } from "./extensions/session-metadata-bridge";
 import { modelBridgeFactory } from "./extensions/model-bridge";
@@ -1020,7 +1021,13 @@ export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResol
       // of hand-rolling the threshold check. Combined with the edge-triggered
       // `crossed` guard so we only request compaction once per crossing, not on
       // every turn above the threshold. `threshold` is the context window here.
-      const shouldCompactNow = shouldCompact(tokens, threshold, DEFAULT_COMPACTION_SETTINGS);
+      //
+      // plan4.4 §A: replace the bare `DEFAULT_COMPACTION_SETTINGS` with the
+      // OpenBuddy-tuned instance so the summarizer gets a reserve that
+      // matches our document truncator budget (~6k tokens) and we retain
+      // more recent context (96k tokens) for chat UX.
+      const compactionSettings = buildOpenbuddyCompactionSettings();
+      const shouldCompactNow = shouldCompact(tokens, threshold, compactionSettings);
       if (!crossed || !shouldCompactNow || !context.compact) return;
       emit("pi/context-compaction-requested", { thresholdTokens: threshold, tokens });
       context.compact();

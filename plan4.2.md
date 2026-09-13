@@ -243,6 +243,19 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 - 当前未跑实际 MiniMax 上游（环境无可用 OPENBUDDY_E2E_API_KEY），所以 `docs/perf/streaming-*.json` 还未生成；plan4.4 把 `perf-streaming.mjs` 接入 nightly，并在 README 记录 `RUN_STREAM_PERF=1 node scripts/electron/perf-streaming.mjs` 的使用方式。
 - **本轮新增 `tests/electron/chat-ui-minimax-streaming-perf.spec.ts`**（plan4.3 §3.7 验收 spec）：用 `@playwright/test` 跑同样的 STREAMING_PROMPT，renderer 内 `requestAnimationFrame` 采样 `dt` 数组，rAF 采样 + 累计渲染时间 + Stop 按钮消失 共同决定 `streamDurationMs`；报告 schema 直接 import `perf-streaming-schema.mjs`（共享 `STREAMING_REPORT_SCHEMA` / `STREAMING_REPORT_FIELDS` / `estimateOutputTokens` / `summarizeFrameDeltas`），落盘 `docs/perf/streaming-<date>-openbuddy-streaming-spec.json`。默认 skip（`test.skip(!RUN, …)` + `test.skip(!HAS_CREDS, …)`），opt-in：`RUN_STREAM_PERF=1 pnpm exec playwright test tests/electron/chat-ui-minimax-streaming-perf.spec.ts`。`pnpm exec tsc --noEmit` 已确认 spec 无类型错误；未跑 playwright（需真实 LLM）。
 
+### 3.8 [plan4.4 §A] OpenBuddy-tuned pi compaction 策略（本轮新增）
+
+- **范围**：把 `electron/main/agent/pi-extensions.ts` 里硬编码的 `DEFAULT_COMPACTION_SETTINGS` 替换成 OpenBuddy-tuned instance，让 pi 上游 `shouldCompact()` 用我们的 `reserveTokens` / `keepRecentTokens`，而不是 SDK 裸默认值。
+- **校准锚点**：
+  - `document-truncator.ts::DEFAULT_TRUNCATION_OPTIONS.maxChars = 24_000`（约 6_000 tokens，4-char heuristic）—— summarizer prompt 必须 ≥ 这个 budget，否则就被截断过；
+  - `agent-host.ts::contextWindow = 128_000` 默认 —— `keepRecentTokens` 取 75% 留 2–3 turn + 1 大附件工作记忆。
+- **实现**（commit `443a8c8`）：
+  - 新增 `electron/main/agent/host-modules/openbuddy-compaction-settings.ts`：纯函数 `buildOpenbuddyCompactionSettings(tuning?)` 合并 `DEFAULT_COMPACTION_SETTINGS`（pi 默认）+ `DEFAULT_OPENBUDDY_COMPACTION_SETTINGS`（OpenBuddy 锚点）+ 调用方 override；`reserveTokens` round 到 1k，`keepRecentTokens` 兜底 `safeNumber`，永不返回 NaN/负值。
+  - 新增 `openbuddy-compaction-settings.test.ts` 9 项定向测试：frozen 默认、`enabled=true`、`reserveTokens ≥ 6_000`（≥ 文档截断预算）、`keepRecentTokens ≤ 120_000`（context window 之内）、override 不污染默认、NaN/负值 clamp、`CompactionSettings` 形状完整、tuning shape 类型守卫。**9/9 通过**。
+  - `pi-extensions.ts` 的 `openbuddy-pi-context-guard` factory 调用 `buildOpenbuddyCompactionSettings()` 而不是 `DEFAULT_COMPACTION_SETTINGS`；周围加注释说明 plan4.4 §A 的 rationale 与 truncator budget 锚点。
+- **回归**：`pi-extensions.test.ts` 39/39 + `document-truncator.test.ts` 8/8 + `agent-prompt-truncation.test.ts` 2/2 全部保持绿色；typecheck 未引入新错误（4 个 pre-existing `cross-spawn` 类型错误与本轮无关）。
+- **价值**：plan4.3 §3.6 的 truncator 与 plan4.4 §A 的 compaction 现在用同一套 token budget 语义 —— truncator 知道自己的 6k 预算，compaction 知道要 reserve 16k，两个模块不再各自孤立读 pi 默认值。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
