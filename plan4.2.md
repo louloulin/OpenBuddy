@@ -467,6 +467,27 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 
 **生产价值**: ops 现在能直接从 panel header 回答「这个 session 内 agent host re-resolve 几次了？」，对诊断 startup churn / 反复 reload（plugin 反复 reload 常见原因：marketplace 自动 update / profile 切换）有用，不需要 drop 进 main-side logs。
 
+### 3.18 [plan4.5 §A] useExtensionAuditPanel on-mount catch-up（本轮新增）
+
+**问题**: Round 11 的 hook 只通过 `agentOnPluginEvent()` 订阅 live event —— 如果 `pi/extension-policy-report` 在 panel mount **之前** 就已经 emit 了（fast agent-host restart / profile 切换 / plugin reload 时常见），panel 会显示「awaiting first report」直到下次 resolve。这是 confusing UX。
+
+**方案**: mount 时额外调用 `agentPluginEvents()`（已存在的 IPC，返回 main 端 ring buffer 缓存）来读取历史 event，把任何 `pi/extension-policy-report` 类型喂进 accumulator。
+
+- `src/hooks/useExtensionAuditPanel.ts`：
+  - 操作顺序关键：先装 live subscription，再 async 跑 catch-up
+  - 同步 dispatcher（不 `await` 的 test）立即看到 handler；catch-up 异步补历史
+  - 两个失败都 try/catch（非致命）
+- `src/hooks/useExtensionAuditPanel.test.tsx`：mock `agentPluginEvents` 后新增 2 个 case：
+  1. **catch up on reports emitted before mount** —— ring buffer 里有 1 个 `pi/extension-policy-report` + 1 个 `session/input-truncated`，mount 后 panel 应该有 1 个 report（filter 掉非 policy-report 类型）
+  2. **does not crash when agentPluginEvents() rejects** —— bridge down 时 hook 不崩，live subscription 仍工作
+
+**验收**:
+- `pnpm exec vitest run src/hooks/useExtensionAuditPanel.test.tsx` —— **8/8 ✓**（was 6/6）
+- 全 extension audit pipeline: parser (11) + accumulator (7) + hook (8) + panel (7) + CSS guard (5) = **38/38 ✓**
+- `pnpm exec tsc --noEmit -p .` —— 0 新增错误
+
+**生产价值**: Extension Audit panel 现在即使 mount 比第一次 resolve 晚也能立刻显示最新状态（profile 切换 / plugin reload / fast agent-host restart 场景），不需要改 panel 本身 —— hook 透明地 hydrate。
+
 ## 4. Plan 4.3 之外的更长路线
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
