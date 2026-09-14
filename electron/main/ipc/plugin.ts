@@ -42,11 +42,18 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     await ensureAgentHost();
     const input = recordValue(args, "session surface acquire payload");
     const lease = multiSurfaceSessions.acquire(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
+    if (!lease.ok) return lease;
     return { sessionId: lease.sessionId, surfaceId: lease.surfaceId, generation: lease.generation, shared: (multiSurfaceSessions.snapshot(lease.sessionId)[0]?.refCount ?? 0) > 1 };
+
   });
   ipcMain.handle("agent:session-surface-release", async (_e, args: unknown) => {
     const input = recordValue(args, "session surface release payload");
-    return { released: multiSurfaceSessions.release(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"), input.generation === undefined ? undefined : optionalFiniteInteger(input.generation, "generation", 0, 0, Number.MAX_SAFE_INTEGER)) };
+    return multiSurfaceSessions.release(
+      requiredString(input.sessionId, "sessionId"),
+      requiredString(input.surfaceId, "surfaceId"),
+      input.generation === undefined ? undefined : optionalFiniteInteger(input.generation, "generation", 0, 0, Number.MAX_SAFE_INTEGER),
+      () => agentHost.dispose(),
+    );
   });
   ipcMain.handle("agent:session-surface-list", async (_e, args?: unknown) => {
     const input = args === undefined || args === null ? {} : recordValue(args, "session surface list payload");

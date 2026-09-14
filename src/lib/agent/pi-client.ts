@@ -1692,10 +1692,13 @@ export async function promptHistory(limit?: number): Promise<string[]> {
 
 import { progressSnapshot, type ProgressRun } from "./progress-runs";
 
-export interface MultiSurfaceSessionLeaseResult { sessionId: string; surfaceId: string; generation: number; shared: boolean; }
+export interface MultiSurfaceSessionLeaseResult { ok: true; sessionId: string; surfaceId: string; generation: number; shared: boolean; }
+export interface MultiSurfaceSessionLeaseError { ok: false; code: "disposed" | "generation-mismatch" | "duplicate-release" | "unknown-session"; message: string; }
+export type MultiSurfaceSessionAcquireResult = MultiSurfaceSessionLeaseResult | MultiSurfaceSessionLeaseError;
+export type MultiSurfaceSessionReleaseResult = { ok: true; released: boolean } | MultiSurfaceSessionLeaseError;
 export interface MultiSurfaceSessionState { sessionId: string; surfaces: string[]; refCount: number; generation: number; }
-export async function multiSurfaceSessionAcquire(sessionId: string, surfaceId: string): Promise<MultiSurfaceSessionLeaseResult> { return invoke("agent:session-surface-acquire", { sessionId, surfaceId }); }
-export async function multiSurfaceSessionRelease(sessionId: string, surfaceId: string, generation?: number): Promise<{ released: boolean }> { return invoke("agent:session-surface-release", { sessionId, surfaceId, ...(generation === undefined ? {} : { generation }) }); }
+export async function multiSurfaceSessionAcquire(sessionId: string, surfaceId: string): Promise<MultiSurfaceSessionAcquireResult> { return invoke("agent:session-surface-acquire", { sessionId, surfaceId }); }
+export async function multiSurfaceSessionRelease(sessionId: string, surfaceId: string, generation?: number): Promise<MultiSurfaceSessionReleaseResult> { return invoke("agent:session-surface-release", { sessionId, surfaceId, ...(generation === undefined ? {} : { generation }) }); }
 export async function multiSurfaceSessionList(sessionId?: string): Promise<MultiSurfaceSessionState[]> { return invoke("agent:session-surface-list", sessionId === undefined ? undefined : { sessionId }); }
 
 export async function progressRunsGet(): Promise<ProgressRun[]> { return invoke<ProgressRun[]>("progress:list"); }

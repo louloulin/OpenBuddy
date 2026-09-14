@@ -228,6 +228,7 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
     if (!sessionId || sessionId.startsWith("__pending_")) return;
     let cancelled = false;
     void multiSurfaceSessionAcquire(sessionId, multiSurfaceIdRef.current).then((lease) => {
+      if (!lease.ok) return;
       if (cancelled) {
         void multiSurfaceSessionRelease(lease.sessionId, lease.surfaceId, lease.generation);
         return;
