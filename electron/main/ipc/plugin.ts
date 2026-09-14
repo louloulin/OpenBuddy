@@ -18,7 +18,8 @@
  * cold-start path (matches `plugins_list`).
  */
 import { ipcMain } from "electron";
-import { progressSnapshot, cancelProgress, retryProgress } from "../../src/lib/agent/progress-runs";
+import { progressSnapshot, cancelProgress, retryProgress } from "../agent/progress-runs";
+
 
 
 import {

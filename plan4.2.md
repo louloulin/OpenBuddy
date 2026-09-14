@@ -675,3 +675,9 @@ plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 新增带唯一 `runId` 的 progress state machine：支持阶段、百分比/不确定进度、最近事件、completed/failed/cancelled 状态；旧 run 更新会被忽略，取消幂等，retry 只创建新 run。新增 `progress:list`、`progress:cancel`、`progress:retry` IPC 与 typed client，并提供 renderer `ProgressPanel` 显示取消/重试/错误反馈。
 
 验收：progress-runs 回归 2/2，tsc 与 diff check 通过。后续接入真实 AgentSession 长任务事件与 replay 恢复，并补 UI 集成测试。
+
+### 3.32 [plan4.5 §E] Progress UX AgentSession/replay bridge（本轮新增）
+
+Progress run 现在由真实 `tool_execution_start` / `tool_execution_end` 阶段事件创建和完成，并共享 tool abort controller；renderer `ProgressPanel` 订阅 `openbuddy://plugin-event`，同时读取 plugin event ring buffer 和 `progress:list`，因此刷新/短断线可恢复。状态机按 runId 隔离旧事件，取消幂等，失败重试生成新 run。
+
+验收：progress 状态回归 2/2，TypeScript 与 diff check 通过。后续补 ProgressPanel 集成测试和完整 cursor gap → session history fallback；多 surface session、Electron smoke/E2E 仍未完成。

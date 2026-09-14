@@ -1692,7 +1692,7 @@ export async function promptHistory(limit?: number): Promise<string[]> {
 
 import { progressSnapshot, type ProgressRun } from "./progress-runs";
 
-export function progressRunsGet(): ProgressRun[] { return progressSnapshot(); }
+export async function progressRunsGet(): Promise<ProgressRun[]> { return invoke<ProgressRun[]>("progress:list"); }
 export function progressRunCancel(runId: string): Promise<ProgressRun | null> { return invoke("progress:cancel", { runId }); }
 export function progressRunRetry(runId: string): Promise<ProgressRun | null> { return invoke("progress:retry", { runId }); }
 

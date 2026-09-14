@@ -31,7 +31,8 @@
  * Reverse-dependency invariant:
  *   This module imports nothing from agent-host.ts. deps are passed in.
  */
-import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import { startProgress, finishProgress } from "../../progress-runs";
+
 
 export interface HandleSessionEventDeps {
   /** Mutable session-scoped state (queueMirror, eventHandlers, jobsRegistry, runningTasks). */
@@ -235,6 +236,8 @@ export function handleSessionEvent(
     const toolCallId = event.toolCallId ?? "";
     const toolName = event.toolName ?? "";
     const abortController = new AbortController();
+    startProgress(toolCallId, session.sessionId, abortController);
+
     state.runningTasks.set(toolCallId, {
       id: toolCallId,
       kind: toolName,
@@ -274,7 +277,8 @@ export function handleSessionEvent(
     }
   } else if (event.type === "tool_execution_end") {
     const toolCallId = event.toolCallId ?? "";
-    const job = state.jobsRegistry.get(toolCallId);
+    finishProgress(toolCallId, event.isError ? "failed" : "completed", event.isError ? String(event.message ?? "tool execution failed") : undefined);
+
     if (job) {
       job.status = event.isError ? "failed" : "completed";
       job.finishedAt = Date.now();
