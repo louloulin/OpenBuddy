@@ -55,6 +55,7 @@ async function installManagedPackage(sourceRoot: string, targetRoot: string, rem
   const stagedPackage = join(staging, "package");
   const backup = `${target}.openbuddy-backup-${process.pid}-${Date.now()}`;
   let movedOld = false;
+  let installedNew = false;
   try {
     await cp(sourceRoot, stagedPackage, { recursive: true, force: false, errorOnExist: true });
     const verification = await verifyMarketplacePackage(stagedPackage, remote);
@@ -62,8 +63,9 @@ async function installManagedPackage(sourceRoot: string, targetRoot: string, rem
     await writeJson(join(stagedPackage, MARKETPLACE_MANAGED_FILE), { version: 1, source: "marketplace", keyId: verification.keyId ?? null });
     if (targetInfo) { await rename(target, backup); movedOld = true; }
     await rename(stagedPackage, target);
+    installedNew = true;
   } catch (error) {
-    await rm(target, { recursive: true, force: true }).catch(() => undefined);
+    if (installedNew) await rm(target, { recursive: true, force: true }).catch(() => undefined);
     if (movedOld) await rename(backup, target).catch(() => undefined);
     throw error;
   } finally {

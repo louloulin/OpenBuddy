@@ -657,3 +657,9 @@ plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 安装改为 staging → 验签 → 写 managed marker → rename 旧版本到 backup → rename staging 到 target；任一步失败删除新 target 并恢复旧 backup，临时目录最终清理。重复安装不覆盖 symlink target。卸载仅接受 `realpath(agentRoot/plugins)` 下的目录，拒绝 symlink、非目录、缺少 `.openbuddy-marketplace-managed.json` 管理标记的目标；因此不会删除用户数据目录或越权路径。
 
 验收：`pi-resources.test.ts` + `marketplace-pi-sync.test.ts` 21/21 通过，tsc 与 diff check 通过。仍需补专门失败注入/符号链接/重复卸载 fixtures；Progress UX、多 surface session、Electron smoke/E2E 仍未完成。
+
+### 3.29 [plan4.5 §D] marketplace 事务安全独立回归（本轮新增）
+
+新增 `marketplace-transaction-safety.test.ts`，独立验证旧版本恢复、验签失败后的 target/managed metadata 状态、symlink 越权保护、路径穿越拒绝、非 managed 目录卸载拒绝。修复事务 catch 逻辑：staging/验签阶段失败不得误删原有 target，只有新 target 已 rename 后才清理并恢复 backup。
+
+验收：独立安全测试 4/4；连同 `pi-resources.test.ts` 与 `marketplace-pi-sync.test.ts` 共 25/25，通过 tsc 与 diff check。下一阶段推进 Progress UX 或多 surface session。
