@@ -127,7 +127,7 @@
     "sync:ui-aliases": "node scripts/sync-ui-aliases.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.124.0",
+    "@anthropic-ai/sdk": "^0.125.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1048.0",
     "@cordisjs/core": "^3.18.1",
     "@earendil-works/pi-agent-core": "^0.85.0",
@@ -248,7 +248,7 @@
     "@types/hast": "^3.0.5",
     "@types/linkify-it": "^5.0.0",
     "@types/mdast": "^4.0.4",
-    "@types/node": "26.4.1",
+    "@types/node": "26.5.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^19.2.7",
