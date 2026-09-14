@@ -339,7 +339,14 @@ pnpm lint
 - `scripts/electron/screenshot.mjs` 在真实 compiled Electron 应用中成功生成 `desktop-main.png`、`settings-zh.png`。当前 runner 没有 ImageMagick，因此 blank-frame histogram 检查明确输出 skipped；截图仍通过 renderer 文本 readiness 检查。未生成 PDF canvas 截图，避免用错误链路冒充证据。
 - 本轮未提交未经真实验证的 session-store 修复；真实 PDF transcript 失败说明仍需继续追踪 session projection / optimistic bubble 生命周期，不能将此修复标记为最终闭环。
 
-本轮验证汇总：定向 Vitest 5 个测试文件、55/55 通过；Electron 文档预览 2/3 通过、1/3 失败；compiled Electron screenshot 脚本退出码 0（ImageMagick 检查 skipped）。
+### 10.7 本轮追加验证（2026-09-14）
+
+- 在 `28484e7` 基础上再次运行真实 Electron PDF 预览矩阵，结果仍为 2/3：PDF chip 和非法 `.zip` 拒绝通过，发送后 transcript 未出现 `.file-preview--pdf`。
+- 失败页快照显示会话与 assistant/tool 内容均已渲染，但用户消息的 PDF file part 缺失；因此失败发生在附件 content → session projection 生命周期，而非 PDF.js canvas renderer。
+- 对 `loadHistoryMessages`、optimistic attachment 保留和 `setSession` 同会话重选路径分别做了最小回归实验；单测可通过，但真实 Electron 失败仍复现，故本轮撤销所有未验证实验改动，没有把猜测性状态修复提交。
+- 当前稳定远程版本仍为 `28484e7`；不生成 PDF canvas 截图，避免把失败链路当作最终证据。
+
+后续修复必须在 Electron 边界增加结构化诊断，记录 `Composer content`、`agent:prompt-content` 入参、`agent-session` persisted message 和 renderer projection 四个边界的 file-part 数量/媒体类型，再依据首个丢失点修复。
 
 本轮自动测试发现并修复 PDF.js loading task 的卸载竞态：当 `getDocument()` 已返回但 `loadingTask.promise` 尚未完成时，组件卸载原实现无法调用 task 的 `destroy()`，可能让 PDF worker 和加载任务继续存活。`PdfJsPreview` 现在在该阶段直接销毁 loading task；文档已完成加载时继续销毁 PDF document。
 
