@@ -146,17 +146,11 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     // whether to fall back to `agent:session-messages`.
     const input = args === undefined || args === null ? {} : recordValue(args, "event-log-replay payload");
     const sessionId = requiredString(input.sessionId, "sessionId");
-    const fromSequence = input.fromSequence === undefined ? 0 : optionalFiniteInteger(input.fromSequence, "fromSequence", 0, 0, Number.MAX_SAFE_INTEGER);
-    const limit = input.limit === undefined ? 500 : optionalFiniteInteger(input.limit, "limit", 500, 1, 2000);
-    const entries = await agentHost.pluginEvents({ sessionId, sinceSequence: fromSequence, limit });
-    const cursor = await agentHost.pluginEventLogCursor({ sessionId });
-    return {
-      sessionId,
-      fromSequence,
-      count: Array.isArray(entries) ? entries.length : 0,
-      entries,
-      cursor,
-    };
+    const surfaceId = requiredString(input.surfaceId, "surfaceId");
+    const attached = pluginEventLogCursor.attachSurface(sessionId, surfaceId);
+    if (!attached.ok) return attached;
+    const replay = pluginEventLogCursor.readSince(sessionId, surfaceId, input.sinceEventId === undefined ? undefined : requiredString(input.sinceEventId, "sinceEventId"), input.limit === undefined ? 2000 : optionalFiniteInteger(input.limit, "limit", 2000, 1, 2000));
+    return replay;
   });
   ipcMain.handle("agent:plugin-enable", async (_e, args: { id: string; enabled: boolean }) => {
     const input = recordValue(args, "plugin-enable payload");

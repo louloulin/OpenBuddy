@@ -940,16 +940,19 @@ export interface AgentEventLogReplayResult {
   };
 }
 
+export interface SurfaceEventLogReplayResult { ok: true; events: unknown[]; nextCursor: string | null; truncated: boolean; }
+export interface SurfaceEventLogReplayError { ok: false; code: string; message: string; }
+export type SurfaceEventLogReplayResponse = SurfaceEventLogReplayResult | SurfaceEventLogReplayError;
+export async function eventLogReplay(sessionId: string, surfaceId: string, sinceEventId?: string, limit = 2000): Promise<SurfaceEventLogReplayResponse> {
+  return invoke<SurfaceEventLogReplayResponse>("agent:event-log-replay", { sessionId, surfaceId, ...(sinceEventId === undefined ? {} : { sinceEventId }), limit });
+}
+
 export async function agentEventLogReplay(
   sessionId: string,
   fromSequence: number,
   limit = 2000,
 ): Promise<AgentEventLogReplayResult> {
-  return invoke<AgentEventLogReplayResult>("agent:event-log-replay", {
-    sessionId,
-    fromSequence,
-    limit,
-  });
+  return invoke<AgentEventLogReplayResult>("agent:event-log-replay", { sessionId, fromSequence, limit });
 }
 
 export async function agentCurrentModel(): Promise<unknown> {
