@@ -59,6 +59,8 @@ import {
   dispatchPiEvent,
   agentEventLogReplay,
   eventLogReplay,
+  restoreDocument,
+  agentOnPluginEvent,
   attachEventLogSurface,
   detachEventLogSurface,  agentSessionMessages,
   sessionEntriesToChatMessages,
@@ -233,7 +235,11 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
   const multiSurfaceIdRef = useRef(`renderer:${Math.random().toString(36).slice(2, 10)}`);
   const [truncations, setTruncations] = useState<Map<string, import("@/components/TruncationBanner").TruncationInfo>>(new Map());
   const dismissTruncation = useCallback((sessionId: string) => setTruncations((current) => { const next = new Map(current); next.delete(sessionId); return next; }), []);
-  const restoreTruncation = useCallback(async (sessionId: string) => { dismissTruncation(sessionId); }, [dismissTruncation]);
+  const restoreTruncation = useCallback(async (sessionId: string) => {
+    const truncation = truncations.get(sessionId);
+    const result = await restoreDocument(sessionId, truncation?.sourceDocumentId);
+    if (result.ok) dismissTruncation(sessionId);
+  }, [dismissTruncation, truncations]);
 
   const multiSurfaceGenerationRef = useRef<number | undefined>(undefined);
   const multiSurfaceSessionRef = useRef<string | undefined>(undefined);
@@ -249,6 +255,23 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
   const advanceSince = useCallback((eventId: string) => { eventLogCursorRef.current = eventId; }, []);
   const reconnect = useCallback(async () => { eventLogCursorRef.current = undefined; return replayEvents(); }, [replayEvents]);
 
+  useEffect(() => {
+    let dispose: (() => void) | undefined;
+    void agentOnPluginEvent((event) => {
+      if ((event as { type?: string }).type !== "session/input-truncated") return;
+      const payload = (event as { payload?: Record<string, unknown> }).payload ?? {};
+      const sessionId = typeof payload.sessionId === "string" ? payload.sessionId : "";
+      if (!sessionId) return;
+      setTruncations((current) => new Map(current).set(sessionId, {
+        sessionId,
+        truncatedAt: typeof payload.truncatedAt === "string" || typeof payload.truncatedAt === "number" ? payload.truncatedAt : Date.now(),
+        byteCount: typeof payload.byteCount === "number" ? payload.byteCount : Number(payload.totalChars ?? 0),
+        ...(typeof payload.sourceDocumentId === "string" ? { sourceDocumentId: payload.sourceDocumentId } : {}),
+        ...(typeof payload.originalName === "string" ? { originalName: payload.originalName } : {}),
+      }));
+    }).then((unlisten) => { dispose = unlisten; }).catch(() => undefined);
+    return () => { dispose?.(); };
+  }, []);
   useEffect(() => {
     const sessionId = useSessionStore.getState().sessionId;
     if (!sessionId || sessionId.startsWith("__pending_")) return;

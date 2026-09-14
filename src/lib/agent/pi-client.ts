@@ -856,9 +856,13 @@ export interface PiSessionEntry {
   data?: unknown;
 }
 
-export async function agentSessionMessages(sessionId: string): Promise<PiSessionEntry[]> {
-  return invoke<PiSessionEntry[]>("agent:session-messages", { sessionId });
+export async function agentSessionMessages(sessionId: string): Promise<PiSessionEntry[]> { return invoke<PiSessionEntry[]>("agent:session-messages", { sessionId }); }
+
+export async function restoreDocument(sessionId: string, sourceDocumentId?: string): Promise<{ ok: true; content: string } | { ok: false; code: "unsupported" | "missing" | "disposed"; message: string }> {
+  return invoke("agent:document-restore", { sessionId, ...(sourceDocumentId === undefined ? {} : { sourceDocumentId }) });
 }
+
+
 
 /**
  * Map pi SessionEntry[] to ChatMessage[] used by session-store.

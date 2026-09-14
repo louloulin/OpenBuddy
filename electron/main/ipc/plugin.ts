@@ -137,7 +137,14 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
       ...(input.limit === undefined ? {} : { limit: optionalFiniteInteger(input.limit, "limit", 2000, 1, 2000) }),
     });
   });
-  ipcMain.handle("agent:event-log-surface-attach", async (_e, args: unknown) => {
+  ipcMain.handle("agent:document-restore", async (_e, args: unknown) => {
+    const input = recordValue(args, "document restore payload");
+    const sessionId = requiredString(input.sessionId, "sessionId");
+    const session = await agentHost.getSession?.(sessionId).catch(() => null);
+    if (!session) return { ok: false, code: "disposed", message: `session ${sessionId} is unavailable` };
+    return { ok: false, code: "unsupported", message: "complete source document restoration is not available for this session" };
+  });
+
     const input = recordValue(args, "event log surface attach payload");
     return pluginEventLogCursor.attachSurface(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
   });
