@@ -635,3 +635,13 @@ plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 **验收**：`pi-extension-configure.test.ts` 新增 allow→deny 热切换回归；extension policy / needs-review integration / configure 定向测试 30 项通过；全仓 `pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过。
 
 **后续缺口**：renderer 尚未提供专用 policy 编辑 UI/typed client；下一步应将 IPC 接入设置面板，并补 policy 持久化、签名信任和 marketplace 安装回滚。
+
+### 3.26 [plan4.5 §C] renderer policy editor + persistence（本轮新增）
+
+**实现**：新增 typed client `extensionPolicyGet()` / `extensionPolicySave()`；main IPC 增加 get/save。保存前由资源层做字符串类型校验、trim、去重，并以 `0600` 写入 Pi agent root 的 `openbuddy-extension-policy.json`；启动时 configure 阶段读取该文件，随后仍通过既有 policy resolver、audit report 和 needs-review gate，不绕过审批。新增 `ExtensionPolicyEditor`，支持 allowlist/denylist 编辑、保存并刷新反馈。
+
+**回归与兼容修复**：补充 marketplace Pi resource 探测的 ENOENT fail-soft，避免不存在的 prompts/themes 目录阻断 policy reload。
+
+**验收**：`pi-extension-configure.test.ts`、`pi-resources.test.ts`、`ExtensionAuditPanel.test.tsx` 合计 38/38；`pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过。
+
+**下一缺口**：marketplace 包的签名校验、信任根、安装失败回滚及卸载清理仍未完成。

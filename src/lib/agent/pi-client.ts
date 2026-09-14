@@ -1807,7 +1807,20 @@ export async function agentsDefaultsSave(defaults: AgentDefaults): Promise<void>
   await invoke<void>("agents_defaults_save", { defaults });
 }
 
-// ---------- plugins + marketplace (x.ai/plugins/*, x.ai/marketplace/*) ----------
+export interface ExtensionPolicyConfig {
+  allowlistPackageNames: string[];
+  denylistPackageNames: string[];
+}
+
+export async function extensionPolicyGet(): Promise<ExtensionPolicyConfig> {
+  return invoke<ExtensionPolicyConfig>("agent:extension-policy-get");
+}
+
+export async function extensionPolicySave(config: ExtensionPolicyConfig): Promise<{ ok: true; policy: ExtensionPolicyConfig }> {
+  return invoke("agent:extension-policy-save", config);
+}
+
+
 
 import type {
   MarketplaceActionResult,

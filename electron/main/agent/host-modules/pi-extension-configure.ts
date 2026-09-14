@@ -34,6 +34,7 @@ import { createPiPlanModeExtension } from "../pi-plan-mode";
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { HookPermissionRequest } from "../agent-hooks";
 import { getNeedsReviewGate } from "./needs-review-singleton";
+import { readExtensionPolicyConfigSync } from "../pi-resources/config";
 
 // ---------------------------------------------------------------------------
 // Module-level singleton deps (install pattern)
@@ -110,6 +111,9 @@ export function configurePiExtensions(
   manifestSpecs: readonly OpenBuddyPiExtensionSpec[],
 ): void {
   if (!state) throw new Error("pi-extension-configure: not installed");
+  if (state.piExtensionPolicy.allowlistPackageNames.length === 0 && state.piExtensionPolicy.denylistPackageNames.length === 0) {
+    state.piExtensionPolicy = readExtensionPolicyConfigSync();
+  }
   const specs = applyPiExtensionOverrides(manifestSpecs, state.piExtensionOverrides);
   const telemetry = telemetrySinkImpl() as Parameters<typeof resolvePiExtensions>[1] extends infer _ ? never : never;
   // plan4.5 §B — the gate is the same singleton exposed to IPC; the

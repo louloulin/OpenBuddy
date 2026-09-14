@@ -208,11 +208,26 @@ async function manifestResourcePaths(
     : undefined;
   if (Array.isArray(declared) && declared.every((entry) => typeof entry === "string")) {
     const candidates = declared.map((entry) => resolve(root, entry));
-    const checks = await Promise.all(candidates.map(async (entry) => ((await stat(entry, { throwIfNoEntry: false })) ? entry : undefined)));
+    const checks = await Promise.all(candidates.map(async (entry) => {
+      try {
+        return (await stat(entry)).isDirectory() || field === "extensions" ? entry : undefined;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+        throw error;
+      }
+    }));
     return checks.filter((entry): entry is string => entry !== undefined);
   }
   const convention = join(root, field);
-  return (await stat(convention, { throwIfNoEntry: false }))?.isDirectory() ? [convention] : [];
+  const existingDirectory = async (path: string): Promise<boolean> => {
+    try {
+      return (await stat(path)).isDirectory();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
+  };
+  return (await existingDirectory(convention)) ? [convention] : [];
 }
 
 /** Resolve Pi-native resources declared by installed marketplace plugins. */
