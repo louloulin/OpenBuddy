@@ -645,3 +645,9 @@ plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 **验收**：`pi-extension-configure.test.ts`、`pi-resources.test.ts`、`ExtensionAuditPanel.test.tsx` 合计 38/38；`pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过。
 
 **下一缺口**：marketplace 包的签名校验、信任根、安装失败回滚及卸载清理仍未完成。
+
+### 3.27 [plan4.5 §D] marketplace 包签名与受信任根（本轮新增）
+
+新增 `marketplace-trust.ts` 管理 `marketplace-trust.json`（0600）与 trusted roots；支持 RSA-SHA256/ECDSA-SHA256 manifest 验签。远程 marketplace 包默认必须带受信任 keyId 的签名，本地包保持兼容性的可选签名策略。安装复制到 plugin root 后立即验签，失败删除本次 target 并拒绝运行时加载；签名校验不改变现有 policy audit/needs-review gate。
+
+验收：`pi-resources.test.ts` + `marketplace-pi-sync.test.ts` 21/21 通过，tsc 与 diff check 通过。剩余：签名专用 fixture 测试、覆盖旧版本的完整原子回滚，以及仅限 agentRoot/plugins 的卸载清理。
