@@ -676,8 +676,11 @@ plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 
 验收：progress-runs 回归 2/2，tsc 与 diff check 通过。后续接入真实 AgentSession 长任务事件与 replay 恢复，并补 UI 集成测试。
 
-### 3.32 [plan4.5 §E] Progress UX AgentSession/replay bridge（本轮新增）
+### 3.33 [plan4.5 §E] ProgressPanel 集成验证闭环（本轮新增）
 
-Progress run 现在由真实 `tool_execution_start` / `tool_execution_end` 阶段事件创建和完成，并共享 tool abort controller；renderer `ProgressPanel` 订阅 `openbuddy://plugin-event`，同时读取 plugin event ring buffer 和 `progress:list`，因此刷新/短断线可恢复。状态机按 runId 隔离旧事件，取消幂等，失败重试生成新 run。
+新增 `src/components/__tests__/ProgressPanel.test.tsx`，以 typed client/event bridge mock 验证 renderer 实际消费行为：
+- live `progress/update` 可驱动 running → completed，展示阶段和 100% 进度；
+- failed run 展示错误反馈，Retry 调用对应 `runId`；running run 的 Cancel 调用对应 `runId`；
+- plugin event history + `progress:list` 重连恢复只保留当前 snapshot，旧 run 不污染新 run；不确定进度显示 `Working`。
 
-验收：progress 状态回归 2/2，TypeScript 与 diff check 通过。后续补 ProgressPanel 集成测试和完整 cursor gap → session history fallback；多 surface session、Electron smoke/E2E 仍未完成。
+验收：`ProgressPanel.test.tsx` 3/3 通过；现有 `progress-runs.test.ts` 2/2 作为状态机回归。测试运行仅有 React act 警告，来源为组件按钮回调中的异步 refresh，未影响断言；后续可将组件回调改为显式 await/状态更新以消除警告。完整 cursor gap → session history fallback 仍依赖 transport 层真实 coordinator，未在本轮虚构为已完成。
