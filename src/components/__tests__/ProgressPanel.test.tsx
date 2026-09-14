@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
@@ -82,17 +83,24 @@ describe("ProgressPanel", () => {
   it("shows failure feedback and invokes cancel/retry controls idempotently", async () => {
     const failed = run({ status: "failed", error: "network failure", recentEvent: "Task failed" });
     state.snapshot = [failed];
-    render(<ProgressPanel />);
+    const failedView = render(<ProgressPanel />);
     expect(await screen.findByRole("alert")).toHaveTextContent("network failure");
-    await fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(state.retry).toHaveBeenCalledWith("run-1");
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry" })); });
+    await waitFor(() => expect(state.retry).toHaveBeenCalledWith("run-1"));
 
-    state.snapshot = [run()];
-    render(<ProgressPanel />);
-    await fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
-    expect(state.cancel).toHaveBeenCalledWith("run-1");
+    act(() => state.liveHandler?.({ type: "progress/update", payload: run() }));
+    await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Cancel" })); });
+    await waitFor(() => expect(state.cancel).toHaveBeenCalledWith("run-1"));
   });
 
+  it("flushes refresh after retry and cancel without stale state", async () => {
+    const failed = run({ status: "failed", error: "retryable" }); state.snapshot = [failed]; render(<ProgressPanel />);
+    await screen.findByRole("button", { name: "Retry" });
+    state.snapshot = [run({ stage: "retried" })];
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry" })); });
+    await waitFor(() => expect(screen.getByText("retried")).toBeTruthy());
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
   it("restores history after a renderer reconnect and does not mix old run events", async () => {
     const oldRun = run({ runId: "old-run", taskId: "task-old", status: "completed" });
     const current = run({ runId: "run-2", taskId: "task-2", stage: "resumed", percent: null });
