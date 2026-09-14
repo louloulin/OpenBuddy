@@ -1,8 +1,13 @@
 import { isAbsolute, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { Type } from "@earendil-works/pi-ai";
-import { DEFAULT_COMPACTION_SETTINGS, shouldCompact } from "@earendil-works/pi-agent-core";
+import { shouldCompact } from "@earendil-works/pi-agent-core";
+import { buildOpenbuddyCompactionSettings } from "./host-modules/openbuddy-compaction-settings";
 import openBuddyApplyPatch, { type OpenBuddyApplyPatchConfig } from "./extensions/apply-patch";
+import {
+  createExtensionPolicy,
+  describeExtensionPolicyReport,
+} from "./host-modules/extension-policy";
 import { sessionMetadataBridgeFactory } from "./extensions/session-metadata-bridge";
 import { modelBridgeFactory } from "./extensions/model-bridge";
 import { calendarPiFactory } from "./extensions/calendar-pi-extension";
@@ -1020,7 +1025,13 @@ export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResol
       // of hand-rolling the threshold check. Combined with the edge-triggered
       // `crossed` guard so we only request compaction once per crossing, not on
       // every turn above the threshold. `threshold` is the context window here.
-      const shouldCompactNow = shouldCompact(tokens, threshold, DEFAULT_COMPACTION_SETTINGS);
+      //
+      // plan4.4 §A: replace the bare `DEFAULT_COMPACTION_SETTINGS` with the
+      // OpenBuddy-tuned instance so the summarizer gets a reserve that
+      // matches our document truncator budget (~6k tokens) and we retain
+      // more recent context (96k tokens) for chat UX.
+      const compactionSettings = buildOpenbuddyCompactionSettings();
+      const shouldCompactNow = shouldCompact(tokens, threshold, compactionSettings);
       if (!crossed || !shouldCompactNow || !context.compact) return;
       emit("pi/context-compaction-requested", { thresholdTokens: threshold, tokens });
       context.compact();
@@ -1198,6 +1209,50 @@ export function resolvePiExtensions(
       result.diagnostics.push({ id: spec.id, state: "failed", error: String(error) });
     }
   }
+  // plan4.4 §E — emit a consolidated policy audit trail so the renderer
+  // (and any future telemetry sink) can see WHY each spec was allowed /
+  // denied / needs-review without re-implementing the policy logic.
+  // The decisions list mirrors the spec list order; the report object is
+  // frozen by `describeExtensionPolicyReport` so consumers can't mutate
+  // it after the event lands in renderer state.
+  const policy = createExtensionPolicy({
+    // Compatibility-adapter packages are vetted by the loader — they
+    // belong to the implicit allowlist. We rely on the adapter branch
+    // above to push the `resolved` entry; the policy report still
+    // describes them as "allow" with the package allowlist rationale.
+    allowlistPackageNames: compatibilityAdapters.flatMap((entry) => entry.packageNames),
+    // All built-in extensions are always allowed — the existing
+    // `builtinPiExtensionFactories` check above already filtered the
+    // list, but we still report it for audit completeness.
+    allowBuiltins: true,
+  });
+  const decisions = specs.map((spec) => ({
+    input: {
+      id: typeof spec?.id === "string" ? spec.id : "<unknown>",
+      packageName: typeof spec?.source === "string" ? spec.source : undefined,
+      builtIn: typeof spec?.id === "string" && spec.id in builtinPiExtensionFactories,
+    },
+    decision: policy.decide({
+      id: typeof spec?.id === "string" ? spec.id : "<unknown>",
+      packageName: typeof spec?.source === "string" ? spec.source : undefined,
+      builtIn: typeof spec?.id === "string" && spec.id in builtinPiExtensionFactories,
+    }),
+  }));
+  const report = describeExtensionPolicyReport(decisions);
+  options.emit("pi/extension-policy-report", {
+    generatedAt: new Date().toISOString(),
+    total: report.total,
+    allowed: report.allowed,
+    denied: report.denied,
+    needsReview: report.needsReview,
+    decisions: report.entries.map((entry) => ({
+      id: entry.input.id,
+      packageName: entry.input.packageName,
+      builtIn: entry.input.builtIn,
+      action: entry.decision.action,
+      reason: entry.decision.reason,
+    })),
+  });
   return result;
 }
 

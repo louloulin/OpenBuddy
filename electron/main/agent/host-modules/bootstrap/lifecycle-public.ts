@@ -28,10 +28,27 @@ import {
 } from "../workbench-scope-sync";
 import { __registerDefaultState as __registerDefaultDshState } from "../dsh-bridge-helpers";
 import type { OpenBuddyTelemetrySink } from "../../pi-telemetry-bridge";
+import type { SessionEventRecord } from "../../../session/session-event-log";
 import type { AgentHostState } from "../_state-shape";
 
 // Module-level singleton for the renderer event emitter
 let rendererEventEmitter: ((channel: string, payload: unknown) => void) | null = null;
+let lifecycleState: AgentHostState | null = null;
+
+const REPLAYABLE_RENDERER_CHANNELS = new Set([
+  "pi://update",
+  "pi://complete",
+  "pi://turn-error",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function sessionIdFromPayload(value: unknown): string | undefined {
+  const sessionId = isRecord(value) ? value.sessionId : undefined;
+  return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : undefined;
+}
 
 export function bindRendererEventEmitter(emitter: (channel: string, payload: unknown) => void): () => void {
   rendererEventEmitter = emitter;
@@ -39,7 +56,43 @@ export function bindRendererEventEmitter(emitter: (channel: string, payload: unk
 }
 
 export function emitRendererEvent(channel: string, payload: unknown): void {
-  rendererEventEmitter?.(channel, boundEventPayload(payload).value);
+  const bounded = boundEventPayload(payload).value;
+  if (!REPLAYABLE_RENDERER_CHANNELS.has(channel) || !lifecycleState) {
+    rendererEventEmitter?.(channel, bounded);
+    return;
+  }
+
+  const sessionId = sessionIdFromPayload(bounded);
+  const sequence = ++lifecycleState.eventSequence;
+  const sessionSequence = sessionId
+    ? (lifecycleState.sessionSequences.get(sessionId) ?? 0) + 1
+    : undefined;
+  if (sessionId) lifecycleState.sessionSequences.set(sessionId, sessionSequence!);
+  const timestamp = new Date().toISOString();
+  const enriched = isRecord(bounded)
+    ? {
+        ...bounded,
+        eventVersion: 1 as const,
+        sequence,
+        ...(sessionSequence === undefined ? {} : { sessionSequence }),
+        timestamp,
+      }
+    : bounded;
+  const record: SessionEventRecord = {
+    eventVersion: 1,
+    sequence,
+    ...(sessionSequence === undefined ? {} : { sessionSequence }),
+    timestamp,
+    type: `renderer/${channel}`,
+    ...(sessionId ? { sessionId } : {}),
+    payload: enriched,
+  };
+  try {
+    lifecycleState.sessionEventLog?.append(record);
+  } catch {
+    // Event delivery must survive a best-effort replay-log failure.
+  }
+  rendererEventEmitter?.(channel, enriched);
 }
 
 // Bridge to workbench-scope-sync's module-level emit registry so module-load
@@ -49,6 +102,7 @@ __registerDefaultCasdoorStatus(() => casdoorAuth.status());
 
 // These need state passed in
 export function registerLifecycleDefaultState(state: AgentHostState): void {
+  lifecycleState = state;
   __registerDefaultState(state);
   __registerDefaultDshState(state);
 }

@@ -85,6 +85,21 @@ function pluginEvents(query?: { sessionId?: string; sinceSequence?: number; limi
   return state.sessionEventLog?.snapshot(query) ?? [];
 }
 
+export interface PluginEventLogCursor {
+  earliestSequence: number;
+  latestSequence: number;
+  generation: number;
+  available: number;
+}
+
+function pluginEventLogCursor(query?: { sessionId?: string }): PluginEventLogCursor {
+  const log = state.sessionEventLog;
+  if (!log || typeof log.describeCursor !== "function") {
+    return { earliestSequence: 0, latestSequence: 0, generation: 0, available: 0 };
+  }
+  return log.describeCursor(query ?? {});
+}
+
 function reportActivePluginTransaction(
   transactionId: string,
   surface: string,
@@ -114,6 +129,7 @@ function listActivePluginTransactions(): Array<{ transactionId: string; kind: st
 export {
   pluginSnapshot,
   pluginEvents,
+  pluginEventLogCursor,
   reportActivePluginTransaction,
   listActivePluginTransactions,
 };

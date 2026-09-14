@@ -118,16 +118,39 @@ describe("OpenBuddy Pi extension resolution", () => {
       },
     };
     result.factories.forEach((entry) => entry.factory(api as never));
-    expect(emit.mock.calls.map(([type, payload]) => [type, (payload as { owner: string }).owner])).toEqual([
-      ["pi/extension-adapted", "openbuddy-team"],
-      ["pi/extension-adapted", "pi-plan-mode"],
-      ["pi/extension-adapted", "openbuddy-task"],
-      ["pi/extension-adapted", "openbuddy-task"],
-      ["pi/extension-adapted", "openbuddy-session"],
-      ["pi/extension-adapted", "openbuddy-session"],
-      ["pi/extension-adapted", "openbuddy-fs-local"],
-      ["pi/extension-adapted", "openbuddy-fs-local"],
+    // plan4.4 §E — the resolver now emits a single consolidated
+    // `pi/extension-policy-report` event after the adapter projections.
+    // Filter to only the per-adapter emissions so the policy report does
+    // not perturb this snapshot.
+    expect(
+      emit.mock.calls
+        .filter(([type]) => type === "pi/extension-adapted")
+        .map(([, payload]) => (payload as { owner: string }).owner),
+    ).toEqual([
+      "openbuddy-team",
+      "pi-plan-mode",
+      "openbuddy-task",
+      "openbuddy-task",
+      "openbuddy-session",
+      "openbuddy-session",
+      "openbuddy-fs-local",
+      "openbuddy-fs-local",
     ]);
+    // The trailing `pi/extension-policy-report` event carries the
+    // audit trail (counts + per-spec decision rationale).
+    const policyReport = emit.mock.calls.find(([type]) => type === "pi/extension-policy-report");
+    expect(policyReport, "expected pi/extension-policy-report event").toBeDefined();
+    const policyPayload = policyReport?.[1] as {
+      generatedAt: string;
+      total: number;
+      allowed: number;
+      denied: number;
+      needsReview: number;
+      decisions: Array<{ id: string; action: string }>;
+    };
+    expect(policyPayload.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(policyPayload.total).toBeGreaterThan(0);
+    expect(policyPayload.allowed + policyPayload.denied + policyPayload.needsReview).toBe(policyPayload.total);
 
     const ctx = { cwd: "/tmp/workspace", sessionManager: { getSessionId: () => "s-1" }, ui: { notify } };
 
@@ -187,15 +210,26 @@ describe("OpenBuddy Pi extension resolution", () => {
       expect.objectContaining({ id: "pi-permission-system", mode: "adapter", adapter: "openbuddy-authorization" }),
     ]);
     result.factories.forEach((entry) => entry.factory({} as never));
-    expect(emit.mock.calls.map(([type, payload]) => [type, (payload as { owner: string }).owner])).toEqual([
-      ["pi/extension-adapted", "openbuddy-mcp-client"],
-      ["pi/extension-adapted", "openbuddy-authorization"],
+    // plan4.4 §E — the resolver now emits a single consolidated
+    // `pi/extension-policy-report` event after the adapter projections.
+    // Filter to only the per-adapter emissions so the policy report does
+    // not perturb this snapshot.
+    expect(
+      emit.mock.calls
+        .filter(([t]) => t === "pi/extension-adapted")
+        .map(([, payload]) => (payload as { owner: string }).owner),
+    ).toEqual([
+      "openbuddy-mcp-client",
+      "openbuddy-authorization",
     ]);
-    expect(emit.mock.calls.map(([type, payload]) => [type, (payload as { commands: readonly string[] }).commands]))
-      .toEqual([
-        ["pi/extension-adapted", ["mcp", "pi-mcp", "mcp-auth"]],
-        ["pi/extension-adapted", ["permission-system"]],
-      ]);
+    expect(
+      emit.mock.calls
+        .filter(([t]) => t === "pi/extension-adapted")
+        .map(([t, payload]) => [t, (payload as { commands: readonly string[] }).commands]),
+    ).toEqual([
+      ["pi/extension-adapted", ["mcp", "pi-mcp", "mcp-auth"]],
+      ["pi/extension-adapted", ["permission-system"]],
+    ]);
   });
 
   it("registers adapter-projected slash commands that delegate to OpenBuddy canonical services", async () => {
@@ -483,11 +517,17 @@ describe("OpenBuddy Pi extension resolution", () => {
           "pi-mcp",
           "plan",
         ]);
-        expect(emit.mock.calls.map(([type, payload]) => [type, (payload as { owner: string }).owner])).toEqual([
-          ["pi/extension-adapted", "openbuddy-mcp-client"],
-          ["pi/extension-adapted", "openbuddy-authorization"],
-          ["pi/extension-adapted", "openbuddy-team"],
-          ["pi/extension-adapted", "pi-plan-mode"],
+        // plan4.4 §E — filter to per-adapter emissions so the consolidated
+        // `pi/extension-policy-report` event does not perturb this snapshot.
+        expect(
+          emit.mock.calls
+            .filter(([t]) => t === "pi/extension-adapted")
+            .map(([, payload]) => (payload as { owner: string }).owner),
+        ).toEqual([
+          "openbuddy-mcp-client",
+          "openbuddy-authorization",
+          "openbuddy-team",
+          "pi-plan-mode",
         ]);
       } finally {
         created.session.dispose();

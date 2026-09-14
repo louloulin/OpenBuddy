@@ -212,6 +212,40 @@ export class PiSessionEventBridge {
       .map((entry) => ({ ...entry }));
   }
 
+  /**
+   * Cursor metadata for replay-aware callers. The renderer compares its
+   * `lastSequence` with `earliestSequence` to detect ring-buffer evictions;
+   * `generation` is bumped by `advanceGeneration()` (e.g. on plugin reload)
+   * so stale records from before the swap are ignored on the renderer side.
+   */
+  describeCursor(query: SessionEventLogQuery = {}): {
+    earliestSequence: number;
+    latestSequence: number;
+    generation: number;
+    available: number;
+  } {
+    this.flushPendingProgress();
+    const filtered = this.entries
+      .filter((entry) => entry.generation === undefined || entry.generation >= this.currentGeneration)
+      .filter((entry) => query.sessionId === undefined || entry.sessionId === query.sessionId);
+    if (filtered.length === 0) {
+      return {
+        earliestSequence: 0,
+        latestSequence: this.nextSequence,
+        generation: this.currentGeneration,
+        available: 0,
+      };
+    }
+    const earliest = filtered[0].sequence;
+    const latest = filtered[filtered.length - 1].sequence;
+    return {
+      earliestSequence: earliest,
+      latestSequence: latest,
+      generation: this.currentGeneration,
+      available: filtered.length,
+    };
+  }
+
   lastSequence(): number {
     return this.nextSequence;
   }

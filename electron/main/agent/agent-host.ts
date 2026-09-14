@@ -621,11 +621,13 @@ export type { HarnessSubagentEntry, HarnessJobView } from "./host-modules/subage
 import {
   pluginSnapshot as pluginSnapshotImpl,
   pluginEvents as pluginEventsImpl,
+  pluginEventLogCursor as pluginEventLogCursorImpl,
   reportActivePluginTransaction as reportActivePluginTransactionImpl,
   listActivePluginTransactions as listActivePluginTransactionsImpl,
 } from "./host-modules/plugin-state";
 const pluginSnapshot = () => pluginSnapshotImpl();
 const pluginEvents = (query?: any) => pluginEventsImpl(query);
+const pluginEventLogCursor = (query?: any) => pluginEventLogCursorImpl(query);
 
 // Phase 8.3 Batch D3: plugin runtime READ surface extracted (4 fns).
 // Write paths stay in agent-host.ts — entwined with state.pluginState /
@@ -1397,6 +1399,7 @@ export const agentHost = buildAgentHostFacade({
   pluginInventory: listPluginInventoryImpl,
   pluginSnapshot: pluginSnapshotImpl,
   pluginEvents: pluginEventsImpl,
+  pluginEventLogCursor: pluginEventLogCursorImpl,
   setPluginEnabled: setPluginEnabledImpl,
   reloadPlugin: reloadPluginImpl,
   reloadPiExtensions: reloadPiExtensionsImpl,

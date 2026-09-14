@@ -1,0 +1,160 @@
+name: nightly-perf
+
+# plan4.4 §D — wire `perf-100-turns-nightly.mjs` + `perf-streaming.mjs`
+# into a nightly GitHub Actions cron so we accumulate real-LLM perf data
+# into `docs/perf/*.json` without burning local tokens. Each job is
+# marked `continue-on-error: true` so a missing credential (default on
+# public forks) does not break the cron schedule.
+
+on:
+  schedule:
+    # 02:00 UTC nightly — runs even when the repo is quiet so the perf
+    # trend line stays populated. The `concurrency` block below cancels
+    # a previous run if a new one starts.
+    - cron: '7 2 * * *'
+  workflow_dispatch:
+    # Manual trigger for ad-hoc calibration runs (`Actions → nightly-perf
+    # → Run workflow`). Required because cron-only workflows can sit for
+    # weeks unused and then fail for unrelated reasons on the first run.
+  push:
+    branches: [feature/pi0911, master]
+    # Run on push so changes to either perf script trigger a fresh
+    # measurement immediately. Path-scoped below.
+    paths:
+      - 'scripts/electron/perf-100-turns-nightly.mjs'
+      - 'scripts/electron/perf-streaming.mjs'
+      - 'scripts/electron/perf-streaming-schema.mjs'
+      - 'scripts/lib/e2e-credentials.mjs'
+      - '.github/workflows/nightly-perf.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-perf-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: OpenBuddy
+
+jobs:
+  perf-100-turns:
+    name: 100-turns real-LLM latency profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync moon workspace
+        run: pnpm moon:sync
+
+      - name: Run 100-turns nightly
+        env:
+          OPENBUDDY_E2E_API_KEY: ${{ secrets.OPENBUDDY_E2E_API_KEY }}
+          OPENBUDDY_E2E_BASE_URL: ${{ secrets.OPENBUDDY_E2E_BASE_URL }}
+          OPENBUDDY_E2E_MODEL_ID: ${{ vars.OPENBUDDY_E2E_MODEL_ID }}
+        run: |
+          if node scripts/electron/perf-100-turns-nightly.mjs; then
+            echo "100-turns perf recorded"
+          else
+            echo "::warning::100-turns perf skipped (no credentials or upstream failure)"
+          fi
+
+      - name: Upload 100-turns perf artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openbuddy-100-turns-perf-${{ github.run_id }}
+          path: docs/perf/*openbuddy-100-turns*.json
+          retention-days: 90
+
+  perf-streaming:
+    name: streaming-perf long-stream (≥30s) regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync moon workspace
+        run: pnpm moon:sync
+
+      - name: Run streaming-perf (≥30s)
+        env:
+          # Required gate; without it the script no-ops with exit 0.
+          RUN_STREAM_PERF: '1'
+          OPENBUDDY_E2E_API_KEY: ${{ secrets.OPENBUDDY_E2E_API_KEY }}
+          OPENBUDDY_E2E_BASE_URL: ${{ secrets.OPENBUDDY_E2E_BASE_URL }}
+          OPENBUDDY_E2E_MODEL_ID: ${{ vars.OPENBUDDY_E2E_MODEL_ID }}
+        run: |
+          if node scripts/electron/perf-streaming.mjs; then
+            echo "streaming-perf recorded"
+          else
+            echo "::warning::streaming-perf skipped (no credentials or upstream failure)"
+          fi
+
+      - name: Upload streaming-perf artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openbuddy-streaming-perf-${{ github.run_id }}
+          path: docs/perf/*openbuddy-streaming*.json
+          retention-days: 90
+
+  # Sanity-only job: catches YAML drift or schema regressions in the
+  # shared streaming-perf schema (vitest unit suite). Cheap (~1s) and
+  # blocks nothing if it fails — it just records a CI annotation.
+  perf-streaming-schema:
+    name: streaming-perf schema unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync moon workspace
+        run: pnpm moon:sync
+
+      - name: Vitest streaming-perf schema
+        run: |
+          pnpm exec vitest run scripts/electron/perf-streaming-schema.test.mjs --reporter=line

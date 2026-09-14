@@ -15465,3 +15465,161 @@ body.dark .permission-picker__popover,
   opacity: 0.4;
   cursor: default;
 }
+
+/* === ExtensionAuditPanel (plan4.5 §A) =============================
+ *
+ * Display-only panel that renders the latest `pi/extension-policy-report`
+ * emitted by `electron/main/agent/pi-extensions.ts`. Tones:
+ *
+ *   allow          neutral (green-tinted)  — builtin + allowlisted
+ *   deny           red                     — extension blocked
+ *   needs-review   amber                   — extension awaits sign-off
+ *
+ * The component emits `data-action` on each row and `data-tone` on
+ * each metric tile + action chip. CSS hooks drive the colour so a
+ * future design-system migration only needs to touch these rules.
+ */
+.extension-audit-panel {
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-surface);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: var(--wb-font-sans);
+}
+.extension-audit-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.extension-audit-panel__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.extension-audit-panel__timestamp {
+  font-size: 11px;
+  color: var(--wb-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.extension-audit-panel__summary {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+}
+.extension-audit-panel__metric {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--wb-bg-elevated);
+}
+.extension-audit-panel__metric dt {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--wb-text-secondary);
+  margin: 0;
+}
+.extension-audit-panel__metric dd {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.extension-audit-panel__metric[data-tone="allow"] dd { color: rgba(0, 168, 132, 0.95); }
+.extension-audit-panel__metric[data-tone="deny"] dd { color: rgba(229, 72, 77, 0.95); }
+.extension-audit-panel__metric[data-tone="needs-review"] dd { color: rgba(217, 130, 0, 0.95); }
+.extension-audit-panel__metric[data-tone="resolves"] dd { color: rgba(82, 132, 255, 0.95); }
+.extension-audit-panel__metric[data-tone="total"] dd { color: var(--wb-text-strong); }
+.extension-audit-panel__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.extension-audit-panel__row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto 2fr;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.extension-audit-panel__row-id {
+  font-family: var(--wb-font-mono);
+  color: var(--wb-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.extension-audit-panel__reason {
+  color: var(--wb-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.extension-audit-panel__action {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.extension-audit-panel__action[data-testid="extension-audit-action-allow"] {
+  background: rgba(0, 168, 132, 0.12);
+  color: rgba(0, 132, 102, 0.95);
+}
+.extension-audit-panel__action[data-testid="extension-audit-action-deny"] {
+  background: rgba(229, 72, 77, 0.12);
+  color: rgba(180, 40, 45, 0.95);
+}
+.extension-audit-panel__action[data-testid="extension-audit-action-needs-review"] {
+  background: rgba(217, 130, 0, 0.12);
+  color: rgba(170, 95, 0, 0.95);
+}
+.extension-audit-panel__row[data-action="deny"] {
+  background: rgba(229, 72, 77, 0.06);
+  border-left: 2px solid rgba(229, 72, 77, 0.95);
+}
+.extension-audit-panel__row[data-action="needs-review"] {
+  background: rgba(217, 130, 0, 0.06);
+  border-left: 2px solid rgba(217, 130, 0, 0.95);
+}
+.extension-audit-panel__row[data-action="allow"] {
+  border-left: 2px solid transparent;
+}
+.extension-audit-panel__clear {
+  align-self: flex-end;
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wb-text-secondary);
+  cursor: pointer;
+}
+.extension-audit-panel__clear:hover {
+  background: var(--wb-bg-elevated);
+  color: var(--wb-text-strong);
+}
+.extension-audit-panel__empty {
+  margin: 0;
+  padding: 12px 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--wb-text-secondary);
+  font-style: italic;
+}

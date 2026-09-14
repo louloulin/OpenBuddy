@@ -98,14 +98,23 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
   ipcMain.handle("agent:event-log-replay", async (_e, args?: unknown) => {
     // Cursor-based replay used after bridge recovery. Returns events
     // from `fromSequence` forward so the renderer can rehydrate
-    // stores without a full reload. Gated by
-    // OPENBUDDY_REPLAY_ON_SUBSCRIBE.
+    // stores without a full reload. The `cursor` payload reports
+    // the bridge's earliest available sequence + current generation
+    // so the renderer can detect ring-buffer evictions and decide
+    // whether to fall back to `agent:session-messages`.
     const input = args === undefined || args === null ? {} : recordValue(args, "event-log-replay payload");
     const sessionId = requiredString(input.sessionId, "sessionId");
     const fromSequence = input.fromSequence === undefined ? 0 : optionalFiniteInteger(input.fromSequence, "fromSequence", 0, 0, Number.MAX_SAFE_INTEGER);
     const limit = input.limit === undefined ? 500 : optionalFiniteInteger(input.limit, "limit", 500, 1, 2000);
     const entries = await agentHost.pluginEvents({ sessionId, sinceSequence: fromSequence, limit });
-    return { sessionId, fromSequence, count: Array.isArray(entries) ? entries.length : 0, entries };
+    const cursor = await agentHost.pluginEventLogCursor({ sessionId });
+    return {
+      sessionId,
+      fromSequence,
+      count: Array.isArray(entries) ? entries.length : 0,
+      entries,
+      cursor,
+    };
   });
   ipcMain.handle("agent:plugin-enable", async (_e, args: { id: string; enabled: boolean }) => {
     const input = recordValue(args, "plugin-enable payload");
