@@ -37,6 +37,22 @@ export class MultiSurfaceSessionRegistry {
       return this.release(id, surface, record!.generation);
     } };
   }
+  reconnect(sessionId: string, surfaceId: string): MultiSurfaceSessionAcquireResult {
+    const id = sessionId.trim(), surface = surfaceId.trim();
+    if (!id || !surface) throw new Error("multi-surface session requires sessionId and surfaceId");
+    const current = this.sessions.get(id);
+    if (!current || current.disposed || this.disposedSessions.has(id)) return { ok: false, code: "disposed", message: `session ${id} is already disposed` };
+    const generation = current.generation + 1;
+    this.generations.set(id, generation);
+    const record: SessionRecord = { surfaces: new Set([surface]), generation, disposed: false };
+    this.sessions.set(id, record);
+    let released = false;
+    return { ok: true, sessionId: id, surfaceId: surface, generation, release: () => {
+      if (released) return { ok: false, code: "duplicate-release", message: `surface ${surface} was already released` };
+      released = true;
+      return this.release(id, surface, generation);
+    } };
+  }
   release(sessionId: string, surfaceId: string, generation?: number, ownerDispose?: OwnerDispose): MultiSurfaceSessionReleaseResult {
     const record = this.sessions.get(sessionId);
     if (!record) return { ok: false, code: "unknown-session", message: `session ${sessionId} is not active` };
