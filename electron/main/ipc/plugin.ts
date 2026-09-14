@@ -18,7 +18,7 @@
  * cold-start path (matches `plugins_list`).
  */
 import { ipcMain } from "electron";
-import { progressSnapshot, cancelProgress, retryProgress } from "../agent/progress-runs";
+import { MultiSurfaceSessionRegistry } from "../agent/multi-surface-session";
 
 
 
@@ -35,6 +35,22 @@ import * as resources from "../agent/pi-resources";
 
 export function registerPluginIpc(deps: AgentHostIpcDeps): void {
   const { agentHost, ensureAgentHost } = deps;
+  const multiSurfaceSessions = new MultiSurfaceSessionRegistry();
+
+  ipcMain.handle("agent:session-surface-acquire", async (_e, args: unknown) => {
+    await ensureAgentHost();
+    const input = recordValue(args, "session surface acquire payload");
+    const lease = multiSurfaceSessions.acquire(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
+    return { sessionId: lease.sessionId, surfaceId: lease.surfaceId, generation: lease.generation, shared: (multiSurfaceSessions.snapshot(lease.sessionId)[0]?.refCount ?? 0) > 1 };
+  });
+  ipcMain.handle("agent:session-surface-release", async (_e, args: unknown) => {
+    const input = recordValue(args, "session surface release payload");
+    return { released: multiSurfaceSessions.release(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"), input.generation === undefined ? undefined : optionalFiniteInteger(input.generation, "generation", 0, 0, Number.MAX_SAFE_INTEGER)) };
+  });
+  ipcMain.handle("agent:session-surface-list", async (_e, args?: unknown) => {
+    const input = args === undefined || args === null ? {} : recordValue(args, "session surface list payload");
+    return multiSurfaceSessions.snapshot(input.sessionId === undefined ? undefined : requiredString(input.sessionId, "sessionId"));
+  });
 
   ipcMain.handle("progress:list", async () => progressSnapshot());
   ipcMain.handle("progress:cancel", async (_e, args: unknown) => cancelProgress(String((args as { runId?: unknown })?.runId ?? "")));

@@ -676,7 +676,15 @@ plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 
 验收：progress-runs 回归 2/2，tsc 与 diff check 通过。后续接入真实 AgentSession 长任务事件与 replay 恢复，并补 UI 集成测试。
 
-### 3.34 [plan4.5 §E] renderer Progress replay fallback 集成验证（本轮新增）
+### 3.35 [plan5.0 §A] multi-surface session lease（本轮新增）
+
+新增 `electron/main/agent/multi-surface-session.ts` 引用计数注册表：同一 `sessionId` 的多个 renderer/surface 共享一个 generation，surface lease 的 `release()` 幂等，只有最后一个 surface 退出才触发释放回调；旧 generation 的迟到 release 不会误伤新连接，不同 session 完全隔离。
+
+新增 typed IPC/client：`agent:session-surface-acquire`、`agent:session-surface-release`、`agent:session-surface-list`，通过 preload/main allowlist 暴露。事件仍复用现有 sessionId、global cursor/history replay 和 Progress run 状态，不重复启动 agent。
+
+验收：`multi-surface-session.test.ts` 2/2，覆盖最后 surface 释放、幂等 release、generation 隔离、session 隔离和输入校验；`tsc --noEmit -p .`、`git diff --check` 通过。后续需在真实 renderer mount/unmount 与 Electron smoke 中接入 lease 自动 acquire/release，并验证断线重连后的 surface 恢复。
+
+
 
 在 `src/lib/__tests__/renderer-plugin-runtime.test.ts` 新增集成回归：当 renderer plugin ring buffer 为空时，`replayMainEvents()` 必须读取 `agentSessionEventLog({ limit: 2000 })`，把持久化的 `progress/update` 事件重新投递到 renderer event registry，并返回最高 global sequence，保证 ProgressPanel/插件订阅者可在重连后恢复。
 
