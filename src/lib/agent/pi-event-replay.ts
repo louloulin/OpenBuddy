@@ -39,25 +39,64 @@ export function eventSequence(payload: unknown): number | undefined {
   return isFiniteSequence(sequence) ? sequence : undefined;
 }
 
+export interface ReplayCoverageEntry {
+  sequence: number;
+}
+
 export function detectReplayGap(
   fromSequence: number,
   cursor: ReplayCursor | undefined,
 ): ReplayGapInfo {
   const earliest = cursor?.earliestSequence ?? 0;
   const hasCursor = cursor !== undefined;
-  // A replay asks for events strictly after `fromSequence`. If the
-  // earliest retained event is later than that next expected sequence,
-  // the ring buffer has already evicted at least one event. A cursor at
-  // `earliestSequence - 1` is still recoverable and is not a gap.
   const gap = hasCursor && fromSequence > 0 && fromSequence < earliest - 1;
   const missing = gap ? Math.max(0, earliest - fromSequence - 1) : 0;
-  return {
-    requestedFromSequence: fromSequence,
-    earliestSequence: earliest,
-    gap,
-    missing,
-  };
+  return { requestedFromSequence: fromSequence, earliestSequence: earliest, gap, missing };
 }
+
+
+
+export type ReplayGapReason = "evicted" | "non-contiguous";
+
+export interface ReplayCoverageGap extends ReplayGapInfo {
+  reason: ReplayGapReason;
+}
+
+/**
+ * Detects gaps that a successful replay RPC can still contain. The ring
+ * cursor detects eviction; this additionally validates the returned global
+ * sequence stream so a reconnect cannot silently skip a persisted event.
+ */
+export function detectReplayCoverageGap(
+  fromSequence: number,
+  entries: readonly ReplayCoverageEntry[],
+  cursor: ReplayCursor | undefined,
+): ReplayCoverageGap | undefined {
+  const boundary = detectReplayGap(fromSequence, cursor);
+  if (boundary.gap) return { ...boundary, reason: "evicted" };
+
+  const sequences = [...new Set(entries
+    .map((entry) => entry.sequence)
+    .filter((sequence) => isFiniteSequence(sequence) && sequence > fromSequence))]
+    .sort((left, right) => left - right);
+  if (sequences.length === 0) return undefined;
+
+  let expected = fromSequence + 1;
+  for (const sequence of sequences) {
+    if (sequence !== expected) {
+      return {
+        ...boundary,
+        gap: true,
+        missing: Math.max(0, sequence - expected),
+        reason: "non-contiguous",
+      };
+    }
+    expected += 1;
+  }
+  return undefined;
+}
+
+
 
 /**
  * Coordinates a live subscription with a cursor-based replay.

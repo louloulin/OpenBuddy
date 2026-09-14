@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPiEventReplayCoordinator, detectReplayGap, eventSequence } from "./pi-event-replay";
+import { createPiEventReplayCoordinator, detectReplayCoverageGap, detectReplayGap, eventSequence } from "./pi-event-replay";
 
 describe("pi event replay coordinator", () => {
   it("merges replay and live events in sequence order and de-duplicates", () => {
@@ -90,4 +90,32 @@ describe("pi event replay coordinator", () => {
       missing: 0,
     });
   });
+  it("detects a non-contiguous replay even when the ring cursor looks healthy", () => {
+    expect(detectReplayCoverageGap(10, [{ sequence: 11 }, { sequence: 13 }], {
+      earliestSequence: 11,
+      latestSequence: 13,
+      generation: 4,
+      available: 3,
+    })).toMatchObject({ gap: true, missing: 1, reason: "non-contiguous" });
+  });
+
+  it("reports evicted coverage before inspecting duplicate history", () => {
+    expect(detectReplayCoverageGap(10, [{ sequence: 12 }, { sequence: 12 }], {
+      earliestSequence: 20,
+      latestSequence: 30,
+      generation: 5,
+      available: 11,
+    })).toMatchObject({ gap: true, missing: 9, reason: "evicted" });
+  });
+
+  it("accepts continuous replay with duplicate sequence records", () => {
+    expect(detectReplayCoverageGap(10, [{ sequence: 11 }, { sequence: 11 }, { sequence: 12 }], {
+      earliestSequence: 11,
+      latestSequence: 12,
+      generation: 4,
+      available: 2,
+    })).toBeUndefined();
+  });
+
+
 });

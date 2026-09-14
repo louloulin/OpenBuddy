@@ -65,7 +65,7 @@ import {
   notificationAppend,
 } from "@/lib/agent/pi-client";
 import { isElectronBridgeUnavailable } from "@/lib/platform/electron-api";
-import { createPiEventReplayCoordinator, detectReplayGap } from "@/lib/agent/pi-event-replay";
+import { createPiEventReplayCoordinator, detectReplayCoverageGap } from "@/lib/agent/pi-event-replay";
 import { useSessionStore } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { usePermissionStore } from "@/stores/permission-store";
@@ -587,11 +587,11 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
     const fromSequence = piReplayRef.current.cursor();
     try {
       const result = await agentEventLogReplay(sessionId, fromSequence, 2000);
-      const gap = detectReplayGap(fromSequence, result.cursor);
-      if (gap.gap) {
-        // Ring buffer eviction: replay cannot reconstruct the missing wire
-        // events. Rehydrate the persisted transcript via Pi's session
-        // history, then continue with whatever live/replay coverage remains.
+      const gap = detectReplayCoverageGap(fromSequence, result.entries, result.cursor);
+      if (gap) {
+        // Ring buffer eviction or a non-contiguous replay cannot reconstruct
+        // the missing wire events. Rehydrate the persisted transcript via Pi's
+        // session history, then continue with whatever replay coverage remains.
         appLogger.warn("pi.replay.gap", {
           msg: "pi.replay.gap",
           sessionId,
