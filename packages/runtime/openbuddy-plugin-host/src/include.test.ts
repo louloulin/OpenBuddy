@@ -3,7 +3,8 @@ import { Context } from "@openbuddy/cordis";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createIncludePlugin, HarnessPluginLoader } from "./index";
+import { createIncludePlugin } from "./include";
+import { HarnessPluginLoader } from "./index";
 
 async function fixture() {
   const dir = await mkdtemp(join(tmpdir(), "openbuddy-include-"));

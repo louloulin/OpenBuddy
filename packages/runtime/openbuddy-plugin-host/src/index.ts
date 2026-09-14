@@ -1174,7 +1174,13 @@ export class HarnessPluginLoader {
 
 export type Plugin = HarnessPlugin;
 
-export { createIncludePlugin, type IncludeRuntime } from "./include";
+// `createIncludePlugin` and `IncludeRuntime` are server-only — they pull
+// `node:fs/promises`, `node:path`, and `node:url` into a graph that must
+// stay out of the renderer bundle. Import them directly from
+// `./include` instead of re-exporting them from this entry point.
+//
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _KeepIncludeTypeReferenced = import("./include").IncludeRuntime;
 export {
   installProfilePackage,
   listProfilePackages,

@@ -134,7 +134,19 @@ const uiRendererAliases = buildUiRendererAliases(repoRoot);
 // being discovered during a render-only build.
 const rendererOnlyAliases: Array<{ find: string; replacement: string }> = [
   // Renderer-safe workspace packages only.
+  // Subpath aliases MUST come before the bare-package alias — Vite alias
+  // matches in order, and `@openbuddy/plugin-host` is a prefix of every
+  // `@openbuddy/plugin-host/*` subpath. The renderer-safe subpaths are
+  // the ones that have no `node:*` imports (verified by inspection).
   { find: "@openbuddy/plugin-host/renderer-patch", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/renderer-patch.ts") },
+  { find: "@openbuddy/plugin-host/yaml-patch", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/yaml-patch.ts") },
+  { find: "@openbuddy/plugin-host/remote-codec", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/remote-codec.ts") },
+  { find: "@openbuddy/plugin-host/rpc-contract", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/rpc-contract.ts") },
+  // Alias the bare `@openbuddy/plugin-host` to a renderer-safe facade so
+  // the UI bundle never pulls in server-only modules (./include, ./profile)
+  // that would otherwise be tree-shaken into a rollup error against
+  // `__vite-browser-external`.
+  { find: "@openbuddy/plugin-host", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/renderer.ts") },
   { find: "@openbuddy/bundle-base/renderer", replacement: resolve(repoRoot, "packages/bundle/openbuddy-base/src/renderer.ts") },
   { find: "@openbuddy/plugin-host/yaml-patch", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/yaml-patch.ts") },
   { find: "@deepseek-ai/cordis", replacement: resolve(repoRoot, "packages/runtime/openbuddy-cordis/src/index.ts") },
