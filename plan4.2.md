@@ -663,3 +663,9 @@ plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 新增 `marketplace-transaction-safety.test.ts`，独立验证旧版本恢复、验签失败后的 target/managed metadata 状态、symlink 越权保护、路径穿越拒绝、非 managed 目录卸载拒绝。修复事务 catch 逻辑：staging/验签阶段失败不得误删原有 target，只有新 target 已 rename 后才清理并恢复 backup。
 
 验收：独立安全测试 4/4；连同 `pi-resources.test.ts` 与 `marketplace-pi-sync.test.ts` 共 25/25，通过 tsc 与 diff check。下一阶段推进 Progress UX 或多 surface session。
+
+### 3.30 [plan4.5 §D] marketplace metadata/index 原子提交（本轮新增）
+
+新增受管理安装索引 `marketplace-installed.json`（0600）。安装只有在 target rename 成功后才写入索引；索引记录失败时删除新 target 并恢复旧 backup。卸载先更新索引再删除 managed target，非 managed/symlink 目标仍拒绝。独立 transaction fixture 新增旧版本索引恢复和卸载后索引一致性断言；Windows junction/reparse-point 在 Linux CI 无法创建，现有 symlink 契约覆盖同一拒绝边界，Windows runner 需补原生 fixture。
+
+验收：transaction safety + pi-resources 21/21，tsc 与 diff check 通过。下一步转向 Progress UX：长任务进度、取消/重试/错误反馈。

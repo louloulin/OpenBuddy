@@ -43,6 +43,18 @@ import {
 } from "./shared";
 
 const MARKETPLACE_MANAGED_FILE = ".openbuddy-marketplace-managed.json";
+const MARKETPLACE_INDEX_FILE = "marketplace-installed.json";
+
+interface ManagedMarketplaceIndex { version: 1; plugins: Record<string, { path: string; source: string; installedAt: string }> }
+
+async function readManagedIndex(): Promise<ManagedMarketplaceIndex> {
+  return readJson<ManagedMarketplaceIndex>(join(agentRoot(), MARKETPLACE_INDEX_FILE), { version: 1, plugins: {} });
+}
+
+async function writeManagedIndex(index: ManagedMarketplaceIndex): Promise<void> {
+  await writeJson(join(agentRoot(), MARKETPLACE_INDEX_FILE), index, 0o600);
+}
+
 
 async function installManagedPackage(sourceRoot: string, targetRoot: string, remote: boolean): Promise<void> {
   const pluginsRoot = join(agentRoot(), "plugins");
@@ -64,6 +76,15 @@ async function installManagedPackage(sourceRoot: string, targetRoot: string, rem
     if (targetInfo) { await rename(target, backup); movedOld = true; }
     await rename(stagedPackage, target);
     installedNew = true;
+    const index = await readManagedIndex();
+    index.plugins[resolve(target)] = { path: resolve(target), source: "marketplace", installedAt: new Date().toISOString() };
+    try {
+      await writeManagedIndex(index);
+    } catch (error) {
+      await rm(target, { recursive: true, force: true }).catch(() => undefined);
+      if (movedOld) await rename(backup, target).catch(() => undefined);
+      throw error;
+    }
   } catch (error) {
     if (installedNew) await rm(target, { recursive: true, force: true }).catch(() => undefined);
     if (movedOld) await rename(backup, target).catch(() => undefined);
@@ -83,6 +104,9 @@ async function removeManagedPackage(targetRoot: string): Promise<boolean> {
   const marker = join(target, MARKETPLACE_MANAGED_FILE);
   const markerInfo = await lstat(marker).catch(() => undefined);
   if (!markerInfo?.isFile() || markerInfo.isSymbolicLink()) throw new Error("marketplace target is not managed by OpenBuddy");
+  const index = await readManagedIndex();
+  delete index.plugins[resolve(target)];
+  await writeManagedIndex(index);
   await rm(target, { recursive: true, force: false });
   return true;
 }
