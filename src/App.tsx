@@ -67,6 +67,7 @@ import {
 } from "./lib/agent/pi-client";
 import { useOptimisticNewSession } from "./hooks/useOptimisticNewSession";
 import { useAgentSession } from "./hooks/useAgentSession";
+import { TruncationBanner } from "./components/TruncationBanner";
 import { newSessionFlow, composeDiscoverBody } from "./lib/agent/new-session-flow";
 import type { AgentEntry, Plan } from "@openbuddy/shared-types";
 import { useProjectsStore, type ProjectMeta } from "./stores/projects-store";
@@ -1668,6 +1669,7 @@ function Shell() {
             </ErrorBoundary>
           ) : currentSessionId ? (
             <ErrorBoundary compact title="对话视图出现错误">
+              {sessionEvents.truncations.get(currentSessionId) && <TruncationBanner truncation={sessionEvents.truncations.get(currentSessionId)!} onDismiss={sessionEvents.dismissTruncation} onRestore={sessionEvents.restoreTruncation} />}
               <ChatView
                 onSend={handleSendCurrent}
                 onSendContent={handleSendContent}
