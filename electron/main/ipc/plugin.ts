@@ -126,6 +126,12 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     return agentHost.reloadPlugin(requiredString(recordValue(args, "plugin-reload payload").id, "plugin id"));
   });
   ipcMain.handle("agent:extensions-reload", async () => agentHost.reloadPiExtensions());
+  ipcMain.handle("agent:extension-policy-reload", async (_e, args: unknown) => {
+    const input = recordValue(args, "extension policy payload");
+    const allowlist = Array.isArray(input.allowlistPackageNames) ? input.allowlistPackageNames : [];
+    const denylist = Array.isArray(input.denylistPackageNames) ? input.denylistPackageNames : [];
+    return agentHost.updateExtensionPolicy({ allowlistPackageNames: allowlist, denylistPackageNames: denylist });
+  });
   ipcMain.handle("agent:plugin-config", async (_e, args: { id: string; config: unknown }) => {
     const input = recordValue(args, "plugin-config payload");
     return agentHost.updatePluginConfig(requiredString(input.id, "plugin id"), input.config);

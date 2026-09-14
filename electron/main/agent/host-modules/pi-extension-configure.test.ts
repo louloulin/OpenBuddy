@@ -125,11 +125,23 @@ describe("pi-extension-configure", () => {
       expect(stub.state.piExtensionPaths).toContain("/m1");
     });
 
+    it("applies runtime policy overrides without changing profile specs", () => {
+      stub.state.piExtensionPolicy = {
+        allowlistPackageNames: ["approved-package"],
+        denylistPackageNames: [],
+      };
+      configurePiExtensions([{ id: "approved", source: "approved-package" } as any]);
+      expect(stub.events.some((event) => event.type === "pi/extension-policy-report" && JSON.stringify(event.payload).includes("allow"))).toBe(true);
+      stub.state.piExtensionPolicy = {
+        allowlistPackageNames: ["approved-package"],
+        denylistPackageNames: ["approved-package"],
+      };
+      configurePiExtensions([{ id: "approved", source: "approved-package" } as any]);
+      const report = stub.events.filter((event) => event.type === "pi/extension-policy-report").at(-1)?.payload as { decisions?: Array<{ action: string }> };
+      expect(report.decisions?.[0]?.action).toBe("deny");
+    });
     it("emits pi/extension-failed for failed diagnostics", () => {
       // config spec 包含 enabled: false — 不会失败
-      // 测路径: 故意构造让 resolution.diagnostics 含 failed
-      // 因为 helper 都是 stub, resolution 是真实的 resolvePiExtensions
-      // 跳过这个测试, 改测 enabled: false 路径
       configurePiExtensions([{ id: "disabled-ext", enabled: false } as any]);
       const failedEvt = stub.events.find((e) => e.type === "pi/extension-disabled");
       expect(failedEvt).toBeDefined();

@@ -181,7 +181,8 @@ export interface AgentHostFacade {
   pluginEvents: (query?: { sessionId?: string; sinceSequence?: number; limit?: number }) => Promise<ReadonlyArray<PluginEventRecord>>;
   setPluginEnabled: (id: string, enabled: boolean) => Promise<MutationAck>;
   reloadPlugin: (id: string) => Promise<MutationAck>;
-  reloadPiExtensions: () => Promise<MutationAck>;
+  /** Apply allow/deny policy overrides and reload the live Pi extension host. */
+  updateExtensionPolicy: (policy: { allowlistPackageNames?: readonly string[]; denylistPackageNames?: readonly string[] }) => Promise<{ ok: true; policy: { allowlistPackageNames: string[]; denylistPackageNames: string[] } }>;
   reloadPiRuntime: (reason?: string) => Promise<MutationAck>;
   updatePluginConfig: (id: string, config: unknown) => Promise<MutationAck>;
   getStoredPluginState: (id?: string) => unknown;

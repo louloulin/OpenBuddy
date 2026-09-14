@@ -95,6 +95,9 @@ export interface PiExtensionResolutionOptions {
    * packages that match are flagged).
    */
   needsReviewPackageNames?: readonly string[];
+  /** Runtime policy overrides applied by the policy hot-reload IPC. */
+  allowlistPackageNames?: readonly string[];
+  denylistPackageNames?: readonly string[];
 }
 
 export interface PiExtensionResolution {
@@ -1246,7 +1249,13 @@ export function resolvePiExtensions(
     // belong to the implicit allowlist. We rely on the adapter branch
     // above to push the `resolved` entry; the policy report still
     // describes them as "allow" with the package allowlist rationale.
-    allowlistPackageNames: compatibilityAdapters.flatMap((entry) => entry.packageNames),
+    allowlistPackageNames: [
+      ...compatibilityAdapters.flatMap((entry) => entry.packageNames),
+      ...(options.allowlistPackageNames ?? []),
+    ],
+    ...(options.denylistPackageNames && options.denylistPackageNames.length > 0
+      ? { denylistPackageNames: options.denylistPackageNames }
+      : {}),
     // All built-in extensions are always allowed — the existing
     // `builtinPiExtensionFactories` check above already filtered the
     // list, but we still report it for audit completeness.

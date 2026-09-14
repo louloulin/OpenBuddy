@@ -625,3 +625,13 @@ plan4.3 (下一阶段) ── replay gap fallback + PDF 阅读器 + pi file part
         ▼
 plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 ```
+
+### 3.25 [plan4.5 §C] extension policy 热加载（本轮新增）
+
+**实现**：新增运行时 policy 状态 `state.piExtensionPolicy` 与 `agent:extension-policy-reload` IPC。调用方提交 allowlist/denylist 后，主进程在当前 plugin host 内更新策略，并复用已有事务化 `reloadPiExtensions()`；resolver 继续产生 `pi/extension-policy-report`，needs-review gate 继续使用同一个 singleton，最后额外发送 `pi/extension-policy-reloaded` 事件供 renderer/telemetry 感知。
+
+**安全边界**：输入仅接受字符串数组，去重、去首尾空格；策略不写入 profile manifest，避免未经审计的配置污染持久化 profile。denylist 仍在 resolver 中优先于 allowlist，策略切换与扩展重载串行执行。
+
+**验收**：`pi-extension-configure.test.ts` 新增 allow→deny 热切换回归；extension policy / needs-review integration / configure 定向测试 30 项通过；全仓 `pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过。
+
+**后续缺口**：renderer 尚未提供专用 policy 编辑 UI/typed client；下一步应将 IPC 接入设置面板，并补 policy 持久化、签名信任和 marketplace 安装回滚。

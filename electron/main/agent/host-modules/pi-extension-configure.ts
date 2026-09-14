@@ -134,6 +134,8 @@ export function configurePiExtensions(
     ...(telemetry ? { telemetrySink: telemetry as any } : {}),
     needsReviewGate,
     ...(needsReviewIds.length > 0 ? { needsReviewIds } : {}),
+    allowlistPackageNames: state.piExtensionPolicy.allowlistPackageNames,
+    denylistPackageNames: state.piExtensionPolicy.denylistPackageNames,
   };
   const resolution = resolvePiExtensions(specs, resolutionOptions);
 

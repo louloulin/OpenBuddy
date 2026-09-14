@@ -275,6 +275,15 @@ export interface AgentHostState {
    * audit-only behaviour is preserved when the profile hasn't opted
    * into any needs-review ids.
    */
+  /**
+   * Runtime policy overrides loaded without restarting Electron. These are
+   * intentionally separate from profile manifest data so an operator can
+   * revoke a package and then use the normal transactional reload path.
+   */
+  piExtensionPolicy: {
+    allowlistPackageNames: string[];
+    denylistPackageNames: string[];
+  };
   piExtensionNeedsReviewIds: string[];
   baseProfile: PluginProfile | null;
   storedLayers: PluginPatch[][];
