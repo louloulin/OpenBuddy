@@ -24,7 +24,7 @@
  *   This module imports nothing from agent-host.ts. All deps are passed in.
  */
 
-import { SessionManager, DefaultResourceLoader, ModelRuntime, type AgentSession } from "@earendil-works/pi-coding-agent";
+import { SessionManager, SettingsManager, DefaultResourceLoader, ModelRuntime, type AgentSession } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
 import type { Context } from "@openbuddy/cordis";
 import type { HandleSessionEventDeps } from "./handle-session-event";
@@ -165,6 +165,10 @@ export async function initSession(deps: InitSessionDeps): Promise<string> {
       sessionManager: sessionPath
         ? SessionManager.open(sessionPath, undefined, cwd)
         : SessionManager.create(cwd, piSessionDir(cwd)),
+      // Use Pi's canonical global + project settings merge. This keeps
+      // compaction/retry/model settings compatible with Pi while preserving
+      // OpenBuddy's profile-specific resource loader above.
+      settingsManager: SettingsManager.create(cwd, piHome()),
       resourceLoader: piResourceLoader,
     });
     if (!sessionPath) await persistPiSessionHeaderImpl(session);

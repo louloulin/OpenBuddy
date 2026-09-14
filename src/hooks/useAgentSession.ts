@@ -49,6 +49,7 @@ import {
   useCallback,
   useEffect,
   useRef,
+  useState,
   type MutableRefObject,
 } from "react";
 import type { SessionUpdate } from "@openbuddy/shared-types";
@@ -57,15 +58,22 @@ import {
   subscribePiEvents,
   dispatchPiEvent,
   agentEventLogReplay,
-  agentSessionMessages,
+  eventLogReplay,
+  restoreDocument,
+  agentOnPluginEvent,
+  attachEventLogSurface,
+  detachEventLogSurface,  agentSessionMessages,
   sessionEntriesToChatMessages,
   piSend,
   piCancel,
   piListWorkspaceRegistry,
   notificationAppend,
+  multiSurfaceSessionAcquire,
+  multiSurfaceSessionRelease,
+  type SurfaceEventLogReplayResponse,
 } from "@/lib/agent/pi-client";
 import { isElectronBridgeUnavailable } from "@/lib/platform/electron-api";
-import { createPiEventReplayCoordinator, detectReplayGap } from "@/lib/agent/pi-event-replay";
+import { createPiEventReplayCoordinator, detectReplayCoverageGap } from "@/lib/agent/pi-event-replay";
 import { useSessionStore } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { usePermissionStore } from "@/stores/permission-store";
@@ -182,6 +190,12 @@ export interface UseAgentSessionOptions {
 }
 
 export interface UseAgentSessionReturn {
+  replayEvents: (surfaceId?: string, sinceEventId?: string) => Promise<SurfaceEventLogReplayResponse>;
+  truncations: Map<string, import("@/components/TruncationBanner").TruncationInfo>;
+  dismissTruncation: (sessionId: string) => void;
+  restoreTruncation: (sessionId: string) => Promise<void>;
+  advanceSince: (eventId: string) => void;
+  reconnect: () => Promise<SurfaceEventLogReplayResponse | null>;
   /** Manual resubscribe (used by `handleAgentDied`'s "立即重连" action and
    *  its auto-back-off timer). The hook handles the bookkeeping so the
    *  caller doesn't need to re-implement the dispose-then-subscribe dance. */
@@ -218,7 +232,75 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
     currentModelIdRef,
   } = options;
 
-  // Stable ref to the most recent `setToast` so the handler set can call
+  const multiSurfaceIdRef = useRef(`renderer:${Math.random().toString(36).slice(2, 10)}`);
+  const [truncations, setTruncations] = useState<Map<string, import("@/components/TruncationBanner").TruncationInfo>>(new Map());
+  const dismissTruncation = useCallback((sessionId: string) => setTruncations((current) => { const next = new Map(current); next.delete(sessionId); return next; }), []);
+  const restoreTruncation = useCallback(async (sessionId: string) => {
+    const truncation = truncations.get(sessionId);
+    const result = await restoreDocument(sessionId, truncation?.sourceDocumentId);
+    if (result.ok) dismissTruncation(sessionId);
+  }, [dismissTruncation, truncations]);
+
+  const multiSurfaceGenerationRef = useRef<number | undefined>(undefined);
+  const multiSurfaceSessionRef = useRef<string | undefined>(undefined);
+  const eventLogCursorRef = useRef<string | undefined>(undefined);
+  const replaySurfaceRef = useRef<string | undefined>(undefined);
+  const replayEvents = useCallback(async (surfaceId = multiSurfaceIdRef.current, sinceEventId = eventLogCursorRef.current) => {
+    const sessionId = useSessionStore.getState().sessionId;
+    if (!sessionId || sessionId.startsWith("__pending_")) return { ok: false, code: "unknown-session", message: "no active session" } as SurfaceEventLogReplayResponse;
+    const result = await eventLogReplay(sessionId, surfaceId, sinceEventId, 50);
+    if (result.ok) { eventLogCursorRef.current = result.nextCursor ?? eventLogCursorRef.current; replaySurfaceRef.current = surfaceId; }
+    return result;
+  }, []);
+  const advanceSince = useCallback((eventId: string) => { eventLogCursorRef.current = eventId; }, []);
+  const reconnect = useCallback(async () => { eventLogCursorRef.current = undefined; return replayEvents(); }, [replayEvents]);
+
+  useEffect(() => {
+    let dispose: (() => void) | undefined;
+    void agentOnPluginEvent((event) => {
+      if ((event as { type?: string }).type !== "session/input-truncated") return;
+      const payload = (event as { payload?: Record<string, unknown> }).payload ?? {};
+      const sessionId = typeof payload.sessionId === "string" ? payload.sessionId : "";
+      if (!sessionId) return;
+      setTruncations((current) => new Map(current).set(sessionId, {
+        sessionId,
+        truncatedAt: typeof payload.truncatedAt === "string" || typeof payload.truncatedAt === "number" ? payload.truncatedAt : Date.now(),
+        byteCount: typeof payload.byteCount === "number" ? payload.byteCount : Number(payload.totalChars ?? 0),
+        ...(typeof payload.sourceDocumentId === "string" ? { sourceDocumentId: payload.sourceDocumentId } : {}),
+        ...(typeof payload.originalName === "string" ? { originalName: payload.originalName } : {}),
+      }));
+    }).then((unlisten) => { dispose = unlisten; }).catch(() => undefined);
+    return () => { dispose?.(); };
+  }, []);
+  useEffect(() => {
+    const sessionId = useSessionStore.getState().sessionId;
+    if (!sessionId || sessionId.startsWith("__pending_")) return;
+    let cancelled = false;
+    void multiSurfaceSessionAcquire(sessionId, multiSurfaceIdRef.current).then((lease) => {
+      if (!lease.ok) return;
+      if (cancelled) {
+        void multiSurfaceSessionRelease(lease.sessionId, lease.surfaceId, lease.generation);
+        return;
+      }
+      multiSurfaceSessionRef.current = lease.sessionId;
+      multiSurfaceGenerationRef.current = lease.generation;
+      void attachEventLogSurface(sessionId, multiSurfaceIdRef.current).then((attached) => {
+        if (!(attached && typeof attached === "object" && "ok" in attached && attached.ok === false)) void replayEvents(multiSurfaceIdRef.current, undefined);
+      }).catch(() => undefined);
+    }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+      const leasedSession = multiSurfaceSessionRef.current;
+      const generation = multiSurfaceGenerationRef.current;
+      multiSurfaceSessionRef.current = undefined;
+      multiSurfaceGenerationRef.current = undefined;
+      if (leasedSession) void multiSurfaceSessionRelease(leasedSession, multiSurfaceIdRef.current, generation);
+      if (leasedSession) void detachEventLogSurface(leasedSession, multiSurfaceIdRef.current);
+      eventLogCursorRef.current = undefined;
+    };
+  }, [useSessionStore((state) => state.sessionId)]);
+
+
   // it without re-subscribing on every render. React guarantees the
   // setter identity is stable, so this is purely defensive.
   const setToastRef = useRef(setToast);
@@ -587,11 +669,11 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
     const fromSequence = piReplayRef.current.cursor();
     try {
       const result = await agentEventLogReplay(sessionId, fromSequence, 2000);
-      const gap = detectReplayGap(fromSequence, result.cursor);
-      if (gap.gap) {
-        // Ring buffer eviction: replay cannot reconstruct the missing wire
-        // events. Rehydrate the persisted transcript via Pi's session
-        // history, then continue with whatever live/replay coverage remains.
+      const gap = detectReplayCoverageGap(fromSequence, result.entries, result.cursor);
+      if (gap) {
+        // Ring buffer eviction or a non-contiguous replay cannot reconstruct
+        // the missing wire events. Rehydrate the persisted transcript via Pi's
+        // session history, then continue with whatever replay coverage remains.
         appLogger.warn("pi.replay.gap", {
           msg: "pi.replay.gap",
           sessionId,
@@ -950,5 +1032,5 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
   // value via the ref indirection inside App.tsx.
   void cwdRef;
 
-  return { resubscribe };
+  return { resubscribe, replayEvents, advanceSince, reconnect, truncations, dismissTruncation, restoreTruncation };
 }

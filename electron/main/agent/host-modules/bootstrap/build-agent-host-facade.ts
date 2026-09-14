@@ -123,7 +123,11 @@ export interface AgentHostFacade {
   onEvent: (handler: (event: AgentSessionEvent) => void) => () => void;
   onPluginEvent: (handler: (event: SessionEventRecord & { eventVersion: 1 }) => void) => () => void;
 
-  // ---- prompt / steer / follow-up / abort ----
+  // ---- plugin lifecycle / replay ----
+  pluginEventLogCursor: (query?: { sessionId?: string }) => Promise<unknown>;
+  reloadPiExtensions: () => Promise<unknown>;
+
+
   // A-5: signal propagated for renderer-initiated cancellation.
   prompt: (text: string, options?: { traceId?: TraceId; sessionId?: SessionId; signal?: AbortSignal }) => Promise<PromptDispatchResult>;
   promptContent: (
@@ -181,7 +185,8 @@ export interface AgentHostFacade {
   pluginEvents: (query?: { sessionId?: string; sinceSequence?: number; limit?: number }) => Promise<ReadonlyArray<PluginEventRecord>>;
   setPluginEnabled: (id: string, enabled: boolean) => Promise<MutationAck>;
   reloadPlugin: (id: string) => Promise<MutationAck>;
-  reloadPiExtensions: () => Promise<MutationAck>;
+  /** Apply allow/deny policy overrides and reload the live Pi extension host. */
+  updateExtensionPolicy: (policy: { allowlistPackageNames?: readonly string[]; denylistPackageNames?: readonly string[] }) => Promise<{ ok: true; policy: { allowlistPackageNames: string[]; denylistPackageNames: string[] } }>;
   reloadPiRuntime: (reason?: string) => Promise<MutationAck>;
   updatePluginConfig: (id: string, config: unknown) => Promise<MutationAck>;
   getStoredPluginState: (id?: string) => unknown;

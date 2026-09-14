@@ -124,6 +124,11 @@ describe("init-session", () => {
       createTeamRunner: deps.createTeamRunner as any,
     });
     expect(id).toBe("test-session");
+    const createOptions = (deps.piSessionRuntime.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
+      settingsManager?: { get?: (key: string) => unknown };
+    };
+    expect(createOptions.settingsManager).toBeDefined();
+    expect(typeof createOptions.settingsManager).toBe("object");
   });
 
   it("emits session/created + plugin/ready on success", async () => {

@@ -22,7 +22,34 @@
  *   - Action rows are visually tagged via `data-action="allow|deny|needs-review"`
  *     so CSS can tone them (deny = red, needs-review = amber, allow = neutral).
  */
-import { memo, useMemo } from "react";
+export interface ExtensionPolicyEditorProps {
+  initial?: { allowlistPackageNames: string[]; denylistPackageNames: string[] };
+  onSaved?: (policy: { allowlistPackageNames: string[]; denylistPackageNames: string[] }) => void;
+}
+
+export function ExtensionPolicyEditor({ initial, onSaved }: ExtensionPolicyEditorProps) {
+  const [allowlist, setAllowlist] = useState(initial?.allowlistPackageNames.join("\n") ?? "");
+  const [denylist, setDenylist] = useState(initial?.denylistPackageNames.join("\n") ?? "");
+  const [status, setStatus] = useState<string>("");
+  const save = async () => {
+    const parse = (value: string) => [...new Set(value.split(/\r?\n|,/).map((entry) => entry.trim()).filter(Boolean))];
+    try {
+      const result = await extensionPolicySave({ allowlistPackageNames: parse(allowlist), denylistPackageNames: parse(denylist) });
+      setStatus("Policy refreshed");
+      onSaved?.(result.policy);
+    } catch {
+      setStatus("Unable to refresh policy");
+    }
+  };
+  return <div className="extension-policy-editor" data-testid="extension-policy-editor">
+    <label>Allowlist packages<textarea value={allowlist} onChange={(event) => setAllowlist(event.target.value)} /></label>
+    <label>Denylist packages<textarea value={denylist} onChange={(event) => setDenylist(event.target.value)} /></label>
+    <button type="button" onClick={save}>Save and refresh</button>
+    {status && <output role="status">{status}</output>}
+  </div>;
+}
+import { memo, useMemo, useState } from "react";
+import { extensionPolicySave } from "../lib/agent/pi-client";
 import { useExtensionAuditPanel } from "../hooks/useExtensionAuditPanel";
 import type { ExtensionAuditDecision } from "../lib/agent/extension-audit-event-parser";
 

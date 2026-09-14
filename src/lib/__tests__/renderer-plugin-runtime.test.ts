@@ -207,6 +207,21 @@ describe("renderer-plugin-runtime", () => {
     stop();
   });
 
+  it("falls back to persisted session event history when the plugin ring is empty", async () => {
+    const mod = await import("../runtime/renderer-plugin-runtime");
+    const runtime = mod.getRendererPluginRuntime();
+    const seen: unknown[] = [];
+    runtime.events.on("progress/update", (payload) => seen.push(payload));
+    const { agentPluginEvents, agentSessionEventLog } = await import("../agent/pi-client");
+    vi.mocked(agentPluginEvents).mockResolvedValueOnce([]);
+    vi.mocked(agentSessionEventLog).mockResolvedValueOnce([
+      { sequence: 77, timestamp: "2026-08-28T00:00:00.000Z", type: "progress/update", payload: { runId: "run-2", stage: "restored" } },
+    ]);
+
+    await expect(runtime.replayMainEvents()).resolves.toBe(77);
+    expect(seen).toEqual([{ runId: "run-2", stage: "restored" }]);
+    expect(vi.mocked(agentSessionEventLog)).toHaveBeenCalledWith({ limit: 2000 });
+  });
   it("prefers the Harness transport and maps carrier events into renderer events", async () => {
     const electronApi = await import("../platform/electron-api");
     vi.mocked(electronApi.invoke).mockImplementation(async (channel) => channel === "harness:address"

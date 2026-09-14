@@ -88,7 +88,6 @@ function spawnAsync(
   return new Promise((resolve, reject) => {
     const child = crossSpawn(command, args as string[], {
       cwd: options.cwd,
-      maxBuffer: options.maxBuffer,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
@@ -558,9 +557,28 @@ function hasCordisPlugin(manifest: Record<string, unknown>): boolean {
     || dependencies?.["@deepseek-ai/cordis"] || dependencies?.["@cordisjs/core"]);
 }
 
+async function existingDirectory(path: string): Promise<string | undefined> {
+  try {
+    return (await stat(path)).isDirectory() ? path : undefined;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+async function existingPath(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+}
+
 async function hasPiConventionDirectory(path: string): Promise<boolean> {
   for (const field of ["extensions", "skills", "prompts", "themes"]) {
-    if ((await stat(join(path, field), { throwIfNoEntry: false }))?.isDirectory()) return true;
+    if (await existingDirectory(join(path, field))) return true;
   }
   return false;
 }
@@ -577,7 +595,7 @@ async function packageDirectories(root: string): Promise<string[]> {
       for (const child of scoped) result.push(join(path, child));
     } else result.push(path);
   }
-  const checks = await Promise.all(result.map(async (path) => ((await stat(path, { throwIfNoEntry: false }))?.isDirectory() ? path : undefined)));
+  const checks = await Promise.all(result.map(async (path) => (await existingDirectory(path)) ?? undefined));
   return checks.filter((path): path is string => path !== undefined);
 }
 
@@ -755,7 +773,7 @@ export async function installProfilePackage(options: ProfilePackageOptions, sour
   const profileManifestBefore = await readFile(profile.packageJson, "utf8");
   await mkdir(dirname(target), { recursive: true });
   await rm(temporary, { recursive: true, force: true });
-  const hadPrevious = (await stat(target, { throwIfNoEntry: false })) !== undefined;
+  const hadPrevious = await existingPath(target);
   if (hadPrevious) await rename(target, backup);
   try {
     await copyPackageTree(source, temporary);
@@ -798,7 +816,7 @@ export async function removeProfilePackage(options: ProfilePackageOptions, name:
     }
     return;
   }
-  if (!(await stat(target, { throwIfNoEntry: false }))) {
+  if (!(await existingPath(target))) {
     await packageManagerFor(options).remove(profile.dir, packageName(name));
     return;
   }

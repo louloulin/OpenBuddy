@@ -856,9 +856,13 @@ export interface PiSessionEntry {
   data?: unknown;
 }
 
-export async function agentSessionMessages(sessionId: string): Promise<PiSessionEntry[]> {
-  return invoke<PiSessionEntry[]>("agent:session-messages", { sessionId });
+export async function agentSessionMessages(sessionId: string): Promise<PiSessionEntry[]> { return invoke<PiSessionEntry[]>("agent:session-messages", { sessionId }); }
+
+export async function restoreDocument(sessionId: string, sourceDocumentId?: string): Promise<{ ok: true; content: string } | { ok: false; code: "unsupported" | "missing" | "disposed"; message: string }> {
+  return invoke("agent:document-restore", { sessionId, ...(sourceDocumentId === undefined ? {} : { sourceDocumentId }) });
 }
+
+
 
 /**
  * Map pi SessionEntry[] to ChatMessage[] used by session-store.
@@ -951,16 +955,21 @@ export interface AgentEventLogReplayResult {
   };
 }
 
+export async function attachEventLogSurface(sessionId: string, surfaceId: string): Promise<unknown> { return invoke("agent:event-log-surface-attach", { sessionId, surfaceId }); }
+export async function detachEventLogSurface(sessionId: string, surfaceId: string): Promise<unknown> { return invoke("agent:event-log-surface-detach", { sessionId, surfaceId }); }
+export interface SurfaceEventLogReplayResult { ok: true; events: unknown[]; nextCursor: string | null; truncated: boolean; }
+export interface SurfaceEventLogReplayError { ok: false; code: string; message: string; }
+export type SurfaceEventLogReplayResponse = SurfaceEventLogReplayResult | SurfaceEventLogReplayError;
+export async function eventLogReplay(sessionId: string, surfaceId: string, sinceEventId?: string, limit = 2000): Promise<SurfaceEventLogReplayResponse> {
+  return invoke<SurfaceEventLogReplayResponse>("agent:event-log-replay", { sessionId, surfaceId, ...(sinceEventId === undefined ? {} : { sinceEventId }), limit });
+}
+
 export async function agentEventLogReplay(
   sessionId: string,
   fromSequence: number,
   limit = 2000,
 ): Promise<AgentEventLogReplayResult> {
-  return invoke<AgentEventLogReplayResult>("agent:event-log-replay", {
-    sessionId,
-    fromSequence,
-    limit,
-  });
+  return invoke<AgentEventLogReplayResult>("agent:event-log-replay", { sessionId, fromSequence, limit });
 }
 
 export async function agentCurrentModel(): Promise<unknown> {
@@ -1701,7 +1710,22 @@ export async function promptHistory(limit?: number): Promise<string[]> {
   return invoke<string[]>("prompt_history", { limit: limit ?? null });
 }
 
-// ---------- tasks / subagents ----------
+import { progressSnapshot, type ProgressRun } from "./progress-runs";
+
+export interface MultiSurfaceSessionLeaseResult { ok: true; sessionId: string; surfaceId: string; generation: number; shared: boolean; }
+export interface MultiSurfaceSessionLeaseError { ok: false; code: "disposed" | "generation-mismatch" | "duplicate-release" | "unknown-session"; message: string; }
+export type MultiSurfaceSessionAcquireResult = MultiSurfaceSessionLeaseResult | MultiSurfaceSessionLeaseError;
+export type MultiSurfaceSessionReleaseResult = { ok: true; released: boolean } | MultiSurfaceSessionLeaseError;
+export interface MultiSurfaceSessionState { sessionId: string; surfaces: string[]; refCount: number; generation: number; }
+export async function multiSurfaceSessionAcquire(sessionId: string, surfaceId: string): Promise<MultiSurfaceSessionAcquireResult> { return invoke("agent:session-surface-acquire", { sessionId, surfaceId }); }
+export async function multiSurfaceSessionRelease(sessionId: string, surfaceId: string, generation?: number): Promise<MultiSurfaceSessionReleaseResult> { return invoke("agent:session-surface-release", { sessionId, surfaceId, ...(generation === undefined ? {} : { generation }) }); }
+export async function multiSurfaceSessionList(sessionId?: string): Promise<MultiSurfaceSessionState[]> { return invoke("agent:session-surface-list", sessionId === undefined ? undefined : { sessionId }); }
+
+export async function progressRunsGet(): Promise<ProgressRun[]> { return invoke<ProgressRun[]>("progress:list"); }
+export function progressRunCancel(runId: string): Promise<ProgressRun | null> { return invoke("progress:cancel", { runId }); }
+export function progressRunRetry(runId: string): Promise<ProgressRun | null> { return invoke("progress:retry", { runId }); }
+
+
 
 /** List running background tasks / subagents. */
 export async function tasksList(): Promise<RunningTask[]> {
@@ -1818,7 +1842,20 @@ export async function agentsDefaultsSave(defaults: AgentDefaults): Promise<void>
   await invoke<void>("agents_defaults_save", { defaults });
 }
 
-// ---------- plugins + marketplace (x.ai/plugins/*, x.ai/marketplace/*) ----------
+export interface ExtensionPolicyConfig {
+  allowlistPackageNames: string[];
+  denylistPackageNames: string[];
+}
+
+export async function extensionPolicyGet(): Promise<ExtensionPolicyConfig> {
+  return invoke<ExtensionPolicyConfig>("agent:extension-policy-get");
+}
+
+export async function extensionPolicySave(config: ExtensionPolicyConfig): Promise<{ ok: true; policy: ExtensionPolicyConfig }> {
+  return invoke("agent:extension-policy-save", config);
+}
+
+
 
 import type {
   MarketplaceActionResult,
@@ -1842,6 +1879,64 @@ export async function pluginsAction(
 /** Re-materialize and reload the active Pi extension resources in place. */
 export async function reloadPiExtensions(): Promise<unknown[]> {
   return invoke<unknown[]>("agent:extensions-reload");
+}
+
+// ---------- needs-review approval gate (plan4.5 §B) ----------
+
+/**
+ * A Pi extension that the resolver classified as `needs-review` and
+ * is currently blocking the agent loop until the user signs off.
+ * Mirrors the `NeedsReviewEntry` shape from
+ * `electron/main/agent/host-modules/needs-review-gate.ts`.
+ */
+export interface NeedsReviewPendingEntry {
+  id: string;
+  packageName?: string;
+  reason: string;
+  requestedAt: string;
+}
+
+export interface NeedsReviewStateSummary {
+  pending: NeedsReviewPendingEntry[];
+  pendingCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+}
+
+/**
+ * Snapshot the needs-review gate. The renderer calls this on mount so
+ * the modal can rehydrate from the current process state instead of
+ * waiting for the next `pi/extension-needs-review-pending` event.
+ */
+export async function agentNeedsReviewState(): Promise<NeedsReviewStateSummary> {
+  return invoke<NeedsReviewStateSummary>("extension:needs-review-state");
+}
+
+export interface NeedsReviewDecisionResult {
+  ok: boolean;
+  id: string;
+  /** Current gate verdict after the call: `allow` | `deny` | `pending`. */
+  state: "allow" | "deny" | "pending";
+  summary: NeedsReviewStateSummary;
+}
+
+/**
+ * Approve a pending needs-review id. Main approves the gate entry
+ * and triggers `reloadPiExtensions` so the next agent loop sees the
+ * factory. Idempotent — an already-approved id returns the current
+ * state without reloading.
+ */
+export async function agentApproveNeedsReview(id: string): Promise<NeedsReviewDecisionResult> {
+  return invoke<NeedsReviewDecisionResult>("extension:approve-needs-review", { id });
+}
+
+/**
+ * Reject a pending needs-review id. Main rejects the gate entry and
+ * triggers `reloadPiExtensions` so the next agent loop confirms the
+ * factory stays out. Idempotent.
+ */
+export async function agentRejectNeedsReview(id: string): Promise<NeedsReviewDecisionResult> {
+  return invoke<NeedsReviewDecisionResult>("extension:reject-needs-review", { id });
 }
 
 /** List marketplace sources + plugins via `x.ai/marketplace/list`. */

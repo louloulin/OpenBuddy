@@ -18,6 +18,12 @@
  * cold-start path (matches `plugins_list`).
  */
 import { ipcMain } from "electron";
+import { progressSnapshot, cancelProgress, retryProgress } from "../agent/progress-runs";
+import { MultiSurfaceSessionRegistry } from "../agent/multi-surface-session";
+import { pluginEventLogCursor } from "../agent/plugin-event-log-cursor";
+
+
+
 
 import {
   optionalFiniteInteger,
@@ -26,9 +32,45 @@ import {
   requiredString,
 } from "./validation";
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
+import { getNeedsReviewGate } from "../agent/host-modules/needs-review-singleton";
+import { summarizeNeedsReviewState } from "../agent/host-modules/needs-review-gate";
+import * as resources from "../agent/pi-resources";
 
 export function registerPluginIpc(deps: AgentHostIpcDeps): void {
   const { agentHost, ensureAgentHost } = deps;
+  const multiSurfaceSessions = new MultiSurfaceSessionRegistry((sessionId, generation) => {
+    pluginEventLogCursor.disposeOwner(sessionId);
+    return undefined;
+  });
+
+  ipcMain.handle("agent:session-surface-acquire", async (_e, args: unknown) => {
+    await ensureAgentHost();
+    const input = recordValue(args, "session surface acquire payload");
+    const lease = multiSurfaceSessions.acquire(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
+    if (!lease.ok) return lease;
+    return { sessionId: lease.sessionId, surfaceId: lease.surfaceId, generation: lease.generation, shared: (multiSurfaceSessions.snapshot(lease.sessionId)[0]?.refCount ?? 0) > 1 };
+
+  });
+  ipcMain.handle("agent:session-surface-release", async (_e, args: unknown) => {
+    const input = recordValue(args, "session surface release payload");
+    return multiSurfaceSessions.release(
+      requiredString(input.sessionId, "sessionId"),
+      requiredString(input.surfaceId, "surfaceId"),
+      input.generation === undefined ? undefined : optionalFiniteInteger(input.generation, "generation", 0, 0, Number.MAX_SAFE_INTEGER),
+      () => {
+        pluginEventLogCursor.disposeOwner(requiredString(input.sessionId, "sessionId"));
+        return agentHost.dispose();
+      },
+    );
+  });
+  ipcMain.handle("agent:session-surface-list", async (_e, args?: unknown) => {
+    const input = args === undefined || args === null ? {} : recordValue(args, "session surface list payload");
+    return multiSurfaceSessions.snapshot(input.sessionId === undefined ? undefined : requiredString(input.sessionId, "sessionId"));
+  });
+
+  ipcMain.handle("progress:list", async () => progressSnapshot());
+  ipcMain.handle("progress:cancel", async (_e, args: unknown) => cancelProgress(String((args as { runId?: unknown })?.runId ?? "")));
+  ipcMain.handle("progress:retry", async (_e, args: unknown) => retryProgress(String((args as { runId?: unknown })?.runId ?? "")));
 
   ipcMain.handle("agent:plugin-list", async () => {
     await ensureAgentHost();
@@ -95,7 +137,22 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
       ...(input.limit === undefined ? {} : { limit: optionalFiniteInteger(input.limit, "limit", 2000, 1, 2000) }),
     });
   });
-  ipcMain.handle("agent:event-log-replay", async (_e, args?: unknown) => {
+  ipcMain.handle("agent:document-restore", async (_e, args: unknown) => {
+    const input = recordValue(args, "document restore payload");
+    const sessionId = requiredString(input.sessionId, "sessionId");
+    const session = await agentHost.getSession?.(sessionId).catch(() => null);
+    if (!session) return { ok: false, code: "disposed", message: `session ${sessionId} is unavailable` };
+    return { ok: false, code: "unsupported", message: "complete source document restoration is not available for this session" };
+  });
+
+    const input = recordValue(args, "event log surface attach payload");
+    return pluginEventLogCursor.attachSurface(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
+  });
+  ipcMain.handle("agent:event-log-surface-detach", async (_e, args: unknown) => {
+    const input = recordValue(args, "event log surface detach payload");
+    return pluginEventLogCursor.detachSurface(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
+  });
+
     // Cursor-based replay used after bridge recovery. Returns events
     // from `fromSequence` forward so the renderer can rehydrate
     // stores without a full reload. The `cursor` payload reports
@@ -104,17 +161,11 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     // whether to fall back to `agent:session-messages`.
     const input = args === undefined || args === null ? {} : recordValue(args, "event-log-replay payload");
     const sessionId = requiredString(input.sessionId, "sessionId");
-    const fromSequence = input.fromSequence === undefined ? 0 : optionalFiniteInteger(input.fromSequence, "fromSequence", 0, 0, Number.MAX_SAFE_INTEGER);
-    const limit = input.limit === undefined ? 500 : optionalFiniteInteger(input.limit, "limit", 500, 1, 2000);
-    const entries = await agentHost.pluginEvents({ sessionId, sinceSequence: fromSequence, limit });
-    const cursor = await agentHost.pluginEventLogCursor({ sessionId });
-    return {
-      sessionId,
-      fromSequence,
-      count: Array.isArray(entries) ? entries.length : 0,
-      entries,
-      cursor,
-    };
+    const surfaceId = requiredString(input.surfaceId, "surfaceId");
+    const attached = pluginEventLogCursor.attachSurface(sessionId, surfaceId);
+    if (!attached.ok) return attached;
+    const replay = pluginEventLogCursor.readSince(sessionId, surfaceId, input.sinceEventId === undefined ? undefined : requiredString(input.sinceEventId, "sinceEventId"), input.limit === undefined ? 2000 : optionalFiniteInteger(input.limit, "limit", 2000, 1, 2000));
+    return replay;
   });
   ipcMain.handle("agent:plugin-enable", async (_e, args: { id: string; enabled: boolean }) => {
     const input = recordValue(args, "plugin-enable payload");
@@ -124,6 +175,21 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     return agentHost.reloadPlugin(requiredString(recordValue(args, "plugin-reload payload").id, "plugin id"));
   });
   ipcMain.handle("agent:extensions-reload", async () => agentHost.reloadPiExtensions());
+  ipcMain.handle("agent:extension-policy-reload", async (_e, args: unknown) => {
+    const input = recordValue(args, "extension policy payload");
+    const allowlist = Array.isArray(input.allowlistPackageNames) ? input.allowlistPackageNames : [];
+    const denylist = Array.isArray(input.denylistPackageNames) ? input.denylistPackageNames : [];
+    return agentHost.updateExtensionPolicy({ allowlistPackageNames: allowlist, denylistPackageNames: denylist });
+  });
+  ipcMain.handle("agent:extension-policy-get", async () => resources.readExtensionPolicyConfig());
+  ipcMain.handle("agent:extension-policy-save", async (_e, args: unknown) => {
+    const input = recordValue(args, "extension policy save payload");
+    const config = await resources.writeExtensionPolicyConfig({
+      allowlistPackageNames: Array.isArray(input.allowlistPackageNames) ? input.allowlistPackageNames.filter((entry): entry is string => typeof entry === "string") : [],
+      denylistPackageNames: Array.isArray(input.denylistPackageNames) ? input.denylistPackageNames.filter((entry): entry is string => typeof entry === "string") : [],
+    });
+    return agentHost.updateExtensionPolicy(config);
+  });
   ipcMain.handle("agent:plugin-config", async (_e, args: { id: string; config: unknown }) => {
     const input = recordValue(args, "plugin-config payload");
     return agentHost.updatePluginConfig(requiredString(input.id, "plugin id"), input.config);
@@ -165,5 +231,43 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     }
     if (action.type === "reload") return agentHost.reloadPlugin(pluginName);
     throw new Error(`unsupported plugin action: ${action.type ?? "unknown"}`);
+  });
+
+  // plan4.5 §B — needs-review approval gate. The gate is a process-wide
+  // singleton; the resolver consults it during `configurePiExtensions`
+  // (host-modules/pi-extension-configure.ts) so a `pending` verdict
+  // drops the factory from `factories` and pushes a `blocked` diagnostic.
+  // The renderer pops a modal off `pi/extension-needs-review-pending`
+  // (also emitted by the resolver) and replies through these three
+  // channels. After every approve / reject we call `reloadPiExtensions`
+  // so the next agent loop sees the new factory set.
+  ipcMain.handle("extension:needs-review-state", async () => {
+    return summarizeNeedsReviewState(getNeedsReviewGate().snapshot());
+  });
+  ipcMain.handle("extension:approve-needs-review", async (_e, args: unknown) => {
+    const input = recordValue(args, "needs-review approve payload");
+    const id = requiredString(input.id, "id");
+    const gate = getNeedsReviewGate();
+    if (gate.gate({ id }) !== "pending") {
+      // Idempotent: an already-approved / rejected / unknown id is
+      // not an error — the renderer's optimistic UI may have already
+      // applied the change. Return the current summary so the modal
+      // can reconcile without a second round-trip.
+      return { ok: true, id, state: gate.gate({ id }), summary: summarizeNeedsReviewState(gate.snapshot()) };
+    }
+    gate.approve(id);
+    await agentHost.reloadPiExtensions();
+    return { ok: true, id, state: "allow", summary: summarizeNeedsReviewState(gate.snapshot()) };
+  });
+  ipcMain.handle("extension:reject-needs-review", async (_e, args: unknown) => {
+    const input = recordValue(args, "needs-review reject payload");
+    const id = requiredString(input.id, "id");
+    const gate = getNeedsReviewGate();
+    if (gate.gate({ id }) !== "pending") {
+      return { ok: true, id, state: gate.gate({ id }), summary: summarizeNeedsReviewState(gate.snapshot()) };
+    }
+    gate.reject(id);
+    await agentHost.reloadPiExtensions();
+    return { ok: true, id, state: "deny", summary: summarizeNeedsReviewState(gate.snapshot()) };
   });
 }

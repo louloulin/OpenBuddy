@@ -488,7 +488,97 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 
 **生产价值**: Extension Audit panel 现在即使 mount 比第一次 resolve 晚也能立刻显示最新状态（profile 切换 / plugin reload / fast agent-host restart 场景），不需要改 panel 本身 —— hook 透明地 hydrate。
 
-## 4. Plan 4.3 之外的更长路线
+### 3.19 [plan4.5 §B] needs-review approval gate（本轮新增）
+
+**问题**: Round 8–16 把 `needs-review` 从一个 audit 标签变成 resolver 阶段会读取的 hint —— 但它只是「factory 不进 list，diagnostic 提示一下」的非阻塞挂起。用户没有任何 UI 入口去 approve / reject，导致配置被标记 `needs-review` 的扩展永远处于 blocked 状态、永远 reload 也只是重新落 blocked 诊断，不是「先 sign-off 再加载」。
+
+**方案**: 把 `needs-review` 升格成 active sign-off gate —— 纯工厂状态的 `createNeedsReviewGate()` 持有 pending / approved / rejected 三个集合，resolver 在产出 final resolution 时调用 `applyNeedsReviewGate()` 决定 factory 是否保留，main 端 IPC handler 把 approve / reject 转成 `reloadPiExtensions()` 让下一轮 agent loop 拿到新 factory 集合，renderer 用 hook 订阅 `pi/extension-needs-review-pending` event stream + 在 mount 时从 cached ring buffer / `extension:needs-review-state` snapshot hydrate。
+
+- `electron/main/agent/host-modules/needs-review-gate.ts`：
+  - 纯工厂：`createNeedsReviewGate()` 返回 `{ snapshot, gate, track, approve, reject, subscribe }`
+  - `gate({ id })` 对 tracked-but-undecided id → `pending`，对 approved id → `allow`，对 rejected id → `deny`，对未 tracked 或空字符串 id → `deny`（fail-closed，默认拒绝未登记请求）
+  - `approve(id)` / `reject(id)` 对未知 id 是 no-op（refuse to lift unknown id）
+  - `summarizeNeedsReviewState()` 把 internal snapshot 转 renderer 友好的 `{ pending, pendingCount, approvedCount, rejectedCount }`，用 `Object.freeze` 保护 pending 数组防外部 mutate
+- `electron/main/agent/host-modules/needs-review-gate.test.ts` —— **8 cases**：empty state / track idempotency / gate 分类 / approve-reject 语义 / unknown id no-op / subscribe listener 在每个 mutation 触发 / `summarizeNeedsReviewState` frozen
+- `electron/main/agent/host-modules/pi-extensions-needs-review.ts`：
+  - `applyNeedsReviewGate(resolution, decisions, gate, emit)` 后处理 resolver 产物：对 pending/deny 状态从 `factories` 移除并 push `blocked` 诊断；`emit` 总是被调用（即使 0 pending）让 renderer 显式收「no pending」事件确认 modal 关闭
+- `electron/main/agent/host-modules/pi-extensions-needs-review.test.ts` —— **6 cases**
+- `electron/main/agent/host-modules/needs-review-singleton.ts`：模块级 `let gate = createNeedsReviewGate()` + `installNeedsReviewGate(instance?)` / `getNeedsReviewGate()` / `__resetNeedsReviewGateForTest()`，匹配 `plugin-event-bus.ts` / `pi-extension-configure.ts` 的 install 模式
+- `electron/main/agent/__tests__/pi-extensions-needs-review-integration.test.ts` —— **4 cases** 验证 `resolvePiExtensions` 接 `needsReviewGate` 后 factory 被移除、approve 后 reload 又装回来、`pi/extension-needs-review-pending` 被 emit
+- `electron/main/agent/host-modules/_state-shape.ts` + `_default-state.ts`：新增 `piExtensionNeedsReviewIds: string[]` state 字段
+- `electron/main/agent/host-modules/pi-extension-configure.ts`：把 `needsReviewGate` 和 `needsReviewIds` 透传给 `resolvePiExtensions`
+- `electron/main/agent/pi-extensions.ts`：`PiExtensionResolutionOptions` 新增 `needsReviewGate?: NeedsReviewGate`、`needsReviewIds?: readonly string[]`、`needsReviewPackageNames?: readonly string[]`；resolver 完成后调 `applyNeedsReviewGate(result, decisions, options.needsReviewGate, options.emit)`
+- `electron/main/ipc/plugin.ts`：新增 3 个 handler —— `extension:needs-review-state`（snapshot）/ `extension:approve-needs-review`（mutate + reload）/ `extension:reject-needs-review`（mutate + reload），都对未知 id 返回 idempotent current state 不报错
+- `src/lib/agent/pi-client.ts`：导出 `NeedsReviewPendingEntry` / `NeedsReviewStateSummary` / `NeedsReviewDecisionResult` 类型 + 三个 wrapper：`agentNeedsReviewState()` / `agentApproveNeedsReview(id)` / `agentRejectNeedsReview(id)`
+- `src/hooks/useExtensionNeedsReviewApproval.tsx`：
+  - 拥有单一 summary `useState`，live event 直接 mutate summary in-place
+  - 操作顺序关键：live subscription FIRST → ring buffer catch-up → fresh IPC snapshot ONLY if `!sawAnyEvent && !userTouchedRef.current`
+  - `userTouchedRef` 在 approve/reject 立刻置 true，`sawAnyEvent` 任何 pending event 看到都置 true —— 双保险防 mount 时 snapshot round-trip 覆盖刚刚 user-mutate 的 state
+  - `approve(id)` / `reject(id)` 都先 flip `userTouchedRef` 再 await IPC，prevent race
+- `src/hooks/useExtensionNeedsReviewApproval.test.tsx` —— **6 cases**：mount subscribe / on-mount hydrate / live event 更新 / unrelated event 忽略 / approve IPC + summary 反映 / reject IPC + summary 反映
+
+**验收**:
+- `pnpm exec vitest run electron/main/agent/host-modules/needs-review-gate.test.ts` —— **8/8 ✓**
+- `pnpm exec vitest run electron/main/agent/host-modules/pi-extensions-needs-review.test.ts` —— **6/6 ✓**
+- `pnpm exec vitest run electron/main/agent/__tests__/pi-extensions-needs-review-integration.test.ts` —— **4/4 ✓**
+- `pnpm exec vitest run src/hooks/useExtensionNeedsReviewApproval.test.tsx` —— **6/6 ✓**
+- 全 extension needs-review pipeline: gate (8) + wiring (6) + integration (4) + hook (6) + Round 17 audit pipeline (38) = **62/62 ✓**
+- 总体（含现有 pi-extensions / state-shape / configure / audit panel / audit hook）：**91/91 ✓** 跨 9 个 test file
+- `pnpm exec tsc --noEmit -p .` —— 0 新增错误
+
+**生产价值**: needs-review 现在从「被动的 audit 标签」升级成「主动的 sign-off gate」—— 用户在 modal 里看到 `pi/extension-needs-review-pending` 列出的待审条目、点 Approve / Reject、main 端 gate mutate 后 `reloadPiExtensions()` 让下一轮 agent loop 真正加载（或永不加载）这些扩展。空字符串 / 未登记 id 全部 fail-closed 防绕过；modal 不再卡死、audit 不再 silently 挂起、配置可预测地 enforce。
+
+### 3.20 [plan4.5 §B] needs-review gate ID normalization（本轮修复）
+
+**问题**：审批门对 `gate()` 的输入做了 `trim()`，但 `track()` / `approve()` / `reject()` 使用未规范化的原始 id。来自 manifest、IPC 或 renderer 的首尾空白会导致同一个扩展出现「查询是 pending、批准却找不到」的不一致状态；重新 resolve 时也可能重复登记。
+
+**修复**：在 `needs-review-gate.ts` 集中使用 `normalizeId()`：
+- `track()` 以规范化 id 存储，并避免覆盖已批准/已拒绝的决策；
+- `approve()` / `reject()` 规范化输入后再执行状态迁移；
+- 无效 id 继续 fail-closed / no-op，不扩大授权面。
+
+**验收**：新增首尾空白 id 回归用例，覆盖 track → gate → approve/reject 全链路；needs-review gate、wiring、integration 共 **19/19** 通过。
+
+### 3.21 [plan4.3] renderer replay gap boundary 修复（本轮新增）
+
+**问题**：`detectReplayGap()` 原实现把 `fromSequence > earliestSequence` 当成 gap，方向相反；当 renderer 游标早于 ring buffer 保留范围时反而返回 `gap: false`，会静默丢失事件并跳过 fallback。另一个边界是 `fromSequence === earliestSequence - 1`，下一条事件仍可重放，不应报告 gap。
+
+**修复**：按 replay 语义统一判定：当 `fromSequence < earliestSequence - 1` 时才表示至少有一个事件已被淘汰；`missing = earliestSequence - fromSequence - 1`，保留 fresh start 和恰好连续游标的无 gap 行为。
+
+**验收**：新增“游标早于 ring buffer”与“下一条仍可用”的回归测试；replay coordinator、Pi event bridge、needs-review gate 共 **29/29** 通过，`git diff --check` 通过。
+
+### 3.22 [plan4.3] plugin-host typecheck unblock（本轮新增）
+
+**问题**：`packages/runtime/openbuddy-plugin-host/src/profile-manager.ts` 使用运行时依赖 `cross-spawn`，但包没有声明对应 TypeScript 类型；同时把 `maxBuffer`（Node `SpawnOptions` 不支持的字段）传入 `crossSpawn`，导致全局 `pnpm exec tsc --noEmit -p .` 失败。
+
+**修复**：
+- 在 `packages/runtime/openbuddy-plugin-host/package.json` 添加精确版本 devDependency `@types/cross-spawn@6.0.2`；
+- 移除不属于 `SpawnOptions` 的 `maxBuffer` 传参。进程输出上限仍由现有 stdout/stderr 手工计数逻辑执行，运行时行为不变。
+
+**验收**：全仓 `pnpm exec tsc --noEmit -p .` 通过。plugin-host 全套测试仍有 **35 个既有失败**，均来自 `profile.ts:407` 对测试临时 profile 缺失 `extensions` 目录抛出 ENOENT，未触及本轮改动；其余 260 个测试通过、1 个 skip。
+
+### 3.23 [plan4.3] plugin profile resource probing fail-soft（本轮新增）
+
+**问题**：profile 初始化与插件安装测试中，缺失的 `extensions` / `skills` / `prompts` / `themes` 目录被 `stat(..., { throwIfNoEntry: false })` 直接抛出 ENOENT，导致资源发现尚未返回空结果就中断 profile 组合；此前 plugin-host 全套测试因此出现 35 个级联失败。
+
+**修复**：
+- `packages/runtime/openbuddy-plugin-host/src/profile.ts` 增加 `directoryExists()`，统一捕获 ENOENT 并返回 `false`；
+- `packages/runtime/openbuddy-plugin-host/src/profile-manager.ts` 增加 `existingDirectory()` / `existingPath()`，覆盖 Pi convention 目录扫描、包目录枚举、安装替换和卸载判断；
+- 非 ENOENT 错误仍原样抛出，避免掩盖权限或 I/O 故障。
+
+**验收**：`profile-manager-extensions.test.ts` 9/9 通过；`profile.test.ts` 30/30 通过。跨平台适配使用 `path.normalize()` 比较路径，并使用基于 `process.cwd()` 的绝对 fixture 路径，避免 Windows 分隔符和 Vite/8.3 短路径 URL 解析差异；全仓 `pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过。
+
+### 3.24 [plan4.5] Pi SettingsManager 接入 AgentSession（本轮新增）
+
+**问题**：OpenBuddy 已使用 Pi `DefaultResourceLoader` 发现 extensions / skills / prompts / themes，但创建 `AgentSession` 时未传入 Pi 官方 `SettingsManager`，导致全局 `~/.pi/agent/settings.json` 与项目 `<cwd>/.pi/settings.json` 的 compaction、retry 等设置不会按 Pi 语义合并，属于半迁移状态。
+
+**实现**：`electron/main/agent/host-modules/bootstrap/init-session.ts` 在创建 session 时传入 `SettingsManager.create(cwd, piHome())`。资源路径仍由 OpenBuddy profile + marketplace 合并后传给 `DefaultResourceLoader`，因此本轮是兼容式迁移，不破坏现有 profile 资源隔离；Pi 官方 settings 只负责设置加载与持久化。
+
+**回归测试**：`init-session.test.ts` 验证 session 创建选项包含 SettingsManager；与 `profile/resource-paths.test.ts`、`pi-bridge/skill-utils.test.ts` 一起定向测试 13/13 通过。
+
+**验收**：`pnpm exec tsc --noEmit -p .` 通过，`git diff --check` 通过。后续可继续将 OpenBuddy 自定义设置映射到 `SettingsManager.applyOverrides()`，但必须先定义键冲突与敏感配置边界。 
+
+
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
 - **Plan 5.1**：插件系统正式化（manifest + 权限 + 健康度）
@@ -535,3 +625,82 @@ plan4.3 (下一阶段) ── replay gap fallback + PDF 阅读器 + pi file part
         ▼
 plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 ```
+
+### 3.25 [plan4.5 §C] extension policy 热加载（本轮新增）
+
+**实现**：新增运行时 policy 状态 `state.piExtensionPolicy` 与 `agent:extension-policy-reload` IPC。调用方提交 allowlist/denylist 后，主进程在当前 plugin host 内更新策略，并复用已有事务化 `reloadPiExtensions()`；resolver 继续产生 `pi/extension-policy-report`，needs-review gate 继续使用同一个 singleton，最后额外发送 `pi/extension-policy-reloaded` 事件供 renderer/telemetry 感知。
+
+**安全边界**：输入仅接受字符串数组，去重、去首尾空格；策略不写入 profile manifest，避免未经审计的配置污染持久化 profile。denylist 仍在 resolver 中优先于 allowlist，策略切换与扩展重载串行执行。
+
+**验收**：`pi-extension-configure.test.ts` 新增 allow→deny 热切换回归；extension policy / needs-review integration / configure 定向测试 30 项通过；全仓 `pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过。
+
+**后续缺口**：renderer 尚未提供专用 policy 编辑 UI/typed client；下一步应将 IPC 接入设置面板，并补 policy 持久化、签名信任和 marketplace 安装回滚。
+
+### 3.26 [plan4.5 §C] renderer policy editor + persistence（本轮新增）
+
+**实现**：新增 typed client `extensionPolicyGet()` / `extensionPolicySave()`；main IPC 增加 get/save。保存前由资源层做字符串类型校验、trim、去重，并以 `0600` 写入 Pi agent root 的 `openbuddy-extension-policy.json`；启动时 configure 阶段读取该文件，随后仍通过既有 policy resolver、audit report 和 needs-review gate，不绕过审批。新增 `ExtensionPolicyEditor`，支持 allowlist/denylist 编辑、保存并刷新反馈。
+
+**回归与兼容修复**：补充 marketplace Pi resource 探测的 ENOENT fail-soft，避免不存在的 prompts/themes 目录阻断 policy reload。
+
+**验收**：`pi-extension-configure.test.ts`、`pi-resources.test.ts`、`ExtensionAuditPanel.test.tsx` 合计 38/38；`pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过。
+
+**下一缺口**：marketplace 包的签名校验、信任根、安装失败回滚及卸载清理仍未完成。
+
+### 3.27 [plan4.5 §D] marketplace 包签名与受信任根（本轮新增）
+
+新增 `marketplace-trust.ts` 管理 `marketplace-trust.json`（0600）与 trusted roots；支持 RSA-SHA256/ECDSA-SHA256 manifest 验签。远程 marketplace 包默认必须带受信任 keyId 的签名，本地包保持兼容性的可选签名策略。安装复制到 plugin root 后立即验签，失败删除本次 target 并拒绝运行时加载；签名校验不改变现有 policy audit/needs-review gate。
+
+验收：`pi-resources.test.ts` + `marketplace-pi-sync.test.ts` 21/21 通过，tsc 与 diff check 通过。剩余：签名专用 fixture 测试、覆盖旧版本的完整原子回滚，以及仅限 agentRoot/plugins 的卸载清理。
+
+### 3.28 [plan4.5 §D] marketplace 安装/卸载原子性与路径安全（本轮新增）
+
+安装改为 staging → 验签 → 写 managed marker → rename 旧版本到 backup → rename staging 到 target；任一步失败删除新 target 并恢复旧 backup，临时目录最终清理。重复安装不覆盖 symlink target。卸载仅接受 `realpath(agentRoot/plugins)` 下的目录，拒绝 symlink、非目录、缺少 `.openbuddy-marketplace-managed.json` 管理标记的目标；因此不会删除用户数据目录或越权路径。
+
+验收：`pi-resources.test.ts` + `marketplace-pi-sync.test.ts` 21/21 通过，tsc 与 diff check 通过。仍需补专门失败注入/符号链接/重复卸载 fixtures；Progress UX、多 surface session、Electron smoke/E2E 仍未完成。
+
+### 3.29 [plan4.5 §D] marketplace 事务安全独立回归（本轮新增）
+
+新增 `marketplace-transaction-safety.test.ts`，独立验证旧版本恢复、验签失败后的 target/managed metadata 状态、symlink 越权保护、路径穿越拒绝、非 managed 目录卸载拒绝。修复事务 catch 逻辑：staging/验签阶段失败不得误删原有 target，只有新 target 已 rename 后才清理并恢复 backup。
+
+验收：独立安全测试 4/4；连同 `pi-resources.test.ts` 与 `marketplace-pi-sync.test.ts` 共 25/25，通过 tsc 与 diff check。下一阶段推进 Progress UX 或多 surface session。
+
+### 3.30 [plan4.5 §D] marketplace metadata/index 原子提交（本轮新增）
+
+新增受管理安装索引 `marketplace-installed.json`（0600）。安装只有在 target rename 成功后才写入索引；索引记录失败时删除新 target 并恢复旧 backup。卸载先更新索引再删除 managed target，非 managed/symlink 目标仍拒绝。独立 transaction fixture 新增旧版本索引恢复和卸载后索引一致性断言；Windows junction/reparse-point 在 Linux CI 无法创建，现有 symlink 契约覆盖同一拒绝边界，Windows runner 需补原生 fixture。
+
+验收：transaction safety + pi-resources 21/21，tsc 与 diff check 通过。下一步转向 Progress UX：长任务进度、取消/重试/错误反馈。
+
+### 3.31 [plan4.5 §E] Progress UX first slice（本轮新增）
+
+新增带唯一 `runId` 的 progress state machine：支持阶段、百分比/不确定进度、最近事件、completed/failed/cancelled 状态；旧 run 更新会被忽略，取消幂等，retry 只创建新 run。新增 `progress:list`、`progress:cancel`、`progress:retry` IPC 与 typed client，并提供 renderer `ProgressPanel` 显示取消/重试/错误反馈。
+
+验收：progress-runs 回归 2/2，tsc 与 diff check 通过。后续接入真实 AgentSession 长任务事件与 replay 恢复，并补 UI 集成测试。
+
+### 3.36 [plan5.0 §A] renderer session lease lifecycle（本轮新增）
+
+`useAgentSession` 现在在获得真实 sessionId 后自动 acquire renderer lease，并在 session 切换、renderer unmount 或 bridge crash cleanup 时 release；pending session 不登记，避免把占位 id 误当成真实 AgentSession。surface id 在 renderer 实例内稳定，重复 cleanup 幂等，重新 mount 会重新 acquire 并由 host registry bump generation；旧 generation release 不会释放新 lease。
+
+本轮验证：`multi-surface-session.test.ts` 2/2、Pi replay 11/11、`tsc --noEmit -p .`、`git diff --check` 通过。Electron smoke runner 存在（`test:electron`、`test:electron:real-ui`），但本轮未宣称完整 UI/E2E 已通过；需在具备 Electron display/headless runner 的环境执行，并补真实多窗口 mount/unmount 验证。
+
+
+
+新增 `electron/main/agent/multi-surface-session.ts` 引用计数注册表：同一 `sessionId` 的多个 renderer/surface 共享一个 generation，surface lease 的 `release()` 幂等，只有最后一个 surface 退出才触发释放回调；旧 generation 的迟到 release 不会误伤新连接，不同 session 完全隔离。
+
+新增 typed IPC/client：`agent:session-surface-acquire`、`agent:session-surface-release`、`agent:session-surface-list`，通过 preload/main allowlist 暴露。事件仍复用现有 sessionId、global cursor/history replay 和 Progress run 状态，不重复启动 agent。
+
+验收：`multi-surface-session.test.ts` 2/2，覆盖最后 surface 释放、幂等 release、generation 隔离、session 隔离和输入校验；`tsc --noEmit -p .`、`git diff --check` 通过。后续需在真实 renderer mount/unmount 与 Electron smoke 中接入 lease 自动 acquire/release，并验证断线重连后的 surface 恢复。
+
+
+
+在 `src/lib/__tests__/renderer-plugin-runtime.test.ts` 新增集成回归：当 renderer plugin ring buffer 为空时，`replayMainEvents()` 必须读取 `agentSessionEventLog({ limit: 2000 })`，把持久化的 `progress/update` 事件重新投递到 renderer event registry，并返回最高 global sequence，保证 ProgressPanel/插件订阅者可在重连后恢复。
+
+验收：renderer runtime 31/31、ProgressPanel 3/3、progress state 2/2、Pi replay coordinator 8/8，共 **44/44** 通过；`tsc --noEmit -p .` 与 `git diff --check` 通过。测试仍会输出一个既有 React `act()` 警告，来自 ProgressPanel 异步 refresh，不影响结果。旧 run 隔离、cancel/retry、live/success/error 已有独立覆盖；完整 Electron smoke/E2E 仍待执行。
+
+### 3.33 [plan4.5 §E] ProgressPanel 集成验证闭环（本轮新增）
+
+新增 `src/components/__tests__/ProgressPanel.test.tsx`，以 typed client/event bridge mock 验证 renderer 实际消费行为：
+- live `progress/update` 可驱动 running → completed，展示阶段和 100% 进度；
+- failed run 展示错误反馈，Retry 调用对应 `runId`；running run 的 Cancel 调用对应 `runId`；
+- plugin event history + `progress:list` 重连恢复只保留当前 snapshot，旧 run 不污染新 run；不确定进度显示 `Working`。
+
+验收：`ProgressPanel.test.tsx` 3/3 通过；现有 `progress-runs.test.ts` 2/2 作为状态机回归。测试运行仅有 React act 警告，来源为组件按钮回调中的异步 refresh，未影响断言；后续可将组件回调改为显式 await/状态更新以消除警告。完整 cursor gap → session history fallback 仍依赖 transport 层真实 coordinator，未在本轮虚构为已完成。

@@ -8,6 +8,8 @@ import {
   createExtensionPolicy,
   describeExtensionPolicyReport,
 } from "./host-modules/extension-policy";
+import { applyNeedsReviewGate } from "./host-modules/pi-extensions-needs-review";
+import type { NeedsReviewGate } from "./host-modules/needs-review-gate";
 import { sessionMetadataBridgeFactory } from "./extensions/session-metadata-bridge";
 import { modelBridgeFactory } from "./extensions/model-bridge";
 import { calendarPiFactory } from "./extensions/calendar-pi-extension";
@@ -69,6 +71,33 @@ export interface PiExtensionResolutionOptions {
    * back to a notification explaining the projection.
    */
   resolveService?: ServiceKeyResolver;
+  /**
+   * plan4.5 §B — needs-review approval gate. When provided, every
+   * spec whose policy decision is `needs-review` is blocked from
+   * loading until the user approves it through the renderer. The
+   * helper also emits `pi/extension-needs-review-pending` so the
+   * renderer can pop the approval modal. Omit to keep the legacy
+   * audit-only behaviour (recommended only for cold-boot before the
+   * gate singleton has been created).
+   */
+  needsReviewGate?: NeedsReviewGate;
+  /**
+   * plan4.5 §B — extension ids that should be classified as
+   * `needs-review` by the policy (forwarded to
+   * `createExtensionPolicy({ needsReviewIds })`). The renderer
+   * typically populates this from the workspace profile so the user
+   * only signs off on third-party extensions they actually want to
+   * load.
+   */
+  needsReviewIds?: readonly string[];
+  /**
+   * plan4.5 §B — same idea for npm package names (third-party
+   * packages that match are flagged).
+   */
+  needsReviewPackageNames?: readonly string[];
+  /** Runtime policy overrides applied by the policy hot-reload IPC. */
+  allowlistPackageNames?: readonly string[];
+  denylistPackageNames?: readonly string[];
 }
 
 export interface PiExtensionResolution {
@@ -1220,11 +1249,23 @@ export function resolvePiExtensions(
     // belong to the implicit allowlist. We rely on the adapter branch
     // above to push the `resolved` entry; the policy report still
     // describes them as "allow" with the package allowlist rationale.
-    allowlistPackageNames: compatibilityAdapters.flatMap((entry) => entry.packageNames),
+    allowlistPackageNames: [
+      ...compatibilityAdapters.flatMap((entry) => entry.packageNames),
+      ...(options.allowlistPackageNames ?? []),
+    ],
+    ...(options.denylistPackageNames && options.denylistPackageNames.length > 0
+      ? { denylistPackageNames: options.denylistPackageNames }
+      : {}),
     // All built-in extensions are always allowed — the existing
     // `builtinPiExtensionFactories` check above already filtered the
     // list, but we still report it for audit completeness.
     allowBuiltins: true,
+    // plan4.5 §B — let the caller mark specific ids / packages as
+    // needs-review so the gate can block them until the user signs off.
+    ...(options.needsReviewIds && options.needsReviewIds.length > 0 ? { needsReviewIds: options.needsReviewIds } : {}),
+    ...(options.needsReviewPackageNames && options.needsReviewPackageNames.length > 0
+      ? { needsReviewPackageNames: options.needsReviewPackageNames }
+      : {}),
   });
   const decisions = specs.map((spec) => ({
     input: {
@@ -1253,6 +1294,13 @@ export function resolvePiExtensions(
       reason: entry.decision.reason,
     })),
   });
+  // plan4.5 §B — apply the needs-review gate AFTER the audit report so
+  // the renderer sees the rationale (why X was flagged) before being
+  // asked to sign off. The helper removes blocked factories, pushes
+  // diagnostics, and emits the pending summary for the approval modal.
+  if (options.needsReviewGate) {
+    applyNeedsReviewGate(result, decisions, options.needsReviewGate, options.emit);
+  }
   return result;
 }
 

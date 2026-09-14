@@ -485,6 +485,18 @@ export function reloadPlugin(id: string): Promise<PluginStatus | null> {
   });
 }
 
+export async function updateExtensionPolicy(policy: { allowlistPackageNames?: readonly string[]; denylistPackageNames?: readonly string[] }): Promise<{ ok: true; policy: { allowlistPackageNames: string[]; denylistPackageNames: string[] } }> {
+  if (!state) throw new Error("plugin-mutations: not installed");
+  const normalize = (values: readonly string[] | undefined) => [...new Set((values ?? []).filter((value): value is string => typeof value === "string" && value.trim().length > 0).map((value) => value.trim()))];
+  state.piExtensionPolicy = {
+    allowlistPackageNames: normalize(policy.allowlistPackageNames),
+    denylistPackageNames: normalize(policy.denylistPackageNames),
+  };
+  await reloadPiExtensionsInternal();
+  emitPluginEvent("pi/extension-policy-reloaded", { policy: state.piExtensionPolicy, generatedAt: new Date().toISOString() });
+  return { ok: true, policy: { ...state.piExtensionPolicy } };
+}
+
 export function reloadPiExtensions(): Promise<PiExtensionStatus[]> {
   return pluginLifecycleQueue.enqueue("pi-reload", "all", (transaction: any) => reloadPiExtensionsInternal(transaction));
 }

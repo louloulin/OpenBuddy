@@ -1,8 +1,8 @@
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { join, normalize } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { Context } from "@openbuddy/cordis";
 import {
@@ -314,7 +314,7 @@ describe("DeepSeek profile composition", () => {
     await removeProfilePackage(options, "fixture-installed-bundle");
     expect(await listProfilePackages(options)).toEqual([]);
     expect((await readOpenBuddyProfile(options)).bundles).toEqual([]);
-    expect(profile.dir).toContain("profiles/desktop");
+    expect(normalize(profile.dir)).toContain(normalize(join("profiles", "desktop")));
   });
 
   it("installs and removes a pure DeepSeek Cordis plugin package", async () => {
@@ -380,7 +380,7 @@ describe("DeepSeek profile composition", () => {
 
   it("runs an external dsh package through bundle, renderer, remote, and Pi discovery", async () => {
     const home = await mkdtemp(join(tmpdir(), "openbuddy-external-dsh-"));
-    const source = join(dirname(fileURLToPath(import.meta.url)), "__fixtures__", "external-dsh-plugin");
+    const source = join(process.cwd(), "packages/runtime/openbuddy-plugin-host/src/__fixtures__/external-dsh-plugin");
     const options = { home, profileName: "desktop" };
     await ensureOpenBuddyProfile(options);
     const installed = await installProfilePackage(options, source);

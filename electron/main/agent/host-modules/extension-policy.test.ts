@@ -67,7 +67,7 @@ describe("extension-policy (plan4.4 §E — audit trail for pi extension resolut
       const policy = createExtensionPolicy();
       const empty = policy.decide({ id: "x" });
       expect(empty.action).toMatch(/allow|deny|needs-review/);
-      const noId = policy.decide({});
+      const noId = policy.decide({ id: "" });
       expect(noId.action).toBe("deny");
       expect(noId.reason).toMatch(/missing id/i);
     });

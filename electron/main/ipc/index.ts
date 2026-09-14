@@ -752,7 +752,8 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	}
 	for (const channel of [
 		"agent:new-session", "agent:prompt", "agent:steer", "agent:follow-up", "agent:abort", "agent:set-model", "agent:current-model",
-		"agent:plugin-list", "agent:plugin-inventory", "agent:plugin-snapshot", "agent:plugin-readiness", "agent:tools-list", "agent:deepseek-cordis-snapshot", "agent:deepseek-pi-describe", "agent:deepseek-cordis-invoke", "agent:plugin-events", "agent:event-log",
+  "agent:session-surface-acquire", "agent:session-surface-release", "agent:session-surface-list",
+		"agent:plugin-list", "agent:plugin-inventory", "agent:plugin-snapshot", "agent:plugin-readiness", "agent:tools-list", "agent:deepseek-cordis-snapshot", "agent:deepseek-pi-describe", "agent:deepseek-cordis-invoke", "agent:plugin-events", "agent:event-log", "agent:event-log-replay", "agent:event-log-surface-attach", "agent:event-log-surface-detach",
 		"agent:plugin-enable", "agent:plugin-reload", "agent:extensions-reload", "agent:plugin-config", "agent:presets-list", "agent:preset-current", "agent:preset-default-save", "agent:preset-select",
 		"agent:profile-packages", "agent:profile-install", "agent:profile-install-default-pi", "agent:profile-remove",
 		"agent:renderer-plugin-entries",

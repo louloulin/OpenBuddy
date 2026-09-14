@@ -1,7 +1,31 @@
-export interface ReplayDispatch {
-  sequence: number;
-  dispatch: () => void;
+export interface ReplayDispatch { sequence: number; dispatch: () => void; }
+export interface ReplayEvent { id?: string; eventId?: string; sequence?: number; type?: string; [key: string]: unknown; }
+export type ReplayFallbackResult = { ok: true; events: ReplayEvent[]; cursor: string | number | null; fallback: boolean } | { ok: false; code: "history-fallback-failed"; message: string; cursor: string | number | null };
+
+/** Deduplicates replay and history delivery, keeping side-effecting handlers
+ * behind one dispatch boundary. */
+export class ReplayCoordinator {
+  private readonly delivered = new Set<string>();
+  private cursor: string | number | null = null;
+  private fallbackComplete = false;
+  constructor(private readonly dispatch: (event: ReplayEvent) => void, private readonly telemetry: (name: string, props?: Record<string, unknown>) => void = () => undefined) {}
+  private id(event: ReplayEvent): string { return String(event.id ?? event.eventId ?? event.sequence ?? JSON.stringify(event)); }
+  consume(events: readonly ReplayEvent[]): ReplayEvent[] {
+    const accepted: ReplayEvent[] = [];
+    for (const event of events) { const id = this.id(event); if (this.delivered.has(id)) continue; this.delivered.add(id); this.cursor = event.id ?? event.eventId ?? event.sequence ?? this.cursor; accepted.push(event); this.dispatch(event); }
+    return accepted;
+  }
+  async consumeWithFallback(events: readonly ReplayEvent[], options: { gap?: boolean; errorCode?: string; loadHistory: () => Promise<readonly ReplayEvent[]> }): Promise<ReplayFallbackResult> {
+    if (!options.gap && !options.errorCode) return { ok: true, events: this.consume(events), cursor: this.cursor, fallback: false };
+    if (!this.fallbackComplete) {
+      try { const history = await options.loadHistory(); const merged = this.consume([...history, ...events]); this.fallbackComplete = true; this.telemetry("replay/gap-fallback-complete", { count: merged.length }); return { ok: true, events: merged, cursor: this.cursor, fallback: true }; }
+      catch (error) { return { ok: false, code: "history-fallback-failed", message: String(error), cursor: this.cursor }; }
+    }
+    return { ok: true, events: this.consume(events), cursor: this.cursor, fallback: false };
+  }
+  getCursor(): string | number | null { return this.cursor; }
 }
+
 
 export interface ReplayCursor {
   earliestSequence: number;
@@ -39,24 +63,64 @@ export function eventSequence(payload: unknown): number | undefined {
   return isFiniteSequence(sequence) ? sequence : undefined;
 }
 
+export interface ReplayCoverageEntry {
+  sequence: number;
+}
+
 export function detectReplayGap(
   fromSequence: number,
   cursor: ReplayCursor | undefined,
 ): ReplayGapInfo {
   const earliest = cursor?.earliestSequence ?? 0;
   const hasCursor = cursor !== undefined;
-  // When the renderer has not seen any events yet, `fromSequence === 0` is
-  // not a gap — only positive cursors that precede the bridge's earliest
-  // available sequence signal eviction.
-  const gap = hasCursor && fromSequence > 0 && fromSequence > earliest;
-  const missing = gap ? Math.max(0, fromSequence - earliest) : 0;
-  return {
-    requestedFromSequence: fromSequence,
-    earliestSequence: earliest,
-    gap,
-    missing,
-  };
+  const gap = hasCursor && fromSequence > 0 && fromSequence < earliest - 1;
+  const missing = gap ? Math.max(0, earliest - fromSequence - 1) : 0;
+  return { requestedFromSequence: fromSequence, earliestSequence: earliest, gap, missing };
 }
+
+
+
+export type ReplayGapReason = "evicted" | "non-contiguous";
+
+export interface ReplayCoverageGap extends ReplayGapInfo {
+  reason: ReplayGapReason;
+}
+
+/**
+ * Detects gaps that a successful replay RPC can still contain. The ring
+ * cursor detects eviction; this additionally validates the returned global
+ * sequence stream so a reconnect cannot silently skip a persisted event.
+ */
+export function detectReplayCoverageGap(
+  fromSequence: number,
+  entries: readonly ReplayCoverageEntry[],
+  cursor: ReplayCursor | undefined,
+): ReplayCoverageGap | undefined {
+  const boundary = detectReplayGap(fromSequence, cursor);
+  if (boundary.gap) return { ...boundary, reason: "evicted" };
+
+  const sequences = [...new Set(entries
+    .map((entry) => entry.sequence)
+    .filter((sequence) => isFiniteSequence(sequence) && sequence > fromSequence))]
+    .sort((left, right) => left - right);
+  if (sequences.length === 0) return undefined;
+
+  let expected = fromSequence + 1;
+  for (const sequence of sequences) {
+    if (sequence !== expected) {
+      return {
+        ...boundary,
+        gap: true,
+        missing: Math.max(0, sequence - expected),
+        reason: "non-contiguous",
+      };
+    }
+    expected += 1;
+  }
+  return undefined;
+}
+
+
 
 /**
  * Coordinates a live subscription with a cursor-based replay.

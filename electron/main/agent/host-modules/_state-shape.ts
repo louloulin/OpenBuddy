@@ -267,6 +267,24 @@ export interface AgentHostState {
   hookConfigs: HookRuntimeConfig[];
   piExtensionStatuses: PiExtensionStatus[];
   piExtensionOverrides: Record<string, { enabled?: boolean; config?: unknown }>;
+  /**
+   * plan4.5 §B — Pi extension ids whose policy classification is
+   * `needs-review`. The resolver reads this list and consults the
+   * process-wide `NeedsReviewGate` so the user can sign off before
+   * the extension is allowed to load. Empty by default — the legacy
+   * audit-only behaviour is preserved when the profile hasn't opted
+   * into any needs-review ids.
+   */
+  /**
+   * Runtime policy overrides loaded without restarting Electron. These are
+   * intentionally separate from profile manifest data so an operator can
+   * revoke a package and then use the normal transactional reload path.
+   */
+  piExtensionPolicy: {
+    allowlistPackageNames: string[];
+    denylistPackageNames: string[];
+  };
+  piExtensionNeedsReviewIds: string[];
   baseProfile: PluginProfile | null;
   storedLayers: PluginPatch[][];
   toolRegistryRevision: number;
