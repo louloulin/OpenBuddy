@@ -566,9 +566,19 @@ plan4.2 §2.3 提到的 `email-unsubscribe-dialog` pre-existing 问题在 `elect
 - `packages/runtime/openbuddy-plugin-host/src/profile-manager.ts` 增加 `existingDirectory()` / `existingPath()`，覆盖 Pi convention 目录扫描、包目录枚举、安装替换和卸载判断；
 - 非 ENOENT 错误仍原样抛出，避免掩盖权限或 I/O 故障。
 
-**验收**：`profile-manager-extensions.test.ts` 9/9 通过；`profile.test.ts` 当前 28/30 通过，已从原先 30 个级联失败显著收敛；剩余 2 个是测试 fixture 的 Windows 短路径/URL 兼容问题（路径断言使用 POSIX 分隔符，以及 Vite 无法加载带 8.3 短路径编码的 fixture URL），不再是生产资源发现 ENOENT。全仓 `pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过；剩余 fixture 问题需单独做跨平台测试适配。
+**验收**：`profile-manager-extensions.test.ts` 9/9 通过；`profile.test.ts` 30/30 通过。跨平台适配使用 `path.normalize()` 比较路径，并使用基于 `process.cwd()` 的绝对 fixture 路径，避免 Windows 分隔符和 Vite/8.3 短路径 URL 解析差异；全仓 `pnpm exec tsc --noEmit -p .` 与 `git diff --check` 通过。
 
-## 4. Plan 4.3 之外的更长路线
+### 3.24 [plan4.5] Pi SettingsManager 接入 AgentSession（本轮新增）
+
+**问题**：OpenBuddy 已使用 Pi `DefaultResourceLoader` 发现 extensions / skills / prompts / themes，但创建 `AgentSession` 时未传入 Pi 官方 `SettingsManager`，导致全局 `~/.pi/agent/settings.json` 与项目 `<cwd>/.pi/settings.json` 的 compaction、retry 等设置不会按 Pi 语义合并，属于半迁移状态。
+
+**实现**：`electron/main/agent/host-modules/bootstrap/init-session.ts` 在创建 session 时传入 `SettingsManager.create(cwd, piHome())`。资源路径仍由 OpenBuddy profile + marketplace 合并后传给 `DefaultResourceLoader`，因此本轮是兼容式迁移，不破坏现有 profile 资源隔离；Pi 官方 settings 只负责设置加载与持久化。
+
+**回归测试**：`init-session.test.ts` 验证 session 创建选项包含 SettingsManager；与 `profile/resource-paths.test.ts`、`pi-bridge/skill-utils.test.ts` 一起定向测试 13/13 通过。
+
+**验收**：`pnpm exec tsc --noEmit -p .` 通过，`git diff --check` 通过。后续可继续将 OpenBuddy 自定义设置映射到 `SettingsManager.applyOverrides()`，但必须先定义键冲突与敏感配置边界。 
+
+
 
 - **Plan 5.0**：AI Chat → 多 surface（CLI / Web / 移动）
 - **Plan 5.1**：插件系统正式化（manifest + 权限 + 健康度）
