@@ -10,7 +10,7 @@
  * `mcp.ts` imports `listMarketplaceMcpServers` from here to merge
  * plugin-contributed MCP servers into the user config view.
  */
-import { cp, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdtemp, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { execFile as defaultExecFile } from "node:child_process";
 import { isAbsolute, join, resolve } from "node:path";
@@ -41,6 +41,49 @@ import {
   workspaceRoot,
   writeJson,
 } from "./shared";
+
+const MARKETPLACE_MANAGED_FILE = ".openbuddy-marketplace-managed.json";
+
+async function installManagedPackage(sourceRoot: string, targetRoot: string, remote: boolean): Promise<void> {
+  const pluginsRoot = join(agentRoot(), "plugins");
+  await stat(pluginsRoot).catch(async () => { await (await import("node:fs/promises")).mkdir(pluginsRoot, { recursive: true }); });
+  const targetParent = await realpath(pluginsRoot);
+  const target = within(targetParent, targetRoot);
+  const targetInfo = await lstat(target).catch(() => undefined);
+  if (targetInfo?.isSymbolicLink()) throw new Error("refusing to replace symlinked marketplace target");
+  const staging = await mkdtemp(join(targetParent, ".openbuddy-marketplace-staging-"));
+  const stagedPackage = join(staging, "package");
+  const backup = `${target}.openbuddy-backup-${process.pid}-${Date.now()}`;
+  let movedOld = false;
+  try {
+    await cp(sourceRoot, stagedPackage, { recursive: true, force: false, errorOnExist: true });
+    const verification = await verifyMarketplacePackage(stagedPackage, remote);
+    if (!verification.verified) throw new Error(`marketplace package rejected: ${verification.reason}`);
+    await writeJson(join(stagedPackage, MARKETPLACE_MANAGED_FILE), { version: 1, source: "marketplace", keyId: verification.keyId ?? null });
+    if (targetInfo) { await rename(target, backup); movedOld = true; }
+    await rename(stagedPackage, target);
+  } catch (error) {
+    await rm(target, { recursive: true, force: true }).catch(() => undefined);
+    if (movedOld) await rename(backup, target).catch(() => undefined);
+    throw error;
+  } finally {
+    await rm(staging, { recursive: true, force: true }).catch(() => undefined);
+    if (movedOld && await lstat(backup).then(() => true).catch(() => false)) await rm(backup, { recursive: true, force: true });
+  }
+}
+
+async function removeManagedPackage(targetRoot: string): Promise<boolean> {
+  const pluginsRoot = await realpath(join(agentRoot(), "plugins"));
+  const target = within(pluginsRoot, targetRoot);
+  const info = await lstat(target).catch(() => undefined);
+  if (!info) return false;
+  if (info.isSymbolicLink() || !info.isDirectory()) throw new Error("refusing to remove unmanaged marketplace target");
+  const marker = join(target, MARKETPLACE_MANAGED_FILE);
+  const markerInfo = await lstat(marker).catch(() => undefined);
+  if (!markerInfo?.isFile() || markerInfo.isSymbolicLink()) throw new Error("marketplace target is not managed by OpenBuddy");
+  await rm(target, { recursive: true, force: false });
+  return true;
+}
 
 type MarketplaceSource =
   | { name: string; kind: "local"; path: string; builtIn?: boolean }
@@ -1080,12 +1123,7 @@ export async function marketplaceAction(action: Record<string, unknown>): Promis
       if (!entry.tarball) throw new Error(`plugin ${pluginName} has no tarball on npm registry`);
       const tmpDir = await downloadAndExtractTarball(entry.tarball);
       try {
-        await cp(tmpDir, targetRoot, { recursive: true, force: true });
-      const verification = await verifyMarketplacePackage(targetRoot, true);
-      if (!verification.verified) {
-        await rm(targetRoot, { recursive: true, force: true });
-        throw new Error(`marketplace package rejected: ${verification.reason}`);
-      }
+        await installManagedPackage(tmpDir, targetRoot, true);
       } finally {
         await rm(tmpDir, { recursive: true, force: true });
       }
@@ -1102,7 +1140,7 @@ export async function marketplaceAction(action: Record<string, unknown>): Promis
       };
     }
     if (type === "uninstall") {
-      await rm(within(join(agentRoot(), "plugins"), targetRoot), { recursive: true, force: true });
+      await removeManagedPackage(targetRoot);
       const sync = await syncProfileExtension(pluginName, false);
       return sync.synced ? { ok: true, piPriorityEnabled: false, capability: sync.capability } : { ok: true };
     }
@@ -1120,12 +1158,7 @@ export async function marketplaceAction(action: Record<string, unknown>): Promis
   const pluginName = safeName(sourceRoot.split("/").pop() ?? "plugin");
   const targetRoot = join(agentRoot(), "plugins", pluginName);
   if (type === "install" || type === "update") {
-    await cp(sourceRoot, targetRoot, { recursive: true, force: true });
-    const verification = await verifyMarketplacePackage(targetRoot, false);
-    if (!verification.verified) {
-      await rm(targetRoot, { recursive: true, force: true });
-      throw new Error(`marketplace package rejected: ${verification.reason}`);
-    }
+    await installManagedPackage(sourceRoot, targetRoot, false);
     const sync = await syncProfileExtension(pluginName, true);
     return {
       ok: true,
@@ -1134,7 +1167,7 @@ export async function marketplaceAction(action: Record<string, unknown>): Promis
     };
   }
   if (type === "uninstall") {
-    await rm(within(join(agentRoot(), "plugins"), targetRoot), { recursive: true, force: true });
+    await removeManagedPackage(targetRoot);
     const sync = await syncProfileExtension(pluginName, false);
     return sync.synced ? { ok: true, piPriorityEnabled: false, capability: sync.capability } : { ok: true };
   }
