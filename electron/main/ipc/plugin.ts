@@ -20,6 +20,8 @@
 import { ipcMain } from "electron";
 import { progressSnapshot, cancelProgress, retryProgress } from "../agent/progress-runs";
 import { MultiSurfaceSessionRegistry } from "../agent/multi-surface-session";
+import { pluginEventLogCursor } from "../agent/plugin-event-log-cursor";
+
 
 
 
@@ -36,7 +38,10 @@ import * as resources from "../agent/pi-resources";
 
 export function registerPluginIpc(deps: AgentHostIpcDeps): void {
   const { agentHost, ensureAgentHost } = deps;
-  const multiSurfaceSessions = new MultiSurfaceSessionRegistry();
+  const multiSurfaceSessions = new MultiSurfaceSessionRegistry((sessionId, generation) => {
+    pluginEventLogCursor.disposeOwner(sessionId);
+    return undefined;
+  });
 
   ipcMain.handle("agent:session-surface-acquire", async (_e, args: unknown) => {
     await ensureAgentHost();
@@ -52,7 +57,10 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
       requiredString(input.sessionId, "sessionId"),
       requiredString(input.surfaceId, "surfaceId"),
       input.generation === undefined ? undefined : optionalFiniteInteger(input.generation, "generation", 0, 0, Number.MAX_SAFE_INTEGER),
-      () => agentHost.dispose(),
+      () => {
+        pluginEventLogCursor.disposeOwner(requiredString(input.sessionId, "sessionId"));
+        return agentHost.dispose();
+      },
     );
   });
   ipcMain.handle("agent:session-surface-list", async (_e, args?: unknown) => {
