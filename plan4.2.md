@@ -651,3 +651,9 @@ plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 新增 `marketplace-trust.ts` 管理 `marketplace-trust.json`（0600）与 trusted roots；支持 RSA-SHA256/ECDSA-SHA256 manifest 验签。远程 marketplace 包默认必须带受信任 keyId 的签名，本地包保持兼容性的可选签名策略。安装复制到 plugin root 后立即验签，失败删除本次 target 并拒绝运行时加载；签名校验不改变现有 policy audit/needs-review gate。
 
 验收：`pi-resources.test.ts` + `marketplace-pi-sync.test.ts` 21/21 通过，tsc 与 diff check 通过。剩余：签名专用 fixture 测试、覆盖旧版本的完整原子回滚，以及仅限 agentRoot/plugins 的卸载清理。
+
+### 3.28 [plan4.5 §D] marketplace 安装/卸载原子性与路径安全（本轮新增）
+
+安装改为 staging → 验签 → 写 managed marker → rename 旧版本到 backup → rename staging 到 target；任一步失败删除新 target 并恢复旧 backup，临时目录最终清理。重复安装不覆盖 symlink target。卸载仅接受 `realpath(agentRoot/plugins)` 下的目录，拒绝 symlink、非目录、缺少 `.openbuddy-marketplace-managed.json` 管理标记的目标；因此不会删除用户数据目录或越权路径。
+
+验收：`pi-resources.test.ts` + `marketplace-pi-sync.test.ts` 21/21 通过，tsc 与 diff check 通过。仍需补专门失败注入/符号链接/重复卸载 fixtures；Progress UX、多 surface session、Electron smoke/E2E 仍未完成。
