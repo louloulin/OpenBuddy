@@ -1,7 +1,31 @@
-export interface ReplayDispatch {
-  sequence: number;
-  dispatch: () => void;
+export interface ReplayDispatch { sequence: number; dispatch: () => void; }
+export interface ReplayEvent { id?: string; eventId?: string; sequence?: number; type?: string; [key: string]: unknown; }
+export type ReplayFallbackResult = { ok: true; events: ReplayEvent[]; cursor: string | number | null; fallback: boolean } | { ok: false; code: "history-fallback-failed"; message: string; cursor: string | number | null };
+
+/** Deduplicates replay and history delivery, keeping side-effecting handlers
+ * behind one dispatch boundary. */
+export class ReplayCoordinator {
+  private readonly delivered = new Set<string>();
+  private cursor: string | number | null = null;
+  private fallbackComplete = false;
+  constructor(private readonly dispatch: (event: ReplayEvent) => void, private readonly telemetry: (name: string, props?: Record<string, unknown>) => void = () => undefined) {}
+  private id(event: ReplayEvent): string { return String(event.id ?? event.eventId ?? event.sequence ?? JSON.stringify(event)); }
+  consume(events: readonly ReplayEvent[]): ReplayEvent[] {
+    const accepted: ReplayEvent[] = [];
+    for (const event of events) { const id = this.id(event); if (this.delivered.has(id)) continue; this.delivered.add(id); this.cursor = event.id ?? event.eventId ?? event.sequence ?? this.cursor; accepted.push(event); this.dispatch(event); }
+    return accepted;
+  }
+  async consumeWithFallback(events: readonly ReplayEvent[], options: { gap?: boolean; errorCode?: string; loadHistory: () => Promise<readonly ReplayEvent[]> }): Promise<ReplayFallbackResult> {
+    if (!options.gap && !options.errorCode) return { ok: true, events: this.consume(events), cursor: this.cursor, fallback: false };
+    if (!this.fallbackComplete) {
+      try { const history = await options.loadHistory(); const merged = this.consume([...history, ...events]); this.fallbackComplete = true; this.telemetry("replay/gap-fallback-complete", { count: merged.length }); return { ok: true, events: merged, cursor: this.cursor, fallback: true }; }
+      catch (error) { return { ok: false, code: "history-fallback-failed", message: String(error), cursor: this.cursor }; }
+    }
+    return { ok: true, events: this.consume(events), cursor: this.cursor, fallback: false };
+  }
+  getCursor(): string | number | null { return this.cursor; }
 }
+
 
 export interface ReplayCursor {
   earliestSequence: number;
