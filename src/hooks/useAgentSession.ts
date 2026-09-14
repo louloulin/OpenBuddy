@@ -49,6 +49,7 @@ import {
   useCallback,
   useEffect,
   useRef,
+  useState,
   type MutableRefObject,
 } from "react";
 import type { SessionUpdate } from "@openbuddy/shared-types";
@@ -188,6 +189,9 @@ export interface UseAgentSessionOptions {
 
 export interface UseAgentSessionReturn {
   replayEvents: (surfaceId?: string, sinceEventId?: string) => Promise<SurfaceEventLogReplayResponse>;
+  truncations: Map<string, import("@/components/TruncationBanner").TruncationInfo>;
+  dismissTruncation: (sessionId: string) => void;
+  restoreTruncation: (sessionId: string) => Promise<void>;
   advanceSince: (eventId: string) => void;
   reconnect: () => Promise<SurfaceEventLogReplayResponse | null>;
   /** Manual resubscribe (used by `handleAgentDied`'s "立即重连" action and
@@ -227,6 +231,10 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
   } = options;
 
   const multiSurfaceIdRef = useRef(`renderer:${Math.random().toString(36).slice(2, 10)}`);
+  const [truncations, setTruncations] = useState<Map<string, import("@/components/TruncationBanner").TruncationInfo>>(new Map());
+  const dismissTruncation = useCallback((sessionId: string) => setTruncations((current) => { const next = new Map(current); next.delete(sessionId); return next; }), []);
+  const restoreTruncation = useCallback(async (sessionId: string) => { dismissTruncation(sessionId); }, [dismissTruncation]);
+
   const multiSurfaceGenerationRef = useRef<number | undefined>(undefined);
   const multiSurfaceSessionRef = useRef<string | undefined>(undefined);
   const eventLogCursorRef = useRef<string | undefined>(undefined);
@@ -1001,5 +1009,5 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
   // value via the ref indirection inside App.tsx.
   void cwdRef;
 
-  return { resubscribe, replayEvents, advanceSince, reconnect };
+  return { resubscribe, replayEvents, advanceSince, reconnect, truncations, dismissTruncation, restoreTruncation };
 }
