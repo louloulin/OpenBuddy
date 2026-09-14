@@ -65,6 +65,7 @@ import {
   notificationAppend,
 } from "@/lib/agent/pi-client";
 import { isElectronBridgeUnavailable } from "@/lib/platform/electron-api";
+import { multiSurfaceSessionAcquire, multiSurfaceSessionRelease } from "@/lib/agent/pi-client";
 import { createPiEventReplayCoordinator, detectReplayCoverageGap } from "@/lib/agent/pi-event-replay";
 import { useSessionStore } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
@@ -218,7 +219,33 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
     currentModelIdRef,
   } = options;
 
-  // Stable ref to the most recent `setToast` so the handler set can call
+  const multiSurfaceIdRef = useRef(`renderer:${Math.random().toString(36).slice(2, 10)}`);
+  const multiSurfaceGenerationRef = useRef<number | undefined>(undefined);
+  const multiSurfaceSessionRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    const sessionId = useSessionStore.getState().sessionId;
+    if (!sessionId || sessionId.startsWith("__pending_")) return;
+    let cancelled = false;
+    void multiSurfaceSessionAcquire(sessionId, multiSurfaceIdRef.current).then((lease) => {
+      if (cancelled) {
+        void multiSurfaceSessionRelease(lease.sessionId, lease.surfaceId, lease.generation);
+        return;
+      }
+      multiSurfaceSessionRef.current = lease.sessionId;
+      multiSurfaceGenerationRef.current = lease.generation;
+    }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+      const leasedSession = multiSurfaceSessionRef.current;
+      const generation = multiSurfaceGenerationRef.current;
+      multiSurfaceSessionRef.current = undefined;
+      multiSurfaceGenerationRef.current = undefined;
+      if (leasedSession) void multiSurfaceSessionRelease(leasedSession, multiSurfaceIdRef.current, generation);
+    };
+  }, [useSessionStore((state) => state.sessionId)]);
+
+
   // it without re-subscribing on every render. React guarantees the
   // setter identity is stable, so this is purely defensive.
   const setToastRef = useRef(setToast);

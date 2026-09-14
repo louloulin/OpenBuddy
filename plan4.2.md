@@ -676,7 +676,13 @@ plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 
 验收：progress-runs 回归 2/2，tsc 与 diff check 通过。后续接入真实 AgentSession 长任务事件与 replay 恢复，并补 UI 集成测试。
 
-### 3.35 [plan5.0 §A] multi-surface session lease（本轮新增）
+### 3.36 [plan5.0 §A] renderer session lease lifecycle（本轮新增）
+
+`useAgentSession` 现在在获得真实 sessionId 后自动 acquire renderer lease，并在 session 切换、renderer unmount 或 bridge crash cleanup 时 release；pending session 不登记，避免把占位 id 误当成真实 AgentSession。surface id 在 renderer 实例内稳定，重复 cleanup 幂等，重新 mount 会重新 acquire 并由 host registry bump generation；旧 generation release 不会释放新 lease。
+
+本轮验证：`multi-surface-session.test.ts` 2/2、Pi replay 11/11、`tsc --noEmit -p .`、`git diff --check` 通过。Electron smoke runner 存在（`test:electron`、`test:electron:real-ui`），但本轮未宣称完整 UI/E2E 已通过；需在具备 Electron display/headless runner 的环境执行，并补真实多窗口 mount/unmount 验证。
+
+
 
 新增 `electron/main/agent/multi-surface-session.ts` 引用计数注册表：同一 `sessionId` 的多个 renderer/surface 共享一个 generation，surface lease 的 `release()` 幂等，只有最后一个 surface 退出才触发释放回调；旧 generation 的迟到 release 不会误伤新连接，不同 session 完全隔离。
 
