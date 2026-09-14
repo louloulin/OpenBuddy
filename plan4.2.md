@@ -669,3 +669,9 @@ plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 新增受管理安装索引 `marketplace-installed.json`（0600）。安装只有在 target rename 成功后才写入索引；索引记录失败时删除新 target 并恢复旧 backup。卸载先更新索引再删除 managed target，非 managed/symlink 目标仍拒绝。独立 transaction fixture 新增旧版本索引恢复和卸载后索引一致性断言；Windows junction/reparse-point 在 Linux CI 无法创建，现有 symlink 契约覆盖同一拒绝边界，Windows runner 需补原生 fixture。
 
 验收：transaction safety + pi-resources 21/21，tsc 与 diff check 通过。下一步转向 Progress UX：长任务进度、取消/重试/错误反馈。
+
+### 3.31 [plan4.5 §E] Progress UX first slice（本轮新增）
+
+新增带唯一 `runId` 的 progress state machine：支持阶段、百分比/不确定进度、最近事件、completed/failed/cancelled 状态；旧 run 更新会被忽略，取消幂等，retry 只创建新 run。新增 `progress:list`、`progress:cancel`、`progress:retry` IPC 与 typed client，并提供 renderer `ProgressPanel` 显示取消/重试/错误反馈。
+
+验收：progress-runs 回归 2/2，tsc 与 diff check 通过。后续接入真实 AgentSession 长任务事件与 replay 恢复，并补 UI 集成测试。

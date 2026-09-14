@@ -18,6 +18,8 @@
  * cold-start path (matches `plugins_list`).
  */
 import { ipcMain } from "electron";
+import { progressSnapshot, cancelProgress, retryProgress } from "../../src/lib/agent/progress-runs";
+
 
 import {
   optionalFiniteInteger,
@@ -33,7 +35,10 @@ import * as resources from "../agent/pi-resources";
 export function registerPluginIpc(deps: AgentHostIpcDeps): void {
   const { agentHost, ensureAgentHost } = deps;
 
-  ipcMain.handle("agent:plugin-list", async () => {
+  ipcMain.handle("progress:list", async () => progressSnapshot());
+  ipcMain.handle("progress:cancel", async (_e, args: unknown) => cancelProgress(String((args as { runId?: unknown })?.runId ?? "")));
+  ipcMain.handle("progress:retry", async (_e, args: unknown) => retryProgress(String((args as { runId?: unknown })?.runId ?? "")));
+
     await ensureAgentHost();
     return agentHost.listPlugins();
   });

@@ -1690,7 +1690,13 @@ export async function promptHistory(limit?: number): Promise<string[]> {
   return invoke<string[]>("prompt_history", { limit: limit ?? null });
 }
 
-// ---------- tasks / subagents ----------
+import { progressSnapshot, type ProgressRun } from "./progress-runs";
+
+export function progressRunsGet(): ProgressRun[] { return progressSnapshot(); }
+export function progressRunCancel(runId: string): Promise<ProgressRun | null> { return invoke("progress:cancel", { runId }); }
+export function progressRunRetry(runId: string): Promise<ProgressRun | null> { return invoke("progress:retry", { runId }); }
+
+
 
 /** List running background tasks / subagents. */
 export async function tasksList(): Promise<RunningTask[]> {
