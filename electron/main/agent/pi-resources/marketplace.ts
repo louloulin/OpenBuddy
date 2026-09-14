@@ -30,6 +30,7 @@ async function findCompatibilityAdapterForPackageName(pluginName: string) {
   const mod = await import("../pi-extensions");
   return mod.findCompatibilityAdapterForPackageName(pluginName);
 }
+import { verifyMarketplacePackage } from "./marketplace-trust";
 import {
   agentHome,
   agentRoot,
@@ -1080,6 +1081,11 @@ export async function marketplaceAction(action: Record<string, unknown>): Promis
       const tmpDir = await downloadAndExtractTarball(entry.tarball);
       try {
         await cp(tmpDir, targetRoot, { recursive: true, force: true });
+      const verification = await verifyMarketplacePackage(targetRoot, true);
+      if (!verification.verified) {
+        await rm(targetRoot, { recursive: true, force: true });
+        throw new Error(`marketplace package rejected: ${verification.reason}`);
+      }
       } finally {
         await rm(tmpDir, { recursive: true, force: true });
       }
@@ -1115,6 +1121,11 @@ export async function marketplaceAction(action: Record<string, unknown>): Promis
   const targetRoot = join(agentRoot(), "plugins", pluginName);
   if (type === "install" || type === "update") {
     await cp(sourceRoot, targetRoot, { recursive: true, force: true });
+    const verification = await verifyMarketplacePackage(targetRoot, false);
+    if (!verification.verified) {
+      await rm(targetRoot, { recursive: true, force: true });
+      throw new Error(`marketplace package rejected: ${verification.reason}`);
+    }
     const sync = await syncProfileExtension(pluginName, true);
     return {
       ok: true,
