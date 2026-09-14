@@ -21,6 +21,6 @@
     "yaml": "2.9.0"
   },
   "devDependencies": {
-    "@types/cross-spawn": "6.0.2"
+    "@types/cross-spawn": "6.0.6"
   }
 }
