@@ -137,7 +137,15 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
       ...(input.limit === undefined ? {} : { limit: optionalFiniteInteger(input.limit, "limit", 2000, 1, 2000) }),
     });
   });
-  ipcMain.handle("agent:event-log-replay", async (_e, args?: unknown) => {
+  ipcMain.handle("agent:event-log-surface-attach", async (_e, args: unknown) => {
+    const input = recordValue(args, "event log surface attach payload");
+    return pluginEventLogCursor.attachSurface(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
+  });
+  ipcMain.handle("agent:event-log-surface-detach", async (_e, args: unknown) => {
+    const input = recordValue(args, "event log surface detach payload");
+    return pluginEventLogCursor.detachSurface(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
+  });
+
     // Cursor-based replay used after bridge recovery. Returns events
     // from `fromSequence` forward so the renderer can rehydrate
     // stores without a full reload. The `cursor` payload reports

@@ -940,6 +940,8 @@ export interface AgentEventLogReplayResult {
   };
 }
 
+export async function attachEventLogSurface(sessionId: string, surfaceId: string): Promise<unknown> { return invoke("agent:event-log-surface-attach", { sessionId, surfaceId }); }
+export async function detachEventLogSurface(sessionId: string, surfaceId: string): Promise<unknown> { return invoke("agent:event-log-surface-detach", { sessionId, surfaceId }); }
 export interface SurfaceEventLogReplayResult { ok: true; events: unknown[]; nextCursor: string | null; truncated: boolean; }
 export interface SurfaceEventLogReplayError { ok: false; code: string; message: string; }
 export type SurfaceEventLogReplayResponse = SurfaceEventLogReplayResult | SurfaceEventLogReplayError;

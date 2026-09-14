@@ -57,15 +57,19 @@ import {
   subscribePiEvents,
   dispatchPiEvent,
   agentEventLogReplay,
-  agentSessionMessages,
+  eventLogReplay,
+  attachEventLogSurface,
+  detachEventLogSurface,  agentSessionMessages,
   sessionEntriesToChatMessages,
   piSend,
   piCancel,
   piListWorkspaceRegistry,
   notificationAppend,
+  multiSurfaceSessionAcquire,
+  multiSurfaceSessionRelease,
+  type SurfaceEventLogReplayResponse,
 } from "@/lib/agent/pi-client";
 import { isElectronBridgeUnavailable } from "@/lib/platform/electron-api";
-import { multiSurfaceSessionAcquire, multiSurfaceSessionRelease } from "@/lib/agent/pi-client";
 import { createPiEventReplayCoordinator, detectReplayCoverageGap } from "@/lib/agent/pi-event-replay";
 import { useSessionStore } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
@@ -183,6 +187,9 @@ export interface UseAgentSessionOptions {
 }
 
 export interface UseAgentSessionReturn {
+  replayEvents: (surfaceId?: string, sinceEventId?: string) => Promise<SurfaceEventLogReplayResponse>;
+  advanceSince: (eventId: string) => void;
+  reconnect: () => Promise<SurfaceEventLogReplayResponse | null>;
   /** Manual resubscribe (used by `handleAgentDied`'s "立即重连" action and
    *  its auto-back-off timer). The hook handles the bookkeeping so the
    *  caller doesn't need to re-implement the dispose-then-subscribe dance. */
@@ -222,6 +229,17 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
   const multiSurfaceIdRef = useRef(`renderer:${Math.random().toString(36).slice(2, 10)}`);
   const multiSurfaceGenerationRef = useRef<number | undefined>(undefined);
   const multiSurfaceSessionRef = useRef<string | undefined>(undefined);
+  const eventLogCursorRef = useRef<string | undefined>(undefined);
+  const replaySurfaceRef = useRef<string | undefined>(undefined);
+  const replayEvents = useCallback(async (surfaceId = multiSurfaceIdRef.current, sinceEventId = eventLogCursorRef.current) => {
+    const sessionId = useSessionStore.getState().sessionId;
+    if (!sessionId || sessionId.startsWith("__pending_")) return { ok: false, code: "unknown-session", message: "no active session" } as SurfaceEventLogReplayResponse;
+    const result = await eventLogReplay(sessionId, surfaceId, sinceEventId, 50);
+    if (result.ok) { eventLogCursorRef.current = result.nextCursor ?? eventLogCursorRef.current; replaySurfaceRef.current = surfaceId; }
+    return result;
+  }, []);
+  const advanceSince = useCallback((eventId: string) => { eventLogCursorRef.current = eventId; }, []);
+  const reconnect = useCallback(async () => { eventLogCursorRef.current = undefined; return replayEvents(); }, [replayEvents]);
 
   useEffect(() => {
     const sessionId = useSessionStore.getState().sessionId;
@@ -235,6 +253,9 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
       }
       multiSurfaceSessionRef.current = lease.sessionId;
       multiSurfaceGenerationRef.current = lease.generation;
+      void attachEventLogSurface(sessionId, multiSurfaceIdRef.current).then((attached) => {
+        if (!(attached && typeof attached === "object" && "ok" in attached && attached.ok === false)) void replayEvents(multiSurfaceIdRef.current, undefined);
+      }).catch(() => undefined);
     }).catch(() => undefined);
     return () => {
       cancelled = true;
@@ -243,6 +264,8 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
       multiSurfaceSessionRef.current = undefined;
       multiSurfaceGenerationRef.current = undefined;
       if (leasedSession) void multiSurfaceSessionRelease(leasedSession, multiSurfaceIdRef.current, generation);
+      if (leasedSession) void detachEventLogSurface(leasedSession, multiSurfaceIdRef.current);
+      eventLogCursorRef.current = undefined;
     };
   }, [useSessionStore((state) => state.sessionId)]);
 
@@ -978,5 +1001,5 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
   // value via the ref indirection inside App.tsx.
   void cwdRef;
 
-  return { resubscribe };
+  return { resubscribe, replayEvents, advanceSince, reconnect };
 }
