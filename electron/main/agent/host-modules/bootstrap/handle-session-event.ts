@@ -32,7 +32,7 @@
  *   This module imports nothing from agent-host.ts. deps are passed in.
  */
 import { startProgress, finishProgress } from "../../progress-runs";
-
+import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
 export interface HandleSessionEventDeps {
   /** Mutable session-scoped state (queueMirror, eventHandlers, jobsRegistry, runningTasks). */
@@ -277,6 +277,7 @@ export function handleSessionEvent(
     }
   } else if (event.type === "tool_execution_end") {
     const toolCallId = event.toolCallId ?? "";
+    const job = state.jobsRegistry.get(toolCallId);
     finishProgress(toolCallId, event.isError ? "failed" : "completed", event.isError ? String(event.message ?? "tool execution failed") : undefined);
 
     if (job) {

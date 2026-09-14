@@ -22,7 +22,8 @@ async function setup(home: string, plugin = "demo") {
 
 describe("marketplace transaction safety", () => {
   it("restores the managed version after verification failure", async () => {
-    const { resources, source, pluginRoot, targetRoot } = await setup(await mkdtemp(join(tmpdir(), "marketplace-home-")));
+    const home = await mkdtemp(join(tmpdir(), "marketplace-home-"));
+    const { resources, source, pluginRoot, targetRoot } = await setup(home);
     await resources.marketplaceAction({ type: "install", sourceUrlOrPath: source, pluginRelativePath: "demo" });
     await writeFile(join(targetRoot, "version.txt"), "old-version"); await writeFile(join(pluginRoot, "package.json"), "not-json");
     await expect(resources.marketplaceAction({ type: "install", sourceUrlOrPath: source, pluginRelativePath: "demo" })).rejects.toThrow();
@@ -31,17 +32,20 @@ describe("marketplace transaction safety", () => {
     await expect(readFile(join(targetRoot, ".openbuddy-marketplace-managed.json"), "utf8")).resolves.toContain('"version": 1');
   });
   it("rejects symlink targets without touching linked data", async () => {
-    const { resources, source, targetRoot } = await setup(await mkdtemp(join(tmpdir(), "marketplace-home-")), "linked");
+    const home = await mkdtemp(join(tmpdir(), "marketplace-home-"));
+    const { resources, source, targetRoot } = await setup(home, "linked");
     const outside = await mkdtemp(join(tmpdir(), "marketplace-user-data-")); await mkdir(join(targetRoot, ".."), { recursive: true }); await symlink(outside, targetRoot, "junction");
     await expect(resources.marketplaceAction({ type: "install", sourceUrlOrPath: source, pluginRelativePath: "linked" })).rejects.toThrow(/symlink/i);
     await expect(readlink(targetRoot)).resolves.toBe(outside); await expect(lstat(join(outside, ".openbuddy-marketplace-managed.json"))).rejects.toMatchObject({ code: "ENOENT" });
   });
   it("rejects traversal without target residue", async () => {
-    const { resources, source } = await setup(await mkdtemp(join(tmpdir(), "marketplace-home-")));
+    const home = await mkdtemp(join(tmpdir(), "marketplace-home-"));
+    const { resources, source } = await setup(home);
     await expect(resources.marketplaceAction({ type: "install", sourceUrlOrPath: source, pluginRelativePath: "../outside" })).rejects.toThrow();
   });
   it("refuses unmanaged uninstall", async () => {
-    const { resources, source, targetRoot } = await setup(await mkdtemp(join(tmpdir(), "marketplace-home-")), "unmanaged");
+    const home = await mkdtemp(join(tmpdir(), "marketplace-home-"));
+    const { resources, source, targetRoot } = await setup(home, "unmanaged");
     await resources.marketplaceAction({ type: "install", sourceUrlOrPath: source, pluginRelativePath: "unmanaged" });
     await (await import("node:fs/promises")).rm(join(targetRoot, ".openbuddy-marketplace-managed.json"));
     await expect(resources.marketplaceAction({ type: "uninstall", sourceUrlOrPath: source, pluginRelativePath: "unmanaged" })).rejects.toThrow(/managed/i);

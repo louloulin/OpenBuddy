@@ -123,7 +123,11 @@ export interface AgentHostFacade {
   onEvent: (handler: (event: AgentSessionEvent) => void) => () => void;
   onPluginEvent: (handler: (event: SessionEventRecord & { eventVersion: 1 }) => void) => () => void;
 
-  // ---- prompt / steer / follow-up / abort ----
+  // ---- plugin lifecycle / replay ----
+  pluginEventLogCursor: (query?: { sessionId?: string }) => Promise<unknown>;
+  reloadPiExtensions: () => Promise<unknown>;
+
+
   // A-5: signal propagated for renderer-initiated cancellation.
   prompt: (text: string, options?: { traceId?: TraceId; sessionId?: SessionId; signal?: AbortSignal }) => Promise<PromptDispatchResult>;
   promptContent: (

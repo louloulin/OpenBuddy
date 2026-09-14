@@ -67,7 +67,7 @@ function pushBlockedDiagnostic(
   reason: string,
   state: "blocked" | "denied",
 ): void {
-  resolution.diagnostics.push({ id: specId, state, error: reason });
+  resolution.diagnostics.push({ id: specId, state: state === "blocked" ? "disabled" : "failed", error: reason });
 }
 
 function dropFactory(resolution: PiExtensionResolution, specId: string): void {

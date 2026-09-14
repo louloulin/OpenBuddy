@@ -39,7 +39,7 @@ export interface ExtensionPolicyConfig {
 export function readExtensionPolicyConfigSync(): ExtensionPolicyConfig {
   try {
     const raw = JSON.parse(readFileSync(join(agentRoot(), "openbuddy-extension-policy.json"), "utf8")) as Record<string, unknown>;
-    const strings = (value: unknown) => Array.isArray(value) ? [...new Set(value.filter((entry): entry is string => typeof entry === "string" && entry.trim()).map((entry) => entry.trim()))] : [];
+    const strings = (value: unknown): string[] => Array.isArray(value) ? [...new Set(value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim()))] : [];
     return { allowlistPackageNames: strings(raw.allowlistPackageNames), denylistPackageNames: strings(raw.denylistPackageNames) };
   } catch {
     return { allowlistPackageNames: [], denylistPackageNames: [] };
@@ -51,7 +51,7 @@ export async function readExtensionPolicyConfig(): Promise<ExtensionPolicyConfig
 }
 
 export async function writeExtensionPolicyConfig(config: ExtensionPolicyConfig): Promise<ExtensionPolicyConfig> {
-  const normalize = (values: unknown) => Array.isArray(values) ? [...new Set(values.filter((entry): entry is string => typeof entry === "string" && entry.trim()).map((entry) => entry.trim()))] : [];
+  const normalize = (values: unknown): string[] => Array.isArray(values) ? [...new Set(values.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim()))] : [];
   const next = { allowlistPackageNames: normalize(config.allowlistPackageNames), denylistPackageNames: normalize(config.denylistPackageNames) };
   await writeJson(join(agentRoot(), "openbuddy-extension-policy.json"), next, 0o600);
   return next;
