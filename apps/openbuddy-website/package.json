@@ -12,7 +12,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md}\""
   },
   "dependencies": {
-    "next": "14.2.18",
+    "next": "16.3.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "lucide-react": "^1.41.0",
