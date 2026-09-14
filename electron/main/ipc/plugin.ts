@@ -18,6 +18,7 @@
  * cold-start path (matches `plugins_list`).
  */
 import { ipcMain } from "electron";
+import { progressSnapshot, cancelProgress, retryProgress } from "../agent/progress-runs";
 import { MultiSurfaceSessionRegistry } from "../agent/multi-surface-session";
 
 
@@ -56,6 +57,7 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
   ipcMain.handle("progress:cancel", async (_e, args: unknown) => cancelProgress(String((args as { runId?: unknown })?.runId ?? "")));
   ipcMain.handle("progress:retry", async (_e, args: unknown) => retryProgress(String((args as { runId?: unknown })?.runId ?? "")));
 
+  ipcMain.handle("agent:plugin-list", async () => {
     await ensureAgentHost();
     return agentHost.listPlugins();
   });

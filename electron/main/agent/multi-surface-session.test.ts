@@ -7,9 +7,37 @@ describe("MultiSurfaceSessionRegistry", () => {
     expect(first.generation).toBe(second.generation); expect(registry.snapshot("session-1")[0]?.refCount).toBe(2);
     first.release(); first.release(); expect(released).not.toHaveBeenCalled(); second.release(); expect(released).toHaveBeenCalledWith("session-1", first.generation);
   });
-  it("isolates generations and sessions", () => {
-    const registry = new MultiSurfaceSessionRegistry(); const old = registry.acquire("session-1", "desktop"); old.release(); const current = registry.acquire("session-1", "web");
-    expect(current.generation).toBeGreaterThan(old.generation); expect(registry.release("session-1", "web", old.generation)).toBe(false);
-    expect(() => registry.acquire("", "desktop")).toThrow(); expect(registry.snapshot()[0]?.sessionId).toBe("session-1");
+  it("treats duplicate acquire of one surface as idempotent", () => {
+    const released = vi.fn(); const registry = new MultiSurfaceSessionRegistry(released);
+    const first = registry.acquire("session-1", "desktop");
+    const duplicate = registry.acquire("session-1", "desktop");
+    expect(duplicate.generation).toBe(first.generation);
+    expect(registry.snapshot("session-1")[0]).toMatchObject({ refCount: 1, surfaces: ["desktop"] });
+    duplicate.release();
+    expect(registry.snapshot("session-1")).toEqual([]);
+    expect(released).toHaveBeenCalledTimes(1);
+    first.release();
+    expect(released).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps different sessions independent across generation bumps", () => {
+    const released = vi.fn(); const registry = new MultiSurfaceSessionRegistry(released);
+    const first = registry.acquire("session-1", "desktop");
+    const other = registry.acquire("session-2", "desktop");
+    first.release();
+    expect(registry.snapshot("session-2")[0]).toMatchObject({ sessionId: "session-2", refCount: 1 });
+    const replacement = registry.acquire("session-1", "desktop");
+    expect(replacement.generation).toBeGreaterThan(first.generation);
+    expect(registry.release("session-1", "desktop", first.generation)).toBe(false);
+    expect(registry.snapshot("session-1")[0]?.generation).toBe(replacement.generation);
+    other.release(); replacement.release();
+    expect(released).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects empty identities", () => {
+    const registry = new MultiSurfaceSessionRegistry();
+    expect(() => registry.acquire("", "desktop")).toThrow();
+    expect(() => registry.acquire("session-1", " ")).toThrow();
+  });
+
 });
