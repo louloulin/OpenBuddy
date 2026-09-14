@@ -676,6 +676,12 @@ plan5.0+  ── 多 surface / 插件化 / Cordis 迁移
 
 验收：progress-runs 回归 2/2，tsc 与 diff check 通过。后续接入真实 AgentSession 长任务事件与 replay 恢复，并补 UI 集成测试。
 
+### 3.34 [plan4.5 §E] renderer Progress replay fallback 集成验证（本轮新增）
+
+在 `src/lib/__tests__/renderer-plugin-runtime.test.ts` 新增集成回归：当 renderer plugin ring buffer 为空时，`replayMainEvents()` 必须读取 `agentSessionEventLog({ limit: 2000 })`，把持久化的 `progress/update` 事件重新投递到 renderer event registry，并返回最高 global sequence，保证 ProgressPanel/插件订阅者可在重连后恢复。
+
+验收：renderer runtime 31/31、ProgressPanel 3/3、progress state 2/2、Pi replay coordinator 8/8，共 **44/44** 通过；`tsc --noEmit -p .` 与 `git diff --check` 通过。测试仍会输出一个既有 React `act()` 警告，来自 ProgressPanel 异步 refresh，不影响结果。旧 run 隔离、cancel/retry、live/success/error 已有独立覆盖；完整 Electron smoke/E2E 仍待执行。
+
 ### 3.33 [plan4.5 §E] ProgressPanel 集成验证闭环（本轮新增）
 
 新增 `src/components/__tests__/ProgressPanel.test.tsx`，以 typed client/event bridge mock 验证 renderer 实际消费行为：
