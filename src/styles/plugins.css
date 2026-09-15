@@ -556,3 +556,431 @@
   color: var(--wb-text-strong);
   font-variant-numeric: tabular-nums;
 }
+
+/* ============================================================================
+ * OpenBuddy 插件面板（openbuddy-ui-mcp/OpenBuddyPluginPanel.tsx）
+ *
+ * `openbuddy-plugin-panel*` / `panel-header*` / `panel-section*` /
+ * `plugin-list*` / `contribution-list*` / `event-log*` 这一整套类名
+ * （约 35 个）在 app.css 与拆分后的文件里都不存在 —— 该页面此前是一坨
+ * 无样式的裸文本。此处按「分组卡片 + 行式清单」重建。
+ * ========================================================================== */
+
+.openbuddy-plugin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  padding: 20px 24px 28px;
+  overflow-y: auto;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+}
+
+/* ---- 与 legacy pi 插件面板的交叉引用说明条 ---- */
+.openbuddy-plugin-panel__cross-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--wb-brand-primary) 24%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--wb-brand-primary) 7%, transparent);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-text-medium);
+}
+.openbuddy-plugin-panel__cross-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wb-brand-primary) 16%, transparent);
+  color: var(--wb-brand-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+.openbuddy-plugin-panel__cross-link-text {
+  flex: 1;
+  min-width: 220px;
+}
+.openbuddy-plugin-panel__cross-link-doc {
+  flex: none;
+  color: var(--wb-brand-primary);
+  text-decoration: none;
+}
+.openbuddy-plugin-panel__cross-link-doc:hover {
+  text-decoration: underline;
+}
+
+/* ---- 面板头 ---- */
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.panel-header__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.panel-header__title h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.panel-header__refresh,
+.panel-header__default-pi {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-medium);
+  font-size: 12px;
+  cursor: pointer;
+}
+.panel-header__refresh:hover:not(:disabled),
+.panel-header__default-pi:hover:not(:disabled) {
+  border-color: var(--wb-brand-primary);
+  color: var(--wb-text-strong);
+}
+.panel-header__refresh:disabled,
+.panel-header__default-pi:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---- 分组卡片 ---- */
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--wb-border-soft);
+  border-radius: 12px;
+  background: var(--wb-bg-secondary);
+}
+.panel-section h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.panel-section__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-text-tertiary);
+  overflow-wrap: anywhere;
+}
+.panel-section__hint code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--wb-bg-tertiary);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+
+/* ---- 行式清单 ---- */
+.plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.plugin-list__row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  font-size: 12px;
+}
+.plugin-list__row:hover {
+  background: var(--wb-bg-hover);
+}
+.plugin-list__dot {
+  flex: none;
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.plugin-list__id {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--wb-text-strong);
+}
+.plugin-list__name {
+  color: var(--wb-text-medium);
+}
+.plugin-list__kind,
+.plugin-list__hint,
+.plugin-list__state {
+  color: var(--wb-text-tertiary);
+}
+.plugin-list__kind {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--wb-bg-tertiary);
+  font-size: 11px;
+}
+.plugin-list__hint {
+  flex-basis: 100%;
+  font-size: 11px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+.plugin-list__state {
+  margin-left: auto;
+  flex: none;
+}
+.plugin-list__error {
+  flex-basis: 100%;
+  color: var(--wb-error);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.plugin-list__reset,
+.plugin-list__reload {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 7px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-medium);
+  font-size: 12px;
+  cursor: pointer;
+}
+.plugin-list__reset:hover:not(:disabled),
+.plugin-list__reload:hover:not(:disabled) {
+  border-color: var(--wb-brand-primary);
+  color: var(--wb-text-strong);
+}
+.plugin-list__reset:disabled,
+.plugin-list__reload:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.plugin-list__source-install {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.plugin-list__source-install input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+.plugin-list__source-install input:focus-visible {
+  outline: 2px solid var(--wb-brand-primary);
+  outline-offset: 0;
+}
+
+/* ---- contribution 清单 ---- */
+.contribution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.contribution-list__row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  font-size: 12px;
+}
+.contribution-list__row:hover {
+  background: var(--wb-bg-hover);
+}
+.contribution-list__kind {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--wb-brand-primary) 32%, transparent);
+  background: color-mix(in srgb, var(--wb-brand-primary) 10%, transparent);
+  color: var(--wb-brand-primary);
+  font-size: 11px;
+}
+.contribution-list__id {
+  font-family: ui-monospace, monospace;
+  color: var(--wb-text-strong);
+}
+.contribution-list__label {
+  color: var(--wb-text-medium);
+}
+.contribution-list__desc {
+  flex-basis: 100%;
+  color: var(--wb-text-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* ---- 事件日志 ---- */
+.event-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  margin: 0;
+  padding: 6px 8px;
+  list-style: none;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+.event-log > li {
+  display: flex;
+  gap: 8px;
+  padding: 3px 4px;
+  border-radius: 4px;
+}
+.event-log > li:hover {
+  background: var(--wb-bg-hover);
+}
+.event-log__type {
+  flex: none;
+  min-width: 84px;
+  color: var(--wb-brand-primary);
+}
+.event-log__time {
+  flex: 1;
+  min-width: 0;
+  color: var(--wb-text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+/* ---- dev 插件提示（DevPluginsHint） ---- */
+.dev-plugins-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed var(--wb-border-default);
+  border-radius: 10px;
+  background: var(--wb-bg-secondary);
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.dev-plugins-hint__toggle {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--wb-brand-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.dev-plugins-hint__toggle:hover {
+  text-decoration: underline;
+}
+.dev-plugins-hint__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--wb-text-tertiary);
+  line-height: 18px;
+}
+.dev-plugins-hint__code {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--wb-bg-tertiary);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- OpenBuddy 插件面板：行内补充元素 ---- */
+.plugin-list__empty {
+  padding: 10px 12px;
+  color: var(--wb-text-tertiary);
+  font-size: 12px;
+  list-style: none;
+}
+.plugin-list__kind--adapter {
+  border: 1px solid color-mix(in srgb, var(--wb-brand-primary) 32%, transparent);
+  background: color-mix(in srgb, var(--wb-brand-primary) 10%, transparent);
+  color: var(--wb-brand-primary);
+}
+.plugin-list__kind--source {
+  border: 1px solid var(--wb-border-default);
+  background: transparent;
+  color: var(--wb-text-tertiary);
+}
+.plugin-list__commands {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--wb-text-tertiary);
+}
+.plugin-list__commands code,
+.plugin-list__commands > span {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--wb-bg-tertiary);
+}
+.plugin-list__saved {
+  font-size: 11px;
+  color: var(--wb-text-tertiary);
+  white-space: nowrap;
+}
+.plugin-list__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  font-size: 12px;
+  color: var(--wb-text-medium);
+  cursor: pointer;
+}
+.plugin-list__config {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-basis: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--wb-bg-secondary);
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}

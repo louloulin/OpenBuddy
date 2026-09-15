@@ -21,6 +21,7 @@
 @import "./ui-kit.css";
 @import "./sidebar.css";
 @import "./sidebar-menus.css";
+@import "./composer.css";
 @import "./chat-shell.css";
 @import "./messages.css";
 @import "./prose.css";
@@ -31,6 +32,7 @@
 @import "./email.css";
 @import "./plugins.css";
 @import "./experts.css";
+@import "./files.css";
 @import "./home.css";
 @import "./automation.css";
 @import "./misc.css";

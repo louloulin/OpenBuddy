@@ -656,3 +656,321 @@
 .mcp-email-profile select { max-width: 220px; padding: 4px 6px; border: 1px solid #d9dce3; border-radius: 6px; background: var(--surface, #fff); color: inherit; }
 @media (max-width: 960px) { .email-layout { grid-template-columns: 168px minmax(240px, 1fr); } .email-layout > .email-sidebar { grid-column: 1; grid-row: 5; } .email-layout > .email-list { grid-column: 2; grid-row: 5; } .email-detail { display: none; } }
 @media (max-width: 640px) { .email-panel { padding: 18px 14px; } .email-layout { display: block; overflow: auto; } .email-sidebar { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-right: 0; border-bottom: 1px solid var(--wb-border-default, #e4e7ec); } .email-sidebar__account { grid-column: 1 / -1; } .email-sidebar__section { min-width: 0; } .email-sidebar__section:last-child { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); } .email-sidebar__section:last-child .email-sidebar__label { grid-column: 1 / -1; } .email-list { min-height: 360px; border-right: 0; border-bottom: 1px solid var(--wb-border-default, #e4e7ec); } }
+/* ============================================================================
+ * ConnectionBanner —— 邮件连接状态横幅
+ *
+ * `wb-connection-banner*`（9 个）+ `wb-button*`（4 个）此前全仓库无样式定义，
+ * 横幅退化成「图标字符 + 标题 + 三个裸按钮」的一行文本。
+ * ========================================================================== */
+
+.wb-connection-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--wb-border-soft);
+  border-radius: 12px;
+  background: var(--wb-bg-secondary);
+  color: var(--wb-text-strong);
+}
+.wb-connection-banner--no-provider {
+  border-color: color-mix(in srgb, var(--wb-brand-primary) 28%, transparent);
+  background: color-mix(in srgb, var(--wb-brand-primary) 7%, transparent);
+}
+.wb-connection-banner--partial {
+  border-color: color-mix(in srgb, var(--wb-warning) 34%, transparent);
+  background: color-mix(in srgb, var(--wb-warning) 8%, transparent);
+}
+.wb-connection-banner--reauthorize {
+  border-color: color-mix(in srgb, var(--wb-error) 34%, transparent);
+  background: var(--wb-status-error-soft);
+}
+.wb-connection-banner__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  font-size: 15px;
+  line-height: 1;
+}
+.wb-connection-banner__body {
+  flex: 1;
+  min-width: 0;
+}
+.wb-connection-banner__title {
+  margin: 0 0 3px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.wb-connection-banner__description {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-text-medium);
+}
+.wb-connection-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+/* ---- 跨包共享按钮原语 ---- */
+.wb-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--wb-duration-fast, 120ms) ease, border-color var(--wb-duration-fast, 120ms) ease, color var(--wb-duration-fast, 120ms) ease;
+}
+.wb-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.wb-button--primary {
+  background: var(--wb-brand-primary);
+  border-color: var(--wb-brand-primary);
+  color: #ffffff;
+}
+.wb-button--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-brand-primary) 88%, #000);
+}
+.wb-button--secondary {
+  background: var(--wb-bg-primary);
+  border-color: var(--wb-border-default);
+  color: var(--wb-text-strong);
+}
+.wb-button--secondary:hover:not(:disabled) {
+  border-color: var(--wb-brand-primary);
+}
+.wb-button--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--wb-text-medium);
+}
+.wb-button--ghost:hover:not(:disabled) {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.wb-connection-banner__dismiss {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 15px;
+}
+
+/* ============================================================================
+ * 邮件面板补齐（Phase 2 拆分遗漏）
+ * ========================================================================== */
+
+/* ---- 列表 ---- */
+.email-load-more {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 8px 12px 12px;
+  height: 32px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-medium);
+  font-size: 12px;
+  cursor: pointer;
+}
+.email-load-more:hover:not(:disabled) {
+  border-color: var(--wb-brand-primary);
+  color: var(--wb-text-strong);
+}
+.email-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.email-scheduled-cancel {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-medium);
+  font-size: 11px;
+  cursor: pointer;
+}
+.email-scheduled-cancel:hover {
+  border-color: var(--wb-error);
+  color: var(--wb-error);
+}
+.email-thread__tags {
+  display: inline-block;
+  margin-top: 2px;
+  color: var(--wb-brand-primary);
+  font-size: 11px;
+}
+
+/* ---- 账户能力 / 诊断 ---- */
+.email-accounts-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--wb-text-tertiary);
+}
+.email-sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--wb-text-tertiary);
+}
+.email-triage-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+
+/* ---- 洞察面板条目 ---- */
+.email-insight__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.email-insight__item:hover {
+  background: var(--wb-bg-hover);
+}
+
+/* ---- AI 分析卡片 ---- */
+.email-ai-analyses {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.email-ai-analysis__summary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--wb-text-strong);
+}
+.email-ai-analysis__facts,
+.email-ai-analysis__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 0 2px;
+  list-style: none;
+}
+.email-ai-analysis__facts > li,
+.email-ai-analysis__actions > li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--wb-bg-secondary);
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.email-ai-analysis__facts small,
+.email-ai-analysis__actions small {
+  color: var(--wb-text-tertiary);
+  font-size: 11px;
+}
+.email-ai-analysis__reply {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--wb-bg-tertiary);
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.email-ai-analysis__reply pre {
+  margin: 0;
+  font-family: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.email-ai-analysis__meeting-link {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--wb-text-tertiary);
+}
+
+/* ---- 正文内的退订提示 ---- */
+.email-message__unsubscribe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--wb-border-soft);
+  border-radius: 8px;
+  background: var(--wb-bg-secondary);
+  font-size: 11px;
+  color: var(--wb-text-tertiary);
+}
+.email-message__unsubscribe button {
+  flex: none;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-medium);
+  font-size: 11px;
+  cursor: pointer;
+}
+.email-message__unsubscribe button:hover:not(:disabled) {
+  border-color: var(--wb-brand-primary);
+  color: var(--wb-text-strong);
+}
+
+/* ---- 邮件头 AI 摘要 / 分流 ---- */
+.wb-email-header__ai-summary,
+.wb-email-header__ai-digest,
+.wb-email-header__ai-triage,
+.wb-email-header__ai-reply-zero {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--wb-bg-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-text-medium);
+}
+.wb-email-header__ai-triage {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.wb-email-header__ai-reply-zero {
+  color: var(--wb-text-tertiary);
+}

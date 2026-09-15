@@ -1577,3 +1577,266 @@
   color: var(--wb-text-secondary);
   font-style: italic;
 }
+
+/* ============================================================================
+ * 补齐：跨包零散缺失类（Phase 2 拆分遗漏）
+ * 覆盖 proj-*（项目详情）/ um-tab*（专家市场）/ file-preview 变体 /
+ * branch-navigator / settings-fields|settings-tag / pd-* 扩展 /
+ * mermaid 代码块 / email-provider-diagnostic。
+ * ========================================================================== */
+
+/* ---- 项目详情：自动化弹窗 / 标签编辑器 ---- */
+.proj-automation-modal {
+  width: min(960px, 92vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--wb-bg-primary);
+  border-radius: 14px;
+  box-shadow: var(--wb-shadow-lg, 0 24px 60px rgba(0, 0, 0, 0.24));
+}
+.proj-automation-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: none;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--wb-border-soft);
+}
+.proj-automation-modal__head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.proj-automation-modal > *:not(.proj-automation-modal__head) {
+  min-height: 0;
+  overflow-y: auto;
+}
+.proj-tags-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+
+/* ---- 专家市场 tab 容器 ---- */
+.um-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.um-tab--plugins {
+  background: var(--wb-bg-primary);
+}
+.um-tab-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 24px 24px;
+}
+
+/* ---- 文件预览变体：容器只是布局钩子，需保证高度/圆角一致 ---- */
+.file-preview--image,
+.file-preview--markdown,
+.file-preview--audio,
+.file-preview--video,
+.file-preview--pdf,
+.file-preview--code,
+.file-preview--binary {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.file-preview--binary {
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- 会话分支导航 ---- */
+.branch-navigator__node {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.branch-navigator__children {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: 14px;
+  padding-left: 6px;
+  border-left: 1px solid var(--wb-border-soft);
+}
+
+/* ---- 设置：字段组 / 标签 ---- */
+.settings-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--wb-brand-primary) 30%, transparent);
+  background: color-mix(in srgb, var(--wb-brand-primary) 10%, transparent);
+  color: var(--wb-brand-primary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+/* ---- 扩展策略编辑器 ---- */
+.extension-policy-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--wb-border-soft);
+  border-radius: 12px;
+  background: var(--wb-bg-secondary);
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.extension-policy-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.extension-policy-editor textarea {
+  min-height: 72px;
+  padding: 8px 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  resize: vertical;
+}
+.extension-policy-editor button {
+  align-self: flex-start;
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  cursor: pointer;
+}
+.extension-policy-editor button:hover {
+  border-color: var(--wb-brand-primary);
+}
+
+/* ---- 项目详情补充（pd-*） ---- */
+.pd-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pd-activity-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.pd-activity-item:hover {
+  background: var(--wb-bg-hover);
+}
+.pd-activity-item__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pd-data-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pd-data-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--wb-border-soft);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  font-size: 12px;
+}
+.pd-search-inline-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pd-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pd-task-item__canonical {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--wb-text-tertiary);
+}
+
+/* ---- mermaid 代码块 ---- */
+.md-mermaid-wrapper {
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid var(--wb-border-soft);
+  border-radius: 10px;
+  background: var(--wb-bg-secondary);
+  overflow-x: auto;
+}
+.md-mermaid-source {
+  margin: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wb-text-medium);
+  white-space: pre;
+}
+code.language-mermaid,
+pre.language-mermaid {
+  display: block;
+  font-family: ui-monospace, monospace;
+}
+code.language-latex {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--wb-bg-tertiary);
+  font-family: ui-monospace, monospace;
+  font-size: 0.92em;
+}
+/* ---- 邮件 provider 诊断卡 ---- */
+.email-provider-diagnostic__details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.email-provider-diagnostic__operations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -412,3 +412,19 @@
 .file-preview__err p {
   margin: 0 0 10px;
 }
+
+/* ---- 工具详情 / 命令输出容器 ----
+ * ToolCallCard 的 .tool-detail 与 .toolcall__cmd 只是布局容器，此前没有
+ * 选择器，导致「状态行 + 标题 + diff/命令输出」挤在一起没有间距。 */
+.tool-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.toolcall__cmd {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}

@@ -1,0 +1,114 @@
+/* ============================================================================
+ * composer.css — Composer 输入卡的浮层菜单
+ *
+ * Phase 2 拆分时 SlashCommands（输入 `/` 弹出的命令补全菜单）没有任何样式，
+ * 它以普通文档流的形式被塞进输入卡里，把 footer 工具栏往下顶，并显示成
+ * 一列裸文本。这里把它定位成与 MentionPicker 一致的浮层。
+ * ============================================================================ */
+
+.slash-commands {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(100% + 6px);
+  z-index: 60;
+  max-height: min(320px, 46vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  border: 1px solid var(--wb-border-default);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06);
+  font-size: 13px;
+  animation: ob-slash-menu-in 140ms var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+@keyframes ob-slash-menu-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.slash-commands__header {
+  flex: none;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--wb-border-soft);
+  background: var(--wb-bg-secondary);
+  color: var(--wb-text-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.slash-commands__list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.slash-commands__item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 2px 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--wb-text-strong);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--wb-duration-fast, 120ms) ease;
+}
+
+.slash-commands__item--active,
+.slash-commands__item:hover {
+  background: var(--wb-bg-hover);
+}
+
+.slash-commands__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: var(--wb-text-strong);
+}
+
+.slash-commands__adapter-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--wb-brand-primary) 36%, transparent);
+  background: color-mix(in srgb, var(--wb-brand-primary) 12%, transparent);
+  color: var(--wb-brand-primary);
+  font-family: var(--wb-font-sans, system-ui), sans-serif;
+  font-size: 10px;
+  line-height: 15px;
+}
+
+.slash-commands__desc {
+  grid-column: 1 / -1;
+  color: var(--wb-text-medium);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.slash-commands__source {
+  grid-column: 2;
+  grid-row: 1;
+  flex: none;
+  color: var(--wb-text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slash-commands {
+    animation: none;
+  }
+}

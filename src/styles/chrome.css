@@ -365,3 +365,226 @@
   .route-pending__dot { animation: none; }
   .startup-splash__progress-bar { transition: none; }
 }
+
+/* ---- 自绘窗口栏控制按钮（Windows / Linux 无边框窗口） ----
+ * TitleBar.tsx 一直渲染 titlebar__controls / __control，但 Phase 2 拆分时
+ * 只有 .titlebar / .titlebar__menus / __brand / __dropdown 被带过来
+ * （散落在 email.css 里），窗口按钮因此没有任何命中区域与 hover 反馈。 */
+.titlebar__spacer {
+  flex: 1 1 auto;
+  height: 100%;
+}
+.titlebar__controls {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  flex: none;
+  -webkit-app-region: no-drag;
+}
+.titlebar__control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 100%;
+  border: none;
+  background: none;
+  color: var(--wb-text-medium, #6e6e80);
+  cursor: pointer;
+  transition: background var(--wb-duration-fast, 120ms) ease, color var(--wb-duration-fast, 120ms) ease;
+}
+.titlebar__control:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.titlebar__control:focus-visible {
+  outline: 2px solid var(--wb-brand-primary, #00c29a);
+  outline-offset: -2px;
+}
+.titlebar__control--close:hover {
+  background: #e5484d;
+  color: #ffffff;
+}
+
+/* ---- 右侧「助理」导轨（SecondarySidebar） ----
+ * ui-shell 的 SecondarySidebar 有 17 个类名，全仓库没有任何样式定义；
+ * 一旦 details slot 被消费（ui-layout AppFrame）就会以裸文本形式出现。 */
+.secondary-sidebar__trigger {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border: 1px solid var(--wb-border-soft);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  color: var(--wb-text-medium);
+  cursor: pointer;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.06);
+}
+.secondary-sidebar__trigger:hover {
+  color: var(--wb-brand-primary);
+  border-color: color-mix(in srgb, var(--wb-brand-primary) 36%, transparent);
+}
+.secondary-sidebar__trigger-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.secondary-sidebar__trigger-label {
+  font-size: 11px;
+  line-height: 16px;
+}
+.secondary-sidebar__trigger-chevron {
+  opacity: 0.6;
+}
+
+.secondary-sidebar__floating {
+  position: fixed;
+  top: 50%;
+  right: 44px;
+  transform: translateY(-50%);
+  z-index: 61;
+  width: 268px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  overflow-y: auto;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 12px;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  box-shadow: var(--wb-shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.16));
+  animation: ob-scale-in 140ms var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.secondary-sidebar__loading {
+  padding: 12px;
+  color: var(--wb-text-tertiary);
+  font-size: 12px;
+  text-align: center;
+}
+.secondary-sidebar__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.secondary-sidebar__item {
+  display: block;
+}
+.secondary-sidebar__item-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--wb-text-medium);
+  text-align: left;
+  cursor: pointer;
+}
+.secondary-sidebar__item-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.secondary-sidebar__item-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wb-brand-primary) 14%, transparent);
+  color: var(--wb-brand-primary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.secondary-sidebar__item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.secondary-sidebar__item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--wb-text-strong);
+}
+.secondary-sidebar__item-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--wb-text-tertiary);
+}
+.secondary-sidebar__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--wb-bg-secondary);
+  font-size: 12px;
+}
+.secondary-sidebar__preview-name {
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.secondary-sidebar__preview-desc {
+  color: var(--wb-text-medium);
+  line-height: 18px;
+}
+.secondary-sidebar__preview-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--wb-text-tertiary);
+  font-size: 11px;
+}
+
+/* ---- 文档截断提示条（AppShell 顶部渲染） ---- */
+.truncation-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--wb-warning) 32%, transparent);
+  background: color-mix(in srgb, var(--wb-warning) 10%, transparent);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+}
+.truncation-banner > span {
+  flex: 1;
+  min-width: 200px;
+}
+.truncation-banner button {
+  flex: none;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 7px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-medium);
+  font-size: 12px;
+  cursor: pointer;
+}
+.truncation-banner button:hover {
+  border-color: var(--wb-brand-primary);
+  color: var(--wb-text-strong);
+}

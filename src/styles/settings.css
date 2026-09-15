@@ -742,3 +742,206 @@
     transform: rotate(360deg);
   }
 }
+
+/* ============================================================================
+ * 补齐：设置 / 账户 / 计费面板共享原语
+ *
+ * 这批类名在 SettingsPanel / SessionManagementPanel / AccountLinkingPanel /
+ * WebhookSubscriptionPanel / TenantMembersPanel / TokenIntrospectionPanel /
+ * BillingPanel / CreditWalletPanel / CreditReconciliationPanel /
+ * CreditPricingPanel / ResourceCatalogPanel 里使用，但 Phase 2 从 app.css
+ * 机械拆分时漏写了对应选择器，导致这些面板退化成无样式堆叠文本。
+ * ========================================================================== */
+
+/* ---- 扁平导航分组：分组只有一个子项时（如「关于」）不再渲染可折叠 header，
+ *      入口直接与其它分组项对齐。 ---- */
+.settings-navigation__group--flat {
+  gap: 0;
+}
+.settings-navigation__group--flat .settings-navigation__sublist {
+  margin-top: 0;
+}
+
+/* ---- ghost 按钮：列表内次级操作（刷新 / 注销全部 / 重载等） ---- */
+.settings-btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--wb-text-medium);
+}
+.settings-btn--ghost:hover:not(:disabled) {
+  background: var(--wb-bg-hover);
+  border-color: transparent;
+  color: var(--wb-text-strong);
+}
+
+/* ---- 内联状态提示 ---- */
+.settings-msg--ok {
+  color: var(--wb-success);
+  background: color-mix(in srgb, var(--wb-success) 12%, transparent);
+}
+.settings-msg--err {
+  color: var(--wb-error);
+  background: var(--wb-status-error-soft);
+}
+
+/* ---- 字段标签（settings-field 内的 <span> 标题行） ---- */
+.settings-field__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wb-text-strong);
+}
+.settings-field textarea {
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  padding: 7px 9px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  font: inherit;
+  resize: vertical;
+}
+
+/* ---- 单选组 ---- */
+.settings-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--wb-text-strong);
+  cursor: pointer;
+}
+.settings-radio input {
+  margin: 0;
+  accent-color: var(--wb-brand-primary);
+}
+
+/* ---- 多行文本域 ---- */
+.settings-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.settings-textarea:focus-visible {
+  outline: 2px solid var(--wb-brand-primary);
+  outline-offset: 1px;
+}
+
+/* ---- 明细流水 / 指标 ---- */
+.settings-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+.settings-ledger__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--wb-bg-tertiary);
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.settings-ledger__row strong {
+  font-weight: 600;
+  color: var(--wb-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.settings-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 12px;
+}
+
+/* ---- 徽标 ---- */
+.account-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-text-medium);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.account-badge--ok {
+  border-color: color-mix(in srgb, var(--wb-success) 36%, transparent);
+  background: color-mix(in srgb, var(--wb-success) 12%, transparent);
+  color: var(--wb-success);
+}
+
+/* ---- section header / actions ---- */
+.account-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.account-section__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.account-section__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---- 列表行：左 meta / 右 actions ---- */
+.shortcuts-list__row-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.shortcuts-list__row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.shortcuts-list__row:has(.shortcuts-list__row-meta) {
+  align-items: flex-start;
+}
+.shortcuts-list__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.shortcuts-list__key {
+  overflow-wrap: anywhere;
+}
+
+/* ---- 模型编辑器 ---- */
+.models-settings-panel__checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--wb-text-medium);
+  cursor: pointer;
+}
+.models-settings-panel__checkbox-row input {
+  margin: 0;
+  accent-color: var(--wb-brand-primary);
+}
+.models-settings-panel__fetch-select-all {
+  flex: none;
+}

@@ -1966,3 +1966,113 @@
   background: rgba(0, 0, 0, 0.05);
   color: var(--atm-text-primary);
 }
+
+/* ============================================================================
+ * 自动化面板补齐（Phase 2 拆分遗漏的修饰类）
+ * ========================================================================== */
+
+.atm-toolbar--breadcrumb {
+  height: 48px;
+}
+.atm-tabs {
+  flex: none;
+}
+.atm-filter-menu--right {
+  left: auto;
+  right: 0;
+}
+.atm-records-group--archived {
+  opacity: 0.75;
+}
+.atm-records-group--archived .atm-records-group-label {
+  font-weight: 500;
+}
+.atm-row-checkbox {
+  flex: none;
+}
+.atm-push-switch {
+  flex: none;
+}
+
+/* ---- 模板网格 ---- */
+.atm-template-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.atm-template-section--compact {
+  gap: 6px;
+}
+.atm-template-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.atm-template-list--compact {
+  grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  gap: 6px;
+}
+.atm-template-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--atm-border, var(--wb-border-soft));
+  border-radius: 12px;
+  background: var(--atm-surface, var(--wb-bg-primary));
+  color: var(--atm-text-primary, var(--wb-text-strong));
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--wb-duration-fast, 120ms) ease, transform var(--wb-duration-fast, 120ms) ease;
+}
+.atm-template-card:hover {
+  border-color: color-mix(in srgb, var(--wb-brand-primary) 48%, transparent);
+  transform: translateY(-1px);
+}
+.atm-template-card--compact {
+  padding: 8px 10px;
+  gap: 8px;
+  border-radius: 10px;
+}
+.atm-template-compact-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--atm-surface-subtle, var(--wb-bg-tertiary));
+  color: var(--wb-brand-primary);
+}
+.atm-template-compact-icon {
+  width: 16px;
+  height: 16px;
+}
+.atm-template-compact-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.atm-template-compact-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--atm-text-primary, var(--wb-text-strong));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atm-template-compact-desc {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--atm-text-muted, var(--wb-text-tertiary));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 完全访问权限确认弹窗（叠加在通用 modal-overlay 上） ---- */
+.automation-permission-confirm__overlay {
+  z-index: 1200;
+}

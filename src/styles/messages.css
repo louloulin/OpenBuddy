@@ -630,3 +630,11 @@ button.diff__path {
 .rewind-bar__timeline-action:hover {
   background: var(--wb-bg-hover);
 }
+
+/* ---- diff 容器（.diff 本身此前只有子元素有样式） ---- */
+.diff {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-bottom: 4px;
+}

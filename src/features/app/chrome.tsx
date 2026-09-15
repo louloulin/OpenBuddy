@@ -13,6 +13,7 @@
 
 import type { ReactNode } from "react";
 import { memo } from "react";
+import { NewTaskIcon, SidebarToggleIcon } from "@openbuddy/ui-primitives/icons";
 
 /** 启动时 / 路由 lazy 时的占位 loading 视图。 */
 export const RoutePending = memo(function RoutePending({
@@ -54,7 +55,7 @@ export const MainTopbarActions = memo(function MainTopbarActions({
         data-tip="展开侧边栏"
         onClick={onExpandSidebar}
       >
-        <span className="icon-slot" data-icon="sidebar-toggle" />
+        <SidebarToggleIcon size="md" />
       </button>
       <button
         className="main-topbar__btn"
@@ -62,7 +63,7 @@ export const MainTopbarActions = memo(function MainTopbarActions({
         data-tip="新建任务"
         onClick={onNewSession}
       >
-        <span className="icon-slot" data-icon="new-task" />
+        <NewTaskIcon size="md" />
       </button>
     </>
   );
@@ -88,7 +89,7 @@ export const CollapsedTopbarFloat = memo(function CollapsedTopbarFloat({
         data-tip="展开侧边栏"
         onClick={onExpandSidebar}
       >
-        <span className="icon-slot" data-icon="sidebar-toggle" />
+        <SidebarToggleIcon size="md" />
       </button>
       <button
         className="main-topbar__btn"
@@ -96,7 +97,7 @@ export const CollapsedTopbarFloat = memo(function CollapsedTopbarFloat({
         data-tip="新建任务"
         onClick={onNewSession}
       >
-        <span className="icon-slot" data-icon="new-task" />
+        <NewTaskIcon size="md" />
       </button>
     </div>
   );
