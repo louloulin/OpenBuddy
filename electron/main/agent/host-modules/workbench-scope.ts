@@ -57,15 +57,29 @@ export type WorkspaceProjection = {
 	archivedSessionIds: readonly string[];
 };
 
+/**
+ * Structural shape we need off a pi session entry for workspace derivation.
+ * Kept local so this module doesn't pull in pi-runtime-factories just for types.
+ * Matches `SessionHeaderSummary` from host-modules/session-metadata.
+ */
+export interface PiSessionEntry {
+	id: string;
+	cwd: string;
+	path: string;
+	modified: Date;
+	name?: string;
+	firstMessage?: string;
+}
+
 let state: AgentHostState = createDefaultAgentHostState();
-let listAllPiSessions: <T = unknown>() => any = async () => [];
+let listAllPiSessions: () => Promise<PiSessionEntry[]> = async () => [];
 
 export function installWorkbenchScope(deps: {
 	state: AgentHostState;
-	listAllPiSessions: <T = unknown>() => any;
+	listAllPiSessions: () => Promise<PiSessionEntry[]>;
 }): void {
 	if (deps.state) state = deps.state;
-	listAllPiSessions = deps.listAllPiSessions as any;
+	listAllPiSessions = deps.listAllPiSessions;
 }
 
 // --- Workspace registry type ----------------------------------------
@@ -282,30 +296,54 @@ async function listWorkspaces(): Promise<WorkspaceProjection[]> {
 	}
 	await registry.ready();
 	const sessionEntries = await listAllPiSessions();
-	const byPath = new Map(discovered.map((entry) => [entry.cwd, entry]));
+	// P0.6: the workspace registry's `sessionIds` array is *redundant* with pi's
+	// own session store at ~/.openbuddy/agent/sessions/<encoded-cwd>/*. Every call to
+	// listWorkspaces() used to call `attachSession()` for each pi session, which
+	// ran `registry.update()` once per session — that's a disk write, a revision
+	// bump, and a `workspace/changed` event per session per refresh. With 1146
+	// sessions across 37 workspaces that was ~30 000 disk writes per refresh.
+	//
+	// The registry should only track sessions the user *manually* attached or
+	// reordered (insertSessionBefore). For the workspace picker we derive the
+	// session list straight from pi's store by matching cwd, so:
+	//   1. attaching a session is a no-op when its cwd already matches the
+	//      workspace path (the workspace "owns" it via cwd, no separate
+	//      bookkeeping needed)
+	//   2. listing stays cheap — one scan of pi's session tree, no writes
+	// We still ensure each discovered workspace exists in the registry so the
+	// user can rename / reorder / archive it, but we never mutate sessionIds
+	// during listWorkspaces().
 	const archived = new Set(registry.archivedSessionIds);
-	for (const entry of discovered) {
-		let workspace: DeepSeekWorkspace;
-		try {
-			workspace = await registry.create(entry.cwd);
-		} catch {
-			continue;
+	const sessionsByPath = new Map<string, typeof sessionEntries>();
+	for (const session of sessionEntries) {
+		const cwd = session.cwd || "";
+		let bucket = sessionsByPath.get(cwd);
+		if (!bucket) {
+			bucket = [];
+			sessionsByPath.set(cwd, bucket);
 		}
-		for (const session of sessionEntries) {
-			if ((session.cwd || entry.cwd) !== entry.cwd || workspace.sessionIds.includes(session.id)) continue;
-			await workspace.attachSession(session.id);
-			workspace = registry.get(workspace.id) ?? workspace;
+		bucket.push(session);
+	}
+	for (const entry of discovered) {
+		try {
+			await registry.create(entry.cwd);
+		} catch {
+			// Workspace already exists or path is invalid — both fine to skip.
 		}
 	}
 	return registry.list().map((workspace) => {
-		const discoveredEntry = byPath.get(workspace.path);
+		const discoveredEntry = discovered.find((entry) => entry.cwd === workspace.path);
+		const cwdSessions = sessionsByPath.get(workspace.path) ?? [];
+		const sessionIds = cwdSessions
+			.filter((session) => !archived.has(session.id))
+			.map((session) => session.id);
 		return {
 			workspaceId: workspace.id,
 			cwd: workspace.path,
 			path: workspace.path,
 			title: workspace.title,
-			sessionCount: workspace.sessionIds.filter((id) => !archived.has(id)).length,
-			sessionIds: [...workspace.sessionIds],
+			sessionCount: sessionIds.length,
+			sessionIds,
 			createdAt: workspace.createdAt,
 			updatedAt: workspace.updatedAt,
 			lastTitle: discoveredEntry?.lastTitle,

@@ -1,3 +1,4 @@
+import { agentHome } from "@openbuddy/storage";
 import { lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
 import { createHash, randomUUID } from "node:crypto"
 import os from "node:os"
@@ -1601,7 +1602,7 @@ interface EmailStore {
 	processingPlans: EmailProcessingPlan[]
 	rules: EmailRule[]
 }
-function storePath(): string { return path.join(process.env.PI_CODING_AGENT_DIR ?? path.join(process.env.PI_HOME ?? os.homedir(), ".pi", "agent"), "openbuddy-email.json") }
+function storePath(): string { return path.join(agentHome(), "openbuddy-email.json") }
 function emptyEmailStore(): EmailStore { return { drafts: [], audit: [], connections: [], senderPolicies: [], shares: [], reminders: [], projects: [], tags: [], threadTags: [], scheduledSends: [], pendingSends: [], analyses: [], inboxReceipts: [], syncStates: [], processingPlans: [], rules: [] } }
 async function readStore(): Promise<EmailStore> {
 	let raw: string

@@ -11,7 +11,7 @@ import {
 } from "@openbuddy/storage";
 
 function agentHome(): string {
-  return process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent");
+  return agentHome();
 }
 
 function databasePath(): string {

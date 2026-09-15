@@ -31,6 +31,7 @@
  *
  * createDeepSeekHookedTool 不导出 — 只在本模块内被 createDeepSeekAgentRuntime 调用
  */
+import { agentHome } from "@openbuddy/storage";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -62,7 +63,7 @@ function log(): MainLogger {
 
 let listAllPiSessions: <T = unknown>() => any = async () => [];
 let persistedSessionPath: (id: string | undefined) => Promise<string | undefined> = async () => undefined;
-let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd();
+let piHome: () => string = () => agentHome();
 let piSessionDir: (cwd: string) => string = (cwd) => "";
 let state: AgentHostState;
 let createSubagentResourceLoader:

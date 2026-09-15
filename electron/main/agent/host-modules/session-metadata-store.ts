@@ -40,7 +40,7 @@ import { rm, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { openStorageSync, SettingsStore } from "@openbuddy/storage";
+import { openStorageSync, SettingsStore, agentHome } from "@openbuddy/storage";
 
 import { piHome } from "./_host-paths";
 
@@ -78,7 +78,7 @@ function defaultLegacyJsonPath(): string {
 }
 
 function defaultPiHome(): string {
-  return process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? join(homedir(), ".pi", "agent");
+  return agentHome();
 }
 
 /**

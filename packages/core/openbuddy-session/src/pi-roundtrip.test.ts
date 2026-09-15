@@ -59,7 +59,7 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
     // scans. This proves the Cordis side discovers the JSONL without standing
     // up a real LLM loop.
     workspace = "/tmp/openbuddy-roundtrip-ws-list";
-    const piAgentRoot = join(home, ".pi", "agent");
+    const piAgentRoot = join(home, ".openbuddy", "agent");
     const encoded = workspace.replace(/\//g, "-");
     const targetDir = join(piAgentRoot, encoded);
     await mkdir(targetDir, { recursive: true });
@@ -92,7 +92,7 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
   it("setPinned writes to both SQLite catalog and the legacy JSON mirror", async () => {
     // Hand-author a JSONL session header so the Cordis service has something
     // to scan.
-    sessionsRoot = join(home, ".pi", "agent");
+    sessionsRoot = join(home, ".openbuddy", "agent");
     workspace = "/tmp/openbuddy-roundtrip-ws";
     await mkdir(join(sessionsRoot, workspace.replace(/\//g, "-")), { recursive: true });
     await writeFile(
@@ -112,7 +112,7 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
 
     // SQLite catalog must reflect the pinned flag.
     const storage = await openStorage({
-      filePath: join(home, ".pi", "agent", "openbuddy.sqlite"),
+      filePath: join(home, ".openbuddy", "agent", "openbuddy.sqlite"),
       appVersion: "openbuddy-phase6-e2e",
     });
     try {
@@ -125,14 +125,14 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
     // Legacy JSON mirror must also contain the pin (it's the migration source).
     const mirror = JSON.parse(
       await import("node:fs/promises").then((m) =>
-        m.readFile(join(home, ".pi", "agent", "openbuddy-state.json"), "utf-8"),
+        m.readFile(join(home, ".openbuddy", "agent", "openbuddy-state.json"), "utf-8"),
       ),
     );
     expect(mirror.pinned).toContain("session-r1");
   });
 
   it("setExpert persists across a fresh SQLite handle (authority = SQLite)", async () => {
-    sessionsRoot = join(home, ".pi", "agent");
+    sessionsRoot = join(home, ".openbuddy", "agent");
     workspace = "/tmp/openbuddy-roundtrip-ws2";
     await mkdir(join(sessionsRoot, workspace.replace(/\//g, "-")), { recursive: true });
     await writeFile(
@@ -154,7 +154,7 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
 
     // Reopen the SQLite handle to prove metadata survives a process restart.
     const storage = await openStorage({
-      filePath: join(home, ".pi", "agent", "openbuddy.sqlite"),
+      filePath: join(home, ".openbuddy", "agent", "openbuddy.sqlite"),
       appVersion: "openbuddy-phase6-e2e",
     });
     try {

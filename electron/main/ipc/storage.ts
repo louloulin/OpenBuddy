@@ -14,7 +14,7 @@ import {
   rendererWriteVersioned,
 } from "../storage/renderer-storage";
 import { loadCollaborationBootstrap, loadTaskBootstrap, loadWorkspaceBootstrap, recentStorageMetrics } from "../storage/workspace-bootstrap";
-import { closeStorage, openStorage } from "@openbuddy/storage";
+import { closeStorage, openStorage, agentHome } from "@openbuddy/storage";
 import {
 	absolutePath,
 	assertPolicyModelAllowed,
@@ -88,7 +88,7 @@ export function registerStorageIpc(getWindow: () => BrowserWindow | null): void 
 			return rendererRemove({ namespace: requiredString(payload.namespace, "namespace"), key: requiredString(payload.key, "key") });
 		});
 		ipcMain.handle("storage:metrics", async () => {
-			const path = join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent"), "openbuddy.sqlite");
+			const path = join(agentHome(), "openbuddy.sqlite");
 			try {
 				const opened = await openStorage({ filePath: path, appVersion: "openbuddy-ipc-metrics" });
 				try {

@@ -10,6 +10,7 @@
  *   read_text_file, write_text_file, export_text_file,
  *   list_dir, browse_directory
  */
+import { agentHome } from "@openbuddy/storage";
 import { spawn } from "node:child_process"
 import { promises as fs } from "node:fs"
 import { platform } from "node:os"
@@ -43,7 +44,7 @@ function resolvePath(input: string, cwd?: string | null): string {
 }
 
 function piRoot(): string {
-	return process.env.PI_CODING_AGENT_DIR ?? path.join(process.env.PI_HOME ?? path.join(process.env.HOME ?? process.cwd(), ".pi"), "agent")
+	return agentHome()
 }
 
 function isWithin(root: string, candidate: string): boolean {

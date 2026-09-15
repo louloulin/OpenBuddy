@@ -6,11 +6,12 @@
  * merges these into a Harness `PluginPatch[][]` so callers can layer them on
  * top of the default profile via `HarnessPluginLoader.loadProfile()`.
  *
- * The default JSON adapter writes to `~/.pi/agent/openbuddy-plugins.json`
+ * The default JSON adapter writes to `~/.openbuddy/agent/openbuddy-plugins.json`
  * (configurable via `PluginStateStoreOptions.path`). The store is intentionally
  * synchronous-ish: callers pass a `read`/`write` adapter if they want atomic
  * file replacement (write-temp-then-rename) or remote storage.
  */
+import { agentPath } from "@openbuddy/storage";
 import type { PluginPatch } from "./index";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -64,7 +65,7 @@ export interface PluginStateStore {
 }
 
 export interface PluginStateStoreOptions {
-  /** Filesystem adapter — defaults to `~/.pi/agent/openbuddy-plugins.json`. */
+  /** Filesystem adapter — defaults to `~/.openbuddy/agent/openbuddy-plugins.json`. */
   path?: string;
   /** Custom IO; pass for tests or non-default storage. */
   read?: () => Promise<PluginStateSnapshot | null>;
@@ -74,8 +75,7 @@ export interface PluginStateStoreOptions {
 }
 
 function defaultPath(): string {
-  const agentHome = process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? process.env.HOME ?? homedir(), ".pi", "agent");
-  return join(agentHome, "openbuddy-plugins.json");
+  return agentPath("openbuddy-plugins.json");
 }
 
 function defaultRead(path: string): () => Promise<PluginStateSnapshot | null> {

@@ -18,6 +18,7 @@
  *   - 来自 profile/* + deepseek/* + @openbuddy/plugin-host 的工具/类型 import 走
  *     相对路径 (../../../deepseek/...、../../../@openbuddy/plugin-host)
  */
+import { agentHome } from "@openbuddy/storage";
 import { join } from "node:path";
 
 import { type PluginBundle, type PluginEntryOptions, DeepSeekCordisRuntime, type DeepSeekCordisPluginEntry, type DeepSeekCordisRuntimeSnapshot } from "@openbuddy/plugin-host";
@@ -47,7 +48,7 @@ let promptSubagent: (
 	parts: readonly unknown[],
 ) => Promise<unknown> = async () => undefined;
 let interruptSubagent: (parentSessionId: string, childSessionId: string) => Promise<unknown> = async () => undefined;
-let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd();
+let piHome: () => string = () => agentHome();
 let profileArtifactModuleUrl: (id: string) => string = (id) => id;
 
 export function installDeepSeekCordisRuntime(deps: {

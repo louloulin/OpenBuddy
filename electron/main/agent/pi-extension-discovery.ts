@@ -84,11 +84,11 @@ function nodeModulesRoots(): string[] {
   } catch {
     // ignore
   }
-  // `~/.pi/agent/node_modules` is the recommended per-user install root
+  // `~/.openbuddy/agent/node_modules` is the recommended per-user install root
   // for system-wide pi extensions.
   try {
     const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    if (home) roots.add(join(home, ".pi", "agent", "node_modules"));
+    if (home) roots.add(join(home, ".openbuddy", "agent", "node_modules"));
   } catch {
     // ignore
   }

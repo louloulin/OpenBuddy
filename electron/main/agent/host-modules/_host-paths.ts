@@ -14,22 +14,21 @@
  *
  * 设计:
  *   - 纯函数, 无 module-level mutable
- *   - `piHome()` 返回 `~/.pi/agent` (即 OpenBuddy 的 pi home), 与
- *     agent-home.ts 的逻辑一致
+ *   - `piHome()` 返回 `~/.openbuddy/agent`, 布局由 @openbuddy/storage 的
+ *     `agentHome()` 单点决定
  *   - `isPathWithin()` / `piSessionDir()` 等保持原有签名, call site 一行不改
  */
 
-import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { agentHome } from "../agent-home";
+import { agentHome } from "@openbuddy/storage";
 
 /**
- * Returns the absolute path to OpenBuddy's pi home (~/.pi/agent).
+ * Returns the absolute path to OpenBuddy's agent home (~/.openbuddy/agent).
  *
  * Used by every disk-touching helper in the host: auth.json, models.json,
- * openbuddy-events.jsonl, marketplace caches, etc. Centralizing it here
- * means a future migration to a different base directory is one edit.
+ * openbuddy-events.jsonl, marketplace caches, etc. The layout itself is owned
+ * by `@openbuddy/storage`; this is the host-side alias for it.
  */
 export function piHome(): string {
   return agentHome();
@@ -56,12 +55,4 @@ export function isPathWithin(root: string, candidate: string): boolean {
 export function piSessionDir(cwd: string): string {
   const encoded = resolve(cwd).replace(/^[/\\]/, "").replace(/[\\/:]/g, "-");
   return join(piHome(), "sessions", `--${encoded}--`);
-}
-
-/**
- * Convenience for code that already has `homedir()` cached — keeps the
- * homedir() call out of hot paths.
- */
-export function userHome(): string {
-  return homedir();
 }

@@ -1,3 +1,4 @@
+import { agentHome } from "@openbuddy/storage";
 import { createHash, randomUUID } from "node:crypto";
 import { copyFile, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -52,7 +53,7 @@ interface ImportJournal {
 const previews = new Map<string, WorkBuddyImportPreview>();
 
 function piRoot(): string {
-	return process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent");
+	return agentHome();
 }
 
 export function workbuddyDefaultRoot(): string {

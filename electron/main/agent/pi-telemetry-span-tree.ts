@@ -25,7 +25,7 @@ export const SPAN_TREE_ENV_FLAG = "OPENBUDDY_SPAN_TREE_EXPORTER";
 export interface CreateSpanTreeExporterOptions {
   /**
    * Path to the JSONL output file. Defaults to
-   * `~/.pi/openbuddy/span-tree.jsonl`. The directory is created on
+   * `~/.openbuddy/span-tree.jsonl`. The directory is created on
    * first write if it does not exist.
    */
   outputPath?: string;
@@ -33,7 +33,7 @@ export interface CreateSpanTreeExporterOptions {
 
 function defaultSpanTreePath(): string {
   const home = process.env.PI_HOME ?? os.homedir();
-  return join(home, ".pi", "openbuddy", "span-tree.jsonl");
+  return join(home, ".openbuddy", "span-tree.jsonl");
 }
 
 /** Returns true when the user has opted into the span-tree exporter. */

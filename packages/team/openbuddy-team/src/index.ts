@@ -8,8 +8,9 @@
  * Promise.all. They share Pi's auth + extension host but have isolated
  * message contexts (recursion guard: members do NOT get the team-tools).
  *
- * Storage: ~/.pi/agent/openbuddy-teams.json
+ * Storage: ~/.openbuddy/agent/openbuddy-teams.json
  */
+import { agentHome } from "@openbuddy/storage";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
@@ -69,7 +70,7 @@ type TeamContext = {
 }
 
 function teamsFile(): string {
-	return join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent"), "openbuddy-teams.json")
+	return join(agentHome(), "openbuddy-teams.json")
 }
 
 async function readTeams(file = teamsFile()): Promise<TeamsFile> {

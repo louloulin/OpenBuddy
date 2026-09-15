@@ -35,7 +35,7 @@ import type { Model } from "@earendil-works/pi-ai";
 import { createPiPlanModeExtension } from "./pi-plan-mode";
 import { formatBranchSummaryText as formatBranchSummaryTextExport } from "./branch-summary-format";
 import { Context } from "@openbuddy/cordis";
-import { HarnessCursorStore } from "@openbuddy/storage";
+import { HarnessCursorStore, agentHome } from "@openbuddy/storage";
 import {
   HarnessPluginLoader,
   composePluginPatches,
@@ -237,7 +237,7 @@ export const state: AgentHostState = {
   // `ExtensionRunner` owns the active contribution surface), so we
   // simply pass an empty-list closure to keep the call-site uniform.
   remoteDispatcher: new RemoteDispatcher(() => []),
-  attachmentStore: new SessionAttachmentStore(join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent"), "openbuddy-attachments")),
+  attachmentStore: new SessionAttachmentStore(join(agentHome(), "openbuddy-attachments")),
 };
 
 // v6-G M1 收尾: module-load 时把 state 注入 lifecycle-public / dsh-bridge-helpers

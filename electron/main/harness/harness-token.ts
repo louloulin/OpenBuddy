@@ -1,10 +1,11 @@
+import { agentHome } from "@openbuddy/storage";
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 export function defaultHarnessTokenPath(): string {
-	const home = process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent");
+	const home = agentHome();
 	return join(home, "openbuddy-harness-token");
 }
 

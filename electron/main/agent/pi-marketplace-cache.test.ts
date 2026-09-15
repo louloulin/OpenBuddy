@@ -94,7 +94,7 @@ describe("marketplaceScan cache guard", () => {
       ]),
     );
     // Cache file should not have been written on the default path.
-    const cachePath = join(home, ".pi", "agent", "marketplace-cache.json");
+    const cachePath = join(home, ".openbuddy", "agent", "marketplace-cache.json");
     await expect(
       import("node:fs/promises").then(({ access }) => access(cachePath).then(() => "ok").catch((err: NodeJS.ErrnoException) => err.code)),
     ).resolves.toBe("ENOENT");
@@ -128,7 +128,7 @@ describe("marketplaceScan cache guard", () => {
     const { fetchImpl, calls } = await makeFakeFetch(() => page1);
 
     await resources.marketplaceScan({ force: true, maxPages: 1, fetchImpl });
-    const cachePath = join(home, ".pi", "agent", "marketplace-cache.json");
+    const cachePath = join(home, ".openbuddy", "agent", "marketplace-cache.json");
     const cacheRaw = await readFile(cachePath, "utf8");
     const cache = JSON.parse(cacheRaw) as { caches: Array<{ sourceUrl: string; fetchedAt: string; entries: Array<Record<string, string>>; totalPackages?: number }> };
     expect(cache.caches.length).toBe(1);
@@ -188,7 +188,7 @@ describe("marketplaceScan cache guard", () => {
       resources.marketplaceScan({ force: true, maxPages: 2, fetchImpl }),
     ).resolves.toMatchObject({ sources: expect.any(Array) });
 
-    const cachePath = join(home, ".pi", "agent", "marketplace-cache.json");
+    const cachePath = join(home, ".openbuddy", "agent", "marketplace-cache.json");
     const cacheRaw = await readFile(cachePath, "utf8");
     const cache = JSON.parse(cacheRaw) as { caches: Array<{ sourceUrl: string; entries: unknown[] }> };
     expect(cache.caches[0]?.sourceUrl).toBe("https://pi.dev/packages");

@@ -17,7 +17,7 @@ async function setup(home: string, plugin = "demo") {
   await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: plugin, version: "1.0.0" }));
   const resources = await import("../pi-resources");
   await resources.marketplaceAddSource(source);
-  return { resources, source, pluginRoot, targetRoot: join(home, ".pi", "agent", "plugins", plugin) };
+  return { resources, source, pluginRoot, targetRoot: join(home, ".openbuddy", "agent", "plugins", plugin) };
 }
 
 describe("marketplace transaction safety", () => {
@@ -27,7 +27,7 @@ describe("marketplace transaction safety", () => {
     await resources.marketplaceAction({ type: "install", sourceUrlOrPath: source, pluginRelativePath: "demo" });
     await writeFile(join(targetRoot, "version.txt"), "old-version"); await writeFile(join(pluginRoot, "package.json"), "not-json");
     await expect(resources.marketplaceAction({ type: "install", sourceUrlOrPath: source, pluginRelativePath: "demo" })).rejects.toThrow();
-    await expect(readFile(join(home, ".pi", "agent", "marketplace-installed.json"), "utf8")).resolves.toContain("demo");
+    await expect(readFile(join(home, ".openbuddy", "agent", "marketplace-installed.json"), "utf8")).resolves.toContain("demo");
     await expect(readFile(join(targetRoot, "version.txt"), "utf8")).resolves.toBe("old-version");
     await expect(readFile(join(targetRoot, ".openbuddy-marketplace-managed.json"), "utf8")).resolves.toContain('"version": 1');
   });
@@ -50,6 +50,6 @@ describe("marketplace transaction safety", () => {
     await (await import("node:fs/promises")).rm(join(targetRoot, ".openbuddy-marketplace-managed.json"));
     await expect(resources.marketplaceAction({ type: "uninstall", sourceUrlOrPath: source, pluginRelativePath: "unmanaged" })).rejects.toThrow(/managed/i);
     await expect(lstat(targetRoot)).resolves.toBeDefined();
-    await expect(readFile(join(home, ".pi", "agent", "marketplace-installed.json"), "utf8")).resolves.toContain("unmanaged");
+    await expect(readFile(join(home, ".openbuddy", "agent", "marketplace-installed.json"), "utf8")).resolves.toContain("unmanaged");
   });
 });

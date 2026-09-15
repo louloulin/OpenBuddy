@@ -1,14 +1,5 @@
-import { homedir } from "node:os";
 import { join } from "node:path";
-import {
-  RendererStorageGateway,
-  RendererStorageVersionConflictError,
-  type RendererStorageValue,
-} from "@openbuddy/storage";
-
-function agentHome(): string {
-  return process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent");
-}
+import { RendererStorageGateway, RendererStorageVersionConflictError, type RendererStorageValue, agentHome } from "@openbuddy/storage";
 
 function rendererDatabasePath(): string {
   return join(agentHome(), "openbuddy-renderer.sqlite");

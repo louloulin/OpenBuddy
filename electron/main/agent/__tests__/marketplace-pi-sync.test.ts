@@ -78,7 +78,7 @@ describe("Phase I.2: marketplace install/uninstall sync profile.piExtensions", (
 
     // The profile package.json now declares the spec, mirrored in both
     // openbuddy + dsh namespaces (dual-namespace mirror from Phase I.1).
-    const profilePath = join(home, ".pi", "agent", "profiles", "desktop", "package.json");
+    const profilePath = join(home, ".openbuddy", "agent", "profiles", "desktop", "package.json");
     const written = JSON.parse(await readFile(profilePath, "utf8"));
     expect(written.openbuddy.profile.piExtensions).toEqual([
       expect.objectContaining({
@@ -120,7 +120,7 @@ describe("Phase I.2: marketplace install/uninstall sync profile.piExtensions", (
     expect(uninstallResult.capability).toBe("mcp");
 
     // Spec is gone from both namespaces.
-    const profilePath = join(home, ".pi", "agent", "profiles", "desktop", "package.json");
+    const profilePath = join(home, ".openbuddy", "agent", "profiles", "desktop", "package.json");
     const written = JSON.parse(await readFile(profilePath, "utf8"));
     expect(written.openbuddy.profile.piExtensions ?? []).toEqual([]);
     expect(written.dsh.profile.piExtensions ?? []).toEqual([]);
@@ -152,7 +152,7 @@ describe("Phase I.2: marketplace install/uninstall sync profile.piExtensions", (
     // Either the profile file was never created (no-op path) or it exists
     // with an empty piExtensions array — both prove the marketplace layer
     // didn't write any spec.
-    const profilePath = join(home, ".pi", "agent", "profiles", "desktop", "package.json");
+    const profilePath = join(home, ".openbuddy", "agent", "profiles", "desktop", "package.json");
     let piExtensions: unknown = undefined;
     try {
       const written = JSON.parse(await readFile(profilePath, "utf8"));

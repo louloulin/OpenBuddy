@@ -6,29 +6,19 @@
  * needs — e.g. `skills.ts` doesn't drag in the SessionManager native binding
  * from `memory.ts`.
  *
- * P2-13 stage 2: `agentHome()` is inlined here instead of imported from
- * `../agent-home.ts`. The original is kept for the 2 other importers
- * (pi-package-installed.ts, _host-paths.ts) but this module now has ZERO
- * relative `.ts` source deps — so when `inlineDynamicImports` is flipped
- * off, sub-modules can be split into independent lazy chunks that Node ESM
- * can load at runtime (no `.ts` resolution required).
+ * Path resolution delegates to `@openbuddy/storage` — a package import, so this
+ * module keeps its "no relative source deps" property while sharing the one
+ * canonical agent-home resolver.
  */
-import { homedir } from "node:os";
 import { mkdir, readFile, readdir, realpath, rename, writeFile } from "node:fs/promises";
 import { isAbsolute, dirname, join, relative, resolve } from "node:path";
-import { McpAuthStore, McpRegistry, createPlatformSecretStore } from "@openbuddy/storage";
+import { McpAuthStore, McpRegistry, agentHome, createPlatformSecretStore } from "@openbuddy/storage";
 
-// Inlined from ../agent-home.ts — same logic, no relative `.ts` dep.
-// Keep the original in ../agent-home.ts for the 2 other importers.
-export function agentHome(): string {
-  return process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent");
-}
+export { agentHome };
 
 export function piRoot(): string {
-  // Mirrors the legacy root used by piHome() in agent-host.ts. The workbench
-  // path resolution (workbenchPiHome) is intentionally not used here because
-  // the same path must serve both Pi session files (legacy) and MCP config
-  // (new) for any PI_CODING_AGENT_DIR override to work as documented.
+  // The same root must serve both Pi session files (legacy) and MCP config
+  // (new) so any agent-home override applies uniformly.
   return agentHome();
 }
 

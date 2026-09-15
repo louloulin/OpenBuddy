@@ -3,7 +3,7 @@ import os from "node:os"
 import path from "node:path"
 import type { Context } from "@openbuddy/cordis"
 import { OpenBuddyService } from "@openbuddy/cordis"
-import { CalendarCatalog } from "@openbuddy/storage"
+import { CalendarCatalog, agentHome } from "@openbuddy/storage";
 
 export type CalendarEventId = string
 export type CalendarEventStatus = "confirmed" | "tentative" | "cancelled"
@@ -60,7 +60,7 @@ export interface CalendarListInput {
 }
 
 function homeDir(): string {
-	return process.env.PI_CODING_AGENT_DIR ?? path.join(process.env.PI_HOME ?? os.homedir(), ".pi", "agent")
+	return agentHome()
 }
 
 function storePath(): string {

@@ -30,7 +30,7 @@ import { type AgentHostState } from "./_state-shape";
 import { createDefaultAgentHostState } from "./_default-state";
 
 let state: AgentHostState = createDefaultAgentHostState();
-let piHome: () => string = () => process.env.PI_HOME ?? process.env.PI_CODING_AGENT_DIR ?? homedir();
+let piHome: () => string = _piHome;
 let isPathWithin: (root: string, candidate: string) => boolean = () => false;
 
 /**

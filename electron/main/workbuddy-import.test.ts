@@ -66,13 +66,13 @@ describe("WorkBuddy import service", () => {
     const result = await importer.confirmWorkBuddyImport(preview.previewToken);
     expect(result.autoActivated).toBe(false);
     expect(result.status).toBe("installed");
-    const installed = join(home, ".pi", "agent", "workbuddy-experts", "citongshuopro");
+    const installed = join(home, ".openbuddy", "agent", "workbuddy-experts", "citongshuopro");
     await expect(readFile(join(installed, "plugin.json"), "utf8")).resolves.not.toContain("apiToken");
     await expect(stat(join(installed, "agents", "lead.md"))).resolves.toBeTruthy();
-    await expect(stat(join(home, ".pi", "agent", "workbuddy-experts", "_meta", "_expert_center.json"))).resolves.toBeTruthy();
+    await expect(stat(join(home, ".openbuddy", "agent", "workbuddy-experts", "_meta", "_expert_center.json"))).resolves.toBeTruthy();
     const resources = await import("./agent/pi-resources");
-    await expect(resources.expertDefaultRoot("/tmp/openbuddy-import-test")).resolves.toBe(join(home, ".pi", "agent", "workbuddy-experts"));
-    await expect(resources.listExpertCatalog(join(home, ".pi", "agent", "workbuddy-experts"))).resolves.toMatchObject({ experts: [{ plugin: "citongshuopro", type: "team", agentName: "lead" }] });
+    await expect(resources.expertDefaultRoot("/tmp/openbuddy-import-test")).resolves.toBe(join(home, ".openbuddy", "agent", "workbuddy-experts"));
+    await expect(resources.listExpertCatalog(join(home, ".openbuddy", "agent", "workbuddy-experts"))).resolves.toMatchObject({ experts: [{ plugin: "citongshuopro", type: "team", agentName: "lead" }] });
 
     const repeatPreview = await importer.previewWorkBuddyImport(source, "citongshuopro");
     expect(repeatPreview.disposition).toBe("same");

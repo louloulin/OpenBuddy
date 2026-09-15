@@ -194,7 +194,7 @@ describe("OpenBuddy Pi package resource loading", () => {
     const root = await mkdtemp(join(tmpdir(), "openbuddy-marketplace-lifecycle-"));
     const previousPiHome = process.env.PI_HOME;
     const previousPiAgent = process.env.PI_CODING_AGENT_DIR;
-    const pluginRoot = join(root, ".pi", "agent", "plugins", "lifecycle-fixture");
+    const pluginRoot = join(root, ".openbuddy", "agent", "plugins", "lifecycle-fixture");
     const cwd = join(root, "workspace");
     const agentDir = join(root, "agent");
     await mkdir(join(pluginRoot, "extensions"), { recursive: true });

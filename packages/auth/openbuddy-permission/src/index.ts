@@ -5,6 +5,7 @@
  * Pi-native settings.json permission block. Supports compact
  * `Tool(pattern)` and structured `{action, tool, pattern}` forms.
  */
+import { agentPath } from "@openbuddy/storage";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
@@ -58,8 +59,7 @@ interface PiSettings {
 }
 
 function settingsPath(): string {
-	const agentHome = process.env.PI_CODING_AGENT_DIR ?? path.join(process.env.PI_HOME ?? os.homedir(), ".pi", "agent")
-	return path.join(agentHome, "settings.json")
+	return agentPath("settings.json")
 }
 
 async function readSettings(): Promise<PiSettings> {

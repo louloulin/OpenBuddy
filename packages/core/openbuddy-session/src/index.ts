@@ -8,7 +8,7 @@
  *   - Consumer:           renderer via IPC; tool plugins via ctx.<consumer>
  *
  * Sessions are sourced from:
- *   Pi JSONL tree — ~/.pi/agent/sessions/<encoded-cwd>/*.jsonl
+ *   Pi JSONL tree — ~/.openbuddy/agent/sessions/<encoded-cwd>/*.jsonl
  *
  * OpenBuddy-only metadata (pinned / archived / expert bindings) is owned by
  * the SQLite session catalog; ~/.pi/openbuddy-state.json remains a compatibility
@@ -19,7 +19,7 @@ import os from "node:os"
 import path from "node:path"
 import type { Context } from "@openbuddy/cordis"
 import { OpenBuddyService, brand, type Branded } from "@openbuddy/cordis"
-import { closeStorage, openStorage, PiSessionCatalogAdapter, SessionCatalog, type OpenStorageResult } from "@openbuddy/storage"
+import { closeStorage, openStorage, PiSessionCatalogAdapter, SessionCatalog, type OpenStorageResult, agentHome, agentPath } from "@openbuddy/storage";
 
 export type SessionId = Branded<"SessionId">
 export type WorkspaceCwd = Branded<"WorkspaceCwd">
@@ -60,8 +60,7 @@ class SessionStorageUnavailableError extends Error {
 }
 
 function statePath(): string {
-	const agentHome = process.env.PI_CODING_AGENT_DIR ?? path.join(process.env.PI_HOME ?? os.homedir(), ".pi", "agent")
-	return path.join(agentHome, "openbuddy-state.json")
+	return agentPath("openbuddy-state.json")
 }
 
 async function readState(): Promise<StateFile> {
@@ -88,8 +87,7 @@ async function writeState(state: StateFile): Promise<void> {
 }
 
 function piAgentRoot(): string {
-	const agentHome = process.env.PI_CODING_AGENT_DIR ?? path.join(process.env.PI_HOME ?? os.homedir(), ".pi", "agent")
-	return agentHome
+	return agentHome()
 }
 
 async function sessionFiles(root: string): Promise<string[]> {
@@ -117,8 +115,7 @@ export class Session extends OpenBuddyService {
 	#storage: Promise<OpenStorageResult> | undefined
 
 	#storagePath(): string {
-		const agentHome = process.env.PI_CODING_AGENT_DIR ?? path.join(process.env.PI_HOME ?? os.homedir(), ".pi", "agent")
-		return path.join(agentHome, "openbuddy.sqlite")
+		return agentPath("openbuddy.sqlite")
 	}
 
 	async #catalog(): Promise<SessionCatalog> {

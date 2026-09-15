@@ -20,6 +20,7 @@
  *     3884 中后两者被删除, 但 line 3404 实现还在; 实际 wrapper import 替换
  *     实际函数, 行为不变)
  */
+import { agentHome } from "@openbuddy/storage";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -45,7 +46,7 @@ import type { ProviderConfig, ModelConfig } from "./bootstrap/agent-host-types";
 
 let state: AgentHostState = createDefaultAgentHostState();
 let emitRendererEvent: (channel: string, payload: unknown) => void = () => undefined;
-let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd(); // fallback kept for back-compat; init will replace with real agentHome()
+let piHome: () => string = () => agentHome(); // fallback kept for back-compat; init will replace with the injected piHome
 let readModelsConfig: () => Promise<{ providers: Record<string, unknown> }> = async () => ({ providers: {} });
 
 export function installAgentModel(deps: {

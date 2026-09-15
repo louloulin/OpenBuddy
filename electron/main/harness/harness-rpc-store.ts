@@ -1,3 +1,4 @@
+import { agentHome } from "@openbuddy/storage";
 import { createHash, randomUUID } from "node:crypto";
 import { chmod, mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -67,7 +68,7 @@ export class HarnessRpcRevisionConflict extends Error {
 }
 
 export function defaultHarnessRpcCachePath(): string {
-	const home = process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent");
+	const home = agentHome();
 	return join(home, "openbuddy-harness-rpc-cache.json");
 }
 

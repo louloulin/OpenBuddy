@@ -83,7 +83,7 @@ describe("Pi resource adapters", () => {
     await expect(resources.listPlugins()).resolves.toMatchObject([{ name: "demo", agentCount: 1, skillCount: 1 }]);
     await resources.marketplaceAction({ type: "uninstall", sourceUrlOrPath: source, pluginRelativePath: "demo" });
     await expect(resources.listPlugins()).resolves.toEqual([]);
-    await expect(readFile(join(home, ".pi", "agent", "marketplaces.json"), "utf8")).resolves.toContain(source);
+    await expect(readFile(join(home, ".openbuddy", "agent", "marketplaces.json"), "utf8")).resolves.toContain(source);
 	});
 
 	it("supports Harness candidate files, local overlays, and configured source limits", async () => {
@@ -138,7 +138,7 @@ describe("Pi resource adapters", () => {
 		const home = await mkdtemp(join(tmpdir(), "openbuddy-market-hooks-"));
 		process.env.PI_HOME = home;
 		delete process.env.PI_CODING_AGENT_DIR;
-		const pluginRoot = join(home, ".pi", "agent", "plugins", "declared-hooks");
+		const pluginRoot = join(home, ".openbuddy", "agent", "plugins", "declared-hooks");
 		await mkdir(pluginRoot, { recursive: true });
 		await writeFile(join(pluginRoot, "package.json"), JSON.stringify({
 			name: "declared-hooks",
@@ -221,7 +221,7 @@ describe("Pi resource adapters", () => {
     await resources.mcpAuthStoreCredential("local", { accessToken: "secret-token", refreshToken: "refresh-token", expiresIn: 3600 });
     await expect(resources.mcpAuthStatus(project)).resolves.toEqual([]);
     await expect(resources.mcpAuthCredential("local")).resolves.toMatchObject({ accessToken: "secret-token" });
-		await expect(readFile(join(home, ".pi", "agent", "mcp-auth.json"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+		await expect(readFile(join(home, ".openbuddy", "agent", "mcp-auth.json"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
 	});
 
 	it("writes MCP mutations to the owning project or global scope", async () => {
@@ -234,7 +234,7 @@ describe("Pi resource adapters", () => {
 		await mkdir(join(project, ".pi"), { recursive: true });
 		await writeFile(join(project, ".pi", "mcp.json"), JSON.stringify({ mcpServers: { project: { command: "project" } } }));
 		await resources.mcpUpsert("project", { command: "project-updated" }, project);
-		await expect(readFile(join(home, ".pi", "agent", "mcp.json"), "utf8")).resolves.toContain('"global"');
+		await expect(readFile(join(home, ".openbuddy", "agent", "mcp.json"), "utf8")).resolves.toContain('"global"');
 		await expect(readFile(join(project, ".pi", "mcp.json"), "utf8")).resolves.toContain('"project"');
 		await resources.mcpToggle("project", false, project);
 		await resources.mcpDelete("project", project);
@@ -246,7 +246,7 @@ describe("Pi resource adapters", () => {
     const project = await mkdtemp(join(tmpdir(), "openbuddy-marketplace-mcp-project-"));
     process.env.PI_HOME = home;
     delete process.env.PI_CODING_AGENT_DIR;
-    const pluginRoot = join(home, ".pi", "agent", "plugins", "market-mcp");
+    const pluginRoot = join(home, ".openbuddy", "agent", "plugins", "market-mcp");
     await mkdir(pluginRoot, { recursive: true });
     await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "market-mcp", version: "1.0.0" }));
     await writeFile(join(pluginRoot, "mcp.json"), JSON.stringify({ mcpServers: { bundled: { command: "market-command" }, shared: { command: "market-shared" } } }));
@@ -257,7 +257,7 @@ describe("Pi resource adapters", () => {
       shared: { command: "market-shared" },
     } });
     await resources.mcpConfigSave(JSON.stringify(await resources.mcpConfigRead(project)));
-    await expect(readFile(join(home, ".pi", "agent", "mcp.json"), "utf8")).resolves.not.toContain("market-command");
+    await expect(readFile(join(home, ".openbuddy", "agent", "mcp.json"), "utf8")).resolves.not.toContain("market-command");
     await resources.mcpConfigSave(JSON.stringify({ mcpServers: { shared: { command: "user-shared" } } }));
     await mkdir(join(project, ".pi"), { recursive: true });
     await writeFile(join(project, ".pi", "mcp.json"), JSON.stringify({ mcpServers: { shared: { command: "project-shared" } } }));
@@ -265,7 +265,7 @@ describe("Pi resource adapters", () => {
       expect.objectContaining({ name: "bundled", source: "marketplace:market-mcp", target: "market-command" }),
       expect.objectContaining({ name: "shared", source: "project", target: "project-shared" }),
     ]));
-    await expect(readFile(join(home, ".pi", "agent", "mcp.json"), "utf8")).resolves.toBe(JSON.stringify({ mcpServers: { shared: { command: "user-shared" } } }, null, 2) + "\n");
+    await expect(readFile(join(home, ".openbuddy", "agent", "mcp.json"), "utf8")).resolves.toBe(JSON.stringify({ mcpServers: { shared: { command: "user-shared" } } }, null, 2) + "\n");
   });
 
   it("links expert agent prompts into the Pi agent directory", async () => {
@@ -277,7 +277,7 @@ describe("Pi resource adapters", () => {
     await mkdir(join(root, "plugin", "agents"), { recursive: true });
     await writeFile(join(root, "plugin", "agents", "reviewer.md"), "---\ndescription: Review\n---\nReview the change.\n");
     await expect(resources.linkExpertAgents(root, "plugin", ["reviewer"])).resolves.toBe(1);
-    await expect(readFile(join(home, ".pi", "agent", "agents", "reviewer.md"), "utf8")).resolves.toContain("Review the change.");
+    await expect(readFile(join(home, ".openbuddy", "agent", "agents", "reviewer.md"), "utf8")).resolves.toContain("Review the change.");
     await expect(resources.linkExpertAgents(root, "plugin", ["../escape"])).rejects.toThrow("invalid resource name");
   });
 
@@ -288,7 +288,7 @@ describe("Pi resource adapters", () => {
     delete process.env.PI_CODING_AGENT_DIR;
     const resources = await loadResources();
     const sessionId = "01a04373-374a-796c-bdbb-ecd1d67056ee";
-    const sessionRoot = join(home, ".pi", "agent");
+    const sessionRoot = join(home, ".openbuddy", "agent");
     await mkdir(sessionRoot, { recursive: true });
     await writeFile(join(sessionRoot, "session.jsonl"), `${JSON.stringify({ type: "session", version: 3, id: sessionId, timestamp: new Date().toISOString(), cwd })}\n${JSON.stringify({ type: "message", id: "message-1", parentId: null, timestamp: new Date().toISOString(), message: { role: "user", content: "lifecycle smoke", timestamp: Date.now() } })}\n`);
     await expect(resources.searchSessions("lifecycle smoke", cwd)).resolves.toEqual(expect.arrayContaining([
@@ -304,7 +304,7 @@ describe("Pi resource adapters", () => {
     delete process.env.PI_CODING_AGENT_DIR;
     const resources = await loadResources();
     const sessionId = "01a04373-374a-796c-bdbb-ecd1d67056f0";
-    const sessionRoot = join(home, ".pi", "agent");
+    const sessionRoot = join(home, ".openbuddy", "agent");
     const timestamp = new Date().toISOString();
     const entries = [
       { type: "message", id: "message-1", parentId: null, timestamp, message: { role: "user", content: "first", timestamp: Date.now() } },
@@ -336,7 +336,7 @@ describe("Pi resource adapters", () => {
     delete process.env.PI_CODING_AGENT_DIR;
     const resources = await loadResources();
     const sessionId = "01a04373-374a-796c-bdbb-rewind0001";
-    const sessionRoot = join(home, ".pi", "agent");
+    const sessionRoot = join(home, ".openbuddy", "agent");
     const timestamp = new Date().toISOString();
     const sessionPath = join(sessionRoot, "session-rewind.jsonl");
     await mkdir(sessionRoot, { recursive: true });
@@ -404,7 +404,7 @@ describe("Pi resource adapters", () => {
     delete process.env.PI_CODING_AGENT_DIR;
     const resources = await loadResources();
     const sessionId = "01a04373-374a-796c-bdbb-rewind0002";
-    const sessionRoot = join(home, ".pi", "agent");
+    const sessionRoot = join(home, ".openbuddy", "agent");
     const timestamp = new Date().toISOString();
     const sessionPath = join(sessionRoot, "session-rewind-overflow.jsonl");
     await mkdir(sessionRoot, { recursive: true });

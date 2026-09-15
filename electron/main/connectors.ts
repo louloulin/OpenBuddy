@@ -1,3 +1,4 @@
+import { agentPath } from "@openbuddy/storage";
 import { spawn, type ChildProcess } from "node:child_process";
 import { access, readFile, readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -77,12 +78,11 @@ async function fileIfExists(file: string): Promise<string | undefined> {
 }
 
 export function candidateRoots(cwd: string): string[] {
-  const scopedPiRoot = process.env.PI_CODING_AGENT_DIR?.trim();
   const enterpriseScope = Boolean(process.env.OPENBUDDY_WORKBENCH_SCOPE?.trim() && process.env.OPENBUDDY_WORKBENCH_SCOPE !== "local");
   const roots = [
     process.env.OPENBUDDY_CONNECTORS_DIR,
-    scopedPiRoot ? join(scopedPiRoot, "connectors-marketplace") : undefined,
-    scopedPiRoot ? join(scopedPiRoot, "connectors") : undefined,
+    agentPath("connectors-marketplace"),
+    agentPath("connectors"),
     join(resolve(cwd), ".pi", "connectors"),
     ...(enterpriseScope ? [] : [
       join(process.env.PI_HOME ?? homedir(), ".workbuddy", "connectors-marketplace"),

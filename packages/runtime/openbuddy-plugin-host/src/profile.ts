@@ -1,3 +1,4 @@
+import { agentHome } from "@openbuddy/storage";
 import { access, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -141,7 +142,7 @@ const DEFAULT_PROFILE_PACKAGE = (name: string): string => `${JSON.stringify({
 const DEFAULT_PROFILE_PATCH = "# OpenBuddy user patch layer; applied after profile bundles.\n[]\n";
 
 export function defaultOpenBuddyProfileHome(): string {
-  return process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent");
+  return agentHome();
 }
 
 function validateProfileName(name: string): void {

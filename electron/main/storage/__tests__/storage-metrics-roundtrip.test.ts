@@ -17,7 +17,7 @@ import { closeStorage, openStorage, storageMetricsRegistry } from "@openbuddy/st
 import { recentStorageMetrics } from "../workspace-bootstrap";
 
 function databasePath(): string {
-  return join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent"), "openbuddy.sqlite");
+  return join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".openbuddy", "agent"), "openbuddy.sqlite");
 }
 
 describe("Agent storage metrics IPC roundtrip (real SQLite)", () => {

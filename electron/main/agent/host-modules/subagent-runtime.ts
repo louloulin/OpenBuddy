@@ -37,7 +37,7 @@ import { createDefaultAgentHostState } from "./_default-state";
 import type { HostJobRecord, PiPromptContentPart } from "./_state-shape";
 
 let state: AgentHostState = createDefaultAgentHostState();
-let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? process.cwd();
+let piHome: () => string = _piHome;
 let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
 let emitRendererEvent: (channel: string, payload: unknown) => void = () => undefined;
 let ensureContinuableSubagent: (

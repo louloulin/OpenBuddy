@@ -1,3 +1,4 @@
+import { agentHome } from "@openbuddy/storage";
 import { cp, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import crossSpawn from "cross-spawn";
 import { createRequire } from "node:module";
@@ -876,7 +877,7 @@ export async function ensureDefaultPiPackages(options: {
 } = {}): Promise<DefaultPiPackageResult[]> {
   const results: DefaultPiPackageResult[] = [];
   const dir = options.profileDir ?? join(
-    process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? osHomedir(), ".pi", "agent"),
+    agentHome(),
     OPENBUDDY_PROFILES_DIR,
     options.profileName ?? "desktop",
   );

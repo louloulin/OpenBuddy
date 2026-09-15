@@ -20,6 +20,7 @@
  *   imports nothing from electron/main/.
  */
 
+import { agentHome } from "@openbuddy/storage";
 import {
   loadSkills as piLoadSkills,
   loadSkillsFromDir as piLoadSkillsFromDir,
@@ -29,16 +30,11 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 /**
- * Default OpenBuddy agent dir.
- *
- * We compute this inline (vs importing `piHome` from
- * `electron/main/agent/host-modules/_host-paths`) because the
- * plugin-host package has no cross-package dependency on the electron
- * main-process internals. `piHome()` returns the user-configured
- * `PI_CODING_AGENT_DIR` env var (or the default `~/.pi/agent`).
+ * Default OpenBuddy agent dir — delegates to the single `@openbuddy/storage`
+ * resolver so the plugin-host never re-derives the layout locally.
  */
 function defaultAgentDir(): string {
-  return process.env.PI_CODING_AGENT_DIR ?? `${process.env.HOME ?? "/root"}/.pi/agent`;
+  return agentHome();
 }
 
 export type { Skill, LoadSkillsResult };

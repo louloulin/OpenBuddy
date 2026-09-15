@@ -1,3 +1,4 @@
+import { agentHome } from "@openbuddy/storage";
 import { Context, OpenBuddyService, symbols } from "@openbuddy/cordis";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
@@ -3535,7 +3536,7 @@ type WorkspaceDocument = {
 };
 
 function workspaceStorePath(): string {
-  const root = process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? process.env.HOME ?? process.cwd(), ".pi", "agent");
+  const root = agentHome();
   return join(root, "dsh-workspaces.json");
 }
 
@@ -3558,6 +3559,21 @@ function workspaceTitle(pathValue: string, title?: string): string {
   // `workspaceTitle(path, "")` throws WorkspaceTitleInvalidError.
   const derived = normalized.slice(separator + 1);
   return derived || normalized || pathValue || "/";
+}
+
+// Append " (N)" to `candidate` until it does not collide with `taken`.
+// Two workspaces whose paths share a basename (e.g. `/appx/pi` and
+// `/Documents/Codex/2026-09-06/pi`) would otherwise both derive title "pi",
+// and the next registry.update() would throw WorkspaceNameConflictError on
+// every listWorkspaces() pass — see P0.5 + follow-up "workspace 'pi' name
+// conflict loop" investigation (2026-09-15).
+function dedupeTitle(candidate: string, taken: ReadonlySet<string>): string {
+  if (!taken.has(candidate)) return candidate;
+  const match = candidate.match(/^(.*?) \((\d+)\)$/u);
+  const base = match ? match[1]! : candidate;
+  let index = match ? Number(match[2]) + 1 : 2;
+  while (taken.has(`${base} (${index})`)) index += 1;
+  return `${base} (${index})`;
 }
 
 class DeepSeekWorkspaceEntity implements DeepSeekWorkspace {
@@ -3651,18 +3667,30 @@ export class DeepSeekWorkspaceRegistryService extends OpenBuddyService {
           : [],
 		};
 		this.revision = 1;
+      // Normalize legacy / corrupted empty titles AND resolve duplicate titles
+      // on load. Two workspaces sharing a basename (e.g. `/appx/pi` and
+      // `/Documents/Codex/2026-09-06/pi`) used to persist with title "pi" for
+      // both; the next attachSession() then threw WorkspaceNameConflictError
+      // on every listWorkspaces() pass. We re-title in load order so the
+      // first workspace keeps its name and later ones get " (N)" suffixes;
+      // we also persist the rewrite so the on-disk file is consistent.
+      const takenTitles = new Set<string>();
       for (const id of order) {
         const stored = this.document.records[id]!;
-        // Normalize legacy / corrupted empty titles on load. A previous build
-        // allowed `workspaceTitle("/")` to return "" which got persisted as
-        // the workspace title; subsequent `registry.update()` then threw
-        // WorkspaceTitleInvalidError because title was explicit-empty.
         const normalizedTitle = typeof stored.title === "string" && stored.title.trim()
           ? stored.title
           : workspaceTitle(stored.path);
-        const normalized: WorkspaceRecord = { ...stored, title: normalizedTitle };
+        const uniqueTitle = dedupeTitle(normalizedTitle, takenTitles);
+        const normalized: WorkspaceRecord = { ...stored, title: uniqueTitle };
         this.document.records[id] = normalized;
         this.entities.set(workspaceId(id), new DeepSeekWorkspaceEntity(this, workspaceId(id), normalized));
+        takenTitles.add(uniqueTitle);
+      }
+      const dirty = Object.entries(this.document.records).some(([id, rec]) => rec.title !== records[id]?.title);
+      if (dirty) {
+        // Persist the rewritten titles so a crash mid-load doesn't leave the
+        // registry in memory / on disk inconsistent.
+        this.writeTail = this.writeTail.then(() => this.persist());
       }
     } catch {
       this.document = { order: [], records: {}, archivedSessionIds: [] };
@@ -3695,9 +3723,30 @@ export class DeepSeekWorkspaceRegistryService extends OpenBuddyService {
     await this.ready();
     const entity = this.entities.get(id);
     if (!entity) throw new Error(`dsh-workspace: unknown workspace '${id}'`);
-    const title = workspaceTitle(record.path, record.title);
-    if ([...this.entities.values()].some((other) => other.id !== id && other.title === title)) {
-      throw new WorkspaceNameConflictError(title);
+    // An undefined `record.title` means the caller didn't pick a name and the
+    // registry is deriving one from `record.path` (basename). When two
+    // workspaces share a basename — e.g. `/appx/pi` vs
+    // `/Documents/Codex/2026-09-06/pi` — the derived title collides and the
+    // previous implementation threw WorkspaceNameConflictError on every
+    // attachSession(). That turns listWorkspaces() into a hot retry loop on
+    // the renderer (workspace/changed fires even though nothing changed,
+    // because the throw aborts the emit before persistence).
+    //
+    // Resolve that case by appending " (N)" automatically so the registry
+    // never trips on auto-derived titles. Explicitly-chosen titles still
+    // throw on conflict — the user typed it, they should see the error.
+    const isAutoDerived = record.title === undefined;
+    const takenTitles = new Set<string>();
+    for (const other of this.entities.values()) {
+      if (other.id !== id) takenTitles.add(other.title);
+    }
+    let title: string;
+    if (isAutoDerived) {
+      const candidate = workspaceTitle(record.path);
+      title = dedupeTitle(candidate, takenTitles);
+    } else {
+      title = workspaceTitle(record.path, record.title);
+      if (takenTitles.has(title)) throw new WorkspaceNameConflictError(title);
     }
     const next = { ...record, title, updatedAt: new Date().toISOString() };
 		this.document.records[id] = next;

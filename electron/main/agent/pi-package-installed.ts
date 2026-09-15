@@ -26,7 +26,7 @@
 import { createRequire } from "node:module";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { agentHome } from "./agent-home";
+import { agentHome } from "@openbuddy/storage";
 
 const projectRoot = resolve(dirname(new URL(import.meta.url).pathname), "..", "..", "..");
 

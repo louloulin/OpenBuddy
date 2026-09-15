@@ -41,7 +41,7 @@ function summariseMcpSnapshot(snapshot: unknown): string {
   const record = asRecord(snapshot);
   if (!record) return "MCP status unavailable";
   const servers = Array.isArray(record.servers) ? record.servers : Array.isArray(record.entries) ? record.entries : [];
-  if (servers.length === 0) return "No MCP servers are configured in ~/.pi/agent/mcp.json.";
+  if (servers.length === 0) return "No MCP servers are configured in ~/.openbuddy/agent/mcp.json.";
   const summary = servers
     .map((entry) => {
       const item = asRecord(entry);
@@ -65,7 +65,7 @@ export async function describeMcpCommand(service: unknown, args: string): Promis
     return `OpenBuddy routes MCP ${verb || "list"} to openbuddy-mcp-client. ${description}`;
   }
   if (verb === "reload") {
-    return "OpenBuddy MCP config reload happens automatically when openbuddy-mcp-client refreshes the ~/.pi/agent/mcp.json snapshot; rerun /mcp list to confirm.";
+    return "OpenBuddy MCP config reload happens automatically when openbuddy-mcp-client refreshes the ~/.openbuddy/agent/mcp.json snapshot; rerun /mcp list to confirm.";
   }
   if (verb === "tools") {
     return "OpenBuddy exposes MCP tools through the openbuddy-mcp-client service; they appear under mcp__<server>__<tool> for the LLM.";
@@ -90,7 +90,7 @@ export async function describePermissionSystemCommand(service: unknown, args: st
     const ruleCount = Array.isArray(rules) ? rules.length : 0;
     return `OpenBuddy permission policy is delegated to openbuddy-permission (mode=${typeof mode === "string" ? mode : "unknown"}, rules=${ruleCount}).`;
   }
-  if (verb === "rules") return "OpenBuddy permission rules are persisted in ~/.pi/agent/settings.json and exposed through openbuddy-permission.readRules/writeRules.";
+  if (verb === "rules") return "OpenBuddy permission rules are persisted in ~/.openbuddy/agent/settings.json and exposed through openbuddy-permission.readRules/writeRules.";
   if (verb === "mode") return "OpenBuddy permission mode is delegated to openbuddy-permission.writeMode; change it from Settings -> Permissions.";
   if (verb === "reload") return "OpenBuddy permission rules reload automatically when the underlying settings.json changes; the next agent turn sees the new policy.";
   return `OpenBuddy does not load pi-permission-system natively; command '/permission-system ${args.trim()}' is delegated to openbuddy-permission.`;
@@ -137,7 +137,7 @@ export async function describeTasksCommand(service: unknown, args: string): Prom
 export async function describeSessionCommand(service: unknown, args: string): Promise<string> {
   const verb = args.trim().split(/\s+/u, 1)[0]?.toLowerCase() ?? "";
   if (!verb || verb === "list") {
-    return "OpenBuddy session ledger is delegated to openbuddy-session; WorkBuddy's Sidebar renders the same set, pinned and archived states round-trip through ~/.pi/agent/sessions.";
+    return "OpenBuddy session ledger is delegated to openbuddy-session; WorkBuddy's Sidebar renders the same set, pinned and archived states round-trip through ~/.openbuddy/agent/sessions.";
   }
   if (verb === "workspaces") return "OpenBuddy workspace discovery is delegated to openbuddy-session.listWorkspaces; groups every cwd in the session store by session count.";
   if (verb === "pin" || verb === "unpin") return `OpenBuddy pin toggle is delegated to openbuddy-session.setPinned; /sessions ${verb} is an alias for setPinned(<id>, ${verb === "pin"}).`;

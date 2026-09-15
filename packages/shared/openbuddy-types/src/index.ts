@@ -416,7 +416,7 @@ export interface ConnectorCliAuthDoneEvent {
   error?: string;
 }
 
-// ---------- experts / assistants (~/.pi/agents/*.md) ----------
+// ---------- experts / assistants (~/.openbuddy/agent/agents/*.md) ----------
 
 /** One agent definition (subagent template). */
 export interface AgentEntry {

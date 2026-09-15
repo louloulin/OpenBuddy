@@ -29,6 +29,7 @@
  *     agent-host.ts, 它们还要被 plugin-state (Batch D) 用, 那里再决定是否
  *     搬走
  */
+import { agentHome } from "@openbuddy/storage";
 import { readdir, open } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -50,7 +51,7 @@ import { type AgentHostState } from "./_state-shape";
 // undefined, 调用时 throw. 修复: 给所有 module-level let 默认 inline lambda,
 // 既不需要 install 也能工作, install 后会被覆盖.
 let state: AgentHostState = createDefaultAgentHostState();
-let piHome: () => string = () => process.env.PI_CODING_AGENT_DIR ?? process.env.PI_HOME ?? join(homedir(), ".pi", "agent");
+let piHome: () => string = () => agentHome();
 let piSessionDir: (cwd: string) => string = (cwd) => "";
 let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
 let listAllPiSessions: <T = unknown>() => any = async () => [];

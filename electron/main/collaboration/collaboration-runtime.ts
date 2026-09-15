@@ -1,3 +1,4 @@
+import { agentHome } from "@openbuddy/storage";
 import {
 	type BuddyEvent,
 	type BuddyExecutionRef,
@@ -570,7 +571,7 @@ export class CollaborationRuntime {
 	private readonly sideEffectIntents = new Map<string, SideEffectIntent>();
 
 	constructor(options: { storagePath?: string; now?: () => Date; localRelay?: BuddyRelayPort & { hasEndpoint?: (identityId: string, scope: RoomScope) => boolean; revokeRoomGrant?: (grantId: string) => void | Promise<void>; setRoomGrantVerifier?: (verify: (grant: FederatedRoomGrant, expected: import("@openbuddy/collaboration-network").FederatedRoomGrantExpectation) => void) => void }; relay?: BuddyRelayPort & { hasEndpoint?: (identityId: string, scope: RoomScope) => boolean; revokeRoomGrant?: (grantId: string) => void | Promise<void>; setRoomGrantVerifier?: (verify: (grant: FederatedRoomGrant, expected: import("@openbuddy/collaboration-network").FederatedRoomGrantExpectation) => void) => void }; relayOutbox?: DurableRelayOutbox; relaySync?: { enabled?: boolean; intervalMs?: number; maxBackoffMs?: number }; relayCapabilitySecret?: string; identity?: BuddyIdentity; scope?: RoomScope; verifyAgentCard?: (card: BuddyAgentCard) => boolean; agentCardTrustStore?: AgentCardTrustStore; grantSigningSecret?: string; grantSigningPrivateKey?: KeyLike } = {}) {
-		this.storagePath = options.storagePath ?? join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.PI_HOME ?? homedir(), ".pi", "agent"), "openbuddy-collaboration", "events.jsonl");
+		this.storagePath = options.storagePath ?? join(agentHome(), "openbuddy-collaboration", "events.jsonl");
 		this.cursorPath = `${this.storagePath}.cursor.json`;
 		this.contractsPath = `${this.storagePath}.contracts.json`;
 		this.workflowsPath = `${this.storagePath}.workflows.json`;
