@@ -1,0 +1,8 @@
+{
+  "schema": "openbuddy.plugin.v1",
+  "name": "openbuddy-plugin-slash",
+  "version": "0.1.0",
+  "description": "示例插件 — openbuddy-plugin-slash",
+  "author": "OpenBuddy Team",
+  "contributes": {}
+}

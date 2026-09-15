@@ -1,0 +1,104 @@
+/**
+ * interactions.css — Phase 6 微交互样式
+ *
+ * 6 个核心 utility 类，对应 React Bits 风格的微交互：
+ *   .wb-press       按钮按下 scale + spring
+ *   .wb-lift        卡片 hover translateY + shadow
+ *   .wb-spring-in   Toast 进入 spring
+ *   .wb-tooltip-pop Tooltip 出现 fade + translateY
+ *   .wb-tab-slide   tab 下划线 spring 滑动
+ *   .wb-collapse    侧边栏 width 过渡
+ *
+ * 所有 utility 在 prefers-reduced-motion: reduce 下退化为瞬时。
+ */
+
+:root {
+  --wb-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --wb-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --wb-duration-fast: 120ms;
+  --wb-duration-base: 200ms;
+  --wb-duration-slow: 320ms;
+}
+
+/* ── 1. 按钮按下 ──────────────────────────────────────────────── */
+.wb-press {
+  transition: transform var(--wb-duration-fast) var(--wb-ease-spring),
+              box-shadow var(--wb-duration-fast) var(--wb-ease-out-expo);
+}
+.wb-press:active {
+  transform: scale(0.97);
+}
+
+/* ── 2. 卡片 hover lift ───────────────────────────────────────── */
+.wb-lift {
+  transition: transform var(--wb-duration-base) var(--wb-ease-out-expo),
+              box-shadow var(--wb-duration-base) var(--wb-ease-out-expo);
+}
+.wb-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* ── 3. Toast 进入 ───────────────────────────────────────────── */
+.wb-spring-in {
+  animation: ob-spring-in var(--wb-duration-slow) var(--wb-ease-spring) both;
+}
+
+/* ── 4. Tooltip 出现 ─────────────────────────────────────────── */
+.wb-tooltip-pop {
+  animation: ob-tooltip-pop var(--wb-duration-fast) var(--wb-ease-out-expo) both;
+}
+
+/* ── 5. Tab 指示器滑动 ───────────────────────────────────────── */
+.wb-tab-slide {
+  transition: transform var(--wb-duration-base) var(--wb-ease-spring),
+              width var(--wb-duration-base) var(--wb-ease-spring);
+}
+
+/* ── 6. 侧边栏折叠 ───────────────────────────────────────────── */
+.wb-collapse {
+  transition: width var(--wb-duration-slow) var(--wb-ease-out-expo),
+              padding var(--wb-duration-slow) var(--wb-ease-out-expo);
+}
+
+/* ── Keyframes ──────────────────────────────────────────────── */
+@keyframes ob-press {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+@keyframes ob-lift {
+  0% { transform: translateY(0); box-shadow: 0 0 0 rgba(0, 0, 0, 0); }
+  100% { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+}
+
+@keyframes ob-spring-in {
+  0% { opacity: 0; transform: translateY(16px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ob-tooltip-pop {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ob-collapse {
+  0% { width: var(--wb-collapse-from, 280px); }
+  100% { width: var(--wb-collapse-to, 64px); }
+}
+
+/* ── Reduced motion 降级 ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .wb-press,
+  .wb-lift,
+  .wb-spring-in,
+  .wb-tooltip-pop,
+  .wb-tab-slide,
+  .wb-collapse {
+    transition: none !important;
+    animation: none !important;
+  }
+  .wb-press:active { transform: none; }
+  .wb-lift:hover { transform: none; box-shadow: 0 0 0 rgba(0, 0, 0, 0); }
+}

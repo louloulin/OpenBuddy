@@ -1,0 +1,95 @@
+/**
+ * errors.css — 错误状态表面样式（Phase 6.5）
+ */
+
+.wb-error-surface {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 24px;
+  border-radius: 12px;
+  background: var(--wb-surface-error, rgba(255, 84, 84, 0.08));
+  border: 1px solid var(--wb-border-error, rgba(255, 84, 84, 0.3));
+  color: var(--wb-text-error, #c43030);
+  text-align: center;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.wb-error-surface__icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.wb-error-surface__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.wb-error-surface__detail {
+  font-size: 14px;
+  opacity: 0.8;
+  margin: 0;
+}
+
+.wb-error-surface__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.wb-error-surface__btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, ease-out);
+}
+.wb-error-surface__btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.wb-error-surface__btn--primary {
+  background: var(--wb-text-error, #c43030);
+  color: white;
+  border-color: transparent;
+}
+.wb-error-surface__btn--primary:hover {
+  background: color-mix(in srgb, var(--wb-text-error, #c43030) 85%, white);
+}
+
+/* 离线 banner */
+.wb-offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: linear-gradient(90deg, #ff9800, #ff5722);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(255, 87, 34, 0.3);
+}
+
+/* 网络错误 */
+.wb-error-surface--network {
+  background: rgba(255, 152, 0, 0.08);
+  border-color: rgba(255, 152, 0, 0.3);
+  color: #c66a00;
+}
+
+/* Agent 死亡 */
+.wb-error-surface--agent-died {
+  background: rgba(156, 39, 176, 0.08);
+  border-color: rgba(156, 39, 176, 0.3);
+  color: #7b1fa2;
+}

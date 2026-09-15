@@ -36,3 +36,10 @@ export { SessionControls } from "./SessionControls";
 export { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
 export type { ShortcutEntry } from "./KeyboardShortcutsDialog";
 export { PlanModeBanner } from "./PlanModeBanner";
+
+export { useShortcut } from "./useShortcut";
+export type { ShortcutOptions } from "./useShortcut";
+export { StartupSplash } from "./StartupSplash";
+export type { StartupSplashProps } from "./StartupSplash";
+export { OnboardingChecklist } from "./OnboardingChecklist";
+export type { OnboardingChecklistProps } from "./OnboardingChecklist";
