@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
+import { memo, useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
 import { GlobalConfirmHost } from "@/components/GlobalConfirmHost";
 import { TitleBar } from "@openbuddy/ui-shell";
 import { Sidebar } from "@openbuddy/ui-sidebar";
@@ -229,7 +229,7 @@ export default function App() {
   );
 }
 
-function Shell() {
+const Shell = memo(function Shell() {
   const [init, setInit] = useState<InitResult | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1754,4 +1754,4 @@ function Shell() {
       <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   );
-}
+});
