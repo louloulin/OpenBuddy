@@ -577,7 +577,11 @@ function MoreDropdown({
         }
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        // Hover already opens the menu (onMouseEnter → openMenu). Toggling here
+        // meant the pointer's own click immediately re-closed it, so the menu
+        // could never be opened with the mouse. Click is idempotent-open;
+        // closing happens on mouse-leave, outside-click, Escape, or item click.
+        onClick={openMenu}
         onFocus={openMenu}
       >
         <WbMoreNavIcon size="md" />

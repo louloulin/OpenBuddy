@@ -143,6 +143,11 @@ interface NavGroup {
   /** Optional nested sub-group rendered as a labelled sub-block inside
    *  the parent group; used for enterprise finance (4 closely-related items). */
   subgroups?: { id: string; label: string; items: NavItem[] }[];
+  /** Render the group as a single flat entry (no collapsible header).
+   *  Used when the group holds exactly one item whose label equals the
+   *  group label — otherwise the nav shows the same word twice in a row
+   *  (e.g. 「关于」 group header followed by a 「关于」 item). */
+  flat?: boolean;
 }
 
 const NAV_GROUPS: NavGroup[] = [
@@ -178,8 +183,9 @@ const NAV_GROUPS: NavGroup[] = [
     id: "about",
     label: "关于",
     icon: HelpCircle,
+    flat: true,
     items: [
-      { id: "help", label: "关于", icon: HelpCircle },
+      { id: "help", label: "关于 OpenBuddy", icon: HelpCircle },
     ],
   },
   {
@@ -421,7 +427,31 @@ export function SettingsPanel({
             {NAV_GROUPS.map((group) => {
               const GroupIcon = group.icon;
               const collapsed = !!collapsedGroups[group.id];
-              return (
+              if (group.flat && group.items.length === 1 && !group.subgroups) {
+                  const only = group.items[0];
+                  const OnlyIcon = only.icon;
+                  return (
+                    <li key={group.id} className="settings-navigation__group settings-navigation__group--flat">
+                      <ul className="settings-navigation__sublist">
+                        <li>
+                          <button
+                            className={
+                              "settings-navigation__item" +
+                              (active === only.id ? " settings-navigation__item--active" : "")
+                            }
+                            onClick={() => setActive(only.id)}
+                          >
+                            <span className="settings-navigation__icon">
+                              <OnlyIcon size={16} strokeWidth={1.75} />
+                            </span>
+                            <span className="settings-navigation__label">{only.label}</span>
+                          </button>
+                        </li>
+                      </ul>
+                    </li>
+                  );
+                }
+                return (
                 <li
                   key={group.id}
                   className={
@@ -493,7 +523,7 @@ export function SettingsPanel({
                     </ul>
                   )}
                 </li>
-              );
+                );
             })}
           </ul>
         </nav>
