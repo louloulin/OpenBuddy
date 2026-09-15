@@ -35,6 +35,18 @@ import { createRpcId, parseRpcMessage, rpcError, rpcValue, RpcId, serverResponse
 import { remoteRequestFromHarnessRequest } from "../harness/harness-remote-request";
 import type { DeepSeekConnectionDispatchContext } from "../deepseek/deepseek-runtime";
 import { describeTypertCatalog } from "../agent/typert-catalog";
+import {
+  addSkill,
+  forkSession,
+  mcpConfigRead,
+  mcpDelete,
+  mcpList,
+  mcpToggle,
+  mcpUpsert,
+  removeSkill,
+  searchSessions,
+  toggleSkill,
+} from "../agent/pi-resources";
 import { paginateHistoryEntries as paginateHistory } from "../agent/host-modules/pagination";
 import { casdoorAuth } from "../casdoor/casdoor-auth";
 import { casdoorAudit } from "../casdoor/casdoor-audit";
@@ -509,7 +521,7 @@ export async function dispatchTypedRpc(request: ClientRequest, source: "renderer
 				tasks: { sessionId, source: "pi-native", note: "todo list is owned by pi's @juicesharp/rpiv-todo when installed; otherwise the bundled pi todo tool." },
 				mcp: mcp.map((entry: { serverName?: string; status?: string; toolCount?: number }) => ({ serverName: entry.serverName, status: entry.status, toolCount: entry.toolCount })),
 				plugins: plugins.map((entry: { id?: string; enabled?: boolean; status?: string }) => ({ id: entry.id, enabled: entry.enabled, status: entry.status })),
-				resources: { extensions: (pluginInventory as any)?.piExtensions?.length, skills: skills?.length ?? 0, prompts: prompts?.length ?? 0, themes: themes?.length ?? 0, diagnostics: Object.keys(diagnostics ?? {}).length },
+				resources: { extensions: (pluginInventory as any)?.piExtensions?.length, skills: resources.skills?.length ?? 0, prompts: resources.prompts?.length ?? 0, themes: resources.themes?.length ?? 0, diagnostics: Object.keys(resources.diagnostics ?? {}).length },
 				commands: Array.isArray(commands) ? commands.length : 0,
 				contextReady: Boolean(context),
 				pluginReadiness: readiness,
@@ -980,7 +992,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		await ensureAgentHostLoaded();
 		const resources = await agentHost.resourceInventory();
 		collaborationRuntime.setCapabilityCards([
-			...skills.map((entry: any) => ({
+			...resources.skills.map((entry: any) => ({
 				id: `pi-skill:${entry.name}`,
 				name: entry.name,
 				source: "pi-skill" as const,
@@ -988,7 +1000,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 				status: "available" as const,
 				contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const },
 			})),
-			...(extensions ?? []).map((entry: any) => ({
+			...(resources.extensions ?? []).map((entry: any) => ({
 				id: `pi-extension:${entry.id}`,
 				name: entry.name,
 				source: "pi-extension" as const,
@@ -996,7 +1008,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 				status: entry.health === "failed" ? "degraded" as const : "available" as const,
 				contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const },
 			})),
-			...(prompts ?? []).map((entry: any) => ({
+			...(resources.prompts ?? []).map((entry: any) => ({
 				id: `prompt:${entry.name}`,
 				name: entry.name,
 				source: "prompt" as const,
@@ -1034,10 +1046,10 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 			mcpCapabilities: agentHost.mcpCapabilityGovernance(),
 			inbox: [...data.inbox, ...emailInboxItems].sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
 			capabilities: {
-				local: skills.length,
+				local: resources.skills.length,
 				room: 0,
-				organization: (extensions ?? []).filter((entry: any) => entry.sourceScope === "project").length,
-				directory: (prompts ?? []).length,
+				organization: (resources.extensions ?? []).filter((entry: any) => entry.sourceScope === "project").length,
+				directory: (resources.prompts ?? []).length,
 			},
 		};
 	});
