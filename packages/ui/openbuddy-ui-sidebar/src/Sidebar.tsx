@@ -586,6 +586,8 @@ function MoreDropdown({
       >
         <WbMoreNavIcon size="md" />
         <span>更多</span>
+        {/* WB 实测: 「更多」右侧有一个小字「灵感」尾标,作为更多菜单的入口提示。 */}
+        <span className="sidebar__nav-sub" aria-hidden="true">灵感</span>
       </button>
       {open && (
         <div className="sidebar__more-popover" role="menu">
@@ -750,6 +752,15 @@ export const SessionRow = memo(function SessionRow({
  * 任务分组列「独立会话」(cwd 为空);空间分组列本地工作目录节点,每个节点可
  * 展开懒加载其下的会话。详见 sessions-store 的双分组模型。
  */
+/** 用户头像里的首字母(支持中英文);空字符串时回退到 UserIcon。 */
+function accountInitial(label?: string): string {
+  if (!label) return "";
+  const trimmed = label.trim();
+  if (!trimmed) return "";
+  // 取第一个非空白字符
+  return Array.from(trimmed)[0] ?? "";
+}
+
 export function Sidebar({
   onNewSession,
   onSelect,
@@ -1588,9 +1599,19 @@ export function Sidebar({
             screen-reader users always have a live region for connection
             state. */}
         <StatusIndicator connection="unknown" />
-        <button className="sidebar__user" onClick={() => (onOpenAccount ?? onOpenSettings)()} aria-label="用户中心">
-          <UserIcon size="md" />
-          <span>{accountLabel ?? "企业登录"}</span>
+        <button
+          className="sidebar__user"
+          onClick={() => (onOpenAccount ?? onOpenSettings)()}
+          aria-label={accountLabel ? `${accountLabel} · 用户中心` : "用户中心"}
+          title={accountLabel ?? "企业登录"}
+        >
+          <span className="sidebar__user-avatar" aria-hidden="true">
+            {accountInitial(accountLabel) || <UserIcon size="md" />}
+          </span>
+          <span className="sidebar__user-text">
+            <span className="sidebar__user-name">{accountLabel ?? "企业登录"}</span>
+            <span className="sidebar__user-sub">{accountLabel ? "已登录" : "未登录"}</span>
+          </span>
         </button>
         <div className="sidebar__logo-spacer" />
         <button className="sidebar__icon-btn" aria-label="通知" onClick={() => onOpenSettings()}>

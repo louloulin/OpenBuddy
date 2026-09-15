@@ -10,16 +10,24 @@ import { AboutDialog } from "./AboutDialog";
 import { FolderTrustDialog } from "./FolderTrustDialog";
 
 export function apply(ctx: UiRuntimeContext): () => void {
-  const disposeAbout = ctx.slots.register(
-    { name: "shell.overlay", kind: "list", scope: "root", registrant: "@openbuddy/ui-dialogs/about" },
-    AboutDialog as never
-  );
-  const disposeTrust = ctx.slots.register(
-    { name: "shell.overlay", kind: "list", scope: "root", registrant: "@openbuddy/ui-dialogs/folder-trust" },
-    FolderTrustDialog as never
-  );
-  return () => {
-    disposeAbout();
-    disposeTrust();
-  };
+  const disposers: Array<() => void> = [];
+  const dialogs = [
+    { id: "about", named: "overlay.about", component: AboutDialog },
+    { id: "folder-trust", named: "overlay.folder-trust", component: FolderTrustDialog },
+  ] as const;
+  for (const dialog of dialogs) {
+    disposers.push(
+      ctx.slots.register(
+        { name: "shell.overlay", kind: "list", scope: "root", id: dialog.id, registrant: `@openbuddy/ui-dialogs/${dialog.id}` },
+        dialog.component as never
+      )
+    );
+    disposers.push(
+      ctx.slots.register(
+        { name: dialog.named, kind: "single", scope: "root", registrant: `@openbuddy/ui-dialogs/${dialog.id}` },
+        dialog.component as never
+      )
+    );
+  }
+  return () => { for (let i = disposers.length - 1; i >= 0; i--) disposers[i](); };
 }

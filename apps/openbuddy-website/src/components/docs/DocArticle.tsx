@@ -6,7 +6,7 @@ import { getDictionary, localizedPath } from '@/lib/i18n';
 import LanguageSwitcher from './LanguageSwitcher';
 import MDCodeEnhancer from './MDCodeEnhancer';
 import MermaidEnhancer from './MermaidEnhancer';
-import TocScrollSpy from './TocScrollSpy';
+import DocsAsideContent from './DocsAsideContent';
 
 interface DocArticleProps {
   content: DocContent;
@@ -22,12 +22,15 @@ export default function DocArticle({ content, locale }: DocArticleProps) {
   const copy = dict.docsPage;
   const { meta, html, toc, githubEditUrl, sourceFile, lastUpdated, readingMinutes, isNative } = content;
   const { prev, next } = getAdjacentDocs(meta.slug);
+  const rawUrl = `https://github.com/louloulin/OpenBuddy/blob/main/docs/${ sourceFile }`;
 
   return (
     <article className="grid gap-12 lg:grid-cols-[1fr_220px]">
       <MDCodeEnhancer />
       <MermaidEnhancer />
-      <div>
+      {/* min-w-0: grid 子项默认 min-width:auto,会被宽代码块撑到 min-content 宽度,
+          整个页面随之横向滚动。 */}
+      <div className="min-w-0">
         <header className="mb-8 border-b border-[var(--wb-border)] pb-6">
           <div className="mb-4 flex flex-wrap items-center gap-3 text-[12px]">
             <LanguageSwitcher
@@ -67,6 +70,27 @@ export default function DocArticle({ content, locale }: DocArticleProps) {
             ) : null }
           </div>
         </header>
+
+        {/* lg 以下右侧栏不存在,把目录 + 源文件链接收进正文顶部的折叠面板 */}
+        <details className="group mb-8 rounded-xl border border-[var(--wb-border)] lg:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--wb-fg-muted)] [&::-webkit-details-marker]:hidden">
+            <span>{ copy.onThisPage }</span>
+            <span aria-hidden className="text-[10px] transition-transform group-open:rotate-180">
+              ▾
+            </span>
+          </summary>
+          <div className="border-t border-[var(--wb-border)] px-4 py-4">
+            <DocsAsideContent
+              toc={ toc }
+              onThisPage={ copy.onThisPage }
+              editOnGitHub={ copy.editOnGitHub }
+              editUrl={ githubEditUrl }
+              viewRaw={ copy.viewRaw }
+              rawUrl={ rawUrl }
+              showTocLabel={ false }
+            />
+          </div>
+        </details>
 
         <div
           className="md-prose"
@@ -109,28 +133,14 @@ export default function DocArticle({ content, locale }: DocArticleProps) {
 
       <aside className="hidden lg:block">
         <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2">
-          { toc.length > 0 ? (
-            <TocScrollSpy toc={ toc } label={ copy.onThisPage } />
-          ) : null }
-
-          <div className="mt-8 flex flex-col gap-2 border-t border-[var(--wb-border)] pt-6 text-[12px]">
-            <a
-              href={ githubEditUrl }
-              target="_blank"
-              rel="noreferrer"
-              className="text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)]"
-            >
-              { copy.editOnGitHub } ↗
-            </a>
-            <a
-              href={ `https://github.com/louloulin/OpenBuddy/blob/main/docs/${ sourceFile }` }
-              target="_blank"
-              rel="noreferrer"
-              className="text-[var(--wb-fg-faint)] hover:text-[var(--wb-fg-muted)]"
-            >
-              { copy.viewRaw } ↗
-            </a>
-          </div>
+          <DocsAsideContent
+            toc={ toc }
+            onThisPage={ copy.onThisPage }
+            editOnGitHub={ copy.editOnGitHub }
+            editUrl={ githubEditUrl }
+            viewRaw={ copy.viewRaw }
+            rawUrl={ rawUrl }
+          />
         </div>
       </aside>
     </article>

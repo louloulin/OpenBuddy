@@ -12,13 +12,33 @@
 
 ## 微内核回顾
 
-OpenBuddy 内部已经实现了 Cordis + Slot 微内核总线：
+OpenBuddy 的 UI 由微内核（`@openbuddy/ui-runtime` 里的 SlotCore）组合：
 
-- **ui-runtime** 提供 `SlotProvider` 上下文 + `BUILTIN_UI_APPLIES` 表
-- 26 个 `ui-*` 包通过 `apply(ctx)` 注册 slot / theme / locale / store
-- 第三方插件通过相同 API 注册新 slot
+- **ui-runtime** 持有内核，`<SlotProvider>` 挂载时把 **21 个内置 `ui-*` 包**
+  的 `apply(ctx)` 全部装进去（每个包注册自己的 slot）。
+- 结构性 UI 位置（`sidebar` / `conversation` / `home` / `overlay.*` …）由
+  AppShell 向内核取用，而不是硬绑到具体组件。
+- **第三方插件走同一条注册路径** —— 你注册的 slot 和内置包注册的 slot 在
+  内核里没有区别。
 
-详细 slot 列表见 [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md)。
+### 插件 SDK 的两种贡献形态
+
+| 形态 | 你提供什么 | 宿主做什么 | 例子 |
+|---|---|---|---|
+| **数据型**（推荐） | 一个描述对象 `{ id, label, icon, onActivate }` | 宿主渲染 UI | 场景 tab、工具栏按钮、命令 |
+| **组件型** | 一个 React 组件 | 直接渲染你的组件 | 整块替换侧栏 / 会话区 |
+
+数据型贡献**不需要你打包 React**，插件体积可以只有几 KB。
+
+### 覆盖内置 UI vs 追加内容
+
+- 想**替换**某块内置 UI（如整个侧栏）：向该 `single` slot 注册一个组件。
+  卸载后内置实现会自动恢复。
+- 想**追加**内容（如往工具栏加按钮）：向对应的 `list` slot 注册数据。
+- ⚠️ 同一个 slot 名只能有一种 kind。内置声明为 `single` 时你按 `list` 注册
+  会被内核拒绝并告警 —— 应该找那个 list slot，或注册一个自己的新 slot。
+
+优先级规则与完整 slot 清单见 [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md)。
 
 ## 10 分钟写 hello-world
 
@@ -75,18 +95,45 @@ export default defineExtension({
 
 ### 第 4 步：加载验证
 
-1. 启动 OpenBuddy dev 模式：
-   ```bash
-   pnpm dev
+`defineExtension()` 通过派发 DOM CustomEvent（`openbuddy:register-slot`）表达
+贡献，`main.tsx` 里的 `installPluginSdkBridge()` 把它们接进微内核。验证方式：
+
+1. 启动 OpenBuddy dev 模式：`pnpm dev`
+2. 打开 DevTools Console，直接派发一次事件即可看到界面变化：
+
+   ```js
+   window.dispatchEvent(new CustomEvent("openbuddy:register-slot", {
+     detail: {
+       name: "home.scene.tab", kind: "list", scope: "root",
+       payload: { id: "hello", label: "👋 Hello", icon: "👋" },
+     },
+   }));
    ```
-2. 打开设置 → 已安装扩展 → 「开发模式」自动加载列表 → 看到 `openbuddy-plugin-hello`。
-3. 回到 HomePage，场景切换栏出现 `👋 Hello` tab。点击弹出 alert。
+
+3. 首页场景栏会立刻多出 `👋 Hello` tab。反注册：
+
+   ```js
+   window.dispatchEvent(new CustomEvent("openbuddy:unregister-slot", {
+     detail: { name: "home.scene.tab" },
+   }));
+   ```
+
+自动化验证可直接跑仓库里的两个探针（真实 Electron）：
+
+```bash
+node scripts/electron/_probe-microkernel.mjs      # 21 个内置包全部装配 + 结构性 slot 有实现
+node scripts/electron/_probe-plugin-sdk.mjs       # 插件注册 → UI 变化 → 反注册 → 还原
+node scripts/electron/_probe-plugin-toolbar.mjs   # 工具栏按钮注入 + 点击插入文本
+```
 
 ### 第 5 步：调试技巧
 
-- 浏览器 DevTools → Console 过滤 `openbuddy:register-slot` 事件
-- `window.dispatchEvent(new CustomEvent('openbuddy:list-slots'))` 可查看当前所有 slot
-- 插件 reload：设置 → 已安装扩展 → 「刷新」按钮
+- **看内核当前状态**：`window.__ob_slotcore.snapshot()` 返回所有 slot 的
+  `{ name, kind, entries, registrants, payloadIds }`。
+- **看内置包装配结果**：`window.__ob_builtin_report` —— 21 个包各自的
+  成功/失败、注册了几个 slot、耗时。
+- **看谁注册了哪块 UI**：`snapshot()` 里该 slot 的 `registrants` 字段。
+- 插件 reload：设置 → 已安装扩展 → 「刷新」按钮（会先 `unregisterAll` 再重放）。
 
 ## API 参考
 
@@ -103,10 +150,43 @@ interface ExtensionConfig {
 
 ### `api.registerSlot(name, kind, scope, payload)`
 
-- `name`：string，参见 `EXTENSION_POINTS.md` 中的 slot 名
-- `kind`：`'list'` | `'keyed'`
+- `name`：string，见 [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md) 的 slot 清单
+- `kind`：`'list'`（追加）| `'keyed'`（按 key 唯一）
+  > 想整体替换某块内置 UI 时，直接用内核 API 注册 `single`（见下节）；
+  > SDK 的 `registerSlot` 只暴露 list / keyed 两种追加语义。
 - `scope`：`'root'` | `'session'`
-- `payload`：slot 载荷（参见 `EXTENSION_POINTS.md` 详细说明）
+- `payload`：**数据型贡献的载荷**。约定至少带 `id`；常见字段：
+  `label` / `icon` / `description` / `onActivate`。
+  宿主会用 `useSlotPayloads(name)` 读取并渲染。
+
+同一 `id` 重复注册是幂等的 —— 插件重复 `setup()` 不会在界面里叠加两份。
+
+### 直接使用内核 API（组件型贡献 / 覆盖内置 UI）
+
+SDK 事件适合数据型贡献。要提供 React 组件或覆盖 `single` slot，直接用内核：
+
+```tsx
+import { getRuntime } from "@openbuddy/ui-runtime/client";
+
+const runtime = getRuntime();
+const dispose = runtime.slots.register(
+  {
+    name: "sidebar",          // 覆盖整个侧栏
+    kind: "single",
+    scope: "root",
+    priority: 10,             // 数值大者胜；同 priority 后注册者胜
+    registrant: "acme/sidebar-plus",
+  },
+  MySidebar,                  // 你的 React 组件
+);
+
+// 卸载时归还：内置实现自动恢复
+dispose();
+```
+
+消费端则用 `useSlotComponents(name)` / `<SlotOutlet name="..." />`
+（都从 `@openbuddy/ui-runtime/client` 导出），它们会订阅内核变更、
+在插件注册或卸载后立即重渲染。
 
 ### `api.registerCommand(id, label, onExecute)`
 
@@ -120,7 +200,16 @@ interface ExtensionConfig {
 
 ### 监听 slot 变化
 
-通过 `window.addEventListener('openbuddy:register-slot', handler)` 监听其他插件注册的事件（注意性能：节流到 100ms）。
+内核为每个 slot 提供精准订阅（注册 / 反注册时触发一次）：
+
+```ts
+const off = getRuntime().slots.subscribe?.("home.scene.tab", () => {
+  console.log("场景 tab 变了", getRuntime().slots.entries("home.scene.tab").length);
+});
+```
+
+宿主组件应该用 `useSlotComponents` / `useSlotPayloads`（它们内部就是这个订阅），
+不要自己去轮询 DOM。
 
 ### 异步初始化
 

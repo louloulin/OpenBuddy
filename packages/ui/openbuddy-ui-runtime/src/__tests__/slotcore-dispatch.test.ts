@@ -131,14 +131,53 @@ describe("SlotCore dispatch mode — chain", () => {
   });
 });
 
-describe("SlotCore dispatch mode — single (向后兼容)", () => {
-  it("仅保留第一个注册者,后续注册不覆盖", () => {
+describe("SlotCore dispatch mode — single(可覆盖)", () => {
+  /**
+   * single slot 的语义是「同一时刻只有一个实现」,而不是「先注册者永久占位」。
+   *
+   * 这是微内核能成立的前提:内置包在 boot 时先注册(sidebar / conversation /
+   * home …),第三方插件随后注册同名 single slot 即可**整体替换**这块 UI;
+   * 插件卸载后内置实现自动恢复(disposer 归还)。
+   *
+   * 早期 fallback core 采用「first wins」,导致 single slot 永远无法被覆盖 ——
+   * 微内核就退化成了硬编码装配。现在改为:priority 高者胜;同 priority 后写覆盖。
+   */
+  it("同 priority 时后注册者覆盖(single 可被插件替换)", () => {
     const core = __makeTestSlotCore();
     const first = tag("FIRST");
     const second = tag("SECOND");
     core.register({ name: "single.test", kind: "single" }, first);
     core.register({ name: "single.test", kind: "single" }, second);
-    expect(core.entries("single.test")).toEqual([first]);
+    expect(core.entries("single.test")).toEqual([second]);
+  });
+
+  it("entries() 始终最多返回一个实现", () => {
+    const core = __makeTestSlotCore();
+    core.register({ name: "single.many", kind: "single" }, tag("A"));
+    core.register({ name: "single.many", kind: "single" }, tag("B"));
+    core.register({ name: "single.many", kind: "single" }, tag("C"));
+    expect(core.entries("single.many")).toHaveLength(1);
+  });
+
+  it("高 priority 的内置实现可以挡住低 priority 的覆盖", () => {
+    const core = __makeTestSlotCore();
+    const builtin = tag("BUILTIN");
+    const plugin = tag("PLUGIN");
+    core.register({ name: "single.protected", kind: "single", priority: 100 }, builtin);
+    core.register({ name: "single.protected", kind: "single", priority: 0 }, plugin);
+    expect(core.entries("single.protected")).toEqual([builtin]);
+  });
+
+  it("disposer 撤销覆盖后,先前实现重新生效", () => {
+    const core = __makeTestSlotCore();
+    const builtin = tag("BUILTIN");
+    const plugin = tag("PLUGIN");
+    core.register({ name: "single.restore", kind: "single" }, builtin);
+    const disposePlugin = core.register({ name: "single.restore", kind: "single" }, plugin);
+    expect(core.entries("single.restore")).toEqual([plugin]);
+    disposePlugin();
+    // 插件卸载后,内置实现必须是内核里仅剩的那一个。
+    expect(core.entries("single.restore")).toEqual([builtin]);
   });
 });
 

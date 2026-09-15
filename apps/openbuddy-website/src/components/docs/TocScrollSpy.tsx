@@ -6,6 +6,8 @@ import type { DocTocItem } from '@/lib/docs-server';
 interface TocScrollSpyProps {
   toc: DocTocItem[];
   label: string;
+  /** Set false when the caller already renders the label (e.g. a <summary>) */
+  showLabel?: boolean;
 }
 
 /**
@@ -16,7 +18,7 @@ interface TocScrollSpyProps {
  * 通过 data-toc-id 属性(由 docs-server.ts 的 heading renderer 注入)选取 headings,
  * 避开 marked 输出里其它任意 id 元素。
  */
-export default function TocScrollSpy({ toc, label }: TocScrollSpyProps) {
+export default function TocScrollSpy({ toc, label, showLabel = true }: TocScrollSpyProps) {
   const [activeId, setActiveId] = useState<string | null>(toc[0]?.id ?? null);
 
   useEffect(() => {
@@ -61,9 +63,11 @@ export default function TocScrollSpy({ toc, label }: TocScrollSpyProps) {
 
   return (
     <>
-      <h3 className="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
-        { label }
-      </h3>
+      { showLabel ? (
+        <h3 className="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
+          { label }
+        </h3>
+      ) : null }
       <ul className="space-y-1.5 border-l border-[var(--wb-border)]">
         { toc.map((item) => {
           const isActive = item.id === activeId;

@@ -180,6 +180,23 @@ export const DOC_INDEX: DocMeta[] = [
   }
 ];
 
+/**
+ * One searchable document. Built server-side by docs-search.ts and handed to
+ * the client Cmd-K dialog. Titles/descriptions come from DOC_INDEX; headings
+ * and excerpt are extracted from every available locale file, so a query in
+ * either language matches.
+ */
+export interface SearchEntry {
+  slug: string;
+  title: string;
+  description: string;
+  category: DocCategory;
+  /** Section headings (h1–h3) across all available locale files */
+  headings: string[];
+  /** Plain-text excerpt of the opening paragraph */
+  excerpt: string;
+}
+
 export function getAllDocs(): DocMeta[] {
   return DOC_INDEX;
 }

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 import LocaleSwitcher from '@/components/LocaleSwitcher';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
+import SearchButton from '@/components/search/SearchButton';
 import GitHubStars from '@/components/GitHubStars';
 import Logo from '@/components/icons/Logo';
 import type { Dict, Locale } from '@/lib/i18n';
@@ -77,6 +78,7 @@ export default function SiteHeader({ dict, locale }: SiteHeaderProps) {
         </nav>
 
         <div className="flex items-center gap-3">
+          <SearchButton label={ dict.search.trigger } shortcut="⌘K" />
           <div className="hidden md:block">
             <LocaleSwitcher />
           </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { usePathname, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Globe, Check, ChevronDown } from 'lucide-react';
 import { locales, localeNames, localeFlags, type Locale } from '@/lib/i18n';
@@ -18,7 +18,6 @@ import { locales, localeNames, localeFlags, type Locale } from '@/lib/i18n';
  */
 export default function LocaleSwitcher() {
   const params = useParams();
-  const pathname = usePathname();
   const [open, setOpenState] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -45,21 +44,15 @@ export default function LocaleSwitcher() {
 
   /**
    * 构建切换后的目标路径。
-   * 保持 hash 锚点 (#features 等)
+   * 保持 hash 锚点 (#features 等);所有路径都带 locale 前缀,
+   * 因为路由结构是 `[locale]/...`(默认语言同样需要前缀)。
    */
   function buildTargetHref(target: Locale): string {
-    if (typeof window === 'undefined') return pathname ?? '/';
+    if (typeof window === 'undefined') return `/${target}`;
     const { pathname: path, hash } = window.location;
-    let stripped = path;
-    // 移除当前 locale 前缀
-    if (currentLocale !== 'en') {
-      stripped = path.replace(new RegExp(`^/${currentLocale}`), '') || '/';
-    }
-    // 添加目标 locale 前缀
-    let targetPath = stripped;
-    if (target !== 'en') {
-      targetPath = `/${target}${stripped === '/' ? '' : stripped}`;
-    }
+    // 去掉已有的 locale 前缀(若有)
+    const stripped = path.replace(new RegExp(`^/(${locales.join('|')})(?=/|$)`), '') || '/';
+    const targetPath = stripped === '/' ? `/${target}` : `/${target}${stripped}`;
     return `${targetPath}${hash || ''}`;
   }
 

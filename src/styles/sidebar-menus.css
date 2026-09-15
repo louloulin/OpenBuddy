@@ -711,19 +711,22 @@
 }
 /* WB 首页: composer 外层托盘(input-slot)灰渐变背景,包裹白卡+meta行 */
 .wb-composer-wrap--home {
-  background: linear-gradient(
-    var(--wb-bg-tertiary, #f0f0f0) 0%,
-    var(--wb-bg-secondary, #f5f5f5) 100%
-  );
-  border-radius: 18px;
-  padding: 2px 2px 4px;
+  /* WB: outer card = white + 1px #EBEBEB border + radius 20, padding 让出 10px 给
+   *     内部输入卡和底部灰条带各自撑开。overflow: hidden 让灰条带的圆角对齐外卡。 */
+  background: var(--wb-bg-elevated, #fff);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 20px;
+  padding: 10px 10px 0;
+  overflow: hidden;
 }
 .wb-composer {
   position: relative;
   background: var(--wb-bg-elevated, #fff);
-  border: none;
-  border-radius: 16px;
-  box-shadow: 0 12px 24px -8px rgba(0,0,0,.02), 0 2px 4px -4px rgba(0,0,0,.02);
+  /* WB: 输入卡四边 1px #EBEBEB 描边 (亮色=8% 黑), 内卡 radius 14, 微微阴影把它从
+   *     外卡 (radius 20) 与底部灰条带上抬起 1px。 */
+  border: 1px solid var(--wb-border-default);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   padding: 12px 12px 12px;
   display: flex;
   flex-direction: column;
@@ -735,6 +738,7 @@
 }
 /* WB: 首页卡片底行高56、底部padding 0 → 卡片高138;meta行在卡片外下方(透明背景,间距4) */
 .wb-composer--home {
+  /* 与外卡 padding-bottom: 0 配合,让 .wb-composer-meta 紧贴输入卡底边无缝衔接 */
   padding-bottom: 0;
 }
 .wb-composer--disabled {
@@ -1087,14 +1091,17 @@
   font-size: 10px;
 }
 .wb-composer-meta {
+  /* WB: 底部灰条带。margin 横向 -10px 让其扩展到外卡边缘 (与外卡 padding 对消),
+   *     border-radius 0 0 20 20 与外卡底部圆角对齐 (外卡 overflow:hidden 已裁剪)。 */
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: 32px;
-  /* WB: meta 行在白卡外下方,透明背景,距卡片4px,横向12px对齐卡片内容 */
-  margin-top: 4px;
-  padding: 0 12px;
-  background: transparent;
+  gap: 16px;
+  height: 44px;
+  margin: 0 -10px;
+  padding: 0 16px;
+  background: var(--wb-bg-secondary, #f4f4f4);
+  border-radius: 0 0 20px 20px;
+  border-top: 1px solid var(--wb-border-weak, rgba(0, 0, 0, 0.04));
 }
 .wb-composer-meta__btn {
   display: flex;
@@ -1825,83 +1832,150 @@ body.dark .permission-picker__popover,
 .home {
   height: 100%;
   overflow-y: auto;
-  /* Hide the scrollbar so the home pane doesn't paint its own thin red thumb
-     when content exceeds viewport. Scrolling falls back to .app__main
-     (overflow: hidden) when needed; on the home page the full content fits
-     inside the 800px column. */
   scrollbar-width: none;
-  /* WB CDP: home bg=transparent (inherits app #F2F2F2) */
   background: transparent;
   display: flex;
-  justify-content: center;
-  /* WB: max-width 800px,在主区内水平居中 */
-  max-width: 800px;
+  /* 用户反馈「删除底部 onboarding 卡片」(2026-09-15 第 10 轮):
+   *  - 旧版 `justify-content: center` 让 homeInner 在 flex 列里垂直居中,
+   *    内容缩短时 (移除 onboarding 后) 会被重新居中, 反而把案例卡下移;
+   *  - 改为 `flex-start` (默认) 让 homeInner 顶部对齐到 home 顶部,
+   *    title 直接落在 hero padding-top 之后, 案例卡紧跟 composer 下方;
+   *  - 水平居中由 `margin: 0 auto` + max-width: 960px 处理, 不依赖 justify-content。
+   *  - WB 实测: 内容列 516→1476 = 960px, 在主区 (264→1728) 水平居中 (中心 996);
+   *    早期实现 800/1100 都偏离真实宽度,导致 4 张案例卡被拉宽,整页显松。 */
+  justify-content: flex-start;
+  max-width: 960px;
   width: 100%;
-  padding: 32px 24px 48px;
+  /* WB: 内容列顶满 960 (4×234 + 3×8 = 960), 上下只留一点呼吸。 */
+  padding: 0 0 48px;
   margin: 0 auto;
   box-sizing: border-box;
   flex-direction: column;
 }
 .home::-webkit-scrollbar { display: none; }
+
+/* ===== 侧栏折叠时, 让 home 内容列扩到全宽 (而不是仍居中 960) =====
+ * 用户体验: 收起侧栏后, 屏幕更宽, 内容列应该跟着扩, 否则留出 264px 死区。
+ * 同样对 chatview / placeholder 让其扩展, 让宽屏用户充分利用空间。 */
+.app__body--collapsed .home {
+  max-width: 1280px;
+  padding: 0 32px 48px;
+}
+.app__body--collapsed .home__inner {
+  /* 折叠态去掉 min-height: 100%, 让内容自然顶到顶部, 不留顶部留白 */
+  min-height: 0;
+}
+.app__body--collapsed .home__hero {
+  /* 用户反馈「底部卡片上移」(2026-09-15 第 10 轮):
+   *  - padding-top 60 → 40 (再省 20px), 折叠态 (1280 列) 时
+   *    5 张卡每张 ≈248px (1280-40=1240 / 5 ≈ 248), 充分利用宽屏空间。 */
+  padding-top: 40px;
+}
+/* hero 区 = title / scenes / chips / composer;flex:1 让它把内容推到视口中部,
+ * 下面 .home__practices 用 margin-top:auto 锚到底部, 与 WB 实测节奏一致。 */
 .home__inner {
   position: relative;
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  /* 用户反馈「底部卡片上移 + 优化卡片自适应展示」(2026-09-15 第 6 轮):
+   *  - 去掉 min-height: 100%, 让 inner 高度由内容决定,
+   *    案例卡 + onboarding 不再被强制撑到 viewport 底部;
+   *  - 配合 hero padding-top 收紧 (160→100), 整页内容上移 ~80px;
+   *  - gap 14 让 inner 内部节奏更紧凑 (原 16)。 */
+  min-height: 0;
+  gap: 14px;
   box-sizing: border-box;
+}
+.home__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  /* 用户反馈「将底部卡片上移」(2026-09-15 第 6 轮):
+   *  - padding-top 160 → 100 (节省 60px 顶部空白),
+   *    title 从 y=160 上移到 y=100, 案例卡从 y=606 上移到 y≈546,
+   *    onboarding 从 y=821 上移到 y≈760, 底部留白约 230px (更平衡);
+   *  - 上一版 160 是为了应对 hero `flex:1` 把卡片甩到底部, 现在
+   *    .home__inner 已去掉 min-height:100%, 不再需要那么多顶部留白;
+   *  - gap 18 → 16 让 hero 内部节奏与 inner 一致;
+   *  - 窄屏 (<860) 由下方 @media 进一步降到 28。 */
+  /* 用户反馈「将底部卡片上移」(2026-09-15 第 10 轮):
+   *  - padding-top 100 → 64 (省 36px), title 从 y=132 上移到 y=96,
+   *    案例卡 y=536 → y≈500, onboarding y=760 → y≈700;
+   *  - gap 16 → 12 (title/scenes/chips/composer 节奏更紧凑);
+   *  - 折叠态 + 窄屏 <860 由下方 @media 进一步收敛。 */
+  padding-top: 64px;
+  gap: 12px;
 }
 .home__header {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
+  align-self: center;
 }
 .home__title,
 .home__subtitle {
   margin: 0;
-  font-size: 36px;
-  font-weight: 600;
-  line-height: 48px;
-  /* WorkBuddy uses "PingFang SC" as the primary font for titles. */
+  /* WB 实测 v5.4.7: "WorkBuddy，我帮你" 宽 278px / 9.168em → font-size 30px,
+   * weight 700。PingFang SC 的 Latin glyph cap height ≈ 0.72em, 实测 W 22px 高
+   * 反推 30/0.72=29.7, 吻合。 */
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 38px;
   font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   color: var(--wb-text-strong);
+  letter-spacing: -0.2px;
 }
-/* WB 的问候语只有一行大字;副标题曾与 title 同为 36px/600,压迫感过强 */
 .home__subtitle {
-  margin-top: 6px;
-  font-size: 15px;
-  font-weight: 400;
-  line-height: 22px;
-  color: var(--wb-text-medium, #6e6e80);
+  /* WB 首页只有一行大字;此处保留选择器以防外部引用,但隐藏以免竞争视觉。 */
+  display: none;
 }
+/* WB 实测（v5.4.7，DPR=2）：
+ *  - 场景 tab 是一排**独立 pill**，没有外层灰底容器。
+ *  - 未选中 pill = 实心 #EBEBEB，36px 高，圆角 10px。
+ *  - 选中 pill = rgba(0,0,0,0.75) 深灰，白字。
+ * 早期实现套了一层 gray-4 容器 + 2px padding，视觉上比 WB 多一圈底。 */
 .home__scenes {
-  display: flex;
-  gap: 2px;
+  /* WB 实测(v5.4.7):场景区是 segmented control —— 灰色椭圆轨道 + 内嵌的
+   * 深色激活 pill。早前实现误判为"独立 pill 排",实测像素 312→348 横跨灰底,
+   * 激活块 314→346 仅 2px 内缩。还原为标准 segmented control。 */
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
   padding: 2px;
-  background: var(--wb-palette-gray-4);
-  border-radius: 10px;
+  background: var(--wb-palette-gray-4, #ebebeb);
+  border-radius: 999px;
   height: 36px;
-  align-self: flex-start;
+  align-self: center;
   box-sizing: border-box;
-  margin: 16px 0 48px;
+  margin: 0 0 32px;
 }
 .home__scene {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   height: 32px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: none;
-  border-radius: var(--wb-radius-lg);
-  background: none;
+  border-radius: 999px;
+  background: transparent;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  color: var(--wb-text-medium);
+  color: var(--wb-text-strong);
+  transition: background-color .16s ease, color .16s ease;
+}
+.home__scene:hover {
+  background: rgba(0, 0, 0, 0.05);
 }
 .home__scene--active {
-  background: var(--wb-bg-pill-active);
-  color: var(--wb-text-white);
-  font-weight: 600;
+  background: var(--wb-bg-pill-active, #3b3b3b);
+  color: #fff;
+  font-weight: 500;
+}
+.home__scene--active:hover {
+  background: var(--wb-bg-pill-active, #3b3b3b);
 }
 .home__composer-area {
   display: flex;
@@ -2041,117 +2115,21 @@ body.dark .permission-picker__popover,
   color: var(--wb-text-medium, rgba(0, 0, 0, 0.55));
 }
 
-/* ===== 顶部右上"做任务赢积分好礼"chip(对齐 WorkBuddy) ===== */
-.home__topbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-bottom: -8px;
-}
-.home__topbar-spacer { flex: 1 1 auto; }
-.home__points-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--wb-border-default);
-  border-radius: 999px;
-  background: var(--wb-bg-primary);
-  color: var(--wb-text-strong);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color .18s, color .18s, border-color .18s;
-}
-.home__points-chip:hover {
-  background: var(--wb-bg-hover);
-  border-color: var(--wb-border-strong, var(--wb-border-default));
-}
-.home__points-chip-icon {
-  width: 14px;
-  height: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #f59e0b;
-}
-
-/* ===== 活动 banner(可关闭) — WB 同款右上浮动小气泡,不占版面流 ===== */
-.home__activity-banner {
-  position: absolute;
-  top: 34px;
-  right: 0;
-  z-index: 30;
-  width: 288px;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas:
-    "icon text"
-    "icon cta";
-  align-items: start;
-  gap: 6px 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--wb-border-default);
-  border-radius: 14px;
-  background: linear-gradient(135deg, #fff7ed 0%, #fde6c1 100%);
-  color: var(--wb-text-strong);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-}
-[data-theme="dark"] .home__activity-banner {
-  background: rgba(40, 40, 44, 0.94);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-.home__activity-banner-icon {
-  grid-area: icon;
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: rgba(245, 158, 11, .18);
-  color: #f59e0b;
-}
-.home__activity-banner-text { grid-area: text; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.home__activity-banner-text strong { font-size: 13px; font-weight: 600; color: var(--wb-text-strong); }
-.home__activity-banner-text p { margin: 0; font-size: 12px; line-height: 1.55; color: var(--wb-text-medium); }
-.home__activity-banner-cta {
-  grid-area: cta;
-  justify-self: end;
-  height: 26px;
-  padding: 0 12px;
-  border: none;
-  border-radius: 999px;
-  background: #f59e0b;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color .18s;
-}
-.home__activity-banner-cta:hover { background: #d97706; }
-.home__activity-banner-close {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--wb-text-medium);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.home__activity-banner-close:hover { background: var(--wb-bg-hover); color: var(--wb-text-strong); }
-
 /* ===== 最佳实践案例(对齐 WorkBuddy "不知道做什么，试试最佳实践案例") ===== */
-.home__practices { display: flex; flex-direction: column; gap: 12px; }
+.home__practices {
+  /* 用户反馈「将底部卡片上移」(2026-09-15 第 10 轮):
+   *  - margin-top 12 → 4 (再省 8px), 案例卡 y=536 → y≈500;
+   *  - gap 12 → 10 (header 与 grid 之间呼吸更紧凑);
+   *  - 折叠态 + 窄屏由 @media 进一步收敛节奏。 （viewport 1091）,
+   * 但用户多次反馈「卡片往下沉, 看不见」, 说明 200 在真实使用场景下太深.
+   * 与 hero 配合:hero padding-top 已收到 80, 此处 margin-top 收到 12
+   * 让卡片紧贴 composer 下方, 整页节奏紧凑。
+   * 下方 @media 规则针对窄屏(<860)再做节奏收紧。 */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
 .home__practices-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .home__practices-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--wb-text-strong); }
 .home__practices-actions { display: inline-flex; align-items: center; gap: 6px; }
@@ -2173,33 +2151,90 @@ body.dark .permission-picker__popover,
 .home__practices-refresh:hover,
 .home__practices-dismiss:hover { background: var(--wb-bg-hover); color: var(--wb-text-strong); }
 .home__practices-divider { color: var(--wb-border-default); user-select: none; }
+
+/* ===== 最佳实践案例 grid(对齐 WorkBuddy "不知道做什么，试试最佳实践案例") =====
+ * 旧版曾有 .home__onboarding 区块, 但用户反馈 2026-09-15 第 10 轮「删除底部
+ * 引导卡片(欢迎使用 OpenBuddy / 3 步开始旅程) 不需要」, 已从 HomePage.tsx
+ * 移除, 此处同步清理, 避免死代码污染 CSS 体积。 */
 .home__practices-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  /* 用户反馈「卡片自适应优化」(2026-09-15 第 8 轮):
+   *  - 关键修复: 旧用 `auto-fill` + `minmax(168, 1fr)`, 在 1216px 容器下会保留 6 列
+   *    空轨 (计算公式 (1216+10)/(168+10) = 6.89 → 6 列), 让 5 张卡每张只分到 194px,
+   *    右侧 32px 留白浪费; 改为 `auto-fit` 后空轨折叠, 5 张卡每张分到 243px
+   *    (1216-40)/5 = 235.2 + 实际微调, 卡片视觉密度更舒展, 充分利用宽屏空间;
+   *  - 折叠态 (1280 列) / 宽屏 (1920+): 5 卡平铺, 每张卡 ~235px;
+   *  - 1280 列宽屏仍 OK, 1080 以下 4+1 wrap, 860 以下 3 列, 560 以下 1 列;
+   *  - container-type: inline-size 启用 @container 内联尺寸查询, 窄列自适应 thumb 比例;
+   *  - row-gap 12 让两行卡片之间有呼吸;
+   *  - min-height 防止 key 切换瞬间塌陷。 */
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  column-gap: 10px;
+  row-gap: 12px;
+  container-type: inline-size;
+  container-name: practices;
+  min-height: 1px;
 }
-@media (max-width: 900px) {
-  .home__practices-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .home__activity-banner { display: none; }
+
+/* @container —— 让卡片自身感知所在列宽, 不依赖外部 media query。
+ * 列宽 <220px (窄列 fallback) → 缩略图降到 16:9 + caption 字号 12。
+ * 列宽 <180px (极窄)         → caption 走单行截断, 字号 11。 */
+@container practices (max-width: 480px) {
+  .home__practice-card-thumb { aspect-ratio: 16 / 9; min-height: 84px; max-height: 120px; }
+  .home__practice-card-caption { font-size: 13px; line-height: 18px; -webkit-line-clamp: 1; line-clamp: 1; }
+}
+@container practices (max-width: 220px) {
+  .home__practice-card-thumb { aspect-ratio: 16 / 10; min-height: 72px; max-height: 100px; border-radius: 10px; }
+  .home__practice-card-caption { font-size: 12px; line-height: 16px; }
+}
+
+/* viewport 兜底 —— 侧栏展开+窗口变窄时整页节奏重排。
+ * 用户反馈「将底部卡片上移 + 优化自适应」(2026-09-15 第 6 轮):
+ *  - 1080 以下: hero padding-top 100→64, title 字号 30→26, 案例卡 margin-top 12→8
+ *    整页节奏紧凑, 底部卡片 (practices + onboarding) 始终在 viewport 中线以上;
+ *  - 860 以下:  hero padding-top 64→28, 案例卡 margin-top 8→4;
+ *  - 560 以下:  案例卡 min 收到 140 让单列卡片在小屏也能完整显示缩略图;
+ *  - 折叠态 hero padding-top 已收到 60, 不重复处理。 */
+@media (max-width: 1080px) {
+  /* 用户反馈「底部卡片上移」(2026-09-15 第 10 轮):
+   *  - hero padding-top 64 → 44, practices margin 8 → 2, onboarding 10 → 4
+   *    让 1080 档 (中等屏幕) 节奏更紧凑, 底部卡片可见性显著提升。 */
+  .home__hero { padding-top: 44px; gap: 10px; }
+  .home__title, .home__subtitle { font-size: 26px; line-height: 34px; }
+  .home__practices { margin-top: 2px; gap: 8px; }
+}
+@media (max-width: 860px) {
+  .home__hero { padding-top: 28px; gap: 12px; }
+  .home__title, .home__subtitle { font-size: 22px; line-height: 30px; }
+  .home__practices { margin-top: 4px; }
+  .home__practices-grid { column-gap: 8px; row-gap: 10px; }
 }
 @media (max-width: 560px) {
-  .home__practices-grid { grid-template-columns: 1fr; }
+  .home__practices-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); column-gap: 8px; row-gap: 10px; }
+  .home__practices-title { font-size: 13px; }
 }
+
 .home__practice-card {
+  /* WB 实测: 4 张卡 w=234 / 内部 234x121 缩略图 + 下方 24px 标题, 整卡高约 145。
+   * 早期 base 样式只写在 死文件 app.css, 这里重新声明: 透明背景让 .thumb 透出,
+   * display column 让缩略图与 caption 垂直堆叠。
+   * 用户反馈「优化卡片自适应展示」(2026-09-15 第 6 轮):
+   *  - min-width: 0 让 grid track 在 flex 容器下能正确收缩 (避免内容溢出撑大列);
+   *  - 显式 height: auto 让 thumb 自适应后整卡高度保持一致 (grid stretch)。 */
   position: relative;
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
-  height: 96px;
-  padding: 12px 14px;
-  border: 1px solid var(--wb-border-default);
-  border-radius: 12px;
+  flex-direction: column;
+  gap: 0;
+  align-items: stretch;
   text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+  height: auto;
   cursor: pointer;
-  overflow: hidden;
-  transition: transform .18s, box-shadow .18s;
-  color: var(--wb-text-strong);
+  transition: transform .18s var(--wb-ease-out-expo, cubic-bezier(.16, 1, .3, 1)),
+              box-shadow .18s var(--wb-ease-out-expo, cubic-bezier(.16, 1, .3, 1));
 }
 .home__practice-card:hover {
   transform: translateY(-2px);
@@ -2216,10 +2251,9 @@ body.dark .permission-picker__popover,
   filter: brightness(.62) saturate(.8);
 }
 .home__practice-card-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  /* 旧版浮在渐变上的标题/英文小字: 已迁到 .home__practice-card-caption (下方居中),
+   * 此处保留类名但隐藏,避免旧结构在 hover 上闪回。 */
+  display: none;
 }
 .home__practice-card-title > span:first-child {
   font-size: 13px;
@@ -2229,6 +2263,62 @@ body.dark .permission-picker__popover,
   overflow: hidden;
   text-overflow: ellipsis;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}.home__practice-card-thumb {
+  /* 卡内"缩略图"区域 —— WB 用真实截图, 我们用内联 SVG 模拟同类视觉。
+   * 用户反馈「将底部卡片上移 + 优化自适应展示」(2026-09-15 第 6 轮):
+   *  - aspect 234:160 (1.46:1) 让卡片更"饱满",
+   *    视觉上把 viewport 底部空白压住;
+   *  - min/max-height (108 / 180), 整卡高度更紧凑, 案例行不再甩到底部;
+   *  - @container 内联尺寸查询会在窄列 (<480 / <220) 进一步收紧。 */
+  position: relative;
+  display: block;
+  width: 100%;
+  /* 用户反馈「优化卡片自适应展示」(2026-09-15 第 10 轮):
+   *  - aspect 234:160 → 234:140 (16:10 略方), 5 张卡整行总高从 ~172 → ~140,
+   *    viewport 底部空白显著收缩;
+   *  - min-height 108 → 88, max-height 180 → 156, 卡片更紧凑;
+   *  - @container 内联尺寸查询在窄列 (<480 / <220) 进一步收紧, 不重复。 */
+  aspect-ratio: 234 / 140;
+  min-height: 88px;
+  max-height: 156px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--wb-bg-elevated);
+}
+.home__practice-card-thumb svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.home__practice-card-caption {
+  /* WB: 案例标题在卡片下方居中, 14/500 / 中性色。
+   * 自适应: 窄屏允许换行 (最多 2 行) 保证标题完整可见;
+   * 容器查询 @container practices (max-width: 480px) 在窄列下进一步降到 13/1 行。
+   * 用户反馈「优化自适应」: margin-top 从 12 收到 8 让 thumb 与 caption 更紧凑。 */
+  /* 用户反馈「优化卡片自适应展示」(2026-09-15 第 10 轮):
+   *  - margin-top 8 → 6 (再省 2px/卡), 5 张总高省 ~10px;
+   *  - line-height 20 保持, -webkit-line-clamp 2 保留, 标题最多 2 行截断。 */
+  display: block;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: color-mix(in srgb, var(--wb-text-strong) 60%, transparent);
+  text-align: center;
+  letter-spacing: 0.1px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* 单行截断作为基础, -webkit-box 接管窄屏换行 */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .home__practice-card-title small {
   font-size: 11px;
@@ -2239,10 +2329,8 @@ body.dark .permission-picker__popover,
   text-overflow: ellipsis;
 }
 .home__practice-card-glyph {
-  flex: 0 0 auto;
-  font-size: 24px;
-  line-height: 1;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .15));
+  /* 旧版右上角 emoji: 缩略图本身已包含 mock 视觉, glyph 隐藏避免与缩略图重叠。 */
+  display: none;
 }
 
 /* ===== Composer 内"操作类型"黑色标签(复刻 WorkBuddy scene tag) ===== */
@@ -2979,4 +3067,60 @@ body.dark .permission-picker__popover,
 .placeholder-page--panel[aria-busy="true"] {
   align-items: center;
   justify-content: center;
+}
+
+/* ============================================================================
+ * Section label (「任务 (N) ⌄」/「空间 (N) ⌄」) + collapse chevron
+ * 旧实现只在死文件 app.css 里写过一份, 这里重新落到活文件 sidebar-menus.css。
+ * WB: 12/600 + 8px radius 整行可点; chevron 收起时旋转 -90°, 0.2s ease。
+ * ========================================================================== */
+.sidebar__section-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 28px;
+  padding: 4px 12px;
+  margin-bottom: 2px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  /* WB 实测: section 标题颜色 ~rgba(0,0,0,0.55), 比正文浅一档但清晰可读。
+   * 旧版用 --wb-text-medium=rgba(0,0,0,0.3) 太淡, 在浅色 sidebar 上几乎看不见。 */
+  color: color-mix(in srgb, var(--wb-text-strong) 55%, transparent);
+  user-select: none;
+  transition: background-color .15s ease, color .15s ease;
+}
+.sidebar__section-label:hover {
+  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.04));
+  color: var(--wb-text-strong, #1f1f29);
+}
+.sidebar__section-label:hover .sidebar__chevron {
+  color: var(--wb-text-strong, #1f1f29);
+}
+.sidebar__chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: color-mix(in srgb, var(--wb-text-strong) 55%, transparent);
+  transition: transform .2s ease, color .15s ease;
+}
+.sidebar__chevron--collapsed {
+  transform: rotate(-90deg);
+}
+/* 一级导航项的尾随小标 (WB: 「更多」右边的「灵感」) */
+.sidebar__nav-sub {
+  margin-left: auto;
+  flex: none;
+  font-size: 11px;
+  color: var(--wb-text-tertiary, #8a8a96);
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  pointer-events: none;
 }

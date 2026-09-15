@@ -168,6 +168,13 @@ export function getDocBySlug(slug: string, locale: Locale): DocContent | null {
     );
   };
 
+  // 宽表格在窄屏会把整页撑出横向滚动(表格自身不会滚动)。
+  // 包一层可横向滚动的容器,同时保留 table 的 width:100% 桌面布局。
+  const defaultTable = renderer.table;
+  renderer.table = function (token: Tokens.Table) {
+    return `<div class="md-table-wrap">${ defaultTable.call(this, token) }</div>\n`;
+  };
+
   marked.use({ renderer, gfm: true, breaks: false, pedantic: false });
   const html = marked.parse(cleaned) as string;
 

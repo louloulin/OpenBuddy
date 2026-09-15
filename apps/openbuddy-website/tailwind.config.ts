@@ -113,7 +113,10 @@ const config: Config = {
       boxShadow: {
         'wb-card': 'none',
         'wb-card-hover': 'none',
-        'wb-glow-brand': 'none'
+        'wb-glow-brand': 'none',
+        // Modals/dialogs float above a blurred mask — the flat aesthetic needs
+        // one exception or the panel reads as part of the page underneath.
+        'wb-overlay': '0 24px 60px -12px rgba(10, 15, 30, 0.28), 0 8px 20px -8px rgba(10, 15, 30, 0.16)'
       },
       keyframes: {
         'fade-up': {

@@ -133,11 +133,13 @@
   border-radius: 8px;
   background: none;
   cursor: pointer;
-  /* WB conversation-section-label-text: 12px/600/heading(black-30) */
+  /* WB conversation-section-label-text: 12px/600;
+   * 旧版用 --wb-todo-menu-text-heading=rgba(0,0,0,0.3) 在浅色 sidebar 上太淡,
+   * 改用 --wb-text-strong 55% mix 达到 ~rgba(0,0,0,0.5) 易读灰。 */
   font-size: 12px;
   font-weight: 600;
   line-height: 20px;
-  color: var(--wb-todo-menu-text-heading);
+  color: color-mix(in srgb, var(--wb-text-strong) 55%, transparent);
   user-select: none;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
@@ -154,7 +156,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--wb-todo-menu-text-heading);
+  color: color-mix(in srgb, var(--wb-text-strong) 55%, transparent);
   transition: transform 0.2s ease, color 0.15s ease;
 }
 .sidebar__chevron--collapsed {

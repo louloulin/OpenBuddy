@@ -47,7 +47,7 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
         <Architecture locale={ typed } />
         <CTAFinal locale={ typed } />
       </main>
-      <SiteFooter dict={ dict } />
+      <SiteFooter dict={ dict } locale={ typed } />
     </>
   );
 }

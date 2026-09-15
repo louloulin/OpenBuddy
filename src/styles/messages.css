@@ -385,6 +385,23 @@
   gap: 6px;
   margin-bottom: 4px;
 }
+/* 真实对比 WorkBuddy/WeChat/iMessage 气泡方向(2026-09-15 第 7 轮):
+ *  - 助理气泡(左侧): TL=16 / TR=16 / BR=16 / **BL=0**  → 尾巴指向左下(用户视角)
+ *  - 用户气泡(右侧): TL=16 / TR=16 / **BR=0** / BL=16    → 尾巴指向右下(自己视角)
+ *  旧实现 `.msg__bubble { border-radius: 16px 16px 0 16px }` 让两边都 BR=0,
+ *  助理气泡看起来像"右对齐气泡" — 视觉割裂, 像没有说话的占位气泡。
+ *  修复后两侧气泡明确朝自己方向收尾, 视觉更接近 WorkBuddy 风格。 */
+.msg--assistant .msg__bubble {
+  border-radius: 16px 16px 16px 0;
+  /* 助理气泡用更浅的灰底, 与用户气泡区分(WB 实测) */
+  background: var(--wb-bg-tertiary, #f4f5f8);
+}
+.msg--user .msg__bubble {
+  /* 用户气泡: BR=0 (默认已正确), 用品牌/次级灰底凸显发送方 */
+  border-radius: 16px 16px 0 16px;
+  background: var(--wb-bg-secondary, #e9eaef);
+  color: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
+}
 
 
 /* === diff === */

@@ -203,7 +203,7 @@ export function DownloadView({ locale }: { locale: Locale }) {
           </div>
         </section>
       </main>
-      <SiteFooter dict={ dict } />
+      <SiteFooter dict={ dict } locale={ locale } />
     </>
   );
 }

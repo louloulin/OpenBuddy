@@ -2,16 +2,24 @@ import Link from 'next/link';
 import { MessageCircle } from 'lucide-react';
 import { GithubIcon, XIcon, YoutubeIcon, DiscordIcon } from '@/components/icons/BrandIcons';
 import Logo from '@/components/icons/Logo';
-import type { Dict } from '@/lib/i18n';
+import { localizedPath, type Dict, type Locale } from '@/lib/i18n';
 
 interface SiteFooterProps {
   dict: Dict;
+  locale: Locale;
 }
 
 /**
  * SiteFooter —— tutti 风格极简版 (跟随 global theme)
+ *
+ * dict 里的链接是 locale 无关的站内路径(`/pricing`、`/#features`),
+ * 渲染时统一过一层 localizedPath 补上 locale 前缀。
  */
-export default function SiteFooter({ dict }: SiteFooterProps) {
+export default function SiteFooter({ dict, locale }: SiteFooterProps) {
+  function resolveHref(href: string): string {
+    return href.startsWith('/') ? localizedPath(href, locale) : href;
+  }
+
   const sections = [
     { title: dict.footer.product.title, links: dict.footer.product.links },
     { title: dict.footer.resources.title, links: dict.footer.resources.links },
@@ -25,7 +33,7 @@ export default function SiteFooter({ dict }: SiteFooterProps) {
         {/* 顶部: 大 logo + tagline + 社交 */}
         <div className="border-b border-[var(--wb-border)] pb-12">
           <Link
-            href="/"
+            href={ localizedPath('/', locale) }
             className="inline-flex items-center text-[var(--wb-fg)]"
             aria-label="OpenBuddy"
           >
@@ -71,7 +79,7 @@ export default function SiteFooter({ dict }: SiteFooterProps) {
                 { section.links.map((link) => (
                   <li key={ link.href + link.label }>
                     <Link
-                      href={ link.href }
+                      href={ resolveHref(link.href) }
                       className="text-[14px] text-[var(--wb-fg-muted)] transition-colors hover:text-[var(--wb-fg)]"
                     >
                       { link.label }

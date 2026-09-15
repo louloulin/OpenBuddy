@@ -227,8 +227,8 @@
 .sidebar__user {
   display: flex;
   align-items: center;
-  /* WB CDP user-menu-trigger: no gap, takes remaining width */
-  gap: 0;
+  /* 头像 + 双行文本: 头像 28×28, 文本块占剩余空间 */
+  gap: 8px;
   flex: 1;
   min-width: 0;
   height: 44px;
@@ -239,6 +239,54 @@
   cursor: pointer;
   font-size: 13px;
   color: var(--wb-text-strong);
+}
+.sidebar__user-avatar {
+  /* WB 实测: 头像为 28×28 圆, 浅灰底 (light) / 深灰底 (dark);
+   * 已登录时显示用户名首字母, 未登录回退 UserIcon;
+   * 微内核适配: 用 var(--wb-user-avatar-bg) 让三方插件可覆盖品牌色。 */
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--wb-user-avatar-bg, var(--wb-bg-hover, #EBEBEB));
+  color: var(--wb-user-avatar-color, var(--wb-text-strong));
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+.sidebar__user-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  text-align: left;
+}
+.sidebar__user-name {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--wb-text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar__user-sub {
+  width: 100%;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 14px;
+  color: var(--wb-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* “企业登录” wrapped onto a second line when the footer ran out of width —
    truncate instead. */

@@ -147,11 +147,14 @@ body[data-vscode-theme-name="IDE Light"] {
    * dark mode — the composer stayed a glaring white card on a near-black
    * canvas. */
   --wb-bg-elevated: var(--wb-palette-white-100);
+  --wb-bg-subtle: color-mix(in srgb, var(--wb-palette-black-100) 4%, transparent);
   --wb-bg-hover: color-mix(in srgb, var(--wb-palette-black-100) 5%, transparent);
   --wb-bg-active: color-mix(in srgb, var(--wb-palette-black-100) 8%, transparent);
   --wb-bg-overlay: var(--wb-palette-black-40);
-  --wb-border-default: color-mix(in srgb, var(--wb-palette-white-100) 12%, transparent);
-  --wb-border-weak: color-mix(in srgb, var(--wb-palette-white-100) 6%, transparent);
+  /* WB 实测：浅色主题下 chip/card 边框 = rgba(0,0,0,0.08)（白底合成后 #EBEBEB）。
+   * 早期实现误用 white-alpha，导致白底上边框完全不可见。 */
+  --wb-border-default: color-mix(in srgb, var(--wb-palette-black-100) 8%, transparent);
+  --wb-border-weak: color-mix(in srgb, var(--wb-palette-black-100) 4%, transparent);
   --wb-border-subtle: var(--wb-palette-gray-3);
   --wb-border-strong: var(--wb-color-border-primary);
   --wb-border-focus: var(--wb-color-border-focus);
@@ -292,11 +295,13 @@ body.dark,
   --wb-bg-tertiary: var(--wb-palette-gray-4);
   /* Slightly lifted vs bg-primary so elevated cards read as a distinct layer. */
   --wb-bg-elevated: var(--wb-palette-gray-4);
+  --wb-bg-subtle: color-mix(in srgb, var(--wb-palette-black-100) 4%, transparent);
   --wb-bg-hover: color-mix(in srgb, var(--wb-palette-white-100) 6%, transparent);
   --wb-bg-active: var(--wb-palette-white-10);
   --wb-bg-overlay: var(--wb-palette-black-60);
-  --wb-border-default: color-mix(in srgb, var(--wb-palette-black-100) 8%, transparent);
-  --wb-border-weak: color-mix(in srgb, var(--wb-palette-black-100) 4%, transparent);
+  /* 暗色主题镜像规则：边框用 white-alpha，在黑底上才可见。 */
+  --wb-border-default: color-mix(in srgb, var(--wb-palette-white-100) 12%, transparent);
+  --wb-border-weak: color-mix(in srgb, var(--wb-palette-white-100) 6%, transparent);
   --wb-border-subtle: color-mix(in srgb, var(--wb-palette-white-100) 6%, transparent);
   --wb-border-strong: var(--wb-color-border-primary);
   --wb-border-focus: var(--wb-color-border-focus);
@@ -681,6 +686,7 @@ body.dark,
   --wb-bg-secondary: #141414 !important;
   --wb-bg-tertiary: #242424 !important;
   --wb-bg-elevated: #2a2a2a !important;
+  --wb-bg-subtle: rgba(255, 255, 255, 0.06) !important;
   --wb-color-bg-secondary-default: #1f1f1f !important;
   --wb-color-bg-primary-default: #1f1f1f !important;
   --wb-color-bg-primary-hover: #242424 !important;

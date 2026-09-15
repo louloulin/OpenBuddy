@@ -93,7 +93,7 @@ export function ChangelogView({ locale, releases }: { locale: Locale; releases: 
           </div>
         </section>
       </main>
-      <SiteFooter dict={ dict } />
+      <SiteFooter dict={ dict } locale={ locale } />
     </>
   );
 }

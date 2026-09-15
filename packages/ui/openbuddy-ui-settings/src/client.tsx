@@ -14,10 +14,15 @@ export function apply(ctx: UiRuntimeContext): () => void {
     HomePage as never
   );
   const disposeSettings = ctx.slots.register(
-    { name: "shell.overlay", kind: "list", scope: "root", registrant: "@openbuddy/ui-settings" },
+    { name: "shell.overlay", kind: "list", scope: "root", id: "settings", registrant: "@openbuddy/ui-settings" },
+    SettingsPanel as never
+  );
+  const disposeNamedSettings = ctx.slots.register(
+    { name: "overlay.settings", kind: "single", scope: "root", registrant: "@openbuddy/ui-settings" },
     SettingsPanel as never
   );
   return () => {
+    disposeNamedSettings();
     disposeHome();
     disposeSettings();
   };

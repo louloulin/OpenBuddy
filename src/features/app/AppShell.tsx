@@ -45,6 +45,7 @@ import {
   MainTopbarToolsSlot,
 } from "./chrome";
 import { RoutePending } from "./RoutePending";
+import { useSlotComponent } from "./slot-bridge";
 import type { AppShellRuntime } from "./types";
 
 // ---- Lazy overlays ----------------------------------------------------------
@@ -119,6 +120,62 @@ const Topbar = memo(function Topbar({
     </header>
   );
 });
+
+// ---- Slot surfaces ---------------------------------------------------------
+//
+// 结构位置（侧栏 / 会话区 / 首页）不再硬绑到某个具体组件，而是先问微内核
+// 「这个 slot 现在由谁提供」，内核里没有才回落到内置组件。这样：
+//   - 第三方插件可以用更高 priority 注册 "conversation" 整体替换会话区
+//   - 内置实现仍然在核心里作为底座，卸载插件即自动恢复
+// 参考 PI-Desktop 的 AppFrame slot 组合模式。
+
+/** 会话区：内核 `conversation` slot 优先，回落到 ui-conversation 的 ChatView。 */
+function ConversationSurface(props: React.ComponentProps<typeof ChatView>) {
+  const Component = useSlotComponent("conversation", ChatView);
+  return <Component {...props} />;
+}
+
+/** 首页：内核 `home` slot 优先，回落到 ui-settings 的 HomePage。 */
+function HomeSurface(props: React.ComponentProps<typeof HomePage>) {
+  const Component = useSlotComponent("home", HomePage);
+  return <Component {...props} />;
+}
+
+/** 侧栏：内核 `sidebar` slot 优先，回落到 ui-sidebar 的 Sidebar。 */
+function SidebarSurface(props: React.ComponentProps<typeof Sidebar>) {
+  const Component = useSlotComponent("sidebar", Sidebar);
+  return <Component {...props} />;
+}
+
+/** 搜索面板：内核 `overlay.search` slot 优先。 */
+function SearchSurface(props: React.ComponentProps<typeof SearchOverlay>) {
+  const Component = useSlotComponent("overlay.search", SearchOverlay);
+  return <Component {...props} />;
+}
+
+/** 设置面板：内核 `overlay.settings` slot 优先。 */
+function SettingsSurface(props: React.ComponentProps<typeof SettingsPanel>) {
+  const Component = useSlotComponent("overlay.settings", SettingsPanel);
+  return <Component {...props} />;
+}
+
+/** 关于对话框：内核 `overlay.about` slot 优先。 */
+function AboutSurface(props: React.ComponentProps<typeof AboutDialog>) {
+  const Component = useSlotComponent("overlay.about", AboutDialog);
+  return <Component {...props} />;
+}
+
+/** 目录信任对话框：内核 `overlay.folder-trust` slot 优先。 */
+function TrustSurface(props: React.ComponentProps<typeof FolderTrustDialog>) {
+  const Component = useSlotComponent("overlay.folder-trust", FolderTrustDialog);
+  return <Component {...props} />;
+}
+
+/** 任务面板：内核 `overlay.tasks` slot 优先。 */
+function TasksSurface(props: React.ComponentProps<typeof TasksPanel>) {
+  const Component = useSlotComponent("overlay.tasks", TasksPanel);
+  return <Component {...props} />;
+}
 
 // ---- Main content (one of: notice / placeholder / chat / home) -------------
 function MainContent({ runtime }: { runtime: AppShellRuntime }) {
@@ -221,7 +278,7 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
             onRestore={runtime.sessionEvents.restoreTruncation}
           />
         )}
-        <ChatView
+        <ConversationSurface
           onSend={handleSendCurrent}
           onSendContent={handleSendContent}
           onCancel={handleCancel}
@@ -247,7 +304,7 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
   return (
     <ErrorBoundary compact title="首页出现错误">
       <Suspense fallback={<RoutePending label="加载首页" />}>
-        <HomePage
+        <HomeSurface
           onSend={handleSendNew}
           streaming={streaming}
           apiReady={apiReady}
@@ -261,7 +318,6 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
           onSelectWorkspace={handleSelectWorkspace}
           onSelectExpert={handleStartWithExpert}
           onNavigateConnectors={() => setPlaceholderView("专家·技能·连接器")}
-          onOpenActivity={() => setPlaceholderView("活动中心")}
         />
       </Suspense>
     </ErrorBoundary>
@@ -314,7 +370,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
       )}
       <div className={"app__body" + (sidebarCollapsed ? " app__body--collapsed" : "")}>
         <ErrorBoundary compact title="侧栏出现错误">
-          <Sidebar
+          <SidebarSurface
             onNewSession={handleNewSession}
             onSelect={handleSelectSession}
             onNavigate={handleNavigate}
@@ -361,7 +417,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
       </div>
       <Toast entries={toastQueue} onDismiss={dismissToast} />
       <Suspense fallback={null}>
-        <SearchOverlay
+        <SearchSurface
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
           onSelect={handleSelectSession}
@@ -372,7 +428,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           currentSessionId={currentSessionId}
           onSelectCalendar={() => handleNavigate("助理·日程")}
         />
-        <SettingsPanel
+        <SettingsSurface
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
           onModelsChanged={refreshModels}
@@ -383,13 +439,13 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
             handleNavigate("邮件");
           }}
         />
-        <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} init={runtime.init} />
-        <FolderTrustDialog
+        <AboutSurface open={aboutOpen} onClose={() => setAboutOpen(false)} init={runtime.init} />
+        <TrustSurface
           request={trustRequest}
           onResolve={() => setTrustRequest(null)}
           onToast={showToast}
         />
-        <TasksPanel refreshSignal={runtime.taskRefreshSignal} onToast={showToast} />
+        <TasksSurface refreshSignal={runtime.taskRefreshSignal} onToast={showToast} />
       </Suspense>
       <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <GlobalConfirmHost />

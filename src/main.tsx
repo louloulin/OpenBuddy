@@ -5,6 +5,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 // the app-level styles so any later OpenBuddy token can refine it deliberately.
 import "@openbuddy/ui-theme/styles";
 import { startRendererPluginEventBridge } from "./lib/runtime/renderer-plugin-runtime";
+import { installPluginSdkBridge } from "@openbuddy/ui-runtime/client";
 import { setToast } from "./stores/toast-store";
 import { useSessionStore } from "./stores/session-store";
 import { abandonInFlightStream } from "./lib/agent/abandon-stream";
@@ -12,6 +13,11 @@ import { abandonInFlightStream } from "./lib/agent/abandon-stream";
 // theme / chrome / per-domain 拆分文件。app.css 与 automation-wb.css 由
 // globals.css 间接引入（兜底，向后兼容）。
 import "./styles/globals.css";
+
+// Phase K.3 — 把 `@openbuddy/plugin-sdk` 的 `defineExtension()` 事件接进微内核。
+// 在此之前 SDK 只派发 DOM 事件、没有监听者，第三方插件注册完等于没注册。
+// 必须在插件的 setup() 运行前装好，因此放在 React 挂载之前。
+installPluginSdkBridge();
 
 // R2.4 — boot Composer-draft persistence (localStorage mirror of
 // sessions-store.drafts) so unsent text survives a renderer reload.

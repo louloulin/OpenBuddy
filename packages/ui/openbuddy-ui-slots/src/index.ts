@@ -219,13 +219,35 @@ export interface SlotCoreLike {
     scope?: SlotScope;
     /** Keyed entry key (kind="keyed" 时必填,作为 Map 的 key)。 */
     key?: string;
+    /**
+     * List entry id(kind="list" 时是该 cell 的稳定标识)。
+     *
+     * 为什么需要:id 是「同一条目重复注册」的判据 —— 有了它 HMR / 重复 apply
+     * 才能幂等覆盖而不是叠加两份。缺省时内核会按 `<registrant>#<seq>` 派生,
+     * 因此漏写不会导致注册失败,只是失去跨 pass 的稳定性。
+     */
+    id?: string;
+    /** 排序位(kind="list" 内生效),数值小的排前。 */
+    order?: number;
+    /** 注册者标识(e.g. `@openbuddy/ui-sidebar`),用于诊断与插件面板展示。 */
+    registrant?: string;
+    /**
+     * 数据型贡献的载荷。
+     *
+     * 插件（尤其经 plugin-sdk `defineExtension` 接入的第三方插件）不必提供
+     * React 组件：它可以只描述"我要加一个场景 tab / 一条命令"，由宿主提供 UI。
+     * 这类贡献把描述放在 payload 里，消费方用 `useSlotPayloads(name)` 读取。
+     * 组件型贡献的 payload 也可以直接是组件本身。
+     */
+    payload?: unknown;
     /** 优先级;list kind 下数字大者后渲染,keyed kind 下数字大者覆盖低优先级。 */
     priority?: number;
     children?: ChildrenDecl;
     store?: StoreDecl | (() => StoreHandle<unknown, Record<string, (...args: never[]) => void>>);
     inject?: (ctx: unknown) => object;
     locale?: string;
-    registrant?: string;
+    /** chain 模式的 selector(kind="chain" 时由 owner 提供)。 */
+    select?: (owner: unknown) => unknown | null;
   }, component: unknown): () => void;
   inject(name: string, register: () => () => void): () => void;
   /** 默认 entries:按 kind 返回单组件 / 列表 / Map。 */

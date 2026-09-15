@@ -9,9 +9,13 @@ import type { UiRuntimeContext } from "@openbuddy/ui-slots";
 import { TasksPanel } from "./TasksPanel";
 
 export function apply(ctx: UiRuntimeContext): () => void {
-  const dispose = ctx.slots.register(
-    { name: "shell.overlay", kind: "list", scope: "root", registrant: "@openbuddy/ui-automation" },
+  const disposeOverlay = ctx.slots.register(
+    { name: "shell.overlay", kind: "list", scope: "root", id: "tasks", registrant: "@openbuddy/ui-automation" },
     TasksPanel as never
   );
-  return dispose;
+  const disposeNamed = ctx.slots.register(
+    { name: "overlay.tasks", kind: "single", scope: "root", registrant: "@openbuddy/ui-automation" },
+    TasksPanel as never
+  );
+  return () => { disposeNamed(); disposeOverlay(); };
 }

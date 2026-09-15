@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import DocsSidebar from '@/components/docs/DocsSidebar';
+import DocsMobileNav from '@/components/docs/DocsMobileNav';
 import DocArticle from '@/components/docs/DocArticle';
 import { getAllDocs } from '@/lib/docs-meta';
 import { getDocBySlug } from '@/lib/docs-server';
@@ -50,20 +51,21 @@ export default async function DocPage({
     <>
       <SiteHeader dict={ dict } locale={ locale as Locale } />
       <main id="main-content" className="pt-12">
-        <section className="relative py-20 md:py-28">
+        <section className="relative py-10 md:py-28">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <DocsMobileNav locale={ locale as Locale } label={ dict.docsPage.browseDocs } />
             <div className="grid gap-12 lg:grid-cols-[260px_1fr]">
               <aside className="hidden lg:block">
                 <DocsSidebar locale={ locale as Locale } activeSlug={ slug } />
               </aside>
-              <div>
+              <div className="min-w-0">
                 <DocArticle content={ content } locale={ locale as Locale } />
               </div>
             </div>
           </div>
         </section>
       </main>
-      <SiteFooter dict={ dict } />
+      <SiteFooter dict={ dict } locale={ locale as Locale } />
     </>
   );
 }

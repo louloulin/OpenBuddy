@@ -107,3 +107,101 @@
   background: var(--wb-brand-primary);
   border-color: var(--wb-brand-primary);
 }
+
+/* ---- Sidebar / Topbar / 主区背景层次 ----
+ * 用户反馈「暗色下侧栏与主区一片黑」: 原 CSS .app 和 .sidebar 都引用
+ * 同一 token --wb-bg-base, 暗色下都解析到 rgb(31,31,31), 失去层次。
+ * 这里:
+ *   - sidebar 在暗色用 --wb-bg-elevated 提亮一档 (rgb 42,42,42)
+ *   - main 保持 --wb-bg-base (rgb 31,31,31) 当画布
+ *   - sidebar 右侧加 1px 边框当分界线 (替代浅色下的 bg 差异)
+ *   - topbar / titlebar 在暗色下提亮一档
+ */
+[data-theme="dark"] .sidebar {
+  background: var(--wb-bg-elevated, rgb(42, 42, 42));
+  border-right: 1px solid var(--wb-border-default);
+}
+[data-theme="dark"] .sidebar__logo-row,
+[data-theme="dark"] .sidebar__search-row,
+[data-theme="dark"] .sidebar__nav,
+[data-theme="dark"] .sidebar__footer {
+  background: transparent;
+}
+[data-theme="dark"] .sidebar__search-input {
+  background: var(--wb-bg-base, rgb(31, 31, 31));
+  border-color: var(--wb-border-default);
+}
+[data-theme="dark"] .sidebar__search-input:focus-within {
+  background: var(--wb-bg-base, rgb(31, 31, 31));
+  border-color: var(--wb-border-strong);
+}
+[data-theme="dark"] .sidebar__nav-item:hover {
+  background: var(--wb-bg-hover);
+}
+[data-theme="dark"] .sidebar__nav-item--active {
+  background: var(--wb-bg-active, rgba(255, 255, 255, 0.08));
+}
+[data-theme="dark"] .sidebar__user,
+[data-theme="dark"] .sidebar__icon-btn {
+  color: var(--wb-text-medium);
+}
+[data-theme="dark"] .sidebar__user-avatar {
+  background: var(--wb-user-avatar-bg-dark, rgba(255, 255, 255, 0.10));
+  color: var(--wb-user-avatar-color-dark, var(--wb-text-strong));
+}
+[data-theme="dark"] .sidebar__user:hover,
+[data-theme="dark"] .sidebar__icon-btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+[data-theme="dark"] .sidebar__footer {
+  border-top: 1px solid var(--wb-border-default);
+}
+
+/* 主区背景: 暗色用更深的画布, 让 sidebar (提亮) 形成对比 */
+[data-theme="dark"] .app__main {
+  background: var(--wb-bg-base, rgb(31, 31, 31));
+}
+
+/* Topbar / ChatView 暗色下的层次 */
+[data-theme="dark"] .main-topbar {
+  background: var(--wb-bg-elevated, rgb(42, 42, 42));
+  border-bottom: 1px solid var(--wb-border-default);
+}
+[data-theme="dark"] .chatview__scroll,
+[data-theme="dark"] .chatview__main {
+  background: var(--wb-bg-base, rgb(31, 31, 31));
+}
+[data-theme="dark"] .chatview__inner {
+  background: transparent;
+}
+[data-theme="dark"] .chatview__footer {
+  background: transparent;
+  border-top: none;
+}
+[data-theme="dark"] .chatview__empty-state {
+  color: var(--wb-text-strong);
+}
+[data-theme="dark"] .chatview__empty-state-icon {
+  background: var(--wb-bg-elevated, rgb(42, 42, 42));
+  border-color: var(--wb-border-default);
+}
+
+/* Status indicator 暗色 */
+[data-theme="dark"] .status-indicator--empty {
+  background: transparent;
+}
+
+
+/* Message bubbles 暗色 (2026-09-15 第 7 轮)
+ * 真实对比 WorkBuddy/WeChat/iMessage 暗色模式气泡 — 在 #1f1f1f 主区上,
+ * 助理气泡用 #242424 (提亮一层), 用户气泡用 #2a2a2a (再提亮一层),
+ * 形成"我说的"对比"对方说的"的层次。 */
+[data-theme="dark"] .msg--assistant .msg__bubble {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--wb-text-strong);
+}
+[data-theme="dark"] .msg--user .msg__bubble {
+  background: var(--wb-bg-elevated, rgb(42, 42, 42));
+  color: var(--wb-text-strong);
+}

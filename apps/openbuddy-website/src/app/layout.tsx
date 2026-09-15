@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import CookieConsent from '@/components/CookieConsent';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
+import SearchDialog from '@/components/search/SearchDialog';
 import BackToTop from '@/components/BackToTop';
+import { getSearchIndex } from '@/lib/docs-search';
 import '../styles/globals.css';
 
 export const viewport: Viewport = {
@@ -38,6 +40,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const searchIndex = getSearchIndex();
   return (
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
@@ -160,6 +163,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <BackToTop />
           <CookieConsent />
           <KeyboardShortcuts />
+          <SearchDialog index={ searchIndex } />
         </ThemeProvider>
       </body>
     </html>

@@ -721,7 +721,7 @@
   font-size: 12px;
   font-weight: 500;
   color: var(--wb-text-strong, #1a1a2e);
-  background: var(--wb-bg-secondary, #f5f5f7);
+  background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.04));
   border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
   border-radius: 999px;
   user-select: none;

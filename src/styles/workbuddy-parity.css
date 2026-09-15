@@ -146,57 +146,20 @@
   margin-left: 0;
 }
 
-/* 场景 tabs 居中 */
-.home__scenes {
-  align-self: center;
-}
-
-/* WorkBuddy 实测首页内容列约 1100px（非 800px）：composer 与案例卡同行宽，
- * 4 张案例卡在 1100px 下每张约 272px；窄窗口自动降为 3 / 2 / 1 列。 */
-.home {
-  max-width: min(1100px, 100%);
-}
-.home__practices-grid {
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-}
-
-.home__practice-card {
-  height: 132px;
-  padding: 14px 16px;
-  border-radius: 14px;
-}
-.home__practice-card-title > span:first-child {
-  font-size: 14px;
-}
-.home__practice-card-glyph {
-  font-size: 30px;
-}
+/* 旧版"宽 1100px + 案例卡 132 高 + emoji 浮在渐变上"的扁平 overlay 实现已被
+ * 替换为：960 内容列 + 案例卡改成 (缩略图 + 下方居中标题) 的垂直布局。
+ * 相关样式迁到 sidebar-menus.css(.home / .home__practice-card-thumb /
+ * .home__practice-card-caption),此处不重复定义。 */
 
 /* ---------------------------------------------------------------------------
  * 暗色下的最佳实践案例卡
  *
- * 原实现用 `filter: brightness(.5) saturate(.7)` 压暗整张卡——但滤镜作用在
- * 整棵子树，白字标题一起被压暗，案例名几乎不可读。改为在渐变之上叠一层
- * scrim（伪元素），只压背景不动文字。
+ * 暗色下保持缩略图可见但不刺眼:把整张卡做一次温和压暗去饱和,而文字
+ * (缩略图里的白/深色前景 + 卡片外的 caption) 已被移到 ::before 伪元素之外的
+ * 兄弟节点,所以滤镜作用不到标题 —— 不再需要 ::after scrim 兜底。
  * ------------------------------------------------------------------------- */
 [data-theme="dark"] .home__practice-card {
-  filter: none;
-  border-color: rgba(255, 255, 255, 0.08);
-}
-[data-theme="dark"] .home__practice-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: rgba(0, 0, 0, 0.55);
-  pointer-events: none;
-}
-[data-theme="dark"] .home__practice-card > * {
-  position: relative;
-  z-index: 1;
-}
-[data-theme="dark"] .home__practice-card:hover::after {
-  background: rgba(0, 0, 0, 0.42);
+  filter: brightness(.86) saturate(.92);
 }
 
 
@@ -212,16 +175,17 @@
   outline: none;
 }
 .wb-composer:focus-within {
-  border-color: var(--wb-focus, #4d8eff);
+  /* WB: 即使输入框自动聚焦, 外卡 + 内卡的边框都保持 #EBEBEB, 不上深。
+   * 仅额外加一圈极淡的中性灰呼吸供键盘 a11y (WCAG 2.4.7) 识别,
+   * 完全不引入品牌色,避免再次出现"像表单校验报错"的视觉误读。 */
+  border-color: var(--wb-border-default);
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--wb-focus, #4d8eff) 22%, transparent),
-    0 12px 24px -8px rgba(0, 0, 0, 0.02),
-    0 2px 4px -4px rgba(0, 0, 0, 0.02);
+    0 0 0 4px color-mix(in srgb, var(--wb-text-strong) 6%, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.04);
 }
 [data-theme="dark"] .wb-composer:focus-within {
-  border-color: color-mix(in srgb, var(--wb-focus, #4d8eff) 70%, transparent);
+  border-color: var(--wb-border-default);
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--wb-focus, #4d8eff) 26%, transparent),
-    0 12px 28px -6px rgba(0, 0, 0, 0.55),
-    0 2px 8px rgba(0, 0, 0, 0.35);
+    0 0 0 4px color-mix(in srgb, var(--wb-text-strong) 14%, transparent),
+    0 1px 4px rgba(0, 0, 0, 0.35);
 }

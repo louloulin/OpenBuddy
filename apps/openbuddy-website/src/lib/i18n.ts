@@ -46,6 +46,15 @@ export interface Dict {
     github: string;
     starOnGithub: string;
   };
+  search: {
+    trigger: string;
+    placeholder: string;
+    empty: string;
+    noResults: string;
+    hintNavigate: string;
+    hintSelect: string;
+    hintClose: string;
+  };
   hero: {
     chip: string;
     titlePre: string;
@@ -197,6 +206,7 @@ export interface Dict {
   };
   docsPage: {
     onThisPage: string;
+    browseDocs: string;
     editOnGitHub: string;
     viewRaw: string;
     previous: string;
@@ -266,6 +276,15 @@ const en: Dict = {
     download: 'Download',
     github: 'GitHub',
     starOnGithub: 'Star on GitHub'
+  },
+  search: {
+    trigger: 'Search docs',
+    placeholder: 'Search documentation…',
+    empty: 'Type to search 22 documents — or try one of these.',
+    noResults: 'No documents match that query.',
+    hintNavigate: 'navigate',
+    hintSelect: 'open',
+    hintClose: 'close'
   },
   hero: {
     chip: 'v0.15 · MIT licensed · 1,886 tests',
@@ -860,6 +879,7 @@ const en: Dict = {
   },
   docsPage: {
     onThisPage: 'On this page',
+    browseDocs: 'Browse docs',
     editOnGitHub: 'Edit on GitHub',
     viewRaw: 'View raw markdown',
     previous: 'Previous',
@@ -967,6 +987,15 @@ const zhCN: Dict = {
     download: '下载',
     github: 'GitHub',
     starOnGithub: '在 GitHub 上 Star'
+  },
+  search: {
+    trigger: '搜索文档',
+    placeholder: '搜索文档…',
+    empty: '输入关键词检索 22 篇文档,或试试这些:',
+    noResults: '没有匹配的文档。',
+    hintNavigate: '切换',
+    hintSelect: '打开',
+    hintClose: '关闭'
   },
   hero: {
     chip: 'v0.14 · MIT 协议 · 455 测试通过',
@@ -1474,6 +1503,7 @@ const zhCN: Dict = {
   },
   docsPage: {
     onThisPage: '本页目录',
+    browseDocs: '浏览文档',
     editOnGitHub: '在 GitHub 编辑',
     viewRaw: '查看原始 Markdown',
     previous: '上一篇',
@@ -1564,7 +1594,16 @@ export function extractLocaleFromPath(pathname: string): Locale {
   return defaultLocale;
 }
 
+/**
+ * 构建带 locale 前缀的内部链接。
+ *
+ * 注意:这个站点的路由**始终**带 locale 前缀(`src/app/[locale]/...`),
+ * 只有根路径 `/` 例外(由 middleware 重定向到 `/<locale>`)。
+ * 早先的实现对默认语言直接返回无前缀路径,导致英文站所有内链落到
+ * `[locale]` 被当成 locale 名的错误分支(空页/崩溃)或 404。
+ */
 export function localizedPath(path: string, locale: Locale): string {
-  if (locale === defaultLocale) return path;
-  return `/${locale}${path.startsWith('/') ? path : `/${path}`}`;
+  const suffix = path.startsWith('/') ? path : `/${path}`;
+  if (suffix === '/') return `/${locale}`;
+  return `/${locale}${suffix}`;
 }

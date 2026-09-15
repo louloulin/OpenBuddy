@@ -25,6 +25,7 @@ import { SlashCommands } from "@openbuddy/ui-workbench";
 import { InputAddMenu } from "./InputAddMenu";
 import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
 import { RendererSlotView } from "@openbuddy/ui-workbench";
+import { useSlotPayloads } from "@openbuddy/ui-runtime/client";
 import {
   collectDroppedPaths,
   isDragHovering,
@@ -690,6 +691,18 @@ export function ComposerInner({
   const ph = (label: string) => onPlaceholder?.(label);
   const pluginComposerContributions = useRendererContributions("composer");
   const pluginComposerSlots = useRendererSlot("conversation.input.dock");
+  // 插件贡献的工具栏按钮（`composer.toolbar.action` slot）。
+  // 数据型贡献：插件只描述按钮长什么样、点了做什么，UI 由 Composer 渲染。
+  const pluginToolbarActions = useSlotPayloads<{
+    id: string;
+    label: string;
+    icon?: React.ReactNode;
+    description?: string;
+    insertText?: string;
+    placeholder?: string;
+    onClick?: (ctx: { insertText: (text: string) => void }) => void;
+    onActivate?: () => void;
+  }>("composer.toolbar.action");
 
   // Cursor tracking for slash-command autocomplete.
   const [cursorPos, setCursorPos] = useState(0);
@@ -1121,6 +1134,33 @@ export function ComposerInner({
           })}
           {pluginComposerSlots.map((entry) => (
             <RendererSlotView key={String(entry.options.id ?? entry.options.key ?? entry.options.name)} entry={entry} className="wb-composer__plugin-action" />
+          ))}
+          {/* 微内核 `composer.toolbar.action` slot 的插件按钮。第三方插件通过
+              plugin-sdk 的 api.registerSlot 注册，无需打包 React 组件。 */}
+          {pluginToolbarActions.map((action) => (
+            <button
+              key={action.id}
+              type="button"
+              className="wb-composer__plugin-action"
+              title={action.description ?? action.label}
+              onClick={(event) => {
+                event.stopPropagation();
+                const insert = (snippet: string) => {
+                  updateText((prev) => {
+                    const prefix = prev === "" || prev.endsWith(" ") ? "" : " ";
+                    return prev + prefix + snippet;
+                  });
+                  requestAnimationFrame(() => ref.current?.focus());
+                };
+                if (action.insertText !== undefined) insert(action.insertText);
+                if (action.placeholder) ph(action.placeholder);
+                action.onClick?.({ insertText: insert });
+                action.onActivate?.();
+              }}
+            >
+              {action.icon ? <span aria-hidden="true">{action.icon}</span> : null}
+              {action.label}
+            </button>
           ))}
           {activeExpertName && (
             <span className="wb-composer__expert-badge" title={`当前专家：${activeExpertName}`}>

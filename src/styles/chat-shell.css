@@ -85,7 +85,8 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  background: var(--wb-home-bg-primary);
+  /* WB CDP: main area is white card on top of gray app background */
+  background: var(--wb-bg-primary);
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
   overflow: hidden;
@@ -106,4 +107,104 @@
   padding: 2px 6px;
   border-radius: 4px;
   font-family: var(--wb-font-code-family);
+}
+
+/* ===== ChatView 空状态 (空对话时显示的欢迎屏) =====
+ * 之前只有 React markup 没有样式,空对话时一片白。现在给一个 WB 风格的居中欢迎卡。
+ * 用户反馈「真实对比 workbuddy 的 ui」, WB 空对话的视觉密度跟 home 一样高, 这里
+ * 用 icon + title + subtitle + 快捷键提示 + 能力标签 5 层结构拉齐密度。 */
+.chatview__empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  padding: 64px 24px 32px;
+  margin: 0 auto;
+  max-width: 560px;
+  color: var(--wb-text-strong);
+}
+.chatview__empty-state-icon {
+  font-size: 36px;
+  line-height: 1;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--wb-bg-elevated);
+  border: 1px solid var(--wb-border-default);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+.chatview__empty-state-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  color: var(--wb-text-strong);
+}
+.chatview__empty-state-subtitle {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--wb-text-medium);
+  max-width: 420px;
+}
+.chatview__empty-state-hint {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--wb-text-medium);
+}
+.chatview__empty-state-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  margin: 0 2px;
+  border: 1px solid var(--wb-border-default);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--wb-bg-elevated);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--wb-text-strong);
+}
+.chatview__empty-state-tags {
+  list-style: none;
+  margin: 16px 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.chatview__empty-state-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.04));
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wb-text-medium);
+  transition: background-color .18s var(--wb-ease-out-expo), color .18s var(--wb-ease-out-expo);
+}
+.chatview__empty-state-tag:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+
+/* 暗色适配：空状态的图标卡 + 标签在暗背景下要再压暗一点 */
+[data-theme="dark"] .chatview__empty-state-icon {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+[data-theme="dark"] .chatview__empty-state-tag {
+  background: rgba(255, 255, 255, 0.06);
 }

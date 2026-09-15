@@ -10,6 +10,10 @@ import { localizedPath } from '@/lib/i18n';
 interface DocsSidebarProps {
   locale: Locale;
   activeSlug?: string;
+  /** 'rail' = sticky desktop column; 'inline' = flows inside the mobile panel */
+  variant?: 'rail' | 'inline';
+  /** Called when a doc link is activated — lets a mobile panel close itself */
+  onNavigate?: () => void;
 }
 
 const CATEGORY_ORDER: DocCategory[] = ['core', 'plugin', 'operations', 'reference', 'meta', 'spec'];
@@ -23,7 +27,12 @@ const COLLAPSE_KEY = 'openbuddy-docs-sidebar';
  * 折叠状态:每个 group 默认展开;展开/折叠状态写 localStorage 持久化。
  * 当前 group 命中 activeSlug 时强制展开。
  */
-export default function DocsSidebar({ locale, activeSlug }: DocsSidebarProps) {
+export default function DocsSidebar({
+  locale,
+  activeSlug,
+  variant = 'rail',
+  onNavigate
+}: DocsSidebarProps) {
   const pathname = usePathname();
   const grouped = getDocsByCategory();
 
@@ -53,7 +62,14 @@ export default function DocsSidebar({ locale, activeSlug }: DocsSidebarProps) {
   }
 
   return (
-    <nav aria-label="Documentation" className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-4">
+    <nav
+      aria-label="Documentation"
+      className={
+        variant === 'rail'
+          ? 'sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-4'
+          : ''
+      }
+    >
       <ul className="space-y-7">
         { CATEGORY_ORDER.map((cat) => {
           const docs = grouped[cat];
@@ -84,6 +100,7 @@ export default function DocsSidebar({ locale, activeSlug }: DocsSidebarProps) {
                       doc={ doc }
                       href={ localizedPath(`/docs/${ doc.slug }`, locale) }
                       isActive={ activeSlug === doc.slug || pathname?.endsWith(`/${ doc.slug }`) }
+                      onNavigate={ onNavigate }
                     />
                   )) }
                 </ul>
@@ -96,11 +113,22 @@ export default function DocsSidebar({ locale, activeSlug }: DocsSidebarProps) {
   );
 }
 
-function DocLink({ doc, href, isActive }: { doc: DocMeta; href: string; isActive: boolean }) {
+function DocLink({
+  doc,
+  href,
+  isActive,
+  onNavigate
+}: {
+  doc: DocMeta;
+  href: string;
+  isActive: boolean;
+  onNavigate?: () => void;
+}) {
   return (
     <li>
       <Link
         href={ href }
+        onClick={ onNavigate }
         className={ `block rounded-md px-2.5 py-1.5 text-[13.5px] transition-colors ${
           isActive
             ? 'bg-[var(--wb-bg-soft)] font-medium text-[var(--wb-fg)]'

@@ -10,6 +10,8 @@
 import {
   createContext,
   createElement,
+  Fragment,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -19,7 +21,6 @@ import {
 } from "react";
 import {
   RendererPluginLoader,
-  createDeepSeekClientCompatibilityModules,
   type RendererPlugin,
   type RendererPluginEntry,
 } from "@openbuddy/renderer-host";
@@ -30,6 +31,9 @@ import type { SessionRecord, WorkspaceRecord, Observable, UiRuntime } from "./in
 import type { UiPlugin, SlotCoreLike, UiRuntimeContext, SlotKind, SlotScope } from "@openbuddy/ui-slots";
 import { BUILTIN_UI_APPLIES } from "./builtin-applies";
 import { serializeBuiltinUiSlotTrack } from "./slot-plugin-manifest";
+import { createSlotCore, type SlotCoreHandle, type SlotEntry } from "./slot-core";
+
+export type { SlotEntry, SlotCoreHandle, SlotRegistrationOptions } from "./slot-core";
 
 // ---------- session/workspace store ---------------------------------------
 
@@ -74,21 +78,10 @@ function createWorkspacesStore(): Observable<readonly WorkspaceRecord[]> & {
 // ---------- runtime singleton ---------------------------------------------
 
 function buildUiRuntime(): UiRuntime {
-  // Construct the renderer-host SlotCore via the existing deepseek-compat
-  // adapter so third-party dsh.client bundles compose through the same
-  // loader the original renderer-plugin-runtime already exercises.
-  const compatibility = createDeepSeekClientCompatibilityModules(/* react */ {} as never);
-  // The compatibility layer is module-only and returns the SlotCore as one
-  // of its members; we extract it to attach to UiRuntime. We import lazily
-  // to avoid pulling renderer-host into the SSR surface.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const compatSlotCore: SlotCoreLike | undefined = (compatibility as {
-    DeepSeekSlotCore?: new () => SlotCoreLike;
-  }).DeepSeekSlotCore
-    ? new (compatibility as { DeepSeekSlotCore: new () => SlotCoreLike }).DeepSeekSlotCore()
-    : undefined;
-
-  const slots: SlotCoreLike = compatSlotCore ?? makeFallbackSlotCore();
+  // Phase K.3 —— 微内核：SlotCore 是自持实现（见 ./slot-core）。
+  // 它同时提供 register/entries/spec 与 subscribe/snapshot，既是插件装配总线，
+  // 也是 UI 组合的订阅源。第三方 dsh.client 插件通过 ui.slots 走同一条注册路径。
+  const slots: SlotCoreHandle = createSlotCore();
 
   const sessions = createSessionsStore();
   const workspaces = createWorkspacesStore();
@@ -143,128 +136,15 @@ function makeEvents() {
 }
 
 /**
- * 内部槽位记录:按 kind 维护不同数据结构。
- * - list 模式:按注册顺序存数组,提供 entries()
- * - keyed 模式:按 key 维度 Map<key, entry>,同 key 后注册覆盖前注册(按 priority 大者覆盖)
- * - chain 模式:按 priority 升序存数组,提供 chain() 返回外→内逐层包装的最终组件
- * - single 模式:仅保留第一个注册者(向后兼容历史调用)
- */
-interface SlotRecord {
-  spec: { kind: SlotKind; scope: SlotScope } | undefined;
-  list: Array<{ key: string | undefined; priority: number; component: unknown }>;
-  keyed: Map<string, { priority: number; component: unknown }>;
-  chain: Array<{ key: string | undefined; priority: number; component: unknown; dispose: () => void }>;
-}
-
-function makeSlotRecord(): SlotRecord {
-  return { spec: undefined, list: [], keyed: new Map(), chain: [] };
-}
-
-/**
- * Fallback SlotCore 实现,支持四种 dispatch kind:
- *   - list   — 默认,按注册顺序返回所有 component
- *   - keyed  — 按 key 注册,同 key 后注册覆盖前注册(priority 大者赢)
- *   - chain  — 按 priority 升序包裹(外→内),chain() 返回组装好的最终组件
- *   - single — 仅保留第一个注册者(向后兼容)
+ * 真实 SlotCore 由 `./slot-core` 提供（Phase K.3 微内核）。
  *
- * 设计要点:
- *   1. 同一个 slot 名可以反复 register,内部按 kind 维护不同视图
- *   2. 由第一次 register 时锁定的 kind 决定该 slot 的后续行为
- *   3. disposer 按 component identity 去除,keyed 模式还要带 key 维度
+ * 历史包袱：这里曾经尝试从 `createDeepSeekClientCompatibilityModules()` 的返回值
+ * 取 `DeepSeekSlotCore`，但那个函数把 class 放在模块名 key 下、顶层并没有该字段，
+ * 于是每次都拿到 undefined 并静默回落到一个手写 stub。stub 既没有 subscribe，
+ * 又要求调用方自己保证 entry 形状，导致 21 个内置包中 6 个在真实 core 上会直接
+ * 抛错、而 stub 上则完全没有变更通知。现在统一走 `createSlotCore()`。
  */
-function makeFallbackSlotCore(): SlotCoreLike { return makeFallbackSlotCoreImpl(); }
-function makeFallbackSlotCoreImpl(): SlotCoreLike {
-  const records = new Map<string, SlotRecord>();
-  records.set("root", makeSlotRecord());
-
-  const ensureRecord = (name: string, kind: SlotKind): SlotRecord => {
-    let rec = records.get(name);
-    if (!rec) { rec = makeSlotRecord(); records.set(name, rec); }
-    if (!rec.spec) rec.spec = { kind, scope: "root" };
-    return rec;
-  };
-
-  return {
-    register(options, component) {
-      const kind: SlotKind = options.kind ?? "list";
-      const key = options.key;
-      const priority = typeof options.priority === "number" ? options.priority : 0;
-      const rec = ensureRecord(options.name, kind);
-
-      if (kind === "keyed") {
-        const existing = rec.keyed.get(key ?? "");
-        if (!existing || priority >= existing.priority) {
-          rec.keyed.set(key ?? "", { priority, component });
-        }
-        return () => {
-          const r = records.get(options.name);
-          if (!r) return;
-          const cur = r.keyed.get(key ?? "");
-          if (cur && cur.component === component) r.keyed.delete(key ?? "");
-        };
-      }
-
-      if (kind === "chain") {
-        const entry = { key, priority, component, dispose: () => {} };
-        rec.chain.push(entry);
-        rec.chain.sort((a, b) => a.priority - b.priority);
-        let disposed = false;
-        entry.dispose = () => {
-          if (disposed) return;
-          disposed = true;
-          const r = records.get(options.name);
-          if (!r) return;
-          r.chain = r.chain.filter((e) => e !== entry);
-        };
-        return entry.dispose;
-      }
-
-      if (kind === "single") {
-        if (rec.list.length === 0) {
-          rec.list.push({ key, priority, component });
-        }
-        return () => { /* single 模式下后注册者 disposer 为 no-op */ };
-      }
-
-      rec.list.push({ key, priority, component });
-      return () => {
-        const r = records.get(options.name);
-        if (!r) return;
-        r.list = r.list.filter((e) => e.component !== component);
-      };
-    },
-    inject(_name, register) { return register(); },
-    entries(name) {
-      const rec = records.get(name);
-      if (!rec || !rec.spec) return [];
-      const kind = rec.spec.kind;
-      if (kind === "keyed") return Array.from(rec.keyed.values()).map((e) => e.component);
-      if (kind === "chain") return rec.chain.map((e) => e.component);
-      if (kind === "single") return rec.list.slice(0, 1).map((e) => e.component);
-      return rec.list.map((e) => e.component);
-    },
-    entryForKey(name, key) {
-      const rec = records.get(name);
-      if (!rec || rec.spec?.kind !== "keyed") return undefined;
-      return rec.keyed.get(key)?.component;
-    },
-    chain(name) {
-      const rec = records.get(name);
-      if (!rec || rec.spec?.kind !== "chain") return undefined;
-      const layer = rec.chain;
-      if (layer.length === 0) return undefined;
-      type Cmp = React.ComponentType<{ children?: React.ReactNode }>;
-      let inner: Cmp = ({ children }: { children?: React.ReactNode }) => <>{children}</>;
-      for (let i = 0; i < layer.length; i++) {
-        const Outer = layer[i].component as Cmp;
-        const Next = inner;
-        inner = ((props: { children?: React.ReactNode }) => <Outer><Next>{props.children}</Next></Outer>) as Cmp;
-      }
-      return inner;
-    },
-    spec(name) { return records.get(name)?.spec as never; },
-  };
-}
+function makeFallbackSlotCore(): SlotCoreHandle { return createSlotCore(); }
 
 // ---------- React provider ------------------------------------------------
 
@@ -279,6 +159,24 @@ export function getOrCreateSingleton(): UiRuntime {
 let builtinRegistered = false;
 let lastRegisteredCount = 0;
 
+/** 单包装配结果 —— 供 e2e 探针 / 插件面板 / 单测观测内核真实装配情况。 */
+export interface BuiltinUiPackageReport {
+  /** 包 id，例如 `@openbuddy/ui-sidebar`。 */
+  pkg: string;
+  /** apply() 是否未抛错。 */
+  ok: boolean;
+  /** 本次 apply() 注册了几条 entry（含 children 声明）。 */
+  slotsRegistered: number;
+  /** 本次 apply() 注册到的 slot 名（去重）。 */
+  slotNames: string[];
+  /** 耗时（ms，保留 2 位）。 */
+  durationMs: number;
+  /** 失败原因（ok=false 时存在）。 */
+  error?: string;
+}
+
+let lastReport: readonly BuiltinUiPackageReport[] = [];
+
 /** 暴露给测试与集成代码,返回当前 runtime singleton。 */
 export function getRuntime(): UiRuntime {
   return getOrCreateSingleton();
@@ -289,9 +187,14 @@ export function lastRegisteredPackageCount(): number {
   return lastRegisteredCount;
 }
 
-/** 测试专用:返回一个全新的、与 runtime 单例隔离的 fallback SlotCore。 */
-export function __makeTestSlotCore(): SlotCoreLike {
-  return makeFallbackSlotCoreImpl();
+/** 上一次 registerAllBuiltinUis 的逐包结果。 */
+export function lastRegisteredReport(): readonly BuiltinUiPackageReport[] {
+  return lastReport;
+}
+
+/** 测试专用:返回一个全新的、与 runtime 单例隔离的 SlotCore。 */
+export function __makeTestSlotCore(): SlotCoreHandle {
+  return createSlotCore();
 }
 
 let builtinDisposer: (() => void) | null = null;
@@ -323,6 +226,21 @@ export function useUiRuntime(): UiRuntime {
   const v = useContext(RuntimeCtx);
   if (!v) throw new Error("useUiRuntime must be used inside <SlotProvider>");
   return v;
+}
+
+/**
+ * 宽松版 runtime 读取：不在 `<SlotProvider>` 内时返回 undefined。
+ *
+ * 为什么需要：消费面 hooks（useSlotEntries / useSlotComponents / useSlotPayloads）
+ * 会被 HomePage、Composer 这类**叶子组件**调用，而这些组件经常在
+ * SlotProvider 之外被渲染 —— 单元测试、Storybook、插件预览页都是这种情况。
+ * 微内核不该让"没装内核"变成渲染崩溃：没有内核 = 没有插件贡献 = 渲染空集，
+ * 这是合理的降级，不是错误。
+ *
+ * `useUiRuntime()` 保持抛错语义不变：直接要 runtime 句柄的代码确实装错了位置。
+ */
+export function useUiRuntimeOptional(): UiRuntime | undefined {
+  return useContext(RuntimeCtx) ?? undefined;
 }
 
 // ---------- standard-kit hook bindings -----------------------------------
@@ -361,6 +279,112 @@ export function useSlotHook<K extends string>(name: K) {
   const entries = rt.slots.entries(name);
   const spec = rt.slots.spec(name);
   return { entries, spec };
+}
+
+// ---------- 微内核消费面：把 slot 变成 React 组件树 -------------------------
+//
+// 内核只负责「登记」；UI 组合需要「订阅 + 渲染」。下面这组 API 是消费面：
+// 任何包（含第三方插件）都可以用 <SlotOutlet name="..."/> 把某个 slot 的
+// 当前实现渲染出来，而不用 import 具体组件。
+
+/**
+ * 订阅一个 slot 的 entry 变化，返回当前的原始 entry 列表（含 options）。
+ *
+ * 用 state + subscribe 而不是 useSyncExternalStore：内核的 entriesOfSlot()
+ * 每次调用都返回新数组，直接喂给 useSyncExternalStore 会因快照不稳定而
+ * 触发 "getSnapshot should be cached" 的无限渲染。state 版本只在
+ * 内核真正 emit 时更新一次。
+ */
+const EMPTY_SLOT_ENTRIES: readonly SlotEntry[] = Object.freeze([]);
+
+export function useSlotEntries(name: string): readonly SlotEntry[] {
+  const rt = useUiRuntimeOptional();
+  const core = rt?.slots as SlotCoreHandle | undefined;
+  const read = useCallback(
+    () => (core?.entriesOfSlot?.(name) ?? EMPTY_SLOT_ENTRIES),
+    [core, name],
+  );
+  const [entries, setEntries] = useState<readonly SlotEntry[]>(read);
+  useEffect(() => {
+    if (!core) return undefined;
+    setEntries(read());
+    // 内核缺失 subscribe（早期 fallback 实现）时至少保证初次挂载读到内容。
+    return core.subscribe?.(name, () => setEntries(read())) ?? undefined;
+  }, [core, name, read]);
+  return entries;
+}
+
+/**
+ * 订阅一个 slot，返回**按 kind 分派后**可渲染的组件列表。
+ *
+ * 与 useSlotEntries 的区别很关键：useSlotEntries 返回内核里的全部原始登记项
+ * （用于诊断 / 插件面板），而这里返回的是「当前该渲染哪些」——single slot 只会
+ * 给出 priority 最高的那一个，keyed 按 key 去重。消费方一律应该用这个。
+ */
+const EMPTY_COMPONENTS: readonly unknown[] = Object.freeze([]);
+
+export function useSlotComponents(name: string): readonly unknown[] {
+  const rt = useUiRuntimeOptional();
+  const read = useCallback(
+    () => (rt ? [...rt.slots.entries(name)] : EMPTY_COMPONENTS),
+    [rt, name],
+  );
+  const [components, setComponents] = useState<readonly unknown[]>(read);
+  useEffect(() => {
+    if (!rt) return undefined;
+    setComponents(read());
+    return rt.slots.subscribe?.(name, () => setComponents(read())) ?? undefined;
+  }, [rt, name, read]);
+  return components;
+}
+
+/** 渲染单个 slot entry（函数组件 / 带 render() 的对象 / 已渲染节点都支持）。 */
+export function renderSlotEntry(component: unknown, props?: Record<string, unknown>): ReactNode {
+  if (component === null || component === undefined) return null;
+  if (typeof component === "function") {
+    return createElement(component as never, (props ?? {}) as never);
+  }
+  if (typeof component === "object" && "render" in (component as object)) {
+    const render = (component as { render?: () => ReactNode }).render;
+    if (typeof render === "function") return render();
+  }
+  return component as ReactNode;
+}
+
+export interface SlotOutletProps {
+  /** slot 名，例如 "sidebar" / "shell.overlay" / "placeholder.my-files"。 */
+  name: string;
+  /** 传给 slot 组件的 owner props。 */
+  props?: Record<string, unknown>;
+  /** entries 为空时渲染（默认渲染 null）。 */
+  fallback?: ReactNode;
+  /** 只渲染第一个 entry（single / 需要唯一实现的场景）。 */
+  first?: boolean;
+  /** 额外包裹每一层的元素，便于加 class / key。 */
+  wrap?: (node: ReactNode, index: number) => ReactNode;
+}
+
+/**
+ * <SlotOutlet> —— 微内核的渲染出口。
+ *
+ * 消费者只声明「我要渲染哪个 slot」，具体渲染哪个组件由内核里当前登记的
+ * 实现决定。第三方插件可以用更高 priority 注册同名字 slot 来整体替换某块 UI，
+ * 也可以用 list slot 追加内容 —— 这正是「微内核 + 插件式」的可见收益。
+ */
+export function SlotOutlet({ name, props, fallback = null, first = false, wrap }: SlotOutletProps): ReactNode {
+  // 用 kind-aware 的 components（single 已收敛为唯一赢家），而不是原始 entries。
+  const components = useSlotComponents(name);
+  if (components.length === 0) return fallback;
+  const list = first ? components.slice(0, 1) : components;
+  return createElement(
+    Fragment,
+    null,
+    ...list.map((component, index) => {
+      const node = renderSlotEntry(component, props);
+      if (wrap) return createElement(Fragment, { key: index }, wrap(node, index));
+      return createElement(Fragment, { key: index }, node);
+    }),
+  );
 }
 
 // ---------- session-id bridge --------------------------------------------
@@ -404,16 +428,25 @@ export function applyUiRuntime(ctx: { ui?: UiRuntime; slots?: SlotCoreLike; sess
  *   - 包内 ctx.slots.register() 注册的内容会被 SlotCore 持有,dispose 由各包负责
  */
 export function registerAllBuiltinUis(): () => void {
-  lastRegisteredCount = 0;
   const rt = getOrCreateSingleton();
+  const core = rt.slots as SlotCoreHandle;
   const ctx: UiRuntimeContext = {
     slots: rt.slots,
     events: makeEvents(),
   };
   const disposers: Array<() => void> = [];
+  const report: BuiltinUiPackageReport[] = [];
+  let okCount = 0;
+
   for (const { pkg, apply, ...rest } of BUILTIN_UI_APPLIES) {
+    const started = Date.now();
+    // 记录 apply() 前 core 的 slot 快照，apply() 后求差即可得到「这个包注册了什么」，
+    // 不需要包自己上报 —— 这是 report 能零侵入的原因。
+    // 注意必须比对 entry 数而不是 slot 名集合：多个包会注册进同一个 slot
+    // （ui-settings / ui-workbench / ui-dialogs / ui-automation → shell.overlay），
+    // 只看新增 slot 名会把它们误判成 0。
+    const beforeCounts = new Map(core.snapshot().map((row) => [row.name, row.entries.length]));
     try {
-      lastRegisteredCount++;
       // Materialise the Phase K.1 SDK slot track row up front so any
       // manifest-level validation errors surface before the apply() call.
       // The serialised row is unused at runtime (the in-process apply()
@@ -424,17 +457,234 @@ export function registerAllBuiltinUis(): () => void {
         apply,
         ...(rest as { description?: string; configDefaults?: Record<string, unknown> }),
       });
-      if (track.disabled) continue;
+      if (track.disabled) {
+        report.push({ pkg, ok: true, slotsRegistered: 0, slotNames: [], durationMs: 0 });
+        continue;
+      }
       const dispose = apply(ctx as never, undefined);
       if (typeof dispose === "function") disposers.push(() => dispose());
+      okCount++;
+
+      const touched: string[] = [];
+      let slotsRegistered = 0;
+      for (const row of core.snapshot()) {
+        const delta = row.entries.length - (beforeCounts.get(row.name) ?? 0);
+        if (delta <= 0) continue;
+        slotsRegistered += delta;
+        touched.push(row.name);
+      }
+      report.push({
+        pkg,
+        ok: true,
+        slotsRegistered,
+        slotNames: touched,
+        durationMs: Math.round((Date.now() - started) * 100) / 100,
+      });
     } catch (err) {
+      report.push({
+        pkg,
+        ok: false,
+        slotsRegistered: 0,
+        slotNames: [],
+        durationMs: Math.round((Date.now() - started) * 100) / 100,
+        error: err instanceof Error ? err.message : String(err),
+      });
       // eslint-disable-next-line no-console
       console.error("[ui-runtime] apply() failed for " + pkg + ":", err);
     }
   }
+
+  lastRegisteredCount = okCount;
+  lastReport = report;
+  // 暴露给 e2e 探针：Electron 里可以直接读 window.__ob_builtin_report 校验装配。
+  if (typeof window !== "undefined") {
+    (window as unknown as { __ob_builtin_report?: readonly BuiltinUiPackageReport[] }).__ob_builtin_report = report;
+    // 内核快照：让 e2e 能断言「某个 slot 当前有几条 entry、由谁提供」，
+    // 而不必从 DOM 反推。只读，不暴露 register（避免探针误改运行时状态）。
+    (window as unknown as { __ob_slotcore?: unknown }).__ob_slotcore = {
+      snapshot: () => core.snapshot().map((row) => ({
+        name: row.name,
+        kind: row.spec.kind,
+        entries: row.entries.length,
+        registrants: row.entries.map((e) => e.registrant ?? null),
+        // 插件贡献的 payload 让 e2e 能断言"插件真的注册进来了什么"。
+        payloadIds: row.entries.map((e) => {
+          const payload = e.options.payload as { id?: unknown } | undefined;
+          return payload && typeof payload.id === "string" ? payload.id : null;
+        }),
+      })),
+      size: () => core.size(),
+    };
+  }
+  // 单包失败静默会让 UI 悄悄退化成裸文本；这里统一告警，便于启动期发现问题。
+  const failed = report.filter((row) => !row.ok);
+  if (failed.length > 0) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[ui-runtime] ${failed.length}/${report.length} 个内置 UI 包装配失败：` +
+        failed.map((row) => `${row.pkg} (${row.error})`).join(", "),
+    );
+  }
+
   return () => {
     for (let i = disposers.length - 1; i >= 0; i--) {
       try { disposers[i](); } catch { /* swallow */ }
     }
   };
+}
+
+// ---------- 插件 SDK 桥接（Phase K.3）--------------------------------------
+//
+// `@openbuddy/plugin-sdk` 的 `defineExtension()` 通过派发 DOM CustomEvent
+// （`openbuddy:register-slot` 等）来表达「我贡献了这些东西」。在这之前**没有任何
+// 监听者**：三个示例插件（hello / toolbar / slash）的注册调用派发完事件就消失了，
+// 插件作者看到的是"代码跑了、界面没变"。
+//
+// 本模块是那个缺失的 sink —— 把 SDK 事件接进微内核。分层考虑：
+//   - SDK 保持零依赖（它不 import ui-runtime，第三方可以在任何 host 里复用）；
+//   - 内核侧的命名/校验/去重全部由 ui-runtime 负责。
+//
+// 事件 → 内核 slot 的映射是 1:1 的：插件写的 slot 名就是内核里的 slot 名。
+// payload 原样存进 entry.options.payload，消费方用 useSlotPayloads(name) 读取。
+
+/** SDK 事件携带的 detail 形状。 */
+interface PluginSdkSlotDetail {
+  name?: string;
+  kind?: "list" | "keyed";
+  scope?: "root" | "session";
+  payload?: unknown;
+}
+
+interface PluginSdkCommandDetail {
+  id?: string;
+  label?: string;
+  onExecute?: (ctx?: { args?: string }) => void;
+}
+
+export interface PluginSdkBridgeOptions {
+  /** 覆盖默认 window；测试用。 */
+  target?: Window & typeof globalThis;
+}
+
+let pluginSdkBridgeInstalled = false;
+let pluginSdkBridgeDisposer: (() => void) | null = null;
+
+/**
+ * 把 plugin-sdk 的 DOM 事件接进微内核。幂等：重复调用只装一次。
+ *
+ * 返回 disposer，卸载时同时摘除全部由插件注册的 entry（避免 HMR 后重复）。
+ */
+export function installPluginSdkBridge(options: PluginSdkBridgeOptions = {}): () => void {
+  if (pluginSdkBridgeInstalled) return pluginSdkBridgeDisposer ?? (() => {});
+  const target = options.target ?? (typeof window !== "undefined" ? window : undefined);
+  if (!target) return () => {};
+
+  const core = getOrCreateSingleton().slots as SlotCoreHandle;
+  /** 记录插件注册过的东西，卸载时统一反注册。 */
+  const disposers = new Map<string, () => void>();
+
+  const slotsChanged = (name: string): void => {
+    // 内核已经 emit 过，这里只是给需要一个统一事件名的消费者（如旧版
+    // renderer-plugin-runtime 的贡献面板）留一个观察点。
+    target.dispatchEvent(new CustomEvent("openbuddy:slot-changed", { detail: { name } }));
+  };
+
+  const onRegisterSlot = (event: Event): void => {
+    const detail = (event as CustomEvent<PluginSdkSlotDetail>).detail ?? {};
+    const name = detail.name;
+    if (!name) return;
+    const kind = detail.kind ?? "list";
+    const id = `${name}::${String((detail.payload as { id?: unknown } | undefined)?.id ?? detail.payload ?? "")}`;
+    // 同 id 重复注册时先摘掉旧的，保证插件重复 setup() 不会叠加两份。
+    disposers.get(id)?.();
+    const dispose = core.register(
+      {
+        name,
+        kind: kind === "keyed" ? "keyed" : "list",
+        scope: detail.scope === "session" ? "session" : "root",
+        id: kind === "keyed" ? undefined : id,
+        key: kind === "keyed" ? id : undefined,
+        registrant: "@openbuddy/plugin-sdk",
+        payload: detail.payload,
+      },
+      // 数据型贡献没有组件；消费者通过 useSlotPayloads() 读 payload。
+      null,
+    );
+    disposers.set(id, () => { dispose(); disposers.delete(id); });
+    slotsChanged(name);
+  };
+
+  const onUnregisterSlot = (event: Event): void => {
+    const detail = (event as CustomEvent<{ name?: string }>).detail ?? {};
+    const name = detail.name;
+    if (!name) return;
+    for (const [id, dispose] of [...disposers]) {
+      if (id.startsWith(`${name}::`)) dispose();
+    }
+    slotsChanged(name);
+  };
+
+  /** 插件注册的命令：存进 `plugin.command` list slot，⌘K / SlashCommands 可消费。 */
+  const commands = new Map<string, PluginSdkCommandDetail>();
+  const onRegisterCommand = (event: Event): void => {
+    const detail = (event as CustomEvent<PluginSdkCommandDetail>).detail ?? {};
+    if (!detail.id) return;
+    commands.set(detail.id, detail);
+    const dispose = core.register(
+      {
+        name: "plugin.command",
+        kind: "list",
+        id: `command::${detail.id}`,
+        registrant: "@openbuddy/plugin-sdk",
+        payload: detail,
+      },
+      null,
+    );
+    disposers.set(`command::${detail.id}`, dispose);
+  };
+  const onUnregisterCommand = (event: Event): void => {
+    const detail = (event as CustomEvent<{ id?: string }>).detail ?? {};
+    if (!detail.id) return;
+    commands.delete(detail.id);
+    disposers.get(`command::${detail.id}`)?.();
+  };
+
+  target.addEventListener("openbuddy:register-slot", onRegisterSlot as EventListener);
+  target.addEventListener("openbuddy:unregister-slot", onUnregisterSlot as EventListener);
+  target.addEventListener("openbuddy:register-command", onRegisterCommand as EventListener);
+  target.addEventListener("openbuddy:unregister-command", onUnregisterCommand as EventListener);
+
+  pluginSdkBridgeInstalled = true;
+  pluginSdkBridgeDisposer = () => {
+    target.removeEventListener("openbuddy:register-slot", onRegisterSlot as EventListener);
+    target.removeEventListener("openbuddy:unregister-slot", onUnregisterSlot as EventListener);
+    target.removeEventListener("openbuddy:register-command", onRegisterCommand as EventListener);
+    target.removeEventListener("openbuddy:unregister-command", onUnregisterCommand as EventListener);
+    for (const dispose of [...disposers.values()]) {
+      try { dispose(); } catch { /* swallow */ }
+    }
+    disposers.clear();
+    commands.clear();
+    pluginSdkBridgeInstalled = false;
+    pluginSdkBridgeDisposer = null;
+  };
+  return pluginSdkBridgeDisposer;
+}
+
+/**
+ * 读取一个 slot 里由插件注册的**数据型**贡献（payload）。
+ *
+ * 插件贡献有两类形态：
+ *   - 组件型：payload 是 React 组件，用 useSlotComponents() 渲染；
+ *   - 数据型：payload 是 `{ id, label, onActivate }` 这类描述，由宿主提供 UI，
+ *     插件只提供数据。这个 hook 就是给后者用的。
+ */
+export function useSlotPayloads<T = unknown>(name: string): readonly T[] {
+  const entries = useSlotEntries(name);
+  return useMemo(
+    () => entries
+      .map((entry) => entry.options.payload as T | undefined)
+      .filter((payload): payload is T => payload !== undefined),
+    [entries],
+  );
 }
