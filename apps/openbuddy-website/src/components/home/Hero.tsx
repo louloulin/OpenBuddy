@@ -50,7 +50,7 @@ export default function Hero({ locale, dict }: HeroProps) {
               <span>{ dict.hero.chip }</span>
             </div>
 
-            <h1 className="font-display-serif text-[clamp(48px,7vw,96px)] font-normal leading-[1.02] tracking-[-0.035em] text-[var(--wb-fg)]">
+            <h1 className={ locale === 'zh-CN' ? 'font-display-serif text-[clamp(32px,4.2vw,52px)] font-normal leading-[1.08] tracking-[-0.025em] text-[var(--wb-fg)]' : 'font-display-serif text-[clamp(48px,7vw,96px)] font-normal leading-[1.02] tracking-[-0.035em] text-[var(--wb-fg)]' }>
               { dict.hero.titlePre }
               <span className="block">{ dict.hero.titleHighlight }</span>
               <span className="block italic text-[var(--wb-fg-muted)]">{ dict.hero.titlePost }</span>

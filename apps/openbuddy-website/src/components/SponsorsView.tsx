@@ -2,16 +2,14 @@ import type { Metadata } from 'next';
 import { Heart, ArrowRight, CheckCircle2 } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
-import SharedHeader from '@/components/SharedHeader';
+import { PageHeader, SectionHeader } from '@/components/PageHeader';
 import { getDictionary, type Locale } from '@/lib/i18n';
+import { localizedPath } from '@/lib/i18n';
 import Link from 'next/link';
-import RevealOnScroll from '@/components/RevealOnScroll';
-import BackToTop from '@/components/BackToTop';
 
 export const metadata: Metadata = {
   title: 'Sponsors',
-  description:
-    'OpenBuddy is free, MIT, and ad-free. Sponsors keep the lights on and the codebase growing.'
+  description: 'OpenBuddy is free, MIT, and ad-free. Sponsors keep the lights on and the codebase growing.'
 };
 
 interface Tier {
@@ -22,67 +20,20 @@ interface Tier {
 }
 
 const TIERS_EN: Tier[] = [
-  {
-    name: 'Backer',
-    amount: '$5 / month',
-    perks: ['Your name on the README', 'Early access to release notes', 'Our gratitude']
-  },
-  {
-    name: 'Sponsor',
-    amount: '$25 / month',
-    perks: [
-      'Everything in Backer',
-      'Logo on the website footer',
-      'Priority issue triage',
-      'Invite to monthly Office Hours'
-    ],
-    popular: true
-  },
-  {
-    name: 'Enterprise',
-    amount: 'Custom',
-    perks: [
-      'Everything in Sponsor',
-      'Dedicated support channel',
-      'Casdoor + NewAPI integration help',
-      'Quarterly roadmap review'
-    ]
-  }
+  { name: 'Backer', amount: '$5 / month', perks: ['Your name on the README', 'Early access to release notes', 'Our gratitude'] },
+  { name: 'Sponsor', amount: '$25 / month', perks: ['Everything in Backer', 'Logo on the website footer', 'Priority issue triage', 'Invite to monthly Office Hours'], popular: true },
+  { name: 'Enterprise', amount: 'Custom', perks: ['Everything in Sponsor', 'Dedicated support channel', 'Casdoor + NewAPI integration help', 'Quarterly roadmap review'] }
 ];
 
 const TIERS_ZH: Tier[] = [
-  {
-    name: '支持者',
-    amount: '¥30 / 月',
-    perks: ['README 中列出你的名字', '提前获取发布说明', '我们的感谢']
-  },
-  {
-    name: '赞助商',
-    amount: '¥150 / 月',
-    perks: [
-      '支持者全部权益',
-      '官网 footer 展示 Logo',
-      '优先处理 Issue',
-      '受邀参加每月 Office Hours'
-    ],
-    popular: true
-  },
-  {
-    name: '企业',
-    amount: '定制',
-    perks: [
-      '赞助商全部权益',
-      '专属支持频道',
-      'Casdoor + NewAPI 集成协助',
-      '季度路线图复盘'
-    ]
-  }
+  { name: '支持者', amount: '¥30 / 月', perks: ['README 中列出你的名字', '提前获取发布说明', '我们的感谢'] },
+  { name: '赞助商', amount: '¥150 / 月', perks: ['支持者全部权益', '官网 footer 展示 Logo', '优先处理 Issue', '受邀参加每月 Office Hours'], popular: true },
+  { name: '企业', amount: '定制', perks: ['赞助商全部权益', '专属支持频道', 'Casdoor + NewAPI 集成协助', '季度路线图复盘'] }
 ];
 
 const COPY_EN = {
   title: 'Sponsors',
-  subtitle:
-    'OpenBuddy is free, MIT, and ad-free. Sponsors keep the lights on and the codebase growing.',
+  subtitle: 'OpenBuddy is free, MIT, and ad-free. Sponsors keep the lights on and the codebase growing.',
   whyTitle: 'Where the money goes',
   whyItems: [
     'CI minutes for macOS / Windows / Linux builds',
@@ -112,119 +63,82 @@ export function SponsorsView({ locale }: { locale: Locale }) {
   const dict = getDictionary(locale);
   const tiers = locale === 'zh-CN' ? TIERS_ZH : TIERS_EN;
   const copy = locale === 'zh-CN' ? COPY_ZH : COPY_EN;
+  const isZh = locale === 'zh-CN';
 
   return (
     <>
       <SiteHeader dict={ dict } locale={ locale } />
       <main id="main-content" className="pt-12">
-        <section className="relative section-pad">
+        <section className="relative py-20 md:py-28">
           <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-            <SharedHeader
-              label="Sponsor"
-              number="01"
+            <PageHeader
+              eyebrow={ isZh ? '赞助' : 'Sponsors' }
               title={ copy.title }
               subtitle={ copy.subtitle }
+              compact={ isZh }
             />
 
-            <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-3">
-              { tiers.map((tier) => {
-                const accent = tier.popular ? 'var(--wb-accent)' : 'var(--wb-fg-faint)';
-                return (
-                  <RevealOnScroll key={ tier.name }>
-                    <article
-                      className="group flex h-full flex-col gap-4 bg-[var(--wb-bg-pure)] p-6 transition-colors hover:bg-[var(--wb-bg-soft)]"
-                    >
-                      <header className="flex items-center justify-between border-b border-[var(--wb-border)] pb-4">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="h-1.5 w-1.5 rounded-full"
-                            style={ { background: accent } }
-                          />
-                          <h3 className="font-display-serif text-[20px] leading-tight text-[var(--wb-fg)]">
-                            { tier.name }
-                          </h3>
-                        </div>
-                        { tier.popular ? (
-                          <span className="rounded-full bg-[var(--wb-accent)] px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-white">
-                            popular
-                          </span>
-                        ) : null }
-                      </header>
-
-                      <div className="font-display-serif text-[36px] leading-none tracking-tight text-[var(--wb-fg)]">
-                        { tier.amount }
-                      </div>
-
-                      <ul className="mt-2 flex-1 space-y-2.5 border-t border-[var(--wb-border)] pt-4">
-                        { tier.perks.map((perk) => (
-                          <li
-                            key={ perk }
-                            className="flex items-start gap-2 text-[13px] leading-relaxed text-[var(--wb-fg-muted)]"
-                          >
-                            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--wb-working)]" />
-                            <span>{ perk }</span>
-                          </li>
-                        )) }
-                      </ul>
-
-                      <a
-                        href="https://github.com/sponsors/louloulin"
-                        target="_blank"
-                        rel="noreferrer"
-                        className={ `mt-4 inline-flex items-center justify-center gap-1.5 rounded-md px-4 py-2 text-[13px] font-semibold transition-colors ${
-                          tier.popular
-                            ? 'bg-[var(--wb-accent)] text-white hover:bg-[var(--wb-accent-hover)]'
-                            : 'border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] text-[var(--wb-fg)] hover:bg-[var(--wb-bg-soft)]'
-                        }` }
-                      >
-                        <Heart className="h-3.5 w-3.5" />
-                        <span>{ copy.ctaPrimary }</span>
-                      </a>
-                    </article>
-                  </RevealOnScroll>
-                );
-              }) }
+            <div className="mt-16 grid gap-5 md:grid-cols-3">
+              { tiers.map((tier) => (
+                <article key={ tier.name } className={ `flex h-full flex-col gap-5 rounded-2xl border p-7 transition-all ${
+                  tier.popular
+                    ? 'border-[var(--wb-brand)] bg-[var(--wb-bg-pure)] shadow-[0_0_0_4px_var(--wb-brand-soft)]'
+                    : 'border-[var(--wb-border)] bg-[var(--wb-bg-pure)]'
+                }` }>
+                  { tier.popular ? (
+                    <span className="self-start rounded-full bg-[var(--wb-brand)] px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white">
+                      { isZh ? '推荐' : 'Popular' }
+                    </span>
+                  ) : null }
+                  <div>
+                    <h3 className="font-display-serif text-[28px] leading-tight tracking-[-0.02em] text-[var(--wb-fg)]">{ tier.name }</h3>
+                    <div className="mt-2 font-display-serif text-[20px] leading-none text-[var(--wb-fg-muted)]">{ tier.amount }</div>
+                  </div>
+                  <ul className="flex-1 space-y-2.5 border-t border-[var(--wb-border)] pt-4">
+                    { tier.perks.map((perk) => (
+                      <li key={ perk } className="flex items-start gap-3 text-[13px] leading-snug text-[var(--wb-fg)]">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--wb-working)]" />
+                        <span>{ perk }</span>
+                      </li>
+                    )) }
+                  </ul>
+                  <a href="https://github.com/sponsors/louloulin" target="_blank" rel="noreferrer" className={ `inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-all ${
+                    tier.popular
+                      ? 'bg-[var(--wb-brand)] text-white hover:bg-[var(--wb-brand-hover)]'
+                      : 'border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] text-[var(--wb-fg)] hover:border-[var(--wb-border-strong)]'
+                  }` }>
+                    <Heart className="h-3.5 w-3.5" />
+                    <span>{ copy.ctaPrimary }</span>
+                  </a>
+                </article>
+              )) }
             </div>
 
-            <div className="mt-12 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6">
-              <h2 className="font-display-serif text-[20px] leading-tight text-[var(--wb-fg)]">
-                { copy.whyTitle }
-              </h2>
-              <ul className="mt-4 space-y-2">
+            <div className="mt-16 rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-7 sm:p-8">
+              <SectionHeader eyebrow={ isZh ? '透明' : 'Transparency' } title={ copy.whyTitle } />
+              <ul className="grid gap-3 sm:grid-cols-2">
                 { copy.whyItems.map((item) => (
-                  <li key={ item } className="flex items-start gap-2 text-[13.5px] leading-relaxed text-[var(--wb-fg-muted)]">
-                    <span
-                      className="mt-2 inline-block h-1 w-1 flex-shrink-0 rounded-full"
-                      style={ { background: 'var(--wb-working)' } }
-                    />
+                  <li key={ item } className="flex items-start gap-3 rounded-xl border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] p-4 text-[13.5px] leading-snug text-[var(--wb-fg)]">
+                    <span className="mt-1.5 inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full" style={ { background: 'var(--wb-working)' } } />
                     <span>{ item }</span>
                   </li>
                 )) }
               </ul>
-              <a
-                href="https://github.com/louloulin/OpenBuddy/blob/main/SPONSORS.md"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-5 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--wb-accent)] hover:underline"
-              >
+              <a href="https://github.com/louloulin/OpenBuddy/blob/main/SPONSORS.md" target="_blank" rel="noreferrer" className="mt-6 inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--wb-brand)] hover:underline">
                 { copy.ctaSecondary }
-                <ArrowRight className="h-3 w-3" />
+                <ArrowRight className="h-3.5 w-3.5" />
               </a>
             </div>
 
-            <div className="mt-12 text-center">
-              <Link
-                href={ locale === 'zh-CN' ? '/zh-CN' : '/' }
-                className="inline-flex items-center gap-2 text-[13px] text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)]"
-              >
-                ← { locale === 'zh-CN' ? '返回首页' : 'Back to home' }
+            <div className="mt-12">
+              <Link href={ localizedPath('/', locale) } className="cta-link text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)] text-[14px]">
+                <span>← { isZh ? '返回首页' : 'Back to home' }</span>
               </Link>
             </div>
           </div>
         </section>
       </main>
       <SiteFooter dict={ dict } />
-      <BackToTop />
     </>
   );
 }

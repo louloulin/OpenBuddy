@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { Monitor, Apple, Terminal, ArrowRight, Check, Copy } from 'lucide-react';
-import { GithubIcon } from '@/components/icons/BrandIcons';
+import { Monitor, Apple, Terminal, ArrowRight, Check } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import CopyButton from '@/components/CopyButton';
-import SharedHeader from '@/components/SharedHeader';
-import { defaultLocale, getDictionary, type Locale } from '@/lib/i18n';
+import { PageHeader, SectionHeader } from '@/components/PageHeader';
+import { SITE_STATS } from '@/lib/constants';
+import { getDictionary, type Locale } from '@/lib/i18n';
 import { localizedPath } from '@/lib/i18n';
 import Link from 'next/link';
 
@@ -26,72 +26,22 @@ interface DownloadPlatform {
 }
 
 const PLATFORMS_EN: DownloadPlatform[] = [
-  {
-    icon: Apple,
-    name: 'macOS',
-    file: 'OpenBuddy-0.14.0-macOS.dmg',
-    size: '124 MB',
-    arch: 'Apple Silicon & Intel',
-    installHint: 'Open the .dmg and drag OpenBuddy.app to /Applications',
-    downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest'
-  },
-  {
-    icon: Monitor,
-    name: 'Windows',
-    file: 'OpenBuddy-0.14.0-win-x64.exe',
-    size: '108 MB',
-    arch: 'x64 · NSIS installer',
-    installHint: 'Run the installer. SmartScreen warning? Click "More info" → "Run anyway".',
-    downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest'
-  },
-  {
-    icon: Terminal,
-    name: 'Linux',
-    file: 'openbuddy_0.14.0_amd64.deb',
-    size: '102 MB',
-    arch: 'x86_64 · AppImage + .deb',
-    installHint: 'sudo dpkg -i openbuddy_0.14.0_amd64.deb  ·  or run the AppImage directly',
-    downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest'
-  }
+  { icon: Apple, name: 'macOS', file: 'OpenBuddy-0.14.0-macOS.dmg', size: '124 MB', arch: 'Apple Silicon & Intel', installHint: 'Open the .dmg and drag OpenBuddy.app to /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Monitor, name: 'Windows', file: 'OpenBuddy-0.14.0-win-x64.exe', size: '108 MB', arch: 'x64 · NSIS installer', installHint: 'Run the installer. SmartScreen warning? Click "More info" → "Run anyway".', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Terminal, name: 'Linux', file: 'openbuddy_0.14.0_amd64.deb', size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: 'sudo dpkg -i openbuddy_0.14.0_amd64.deb · or run the AppImage directly', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
 ];
 
 const PLATFORMS_ZH: DownloadPlatform[] = [
-  {
-    icon: Apple,
-    name: 'macOS',
-    file: 'OpenBuddy-0.14.0-macOS.dmg',
-    size: '124 MB',
-    arch: 'Apple Silicon & Intel',
-    installHint: '打开 .dmg,将 OpenBuddy.app 拖入 /Applications',
-    downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest'
-  },
-  {
-    icon: Monitor,
-    name: 'Windows',
-    file: 'OpenBuddy-0.14.0-win-x64.exe',
-    size: '108 MB',
-    arch: 'x64 · NSIS 安装器',
-    installHint: '运行安装器。SmartScreen 警告?点击"更多信息" → "仍要运行"。',
-    downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest'
-  },
-  {
-    icon: Terminal,
-    name: 'Linux',
-    file: 'openbuddy_0.14.0_amd64.deb',
-    size: '102 MB',
-    arch: 'x86_64 · AppImage + .deb',
-    installHint: 'sudo dpkg -i openbuddy_0.14.0_amd64.deb · 或直接运行 AppImage',
-    downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest'
-  }
+  { icon: Apple, name: 'macOS', file: 'OpenBuddy-0.14.0-macOS.dmg', size: '124 MB', arch: 'Apple Silicon & Intel', installHint: '打开 .dmg,将 OpenBuddy.app 拖入 /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Monitor, name: 'Windows', file: 'OpenBuddy-0.14.0-win-x64.exe', size: '108 MB', arch: 'x64 · NSIS 安装器', installHint: '运行安装器。SmartScreen 警告?点击"更多信息" → "仍要运行"。', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Terminal, name: 'Linux', file: 'openbuddy_0.14.0_amd64.deb', size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: 'sudo dpkg -i openbuddy_0.14.0_amd64.deb · 或直接运行 AppImage', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
 ];
 
 const COPY_EN = {
   title: 'Download OpenBuddy',
-  subtitle:
-    'Three installers, one MIT license, zero telemetry. Or build from source — the repo is the product.',
+  subtitle: 'Three installers, one MIT license, zero telemetry. Or build from source — the repo is the product.',
   sourceLabel: 'Build from source',
-  sourceDesc:
-    'If you want to read every line before you run it, that\'s our preferred way too.',
+  sourceDesc: "If you want to read every line before you run it, that's our preferred way too.",
   sourceSteps: [
     '$ git clone --recurse-submodules https://github.com/louloulin/OpenBuddy.git',
     '$ cd OpenBuddy && pnpm install',
@@ -102,7 +52,7 @@ const COPY_EN = {
   brewFormula: 'brew install --cask openbuddy',
   verifications: 'Verifications',
   verificationsList: [
-    '455 test files in the repo (run `pnpm workspace:test`)',
+    `${SITE_STATS.tests.toLocaleString()} test files in the repo (run \`pnpm workspace:test\`)`,
     'Closed-loop capability evals (`pnpm test:closed-loop`)',
     'Real-model Playwright UI tests (`pnpm test:electron:real-ui`)'
   ],
@@ -129,7 +79,7 @@ const COPY_ZH = {
   brewFormula: 'brew install --cask openbuddy',
   verifications: '验证',
   verificationsList: [
-    '仓库内 1,886 个测试文件 (运行 `pnpm workspace:test`)',
+    `仓库内 ${SITE_STATS.tests.toLocaleString()} 个测试文件 (运行 \`pnpm workspace:test\`)`,
     '闭环能力评估 (`pnpm test:closed-loop`)',
     '真实模型 Playwright UI 测试 (`pnpm test:electron:real-ui`)'
   ],
@@ -145,60 +95,42 @@ export function DownloadView({ locale }: { locale: Locale }) {
   const dict = getDictionary(locale);
   const platforms = locale === 'zh-CN' ? PLATFORMS_ZH : PLATFORMS_EN;
   const copy = locale === 'zh-CN' ? COPY_ZH : COPY_EN;
+  const isZh = locale === 'zh-CN';
 
   return (
     <>
       <SiteHeader dict={ dict } locale={ locale } />
       <main id="main-content" className="pt-12">
-        <section className="relative section-pad">
+        <section className="relative py-20 md:py-28">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <SharedHeader
-              label="Download"
-              number="01"
+            <PageHeader
+              eyebrow={ isZh ? '下载' : 'Download' }
               title={ copy.title }
               subtitle={ copy.subtitle }
+              compact={ isZh }
             />
 
-            {/* Platform cards — list style */}
-            <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[var(--wb-border)] md:grid-cols-3">
-              { platforms.map((p, idx) => {
+            <div className="mt-16 grid gap-5 md:grid-cols-3">
+              { platforms.map((p) => {
                 const Icon = p.icon;
                 return (
-                  <article
-                    key={ p.name }
-                    className="group flex flex-col gap-3 bg-[var(--wb-bg-pure)] p-6 transition-colors hover:bg-[var(--wb-bg-soft)]"
-                  >
+                  <article key={ p.name } className="flex flex-col gap-4 rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 transition-all hover:border-[var(--wb-border-strong)]">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">
-                          { String(idx + 1).padStart(2, '0') }
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--wb-bg-soft)]">
+                          <Icon className="h-4 w-4 text-[var(--wb-fg)]" />
                         </span>
-                        <Icon className="h-4 w-4 text-[var(--wb-fg-faint)]" />
-                        <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-[var(--wb-fg)]">
-                          { p.name }
-                        </span>
+                        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--wb-fg)]">{ p.name }</span>
                       </div>
-                      <span className="font-mono text-[10px] text-[var(--wb-fg-faint)]">{ p.size }</span>
+                      <span className="font-mono text-[10.5px] text-[var(--wb-fg-faint)]">{ p.size }</span>
                     </div>
-
-                    <h3 className="font-display-serif text-[22px] leading-tight text-[var(--wb-fg)]">
-                      { p.name }
-                    </h3>
-                    <p className="font-mono text-[11px] text-[var(--wb-fg-muted)]">{ p.arch }</p>
-
-                    <code className="rounded border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-2 py-1.5 font-mono text-[10.5px] text-[var(--wb-fg)]">
-                      { p.file }
-                    </code>
-                    <p className="text-[12.5px] leading-snug text-[var(--wb-fg-muted)]">
-                      { p.installHint }
-                    </p>
-
-                    <a
-                      href={ p.downloadUrl }
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-3 inline-flex items-center justify-center gap-1.5 rounded-md bg-[var(--wb-fg)] px-3 py-2 text-[13px] font-medium text-[var(--wb-bg)] transition-opacity hover:opacity-90"
-                    >
+                    <div>
+                      <h3 className="font-display-serif text-[28px] leading-tight tracking-[-0.02em] text-[var(--wb-fg)]">{ p.name }</h3>
+                      <p className="mt-1 font-mono text-[11px] text-[var(--wb-fg-muted)]">{ p.arch }</p>
+                    </div>
+                    <code className="rounded-md border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-3 py-2 font-mono text-[11px] leading-relaxed text-[var(--wb-fg)] break-all">{ p.file }</code>
+                    <p className="text-[13px] leading-snug text-[var(--wb-fg-muted)]">{ p.installHint }</p>
+                    <a href={ p.downloadUrl } target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--wb-fg)] px-4 py-2.5 text-[13px] font-semibold text-[var(--wb-bg)] transition-opacity hover:opacity-90">
                       <span>Download</span>
                       <ArrowRight className="h-3.5 w-3.5" />
                     </a>
@@ -207,22 +139,15 @@ export function DownloadView({ locale }: { locale: Locale }) {
               }) }
             </div>
 
-            {/* Brew badge */}
-            <div className="mt-8 flex items-center justify-center gap-2 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-4 py-3">
+            <div className="mt-8 flex items-center justify-center gap-2 rounded-full border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-4 py-3">
               <Terminal className="h-4 w-4 text-[var(--wb-fg-muted)]" />
               <code className="font-mono text-[13px] text-[var(--wb-fg)]">{ copy.brewFormula }</code>
               <CopyButton text={ copy.brewFormula } className="ml-auto" />
             </div>
 
-            {/* Source build */}
-            <div className="mt-16 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 sm:p-7">
-              <div className="flex items-center gap-2 text-[var(--wb-fg-muted)]">
-                <GithubIcon size={ 16 } />
-                <span className="font-mono text-[11px] uppercase tracking-[0.12em]">{ copy.sourceLabel }</span>
-              </div>
-              <p className="mt-3 text-[14px] leading-relaxed text-[var(--wb-fg-muted)]">{ copy.sourceDesc }</p>
-
-              <div className="mt-5 overflow-hidden rounded-lg border border-[var(--wb-border)] bg-[#0A0F1E]">
+            <div className="mt-16 rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-7 sm:p-8">
+              <SectionHeader eyebrow={ copy.sourceLabel } title={ isZh ? '从源码构建' : 'Read every line, then run it.' } subtitle={ copy.sourceDesc } />
+              <div className="mt-6 overflow-hidden rounded-xl border border-[var(--wb-border)] bg-[#0A0F1E]">
                 <div className="flex items-center gap-1.5 border-b border-white/10 bg-[#111827] px-4 py-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
                   <span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
@@ -240,56 +165,39 @@ export function DownloadView({ locale }: { locale: Locale }) {
               </div>
             </div>
 
-            {/* Verifications */}
-            <div className="mt-12 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 sm:p-7">
-              <h2 className="font-display-serif text-[20px] leading-tight text-[var(--wb-fg)]">
-                { copy.verifications }
-              </h2>
-              <ul className="mt-4 space-y-2">
-                { copy.verificationsList.map((v) => (
-                  <li key={ v } className="flex items-start gap-2 text-[13.5px] leading-relaxed text-[var(--wb-fg-muted)]">
-                    <Check className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--wb-working)]" />
-                    <span>{ v }</span>
-                  </li>
-                )) }
-              </ul>
-            </div>
-
-            {/* Checksums */}
-            <div className="mt-8 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 sm:p-7">
-              <h2 className="font-display-serif text-[20px] leading-tight text-[var(--wb-fg)]">
-                { copy.checksumLabel }
-              </h2>
-              <table className="mt-4 w-full text-[13px]">
-                <tbody>
-                  { copy.checksums.map((c) => (
-                    <tr key={ c.platform } className="border-t border-[var(--wb-border)]">
-                      <td className="py-2 font-medium text-[var(--wb-fg)]">{ c.platform }</td>
-                      <td className="py-2">
-                        <code className="font-mono text-[12px] text-[var(--wb-fg-muted)]">{ c.hash }</code>
-                      </td>
-                      <td className="py-2 text-right">
-                        <a
-                          href="https://github.com/louloulin/OpenBuddy/releases/latest"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-mono text-[11px] text-[var(--wb-accent)] hover:underline"
-                        >
-                          verify →
-                        </a>
-                      </td>
-                    </tr>
+            <div className="mt-12 grid gap-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-7">
+                <SectionHeader eyebrow={ copy.verifications } title="" />
+                <ul className="space-y-3">
+                  { copy.verificationsList.map((v) => (
+                    <li key={ v } className="flex items-start gap-3 text-[13.5px] leading-snug text-[var(--wb-fg)]">
+                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--wb-working)]" />
+                      <span>{ v }</span>
+                    </li>
                   )) }
-                </tbody>
-              </table>
+                </ul>
+              </div>
+              <div className="rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-7">
+                <SectionHeader eyebrow={ copy.checksumLabel } title="" />
+                <table className="w-full text-[13px]">
+                  <tbody>
+                    { copy.checksums.map((c) => (
+                      <tr key={ c.platform } className="border-t border-[var(--wb-border)] first:border-t-0">
+                        <td className="py-2 font-medium text-[var(--wb-fg)]">{ c.platform }</td>
+                        <td className="py-2"><code className="font-mono text-[12px] text-[var(--wb-fg-muted)]">{ c.hash }</code></td>
+                        <td className="py-2 text-right">
+                          <a href="https://github.com/louloulin/OpenBuddy/releases/latest" target="_blank" rel="noreferrer" className="font-mono text-[11px] text-[var(--wb-brand)] hover:underline">verify →</a>
+                        </td>
+                      </tr>
+                    )) }
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            <div className="mt-12 text-center">
-              <Link
-                href={ localizedPath('/', locale) }
-                className="inline-flex items-center gap-2 text-[13px] text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)]"
-              >
-                ← { locale === 'zh-CN' ? '返回首页' : 'Back to home' }
+            <div className="mt-16">
+              <Link href={ localizedPath('/', locale) } className="cta-link text-[var(--wb-fg-muted)] hover:text-[var(--wb-fg)] text-[14px]">
+                <span>← { isZh ? '返回首页' : 'Back to home' }</span>
               </Link>
             </div>
           </div>

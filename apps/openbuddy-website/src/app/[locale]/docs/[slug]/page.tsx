@@ -50,7 +50,7 @@ export default async function DocPage({
     <>
       <SiteHeader dict={ dict } locale={ locale as Locale } />
       <main id="main-content" className="pt-12">
-        <section className="relative section-pad">
+        <section className="relative py-20 md:py-28">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div className="grid gap-12 lg:grid-cols-[260px_1fr]">
               <aside className="hidden lg:block">

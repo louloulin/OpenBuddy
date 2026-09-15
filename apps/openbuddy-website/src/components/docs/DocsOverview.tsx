@@ -31,26 +31,18 @@ export default function DocsOverview({ locale }: DocsOverviewProps) {
       };
 
   return (
-    <div className="grid gap-12 lg:grid-cols-[260px_1fr]">
-      {/* Sidebar */}
-      <aside className="hidden lg:block">
-        {/* We import the client sidebar lazily via a server wrapper if needed; for now use this static fallback */}
-        <SidebarList locale={ locale } activeSlug={ undefined } />
-      </aside>
-
-      {/* Main */}
-      <div>
-        <div className="mb-12">
-          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
-            { copy.eyebrow }
-          </p>
-          <h1 className="mt-3 font-display-serif text-[44px] leading-[1.05] tracking-[-0.02em] text-[var(--wb-fg)] md:text-[56px]">
-            { copy.title }
-          </h1>
-          <p className="mt-5 max-w-2xl text-[16px] leading-relaxed text-[var(--wb-fg-muted)]">
-            { copy.subtitle }
-          </p>
-        </div>
+    <div>
+      <div className="mb-12">
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--wb-fg-faint)]">
+          { copy.eyebrow }
+        </p>
+        <h1 className="mt-3 font-display-serif text-[clamp(32px,4.5vw,52px)] font-normal leading-[1.05] tracking-[-0.025em] text-[var(--wb-fg)]">
+          { copy.title }
+        </h1>
+        <p className="mt-5 max-w-2xl text-[16px] leading-relaxed text-[var(--wb-fg-muted)]">
+          { copy.subtitle }
+        </p>
+      </div>
 
         <div className="space-y-12">
           { CATEGORY_ORDER.map((cat) => {
@@ -82,45 +74,7 @@ export default function DocsOverview({ locale }: DocsOverviewProps) {
             <span className="cta-link-arrow">→</span>
           </a>
         </div>
-      </div>
     </div>
-  );
-}
-
-function SidebarList({ locale, activeSlug }: { locale: 'en' | 'zh-CN'; activeSlug?: string }) {
-  const grouped = getDocsByCategory();
-  return (
-    <nav aria-label="Documentation" className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-4">
-      <ul className="space-y-7">
-        { CATEGORY_ORDER.map((cat) => {
-          const docs = grouped[cat];
-          if (docs.length === 0) return null;
-          return (
-            <li key={ cat }>
-              <h3 className="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
-                { CATEGORY_LABELS[cat][locale === 'zh-CN' ? 'zh' : 'en'] }
-              </h3>
-              <ul className="space-y-0.5">
-                { docs.map((doc) => (
-                  <li key={ doc.slug }>
-                    <a
-                      href={ `/${ locale === 'zh-CN' ? 'zh-CN' : 'en' }/docs/${ doc.slug }` }
-                      className={ `block rounded-md px-2.5 py-1.5 text-[13.5px] transition-colors ${
-                        activeSlug === doc.slug
-                          ? 'bg-[var(--wb-bg-soft)] font-medium text-[var(--wb-fg)]'
-                          : 'text-[var(--wb-fg-muted)] hover:bg-[var(--wb-bg-soft)]/60 hover:text-[var(--wb-fg)]'
-                      }` }
-                    >
-                      { doc.title }
-                    </a>
-                  </li>
-                )) }
-              </ul>
-            </li>
-          );
-        }) }
-      </ul>
-    </nav>
   );
 }
 
