@@ -1,6 +1,21 @@
 import { useEffect, useMemo, useRef, useState, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { Bot, FileDiff, FolderTree, Globe, ListTodo, Package, Search, Users } from "lucide-react";
+// Phase A4 — pull each icon directly from its per-icon ESM module. The
+// barrel re-exports ~1500 icons and the bundler would otherwise drag the
+// whole tree through the entry chunk even with tree-shaking (lucide-react
+// is a single-file barrel by default; only the per-icon paths tree-shake
+// reliably with esbuild + Vite 5). The deep modules export the icon as
+// their default binding — see `lucide-icons.d.ts`. `.mjs` extension is
+// omitted because lucide-react's package.json `main` points at `.js` and
+// esbuild/Vite resolve the deeper file by that side-effect anyway.
+import Bot from "lucide-react/dist/esm/icons/bot";
+import FileDiff from "lucide-react/dist/esm/icons/file-diff";
+import FolderTree from "lucide-react/dist/esm/icons/folder-tree";
+import Globe from "lucide-react/dist/esm/icons/globe";
+import ListTodo from "lucide-react/dist/esm/icons/list-todo";
+import Package from "lucide-react/dist/esm/icons/package";
+import Search from "lucide-react/dist/esm/icons/search";
+import Users from "lucide-react/dist/esm/icons/users";
 import { shallow } from "zustand/shallow";
 import { PauseIcon } from "@openbuddy/ui-primitives/icons";
 import { useSessionStore, type ToolCallView } from "@/stores/session-store";
@@ -441,6 +456,26 @@ export function ChatView({
   // double-clicks during the IPC round-trip).
   const [switchingWorkspace, setSwitchingWorkspace] = useState<string | null>(null);
 
+  // Phase A5 — stable callback so `<Composer>`'s React.memo wrapper can
+  // actually skip re-renders. The previous inline arrow recreated the
+  // function on every ChatView render, defeating the memo every time any
+  // selector in the dep array changed (which is constantly during a turn).
+  const handleComposerWorkspaceChange = useCallback(
+    (next: string) => {
+      // R2.5 — flip the loading flag while the parent is running the
+      // workspace switch IPC. The flag is cleared whether the switch
+      // succeeds or fails so a hung IPC doesn't wedge the UI.
+      setSwitchingWorkspace(next);
+      if (!onSelectWorkspace) return;
+      Promise.resolve(onSelectWorkspace(next))
+        .catch(() => {
+          /* parent surfaces its own toast */
+        })
+        .finally(() => setSwitchingWorkspace(null));
+    },
+    [onSelectWorkspace],
+  );
+
   // Artifacts only depend on tool-call parts — text-only chunk deltas
   // (the bulk of streaming updates) shouldn't trigger a full rescan.
   // Fingerprint on (message count, last tool-call id + status) is a cheap
@@ -577,7 +612,14 @@ export function ChatView({
   // R1.2: Render a single timeline node — used by both the flat
   // timeline.map (default) and the VirtualizedMessageList (opt-in).
   // Stable across renders as long as its captured deps are stable;
-  // messages / streaming / findOpen are captured by reference.
+  // // Phase A3 — `messages` is intentionally NOT in the dep array. The
+  // closure only needs the count (for `isLastAssistant`) and a stable
+  // signal that the trailing assistant bubble is the same one. Both
+  // are primitive and survive streaming deltas that mutate `messages`
+  // in place; the previous `messages` dep forced a fresh callback
+  // (and therefore a fresh JSX subtree) every time any part of any
+  // message changed during a turn.
+  const messagesLength = messages.length;
   const renderTimelineNode = useCallback(
     ({ node, index: _index }: { node: TimelineNode; index: number }) => {
       if (node.kind === "date-divider") {
@@ -597,7 +639,7 @@ export function ChatView({
       const m = node.message;
       const idx = node.index;
       const isLastAssistant =
-        m.role === "assistant" && idx === messages.length - 1;
+        m.role === "assistant" && idx === messagesLength - 1;
       const findCls =
         findOpen && isFindHit(findHits, m.id)
           ? m.id === findCurrent
@@ -623,7 +665,7 @@ export function ChatView({
       );
     },
     [
-      messages,
+      messagesLength,
       streaming,
       streamingMessageId,
       markdownConfig,
@@ -1096,16 +1138,7 @@ export function ChatView({
             onModelChange={onModelChange}
             cwd={cwd}
             workspaces={workspaces}
-            onSelectWorkspace={(next) => {
-              // R2.5 — flip the loading flag while the parent is running
-              // the workspace switch IPC. The flag is cleared whether the
-              // switch succeeds or fails so a hung IPC doesn't wedge the UI.
-              setSwitchingWorkspace(next);
-              if (!onSelectWorkspace) return;
-              Promise.resolve(onSelectWorkspace(next))
-                .catch(() => { /* parent surfaces its own toast */ })
-                .finally(() => setSwitchingWorkspace(null));
-            }}
+            onSelectWorkspace={handleComposerWorkspaceChange}
             workspaceLoading={switchingWorkspace !== null}
             showDisclaimer
             permissionInline
