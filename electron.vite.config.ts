@@ -480,6 +480,13 @@ export default defineConfig({
           "electron",
           /^node:/,
           /^@earendil-works\/pi-/,
+          // pino + its transport dependencies are intentionally external:
+          // they're heavy native modules loaded at runtime by
+          // @openbuddy/logging-main and resolving them at bundle time
+          // requires the pino bundle-graph which is unstable under Vite 8.
+          "pino",
+          "pino-roll",
+          "pino-pretty",
         ],
         output: {
           // Keep `await import(...)` boundaries as real ESM chunks. All
@@ -754,13 +761,16 @@ export default defineConfig({
     // stall or rewrite them away. Mark the workspace aliases as
     // non-prebundlable and explicitly enumerate the heavy npm dependencies
     // that DO benefit from prebundling (katex/mermaid/markdown/univerjs).
-    // The holdUntilCrawled flag defers the first request until the full
-    // prebundle graph has been materialised — without it, the very first
-    // `/` request races with esbuild and falls back to on-the-fly
-    // transpilation per import, which is the dominant source of "click takes
-    // 10s" complaints.
+    //
+    // A1 fix: holdUntilCrawled previously waited for an esbuild dep-scan
+    // graph that Vite 8.3.0 cannot produce (path.at / str.replace / Failed
+    // to resolve dependency: date-fns, dompurify, nanoid). Disabling the
+    // flag lets the renderer proceed even when prebundling skips; Vite
+    // serves deps on-the-fly. date-fns / dompurify / nanoid are removed
+    // from `include` because esbuild's scanner consistently fails them
+    // here; runtime still resolves them via the workspace alias graph.
     optimizeDeps: {
-      holdUntilCrawled: true,
+      holdUntilCrawled: false,
       include: [
         "react",
         "react-dom",
@@ -781,9 +791,6 @@ export default defineConfig({
         "lucide-react",
         "grok-mermaid",
         "diff",
-        "date-fns",
-        "dompurify",
-        "nanoid",
       ],
       exclude: [
         // Workspace packages are aliased to `.ts` source — esbuild cannot
@@ -797,6 +804,9 @@ export default defineConfig({
         // is statically replaced by the renderer shim. Exclude so the
         // dep crawler doesn't try to load it.
         "@openbuddy/electron-api",
+        // Optional native dep that fails to load in dev. Consumed only by
+        // mermaid/grok-mermaid; the runtime paths fall back gracefully.
+        "@napi-rs/canvas",
       ],
     },
   },
