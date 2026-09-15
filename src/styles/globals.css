@@ -34,6 +34,7 @@
 @import "./home.css";
 @import "./automation.css";
 @import "./misc.css";
+@import "./workbuddy-parity.css";
 
 /* 历史遗留的 WorkBuddy 样式保留 — 跨包样式兼容用 */
 @import "./automation-wb.css";
@@ -91,8 +92,3 @@
 .ob-motion-slide-in-right {
   opacity: 0;
 }
-
-@import "./interactions.css";
-@import "./a11y.css";
-@import "./errors.css";
-@import "./workbuddy-parity.css";

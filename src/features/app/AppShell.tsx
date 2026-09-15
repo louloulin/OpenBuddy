@@ -360,7 +360,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           )}
           <MainContent runtime={runtime} />
         </main>
-        {!currentSessionId && !placeholderView && !runtime.initError && !runtime.init && (
+        {!currentSessionId && !placeholderView && !runtime.initError && runtime.init && (
           <aside className="app__right-panel" aria-label="概览/产物">
             <HomeOverviewPanel />
           </aside>
