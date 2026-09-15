@@ -1,0 +1,60 @@
+/**
+ * a11y.css — 无障碍样式（Phase 6）
+ *
+ * 全局焦点环 + 屏幕阅读器辅助类 + 高对比度适配。
+ */
+
+:root {
+  --wb-focus: #4d8eff;
+  --wb-focus-offset: 2px;
+  --wb-focus-width: 2px;
+}
+
+/* 全局焦点环：仅键盘聚焦时显示 */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: var(--wb-focus-width) solid var(--wb-focus);
+  outline-offset: var(--wb-focus-offset);
+  border-radius: 4px;
+}
+
+/* 屏幕阅读器专用类 */
+.wb-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* 聚焦时可访问版本 */
+.wb-sr-only-focusable:focus,
+.wb-sr-only-focusable:focus-within {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: more) {
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline-width: 3px;
+  }
+  :root {
+    --wb-focus: #ffffff;
+  }
+}
+
+/* 强制颜色模式（Windows High Contrast） */
+@media (forced-colors: active) {
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid CanvasText;
+  }
+}

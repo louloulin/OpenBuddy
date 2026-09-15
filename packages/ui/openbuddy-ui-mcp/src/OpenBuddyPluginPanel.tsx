@@ -41,6 +41,7 @@ import {
   useRendererContributions,
 } from "@/lib/runtime/renderer-plugin-runtime";
 import type { RendererContribution } from "@openbuddy/renderer-host";
+import { DevPluginsHint } from "./extensions/DevPluginsHint";
 
 interface OpenBuddyPluginPanelProps {
   /** Optional toast handler so the panel can surface refresh errors. */
@@ -286,6 +287,7 @@ export function OpenBuddyPluginPanel({ onToast }: OpenBuddyPluginPanelProps) {
 
   return (
     <div className="openbuddy-plugin-panel">
+      <DevPluginsHint />
       {/* UX-3: clarify the relationship between this panel (OpenBuddy's
           plugin host + Cordis services + pi profile.piExtensions) and the
           legacy PluginsPanel (pi x.ai/plugins). The two panels previously
