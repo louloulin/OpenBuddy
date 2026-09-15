@@ -4,7 +4,7 @@
  * Stand-in for `@braintrust/pi-extension` / `@raindrop-ai/pi-agent` that
  * doesn't require any external SaaS account. Each span start/end event
  * coming through `OpenBuddyTelemetrySink` is mirrored as a structured
- * JSON line in `~/.pi/openbuddy/span-tree.jsonl` (or whatever path the
+ * JSON line in `<agentHome>/span-tree.jsonl` (or whatever path the
  * caller wires). Downstream tooling (Braintrust ingest CLI, Raindrop
  * collector, or a future pi-bridged SaaS adapter) can read the same
  * file offline.
@@ -16,8 +16,8 @@
  */
 
 import { appendFile, mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import os from "node:os";
+import { dirname } from "node:path";
+import { agentPath } from "@openbuddy/storage";
 import type { OpenBuddyTelemetrySink, OpenBuddyTelemetrySinkEvent } from "./pi-telemetry-bridge";
 
 export const SPAN_TREE_ENV_FLAG = "OPENBUDDY_SPAN_TREE_EXPORTER";
@@ -25,15 +25,14 @@ export const SPAN_TREE_ENV_FLAG = "OPENBUDDY_SPAN_TREE_EXPORTER";
 export interface CreateSpanTreeExporterOptions {
   /**
    * Path to the JSONL output file. Defaults to
-   * `~/.openbuddy/span-tree.jsonl`. The directory is created on
+   * `<agentHome>/span-tree.jsonl`. The directory is created on
    * first write if it does not exist.
    */
   outputPath?: string;
 }
 
 function defaultSpanTreePath(): string {
-  const home = process.env.PI_HOME ?? os.homedir();
-  return join(home, ".openbuddy", "span-tree.jsonl");
+  return agentPath("span-tree.jsonl");
 }
 
 /** Returns true when the user has opted into the span-tree exporter. */

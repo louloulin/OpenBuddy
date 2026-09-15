@@ -1,21 +1,16 @@
-import { homedir } from "node:os";
-import { join } from "node:path";
 import {
   WorkspaceBootstrapStore,
   storageMetricsRegistry,
   TaskBootstrapStore,
   CollaborationBootstrapStore,
+  agentPath,
   type WorkspaceBootstrapSnapshot,
   type TaskBootstrapSnapshot,
   type CollaborationBootstrapSnapshot,
 } from "@openbuddy/storage";
 
-function agentHome(): string {
-  return agentHome();
-}
-
 function databasePath(): string {
-  return join(agentHome(), "openbuddy.sqlite");
+  return agentPath("openbuddy.sqlite");
 }
 
 let cached: WorkspaceBootstrapStore | undefined;

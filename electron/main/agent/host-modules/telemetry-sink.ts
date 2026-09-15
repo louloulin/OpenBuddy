@@ -54,7 +54,7 @@ export function __resetTelemetrySinkForTest(): void {
  * 构建主进程的 OpenBuddy telemetry sink. 行为:
  *   - 没有 renderer emitter → 返回 undefined (sink 不工作)
  *   - OPENBUDDY_AEGIS_MODE=1 → 透传到 WorkBuddy Aegis 收集器 (wb.telemetry.*)
- *   - OPENBUDDY_SPAN_TREE_EXPORTER=1 → 同时镜像到 ~/.pi/openbuddy/span-tree.jsonl
+ *   - OPENBUDDY_SPAN_TREE_EXPORTER=1 → 同时镜像到 <agentHome>/span-tree.jsonl
  *
  * 默认 boot 路径两个 flag 都未设,  返回无 side-effect 的 span exporter passthrough.
  */
@@ -69,7 +69,7 @@ export function telemetrySink(): OpenBuddyTelemetrySink | undefined {
     aegisMode ? { aegisMode: true } : {},
   );
   // When `OPENBUDDY_SPAN_TREE_EXPORTER=1` is set, mirror every event
-  // into `~/.pi/openbuddy/span-tree.jsonl`. The exporter is a no-op
+  // into `<agentHome>/span-tree.jsonl`. The exporter is a no-op
   // identity passthrough when the flag is unset, so the default
   // boot path is unchanged. This is the local stand-in for
   // `@braintrust/pi-extension` / `@raindrop-ai/pi-agent` per the

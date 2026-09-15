@@ -16,6 +16,7 @@
  */
 import { existsSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { agentPath } from "@openbuddy/storage";
 
 export const CANONICAL_PI_PACKAGES: readonly string[] = [
   // P0 memory + tasks
@@ -84,14 +85,9 @@ function nodeModulesRoots(): string[] {
   } catch {
     // ignore
   }
-  // `~/.openbuddy/agent/node_modules` is the recommended per-user install root
+  // `<agentHome>/node_modules` is the recommended per-user install root
   // for system-wide pi extensions.
-  try {
-    const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    if (home) roots.add(join(home, ".openbuddy", "agent", "node_modules"));
-  } catch {
-    // ignore
-  }
+  roots.add(agentPath("node_modules"));
   return Array.from(roots);
 }
 

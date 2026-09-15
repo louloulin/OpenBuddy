@@ -8,7 +8,6 @@
  */
 import { copyFile, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import { basename, extname, isAbsolute, join, resolve } from "node:path";
-import { homedir } from "node:os";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import {
   agentRoot,
@@ -229,7 +228,7 @@ export async function listExpertCatalog(root: string): Promise<Record<string, un
 }
 
 export async function expertDefaultRoot(cwd: string): Promise<string> {
-  const candidates = [process.env.OPENBUDDY_AGENTS_DIR, join(resolve(cwd), ".pi", "experts"), join(agentRoot(), "agents"), join(agentRoot(), "workbuddy-experts"), join(process.env.PI_HOME ?? homedir(), "agents"), join(homedir(), "agents")].filter((value): value is string => Boolean(value));
+  const candidates = [process.env.OPENBUDDY_AGENTS_DIR, join(resolve(cwd), ".pi", "experts"), join(agentRoot(), "agents"), join(agentRoot(), "workbuddy-experts")].filter((value): value is string => Boolean(value));
   for (const candidate of candidates) {
     if (await filePathIfExists(join(candidate, "_meta", "_expert_center.json"))) return resolve(candidate);
   }
