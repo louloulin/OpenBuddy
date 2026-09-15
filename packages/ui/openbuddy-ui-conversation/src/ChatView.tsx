@@ -524,12 +524,13 @@ export function ChatView({
   }, []);
 
   // Stable wrapper around the imported findToolCall so ToolSidePanel's
-  // memo comparator sees a stable identity. The body is recomputed each
-  // call (so messages/activeTool changes are still reflected) but the
-  // function reference itself only changes when sessionId flips.
+  // memo comparator sees a stable identity. The body reads messages
+  // through messagesRef (kept current by the useEffect above) so the
+  // function reference itself only changes when sessionId flips —
+  // streaming deltas no longer invalidate the comparator.
   const findToolCallStable = useCallback(
-    (id: string) => findToolCall(messages, id),
-    [messages, sessionId],
+    (id: string) => findToolCall(messagesRef.current, id),
+    [sessionId],
   );
 
   // R1.3 — Stabilize the inline callbacks passed to Composer and
