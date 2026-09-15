@@ -53,6 +53,7 @@ const workspacePackageAliases = [
   { find: "@openbuddy/plugin-host/persistence", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/persistence.ts") },
   { find: "@openbuddy/plugin-host/yaml-patch", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/yaml-patch.ts") },
   { find: "@openbuddy/plugin-host/js-expr", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/js-expr.ts") },
+  { find: "@openbuddy/plugin-host/plugin-manifest", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts") },
   // Phase B.3 step 2b — DSH core shared state + PI extensions. Subpath
   // aliases must precede the bare-package alias below so the longer
   // `@openbuddy/dsh-core/state` lookup wins over the bare
@@ -141,6 +142,11 @@ const rendererOnlyAliases: Array<{ find: string; replacement: string }> = [
   { find: "@openbuddy/plugin-host/renderer-patch", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/renderer-patch.ts") },
   { find: "@openbuddy/bundle-base/renderer", replacement: resolve(repoRoot, "packages/bundle/openbuddy-base/src/renderer.ts") },
   { find: "@openbuddy/plugin-host/yaml-patch", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/yaml-patch.ts") },
+  // Self-contained manifest module: the renderer needs only this slice of
+  // plugin-host. Aliasing it avoids resolving the bare barrel, which pulls
+  // profile-manager → @openbuddy/storage → node:sqlite (unavailable in the
+  // renderer) and leaves the page blank on load.
+  { find: "@openbuddy/plugin-host/plugin-manifest", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts") },
   { find: "@deepseek-ai/cordis", replacement: resolve(repoRoot, "packages/runtime/openbuddy-cordis/src/index.ts") },
   { find: "@openbuddy/cordis", replacement: resolve(repoRoot, "packages/runtime/openbuddy-cordis/src/index.ts") },
   { find: "@openbuddy/renderer-host", replacement: resolve(repoRoot, "packages/renderer/openbuddy-renderer-host/src/index.ts") },

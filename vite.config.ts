@@ -18,6 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const rendererPackageAliases = {
   "@openbuddy/plugin-host/renderer-patch": resolve(__dirname, "packages/runtime/openbuddy-plugin-host/src/renderer-patch.ts"),
   "@openbuddy/plugin-host/yaml-patch": resolve(__dirname, "packages/runtime/openbuddy-plugin-host/src/yaml-patch.ts"),
+  "@openbuddy/plugin-host/plugin-manifest": resolve(__dirname, "packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts"),
   "@openbuddy/cordis": resolve(__dirname, "packages/runtime/openbuddy-cordis/src/index.ts"),
   "@openbuddy/renderer-host": resolve(__dirname, "packages/renderer/openbuddy-renderer-host/src/index.ts"),
 };

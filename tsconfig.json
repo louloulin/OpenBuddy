@@ -114,6 +114,9 @@
       "@openbuddy/plugin-host/remote-codec": [
         "./packages/runtime/openbuddy-plugin-host/src/remote-codec.ts"
       ],
+      "@openbuddy/plugin-host/plugin-manifest": [
+        "./packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts"
+      ],
       "@openbuddy/plugin-sdk": [
         "./packages/runtime/openbuddy-plugin-sdk/src/index.ts"
       ],

@@ -13,10 +13,12 @@
     "./bundle-manifest": "./src/bundle-manifest.ts",
     "./persistence": "./src/persistence.ts",
     "./remote-codec": "./src/remote-codec.ts",
-    "./rpc-contract": "./src/rpc-contract.ts"
+    "./rpc-contract": "./src/rpc-contract.ts",
+    "./plugin-manifest": "./src/openbuddy-plugin-manifest.ts"
   },
   "dependencies": {
     "@openbuddy/cordis": "workspace:*",
+    "@openbuddy/storage": "workspace:*",
     "cross-spawn": "^7.0.6",
     "yaml": "2.9.0"
   },

@@ -189,6 +189,9 @@
       "@openbuddy/plugin-host": [
         "packages/runtime/openbuddy-plugin-host/src/index.ts"
       ],
+      "@openbuddy/plugin-host/plugin-manifest": [
+        "packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts"
+      ],
       "@openbuddy/storage": [
         "packages/runtime/openbuddy-storage/src/index.ts"
       ],

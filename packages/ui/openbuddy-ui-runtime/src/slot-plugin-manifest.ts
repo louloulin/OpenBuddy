@@ -20,9 +20,10 @@
  * Why not move the manifest table to `openbuddy-plugin-host`?
  * The slot track only exists in the renderer process; pulling the
  * dependency would force the host package to reach into renderer-side
- * types. The K.1 SDK exports `serializeSlotTrack` from
- * `@openbuddy/plugin-host` so this module reuses it without duplicating
- * the manifest shape definition.
+ * types. The K.1 SDK exports `serializeSlotTrack` from the self-contained
+ * `@openbuddy/plugin-host/plugin-manifest` entry so this module reuses it
+ * without duplicating the manifest shape definition — and without pulling
+ * the bare barrel, which drags in Node-only storage code.
  */
 
 import {
@@ -31,7 +32,7 @@ import {
   validateOpenBuddyPluginManifest,
   type OpenBuddyPluginManifest,
   type SerializedSlotTrack,
-} from "@openbuddy/plugin-host";
+} from "@openbuddy/plugin-host/plugin-manifest";
 import type { UiPlugin } from "@openbuddy/ui-slots";
 
 /**
