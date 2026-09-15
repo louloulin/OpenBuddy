@@ -1,0 +1,93 @@
+/* ============================================================================
+ * globals.css — Phase 2 unified CSS entry
+ *
+ * Import order matters: tokens → base → theme → chrome → per-domain
+ * 1. tokens.css       设计令牌（含 motion tokens、easing、duration）
+ * 2. base.css         重置 + 排版基线
+ * 3. theme-dark-overrides.css  暗色主题强校验
+ * 4. chrome.css       窗口外壳（TitleBar / drag region）
+ * 5. ui-kit.css       跨域共享的按钮 / pill / chip 样式
+ * 6. chrome 域细分：sidebar / sidebar-menus / messages / chat-shell 等
+ * 7. 业务域：home / settings / plugins / experts / email / work-panel / tool-call
+ * 8. automation-wb.css 历史 WorkBuddy 样式（保留兼容）
+ *
+ * app.css 保留作为兜底，零行为变更；后续按模块逐渐迁移完成后再删除。
+ * ============================================================================ */
+
+@import "./tokens.css";
+@import "./base.css";
+@import "./theme-dark-overrides.css";
+@import "./chrome.css";
+@import "./ui-kit.css";
+@import "./sidebar.css";
+@import "./sidebar-menus.css";
+@import "./chat-shell.css";
+@import "./messages.css";
+@import "./prose.css";
+@import "./tool-call.css";
+@import "./work-panel.css";
+@import "./modals.css";
+@import "./settings.css";
+@import "./email.css";
+@import "./plugins.css";
+@import "./experts.css";
+@import "./home.css";
+@import "./automation.css";
+@import "./misc.css";
+
+/* 历史遗留的 WorkBuddy 样式保留 — 跨包样式兼容用 */
+@import "./automation-wb.css";
+
+/* ============================================================================
+ * @openbuddy/ui-motion keyframes (Phase 3)
+ * 与 presets.ts 一一对应；CSS class 触发，由 FadeInUp / ScaleIn / SlideInRight 组件使用。
+ * ============================================================================ */
+
+@keyframes ob-fade-in-up {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0,   0); }
+}
+
+@keyframes ob-scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ob-slide-in-right {
+  from { opacity: 0; transform: translate3d(16px, 0, 0); }
+  to   { opacity: 1; transform: translate3d(0,    0, 0); }
+}
+
+/* AnimatedTabs 下划线滑动 */
+@keyframes ob-tab-indicator-slide {
+  from { transform: scaleX(0.7); opacity: 0.5; }
+  to   { transform: scaleX(1);   opacity: 1; }
+}
+
+/* Skeleton shimmer */
+@keyframes ob-skeleton-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Marquee */
+@keyframes ob-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.ob-motion-fade-in-up {
+  opacity: 0;
+}
+
+.ob-motion-fade-in-up.is-in-view {
+  opacity: 1;
+}
+
+.ob-motion-scale-in {
+  opacity: 0;
+}
+
+.ob-motion-slide-in-right {
+  opacity: 0;
+}

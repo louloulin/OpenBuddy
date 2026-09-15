@@ -1,0 +1,42 @@
+name: website
+
+on:
+  push:
+    paths:
+      - 'apps/openbuddy-website/**'
+      - '.github/workflows/website.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/openbuddy-website
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: apps/openbuddy-website/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --filter @openbuddy/website --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter @openbuddy/website typecheck
+
+      - name: Build
+        run: pnpm --filter @openbuddy/website build
+
+      - name: Lint
+        run: pnpm --filter @openbuddy/website lint

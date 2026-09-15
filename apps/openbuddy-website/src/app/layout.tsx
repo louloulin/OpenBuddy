@@ -28,40 +28,12 @@ export const metadata: Metadata = {
     'OpenBuddy is a 100% open source (MIT) desktop AI workspace rebuilt on Electron + Pi. WorkBuddy-grade UI, BYOK providers, plan mode, skills, MCP — auditable, forkable, yours.',
   keywords: ['OpenBuddy', 'WorkBuddy', 'open source', 'desktop AI', 'Electron', 'Pi agent'],
   authors: [{ name: 'OpenBuddy contributors' }],
-  openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    url: 'https://openbuddy.dev',
-    title: 'OpenBuddy — The open desktop AI workspace',
-    description: '100% MIT, auditable, forkable. Built on Electron + Pi with WorkBuddy-grade UI.',
-    siteName: 'OpenBuddy',
-    images: [
-      {
-        url: '/og.png',
-        width: 1200,
-        height: 630,
-        alt: 'OpenBuddy — The open desktop AI workspace'
-      }
-    ]
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'OpenBuddy — The open desktop AI workspace',
-    description: '100% MIT, auditable, forkable. Built on Electron + Pi with WorkBuddy-grade UI.',
-    images: ['/og.png']
-  },
   icons: {
-    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }]
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-image-preview': 'large',
-      'max-snippet': -1
-    }
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico' }
+    ],
+    apple: [{ url: '/app-icon.png', sizes: '1024x1024' }]
   }
 };
 

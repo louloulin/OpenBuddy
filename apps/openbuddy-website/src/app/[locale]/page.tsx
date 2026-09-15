@@ -1,26 +1,12 @@
-import { notFound } from 'next/navigation';
-import Hero from '@/components/Hero';
-import ShowcaseSection from '@/components/ShowcaseSection';
-import FeaturesSection from '@/components/FeaturesSection';
-import ArchitectureSection from '@/components/ArchitectureSection';
-import StatsSection from '@/components/StatsSection';
-import ComparisonSection from '@/components/ComparisonSection';
-import CapabilitiesSection from '@/components/CapabilitiesSection';
-import TechStackSection from '@/components/TechStackSection';
-import CLISection from '@/components/CLISection';
-import TestimonialsSection from '@/components/TestimonialsSection';
-import FAQSection from '@/components/FAQSection';
-import CommunitySection from '@/components/CommunitySection';
-import CTASection from '@/components/CTASection';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
+import Hero from '@/components/home/Hero';
+import ProductTabs from '@/components/home/ProductTabs';
+import CapabilityGrid from '@/components/home/CapabilityGrid';
+import Architecture from '@/components/home/Architecture';
+import CTAFinal from '@/components/home/CTAFinal';
 import { locales, getDictionary, type Locale } from '@/lib/i18n';
 
-/**
- * /[locale] —— 国际化首页 (tutti 严格对标版)
- *
- * 根 `/` 是英文版；`/zh-CN` 是中文版
- */
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
@@ -43,26 +29,18 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 
 export default async function LocaleHomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  if (!locales.includes(locale as Locale)) notFound();
-  const dict = getDictionary(locale as Locale);
+  const typed = locale as Locale;
+  const dict = getDictionary(typed);
 
   return (
     <>
-      <SiteHeader dict={ dict } locale={ locale as Locale } />
+      <SiteHeader dict={ dict } locale={ typed } />
       <main id="main-content">
-        <Hero dict={ dict } locale={ locale as Locale } />
-        <ShowcaseSection dict={ dict } />
-        <CapabilitiesSection dict={ dict } />
-        <FeaturesSection dict={ dict } />
-        <ComparisonSection dict={ dict } />
-        <ArchitectureSection dict={ dict } />
-        <StatsSection dict={ dict } />
-        <TechStackSection dict={ dict } />
-        <CLISection dict={ dict } />
-        <TestimonialsSection dict={ dict } />
-        <FAQSection dict={ dict } />
-        <CommunitySection dict={ dict } />
-        <CTASection dict={ dict } />
+        <Hero locale={ typed } dict={ dict } />
+        <ProductTabs locale={ typed } />
+        <CapabilityGrid locale={ typed } />
+        <Architecture locale={ typed } />
+        <CTAFinal locale={ typed } />
       </main>
       <SiteFooter dict={ dict } />
     </>

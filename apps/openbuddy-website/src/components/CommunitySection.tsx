@@ -4,10 +4,10 @@ import {
   MessagesSquare,
   UsersRound,
   Video,
-  Youtube,
   ArrowUpRight,
   type LucideIcon
 } from 'lucide-react';
+import { YoutubeIcon } from '@/components/icons/BrandIcons';
 import type { Dict } from '@/lib/i18n';
 import { SharedHeader } from './SharedHeader';
 
@@ -21,7 +21,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   'messages-square': MessagesSquare,
   'users-round': UsersRound,
   video: Video,
-  youtube: Youtube
+  youtube: YoutubeIcon
 };
 
 /**

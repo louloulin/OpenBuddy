@@ -30,3 +30,11 @@ export type { FilterableListProps, FilterableListItem } from "./components/Filte
 export { ThemePreview } from "./components/ThemePreview";
 export type { ThemePreviewProps, ThemePreviewToken } from "./components/ThemePreview";
 export * from "./icons";
+export { AnimatedTabs } from "./components/AnimatedTabs";
+export type { AnimatedTabsProps, AnimatedTabsItem } from "./components/AnimatedTabs";
+export { Skeleton } from "./components/Skeleton";
+export type { SkeletonProps } from "./components/Skeleton";
+export { KbdHint } from "./components/KbdHint";
+export type { KbdHintProps } from "./components/KbdHint";
+export { Marquee } from "./components/Marquee";
+export type { MarqueeProps } from "./components/Marquee";

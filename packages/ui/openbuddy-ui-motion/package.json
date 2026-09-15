@@ -1,0 +1,17 @@
+{
+  "name": "@openbuddy/ui-motion",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./easings": "./src/easings.ts",
+    "./presets": "./src/presets.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {}
+}

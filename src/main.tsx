@@ -8,10 +8,10 @@ import { startRendererPluginEventBridge } from "./lib/runtime/renderer-plugin-ru
 import { setToast } from "./stores/toast-store";
 import { useSessionStore } from "./stores/session-store";
 import { abandonInFlightStream } from "./lib/agent/abandon-stream";
-import "./styles/global.css";
-import "./styles/app.css";
-import "./styles/automation-wb.css";
-import "./styles/theme-dark-overrides.css";
+// Phase 2 — modular CSS. globals.css transitively imports tokens / base /
+// theme / chrome / per-domain 拆分文件。app.css 与 automation-wb.css 由
+// globals.css 间接引入（兜底，向后兼容）。
+import "./styles/globals.css";
 
 // R2.4 — boot Composer-draft persistence (localStorage mirror of
 // sessions-store.drafts) so unsent text survives a renderer reload.

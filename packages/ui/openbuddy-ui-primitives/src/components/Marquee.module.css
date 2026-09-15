@@ -1,0 +1,20 @@
+.ob-marquee {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent 0, #000 8%, #000 92%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 8%, #000 92%, transparent 100%);
+}
+.ob-marquee__track {
+  display: flex;
+  width: max-content;
+  animation: ob-marquee linear infinite;
+}
+.ob-marquee__group {
+  display: flex;
+  gap: 12px;
+  padding-right: 12px;
+}
+.ob-marquee--hover-pause:hover .ob-marquee__track {
+  animation-play-state: paused;
+}

@@ -140,6 +140,17 @@
     "subpaths": {}
   },
   {
+    "dir": "openbuddy-ui-motion",
+    "name": "@openbuddy/ui-motion",
+    "main": "./packages/ui/openbuddy-ui-motion/src/index.ts",
+    "client": "./packages/ui/openbuddy-ui-motion/src/client.ts",
+    "invariant": "./packages/ui/openbuddy-ui-motion/src/invariant.ts",
+    "subpaths": {
+      "easings": "./packages/ui/openbuddy-ui-motion/src/easings.ts",
+      "presets": "./packages/ui/openbuddy-ui-motion/src/presets.ts"
+    }
+  },
+  {
     "dir": "openbuddy-ui-primitives",
     "name": "@openbuddy/ui-primitives",
     "main": "./packages/ui/openbuddy-ui-primitives/src/index.ts",

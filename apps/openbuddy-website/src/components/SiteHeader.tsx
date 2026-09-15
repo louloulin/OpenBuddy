@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Github } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import LocaleSwitcher from '@/components/LocaleSwitcher';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 import GitHubStars from '@/components/GitHubStars';
+import Logo from '@/components/icons/Logo';
 import type { Dict, Locale } from '@/lib/i18n';
 import { localizedPath } from '@/lib/i18n';
 
@@ -56,19 +57,10 @@ export default function SiteHeader({ dict, locale }: SiteHeaderProps) {
         {/* Brand */}
         <Link
           href={ localizedPath('/', locale) }
-          className="flex items-center gap-2.5 text-[var(--wb-fg)]"
+          className="flex items-center text-[var(--wb-fg)]"
           aria-label="OpenBuddy home"
         >
-          <span className="relative inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-md">
-            <span
-              className="absolute inset-0"
-              style={ { background: 'linear-gradient(135deg, #5266E8 0%, #3F4FD8 100%)' } }
-            />
-            <span className="relative text-[13px]">🐕</span>
-          </span>
-          <span className="text-[16px] font-medium tracking-tight">
-            OpenBuddy
-          </span>
+          <Logo size={ 26 } />
         </Link>
 
         {/* Desktop nav */}
@@ -94,8 +86,9 @@ export default function SiteHeader({ dict, locale }: SiteHeaderProps) {
             target="_blank"
             rel="noreferrer"
             className="hidden items-center gap-1.5 text-[13px] text-[var(--wb-fg-muted)] transition-colors hover:text-[var(--wb-fg)] sm:inline-flex"
+            aria-label="Star on GitHub"
           >
-            <Github className="h-4 w-4" />
+            <span aria-hidden="true">★</span>
             <GitHubStars repo="louloulin/OpenBuddy" compact />
           </a>
           <Link

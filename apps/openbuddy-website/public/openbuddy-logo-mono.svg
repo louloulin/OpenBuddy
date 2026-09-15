@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    Monochrome OpenBuddy mark: badge removed, features knocked out as holes so
+    the mark works as a stencil on any background. Change the `fill` on the rect
+    below (or inline the SVG and use `currentColor`) to re-colour it.
+  -->
+  <defs>
+    <mask id="mono" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <g transform="matrix(1.55 0 0 1.55 -281.6 -281.3)">
+        <g transform="matrix(1.05 0 0 1.05 -25.6 -15.1)">
+          <!-- solid silhouette -->
+          <path d="M312 470C276 372 274 262 290 220C324 206 398 296 442 394C396 410 348 438 312 470Z" fill="#FFF"/>
+          <path d="M712 470C748 372 750 262 734 220C700 206 626 296 582 394C628 410 676 438 712 470Z" fill="#FFF"/>
+          <path d="M512 356C660 356 748 452 748 574C748 704 646 792 512 792C378 792 276 704 276 574C276 452 364 356 512 356Z" fill="#FFF"/>
+
+          <!-- knockouts -->
+          <path d="M344 424C326 356 324 300 336 280C354 274 396 332 412 386C384 396 362 408 344 424Z" fill="#000"/>
+          <path d="M680 424C698 356 700 300 688 280C670 274 628 332 612 386C640 396 662 408 680 424Z" fill="#000"/>
+          <path d="M512 556C602 556 664 596 664 656C664 700 640 740 604 760C580 772 546 778 512 778C478 778 444 772 420 760C384 740 360 700 360 656C360 596 422 556 512 556Z" fill="none" stroke="#000" stroke-width="15"/>
+          <circle cx="416" cy="434" r="31" fill="#000"/><circle cx="608" cy="434" r="31" fill="#000"/>
+          <ellipse cx="426" cy="506" rx="34" ry="38" fill="#000"/>
+          <ellipse cx="598" cy="506" rx="34" ry="38" fill="#000"/>
+          <path d="M466 622C466 606 484 598 512 598C540 598 558 606 558 622C558 648 534 674 512 674C490 674 466 648 466 622Z" fill="#000"/>
+        </g>
+      </g>
+    </mask>
+  </defs>
+  <rect width="1024" height="1024" fill="#1F2328" mask="url(#mono)"/>
+</svg>

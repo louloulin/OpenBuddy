@@ -1,4 +1,5 @@
-import { Github, Users as UsersIcon } from 'lucide-react';
+import { Users as UsersIcon } from 'lucide-react';
+import { GithubIcon } from '@/components/icons/BrandIcons';
 import type { Dict } from '@/lib/i18n';
 import { SharedHeader } from './SharedHeader';
 
@@ -46,7 +47,7 @@ export default function CTASection({ dict }: CTASectionProps) {
             rel="noreferrer"
             className="cta-link text-white"
           >
-            <Github className="h-4 w-4" />
+            <GithubIcon size={ 16 } />
             <span>{ dict.cta.ctaPrimary }</span>
             <span className="cta-link-arrow">→</span>
           </a>
@@ -65,9 +66,9 @@ export default function CTASection({ dict }: CTASectionProps) {
         {/* Stat row */}
         <div className="mt-24 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 sm:grid-cols-4">
           { [
-            { value: '12.8k', label: 'GitHub stars' },
+            { value: '8', label: 'GitHub stars' },
             { value: '64', label: 'capability packages' },
-            { value: '455', label: 'tests in repo' },
+            { value: '634', label: 'specs in repo' },
             { value: 'MIT', label: 'forkable' }
           ].map((s) => (
             <div key={ s.label } className="bg-black p-6">

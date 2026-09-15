@@ -1,0 +1,196 @@
+/* ============================================================================
+ * chrome.css — Phase 2 modular CSS
+ * Auto-generated from app.css. Mechanical split preserving all original rules.
+ * Loaded by globals.css in the order specified there.
+ * ============================================================================
+ */
+
+/* === (header) === */
+ * OpenBuddy application styles.
+ *
+ * Design tokens (--wb-*) come from tokens.css (ported from WorkBuddy).
+ * Layout numbers mirror WorkBuddy: 56px topbar, ~260px sidebar, 800px chat
+ * column, 13px base font.
+ */
+
+
+/* === app shell === */
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  /* WB teams-container bg = --wb-home-bg-primary (#f2f2f2 light) */
+  background: var(--wb-home-bg-primary);
+  color: var(--wb-text-strong);
+}
+.app__body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+/* Sidebar collapsed: hide the aside; chat topbar / float controls carry expand +
+ * new-task affordances. */
+.app__body--collapsed .sidebar {
+  display: none;
+}
+/* Chat-only top bar: in-flow header so it reserves height and pushes content
+ * down. Other pages hide it entirely and stick their own headers to the top. */
+.main-topbar {
+  flex: none;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  box-sizing: border-box;
+  /* Empty area drags the window, like the title bar; interactive children opt out. */
+  -webkit-app-region: drag;
+}
+/* Floating expand/new controls when sidebar is collapsed on non-chat pages.
+ * Absolute so it does not push page content down. */
+.main-topbar-float {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  -webkit-app-region: no-drag;
+}
+.app--macos .app__body--collapsed .main-topbar-float {
+  /* 三个红绿灯总宽约 70px,左侧留 84px */
+  left: 84px;
+}
+.main-topbar__left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  -webkit-app-region: no-drag;
+}
+/* Transparent icon buttons — no background until hover (WorkBuddy style). */
+.main-topbar__btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--wb-radius-lg);
+  color: var(--wb-text-medium);
+}
+.main-topbar__btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.main-topbar__title {
+  margin-left: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--wb-text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60vw;
+}
+/* Editable conversation title — mirrors WorkBuddy's workbuddy-topbar
+ * title-area: the pencil stays hidden until the area is hovered; clicking it
+ * swaps the text for an input whose contents are fully selected. */
+.main-topbar__title-area {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  margin-left: 8px;
+}
+.main-topbar__title-area .main-topbar__title {
+  margin-left: 0;
+}
+.main-topbar__title-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--wb-radius-sm);
+  color: var(--wb-text-medium);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  height: 24px;
+}
+.main-topbar__title-area:hover .main-topbar__title-edit,
+.main-topbar__title-edit:focus-visible {
+  opacity: 1;
+}
+/* R — version pill in topbar (mirror WorkBuddy "v5.4.7" chip). */
+.main-topbar__version-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 1px 8px;
+  height: 18px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--wb-text-medium, #6e6e80);
+  background: color-mix(in srgb, var(--wb-brand, #5b67f1) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-brand, #5b67f1) 20%, transparent);
+  border-radius: 999px;
+  white-space: nowrap;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.main-topbar__title-edit:hover {
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-hover);
+}
+.main-topbar__title-input {
+  margin-left: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-input, transparent);
+  border: 1px solid var(--wb-border-strong);
+  border-radius: var(--wb-radius-sm);
+  padding: 2px 6px;
+  outline: none;
+  min-width: 120px;
+  max-width: 300px;
+  height: 24px;
+  line-height: 24px;
+  box-sizing: border-box;
+}
+.main-topbar__title-input:focus {
+  border-color: var(--wb-border-focus);
+}
+
+
+/* === Expert badge (topbar) === */
+.expert-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--wb-accent, #6366f1);
+  background: color-mix(in srgb, var(--wb-accent, #6366f1) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-accent, #6366f1) 25%, transparent);
+  border-radius: 999px;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+  cursor: default;
+  user-select: none;
+}

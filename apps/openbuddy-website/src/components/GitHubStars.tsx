@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Github, Star } from 'lucide-react';
+import { Star } from 'lucide-react';
+import { GithubIcon } from '@/components/icons/BrandIcons';
 
 interface GitHubStarsProps {
   /** 仓库 owner/name (e.g. louloulin/OpenBuddy) */
@@ -22,7 +23,7 @@ interface GitHubStarsProps {
  * - localStorage 缓存 1 小时，避免每次渲染都请求
  * - 组件挂载时后台拉取新数据
  */
-export default function GitHubStars({ repo, fallback = '12.8k', compact = false }: GitHubStarsProps) {
+export default function GitHubStars({ repo, fallback = '8', compact = false }: GitHubStarsProps) {
   const [count, setCount] = useState<string | null>(null);
 
   useEffect(() => {

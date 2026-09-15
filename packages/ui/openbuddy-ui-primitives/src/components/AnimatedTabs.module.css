@@ -1,0 +1,40 @@
+/* AnimatedTabs.module.css — 下划线滑动 tabs */
+.ob-tabs {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--wb-bg-surface, rgba(0, 0, 0, 0.03));
+  border-radius: 10px;
+  border: 1px solid var(--wb-border-soft);
+}
+.ob-tabs--sm { padding: 2px; gap: 2px; border-radius: 8px; }
+.ob-tabs__btn {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--wb-text-secondary);
+  border-radius: 7px;
+  transition: var(--wb-transition-color);
+  cursor: pointer;
+  user-select: none;
+}
+.ob-tabs--sm .ob-tabs__btn { padding: 4px 10px; font-size: 12px; }
+.ob-tabs__btn:hover { color: var(--wb-text-strong); background: var(--wb-bg-hover); }
+.ob-tabs__btn.is-active { color: var(--wb-color-text-brand, var(--wb-accent)); }
+.ob-tabs__indicator {
+  position: absolute;
+    bottom: 0;
+    left: 0;
+  height: 2px;
+  background: var(--wb-accent);
+  border-radius: 2px;
+  transition: left var(--wb-duration-medium) var(--wb-ease-out-expo),
+              width var(--wb-duration-medium) var(--wb-ease-out-expo);
+  z-index: 1;
+}

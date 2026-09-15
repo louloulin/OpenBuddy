@@ -1,0 +1,12 @@
+.ob-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--wb-bg-surface, rgba(0, 0, 0, 0.04)) 0%,
+    var(--wb-bg-hover, rgba(0, 0, 0, 0.08)) 50%,
+    var(--wb-bg-surface, rgba(0, 0, 0, 0.04)) 100%
+  );
+  background-size: 200% 100%;
+  animation: ob-skeleton-shimmer 1.4s ease-in-out infinite;
+  vertical-align: middle;
+}
+.ob-skeleton--inline { vertical-align: text-bottom; }

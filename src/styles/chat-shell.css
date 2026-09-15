@@ -1,0 +1,109 @@
+/* ============================================================================
+ * chat-shell.css — Phase 2 modular CSS
+ * Auto-generated from app.css. Mechanical split preserving all original rules.
+ * Loaded by globals.css in the order specified there.
+ * ============================================================================
+ */
+
+/* === TopbarActions: 更多操作下拉菜单 === */
+.topbar-actions {
+  position: relative;
+  display: inline-flex;
+}
+.topbar-actions__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 950;
+  min-width: 168px;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 10px;
+  box-shadow: var(--wb-shadow-lg, 0 10px 40px rgba(0, 0, 0, 0.18));
+  padding: 4px;
+  animation: topbar-actions__fade-in 0.12s ease;
+}
+@keyframes topbar-actions__fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.topbar-actions__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--wb-text-strong);
+  cursor: pointer;
+  text-align: left;
+}
+.topbar-actions__item:hover {
+  background: var(--wb-bg-hover);
+}
+.topbar-actions__item-icon {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+/* Lightweight hover tooltip (mirrors WorkBuddy's "收起侧边栏" hint).
+ * :where() keeps specificity at 0 so this never overrides a positioned
+ * element's own `position` (e.g. the floating .sidebar-expand-btn stays
+ * `absolute` and is not forced to `relative`). */
+:where([data-tip]) {
+  position: relative;
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--wb-bg-elevated, #fff);
+  color: var(--wb-text-strong);
+  border: 1px solid var(--wb-border, rgba(0, 0, 0, 0.08));
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 60;
+}
+[data-tip]:hover::after {
+  opacity: 1;
+}
+.app__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: var(--wb-home-bg-primary);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  overflow: hidden;
+}
+.app__notice {
+  margin: auto;
+  padding: 24px;
+  color: var(--wb-text-medium);
+  font-size: 14px;
+  text-align: center;
+  line-height: 1.8;
+}
+.app__notice--err {
+  color: var(--wb-status-error, #e5484d);
+}
+.app__notice code {
+  background: var(--wb-bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--wb-font-code-family);
+}

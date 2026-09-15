@@ -5,7 +5,7 @@ import { locales, type Locale } from '@/lib/i18n';
 export const dynamicParams = false;
 
 export async function generateStaticParams() {
-  return locales.filter((l) => l !== 'en').map((locale) => ({ locale }));
+  return locales.map((locale) => ({ locale }));
 }
 
 export default async function LocaleRoadmapPage({

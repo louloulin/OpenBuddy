@@ -7,6 +7,7 @@ import type { WorkspaceInfo } from "@/lib/agent/pi-client";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import { MoreIcon, SparklesIcon, CloseIcon } from "@openbuddy/ui-primitives/icons";
 import { useHorizontalScroll } from "@openbuddy/ui-shared";
+import { Skeleton } from "@openbuddy/ui-primitives";
 import { useSessionsStore, HOME_DRAFT_KEY } from "@/stores/sessions-store";
 import { useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
 import { RendererSlotView } from "@openbuddy/ui-workbench";
@@ -49,6 +50,16 @@ function RefreshIcon() {
     </svg>
   );
 }
+
+/** Phase 4 — 技能推荐 chips */
+const SKILL_LABELS = [
+  "📝 会议纪要",
+  "🚀 GTM 计划",
+  "📊 投资组合",
+  "✍️ 文案润色",
+  "🔍 竞品调研",
+  "🎨 UI 草图",
+] as const;
 
 /**
  * 「最佳实践案例」数据 —— 对齐 WorkBuddy 首页底部 4 张案例卡片。
@@ -459,6 +470,27 @@ export function HomePage({
               )}
             </div>
           )}
+
+        <section
+            className="home__skills"
+            aria-label="技能推荐"
+          >
+            <div className="home__skills-bar">
+              <span className="home__skills-bar-title">试试这些工作流</span>
+              <div className="home__skills-bar-chips">
+                {SKILL_LABELS.map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    className="home__skill-chip"
+                    onClick={() => fillComposer(label)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
 
           <Composer
             streaming={streaming}

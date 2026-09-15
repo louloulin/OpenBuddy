@@ -105,7 +105,12 @@
       "@openbuddy/ui-workbench/invariant": ["./packages/ui/openbuddy-ui-workbench/src/invariant.ts"],
       "@openbuddy/ui-collaboration": ["./packages/ui/openbuddy-ui-collaboration/src/index.ts"],
       "@openbuddy/ui-collaboration/client": ["./packages/ui/openbuddy-ui-collaboration/src/client.tsx"],
-      "@openbuddy/ui-collaboration/invariant": ["./packages/ui/openbuddy-ui-collaboration/src/invariant.ts"]
+      "@openbuddy/ui-collaboration/invariant": ["./packages/ui/openbuddy-ui-collaboration/src/invariant.ts"],
+      "@openbuddy/ui-motion": ["./packages/ui/openbuddy-ui-motion/src/index.ts"],
+      "@openbuddy/ui-motion/client": ["./packages/ui/openbuddy-ui-motion/src/client.ts"],
+      "@openbuddy/ui-motion/easings": ["./packages/ui/openbuddy-ui-motion/src/easings.ts"],
+      "@openbuddy/ui-motion/invariant": ["./packages/ui/openbuddy-ui-motion/src/invariant.ts"],
+      "@openbuddy/ui-motion/presets": ["./packages/ui/openbuddy-ui-motion/src/presets.ts"]
     },
     "types": [
       "node"

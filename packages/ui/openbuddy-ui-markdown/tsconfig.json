@@ -314,7 +314,12 @@
       "@openbuddy/ui-markdown/components/MarkdownPre": ["./packages/ui/openbuddy-ui-markdown/src/components/MarkdownPre.tsx"],
       "@openbuddy/ui-markdown/components/MarkdownPreMermaid": ["./packages/ui/openbuddy-ui-markdown/src/components/MarkdownPreMermaid.tsx"],
       "@openbuddy/ui-markdown/components/preprocess": ["./packages/ui/openbuddy-ui-markdown/src/components/preprocess.ts"],
-      "@openbuddy/ui-markdown/components/types": ["./packages/ui/openbuddy-ui-markdown/src/components/types.ts"]
+      "@openbuddy/ui-markdown/components/types": ["./packages/ui/openbuddy-ui-markdown/src/components/types.ts"],
+      "@openbuddy/ui-motion": ["./packages/ui/openbuddy-ui-motion/src/index.ts"],
+      "@openbuddy/ui-motion/client": ["./packages/ui/openbuddy-ui-motion/src/client.ts"],
+      "@openbuddy/ui-motion/easings": ["./packages/ui/openbuddy-ui-motion/src/easings.ts"],
+      "@openbuddy/ui-motion/invariant": ["./packages/ui/openbuddy-ui-motion/src/invariant.ts"],
+      "@openbuddy/ui-motion/presets": ["./packages/ui/openbuddy-ui-motion/src/presets.ts"]
     }
   },
   "include": [

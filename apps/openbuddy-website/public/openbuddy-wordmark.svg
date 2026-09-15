@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="256" viewBox="0 0 1120 256">
+  <!--
+    Horizontal lockup: badge mark + wordmark. The type uses a font stack rather
+    than outlined paths, so a viewer without Inter falls back to the platform UI
+    font. Ink colour is picked to stay legible on both white and #0d1117.
+  -->
+  <defs>
+    <linearGradient id="badge" x1="120" y1="90" x2="900" y2="940" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#13665C"/><stop offset=".52" stop-color="#0C4A48"/><stop offset="1" stop-color="#083034"/>
+    </linearGradient>
+    <linearGradient id="coat" x1="290" y1="210" x2="750" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFCB86"/><stop offset=".5" stop-color="#FCA23F"/><stop offset="1" stop-color="#EF7E27"/>
+    </linearGradient>
+    <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
+  </defs>
+
+  <g transform="scale(0.25)">
+    <g clip-path="url(#clip)">
+      <rect x="38" y="38" width="948" height="948" rx="224" fill="url(#badge)"/>
+      <circle cx="286" cy="232" r="430" fill="#FFFFFF" opacity=".07"/>
+      <g transform="matrix(1.05 0 0 1.05 -25.6 -15.1)">
+        <path d="M312 470C276 372 274 262 290 220C324 206 398 296 442 394C396 410 348 438 312 470Z" fill="url(#coat)"/>
+        <path d="M712 470C748 372 750 262 734 220C700 206 626 296 582 394C628 410 676 438 712 470Z" fill="url(#coat)"/>
+        <path d="M344 424C326 356 324 300 336 280C354 274 396 332 412 386C384 396 362 408 344 424Z" fill="#FFF6E8"/>
+        <path d="M680 424C698 356 700 300 688 280C670 274 628 332 612 386C640 396 662 408 680 424Z" fill="#FFF6E8"/>
+        <path d="M512 356C660 356 748 452 748 574C748 704 646 792 512 792C378 792 276 704 276 574C276 452 364 356 512 356Z" fill="url(#coat)"/>
+        <path d="M512 556C602 556 664 596 664 656C664 700 640 740 604 760C580 772 546 778 512 778C478 778 444 772 420 760C384 740 360 700 360 656C360 596 422 556 512 556Z" fill="#FFF6E8"/>
+        <circle cx="416" cy="434" r="31" fill="#FFF6E8"/><circle cx="608" cy="434" r="31" fill="#FFF6E8"/>
+        <ellipse cx="426" cy="506" rx="34" ry="38" fill="#2B1A11"/>
+        <ellipse cx="598" cy="506" rx="34" ry="38" fill="#2B1A11"/>
+        <circle cx="415" cy="494" r="11" fill="#FFFFFF"/><circle cx="587" cy="494" r="11" fill="#FFFFFF"/>
+        <path d="M466 622C466 606 484 598 512 598C540 598 558 606 558 622C558 648 534 674 512 674C490 674 466 648 466 622Z" fill="#2B1A11"/>
+        <path d="M512 676V700" stroke="#2B1A11" stroke-width="18" stroke-linecap="round"/>
+        <path d="M512 700C512 732 474 742 455 720M512 700C512 732 550 742 569 720" fill="none" stroke="#2B1A11" stroke-width="18" stroke-linecap="round"/>
+      </g>
+    </g>
+  </g>
+
+  <text x="300" y="180" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+        font-size="148" font-weight="700" letter-spacing="-4" fill="#0C8478">OpenBuddy</text>
+</svg>

@@ -241,7 +241,7 @@ const en: Dict = {
     starOnGithub: 'Star on GitHub'
   },
   hero: {
-    chip: 'v0.14 · MIT licensed · 455 tests passing',
+    chip: 'v0.15 · MIT licensed · 1,886 tests',
     titlePre: 'The open desktop',
     titleHighlight: 'AI workspace',
     titlePost: 'you can actually read, fork, and own.',
@@ -1438,7 +1438,7 @@ const zhCN: Dict = {
       title: '资源',
       links: [
         { label: '文档', href: 'https://github.com/louloulin/OpenBuddy/tree/main/docs' },
-        { label: '快速开始', href: 'https://github.com/lougoulin/OpenBuddy/blob/main/docs/GETTING_STARTED.zh-CN.md' },
+        { label: '快速开始', href: 'https://github.com/louloulin/OpenBuddy/blob/main/docs/GETTING_STARTED.zh-CN.md' },
         { label: '插件开发', href: 'https://github.com/louloulin/OpenBuddy/blob/main/docs/PLUGIN_DEVELOPMENT.md' },
         { label: '路线图', href: 'https://github.com/louloulin/OpenBuddy/blob/main/TODO.md' },
         { label: '更新日志', href: 'https://github.com/louloulin/OpenBuddy/blob/main/CHANGELOG.zh-CN.md' }

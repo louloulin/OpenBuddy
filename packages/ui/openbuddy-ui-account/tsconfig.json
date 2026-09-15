@@ -106,7 +106,12 @@
     
       "@openbuddy/ui-account": ["./packages/ui/openbuddy-ui-account/src/index.ts"],
       "@openbuddy/ui-account/client": ["./packages/ui/openbuddy-ui-account/src/client.tsx"],
-      "@openbuddy/ui-account/invariant": ["./packages/ui/openbuddy-ui-account/src/invariant.ts"]
+      "@openbuddy/ui-account/invariant": ["./packages/ui/openbuddy-ui-account/src/invariant.ts"],
+      "@openbuddy/ui-motion": ["./packages/ui/openbuddy-ui-motion/src/index.ts"],
+      "@openbuddy/ui-motion/client": ["./packages/ui/openbuddy-ui-motion/src/client.ts"],
+      "@openbuddy/ui-motion/easings": ["./packages/ui/openbuddy-ui-motion/src/easings.ts"],
+      "@openbuddy/ui-motion/invariant": ["./packages/ui/openbuddy-ui-motion/src/invariant.ts"],
+      "@openbuddy/ui-motion/presets": ["./packages/ui/openbuddy-ui-motion/src/presets.ts"]
     },
     "types": [
       "node"

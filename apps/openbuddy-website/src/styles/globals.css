@@ -20,8 +20,6 @@
  * 暗/亮 section 交替: 使用 [data-section-theme] 局部覆盖
  * ========================================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;1,8..60,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 /* =========================================================================
  * LIGHT THEME (default)
  * tutti 浅色风格: cream 底色 + 深海军文本
@@ -172,31 +170,6 @@
  * - 通过 data-section-theme 提供 cream 变体作为 light 模式下的视觉节奏
  * - Dark 模式拥有最高优先级, 强制覆盖所有 section themes
  * ========================================================================= */
-[data-theme='dark'] section,
-[data-theme='dark'] footer {
-  /* Dark 主题下, 强制所有 section (不管有没有 data-section-theme) 都用黑色 */
-  --wb-bg: #000000;
-  --wb-bg-pure: #0A0A0A;
-  --wb-bg-soft: #0E0E11;
-  --wb-bg-soft-2: #161618;
-  --wb-bg-tertiary: #1A1A1D;
-  --wb-bg-elevated: #0A0A0A;
-  --wb-bg-overlay: rgba(255, 255, 255, 0.04);
-  --wb-bg-hover: rgba(255, 255, 255, 0.06);
-  --wb-bg-active: rgba(255, 255, 255, 0.10);
-  --wb-fg: #F2F2F6;
-  --wb-fg-muted: rgba(242, 242, 246, 0.72);
-  --wb-fg-faint: rgba(242, 242, 246, 0.40);
-  --wb-fg-inverse: #152B43;
-  --wb-border: rgba(255, 255, 255, 0.10);
-  --wb-border-soft: rgba(255, 255, 255, 0.06);
-  --wb-border-strong: rgba(255, 255, 255, 0.18);
-  --wb-border-focus: #818CF8;
-  --wb-grid-color: rgba(255, 255, 255, 0.04);
-  background-color: #000 !important;
-  color: #F2F2F6 !important;
-}
-
 [data-section-theme='cream'] {
   /* Light mode 下的暖米色变体, 用于 section 交替节奏 */
   --wb-bg: #F2F0E8;
@@ -429,6 +402,137 @@
     font-family: var(--font-display);
     font-weight: 400;
     letter-spacing: -0.02em;
+  }
+
+  /* Markdown 渲染 —— docs.ts 输出 HTML 的样式 */
+  .md-prose {
+    color: var(--wb-fg);
+    font-size: 15.5px;
+    line-height: 1.7;
+    max-width: 72ch;
+  }
+  .md-prose .md-h {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    color: var(--wb-fg);
+    scroll-margin-top: 6rem;
+  }
+  .md-prose .md-h2 {
+    font-size: 28px;
+    line-height: 1.2;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--wb-border);
+  }
+  .md-prose .md-h3 {
+    font-size: 21px;
+    line-height: 1.3;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+  }
+  .md-prose .md-h4 {
+    font-size: 17px;
+    line-height: 1.35;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-jetbrains);
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .md-prose p { margin: 1rem 0; }
+  .md-prose a {
+    color: var(--wb-fg);
+    text-decoration: underline;
+    text-decoration-color: var(--wb-border-strong);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.15s ease;
+  }
+  .md-prose a:hover { text-decoration-color: var(--wb-fg); }
+  .md-prose strong { font-weight: 600; color: var(--wb-fg); }
+  .md-prose em { font-style: italic; }
+  .md-prose ul,
+  .md-prose ol {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+  }
+  .md-prose ul { list-style: disc; }
+  .md-prose ol { list-style: decimal; }
+  .md-prose li {
+    margin: 0.4rem 0;
+    padding-left: 0.25rem;
+  }
+  .md-prose li::marker { color: var(--wb-fg-faint); }
+  .md-prose code {
+    font-family: var(--font-jetbrains);
+    font-size: 0.88em;
+    background: var(--wb-bg-soft);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    border: 1px solid var(--wb-border);
+  }
+  .md-prose pre {
+    margin: 1.25rem 0;
+    padding: 1.1rem 1.25rem;
+    background: var(--wb-code-bg);
+    color: var(--wb-code-fg);
+    border-radius: 10px;
+    overflow-x: auto;
+    font-family: var(--font-jetbrains);
+    font-size: 13px;
+    line-height: 1.6;
+    border: 1px solid var(--wb-border);
+  }
+  .md-prose pre code {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font-size: inherit;
+    color: inherit;
+  }
+  .md-prose blockquote {
+    margin: 1.25rem 0;
+    padding: 0.4rem 1rem;
+    border-left: 3px solid var(--wb-accent);
+    color: var(--wb-fg-muted);
+    background: var(--wb-bg-soft);
+    border-radius: 0 6px 6px 0;
+  }
+  .md-prose blockquote p { margin: 0.4rem 0; }
+  .md-prose hr {
+    border: 0;
+    border-top: 1px solid var(--wb-border);
+    margin: 2.5rem 0;
+  }
+  .md-prose table {
+    width: 100%;
+    margin: 1.25rem 0;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  .md-prose th,
+  .md-prose td {
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--wb-border);
+    text-align: left;
+    vertical-align: top;
+  }
+  .md-prose th {
+    background: var(--wb-bg-soft);
+    font-weight: 600;
+    font-family: var(--font-jetbrains);
+    font-size: 12.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .md-prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--wb-border);
+    margin: 1.25rem 0;
   }
 }
 

@@ -1,0 +1,45 @@
+/* ============================================================================
+ * base.css — Foundation reset + typography baseline
+ * Phase 2 — extracted from app.css
+ * Loaded first in globals.css so subsequent files can override.
+ * ============================================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--wb-font-family-base, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--wb-text-strong);
+  background: var(--wb-bg, var(--wb-home-bg-primary, #fff));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img, svg, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+input, textarea, select {
+  font: inherit;
+  color: inherit;
+}

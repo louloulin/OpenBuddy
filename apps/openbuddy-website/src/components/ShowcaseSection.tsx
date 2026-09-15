@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, ImageIcon, ArrowUpRight } from 'lucide-react';
+import Logo from '@/components/icons/Logo';
 import type { Dict } from '@/lib/i18n';
 import { SharedHeader } from './SharedHeader';
 
@@ -147,8 +148,8 @@ function ShowcaseMock({ tabId }: { tabId: string }) {
     <div className="grid grid-cols-[200px_1fr] bg-[var(--wb-bg-soft)] min-h-[420px]">
       <aside className="border-r border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-4">
         <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-[#5266E8] to-[#3F4FD8] text-[12px]">
-            🐕
+          <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded">
+            <Logo size={ 18 } showWordmark={ false } />
           </span>
           <span className="text-[12px] font-semibold">OpenBuddy</span>
         </div>
@@ -183,8 +184,8 @@ function ShowcaseMock({ tabId }: { tabId: string }) {
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-gradient-to-br from-[#5266E8] to-[#3F4FD8] text-[10px]">
-                🐕
+              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center overflow-hidden rounded">
+                <Logo size={ 16 } showWordmark={ false } />
               </span>
               <div className="flex-1 rounded-xl rounded-tl-md border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] px-4 py-3">
                 { preset.status === 'streaming' && (

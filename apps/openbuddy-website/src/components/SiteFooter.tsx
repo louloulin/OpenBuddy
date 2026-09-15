@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import { Github, Twitter, Youtube, MessageCircle } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
+import { GithubIcon, XIcon, YoutubeIcon, DiscordIcon } from '@/components/icons/BrandIcons';
+import Logo from '@/components/icons/Logo';
 import type { Dict } from '@/lib/i18n';
 
 interface SiteFooterProps {
@@ -24,19 +26,10 @@ export default function SiteFooter({ dict }: SiteFooterProps) {
         <div className="border-b border-[var(--wb-border)] pb-12">
           <Link
             href="/"
-            className="inline-flex items-center gap-2.5 text-[var(--wb-fg)]"
+            className="inline-flex items-center text-[var(--wb-fg)]"
             aria-label="OpenBuddy"
           >
-            <span className="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-md">
-              <span
-                className="absolute inset-0"
-                style={ { background: 'linear-gradient(135deg, #5266E8 0%, #3F4FD8 100%)' } }
-              />
-              <span className="relative text-[14px]">🐕</span>
-            </span>
-            <span className="text-[20px] font-medium tracking-tight">
-              OpenBuddy
-            </span>
+            <Logo size={ 32 } />
           </Link>
 
           <p className="mt-6 max-w-md text-body-lg text-[var(--wb-fg-muted)]">
@@ -46,22 +39,22 @@ export default function SiteFooter({ dict }: SiteFooterProps) {
           <div className="mt-8 flex items-center gap-4">
             <SocialLink
               href="https://github.com/louloulin/OpenBuddy"
-              icon={ Github }
+              icon={ GithubIcon }
               label="GitHub"
             />
             <SocialLink
               href="https://x.com/openbuddy"
-              icon={ Twitter }
+              icon={ XIcon }
               label="X"
             />
             <SocialLink
               href="https://discord.gg/openbuddy"
-              icon={ MessageCircle }
+              icon={ DiscordIcon }
               label="Discord"
             />
             <SocialLink
               href="https://youtube.com/@openbuddy"
-              icon={ Youtube }
+              icon={ YoutubeIcon }
               label="YouTube"
             />
           </div>
@@ -110,7 +103,7 @@ function SocialLink({
   label
 }: {
   href: string;
-  icon: typeof Github;
+  icon: typeof GithubIcon;
   label: string;
 }) {
   return (

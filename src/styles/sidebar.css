@@ -1,0 +1,90 @@
+/* ============================================================================
+ * sidebar.css — Sidebar nav + secondary actions
+ * Phase 2 — extracted from ui-sidebar package
+ * Loaded after chrome.css. The actual implementation lives in
+ * packages/ui/openbuddy-ui-sidebar/ — this global file only carries the
+ * shared design tokens / shadows that cross-cut all sidebar variants.
+ * ============================================================================ */
+
+.sidebar {
+  flex: none;
+  width: var(--ds-sidebar-width, 260px);
+  display: flex;
+  flex-direction: column;
+  background: var(--wb-bg-sidebar, var(--wb-bg-primary));
+  border-right: 1px solid var(--wb-border, var(--wb-border-soft));
+  overflow: hidden;
+  transition: width var(--wb-duration-medium) var(--wb-ease-out-expo);
+}
+
+.sidebar--collapsed {
+  width: 0;
+  border-right: 0;
+}
+
+.sidebar__header {
+  flex: none;
+  padding: 12px 12px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar__scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 12px;
+}
+
+.sidebar__footer {
+  flex: none;
+  padding: 8px 12px;
+  border-top: 1px solid var(--wb-border-soft);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.sidebar-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--wb-text-secondary);
+  cursor: pointer;
+  transition: var(--wb-transition-color);
+  user-select: none;
+}
+
+.sidebar-nav__item:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+
+.sidebar-nav__item--active {
+  background: var(--wb-bg-active);
+  color: var(--wb-color-text-brand, var(--wb-accent));
+  font-weight: 500;
+}
+
+/* Resize handle (drag bar between sidebar and main) */
+.sidebar-resize {
+  flex: none;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background var(--wb-duration-fast) var(--wb-ease-out-expo);
+}
+
+.sidebar-resize:hover,
+.sidebar-resize.is-dragging {
+  background: var(--wb-accent);
+}

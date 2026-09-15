@@ -3,6 +3,7 @@ import { Calendar, Tag, GitCommit, Sparkles, Wrench, Bug, ExternalLink } from 'l
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import SharedHeader from '@/components/SharedHeader';
+import type { ChangelogRelease } from '@/lib/changelog-server';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import Link from 'next/link';
 import RevealOnScroll from '@/components/RevealOnScroll';
@@ -21,7 +22,7 @@ const TAG_STYLES: Record<string, { dot: string; chip: string }> = {
   lts: { dot: 'var(--wb-accent)', chip: 'bg-[rgba(79,70,229,0.10)] text-[var(--wb-accent)] border-[rgba(79,70,229,0.30)]' }
 };
 
-export function ChangelogView({ locale }: { locale: Locale }) {
+export function ChangelogView({ locale, releases }: { locale: Locale; releases: ChangelogRelease[] }) {
   const dict = getDictionary(locale);
 
   return (
@@ -42,7 +43,11 @@ export function ChangelogView({ locale }: { locale: Locale }) {
               <div className="absolute left-[19px] top-2 bottom-2 hidden w-px bg-gradient-to-b from-[var(--wb-working)] via-[var(--wb-border)] to-transparent sm:block" />
 
               <div className="space-y-12">
-                { dict.changelog.releases.map((r, idx) => {
+                { releases.length === 0 ? (
+                  <p className="text-[var(--wb-fg-muted)]">
+                    { locale === 'zh-CN' ? '暂无更新日志。' : 'No releases published yet.' }
+                  </p>
+                ) : releases.map((r, idx) => {
                   const tag = TAG_STYLES[r.tag] ?? TAG_STYLES.stable;
                   return (
                     <RevealOnScroll key={ r.version } delay={ idx * 80 }>

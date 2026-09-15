@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, Github, Terminal, Sparkles } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowRight, Terminal, Sparkles } from 'lucide-react';
 import type { Dict, Locale } from '@/lib/i18n';
 import { localizedPath } from '@/lib/i18n';
 
@@ -47,7 +48,7 @@ export default function Hero({ dict, locale }: HeroProps) {
             <span>{ dict.hero.chip }</span>
           </span>
           <span className="font-mono text-[11.5px] text-[var(--wb-fg-faint)]">
-            MIT · 64 packages · 309 tests
+            MIT · 64 packages · 1,886 tests
           </span>
         </div>
 
@@ -88,9 +89,10 @@ export default function Hero({ dict, locale }: HeroProps) {
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-2 font-mono text-[13px] text-[var(--wb-fg-faint)] hover:text-[var(--wb-fg)]"
+            aria-label="Star on GitHub"
           >
-            <Github className="h-3.5 w-3.5" />
-            <span>★ 12.8k</span>
+            <span aria-hidden="true">★</span>
+            <span>Star on GitHub</span>
           </a>
         </div>
 
@@ -104,14 +106,12 @@ export default function Hero({ dict, locale }: HeroProps) {
 }
 
 /**
- * HeroVisual —— 跟随 theme 的产品 mockup
+ * HeroVisual —— 真产品截图 + 浮动 agent 卡片
  */
 function HeroVisual() {
   return (
     <div className="relative">
-      {/* 主应用窗口 */}
       <div className="wb-window shadow-2xl shadow-[var(--wb-fg)]/10">
-        {/* Title bar */}
         <div className="flex items-center gap-2 border-b border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-3 py-2.5">
           <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" />
@@ -119,128 +119,15 @@ function HeroVisual() {
           <span className="ml-3 font-mono text-[10.5px] text-[var(--wb-fg-muted)]">
             ~/openbuddy · main workspace
           </span>
-          <span className="ml-auto flex items-center gap-2 font-mono text-[10.5px] text-[var(--wb-fg-muted)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
-            <span>connected · MiniMax-M3</span>
-          </span>
         </div>
-
-        <div className="grid grid-cols-[200px_1fr] bg-[var(--wb-bg-pure)]">
-          {/* Sidebar */}
-          <aside className="border-r border-[var(--wb-border)] bg-[var(--wb-bg-soft)] p-3.5">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-[#5266E8] to-[#3F4FD8] text-[12px]">
-                🐕
-              </span>
-              <span className="text-[12px] font-semibold text-[var(--wb-fg)]">OpenBuddy</span>
-              <span className="ml-auto rounded border border-[var(--wb-border)] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-[var(--wb-fg-muted)]">
-                MIT
-              </span>
-            </div>
-
-            <button
-              type="button"
-              className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--wb-accent)]/10 px-2.5 py-1.5 text-[11px] font-medium text-[var(--wb-fg)] hover:bg-[var(--wb-accent)]/20"
-            >
-              <span>+</span>
-              <span>New chat</span>
-            </button>
-
-            <div className="mt-5 space-y-0.5">
-              { [
-                { name: 'Chat', active: true },
-                { name: 'Workspace', active: false },
-                { name: 'Skills', active: false },
-                { name: 'MCP servers', active: false },
-                { name: 'Settings', active: false }
-              ].map((item) => (
-                <div
-                  key={ item.name }
-                  className={ `flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] ${
-                    item.active
-                      ? 'bg-[var(--wb-accent)]/15 font-medium text-[var(--wb-fg)]'
-                      : 'text-[var(--wb-fg-muted)] hover:bg-[var(--wb-bg)]'
-                  }` }
-                >
-                  <span className="h-1 w-1 rounded-full bg-current opacity-50" />
-                  <span>{ item.name }</span>
-                </div>
-              )) }
-            </div>
-
-            <div className="mt-6 border-t border-[var(--wb-border)] pt-4">
-              <p className="px-2 font-mono text-[9px] uppercase tracking-wider text-[var(--wb-fg-faint)]">
-                Today
-              </p>
-              <div className="mt-2 space-y-1">
-                <div className="rounded-md bg-[var(--wb-bg)] px-2 py-1.5 text-[10.5px] text-[var(--wb-fg)]">
-                  Refactor auth.ts
-                </div>
-                <div className="rounded-md px-2 py-1.5 text-[10.5px] text-[var(--wb-fg-muted)] hover:bg-[var(--wb-bg)]">
-                  Translate README
-                </div>
-                <div className="rounded-md px-2 py-1.5 text-[10.5px] text-[var(--wb-fg-muted)] hover:bg-[var(--wb-bg)]">
-                  DB migration review
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          {/* Main */}
-          <main className="flex flex-col">
-            <div className="flex-1 space-y-5 p-7">
-              <div className="flex justify-end">
-                <div className="max-w-[78%] rounded-xl rounded-br-sm bg-[var(--wb-fg)] px-4 py-2.5 text-[12.5px] leading-relaxed text-[var(--wb-bg)]">
-                  refactor auth.ts to use async/await + add proper error handling. plan first, then execute.
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-[#5266E8] to-[#3F4FD8] text-[12px]">
-                  🐕
-                </span>
-                <div className="flex-1 rounded-xl rounded-tl-sm border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] px-4 py-3">
-                  <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--wb-accent)]/15 px-2 py-0.5 text-[10px] font-medium text-[var(--wb-accent)]">
-                    <Sparkles className="h-2.5 w-2.5" />
-                    Plan mode · reviewing 47 lines
-                  </div>
-                  <p className="text-[12.5px] leading-relaxed text-[var(--wb-fg)]">
-                    Refactored <code className="rounded bg-[var(--wb-bg-soft)] px-1 py-0.5 font-mono text-[11px] text-[var(--wb-working-fg)]">auth.ts</code> · 47 lines changed · added try/catch around JWT validation, switched to async/await, preserved public API.
-                  </p>
-                  <div className="mt-2.5 flex items-center gap-2 border-t border-[var(--wb-border)] pt-2 text-[10.5px] text-[var(--wb-fg-muted)]">
-                    <span className="text-[var(--wb-working)]">✓ completed 4.2s</span>
-                    <span>·</span>
-                    <span className="hover:text-[var(--wb-fg)] cursor-pointer">copy</span>
-                    <span>·</span>
-                    <span className="hover:text-[var(--wb-fg)] cursor-pointer">retry</span>
-                    <span>·</span>
-                    <span className="hover:text-[var(--wb-fg)] cursor-pointer">apply</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-[var(--wb-border)] p-4">
-              <div className="rounded-xl border border-[var(--wb-border)] bg-[var(--wb-bg)] p-3.5">
-                <div className="font-mono text-[12.5px] text-[var(--wb-fg-muted)]">
-                  ask anything, or @ to invoke a skill…
-                  <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-cursor-blink bg-[var(--wb-fg)] align-middle" />
-                </div>
-                <div className="mt-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2 font-mono text-[10px] text-[var(--wb-fg-muted)]">
-                    <span className="rounded border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] px-1.5 py-0.5">⌘K</span>
-                    <span>Plan mode</span>
-                    <span>·</span>
-                    <span className="text-[var(--wb-working)]">2 agents running</span>
-                  </div>
-                  <span className="rounded-md bg-[var(--wb-fg)] px-3 py-1 text-[11px] font-medium text-[var(--wb-bg)]">
-                    Send
-                  </span>
-                </div>
-              </div>
-            </div>
-          </main>
-        </div>
+        <Image
+          src="/screenshots/desktop-main.png"
+          alt="OpenBuddy desktop workspace"
+          width={ 1696 }
+          height={ 1080 }
+          priority
+          className="block w-full h-auto"
+        />
       </div>
 
       {/* Floating cards */}

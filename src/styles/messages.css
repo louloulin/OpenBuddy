@@ -1,0 +1,463 @@
+/* ============================================================================
+ * messages.css — Phase 2 modular CSS
+ * Auto-generated from app.css. Mechanical split preserving all original rules.
+ * Loaded by globals.css in the order specified there.
+ * ============================================================================
+ */
+
+/* === chat view === */
+.chatview {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+}
+.chatview__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+}
+/* R — chat rail (vertical stack of floating action buttons aligned to the
+ * right edge of the chat column; mirrors WorkBuddy's 添加文件 / 模式 /
+ * 技能 / 连接器 chip rail). */
+/* R — chat rail (single trigger button + dropdown panel anchored to the
+ * right edge of the chat column; mirrors WorkBuddy's 添加文件 / 模式 /
+ * 技能 / 连接器 chip rail, condensed to a popover). */
+.chat-rail {
+  position: absolute;
+  top: 16px;
+  right: 12px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: auto;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.chat-rail__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+  background: color-mix(in srgb, var(--wb-bg-primary, #ffffff) 92%, transparent);
+  border-radius: 999px;
+  color: var(--wb-text-medium, #6e6e80);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.chat-rail__trigger:hover {
+  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--wb-text-strong, #1a1a2e);
+  border-color: color-mix(in srgb, var(--wb-border-soft, rgba(0, 0, 0, 0.08)) 50%, transparent);
+}
+.chat-rail__trigger-label {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.chat-rail__menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--wb-bg-primary, #ffffff) 96%, transparent);
+  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.chat-rail__menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--wb-text-medium, #6e6e80);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.chat-rail__menu-item:hover {
+  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--wb-text-strong, #1a1a2e);
+}
+.chat-rail__menu-item:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand, #5b67f1) 50%, transparent);
+  outline-offset: -2px;
+}
+.chat-rail__menu {
+  display: none;
+}
+
+.chatview__extension-widgets,
+.chatview__extension-status {
+  margin: 8px 16px 0;
+  border-radius: 8px;
+  color: var(--wb-text-secondary, #666);
+  font-size: 12px;
+}
+
+.chatview__extension-widget {
+  padding: 8px 10px;
+  background: var(--wb-bg-secondary, #f5f5f5);
+}
+
+.chatview__extension-status {
+  padding: 4px 10px;
+}
+.chatview__extension-working {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 8px 16px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--wb-bg-secondary, #f5f5f5);
+  color: var(--wb-text-secondary, #666);
+  font-size: 12px;
+}
+.chatview__extension-working-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--wb-brand, #5b67f1);
+  animation: chatview-extension-pulse 1.2s ease-in-out infinite;
+}
+.chatview__extension-working-tools {
+  margin-left: auto;
+  opacity: 0.72;
+}
+@keyframes chatview-extension-pulse {
+  50% { opacity: 0.35; }
+}
+.chatview__scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.chatview__inner {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 24px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.chatview__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--wb-text-strong, #1a1a2e);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.chatview__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--wb-text-medium, #6e6e80);
+  background: var(--wb-bg-secondary, #f5f5f7);
+  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+  border-radius: 999px;
+  white-space: nowrap;
+  user-select: none;
+}
+.chatview__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wb-brand, #5b67f1) 70%, transparent);
+}
+.chatview__status--streaming .chatview__status-dot {
+  animation: chatview__status-pulse 1.2s ease-in-out infinite;
+}
+@keyframes chatview__status-pulse {
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+/* R6.7 — secondary cumulative-time chip rendered inside chatview__status
+   once the session has been alive ≥ 30s. Visually muted (no background
+   tint, smaller font, no dot) so the primary streaming/completed chip
+   stays the dominant affordance. */
+.chatview__status-total {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--wb-text-soft, #9999a3);
+  letter-spacing: 0.01em;
+  padding-left: 4px;
+  border-left: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+  margin-left: 2px;
+  user-select: none;
+}
+.chatview__footer {
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  /* Pin to the bottom of `chatview__main` (flex-column). Without
+     `flex-shrink: 0` a tall transcript can compress the footer instead of
+     overflowing the scroll container — the composer would visibly shrink
+     rather than the transcript growing behind it. Keep the composer's
+     intrinsic height stable so input stays usable at any transcript length. */
+  flex-shrink: 0;
+  /* 贴底:底部留出仅免责声明一行的间距(对齐 WB 24px→10px)。 */
+  padding: 6px 24px 10px;
+  box-sizing: border-box;
+}
+/* WB 风格:会话工具按钮 portal 进 main-topbar 右侧槽位;宿主缺失时
+   回退为正文内的图标行(--fallback)。按钮统一 .chatview__tool-btn。 */
+.chatview__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.chatview__toolbar--fallback {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 16px 0;
+}
+.chatview__tool-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--wb-text-medium, rgba(255, 255, 255, 0.65));
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+.chatview__tool-btn:hover {
+  background: var(--wb-bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--wb-text-strong, rgba(255, 255, 255, 0.92));
+}
+.chatview__tool-btn--active {
+  color: var(--wb-brand, #5b67f1);
+  background: color-mix(in srgb, var(--wb-brand, #5b67f1) 14%, transparent);
+}
+/* 顶栏右侧槽位(ChatView 的 portal 目标):把按钮右推到顶栏右端,
+   并允许按钮接收鼠标事件(顶栏整体是 -webkit-app-region: drag)。 */
+.main-topbar__right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+.chatview--with-panel .chatview__plan-panel {
+  right: 16px;
+}
+.chatview__error {
+  color: var(--wb-status-error, #e5484d);
+  font-size: 13px;
+  padding: 8px 12px;
+  background: var(--wb-bg-tertiary);
+  border-radius: 8px;
+}
+/* 会话内查找条(对齐 WorkBuddy chat-search) */
+.findbar {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  border: 1px solid var(--wb-border-default);
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  font-size: 12px;
+}
+.findbar__input {
+  width: 180px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--wb-text-strong);
+}
+.findbar__count {
+  min-width: 34px;
+  text-align: center;
+  color: var(--wb-text-light);
+  font-variant-numeric: tabular-nums;
+}
+.findbar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-text-medium);
+  cursor: pointer;
+}
+.findbar__btn:hover:not(:disabled) {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-text-strong);
+}
+.findbar__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* 命中消息容器高亮(包在 MessageItem 外的 msg-wrap 上) */
+.msg-wrap {
+  border-radius: 8px;
+}
+.msg-wrap--find-hit {
+  box-shadow: inset 3px 0 0 var(--wb-brand);
+  background: rgba(0, 0, 0, 0.02);
+}
+.msg-wrap--find-current {
+  box-shadow: inset 3px 0 0 var(--wb-brand);
+  background: rgba(0, 122, 255, 0.06);
+}
+
+
+/* === messages === */
+.msg {
+  display: flex;
+  gap: 8px;
+}
+.msg--user {
+  display: block;
+  text-align: right;
+}
+/* 右对齐气泡容器：inline-block 使其按内容收缩，max-width 限制不超过 75% 行宽，
+   父级 text-align:right 把它推到右侧。文本在容器内恢复左对齐。 */
+.msg--user > div {
+  display: inline-block;
+  max-width: 75%;
+  text-align: left;
+}
+.msg__bubble {
+  max-width: 100%;
+  padding: 8px 12px;
+  background: var(--wb-bg-secondary, #ebebeb);
+  color: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
+  border-radius: 16px 16px 0 16px;
+  font-size: 14px;
+  line-height: 22px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg--assistant .msg__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+
+/* === diff === */
+.diff__path {
+  font-family: var(--wb-font-code-family);
+  font-size: 11px;
+  color: var(--wb-text-weak);
+  margin-bottom: 4px;
+}
+button.diff__path {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: default;
+}
+.diff__path--clickable {
+  cursor: pointer;
+  color: var(--md-link, var(--wb-brand, #5b5fc7));
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+.diff__path--clickable:hover {
+  text-decoration-style: solid;
+  color: var(--wb-text-strong);
+}
+.diff__body {
+  margin: 0;
+  padding: 8px;
+  background: var(--wb-bg-tertiary);
+  border-radius: 6px;
+  font-family: var(--wb-font-code-family);
+  font-size: 12px;
+  line-height: 18px;
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+.diff__add {
+  color: #1a7f37;
+  background: rgba(26, 127, 55, 0.1);
+}
+.diff__del {
+  color: #cf222e;
+  background: rgba(207, 34, 46, 0.1);
+}
+/* Unified diff stats + line numbers */
+.diff__stats {
+  display: flex;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.diff__stats-add { color: #1a7f37; font-weight: 600; }
+.diff__stats-del { color: #cf222e; font-weight: 600; }
+.diff__line { display: flex; gap: 8px; line-height: 18px; }
+.diff__line--add { background: rgba(26, 127, 55, 0.1); }
+.diff__line--del { background: rgba(207, 34, 46, 0.1); }
+.diff__line-num {
+  flex: none; min-width: 40px; text-align: right;
+  color: var(--wb-text-weak); font-size: 10px; user-select: none;
+}
+.diff__line-prefix {
+  flex: none; width: 12px; text-align: center; user-select: none;
+  color: var(--wb-text-weak);
+}
+.diff__line--add .diff__line-prefix { color: #1a7f37; }
+.diff__line--del .diff__line-prefix { color: #cf222e; }
+.diff__line-text { flex: 1; white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere; }

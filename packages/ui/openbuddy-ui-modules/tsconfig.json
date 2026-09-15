@@ -314,6 +314,12 @@
       "@openbuddy/ui-shared/client": ["./packages/ui/openbuddy-ui-shared/src/client.tsx"],
       "@openbuddy/ui-shared/invariant": ["./packages/ui/openbuddy-ui-shared/src/invariant.ts"],
       "@openbuddy/ui-theme/styles": ["./packages/ui/openbuddy-ui-theme/src/styles/index.css"],
+    
+      "@openbuddy/ui-motion": ["./packages/ui/openbuddy-ui-motion/src/index.ts"],
+      "@openbuddy/ui-motion/client": ["./packages/ui/openbuddy-ui-motion/src/client.ts"],
+      "@openbuddy/ui-motion/easings": ["./packages/ui/openbuddy-ui-motion/src/easings.ts"],
+      "@openbuddy/ui-motion/invariant": ["./packages/ui/openbuddy-ui-motion/src/invariant.ts"],
+      "@openbuddy/ui-motion/presets": ["./packages/ui/openbuddy-ui-motion/src/presets.ts"]
     },
     "types": [
       "node"

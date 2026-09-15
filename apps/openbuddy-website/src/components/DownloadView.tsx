@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { Monitor, Apple, Terminal, Github, ArrowRight, Check, Copy } from 'lucide-react';
+import { Monitor, Apple, Terminal, ArrowRight, Check, Copy } from 'lucide-react';
+import { GithubIcon } from '@/components/icons/BrandIcons';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import CopyButton from '@/components/CopyButton';
@@ -128,7 +129,7 @@ const COPY_ZH = {
   brewFormula: 'brew install --cask openbuddy',
   verifications: '验证',
   verificationsList: [
-    '仓库内 455 个测试文件 (运行 `pnpm workspace:test`)',
+    '仓库内 1,886 个测试文件 (运行 `pnpm workspace:test`)',
     '闭环能力评估 (`pnpm test:closed-loop`)',
     '真实模型 Playwright UI 测试 (`pnpm test:electron:real-ui`)'
   ],
@@ -216,7 +217,7 @@ export function DownloadView({ locale }: { locale: Locale }) {
             {/* Source build */}
             <div className="mt-16 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 sm:p-7">
               <div className="flex items-center gap-2 text-[var(--wb-fg-muted)]">
-                <Github className="h-4 w-4" />
+                <GithubIcon size={ 16 } />
                 <span className="font-mono text-[11px] uppercase tracking-[0.12em]">{ copy.sourceLabel }</span>
               </div>
               <p className="mt-3 text-[14px] leading-relaxed text-[var(--wb-fg-muted)]">{ copy.sourceDesc }</p>

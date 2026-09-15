@@ -802,3 +802,47 @@ body.dark,
 [data-theme="dark"] {
   color-scheme: dark;
 }
+
+/* ============================================================================
+ * Motion tokens — Phase 2
+ *
+ * 不引入 framer-motion 依赖（保持包小，零运行时开销）。
+ * 与现有 CSS modules + tokens.css 体系一致，所有 React Bits 风格的动效
+ * 通过 CSS transitions + Web Animations API + IntersectionObserver 实现。
+ * ============================================================================ */
+
+:root {
+  /* Easing curves（与 react-bits / material 设计语言对齐） */
+  --wb-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --wb-ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --wb-ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --wb-ease-spring-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Duration scale（统一动画时长，避免散落的 magic number） */
+  --wb-duration-instant: 80ms;
+  --wb-duration-fast: 120ms;
+  --wb-duration-base: 200ms;
+  --wb-duration-medium: 280ms;
+  --wb-duration-slow: 380ms;
+  --wb-duration-slower: 540ms;
+
+  /* Common composite tokens（直接用于常见场景） */
+  --wb-transition-fade: opacity var(--wb-duration-base) var(--wb-ease-out-expo);
+  --wb-transition-slide: transform var(--wb-duration-medium) var(--wb-ease-out-expo),
+                         opacity var(--wb-duration-medium) var(--wb-ease-out-expo);
+  --wb-transition-pop: transform var(--wb-duration-base) var(--wb-ease-spring-pop);
+  --wb-transition-color: color var(--wb-duration-fast) var(--wb-ease-out-expo),
+                         background-color var(--wb-duration-fast) var(--wb-ease-out-expo),
+                         border-color var(--wb-duration-fast) var(--wb-ease-out-expo);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --wb-duration-instant: 0ms;
+    --wb-duration-fast: 0ms;
+    --wb-duration-base: 0ms;
+    --wb-duration-medium: 0ms;
+    --wb-duration-slow: 0ms;
+    --wb-duration-slower: 0ms;
+  }
+}

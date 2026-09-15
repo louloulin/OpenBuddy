@@ -1,0 +1,19 @@
+.ob-kbd { display: inline-flex; gap: 4px; align-items: center; }
+.ob-kbd__key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--wb-text-secondary);
+  background: var(--wb-bg-surface, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--wb-border-soft);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.ob-kbd--md .ob-kbd__key { min-width: 22px; height: 22px; font-size: 11px; padding: 0 6px; }
