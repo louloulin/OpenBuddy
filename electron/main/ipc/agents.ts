@@ -13,7 +13,8 @@
  */
 import { ipcMain } from "electron";
 
-import * as resources from "../agent/pi-resources";
+import { agentTemplate, deleteAgent, getAgent, listAgents, readAgentDefaults, saveAgent, writeAgentDefaults } from "../agent/pi-resources";
+import type { AgentDefaults } from "../agent/pi-resources";
 import {
   absolutePath,
   optionalCwd,
@@ -26,18 +27,18 @@ import {
 export function registerAgentsIpc(): void {
   ipcMain.handle("agents_list", async (_e, args?: unknown) => {
     const input = args === undefined || args === null ? {} : recordValue(args, "agents list payload");
-    return resources.listAgents(optionalCwd(input));
+    return listAgents(optionalCwd(input));
   });
   ipcMain.handle("agents_get", async (_e, args: { path: string; cwd?: string | null }) => {
     const input = recordValue(args, "agent get payload");
-    return resources.getAgent(
+    return getAgent(
       requiredString(input.path, "agent path"),
       input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"),
     );
   });
   ipcMain.handle("agents_save", async (_e, args: { name: string; raw: string; cwd?: string | null }) => {
     const input = recordValue(args, "agent save payload");
-    return resources.saveAgent(
+    return saveAgent(
       requiredString(input.name, "agent name"),
       requiredString(input.raw, "agent content"),
       input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"),
@@ -45,27 +46,27 @@ export function registerAgentsIpc(): void {
   });
   ipcMain.handle("agents_delete", async (_e, args: { path: string; cwd?: string | null }) => {
     const input = recordValue(args, "agent delete payload");
-    return resources.deleteAgent(
+    return deleteAgent(
       requiredString(input.path, "agent path"),
       input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"),
     );
   });
   ipcMain.handle("agents_template", async (_e, args: { name: string; description: string; systemPrompt: string }) => {
     const input = recordValue(args, "agent template payload");
-    return resources.agentTemplate(
+    return agentTemplate(
       requiredString(input.name, "agent name"),
       requiredString(input.description, "agent description"),
       requiredString(input.systemPrompt, "agent prompt"),
     );
   });
-  ipcMain.handle("agents_defaults_get", async () => resources.readAgentDefaults());
+  ipcMain.handle("agents_defaults_get", async () => readAgentDefaults());
   ipcMain.handle("agents_defaults_save", async (_e, args: unknown) => {
     const input = recordValue(args, "agents defaults payload");
     const defaults = input.defaults === undefined ? {} : recordValue(input.defaults, "defaults");
-    const patch: Partial<resources.AgentDefaults> = {};
+    const patch: Partial<AgentDefaults> = {};
     if (defaults.defaultModel !== undefined) patch.defaultModel = stringValue(defaults.defaultModel, "defaultModel");
     if (defaults.defaultPermission !== undefined) patch.defaultPermission = stringValue(defaults.defaultPermission, "defaultPermission");
     if (defaults.rememberToolApprovals !== undefined) patch.rememberToolApprovals = requiredBoolean(defaults.rememberToolApprovals, "rememberToolApprovals");
-    return resources.writeAgentDefaults(patch);
+    return writeAgentDefaults(patch);
   });
 }

@@ -6,7 +6,7 @@
 import { ipcMain, type BrowserWindow } from "electron";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import * as resources from "../agent/pi-resources";
+import { readStorageSources, writeStorageSources } from "../agent/pi-resources";
 import {
   rendererList,
   rendererRead,
@@ -54,14 +54,14 @@ import {
 } from "./validation";
 
 export function registerStorageIpc(getWindow: () => BrowserWindow | null): void {
-		ipcMain.handle("storage-sources:list", async () => resources.readStorageSources());
+		ipcMain.handle("storage-sources:list", async () => readStorageSources());
 		ipcMain.handle("storage-sources:save", async (_e, args: unknown) => {
 			const input = recordValue(args, "storage sources save payload");
 			if (!Array.isArray(input.sources)) throw new Error("sources must be an array");
 			// writeAllowedRoot rejects the filesystem root, preventing a
 			// "register / as workspace" bypass of shellfs write containment.
 			const sources = input.sources.map((source, index) => writeAllowedRoot(absolutePath(source, `sources[${index}]`)));
-			return resources.writeStorageSources([...new Set(sources)]);
+			return writeStorageSources([...new Set(sources)]);
 		});
 		ipcMain.handle("storage:renderer-read", async (_e, args: unknown) => {
 			const payload = recordValue(args ?? {}, "storage:renderer-read payload");

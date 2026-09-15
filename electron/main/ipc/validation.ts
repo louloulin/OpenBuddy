@@ -6,7 +6,7 @@
  * testable in isolation.
  */
 import { isAbsolute, resolve } from "node:path";
-import * as resources from "../agent/pi-resources";
+import { readPolicyConfig } from "../agent/pi-resources";
 import {
 	WorkspaceInvalidPathError,
 	WorkspaceMoveInvalidError,
@@ -250,7 +250,7 @@ export function emailComposePayload(value: unknown): Record<string, unknown> {
 }
 
 export async function assertPolicyModelAllowed(modelId: string): Promise<void> {
-	const policy = await resources.readPolicyConfig();
+	const policy = await readPolicyConfig();
 	const rules = policy.rules.filter((rule) => rule.type === "model-whitelist").sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 	const whitelist = rules[0]?.value;
 	if (!Array.isArray(whitelist) || whitelist.length === 0) return;
@@ -261,7 +261,7 @@ export async function assertPolicyModelAllowed(modelId: string): Promise<void> {
 }
 
 export async function assertPolicySkillUploadAllowed(): Promise<void> {
-	const policy = await resources.readPolicyConfig();
+	const policy = await readPolicyConfig();
 	const rules = policy.rules.filter((rule) => rule.type === "skill-upload").sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 	if (rules[0]?.value === false) throw new Error("策略禁止上传技能");
 }

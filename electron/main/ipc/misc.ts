@@ -7,7 +7,8 @@ import { clipboard, dialog, ipcMain, shell, type BrowserWindow } from "electron"
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import * as fs from "node:fs/promises";
 import { agentHost, bindRendererEventEmitter, ensureAgentHostLoaded } from "./agent-host-proxy";
-import * as resources from "../agent/pi-resources";
+import { readKnowledgeSources, readNotifyChannels, readPolicyConfig, readStorageSources, readSubagentsConfig, writeKnowledgeSources, writeNotifyChannels, writePolicyConfig, writeSubagentsConfig } from "../agent/pi-resources";
+import type { OpenBuddySubagentsConfig } from "../agent/pi-resources";
 import { dispatchMainNotifications } from "../notifications";
 import { casdoorAuth } from "../casdoor/casdoor-auth";
 import {
@@ -84,7 +85,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		await ensureAgentHost();
 		const root = resolve(writeAllowedRoot(absolutePath(candidate, "workspaceRoot")));
 		const allowed = new Set<string>([resolve(agentHost.getCwd())]);
-		for (const source of await resources.readStorageSources()) {
+		for (const source of await readStorageSources()) {
 			if (typeof source === "string" && source.trim()) allowed.add(resolve(source));
 		}
 		if (!allowed.has(root)) throw new Error("workspaceRoot 必须是已注册的工作区");
@@ -215,7 +216,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		ipcMain.handle("memory_flush", async () => null);
 		ipcMain.handle("subagents:get-config", async () => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
-			return resources.readSubagentsConfig();
+			return readSubagentsConfig();
 		});
 		// Stub channels for legacy / 3rd-party IPC keep preload allowlist in sync.
 		// Stage G-1c: storage:automation-bootstrap removed; automation is owned by pi-background-tasks (passthrough).
@@ -273,16 +274,16 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		ipcMain.handle("subagents:set-config", async (_e, args: unknown) => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			const input = recordValue(args, "subagents set-config payload");
-			const patch: resources.OpenBuddySubagentsConfig = {};
+			const patch: OpenBuddySubagentsConfig = {};
 			if (input.maxDepth !== undefined) patch.maxDepth = optionalFiniteInteger(input.maxDepth, "maxDepth", 1, 1, 8);
-			return resources.writeSubagentsConfig(patch);
+			return writeSubagentsConfig(patch);
 		});
-		ipcMain.handle("policy:get", async () => resources.readPolicyConfig());
+		ipcMain.handle("policy:get", async () => readPolicyConfig());
 		ipcMain.handle("policy:save", async (_e, args: unknown) => {
 			const input = recordValue(args, "policy save payload");
 			const policy = recordValue(input.policy, "policy");
 			if (!Array.isArray(policy.rules)) throw new Error("policy.rules must be an array");
-			return resources.writePolicyConfig({ rules: policy.rules.map((rule, index) => {
+			return writePolicyConfig({ rules: policy.rules.map((rule, index) => {
 				const item = recordValue(rule, `policy.rules[${index}]`);
 				return {
 					type: requiredString(item.type, `policy.rules[${index}].type`),
@@ -292,7 +293,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				};
 			}) });
 		});
-		ipcMain.handle("notify-channels:list", async () => resources.readNotifyChannels());
+		ipcMain.handle("notify-channels:list", async () => readNotifyChannels());
 		ipcMain.handle("notify-channels:save", async (_e, args: unknown) => {
 			const input = recordValue(args, "notify channels save payload");
 			if (!Array.isArray(input.channels)) throw new Error("channels must be an array");
@@ -307,19 +308,19 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 					enabled: requiredBoolean(channel.enabled, `channels[${index}].enabled`),
 				};
 			});
-			return resources.writeNotifyChannels(channels);
+			return writeNotifyChannels(channels);
 		});
 		ipcMain.handle("notify:dispatch", async (_e, args: unknown) => {
 			const input = recordValue(args, "notification dispatch payload");
 			const message = recordValue(input.message, "notification message");
-			return dispatchMainNotifications(await resources.readNotifyChannels(), {
+			return dispatchMainNotifications(await readNotifyChannels(), {
 				title: requiredString(message.title, "message.title"),
 				...(message.body === undefined ? {} : { body: stringValue(message.body, "message.body") }),
 				...(message.level === undefined ? {} : { level: enumValue(message.level, "message.level", ["info", "warn", "error"] as const) }),
 				...(message.sessionId === undefined ? {} : { sessionId: requiredString(message.sessionId, "message.sessionId") }),
 			});
 		});
-		ipcMain.handle("knowledge-sources:list", async () => resources.readKnowledgeSources());
+		ipcMain.handle("knowledge-sources:list", async () => readKnowledgeSources());
 		ipcMain.handle("knowledge-sources:save", async (_e, args: unknown) => {
 			const input = recordValue(args, "knowledge sources save payload");
 			if (!Array.isArray(input.sources)) throw new Error("sources must be an array");
@@ -328,7 +329,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				if (!isAbsolute(value)) throw new Error(`sources[${index}] must be absolute`);
 				return value;
 			});
-			return resources.writeKnowledgeSources([...new Set(sources)]);
+			return writeKnowledgeSources([...new Set(sources)]);
 		});
 		ipcMain.handle("teams:create", async (_e, args: unknown) => {
 			const input = recordValue(args, "team create payload");
@@ -484,12 +485,12 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		ipcMain.handle("automations_run", async () => { throw new Error(automationRetired); });
 		ipcMain.handle("automation_records_archive", async () => { throw new Error(automationRetired); });
 		ipcMain.handle("automation_records_delete", async () => { throw new Error(automationRetired); });
-		ipcMain.handle("subagents_config_get", async () => resources.readSubagentsConfig());
+		ipcMain.handle("subagents_config_get", async () => readSubagentsConfig());
 		ipcMain.handle("subagents_config_save", async (_e, args: unknown) => {
 			const input = recordValue(args, "subagents_config_save payload");
-			const patch: resources.OpenBuddySubagentsConfig = {};
+			const patch: OpenBuddySubagentsConfig = {};
 			if (input.maxDepth !== undefined) patch.maxDepth = optionalFiniteInteger(input.maxDepth, "maxDepth", 1, 1, 8);
-			return resources.writeSubagentsConfig(patch);
+			return writeSubagentsConfig(patch);
 		});
 		// Stage G-1c: removed automation IPC channels (delegate to pi-background-tasks):
 		//   automations:save / automations:delete / automations:set-status

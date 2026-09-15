@@ -6,9 +6,9 @@
 import { ipcMain, type BrowserWindow } from "electron";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { agentHost, bindRendererEventEmitter, ensureAgentHostLoaded } from "./agent-host-proxy";
-import * as connectors from "../connectors";
-import * as resources from "../agent/pi-resources";
-import * as workbuddyImport from "../workbuddy-import";
+import { candidateRoots, cliAuth, cliCancel, cliSkillsDir, cliStatus, cliUnauth, defaultRoot, listRoots, loadCatalog, readImageData as readConnectorImage, readMcpConfig } from "../connectors";
+import { addSkill, expertDefaultRoot, expertListRoots, linkExpertAgents, listExpertCatalog, listSkillCatalog, mcpAuthStatus, mcpConfigPath, mcpConfigRead, mcpConfigSave, mcpDelete, mcpList, mcpToggle, mcpUpsert, readExpertAgent, readImageData as readPiResourceImage, readSkillCatalogSkill, removeSkill, toggleSkill } from "../agent/pi-resources";
+import { confirmWorkBuddyImport, getWorkBuddyImportStatus, previewWorkBuddyImport, rollbackWorkBuddyImport } from "../workbuddy-import";
 
 import {
 	absolutePath,
@@ -56,7 +56,7 @@ export function registerConnectorsIpc(getWindow: () => BrowserWindow | null): vo
 	// an arbitrary directory it just wrote.
 	const assertConnectorRoot = (candidate: unknown): string => {
 		const root = resolve(absolutePath(candidate, "root"));
-		const allowed = connectors.candidateRoots(agentHost.getCwd()).map((candidateRoot) => resolve(candidateRoot));
+		const allowed = candidateRoots(agentHost.getCwd()).map((candidateRoot) => resolve(candidateRoot));
 		const contained = allowed.some((candidateRoot) => root === candidateRoot || root.startsWith(candidateRoot + sep));
 		if (!contained) throw new Error("connector root 不在允许的连接器目录内");
 		return root;
@@ -73,19 +73,19 @@ export function registerConnectorsIpc(getWindow: () => BrowserWindow | null): vo
 		ipcMain.handle("skills:add", async (_e, args: { path: string; cwd?: string | null }) => {
 			const input = recordValue(args, "skill add payload");
 			await assertPolicySkillUploadAllowed();
-			return resources.addSkill(requiredString(input.path, "skill path"), input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"));
+			return addSkill(requiredString(input.path, "skill path"), input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"));
 		});
 		ipcMain.handle("skills:remove", async (_e, args: { path: string; cwd?: string | null }) => {
 			const input = recordValue(args, "skill remove payload");
-			return resources.removeSkill(requiredString(input.path, "skill path"), input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"));
+			return removeSkill(requiredString(input.path, "skill path"), input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"));
 		});
 		ipcMain.handle("skills:toggle", async (_e, args: { name: string; enabled: boolean }) => {
 			const input = recordValue(args, "skill toggle payload");
-			return resources.toggleSkill(requiredString(input.name, "skill name"), requiredBoolean(input.enabled, "enabled"));
+			return toggleSkill(requiredString(input.name, "skill name"), requiredBoolean(input.enabled, "enabled"));
 		});
 		ipcMain.handle("mcp:list", async () => {
 			await ensureAgentHost();
-			const configured = await resources.mcpList(agentHost.getCwd());
+			const configured = await mcpList(agentHost.getCwd());
 			const live = new Map(agentHost.mcpStatus().map((entry) => [entry.serverName, entry]));
 			return configured.map((entry) => {
 				const current = live.get(String(entry.name));
@@ -102,29 +102,29 @@ export function registerConnectorsIpc(getWindow: () => BrowserWindow | null): vo
 			const server = recordValue(input.server, "MCP server");
 			const name = typeof server.name === "string" && server.name.trim() ? server.name : "server";
 			if (!/^[a-zA-Z0-9._-]{1,64}$/.test(name)) throw new Error("MCP server name must be 1-64 chars of [a-zA-Z0-9._-]");
-			await resources.mcpUpsert(name, server, agentHost.getCwd());
+			await mcpUpsert(name, server, agentHost.getCwd());
 			await agentHost.reloadMcp();
 		});
 		ipcMain.handle("mcp:delete", async (_e, args: { name: string }) => {
 			await ensureAgentHost();
-			await resources.mcpDelete(requiredString(recordValue(args, "MCP delete payload").name, "MCP server name"), agentHost.getCwd());
+			await mcpDelete(requiredString(recordValue(args, "MCP delete payload").name, "MCP server name"), agentHost.getCwd());
 			await agentHost.reloadMcp();
 		});
 		ipcMain.handle("mcp:toggle", async (_e, args: { name: string; enabled: boolean }) => {
 			await ensureAgentHost();
 			const input = recordValue(args, "MCP toggle payload");
-			await resources.mcpToggle(requiredString(input.name, "MCP server name"), requiredBoolean(input.enabled, "enabled"), agentHost.getCwd());
+			await mcpToggle(requiredString(input.name, "MCP server name"), requiredBoolean(input.enabled, "enabled"), agentHost.getCwd());
 			await agentHost.reloadMcp();
 		});
-		ipcMain.handle("mcp:config-path", async () => resources.mcpConfigPath());
+		ipcMain.handle("mcp:config-path", async () => mcpConfigPath());
 		ipcMain.handle("mcp:config-read", async () => {
 			await ensureAgentHost();
-			return { filePath: await resources.mcpConfigPath(), content: JSON.stringify(await resources.mcpConfigRead(agentHost.getCwd()), null, 2) };
+			return { filePath: await mcpConfigPath(), content: JSON.stringify(await mcpConfigRead(agentHost.getCwd()), null, 2) };
 		});
 		ipcMain.handle("mcp:config-save", async (_e, args: { content: string }) => {
 			await ensureAgentHost();
 			const input = recordValue(args, "MCP config-save payload");
-			await resources.mcpConfigSave(requiredString(input.content, "content"), agentHost.getCwd());
+			await mcpConfigSave(requiredString(input.content, "content"), agentHost.getCwd());
 			await agentHost.reloadMcp();
 		});
 		ipcMain.handle("mcp_auth_trigger", async (_e, args: unknown) => {
@@ -139,7 +139,7 @@ export function registerConnectorsIpc(getWindow: () => BrowserWindow | null): vo
 		});
 		ipcMain.handle("mcp_auth_status", async () => {
 			await ensureAgentHost();
-			return resources.mcpAuthStatus(agentHost.getCwd());
+			return mcpAuthStatus(agentHost.getCwd());
 		});
 		ipcMain.handle("skills_catalog_default_root", async () => {
 			await ensureAgentHost();
@@ -154,7 +154,7 @@ export function registerConnectorsIpc(getWindow: () => BrowserWindow | null): vo
 			const input = args === undefined || args === null ? {} : recordValue(args, "skills catalog load payload");
 			const root = input.root === undefined || input.root === null ? join(agentHost.getCwd(), ".pi", "skills") : absolutePath(input.root, "root");
 			const builtinRoot = input.builtinRoot === undefined || input.builtinRoot === null || input.builtinRoot === "" ? "" : absolutePath(input.builtinRoot, "builtinRoot");
-			return resources.listSkillCatalog(root, builtinRoot);
+			return listSkillCatalog(root, builtinRoot);
 		});
 		ipcMain.handle("skills_catalog_read_skill", async (_e, args: unknown) => {
 			await ensureAgentHost();
@@ -163,76 +163,76 @@ export function registerConnectorsIpc(getWindow: () => BrowserWindow | null): vo
 			const root = input.root === undefined || input.root === null ? join(agentHost.getCwd(), ".pi", "skills") : absolutePath(input.root, "root");
 			const builtinRoot = input.builtinRoot === undefined || input.builtinRoot === null || input.builtinRoot === "" ? "" : absolutePath(input.builtinRoot, "builtinRoot");
 			const roots = [root, builtinRoot, join(agentHost.getCwd(), ".pi", "skills")].filter(Boolean);
-			return resources.readSkillCatalogSkill(dir, [...new Set(roots)]);
+			return readSkillCatalogSkill(dir, [...new Set(roots)]);
 		});
-	ipcMain.handle("connectors_default_root", async () => { await ensureAgentHost(); return connectors.defaultRoot(agentHost.getCwd()); });
-		ipcMain.handle("connectors_list_roots", async (_e, args: unknown) => connectors.listRoots(absolutePath(recordValue(args, "connector roots payload").root, "root")));
+	ipcMain.handle("connectors_default_root", async () => { await ensureAgentHost(); return defaultRoot(agentHost.getCwd()); });
+		ipcMain.handle("connectors_list_roots", async (_e, args: unknown) => listRoots(absolutePath(recordValue(args, "connector roots payload").root, "root")));
 		ipcMain.handle("connectors_load", async (_e, args?: unknown) => {
 			await ensureAgentHost();
 			const input = args === undefined || args === null ? {} : recordValue(args, "connector load payload");
-			return connectors.loadCatalog(agentHost.getCwd(), input.root === undefined || input.root === null ? undefined : absolutePath(input.root, "root"));
+			return loadCatalog(agentHost.getCwd(), input.root === undefined || input.root === null ? undefined : absolutePath(input.root, "root"));
 		});
 		ipcMain.handle("connectors_icon", async (_e, args: unknown) => {
 			await ensureAgentHost();
 			const input = recordValue(args, "connector icon payload");
-			const root = input.root === undefined || input.root === null ? await connectors.defaultRoot(agentHost.getCwd()) : absolutePath(input.root, "root");
+			const root = input.root === undefined || input.root === null ? await defaultRoot(agentHost.getCwd()) : absolutePath(input.root, "root");
 			if (!root) throw new Error("connector asset root is unavailable");
-			return connectors.readImageData(absolutePath(input.path, "path"), root);
+			return readConnectorImage(absolutePath(input.path, "path"), root);
 		});
-		ipcMain.handle("connectors_read_mcp_config", async (_e, args: unknown) => { const input = recordValue(args, "connector mcp payload"); return connectors.readMcpConfig(absolutePath(input.root, "root"), requiredString(input.source, "source")); });
-		ipcMain.handle("connectors_cli_status", async (_e, args: unknown) => { await ensureAgentHost(); const input = recordValue(args, "connector status payload"); return connectors.cliStatus(assertConnectorRoot(input.root), requiredString(input.source, "source")); });
-		ipcMain.handle("connectors_cli_auth", async (_e, args: unknown) => { await ensureAgentHost(); const input = recordValue(args, "connector auth payload"); return connectors.cliAuth(assertConnectorRoot(input.root), requiredString(input.source, "source"), emitConnectorEvent); });
-		ipcMain.handle("connectors_cli_auth_cancel", async (_e, args: unknown) => connectors.cliCancel(requiredString(recordValue(args, "connector auth cancel payload").source, "source")));
-		ipcMain.handle("connectors_cli_unauth", async (_e, args: unknown) => { await ensureAgentHost(); const input = recordValue(args, "connector unauth payload"); return connectors.cliUnauth(assertConnectorRoot(input.root), requiredString(input.source, "source")); });
-		ipcMain.handle("connectors_cli_skills_dir", async (_e, args: unknown) => { const input = recordValue(args, "connector skills payload"); return connectors.cliSkillsDir(absolutePath(input.root, "root"), requiredString(input.source, "source")); });
+		ipcMain.handle("connectors_read_mcp_config", async (_e, args: unknown) => { const input = recordValue(args, "connector mcp payload"); return readMcpConfig(absolutePath(input.root, "root"), requiredString(input.source, "source")); });
+		ipcMain.handle("connectors_cli_status", async (_e, args: unknown) => { await ensureAgentHost(); const input = recordValue(args, "connector status payload"); return cliStatus(assertConnectorRoot(input.root), requiredString(input.source, "source")); });
+		ipcMain.handle("connectors_cli_auth", async (_e, args: unknown) => { await ensureAgentHost(); const input = recordValue(args, "connector auth payload"); return cliAuth(assertConnectorRoot(input.root), requiredString(input.source, "source"), emitConnectorEvent); });
+		ipcMain.handle("connectors_cli_auth_cancel", async (_e, args: unknown) => cliCancel(requiredString(recordValue(args, "connector auth cancel payload").source, "source")));
+		ipcMain.handle("connectors_cli_unauth", async (_e, args: unknown) => { await ensureAgentHost(); const input = recordValue(args, "connector unauth payload"); return cliUnauth(assertConnectorRoot(input.root), requiredString(input.source, "source")); });
+		ipcMain.handle("connectors_cli_skills_dir", async (_e, args: unknown) => { const input = recordValue(args, "connector skills payload"); return cliSkillsDir(absolutePath(input.root, "root"), requiredString(input.source, "source")); });
 		ipcMain.handle("experts_default_root", async () => {
 			await ensureAgentHost();
-			return resources.expertDefaultRoot(agentHost.getCwd());
+			return expertDefaultRoot(agentHost.getCwd());
 		});
-		ipcMain.handle("experts_list_roots", async (_e, args: unknown) => resources.expertListRoots(absolutePath(recordValue(args, "expert roots payload").root, "root")));
+		ipcMain.handle("experts_list_roots", async (_e, args: unknown) => expertListRoots(absolutePath(recordValue(args, "expert roots payload").root, "root")));
 		ipcMain.handle("experts_load", async (_e, args?: unknown) => {
 			await ensureAgentHost();
 			const input = args === undefined || args === null ? {} : recordValue(args, "expert load payload");
-			const root = input.root === undefined || input.root === null || input.root === "" ? await resources.expertDefaultRoot(agentHost.getCwd()) : absolutePath(input.root, "root");
-			return resources.listExpertCatalog(root);
+			const root = input.root === undefined || input.root === null || input.root === "" ? await expertDefaultRoot(agentHost.getCwd()) : absolutePath(input.root, "root");
+			return listExpertCatalog(root);
 		});
 		ipcMain.handle("experts_thumbnail", async (_e, args: unknown) => {
 			await ensureAgentHost();
 			const input = recordValue(args, "expert thumbnail payload");
-			const root = input.root === undefined || input.root === null ? await resources.expertDefaultRoot(agentHost.getCwd()) : absolutePath(input.root, "root");
+			const root = input.root === undefined || input.root === null ? await expertDefaultRoot(agentHost.getCwd()) : absolutePath(input.root, "root");
 			if (!root) throw new Error("expert asset root is unavailable");
-			return resources.readImageData(absolutePath(input.path, "path"), [root]);
+			return readPiResourceImage(absolutePath(input.path, "path"), [root]);
 		});
 		ipcMain.handle("experts_image_bytes", async (_e, args: unknown) => {
 			await ensureAgentHost();
 			const input = recordValue(args, "expert image payload");
-			const root = input.root === undefined || input.root === null ? await resources.expertDefaultRoot(agentHost.getCwd()) : absolutePath(input.root, "root");
+			const root = input.root === undefined || input.root === null ? await expertDefaultRoot(agentHost.getCwd()) : absolutePath(input.root, "root");
 			if (!root) throw new Error("expert asset root is unavailable");
-			return resources.readImageData(absolutePath(input.path, "path"), [root]);
+			return readPiResourceImage(absolutePath(input.path, "path"), [root]);
 		});
 		ipcMain.handle("experts_read_agent_prompt", async (_e, args: unknown) => {
 			const input = recordValue(args, "expert prompt payload");
-			return resources.readExpertAgent(absolutePath(input.root, "root"), requiredString(input.plugin, "plugin"), requiredString(input.agentName, "agentName"));
+			return readExpertAgent(absolutePath(input.root, "root"), requiredString(input.plugin, "plugin"), requiredString(input.agentName, "agentName"));
 		});
 		ipcMain.handle("experts_link_agents", async (_e, args: unknown) => {
 			const input = recordValue(args, "expert link payload");
-			return resources.linkExpertAgents(absolutePath(input.root, "root"), requiredString(input.plugin, "plugin"), optionalStringArray(input.agentNames, "agentNames"));
+			return linkExpertAgents(absolutePath(input.root, "root"), requiredString(input.plugin, "plugin"), optionalStringArray(input.agentNames, "agentNames"));
 		});
 		ipcMain.handle("workbuddy_import_preview", async (_e, args: unknown) => {
 			const input = recordValue(args, "WorkBuddy import preview payload");
-			return workbuddyImport.previewWorkBuddyImport(absolutePath(input.sourceRoot, "sourceRoot"), requiredString(input.pluginId, "pluginId"));
+			return previewWorkBuddyImport(absolutePath(input.sourceRoot, "sourceRoot"), requiredString(input.pluginId, "pluginId"));
 		});
 		ipcMain.handle("workbuddy_import_confirm", async (_e, args: unknown) => {
 			const input = recordValue(args, "WorkBuddy import confirm payload");
-			return workbuddyImport.confirmWorkBuddyImport(requiredString(input.previewToken, "previewToken"));
+			return confirmWorkBuddyImport(requiredString(input.previewToken, "previewToken"));
 		});
 		ipcMain.handle("workbuddy_import_status", async (_e, args: unknown) => {
 			const input = recordValue(args, "WorkBuddy import status payload");
-			return workbuddyImport.getWorkBuddyImportStatus(requiredString(input.importId, "importId"));
+			return getWorkBuddyImportStatus(requiredString(input.importId, "importId"));
 		});
 		ipcMain.handle("workbuddy_import_rollback", async (_e, args: unknown) => {
 			const input = recordValue(args, "WorkBuddy import rollback payload");
-			return workbuddyImport.rollbackWorkBuddyImport(requiredString(input.importId, "importId"));
+			return rollbackWorkBuddyImport(requiredString(input.importId, "importId"));
 		});
 		ipcMain.handle("marketplace_list", async (_e, opts?: { force?: boolean; maxPages?: number }) => {
 			// Defensive defaults: callers that omit `opts` get the cache-first

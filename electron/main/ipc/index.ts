@@ -30,15 +30,12 @@ import {
 export { agentHostReady, bindAgentHost, bindRendererEventEmitterFn, ensureAgentHostLoaded };
 
 import { getActiveHarnessServer, getHarnessServerAddress } from "../harness/harness-server";
-import * as connectors from "../connectors";
-import * as resources from "../agent/pi-resources";
 import { dispatchMainNotifications } from "../notifications";
 import { createRpcId, parseRpcMessage, rpcError, rpcValue, RpcId, serverResponse, validateRpcRequestPayload, type ClientRequest } from "@openbuddy/plugin-host";
 import { remoteRequestFromHarnessRequest } from "../harness/harness-remote-request";
 import type { DeepSeekConnectionDispatchContext } from "../deepseek/deepseek-runtime";
 import { describeTypertCatalog } from "../agent/typert-catalog";
 import { paginateHistoryEntries as paginateHistory } from "../agent/host-modules/pagination";
-import * as workbuddyImport from "../workbuddy-import";
 import { casdoorAuth } from "../casdoor/casdoor-auth";
 import { casdoorAudit } from "../casdoor/casdoor-audit";
 import { casdoorResources } from "../casdoor/casdoor-resources";
@@ -264,12 +261,12 @@ export async function dispatchTypedRpc(request: ClientRequest, source: "renderer
 			return { items: await agentHost.listSessions(typeof payload.cwd === "string" && payload.cwd.trim() ? payload.cwd : agentHost.getCwd()) };
 		case "session.search": {
 			const limit = typeof payload.limit === "number" ? Math.max(1, Math.min(payload.limit, 200)) : 50;
-			const items = await resources.searchSessions(requiredString(payload.query, "query"), typeof payload.cwd === "string" ? payload.cwd : undefined, limit + 1);
+			const items = await searchSessions(requiredString(payload.query, "query"), typeof payload.cwd === "string" ? payload.cwd : undefined, limit + 1);
 			return { items: items.slice(0, limit), hasMore: items.length > limit };
 		}
 		case "session.fork": {
 			const sessionId = requiredString(payload.sessionId, "sessionId");
-			const sessionIdResult = await resources.forkSession(sessionId, typeof payload.cwd === "string" ? payload.cwd : undefined, typeof payload.atSeq === "number" ? payload.atSeq : undefined);
+			const sessionIdResult = await forkSession(sessionId, typeof payload.cwd === "string" ? payload.cwd : undefined, typeof payload.atSeq === "number" ? payload.atSeq : undefined);
 			return { sessionId: sessionIdResult };
 		}
 		case "session.rename": {
@@ -443,29 +440,29 @@ export async function dispatchTypedRpc(request: ClientRequest, source: "renderer
 		case "capability.skills": {
 			const action = enumValue(payload.action, "action", ["list", "toggle", "add", "remove"] as const);
 			if (action === "list") return agentHost.listSkills(typeof payload.cwd === "string" ? payload.cwd : agentHost.getCwd());
-			if (action === "toggle") return resources.toggleSkill(requiredString(payload.name, "name"), requiredBoolean(payload.enabled, "enabled"));
+			if (action === "toggle") return toggleSkill(requiredString(payload.name, "name"), requiredBoolean(payload.enabled, "enabled"));
 			if (action === "add") {
 				await assertPolicySkillUploadAllowed();
-				return resources.addSkill(requiredString(payload.path, "path"), typeof payload.cwd === "string" ? absolutePath(payload.cwd, "cwd") : agentHost.getCwd());
+				return addSkill(requiredString(payload.path, "path"), typeof payload.cwd === "string" ? absolutePath(payload.cwd, "cwd") : agentHost.getCwd());
 			}
-			return resources.removeSkill(requiredString(payload.path, "path"), typeof payload.cwd === "string" ? absolutePath(payload.cwd, "cwd") : agentHost.getCwd());
+			return removeSkill(requiredString(payload.path, "path"), typeof payload.cwd === "string" ? absolutePath(payload.cwd, "cwd") : agentHost.getCwd());
 		}
 		case "capability.mcp": {
 			const action = enumValue(payload.action, "action", ["list", "status", "upsert", "toggle", "delete", "config-read"] as const);
-			if (action === "list") return resources.mcpList(agentHost.getCwd());
+			if (action === "list") return mcpList(agentHost.getCwd());
 			if (action === "status") return agentHost.mcpStatus();
-			if (action === "config-read") return resources.mcpConfigRead(agentHost.getCwd());
+			if (action === "config-read") return mcpConfigRead(agentHost.getCwd());
 			const name = requiredString(payload.name ?? recordValue(payload.server, "server").name, "name");
 			if (action === "upsert") {
 				const server = recordValue(payload.server, "server");
-				await resources.mcpUpsert(name, server, agentHost.getCwd());
+				await mcpUpsert(name, server, agentHost.getCwd());
 			} else if (action === "toggle") {
-				await resources.mcpToggle(name, requiredBoolean(payload.enabled, "enabled"), agentHost.getCwd());
+				await mcpToggle(name, requiredBoolean(payload.enabled, "enabled"), agentHost.getCwd());
 			} else {
-				await resources.mcpDelete(name, agentHost.getCwd());
+				await mcpDelete(name, agentHost.getCwd());
 			}
 			await agentHost.reloadMcp();
-			return resources.mcpList(agentHost.getCwd());
+			return mcpList(agentHost.getCwd());
 		}
 		// Stage G-1c: openbuddy-automation removed; automation is owned
 		// by pi-background-tasks + pi-goal (passthrough). The legacy
@@ -512,7 +509,7 @@ export async function dispatchTypedRpc(request: ClientRequest, source: "renderer
 				tasks: { sessionId, source: "pi-native", note: "todo list is owned by pi's @juicesharp/rpiv-todo when installed; otherwise the bundled pi todo tool." },
 				mcp: mcp.map((entry: { serverName?: string; status?: string; toolCount?: number }) => ({ serverName: entry.serverName, status: entry.status, toolCount: entry.toolCount })),
 				plugins: plugins.map((entry: { id?: string; enabled?: boolean; status?: string }) => ({ id: entry.id, enabled: entry.enabled, status: entry.status })),
-				resources: { extensions: (pluginInventory as any)?.piExtensions?.length, skills: resources.skills?.length ?? 0, prompts: resources.prompts?.length ?? 0, themes: resources.themes?.length ?? 0, diagnostics: Object.keys(resources.diagnostics ?? {}).length },
+				resources: { extensions: (pluginInventory as any)?.piExtensions?.length, skills: skills?.length ?? 0, prompts: prompts?.length ?? 0, themes: themes?.length ?? 0, diagnostics: Object.keys(diagnostics ?? {}).length },
 				commands: Array.isArray(commands) ? commands.length : 0,
 				contextReady: Boolean(context),
 				pluginReadiness: readiness,
@@ -983,7 +980,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		await ensureAgentHostLoaded();
 		const resources = await agentHost.resourceInventory();
 		collaborationRuntime.setCapabilityCards([
-			...resources.skills.map((entry: any) => ({
+			...skills.map((entry: any) => ({
 				id: `pi-skill:${entry.name}`,
 				name: entry.name,
 				source: "pi-skill" as const,
@@ -991,7 +988,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 				status: "available" as const,
 				contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const },
 			})),
-			...(resources.extensions ?? []).map((entry: any) => ({
+			...(extensions ?? []).map((entry: any) => ({
 				id: `pi-extension:${entry.id}`,
 				name: entry.name,
 				source: "pi-extension" as const,
@@ -999,7 +996,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 				status: entry.health === "failed" ? "degraded" as const : "available" as const,
 				contract: { input: "context-refs" as const, output: "artifact-or-message" as const, approval: "before-external-commit" as const },
 			})),
-			...(resources.prompts ?? []).map((entry: any) => ({
+			...(prompts ?? []).map((entry: any) => ({
 				id: `prompt:${entry.name}`,
 				name: entry.name,
 				source: "prompt" as const,
@@ -1037,10 +1034,10 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 			mcpCapabilities: agentHost.mcpCapabilityGovernance(),
 			inbox: [...data.inbox, ...emailInboxItems].sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
 			capabilities: {
-				local: resources.skills.length,
+				local: skills.length,
 				room: 0,
-				organization: (resources.extensions ?? []).filter((entry: any) => entry.sourceScope === "project").length,
-				directory: (resources.prompts ?? []).length,
+				organization: (extensions ?? []).filter((entry: any) => entry.sourceScope === "project").length,
+				directory: (prompts ?? []).length,
 			},
 		};
 	});

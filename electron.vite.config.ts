@@ -182,274 +182,274 @@ const rendererOnlyAliases: Array<{ find: string; replacement: string }> = [
  * not a function`. This plugin mutates the synthetic CJS module
  * AFTER Vite resolves it so every call site sees the shim.
  */
+// buildOpenBuddyExternalPatch returns the ESM body Vite should serve for
+// every `browser-external:<built-in>` and `__vite-browser-external:<built-in>`
+// virtual id. Vite 8 renamed the namespace from `__vite-browser-external:`
+// to `browser-external:` and the default shim is now a Proxy with no
+// `default` export, which breaks `import { x } from "node:fs/promises"`
+// (vite 8 rewrites named imports through `interopHelper(m.default, …)`).
+// The body assigns every method/property the renderer ever asks for to a
+// fresh `__openbuddyFac` constructor so the polyfill module is itself a
+// valid class (for `class X extends require___vite_browser_external() {}`),
+// then exposes both a default export and a plain-object facade with all
+// static methods attached as own enumerable properties (so spread/destructuring
+// through `import * as url from "node:url"` keeps every method reachable).
+function buildOpenBuddyExternalPatch(): string {
+  return [
+    "function __openbuddyFac(){this._listeners=[];}",
+    "__openbuddyFac.defaultMaxListeners=10;",
+    "__openbuddyFac.prototype.on=function(){return this;};",
+    "__openbuddyFac.prototype.once=function(){return this;};",
+    "__openbuddyFac.prototype.off=function(){return this;};",
+    "__openbuddyFac.prototype.emit=function(){return false;};",
+    "__openbuddyFac.prototype.removeAllListeners=function(){return this;};",
+    "__openbuddyFac.prototype.setMaxListeners=function(){return this;};",
+    "__openbuddyFac.prototype.getMaxListeners=function(){return 10;};",
+    "__openbuddyFac.prototype.listenerCount=function(){return 0;};",
+    // Self-reference so `const { EventEmitter } = require(...)` and
+    // `require(...).EventEmitter` both work.
+    "__openbuddyFac.EventEmitter=__openbuddyFac;",
+    "__openbuddyFac.fileURLToPath=function(){return '';};",
+    "__openbuddyFac.pathToFileURL=function(p){return new URL('file://'+(p||''));};",
+    "__openbuddyFac.createRequire=function(){return function(id){if(id==='node:events')return __openbuddyFac;return undefined;};};",
+    "__openbuddyFac.dirname=function(p){return '/';};",
+    "__openbuddyFac.basename=function(p){return '';};",
+    "__openbuddyFac.extname=function(p){return '';};",
+    "__openbuddyFac.join=function(){return '/';};",
+    "__openbuddyFac.resolve=function(){return '/';};",
+    "__openbuddyFac.isAbsolute=function(){return true;};",
+    "__openbuddyFac.homedir=function(){return '/';};",
+    // node:buffer — many old npm packages do `const Buffer = require('buffer').Buffer`
+    // at module load. Provide a minimal buffer shim.
+    "__openbuddyFac.Buffer=function(){return [];};",
+    "__openbuddyFac.Buffer.from=function(){return [];};",
+    "__openbuddyFac.Buffer.alloc=function(){return [];};",
+    "__openbuddyFac.Buffer.allocUnsafe=function(){return [];};",
+    "__openbuddyFac.Buffer.allocUnsafeSlow=function(){return [];};",
+    "__openbuddyFac.isBuffer=function(){return false;};",
+    "__openbuddyFac.isAscii=function(){return true;};",
+    // node:util — promisify(undefined) used to throw at module load.
+    // Extend the util shim with a few more entries that Node-only
+    // npm packages (e.g. `debug`) read at module load.
+    "__openbuddyFac.deprecate=function(fn){return function(){return fn.apply(this,arguments);};};",
+    "__openbuddyFac.format=function(){return '';};",
+    "__openbuddyFac.inspect=function(){return '';};",
+    "__openbuddyFac.debuglog=function(){return function(){};};",
+    "__openbuddyFac.isDeepStrictEqual=function(){return false;};",
+    // node:tty — `debug@4` calls `tty.isatty(fd)` at module load
+    // via `require('tty')`. Renderer never has a real tty.
+    "__openbuddyFac.isatty=function(){return false;};",
+    "__openbuddyFac.setRawMode=function(){};",
+    // node:diagnostics_channel — undici/fetch load this at module
+    // load. The renderer never subscribes; provide a no-op.
+    "__openbuddyFac.channel=function(name){return{name:name,subscribe:function(){return function(){};},publish:function(){},unsubscribe:function(){}};};",
+    "__openbuddyFac.hasSubscribers=function(){return false;};",
+    "__openbuddyFac.subscribe=function(){return function(){};};",
+    "__openbuddyFac.unsubscribe=function(){};",
+    // node:http2 — undici's `client-h2.js` does
+    //   `var { constants: { HTTP2_HEADER_AUTHORITY, ... } } = http2;`
+    // where `http2 = require___vite_browser_external()`. Without a
+    // `constants` property the destructure crashes with
+    // `Cannot read properties of undefined (reading
+    // 'HTTP2_HEADER_AUTHORITY')` — second reason the renderer
+    // ended up showing white. Expose `constants` as an empty
+    // object so the destructure evaluates; the HTTP/2 path is
+    // never executed in the renderer.
+    "__openbuddyFac.constants={};",
+    "__openbuddyFac.Http2ServerRequest=function(){};",
+    "__openbuddyFac.Http2ServerResponse=function(){};",
+    "__openbuddyFac.createServer=function(){return{on:function(){},listen:function(){}};};",
+    "__openbuddyFac.createSecureServer=function(){return{on:function(){},listen:function(){}};};",
+    "__openbuddyFac.connect=function(){return{on:function(){},end:function(){},destroy:function(){}};};",
+    "__openbuddyFac.constants={};",
+    // node:crypto — undici's `web/fetch/data-url.js` does
+    //   `const cryptoHashes = crypto.getHashes()`. Without
+    //   `getHashes` on the facade, that line crashes with
+    //   `crypto.getHashes is not a function` (fifth reason the
+    //   renderer ended up showing white). The renderer uses
+    //   `window.crypto.subtle` for hashing; the Node-side API
+    //   here only needs to NOT throw. Report a static set of
+    //   algorithm names so SRI / hash detection logic in undici
+    //   treats them as supported.
+    "var __openbuddyCryptoHashes=['sha256','sha384','sha512','sha1','md5','sha224','sha3-256','sha3-384','sha3-512'];",
+    "function __openbuddyHash(){this._buf=[];}",
+    "__openbuddyHash.prototype.update=function(d){return this;};",
+    "__openbuddyHash.prototype.digest=function(){return {};};",
+    "__openbuddyHash.prototype.copy=function(){return new __openbuddyHash();};",
+    "__openbuddyFac.getHashes=function(){return __openbuddyCryptoHashes.slice();};",
+    // node:worker_threads — undici's `web/webidl/index.js` requires
+    // `markAsUncloneable` from the facade. Provide a noop so the
+    // destructure evaluates; the renderer never spawns a real
+    // worker thread.
+    "__openbuddyFac.markAsUncloneable=function(){};",
+    "__openbuddyFac.isMarkedAsUncloneable=function(){return false;};",
+    "__openbuddyFac.isClonable=function(){return true;};",
+    "__openbuddyFac.getCiphers=function(){return [];};",
+    "__openbuddyFac.getCurves=function(){return [];};",
+    "__openbuddyFac.createHash=function(){return new __openbuddyHash();};",
+    "__openbuddyFac.createHmac=function(){return new __openbuddyHash();};",
+    "__openbuddyFac.randomBytes=function(){return new Uint8Array(0);};",
+    "__openbuddyFac.randomUUID=function(){return '00000000-0000-0000-0000-000000000000';};",
+    "__openbuddyFac.constants={};",
+    // node:async_hooks — undici's `api/api-request.js` does
+    //   `class RequestHandler extends AsyncResource {}`. Without
+    //   an `AsyncResource` export on the facade, the `extends`
+    //   clause crashes with `Class extends value undefined is not
+    //   a constructor or null` (fourth reason the renderer ended
+    //   up showing white). The renderer's fetch path never actually
+    //   uses Node's async resource tracking — provide a noop class
+    //   so the destructure + `super("UNDICI_REQUEST")` call evaluates
+    //   without crashing.
+    "function __openbuddyAsyncResource(){this._id=0;}",
+    "__openbuddyAsyncResource.prototype.runInAsyncScope=function(fn){if(typeof fn==='function')fn();};",
+    "__openbuddyAsyncResource.prototype.emitDestroy=function(){};",
+    "__openbuddyAsyncResource.prototype.asyncId=function(){return 0;};",
+    "__openbuddyAsyncResource.prototype.triggerAsyncId=function(){return 0;};",
+    "__openbuddyAsyncResource.prototype.bind=function(fn){return fn;};",
+    "__openbuddyAsyncResource.prototype[Symbol.toStringTag]='AsyncResource';",
+    "__openbuddyFac.AsyncResource=__openbuddyAsyncResource;",
+    "__openbuddyFac.createHook=function(){return{};};",
+    "__openbuddyFac.executionAsyncId=function(){return 0;};",
+    "__openbuddyFac.executionAsyncResource=function(){return{kAsyncId:0};};",
+    "__openbuddyFac.triggerAsyncId=function(){return 0;};",
+    // node:stream — undici's `web/fetch/body.js` does
+    //   `var { Readable } = require___vite_browser_external()`,
+    //   then `class BodyReadable extends Readable {}`. Without a
+    //   stream class on the facade, the `extends` clause crashes with
+    //   `Class extends value undefined is not a constructor or
+    //   null` (third reason the renderer ended up showing white).
+    // Provide a no-op Readable / Writable / Duplex / Transform /
+    // PassThrough hierarchy so the destructure evaluates; the
+    // renderer never actually streams bytes through Node's
+    // stream machinery — fetch responses are decoded by the
+    // browser-side Fetch API instead.
+    "function __openbuddyNoopStream(){}",
+    "function __openbuddyReadable(){this._listeners=[];this._state={};}",
+    "__openbuddyReadable.prototype.on=function(){return this;};",
+    "__openbuddyReadable.prototype.once=function(){return this;};",
+    "__openbuddyReadable.prototype.off=function(){return this;};",
+    "__openbuddyReadable.prototype.emit=function(){return false;};",
+    "__openbuddyReadable.prototype.pipe=function(){return this;};",
+    "__openbuddyReadable.prototype.unpipe=function(){return this;};",
+    "__openbuddyReadable.prototype.read=function(){return null;};",
+    "__openbuddyReadable.prototype.pause=function(){return this;};",
+    "__openbuddyReadable.prototype.resume=function(){return this;};",
+    "__openbuddyReadable.prototype.destroy=function(){return this;};",
+    "__openbuddyReadable.prototype.pause=function(){return this;};",
+    "__openbuddyReadable.prototype.isPaused=function(){return false;};",
+    "__openbuddyReadable.prototype.setEncoding=function(){return this;};",
+    "__openbuddyReadable.prototype.unshift=function(){return undefined;};",
+    "__openbuddyReadable.prototype.wrap=function(){return this;};",
+    "__openbuddyReadable.prototype[Symbol.toStringTag]='Readable';",
+    "function __openbuddyWritable(){this._listeners=[];this._state={};}",
+    "__openbuddyWritable.prototype.on=function(){return this;};",
+    "__openbuddyWritable.prototype.once=function(){return this;};",
+    "__openbuddyWritable.prototype.off=function(){return this;};",
+    "__openbuddyWritable.prototype.emit=function(){return false;};",
+    "__openbuddyWritable.prototype.write=function(cb){if(typeof cb==='function')cb();return true;};",
+    "__openbuddyWritable.prototype.end=function(cb){if(typeof cb==='function')cb();return this;};",
+    "__openbuddyWritable.prototype.destroy=function(){return this;};",
+    "__openbuddyWritable.prototype.cork=function(cb){if(typeof cb==='function')cb();return undefined;};",
+    "__openbuddyWritable.prototype.uncork=function(){return undefined;};",
+    "__openbuddyWritable.prototype.setDefaultEncoding=function(){return this;};",
+    "__openbuddyWritable.prototype[Symbol.toStringTag]='Writable';",
+    "function __openbuddyDuplex(){}",
+    "__openbuddyDuplex.prototype=Object.create(__openbuddyReadable.prototype);",
+    "var __openbuddyTransform=__openbuddyDuplex;",
+    "var __openbuddyPassThrough=__openbuddyDuplex;",
+    "__openbuddyFac.Readable=__openbuddyReadable;",
+    "__openbuddyFac.Writable=__openbuddyWritable;",
+    "__openbuddyFac.Duplex=__openbuddyDuplex;",
+    "__openbuddyFac.Transform=__openbuddyTransform;",
+    "__openbuddyFac.PassThrough=__openbuddyPassThrough;",
+    "__openbuddyFac.Stream=__openbuddyReadable;",
+    "__openbuddyFac.pipeline=function(){return Promise.resolve();};",
+    "__openbuddyFac.finished=function(){return Promise.resolve();};",
+    "__openbuddyFac.addAbortListener=function(){return function(){};};",
+    "__openbuddyFac.removeAbortListener=function(){};",
+    "__openbuddyFac.getDefaultHighWaterMark=function(){return 65536;};",
+    "__openbuddyFac.setDefaultHighWaterMark=function(){};",
+    "__openbuddyFac.isDisturbed=function(){return false;};",
+    "__openbuddyFac.isReadable=function(){return true;};",
+    "__openbuddyFac.isWritable=function(){return true;};",
+    "__openbuddyFac.isDuplex=function(){return false;};",
+    "__openbuddyFac.isTransform=function(){return false;};",
+    "__openbuddyFac.isReadableNodeStream=function(){return false;};",
+    "__openbuddyFac.isWritableNodeStream=function(){return false;};",
+    "__openbuddyFac.constants={};",
+    "__openbuddyFac.platform=function(){return 'darwin';};",
+    "__openbuddyFac.cpus=function(){return [];};",
+    // node:fs / node:fs/promises — return noop fs. Renderer
+    // never actually touches the filesystem; this only needs to
+    // exist so module-level `import { readFileSync } from "node:fs"`
+    // doesn't crash. Return a default JSON string for `readFileSync`
+    // since `JSON.parse(stripBom(readFileSync(...)))` is the typical
+    // shape and would otherwise crash on `stripBom(undefined)`.
+    "var __noopFs=function(){return function(){return '{}';};};",
+    "var __noopFsSync=function(){return function(){return false;};};",
+    "__openbuddyFac.readFileSync=__noopFs();",
+    "__openbuddyFac.readFile=__noopFs();",
+    "__openbuddyFac.writeFileSync=__noopFsSync();",
+    "__openbuddyFac.writeFile=__noopFsSync();",
+    "__openbuddyFac.existsSync=__noopFsSync();",
+    "__openbuddyFac.statSync=__noopFsSync();",
+    "__openbuddyFac.readdirSync=__noopFsSync();",
+    "__openbuddyFac.mkdirSync=__noopFsSync();",
+    "__openbuddyFac.openSync=__noopFsSync();",
+    "__openbuddyFac.closeSync=__noopFsSync();",
+    "__openbuddyFac.promises={readFile:__noopFs(),writeFile:__noopFsSync(),stat:__noopFsSync(),mkdir:__noopFsSync(),readdir:__noopFsSync(),cp:__noopFsSync(),rm:__noopFsSync(),rename:__noopFsSync(),realpath:__noopFs(),access:__noopFsSync()};",
+    // node:child_process — make spawn/exec/execFile no-op stubs so
+    // `import { execFile } from "node:child_process"` doesn't blow
+    // up when the renderer accidentally evaluates a call site.
+    "__openbuddyFac.execFile=__noopFs();",
+    "__openbuddyFac.exec=__noopFs();",
+    "__openbuddyFac.spawn=__noopFs();",
+    // node:util — promisify(undefined) used to throw at module load.
+    "__openbuddyFac.promisify=function(fn){if(typeof fn!=='function')return fn;return function(){return Promise.resolve(undefined);};};",
+    "__openbuddyFac.types={isUint8Array:function(){return false;},isDate:function(){return false;}};",
+    "if(typeof process!=='undefined'){if(typeof process.getMaxListeners!=='function'){process.getMaxListeners=function(){return 0;};process.setMaxListeners=function(){};}process.versions={};process.features={};process.argv=[];process.execPath='/';process.exit=function(){};process.getBuiltinModule=function(){return undefined;};process.version='v0.0.0';process.platform='darwin';if(!process.stderr){process.stderr={fd:1,write:function(){},_handle:{}};}if(!process.stdout){process.stdout={fd:1,write:function(){},_handle:{}};}process.stderr.fd=process.stderr.fd||1;}",
+    // Make `module.exports` itself the no-op class so
+    // `class X extends require___vite_browser_external() {}` works
+    // (the constructor is now a valid class with a prototype).
+    // All the static methods assigned to `__openbuddyFac` above
+    // become available as `require___vite_browser_external().method`,
+    // and `__toESM(...)` copies them through to the
+    // `import_..._browser_external` namespace so consumers using
+    // `import_X.Y(...)` style access keep working too.
+    "var __openbuddyExports = Object.assign({default: __openbuddyFac, EventEmitter: __openbuddyFac}, __openbuddyFac);",
+    "export default __openbuddyExports;",
+  ].join("");
+}
+
 function nodeExternalPatch() {
   return {
     name: "openbuddy:renderer-node-external-patch",
-    enforce: "post",
+    enforce: "pre",
+    load(id: string): { code: string; map: null } | null | undefined {
+      // Vite 8 renamed the browser-external shim from
+      // `__vite-browser-external:` to `browser-external:`. The shim
+      // returns a Proxy with no real exports, which then explodes
+      // inside vite 8's `interopNamedImports` for
+      // `import { x } from "node:fs/promises"` because the rewrite
+      // calls `interopHelper(m.default, …)` on a value that has no
+      // `default` property. Returning our own no-op facade body here
+      // short-circuits vite 8's load handler so the patch always wins.
+      if (id.startsWith("browser-external:") || id.startsWith("__vite-browser-external:")) {
+        return { code: buildOpenBuddyExternalPatch(), map: null };
+      }
+      return null;
+    },
     renderChunk(code: string, _chunk: unknown): { code: string; map: null } | null | undefined {
       // Patch 2 (chunk-level) — `require___vite_browser_external()`
-      // is the renderer-side facade for Node built-ins. We leave it
-      // untouched here; the per-module patch (Patch 1) installs the
-      // required methods/properties (`.EventEmitter`, `.constants`,
-      // `.Readable`, `.AsyncResource`, etc.) so every consumer in the
-      // chunk sees a usable shape. We deliberately do NOT wrap the
-      // call result here — wrapping `require___vite_browser_external()`
-      // in `.EventEmitter || ...` causes `__toESM` to put the class
-      // (not the namespace) into the `default` slot, breaking
-      // `import___vite_browser_external.promisify(...)` style access.
-      // Instead, every call site that needs the class imports it
-      // explicitly through `.EventEmitter` and the patched module
-      // already exposes that.
-      return undefined;
-    },
-    transform(code: string, id: string): null | { code: string; map: null } | undefined {
-      // Patch 1 — the `__vite_browser_external__` CJS shim itself.
-      if (id.includes("__vite-browser-external")) {
-      // Append the patch as a final line of the CJS wrapper. The
-      // synthetic module exports `{}`; we re-export a flat shim
-      // object so `require___vite_browser_external().fileURLToPath`
-      // returns a string (the noop path) and `.createRequire` returns
-      // a noop require function.
-      // The patch body assigns every method/property to a fresh
-      // `__openbuddyFac` function so the polyfill module is itself a
-      // constructor (no-op class). That way:
-      //   - `class X extends require___vite_browser_external() {}`
-      //     works (the constructor is a valid class).
-      //   - `require___vite_browser_external().fileURLToPath` works
-      //     (static properties on the function survive CJS wrapping).
-      //   - `__toESM(require___vite_browser_external())` copies every
-      //     static property through to the `import` namespace, so
-      //     `import___vite_browser_external.promisify(execFile)` and
-      //     similar access patterns survive too.
-      const patch = [
-        "function __openbuddyFac(){this._listeners=[];}",
-        "__openbuddyFac.defaultMaxListeners=10;",
-        "__openbuddyFac.prototype.on=function(){return this;};",
-        "__openbuddyFac.prototype.once=function(){return this;};",
-        "__openbuddyFac.prototype.off=function(){return this;};",
-        "__openbuddyFac.prototype.emit=function(){return false;};",
-        "__openbuddyFac.prototype.removeAllListeners=function(){return this;};",
-        "__openbuddyFac.prototype.setMaxListeners=function(){return this;};",
-        "__openbuddyFac.prototype.getMaxListeners=function(){return 10;};",
-        "__openbuddyFac.prototype.listenerCount=function(){return 0;};",
-        // Self-reference so `const { EventEmitter } = require(...)` and
-        // `require(...).EventEmitter` both work.
-        "__openbuddyFac.EventEmitter=__openbuddyFac;",
-        "__openbuddyFac.fileURLToPath=function(){return '';};",
-        "__openbuddyFac.pathToFileURL=function(p){return new URL('file://'+(p||''));};",
-        "__openbuddyFac.createRequire=function(){return function(id){if(id==='node:events')return __openbuddyFac;return undefined;};};",
-        "__openbuddyFac.dirname=function(p){return '/';};",
-        "__openbuddyFac.basename=function(p){return '';};",
-        "__openbuddyFac.extname=function(p){return '';};",
-        "__openbuddyFac.join=function(){return '/';};",
-        "__openbuddyFac.resolve=function(){return '/';};",
-        "__openbuddyFac.isAbsolute=function(){return true;};",
-        "__openbuddyFac.homedir=function(){return '/';};",
-        // node:buffer — many old npm packages do `const Buffer = require('buffer').Buffer`
-        // at module load. Provide a minimal buffer shim.
-        "__openbuddyFac.Buffer=function(){return [];};",
-        "__openbuddyFac.Buffer.from=function(){return [];};",
-        "__openbuddyFac.Buffer.alloc=function(){return [];};",
-        "__openbuddyFac.Buffer.allocUnsafe=function(){return [];};",
-        "__openbuddyFac.Buffer.allocUnsafeSlow=function(){return [];};",
-        "__openbuddyFac.isBuffer=function(){return false;};",
-        "__openbuddyFac.isAscii=function(){return true;};",
-        // node:util — promisify(undefined) used to throw at module load.
-        // Extend the util shim with a few more entries that Node-only
-        // npm packages (e.g. `debug`) read at module load.
-        "__openbuddyFac.deprecate=function(fn){return function(){return fn.apply(this,arguments);};};",
-        "__openbuddyFac.format=function(){return '';};",
-        "__openbuddyFac.inspect=function(){return '';};",
-        "__openbuddyFac.debuglog=function(){return function(){};};",
-        "__openbuddyFac.isDeepStrictEqual=function(){return false;};",
-        // node:tty — `debug@4` calls `tty.isatty(fd)` at module load
-        // via `require('tty')`. Renderer never has a real tty.
-        "__openbuddyFac.isatty=function(){return false;};",
-        "__openbuddyFac.setRawMode=function(){};",
-        // node:diagnostics_channel — undici/fetch load this at module
-        // load. The renderer never subscribes; provide a no-op.
-        "__openbuddyFac.channel=function(name){return{name:name,subscribe:function(){return function(){};},publish:function(){},unsubscribe:function(){}};};",
-        "__openbuddyFac.hasSubscribers=function(){return false;};",
-        "__openbuddyFac.subscribe=function(){return function(){};};",
-        "__openbuddyFac.unsubscribe=function(){};",
-        // node:http2 — undici's `client-h2.js` does
-        //   `var { constants: { HTTP2_HEADER_AUTHORITY, ... } } = http2;`
-        // where `http2 = require___vite_browser_external()`. Without a
-        // `constants` property the destructure crashes with
-        // `Cannot read properties of undefined (reading
-        // 'HTTP2_HEADER_AUTHORITY')` — second reason the renderer
-        // ended up showing white. Expose `constants` as an empty
-        // object so the destructure evaluates; the HTTP/2 path is
-        // never executed in the renderer.
-        "__openbuddyFac.constants={};",
-        "__openbuddyFac.Http2ServerRequest=function(){};",
-        "__openbuddyFac.Http2ServerResponse=function(){};",
-        "__openbuddyFac.createServer=function(){return{on:function(){},listen:function(){}};};",
-        "__openbuddyFac.createSecureServer=function(){return{on:function(){},listen:function(){}};};",
-        "__openbuddyFac.connect=function(){return{on:function(){},end:function(){},destroy:function(){}};};",
-        "__openbuddyFac.constants={};",
-        // node:crypto — undici's `web/fetch/data-url.js` does
-        //   `const cryptoHashes = crypto.getHashes()`. Without
-        //   `getHashes` on the facade, that line crashes with
-        //   `crypto.getHashes is not a function` (fifth reason the
-        //   renderer ended up showing white). The renderer uses
-        //   `window.crypto.subtle` for hashing; the Node-side API
-        //   here only needs to NOT throw. Report a static set of
-        //   algorithm names so SRI / hash detection logic in undici
-        //   treats them as supported.
-        "var __openbuddyCryptoHashes=['sha256','sha384','sha512','sha1','md5','sha224','sha3-256','sha3-384','sha3-512'];",
-        "function __openbuddyHash(){this._buf=[];}",
-        "__openbuddyHash.prototype.update=function(d){return this;};",
-        "__openbuddyHash.prototype.digest=function(){return {};};",
-        "__openbuddyHash.prototype.copy=function(){return new __openbuddyHash();};",
-        "__openbuddyFac.getHashes=function(){return __openbuddyCryptoHashes.slice();};",
-        // node:worker_threads — undici's `web/webidl/index.js` requires
-        // `markAsUncloneable` from the facade. Provide a noop so the
-        // destructure evaluates; the renderer never spawns a real
-        // worker thread.
-        "__openbuddyFac.markAsUncloneable=function(){};",
-        "__openbuddyFac.isMarkedAsUncloneable=function(){return false;};",
-        "__openbuddyFac.isClonable=function(){return true;};",
-        "__openbuddyFac.getCiphers=function(){return [];};",
-        "__openbuddyFac.getCurves=function(){return [];};",
-        "__openbuddyFac.createHash=function(){return new __openbuddyHash();};",
-        "__openbuddyFac.createHmac=function(){return new __openbuddyHash();};",
-        "__openbuddyFac.randomBytes=function(){return new Uint8Array(0);};",
-        "__openbuddyFac.randomUUID=function(){return '00000000-0000-0000-0000-000000000000';};",
-        "__openbuddyFac.constants={};",
-        // node:async_hooks — undici's `api/api-request.js` does
-        //   `class RequestHandler extends AsyncResource {}`. Without
-        //   an `AsyncResource` export on the facade, the `extends`
-        //   clause crashes with `Class extends value undefined is not
-        //   a constructor or null` (fourth reason the renderer ended
-        //   up showing white). The renderer's fetch path never actually
-        //   uses Node's async resource tracking — provide a noop class
-        //   so the destructure + `super("UNDICI_REQUEST")` call evaluates
-        //   without crashing.
-        "function __openbuddyAsyncResource(){this._id=0;}",
-        "__openbuddyAsyncResource.prototype.runInAsyncScope=function(fn){if(typeof fn==='function')fn();};",
-        "__openbuddyAsyncResource.prototype.emitDestroy=function(){};",
-        "__openbuddyAsyncResource.prototype.asyncId=function(){return 0;};",
-        "__openbuddyAsyncResource.prototype.triggerAsyncId=function(){return 0;};",
-        "__openbuddyAsyncResource.prototype.bind=function(fn){return fn;};",
-        "__openbuddyAsyncResource.prototype[Symbol.toStringTag]='AsyncResource';",
-        "__openbuddyFac.AsyncResource=__openbuddyAsyncResource;",
-        "__openbuddyFac.createHook=function(){return{};};",
-        "__openbuddyFac.executionAsyncId=function(){return 0;};",
-        "__openbuddyFac.executionAsyncResource=function(){return{kAsyncId:0};};",
-        "__openbuddyFac.triggerAsyncId=function(){return 0;};",
-        // node:stream — undici's `web/fetch/body.js` does
-        //   `var { Readable } = require___vite_browser_external()`,
-        //   then `class BodyReadable extends Readable {}`. Without a
-        //   stream class on the facade, the `extends` clause crashes with
-        //   `Class extends value undefined is not a constructor or
-        //   null` (third reason the renderer ended up showing white).
-        // Provide a no-op Readable / Writable / Duplex / Transform /
-        // PassThrough hierarchy so the destructure evaluates; the
-        // renderer never actually streams bytes through Node's
-        // stream machinery — fetch responses are decoded by the
-        // browser-side Fetch API instead.
-        "function __openbuddyNoopStream(){}",
-        "function __openbuddyReadable(){this._listeners=[];this._state={};}",
-        "__openbuddyReadable.prototype.on=function(){return this;};",
-        "__openbuddyReadable.prototype.once=function(){return this;};",
-        "__openbuddyReadable.prototype.off=function(){return this;};",
-        "__openbuddyReadable.prototype.emit=function(){return false;};",
-        "__openbuddyReadable.prototype.pipe=function(){return this;};",
-        "__openbuddyReadable.prototype.unpipe=function(){return this;};",
-        "__openbuddyReadable.prototype.read=function(){return null;};",
-        "__openbuddyReadable.prototype.pause=function(){return this;};",
-        "__openbuddyReadable.prototype.resume=function(){return this;};",
-        "__openbuddyReadable.prototype.destroy=function(){return this;};",
-        "__openbuddyReadable.prototype.pause=function(){return this;};",
-        "__openbuddyReadable.prototype.isPaused=function(){return false;};",
-        "__openbuddyReadable.prototype.setEncoding=function(){return this;};",
-        "__openbuddyReadable.prototype.unshift=function(){return undefined;};",
-        "__openbuddyReadable.prototype.wrap=function(){return this;};",
-        "__openbuddyReadable.prototype[Symbol.toStringTag]='Readable';",
-        "function __openbuddyWritable(){this._listeners=[];this._state={};}",
-        "__openbuddyWritable.prototype.on=function(){return this;};",
-        "__openbuddyWritable.prototype.once=function(){return this;};",
-        "__openbuddyWritable.prototype.off=function(){return this;};",
-        "__openbuddyWritable.prototype.emit=function(){return false;};",
-        "__openbuddyWritable.prototype.write=function(cb){if(typeof cb==='function')cb();return true;};",
-        "__openbuddyWritable.prototype.end=function(cb){if(typeof cb==='function')cb();return this;};",
-        "__openbuddyWritable.prototype.destroy=function(){return this;};",
-        "__openbuddyWritable.prototype.cork=function(cb){if(typeof cb==='function')cb();return undefined;};",
-        "__openbuddyWritable.prototype.uncork=function(){return undefined;};",
-        "__openbuddyWritable.prototype.setDefaultEncoding=function(){return this;};",
-        "__openbuddyWritable.prototype[Symbol.toStringTag]='Writable';",
-        "function __openbuddyDuplex(){}",
-        "__openbuddyDuplex.prototype=Object.create(__openbuddyReadable.prototype);",
-        "var __openbuddyTransform=__openbuddyDuplex;",
-        "var __openbuddyPassThrough=__openbuddyDuplex;",
-        "__openbuddyFac.Readable=__openbuddyReadable;",
-        "__openbuddyFac.Writable=__openbuddyWritable;",
-        "__openbuddyFac.Duplex=__openbuddyDuplex;",
-        "__openbuddyFac.Transform=__openbuddyTransform;",
-        "__openbuddyFac.PassThrough=__openbuddyPassThrough;",
-        "__openbuddyFac.Stream=__openbuddyReadable;",
-        "__openbuddyFac.pipeline=function(){return Promise.resolve();};",
-        "__openbuddyFac.finished=function(){return Promise.resolve();};",
-        "__openbuddyFac.addAbortListener=function(){return function(){};};",
-        "__openbuddyFac.removeAbortListener=function(){};",
-        "__openbuddyFac.getDefaultHighWaterMark=function(){return 65536;};",
-        "__openbuddyFac.setDefaultHighWaterMark=function(){};",
-        "__openbuddyFac.isDisturbed=function(){return false;};",
-        "__openbuddyFac.isReadable=function(){return true;};",
-        "__openbuddyFac.isWritable=function(){return true;};",
-        "__openbuddyFac.isDuplex=function(){return false;};",
-        "__openbuddyFac.isTransform=function(){return false;};",
-        "__openbuddyFac.isReadableNodeStream=function(){return false;};",
-        "__openbuddyFac.isWritableNodeStream=function(){return false;};",
-        "__openbuddyFac.constants={};",
-        "__openbuddyFac.platform=function(){return 'darwin';};",
-        "__openbuddyFac.cpus=function(){return [];};",
-        // node:fs / node:fs/promises — return noop fs. Renderer
-        // never actually touches the filesystem; this only needs to
-        // exist so module-level `import { readFileSync } from "node:fs"`
-        // doesn't crash. Return a default JSON string for `readFileSync`
-        // since `JSON.parse(stripBom(readFileSync(...)))` is the typical
-        // shape and would otherwise crash on `stripBom(undefined)`.
-        "var __noopFs=function(){return function(){return '{}';};};",
-        "var __noopFsSync=function(){return function(){return false;};};",
-        "__openbuddyFac.readFileSync=__noopFs();",
-        "__openbuddyFac.readFile=__noopFs();",
-        "__openbuddyFac.writeFileSync=__noopFsSync();",
-        "__openbuddyFac.writeFile=__noopFsSync();",
-        "__openbuddyFac.existsSync=__noopFsSync();",
-        "__openbuddyFac.statSync=__noopFsSync();",
-        "__openbuddyFac.readdirSync=__noopFsSync();",
-        "__openbuddyFac.mkdirSync=__noopFsSync();",
-        "__openbuddyFac.openSync=__noopFsSync();",
-        "__openbuddyFac.closeSync=__noopFsSync();",
-        "__openbuddyFac.promises={readFile:__noopFs(),writeFile:__noopFsSync(),stat:__noopFsSync(),mkdir:__noopFsSync(),readdir:__noopFsSync(),cp:__noopFsSync(),rm:__noopFsSync(),rename:__noopFsSync(),realpath:__noopFs(),access:__noopFsSync()};",
-        // node:child_process — make spawn/exec/execFile no-op stubs so
-        // `import { execFile } from "node:child_process"` doesn't blow
-        // up when the renderer accidentally evaluates a call site.
-        "__openbuddyFac.execFile=__noopFs();",
-        "__openbuddyFac.exec=__noopFs();",
-        "__openbuddyFac.spawn=__noopFs();",
-        // node:util — promisify(undefined) used to throw at module load.
-        "__openbuddyFac.promisify=function(fn){if(typeof fn!=='function')return fn;return function(){return Promise.resolve(undefined);};};",
-        "__openbuddyFac.types={isUint8Array:function(){return false;},isDate:function(){return false;}};",
-        "if(typeof process!=='undefined'){if(typeof process.getMaxListeners!=='function'){process.getMaxListeners=function(){return 0;};process.setMaxListeners=function(){};}process.versions={};process.features={};process.argv=[];process.execPath='/';process.exit=function(){};process.getBuiltinModule=function(){return undefined;};process.version='v0.0.0';process.platform='darwin';if(!process.stderr){process.stderr={fd:1,write:function(){},_handle:{}};}if(!process.stdout){process.stdout={fd:1,write:function(){},_handle:{}};}process.stderr.fd=process.stderr.fd||1;}",
-        // Make `module.exports` itself the no-op class so
-        // `class X extends require___vite_browser_external() {}` works
-        // (the constructor is now a valid class with a prototype).
-        // All the static methods assigned to `__openbuddyFac` above
-        // become available as `require___vite_browser_external().method`,
-        // and `__toESM(...)` copies them through to the
-        // `import_..._browser_external` namespace so consumers using
-        // `import_X.Y(...)` style access keep working too.
-        "module.exports=__openbuddyFac;",
-      ].join("");
-      return { code: patch, map: null };
-      }
+      // is the renderer-side facade for Node built-ins. The per-module
+      // patch (Patch 1) already installs every required method/property
+      // (`.EventEmitter`, `.constants`, `.Readable`, `.AsyncResource`, …)
+      // so every consumer in the chunk sees a usable shape.
       return undefined;
     },
   };
 }
+
 
 export default defineConfig({
   // ---------------------------------------------------------------------------
@@ -781,22 +781,19 @@ export default defineConfig({
         "lucide-react",
         "grok-mermaid",
         "diff",
-        "date-fns",
-        "dompurify",
-        "nanoid",
       ],
       exclude: [
         // Workspace packages are aliased to `.ts` source — esbuild cannot
         // prebundle them. Vite's normal module resolver handles them.
-        /^@openbuddy\//,
-        // The Pi ecosystem is only ever used by the main process; the
-        // renderer never imports it. Excluding here keeps the dep
-        // crawler from chasing a graph that has no consumer.
-        /^@earendil-works\//,
-        // The shared Electron preload exposes its API via `window.api` and
-        // is statically replaced by the renderer shim. Exclude so the
-        // dep crawler doesn't try to load it.
+        // NOTE: `optimizeDeps.exclude` must be string globs in Vite 8.
+        // Passing a RegExp crashes `rolldownCjsExternalPlugin` with
+        // `str.replace is not a function` because it tries to call
+        // `escapeRegex(item)` on every entry. Workspace aliases are
+        // matched via their literal name + the `@openbuddy` /
+        // `@earendil-works` scope prefix patterns below.
         "@openbuddy/electron-api",
+        "@openbuddy/*",
+        "@earendil-works/*",
       ],
     },
   },

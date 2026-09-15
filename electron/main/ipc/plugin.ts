@@ -34,7 +34,7 @@ import {
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
 import { getNeedsReviewGate } from "../agent/host-modules/needs-review-singleton";
 import { summarizeNeedsReviewState } from "../agent/host-modules/needs-review-gate";
-import * as resources from "../agent/pi-resources";
+import { readExtensionPolicyConfig, writeExtensionPolicyConfig } from "../agent/pi-resources";
 
 export function registerPluginIpc(deps: AgentHostIpcDeps): void {
   const { agentHost, ensureAgentHost } = deps;
@@ -181,10 +181,10 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     const denylist = Array.isArray(input.denylistPackageNames) ? input.denylistPackageNames : [];
     return agentHost.updateExtensionPolicy({ allowlistPackageNames: allowlist, denylistPackageNames: denylist });
   });
-  ipcMain.handle("agent:extension-policy-get", async () => resources.readExtensionPolicyConfig());
+  ipcMain.handle("agent:extension-policy-get", async () => readExtensionPolicyConfig());
   ipcMain.handle("agent:extension-policy-save", async (_e, args: unknown) => {
     const input = recordValue(args, "extension policy save payload");
-    const config = await resources.writeExtensionPolicyConfig({
+    const config = await writeExtensionPolicyConfig({
       allowlistPackageNames: Array.isArray(input.allowlistPackageNames) ? input.allowlistPackageNames.filter((entry): entry is string => typeof entry === "string") : [],
       denylistPackageNames: Array.isArray(input.denylistPackageNames) ? input.denylistPackageNames.filter((entry): entry is string => typeof entry === "string") : [],
     });

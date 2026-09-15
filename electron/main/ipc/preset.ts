@@ -8,7 +8,7 @@
  */
 import { ipcMain } from "electron";
 
-import * as resources from "../agent/pi-resources";
+import { writeAgentPresetDefault } from "../agent/pi-resources";
 import {
   absolutePath,
   recordValue,
@@ -35,6 +35,6 @@ export function registerPresetIpc(deps: AgentHostIpcDeps): void {
   ipcMain.handle("agent:preset-default-save", async (_e, input?: unknown) => {
     const payload = input === undefined || input === null ? {} : recordValue(input, "preset default payload");
     const id = payload.id === undefined || payload.id === null ? undefined : requiredString(payload.id, "id");
-    return resources.writeAgentPresetDefault(id);
+    return writeAgentPresetDefault(id);
   });
 }

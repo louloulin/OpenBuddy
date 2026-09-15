@@ -5,7 +5,6 @@
  */
 import { ipcMain, type BrowserWindow } from "electron";
 import { agentHost, bindRendererEventEmitter, ensureAgentHostLoaded } from "./agent-host-proxy";
-import * as resources from "../agent/pi-resources";
 import {
 	absolutePath,
 	assertPolicyModelAllowed,
