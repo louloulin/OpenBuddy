@@ -7,8 +7,8 @@
  * 3. theme-dark-overrides.css  暗色主题强校验
  * 4. chrome.css       窗口外壳（TitleBar / drag region）
  * 5. ui-kit.css       跨域共享的按钮 / pill / chip 样式
- * 6. chrome 域细分：sidebar / sidebar-menus / messages / chat-shell 等
- * 7. 业务域：home / settings / plugins / experts / email / work-panel / tool-call
+ * 6. chrome 域细分：sidebar / sidebar-menus / composer / messages / chat-shell 等
+ * 7. 业务域：home / settings / plugins / experts / files / email / work-panel / tool-call
  * 8. automation-wb.css 历史 WorkBuddy 样式（保留兼容）
  *
  * app.css 保留作为兜底，零行为变更；后续按模块逐渐迁移完成后再删除。
