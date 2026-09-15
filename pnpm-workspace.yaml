@@ -1,3 +1,45 @@
+# pnpm workspace configuration.
+#
+# NOTE: pnpm 11 stopped reading project-structural settings from `.npmrc`.
+# `node-linker`, `public-hoist-pattern`, `package-import-method` and friends
+# only take effect here in `pnpm-workspace.yaml` now; the same keys in
+# `.npmrc` are silently ignored. They used to live in `.npmrc` and silently
+# stopped applying when the repo moved to pnpm 11, which shipped broken
+# Electron installers (see the block below).
+#
+# ---------------------------------------------------------------------------
+# nodeLinker: hoisted — required for `electron-builder`
+#
+# The default `isolated` linker keeps every transitive dependency inside
+# `node_modules/.pnpm/<hash>/node_modules/<pkg>/` and only symlinks direct
+# dependencies into `node_modules/`. electron-builder walks the
+# `node_modules/` tree to decide what to copy and cannot follow the pnpm
+# virtual store, so transitive deps of runtime packages were dropped from
+# the app payload. The packaged app then died at startup with
+# `Cannot find module 'sonic-boom'` (pino) before it ever opened a window —
+# 40 top-level packages missing, 178 packages missing once the closure is
+# expanded (express, pino, react-dom/scheduler, google-auth-library,
+# protobufjs/@grpc, @univerjs/*, ...).
+#
+# `hoisted` gives a flat, npm-style `node_modules/` where every package is
+# reachable at `node_modules/<pkg>`, so electron-builder resolves and ships
+# the full runtime closure. Trade-off: slower install, larger on-disk
+# `node_modules`.
+# ---------------------------------------------------------------------------
+nodeLinker: hoisted
+
+# Hoist everything to the public `node_modules/` root, not just direct deps.
+publicHoistPattern:
+  - '*'
+
+# Copy real files instead of symlinking into the pnpm virtual store, so
+# electron-builder reads regular files during packaging.
+packageImportMethod: copy
+
+# Do not cache postinstall side effects: the cached symlink rewrites break
+# `electron`'s `node-install.js`, which walks realpaths.
+sideEffectsCache: false
+
 packages:
   - '.'
   - 'apps/*'
