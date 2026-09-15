@@ -16,6 +16,7 @@
  * profile-reload-transaction, session-rebind 等保持一致.
  */
 
+import { invalidateSessionsCache } from "./_cache";
 import { type AgentHostState } from "./_state-shape";
 
 // ---------------------------------------------------------------------------
@@ -114,6 +115,9 @@ export async function disposeInternal(): Promise<void> {
     if (session) {
       state.context?.emit("pi/dispose", { sessionId: session.sessionId });
       emitPluginEventImpl("session/dispose", { sessionId: session.sessionId });
+      // P0 perf: drop the cached listSessions / listAllPiSessions so the
+      // renderer's next listSessions doesn't surface the just-disposed session.
+      invalidateSessionsCache();
     }
     await piSessionRuntimeDisposeImpl();
   } catch (error) {

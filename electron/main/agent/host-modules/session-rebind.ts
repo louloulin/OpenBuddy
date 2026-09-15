@@ -2,6 +2,7 @@
  * host-modules/session-rebind.ts — session 热重绑定 (warm-host rebind).
  */
 
+import { invalidateSessionsCache } from "./_cache";
 import { type AgentHostState } from "./_state-shape";
 
 let state: AgentHostState | null = null;
@@ -118,6 +119,10 @@ export async function rebindSession(sessionPath: string, cwd: string): Promise<v
 
   context.emit("pi/ready", { sessionId: session.sessionId, cwd });
   emitPluginEventImpl("session/created", { sessionId: session.sessionId, cwd });
+  // P0 perf: drop the cached listSessions / listAllPiSessions so the renderer's
+  // next listSessions sees the new session immediately instead of after the
+  // 5 s / 30 s TTL window.
+  invalidateSessionsCache();
 
   try {
     if (!session.sessionManager.getSessionName()) session.setSessionName("OpenBuddy");

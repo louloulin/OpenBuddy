@@ -10,6 +10,15 @@
  *   - setAllArchived (line 4601) — bulk archive/unarchive (R2.5)
  *   - setSessionExpert (line 4630) — assign / clear expert persona
  *
+ * Phase 8.3 P0 perf: the original `SessionManager.list / .listAll / .open().getEntries()`
+ * pipeline read every JSONL line via readline + JSON.parse, then concatenated every
+ * message text via `allMessages.join(" ")`. With 1146 files (54 MB) on this dev box
+ * that produced ~140 % main-process CPU. Replaced with a lightweight scanner
+ * (`peekSessionHeader` / `peekSubagentMode`) using fs.open + fs.read with fixed
+ * buffers (no readline, no per-line JSON.parse). `listSessions` is cached for 5 s
+ * and `listAllPiSessions` for 30 s with single-flight coalescing so the
+ * App.tsx:937 debounced effect doesn't stampede the disk.
+ *
  * 设计:
  *   - state / listAllPiSessions / workspaceRegistry 通过环形 import 自
  *     ../agent-host 注入 (workspaceRegistry 来自 workbench-scope.ts, 也是
@@ -20,10 +29,9 @@
  *     agent-host.ts, 它们还要被 plugin-state (Batch D) 用, 那里再决定是否
  *     搬走
  */
+import { readdir, open } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-
-import { SessionManager } from "@earendil-works/pi-coding-agent";
 
 import { SessionMetadataStore, type SessionMetadataSnapshot } from "./session-metadata-store";
 
@@ -31,8 +39,9 @@ import { SessionMetadataStore, type SessionMetadataSnapshot } from "./session-me
 //   修复前: `import { emitPluginEvent, listAllPiSessions, piHome, piSessionDir, state, workspaceRegistry } from "../agent-host"` (reverse dep)
 //   修复后: 通过 installSessionMetadata() 一次性注入, 本模块零 agent-host 导入.
 //   listAllPiSessions / piSessionDir 来自 _state-shape (types) 或 _host-paths (runtime).
-import { type AgentHostState } from "./_state-shape";
+import { cachedListSessions, invalidateSessionsCache } from "./_cache";
 import { createDefaultAgentHostState } from "./_default-state";
+import { type AgentHostState } from "./_state-shape";
 
 // Vite/Rollup ESM disambiguation fix (piHome$1 is not a function):
 // 之前 import piHome from _host-paths 但不调用, 只存为 module-level let, 然后在
@@ -72,12 +81,264 @@ export function installSessionMetadata(deps: {
   });
 }
 
+// ---------------------------------------------------------------------------
+// P0 perf scanner — replaces SessionManager.list / .listAll / .open().getEntries()
+// in the listing path. No readline, no per-line JSON.parse, no allMessages.join.
+// ---------------------------------------------------------------------------
+
+/** Summary shape returned by peekSessionHeader. Matches the fields of
+ *  pi-coding-agent's `SessionInfo` that OpenBuddy's listing actually uses. */
+export interface SessionHeaderSummary {
+  path: string;
+  id: string;
+  cwd: string;
+  name?: string;
+  parentSessionPath?: string;
+  created: Date;
+  modified: Date;
+  messageCount: number;
+  firstMessage: string;
+}
+
+/** Read the whole file when small enough, otherwise peek head + tail. */
+const PEEK_MAX_BYTES = 4 * 1024 * 1024; // 4 MB cap per file
+const PEEK_HEAD_BYTES = 2 * 1024 * 1024; // 2 MB head peek
+const PEEK_TAIL_BYTES = 64 * 1024; // 64 KB tail peek
+const SUBAGENT_PEEK_BYTES = 256 * 1024; // 256 KB — marker usually appears near start
+const SCAN_CONCURRENCY = 10; // matches MAX_CONCURRENT_SESSION_INFO_LOADS in pi-coding-agent
+
+/** Cheap scan of one JSONL file. Returns null on missing/corrupt header. */
+export async function peekSessionHeader(filePath: string): Promise<SessionHeaderSummary | null> {
+  let fh: Awaited<ReturnType<typeof open>> | null = null;
+  try {
+    fh = await open(filePath, "r");
+    const fileStat = await fh.stat();
+    const size = fileStat.size;
+    const mtime = fileStat.mtime;
+    if (size === 0) return null;
+
+    let text: string;
+    let truncated = false;
+    if (size <= PEEK_MAX_BYTES) {
+      const buf = Buffer.alloc(size);
+      await fh.read(buf, 0, size, 0);
+      text = buf.toString("utf8");
+    } else {
+      truncated = true;
+      const headBuf = Buffer.alloc(PEEK_HEAD_BYTES);
+      await fh.read(headBuf, 0, PEEK_HEAD_BYTES, 0);
+      const tailBuf = Buffer.alloc(PEEK_TAIL_BYTES);
+      await fh.read(tailBuf, 0, PEEK_TAIL_BYTES, size - PEEK_TAIL_BYTES);
+      // Bridge with a newline so the last head line and first tail line stay separate.
+      text = headBuf.toString("utf8") + "\n" + tailBuf.toString("utf8");
+    }
+    return parseHeaderText(text, filePath, mtime, truncated);
+  } catch {
+    return null;
+  } finally {
+    if (fh) await fh.close().catch(() => undefined);
+  }
+}
+
+/** Walk lines and extract header / name / first user message / message count.
+ *  Cheap: only JSON.parse the header line, the session_info line with a name,
+ *  and the first user-role message line. All other message lines are counted
+ *  via a substring match. */
+function parseHeaderText(text: string, filePath: string, mtime: Date, truncated: boolean): SessionHeaderSummary | null {
+  let header: { type?: string; id?: string; cwd?: string; parentSession?: string; timestamp?: string } | null = null;
+  let name: string | undefined;
+  let firstMessage = "";
+  let messageCount = 0;
+  let lineStart = 0;
+
+  while (lineStart <= text.length) {
+    const nl = text.indexOf("\n", lineStart);
+    const lineEnd = nl === -1 ? text.length : nl;
+    let line = text.slice(lineStart, lineEnd);
+    if (line.endsWith("\r")) line = line.slice(0, -1);
+
+    if (line.length > 0) {
+      if (!header) {
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.type !== "session") return null;
+          header = parsed;
+        } catch {
+          return null;
+        }
+      } else {
+        // Cheap substring gates before any JSON.parse
+        if (line.indexOf("session_info") !== -1) {
+          try {
+            const entry = JSON.parse(line);
+            if (entry && entry.type === "session_info") {
+              const raw = typeof entry.name === "string" ? entry.name.trim() : "";
+              if (raw) name = raw;
+            }
+          } catch {
+            /* skip malformed line */
+          }
+        } else if (line.indexOf('"type":"message"') !== -1 || line.indexOf('"type": "message"') !== -1) {
+          messageCount += 1;
+          if (!firstMessage && (line.indexOf('"role":"user"') !== -1 || line.indexOf('"role": "user"') !== -1)) {
+            try {
+              const entry = JSON.parse(line);
+              const text2 = extractFirstUserText(entry?.message);
+              if (text2) firstMessage = text2;
+            } catch {
+              /* skip malformed line */
+            }
+          }
+        }
+      }
+    }
+
+    if (nl === -1) break;
+    lineStart = nl + 1;
+  }
+
+  if (!header || !header.id) return null;
+
+  const headerTs = typeof header.timestamp === "string" ? new Date(header.timestamp).getTime() : NaN;
+  const created = Number.isNaN(headerTs) ? mtime : new Date(headerTs);
+
+  return {
+    path: filePath,
+    id: header.id,
+    cwd: typeof header.cwd === "string" ? header.cwd : "",
+    name,
+    parentSessionPath: header.parentSession,
+    created,
+    modified: mtime,
+    // When the file was truncated and we found no message in the head peek,
+    // assume the file has at least one message (rare edge case for huge files).
+    messageCount: truncated && messageCount === 0 ? 1 : messageCount,
+    firstMessage: firstMessage || "(no messages)",
+  };
+}
+
+/** Mirror of pi-coding-agent's extractTextContent (not exported from the package). */
+function extractFirstUserText(message: unknown): string {
+  if (!message || typeof message !== "object") return "";
+  const m = message as { role?: unknown; content?: unknown };
+  if (typeof m.role !== "string") return "";
+  const content = m.content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const block of content) {
+    if (block && typeof block === "object" && (block as { type?: unknown }).type === "text") {
+      const t = (block as { text?: unknown }).text;
+      if (typeof t === "string") parts.push(t);
+    }
+  }
+  return parts.join(" ");
+}
+
+/** Read first ~256 KB of a session file and look for an openbuddy/subagent custom
+ *  entry. Returns "continuable" only when the marker explicitly carries that mode.
+ *  Anything missing or unparseable falls back to "one-shot", matching the original
+ *  SessionManager.open().getEntries().find(...) behavior. */
+export async function peekSubagentMode(filePath: string): Promise<"one-shot" | "continuable"> {
+  let fh: Awaited<ReturnType<typeof open>> | null = null;
+  try {
+    fh = await open(filePath, "r");
+    const fileStat = await fh.stat();
+    const size = fileStat.size;
+    if (size === 0) return "one-shot";
+
+    const peekSize = Math.min(size, SUBAGENT_PEEK_BYTES);
+    const buf = Buffer.alloc(peekSize);
+    await fh.read(buf, 0, peekSize, 0);
+    const text = buf.toString("utf8");
+
+    const markerIdx = text.indexOf("openbuddy/subagent");
+    if (markerIdx === -1) return "one-shot";
+
+    // Find the surrounding JSON object — walk back to the previous '{' on the line.
+    const openIdx = text.lastIndexOf("{", markerIdx);
+    if (openIdx === -1) return "one-shot";
+    const lineStart = text.lastIndexOf("\n", openIdx) + 1;
+    const nlIdx = text.indexOf("\n", markerIdx);
+    const lineEnd = nlIdx === -1 ? text.length : nlIdx;
+    const line = text.slice(lineStart, lineEnd);
+
+    try {
+      const entry = JSON.parse(line);
+      if (entry && entry.type === "custom" && entry.customType === "openbuddy/subagent") {
+        const data = entry.data && typeof entry.data === "object" ? entry.data : null;
+        return data && data.mode === "continuable" ? "continuable" : "one-shot";
+      }
+    } catch {
+      /* fall through to one-shot */
+    }
+    return "one-shot";
+  } catch {
+    return "one-shot";
+  } finally {
+    if (fh) await fh.close().catch(() => undefined);
+  }
+}
+
+/** Scan a single directory of .jsonl files with bounded concurrency. */
+export async function scanSessionDir(dir: string): Promise<SessionHeaderSummary[]> {
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const files = entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".jsonl"))
+    .map((entry) => join(dir, entry.name));
+
+  if (files.length === 0) return [];
+  const results: (SessionHeaderSummary | null)[] = new Array(files.length).fill(null);
+  const inFlight = new Set<Promise<void>>();
+  let nextIndex = 0;
+
+  const startNext = (): void => {
+    const index = nextIndex++;
+    if (index >= files.length) return;
+    const file = files[index];
+    const task = peekSessionHeader(file)
+      .then((info) => {
+        results[index] = info;
+      })
+      .catch(() => {
+        results[index] = null;
+      })
+      .finally(() => {
+        inFlight.delete(task);
+      });
+    inFlight.add(task);
+  };
+
+  while (nextIndex < files.length || inFlight.size > 0) {
+    while (nextIndex < files.length && inFlight.size < SCAN_CONCURRENCY) {
+      startNext();
+    }
+    if (inFlight.size > 0) {
+      await Promise.race(inFlight);
+    }
+  }
+  return results.filter((entry): entry is SessionHeaderSummary => entry !== null);
+}
+
+// ---------------------------------------------------------------------------
+// Public listSessions
+// ---------------------------------------------------------------------------
+
 export async function listSessions(cwd: string) {
+  return cachedListSessions(cwd, () => loadSessionsImpl(cwd));
+}
+
+async function loadSessionsImpl(cwd: string) {
   const metadata = await metadataStore.snapshot();
   const pinned = new Set(metadata.pinned);
   const archived = new Set(metadata.archived);
   const registryArchived = new Set((state.context?.get("workspaceRegistry") as { archivedSessionIds?: readonly string[] } | undefined)?.archivedSessionIds ?? []);
-  const scopedSessions = await SessionManager.list(cwd, piSessionDir(cwd));
+  const scopedSessions = await scanSessionDir(piSessionDir(cwd));
   const allSessions = await listAllPiSessions();
   const sessions = [...new Map([
     ...scopedSessions,
@@ -87,14 +348,10 @@ export async function listSessions(cwd: string) {
   const childModes = new Map<string, "one-shot" | "continuable">();
   for (const entry of allSessions) {
     if (!entry.parentSessionPath) continue;
-    try {
-      const marker = SessionManager.open(entry.path).getEntries()
-        .find((candidate) => candidate.type === "custom" && (candidate as { customType?: unknown }).customType === "openbuddy/subagent") as { data?: unknown } | undefined;
-      const data = marker?.data && typeof marker.data === "object" ? marker.data as Record<string, unknown> : undefined;
-      childModes.set(entry.id, data?.mode === "continuable" ? "continuable" : "one-shot");
-    } catch {
-      childModes.set(entry.id, "one-shot");
-    }
+    // Use the lightweight peek (fs.open + small fs.read) instead of
+    // SessionManager.open(path).getEntries(), which parsed the entire file.
+    const mode = await peekSubagentMode(entry.path);
+    childModes.set(entry.id, mode);
   }
   // R2.5 — surface archived sessions too. The previous implementation dropped
   // them entirely, which made historical sessions invisible once any cleanup
@@ -145,11 +402,15 @@ async function updateSessionMetadata(
   if (state.session?.sessionId === sessionId) {
     emitPluginEvent("session/metadata-updated", { sessionId });
   }
+  // P0: drop the cached list so the next listSessions / listAllPiSessions sees
+  // the metadata change immediately instead of after the TTL window.
+  invalidateSessionsCache();
 }
 
 async function clearSessionMetadata(): Promise<void> {
   await metadataStore.clearAll();
   emitPluginEvent("session/metadata-cleared", {});
+  invalidateSessionsCache();
 }
 
 async function setSessionArchived(sessionId: string, archived: boolean): Promise<boolean> {

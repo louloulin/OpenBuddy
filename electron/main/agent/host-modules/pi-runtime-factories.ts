@@ -15,11 +15,10 @@
 
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  SessionManager,
-  type ToolDefinition,
-} from "@earendil-works/pi-coding-agent";
+import { type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { OpenBuddyThinkingLevel } from "../../ipc/validation";
+import { cachedListAllPiSessions } from "./_cache";
+import { type SessionHeaderSummary, scanSessionDir } from "./session-metadata";
 import { type AgentHostState, type PiToolRegistry } from "./_state-shape";
 
 // ---------------------------------------------------------------------------
@@ -200,9 +199,18 @@ export function createPiSessionFacade(): PiSessionFacade {
  * `listAllPiSessions` — 列出 piHome 下所有 session.
  *
  * 扫描 `${piHome}` 和 `${piHome}/sessions/<workspace>/` 三个层级的目录,
- * 用 SessionManager.listAll 去重并按 modified 时间倒序返回.
+ * 用 scanSessionDir (轻量级 peek: 不 readline, 不全行 JSON.parse, 不
+ * allMessages.join) 读 header 信息, 去重并按 modified 时间倒序返回.
+ *
+ * P0 perf: 30 s TTL + 单飞合并 (见 _cache.cachedListAllPiSessions). 之前
+ * SessionManager.listAll 在 1146 个文件 54 MB 上跑一次 ~140 % CPU / 2.7 GB RSS,
+ * 这是 App.tsx debounced effect 触发的热路径.
  */
-export async function listAllPiSessions(): Promise<Awaited<ReturnType<typeof SessionManager.listAll>>> {
+export async function listAllPiSessions(): Promise<SessionHeaderSummary[]> {
+  return cachedListAllPiSessions(() => listAllPiSessionsImpl());
+}
+
+async function listAllPiSessionsImpl(): Promise<SessionHeaderSummary[]> {
   const root = piHomeImpl();
   const sessionRoots = [root, join(root, "sessions")];
   try {
@@ -212,8 +220,8 @@ export async function listAllPiSessions(): Promise<Awaited<ReturnType<typeof Ses
   } catch {
     // A first-run agent directory may not have a sessions directory yet.
   }
-  const sessions = await Promise.all(sessionRoots.map((directory) => SessionManager.listAll(directory)));
-  return [...new Map(sessions.flat().map((session) => [session.path, session])).values()]
+  const sessions = (await Promise.all(sessionRoots.map((directory) => scanSessionDir(directory)))).flat();
+  return [...new Map(sessions.map((session) => [session.path, session])).values()]
     .sort((left, right) => right.modified.getTime() - left.modified.getTime());
 }
 
