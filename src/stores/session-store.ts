@@ -118,6 +118,15 @@ interface UiSessionState {
    *  Drives badges (`running 3 tools`, `awaiting model`) without forcing
    *  the UI to recompute from tool counts + streaming boolean. */
   phase: AgentPhase;
+  /** Phase A2 — O(1) lookup from a toolCallId to the (message, part) cell
+   *  in `messages` where the tool_call card lives. Populated on `tool_call`
+   *  append and consulted on every `tool_call_update`. Eliminates the
+   *  previous O(n·k) `messages.map(...) + parts.findIndex(...)` per update.
+   *  Cleared whenever `messages` is reset, replaced wholesale (history
+   *  replay, session switch), or has any entry spliced out (popOptimistic,
+   *  abandon). Garbage is bounded by the assistant-message footprint, not
+   *  the full session history, so size stays small even for long runs. */
+  toolCallIndex: Map<string, { messageIdx: number; partIdx: number }>;
   /** Phase R3.0 — set of session ids that are still in the optimistic
    *  `__pending_<nonce>` state (i.e. the renderer knows about them but the
    *  backend hasn't confirmed). UI components consult `isPending(id)` /
@@ -413,10 +422,13 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
   // session ids. Populated by `beginPendingNewSession` (App.tsx) and
   // drained by `markResolved` once the real id round-trips from main.
   pendingSessionIds: new Set<string>() as ReadonlySet<string>,
+  // Phase A2 — O(1) toolCallId -> (messageIdx, partIdx). Empty at boot;
+  // populated lazily on the first `tool_call` event of a turn.
+  toolCallIndex: new Map<string, { messageIdx: number; partIdx: number }>(),
 
   setSession: (id) => {
     discardStreamingBuffer();
-    set({ sessionId: id, error: null, messages: [], streamingMessageId: null, plan: null, streamState: INITIAL_STREAMING_STATE, phase: IDLE_PHASE });
+    set({ sessionId: id, error: null, messages: [], streamingMessageId: null, plan: null, streamState: INITIAL_STREAMING_STATE, phase: IDLE_PHASE, toolCallIndex: new Map() });
   },
   migrateSession: (oldId, newId) => {
     if (oldId === newId) return;
@@ -471,6 +483,10 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
         messages: merged,
         streamingMessageId: null,
         streamState: INITIAL_STREAMING_STATE,
+        // Phase A2 — history replay replaces messages wholesale, so every
+        // existing toolCallIndex entry points at stale cells. Drop it; the
+        // next tool_call event of the next turn rebuilds lazily.
+        toolCallIndex: new Map(),
       };
     });
   },
@@ -548,6 +564,11 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
     return {
       optimisticBubble: null,
       messages: s.messages.filter((m) => m.id !== bubble.id),
+      // Phase A2 — popOptimistic splices the bubble out by id; any
+      // toolCallIndex entries whose messageIdx pointed past it would now
+      // be off-by-one. Safer (and cheap) to drop the whole index and let
+      // the next tool_call event rebuild it.
+      toolCallIndex: new Map(),
     };
   }),
 
@@ -646,6 +667,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
       streamState: INITIAL_STREAMING_STATE,
       phase: IDLE_PHASE,
       pendingSessionIds: new Set<string>() as ReadonlySet<string>,
+      toolCallIndex: new Map(),
     });
   },
 

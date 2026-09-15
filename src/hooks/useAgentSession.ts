@@ -887,24 +887,42 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
               // Re-read so we see the latest streamingMessageId set by the
               // most recent `beginStreamingMessage()`.
               const streamingId = useSessionStore.getState().streamingMessageId;
-              if (streamingId) {
-                useSessionStore.setState((s) => ({
-                  messages: s.messages.map((m) =>
-                    m.id === streamingId
-                      ? { ...m, parts: [...m.parts, { kind: "tool_call", toolCall: { toolCallId: tc.toolCallId, title: tc.title, kind: tc.kind, status: tc.status, startedAt, content: Array.isArray(tc.content) ? (tc.content as never) : [], ...(tc.rawInput != null ? { rawInput: tc.rawInput } : {}) } } ] }
-                      : m,
-                  ),
-                }));
-              } else {
+              if (!streamingId) {
+                // No bubble yet — start one. Re-read streamingMessageId
+                // after beginStreamingMessage so we can target it directly.
                 store.beginStreamingMessage();
-                useSessionStore.setState((s) => ({
-                  messages: s.messages.map((m) =>
-                    m.id === s.streamingMessageId
-                      ? { ...m, parts: [...m.parts, { kind: "tool_call", toolCall: { toolCallId: tc.toolCallId, title: tc.title, kind: tc.kind, status: tc.status, startedAt, content: Array.isArray(tc.content) ? (tc.content as never) : [], ...(tc.rawInput != null ? { rawInput: tc.rawInput } : {}) } } ] }
-                      : m,
-                  ),
-                }));
               }
+              const targetId = useSessionStore.getState().streamingMessageId;
+              if (!targetId) break;
+              const toolCallPart = {
+                kind: "tool_call" as const,
+                toolCall: {
+                  toolCallId: tc.toolCallId,
+                  title: tc.title,
+                  kind: tc.kind,
+                  status: tc.status,
+                  startedAt,
+                  content: Array.isArray(tc.content) ? (tc.content as never) : [],
+                  ...(tc.rawInput != null ? { rawInput: tc.rawInput } : {}),
+                },
+              };
+              // Phase A2 — single-message write: find the streaming bubble's
+              // index once, replace just that cell in `messages`, and record
+              // the (messageIdx, partIdx) in `toolCallIndex` so future
+              // `tool_call_update` events can patch in O(1). No more
+              // `messages.map(...)` allocating a fresh array across every
+              // historical assistant turn per event.
+              useSessionStore.setState((s) => {
+                const messageIdx = s.messages.findIndex((m) => m.id === targetId);
+                if (messageIdx === -1) return s;
+                const msg = s.messages[messageIdx];
+                const partIdx = msg.parts.length;
+                const newMessages = [...s.messages];
+                newMessages[messageIdx] = { ...msg, parts: [...msg.parts, toolCallPart] };
+                const newToolCallIndex = new Map(s.toolCallIndex);
+                newToolCallIndex.set(tc.toolCallId, { messageIdx, partIdx });
+                return { messages: newMessages, toolCallIndex: newToolCallIndex };
+              });
               break;
             }
             case "tool_call_update": {
@@ -919,37 +937,44 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
               const content = upd.content;
               const partial = Boolean(upd.update?.partial);
               const partialResult = upd.update?.partialResult;
-              useSessionStore.setState((s) => ({
-                messages: s.messages.map((m) => {
-                  const idx = m.parts.findIndex((p) => p.kind === "tool_call" && p.toolCall.toolCallId === toolCallId);
-                  if (idx === -1) return m;
-                  const parts = [...m.parts];
-                  const part = parts[idx];
-                  if (part.kind !== "tool_call") return m;
-                  const toolCall = part.toolCall as typeof part.toolCall & { partial?: boolean; partialResult?: unknown };
-                  // Phase R3.0 — freeze the wall clock the first time a tool
-                  // leaves `in_progress`. Without this the card computes its
-                  // duration against `Date.now()` forever, so a finished tool
-                  // shows "time since it started" rather than how long it
-                  // actually took, and the number jumps on every later
-                  // re-render. Only the first terminal status wins so a
-                  // duplicate `completed` event can't extend the duration.
-                  const reachedTerminal =
-                    (status === "completed" || status === "failed") &&
-                    toolCall.completedAt === undefined;
-                  parts[idx] = {
-                    kind: "tool_call",
-                    toolCall: {
-                      ...toolCall,
-                      ...(status ? { status } : {}),
-                      ...(reachedTerminal ? { completedAt: Date.now() } : {}),
-                      ...(Array.isArray(content) ? { content: content as never } : {}),
-                      ...(partial ? { partial: true, partialResult } : {}),
-                    },
-                  };
-                  return { ...m, parts };
-                }),
-              }));
+              // Phase A2 — O(1) lookup via the index written by the
+              // matching `tool_call` event. Drops the previous
+              // `messages.map` + `parts.findIndex` walk that paid an O(n·k)
+              // tax per tool event.
+              useSessionStore.setState((s) => {
+                const loc = s.toolCallIndex.get(toolCallId);
+                if (!loc) return s;
+                const { messageIdx, partIdx } = loc;
+                const msg = s.messages[messageIdx];
+                if (!msg) return s;
+                const part = msg.parts[partIdx];
+                if (!part || part.kind !== "tool_call") return s;
+                const toolCall = part.toolCall as typeof part.toolCall & { partial?: boolean; partialResult?: unknown };
+                // Phase R3.0 — freeze the wall clock the first time a tool
+                // leaves `in_progress`. Without this the card computes its
+                // duration against `Date.now()` forever, so a finished tool
+                // shows "time since it started" rather than how long it
+                // actually took, and the number jumps on every later
+                // re-render. Only the first terminal status wins so a
+                // duplicate `completed` event can't extend the duration.
+                const reachedTerminal =
+                  (status === "completed" || status === "failed") &&
+                  toolCall.completedAt === undefined;
+                const newParts = [...msg.parts];
+                newParts[partIdx] = {
+                  kind: "tool_call",
+                  toolCall: {
+                    ...toolCall,
+                    ...(status ? { status } : {}),
+                    ...(reachedTerminal ? { completedAt: Date.now() } : {}),
+                    ...(Array.isArray(content) ? { content: content as never } : {}),
+                    ...(partial ? { partial: true, partialResult } : {}),
+                  },
+                };
+                const newMessages = [...s.messages];
+                newMessages[messageIdx] = { ...msg, parts: newParts };
+                return { messages: newMessages };
+              });
               break;
             }
             case "plan": {
