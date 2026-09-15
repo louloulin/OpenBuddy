@@ -1,0 +1,163 @@
+/* ============================================================================
+ * home-widgets.css — 首页小组件样式
+ *
+ * 这些类名由 packages/ui/openbuddy-ui-settings 与 openbuddy-ui-home 的组件渲染，
+ * 但 Phase 2 拆分后没有任何样式文件写过它们，组件因此在页面上退化成裸文本
+ * （例如「试试这些工作流」一行没有 chip 外观、插件 slot 没有容器）。
+ * ========================================================================== */
+
+/* ---- 「试试这些工作流」技能推荐行 ---- */
+.home__skills {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.home__skills-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.home__skills-bar-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wb-text-medium, #6e6e80);
+}
+.home__skills-bar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.home__skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 999px;
+  background: var(--wb-bg-elevated);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 140ms var(--wb-ease-out-expo, cubic-bezier(.16, 1, .3, 1)),
+    border-color 140ms var(--wb-ease-out-expo, cubic-bezier(.16, 1, .3, 1)),
+    transform 140ms var(--wb-ease-out-expo, cubic-bezier(.16, 1, .3, 1));
+}
+.home__skill-chip:hover {
+  background: var(--wb-bg-hover);
+  border-color: color-mix(in srgb, var(--wb-brand-primary, #00c29a) 40%, transparent);
+  transform: translateY(-1px);
+}
+.home__skill-chip:active {
+  transform: translateY(0) scale(.97);
+}
+
+/* ---- 插件 slot 容器（品牌区 / 工作区区） ---- */
+.home__brand-plugin,
+.home__workspace-plugin {
+  display: block;
+  margin-bottom: 8px;
+}
+.home__workspace-plugin:empty,
+.home__brand-plugin:empty {
+  display: none;
+}
+
+/* ---- SkillRecommendBar（ui-home 的技能推荐条） ---- */
+.skill-recommend-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skill-recommend-bar--loading {
+  opacity: .6;
+}
+.skill-recommend-bar__title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wb-text-medium, #6e6e80);
+}
+.skill-recommend-bar__hint {
+  font-size: 12px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.skill-recommend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 999px;
+  background: var(--wb-bg-elevated);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  cursor: pointer;
+}
+.skill-recommend-chip__icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+}
+.skill-recommend-chip__label {
+  line-height: 1;
+}
+
+/* ---- HomeOverviewPanel（概览/待办/工具右栏面板，供插件与未来布局复用） ---- */
+.home-overview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.home-overview-section {
+  padding: 12px 14px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 12px;
+  background: var(--wb-bg-elevated);
+}
+.home-overview-section__title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.home-overview-section__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.home-overview-section__item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 12px;
+  color: var(--wb-text-medium, #6e6e80);
+}
+.home-overview-section__item.is-done {
+  text-decoration: line-through;
+  opacity: .6;
+}
+.home-overview-section__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.home-overview-section__chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wb-brand-primary, #00c29a) 12%, transparent);
+  color: var(--wb-brand-primary, #00c29a);
+  font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home__skill-chip { transition: none; }
+  .home__skill-chip:hover { transform: none; }
+  .home__skill-chip:active { transform: none; }
+}

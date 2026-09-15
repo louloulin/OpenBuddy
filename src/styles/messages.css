@@ -461,3 +461,172 @@ button.diff__path {
 .diff__line--add .diff__line-prefix { color: #1a7f37; }
 .diff__line--del .diff__line-prefix { color: #cf222e; }
 .diff__line-text { flex: 1; white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere; }
+
+/* ============================================================================
+ * RewindBar —— 会话回滚/时间线面板
+ * 组件（openbuddy-ui-conversation/RewindBar.tsx）渲染的 21 个类名此前没有任何
+ * 样式定义，面板退化为无边框的裸列表。此处补齐。
+ * ========================================================================== */
+.rewind-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rewind-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-elevated);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 140ms, border-color 140ms;
+}
+.rewind-bar__btn:hover {
+  background: var(--wb-bg-hover);
+  border-color: color-mix(in srgb, var(--wb-brand-primary, #00c29a) 35%, transparent);
+}
+.rewind-bar__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--wb-bg-tertiary, #ebedf2);
+  color: var(--wb-text-medium, #6e6e80);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.rewind-bar__badge--file { background: color-mix(in srgb, #4d8eff 16%, transparent); color: #2f6feb; }
+.rewind-bar__badge--memory { background: color-mix(in srgb, #a855f7 16%, transparent); color: #7e3ff2; }
+.rewind-bar__badge--tool { background: color-mix(in srgb, #00c29a 16%, transparent); color: #00926f; }
+
+.rewind-bar__dropdown {
+  position: absolute;
+  z-index: 60;
+  min-width: 320px;
+  max-width: min(560px, calc(100vw - 32px));
+  max-height: min(420px, calc(100vh - 120px));
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 14px;
+  background: var(--wb-bg-primary);
+  box-shadow:
+    0 8px 24px -8px rgba(0, 0, 0, .18),
+    0 24px 64px -12px rgba(0, 0, 0, .22);
+}
+.rewind-bar__dropdown--timeline {
+  min-width: 380px;
+}
+.rewind-bar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.rewind-bar__modes {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--wb-bg-tertiary, #ebedf2);
+}
+.rewind-bar__refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--wb-text-medium, #6e6e80);
+  cursor: pointer;
+}
+.rewind-bar__refresh:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.rewind-bar__empty {
+  padding: 20px 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.rewind-bar__timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rewind-bar__timeline-rail {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 5px;
+  width: 1px;
+  background: var(--wb-border-default);
+}
+.rewind-bar__timeline-card {
+  position: relative;
+  padding-left: 20px;
+}
+.rewind-bar__timeline-dot {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--wb-bg-primary);
+  background: var(--wb-brand-primary, #00c29a);
+}
+.rewind-bar__timeline-time {
+  font-size: 11px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.rewind-bar__timeline-prompt,
+.rewind-bar__timeline-response {
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+.rewind-bar__timeline-prompt {
+  background: var(--wb-bg-secondary, #f4f5f8);
+  color: var(--wb-text-strong);
+}
+.rewind-bar__timeline-response {
+  background: var(--wb-bg-tertiary, #ebedf2);
+  color: var(--wb-text-medium, #6e6e80);
+}
+.rewind-bar__timeline-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.rewind-bar__timeline-action {
+  margin-top: 8px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  cursor: pointer;
+}
+.rewind-bar__timeline-action:hover {
+  background: var(--wb-bg-hover);
+}

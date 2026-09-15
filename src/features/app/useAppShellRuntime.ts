@@ -442,9 +442,19 @@ export function useAppShellRuntime(): AppShellRuntime {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const isEditable = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-      if (e.key === "?" && !isEditable && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); setShortcutsOpen((v) => !v); }
+      // The home composer is autofocused, so `isEditable` is true the moment the
+      // app opens. Guarding purely on it made `?` and ⌘, unreachable until the
+      // user clicked somewhere else. Only suppress a bare `?` once the user has
+      // actually typed something (then "?" is legitimate text); modifier combos
+      // never produce text, so they are never suppressed.
+      const typedIntoEditable =
+        isEditable &&
+        (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+          ? target.value.length > 0
+          : (target?.textContent?.length ?? 0) > 0);
+      if (e.key === "?" && !typedIntoEditable && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); setShortcutsOpen((v) => !v); }
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === "k" || e.key === "K")) { e.preventDefault(); setSearchOpen(true); }
-      if (!isEditable && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === ",") { e.preventDefault(); setSettingsOpen(true); }
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === ",") { e.preventDefault(); setSettingsOpen(true); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

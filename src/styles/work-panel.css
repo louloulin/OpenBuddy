@@ -438,3 +438,311 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ============================================================================
+ * PlanPanel / TasksPanel —— 自动化计划与后台任务面板
+ * 这两个组件（openbuddy-ui-automation）的 48 个类名此前没有任何样式定义。
+ * ========================================================================== */
+
+/* ---- TasksPanel ---- */
+.tasks-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tasks-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tasks-panel__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.tasks-panel__refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--wb-text-medium, #6e6e80);
+  cursor: pointer;
+}
+.tasks-panel__refresh:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.tasks-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tasks-panel__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 10px;
+  background: var(--wb-bg-elevated);
+}
+.tasks-panel__item-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--wb-bg-tertiary, #ebedf2);
+}
+.tasks-panel__item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.tasks-panel__item-desc {
+  font-size: 13px;
+  color: var(--wb-text-strong);
+}
+.tasks-panel__item-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.tasks-panel__item-id {
+  font-family: var(--wb-font-mono, ui-monospace, Menlo, monospace);
+}
+.tasks-panel__kill {
+  flex: none;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, #e5484d 40%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: #e5484d;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tasks-panel__kill:hover {
+  background: color-mix(in srgb, #e5484d 12%, transparent);
+}
+.tasks-panel__loading {
+  padding: 16px 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+
+/* ---- PlanPanel（计划模式） ---- */
+.plan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 12px;
+  background: var(--wb-bg-elevated);
+}
+.plan-panel--empty {
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.plan-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.plan-panel__header-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+.plan-panel__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.plan-panel__hint,
+.plan-panel__active-hint {
+  font-size: 12px;
+  color: var(--wb-text-medium, #6e6e80);
+}
+.plan-panel__progress-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--wb-bg-tertiary, #ebedf2);
+  overflow: hidden;
+}
+.plan-panel__progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--wb-brand-primary, #00c29a);
+  transition: width 200ms var(--wb-ease-out-expo, cubic-bezier(.16, 1, .3, 1));
+}
+.plan-panel__progress-text {
+  font-size: 11px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.plan-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.plan-panel__row-body,
+.plan-panel__row-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--wb-bg-secondary, #f4f5f8);
+}
+.plan-panel__row-index {
+  flex: none;
+  min-width: 18px;
+  font-size: 11px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.plan-panel__row-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+}
+.plan-panel__row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.plan-panel__row-elapsed {
+  font-variant-numeric: tabular-nums;
+}
+.plan-panel__row-status {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--wb-bg-tertiary, #ebedf2);
+  font-size: 10px;
+}
+.plan-panel__row-status--clickable {
+  cursor: pointer;
+}
+.plan-panel__row-priority {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+}
+.plan-panel__row-priority--clickable {
+  cursor: pointer;
+}
+.plan-panel__row-actions {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.plan-panel__row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-text-medium, #6e6e80);
+  cursor: pointer;
+}
+.plan-panel__row-action:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.plan-panel__row-action--danger:hover {
+  background: color-mix(in srgb, #e5484d 14%, transparent);
+  color: #e5484d;
+}
+.plan-panel__row-edit,
+.plan-panel__row-edit-input,
+.plan-panel__add-input {
+  flex: 1;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.plan-panel__row-edit-save,
+.plan-panel__add-btn {
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--wb-brand-primary, #00c29a);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.plan-panel__add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.plan-panel__mode-btn {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  cursor: pointer;
+}
+.plan-panel__mode-btn:hover {
+  background: var(--wb-bg-hover);
+}
+.plan-panel__approval {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--wb-color-text-warning-default, #b7791f) 12%, transparent);
+}
+.plan-panel__approve-btn,
+.plan-panel__reject-btn {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+.plan-panel__approve-btn {
+  background: var(--wb-brand-primary, #00c29a);
+  color: #fff;
+}
+.plan-panel__reject-btn {
+  background: transparent;
+  border: 1px solid var(--wb-border-default);
+  color: var(--wb-text-strong);
+}
+.plan-panel__done-banner {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--wb-brand-primary, #00c29a) 14%, transparent);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+}

@@ -582,3 +582,330 @@ textarea.mshell-field__control { resize: vertical; min-height: 96px; font-family
  * "添加模型" editor dialog (560×318). All values approximate WorkBuddy's
  * measured layout from the CDP captures.
  * ====================================================================== */
+
+/* ============================================================================
+ * KeyboardShortcutsDialog（⌘/ 或 ? 打开）
+ *
+ * 组件一直在 packages/ui/openbuddy-ui-shell 里渲染 .kbd-shortcuts-* 类名，
+ * 但 Phase 2 拆分后没有任何一个样式文件写过这些选择器——面板因此退化成
+ * 页面左下角一段无样式文本。此处按 request-modal 的既有视觉语言补齐。
+ * ========================================================================== */
+.kbd-shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--wb-palette-black-100, #000) 52%, transparent);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+}
+.kbd-shortcuts-panel {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px 20px;
+  overflow: hidden;
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 18px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 8px 24px -8px rgba(0, 0, 0, 0.18),
+    0 24px 64px -12px rgba(0, 0, 0, 0.22);
+  animation: wb-request-modal-in 240ms cubic-bezier(.22, 1, .36, 1) both;
+}
+.kbd-shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.kbd-shortcuts-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.kbd-shortcuts-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--wb-text-medium, #6e6e80);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 140ms, color 140ms;
+}
+.kbd-shortcuts-close:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.kbd-shortcuts-search {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 10px;
+  background: var(--wb-bg-secondary, #f4f5f8);
+  color: var(--wb-text-strong);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.kbd-shortcuts-search::placeholder {
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.kbd-shortcuts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.kbd-shortcuts-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+.kbd-shortcuts-item:hover {
+  background: var(--wb-bg-hover);
+}
+.kbd-shortcuts-label {
+  font-size: 13px;
+  color: var(--wb-text-strong);
+}
+.kbd-shortcuts-keys {
+  flex: none;
+  padding: 3px 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-secondary, #f4f5f8);
+  color: var(--wb-text-medium, #6e6e80);
+  font-family: var(--wb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.kbd-shortcuts-empty {
+  padding: 16px 10px;
+  text-align: center;
+  color: var(--wb-text-weak, #9aa0a6);
+  font-size: 13px;
+}
+
+/* ---- AboutDialog（关于 OpenBuddy，从 TitleBar 菜单打开） ---- */
+.about-dialog__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--wb-palette-black-100, #000) 52%, transparent);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+}
+.about-dialog {
+  position: relative;
+  width: min(440px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 48px));
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 18px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 8px 24px -8px rgba(0, 0, 0, 0.18),
+    0 24px 64px -12px rgba(0, 0, 0, 0.22);
+  animation: wb-request-modal-in 240ms cubic-bezier(.22, 1, .36, 1) both;
+}
+.about-dialog__close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--wb-text-medium, #6e6e80);
+  cursor: pointer;
+  transition: background-color 140ms, color 140ms;
+}
+.about-dialog__close:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.about-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.about-dialog__logo {
+  flex: none;
+  border-radius: 12px;
+}
+.about-dialog__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.about-dialog__subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--wb-text-medium, #6e6e80);
+}
+.about-dialog__list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.about-dialog__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+.about-dialog__row + .about-dialog__row {
+  border-top: 1px solid var(--wb-border-weak, rgba(0, 0, 0, .06));
+}
+.about-dialog__row dt {
+  font-size: 13px;
+  color: var(--wb-text-medium, #6e6e80);
+}
+.about-dialog__row dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--wb-text-strong);
+  text-align: right;
+  word-break: break-all;
+}
+.about-dialog__warn {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--wb-color-text-warning-default, #b7791f) 12%, transparent);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+}
+.about-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+.about-dialog__ok {
+  height: 34px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--wb-brand-primary, #00c29a);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.about-dialog__ok:hover {
+  filter: brightness(1.05);
+}
+
+/* ---- FolderTrustDialog（文件夹信任确认） ---- */
+.trust-dialog__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--wb-palette-black-100, #000) 52%, transparent);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+}
+.trust-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 48px));
+  overflow-y: auto;
+  padding: 22px 24px 18px;
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  border-radius: 18px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 8px 24px -8px rgba(0, 0, 0, 0.18),
+    0 24px 64px -12px rgba(0, 0, 0, 0.22);
+  animation: wb-request-modal-in 240ms cubic-bezier(.22, 1, .36, 1) both;
+}
+.trust-dialog__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--wb-color-text-warning-default, #b7791f) 16%, transparent);
+}
+.trust-dialog__title {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+}
+.trust-dialog__desc {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--wb-text-medium, #6e6e80);
+}
+.trust-dialog__path {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--wb-bg-secondary, #f4f5f8);
+  border: 1px solid var(--wb-border-weak, rgba(0, 0, 0, .06));
+  font-family: var(--wb-font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+  word-break: break-all;
+}
+.trust-dialog__reason {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--wb-text-medium, #6e6e80);
+}
+.trust-dialog__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.trust-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}

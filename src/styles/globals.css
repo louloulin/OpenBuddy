@@ -35,6 +35,7 @@
 @import "./automation.css";
 @import "./misc.css";
 @import "./workbuddy-parity.css";
+@import "./home-widgets.css";
 
 /* 历史遗留的 WorkBuddy 样式保留 — 跨包样式兼容用 */
 @import "./automation-wb.css";
