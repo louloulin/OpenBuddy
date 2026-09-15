@@ -46,8 +46,6 @@ import {
 } from "./chrome";
 import { RoutePending } from "./RoutePending";
 import type { AppShellRuntime } from "./types";
-import { StatusBar } from "./StatusBar";
-import { HomeOverviewPanel } from "@openbuddy/ui-home";
 
 // ---- Lazy overlays ----------------------------------------------------------
 const HomePage = lazy(() =>
@@ -360,13 +358,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           )}
           <MainContent runtime={runtime} />
         </main>
-        {!currentSessionId && !placeholderView && !runtime.initError && runtime.init && (
-          <aside className="app__right-panel" aria-label="概览/产物">
-            <HomeOverviewPanel />
-          </aside>
-        )}
       </div>
-      <StatusBar />
       <Toast entries={toastQueue} onDismiss={dismissToast} />
       <Suspense fallback={null}>
         <SearchOverlay

@@ -39,6 +39,12 @@
 /* 历史遗留的 WorkBuddy 样式保留 — 跨包样式兼容用 */
 @import "./automation-wb.css";
 
+/* Phase 6 — 交互 / 无障碍 / 错误态（原位于文件尾部，必须与其它 @import
+ * 一起置于任何普通规则之前，否则 CSS 规范要求忽略该 @import）。 */
+@import "./interactions.css";
+@import "./a11y.css";
+@import "./errors.css";
+
 /* ============================================================================
  * @openbuddy/ui-motion keyframes (Phase 3)
  * 与 presets.ts 一一对应；CSS class 触发，由 FadeInUp / ScaleIn / SlideInRight 组件使用。

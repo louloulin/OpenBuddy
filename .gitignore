@@ -192,3 +192,6 @@ packages/*/*/node_modules
 
 # pi agent task output
 .pi/
+
+# Local UI screenshots (diagnostics only)
+.tmp-screenshots/

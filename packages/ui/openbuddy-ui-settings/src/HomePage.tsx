@@ -328,7 +328,11 @@ export function HomePage({
           {brandHeroSlots.map((entry) => (
             <RendererSlotView key={String(entry.options.id ?? entry.options.name)} entry={entry} className="home__brand-plugin" />
           ))}
-          <h1 className="home__title">OpenBuddy</h1>
+          <h1 className="home__title">
+            <span className="home__title-brand">OpenBuddy</span>
+            <span className="home__title-sep" aria-hidden="true">,</span>
+            <span className="home__title-greet">我帮你</span>
+          </h1>
           <p className="home__subtitle">{mode.subtitle}</p>
         </header>
         {workspaceHeroSlots.map((entry) => (
