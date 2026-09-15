@@ -55,6 +55,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   operatingSystem: 'Windows, macOS, Linux',
                   description:
                     'OpenBuddy is a 100% open source (MIT) desktop AI workspace rebuilt on Electron + Pi.',
+                  softwareVersion: '0.15.0',
+                  datePublished: '2026-08-01',
                   offers: {
                     '@type': 'Offer',
                     price: '0',
@@ -62,7 +64,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   },
                   license: 'https://github.com/louloulin/OpenBuddy/blob/main/LICENSE',
                   url: 'https://openbuddy.dev',
-                  downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases'
+                  downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases',
+                  author: { '@type': 'Organization', name: 'OpenBuddy contributors', url: 'https://github.com/louloulin/OpenBuddy' },
+                  featureList: [
+                    'Multi-provider LLM support (Anthropic, OpenAI, NewAPI, Ollama)',
+                    'Local-first SQLite workspace',
+                    'BYOK (Bring Your Own Key) mode',
+                    'Plan mode · Rewind · Fork',
+                    'MCP (Model Context Protocol) connectors',
+                    'Casdoor OIDC / SAML / SCIM',
+                    '64 capability packages',
+                    '1,886 progressive test specs'
+                  ]
                 },
                 {
                   '@type': 'Organization',
@@ -80,7 +93,52 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   '@type': 'WebSite',
                   name: 'OpenBuddy',
                   url: 'https://openbuddy.dev',
-                  inLanguage: ['en-US', 'zh-CN']
+                  inLanguage: ['en-US', 'zh-CN'],
+                  potentialAction: {
+                    '@type': 'SearchAction',
+                    target: {
+                      '@type': 'EntryPoint',
+                      urlTemplate: 'https://openbuddy.dev/en/docs?q={search_term_string}'
+                    },
+                    'query-input': 'required name=search_term_string'
+                  }
+                },
+                {
+                  '@type': 'FAQPage',
+                  mainEntity: [
+                    {
+                      '@type': 'Question',
+                      name: 'Is OpenBuddy really free and open source?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'Yes. OpenBuddy is MIT-licensed, with no premium tier, no telemetry, and no phone-home. The full source code is auditable on GitHub and every release is PGP-signed.'
+                      }
+                    },
+                    {
+                      '@type': 'Question',
+                      name: 'How does OpenBuddy compare to WorkBuddy?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'OpenBuddy is a pixel-close, 100% open source rewrite of WorkBuddy on Electron + Pi. Same design tokens, same UI; the difference is the open core, the BYOK model, and the data path. See the full comparison at /docs/comparison.'
+                      }
+                    },
+                    {
+                      '@type': 'Question',
+                      name: 'Which LLM providers does OpenBuddy support?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'Anthropic, OpenAI, Google, Bedrock, OpenRouter, Ollama, NewAPI, and any OpenAI-compatible endpoint. Bring your own key or use a service token against a Casdoor / NewAPI gateway.'
+                      }
+                    },
+                    {
+                      '@type': 'Question',
+                      name: 'Where does my data live?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'All conversations, prompts, skills, and the audit ledger live on your machine in ~/.openbuddy/. No telemetry by default; opt-in spans only.'
+                      }
+                    }
+                  ]
                 }
               ]
             })

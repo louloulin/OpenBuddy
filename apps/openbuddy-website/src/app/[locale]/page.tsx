@@ -1,9 +1,12 @@
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import Hero from '@/components/home/Hero';
+import InstallBlock from '@/components/home/InstallBlock';
+import LiveStats from '@/components/home/LiveStats';
 import ProductTabs from '@/components/home/ProductTabs';
 import CapabilityGrid from '@/components/home/CapabilityGrid';
 import Architecture from '@/components/home/Architecture';
+import LogoWall from '@/components/home/LogoWall';
 import CTAFinal from '@/components/home/CTAFinal';
 import { locales, getDictionary, type Locale } from '@/lib/i18n';
 
@@ -21,8 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     openGraph: {
       title: dict.meta.title,
       description: dict.meta.ogDescription,
-      locale: locale === 'zh-CN' ? 'zh_CN' : 'en_US',
-      images: [{ url: '/og.png', width: 1200, height: 630, alt: dict.meta.title }]
+      locale: locale === 'zh-CN' ? 'zh_CN' : 'en_US'
     }
   };
 }
@@ -37,6 +39,9 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
       <SiteHeader dict={ dict } locale={ typed } />
       <main id="main-content">
         <Hero locale={ typed } dict={ dict } />
+        <LogoWall locale={ typed } />
+        <InstallBlock locale={ typed } dict={ dict.installBlock } />
+        <LiveStats locale={ typed } />
         <ProductTabs locale={ typed } />
         <CapabilityGrid locale={ typed } />
         <Architecture locale={ typed } />

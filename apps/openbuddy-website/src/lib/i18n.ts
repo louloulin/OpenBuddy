@@ -212,6 +212,16 @@ export interface Dict {
     copyCode: string;
     copied: string;
   };
+  installBlock: {
+    installLabel: string;
+    installHint: string;
+    platform: 'macOS' | 'Windows' | 'Linux';
+    installCommand: string;
+    brewTab: string;
+    curlTab: string;
+    noteLabel: string;
+    note: string;
+  };
   footer: {
     tagline: string;
     product: { title: string; links: Array<{ label: string; href: string }> };
@@ -865,6 +875,16 @@ const en: Dict = {
     copyCode: 'Copy',
     copied: 'Copied'
   },
+  installBlock: {
+    installLabel: 'install · v0.15',
+    installHint: 'Other platforms, see Getting Started →',
+    platform: 'macOS',
+    installCommand: 'brew tap louloulin/openbuddy && brew install --cask openbuddy',
+    brewTab: 'brew',
+    curlTab: 'curl',
+    noteLabel: 'note',
+    note: 'macOS 13+, Apple Silicon & Intel. SHA-256 verified by the installer.'
+  },
   footer: {
     tagline:
       'The open desktop AI workspace. 100% MIT, auditable, forkable. Built on Electron + Pi with WorkBuddy-grade UI.',
@@ -1468,6 +1488,16 @@ const zhCN: Dict = {
     translationMissingHint: '本页暂无中文版本。',
     copyCode: '复制',
     copied: '已复制'
+  },
+  installBlock: {
+    installLabel: '安装 · v0.15',
+    installHint: '其他平台 → 见 Getting Started',
+    platform: 'macOS',
+    installCommand: 'brew tap louloulin/openbuddy && brew install --cask openbuddy',
+    brewTab: 'brew',
+    curlTab: 'curl',
+    noteLabel: '提示',
+    note: 'macOS 13+,Apple Silicon 与 Intel。安装器已校验 SHA-256。'
   },
   footer: {
     tagline: '开源的桌面 AI 工作台。100% MIT、可审计、可 fork。基于 Electron + Pi,WorkBuddy 级 UI。',

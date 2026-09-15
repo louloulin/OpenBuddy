@@ -5,6 +5,7 @@ import type { Locale } from '@/lib/i18n';
 import { getDictionary, localizedPath } from '@/lib/i18n';
 import LanguageSwitcher from './LanguageSwitcher';
 import MDCodeEnhancer from './MDCodeEnhancer';
+import MermaidEnhancer from './MermaidEnhancer';
 import TocScrollSpy from './TocScrollSpy';
 
 interface DocArticleProps {
@@ -25,6 +26,7 @@ export default function DocArticle({ content, locale }: DocArticleProps) {
   return (
     <article className="grid gap-12 lg:grid-cols-[1fr_220px]">
       <MDCodeEnhancer />
+      <MermaidEnhancer />
       <div>
         <header className="mb-8 border-b border-[var(--wb-border)] pb-6">
           <div className="mb-4 flex flex-wrap items-center gap-3 text-[12px]">

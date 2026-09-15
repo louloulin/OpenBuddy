@@ -147,6 +147,15 @@ export function getDocBySlug(slug: string, locale: Locale): DocContent | null {
 
   renderer.code = function ({ text, lang }: Tokens.Code) {
     const safeLang = ((lang ?? '').trim() || 'text').toLowerCase();
+    // Mermaid blocks are emitted as <pre class="mermaid"> by the markdown renderer
+    // and then hydrated on the client via MermaidEnhancer.
+    if (safeLang === 'mermaid') {
+      const escaped = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      return `<div class="mermaid-block" data-mermaid="1"><pre class="mermaid">${escaped}</pre></div>\n`;
+    }
     const escaped = text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -159,7 +168,7 @@ export function getDocBySlug(slug: string, locale: Locale): DocContent | null {
     );
   };
 
-  marked.use({ renderer, gfm: true, breaks: false });
+  marked.use({ renderer, gfm: true, breaks: false, pedantic: false });
   const html = marked.parse(cleaned) as string;
 
   let lastUpdated = '';

@@ -524,6 +524,29 @@
     color: var(--wb-code-fg);
   }
   .md-prose .code-block:hover .code-copy-btn { opacity: 1 !important; }
+  .md-prose .mermaid-block {
+    margin: 1.5rem 0;
+    padding: 1.25rem;
+    border: 1px solid var(--wb-border);
+    border-radius: 10px;
+    background: var(--wb-bg-pure);
+    overflow-x: auto;
+    text-align: center;
+  }
+  .md-prose .mermaid-block pre.mermaid {
+    margin: 0;
+    background: transparent;
+    color: var(--wb-fg);
+    font-family: var(--font-jetbrains);
+    font-size: 12.5px;
+    line-height: 1.55;
+    white-space: pre;
+    text-align: left;
+  }
+  .md-prose .mermaid-block.mermaid-rendered {
+    padding: 0.5rem;
+  }
+  .md-prose .mermaid-block svg { max-width: 100%; height: auto; }
   .md-prose blockquote {
     margin: 1.25rem 0;
     padding: 0.4rem 1rem;
