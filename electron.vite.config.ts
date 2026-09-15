@@ -169,171 +169,6 @@ const rendererOnlyAliases: Array<{ find: string; replacement: string }> = [
 // fails because `.ts` files aren't supported by the ESM loader.
 
 /**
- * Returns the JS body that turns the empty `__vite_browser_external__`
- * CJS shim into a usable renderer-side facade. Extracted so both the
- * `__vite-browser-external` CJS shim and the inline Proxy facade that
- * Vite 8's optimize-deps step inlines into prebundled deps can reuse it.
- *
- * The facade exposes a constructor (`__openbuddyFac`) so:
- *   - `class X extends require___vite_browser_external() {}` works.
- *   - `require___vite_browser_external().fileURLToPath` returns a function
- *     (a no-op that yields the empty string).
- *   - `__toESM(require___vite_browser_external())` copies every static
- *     property through to the `import_..._browser_external` namespace, so
- *     `import_..._browser_external.promisify(...)` style access works too.
- */
-function buildOpenBuddyExternalPatch(): string {
-  return [
-    "function __openbuddyFac(){this._listeners=[];}",
-    "__openbuddyFac.defaultMaxListeners=10;",
-    "__openbuddyFac.prototype.on=function(){return this;};",
-    "__openbuddyFac.prototype.once=function(){return this;};",
-    "__openbuddyFac.prototype.off=function(){return this;};",
-    "__openbuddyFac.prototype.emit=function(){return false;};",
-    "__openbuddyFac.prototype.removeAllListeners=function(){return this;};",
-    "__openbuddyFac.prototype.setMaxListeners=function(){return this;};",
-    "__openbuddyFac.prototype.getMaxListeners=function(){return 10;};",
-    "__openbuddyFac.prototype.listenerCount=function(){return 0;};",
-    "__openbuddyFac.EventEmitter=__openbuddyFac;",
-    "__openbuddyFac.fileURLToPath=function(){return '';};",
-    "__openbuddyFac.pathToFileURL=function(p){return new URL('file://'+(p||''));};",
-    "__openbuddyFac.createRequire=function(){return function(id){if(id==='node:events')return __openbuddyFac;return undefined;};};",
-    "__openbuddyFac.dirname=function(p){return '/';};",
-    "__openbuddyFac.basename=function(p){return '';};",
-    "__openbuddyFac.extname=function(p){return '';};",
-    "__openbuddyFac.join=function(){return '/';};",
-    "__openbuddyFac.resolve=function(){return '/';};",
-    "__openbuddyFac.isAbsolute=function(){return true;};",
-    "__openbuddyFac.homedir=function(){return '/';};",
-    "__openbuddyFac.Buffer=function(){return [];};",
-    "__openbuddyFac.Buffer.from=function(){return [];};",
-    "__openbuddyFac.Buffer.alloc=function(){return [];};",
-    "__openbuddyFac.Buffer.allocUnsafe=function(){return [];};",
-    "__openbuddyFac.Buffer.allocUnsafeSlow=function(){return [];};",
-    "__openbuddyFac.isBuffer=function(){return false;};",
-    "__openbuddyFac.isAscii=function(){return true;};",
-    "__openbuddyFac.deprecate=function(fn){return function(){return fn.apply(this,arguments);};};",
-    "__openbuddyFac.format=function(){return '';};",
-    "__openbuddyFac.inspect=function(){return '';};",
-    "__openbuddyFac.debuglog=function(){return function(){};};",
-    "__openbuddyFac.isDeepStrictEqual=function(){return false;};",
-    "__openbuddyFac.isatty=function(){return false;};",
-    "__openbuddyFac.setRawMode=function(){};",
-    "__openbuddyFac.channel=function(name){return{name:name,subscribe:function(){return function(){};},publish:function(){},unsubscribe:function(){}};};",
-    "__openbuddyFac.hasSubscribers=function(){return false;};",
-    "__openbuddyFac.subscribe=function(){return function(){};};",
-    "__openbuddyFac.unsubscribe=function(){};",
-    "__openbuddyFac.constants={};",
-    "__openbuddyFac.Http2ServerRequest=function(){};",
-    "__openbuddyFac.Http2ServerResponse=function(){};",
-    "__openbuddyFac.createServer=function(){return{on:function(){},listen:function(){}};};",
-    "__openbuddyFac.createSecureServer=function(){return{on:function(){},listen:function(){}};};",
-    "__openbuddyFac.connect=function(){return{on:function(){},end:function(){},destroy:function(){}};};",
-    "var __openbuddyCryptoHashes=['sha256','sha384','sha512','sha1','md5','sha224','sha3-256','sha3-384','sha3-512'];",
-    "function __openbuddyHash(){this._buf=[];}",
-    "__openbuddyHash.prototype.update=function(d){return this;};",
-    "__openbuddyHash.prototype.digest=function(){return {};};",
-    "__openbuddyHash.prototype.copy=function(){return new __openbuddyHash();};",
-    "__openbuddyFac.getHashes=function(){return __openbuddyCryptoHashes.slice();};",
-    "__openbuddyFac.markAsUncloneable=function(){};",
-    "__openbuddyFac.isMarkedAsUncloneable=function(){return false;};",
-    "__openbuddyFac.isClonable=function(){return true;};",
-    "__openbuddyFac.getCiphers=function(){return [];};",
-    "__openbuddyFac.getCurves=function(){return [];};",
-    "__openbuddyFac.createHash=function(){return new __openbuddyHash();};",
-    "__openbuddyFac.createHmac=function(){return new __openbuddyHash();};",
-    "__openbuddyFac.randomBytes=function(){return new Uint8Array(0);};",
-    "__openbuddyFac.randomUUID=function(){return '00000000-0000-0000-0000-000000000000';};",
-    "function __openbuddyAsyncResource(){this._id=0;}",
-    "__openbuddyAsyncResource.prototype.runInAsyncScope=function(fn){if(typeof fn==='function')fn();};",
-    "__openbuddyAsyncResource.prototype.emitDestroy=function(){};",
-    "__openbuddyAsyncResource.prototype.asyncId=function(){return 0;};",
-    "__openbuddyAsyncResource.prototype.triggerAsyncId=function(){return 0;};",
-    "__openbuddyAsyncResource.prototype.bind=function(fn){return fn;};",
-    "__openbuddyAsyncResource.prototype[Symbol.toStringTag]='AsyncResource';",
-    "__openbuddyFac.AsyncResource=__openbuddyAsyncResource;",
-    "__openbuddyFac.createHook=function(){return{};};",
-    "__openbuddyFac.executionAsyncId=function(){return 0;};",
-    "__openbuddyFac.executionAsyncResource=function(){return{kAsyncId:0};};",
-    "__openbuddyFac.triggerAsyncId=function(){return 0;};",
-    "function __openbuddyNoopStream(){}",
-    "function __openbuddyReadable(){this._listeners=[];this._state={};}",
-    "__openbuddyReadable.prototype.on=function(){return this;};",
-    "__openbuddyReadable.prototype.once=function(){return this;};",
-    "__openbuddyReadable.prototype.off=function(){return this;};",
-    "__openbuddyReadable.prototype.emit=function(){return false;};",
-    "__openbuddyReadable.prototype.pipe=function(){return this;};",
-    "__openbuddyReadable.prototype.unpipe=function(){return this;};",
-    "__openbuddyReadable.prototype.read=function(){return null;};",
-    "__openbuddyReadable.prototype.pause=function(){return this;};",
-    "__openbuddyReadable.prototype.resume=function(){return this;};",
-    "__openbuddyReadable.prototype.destroy=function(){return this;};",
-    "__openbuddyReadable.prototype.isPaused=function(){return false;};",
-    "__openbuddyReadable.prototype.setEncoding=function(){return this;};",
-    "__openbuddyReadable.prototype.unshift=function(){return undefined;};",
-    "__openbuddyReadable.prototype.wrap=function(){return this;};",
-    "__openbuddyReadable.prototype[Symbol.toStringTag]='Readable';",
-    "function __openbuddyWritable(){this._listeners=[];this._state={};}",
-    "__openbuddyWritable.prototype.on=function(){return this;};",
-    "__openbuddyWritable.prototype.once=function(){return this;};",
-    "__openbuddyWritable.prototype.off=function(){return this;};",
-    "__openbuddyWritable.prototype.emit=function(){return false;};",
-    "__openbuddyWritable.prototype.write=function(cb){if(typeof cb==='function')cb();return true;};",
-    "__openbuddyWritable.prototype.end=function(cb){if(typeof cb==='function')cb();return this;};",
-    "__openbuddyWritable.prototype.destroy=function(){return this;};",
-    "__openbuddyWritable.prototype.cork=function(cb){if(typeof cb==='function')cb();return undefined;};",
-    "__openbuddyWritable.prototype.uncork=function(){return undefined;};",
-    "__openbuddyWritable.prototype.setDefaultEncoding=function(){return this;};",
-    "__openbuddyWritable.prototype[Symbol.toStringTag]='Writable';",
-    "function __openbuddyDuplex(){}",
-    "__openbuddyDuplex.prototype=Object.create(__openbuddyReadable.prototype);",
-    "var __openbuddyTransform=__openbuddyDuplex;",
-    "var __openbuddyPassThrough=__openbuddyDuplex;",
-    "__openbuddyFac.Readable=__openbuddyReadable;",
-    "__openbuddyFac.Writable=__openbuddyWritable;",
-    "__openbuddyFac.Duplex=__openbuddyDuplex;",
-    "__openbuddyFac.Transform=__openbuddyTransform;",
-    "__openbuddyFac.PassThrough=__openbuddyPassThrough;",
-    "__openbuddyFac.Stream=__openbuddyReadable;",
-    "__openbuddyFac.pipeline=function(){return Promise.resolve();};",
-    "__openbuddyFac.finished=function(){return Promise.resolve();};",
-    "__openbuddyFac.addAbortListener=function(){return function(){};};",
-    "__openbuddyFac.removeAbortListener=function(){};",
-    "__openbuddyFac.getDefaultHighWaterMark=function(){return 65536;};",
-    "__openbuddyFac.setDefaultHighWaterMark=function(){};",
-    "__openbuddyFac.isDisturbed=function(){return false;};",
-    "__openbuddyFac.isReadable=function(){return true;};",
-    "__openbuddyFac.isWritable=function(){return true;};",
-    "__openbuddyFac.isDuplex=function(){return false;};",
-    "__openbuddyFac.isTransform=function(){return false;};",
-    "__openbuddyFac.isReadableNodeStream=function(){return false;};",
-    "__openbuddyFac.isWritableNodeStream=function(){return false;};",
-    "__openbuddyFac.platform=function(){return 'darwin';};",
-    "__openbuddyFac.cpus=function(){return [];};",
-    "var __noopFs=function(){return function(){return '{}';};};",
-    "var __noopFsSync=function(){return function(){return false;};};",
-    "__openbuddyFac.readFileSync=__noopFs();",
-    "__openbuddyFac.readFile=__noopFs();",
-    "__openbuddyFac.writeFileSync=__noopFsSync();",
-    "__openbuddyFac.writeFile=__noopFsSync();",
-    "__openbuddyFac.existsSync=__noopFsSync();",
-    "__openbuddyFac.statSync=__noopFsSync();",
-    "__openbuddyFac.readdirSync=__noopFsSync();",
-    "__openbuddyFac.mkdirSync=__noopFsSync();",
-    "__openbuddyFac.openSync=__noopFsSync();",
-    "__openbuddyFac.closeSync=__noopFsSync();",
-    "__openbuddyFac.promises={readFile:__noopFs(),writeFile:__noopFsSync(),stat:__noopFsSync(),mkdir:__noopFsSync(),readdir:__noopFsSync(),cp:__noopFsSync(),rm:__noopFsSync(),rename:__noopFsSync(),realpath:__noopFs(),access:__noopFsSync()};",
-    "__openbuddyFac.execFile=__noopFs();",
-    "__openbuddyFac.exec=__noopFs();",
-    "__openbuddyFac.spawn=__noopFs();",
-    "__openbuddyFac.promisify=function(fn){if(typeof fn!=='function')return fn;return function(){return Promise.resolve(undefined);};};",
-    "__openbuddyFac.types={isUint8Array:function(){return false;},isDate:function(){return false;}};",
-    "if(typeof process!=='undefined'){if(typeof process.getMaxListeners!=='function'){process.getMaxListeners=function(){return 0;};process.setMaxListeners=function(){};}process.versions={};process.features={};process.argv=[];process.execPath='/';process.exit=function(){};process.getBuiltinModule=function(){return undefined;};process.version='v0.0.0';process.platform='darwin';if(!process.stderr){process.stderr={fd:1,write:function(){},_handle:{}};}if(!process.stdout){process.stdout={fd:1,write:function(){},_handle:{}};}process.stderr.fd=process.stderr.fd||1;}",
-    "module.exports=__openbuddyFac;",
-  ].join("");
-}
-
-/**
  * Vite plugin — patch `__vite_browser_external__` so the renderer
  * doesn't crash on `fileURLToPath`, `EventEmitter`, etc.
  *
@@ -596,8 +431,23 @@ function buildOpenBuddyExternalPatch(): string {
   ].join("");
 }
 
+/**
+ * Same facade body as `buildOpenBuddyExternalPatch()` but WITHOUT the
+ * trailing `export default` statement. Use this when patching Vite 8
+ * optimize-deps output (`.vite/deps/*.js`) — those files already carry
+ * their own `export default require_X()` / `export { ... }` tail added
+ * by the optimizer, so prepending a body that itself exports `default`
+ * produces `SyntaxError: Identifier '.default' has already been declared`.
+ */
+function buildOpenBuddyDepsPatch(): string {
+  return buildOpenBuddyExternalPatch().replace(/export default __openbuddyExports;/, "");
+}
+
 function nodeExternalPatch() {
   const patchBody = buildOpenBuddyExternalPatch();
+  // Optimize-deps files already end with their own `export default` /
+  // named `export { ... }` tail, so they need the no-export variant.
+  const depsPatchBody = buildOpenBuddyDepsPatch();
   return {
     name: "openbuddy:renderer-node-external-patch",
     enforce: "pre",
@@ -653,7 +503,7 @@ function nodeExternalPatch() {
           "module.exports=__openbuddyFac",
         );
         if (replaced !== code) {
-          return { code: patchBody + ";\n" + replaced, map: null };
+          return { code: depsPatchBody + ";\n" + replaced, map: null };
         }
       }
       return undefined;
