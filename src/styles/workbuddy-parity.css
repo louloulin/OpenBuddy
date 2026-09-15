@@ -1,0 +1,231 @@
+/**
+ * workbuddy-parity.css — Phase 7 三列布局 + 右栏 + StatusBar + 模板/专家
+ */
+
+/* ── 三列布局 ──────────────────────────────────────────────── */
+:root {
+  --rightpanel-width: 320px;
+  --rightpanel-collapsed-width: 0px;
+}
+
+.app__body {
+  display: grid;
+  grid-template-columns: var(--sidebar-width, 264px) 1fr var(--rightpanel-width);
+  gap: 0;
+  height: calc(100vh - var(--titlebar-height, 0px));
+}
+
+.app__body--collapsed {
+  grid-template-columns: 64px 1fr var(--rightpanel-width);
+}
+
+.app__body--rightpanel-hidden {
+  grid-template-columns: var(--sidebar-width, 264px) 1fr var(--rightpanel-collapsed-width);
+}
+
+.app__body--collapsed.app__body--rightpanel-hidden {
+  grid-template-columns: 64px 1fr var(--rightpanel-collapsed-width);
+}
+
+.app__right-panel {
+  border-left: 1px solid var(--wb-border, rgba(0, 0, 0, 0.08));
+  background: var(--wb-surface, #fafafa);
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* ── HomeOverviewPanel ─────────────────────────────────────── */
+.home-overview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.home-overview-section {
+  background: white;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--wb-border, rgba(0, 0, 0, 0.06));
+}
+.home-overview-section__title {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wb-text, #222);
+}
+.home-overview-section__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.home-overview-section__item {
+  font-size: 12px;
+  color: var(--wb-text-muted, #555);
+  padding: 4px 0;
+}
+.home-overview-section__item.is-done {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.home-overview-section__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.home-overview-section__chip {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--wb-accent-bg, rgba(77, 142, 255, 0.1));
+  color: var(--wb-accent, #4d8eff);
+}
+
+/* ── ProjectTemplatesPanel ─────────────────────────────────── */
+.project-templates-panel__header {
+  margin-bottom: 14px;
+}
+.project-templates-panel__title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+.project-templates-panel__subtitle {
+  font-size: 13px;
+  color: var(--wb-text-muted, #555);
+  margin: 0;
+}
+.project-templates-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.project-template-card {
+  background: white;
+  border: 1px solid var(--wb-border, rgba(0, 0, 0, 0.08));
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 160ms var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+              box-shadow 160ms var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.project-template-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+.project-template-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+.project-template-card__description {
+  font-size: 12px;
+  color: var(--wb-text-muted, #555);
+  margin: 0;
+  line-height: 1.5;
+}
+.project-template-card__chips {
+  display: flex;
+  gap: 4px;
+}
+.project-template-card__chip {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.04));
+  color: var(--wb-text-muted, #555);
+}
+.project-template-card__action {
+  margin-top: auto;
+  padding: 6px 12px;
+  background: var(--wb-accent, #4d8eff);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 160ms;
+}
+.project-template-card__action:hover {
+  opacity: 0.85;
+}
+
+/* ── ExpertsGrid（如果启用）或复用现有 ec-card ──────────────── */
+.experts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.expert-card {
+  background: white;
+  border: 1px solid var(--wb-border, rgba(0, 0, 0, 0.08));
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.expert-card__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.04));
+}
+.expert-card__name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.expert-card__role {
+  font-size: 12px;
+  color: var(--wb-text-muted, #555);
+}
+.expert-card__chips {
+  display: flex;
+  gap: 4px;
+}
+
+/* ── StatusBar ────────────────────────────────────────────── */
+.status-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 12px;
+  background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.04));
+  border-top: 1px solid var(--wb-border, rgba(0, 0, 0, 0.08));
+  font-size: 11px;
+  color: var(--wb-text-muted, #555);
+  min-height: 24px;
+}
+.status-bar__group {
+  display: flex;
+  gap: 12px;
+}
+.status-bar__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.status-bar__icon {
+  font-size: 11px;
+  line-height: 1;
+}
+.status-bar__network--offline {
+  color: #c43030;
+}
+
+/* ── Reduced motion 降级 ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .project-template-card {
+    transition: none;
+  }
+  .project-template-card:hover {
+    transform: none;
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+}
