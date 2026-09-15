@@ -169,6 +169,171 @@ const rendererOnlyAliases: Array<{ find: string; replacement: string }> = [
 // fails because `.ts` files aren't supported by the ESM loader.
 
 /**
+ * Returns the JS body that turns the empty `__vite_browser_external__`
+ * CJS shim into a usable renderer-side facade. Extracted so both the
+ * `__vite-browser-external` CJS shim and the inline Proxy facade that
+ * Vite 8's optimize-deps step inlines into prebundled deps can reuse it.
+ *
+ * The facade exposes a constructor (`__openbuddyFac`) so:
+ *   - `class X extends require___vite_browser_external() {}` works.
+ *   - `require___vite_browser_external().fileURLToPath` returns a function
+ *     (a no-op that yields the empty string).
+ *   - `__toESM(require___vite_browser_external())` copies every static
+ *     property through to the `import_..._browser_external` namespace, so
+ *     `import_..._browser_external.promisify(...)` style access works too.
+ */
+function buildOpenBuddyExternalPatch(): string {
+  return [
+    "function __openbuddyFac(){this._listeners=[];}",
+    "__openbuddyFac.defaultMaxListeners=10;",
+    "__openbuddyFac.prototype.on=function(){return this;};",
+    "__openbuddyFac.prototype.once=function(){return this;};",
+    "__openbuddyFac.prototype.off=function(){return this;};",
+    "__openbuddyFac.prototype.emit=function(){return false;};",
+    "__openbuddyFac.prototype.removeAllListeners=function(){return this;};",
+    "__openbuddyFac.prototype.setMaxListeners=function(){return this;};",
+    "__openbuddyFac.prototype.getMaxListeners=function(){return 10;};",
+    "__openbuddyFac.prototype.listenerCount=function(){return 0;};",
+    "__openbuddyFac.EventEmitter=__openbuddyFac;",
+    "__openbuddyFac.fileURLToPath=function(){return '';};",
+    "__openbuddyFac.pathToFileURL=function(p){return new URL('file://'+(p||''));};",
+    "__openbuddyFac.createRequire=function(){return function(id){if(id==='node:events')return __openbuddyFac;return undefined;};};",
+    "__openbuddyFac.dirname=function(p){return '/';};",
+    "__openbuddyFac.basename=function(p){return '';};",
+    "__openbuddyFac.extname=function(p){return '';};",
+    "__openbuddyFac.join=function(){return '/';};",
+    "__openbuddyFac.resolve=function(){return '/';};",
+    "__openbuddyFac.isAbsolute=function(){return true;};",
+    "__openbuddyFac.homedir=function(){return '/';};",
+    "__openbuddyFac.Buffer=function(){return [];};",
+    "__openbuddyFac.Buffer.from=function(){return [];};",
+    "__openbuddyFac.Buffer.alloc=function(){return [];};",
+    "__openbuddyFac.Buffer.allocUnsafe=function(){return [];};",
+    "__openbuddyFac.Buffer.allocUnsafeSlow=function(){return [];};",
+    "__openbuddyFac.isBuffer=function(){return false;};",
+    "__openbuddyFac.isAscii=function(){return true;};",
+    "__openbuddyFac.deprecate=function(fn){return function(){return fn.apply(this,arguments);};};",
+    "__openbuddyFac.format=function(){return '';};",
+    "__openbuddyFac.inspect=function(){return '';};",
+    "__openbuddyFac.debuglog=function(){return function(){};};",
+    "__openbuddyFac.isDeepStrictEqual=function(){return false;};",
+    "__openbuddyFac.isatty=function(){return false;};",
+    "__openbuddyFac.setRawMode=function(){};",
+    "__openbuddyFac.channel=function(name){return{name:name,subscribe:function(){return function(){};},publish:function(){},unsubscribe:function(){}};};",
+    "__openbuddyFac.hasSubscribers=function(){return false;};",
+    "__openbuddyFac.subscribe=function(){return function(){};};",
+    "__openbuddyFac.unsubscribe=function(){};",
+    "__openbuddyFac.constants={};",
+    "__openbuddyFac.Http2ServerRequest=function(){};",
+    "__openbuddyFac.Http2ServerResponse=function(){};",
+    "__openbuddyFac.createServer=function(){return{on:function(){},listen:function(){}};};",
+    "__openbuddyFac.createSecureServer=function(){return{on:function(){},listen:function(){}};};",
+    "__openbuddyFac.connect=function(){return{on:function(){},end:function(){},destroy:function(){}};};",
+    "var __openbuddyCryptoHashes=['sha256','sha384','sha512','sha1','md5','sha224','sha3-256','sha3-384','sha3-512'];",
+    "function __openbuddyHash(){this._buf=[];}",
+    "__openbuddyHash.prototype.update=function(d){return this;};",
+    "__openbuddyHash.prototype.digest=function(){return {};};",
+    "__openbuddyHash.prototype.copy=function(){return new __openbuddyHash();};",
+    "__openbuddyFac.getHashes=function(){return __openbuddyCryptoHashes.slice();};",
+    "__openbuddyFac.markAsUncloneable=function(){};",
+    "__openbuddyFac.isMarkedAsUncloneable=function(){return false;};",
+    "__openbuddyFac.isClonable=function(){return true;};",
+    "__openbuddyFac.getCiphers=function(){return [];};",
+    "__openbuddyFac.getCurves=function(){return [];};",
+    "__openbuddyFac.createHash=function(){return new __openbuddyHash();};",
+    "__openbuddyFac.createHmac=function(){return new __openbuddyHash();};",
+    "__openbuddyFac.randomBytes=function(){return new Uint8Array(0);};",
+    "__openbuddyFac.randomUUID=function(){return '00000000-0000-0000-0000-000000000000';};",
+    "function __openbuddyAsyncResource(){this._id=0;}",
+    "__openbuddyAsyncResource.prototype.runInAsyncScope=function(fn){if(typeof fn==='function')fn();};",
+    "__openbuddyAsyncResource.prototype.emitDestroy=function(){};",
+    "__openbuddyAsyncResource.prototype.asyncId=function(){return 0;};",
+    "__openbuddyAsyncResource.prototype.triggerAsyncId=function(){return 0;};",
+    "__openbuddyAsyncResource.prototype.bind=function(fn){return fn;};",
+    "__openbuddyAsyncResource.prototype[Symbol.toStringTag]='AsyncResource';",
+    "__openbuddyFac.AsyncResource=__openbuddyAsyncResource;",
+    "__openbuddyFac.createHook=function(){return{};};",
+    "__openbuddyFac.executionAsyncId=function(){return 0;};",
+    "__openbuddyFac.executionAsyncResource=function(){return{kAsyncId:0};};",
+    "__openbuddyFac.triggerAsyncId=function(){return 0;};",
+    "function __openbuddyNoopStream(){}",
+    "function __openbuddyReadable(){this._listeners=[];this._state={};}",
+    "__openbuddyReadable.prototype.on=function(){return this;};",
+    "__openbuddyReadable.prototype.once=function(){return this;};",
+    "__openbuddyReadable.prototype.off=function(){return this;};",
+    "__openbuddyReadable.prototype.emit=function(){return false;};",
+    "__openbuddyReadable.prototype.pipe=function(){return this;};",
+    "__openbuddyReadable.prototype.unpipe=function(){return this;};",
+    "__openbuddyReadable.prototype.read=function(){return null;};",
+    "__openbuddyReadable.prototype.pause=function(){return this;};",
+    "__openbuddyReadable.prototype.resume=function(){return this;};",
+    "__openbuddyReadable.prototype.destroy=function(){return this;};",
+    "__openbuddyReadable.prototype.isPaused=function(){return false;};",
+    "__openbuddyReadable.prototype.setEncoding=function(){return this;};",
+    "__openbuddyReadable.prototype.unshift=function(){return undefined;};",
+    "__openbuddyReadable.prototype.wrap=function(){return this;};",
+    "__openbuddyReadable.prototype[Symbol.toStringTag]='Readable';",
+    "function __openbuddyWritable(){this._listeners=[];this._state={};}",
+    "__openbuddyWritable.prototype.on=function(){return this;};",
+    "__openbuddyWritable.prototype.once=function(){return this;};",
+    "__openbuddyWritable.prototype.off=function(){return this;};",
+    "__openbuddyWritable.prototype.emit=function(){return false;};",
+    "__openbuddyWritable.prototype.write=function(cb){if(typeof cb==='function')cb();return true;};",
+    "__openbuddyWritable.prototype.end=function(cb){if(typeof cb==='function')cb();return this;};",
+    "__openbuddyWritable.prototype.destroy=function(){return this;};",
+    "__openbuddyWritable.prototype.cork=function(cb){if(typeof cb==='function')cb();return undefined;};",
+    "__openbuddyWritable.prototype.uncork=function(){return undefined;};",
+    "__openbuddyWritable.prototype.setDefaultEncoding=function(){return this;};",
+    "__openbuddyWritable.prototype[Symbol.toStringTag]='Writable';",
+    "function __openbuddyDuplex(){}",
+    "__openbuddyDuplex.prototype=Object.create(__openbuddyReadable.prototype);",
+    "var __openbuddyTransform=__openbuddyDuplex;",
+    "var __openbuddyPassThrough=__openbuddyDuplex;",
+    "__openbuddyFac.Readable=__openbuddyReadable;",
+    "__openbuddyFac.Writable=__openbuddyWritable;",
+    "__openbuddyFac.Duplex=__openbuddyDuplex;",
+    "__openbuddyFac.Transform=__openbuddyTransform;",
+    "__openbuddyFac.PassThrough=__openbuddyPassThrough;",
+    "__openbuddyFac.Stream=__openbuddyReadable;",
+    "__openbuddyFac.pipeline=function(){return Promise.resolve();};",
+    "__openbuddyFac.finished=function(){return Promise.resolve();};",
+    "__openbuddyFac.addAbortListener=function(){return function(){};};",
+    "__openbuddyFac.removeAbortListener=function(){};",
+    "__openbuddyFac.getDefaultHighWaterMark=function(){return 65536;};",
+    "__openbuddyFac.setDefaultHighWaterMark=function(){};",
+    "__openbuddyFac.isDisturbed=function(){return false;};",
+    "__openbuddyFac.isReadable=function(){return true;};",
+    "__openbuddyFac.isWritable=function(){return true;};",
+    "__openbuddyFac.isDuplex=function(){return false;};",
+    "__openbuddyFac.isTransform=function(){return false;};",
+    "__openbuddyFac.isReadableNodeStream=function(){return false;};",
+    "__openbuddyFac.isWritableNodeStream=function(){return false;};",
+    "__openbuddyFac.platform=function(){return 'darwin';};",
+    "__openbuddyFac.cpus=function(){return [];};",
+    "var __noopFs=function(){return function(){return '{}';};};",
+    "var __noopFsSync=function(){return function(){return false;};};",
+    "__openbuddyFac.readFileSync=__noopFs();",
+    "__openbuddyFac.readFile=__noopFs();",
+    "__openbuddyFac.writeFileSync=__noopFsSync();",
+    "__openbuddyFac.writeFile=__noopFsSync();",
+    "__openbuddyFac.existsSync=__noopFsSync();",
+    "__openbuddyFac.statSync=__noopFsSync();",
+    "__openbuddyFac.readdirSync=__noopFsSync();",
+    "__openbuddyFac.mkdirSync=__noopFsSync();",
+    "__openbuddyFac.openSync=__noopFsSync();",
+    "__openbuddyFac.closeSync=__noopFsSync();",
+    "__openbuddyFac.promises={readFile:__noopFs(),writeFile:__noopFsSync(),stat:__noopFsSync(),mkdir:__noopFsSync(),readdir:__noopFsSync(),cp:__noopFsSync(),rm:__noopFsSync(),rename:__noopFsSync(),realpath:__noopFs(),access:__noopFsSync()};",
+    "__openbuddyFac.execFile=__noopFs();",
+    "__openbuddyFac.exec=__noopFs();",
+    "__openbuddyFac.spawn=__noopFs();",
+    "__openbuddyFac.promisify=function(fn){if(typeof fn!=='function')return fn;return function(){return Promise.resolve(undefined);};};",
+    "__openbuddyFac.types={isUint8Array:function(){return false;},isDate:function(){return false;}};",
+    "if(typeof process!=='undefined'){if(typeof process.getMaxListeners!=='function'){process.getMaxListeners=function(){return 0;};process.setMaxListeners=function(){};}process.versions={};process.features={};process.argv=[];process.execPath='/';process.exit=function(){};process.getBuiltinModule=function(){return undefined;};process.version='v0.0.0';process.platform='darwin';if(!process.stderr){process.stderr={fd:1,write:function(){},_handle:{}};}if(!process.stdout){process.stdout={fd:1,write:function(){},_handle:{}};}process.stderr.fd=process.stderr.fd||1;}",
+    "module.exports=__openbuddyFac;",
+  ].join("");
+}
+
+/**
  * Vite plugin — patch `__vite_browser_external__` so the renderer
  * doesn't crash on `fileURLToPath`, `EventEmitter`, etc.
  *
@@ -181,8 +346,19 @@ const rendererOnlyAliases: Array<{ find: string; replacement: string }> = [
  * `undefined`. The renderer then crashes with `(...).fileURLToPath is
  * not a function`. This plugin mutates the synthetic CJS module
  * AFTER Vite resolves it so every call site sees the shim.
+ *
+ * Vite 8's optimize-deps step also inlines a Proxy facade into each
+ * prebundled module that uses a Node built-in, e.g.
+ *   var require_browser_external_url = /* @__PURE__ *\/ __commonJSMin(((exports, module) => {
+ *     module.exports = Object.create(new Proxy({}, { get(_, key) { ... } }));
+ *   }));
+ * Every property access on `require_browser_external_url()` returns
+ * undefined and warns to the console. We rewrite those facades in
+ * place so the renderer can resolve `fileURLToPath`, `readFileSync`,
+ * etc. without crashing.
  */
 function nodeExternalPatch() {
+  const patchBody = buildOpenBuddyExternalPatch();
   return {
     name: "openbuddy:renderer-node-external-patch",
     enforce: "post",
@@ -203,248 +379,29 @@ function nodeExternalPatch() {
       return undefined;
     },
     transform(code: string, id: string): null | { code: string; map: null } | undefined {
-      // Patch 1 — the `__vite_browser_external__` CJS shim itself.
+      // Patch 1 — the `__vite_browser_external` CJS shim itself.
       if (id.includes("__vite-browser-external")) {
-      // Append the patch as a final line of the CJS wrapper. The
-      // synthetic module exports `{}`; we re-export a flat shim
-      // object so `require___vite_browser_external().fileURLToPath`
-      // returns a string (the noop path) and `.createRequire` returns
-      // a noop require function.
-      // The patch body assigns every method/property to a fresh
-      // `__openbuddyFac` function so the polyfill module is itself a
-      // constructor (no-op class). That way:
-      //   - `class X extends require___vite_browser_external() {}`
-      //     works (the constructor is a valid class).
-      //   - `require___vite_browser_external().fileURLToPath` works
-      //     (static properties on the function survive CJS wrapping).
-      //   - `__toESM(require___vite_browser_external())` copies every
-      //     static property through to the `import` namespace, so
-      //     `import___vite_browser_external.promisify(execFile)` and
-      //     similar access patterns survive too.
-      const patch = [
-        "function __openbuddyFac(){this._listeners=[];}",
-        "__openbuddyFac.defaultMaxListeners=10;",
-        "__openbuddyFac.prototype.on=function(){return this;};",
-        "__openbuddyFac.prototype.once=function(){return this;};",
-        "__openbuddyFac.prototype.off=function(){return this;};",
-        "__openbuddyFac.prototype.emit=function(){return false;};",
-        "__openbuddyFac.prototype.removeAllListeners=function(){return this;};",
-        "__openbuddyFac.prototype.setMaxListeners=function(){return this;};",
-        "__openbuddyFac.prototype.getMaxListeners=function(){return 10;};",
-        "__openbuddyFac.prototype.listenerCount=function(){return 0;};",
-        // Self-reference so `const { EventEmitter } = require(...)` and
-        // `require(...).EventEmitter` both work.
-        "__openbuddyFac.EventEmitter=__openbuddyFac;",
-        "__openbuddyFac.fileURLToPath=function(){return '';};",
-        "__openbuddyFac.pathToFileURL=function(p){return new URL('file://'+(p||''));};",
-        "__openbuddyFac.createRequire=function(){return function(id){if(id==='node:events')return __openbuddyFac;return undefined;};};",
-        "__openbuddyFac.dirname=function(p){return '/';};",
-        "__openbuddyFac.basename=function(p){return '';};",
-        "__openbuddyFac.extname=function(p){return '';};",
-        "__openbuddyFac.join=function(){return '/';};",
-        "__openbuddyFac.resolve=function(){return '/';};",
-        "__openbuddyFac.isAbsolute=function(){return true;};",
-        "__openbuddyFac.homedir=function(){return '/';};",
-        // node:buffer — many old npm packages do `const Buffer = require('buffer').Buffer`
-        // at module load. Provide a minimal buffer shim.
-        "__openbuddyFac.Buffer=function(){return [];};",
-        "__openbuddyFac.Buffer.from=function(){return [];};",
-        "__openbuddyFac.Buffer.alloc=function(){return [];};",
-        "__openbuddyFac.Buffer.allocUnsafe=function(){return [];};",
-        "__openbuddyFac.Buffer.allocUnsafeSlow=function(){return [];};",
-        "__openbuddyFac.isBuffer=function(){return false;};",
-        "__openbuddyFac.isAscii=function(){return true;};",
-        // node:util — promisify(undefined) used to throw at module load.
-        // Extend the util shim with a few more entries that Node-only
-        // npm packages (e.g. `debug`) read at module load.
-        "__openbuddyFac.deprecate=function(fn){return function(){return fn.apply(this,arguments);};};",
-        "__openbuddyFac.format=function(){return '';};",
-        "__openbuddyFac.inspect=function(){return '';};",
-        "__openbuddyFac.debuglog=function(){return function(){};};",
-        "__openbuddyFac.isDeepStrictEqual=function(){return false;};",
-        // node:tty — `debug@4` calls `tty.isatty(fd)` at module load
-        // via `require('tty')`. Renderer never has a real tty.
-        "__openbuddyFac.isatty=function(){return false;};",
-        "__openbuddyFac.setRawMode=function(){};",
-        // node:diagnostics_channel — undici/fetch load this at module
-        // load. The renderer never subscribes; provide a no-op.
-        "__openbuddyFac.channel=function(name){return{name:name,subscribe:function(){return function(){};},publish:function(){},unsubscribe:function(){}};};",
-        "__openbuddyFac.hasSubscribers=function(){return false;};",
-        "__openbuddyFac.subscribe=function(){return function(){};};",
-        "__openbuddyFac.unsubscribe=function(){};",
-        // node:http2 — undici's `client-h2.js` does
-        //   `var { constants: { HTTP2_HEADER_AUTHORITY, ... } } = http2;`
-        // where `http2 = require___vite_browser_external()`. Without a
-        // `constants` property the destructure crashes with
-        // `Cannot read properties of undefined (reading
-        // 'HTTP2_HEADER_AUTHORITY')` — second reason the renderer
-        // ended up showing white. Expose `constants` as an empty
-        // object so the destructure evaluates; the HTTP/2 path is
-        // never executed in the renderer.
-        "__openbuddyFac.constants={};",
-        "__openbuddyFac.Http2ServerRequest=function(){};",
-        "__openbuddyFac.Http2ServerResponse=function(){};",
-        "__openbuddyFac.createServer=function(){return{on:function(){},listen:function(){}};};",
-        "__openbuddyFac.createSecureServer=function(){return{on:function(){},listen:function(){}};};",
-        "__openbuddyFac.connect=function(){return{on:function(){},end:function(){},destroy:function(){}};};",
-        "__openbuddyFac.constants={};",
-        // node:crypto — undici's `web/fetch/data-url.js` does
-        //   `const cryptoHashes = crypto.getHashes()`. Without
-        //   `getHashes` on the facade, that line crashes with
-        //   `crypto.getHashes is not a function` (fifth reason the
-        //   renderer ended up showing white). The renderer uses
-        //   `window.crypto.subtle` for hashing; the Node-side API
-        //   here only needs to NOT throw. Report a static set of
-        //   algorithm names so SRI / hash detection logic in undici
-        //   treats them as supported.
-        "var __openbuddyCryptoHashes=['sha256','sha384','sha512','sha1','md5','sha224','sha3-256','sha3-384','sha3-512'];",
-        "function __openbuddyHash(){this._buf=[];}",
-        "__openbuddyHash.prototype.update=function(d){return this;};",
-        "__openbuddyHash.prototype.digest=function(){return {};};",
-        "__openbuddyHash.prototype.copy=function(){return new __openbuddyHash();};",
-        "__openbuddyFac.getHashes=function(){return __openbuddyCryptoHashes.slice();};",
-        // node:worker_threads — undici's `web/webidl/index.js` requires
-        // `markAsUncloneable` from the facade. Provide a noop so the
-        // destructure evaluates; the renderer never spawns a real
-        // worker thread.
-        "__openbuddyFac.markAsUncloneable=function(){};",
-        "__openbuddyFac.isMarkedAsUncloneable=function(){return false;};",
-        "__openbuddyFac.isClonable=function(){return true;};",
-        "__openbuddyFac.getCiphers=function(){return [];};",
-        "__openbuddyFac.getCurves=function(){return [];};",
-        "__openbuddyFac.createHash=function(){return new __openbuddyHash();};",
-        "__openbuddyFac.createHmac=function(){return new __openbuddyHash();};",
-        "__openbuddyFac.randomBytes=function(){return new Uint8Array(0);};",
-        "__openbuddyFac.randomUUID=function(){return '00000000-0000-0000-0000-000000000000';};",
-        "__openbuddyFac.constants={};",
-        // node:async_hooks — undici's `api/api-request.js` does
-        //   `class RequestHandler extends AsyncResource {}`. Without
-        //   an `AsyncResource` export on the facade, the `extends`
-        //   clause crashes with `Class extends value undefined is not
-        //   a constructor or null` (fourth reason the renderer ended
-        //   up showing white). The renderer's fetch path never actually
-        //   uses Node's async resource tracking — provide a noop class
-        //   so the destructure + `super("UNDICI_REQUEST")` call evaluates
-        //   without crashing.
-        "function __openbuddyAsyncResource(){this._id=0;}",
-        "__openbuddyAsyncResource.prototype.runInAsyncScope=function(fn){if(typeof fn==='function')fn();};",
-        "__openbuddyAsyncResource.prototype.emitDestroy=function(){};",
-        "__openbuddyAsyncResource.prototype.asyncId=function(){return 0;};",
-        "__openbuddyAsyncResource.prototype.triggerAsyncId=function(){return 0;};",
-        "__openbuddyAsyncResource.prototype.bind=function(fn){return fn;};",
-        "__openbuddyAsyncResource.prototype[Symbol.toStringTag]='AsyncResource';",
-        "__openbuddyFac.AsyncResource=__openbuddyAsyncResource;",
-        "__openbuddyFac.createHook=function(){return{};};",
-        "__openbuddyFac.executionAsyncId=function(){return 0;};",
-        "__openbuddyFac.executionAsyncResource=function(){return{kAsyncId:0};};",
-        "__openbuddyFac.triggerAsyncId=function(){return 0;};",
-        // node:stream — undici's `web/fetch/body.js` does
-        //   `var { Readable } = require___vite_browser_external()`,
-        //   then `class BodyReadable extends Readable {}`. Without a
-        //   stream class on the facade, the `extends` clause crashes with
-        //   `Class extends value undefined is not a constructor or
-        //   null` (third reason the renderer ended up showing white).
-        // Provide a no-op Readable / Writable / Duplex / Transform /
-        // PassThrough hierarchy so the destructure evaluates; the
-        // renderer never actually streams bytes through Node's
-        // stream machinery — fetch responses are decoded by the
-        // browser-side Fetch API instead.
-        "function __openbuddyNoopStream(){}",
-        "function __openbuddyReadable(){this._listeners=[];this._state={};}",
-        "__openbuddyReadable.prototype.on=function(){return this;};",
-        "__openbuddyReadable.prototype.once=function(){return this;};",
-        "__openbuddyReadable.prototype.off=function(){return this;};",
-        "__openbuddyReadable.prototype.emit=function(){return false;};",
-        "__openbuddyReadable.prototype.pipe=function(){return this;};",
-        "__openbuddyReadable.prototype.unpipe=function(){return this;};",
-        "__openbuddyReadable.prototype.read=function(){return null;};",
-        "__openbuddyReadable.prototype.pause=function(){return this;};",
-        "__openbuddyReadable.prototype.resume=function(){return this;};",
-        "__openbuddyReadable.prototype.destroy=function(){return this;};",
-        "__openbuddyReadable.prototype.pause=function(){return this;};",
-        "__openbuddyReadable.prototype.isPaused=function(){return false;};",
-        "__openbuddyReadable.prototype.setEncoding=function(){return this;};",
-        "__openbuddyReadable.prototype.unshift=function(){return undefined;};",
-        "__openbuddyReadable.prototype.wrap=function(){return this;};",
-        "__openbuddyReadable.prototype[Symbol.toStringTag]='Readable';",
-        "function __openbuddyWritable(){this._listeners=[];this._state={};}",
-        "__openbuddyWritable.prototype.on=function(){return this;};",
-        "__openbuddyWritable.prototype.once=function(){return this;};",
-        "__openbuddyWritable.prototype.off=function(){return this;};",
-        "__openbuddyWritable.prototype.emit=function(){return false;};",
-        "__openbuddyWritable.prototype.write=function(cb){if(typeof cb==='function')cb();return true;};",
-        "__openbuddyWritable.prototype.end=function(cb){if(typeof cb==='function')cb();return this;};",
-        "__openbuddyWritable.prototype.destroy=function(){return this;};",
-        "__openbuddyWritable.prototype.cork=function(cb){if(typeof cb==='function')cb();return undefined;};",
-        "__openbuddyWritable.prototype.uncork=function(){return undefined;};",
-        "__openbuddyWritable.prototype.setDefaultEncoding=function(){return this;};",
-        "__openbuddyWritable.prototype[Symbol.toStringTag]='Writable';",
-        "function __openbuddyDuplex(){}",
-        "__openbuddyDuplex.prototype=Object.create(__openbuddyReadable.prototype);",
-        "var __openbuddyTransform=__openbuddyDuplex;",
-        "var __openbuddyPassThrough=__openbuddyDuplex;",
-        "__openbuddyFac.Readable=__openbuddyReadable;",
-        "__openbuddyFac.Writable=__openbuddyWritable;",
-        "__openbuddyFac.Duplex=__openbuddyDuplex;",
-        "__openbuddyFac.Transform=__openbuddyTransform;",
-        "__openbuddyFac.PassThrough=__openbuddyPassThrough;",
-        "__openbuddyFac.Stream=__openbuddyReadable;",
-        "__openbuddyFac.pipeline=function(){return Promise.resolve();};",
-        "__openbuddyFac.finished=function(){return Promise.resolve();};",
-        "__openbuddyFac.addAbortListener=function(){return function(){};};",
-        "__openbuddyFac.removeAbortListener=function(){};",
-        "__openbuddyFac.getDefaultHighWaterMark=function(){return 65536;};",
-        "__openbuddyFac.setDefaultHighWaterMark=function(){};",
-        "__openbuddyFac.isDisturbed=function(){return false;};",
-        "__openbuddyFac.isReadable=function(){return true;};",
-        "__openbuddyFac.isWritable=function(){return true;};",
-        "__openbuddyFac.isDuplex=function(){return false;};",
-        "__openbuddyFac.isTransform=function(){return false;};",
-        "__openbuddyFac.isReadableNodeStream=function(){return false;};",
-        "__openbuddyFac.isWritableNodeStream=function(){return false;};",
-        "__openbuddyFac.constants={};",
-        "__openbuddyFac.platform=function(){return 'darwin';};",
-        "__openbuddyFac.cpus=function(){return [];};",
-        // node:fs / node:fs/promises — return noop fs. Renderer
-        // never actually touches the filesystem; this only needs to
-        // exist so module-level `import { readFileSync } from "node:fs"`
-        // doesn't crash. Return a default JSON string for `readFileSync`
-        // since `JSON.parse(stripBom(readFileSync(...)))` is the typical
-        // shape and would otherwise crash on `stripBom(undefined)`.
-        "var __noopFs=function(){return function(){return '{}';};};",
-        "var __noopFsSync=function(){return function(){return false;};};",
-        "__openbuddyFac.readFileSync=__noopFs();",
-        "__openbuddyFac.readFile=__noopFs();",
-        "__openbuddyFac.writeFileSync=__noopFsSync();",
-        "__openbuddyFac.writeFile=__noopFsSync();",
-        "__openbuddyFac.existsSync=__noopFsSync();",
-        "__openbuddyFac.statSync=__noopFsSync();",
-        "__openbuddyFac.readdirSync=__noopFsSync();",
-        "__openbuddyFac.mkdirSync=__noopFsSync();",
-        "__openbuddyFac.openSync=__noopFsSync();",
-        "__openbuddyFac.closeSync=__noopFsSync();",
-        "__openbuddyFac.promises={readFile:__noopFs(),writeFile:__noopFsSync(),stat:__noopFsSync(),mkdir:__noopFsSync(),readdir:__noopFsSync(),cp:__noopFsSync(),rm:__noopFsSync(),rename:__noopFsSync(),realpath:__noopFs(),access:__noopFsSync()};",
-        // node:child_process — make spawn/exec/execFile no-op stubs so
-        // `import { execFile } from "node:child_process"` doesn't blow
-        // up when the renderer accidentally evaluates a call site.
-        "__openbuddyFac.execFile=__noopFs();",
-        "__openbuddyFac.exec=__noopFs();",
-        "__openbuddyFac.spawn=__noopFs();",
-        // node:util — promisify(undefined) used to throw at module load.
-        "__openbuddyFac.promisify=function(fn){if(typeof fn!=='function')return fn;return function(){return Promise.resolve(undefined);};};",
-        "__openbuddyFac.types={isUint8Array:function(){return false;},isDate:function(){return false;}};",
-        "if(typeof process!=='undefined'){if(typeof process.getMaxListeners!=='function'){process.getMaxListeners=function(){return 0;};process.setMaxListeners=function(){};}process.versions={};process.features={};process.argv=[];process.execPath='/';process.exit=function(){};process.getBuiltinModule=function(){return undefined;};process.version='v0.0.0';process.platform='darwin';if(!process.stderr){process.stderr={fd:1,write:function(){},_handle:{}};}if(!process.stdout){process.stdout={fd:1,write:function(){},_handle:{}};}process.stderr.fd=process.stderr.fd||1;}",
-        // Make `module.exports` itself the no-op class so
-        // `class X extends require___vite_browser_external() {}` works
-        // (the constructor is now a valid class with a prototype).
-        // All the static methods assigned to `__openbuddyFac` above
-        // become available as `require___vite_browser_external().method`,
-        // and `__toESM(...)` copies them through to the
-        // `import_..._browser_external` namespace so consumers using
-        // `import_X.Y(...)` style access keep working too.
-        "module.exports=__openbuddyFac;",
-      ].join("");
-      return { code: patch, map: null };
+        return { code: patchBody, map: null };
+      }
+      // Patch 3 — Vite 8 optimize-deps inline Proxy facades. Each
+      // prebundled module contains a `module.exports = Object.create(
+      // new Proxy({}, { get(_, key) { ... } }))` per Node built-in.
+      // The Proxy returns undefined for every property access, so
+      // `require_browser_external_url().fileURLToPath` blows up.
+      // Match that block and replace it with `module.exports =
+      // __openbuddyFac`, then prepend the facade body so the symbol
+      // is defined before any of the require calls run.
+      if (
+        id.includes(".vite/deps/") &&
+        code.includes("Object.create(new Proxy({}, { get(_, key) {")
+      ) {
+        const replaced = code.replace(
+          /module\.exports\s*=\s*Object\.create\(new Proxy\(\{\},\s*\{\s*get\(_, key\)\s*\{[\s\S]*?\}\s*\}\)\)/g,
+          "module.exports=__openbuddyFac",
+        );
+        if (replaced !== code) {
+          return { code: patchBody + ";\n" + replaced, map: null };
+        }
       }
       return undefined;
     },
