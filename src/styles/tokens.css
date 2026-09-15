@@ -142,6 +142,11 @@ body[data-vscode-theme-name="IDE Light"] {
   --wb-bg-primary: var(--wb-palette-white-100);
   --wb-bg-secondary: var(--wb-color-bg-secondary-hover-active);
   --wb-bg-tertiary: var(--wb-color-bg-primary-hover);
+  /* Elevated surfaces (composer card, popovers, menus). Previously undefined,
+   * so every `var(--wb-bg-elevated, #fff)` fell back to literal white even in
+   * dark mode — the composer stayed a glaring white card on a near-black
+   * canvas. */
+  --wb-bg-elevated: var(--wb-palette-white-100);
   --wb-bg-hover: color-mix(in srgb, var(--wb-palette-black-100) 5%, transparent);
   --wb-bg-active: color-mix(in srgb, var(--wb-palette-black-100) 8%, transparent);
   --wb-bg-overlay: var(--wb-palette-black-40);
@@ -285,6 +290,8 @@ body.dark,
   --wb-bg-primary: var(--wb-palette-gray-3);
   --wb-bg-secondary: var(--wb-palette-gray-2);
   --wb-bg-tertiary: var(--wb-palette-gray-4);
+  /* Slightly lifted vs bg-primary so elevated cards read as a distinct layer. */
+  --wb-bg-elevated: var(--wb-palette-gray-4);
   --wb-bg-hover: color-mix(in srgb, var(--wb-palette-white-100) 6%, transparent);
   --wb-bg-active: var(--wb-palette-white-10);
   --wb-bg-overlay: var(--wb-palette-black-60);
@@ -673,6 +680,7 @@ body.dark,
   --wb-bg-primary: #1f1f1f !important;
   --wb-bg-secondary: #141414 !important;
   --wb-bg-tertiary: #242424 !important;
+  --wb-bg-elevated: #2a2a2a !important;
   --wb-color-bg-secondary-default: #1f1f1f !important;
   --wb-color-bg-primary-default: #1f1f1f !important;
   --wb-color-bg-primary-hover: #242424 !important;

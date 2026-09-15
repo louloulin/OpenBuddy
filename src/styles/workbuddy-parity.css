@@ -171,3 +171,57 @@
 .home__practice-card-glyph {
   font-size: 30px;
 }
+
+/* ---------------------------------------------------------------------------
+ * 暗色下的最佳实践案例卡
+ *
+ * 原实现用 `filter: brightness(.5) saturate(.7)` 压暗整张卡——但滤镜作用在
+ * 整棵子树，白字标题一起被压暗，案例名几乎不可读。改为在渐变之上叠一层
+ * scrim（伪元素），只压背景不动文字。
+ * ------------------------------------------------------------------------- */
+[data-theme="dark"] .home__practice-card {
+  filter: none;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+[data-theme="dark"] .home__practice-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+[data-theme="dark"] .home__practice-card > * {
+  position: relative;
+  z-index: 1;
+}
+[data-theme="dark"] .home__practice-card:hover::after {
+  background: rgba(0, 0, 0, 0.42);
+}
+
+
+/* ---------------------------------------------------------------------------
+ * Composer 聚焦态
+ *
+ * 首页 composer 的 textarea 会在挂载时自动聚焦，全局 a11y 焦点环（2px 品牌色
+ * outline + 2px offset）于是常驻在输入框四周，看着像一个多余的蓝框；而 WorkBuddy
+ * 静止态没有任何描边。把焦点指示上移到卡片本身：键盘用户依然有清晰可见的
+ * focus 提示（WCAG 2.4.7），视觉上则收敛成卡片的一圈柔光。
+ * ------------------------------------------------------------------------- */
+.wb-composer__input:focus-visible {
+  outline: none;
+}
+.wb-composer:focus-within {
+  border-color: var(--wb-focus, #4d8eff);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--wb-focus, #4d8eff) 22%, transparent),
+    0 12px 24px -8px rgba(0, 0, 0, 0.02),
+    0 2px 4px -4px rgba(0, 0, 0, 0.02);
+}
+[data-theme="dark"] .wb-composer:focus-within {
+  border-color: color-mix(in srgb, var(--wb-focus, #4d8eff) 70%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--wb-focus, #4d8eff) 26%, transparent),
+    0 12px 28px -6px rgba(0, 0, 0, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+}
