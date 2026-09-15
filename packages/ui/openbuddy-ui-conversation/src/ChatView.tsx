@@ -456,6 +456,26 @@ export function ChatView({
   // double-clicks during the IPC round-trip).
   const [switchingWorkspace, setSwitchingWorkspace] = useState<string | null>(null);
 
+  // Phase A5 — stable callback so `<Composer>`'s React.memo wrapper can
+  // actually skip re-renders. The previous inline arrow recreated the
+  // function on every ChatView render, defeating the memo every time any
+  // selector in the dep array changed (which is constantly during a turn).
+  const handleComposerWorkspaceChange = useCallback(
+    (next: string) => {
+      // R2.5 — flip the loading flag while the parent is running the
+      // workspace switch IPC. The flag is cleared whether the switch
+      // succeeds or fails so a hung IPC doesn't wedge the UI.
+      setSwitchingWorkspace(next);
+      if (!onSelectWorkspace) return;
+      Promise.resolve(onSelectWorkspace(next))
+        .catch(() => {
+          /* parent surfaces its own toast */
+        })
+        .finally(() => setSwitchingWorkspace(null));
+    },
+    [onSelectWorkspace],
+  );
+
   // Artifacts only depend on tool-call parts — text-only chunk deltas
   // (the bulk of streaming updates) shouldn't trigger a full rescan.
   // Fingerprint on (message count, last tool-call id + status) is a cheap
@@ -1117,16 +1137,7 @@ export function ChatView({
             onModelChange={onModelChange}
             cwd={cwd}
             workspaces={workspaces}
-            onSelectWorkspace={(next) => {
-              // R2.5 — flip the loading flag while the parent is running
-              // the workspace switch IPC. The flag is cleared whether the
-              // switch succeeds or fails so a hung IPC doesn't wedge the UI.
-              setSwitchingWorkspace(next);
-              if (!onSelectWorkspace) return;
-              Promise.resolve(onSelectWorkspace(next))
-                .catch(() => { /* parent surfaces its own toast */ })
-                .finally(() => setSwitchingWorkspace(null));
-            }}
+            onSelectWorkspace={handleComposerWorkspaceChange}
             workspaceLoading={switchingWorkspace !== null}
             showDisclaimer
             permissionInline
