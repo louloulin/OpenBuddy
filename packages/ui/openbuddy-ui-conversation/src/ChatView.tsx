@@ -576,7 +576,14 @@ export function ChatView({
   // R1.2: Render a single timeline node — used by both the flat
   // timeline.map (default) and the VirtualizedMessageList (opt-in).
   // Stable across renders as long as its captured deps are stable;
-  // messages / streaming / findOpen are captured by reference.
+  // // Phase A3 — `messages` is intentionally NOT in the dep array. The
+  // closure only needs the count (for `isLastAssistant`) and a stable
+  // signal that the trailing assistant bubble is the same one. Both
+  // are primitive and survive streaming deltas that mutate `messages`
+  // in place; the previous `messages` dep forced a fresh callback
+  // (and therefore a fresh JSX subtree) every time any part of any
+  // message changed during a turn.
+  const messagesLength = messages.length;
   const renderTimelineNode = useCallback(
     ({ node, index: _index }: { node: TimelineNode; index: number }) => {
       if (node.kind === "date-divider") {
@@ -596,7 +603,7 @@ export function ChatView({
       const m = node.message;
       const idx = node.index;
       const isLastAssistant =
-        m.role === "assistant" && idx === messages.length - 1;
+        m.role === "assistant" && idx === messagesLength - 1;
       const findCls =
         findOpen && isFindHit(findHits, m.id)
           ? m.id === findCurrent
@@ -622,7 +629,7 @@ export function ChatView({
       );
     },
     [
-      messages,
+      messagesLength,
       streaming,
       streamingMessageId,
       markdownConfig,
