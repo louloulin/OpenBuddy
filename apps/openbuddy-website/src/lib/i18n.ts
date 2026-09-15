@@ -195,6 +195,23 @@ export interface Dict {
     faqTitle: string;
     faq: Array<{ q: string; a: string }>;
   };
+  docsPage: {
+    onThisPage: string;
+    editOnGitHub: string;
+    viewRaw: string;
+    previous: string;
+    next: string;
+    sourceFile: string;
+    notFound: string;
+    readingTimeUnit: string;
+    lastUpdatedPrefix: string;
+    langSwitchLabel: string;
+    langSwitchToPrefix: string;
+    translationMissing: string;
+    translationMissingHint: string;
+    copyCode: string;
+    copied: string;
+  };
   footer: {
     tagline: string;
     product: { title: string; links: Array<{ label: string; href: string }> };
@@ -831,6 +848,23 @@ const en: Dict = {
       ]
     }
   },
+  docsPage: {
+    onThisPage: 'On this page',
+    editOnGitHub: 'Edit on GitHub',
+    viewRaw: 'View raw markdown',
+    previous: 'Previous',
+    next: 'Next',
+    sourceFile: 'Source file',
+    notFound: 'Document not found',
+    readingTimeUnit: 'min read',
+    lastUpdatedPrefix: 'Updated',
+    langSwitchLabel: 'Language',
+    langSwitchToPrefix: 'Read in',
+    translationMissing: 'English only',
+    translationMissingHint: 'A Chinese version of this page is not yet available.',
+    copyCode: 'Copy',
+    copied: 'Copied'
+  },
   footer: {
     tagline:
       'The open desktop AI workspace. 100% MIT, auditable, forkable. Built on Electron + Pi with WorkBuddy-grade UI.',
@@ -1417,6 +1451,23 @@ const zhCN: Dict = {
         '移动端 (iPad / Android) 预览构建'
       ]
     }
+  },
+  docsPage: {
+    onThisPage: '本页目录',
+    editOnGitHub: '在 GitHub 编辑',
+    viewRaw: '查看原始 Markdown',
+    previous: '上一篇',
+    next: '下一篇',
+    sourceFile: '源文件',
+    notFound: '未找到文档',
+    readingTimeUnit: '分钟阅读',
+    lastUpdatedPrefix: '更新于',
+    langSwitchLabel: '语言',
+    langSwitchToPrefix: '切换为',
+    translationMissing: '仅英文',
+    translationMissingHint: '本页暂无中文版本。',
+    copyCode: '复制',
+    copied: '已复制'
   },
   footer: {
     tagline: '开源的桌面 AI 工作台。100% MIT、可审计、可 fork。基于 Electron + Pi,WorkBuddy 级 UI。',

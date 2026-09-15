@@ -1,13 +1,9 @@
 # Release Process
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 How OpenBuddy ships a release — from cutting a branch to publishing the GitHub Release. For the CI matrix, see [`release-ci.md`](release-ci.md).
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### Cadence
 
@@ -212,8 +208,6 @@ For critical security issues:
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 节奏
 

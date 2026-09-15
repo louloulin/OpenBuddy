@@ -1,13 +1,9 @@
 # Community
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 OpenBuddy is a community-driven project. This page lists every place you can ask questions, share what you've built, or just hang out with other OpenBuddy users.
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### Channels
 
@@ -120,8 +116,6 @@ OpenBuddy integrates with and is supported by:
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 频道
 

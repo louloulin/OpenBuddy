@@ -1,13 +1,9 @@
 # Operations Guide
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 This guide covers **deploying and operating OpenBuddy in production** — for self-hosters, IT teams, and enterprise admins. For developer setup, see [`GETTING_STARTED.md`](GETTING_STARTED.md). For CI/release workflow, see [`release-ci.md`](release-ci.md).
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### Deployment topology
 
@@ -339,8 +335,6 @@ Recommended alerts:
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 部署拓扑
 

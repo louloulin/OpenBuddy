@@ -1,15 +1,11 @@
 # Public Roadmap
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 This is the **public roadmap** for OpenBuddy. It is updated quarterly and reflects what the maintainer team plans to ship in the next 3 release cycles. For the full backlog see [`../TODO.md`](../TODO.md).
 
 **Last updated:** 2026-09-01 · **Next refresh:** 2026-12-01
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### At a glance
 
@@ -130,8 +126,6 @@ Items marked **deprecated** stay functional for at least 2 minor releases before
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 一览
 

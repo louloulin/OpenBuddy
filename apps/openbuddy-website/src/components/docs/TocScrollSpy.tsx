@@ -5,7 +5,6 @@ import type { DocTocItem } from '@/lib/docs-server';
 
 interface TocScrollSpyProps {
   toc: DocTocItem[];
-  /** i18n label for the TOC heading */
   label: string;
 }
 
@@ -14,6 +13,8 @@ interface TocScrollSpyProps {
  * 把当前 active 的 TOC item 加 brand 左边 border + 高亮。
  *
  * TOC 链接保持作为锚点导航(无 JS 也能用); 只在 JS 启用时增强 active 视觉。
+ * 通过 data-toc-id 属性(由 docs-server.ts 的 heading renderer 注入)选取 headings,
+ * 避开 marked 输出里其它任意 id 元素。
  */
 export default function TocScrollSpy({ toc, label }: TocScrollSpyProps) {
   const [activeId, setActiveId] = useState<string | null>(toc[0]?.id ?? null);
@@ -21,31 +22,29 @@ export default function TocScrollSpy({ toc, label }: TocScrollSpyProps) {
   useEffect(() => {
     if (typeof window === 'undefined' || toc.length === 0) return;
 
-    const headings = Array.from(
-      document.querySelectorAll<HTMLElement>('article .md-prose [id^=""]:not([data-toc-id=""])')
-    ).concat(
-      Array.from(
-        document.querySelectorAll<HTMLElement>('[data-toc-id]')
-      )
-    );
-    // Dedupe by id
+    const headings: HTMLElement[] = [];
     const seen = new Set<string>();
-    const els = headings.filter((el) => {
-      if (!el.id || seen.has(el.id)) return false;
-      seen.add(el.id);
-      return true;
-    });
+    document
+      .querySelectorAll<HTMLElement>('article .md-prose [data-toc-id]')
+      .forEach((el) => {
+        const id = el.dataset.tocId;
+        if (id && !seen.has(id)) {
+          seen.add(id);
+          headings.push(el);
+        }
+      });
 
-    if (els.length === 0) return;
+    if (headings.length === 0) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // Find the topmost heading currently in view.
         const visible = entries
           .filter((e) => e.isIntersecting)
           .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
         if (visible.length > 0) {
-          setActiveId(visible[0].target.id);
+          const top = visible[0].target as HTMLElement;
+          const id = top.dataset.tocId;
+          if (id) setActiveId(id);
         }
       },
       {
@@ -54,7 +53,7 @@ export default function TocScrollSpy({ toc, label }: TocScrollSpyProps) {
       }
     );
 
-    els.forEach((el) => observer.observe(el));
+    headings.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, [toc]);
 

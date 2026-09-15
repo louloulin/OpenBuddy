@@ -1,7 +1,5 @@
 # Architecture
 
-[English](ARCHITECTURE.md) · **简体中文**
-
 ### 鸟瞰
 
 ```

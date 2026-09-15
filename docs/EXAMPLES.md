@@ -1,13 +1,9 @@
 # Examples & Showcase
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 A curated list of plugins, integrations, and projects built with OpenBuddy. **Want to add yours?** Open a PR editing this file.
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### Official packages
 
@@ -266,8 +262,6 @@ We'll review within 48 hours and merge if it fits.
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 官方包
 

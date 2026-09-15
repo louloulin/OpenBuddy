@@ -1,13 +1,9 @@
 # Security PGP Key
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 This document hosts the PGP keys used by the OpenBuddy security team for encrypted vulnerability disclosures.
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### Current key
 
@@ -102,8 +98,6 @@ Public list: <https://github.com/orgs/louloulin/teams/security>
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 当前 key
 

@@ -1,13 +1,9 @@
 # Migrating from Tencent WorkBuddy to OpenBuddy
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 This guide helps **WorkBuddy users and teams** switch to OpenBuddy with minimal disruption. It assumes you already have WorkBuddy installed and configured.
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### Why migrate?
 
@@ -195,8 +191,6 @@ The `WorkBuddy import` IPC handler is implemented in `electron/main/workbookd-im
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 为什么迁移?
 

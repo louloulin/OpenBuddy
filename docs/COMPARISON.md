@@ -1,13 +1,9 @@
 # OpenBuddy vs Peer AI Tools
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 A side-by-side comparison of OpenBuddy against the most popular AI coding / agent tools. Every row is something we can publicly substantiate — see linked docs for evidence.
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### TL;DR
 
@@ -113,8 +109,6 @@ Last verified: 2026-09-01. If you spot a stale claim, open an issue labeled `doc
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 一句话总结
 

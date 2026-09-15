@@ -1,7 +1,5 @@
 # Architecture
 
-**English** · [简体中文](ARCHITECTURE.zh-CN.md)
-
 ### Bird's-eye view
 
 ```

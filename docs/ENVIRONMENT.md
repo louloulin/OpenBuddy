@@ -1,15 +1,11 @@
 # Environment Variables
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 Every environment variable OpenBuddy recognizes. Set these in your shell, in `.env`, in CI secrets, or via the OS service manager.
 
 > **Note**: OpenBuddy auto-loads `.env` from the project root (development) and from the user's data directory (production). Variables set in the shell take precedence over `.env`.
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### Application
 
@@ -159,8 +155,6 @@ ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 应用程序
 

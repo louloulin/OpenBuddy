@@ -1,13 +1,9 @@
 # Plugin Development Guide
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 This guide teaches you how to build your first Cordis capability package for OpenBuddy. By the end you'll have a working "Counter" capability, full test coverage, and a published internal package.
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### What is a Cordis capability?
 
@@ -371,8 +367,6 @@ Each one follows the same pattern: `apply(ctx)` + `Service` class + tests.
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 什么是 Cordis 能力?
 

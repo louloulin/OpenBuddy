@@ -2,58 +2,68 @@ import Link from 'next/link';
 import { getAdjacentDocs } from '@/lib/docs-meta';
 import type { DocContent } from '@/lib/docs-server';
 import type { Locale } from '@/lib/i18n';
-import { localizedPath } from '@/lib/i18n';
+import { getDictionary, localizedPath } from '@/lib/i18n';
+import LanguageSwitcher from './LanguageSwitcher';
+import MDCodeEnhancer from './MDCodeEnhancer';
+import TocScrollSpy from './TocScrollSpy';
 
 interface DocArticleProps {
   content: DocContent;
   locale: Locale;
 }
 
-const COPY = {
-  en: {
-    onThisPage: 'On this page',
-    editOnGitHub: 'Edit on GitHub',
-    viewRaw: 'View raw markdown',
-    previous: 'Previous',
-    next: 'Next',
-    lastUpdated: 'Source file',
-    notFound: 'Document not found'
-  },
-  'zh-CN': {
-    onThisPage: '本页目录',
-    editOnGitHub: '在 GitHub 编辑',
-    viewRaw: '查看原始 Markdown',
-    previous: '上一篇',
-    next: '下一篇',
-    lastUpdated: '源文件',
-    notFound: '未找到文档'
-  }
-} as const;
-
 /**
  * DocArticle —— 渲染单篇文档:左主内容 + 右 TOC + 底部分页。
+ * 顶部含语言切换、阅读时长、最近更新,所有元数据来自 docs-server.ts。
  */
 export default function DocArticle({ content, locale }: DocArticleProps) {
-  const copy = COPY[locale];
-  const { meta, html, toc, githubEditUrl, sourceFile } = content;
+  const dict = getDictionary(locale);
+  const copy = dict.docsPage;
+  const { meta, html, toc, githubEditUrl, sourceFile, lastUpdated, readingMinutes, isNative } = content;
   const { prev, next } = getAdjacentDocs(meta.slug);
 
   return (
     <article className="grid gap-12 lg:grid-cols-[1fr_220px]">
-      {/* Main content */}
+      <MDCodeEnhancer />
       <div>
         <header className="mb-8 border-b border-[var(--wb-border)] pb-6">
-          <h1 className="font-display-serif text-[40px] leading-[1.05] tracking-[-0.02em] text-[var(--wb-fg)] md:text-[48px]">
+          <div className="mb-4 flex flex-wrap items-center gap-3 text-[12px]">
+            <LanguageSwitcher
+              current={ content }
+              currentLocale={ locale }
+              slug={ meta.slug }
+              label={ copy.langSwitchLabel }
+              isFallback={ !isNative }
+              missingLabel={ copy.translationMissing }
+              missingHint={ copy.translationMissingHint }
+              switchToLabelPrefix={ copy.langSwitchToPrefix }
+            />
+          </div>
+          <h1 className="font-display-serif text-[clamp(32px,4.5vw,52px)] font-normal leading-[1.05] tracking-[-0.025em] text-[var(--wb-fg)]">
             { meta.title }
           </h1>
           { meta.description ? (
-            <p className="mt-4 text-[16px] leading-relaxed text-[var(--wb-fg-muted)]">
+            <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-[var(--wb-fg-muted)]">
               { meta.description }
             </p>
           ) : null }
-          <p className="mt-4 font-mono text-[11px] text-[var(--wb-fg-faint)]">
-            { copy.lastUpdated }: <code>{ sourceFile }</code>
-          </p>
+          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-[var(--wb-fg-faint)]">
+            <span>
+              { copy.sourceFile }: <code className="text-[var(--wb-fg-muted)]">{ sourceFile }</code>
+            </span>
+            { readingMinutes > 0 ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{ readingMinutes <= 1 && locale === 'en' ? `1 ${copy.readingTimeUnit}` : `${readingMinutes} ${copy.readingTimeUnit}` }</span>
+              </>
+            ) : null }
+            { lastUpdated ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{ copy.lastUpdatedPrefix } { lastUpdated }</span>
+              </>
+            ) : null }
+          </div>
         </header>
 
         <div
@@ -61,7 +71,6 @@ export default function DocArticle({ content, locale }: DocArticleProps) {
           dangerouslySetInnerHTML={ { __html: html } }
         />
 
-        {/* Prev / next */}
         <nav className="mt-16 grid gap-4 border-t border-[var(--wb-border)] pt-8 sm:grid-cols-2">
           { prev ? (
             <Link
@@ -96,30 +105,10 @@ export default function DocArticle({ content, locale }: DocArticleProps) {
         </nav>
       </div>
 
-      {/* Right rail — TOC + edit link */}
       <aside className="hidden lg:block">
         <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2">
           { toc.length > 0 ? (
-            <>
-              <h3 className="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--wb-fg-faint)]">
-                { copy.onThisPage }
-              </h3>
-              <ul className="space-y-1.5 border-l border-[var(--wb-border)]">
-                { toc.map((item) => (
-                  <li
-                    key={ `${ item.id }-${ item.text }` }
-                    style={ { paddingLeft: `${ (item.level - 1) * 12 + 12 }px` } }
-                  >
-                    <a
-                      href={ `#${ item.id }` }
-                      className="block text-[12.5px] leading-snug text-[var(--wb-fg-muted)] transition-colors hover:text-[var(--wb-fg)]"
-                    >
-                      { item.text }
-                    </a>
-                  </li>
-                )) }
-              </ul>
-            </>
+            <TocScrollSpy toc={ toc } label={ copy.onThisPage } />
           ) : null }
 
           <div className="mt-8 flex flex-col gap-2 border-t border-[var(--wb-border)] pt-6 text-[12px]">

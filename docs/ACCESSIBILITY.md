@@ -1,13 +1,9 @@
 # Accessibility (a11y)
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 OpenBuddy aims to be usable by everyone, including people who use assistive technologies. This document describes our accessibility standards, what we test, and how to design new features a11y-first.
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### Standards
 
@@ -172,8 +168,6 @@ We aim to **fix all critical a11y issues within 14 days**.
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 标准
 

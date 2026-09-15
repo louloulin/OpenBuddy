@@ -1,13 +1,9 @@
 # Testing Strategy
 
-> 🌐 **Language / 语言:** [English](#english) · [简体中文](#简体中文)
-
 This guide explains **how we test OpenBuddy** — every test type, when to run it, and how to add new tests. If you want to know *what* to test, see [`ARCHITECTURE.md`](ARCHITECTURE.md). If you want to know *how to debug* a failing test, see [`../SUPPORT.md`](../SUPPORT.md).
 
 ---
 
-<a id="english"></a>
-## 🇬🇧 English
 
 ### Test pyramid
 
@@ -162,8 +158,6 @@ See [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) for the full ma
 
 ---
 
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 测试金字塔
 

@@ -492,6 +492,38 @@
     font-size: inherit;
     color: inherit;
   }
+  .md-prose .code-block {
+    position: relative;
+    margin: 1.5rem 0;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--wb-border);
+    background: var(--wb-code-bg);
+  }
+  .md-prose .code-block-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.45rem 0.75rem 0.45rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .md-prose .code-block-lang {
+    font-family: var(--font-jetbrains);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.5);
+  }
+  .md-prose .code-block-pre {
+    margin: 0;
+    padding: 1rem 1.15rem;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    color: var(--wb-code-fg);
+  }
+  .md-prose .code-block:hover .code-copy-btn { opacity: 1 !important; }
   .md-prose blockquote {
     margin: 1.25rem 0;
     padding: 0.4rem 1rem;
