@@ -140,11 +140,11 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
   ipcMain.handle("agent:document-restore", async (_e, args: unknown) => {
     const input = recordValue(args, "document restore payload");
     const sessionId = requiredString(input.sessionId, "sessionId");
-    const session = await agentHost.getSession?.(sessionId).catch(() => null);
-    if (!session) return { ok: false, code: "disposed", message: `session ${sessionId} is unavailable` };
+    const session = agentHost.getSession();
+    if (!session || session.sessionId !== sessionId) return { ok: false, code: "disposed", message: `session ${sessionId} is unavailable` };
     return { ok: false, code: "unsupported", message: "complete source document restoration is not available for this session" };
   });
-
+  ipcMain.handle("agent:event-log-surface-attach", async (_e, args: unknown) => {
     const input = recordValue(args, "event log surface attach payload");
     return pluginEventLogCursor.attachSurface(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
   });
@@ -152,7 +152,7 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     const input = recordValue(args, "event log surface detach payload");
     return pluginEventLogCursor.detachSurface(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
   });
-
+  ipcMain.handle("agent:event-log-replay", async (_e, args?: unknown) => {
     // Cursor-based replay used after bridge recovery. Returns events
     // from `fromSequence` forward so the renderer can rehydrate
     // stores without a full reload. The `cursor` payload reports

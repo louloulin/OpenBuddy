@@ -2054,7 +2054,7 @@ export interface PiEventDelivery {
 
 export interface SubscribePiEventsOptions {
   updateTransport?: "auto" | "ipc" | "port";
-  eventGate?: (delivery: PiEventDelivery) => void;
+  eventGate?: (delivery: PiEventDelivery) => boolean;
 }
 
 function normalizedPiUpdate(raw: unknown): (SessionUpdate & { __sessionId?: string } & SequencedPiPayload) | undefined {
@@ -2084,7 +2084,13 @@ export async function subscribePiEvents(handlers: PiEventHandlers, options?: Sub
 	ensureRendererRpcChannel();
 	const unlisteners: UnlistenFn[] = [];
   const deliver = (channel: string, payload: unknown, dispatch: () => void): void => {
-    options?.eventGate?.({ channel, payload, dispatch }) ?? dispatch();
+    // The gate is responsible for dispatching when it returns true (it has
+    // either applied the event, queued it for replay `finish()`, or
+    // deduped it). It returns false only when it cannot manage the payload
+    // (e.g. no sequence number) — in that case we MUST dispatch ourselves,
+    // otherwise the event would silently disappear.
+    const handled = options?.eventGate?.({ channel, payload, dispatch });
+    if (handled !== true) dispatch();
   };
   const wire = async <T>(event: string, cb: ((p: T) => void) | undefined) => {
     if (!cb) return;

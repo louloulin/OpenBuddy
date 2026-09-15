@@ -748,5 +748,56 @@ export default defineConfig({
       strictPort: false,
       host: "0.0.0.0",
     },
+    // Phase UX-perf: dev cold-start was blocked on Vite crawling the heavy
+    // workspace alias graph. `@openbuddy/*` aliases point at `.ts` sources
+    // (NOT prebundled npm packages), so esbuild's dep crawler would either
+    // stall or rewrite them away. Mark the workspace aliases as
+    // non-prebundlable and explicitly enumerate the heavy npm dependencies
+    // that DO benefit from prebundling (katex/mermaid/markdown/univerjs).
+    // The holdUntilCrawled flag defers the first request until the full
+    // prebundle graph has been materialised — without it, the very first
+    // `/` request races with esbuild and falls back to on-the-fly
+    // transpilation per import, which is the dominant source of "click takes
+    // 10s" complaints.
+    optimizeDeps: {
+      holdUntilCrawled: true,
+      include: [
+        "react",
+        "react-dom",
+        "react-dom/client",
+        "react-router-dom",
+        "zustand",
+        "react-markdown",
+        "remark-gfm",
+        "remark-breaks",
+        "remark-math",
+        "rehype-highlight",
+        "rehype-katex",
+        "rehype-sanitize",
+        "lowlight",
+        "highlight.js",
+        "katex",
+        "mermaid",
+        "lucide-react",
+        "grok-mermaid",
+        "diff",
+        "date-fns",
+        "dompurify",
+        "nanoid",
+      ],
+      exclude: [
+        // Workspace packages are aliased to `.ts` source — esbuild cannot
+        // prebundle them. Vite's normal module resolver handles them.
+        /^@openbuddy\//,
+        // The Pi ecosystem is only ever used by the main process; the
+        // renderer never imports it. Excluding here keeps the dep
+        // crawler from chasing a graph that has no consumer.
+        /^@earendil-works\//,
+        // The shared Electron preload exposes its API via `window.api` and
+        // is statically replaced by the renderer shim. Exclude so the
+        // dep crawler doesn't try to load it.
+        "@openbuddy/electron-api",
+      ],
+    },
   },
 });

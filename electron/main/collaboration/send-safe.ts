@@ -4,9 +4,16 @@ import { createMainLogger } from "@openbuddy/logging-main";
 const moduleLogger = createMainLogger({ name: "pi-bridge-send-safe" });
 
 const SAFE_CHANNEL_PREFIX = "safe::";
+// Phase UX-perf: bridge-status broadcasts previously ran every 10s after a 5s
+// startup delay. On a busy main process (503 IPC handlers, Pi event log
+// streaming, bridge flushes) the periodic sendSafeAll + JSON serialisation
+// accounted for a noticeable share of the event-loop time and made clicks
+// feel sluggish. The renderer no longer needs a heartbeat —
+// `bridge:unavailable` still fires synchronously on real failures — so we
+// coalesce the heartbeat to 30s by default and drop the startup delay.
 const DEFAULT_THROTTLE_MS = 30_000;
-const DEFAULT_INTERVAL_MS = 10_000;
-const DEFAULT_STARTUP_DELAY_MS = 5_000;
+const DEFAULT_INTERVAL_MS = 30_000;
+const DEFAULT_STARTUP_DELAY_MS = 0;
 const BROADCAST_CHANNEL = "electron-bridge-status";
 const UNAVAILABLE_CHANNEL = "bridge:unavailable";
 

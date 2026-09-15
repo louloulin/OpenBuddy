@@ -136,7 +136,11 @@ describe("subscribePiEvents — stream port transport", () => {
     const deliveries: Array<{ channel: string; dispatch: () => void }> = [];
     await subscribePiEvents(
       { onUpdate },
-      { eventGate: (delivery) => deliveries.push({ channel: delivery.channel, dispatch: delivery.dispatch }) },
+      // The gate signals "I took responsibility for the dispatch" by
+      // returning true. Returning void would mean the gate cannot manage
+      // the payload and the caller (deliver) would fall through and
+      // dispatch it itself.
+      { eventGate: (delivery) => { deliveries.push({ channel: delivery.channel, dispatch: delivery.dispatch }); return true; } },
     );
     emitPort({ version: 1, events: [{ sessionId: "s1", sequence: 7, type: "agent_message_chunk" }] });
     expect(onUpdate).not.toHaveBeenCalled();

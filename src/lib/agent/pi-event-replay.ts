@@ -48,7 +48,16 @@ export interface ReplayGapInfo {
 export interface PiEventReplayCoordinator {
   readonly cursor: () => number;
   begin(): void;
-  acceptLive(payload: unknown, dispatch: () => void): void;
+  /**
+   * Routes a live payload through the coordinator.
+   *
+   * Returns `true` if the coordinator is responsible for the dispatch
+   * (it was either applied immediately, queued for replay `finish()`, or
+   * de-duplicated). Returns `false` only when the payload is missing the
+   * shape this coordinator can manage (e.g. no sequence number) — in that
+   * case the caller MUST dispatch the payload itself.
+   */
+  acceptLive(payload: unknown, dispatch: () => void): boolean;
   finish(replayed: readonly ReplayDispatch[]): void;
   fail(): void;
 }
@@ -159,17 +168,25 @@ export function createPiEventReplayCoordinator(initialCursor = 0): PiEventReplay
     acceptLive(payload, dispatch) {
       const sequence = eventSequence(payload);
       if (sequence === undefined) {
-        dispatch();
-        return;
+        // Coordinator cannot dedupe an unsequenced payload. Return false so
+        // the caller dispatches it directly; doing so here AND letting the
+        // caller fall through would double-apply the dispatch and corrupt
+        // streaming transcripts (each delta would be appended twice).
+        return false;
       }
-      if (sequence <= lastSequence) return;
+      if (sequence <= lastSequence) {
+        // Already delivered (either live or via a previous replay). The
+        // coordinator owns dedupe; the caller must not also dispatch.
+        return true;
+      }
       if (replaying) {
         if (!pending.some((event) => event.sequence === sequence)) {
           pending.push({ sequence, dispatch });
         }
-        return;
+        return true;
       }
       dispatchOrdered([{ sequence, dispatch }]);
+      return true;
     },
     finish(replayed) {
       const live = pending;

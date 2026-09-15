@@ -656,8 +656,12 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
     } as Parameters<typeof subscribePiEvents>[0];
   });
 
-  const gateLivePiEvent = useCallback((delivery: PiEventDelivery): void => {
-    piReplayRef.current.acceptLive(delivery.payload, delivery.dispatch);
+  const gateLivePiEvent = useCallback((delivery: PiEventDelivery): boolean => {
+    // acceptLive owns dedupe + replay ordering. Returning its result tells
+    // subscribePiEvents' deliver helper not to ALSO call dispatch — that
+    // would double-apply each pi://update and corrupt streaming transcripts
+    // (every delta would be appended twice to the assistant message).
+    return piReplayRef.current.acceptLive(delivery.payload, delivery.dispatch);
   }, []);
 
   const replayMissedPiEvents = useCallback(async (handlers: Parameters<typeof subscribePiEvents>[0]): Promise<void> => {

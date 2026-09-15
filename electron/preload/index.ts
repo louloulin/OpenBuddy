@@ -10,7 +10,7 @@ import { contextBridge, ipcRenderer } from "electron";
 const allowedInvokeChannels = new Set([
   // agent-runtime
   "agent:abort", "agent:auth-status", "agent:commands-list", "agent:current-model", "agent:deepseek-cordis-invoke", "agent:deepseek-cordis-snapshot", "agent:deepseek-pi-describe", "agent:dispose",
-  "agent:event-log", "agent:event-log-replay", "agent:event-log-surface-attach", "agent:event-log-surface-detach", "agent:document-restore", "agent:extensions-reload", "agent:follow-up", "agent:init", "agent:ensure-new-session", "agent:load-session", "agent:new-session", "agent:plugin-config", "agent:plugin-enable",
+  "agent:event-log", "agent:event-log-replay", "agent:event-log-surface-attach", "agent:event-log-surface-detach", "agent:document-restore", "agent:extensions-reload", "agent:follow-up", "agent:init", "agent:ensure-new-session", "agent:load-session", "agent:new-session", "agent:plugin-config", "agent:plugin-enable", "agent:plugin-list", "agent:plugin-inventory", "agent:plugin-snapshot", "agent:plugin-readiness", "agent:plugin-events", "agent:tools-list",
   "agent:session-surface-acquire", "agent:session-surface-release", "agent:session-surface-list",
   "agent:preset-current", "agent:preset-default-save", "agent:preset-select", "agent:presets-list", "agent:profile-install", "agent:profile-install-default-pi", "agent:profile-packages", "agent:profile-remove", "agent:prompt",
   "agent:providers-delete-model", "agent:providers-delete-provider", "agent:providers-fetch-models", "agent:providers-list", "agent:providers-save-model", "agent:providers-save-provider", "agent:providers-test", "agent:remote-contributions", "agent:renderer-plugin-boot",

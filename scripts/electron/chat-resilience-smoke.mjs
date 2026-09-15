@@ -1,4 +1,15 @@
 // Real Electron + chat-resilience verification (no GUI window required).
+async function waitForLog(lines, regex, timeoutMs) {
+  const start = Date.now();
+  // Re-check every 250ms; cheap because lines.length is already a snapshot.
+  while (Date.now() - start < timeoutMs) {
+    const joined = lines.join("\n");
+    if (regex.test(joined)) return { ok: true };
+    await sleep(250);
+  }
+  return { ok: false, detail: "timeout " + timeoutMs + "ms" };
+}
+
 // Boots a real Electron main process via Playwright, then validates:
 //   1. main process boots cleanly
 //   2. pino file logger actually wrote JSON log lines to the platform log dir
@@ -98,8 +109,17 @@ async function main() {
   });
 
   try {
-    // give main process time to initialize (app.whenReady, registerIpc, ensureMainLogger)
-    await sleep(6000);
+    // Wait until the agent-host init-pipeline has finished booting. The
+    // init pipeline emits "[openbuddy-diag] init-pipeline stage=N DONE" lines
+    // for each stage; stage 8 (PluginReady) means the IPC handlers are
+    // registered and chat traffic can be observed. Without this wait, the
+    // 6s hard sleep is sometimes too short and the chat-handlers assertion
+    // races ahead of agent-host init, producing a false negative.
+    const initDone = await waitForLog(mainLines, /init-pipeline stage=8 DONE/, 30_000);
+    record("init-pipeline.complete", initDone.ok, initDone.ok ? "stage=8 DONE observed" : initDone.detail);
+    if (!initDone.ok) {
+      throw new Error("init-pipeline never reached stage=8; aborting before phase 3");
+    }
 
     // ---- Phase 1: process readiness ----
     const mainStatus = await app.evaluate(async ({ app }) => ({

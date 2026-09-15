@@ -33,13 +33,16 @@ describe("pi event replay coordinator", () => {
     expect(coordinator.cursor()).toBe(2);
   });
 
-  it("dispatches unsequenced events immediately", () => {
+  it("refuses unsequenced events so the caller can dispatch them", () => {
     const coordinator = createPiEventReplayCoordinator(5);
     const applied: string[] = [];
     coordinator.begin();
-    coordinator.acceptLive({ sessionId: "s1" }, () => applied.push("permission"));
-
-    expect(applied).toEqual(["permission"]);
+    // acceptLive returns false for unsequenced payloads — the caller is
+    // responsible for dispatching them. This avoids the double-dispatch
+    // bug where the coordinator and the caller each ran dispatch().
+    const handled = coordinator.acceptLive({ sessionId: "s1" }, () => applied.push("permission"));
+    expect(handled).toBe(false);
+    expect(applied).toEqual([]);
     expect(eventSequence({ sequence: 6 })).toBe(6);
     expect(eventSequence({ sequence: 1.5 })).toBeUndefined();
     expect(eventSequence({})).toBeUndefined();

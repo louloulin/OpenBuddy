@@ -57,6 +57,15 @@ files:
   - "!**/.DS_Store"
   - "!**/.git/**"
 
+# pnpm stores transitive packages behind symlinks in `.pnpm/`. electron-builder
+# cannot reliably follow those links when assembling an unpacked app, so copy
+# the runtime directories used by Pi explicitly into the app's node_modules.
+extraResources:
+  - from: "node_modules/.pnpm/@earendil-works+chord@0.85.1/node_modules/@earendil-works/chord"
+    to: "app/node_modules/@earendil-works/chord"
+  - from: "node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild"
+    to: "app/node_modules/esbuild"
+
 asar: false
 # asar: false is a workaround for the pnpm + electron-builder
 # "duplicate dependency references" + "cannot find path for dependency"

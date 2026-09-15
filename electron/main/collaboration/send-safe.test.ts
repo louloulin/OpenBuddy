@@ -138,8 +138,8 @@ describe("sendSafe", () => {
 
   it("exposes safe bridge constants", () => {
     expect(SAFE_BRIDGE_CONSTANTS.DEFAULT_THROTTLE_MS).toBe(30_000);
-    expect(SAFE_BRIDGE_CONSTANTS.DEFAULT_INTERVAL_MS).toBe(10_000);
-    expect(SAFE_BRIDGE_CONSTANTS.DEFAULT_STARTUP_DELAY_MS).toBe(5_000);
+    expect(SAFE_BRIDGE_CONSTANTS.DEFAULT_INTERVAL_MS).toBe(30_000);
+    expect(SAFE_BRIDGE_CONSTANTS.DEFAULT_STARTUP_DELAY_MS).toBe(0);
     expect(SAFE_BRIDGE_CONSTANTS.BROADCAST_CHANNEL).toBe("electron-bridge-status");
     expect(SAFE_BRIDGE_CONSTANTS.UNAVAILABLE_CHANNEL).toBe("bridge:unavailable");
   });
@@ -177,7 +177,7 @@ describe("createBridgeStatusBroadcaster", () => {
     expect(broadcaster.isRunning()).toBe(false);
   });
 
-  it("B3.b honors 5s startup delay before first broadcast", () => {
+  it("B3.b broadcasts immediately (no startup delay) by default", () => {
     const ok = makeContents();
     mockGetAllWebContents.mockReturnValue([ok]);
     const broadcaster = createBridgeStatusBroadcaster();
@@ -188,10 +188,10 @@ describe("createBridgeStatusBroadcaster", () => {
       lastUpdated: 12345,
     }));
 
-    vi.advanceTimersByTime(SAFE_BRIDGE_CONSTANTS.DEFAULT_STARTUP_DELAY_MS - 1000);
-    expect(mockSend).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(1000);
+    // Phase UX-perf: with DEFAULT_STARTUP_DELAY_MS = 0, the first broadcast
+    // happens on the very next timer tick. Drive one minimal tick and
+    // confirm the payload landed.
+    vi.advanceTimersByTime(1);
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend).toHaveBeenCalledWith(
       SAFE_BRIDGE_CONSTANTS.BROADCAST_CHANNEL,

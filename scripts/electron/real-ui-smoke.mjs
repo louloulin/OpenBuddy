@@ -212,11 +212,17 @@ async function sendFirstThroughUi(prompt, marker) {
   await page.waitForFunction(() => {
     try {
       const value = JSON.parse(localStorage.getItem("openbuddy.active-session") ?? "null");
-      return typeof value?.sessionId === "string" && value.sessionId.length > 0;
+      // Wait until the optimistic __pending_<nonce> id has been migrated to
+      // the real sessionId returned by the agent:new-session IPC. Without
+      // this guard waitForTrace would look up eventLog with a placeholder
+      // sessionId that has no events and time out.
+      return typeof value?.sessionId === "string"
+        && value.sessionId.length > 0
+        && !value.sessionId.startsWith("__pending_");
     } catch {
       return false;
     }
-  }, undefined, { timeout: 30_000 });
+  }, undefined, { timeout: 60_000 });
   const active = await activeSessionFromStorage();
   if (!active?.sessionId) throw new Error("UI did not persist the newly created Pi session");
   const trace = await waitForTrace(active.sessionId, prompt, marker, 0);

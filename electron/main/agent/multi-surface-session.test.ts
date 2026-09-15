@@ -22,7 +22,7 @@ describe("MultiSurfaceSessionRegistry", () => {
       expect(ownerDispose).not.toHaveBeenCalled();
       expect(registry.release(first.sessionId, first.surfaceId, first.generation, ownerDispose)).toEqual({ ok: true, released: true });
       expect(ownerDispose).toHaveBeenCalledTimes(1);
-      expect(registry.release(first.sessionId, first.surfaceId, first.generation, ownerDispose).code).toBe("unknown-session");
+      expect(registry.release(first.sessionId, first.surfaceId, first.generation, ownerDispose)).toMatchObject({ ok: false, code: "unknown-session" });
     }
   });
 

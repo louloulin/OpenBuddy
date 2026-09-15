@@ -128,15 +128,6 @@ casdoorController = initCasdoorSecurity({
   },
 });
 
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
-if (!gotSingleInstanceLock) {
-  app.quit();
-} else {
-  app.on("second-instance", (_event, commandLine) => {
-    for (const argument of commandLine) casdoorController!.handleCasdoorProtocol(argument);
-  });
-}
-
 async function ensureRendererBuild(): Promise<boolean> {
   if (devRendererUrl || existsSync(rendererIndex) || app.isPackaged || process.env.ELECTRON_SKIP_AUTO_BUILD === "1") {
     return existsSync(rendererIndex) || Boolean(devRendererUrl);
@@ -262,4 +253,3 @@ async function bootBackgroundServices(): Promise<void> {
     console.error("[openbuddy-pi] agent host init failed:", err);
   }
 }
-
