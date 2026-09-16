@@ -4,7 +4,13 @@
  * 与 composer 输入框的 `SlashCommands.tsx` 不同:那一个是"往 textarea
  * 里插文本",本模块服务于 TipTap 的 suggestion 插件,选中后直接改写
  * ProseMirror 文档节点(插入标题 / 表格 / 图表等真实块)。
+ *
+ * 插件扩展点:`editor.slash-commands` 槽位贡献的命令经
+ * `mergeSlashCommandContributions` 并进菜单;有 `run` 的命令由插件自己的
+ * 执行体负责(见 `apply-slash-command.ts`),没有的走内置 switch。
+ * `Editor` 只做类型引用(`import type`),运行时仍然零 TipTap 依赖。
  */
+import type { Editor } from "@tiptap/core";
 
 export type SlashCommandKind =
   | "heading"
@@ -27,6 +33,34 @@ export interface EditorSlashCommand {
   icon: string;
   /** 分组名,菜单按组渲染。 */
   group: string;
+  /**
+   * 自定义执行体(插件贡献的命令用)。
+   * 内置命令不设此字段 —— 它们的语义在 `applySlashCommand` 的 switch 里,
+   * 免得"命令表"和"执行体"两处各写一份文档。
+   * 约定:调用前 `/xxx` 区间已被删除,`run` 只需插入自己想要的块。
+   */
+  run?: EditorSlashCommandRun;
+}
+
+/** 命令执行上下文:当前编辑器 + `/xxx` 文本区间。 */
+export interface EditorSlashCommandRunContext {
+  editor: Editor;
+  range: { from: number; to: number };
+}
+
+/** 自定义命令执行体。返回 false 表示"什么都没做"。 */
+export type EditorSlashCommandRun = (ctx: EditorSlashCommandRunContext) => void | boolean;
+
+/** 插件通过 `editor.slash-commands` 槽位贡献的命令(描述 + 执行体)。 */
+export interface EditorSlashCommandContribution {
+  id: string;
+  title: string;
+  description?: string;
+  aliases?: string[];
+  icon?: string;
+  group?: string;
+  kind?: SlashCommandKind;
+  run: EditorSlashCommandRun;
 }
 
 /**
@@ -106,6 +140,45 @@ export function filterSlashCommands(
     .map((entry, index) => ({ entry, index }))
     .sort((a, b) => b.entry.score - a.entry.score || a.index - b.index)
     .map(({ entry }) => entry.command);
+}
+
+/**
+ * 合并插件贡献的 `/` 命令。
+ *
+ * 规则:
+ *   - 与内置(或先贡献的)命令 id 撞名 → 保留先来的,插件不能悄悄替换
+ *     "表格"这类高风险内置语义;
+ *   - 缺少 `run` 的贡献直接丢弃(菜单里点不动);
+ *   - 缺省字段补齐:kind=insert / icon=◆ / group="插件"。
+ */
+export function mergeSlashCommandContributions(
+  base: readonly EditorSlashCommand[],
+  contributions: readonly (EditorSlashCommandContribution | undefined | null)[] | undefined,
+  fallbackGroup = "插件",
+): EditorSlashCommand[] {
+  const merged = [...base];
+  if (!contributions || contributions.length === 0) return merged;
+  const seen = new Set(base.map((command) => command.id));
+  for (const contribution of contributions) {
+    if (!contribution || typeof contribution !== "object") continue;
+    const { id, title, run } = contribution;
+    if (typeof id !== "string" || id.length === 0) continue;
+    if (typeof title !== "string" || title.length === 0) continue;
+    if (typeof run !== "function") continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    merged.push({
+      id,
+      title,
+      description: contribution.description,
+      aliases: contribution.aliases,
+      kind: contribution.kind ?? "insert",
+      icon: contribution.icon ?? "◆",
+      group: contribution.group ?? fallbackGroup,
+      run,
+    });
+  }
+  return merged;
 }
 
 /** 把命令按 `group` 聚合,保持首次出现顺序。 */

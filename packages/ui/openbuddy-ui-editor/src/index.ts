@@ -83,18 +83,37 @@ export {
   detectSlashTrigger,
   filterSlashCommands,
   groupSlashCommands,
+  mergeSlashCommandContributions,
   moveSlashSelection,
   type EditorSlashCommand,
+  type EditorSlashCommandContribution,
+  type EditorSlashCommandRun,
+  type EditorSlashCommandRunContext,
   type SlashCommandKind,
   type SlashTrigger,
 } from "./lib/slash-command";
 export {
   detectMentionTrigger,
   filterMentionItems,
+  gatherMentionItems,
+  isMentionItem,
   mentionToMarkdown,
   type EditorMentionItem,
+  type EditorMentionSource,
   type MentionTrigger,
 } from "./lib/mention";
+export {
+  mergeToolbarActions,
+  runToolbarAction,
+  toolbarActionActive,
+  toolbarActionDisabled,
+  type EditorToolbarAction,
+} from "./lib/toolbar-actions";
+export {
+  useEditorMentionSources,
+  useEditorSlashCommands,
+  useEditorToolbarActions,
+} from "./lib/use-editor-slots";
 export {
   computePopupPosition,
   createSuggestionPopup,
@@ -123,19 +142,27 @@ declare module "@openbuddy/ui-slots" {
         placeholder?: string;
       };
     };
-    /** 工具栏右侧扩展区。插件用 payload 描述按钮或直接提供组件。 */
+    /**
+     * 工具栏扩展区。
+     *
+     * 两种贡献方式:
+     *   - **数据型**(推荐):payload = `EditorToolbarAction`,由 `TiptapEditor`
+     *     读取后交给 `EditorToolbar` 渲染 —— 插件不必知道编辑器长什么样;
+     *   - **组件型**:payload = React 组件,由宿主自行决定渲染位置
+     *     (例如放进 `trailing`)。
+     */
     "editor.toolbar": {
       kind: "list";
       scope: "session-maybe";
       owner: { editorId?: string };
     };
-    /** `/` 命令来源。插件可以只贡献数据(payload 为 EditorSlashCommand)。 */
+    /** `/` 命令来源。payload = `EditorSlashCommandContribution`(带 `run`)。 */
     "editor.slash-commands": {
       kind: "list";
       scope: "session-maybe";
       owner: Record<string, never>;
     };
-    /** `@` 候选来源。payload 为 EditorMentionItem[] 或一个异步 provider。 */
+    /** `@` 候选来源。payload = `EditorMentionSource`(静态 items 或 getItems)。 */
     "editor.mention-sources": {
       kind: "list";
       scope: "session-maybe";

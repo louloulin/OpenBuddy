@@ -11,6 +11,13 @@
  *   - `value` 是外部真相;但**只在编辑器未聚焦且非输入法合成中**才写回,
  *     否则光标会被外部更新打断(见 `shouldSyncExternalValue`);
  *   - 编辑器自己的 `update` 通过 `onChange` 回传,宿主只需把值存起来。
+ *
+ * 微内核扩展点(本包自取,宿主无需透传):
+ *   - `editor.toolbar`        → 工具栏追加按钮
+ *   - `editor.slash-commands` → `/` 菜单追加命令
+ *   - `editor.mention-sources`→ `@` 候选追加来源(有来源时自动开启 mention)
+ *   三个槽位都由 props 同名覆盖(`toolbarActions` / `slashCommands` /
+ *   `mention`),props 优先 —— 单元测试与独立挂载不依赖内核。
  */
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -25,6 +32,17 @@ import {
   markdownToHtml,
   shouldSyncExternalValue,
 } from "../lib/markdown-bridge";
+import {
+  DEFAULT_SLASH_COMMANDS,
+  mergeSlashCommandContributions,
+} from "../lib/slash-command";
+import { gatherMentionItems, type EditorMentionSource } from "../lib/mention";
+import type { EditorToolbarAction } from "../lib/toolbar-actions";
+import {
+  useEditorMentionSources,
+  useEditorSlashCommands,
+  useEditorToolbarActions,
+} from "../lib/use-editor-slots";
 import { EditorToolbar } from "./EditorToolbar";
 import { BubbleToolbar } from "./BubbleToolbar";
 import { FloatingToolbar } from "./FloatingToolbar";
@@ -49,8 +67,10 @@ export interface TiptapEditorProps {
   extensions?: BuildEditorExtensionsOptions;
   /** 额外扩展(追加在最后)。 */
   extraExtensions?: Extensions;
-  /** mention 配置(传了才启用 `@`)。 */
+  /** mention 配置(传了才启用 `@`);未传时若有插件候选来源则自动启用。 */
   mention?: MentionExtensionOptions;
+  /** 工具栏追加按钮;未传时读内核 `editor.toolbar` 槽位。 */
+  toolbarActions?: readonly EditorToolbarAction[];
   /** 顶部工具栏:true = 默认,false = 不渲染,ReactNode = 自定义。 */
   toolbar?: boolean | ReactNode;
   /** 选区气泡菜单。 */
@@ -94,10 +114,15 @@ export function TiptapEditor({
   floatingMenu = true,
   footer,
   onRequestLink,
+  toolbarActions: toolbarActionsProp,
   ariaLabel = "编辑器",
   className,
   minHeight,
 }: TiptapEditorProps) {
+  // 内核扩展点(无内核时是空数组,行为与今天一致)。
+  const slotToolbarActions = useEditorToolbarActions();
+  const slotSlashCommands = useEditorSlashCommands();
+  const slotMentionSources = useEditorMentionSources();
   const lastEmittedRef = useRef<string>(value);
   const composingRef = useRef(false);
   const onChangeRef = useRef(onChange);
@@ -107,11 +132,44 @@ export function TiptapEditor({
   onReadyRef.current = onReady;
   formatRef.current = format;
 
+  const toolbarActions = toolbarActionsProp ?? slotToolbarActions;
+
+  /** `/` 命令 = 内置(或宿主显式传入)+ 插件贡献。false 表示宿主关掉了菜单。 */
+  const resolvedSlashCommands = useMemo(() => {
+    const explicit = extensions?.slashCommands;
+    if (explicit === false) return false;
+    if (slotSlashCommands.length === 0) return explicit;
+    const base = explicit?.commands ?? DEFAULT_SLASH_COMMANDS;
+    return { ...(explicit ?? {}), commands: mergeSlashCommandContributions(base, slotSlashCommands) };
+  }, [extensions?.slashCommands, slotSlashCommands]);
+
+  /** `@` 候选 = 宿主 getItems(可选)+ 插件来源;两者都没有则不开 mention。 */
+  const resolvedMention = useMemo((): MentionExtensionOptions | undefined => {
+    if (slotMentionSources.length === 0) return mention;
+    const contributed = (query: string) => gatherMentionItems(slotMentionSources, query);
+    if (!mention) return { getItems: contributed };
+    const base = mention.getItems;
+    return {
+      ...mention,
+      getItems: async (query: string) => [
+        ...(await base(query)),
+        ...(await contributed(query)),
+      ],
+    };
+  }, [mention, slotMentionSources]);
+
   const builtExtensions = useMemo(
-    () => buildEditorExtensions({ ...extensions, placeholder, mention, extra: extraExtensions }),
+    () =>
+      buildEditorExtensions({
+        ...extensions,
+        placeholder,
+        mention: resolvedMention,
+        slashCommands: resolvedSlashCommands,
+        extra: extraExtensions,
+      }),
     // 扩展只在配置真的变了时重建;placeholder / mention 由宿主控制稳定性。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(extensions ?? {}), placeholder, mention, extraExtensions],
+    [JSON.stringify(extensions ?? {}), placeholder, resolvedMention, resolvedSlashCommands, extraExtensions],
   );
 
   const editor = useEditor({
@@ -167,7 +225,11 @@ export function TiptapEditor({
   }, []);
 
   const toolbarNode =
-    toolbar === true ? <EditorToolbar editor={editor} /> : toolbar === false ? null : toolbar;
+    toolbar === true
+      ? <EditorToolbar editor={editor} actions={toolbarActions} />
+      : toolbar === false
+        ? null
+        : toolbar;
 
   return (
     <div

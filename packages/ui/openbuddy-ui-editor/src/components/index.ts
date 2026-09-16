@@ -14,3 +14,4 @@ export type { ToolbarButtonProps } from "./ToolbarButton";
 export { SuggestionMenu } from "./SuggestionMenu";
 export type { SuggestionMenuProps } from "./SuggestionMenu";
 export { MermaidNodeView } from "./MermaidNodeView";
+export type { EditorToolbarAction } from "../lib/toolbar-actions";

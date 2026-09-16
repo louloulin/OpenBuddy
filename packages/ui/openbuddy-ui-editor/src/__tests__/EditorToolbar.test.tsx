@@ -125,6 +125,42 @@ describe("EditorToolbar", () => {
     expect(screen.getByTestId("trail")).toBeInTheDocument();
   });
 
+  it("actions 渲染为追加按钮,且受 hidden 约束", () => {
+    const run = vi.fn();
+    render(
+      <EditorToolbar
+        editor={makeEditor()}
+        hidden={["plugin-hidden"]}
+        actions={[
+          { id: "plugin-a", label: "插件按钮 A", run },
+          { id: "plugin-hidden", label: "被隐藏", run },
+        ]}
+      />,
+    );
+    expect(screen.getByLabelText("插件按钮 A")).toBeInTheDocument();
+    expect(screen.queryByLabelText("被隐藏")).not.toBeInTheDocument();
+    // 内置按钮不受影响。
+    expect(screen.getByLabelText("2 级标题")).toBeInTheDocument();
+  });
+
+  it("点击插件按钮执行其 run,且能读到编辑器实例", async () => {
+    const editor = makeEditor("<p>text</p>");
+    const run = vi.fn();
+    render(<EditorToolbar editor={editor} actions={[{ id: "wc", label: "字数", icon: "#", run }]} />);
+    await act(async () => {
+      screen.getByLabelText("字数").click();
+    });
+    expect(run).toHaveBeenCalledWith(editor);
+    expect(screen.getByLabelText("字数")).toHaveTextContent("#");
+  });
+
+  it("只读编辑器下插件按钮同样 disabled", () => {
+    const editor = makeEditor();
+    editor.setEditable(false);
+    render(<EditorToolbar editor={editor} actions={[{ id: "wc", label: "字数", run: vi.fn() }]} />);
+    expect(screen.getByLabelText("字数")).toBeDisabled();
+  });
+
   it("表格按钮使用传入的尺寸", async () => {
     const editor = makeEditor("<p>t</p>");
     render(<EditorToolbar editor={editor} tableSize={{ rows: 2, cols: 1 }} />);

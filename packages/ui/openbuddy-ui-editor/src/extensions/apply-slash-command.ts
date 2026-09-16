@@ -7,6 +7,10 @@
  *
  * 约定:`range` 是 suggestion 给出的 `/xxx` 文本区间,所有命令都必须先
  * `deleteRange(range)` 再插入内容,否则会留下残字。
+ *
+ * 命令来源有两类:
+ *   - 内置:本文件的 switch 认识 id(h1 / table / mermaid ...);
+ *   - 插件贡献:命令自带 `run`,这里负责先删掉 `/xxx` 再把控制权交出去。
  */
 import type { Editor } from "@tiptap/core";
 import type { EditorSlashCommand } from "../lib/slash-command";
@@ -89,6 +93,16 @@ export function applySlashCommand(
       return editor.chain().focus().setImage({ src: resolved }).run();
     }
     default:
+      if (typeof command.run === "function") {
+        // 插件命令:先把 `/xxx` 抹掉再交给插件,保证两条路径的前置条件一致。
+        chain.run();
+        try {
+          return command.run({ editor, range }) === false ? false : true;
+        } catch {
+          // 坏插件不该弄炸编辑器:文档保留"已删除触发文本"的状态即可。
+          return true;
+        }
+      }
       return false;
   }
 }
