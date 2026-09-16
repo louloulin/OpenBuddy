@@ -415,6 +415,10 @@ body[data-vscode-theme-name="IDE Light"] {
      不铺在整个实心按钮上。 */
   --wb-bg-pill-active: rgba(0, 0, 0, 0.75);
   --wb-bg-pill-active-hover: rgba(0, 0, 0, 0.82);
+  /* R27 — 实心胶囊的**配对前景色**。胶囊在亮色下是 75% 黑,配
+     `--wb-text-strong`(深字)会变成黑底黑字 —— 选中态的文字色必须跟着胶囊走,
+     不能跟着"当前表面的正文色"走。 */
+  --wb-pill-active-fg: var(--wb-palette-white-100);
   /* R8.60 — 开关拨杆颜色:跟随主操作填充反转(亮色黑底白拨杆/暗色白底深色拨杆)。*/
   --wb-toggle-knob: var(--wb-palette-white-100);
   --wb-bg-pill-hover: #fafafa;
@@ -499,6 +503,9 @@ body.dark,
   --wb-accent-unread: var(--wb-color-text-brand-default);
   --wb-bg-pill-active: rgba(255, 255, 255, 0.18);
   --wb-bg-pill-active-hover: rgba(255, 255, 255, 0.22);
+  /* R27 — 暗色胶囊是"半透白抬升",配主题自己的主文字色(近白)才是 WorkBuddy
+     实测的观感;纯 #fff 在这种半透面上会发糊。 */
+  --wb-pill-active-fg: var(--wb-color-text-primary);
   --wb-toggle-knob: var(--wb-palette-black-90);
   --wb-bg-pill-hover: rgba(255, 255, 255, 0.06);
   --wb-task-starter-trigger-bg-hover: rgba(255, 255, 255, 0.06);

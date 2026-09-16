@@ -615,9 +615,13 @@
 }
 .mention-picker__item--active,
 .mention-picker__item:hover {
-  /* R8.61 — Neutral pill on selected/hover, matching workbuddy's
-     pill-active token. Brand colour reserved for streaming indicators. */
-  background: var(--wb-bg-pill-active);
+  /* R8.61 / R27 — Neutral surface on selected/hover. Brand colour is
+     reserved for streaming indicators.
+     R27 fix — 原本用 `--wb-bg-pill-active`(实心 CTA 胶囊色,亮色 = 75% 黑),
+     而本行的文字色是 `--wb-text-strong`(亮色下接近纯黑)→ 亮色主题里
+     被选中/悬停的那一行是黑底黑字,完全看不见。列表行用"比容器深一层的
+     中性表面"才对,文字色不用跟着换。 */
+  background: var(--wb-bg-active);
 }
 .mention-picker__kind-icon {
   display: inline-flex;
@@ -672,11 +676,11 @@
 }
 [data-theme="dark"] .mention-picker__item--active,
 .dark .mention-picker__item--active,
-[data-theme="dark"] .mention-picker__item--active,
-.dark .mention-picker__item--active,
 .wb-theme--dark .mention-picker__item--active {
-  /* R8.61 — Dark neutral pill, matching light theme. */
-  background: var(--wb-bg-pill-active);
+  /* R8.61 / R27 — 暗色侧同样换成中性活动表面(原注释说"matching light theme",
+     但两边都指向实心胶囊色,结果是两边都不对)。--wb-bg-active 暗色下是
+     10% 白,叠在弹层表面之上,文字仍是 --wb-text-strong。 */
+  background: var(--wb-bg-active);
 }
 
 /* ========================================================================

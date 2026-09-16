@@ -75,7 +75,9 @@
 }
 .question-inline__option--selected {
   border-color: var(--wb-border-default);
-  background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
+  /* R27 — 同 composer 的 slash 菜单:选中行不能用实心 CTA 胶囊色
+     (亮色 75% 黑),否则配 --wb-text-strong 会变成黑底黑字。 */
+  background: var(--wb-bg-active, rgba(0, 0, 0, 0.08));
   color: var(--wb-text-strong);
 }
 .question-inline__custom-input {

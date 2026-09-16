@@ -220,11 +220,15 @@ describe.skipIf(!canLaunch)("R8.5 live electron probe", () => {
     expect(report.r87_mention_picker.width).toBe("420px");
     expect(report.r87_mention_picker.borderRadius).toBe("12px");
     expect(report.r87_mention_picker.hasEnterAnim).toBe("ob-mention-picker-in");
-    // R8.61 把选中态从"品牌 8% 混合"改成了中性 pill(对齐 WorkBuddy 分段
-    // 控件),品牌色只留给 streaming 指示条。契约见
+    // R8.61 把选中态从"品牌 8% 混合"改成了中性表面,品牌色只留给
+    // streaming 指示条。契约见
     // src/styles/__tests__/mention-picker-neutral-r8.61.test.ts。
-    // 亮色 --wb-bg-pill-active = rgba(0, 0, 0, 0.75)。
-    expect(report.r87_mention_picker.activeItemBg).toBe("rgba(0, 0, 0, 0.75)");
+    // R27 修正:列表行不能用"实心 CTA 胶囊色"(--wb-bg-pill-active,亮色
+    // = 75% 黑),那样配 --wb-text-strong 就是黑底黑字。改用"比容器深一层
+    // 的中性表面" --wb-bg-active;亮色 = color-mix(black 8%, transparent)。
+    expect(report.r87_mention_picker.activeItemBg).toBe("color(srgb 0 0 0 / 0.08)");
+    // 且不能是实心胶囊色(否则又回到黑底黑字)。
+    expect(report.r87_mention_picker.activeItemBg).not.toBe("rgba(0, 0, 0, 0.75)");
     // 且绝不是品牌色(0.760784 0.603922 是 #00C29A 的 srgb 分量)。
     expect(report.r87_mention_picker.activeItemBg).not.toMatch(
       /0\.760784\s+0\.603922/,

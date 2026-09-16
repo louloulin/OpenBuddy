@@ -543,7 +543,8 @@
 .email-sidebar__section button { min-height: 30px; padding: 6px 9px; border: 0; border-radius: 7px; background: transparent; color: var(--wb-text-medium, #4b5563); text-align: left; cursor: pointer; font: inherit; font-size: 12px; }
 .email-sidebar__section button:hover { background: var(--wb-bg-hover, rgba(37, 99, 235, .07)); }
 .email-sidebar__section button.is-active {
-  background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.08));
+  /* R27 — 选中行用中性的 active 表面色,不用实心 CTA 胶囊色(亮色 75% 黑)。 */
+  background: var(--wb-bg-active, rgba(0, 0, 0, 0.08));
   color: var(--wb-text-strong);
   font-weight: 650;
 }

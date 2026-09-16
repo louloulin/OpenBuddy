@@ -3114,7 +3114,7 @@
 .model-tags__chip--on {
   background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
   border-color: var(--wb-border-default);
-  color: var(--wb-text-strong);
+  color: var(--wb-pill-active-fg);
 }
 .model-tags__chip:hover {
   border-color: var(--wb-brand);
@@ -3916,7 +3916,7 @@
 .create-colleague-tag { padding: 6px 14px; border: 1px solid var(--wb-border-default); border-radius: 8px; background: transparent; font-size: 13px; cursor: pointer; color: var(--wb-text-medium); transition: all .15s; }
 .create-colleague-tag--on {
   background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
-  color: var(--wb-text-strong);
+  color: var(--wb-pill-active-fg);
   border-color: var(--wb-border-default);
 }
 
@@ -4257,7 +4257,7 @@
 .quota-panel__period-btn{padding:2px 12px;border:1px solid var(--wb-border-default);background:var(--wb-bg-primary);color:var(--wb-text-medium);border-radius:6px;font-size:11px;cursor:pointer}
 .quota-panel__period-btn.active {
   background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
-  color: var(--wb-text-strong);
+  color: var(--wb-pill-active-fg);
   border-color: var(--wb-border-default);
 }
 .quota-panel__stats{display:flex;gap:16px;padding:12px 14px}
@@ -4970,7 +4970,7 @@
 .email-action-center__filter-group button:hover { border-color: #8bb7ff; background: #f2f7ff; }
 .email-action-center__filter-group button.is-active {
   background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
-  color: var(--wb-text-strong);
+  color: var(--wb-pill-active-fg);
   border-color: var(--wb-border-default);
 }
 .email-action-center__filter-group button small {
@@ -5044,7 +5044,7 @@
 .email-action-center__sort button:hover { border-color: #8bb7ff; background: #f2f7ff; }
 .email-action-center__sort button.is-active {
   background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
-  color: var(--wb-text-strong);
+  color: var(--wb-pill-active-fg);
   border-color: var(--wb-border-default);
 }
 

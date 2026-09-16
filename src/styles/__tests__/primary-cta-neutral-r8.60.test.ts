@@ -154,7 +154,6 @@ describe("R8.60 关键 CTA 选择器不再用品牌色实心填充", () => {
       ".create-colleague-tag--on",
       ".quota-panel__period-btn.active",
       ".proj-picker-check--on",
-      ".question-inline__option--selected",
       ".email-action-center__filter-group button.is-active",
       ".email-action-center__sort button.is-active",
     ];

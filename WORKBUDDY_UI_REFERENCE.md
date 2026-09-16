@@ -1509,6 +1509,67 @@ R23:  ok=20 dead=0 ext=19 no-impl=0    (39 槽)  ← 注册 / 消费 / 分类全
 - 全量:`npx vitest run` → **780 文件 / 7546 通过 / 0 失败 / 16 跳过**;
   `tsc --noEmit` → 0 错;`electron-vite build` → 成功。
 
+## R27 — 「暗色补全和浅色有差距」:真正不可读的是**亮色**主题
+
+用户原话是"黑色主题下 chatinput 框展示补全和白色主题存在差距"。真机把两套主题的
+`/` 补全菜单全部量出来之后,发现方向正好相反 —— **亮色主题下被选中的第一行是
+黑底黑字**:
+
+| | 选中行背景 | 选中行文字 | 结论 |
+|---|---|---|---|
+| 亮色(修复前) | `rgba(0, 0, 0, 0.75)` | `rgba(0, 0, 0, 0.9)` | 对比度 ≈ **1.0** —— 完全看不见 |
+| 暗色(修复前) | `rgba(255, 255, 255, 0.18)` | `rgba(255, 255, 255, 0.92)` | ≈ 4.1 —— 勉强 |
+| 亮色(修复后) | `color(srgb 0 0 0 / 0.08)` | `rgba(0, 0, 0, 0.9)` | **14.92** |
+| 暗色(修复后) | `rgba(255, 255, 255, 0.1)` | `rgba(255, 255, 255, 0.92)` | **9.17** |
+
+### 根因:把"实心 CTA 胶囊色"当成"列表选中行底色"
+
+`--wb-bg-pill-active` 的语义是**实心主操作胶囊**(亮色 `rgba(0,0,0,0.75)` 黑底 +
+白字,给发送按钮 / 场景 tab 选中态用)。`.slash-commands__item--active` 拿它当列表
+行底色,却配了 `--wb-text-strong`(亮色下是深色文字)→ 黑底黑字。
+
+同一处误用还有另外两族,一并修掉 —— 全仓扫描后发现**9 条规则**都踩了同一个坑:
+
+**A. 列表行 / 选项行**(选中行应该只是"比容器深一层的表面"):
+`composer.css` 的 `.slash-commands__item--active`(+ `:hover`)、`misc.css` 的
+`.mention-picker__item--active/:hover`(这就是用户说的"chatinput 补全",亮色下
+悬停/选中行同样是黑底黑字)、`modals.css` 的 `.question-inline__option--selected`、
+`email.css` 的 `.email-sidebar__section button.is-active` → 统一改用
+`--wb-bg-active`(亮 8% 黑 / 暗 10% 白)。
+
+**B. 实心胶囊 / 选中片**(这里"黑底"是对的,错的是文字色跟着正文走了):
+`home.css` 的 `.model-tags__chip--on` / `.create-colleague-tag--on` /
+`.quota-panel__period-btn.active` / `.email-action-center__filter-group button.is-active` /
+`.email-action-center__sort button.is-active`(含 `theme-dark-overrides.css` 里的暗色镜像)
+→ 新增**配对前景令牌** `--wb-pill-active-fg`(亮 = 白,暗 = 主题主文字色),
+文字色从 `--wb-text-strong` 换成它。胶囊的底色不动 —— 黑底白字才是它本来的样子。
+
+新增的守卫测试 `src/styles/__tests__/pill-active-contrast-r27.test.ts` 把这条规则
+静态锁死:**任何把 `--wb-bg-pill-active` 当背景的规则,都不允许用 `--wb-text-*`
+当文字色**。以后再有人复制粘贴这个组合,CI 直接红。
+
+3px 左侧强调条仍走 `--wb-bg-pill-active`(它只做一条 3px 指示,亮暗都可见)。
+
+### 测试
+
+- 新增 `scripts/electron/_probe-r27-completion-theme.mjs` + CI wrapper(4 条):探针在
+  页面内按 WCAG 公式算对比度(半透明色先合成到菜单背景,同时支持 `rgb()` /
+  `rgba()` / `color(srgb …)` 三种 computed 写法),断言两套主题的"命令名 + 描述"
+  都 ≥ 4.5,并断言选中态**确实随主题变化**。
+- 截图留在 `tests/screenshots/r27-completion-{light,dark}.png` 作为 PR 视觉资产。
+- 探针同时量了 `@` mention 补全(它 hover 与 active 共用一条规则,是同一个坑的
+  第二处)。全新安装下 mention 列表为空(没有索引到文件),所以只作诊断输出;
+  该路径的契约由上面的静态守卫测试覆盖。
+- 顺带复核了"会话多时的自适应滚动条":`src/styles/shell.css` 里侧栏已有
+  `flex:1 + min-height:0 + thin 常驻滚动条(亮暗两套 thumb 令牌)`,不需要改。
+- 改了 4 条既有 CSS 断言(语义已变,不是放宽标准):
+  `primary-cta-neutral-r8.60.test.ts`(把 `.question-inline__option--selected`
+  从"实心胶囊"组移出)、`mention-picker-neutral-r8.61.test.ts`(2 处)、
+  `slash-commands-active-r8.61.test.ts`(1 处)、`composer-visual-r8.7.test.ts`(1 处),
+  以及真机 `scripts/electron/_r8_5-probe.test.mjs` 的 mention 选中行断言。
+- 全量结果:vitest **782 文件 / 7553 通过 / 16 skip**,`tsc --noEmit` 0 错,
+  `electron-vite build` 成功,真机探针 R23(4)+ R26(2)+ R27(4)全绿。
+
 ## 当前进度(按四期主线)
 
 | 期 | 内容 | 进度 | 说明 |
@@ -1526,8 +1587,6 @@ R23:  ok=20 dead=0 ext=19 no-impl=0    (39 槽)  ← 注册 / 消费 / 分类全
 2. **R25 — Pi 扩展市场多源 registry**:当前是单源,多源 + 权重 + 离线缓存;
    `agent:pi-market-*` 七个 channel 已就位,只需扩 registry 层。
 3. **R27 — 用户可见的遗留问题**(与 WorkBuddy 对齐的最后几处):
-   - 深色主题下 Composer 补全菜单与浅色主题的观感差异(待真机复核);
-   - 会话数量大时侧栏滚动的自适应表现(待真机复核);
    - 顶栏 / 菜单栏宽度与信息密度的再平衡。
 4. **加固项**:math / mermaid 编辑侧 round-trip;`details` 浮层的窄屏表现。
 

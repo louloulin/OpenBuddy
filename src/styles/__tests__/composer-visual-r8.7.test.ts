@@ -82,8 +82,10 @@ describe("R8.7 Composer visual polish CSS", () => {
   it("mention-picker active item uses neutral pill (NOT brand colour-mix)", () => {
     const m = ruleBody(allCss, ".mention-picker__item--active,\n.mention-picker__item:hover");
     expect(m).toBeTruthy();
-    // R8.61 - Neutral contract: active uses --wb-bg-pill-active.
-    expect(m!).toMatch(/var\(--wb-bg-pill-active\)/);
+    // R8.61 / R27 - Neutral contract: active uses a neutral *surface*
+    // (--wb-bg-active). 早期用 --wb-bg-pill-active(亮色 75% 黑),配本行
+    // 深色文字 → 亮色主题下黑底黑字。
+    expect(m!).toMatch(/var\(--wb-bg-active\)/);
     expect(m!).not.toMatch(/color-mix\(in srgb,\s*var\(--wb-brand/);
   });
 

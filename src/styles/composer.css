@@ -80,25 +80,29 @@
   padding-left: 12px;
 }
 
-/* R8.61 — Active item (keyboard-selected) gets a neutral pill
-   background + 3px left bar in the same neutral as the workbuddy-parity
-   pill-active token. Brand colours are reserved for status/streaming
-   accents, not for "selected row" affordances inside a chat popover. */
+/* R8.61 / R27 — Active item (keyboard-selected) gets a neutral surface
+   + 3px left bar. Brand colours are reserved for status/streaming
+   accents, not for "selected row" affordances inside a chat popover.
+
+   R27 fix — 这里原本用 `--wb-bg-pill-active`,那是**实心 CTA 胶囊**色
+   (亮色 = rgba(0,0,0,0.75) 黑底白字按钮)。用在列表行上,配
+   `--wb-text-strong` 就变成"黑底黑字":亮色主题下被选中的第一行完全看不见
+   (真机实测 bg rgba(0,0,0,0.75) / color rgba(0,0,0,0.9))。
+   改用 `--wb-bg-active` —— 亮色是 8% 黑、暗色是 10% 白,两套都只是"比容器
+   更深一层的表面",文字色不用换。 */
 .slash-commands__item--active {
-  background: var(--wb-bg-pill-active);
+  background: var(--wb-bg-active);
   color: var(--wb-text-strong);
   padding-left: 13px;
-  /* 3px left bar uses the brand token ONLY as a single accent indicator,
-     matching the workbuddy-parity selected-pill pattern (subtle inset
-     bar on the left so the row reads as "selected" without colouring the
-     whole surface). */
+  /* 3px left bar 只作为"选中"的单一强调指示:亮/暗两套都用当前文字色的中性
+     替代(黑 75% / 白 18%),保证在任意主题下都比背景更深或更亮。 */
   box-shadow: inset 3px 0 0 0 var(--wb-bg-pill-active);
 }
 
 .slash-commands__item--active:hover {
-  /* Active + hover: keep the neutral pill but slightly stronger so the
-     user still sees that hovering is meaningful. */
-  background: var(--wb-bg-hover);
+  /* Active + hover 保持同一表面 —— 悬停已经在 --item:hover 里给了 padding
+     反馈,再叠加一层比 active 更弱的背景反而会让选中态"跳一下"。 */
+  background: var(--wb-bg-active);
 }
 
 .slash-commands__name {
