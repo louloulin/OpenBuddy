@@ -147,7 +147,10 @@
       "@openbuddy/ui-onboarding/components/OnboardingWizard": ["./packages/ui/openbuddy-ui-onboarding/src/components/OnboardingWizard.tsx"],
       "@openbuddy/ui-onboarding/components/WhatsNewCard": ["./packages/ui/openbuddy-ui-onboarding/src/components/WhatsNewCard.tsx"],
       "@openbuddy/ui-onboarding/tour/TourSpotlight": ["./packages/ui/openbuddy-ui-onboarding/src/tour/TourSpotlight.tsx"],
-      "@openbuddy/ui-files-tree/components/LazyFileTree": ["./packages/ui/openbuddy-ui-files-tree/src/components/LazyFileTree.tsx"]
+      "@openbuddy/ui-files-tree/components/LazyFileTree": ["./packages/ui/openbuddy-ui-files-tree/src/components/LazyFileTree.tsx"],
+      "@openbuddy/ui-library": ["./packages/ui/openbuddy-ui-library/src/index.ts"],
+      "@openbuddy/ui-library/client": ["./packages/ui/openbuddy-ui-library/src/client.tsx"],
+      "@openbuddy/ui-library/invariant": ["./packages/ui/openbuddy-ui-library/src/invariant.ts"]
     }
   },
   "include": ["src", "../assets.d.ts"]

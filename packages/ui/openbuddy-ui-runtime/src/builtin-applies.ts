@@ -46,6 +46,7 @@ import { apply as filesApply } from "@openbuddy/ui-files/client";
 import { apply as filesTreeApply } from "@openbuddy/ui-files-tree/client";
 import { apply as homeApply } from "@openbuddy/ui-home/client";
 import { apply as layoutApply } from "@openbuddy/ui-layout/client";
+import { apply as libraryApply } from "@openbuddy/ui-library/client";
 import { apply as markdownApply } from "@openbuddy/ui-markdown/client";
 import { apply as mcpApply } from "@openbuddy/ui-mcp/client";
 import { apply as modulesApply } from "@openbuddy/ui-modules/client";
@@ -82,6 +83,7 @@ export const BUILTIN_UI_APPLIES: ReadonlyArray<BuiltinUiPluginSlotTrack> = [
   { pkg: "@openbuddy/ui-files-tree", apply: filesTreeApply, description: "Virtualized, multi-select file / knowledge tree." },
   { pkg: "@openbuddy/ui-home", apply: homeApply, description: "Home / dashboard surface." },
   { pkg: "@openbuddy/ui-layout", apply: layoutApply, description: "Layout chrome (panels, splits, resize). " },
+  { pkg: "@openbuddy/ui-library", apply: libraryApply, description: "资料库 — user library hub (files / knowledge / cloud / inspiration) with pluggable sections." },
   { pkg: "@openbuddy/ui-markdown", apply: markdownApply, description: "Markdown renderer + editor primitives." },
   { pkg: "@openbuddy/ui-mcp", apply: mcpApply, description: "MCP server picker / plugin panel." },
   { pkg: "@openbuddy/ui-modules", apply: modulesApply, description: "Module registry + activation surface." },

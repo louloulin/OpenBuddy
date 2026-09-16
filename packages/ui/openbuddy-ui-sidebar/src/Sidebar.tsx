@@ -446,11 +446,24 @@ function MoreDropdown({
     icon: React.ReactNode;
     action: () => void;
   };
-  type MoreGroup = { id: string; label: string; items: MoreItem[] };
+  type MoreGroup = {
+    id: string;
+    label: string;
+    items: MoreItem[];
+    /** R37 — 分组标题可点:进入该分组的「主页面」(目前只有资料库有)。 */
+    onOpen?: () => void;
+  };
   const MORE_GROUPS: MoreGroup[] = [
     {
       id: "library",
       label: "资料库",
+      // R37 — 「更多」以前只有一个长下拉:资料库三个面板各自直达,却没有
+      // "我到底有哪些资料"的落点。分组标题现在进资料库页(分区 = 我的文件 /
+      // 知识库 / 云存储 / 灵感,由内核 `library.section` 槽装配)。
+      onOpen: () => {
+        setOpen(false);
+        onNavigate("资料库");
+      },
       items: [
         {
           id: "my_files",
@@ -598,7 +611,21 @@ function MoreDropdown({
         <div className="sidebar__more-popover" role="menu">
           {MORE_GROUPS.map((group) => (
             <div key={group.id} className="sidebar__more-group">
-              <div className="sidebar__more-group-label">{group.label}</div>
+              {group.onOpen ? (
+                <button
+                  type="button"
+                  className="sidebar__more-group-label sidebar__more-group-label--link"
+                  data-testid={`sidebar-more-group-${group.id}`}
+                  onClick={group.onOpen}
+                >
+                  {group.label}
+                  <span className="sidebar__more-group-label-hint" aria-hidden="true">
+                    打开资料库
+                  </span>
+                </button>
+              ) : (
+                <div className="sidebar__more-group-label">{group.label}</div>
+              )}
               {group.items.map((item) => (
                 <button
                   key={item.id}

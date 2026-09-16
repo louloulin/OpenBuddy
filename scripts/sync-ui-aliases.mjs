@@ -153,6 +153,19 @@ function insertMissingEntries(raw, block, missing) {
 
   let cutAt = block.end;
   while (cutAt > block.open + 1 && /\s/.test(raw[cutAt - 1])) cutAt--;
+  // 空 paths 块(新建包用 `"paths": {}` 占位时会走到这里):不能补前导逗号,
+  // 否则会写出 `{,` 这种非法 JSON —— vitest 解析该 tsconfig 时直接报错。
+  if (raw[cutAt - 1] === "{") {
+    return (
+      raw.slice(0, cutAt) +
+      "\n" +
+      newLines +
+      "\n" +
+      closingIndent +
+      "}" +
+      raw.slice(block.end + 1)
+    );
+  }
   if (raw[cutAt - 1] !== ",") {
     const lastEntryEnd = cutAt;
     return raw.slice(0, lastEntryEnd) + ",\n" + newLines + "\n" + closingIndent + "}" + raw.slice(block.end + 1);

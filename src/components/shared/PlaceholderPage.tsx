@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import { AgentToolIcon } from "@openbuddy/ui-primitives/icons";
 import { assistantWorkspaceSectionFromRoute } from "@openbuddy/ui-shared";
 import { AssistantWorkbenchNav } from "@openbuddy/ui-shell";
@@ -37,6 +37,8 @@ const NotifyChannelsPanel = lazy(() => import("@openbuddy/ui-mcp").then((m) => (
 const UsageQuotaPanel = lazy(() => import("@openbuddy/ui-billing").then((m) => ({ default: m.UsageQuotaPanel })));
 const EmailPanel = lazy(() => import("@openbuddy/ui-email").then((m) => ({ default: m.EmailPanel })));
 const PolicySettingsPanel = lazy(() => import("@openbuddy/ui-settings").then((m) => ({ default: m.PolicySettingsPanel })));
+// R37 — 资料库页整体走内核 `placeholder.library` 槽(ui-library 注册默认实现)。
+const LibraryPage = lazy(() => import("@openbuddy/ui-library").then((m) => ({ default: m.LibraryPage })));
 
 interface PlaceholderPageProps {
   label: string;
@@ -122,6 +124,25 @@ function PlaceholderPageInner({
   // 实现整体替换这个面板(例如换成企业内部的专家目录)。必须在所有 early return
   // 之前调用 hook —— 与下面 `files.tree` / `editor.body` 的接线方式一致。
   const ExpertsPanelSlot = useSlotComponent("experts.panel", ExpertsPanel);
+  // R37 — 「资料库 / 更多」与「灵感」都落到资料库页:`灵感` 是它的一个分区
+  // (`initialSection="inspiration"`),于是这个从 Stage G-1c 起一直空着的
+  // 入口第一次有了真内容;插件注册更高优先级即可整体替换这一页。
+  const LibrarySlot = useSlotComponent("placeholder.library", LibraryPage);
+
+  // 知识条目打开:有 url 就交给系统打开,否则退化成提示。原先这段内联在
+  // 「知识库」分支里,现在资料库分区与独立路由共用同一份实现。
+  const openKnowledgeEntry = useCallback(
+    (id: string, url?: string) => {
+      if (url) {
+        void invoke("open_path", { path: url, cwd: null }).catch(() =>
+          onToast?.(`无法打开知识条目：${id}`),
+        );
+        return;
+      }
+      onToast?.(`打开知识条目 ${id}`);
+    },
+    [onToast],
+  );
   if (label === "助理·本地助理") {
     return (
       <AssistantLocalWorkspace
@@ -236,31 +257,33 @@ function PlaceholderPageInner({
     );
   }
 
+  // R37 — 资料库:我的文件 / 知识库 / 云存储 / 灵感 四个分区(内置也走
+  // `library.section` 槽,插件可追加或顶替)。此前这里是空壳占位。
   if (label === "更多" || label === "资料库") {
-    // Stage G-1c restoration: ResourcesPanel was removed when openbuddy-memory
-    // Cordis backend was deleted. Replaced with an empty placeholder shell so
-    // route navigation still resolves without breaking.
     return (
-      <div className="placeholder-page placeholder-page--panel">
-        <h2 className="settings-section__title">资料库</h2>
-        <p className="settings-section__desc">
-          资源目录由 pi-resource 接管；本视图在 pi-native 重建完成前先提供占位入口。
-        </p>
-      </div>
+      <LibrarySlot
+        initialSection="my-files"
+        cwd={cwd}
+        sessionId={sessionId}
+        onToast={onToast}
+        onLaunch={onLaunch}
+        onOpenKnowledge={openKnowledgeEntry}
+      />
     );
   }
 
-  // Stage G-1c restoration: InspirationPanel removed (openbuddy-inspiration
-  // backend was deleted in Stage B-2; the panel depended on it). Route still
-  // resolves, just shows a placeholder.
+  // R37 — 「灵感」不再是停用页,它就是资料库的 inspiration 分区
+  // (SceneTabs + PracticeCases,数据来自 HOME_MODES 这一份单一来源)。
   if (label === "灵感") {
     return (
-      <div className="placeholder-page placeholder-page--panel">
-        <h2 className="settings-section__title">灵感</h2>
-        <p className="settings-section__desc">
-          灵感面板后端已迁移至 pi-native 插件；本视图暂时停用。
-        </p>
-      </div>
+      <LibrarySlot
+        initialSection="inspiration"
+        cwd={cwd}
+        sessionId={sessionId}
+        onToast={onToast}
+        onLaunch={onLaunch}
+        onOpenKnowledge={openKnowledgeEntry}
+      />
     );
   }
 
@@ -272,16 +295,7 @@ function PlaceholderPageInner({
   if (label === "知识库") {
     return (
       <div className="placeholder-page placeholder-page--panel">
-        <KnowledgeBasePanel
-          onOpen={(id, url) => {
-            if (url) {
-              void invoke("open_path", { path: url, cwd: null }).catch(() => onToast?.(`无法打开知识条目：${id}`));
-              return;
-            }
-            onToast?.(`打开知识条目 ${id}`);
-          }}
-          onToast={onToast}
-        />
+        <KnowledgeBasePanel onOpen={openKnowledgeEntry} onToast={onToast} />
       </div>
     );
   }

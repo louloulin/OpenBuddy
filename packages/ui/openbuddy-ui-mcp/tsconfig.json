@@ -150,7 +150,10 @@
       "@openbuddy/ui-onboarding/tour/tour-steps": ["./packages/ui/openbuddy-ui-onboarding/src/tour/tour-steps.ts"],
       "@openbuddy/ui-onboarding/tour/TourModal": ["./packages/ui/openbuddy-ui-onboarding/src/tour/TourModal.tsx"],
       "@openbuddy/ui-onboarding/tour/TourSpotlight": ["./packages/ui/openbuddy-ui-onboarding/src/tour/TourSpotlight.tsx"],
-      "@openbuddy/ui-files-tree/components/LazyFileTree": ["./packages/ui/openbuddy-ui-files-tree/src/components/LazyFileTree.tsx"]
+      "@openbuddy/ui-files-tree/components/LazyFileTree": ["./packages/ui/openbuddy-ui-files-tree/src/components/LazyFileTree.tsx"],
+      "@openbuddy/ui-library": ["./packages/ui/openbuddy-ui-library/src/index.ts"],
+      "@openbuddy/ui-library/client": ["./packages/ui/openbuddy-ui-library/src/client.tsx"],
+      "@openbuddy/ui-library/invariant": ["./packages/ui/openbuddy-ui-library/src/invariant.ts"]
     },
     "types": [
       "node"
