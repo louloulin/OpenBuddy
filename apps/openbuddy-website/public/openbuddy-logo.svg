@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
   <!--
-    OpenBuddy mark v7 - cute robot pet companion.
-    Round dome head, big luminous eyes (oversized for cute ratio), small
-    heart-shaped antenna, soft chubby cheeks, gentle smile. No sharp angles,
-    no industrial panels — friendly proportions throughout.
-    Lavender + indigo + warm pink heart for the "buddy" warmth.
-    Original character design using basic geometric primitives.
+    OpenBuddy mark v8 - mecha mushroom spirit.
+    Original friendly forest scout: a round dome body wearing a mushroom cap,
+    big luminous eyes, glowing visor band, stubby legs/arms, gentle smile.
+    Mushroom cap uses generic dot-pattern motif (not tied to any branded IP).
+    Mecha panels + mushroom motif = 'AI forest companion'.
+    Lavender + warm pink + soft cyan mushroom dots.
   -->
   <defs>
     <radialGradient id="bgRad" cx="50%" cy="38%" r="70%">
@@ -13,87 +13,118 @@
       <stop offset=".55" stop-color="#15123A"/>
       <stop offset="1" stop-color="#0A0820"/>
     </radialGradient>
-    <radialGradient id="dome" cx="50%" cy="35%" r="65%">
+    <radialGradient id="body" cx="50%" cy="40%" r="60%">
       <stop stop-color="#FFFFFF"/>
-      <stop offset=".45" stop-color="#D6D3FF"/>
-      <stop offset="1" stop-color="#7A75E0"/>
+      <stop offset=".5" stop-color="#E8E5FF"/>
+      <stop offset="1" stop-color="#9C95E8"/>
     </radialGradient>
-    <radialGradient id="cheek" cx="50%" cy="50%" r="50%">
-      <stop stop-color="#FFB5D9" stop-opacity=".6"/>
-      <stop stop-color="#FFB5D9" stop-opacity="0"/>
+    <radialGradient id="cap" cx="50%" cy="40%" r="60%">
+      <stop stop-color="#FF9DC9"/>
+      <stop offset=".5" stop-color="#E84A8E"/>
+      <stop offset="1" stop-color="#8C2A60"/>
+    </radialGradient>
+    <radialGradient id="capRim" cx="50%" cy="50%" r="60%">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FFC8DC"/>
     </radialGradient>
     <radialGradient id="eye" cx="50%" cy="50%" r="50%">
       <stop stop-color="#FFFFFF"/>
-      <stop offset=".45" stop-color="#C0BFFF"/>
-      <stop offset="1" stop-color="#5A5588"/>
+      <stop stop-color="#5A5588"/>
     </radialGradient>
-    <linearGradient id="heart" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#FF8FBE"/>
-      <stop offset="1" stop-color="#E84A8E"/>
+    <linearGradient id="visor" x1="280" y1="560" x2="744" y2="624" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7A75E0"/>
+      <stop offset=".5" stop-color="#C0BFFF"/>
+      <stop offset="1" stop-color="#E8E5FF"/>
     </linearGradient>
     <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
   </defs>
 
   <g clip-path="url(#clip)">
     <rect x="38" y="38" width="948" height="948" fill="url(#bgRad)"/>
-    <!-- soft sparkles -->
-    <circle cx="160" cy="180" r="3" fill="#E8E5FF" opacity=".7"/>
-    <circle cx="860" cy="160" r="4" fill="#E8E5FF" opacity=".75"/>
-    <circle cx="120" cy="860" r="3" fill="#E8E5FF" opacity=".65"/>
+    <!-- forest sparkle dots -->
+    <circle cx="140" cy="180" r="3" fill="#FFC8DC" opacity=".7"/>
+    <circle cx="880" cy="160" r="4" fill="#FFC8DC" opacity=".75"/>
+    <circle cx="120" cy="860" r="3" fill="#E8E5FF" opacity=".6"/>
     <circle cx="880" cy="880" r="3.5" fill="#E8E5FF" opacity=".7"/>
-    <circle cx="200" cy="500" r="2.5" fill="#E8E5FF" opacity=".55"/>
-    <circle cx="820" cy="500" r="2.5" fill="#E8E5FF" opacity=".55"/>
+    <circle cx="200" cy="500" r="2.5" fill="#FFC8DC" opacity=".5"/>
+    <circle cx="820" cy="500" r="2.5" fill="#FFC8DC" opacity=".5"/>
+    <!-- tiny grass silhouettes -->
+    <path d="M100 880 L100 850 M120 880 L120 845 M140 880 L140 855" stroke="#7A75E0" stroke-width="4" stroke-linecap="round" opacity=".4"/>
+    <path d="M880 880 L880 850 M900 880 L900 845 M920 880 L920 855" stroke="#7A75E0" stroke-width="4" stroke-linecap="round" opacity=".4"/>
 
-    <!-- heart antenna on top of dome -->
-    <line x1="512" y1="170" x2="512" y2="244" stroke="#9C95E8" stroke-width="14" stroke-linecap="round"/>
-    <g transform="translate(512 156)">
-      <path d="M0 14 C-22 -10 -54 -10 -54 18 C-54 42 -22 60 0 84 C22 60 54 42 54 18 C54 -10 22 -10 0 14 Z" fill="url(#heart)" transform="scale(0.55)"/>
-      <ellipse cx="-12" cy="-2" rx="10" ry="6" fill="#FFFFFF" opacity=".7"/>
+    <!-- mushroom cap: classic dome with white spots -->
+    <!-- underside highlight ring -->
+    <ellipse cx="512" cy="396" rx="320" ry="40" fill="url(#capRim)"/>
+    <!-- main cap dome (semi-ellipse) -->
+    <path d="M192 396 Q192 168 512 168 Q832 168 832 396 Z" fill="url(#cap)"/>
+    <!-- cap shine highlight -->
+    <ellipse cx="380" cy="248" rx="120" ry="36" fill="#FFFFFF" opacity=".5"/>
+    <!-- mushroom spots -->
+    <ellipse cx="340" cy="316" rx="40" ry="28" fill="#FFFFFF" opacity=".92"/>
+    <ellipse cx="540" cy="232" rx="32" ry="24" fill="#FFFFFF" opacity=".92"/>
+    <ellipse cx="680" cy="312" rx="44" ry="32" fill="#FFFFFF" opacity=".92"/>
+    <ellipse cx="460" cy="368" rx="22" ry="16" fill="#FFFFFF" opacity=".92"/>
+    <ellipse cx="730" cy="228" rx="18" ry="14" fill="#FFFFFF" opacity=".85"/>
+
+    <!-- head/face dome below the cap (the mushroom stem head) -->
+    <rect x="240" y="396" width="544" height="392" rx="180" fill="url(#body)"/>
+    <!-- mecha panel seam -->
+    <path d="M240 580 Q512 600 784 580" fill="none" stroke="#9C95E8" stroke-width="6" opacity=".5"/>
+    <!-- mecha rivets at sides -->
+    <circle cx="270" cy="500" r="6" fill="#5A5588"/>
+    <circle cx="270" cy="660" r="6" fill="#5A5588"/>
+    <circle cx="754" cy="500" r="6" fill="#5A5588"/>
+    <circle cx="754" cy="660" r="6" fill="#5A5588"/>
+
+    <!-- visor band -->
+    <rect x="298" y="492" width="428" height="92" rx="46" fill="#0F0D24"/>
+    <rect x="298" y="492" width="428" height="92" rx="46" fill="url(#visor)" opacity=".92"/>
+    <!-- big luminous eyes (oversized for cute) -->
+    <circle cx="412" cy="538" r="56" fill="url(#eye)"/>
+    <circle cx="612" cy="538" r="56" fill="url(#eye)"/>
+    <circle cx="412" cy="548" r="32" fill="#15123A"/>
+    <circle cx="612" cy="548" r="32" fill="#15123A"/>
+    <!-- twin catchlights per eye (cute ratio) -->
+    <ellipse cx="426" cy="528" rx="14" ry="18" fill="#FFFFFF"/>
+    <ellipse cx="626" cy="528" rx="14" ry="18" fill="#FFFFFF"/>
+    <circle cx="400" cy="558" r="6" fill="#FFFFFF" opacity=".8"/>
+    <circle cx="600" cy="558" r="6" fill="#FFFFFF" opacity=".8"/>
+
+    <!-- cheek blush -->
+    <circle cx="320" cy="660" r="32" fill="#FF9DC9" opacity=".55"/>
+    <circle cx="704" cy="660" r="32" fill="#FF9DC9" opacity=".55"/>
+
+    <!-- gentle smile under the visor -->
+    <path d="M460 700 Q512 740 564 700" fill="none" stroke="#5A5588" stroke-width="14" stroke-linecap="round"/>
+
+    <!-- stubby arms with mitten hands -->
+    <ellipse cx="170" cy="660" rx="60" ry="80" fill="url(#body)"/>
+    <ellipse cx="170" cy="660" rx="48" ry="68" fill="#9C95E8" opacity=".5"/>
+    <circle cx="170" cy="720" r="44" fill="url(#body)"/>
+    <ellipse cx="854" cy="660" rx="60" ry="80" fill="url(#body)"/>
+    <ellipse cx="854" cy="660" rx="48" ry="68" fill="#9C95E8" opacity=".5"/>
+    <circle cx="854" cy="720" r="44" fill="url(#body)"/>
+
+    <!-- stubby legs/feet at the bottom -->
+    <ellipse cx="380" cy="850" rx="64" ry="34" fill="url(#body)"/>
+    <ellipse cx="380" cy="850" rx="48" ry="22" fill="#9C95E8" opacity=".5"/>
+    <ellipse cx="644" cy="850" rx="64" ry="34" fill="url(#body)"/>
+    <ellipse cx="644" cy="850" rx="48" ry="22" fill="#9C95E8" opacity=".5"/>
+
+    <!-- tiny floating mushroom buddy on shoulder (signature element) -->
+    <g transform="translate(160 360)">
+      <ellipse cx="0" cy="6" rx="28" ry="6" fill="url(#capRim)"/>
+      <path d="M-26 6 Q-26 -22 0 -22 Q26 -22 26 6 Z" fill="url(#cap)"/>
+      <circle cx="-8" cy="-8" r="3.5" fill="#FFFFFF"/>
+      <circle cx="10" cy="-4" r="3" fill="#FFFFFF"/>
+      <rect x="-10" y="6" width="20" height="14" rx="6" fill="url(#body)"/>
     </g>
 
-    <!-- dome head: a big rounded rectangle (no hard corners) -->
-    <rect x="176" y="244" width="672" height="560" rx="280" fill="url(#dome)"/>
-
-    <!-- soft shadow under dome -->
-    <ellipse cx="512" cy="820" rx="320" ry="22" fill="#0F0D24" opacity=".35"/>
-
-    <!-- cheek blush circles -->
-    <circle cx="280" cy="600" r="56" fill="url(#cheek)"/>
-    <circle cx="744" cy="600" r="56" fill="url(#cheek)"/>
-
-    <!-- eye sockets (soft dark wells) -->
-    <ellipse cx="400" cy="496" rx="106" ry="116" fill="#15123A"/>
-    <ellipse cx="624" cy="496" rx="106" ry="116" fill="#15123A"/>
-
-    <!-- glowing eye irises -->
-    <circle cx="400" cy="500" r="86" fill="url(#eye)"/>
-    <circle cx="624" cy="500" r="86" fill="url(#eye)"/>
-    <!-- pupils (big, friendly) -->
-    <circle cx="400" cy="510" r="48" fill="#15123A"/>
-    <circle cx="624" cy="510" r="48" fill="#15123A"/>
-    <!-- catchlight sparkles -->
-    <ellipse cx="424" cy="486" rx="22" ry="26" fill="#FFFFFF"/>
-    <ellipse cx="648" cy="486" rx="22" ry="26" fill="#FFFFFF"/>
-    <circle cx="384" cy="528" r="10" fill="#FFFFFF" opacity=".8"/>
-    <circle cx="608" cy="528" r="10" fill="#FFFFFF" opacity=".8"/>
-
-    <!-- tiny smile -->
-    <path d="M460 700 Q512 744 564 700" fill="none" stroke="#5A5588" stroke-width="18" stroke-linecap="round"/>
-
-    <!-- little stubby side "ears" (rounded nubs, not panels) -->
-    <ellipse cx="186" cy="380" rx="38" ry="64" fill="url(#dome)"/>
-    <ellipse cx="838" cy="380" rx="38" ry="64" fill="url(#dome)"/>
-    <ellipse cx="186" cy="380" rx="14" ry="32" fill="#FFB5D9" opacity=".7"/>
-    <ellipse cx="838" cy="380" rx="14" ry="32" fill="#FFB5D9" opacity=".7"/>
-
-    <!-- body hint: small rounded shoulder below dome -->
-    <ellipse cx="512" cy="864" rx="200" ry="40" fill="url(#dome)" opacity=".7"/>
-
-    <!-- sparkle accent -->
-    <g transform="translate(810 240)">
+    <!-- sparkle accent top right -->
+    <g transform="translate(820 220)">
       <circle r="14" fill="#FFFFFF"/>
-      <circle r="26" fill="none" stroke="#C0BFFF" stroke-width="3" opacity=".55"/>
-      <circle r="38" fill="none" stroke="#C0BFFF" stroke-width="1.5" opacity=".3"/>
+      <circle r="26" fill="none" stroke="#FFC8DC" stroke-width="3" opacity=".7"/>
+      <circle r="38" fill="none" stroke="#FFC8DC" stroke-width="1.5" opacity=".35"/>
     </g>
   </g>
 </svg>

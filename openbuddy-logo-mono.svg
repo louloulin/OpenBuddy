@@ -2,21 +2,32 @@
   <defs>
     <mask id="mono" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
       <rect width="1024" height="1024" fill="#FFF"/>
-      <line x1="512" y1="170" x2="512" y2="244" stroke="#FFF" stroke-width="14" stroke-linecap="round"/>
-      <ellipse cx="186" cy="380" rx="38" ry="64" fill="#FFF"/>
-      <ellipse cx="838" cy="380" rx="38" ry="64" fill="#FFF"/>
-      <rect x="176" y="244" width="672" height="560" rx="280" fill="#FFF"/>
-      <ellipse cx="512" cy="864" rx="200" ry="40" fill="#FFF"/>
-      <g transform="translate(810 240)">
+      <ellipse cx="512" cy="396" rx="320" ry="40" fill="#FFF"/>
+      <path d="M192 396 Q192 168 512 168 Q832 168 832 396 Z" fill="#FFF"/>
+      <rect x="240" y="396" width="544" height="392" rx="180" fill="#FFF"/>
+      <rect x="298" y="492" width="428" height="92" rx="46" fill="#FFF"/>
+      <ellipse cx="170" cy="660" rx="60" ry="80" fill="#FFF"/>
+      <ellipse cx="854" cy="660" rx="60" ry="80" fill="#FFF"/>
+      <ellipse cx="380" cy="850" rx="64" ry="34" fill="#FFF"/>
+      <ellipse cx="644" cy="850" rx="64" ry="34" fill="#FFF"/>
+      <g transform="translate(160 360)">
+        <ellipse cx="0" cy="6" rx="28" ry="6" fill="#FFF"/>
+        <path d="M-26 6 Q-26 -22 0 -22 Q26 -22 26 6 Z" fill="#FFF"/>
+        <rect x="-10" y="6" width="20" height="14" rx="6" fill="#FFF"/>
+      </g>
+      <g transform="translate(820 220)">
         <circle r="26" fill="#FFF"/>
       </g>
-      <ellipse cx="400" cy="496" rx="106" ry="116" fill="#000"/>
-      <ellipse cx="624" cy="496" rx="106" ry="116" fill="#000"/>
-      <circle cx="400" cy="510" r="48" fill="#FFF"/>
-      <circle cx="624" cy="510" r="48" fill="#FFF"/>
-      <ellipse cx="424" cy="486" rx="22" ry="26" fill="#000"/>
-      <ellipse cx="648" cy="486" rx="22" ry="26" fill="#000"/>
-      <path d="M460 700 Q512 744 564 700" fill="none" stroke="#000" stroke-width="18" stroke-linecap="round"/>
+      <ellipse cx="340" cy="316" rx="40" ry="28" fill="#000"/>
+      <ellipse cx="540" cy="232" rx="32" ry="24" fill="#000"/>
+      <ellipse cx="680" cy="312" rx="44" ry="32" fill="#000"/>
+      <ellipse cx="460" cy="368" rx="22" ry="16" fill="#000"/>
+      <ellipse cx="730" cy="228" rx="18" ry="14" fill="#000"/>
+      <circle cx="412" cy="548" r="32" fill="#000"/>
+      <circle cx="612" cy="548" r="32" fill="#000"/>
+      <ellipse cx="426" cy="528" rx="14" ry="18" fill="#FFF"/>
+      <ellipse cx="626" cy="528" rx="14" ry="18" fill="#FFF"/>
+      <path d="M460 700 Q512 740 564 700" fill="none" stroke="#000" stroke-width="14" stroke-linecap="round"/>
     </mask>
   </defs>
   <rect width="1024" height="1024" fill="currentColor" mask="url(#mono)"/>

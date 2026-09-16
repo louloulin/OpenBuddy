@@ -4,38 +4,40 @@
       <stop stop-color="#26204E"/>
       <stop offset="1" stop-color="#0A0820"/>
     </radialGradient>
-    <radialGradient id="dome" cx="50%" cy="35%" r="65%">
+    <radialGradient id="body" cx="50%" cy="40%" r="60%">
       <stop stop-color="#FFFFFF"/>
-      <stop offset=".45" stop-color="#D6D3FF"/>
-      <stop offset="1" stop-color="#7A75E0"/>
+      <stop offset=".5" stop-color="#E8E5FF"/>
+      <stop offset="1" stop-color="#9C95E8"/>
+    </radialGradient>
+    <radialGradient id="cap" cx="50%" cy="40%" r="60%">
+      <stop stop-color="#FF9DC9"/>
+      <stop offset=".5" stop-color="#E84A8E"/>
+      <stop offset="1" stop-color="#8C2A60"/>
     </radialGradient>
     <radialGradient id="eye" cx="50%" cy="50%" r="50%">
       <stop stop-color="#FFFFFF"/>
       <stop stop-color="#5A5588"/>
     </radialGradient>
-    <linearGradient id="heart" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#FF8FBE"/>
-      <stop offset="1" stop-color="#E84A8E"/>
+    <linearGradient id="visor" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#7A75E0"/>
+      <stop stop-color="#E8E5FF"/>
     </linearGradient>
   </defs>
   <g transform="translate(32 32)">
     <rect x="0" y="0" width="256" height="256" rx="58" fill="url(#bg)"/>
-    <line x1="128" y1="40" x2="128" y2="62" stroke="#9C95E8" stroke-width="4" stroke-linecap="round"/>
-    <g transform="translate(128 36) scale(0.18)">
-      <path d="M0 14 C-22 -10 -54 -10 -54 18 C-54 42 -22 60 0 84 C22 60 54 42 54 18 C54 -10 22 -10 0 14 Z" fill="url(#heart)"/>
-    </g>
-    <ellipse cx="38" cy="100" rx="9" ry="16" fill="url(#dome)"/>
-    <ellipse cx="218" cy="100" rx="9" ry="16" fill="url(#dome)"/>
-    <rect x="42" y="62" width="172" height="148" rx="74" fill="url(#dome)"/>
-    <ellipse cx="100" cy="134" rx="28" ry="30" fill="#15123A"/>
-    <ellipse cx="156" cy="134" rx="28" ry="30" fill="#15123A"/>
-    <circle cx="100" cy="138" r="18" fill="url(#eye)"/>
-    <circle cx="156" cy="138" r="18" fill="url(#eye)"/>
-    <circle cx="100" cy="142" r="10" fill="#15123A"/>
-    <circle cx="156" cy="142" r="10" fill="#15123A"/>
-    <ellipse cx="106" cy="135" rx="5" ry="6" fill="#FFFFFF"/>
-    <ellipse cx="162" cy="135" rx="5" ry="6" fill="#FFFFFF"/>
-    <path d="M114 178 Q128 192 142 178" fill="none" stroke="#5A5588" stroke-width="5" stroke-linecap="round"/>
+    <path d="M48 100 Q48 50 128 50 Q208 50 208 100 Z" fill="url(#cap)"/>
+    <ellipse cx="80" cy="80" rx="14" ry="10" fill="#FFFFFF" opacity=".92"/>
+    <ellipse cx="170" cy="84" rx="14" ry="10" fill="#FFFFFF" opacity=".92"/>
+    <ellipse cx="125" cy="68" rx="9" ry="6" fill="#FFFFFF" opacity=".92"/>
+    <rect x="60" y="100" width="136" height="106" rx="48" fill="url(#body)"/>
+    <rect x="74" y="130" width="108" height="26" rx="13" fill="url(#visor)"/>
+    <circle cx="104" cy="143" r="14" fill="url(#eye)"/>
+    <circle cx="152" cy="143" r="14" fill="url(#eye)"/>
+    <circle cx="104" cy="146" r="8" fill="#15123A"/>
+    <circle cx="152" cy="146" r="8" fill="#15123A"/>
+    <ellipse cx="108" cy="140" rx="3.5" ry="4.5" fill="#FFFFFF"/>
+    <ellipse cx="156" cy="140" rx="3.5" ry="4.5" fill="#FFFFFF"/>
+    <path d="M114 188 Q128 198 142 188" fill="none" stroke="#5A5588" stroke-width="3.5" stroke-linecap="round"/>
   </g>
   <g transform="translate(330 0)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif">
     <text x="0" y="190" font-size="148" font-weight="700" letter-spacing="-3" fill="#0F0D24">Open<tspan font-weight="700" fill="#7A75E0">Buddy</tspan></text>
