@@ -200,6 +200,34 @@ export interface ThemeService {
   setPair(pair: Partial<{ light: ThemeName; dark: ThemeName }>): void;
   setMode(mode: ThemeMode): void;
   list(): ReadonlyArray<ThemeDefinition>;
+  /**
+   * R44 — 接入用户在 ThemeStudio 保存的自定义主题。`CustomTheme` 的
+   * vars 是 OKLCh inline 值,不走 setThemeByName(后者接 ThemeName
+   * literal union,对 `custom-...` 名字直接拒绝)。
+   *
+   * 顺序很关键:
+   *   1. 先把 lastAppliedType 同步到 custom.type,后续 setAttribute
+   *      `data-theme` 才会被 compatObserver 当成"我们自己写的"。
+   *   2. 写 vars(data-theme-name="custom" + 全部 --wb-*)。
+   *   3. 持久化 ACTIVE_CUSTOM_KEY,通知 subscribers。
+   *
+   * 不在 picker 里直接 `applyCustomVars` + `setAttribute("data-theme")`:
+   *   那条路径会被 compatObserver 误判为"外部修改",触发 onCompatFlip
+   *   把当前 store 主题(openbuddy-dark)的 vars 写回 documentElement,
+   *   覆盖刚 applyCustomVars 写入的 custom 值 —— 用户看到的还是内置主题。
+   */
+  applyCustomTheme(theme: CustomThemeInput): void;
+}
+
+/** 主题 studio 自定义主题的输入 shape。`name` 是字符串(不是 ThemeName
+ *  literal union),允许 `custom-` 前缀;`vars` 是 `--wb-*` → OKLCh
+ *  inline 值的字典。 */
+export interface CustomThemeInput {
+  name: string;
+  type: "dark" | "light";
+  vars: Record<string, string>;
+  accent?: string;
+  label?: string;
 }
 
 function pickActiveThemeName(
@@ -415,6 +443,36 @@ export function createThemeStore(): ThemeStoreInternal {
     },
     list() {
       return THEMES;
+    },
+    applyCustomTheme(theme) {
+      if (typeof document === "undefined") return;
+      const root = document.documentElement;
+      // 顺序:1. lastAppliedType 先同步,2. setAttribute data-theme 让
+      // compatObserver 看到"自写",3. data-theme-name + vars。
+      lastAppliedType = theme.type;
+      root.setAttribute("data-theme", theme.type);
+      root.setAttribute("data-theme-name", theme.name);
+      // 写 vars(custom 主题不依赖 resolveThemeVars,直接用 OKLCh)。
+      // 先清掉旧 --wb-* inline 残留,避免浅色画布配深色遮罩这类泄漏
+      // (切主题时上一个主题只写了 delta,没写的 token 仍走 :root 兜底;
+      // 但切到 custom 时 vars 是用户自选的 delta,必须先把残留清干净)。
+      // 枚举 CSSStyleDeclaration 找带 `--wb-` 前缀的内联属性,避免维护
+      // 一份可能漂移的静态 token 列表。
+      for (let i = root.style.length - 1; i >= 0; i--) {
+        const prop = root.style.item(i);
+        if (prop.startsWith("--wb-")) root.style.removeProperty(prop);
+      }
+      for (const [k, v] of Object.entries(theme.vars)) {
+        root.style.setProperty(k, v);
+      }
+      // custom 主题的 active 持久化:写 ACTIVE_CUSTOM_KEY 让 picker /
+      // ThemeStudio 重开时知道这是 custom,不要回退到内置 active。
+      try {
+        window.localStorage.setItem("openbuddy.theme.custom.active", theme.name);
+      } catch {
+        /* ignore quota */
+      }
+      notify();
     },
   };
 

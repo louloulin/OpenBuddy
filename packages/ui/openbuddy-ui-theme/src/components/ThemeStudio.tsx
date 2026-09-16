@@ -33,8 +33,8 @@ export interface CustomTheme {
   vars: Record<string, string>;
 }
 
-const CUSTOM_KEY = "openbuddy.theme.custom";
-const ACTIVE_CUSTOM_KEY = "openbuddy.theme.custom.active";
+export const CUSTOM_KEY = "openbuddy.theme.custom";
+export const ACTIVE_CUSTOM_KEY = "openbuddy.theme.custom.active";
 
 const OKLCH_RE = /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/i;
 
@@ -205,6 +205,11 @@ export function ThemeStudio({
     } catch {
       /* ignore */
     }
+    // R44 — 通知同 tab 内的 ThemePicker 实例刷新(custom 主题列表 +
+    // active 高亮都依赖这条事件;否则用户保存后还要关掉再开 picker)。
+    window.dispatchEvent(
+      new CustomEvent("openbuddy:custom-themes-updated"),
+    );
     onSave?.(theme);
   }, [theme, onSave]);
 
