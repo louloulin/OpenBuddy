@@ -38,8 +38,10 @@ export function RoadmapView({ locale }: { locale: Locale }) {
               { groups.map((g, idx) => {
                 const status = STATUS[g.key];
                 return (
-                  <article
+                  <Reveal
                     key={ g.key }
+                    as="article"
+                    delay={ idx * 90 }
                     className={ `flex h-full flex-col gap-5 rounded-2xl border p-6 transition-all ${
                       idx === 1
                         ? 'border-[var(--wb-brand)] bg-[var(--wb-bg-pure)] shadow-[0_0_0_4px_var(--wb-brand-soft)]'
@@ -66,7 +68,7 @@ export function RoadmapView({ locale }: { locale: Locale }) {
                         </li>
                       )) }
                     </ul>
-                  </article>
+                  </Reveal>
                 );
               }) }
             </div>

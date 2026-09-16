@@ -3,6 +3,7 @@ import { Monitor, Apple, Terminal, ArrowRight, Check } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import CopyButton from '@/components/CopyButton';
+import Reveal from '@/components/motion/Reveal';
 import { PageHeader, SectionHeader } from '@/components/PageHeader';
 import { SITE_STATS } from '@/lib/constants';
 import { getDictionary, type Locale } from '@/lib/i18n';
@@ -111,10 +112,10 @@ export function DownloadView({ locale }: { locale: Locale }) {
             />
 
             <div className="mt-16 grid gap-5 md:grid-cols-3">
-              { platforms.map((p) => {
+              { platforms.map((p, platformIndex) => {
                 const Icon = p.icon;
                 return (
-                  <article key={ p.name } className="flex flex-col gap-4 rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 transition-all hover:border-[var(--wb-border-strong)]">
+                  <Reveal key={ p.name } as="article" delay={ platformIndex * 90 } className="flex flex-col gap-4 rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 transition-all hover:border-[var(--wb-border-strong)]">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--wb-bg-soft)]">
@@ -134,7 +135,7 @@ export function DownloadView({ locale }: { locale: Locale }) {
                       <span>Download</span>
                       <ArrowRight className="h-3.5 w-3.5" />
                     </a>
-                  </article>
+                  </Reveal>
                 );
               }) }
             </div>

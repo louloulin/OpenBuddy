@@ -2,6 +2,7 @@ import { Check } from 'lucide-react';
 import Link from 'next/link';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
+import Reveal from '@/components/motion/Reveal';
 import { PageHeader, SectionHeader } from '@/components/PageHeader';
 import { getDictionary, localizedPath, type Locale } from '@/lib/i18n';
 
@@ -25,9 +26,11 @@ export function PricingView({ locale }: { locale: Locale }) {
             />
 
             <div className="mt-16 grid gap-5 md:grid-cols-3">
-              { tiers.map((tier) => (
-                <article
+              { tiers.map((tier, tierIndex) => (
+                <Reveal
                   key={ tier.name }
+                  as="article"
+                  delay={ tierIndex * 90 }
                   className={ `relative flex flex-col gap-6 rounded-2xl border p-7 transition-all ${
                     tier.popular
                       ? 'border-[var(--wb-brand)] bg-[var(--wb-bg-pure)] shadow-[0_0_0_4px_var(--wb-brand-soft)]'
@@ -79,7 +82,7 @@ export function PricingView({ locale }: { locale: Locale }) {
                     <span>{ tier.cta }</span>
                     <span className="cta-link-arrow">→</span>
                   </Link>
-                </article>
+                </Reveal>
               )) }
             </div>
 
