@@ -8,7 +8,7 @@
 
 ## 🇨🇳 简体中文 · 文档入口
 
-> 📅 最近一次全面核验:2026-09-05 · 📦 对应版本:`0.14.0` · 🌿 git HEAD:`a9d240ff feat(pi-observability): forward session_tree / session_before_fork / provider hooks`
+> 📅 最近一次全面核验:2026-09-05 · 📦 对应版本:`0.15.0` · 🌿 git HEAD:`a9d240ff feat(pi-observability): forward session_tree / session_before_fork / provider hooks`
 
 ### 🚀 30 秒速览
 

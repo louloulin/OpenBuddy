@@ -53,7 +53,7 @@ pnpm electron:release:mac
 ```bash
 codesign --verify --deep --strict --verbose=2 "release/mac-arm64/OpenBuddy Pi.app"
 spctl --assess --type execute --verbose=4 "release/mac-arm64/OpenBuddy Pi.app"
-xcrun stapler validate "release/OpenBuddy Pi-0.14.0-arm64.dmg"
+xcrun stapler validate "release/OpenBuddy Pi-0.15.0-arm64.dmg"
 ```
 
 只有签名验证、公证状态和 stapling 都通过，才应发布 DMG。Apple Developer ID 证书是个人/组织专属的，不存在项目可以共享的通用证书。

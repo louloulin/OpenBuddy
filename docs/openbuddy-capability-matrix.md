@@ -425,7 +425,7 @@ flowchart TB
 | --- | ---: | --- |
 | `README.md` | 443 | 用户向（特性 / 路线 / 致谢） |
 | `README.zh-CN.md` | — | 中文版 |
-| `CHANGELOG.md` | — | v0.9 – v0.15 完整版本日志；`release.yml` 自动抽取 |
+| `CHANGELOG.md` | — | v0.9 – v0.15.0 完整版本日志；`release.yml` 自动抽取 |
 | `TODO.md` | — | moon 化迁移完成度 + 后续 |
 | `WORKBUDDY_UI_REFERENCE.md` | — | UI 范式基线（已完成 / 待完善） |
 

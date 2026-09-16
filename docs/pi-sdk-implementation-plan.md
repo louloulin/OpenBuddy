@@ -15,7 +15,7 @@
 | Debuggability | Node DevTools, source maps | Two-process trace stitching |
 | Hot reload | Reload Vite + restart Electron | Same |
 | Compatibility with `--mode rpc-ui` extensions | N/A (host controls UI directly) | Requires `extension_ui_request` handling |
-| v0.14.0's `grok://agent-died` semantics | Detected via `session.subscribe` `agent_end` with error + try/catch | Detected via subprocess `exit` event |
+| v0.15.0's `grok://agent-died` semantics | Detected via `session.subscribe` `agent_end` with error + try/catch | Detected via subprocess `exit` event |
 
 We pick **SDK embed**. Crash isolation is sacrificed; mitigation = `agent_end` with error event surfaces to UI as `grok://agent-died` (same UX as today). If reliability proves insufficient in Phase 2 testing, we revisit by switching `electron/main/agent-host.ts` to spawn `pi-coding-agent`'s CLI mode and re-implement the IPC layer.
 

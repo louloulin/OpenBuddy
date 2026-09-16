@@ -8,7 +8,7 @@ Welcome to the OpenBuddy documentation index. This directory is the **single sou
 
 ## 🇬🇧 English · Documentation entry point
 
-> 📅 Most recent full verification: **2026-09-05** · 📦 Version: `0.14.0` · 🌿 git HEAD: `a9d240ff feat(pi-observability): forward session_tree / session_before_fork / provider hooks`
+> 📅 Most recent full verification: **2026-09-05** · 📦 Version: `0.15.0` · 🌿 git HEAD: `a9d240ff feat(pi-observability): forward session_tree / session_before_fork / provider hooks`
 
 ### 🚀 30-second tour
 

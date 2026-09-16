@@ -704,7 +704,7 @@ Pi has **no built-in subagent concept** in v0.84.x (Zechner's "4 tools" philosop
 ### OpenBuddy strategy
 
 - **Don't vendor any of these directly** — they are designed for TUI workflows and our Electron renderer is the UI.
-- **Implement `create_team` / `team_status` / `team_delete` as our own Pi extension** (`extensions/openbuddy/team-tools/index.ts`) — same surface as v0.14.0's MCP server, but the team runtime is in-process (sub-sessions that share Pi's auth + extension host).
+- **Implement `create_team` / `team_status` / `team_delete` as our own Pi extension** (`extensions/openbuddy/team-tools/index.ts`) — same surface as v0.15.0's MCP server, but the team runtime is in-process (sub-sessions that share Pi's auth + extension host).
 - The team members are themselves `AgentSession` instances, spawned with `SessionManager.inMemory()` to keep them transient.
 
 Sources: [`pi.dev/packages/@ferris1225/pi-subagents`](https://pi.dev/packages/@ferris1225/pi-subagents), [`npmjs.com/package/pi-ultracode`](https://www.npmjs.com/package/pi-ultracode).
@@ -926,7 +926,7 @@ Plus 10 host modules in `electron/main/` for things Pi doesn't do at all:
 
 ## 20. Net result for the OpenBuddy Pi migration
 
-| Item | v0.14.0 | OpenBuddy Pi v1.0 |
+| Item | v0.15.0 | OpenBuddy Pi v1.0 |
 |---|---|---|
 | Agent core LOC | 14,237 (Rust) | ~0 (npm dep) |
 | Desktop shell LOC | Tauri 2 + lib.rs | Electron 31 + window.ts (~300) |

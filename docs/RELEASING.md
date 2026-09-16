@@ -26,9 +26,9 @@ Pre-1.0: even minor bumps may include breaking changes. We document them loudly.
 | Type | Trigger | Example | Promotion |
 |---|---|---|---|
 | **Stable** | Manual `workflow_dispatch` | `v0.15.0` | Internal users for 3+ days → public |
-| **RC** | Manual `workflow_dispatch` | `v0.16.0-rc.1` | Internal users + power users |
-| **Patch** | Manual `workflow_dispatch` | `v0.15.1` | Fast-track after CI green |
-| **Security** | Off-cycle | `v0.15.2-sec.1` | Private disclosure + advisory |
+| **RC** | Manual `workflow_dispatch` | `v0.15.0-rc.1` | Internal users + power users |
+| **Patch** | Manual `workflow_dispatch` | `v0.15.0` | Fast-track after CI green |
+| **Security** | Off-cycle | `v0.15.0-sec.1` | Private disclosure + advisory |
 
 ### Step-by-step
 
@@ -38,8 +38,8 @@ Pre-1.0: even minor bumps may include breaking changes. We document them loudly.
 git fetch upstream
 git checkout master
 git pull upstream master
-git checkout -b release/v0.16.0
-git push upstream release/v0.16.0
+git checkout -b release/v0.15.0
+git push upstream release/v0.15.0
 ```
 
 For patches, work directly on `master`.
@@ -55,7 +55,7 @@ Edit version numbers in:
 
 ```bash
 # Use moon's bump task (planned)
-pnpm moon:version v0.16.0
+pnpm moon:version v0.15.0
 ```
 
 For now, do it manually and use `pnpm -r --filter @openbuddy/* version X.Y.Z`.
@@ -94,10 +94,10 @@ pnpm electron:build:all
 ```bash
 # Via gh CLI
 gh workflow run release.yml \
-  -f tag=v0.16.0
+  -f tag=v0.15.0
 
 # Or via GitHub UI
-# Actions → Release → Run workflow → Tag: v0.16.0
+# Actions → Release → Run workflow → Tag: v0.15.0
 ```
 
 The CI will:
@@ -155,14 +155,14 @@ For urgent fixes:
 
 ```bash
 # 1. Branch from the release tag
-git checkout -b hotfix/v0.15.1 v0.15.0
+git checkout -b hotfix/v0.15.0 v0.15.0
 
 # 2. Cherry-pick the fix
 git cherry-pick <commit-sha>
 
 # 3. Push and trigger patch workflow
-git push upstream hotfix/v0.15.1
-gh workflow run release.yml -f tag=v0.15.1
+git push upstream hotfix/v0.15.0
+gh workflow run release.yml -f tag=v0.15.0
 ```
 
 Patch releases don't need a release branch — they can go straight to `master` and be tagged.
@@ -175,7 +175,7 @@ For critical security issues:
 2. **Prepare** the fix on a private branch.
 3. **Pre-notify** integrators (Casdoor, NewAPI, etc.) under embargo.
 4. **CVE** assignment (if applicable).
-5. **Ship** the fix with `v0.15.2-sec.1` tag.
+5. **Ship** the fix with `v0.15.0-sec.1` tag.
 6. **Disclose** with GitHub Security Advisory + CVE record.
 7. **Backport** to supported releases (see [`SECURITY.md`](../SECURITY.md)).
 

@@ -48,7 +48,7 @@ See [`openbuddy-capability-matrix.md`](openbuddy-capability-matrix.md) for the f
 
 ### Community plugins
 
-> These are not yet published. Once the public marketplace ships in v0.17, they'll live at <https://openbuddy.dev/marketplace>.
+> These are not yet published. Once the public marketplace ships in v0.15.0, they'll live at <https://openbuddy.dev/marketplace>.
 
 >>
 ->
@@ -285,7 +285,7 @@ We'll review within 48 hours and merge if it fits.
 
 ### 社区插件
 
-> 这些还未发布。公开市场将在 v0.17 上线,届时会放在 <https://openbuddy.dev/marketplace>。
+> 这些还未发布。公开市场将在 v0.15.0 上线,届时会放在 <https://openbuddy.dev/marketplace>。
 
 (表格待填充)
 

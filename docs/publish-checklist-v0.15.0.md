@@ -128,7 +128,7 @@ DEPLOY_ROLLBACK=1 \
 
 - 在 GitHub Web 端为本次发布按 `## v0.15.0（2026-08-31）` 自动生成的 Release Notes 复核
 - 通知订阅方：`docs/openbuddy-commercial-model.md` 列出的 3 个 active SKU 已完成端到端打通，可以开始计费
-- 启动下一轮：把 §9 §10（多租户 SLA / 积分转赠 / SIEM 对接）等尚未实现的商业化能力列入 v0.16.0 backlog
+- 启动下一轮：把 §9 §10（多租户 SLA / 积分转赠 / SIEM 对接）等尚未实现的商业化能力列入 v0.15.0 backlog
 
 ## 7. 用 SSH 密码（非密钥）部署（2026-08-31 已验证）
 

@@ -82,7 +82,7 @@
 - 备份：`/opt/service/openbuddy/.previous-deploy/src.prev/` 保留 v0.15.0 之前的 src 树，便于回滚
 - 教训：`docker build` 必须从 `services/casdoor-resource-gateway/` 出发，**不能**从 `/opt/service/openbuddy/` 出发，否则 `COPY package.json tsconfig.json ./` 会拿到根仓库的 `package.json`，编译出缺失路由的 dist
 
-### 8. 生产部署 v0.16.0 — `credits/transfer` 端点上线（2026-08-31 07:30 Asia/Shanghai）
+### 8. 生产部署 v0.15.0 — `credits/transfer` 端点上线（2026-08-31 07:30 Asia/Shanghai）
 
 本次把 commit `2fb4359`（含 `POST /v1/tenants/{tid}/credits/transfer` 的 3 个回归测试 + 文档）部署到生产 Gateway，从 `8926d4e7f7c2` 推进到 `2fb4359`。
 
@@ -141,4 +141,4 @@
 ## 结论
 - **三方打通证据齐全**：Casdoor（身份 + Organization）+ OpenBuddy Resource Gateway（账本 + 权限 + 商业化）+ New API（仅模型执行 + 上游成本）三种角色互不重叠，分工明确
 - **真实 New API 可被 admin 操作**：本次 6 个远端 HTTP 调用都返回正确响应，未对生产数据造成写入
-- **未完成项均需外部资源**：WeChat AppID/Secret、SMS Provider、真实支付通道、多租户实测仍需操作员提供凭据；远程部署一项已在 §7（v0.15.0）与 §8（v0.16.0 `credits/transfer`）由 SSH 密码 + expect 完成两轮闭环
+- **未完成项均需外部资源**：WeChat AppID/Secret、SMS Provider、真实支付通道、多租户实测仍需操作员提供凭据；远程部署一项已在 §7（v0.15.0）与 §8（v0.15.0 `credits/transfer`）由 SSH 密码 + expect 完成两轮闭环
