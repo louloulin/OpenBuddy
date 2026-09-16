@@ -1,125 +1,68 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
   <!--
-    OpenBuddy mark v12 - cyberpunk mecha-dog.
-    Geometric dog silhouette built from angular polygonal segments. Dark
-    indigo base + neon cyan stroke + magenta eye glow + circuit-dot details.
-    Original angular construction, no specific IP character.
+    OpenBuddy mark v13 - abstract dog with brand teal accent.
+    Original organic dog silhouette inspired by the user's reference aesthetic:
+    white body + dark brown outline + teal accent. Recognizable as dog via
+    triangular ears + snout + sitting posture. Single teal circle as the
+    only "feature" — no eyes, nose, mouth. Pure shape + color storytelling.
   -->
   <defs>
     <radialGradient id="bgRad" cx="50%" cy="50%" r="70%">
-      <stop stop-color="#1A0B2E"/>
-      <stop offset=".55" stop-color="#0F0820"/>
-      <stop offset="1" stop-color="#06030F"/>
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F2EBDC"/>
     </radialGradient>
-    <linearGradient id="body" x1="120" y1="120" x2="900" y2="940" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#2D1B4E"/>
-      <stop offset="1" stop-color="#0F0820"/>
-    </linearGradient>
-    <linearGradient id="stroke" x1="120" y1="120" x2="900" y2="940" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#00F0FF"/>
-      <stop offset="1" stop-color="#7B2BFF"/>
-    </linearGradient>
-    <radialGradient id="eyeG" cx="50%" cy="50%" r="50%">
-      <stop stop-color="#FF1B8D"/>
-      <stop stop-color="#7B2BFF" stop-opacity="0"/>
+    <radialGradient id="body" cx="50%" cy="35%" r="70%">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset=".55" stop-color="#FFFCF5"/>
+      <stop offset="1" stop-color="#F0E5C8"/>
     </radialGradient>
+    <linearGradient id="outline" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#3D2A1A"/>
+      <stop offset="1" stop-color="#1F140A"/>
+    </linearGradient>
     <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
   </defs>
 
   <g clip-path="url(#clip)">
     <rect x="38" y="38" width="948" height="948" fill="url(#bgRad)"/>
 
-    <!-- grid background lines (cyber) -->
-    <line x1="38" y1="248" x2="986" y2="248" stroke="#00F0FF" stroke-width="1" opacity=".12"/>
-    <line x1="38" y1="512" x2="986" y2="512" stroke="#FF1B8D" stroke-width="1" opacity=".12"/>
-    <line x1="38" y1="776" x2="986" y2="776" stroke="#00F0FF" stroke-width="1" opacity=".12"/>
-    <line x1="248" y1="38" x2="248" y2="986" stroke="#00F0FF" stroke-width="1" opacity=".12"/>
-    <line x1="512" y1="38" x2="512" y2="986" stroke="#FF1B8D" stroke-width="1" opacity=".12"/>
-    <line x1="776" y1="38" x2="776" y2="986" stroke="#00F0FF" stroke-width="1" opacity=".12"/>
+    <!-- left triangular ear (filled, organic) -->
+    <path d="M280 320 L256 200 L320 232 L356 320 Z" fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
+    <!-- right triangular ear -->
+    <path d="M744 320 L768 200 L704 232 L668 320 Z" fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
 
-    <!-- background cyber dots -->
-    <circle cx="160" cy="180" r="2" fill="#00F0FF" opacity=".6"/>
-    <circle cx="860" cy="200" r="2.5" fill="#FF1B8D" opacity=".7"/>
-    <circle cx="140" cy="820" r="2" fill="#7B2BFF" opacity=".6"/>
-    <circle cx="880" cy="800" r="2.5" fill="#00F0FF" opacity=".6"/>
+    <!-- head dome -->
+    <ellipse cx="512" cy="468" rx="280" ry="200" fill="url(#body)" stroke="url(#outline)" stroke-width="18"/>
 
-    <!-- the cyber-dog: angular geometric silhouette, side profile, sitting/crouched -->
-    <!-- main body mass: angular polygon -->
-    <path d="
-      M 280 380
-      L 300 240
-      L 340 220
-      L 380 280
-      L 410 250
-      L 460 240
-      L 510 250
-      L 550 270
-      L 580 290
-      L 640 320
-      L 690 360
-      L 700 420
-      L 690 470
-      L 660 500
-      L 640 540
-      L 640 660
-      L 680 700
-      L 680 760
-      L 640 780
-      L 580 780
-      L 560 750
-      L 540 720
-      L 540 700
-      L 420 700
-      L 420 740
-      L 400 780
-      L 360 800
-      L 320 800
-      L 280 780
-      L 280 740
-      L 320 700
-      L 340 660
-      L 340 580
-      L 320 540
-      L 290 500
-      L 270 440
-      Z
-    " fill="url(#body)" stroke="url(#stroke)" stroke-width="6" stroke-linejoin="miter"/>
+    <!-- snout (lower rounded protrusion) -->
+    <ellipse cx="512" cy="568" rx="140" ry="80" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
 
-    <!-- cyber eye: glowing magenta visor -->
-    <circle cx="380" cy="340" r="32" fill="url(#eyeG)"/>
-    <ellipse cx="380" cy="340" rx="28" ry="14" fill="#FF1B8D"/>
-    <ellipse cx="380" cy="340" rx="22" ry="10" fill="#FFFFFF" opacity=".9"/>
+    <!-- body: rounded teardrop -->
+    <path d="M512 612
+             Q280 612 244 760
+             Q220 880 320 920
+             Q420 952 512 952
+             Q604 952 704 920
+             Q 804 880 780 760
+             Q 744 612 512 612 Z"
+          fill="url(#body)" stroke="url(#outline)" stroke-width="18" stroke-linejoin="round"/>
 
-    <!-- secondary eye dot (smaller, near muzzle area) -->
-    <circle cx="340" cy="430" r="8" fill="#00F0FF"/>
+    <!-- teal chest accent (the "feature" - replaces eyes/nose) -->
+    <ellipse cx="512" cy="744" rx="120" ry="80" fill="#09C8A7" stroke="url(#outline)" stroke-width="14"/>
 
-    <!-- circuit lines on body (cyber detail) -->
-    <path d="M 460 360 L 540 360 L 560 380 L 620 380" fill="none" stroke="#00F0FF" stroke-width="3" opacity=".7"/>
-    <circle cx="620" cy="380" r="5" fill="#00F0FF"/>
+    <!-- teal inner detail: smaller offset circle for layering -->
+    <ellipse cx="512" cy="744" rx="64" ry="44" fill="#0AA88C" opacity=".55"/>
 
-    <path d="M 500 440 L 580 440 L 600 460" fill="none" stroke="#FF1B8D" stroke-width="3" opacity=".7"/>
-    <circle cx="600" cy="460" r="5" fill="#FF1B8D"/>
+    <!-- tiny paw nubs at bottom -->
+    <ellipse cx="380" cy="950" rx="48" ry="20" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
+    <ellipse cx="644" cy="950" rx="48" ry="20" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
 
-    <path d="M 380 560 L 380 600 L 360 620 L 360 680" fill="none" stroke="#7B2BFF" stroke-width="3" opacity=".7"/>
-    <circle cx="360" cy="680" r="5" fill="#7B2BFF"/>
+    <!-- ear inner detail: small teal triangles -->
+    <path d="M286 314 L296 248 L324 270 Z" fill="#09C8A7" opacity=".8"/>
+    <path d="M738 314 L728 248 L700 270 Z" fill="#09C8A7" opacity=".8"/>
 
-    <!-- antenna spike from head -->
-    <line x1="370" y1="220" x2="350" y2="160" stroke="#00F0FF" stroke-width="4" stroke-linecap="round"/>
-    <circle cx="350" cy="160" r="8" fill="#00F0FF"/>
-    <circle cx="350" cy="160" r="14" fill="none" stroke="#00F0FF" stroke-width="2" opacity=".55"/>
-
-    <!-- tail: angular spike -->
-    <path d="M 690 360 L 740 320 L 780 280 L 800 260" fill="none" stroke="url(#stroke)" stroke-width="6" stroke-linecap="round"/>
-    <circle cx="800" cy="260" r="6" fill="#FF1B8D"/>
-
-    <!-- glitch accent: thin diagonal line through -->
-    <line x1="180" y1="500" x2="240" y2="480" stroke="#FF1B8D" stroke-width="2" opacity=".6"/>
-    <line x1="800" y1="640" x2="860" y2="620" stroke="#00F0FF" stroke-width="2" opacity=".6"/>
-
-    <!-- corner brackets (UI frame) -->
-    <path d="M 100 100 L 100 140 M 100 100 L 140 100" fill="none" stroke="#00F0FF" stroke-width="3" opacity=".6"/>
-    <path d="M 924 100 L 924 140 M 924 100 L 884 100" fill="none" stroke="#FF1B8D" stroke-width="3" opacity=".6"/>
-    <path d="M 100 924 L 100 884 M 100 924 L 140 924" fill="none" stroke="#FF1B8D" stroke-width="3" opacity=".6"/>
-    <path d="M 924 924 L 924 884 M 924 924 L 884 924" fill="none" stroke="#00F0FF" stroke-width="3" opacity=".6"/>
+    <!-- tail: curved organic spike -->
+    <path d="M780 760 Q840 720 856 660 Q860 632 836 624 Q816 624 808 660 Q800 696 740 720 Z"
+          fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
   </g>
 </svg>

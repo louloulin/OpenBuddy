@@ -1,74 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1480" height="320" viewBox="0 0 1480 320" role="img" aria-label="OpenBuddy">
   <defs>
     <radialGradient id="bg" cx="50%" cy="50%" r="70%">
-      <stop stop-color="#1A0B2E"/>
-      <stop offset="1" stop-color="#06030F"/>
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F2EBDC"/>
     </radialGradient>
-    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#2D1B4E"/>
-      <stop offset="1" stop-color="#0F0820"/>
-    </linearGradient>
-    <linearGradient id="stroke" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#00F0FF"/>
-      <stop offset="1" stop-color="#7B2BFF"/>
-    </linearGradient>
+    <radialGradient id="body" cx="50%" cy="35%" r="70%">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F0E5C8"/>
+    </radialGradient>
   </defs>
   <g transform="translate(32 32)">
     <rect x="0" y="0" width="256" height="256" rx="58" fill="url(#bg)"/>
-    <line x1="0" y1="62" x2="256" y2="62" stroke="#00F0FF" stroke-width=".6" opacity=".18"/>
-    <line x1="0" y1="128" x2="256" y2="128" stroke="#FF1B8D" stroke-width=".6" opacity=".18"/>
-    <line x1="0" y1="194" x2="256" y2="194" stroke="#00F0FF" stroke-width=".6" opacity=".18"/>
-    <line x1="62" y1="0" x2="62" y2="256" stroke="#00F0FF" stroke-width=".6" opacity=".18"/>
-    <line x1="128" y1="0" x2="128" y2="256" stroke="#FF1B8D" stroke-width=".6" opacity=".18"/>
-    <line x1="194" y1="0" x2="194" y2="256" stroke="#00F0FF" stroke-width=".6" opacity=".18"/>
-    <g transform="translate(128 128) scale(0.18)">
-      <path d="
-        M 280 380
-        L 300 240
-        L 340 220
-        L 380 280
-        L 410 250
-        L 460 240
-        L 510 250
-        L 550 270
-        L 580 290
-        L 640 320
-        L 690 360
-        L 700 420
-        L 690 470
-        L 660 500
-        L 640 540
-        L 640 660
-        L 680 700
-        L 680 760
-        L 640 780
-        L 580 780
-        L 560 750
-        L 540 720
-        L 540 700
-        L 420 700
-        L 420 740
-        L 400 780
-        L 360 800
-        L 320 800
-        L 280 780
-        L 280 740
-        L 320 700
-        L 340 660
-        L 340 580
-        L 320 540
-        L 290 500
-        L 270 440
-        Z
-      " fill="url(#body)" stroke="url(#stroke)" stroke-width="22" stroke-linejoin="miter" transform="scale(-1 1) translate(-256 0)"/>
-    </g>
-    <circle cx="98" cy="116" r="6" fill="#FF1B8D"/>
-    <line x1="178" y1="64" x2="170" y2="42" stroke="#00F0FF" stroke-width="1.6" stroke-linecap="round"/>
-    <circle cx="170" cy="40" r="3" fill="#00F0FF"/>
-    <line x1="0" y1="0" stroke="#00F0FF" stroke-width="3"/>
+    <path d="M70 78 L62 38 L86 50 L100 78 Z" fill="url(#body)" stroke="#1F140A" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M186 78 L194 38 L170 50 L156 78 Z" fill="url(#body)" stroke="#1F140A" stroke-width="4" stroke-linejoin="round"/>
+    <ellipse cx="128" cy="116" rx="76" ry="54" fill="url(#body)" stroke="#1F140A" stroke-width="6"/>
+    <ellipse cx="128" cy="152" rx="38" ry="22" fill="url(#body)" stroke="#1F140A" stroke-width="4"/>
+    <path d="M128 168 Q72 168 60 210 Q54 234 80 244 Q104 252 128 252 Q152 252 176 244 Q202 234 196 210 Q184 168 128 168 Z"
+          fill="url(#body)" stroke="#1F140A" stroke-width="6" stroke-linejoin="round"/>
+    <ellipse cx="128" cy="200" rx="32" ry="22" fill="#09C8A7" stroke="#1F140A" stroke-width="4"/>
+    <ellipse cx="100" cy="252" rx="14" ry="6" fill="url(#body)" stroke="#1F140A" stroke-width="4"/>
+    <ellipse cx="156" cy="252" rx="14" ry="6" fill="url(#body)" stroke="#1F140A" stroke-width="4"/>
+    <path d="M196 210 Q210 198 214 184 Q216 176 208 174 Q202 174 200 184 Q198 194 184 200 Z"
+          fill="url(#body)" stroke="#1F140A" stroke-width="4" stroke-linejoin="round"/>
   </g>
   <g transform="translate(330 0)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif">
-    <text x="0" y="190" font-size="148" font-weight="700" letter-spacing="-3" fill="#E8E5FF">Open<tspan font-weight="700" fill="#00F0FF">Buddy</tspan></text>
-    <text x="4" y="240" font-size="28" font-weight="500" letter-spacing="6" fill="#7A75E0">OPEN · ADAPTIVE · AI WORKBENCH</text>
+    <text x="0" y="190" font-size="148" font-weight="700" letter-spacing="-3" fill="#1F140A">Open<tspan font-weight="700" fill="#008C75">Buddy</tspan></text>
+    <text x="4" y="240" font-size="28" font-weight="500" letter-spacing="6" fill="#5C5040">OPEN · ADAPTIVE · AI WORKBENCH</text>
   </g>
 </svg>

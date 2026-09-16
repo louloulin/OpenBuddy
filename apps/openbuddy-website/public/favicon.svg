@@ -1,53 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="OpenBuddy">
-  <rect width="64" height="64" rx="14" fill="#06030F"/>
-  <line x1="0" y1="16" x2="64" y2="16" stroke="#00F0FF" stroke-width=".4" opacity=".3"/>
-  <line x1="0" y1="32" x2="64" y2="32" stroke="#FF1B8D" stroke-width=".4" opacity=".3"/>
-  <line x1="0" y1="48" x2="64" y2="48" stroke="#00F0FF" stroke-width=".4" opacity=".3"/>
-  <line x1="16" y1="0" x2="16" y2="64" stroke="#00F0FF" stroke-width=".4" opacity=".3"/>
-  <line x1="32" y1="0" x2="32" y2="64" stroke="#FF1B8D" stroke-width=".4" opacity=".3"/>
-  <line x1="48" y1="0" x2="48" y2="64" stroke="#00F0FF" stroke-width=".4" opacity=".3"/>
-  <g transform="translate(32 32) scale(0.05)">
-    <path d="
-      M 280 380
-      L 300 240
-      L 340 220
-      L 380 280
-      L 410 250
-      L 460 240
-      L 510 250
-      L 550 270
-      L 580 290
-      L 640 320
-      L 690 360
-      L 700 420
-      L 690 470
-      L 660 500
-      L 640 540
-      L 640 660
-      L 680 700
-      L 680 760
-      L 640 780
-      L 580 780
-      L 560 750
-      L 540 720
-      L 540 700
-      L 420 700
-      L 420 740
-      L 400 780
-      L 360 800
-      L 320 800
-      L 280 780
-      L 280 740
-      L 320 700
-      L 340 660
-      L 340 580
-      L 320 540
-      L 290 500
-      L 270 440
-      Z
-    " fill="#2D1B4E" stroke="#00F0FF" stroke-width="40" stroke-linejoin="miter" transform="scale(-1 1) translate(-1280 0)"/>
-  </g>
-  <circle cx="20" cy="22" r="3" fill="#FF1B8D"/>
-  <line x1="50" y1="10" x2="46" y2="4" stroke="#00F0FF" stroke-width="1" stroke-linecap="round"/>
-  <circle cx="46" cy="4" r="1.4" fill="#00F0FF"/>
+  <rect width="64" height="64" rx="14" fill="#FFFFFF"/>
+  <path d="M16 22 L13 8 L20 11 L24 22 Z" fill="#FFFFFF" stroke="#1F140A" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M48 22 L51 8 L44 11 L40 22 Z" fill="#FFFFFF" stroke="#1F140A" stroke-width="2.4" stroke-linejoin="round"/>
+  <ellipse cx="32" cy="30" rx="19" ry="14" fill="#FFFFFF" stroke="#1F140A" stroke-width="2.8"/>
+  <ellipse cx="32" cy="40" rx="10" ry="6" fill="#FFFFFF" stroke="#1F140A" stroke-width="2"/>
+  <path d="M32 44 Q18 44 14 56 Q12 62 20 64 Q26 64 32 64 Q38 64 44 64 Q52 62 50 56 Q46 44 32 44 Z"
+        fill="#FFFFFF" stroke="#1F140A" stroke-width="2.8" stroke-linejoin="round"/>
+  <ellipse cx="32" cy="54" rx="8" ry="6" fill="#09C8A7" stroke="#1F140A" stroke-width="2"/>
 </svg>
