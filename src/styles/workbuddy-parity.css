@@ -204,3 +204,20 @@
     transition: none;
   }
 }
+
+/* ── Phase 7 polish — WorkBuddy 风格 ExpertsGrid / ProjectTemplatesPanel
+ *   这两段只是 9 卡 3 列专家网格 + 模板入口的轻量包装,
+ *   真正的 card 样式见各 *.module.css(ExpertCard / ProjectTemplateCard)。
+ *   —— 通过 placeholder-page-stack 把它们叠在原来的 panel 之上。 */
+
+.experts-grid-host {
+  padding: 12px 16px 0 16px;
+}
+
+.project-templates-host {
+  padding: 12px 16px 0 16px;
+}
+
+.placeholder-page-stack > * + * {
+  margin-top: 12px;
+}

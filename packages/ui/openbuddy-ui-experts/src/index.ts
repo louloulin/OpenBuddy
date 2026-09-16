@@ -20,6 +20,8 @@ import type { SlotMap } from "@openbuddy/ui-slots";
 export type { SlotMap };
 
 export { ExpertsPanel } from "./ExpertsPanel";
+export { ExpertsGrid } from "./ExpertsGrid";
+export type { ExpertsGridProps, ExpertCardModel } from "./ExpertsGrid";
 export { MarketPills } from "./MarketHeader";
 export type { MarketTab } from "./MarketHeader";
 

@@ -20,6 +20,12 @@ const AssistantWorkspacePanel = lazy(() => import("@openbuddy/ui-workbench").the
 const AssistantExtensionPanel = lazy(() => import("@openbuddy/ui-workbench").then((m) => ({ default: m.AssistantExtensionPanel })));
 const BrowserPreview = lazy(() => import("@openbuddy/ui-workbench").then((m) => ({ default: m.BrowserPreview })));
 const ProjectsPanel = lazy(() => import("@openbuddy/ui-collaboration").then((m) => ({ default: m.ProjectsPanel })));
+// Phase 7 — WorkBuddy 风格项目模板入口 + 9 卡 3 列专家网格直接导入,
+// 与 ui-collaboration/ExpertsPanel 的 lazy 边界区分开,避免 home overview 与
+// placeholder 视图互相拖入对方的 chunk。
+import { ProjectTemplatesPanel } from "@openbuddy/ui-home";
+import { ExpertsGrid } from "@openbuddy/ui-experts";
+
 const ExpertsPanel = lazy(() => import("@openbuddy/ui-experts").then((m) => ({ default: m.ExpertsPanel })));
 const AutomationPanel = lazy(() => import("@openbuddy/ui-automation").then((m) => ({ default: m.AutomationPanel })));
 const MyFilesPanel = lazy(() => import("@openbuddy/ui-files").then((m) => ({ default: m.MyFilesPanel })));
@@ -178,29 +184,36 @@ function PlaceholderPageInner({
 
   if (label === "项目") {
     return (
-      <ProjectsPanel
-        cwd={cwd}
-        onSelectWorkspace={onSelectWorkspace}
-        onToast={onToast}
-        onStartProject={onStartProject}
-        onStartProjectConversation={onStartProjectConversation}
-        onNavigate={onNavigate}
-      />
+      <div className="placeholder-page-stack">
+        <div className="project-templates-host">
+          <ProjectTemplatesPanel />
+        </div>
+        <ProjectsPanel
+          cwd={cwd}
+          onSelectWorkspace={onSelectWorkspace}
+          onToast={onToast}
+          onStartProject={onStartProject}
+          onStartProjectConversation={onStartProjectConversation}
+          onNavigate={onNavigate}
+        />
+      </div>
     );
   }
 
   if (label === "专家·技能·连接器") {
-    // MarketplacePanel requires a `sessionId` to issue install/uninstall IPC
-    // calls; without one the panel renders a yellow "open a session first"
-    // banner and disables every action. Pass it through here so users can
-    // install plugins the moment they enter the experts panel, instead of
-    // having to bounce out to the home page.
+    // Phase 7 — WorkBuddy 风格 9 卡 3 列专家网格作为顶部 banner;
+    // 下方仍然渲染原有的 market tabs(专家·技能·连接器·插件)。
     return (
-      <ExpertsPanel
-        onGoHome={onGoHome}
-        onToast={onToast}
-        sessionId={sessionId}
-      />
+      <div className="placeholder-page-stack">
+        <div className="experts-grid-host">
+          <ExpertsGrid />
+        </div>
+        <ExpertsPanel
+          onGoHome={onGoHome}
+          onToast={onToast}
+          sessionId={sessionId}
+        />
+      </div>
     );
   }
 
