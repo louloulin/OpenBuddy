@@ -1049,3 +1049,89 @@ SDK 命令实际只能靠 ⌘K 执行 —— 文档与行为不一致。现在�
 `shell.overlay` / `notifications` / `details` 标为 `ext`:它们的消费者是 ui-layout 的
 `AppFrame`(整壳实现),而本产品外壳走命名 `overlay.*` slot 路径。**这是一个待决策项**:
 要么把 AppFrame 的浮层渲染接进 AppShell,要么退役这两个槽,别让「有注册没消费」长期存在。
+
+## R20 — 第二轮接线:编辑器扩展点 / 专家页 / 主题字体
+
+R19 用审计脚本把「注册了零消费」的槽位挖了出来(当时 ok=12 / dead=5 / no-impl=20)。
+R20 把其中**有真实产品价值**的三组补完,并把审计本身升级成能区分"漏接线"和
+"设计如此"的工具。
+
+### R20.1 编辑器三个扩展点接上消费者(no-impl → 可用)
+
+`editor.toolbar` / `editor.slash-commands` / `editor.mention-sources` 声明齐全、
+零消费者 —— 插件注册进去石沉大海(`packages/ui/openbuddy-ui-editor/src/client.tsx`
+的注释还写着"由消费方追加",但消费方不存在)。
+
+| 层 | 文件 | 职责 |
+|---|---|---|
+| 纯逻辑 | `lib/toolbar-actions.ts` | 插件按钮收敛:去重 / 排序 / 丢弃缺 `run` / 吞抛错 |
+| 纯逻辑 | `lib/slash-command.ts` | `mergeSlashCommandContributions`:内置 id 撞名时内置赢 |
+| 纯逻辑 | `lib/mention.ts` | `gatherMentionItems`:多来源串行聚合 + 按 id 去重 + 单来源容错 |
+| 消费 | `lib/use-editor-slots.ts` | 编辑器自取三个槽位(宿主拿到的是 `editor.body` 组件,不认识内部类型) |
+| 渲染 | `components/EditorToolbar.tsx` / `TiptapEditor.tsx` | 合并进内置集合;有 mention 来源时自动开 `@` |
+
+**端到端验证不是从槽位数量反推的**:`editor-slot-wiring.test.tsx` 挂真内核
+(`SlotProvider` + `registerAllBuiltinUis`)、真插件桥(`installPluginSdkBridge`),
+断言插件注册的按钮出现在工具栏、输入 `/` 时插件命令出现在补全菜单、输入 `@comp`
+时插件候选出现在候选菜单 —— 4 个断言全部落在 DOM 上。
+
+`applySlashCommand` 也补了一条路径:插件命令先删 `/xxx` 区间再调 `command.run`,
+与内置命令的前置条件一致;`run` 抛错只吞异常(文档保留"触发文本已删除"),不把
+异常抛给菜单。
+
+### R20.2 `placeholder.experts` 接上消费者(dead → ok)
+
+`ui-experts` 把 `ExpertsTab` 注册进槽位,但 `PlaceholderPage` 直接 import
+`ExpertsPanel`,槽位空转 —— "第三方可替换专家页"的能力等于不存在。修法沿用同文件
+里 `modules.marketplace` 的既有模式:`ExpertsPanel` 内新增 `ExpertsTabContent`
+消费槽位、回退到本地 `ExpertsTab`(两条路径同一个组件,卸载插件视觉零变化)。
+
+### R20.3 主题字体真的生效(功能缺陷,不只是视觉)
+
+19 套主题都声明了 `font` / `headingFont`,但这两个字段**只喂给 ThemePicker 的
+预览卡片**:全仓 `var(--wb-font)` 只有 3 处消费,`src/styles/base.css` 的 body
+读的是一个**从未定义**的 `--wb-font-family-base`。也就是"换主题只换颜色,字体
+一动不动"。
+
+修复的**关键陷阱**:主题写的是 `'"Space Grotesk", var(--wb-font)'` —— 自引用
+即将被覆盖的那个 token。原样写回 `--wb-font` 就是循环引用,CSS 会丢弃整条声明,
+字体依旧不生效(而且更难查)。因此 `expandFontRefs()` 在**定义时**文本展开,
+`resolveThemeVars()` 作为 store 与 `ThemeInitializer` 的唯一组合入口(首屏不再
+"挂载后字体跳一次"),新增 `--wb-font-heading` 给 markdown 标题用。
+
+### R20.4 审计脚本升级:`ext-default`
+
+`dead` 一直把两类东西混着:真漏接线,和"内置默认 + 插件增量"(内置按钮写在组件
+里,槽位只承载增量 —— 这类槽位**本来就该零注册**)。新增自动判据:
+
+> 声明于包 P + 被包 P 消费 + 零注册者 ⇒ `ext-default`(设计如此)
+
+不需要手工白名单,no-impl 从 20 降到 17。审计末尾现在直接列出 no-impl / dead
+的槽名,省得去表里数。
+
+### R20.5 当前审计快照(`node scripts/ui-slot-audit.mjs`)
+
+```
+总共 40 个槽位; ok=13 dead=4 ext=6 no-impl=17
+dead(注册了但零消费,能力不可见):
+  onboarding.data-dir, onboarding.feedback, onboarding.whats-new, root
+```
+
+| 剩余 dead 槽 | 差什么 | 性质 |
+|---|---|---|
+| `onboarding.data-dir` | 宿主注入 `onSubmit`;改数据目录要重启进程 | 独立特性(需主进程配合) |
+| `onboarding.feedback` | 宿主注入 `onSubmit`(提交到本地队列 / 外链) | 独立特性 |
+| `onboarding.whats-new` | 需要 `version` + `items`;仓库里还没有**应用内** changelog 数据源 | 缺数据,不是缺接线 |
+| `root` | ui-layout 的 `AppFrame` 子槽,`AppFrame` 未在本产品外壳使用 | 与 `shell.overlay` 同一待决策项 |
+
+### R20.6 仍然悬而未决:AppFrame 浮层槽
+
+`shell.overlay` / `notifications` / `details` 的唯一消费者是 ui-layout 的
+`AppFrame`(整壳实现),而产品外壳走命名 `overlay.*` 路径。后果是 `ui-dialogs`
+注册的 AboutDialog / FolderTrustDialog 等 5 个浮层**永远不渲染**。两条路:
+
+1. 把 AppFrame 的浮层渲染接进 `AppShell`(保留插件的整壳替换能力);
+2. 退役这几个槽,把 `ui-dialogs` 的注册改到命名 `overlay.*` 路径。
+
+倾向 (1):整壳替换是微内核的对称性(第三方 shell 也能被替换),但要先确认
+AppShell 的浮层容器与 AppFrame 的语义一致。
