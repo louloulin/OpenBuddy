@@ -12,7 +12,7 @@
  *  - account: 账户（pi auth 状态）
  *  - agent-settings / assistant: 引导到对应面板
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Sun,
   Moon,

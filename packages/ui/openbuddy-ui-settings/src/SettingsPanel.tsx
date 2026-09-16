@@ -111,7 +111,8 @@ type SectionId =
   | "personalize"
   | "data"
   | "security"
-  | "help";
+  | "help"
+  | "audit";
 
 interface NavItem {
   id: SectionId;

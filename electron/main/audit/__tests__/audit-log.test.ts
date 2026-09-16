@@ -12,6 +12,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Suite-wide injection target: tests rebind globalThis.__OB_USER_DATA__ in
+// beforeEach so the mocked electron.app.getPath("userData") resolves to the
+// per-test temp directory. Declare it here so strict-mode tsc doesn't
+// flag every `globalThis.__OB_USER_DATA__` access as implicit-any.
+declare global {
+  // eslint-disable-next-line no-var
+  var __OB_USER_DATA__: string | undefined;
+}
+
 const tmpRoots: string[] = [];
 function setupUserData(): string {
   const dir = mkdtempSync(join(tmpdir(), "ob-audit-"));
@@ -23,7 +32,6 @@ vi.mock("electron", () => ({
   app: {
     getPath: (key: string) => {
       if (key !== "userData") throw new Error(`unexpected getPath(${key})`);
-      // @ts-expect-error injected by suite
       return globalThis.__OB_USER_DATA__ ?? "/tmp";
     },
   },
@@ -56,7 +64,7 @@ describe("audit-log", () => {
     expect(event.at).toBeTruthy();
     expect(event.event).toBe("test.append");
     expect(event.hash).toMatch(/^[0-9a-f]{16}$/);
-    const filePath = join(globalThis.__OB_USER_DATA__, "audit.jsonl");
+    const filePath = join(globalThis.__OB_USER_DATA__!, "audit.jsonl");
     expect(existsSync(filePath)).toBe(true);
     const lines = readFileSync(filePath, "utf8").split("\n").filter(Boolean);
     expect(lines).toHaveLength(1);
@@ -68,7 +76,7 @@ describe("audit-log", () => {
     const e2 = await trail.record({ event: "test.chain", outcome: "info", source: "renderer" });
     expect(e1.hash).not.toBe(e2.hash);
     // 第二条的 hash 应该依赖第一条的 hash(同 event 同 subject 仍然不同是因为时间戳 + id 不同)
-    const filePath = join(globalThis.__OB_USER_DATA__, "audit.jsonl");
+    const filePath = join(globalThis.__OB_USER_DATA__!, "audit.jsonl");
     const lines = readFileSync(filePath, "utf8").split("\n").filter(Boolean);
     expect(lines).toHaveLength(2);
     expect(JSON.parse(lines[0]).hash).toBe(e1.hash);
@@ -76,7 +84,7 @@ describe("audit-log", () => {
   });
 
   it("load() 容忍坏行 + 倒序读取尾部", async () => {
-    const filePath = join(globalThis.__OB_USER_DATA__, "audit.jsonl");
+    const filePath = join(globalThis.__OB_USER_DATA__!, "audit.jsonl");
     writeFileSync(filePath, `{"id":"a","at":"2026-01-01T00:00:00Z","event":"good1","outcome":"info","source":"renderer"}\nnot-valid-json\n{"id":"b","at":"2026-01-02T00:00:00Z","event":"good2","outcome":"info","source":"renderer"}\n`, "utf8");
 
     vi.resetModules();
@@ -106,7 +114,7 @@ describe("audit-log", () => {
 
   it("clear() 同时清内存 + 文件", async () => {
     await trail.record({ event: "to.clear", outcome: "info", source: "renderer" });
-    const filePath = join(globalThis.__OB_USER_DATA__, "audit.jsonl");
+    const filePath = join(globalThis.__OB_USER_DATA__!, "audit.jsonl");
     expect(readFileSync(filePath, "utf8")).not.toBe("");
     await trail.clear();
     expect(readFileSync(filePath, "utf8")).toBe("");
