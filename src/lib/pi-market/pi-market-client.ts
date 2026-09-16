@@ -38,8 +38,10 @@ export type {
   PiMarketManifestView,
   PiMarketRefreshReport,
   PiMarketRegistrySource,
+  PiMarketSourceProbeResult,
   PiMarketSourceState,
   PiMarketSourceStatus,
+  PiMarketSourcesView,
   PiMarketUninstallResult,
 } from "@openbuddy/shared-types";
 
@@ -49,6 +51,9 @@ import type {
   PiMarketInstallResult,
   PiMarketLockfile,
   PiMarketRefreshReport,
+  PiMarketRegistrySource,
+  PiMarketSourceProbeResult,
+  PiMarketSourcesView,
   PiMarketUninstallResult,
 } from "@openbuddy/shared-types";
 
@@ -62,6 +67,10 @@ export const PI_MARKET_CHANNELS = {
   uninstall: "agent:pi-market-uninstall",
   lockfile: "agent:pi-market-lockfile",
   audit: "agent:pi-market-audit",
+  // R35 —— 源管理:读 / 写 / 探活。
+  sourcesGet: "agent:pi-market-sources-get",
+  sourcesSet: "agent:pi-market-sources-set",
+  sourceProbe: "agent:pi-market-source-probe",
 } as const;
 
 export interface PiMarketListResult {
@@ -128,6 +137,37 @@ export function lockfilePiMarket(): Promise<PiMarketLockfile> {
 
 export function auditPiMarket(args?: { limit?: number }): Promise<PiMarketAuditResult> {
   return invoke(PI_MARKET_CHANNELS.audit, args) as Promise<PiMarketAuditResult>;
+}
+
+/**
+ * R35 —— 读源清单。`file` 是可编辑的那一份,`effective` 是合并去重后的最终列表,
+ * `readonlySourceIds` 标出改不动的源(环境变量 / 宿主注入)。
+ */
+export function getPiMarketSources(): Promise<PiMarketSourcesView> {
+  return invoke(PI_MARKET_CHANNELS.sourcesGet) as Promise<PiMarketSourcesView>;
+}
+
+/**
+ * R35 —— 覆盖写 `sources.json` 并**立即**替换内存里的源清单,所以调用方紧接着
+ * `refreshPiMarket()` 就是按新源跑(不需要重启)。
+ *
+ * 失败时 reject:坏条目会被指出是第几行的哪个字段(而不是静默丢弃),
+ * 用 `piMarketErrorInfo()` 取回码与明细。
+ */
+export function setPiMarketSources(
+  sources: readonly PiMarketRegistrySource[],
+): Promise<PiMarketSourcesView> {
+  return invoke(PI_MARKET_CHANNELS.sourcesSet, { sources }) as Promise<PiMarketSourcesView>;
+}
+
+/**
+ * R35 —— 探一个源此刻是否可达(不落盘)。给"保存前先测一下"用:
+ * 地址写错时,用户不必先保存再刷新才发现。
+ */
+export function probePiMarketSource(
+  source: PiMarketRegistrySource,
+): Promise<PiMarketSourceProbeResult> {
+  return invoke(PI_MARKET_CHANNELS.sourceProbe, { source }) as Promise<PiMarketSourceProbeResult>;
 }
 
 /**

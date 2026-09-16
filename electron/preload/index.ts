@@ -35,6 +35,8 @@ const allowedInvokeChannels = new Set([
   "agent:pi-market-install", "agent:pi-market-upgrade",
   "agent:pi-market-rollback", "agent:pi-market-uninstall",
   "agent:pi-market-lockfile", "agent:pi-market-audit",
+  "agent:pi-market-sources-get", "agent:pi-market-sources-set",
+  "agent:pi-market-source-probe",
   // casdoor
   "casdoor:ai-capabilities", "casdoor:audit-list", "casdoor:authorize", "casdoor:authorize-decision", "casdoor:authorize-resource", "casdoor:billing-order-create", "casdoor:billing-order-expire", "casdoor:billing-order-refund",
   "casdoor:billing-orders", "casdoor:billing-plan-upsert", "casdoor:billing-plans", "casdoor:billing-subscription", "casdoor:can", "casdoor:capabilities", "casdoor:commercial-model-catalog", "casdoor:config-get",

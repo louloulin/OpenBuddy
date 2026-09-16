@@ -23,6 +23,9 @@ const client = vi.hoisted(() => ({
   uninstallPiMarket: vi.fn(),
   lockfilePiMarket: vi.fn(),
   auditPiMarket: vi.fn(),
+  getPiMarketSources: vi.fn(),
+  setPiMarketSources: vi.fn(),
+  probePiMarketSource: vi.fn(),
   piMarketErrorInfo: vi.fn((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     return { code: "unknown", detail: message };
@@ -51,6 +54,15 @@ function entry(partial: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  client.getPiMarketSources.mockReset().mockResolvedValue({
+    file: [],
+    effective: [],
+    filePath: "/data/pi-extensions/sources.json",
+    readonlySourceIds: [],
+    statuses: [],
+  });
+  client.setPiMarketSources.mockReset();
+  client.probePiMarketSource.mockReset();
   client.listPiMarket.mockReset().mockResolvedValue({ entries: [entry()] });
   client.refreshPiMarket.mockReset().mockResolvedValue({
     count: 1,
@@ -236,4 +248,113 @@ describe("安装流程", () => {
     expect(error.textContent).toContain("高风险");
     expect(screen.getByTestId("install-dialog")).toBeTruthy();
   });
+
 });
+
+// ---------------------------------------------------------------------------
+// R35 — 源管理面板
+// ---------------------------------------------------------------------------
+
+describe("R35 源管理", () => {
+  it("默认收起;点「源管理」才读配置并渲染每一行", async () => {
+    client.getPiMarketSources.mockResolvedValue({
+      file: [{ id: "internal", url: "https://internal.example/i.json", weight: 5, label: "内网" }],
+      effective: [{ id: "deployed", url: "https://deployed.example/i.json", weight: 10 }],
+      filePath: "/data/pi-extensions/sources.json",
+      readonlySourceIds: ["deployed"],
+      statuses: [],
+    });
+    render(<PiExtensionsSection onToast={() => {}} />);
+
+    // 收起状态:不读配置(省一次 IPC),也不渲染编辑器。
+    expect(screen.queryByTestId("pi-ext-sources-editor")).toBeNull();
+    expect(client.getPiMarketSources).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByTestId("pi-ext-sources-toggle"));
+    const editor = await screen.findByTestId("pi-ext-sources-editor");
+    expect(editor.textContent).toContain("/data/pi-extensions/sources.json");
+
+    const rows = await screen.findAllByTestId("pi-ext-source-row");
+    expect(rows).toHaveLength(2);
+    // 只读源(宿主注入)显示但标「只读」,且没有删除按钮。
+    expect(rows[0].getAttribute("data-readonly")).toBe("true");
+    expect(rows[0].textContent).toContain("只读");
+    expect(rows[0].querySelector("[data-testid='pi-ext-source-remove']")).toBeNull();
+    expect(rows[1].querySelector("[data-testid='pi-ext-source-remove']")).not.toBeNull();
+  });
+
+  it("保存把改过的行写回,并在成功后刷新市场条目", async () => {
+    client.getPiMarketSources.mockResolvedValue({
+      file: [{ id: "internal", url: "https://internal.example/i.json" }],
+      effective: [{ id: "internal", url: "https://internal.example/i.json" }],
+      filePath: "/data/pi-extensions/sources.json",
+      readonlySourceIds: [],
+      statuses: [],
+    });
+    client.setPiMarketSources.mockResolvedValue({
+      file: [{ id: "internal", url: "https://internal.example/i.json", weight: 9 }],
+      effective: [{ id: "internal", url: "https://internal.example/i.json", weight: 9 }],
+      filePath: "/data/pi-extensions/sources.json",
+      readonlySourceIds: [],
+      statuses: [],
+    });
+    const onToast = vi.fn();
+    render(<PiExtensionsSection onToast={onToast} />);
+
+    fireEvent.click(await screen.findByTestId("pi-ext-sources-toggle"));
+    const weight = await screen.findByTestId("pi-ext-source-weight");
+
+    // 没改动时保存不可点(避免"点了没反应"的按钮)。
+    const save = screen.getByTestId("pi-ext-sources-save");
+    expect(save).toHaveProperty("disabled", true);
+
+    fireEvent.change(weight, { target: { value: "9" } });
+    await waitFor(() => expect(save).toHaveProperty("disabled", false));
+    fireEvent.click(save);
+
+    await waitFor(() => expect(client.setPiMarketSources).toHaveBeenCalledTimes(1));
+    expect(client.setPiMarketSources.mock.calls[0][0]).toEqual([
+      { id: "internal", url: "https://internal.example/i.json", weight: 9 },
+    ]);
+    // 源变了 → 合并结果也变了 → 市场条目必须重新读。
+    await waitFor(() => expect(client.listPiMarket).toHaveBeenCalledTimes(2));
+    expect(onToast).toHaveBeenCalledWith("已保存 1 个源");
+  });
+
+  it("坏输入就地报行号,并且保存按钮点不动", async () => {
+    render(<PiExtensionsSection onToast={() => {}} />);
+    fireEvent.click(await screen.findByTestId("pi-ext-sources-toggle"));
+    fireEvent.click(await screen.findByTestId("pi-ext-source-add"));
+
+    const url = await screen.findByTestId("pi-ext-source-url");
+    fireEvent.change(url, { target: { value: "not a url" } });
+
+    expect(await screen.findByTestId("pi-ext-source-row-error")).toHaveTextContent(
+      "不是合法的 URL 或绝对路径",
+    );
+    expect(screen.getByTestId("pi-ext-sources-save")).toHaveProperty("disabled", true);
+  });
+
+  it("「测试」用当前行探活,结果写在行上(不保存)", async () => {
+    render(<PiExtensionsSection onToast={() => {}} />);
+    fireEvent.click(await screen.findByTestId("pi-ext-sources-toggle"));
+    fireEvent.click(await screen.findByTestId("pi-ext-source-add"));
+    fireEvent.change(await screen.findByTestId("pi-ext-source-url"), {
+      target: { value: "https://probe.example/i.json" },
+    });
+    client.probePiMarketSource.mockResolvedValue({
+      ok: true,
+      entryCount: 3,
+      sampleId: "demo.alpha",
+      elapsedMs: 12,
+    });
+
+    fireEvent.click(screen.getByTestId("pi-ext-source-probe"));
+    expect(await screen.findByTestId("pi-ext-source-probe-result")).toHaveTextContent(
+      "可达:3 条,例如 demo.alpha",
+    );
+    // 探活不写文件。
+    expect(client.setPiMarketSources).not.toHaveBeenCalled();
+  });
+});
+

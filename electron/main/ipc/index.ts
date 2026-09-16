@@ -162,7 +162,7 @@ import { registerDataDirIpc } from "./data-dir";
 import {
   createPiMarketBridge,
   registerPiMarketBridgeIpc,
-  resolvePiMarketSources,
+  resolvePiMarketSourcesDetailed,
 } from "../agent/pi-market-bridge";
 import { app } from "electron";
 
@@ -1134,13 +1134,15 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	//   七个 channel 提供版本化安装 + 原子提交 + 锁文件 + 审计 + 回滚。
 	const dataDir = app.getPath("userData");
 	// R32 — 多源索引:显式配置 > 环境变量 > `<dataDir>/pi-extensions/sources.json`。
-	// **默认不内置任何远端源**(本地优先 / 数据自决:没配置 = 不联网);源清单在
-	// 启动时定下来,避免"读盘读到一半文件被改"的不确定性。
-	const piMarketSources = await resolvePiMarketSources({ dataDir });
+	// **默认不内置任何远端源**(本地优先 / 数据自决:没配置 = 不联网)。启动时读一次,
+	// 之后由 `setSources()` 就地替换 —— 不在每次 list 时读盘,避免"读到一半文件被改"。
+	// R35 — 只读源(宿主 / 环境变量)与文件源分开传,源管理 UI 才知道哪些能改。
+	const piMarketResolved = await resolvePiMarketSourcesDetailed({ dataDir });
 	const piMarketBridge = createPiMarketBridge({
 		dataDir,
 		hostVersion: "0.15.0",
-		sources: piMarketSources,
+		sources: piMarketResolved.readonly,
+		fileSources: piMarketResolved.file,
 	});
 	registerPiMarketBridgeIpc(piMarketBridge, ipcMain);
 }

@@ -64,8 +64,15 @@ describe.skipIf(!canLaunch)("live electron probe: 插件·市场可达性", () =
 
   it("面板给出源 / 插件 / 已安装计数(空市场也要有明确数字,不是白板)", () => {
     const probe = runProbe();
-    expect(probe.panel?.text).toMatch(/\d+ 个源/);
-    expect(probe.panel?.text).toMatch(/\d+ 个插件/);
+    // 读的是统计行本身(`.marketplace-panel__stats`),不是面板全文的截断 ——
+    // 前面区块的文案变长会把统计行挤出 `text.slice()` 窗口,那不是产品回归。
+    expect(probe.panel?.stats).toMatch(/\d+ 个源/);
+    expect(probe.panel?.stats).toMatch(/\d+ 个插件/);
+    expect(probe.panel?.stats).toMatch(/\d+ 已安装/);
+  });
+
+  it("面板可以搜索", () => {
+    const probe = runProbe();
     expect(probe.panel?.searchable).toBe(true);
   });
 

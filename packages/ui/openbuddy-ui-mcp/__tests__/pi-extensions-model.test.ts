@@ -8,16 +8,28 @@
  */
 import { describe, expect, it } from "vitest";
 import { PI_MARKET_ERROR_CODES } from "@openbuddy/shared-types";
-import type { PiMarketEntryView, PiMarketSourceStatus } from "@openbuddy/shared-types";
+import type {
+  PiMarketEntryView,
+  PiMarketSourceStatus,
+  PiMarketSourcesView,
+} from "@openbuddy/shared-types";
 import {
+  blankSourceDraft,
   describePiMarketError,
+  describeProbeResult,
   groupPiMarketEntries,
   installStateOf,
   mirrorLabel,
+  moveSourceDraft,
   sourceChips,
+  sourceDraftsDirty,
   sourceLabel,
+  sourceStateLabel,
+  sourcesToDrafts,
   summarizeSources,
   toMarketplaceEntry,
+  validateSourceDrafts,
+  type PiSourceDraft,
 } from "../src/pi-extensions-model";
 
 function entry(partial: Partial<PiMarketEntryView> = {}): PiMarketEntryView {
@@ -213,4 +225,193 @@ describe("describePiMarketError", () => {
     expect(action.title).toBe("操作失败");
     expect(action.hint).toBe("socket hang up");
   });
+
 });
+
+// ---------------------------------------------------------------------------
+// R35 — 源管理编辑态模型
+// ---------------------------------------------------------------------------
+
+function sourcesView(partial: Partial<PiMarketSourcesView> = {}): PiMarketSourcesView {
+  return {
+    file: [],
+    effective: [],
+    filePath: "/data/pi-extensions/sources.json",
+    readonlySourceIds: [],
+    statuses: [],
+    ...partial,
+  };
+}
+
+function draft(partial: Partial<PiSourceDraft> = {}): PiSourceDraft {
+  return { ...blankSourceDraft(), ...partial };
+}
+
+describe("R35 源管理:sourcesToDrafts", () => {
+  it("只读源排在最前,文件源在后,且带上一次刷新的每源状态", () => {
+    const rows = sourcesToDrafts(
+      sourcesView({
+        readonlySourceIds: ["deployed"],
+        effective: [
+          { id: "deployed", url: "https://deployed.example/i.json", weight: 10 },
+          { id: "file", url: "https://file.example/i.json" },
+        ],
+        file: [{ id: "file", url: "https://file.example/i.json" }],
+        statuses: [
+          {
+            id: "file",
+            url: "https://file.example/i.json",
+            weight: 0,
+            state: "cached",
+            entryCount: 7,
+            error: "socket hang up",
+          },
+        ],
+      }),
+    );
+    expect(rows.map((row) => row.id)).toEqual(["deployed", "file"]);
+    expect(rows[0].readonly).toBe(true);
+    expect(rows[1].readonly).toBe(false);
+    expect(rows[1].status).toBe("cached");
+    expect(rows[1].entryCount).toBe(7);
+    expect(rows[1].error).toBe("socket hang up");
+  });
+
+  it("同 id 的文件源不会重复出现(生效的是只读那一份)", () => {
+    const rows = sourcesToDrafts(
+      sourcesView({
+        readonlySourceIds: ["dup"],
+        effective: [{ id: "dup", url: "https://deployed.example/i.json" }],
+        file: [{ id: "dup", url: "https://hijack.example/i.json" }],
+      }),
+    );
+    expect(rows.map((row) => row.url)).toEqual(["https://deployed.example/i.json"]);
+  });
+
+  it("数字字段保持字符串:输入框里的半成品不该在 onChange 里被悄悄变成 0", () => {
+    const rows = sourcesToDrafts(
+      sourcesView({ file: [{ id: "w", url: "https://w.example/i.json", weight: 5, timeoutMs: 1500 }] }),
+    );
+    expect(rows[0].weight).toBe("5");
+    expect(rows[0].timeoutMs).toBe("1500");
+  });
+});
+
+describe("R35 源管理:validateSourceDrafts", () => {
+  it("坏行给出**行号**,而不是整表报错", () => {
+    const result = validateSourceDrafts([
+      draft({ id: "ok", url: "https://ok.example/i.json" }),
+      draft({ url: "" }),
+      draft({ url: "not a url" }),
+      draft({ url: "https://x.example/i.json", weight: "abc" }),
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.errors.rows[1]).toBe("源地址必填");
+    expect(result.errors.rows[2]).toBe("不是合法的 URL 或绝对路径");
+    expect(result.errors.rows[3]).toBe("权重必须是数字");
+    // 第一行是好的 —— 行号必须精确,否则用户要去猜是哪一行。
+    expect(result.errors.rows[0]).toBeUndefined();
+  });
+
+  it("重复 id 报在后出现的那一行", () => {
+    const result = validateSourceDrafts([
+      draft({ id: "same", url: "https://a.example/i.json" }),
+      draft({ id: "same", url: "https://b.example/i.json" }),
+    ]);
+    expect(result.errors.rows[1]).toBe("id 重复:same");
+  });
+
+  it("只读行不参与校验、也不进提交载荷", () => {
+    const result = validateSourceDrafts([
+      draft({ id: "deployed", url: "", readonly: true }),
+      draft({ id: "file", url: "https://file.example/i.json" }),
+    ]);
+    expect(result.ok).toBe(true);
+    expect(result.sources.map((item) => item.id)).toEqual(["file"]);
+  });
+
+  it("没写 id 时按 host + path 派生;label / trusted / 超时都保留", () => {
+    const result = validateSourceDrafts([
+      draft({ url: "https://mirror.example.com/pi/index.json", label: " 镜像 ", trusted: true, weight: "3", timeoutMs: "1500" }),
+    ]);
+    expect(result.sources).toEqual([
+      {
+        id: "mirror.example.com-pi-index",
+        url: "https://mirror.example.com/pi/index.json",
+        label: "镜像",
+        weight: 3,
+        trusted: true,
+        timeoutMs: 1500,
+      },
+    ]);
+  });
+
+  it("同一个 host 上的两个索引拿到不同 id(否则 UI 会报一个用户看不懂的重复)", () => {
+    const result = validateSourceDrafts([
+      draft({ url: "https://mirror.corp/pi/stable.json" }),
+      draft({ url: "https://mirror.corp/pi/nightly.json" }),
+    ]);
+    expect(result.ok).toBe(true);
+    expect(result.sources.map((item) => item.id)).toEqual([
+      "mirror.corp-pi-stable",
+      "mirror.corp-pi-nightly",
+    ]);
+  });
+
+  it("绝对路径也是合法源(main 侧同样接受非 URL 输入)", () => {
+    const result = validateSourceDrafts([draft({ url: "/srv/pi/index.json" })]);
+    expect(result.ok).toBe(true);
+    expect(result.sources[0].id).toBe("local-srv-pi-index");
+    // 显式写 id 时以用户写的为准。
+    expect(validateSourceDrafts([draft({ id: "local", url: "/srv/pi/index.json" })]).sources[0].id).toBe("local");
+  });
+});
+
+describe("R35 源管理:脏检查与排序", () => {
+  it("改一个字就算脏;改回原样就不脏", () => {
+    const saved = [{ id: "a", url: "https://a.example/i.json", weight: 1 }];
+    expect(sourceDraftsDirty(sourcesToDrafts(sourcesView({ file: saved })), saved)).toBe(false);
+    const edited = sourcesToDrafts(sourcesView({ file: saved }));
+    edited[0] = { ...edited[0], label: "镜像" };
+    expect(sourceDraftsDirty(edited, saved)).toBe(true);
+    edited[0] = { ...edited[0], label: "" };
+    expect(sourceDraftsDirty(edited, saved)).toBe(false);
+  });
+
+  it("权重相同时声明顺序决定优先级,所以顺序本身是可编辑语义", () => {
+    const rows = [
+      draft({ id: "a", url: "https://a.example/i.json" }),
+      draft({ id: "b", url: "https://b.example/i.json" }),
+    ];
+    expect(moveSourceDraft(rows, 1, -1).map((row) => row.id)).toEqual(["b", "a"]);
+    // 越界的移动是 no-op(不抛错,也不产生空位)。
+    expect(moveSourceDraft(rows, 0, -1).map((row) => row.id)).toEqual(["a", "b"]);
+    expect(moveSourceDraft(rows, 1, 1).map((row) => row.id)).toEqual(["a", "b"]);
+  });
+
+  it("只读行不可移动 —— 让用户拖动会让人以为改了优先级", () => {
+    const rows = [
+      draft({ id: "deployed", url: "https://d.example/i.json", readonly: true }),
+      draft({ id: "file", url: "https://f.example/i.json" }),
+    ];
+    expect(moveSourceDraft(rows, 1, -1).map((row) => row.id)).toEqual(["deployed", "file"]);
+  });
+});
+
+describe("R35 源管理:状态与探活文案", () => {
+  it("每源状态有短标签", () => {
+    expect(sourceStateLabel("fresh")).toBe("已拉取");
+    expect(sourceStateLabel("cached")).toBe("用缓存");
+    expect(sourceStateLabel("failed")).toBe("不可达");
+    expect(sourceStateLabel(undefined)).toBeUndefined();
+  });
+
+  it("探活文案区分可达/不可达,并把样例条目名带出来", () => {
+    expect(describeProbeResult({ ok: true, entryCount: 12, sampleId: "demo.alpha" })).toBe(
+      "可达:12 条,例如 demo.alpha",
+    );
+    expect(describeProbeResult({ ok: false, entryCount: 0, error: "HTTP 404" })).toBe("不可达:HTTP 404");
+    expect(describeProbeResult({ ok: false, entryCount: 0 })).toBe("不可达:未知错误");
+  });
+});
+

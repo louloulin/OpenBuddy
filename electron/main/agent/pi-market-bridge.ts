@@ -64,7 +64,9 @@ import type {
   PiMarketRefreshReport,
   PiMarketRegistrySource,
   PiMarketSourceState,
+  PiMarketSourceProbeResult,
   PiMarketSourceStatus,
+  PiMarketSourcesView,
   PiMarketUninstallResult,
 } from "@openbuddy/shared-types";
 import { formatPiMarketError } from "@openbuddy/shared-types";
@@ -175,8 +177,16 @@ export interface PiMarketBridgeOptions {
   /**
    * R32 — 多个索引源。权重大的先赢,详见 `mergePiMarketSources`。
    * 与 registryUrl 同时给出时两者都生效(registryUrl 变成 `default` 源)。
+   *
+   * R35 —— 这里的源被当作**只读**(宿主注入 / 部署事实),不在 UI 里编辑。
    */
   sources?: readonly PiMarketRegistrySource[];
+  /**
+   * R35 —— `sources.json` 的内容(宿主启动时用 `resolvePiMarketSourcesDetailed()`
+   * 读一次传进来)。这一份是**用户可编辑**的:`setSources()` 会原子写回文件并
+   * 立刻替换内存里的列表,所以 UI 改完源不用重启就能刷新。
+   */
+  fileSources?: readonly PiMarketRegistrySource[];
   /** 注入式 JSON fetcher(测试用;缺省走 globalThis.fetch)。 */
   fetchJson?: (url: string) => Promise<unknown>;
   /** 注入式载荷物化(远端 tarball / 私有协议由宿主实现)。 */
@@ -221,6 +231,8 @@ export interface PiMarketBridge {
     auditFile: string;
     /** R32 — 每源离线缓存目录(`sources/<sourceId>.json`)。 */
     sourcesDir: string;
+    /** R35 — 用户可编辑的源配置(`pi-extensions/sources.json`)。 */
+    sourcesFile: string;
   };
   readRegistry(): Promise<{
     entries: PiMarketRegistryEntry[];
@@ -247,6 +259,22 @@ export interface PiMarketBridge {
     id: string,
     options?: PiMarketUninstallOptions,
   ): Promise<PiMarketUninstallResult>;
+  /**
+   * R35 —— 当前源清单。`file` 是可编辑的那一份,`effective` 是合并后的最终列表,
+   * `readonlySourceIds` 标出改不动的源(环境变量 / 宿主注入)。
+   */
+  getSources(): PiMarketSourcesView;
+  /**
+   * R35 —— 原子写回 `sources.json` 并**立即**替换内存里的源列表,所以紧接着
+   * 调 `refreshRegistry()` 就是按新源跑。写入前做严格校验(坏 URL / 重复 id
+   * 直接报错,而不是像读路径那样静默跳过)—— 用户正在编辑的东西必须给回执。
+   */
+  setSources(sources: readonly PiMarketRegistrySource[]): Promise<PiMarketSourcesView>;
+  /**
+   * R35 —— 探一个源此刻是否可达(不落盘)。给"保存前先测一下"用:
+   * 源地址写错时,用户不必先保存再刷新才发现。
+   */
+  probeSource(source: PiMarketRegistrySource): Promise<PiMarketSourceProbeResult>;
   readLockfile(): Promise<PiMarketLockfile>;
   readAuditTrail(limit?: number): Promise<PiMarketAuditEntry[]>;
 }
@@ -612,13 +640,44 @@ export function sourceWeight(source: PiMarketRegistrySource): number {
   return typeof weight === "number" && Number.isFinite(weight) ? weight : 0;
 }
 
-/** 用户没写 id 时从 URL 里凑一个稳定的(host 优先)。 */
+/** 派生 id 时顺手去掉的常见索引文件后缀(`primary.json` → `primary`)。 */
+const SOURCE_URL_EXT_RE = /\.(json|json5|ya?ml|txt)$/i;
+
+/**
+ * 把 URL 的 path 压成 id 里可读的一段:`/pi/stable.json` → `pi-stable`。
+ *
+ * 为什么 id 必须带 path(而不是只有 host):**同一个 host 上放多个索引是常态**
+ * —— `https://mirror.corp/pi/stable.json` 与 `.../nightly.json` 是两个源。
+ * 只按 host 派生会让它们撞成一个 id,读路径的去重(同 id 只保留第一条)于是
+ * **静默丢掉第二个源** —— 用户写了两个源却只有一个生效,而且没有任何提示。
+ */
+function slugifySourcePath(pathname: string): string {
+  return pathname
+    .replace(/^[/\\]+|[/\\]+$/g, "")
+    .replace(SOURCE_URL_EXT_RE, "")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+}
+
+/**
+ * 用户没写 id 时从 URL 里凑一个稳定的标识。
+ *
+ * 稳定性是硬要求:id 同时是**离线缓存的文件名**(`sources/<id>.json`)。
+ * 用序号做兜底会让"调整一下源的顺序"把缓存全部指错地方。
+ */
 function deriveSourceId(url: string, index: number): string {
   try {
-    const host = new URL(url).host.replace(/[^a-z0-9.-]/gi, "");
-    if (host) return host.toLowerCase();
+    const parsed = new URL(url);
+    const host = parsed.host.replace(/[^a-z0-9.-]/gi, "").toLowerCase();
+    if (host) {
+      const slug = slugifySourcePath(parsed.pathname);
+      return slug ? `${host}-${slug}` : host;
+    }
   } catch {
-    // 非 URL(本地路径等):落到序号,保证 id 稳定且能写进缓存文件名。
+    // 非 URL(本地绝对路径等):用路径本身派生,同样避免两个本地索引撞 id。
+    const slug = slugifySourcePath(url);
+    if (slug) return `local-${slug}`;
   }
   return `source-${index + 1}`;
 }
@@ -702,34 +761,50 @@ export function mergePiMarketSources(
   });
 }
 
+/** `resolvePiMarketSourcesDetailed()` 的三份结果。 */
+export interface PiMarketResolvedSources {
+  /**
+   * 宿主注入 + registryUrl + 环境变量。这些是**部署事实** —— UI 里改不动,
+   * 改了文件也不会生效,所以单独一份而不是混进可编辑列表。
+   */
+  readonly: PiMarketRegistrySource[];
+  /** `sources.json` 的内容(用户可编辑的那一份)。 */
+  file: PiMarketRegistrySource[];
+  /** 合并去重(同 id 先出现者赢)+ 按权重从大到小排序后的最终列表。 */
+  merged: PiMarketRegistrySource[];
+}
+
 /**
- * 汇总所有配置来源,得到最终的源清单。
+ * 汇总所有配置来源,得到最终的源清单(分读写两半)。
  *
  * 优先级(同 id 时先出现的赢):**显式 options.sources > registryUrl > 环境变量
  * > `sources.json`**。最终按权重从大到小排序。
  *
  * 为什么默认不内置任何远端源:OpenBuddy 的产品立场是本地优先 / 数据自决
  * (见 `docs/PLUGIN_MARKETPLACE.md`)—— **没配置 = 不联网**;要多个源就显式写下来。
+ *
+ * R35 —— 返回**分开的两份**(`readonly` / `file`)而不只是一份合并结果:源管理 UI
+ * 需要知道"哪些能改"。把三份拼成一份再让 UI 去猜哪条来自环境变量,是猜不准的。
  */
-export async function resolvePiMarketSources(options: {
+export async function resolvePiMarketSourcesDetailed(options: {
   dataDir: string;
   sources?: readonly PiMarketRegistrySource[];
   registryUrl?: string;
   env?: Record<string, string | undefined>;
   /** 注入读取(测试用);返回 `undefined` 表示文件不存在。 */
   readSourceFile?: (path: string) => Promise<string | undefined>;
-}): Promise<PiMarketRegistrySource[]> {
-  const list: PiMarketRegistrySource[] = [];
-  const push = (value: unknown): void => {
+}): Promise<PiMarketResolvedSources> {
+  const readonly: PiMarketRegistrySource[] = [];
+  const pushReadonly = (value: unknown): void => {
     for (const source of normalizeRegistrySources(value)) {
-      if (list.some((existing) => existing.id === source.id)) continue;
-      list.push(source);
+      if (readonly.some((existing) => existing.id === source.id)) continue;
+      readonly.push(source);
     }
   };
 
-  push(options.sources);
+  pushReadonly(options.sources);
   if (options.registryUrl && options.registryUrl.trim()) {
-    push([{ id: "default", url: options.registryUrl.trim() }]);
+    pushReadonly([{ id: "default", url: options.registryUrl.trim() }]);
   }
 
   const env = options.env ?? (typeof process !== "undefined" ? process.env : {});
@@ -737,16 +812,16 @@ export async function resolvePiMarketSources(options: {
   if (typeof envRaw === "string" && envRaw.trim()) {
     const text = envRaw.trim();
     try {
-      push(JSON.parse(text));
+      pushReadonly(JSON.parse(text));
     } catch {
       // 不是 JSON:当成"单个 URL"(手写环境变量时最省事的形式)。
-      push([{ id: "env", url: text }]);
+      pushReadonly([{ id: "env", url: text }]);
     }
   }
   const envUrl = env[PI_MARKET_REGISTRY_URL_ENV];
   // 与 `options.registryUrl` 用同一个 id(`default`):它们语义相同,同 id 去重
   // 保证"显式配置赢" —— 否则同一个 URL 会因为写法不同出现两次。
-  if (typeof envUrl === "string" && envUrl.trim()) push([{ id: "default", url: envUrl.trim() }]);
+  if (typeof envUrl === "string" && envUrl.trim()) pushReadonly([{ id: "default", url: envUrl.trim() }]);
 
   const file = join(resolve(options.dataDir), "pi-extensions", PI_MARKET_SOURCES_FILE);
   const readFileText =
@@ -758,16 +833,96 @@ export async function resolvePiMarketSources(options: {
         return undefined;
       }
     });
+  let fileSources: PiMarketRegistrySource[] = [];
   const raw = await readFileText(file);
   if (typeof raw === "string" && raw.trim()) {
     try {
-      push(JSON.parse(raw));
+      fileSources = normalizeRegistrySources(JSON.parse(raw));
     } catch {
       // 配置文件语法错误时忽略它,而不是让整个市场打不开。
     }
   }
 
-  return list.sort((a, b) => sourceWeight(b) - sourceWeight(a));
+  return { readonly, file: fileSources, merged: mergeSourceLists(readonly, fileSources) };
+}
+
+/** 向后兼容的薄封装:只要合并后的那一份。 */
+export async function resolvePiMarketSources(options: {
+  dataDir: string;
+  sources?: readonly PiMarketRegistrySource[];
+  registryUrl?: string;
+  env?: Record<string, string | undefined>;
+  readSourceFile?: (path: string) => Promise<string | undefined>;
+}): Promise<PiMarketRegistrySource[]> {
+  return (await resolvePiMarketSourcesDetailed(options)).merged;
+}
+
+/**
+ * 合并「只读源」与「文件源」:同 id 时只读源赢(部署优先),最后按权重降序。
+ *
+ * 排序用 `Array.prototype.sort`,它在 V8 上是稳定的 —— 同权重的源保持声明顺序,
+ * 否则"我把权重都设成 0"会让优先级变成一个不可预测的谜。
+ */
+export function mergeSourceLists(
+  readonly: readonly PiMarketRegistrySource[],
+  file: readonly PiMarketRegistrySource[],
+): PiMarketRegistrySource[] {
+  const out: PiMarketRegistrySource[] = [];
+  for (const list of [readonly, file]) {
+    for (const source of list) {
+      if (out.some((existing) => existing.id === source.id)) continue;
+      out.push(source);
+    }
+  }
+  return out.sort((a, b) => sourceWeight(b) - sourceWeight(a));
+}
+
+/**
+ * 写入前的**严格**校验 —— 与读路径刻意相反。
+ *
+ * 读 `sources.json` 时坏条目静默跳过(用户手写 JSON 写错一行不该让市场打不开);
+ * 写的时候必须报错并指出位置,因为用户正在编辑,需要回执才能改对。静默丢弃
+ * 会让"我明明加了这个源"变成一个查不出来的谜。
+ */
+export function validateRegistrySourcesForWrite(value: unknown): PiMarketRegistrySource[] {
+  if (!Array.isArray(value)) {
+    throw new PiMarketBridgeError("invalid-registry", "sources must be an array");
+  }
+  const seen = new Set<string>();
+  return value.map((item, index) => {
+    const label = `sources[${index}]`;
+    if (!isRecord(item)) throw new PiMarketBridgeError("invalid-registry", `${label} must be an object`);
+    const url = typeof item.url === "string" ? item.url.trim() : "";
+    if (!url) throw new PiMarketBridgeError("invalid-registry", `${label}.url is required`);
+    const rawId = typeof item.id === "string" ? item.id.trim() : "";
+    if (rawId && !SOURCE_ID_RE.test(rawId)) {
+      throw new PiMarketBridgeError("invalid-registry", `${label}.id is invalid (letters, digits, . _ -)`);
+    }
+    const id = rawId || deriveSourceId(url, index);
+    if (seen.has(id)) throw new PiMarketBridgeError("invalid-registry", `duplicate source id: ${id}`);
+    seen.add(id);
+    const weight = item.weight;
+    if (weight !== undefined && weight !== null && (typeof weight !== "number" || !Number.isFinite(weight))) {
+      throw new PiMarketBridgeError("invalid-registry", `${label}.weight must be a finite number`);
+    }
+    const timeoutMs = item.timeoutMs;
+    if (
+      timeoutMs !== undefined &&
+      timeoutMs !== null &&
+      (typeof timeoutMs !== "number" || !Number.isFinite(timeoutMs) || timeoutMs <= 0)
+    ) {
+      throw new PiMarketBridgeError("invalid-registry", `${label}.timeoutMs must be a positive number`);
+    }
+    const label_ = typeof item.label === "string" ? item.label.trim() : "";
+    return {
+      id,
+      url,
+      ...(label_ ? { label: label_ } : {}),
+      ...(typeof weight === "number" ? { weight } : {}),
+      ...(item.trusted === true ? { trusted: true } : {}),
+      ...(typeof timeoutMs === "number" ? { timeoutMs } : {}),
+    };
+  });
 }
 
 /** 给 fetch 套一层超时:多源下不能让一个卡死的源拖住整次刷新。 */
@@ -807,15 +962,21 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
   const sourcesDir = join(root, "sources");
   const now = options.now ?? (() => new Date());
 
-  // 源清单在构造时定下来(显式 options.sources / 单源 registryUrl)。
-  // `sources.json` 由宿主启动时用 `resolvePiMarketSources()` 读入后传进来 ——
-  // bridge 不在每次 list 时读盘,避免"读到一半文件被改"的不确定性。
-  const sources: PiMarketRegistrySource[] = normalizeRegistrySources([
+  const sourcesFile = join(root, PI_MARKET_SOURCES_FILE);
+  // 只读源 = 宿主注入 / registryUrl(部署事实,UI 里改不动)。
+  const readonlySources: PiMarketRegistrySource[] = normalizeRegistrySources([
     ...(options.sources ?? []),
     ...(options.registryUrl && options.registryUrl.trim()
       ? [{ id: "default", url: options.registryUrl.trim() }]
       : []),
   ]).sort((a, b) => sourceWeight(b) - sourceWeight(a));
+  // 文件源 = 用户在 UI 里能编辑的那一份。R35 之前它只是构造时读一次的快照;
+  // 现在 `setSources()` 会原子写回并就地替换 —— 改完源不用重启就能刷新。
+  // 仍然不在每次 list 时读盘:避免"读到一半文件被改"的不确定性。
+  let fileSources: PiMarketRegistrySource[] = normalizeRegistrySources(options.fileSources ?? []);
+  let sources: PiMarketRegistrySource[] = mergeSourceLists(readonlySources, fileSources);
+  /** 上一次探源的结果,给源管理 UI 显示每源状态;`setSources()` 后清空(源变了,旧状态无意义)。 */
+  let lastStatuses: PiMarketSourceStatus[] = [];
 
   // 进程内串行化:install/upgrade/rollback 互斥,避免并发写坏 lockfile。
   let queue: Promise<unknown> = Promise.resolve();
@@ -969,7 +1130,7 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
    * (读路径抛 invalid-registry、刷新路径同样,但只要有缓存就继续服务)。
    */
   async function probeSources(persist: boolean): Promise<SourceProbe[]> {
-    return Promise.all(
+    const probes = await Promise.all(
       sources.map(async (source): Promise<SourceProbe> => {
         try {
           const fetched = await fetchSource(source);
@@ -998,6 +1159,61 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
         }
       }),
     );
+    lastStatuses = probes.map((probe) => probe.status);
+    return probes;
+  }
+
+  /** R35 —— 源清单的三视图:`file`(可编辑)/ `effective`(最终)/ 只读 id。 */
+  function sourcesView(): PiMarketSourcesView {
+    return {
+      file: fileSources,
+      effective: sources,
+      filePath: sourcesFile,
+      readonlySourceIds: readonlySources.map((source) => source.id),
+      statuses: lastStatuses,
+    };
+  }
+
+  async function setSources(next: readonly PiMarketRegistrySource[]): Promise<PiMarketSourcesView> {
+    const validated = validateRegistrySourcesForWrite(next);
+    await writeJsonAtomic(sourcesFile, { version: 1, sources: validated }, 0o600);
+    fileSources = validated;
+    sources = mergeSourceLists(readonlySources, fileSources);
+    // 源换了,上一次的每源状态就不再对应任何东西了 —— 留着只会让 UI 显示
+    // "这个源已拉取 12 条"而那个源其实已经被删掉/改名。
+    lastStatuses = [];
+    await appendAudit({
+      action: "refresh",
+      extensionId: "*",
+      outcome: "success",
+      reason: `sources updated: ${validated.length} file source(s), ${readonlySources.length} read-only`,
+    });
+    return sourcesView();
+  }
+
+  /**
+   * 探一个源此刻可达性。**不落盘**(不写缓存、不改 lastStatuses)——
+   * 这是"保存前先试一下",不该在用户还没确定的时候改动任何状态。
+   */
+  async function probeSource(source: PiMarketRegistrySource): Promise<PiMarketSourceProbeResult> {
+    const [candidate] = validateRegistrySourcesForWrite([source]);
+    const startedAt = Date.now();
+    try {
+      const fetched = await fetchSource(candidate);
+      return {
+        ok: true,
+        entryCount: fetched.entries.length,
+        ...(fetched.entries[0]?.id ? { sampleId: fetched.entries[0].id } : {}),
+        elapsedMs: Date.now() - startedAt,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        entryCount: 0,
+        error: errorMessage(error),
+        elapsedMs: Date.now() - startedAt,
+      };
+    }
   }
 
   const groupsOf = (
@@ -1646,7 +1862,7 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
   }
 
   return {
-    paths: { root, registryFile, lockfile: lockfilePath, auditFile, sourcesDir },
+    paths: { root, registryFile, lockfile: lockfilePath, auditFile, sourcesDir, sourcesFile },
     readRegistry,
     refreshRegistry,
     listMarketEntries,
@@ -1660,6 +1876,9 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
     rollbackPiExtension: (id, installOptions = {}) => serialize(() => rollback(id, installOptions)),
     uninstallPiExtension: (id, uninstallOptions = {}) =>
       serialize(() => uninstall(id, uninstallOptions)),
+    getSources: sourcesView,
+    setSources: (next) => serialize(() => setSources(next)),
+    probeSource: (source) => probeSource(source),
     readLockfile,
     readAuditTrail,
   };
@@ -1678,6 +1897,11 @@ export const PI_MARKET_IPC_CHANNELS = {
   uninstall: "agent:pi-market-uninstall",
   lockfile: "agent:pi-market-lockfile",
   audit: "agent:pi-market-audit",
+  // R35 —— 源管理。在 R35 之前 `sources.json` 只能手写,而且写完必须重启
+  // 才生效(源清单在 bridge 构造时定死)。
+  sourcesGet: "agent:pi-market-sources-get",
+  sourcesSet: "agent:pi-market-sources-set",
+  sourceProbe: "agent:pi-market-source-probe",
 } as const;
 
 export type PiMarketIpcChannel =
@@ -1730,6 +1954,22 @@ export function createPiMarketHandlers(
       return bridge.uninstallPiExtension(requiredArg(input.id, "id"), {
         keepPayload: input.keepPayload === true,
       });
+    },
+    [PI_MARKET_IPC_CHANNELS.sourcesGet]: async () => bridge.getSources(),
+    [PI_MARKET_IPC_CHANNELS.sourcesSet]: async (args) => {
+      const input = optionalRecord(args);
+      if (!Array.isArray(input.sources)) {
+        throw new PiMarketBridgeError("invalid-registry", "sources payload is required");
+      }
+      // **不要**在这里 normalize:读路径的归一化会静默丢掉坏条目,而这是写路径 ——
+      // 用户刚在输入框里敲的那一行如果被悄悄吞掉,"我明明加了"就成了查不出的谜。
+      // 形状校验交给 bridge 的 validateRegistrySourcesForWrite(),它会指出第几行错在哪。
+      return bridge.setSources(input.sources as PiMarketRegistrySource[]);
+    },
+    [PI_MARKET_IPC_CHANNELS.sourceProbe]: async (args) => {
+      const input = optionalRecord(args);
+      const candidate = isRecord(input.source) ? input.source : { url: input.url };
+      return bridge.probeSource(candidate as PiMarketRegistrySource);
     },
     [PI_MARKET_IPC_CHANNELS.lockfile]: async () => bridge.readLockfile(),
     [PI_MARKET_IPC_CHANNELS.audit]: async (args) => {

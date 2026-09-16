@@ -184,6 +184,45 @@ export interface PiMarketRefreshReport {
 }
 
 // ---------------------------------------------------------------------------
+// R35 — 源管理(读 / 写 / 探活)
+// ---------------------------------------------------------------------------
+
+/**
+ * `agent:pi-market-sources-get` 的返回。
+ *
+ * 为什么要分成 `file` 与 `effective` 两份:一个源可能来自四个地方,优先级是
+ * **宿主注入 > registryUrl > 环境变量 > `sources.json`**。只有 `sources.json`
+ * 是用户能在 UI 里改的,其余三个是「这台机器的部署事实」——
+ * 把两者混成一份列表会让 UI 显示一个改不动的输入框。
+ */
+export interface PiMarketSourcesView {
+  /** `sources.json` 里的内容 —— UI 可编辑的那一份。 */
+  file: readonly PiMarketRegistrySource[];
+  /** 合并去重(同 id 高优先级赢)+ 按权重排序后的最终生效列表。 */
+  effective: readonly PiMarketRegistrySource[];
+  /** `sources.json` 的绝对路径(UI 告诉用户"改的是哪个文件")。 */
+  filePath: string;
+  /**
+   * 不是来自 `sources.json` 的源 id(环境变量 / 宿主注入)。UI 里标「只读」:
+   * 它们由部署决定,改了文件也不会生效。
+   */
+  readonlySourceIds: readonly string[];
+  /** 上一次刷新时每源的结果;还没刷新过则为空数组。 */
+  statuses: readonly PiMarketSourceStatus[];
+}
+
+/** `agent:pi-market-source-probe` 的返回:一个源**此刻**能不能拉到内容。 */
+export interface PiMarketSourceProbeResult {
+  ok: boolean;
+  entryCount: number;
+  /** 首个条目的 id —— 给"这个源确实有内容"一个具体证据,而不是只有计数。 */
+  sampleId?: string;
+  /** 失败原因(仅 `ok=false` 时有值)。 */
+  error?: string;
+  elapsedMs: number;
+}
+
+// ---------------------------------------------------------------------------
 // R32 — 错误码(线契约的一部分)
 // ---------------------------------------------------------------------------
 

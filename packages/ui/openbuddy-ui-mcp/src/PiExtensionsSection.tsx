@@ -45,6 +45,7 @@ import {
   summarizeSources,
   toMarketplaceEntry,
 } from "./pi-extensions-model";
+import { PiSourcesEditor } from "./PiSourcesEditor";
 
 interface PiExtensionsSectionProps {
   onToast?: (message: string) => void;
@@ -75,6 +76,7 @@ export function PiExtensionsSection({ onToast }: PiExtensionsSectionProps) {
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [dialogConsent, setDialogConsent] = useState(false);
   const [dialogBusy, setDialogBusy] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [kindFilter, setKindFilter] = useState<readonly MarketplaceKind[]>([]);
   const [stateFilter, setStateFilter] = useState<readonly InstallState[]>([]);
@@ -307,6 +309,18 @@ export function PiExtensionsSection({ onToast }: PiExtensionsSectionProps) {
             {groups.updatable.length > 0 ? ` · 可升级 ${groups.updatable.length}` : ""}
             {` · 索引 ${entries.length}`}
           </span>
+          {/* R35 —— 源管理入口。在它之前 `sources.json` 只能手写,而且写完要重启
+              才生效;现在改源是"点开 → 改 → 保存并生效 → 刷新索引"。 */}
+          <button
+            type="button"
+            className="pi-ext__btn"
+            onClick={() => setSourcesOpen((open) => !open)}
+            aria-expanded={sourcesOpen}
+            aria-controls="pi-ext-sources-editor"
+            data-testid="pi-ext-sources-toggle"
+          >
+            {sourcesOpen ? "收起源管理" : "源管理"}
+          </button>
           <button
             type="button"
             className="pi-ext__btn"
@@ -318,6 +332,14 @@ export function PiExtensionsSection({ onToast }: PiExtensionsSectionProps) {
           </button>
         </div>
       </header>
+
+      <div id="pi-ext-sources-editor">
+        <PiSourcesEditor
+          open={sourcesOpen}
+          onToast={onToast}
+          onSaved={() => void reload()}
+        />
+      </div>
 
       {chips.length > 0 && (
         <div className="pi-ext__sources" data-testid="pi-ext-sources">
@@ -353,10 +375,11 @@ export function PiExtensionsSection({ onToast }: PiExtensionsSectionProps) {
         <div className="pi-ext__empty" data-testid="pi-ext-empty">
           <p className="pi-ext__empty-title">还没有配置索引源</p>
           <p className="pi-ext__empty-hint">
-            OpenBuddy 的市场是<strong>本地优先</strong>的:没配置源就不会联网。要装 Pi
-            扩展,把源写进数据目录下的 <code>pi-extensions/sources.json</code>
-            (或设环境变量 <code>OPENBUDDY_PI_MARKET_SOURCES</code>),也可以直接把内网导出的{" "}
-            <code>pi-extensions/registry.json</code> 拷进来。写好后点「刷新索引」。
+            OpenBuddy 的市场是<strong>本地优先</strong>的:没配置源就不会联网。点上面的
+            「源管理」加一个索引源(可以先「测试」再保存),保存即时生效 —— 它写的还是
+            数据目录下的 <code>pi-extensions/sources.json</code>,所以也可以手写;再或者设环境
+            变量 <code>OPENBUDDY_PI_MARKET_SOURCES</code>,直接把内网导出的{" "}
+            <code>pi-extensions/registry.json</code> 拷进来。配好后点「刷新索引」。
           </p>
           <p className="pi-ext__empty-hint">
             同一个扩展被多个源提供时<strong>权重大的赢</strong>,低权重源只做镜像补齐;

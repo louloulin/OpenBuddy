@@ -3879,6 +3879,112 @@
   font-size: 11px;
 }
 
+/* ── R35 源管理(pi-ext-src)────────────────────────────────────────────
+ * 一行 = 一个源。网格是「宽输入列 + 窄状态动作列」,窄窗口下自动折行 ——
+ * 源的地址通常很长,把状态挤到第二行比把 URL 截断要好。 */
+.pi-ext__btn--primary {
+  border-color: var(--wb-brand);
+  color: var(--wb-brand);
+}
+.pi-ext-src {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 10px;
+  background: var(--wb-bg-secondary);
+}
+.pi-ext-src__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pi-ext-src__title { font-size: 13px; font-weight: 600; color: var(--wb-text-strong); }
+.pi-ext-src__meta {
+  font-size: 11px;
+  color: var(--wb-text-weak);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+  direction: rtl;
+  text-align: left;
+}
+.pi-ext-src__hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--wb-text-weak);
+}
+.pi-ext-src__list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pi-ext-src__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+}
+.pi-ext-src__row--readonly { opacity: 0.72; }
+.pi-ext-src__row[data-invalid="true"] { border-color: var(--wb-danger, #dc2626); }
+.pi-ext-src__row-main { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.pi-ext-src__input {
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-secondary);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  font-family: inherit;
+}
+.pi-ext-src__input:read-only { background: transparent; border-color: transparent; padding-left: 2px; }
+.pi-ext-src__input--url { flex: 1 1 220px; font-family: var(--wb-font-mono, ui-monospace, monospace); }
+.pi-ext-src__input--num { flex: 0 1 72px; font-variant-numeric: tabular-nums; }
+.pi-ext-src__row-side { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.pi-ext-src__badge {
+  padding: 2px 6px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--wb-text-weak);
+}
+.pi-ext-src__probe { font-size: 11px; color: var(--wb-text-medium); }
+.pi-ext-src__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-secondary);
+  color: var(--wb-text-medium);
+  font-size: 11px;
+  cursor: pointer;
+}
+.pi-ext-src__icon:hover:not(:disabled) { border-color: var(--wb-brand); color: var(--wb-text-strong); }
+.pi-ext-src__icon:disabled { opacity: 0.4; cursor: default; }
+.pi-ext-src__icon--danger:hover:not(:disabled) { border-color: var(--wb-danger, #dc2626); color: var(--wb-danger, #dc2626); }
+.pi-ext-src__row-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 11px;
+  color: var(--wb-danger, #dc2626);
+}
+.pi-ext-src__foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pi-ext-src__foot .pi-ext__btn { display: inline-flex; align-items: center; gap: 5px; }
+.pi-ext-src__foot .pi-ext-src__meta { flex: 1 1 auto; }
+
+
 /* ========================================================================
  * AgentMailSettingsPanel — 会话通知中心
  * ===================================================================== */

@@ -140,11 +140,17 @@ describe("normalizeRegistrySources", () => {
     expect(out[0].url).toBe("https://a/1.json");
   });
 
-  it("id 非法或缺失时从 URL 的 host 派生一个稳定 id", () => {
+  it("id 非法或缺失时从 URL 的 host + path 派生一个稳定 id", () => {
     const out = normalizeRegistrySources([{ url: "https://Market.Example.COM/index.json" }]);
-    expect(out[0].id).toBe("market.example.com");
+    // 带 path:R35 之后 id 还要区分同一 host 上的多个索引,否则读路径的去重
+    // (同 id 只保留第一条)会把第二个源静默丢掉。
+    expect(out[0].id).toBe("market.example.com-index");
     const local = normalizeRegistrySources([{ url: "./vendor/market" }]);
-    expect(local[0].id).toBe("source-1");
+    expect(local[0].id).toBe("local-vendor-market");
+    // 完全无法派生的输入(路径里没有任何可用字符)才落到序号。
+    const blank = normalizeRegistrySources([{ url: "///" }]);
+    expect(blank).toHaveLength(1);
+    expect(blank[0].id).toBe("source-1");
   });
 
   it("保留 weight / label / trusted / timeoutMs", () => {

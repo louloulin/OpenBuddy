@@ -1975,15 +1975,145 @@ PASS 卸载真的摘掉 lockfile 记录        → lockKeys: [] ,统计行回到
 PASS 审计里留下 uninstall 记录          → uninstall/success
 ```
 
+## R34 — Phase C 收尾:编辑器保存链路的真机断言 + cwd 契约统一
+
+### R34.1 缺失的那条证据
+
+Phase C 的链路(`ui-editor` 的 `editor.body` 槽 → `ToolSidePanel` 的 `FilePreview`
+→ `write_text_file` IPC)在代码里是通的,但**没有任何断言**证明它端到端可用:
+唯一相关的 `_probe-editor-flow.mjs` 只 `console.log` 扫描结果,不判定。
+
+新探针 `_probe-r34-editor-save.mjs` 走纯用户路径并逐条判定(**15 步全绿**):
+
+```
+PASS agent:new-session 真的建出会话
+PASS 点「工作区文件树」真的挂载文件树
+PASS 工作区里的 README.md 出现在树里
+PASS 点文件后主列真的读出文件内容
+PASS markdown 文件出现「编辑」入口(说明 editor.body 槽有实现)
+PASS 「编辑」渲染出内核 editor.body 槽的编辑器
+PASS markdown 真的转成富文本(h1 + li,不是 textarea)
+PASS 键盘输入真的进了编辑器(onChange 回传)
+PASS 输入是追加,没有把原文整篇替换掉
+PASS 点保存之前磁盘文件没有被改动        ← 写入发生在点保存那一刻
+PASS 点「保存」把标记文本真的写进磁盘
+PASS 原文在往返后仍然存在(没有静默重写用户文档)
+PASS markdown 结构往返保真(标题仍是 '# ',列表仍是 '- ')
+PASS 保存后退出编辑态并回到预览
+PASS 重新 read_text_file 读回的就是新内容
+```
+
+写这条探针时的两个坑(留在注释里):
+
+- **不要用 select-all + ArrowRight 把光标推到文末**:ProseMirror 不保证方向键会
+  折叠 `AllSelection`,一旦没折叠,回车和输入就是**整篇替换** —— 探针测的就成了
+  "覆盖"而不是"追加"。
+- **不要用块级 `getBoundingClientRect()` 定位点击点**:块的内容盒可能比可点击区域宽
+  (或者 Range 的 client rects 退化成 2px),点下去落到编辑器外面,焦点跑到右侧导轨上。
+  改用 `.ProseMirror` 的 `boundingBox()` + 相对 position。
+
+### R34.2 探针一跑就撞出的两个真 bug(同一个根因)
+
+渲染进程统一发 `cwd ?? null`(`JSON.stringify` 会吃掉 `undefined`),但 main 侧只有
+**一半** handler 同时接受 `null`,另一半点 `absolutePath(null)` 直接抛
+`cwd must be a non-empty string`:
+
+1. **「工作区文件树」整列永远是空态** —— `slotLoadDir = (p) => listDir(p)` 不带 cwd,
+   `shellfs:list-dir` 收到 `null` 就抛,树走到 error 分支后 `nodes` 为空,UI 只剩一句
+   「选择文件查看内容」。工具栏按钮点了有反应、面板也开,就是没有内容。
+2. **`shellfs:reveal / open-path / stat / browse-directory` 与 `sessions:delete`**
+   ——「在文件夹中显示 / 系统打开 / 删除会话」在 cwd 缺省时静默失败,日志里只有一句校验错误。
+
+修复:`validation.ts` 新增 `resolvedCwd(input, fallback)`,把「`null` / `undefined` 都表示
+用宿主当前工作区」收敛到唯一一处;shellfs 家族 8 处 + `sessions:delete` 全部改走它。
+`fallback` 是**惰性**的(`() => agentHost.getCwd()`):agentHost 代理在模块加载完成前
+访问属性会抛错,不能在 handler 入口就无条件求值 —— 那只会在调用方已经给了绝对 cwd 的
+情况下引入一个全新的失败模式。
+
+回归:`electron/main/ipc/security-hardening.test.ts` 新增一条契约用例,把
+`null` 与 `undefined` 必须等价、且都必须落到 `agentHost` 的工作区钉死。
+
+## R35 — Pi 扩展的源管理:在 UI 里改源,不重启就生效
+
+R33 之后 `sources.json` 仍然只能手写,而且**写完必须重启**(源清单在
+`createPiMarketBridge()` 构造时定死)。这两件事加起来意味着"配置一个内网镜像源"
+是一个要读文档、找数据目录、编辑 JSON、重启应用的流程。
+
+现在:**源管理 → 加源 → 测试 → 保存并生效 → 刷新索引**。
+
+### R35.1 三份视图
+
+`agent:pi-market-sources-get` 返回 `PiMarketSourcesView`:`file`(可编辑的
+`sources.json`)/ `effective`(合并排序后的最终列表)/ `readonlySourceIds`
+(环境变量 / 宿主注入的源)/ `filePath` / `statuses`(上一次每源结果)。
+
+拆开的理由:一个源可能来自四个地方,只有 `sources.json` 是用户能改的。混成一份会让
+UI 显示一个改不动的输入框;只显示可编辑的那份又会藏起"其实还有一个源压着你"。
+只读源照常显示,只标「只读」。
+
+### R35.2 保存即时生效,写路径严格校验
+
+`agent:pi-market-sources-set` = 严格校验 → 原子写回(临时文件 + rename,`0600`)
+→ **就地替换内存里的源清单**并清空上一次的每源状态。所以紧接着的
+`refreshRegistry()` 就是按新源跑,不需要重建 bridge 更不需要重启。
+
+写路径的校验与读路径**刻意相反**:读盘时坏条目静默跳过(手写 JSON 写错一行不该让整个
+市场打不开),写的时候必须报错并指出第几行的哪个字段 —— 用户正在编辑,需要回执才能改对。
+静默丢弃会让"我明明加了这个源"变成查不出来的谜。
+
+`agent:pi-market-source-probe` 探活**不落盘**(不写缓存、不改状态):这是"保存前先试一下"。
+返回里带首个条目的 id,给「这个源确实有内容」一个具体证据,而不是只有一个计数。
+
+### R35.3 R35 顺带查出的真 bug:派生 id 只取 host
+
+`deriveSourceId()` 此前只用 URL 的 host。**同一个 host 上放多个索引是常态**
+(`https://mirror.corp/pi/stable.json` 与 `.../nightly.json`),于是它们撞成一个 id ——
+读路径的去重(同 id 只保留第一条)会**静默丢掉第二个源**:用户写了两个源,只有一个生效,
+而且没有任何提示。
+
+现在 path 也进 id(`mirror.corp-pi-stable` / `mirror.corp-pi-nightly`),本地绝对路径
+派生 `local-<path>`(用序号做兜底会让"调整一下源的顺序"把离线缓存全部指错地方)。
+main 与渲染端的派生逻辑保持同一口径 —— 否则 UI 会算出一个保存后被改掉的 id。
+
+### R35.4 真机验证
+
+`_probe-r35-pi-sources-ui.mjs` **20 步全绿**(两个真 HTTP 源,同一个 host 的两个 path):
+
+```
+PASS Pi 扩展区块渲染出来,且源管理默认收起
+PASS 没有源时给的是本地优先空态(不是一个空列表)
+PASS 点「源管理」展开编辑器并显示配置文件路径
+PASS 还没有保存过 → 一行都没有
+PASS 「测试」真的打到了 URL(报出条数与样例条目)
+PASS 测试不会落盘(sources.json 还不存在)
+PASS 点「保存并生效」把源真的写进 sources.json
+PASS 保存后按钮回到「已保存」(不再可点)
+PASS 保存后**不重启**,刷新就按新源拉到条目
+PASS 顶部来源 chip 带上权威状态(已拉取 + 条数)
+PASS 同一个 host 上的两个源拿到不同的派生 id
+PASS 同 id 只有权重大的源赢(字段不从镜像合并)
+PASS 低权重源独有的扩展照常收录
+PASS 把镜像权重调到 20(不重启)→ 赢家翻转成镜像
+PASS 删掉主源后 sources.json 里只剩一个源
+PASS 刷新后主源独有的条目消失,镜像的条目还在
+PASS 坏权重就地报行号 + 标红该行
+PASS 有未修正的错误时保存按钮点不动
+PASS 改回合法值后错误消失(错误是逐行的)
+PASS reload 之后源配置还在(从 sources.json 读回来的)
+```
+
+顺带修掉 `_probe-r29-market-placeholder.test.mjs` 的一个**假失败机制**:它用
+「面板全文 `slice(0, 320)` + 正则」找统计行 —— 面板上方文案一变长,统计行被挤出窗口就
+变成假失败。已改成直接读 `.marketplace-panel__stats`。
+
 ## 后续计划(优先级排序)
 
-1. **Phase C 收尾**:真实会话里「打开 markdown 产物 → 编辑 → 保存」的断言型探针
-   (`ToolSidePanel` 走 `write_text_file`;现有 `_probe-editor-flow.mjs` 只打印不判定,
-   而这条链路有 4 个前置条件,任一不满足「编辑」按钮就不渲染)。
-2. **Pi 扩展的源管理 UI**:`sources.json` 目前只能手写;建议在 Pi 扩展区块加
-   增删源 / 调权重 / 测可达,配套 `agent:pi-market-sources-get|set`。
-3. **加固项**:`details` 导轨与右侧工作面板(ToolSidePanel)在窄窗口下的避让。
-4. **可选**:把第二条总线(renderer contributions)纳入同一张 registry 视图。
+1. **加固项**:`details` 导轨与右侧工作面板(ToolSidePanel)在窄窗口下的避让
+   (两者都占右侧;R35 探针里已经量到主列只剩 174px 宽的情形)。
+2. **源管理延伸**:给「测试」加并发/耗时直方图;`registry.json` 直接导入(内网导出拷进来
+   的路径目前只提示、没有 UI 入口)。
+3. **可选**:把第二条总线(renderer contributions)纳入同一张 registry 视图。
+4. **可选**:把 Phase C 的编辑器接进「新建产物」路径(现在只能在文件树里改已有文件)。
 
 ## 用户可见的差距分析(与 WorkBuddy 对比)
 

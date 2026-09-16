@@ -240,7 +240,13 @@ R32 接 UI 时先修类型,再让 wrapper 直接对着**真实 bridge handler** 
 ```
 
 坏条目**跳过而不是抛错**(源是用户手写的配置,写错一行不该让整个市场打不开);
-同 id 只保留第一条;缺 id 时从 URL 的 host 派生一个稳定 id(写缓存文件名要用)。
+同 id 只保留第一条;缺 id 时从 URL 的 **host + path** 派生一个稳定 id(写缓存文件名要用)。
+
+> R35 之前这里只取 host。同一个 host 上放多个索引是常态
+> (`https://mirror.corp/pi/stable.json` 与 `.../nightly.json`),只按 host 派生会让
+> 它们撞成一个 id —— 读路径的去重(同 id 只保留第一条)于是**静默丢掉第二个源**:
+> 用户写了两个源,只有一个生效,而且没有任何提示。现在 path 也进 id
+> (`mirror.corp-pi-stable` / `mirror.corp-pi-nightly`)。
 
 合并规则刻意做得很窄,因为"聪明的字段级合并"不可预测:
 
@@ -385,3 +391,77 @@ uninstallPiExtension(id, { keepPayload?: false })
 | `packages/ui/openbuddy-ui-modules/src/__tests__/MarketplaceCard.test.tsx` | +2 | `visible` 谓词过滤 / 全被过滤时不渲染 `⋯` |
 | `packages/ui/openbuddy-ui-mcp/__tests__/pi-extensions-section.test.tsx` | +4 | 未安装无菜单 / 卸载确认 / 强制重装 `force:true` / 失败按码给说明 |
 | `scripts/electron/_probe-r32-pi-market-ui.mjs` | 真机 +3 步 | 走 UI 的 ⋯ → 卸载 → ConfirmDialog → lockfile 清空 + 审计 `uninstall/success` |
+
+## 10. R35 — 源管理(在 UI 里改源,不重启就生效)
+
+在 R35 之前,配置一个内网镜像源的完整流程是:读文档 → 找数据目录 → 手写
+`sources.json` → **重启应用**。两件事都是门槛,而第二件更隐蔽:源清单在
+`createPiMarketBridge()` 构造时定死,所以"我明明改了文件"的答案是"你需要重启"。
+
+现在流程是:**源管理 → 加源 → 测试 → 保存并生效 → 刷新索引**。
+
+### 10.1 三份视图,而不是一份合并列表
+
+`agent:pi-market-sources-get` 返回 `PiMarketSourcesView`:
+
+| 字段 | 含义 |
+|---|---|
+| `file` | `sources.json` 的内容 —— UI 里**可编辑**的那一份 |
+| `effective` | 合并去重(同 id 高优先级赢)+ 按权重排序后的最终列表 |
+| `readonlySourceIds` | 不是来自文件、因而改不动的源(环境变量 / 宿主注入) |
+| `filePath` | `sources.json` 的绝对路径(UI 直接告诉用户"改的是哪个文件") |
+| `statuses` | 上一次刷新的每源结果(`fresh` / `cached` / `failed` / `skipped`) |
+
+拆成两份的理由:一个源可能来自四个地方(宿主注入 > registryUrl > 环境变量 >
+`sources.json`),只有最后一个是用户能改的。混成一份列表会让 UI 显示一个
+**改不动的输入框**;只显示可编辑的那一份又会藏起"其实还有一个源压着你"。
+只读源照常显示,只标记为「只读」。
+
+### 10.2 保存即时生效
+
+`agent:pi-market-sources-set` 做三件事,顺序固定:
+
+1. **严格校验**(与读路径刻意相反)。读盘时坏条目静默跳过(手写 JSON 写错一行
+   不该让整个市场打不开);写的时候必须报错并**指出第几行的哪个字段**,因为
+   用户正在编辑、需要回执才能改对。静默丢弃会让"我明明加了这个源"变成查不出的谜。
+2. 原子写回 `sources.json`(temp + rename,`0600`)。
+3. **就地替换内存里的源清单** 并清空上一次的每源状态(源变了,旧状态不再对应
+   任何东西)。所以紧接着的 `refreshRegistry()` 就是按新源跑 —— 不需要重建
+   bridge,更不需要重启。
+
+### 10.3 探活(`agent:pi-market-source-probe`)
+
+- 走同一个 fetcher,但**不落盘**:不写缓存、不改 `statuses`。
+  这是"保存前先试一下",不该在用户还没确定的时候改动任何状态。
+- 返回 `{ ok, entryCount, sampleId, error, elapsedMs }` —— 带上首个条目的 id,
+  给「这个源确实有内容」一个具体证据,而不是只有一个计数。
+- 输入同样走严格校验(空 URL 直接报错,而不是发一个空请求)。
+
+### 10.4 UI 落点
+
+- 入口:「Pi 扩展」区块头部的**源管理**按钮(默认收起 —— 不点就不读配置)。
+- `packages/ui/openbuddy-ui-mcp/src/PiSourcesEditor.tsx` 负责渲染,
+  纯逻辑在 `pi-extensions-model.ts`(`sourcesToDrafts` / `validateSourceDrafts` /
+  `sourceDraftsDirty` / `moveSourceDraft`),组件不重复实现业务判断。
+- 每行:URL / 名称 / 权重 / 超时 + 状态 chip + 「测试」+ 上移 / 下移 / 删除。
+  权重相同时**声明顺序**决定优先级,所以顺序本身是可编辑语义(只读行不可移动)。
+- 数字字段在编辑态是**字符串**:输入框里敲到一半的 `1.` 或手滑的 `abc`,存成
+  number 会在 `onChange` 里被 `Number()` 悄悄变成 0。
+- 校验失败时该行标红 + 就地给出原因,「保存」按钮不可点 —— 不写出半坏的配置。
+
+### 10.5 R35 测试
+
+| 文件 | 条数 | 覆盖 |
+|---|---|---|
+| `electron/main/agent/pi-market-sources.test.ts` | 13 | 三视图拆分 / 只读源永远赢 / 严格校验的行号 / 派生 id 带 path / 保存后不重启即生效 / 清空旧状态 / 校验失败不落盘 / 探活不落盘 |
+| `packages/ui/openbuddy-ui-mcp/__tests__/pi-extensions-model.test.ts` | +13 | 草稿投影 / 逐行校验 / 同 host 不同 path 不撞 id / 脏检查 / 排序 / 状态与探活文案 |
+| `packages/ui/openbuddy-ui-mcp/__tests__/pi-extensions-section.test.tsx` | +4 | 默认收起不读配置 / 保存写回并重读市场 / 坏输入禁用保存 / 测试不保存 |
+| `scripts/electron/_probe-r35-pi-sources-ui.mjs` | 真机 20 步 | 走 UI 加源 → 测试 → 保存 → 刷新 → 权重改动翻转赢家 → 删源 → reload 后仍在 |
+
+### 10.6 R35 顺带查出的真 bug
+
+1. **派生 id 只取 host** → 同 host 上两个索引被读路径去重静默丢掉一个(见 §8.2)。
+2. `_probe-r29-market-placeholder.test.mjs` 用「面板全文 `slice(0, 320)` + 正则」找
+   统计行 —— 面板上方文案一变长,统计行被挤出窗口就变成假失败。已改成直接读
+   `.marketplace-panel__stats`。
+

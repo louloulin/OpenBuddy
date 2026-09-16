@@ -18,8 +18,10 @@ import type {
 import type {
   PiMarketEntryView,
   PiMarketErrorInfo,
+  PiMarketRegistrySource,
   PiMarketSourceState,
   PiMarketSourceStatus,
+  PiMarketSourcesView,
 } from "@openbuddy/shared-types";
 
 /**
@@ -268,4 +270,261 @@ export function describePiMarketError(info: PiMarketErrorInfo): PiMarketErrorAct
     default:
       return { title: "操作失败", hint: info.detail || "未知错误。", retryable: true };
   }
+}
+
+// ---------------------------------------------------------------------------
+// R35 — 源管理(编辑态模型)
+// ---------------------------------------------------------------------------
+
+const SOURCE_ID_RE = /^[a-z0-9][a-z0-9._-]*$/i;
+
+/**
+ * 一行源配置的**编辑态**。
+ *
+ * 为什么数字字段也存字符串:`weight` / `timeoutMs` 是输入框里的文本。存成
+ * number 的话,用户敲到一半的 "1." 或手滑的 "abc" 会在 onChange 里被 `Number()`
+ * 悄悄变成 0 —— 然后"我明明设了权重"变成一个查不出来的谜。留字符串,校验时
+ * 才报错。
+ */
+export interface PiSourceDraft {
+  id: string;
+  url: string;
+  label: string;
+  weight: string;
+  timeoutMs: string;
+  trusted: boolean;
+  /** 来自环境变量 / 宿主注入 —— 只读行,不参与保存,也不允许删除。 */
+  readonly: boolean;
+  /** 上一次刷新时这个源的结果。 */
+  status?: PiMarketSourceState;
+  entryCount?: number;
+  error?: string;
+  /** 上一次「测试可达」的结论文案(与 `status` 无关,是用户主动触发的)。 */
+  probe?: string;
+}
+
+export interface PiSourceDraftErrors {
+  /** 行号(0 基)→ 该行的错误文案。 */
+  readonly rows: Readonly<Record<number, string>>;
+  /** 整表级错误(不是某一行的错)。 */
+  readonly form?: string;
+}
+
+export interface PiSourceDraftValidation {
+  /** 校验通过时可直接交给 `setPiMarketSources()` 的载荷(不含只读行)。 */
+  readonly sources: readonly PiMarketRegistrySource[];
+  readonly errors: PiSourceDraftErrors;
+  readonly ok: boolean;
+}
+
+/** 把线契约的源视图摊成编辑态行:只读源排在最前(和"生效顺序"一致)。 */
+export function sourcesToDrafts(view: PiMarketSourcesView): PiSourceDraft[] {
+  const statusById = new Map(view.statuses.map((status) => [status.id, status]));
+  const readonlyIds = new Set(view.readonlySourceIds);
+  const rows: PiSourceDraft[] = [];
+  const push = (source: PiMarketRegistrySource, readonly: boolean): void => {
+    const status = statusById.get(source.id);
+    rows.push({
+      id: source.id,
+      url: source.url,
+      label: source.label ?? "",
+      weight: typeof source.weight === "number" ? String(source.weight) : "",
+      timeoutMs: typeof source.timeoutMs === "number" ? String(source.timeoutMs) : "",
+      trusted: source.trusted === true,
+      readonly,
+      ...(status ? { status: status.state, entryCount: status.entryCount } : {}),
+      ...(status?.error ? { error: status.error } : {}),
+    });
+  };
+  // 只读源排在前面:它们权重相同时也永远赢(部署优先),放最前才不会让用户
+  // 以为"拖到上面就能改优先级"。
+  for (const source of view.effective) {
+    if (readonlyIds.has(source.id)) push(source, true);
+  }
+  for (const source of view.file) {
+    if (readonlyIds.has(source.id)) continue; // 同 id:生效的是只读那份
+    push(source, false);
+  }
+  return rows;
+}
+
+/** 空行(「添加源」按钮)。 */
+export function blankSourceDraft(): PiSourceDraft {
+  return {
+    id: "",
+    url: "",
+    label: "",
+    weight: "",
+    timeoutMs: "",
+    trusted: false,
+    readonly: false,
+  };
+}
+
+function absolutePathLike(value: string): boolean {
+  return value.startsWith("/") || /^[a-z]:[\\/]/i.test(value);
+}
+
+/**
+ * 校验整张表。
+ *
+ * 规则刻意比 main 侧更**早**(在保存前就给出行号),但判定口径完全一致 ——
+ * 否则会出现"UI 说没问题、保存却报错"的分裂体验。只读行不参与校验与提交:
+ * 它们由部署决定,写进 `sources.json` 也不会生效。
+ */
+export function validateSourceDrafts(drafts: readonly PiSourceDraft[]): PiSourceDraftValidation {
+  const rows: Record<number, string> = {};
+  const sources: PiMarketRegistrySource[] = [];
+  const seen = new Set<string>();
+  drafts.forEach((draft, index) => {
+    if (draft.readonly) return;
+    const url = draft.url.trim();
+    if (!url) {
+      rows[index] = "源地址必填";
+      return;
+    }
+    // 接受 URL(http/https/file…)或绝对路径 —— 与 main 侧 `deriveSourceId()`
+    // 的容忍度一致:非 URL 的本地路径也是合法输入。
+    if (!absolutePathLike(url)) {
+      try {
+        new URL(url);
+      } catch {
+        rows[index] = "不是合法的 URL 或绝对路径";
+        return;
+      }
+    }
+    const id = draft.id.trim();
+    if (id && !SOURCE_ID_RE.test(id)) {
+      rows[index] = "id 只能包含字母、数字、. _ -";
+      return;
+    }
+    const resolvedId = id || deriveDraftId(url, index);
+    if (seen.has(resolvedId)) {
+      rows[index] = `id 重复:${resolvedId}`;
+      return;
+    }
+    seen.add(resolvedId);
+    const weight = draft.weight.trim();
+    if (weight && !Number.isFinite(Number(weight))) {
+      rows[index] = "权重必须是数字";
+      return;
+    }
+    const timeoutMs = draft.timeoutMs.trim();
+    if (timeoutMs && (!Number.isFinite(Number(timeoutMs)) || Number(timeoutMs) <= 0)) {
+      rows[index] = "超时必须是正数(毫秒)";
+      return;
+    }
+    const label = draft.label.trim();
+    sources.push({
+      id: resolvedId,
+      url,
+      ...(label ? { label } : {}),
+      ...(weight ? { weight: Number(weight) } : {}),
+      ...(draft.trusted ? { trusted: true } : {}),
+      ...(timeoutMs ? { timeoutMs: Number(timeoutMs) } : {}),
+    });
+  });
+  return Object.keys(rows).length === 0
+    ? { sources, errors: { rows: {} }, ok: true }
+    : { sources, errors: { rows }, ok: false };
+}
+
+const SOURCE_URL_EXT_RE = /\.(json|json5|ya?ml|txt)$/i;
+
+/** 与 main 侧 `slugifySourcePath()` 同一口径(否则 UI 会算出一个保存后被改掉的 id)。 */
+function slugifySourcePath(pathname: string): string {
+  return pathname
+    .replace(/^[/\\]+|[/\\]+$/g, "")
+    .replace(SOURCE_URL_EXT_RE, "")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+}
+
+/**
+ * 用户没写 id 时从 URL 里凑一个 —— 与 main 侧 `deriveSourceId()` **同一口径**。
+ *
+ * 必须带 path:同一个 host 上放多个索引是常态(stable / nightly),只按 host
+ * 派生会让两个源撞成一个 id,用户就会看到"id 重复"却不知道自己哪里错了。
+ */
+function deriveDraftId(url: string, index: number): string {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.host.replace(/[^a-z0-9.-]/gi, "").toLowerCase();
+    if (host) {
+      const slug = slugifySourcePath(parsed.pathname);
+      return slug ? `${host}-${slug}` : host;
+    }
+  } catch {
+    const slug = slugifySourcePath(url);
+    if (slug) return `local-${slug}`;
+  }
+  return `source-${index + 1}`;
+}
+
+/** 当前编辑态是否与已保存的配置不同(决定「保存」是否可点)。 */
+export function sourceDraftsDirty(
+  drafts: readonly PiSourceDraft[],
+  saved: readonly PiMarketRegistrySource[],
+): boolean {
+  const current = validateSourceDrafts(drafts).sources;
+  const normalize = (list: readonly PiMarketRegistrySource[]): string =>
+    JSON.stringify(
+      list.map((item) => [
+        item.id,
+        item.url,
+        item.label ?? "",
+        typeof item.weight === "number" ? item.weight : null,
+        item.trusted === true,
+        typeof item.timeoutMs === "number" ? item.timeoutMs : null,
+      ]),
+    );
+  return normalize(current) !== normalize(saved);
+}
+
+/**
+ * 上下移动一行(权重相同时**声明顺序**决定优先级,所以顺序是可编辑语义的一部分)。
+ *
+ * 只读行不参与移动:它们在保存时会被排除,允许拖动只会让用户以为改了优先级。
+ */
+export function moveSourceDraft(
+  drafts: readonly PiSourceDraft[],
+  index: number,
+  delta: number,
+): PiSourceDraft[] {
+  const target = index + delta;
+  if (index < 0 || index >= drafts.length) return [...drafts];
+  if (target < 0 || target >= drafts.length) return [...drafts];
+  if (drafts[index].readonly || drafts[target].readonly) return [...drafts];
+  const next = [...drafts];
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
+
+/** 每源状态的短标签(与区块顶部 chips 用同一套文案)。 */
+export function sourceStateLabel(state: PiMarketSourceState | undefined): string | undefined {
+  switch (state) {
+    case "fresh":
+      return "已拉取";
+    case "cached":
+      return "用缓存";
+    case "failed":
+      return "不可达";
+    case "skipped":
+      return "已跳过";
+    default:
+      return undefined;
+  }
+}
+
+/** 「测试可达」的结果文案。 */
+export function describeProbeResult(result: {
+  ok: boolean;
+  entryCount: number;
+  sampleId?: string;
+  error?: string;
+}): string {
+  if (!result.ok) return `不可达:${result.error ?? "未知错误"}`;
+  const sample = result.sampleId ? `,例如 ${result.sampleId}` : "";
+  return `可达:${result.entryCount} 条${sample}`;
 }

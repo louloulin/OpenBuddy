@@ -96,6 +96,10 @@ try {
     return {
       mounted: Boolean(host),
       hasMarketplaceBody: Boolean(host && host.childElementCount > 0),
+      // 计数从**专门的统计行**读,不从整段文本里正则捞:面板上方还有别的区块
+      // (Pi 扩展的文案会变长),用 `text.slice()` 截断会把统计行挤出窗口,
+      // 于是"文案改了一句"变成"计数不见了"的假失败。
+      stats: host?.querySelector(".marketplace-panel__stats")?.textContent?.replace(/\s+/g, " ").trim() ?? null,
       text: text.slice(0, 320),
       searchable: Boolean(host?.querySelector('input[type="search"], input[type="text"]')),
       pluginRows: host?.querySelectorAll("[class*='marketplace-row'], [class*='plugin-row'], li").length ?? 0,
