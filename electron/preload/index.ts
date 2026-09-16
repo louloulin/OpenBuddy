@@ -15,6 +15,7 @@ const allowedInvokeChannels = new Set([
   "agent:preset-current", "agent:preset-default-save", "agent:preset-select", "agent:presets-list", "agent:profile-install", "agent:profile-install-default-pi", "agent:profile-packages", "agent:profile-remove", "agent:prompt",
   "agent:providers-delete-model", "agent:providers-delete-provider", "agent:providers-fetch-models", "agent:providers-list", "agent:providers-save-model", "agent:providers-save-provider", "agent:providers-test", "agent:remote-contributions", "agent:renderer-plugin-boot",
   "agent:renderer-plugin-entries", "agent:renderer-plugin-module", "agent:resolve-permission", "agent:resolve-question", "agent:resource-inventory", "agent:session-messages", "agent:session-info", "agent:session-metadata-clear", "agent:session-usage", "agent:tools-list",
+  "agent:stream-port", "agent:plugin-reload", "agent:plugin-state-get", "agent:plugin-state-reset", "agent:extension-policy-reload", "agent:extension-policy-get", "agent:extension-policy-save",
   "stream-smoke:publish",
   "agent:prompt-content", "agent:set-thinking-level", "agent:set-permission-mode", "agent:workspace-search",
   "agent:compact", "agent:set-auto-compaction", "agent:set-auto-retry", "agent:abort-retry", "agent:abort-bash",
@@ -23,6 +24,8 @@ const allowedInvokeChannels = new Set([
   "agent:set-model", "agent:steer", "agent:transaction-list", "agent:transaction-receipt", "agents_defaults_get", "agents_defaults_save", "agents_delete", "agents_get",
   "agents_list", "agents_save", "agents_template", "dsh:remote", "dsh:remote-register", "dsh:remote-unregister", "dsh:rpc", "harness:address",
   "harness:recovery-claim", "harness:recovery-list", "harness:recovery-resolve", "harness:recovery-status", "harness:resume-token", "harness:resume-token-set", "harness:session-cursors", "harness:session-cursors-set",
+  // progress (rendered by progress:* IPC handlers)
+  "progress:list", "progress:cancel", "progress:retry",
   // casdoor
   "casdoor:ai-capabilities", "casdoor:audit-list", "casdoor:authorize", "casdoor:authorize-decision", "casdoor:authorize-resource", "casdoor:billing-order-create", "casdoor:billing-order-expire", "casdoor:billing-order-refund",
   "casdoor:billing-orders", "casdoor:billing-plan-upsert", "casdoor:billing-plans", "casdoor:billing-subscription", "casdoor:can", "casdoor:capabilities", "casdoor:commercial-model-catalog", "casdoor:config-get",
@@ -76,6 +79,8 @@ const allowedInvokeChannels = new Set([
   "notifications:mark-all-read", "notifications:mark-read",
   // plugins-experts
   "connectors_cli_auth", "connectors_cli_auth_cancel", "connectors_cli_skills_dir", "connectors_cli_status", "connectors_cli_unauth", "connectors_default_root", "connectors_icon", "connectors_list_roots",
+  // extension (needs-review gate wired by Phase I.2)
+  "extension:needs-review-state", "extension:approve-needs-review", "extension:reject-needs-review",
   "connectors_load", "connectors_read_mcp_config", "experts_default_root", "experts_image_bytes", "experts_link_agents", "experts_list_roots", "experts_load", "experts_read_agent_prompt",
   "experts_thumbnail", "marketplace_action", "marketplace_list", "pi_clear_session_expert", "pi_set_session_expert", "plugins_action", "plugins_list",
   // filesystem-shell
