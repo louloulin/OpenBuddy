@@ -3,7 +3,7 @@
  *
  * 断言的是「内核真的装配成了什么」,而不是从 DOM 反推:
  *   - 每个内置 ui-* 包的 apply() 是否成功(失败会静默让界面退化成裸文本)
- *   - `files.tree` / `editor.body` / `shell.statusbar` 这些 Phase B–D 新增槽
+ *   - `files.tree` / `editor.body` / `shell.statusbar` / `plugin.command` 这些槽
  *     位到底有几条 entry、由谁提供
  *   - 全新 profile 首启的主题是不是品牌主题,`--wb-accent` 是不是 #00C29A
  *
@@ -54,7 +54,8 @@ const report = await page.evaluate(() => {
       "shell.statusbar": pick("shell.statusbar"),
       "shell.overlay": pick("shell.overlay"),
       "onboarding.wizard": pick("onboarding.wizard"),
-      "settings.sections": pick("settings.sections"),
+      "plugin.command": pick("plugin.command"),
+      "notifications": pick("notifications"),
     },
     theme: {
       attr: root.getAttribute("data-theme"),

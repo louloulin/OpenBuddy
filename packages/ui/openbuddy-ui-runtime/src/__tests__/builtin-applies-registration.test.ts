@@ -153,8 +153,11 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     expect(entries("placeholder.experts").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("ui-settings-models → 'settings.extension' slot 注册扩展入口", () => {
-    expect(entries("settings.extension").length).toBeGreaterThanOrEqual(1);
+  it("ui-settings-models → 不注册占位槽(设置扩展走渲染端 settings.section)", () => {
+    // 以前这里注册了一个没有契约、没有消费者的 settings.extension + () => null,
+    // 让审计表把这块记成「已实现」。扩展点在渲染端 contribution 注册表里,
+    // 微内核侧保持空,免得用空壳刷注册数。
+    expect(entries("settings.extension").length).toBe(0);
   });
 
   it("ui-layout → 'root' slot 注册 AppFrame(原有)", () => {

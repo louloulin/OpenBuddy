@@ -1007,7 +1007,18 @@ can replace it",但实际既没注册也没消费(宿主直接 `import`)。现�
 真机验证:`_probe-slot-assembly.mjs` 断言 `shell.statusbar` 有 1 条
 `@openbuddy/ui-shell` 的 entry。
 
-### R19.3 仍然存在、留给下一轮的 dead 槽
+### R19.3 假实现:删掉 `settings.extension`
+
+`ui-settings-models` 的 apply() 里注册过一个 `settings.extension` 槽 + `() => null` 组件:
+槽名没有 `declare module` 契约、没有任何消费者,组件还是空壳。它唯一的效果是让
+「注册数」好看、让审计表把这块记成已实现。真正的扩展点是**渲染端**的
+`settings.section`(由 `SettingsPanel` 的 `useRendererSlot("settings.section")` 消费)。
+
+占位注册比不注册更糟(它会骗过审计),所以直接删掉;等真有面板时再以真实组件注册。
+同时修掉探针里一个不存在的老槽名(`settings.sections`,从来没被声明过),换成
+真实存在的 `plugin.command` / `notifications`。
+
+### R19.4 仍然存在、留给下一轮的 dead 槽
 
 | 槽位 | 注册者 | 现状 |
 |---|---|---|
@@ -1015,8 +1026,11 @@ can replace it",但实际既没注册也没消费(宿主直接 `import`)。现�
 | `onboarding.feedback` | ui-onboarding | 同上(`onSubmit`) |
 | `onboarding.whats-new` | ui-onboarding | 需要宿主给 `version` + `items`(本地 changelog 数据尚未进包) |
 | `placeholder.experts` | ui-experts | `PlaceholderPage` 直接 import 了 `ExpertsPanel`,槽位空转 |
-| `settings.extension` | ui-settings-models | 设置面板没有消费扩展入口 |
 | `root` | ui-layout | `AppFrame` 的子槽,AppFrame 本身未在本产品外壳中使用 |
+
+下一项可做的接线:**Composer 的 `/` 菜单认 `plugin.command`**。目前 Composer 的
+slash 补全只列 Pi 自带命令 + 渲染端 contribution(`insertText` 模板),SDK 命令要靠 ⌘K
+执行;两者打通需要在发送路径上按命令名分流(并保证不抢 Pi 的命令名)。
 
 `shell.overlay` / `notifications` / `details` 标为 `ext`:它们的消费者是 ui-layout 的
 `AppFrame`(整壳实现),而本产品外壳走命名 `overlay.*` slot 路径。**这是一个待决策项**:
