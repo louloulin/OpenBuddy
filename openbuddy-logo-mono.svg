@@ -2,32 +2,22 @@
   <defs>
     <mask id="mono" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
       <rect width="1024" height="1024" fill="#FFF"/>
-      <ellipse cx="512" cy="396" rx="320" ry="40" fill="#FFF"/>
-      <path d="M192 396 Q192 168 512 168 Q832 168 832 396 Z" fill="#FFF"/>
-      <rect x="240" y="396" width="544" height="392" rx="180" fill="#FFF"/>
-      <rect x="298" y="492" width="428" height="92" rx="46" fill="#FFF"/>
-      <ellipse cx="170" cy="660" rx="60" ry="80" fill="#FFF"/>
-      <ellipse cx="854" cy="660" rx="60" ry="80" fill="#FFF"/>
-      <ellipse cx="380" cy="850" rx="64" ry="34" fill="#FFF"/>
-      <ellipse cx="644" cy="850" rx="64" ry="34" fill="#FFF"/>
-      <g transform="translate(160 360)">
-        <ellipse cx="0" cy="6" rx="28" ry="6" fill="#FFF"/>
-        <path d="M-26 6 Q-26 -22 0 -22 Q26 -22 26 6 Z" fill="#FFF"/>
-        <rect x="-10" y="6" width="20" height="14" rx="6" fill="#FFF"/>
+      <path d="M256 312 Q192 220 244 168 Q310 184 332 296 Z" fill="#FFF"/>
+      <path d="M768 312 Q832 220 780 168 Q714 184 692 296 Z" fill="#FFF"/>
+      <path d="M512 200 Q280 200 232 480 Q200 720 320 832 Q440 920 512 920 Q584 920 704 832 Q824 720 792 480 Q744 200 512 200 Z" fill="#FFF"/>
+      <path d="M512 480 Q380 480 360 640 Q352 760 460 800 Q500 812 512 812 Q524 812 564 800 Q672 760 664 640 Q644 480 512 480 Z" fill="#FFF"/>
+      <ellipse cx="252" cy="700" rx="44" ry="68" fill="#FFF"/>
+      <ellipse cx="772" cy="700" rx="44" ry="68" fill="#FFF"/>
+      <ellipse cx="380" cy="906" rx="70" ry="22" fill="#FFF"/>
+      <ellipse cx="644" cy="906" rx="70" ry="22" fill="#FFF"/>
+      <g transform="translate(660 420)">
+        <circle r="22" fill="#FFF"/>
       </g>
-      <g transform="translate(820 220)">
-        <circle r="26" fill="#FFF"/>
-      </g>
-      <ellipse cx="340" cy="316" rx="40" ry="28" fill="#000"/>
-      <ellipse cx="540" cy="232" rx="32" ry="24" fill="#000"/>
-      <ellipse cx="680" cy="312" rx="44" ry="32" fill="#000"/>
-      <ellipse cx="460" cy="368" rx="22" ry="16" fill="#000"/>
-      <ellipse cx="730" cy="228" rx="18" ry="14" fill="#000"/>
-      <circle cx="412" cy="548" r="32" fill="#000"/>
-      <circle cx="612" cy="548" r="32" fill="#000"/>
-      <ellipse cx="426" cy="528" rx="14" ry="18" fill="#FFF"/>
-      <ellipse cx="626" cy="528" rx="14" ry="18" fill="#FFF"/>
-      <path d="M460 700 Q512 740 564 700" fill="none" stroke="#000" stroke-width="14" stroke-linecap="round"/>
+      <ellipse cx="456" cy="588" rx="22" ry="28" fill="#000"/>
+      <ellipse cx="568" cy="588" rx="22" ry="28" fill="#000"/>
+      <ellipse cx="464" cy="578" rx="7" ry="9" fill="#FFF"/>
+      <ellipse cx="576" cy="578" rx="7" ry="9" fill="#FFF"/>
+      <path d="M460 680 Q512 736 564 680" fill="none" stroke="#000" stroke-width="16" stroke-linecap="round"/>
     </mask>
   </defs>
   <rect width="1024" height="1024" fill="currentColor" mask="url(#mono)"/>
