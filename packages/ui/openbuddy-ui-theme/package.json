@@ -9,6 +9,10 @@
     ".": "./src/index.ts",
     "./client": "./src/client.tsx",
     "./invariant": "./src/invariant.ts",
+    "./components": "./src/components/index.ts",
+    "./components/ThemePicker": "./src/components/ThemePicker.tsx",
+    "./components/ThemeInitializer": "./src/components/ThemeInitializer.tsx",
+    "./components/ThemeCard": "./src/components/ThemeCard.tsx",
     "./styles": "./src/styles/index.css"
   },
   "dependencies": {

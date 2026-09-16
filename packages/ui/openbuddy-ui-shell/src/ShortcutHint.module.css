@@ -1,0 +1,35 @@
+/* ShortcutHint — 键盘和弦 glyph。低对比度,不与该行的动作文案竞争。 */
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  color: var(--wb-fg-tertiary);
+  font-family: var(--wb-font);
+  font-size: 11px;
+  line-height: 1;
+  user-select: none;
+}
+
+.key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border: 1px solid var(--wb-border-soft, rgba(127, 127, 127, 0.25));
+  border-bottom-width: 2px;
+  border-radius: var(--wb-radius-sm, 4px);
+  background: var(--wb-bg-tertiary, transparent);
+  color: var(--wb-fg-secondary);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.plain {
+  font-family: inherit;
+  font-size: 11px;
+}

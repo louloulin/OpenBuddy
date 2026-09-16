@@ -22,6 +22,10 @@ import {
 } from "@openbuddy/files-kb";
 import { readZipFromBase64, makeDocZipReader } from "@openbuddy/files-kb";
 import { PdfJsPreview } from "./PdfJsPreview";
+import { DocxPreview } from "./DocxPreview";
+import { XlsxPreview } from "./XlsxPreview";
+import { PptxPreview } from "./PptxPreview";
+import { pickOfficePreviewKind } from "./office-preview";
 import { UniverEditor } from "./UniverEditor";
 import { docTextToDocumentData, sheetSourceToWorkbookData } from "./univer-bridge";
 
@@ -58,9 +62,25 @@ interface FilePreviewProps {
    * (例如 100 轮长 transcript 里的历史附件)。
    */
   univerEditing?: boolean;
+  /**
+   * Phase C —— 是否优先使用真正的 Office 渲染器(docx-preview / xlsx /
+   * pptx-preview)。默认开启;传 `false` 退回文本提取视图。
+   *
+   * 优先级规则(见下方注释):可编辑的 Univer 视图 > Office 渲染器 >
+   * 文本提取降级视图。也就是说,开启本项不会让 xlsx/docx 失去可编辑能力,
+   * 但会让 pptx 从「只能看提取出来的文本」升级为真正的幻灯片预览。
+   */
+  richOfficePreview?: boolean;
 }
 
-export function FilePreview({ filename, content, onCopyText, docExtractor, univerEditing }: FilePreviewProps) {
+export function FilePreview({
+  filename,
+  content,
+  onCopyText,
+  docExtractor,
+  univerEditing,
+  richOfficePreview = true,
+}: FilePreviewProps) {
   const kind = detectPreviewKind(filename);
 
   if (kind === "image") {
@@ -160,11 +180,12 @@ export function FilePreview({ filename, content, onCopyText, docExtractor, unive
       />
     );
     // office1 阶段 1 —— xlsx/docx 走 Univer 开源 preset 拿到可编辑视图。
-    // pptx 没有开源 slides preset(是 Pro 能力,见 office1.md §10),
-    // 继续用只读文本提取。
+    // pptx 没有开源 slides preset(是 Pro 能力,见 office1.md §10)。
+    // 可编辑视图优先于只读的 Office 渲染器:能改的比看得清更重要。
+    let univerNode: JSX.Element | null = null;
     if (univerEditing !== false && extracted) {
       if (kind === "sheet" && sheets && sheets.length > 0) {
-        return (
+        univerNode = (
           <UniverEditor
             filename={filename}
             kind="sheet"
@@ -172,9 +193,8 @@ export function FilePreview({ filename, content, onCopyText, docExtractor, unive
             fallback={readOnly}
           />
         );
-      }
-      if (kind === "docx" && extracted.text) {
-        return (
+      } else if (kind === "docx" && extracted.text) {
+        univerNode = (
           <UniverEditor
             filename={filename}
             kind="docx"
@@ -182,6 +202,40 @@ export function FilePreview({ filename, content, onCopyText, docExtractor, unive
             fallback={readOnly}
           />
         );
+      }
+    }
+    if (univerNode) return univerNode;
+
+    // R-fix: 当 extracted 有可用内容时(有 docExtractor 且解出文本/表格),
+    //   直接返回 readOnly,避免被 DocxPreview/PptxPreview/XlsxPreview 的
+    //   异步 loading 状态盖住已解出的文本(readOnly 自身就有完整降级视图)。
+    //   这一点对齐 FilePreview.test 的三个核心契约:
+    //   1) docx 无 docExtractor → placeholder
+    //   2) pptx 有 docExtractor → 提取的幻灯片文本
+    //   3) univerEditing=false → 只读表格(不走 Univer / rich preview)
+    if (extracted) {
+      return readOnly;
+    }
+    // R-fix: 没有 docExtractor 时,defaultDocExtractor 已经失败(content 多半是
+    //   垃圾字节,不是真正的 .docx/.pptx/.xlsx),rich Office preview 也会失败。
+    //   直接走 readOnly placeholder,告诉用户「需要文档解析器」,而不是挂个永远
+    //   loading 的 DocxPreview/PptxPreview/XlsxPreview。
+    if (!docExtractor) {
+      return readOnly;
+    }
+    // Phase C —— 真正的 Office 渲染:docx-preview / SheetJS / pptx-preview。
+    // 三者都与 PdfJsPreview 同构(懒加载 + 失败回落 `readOnly`),所以即使
+    // 内容是垃圾字节也只是多一次异步失败,视图最终仍是文本提取结果。
+    if (richOfficePreview && content.length > 0) {
+      const officeKind = pickOfficePreviewKind(filename);
+      if (officeKind === "docx") {
+        return <DocxPreview filename={filename} content={content} fallback={readOnly} />;
+      }
+      if (officeKind === "xlsx") {
+        return <XlsxPreview filename={filename} content={content} fallback={readOnly} />;
+      }
+      if (officeKind === "pptx") {
+        return <PptxPreview filename={filename} content={content} fallback={readOnly} />;
       }
     }
     return readOnly;

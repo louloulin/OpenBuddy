@@ -34,6 +34,16 @@
 - 值/组件: `WorkflowBlackboard, computeWorkflowLevels` ← `./WorkflowBlackboard`
 - 类型契约: `WorkflowBlackboardProps` ← `./WorkflowBlackboard`
 - 值/组件: `ArtifactTabsBar` ← `./ArtifactTabsBar`
+- 值/组件: `ArtifactBreadcrumb, buildBreadcrumbItems` ← `./ArtifactBreadcrumb`
+- 类型契约: `ArtifactBreadcrumbProps, ArtifactBreadcrumbSegment` ← `./ArtifactBreadcrumb`
+- 值/组件: `ArtifactViewerHeader` ← `./ArtifactViewerHeader`
+- 类型契约: `ArtifactViewerHeaderProps, ArtifactViewerStatus, ArtifactViewerStatusTone` ← `./ArtifactViewerHeader`
+- 值/组件: `ViewerToolbar` ← `./ViewerToolbar`
+- 类型契约: `ViewerToolbarMenuItem, ViewerToolbarProps` ← `./ViewerToolbar`
+- 值/组件: `DocxPreview, XlsxPreview, PptxPreview` ← `./DocxPreview` / `./XlsxPreview` / `./PptxPreview`
+- 类型契约: `DocxPreviewProps, XlsxPreviewProps, PptxPreviewProps` ← 同上
+- 纯函数: `pickOfficePreviewKind, officePreviewKindLabel, decodeDataUrl, toArrayBuffer` ← `./office-preview`
+- 懒加载器: `loadDocxPreview, loadXlsx, loadPptxPreview` ← `./office-preview-loader`
 - 值/组件: `FileTreeView` ← `./FileTreeView`
 - 值/组件: `ViewSelector, defaultViews` ← `./ViewSelector`
 
@@ -41,6 +51,40 @@
 
 - `@openbuddy/ui-workbench/client` — 槽位注册入口,由 `@openbuddy/ui-runtime` 调用
 - `@openbuddy/ui-workbench/invariant` — 不变式同伴(开发态类型守卫)
+
+## 查看器 chrome（ArtifactTabsBar / 头部条 / 工具栏）
+
+三层结构，各自独立可复用，宿主按需组合：
+
+```
+┌ ArtifactTabsBar ── 打开了哪些（点击切换 / × 或中键关闭 / 拖拽排序 / 滚轮横滚 / 溢出菜单）
+└ ArtifactViewerHeader
+    ├ ArtifactBreadcrumb ── 当前是什么（中间省略折叠，点击展开）
+    └ ViewerToolbar ── 能对它做什么（刷新 / 外部打开 / 复制 / 下载 ‖ 换行 / 缩放 ‖ 分屏 / 更多）
+```
+
+约定：
+
+- **未传 handler 的工具栏按钮一律 `disabled`**，不会出现「点了没反应」的假交互。
+- 每个工具栏按钮同时带 `aria-label` / `title` / `data-tip`（后者供全局 tooltip 系统使用）。
+- 面包屑与工具栏都是**受控**的：数据全部来自 props，不读包外 store。
+- `ArtifactTabsBar` 的新增能力（中键关闭、滚轮横滚、溢出菜单）都是增量，
+  `overflowMenu={false}` 可完全关闭溢出菜单。
+
+## Office 内嵌预览
+
+与既有 `PdfJsPreview` 同构的「懒加载 + 永不白屏」模式：
+
+| 组件 | 底层库 | 说明 |
+| --- | --- | --- |
+| `DocxPreview` | `docx-preview` | 逐页渲染成 DOM，`inWrapper:false` + 纸张卡片化 |
+| `XlsxPreview` | `xlsx` (SheetJS) | `sheet_to_html` 转表格，首屏最多 5 张工作表，其余按需展开 |
+| `PptxPreview` | `pptx-preview` | 按容器宽度 16:9 初始化，卸载时 `destroy()` |
+
+- 三个库都走 `office-preview-loader.ts` 的 **dynamic import + 单次缓存 + 失败可重试**；
+  失败（库缺失 / 文件损坏 / 非法 base64）一律渲染调用方传入的 `fallback`。
+- `pickOfficePreviewKind(filename)` 只识别 OOXML 家族（docx/xlsx/pptx 及其同族），
+  老式 `.doc` / `.xls` / `.ppt` 刻意返回 `null`，让调用方走显式「暂不支持」分支。
 
 ## 协作方式
 

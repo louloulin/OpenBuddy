@@ -1,0 +1,154 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--wb-bg-elevated);
+  color: var(--wb-fg-primary);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-lg);
+  width: 100%;
+  max-width: 520px;
+  max-height: 70vh;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.headerRight {
+  display: flex;
+  gap: 6px;
+}
+
+.btn,
+.btnGhost {
+  padding: 3px 10px;
+  border-radius: var(--wb-radius-sm);
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid var(--wb-border);
+  background: transparent;
+  color: var(--wb-fg-secondary);
+  transition: all 120ms ease;
+}
+
+.btnGhost:hover {
+  border-color: var(--wb-accent);
+  color: var(--wb-accent);
+}
+
+.btn {
+  background: var(--wb-accent);
+  color: var(--wb-accent-fg);
+  border-color: var(--wb-accent);
+  font-weight: 600;
+}
+
+.btn:hover {
+  filter: brightness(1.08);
+}
+
+.metaRow {
+  display: flex;
+  gap: 10px;
+}
+
+.metaField {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.metaField > span {
+  color: var(--wb-fg-tertiary);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.textInput,
+.select {
+  padding: 4px 8px;
+  border-radius: var(--wb-radius-sm);
+  border: 1px solid var(--wb-border);
+  background: var(--wb-bg-primary);
+  color: var(--wb-fg-primary);
+  font-size: 12px;
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: var(--wb-radius-md);
+  background: color-mix(in oklch, var(--wb-fg-primary) 3%, transparent);
+}
+
+.groupLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--wb-fg-tertiary);
+}
+
+.tokenRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tokenName {
+  font-family: var(--wb-font-mono);
+  font-size: 11px;
+  color: var(--wb-fg-secondary);
+}
+
+.sliders {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.slider {
+  display: grid;
+  grid-template-columns: 14px 1fr 40px;
+  align-items: center;
+  gap: 4px;
+}
+
+.sliderLabel {
+  font-size: 10px;
+  color: var(--wb-fg-tertiary);
+}
+
+.sliderValue {
+  font-family: var(--wb-font-mono);
+  font-size: 10px;
+  color: var(--wb-fg-secondary);
+  text-align: right;
+}
+
+.slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--wb-accent);
+}

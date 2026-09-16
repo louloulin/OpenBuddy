@@ -4,9 +4,14 @@
  * 特性：
  *  - 按标签 kind 显示图标（file → 文件 emoji，preview → 🌐，artifact/changes → 文件 emoji）
  *  - 点击切换激活标签
- *  - 关闭按钮（×）
+ *  - 关闭按钮（×）与鼠标中键关闭
  *  - 指针拖拽排序（threshold 4px，FLIP 动画过渡）
  *  - 跟随激活标签滚入视野
+ *  - 竖向滚轮在标签条上转成横向滚动（触控板 / 鼠标滚轮一致）
+ *  - 标签超出条宽时在右端提供「查看全部标签」溢出菜单
+ *
+ * 所有新增能力都是 **增量** 的：新增 props 全部可选，未传时行为与旧版
+ * 完全一致（溢出菜单只在真的溢出时出现，jsdom / 窄标签集下不渲染）。
  */
 import {
   useCallback,
@@ -19,8 +24,11 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { UnifiedTab } from "@/lib/ui/use-unified-tabs";
+import { ChevronDownIcon } from "@openbuddy/ui-primitives/icons";
 import { pickFileEmoji } from "./file-tab-icon";
+import { cx } from "./cx";
 import { IS_MACOS } from "@/lib/platform/platform";
+import styles from "./ArtifactTabsBar.module.css";
 
 const DRAG_START_THRESHOLD = 4;
 
@@ -106,12 +114,18 @@ export function ArtifactTabsBar({
   onSelect,
   onClose,
   onReorder,
+  overflowMenu = true,
 }: {
   tabs: UnifiedTab[];
   activeTabId?: string;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onReorder?: (orderedIds: string[]) => void;
+  /**
+   * 标签条溢出时是否在右端显示「查看全部标签」菜单。默认开启；
+   * 传 false 可完全关闭（例如宿主自己实现了溢出策略）。
+   */
+  overflowMenu?: boolean;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef(new Map<string, HTMLElement>());
@@ -122,6 +136,11 @@ export function ArtifactTabsBar({
   const suppressNextClickRef = useRef(false);
   const [visualOrder, setVisualOrder] = useState<string[] | null>(null);
   const [dragSnapshot, setDragSnapshot] = useState<DragSnapshot | null>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  // 无标签时组件整体返回 null（listRef 为空），用这个布尔量驱动
+  // 「监听挂载 / 卸载」的副作用重新执行。
+  const isEmpty = tabs.length === 0;
 
   const tabsById = useMemo(
     () => new Map(tabs.map((t) => [t.id, t])),
@@ -344,6 +363,68 @@ export function ArtifactTabsBar({
   // 卸载时移除拖拽监听。
   useEffect(() => () => removeDragListeners(), [removeDragListeners]);
 
+  // 溢出检测：条宽 < 内容宽时（真的还有标签被裁掉）才显示溢出菜单。
+  // jsdom 下 scrollWidth / clientWidth 恒为 0，因此不会误触发。
+  useEffect(() => {
+    const node = listRef.current;
+    if (!node) return;
+    const measure = () => setOverflowing(node.scrollWidth - node.clientWidth > 1);
+    measure();
+    node.addEventListener("scroll", measure, { passive: true });
+    const observer =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    observer?.observe(node);
+    window.addEventListener("resize", measure);
+    return () => {
+      node.removeEventListener("scroll", measure);
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [isEmpty, tabs]);
+
+  // 竖向滚轮在标签条上转成横向滚动。必须用原生非 passive 监听：
+  // React 的 onWheel 在根节点上是 passive 的，preventDefault 会被忽略。
+  useEffect(() => {
+    const node = listRef.current;
+    if (!node) return;
+    const onWheel = (event: WheelEvent) => {
+      const maxScroll = node.scrollWidth - node.clientWidth;
+      if (maxScroll <= 0) return;
+      const delta =
+        Math.abs(event.deltaX) > Math.abs(event.deltaY)
+          ? event.deltaX
+          : event.deltaY;
+      if (delta === 0) return;
+      const next = clamp(node.scrollLeft + delta, 0, maxScroll);
+      if (next === node.scrollLeft) return;
+      event.preventDefault();
+      node.scrollLeft = next;
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, [isEmpty]);
+
+  // 溢出菜单：点击外部 / Esc 关闭（与 ViewerToolbar 的更多菜单同一约定）。
+  useEffect(() => {
+    if (!overflowOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".artifact-tabs__overflow")) return;
+      setOverflowOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOverflowOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [overflowOpen]);
+
+  const showOverflow = overflowMenu && overflowing && tabs.length > 1;
+
   if (tabs.length === 0) return null;
 
   return (
@@ -375,6 +456,13 @@ export function ArtifactTabsBar({
             }
             onClick={() => handleSelect(tab.id)}
             onPointerDown={(e) => handlePointerDown(e, tab.id)}
+            onMouseDown={(e) => {
+              // 中键：阻止 Chromium 的自动滚动光标，并交给 onAuxClick 关闭。
+              if (e.button === 1) e.preventDefault();
+            }}
+            onAuxClick={(e) => {
+              if (e.button === 1) handleClose(e, tab.id);
+            }}
             role="tab"
             aria-selected={tab.id === activeTabIdForRender}
             title={tab.subtitle ?? tab.label}
@@ -393,6 +481,54 @@ export function ArtifactTabsBar({
           </div>
         ))}
       </div>
+      {showOverflow ? (
+        <div
+          className={cx("artifact-tabs__overflow", styles.overflow)}
+          data-openbuddy-nodrag
+        >
+          {/* macOS：标签条本身是窗口拖拽区（data-openbuddy-drag），交互元素
+              必须显式退出拖拽区（data-openbuddy-nodrag），否则点击会被窗口拖拽吞掉。 */}
+          <button
+            type="button"
+            className={styles.overflowButton}
+            aria-label="查看全部标签"
+            aria-haspopup="menu"
+            aria-expanded={overflowOpen}
+            title="查看全部标签"
+            data-tip="查看全部标签"
+            onClick={() => setOverflowOpen((open) => !open)}
+          >
+            <ChevronDownIcon size="sm" />
+          </button>
+          {overflowOpen ? (
+            <div
+              className={styles.overflowMenu}
+              role="menu"
+              aria-label="全部标签"
+            >
+              {renderedTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="menuitem"
+                  className={cx(
+                    styles.overflowItem,
+                    tab.id === activeTabIdForRender && styles.overflowItemActive,
+                  )}
+                  title={tab.subtitle ?? tab.label}
+                  onClick={() => {
+                    setOverflowOpen(false);
+                    onSelect(tab.id);
+                  }}
+                >
+                  <span className={styles.overflowIcon}>{pickTabIcon(tab)}</span>
+                  <span className={styles.overflowLabel}>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {dragSnapshot && draggedTab &&
         createPortal(
           <div

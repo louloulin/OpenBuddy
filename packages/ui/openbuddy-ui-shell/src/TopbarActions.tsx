@@ -4,11 +4,23 @@
  *  - 置顶 / 取消置顶当前会话
  *  - 归档当前会话
  *
+ * Phase B 增补（全部向后兼容，老调用方零改动）：
+ *  - `statusChip`      → 在菜单按钮左侧内联一枚状态胶囊（如 TopbarStatusChip）
+ *  - `themeMenu`       → 追加「切换主题」行，点一次切到下一套主题
+ *  - `onShowShortcuts` → 追加「键盘快捷键」行
+ *  - 每一行右侧渲染 <ShortcutHint>，和弦集中在 `TOPBAR_ACTION_SHORTCUTS`
+ *
  * 位置：main-topbar 右侧（标题旁边）。
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { save as saveDialog } from "@/lib/platform/electron-api";
-import { MoreDotsIcon, PinFilledIcon, ArchiveIcon } from "@openbuddy/ui-primitives/icons";
+import {
+  MoreDotsIcon,
+  PinFilledIcon,
+  ArchiveIcon,
+  KeyboardIcon,
+} from "@openbuddy/ui-primitives/icons";
+import { useTheme } from "@openbuddy/ui-theme/client";
 import { useSessionStore } from "@/stores/session-store";
 import {
   exportTextFile,
@@ -16,6 +28,9 @@ import {
   piSetSessionArchived,
 } from "@/lib/agent/pi-client";
 import { buildSessionMarkdown, sanitizeFilename } from "@/lib/files/export-markdown";
+import { ShortcutHint } from "./ShortcutHint";
+import { ThemeBoundary } from "./ThemeBoundary";
+import { TOPBAR_ACTION_SHORTCUTS } from "./topbar-shortcuts";
 
 interface TopbarActionsProps {
   sessionId: string;
@@ -24,6 +39,12 @@ interface TopbarActionsProps {
   onToast?: (msg: string) => void;
   /** After archive/pin mutations, parent merges the patch into the sessions store. */
   onSessionsChanged?: (patch?: Record<string, unknown>) => void;
+  /** 菜单按钮左侧的内联状态胶囊（通常传 <TopbarStatusChip />）。 */
+  statusChip?: ReactNode;
+  /** 是否在菜单里追加「切换主题」行（默认关闭）。 */
+  themeMenu?: boolean;
+  /** 传入后追加「键盘快捷键」行。 */
+  onShowShortcuts?: () => void;
 }
 
 export function TopbarActions({
@@ -32,6 +53,9 @@ export function TopbarActions({
   pinned,
   onToast,
   onSessionsChanged,
+  statusChip,
+  themeMenu = false,
+  onShowShortcuts,
 }: TopbarActionsProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -116,38 +140,118 @@ export function TopbarActions({
     }
   }, [sessionId, isPending, onToast, onSessionsChanged]);
 
-  return (
-    <div className="topbar-actions" ref={menuRef}>
-      <button
-        type="button"
-        className="main-topbar__btn"
-        aria-label="更多操作"
-        data-tip="更多操作"
-        disabled={busy}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-      >
-        <MoreDotsIcon size="md" />
-      </button>
+  const handleShowShortcuts = useCallback(() => {
+    setOpen(false);
+    onShowShortcuts?.();
+  }, [onShowShortcuts]);
 
-      {open && (
-        <div className="topbar-actions__menu" onClick={(e) => e.stopPropagation()}>
-          <button type="button" className="topbar-actions__item" onClick={handleExport}>
-            <span className="topbar-actions__item-icon">📄</span>
-            <span>导出为 Markdown</span>
-          </button>
-          <button type="button" className="topbar-actions__item" onClick={handleTogglePin} disabled={isPending}>
-            <PinFilledIcon size="sm" />
-            <span>{pinned ? "取消置顶" : "置顶会话"}</span>
-          </button>
-          <button type="button" className="topbar-actions__item" onClick={handleArchive} disabled={isPending}>
-            <ArchiveIcon size="sm" />
-            <span>归档会话</span>
-          </button>
-        </div>
-      )}
-    </div>
+  return (
+    <>
+      {statusChip}
+      <div className="topbar-actions" ref={menuRef}>
+        <button
+          type="button"
+          className="main-topbar__btn"
+          aria-label="更多操作"
+          data-tip="更多操作"
+          disabled={busy}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
+          }}
+        >
+          <MoreDotsIcon size="md" />
+        </button>
+
+        {open && (
+          <div className="topbar-actions__menu" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="topbar-actions__item" onClick={handleExport}>
+              <span className="topbar-actions__item-icon">📄</span>
+              <span className="topbar-actions__item-label">导出为 Markdown</span>
+              <ShortcutHint chord={TOPBAR_ACTION_SHORTCUTS.exportMarkdown} />
+            </button>
+            <button type="button" className="topbar-actions__item" onClick={handleTogglePin} disabled={isPending}>
+              <span className="topbar-actions__item-icon"><PinFilledIcon size="sm" /></span>
+              <span className="topbar-actions__item-label">{pinned ? "取消置顶" : "置顶会话"}</span>
+              <ShortcutHint chord={TOPBAR_ACTION_SHORTCUTS.togglePin} />
+            </button>
+            <button type="button" className="topbar-actions__item" onClick={handleArchive} disabled={isPending}>
+              <span className="topbar-actions__item-icon"><ArchiveIcon size="sm" /></span>
+              <span className="topbar-actions__item-label">归档会话</span>
+              <ShortcutHint chord={TOPBAR_ACTION_SHORTCUTS.archive} />
+            </button>
+
+            {themeMenu && (
+              <>
+                <div className="topbar-actions__divider" role="presentation" />
+                <ThemeBoundary
+                  fallback={
+                    <div className="topbar-actions__item topbar-actions__item--disabled" aria-disabled>
+                      <span className="topbar-actions__item-icon">🎨</span>
+                      <span className="topbar-actions__item-label">主题不可用</span>
+                    </div>
+                  }
+                >
+                  <ThemeCycleRow />
+                </ThemeBoundary>
+              </>
+            )}
+
+            {onShowShortcuts && (
+              <>
+                {!themeMenu && <div className="topbar-actions__divider" role="presentation" />}
+                <button
+                  type="button"
+                  className="topbar-actions__item"
+                  onClick={handleShowShortcuts}
+                  data-testid="topbar-actions-shortcuts"
+                >
+                  <span className="topbar-actions__item-icon"><KeyboardIcon size="sm" /></span>
+                  <span className="topbar-actions__item-label">键盘快捷键</span>
+                  <ShortcutHint chord={TOPBAR_ACTION_SHORTCUTS.shortcutsHelp} />
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/**
+ * 「切换主题」行 —— 独立组件，保证 `useTheme()` 只在 `themeMenu` 打开时才被调用
+ * （未挂 ThemeProvider 的宿主走 ThemeBoundary 降级，而不是让 hooks 规则崩掉）。
+ * 点击一次循环到 `list()` 里的下一套主题；右侧显示当前主题名。
+ */
+function ThemeCycleRow() {
+  const service = useTheme();
+  const [name, setName] = useState(() => service.currentName());
+
+  useEffect(() => {
+    setName(service.currentName());
+    return service.subscribe(() => setName(service.currentName()));
+  }, [service]);
+
+  const cycle = useCallback(() => {
+    const all = service.list();
+    if (all.length === 0) return;
+    const idx = all.findIndex((t) => t.name === service.currentName());
+    const next = all[(idx + 1) % all.length];
+    if (next) service.setThemeByName(next.name);
+  }, [service]);
+
+  return (
+    <button
+      type="button"
+      className="topbar-actions__item"
+      onClick={cycle}
+      data-testid="topbar-actions-theme"
+      title="切换到下一套主题"
+    >
+      <span className="topbar-actions__item-icon">🎨</span>
+      <span className="topbar-actions__item-label">切换主题</span>
+      <span className="topbar-actions__item-meta">{name}</span>
+    </button>
   );
 }

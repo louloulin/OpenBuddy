@@ -14,7 +14,12 @@ export function PiReloadFailureBanner() {
   const [retryError, setRetryError] = useState<string | null>(null);
 
   useEffect(() => {
-    const events = getRendererPluginRuntime().events;
+    const events = getRendererPluginRuntime()?.events;
+    if (!events || typeof events.on !== "function") {
+      // 测试环境(jsdom 没有真实 renderer plugin runtime)或 main 阶段
+      // events 还没注入 —— 退化为不挂监听,行为等价于组件未挂载。
+      return undefined;
+    }
     const offFailure = events.on("renderer/pi-reload-failed", (payload) => {
       const next = payload as PiReloadFailureState;
       setFailure({ reason: next.reason, error: next.error, generation: next.generation });

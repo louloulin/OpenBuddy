@@ -11,7 +11,7 @@
  * 兼容性：保留原导出名 `ToolSidePanel` / `ToolSidePanelMode` 与 ChatView 的 props，
  * 新增内部状态管理视图/标签/宽度。原 "tool" 模式仍用于展示单个工具调用详情。
  */
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
 import type { ToolCallView } from "@/stores/session-store";
 import type { SessionArtifact } from "@/lib/agent/session-artifacts";
 import type { FileChange } from "@/lib/files/file-changes";
@@ -24,6 +24,7 @@ import {
 import { ToolCallDetailBody } from "./ToolCallCard";
 import { openLocalPath } from "@/lib/markdown/markdown-host";
 import { invoke } from "@/lib/platform/electron-api";
+import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { IS_MACOS } from "@/lib/platform/platform";
 import { ViewSelector, defaultViews } from "@openbuddy/ui-workbench";
 import { ArtifactTabsBar } from "@openbuddy/ui-workbench";
@@ -612,6 +613,53 @@ function FilePreview({
   const [text, setText] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Phase C —— markdown 源码可用富文本编辑器就地修改并写回。
+  // 编辑器本体从内核 `editor.body` 槽取（@openbuddy/ui-editor 注册），
+  // 宿主没有装编辑器时不渲染「编辑」入口，避免出现点了没反应的按钮。
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const editorComponents = useSlotComponents("editor.body");
+  const EditorBody = editorComponents[0] as
+    | ComponentType<{
+        value?: string;
+        format?: string;
+        editable?: boolean;
+        placeholder?: string;
+        onChange?: (next: string) => void;
+      }>
+    | undefined;
+  const isMarkdown = /\.(md|markdown|mdx)$/i.test(path);
+  const canEdit = isMarkdown && EditorBody != null && text != null;
+
+  const beginEdit = useCallback(() => {
+    setDraft(text ?? "");
+    setEditing(true);
+  }, [text]);
+
+  const cancelEdit = useCallback(() => {
+    setEditing(false);
+    setDraft("");
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await invoke("write_text_file", {
+        path,
+        content: draft,
+        workspaceRoot: cwd ?? null,
+      });
+      setText(draft);
+      setEditing(false);
+      onToast?.("已保存");
+    } catch (e) {
+      onToast?.(`保存失败：${String(e).replace(/^Error:\s*/, "")}`);
+    } finally {
+      setSaving(false);
+    }
+  }, [cwd, draft, onToast, path, saving]);
 
   useEffect(() => {
     let cancelled = false;
@@ -647,6 +695,37 @@ function FilePreview({
         <span className="file-preview__path" title={path}>
           {path}
         </span>
+        {canEdit && !editing && (
+          <button
+            type="button"
+            className="file-preview__open"
+            onClick={beginEdit}
+            aria-label="编辑"
+          >
+            编辑
+          </button>
+        )}
+        {editing && (
+          <>
+            <button
+              type="button"
+              className="file-preview__open"
+              onClick={saveEdit}
+              disabled={saving}
+              aria-label="保存"
+            >
+              {saving ? "保存中…" : "保存"}
+            </button>
+            <button
+              type="button"
+              className="file-preview__open"
+              onClick={cancelEdit}
+              aria-label="取消编辑"
+            >
+              取消
+            </button>
+          </>
+        )}
         <button type="button" className="file-preview__open" onClick={onOpenOs}>
           系统打开
         </button>
@@ -667,7 +746,19 @@ function FilePreview({
           </button>
         </div>
       )}
-      {text != null && <pre className="file-preview__body">{text}</pre>}
+      {text != null && editing && EditorBody ? (
+        <div className="file-preview__editor" data-testid="file-preview-editor">
+          <EditorBody
+            value={draft}
+            format="markdown"
+            editable
+            placeholder="输入 / 调出命令"
+            onChange={setDraft}
+          />
+        </div>
+      ) : (
+        text != null && <pre className="file-preview__body">{text}</pre>
+      )}
     </div>
   );
 }

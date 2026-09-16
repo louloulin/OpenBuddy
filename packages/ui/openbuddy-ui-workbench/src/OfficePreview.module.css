@@ -1,0 +1,173 @@
+/* Office 预览(DOCX / XLSX / PPTX)共享样式。
+   结构对齐既有的 `.file-preview*` 全局类,但把「预览体」部分收进本包,
+   避免继续往 root src/styles 里堆办公文档专属规则。 */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--wb-bg-primary);
+  color: var(--wb-fg-primary);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--wb-border-soft);
+  font-size: 11px;
+  color: var(--wb-fg-secondary);
+  flex: none;
+}
+
+.name {
+  font-weight: 600;
+  color: var(--wb-fg-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kind {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-accent-soft);
+  color: var(--wb-accent-fg);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+.meta {
+  flex: none;
+  color: var(--wb-fg-tertiary);
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 10px 16px;
+  position: relative;
+}
+
+.loading {
+  padding: 18px 6px;
+  color: var(--wb-fg-secondary);
+  font-size: 12px;
+}
+
+.error {
+  padding: 18px 6px;
+  color: var(--wb-danger);
+  font-size: 12px;
+}
+
+/* ---- DOCX ---- */
+
+.docxBody {
+  position: relative;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* docx-preview 以 inWrapper:false 渲染,页面直接是 `<section class="docx">` 子元素。
+   这里用元素选择器(不用 :global)把纸张卡片化,保持与主题令牌一致。 */
+.docxBody > section {
+  margin: 0 auto 10px;
+  padding: 18px 22px;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  border: 1px solid var(--wb-border-soft);
+  border-radius: var(--wb-radius-md);
+  box-shadow: var(--wb-shadow-sm);
+}
+
+/* ---- XLSX ---- */
+
+.sheetTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.sheetTab {
+  padding: 2px 8px;
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-bg-secondary);
+  color: var(--wb-fg-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.sheetTab:hover {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-fg-primary);
+}
+
+.sheet {
+  margin-bottom: 14px;
+}
+
+.sheetName {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--wb-fg-secondary);
+}
+
+.sheetBody {
+  overflow: auto;
+  font-size: 12px;
+}
+
+.sheetBody table {
+  border-collapse: collapse;
+  min-width: 100%;
+}
+
+.sheetBody td,
+.sheetBody th {
+  border: 1px solid var(--wb-border-soft);
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.sheetBody tbody tr:nth-child(even) {
+  background: var(--wb-bg-secondary);
+}
+
+.more {
+  align-self: flex-start;
+  margin: 4px 0 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-bg-secondary);
+  color: var(--wb-fg-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.more:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- PPTX ---- */
+
+.pptxBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.pptxStage {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}

@@ -17,13 +17,15 @@ import {
   Sun,
   Moon,
   Type,
+  Palette,
   Folder,
   Trash2,
   ExternalLink,
   RefreshCw,
   Shield,
 } from "lucide-react";
-import { useTheme, useThemeSnapshot } from "@openbuddy/ui-theme/client";
+import { useTheme, useThemeSnapshot, ThemePicker, ThemeStudio } from "@openbuddy/ui-theme/client";
+import { resolveVars } from "@openbuddy/ui-theme";
 import {
   agentsDefaultsGet,
   agentsDefaultsSave,
@@ -177,6 +179,8 @@ export function PersonalizeSettingsPanel() {
     const saved = localStorage.getItem(FONT_KEY);
     return saved ? Number(saved) : 13;
   });
+  const [studioOpen, setStudioOpen] = useState(false);
+  const activeThemeName = useThemeSnapshot((s) => s.currentName());
 
   useEffect(() => {
     localStorage.setItem(FONT_KEY, String(fontSize));
@@ -193,6 +197,28 @@ export function PersonalizeSettingsPanel() {
         <div className="settings-row__label">
           {theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
           <span>主题</span>
+        </div>
+        <ThemePicker />
+        <div className="settings-row__label">
+          <Palette size={16} />
+          <span>主题库（17 套）</span>
+          <span className="settings-row__hint">点此选择 Claude / Sakura / Cyber / Win95 等</span>
+        </div>
+        <div className="settings-row__control" style={{ marginLeft: "auto" }}>
+          <ThemePicker compact={false} />
+        </div>
+        <div className="settings-row__label">
+          <Palette size={16} />
+          <span>Theme Studio</span>
+          <span className="settings-row__hint">用 OKLCh 滑块微调并导出自己的主题</span>
+        </div>
+        <div className="settings-row__control" style={{ marginLeft: "auto" }}>
+          <button
+            className="settings-reset"
+            onClick={() => setStudioOpen((v) => !v)}
+          >
+            {studioOpen ? "收起" : "打开"}
+          </button>
         </div>
         <div className="settings-row__control theme-toggle">
           <button
@@ -229,6 +255,16 @@ export function PersonalizeSettingsPanel() {
           </button>
         </div>
       </div>
+
+      {studioOpen ? (
+        <div className="settings-row">
+          <ThemeStudio
+            initialVars={resolveVars(activeThemeName)}
+            initialLabel={`${activeThemeName} 自定义`}
+            onClose={() => setStudioOpen(false)}
+          />
+        </div>
+      ) : null}
     </SectionShell>
   );
 }
@@ -409,6 +445,143 @@ export function DataSettingsPanel() {
   );
 }
 
+// ---------- 本地审计追踪 (R17 / Phase D) ----------
+
+const AUDIT_OUTCOME_LABEL: Record<AuditEvent["outcome"], string> = {
+  allow: "允许",
+  deny: "拒绝",
+  success: "成功",
+  failure: "失败",
+  info: "信息",
+};
+
+function formatLocalTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    const pad = (n: number) => `${n}`.padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  } catch {
+    return iso;
+  }
+}
+
+/**
+ * 数据管理 → 本地审计追踪:
+ *  - 只读展示最近 200 条事件,JSONL 来自 ~/.openbuddy/audit.jsonl;
+ *  - 一键清空本地审计,不做远端备份(本地优先 · 数据自决)。
+ */
+export function AuditSettingsPanel() {
+  const [events, setEvents] = useState<AuditEvent[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await auditList({ limit: 200 });
+      setEvents(result.events);
+    } catch (e) {
+      setError(String(e).replace(/^Error:\s*/, ""));
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  const visible = useMemo(() => {
+    if (!events) return [];
+    const q = filter.trim().toLowerCase();
+    if (!q) return events.slice().reverse();
+    return events.filter((e) =>
+      [e.event, e.subject, e.outcome, e.source, JSON.stringify(e.detail ?? {})].some((field) =>
+        String(field ?? "").toLowerCase().includes(q),
+      ),
+    ).reverse();
+  }, [events, filter]);
+
+  const handleClear = async () => {
+    if (!confirm("清空本地审计日志？此操作不可撤销,清空前请确保不再需要这些事件用于排障。")) return;
+    try {
+      await auditClear();
+      await reload();
+    } catch (e) {
+      setError(String(e).replace(/^Error:\s*/, ""));
+    }
+  };
+
+  return (
+    <SectionShell
+      title="本地审计追踪"
+      desc="只记录在你本机( ~/.openbuddy/audit.jsonl )的事件:设置打开、登录尝试、插件市场安装、关键文件操作等。本地优先,不上传,不与 WorkBuddy 等云端 AI 工作台共享。"
+    >
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <span>最近事件</span>
+          <span className="settings-row__hint">{events ? `${events.length} 条 · 默认显示全部` : "加载中…"}</span>
+        </div>
+        <div className="settings-row__control" style={{ gap: 8 }}>
+          <input
+            type="search"
+            placeholder="按事件名 / 主体 / 详情搜索…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            style={{ minWidth: 240 }}
+          />
+          <button className="settings-reset" onClick={reload} disabled={loading}>
+            {loading ? "刷新中…" : "刷新"}
+          </button>
+          <button className="settings-btn settings-btn--danger" onClick={handleClear} disabled={loading}>
+            清空本地审计
+          </button>
+        </div>
+      </div>
+      {error ? <p className="settings-hint" style={{ color: "var(--wb-danger, #cf222e)" }}>{error}</p> : null}
+      <div className="audit-trail">
+        {visible.length === 0 ? (
+          <p className="settings-hint">暂无事件 — 开始使用 OpenBuddy,审计会自动填充。</p>
+        ) : (
+          <table className="audit-trail__table">
+            <thead>
+              <tr>
+                <th className="audit-trail__col-time">时间</th>
+                <th className="audit-trail__col-event">事件</th>
+                <th className="audit-trail__col-outcome">结果</th>
+                <th className="audit-trail__col-source">来源</th>
+                <th className="audit-trail__col-subject">主体</th>
+                <th className="audit-trail__col-hash">哈希</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((event) => (
+                <tr key={event.id} className={`audit-trail__row audit-trail__row--${event.outcome}`}>
+                  <td className="audit-trail__col-time">{formatLocalTime(event.at)}</td>
+                  <td className="audit-trail__col-event">{event.event}</td>
+                  <td className="audit-trail__col-outcome">{AUDIT_OUTCOME_LABEL[event.outcome] ?? event.outcome}</td>
+                  <td className="audit-trail__col-source">{event.source}</td>
+                  <td className="audit-trail__col-subject">{event.subject ?? "—"}</td>
+                  <td className="audit-trail__col-hash" title={event.hash}>{event.hash ? event.hash.slice(0, 8) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <p className="settings-hint">
+        每条事件携带链式 SHA-256 哈希(前一条 hash + 当前事件 → 截前 16 字符),
+        没有前序 hash 无法重新算出相同 hash,可用于校验日志未被单独篡改。
+      </p>
+    </SectionShell>
+  );
+}
+
+
 // ---------- 系统设置 ----------
 
 export function GeneralSettingsPanel() {
@@ -499,6 +672,12 @@ export function AccountSettingsPanel() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // R17 — Casdoor 未配置时自动展开配置表单。「企业登录」在未配置态下
+  // 只能返回错误提示,如果表单保持折叠,用户会看到一个没有下一步的死胡同。
+  useEffect(() => {
+    if (casdoor?.status === "configuration_needed") setShowCasdoorConfig(true);
+  }, [casdoor?.status]);
 
   useEffect(() => {
     let disposed = false;
@@ -1846,6 +2025,36 @@ export function AccountSettingsPanel() {
                     <button type="button" className="settings-button" onClick={saveCasdoorConfig}>保存配置</button>
                   </div>
                 )}
+                {/* R15 — 修复:配置未完成时也要渲染登录入口。此前只给「配置 Casdoor」
+                    按钮,用户点左下角「企业登录」后看不到任何登录按钮,误以为登录失效。
+                    这里保留登录按钮(disabled + 明确 hint),点击后引导到配置区。 */}
+                <div className="settings-actions">
+                  <button
+                    type="button"
+                    className="settings-button"
+                    onClick={() => setShowCasdoorConfig(true)}
+                    title="请先填写 Issuer / client ID / Redirect URI 再登录"
+                  >
+                    企业账号登录
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-button"
+                    onClick={() => setShowCasdoorConfig(true)}
+                    title="请先配置短信登录项再登录"
+                  >
+                    短信登录
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-button"
+                    onClick={() => setShowCasdoorConfig(true)}
+                    title="请先配置微信 Provider 再登录"
+                  >
+                    微信登录
+                  </button>
+                </div>
+                <p className="settings-hint">登录按钮需要先补齐上面的配置才会打开 Casdoor 登录页。</p>
               </>
             ) : (
               <>
@@ -2317,3 +2526,4 @@ export { TenantPolicyPanel } from "@openbuddy/ui-account";
 export { SessionManagementPanel } from "@openbuddy/ui-account";
 export { TokenIntrospectionPanel } from "@openbuddy/ui-account";
 export { GatewayHealthPanel } from "@openbuddy/ui-account";
+import { auditList, auditClear, type AuditEvent } from "@/lib/audit/audit-client";

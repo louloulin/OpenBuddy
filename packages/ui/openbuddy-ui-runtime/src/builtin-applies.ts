@@ -39,14 +39,17 @@ import { apply as billingApply } from "@openbuddy/ui-billing/client";
 import { apply as collaborationApply } from "@openbuddy/ui-collaboration/client";
 import { apply as conversationApply } from "@openbuddy/ui-conversation/client";
 import { apply as dialogsApply } from "@openbuddy/ui-dialogs/client";
+import { apply as editorApply } from "@openbuddy/ui-editor/client";
 import { apply as emailApply } from "@openbuddy/ui-email/client";
 import { apply as expertsApply } from "@openbuddy/ui-experts/client";
 import { apply as filesApply } from "@openbuddy/ui-files/client";
+import { apply as filesTreeApply } from "@openbuddy/ui-files-tree/client";
 import { apply as homeApply } from "@openbuddy/ui-home/client";
 import { apply as layoutApply } from "@openbuddy/ui-layout/client";
 import { apply as markdownApply } from "@openbuddy/ui-markdown/client";
 import { apply as mcpApply } from "@openbuddy/ui-mcp/client";
 import { apply as modulesApply } from "@openbuddy/ui-modules/client";
+import { apply as onboardingApply } from "@openbuddy/ui-onboarding/client";
 import { apply as primitivesApply } from "@openbuddy/ui-primitives/client";
 import { apply as settingsModelsApply } from "@openbuddy/ui-settings-models/client";
 import { apply as settingsApply } from "@openbuddy/ui-settings/client";
@@ -72,14 +75,17 @@ export const BUILTIN_UI_APPLIES: ReadonlyArray<BuiltinUiPluginSlotTrack> = [
   { pkg: "@openbuddy/ui-collaboration", apply: collaborationApply, description: "Multi-user collaboration: rooms, inboxes, presence." },
   { pkg: "@openbuddy/ui-conversation", apply: conversationApply, description: "Chat surface — composer, history, agent responses." },
   { pkg: "@openbuddy/ui-dialogs", apply: dialogsApply, description: "Modal dialogs (confirm / input / form)." },
+  { pkg: "@openbuddy/ui-editor", apply: editorApply, description: "TipTap rich-text / markdown editor + slash commands + mentions." },
   { pkg: "@openbuddy/ui-email", apply: emailApply, description: "Email capability surface (auth + provider + composer)." },
   { pkg: "@openbuddy/ui-experts", apply: expertsApply, description: "Expert catalogue / configuration." },
   { pkg: "@openbuddy/ui-files", apply: filesApply, description: "Workspace file browser + metadata." },
+  { pkg: "@openbuddy/ui-files-tree", apply: filesTreeApply, description: "Virtualized, multi-select file / knowledge tree." },
   { pkg: "@openbuddy/ui-home", apply: homeApply, description: "Home / dashboard surface." },
   { pkg: "@openbuddy/ui-layout", apply: layoutApply, description: "Layout chrome (panels, splits, resize). " },
   { pkg: "@openbuddy/ui-markdown", apply: markdownApply, description: "Markdown renderer + editor primitives." },
   { pkg: "@openbuddy/ui-mcp", apply: mcpApply, description: "MCP server picker / plugin panel." },
   { pkg: "@openbuddy/ui-modules", apply: modulesApply, description: "Module registry + activation surface." },
+  { pkg: "@openbuddy/ui-onboarding", apply: onboardingApply, description: "First-run wizard, product tour, data-dir prompt, feedback." },
   { pkg: "@openbuddy/ui-primitives", apply: primitivesApply, description: "Shared design primitives (Button / Menu / Input)." },
   { pkg: "@openbuddy/ui-settings", apply: settingsApply, description: "Generic settings surface (theme / language / privacy)." },
   { pkg: "@openbuddy/ui-settings-models", apply: settingsModelsApply, description: "Model selection + provider CRUD surface." },

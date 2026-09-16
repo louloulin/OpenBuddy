@@ -37,4 +37,6 @@ export type { SkeletonProps } from "./components/Skeleton";
 export { KbdHint } from "./components/KbdHint";
 export type { KbdHintProps } from "./components/KbdHint";
 export { Marquee } from "./components/Marquee";
+export { Resizable, clampWidth } from "./components/Resizable";
+export type { ResizableProps } from "./components/Resizable";
 export type { MarqueeProps } from "./components/Marquee";

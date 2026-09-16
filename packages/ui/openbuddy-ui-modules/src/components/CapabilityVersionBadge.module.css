@@ -1,0 +1,121 @@
+.root {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--wb-fg-secondary);
+}
+
+.compact {
+  gap: 4px;
+  font-size: 10px;
+}
+
+.versionWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.version {
+  font-family: var(--wb-font-mono);
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-fg-primary);
+}
+
+.current {
+  font-family: var(--wb-font-mono);
+  color: var(--wb-fg-tertiary);
+}
+
+.state {
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border);
+  background: var(--wb-bg-secondary);
+}
+
+.t_neutral {
+  color: var(--wb-fg-secondary);
+}
+.t_info {
+  color: var(--wb-accent);
+  border-color: var(--wb-accent);
+  background: var(--wb-accent-soft);
+}
+.t_success {
+  color: var(--wb-success);
+  border-color: var(--wb-success);
+}
+.t_warning {
+  color: var(--wb-warning);
+  border-color: var(--wb-warning);
+}
+.t_danger {
+  color: var(--wb-danger);
+  border-color: var(--wb-danger);
+}
+
+.breaking {
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--wb-danger);
+  border: 1px dashed var(--wb-danger);
+}
+
+.kinds {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.kind {
+  padding: 1px 5px;
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-fg-secondary);
+}
+
+.risk {
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-soft);
+}
+
+.r_low {
+  color: var(--wb-fg-tertiary);
+}
+.r_medium {
+  color: var(--wb-warning);
+  border-color: var(--wb-warning);
+}
+.r_high {
+  color: var(--wb-danger);
+  border-color: var(--wb-danger);
+}
+
+.actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.action {
+  all: unset;
+  cursor: pointer;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-accent);
+  color: var(--wb-accent);
+  font-size: 11px;
+}
+
+.action:hover {
+  background: var(--wb-accent-soft);
+}
+.action:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 1px;
+}

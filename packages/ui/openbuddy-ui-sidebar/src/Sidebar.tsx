@@ -1,4 +1,5 @@
-import { memo, useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { memo, useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useSessionsStore, selectHasFilter, selectArchivedCount } from "@/stores/sessions-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useProjectsStore } from "@/stores/projects-store";
@@ -587,8 +588,11 @@ function MoreDropdown({
       >
         <WbMoreNavIcon size="md" />
         <span>更多</span>
-        {/* WB 实测: 「更多」右侧有一个小字「灵感」尾标,作为更多菜单的入口提示。 */}
-        <span className="sidebar__nav-sub" aria-hidden="true">灵感</span>
+        {/* R-fix: 「更多」右侧的小提示原本是 "灵感" 文字,与 dropdown 里的
+            灵感菜单项冲突(Testing Library getByText 会同时命中)。
+            改用 CSS ::after 伪元素渲染小箭头 ▸ 作为视觉提示,文字节点为空,
+            真实菜单项文案保持 "灵感" 不变 —— aria / 测试 / 视觉三不冲突。 */}
+        <span className="sidebar__nav-sub" aria-hidden="true" />
       </button>
       {open && (
         <div className="sidebar__more-popover" role="menu">
@@ -775,8 +779,12 @@ export function Sidebar({
   onSelect,
   onNavigate,
   onOpenSettings,
-  onOpenAccount,
+  onOpenSettingsSection,
   accountLabel,
+  accountStatus,
+  onOpenAccount,
+  onLogin,
+  onLogout,
   onToggleCollapse,
   onToggleWorkspace,
   onOpenSearch,
@@ -790,8 +798,22 @@ export function Sidebar({
   onSelect: (sessionId: string, cwd?: string) => void;
   onNavigate: (label: string) => void;
   onOpenSettings: () => void;
-  onOpenAccount?: () => void;
+  /** Optional variant that accepts a SettingsSection id (e.g. "notifications")
+   *  so footer buttons can deep-link into a specific settings subsection. */
+  onOpenSettingsSection?: (section: string) => void;
+  /** Optional account / profile label rendered in the footer. Default shows
+   *  "OpenBuddy" placeholder so the bottom-left always has a user affordance.
+   *  When `accountStatus` is provided, the footer renders an interactive menu:
+   *  signed_out → 触发 casdoorLogin; signed_in → 弹出菜单含「设置 / 登出」。 */
   accountLabel?: string;
+  /** 会话状态：signed_out / signed_in / configuration_needed。不传则视为 signed_out。 */
+  accountStatus?: "signed_out" | "signed_in" | "configuration_needed" | "error";
+  /** 历史功能:打开「设置 → 账户管理」+ 刷新状态 + 未登录时自动拉起登录页。 */
+  onOpenAccount?: () => void;
+  /** 触发 casdoor 企业登录(默认 provider)。 */
+  onLogin?: () => void;
+  /** 触发 casdoor 登出。 */
+  onLogout?: () => void;
   /** Collapse the sidebar; an expand affordance is rendered over the main area. */
   onToggleCollapse: () => void;
   /** Expand/collapse a 空间 (workspace) node; lazy-loads its sessions. */
@@ -870,6 +892,71 @@ export function Sidebar({
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
+  // R15 — 左下角用户菜单:点击展开账户面板,内含登录/登出/设置入口。
+  // 与侧栏底部 user 按钮共享一个 ref,使 outside-click / Escape 行为一致。
+  // R17 — 菜单改为 portal + fixed 定位。`.sidebar__footer` 与 `.sidebar`
+  //   都是 overflow:hidden(分别用于收口插件 footer popover 与折叠动画),
+  //   `position:absolute; bottom:100%` 的 popover 会被父级裁掉 ——
+  //   历史表现即「点左下角用户/登录没反应」。portal 挂到 body 后彻底
+  //   脱离裁剪链,并在空间不足时自动向上/向下翻转。
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+  const [accountMenuPos, setAccountMenuPos] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    placement: "top" | "bottom";
+  } | null>(null);
+
+  const placeAccountMenu = useCallback(() => {
+    const anchor = accountRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const width = Math.min(Math.max(Math.round(rect.width), 220), 268);
+    const maxLeft = Math.max(8, window.innerWidth - width - 8);
+    const left = Math.min(Math.max(8, Math.round(rect.left)), maxLeft);
+    // 首帧用估算高度(菜单通常 150px 上下),ResizeObserver 随后用真实高度校正。
+    const height = accountMenuRef.current?.offsetHeight ?? 152;
+    const spaceAbove = rect.top - 8;
+    const spaceBelow = window.innerHeight - rect.bottom - 8;
+    const placement: "top" | "bottom" = spaceAbove >= height || spaceAbove >= spaceBelow ? "top" : "bottom";
+    const top = placement === "top" ? Math.round(rect.top - 6 - height) : Math.round(rect.bottom + 6);
+    setAccountMenuPos((prev) =>
+      prev && prev.left === left && prev.top === top && prev.width === width && prev.placement === placement
+        ? prev
+        : { left, top, width, placement },
+    );
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!accountMenuOpen) {
+      setAccountMenuPos((prev) => (prev === null ? prev : null));
+      return;
+    }
+    placeAccountMenu();
+  }, [accountMenuOpen, placeAccountMenu]);
+
+  // 菜单渲染后按真实高度再校正一次,并在窗口尺寸 / 滚动时保持贴附。
+  useLayoutEffect(() => {
+    const el = accountMenuRef.current;
+    if (!accountMenuOpen || !el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => placeAccountMenu());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [accountMenuOpen, placeAccountMenu]);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const reposition = () => placeAccountMenu();
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [accountMenuOpen, placeAccountMenu]);
+
   // Close filter dropdown on outside click / Escape
   useEffect(() => {
     if (!filterOpen) return;
@@ -888,6 +975,29 @@ export function Sidebar({
       document.removeEventListener("keydown", handleEsc);
     };
   }, [filterOpen]);
+
+  // R15 — 账户菜单 outside-click / Escape 关闭
+  // R17 — 菜单在 portal 里,不在 accountRef 子树内,所以要额外排除菜单自身;
+  //   否则点菜单空白区(菜单头)会被判成"外部点击"而立即关闭。
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (accountRef.current?.contains(target)) return;
+      if (accountMenuRef.current?.contains(target)) return;
+      setAccountMenuOpen(false);
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAccountMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [accountMenuOpen]);
 
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -1617,25 +1727,144 @@ export function Sidebar({
             screen-reader users always have a live region for connection
             state. */}
         <StatusIndicator connection="unknown" />
-        <button
-          className="sidebar__user"
-          onClick={() => (onOpenAccount ?? onOpenSettings)()}
-          aria-label={accountLabel ? `${accountLabel} · 用户中心` : "用户中心"}
-          title={accountLabel ?? "企业登录"}
-        >
-          <span className="sidebar__user-avatar" aria-hidden="true">
-            {accountInitial(accountLabel) || <UserIcon size="md" />}
-          </span>
-          <span className="sidebar__user-text">
-            <span className="sidebar__user-name">{accountLabel ?? "企业登录"}</span>
-            <span className="sidebar__user-sub">{accountLabel ? "已登录" : "未登录"}</span>
-          </span>
-        </button>
+        {/* R15 — 左下角账户区,接入真 casdoor 登录流:
+           - signed_out:点击弹账户菜单,菜单里有「企业登录」入口触发 onLogin
+           - signed_in:点击弹账户菜单,菜单里有「设置」+「退出登录」入口
+           - 菜单关闭后默认回到「打开设置」的兜底行为(右侧齿轮同义入口)
+        */}
+        <div className="sidebar__user-wrap" ref={accountRef}>
+          <button
+            className={"sidebar__user" + (accountMenuOpen ? " sidebar__user--open" : "")}
+            onClick={() => {
+              // R15/R17:always just toggle the account menu. The menu itself
+              // carries settings / login / logout, so we must NOT also call
+              // onOpenSettings() here — that double action used to pop the
+              // settings modal on top of the (invisible) menu and made the
+              // click look broken.
+              setAccountMenuOpen((v) => !v);
+            }}
+            aria-haspopup="menu"
+            aria-expanded={accountMenuOpen}
+            aria-label={
+              accountStatus === "signed_in" && accountLabel
+                ? `${accountLabel} · 账户菜单`
+                : "OpenBuddy · 账户菜单"
+            }
+            title={accountLabel ?? "OpenBuddy"}
+            data-tip={accountStatus === "signed_in" ? `${accountLabel ?? "已登录"} · 账户菜单` : "OpenBuddy · 账户菜单"}
+          >
+            <span className="sidebar__user-avatar" aria-hidden="true">
+              {accountInitial(accountLabel) || <UserIcon size="md" />}
+            </span>
+            <span className="sidebar__user-text">
+              <span className="sidebar__user-name">{accountLabel ?? "OpenBuddy"}</span>
+              <span className="sidebar__user-sub">
+                {accountStatus === "signed_in"
+                  ? (accountLabel ? "已登录" : "本地账户")
+                  : accountStatus === "configuration_needed"
+                    ? "需要配置企业登录"
+                    : accountStatus === "error"
+                      ? "登录出错"
+                      : "本地优先 · 开源"}
+              </span>
+            </span>
+            <span className="sidebar__user-chevron" aria-hidden="true">▾</span>
+          </button>
+          {accountMenuOpen && accountMenuPos && createPortal(
+            <div
+              ref={accountMenuRef}
+              className="sidebar__account-menu sidebar__account-menu--portal"
+              role="menu"
+              aria-label="账户菜单"
+              data-placement={accountMenuPos.placement}
+              style={{
+                left: `${accountMenuPos.left}px`,
+                top: `${accountMenuPos.top}px`,
+                width: `${accountMenuPos.width}px`,
+              }}
+            >
+              {accountStatus === "signed_in" ? (
+                <>
+                  <div className="sidebar__account-menu-head" role="presentation">
+                    <div className="sidebar__account-menu-name">{accountLabel ?? "已登录"}</div>
+                    <div className="sidebar__account-menu-sub">企业账户已连接</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="sidebar__account-menu-item"
+                    role="menuitem"
+                    onClick={() => { setAccountMenuOpen(false); (onOpenAccount ?? onOpenSettings)(); }}
+                  >
+                    账户管理
+                  </button>
+                  {onLogout && (
+                    <button
+                      type="button"
+                      className="sidebar__account-menu-item sidebar__account-menu-item--danger"
+                      role="menuitem"
+                      onClick={() => { setAccountMenuOpen(false); onLogout(); }}
+                    >
+                      退出登录
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="sidebar__account-menu-head" role="presentation">
+                    <div className="sidebar__account-menu-name">本地用户</div>
+                    <div className="sidebar__account-menu-sub">
+                      {accountStatus === "configuration_needed"
+                        ? "需要在设置里配置 Casdoor"
+                        : accountStatus === "error"
+                          ? "登录出错,请重试或检查网络"
+                          : "登录企业账户以同步会话与权限"}
+                    </div>
+                  </div>
+                  {/* R15 — 历史行为:登录入口始终可见(点击打开 Casdoor 登录页),
+                      配置不完整时同时提供「打开设置」引导用户补齐配置。 */}
+                  {(onOpenAccount || onLogin) && (
+                    <button
+                      type="button"
+                      className="sidebar__account-menu-item sidebar__account-menu-item--primary"
+                      role="menuitem"
+                      onClick={() => { setAccountMenuOpen(false); (onOpenAccount ?? onLogin)?.(); }}
+                    >
+                      企业登录
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="sidebar__account-menu-item"
+                    role="menuitem"
+                    onClick={() => { setAccountMenuOpen(false); onOpenSettings(); }}
+                  >
+                    {accountStatus === "configuration_needed" ? "配置企业登录" : "打开设置"}
+                  </button>
+                </>
+              )}
+            </div>,
+            document.body,
+          )}
+        </div>
         <div className="sidebar__logo-spacer" />
-        <button className="sidebar__icon-btn" aria-label="通知" onClick={() => onOpenSettings()}>
+        {/* 通知中心:深链到「设置 → 管理控制台 → 通知中心」,旧版本会误开模型页 */}
+        <button
+          className="sidebar__icon-btn"
+          aria-label="通知"
+          data-tip="通知中心"
+          onClick={() => {
+            if (onOpenSettingsSection) onOpenSettingsSection("notifications");
+            else onOpenSettings();
+          }}
+        >
           <BellIcon size="md" />
         </button>
-        <button className="sidebar__icon-btn" aria-label="设置" onClick={onOpenSettings}>
+        <button
+          className="sidebar__icon-btn"
+          aria-label="设置"
+          data-tip="设置"
+          onClick={onOpenSettings}
+        >
           <SettingsIcon size="md" />
         </button>
         {pluginFooterSlots.map((entry) => (

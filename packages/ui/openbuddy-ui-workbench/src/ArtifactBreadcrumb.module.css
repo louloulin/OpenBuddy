@@ -1,0 +1,94 @@
+/* ArtifactBreadcrumb —— 单行、中间省略的路径面包屑。 */
+
+.root {
+  min-width: 0;
+  font-size: 11px;
+  color: var(--wb-fg-tertiary);
+}
+
+.list {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 0;
+}
+
+.separator {
+  flex: none;
+  opacity: 0.4;
+  color: var(--wb-fg-tertiary);
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 12rem;
+  padding: 1px 4px;
+  border: none;
+  border-radius: var(--wb-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+button.crumb {
+  flex: none;
+}
+
+button.crumb:hover {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-fg-primary);
+}
+
+button.crumb:focus-visible {
+  outline: 1px solid var(--wb-accent);
+  outline-offset: 1px;
+}
+
+.plain {
+  flex: none;
+  cursor: default;
+}
+
+.gap {
+  flex: none;
+  min-width: 18px;
+  justify-content: center;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.leaf {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--wb-fg-primary);
+  cursor: default;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

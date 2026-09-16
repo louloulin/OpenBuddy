@@ -1,0 +1,37 @@
+/* ThemeMenuButton — 顶栏容器。内部按钮的尺寸由 ui-theme 的 ThemePicker 决定,
+ * 这里只负责对齐顶栏 32px 行高与 hover 反馈。 */
+.host {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  -webkit-app-region: no-drag;
+}
+
+.host button {
+  height: 28px;
+  min-width: 28px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--wb-radius-md, 6px);
+  background: transparent;
+  color: var(--wb-fg-secondary);
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--wb-bg-hover, rgba(127, 127, 127, 0.1));
+  color: var(--wb-fg-primary);
+}
+
+.buttonDisabled {
+  opacity: 0.5;
+  cursor: default;
+}

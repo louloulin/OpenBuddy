@@ -1,21 +1,22 @@
 /**
- * 集成测试:验证所有 21 个 ui-* 包的真实 apply() 注册到对应 slot。
+ * 集成测试:验证所有 24 个 ui-* 包的真实 apply() 注册到对应 slot。
  *
  * 范围:
- *   - 21 个 ui-* 业务包(ui-account / ui-automation / / ui-billing / ui-collaboration /
- *     ui-conversation / ui-dialogs / ui-email / ui-experts / ui-files / ui-mcp /
- *     ui-markdown / ui-modules / ui-primitives / ui-settings / ui-settings-models /
- *     ui-shared / ui-sidebar / ui-workbench / ui-home / ui-layout)
+ *   - 24 个 ui-* 业务包(ui-account / ui-automation / ui-billing / ui-collaboration /
+ *     ui-conversation / ui-dialogs / ui-editor / ui-email / ui-experts / ui-files /
+ *     ui-files-tree / ui-home / ui-layout / ui-markdown / ui-mcp / ui-modules /
+ *     ui-onboarding / ui-primitives / ui-settings / ui-settings-models /
+ *     ui-shared / ui-sidebar / ui-workbench)
  *   - 通过 runtime.slots.entries(<slot>).length 验证注册成功
  *
  * 设计目的:
- *   - L3 改造目标:21 个包全部从 `return () => {}` 改为真注册 slot 节点
+ *   - L3 改造目标:所有包全部从 `return () => {}` 改为真注册 slot 节点
  *   - 本测试是 L3 完成度的硬证据:任何包忘记注册,本测试失败
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
 
-describe("21 个 ui-* 包真实 apply() 注册 slot 验证", () => {
+describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
   let runtime: Awaited<typeof import("../client")>["getOrCreateSingleton"] extends () => infer R ? R : never;
   let entries: (name: string) => readonly unknown[];
 
@@ -156,6 +157,22 @@ describe("21 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     // ThemeProvider 在 buildUiRuntime() 内由 ThemeProvider React context 处理,
     // 不通过 ctx.slots。验证 buildUiRuntime 后 theme provider 已被 mount。
     expect(runtime.slots).toBeDefined();
+  });
+
+  it("ui-editor → 'editor.body' slot 注册 TiptapEditor", () => {
+    expect(entries("editor.body").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("ui-onboarding → 5 个 onboarding.* slot 全部注册", () => {
+    for (const slot of [
+      "onboarding.wizard",
+      "onboarding.tour",
+      "onboarding.data-dir",
+      "onboarding.feedback",
+      "onboarding.whats-new",
+    ]) {
+      expect(entries(slot).length).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it("shell.overlay 累计 >= 5(来自 ui-settings + ui-workbench + ui-dialogs*2 + ui-automation)", () => {

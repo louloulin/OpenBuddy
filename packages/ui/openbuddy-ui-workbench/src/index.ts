@@ -40,7 +40,48 @@ export { TeamStatusView } from "./TeamStatusView";
 export { WorkflowBlackboard, computeWorkflowLevels } from "./WorkflowBlackboard";
 export type { WorkflowBlackboardProps } from "./WorkflowBlackboard";
 
+// ── 查看器 chrome（对齐 WorkBuddy / cabinet 的查看器头部）──────────────
+//   ArtifactTabsBar      打开了哪些（切换 / 中键关闭 / 拖拽排序 / 溢出菜单）
+//   ArtifactViewerHeader 组合条：面包屑 + 状态徽标 + ViewerToolbar
+//   ViewerToolbar        能对它做什么（未传 handler 的按钮一律 disabled）
 export { ArtifactTabsBar } from "./ArtifactTabsBar";
+export { ArtifactBreadcrumb, buildBreadcrumbItems } from "./ArtifactBreadcrumb";
+export type {
+  ArtifactBreadcrumbProps,
+  ArtifactBreadcrumbSegment,
+} from "./ArtifactBreadcrumb";
+export { ArtifactViewerHeader } from "./ArtifactViewerHeader";
+export type {
+  ArtifactViewerHeaderProps,
+  ArtifactViewerStatus,
+  ArtifactViewerStatusTone,
+} from "./ArtifactViewerHeader";
+export { ViewerToolbar } from "./ViewerToolbar";
+export type { ViewerToolbarMenuItem, ViewerToolbarProps } from "./ViewerToolbar";
+
+// Office 内嵌预览（docx / xlsx / pptx）—— 与 PdfJsPreview 同构的懒加载 + 降级。
+export { DocxPreview } from "./DocxPreview";
+export type { DocxPreviewProps } from "./DocxPreview";
+export { XlsxPreview } from "./XlsxPreview";
+export type { XlsxPreviewProps } from "./XlsxPreview";
+export { PptxPreview } from "./PptxPreview";
+export type { PptxPreviewProps } from "./PptxPreview";
+export {
+  decodeDataUrl,
+  officePreviewKindLabel,
+  pickOfficePreviewKind,
+  toArrayBuffer,
+} from "./office-preview";
+export type { OfficePreviewKind } from "./office-preview";
+export { loadDocxPreview, loadPptxPreview, loadXlsx } from "./office-preview-loader";
+export type {
+  DocxPreviewModule,
+  PptxPreviewModule,
+  PptxPreviewer,
+  XlsxModule,
+  XlsxWorkbook,
+} from "./office-preview-loader";
+
 export { projectArtifact } from "./artifact-view-model";
 export type { ArtifactViewModel, ArtifactViewStatus } from "./artifact-view-model";
 export { resolveArtifactPreview } from "./artifact-preview-route";

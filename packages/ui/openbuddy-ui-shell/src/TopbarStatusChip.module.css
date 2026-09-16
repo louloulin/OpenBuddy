@@ -1,0 +1,110 @@
+/* TopbarStatusChip — 22px 高的状态胶囊,与顶栏 48px 行高对齐。 */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--wb-border-soft, rgba(127, 127, 127, 0.25));
+  border-radius: var(--wb-radius-full, 9999px);
+  background: var(--wb-bg-tertiary, transparent);
+  color: var(--wb-fg-secondary);
+  font-family: var(--wb-font);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  max-width: 220px;
+  cursor: default;
+  user-select: none;
+}
+
+button.chip {
+  cursor: pointer;
+}
+
+button.chip:hover {
+  background: var(--wb-bg-hover, rgba(127, 127, 127, 0.08));
+  color: var(--wb-fg-primary);
+}
+
+button.chip:focus-visible {
+  outline: 2px solid var(--wb-border-focus, var(--wb-accent));
+  outline-offset: 1px;
+}
+
+.body {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--wb-fg-tertiary, currentColor);
+}
+
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+}
+
+.label {
+  font-weight: 500;
+}
+
+.detail {
+  color: var(--wb-fg-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toneReady .dot {
+  background: var(--wb-success, #1a7f37);
+}
+
+.toneWorking .dot {
+  background: var(--wb-accent, #00c29a);
+}
+
+.tonePaused .dot {
+  background: var(--wb-warning, #9a6700);
+}
+
+.toneOffline .dot {
+  background: var(--wb-fg-tertiary, currentColor);
+  opacity: 0.6;
+}
+
+.toneError .dot {
+  background: var(--wb-danger, #cf222e);
+}
+
+.toneError {
+  color: var(--wb-danger, #cf222e);
+}
+
+.pulse .dot {
+  animation: topbarStatusPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes topbarStatusPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse .dot {
+    animation: none;
+  }
+}

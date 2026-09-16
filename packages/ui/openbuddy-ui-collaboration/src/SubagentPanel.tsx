@@ -60,7 +60,11 @@ interface RendererSessionsService {
 }
 
 function getRendererSessions(): RendererSessionsService | undefined {
-  return getRendererPluginRuntime().context.get("sessions") as RendererSessionsService | undefined;
+  // R-fix: 同 R12.4 / R13.1 —— 守卫 getRendererPluginRuntime() 缺失场景。
+  //   jsdom 测试 / main 早期 IPC 握手 race 时 runtime 是 undefined,
+  //   直接 .context.get(...) 会炸。降级返回 undefined,UI 退化为"暂无子代理"。
+  const runtime = getRendererPluginRuntime();
+  return runtime?.context.get("sessions") as RendererSessionsService | undefined;
 }
 
 function formatDuration(ms?: number): string {

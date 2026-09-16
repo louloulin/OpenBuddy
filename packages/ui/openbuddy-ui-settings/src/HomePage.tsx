@@ -561,6 +561,13 @@ export function HomePage({
             <span className="home__title-sep" aria-hidden="true">,</span>
             <span className="home__title-greet">我帮你</span>
           </h1>
+          {/* R-fix: 场景副标题(你的职场超能力 / 你的开发超能力 / 你的设计超能力)
+              —— 之前被 sidebar-menus.css 的 .home__subtitle{display:none} 隐藏,
+              导致 HomePage.test 找不到 subtitle 文本。恢复可见并按 active scene
+              动态切换。 */}
+          <p className="home__subtitle" aria-live="polite">
+            {mode.subtitle}
+          </p>
         </header>
         {workspaceHeroSlots.map((entry) => (
           <RendererSlotView key={String(entry.options.id ?? entry.options.name)} entry={entry} className="home__workspace-plugin" />

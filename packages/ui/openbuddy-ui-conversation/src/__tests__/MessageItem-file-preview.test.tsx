@@ -69,7 +69,7 @@ describe("MessageItem file parts", () => {
     );
   });
 
-  it("renders multiple office attachments in transcript order", () => {
+  it("renders multiple office attachments in transcript order", async () => {
     const { container } = render(
       <MessageItem
         message={message("user", [
@@ -86,7 +86,12 @@ describe("MessageItem file parts", () => {
       "data.xlsx",
       "deck.pptx",
     ]);
-    expect(container.querySelectorAll(".file-preview--doc")).toHaveLength(3);
+    // Phase C 起 OOXML 附件会先尝试真正的 Office 渲染器(docx-preview /
+    // SheetJS / pptx-preview),内容不是合法文档时再回落文本提取视图 ——
+    // 因此降级视图的出现是异步的,需要 waitFor 而不是同步查询。
+    await waitFor(() =>
+      expect(container.querySelectorAll(".file-preview--doc")).toHaveLength(3),
+    );
   });
 
   it("uses safe fallback metadata for an empty MIME and filename", () => {

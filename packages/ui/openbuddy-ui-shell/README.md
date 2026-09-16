@@ -21,6 +21,36 @@
 - 多行导出: 1 项 — AssistantWorkbenchNav
 - 多行导出: 3 项 — assistantPluginTabsFromContributions, ASSISTANT_TAB_SECTIONS, ASSISTANT_TAB_ROUTE_BY_SECTION
 - 类型契约: `AssistantTopTabItem` ← `./AssistantTopTabs`
+- 值/组件: `StatusBar` ← `./StatusBar`(底部状态条,`shell.statusbar` slot)
+- 值/组件: `TopbarStatusChip` ← `./TopbarStatusChip`(顶栏状态胶囊,五态 + 颜色点)
+- 值/组件: `ShortcutHint` ← `./ShortcutHint`(平台自适应 `<kbd>`,附纯函数 `formatShortcut`)
+- 值/组件: `UpdateDialog` ← `./UpdateDialog`(更新弹窗,idle/downloading/ready/error)
+- 值/组件: `ThemeMenuButton` ← `./ThemeMenuButton`(顶栏主题入口,复用 ui-theme 的 ThemePicker)
+- 值/组件: `ThemeBoundary` ← `./ThemeBoundary`(主题子树容错边界,缺失 ThemeProvider 时降级)
+- 常量: `TOPBAR_ACTION_SHORTCUTS` ← `./topbar-shortcuts`(动作菜单展示用和弦;宿主注册监听时引用同一份)
+
+## Phase B 顶栏升级(全部向后兼容)
+
+`TopbarTitle` / `TopbarActions` 的原有 props 与 DOM 结构保持不变,新增能力都是"不传即无"的可选项:
+
+| 组件            | 新增 props          | 作用                                            |
+| --------------- | ------------------- | ----------------------------------------------- |
+| `TopbarTitle`   | `status` / `detail` | 标题后渲染 `TopbarStatusChip`                   |
+| `TopbarTitle`   | `breadcrumb`        | 标题前的浅色路径(>3 段折叠成 `首段 / … / 末段`) |
+| `TopbarActions` | `statusChip`        | 菜单按钮左侧内联状态胶囊                        |
+| `TopbarActions` | `themeMenu`         | 菜单里追加「切换主题」行(点击循环到下一套主题)  |
+| `TopbarActions` | `onShowShortcuts`   | 菜单里追加「键盘快捷键」行                      |
+
+`themeMenu` 打开时才会调用 `useTheme()`,并由 `ThemeBoundary` 兜底 —— 未挂
+`ThemeProvider` 的宿主只会看到一行禁用提示,不会让整条顶栏崩掉。
+
+## 样式
+
+本包组件自带 `*.module.css`(如 `TopbarStatusChip.module.css`、`UpdateDialog.module.css`)。
+`TopbarTitle` / `TopbarActions` 沿用宿主既有的全局类名
+(`main-topbar__*` / `topbar-actions__*`),新增的 `.main-topbar__breadcrumb*` 与
+`.topbar-actions__divider` / `__item-label` / `__item-meta` 追加在宿主
+`src/styles/shell.css` / `src/styles/chat-shell.css` 里。
 
 > 完整签名见 `src/index.ts`。子路径导入:
 

@@ -14,8 +14,8 @@ import { BUILTIN_UI_APPLIES } from "../builtin-applies";
 
 describe("BUILTIN_UI_APPLIES 聚合完整性", () => {
   it("覆盖所有 ui-* 包(防漏注册)", () => {
-    // 当前约定:至少 21 个 ui-* 业务包(去除 ui-slots / ui-theme / ui-locale / ui-hmr / ui-runtime 这5个走特殊通道)
-    expect(BUILTIN_UI_APPLIES.length).toBeGreaterThanOrEqual(21);
+    // 当前约定:至少 22 个 ui-* 业务包(去除 ui-slots / ui-theme / ui-locale / ui-hmr / ui-runtime 这5个走特殊通道)
+    expect(BUILTIN_UI_APPLIES.length).toBeGreaterThanOrEqual(23);
     const names = BUILTIN_UI_APPLIES.map((e) => e.pkg);
     const expected = [
       "@openbuddy/ui-account",

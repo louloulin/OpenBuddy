@@ -1,0 +1,197 @@
+/* UpdateDialog — 居中模态。遮罩复用 --wb-bg-overlay,面板走 elevated。 */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--wb-bg-overlay, rgba(0, 0, 0, 0.45));
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(460px, 100%);
+  max-height: min(72vh, 640px);
+  padding: 18px 20px 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--wb-border, var(--wb-border-default));
+  border-radius: var(--wb-radius-lg, 10px);
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  color: var(--wb-fg-primary);
+  font-family: var(--wb-font);
+  box-shadow: var(--wb-shadow-lg, 0 16px 48px rgba(0, 0, 0, 0.18));
+}
+
+.panel:focus {
+  outline: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.close {
+  border: none;
+  background: transparent;
+  color: var(--wb-fg-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: var(--wb-radius-sm, 4px);
+}
+
+.close:hover {
+  background: var(--wb-bg-hover, rgba(127, 127, 127, 0.1));
+  color: var(--wb-fg-primary);
+}
+
+.versions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.versionMuted {
+  color: var(--wb-fg-tertiary);
+}
+
+.versionNew {
+  color: var(--wb-accent);
+  font-weight: 600;
+}
+
+.arrow {
+  color: var(--wb-fg-tertiary);
+}
+
+.progress {
+  height: 4px;
+  border-radius: var(--wb-radius-full, 9999px);
+  background: var(--wb-bg-tertiary, rgba(127, 127, 127, 0.15));
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--wb-accent);
+  transition: width 160ms ease;
+}
+
+.error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--wb-radius-sm, 4px);
+  background: color-mix(in oklch, var(--wb-danger, #cf222e) 12%, transparent);
+  color: var(--wb-danger, #cf222e);
+  font-size: 12px;
+}
+
+.notes {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notesGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notesHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.notesVersion {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.notesDate {
+  font-size: 11px;
+  color: var(--wb-fg-tertiary);
+}
+
+.notesList {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notesItem {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--wb-fg-secondary);
+}
+
+.notesEmpty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--wb-fg-tertiary);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btnGhost,
+.btnPrimary {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: var(--wb-radius-md, 6px);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btnGhost {
+  border: 1px solid var(--wb-border-soft, rgba(127, 127, 127, 0.25));
+  background: transparent;
+  color: var(--wb-fg-secondary);
+}
+
+.btnGhost:hover {
+  background: var(--wb-bg-hover, rgba(127, 127, 127, 0.1));
+  color: var(--wb-fg-primary);
+}
+
+.btnPrimary {
+  border: 1px solid transparent;
+  background: var(--wb-accent);
+  color: var(--wb-accent-fg, #fff);
+  font-weight: 500;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

@@ -1,13 +1,13 @@
 /**
  * microkernel-assembly.test.ts — 微内核真实装配证据。
  *
- * 这个文件回答一个可被证伪的问题：**21 个内置 ui-* 包是否真的都装进了内核？**
+ * 这个文件回答一个可被证伪的问题：**内置 ui-* 包(当前 24 个)是否真的都装进了内核?**
  *
  * 历史教训：L1/L2 阶段的测试只验证「包存在 + tsc 通过」，而
  * `buildUiRuntime()` 实际上一直在用一个 `DeepSeekSlotCore` 取不到的
  * fallback stub —— 真实 core 上 6 个包会因 registry 校验直接抛错。
  * 因此这里的断言必须落在 `lastRegisteredReport()` 上（逐包真实结果），
- * 而不是落在「源码里有 21 个 import」这种静态证据上。
+ * 而不是落在「源码里有 N 个 import」这种静态证据上。
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -21,14 +21,15 @@ import {
 } from "../client";
 import { BUILTIN_UI_APPLIES } from "../builtin-applies";
 
-describe("微内核装配 — 21 个内置包", () => {
+describe("微内核装配 — 24 个内置包", () => {
   beforeEach(() => {
     registerAllBuiltinUis();
   });
 
   it("包数与 BUILTIN_UI_APPLIES 表一致", () => {
     expect(lastRegisteredReport()).toHaveLength(BUILTIN_UI_APPLIES.length);
-    expect(BUILTIN_UI_APPLIES.length).toBe(21);
+    // 21 个原始包 + ui-files-tree(Phase B)+ ui-editor / ui-onboarding(Phase C/D)。
+    expect(BUILTIN_UI_APPLIES.length).toBe(24);
   });
 
   it("没有任何包 apply() 失败", () => {

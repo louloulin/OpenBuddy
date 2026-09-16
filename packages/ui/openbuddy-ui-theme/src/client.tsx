@@ -1,11 +1,16 @@
 /**
- * @openbuddy/ui-theme/client — React provider + hook.
+ * @openbuddy/ui-theme/client — React provider + hook + ThemeInitializer.
  *
- * Mounts ThemeProvider at the SlotProvider root. Subscribes to the system
- * color-scheme media query, persists the preference to localStorage, and
- * writes `data-theme` on documentElement. The ThemeService context value
- * is the only object components ever see — never read localStorage or
- * `data-theme` directly.
+ * Provides:
+ *   - <ThemeProvider>  wraps a subtree, holds the store, exposes useTheme
+ *   - <ThemeInitializer>  synchronously paints data-theme on first render
+ *                         (pre-React-tree side effect; safe to render anywhere)
+ *   - useTheme()  returns the v1+v2 ThemeService
+ *   - useThemeSnapshot()  useSyncExternalStore selector (preserved from v1)
+ *
+ * The runtime ctx.theme surface is the *same* v2 ThemeService, so third-party
+ * plugins can read the extended API (currentName, setThemeByName, setPair, etc.)
+ * without going through a new entry point.
  */
 
 import {
@@ -14,88 +19,32 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import type { Theme, ThemeService } from "./index";
+import {
+  createThemeStore,
+  getStoredThemeName,
+  getStoredThemeMode,
+  getStoredThemePair,
+  type ThemeService,
+  type ThemeStoreInternal,
+} from "./theme-store";
+import type { Theme, ThemeName } from "./index";
+import { getThemeByName } from "./themes";
+import { ThemeInitializer } from "./components/ThemeInitializer";
 
-const STORAGE_KEY = "openbuddy.theme";
+export { ThemeInitializer };
 
-function readStored(): Theme {
+function readStoredPreference(): Theme {
   if (typeof window === "undefined") return "system";
-  const v = window.localStorage.getItem(STORAGE_KEY);
+  const v = window.localStorage.getItem("openbuddy.theme");
   return v === "light" || v === "dark" || v === "system" ? v : "system";
 }
 
-function writeStored(theme: Theme) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, theme);
-  } catch {
-    /* storage unavailable (private mode / quota); ignore */
-  }
-}
-
-function systemPrefersDarkNow(): boolean {
-  if (typeof window === "undefined") return false;
-  return !!window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-}
-
-/** Internal observable store; do not export. */
-function createThemeStore(): ThemeService & { subscribe: (fn: () => void) => () => void } {
-  const listeners = new Set<() => void>();
-  let pref: Theme = readStored();
-  let systemDark = systemPrefersDarkNow();
-
-  const notify = () => {
-    for (const fn of listeners) fn();
-  };
-
-  if (typeof window !== "undefined") {
-    const mql = window.matchMedia?.("(prefers-color-scheme: dark)");
-    mql?.addEventListener("change", (e) => {
-      systemDark = e.matches;
-      notify();
-    });
-  }
-
-  const applyDocumentTheme = (theme: Exclude<Theme, "system">) => {
-    if (typeof document === "undefined") return;
-    document.documentElement.setAttribute("data-theme", theme);
-  };
-
-  const service: ThemeService = {
-    current() {
-      return pref === "system" ? (systemDark ? "dark" : "light") : pref;
-    },
-    preference() {
-      return pref;
-    },
-    subscribe(fn) {
-      listeners.add(fn);
-      return () => listeners.delete(fn);
-    },
-    setTheme(theme) { service.setPreference(theme); },
-    setPreference(theme) {
-      pref = theme;
-      writeStored(theme);
-      applyDocumentTheme(service.current());
-      notify();
-    },
-    toggle() {
-      service.setPreference(service.current() === "dark" ? "light" : "dark");
-    },
-    systemPrefersDark() {
-      return systemDark;
-    },
-  };
-
-  // Apply once on construction so documentElement is correct before first paint.
-  applyDocumentTheme(service.current());
-
-  return service as ThemeService & { subscribe: (fn: () => void) => () => void };
-}
+/** @deprecated use ThemeStoreInternal via createThemeStore directly. Kept
+ *  for back-compat with the v1 test suite that imports this type name. */
+export type ThemeStore = ThemeStoreInternal;
 
 const Ctx = createContext<ThemeService | null>(null);
 
@@ -110,30 +59,69 @@ export function useTheme(): ThemeService {
   return ctx;
 }
 
-/** Standard-kit hook binding (SlotMap merge): returns the same service. */
 export function useThemeHook(): ThemeService {
   return useTheme();
 }
 
-/** useSyncExternalStore adapter; reserved for store consumers. */
 export function useThemeSnapshot<T>(selector: (s: ThemeService) => T): T {
   const service = useTheme();
   return useSyncExternalStore(
     (fn) => service.subscribe(fn),
     () => selector(service),
-    () => selector(service)
+    () => selector(service),
   );
 }
 
-/** Plugin apply(): wire the ThemeProvider into the SlotProvider and expose ctx.theme. */
-export function applyTheme(ctx: { slots?: { register: (o: { name: string }, c: unknown) => () => void } } & Record<string, unknown>): () => void {
-  const disposers: Array<() => void> = [];
+/**
+ * Plugin apply(): wire the ThemeProvider into the SlotProvider and expose
+ * ctx.theme (v2 service). Idempotent — re-invocation just replaces the ctx
+ * reference, never double-mounts providers.
+ */
+export function applyTheme(ctx: {
+  slots?: { register: (o: { name: string }, c: unknown) => () => void };
+  theme?: ThemeService;
+} & Record<string, unknown>): () => void {
   const store = createThemeStore();
-  // ctx.theme service (declared via @openbuddy/cordis Context augmentation).
   if (ctx && typeof ctx === "object") {
     (ctx as Record<string, unknown>).theme = store;
   }
-  return () => {
-    for (const d of disposers) d();
-  };
+  return () => {};
 }
+
+export { readStoredPreference };
+
+// ─── Settings-page helpers (used by ui-settings) ────────────────────
+export interface ThemeSnapshot {
+  preference: Theme;
+  currentName: ThemeName;
+  mode: "manual" | "system";
+  pair: { light: ThemeName; dark: ThemeName };
+  systemPrefersDark: boolean;
+}
+
+/** Read the current store snapshot, suitable for the settings panel. */
+export function useThemeSnapshotV2(): ThemeSnapshot {
+  const service = useTheme();
+  const preference = useThemeSnapshot((s) => s.preference());
+  const mode = useThemeSnapshot((s) => s.mode());
+  const pair = useThemeSnapshot((s) => s.getPair());
+  const currentName = useThemeSnapshot((s) => s.currentName());
+  const systemPrefersDark = useThemeSnapshot((s) => s.systemPrefersDark());
+  return { preference, currentName, mode, pair, systemPrefersDark };
+}
+
+// ─── Back-compat hook for the v1 test ──────────────────────────────
+/** @deprecated kept for the existing client.test.tsx */
+export function useStoreName(): ThemeName | null {
+  return getStoredThemeName();
+}
+
+export { getStoredThemeMode, getStoredThemePair, getThemeByName };
+
+// Re-export the React UI building blocks for ergonomic imports:
+//   import { ThemePicker, ThemeInitializer } from "@openbuddy/ui-theme/client";
+export { ThemePicker } from "./components/ThemePicker";
+export { ThemeCard } from "./components/ThemeCard";
+export { initializeThemeSync } from "./components/ThemeInitializer";
+
+export { ThemeStudio } from "./components/ThemeStudio";

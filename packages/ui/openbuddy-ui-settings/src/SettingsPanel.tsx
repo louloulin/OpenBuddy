@@ -58,6 +58,7 @@ import {
   CreditReconciliationPanel,
   CreditWalletPanel,
   DataSettingsPanel,
+  AuditSettingsPanel,
   GeneralSettingsPanel,
   HelpSettingsPanel,
   PersonalizeSettingsPanel,
@@ -176,6 +177,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Shield,
     items: [
       { id: "data", label: "数据管理", icon: Database },
+      { id: "audit", label: "审计追踪", icon: Database },
       { id: "security", label: "安全中心", icon: Shield },
     ],
   },
@@ -550,6 +552,8 @@ export function SettingsPanel({
               <SecuritySettingsPanel />
             ) : active === "data" ? (
               <DataSettingsPanel />
+            ) : active === "audit" ? (
+              <AuditSettingsPanel />
             ) : active === "general" ? (
               <GeneralSettingsPanel />
             ) : active === "account" ? (

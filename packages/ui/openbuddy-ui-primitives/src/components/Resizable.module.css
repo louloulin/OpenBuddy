@@ -1,0 +1,69 @@
+.wrapper {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 5;
+  transition: background 120ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.handle::after {
+  content: "";
+  width: 1px;
+  height: 100%;
+  background: var(--wb-border, oklch(0.9 0 0));
+  transition: background 120ms ease, width 120ms ease;
+}
+
+.handle:hover::after,
+.handle:focus-visible::after,
+.handle[data-dragging="true"]::after {
+  background: var(--wb-accent, oklch(0.7 0.13 165));
+  width: 2px;
+}
+
+.handle:focus-visible {
+  outline: none;
+}
+
+.handleActive {
+  background: color-mix(in oklch, var(--wb-accent, oklch(0.7 0.13 165)) 10%, transparent);
+}
+
+/* The handle sits on the right edge of the sidebar (edge="right"). */
+.wrapper[data-resizable-edge="right"] > .handle {
+  right: -2px;
+}
+
+.wrapper[data-resizable-edge="left"] > .handle {
+  left: -2px;
+}
+
+/* While dragging, suppress text selection and pointer events on content. */
+.wrapper:has(.handle[data-dragging="true"]) .content {
+  pointer-events: none;
+  user-select: none;
+}

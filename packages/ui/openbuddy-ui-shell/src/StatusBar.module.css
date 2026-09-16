@@ -1,0 +1,104 @@
+.bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+  padding: 0 10px;
+  background: var(--wb-bg-secondary, var(--wb-bg-primary));
+  border-top: 1px solid var(--wb-border-soft, var(--wb-border));
+  color: var(--wb-fg-secondary);
+  font-size: 11px;
+  line-height: 1;
+  user-select: none;
+}
+
+.side {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--wb-radius-sm);
+  white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden;
+}
+
+.itemButton {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.itemButton:hover {
+  background: color-mix(in oklch, var(--wb-fg-primary) 8%, transparent);
+  color: var(--wb-fg-primary);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.glyph {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.dotNeutral {
+  background: var(--wb-fg-tertiary, currentColor);
+  opacity: 0.6;
+}
+
+.dotOk {
+  background: var(--wb-success, #1a7f37);
+}
+
+.dotWarn {
+  background: var(--wb-warning, #9a6700);
+}
+
+.dotError {
+  background: var(--wb-danger, #cf222e);
+}
+
+.dotBusy {
+  background: var(--wb-accent);
+  animation: statusPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dotBusy {
+    animation: none;
+  }
+}

@@ -1,0 +1,84 @@
+/* ArtifactViewerHeader —— 查看器头部条(面包屑 + 状态 + 工具栏 单行布局)。 */
+
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--wb-border-soft);
+  background: var(--wb-bg-secondary);
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+
+.breadcrumb {
+  min-width: 0;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.meta {
+  color: var(--wb-fg-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.toolbar {
+  min-height: 24px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-fg-secondary);
+}
+
+.neutral {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-fg-secondary);
+}
+
+.info {
+  background: var(--wb-accent-soft);
+  color: var(--wb-accent-fg);
+}
+
+/* 下面是「同一属性两段声明」的渐进增强写法:color-mix 不被支持时,
+   浏览器会丢弃第二条声明,自动回退到上一行基于 token 的底色。 */
+.success {
+  background: var(--wb-bg-tertiary);
+  background: color-mix(in srgb, var(--wb-success) 18%, transparent);
+  color: var(--wb-success);
+}
+
+.warning {
+  background: var(--wb-bg-tertiary);
+  background: color-mix(in srgb, var(--wb-warning) 18%, transparent);
+  color: var(--wb-warning);
+}
+
+.danger {
+  background: var(--wb-bg-tertiary);
+  background: color-mix(in srgb, var(--wb-danger) 18%, transparent);
+  color: var(--wb-danger);
+}
