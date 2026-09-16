@@ -197,3 +197,168 @@ describe("session-store UI state", () => {
     });
   });
 });
+/**
+ * R8.14 — `createdAt` / `completedAt` stamping on every ChatMessage
+ * creation path. Drives the `.msg__meta` timestamp + duration chip.
+ */
+describe("R8.14 ChatMessage meta stamping", () => {
+  beforeEach(() => {
+    useSessionStore.setState({
+      sessionId: null,
+      streaming: false,
+      planMode: false,
+      optimisticBubble: null,
+      error: null,
+      messages: [],
+      streamingMessageId: null,
+      plan: null,
+    });
+  });
+
+  it("pushOptimisticUser stamps createdAt with a wall-clock number", () => {
+    useSessionStore.getState().setSession("sess-meta");
+    const before = Date.now();
+    useSessionStore.getState().pushOptimisticUser("hello");
+    const after = Date.now();
+    const bubble = useSessionStore.getState().optimisticBubble;
+    expect(bubble).not.toBeNull();
+    expect(typeof bubble!.createdAt).toBe("number");
+    // The stamp should land within the [before, after] window — guards
+    // against an accidental Date.parse() result or hardcoded constant.
+    expect(bubble!.createdAt).toBeGreaterThanOrEqual(before);
+    expect(bubble!.createdAt).toBeLessThanOrEqual(after);
+  });
+
+  it("pushOptimisticUserContent also stamps createdAt", () => {
+    useSessionStore.getState().setSession("sess-meta-content");
+    const before = Date.now();
+    useSessionStore.getState().pushOptimisticUserContent([
+      { type: "text", text: "with files" },
+      { type: "file", mediaType: "text/plain", data: "aGk=", name: "hi.txt" },
+    ]);
+    const after = Date.now();
+    const bubble = useSessionStore.getState().optimisticBubble;
+    expect(bubble).not.toBeNull();
+    expect(typeof bubble!.createdAt).toBe("number");
+    expect(bubble!.createdAt).toBeGreaterThanOrEqual(before);
+    expect(bubble!.createdAt).toBeLessThanOrEqual(after);
+    // No completedAt on user bubbles — only assistant turns track duration.
+    expect(bubble!.completedAt).toBeUndefined();
+  });
+
+  it("beginStreamingMessage stamps createdAt on the empty assistant bubble", () => {
+    useSessionStore.getState().setSession("sess-stream");
+    const before = Date.now();
+    const id = useSessionStore.getState().beginStreamingMessage();
+    const after = Date.now();
+    expect(id).toBeTruthy();
+    const bubble = useSessionStore.getState().messages.find((m) => m.id === id);
+    expect(bubble).toBeTruthy();
+    expect(typeof bubble!.createdAt).toBe("number");
+    expect(bubble!.createdAt).toBeGreaterThanOrEqual(before);
+    expect(bubble!.createdAt).toBeLessThanOrEqual(after);
+    // Active streaming bubbles never have completedAt yet.
+    expect(bubble!.completedAt).toBeUndefined();
+  });
+
+  it("finishStreamingMessage stamps completedAt on the finalised assistant bubble", async () => {
+    useSessionStore.getState().setSession("sess-finish");
+    const id = useSessionStore.getState().beginStreamingMessage();
+    useSessionStore.getState().appendStreamingDelta("hello");
+    // appendStreamingDelta is RAF-batched; wait a tick for the flush.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const before = Date.now();
+    useSessionStore.getState().finishStreamingMessage();
+    const after = Date.now();
+    const bubble = useSessionStore.getState().messages.find((m) => m.id === id);
+    expect(bubble).toBeTruthy();
+    expect(bubble!.complete).toBe(true);
+    expect(typeof bubble!.completedAt).toBe("number");
+    const completedAt = bubble!.completedAt as number;
+    expect(completedAt).toBeGreaterThanOrEqual(before);
+    expect(completedAt).toBeLessThanOrEqual(after);
+    // completedAt >= createdAt (duration is non-negative).
+    expect(completedAt).toBeGreaterThanOrEqual(bubble!.createdAt as number);
+  });
+
+  it("abandonStreamingMessage also stamps completedAt so the chip leaves streaming mode", async () => {
+    useSessionStore.getState().setSession("sess-abandon");
+    const id = useSessionStore.getState().beginStreamingMessage();
+    useSessionStore.getState().appendStreamingDelta("partial");
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const before = Date.now();
+    useSessionStore.getState().abandonStreamingMessage("user cancelled");
+    const after = Date.now();
+    const bubble = useSessionStore.getState().messages.find((m) => m.id === id);
+    expect(bubble).toBeTruthy();
+    expect(bubble!.complete).toBe(true);
+    expect(typeof bubble!.completedAt).toBe("number");
+    const completedAt = bubble!.completedAt as number;
+    expect(completedAt).toBeGreaterThanOrEqual(before);
+    expect(completedAt).toBeLessThanOrEqual(after);
+  });
+});
+
+/**
+ * R8.15 — `finishStreamingMessage` accepts an optional `{ modelId,
+ * outputTokens }` payload and stamps it onto the finalised assistant
+ * bubble so the meta chip can render the model id + tok/s throughput.
+ */
+describe("R8.15 finishStreamingMessage meta stamping", () => {
+  beforeEach(() => {
+    useSessionStore.setState({
+      sessionId: null,
+      streaming: false,
+      planMode: false,
+      optimisticBubble: null,
+      error: null,
+      messages: [],
+      streamingMessageId: null,
+      plan: null,
+    });
+  });
+
+  it("stamps modelId + outputTokens when provided", async () => {
+    useSessionStore.getState().setSession("sess-meta-r815");
+    const id = useSessionStore.getState().beginStreamingMessage();
+    useSessionStore.getState().appendStreamingDelta("answer");
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    useSessionStore.getState().finishStreamingMessage({
+      modelId: "claude-opus-4-7",
+      outputTokens: 420,
+    });
+    const bubble = useSessionStore.getState().messages.find((m) => m.id === id);
+    expect(bubble).toBeTruthy();
+    expect(bubble!.modelId).toBe("claude-opus-4-7");
+    expect(bubble!.outputTokens).toBe(420);
+  });
+
+  it("leaves both fields absent when no meta is passed (legacy call sites)", async () => {
+    useSessionStore.getState().setSession("sess-meta-r815-legacy");
+    const id = useSessionStore.getState().beginStreamingMessage();
+    useSessionStore.getState().appendStreamingDelta("answer");
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    useSessionStore.getState().finishStreamingMessage();
+    const bubble = useSessionStore.getState().messages.find((m) => m.id === id);
+    expect(bubble).toBeTruthy();
+    expect(bubble!.modelId).toBeUndefined();
+    expect(bubble!.outputTokens).toBeUndefined();
+  });
+
+  it("ignores empty / non-positive outputTokens (no fake 0-tok/s chips)", async () => {
+    useSessionStore.getState().setSession("sess-meta-r815-empty");
+    const id = useSessionStore.getState().beginStreamingMessage();
+    useSessionStore.getState().appendStreamingDelta("answer");
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    useSessionStore.getState().finishStreamingMessage({
+      modelId: "claude-opus-4-7",
+      outputTokens: 0,
+    });
+    const bubble = useSessionStore.getState().messages.find((m) => m.id === id);
+    expect(bubble).toBeTruthy();
+    expect(bubble!.modelId).toBe("claude-opus-4-7");
+    // 0 tokens are dropped so the chip doesn't render a misleading
+    // "0 tok/s" pill.
+    expect(bubble!.outputTokens).toBeUndefined();
+  });
+});

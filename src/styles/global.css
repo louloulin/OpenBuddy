@@ -15,7 +15,7 @@
  * rule overrides it. The accent-tinted ring also helps mouse-only users
  * spot which control is focused after pressing Tab. */
 :focus-visible {
-  outline: 2px solid var(--wb-accent, #3b82f6);
+  outline: 2px solid var(--wb-accent, #00c29a);
   outline-offset: 2px;
   border-radius: inherit;
 }
@@ -109,7 +109,8 @@
   --wb-text-strong: var(--wb-color-text-primary, #1a1a1a);
   --wb-text-medium: var(--wb-color-text-secondary, #555);
   --wb-text-weak: var(--wb-color-text-tertiary, #999);
-  --wb-brand: var(--wb-brand-primary, #00c29a);
+  /* `--wb-brand` 已迁移到 tokens.css —— global.css 并未被 app 入口
+   * globals.css 加载，放在这里会被运行时忽略（2026-09-16 缺陷根因）。 */
   --wb-border-default: var(--wb-color-border-primary, #e6e6e6);
 }
 

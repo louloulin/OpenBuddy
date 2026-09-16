@@ -1,4 +1,5 @@
 import type { Locale } from '@/lib/i18n';
+import Reveal from '@/components/motion/Reveal';
 
 interface ArchitectureProps {
   locale: Locale;

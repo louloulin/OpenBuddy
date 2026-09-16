@@ -18,6 +18,7 @@
 @import "./base.css";
 @import "./theme-dark-overrides.css";
 @import "./chrome.css";
+@import "./shell.css";
 @import "./ui-kit.css";
 @import "./sidebar.css";
 @import "./sidebar-menus.css";

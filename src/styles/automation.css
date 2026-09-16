@@ -27,7 +27,7 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
   padding: 6px;
   z-index: 1200;
-  animation: sidebarMoreFadeIn 0.14s ease-out;
+  animation: sidebarMoreFadeIn var(--wb-motion-duration-fast, 140ms) ease-out;
 }
 @keyframes sidebarMoreFadeIn {
   from {

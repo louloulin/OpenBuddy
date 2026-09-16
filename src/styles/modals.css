@@ -74,9 +74,9 @@
   background: var(--wb-bg-tertiary);
 }
 .question-inline__option--selected {
-  border-color: var(--wb-brand, #10b981);
-  background: var(--wb-brand, #10b981);
-  color: #fff;
+  border-color: var(--wb-border-default);
+  background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
+  color: var(--wb-text-strong);
 }
 .question-inline__custom-input {
   width: 100%;
@@ -113,7 +113,7 @@
   background: color-mix(in srgb, var(--wb-palette-black-100, #000) 52%, transparent);
   backdrop-filter: blur(16px) saturate(120%);
   -webkit-backdrop-filter: blur(16px) saturate(120%);
-  animation: wb-request-overlay-in 180ms cubic-bezier(.22, 1, .36, 1) both;
+  animation: wb-request-overlay-in var(--wb-motion-duration-md, 180ms) var(--wb-motion-easing-emphasized, cubic-bezier(.22, 1, .36, 1)) both;
 }
 @keyframes wb-request-overlay-in { from { opacity: 0; backdrop-filter: blur(0); } to { opacity: 1; backdrop-filter: blur(16px); } }
 @keyframes wb-request-modal-in {
@@ -134,7 +134,7 @@
     0 1px 2px rgba(0, 0, 0, 0.04),
     0 8px 24px -8px rgba(0, 0, 0, 0.18),
     0 24px 64px -12px rgba(0, 0, 0, 0.22);
-  animation: wb-request-modal-in 240ms cubic-bezier(.22, 1, .36, 1) both;
+  animation: wb-request-modal-in var(--wb-motion-duration-large, 240ms) var(--wb-motion-easing-emphasized, cubic-bezier(.22, 1, .36, 1)) both;
 }
 .request-modal__head {
   display: flex;
@@ -316,12 +316,12 @@
   transition: all .15s cubic-bezier(.22, 1, .36, 1);
 }
 .request-modal .btn--primary {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--wb-brand) 100%, white 4%), var(--wb-brand));
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 1px color-mix(in srgb, var(--wb-brand) 30%, transparent);
+  background: var(--wb-button-primary-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 1px var(--wb-button-primary-bg);
 }
 .request-modal .btn--primary:hover {
-  background: linear-gradient(180deg, var(--wb-brand), color-mix(in srgb, var(--wb-brand) 90%, black 10%));
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--wb-brand), 0 4px 12px color-mix(in srgb, var(--wb-brand) 30%, transparent);
+  background: var(--wb-button-primary-bg-hover);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--wb-button-primary-bg), 0 4px 12px color-mix(in srgb, var(--wb-text-strong, #000) 8%, transparent);
   transform: translateY(-1px);
 }
 .request-modal .btn--ghost {
@@ -561,13 +561,13 @@ textarea.mshell-field__control { resize: vertical; min-height: 96px; font-family
   background: var(--wb-bg-tertiary);
 }
 .btn--primary {
-  background: var(--wb-brand);
-  color: #fff;
-  border-color: var(--wb-brand);
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+  border-color: var(--wb-button-primary-bg);
 }
 .btn--primary:hover {
   opacity: 0.9;
-  background: var(--wb-brand);
+  background: var(--wb-button-primary-bg-hover);
 }
 .btn--ghost {
   background: transparent;
@@ -618,7 +618,7 @@ textarea.mshell-field__control { resize: vertical; min-height: 96px; font-family
     0 1px 2px rgba(0, 0, 0, 0.04),
     0 8px 24px -8px rgba(0, 0, 0, 0.18),
     0 24px 64px -12px rgba(0, 0, 0, 0.22);
-  animation: wb-request-modal-in 240ms cubic-bezier(.22, 1, .36, 1) both;
+  animation: wb-request-modal-in var(--wb-motion-duration-large, 240ms) var(--wb-motion-easing-emphasized, cubic-bezier(.22, 1, .36, 1)) both;
 }
 .kbd-shortcuts-header {
   display: flex;
@@ -734,7 +734,7 @@ textarea.mshell-field__control { resize: vertical; min-height: 96px; font-family
     0 1px 2px rgba(0, 0, 0, 0.04),
     0 8px 24px -8px rgba(0, 0, 0, 0.18),
     0 24px 64px -12px rgba(0, 0, 0, 0.22);
-  animation: wb-request-modal-in 240ms cubic-bezier(.22, 1, .36, 1) both;
+  animation: wb-request-modal-in var(--wb-motion-duration-large, 240ms) var(--wb-motion-easing-emphasized, cubic-bezier(.22, 1, .36, 1)) both;
 }
 .about-dialog__close {
   position: absolute;
@@ -824,8 +824,8 @@ textarea.mshell-field__control { resize: vertical; min-height: 96px; font-family
   padding: 0 18px;
   border: none;
   border-radius: 10px;
-  background: var(--wb-brand-primary, #00c29a);
-  color: #fff;
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -860,7 +860,7 @@ textarea.mshell-field__control { resize: vertical; min-height: 96px; font-family
     0 1px 2px rgba(0, 0, 0, 0.04),
     0 8px 24px -8px rgba(0, 0, 0, 0.18),
     0 24px 64px -12px rgba(0, 0, 0, 0.22);
-  animation: wb-request-modal-in 240ms cubic-bezier(.22, 1, .36, 1) both;
+  animation: wb-request-modal-in var(--wb-motion-duration-large, 240ms) var(--wb-motion-easing-emphasized, cubic-bezier(.22, 1, .36, 1)) both;
 }
 .trust-dialog__icon {
   display: inline-flex;

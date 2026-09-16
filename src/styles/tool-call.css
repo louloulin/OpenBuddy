@@ -68,6 +68,11 @@
   flex-shrink: 0;
   font-size: 11px;
 }
+/* R8.47 — Tool call title polish. Switch the font family to the
+   codebase code family so the title reads as "code-ish" (matches
+   the .toolcall__kind chip + .toolcall__output below it), and add
+   a brand-tinted hover state that lifts the title colour slightly
+   so the user knows the row is interactive. */
 .toolcall__title {
   flex: 1;
   min-width: 0;
@@ -75,7 +80,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--wb-text-strong);
+  font-family: var(--wb-font-code-family, ui-monospace, monospace);
   font-size: 12px;
+  transition: color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.toolcall:hover .toolcall__title {
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 35%, var(--wb-text-strong));
 }
 .toolcall__status-mark {
   flex-shrink: 0;
@@ -89,9 +99,14 @@
   font-weight: 600;
   line-height: 1;
 }
+/* R8.33 — Migrate the completed status mark from the hardcoded
+   #1a7f37 to the canonical --wb-status-success token so it stays
+   in lock-step with .turn-error__code, .msg-wrap--selected, and
+   the other success-coloured surfaces. The #1a7f37 fallback keeps
+   legacy themes rendering unchanged. */
 .toolcall__status-mark--completed {
-  color: #1a7f37;
-  background: color-mix(in srgb, #1a7f37 12%, transparent);
+  color: var(--wb-status-success, #1a7f37);
+  background: color-mix(in srgb, var(--wb-status-success, #1a7f37) 12%, transparent);
 }
 .toolcall__status-mark--failed {
   color: var(--wb-status-error, #e5484d);
@@ -127,6 +142,25 @@
   overflow-y: auto;
   overflow-x: hidden;
   font-size: 12px;
+  /* R8.40 — Slim scrollbar that matches the chat UI's other
+   scrollable surfaces (findbar, message list). The 6px-wide
+   scrollbar + brand-tinted thumb keeps the visual language
+   cohesive. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--wb-brand, #00c29a) 30%, transparent) transparent;
+}
+.toolcall__text::-webkit-scrollbar,
+.toolcall__output::-webkit-scrollbar {
+  width: 6px;
+}
+.toolcall__text::-webkit-scrollbar-thumb,
+.toolcall__output::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 30%, transparent);
+  border-radius: 3px;
+}
+.toolcall__text::-webkit-scrollbar-thumb:hover,
+.toolcall__output::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 50%, transparent);
 }
 .toolcall__cmd-line {
   margin: 4px 0;
@@ -230,8 +264,8 @@
   padding: 0 12px;
   border: none;
   border-radius: 6px;
-  background: var(--wb-brand);
-  color: #fff;
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
   font-size: 12px;
   cursor: pointer;
 }
@@ -263,8 +297,12 @@
   font-size: 11px;
   color: var(--wb-text-weak);
 }
+/* R8.33 — Migrate the tool-detail status text colour from the
+   hardcoded #1a7f37 to the canonical --wb-status-success token so
+   it stays in lock-step with .toolcall__status-mark--completed and
+   the other success-coloured surfaces. */
 .tool-detail__status--completed {
-  color: #1a7f37;
+  color: var(--wb-status-success, #1a7f37);
 }
 .tool-detail__status--failed {
   color: var(--wb-status-error, #e5484d);
@@ -427,4 +465,78 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+}
+
+/* R8.2 — success border tint (matches the green status dot / check icon).
+   Falls back to a neutral tone when --wb-status-success isn't themed. */
+.toolcall--ok {
+  border-color: color-mix(in srgb, var(--wb-status-success, #1a7f37) 30%, var(--wb-border-default));
+}
+/* R8.2 — compact variant used by ToolCallCard. Slightly tighter than the
+   base 32px row so a busy transcript still scans well; trades 2px of height
+   for a 1px smaller font and tighter kind chip. */
+.toolcall--compact {
+  height: 30px;
+  font-size: 12px;
+  margin: 4px 0;
+  padding: 0 10px;
+  gap: 8px;
+}
+/* R8.2 — keyboard focus ring. Native browser default on a button this
+   small is barely visible against the row background; add an explicit
+   brand-tinted ring for a11y / power users. */
+.toolcall:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand) 65%, transparent);
+  outline-offset: 2px;
+}
+/* R8.2 — duration label: muted, tabular-nums, sits to the left of the
+   status mark. A small font + thin letter-spacing keeps it visually
+   subordinate to the title. */
+.toolcall__duration {
+  flex-shrink: 0;
+  margin-left: 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--wb-text-strong, #1a1a1a) 45%, transparent);
+  white-space: nowrap;
+}
+.toolcall--err .toolcall__duration {
+  color: color-mix(in srgb, var(--wb-status-error, #e5484d) 70%, transparent);
+}
+.toolcall--ok .toolcall__duration {
+  color: color-mix(in srgb, var(--wb-status-success, #1a7f37) 75%, transparent);
+}
+/* R8.2 — enter animation. Each new toolcall slides up 2px and fades in,
+   so the user sees the row "land" instead of popping in flat. ~140ms is
+   short enough not to feel sluggish when 3 tools land within a second. */
+@media (prefers-reduced-motion: no-preference) {
+  .toolcall {
+    animation: toolcall-enter var(--wb-motion-duration-fast, 140ms) ease-out;
+  }
+}
+@keyframes toolcall-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* R8.2 — staggered enter. When 3 tool calls land in the same message
+   within 200ms (typical of a parallel agent dispatch), each row lands
+   60ms after the previous so the eye can track them. Capped at 4 to
+   avoid an awkwardly long tail for tools 5+. */
+.msg .toolcall:nth-child(1) { animation-delay: 0ms; }
+.msg .toolcall:nth-child(2) { animation-delay: 60ms; }
+.msg .toolcall:nth-child(3) { animation-delay: 120ms; }
+.msg .toolcall:nth-child(n + 4) { animation-delay: 180ms; }
+/* Suppress the entry animation when the tool call is already in a
+   completed state — replays shouldn't flash every card on session
+   load. */
+.toolcall--ok,
+.toolcall--err {
+  animation: none;
 }

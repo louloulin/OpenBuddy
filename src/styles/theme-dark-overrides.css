@@ -103,9 +103,9 @@
 [data-theme="dark"] .email-connection-warning button,
 [data-theme="dark"] .email-action-center__filter-group button.is-active,
 [data-theme="dark"] .email-action-center__sort button.is-active {
-  color: var(--wb-text-on-primary, #fff);
-  background: var(--wb-brand-primary);
-  border-color: var(--wb-brand-primary);
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-pill-active, rgba(255, 255, 255, 0.18));
+  border-color: var(--wb-border-default);
 }
 
 /* ---- Sidebar / Topbar / 主区背景层次 ----

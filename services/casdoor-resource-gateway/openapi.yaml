@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Casdoor Resource Gateway
-  version: 1.0.0
+  version: 0.15.0
   description: |
     Production-grade enterprise resource gateway. Validates Casdoor OIDC
     access tokens, applies tenant + resource + action authorization,

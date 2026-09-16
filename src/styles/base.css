@@ -43,3 +43,19 @@ input, textarea, select {
   font: inherit;
   color: inherit;
 }
+
+/* R8.9 — Accessibility: honour the OS-level "reduce motion" preference.
+   Token-based durations (var(--wb-motion-duration-*)) are already zeroed
+   in tokens.css's @media block; this rule covers the rest (infinite
+   pulses, transition durations, scroll smooth-scroll). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

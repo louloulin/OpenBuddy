@@ -40,6 +40,11 @@ export interface AbandonInFlightStreamOptions {
    *  error paths); user-cancel uses "completed" because cancel is a
    *  user-initiated normal termination, not a backend failure. */
   status?: "failed" | "completed";
+  /** Structured per-turn error (e.g. a provider 429 with a machine code).
+   *  When provided AND the bubble has no streamed content, the renderer
+   *  renders an inline error card inside the transcript instead of the
+   *  generic "（已中断：...）" placeholder. */
+  error?: { message: string; code?: string };
 }
 
 /**
@@ -62,7 +67,7 @@ export function abandonInFlightStream(
   const focusedHere =
     !session.sessionId || !sessionId || session.sessionId === sessionId;
   if (focusedHere) {
-    session.abandonStreamingMessage(reason);
+    session.abandonStreamingMessage(reason, opts.error);
     session.setStreaming(false);
   }
 

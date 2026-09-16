@@ -360,7 +360,7 @@ writeFileSync(join(connectorRoot, ".codebuddy-connector", "connectors.json"), JS
   { id: connectorCancelSource, source: connectorCancelSource, name: "Electron smoke cancel CLI", type: "cli" },
 ] }), "utf8");
 writeFileSync(join(connectorRoot, "connectors", connectorSource, "cli.json"), JSON.stringify({
-  versionCheck: { command: { darwin: `${nodeExecutable} -e 'console.log("1.0.0")'` }, minVersion: "0.1.0" },
+  versionCheck: { command: { darwin: `${nodeExecutable} -e 'console.log("1.0.0")'` }, minVersion: "0.15.0" },
   status: { darwin: `${nodeExecutable} -e "process.exit(require('fs').existsSync('${connectorAuthMarker}') ? 0 : 1)"` },
   auth: { darwin: `${nodeExecutable} -e "require('fs').writeFileSync('${connectorAuthMarker}','1'); console.log('https://example.com/openbuddy-smoke')"` },
   unAuth: { darwin: `${nodeExecutable} -e 'require("node:fs").rmSync("${connectorAuthMarker}",{force:true})'` },
@@ -368,7 +368,7 @@ writeFileSync(join(connectorRoot, "connectors", connectorSource, "cli.json"), JS
   authSuppressBrowser: true,
 }), "utf8");
 writeFileSync(join(connectorRoot, "connectors", connectorCancelSource, "cli.json"), JSON.stringify({
-  versionCheck: { command: { darwin: `${nodeExecutable} -e 'console.log("1.0.0")'` }, minVersion: "0.1.0" },
+  versionCheck: { command: { darwin: `${nodeExecutable} -e 'console.log("1.0.0")'` }, minVersion: "0.15.0" },
   status: { darwin: `${nodeExecutable} -e "process.exit(1)"` },
   auth: { darwin: `${nodeExecutable} -e "require('fs').writeFileSync('${connectorCancelStarted}','1'); setTimeout(() => {}, 30000)"` },
   authSuppressBrowser: true,

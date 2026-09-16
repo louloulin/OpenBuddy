@@ -63,6 +63,7 @@ import {
   agentOnPluginEvent,
   attachEventLogSurface,
   detachEventLogSurface,  agentSessionMessages,
+  inferErrorCode as inferErrorCodeSafe,
   sessionEntriesToChatMessages,
   piSend,
   piCancel,
@@ -445,7 +446,14 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
         // buffer was still unflushed, and the later flush mutated the array
         // tail without producing another notification — leaving a
         // permanently empty assistant bubble.
-        useSessionStore.getState().finishStreamingMessage();
+        // R8.15 — pass model id + completion token count so the meta chip
+        // on the just-finished bubble can show "<model> · X tok/s".
+        // `currentModelIdRef` mirrors the model picker; `p.usage.completionTokens`
+        // is the provider-reported completion count for this turn.
+        useSessionStore.getState().finishStreamingMessage({
+          modelId: currentModelIdRef.current,
+          outputTokens: p.usage?.completionTokens,
+        });
         useSessionStore.getState().setStreaming(false);
         // Let the next turn re-decide its wire shape. Safe to reset only at a
         // turn boundary — resetting mid-turn would re-open the duplicate-append
@@ -861,8 +869,18 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
                 reason?: string;
               };
               if (usagePayload.errorMessage) {
-                store.setError(`⚠️ ${usagePayload.errorMessage}`);
-                useSessionStore.getState().abandonStreamingMessage(`usage-error: ${usagePayload.errorMessage}`);
+                // Inline the error on the assistant bubble (TurnErrorCard
+                // renders it). Skip `store.setError` here so the same
+                // reason isn't shown twice — once in the banner, once in
+                // the card. The banner is reserved for session-level
+                // failures (agent-died / init) that don't belong to a
+                // single bubble.
+                const raw = usagePayload.errorMessage;
+                const code = inferErrorCodeSafe(raw);
+                useSessionStore.getState().abandonStreamingMessage(
+                  `usage-error: ${raw}`,
+                  { message: raw, ...(code ? { code } : {}) },
+                );
               }
               // Phase 8.2-track: usage payload is intentionally NOT persisted
               // to the store — the canonical usage lives in `useSessionUsage`

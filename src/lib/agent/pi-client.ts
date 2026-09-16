@@ -877,6 +877,11 @@ export interface SessionEntriesProjection {
   messages: Array<{
     id: string;
     role: "user" | "assistant";
+    // R8.14 — optional; populated from `entry.message.timestamp` or
+    // `Date.parse(entry.timestamp)` so the meta chip has something to
+    // render. Optional here because the projection also serves
+    // pre-R8.14 fixtures that never carried it.
+    createdAt?: number;
     parts: Array<
       | { kind: "text"; text: string }
       | { kind: "thought"; text: string }
@@ -884,8 +889,31 @@ export interface SessionEntriesProjection {
       | { kind: "tool_call"; toolCall: { toolCallId: string; title: string; kind: string; status: "completed" | "failed"; content: unknown[] } }
     >;
     complete: boolean;
+    /** Turn-level failure projected from pi's session entry (see
+     *  `sessionEntriesToChatMessages`). Absent on healthy turns. */
+    error?: { message: string; code?: string };
   }>;
   model?: { provider: string; modelId: string };
+}
+
+/**
+ * Best-effort classification of a raw provider error string into a short
+ * machine code the UI can localise ("rate_limit_error", "auth_error", …).
+ * Returns undefined when nothing matches — callers fall back to the raw text.
+ */
+export function inferErrorCode(raw: string): string | undefined {
+  const text = raw.toLowerCase();
+  if (/429|rate[_ ]?limit|too many requests|quota|用量上限/.test(text)) return "rate_limit_error";
+  if (/401|unauthorized|invalid[_ ]api[_ ]key|api key/.test(text)) return "auth_error";
+  if (/403|forbidden|permission/.test(text)) return "permission_error";
+  if (/404|not found|unknown model|model.*not.*exist/.test(text)) return "model_not_found";
+  if (/5\d\d|server error|overloaded|unavailable/.test(text)) return "provider_error";
+  if (/timeout|timed ?out|socket hang up|econnreset|eai_again|etimedout/.test(text)) return "network_error";
+  if (/abort|cancel/.test(text)) return "aborted";
+  // (legacy alias: timed-out aborts sometimes come through with `aborted`
+  // after a previous `timeout` keyword earlier in the same error string,
+  // which would have returned network_error above — that is fine.)
+  return undefined;
 }
 
 export function sessionEntriesToChatMessages(entries: readonly PiSessionEntry[]): SessionEntriesProjection {
@@ -930,7 +958,54 @@ export function sessionEntriesToChatMessages(entries: readonly PiSessionEntry[])
           });
         }
       }
-      messages.push({ id: entry.id, role, parts, complete: true });
+      // pi persists failed turns as an assistant message with the raw
+      // provider error on `entry.message.errorMessage` (and `stopReason:
+      // "error"`) and an empty `content[]`. Projecting only `content`
+      // dropped the reason entirely, so the transcript rendered a blank
+      // "Buddy" bubble with no way to tell that the turn had failed.
+      // Carry it through as message metadata and skip genuinely empty
+      // messages that have nothing to show.
+      const rawMsg = entry.message as unknown as {
+        errorMessage?: unknown;
+        stopReason?: unknown;
+        // R8.14 — entry.message carries an optional numeric ms-since-epoch
+        // timestamp (set by pi when it persisted the entry); we read it
+        // for the per-message meta chip's createdAt field.
+        timestamp?: number;
+      };
+      const errorMessage =
+        typeof rawMsg.errorMessage === "string" && rawMsg.errorMessage.trim()
+          ? rawMsg.errorMessage.trim()
+          : undefined;
+      const failed = errorMessage !== undefined || rawMsg.stopReason === "error";
+      const messageError = failed
+        ? {
+            message: errorMessage ?? "本次响应未能完成（模型或连接异常）。",
+            code: errorMessage ? inferErrorCode(errorMessage) : undefined,
+          }
+        : undefined;
+      if (parts.length === 0 && !messageError) continue;
+      // R8.14 — backfill `createdAt` so the per-message meta chip has a
+      // timestamp to render. Prefer the message-level numeric timestamp
+      // (ms since epoch, set by pi when it persisted the entry); fall
+      // back to parsing the entry ISO timestamp; final fallback to
+      // Date.now() so we never feed `undefined` into the renderer.
+      const createdAt =
+        typeof rawMsg.timestamp === "number"
+          ? rawMsg.timestamp
+          : Date.parse(entry.timestamp) || Date.now();
+      messages.push({
+        id: entry.id,
+        role,
+        parts,
+        complete: true,
+        createdAt,
+        // Historic entries are always complete by the time they reach
+        // the renderer (loadHistoryMessages marks incomplete tails
+        // complete in cleanupOrphanHistory), so the duration chip
+        // derives from `createdAt` alone — no completedAt stamped.
+        ...(messageError ? { error: messageError } : {}),
+      });
     } else if (entry.type === "model_change" && entry.provider && entry.modelId) {
       model = { provider: entry.provider, modelId: entry.modelId };
     }

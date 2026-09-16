@@ -21,7 +21,7 @@ OpenBuddy 不应继续演化成一个复制 Agent Runtime 的“大单体”，�
 
 ### 2.1 已检查的仓库证据
 
-- `package.json`：应用为 `openbuddy@0.14.0`，Electron 44、React 18、Vite 8、moon 2.5、pnpm 11、Vitest 2、Pi `@earendil-works/*` 0.85.x、Cordis 3.18.x。
+- `package.json`：应用为 `openbuddy@0.15.0`，Electron 44、React 18、Vite 8、moon 2.5、pnpm 11、Vitest 2、Pi `@earendil-works/*` 0.85.x、Cordis 3.18.x。
 - `electron/main/agent/agent-host.ts`：当前约 1484 行，仍是 composition root/facade 与初始化兼容面，不能直接当作目标微内核已完成。
 - `electron/main/agent/pi-extensions.ts`：当前约 1222 行，已聚合多个 builtin extension、manifest 投影和适配逻辑，需继续拆 registry、adapter 和 builtin factory。
 - `electron/main/agent/host-modules/bootstrap/install-host-modules.ts`：约 314 行，已有 profile/session/plugin/runtime 四域安装入口。

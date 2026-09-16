@@ -62,7 +62,10 @@
 .ec-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .ec-card-tag { font-size: 11px; padding: 3px 9px; border-radius: 7px; background: var(--wb-bg-tertiary); color: var(--wb-text-medium); }
 .ec-card-tag--btn { cursor: pointer; border: none; }
-.ec-card-tag--btn:hover { background: var(--wb-brand); color: #fff; }
+.ec-card-tag--btn:hover {
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+}
 
 /* 我的专家 */
 .ec-my-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px; padding-top: 12px; }
@@ -162,8 +165,20 @@
 .sk-toggle { position: relative; display: inline-block; width: 36px; height: 20px; flex: 0 0 auto; cursor: pointer; }
 .sk-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
 .sk-toggle-track { position: absolute; inset: 0; border-radius: 999px; background: var(--wb-bg-tertiary); transition: background .15s; }
-.sk-toggle-thumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.2); transition: transform .15s; }
-.sk-toggle input:checked + .sk-toggle-track { background: var(--wb-brand); }
+.sk-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--wb-bg-primary, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform .15s;
+}
+.sk-toggle input:checked + .sk-toggle-track {
+  background: var(--wb-button-primary-bg);
+}
 .sk-toggle input:checked + .sk-toggle-track .sk-toggle-thumb { transform: translateX(16px); }
 
 /* import modal (截图 5) */
@@ -212,7 +227,7 @@
 /* === connector token-authorization form === */
 .cn-token-doclink {
   display: inline-flex; align-items: center; gap: 5px;
-  margin: 0 0 16px; font-size: 13px; color: var(--wb-brand, #6366f1);
+  margin: 0 0 16px; font-size: 13px; color: var(--wb-brand, #00c29a);
   text-decoration: none; cursor: pointer;
 }
 .cn-token-doclink:hover { text-decoration: underline; }
@@ -225,7 +240,7 @@
   border: 1px solid var(--wb-border-default); background: var(--wb-bg-primary);
   color: var(--wb-text-strong); transition: border-color .15s;
 }
-.cn-token-input:focus { outline: none; border-color: var(--wb-brand, #6366f1); }
+.cn-token-input:focus { outline: none; border-color: var(--wb-brand, #00c29a); }
 .cn-token-help { font-size: 11.5px; color: var(--wb-text-weak); line-height: 1.5; }
 
 
@@ -301,7 +316,7 @@
   background: var(--wb-bg-hover, #f9fafb); border: 1px solid var(--wb-border-default, #e5e7eb);
   cursor: pointer; text-align: left; transition: border-color 0.15s;
 }
-.ec-modal-qp-btn:hover { border-color: var(--wb-brand, #6366f1); }
+.ec-modal-qp-btn:hover { border-color: var(--wb-brand, #00c29a); }
 .ec-modal-qp-text { font-size: 13px; color: var(--wb-text-medium); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ec-modal-qp-arrow { font-size: 16px; color: var(--wb-text-weak); margin-left: 8px; }
 .ec-modal-summon-btn {
@@ -326,7 +341,7 @@
 }
 [data-theme="dark"] .cn-modal-code { background: rgba(255,255,255,0.04); }
 /* featured sparkle glyph next to a skill card name */
-.sk-card-star { color: var(--wb-brand, #6366f1); margin-right: 4px; vertical-align: middle; }
+.sk-card-star { color: var(--wb-brand, #00c29a); margin-right: 4px; vertical-align: middle; }
 
 /* ======================================================================
  * Skill detail view (full-screen overlay, mirrors WorkBuddy SkillDetailView)
@@ -363,7 +378,7 @@
 .sk-detail-install-btn {
   display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
   padding: 8px 16px; border-radius: 9px; border: none;
-  background: var(--wb-brand, #6366f1); color: #fff;
+  background: var(--wb-button-primary-bg); color: var(--wb-button-primary-fg);
   font-size: 13px; font-weight: 600; transition: opacity .15s;
 }
 .sk-detail-install-btn:hover { opacity: 0.88; }
@@ -446,7 +461,7 @@
   stroke-width: 2;
 }
 .context-usage__ring-progress {
-  stroke: var(--wb-accent, #6366f1);
+  stroke: var(--wb-accent, #00c29a);
   stroke-width: 2;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.3s ease;
@@ -494,7 +509,7 @@
 .context-usage__bar-fill {
   height: 100%;
   border-radius: 999px;
-  background: var(--wb-accent, #6366f1);
+  background: var(--wb-accent, #00c29a);
   transition: width 0.2s ease;
 }
 .context-usage__rows {

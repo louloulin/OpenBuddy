@@ -27,6 +27,65 @@ export interface ChatMessage {
   parts: MessagePart[];
   /** False while the assistant is still streaming this message. */
   complete: boolean;
+  /** Turn-level failure attached to an assistant message whose turn ended
+   *  in an error (provider 4xx/5xx, rate limit, agent crash, aborted stream).
+   *
+   *  Kept as message metadata rather than a `MessagePart` so the transcript
+   *  can render it as a dedicated error card even when the model produced
+   *  zero content parts — without it, a failed turn rendered as an empty
+   *  "Buddy" bubble with no explanation. */
+  error?: MessageError;
+  /** R8.1 (revision-pager) — user-message re-edit history.
+   *
+   *  When the user clicks `编辑` on a user bubble and submits a new prompt,
+   *  we keep the original text in `revisions[0]` and append the new text at
+   *  `revisions[1]`, `revisions[2]`, … The currently displayed revision is
+   *  `revisions[activeRevision - 1]`; the very last entry (highest index) is
+   *  always the live one driving the conversation.
+   *
+   *  Only set on `role: "user"` messages. Backward compatible: when absent
+   *  the renderer falls back to the `parts` text exactly as before.
+   *
+   *  Mirrors the spirit of PI-Desktop's `revisionCount` / `activeRevision`
+   *  fields but stays self-contained — we don't (yet) split the transcript
+   *  into a "revision tree" because the optimistic user-bubble path keeps
+   *  the canonical timeline linear. */
+  revisions?: string[];
+  /** R8.1 — 1-based index into `revisions` of the version currently shown
+   *  in the bubble. Defaults to the last entry when unset. */
+  activeRevision?: number;
+  /** R8.14 — wall-clock ms (Date.now()) when this message was first
+   *  inserted into the transcript. Optional so legacy fixtures and
+   *  pre-R8.14 JSONL entries keep type-checking; the renderer skips
+   *  the meta chip when this is absent. Newly created bubbles always
+   *  carry the stamp (pushOptimisticUser / pushOptimisticUserContent /
+   *  beginStreamingMessage), and pi history replay backfills it from
+   *  the entry's `timestamp` field. */
+  createdAt?: number;
+  /** R8.14 — wall-clock ms when this assistant message first reached
+   *  a terminal state (finishStreamingMessage / abandonStreamingMessage).
+   *  Combined with `createdAt` to render the "1.2s / 12s / 1m 5s"
+   *  duration chip beside the timestamp. Undefined while streaming
+   *  or on user bubbles. */
+  completedAt?: number;
+  /** R8.15 — model identifier used to produce this assistant turn
+   *  (e.g. `claude-opus-4-7`, `gpt-5`, `MiniMax-M3`). Stamped on
+   *  finishStreamingMessage from useAgentSession's currentModelIdRef so
+   *  the meta chip can show what produced the answer. Optional so
+   *  pre-R8.15 history / pre-streaming fixtures keep type-checking. */
+  modelId?: string;
+  /** R8.15 — completion token count reported by the provider for this
+   *  turn (drives the throughput chip "X tok/s" alongside the model
+   *  id). Optional for the same reason as `modelId`. */
+  outputTokens?: number;
+}
+
+/** A failed assistant turn, surfaced inline in the transcript. */
+export interface MessageError {
+  /** Human-readable reason (raw provider text or a short local summary). */
+  message: string;
+  /** Optional machine-readable code (e.g. `rate_limit_error`). */
+  code?: string;
 }
 export type MessagePart =
   | { kind: "text"; text: string }
@@ -160,6 +219,17 @@ interface UiSessionActions {
   pushOptimisticUserContent: (content: UserContentPart[]) => string;
   /** Drop the optimistic user bubble (e.g. round-trip failed). */
   popOptimistic: () => void;
+  /** R8.1 (revision-pager) — append a re-edited user prompt to an
+   *  existing user bubble's revision history and make it the active
+   *  version. No-op if the id doesn't resolve to a user message.
+   *
+   *  Used by `handleEditResend` to record every "edit & resend" iteration
+   *  so the bubble can show the user a prev/next pager of all the texts
+   *  they ever submitted from this slot. */
+  appendUserRevision: (messageId: string, text: string) => void;
+  /** R8.1 — switch the displayed revision of a user bubble. 1-based index.
+   *  No-op when out of range or when the message isn't a user message. */
+  setActiveRevision: (messageId: string, idx: number) => void;
   setError: (e: string | null) => void;
   /** R1.4 — start a streaming assistant message. Returns its id so subsequent
    *  deltas can target it. Called by App.tsx from `agent_message_chunk` /
@@ -181,12 +251,15 @@ interface UiSessionActions {
    *  where `streamingMessageId` was already cleared (cancel path, session
    *  switch, prior error path) — falls back to the latest incomplete
    *  assistant message so the orphan LoadingRow can never get stuck. */
-  finishStreamingMessage: () => void;
+  /** R8.15 — accepts optional model id + completion-token count so the
+   *  meta chip can show "model: X · 42 tok/s". Backward-compatible:
+   *  legacy call sites (cancel path, watchdog) pass nothing. */
+  finishStreamingMessage: (meta?: { modelId?: string; outputTokens?: number }) => void;
   /** Abandon the in-flight assistant message. Called from every error
    *  path (pi://turn-error, pi://agent-died, 60s streaming watchdog,
    *  user cancel) so the orphan LoadingRow is force-finalised and
    *  stamped with the interruption reason. Idempotent. */
-  abandonStreamingMessage: (reason: string) => void;
+  abandonStreamingMessage: (reason: string, error?: MessageError) => void;
   /** R2 — replace the current plan with a new one. Called when the agent
    *  emits a new PlanUpdate; old entries are dropped (ACP semantics). */
   setPlan: (plan: Plan | null) => void;
@@ -528,6 +601,9 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
       role: "user" as const,
       parts: [{ kind: "text" as const, text }],
       complete: true,
+      // R8.14 — wall-clock ms when the optimistic bubble was pushed.
+      // Drives `.msg__meta` relative-timestamp rendering.
+      createdAt: Date.now(),
     };
     set((s) => ({
       optimisticBubble: bubble,
@@ -550,7 +626,9 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
       }
       return [];
     });
-    const bubble: ChatMessage = { id, role: "user", parts, complete: true };
+    // R8.14 — wall-clock stamp so the relative-timestamp chip can
+    // render "刚刚" / "5 分钟前" beneath the bubble.
+    const bubble: ChatMessage = { id, role: "user", parts, complete: true, createdAt: Date.now() };
     set((s) => ({
       optimisticBubble: bubble,
       messages: [...s.messages, bubble],
@@ -572,6 +650,56 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
     };
   }),
 
+  appendUserRevision: (messageId, text) => {
+    set((s) => {
+      const idx = s.messages.findIndex((m) => m.id === messageId);
+      if (idx < 0) return s;
+      const target = s.messages[idx];
+      if (target.role !== "user") return s;
+      // revisions[0] is always the original prompt text so the pager can
+      // scrub back to "what I typed the very first time". If we already
+      // have a revisions array it was initialised correctly when the
+      // first edit happened, so don't re-seed.
+      const seeded = target.revisions ?? (() => {
+        const original = target.parts
+          .filter((p) => p.kind === "text")
+          .map((p) => p.text)
+          .join("\n");
+        return [original];
+      })();
+      const revisions = seeded.slice();
+      const last = revisions[revisions.length - 1];
+      // De-dup: re-submitting the exact same text is a no-op (still bumps
+      // activeRevision to the existing entry — saves on memory churn).
+      if (last === text) {
+        return {
+          messages: s.messages.map((m, i) =>
+            i === idx ? { ...m, revisions, activeRevision: revisions.length } : m,
+          ),
+        };
+      }
+      revisions.push(text);
+      const next = s.messages.slice();
+      next[idx] = { ...target, revisions, activeRevision: revisions.length };
+      return { messages: next };
+    });
+  },
+
+  setActiveRevision: (messageId, idx1) => {
+    set((s) => {
+      const idx = s.messages.findIndex((m) => m.id === messageId);
+      if (idx < 0) return s;
+      const target = s.messages[idx];
+      if (target.role !== "user") return s;
+      const total = target.revisions?.length ?? 0;
+      if (total === 0) return s;
+      const clamped = Math.min(Math.max(1, idx1 | 0), total);
+      const next = s.messages.slice();
+      next[idx] = { ...target, activeRevision: clamped };
+      return { messages: next };
+    });
+  },
+
   setError: (error) => set({ error }),
 
   beginStreamingMessage: () => {
@@ -579,7 +707,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
     discardStreamingBuffer();
     const id = nextId();
     set((s) => ({
-      messages: [...s.messages, { id, role: "assistant", parts: [], complete: false }],
+      messages: [...s.messages, { id, role: "assistant", parts: [], complete: false, createdAt: Date.now() }],
       streamingMessageId: id,
       // Drive the new single-source-of-truth reducer too. Same id so any
       // consumer that watches both views sees them stay coherent.
@@ -602,7 +730,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
     deltaRafId = scheduleDeltaFlush();
   },
 
-  finishStreamingMessage: () => {
+  finishStreamingMessage: (meta) => {
     // flush 保证缓冲里的文本先落进消息,再标记完成。
     flushStreamingBuffer();
     set((s) => {
@@ -615,9 +743,26 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
           streamState: streamReducer(s.streamState, { type: "end" }),
         };
       }
+      // R8.14 — `completedAt` lets MessageItem render the "12s" /
+      // "1m 5s" duration chip beside the timestamp. Stamped here
+      // (only on the assistant row that just finalised) so historic
+      // rows without it fall back to createdAt-only display.
+      const completedAt = Date.now();
+      // R8.15 — modelId + outputTokens from the pi lifecycle payload
+      // drive the meta chip's "model: X · 42 tok/s" affordance.
+      // Spread with `undefined` checks so we don't write `modelId:
+      // undefined` (which TS would treat as missing but is ugly in
+      // devtools / persisted transcripts).
+      const extra: { modelId?: string; outputTokens?: number } = {};
+      if (meta?.modelId) extra.modelId = meta.modelId;
+      if (typeof meta?.outputTokens === "number" && meta.outputTokens > 0) {
+        extra.outputTokens = meta.outputTokens;
+      }
       return {
         messages: s.messages.map((m) =>
-          m.id === target.id ? { ...m, complete: true } : m,
+          m.id === target.id
+            ? { ...m, complete: true, completedAt, ...extra }
+            : m,
         ),
         streamingMessageId: null,
         streamState: streamReducer(s.streamState, { type: "end" }),
@@ -625,7 +770,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
     });
   },
 
-  abandonStreamingMessage: (reason) => {
+  abandonStreamingMessage: (reason, error) => {
     // 异常兜底：把所有异常路径(turn-error / agent-died / watchdog /
     // 用户 cancel)统一收口；找不到目标就只清 streamingMessageId。
     // 与 finishStreamingMessage 不同：若目标消息 parts 为空，会写入一
@@ -639,13 +784,28 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
           streamState: streamReducer(s.streamState, { type: "end" }),
         };
       }
+      // When the caller knows *why* the turn failed, attach a structured
+      // error instead of an anonymous "（已中断）" placeholder. MessageItem
+      // renders it as an error card with the reason + a retry affordance,
+      // which is strictly more useful than a grey sentence.
       const parts =
         target.parts.length > 0
           ? target.parts
-          : [{ kind: "text" as const, text: `（已中断：${reason}）` }];
+          : error
+            ? []
+            : [{ kind: "text" as const, text: `（已中断：${reason}）` }];
+      const nextError =
+        error ?? (target.error?.message ? target.error : undefined);
+      // R8.14 — abandoned turns still need a `completedAt` so the
+      // meta chip stops showing the live streaming label. Captured
+      // here so the abandon path doesn't drift behind the
+      // finishStreamingMessage path.
+      const completedAt = Date.now();
       return {
         messages: s.messages.map((m) =>
-          m.id === target.id ? { ...m, parts, complete: true } : m,
+          m.id === target.id
+            ? { ...m, parts, complete: true, completedAt, ...(nextError ? { error: nextError } : {}) }
+            : m,
         ),
         streamingMessageId: null,
         streamState: streamReducer(s.streamState, { type: "end" }),

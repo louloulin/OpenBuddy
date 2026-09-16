@@ -58,7 +58,7 @@ test.describe("marketplace install/uninstall E2E via real IPC", () => {
     expect(install.ok, `install failed: ${String(install.value)}`).toBe(true);
     const info = install.value as { name?: string; version?: string };
     expect(info.name).toBe(FIXTURE_NAME);
-    expect(info.version).toBe("1.0.0");
+    expect(info.version).toBe("0.15.0");
 
     const after = await invokeOrReject(page, "agent:profile-packages");
     expect(after.ok).toBe(true);

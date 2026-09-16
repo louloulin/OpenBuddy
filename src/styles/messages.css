@@ -104,7 +104,7 @@
   color: var(--wb-text-strong, #1a1a2e);
 }
 .chat-rail__menu-item:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--wb-brand, #5b67f1) 50%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--wb-brand, #00c29a) 50%, transparent);
   outline-offset: -2px;
 }
 .chat-rail__menu {
@@ -142,7 +142,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--wb-brand, #5b67f1);
+  background: var(--wb-brand, #00c29a);
   animation: chatview-extension-pulse 1.2s ease-in-out infinite;
 }
 .chatview__extension-working-tools {
@@ -156,6 +156,55 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  /* R8.58 — top + bottom fade overlays that stay pinned to the
+     scroll viewport regardless of scroll position. They sit on
+     top of the scroll viewport (NOT the content), so the fade
+     is visible at all times even when the transcript is short
+     enough to not need scrolling. The fade reads as "there's
+     more above/below" without needing scroll detection JS. */
+}
+.chatview__scroll::before,
+.chatview__scroll::after {
+  content: "";
+  position: sticky;
+  left: 0;
+  right: 0;
+  height: 24px;
+  pointer-events: none;
+  z-index: 1;
+  display: block;
+}
+.chatview__scroll::before {
+  top: 0;
+  margin-bottom: -24px;
+  background: linear-gradient(
+    to bottom,
+    var(--wb-bg-primary, #ffffff),
+    transparent
+  );
+}
+.chatview__scroll::after {
+  bottom: 0;
+  margin-top: -24px;
+  background: linear-gradient(
+    to top,
+    var(--wb-bg-primary, #ffffff),
+    transparent
+  );
+}
+[data-theme="dark"] .chatview__scroll::before {
+  background: linear-gradient(
+    to bottom,
+    var(--wb-bg-primary, #0f0f12),
+    transparent
+  );
+}
+[data-theme="dark"] .chatview__scroll::after {
+  background: linear-gradient(
+    to top,
+    var(--wb-bg-primary, #0f0f12),
+    transparent
+  );
 }
 .chatview__inner {
   max-width: 800px;
@@ -171,12 +220,39 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   line-height: 1.4;
   color: var(--wb-text-strong, #1a1a2e);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+  padding-bottom: 8px;
+  /* R8.53 — brand-tinted hairline accent below the conversation
+     title (parity with ChatGPT / Claude Cowork conversation
+     headers). The 1px border + 8px breathing room gives the
+     title its own visual weight without competing with the
+     status pill that follows it. */
+  border-bottom: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 18%, transparent);
+  transition:
+    color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-bottom-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.chatview__title:hover {
+  /* On hover the hairline picks up more brand presence — same
+     principle as the sidebar nav item hover, but more
+     restrained because the title itself stays as primary text. */
+  border-bottom-color: color-mix(in srgb, var(--wb-brand, #00c29a) 36%, transparent);
+}
+.chatview__title:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand, #00c29a) 60%, transparent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chatview__title {
+    transition: none;
+  }
 }
 
 .chatview__status {
@@ -198,10 +274,23 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--wb-brand, #5b67f1) 70%, transparent);
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 70%, transparent);
 }
 .chatview__status--streaming .chatview__status-dot {
   animation: chatview__status-pulse 1.2s ease-in-out infinite;
+  /* R8.34 — bump the dot to solid brand colour when streaming so
+     the user gets a clearer "active" cue vs the neutral gray
+     resting state. */
+  background: var(--wb-brand, #00c29a);
+}
+.chatview__status--streaming {
+  /* R8.34 — subtle brand-tinted background when actively streaming
+     so the pill stands out against the muted "completed" state.
+     Uses color-mix at 8% so it doesn't compete with the active
+     tool-call borders nearby. */
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 8%, var(--wb-bg-secondary, #f5f5f7));
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 20%, var(--wb-border-soft, rgba(0, 0, 0, 0.08)));
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 80%, var(--wb-text-strong, #000) 15%);
 }
 @keyframes chatview__status-pulse {
   50% { opacity: 0.35; transform: scale(0.8); }
@@ -219,6 +308,28 @@
   border-left: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
   margin-left: 2px;
   user-select: none;
+}
+/* R8.20 — model id chip beside the status pill. Mirrors PI-Desktop's
+ * status pill model badge: a glanceable, brand-tinted pill that lets
+ * the user always know which model is producing the answer without
+ * opening the model picker. */
+.chatview__status-model {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 10%, transparent);
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 85%, var(--wb-text-strong, #000) 10%);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  user-select: none;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .chatview__footer {
   max-width: 800px;
@@ -256,18 +367,35 @@
   border: none;
   background: transparent;
   border-radius: 8px;
-  color: var(--wb-text-medium, rgba(255, 255, 255, 0.65));
+  /* R8.35 — Migrate the colour fallbacks from hardcoded rgba to
+     var(--wb-text-medium) so the tool button stays legible on both
+     light and dark themes. The rgba(255, 255, 255, …) fallback
+     was a dark-theme assumption leaking into the rest. */
+  color: var(--wb-text-medium);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  /* R8.9 motion tokens for the hover transition. */
+  transition:
+    background var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
   -webkit-app-region: no-drag;
 }
 .chatview__tool-btn:hover {
-  background: var(--wb-bg-hover, rgba(255, 255, 255, 0.08));
-  color: var(--wb-text-strong, rgba(255, 255, 255, 0.92));
+  /* R8.35 — Use the canonical --wb-bg-hover (a theme-aware color-mix)
+     so the hover state looks right on both light + dark themes. The
+     legacy rgba(255, 255, 255, 0.08) fallback was dark-only. */
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.chatview__tool-btn:active:not(:disabled) {
+  /* R8.35 — Micro-interaction parity with .msg__revision-btn:active
+     (R8.18). The button depresses slightly on click so the user
+     feels the action register. */
+  transform: scale(0.94);
 }
 .chatview__tool-btn--active {
-  color: var(--wb-brand, #5b67f1);
-  background: color-mix(in srgb, var(--wb-brand, #5b67f1) 14%, transparent);
+  color: var(--wb-brand, #00c29a);
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 14%, transparent);
 }
 /* 顶栏右侧槽位(ChatView 的 portal 目标):把按钮右推到顶栏右端,
    并允许按钮接收鼠标事件(顶栏整体是 -webkit-app-region: drag)。 */
@@ -301,8 +429,23 @@
   background: var(--wb-bg-elevated, var(--wb-bg-primary));
   border: 1px solid var(--wb-border-default);
   border-radius: 10px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
   font-size: 12px;
+  /* R8.8 — slide-in from the right edge so the bar feels "snapped
+     open" rather than appearing flat. ~120ms matches the existing
+     mention-picker / slash-commands enter curves. */
+  animation: ob-findbar-in var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+@keyframes ob-findbar-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* R8.8 — when the findbar contains a focused input, paint a brand-tinted
+   ring so the affordance for typing is visible against the chat transcript. */
+.findbar:focus-within {
+  border-color: color-mix(in srgb, var(--wb-brand) 45%, var(--wb-border-default));
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06),
+    0 0 0 3px color-mix(in srgb, var(--wb-brand) 12%, transparent);
 }
 .findbar__input {
   width: 180px;
@@ -317,6 +460,13 @@
   text-align: center;
   color: var(--wb-text-light);
   font-variant-numeric: tabular-nums;
+}
+/* R8.8 — when the query is non-empty and produced zero hits, paint the
+   counter red so the user notices the search failed before pressing
+   the (also disabled) prev / next arrows. */
+.findbar__count[data-empty="true"] {
+  color: color-mix(in srgb, var(--wb-status-error, #e5484d) 75%, transparent);
+  font-weight: 500;
 }
 .findbar__btn {
   display: inline-flex;
@@ -334,6 +484,14 @@
   background: var(--wb-bg-tertiary);
   color: var(--wb-text-strong);
 }
+.findbar__btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand) 65%, transparent);
+  outline-offset: 1px;
+}
+.findbar__btn:active:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-bg-tertiary) 70%, var(--wb-text-strong, #000) 5%);
+  transform: translateY(0.5px);
+}
 .findbar__btn:disabled {
   opacity: 0.4;
   cursor: default;
@@ -342,13 +500,69 @@
 .msg-wrap {
   border-radius: 8px;
 }
+/* R8.22 — find-hit highlight now routes through color-mix so dark
+ * theme can override the tint without per-theme overrides. The hit
+ * background stays neutral (text-mix 5%) so multiple hits don't
+ * fight the current hit's brand tint. */
 .msg-wrap--find-hit {
-  box-shadow: inset 3px 0 0 var(--wb-brand);
-  background: rgba(0, 0, 0, 0.02);
+  box-shadow: inset 3px 0 0 var(--wb-brand, #00c29a);
+  background: color-mix(in srgb, var(--wb-text-strong, #000) 5%, transparent);
+  transition: background var(--wb-motion-duration-fast, 120ms) var(--wb-ease-standard, ease-out);
 }
 .msg-wrap--find-current {
-  box-shadow: inset 3px 0 0 var(--wb-brand);
-  background: rgba(0, 122, 255, 0.06);
+  box-shadow: inset 3px 0 0 var(--wb-brand, #00c29a);
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 12%, transparent);
+  transition: background var(--wb-motion-duration-fast, 120ms) var(--wb-ease-standard, ease-out);
+}
+
+/* R8.28 — Multi-select message highlight (Slack-style).
+   Distinct from --find-current so a user searching the transcript
+   doesn't confuse the two states:
+     - --find-current: blue/brand tint (one match)
+     - --find-hit:    neutral text-mix (other matches)
+     - --selected:    green-tinted checkbox accent (multi-select)
+   The inset right border carries a soft checkmark glyph via a
+   pseudo-element so the row reads as "checked" even without a
+   visible checkbox (the actual checkbox UI ships separately
+   when multi-select wiring lands). */
+.msg-wrap--selected {
+  box-shadow: inset 3px 0 0 var(--wb-status-success, #1a7f37);
+  background: color-mix(in srgb, var(--wb-status-success, #1a7f37) 8%, transparent);
+  transition: background var(--wb-motion-duration-fast, 120ms) var(--wb-ease-standard, ease-out);
+}
+.msg-wrap--selected::before {
+  /* Small checkmark glyph rendered via CSS so the row reads as
+     "checked" without needing an actual checkbox UI. The glyph is
+     positioned top-left so it doesn't conflict with the message
+     avatar or actions. */
+  content: "✓";
+  position: absolute;
+  top: 6px;
+  left: -22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--wb-status-success, #1a7f37);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.msg-wrap--selected + .msg-wrap--selected {
+  /* Stack selected rows without double-spacing the checkmark. */
+  margin-top: 0;
+}
+.msg-wrap--selected.msg-wrap--find-hit,
+.msg-wrap--selected.msg-wrap--find-current {
+  /* When a selected message also matches a search hit, prefer the
+     selected green accent (it's the more recent user intent) but
+     keep the green tinted background slightly stronger so both
+     states remain readable. */
+  box-shadow: inset 3px 0 0 var(--wb-status-success, #1a7f37);
+  background: color-mix(in srgb, var(--wb-status-success, #1a7f37) 12%, transparent);
 }
 
 
@@ -360,6 +574,29 @@
 .msg--user {
   display: block;
   text-align: right;
+  /* R8.30 — User message bubble entrance animation. The animation
+     fires once when a new user message mounts (React mounts a fresh
+     component for each new message). Subsequent re-renders of the
+     same message do not re-trigger because the component instance
+     is preserved. Parity with Claude Cowork / ChatGPT — makes the
+     timeline feel like a flowing conversation rather than a series
+     of abrupt insertions. */
+  animation: msg-user-enter var(--wb-motion-duration-base, 200ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+@keyframes msg-user-enter {
+  from {
+    opacity: 0;
+    transform: translateX(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg--user {
+    animation: none;
+  }
 }
 /* 右对齐气泡容器：inline-block 使其按内容收缩，max-width 限制不超过 75% 行宽，
    父级 text-align:right 把它推到右侧。文本在容器内恢复左对齐。 */
@@ -393,6 +630,166 @@
  *  修复后两侧气泡明确朝自己方向收尾, 视觉更接近 WorkBuddy 风格。 */
 .msg--assistant .msg__bubble {
   border-radius: 16px 16px 16px 0;
+/* R8.1 (revision-pager) — split text + attachments inside the user
+ * bubble so we can replace the text span alone when scrubbing through
+ * revisions (file/image previews stay mounted across revisions).
+ * Block layout keeps attachments stacked above the text. */
+.msg__bubble-text {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg__bubble-text + .msg__bubble-text {
+  margin-top: 4px;
+}
+/* R8.1 — revision pager sits next to the hover action bar in the user
+ * bubble. Uses the same compact pill style as PI-Desktop's revision
+ * pager: tiny chevron buttons, tabular label "current / total". */
+.msg__revision-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--wb-bg-secondary, #ebebeb) 70%, transparent);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--wb-text-medium, rgba(0, 0, 0, 0.55));
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  user-select: none;
+}
+.msg--user:hover .msg__revision-pager,
+.msg__revision-pager:focus-within {
+  opacity: 0.9;
+}
+.msg__revision-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.msg__revision-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-text-strong, #000) 8%, transparent);
+  color: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
+}
+.msg__revision-btn:active:not(:disabled) {
+  /* R8.18 — PI-Desktop `.icon-btn:active scale(0.96)` parity.
+   * The subtle press-down feedback makes the click feel responsive
+   * without crossing into a "bouncy" feel that would feel cheap. */
+  transform: scale(0.96);
+}
+.msg__revision-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.msg__revision-label {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  min-width: 32px;
+  text-align: center;
+}
+.msg__revision-label {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  min-width: 32px;
+  text-align: center;
+}
+
+/* R8.3 (inline-edit) — user-bubble inline editor. The textarea replaces
+   the bubble body so the user can refine the prompt without leaving the
+   transcript. Layout mirrors PI-Desktop's .message-edit block but keeps
+   OpenBuddy's smaller, sharper visual language. */
+.msg__edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  max-width: 100%;
+  /* Use the same right-aligned column the bubble sits in so the textarea
+     lines up visually with the original bubble. */
+  background: var(--wb-bg-primary, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--wb-brand) 45%, var(--wb-border-default, #ebebeb));
+  border-radius: 12px;
+  padding: 8px 10px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-brand) 12%, transparent);
+  /* Subtle slide-down so the editor "lands" instead of popping. */
+  animation: msg-edit-enter var(--wb-motion-duration-fast, 120ms) ease-out;
+}
+@keyframes msg-edit-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.msg__edit-input {
+  appearance: none;
+  resize: none;
+  width: 100%;
+  min-height: 64px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 0;
+}
+.msg__edit-input::placeholder {
+  color: color-mix(in srgb, var(--wb-text-strong) 35%, transparent);
+}
+.msg__edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px dashed color-mix(in srgb, var(--wb-border-default, #ebebeb) 60%, transparent);
+  padding-top: 6px;
+}
+.msg__edit-hint {
+  flex: 1 1 auto;
+  font-size: 11px;
+  color: color-mix(in srgb, var(--wb-text-strong) 50%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.msg__action-btn--primary {
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+  border: 1px solid var(--wb-button-primary-bg);
+}
+.msg__action-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 90%, #000);
+}
+.msg__action-btn--primary:disabled {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 40%, transparent);
+  border-color: transparent;
+  color: color-mix(in srgb, var(--wb-text-strong) 50%, transparent);
+  cursor: not-allowed;
+}
+/* R8.3 — when the bubble is editable (inline-edit available), highlight
+   on hover with a faint brand tint so users discover the double-click
+   affordance. Keyboard focus on the bubble itself is invisible by default
+   (not focusable); the textarea inside the editor owns focus. */
+.msg__bubble--editable {
+  cursor: text;
+  transition: box-shadow 0.12s ease, background 0.12s ease;
+}
+.msg--user:hover .msg__bubble--editable {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wb-brand) 18%, transparent);
+}
   /* 助理气泡用更浅的灰底, 与用户气泡区分(WB 实测) */
   background: var(--wb-bg-tertiary, #f4f5f8);
 }
@@ -422,7 +819,7 @@ button.diff__path {
 }
 .diff__path--clickable {
   cursor: pointer;
-  color: var(--md-link, var(--wb-brand, #5b5fc7));
+  color: var(--md-link, var(--wb-brand, #00c29a));
   text-decoration: underline;
   text-decoration-style: dotted;
   text-underline-offset: 2px;
@@ -446,13 +843,17 @@ button.diff__path {
   word-break: break-all;
   overflow-wrap: anywhere;
 }
-.diff__add {
-  color: #1a7f37;
-  background: rgba(26, 127, 55, 0.1);
-}
+/* R8.21 — diff stats + line backgrounds now route through the
+ * --wb-status-success / --wb-status-error tokens so dark theme can
+ * shift the green/red palette without per-theme overrides. The
+ * color-mix alpha mirrors the previous 10% surface tint. */
 .diff__del {
-  color: #cf222e;
-  background: rgba(207, 34, 46, 0.1);
+  color: var(--wb-status-error, #cf222e);
+  background: color-mix(in srgb, var(--wb-status-error, #cf222e) 10%, transparent);
+}
+.diff__add {
+  color: var(--wb-status-success, #1a7f37);
+  background: color-mix(in srgb, var(--wb-status-success, #1a7f37) 10%, transparent);
 }
 /* Unified diff stats + line numbers */
 .diff__stats {
@@ -462,11 +863,21 @@ button.diff__path {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
-.diff__stats-add { color: #1a7f37; font-weight: 600; }
-.diff__stats-del { color: #cf222e; font-weight: 600; }
+.diff__stats-add {
+  color: var(--wb-status-success, #1a7f37);
+  font-weight: 600;
+}
+.diff__stats-del {
+  color: var(--wb-status-error, #cf222e);
+  font-weight: 600;
+}
 .diff__line { display: flex; gap: 8px; line-height: 18px; }
-.diff__line--add { background: rgba(26, 127, 55, 0.1); }
-.diff__line--del { background: rgba(207, 34, 46, 0.1); }
+.diff__line--add {
+  background: color-mix(in srgb, var(--wb-status-success, #1a7f37) 10%, transparent);
+}
+.diff__line--del {
+  background: color-mix(in srgb, var(--wb-status-error, #cf222e) 10%, transparent);
+}
 .diff__line-num {
   flex: none; min-width: 40px; text-align: right;
   color: var(--wb-text-weak); font-size: 10px; user-select: none;
@@ -475,8 +886,12 @@ button.diff__path {
   flex: none; width: 12px; text-align: center; user-select: none;
   color: var(--wb-text-weak);
 }
-.diff__line--add .diff__line-prefix { color: #1a7f37; }
-.diff__line--del .diff__line-prefix { color: #cf222e; }
+.diff__line--add .diff__line-prefix {
+  color: var(--wb-status-success, #1a7f37);
+}
+.diff__line--del .diff__line-prefix {
+  color: var(--wb-status-error, #cf222e);
+}
 .diff__line-text { flex: 1; white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere; }
 
 /* ============================================================================
@@ -485,27 +900,42 @@ button.diff__path {
  * 样式定义，面板退化为无边框的裸列表。此处补齐。
  * ========================================================================== */
 .rewind-bar {
+  /* R6.9 — compact horizontal bar above the composer (was a full-width
+   * stacked pair that ate ~64px of vertical space and looked broken).
+   * `position: relative` so the absolutely-positioned dropdown anchors
+   * to the bar, not the page. */
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
 }
 .rewind-bar__btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
+  height: 26px;
   padding: 0 10px;
   border: 1px solid var(--wb-border-default);
   border-radius: 8px;
   background: var(--wb-bg-elevated);
-  color: var(--wb-text-strong);
+  color: var(--wb-text-medium, #6e6e80);
   font-size: 12px;
   cursor: pointer;
-  transition: background-color 140ms, border-color 140ms;
+  transition: background-color 140ms, border-color 140ms, color 140ms;
 }
 .rewind-bar__btn:hover {
   background: var(--wb-bg-hover);
   border-color: color-mix(in srgb, var(--wb-brand-primary, #00c29a) 35%, transparent);
+}
+.rewind-bar__btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand-primary, #00c29a) 65%, transparent);
+  outline-offset: 1px;
+}
+.rewind-bar__btn:active {
+  background: color-mix(in srgb, var(--wb-bg-hover) 75%, var(--wb-text-strong, #000) 4%);
+  transform: translateY(0.5px);
 }
 .rewind-bar__badge {
   display: inline-flex;
@@ -535,6 +965,14 @@ button.diff__path {
   box-shadow:
     0 8px 24px -8px rgba(0, 0, 0, .18),
     0 24px 64px -12px rgba(0, 0, 0, .22);
+  /* R8.8 — slide-in animation matching the mention-picker / slash-commands
+     popovers. 140ms feels snappy on the click that opens the timeline. */
+  animation: ob-rewind-dropdown-in var(--wb-motion-duration-fast, 140ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  transform-origin: top right;
+}
+@keyframes ob-rewind-dropdown-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .rewind-bar__dropdown--timeline {
   min-width: 380px;
@@ -654,4 +1092,234 @@ button.diff__path {
   flex-direction: column;
   min-width: 0;
   margin-bottom: 4px;
+}
+
+/* ============================================================================
+ * turn-error — 失败 assistant 回合的内联错误卡(Phase R6.9)
+ * 替代以往"空气泡 + 横幅"双展示;气泡卡本身承载原因 + 恢复动作。
+ * ========================================================================== */
+.turn-error {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--wb-text-error, #c43030) 35%, var(--wb-border-default));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--wb-text-error, #c43030) 7%, var(--wb-bg-primary));
+  color: var(--wb-text-strong);
+  font-size: 13px;
+  line-height: 1.5;
+}
+[data-theme="dark"] .turn-error {
+  background: color-mix(in srgb, var(--wb-text-error, #c43030) 10%, var(--wb-bg-elevated, var(--wb-bg-primary)));
+  border-color: color-mix(in srgb, var(--wb-text-error, #ff6f6f) 40%, transparent);
+}
+.turn-error__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.turn-error__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--wb-text-error, #c43030);
+  background: color-mix(in srgb, var(--wb-text-error, #c43030) 14%, transparent);
+}
+[data-theme="dark"] .turn-error__icon {
+  color: #ff8b8b;
+  background: color-mix(in srgb, #ff8b8b 18%, transparent);
+}
+.turn-error__title {
+  font-weight: 600;
+  font-size: 13px;
+}
+.turn-error__code {
+  /* R8.25 — Migrate to --wb-status-error (the canonical token) so the
+     chip stays in lock-step with .chatview__error-retry, .email-badges,
+     and the other error surfaces. The fallback (#c43030) preserves the
+     legacy look for any theme that hasn't adopted the new palette. */
+  font-family: var(--wb-font-code-family, ui-monospace, SFMono-Regular, monospace);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wb-status-error, var(--wb-text-error, #c43030)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-status-error, var(--wb-text-error, #c43030)) 28%, transparent);
+  /* 2026-09-16 对比度修复 —— 直接用 --wb-status-error (#F64041) 作为
+   * 10.5px 小字号文本颜色时，在白底上的对比度只有 3.67:1，低于 WCAG AA
+   * 要求的 4.5:1。改成把错误红与正文色按 76:24 混合，实测对比度升到
+   * 约 5.8:1，同时保留"这是报错"的红色语义。
+   * （暗色主题另有 #ff8b8b 覆盖，不受影响。） */
+  color: color-mix(in srgb, var(--wb-status-error, var(--wb-text-error, #c43030)) 76%, var(--wb-text-strong, #1a1a1a));
+  user-select: text;
+  transition: background var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+              border-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.turn-error__code:hover {
+  background: color-mix(in srgb, var(--wb-status-error, var(--wb-text-error, #c43030)) 20%, transparent);
+  border-color: color-mix(in srgb, var(--wb-status-error, var(--wb-text-error, #c43030)) 40%, transparent);
+}
+[data-theme="dark"] .turn-error__code {
+  /* Dark theme: keep the chip readable but use the soft palette token
+     for the background so the contrast ratio stays comfortable. */
+  background: color-mix(in srgb, var(--wb-status-error, #ff6f6f) 18%, transparent);
+  border-color: color-mix(in srgb, var(--wb-status-error, #ff6f6f) 36%, transparent);
+  color: #ff8b8b;
+}
+.turn-error__actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 6px;
+}
+.turn-error__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  color: var(--wb-text-medium, #6e6e80);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.turn-error__btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 35%, transparent);
+}
+.turn-error__btn--primary {
+  background: var(--wb-text-error, #c43030);
+  border-color: transparent;
+  color: #fff;
+}
+.turn-error__btn--primary:hover {
+  background: color-mix(in srgb, var(--wb-text-error, #c43030) 88%, white);
+  color: #fff;
+}
+.turn-error__body {
+  position: relative;
+  max-height: 4.5em; /* 3 lines @ 1.5 line-height */
+  overflow: hidden;
+}
+.turn-error__body--expanded {
+  max-height: none;
+}
+.turn-error__text {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-family: var(--wb-font-code-family, ui-monospace, SFMono-Regular, monospace);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--wb-text-medium, #6e6e80);
+}
+.turn-error__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wb-text-medium, #6e6e80);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.turn-error__toggle:hover {
+  color: var(--wb-text-strong);
+}
+
+/* ============================================================================
+ * R8.19 — Mobile / narrow-viewport responsive breakpoints
+ *
+ * Three breakpoint tiers, increasing restrictiveness as the viewport shrinks:
+ *
+ *   - ≤ 768px (tablet portrait / small desktop windows): trim padding,
+ *     widen the user bubble from 75% → 88% so short prompts aren't a
+ *     narrow column on the right.
+ *
+ *   - ≤ 540px (phone portrait): widen further to 92%, drop horizontal
+ *     padding on .chatview__inner, shrink the composer footer padding.
+ *
+ *   - ≤ 380px (small phone / split-screen): max out at 100% so very long
+ *     user prompts wrap naturally without clipping.
+ *
+ * The .chatview__inner width cap (800px) stays in effect for ≥ 769px so
+ * desktop users keep their reading column. Below that, the cap drops to
+ * 100% — the inner padding alone provides the gutter.
+ * ============================================================================ */
+@media (max-width: 768px) {
+  .chatview__inner {
+    max-width: 100%;
+    padding: 16px 12px 8px;
+    gap: 16px;
+  }
+  .msg--user > div {
+    /* Bump from 75% → 88% on tablet portrait so short prompts aren't
+     * crammed against the right edge. Long prompts still wrap. */
+    max-width: 88%;
+  }
+  .msg__meta {
+    /* Slightly more readable timestamp on tablet portrait. */
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 540px) {
+  .chatview__inner {
+    padding: 12px 8px 6px;
+    gap: 14px;
+  }
+  .msg--user > div {
+    max-width: 92%;
+  }
+  .msg--assistant .msg__avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+  }
+  .msg--assistant .msg__name {
+    font-size: 12px;
+  }
+  .msg__meta-chip {
+    max-width: 130px;
+  }
+}
+
+@media (max-width: 380px) {
+  .chatview__inner {
+    padding: 10px 6px 4px;
+  }
+  .msg--user > div {
+    max-width: 100%;
+  }
+  /* The user bubble gets tighter padding so it doesn't push the
+   * composer off-screen on a 360px viewport. */
+  .msg__bubble {
+    padding: 7px 10px;
+    font-size: 13.5px;
+    line-height: 21px;
+  }
+  /* Assistant header shrinks to free up horizontal space. */
+  .msg--assistant .msg__header {
+    gap: 4px;
+  }
+  .msg--assistant .msg__role {
+    padding: 0 4px;
+    font-size: 9px;
+  }
 }

@@ -294,6 +294,7 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
           onToast={showToast}
           onSelectExpert={handleStartWithExpert}
           onNavigateConnectors={() => setPlaceholderView("专家·技能·连接器")}
+          onOpenSettings={openSettings}
           extensionText={extensionText}
           extensionTextNonce={extensionTextNonce}
           extensionUi={extensionUiBySession[currentSessionId]}

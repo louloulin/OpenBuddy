@@ -240,7 +240,11 @@
 .um-btn:disabled { opacity: .5; cursor: not-allowed; }
 .um-btn--grey { background: var(--wb-bg-tertiary); border-color: transparent; }
 .um-btn--grey:hover { background: var(--wb-bg-tertiary); filter: brightness(0.97); border-color: transparent; }
-.um-btn--primary { background: var(--wb-brand); color: #fff; border-color: var(--wb-brand); }
+.um-btn--primary {
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+  border-color: var(--wb-button-primary-bg);
+}
 .um-btn--primary:hover { filter: brightness(1.05); border-color: var(--wb-brand); }
 
 

@@ -22,7 +22,7 @@ const sampleCapability: BuddyCapability = {
 
 const options = {
   serverName: "openbuddy-test",
-  serverVersion: "0.1.0-test",
+  serverVersion: "0.15.0-test",
   listCapabilities: () => [sampleCapability],
   invokeCapability: async () => ({ content: [{ type: "text" as const, text: "ok" }] }),
 };
@@ -69,7 +69,7 @@ describe("buildListToolsResponse with per-package exporters", () => {
   it("merges collaboration capabilities with exporter capabilities in the tools list", async () => {
     const response = await buildListToolsResponse({
       serverName: "openbuddy-test",
-      serverVersion: "0.1.0-test",
+      serverVersion: "0.15.0-test",
       invokeCapability: async () => ({ content: [{ type: "text", text: "{}" }] }),
       listCapabilities: () => [sampleCapability],
       exporters: [{
@@ -89,7 +89,7 @@ describe("buildCallToolResponse with per-package exporters", () => {
     const response = await buildCallToolResponse(
       {
         serverName: "openbuddy-test",
-        serverVersion: "0.1.0-test",
+        serverVersion: "0.15.0-test",
         invokeCapability: async () => ({ content: [{ type: "text", text: "{}" }] }),
         listCapabilities: () => [sampleCapability],
         exporters: [{
@@ -110,7 +110,7 @@ describe("buildCallToolResponse with per-package exporters", () => {
     const response = await buildCallToolResponse(
       {
         serverName: "openbuddy-test",
-        serverVersion: "0.1.0-test",
+        serverVersion: "0.15.0-test",
         invokeCapability: async () => ({ content: [{ type: "text", text: "{}" }] }),
         listCapabilities: () => [sampleCapability],
         exporters: [],
@@ -187,7 +187,7 @@ describe("createMcpServerAdapter", () => {
   it("reports server name, version, and a zero tool count before any list call", () => {
     const adapter = createMcpServerAdapter(options);
     expect(adapter.serverName()).toBe("openbuddy-test");
-    expect(adapter.serverVersion()).toBe("0.1.0-test");
+    expect(adapter.serverVersion()).toBe("0.15.0-test");
     expect(adapter.listToolCount()).toBe(0);
   });
 

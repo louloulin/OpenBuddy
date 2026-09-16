@@ -10,8 +10,10 @@ import { setToast } from "./stores/toast-store";
 import { useSessionStore } from "./stores/session-store";
 import { abandonInFlightStream } from "./lib/agent/abandon-stream";
 // Phase 2 — modular CSS. globals.css transitively imports tokens / base /
-// theme / chrome / per-domain 拆分文件。app.css 与 automation-wb.css 由
-// globals.css 间接引入（兜底，向后兼容）。
+// theme / chrome / per-domain 拆分文件。automation-wb.css 保留兜底兼容。
+// R8.4 — 删除了原 app.css 单体（15633 行 / 477KB，从未 import 验证为死
+// 代码）；其独有 shell selector 已迁到 src/styles/shell.css，R8.2 toolcall
+// 样式已迁到 tool-call.css。
 import "./styles/globals.css";
 
 // Phase K.3 — 把 `@openbuddy/plugin-sdk` 的 `defineExtension()` 事件接进微内核。

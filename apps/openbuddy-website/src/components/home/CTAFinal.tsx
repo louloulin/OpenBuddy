@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { GithubIcon } from '@/components/icons/BrandIcons';
+import Reveal from '@/components/motion/Reveal';
 import { localizedPath, type Locale } from '@/lib/i18n';
 import { SITE_LICENSE, SITE_STATS } from '@/lib/constants';
 
@@ -23,7 +24,7 @@ export default function CTAFinal({ locale }: CTAFinalProps) {
             className="pointer-events-none absolute -bottom-32 -left-24 h-72 w-72 rounded-full bg-[var(--wb-brand-soft)] blur-3xl"
           />
 
-          <div className="relative">
+          <Reveal className="relative">
             <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--wb-fg-faint)]">
               { isZh ? '下一步' : 'Get started' }
             </p>

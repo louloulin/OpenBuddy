@@ -18,7 +18,7 @@
   justify-content: center;
   padding: 24px;
   z-index: 1100;
-  animation: wb-modal-overlay-in 160ms ease-out both;
+  animation: wb-modal-overlay-in var(--wb-motion-duration-pop, 160ms) ease-out both;
 }
 @keyframes wb-modal-overlay-in {
   from { opacity: 0; }
@@ -29,7 +29,7 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .modal-overlay > [role="dialog"] {
-  animation: wb-modal-card-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: wb-modal-card-in var(--wb-motion-duration-md, 180ms) var(--wb-motion-easing-emphasized, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
 .settings-modal-overlay {
   position: fixed;
@@ -39,7 +39,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: settings-fade-in 0.15s ease-out;
+  animation: settings-fade-in var(--wb-motion-duration-sm, 150ms) ease-out;
 }
 @keyframes settings-fade-in {
   from { opacity: 0; }
@@ -60,7 +60,7 @@
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
   display: flex;
   overflow: hidden;
-  animation: settings-slide-up 0.2s ease-out;
+  animation: settings-slide-up var(--wb-motion-duration-base, 200ms) ease-out;
 }
 @media (max-height: 600px) {
   .settings-modal {
@@ -449,7 +449,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1001;
-  animation: settings-fade-in 0.12s ease-out;
+  animation: settings-fade-in var(--wb-motion-duration-fast, 120ms) ease-out;
 }
 .models-settings-panel__editor {
   width: min(560px, calc(100vw - 64px));
@@ -459,7 +459,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: settings-slide-up 0.18s ease-out;
+  animation: settings-slide-up var(--wb-motion-duration-md, 180ms) ease-out;
 }
 .models-settings-panel__editor-header {
   display: flex;

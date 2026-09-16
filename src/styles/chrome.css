@@ -140,8 +140,8 @@
   font-size: 11px;
   font-weight: 500;
   color: var(--wb-text-medium, #6e6e80);
-  background: color-mix(in srgb, var(--wb-brand, #5b67f1) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--wb-brand, #5b67f1) 20%, transparent);
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 20%, transparent);
   border-radius: 999px;
   white-space: nowrap;
   user-select: none;
@@ -183,9 +183,9 @@
   padding: 2px 8px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--wb-accent, #6366f1);
-  background: color-mix(in srgb, var(--wb-accent, #6366f1) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--wb-accent, #6366f1) 25%, transparent);
+  color: var(--wb-accent, #00c29a);
+  background: color-mix(in srgb, var(--wb-accent, #00c29a) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-accent, #00c29a) 25%, transparent);
   border-radius: 999px;
   white-space: nowrap;
   max-width: 160px;
@@ -462,7 +462,7 @@
   border-radius: 12px;
   background: var(--wb-bg-elevated, var(--wb-bg-primary));
   box-shadow: var(--wb-shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.16));
-  animation: ob-scale-in 140ms var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: ob-scale-in var(--wb-motion-duration-fast, 140ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 .secondary-sidebar__loading {
   padding: 12px;

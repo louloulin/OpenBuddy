@@ -21,7 +21,7 @@
   border-radius: 10px;
   box-shadow: var(--wb-shadow-lg, 0 10px 40px rgba(0, 0, 0, 0.18));
   padding: 4px;
-  animation: topbar-actions__fade-in 0.12s ease;
+  animation: topbar-actions__fade-in var(--wb-motion-duration-fast, 120ms) ease;
 }
 @keyframes topbar-actions__fade-in {
   from { opacity: 0; transform: translateY(-4px); }
@@ -125,18 +125,71 @@
   max-width: 560px;
   color: var(--wb-text-strong);
 }
-.chatview__empty-state-icon {
-  font-size: 36px;
-  line-height: 1;
+/* R8.27 — Empty-state hero illustration upgrade.
+   The hero is now a 64×64 brand-tinted halo + a 28px lucide WandSparkles
+   icon stacked on top. The halo carries the brand colour via color-mix
+   so dark-theme overrides can adjust without per-theme overrides. The
+   hero animates in with a soft scale + fade on first paint via
+   @keyframes chatview__empty-hero-in. */
+.chatview__empty-state-hero {
+  position: relative;
   width: 64px;
   height: 64px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin-bottom: 4px;
+  isolation: isolate;
+  animation: chatview__empty-hero-in var(--wb-motion-duration-slow, 320ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+.chatview__empty-state-halo {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--wb-brand, #00c29a) 24%, transparent) 0%,
+    color-mix(in srgb, var(--wb-brand, #00c29a) 6%, transparent) 60%,
+    transparent 100%
+  );
+  z-index: -1;
+  /* Subtle pulsing glow keeps the hero feeling alive without being noisy */
+  animation: chatview__empty-hero-pulse 4s ease-in-out infinite;
+}
+.chatview__empty-state-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wb-brand, #00c29a);
   background: var(--wb-bg-elevated);
-  border: 1px solid var(--wb-border-default);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  border: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 20%, var(--wb-border-default));
+  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  padding: 14px;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--wb-brand, #00c29a) 14%, transparent);
+}
+@keyframes chatview__empty-hero-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes chatview__empty-hero-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.06); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chatview__empty-state-hero {
+    animation: none;
+  }
+  .chatview__empty-state-halo {
+    animation: none;
+  }
 }
 .chatview__empty-state-title {
   margin: 0;
@@ -183,21 +236,133 @@
   gap: 8px;
   justify-content: center;
 }
+/* R8.31 — Empty-state capability tag chips. Each chip carries a
+   small brand-tinted dot on the left + a 1px brand-tinted border so
+   the chips read as "available capabilities" rather than generic
+   labels. The dot uses color-mix to scale with the brand tint and
+   stays visible against both light + dark themes. */
 .chatview__empty-state-tag {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   height: 26px;
-  padding: 0 10px;
+  padding: 0 10px 0 8px;
   border-radius: 13px;
-  background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.04));
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 14%, transparent);
   font-size: 12px;
   font-weight: 500;
   color: var(--wb-text-medium);
-  transition: background-color .18s var(--wb-ease-out-expo), color .18s var(--wb-ease-out-expo);
+  transition:
+    background-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.chatview__empty-state-tag::before {
+  /* Tiny brand-tinted dot on the left so the chip reads as
+     "available capability" rather than a generic label. */
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 70%, transparent);
+  flex: none;
 }
 .chatview__empty-state-tag:hover {
-  background: var(--wb-bg-hover);
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 10%, transparent);
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 28%, transparent);
   color: var(--wb-text-strong);
+  transform: translateY(-1px);
+}
+.chatview__empty-state-tag:hover::before {
+  background: var(--wb-brand, #00c29a);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chatview__empty-state-tag,
+  .chatview__empty-state-tag:hover {
+    transform: none;
+  }
+}
+
+/* R8.10 — quick-prompt cards on the welcome empty state. Each card is a
+   button that seeds the composer with a preset prompt via resendText.
+   Layout: 2 columns on wide screens, 1 column on narrow. Each card has
+   an icon left + title/desc stacked on the right. */
+.chatview__quick-prompts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+  width: 100%;
+  max-width: 560px;
+}
+.chatview__quick-prompt {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--wb-bg-primary, #ffffff);
+  border: 1px solid var(--wb-border-default, #ebebeb);
+  border-radius: 10px;
+  color: var(--wb-text-strong);
+  cursor: pointer;
+  transition:
+    border-color var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    background-color var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.chatview__quick-prompt:hover {
+  border-color: color-mix(in srgb, var(--wb-brand) 45%, var(--wb-border-default, #ebebeb));
+  background: color-mix(in srgb, var(--wb-brand) 4%, var(--wb-bg-primary, #ffffff));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--wb-palette-black-100, #000) 6%, transparent);
+}
+.chatview__quick-prompt:focus-visible {
+  outline: none;
+  border-color: var(--wb-brand, #00c29a);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-brand) 22%, transparent);
+}
+.chatview__quick-prompt:active {
+  transform: translateY(0);
+  background: color-mix(in srgb, var(--wb-brand) 7%, var(--wb-bg-primary, #ffffff));
+}
+.chatview__quick-prompt-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--wb-brand) 10%, transparent);
+  color: var(--wb-brand, #00c29a);
+}
+.chatview__quick-prompt:hover .chatview__quick-prompt-icon {
+  background: color-mix(in srgb, var(--wb-brand) 16%, transparent);
+}
+.chatview__quick-prompt-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.chatview__quick-prompt-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--wb-text-strong);
+}
+.chatview__quick-prompt-desc {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--wb-text-medium, rgba(0, 0, 0, 0.55));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 暗色适配：空状态的图标卡 + 标签在暗背景下要再压暗一点 */
@@ -207,4 +372,16 @@
 }
 [data-theme="dark"] .chatview__empty-state-tag {
   background: rgba(255, 255, 255, 0.06);
+}
+[data-theme="dark"] .chatview__quick-prompt {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+[data-theme="dark"] .chatview__quick-prompt:hover {
+  background: color-mix(in srgb, var(--wb-brand) 10%, rgba(255, 255, 255, 0.03));
+  border-color: color-mix(in srgb, var(--wb-brand) 50%, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+[data-theme="dark"] .chatview__quick-prompt-icon {
+  background: color-mix(in srgb, var(--wb-brand) 18%, transparent);
 }

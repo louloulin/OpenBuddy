@@ -3,20 +3,28 @@
  * that drive the ExtensionAuditPanel's red/amber/neutral row colouring
  * (plan4.5 §A).
  *
+ * R8.4 (css-modularisation) — the rules used to live in the now-removed
+ * `src/styles/app.css` monolith. They were migrated to `ui-kit.css` and
+ * `work-panel.css` during Phase 2; this spec concatenates every CSS file
+ * in `src/styles/` so it pins the spec to the union of the modular
+ * stylesheets, mirroring what the runtime actually loads (vite pulls them
+ * in via globals.css's @import chain).
+ *
  * The component emits `data-action` and `data-tone` hooks; the actual
- * styling lives in `src/styles/app.css`. If a future refactor strips
- * the CSS rules without removing the hooks (or vice-versa), the panel
- * will render but visually silently lose its deny/needs-review
- * emphasis — a regression this spec catches at CI time.
+ * styling lives in the modular CSS. If a future refactor strips the CSS
+ * rules without removing the hooks (or vice-versa), the panel will
+ * render but visually silently lose its deny/needs-review emphasis — a
+ * regression this spec catches at CI time.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-const css = readFileSync(
-  join(__dirname, "..", "..", "styles", "app.css"),
-  "utf8",
-);
+const stylesDir = join(__dirname, "..", "..", "styles");
+const css = readdirSync(stylesDir)
+  .filter((f) => f.endsWith(".css"))
+  .map((f) => readFileSync(join(stylesDir, f), "utf8"))
+  .join("\n");
 
 describe("ExtensionAuditPanel CSS tones (plan4.5 §A)", () => {
   it("declares the panel root selector", () => {

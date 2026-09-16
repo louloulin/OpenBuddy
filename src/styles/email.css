@@ -542,7 +542,11 @@
 .email-sidebar__label { padding: 0 8px 4px; }
 .email-sidebar__section button { min-height: 30px; padding: 6px 9px; border: 0; border-radius: 7px; background: transparent; color: var(--wb-text-medium, #4b5563); text-align: left; cursor: pointer; font: inherit; font-size: 12px; }
 .email-sidebar__section button:hover { background: var(--wb-bg-hover, rgba(37, 99, 235, .07)); }
-.email-sidebar__section button.is-active { background: var(--wb-brand-soft, #e6efff); color: var(--wb-color-primary, #1554c0); font-weight: 650; }
+.email-sidebar__section button.is-active {
+  background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.08));
+  color: var(--wb-text-strong);
+  font-weight: 650;
+}
 .email-thread.is-focused { outline: 2px solid #8bb7ff; outline-offset: -2px; background: #f0f6ff; }
 .email-list { overflow: auto; border-right: 1px solid #e4e7ec; }
 .email-thread-row { display: flex; align-items: center; gap: 6px; padding-left: 8px; }
@@ -559,7 +563,7 @@
 .email-detail h2 { margin-top: 12px; }
 .email-detail__actions { display: flex; gap: 8px; }
 .email-message-nav { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
-.email-message.is-current { background: rgba(0, 122, 255, 0.05); border-radius: 8px; padding: 16px; }
+.email-message.is-current { background: color-mix(in srgb, var(--wb-brand) 5%, transparent); border-radius: 8px; padding: 16px; }
 .email-ai-actions { margin: 14px 0; padding: 10px; border: 1px solid #e4e7ec; border-radius: 8px; background: #f8faff; }
 .email-ai-actions strong { color: #1554c0; margin-right: 4px; }
 .email-message { border-top: 1px solid #eef0f3; padding: 16px 0; }
@@ -743,12 +747,12 @@
   cursor: not-allowed;
 }
 .wb-button--primary {
-  background: var(--wb-brand-primary);
-  border-color: var(--wb-brand-primary);
-  color: #ffffff;
+  background: var(--wb-button-primary-bg);
+  border-color: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
 }
 .wb-button--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--wb-brand-primary) 88%, #000);
+  background: var(--wb-button-primary-bg-hover);
 }
 .wb-button--secondary {
   background: var(--wb-bg-primary);
