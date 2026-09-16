@@ -1,35 +1,34 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="OpenBuddy">
   <defs>
-    <linearGradient id="fur" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
       <stop stop-color="#E8E5FF"/>
-      <stop offset=".4" stop-color="#C0BFFF"/>
-      <stop offset="1" stop-color="#7A75E0"/>
+      <stop offset=".4" stop-color="#B8B4F8"/>
+      <stop offset="1" stop-color="#5A5588"/>
     </linearGradient>
-    <linearGradient id="muzzle" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#D6D3FF"/>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#9C95E8"/>
+      <stop offset="1" stop-color="#3A356A"/>
     </linearGradient>
-    <radialGradient id="eyeG" cx="50%" cy="50%" r="50%">
-      <stop stop-color="#C0BFFF"/>
-      <stop stop-color="#1B1838" stop-opacity="0"/>
-    </radialGradient>
+    <linearGradient id="visor" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#7A75E0"/>
+      <stop offset=".5" stop-color="#C0BFFF"/>
+      <stop offset="1" stop-color="#E8E5FF"/>
+    </linearGradient>
   </defs>
-  <path d="M50 56 Q70 12 106 36 Q92 100 70 124 Z" fill="url(#fur)"/>
-  <path d="M190 56 Q170 12 134 36 Q148 100 170 124 Z" fill="url(#fur)"/>
-  <rect x="58" y="64" width="124" height="124" rx="60" fill="url(#fur)"/>
-  <ellipse cx="120" cy="158" rx="50" ry="34" fill="url(#muzzle)"/>
-  <circle cx="94" cy="118" r="16" fill="url(#eyeG)"/>
-  <circle cx="146" cy="118" r="16" fill="url(#eyeG)"/>
-  <circle cx="94" cy="118" r="11" fill="#0F0D24"/>
-  <circle cx="146" cy="118" r="11" fill="#0F0D24"/>
-  <circle cx="97" cy="115" r="3.5" fill="#FFFFFF"/>
-  <circle cx="149" cy="115" r="3.5" fill="#FFFFFF"/>
-  <path d="M114 148 Q114 142 117 142 Q119 142 120 144 Q121 142 123 142 Q126 142 126 148 Q126 156 120 162 Q114 156 114 148 Z" fill="#0F0D24"/>
-  <path d="M120 162 L120 172" stroke="#0F0D24" stroke-width="3.5" stroke-linecap="round"/>
-  <path d="M120 172 Q108 184 100 176" fill="none" stroke="#0F0D24" stroke-width="3.5" stroke-linecap="round"/>
-  <path d="M120 172 Q132 184 140 176" fill="none" stroke="#0F0D24" stroke-width="3.5" stroke-linecap="round"/>
-  <g transform="translate(204 48)">
-    <circle r="9" fill="#FFFFFF"/>
-    <circle r="16" fill="none" stroke="#C0BFFF" stroke-width="2" opacity=".6"/>
-  </g>
+  <line x1="120" y1="32" x2="120" y2="56" stroke="url(#panel)" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="120" cy="28" r="9" fill="url(#visor)"/>
+  <rect x="48" y="68" width="22" height="44" rx="7" fill="url(#panel)"/>
+  <rect x="170" y="68" width="22" height="44" rx="7" fill="url(#panel)"/>
+  <rect x="56" y="68" width="128" height="128" rx="22" fill="url(#body)"/>
+  <rect x="64" y="76" width="112" height="14" rx="5" fill="url(#panel)" opacity=".55"/>
+  <rect x="68" y="106" width="104" height="32" rx="16" fill="url(#visor)"/>
+  <circle cx="98" cy="122" r="13" fill="#0F0D24"/>
+  <circle cx="142" cy="122" r="13" fill="#0F0D24"/>
+  <circle cx="101" cy="119" r="4" fill="#FFFFFF"/>
+  <circle cx="145" cy="119" r="4" fill="#FFFFFF"/>
+  <rect x="72" y="152" width="96" height="36" rx="14" fill="url(#panel)"/>
+  <rect x="84" y="166" width="72" height="10" rx="3" fill="#0F0D24"/>
+  <circle cx="120" cy="171" r="2.2" fill="#7BFFE0"/>
+  <circle cx="80" cy="200" r="7" fill="url(#panel)"/>
+  <circle cx="160" cy="200" r="7" fill="url(#panel)"/>
 </svg>

@@ -1,15 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="OpenBuddy">
   <rect width="64" height="64" rx="14" fill="#070514"/>
-  <path d="M14 14 Q19 4 27 11 Q24 22 19 26 Z" fill="#C0BFFF"/>
-  <path d="M50 14 Q45 4 37 11 Q40 22 45 26 Z" fill="#C0BFFF"/>
-  <rect x="16" y="18" width="32" height="32" rx="14" fill="#C0BFFF"/>
-  <circle cx="25" cy="33" r="3.6" fill="#070514"/>
-  <circle cx="39" cy="33" r="3.6" fill="#070514"/>
-  <circle cx="26" cy="32" r="1" fill="#FFFFFF"/>
-  <circle cx="40" cy="32" r="1" fill="#FFFFFF"/>
-  <path d="M30 39 Q30 37 31.5 37 Q32 37 32 38 Q32 37 32.5 37 Q34 37 34 39 Q34 41 32 42.5 Q30 41 30 39 Z" fill="#070514"/>
-  <path d="M32 42.5 L32 44" stroke="#070514" stroke-width="1.2" stroke-linecap="round"/>
-  <path d="M32 44 Q29 47 27 45" fill="none" stroke="#070514" stroke-width="1.2" stroke-linecap="round"/>
-  <path d="M32 44 Q35 47 37 45" fill="none" stroke="#070514" stroke-width="1.2" stroke-linecap="round"/>
-  <circle cx="52" cy="14" r="2.5" fill="#FFFFFF"/>
+  <line x1="32" y1="6" x2="32" y2="13" stroke="#9C95E8" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="32" cy="5" r="3" fill="#C0BFFF"/>
+  <rect x="14" y="16" width="8" height="14" rx="2.5" fill="#7A75E0"/>
+  <rect x="42" y="16" width="8" height="14" rx="2.5" fill="#7A75E0"/>
+  <rect x="14" y="18" width="36" height="34" rx="6" fill="#C0BFFF"/>
+  <rect x="18" y="22" width="28" height="6" rx="2" fill="#7A75E0" opacity=".7"/>
+  <rect x="18" y="32" width="28" height="8" rx="4" fill="#7A75E0"/>
+  <circle cx="26" cy="36" r="3" fill="#070514"/>
+  <circle cx="38" cy="36" r="3" fill="#070514"/>
+  <circle cx="27" cy="35" r="1" fill="#FFFFFF"/>
+  <circle cx="39" cy="35" r="1" fill="#FFFFFF"/>
+  <rect x="20" y="44" width="24" height="8" rx="3" fill="#7A75E0"/>
+  <rect x="24" y="47" width="16" height="2.5" rx="1" fill="#070514"/>
+  <circle cx="32" cy="48.5" r="0.8" fill="#7BFFE0"/>
 </svg>

@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
   <!--
-    OpenBuddy mark v4 - lavender palette.
-    Original stylised geometric buddy companion. Lavender/indigo gradient on a
-    deep navy badge — drops the green/teal palette in favour of cool tones.
-    Composition unchanged from the prior buddy mark: rounded square head,
-    splayed ears, ellipse muzzle, glowing eyes, heart nose, W-smile.
+    OpenBuddy mark v5 - robo-dog companion.
+    Original geometric robot dog: rectangular head chassis, antenna, glowing
+    visor band, segmented jaw, articulated neck/shoulder modules. Lavender +
+    indigo palette. Friendly proportions despite the mechanical build.
+    Composition reads as 'AI companion' rather than any specific branded
+    quadruped robot.
   -->
   <defs>
     <radialGradient id="bgRad" cx="50%" cy="38%" r="70%">
@@ -12,21 +13,23 @@
       <stop offset=".55" stop-color="#0F0D24"/>
       <stop offset="1" stop-color="#070514"/>
     </radialGradient>
-    <linearGradient id="fur" x1="280" y1="180" x2="760" y2="840" gradientUnits="userSpaceOnUse">
+    <linearGradient id="body" x1="200" y1="200" x2="820" y2="850" gradientUnits="userSpaceOnUse">
       <stop stop-color="#E8E5FF"/>
-      <stop offset=".4" stop-color="#C0BFFF"/>
-      <stop offset="1" stop-color="#7A75E0"/>
+      <stop offset=".4" stop-color="#B8B4F8"/>
+      <stop offset="1" stop-color="#5A5588"/>
     </linearGradient>
-    <linearGradient id="furDark" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#8C85F0"/>
-      <stop offset="1" stop-color="#4A4580"/>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#9C95E8"/>
+      <stop offset="1" stop-color="#3A356A"/>
     </linearGradient>
-    <linearGradient id="muzzle" x1="380" y1="560" x2="640" y2="780" gradientUnits="userSpaceOnUse">
+    <linearGradient id="visor" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#7A75E0"/>
+      <stop offset=".5" stop-color="#C0BFFF"/>
+      <stop offset="1" stop-color="#E8E5FF"/>
+    </linearGradient>
+    <radialGradient id="eyeCore" cx="50%" cy="50%" r="50%">
       <stop stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#D6D3FF"/>
-    </linearGradient>
-    <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
-      <stop stop-color="#C0BFFF"/>
+      <stop offset=".6" stop-color="#C0BFFF"/>
       <stop stop-color="#1B1838" stop-opacity="0"/>
     </radialGradient>
     <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
@@ -34,54 +37,81 @@
 
   <g clip-path="url(#clip)">
     <rect x="38" y="38" width="948" height="948" fill="url(#bgRad)"/>
-    <!-- ambient halos in lavender -->
+    <!-- ambient halos -->
     <circle cx="780" cy="220" r="340" fill="#C0BFFF" opacity=".14"/>
     <circle cx="220" cy="800" r="300" fill="#7A75E0" opacity=".10"/>
-    <!-- background sparkle dots -->
-    <circle cx="120" cy="180" r="2" fill="#E8E5FF" opacity=".55"/>
-    <circle cx="900" cy="160" r="2.5" fill="#E8E5FF" opacity=".6"/>
-    <circle cx="160" cy="880" r="1.8" fill="#E8E5FF" opacity=".5"/>
-    <circle cx="880" cy="900" r="2.2" fill="#E8E5FF" opacity=".55"/>
+    <!-- background grid + sparkles -->
+    <line x1="148" y1="148" x2="876" y2="148" stroke="#C0BFFF" stroke-width="2" opacity=".10"/>
+    <line x1="148" y1="876" x2="876" y2="876" stroke="#C0BFFF" stroke-width="2" opacity=".10"/>
+    <line x1="148" y1="148" x2="148" y2="876" stroke="#C0BFFF" stroke-width="2" opacity=".10"/>
+    <line x1="876" y1="148" x2="876" y2="876" stroke="#C0BFFF" stroke-width="2" opacity=".10"/>
+    <circle cx="120" cy="180" r="2" fill="#E8E5FF" opacity=".6"/>
+    <circle cx="900" cy="160" r="2.5" fill="#E8E5FF" opacity=".65"/>
+    <circle cx="160" cy="880" r="1.8" fill="#E8E5FF" opacity=".55"/>
 
-    <!-- ears -->
-    <path d="M256 248 Q300 158 388 220 Q360 372 296 416 Z" fill="url(#fur)"/>
-    <path d="M768 248 Q724 158 636 220 Q664 372 728 416 Z" fill="url(#fur)"/>
-    <!-- inner ear shadow -->
-    <path d="M296 264 Q330 218 374 256 Q352 348 312 392 Z" fill="url(#furDark)" opacity=".7"/>
-    <path d="M728 264 Q694 218 650 256 Q672 348 712 392 Z" fill="url(#furDark)" opacity=".7"/>
+    <!-- antenna -->
+    <line x1="512" y1="190" x2="512" y2="244" stroke="url(#panel)" stroke-width="14" stroke-linecap="round"/>
+    <circle cx="512" cy="184" r="22" fill="url(#visor)"/>
+    <circle cx="512" cy="184" r="10" fill="#FFFFFF"/>
 
-    <!-- head -->
-    <rect x="276" y="276" width="472" height="472" rx="232" fill="url(#fur)"/>
-    <!-- inner highlight -->
-    <path d="M276 480 Q276 276 508 276 Q740 276 740 480" fill="none" stroke="#FFFFFF" stroke-width="6" opacity=".5"/>
+    <!-- ear panels (splayed, mechanical) -->
+    <rect x="240" y="280" width="100" height="180" rx="32" fill="url(#panel)"/>
+    <rect x="684" y="280" width="100" height="180" rx="32" fill="url(#panel)"/>
+    <!-- ear grilles -->
+    <line x1="270" y1="320" x2="270" y2="420" stroke="#1B1838" stroke-width="3" opacity=".6"/>
+    <line x1="290" y1="320" x2="290" y2="420" stroke="#1B1838" stroke-width="3" opacity=".6"/>
+    <line x1="310" y1="320" x2="310" y2="420" stroke="#1B1838" stroke-width="3" opacity=".6"/>
+    <line x1="714" y1="320" x2="714" y2="420" stroke="#1B1838" stroke-width="3" opacity=".6"/>
+    <line x1="734" y1="320" x2="734" y2="420" stroke="#1B1838" stroke-width="3" opacity=".6"/>
+    <line x1="754" y1="320" x2="754" y2="420" stroke="#1B1838" stroke-width="3" opacity=".6"/>
 
-    <!-- cream muzzle -->
-    <ellipse cx="512" cy="640" rx="190" ry="124" fill="url(#muzzle)"/>
+    <!-- head chassis: rounded rectangle (slightly squarer than v4) -->
+    <rect x="270" y="280" width="484" height="460" rx="100" fill="url(#body)"/>
+    <!-- panel separator (forehead crown) -->
+    <rect x="290" y="300" width="444" height="60" rx="22" fill="url(#panel)" opacity=".55"/>
+    <!-- rivets -->
+    <circle cx="312" cy="330" r="6" fill="#3A356A"/>
+    <circle cx="712" cy="330" r="6" fill="#3A356A"/>
+    <circle cx="512" cy="330" r="6" fill="#3A356A"/>
 
-    <!-- brow spots -->
-    <circle cx="392" cy="404" r="34" fill="#FFFFFF" opacity=".82"/>
-    <circle cx="632" cy="404" r="34" fill="#FFFFFF" opacity=".82"/>
+    <!-- visor band (glowing eye strip) -->
+    <rect x="300" y="420" width="424" height="110" rx="55" fill="#0F0D24"/>
+    <rect x="300" y="420" width="424" height="110" rx="55" fill="url(#visor)" opacity=".95"/>
+    <!-- two glowing eye cores -->
+    <circle cx="412" cy="475" r="46" fill="url(#eyeCore)"/>
+    <circle cx="612" cy="475" r="46" fill="url(#eyeCore)"/>
+    <circle cx="412" cy="475" r="22" fill="#0F0D24"/>
+    <circle cx="612" cy="475" r="22" fill="#0F0D24"/>
+    <circle cx="424" cy="465" r="8" fill="#FFFFFF"/>
+    <circle cx="624" cy="465" r="8" fill="#FFFFFF"/>
+    <!-- visor scanline -->
+    <line x1="316" y1="475" x2="708" y2="475" stroke="#FFFFFF" stroke-width="2" opacity=".5"/>
 
-    <!-- eyes: glowing rings + dark core + sparkle -->
-    <circle cx="412" cy="494" r="58" fill="url(#eyeGlow)"/>
-    <circle cx="612" cy="494" r="58" fill="url(#eyeGlow)"/>
-    <circle cx="412" cy="494" r="40" fill="#0F0D24"/>
-    <circle cx="612" cy="494" r="40" fill="#0F0D24"/>
-    <circle cx="424" cy="482" r="14" fill="#FFFFFF"/>
-    <circle cx="624" cy="482" r="14" fill="#FFFFFF"/>
-    <circle cx="408" cy="502" r="6" fill="#C0BFFF" opacity=".8"/>
-    <circle cx="608" cy="502" r="6" fill="#C0BFFF" opacity=".8"/>
+    <!-- segmented muzzle / jaw (lower panel) -->
+    <rect x="320" y="580" width="384" height="140" rx="56" fill="url(#panel)"/>
+    <!-- speaker grille (mech mouth) -->
+    <rect x="380" y="630" width="264" height="40" rx="14" fill="#0F0D24"/>
+    <line x1="394" y1="640" x2="394" y2="660" stroke="#C0BFFF" stroke-width="3" opacity=".7"/>
+    <line x1="410" y1="640" x2="410" y2="660" stroke="#C0BFFF" stroke-width="3" opacity=".7"/>
+    <line x1="426" y1="640" x2="426" y2="660" stroke="#C0BFFF" stroke-width="3" opacity=".7"/>
+    <line x1="442" y1="640" x2="442" y2="660" stroke="#C0BFFF" stroke-width="3" opacity=".7"/>
+    <line x1="458" y1="640" x2="458" y2="660" stroke="#C0BFFF" stroke-width="3" opacity=".7"/>
+    <line x1="566" y1="640" x2="566" y2="660" stroke="#C0BFFF" stroke-width="3" opacity=".7"/>
+    <line x1="582" y1="640" x2="582" y2="660" stroke="#C0BFFF" stroke-width="3" opacity=".7"/>
+    <line x1="598" y1="640" x2="598" y2="660" stroke="#C0BFFF" stroke-width="3" opacity=".7"/>
+    <line x1="614" y1="640" x2="614" y2="660" stroke="#C0BFFF" stroke-width="3" opacity=".7"/>
+    <line x1="630" y1="640" x2="630" y2="660" stroke="#C0BFFF" stroke-width="3" opacity=".7"/>
+    <!-- center LED indicator -->
+    <circle cx="512" cy="650" r="6" fill="#7BFFE0"/>
 
-    <!-- heart-shaped nose -->
-    <path d="M484 610 Q484 588 502 588 Q512 588 512 596 Q512 588 522 588 Q540 588 540 610 Q540 640 512 668 Q484 640 484 610 Z" fill="#0F0D24"/>
-
-    <!-- smile -->
-    <path d="M512 670 L512 706" stroke="#0F0D24" stroke-width="16" stroke-linecap="round"/>
-    <path d="M512 706 Q470 752 432 716" fill="none" stroke="#0F0D24" stroke-width="16" stroke-linecap="round"/>
-    <path d="M512 706 Q554 752 592 716" fill="none" stroke="#0F0D24" stroke-width="16" stroke-linecap="round"/>
+    <!-- neck joints (shoulder modules peeking from bottom) -->
+    <circle cx="368" cy="754" r="22" fill="url(#panel)"/>
+    <circle cx="368" cy="754" r="10" fill="#0F0D24"/>
+    <circle cx="656" cy="754" r="22" fill="url(#panel)"/>
+    <circle cx="656" cy="754" r="10" fill="#0F0D24"/>
 
     <!-- AI sparkle upper-right -->
-    <g transform="translate(780 270)">
+    <g transform="translate(800 230)">
       <circle r="22" fill="#FFFFFF"/>
       <circle r="40" fill="none" stroke="#C0BFFF" stroke-width="5" opacity=".6"/>
       <circle r="58" fill="none" stroke="#C0BFFF" stroke-width="2" opacity=".3"/>
