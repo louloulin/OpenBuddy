@@ -33,7 +33,42 @@
 .sidebar__scroll {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 4px 8px 12px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--wb-text-weak) 35%, transparent) transparent;
+}
+
+.sidebar__scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.sidebar__scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar__scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--wb-text-weak) 25%, transparent);
+  border-radius: 999px;
+  transition: background 160ms;
+}
+.sidebar__scroll:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--wb-text-weak) 50%, transparent);
+}
+[data-theme="dark"] .sidebar__scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--wb-text-medium) 30%, transparent);
+}
+[data-theme="dark"] .sidebar__scroll:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--wb-text-medium) 55%, transparent);
+}
+
+.sidebar__scroll-inner { position: relative; }
+.sidebar__scroll-inner--overflow-top {
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 22px);
+          mask-image: linear-gradient(180deg, transparent 0, #000 22px);
+}
+.sidebar__scroll-inner--overflow-bottom {
+  -webkit-mask-image: linear-gradient(0deg, transparent 0, #000 22px);
+          mask-image: linear-gradient(0deg, transparent 0, #000 22px);
+}
+.sidebar__scroll-inner--overflow-top.sidebar__scroll-inner--overflow-bottom {
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
+          mask-image: linear-gradient(180deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
 }
 
 .sidebar__footer {
