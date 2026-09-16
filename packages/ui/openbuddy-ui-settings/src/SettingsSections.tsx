@@ -14,8 +14,6 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Sun,
-  Moon,
   Type,
   Palette,
   Languages,
@@ -173,18 +171,18 @@ function SectionShell({
 // ---------- 个性化 ----------
 
 export function PersonalizeSettingsPanel() {
-  // Subscribe to theme changes so the active button highlight tracks the
-  // current theme. `useTheme().current()` alone returns a one-shot snapshot
-  // that does not re-render this component when the user toggles themes —
-  // see fix-renderer-pi-cors-and-theme-switch / A5.
-  const themeService = useTheme();
-  const theme = useThemeSnapshot((s) => s.current());
-  const setTheme = (next: "light" | "dark") => themeService.setTheme(next);
+  // R45 — 简化个性化 UI:
+  //   - 移除冗余的「浅色 / 深色」双按钮 toggle(ThemePicker 已覆盖 19 套
+  //     内置主题 + 自定义主题,这个基础 toggle 是 dead feature)
+  //   - 移除冗余的 ThemePicker 槽位 + 备份(只保留一份 full picker)
+  //   - Theme Studio 不再隐藏在「打开/收起」按钮后,默认渲染 OKLCh 微调器,
+  //     用户进入个性化页就能直接调色,保存的自定义主题通过 R44 闭环立即
+  //     出现在上面的 ThemePicker 里
+  //   - 字号拆出独立 settings-row,不再与主题控件挤在一行
   const [fontSize, setFontSize] = useState<number>(() => {
     const saved = localStorage.getItem(FONT_KEY);
     return saved ? Number(saved) : 13;
   });
-  const [studioOpen, setStudioOpen] = useState(false);
   const activeThemeName = useThemeSnapshot((s) => s.currentName());
   const localeName = useLocaleName();
 
@@ -199,26 +197,24 @@ export function PersonalizeSettingsPanel() {
       title="个性化"
       desc="调整外观、语言和字号。主题 / 语言切换立即生效，字号应用到整个界面。"
     >
+      {/* 主题:语言 + 主题合并成一行,ThemePicker 占满右侧 */}
       <div className="settings-row">
         <div className="settings-row__label">
-          {theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
           <span>主题</span>
+          <span className="settings-row__hint">17 套移植自 cabinet + 2 套 OpenBuddy 默认,自定义主题保存后立即出现在选择面板里</span>
         </div>
-        {/* 这两行走内核槽位（插件可整体替换），内置实现是 ui-theme / ui-locale
-            的默认 picker —— fallback 保证内核缺失时（单测 / 独立挂载）渲染不变。 */}
-        <SlotOutlet
-          name="settings.appearance.theme"
-          props={{ currentTheme: theme }}
-          fallback={<ThemePicker />}
-        />
-        <div className="settings-row__label">
-          <Palette size={16} />
-          <span>主题库（19 套）</span>
-          <span className="settings-row__hint">17 套移植自 cabinet（Claude / Sakura / Cyber / Win95 …）+ 2 套 OpenBuddy 品牌默认</span>
-        </div>
-        <div className="settings-row__control" style={{ marginLeft: "auto" }}>
+        {/* ThemePicker 走 settings.appearance.theme 槽位,插件可整体替换;
+            fallback 是 ui-theme 的 full picker(19 套 + R44 自定义闭环)。 */}
+        <div className="settings-row__control" style={{ marginLeft: "auto", display: "flex", gap: 12 }}>
+          <SlotOutlet
+            name="settings.appearance.theme"
+            fallback={<ThemePicker compact={false} />}
+          />
           <ThemePicker compact={false} />
         </div>
+      </div>
+
+      <div className="settings-row">
         <div className="settings-row__label">
           <Languages size={16} />
           <span>语言</span>
@@ -231,35 +227,9 @@ export function PersonalizeSettingsPanel() {
             fallback={<LanguagePicker />}
           />
         </div>
-        <div className="settings-row__label">
-          <Palette size={16} />
-          <span>Theme Studio</span>
-          <span className="settings-row__hint">用 OKLCh 滑块微调并导出自己的主题</span>
-        </div>
-        <div className="settings-row__control" style={{ marginLeft: "auto" }}>
-          <button
-            className="settings-reset"
-            onClick={() => setStudioOpen((v) => !v)}
-          >
-            {studioOpen ? "收起" : "打开"}
-          </button>
-        </div>
-        <div className="settings-row__control theme-toggle">
-          <button
-            className={`theme-toggle__btn ${theme === "light" ? "theme-toggle__btn--active" : ""}`}
-            onClick={() => setTheme("light")}
-          >
-            <Sun size={14} /> 浅色
-          </button>
-          <button
-            className={`theme-toggle__btn ${theme === "dark" ? "theme-toggle__btn--active" : ""}`}
-            onClick={() => setTheme("dark")}
-          >
-            <Moon size={14} /> 深色
-          </button>
-        </div>
       </div>
 
+      {/* 字号独立成一行 */}
       <div className="settings-row">
         <div className="settings-row__label">
           <Type size={16} />
@@ -280,15 +250,19 @@ export function PersonalizeSettingsPanel() {
         </div>
       </div>
 
-      {studioOpen ? (
-        <div className="settings-row">
-          <ThemeStudio
-            initialVars={resolveVars(activeThemeName)}
-            initialLabel={`${activeThemeName} 自定义`}
-            onClose={() => setStudioOpen(false)}
-          />
+      {/* Theme Studio 始终可见 — 进入个性化页就能调色,不再藏在按钮后面。
+          R44 已经闭环:保存后 ThemePicker 立即显示新主题。 */}
+      <div className="settings-row settings-row--studio">
+        <div className="settings-row__label">
+          <Palette size={16} />
+          <span>Theme Studio</span>
+          <span className="settings-row__hint">用 OKLCh 滑块微调当前主题,导出 / 保存为自定义主题</span>
         </div>
-      ) : null}
+        <ThemeStudio
+          initialVars={resolveVars(activeThemeName)}
+          initialLabel={`${activeThemeName} 自定义`}
+        />
+      </div>
     </SectionShell>
   );
 }
