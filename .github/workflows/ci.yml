@@ -30,7 +30,7 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
 
@@ -63,7 +63,7 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
 
@@ -85,7 +85,7 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - run: pnpm install --frozen-lockfile
@@ -103,7 +103,7 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - run: pnpm install --frozen-lockfile
@@ -120,7 +120,7 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - run: pnpm install --frozen-lockfile
@@ -152,7 +152,7 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - run: pnpm install --frozen-lockfile
@@ -183,7 +183,7 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - run: pnpm install --frozen-lockfile
@@ -208,7 +208,7 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - run: pnpm install --frozen-lockfile
