@@ -17,6 +17,19 @@
  */
 export { Button } from "./components/Button";
 import type { SlotMap } from "@openbuddy/ui-slots";
+declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * 全局通知层(list)。注册方是 `client.ts`(把本包的 `Toast` 放进去),
+     * 消费者是「统一 overlay 层」——当前由第三方/替代外壳(ui-layout 的
+     * `AppFrame` 是参考实现)取用,本产品外壳走自己的 toast host。
+     *
+     * 这条槽属于「有意扩展点」:零内置消费不是漏接线,不要为了让它显示成
+     * `ok` 而硬接一个消费者进来。
+     */
+    "notifications": { kind: "list"; scope: "root" };
+  }
+}
 export type { ButtonProps, ButtonVariant, ButtonSize } from "./components/Button";
 export { Pill } from "./components/Pill";
 export type { PillProps, PillTone } from "./components/Pill";

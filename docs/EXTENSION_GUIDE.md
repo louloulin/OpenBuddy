@@ -1,6 +1,7 @@
 # OpenBuddy 插件开发指南
 
-> 中文版本（默认） · 英文版见 `EXTENSION_GUIDE.en.md`
+> 完整 slot 清单见 [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md);可复制的完整示例见
+> [`EXTENSION_RECIPES.md`](./EXTENSION_RECIPES.md) 与 `examples/openbuddy-plugin-*`。
 >
 > 本指南带你 10 分钟写出一个 hello-world 插件，并解释 OpenBuddy 微内核扩展 API 的关键概念。
 

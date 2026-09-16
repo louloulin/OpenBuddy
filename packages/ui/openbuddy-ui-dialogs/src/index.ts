@@ -19,6 +19,21 @@ import type { SlotMap } from "@openbuddy/ui-slots";
 
 export type { SlotMap };
 
+declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * 「关于」对话框(single)。注册方 `client.tsx`,消费者 `src/AppShell`。
+     * 插件注册更高优先级即可整体替换,卸载后内置实现自动恢复。
+     *
+     * payload 是本包 `AboutDialog` 的 props(`open` / `onClose`),直接 spread
+     * 给替换实现,所以不用自己找开关状态。
+     */
+    "overlay.about": { kind: "single"; scope: "root" };
+    /** 目录信任对话框(single)。同上,payload 是 `FolderTrustDialog` 的 props。 */
+    "overlay.folder-trust": { kind: "single"; scope: "root" };
+  }
+}
+
 export { AboutDialog } from "./AboutDialog";
 
 export { ConfirmDialog } from "./ConfirmDialog";

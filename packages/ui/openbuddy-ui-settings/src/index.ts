@@ -47,6 +47,39 @@ export {
 declare module "@openbuddy/ui-slots" {
   interface SlotMap {
     /**
+     * 设置面板(single,modal)。注册方 `client.tsx`(`SettingsPanel`),
+     * 消费者 `src/features/app/AppShell.tsx` 的 `SettingsSurface`。
+     */
+    "overlay.settings": { kind: "single"; scope: "root" };
+    /**
+     * 首页整页(single)。消费者:`src/features/app/AppShell.tsx` 的 `HomeSurface`
+     * —— 内核优先,回落到本包注册的 `HomePage`。
+     *
+     * 声明权归**注册方**,与 `details` / `shell.statusbar` 同一规则。这条槽此前
+     * 只在代码里注册、没有 SlotMap 声明,于是登记表里它的 kind/scope 是空的,
+     * 插件作者只能靠猜(或读实现)才知道能不能整页替换。
+     */
+    "home": {
+      kind: "single";
+      scope: "session-maybe";
+      owner: {
+        onSend: (text: string) => void;
+        streaming: boolean;
+        apiReady: boolean;
+        onOpenSettings: () => void;
+        onPlaceholder: (label: string) => void;
+        modelId?: string;
+        models?: readonly unknown[];
+        onModelChange?: (id: string) => void;
+        cwd?: string;
+        workspaces?: readonly unknown[];
+        onSelectWorkspace?: (cwd: string) => void;
+        onSelectMode?: (modeId: string) => void;
+        onSelectExpert?: (agent: unknown) => void;
+        onNavigateConnectors?: () => void;
+      };
+    };
+    /**
      * 首页场景行(list,数据型贡献)。消费者:`HomePage`。
      *
      * 插件只提供描述,UI 由宿主渲染 —— 第三方插件因此不必打包 React。

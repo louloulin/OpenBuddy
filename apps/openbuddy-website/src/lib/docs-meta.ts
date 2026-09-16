@@ -53,6 +53,41 @@ export const DOC_INDEX: DocMeta[] = [
     files: { en: 'PLUGIN_SYSTEM.md', zh: 'PLUGIN_SYSTEM.md' }
   },
   {
+    slug: 'extension-points',
+    title: 'Extension Points Registry',
+    description: 'All 39 SlotCore slots + the renderer bus — kind, scope, status, who consumes.',
+    category: 'plugin',
+    files: { en: 'EXTENSION_POINTS.md', zh: 'EXTENSION_POINTS.md' }
+  },
+  {
+    slug: 'extension-guide',
+    title: 'Extension Guide',
+    description: 'Ten-minute hello-world plugin on the OpenBuddy microkernel.',
+    category: 'plugin',
+    files: { en: 'EXTENSION_GUIDE.md', zh: 'EXTENSION_GUIDE.md' }
+  },
+  {
+    slug: 'extension-recipes',
+    title: 'Extension Recipes',
+    description: 'Copy-paste manifest + code — toolbar button, slash command, panel, theme.',
+    category: 'plugin',
+    files: { en: 'EXTENSION_RECIPES.md', zh: 'EXTENSION_RECIPES.md' }
+  },
+  {
+    slug: 'plugin-marketplace',
+    title: 'Plugin Marketplace',
+    description: 'Multi-source registry, install/upgrade/rollback, Pi extension bridge.',
+    category: 'plugin',
+    files: { en: 'PLUGIN_MARKETPLACE.md', zh: 'PLUGIN_MARKETPLACE.md' }
+  },
+  {
+    slug: 'themes',
+    title: 'Themes & Theme Studio',
+    description: '19 OKLCh themes, match-system pairs, custom theme editor.',
+    category: 'reference',
+    files: { en: 'THEMES.md', zh: 'THEMES.md' }
+  },
+  {
     slug: 'operations',
     title: 'Operations & Deployment',
     description: 'Casdoor OIDC, NewAPI gateway, payment adapters, SCIM, SAML.',

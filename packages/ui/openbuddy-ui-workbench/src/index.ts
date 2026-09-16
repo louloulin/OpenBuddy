@@ -18,6 +18,17 @@
 import type { SlotMap } from "@openbuddy/ui-slots";
 export type { SlotMap };
 
+declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * ⌘K 搜索面板(single)。注册方 `client.tsx`(`SearchOverlay`),消费者
+     * `src/features/app/AppShell.tsx` 的 `SearchSurface` —— 它会把内核
+     * `plugin.command` 槽里的插件命令整理成 `pluginCommands` 一起传下去。
+     */
+    "overlay.search": { kind: "single"; scope: "root" };
+  }
+}
+
 export { SearchOverlay } from "./SearchOverlay";
 export {
   filterPluginCommands,

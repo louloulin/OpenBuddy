@@ -198,10 +198,10 @@ WorkBuddy 采用经典的左侧边栏 + 主内容区布局：
 - [ ] 设置面板完善
 - [ ] 搜索功能
 - [ ] 更多动画效果
-- [ ] TipTap 富文本编辑器（Phase C：`@openbuddy/ui-editor`）
-- [ ] Onboarding Wizard / Tour / DataDir Prompt（Phase D：`@openbuddy/ui-onboarding`）
-- [ ] Plugin Marketplace UI（`@openbuddy/ui-modules` 扩展）
-- [ ] Theme Studio（OKLCh 自定义主题编辑器）
+- [x] TipTap 富文本编辑器（Phase C：`@openbuddy/ui-editor`）
+- [x] Onboarding Wizard / Tour / DataDir Prompt（Phase D：`@openbuddy/ui-onboarding`）
+- [x] Plugin Marketplace UI（`@openbuddy/ui-modules` 扩展）
+- [x] Theme Studio（OKLCh 自定义主题编辑器）
 
 ## 7. 借鉴自 cabinet 的能力（对照表）
 
@@ -215,9 +215,10 @@ WorkBuddy 采用经典的左侧边栏 + 主内容区布局：
 | 可拖拽 Sidebar | 220–420px clamp | `Resizable` 原语 + AppShell 接线 | ✅ |
 | 树状文件管理 | `tree-view.tsx` / `tree-node.tsx` | `@openbuddy/ui-files-tree` `FileTree` | ✅（新增独立 ui-* 包） |
 | 状态栏 | `status-bar.tsx` | `@openbuddy/ui-shell` `StatusBar` | ✅ |
-| TipTap 编辑器 | `@tiptap/*` | Phase C：`@openbuddy/ui-editor` | 📝 计划中 |
-| Onboarding / Tour | `onboarding-wizard.tsx` | Phase D：`@openbuddy/ui-onboarding` | 📝 计划中 |
-| Office 预览 | `docx-preview` / `xlsx` / `pptx-preview` | Phase C：`ui-workbench` 扩展 | 📝 计划中 |
+| TipTap 编辑器 | `@tiptap/*` | `@openbuddy/ui-editor` | ✅ |
+| Onboarding / Tour | `onboarding-wizard.tsx` | `@openbuddy/ui-onboarding` | ✅ |
+| Office 预览 | `docx-preview` / `xlsx` / `pptx-preview` | `ui-workbench` 的 Docx / Xlsx / PptxPreview | ✅ |
+| 扩展点登记表 | —（cabinet 无对应物） | `docs/EXTENSION_POINTS.md`（生成 + CI 守卫） | ✅ 独有 |
 
 ### 架构差异（有意保留）
 
@@ -964,8 +965,10 @@ OpenBuddy 与 WorkBuddy 的关键差异化:**WorkBuddy 不允许第三方 Pi 扩
 谁真的**消费**了它。
 
 ```
-node scripts/ui-slot-audit.mjs          # 人读的表格
-node scripts/ui-slot-audit.mjs --json   # 机器读
+node scripts/ui-slot-audit.mjs                 # 人读的表格
+node scripts/ui-slot-audit.mjs --json          # 机器读(逐槽 kind/scope/状态/双方)
+node scripts/ui-slot-audit.mjs --json-renderer # 第二条总线(渲染端贡献)
+node scripts/ui-slot-audit.mjs --md            # 生成 docs/EXTENSION_POINTS.md 的登记表区块
 ```
 
 状态含义:`ok` 注册且被消费 / `dead` 注册了但零消费(接线漏了)/ `no-impl` 有人在消费
@@ -1124,6 +1127,9 @@ win95  → body: "Pixelated MS Sans Serif", "MS Sans Serif", Tahoma, sans-serif
 的槽名,省得去表里数。
 
 ### R20.5 当前审计快照(`node scripts/ui-slot-audit.mjs`)
+
+> **历史快照**(R20 当时)。当前值见文末「当前进度」与 `docs/EXTENSION_POINTS.md`;
+> R31 后是 `ok=21 dead=0 ext=18 no-impl=0`(39 槽)。
 
 ```
 总共 40 个槽位; ok=13 dead=4 ext=6 no-impl=17
@@ -1577,7 +1583,7 @@ R23:  ok=20 dead=0 ext=19 no-impl=0    (39 槽)  ← 注册 / 消费 / 分类全
 | Phase A | 主题系统 v2 | **100%** | 19 套主题、OKLCh、Match-system、防 FOUC、ThemePicker / Studio、主题字体落地 |
 | Phase B | Workspace 表现层 | **100%** | Resizable sidebar、虚拟化 files-tree 进生产、Artifact Tabs / breadcrumb、Topbar / StatusBar、`details` 助理导轨(R28)、顶栏信息密度(R30) |
 | Phase C | 编辑器与富文本 | **98%** | TiPTap 编辑器 + 三个扩展点接上消费者 + Office 四预览 + 编辑侧 round-trip 保真(R28);剩真实会话里"编辑产物"的端到端截图 |
-| Phase D | Onboarding 与差异化 | **97%** | wizard / tour / whats-new / feedback / data-dir / marketplace(R29 复核可达)/ Pi 市场桥接 / Theme Studio；剩 Plugin SDK v1 文档站点(R24)未开工 |
+| Phase D | Onboarding 与差异化 | **100%** | wizard / tour / whats-new / feedback / data-dir / marketplace(R29 复核可达)/ Pi 市场桥接 / Theme Studio / Plugin SDK v1 文档站点(R31:登记表生成 + CI 守卫 + 5 篇文档上站) |
 
 ## R28 — 编辑器「打开就丢结构」:嵌套列表被拍平 + `details` 槽接线
 
@@ -1722,20 +1728,76 @@ panel: mounted=true  "市场 刷新全部 添加源  1 个源 · 0 个插件 · 
 截图 `tests/screenshots/r30-header-density.png` 与
 `tests/screenshots/r30-composer-setup-hint.png`。
 
+## R31 — 插件 SDK v1 文档站点 + 扩展点登记表全面化
+
+`docs/EXTENSION_POINTS.md` 一直是**手写**的:6 个"核心扩展点" + 13 个结构性槽。
+R31 把它改成从代码生成 + CI 守卫,于是立刻查出两类事实错误。
+
+### R31.1 手写登记表里有 4 个「幽灵槽位」——代码里从来没有过
+
+| 旧文档登记的名字 | 代码里的实际情况 |
+|---|---|
+| `message.toolcall.card` | 全仓 0 次出现(除文档自身) |
+| `sidebar.nav.item` | 全仓 0 次出现 |
+| `workbench.tab` | 全仓 0 次出现 |
+| `settings.page` | 全仓 0 次出现 |
+
+插件作者按旧文档注册这 4 个槽,**不会报错,也不会生效**。它们的能力其实都在
+「第二条总线」(渲染端贡献)上,只是叫法不同:
+
+| 幽灵槽 | 真实位置 |
+|---|---|
+| `sidebar.nav.item` | contribution kind `sidebar`(`Sidebar.tsx:1469` 渲染) |
+| `settings.page` | kind `settings` + 字符串槽 `settings.section` / `settings.general.item` |
+| `message.toolcall.card` | kind `message` + 字符串槽 `conversation.message.footer` |
+| `workbench.tab` | kind `project`(`payload.projectTab`,项目详情页页签) |
+
+处理方式:从登记表移除,在文档里单列一节说明映射关系 —— 补一组同名 SlotCore 槽等于
+给同一块 UI 造第二份实现。
+
+### R31.2 第二条总线此前完全没登记
+
+插件 UI 插入点实际有两条总线,而旧文档只写了 SlotCore 一条:
+
+| | 总线 A:SlotCore | 总线 B:渲染端贡献 |
+|---|---|---|
+| 注册 API | `api.registerSlot(name, kind, scope, payload)` | `rendererContributions.register({ kind, id, payload })` |
+| 契约 | SlotMap + kind/scope 强校验 | kind 封闭联合(`@openbuddy/renderer-host`),payload 自由 |
+| 能力 | 可**替换**内置实现 | 只能**追加** |
+| 数量 | 39 槽 | 7 个 kind + 10 个字符串槽 |
+
+`useRendererContributions("sidebar")` 这类消费点有 7 处(kind 7/7 全覆盖),
+`useRendererSlot("settings.section")` 这类字符串槽有 10 处 —— 它们都没进过登记表。
+
+### R31.3 生成 + 守卫,而不是再手写一遍
+
+- `scripts/ui-slot-audit.mjs` 新增 `--md`(生成登记表区块)与 `--json-renderer`
+  (第二条总线),并补上 kind / scope 解析(从 `declare module` 的声明体 + register
+  选项里抠)。顺带修掉一个真 bug:`pkgOf()` 输出的是 `@openbuddy-ui-settings`,
+  而真实包名是 `@openbuddy/ui-settings` —— 表里的注册方和 `BUILTIN_UI_APPLIES`
+  对不上,守卫测试一比对就红。
+- 声明缺口一并补齐:39 个槽此前有 9 个没有 SlotMap 声明(`home` / `root` /
+  `overlay.*` / `placeholder.experts` / `notifications` / `plugin.command`),
+  插件作者在表里看到的 kind/scope 是空的。现在 **39/39 都有声明 + 可读 kind/scope**。
+- `docs/EXTENSION_POINTS.md` 重写:两条总线的解释 + 生成区块(三张表)+ 幽灵槽位
+  章节 + 注册方式 + 观测手段。
+- `extension-points.test.ts` 从 4 条弱断言升级为 13 条:生成区块与脚本输出**逐字节**
+  比对(手改文档必红)、`dead=0` / `no-impl=0` 硬门槛、每槽必须有声明与 kind/scope、
+  注册方必须在 `BUILTIN_UI_APPLIES` 里、幽灵槽不得回流表体、第二条总线 kind 全覆盖。
+- 文档上站:`apps/openbuddy-website` 的 `DOC_INDEX` 新增 5 篇
+  (`extension-points` / `extension-guide` / `extension-recipes` / `plugin-marketplace` / `themes`),
+  这是「Plugin SDK v1 文档站点」的落点。
+
+### R31.4 测试
+
+`npx vitest run packages/ui/openbuddy-ui-runtime/src/__tests__/extension-points.test.ts`
+→ 13/13;全量 `npx vitest run` 与 `tsc --noEmit` 见文末进度表。
+
 ## 后续计划(优先级排序)
 
-1. **R24 — Plugin SDK v1 文档站点**:`openbuddy.plugin.v1` manifest 全量公开 +
-   `examples/` + starter 模板。这是开源差异化最重要的抓手:槽位表 / 事件表 / 主题
-   token 表现在都齐了,缺的只是"照着抄就能跑"的公开文档。
-2. **R25 — Pi 扩展市场多源 registry**:当前是单源,多源 + 权重 + 离线缓存;
+1. **R32 — Pi 扩展市场多源 registry**(原 R25):当前单源,多源 + 权重 + 离线缓存;
    `agent:pi-market-*` 七个 channel 已就位,只需扩 registry 层。
-3. **R31 — Plugin SDK v1 文档站点**(R24,开源差异化最重要抓手):
-   `openbuddy.plugin.v1` manifest 全量公开 + `examples/` + starter 模板。
-   槽位表(39 条)/ 事件表 / 主题 token 表现在都齐了,缺的只是"照着抄就能跑"
-   的公开文档。
-4. **R32 — Pi 扩展市场多源 registry**(R25):当前单源,多源 + 权重 + 离线缓存;
-   `agent:pi-market-*` 七个 channel 已就位,只需扩 registry 层。
-5. **加固项**:`details` 导轨与右侧工作面板(ToolSidePanel)在窄窗口下的避让;
+2. **加固项**:`details` 导轨与右侧工作面板(ToolSidePanel)在窄窗口下的避让;
    真实会话里"编辑产物 → 保存"的端到端截图。
 
 ## 用户可见的差距分析(与 WorkBuddy 对比)

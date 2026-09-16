@@ -662,6 +662,7 @@ export function installPluginSdkBridge(options: PluginSdkBridgeOptions = {}): ()
       {
         name: "plugin.command",
         kind: "list",
+        scope: "root",
         id: `command::${detail.id}`,
         registrant: "@openbuddy/plugin-sdk",
         payload: detail,
