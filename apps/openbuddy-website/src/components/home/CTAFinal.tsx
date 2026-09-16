@@ -63,7 +63,7 @@ export default function CTAFinal({ locale }: CTAFinalProps) {
                 <span>{ isZh ? '阅读文档' : 'Read the docs' }</span>
               </Link>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>
