@@ -104,7 +104,17 @@ export interface PiExtensionResolution {
   factories: Array<{ name: string; factory: ExtensionFactory; hidden: true }>;
   paths: string[];
   resolved: Array<{ id: string; source: string; builtIn: boolean; mode?: "native" | "adapter"; adapter?: string; commands?: readonly string[] }>;
-  diagnostics: Array<{ id: string; state: "disabled" | "failed"; error?: string }>;
+  /**
+   * `blocked` = held back pending an explicit user approval (needs-review
+   *   gate, plan4.5 §B); `denied` = the user rejected it. Both are
+   *   distinct from `disabled` (turned off by the user outright) so the
+   *   UI can say *why* an extension is not running.
+   */
+  diagnostics: Array<{
+    id: string;
+    state: "disabled" | "failed" | "blocked" | "denied";
+    error?: string;
+  }>;
 }
 
 export type PiExtensionRuntimeState = "pending" | "loaded" | "disabled" | "failed";

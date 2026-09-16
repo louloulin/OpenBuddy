@@ -1060,6 +1060,9 @@ export function useMainPluginInventory(refreshKey = 0): OpenBuddyPluginInventory
       runtime.events.on("pi/extensions-resolved", refresh),
       runtime.events.on("pi/extension-failed", refresh),
       runtime.events.on("pi/extension-disabled", refresh),
+      // A needs-review spec is neither broken nor user-disabled; it is held
+      // back until the user approves it, so it refreshes the same list.
+      runtime.events.on("pi/extension-needs-review", refresh),
     ];
     return () => {
       cancelled = true;
