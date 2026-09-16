@@ -1,16 +1,11 @@
-import type { Metadata } from 'next';
 import { Heart, ArrowRight, CheckCircle2 } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
+import Reveal from '@/components/motion/Reveal';
 import { PageHeader, SectionHeader } from '@/components/PageHeader';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import { localizedPath } from '@/lib/i18n';
 import Link from 'next/link';
-
-export const metadata: Metadata = {
-  title: 'Sponsors',
-  description: 'OpenBuddy is free, MIT, and ad-free. Sponsors keep the lights on and the codebase growing.'
-};
 
 interface Tier {
   name: string;
@@ -59,6 +54,12 @@ const COPY_ZH = {
   ctaSecondary: '查看完整透明账本'
 };
 
+/** Title/subtitle for this page, shared with the route's generateMetadata. */
+export const SPONSORS_COPY: Record<Locale, typeof COPY_EN> = {
+  en: COPY_EN,
+  'zh-CN': COPY_ZH
+};
+
 export function SponsorsView({ locale }: { locale: Locale }) {
   const dict = getDictionary(locale);
   const tiers = locale === 'zh-CN' ? TIERS_ZH : TIERS_EN;
@@ -79,8 +80,8 @@ export function SponsorsView({ locale }: { locale: Locale }) {
             />
 
             <div className="mt-16 grid gap-5 md:grid-cols-3">
-              { tiers.map((tier) => (
-                <article key={ tier.name } className={ `flex h-full flex-col gap-5 rounded-2xl border p-7 transition-all ${
+              { tiers.map((tier, tierIndex) => (
+                <Reveal key={ tier.name } as="article" delay={ tierIndex * 90 } className={ `flex h-full flex-col gap-5 rounded-2xl border p-7 transition-all ${
                   tier.popular
                     ? 'border-[var(--wb-brand)] bg-[var(--wb-bg-pure)] shadow-[0_0_0_4px_var(--wb-brand-soft)]'
                     : 'border-[var(--wb-border)] bg-[var(--wb-bg-pure)]'
@@ -110,7 +111,7 @@ export function SponsorsView({ locale }: { locale: Locale }) {
                     <Heart className="h-3.5 w-3.5" />
                     <span>{ copy.ctaPrimary }</span>
                   </a>
-                </article>
+                </Reveal>
               )) }
             </div>
 

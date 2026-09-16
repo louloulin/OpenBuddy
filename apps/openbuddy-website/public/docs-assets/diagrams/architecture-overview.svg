@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f2937"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5eead4"/>
+      <stop offset=".5" stop-color="#86efac"/>
+      <stop offset="1" stop-color="#fde68a"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#60a5fa"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="rose" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fda4af"/>
+      <stop offset="1" stop-color="#e11d48"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fcd34d"/>
+      <stop offset="1" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="emerald" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6ee7b7"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000" flood-opacity=".35"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrowBrand" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5eead4"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="800" y="58" text-anchor="middle" font-size="34" font-weight="700" fill="#f8fafc">OpenBuddy — End-to-end Architecture</text>
+  <text x="800" y="86" text-anchor="middle" font-size="15" fill="#94a3b8">Electron host · Pi agent runtime · Cordis capability mesh · moon monorepo</text>
+
+  <!-- ====================== Layer 1: Renderer (React) ====================== -->
+  <g filter="url(#softShadow)">
+    <rect x="60" y="120" width="1480" height="160" rx="14" fill="url(#card)" stroke="#334155" stroke-width="1"/>
+  </g>
+  <text x="80" y="148" font-size="16" font-weight="700" fill="#a7f3d0">① Renderer · React 18 + Zustand + Vite</text>
+  <text x="80" y="166" font-size="12" fill="#94a3b8">src/ · contextIsolated sandbox · no Node access · typed IPC only</text>
+
+  <!-- Renderer sub-blocks -->
+  <g>
+    <rect x="90" y="190" width="180" height="70" rx="10" fill="#0f172a" stroke="#5eead4"/>
+    <text x="180" y="220" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">App Shell</text>
+    <text x="180" y="240" text-anchor="middle" font-size="11" fill="#94a3b8">router · sidebar · session list</text>
+
+    <rect x="290" y="190" width="180" height="70" rx="10" fill="#0f172a" stroke="#5eead4"/>
+    <text x="380" y="220" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Chat Stream</text>
+    <text x="380" y="240" text-anchor="middle" font-size="11" fill="#94a3b8">tokens · tool calls · plan UI</text>
+
+    <rect x="490" y="190" width="180" height="70" rx="10" fill="#0f172a" stroke="#5eead4"/>
+    <text x="580" y="220" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Skills &amp; MCP</text>
+    <text x="580" y="240" text-anchor="middle" font-size="11" fill="#94a3b8">@openbuddy/ui · 26 packages</text>
+
+    <rect x="690" y="190" width="180" height="70" rx="10" fill="#0f172a" stroke="#5eead4"/>
+    <text x="780" y="220" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Settings &amp; i18n</text>
+    <text x="780" y="240" text-anchor="middle" font-size="11" fill="#94a3b8">zh-CN · en · 8 locales</text>
+
+    <rect x="890" y="190" width="180" height="70" rx="10" fill="#0f172a" stroke="#5eead4"/>
+    <text x="980" y="220" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Permission Dialogs</text>
+    <text x="980" y="240" text-anchor="middle" font-size="11" fill="#94a3b8">capability · folder · net</text>
+
+    <rect x="1090" y="190" width="180" height="70" rx="10" fill="#0f172a" stroke="#5eead4"/>
+    <text x="1180" y="220" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Live Eval Harness</text>
+    <text x="1180" y="240" text-anchor="middle" font-size="11" fill="#94a3b8">Playwright · 455 tests</text>
+
+    <rect x="1290" y="190" width="220" height="70" rx="10" fill="#0f172a" stroke="#5eead4"/>
+    <text x="1400" y="220" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Zustand Stores</text>
+    <text x="1400" y="240" text-anchor="middle" font-size="11" fill="#94a3b8">16 stores · persisted</text>
+  </g>
+
+  <!-- arrow down to preload -->
+  <line x1="800" y1="280" x2="800" y2="320" stroke="#5eead4" stroke-width="2" marker-end="url(#arrowBrand)"/>
+
+  <!-- ====================== Layer 2: Preload bridge ====================== -->
+  <g filter="url(#softShadow)">
+    <rect x="60" y="320" width="1480" height="80" rx="14" fill="url(#card)" stroke="#475569"/>
+  </g>
+  <text x="80" y="348" font-size="16" font-weight="700" fill="#bae6fd">② Preload · contextBridge</text>
+  <text x="80" y="366" font-size="12" fill="#94a3b8">electron/preload/index.ts · allowlisted IPC surface · no fs / no net directly</text>
+
+  <g>
+    <rect x="90" y="340" width="240" height="48" rx="8" fill="#0f172a" stroke="#60a5fa"/>
+    <text x="210" y="370" text-anchor="middle" font-size="13" font-weight="600" fill="#e2e8f0">ob.* namespace (typed API)</text>
+
+    <rect x="350" y="340" width="240" height="48" rx="8" fill="#0f172a" stroke="#60a5fa"/>
+    <text x="470" y="370" text-anchor="middle" font-size="13" font-weight="600" fill="#e2e8f0">Pi RPC bridge (typed)</text>
+
+    <rect x="610" y="340" width="240" height="48" rx="8" fill="#0f172a" stroke="#60a5fa"/>
+    <text x="730" y="370" text-anchor="middle" font-size="13" font-weight="600" fill="#e2e8f0">Capability registry</text>
+
+    <rect x="870" y="340" width="240" height="48" rx="8" fill="#0f172a" stroke="#60a5fa"/>
+    <text x="990" y="370" text-anchor="middle" font-size="13" font-weight="600" fill="#e2e8f0">Event multiplex (mux)</text>
+
+    <rect x="1130" y="340" width="380" height="48" rx="8" fill="#0f172a" stroke="#60a5fa"/>
+    <text x="1320" y="370" text-anchor="middle" font-size="13" font-weight="600" fill="#e2e8f0">Harness events (eval · surf · audit)</text>
+  </g>
+
+  <!-- arrow down to main -->
+  <line x1="800" y1="400" x2="800" y2="440" stroke="#5eead4" stroke-width="2" marker-end="url(#arrowBrand)"/>
+
+  <!-- ====================== Layer 3: Electron Main ====================== -->
+  <g filter="url(#softShadow)">
+    <rect x="60" y="440" width="1480" height="180" rx="14" fill="url(#card)" stroke="#475569"/>
+  </g>
+  <text x="80" y="468" font-size="16" font-weight="700" fill="#fbcfe8">③ Electron Main · Process orchestration</text>
+  <text x="80" y="486" font-size="12" fill="#94a3b8">electron/main/** · BrowserWindow · IPC handlers · persistence · harness server</text>
+
+  <g>
+    <rect x="90" y="510" width="170" height="92" rx="10" fill="#0f172a" stroke="#f472b6"/>
+    <text x="175" y="540" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Window Manager</text>
+    <text x="175" y="560" text-anchor="middle" font-size="11" fill="#94a3b8">BrowserWindow · menus</text>
+    <text x="175" y="578" text-anchor="middle" font-size="11" fill="#94a3b8">deep links · auto-update</text>
+
+    <rect x="280" y="510" width="170" height="92" rx="10" fill="#0f172a" stroke="#f472b6"/>
+    <text x="365" y="540" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">IPC Router</text>
+    <text x="365" y="560" text-anchor="middle" font-size="11" fill="#94a3b8">allowlist · zod validate</text>
+    <text x="365" y="578" text-anchor="middle" font-size="11" fill="#94a3b8">audit trail</text>
+
+    <rect x="470" y="510" width="170" height="92" rx="10" fill="#0f172a" stroke="#f472b6"/>
+    <text x="555" y="540" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Auth (Casdoor)</text>
+    <text x="555" y="560" text-anchor="middle" font-size="11" fill="#94a3b8">OIDC · PKCE · refresh</text>
+    <text x="555" y="578" text-anchor="middle" font-size="11" fill="#94a3b8">SCIM v2 bridge</text>
+
+    <rect x="660" y="510" width="170" height="92" rx="10" fill="#0f172a" stroke="#f472b6"/>
+    <text x="745" y="540" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Collaboration RT</text>
+    <text x="745" y="560" text-anchor="middle" font-size="11" fill="#94a3b8">rooms · inbox · fork</text>
+    <text x="745" y="578" text-anchor="middle" font-size="11" fill="#94a3b8">evidence ledger</text>
+
+    <rect x="850" y="510" width="170" height="92" rx="10" fill="#0f172a" stroke="#f472b6"/>
+    <text x="935" y="540" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Harness Server</text>
+    <text x="935" y="560" text-anchor="middle" font-size="11" fill="#94a3b8">WS · mux · localhost</text>
+    <text x="935" y="578" text-anchor="middle" font-size="11" fill="#94a3b8">eval/audit host</text>
+
+    <rect x="1040" y="510" width="170" height="92" rx="10" fill="#0f172a" stroke="#f472b6"/>
+    <text x="1125" y="540" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Persistence</text>
+    <text x="1125" y="560" text-anchor="middle" font-size="11" fill="#94a3b8">sqlite · kv · ledger</text>
+    <text x="1125" y="578" text-anchor="middle" font-size="11" fill="#94a3b8">audit outbox</text>
+
+    <rect x="1230" y="510" width="170" height="92" rx="10" fill="#0f172a" stroke="#f472b6"/>
+    <text x="1315" y="540" text-anchor="middle" font-size="13" font-weight="700" fill="#e2e8f0">Security Gate</text>
+    <text x="1315" y="560" text-anchor="middle" font-size="11" fill="#94a3b8">CSP · permission</text>
+    <text x="1315" y="578" text-anchor="middle" font-size="11" fill="#94a3b8">folder trust</text>
+  </g>
+
+  <!-- arrow down to Pi -->
+  <line x1="800" y1="620" x2="800" y2="660" stroke="#5eead4" stroke-width="2" marker-end="url(#arrowBrand)"/>
+
+  <!-- ====================== Layer 4: Pi Agent Runtime ====================== -->
+  <g filter="url(#softShadow)">
+    <rect x="60" y="660" width="1480" height="120" rx="14" fill="url(#card)" stroke="#7c3aed"/>
+  </g>
+  <text x="80" y="688" font-size="16" font-weight="700" fill="#c4b5fd">④ Pi Agent Runtime · in-process</text>
+  <text x="80" y="706" font-size="12" fill="#94a3b8">@earendil-works/pi-coding-agent · AgentSession owns prompts · tools · plans · tasks · streaming</text>
+
+  <g>
+    <rect x="90" y="720" width="180" height="44" rx="8" fill="#1e1b4b" stroke="#a78bfa"/>
+    <text x="180" y="747" text-anchor="middle" font-size="12" font-weight="700" fill="#e2e8f0">AgentSession</text>
+
+    <rect x="290" y="720" width="180" height="44" rx="8" fill="#1e1b4b" stroke="#a78bfa"/>
+    <text x="380" y="747" text-anchor="middle" font-size="12" font-weight="700" fill="#e2e8f0">Provider Registry</text>
+
+    <rect x="490" y="720" width="180" height="44" rx="8" fill="#1e1b4b" stroke="#a78bfa"/>
+    <text x="580" y="747" text-anchor="middle" font-size="12" font-weight="700" fill="#e2e8f0">Tool Sandbox</text>
+
+    <rect x="690" y="720" width="180" height="44" rx="8" fill="#1e1b4b" stroke="#a78bfa"/>
+    <text x="780" y="747" text-anchor="middle" font-size="12" font-weight="700" fill="#e2e8f0">Plan / Task Engine</text>
+
+    <rect x="890" y="720" width="180" height="44" rx="8" fill="#1e1b4b" stroke="#a78bfa"/>
+    <text x="980" y="747" text-anchor="middle" font-size="12" font-weight="700" fill="#e2e8f0">Event Log (JSONL)</text>
+
+    <rect x="1090" y="720" width="180" height="44" rx="8" fill="#1e1b4b" stroke="#a78bfa"/>
+    <text x="1180" y="747" text-anchor="middle" font-size="12" font-weight="700" fill="#e2e8f0">Permissions</text>
+
+    <rect x="1290" y="720" width="220" height="44" rx="8" fill="#1e1b4b" stroke="#a78bfa"/>
+    <text x="1400" y="747" text-anchor="middle" font-size="12" font-weight="700" fill="#e2e8f0">Extension Loader</text>
+  </g>
+
+  <!-- arrow down to capability mesh -->
+  <line x1="800" y1="780" x2="800" y2="820" stroke="#5eead4" stroke-width="2" marker-end="url(#arrowBrand)"/>
+
+  <!-- ====================== Layer 5: Cordis Capability Mesh ====================== -->
+  <g filter="url(#softShadow)">
+    <rect x="60" y="820" width="1480" height="160" rx="14" fill="url(#card)" stroke="#059669"/>
+  </g>
+  <text x="80" y="848" font-size="16" font-weight="700" fill="#86efac">⑤ Cordis Capability Mesh · 64 workspace packages</text>
+  <text x="80" y="866" font-size="12" fill="#94a3b8">@openbuddy/* · independently enabled · capability manifest · typed DI · scoped lifecycle</text>
+
+  <g>
+    <rect x="90" y="884" width="170" height="76" rx="10" fill="#022c22" stroke="#34d399"/>
+    <text x="175" y="912" text-anchor="middle" font-size="12" font-weight="700" fill="#bbf7d0">Auth (2)</text>
+    <text x="175" y="932" text-anchor="middle" font-size="10" fill="#6ee7b7">casdoor · permission</text>
+
+    <rect x="280" y="884" width="170" height="76" rx="10" fill="#022c22" stroke="#34d399"/>
+    <text x="365" y="912" text-anchor="middle" font-size="12" font-weight="700" fill="#bbf7d0">Capability (5)</text>
+    <text x="365" y="932" text-anchor="middle" font-size="10" fill="#6ee7b7">authz · calendar · email</text>
+    <text x="365" y="948" text-anchor="middle" font-size="10" fill="#6ee7b7">folder-trust · mcp</text>
+
+    <rect x="470" y="884" width="170" height="76" rx="10" fill="#022c22" stroke="#34d399"/>
+    <text x="555" y="912" text-anchor="middle" font-size="12" font-weight="700" fill="#bbf7d0">Collaboration (8)</text>
+    <text x="555" y="932" text-anchor="middle" font-size="10" fill="#6ee7b7">room · inbox · fork</text>
+    <text x="555" y="948" text-anchor="middle" font-size="10" fill="#6ee7b7">policy · evidence</text>
+
+    <rect x="660" y="884" width="170" height="76" rx="10" fill="#022c22" stroke="#34d399"/>
+    <text x="745" y="912" text-anchor="middle" font-size="12" font-weight="700" fill="#bbf7d0">Core (3)</text>
+    <text x="745" y="932" text-anchor="middle" font-size="10" fill="#6ee7b7">session · logging</text>
+    <text x="745" y="948" text-anchor="middle" font-size="10" fill="#6ee7b7">logging-renderer</text>
+
+    <rect x="850" y="884" width="170" height="76" rx="10" fill="#022c22" stroke="#34d399"/>
+    <text x="935" y="912" text-anchor="middle" font-size="12" font-weight="700" fill="#bbf7d0">UI (26)</text>
+    <text x="935" y="932" text-anchor="middle" font-size="10" fill="#6ee7b7">shadcn-style atoms</text>
+    <text x="935" y="948" text-anchor="middle" font-size="10" fill="#6ee7b7">chat · plan · dialog</text>
+
+    <rect x="1040" y="884" width="170" height="76" rx="10" fill="#022c22" stroke="#34d399"/>
+    <text x="1125" y="912" text-anchor="middle" font-size="12" font-weight="700" fill="#bbf7d0">Enterprise (7)</text>
+    <text x="1125" y="932" text-anchor="middle" font-size="10" fill="#6ee7b7">payment · saml</text>
+    <text x="1125" y="948" text-anchor="middle" font-size="10" fill="#6ee7b7">scim · outbox</text>
+
+    <rect x="1230" y="884" width="170" height="76" rx="10" fill="#022c22" stroke="#34d399"/>
+    <text x="1315" y="912" text-anchor="middle" font-size="12" font-weight="700" fill="#bbf7d0">Runtime / Bundle</text>
+    <text x="1315" y="932" text-anchor="middle" font-size="10" fill="#6ee7b7">runtime · bundle</text>
+    <text x="1315" y="948" text-anchor="middle" font-size="10" fill="#6ee7b7">renderer-host</text>
+  </g>
+
+  <!-- Side annotations: providers -->
+  <g>
+    <rect x="60" y="990" width="780" height="0" />
+    <text x="80" y="996" font-size="11" fill="#94a3b8">Providers</text>
+    <text x="170" y="996" font-size="11" fill="#cbd5e1">OpenAI · Anthropic · Gemini · DeepSeek · Ollama · corp-proxy · NewAPI · Casdoor</text>
+  </g>
+
+  <!-- Footer -->
+  <text x="800" y="996" text-anchor="middle" font-size="11" fill="#64748b">© OpenBuddy contributors · MIT · 2026</text>
+</svg>

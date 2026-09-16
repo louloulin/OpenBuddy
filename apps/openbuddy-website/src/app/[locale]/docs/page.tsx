@@ -1,8 +1,10 @@
+import { notFound } from 'next/navigation';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import DocsSidebar from '@/components/docs/DocsSidebar';
 import DocsMobileNav from '@/components/docs/DocsMobileNav';
 import DocsOverview from '@/components/docs/DocsOverview';
+import { buildMetadata } from '@/lib/build-metadata';
 import { locales, getDictionary, type Locale } from '@/lib/i18n';
 
 export const dynamicParams = false;
@@ -13,19 +15,22 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const dict = getDictionary(locale as Locale);
-  return {
+  const typed = (locales.includes(locale as Locale) ? locale : 'en') as Locale;
+  const dict = getDictionary(typed);
+  return buildMetadata({
+    locale: typed,
+    path: '/docs',
     title: dict.nav.docs,
     description:
-      locale === 'zh-CN'
+      typed === 'zh-CN'
         ? 'OpenBuddy 完整文档 —— 安装、架构、插件开发、运维部署。仓库即文档。'
         : 'Complete OpenBuddy documentation — setup, architecture, plugin development, operations. The repo is the docs.'
-  };
+  });
 }
 
 export default async function DocsLandingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  if (!locales.includes(locale as Locale)) return null;
+  if (!locales.includes(locale as Locale)) notFound();
   const dict = getDictionary(locale as Locale);
 
   return (

@@ -5,7 +5,7 @@ import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import SearchDialog from '@/components/search/SearchDialog';
 import BackToTop from '@/components/BackToTop';
 import { getSearchIndex } from '@/lib/docs-search';
-import { SITE_STATS } from '@/lib/constants';
+import { SITE_STATS, SITE_URL } from '@/lib/constants';
 import '../styles/globals.css';
 
 export const viewport: Viewport = {
@@ -22,7 +22,7 @@ export const viewport: Viewport = {
  * 详见 src/app/[lang]/page.tsx 等具体页面的 generateMetadata。
  */
 export const metadata: Metadata = {
-  metadataBase: new URL('https://openbuddy.dev'),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: 'OpenBuddy — The open desktop AI workspace',
     template: '%s · OpenBuddy'
@@ -67,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     priceCurrency: 'USD'
                   },
                   license: 'https://github.com/louloulin/OpenBuddy/blob/main/LICENSE',
-                  url: 'https://openbuddy.dev',
+                  url: SITE_URL,
                   downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases',
                   author: { '@type': 'Organization', name: 'OpenBuddy contributors', url: 'https://github.com/louloulin/OpenBuddy' },
                   featureList: [
@@ -84,8 +84,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {
                   '@type': 'Organization',
                   name: 'OpenBuddy',
-                  url: 'https://openbuddy.dev',
-                  logo: 'https://openbuddy.dev/favicon.svg',
+                  url: SITE_URL,
+                  logo: `${SITE_URL}/favicon.svg`,
                   sameAs: [
                     'https://github.com/louloulin/OpenBuddy',
                     'https://github.com/louloulin/OpenBuddy/discussions',
@@ -96,16 +96,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 {
                   '@type': 'WebSite',
                   name: 'OpenBuddy',
-                  url: 'https://openbuddy.dev',
-                  inLanguage: ['en-US', 'zh-CN'],
-                  potentialAction: {
-                    '@type': 'SearchAction',
-                    target: {
-                      '@type': 'EntryPoint',
-                      urlTemplate: 'https://openbuddy.dev/en/docs?q={search_term_string}'
-                    },
-                    'query-input': 'required name=search_term_string'
-                  }
+                  url: SITE_URL,
+                  inLanguage: ['en-US', 'zh-CN']
+                  // 没有 SearchAction:站内搜索是客户端 Cmd-K 弹窗,不存在
+                  // `?q=` 查询路由。声明一个解析不了该参数的 target 会让 Google
+                  // 生成一个点了没反应的面板搜索框。
                 },
                 {
                   '@type': 'FAQPage',
@@ -151,7 +146,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           // 注入初始 theme，避免 FOUC
           dangerouslySetInnerHTML={ {
-            __html: `(function(){try{var t=localStorage.getItem('openbuddy-theme');var d=t==='light'||t==='dark'?t:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',d);}catch(e){}})();`
+            // 默认浅色 —— 不跟随系统 prefers-color-scheme。只有用户显式点过切换、
+            // 在 localStorage 存了偏好,才用存储值。
+            __html: `(function(){try{var t=localStorage.getItem('openbuddy-theme');var d=t==='light'||t==='dark'?t:'light';document.documentElement.setAttribute('data-theme',d);}catch(e){}})();`
           } }
         />
         <script

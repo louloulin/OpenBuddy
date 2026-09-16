@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5eead4"/>
+    </marker>
+    <marker id="arrowGrey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+
+  <text x="800" y="52" text-anchor="middle" font-size="32" font-weight="700" fill="#f8fafc">OpenBuddy Data Flow · User Prompt → Tool Result</text>
+  <text x="800" y="80" text-anchor="middle" font-size="14" fill="#94a3b8">Every message travels through 5 typed boundaries before reaching the model — and 4 typed boundaries on the way back.</text>
+
+  <!-- User -->
+  <g>
+    <circle cx="120" cy="500" r="50" fill="#0f172a" stroke="#5eead4" stroke-width="2"/>
+    <text x="120" y="495" text-anchor="middle" font-size="14" font-weight="700" fill="#e2e8f0">👤</text>
+    <text x="120" y="515" text-anchor="middle" font-size="14" font-weight="700" fill="#e2e8f0">User</text>
+    <text x="120" y="570" text-anchor="middle" font-size="11" fill="#94a3b8">human-in-the-loop</text>
+  </g>
+
+  <!-- Step 1: Renderer -->
+  <g>
+    <rect x="220" y="450" width="220" height="100" rx="14" fill="url(#card)" stroke="#5eead4"/>
+    <text x="330" y="480" text-anchor="middle" font-size="14" font-weight="700" fill="#a7f3d0">① Renderer</text>
+    <text x="330" y="500" text-anchor="middle" font-size="11" fill="#94a3b8">React · Zustand store</text>
+    <text x="330" y="518" text-anchor="middle" font-size="11" fill="#94a3b8">useChatStore.send()</text>
+    <text x="330" y="540" text-anchor="middle" font-size="10" fill="#64748b">type: ob.chat.send</text>
+  </g>
+
+  <!-- Step 2: Preload -->
+  <g>
+    <rect x="480" y="450" width="220" height="100" rx="14" fill="url(#card)" stroke="#60a5fa"/>
+    <text x="590" y="480" text-anchor="middle" font-size="14" font-weight="700" fill="#bfdbfe">② Preload bridge</text>
+    <text x="590" y="500" text-anchor="middle" font-size="11" fill="#94a3b8">contextBridge.invoke</text>
+    <text x="590" y="518" text-anchor="middle" font-size="11" fill="#94a3b8">zod-validated payload</text>
+    <text x="590" y="540" text-anchor="middle" font-size="10" fill="#64748b">no Node, no fs direct</text>
+  </g>
+
+  <!-- Step 3: IPC Router -->
+  <g>
+    <rect x="740" y="450" width="220" height="100" rx="14" fill="url(#card)" stroke="#a78bfa"/>
+    <text x="850" y="480" text-anchor="middle" font-size="14" font-weight="700" fill="#ddd6fe">③ IPC Router</text>
+    <text x="850" y="500" text-anchor="middle" font-size="11" fill="#94a3b8">allowlist + audit log</text>
+    <text x="850" y="518" text-anchor="middle" font-size="11" fill="#94a3b8">permission gate</text>
+    <text x="850" y="540" text-anchor="middle" font-size="10" fill="#64748b">electron/main/ipc/**</text>
+  </g>
+
+  <!-- Step 4: Agent Session -->
+  <g>
+    <rect x="1000" y="450" width="220" height="100" rx="14" fill="url(#card)" stroke="#f472b6"/>
+    <text x="1110" y="480" text-anchor="middle" font-size="14" font-weight="700" fill="#fbcfe8">④ Pi AgentSession</text>
+    <text x="1110" y="500" text-anchor="middle" font-size="11" fill="#94a3b8">prompt assembly</text>
+    <text x="1110" y="518" text-anchor="middle" font-size="11" fill="#94a3b8">provider stream · tools</text>
+    <text x="1110" y="540" text-anchor="middle" font-size="10" fill="#64748b">@earendil-works/pi</text>
+  </g>
+
+  <!-- Step 5: Provider -->
+  <g>
+    <rect x="1260" y="450" width="220" height="100" rx="14" fill="url(#card)" stroke="#fbbf24"/>
+    <text x="1370" y="480" text-anchor="middle" font-size="14" font-weight="700" fill="#fde68a">⑤ Provider</text>
+    <text x="1370" y="500" text-anchor="middle" font-size="11" fill="#94a3b8">OpenAI · Anthropic</text>
+    <text x="1370" y="518" text-anchor="middle" font-size="11" fill="#94a3b8">DeepSeek · Ollama</text>
+    <text x="1370" y="540" text-anchor="middle" font-size="10" fill="#64748b">SSE / JSONL stream</text>
+  </g>
+
+  <!-- Arrows forward -->
+  <line x1="170" y1="500" x2="220" y2="500" stroke="#5eead4" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="440" y1="500" x2="480" y2="500" stroke="#5eead4" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="700" y1="500" x2="740" y2="500" stroke="#5eead4" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="960" y1="500" x2="1000" y2="500" stroke="#5eead4" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="1220" y1="500" x2="1260" y2="500" stroke="#5eead4" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- External cloud -->
+  <g>
+    <ellipse cx="1520" cy="500" rx="60" ry="50" fill="#0f172a" stroke="#fbbf24"/>
+    <text x="1520" y="495" text-anchor="middle" font-size="11" fill="#fde68a">BYOK</text>
+    <text x="1520" y="510" text-anchor="middle" font-size="11" fill="#fde68a">Cloud</text>
+  </g>
+  <line x1="1480" y1="500" x2="1460" y2="500" stroke="#5eead4" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- ================== Return path ================== -->
+  <text x="800" y="640" text-anchor="middle" font-size="16" font-weight="700" fill="#cbd5e1">Return path · tokens stream back as JSONL events → renderer renders in-place</text>
+
+  <g>
+    <rect x="1000" y="680" width="220" height="80" rx="14" fill="url(#card)" stroke="#5eead4"/>
+    <text x="1110" y="710" text-anchor="middle" font-size="13" font-weight="700" fill="#a7f3d0">event: text_delta</text>
+    <text x="1110" y="730" text-anchor="middle" font-size="11" fill="#94a3b8">→ renderer appends token</text>
+    <text x="1110" y="746" text-anchor="middle" font-size="10" fill="#64748b">via harness events.ws mux</text>
+
+    <rect x="740" y="680" width="220" height="80" rx="14" fill="url(#card)" stroke="#5eead4"/>
+    <text x="850" y="710" text-anchor="middle" font-size="13" font-weight="700" fill="#a7f3d0">event: tool_call</text>
+    <text x="850" y="730" text-anchor="middle" font-size="11" fill="#94a3b8">→ permission dialog</text>
+    <text x="850" y="746" text-anchor="middle" font-size="10" fill="#64748b">capability-folder-trust</text>
+
+    <rect x="480" y="680" width="220" height="80" rx="14" fill="url(#card)" stroke="#5eead4"/>
+    <text x="590" y="710" text-anchor="middle" font-size="13" font-weight="700" fill="#a7f3d0">event: message_done</text>
+    <text x="590" y="730" text-anchor="middle" font-size="11" fill="#94a3b8">→ append to event log</text>
+    <text x="590" y="746" text-anchor="middle" font-size="10" fill="#64748b">JSONL append-only</text>
+
+    <rect x="220" y="680" width="220" height="80" rx="14" fill="url(#card)" stroke="#5eead4"/>
+    <text x="330" y="710" text-anchor="middle" font-size="13" font-weight="700" fill="#a7f3d0">event: ui_redraw</text>
+    <text x="330" y="730" text-anchor="middle" font-size="11" fill="#94a3b8">→ React re-renders</text>
+    <text x="330" y="746" text-anchor="middle" font-size="10" fill="#64748b">Zustand subscribers fire</text>
+  </g>
+
+  <!-- Lines from return path back to user -->
+  <line x1="1110" y1="680" x2="1110" y2="550" stroke="#94a3b8" stroke-width="1" marker-end="url(#arrowGrey)" stroke-dasharray="4 4"/>
+  <line x1="850" y1="680" x2="850" y2="550" stroke="#94a3b8" stroke-width="1" marker-end="url(#arrowGrey)" stroke-dasharray="4 4"/>
+  <line x1="590" y1="680" x2="590" y2="550" stroke="#94a3b8" stroke-width="1" marker-end="url(#arrowGrey)" stroke-dasharray="4 4"/>
+  <line x1="330" y1="680" x2="330" y2="550" stroke="#94a3b8" stroke-width="1" marker-end="url(#arrowGrey)" stroke-dasharray="4 4"/>
+
+  <!-- ================== Side bands ================== -->
+  <g>
+    <rect x="60" y="800" width="480" height="170" rx="14" fill="url(#card)" stroke="#5eead4"/>
+    <text x="80" y="828" font-size="16" font-weight="700" fill="#a7f3d0">Persistence guarantees</text>
+    <text x="80" y="850" font-size="11" fill="#cbd5e1">• Append-only JSONL event log per session (rotated daily)</text>
+    <text x="80" y="868" font-size="11" fill="#cbd5e1">• SQLite for indexed metadata (sessions, tasks, plans)</text>
+    <text x="80" y="886" font-size="11" fill="#cbd5e1">• KV store for capability state (per-session)</text>
+    <text x="80" y="904" font-size="11" fill="#cbd5e1">• Transactional outbox for outbound webhooks</text>
+    <text x="80" y="922" font-size="11" fill="#cbd5e1">• Audit ledger · never truncated · WORM-style</text>
+    <text x="80" y="940" font-size="11" fill="#cbd5e1">• Restart-safe: harness cleans lifecycle on host close</text>
+    <text x="80" y="958" font-size="11" fill="#cbd5e1">• Crash-safe writes with fsync and shadow paging</text>
+  </g>
+
+  <g>
+    <rect x="560" y="800" width="480" height="170" rx="14" fill="url(#card)" stroke="#60a5fa"/>
+    <text x="580" y="828" font-size="16" font-weight="700" fill="#bfdbfe">Security boundaries</text>
+    <text x="580" y="850" font-size="11" fill="#cbd5e1">• contextIsolation: true · sandbox: true</text>
+    <text x="580" y="868" font-size="11" fill="#cbd5e1">• Preload allowlist of 220+ IPC channels</text>
+    <text x="580" y="886" font-size="11" fill="#cbd5e1">• Zod payload validation at every boundary</text>
+    <text x="580" y="904" font-size="11" fill="#cbd5e1">• Folder-trust capability gates fs writes</text>
+    <text x="580" y="922" font-size="11" fill="#cbd5e1">• CSP locks down remote loads to in-process assets</text>
+    <text x="580" y="940" font-size="11" fill="#cbd5e1">• Permission dialog confirms every tool call</text>
+    <text x="580" y="958" font-size="11" fill="#cbd5e1">• All API keys stored in OS keychain via Electron safeStorage</text>
+  </g>
+
+  <g>
+    <rect x="1060" y="800" width="480" height="170" rx="14" fill="url(#card)" stroke="#a78bfa"/>
+    <text x="1080" y="828" font-size="16" font-weight="700" fill="#ddd6fe">Performance budgets</text>
+    <text x="1080" y="850" font-size="11" fill="#cbd5e1">• First token &lt; 300ms (cached prompt)</text>
+    <text x="1080" y="868" font-size="11" fill="#cbd5e1">• Tool-call round-trip &lt; 50ms (in-process)</text>
+    <text x="1080" y="886" font-size="11" fill="#cbd5e1">• Session hydrate &lt; 50ms (16-store preload)</text>
+    <text x="1080" y="904" font-size="11" fill="#cbd5e1">• Renderer bundle &lt; 1.4MB gzip</text>
+    <text x="1080" y="922" font-size="11" fill="#cbd5e1">• Idle memory &lt; 240MB (clean restart)</text>
+    <text x="1080" y="940" font-size="11" fill="#cbd5e1">• Harness WS reconnect &lt; 200ms</text>
+    <text x="1080" y="958" font-size="11" fill="#cbd5e1">• Audit: 455 tests · full eval pipeline green</text>
+  </g>
+</svg>

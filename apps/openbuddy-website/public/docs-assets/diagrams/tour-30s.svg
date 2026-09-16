@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#86efac"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fcd34d"/>
+      <stop offset="1" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+
+  <text x="800" y="52" text-anchor="middle" font-size="32" font-weight="700" fill="#f8fafc">OpenBuddy · 30-Second Tour</text>
+  <text x="800" y="80" text-anchor="middle" font-size="14" fill="#94a3b8">The fastest way to understand what you get.</text>
+
+  <!-- ============== 4-pane showcase ============== -->
+  <!-- Pane 1: Desktop -->
+  <g filter="url(#card)">
+    <rect x="60" y="120" width="740" height="380" rx="16" fill="url(#card)" stroke="#5eead4"/>
+  </g>
+  <text x="80" y="152" font-size="18" font-weight="700" fill="#a7f3d0">🖥️  WorkBuddy-grade desktop UI</text>
+  <text x="80" y="172" font-size="12" fill="#94a3b8">Reuses the `--wb-*` design tokens · 207-icon foundation · pixel-close to WorkBuddy.</text>
+
+  <!-- mock screen -->
+  <g>
+    <rect x="80" y="190" width="700" height="290" rx="10" fill="#0b1220" stroke="#334155"/>
+    <!-- left sidebar -->
+    <rect x="80" y="190" width="180" height="290" fill="#0f172a"/>
+    <text x="100" y="220" font-size="11" font-weight="700" fill="#e2e8f0">OpenBuddy</text>
+    <g font-size="11" fill="#cbd5e1">
+      <text x="100" y="260">+ New task</text>
+      <text x="100" y="282">Assistant</text>
+      <text x="100" y="304">Projects</text>
+      <text x="100" y="326">Skills</text>
+      <text x="100" y="348">Automation</text>
+      <text x="100" y="370">Email</text>
+      <text x="100" y="392">More</text>
+    </g>
+
+    <!-- main area -->
+    <rect x="260" y="190" width="520" height="290" fill="#0b1220"/>
+    <text x="280" y="220" font-size="12" font-weight="700" fill="#e2e8f0">Plan: Refactor capability-email to use NewAPI gateway</text>
+    <text x="280" y="240" font-size="10" fill="#94a3b8">3 steps · 1 of 2 done · eta 12s</text>
+
+    <!-- plan rows -->
+    <g font-size="10" fill="#cbd5e1">
+      <rect x="280" y="256" width="480" height="34" rx="4" fill="#1e293b" stroke="#5eead4"/>
+      <text x="296" y="278" fill="#86efac">✓ 1.</text>
+      <text x="316" y="278">Inspect current @openbuddy/capability-email exports</text>
+
+      <rect x="280" y="296" width="480" height="34" rx="4" fill="#1e293b" stroke="#5eead4"/>
+      <text x="296" y="318" fill="#86efac">✓ 2.</text>
+      <text x="316" y="318">Wire NewAPI base URL + credential store</text>
+
+      <rect x="280" y="336" width="480" height="34" rx="4" fill="#0f172a" stroke="#5eead4"/>
+      <text x="296" y="358" fill="#fbbf24">▶ 3.</text>
+      <text x="316" y="358">Re-route 3 e2e evals + re-run audit harness</text>
+    </g>
+
+    <!-- chat input -->
+    <rect x="280" y="394" width="480" height="60" rx="8" fill="#1e293b" stroke="#475569"/>
+    <text x="296" y="418" font-size="11" fill="#94a3b8">Ask OpenBuddy anything…</text>
+    <text x="296" y="438" font-size="9" fill="#64748b">⇧ Enter for newline · ⏎ to send · /plan to plan first</text>
+  </g>
+
+  <!-- Pane 2: Capability matrix -->
+  <g>
+    <rect x="820" y="120" width="720" height="380" rx="16" fill="url(#card)" stroke="#a78bfa"/>
+    <text x="840" y="152" font-size="18" font-weight="700" fill="#ddd6fe">🧩  64 Cordis capabilities, independently enabled</text>
+    <text x="840" y="172" font-size="12" fill="#94a3b8">Each `@openbuddy/*` package is its own DI service. Pick what you need.</text>
+
+    <!-- 8 capability cards -->
+    <g font-size="11" font-weight="700" fill="#e2e8f0">
+      <rect x="840" y="190" width="170" height="64" rx="10" fill="#1e1b4b" stroke="#a78bfa"/>
+      <text x="925" y="216" text-anchor="middle">Auth · Identity</text>
+      <text x="925" y="234" text-anchor="middle" font-size="10" fill="#c4b5fd">2 packages</text>
+
+      <rect x="1020" y="190" width="170" height="64" rx="10" fill="#1e1b4b" stroke="#a78bfa"/>
+      <text x="1105" y="216" text-anchor="middle">Capability</text>
+      <text x="1105" y="234" text-anchor="middle" font-size="10" fill="#c4b5fd">5 packages</text>
+
+      <rect x="1200" y="190" width="170" height="64" rx="10" fill="#1e1b4b" stroke="#a78bfa"/>
+      <text x="1285" y="216" text-anchor="middle">Collaboration</text>
+      <text x="1285" y="234" text-anchor="middle" font-size="10" fill="#c4b5fd">8 packages</text>
+
+      <rect x="1380" y="190" width="140" height="64" rx="10" fill="#1e1b4b" stroke="#a78bfa"/>
+      <text x="1450" y="216" text-anchor="middle">Core</text>
+      <text x="1450" y="234" text-anchor="middle" font-size="10" fill="#c4b5fd">3 packages</text>
+
+      <rect x="840" y="262" width="170" height="64" rx="10" fill="#1e1b4b" stroke="#a78bfa"/>
+      <text x="925" y="288" text-anchor="middle">UI components</text>
+      <text x="925" y="306" text-anchor="middle" font-size="10" fill="#c4b5fd">26 packages</text>
+
+      <rect x="1020" y="262" width="170" height="64" rx="10" fill="#1e1b4b" stroke="#a78bfa"/>
+      <text x="1105" y="288" text-anchor="middle">Enterprise</text>
+      <text x="1105" y="306" text-anchor="middle" font-size="10" fill="#c4b5fd">7 packages</text>
+
+      <rect x="1200" y="262" width="170" height="64" rx="10" fill="#1e1b4b" stroke="#a78bfa"/>
+      <text x="1285" y="288" text-anchor="middle">Runtime · Glue</text>
+      <text x="1285" y="306" text-anchor="middle" font-size="10" fill="#c4b5fd">6 packages</text>
+
+      <rect x="1380" y="262" width="140" height="64" rx="10" fill="#1e1b4b" stroke="#a78bfa"/>
+      <text x="1450" y="288" text-anchor="middle">Shared</text>
+      <text x="1450" y="306" text-anchor="middle" font-size="10" fill="#c4b5fd">5 packages</text>
+    </g>
+
+    <text x="840" y="356" font-size="11" fill="#94a3b8">Examples:</text>
+    <text x="840" y="376" font-size="11" fill="#86efac" font-family="ui-monospace, monospace">@openbuddy/capability-email</text>
+    <text x="840" y="396" font-size="11" fill="#86efac" font-family="ui-monospace, monospace">@openbuddy/collaboration-room</text>
+    <text x="840" y="416" font-size="11" fill="#86efac" font-family="ui-monospace, monospace">@openbuddy/scim · @openbuddy/saml · @openbuddy/payment</text>
+    <text x="840" y="436" font-size="11" fill="#86efac" font-family="ui-monospace, monospace">@openbuddy/webhook-outbox · @openbuddy/runtime · @openbuddy/renderer-host</text>
+    <text x="840" y="468" font-size="11" fill="#cbd5e1">Each has its own manifest, lifecycle, tests, and bundle. Disable any of them in <tspan font-family="ui-monospace, monospace" fill="#fbbf24">moon.yml</tspan>.</text>
+  </g>
+
+  <!-- ============== Bottom: 3 stacked highlights ============== -->
+  <g>
+    <rect x="60" y="520" width="480" height="200" rx="14" fill="url(#card)" stroke="#fbbf24"/>
+    <text x="80" y="552" font-size="18" font-weight="700" fill="#fde68a">🏢  Enterprise-ready</text>
+    <text x="80" y="576" font-size="11" fill="#cbd5e1">• Casdoor OIDC (PKCE + refresh rotation)</text>
+    <text x="80" y="596" font-size="11" fill="#cbd5e1">• NewAPI gateway + resource gateway</text>
+    <text x="80" y="616" font-size="11" fill="#cbd5e1">• 4 payment channels (Stripe, Alipay, WeChat Pay, custom)</text>
+    <text x="80" y="636" font-size="11" fill="#cbd5e1">• SCIM v2 provisioning + SAML 2.0 federation</text>
+    <text x="80" y="656" font-size="11" fill="#cbd5e1">• Transactional outbox webhook delivery</text>
+    <text x="80" y="676" font-size="11" fill="#cbd5e1">• Local-first audit ledger (WORM-style)</text>
+    <text x="80" y="696" font-size="11" fill="#cbd5e1">• Casdoor Resource Gateway SPA bundled</text>
+  </g>
+
+  <g>
+    <rect x="560" y="520" width="480" height="200" rx="14" fill="url(#card)" stroke="#f472b6"/>
+    <text x="580" y="552" font-size="18" font-weight="700" fill="#fbcfe8">🧪  Verifiable correctness</text>
+    <text x="580" y="576" font-size="11" fill="#cbd5e1">• 455 vitest files + Playwright UI tests</text>
+    <text x="580" y="596" font-size="11" fill="#cbd5e1">• Moon DAG caches the test graph (CI in &lt; 6 min)</text>
+    <text x="580" y="616" font-size="11" fill="#cbd5e1">• Capability matrix auditor enforces declared scope</text>
+    <text x="580" y="636" font-size="11" fill="#cbd5e1">• 4 evals: official benchmarks, capability evidence,</text>
+    <text x="580" y="656" font-size="11" fill="#cbd5e1">  benchmark evidence, evidence artifacts</text>
+    <text x="580" y="676" font-size="11" fill="#cbd5e1">• Closed-loop capability eval harness</text>
+    <text x="580" y="696" font-size="11" fill="#cbd5e1">• Architecture boundary checks (storage, IPC)</text>
+  </g>
+
+  <g>
+    <rect x="1060" y="520" width="480" height="200" rx="14" fill="url(#card)" stroke="#5eead4"/>
+    <text x="1080" y="552" font-size="18" font-weight="700" fill="#a7f3d0">⚡  Performance</text>
+    <text x="1080" y="576" font-size="11" fill="#cbd5e1">• First-token &lt; 300ms (cached prompts)</text>
+    <text x="1080" y="596" font-size="11" fill="#cbd5e1">• Tool-call round-trip &lt; 50ms in-process</text>
+    <text x="1080" y="616" font-size="11" fill="#cbd5e1">• 300ms debounced localStorage writes</text>
+    <text x="1080" y="636" font-size="11" fill="#cbd5e1">• Batched async I/O for collaboration log</text>
+    <text x="1080" y="656" font-size="11" fill="#cbd5e1">• Harness lifecycle cleanup on session close</text>
+    <text x="1080" y="676" font-size="11" fill="#cbd5e1">• Renderer bundle &lt; 1.4MB gzip</text>
+    <text x="1080" y="696" font-size="11" fill="#cbd5e1">• Idle memory &lt; 240MB (clean restart)</text>
+  </g>
+
+  <!-- ============== Footer ============== -->
+  <g>
+    <rect x="60" y="740" width="1480" height="220" rx="16" fill="url(#card)" stroke="#34d399"/>
+    <text x="800" y="772" text-anchor="middle" font-size="22" font-weight="700" fill="#bbf7d0">Try it in 5 commands</text>
+
+    <g font-family="ui-monospace, monospace" font-size="14" fill="#a7f3d0">
+      <rect x="180" y="800" width="1240" height="40" rx="6" fill="#022c22" stroke="#10b981"/>
+      <text x="200" y="826">$ git clone https://github.com/louloulin/OpenBuddy &amp;&amp; cd OpenBuddy</text>
+
+      <rect x="180" y="848" width="1240" height="40" rx="6" fill="#022c22" stroke="#10b981"/>
+      <text x="200" y="874">$ pnpm install            # installs all 64 workspace packages via moon</text>
+
+      <rect x="180" y="896" width="1240" height="40" rx="6" fill="#022c22" stroke="#10b981"/>
+      <text x="200" y="922">$ pnpm electron:dev       # launches the Electron host with live reload</text>
+    </g>
+
+    <text x="800" y="956" text-anchor="middle" font-size="13" fill="#cbd5e1">…then <tspan font-family="ui-monospace, monospace" fill="#fbbf24">pnpm typecheck</tspan>, <tspan font-family="ui-monospace, monospace" fill="#fbbf24">pnpm test</tspan>, <tspan font-family="ui-monospace, monospace" fill="#fbbf24">pnpm eval:acceptance</tspan> to validate the build.</text>
+  </g>
+</svg>

@@ -29,6 +29,21 @@ function WordSpans({ text, offset }: { text: string; offset: number }) {
   );
 }
 
+/**
+ * Separator to emit between two title fragments. English always needs one.
+ * Chinese needs one only where a CJK glyph meets a Latin one — `开源的桌面` +
+ * `AI 工作台,` must not render as `桌面AI`; the usual spacing rule applies
+ * because the fragments happen to be split on exactly that boundary.
+ */
+function fragmentSeparator(locale: Locale, before: string, after: string): string {
+  if (locale !== 'zh-CN') return ' ';
+  const a = before.trim().slice(-1);
+  const b = after.trim().slice(0, 1);
+  const cjk = /[㐀-鿿]/;
+  const latin = /[A-Za-z0-9]/;
+  return (cjk.test(a) && latin.test(b)) || (latin.test(a) && cjk.test(b)) ? ' ' : '';
+}
+
 interface HeroProps {
   locale: Locale;
   dict: {
@@ -66,9 +81,14 @@ export default function Hero({ locale, dict }: HeroProps) {
 
             <h1 className={ locale === 'zh-CN' ? 'font-display-serif text-[clamp(32px,4.2vw,52px)] font-normal leading-[1.08] tracking-[-0.025em] text-[var(--wb-fg)]' : 'font-display-serif text-[clamp(48px,7vw,96px)] font-normal leading-[1.02] tracking-[-0.035em] text-[var(--wb-fg)]' }>
               <WordSpans text={ dict.hero.titlePre } offset={ 0 } />
+              { /* The three fragments sit on separate lines, so JSX drops the
+                   whitespace between them — `textContent` then reads
+                   "desktopAI workspaceyou" for crawlers and screen readers. */ }
+              { fragmentSeparator(locale, dict.hero.titlePre, dict.hero.titleHighlight) }
               <span className="block">
                 <WordSpans text={ dict.hero.titleHighlight } offset={ preCount } />
               </span>
+              { fragmentSeparator(locale, dict.hero.titleHighlight, dict.hero.titlePost) }
               <span className="block italic text-[var(--wb-fg-muted)]">
                 <WordSpans
                   text={ dict.hero.titlePost }

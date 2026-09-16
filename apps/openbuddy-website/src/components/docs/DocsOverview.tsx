@@ -1,3 +1,4 @@
+import Reveal from '@/components/motion/Reveal';
 import { CATEGORY_LABELS, type DocCategory, type DocMeta, getAllDocs, getDocsByCategory } from '@/lib/docs-meta';
 
 interface DocsOverviewProps {
@@ -54,8 +55,8 @@ export default function DocsOverview({ locale }: DocsOverviewProps) {
                   { CATEGORY_LABELS[cat][locale === 'zh-CN' ? 'zh' : 'en'] }
                 </h2>
                 <ul className="grid gap-3 md:grid-cols-2">
-                  { docs.map((doc) => (
-                    <DocCard key={ doc.slug } doc={ doc } locale={ locale } />
+                  { docs.map((doc, docIndex) => (
+                    <DocCard key={ doc.slug } doc={ doc } locale={ locale } index={ docIndex } />
                   )) }
                 </ul>
               </section>
@@ -78,9 +79,9 @@ export default function DocsOverview({ locale }: DocsOverviewProps) {
   );
 }
 
-function DocCard({ doc, locale }: { doc: DocMeta; locale: 'en' | 'zh-CN' }) {
+function DocCard({ doc, locale, index }: { doc: DocMeta; locale: 'en' | 'zh-CN'; index: number }) {
   return (
-    <li>
+    <Reveal as="li" delay={ Math.min(index, 5) * 60 }>
       <a
         href={ `/${ locale === 'zh-CN' ? 'zh-CN' : 'en' }/docs/${ doc.slug }` }
         className="wb-card group block"
@@ -92,6 +93,6 @@ function DocCard({ doc, locale }: { doc: DocMeta; locale: 'en' | 'zh-CN' }) {
           { doc.description }
         </p>
       </a>
-    </li>
+    </Reveal>
   );
 }

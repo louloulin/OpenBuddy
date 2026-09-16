@@ -1,17 +1,12 @@
-import type { Metadata } from 'next';
 import { Calendar, Sparkles, Wrench, Bug, ExternalLink } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
+import Reveal from '@/components/motion/Reveal';
 import { PageHeader } from '@/components/PageHeader';
 import type { ChangelogRelease } from '@/lib/changelog-server';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import { localizedPath } from '@/lib/i18n';
 import Link from 'next/link';
-
-export const metadata: Metadata = {
-  title: 'Changelog',
-  description: 'Every OpenBuddy release — highlights, improvements, fixes. Subscribe to GitHub Releases for notifications.'
-};
 
 const TAG_STYLES: Record<string, { dot: string; chip: string }> = {
   stable: { dot: 'var(--wb-working)', chip: 'bg-[var(--wb-working-soft)] text-[var(--wb-working-fg)] border-[var(--wb-working-border)]' },
@@ -43,10 +38,10 @@ export function ChangelogView({ locale, releases }: { locale: Locale; releases: 
               <div className="space-y-10">
                 { releases.length === 0 ? (
                   <p className="text-[var(--wb-fg-muted)]">{ isZh ? '暂无更新日志。' : 'No releases published yet.' }</p>
-                ) : releases.map((r) => {
+                ) : releases.map((r, releaseIndex) => {
                   const tag = TAG_STYLES[r.tag] ?? TAG_STYLES.stable;
                   return (
-                    <article key={ r.version } className="relative sm:pl-14">
+                    <Reveal key={ r.version } as="article" delay={ Math.min(releaseIndex, 4) * 90 } className="relative sm:pl-14">
                       <div className="absolute left-0 top-3 hidden h-10 w-10 items-center justify-center rounded-full border-2 bg-[var(--wb-bg-pure)] sm:flex" style={ { borderColor: tag.dot } }>
                         <span className="h-2 w-2 rounded-full" style={ { background: tag.dot } } />
                       </div>
@@ -79,7 +74,7 @@ export function ChangelogView({ locale, releases }: { locale: Locale; releases: 
                           </a>
                         </footer>
                       </div>
-                    </article>
+                    </Reveal>
                   );
                 }) }
               </div>

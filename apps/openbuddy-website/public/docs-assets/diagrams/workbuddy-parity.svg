@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="ob" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#86efac"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+
+  <text x="800" y="52" text-anchor="middle" font-size="32" font-weight="700" fill="#f8fafc">OpenBuddy vs WorkBuddy · Capability parity</text>
+  <text x="800" y="80" text-anchor="middle" font-size="14" fill="#94a3b8">OpenBuddy ships every WorkBuddy capability — open source, auditable, BYOK.</text>
+
+  <!-- Header -->
+  <g>
+    <rect x="60" y="120" width="1480" height="56" rx="10" fill="url(#card)" stroke="#475569"/>
+    <text x="240" y="155" text-anchor="middle" font-size="13" font-weight="700" fill="#cbd5e1">Capability</text>
+    <text x="700" y="155" text-anchor="middle" font-size="13" font-weight="700" fill="#94a3b8">Tencent WorkBuddy</text>
+    <text x="1080" y="155" text-anchor="middle" font-size="13" font-weight="700" fill="94a3b8">OpenBuddy</text>
+    <text x="1380" y="155" text-anchor="middle" font-size="13" font-weight="700" fill="#a7f3d0">License</text>
+  </g>
+
+  <!-- Rows -->
+  <g font-size="12" fill="#e2e8f0">
+    <!-- Row 1 -->
+    <rect x="60" y="186" width="1480" height="48" rx="6" fill="#0f172a" stroke="#1e293b"/>
+    <text x="80" y="216" font-weight="700">Desktop AI workspace</text>
+    <text x="700" y="216" text-anchor="middle" fill="#86efac">✓ Closed-source</text>
+    <text x="1080" y="216" text-anchor="middle" fill="#86efac">✓ Electron + Pi</text>
+    <text x="1380" y="216" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+
+    <!-- Row 2 -->
+    <rect x="60" y="240" width="1480" height="48" rx="6" fill="#1e293b" stroke="#1e293b"/>
+    <text x="80" y="270" font-weight="700">Plan mode (read-only / build)</text>
+    <text x="700" y="270" text-anchor="middle" fill="#86efac">✓</text>
+    <text x="1080" y="270" text-anchor="middle" fill="#86efac">✓ + custom plans</text>
+    <text x="1380" y="270" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+
+    <!-- Row 3 -->
+    <rect x="60" y="294" width="1480" height="48" rx="6" fill="#0f172a" stroke="#1e293b"/>
+    <text x="80" y="324" font-weight="700">Skills system (workbuddy.json)</text>
+    <text x="700" y="324" text-anchor="middle" fill="#86efac">✓ 60+ bundled</text>
+    <text x="1080" y="324" text-anchor="middle" fill="#86efac">✓ Pi extensions</text>
+    <text x="1380" y="324" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+
+    <!-- Row 4 -->
+    <rect x="60" y="348" width="1480" height="48" rx="6" fill="#1e293b" stroke="#1e293b"/>
+    <text x="80" y="378" font-weight="700">MCP connectors</text>
+    <text x="700" y="378" text-anchor="middle" fill="#86efac">✓</text>
+    <text x="1080" y="378" text-anchor="middle" fill="#86efac">✓ + Cordis mesh</text>
+    <text x="1380" y="378" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+
+    <!-- Row 5 -->
+    <rect x="60" y="402" width="1480" height="48" rx="6" fill="#0f172a" stroke="#1e293b"/>
+    <text x="80" y="432" font-weight="700">207-icon foundation</text>
+    <text x="700" y="432" text-anchor="middle" fill="#86efac">✓</text>
+    <text x="1080" y="432" text-anchor="middle" fill="#86efac">✓ 100% implemented</text>
+    <text x="1380" y="432" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+
+    <!-- Row 6 -->
+    <rect x="60" y="456" width="1480" height="48" rx="6" fill="#1e293b" stroke="#1e293b"/>
+    <text x="80" y="486" font-weight="700">Provider BYOK</text>
+    <text x="700" y="486" text-anchor="middle" fill="#fbbf24">partial</text>
+    <text x="1080" y="486" text-anchor="middle" fill="#86efac">✓ 9 providers</text>
+    <text x="1380" y="486" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+
+    <!-- Row 7 -->
+    <rect x="60" y="510" width="1480" height="48" rx="6" fill="#0f172a" stroke="#1e293b"/>
+    <text x="80" y="540" font-weight="700">Plugin marketplace</text>
+    <text x="700" y="540" text-anchor="middle" fill="#86efac">✓ Tencent-owned</text>
+    <text x="1080" y="540" text-anchor="middle" fill="#fbbf24">public catalog (Q4)</text>
+    <text x="1380" y="540" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+
+    <!-- Row 8 -->
+    <rect x="60" y="564" width="1480" height="48" rx="6" fill="#1e293b" stroke="#1e293b"/>
+    <text x="80" y="594" font-weight="700">i18n (zh-CN / en)</text>
+    <text x="700" y="594" text-anchor="middle" fill="#86efac">✓</text>
+    <text x="1080" y="594" text-anchor="middle" fill="#86efac">✓ 8 locales</text>
+    <text x="1380" y="594" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+
+    <!-- Row 9 -->
+    <rect x="60" y="618" width="1480" height="48" rx="6" fill="#0f172a" stroke="#1e293b"/>
+    <text x="80" y="648" font-weight="700">Casdoor OIDC integration</text>
+    <text x="700" y="648" text-anchor="middle" fill="#fda4af">✗</text>
+    <text x="1080" y="648" text-anchor="middle" fill="#86efac">✓ built-in</text>
+    <text x="1380" y="648" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+
+    <!-- Row 10 -->
+    <rect x="60" y="672" width="1480" height="48" rx="6" fill="#1e293b" stroke="#1e293b"/>
+    <text x="80" y="702" font-weight="700">NewAPI gateway</text>
+    <text x="700" y="702" text-anchor="middle" fill="#fda4af">✗</text>
+    <text x="1080" y="702" text-anchor="middle" fill="#86efac">✓ + resource gateway</text>
+    <text x="1380" y="702" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+
+    <!-- Row 11 -->
+    <rect x="60" y="726" width="1480" height="48" rx="6" fill="#0f172a" stroke="#1e293b"/>
+    <text x="80" y="756" font-weight="700">SCIM v2 + SAML 2.0</text>
+    <text x="700" y="756" text-anchor="middle" fill="#fda4af">✗</text>
+    <text x="1080" y="756" text-anchor="middle" fill="#86efac">✓ 4 payment channels</text>
+    <text x="1380" y="756" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+
+    <!-- Row 12 -->
+    <rect x="60" y="780" width="1480" height="48" rx="6" fill="#1e293b" stroke="#1e293b"/>
+    <text x="80" y="810" font-weight="700">Audit ledger (WORM)</text>
+    <text x="700" y="810" text-anchor="middle" fill="#fda4af">✗</text>
+    <text x="1080" y="810" text-anchor="middle" fill="#86efac">✓ local-first</text>
+    <text x="1380" y="810" text-anchor="middle" fill="#86efac" font-weight="700">MIT</text>
+  </g>
+
+  <!-- Footer note -->
+  <text x="800" y="870" text-anchor="middle" font-size="12" fill="#64748b">OpenBuddy is an independent, community-driven project and is not affiliated with, endorsed by, or sponsored by Tencent.</text>
+</svg>

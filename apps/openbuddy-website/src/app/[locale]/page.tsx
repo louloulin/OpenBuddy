@@ -8,6 +8,7 @@ import CapabilityGrid from '@/components/home/CapabilityGrid';
 import Architecture from '@/components/home/Architecture';
 import LogoWall from '@/components/home/LogoWall';
 import CTAFinal from '@/components/home/CTAFinal';
+import { buildMetadata } from '@/lib/build-metadata';
 import { locales, getDictionary, type Locale } from '@/lib/i18n';
 
 export function generateStaticParams() {
@@ -16,15 +17,22 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const dict = getDictionary(locale as Locale);
+  const typed = (locales.includes(locale as Locale) ? locale : 'en') as Locale;
+  const dict = getDictionary(typed);
   return {
-    title: dict.meta.title,
-    description: dict.meta.description,
+    ...buildMetadata({
+      locale: typed,
+      path: '/',
+      // Already carries the brand — bypass the root layout's ' · OpenBuddy' template.
+      title: dict.meta.title,
+      absoluteTitle: true,
+      description: dict.meta.description
+    }),
     keywords: dict.meta.keywords,
     openGraph: {
       title: dict.meta.title,
       description: dict.meta.ogDescription,
-      locale: locale === 'zh-CN' ? 'zh_CN' : 'en_US'
+      locale: typed === 'zh-CN' ? 'zh_CN' : 'en_US'
     }
   };
 }

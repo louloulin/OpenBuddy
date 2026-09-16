@@ -16,7 +16,8 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
  * ThemeProvider —— 简单的明暗主题切换
  *
  * 注意：官网当前所有内容在 light/dark 下都已经做了适配（通过 CSS variables）。
- * 默认遵循系统偏好；用户偏好持久化到 localStorage。
+ * **默认浅色**，不跟随系统 prefers-color-scheme；用户显式切换后持久化到
+ * localStorage，存储值优先于默认值。
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('light');
@@ -25,9 +26,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const stored = (typeof window !== 'undefined' && (localStorage.getItem('openbuddy-theme') as Theme | null));
     if (stored === 'light' || stored === 'dark') {
       setThemeState(stored);
-    } else if (typeof window !== 'undefined') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setThemeState(prefersDark ? 'dark' : 'light');
     }
   }, []);
 

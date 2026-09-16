@@ -1,4 +1,3 @@
-import type { Metadata } from 'next';
 import { Monitor, Apple, Terminal, ArrowRight, Check } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
@@ -9,12 +8,6 @@ import { SITE_STATS } from '@/lib/constants';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import { localizedPath } from '@/lib/i18n';
 import Link from 'next/link';
-
-export const metadata: Metadata = {
-  title: 'Download OpenBuddy',
-  description:
-    'Download OpenBuddy for Windows, macOS, and Linux. 100% MIT, free forever. Or build from source via pnpm.'
-};
 
 interface DownloadPlatform {
   icon: typeof Monitor;
@@ -90,6 +83,12 @@ const COPY_ZH = {
     { platform: 'Windows', hash: 'a8f1…b9e5' },
     { platform: 'Linux', hash: '2c6d…7a4f' }
   ]
+};
+
+/** Title/subtitle for this page, shared with the route's generateMetadata. */
+export const DOWNLOAD_COPY: Record<Locale, typeof COPY_EN> = {
+  en: COPY_EN,
+  'zh-CN': COPY_ZH
 };
 
 export function DownloadView({ locale }: { locale: Locale }) {

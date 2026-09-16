@@ -4,6 +4,7 @@ import SiteFooter from '@/components/SiteFooter';
 import DocsSidebar from '@/components/docs/DocsSidebar';
 import DocsMobileNav from '@/components/docs/DocsMobileNav';
 import DocArticle from '@/components/docs/DocArticle';
+import { buildMetadata } from '@/lib/build-metadata';
 import { getAllDocs } from '@/lib/docs-meta';
 import { getDocBySlug } from '@/lib/docs-server';
 import { locales, getDictionary, type Locale } from '@/lib/i18n';
@@ -28,10 +29,15 @@ export async function generateMetadata({
   const { locale, slug } = await params;
   const content = getDocBySlug(slug, locale as Locale);
   if (!content) return { title: 'Not Found' };
-  return {
+  return buildMetadata({
+    locale: locale as Locale,
+    path: `/docs/${slug}`,
     title: content.meta.title,
-    description: content.meta.description
-  };
+    description: content.meta.description,
+    // Docs without their own zh source file render the English fallback, so
+    // only natively-available locales are advertised as alternates.
+    availableLocales: content.available.filter((a) => a.isNative).map((a) => a.locale)
+  });
 }
 
 export default async function DocPage({

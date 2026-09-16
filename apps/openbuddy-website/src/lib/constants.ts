@@ -23,3 +23,11 @@ export const SITE_STATS = {
 } as const;
 
 export const SITE_LICENSE = 'MIT' as const;
+
+/**
+ * Canonical origin for absolute URLs (canonical tags, hreflang, sitemap,
+ * robots). Read from the environment so a preview deploy advertises its own
+ * origin instead of the production one; the literal is the production
+ * fallback for builds that do not set it.
+ */
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://openbuddy.dev').replace(/\/+$/, '');
