@@ -9,6 +9,10 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+// `ExtensionMode` is not re-exported from the package root in
+// @earendil-works/pi-coding-agent@0.85; declare it locally since the
+// test mock only ever sets `mode: "rpc"`.
+type ExtensionMode = "tui" | "rpc" | "json" | "print";
 
 import createDshMessageFeedbackExtension, { createDshMessageFeedbackExtensionForSession } from "./message-feedback";
 import {

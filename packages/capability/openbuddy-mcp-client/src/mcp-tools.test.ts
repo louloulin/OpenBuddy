@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 
 import {
   createMcpToolDefinitions,
@@ -43,6 +44,28 @@ function makeStubConnection(overrides: Partial<McpConnectionLike> = {}): McpConn
   };
 }
 
+/**
+ * `ToolDefinition.execute` has five parameters in
+ * `@earendil-works/pi-coding-agent@0.85` — `(toolCallId, params, signal,
+ * onUpdate, ctx)`. The MCP bridge only ever uses the first three, so the tests
+ * call tools through this 3-argument adapter rather than repeating a throwaway
+ * `onUpdate`/`ctx` at every call site.
+ */
+type McpToolExecute = (
+  toolCallId: string,
+  params: Record<string, unknown>,
+  signal?: AbortSignal,
+) => Promise<unknown>;
+
+function executeTool(
+  defs: ToolDefinition[],
+  toolCallId: string,
+  params: Record<string, unknown>,
+): Promise<unknown> {
+  const definition = defs[0]!;
+  return (definition.execute as McpToolExecute)(toolCallId, params, undefined);
+}
+
 describe("mcp-tools (Phase C.3)", () => {
   describe("mcpToolName", () => {
     it("strips unsafe characters from server + tool names", () => {
@@ -71,7 +94,7 @@ describe("mcp-tools (Phase C.3)", () => {
     it("forwards execute(args) to connection.callTool and normalises the result", async () => {
       const connection = makeStubConnection();
       const defs = createMcpToolDefinitions("server", [makeTool()], connection);
-      const result = (await defs[0]!.execute("call-1", { message: "hi" }, undefined)) as { content: Array<{ type: string; text: string }>; details: McpCallToolResult };
+      const result = (await executeTool(defs, "call-1", { message: "hi" })) as { content: Array<{ type: string; text: string }>; details: McpCallToolResult };
       expect(connection.callTool).toHaveBeenCalledWith("ping", { message: "hi" }, undefined);
       expect(result.content).toEqual([{ type: "text", text: "pong" }]);
       expect(result.details.content).toEqual([{ type: "text", text: "pong" }]);
@@ -84,7 +107,7 @@ describe("mcp-tools (Phase C.3)", () => {
         })),
       });
       const defs = createMcpToolDefinitions("server", [makeTool()], connection);
-      const result = (await defs[0]!.execute("call-1", {}, undefined)) as { content: Array<{ type: string; text: string }> };
+      const result = (await executeTool(defs, "call-1", {})) as { content: Array<{ type: string; text: string }> };
       expect(result.content[0]?.text).toBe("[image image/png]");
     });
 
@@ -95,7 +118,7 @@ describe("mcp-tools (Phase C.3)", () => {
         })),
       });
       const defs = createMcpToolDefinitions("server", [makeTool()], connection);
-      const result = (await defs[0]!.execute("call-1", {}, undefined)) as { content: Array<{ type: string; text: string }> };
+      const result = (await executeTool(defs, "call-1", {})) as { content: Array<{ type: string; text: string }> };
       expect(result.content[0]?.text).toBe("[audio audio/mp3]");
     });
 
@@ -103,7 +126,7 @@ describe("mcp-tools (Phase C.3)", () => {
       const events: McpToolCallEvent[] = [];
       const onCall = (event: McpToolCallEvent) => { events.push(event); };
       const defs = createMcpToolDefinitions("server", [makeTool()], makeStubConnection(), onCall);
-      await defs[0]!.execute("call-1", {}, undefined);
+      await executeTool(defs, "call-1", {});
       expect(events).toHaveLength(2);
       expect(events[0]?.phase).toBe("start");
       expect(events[1]?.phase).toBe("end");
@@ -121,7 +144,7 @@ describe("mcp-tools (Phase C.3)", () => {
         }),
       });
       const defs = createMcpToolDefinitions("server", [makeTool()], connection, onCall);
-      await expect(defs[0]!.execute("call-1", {}, undefined)).rejects.toThrow("connection broken");
+      await expect(executeTool(defs, "call-1", {})).rejects.toThrow("connection broken");
       expect(events).toHaveLength(2);
       const endEvent = events[1] as Extract<McpToolCallEvent, { phase: "end" }>;
       expect(endEvent.ok).toBe(false);
@@ -132,7 +155,7 @@ describe("mcp-tools (Phase C.3)", () => {
       const events: McpToolCallEvent[] = [];
       const onCall = (event: McpToolCallEvent) => { events.push(event); };
       const defs = createMcpToolDefinitions("server", [makeTool()], makeStubConnection(), onCall);
-      await defs[0]!.execute("trace-id-42", {}, undefined);
+      await executeTool(defs, "trace-id-42", {});
       expect(events[0]).toEqual({
         phase: "start",
         callId: "trace-id-42",

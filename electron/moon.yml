@@ -13,8 +13,11 @@
 #                        at the repo root.
 #
 # All commands run through moon. pnpm is only used to install dependencies.
-# `script:` is used so moon routes through pnpm, which finds `tsc` in
-# `node_modules/.bin/` automatically.
+# Binaries are referenced through the workspace-root `node_modules/.bin`:
+# moon's toolchain PATH does not include it, so a bare `tsc` would instead pick
+# up whatever `tsc` happens to be installed globally on the machine (or fail
+# with 127 if there is none). `electron/` has no `node_modules/` of its own —
+# pnpm hoists everything to the workspace root.
 # ---------------------------------------------------------------------------
 id: app-desktop
 language: typescript
@@ -49,7 +52,7 @@ tasks:
   # The root `pnpm typecheck` task cascades to this via `deps`, so running
   # it once covers both projects.
   typecheck:
-    script: "tsc --noEmit -p tsconfig.json"
+    script: "../node_modules/.bin/tsc --noEmit -p tsconfig.json"
     inputs:
       - "@group(sources)"
     outputs: []
@@ -57,7 +60,7 @@ tasks:
   # Same effect as `typecheck` — the codebase uses tsc for both. Kept as a
   # separate task so CI/scripts can target lint specifically.
   lint:
-    script: "tsc --noEmit -p tsconfig.json"
+    script: "../node_modules/.bin/tsc --noEmit -p tsconfig.json"
     inputs:
       - "@group(sources)"
     outputs: []

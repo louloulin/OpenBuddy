@@ -30,7 +30,7 @@ const PluginManifestShape = z.object({
   version: z.string().min(1),
   description: z.string().min(1),
   author: z.string().optional(),
-  contributes: z.record(z.any()).optional(),
+  contributes: z.record(z.string(), z.any()).optional(),
 });
 
 export type PluginManifest = z.infer<typeof PluginManifestShape>;

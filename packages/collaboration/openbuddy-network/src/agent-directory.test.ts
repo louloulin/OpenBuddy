@@ -2,7 +2,10 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { JsonAgentDirectoryAdapter, MemoryAgentDirectoryAdapter, type PeerRecord } from "./agent-directory";
+import { JsonAgentDirectoryAdapter, MemoryAgentDirectoryAdapter } from "./agent-directory";
+// `PeerRecord` is declared in (and exported from) the package barrel, not in
+// `agent-directory.ts` — importing it from there only worked by accident.
+import type { PeerRecord } from "./index";
 
 const peer: PeerRecord = {
   identity: {

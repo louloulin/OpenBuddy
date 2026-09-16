@@ -1276,7 +1276,7 @@ describe.sequential("email capability", () => {
       threads: async () => ({ items: [], nextCursor: undefined }),
       diagnostics: async () => ({ provider: "fake-cache", profile: "fake-cache", readiness: "ready" as const, message: "cached", missingCapabilities: [], discoveredTools: [], accounts: [], operations: [] }),
     }
-    service.setProvider(fakeProvider)
+    service.setProvider(fakeProvider as never)
     const before = await service.accounts()
     expect(before.map((a) => a.id)).toEqual(["acc-stale"])
     service.invalidateProvider()

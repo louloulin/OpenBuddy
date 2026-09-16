@@ -22,7 +22,14 @@ export interface OpenStorageSyncResult {
   migration: ReturnType<MigrationRunner["runSync"]>;
 }
 
-export async function closeStorage(storage: Promise<OpenStorageResult> | undefined): Promise<void> {
+/**
+ * Accepts either the promise returned by {@link openStorage} or the already
+ * resolved result, so callers can do `await closeStorage(openStorage(...))`
+ * and `await closeStorage(storage)` without unwrapping a promise by hand.
+ */
+export async function closeStorage(
+  storage: Promise<OpenStorageResult> | OpenStorageResult | undefined,
+): Promise<void> {
   if (!storage) return;
   const result = await storage;
   try {

@@ -102,15 +102,23 @@ function discoverUiAliases(): Array<{ find: string; replacement: string }> {
   return out.sort((a, b) => b.find.length - a.find.length);
 }
 
+const allAliases: Array<{ find: string; replacement: string }> = [
+  { find: "pg", replacement: resolve(__dirname, "services/casdoor-resource-gateway/src/__pg-stub__.ts") },
+  { find: "mysql2/promise", replacement: resolve(__dirname, "services/casdoor-resource-gateway/src/__mysql2-stub__.ts") },
+  { find: "@", replacement: resolve(__dirname, "src") },
+  ...discoverUiAliases(),
+  ...workspacePackageAliases,
+];
+// Sort longest `find` first so deeper subpath aliases (e.g.
+// `@openbuddy/dsh-core/state`) beat their bare-package siblings
+// (`@openbuddy/dsh-core`). Vite's resolver tries each alias in order and a
+// bare `@openbuddy/dsh-core` entry would otherwise swallow every `@openbuddy/
+// dsh-core/*` request and rewrite it to `<...>/src/index.ts/state`.
+allAliases.sort((a, b) => b.find.length - a.find.length);
+
 export default defineConfig({
   resolve: {
-    alias: [
-      { find: "@", replacement: resolve(__dirname, "src") },
-      { find: "pg", replacement: resolve(__dirname, "services/casdoor-resource-gateway/src/__pg-stub__.ts") },
-      { find: "mysql2/promise", replacement: resolve(__dirname, "services/casdoor-resource-gateway/src/__mysql2-stub__.ts") },
-      ...discoverUiAliases(),
-      ...workspacePackageAliases,
-    ],
+    alias: allAliases,
   },
   test: {
     globals: true,

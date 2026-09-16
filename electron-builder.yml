@@ -57,14 +57,30 @@ files:
   - "!**/.DS_Store"
   - "!**/.git/**"
 
-# pnpm stores transitive packages behind symlinks in `.pnpm/`. electron-builder
-# cannot reliably follow those links when assembling an unpacked app, so copy
-# the runtime directories used by Pi explicitly into the app's node_modules.
+# Hoisted layout (see pnpm-workspace.yaml): chord and esbuild live at
+# flat `node_modules/<pkg>` paths, not inside `node_modules/.pnpm/<hash>/...`.
+# Pin those flat paths here so they are guaranteed to be copied into the
+# app bundle, regardless of which collector path electron-builder takes.
+# With the node_modules collector these are technically redundant (the
+# collector follows the production closure), but the explicit copy makes
+# the dependency on these two packages visible in the packaging config
+# and survives if the collector ever changes again.
 extraResources:
-  - from: "node_modules/.pnpm/@earendil-works+chord@0.85.1/node_modules/@earendil-works/chord"
+  - from: "node_modules/@earendil-works/chord"
     to: "app/node_modules/@earendil-works/chord"
-  - from: "node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild"
+  - from: "node_modules/esbuild"
     to: "app/node_modules/esbuild"
+  # brace-expansion@5 is ESM (`import { balanced } from "balanced-match"`) and
+  # requires balanced-match@^4, but the hoisted root can only carry one
+  # balanced-match: minimatch@3 pins balanced-match@1.0.2 (CJS) there, so pnpm
+  # keeps 4.x nested under brace-expansion. electron-builder's pnpm collector
+  # flattens that nesting, the packaged app loaded the root 1.0.2 instead and
+  # the main process died before opening a window with:
+  #   SyntaxError: The requested module 'balanced-match' does not provide an
+  #   export named 'balanced'
+  # Ship the nested copy explicitly so the main process can boot.
+  - from: "node_modules/brace-expansion/node_modules/balanced-match"
+    to: "app/node_modules/brace-expansion/node_modules/balanced-match"
 
 asar: false
 # asar: false is a workaround for the pnpm + electron-builder

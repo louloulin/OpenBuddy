@@ -26,8 +26,8 @@ describe("sessionTree projection", () => {
   });
 
   it("projects a linear session into a single-rooted tree", () => {
-    manager.appendMessage({ role: "user", content: "hello" });
-    manager.appendMessage({ role: "assistant", content: "hi there" });
+    manager.appendMessage({ role: "user", content: "hello" } as never);
+    manager.appendMessage({ role: "assistant", content: "hi there" } as never);
 
     const tree = sessionTree(manager);
     expect(tree).toHaveLength(1); // single root
@@ -41,9 +41,9 @@ describe("sessionTree projection", () => {
   });
 
   it("projects a branch_summary entry with its summary text", () => {
-    const first = manager.appendMessage({ role: "user", content: "question" });
+    const first = manager.appendMessage({ role: "user", content: "question" } as never);
     manager.branchWithSummary(first, "abandoned path summary", {});
-    manager.appendMessage({ role: "assistant", content: "answer" });
+    manager.appendMessage({ role: "assistant", content: "answer" } as never);
 
     const tree = sessionTree(manager);
     const kinds = flatten(tree).map((n) => n.branch);
@@ -53,9 +53,9 @@ describe("sessionTree projection", () => {
   });
 
   it("projects a compaction entry with its summary", () => {
-    manager.appendMessage({ role: "user", content: "a" });
+    manager.appendMessage({ role: "user", content: "a" } as never);
     manager.appendCompaction("compacted context", "some-entry-id", 1000);
-    manager.appendMessage({ role: "assistant", content: "b" });
+    manager.appendMessage({ role: "assistant", content: "b" } as never);
 
     const tree = sessionTree(manager);
     const compaction = flatten(tree).find((n) => n.branch === "compaction");
@@ -64,7 +64,7 @@ describe("sessionTree projection", () => {
 
   it("truncates long message summaries to the cap", () => {
     const long = "x".repeat(500);
-    manager.appendMessage({ role: "user", content: long });
+    manager.appendMessage({ role: "user", content: long } as never);
     const tree = sessionTree(manager);
     expect(tree[0]!.summary!.length).toBeLessThan(500);
     expect(tree[0]!.summary!.endsWith("…")).toBe(true);

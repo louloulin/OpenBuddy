@@ -26,13 +26,20 @@ fileGroups:
 # The package manager (pnpm) and the dependency graph (DAG) live in moon —
 # pnpm is only used to install dependencies. All commands run via
 # `pnpm <script>` (each script in `package.json` forwards to `moon run openbuddy:<task>`).
+#
+# Binaries are addressed as `./node_modules/.bin/<bin>` rather than bare names:
+# `script:` is executed by `sh -c` with moon's toolchain PATH, which does NOT
+# contain `node_modules/.bin`. A bare `tsc`, for instance, silently resolves to
+# a globally installed TypeScript (or fails with exit 127) instead of the
+# version this workspace pins. Library packages under `packages/*/*` do not
+# have this problem because they use `command: "pnpm exec <bin>"`.
 # ---------------------------------------------------------------------------
 tasks:
   # Type-check the React renderer (`src/`) + the electron-vite config + the
   # root tsconfig. Cascades to `app-desktop:typecheck` so the electron main
   # + preload TypeScript in `electron/{main,preload}/**` is also checked.
   typecheck:
-    script: "tsc --noEmit"
+    script: "./node_modules/.bin/tsc --noEmit"
     deps:
       - "app-desktop:typecheck"
     inputs:
@@ -45,12 +52,28 @@ tasks:
   # with --noEmit). Kept as a separate task so CI / `pnpm lint` can target
   # it specifically.
   lint:
-    script: "tsc --noEmit"
+    script: "./node_modules/.bin/tsc --noEmit"
     deps:
       - "app-desktop:lint"
     inputs:
       - "@group(sources)"
       - "tsconfig*.json"
+      - "package.json"
+    outputs: []
+
+  # Renderer-side vitest suite (covers `src/**` and every `__tests__` inside
+  # `packages/*` — each package's own vitest.config.ts takes over as soon as
+  # vitest walks into a directory with one). Run on its own after
+  # `~:typecheck` so CI surfaces renderer failures without gating on a full
+  # workspace re-typecheck.
+  test:
+    script: "./node_modules/.bin/vitest run"
+    deps:
+      - "~:typecheck"
+    inputs:
+      - "@group(sources)"
+      - "vitest.config.ts"
+      - "src/test-setup.ts"
       - "package.json"
     outputs: []
 
@@ -63,7 +86,7 @@ tasks:
       - "~:build.bundle"
 
   build.bundle:
-    script: "electron-vite build"
+    script: "./node_modules/.bin/electron-vite build"
     inputs:
       - "@group(sources)"
       - "electron.vite.config.ts"
@@ -75,7 +98,7 @@ tasks:
   # task. Produces the same `out/` as `build.bundle`; the renderer is the
   # largest bundle so it dominates wall time.
   build.renderer:
-    script: "electron-vite build"
+    script: "./node_modules/.bin/electron-vite build"
     inputs:
       - "@group(sources)"
       - "electron.vite.config.ts"
@@ -92,7 +115,7 @@ tasks:
       cache: false
 
   dev.renderer:
-    script: "vite"
+    script: "./node_modules/.bin/vite"
     options:
       persistent: true
       cache: false
@@ -104,7 +127,7 @@ tasks:
       cache: false
 
   preview:
-    script: "electron-vite preview"
+    script: "./node_modules/.bin/electron-vite preview"
     options:
       persistent: true
       cache: false
@@ -112,7 +135,7 @@ tasks:
   electron.start:
     deps:
       - "~:build"
-    script: "electron ."
+    script: "./node_modules/.bin/electron ."
     options:
       persistent: true
       cache: false
@@ -123,7 +146,7 @@ tasks:
   electron.smoke:
     deps:
       - "~:build"
-    script: "electron scripts/electron/smoke.mjs"
+    script: "./node_modules/.bin/electron scripts/electron/smoke.mjs"
     options:
       cache: false
     inputs:
