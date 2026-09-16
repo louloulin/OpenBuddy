@@ -17,11 +17,13 @@ import {
   blankSourceDraft,
   describePiMarketError,
   describeProbeResult,
+  findSourceDraftIndex,
   groupPiMarketEntries,
   installStateOf,
   mirrorLabel,
   moveSourceDraft,
   sourceChips,
+  sourceDraftFromPath,
   sourceDraftsDirty,
   sourceLabel,
   sourceStateLabel,
@@ -415,3 +417,38 @@ describe("R35 源管理:状态与探活文案", () => {
   });
 });
 
+describe("R39 导入本地索引:路径 → 一行草稿", () => {
+  it("取文件名当名称,并且能被现成校验接受(不用用户再改)", () => {
+    const row = sourceDraftFromPath("/srv/pi-mirror/registry.json");
+    expect(row.url).toBe("/srv/pi-mirror/registry.json");
+    expect(row.label).toBe("registry");
+    expect(row.readonly).toBe(false);
+    // 导入的行必须直接合法 —— 否则"导入"就变成了"导入 + 手改 id"。
+    const result = validateSourceDrafts([row]);
+    expect(result.ok).toBe(true);
+    expect(result.sources[0]?.url).toBe("/srv/pi-mirror/registry.json");
+    // id 由 main 侧按 url 派生,不是 UI 硬编码的 "registry"。
+    expect(result.sources[0]?.id).toBeTruthy();
+  });
+
+  it("Windows 路径 / file:// / 带空白的输入都不炸", () => {
+    expect(sourceDraftFromPath("C:\\mirror\\team-index.json").label).toBe("team-index");
+    expect(sourceDraftFromPath("  /srv/idx.json  ").url).toBe("/srv/idx.json");
+    expect(sourceDraftFromPath("file:///srv/idx.json").label).toBe("idx");
+  });
+
+  it("没有扩展名时退化成文件名,不留空标签", () => {
+    expect(sourceDraftFromPath("/srv/pi-index").label).toBe("pi-index");
+  });
+
+  it("查重按 trim 后的地址比对,命中时给出行号", () => {
+    const rows = [
+      draft({ id: "a", url: "https://a.example/i.json" }),
+      draft({ id: "b", url: "/srv/b.json" }),
+    ];
+    expect(findSourceDraftIndex(rows, "/srv/b.json")).toBe(1);
+    expect(findSourceDraftIndex(rows, "  /srv/b.json  ")).toBe(1);
+    expect(findSourceDraftIndex(rows, "/srv/c.json")).toBe(-1);
+    expect(findSourceDraftIndex(rows, "   ")).toBe(-1);
+  });
+});

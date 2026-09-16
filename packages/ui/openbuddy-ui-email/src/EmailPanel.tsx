@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { senderAvatar } from "@/lib/email/email-sender-utils";
 import { useEmailKeyboard } from "@/lib/email/use-email-keyboard";
-import { open as openDialog } from "@/lib/platform/electron-api";
+import { openOne } from "@/lib/platform/electron-api";
 import {
   emailGetThread,
   emailListAccounts,
@@ -757,8 +757,7 @@ export function EmailPanel({ onToast, onLaunch, sessionId, onNavigate }: EmailPa
   };
   const downloadAttachment = async (messageId: string, attachmentId: string) => {
     if (!selected) return;
-    const destination = await openDialog({ directory: true, multiple: false, title: "选择附件保存目录" });
-    const destinationDir = Array.isArray(destination) ? destination[0] : destination;
+    const destinationDir = await openOne({ directory: true, multiple: false, title: "选择附件保存目录" });
     if (!destinationDir) return;
     try { const result = await emailDownloadAttachment(selected.accountId, attachmentId, messageId, destinationDir); onToast?.(`附件已保存：${result.localPath}`); }
     catch (cause) { onToast?.(cause instanceof Error ? cause.message : "附件下载失败"); }

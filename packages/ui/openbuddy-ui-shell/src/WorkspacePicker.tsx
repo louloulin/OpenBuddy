@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check, Folder, FolderOpen, Loader2 } from "lucide-react";
-import { open as openDialog } from "@/lib/platform/electron-api";
+import { openOne } from "@/lib/platform/electron-api";
 import type { WorkspaceInfo } from "@/lib/agent/pi-client";
 
 /**
@@ -50,8 +50,8 @@ export function WorkspacePicker({
   // 打开系统目录选择框,切换到任意文件夹(不限于历史工作空间)。
   const pickFolder = async () => {
     try {
-      const selected = await openDialog({ directory: true, multiple: false });
-      if (!selected || Array.isArray(selected)) return;
+      const selected = await openOne({ directory: true, multiple: false, title: "选择工作区文件夹" });
+      if (!selected) return;
       onSelectWorkspace(selected);
       setOpen(false);
     } catch {

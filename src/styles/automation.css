@@ -87,6 +87,19 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sidebar__more-item-hint {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 7px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--wb-text-secondary);
+  /* 用 token 而不是 black-100 的 alpha 混合:深色主题下黑压黑等于看不见。 */
+  background: var(--wb-bg-elevated);
+}
+.sidebar__more-item:hover .sidebar__more-item-hint {
+  color: var(--wb-text-strong);
+}
 
 /* ---- 弹层里的二级分组(资料库 / 工具 / 配额与监控 / 设置)----
  * 每个分组上方加一行小号 caption,组间留呼吸距离。items 复用 .sidebar__more-item

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { confirm, open as openDialog } from "@/lib/platform/electron-api";
+import { confirm, openOne } from "@/lib/platform/electron-api";
 import {
   SearchIcon, MyExpertIcon, ChevronLeftIcon, DeleteIcon, SparklesIcon,
   FolderOpenIcon, RefreshCwIcon,
@@ -171,11 +171,10 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
 
   const chooseDir = useCallback(async () => {
     try {
-      const sel = await openDialog({
+      const pick = await openOne({
         directory: true, multiple: false, title: "选择专家数据目录",
         defaultPath: root || DEFAULT_PICK,
       });
-      const pick = Array.isArray(sel) ? sel[0] : sel;
       if (!pick) return;
       await loadCatalog(pick);
       if (!error) onToast?.(`已切换专家数据目录：${pick}`);
@@ -212,8 +211,7 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
   const openImport = useCallback(async () => {
     setImportError(""); setImportPreview(null);
     try {
-      const sel = await openDialog({ directory: true, multiple: false, title: "选择 WorkBuddy 配置目录", defaultPath: importSource || "~/.workbuddy" });
-      const pick = Array.isArray(sel) ? sel[0] : sel;
+      const pick = await openOne({ directory: true, multiple: false, title: "选择 WorkBuddy 配置目录", defaultPath: importSource || "~/.workbuddy" });
       if (pick) { setImportSource(pick); setImportOpen(true); }
     } catch { /* cancelled */ }
   }, [importSource]);

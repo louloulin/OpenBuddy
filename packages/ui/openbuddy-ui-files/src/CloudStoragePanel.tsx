@@ -4,7 +4,7 @@
  * 列出已注册 StorageProvider,浏览/读取/删除文件。provider-agnostic(WebDAV/S3/本地)。
  */
 import { useEffect, useState } from "react";
-import { invoke, open as openDialog } from "@/lib/platform/electron-api";
+import { invoke, openOne } from "@/lib/platform/electron-api";
 import {
   createLocalStorageProvider,
   listStorageProviders,
@@ -39,9 +39,8 @@ export function CloudStoragePanel({ onToast }: { onToast?: (msg: string) => void
   }, []);
 
   const addLocalStorage = async () => {
-    const selected = await openDialog({ directory: true, multiple: false, title: "选择本地存储目录" });
-    if (!selected || Array.isArray(selected)) return;
-    const root = selected as string;
+    const root = await openOne({ directory: true, multiple: false, title: "选择本地存储目录" });
+    if (!root) return;
     registerStorageProvider(createLocalStorageProvider(root, localAdapter));
     const existing = await Promise.resolve(invoke<string[]>("storage-sources:list")).catch(() => []);
     await invoke("storage-sources:save", { sources: [...new Set([...(Array.isArray(existing) ? existing : []), root])] }).catch(() => undefined);

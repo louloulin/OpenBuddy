@@ -13,7 +13,8 @@
  * 看见它、知道它压着自己,比把它藏起来更诚实。
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, ChevronUp, ChevronDown, ArrowUpCircle } from "lucide-react";
+import { Plus, Trash2, ChevronUp, ChevronDown, ArrowUpCircle, FileJson } from "lucide-react";
+import { openOne } from "@/lib/platform/electron-api";
 import {
   getPiMarketSources,
   probePiMarketSource,
@@ -25,7 +26,9 @@ import {
   blankSourceDraft,
   describePiMarketError,
   describeProbeResult,
+  findSourceDraftIndex,
   moveSourceDraft,
+  sourceDraftFromPath,
   sourceDraftsDirty,
   sourceStateLabel,
   sourcesToDrafts,
@@ -83,6 +86,34 @@ export function PiSourcesEditor({ open, onToast, onSaved }: PiSourcesEditorProps
   const handleAdd = useCallback(() => {
     setDrafts((current) => [...current, blankSourceDraft()]);
   }, []);
+
+  /**
+   * 「导入 registry.json」—— 用系统文件选择器挑一个本地索引文件,加成一行
+   * `file` 源。企业内网 / 离线分发场景里,索引就是一个文件,不该逼用户
+   * 手敲绝对路径。
+   *
+   * 只做选择与查重,不代替用户点保存:导入后仍然要「保存并生效」,
+   * 用户有时间先改权重、先测可达。
+   */
+  const handleImport = useCallback(async () => {
+    try {
+      const picked = await openOne({
+        multiple: false,
+        title: "选择本地索引 registry.json",
+        filters: [{ name: "索引", extensions: ["json"] }],
+      });
+      if (!picked) return;
+      const existing = findSourceDraftIndex(drafts, picked);
+      if (existing >= 0) {
+        onToast?.(`这个索引已经在第 ${existing + 1} 行:${picked}`);
+        return;
+      }
+      setDrafts((current) => [...current, sourceDraftFromPath(picked)]);
+      onToast?.("已加入索引源;点「保存并生效」后立即生效");
+    } catch {
+      /* 用户取消或桥不可用 —— 都不是错误 */
+    }
+  }, [drafts, onToast]);
 
   const handleRemove = useCallback((index: number) => {
     setDrafts((current) => current.filter((_, i) => i !== index));
@@ -295,6 +326,15 @@ export function PiSourcesEditor({ open, onToast, onSaved }: PiSourcesEditorProps
           data-testid="pi-ext-source-add"
         >
           <Plus size={13} aria-hidden /> 添加源
+        </button>
+        <button
+          type="button"
+          className="pi-ext__btn"
+          onClick={() => void handleImport()}
+          title="从本地选择一个索引文件(registry.json),加成 file 源"
+          data-testid="pi-ext-source-import"
+        >
+          <FileJson size={13} aria-hidden /> 导入 registry.json
         </button>
         <span className="pi-ext-src__meta">
           {editableCount} 个可编辑

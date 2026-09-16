@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState, useCallback, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { MentionPicker } from "./MentionPicker";
 import { Mic, Square, X, type LucideIcon } from "lucide-react";
-import { open as openDialog, type ElectronWindowApi } from "@/lib/platform/electron-api";
+import { openPaths, type ElectronWindowApi } from "@/lib/platform/electron-api";
 import { getCurrentWebview } from "@/lib/platform/electron-api";
 import { ChevronDownIcon, SendPlaneIcon } from "@openbuddy/ui-primitives/icons";
 import { ModelSelector, type ModelOption, type ThinkingLevel } from "@openbuddy/ui-workbench";
@@ -607,9 +607,8 @@ export function ComposerInner({
 
   const pickFiles = async () => {
     try {
-      const selected = await openDialog({ multiple: true });
-      if (!selected) return;
-      const paths = Array.isArray(selected) ? selected : [selected];
+      const paths = await openPaths({ multiple: true });
+      if (paths.length === 0) return;
       setAttachments((prev) => {
         const set = new Set(prev);
         paths.forEach((p) => set.add(p));
@@ -625,14 +624,13 @@ export function ComposerInner({
    *  "I want a vision model to look at this" affordance (Codex-style). */
   const pickImages = async () => {
     try {
-      const selected = await openDialog({
+      const paths = await openPaths({
         multiple: true,
         filters: [
           { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] },
         ],
       });
-      if (!selected) return;
-      const paths = Array.isArray(selected) ? selected : [selected];
+      if (paths.length === 0) return;
       // Resolve each path to a File via fetch. The preload bridge returns
       // a file:// URL we can fetch in the renderer. In test environments
       // (no Electron) fetch will reject — we surface a toast and continue.

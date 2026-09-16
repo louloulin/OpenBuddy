@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Send, Paperclip, Smile, LucideIcon } from "lucide-react";
-import { open as openDialog } from "@/lib/platform/electron-api";
+import { openPaths } from "@/lib/platform/electron-api";
 
 interface HomeComposerProps {
   sceneTag?: { label: string; icon: LucideIcon } | null;
@@ -31,13 +31,13 @@ export function HomeComposer({ sceneTag, onClearSceneTag, onSend }: HomeComposer
   };
 
   const handleFileAttach = async () => {
-    const path = await openDialog({
+    const paths = await openPaths({
       title: "选择文件",
       multiple: true,
       filters: [{ name: "All Files", extensions: ["*"] }]
     });
-    if (path) {
-      console.log("附件:", path);
+    if (paths.length > 0) {
+      console.log("附件:", paths);
       // 这里可以实现附件上传逻辑
     }
   };

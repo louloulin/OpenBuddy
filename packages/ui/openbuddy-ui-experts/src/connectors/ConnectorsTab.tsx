@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { open as openDialog } from "@/lib/platform/electron-api";
+import { openOne } from "@/lib/platform/electron-api";
 import {
   SearchIcon, AddCircleIcon, FolderOpenIcon, RefreshCwIcon, McpIcon,
 } from "@openbuddy/ui-primitives/icons";
@@ -206,11 +206,10 @@ export function ConnectorsTab({ pills, onToast }: Props) {
 
   const chooseDir = useCallback(async () => {
     try {
-      const sel = await openDialog({
+      const pick = await openOne({
         directory: true, multiple: false, title: "选择连接器数据目录",
         defaultPath: root || DEFAULT_PICK,
       });
-      const pick = Array.isArray(sel) ? sel[0] : sel;
       if (!pick) return;
       await loadCatalog(pick);
       if (!error) onToast?.(`已切换连接器数据目录：${pick}`);

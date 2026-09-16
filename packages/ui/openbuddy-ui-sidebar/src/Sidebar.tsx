@@ -445,6 +445,8 @@ function MoreDropdown({
     label: string;
     icon: React.ReactNode;
     action: () => void;
+    /** 行尾小标签:说明这条为什么不是"点一下就完事"(如「需连接器」)。 */
+    hint?: string;
   };
   type MoreGroup = {
     id: string;
@@ -478,9 +480,14 @@ function MoreDropdown({
           id: "tencent_docs",
           label: "腾讯文档",
           icon: <MoreMenuTencentDocsIcon size="md" />,
+          hint: "需连接器",
+          // R39 — 以前这里只 `onToast("当前不可用")`:点下去什么都没有,用户
+          // 既不知道要配什么、也走不到配置的地方。现在它是一条**真路径**:
+          // 跳到「专家 · 技能 · 连接器」,那里有连接器目录和安装入口。
           action: () => {
             setOpen(false);
-            onToast?.("腾讯文档当前不可用：请使用本地文件或已配置的连接器");
+            onToast?.("腾讯文档需要先配置连接器 —— 已为你打开连接器目录");
+            onNavigate("专家·技能·连接器");
           },
         },
         {
@@ -505,9 +512,13 @@ function MoreDropdown({
           id: "lexiang_kb",
           label: "乐享知识库",
           icon: <MoreMenuTencentLexiangIcon size="md" />,
+          hint: "需连接器",
+          // 同「腾讯文档」:本地知识库是零配置的那条路(同分组里的「知识库」),
+          // 但企业源要走连接器 —— 至少得把用户送到能配它的地方。
           action: () => {
             setOpen(false);
-            onToast?.("乐享知识库当前不可用：请使用本地知识库");
+            onToast?.("乐享知识库需要先配置连接器;本地资料请用同组的「知识库」");
+            onNavigate("专家·技能·连接器");
           },
         },
       ],
@@ -639,6 +650,11 @@ function MoreDropdown({
                 >
                   <span className="sidebar__more-item-icon">{item.icon}</span>
                   <span className="sidebar__more-item-label">{item.label}</span>
+                  {item.hint && (
+                    <span className="sidebar__more-item-hint" data-testid={`sidebar-more-hint-${item.id}`}>
+                      {item.hint}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

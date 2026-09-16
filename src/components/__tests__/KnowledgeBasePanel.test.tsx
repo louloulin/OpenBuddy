@@ -2,8 +2,17 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 // Mock desktop dialog + electron-kb-reader，使「添加本地文件夹」可在 vitest 下测试。
+// R39 — 组件现在走 `openOne()`(把"永远返回数组"的原生结果归一成单值),
+// mock 必须跟着改,否则 mock 出来的模块里根本没有 `openOne`。
 const openDialog = vi.fn();
-vi.mock("@/lib/platform/electron-api", () => ({ open: (...a: unknown[]) => openDialog(...a), invoke: vi.fn() }));
+vi.mock("@/lib/platform/electron-api", () => ({
+  openOne: (...a: unknown[]) => openDialog(...a),
+  openPaths: async (...a: unknown[]) => {
+    const one = await openDialog(...a);
+    return one ? [one] : [];
+  },
+  invoke: vi.fn(),
+}));
 vi.mock("@/lib/files/electron-kb-reader", () => ({
   isElectronAvailable: () => true,
   createElectronDirectoryReader: () => ({
@@ -95,7 +104,9 @@ describe("KnowledgeBasePanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /添加本地文件夹/ }));
     await waitFor(() => expect(listKbProviders().length).toBe(before + 1));
     expect(listKbProviders().some((s) => s.id === "local")).toBe(true);
-    expect(openDialog).toHaveBeenCalledWith({ directory: true, multiple: false });
+    expect(openDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ directory: true, multiple: false }),
+    );
   });
 
   it("取消选择(返回 null)不注册 provider", async () => {

@@ -361,6 +361,36 @@ export function blankSourceDraft(): PiSourceDraft {
   };
 }
 
+/**
+ * 从本地索引文件路径造一行草稿(「导入 registry.json」)。
+ *
+ * 索引文件就是一种 `file` 源:main 侧的 `deriveSourceId()` 对绝对路径同样容忍,
+ * 所以导入 = 把路径填进「地址」列。名称取文件名(去掉 .json),让列表里一眼看出
+ * 这是"哪个索引";id 留空 —— 保存时按 url 生成稳定 id,重复导入同一文件不会
+ * 悄悄变成两条。
+ */
+export function sourceDraftFromPath(path: string): PiSourceDraft {
+  const trimmed = path.trim();
+  const base = trimmed.split(/[\\/]/).pop() ?? trimmed;
+  const label = base.replace(/\.json$/i, "") || base;
+  return { ...blankSourceDraft(), url: trimmed, label };
+}
+
+/**
+ * 找到已经引用同一个地址的行(0 基);没有则返回 -1。
+ *
+ * 用途:导入前查重。比"先加进去再让校验报 id 重复"友好 —— 用户看到的是
+ * "这个索引已经在第 3 行",而不是一条红色错误。
+ */
+export function findSourceDraftIndex(
+  drafts: readonly PiSourceDraft[],
+  url: string,
+): number {
+  const needle = url.trim();
+  if (!needle) return -1;
+  return drafts.findIndex((draft) => draft.url.trim() === needle);
+}
+
 function absolutePathLike(value: string): boolean {
   return value.startsWith("/") || /^[a-z]:[\\/]/i.test(value);
 }
