@@ -77,7 +77,7 @@ jobs:
 
       - name: Upload 100-turns perf artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: openbuddy-100-turns-perf-${{ github.run_id }}
           path: docs/perf/*openbuddy-100-turns*.json
@@ -124,7 +124,7 @@ jobs:
 
       - name: Upload streaming-perf artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: openbuddy-streaming-perf-${{ github.run_id }}
           path: docs/perf/*openbuddy-streaming*.json
