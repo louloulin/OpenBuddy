@@ -66,7 +66,9 @@ export default function SearchDialog({ index }: SearchDialogProps) {
   const pathname = usePathname();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const openRef = useRef(false);
 
   const locale: Locale = extractLocaleFromPath(pathname ?? '/');
   const dict = getDictionary(locale).search;
@@ -85,8 +87,6 @@ export default function SearchDialog({ index }: SearchDialogProps) {
     setOpen(false);
     setQuery('');
     setActive(0);
-    restoreFocusRef.current?.focus();
-    restoreFocusRef.current = null;
   }, []);
 
   const openDialog = useCallback(() => {
@@ -94,30 +94,31 @@ export default function SearchDialog({ index }: SearchDialogProps) {
     setOpen(true);
   }, []);
 
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+
+  // Return focus to whatever was focused before the dialog opened. This runs
+  // after the dialog unmounts — restoring inside close() would race the
+  // focus trap below, which is still attached at that point.
+  useEffect(() => {
+    if (open) return;
+    const el = restoreFocusRef.current;
+    if (!el) return;
+    restoreFocusRef.current = null;
+    el.focus();
+  }, [open]);
+
   // Global triggers: Cmd/Ctrl+K toggles, and any component may dispatch OPEN_SEARCH_EVENT.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setOpen((o) => {
-          if (o) {
-            setQuery('');
-            setActive(0);
-            return false;
-          }
-          restoreFocusRef.current = (document.activeElement as HTMLElement) ?? null;
-          return true;
-        });
+        if (openRef.current) close();
+        else openDialog();
         return;
       }
-      if (e.key === 'Escape') {
-        setOpen((o) => {
-          if (!o) return false;
-          setQuery('');
-          setActive(0);
-          return false;
-        });
-      }
+      if (e.key === 'Escape') close();
     };
     const onOpen = () => openDialog();
     window.addEventListener('keydown', onKey);
@@ -126,12 +127,66 @@ export default function SearchDialog({ index }: SearchDialogProps) {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener(OPEN_SEARCH_EVENT, onOpen);
     };
-  }, [openDialog]);
+  }, [close, openDialog]);
 
-  // Focus the input once the dialog mounts.
+  // aria-modal only tells assistive tech to ignore the page behind; it does not
+  // stop Tab or pointer focus from reaching it. Mark every other top-level
+  // branch of <body> inert so the browser itself refuses to focus them, and
+  // trap Tab inside the dialog as a second line of defence.
   useEffect(() => {
     if (!open) return;
-    const t = requestAnimationFrame(() => inputRef.current?.focus());
+    const root = dialogRef.current;
+    const siblings = [...document.body.children].filter(
+      (el): el is HTMLElement => el instanceof HTMLElement && el !== root && !el.contains(root)
+    );
+    const previous = siblings.map((el) => el.inert);
+    siblings.forEach((el) => { el.inert = true; });
+
+    const FOCUSABLE =
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      if (!root) {
+        e.preventDefault();
+        return;
+      }
+      const items = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const current = document.activeElement as HTMLElement | null;
+      const inside = current ? root.contains(current) : false;
+      if (e.shiftKey) {
+        if (!inside || current === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (!inside || current === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true);
+      siblings.forEach((el, i) => { el.inert = previous[i]; });
+    };
+  }, [open]);
+
+  // Focus the input once the dialog mounts. Focus synchronously rather than
+  // waiting for rAF — rAF never fires while the document is hidden (background
+  // tab), which would leave focus on whatever the user had focused before.
+  useEffect(() => {
+    if (!open) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    // Re-assert after paint in case the browser moved focus while laying out.
+    const t = requestAnimationFrame(() => {
+      if (document.activeElement !== el) el.focus({ preventScroll: true });
+    });
     return () => cancelAnimationFrame(t);
   }, [open]);
 
@@ -182,6 +237,7 @@ export default function SearchDialog({ index }: SearchDialogProps) {
       onClick={close}
     >
       <div
+        ref={dialogRef}
         className="w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] shadow-wb-overlay"
         onClick={(e) => e.stopPropagation()}
       >

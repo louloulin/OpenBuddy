@@ -86,7 +86,7 @@ export function SponsorsView({ locale }: { locale: Locale }) {
                     : 'border-[var(--wb-border)] bg-[var(--wb-bg-pure)]'
                 }` }>
                   { tier.popular ? (
-                    <span className="self-start rounded-full bg-[var(--wb-brand)] px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white">
+                    <span className="self-start rounded-full bg-brand-10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white dark:bg-brand-8 dark:text-[var(--wb-bg)]">
                       { isZh ? '推荐' : 'Popular' }
                     </span>
                   ) : null }
@@ -104,7 +104,7 @@ export function SponsorsView({ locale }: { locale: Locale }) {
                   </ul>
                   <a href="https://github.com/sponsors/louloulin" target="_blank" rel="noreferrer" className={ `inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-all ${
                     tier.popular
-                      ? 'bg-[var(--wb-brand)] text-white hover:bg-[var(--wb-brand-hover)]'
+                      ? 'bg-brand-10 text-white hover:opacity-90 dark:bg-brand-8 dark:text-[var(--wb-bg)]'
                       : 'border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] text-[var(--wb-fg)] hover:border-[var(--wb-border-strong)]'
                   }` }>
                     <Heart className="h-3.5 w-3.5" />
@@ -124,7 +124,7 @@ export function SponsorsView({ locale }: { locale: Locale }) {
                   </li>
                 )) }
               </ul>
-              <a href="https://github.com/louloulin/OpenBuddy/blob/main/SPONSORS.md" target="_blank" rel="noreferrer" className="mt-6 inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--wb-brand)] hover:underline">
+              <a href="https://github.com/louloulin/OpenBuddy/blob/main/SPONSORS.md" target="_blank" rel="noreferrer" className="mt-6 inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-10 dark:text-brand-8 hover:underline">
                 { copy.ctaSecondary }
                 <ArrowRight className="h-3.5 w-3.5" />
               </a>

@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { SITE_STATS } from '@/lib/constants';
 
 export const runtime = 'edge';
 export const alt = 'OpenBuddy — The open desktop AI workspace';
@@ -92,7 +93,7 @@ export default async function Image() {
           </div>
           <div style={ { display: 'flex', flexDirection: 'column' } }>
             <div style={ { fontSize: '40px', fontWeight: 700, letterSpacing: '-0.02em' } }>OpenBuddy</div>
-            <div style={ { fontSize: '18px', color: '#9FE8D9', fontWeight: 500 } }>MIT · 64 packages · 1,886 tests</div>
+            <div style={ { fontSize: '18px', color: '#9FE8D9', fontWeight: 500 } }>{ `MIT · ${SITE_STATS.packages} packages · ${SITE_STATS.testFiles} test files` }</div>
           </div>
         </div>
 

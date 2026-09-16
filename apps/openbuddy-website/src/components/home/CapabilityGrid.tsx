@@ -1,4 +1,7 @@
 import type { Locale } from '@/lib/i18n';
+import { SITE_LICENSE, SITE_STATS } from '@/lib/constants';
+import Reveal from '@/components/motion/Reveal';
+import SpotlightCard from '@/components/motion/SpotlightCard';
 
 interface CapabilityGridProps {
   locale: Locale;
@@ -77,12 +80,12 @@ const CAPABILITIES: Capability[] = [
     bullets: {
       en: [
         'PGP-signed releases, public verification log',
-        '64 packages, 634 specs, 1,886 tests',
+        `${SITE_LICENSE} · ${SITE_STATS.packages} packages · ${SITE_STATS.testFiles} test files`,
         'Public roadmap, RFC process, monthly release notes'
       ],
       zh: [
         'PGP 签名发布,公开校验日志',
-        '64 个包 · 634 个 spec · 1,886 个测试',
+        `${SITE_LICENSE} · ${SITE_STATS.packages} 个包 · ${SITE_STATS.testFiles} 个测试文件`,
         '公开路线图、RFC 流程、每月发版说明'
       ]
     }
@@ -94,7 +97,7 @@ export default function CapabilityGrid({ locale }: CapabilityGridProps) {
   return (
     <section className="relative border-y border-[var(--wb-border)] bg-[var(--wb-bg-soft)] py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-12 max-w-3xl">
+        <Reveal className="mb-12 max-w-3xl">
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--wb-fg-faint)]">
             { isZh ? '能力' : 'Capabilities' }
           </p>
@@ -103,29 +106,32 @@ export default function CapabilityGrid({ locale }: CapabilityGridProps) {
               ? '四件事做得扎实,其余全部可替换。'
               : 'Four things done well. Everything else is replaceable.' }
           </h2>
-        </div>
+        </Reveal>
 
         <div className="grid gap-px overflow-hidden rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-border)] sm:grid-cols-2">
-          { CAPABILITIES.map((c) => (
-            <article
+          { CAPABILITIES.map((c, i) => (
+            <SpotlightCard
               key={ c.title.en }
+              as="article"
               className="bg-[var(--wb-bg-pure)] p-8 md:p-10"
             >
-              <h3 className="font-display-serif text-[26px] leading-[1.15] tracking-[-0.02em] text-[var(--wb-fg)]">
-                { c.title[isZh ? 'zh' : 'en'] }
-              </h3>
-              <p className="mt-3 text-[15px] leading-relaxed text-[var(--wb-fg-muted)]">
-                { c.pitch[isZh ? 'zh' : 'en'] }
-              </p>
-              <ul className="mt-6 space-y-2.5">
-                { c.bullets[isZh ? 'zh' : 'en'].map((b) => (
-                  <li key={ b } className="flex gap-3 text-[13.5px] leading-snug text-[var(--wb-fg)]">
-                    <span className="mt-2 h-1 w-1 flex-none rounded-full bg-[var(--wb-brand)]" />
-                    <span className="font-mono text-[12.5px]">{ b }</span>
-                  </li>
-                )) }
-              </ul>
-            </article>
+              <Reveal delay={ i * 90 }>
+                <h3 className="font-display-serif text-[26px] leading-[1.15] tracking-[-0.02em] text-[var(--wb-fg)]">
+                  { c.title[isZh ? 'zh' : 'en'] }
+                </h3>
+                <p className="mt-3 text-[15px] leading-relaxed text-[var(--wb-fg-muted)]">
+                  { c.pitch[isZh ? 'zh' : 'en'] }
+                </p>
+                <ul className="mt-6 space-y-2.5">
+                  { c.bullets[isZh ? 'zh' : 'en'].map((b) => (
+                    <li key={ b } className="flex gap-3 text-[13.5px] leading-snug text-[var(--wb-fg)]">
+                      <span className="mt-2 h-1 w-1 flex-none rounded-full bg-[var(--wb-brand)]" />
+                      <span className="font-mono text-[12.5px]">{ b }</span>
+                    </li>
+                  )) }
+                </ul>
+              </Reveal>
+            </SpotlightCard>
           )) }
         </div>
       </div>

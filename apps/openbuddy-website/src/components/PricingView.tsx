@@ -35,7 +35,7 @@ export function PricingView({ locale }: { locale: Locale }) {
                   }` }
                 >
                   { tier.popular ? (
-                    <span className="absolute right-6 top-6 rounded-full bg-[var(--wb-brand)] px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white">
+                    <span className="absolute right-6 top-6 rounded-full bg-brand-10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white dark:bg-brand-8 dark:text-[var(--wb-bg)]">
                       { isZh ? '推荐' : 'Popular' }
                     </span>
                   ) : null }
@@ -143,7 +143,7 @@ export function PricingView({ locale }: { locale: Locale }) {
                       <span className="flex-1 text-[15.5px] font-medium text-[var(--wb-fg)]">
                         { item.q }
                       </span>
-                      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-[var(--wb-border)] text-[var(--wb-fg-muted)] transition-colors group-open:border-[var(--wb-brand)] group-open:bg-[var(--wb-brand)] group-open:text-white">
+                      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-[var(--wb-border)] text-[var(--wb-fg-muted)] transition-colors group-open:border-brand-10 group-open:bg-brand-10 group-open:text-white dark:group-open:border-brand-8 dark:group-open:bg-brand-8 dark:group-open:text-[var(--wb-bg)]">
                         <span className="block text-[18px] leading-none">+</span>
                       </span>
                     </summary>

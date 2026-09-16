@@ -8,6 +8,8 @@
  * - 内容字段命名按页面区段（hero/features/...）保持中英结构一致
  */
 
+import { SITE_LICENSE, SITE_STATS } from './constants';
+
 export type Locale = 'en' | 'zh-CN';
 
 export const locales: Locale[] = ['en', 'zh-CN'];
@@ -287,7 +289,7 @@ const en: Dict = {
     hintClose: 'close'
   },
   hero: {
-    chip: 'v0.15 · MIT licensed · 1,886 tests',
+    chip: `v0.15.0 · MIT licensed · ${SITE_STATS.testFiles} test files`,
     titlePre: 'The open desktop',
     titleHighlight: 'AI workspace',
     titlePost: 'you can actually read, fork, and own.',
@@ -298,9 +300,9 @@ const en: Dict = {
     ctaGithub: 'Star on GitHub',
     badge: 'Not affiliated with Tencent — independent open-source effort',
     metrics: [
-      { value: '64', label: 'capability packages' },
-      { value: '455', label: 'tests visible in repo' },
-      { value: 'MIT', label: 'license, forkable' },
+      { value: `${SITE_STATS.packages}`, label: 'capability packages' },
+      { value: `${SITE_STATS.testFiles}`, label: 'test files in repo' },
+      { value: SITE_LICENSE, label: 'license, forkable' },
       { value: '3', label: 'platforms · Win/macOS/Linux' }
     ]
   },
@@ -375,11 +377,11 @@ const en: Dict = {
         icon: 'puzzle',
         title: 'Cordis capability mesh',
         description:
-          '64 workspace packages under @openbuddy/* — skills, memory, plan, task, email, calendar, MCP, payment, SCIM, SAML. Pick what you need.',
+          `${SITE_STATS.packages} workspace packages under @openbuddy/* — skills, memory, plan, task, email, calendar, MCP, payment, SCIM, SAML. Pick what you need.`,
         bullets: [
-          '12 capability packages (memory, plan, task…)',
-          '26 UI packages (shell, sidebar, workbench…)',
-          '8 collaboration packages (room, inbox…)'
+          `${SITE_STATS.uiPackages} UI packages (shell, sidebar, workbench…)`,
+          `${SITE_STATS.collaborationPackages} collaboration packages (room, inbox…)`,
+          `${SITE_STATS.packages} packages total under @openbuddy/*`
         ]
       },
       {
@@ -453,7 +455,7 @@ const en: Dict = {
       { capability: 'SAML 2.0', openbuddy: '✓', workbuddy: '✗', advantage: 'openbuddy' },
       { capability: 'Plugin SDK', openbuddy: 'Cordis open capability mesh', workbuddy: 'Closed', advantage: 'openbuddy' },
       { capability: 'Cross-platform', openbuddy: 'Win / macOS / Linux', workbuddy: 'Win / macOS', advantage: 'openbuddy' },
-      { capability: 'Tests visible', openbuddy: '455 test files in repo', workbuddy: '✗', advantage: 'openbuddy' }
+      { capability: 'Tests visible', openbuddy: `${SITE_STATS.testFiles} test files in repo`, workbuddy: '✗', advantage: 'openbuddy' }
     ]
   },
   capabilities: {
@@ -603,7 +605,7 @@ const en: Dict = {
         cadence: 'forever',
         description: 'The full app, MIT-licensed, on Windows / macOS / Linux.',
         features: [
-          'All 64 capability packages',
+          `All ${SITE_STATS.packages} capability packages`,
           'BYOK providers (Anthropic, OpenAI, MiniMax, NewAPI…)',
           'GitHub Discussions + Discord support',
           'Local persistence & restart safety',
@@ -649,7 +651,7 @@ const en: Dict = {
     compareTitle: 'Compare plans',
     compareSubtitle: 'No hidden tiers, no seat math. The free app is genuinely useful — Pro is a convenience.',
     compare: [
-      { feature: 'Capability packages', community: 'All 64', pro: 'All 64', enterprise: 'All 64' },
+      { feature: 'Capability packages', community: `All ${SITE_STATS.packages}`, pro: `All ${SITE_STATS.packages}`, enterprise: `All ${SITE_STATS.packages}` },
       { feature: 'Provider choice', community: 'BYOK', pro: 'BYOK + NewAPI Service Token', enterprise: 'BYOK + on-prem gateway' },
       { feature: 'Release channel', community: 'Stable', pro: 'Stable + Beta', enterprise: 'Stable + Beta + LTS' },
       { feature: 'Session history sync', community: 'Local only', pro: 'Casdoor cloud sync', enterprise: 'Self-hosted sync' },
@@ -707,7 +709,7 @@ const en: Dict = {
       },
       {
         quote:
-          'The 64 Cordis packages feel like LEGO. We extended capability-plan in a weekend without forking the whole repo.',
+          `The ${SITE_STATS.packages} Cordis packages feel like LEGO. We extended capability-plan in a weekend without forking the whole repo.`,
         author: 'Diego R.',
         role: 'Plugin author',
         initials: 'DR',
@@ -751,12 +753,10 @@ const en: Dict = {
     title: 'A capability mesh at scale.',
     subtitle: 'Every number below is verifiable in the repo — no rounding up, no aspirational graphs.',
     items: [
-      { value: '64', label: 'capability packages', description: 'Cordis services under @openbuddy/*' },
-      { value: '309', label: 'test files', description: 'Visible in the repo, run with pnpm workspace:test' },
-      { value: '26', label: 'UI packages', description: 'Sidebar, settings, workbench, dialogs, theme, locale, hmr…' },
-      { value: '12', label: 'core capabilities', description: 'Plan, task, automation, search, inspiration, folder-trust…' },
-      { value: '8', label: 'collaboration packages', description: 'Coordinator, evidence, inbox, room, network, protocol…' },
-      { value: '100', suffix: '%', label: 'auditable', description: 'No telemetry black box, no vendor SDK in the renderer' }
+      { value: `${SITE_STATS.packages}`, label: 'capability packages', description: 'Cordis services under @openbuddy/*' },
+      { value: `${SITE_STATS.testFiles}`, label: 'test files', description: 'Visible in the repo, run with pnpm workspace:test' },
+      { value: `${SITE_STATS.uiPackages}`, label: 'UI packages', description: 'Sidebar, settings, workbench, dialogs, theme, locale, hmr…' },
+      { value: `${SITE_STATS.collaborationPackages}`, label: 'collaboration packages', description: 'Coordinator, evidence, inbox, room, network, protocol…' }
     ]
   },
   changelog: {
@@ -764,7 +764,7 @@ const en: Dict = {
     subtitle: 'Every release, every fix, every breaking change — visible in the repo. Subscribe to GitHub Releases for notifications.',
     releases: [
       {
-        version: 'v0.14.0',
+        version: 'v0.15.0',
         date: '2025-09-06',
         tag: 'stable',
         highlights: [
@@ -783,10 +783,10 @@ const en: Dict = {
           'Sidebar collapse animation flicker on Windows',
           'Casdoor OIDC refresh token rotation on tab restore'
         ],
-        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.14.0'
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.15.0'
       },
       {
-        version: 'v0.13.0',
+        version: 'v0.15.0',
         date: '2025-08-22',
         tag: 'stable',
         highlights: [
@@ -804,10 +804,10 @@ const en: Dict = {
           'MCP connector root resolution on relative paths',
           'Auto-update flow on Linux AppImage'
         ],
-        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.13.0'
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.15.0'
       },
       {
-        version: 'v0.12.0',
+        version: 'v0.15.0',
         date: '2025-08-04',
         tag: 'beta',
         highlights: [
@@ -820,10 +820,10 @@ const en: Dict = {
           'CI now runs pnpm typecheck on 32 projects in <90s',
           'Playwright UI smoke tests against real MiniMax-M3'
         ],
-        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.12.0'
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.15.0'
       },
       {
-        version: 'v0.11.0',
+        version: 'v0.15.0',
         date: '2025-07-18',
         tag: 'lts',
         highlights: [
@@ -831,7 +831,7 @@ const en: Dict = {
           'BYOK provider config (Anthropic, OpenAI, MiniMax, NewAPI)',
           'Skills catalog + local skill registry'
         ],
-        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.11.0'
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.15.0'
       }
     ]
   },
@@ -896,7 +896,7 @@ const en: Dict = {
     copied: 'Copied'
   },
   installBlock: {
-    installLabel: 'install · v0.15',
+    installLabel: 'install · v0.15.0',
     installHint: 'Other platforms, see Getting Started →',
     platform: 'macOS',
     installCommand: 'brew tap louloulin/openbuddy && brew install --cask openbuddy',
@@ -998,7 +998,7 @@ const zhCN: Dict = {
     hintClose: '关闭'
   },
   hero: {
-    chip: 'v0.14 · MIT 协议 · 455 测试通过',
+    chip: `v0.15.0 · MIT 协议 · ${SITE_STATS.testFiles} 个测试文件`,
     titlePre: '开源的桌面',
     titleHighlight: 'AI 工作台,',
     titlePost: '你可以真正阅读、fork 并拥有。',
@@ -1009,9 +1009,9 @@ const zhCN: Dict = {
     ctaGithub: '在 GitHub 上 Star',
     badge: '与腾讯无关 —— 独立开源项目',
     metrics: [
-      { value: '64', label: '能力包' },
-      { value: '455', label: '仓库内可见测试' },
-      { value: 'MIT', label: '协议,可 fork' },
+      { value: `${SITE_STATS.packages}`, label: '能力包' },
+      { value: `${SITE_STATS.testFiles}`, label: '仓库内测试文件' },
+      { value: SITE_LICENSE, label: '协议,可 fork' },
       { value: '3', label: '平台 · Win/macOS/Linux' }
     ]
   },
@@ -1052,8 +1052,8 @@ const zhCN: Dict = {
       {
         icon: 'puzzle',
         title: 'Cordis 能力网格',
-        description: '@openbuddy/* 下 64 个工作区包 —— skills、memory、plan、task、email、calendar、MCP、payment、SCIM、SAML。按需选用。',
-        bullets: ['12 个能力包 (memory、plan、task…)', '26 个 UI 包 (shell、sidebar、workbench…)', '8 个协作包 (room、inbox…)']
+        description: `@openbuddy/* 下 ${SITE_STATS.packages} 个工作区包 —— skills、memory、plan、task、email、calendar、MCP、payment、SCIM、SAML。按需选用。`,
+        bullets: [`${SITE_STATS.uiPackages} 个 UI 包 (shell、sidebar、workbench…)`, `${SITE_STATS.collaborationPackages} 个协作包 (room、inbox…)`, `@openbuddy/* 下共 ${SITE_STATS.packages} 个包`]
       },
       {
         icon: 'git-branch',
@@ -1112,7 +1112,7 @@ const zhCN: Dict = {
       { capability: 'SAML 2.0', openbuddy: '✓', workbuddy: '✗', advantage: 'openbuddy' },
       { capability: '插件 SDK', openbuddy: 'Cordis 开源能力网格', workbuddy: '封闭', advantage: 'openbuddy' },
       { capability: '跨平台', openbuddy: 'Win / macOS / Linux', workbuddy: 'Win / macOS', advantage: 'openbuddy' },
-      { capability: '测试可见', openbuddy: '仓库内 455 测试文件', workbuddy: '✗', advantage: 'openbuddy' }
+      { capability: '测试可见', openbuddy: `仓库内 ${SITE_STATS.testFiles} 个测试文件`, workbuddy: '✗', advantage: 'openbuddy' }
     ]
   },
   capabilities: {
@@ -1230,7 +1230,7 @@ const zhCN: Dict = {
         cadence: '永久',
         description: '全功能应用,MIT 协议,Windows / macOS / Linux 通用。',
         features: [
-          '全部 64 个能力包',
+          `全部 ${SITE_STATS.packages} 个能力包`,
           'BYOK providers (Anthropic、OpenAI、MiniMax、NewAPI…)',
           'GitHub Discussions + Discord 支持',
           '本地持久化与重启安全',
@@ -1276,7 +1276,7 @@ const zhCN: Dict = {
     compareTitle: '方案对比',
     compareSubtitle: '没有隐藏档位,没有席位数计算。免费版完全可用 —— Pro 只是便利。',
     compare: [
-      { feature: '能力包', community: '全部 64 个', pro: '全部 64 个', enterprise: '全部 64 个' },
+      { feature: '能力包', community: `全部 ${SITE_STATS.packages} 个`, pro: `全部 ${SITE_STATS.packages} 个`, enterprise: `全部 ${SITE_STATS.packages} 个` },
       { feature: 'Provider 选', community: 'BYOK', pro: 'BYOK + NewAPI Service Token', enterprise: 'BYOK + 本地网关' },
       { feature: '发布通道', community: '稳定版', pro: '稳定 + Beta', enterprise: '稳定 + Beta + LTS' },
       { feature: '会话历史同步', community: '仅本地', pro: 'Casdoor 云同步', enterprise: '自托管同步' },
@@ -1331,7 +1331,7 @@ const zhCN: Dict = {
         accent: 'amber'
       },
       {
-        quote: '64 个 Cordis 包就像乐高。一个周末我们扩展了 capability-plan,完全没动主仓库。',
+        quote: `${SITE_STATS.packages} 个 Cordis 包就像乐高。一个周末我们扩展了 capability-plan,完全没动主仓库。`,
         author: 'Diego R.',
         role: '插件作者',
         initials: 'DR',
@@ -1375,12 +1375,10 @@ const zhCN: Dict = {
     title: '能力网格的规模。',
     subtitle: '以下每个数字都可在仓库中验证 —— 不夸大,不画饼。',
     items: [
-      { value: '64', label: '能力包', description: '@openbuddy/* 下的 Cordis 服务' },
-      { value: '309', label: '测试文件', description: '仓库内可见,运行 pnpm workspace:test' },
-      { value: '26', label: 'UI 包', description: 'Sidebar、settings、workbench、dialogs、theme、locale、hmr…' },
-      { value: '12', label: '核心能力', description: 'Plan、task、automation、search、inspiration、folder-trust…' },
-      { value: '8', label: '协作包', description: 'Coordinator、evidence、inbox、room、network、protocol…' },
-      { value: '100', suffix: '%', label: '可审计', description: '无遥测黑箱,Renderer 中无供应商 SDK' }
+      { value: `${SITE_STATS.packages}`, label: '能力包', description: '@openbuddy/* 下的 Cordis 服务' },
+      { value: `${SITE_STATS.testFiles}`, label: '测试文件', description: '仓库内可见,运行 pnpm workspace:test' },
+      { value: `${SITE_STATS.uiPackages}`, label: 'UI 包', description: 'Sidebar、settings、workbench、dialogs、theme、locale、hmr…' },
+      { value: `${SITE_STATS.collaborationPackages}`, label: '协作包', description: 'Coordinator、evidence、inbox、room、network、protocol…' }
     ]
   },
   changelog: {
@@ -1388,7 +1386,7 @@ const zhCN: Dict = {
     subtitle: '每个发布、每个修复、每个破坏性变更 —— 仓库内可见。订阅 GitHub Releases 以获取通知。',
     releases: [
       {
-        version: 'v0.14.0',
+        version: 'v0.15.0',
         date: '2025-09-06',
         tag: 'stable',
         highlights: [
@@ -1407,10 +1405,10 @@ const zhCN: Dict = {
           'Windows 上 sidebar 收起动画闪烁',
           'Casdoor OIDC 标签页恢复时的 refresh token 轮换'
         ],
-        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.14.0'
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.15.0'
       },
       {
-        version: 'v0.13.0',
+        version: 'v0.15.0',
         date: '2025-08-22',
         tag: 'stable',
         highlights: [
@@ -1428,10 +1426,10 @@ const zhCN: Dict = {
           '相对路径的 MCP 连接器根解析',
           'Linux AppImage 上的自动更新流'
         ],
-        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.13.0'
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.15.0'
       },
       {
-        version: 'v0.12.0',
+        version: 'v0.15.0',
         date: '2025-08-04',
         tag: 'beta',
         highlights: [
@@ -1444,10 +1442,10 @@ const zhCN: Dict = {
           'CI 现在在 90 秒内对 32 个项目运行 pnpm typecheck',
           '针对真实 MiniMax-M3 的 Playwright UI 烟测'
         ],
-        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.12.0'
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.15.0'
       },
       {
-        version: 'v0.11.0',
+        version: 'v0.15.0',
         date: '2025-07-18',
         tag: 'lts',
         highlights: [
@@ -1455,7 +1453,7 @@ const zhCN: Dict = {
           'BYOK provider 配置 (Anthropic、OpenAI、MiniMax、NewAPI)',
           'Skills 目录与本地 skill 注册'
         ],
-        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.11.0'
+        githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.15.0'
       }
     ]
   },
@@ -1520,7 +1518,7 @@ const zhCN: Dict = {
     copied: '已复制'
   },
   installBlock: {
-    installLabel: '安装 · v0.15',
+    installLabel: '安装 · v0.15.0',
     installHint: '其他平台 → 见 Getting Started',
     platform: 'macOS',
     installCommand: 'brew tap louloulin/openbuddy && brew install --cask openbuddy',

@@ -141,6 +141,12 @@ const config: Config = {
         'fade-in': {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' }
+        },
+        // Track holds two identical copies of the list; -50% lands the second
+        // exactly where the first started, so the loop has no visible seam.
+        'marquee': {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' }
         }
       },
       animation: {
@@ -149,7 +155,8 @@ const config: Config = {
         'shimmer': 'shimmer 3s linear infinite',
         'gradient-pan': 'gradient-pan 8s ease infinite',
         'spin-slow': 'spin-slow 12s linear infinite',
-        'fade-in': 'fade-in 0.4s ease-out both'
+        'fade-in': 'fade-in 0.4s ease-out both',
+        'marquee': 'marquee 48s linear infinite'
       }
     }
   },

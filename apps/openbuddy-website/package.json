@@ -1,6 +1,6 @@
 {
   "name": "@openbuddy/website",
-  "version": "0.1.0",
+  "version": "0.15.0",
   "private": true,
   "description": "OpenBuddy 官方网站 —— 基于 Next.js 14 App Router 的多页面营销站点",
   "scripts": {
@@ -23,7 +23,7 @@
     "@tailwindcss/typography": "^0.5.15",
     "@types/node": "26.4.1",
     "@types/react": "^18.3.12",
-    "@types/react-dom": "^19.2.7",
+    "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.18",

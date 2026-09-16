@@ -7,6 +7,7 @@
  * - subtitle: max-w-2xl + muted + 16-18px
  * - note: monospace 12px + faint
  */
+import Reveal from '@/components/motion/Reveal';
 interface PageHeaderProps {
   eyebrow: string;
   title: string;
@@ -48,9 +49,14 @@ interface SectionHeaderProps {
   subtitle?: string;
 }
 
+/**
+ * Reveal wraps these because every SectionHeader sits below the fold. PageHeader
+ * above does not: it is the top of the page, where Reveal's "already visible at
+ * mount" check makes it a no-op.
+ */
 export function SectionHeader({ eyebrow, title, subtitle }: SectionHeaderProps) {
   return (
-    <header className="mb-10">
+    <Reveal as="header" className="mb-10">
       <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--wb-fg-faint)]">
         { eyebrow }
       </p>
@@ -62,6 +68,6 @@ export function SectionHeader({ eyebrow, title, subtitle }: SectionHeaderProps) 
           { subtitle }
         </p>
       ) : null }
-    </header>
+    </Reveal>
   );
 }

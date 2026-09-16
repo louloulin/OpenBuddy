@@ -26,15 +26,15 @@ interface DownloadPlatform {
 }
 
 const PLATFORMS_EN: DownloadPlatform[] = [
-  { icon: Apple, name: 'macOS', file: 'OpenBuddy-0.14.0-macOS.dmg', size: '124 MB', arch: 'Apple Silicon & Intel', installHint: 'Open the .dmg and drag OpenBuddy.app to /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Monitor, name: 'Windows', file: 'OpenBuddy-0.14.0-win-x64.exe', size: '108 MB', arch: 'x64 · NSIS installer', installHint: 'Run the installer. SmartScreen warning? Click "More info" → "Run anyway".', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Terminal, name: 'Linux', file: 'openbuddy_0.14.0_amd64.deb', size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: 'sudo dpkg -i openbuddy_0.14.0_amd64.deb · or run the AppImage directly', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
+  { icon: Apple, name: 'macOS', file: 'OpenBuddy-0.15.0-macOS.dmg', size: '124 MB', arch: 'Apple Silicon & Intel', installHint: 'Open the .dmg and drag OpenBuddy.app to /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Monitor, name: 'Windows', file: 'OpenBuddy-0.15.0-win-x64.exe', size: '108 MB', arch: 'x64 · NSIS installer', installHint: 'Run the installer. SmartScreen warning? Click "More info" → "Run anyway".', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Terminal, name: 'Linux', file: 'openbuddy_0.15.0_amd64.deb', size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: 'sudo dpkg -i openbuddy_0.15.0_amd64.deb · or run the AppImage directly', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
 ];
 
 const PLATFORMS_ZH: DownloadPlatform[] = [
-  { icon: Apple, name: 'macOS', file: 'OpenBuddy-0.14.0-macOS.dmg', size: '124 MB', arch: 'Apple Silicon & Intel', installHint: '打开 .dmg,将 OpenBuddy.app 拖入 /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Monitor, name: 'Windows', file: 'OpenBuddy-0.14.0-win-x64.exe', size: '108 MB', arch: 'x64 · NSIS 安装器', installHint: '运行安装器。SmartScreen 警告?点击"更多信息" → "仍要运行"。', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Terminal, name: 'Linux', file: 'openbuddy_0.14.0_amd64.deb', size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: 'sudo dpkg -i openbuddy_0.14.0_amd64.deb · 或直接运行 AppImage', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
+  { icon: Apple, name: 'macOS', file: 'OpenBuddy-0.15.0-macOS.dmg', size: '124 MB', arch: 'Apple Silicon & Intel', installHint: '打开 .dmg,将 OpenBuddy.app 拖入 /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Monitor, name: 'Windows', file: 'OpenBuddy-0.15.0-win-x64.exe', size: '108 MB', arch: 'x64 · NSIS 安装器', installHint: '运行安装器。SmartScreen 警告?点击"更多信息" → "仍要运行"。', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Terminal, name: 'Linux', file: 'openbuddy_0.15.0_amd64.deb', size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: 'sudo dpkg -i openbuddy_0.15.0_amd64.deb · 或直接运行 AppImage', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
 ];
 
 const COPY_EN = {
@@ -52,7 +52,7 @@ const COPY_EN = {
   brewFormula: 'brew install --cask openbuddy',
   verifications: 'Verifications',
   verificationsList: [
-    `${SITE_STATS.tests.toLocaleString()} test files in the repo (run \`pnpm workspace:test\`)`,
+    `${SITE_STATS.testFiles} test files in the repo (run \`pnpm workspace:test\`)`,
     'Closed-loop capability evals (`pnpm test:closed-loop`)',
     'Real-model Playwright UI tests (`pnpm test:electron:real-ui`)'
   ],
@@ -79,7 +79,7 @@ const COPY_ZH = {
   brewFormula: 'brew install --cask openbuddy',
   verifications: '验证',
   verificationsList: [
-    `仓库内 ${SITE_STATS.tests.toLocaleString()} 个测试文件 (运行 \`pnpm workspace:test\`)`,
+    `仓库内 ${SITE_STATS.testFiles} 个测试文件 (运行 \`pnpm workspace:test\`)`,
     '闭环能力评估 (`pnpm test:closed-loop`)',
     '真实模型 Playwright UI 测试 (`pnpm test:electron:real-ui`)'
   ],

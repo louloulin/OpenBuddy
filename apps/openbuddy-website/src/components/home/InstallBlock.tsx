@@ -35,23 +35,16 @@ export default function InstallBlock({ locale, dict }: InstallBlockProps) {
         </span>
       </div>
 
-      <div className="flex border-b border-[var(--wb-border)] bg-[var(--wb-bg-soft)]" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected
-          className="flex-1 border-b-2 border-[var(--wb-brand)] px-4 py-2 font-mono text-[12px] font-medium text-[var(--wb-fg)]"
-        >
+      {/* Decorative only — there is one install command, so these are labels,
+          not a widget. Announcing them as a tablist promised screen-reader
+          users two selectable tabs that do nothing. */}
+      <div className="flex border-b border-[var(--wb-border)] bg-[var(--wb-bg-soft)]">
+        <span className="flex-1 border-b-2 border-[var(--wb-brand)] px-4 py-2 font-mono text-[12px] font-medium text-[var(--wb-fg)]">
           { dict.brewTab }
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={ false }
-          className="flex-1 border-b-2 border-transparent px-4 py-2 font-mono text-[12px] text-[var(--wb-fg-faint)]"
-        >
+        </span>
+        <span className="flex-1 border-b-2 border-transparent px-4 py-2 font-mono text-[12px] text-[var(--wb-fg-faint)]">
           { dict.curlTab }
-        </button>
+        </span>
       </div>
 
       <div className="relative bg-[var(--wb-code-bg)] px-4 py-3.5 font-mono text-[12.5px] text-[var(--wb-code-fg)]">

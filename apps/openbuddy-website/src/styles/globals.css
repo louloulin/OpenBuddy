@@ -40,7 +40,7 @@
   /* ===== Text ===== */
   --wb-fg: #152B43;                       /* 深海军 (tutti H1 颜色) */
   --wb-fg-muted: rgba(21, 43, 67, 0.72);
-  --wb-fg-faint: rgba(21, 43, 67, 0.40);
+  --wb-fg-faint: rgba(21, 43, 67, 0.65);
   --wb-fg-inverse: #FAFAF7;
 
   /* ===== Border ===== */
@@ -71,10 +71,16 @@
   --wb-idle: #6B7280;
   --wb-idle-soft: rgba(107, 114, 128, 0.10);
 
-  /* Brand (OpenBuddy cyan) */
+  /* Brand (OpenBuddy cyan)
+   * 注意: --wb-brand 在奶油底上只有 ≈2.3:1, 小字号文字必须用 --wb-brand-deep。
+   * --wb-brand 只用于图形 (圆点/描边/填充块) 或深色底上的文字。 */
   --wb-brand: #00C29A;
   --wb-brand-deep: #00614D;
   --wb-brand-soft: rgba(0, 194, 154, 0.08);
+  --wb-brand-border: rgba(0, 194, 154, 0.35);
+  /* Cursor-follow highlight for SpotlightCard. Slightly stronger than
+   * --wb-brand-soft, which is too faint to read as a moving spotlight. */
+  --wb-spotlight: rgba(0, 194, 154, 0.16);
 
   /* ===== Code / Terminal ===== */
   --wb-code-bg: #0A0F1E;
@@ -87,6 +93,24 @@
 
   /* ===== Focus ring ===== */
   --wb-ring: 0 0 0 2px var(--wb-bg), 0 0 0 4px var(--wb-accent);
+
+  /* ===== Motion =====
+   * 与 packages/ui/openbuddy-ui-motion/src/easings.ts 保持一致(那边是 JS 常量版)。
+   * 改这里时同步改那边,否则 CSS 与 Web Animations API 的时序会分叉。 */
+  --wb-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --wb-ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --wb-ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --wb-ease-spring-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --wb-duration-instant: 80ms;
+  --wb-duration-fast: 120ms;
+  --wb-duration-base: 200ms;
+  --wb-duration-medium: 280ms;
+  --wb-duration-slow: 380ms;
+  --wb-duration-slower: 540ms;
+  --wb-transition-fade: opacity var(--wb-duration-base) var(--wb-ease-out-expo);
+  --wb-transition-slide: transform var(--wb-duration-medium) var(--wb-ease-out-expo),
+                         opacity var(--wb-duration-medium) var(--wb-ease-out-expo);
+  --wb-transition-pop: transform var(--wb-duration-base) var(--wb-ease-spring-pop);
 
   /* ===== Fonts ===== */
   --font-display: 'Source Serif 4', 'Times New Roman', serif;
@@ -112,7 +136,7 @@
   /* ===== Text ===== */
   --wb-fg: #F2F2F6;                       /* off-white, tutti 严格 */
   --wb-fg-muted: rgba(242, 242, 246, 0.72);
-  --wb-fg-faint: rgba(242, 242, 246, 0.40);
+  --wb-fg-faint: rgba(242, 242, 246, 0.55);
   --wb-fg-inverse: #152B43;
 
   /* ===== Border ===== */
@@ -147,6 +171,8 @@
   --wb-brand: #4CF0CE;
   --wb-brand-deep: #22CBA8;
   --wb-brand-soft: rgba(76, 240, 206, 0.08);
+  --wb-brand-border: rgba(76, 240, 206, 0.35);
+  --wb-spotlight: rgba(76, 240, 206, 0.14);
 
   /* ===== Code / Terminal ===== */
   --wb-code-bg: #010409;
@@ -183,7 +209,7 @@
   --wb-bg-active: rgba(21, 43, 67, 0.10);
   --wb-fg: #152B43;
   --wb-fg-muted: rgba(21, 43, 67, 0.72);
-  --wb-fg-faint: rgba(21, 43, 67, 0.40);
+  --wb-fg-faint: rgba(21, 43, 67, 0.65);
   --wb-fg-inverse: #FAFAF7;
   --wb-border: rgba(21, 43, 67, 0.10);
   --wb-border-soft: rgba(21, 43, 67, 0.06);
@@ -205,13 +231,83 @@
   --wb-bg-active: rgba(21, 43, 67, 0.10);
   --wb-fg: #152B43;
   --wb-fg-muted: rgba(21, 43, 67, 0.72);
-  --wb-fg-faint: rgba(21, 43, 67, 0.40);
+  --wb-fg-faint: rgba(21, 43, 67, 0.65);
   --wb-fg-inverse: #FAFAF7;
   --wb-border: rgba(21, 43, 67, 0.10);
   --wb-border-soft: rgba(21, 43, 67, 0.06);
   --wb-border-strong: rgba(21, 43, 67, 0.20);
   --wb-border-focus: #5266E8;
   --wb-grid-color: rgba(21, 43, 67, 0.04);
+}
+
+/* =========================================================================
+ * Hero 逐词揭示
+ *
+ * 纯 CSS,不依赖 JS:服务端就把标题切成 span,爬虫和 JS 关闭时读到的是
+ * 完整文本,动画在 hydration 之前就已开始,不影响 LCP。
+ * 每个词的 `--i` 由组件按顺序写入,延迟靠 calc 阶梯展开。
+ * ========================================================================= */
+.hero-word {
+  display: inline-block;
+  /* inline-block is required for the transform to apply, but it also stops a
+   * long word from wrapping — this keeps a single huge word from overflowing
+   * the heading on a narrow viewport. */
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  animation: hero-word-in 0.62s var(--wb-ease-out-expo) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes hero-word-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.32em, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* =========================================================================
+ * prefers-reduced-motion —— 全局降级开关
+ *
+ * 站上有 smooth scroll、无限循环动画、滚动驱动的 sticky header 和逐字揭示。
+ * 对前庭失调用户这些是真实的伤害,不是偏好问题,所以这里用 !important 兜底,
+ * 而不是依赖每个组件自觉。
+ *
+ * 两层机制:
+ *   1. 令牌归零 —— 走 var(--wb-duration-*) 的动画自然停住;组件 JS 若读
+ *      useReducedMotion() 也会看到 true。
+ *   2. !important 兜底 —— 抓走所有绕过令牌、直接写死时长的 CSS 动画/过渡。
+ * ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --wb-duration-instant: 0ms;
+    --wb-duration-fast: 0ms;
+    --wb-duration-base: 0ms;
+    --wb-duration-medium: 0ms;
+    --wb-duration-slow: 0ms;
+    --wb-duration-slower: 0ms;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    /* Delay must be zeroed too. Zeroing the duration alone leaves a staggered
+     * item (Hero's per-word reveal, Reveal's delay prop) invisible for the
+     * whole delay, which is worse than animating. */
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer base {

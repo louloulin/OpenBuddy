@@ -50,7 +50,7 @@ export default function Architecture({ locale }: ArchitectureProps) {
   return (
     <section className="relative py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-12 max-w-3xl">
+        <Reveal className="mb-12 max-w-3xl">
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--wb-fg-faint)]">
             { isZh ? '架构' : 'Architecture' }
           </p>
@@ -59,7 +59,7 @@ export default function Architecture({ locale }: ArchitectureProps) {
               ? '三层结构:进程边界、能力网格、UI 渲染。'
               : 'Three layers: process boundary, capability mesh, UI render.' }
           </h2>
-        </div>
+        </Reveal>
 
         <ol className="grid gap-5 md:grid-cols-3">
           { LAYERS.map((layer, idx) => (

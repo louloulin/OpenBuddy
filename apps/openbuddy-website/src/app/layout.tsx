@@ -5,6 +5,7 @@ import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import SearchDialog from '@/components/search/SearchDialog';
 import BackToTop from '@/components/BackToTop';
 import { getSearchIndex } from '@/lib/docs-search';
+import { SITE_STATS } from '@/lib/constants';
 import '../styles/globals.css';
 
 export const viewport: Viewport = {
@@ -76,8 +77,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     'Plan mode · Rewind · Fork',
                     'MCP (Model Context Protocol) connectors',
                     'Casdoor OIDC / SAML / SCIM',
-                    '64 capability packages',
-                    '1,886 progressive test specs'
+                    `${SITE_STATS.packages} capability packages`,
+                    `${SITE_STATS.testFiles} progressive test files`
                   ]
                 },
                 {
@@ -151,6 +152,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           // 注入初始 theme，避免 FOUC
           dangerouslySetInnerHTML={ {
             __html: `(function(){try{var t=localStorage.getItem('openbuddy-theme');var d=t==='light'||t==='dark'?t:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',d);}catch(e){}})();`
+          } }
+        />
+        <script
+          // 根 layout 读不到路由参数,lang 只能先写死 'en'。同步改回来,避免首帧
+          // 到 hydration 之间中文页被当成英文读;客户端切换语言由 HtmlLang 兜底。
+          dangerouslySetInnerHTML={ {
+            __html: `(function(){try{var p=location.pathname.split('/').filter(Boolean)[0];if(p==='en'||p==='zh-CN'){document.documentElement.lang=p;}}catch(e){}})();`
           } }
         />
       </head>

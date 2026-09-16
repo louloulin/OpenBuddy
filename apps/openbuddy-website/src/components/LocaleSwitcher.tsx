@@ -99,7 +99,7 @@ export default function LocaleSwitcher() {
                   </span>
                   <span>{ localeNames[l] }</span>
                 </span>
-                { isCurrent ? <Check className="h-3.5 w-3.5 text-brand-8" /> : null }
+                { isCurrent ? <Check className="h-3.5 w-3.5 text-brand-10 dark:text-brand-8" /> : null }
               </Link>
             );
           }) }

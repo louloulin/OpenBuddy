@@ -170,7 +170,7 @@ EXPOSE 80
 构建：
 
 ```bash
-docker build -t openbuddy/admin-portal:0.1.0 -f apps/admin-portal/Dockerfile .
+docker build -t openbuddy/admin-portal:0.15.0 -f apps/admin-portal/Dockerfile .
 ```
 
 ## 7. 与 Electron 客户端的协作

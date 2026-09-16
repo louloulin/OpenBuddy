@@ -23,7 +23,7 @@ export default function CopyButton({ text, className = '' }: CopyButtonProps) {
       onClick={ () => copy(text) }
       className={ `inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--wb-border)] bg-[var(--wb-bg)] text-[var(--wb-fg-muted)] transition-colors hover:text-[var(--wb-fg)] ${className}` }
     >
-      { copied ? <Check className="h-3.5 w-3.5 text-brand-8" /> : <Copy className="h-3.5 w-3.5" /> }
+      { copied ? <Check className="h-3.5 w-3.5 text-brand-10" /> : <Copy className="h-3.5 w-3.5" /> }
     </button>
   );
 }

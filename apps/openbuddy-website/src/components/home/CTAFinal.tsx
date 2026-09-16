@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { GithubIcon } from '@/components/icons/BrandIcons';
 import { localizedPath, type Locale } from '@/lib/i18n';
+import { SITE_LICENSE, SITE_STATS } from '@/lib/constants';
 
 interface CTAFinalProps {
   locale: Locale;
@@ -33,8 +34,8 @@ export default function CTAFinal({ locale }: CTAFinalProps) {
             </h2>
             <p className="mt-6 max-w-xl text-[16px] leading-relaxed text-[var(--wb-fg-muted)]">
               { isZh
-                ? 'MIT 协议。64 个包。1,886 个测试。Star 我们、Clone 我们、改完提 PR。'
-                : 'MIT licensed. 64 packages. 1,886 tests. Star us, clone us, send a PR.' }
+                ? `${SITE_LICENSE} 协议。${SITE_STATS.packages} 个包。${SITE_STATS.testFiles} 个测试文件。Star 我们、Clone 我们、改完提 PR。`
+                : `${SITE_LICENSE} licensed. ${SITE_STATS.packages} packages. ${SITE_STATS.testFiles} test files. Star us, clone us, send a PR.` }
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-3">

@@ -1,8 +1,33 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import type { CSSProperties } from 'react';
 import { GithubIcon } from '@/components/icons/BrandIcons';
 import Logo from '@/components/icons/Logo';
 import { localizedPath, type Locale } from '@/lib/i18n';
+
+/**
+ * Splits a title fragment into per-word spans carrying their stagger index.
+ * The space between words is emitted as a sibling text node rather than inside
+ * the span: trailing whitespace inside an inline-block is collapsed away, which
+ * would run the words together and stop the heading from wrapping.
+ */
+function WordSpans({ text, offset }: { text: string; offset: number }) {
+  const words = text.split(/\s+/).filter(Boolean);
+  return (
+    <>
+      { words.flatMap((word, i) => [
+        <span
+          key={ i }
+          className="hero-word"
+          style={ { '--i': offset + i } as CSSProperties }
+        >
+          { word }
+        </span>,
+        i < words.length - 1 ? ' ' : null
+      ]) }
+    </>
+  );
+}
 
 interface HeroProps {
   locale: Locale;
@@ -16,28 +41,17 @@ interface HeroProps {
       ctaPrimary: string;
       ctaSecondary: string;
       ctaGithub: string;
+      metrics: Array<{ value: string; label: string }>;
     };
-    nav: { github: string; download: string; docs: string };
   };
 }
 
-const REAL_SIGNALS = {
-  en: [
-    { label: 'license', value: 'MIT' },
-    { label: 'packages', value: '64' },
-    { label: 'specs', value: '634' },
-    { label: 'stars', value: '8' }
-  ],
-  'zh-CN': [
-    { label: '许可证', value: 'MIT' },
-    { label: '包', value: '64' },
-    { label: '测试', value: '634' },
-    { label: 'Star', value: '8' }
-  ]
-} as const;
-
 export default function Hero({ locale, dict }: HeroProps) {
-  const signals = REAL_SIGNALS[locale];
+  const signals = dict.hero.metrics;
+  // Word counts drive the stagger offset of each block so the reveal runs as
+  // one continuous cascade instead of restarting at every line.
+  const preCount = dict.hero.titlePre.split(/\s+/).filter(Boolean).length;
+  const highlightCount = dict.hero.titleHighlight.split(/\s+/).filter(Boolean).length;
 
   return (
     <section className="relative pt-24 pb-16 md:pt-32 md:pb-20">
@@ -51,9 +65,16 @@ export default function Hero({ locale, dict }: HeroProps) {
             </div>
 
             <h1 className={ locale === 'zh-CN' ? 'font-display-serif text-[clamp(32px,4.2vw,52px)] font-normal leading-[1.08] tracking-[-0.025em] text-[var(--wb-fg)]' : 'font-display-serif text-[clamp(48px,7vw,96px)] font-normal leading-[1.02] tracking-[-0.035em] text-[var(--wb-fg)]' }>
-              { dict.hero.titlePre }
-              <span className="block">{ dict.hero.titleHighlight }</span>
-              <span className="block italic text-[var(--wb-fg-muted)]">{ dict.hero.titlePost }</span>
+              <WordSpans text={ dict.hero.titlePre } offset={ 0 } />
+              <span className="block">
+                <WordSpans text={ dict.hero.titleHighlight } offset={ preCount } />
+              </span>
+              <span className="block italic text-[var(--wb-fg-muted)]">
+                <WordSpans
+                  text={ dict.hero.titlePost }
+                  offset={ preCount + highlightCount }
+                />
+              </span>
             </h1>
 
             <p className="mt-8 max-w-xl text-[18px] leading-[1.55] text-[var(--wb-fg-muted)]">

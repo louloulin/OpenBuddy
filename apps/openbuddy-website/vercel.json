@@ -2,9 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "next build",
-  "installCommand": "pnpm install --filter @openbuddy/website...",
+  "installCommand": "npm install --no-audit --no-fund",
   "outputDirectory": ".next",
-  "regions": ["iad1", "sin1", "fra1", "hnd1"],
+  "regions": ["sin1"],
   "trailingSlash": false,
   "cleanUrls": true,
   "headers": [

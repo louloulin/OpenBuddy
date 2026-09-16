@@ -1,4 +1,5 @@
 import type { Locale } from '@/lib/i18n';
+import Marquee from '@/components/motion/Marquee';
 
 interface LogoWallProps {
   locale: Locale;
@@ -8,6 +9,7 @@ interface LogoWallProps {
  * LogoWall —— "我们集成 / 我们依赖" 的可信徽章墙。
  * 字体采用 monospace + 边框胶囊,统一节奏;不画真图标,只写字 + 形状 token,
  * 保证零依赖、零图片资源、零性能税。
+ * 窄屏与 reduced-motion 下退回静态换行排列(见 Marquee)。
  */
 const LOGOS: Array<{ name: string; group: 'integration' | 'core' }> = [
   { name: 'Casdoor', group: 'integration' },
@@ -37,7 +39,7 @@ export default function LogoWall({ locale }: LogoWallProps) {
           <span className="h-px flex-1 bg-[var(--wb-border)]" />
         </div>
 
-        <ul className="flex flex-wrap items-center justify-center gap-x-3 gap-y-3 sm:gap-x-4">
+        <Marquee>
           { LOGOS.map((l) => (
             <li
               key={ l.name }
@@ -52,7 +54,7 @@ export default function LogoWall({ locale }: LogoWallProps) {
               { l.name }
             </li>
           )) }
-        </ul>
+        </Marquee>
       </div>
     </section>
   );

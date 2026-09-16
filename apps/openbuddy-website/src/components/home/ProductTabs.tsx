@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Image from 'next/image';
 import type { Locale } from '@/lib/i18n';
 
@@ -51,6 +51,23 @@ const TABS: Tab[] = [
 export default function ProductTabs({ locale }: ProductTabsProps) {
   const [active, setActive] = useState(TABS[0].id);
   const current = TABS.find((t) => t.id === active) ?? TABS[0];
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // Roving tabindex: only the selected tab is in the tab order, so arrow keys
+  // are the way to move between them (WAI-ARIA tabs pattern).
+  function onTablistKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const idx = TABS.findIndex((t) => t.id === active);
+    let next = -1;
+    if (e.key === 'ArrowRight') next = (idx + 1) % TABS.length;
+    else if (e.key === 'ArrowLeft') next = (idx - 1 + TABS.length) % TABS.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = TABS.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    const id = TABS[next].id;
+    setActive(id);
+    tabRefs.current[id]?.focus();
+  }
 
   return (
     <section className="relative py-20 md:py-28">
@@ -70,6 +87,7 @@ export default function ProductTabs({ locale }: ProductTabsProps) {
           <div
             role="tablist"
             aria-label={ locale === 'zh-CN' ? '产品截图标签' : 'Product screenshot tabs' }
+            onKeyDown={ onTablistKeyDown }
             className="inline-flex rounded-full border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-1"
           >
             { TABS.map((tab) => {
@@ -77,8 +95,12 @@ export default function ProductTabs({ locale }: ProductTabsProps) {
               return (
                 <button
                   key={ tab.id }
+                  id={ `product-tab-${tab.id}` }
+                  ref={ (el) => { tabRefs.current[tab.id] = el; } }
                   role="tab"
                   aria-selected={ isActive }
+                  aria-controls={ `product-panel-${tab.id}` }
+                  tabIndex={ isActive ? 0 : -1 }
                   onClick={ () => setActive(tab.id) }
                   type="button"
                   className={ `rounded-full px-4 py-2 text-[13px] transition-colors ${
@@ -94,7 +116,13 @@ export default function ProductTabs({ locale }: ProductTabsProps) {
           </div>
         </div>
 
-        <figure className="overflow-hidden rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] shadow-[0_24px_60px_-32px_rgba(21,43,67,0.18)]">
+        <figure
+          role="tabpanel"
+          id={ `product-panel-${current.id}` }
+          aria-labelledby={ `product-tab-${current.id}` }
+          tabIndex={ 0 }
+          className="overflow-hidden rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] shadow-[0_24px_60px_-32px_rgba(21,43,67,0.18)]"
+        >
           <Image
             key={ current.src }
             src={ current.src }

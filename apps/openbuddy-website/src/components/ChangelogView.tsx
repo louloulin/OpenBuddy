@@ -17,7 +17,7 @@ const TAG_STYLES: Record<string, { dot: string; chip: string }> = {
   stable: { dot: 'var(--wb-working)', chip: 'bg-[var(--wb-working-soft)] text-[var(--wb-working-fg)] border-[var(--wb-working-border)]' },
   beta: { dot: 'var(--wb-warning)', chip: 'bg-[var(--wb-warning-soft)] text-[var(--wb-warning)] border-[rgba(217,119,6,0.30)]' },
   alpha: { dot: 'var(--wb-blocked)', chip: 'bg-[var(--wb-blocked-soft)] text-[var(--wb-blocked)] border-[rgba(220,38,38,0.30)]' },
-  lts: { dot: 'var(--wb-brand)', chip: 'bg-[var(--wb-brand-soft)] text-[var(--wb-brand)] border-[var(--wb-brand-border)]' }
+  lts: { dot: 'var(--wb-brand)', chip: 'bg-[var(--wb-brand-soft)] text-brand-10 dark:text-brand-8 border-[var(--wb-brand-border)]' }
 };
 
 export function ChangelogView({ locale, releases }: { locale: Locale; releases: ChangelogRelease[] }) {
@@ -73,7 +73,7 @@ export function ChangelogView({ locale, releases }: { locale: Locale; releases: 
                         </div>
 
                         <footer className="mt-6 border-t border-[var(--wb-border)] pt-4">
-                          <a href={ r.githubHref } target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--wb-brand)] hover:underline">
+                          <a href={ r.githubHref } target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-brand-10 dark:text-brand-8 hover:underline">
                             { isZh ? '在 GitHub 查看完整发布说明' : 'View full release notes on GitHub' }
                             <ExternalLink className="h-3 w-3" />
                           </a>
