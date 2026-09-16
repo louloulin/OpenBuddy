@@ -60,7 +60,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 
 ### SlotCore 槽位总表
 
-**共 41 个槽位** — `ok=23` · `ext=18` · `dead=0` · `no-impl=0`
+**共 42 个槽位** — `ok=24` · `ext=18` · `dead=0` · `no-impl=0`
 
 | Slot | Kind | Scope | 状态 | 声明于 | 注册方 | 消费方 |
 |---|---|---|---|---|---|---|
@@ -102,6 +102,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 | `root` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-layout | — | app(src) |
 | `settings.appearance.language` | `single` | `root` | ✅ ok | @openbuddy/ui-locale | @openbuddy/ui-settings | @openbuddy/ui-settings |
 | `settings.appearance.theme` | `single` | `root` | ✅ ok | @openbuddy/ui-theme | @openbuddy/ui-settings | @openbuddy/ui-settings |
+| `settings.policy.section` | `list` | `root` | ✅ ok | @openbuddy/ui-settings | @openbuddy/ui-settings | @openbuddy/ui-settings |
 | `shell.overlay` | `list` | `root` | 🔌 ext | @openbuddy/ui-layout | @openbuddy/ui-automation, @openbuddy/ui-dialogs, @openbuddy/ui-settings, @openbuddy/ui-workbench | — |
 | `shell.statusbar` | `single` | `root` | ✅ ok | @openbuddy/ui-shell | @openbuddy/ui-shell | app(src) |
 | `sidebar` | `single` | `root` | ✅ ok | @openbuddy/ui-layout | @openbuddy/ui-sidebar | app(src) |

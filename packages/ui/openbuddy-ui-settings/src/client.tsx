@@ -16,6 +16,7 @@ import { LanguagePicker } from "@openbuddy/ui-locale/client";
 import { ThemePicker } from "@openbuddy/ui-theme/client";
 import { HomePage } from "./HomePage";
 import { SettingsPanel } from "./SettingsPanel";
+import { EXTENSION_POLICY_SECTIONS } from "./policy/sections";
 
 export function apply(ctx: UiRuntimeContext): () => void {
   const disposeHome = ctx.slots.register(
@@ -38,7 +39,22 @@ export function apply(ctx: UiRuntimeContext): () => void {
     { name: "settings.appearance.language", kind: "single", scope: "root", registrant: "@openbuddy/ui-settings" },
     LanguagePicker as never
   );
+  // 「策略设置」的两块插件能力同样走槽位(而不是写死在 PolicySettingsPanel 里):
+  // 插件追加策略区块 = 一次 ctx.slots.register。
+  const disposePolicySections = EXTENSION_POLICY_SECTIONS.map((Section) =>
+    ctx.slots.register(
+      {
+        name: "settings.policy.section",
+        kind: "list",
+        scope: "root",
+        id: Section.policySection.id,
+        registrant: "@openbuddy/ui-settings",
+      },
+      Section as never,
+    ),
+  );
   return () => {
+    for (let i = disposePolicySections.length - 1; i >= 0; i--) disposePolicySections[i]();
     disposeLanguageRow();
     disposeThemeRow();
     disposeNamedSettings();

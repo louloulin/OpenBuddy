@@ -16,12 +16,35 @@
  * @see packages/ui/AGENTS.md 了解 ui-* 包协作约定
  */
 import type { SlotMap } from "@openbuddy/ui-slots";
+import type { PolicySectionProps } from "./policy/section-contract";
 export type { SlotMap };
 
 export { HomePage } from "./HomePage";
 export { SettingsPanel } from "./SettingsPanel";
 export { AssistantsPanel } from "./AssistantsPanel";
 export { PolicySettingsPanel } from "./PolicySettingsPanel";
+
+// ─── 「策略设置」区块总线 ───────────────────────────────────────────
+//
+// 内置的两个策略区块(Pi 扩展准入名单 / 插件策略审计)与第三方插件的区块
+// 走**同一条**总线,契约与 `@openbuddy/ui-library` 的 `library.section` 同构。
+export {
+  EXTENSION_POLICY_SECTIONS,
+  ExtensionAuditPanel,
+  ExtensionPolicyEditor,
+  ExtensionPolicySection,
+  ExtensionAuditSection,
+  POLICY_SECTION_IDS,
+  definePolicySection,
+  readPolicySectionMeta,
+} from "./policy";
+export type {
+  ExtensionAuditPanelProps,
+  ExtensionPolicyEditorProps,
+  PolicySectionComponent,
+  PolicySectionMeta,
+  PolicySectionProps,
+} from "./policy";
 
 export {
   PersonalizeSettingsPanel,
@@ -107,6 +130,17 @@ declare module "@openbuddy/ui-slots" {
       kind: "single";
       scope: "root";
       owner: { onSelect: (prompt: string) => void };
+    };
+    /**
+     * 策略设置区块(list)。消费者:`PolicySettingsPanel`。
+     * 内置两块(Pi 扩展准入名单 order 50 / 插件策略审计 order 60)也走这条总线,
+     * 插件追加策略区块只需一次 `ctx.slots.register`,不需要改设置面板代码。
+     * 注册值必须是 `definePolicySection(meta, Component)` 的产物。
+     */
+    "settings.policy.section": {
+      kind: "list";
+      scope: "root";
+      owner: PolicySectionProps;
     };
   }
 }

@@ -1,6 +1,9 @@
 /**
- * ExtensionAuditPanel.test.tsx — vitest spec for the Extension Audit
- * panel component (plan4.5 §A).
+ * ExtensionAuditPanel.test.tsx — 插件策略审计面板的 spec。
+ *
+ * R38 — 组件从 `src/components/ExtensionAuditPanel.tsx` 搬进
+ * `@openbuddy/ui-settings`(它属于"策略设置"这个域,不属于 App 外壳),
+ * spec 跟着搬,断言保持 testid 级不变(文案改中文只影响两条 /尚未/ 断言)。
  *
  * The panel is a **display-only** consumer of `useExtensionAuditPanel()`:
  * it never writes to a store, never spawns timers, never calls back
@@ -11,8 +14,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 
-import type { ExtensionAuditReport } from "../../lib/agent/extension-audit-event-parser";
-import type { UseExtensionAuditPanelResult } from "../../hooks/useExtensionAuditPanel";
+import type { ExtensionAuditReport } from "@/lib/agent/extension-audit-event-parser";
+import type { UseExtensionAuditPanelResult } from "@/hooks/useExtensionAuditPanel";
 
 // `vi.hoisted` ensures the shared state object is created BEFORE the
 // hoisted `vi.mock` factory runs (vitest hoists vi.mock above imports).
@@ -31,7 +34,7 @@ const state = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../hooks/useExtensionAuditPanel", () => ({
+vi.mock("@/hooks/useExtensionAuditPanel", () => ({
   useExtensionAuditPanel: () => state.current,
 }));
 
@@ -103,12 +106,12 @@ describe("ExtensionAuditPanel (plan4.5 §A — display-only consumer of useExten
     render(<ExtensionAuditPanel />);
     expect(screen.getByTestId("extension-audit-panel")).toBeDefined();
     const empty = screen.getByTestId("extension-audit-empty");
-    expect(empty.textContent).toMatch(/awaiting/i);
+    expect(empty.textContent).toMatch(/尚未/);
     // Timestamp header also reads "awaiting first report" — both
     // signals are intentional so the panel never shows a misleading
     // "last updated: null".
     const timestamp = screen.getByTestId("extension-audit-timestamp");
-    expect(timestamp.textContent).toMatch(/awaiting/i);
+    expect(timestamp.textContent).toMatch(/尚未/);
   });
 
   it("renders the summary tile from the latest report", () => {
@@ -150,6 +153,35 @@ describe("ExtensionAuditPanel (plan4.5 §A — display-only consumer of useExten
     // Sanity: latest-only metrics still reflect the latest report.
     expect(screen.getByTestId("extension-audit-allowed").textContent).toContain("1");
     expect(screen.getByTestId("extension-audit-last-decision-count").textContent).toContain("4");
+  });
+
+  it("空报告(profile 里没有 Pi 扩展)给出说明,而不是一张 0 表格", () => {
+    // resolver 在"一个扩展都没配"时照样发报告(total=0)。面板必须把
+    // "策略就绪、暂时没东西可判"讲清楚,否则用户以为审计坏了。
+    const emptyReport: ExtensionAuditReport = {
+      generatedAt: "2026-09-13T02:00:00.000Z",
+      total: 0,
+      allowed: 0,
+      denied: 0,
+      needsReview: 0,
+      decisions: [],
+    };
+    setHookState({
+      reports: [emptyReport],
+      summary: {
+        latest: emptyReport.generatedAt,
+        reports: 1,
+        totalAllowed: 0,
+        totalDenied: 0,
+        totalNeedsReview: 0,
+        lastDecisionCount: 0,
+      },
+    });
+    render(<ExtensionAuditPanel />);
+    expect(screen.getByTestId("extension-audit-no-decisions")).toBeDefined();
+    expect(screen.queryByTestId("extension-audit-rows")).toBeNull();
+    // 汇总卡片仍然在 —— 空报告也是报告。
+    expect(screen.getByTestId("extension-audit-summary")).toBeDefined();
   });
 
   it("renders one row per decision with an action badge", () => {
