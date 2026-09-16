@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PluginRegistry, satisfiesPluginDependencyRange, type PluginRegistryManifest, type PluginRegistrySurface } from "./plugin-registry";
 
 const manifest = (id: string, surfaces: PluginRegistrySurface[] = ["pi"]): PluginRegistryManifest => ({
-  schema: "openbuddy.plugin.v1", id, version: "1.0.0", apiVersion: "1", surfaces,
+  schema: "openbuddy.plugin.v1", id, version: "0.15.0", apiVersion: "1", surfaces,
 });
 
 describe("PluginRegistry", () => {
@@ -30,14 +30,14 @@ describe("PluginRegistry", () => {
 
   it("rejects missing required dependencies and duplicate registration", async () => {
     const registry = new PluginRegistry();
-    await expect(registry.register({ ...manifest("dependent"), dependencies: [{ id: "missing", range: "^1", optional: false }] })).rejects.toThrow("dependency missing");
+    await expect(registry.register({ ...manifest("dependent"), dependencies: [{ id: "missing", range: "^0.15", optional: false }] })).rejects.toThrow("dependency missing");
     await registry.register(manifest("one"));
     await expect(registry.register(manifest("one"))).rejects.toThrow("already registered");
   });
 
   it("rejects malformed nested manifest fields and protects registered manifests", async () => {
     const registry = new PluginRegistry();
-    await expect(registry.register({ ...manifest("bad"), dependencies: [{ id: "dep", range: "^1" }, { id: "dep", range: "^1" }] })).rejects.toThrow("duplicate dependency");
+    await expect(registry.register({ ...manifest("bad"), dependencies: [{ id: "dep", range: "^0.15" }, { id: "dep", range: "^0.15" }] })).rejects.toThrow("duplicate dependency");
     await expect(registry.register({ ...manifest("bad"), permissions: "shell" as never })).rejects.toThrow("permissions must be a non-empty string array");
     await expect(registry.register({ ...manifest("bad"), permissions: ["shell", " "] })).rejects.toThrow("permissions must be a non-empty string array");
     await expect(registry.register({ ...manifest("bad"), permissions: [] })).rejects.toThrow("permissions must be a non-empty string array");
@@ -45,7 +45,7 @@ describe("PluginRegistry", () => {
     await expect(registry.register({ ...manifest("bad"), entrypoints: {} })).rejects.toThrow("entrypoints must be a map of non-empty strings");
     await registry.register(manifest("dep"));
     await registry.activate("dep");
-    const nested = { ...manifest("nested"), dependencies: [{ id: "dep", range: "^1" }] };
+    const nested = { ...manifest("nested"), dependencies: [{ id: "dep", range: "^0.15" }] };
     await registry.register(nested);
     (nested.surfaces as PluginRegistrySurface[]).push("renderer");
     nested.dependencies![0].id = "mutated";
@@ -58,8 +58,8 @@ describe("PluginRegistry", () => {
     const incompatible = new PluginRegistry();
     await incompatible.register({ ...manifest("dependency"), version: "2.0.0" });
     await incompatible.activate("dependency");
-    await incompatible.register({ ...manifest("consumer"), dependencies: [{ id: "dependency", range: "^1.0.0" }] });
-    await expect(incompatible.activate("consumer")).rejects.toThrow("does not satisfy ^1.0.0");
+    await incompatible.register({ ...manifest("consumer"), dependencies: [{ id: "dependency", range: "^0.15.0" }] });
+    await expect(incompatible.activate("consumer")).rejects.toThrow("does not satisfy ^0.15.0");
   });
 
   it("projects inventory and emits generation-fenced lifecycle events", async () => {
@@ -69,7 +69,7 @@ describe("PluginRegistry", () => {
     await registry.register({ ...manifest("managed"), source: "profile", managed: true });
     await registry.activate("managed");
     await registry.disable("managed");
-    expect(registry.inventory()[0]).toMatchObject({ id: "managed", version: "1.0.0", source: "profile", managed: true, state: "disabled", health: "healthy", disabledReason: "user" });
+    expect(registry.inventory()[0]).toMatchObject({ id: "managed", version: "0.15.0", source: "profile", managed: true, state: "disabled", health: "healthy", disabledReason: "user" });
     await registry.activate("managed");
     expect(registry.inventory()[0]).toMatchObject({ state: "active" });
     expect(registry.inventory()[0]).not.toHaveProperty("disabledReason");
@@ -87,7 +87,7 @@ describe("PluginRegistry", () => {
     const registry = new PluginRegistry();
     await registry.register(manifest("provider"));
     await registry.activate("provider");
-    await registry.register({ ...manifest("consumer"), dependencies: [{ id: "provider", range: "^1.0.0" }] });
+    await registry.register({ ...manifest("consumer"), dependencies: [{ id: "provider", range: "^0.15.0" }] });
     await registry.activate("consumer");
 
     await expect(registry.disable("provider")).rejects.toThrow("active dependents consumer");

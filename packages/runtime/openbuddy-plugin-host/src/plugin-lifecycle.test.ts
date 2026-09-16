@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PluginLifecycleCoordinator } from "./plugin-lifecycle";
 import { PluginRegistry, type PluginRegistryManifest } from "./plugin-registry";
 
-const manifest: PluginRegistryManifest = { schema: "openbuddy.plugin.v1", id: "fixture", version: "1.0.0", apiVersion: "1", surfaces: ["pi"] };
+const manifest: PluginRegistryManifest = { schema: "openbuddy.plugin.v1", id: "fixture", version: "0.15.0", apiVersion: "1", surfaces: ["pi"] };
 
 describe("PluginLifecycleCoordinator", () => {
   it("rolls back failed staging and exposes diagnostics/readiness", async () => {
@@ -67,7 +67,7 @@ describe("PluginLifecycleCoordinator", () => {
     const calls: string[] = [];
     await coordinator.stage(manifest, { stage: () => { calls.push("stage-base"); } });
     await coordinator.activate("fixture");
-    const dependent: PluginRegistryManifest = { ...manifest, id: "dependent", surfaces: ["renderer"], dependencies: [{ id: "fixture", range: "^1" }] };
+    const dependent: PluginRegistryManifest = { ...manifest, id: "dependent", surfaces: ["renderer"], dependencies: [{ id: "fixture", range: "^0.15" }] };
     await coordinator.stage(dependent, { stage: () => { calls.push("stage-dependent"); }, dispose: () => { calls.push("dispose-dependent"); throw new Error("dependent dispose failed"); }, rollback: () => { calls.push("rollback-dependent"); } });
     await coordinator.activate("dependent");
     const result = await coordinator.disable("fixture");
@@ -81,7 +81,7 @@ describe("PluginLifecycleCoordinator", () => {
     const registry = new PluginRegistry();
     const coordinator = new PluginLifecycleCoordinator(registry);
     const base: PluginRegistryManifest = { ...manifest, id: "base" };
-    const dependent: PluginRegistryManifest = { ...manifest, id: "dependent", surfaces: ["renderer"], dependencies: [{ id: "base", range: "^1" }] };
+    const dependent: PluginRegistryManifest = { ...manifest, id: "dependent", surfaces: ["renderer"], dependencies: [{ id: "base", range: "^0.15" }] };
     await coordinator.stage(base);
     await coordinator.activate("base");
     await coordinator.stage(dependent);
