@@ -357,7 +357,7 @@
   flex-direction: column;
   gap: 2px;
   z-index: 30;
-  animation: account-menu-pop 0.14s ease-out;
+  animation: account-menu-pop var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, ease-out);
 }
 /* R17 — portal 变体:菜单挂在 <body> 下,用 fixed 定位脱离
    `.sidebar__footer` / `.sidebar` 的 overflow:hidden 裁剪链。

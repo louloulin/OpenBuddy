@@ -814,7 +814,13 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	});
 	ipcMain.handle("dsh:remote-unregister", async (_e, args: unknown) => {
 		const input = recordValue(args, "DeepSeek remote unregister payload");
-		return agentHost.unregisterRemote(input.package);
+		// `package` is the dispatcher lookup key. Validating it here (instead of
+		// passing `undefined` through) turns a silent no-op into a loud
+		// bad-request, so a renderer bug can't look like a successful unregister.
+		const packageName = input.package === undefined
+			? requiredString(input.packageName, "packageName")
+			: requiredString(input.package, "package");
+		return agentHost.unregisterRemote(packageName);
 	});
 	ipcMain.handle("dsh:remote", async (_e, args: unknown) => {
 		try {
