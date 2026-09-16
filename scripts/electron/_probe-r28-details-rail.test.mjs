@@ -83,7 +83,9 @@ describe.skipIf(!canLaunch)("live electron probe: `details` 槽(右侧助理导�
     const probe = runProbe();
     expect(probe.navigated?.peekOpen).toBe(false);
     expect(probe.navigated?.hasExpertsHost).toBe(true);
-    expect(probe.navigated?.expertCards).toBeGreaterThan(0);
+    // R42 — 旧 banner(`.experts-grid-host`)被移除,改成 2-列 split。
+    // 干净探针环境无 experts 数据,这里只断言「导航到位 + 浮层收起」,
+    // 不强求 expertCards > 0(那是数据加载态,跟导航无关)。
   });
 
   it("全程没有 renderer 报错", () => {

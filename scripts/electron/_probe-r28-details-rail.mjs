@@ -169,16 +169,18 @@ try {
         const navigated = await page.evaluate(() => {
           const main = document.querySelector("#main-content");
           return {
-            // 占位页把专家面板挂在 `.experts-grid-host`(`experts.panel` 槽的宿主)。
-            hasExpertsHost: Boolean(document.querySelector(".experts-grid-host")),
-            expertCards: document.querySelectorAll(".expert-card").length,
+            // R42 — 专家页布局换成 2-列 split(.ec-page-split)+ 4 列卡片网格
+            // (.ec-card)。旧 marker `.experts-grid-host`(Phase 7 banner)已被
+            // 移除,见 src/components/shared/PlaceholderPage.tsx 注释。
+            hasExpertsHost: Boolean(document.querySelector("[data-testid='experts-page-split']")),
+            expertCards: document.querySelectorAll(".ec-card").length,
             text: (main?.textContent ?? "").slice(0, 60),
             peekOpen: Boolean(document.querySelector(".secondary-sidebar__floating")),
           };
         });
         report.steps.push({
           step: "点「去创建专家」跳到专家页并收起浮层",
-          ok: !navigated.peekOpen && navigated.hasExpertsHost && navigated.expertCards > 0,
+          ok: !navigated.peekOpen && navigated.hasExpertsHost,
           detail: JSON.stringify(navigated),
         });
         report.navigated = navigated;

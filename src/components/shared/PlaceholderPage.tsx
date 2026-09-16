@@ -25,7 +25,6 @@ const ProjectsPanel = lazy(() => import("@openbuddy/ui-collaboration").then((m) 
 // 与 ui-collaboration/ExpertsPanel 的 lazy 边界区分开,避免 home overview 与
 // placeholder 视图互相拖入对方的 chunk。
 import { ProjectTemplatesPanel } from "@openbuddy/ui-home";
-import { ExpertsGrid } from "@openbuddy/ui-experts";
 
 const ExpertsPanel = lazy(() => import("@openbuddy/ui-experts").then((m) => ({ default: m.ExpertsPanel })));
 const AutomationPanel = lazy(() => import("@openbuddy/ui-automation").then((m) => ({ default: m.AutomationPanel })));
@@ -230,20 +229,19 @@ function PlaceholderPageInner({
   }
 
   if (label === "专家·技能·连接器") {
-    // Phase 7 — WorkBuddy 风格 9 卡 3 列专家网格作为顶部 banner;
-    // 下方仍然渲染原有的 market tabs(专家·技能·连接器·插件)。
+    // R42 — 完全复刻 WorkBuddy v5.4.7:左侧「任务」栏 + 右侧 4 列专家网格
+    // 都由 ExpertsPanel 内部 .ec-page-split 提供。
+    // 此前 Phase 7 在这里塞了一个 9 卡 3 列的 ExpertsGrid banner,
+    // 但它跟新的 WorkBuddy 风格布局重复,而且高度 (~700px) 会把新的
+    // 任务栏 + 4 列网格推到屏幕外 —— 用户看到的还是旧 banner,以
+    // 为改造没生效。删除 banner,直接渲染 ExpertsPanel。
     return (
-      <div className="placeholder-page-stack">
-        <div className="experts-grid-host">
-          <ExpertsGrid />
-        </div>
-        <ExpertsPanelSlot
-          onGoHome={onGoHome}
-          onToast={onToast}
-          sessionId={sessionId}
-          onSelectSession={onSelectSession}
-        />
-      </div>
+      <ExpertsPanelSlot
+        onGoHome={onGoHome}
+        onToast={onToast}
+        sessionId={sessionId}
+        onSelectSession={onSelectSession}
+      />
     );
   }
 
