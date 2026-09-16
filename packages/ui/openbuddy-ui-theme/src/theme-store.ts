@@ -19,7 +19,7 @@ import {
   extractGoogleFontFamily,
   buildFontStylesheetUrl,
   getThemeByName,
-  resolveVars,
+  resolveThemeVars,
   type ThemeDefinition,
   type ThemeName,
   type ThemeType,
@@ -162,7 +162,9 @@ function applyThemeAttrs(theme: ThemeDefinition | null): void {
   lastAppliedType = theme.type;
   root.setAttribute("data-theme", theme.type);
   root.setAttribute("data-theme-name", theme.name);
-  const vars = resolveVars(theme.name);
+  // 字体是主题的顶层字段(不是 delta),且需要展开 `var(--wb-font)` 自引用,
+  // 因此单独解析后覆盖到颜色 token 之上 —— 这样 19 套主题的字体选择才真的生效。
+  const vars = resolveThemeVars(theme.name);
   const seen = new Set<string>();
   for (const [k, v] of Object.entries(vars)) {
     seen.add(k);

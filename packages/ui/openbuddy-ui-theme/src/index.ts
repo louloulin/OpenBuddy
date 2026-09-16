@@ -21,7 +21,17 @@ import type { ThemeName, ThemeDefinition, ThemeType } from "./themes";
 import type { ThemeMode, ThemePreference, ThemeService } from "./theme-store";
 
 export type { ThemeName, ThemeDefinition, ThemeType } from "./themes";
-export { THEMES, getThemeByName, themesByType, resolveVars } from "./themes";
+export {
+  THEMES,
+  BASE_FONT_STACK,
+  BASE_MONO_STACK,
+  expandFontRefs,
+  getThemeByName,
+  resolveThemeFontTokens,
+  resolveThemeVars,
+  resolveVars,
+  themesByType,
+} from "./themes";
 export type { ThemeMode, ThemePreference, ThemeService } from "./theme-store";
 export {
   createThemeStore,

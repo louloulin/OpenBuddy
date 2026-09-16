@@ -9,7 +9,7 @@
  *      于是设置面板的浅/深按钮和宿主 IDE 的 colorScheme 同步"点了没反应"。
  */
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { resolveVars } from "../themes";
+import { BASE_FONT_STACK, THEMES, resolveVars } from "../themes";
 import { createThemeStore, getStoredThemeName, type ThemeService } from "../theme-store";
 
 function inlineVar(name: string): string {
@@ -43,8 +43,9 @@ describe("applyThemeAttrs — 落地的是 base + delta 的完整集合", () => 
       "--wb-shadow-md",
       "--wb-shadow-lg",
       "--wb-radius-md",
-      "--wb-font",
       "--wb-font-mono",
+      // `--wb-font` / `--wb-font-heading` 不在此列:它们由主题的顶层
+      // `font` / `headingFont` 字段决定(见下面的 "主题字体真的落到 DOM" 一组)。
     ]) {
       expect(inlineVar(token), token).toBe(resolveVars("claude")[token]);
     }
@@ -60,6 +61,44 @@ describe("applyThemeAttrs — 落地的是 base + delta 的完整集合", () => 
     expect(inlineVar("--wb-bg-overlay")).toBe(
       resolveVars("openbuddy-dark")["--wb-bg-overlay"],
     );
+  });
+
+  it("19 套主题的正文字体都落成内联值,且不含自引用 var()", () => {
+    // 回归点:主题写的是 `'"Space Grotesk", var(--wb-font)'`,若原样写回
+    // `--wb-font` 就是循环引用 → font-family 整条失效。
+    for (const theme of THEMES) {
+      service.setThemeByName(theme.name);
+      const body = inlineVar("--wb-font");
+      const heading = inlineVar("--wb-font-heading");
+      expect(body, theme.name).toBeTruthy();
+      expect(body, theme.name).not.toContain("var(--wb-font");
+      expect(heading, theme.name).toBeTruthy();
+      expect(heading, theme.name).not.toContain("var(--wb-font");
+    }
+  });
+
+  it("主题字体真的落到 DOM(claude 的 Space Grotesk + Playfair Display)", () => {
+    service.setThemeByName("claude");
+    expect(inlineVar("--wb-font")).toBe(
+      `"Space Grotesk", ${BASE_FONT_STACK}`,
+    );
+    expect(inlineVar("--wb-font-heading")).toBe('"Playfair Display", Georgia, serif');
+  });
+
+  it("没有 font 的主题回落到基础字体栈,heading 与 body 一致", () => {
+    const plain = THEMES.find((theme) => !theme.font);
+    expect(plain, "至少有一套主题不声明 font").toBeTruthy();
+    service.setThemeByName(plain!.name);
+    expect(inlineVar("--wb-font")).toBe(BASE_FONT_STACK);
+    expect(inlineVar("--wb-font-heading")).toBe(BASE_FONT_STACK);
+  });
+
+  it("切主题时字体会跟着换(不会停留在上一套)", () => {
+    service.setThemeByName("claude");
+    const claudeBody = inlineVar("--wb-font");
+    service.setThemeByName("win95");
+    expect(inlineVar("--wb-font")).not.toBe(claudeBody);
+    expect(inlineVar("--wb-font")).toContain("Pixelated MS Sans Serif");
   });
 
   it("win95 的方角不会泄漏到后续主题", () => {

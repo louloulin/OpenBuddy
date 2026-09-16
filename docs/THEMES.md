@@ -53,7 +53,7 @@ Every theme is a flat record of CSS custom properties using the existing
 --wb-danger / -success / -warning
 --wb-shadow / -md / -lg
 --wb-radius-sm / -md / -lg / -xl
---wb-font / -font-mono
+--wb-font / -font-mono / -font-heading
 ```
 
 Two base blocks (`LIGHT_BASE`, `DARK_BASE`) supply defaults; a theme's `vars`
@@ -191,6 +191,29 @@ behaviour of loading 30+ families on every page load.
 
 The stylesheet link is tagged `#openbuddy-theme-fonts-link` so it can be
 swapped rather than accumulated.
+
+### 7.1 Where the fonts actually land
+
+`font` / `headingFont` are **top-level fields**, not part of `theme.vars`, and
+they were once used only by the ThemePicker preview cards — switching theme
+changed colours but the type never moved. `resolveThemeVars()` (the single
+entry used by both the live store and `ThemeInitializer`) now expands them
+into two tokens:
+
+| token | value | consumed by |
+| --- | --- | --- |
+| `--wb-font` | theme `font`, else `BASE_FONT_STACK` | `src/styles/base.css` (body), `ui-editor` 正文, `ui-shell` 标题 |
+| `--wb-font-heading` | theme `headingFont`, else the body stack | `src/styles/prose.css` markdown `h1`–`h4` |
+
+Themes write their font as `'"Space Grotesk", var(--wb-font)'` — a *self
+reference* to the token we are about to overwrite. Assigning that string
+verbatim would make the custom property cyclic, and CSS drops a cyclic value
+entirely (the theme font would silently never apply). `expandFontRefs()`
+therefore substitutes `var(--wb-font)` / `var(--wb-font-mono)` **at definition
+time**, so the value written to the DOM is a plain font stack.
+
+`src/styles/__tests__/theme-font-wiring.test.ts` guards the consumer side, and
+`theme-store-apply.test.ts` asserts all 19 themes produce a non-cyclic value.
 
 ## 8. Adding a theme
 

@@ -1983,6 +1983,9 @@
 .markdown-body h3,
 .markdown-body h4 {
   margin: 16px 0 8px;
+  /* 主题的 headingFont(如 claude 的 Playfair Display)只在标题上生效;
+     未定义 headingFont 的主题回落到正文字体(inherit)。 */
+  font-family: var(--wb-font-heading, inherit);
   font-weight: 600;
   line-height: 1.35;
   /* R8.57 — tighter letter-spacing (-0.01em) for refined display
