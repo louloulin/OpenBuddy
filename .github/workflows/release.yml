@@ -122,7 +122,7 @@ jobs:
         run: dir release\
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-nsis
           # `electron-builder.yml` flattens everything under `release/`.
@@ -198,7 +198,7 @@ jobs:
         run: ls -la release/
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
           path: |
@@ -254,7 +254,7 @@ jobs:
         run: ls -la release/
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-appimage
           path: |
