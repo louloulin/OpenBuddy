@@ -57,9 +57,21 @@ export interface FileTreeProps {
   selectedIds?: ReadonlySet<TreeNodeId>;
   onSelectionChange?(next: Set<TreeNodeId>): void;
 
+  /**
+   * Fired after every row click, once the selection has been updated. Hosts
+   * use this for single-click-to-open semantics (VS Code / cabinet style):
+   * click a file → preview it, click a folder → toggle it.
+   */
+  onSelect?(node: TreeNode, e: React.MouseEvent): void;
   onOpen?(node: TreeNode): void;
   /** Invoked when a folder is dropped onto another folder. */
   onMove?(source: TreeNode, target: TreeNode): void;
+  /**
+   * Rows become draggable only when this is true (default). Hosts that cannot
+   * perform the move should pass `false` so the tree does not offer a drop it
+   * will silently ignore.
+   */
+  dragEnabled?: boolean;
   /** Host-provided context menu items for a node. */
   renderContextMenu?(node: TreeNode): FileTreeContextMenuItem[];
   /** Optional per-row accessory (badges, trailing actions). */
@@ -77,8 +89,10 @@ export function FileTree({
   onExpandedChange,
   selectedIds,
   onSelectionChange,
+  onSelect,
   onOpen,
   onMove,
+  dragEnabled = true,
   renderContextMenu,
   renderBadge,
   className,
@@ -163,29 +177,31 @@ export function FileTree({
     (node: TreeNode, e: React.MouseEvent) => {
       const isMeta = e.metaKey || e.ctrlKey;
       const isShift = e.shiftKey;
+      // Anchor 必须在改写之前取出来 —— 之前先写 `anchorRef.current = node.id`
+      // 再拿它做 range 起点,起点永远等于终点,Shift 框选退化成单选。
+      const anchor = anchorRef.current;
       anchorRef.current = node.id;
       setFocusedId(node.id);
 
-      if (isShift && anchorRef.current) {
-        const range = rangeSelect(visible, anchorRef.current, node.id);
+      if (isShift && anchor) {
+        const range = rangeSelect(visible, anchor, node.id);
         if (range.size === 0) {
           range.add(node.id);
         }
         setSelected(() => range);
-        return;
-      }
-      if (isMeta) {
+      } else if (isMeta) {
         setSelected((prev) => {
           const next = new Set(prev);
           if (next.has(node.id)) next.delete(node.id);
           else next.add(node.id);
           return next;
         });
-        return;
+      } else {
+        setSelected(() => new Set([node.id]));
       }
-      setSelected(() => new Set([node.id]));
+      onSelect?.(node, e);
     },
-    [visible, setSelected],
+    [visible, setSelected, onSelect],
   );
 
   const handleChevronClick = useCallback(
@@ -437,6 +453,7 @@ export function FileTree({
                   selected={selected.has(node.id)}
                   focused={focusedId === node.id}
                   dropTarget={dropTargetId === node.id}
+                  draggable={dragEnabled}
                   onClick={handleRowClick}
                   onDoubleClick={handleDoubleClick}
                   onChevronClick={handleChevronClick}

@@ -99,6 +99,7 @@
     "subpaths": {
       "components": "./packages/ui/openbuddy-ui-files-tree/src/components/index.ts",
       "components/FileTree": "./packages/ui/openbuddy-ui-files-tree/src/components/FileTree.tsx",
+      "components/LazyFileTree": "./packages/ui/openbuddy-ui-files-tree/src/components/LazyFileTree.tsx",
       "lib/tree-utils": "./packages/ui/openbuddy-ui-files-tree/src/lib/tree-utils.ts"
     }
   },

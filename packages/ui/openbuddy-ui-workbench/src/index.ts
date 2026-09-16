@@ -87,4 +87,5 @@ export type { ArtifactViewModel, ArtifactViewStatus } from "./artifact-view-mode
 export { resolveArtifactPreview } from "./artifact-preview-route";
 export type { ArtifactPreviewResult, ArtifactPreviewRoute } from "./artifact-preview-route";
 export { FileTreeView } from "./FileTreeView";
+export type { FileTreeViewProps, FileTreeSlotComponent } from "./FileTreeView";
 export { ViewSelector, defaultViews } from "./ViewSelector";

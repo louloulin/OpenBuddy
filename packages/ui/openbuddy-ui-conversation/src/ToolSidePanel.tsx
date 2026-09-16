@@ -23,12 +23,14 @@ import {
 } from "@/lib/ui/use-unified-tabs";
 import { ToolCallDetailBody } from "./ToolCallCard";
 import { openLocalPath } from "@/lib/markdown/markdown-host";
+import { listDir } from "@/lib/agent/pi-client";
 import { invoke } from "@/lib/platform/electron-api";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { IS_MACOS } from "@/lib/platform/platform";
 import { ViewSelector, defaultViews } from "@openbuddy/ui-workbench";
 import { ArtifactTabsBar } from "@openbuddy/ui-workbench";
 import { FileTreeView } from "@openbuddy/ui-workbench";
+import type { FileTreeViewProps } from "@openbuddy/ui-workbench";
 import { BrowserPreview } from "@openbuddy/ui-workbench";
 import {
   WbPinIcon,
@@ -399,6 +401,26 @@ function NavContent({
   onFileSelect: (path?: string) => void;
   onToast?: (msg: string) => void;
 }) {
+  // `files.tree` 槽:插件可以整列接管文件树(自带数据源)。内核没装任何实现时
+  // 退回 ui-workbench 的 FileTreeView —— 两者满足同一个 props 契约,所以这里
+  // 只需要把「宿主侧 I/O」准备好交给它。hook 必须在所有 early return 之前调用。
+  const treeSlot = useSlotComponents("files.tree");
+  const SlotTree = (treeSlot[0] as ComponentType<FileTreeViewProps> | undefined) ?? null;
+  const slotLoadDir = useCallback(
+    (dirPath: string) => listDir(dirPath),
+    [],
+  );
+  const slotReveal = useCallback(
+    (path: string) => {
+      void invoke("reveal_in_folder", { path, cwd: cwd ?? null }).catch(
+        (e: unknown) => {
+          onToast?.(`无法在文件夹中显示:${String(e).replace(/^Error:\s*/, "")}`);
+        },
+      );
+    },
+    [cwd, onToast],
+  );
+
   if (view === "artifacts") {
     return (
       <ArtifactsNavList
@@ -418,12 +440,15 @@ function NavContent({
     );
   }
   if (view === "fileTree") {
+    const Tree = SlotTree ?? FileTreeView;
     return (
-      <FileTreeView
+      <Tree
         rootPath={cwd}
         selectedPath={selectedFilePath}
         onFileSelect={(p) => onFileSelect(p)}
         onToast={onToast}
+        loadDir={slotLoadDir}
+        onReveal={slotReveal}
       />
     );
   }

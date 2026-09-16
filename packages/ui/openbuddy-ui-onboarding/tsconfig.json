@@ -146,7 +146,8 @@
       "@openbuddy/ui-onboarding/components/FeedbackPopup": ["./packages/ui/openbuddy-ui-onboarding/src/components/FeedbackPopup.tsx"],
       "@openbuddy/ui-onboarding/components/OnboardingWizard": ["./packages/ui/openbuddy-ui-onboarding/src/components/OnboardingWizard.tsx"],
       "@openbuddy/ui-onboarding/components/WhatsNewCard": ["./packages/ui/openbuddy-ui-onboarding/src/components/WhatsNewCard.tsx"],
-      "@openbuddy/ui-onboarding/tour/TourSpotlight": ["./packages/ui/openbuddy-ui-onboarding/src/tour/TourSpotlight.tsx"]
+      "@openbuddy/ui-onboarding/tour/TourSpotlight": ["./packages/ui/openbuddy-ui-onboarding/src/tour/TourSpotlight.tsx"],
+      "@openbuddy/ui-files-tree/components/LazyFileTree": ["./packages/ui/openbuddy-ui-files-tree/src/components/LazyFileTree.tsx"]
     }
   },
   "include": ["src", "../assets.d.ts"]

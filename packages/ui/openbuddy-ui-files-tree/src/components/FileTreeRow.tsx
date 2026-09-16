@@ -15,6 +15,9 @@ export interface FileTreeRowProps {
   selected: boolean;
   focused: boolean;
   dropTarget: boolean;
+  /** Whether folders can be picked up. Hosts disable it when they have no
+   *  drop handler, so the UI does not advertise a move it cannot perform. */
+  draggable: boolean;
   badge?: ReactNode;
   onClick(node: TreeNode, e: React.MouseEvent): void;
   onDoubleClick(node: TreeNode): void;
@@ -35,6 +38,7 @@ export function FileTreeRow({
   selected,
   focused,
   dropTarget,
+  draggable,
   badge,
   onClick,
   onDoubleClick,
@@ -59,7 +63,7 @@ export function FileTreeRow({
       aria-selected={selected}
       aria-expanded={isDir ? expanded : undefined}
       aria-level={depth + 1}
-      draggable={isDir}
+      draggable={isDir && draggable}
       onClick={(e) => onClick(node, e)}
       onDoubleClick={() => onDoubleClick(node)}
       onContextMenu={(e) => onContextMenu(node, e)}

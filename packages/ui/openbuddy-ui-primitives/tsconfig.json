@@ -357,7 +357,8 @@
       "@openbuddy/ui-onboarding/lib/onboarding-reducer": ["./packages/ui/openbuddy-ui-onboarding/src/lib/onboarding-reducer.ts"],
       "@openbuddy/ui-onboarding/tour/tour-steps": ["./packages/ui/openbuddy-ui-onboarding/src/tour/tour-steps.ts"],
       "@openbuddy/ui-onboarding/tour/TourModal": ["./packages/ui/openbuddy-ui-onboarding/src/tour/TourModal.tsx"],
-      "@openbuddy/ui-onboarding/tour/TourSpotlight": ["./packages/ui/openbuddy-ui-onboarding/src/tour/TourSpotlight.tsx"]
+      "@openbuddy/ui-onboarding/tour/TourSpotlight": ["./packages/ui/openbuddy-ui-onboarding/src/tour/TourSpotlight.tsx"],
+      "@openbuddy/ui-files-tree/components/LazyFileTree": ["./packages/ui/openbuddy-ui-files-tree/src/components/LazyFileTree.tsx"]
     }
   },
   "include": [
