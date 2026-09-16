@@ -2,24 +2,14 @@
   <defs>
     <mask id="mono" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
       <rect width="1024" height="1024" fill="#FFF"/>
-      <path d="M256 248 Q300 158 388 220 Q360 372 296 416 Z" fill="#FFF"/>
-      <path d="M768 248 Q724 158 636 220 Q664 372 728 416 Z" fill="#FFF"/>
-      <rect x="276" y="276" width="472" height="472" rx="232" fill="#FFF"/>
-      <ellipse cx="512" cy="640" rx="190" ry="124" fill="#FFF"/>
-      <circle cx="392" cy="404" r="34" fill="#FFF"/>
-      <circle cx="632" cy="404" r="34" fill="#FFF"/>
-      <circle cx="780" cy="270" r="40" fill="#FFF"/>
-      <!-- knockouts -->
-      <path d="M296 264 Q330 218 374 256 Q352 348 312 392 Z" fill="#000"/>
-      <path d="M728 264 Q694 218 650 256 Q672 348 712 392 Z" fill="#000"/>
-      <circle cx="412" cy="494" r="40" fill="#000"/>
-      <circle cx="612" cy="494" r="40" fill="#000"/>
-      <circle cx="424" cy="482" r="14" fill="#FFF"/>
-      <circle cx="624" cy="482" r="14" fill="#FFF"/>
-      <path d="M484 610 Q484 588 502 588 Q512 588 512 596 Q512 588 522 588 Q540 588 540 610 Q540 640 512 668 Q484 640 484 610 Z" fill="#000"/>
-      <path d="M512 670 L512 706" stroke="#000" stroke-width="16" stroke-linecap="round"/>
-      <path d="M512 706 Q470 752 432 716" fill="none" stroke="#000" stroke-width="16" stroke-linecap="round"/>
-      <path d="M512 706 Q554 752 592 716" fill="none" stroke="#000" stroke-width="16" stroke-linecap="round"/>
+      <circle cx="420" cy="512" r="296" fill="none" stroke="#FFF" stroke-width="64"/>
+      <rect x="448" y="216" width="488" height="488" rx="120" fill="#FFF"/>
+      <circle cx="692" cy="460" r="120" fill="#000"/>
+      <circle cx="692" cy="616" r="74" fill="#000"/>
+      <g transform="translate(820 220)">
+        <circle r="20" fill="#FFF"/>
+        <circle r="36" fill="none" stroke="#FFF" stroke-width="4"/>
+      </g>
     </mask>
   </defs>
   <rect width="1024" height="1024" fill="currentColor" mask="url(#mono)"/>
