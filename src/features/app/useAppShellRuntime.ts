@@ -34,7 +34,7 @@ import { useFeedbackStore } from "@/stores/feedback-store";
 import { usePendingExpertStore } from "@/stores/pending-expert-store";
 import { setToast as pushToast, useToastStore } from "@/stores/toast-store";
 import { useProjectsStore, type ProjectMeta } from "@/stores/projects-store";
-import { useTheme } from "@openbuddy/ui-theme/client";
+import { getStoredThemeName, useTheme } from "@openbuddy/ui-theme/client";
 import { useAgentSession } from "@/hooks/useAgentSession";
 import { useOptimisticNewSession } from "@/hooks/useOptimisticNewSession";
 import { newSessionFlow, composeDiscoverBody } from "@/lib/agent/new-session-flow";
@@ -323,7 +323,16 @@ export function useAppShellRuntime(): AppShellRuntime {
       const theme = rendererRuntime.context.get("theme") as { getTheme?: () => { active?: { colorScheme?: string } }; subscribe?: (l: (s: { active?: { colorScheme?: string } }) => void) => () => void } | undefined;
       if (!theme?.getTheme) return;
       const getSnapshot = theme.getTheme.bind(theme);
-      const sync = (snapshot = getSnapshot()): void => { const c = snapshot.active?.colorScheme; if (!cancelled && (c === "light" || c === "dark")) setTheme(c); };
+      // 宿主/IDE 的 colorScheme 只作为**环境默认值**:它会在每次
+      // plugin/profile 加载时重新同步一次,如果无条件写进主题 store,
+      // 用户手选的命名主题(例如 sakura)会在下一次加载被悄悄换成
+      // pair 里的默认色。用户一旦通过 ThemePicker 显式选过主题,
+      // 就由 ThemePicker 独占控制权。
+      const sync = (snapshot = getSnapshot()): void => {
+        if (cancelled || getStoredThemeName()) return;
+        const c = snapshot.active?.colorScheme;
+        if (c === "light" || c === "dark") setTheme(c);
+      };
       sync();
       stop = theme.subscribe?.(sync);
     };

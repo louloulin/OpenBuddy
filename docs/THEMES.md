@@ -57,7 +57,19 @@ Every theme is a flat record of CSS custom properties using the existing
 ```
 
 Two base blocks (`LIGHT_BASE`, `DARK_BASE`) supply defaults; a theme's `vars`
-is merged on top. The store writes both the variables and two attributes on
+is merged on top via `resolveVars(name)` (type-aware: dark themes get
+`DARK_BASE`). **`applyThemeAttrs()` always writes the merged, complete set** —
+not just `theme.vars`.
+
+> This matters. `theme.vars` is a *delta*; `--wb-bg-overlay`, `--wb-shadow*`,
+> `--wb-radius-*` and `--wb-font*` only exist in the base blocks. Writing only
+> the delta left those tokens pinned at the *previous* theme's inline value,
+> and because an inline custom property outranks every stylesheet rule, the
+> leak never healed: after visiting `win95`/`winxp` (`--wb-radius-*: 0`) every
+> later theme stayed square-cornered forever. The store therefore also tracks
+> the keys it wrote and removes any that the next theme no longer provides.
+
+The store writes both the variables and two attributes on
 `document.documentElement`:
 
 - `data-theme="dark" | "light"` — kept for back-compat with existing CSS.
@@ -108,6 +120,32 @@ setMode(mode: "manual" | "system"): void
 list(): readonly ThemeDefinition[]
 ```
 
+### `setPreference` is a real setter
+
+`setPreference("light" | "dark")` must actually change the palette — that is the
+v1 contract, and the settings panel's 浅色/深色 buttons plus the host IDE's
+`colorScheme` bridge both rely on it. In v2 the palette is resolved from
+`mode` + `name`, so `setPreference` also writes those two keys **when the
+current theme's type disagrees** with the request. A same-type request is a
+no-op for the palette, which is what keeps a user-chosen named theme (say
+`sakura`) alive when the ambient host sync re-fires on every
+`plugin/loaded` / `profile/loaded`.
+
+The ambient sync itself is gated on `getStoredThemeName()` (see
+`src/features/app/useAppShellRuntime.ts`): once the user has picked a theme
+explicitly, the ThemePicker owns the theme and the host scheme is ignored.
+
+### `data-theme` compatibility bridge
+
+Third-party code still flips the legacy `data-theme` attribute directly. Since
+the store's OKLCh values are inline, such a flip used to change the attribute
+(and therefore every `[data-theme="dark"] .foo` descendant rule) while leaving
+all `--wb-*` tokens at the old theme — the "dark attribute, light palette"
+state that produced a white composer with white text. The store now installs a
+`MutationObserver` on `documentElement`, recognises external flips (its own
+writes are filtered through `lastAppliedType`), and re-resolves the theme
+through the normal path.
+
 ## 5. FOUC prevention
 
 `initializeThemeSync()` (exported from `@openbuddy/ui-theme/client`) paints the
@@ -130,6 +168,21 @@ which kept React 19 from logging a console error on every render.
 It is rendered from the settings panel (`个性化 → 主题库（19 套）`) and may be
 dropped anywhere else — it manages its own portal and outside-click handling.
 
+## 6b. Brand accent invariant
+
+`--wb-accent` for the brand-anchored themes (`openbuddy`, `openbuddy-dark`) and
+for both base blocks is `BRAND_ACCENT_OKLCH` — an OKLCh representation that
+round-trips **exactly** to the brand teal `#00C29A` (`rgb(0, 194, 154)`).
+
+> Regression this guards: the palette briefly used `oklch(0.72 0.135 165)`,
+> which is `rgb(55, 191, 143)` — a desaturated mint, *not* the brand colour.
+> Because the store writes `--wb-accent` inline it overrode
+> `src/styles/tokens.css`'s `--wb-accent: var(--wb-brand-primary)` (`#00C29A`),
+> so every accent surface (active indicators, focus outlines, the branch
+> navigator) drifted grey-green while the ThemePicker swatch still displayed
+> `#00C29A`. `BRAND_ACCENT_OKLCH` is the single source of truth;
+> `src/__tests__/brand-accent.test.ts` asserts the round-trip.
+
 ## 7. Fonts
 
 Each theme may declare `font` / `headingFont`. Only the active theme's families
@@ -143,7 +196,7 @@ swapped rather than accumulated.
 
 1. Append a `ThemeDefinition` to `THEMES` in `themes.ts`.
 2. Add the name to the `ThemeName` union.
-3. Run `pnpm vitest run packages/ui/openbuddy-ui-theme` — the "all 17 themes
+3. Run `pnpm vitest run packages/ui/openbuddy-ui-theme` — the "all 19 themes
    apply" suite automatically covers the new entry once the union grows.
 
 ## 9. Roadmap

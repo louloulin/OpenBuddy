@@ -116,7 +116,12 @@ export function useStoreName(): ThemeName | null {
   return getStoredThemeName();
 }
 
-export { getStoredThemeMode, getStoredThemePair, getThemeByName };
+export {
+  getStoredThemeName,
+  getStoredThemeMode,
+  getStoredThemePair,
+  getThemeByName,
+};
 
 // Re-export the React UI building blocks for ergonomic imports:
 //   import { ThemePicker, ThemeInitializer } from "@openbuddy/ui-theme/client";

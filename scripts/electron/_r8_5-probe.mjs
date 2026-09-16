@@ -5,8 +5,10 @@
  * computed-style + structural evidence:
  *
  *   - shell.css painted (.app, .app__body, .main-topbar when present)
- *   - light-theme composer textarea reads as bg-primary with dark text
- *   - dark-theme composer bg flips correctly via data-theme="dark"
+ *   - composer textarea is transparent in BOTH themes (it sits on the
+ *     composer card, which owns the surface) and only the text colour flips
+ *   - dark-theme composer card + app shell flip to dark surfaces via
+ *     data-theme="dark"
  *   - R8.2 toolcall polish: at least one .toolcall with --compact, ok/err/run
  *     modifier, status-mark class, data-duration-ms attribute
  *   - R8.0 LoadingRow: 3 dots + duration + shining-text span (synthesized
@@ -66,6 +68,16 @@ report.composer_textarea_light = await probe(
   "textarea",
   ["background-color", "color", "border-color", "font-size"],
 );
+report.composer_input_light = await probe(
+  "light composer input",
+  ".wb-composer__input",
+  ["background-color", "color"],
+);
+report.composer_card_light = await probe(
+  "light composer card",
+  ".wb-composer",
+  ["background-color", "border-color"],
+);
 
 // === Switch to dark theme ===
 await page.evaluate(() => {
@@ -78,6 +90,16 @@ report.composer_textarea_dark = await probe(
   "textarea",
   ["background-color", "color"],
 );
+report.composer_input_dark = await probe(
+  "dark composer input",
+  ".wb-composer__input",
+  ["background-color", "color"],
+);
+report.composer_card_dark = await probe(
+  "dark composer card",
+  ".wb-composer",
+  ["background-color", "border-color"],
+);
 report.shell_app_dark = await probe(
   "app shell dark",
   ".app",
@@ -85,9 +107,14 @@ report.shell_app_dark = await probe(
 );
 
 // === Switch back to light ===
+// 显式写回 "light" 而不是 removeAttribute():theme-store 的 data-theme 兼容桥
+// 把"外部写入 data-theme"当成一次真实输入重新解析配色。移除属性对 store 来说
+// 是"未知值 → 忽略",而 [data-theme="dark"] 的后代选择器会立刻失效,反而
+// 留下"属性没了、配色还是暗的"的不一致状态。这里直接用 light 表达意图。
 await page.evaluate(() => {
-  document.documentElement.removeAttribute("data-theme");
+  document.documentElement.setAttribute("data-theme", "light");
 });
+await page.waitForTimeout(200);
 
 // === Inject synthetic DOM contracts for the rest ===
 // We can verify markup/CSS by mounting test-only nodes that mirror the
@@ -567,9 +594,16 @@ report.r88_branch_navigator = await page.evaluate(() => {
   const root = document.querySelector("#r8-5-synth .branch-navigator");
   if (!root) return { found: false };
   const active = root.querySelector(".branch-navigator__node-button--active");
+  // getComputedStyle 对 CSS Color 4 语法(oklch)会原样回传,不做 sRGB 折算,
+  // 所以这里同时报告 `--wb-accent` 这个 token 本身 —— 测试断言"描边颜色 ==
+  // accent token",再由 brand-accent.test.ts 把 token 锁死到 #00C29A。
+  const accent = getComputedStyle(document.documentElement)
+    .getPropertyValue("--wb-accent")
+    .trim();
   return {
     found: true,
     activeOutline: active ? getComputedStyle(active).getPropertyValue("outline").trim() : null,
+    accentToken: accent,
   };
 });
 report.r88_rewind_bar = await page.evaluate(() => {

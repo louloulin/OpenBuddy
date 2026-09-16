@@ -48,6 +48,18 @@ export interface ThemeDefinition {
   vars: Record<string, string>;
 }
 
+/**
+ * 品牌色 `#00C29A` 的 OKLCh 等价表示(精确往返:oklch→sRGB 取整后仍是
+ * 0/194/154,见 __tests__/brand-accent.test.ts)。
+ *
+ * 之前 `--wb-accent` 在主题里被写成 `oklch(0.72 0.135 165)`(= rgb(55,191,143)),
+ * 那是一个**被去饱和过的薄荷绿**,并不是品牌色。后果:`src/styles/tokens.css`
+ * 里 `--wb-accent: var(--wb-brand-primary)`(=`#00C29A`)被主题的内联值盖掉,
+ * 全站强调色(选中描边、激活指示条)从品牌青绿漂成灰绿,ThemePicker 的色板
+ * 却仍然显示 `#00C29A` —— 色板和实际不符。这里定义成唯一真源,两边都引用它。
+ */
+export const BRAND_ACCENT_OKLCH = "oklch(0.7246 0.142 171)";
+
 // ─── Base token blocks ───────────────────────────────────────────────
 export const LIGHT_BASE: Record<string, string> = {
   "--wb-bg-primary": "oklch(0.995 0 0)",
@@ -60,8 +72,8 @@ export const LIGHT_BASE: Record<string, string> = {
   "--wb-fg-tertiary": "oklch(0.6 0 0)",
   "--wb-border": "oklch(0.9 0 0)",
   "--wb-border-soft": "oklch(0.93 0 0)",
-  "--wb-accent": "oklch(0.7 0.13 165)",
-  "--wb-accent-soft": "oklch(0.7 0.13 165 / 0.12)",
+  "--wb-accent": BRAND_ACCENT_OKLCH,
+  "--wb-accent-soft": "oklch(0.7246 0.142 171 / 0.12)",
   "--wb-accent-fg": "oklch(0.99 0 0)",
   "--wb-danger": "oklch(0.55 0.2 25)",
   "--wb-success": "oklch(0.6 0.15 145)",
@@ -90,8 +102,8 @@ export const DARK_BASE: Record<string, string> = {
   "--wb-fg-tertiary": "oklch(0.55 0 0)",
   "--wb-border": "oklch(0.32 0 0)",
   "--wb-border-soft": "oklch(0.28 0 0)",
-  "--wb-accent": "oklch(0.74 0.14 165)",
-  "--wb-accent-soft": "oklch(0.74 0.14 165 / 0.16)",
+  "--wb-accent": BRAND_ACCENT_OKLCH,
+  "--wb-accent-soft": "oklch(0.7246 0.142 171 / 0.16)",
   "--wb-accent-fg": "oklch(0.13 0 0)",
   "--wb-danger": "oklch(0.7 0.2 25)",
   "--wb-success": "oklch(0.7 0.16 145)",
@@ -129,8 +141,8 @@ export const THEMES: ReadonlyArray<ThemeDefinition> = [
       "--wb-fg-tertiary": "oklch(0.58 0.015 240)",
       "--wb-border": "oklch(0.88 0.01 165)",
       "--wb-border-soft": "oklch(0.92 0.008 165)",
-      "--wb-accent": "oklch(0.72 0.135 165)",
-      "--wb-accent-soft": "oklch(0.72 0.135 165 / 0.14)",
+      "--wb-accent": BRAND_ACCENT_OKLCH,
+      "--wb-accent-soft": "oklch(0.7246 0.142 171 / 0.14)",
       "--wb-accent-fg": "oklch(0.99 0.005 165)",
       "--wb-danger": "oklch(0.55 0.2 25)",
       "--wb-success": "oklch(0.65 0.15 150)",
@@ -155,8 +167,8 @@ export const THEMES: ReadonlyArray<ThemeDefinition> = [
       "--wb-fg-tertiary": "oklch(0.6 0.01 165)",
       "--wb-border": "oklch(0.32 0.01 240)",
       "--wb-border-soft": "oklch(0.28 0.01 240)",
-      "--wb-accent": "oklch(0.76 0.14 165)",
-      "--wb-accent-soft": "oklch(0.76 0.14 165 / 0.18)",
+      "--wb-accent": BRAND_ACCENT_OKLCH,
+      "--wb-accent-soft": "oklch(0.7246 0.142 171 / 0.18)",
       "--wb-accent-fg": "oklch(0.13 0.01 240)",
       "--wb-danger": "oklch(0.7 0.2 25)",
       "--wb-success": "oklch(0.72 0.16 150)",

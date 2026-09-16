@@ -19,6 +19,7 @@ import {
   extractGoogleFontFamily,
   buildFontStylesheetUrl,
   getThemeByName,
+  resolveVars,
   type ThemeDefinition,
   type ThemeName,
   type ThemeType,
@@ -142,19 +143,39 @@ export function loadThemeFonts(theme: ThemeDefinition | null): void {
 }
 
 // ─── Apply CSS variables + attributes ───────────────────────────────
+//
+// 必须落下 "base + theme.vars" 的**完整**集合,而不是只落 theme.vars:
+// theme.vars 只是 delta,像 `--wb-bg-overlay` / `--wb-shadow*` / `--wb-font`
+// 只在 LIGHT_BASE / DARK_BASE 里。只写 delta 会让这些 token 停留在上一个
+// 主题的内联值上 —— 浅色画布配深色遮罩、深色画布配浅色阴影,以及最典型的
+// win95/winxp 的 `--wb-radius-*: 0` 会一路泄漏到之后的每一套主题(圆角
+// 永远变不回来,因为内联值永远压过 index.css 里的 `:root` 兜底)。
 function applyThemeAttrs(theme: ThemeDefinition | null): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   if (!theme) {
+    lastAppliedType = null;
     root.removeAttribute("data-theme-name");
     loadThemeFonts(null);
     return;
   }
+  lastAppliedType = theme.type;
   root.setAttribute("data-theme", theme.type);
   root.setAttribute("data-theme-name", theme.name);
-  for (const [k, v] of Object.entries(theme.vars)) {
+  const vars = resolveVars(theme.name);
+  const seen = new Set<string>();
+  for (const [k, v] of Object.entries(vars)) {
+    seen.add(k);
     root.style.setProperty(k, v);
   }
+  // 上一个主题写过、这一套不再提供的 token 必须显式清掉,否则它们会继续
+  // 以"更高优先级的内联值"身份生效(见上面的圆角泄漏)。
+  for (const k of lastAppliedKeys) {
+    if (!seen.has(k)) root.style.removeProperty(k);
+  }
+  lastAppliedKeys = [...seen];
+  // 字体按主题懒加载:一次只挂当前主题用到的 family,而不是把 19 套主题的
+  // 30+ 字体全塞进 <head>(会拖慢首屏 LCP)。
   loadThemeFonts(theme);
 }
 
@@ -199,6 +220,50 @@ export interface ThemeStoreInternal extends ThemeService {
   __theme(): ThemeDefinition | null;
 }
 
+// ─── v1 `data-theme` compatibility bridge ──────────────────────────
+//
+// The theme store writes its resolved OKLCh palette as *inline* custom
+// properties on `documentElement`. Inline values outrank any stylesheet rule,
+// including `[data-theme="dark"] { --wb-bg-elevated: … }`. That means flipping
+// the legacy `data-theme` attribute on its own (which the v1 contract exposes
+// as `Theme = "light" | "dark" | "system"`, and which third-party plugins and
+// older call sites still do) left every `--wb-*` token at the *previous*
+// theme's value. Flipping to dark that way produced a white composer with
+// white text — invisible input.
+//
+// Rather than dropping the attribute, treat it as a real input: observe
+// external writes and re-resolve the theme through the normal path. Our own
+// writes are recognised via `lastAppliedType` so the observer never fights
+// `applyThemeAttrs`.
+type CompatListener = (type: ThemeType) => void;
+
+let lastAppliedType: ThemeType | null = null;
+/** Keys written by the previous apply — used to remove stale tokens. */
+let lastAppliedKeys: string[] = [];
+const compatListeners = new Set<CompatListener>();
+let compatObserver: MutationObserver | null = null;
+
+function installCompatObserver(): void {
+  if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
+  if (compatObserver) return;
+  compatObserver = new MutationObserver(() => {
+    const raw = document.documentElement.getAttribute("data-theme");
+    if (raw !== "dark" && raw !== "light") return; // removal / unknown → ignore
+    if (raw === lastAppliedType) return; // our own write
+    for (const fn of compatListeners) {
+      try {
+        fn(raw);
+      } catch {
+        /* a broken listener must not stop the others */
+      }
+    }
+  });
+  compatObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+}
+
 export function createThemeStore(): ThemeStoreInternal {
   const listeners = new Set<() => void>();
   let pref: ThemePreference = readPreference();
@@ -211,6 +276,10 @@ export function createThemeStore(): ThemeStoreInternal {
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = (e: MediaQueryListEvent) => {
       systemDark = e.matches;
+      // Match-system 模式下 palette 完全由 systemDark 决定,只 notify() 会让
+      // currentName() 变了、documentElement 上的 OKLCh 变量还是旧值 ——
+      // 组件重渲染读到的是旧配色。所以这里必须真的重新落一遍。
+      applyThemeAttrs(activeTheme());
       notify();
     };
     mql.addEventListener("change", onChange);
@@ -251,6 +320,28 @@ export function createThemeStore(): ThemeStoreInternal {
     setPreference(theme) {
       pref = theme;
       safeSet(STORAGE_KEY, theme);
+      if (theme === "system") {
+        // v1 语义:system = 跟随操作系统,交给系统深/浅色决定。
+        mode = "system";
+        safeSet(STORAGE_MODE_KEY, "system");
+      } else if (activeTheme()?.type !== theme) {
+        // v1 契约:`setPreference("light"|"dark")` 必须真的改变配色。v2 的
+        // 配色由 mode + name 决定,所以这里要把它们一起写上 —— 否则
+        // `preference()` 说 dark、`--wb-*` 还停在浅色,调用方(设置面板的
+        // 浅色/深色按钮、宿主 IDE 的 colorScheme 同步)看起来"点了没反应"。
+        mode = "manual";
+        safeSet(STORAGE_MODE_KEY, "manual");
+        if (name !== null) {
+          // 只有在"已有一个类型不对的命名主题"时才需要钉一个具体名字。
+          // 没存名字时 pref 本身就足以解析出正确的类型,此时保持 name 为
+          // null —— 否则这次写入会被误当成"用户做过显式选择",让宿主 IDE
+          // 的 colorScheme 同步在之后每次启动都被判定为"要尊重用户选择"
+          // 而被挡掉。
+          const nextName = theme === "dark" ? pair.dark : pair.light;
+          name = nextName;
+          safeSet(STORAGE_NAME_KEY, nextName);
+        }
+      }
       applyThemeAttrs(activeTheme());
       notify();
     },
@@ -312,7 +403,30 @@ export function createThemeStore(): ThemeStoreInternal {
   };
 
   // Apply on construction so documentElement is correct before first paint.
+  //
+  // `lastAppliedType` 也要在这里落地:observer 靠它区分"我们自己写的
+  // data-theme"和"外部(插件 / IDE 桥接 / 测试)改的 data-theme",不初始化
+  // 的话第一次外部翻转会被误判成自写而吞掉。
+  lastAppliedType = activeTheme()?.type ?? null;
   applyThemeAttrs(activeTheme());
+
+  // ── v1 `data-theme` 兼容桥 ──────────────────────────────────────
+  // 外部直接改 data-theme(旧插件、宿主桥接)时,内联 OKLCh 变量不会跟着变,
+  // 于是"属性说 dark、配色还是 light"。这里把它当成一次真正的输入,走正常
+  // 解析路径重算,而不是把属性删掉了事 —— 因为 `[data-theme="dark"] .foo`
+  // 这类后代选择器在 30 个 ui-* 包里被大量使用,属性本身是有意义的。
+  const onCompatFlip: CompatListener = (type) => {
+    if (activeTheme()?.type === type) return; // already there
+    const nextName = type === "dark" ? pair.dark : pair.light;
+    name = nextName;
+    safeSet(STORAGE_NAME_KEY, nextName);
+    mode = "manual";
+    safeSet(STORAGE_MODE_KEY, "manual");
+    applyThemeAttrs(getThemeByName(nextName));
+    notify();
+  };
+  compatListeners.add(onCompatFlip);
+  installCompatObserver();
 
   return Object.assign(service, {
     __theme: () => activeTheme(),
