@@ -85,7 +85,14 @@ export default defineExtension({
 
 ## Recipe 3: 注册 Slash 命令
 
-注册一个 `/greet <name>` 命令，在 Composer 输入后触发执行。
+注册一个 `/greet <name>` 命令。它有两个入口，都会真的执行你的 `onExecute`：
+
+- **Composer 的 `/` 补全菜单**：输入 `/gr` 出现 `/greet`（同名时 Pi 自带命令优先），
+  补全后输入参数再回车即可发送 —— 发送路径会把 `/greet Alice` 识别成插件命令，
+  用 `{ args: "Alice" }` 调用你的回调，**不会**把这段文本当成 prompt 发给模型。
+- **⌘K 命令面板**：打开就能看到命令，回车直接执行（带参数时用 `/greet Alice`）。
+
+两条路径都要求插件命令是渲染端动作，所以请在 `onExecute` 里完成全部工作。
 
 ### `manifest.json`
 

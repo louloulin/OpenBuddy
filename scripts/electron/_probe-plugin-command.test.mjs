@@ -61,6 +61,21 @@ describe.skipIf(!canLaunch)("live electron probe: 插件命令 → ⌘K → 执�
     expect(report.afterEnter.panelOpen).toBe(false);
   });
 
+  it("Composer 的 `/` 菜单也列插件命令,发送时由插件执行(不发 agent)", () => {
+    const report = runProbe();
+    expect(report.composer.hasComposer).toBe(true);
+    expect(report.composerPicker.open).toBe(true);
+    expect(report.composerPicker.names).toContain("/greet");
+    // 第一次是 ⌘K 的 /greet Alice,第二次是 Composer 输入的 /greet ComposerArgs ——
+    // 后者证明发送路径把命令分流给了插件,而不是当成 prompt 发出去。
+    expect(report.composerSend.calls).toEqual([
+      { id: "greet", args: "Alice" },
+      { id: "greet", args: "ComposerArgs" },
+    ]);
+    // 执行后输入框应被清空(命令是动作,不是待发送文本)。
+    expect(report.composerSend.inputValue).toBe("");
+  });
+
   it("没有页面错误", () => {
     const report = runProbe();
     expect(report.pageErrors).toEqual([]);

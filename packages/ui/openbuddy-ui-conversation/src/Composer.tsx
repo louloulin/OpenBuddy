@@ -21,7 +21,13 @@ import {
 } from "@/lib/ui/input-history";
 import { WorkspacePicker } from "@openbuddy/ui-shell";
 import { PermissionPicker } from "@openbuddy/ui-shared";
-import { SlashCommands } from "@openbuddy/ui-workbench";
+import {
+  SlashCommands,
+  NATIVE_PI_COMMANDS,
+  matchPluginSlashCommand,
+  runPluginCommand,
+  type PluginCommandPayload,
+} from "@openbuddy/ui-workbench";
 import { InputAddMenu } from "./InputAddMenu";
 import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
 import { RendererSlotView } from "@openbuddy/ui-workbench";
@@ -509,6 +515,26 @@ export function ComposerInner({
     const t = text.trim();
     // 允许空消息发送，或者需要有附件
     if (streaming || disabled || !apiReady) return;
+    // 插件命令优先:它是渲染端动作,把 "/greet Alice" 当 prompt 发出去只会得到
+    // 一句模型编的回话。带附件/图片时不拦截 —— 那种情况用户显然想发给 agent。
+    // 保留名单里的名字(plan / fork / …)永远归 Pi,插件同名也不许截胡。
+    if (attachments.length === 0 && images.length === 0 && t.startsWith("/")) {
+      const hit = matchPluginSlashCommand(
+        t,
+        pluginCommands,
+        NATIVE_PI_COMMANDS.map((command) => command.name),
+      );
+      if (hit) {
+        runPluginCommand(hit.command, hit.args, (error) =>
+          onToast?.(
+            `插件命令 /${hit.command.id} 执行失败:${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+        updateText("");
+        setCursorPos(0);
+        return;
+      }
+    }
     // Append attachment paths to the prompt text so pi's read_file tool can
     // pick them up (ACP image/audio needs agent-declared capabilities we
     // don't model yet; ResourceLink behavior is unverified — text is safest).
@@ -703,6 +729,13 @@ export function ComposerInner({
     onClick?: (ctx: { insertText: (text: string) => void }) => void;
     onActivate?: () => void;
   }>("composer.toolbar.action");
+
+  /**
+   * Plugin SDK 注册的命令(内核 `plugin.command` 的数据型 payload)。
+   * 它们既能出现在 `/` 补全菜单里,也在发送路径上被识别成「渲染端动作」而不是
+   * 要发给 agent 的 prompt —— 否则插件注册的命令永远只能靠 ⌘K 才能执行。
+   */
+  const pluginCommands = useSlotPayloads<PluginCommandPayload>("plugin.command");
 
   // Cursor tracking for slash-command autocomplete.
   const [cursorPos, setCursorPos] = useState(0);
@@ -1115,6 +1148,7 @@ export function ComposerInner({
         <SlashCommands
           text={text}
           cursor={cursorPos}
+          pluginCommands={pluginCommands}
           onPick={handleSlashPick}
           anchorRect={anchorRect}
         />

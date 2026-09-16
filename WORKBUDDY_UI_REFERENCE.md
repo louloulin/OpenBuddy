@@ -1028,9 +1028,23 @@ can replace it",但实际既没注册也没消费(宿主直接 `import`)。现�
 | `placeholder.experts` | ui-experts | `PlaceholderPage` 直接 import 了 `ExpertsPanel`,槽位空转 |
 | `root` | ui-layout | `AppFrame` 的子槽,AppFrame 本身未在本产品外壳中使用 |
 
-下一项可做的接线:**Composer 的 `/` 菜单认 `plugin.command`**。目前 Composer 的
-slash 补全只列 Pi 自带命令 + 渲染端 contribution(`insertText` 模板),SDK 命令要靠 ⌘K
-执行;两者打通需要在发送路径上按命令名分流(并保证不抢 Pi 的命令名)。
+### R19.5 Composer 的 `/` 菜单也认 `plugin.command`
+
+`docs/EXTENSION_RECIPES.md` 的 Recipe 3 承诺「`/greet` 在 Composer 输入后触发执行」,
+但补全菜单只列 Pi 自带命令 + 渲染端 contribution(那类只是 `insertText` 文本模板),
+SDK 命令实际只能靠 ⌘K 执行 —— 文档与行为不一致。现在两条入口都通:
+
+- `<SlashCommands pluginCommands>`:SDK 命令进补全菜单,id 作命令名、label 作描述;
+  同名时 **Pi 赢**(去重顺序与发送路径的保留名单一致);
+- **发送路径分流**:`send()` 里 `/greet Alice` 命中 `plugin.command` 就调用插件的
+  `onExecute({ args: "Alice" })`、清空输入框、**不发给 agent**。保留名单
+  (`NATIVE_PI_COMMANDS`:plan / fork / tree / label / compact / reload / session)里的
+  名字永远归 Pi,插件同名不截胡;带附件/图片时不拦截(那种情况用户显然想发给 agent);
+- 规则在 `matchPluginSlashCommand(text, commands, reserved)` 里,纯函数、可单测。
+
+真机验证:`_probe-plugin-command.mjs` 第 5 段 —— 在 Composer 输入 `/gre` 弹出补全菜单
+(含 `/greet`),继续输入参数后回车,断言插件回调收到 `{ args: "ComposerArgs" }`
+且输入框被清空。
 
 `shell.overlay` / `notifications` / `details` 标为 `ext`:它们的消费者是 ui-layout 的
 `AppFrame`(整壳实现),而本产品外壳走命名 `overlay.*` slot 路径。**这是一个待决策项**:

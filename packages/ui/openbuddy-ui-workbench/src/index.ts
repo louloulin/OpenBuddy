@@ -21,6 +21,7 @@ export type { SlotMap };
 export { SearchOverlay } from "./SearchOverlay";
 export {
   filterPluginCommands,
+  matchPluginSlashCommand,
   parseSlashQuery,
   pluginCommandLabel,
   runPluginCommand,
@@ -42,7 +43,7 @@ export { ProjectDetailView } from "./ProjectDetailView";
 export { RecoveryList } from "./RecoveryList";
 export { RendererContributionView, RendererContributionCard, RendererSlotView } from "./RendererContributionView";
 export { ShareMenu } from "./ShareMenu";
-export { SlashCommands, slashCommandsKeyHandler } from "./SlashCommands";
+export { SlashCommands, slashCommandsKeyHandler, NATIVE_PI_COMMANDS } from "./SlashCommands";
 export { TeamStatusView } from "./TeamStatusView";
 export { WorkflowBlackboard, computeWorkflowLevels } from "./WorkflowBlackboard";
 export type { WorkflowBlackboardProps } from "./WorkflowBlackboard";

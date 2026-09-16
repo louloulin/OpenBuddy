@@ -92,6 +92,41 @@ report.afterEnter = await page.evaluate(() => ({
   panelOpen: Boolean(document.querySelector(".conversation-search-modal")),
 }));
 
+// 5) Composer 的 `/` 菜单:插件命令也要出现在里面,并在发送路径上执行
+await page.evaluate(() => {
+  document.querySelector(".conversation-search-modal__close")?.click();
+});
+await page.waitForTimeout(500);
+report.composer = await page.evaluate(() => {
+  const textarea = document.querySelector(".wb-composer__input, textarea");
+  return { hasComposer: Boolean(textarea) };
+});
+if (report.composer.hasComposer) {
+  await page.evaluate(() => {
+    const textarea = document.querySelector(".wb-composer__input, textarea");
+    textarea.focus();
+  });
+  await page.keyboard.type("/gre");
+  await page.waitForTimeout(600);
+  report.composerPicker = await page.evaluate(() => {
+    const menu = document.querySelector(".slash-commands");
+    return {
+      open: Boolean(menu),
+      names: Array.from(document.querySelectorAll(".slash-commands__name")).map((el) =>
+        (el.textContent || "").trim(),
+      ),
+    };
+  });
+  await page.keyboard.type("et ComposerArgs");
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(500);
+  report.composerSend = await page.evaluate(() => ({
+    calls: window.__ob_cmd_calls ?? [],
+    inputValue: document.querySelector(".wb-composer__input, textarea")?.value ?? null,
+  }));
+}
+
 report.pageErrors = pageErrors;
 console.log(JSON.stringify(report));
 await app.close();

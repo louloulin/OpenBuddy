@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { commandsList } from "@/lib/agent/pi-client";
 import type { SlashCommand } from "@openbuddy/shared-types";
+import { pluginCommandLabel, type PluginCommandPayload } from "./plugin-commands";
 import { useRendererContributions } from "@/lib/runtime/renderer-plugin-runtime";
 
 interface SlashCommandsProps {
@@ -22,24 +23,29 @@ interface SlashCommandsProps {
    *  by the composer input card's `overflow: hidden` and always floats above
    *  sibling toolbars (e.g. the + / skills / file picker row). */
   anchorRect?: DOMRect | null;
+  /**
+   * Plugin SDK 注册的命令(内核 `plugin.command` 的数据型 payload)。
+   * 由宿主注入 —— 它们排在 Pi 命令之后,同名时 Pi 赢(与发送路径的保留名单一致)。
+   */
+  pluginCommands?: readonly PluginCommandPayload[];
 }
 
-export function SlashCommands({ text, cursor, onPick, anchorRect }: SlashCommandsProps) {
-  const [commands, setCommands] = useState<SlashCommand[]>([]);
+/**
+ * Pi 自带的命令。总是出现在补全菜单里,这样动态列表还没加载完时 picker 也是可用的。
+ * 导出给宿主用:发送路径靠这份名单判断「这个 /xxx 归 Pi,插件不许截胡」。
+ */
+export const NATIVE_PI_COMMANDS: SlashCommand[] = [
+  { name: "plan", description: "切换计划模式(让 agent 先写计划再执行)", source: "Pi" },
+  { name: "fork", description: "从当前用户消息分叉出一个新会话", source: "Pi" },
+  { name: "tree", description: "在会话树中浏览/导航(支持搜索和书签)", source: "Pi" },
+  { name: "label", description: "为当前轮次添加书签(label)", source: "Pi" },
+  { name: "compact", description: "手动压缩当前会话的上下文", source: "Pi" },
+  { name: "reload", description: "热重载扩展、技能、主题和快捷键", source: "Pi" },
+  { name: "session", description: "显示当前会话信息(id / 消息数 / tokens)", source: "Pi" },
+];
 
-  // R1 - native Pi commands that should always appear in the picker so the
-  // user can discover them even when the dynamic list hasn't loaded yet.
-  // Pi's resource loader registers these as real commands; we just surface
-  // them so the picker is useful from the first keystroke.
-  const NATIVE_PI_COMMANDS: SlashCommand[] = [
-    { name: "plan", description: "切换计划模式(让 agent 先写计划再执行)", source: "Pi" },
-    { name: "fork", description: "从当前用户消息分叉出一个新会话", source: "Pi" },
-    { name: "tree", description: "在会话树中浏览/导航(支持搜索和书签)", source: "Pi" },
-    { name: "label", description: "为当前轮次添加书签(label)", source: "Pi" },
-    { name: "compact", description: "手动压缩当前会话的上下文", source: "Pi" },
-    { name: "reload", description: "热重载扩展、技能、主题和快捷键", source: "Pi" },
-    { name: "session", description: "显示当前会话信息(id / 消息数 / tokens)", source: "Pi" },
-  ];
+export function SlashCommands({ text, cursor, onPick, anchorRect, pluginCommands }: SlashCommandsProps) {
+  const [commands, setCommands] = useState<SlashCommand[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
   const pluginCommandContributions = useRendererContributions("command");
   const loadedRef = useRef(false);
@@ -66,14 +72,24 @@ export function SlashCommands({ text, cursor, onPick, anchorRect }: SlashCommand
       return { visible: false, query: "", matches: [] as SlashCommand[] };
     }
     const q = word.slice(1).toLowerCase();
-    const pluginCommands = pluginCommandContributions.flatMap((contribution) => {
+    // 两类「插件」来源:
+    //   - 渲染端 contribution:只是插入文本的模板(insertText);
+    //   - Plugin SDK 命令(plugin.command):回车由插件在渲染端执行的动作。
+    const contributionCommands = pluginCommandContributions.flatMap((contribution) => {
       const payload = contribution.payload;
       const raw = payload.command ?? payload.insertText;
       if (typeof raw !== "string") return [];
       const name = raw.replace(/^\//, "").split(/\s/, 1)[0];
       return name ? [{ name, description: payload.description, source: "插件", isAdapter: false, pluginContribution: contribution }] : [];
     });
-    const available = [...NATIVE_PI_COMMANDS, ...commands, ...pluginCommands].filter((command, index, list) =>
+    const sdkCommands = (pluginCommands ?? []).map((command) => ({
+      name: command.id,
+      description: pluginCommandLabel(command),
+      source: "插件",
+      isAdapter: false,
+    }));
+    // Pi 优先:同名时 Pi 的实现赢(发送路径用同一份名单判保留)。
+    const available = [...NATIVE_PI_COMMANDS, ...commands, ...contributionCommands, ...sdkCommands].filter((command, index, list) =>
       list.findIndex((candidate) => candidate.name === command.name) === index,
     );
     const m = available.filter(
@@ -83,7 +99,7 @@ export function SlashCommands({ text, cursor, onPick, anchorRect }: SlashCommand
         (c.description ?? "").toLowerCase().includes(q),
     );
     return { visible: m.length > 0, query: q, matches: m };
-  }, [text, cursor, commands, pluginCommandContributions]);
+  }, [text, cursor, commands, pluginCommandContributions, pluginCommands]);
 
   useEffect(() => {
     setActiveIdx(0);

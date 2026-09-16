@@ -87,3 +87,27 @@ export function runPluginCommand(
     onError?.(error);
   }
 }
+
+/**
+ * 把「用户按了回车的那段文本」解析成一条待执行的插件命令。
+ *
+ * 用于 Composer:`/greet Alice` 是**命令调用**,不该当作 prompt 发给 agent。
+ *
+ * 为什么需要 `reserved`:`/plan`、`/fork` 这类名字归 Pi 所有,插件万一取了同名 id,
+ * 不能在发送路径上把 Pi 的命令截胡 —— 与 `/` 菜单里「Pi 优先」的展示顺序保持一致。
+ * 大小写不敏感(id 都按小写比对)。
+ */
+export function matchPluginSlashCommand(
+  text: string,
+  commands: readonly PluginCommandPayload[],
+  reserved: readonly string[] = [],
+): { command: PluginCommandPayload; args: string } | null {
+  const slash = parseSlashQuery(text);
+  if (!slash || !slash.commandId) return null;
+  const name = slash.commandId.toLowerCase();
+  const reservedSet = new Set(reserved.map((r) => r.toLowerCase()));
+  if (reservedSet.has(name)) return null;
+  const command = commands.find((c) => typeof c?.id === "string" && c.id.toLowerCase() === name);
+  if (!command) return null;
+  return { command, args: slash.args };
+}

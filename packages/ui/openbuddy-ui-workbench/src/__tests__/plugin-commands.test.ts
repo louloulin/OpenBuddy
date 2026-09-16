@@ -7,6 +7,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   filterPluginCommands,
+  matchPluginSlashCommand,
   parseSlashQuery,
   pluginCommandLabel,
   runPluginCommand,
@@ -95,5 +96,36 @@ describe("runPluginCommand", () => {
 
   it("没有 onExecute 时是 no-op", () => {
     expect(() => runPluginCommand({ id: "noop" })).not.toThrow();
+  });
+});
+
+describe("matchPluginSlashCommand — 发送路径分流", () => {
+  const cmds: PluginCommandPayload[] = [
+    { id: "greet", label: "/greet — 输出问候" },
+    { id: "plan", label: "/plan(插件也注册了同名)" },
+  ];
+
+  it("命中插件命令时返回命令 + args", () => {
+    const hit = matchPluginSlashCommand("/greet Alice", cmds);
+    expect(hit?.command.id).toBe("greet");
+    expect(hit?.args).toBe("Alice");
+  });
+
+  it("大小写不敏感", () => {
+    expect(matchPluginSlashCommand("/GREET", cmds)?.command.id).toBe("greet");
+  });
+
+  it("保留名单里的名字归 Pi — 插件同名也不许截胡", () => {
+    expect(matchPluginSlashCommand("/plan", cmds, ["plan", "fork"])).toBeNull();
+  });
+
+  it("保留名单大小写不敏感", () => {
+    expect(matchPluginSlashCommand("/PLAN", cmds, ["plan"])).toBeNull();
+  });
+
+  it("不是命令调用 / 未注册的 id → null(照常发给 agent)", () => {
+    expect(matchPluginSlashCommand("你好", cmds)).toBeNull();
+    expect(matchPluginSlashCommand("/unknown", cmds)).toBeNull();
+    expect(matchPluginSlashCommand("/", cmds)).toBeNull();
   });
 });
