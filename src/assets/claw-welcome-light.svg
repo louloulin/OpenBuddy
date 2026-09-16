@@ -1,27 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="OpenBuddy">
-  <!-- welcome-state hero: light bg friendly mascot -->
   <defs>
     <linearGradient id="fur" x1="0" y1="0" x2="1" y2="1">
       <stop stop-color="#7BFFE0"/>
-      <stop offset=".55" stop-color="#00C29A"/>
-      <stop offset="1" stop-color="#008C75"/>
+      <stop stop-color="#00C29A"/>
+      <stop offset="1" stop-color="#00755F"/>
     </linearGradient>
     <linearGradient id="muzzle" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#E8FFF7"/>
+      <stop stop-color="#F0FFF9"/>
       <stop offset="1" stop-color="#A8E8D4"/>
     </linearGradient>
+    <radialGradient id="eyeG" cx="50%" cy="50%" r="50%">
+      <stop stop-color="#5BFFD0"/>
+      <stop stop-color="#0A2A28" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <path d="M52 56 Q72 16 106 36 Q92 100 70 124 Z" fill="url(#fur)"/>
-  <path d="M188 56 Q168 16 134 36 Q148 100 170 124 Z" fill="url(#fur)"/>
-  <rect x="60" y="64" width="120" height="120" rx="56" fill="url(#fur)"/>
-  <ellipse cx="120" cy="158" rx="48" ry="32" fill="url(#muzzle)"/>
-  <circle cx="94" cy="118" r="10" fill="#06151A"/>
-  <circle cx="146" cy="118" r="10" fill="#06151A"/>
-  <circle cx="97" cy="115" r="3.2" fill="#FFFFFF"/>
-  <circle cx="149" cy="115" r="3.2" fill="#FFFFFF"/>
-  <path d="M114 148 Q114 142 120 142 Q126 142 126 148 Q126 155 120 159 Q114 155 114 148 Z" fill="#06151A"/>
-  <path d="M120 160 L128 166" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
-  <path d="M120 166 Q108 178 100 170" fill="none" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
-  <path d="M120 166 Q132 178 140 170" fill="none" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
-  <circle cx="206" cy="48" r="10" fill="#FFFFFF"/>
+  <path d="M50 56 Q70 12 106 36 Q92 100 70 124 Z" fill="url(#fur)"/>
+  <path d="M190 56 Q170 12 134 36 Q148 100 170 124 Z" fill="url(#fur)"/>
+  <rect x="58" y="64" width="124" height="124" rx="60" fill="url(#fur)"/>
+  <ellipse cx="120" cy="158" rx="50" ry="34" fill="url(#muzzle)"/>
+  <circle cx="94" cy="118" r="16" fill="url(#eyeG)"/>
+  <circle cx="146" cy="118" r="16" fill="url(#eyeG)"/>
+  <circle cx="94" cy="118" r="11" fill="#06151A"/>
+  <circle cx="146" cy="118" r="11" fill="#06151A"/>
+  <circle cx="97" cy="115" r="3.5" fill="#FFFFFF"/>
+  <circle cx="149" cy="115" r="3.5" fill="#FFFFFF"/>
+  <path d="M114 148 Q114 142 117 142 Q119 142 120 144 Q121 142 123 142 Q126 142 126 148 Q126 156 120 162 Q114 156 114 148 Z" fill="#06151A"/>
+  <path d="M120 162 L120 172" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M120 172 Q108 184 100 176" fill="none" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M120 172 Q132 184 140 176" fill="none" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
+  <g transform="translate(204 48)">
+    <circle r="9" fill="#FFFFFF"/>
+    <circle r="16" fill="none" stroke="#5BFFD0" stroke-width="2" opacity=".55"/>
+  </g>
 </svg>

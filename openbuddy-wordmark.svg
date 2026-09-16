@@ -1,48 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1480" height="320" viewBox="0 0 1480 320" role="img" aria-label="OpenBuddy">
-  <!--
-    Horizontal lockup: badge mark + "OpenBuddy" wordmark.
-  -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#0E2A2A"/>
-      <stop offset="1" stop-color="#06151A"/>
-    </linearGradient>
+    <radialGradient id="bg" cx="50%" cy="38%" r="65%">
+      <stop stop-color="#0F3A36"/>
+      <stop offset="1" stop-color="#04101A"/>
+    </radialGradient>
     <linearGradient id="fur" x1="0" y1="0" x2="1" y2="1">
       <stop stop-color="#7BFFE0"/>
       <stop offset=".55" stop-color="#00C29A"/>
-      <stop offset="1" stop-color="#008C75"/>
+      <stop offset="1" stop-color="#00755F"/>
     </linearGradient>
     <linearGradient id="muzzle" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#E8FFF7"/>
+      <stop stop-color="#F0FFF9"/>
       <stop offset="1" stop-color="#A8E8D4"/>
     </linearGradient>
+    <radialGradient id="eyeG" cx="50%" cy="50%" r="50%">
+      <stop stop-color="#5BFFD0"/>
+      <stop stop-color="#0A2A28" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-
-  <!-- badge 256x256 -->
   <g transform="translate(32 32)">
     <rect x="0" y="0" width="256" height="256" rx="58" fill="url(#bg)"/>
-    <path d="M64 62 Q80 36 106 54 Q98 92 78 108 Z" fill="url(#fur)"/>
-    <path d="M192 62 Q176 36 150 54 Q158 92 178 108 Z" fill="url(#fur)"/>
-    <rect x="68" y="72" width="120" height="120" rx="58" fill="url(#fur)"/>
-    <ellipse cx="128" cy="166" rx="48" ry="32" fill="url(#muzzle)"/>
-    <circle cx="104" cy="126" r="11" fill="#06151A"/>
-    <circle cx="152" cy="126" r="11" fill="#06151A"/>
-    <circle cx="107" cy="123" r="3.5" fill="#FFFFFF"/>
-    <circle cx="155" cy="123" r="3.5" fill="#FFFFFF"/>
-    <path d="M122 156 Q122 150 128 150 Q134 150 134 156 Q134 163 128 167 Q122 163 122 156 Z" fill="#06151A"/>
-    <path d="M128 168 L128 174" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
-    <path d="M128 174 Q118 184 110 178" fill="none" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
-    <path d="M128 174 Q138 184 146 178" fill="none" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
-    <circle cx="210" cy="60" r="8" fill="#FFFFFF"/>
+    <path d="M58 60 Q70 30 96 50 Q88 92 72 106 Z" fill="url(#fur)"/>
+    <path d="M198 60 Q186 30 160 50 Q168 92 184 106 Z" fill="url(#fur)"/>
+    <rect x="64" y="70" width="128" height="128" rx="62" fill="url(#fur)"/>
+    <ellipse cx="128" cy="166" rx="50" ry="34" fill="url(#muzzle)"/>
+    <circle cx="104" cy="124" r="18" fill="url(#eyeG)"/>
+    <circle cx="152" cy="124" r="18" fill="url(#eyeG)"/>
+    <circle cx="104" cy="124" r="11" fill="#06151A"/>
+    <circle cx="152" cy="124" r="11" fill="#06151A"/>
+    <circle cx="107" cy="121" r="3.5" fill="#FFFFFF"/>
+    <circle cx="155" cy="121" r="3.5" fill="#FFFFFF"/>
+    <path d="M122 154 Q122 148 126 148 Q128 148 128 150 Q128 148 130 148 Q134 148 134 154 Q134 162 128 168 Q122 162 122 154 Z" fill="#06151A"/>
+    <path d="M128 168 L128 178" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M128 178 Q118 188 110 182" fill="none" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M128 178 Q138 188 146 182" fill="none" stroke="#06151A" stroke-width="3.5" stroke-linecap="round"/>
+    <g transform="translate(212 56)">
+      <circle r="7" fill="#FFFFFF"/>
+      <circle r="13" fill="none" stroke="#5BFFD0" stroke-width="2" opacity=".55"/>
+    </g>
   </g>
-
-  <!-- wordmark -->
   <g transform="translate(330 0)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif">
-    <text x="0" y="190" font-size="148" font-weight="700" letter-spacing="-3" fill="#0B1F22">
-      Open<tspan font-weight="700" fill="#00C29A">Buddy</tspan>
-    </text>
-    <text x="4" y="240" font-size="28" font-weight="500" letter-spacing="6" fill="#5C7A78">
-      OPEN · ADAPTIVE · AI WORKBENCH
-    </text>
+    <text x="0" y="190" font-size="148" font-weight="700" letter-spacing="-3" fill="#0B1F22">Open<tspan font-weight="700" fill="#00C29A">Buddy</tspan></text>
+    <text x="4" y="240" font-size="28" font-weight="500" letter-spacing="6" fill="#5C7A78">OPEN · ADAPTIVE · AI WORKBENCH</text>
   </g>
 </svg>

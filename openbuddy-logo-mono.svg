@@ -1,30 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
-  <!--
-    Monochrome stencil variant. Knockouts carve eyes / nose / smile /
-    muzzle / inner ears out of the solid silhouette so the mark works
-    on any background. Recolour with fill / currentColor.
-  -->
   <defs>
     <mask id="mono" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
       <rect width="1024" height="1024" fill="#FFF"/>
-      <!-- silhouette: ears + head + muzzle + brow spots all in white -->
-      <path d="M268 240 Q310 170 384 220 Q360 360 300 410 Z" fill="#FFF"/>
-      <path d="M756 240 Q714 170 640 220 Q664 360 724 410 Z" fill="#FFF"/>
-      <rect x="280" y="280" width="464" height="464" rx="220" fill="#FFF"/>
-      <ellipse cx="512" cy="640" rx="180" ry="120" fill="#FFF"/>
-      <circle cx="392" cy="408" r="34" fill="#FFF"/>
-      <circle cx="632" cy="408" r="34" fill="#FFF"/>
+      <path d="M256 248 Q300 158 388 220 Q360 372 296 416 Z" fill="#FFF"/>
+      <path d="M768 248 Q724 158 636 220 Q664 372 728 416 Z" fill="#FFF"/>
+      <rect x="276" y="276" width="472" height="472" rx="232" fill="#FFF"/>
+      <ellipse cx="512" cy="640" rx="190" ry="124" fill="#FFF"/>
+      <circle cx="392" cy="404" r="34" fill="#FFF"/>
+      <circle cx="632" cy="404" r="34" fill="#FFF"/>
+      <circle cx="780" cy="270" r="40" fill="#FFF"/>
       <!-- knockouts -->
-      <path d="M298 252 Q330 210 372 244 Q352 330 314 374 Z" fill="#000"/>
-      <path d="M726 252 Q694 210 652 244 Q672 330 710 374 Z" fill="#000"/>
-      <circle cx="412" cy="492" r="42" fill="#000"/>
-      <circle cx="612" cy="492" r="42" fill="#000"/>
-      <circle cx="424" cy="480" r="14" fill="#FFF"/>
-      <circle cx="624" cy="480" r="14" fill="#FFF"/>
-      <path d="M484 612 Q484 588 512 588 Q540 588 540 612 Q540 644 512 660 Q484 644 484 612 Z" fill="#000"/>
-      <path d="M512 664 L512 696" stroke="#000" stroke-width="14" stroke-linecap="round"/>
-      <path d="M512 696 Q470 740 432 706" fill="none" stroke="#000" stroke-width="14" stroke-linecap="round"/>
-      <path d="M512 696 Q554 740 592 706" fill="none" stroke="#000" stroke-width="14" stroke-linecap="round"/>
+      <path d="M296 264 Q330 218 374 256 Q352 348 312 392 Z" fill="#000"/>
+      <path d="M728 264 Q694 218 650 256 Q672 348 712 392 Z" fill="#000"/>
+      <circle cx="412" cy="494" r="40" fill="#000"/>
+      <circle cx="612" cy="494" r="40" fill="#000"/>
+      <circle cx="424" cy="482" r="14" fill="#FFF"/>
+      <circle cx="624" cy="482" r="14" fill="#FFF"/>
+      <path d="M484 610 Q484 588 502 588 Q512 588 512 596 Q512 588 522 588 Q540 588 540 610 Q540 640 512 668 Q484 640 484 610 Z" fill="#000"/>
+      <path d="M512 670 L512 706" stroke="#000" stroke-width="16" stroke-linecap="round"/>
+      <path d="M512 706 Q470 752 432 716" fill="none" stroke="#000" stroke-width="16" stroke-linecap="round"/>
+      <path d="M512 706 Q554 752 592 716" fill="none" stroke="#000" stroke-width="16" stroke-linecap="round"/>
     </mask>
   </defs>
   <rect width="1024" height="1024" fill="currentColor" mask="url(#mono)"/>
