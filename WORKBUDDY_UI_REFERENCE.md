@@ -1575,9 +1575,102 @@ R23:  ok=20 dead=0 ext=19 no-impl=0    (39 槽)  ← 注册 / 消费 / 分类全
 | 期 | 内容 | 进度 | 说明 |
 |---|---|---|---|
 | Phase A | 主题系统 v2 | **100%** | 19 套主题、OKLCh、Match-system、防 FOUC、ThemePicker / Studio、主题字体落地 |
-| Phase B | Workspace 表现层 | **98%** | Resizable sidebar、虚拟化 files-tree 进生产、Artifact Tabs / breadcrumb、Topbar / StatusBar；剩 `details` 浮层接线 |
-| Phase C | 编辑器与富文本 | **95%** | TiPTap 编辑器 + 三个扩展点接上消费者 + Office 四预览；剩 math/mermaid 的编辑侧 round-trip 加固 |
-| Phase D | Onboarding 与差异化 | **95%** | wizard / tour / whats-new / feedback / data-dir / marketplace / Pi 市场桥接 / Theme Studio 全部接线(39 槽 dead=0)；剩 Plugin SDK v1 文档站点未开工 |
+| Phase B | Workspace 表现层 | **99%** | Resizable sidebar、虚拟化 files-tree 进生产、Artifact Tabs / breadcrumb、Topbar / StatusBar、`details` 助理导轨(R28)；剩顶栏信息密度再平衡 |
+| Phase C | 编辑器与富文本 | **98%** | TiPTap 编辑器 + 三个扩展点接上消费者 + Office 四预览 + 编辑侧 round-trip 保真(R28);剩真实会话里"编辑产物"的端到端截图 |
+| Phase D | Onboarding 与差异化 | **97%** | wizard / tour / whats-new / feedback / data-dir / marketplace(R29 复核可达)/ Pi 市场桥接 / Theme Studio；剩 Plugin SDK v1 文档站点(R24)未开工 |
+
+## R28 — 编辑器「打开就丢结构」:嵌套列表被拍平 + `details` 槽接线
+
+R27 收尾后做了一轮"用户可见功能的真实可达性"复核,发现两个真问题和一个假阴性。
+
+### R28.1 嵌套列表在编辑器往返里被拍平(数据丢失)
+
+先补了一层**编辑侧 round-trip 保真**测试:markdown → bridge → HTML →
+**真实 TipTap schema** → HTML → bridge → markdown,断言逐字符相等。
+以前只测过 bridge 两个方向的纯函数,而"打开编辑器 → 保存"这条真实路径中间
+还插着 ProseMirror schema —— 节点不认识会被静默丢掉,属性名对不上会被重置成
+默认值,纯函数测不出来。
+
+跑出来第一条就中:
+
+| 输入 | 往返后(修复前) |
+|---|---|
+| `- 一级` / `  - 二级` / `- 另一条` | `- 一级` / `- 二级` / `- 另一条` |
+
+根因:`parseBullet` / `parseOrdered` 允许 0–3 个前导空格并且**丢掉**缩进,
+于是缩进 2 格的子项被当成同级项。修复分两个方向:
+
+- **markdownToHtml** 新增 `parseListItemLine`(保留缩进)+ `parseListBlock`
+  (按缩进递归成真正的子列表);有序/无序、任务/普通混排时**分段**输出
+  (TipTap 的 taskList 只接受 taskItem 子节点,普通 li 塞进去会被 schema 静默
+  丢弃);有序列表起始序号 ≠ 1 时写 `start`。
+- **htmlToMarkdown** 新增 `listToMarkdown`(子列表每层缩进 2 空格)。这里还有个
+  坑:TipTap 的 taskItem 渲染成 `li > label + div > p + ul`,子列表在 div 里而
+  不是 li 的直接子节点 —— 必须按"最近的祖先 li 是不是当前项"判定层级,否则
+  子列表被当行内文本、整段丢到 li 之外。
+
+新增 `roundtrip-fidelity.test.ts`(25 条):公式 / mermaid / 表格 / 任务列表 /
+三层嵌套 / 嵌套有序 / 起始序号 / 任务项嵌子列表 / 整篇混合文档 / 两次往返幂等。
+三处**已知规范化**单独成组写明(单行块级公式写出为三行、`_斜_` → `*斜*`、
+普通项与任务项相邻拆成两个列表),免得后人误判成 bug。
+
+### R28.2 `details` 槽接线:右侧「助理」导轨终于出现在产品里
+
+`details` 是最后一条"注册了却没人按正确契约消费"的槽:ui-shell 注册
+SecondarySidebar,唯一的消费者是 ui-layout 的 AppFrame,而 R23 之后 AppFrame
+已降级为参考实现(不进渲染树)—— 于是 WorkBuddy peek-assistant 的等价能力在
+产品里根本不渲染。三处修:
+
+1. **声明权归位**:`details` 的 SlotMap 声明原本写在 ui-layout,注释写着
+   "Right details column. Owned by ui-workbench",owner 形状 `{open,width}` ——
+   与真实注册的组件 props 完全对不上。声明移到 ui-shell(注册方),owner 改成
+   `{visible, onSelectExpert, onToast, onOpenExperts}`。
+2. **宿主接线**:AppShell 新增 `DetailsSurface`(内核槽优先,回落 ui-shell 的
+   SecondarySidebar),只在有活跃会话时 `visible`。AppFrame 不再为它留 320px
+   网格列(组件本身是 `position: fixed` 贴右缘的导轨)。
+3. **空状态**:专家来自 `~/.pi/agents/*.md`,全新安装下一个都没有 —— 实测
+   hover 出来的浮层 `items=0`,一片空白看着像坏了。现在给「还没有专家」+
+   一句说明 +「去创建专家」出口(跳到专家页,那里有 9 张内置专家卡)。
+
+真机探针 `scripts/electron/_probe-r28-details-rail.mjs`(+ CI wrapper 6 条):
+首页无会话不显示 → 会话页导轨贴右缘(`fixed` / `right=0`)→ hover 浮出 268px
+浮层 → 空状态有出口 → 点击跳到专家页(9 张卡片)并收起浮层 → 移开自动收起,
+全程 renderer 零报错。截图 `tests/screenshots/r28-details-rail.png`。
+
+**探针卫生**:会话落盘走 `agentHome()` 而不是 `--user-data-dir`,新探针显式设
+`OPENBUDDY_AGENT_DIR` 到临时目录,不再往用户真实的 `~/.openbuddy/agent/` 里写
+临时工作区(此前会在侧栏「空间」里留一串 `ob-r28-ws-xxxx`)。
+
+## R29 — 「插件·市场」可达性:修掉一个一直为 false 的假阴性
+
+`_probe-phase-bcd.mjs` 一直用 `[data-testid="marketplace-tab"]` 判断市场是否存在。
+那个 testid 属于 `@openbuddy/ui-modules` 的**参考实现** MarketplaceTab —— 它的
+`apply()` 是有意 no-op(纯展示组件,需要宿主注入数据,注册进去只会渲染空白)。
+产品里真正渲染的是 `@openbuddy/ui-mcp` 的 MarketplacePanel,挂在
+`modules.marketplace` 槽的**回退底座**上。
+
+于是"市场到底可不可达"这个问题,长期只有一个恒为 false 的假阴性答案。R29 按
+用户真实路径重测(侧栏进专家页 → 四个市场 tab → 点「插件·市场」):
+
+```
+pills: 专家 | 技能 | 连接器 | 插件·市场
+panel: mounted=true  "市场 刷新全部 添加源  1 个源 · 0 个插件 · 0 已安装"  searchable=true
+```
+
+结论:**可达,且空市场也有明确计数,不是白板**。新增
+`scripts/electron/_probe-r29-market-placeholder.mjs`(+ CI wrapper 4 条),
+并把 `_probe-phase-bcd.mjs` 的 `marketplace` 字段改成真实选择器
+(`.um-pills` / `.um-tab--plugins` / `.um-pill--active`)。
+
+### R29.1 本轮同时复核确认「已经在生产路径上」的能力
+
+| 能力 | 复核方式 | 结论 |
+|---|---|---|
+| Office 四预览(docx / xlsx / pptx / pdf) | `FilePreview.tsx` 按 `pickOfficePreviewKind` 路由到三个懒加载预览组件 | 在生产路径上 |
+| 文件树虚拟滚动 | `ui-workbench/src/FileTreeView.tsx` 直接 import `ui-files-tree` 的 `LazyFileTree` | 在生产路径上 |
+| 编辑器 | `ToolSidePanel` 从内核 `editor.body` 槽取(ui-editor 注册) | 在生产路径上 |
+| 状态栏 | `[data-testid="status-bar"]` 实测渲染 | 在生产路径上 |
+| 主题菜单 | `[data-testid="theme-menu-button"]` 实测渲染 | 在生产路径上 |
 
 ## 后续计划(优先级排序)
 
@@ -1586,9 +1679,11 @@ R23:  ok=20 dead=0 ext=19 no-impl=0    (39 槽)  ← 注册 / 消费 / 分类全
    token 表现在都齐了,缺的只是"照着抄就能跑"的公开文档。
 2. **R25 — Pi 扩展市场多源 registry**:当前是单源,多源 + 权重 + 离线缓存;
    `agent:pi-market-*` 七个 channel 已就位,只需扩 registry 层。
-3. **R27 — 用户可见的遗留问题**(与 WorkBuddy 对齐的最后几处):
-   - 顶栏 / 菜单栏宽度与信息密度的再平衡。
-4. **加固项**:math / mermaid 编辑侧 round-trip;`details` 浮层的窄屏表现。
+3. **R30 — 顶栏信息密度再平衡**(与 WorkBuddy 对齐最后几处):顶栏 56px 高度、
+   搜索框 280–480px、状态胶囊 / 主题入口已就位,待定的是窄窗口(≤980px)下
+   哪些元素降级为图标、哪些收进溢出菜单。
+4. **加固项**:`details` 导轨在窄窗口下与右侧工作面板(ToolSidePanel)的避让;
+   真实会话里"编辑产物 → 保存"的端到端截图。
 
 ## 用户可见的差距分析(与 WorkBuddy 对比)
 
