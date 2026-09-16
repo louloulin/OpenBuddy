@@ -1,6 +1,6 @@
 {
   "name": "openbuddy",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "OpenBuddy - a WorkBuddy-style desktop AI workspace, built on Electron + moon.",
   "main": "./out/main/index.js",
   "bin": {

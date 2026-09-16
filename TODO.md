@@ -4,7 +4,7 @@
 
 ### Current focus
 
-**Make OpenBuddy v0.16 (Linux first-class) shippable.** All work below ladders up to the [`docs/ROADMAP.md`](docs/ROADMAP.md) public themes.
+**Make OpenBuddy v0.15.0 (Linux first-class) shippable.** All work below ladders up to the [`docs/ROADMAP.md`](docs/ROADMAP.md) public themes.
 
 ### Active work
 
@@ -28,7 +28,7 @@
 - [ ] Per-session permission overrides
 - [ ] Folder trust UI polish
 
-#### 🚧 Plugin marketplace (planned for v0.17)
+#### 🚧 Plugin marketplace (planned for v0.15.0)
 
 - [ ] Public catalog at <https://openbuddy.dev/marketplace>
 - [ ] One-click install in app
@@ -42,23 +42,23 @@
 
 ### Documentation improvements
 
-- [ ] Translate the docs/ to Japanese, Korean (after v0.16 ships)
+- [ ] Translate the docs/ to Japanese, Korean (after v0.15.0 ships)
 - [ ] Record architecture overview video for YouTube
 - [ ] Build a "Day in the life of an OpenBuddy session" infographic
 
 ### Tech debt (low priority)
 
-- [ ] Replace 8 known TypeScript errors in `renderer-plugin-runtime.ts` and `use-email-keyboard.test.ts` (orthogonal to v0.16 work)
+- [ ] Replace 8 known TypeScript errors in `renderer-plugin-runtime.ts` and `use-email-keyboard.test.ts` (orthogonal to v0.15.0 work)
 - [ ] Consolidate duplicate IPC handlers in `electron/main/ipc/` (47 handlers across 8 files)
 - [ ] Reduce Vitest total runtime below 3 min (currently ~3:20)
 
 ### Completed (recent)
 
-- [x] moon-managed monorepo (32-project DAG, `moon run` everywhere) — v0.14
-- [x] Casdoor × NewAPI × OpenBuddy enterprise integration — v0.15
-- [x] Admin Portal SPA with Resource Gateway — v0.15
+- [x] moon-managed monorepo (32-project DAG, `moon run` everywhere) — v0.15.0
+- [x] Casdoor × NewAPI × OpenBuddy enterprise integration — v0.15.0
+- [x] Admin Portal SPA with Resource Gateway — v0.15.0
 - [x] 309 test files (Vitest) — visible to every contributor
-- [x] Bilingual EN/中文 documentation suite (35,000+ lines) — v0.15
+- [x] Bilingual EN/中文 documentation suite (35,000+ lines) — v0.15.0
 - [x] GitHub community infrastructure (CODEOWNERS, label guide, workflows, templates)
 
 ### How to help
