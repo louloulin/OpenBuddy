@@ -117,15 +117,28 @@ function useHoverPeek(disabled: boolean) {
   };
 }
 
-interface SecondarySidebarProps {
+export interface SecondarySidebarProps {
   /** Start a new session guided by the selected agent. */
   onSelectExpert?: (agent: AgentEntry) => void;
   onToast?: (msg: string) => void;
+  /**
+   * 打开「专家·技能·连接器」页(导轨为空时的出口)。
+   *
+   * 为什么需要:专家来自 `~/.pi/agents/*.md`,全新安装下一个都没有。导轨
+   * hover 出来却是一片空白(实测 items=0),看起来就像坏了 —— 给它一个
+   * 明确的空状态 + 一条"去哪儿建"的路,比空列表有用得多。
+   */
+  onOpenExperts?: () => void;
   /** Show the contextual assistant picker only while a chat session is active. */
   visible?: boolean;
 }
 
-export function SecondarySidebar({ onSelectExpert, onToast, visible = true }: SecondarySidebarProps) {
+export function SecondarySidebar({
+  onSelectExpert,
+  onToast,
+  onOpenExperts,
+  visible = true,
+}: SecondarySidebarProps) {
   // Hooks must be called unconditionally in a stable order, otherwise React
   // throws #310 ("Rendered more hooks than during the previous render") when
   // `visible` flips. The early return lives AFTER every hook.
@@ -177,6 +190,27 @@ export function SecondarySidebar({ onSelectExpert, onToast, visible = true }: Se
       {hoverPeek && (
         <div className="secondary-sidebar__floating" {...floatingBindings}>
           {loading && <div className="secondary-sidebar__loading">加载中…</div>}
+
+          {!loading && agents.length === 0 && (
+            <div className="secondary-sidebar__empty">
+              <div className="secondary-sidebar__empty-title">还没有专家</div>
+              <div className="secondary-sidebar__empty-desc">
+                专家来自 <code>~/.pi/agents/</code> 下的 markdown 定义。
+              </div>
+              {onOpenExperts && (
+                <button
+                  type="button"
+                  className="secondary-sidebar__empty-action"
+                  onClick={() => {
+                    onOpenExperts();
+                    closePeek();
+                  }}
+                >
+                  去创建专家
+                </button>
+              )}
+            </div>
+          )}
 
           <ul className="secondary-sidebar__list">
             {agents.map((agent) => (

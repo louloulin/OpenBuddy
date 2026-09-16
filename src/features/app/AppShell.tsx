@@ -29,6 +29,7 @@ import { lazy, memo, Suspense, useMemo, type ComponentType } from "react";
 import { GlobalConfirmHost } from "@/components/GlobalConfirmHost";
 import { TitleBar } from "@openbuddy/ui-shell";
 import { TopbarActions, TopbarTitle, KeyboardShortcutsDialog } from "@openbuddy/ui-shell";
+import { SecondarySidebar } from "@openbuddy/ui-shell";
 import { Sidebar } from "@openbuddy/ui-sidebar";
 import { ChatView } from "@openbuddy/ui-conversation";
 import { PlaceholderPage } from "@/components/shared/PlaceholderPage";
@@ -254,6 +255,27 @@ function TasksSurface(props: React.ComponentProps<typeof TasksPanel>) {
   return <Component {...props} />;
 }
 
+/**
+ * 右侧「助理」导轨:内核 `details` slot 优先。
+ *
+ * R28 —— 接线修复。此前 `details` 是"注册了却没人消费"的槽:ui-shell 把
+ * SecondarySidebar 注册进去,唯一的消费者是 ui-layout 的 AppFrame,而 R23
+ * 之后 AppFrame 已降级为参考实现(不进渲染树),于是这条导轨在产品里根本
+ * 看不见 —— 用户拿不到"贴着窗口右缘、hover 就浮出专家列表、点一下开新会话"
+ * 这个 WorkBuddy peek-assistant 的等价能力。
+ *
+ * 组件自己按 `visible` 决定渲染,宿主只负责在"有活跃会话"时打开它。
+ */
+function DetailsSurface(props: {
+  visible: boolean;
+  onSelectExpert: NonNullable<React.ComponentProps<typeof SecondarySidebar>["onSelectExpert"]>;
+  onToast: (message: string) => void;
+  onOpenExperts?: () => void;
+}) {
+  const Component = useSlotComponent("details", SecondarySidebar);
+  return <Component {...props} />;
+}
+
 // ---- Main content (one of: notice / placeholder / chat / home) -------------
 function MainContent({ runtime }: { runtime: AppShellRuntime }) {
   const {
@@ -444,6 +466,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
     refreshModels,
     handleRenameTitle,
     handleStartProjectConversation,
+    handleStartWithExpert,
   } = runtime;
 
   const activeNav = placeholderView ?? (currentSessionId ? "" : "新建任务");
@@ -572,6 +595,13 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
       </Suspense>
       <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <GlobalConfirmHost />
+      {/* R28 — 右侧「助理」导轨(内核 details 槽)。 */}
+      <DetailsSurface
+        visible={Boolean(currentSessionId)}
+        onSelectExpert={handleStartWithExpert}
+        onToast={showToast}
+        onOpenExperts={() => handleNavigate("专家·技能·连接器")}
+      />
       <AppStatusBar runtime={runtime} />
     </div>
   );

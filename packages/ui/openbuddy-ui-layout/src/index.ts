@@ -35,12 +35,13 @@ declare module "@openbuddy/ui-slots" {
       scope: "session-maybe";
       owner: Record<string, never>;
     };
-    /** Right details column. Owned by ui-workbench. */
-    "details": {
-      kind: "single";
-      scope: "session";
-      owner: { open: boolean; width: number };
-    };
+    /**
+     * `details`(右侧助理导轨)的声明权已移交 `@openbuddy/ui-shell` ——
+     * 它是该槽的注册方,AppFrame 只是消费者之一。原来这里写着
+     * "Right details column. Owned by ui-workbench",owner 形状是
+     * `{ open, width }`,和真实注册的 `SecondarySidebar` props 对不上,
+     * 结果是"槽被声明了、被注册了、却没人按正确契约消费"。
+     */
     /** Frame-wide floating layer (toasts, modals). */
     "shell.overlay": {
       kind: "list";

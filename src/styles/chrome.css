@@ -623,6 +623,52 @@
   color: var(--wb-text-tertiary);
   font-size: 11px;
 }
+/* R28 — 空状态。全新安装下 `~/.pi/agents/` 一个专家都没有,hover 出来的浮层
+   原本是一片空白(实测 items=0),看着像坏了。给一句说明 + 一条明确出口。 */
+.secondary-sidebar__empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 10px;
+  border-radius: 8px;
+  background: var(--wb-bg-secondary);
+}
+.secondary-sidebar__empty-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.secondary-sidebar__empty-desc {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--wb-text-tertiary);
+}
+.secondary-sidebar__empty-desc code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.05));
+  color: var(--wb-text-medium);
+}
+.secondary-sidebar__empty-action {
+  align-self: flex-start;
+  margin-top: 2px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default, rgba(0, 0, 0, 0.12));
+  border-radius: 6px;
+  background: var(--wb-bg-elevated, transparent);
+  color: var(--wb-text-strong);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.secondary-sidebar__empty-action:hover {
+  border-color: color-mix(in srgb, var(--wb-brand-primary) 45%, transparent);
+  color: var(--wb-brand-primary);
+}
 
 /* ---- 文档截断提示条（AppShell 顶部渲染） ---- */
 .truncation-banner {
