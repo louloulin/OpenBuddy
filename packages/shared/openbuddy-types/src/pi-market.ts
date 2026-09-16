@@ -98,7 +98,13 @@ export interface PiMarketLockfile {
   extensions: Record<string, PiMarketLockEntry>;
 }
 
-export type PiMarketAction = "install" | "upgrade" | "rollback" | "refresh";
+/**
+ * 审计里出现的动作。
+ *
+ * `uninstall` 是 R33 补的:在此之前装了 Pi 扩展**没有任何卸载入口** ——
+ * 审计里也不会有卸载记录,于是"装过又删了"在本地也查不出来。
+ */
+export type PiMarketAction = "install" | "upgrade" | "rollback" | "uninstall" | "refresh";
 
 export interface PiMarketAuditEntry {
   id: string;
@@ -109,6 +115,22 @@ export interface PiMarketAuditEntry {
   from?: string;
   outcome: "success" | "failure";
   reason?: string;
+}
+
+export interface PiMarketUninstallResult {
+  id: string;
+  /** 卸载前处于激活状态的版本;lockfile 里没有记录时为 `undefined`。 */
+  version?: string;
+  /** 从磁盘上真正删掉的版本目录(降序无关,按目录名排序)。 */
+  removedVersions: readonly string[];
+  /** 被删除的扩展目录(`<root>/<id>`)。 */
+  removedPath: string;
+  at: string;
+  /**
+   * `keepPayload: true` 时保留版本目录、只摘掉 lockfile 里的激活记录
+   * (用于"停用但想留着回滚"的场景)。此时 `removedVersions` 为空。
+   */
+  payloadKept: boolean;
 }
 
 /**

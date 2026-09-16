@@ -40,6 +40,7 @@ export type {
   PiMarketRegistrySource,
   PiMarketSourceState,
   PiMarketSourceStatus,
+  PiMarketUninstallResult,
 } from "@openbuddy/shared-types";
 
 import type {
@@ -48,6 +49,7 @@ import type {
   PiMarketInstallResult,
   PiMarketLockfile,
   PiMarketRefreshReport,
+  PiMarketUninstallResult,
 } from "@openbuddy/shared-types";
 
 /** channel 名与 main 侧 `PI_MARKET_IPC_CHANNELS` 一一对应(单一来源在 main)。 */
@@ -57,6 +59,7 @@ export const PI_MARKET_CHANNELS = {
   install: "agent:pi-market-install",
   upgrade: "agent:pi-market-upgrade",
   rollback: "agent:pi-market-rollback",
+  uninstall: "agent:pi-market-uninstall",
   lockfile: "agent:pi-market-lockfile",
   audit: "agent:pi-market-audit",
 } as const;
@@ -106,6 +109,17 @@ export function upgradePiMarket(args: {
 
 export function rollbackPiMarket(args: { id: string }): Promise<PiMarketInstallResult> {
   return invoke(PI_MARKET_CHANNELS.rollback, args) as Promise<PiMarketInstallResult>;
+}
+
+/**
+ * R33 — 卸载。默认连版本目录一起删;`keepPayload: true` 只摘掉 lockfile 记录
+ * (加载器跟着 lockfile 走,等价于"停用但留着回滚")。
+ */
+export function uninstallPiMarket(args: {
+  id: string;
+  keepPayload?: boolean;
+}): Promise<PiMarketUninstallResult> {
+  return invoke(PI_MARKET_CHANNELS.uninstall, args) as Promise<PiMarketUninstallResult>;
 }
 
 export function lockfilePiMarket(): Promise<PiMarketLockfile> {

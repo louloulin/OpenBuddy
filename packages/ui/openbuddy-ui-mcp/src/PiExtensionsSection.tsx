@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Puzzle } from "lucide-react";
 import { InstallDialog } from "@openbuddy/ui-modules/components/InstallDialog";
 import { MarketplaceTab } from "@openbuddy/ui-modules/components/MarketplaceTab";
+import type { MarketplaceMenuItem } from "@openbuddy/ui-modules/components";
 import type { InstallState, MarketplaceKind } from "@openbuddy/ui-modules/components/marketplace-model";
 import { confirm } from "@/lib/platform/electron-api";
 import {
@@ -29,6 +30,7 @@ import {
   piMarketErrorInfo,
   refreshPiMarket,
   rollbackPiMarket,
+  uninstallPiMarket,
   upgradePiMarket,
   type PiMarketAuditEntry,
   type PiMarketEntryView,
@@ -135,12 +137,17 @@ export function PiExtensionsSection({ onToast }: PiExtensionsSectionProps) {
   };
 
   const runAction = useCallback(
-    async (id: string, task: () => Promise<{ version: string; changed: boolean }>) => {
+    async (
+      id: string,
+      task: () => Promise<{ version?: string; changed: boolean }>,
+      successMessage?: (result: { version?: string; changed: boolean }) => string,
+    ) => {
       markBusy(id, true);
       try {
         const result = await task();
         onToast?.(
-          result.changed ? `已就绪：${id}@${result.version}` : `${id} 已经是 ${result.version}`,
+          successMessage?.(result) ??
+            (result.changed ? `已就绪：${id}@${result.version}` : `${id} 已经是 ${result.version}`),
         );
         await reload();
         return null;
@@ -190,6 +197,88 @@ export function PiExtensionsSection({ onToast }: PiExtensionsSectionProps) {
       if (failure) onToast?.(`回滚失败：${failure}`);
     },
     [onToast, runAction],
+  );
+
+  /**
+   * R33 — 卸载。在此之前装了 Pi 扩展没有任何卸载入口(只能去手删目录),
+   * 审计里也查不出「装过又删了」。
+   */
+  const handleUninstall = useCallback(
+    async (entry: PiMarketEntryView) => {
+      const ok = await confirm(`卸载「${entry.name}」？`, {
+        tone: "warning",
+        description: "会删除本地版本目录并摘掉 lockfile 记录(加载器跟着 lockfile 走);审计日志保留这次操作。",
+      });
+      if (!ok) return;
+      const failure = await runAction(
+        entry.id,
+        async () => {
+          const result = await uninstallPiMarket({ id: entry.id });
+          return { version: result.version, changed: true };
+        },
+        (result) => `已卸载：${entry.id}${result.version ? `@${result.version}` : ""}`,
+      );
+      if (failure) onToast?.(`卸载失败：${failure}`);
+    },
+    [onToast, runAction],
+  );
+
+  /** 载荷被外部改写(corrupt-install)时的自救入口,等价于勾选「强制重新物化」。 */
+  const handleForceReinstall = useCallback(
+    async (entry: PiMarketEntryView) => {
+      const target = entry.installedVersion ?? entry.version;
+      const failure = await runAction(
+        entry.id,
+        async () => {
+          const result = await installPiMarket({
+            id: entry.id,
+            version: target,
+            force: true,
+            allowHighRisk: true,
+          });
+          return result;
+        },
+        (result) => `已重装：${entry.id}@${result.version}`,
+      );
+      if (failure) onToast?.(`重装失败：${failure}`);
+    },
+    [onToast, runAction],
+  );
+
+  const findSource = useCallback(
+    (id: string) => entries.find((item) => item.id === id),
+    [entries],
+  );
+
+  /**
+   * 卡片⋯菜单:两条都是**逐条目**适用的动作,所以用 `visible` 谓词而不是
+   * 给未安装的条目画一个点了会报错的按钮。
+   * 「强制重装」传 `allowHighRisk: true` 是刻意的:用户上一轮安装已经同意过
+   * 这些能力,重装同一个版本不该再问一次。
+   */
+  const menuItems = useMemo<readonly MarketplaceMenuItem[]>(
+    () => [
+      {
+        id: "pi-force-reinstall",
+        label: "强制重装(修复被改写的载荷)",
+        visible: (entry) => Boolean(entry.installedVersion),
+        onSelect: (entry) => {
+          const source = findSource(entry.id);
+          if (source) void handleForceReinstall(source);
+        },
+      },
+      {
+        id: "pi-uninstall",
+        label: "卸载",
+        danger: true,
+        visible: (entry) => Boolean(entry.installedVersion),
+        onSelect: (entry) => {
+          const source = findSource(entry.id);
+          if (source) void handleUninstall(source);
+        },
+      },
+    ],
+    [findSource, handleForceReinstall, handleUninstall],
   );
 
   const marketplaceEntries = useMemo(() => entries.map(toMarketplaceEntry), [entries]);
@@ -288,6 +377,7 @@ export function PiExtensionsSection({ onToast }: PiExtensionsSectionProps) {
           installStateFilter={stateFilter}
           onInstallStateFilterChange={setStateFilter}
           installingIds={busyIds}
+          menuItems={menuItems}
           onInstall={(entry) => {
             const source = entries.find((item) => item.id === entry.id);
             if (source) openDialog(source, "install");

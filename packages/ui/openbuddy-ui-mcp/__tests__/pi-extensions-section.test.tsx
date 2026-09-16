@@ -20,6 +20,7 @@ const client = vi.hoisted(() => ({
   installPiMarket: vi.fn(),
   upgradePiMarket: vi.fn(),
   rollbackPiMarket: vi.fn(),
+  uninstallPiMarket: vi.fn(),
   lockfilePiMarket: vi.fn(),
   auditPiMarket: vi.fn(),
   piMarketErrorInfo: vi.fn((error: unknown) => {
@@ -73,6 +74,14 @@ beforeEach(() => {
     capabilities: [],
   });
   client.rollbackPiMarket.mockReset();
+  client.uninstallPiMarket.mockReset().mockResolvedValue({
+    id: "demo",
+    version: "1.0.0",
+    removedVersions: ["1.0.0"],
+    removedPath: "/tmp/demo",
+    at: "2026-01-01T00:00:00.000Z",
+    payloadKept: false,
+  });
   client.lockfilePiMarket.mockReset().mockResolvedValue({ version: 1, extensions: {} });
   client.auditPiMarket.mockReset().mockResolvedValue({ entries: [] });
 });
@@ -129,6 +138,69 @@ describe("来源展示", () => {
       expect(screen.getByRole("status").textContent).toContain("已用上次缓存"),
     );
     expect(onToast).toHaveBeenCalledWith("索引已刷新：7 条,1 个源不可达");
+  });
+});
+
+describe("卸载 / 重装(R33)", () => {
+  const installed = () => entry({ installedVersion: "1.0.0" });
+
+  it("没安装的条目没有 ⋯ 菜单(避免点了才报 not-found)", async () => {
+    render(<PiExtensionsSection onToast={() => {}} />);
+    await screen.findByTestId("marketplace-tab");
+    expect(screen.queryAllByTestId("marketplace-card-menu")).toHaveLength(0);
+  });
+
+  it("已安装的条目可以在 ⋯ 里卸载,确认后调 IPC 并刷新", async () => {
+    const onToast = vi.fn();
+    client.listPiMarket.mockResolvedValue({ entries: [installed()] });
+    render(<PiExtensionsSection onToast={onToast} />);
+    await screen.findByTestId("marketplace-tab");
+
+    fireEvent.click(screen.getAllByTestId("marketplace-card-menu")[0]);
+    expect(screen.getByTestId("marketplace-card-menu-list").textContent).toContain("卸载");
+    fireEvent.click(screen.getByText("卸载"));
+
+    await waitFor(() => expect(client.uninstallPiMarket).toHaveBeenCalledTimes(1));
+    expect(client.uninstallPiMarket.mock.calls[0][0]).toMatchObject({ id: "demo" });
+    await waitFor(() => expect(onToast).toHaveBeenCalledWith("已卸载：demo@1.0.0"));
+    // 卸载后要重新拉列表,否则卡片还显示「已安装」。
+    expect(client.listPiMarket.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("强制重装走 force=true(修复被外部改写的载荷)", async () => {
+    const onToast = vi.fn();
+    client.listPiMarket.mockResolvedValue({ entries: [installed()] });
+    render(<PiExtensionsSection onToast={onToast} />);
+    await screen.findByTestId("marketplace-tab");
+
+    fireEvent.click(screen.getAllByTestId("marketplace-card-menu")[0]);
+    fireEvent.click(screen.getByText(/强制重装/));
+
+    await waitFor(() => expect(client.installPiMarket).toHaveBeenCalledTimes(1));
+    expect(client.installPiMarket.mock.calls[0][0]).toMatchObject({
+      id: "demo",
+      version: "1.0.0",
+      force: true,
+      allowHighRisk: true,
+    });
+    await waitFor(() => expect(onToast).toHaveBeenCalledWith("已重装：demo@1.0.0"));
+  });
+
+  it("卸载失败时按错误码给补救说明", async () => {
+    const onToast = vi.fn();
+    client.listPiMarket.mockResolvedValue({ entries: [installed()] });
+    client.piMarketErrorInfo.mockReturnValue({ code: "unsafe-target", detail: "symlink" });
+    client.uninstallPiMarket.mockRejectedValue(new Error("unsafe"));
+
+    render(<PiExtensionsSection onToast={onToast} />);
+    await screen.findByTestId("marketplace-tab");
+    fireEvent.click(screen.getAllByTestId("marketplace-card-menu")[0]);
+    fireEvent.click(screen.getByText("卸载"));
+
+    await waitFor(() =>
+      expect(onToast).toHaveBeenCalledWith(expect.stringContaining("卸载失败")),
+    );
+    expect(onToast.mock.calls.at(-1)?.[0]).toContain("符号链接");
   });
 });
 

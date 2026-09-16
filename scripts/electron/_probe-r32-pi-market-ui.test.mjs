@@ -82,6 +82,17 @@ describe.skipIf(!canLaunch)("live electron probe: Pi 扩展市场多源 + UI", (
     expect(probe.install?.dialogStillOpen).toBe(false);
   });
 
+  it("R33 卸载:已安装条目有 ⋯ 菜单,卸载后 lockfile 清空且审计留痕", () => {
+    const probe = runProbe();
+    expect(probe.uninstallMenu?.menuText).toContain("卸载");
+    expect(probe.uninstallMenu?.menuText).toContain("强制重装");
+    expect(probe.install?.lockKeys).toEqual(["demo.alpha"]);
+    expect(probe.uninstall?.lockKeys).toEqual([]);
+    expect(probe.uninstall?.lastAction).toBe("uninstall");
+    expect(probe.uninstall?.lastOutcome).toBe("success");
+    expect(probe.uninstall?.stat).toContain("已装 0");
+  });
+
   it("全程没有 renderer 报错", () => {
     const probe = runProbe();
     expect(probe.pageErrors).toEqual([]);

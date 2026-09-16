@@ -29,6 +29,7 @@ import {
   piMarketErrorInfo,
   refreshPiMarket,
   rollbackPiMarket,
+  uninstallPiMarket,
   upgradePiMarket,
 } from "../pi-market-client";
 
@@ -148,6 +149,32 @@ describe("wrapper 的返回值形状 == UI 会读的字段", () => {
     expect(result.previousVersion).toBe("1.1.0");
   });
 
+  it("uninstall 真的把记录摘掉,并汇报删了哪些版本", async () => {
+    await installPiMarket({ id: "demo.one", version: "1.0.0" });
+    await installPiMarket({ id: "demo.one", version: "1.1.0" });
+    const result = await uninstallPiMarket({ id: "demo.one" });
+    expect(result).toMatchObject({ id: "demo.one", version: "1.1.0", payloadKept: false });
+    expect(result.removedVersions.sort()).toEqual(["1.0.0", "1.1.0"]);
+
+    const lock = await lockfilePiMarket();
+    expect(Object.keys(lock.extensions)).toEqual([]);
+    const trail = await auditPiMarket({ limit: 10 });
+    // audit 是按追加顺序返回的:最后一条才是这次卸载。
+    expect(trail.entries.at(-1)).toMatchObject({ action: "uninstall", outcome: "success" });
+  });
+
+  it("uninstall 的 keepPayload 只摘记录,载荷目录留在磁盘上", async () => {
+    await installPiMarket({ id: "demo.one" });
+    const result = await uninstallPiMarket({ id: "demo.one", keepPayload: true });
+    expect(result).toMatchObject({ id: "demo.one", payloadKept: true, removedVersions: [] });
+    expect(Object.keys((await lockfilePiMarket()).extensions)).toEqual([]);
+  });
+
+  it("uninstall 不存在的扩展 → not-found(经过 wrapper 也能取回码)", async () => {
+    const error = await uninstallPiMarket({ id: "ghost" }).catch((e: unknown) => e);
+    expect(piMarketErrorInfo(error).code).toBe("not-found");
+  });
+
   it("lockfile 的 key 才是 id(条目里没有多余 id 字段)", async () => {
     await installPiMarket({ id: "demo.one" });
     const lock = await lockfilePiMarket();
@@ -156,14 +183,14 @@ describe("wrapper 的返回值形状 == UI 会读的字段", () => {
     expect((lock.extensions["demo.one"] as unknown as { id?: unknown }).id).toBeUndefined();
   });
 
-  it("audit 返回 { entries },action 只用 install/upgrade/rollback/refresh", async () => {
+  it("audit 返回 { entries },action 只用 install/upgrade/rollback/uninstall/refresh", async () => {
     await installPiMarket({ id: "demo.one" });
     const result = await auditPiMarket({ limit: 10 });
     expect(Array.isArray(result.entries)).toBe(true);
     expect(result.entries.length).toBeGreaterThan(0);
     const actions = new Set(result.entries.map((entry) => entry.action));
     for (const action of actions) {
-      expect(["install", "upgrade", "rollback", "refresh"]).toContain(action);
+      expect(["install", "upgrade", "rollback", "uninstall", "refresh"]).toContain(action);
     }
     // 旧 wrapper 把字段名写成 `events`。
     expect((result as unknown as { events?: unknown }).events).toBeUndefined();

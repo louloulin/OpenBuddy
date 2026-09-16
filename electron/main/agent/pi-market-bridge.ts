@@ -65,6 +65,7 @@ import type {
   PiMarketRegistrySource,
   PiMarketSourceState,
   PiMarketSourceStatus,
+  PiMarketUninstallResult,
 } from "@openbuddy/shared-types";
 import { formatPiMarketError } from "@openbuddy/shared-types";
 
@@ -92,6 +93,7 @@ export type {
   PiMarketRegistrySource,
   PiMarketSourceState,
   PiMarketSourceStatus,
+  PiMarketUninstallResult,
 } from "@openbuddy/shared-types";
 
 // ---------------------------------------------------------------------------
@@ -202,6 +204,15 @@ export class PiMarketBridgeError extends Error {
   }
 }
 
+export interface PiMarketUninstallOptions {
+  /**
+   * 只摘掉 lockfile 里的激活记录,保留 `<id>/<version>/` 载荷目录。
+   * 加载器是跟着 lockfile 走的(`init-pi-user-extensions` 读 `installed.json`
+   * 再跟 `<id>/current`),所以效果等同于"停用,但随时能再装回来"。
+   */
+  keepPayload?: boolean;
+}
+
 export interface PiMarketBridge {
   readonly paths: {
     root: string;
@@ -228,6 +239,14 @@ export interface PiMarketBridge {
   ): Promise<PiMarketInstallResult>;
   upgradePiExtension(id: string, options?: PiMarketInstallOptions): Promise<PiMarketInstallResult>;
   rollbackPiExtension(id: string, options?: PiMarketInstallOptions): Promise<PiMarketInstallResult>;
+  /**
+   * R33 — 卸载。在此之前装了 Pi 扩展没有任何卸载入口(审计里也查不出"装过又删了")。
+   * 默认连版本目录一起删;`keepPayload: true` 只摘掉 lockfile 记录(停用但留着回滚)。
+   */
+  uninstallPiExtension(
+    id: string,
+    options?: PiMarketUninstallOptions,
+  ): Promise<PiMarketUninstallResult>;
   readLockfile(): Promise<PiMarketLockfile>;
   readAuditTrail(limit?: number): Promise<PiMarketAuditEntry[]>;
 }
@@ -1481,6 +1500,96 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
     }
   }
 
+  /** 清掉历史遗留的 `.trash-*`(上一次 uninstall 的 rm 失败时留下的)。 */
+  async function sweepTrash(): Promise<void> {
+    const names = await readdir(root).catch(() => [] as string[]);
+    await Promise.all(
+      names
+        .filter((name) => name.startsWith(".trash-"))
+        .map((name) => rm(join(root, name), { recursive: true, force: true }).catch(() => undefined)),
+    );
+  }
+
+  /**
+   * R33 — 卸载。
+   *
+   * 为什么要"先 rename 再 rm":直接 `rm -rf <id>` 删到一半失败会留下一个
+   * **半残但看起来还在**的安装(指针文件还在、版本目录缺文件),加载器照样会去读它。
+   * `rename(<id>, .trash-<rand>)` 是原子的 —— 一旦成功,扩展立刻从加载器视角消失,
+   * 之后的 rm 只是清理磁盘;rm 失败最多留一个 `.trash-*` 目录(下次卸载顺手扫掉)。
+   *
+   * lockfile 与磁盘谁在谁不在的四种组合都要能收敛:
+   *   - 都在 → 正常卸载;
+   *   - 只有 lockfile(目录被外部删了)→ 摘记录,`removedVersions` 为空;
+   *   - 只有目录(手工拷进来的)→ 删目录,`version` 为 undefined;
+   *   - 都没有 → `not-found`。
+   */
+  async function uninstall(
+    id: string,
+    uninstallOptions: PiMarketUninstallOptions,
+  ): Promise<PiMarketUninstallResult> {
+    const safeId = safePiExtensionId(id);
+    const extDir = join(root, safeId);
+    const keepPayload = uninstallOptions.keepPayload === true;
+    const at = now().toISOString();
+    try {
+      const lockfile = await readLockfile();
+      const record = lockfile.extensions[safeId];
+      // lstat(而不是 stat):`<id>` 本身是符号链接时,我们想删的是这个链接,
+      // 而不是顺着链接把外面某个目录删掉。
+      const dirInfo = await lstat(extDir).catch(() => undefined);
+      if (!record && !dirInfo) {
+        throw new PiMarketBridgeError("not-found", `${safeId} is not installed`);
+      }
+
+      let removedVersions: string[] = [];
+      if (dirInfo?.isDirectory() && !keepPayload) {
+        const entries = await readdir(extDir, { withFileTypes: true }).catch(() => []);
+        removedVersions = entries
+          .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+          .map((entry) => entry.name)
+          .sort();
+        const trash = join(root, `.trash-${randomUUID()}`);
+        await rename(extDir, trash);
+        await rm(trash, { recursive: true, force: true }).catch(() => undefined);
+        await sweepTrash();
+      } else if (dirInfo?.isDirectory()) {
+        removedVersions = [];
+      }
+
+      if (record) {
+        const next: PiMarketLockfile = { version: 1, extensions: { ...lockfile.extensions } };
+        delete next.extensions[safeId];
+        await writeLockfile(next);
+      }
+
+      await appendAudit({
+        action: "uninstall",
+        extensionId: safeId,
+        ...(record ? { version: record.version } : {}),
+        outcome: "success",
+        ...(keepPayload ? { reason: "payload kept (lockfile entry removed)" } : {}),
+      });
+
+      return {
+        id: safeId,
+        ...(record ? { version: record.version } : {}),
+        removedVersions,
+        removedPath: extDir,
+        at,
+        payloadKept: keepPayload,
+      };
+    } catch (error) {
+      await appendAudit({
+        action: "uninstall",
+        extensionId: safeId,
+        outcome: "failure",
+        reason: errorMessage(error),
+      });
+      throw error;
+    }
+  }
+
   /**
    * 刷新所有源(并发),把合并结果写进传统 `registry.json`(保持 R18 契约:
    * 刷新后再 list 就不再触网),并给每个源留一条状态。
@@ -1549,6 +1658,8 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
       serialize(() => install(id, version, installOptions)),
     upgradePiExtension: (id, installOptions = {}) => serialize(() => upgrade(id, installOptions)),
     rollbackPiExtension: (id, installOptions = {}) => serialize(() => rollback(id, installOptions)),
+    uninstallPiExtension: (id, uninstallOptions = {}) =>
+      serialize(() => uninstall(id, uninstallOptions)),
     readLockfile,
     readAuditTrail,
   };
@@ -1564,6 +1675,7 @@ export const PI_MARKET_IPC_CHANNELS = {
   install: "agent:pi-market-install",
   upgrade: "agent:pi-market-upgrade",
   rollback: "agent:pi-market-rollback",
+  uninstall: "agent:pi-market-uninstall",
   lockfile: "agent:pi-market-lockfile",
   audit: "agent:pi-market-audit",
 } as const;
@@ -1612,6 +1724,12 @@ export function createPiMarketHandlers(
     [PI_MARKET_IPC_CHANNELS.rollback]: async (args) => {
       const input = optionalRecord(args);
       return bridge.rollbackPiExtension(requiredArg(input.id, "id"));
+    },
+    [PI_MARKET_IPC_CHANNELS.uninstall]: async (args) => {
+      const input = optionalRecord(args);
+      return bridge.uninstallPiExtension(requiredArg(input.id, "id"), {
+        keepPayload: input.keepPayload === true,
+      });
     },
     [PI_MARKET_IPC_CHANNELS.lockfile]: async () => bridge.readLockfile(),
     [PI_MARKET_IPC_CHANNELS.audit]: async (args) => {

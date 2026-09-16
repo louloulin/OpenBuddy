@@ -1583,7 +1583,7 @@ R23:  ok=20 dead=0 ext=19 no-impl=0    (39 槽)  ← 注册 / 消费 / 分类全
 | Phase A | 主题系统 v2 | **100%** | 19 套主题、OKLCh、Match-system、防 FOUC、ThemePicker / Studio、主题字体落地 |
 | Phase B | Workspace 表现层 | **100%** | Resizable sidebar、虚拟化 files-tree 进生产、Artifact Tabs / breadcrumb、Topbar / StatusBar、`details` 助理导轨(R28)、顶栏信息密度(R30) |
 | Phase C | 编辑器与富文本 | **98%** | TiPTap 编辑器 + 三个扩展点接上消费者 + Office 四预览 + 编辑侧 round-trip 保真(R28);剩真实会话里"编辑产物"的端到端截图 |
-| Phase D | Onboarding 与差异化 | **100%** | wizard / tour / whats-new / feedback / data-dir / marketplace(R29 复核可达)/ Pi 市场桥接(**R32:多源 + 权重合并 + 离线缓存 + UI 落地**)/ Theme Studio / Plugin SDK v1 文档站点(R31:登记表生成 + CI 守卫 + 5 篇文档上站) |
+| Phase D | Onboarding 与差异化 | **100%** | wizard / tour / whats-new / feedback / data-dir / marketplace(R29 复核可达)/ Pi 市场桥接(**R32:多源 + 权重合并 + 离线缓存 + UI 落地;R33:卸载**)/ Theme Studio / Plugin SDK v1 文档站点(R31:登记表生成 + CI 守卫 + 5 篇文档上站) |
 
 ## R28 — 编辑器「打开就丢结构」:嵌套列表被拍平 + `details` 槽接线
 
@@ -1900,12 +1900,90 @@ UI 里**只有 `describePiMarketError()` 一处**读错误码,单测穷举
 错误码表 + UI 落点);R18 的接线片段更新为 R32 的 `resolvePiMarketSources()` 版本
 (不传 `sources` 时 `sources.json` 与环境变量都不会被读到)。
 
+## R33 — Pi 扩展「装了不能卸」:卸载能力 + 逐条目动作谓词
+
+R32 把市场做成了「装 / 升级 / 回滚 + 多源」,收尾复核时发现一个用户一眼能看到、
+审计也查不出的缺口:**装完之后没有任何卸载入口**。`PiMarketBridge` 只有
+install / upgrade / rollback,`PiMarketAction` 里连 `uninstall` 都没有。
+
+### R33.1 卸载语义:先 rename 再 rm
+
+```
+uninstallPiExtension(id, { keepPayload?: false })
+  默认:摘 lockfile 记录 + 删掉 <id>/ 扩展目录
+  keepPayload: 只摘记录,载荷留着(停用,随时能装回来)
+```
+
+- **为什么先 rename 再 rm**:直接 `rm -rf <id>` 删到一半失败会留下「看起来还在」的
+  半残安装(指针文件还在、版本目录缺文件),加载器照样会去读它。
+  `rename(<id>, .trash-<uuid>)` 是原子的 —— 一旦成功,扩展立刻从加载器视角消失,
+  之后的 rm 只是清理磁盘;失败最多留一个 `.trash-*`,下次卸载顺手扫掉。
+- **`lstat` 而不是 `stat`**:`<id>` 本身是符号链接时,要删的是这个链接,而不是顺着
+  链接把外面某个目录删掉。
+- **四种组合都要收敛**:lockfile/目录 有有(正常)、有无(摘记录)、无有(手工拷进来的,
+  删目录、`version` 为 undefined)、无无(`not-found` + failure 审计)。
+
+### R33.2 `keepPayload` 为什么成立
+
+加载器(`electron/main/agent/host-modules/bootstrap/init-pi-user-extensions.ts`)
+读的是 `installed.json` 再跟 `<id>/current` 指针 —— **lockfile 才是"是否加载"的唯一
+真相**。所以摘掉记录就已经等于停用,载荷留着只是占磁盘。
+
+### R33.3 UI:逐条目动作谓词
+
+卡片的 `⋯` 菜单此前只能画一整份清单,而「卸载 / 强制重装」的适用性逐条目不同
+(没安装的条目不该出现卸载)。给 `MarketplaceMenuItem` 加了可选的
+`visible?: (entry) => boolean`:不适用的动作不画出来,全被过滤掉时连 `⋯` 都不渲染。
+这是 additive 改动(ui-modules 的公共契约向后兼容),已有消费方零改动。
+
+菜单两项:
+
+| 动作 | 语义 |
+|---|---|
+| 强制重装(修复被改写的载荷) | `corrupt-install` 的自救路径,等价于安装时勾「强制重新物化」;沿用上一轮已同意的能力,不再二次询问 |
+| 卸载 | 走 `GlobalConfirmHost` 确认框 → `agent:pi-market-uninstall` |
+
+### R33.4 测试
+
+| 文件 | 条数 | 覆盖 |
+|---|---|---|
+| `pi-market-bridge.test.ts` | 51(+9) | 四种组合 / keepPayload / 不留 `.trash-*` / 不误删别的扩展 / IPC handler |
+| `pi-market-client.test.ts` | 14(+3) | wrapper 接真 handler:摘记录 / keepPayload / not-found 取码 |
+| `MarketplaceCard.test.tsx` | 17(+2) | `visible` 谓词 / 全被过滤时不渲染 `⋯` |
+| `pi-extensions-section.test.tsx` | 10(+4) | 未安装无菜单 / 卸载确认 / 强制重装 `force:true` / 失败按码给说明 |
+
+顺带把两条 IPC 测试里写死的 `handlers.size === 7` 改成按 `PI_MARKET_IPC_CHANNELS`
+算数量 —— 加一个 channel 不该让测试变红(它俩这次就是这么红的)。
+
+### R33.5 真机验证
+
+`_probe-r32-pi-market-ui.mjs` 扩到 **12 步全绿**(真实用户路径,两个真 HTTP 源 +
+一个死源):
+
+```
+PASS 市场面板顶部真的渲染了 Pi 扩展区块
+PASS 条目渲染成市场卡片(不是空态)
+PASS 同 id 只有权重大的源赢(字段不做合并)
+PASS 低权重源独有的扩展照样收录
+PASS 刷新后顶部来源 chips 带每源权威状态
+PASS 拉不到的源被点名(不可达),而不是静默消失
+PASS 点安装 → 对话框 → 确认
+PASS 扩展真的落到 lockfile(版本 + 路径)
+PASS 安装后对话框自动关闭 + 统计行刷新
+PASS 已安装的扩展出现 ⋯ 菜单(卸载 / 强制重装)
+PASS 卸载真的摘掉 lockfile 记录        → lockKeys: [] ,统计行回到「已装 0 · 索引 3」
+PASS 审计里留下 uninstall 记录          → uninstall/success
+```
+
 ## 后续计划(优先级排序)
 
-1. **加固项**:`details` 导轨与右侧工作面板(ToolSidePanel)在窄窗口下的避让;
-   真实会话里"编辑产物 → 保存"的端到端截图。
-2. **可选**:把第二条总线(renderer contributions)也纳入同一张 registry 视图,
-   让插件作者在一个地方看到两条总线的全部插入点。
+1. **Phase C 收尾**:真实会话里「打开 markdown 产物 → 编辑 → 保存」的断言型探针
+   (`ToolSidePanel` 走 `write_text_file`;现有 `_probe-editor-flow.mjs` 只打印不判定,
+   而这条链路有 4 个前置条件,任一不满足「编辑」按钮就不渲染)。
+2. **Pi 扩展的源管理 UI**:`sources.json` 目前只能手写;建议在 Pi 扩展区块加
+   增删源 / 调权重 / 测可达,配套 `agent:pi-market-sources-get|set`。
+3. **加固项**:`details` 导轨与右侧工作面板(ToolSidePanel)在窄窗口下的避让。
+4. **可选**:把第二条总线(renderer contributions)纳入同一张 registry 视图。
 
 ## 用户可见的差距分析(与 WorkBuddy 对比)
 

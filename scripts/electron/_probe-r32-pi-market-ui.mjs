@@ -273,6 +273,85 @@ try {
     detail: String(installed.stat),
   });
 
+  // ── 5. R33 卸载:在此之前装了 Pi 扩展没有任何卸载入口 ──
+  const hasMenu = await page.evaluate(() => {
+    const card = Array.from(document.querySelectorAll("[data-testid='marketplace-card']")).find(
+      (item) => (item.textContent ?? "").includes("demo.alpha"),
+    );
+    const menu = card?.querySelector("[data-testid='marketplace-card-menu']");
+    if (menu instanceof HTMLElement) {
+      menu.click();
+      return true;
+    }
+    return false;
+  });
+  await page.waitForTimeout(400);
+  const menuText = await page.evaluate(
+    () =>
+      document
+        .querySelector("[data-testid='marketplace-card-menu-list']")
+        ?.textContent?.replace(/\s+/g, " ")
+        .trim() ?? null,
+  );
+  report.uninstallMenu = { hasMenu, menuText };
+  report.steps.push({
+    step: "已安装的扩展出现 ⋯ 菜单(卸载 / 强制重装)",
+    ok: hasMenu && Boolean(menuText?.includes("卸载")) && Boolean(menuText?.includes("强制重装")),
+    detail: JSON.stringify({ hasMenu, menuText }),
+  });
+
+  await page.evaluate(() => {
+    const item = Array.from(
+      document.querySelectorAll("[data-testid='marketplace-card-menu-list'] button"),
+    ).find((button) => (button.textContent ?? "").trim() === "卸载");
+    if (item instanceof HTMLElement) item.click();
+  });
+  await page.waitForTimeout(700);
+  // 卸载会先弹确认框 —— `confirm()` 走 GlobalConfirmHost 渲染的 ConfirmDialog
+  // (role=alertdialog,类名 request-modal--confirm),不是 window.confirm。
+  // 确认按钮在 footer 最后一位且带 autoFocus,所以取最后一个 button。
+  const confirmClicked = await page.evaluate(() => {
+    const dialog = document.querySelector(".request-modal--confirm, [role='alertdialog']");
+    if (!dialog) return null;
+    const buttons = Array.from(dialog.querySelectorAll("button"));
+    const ok = buttons.at(-1);
+    if (ok instanceof HTMLElement) {
+      const label = (ok.textContent ?? "").trim();
+      ok.click();
+      return label;
+    }
+    return null;
+  });
+  await page.waitForTimeout(3500);
+
+  const uninstalled = await page.evaluate(async (label) => {
+    const lock = await window.api
+      .invoke("agent:pi-market-lockfile")
+      .catch((error) => ({ error: String(error?.message ?? error) }));
+    const audit = await window.api
+      .invoke("agent:pi-market-audit", { limit: 20 })
+      .catch(() => ({ entries: [] }));
+    const host = document.querySelector("[data-testid='pi-extensions-section']");
+    return {
+      confirmLabel: label,
+      lockKeys: lock?.extensions ? Object.keys(lock.extensions) : null,
+      lastAction: audit?.entries?.at(-1)?.action ?? null,
+      lastOutcome: audit?.entries?.at(-1)?.outcome ?? null,
+      stat: host?.querySelector(".pi-ext__stat")?.textContent?.replace(/\s+/g, " ").trim() ?? null,
+    };
+  }, confirmClicked);
+  report.uninstall = uninstalled;
+  report.steps.push({
+    step: "卸载真的摘掉 lockfile 记录",
+    ok: Array.isArray(uninstalled.lockKeys) && uninstalled.lockKeys.length === 0,
+    detail: JSON.stringify(uninstalled),
+  });
+  report.steps.push({
+    step: "审计里留下 uninstall 记录",
+    ok: uninstalled.lastAction === "uninstall" && uninstalled.lastOutcome === "success",
+    detail: `${uninstalled.lastAction}/${uninstalled.lastOutcome}`,
+  });
+
   if (SHOTS_ENABLED) {
     await page.screenshot({ path: "tests/screenshots/r32-pi-market-ui.png" });
   }

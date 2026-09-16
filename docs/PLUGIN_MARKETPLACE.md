@@ -322,3 +322,66 @@ R32 接 UI 时先修类型,再让 wrapper 直接对着**真实 bridge handler** 
    —— 渲染进程开不了 `node:fs`(sandbox + contextIsolation),整条探针在那里崩掉,
    于是 R18 以来"文件系统落盘结构"这一节其实**从来没被真机验证过**。现在改成 node
    侧读盘,两条探针 7 步全绿。
+
+---
+
+## 9. R33 — 卸载
+
+R32 之后市场具备了「装 / 升级 / 回滚」,但**没有卸载**:用户装了一个 Pi 扩展之后
+只能去手删 `<dataDir>/pi-extensions/<id>/`,而且审计里查不出「装过又删了」。
+
+### 9.1 语义
+
+```
+uninstallPiExtension(id, { keepPayload?: false })
+  ├─ 默认:摘掉 lockfile 记录 + 删掉 <id>/ 整个扩展目录
+  └─ keepPayload: 只摘 lockfile 记录,载荷目录原样保留(停用,但随时能装回来)
+```
+
+加载器是跟着 lockfile 走的(`init-pi-user-extensions` 读 `installed.json`,再跟
+`<id>/current` 指针),所以**只摘记录**就已经等于「停用」—— 这也是 `keepPayload`
+之所以成立的原因。
+
+### 9.2 为什么先 rename 再 rm
+
+直接 `rm -rf <id>` 删到一半失败,会留下一个「看起来还在」的半残安装(指针文件还在、
+版本目录缺文件),加载器照样会去读它。所以:
+
+1. `rename(<id>, .trash-<uuid>)` —— 原子。一旦成功,扩展立刻从加载器视角消失;
+2. `rm(.trash-<uuid>)` —— 只是清理磁盘;失败最多留一个 `.trash-*` 目录;
+3. `sweepTrash()` —— 每次卸载顺手清掉历史遗留的 `.trash-*`。
+
+`lstat`(而不是 `stat`)是刻意的:`<id>` 本身是符号链接时,要删的是这个链接,
+而不是顺着链接把外面某个目录删掉。
+
+### 9.3 四种磁盘 / lockfile 组合都要收敛
+
+| lockfile | 目录 | 行为 |
+|---|---|---|
+| 有 | 有 | 正常卸载:`removedVersions` = 目录里的版本 |
+| 有 | 无(被外部删了) | 摘记录,`removedVersions` 为空 |
+| 无 | 有(手工拷进来的) | 删目录,`version` 为 `undefined` |
+| 无 | 无 | 抛 `not-found`,审计记 failure |
+
+### 9.4 UI
+
+市场面板的 Pi 扩展区块里,已安装的条目会在卡片的 `⋯` 菜单出现两项:
+
+- **强制重装(修复被改写的载荷)** —— 对应 `corrupt-install` 的自救路径,
+  等价于安装时勾选「强制重新物化」;沿用上一轮已同意的能力,不再二次询问。
+- **卸载** —— 走 `GlobalConfirmHost` 的确认框,确认后调 IPC。
+
+菜单项是**宿主注入的整份清单**,而适用性逐条目不同,所以
+`MarketplaceCard` 的 `MarketplaceMenuItem` 新增了可选的
+`visible?: (entry) => boolean` 谓词:不适用的动作不画出来(否则用户点了才收到
+`not-found`),全部被过滤掉时连 `⋯` 按钮都不渲染。
+
+### 9.5 测试
+
+| 文件 | 条数 | 覆盖 |
+|---|---|---|
+| `electron/main/agent/pi-market-bridge.test.ts` | +9 | 四种组合 / keepPayload / 不留 `.trash-*` / 不误删别的扩展 / IPC handler |
+| `src/lib/pi-market/__tests__/pi-market-client.test.ts` | +3 | wrapper 接真 handler:摘记录 / keepPayload / not-found 取回码 |
+| `packages/ui/openbuddy-ui-modules/src/__tests__/MarketplaceCard.test.tsx` | +2 | `visible` 谓词过滤 / 全被过滤时不渲染 `⋯` |
+| `packages/ui/openbuddy-ui-mcp/__tests__/pi-extensions-section.test.tsx` | +4 | 未安装无菜单 / 卸载确认 / 强制重装 `force:true` / 失败按码给说明 |
+| `scripts/electron/_probe-r32-pi-market-ui.mjs` | 真机 +3 步 | 走 UI 的 ⋯ → 卸载 → ConfirmDialog → lockfile 清空 + 审计 `uninstall/success` |

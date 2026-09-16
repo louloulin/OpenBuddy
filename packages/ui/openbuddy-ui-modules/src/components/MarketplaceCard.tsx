@@ -26,6 +26,14 @@ export interface MarketplaceMenuItem {
   label: string;
   danger?: boolean;
   disabled?: boolean;
+  /**
+   * 这条动作对当前条目是否适用。缺省 = 适用。
+   *
+   * 为什么需要它:菜单项是**宿主注入的整份清单**(例如「卸载 / 强制重装」),
+   * 而适用性逐条目不同 —— 没安装的条目不该出现「卸载」。少了这个谓词,宿主只能
+   * 把不适用的按钮也画出来,点下去才报 `not-found`。
+   */
+  visible?: (entry: MarketplaceEntry) => boolean;
   onSelect: (entry: MarketplaceEntry) => void;
 }
 
@@ -149,7 +157,10 @@ export function MarketplaceCard(props: MarketplaceCardProps) {
     else onInstall?.(entry);
   };
 
-  const items = (menuItems ?? []).filter(Boolean);
+  // 只保留对**这个**条目适用的动作;全都被过滤掉时不渲染 ⋯ 按钮。
+  const items = (menuItems ?? []).filter(
+    (item) => item != null && (item.visible?.(entry) ?? true),
+  );
 
   return (
     <div
