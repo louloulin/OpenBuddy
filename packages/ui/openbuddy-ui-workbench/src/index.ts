@@ -19,6 +19,13 @@ import type { SlotMap } from "@openbuddy/ui-slots";
 export type { SlotMap };
 
 export { SearchOverlay } from "./SearchOverlay";
+export {
+  filterPluginCommands,
+  parseSlashQuery,
+  pluginCommandLabel,
+  runPluginCommand,
+} from "./plugin-commands";
+export type { PluginCommandPayload } from "./plugin-commands";
 export { ModelSelector } from "./ModelSelector";
 export type { ModelOption, ThinkingLevel } from "./ModelSelector";
 export { AssistantCalendarPanel } from "./AssistantCalendarPanel";

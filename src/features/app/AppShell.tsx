@@ -47,7 +47,8 @@ import {
   MainTopbarToolsSlot,
 } from "./chrome";
 import { RoutePending } from "./RoutePending";
-import { useSlotComponent } from "./slot-bridge";
+import type { PluginCommandPayload } from "@openbuddy/ui-workbench";
+import { useSlotComponent, useSlotPayloadValues } from "./slot-bridge";
 import { AppStatusBar } from "./AppStatusBar";
 import type { AppShellRuntime, SettingsSection } from "./types";
 
@@ -184,10 +185,17 @@ function SidebarSurface(props: React.ComponentProps<typeof Sidebar>) {
   );
 }
 
-/** 搜索面板：内核 `overlay.search` slot 优先。 */
+/**
+ * 搜索面板：内核 `overlay.search` slot 优先。
+ *
+ * 插件命令也在这里注入:⌘K 面板要列出第三方插件通过 Plugin SDK 注册的命令
+ * (`plugin.command` 是数据型槽,插件只贡献 { id, label, onExecute })。
+ * 放在这层薄容器而不是 AppShell 里读,是为了让 AppShell 继续「不订阅 store」。
+ */
 function SearchSurface(props: React.ComponentProps<typeof SearchOverlay>) {
   const Component = useSlotComponent("overlay.search", SearchOverlay);
-  return <Component {...props} />;
+  const pluginCommands = useSlotPayloadValues<PluginCommandPayload>("plugin.command");
+  return <Component {...props} pluginCommands={pluginCommands} />;
 }
 
 /** 设置面板：内核 `overlay.settings` slot 优先。 */

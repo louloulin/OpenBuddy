@@ -6,7 +6,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { Search, X, Clock, FileText, CalendarDays, ListTodo, FolderKanban, Inbox } from "lucide-react";
+import { Search, X, Clock, FileText, CalendarDays, ListTodo, FolderKanban, Inbox, Terminal } from "lucide-react";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { calendarList, collaborationSnapshot, emailListThreadsPage, emailListWorkspaceTags, sessionSearch, tasksListForSession } from "@/lib/agent/pi-client";
 import { useProjectsStore, type ProjectMeta } from "@/stores/projects-store";
@@ -14,6 +14,13 @@ import { searchStoredKnowledge } from "@/lib/files/knowledge-base-runtime";
 import type { SearchHit, SessionSummary, RunningTask } from "@openbuddy/shared-types";
 import type { CalendarEvent, CollaborationSnapshot, EmailThreadPreview } from "@/lib/agent/pi-client";
 import type { KbEntry } from "@openbuddy/files-kb";
+import {
+  filterPluginCommands,
+  parseSlashQuery,
+  pluginCommandLabel,
+  runPluginCommand,
+  type PluginCommandPayload,
+} from "./plugin-commands";
 
 const SEARCH_SCOPES = [
   { id: "all", label: "全部" },
@@ -51,6 +58,7 @@ export function SearchOverlay({
   onSelectKnowledge,
   currentSessionId,
   onSelectCalendar,
+  pluginCommands,
 }: {
   open: boolean;
   onClose: () => void;
@@ -61,6 +69,11 @@ export function SearchOverlay({
   onSelectKnowledge?: (entryId: string, url?: string) => void;
   currentSessionId?: string | null;
   onSelectCalendar?: () => void;
+  /**
+   * 插件通过 Plugin SDK 注册的命令(内核 `plugin.command` 槽的数据型 payload)。
+   * 由宿主注入 —— 本包不读微内核,保持对内核零依赖。
+   */
+  pluginCommands?: readonly PluginCommandPayload[];
 }) {
   // Two-section model: there is no single flat list anymore. For local title
   // matching we flatten whatever the sidebar currently holds (independent +
@@ -234,10 +247,31 @@ export function SearchOverlay({
   const localIds = new Set(localMatches.map((s) => s.sessionId));
   const remoteOnly = remoteHits.filter((h) => !localIds.has(h.sessionId));
 
+  // 插件命令(命令面板)。空查询时全量列出;以 `/` 开头时按 id 前缀匹配,
+  // 其余情况按 id / label 子串匹配 —— 规则全在 plugin-commands 里单测。
+  const visibleCommands = useMemo(
+    () => filterPluginCommands(pluginCommands ?? [], query),
+    [pluginCommands, query],
+  );
+  // `/greet Alice` 里的 "Alice" 会作为 args 传给命令回调。
+  const slashArgs = parseSlashQuery(query)?.args ?? "";
+  const executeCommand = useCallback(
+    (command: PluginCommandPayload) => {
+      runPluginCommand(command, slashArgs);
+      onClose();
+    },
+    [slashArgs, onClose],
+  );
+
   const searchResultId = (kind: string, id: string) =>
     `conversation-search-result-${kind}-${id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 
   const searchResults: SearchResultAction[] = [
+    // 命令排在最前:⌘K 首先是个命令面板,回车默认命中的应该是命令而不是会话。
+    ...visibleCommands.map((command) => ({
+      id: searchResultId("command", command.id),
+      select: () => executeCommand(command),
+    })),
     ...localMatches.slice(0, 30).map((session) => ({
       id: searchResultId("local", session.sessionId),
       select: () => onSelect(session.sessionId, session.cwd),
@@ -354,7 +388,11 @@ export function SearchOverlay({
           <input
             ref={inputRef}
             className="conversation-search-modal__input"
-            placeholder="搜索会话标题或内容…"
+            placeholder={
+              (pluginCommands?.length ?? 0) > 0
+                ? "搜索会话 / 命令，或输入 / 执行插件命令…"
+                : "搜索会话标题或内容…"
+            }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             role="combobox"
@@ -396,6 +434,33 @@ export function SearchOverlay({
         </div>
 
         <div id="conversation-search-results" className="conversation-search-modal__body">
+          {visibleCommands.length > 0 && (
+            <>
+              <div className="conversation-search-modal__count">插件命令 ({visibleCommands.length})</div>
+              <ul className="conversation-search-modal__list">
+                {visibleCommands.map((command) => {
+                  const id = searchResultId("command", command.id);
+                  return (
+                    <li key={command.id}>
+                      <button
+                        type="button"
+                        className={resultButtonClassName(id)}
+                        id={id}
+                        onClick={() => executeCommand(command)}
+                        title={pluginCommandLabel(command)}
+                      >
+                        <Terminal size={14} strokeWidth={1.75} className="conversation-search-modal__item-icon" />
+                        <span className="conversation-search-modal__item-title">
+                          {pluginCommandLabel(command)}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+
           {localMatches.length > 0 && (
             <>
               <div className="conversation-search-modal__count">

@@ -16,7 +16,7 @@
  * 不影响其余部分的插件化收益。
  */
 
-import { useSlotComponents, useSlotEntries } from "@openbuddy/ui-runtime/client";
+import { useSlotComponents, useSlotEntries, useSlotPayloads } from "@openbuddy/ui-runtime/client";
 import type { SlotEntry } from "@openbuddy/ui-runtime/client";
 
 /**
@@ -45,6 +45,16 @@ export function useSlotComponent<T>(
  */
 export function useSlotList(name: string): readonly SlotEntry[] {
   return useSlotEntries(name);
+}
+
+/**
+ * 读取一个 slot 里插件贡献的**数据型** payload(`{ id, label, onExecute }` 这类)。
+ *
+ * 与 useSlotList 的区别:那个拿的是 entry(含组件/元信息),这个只拿数据。
+ * 用于「宿主提供 UI、插件只提供数据」的位置 —— 例如 ⌘K 面板里的插件命令。
+ */
+export function useSlotPayloadValues<T>(name: string): readonly T[] {
+  return useSlotPayloads<T>(name);
 }
 
 /**

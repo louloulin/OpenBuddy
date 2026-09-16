@@ -956,3 +956,68 @@ OpenBuddy 与 WorkBuddy 的关键差异化:**WorkBuddy 不允许第三方 Pi 扩
 6. 渲染端有 typed wrapper(`pi-market-client.ts`)与 MarketPlaceTab/InstallDialog UI 对接
 
 **这是开源差异化在 R17 → R18 路线图上第一个可演示的 end-to-end flow**。
+
+## R19 — 微内核「注册了却没人消费」的接线缺口
+
+微内核的价值 = 能力能被别人取用。R19 的起点不是加功能,而是把审计做出来:
+`scripts/ui-slot-audit.mjs` 把三个数字拉到一起 —— 谁**声明**了槽位、谁**注册**了实现、
+谁真的**消费**了它。
+
+```
+node scripts/ui-slot-audit.mjs          # 人读的表格
+node scripts/ui-slot-audit.mjs --json   # 机器读
+```
+
+状态含义:`ok` 注册且被消费 / `dead` 注册了但零消费(接线漏了)/ `no-impl` 有人在消费
+但没有实现(靠 fallback 活着)/ `ext` 有意的扩展点(AppFrame 类外壳的入口)。
+
+首轮审计出的 4 处缺口,本轮修掉 2 处:
+
+### R19.1 插件命令 → ⌘K 命令面板(以前整条链路是断的)
+
+`plugin.command` 是数据型槽:插件通过 Plugin SDK 的
+`api.registerCommand(id, label, onExecute)` 只贡献一条描述,UI 由宿主提供。这条链路上
+有 3 个断点,全部修掉:
+
+1. **SDK 把 label 丢了** —— `author.ts` 只派发 `{ id, onExecute }`,于是内核里的
+   `plugin.command` entry 没有展示名,命令面板根本没法列出它。
+2. **包根不导出 `defineExtension`** —— `examples/openbuddy-plugin-*` 三个示例与文档
+   写的都是 `import { defineExtension } from "@openbuddy/plugin-sdk"`,但包里只导出
+   manifest/serializer,starter 模板抄下来直接报错。
+3. **没有消费者** —— `plugin.command` 之前零消费,命令注册进内核等于石沉大海。
+
+现在:宿主在 `AppShell` 的 `SearchSurface` 薄容器里读 `plugin.command` 的 payload
+(`useSlotPayloadValues`),注入给 `SearchOverlay`;命令分组排在会话之前,支持
+`/greet Alice` 这种「命令 + 参数」写法,回车执行并把 args 交给插件回调,回调抛错被
+兜住(一个坏插件不该拖垮 ⌘K)。规则层抽成 `plugin-commands.ts` 纯函数,组件层不含判断。
+
+真机验证:`scripts/electron/_probe-plugin-command.mjs` —— 派发真实 SDK 事件 →
+⌘K → `/greet Alice` → 回车 → 断言插件回调收到 `{ args: "Alice" }` 且面板关闭。
+
+### R19.2 状态栏接进 `shell.statusbar`
+
+`StatusBar` 的文件头注释一直写着 "Rendered from the `shell.statusbar` slot so a plugin
+can replace it",但实际既没注册也没消费(宿主直接 `import`)。现在:
+
+- `@openbuddy/ui-shell/client` 把 `StatusBar` 注册进 `shell.statusbar`(single/root);
+- `AppStatusBar` 消费该槽(内核没实现时回落内置),拿到的是同一份 `left/right` props;
+- 槽位契约从 `owner: Record<string, never>` 改成真实的 props 形状 —— 插件替换实现时
+  只需要关心怎么画,不用自己找数据。
+
+真机验证:`_probe-slot-assembly.mjs` 断言 `shell.statusbar` 有 1 条
+`@openbuddy/ui-shell` 的 entry。
+
+### R19.3 仍然存在、留给下一轮的 dead 槽
+
+| 槽位 | 注册者 | 现状 |
+|---|---|---|
+| `onboarding.data-dir` | ui-onboarding | 需要宿主注入 `onSubmit`;改数据目录要重启进程,属独立特性 |
+| `onboarding.feedback` | ui-onboarding | 同上(`onSubmit`) |
+| `onboarding.whats-new` | ui-onboarding | 需要宿主给 `version` + `items`(本地 changelog 数据尚未进包) |
+| `placeholder.experts` | ui-experts | `PlaceholderPage` 直接 import 了 `ExpertsPanel`,槽位空转 |
+| `settings.extension` | ui-settings-models | 设置面板没有消费扩展入口 |
+| `root` | ui-layout | `AppFrame` 的子槽,AppFrame 本身未在本产品外壳中使用 |
+
+`shell.overlay` / `notifications` / `details` 标为 `ext`:它们的消费者是 ui-layout 的
+`AppFrame`(整壳实现),而本产品外壳走命名 `overlay.*` slot 路径。**这是一个待决策项**:
+要么把 AppFrame 的浮层渲染接进 AppShell,要么退役这两个槽,别让「有注册没消费」长期存在。

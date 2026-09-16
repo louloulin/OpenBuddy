@@ -47,6 +47,14 @@ export {
 } from "./manifest";
 
 export {
+  defineExtension,
+  type Extension,
+  type ExtensionApi,
+  type ExtensionConfig,
+  type PluginManifest,
+} from "./author";
+
+export {
   drainPendingDiagnostics,
   identityPathResolver,
   isSerializedPlugin,

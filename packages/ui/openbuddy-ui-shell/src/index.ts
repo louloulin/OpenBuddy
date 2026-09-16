@@ -15,7 +15,9 @@
  *
  * @see packages/ui/AGENTS.md 了解 ui-* 包协作约定
  */
+import type { ReactNode } from "react";
 import type { SlotMap } from "@openbuddy/ui-slots";
+import type { StatusItem } from "./StatusBar";
 export type { SlotMap };
 
 export { TitleBar } from "./TitleBar";
@@ -71,11 +73,23 @@ export type { TopbarActionShortcut } from "./topbar-shortcuts";
 
 declare module "@openbuddy/ui-slots" {
   interface SlotMap {
-    /** Bottom status strip. Host-owned; plugins may replace it. */
+    /**
+     * Bottom status strip.
+     *
+     * 宿主(ui-shell 的 StatusBar)是默认实现;插件注册同名单例槽即可整体替换。
+     * 替换实现会拿到与内置实现**同一份 props**(items 由宿主从 live state 计算),
+     * 所以只需关心怎么画,不用自己找数据。
+     */
     "shell.statusbar": {
       kind: "single";
       scope: "root";
-      owner: Record<string, never>;
+      owner: {
+        left?: StatusItem[];
+        right?: StatusItem[];
+        renderLeft?(): ReactNode;
+        renderRight?(): ReactNode;
+        className?: string;
+      };
     };
   }
 }

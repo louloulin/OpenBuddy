@@ -49,6 +49,14 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     expect(entries("shell.overlay").length).toBeGreaterThanOrEqual(5);
   });
 
+  it("ui-shell → 'shell.statusbar' slot 注册 StatusBar(插件可整体替换)", () => {
+    // entries() 返回的是收敛后的组件,要看注册者得读 entriesOfSlot 的原始 entry。
+    const raw = runtime.slots.entriesOfSlot("shell.statusbar");
+    expect(raw.length).toBeGreaterThanOrEqual(1);
+    expect(raw[0]?.options.registrant).toBe("@openbuddy/ui-shell");
+    expect(entries("shell.statusbar").length).toBe(1);
+  });
+
   it("ui-primitives → 'notifications' slot 注册 Toast", () => {
     expect(entries("notifications").length).toBeGreaterThanOrEqual(1);
   });

@@ -88,6 +88,12 @@ describe.skipIf(!canLaunch)("live electron probe: 微内核装配 + 主题落地
     expect(onboarding.entries).toBe(1);
     expect(onboarding.registrants).toEqual(["@openbuddy/ui-onboarding"]);
 
+    // 状态栏:ui-shell 注册默认实现,宿主 AppStatusBar 消费同一个槽。
+    const statusBar = report.slots["shell.statusbar"];
+    expect(statusBar).not.toBeNull();
+    expect(statusBar.entries).toBe(1);
+    expect(statusBar.registrants).toEqual(["@openbuddy/ui-shell"]);
+
     // shell.overlay 是 list kind,由多个包共同填充。
     const overlay = report.slots["shell.overlay"];
     expect(overlay).not.toBeNull();
