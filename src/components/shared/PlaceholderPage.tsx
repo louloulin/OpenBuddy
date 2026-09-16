@@ -4,6 +4,7 @@ import { assistantWorkspaceSectionFromRoute } from "@openbuddy/ui-shared";
 import { AssistantWorkbenchNav } from "@openbuddy/ui-shell";
 import { invoke } from "@/lib/platform/electron-api";
 import { useRendererContributions } from "@/lib/runtime/renderer-plugin-runtime";
+import { useSlotComponent } from "@/features/app/slot-bridge";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import type { ModelOption } from "@openbuddy/ui-workbench";
 import type { ProjectMeta } from "@/stores/projects-store";
@@ -117,6 +118,10 @@ function PlaceholderPageInner({
 }: PlaceholderPageProps) {
   const assistantSection = assistantWorkspaceSectionFromRoute(label);
   const assistantExtension = useRendererContributions("assistant").find((contribution) => contribution.payload.route === label);
+  // 「专家·技能·连接器」整块走内核 `experts.panel` 槽:插件可以注册更高优先级
+  // 实现整体替换这个面板(例如换成企业内部的专家目录)。必须在所有 early return
+  // 之前调用 hook —— 与下面 `files.tree` / `editor.body` 的接线方式一致。
+  const ExpertsPanelSlot = useSlotComponent("experts.panel", ExpertsPanel);
   if (label === "助理·本地助理") {
     return (
       <AssistantLocalWorkspace
@@ -208,7 +213,7 @@ function PlaceholderPageInner({
         <div className="experts-grid-host">
           <ExpertsGrid />
         </div>
-        <ExpertsPanel
+        <ExpertsPanelSlot
           onGoHome={onGoHome}
           onToast={onToast}
           sessionId={sessionId}
@@ -408,4 +413,3 @@ function AssistantLocalWorkspace({
     </div>
   );
 }
-

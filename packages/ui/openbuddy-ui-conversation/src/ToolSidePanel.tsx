@@ -26,6 +26,7 @@ import { openLocalPath } from "@/lib/markdown/markdown-host";
 import { listDir } from "@/lib/agent/pi-client";
 import { invoke } from "@/lib/platform/electron-api";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
+import { ConversationToolSide } from "./conversation-slots";
 import { IS_MACOS } from "@/lib/platform/platform";
 import { ViewSelector, defaultViews } from "@openbuddy/ui-workbench";
 import { ArtifactTabsBar } from "@openbuddy/ui-workbench";
@@ -372,6 +373,16 @@ function ToolSidePanelInner({
               onToast={onToast}
             />
           )}
+          {/* 内核 `conversation.toolside` 槽(list 语义):插件可以往右侧面板
+              追加自己的区块(例如「运行日志」「审阅记录」)。内置不注册任何
+              内容,因此默认完全不占位 —— 这是追加口子,不是替换口子,所以
+              不需要 fallback,也不会改变现有视觉。 */}
+          <ConversationToolSide
+            view={view}
+            sessionId={sessionId}
+            cwd={cwd}
+            open={open}
+          />
         </div>
       </div>
     </aside>

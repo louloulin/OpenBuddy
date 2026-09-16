@@ -16,6 +16,13 @@
  * @see packages/ui/AGENTS.md 了解 ui-* 包协作约定
  */
 import type { SlotMap } from "@openbuddy/ui-slots";
+// 仅供 `declare module` 里的 owner 类型使用(纯类型,编译后擦除,不会引入循环依赖)。
+import type { ComposerProps as ComposerOwnProps } from "./Composer";
+import type {
+  ConversationBodyProps,
+  ConversationMarkdownProps,
+  ConversationToolSideProps,
+} from "./conversation-slots";
 
 export type { SlotMap };
 
@@ -49,11 +56,68 @@ export type { ToolSidePanelMode } from "./ToolSidePanel";
 
 declare module "@openbuddy/ui-slots" {
   interface SlotMap {
-    "conversation.body": { kind: "single"; scope: "session-maybe" };
-    "conversation.composer": { kind: "single"; scope: "session-maybe" };
-    "conversation.toolside": { kind: "list"; scope: "session" };
-    "conversation.message.markdown": { kind: "single"; scope: "session" };
+    /** 转录区(空态 / 列表 / 虚拟列表)整块布局。消费者:`ChatView`。 */
+    "conversation.body": {
+      kind: "single";
+      scope: "session-maybe";
+      owner: ConversationBodyProps;
+    };
+    /** 输入区整块。消费者:`ChatView` —— props 与内置 `<Composer>` 完全一致。 */
+    "conversation.composer": {
+      kind: "single";
+      scope: "session-maybe";
+      owner: ComposerOwnProps;
+    };
+    /** 右侧工具面板的**追加**区(list:所有注册项都渲染)。消费者:`ToolSidePanel`。 */
+    "conversation.toolside": {
+      kind: "list";
+      scope: "session";
+      owner: ConversationToolSideProps;
+    };
+    /** 单条消息的 markdown 正文渲染。消费者:`MessageItem`。 */
+    "conversation.message.markdown": {
+      kind: "single";
+      scope: "session";
+      owner: ConversationMarkdownProps;
+    };
+    /**
+     * 输入框工具栏的**追加**按钮(list)。消费者:`Composer`。
+     *
+     * 这条声明此前**缺失** —— `Composer.tsx` 一直在用 `useSlotPayloads` 读它、
+     * 示例插件与真机探针也一直在往里注册,但 SlotMap 里没有它,所以插件作者
+     * 在编辑器里拿不到任何类型提示(审计里也只显示"有人消费、没人声明")。
+     */
+    "composer.toolbar.action": {
+      kind: "list";
+      scope: "session";
+      owner: ComposerToolbarAction;
+    };
   }
 }
+
+/** `composer.toolbar.action` 的贡献形状(数据型:宿主提供按钮外观,插件只给数据)。 */
+export type ComposerToolbarAction = {
+  id: string;
+  label: string;
+  title?: string;
+  icon?: string;
+  /** 点击回调;宿主已经确保它在会话上下文中被调用。 */
+  onClick?: () => void;
+  /** 需要时由宿主渲染的禁用态。 */
+  disabled?: boolean;
+};
+
+export {
+  ConversationBody,
+  ConversationComposer,
+  ConversationMarkdown,
+  ConversationToolSide,
+} from "./conversation-slots";
+export type {
+  ConversationBodyProps,
+  ConversationMarkdownProps,
+  ConversationToolSideProps,
+} from "./conversation-slots";
+export type { ComposerProps } from "./Composer";
 export { MentionPicker } from "./MentionPicker";
 export type { MentionPickerProps } from "./MentionPicker";

@@ -34,6 +34,8 @@ import {
 } from "@/lib/agent/session-artifacts";
 import { MessageItem } from "./MessageItem";
 import { Composer } from "./Composer";
+import type { ComposerProps } from "./Composer";
+import { ConversationBody, ConversationComposer } from "./conversation-slots";
 import { PiReloadFailureBanner } from "./PiReloadFailureBanner";
 import { PlanPanel } from "@openbuddy/ui-automation";
 import { RewindBar } from "./RewindBar";
@@ -1002,6 +1004,45 @@ export function ChatView({
     </>
   );
 
+  // 输入区的 props 打成一包:内置 <Composer> 与内核 `conversation.composer` 槽的
+  // 实现收到的是**同一份**契约 —— 插件可以只包一层,把剩余 props 原样转发回去,
+  // 不必自己重新发明一套输入区 API。字段与接线前逐个对应(callbacks 仍由 ChatView
+  // 的 useCallback 稳定,所以 Composer 的 memo 行为不变)。
+  const composerProps: ComposerProps = {
+    streaming,
+    disabled: readOnlySubagent,
+    onSend,
+    onSendContent,
+    onEnqueue: sessionId ? handleComposerEnqueue : undefined,
+    onCancel,
+    modelId,
+    models,
+    onModelChange,
+    cwd,
+    workspaces,
+    onSelectWorkspace: handleComposerWorkspaceChange,
+    workspaceLoading: switchingWorkspace !== null,
+    showDisclaimer: true,
+    permissionInline: true,
+    thinkingLevel,
+    onThinkingChange: handleThinkingChange,
+    onToast,
+    draft,
+    draftKey: sessionId ?? undefined,
+    onDraftChange: sessionId ? handleComposerDraftChange : undefined,
+    externalText: resendText,
+    externalTextNonce: resendNonce,
+    onSelectMode,
+    onSelectExpert,
+    onNavigateConnectors,
+    activeExpertName,
+    activeExpertAvatar,
+    usageSessionId: sessionId ?? undefined,
+    usageMsgCount: messages.length,
+    extensionText,
+    extensionTextNonce,
+  };
+
   return (
     <div className={"chatview" + (panelOpen ? " chatview--with-panel" : "")}>
       <div className="chatview__main">
@@ -1181,79 +1222,94 @@ export function ChatView({
             {teamsOpen && (
               <TeamStatusView messages={messages} />
             )}
-            {timeline.length === 0 ? (
-              <div className="chatview__empty-state" role="status">
-                {/* R8.27 — Replace the ✨ emoji with a brand-tinted lucide
-                   WandSparkles icon. The previous emoji varied in
-                   rendering across platforms and didn't pick up the
-                   brand colour. The new icon is consistent, scales with
-                   the page, and is wrapped in a halo div so we can
-                   animate it independently. */}
-                <div className="chatview__empty-state-hero">
-                  <div className="chatview__empty-state-halo" aria-hidden="true" />
-                  <WandSparkles
-                    className="chatview__empty-state-icon"
-                    size={28}
-                    strokeWidth={1.75}
-                    aria-hidden="true"
+            {/* 转录区走内核 `conversation.body` 槽(见 conversation-slots.tsx)。
+                插件可以整体接管布局(分组 / 日期轴 / 自定义列表),`fallback` 就是
+                接线前的那段 JSX —— 内核里没有实现时渲染结果逐字一致,所以卸载
+                插件后视觉零变化。`renderNode` 一起交出去,插件只改布局时不必
+                自己实现消息渲染。 */}
+            <ConversationBody
+              timeline={timeline}
+              renderNode={renderTimelineNode}
+              sessionId={sessionId ?? undefined}
+              streaming={streaming}
+              virtualized={useVirtualList}
+              scrollRef={scrollRef as React.RefObject<HTMLElement | null>}
+              fallback={
+                timeline.length === 0 ? (
+                  <div className="chatview__empty-state" role="status">
+                    {/* R8.27 — Replace the ✨ emoji with a brand-tinted lucide
+                       WandSparkles icon. The previous emoji varied in
+                       rendering across platforms and didn't pick up the
+                       brand colour. The new icon is consistent, scales with
+                       the page, and is wrapped in a halo div so we can
+                       animate it independently. */}
+                    <div className="chatview__empty-state-hero">
+                      <div className="chatview__empty-state-halo" aria-hidden="true" />
+                      <WandSparkles
+                        className="chatview__empty-state-icon"
+                        size={28}
+                        strokeWidth={1.75}
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <h2 className="chatview__empty-state-title">开始一段新的对话</h2>
+                    <p className="chatview__empty-state-subtitle">
+                      OpenBuddy 帮你调度专家 / 技能 / 连接器,在下方输入框描述你的任务即可。
+                    </p>
+                    <p className="chatview__empty-state-hint">
+                      按 <kbd>?</kbd> 查看全部快捷键,<kbd>/</kbd> 调用技能与指令,<kbd>@</kbd> 引用对话文件。
+                    </p>
+                    <ul className="chatview__empty-state-tags" aria-label="可用能力">
+                      <li className="chatview__empty-state-tag">助理</li>
+                      <li className="chatview__empty-state-tag">项目</li>
+                      <li className="chatview__empty-state-tag">专家 / 技能 / 连接器</li>
+                      <li className="chatview__empty-state-tag">自动化</li>
+                      <li className="chatview__empty-state-tag">资料库</li>
+                    </ul>
+                    {/* R8.10 — Quick-prompt cards. Click seeds the composer via the
+                        same resendText pipe as inline-edit / revision-pager; the
+                        user can refine the prompt and hit enter. Each card has
+                        an icon + title + one-line description so first-time users
+                        immediately understand what the assistant can do. */}
+                    <div
+                      className="chatview__quick-prompts"
+                      role="group"
+                      aria-label="快速开始模板"
+                    >
+                      {QUICK_PROMPTS.map((qp) => {
+                        const Icon = qp.icon;
+                        return (
+                          <button
+                            key={qp.id}
+                            type="button"
+                            className="chatview__quick-prompt"
+                            data-testid={`quick-prompt-${qp.id}`}
+                            onClick={() => handleQuickPrompt(qp.prompt)}
+                            aria-label={qp.title}
+                          >
+                            <span className="chatview__quick-prompt-icon" aria-hidden="true">
+                              <Icon size={18} strokeWidth={1.75} />
+                            </span>
+                            <span className="chatview__quick-prompt-body">
+                              <span className="chatview__quick-prompt-title">{qp.title}</span>
+                              <span className="chatview__quick-prompt-desc">{qp.desc}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : useVirtualList ? (
+                  <VirtualizedMessageList
+                    timeline={timeline}
+                    scrollRef={scrollRef as React.RefObject<HTMLElement>}
+                    renderItem={renderTimelineNode}
                   />
-                </div>
-                <h2 className="chatview__empty-state-title">开始一段新的对话</h2>
-                <p className="chatview__empty-state-subtitle">
-                  OpenBuddy 帮你调度专家 / 技能 / 连接器,在下方输入框描述你的任务即可。
-                </p>
-                <p className="chatview__empty-state-hint">
-                  按 <kbd>?</kbd> 查看全部快捷键,<kbd>/</kbd> 调用技能与指令,<kbd>@</kbd> 引用对话文件。
-                </p>
-                <ul className="chatview__empty-state-tags" aria-label="可用能力">
-                  <li className="chatview__empty-state-tag">助理</li>
-                  <li className="chatview__empty-state-tag">项目</li>
-                  <li className="chatview__empty-state-tag">专家 / 技能 / 连接器</li>
-                  <li className="chatview__empty-state-tag">自动化</li>
-                  <li className="chatview__empty-state-tag">资料库</li>
-                </ul>
-                {/* R8.10 — Quick-prompt cards. Click seeds the composer via the
-                    same resendText pipe as inline-edit / revision-pager; the
-                    user can refine the prompt and hit enter. Each card has
-                    an icon + title + one-line description so first-time users
-                    immediately understand what the assistant can do. */}
-                <div
-                  className="chatview__quick-prompts"
-                  role="group"
-                  aria-label="快速开始模板"
-                >
-                  {QUICK_PROMPTS.map((qp) => {
-                    const Icon = qp.icon;
-                    return (
-                      <button
-                        key={qp.id}
-                        type="button"
-                        className="chatview__quick-prompt"
-                        data-testid={`quick-prompt-${qp.id}`}
-                        onClick={() => handleQuickPrompt(qp.prompt)}
-                        aria-label={qp.title}
-                      >
-                        <span className="chatview__quick-prompt-icon" aria-hidden="true">
-                          <Icon size={18} strokeWidth={1.75} />
-                        </span>
-                        <span className="chatview__quick-prompt-body">
-                          <span className="chatview__quick-prompt-title">{qp.title}</span>
-                          <span className="chatview__quick-prompt-desc">{qp.desc}</span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : useVirtualList ? (
-              <VirtualizedMessageList
-                timeline={timeline}
-                scrollRef={scrollRef as React.RefObject<HTMLElement>}
-                renderItem={renderTimelineNode}
-              />
-            ) : (
-              timeline.map((node, index) => renderTimelineNode({ node, index }))
-            )}
+                ) : (
+                  timeline.map((node, index) => renderTimelineNode({ node, index }))
+                )
+              }
+            />
           </div>
           {/* R6.5 — Floating "jump to bottom" button. Visible only when
               the user has scrolled away from the end and new content
@@ -1330,39 +1386,12 @@ export function ChatView({
             <QueuePanel sessionId={sessionId} onSendNow={(t) => onSend(t)} />
           )}
           <PiReloadFailureBanner />
-          <Composer
-            streaming={streaming}
-            disabled={readOnlySubagent}
-            onSend={onSend}
-            onSendContent={onSendContent}
-            onEnqueue={sessionId ? handleComposerEnqueue : undefined}
-            onCancel={onCancel}
-            modelId={modelId}
-            models={models}
-            onModelChange={onModelChange}
-            cwd={cwd}
-            workspaces={workspaces}
-            onSelectWorkspace={handleComposerWorkspaceChange}
-            workspaceLoading={switchingWorkspace !== null}
-            showDisclaimer
-            permissionInline
-            thinkingLevel={thinkingLevel}
-            onThinkingChange={handleThinkingChange}
-            onToast={onToast}
-            draft={draft}
-            draftKey={sessionId ?? undefined}
-            onDraftChange={sessionId ? handleComposerDraftChange : undefined}
-            externalText={resendText}
-            externalTextNonce={resendNonce}
-            onSelectMode={onSelectMode}
-            onSelectExpert={onSelectExpert}
-            onNavigateConnectors={onNavigateConnectors}
-            activeExpertName={activeExpertName}
-            activeExpertAvatar={activeExpertAvatar}
-            usageSessionId={sessionId ?? undefined}
-            usageMsgCount={messages.length}
-            extensionText={extensionText}
-            extensionTextNonce={extensionTextNonce}
+          {/* 输入区走内核 `conversation.composer` 槽:插件可以整体替换输入区,
+              也可以只包一层(加自己的提示条 / 按钮)再把 props 转发给内置 Composer。
+              `fallback` 就是接线前的 `<Composer>` —— 内核里没有实现时逐字一致。 */}
+          <ConversationComposer
+            {...composerProps}
+            fallback={<Composer {...composerProps} />}
           />
         </div>
       </div>

@@ -1276,32 +1276,119 @@ R21: 总共 40 个槽位; ok=17 dead=4 ext=6 no-impl=13
 - 全量:`npx vitest run` → **774 文件 / 7506 通过 / 0 失败 / 16 跳过**;
   `tsc --noEmit` → 0 错;`electron-vite build` → 成功。
 
+## R22 — no-impl 槽位归零:13 条"注册了却没人消费"全部收口
+
+R20 / R21 把审计表里的 no-impl 从 17 降到 13,剩下这 13 条不再只是"接线问题",
+而是四种完全不同的东西被审计脚本用同一把尺子量。R22 的做法是先给判据分类,
+再逐类处置 —— 顺手修掉审计脚本自己的两个假阴性 + 一个真 bug。
+
+### R22.1 四类判据(取代原来的一把尺)
+
+| 类别 | 判据 | 处置 | 条数 |
+|---|---|---|---|
+| 真该接线 | 声明者之外有消费者,但消费者没走槽位 | 补消费者 | 8 |
+| 跨包默认 | 声明在 A 包,内置默认注册在 B 包(A 只声明空位) | 修判据:有消费者 = 有内置默认 | 2 |
+| 参考实现 | `apply()` 有意 no-op,只导出组件给第三方用 | 加 `REFERENCE_ONLY_SLOTS` | 2 |
+| 已废弃 | 命名被新槽取代 | 加 `DEPRECATED_SLOTS` | 1 |
+
+原来的判据是"**声明者 == 消费者**才算 ok",过窄:它把 `modules.marketplace`
+这种"ui-modules 声明、ui-experts 提供默认实现"的正常协作判成了 no-impl。
+新判据只看"有没有人真的渲染它"。
+
+### R22.2 `conversation.*` 四条槽真的接上消费者(本轮最大工作量)
+
+新增 `packages/ui/openbuddy-ui-conversation/src/conversation-slots.tsx` —— 四条薄
+包壳,原实现逐字降级为 `fallback`,零注册时渲染结果与改造前**逐像素相同**:
+
+- `conversation.message.markdown` → `MessageItem.tsx` 的 text / thought 两个分支改走
+  `ConversationMarkdown`,`<StreamingMarkdown>` / `<Markdown>` 成为 fallback。
+- `conversation.body` → `ChatView.tsx` 转录区外包一层,`fallback` 是原来那段 JSX;
+  同时把 `timeline` / `renderNode` / `sessionId` / `streaming` / `virtualized` /
+  `scrollRef` 交给插件,想整块换转录区(比如换成 canvas 时间线)的插件不用再 fork 组件。
+- `conversation.composer` → `ChatView.tsx` 把原来散在 JSX 上的 32 个 prop 收成
+  `const composerProps: ComposerProps`,再
+  `<ConversationComposer {...composerProps} fallback={<Composer {...composerProps} />} />`。
+  `Composer.tsx` 顺带导出 `export type ComposerProps = Parameters<typeof ComposerInner>[0]`,
+  这样插件侧的 props 类型由实现反推,不会两边漂移。
+- `conversation.toolside` → `ToolSidePanel.tsx` 的 `__body` 末尾追加(list 语义,
+  零注册时不占位)。
+
+`index.ts` 的 SlotMap 同时补上 `owner` 类型,并**新增此前完全缺失的
+`composer.toolbar.action` 声明**(全仓早就在注册它,却没有类型 —— 这类"用了没声明"
+是下一种审计假阴性的来源)。
+
+### R22.3 `home.*` 三条槽接线
+
+新增 `packages/ui/openbuddy-ui-settings/src/home-slots.tsx`(`HomeSceneTabs` /
+`HomePracticeCases`)。`HomePage.tsx` 的场景行与案例条分别包进
+`<HomeSceneTabs fallback={原 JSX}>` / `<HomePracticeCases onSelect={fillComposer} fallback={原 JSX}>`。
+
+`ui-settings/src/index.ts` 末尾补 `home.scene.tab` 的 `declare module`(此前全仓在用
+但**零声明**)+ 两条 single 的强类型 owner;`ui-home/src/client.tsx` 删掉重复声明
+(TS2717),`home.page` 标注 `@deprecated` 并写明替代路径。
+
+### R22.4 `experts.panel` 接线
+
+`src/components/shared/PlaceholderPage.tsx`:
+`const ExpertsPanelSlot = useSlotComponent("experts.panel", ExpertsPanel)`,替换
+原来的直接渲染。**关键点**:这个 hook 必须放在所有 early return 之前 —— 否则
+不同渲染分支下 hook 数量不一致,直接是 React error #185(hook 顺序错误)。
+`PlaceholderPage` 恰好有一堆 early return(loading / error / empty),这里踩过一次。
+
+### R22.5 审计脚本三处修
+
+- **新增 `stripComments()`**:剥掉注释后再扫 `<SlotOutlet name="..."/>`。修的是
+  `ui-runtime/client.tsx` 文档注释里的示例代码造成的**幽灵槽 `...`**(40 → 39 槽)。
+- **`isSelfConsumedIncrement` → `hasBuiltinDefault`**:判据简化为"有消费者 = 有内置默认"。
+- **新增 `REFERENCE_ONLY_SLOTS`**(`modules.marketplace` / `.item`,ui-modules 只导出
+  参考实现,`apply()` 有意 no-op)与 **`DEPRECATED_SLOTS`**(`home.page`)。
+
+### R22.6 审计快照变化
+
+```
+R20:  ok=13 dead=4 ext=6  no-impl=17   (40 槽)
+R21:  ok=17 dead=4 ext=6  no-impl=13   (40 槽)
+R22:  ok=17 dead=4 ext=18 no-impl=0    (39 槽)  ← 幽灵槽也清了
+```
+
+剩下的 4 个 dead 是真 dead(`onboarding.data-dir` / `.feedback` / `.whats-new` / `root`),
+需要宿主注入数据或产品决策,见后续计划。
+
+### R22.7 测试
+
+- 新增 `packages/ui/openbuddy-ui-conversation/src/__tests__/conversation-slots.test.tsx`
+  (11 条):4 条覆盖 `message.markdown`(fallback 两条 + 插件接管 + props 契约)、
+  2 条 `body`、2 条 `composer`、2 条 `toolside`,外加 1 条端到端"插件接管后聊天记录
+  真的换了"。
+- **两个必须记住的坑**:(1) 测试必须挂在 `<SlotProvider>` 里 —— `useSlotComponents`
+  读的是 React context 不是模块单例,裸渲染拿不到插件;(2) `vi.mock` 主题包时要用
+  `importOriginal` 展开保留 `ThemeProvider`,整体 mock 会让内核装不起来。
+- 全量:`npx vitest run` → **775 文件 / 7517 通过 / 0 失败 / 16 跳过**;
+  `tsc --noEmit` → 0 错;`electron-vite build` → 成功;
+  真机探针 `_probe-slot-assembly` / `_probe-plugin-command` / `_probe-settings-appearance` /
+  `_probe-theme-fonts` → **13/13 通过**。
+- 局部回归(settings / conversation / home / experts / components)→ 99 文件 / 765 通过。
+
 ## 当前进度(按四期主线)
 
 | 期 | 内容 | 进度 | 说明 |
 |---|---|---|---|
 | Phase A | 主题系统 v2 | **100%** | 19 套主题、OKLCh、Match-system、防 FOUC、ThemePicker / Studio、主题字体落地 |
-| Phase B | Workspace 表现层 | **95%** | Resizable sidebar、虚拟化 files-tree 进生产、Artifact Tabs / breadcrumb、Topbar / StatusBar；剩 `details` 浮层接线 |
+| Phase B | Workspace 表现层 | **98%** | Resizable sidebar、虚拟化 files-tree 进生产、Artifact Tabs / breadcrumb、Topbar / StatusBar；剩 `details` 浮层接线 |
 | Phase C | 编辑器与富文本 | **95%** | TiPTap 编辑器 + 三个扩展点接上消费者 + Office 四预览；剩 math/mermaid 的编辑侧 round-trip 加固 |
-| Phase D | Onboarding 与差异化 | **85%** | wizard / tour / marketplace / Pi 市场桥接 / Theme Studio 完成；剩 3 个 onboarding 槽需要宿主注入数据,Plugin SDK v1 站点未开工 |
+| Phase D | Onboarding 与差异化 | **90%** | wizard / tour / marketplace / Pi 市场桥接 / Theme Studio 完成；剩 3 个 onboarding 槽需要宿主注入数据,Plugin SDK v1 站点未开工 |
 
 ## 后续计划(优先级排序)
 
-1. **R22 — 整壳替换能力落地**:R21.5 已澄清 `shell.overlay` / `notifications` /
-   `details` 不是漏接线,而是"给 AppFrame 路径的第二份注册"。要决定的是**要不要
-   真的把整壳替换做成可用能力**(第三方 shell 通过 `root` 槽替换 AppShell),还是
-   退役这条路径、只保留命名 `overlay.*`。后者能让审计表少 4 个 ext 槽,前者是
-   微内核对称性的最后一块拼图。
-2. **R23 — 3 个 onboarding dead 槽**:`onboarding.data-dir` / `.feedback` 由宿主注入
-   `onSubmit`;`.whats-new` 需要先有**应用内** changelog 数据源(可从
-   `apps/openbuddy-website/src/lib/changelog-server.ts` 抽一份共享 JSON)。
-3. **R24 — 剩余 no-impl 槽收口**:`conversation.{body,composer,message.markdown,toolside}` /
-   `home.*` / `modules.marketplace*` / `experts.panel` / `composer.toolbar.action`。
-   目标是把"靠 fallback 活着"降到 0,或明确标注为设计如此(`overlay.about` /
-   `overlay.folder-trust` 属后者,应加进 `INTENTIONAL_EXTENSION_POINTS`)。
-4. **R25 — Plugin SDK v1 文档站点**:`openbuddy.plugin.v1` manifest 全量公开 +
+1. **R23 — 3 个 onboarding dead 槽 + `root` 槽决策**:`onboarding.data-dir` /
+   `.feedback` 由宿主注入 `onSubmit`;`.whats-new` 需要先有**应用内** changelog 数据源
+   (可从 `apps/openbuddy-website/src/lib/changelog-server.ts` 抽一份共享 JSON)。
+   `root` 槽(R21.5 澄清的"给 AppFrame 路径的第二份注册")要决定:是把它做成真正的
+   整壳替换能力,还是退役这条路径只保留命名 `overlay.*`。
+2. **R25 — Plugin SDK v1 文档站点**:`openbuddy.plugin.v1` manifest 全量公开 +
    `examples/` + starter 模板。开源差异化的最重要抓手。
-5. **R26 — Pi 扩展市场多源 registry**:当前是单源,多源 + 权重 + 离线缓存。
+3. **R26 — Pi 扩展市场多源 registry**:当前是单源,多源 + 权重 + 离线缓存。
+4. **加固项**:math / mermaid 编辑侧 round-trip;`details` 浮层的窄屏表现。
 
 ## 用户可见的差距分析(与 WorkBuddy 对比)
 

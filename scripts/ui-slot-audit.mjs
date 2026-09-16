@@ -43,6 +43,19 @@ function walk(dir, out = []) {
   return out;
 }
 
+/**
+ * 剥掉 `/* … *\/` 与 `// …` 注释。
+ *
+ * 故意做得很朴素(不处理正则字面量 / 模板串里的 `//`):这个脚本只需要"注释里
+ * 的示例代码不参与匹配",而不是一个准确的 JS 词法分析器。真要处理模板串反而
+ * 会引入新的误判面(例如 markdown 里的 URL)。
+ */
+function stripComments(text) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, "$1");
+}
+
 const files = [];
 for (const root of ["packages/ui", "src", "packages/bundle", "packages/runtime"]) {
   const p = join(ROOT, root);
@@ -82,6 +95,14 @@ for (const file of files) {
   } catch {
     continue;
   }
+  // 先去掉注释再扫描。
+  //
+  // 为什么必要:`ui-runtime/src/client.tsx` 的文档注释里写着
+  // `<SlotOutlet name="..."/>`,它被 OUTLET_RE 当成真消费点匹配到,于是审计表
+  // 里多出一行槽名叫 `...` 的幽灵 no-impl —— 每次看表都要重新判断一遍"这是
+  // 不是漏接线"。注释里的示例代码不是契约,扫描前必须剥掉。
+  // (先剥注释也让下面 `declare module` 的定位不会被注释里的同名文本干扰。)
+  src = stripComments(src);
   const add = (map, name, value) => {
     if (!map.has(name)) map.set(name, new Set());
     map.get(name).add(value);
@@ -108,16 +129,44 @@ for (const file of files) {
 // 审计都要重新判断一遍是不是接线漏了。
 const INTENTIONAL_EXTENSION_POINTS = new Set(["shell.overlay", "notifications", "details"]);
 
+/**
+ * 只提供**参考实现**的槽:声明它们的包既不注册、也不在本产品外壳渲染。用途是
+ * 给第三方插件一个可复用的组件底座(插件 import 本包组件,注册到别的槽或自己
+ * 渲染)。
+ *
+ * \`modules.marketplace\` / \`modules.marketplace.item\` 属于这一类:ui-modules 导出
+ * \`MarketplaceTab\` / \`MarketplaceCard\` 作为市场页的参考实现,apply() 是有意的
+ * no-op(内置市场页走 ui-mcp 的 \`MarketplacePanel\`,自带 IPC 取数据;两套数据
+ * 模型不同,强行接线只会造出第二份实现)。
+ */
+const REFERENCE_ONLY_SLOTS = new Set(["modules.marketplace", "modules.marketplace.item"]);
+
+/**
+ * 已废弃、仅为兼容保留的槽。
+ *
+ * \`home.page\` 与 \`home\` 描述的是同一块 UI(首页整页),而 \`home\` 才是本产品
+ * 外壳真正消费的那个。留着声明是为了不破坏已有第三方插件的类型引用,但**不应**
+ * 再去接线它 —— 两个名字指向同一块区域只会误导插件作者。审计把它单列,免得每次
+ * 都重新判断一遍"这是不是漏接线"。
+ */
+const DEPRECATED_SLOTS = new Set(["home.page"]);
+
 const names = [...new Set([...declared.keys(), ...registered.keys(), ...consumed.keys()])].sort();
 
-/** 声明者与消费者是同一个包(或同一消费点),且该包自带内置默认实现。 */
-function isSelfConsumedIncrement(name) {
-  const declPkgs = new Set(
-    [...(declared.get(name) ?? [])].map((file) => pkgOf(file)),
-  );
-  const consPkgs = consumed.get(name) ?? new Set();
-  for (const pkg of consPkgs) if (declPkgs.has(pkg)) return true;
-  return false;
+/**
+ * 这个槽是不是「内置即默认插件」(零注册是设计如此,不是漏接线)。
+ *
+ * 判据只用一条:**有人消费它**。有消费者就意味着那块 UI 一定渲染出来了 ——
+ * 消费者必然带一个内置 fallback(否则是空白),那个 fallback 就是"默认实现"。
+ *
+ * 早期版本还要求"声明者 == 消费者",那是过窄的启发式:跨包默认同样成立
+ * (ui-modules 声明 \`modules.marketplace\`、ui-experts 消费、以 ui-mcp 的
+ * \`MarketplacePanel\` 兜底),这种槽会被误报成"靠 fallback 活着"。反过来也成立:
+ * 一个槽**没有**消费者时,零注册才是真问题(声明了但没人读)—— 那正是 no-impl
+ * 要抓的东西。
+ */
+function hasBuiltinDefault(name) {
+  return (consumed.get(name)?.size ?? 0) > 0;
 }
 
 const rows = names.map((name) => {
@@ -131,7 +180,10 @@ const rows = names.map((name) => {
     status: regs.length && cons.length
       ? "ok"
       : !regs.length
-        ? INTENTIONAL_EXTENSION_POINTS.has(name) || isSelfConsumedIncrement(name)
+        ? INTENTIONAL_EXTENSION_POINTS.has(name) ||
+          REFERENCE_ONLY_SLOTS.has(name) ||
+          DEPRECATED_SLOTS.has(name) ||
+          hasBuiltinDefault(name)
           ? "ext-default"
           : "no-impl"
         : INTENTIONAL_EXTENSION_POINTS.has(name)

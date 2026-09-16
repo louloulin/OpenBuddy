@@ -11,6 +11,7 @@ import { Skeleton } from "@openbuddy/ui-primitives";
 import { useSessionsStore, HOME_DRAFT_KEY } from "@/stores/sessions-store";
 import { useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
 import { useSlotPayloads } from "@openbuddy/ui-runtime/client";
+import { HomePracticeCases, HomeSceneTabs } from "./home-slots";
 import { RendererSlotView } from "@openbuddy/ui-workbench";
 import { usePendingExpertStore } from "@/stores/pending-expert-store";
 import {
@@ -573,43 +574,52 @@ export function HomePage({
           <RendererSlotView key={String(entry.options.id ?? entry.options.name)} entry={entry} className="home__workspace-plugin" />
         ))}
 
-        <div className="home__scenes" role="tablist" aria-label="场景">
-          {HOME_MODES.map((m, index) => (
-            <button
-              key={m.id}
-              role="tab"
-              aria-selected={modeId === m.id}
-              aria-controls="home-mode-panel"
-              aria-label={m.label}
-              tabIndex={modeId === m.id ? 0 : -1}
-              className={sceneCls(m.id)}
-              ref={(element) => {
-                sceneTabRefs.current[index] = element;
-              }}
-              onClick={() => handleModeChange(m.id)}
-              onKeyDown={(event) => handleSceneTabKeyDown(event, index)}
-            >
-              <m.icon size={14} />
-              <span>{m.label}</span>
-            </button>
-          ))}
-          {/* 插件贡献的场景 tab（`home.scene.tab` slot）。
-              数据型贡献只提供描述，UI 由宿主渲染 —— 第三方插件因此不必打包 React。 */}
-          {pluginSceneTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={false}
-              className="home__scene home__scene--plugin"
-              title={tab.description ?? tab.label}
-              onClick={() => tab.onActivate?.()}
-            >
-              {tab.icon ? <span aria-hidden="true">{tab.icon}</span> : null}
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
+        {/* 场景行走内核 `home.scene-tabs` 槽 —— 插件可以整行换成自己的场景导航
+            (例如按团队职责分组的入口);`fallback` 是接线前的这一行,逐字不变。 */}
+        <HomeSceneTabs
+          modes={HOME_MODES}
+          activeMode={modeId}
+          onSelect={handleModeChange}
+          fallback={
+            <div className="home__scenes" role="tablist" aria-label="场景">
+              {HOME_MODES.map((m, index) => (
+                <button
+                  key={m.id}
+                  role="tab"
+                  aria-selected={modeId === m.id}
+                  aria-controls="home-mode-panel"
+                  aria-label={m.label}
+                  tabIndex={modeId === m.id ? 0 : -1}
+                  className={sceneCls(m.id)}
+                  ref={(element) => {
+                    sceneTabRefs.current[index] = element;
+                  }}
+                  onClick={() => handleModeChange(m.id)}
+                  onKeyDown={(event) => handleSceneTabKeyDown(event, index)}
+                >
+                  <m.icon size={14} />
+                  <span>{m.label}</span>
+                </button>
+              ))}
+              {/* 插件贡献的场景 tab（`home.scene.tab` slot）。
+                  数据型贡献只提供描述，UI 由宿主渲染 —— 第三方插件因此不必打包 React。 */}
+              {pluginSceneTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={false}
+                  className="home__scene home__scene--plugin"
+                  title={tab.description ?? tab.label}
+                  onClick={() => tab.onActivate?.()}
+                >
+                  {tab.icon ? <span aria-hidden="true">{tab.icon}</span> : null}
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          }
+        />
 
         <section
           id="home-mode-panel"
@@ -782,27 +792,35 @@ export function HomePage({
               </button>
             </div>
           </header>
-          {!practicesBannerDismissed && (
-            <div className="home__practices-grid" key={practicesNonce}>
-              {bestPractices.map((p) => {
-                const Thumb = p.thumb;
-                return (
-                  <button
-                    key={p.titleZh}
-                    type="button"
-                    className="home__practice-card"
-                    aria-label={p.titleZh}
-                    onClick={() => fillComposer(p.prompt)}
-                  >
-                    <span className="home__practice-card-thumb" aria-hidden="true">
-                      <Thumb />
-                    </span>
-                    <span className="home__practice-card-caption">{p.titleZh}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* 最佳实践案例条走内核 `home.practice-cases` 槽 —— 插件可以换成自己的
+              案例集(企业模板 / 行业模板),`onSelect` 负责把 prompt 灌进输入框
+              (用户先改再发,不会直接发出)。`fallback` 是接线前的这一条。 */}
+          <HomePracticeCases
+            onSelect={fillComposer}
+            fallback={
+              !practicesBannerDismissed && (
+                <div className="home__practices-grid" key={practicesNonce}>
+                  {bestPractices.map((p) => {
+                    const Thumb = p.thumb;
+                    return (
+                      <button
+                        key={p.titleZh}
+                        type="button"
+                        className="home__practice-card"
+                        aria-label={p.titleZh}
+                        onClick={() => fillComposer(p.prompt)}
+                      >
+                        <span className="home__practice-card-thumb" aria-hidden="true">
+                          <Thumb />
+                        </span>
+                        <span className="home__practice-card-caption">{p.titleZh}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )
+            }
+          />
         </section>
       </div>
     </div>

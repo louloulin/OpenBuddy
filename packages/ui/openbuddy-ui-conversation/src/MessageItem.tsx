@@ -18,8 +18,8 @@ import Clock3 from "lucide-react/dist/esm/icons/clock-3";
 import Cpu from "lucide-react/dist/esm/icons/cpu";
 import Zap from "lucide-react/dist/esm/icons/zap";
 import { TooltipButton } from "./TooltipButton";
-import { Markdown, type MarkdownConfig } from "@openbuddy/ui-markdown";
-import { StreamingMarkdown } from "./StreamingMarkdown";
+import { type MarkdownConfig } from "@openbuddy/ui-markdown";
+import { ConversationMarkdown } from "./conversation-slots";
 import { ToolCallCard } from "./ToolCallCard";
 import { LoadingRow } from "./LoadingRow";
 import { TurnErrorCard } from "./TurnErrorCard";
@@ -307,18 +307,19 @@ function MessageItemInner({
             // for the currently-streaming message.
             const isStreaming = streaming && !message.complete;
             if (p.kind === "text") {
-              return isStreaming ? (
-                <StreamingMarkdown key={i} text={p.text} markdownTheme="loose" />
-              ) : (
-                <Markdown
+              // 正文走内核 `conversation.message.markdown` 槽:插件可以换成
+              // 自己的 markdown 引擎 / 批注视图,内核里没实现时渲染的就是原来
+              // 那对 StreamingMarkdown / Markdown —— 视觉零变化。
+              return (
+                <ConversationMarkdown
                   key={i}
+                  text={p.text}
+                  streaming={isStreaming}
                   complete={message.complete}
                   markdownTheme="loose"
                   theme={theme}
                   config={markdownConfig}
-                >
-                  {p.text}
-                </Markdown>
+                />
               );
             }
             if (p.kind === "thought") {
@@ -326,18 +327,14 @@ function MessageItemInner({
                 <details key={i} className="msg__thought">
                   <summary>深度思考</summary>
                   <div className="msg__thought-body">
-                    {isStreaming ? (
-                      <StreamingMarkdown text={p.text} markdownTheme="reasoning" />
-                    ) : (
-                      <Markdown
-                        complete={message.complete}
-                        markdownTheme="reasoning"
-                        theme={theme}
-                        config={markdownConfig}
-                      >
-                        {p.text}
-                      </Markdown>
-                    )}
+                    <ConversationMarkdown
+                      text={p.text}
+                      streaming={isStreaming}
+                      complete={message.complete}
+                      markdownTheme="reasoning"
+                      theme={theme}
+                      config={markdownConfig}
+                    />
                   </div>
                 </details>
               );

@@ -1469,3 +1469,13 @@ function ensureWebSpeechAsrRegistered(): void {
  * so the default comparator's reference check actually skips work.
  */
 export const Composer = memo(ComposerInner);
+
+/**
+ * 内置 Composer 的 props 契约。
+ *
+ * 导出它是为了让"替换输入区"的插件拿到**同一份**契约:内核
+ * `conversation.composer` 槽的实现会收到与内置组件完全相同的 props
+ * (见 `conversation-slots.tsx`),所以插件可以只包一层、把剩余 props 原样
+ * 转发给内置 Composer —— 不需要自己重新发明一套输入区 API。
+ */
+export type ComposerProps = Parameters<typeof ComposerInner>[0];

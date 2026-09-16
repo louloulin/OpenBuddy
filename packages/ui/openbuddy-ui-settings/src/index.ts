@@ -34,3 +34,46 @@ export {
   AgentSettingsPanel,
   AssistantSettingsPanel,
 } from "./SettingsSections";
+
+// ─── 首页子区域的槽位契约 ────────────────────────────────────────────
+//
+// 这三条都**由本包消费**(本包注册的 `HomePage` 才是真正渲染首页的实现),
+// 所以契约声明也放在这里:`@openbuddy/ui-home` 里那几条 `home.*` 描述的是
+// 同一个区域,但没有任何消费者(见该包里的 deprecation 说明)。
+//
+// 其中 `home.scene.tab` 此前**完全没有声明** —— 而它是全仓最久经考验的插件
+// 扩展点之一:`examples/openbuddy-plugin-hello`、`scripts/electron/_probe-plugin-sdk.mjs`
+// 与 plugin-sdk 的 `author.ts` 文档都在用它,插件作者却在编辑器里拿不到类型。
+declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * 首页场景行(list,数据型贡献)。消费者:`HomePage`。
+     *
+     * 插件只提供描述,UI 由宿主渲染 —— 第三方插件因此不必打包 React。
+     * `onActivate` 被调用时宿主把它当成一次场景切换。
+     */
+    "home.scene.tab": {
+      kind: "list";
+      scope: "root";
+      owner: {
+        id: string;
+        label: string;
+        icon?: unknown;
+        description?: string;
+        onActivate?: () => void;
+      };
+    };
+    /** 首页场景行**整行**替换(single)。消费者:`HomePage`(`home-slots.tsx`)。 */
+    "home.scene-tabs": {
+      kind: "single";
+      scope: "root";
+      owner: { modes: readonly { id: string; label: string }[]; activeMode: string; onSelect: (id: never) => void };
+    };
+    /** 最佳实践案例条**整条**替换(single)。消费者:`HomePage`。 */
+    "home.practice-cases": {
+      kind: "single";
+      scope: "root";
+      owner: { onSelect: (prompt: string) => void };
+    };
+  }
+}
