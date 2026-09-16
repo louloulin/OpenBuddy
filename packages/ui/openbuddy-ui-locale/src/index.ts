@@ -20,6 +20,9 @@ export type Locale = "zh-CN" | "en-US";
 export const DEFAULT_LOCALE: Locale = "zh-CN";
 export const SUPPORTED_LOCALES: readonly Locale[] = ["zh-CN", "en-US"] as const;
 
+/** 一份词表:嵌套的 key → 字符串(或子树)。 */
+export type LocaleDictionary = Record<string, unknown>;
+
 export interface LocaleService {
   current(): Locale;
   set(locale: Locale): void;
@@ -30,14 +33,40 @@ export interface LocaleService {
    */
   t(key: string, params?: Record<string, unknown>): string;
   /**
+   * 指定语言查词(与 `t` 的区别:不读当前语言)。宿主里带 locale 参数的
+   * `t(key, locale)` 兼容面用得上。
+   */
+  tIn(locale: Locale, key: string, params?: Record<string, unknown>): string;
+  /**
    * Bind a namespace to a translate function. The returned function reads
    * the active locale at call time, so a locale switch hands out NEW
    * function references.
    */
   bind(namespace: string): (key: string, params?: Record<string, unknown>) => string;
+  /**
+   * 注册一个包 / 插件自己的词表(带语言维度)。
+   *
+   * 与 `merge` 的分工:子表是**作用域隔离**的(只有 `bind(ns)` / 带 ns 的
+   * 查询能读到),合并层是**全局**的(产品文案直接进 `t`)。
+   */
+  register(locale: Locale, namespace: string, dictionary: LocaleDictionary): () => void;
+  /**
+   * 把一份词表**深度合并**进全局词表(宿主把产品文案搬进内核用)。
+   * 返回 disposer,重复调用是幂等的(同一个 locale 多次 merge 会叠加)。
+   */
+  merge(locale: Locale, dictionary: LocaleDictionary): () => void;
+  /** 当前支持的语言(按 SUPPORTED_LOCALES 顺序)。 */
+  available(): readonly Locale[];
 }
 
 declare module "@openbuddy/ui-slots" {
+  interface UiRuntimeContext {
+    /**
+     * 语言服务。与 React 树的 I18nProvider 是**同一个 store**:
+     * 插件 `ctx.locale.set("en-US")` 会立刻让订阅了 `useT` 的组件重渲染。
+     */
+    locale: LocaleService;
+  }
   interface GlobalStandardProps {
     useLocale(): LocaleService;
   }

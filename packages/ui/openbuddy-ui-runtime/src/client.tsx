@@ -25,8 +25,8 @@ import {
   type RendererPluginEntry,
 } from "@openbuddy/renderer-host";
 import { Context as CordisContext } from "@openbuddy/cordis";
-import { ThemeProvider } from "@openbuddy/ui-theme/client";
-import { I18nProvider } from "@openbuddy/ui-locale/client";
+import { ThemeProvider, getOrCreateThemeService } from "@openbuddy/ui-theme/client";
+import { I18nProvider, getOrCreateLocaleService } from "@openbuddy/ui-locale/client";
 import type { SessionRecord, WorkspaceRecord, Observable, UiRuntime } from "./index";
 import type { UiPlugin, SlotCoreLike, UiRuntimeContext, SlotKind, SlotScope } from "@openbuddy/ui-slots";
 import { BUILTIN_UI_APPLIES } from "./builtin-applies";
@@ -113,7 +113,10 @@ async function applyOne(slots: SlotCoreLike, plugin: UiPlugin | RendererPlugin):
   if (typeof apply !== "function") {
     throw new Error("ui-runtime: plugin.apply is not a function");
   }
-  const ctx = { slots, events: makeEvents() };
+  // 与内置包共用同一个 ctx:插件在 apply() 里能拿到 locale / theme / sessions,
+  // 而不是只有 slots。以前这里另建一个 events 总线 + 没有服务,文档承诺的
+  // 「apply 收到 ctx.locale / ctx.theme」对远程插件是空的。
+  const ctx = getRuntimeContext();
   const disposer = await Promise.resolve(apply(ctx as never, undefined));
   return async () => { await Promise.resolve(disposer?.()); };
 }
@@ -427,13 +430,38 @@ export function applyUiRuntime(ctx: { ui?: UiRuntime; slots?: SlotCoreLike; sess
  *   - 失败的 apply 不影响后续包(per-listener error swallow,事件层同策略)
  *   - 包内 ctx.slots.register() 注册的内容会被 SlotCore 持有,dispose 由各包负责
  */
+let runtimeCtx: UiRuntimeContext | null = null;
+
+/**
+ * 微内核给 apply(ctx) 的**完整**上下文。
+ *
+ * 为什么必须是一个共享对象而不是每次现造:
+ *   - `ctx.locale` / `ctx.theme` 指向 React 树用的同一个 store —— 插件改语言 /
+ *     改主题会立刻反映到界面(以前各建一个 store,改了没反应);
+ *   - `ctx.slots` / `ctx.sessions` / `ctx.workspaces` 与 runtime singleton 一致。
+ *
+ * 单例语义与 `getOrCreateSingleton()` 相同:进程内一份,`registerAllBuiltinUis`
+ * 与 `applyRemotePlugin` 都从这里取,因此插件与内置包看到的是同一个内核。
+ */
+export function getRuntimeContext(): UiRuntimeContext {
+  if (runtimeCtx) return runtimeCtx;
+  const rt = getOrCreateSingleton();
+  runtimeCtx = {
+    slots: rt.slots,
+    events: makeEvents(),
+    locale: getOrCreateLocaleService(),
+    theme: getOrCreateThemeService(),
+    sessions: rt.sessions,
+    workspaces: rt.workspaces,
+    ui: rt,
+  };
+  return runtimeCtx;
+}
+
 export function registerAllBuiltinUis(): () => void {
   const rt = getOrCreateSingleton();
   const core = rt.slots as SlotCoreHandle;
-  const ctx: UiRuntimeContext = {
-    slots: rt.slots,
-    events: makeEvents(),
-  };
+  const ctx = getRuntimeContext();
   const disposers: Array<() => void> = [];
   const report: BuiltinUiPackageReport[] = [];
   let okCount = 0;

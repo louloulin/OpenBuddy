@@ -75,6 +75,14 @@ declare module "@openbuddy/cordis" {
 }
 
 declare module "@openbuddy/ui-slots" {
+  interface UiRuntimeContext {
+    /** 会话列表(与 `useSessions()` 读到的是同一个 store)。 */
+    sessions: Observable<readonly SessionRecord[]>;
+    /** 工作区列表。 */
+    workspaces: Observable<readonly WorkspaceRecord[]>;
+    /** 内核句柄本身(高级用法:注册内置 / 远程插件)。 */
+    ui: UiRuntime;
+  }
   interface GlobalStandardProps {
     useUiRuntime(): UiRuntime;
     useSlot<K extends string>(name: K): {

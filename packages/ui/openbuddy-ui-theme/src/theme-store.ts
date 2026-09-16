@@ -220,6 +220,20 @@ function pickActiveThemeName(
 export interface ThemeStoreInternal extends ThemeService {
   /** For tests only: synchronously read the current resolved theme. */
   __theme(): ThemeDefinition | null;
+  /**
+   * 把当前状态重新写一遍到 `documentElement`（`data-theme` /
+   * `data-theme-name` + 全部 `--wb-*` 内联变量）。
+   *
+   * 为什么需要：store 变成进程内单例之后，"构造时 apply 一次"不再等价于
+   * "DOM 上一定是对的"。documentElement 可能被外部重置 —— HMR、单测的
+   * `afterEach`、同一文档里挂载的第二份应用、宿主 IDE 桥接清属性。这时
+   * 属性缺失 = 整棵 UI 掉回无主题状态（`--wb-bg-primary` 走 index.css 的
+   * `:root` 兜底），而 store 自己并不知道。
+   *
+   * Provider 在挂载时调一次即可：写入是幂等的，`lastAppliedType` /
+   * `lastAppliedKeys` 会正确处理"上一次写过、这次不提供"的 token。
+   */
+  syncDocument(): void;
 }
 
 // ─── v1 `data-theme` compatibility bridge ──────────────────────────
@@ -432,5 +446,8 @@ export function createThemeStore(): ThemeStoreInternal {
 
   return Object.assign(service, {
     __theme: () => activeTheme(),
+    syncDocument: () => {
+      applyThemeAttrs(activeTheme());
+    },
   });
 }
