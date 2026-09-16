@@ -13,9 +13,15 @@
  * 「注册了但零消费」= 死能力(要么接线漏了,要么 slot 名拼错)。
  *
  * 已知盲区(静态扫描的边界,不是漏报):
+ *   - 泛型里带函数类型的调用(`useSlotPayloads<{ onClick?: () => void }>("x")`)一度
+ *     被漏掉过 —— 泛型匹配现在允许引号以外的任意字符,别改回 `[^(]*`。
  *   - 用变量注册的槽名(例如 ui-dialogs 里的 `dialog.named`)扫不到,会显示成
  *     no-impl;核对时用真实 Electron 探针(_probe-slot-assembly.mjs)兜底。
  * 「消费了但零注册」= 靠 fallback 活着(内核里没有实现,插件化收益为 0)。
+ * 其中有一类**是设计如此**,单列成 ext-default:声明包自己消费、并且自带
+ * 内置默认实现(例如 ui-editor 的 `editor.toolbar` —— 内置按钮写在组件里,
+ * 槽位只承载"插件增量")。判据是自动推导的,不用手工维护白名单:
+ *   声明于包 P + 被包 P 消费 + 零注册者 ⇒ ext-default。
  *
  * 用法:node scripts/ui-slot-audit.mjs [--json]
  */
@@ -64,7 +70,7 @@ const REG_RES = [
   /\.register\(\s*\n?\s*"([^"]+)"/g,
   /\.register\(\s*\{[^}]*?name:\s*"([^"]+)"/gs,
 ];
-const CONS_RE = /useSlot(?:PayloadValues|Components|Entries|Payloads|Component|List)(?:<[^(]*>)?\(\s*"([^"]+)"/g;
+const CONS_RE = /useSlot(?:PayloadValues|Components|Entries|Payloads|Component|List)(?:<[^"]*?>)?\(\s*"([^"]+)"/g;
 const OUTLET_RE = /<SlotOutlet[^>]*?name="([^"]+)"/g;
 const GET_RE = /(?:slotCore|core)\.get\(\s*"([^"]+)"/g;
 
@@ -104,6 +110,16 @@ const INTENTIONAL_EXTENSION_POINTS = new Set(["shell.overlay", "notifications", 
 
 const names = [...new Set([...declared.keys(), ...registered.keys(), ...consumed.keys()])].sort();
 
+/** 声明者与消费者是同一个包(或同一消费点),且该包自带内置默认实现。 */
+function isSelfConsumedIncrement(name) {
+  const declPkgs = new Set(
+    [...(declared.get(name) ?? [])].map((file) => pkgOf(file)),
+  );
+  const consPkgs = consumed.get(name) ?? new Set();
+  for (const pkg of consPkgs) if (declPkgs.has(pkg)) return true;
+  return false;
+}
+
 const rows = names.map((name) => {
   const regs = [...(registered.get(name) ?? [])];
   const cons = [...(consumed.get(name) ?? [])];
@@ -115,7 +131,9 @@ const rows = names.map((name) => {
     status: regs.length && cons.length
       ? "ok"
       : !regs.length
-        ? "no-impl"
+        ? INTENTIONAL_EXTENSION_POINTS.has(name) || isSelfConsumedIncrement(name)
+          ? "ext-default"
+          : "no-impl"
         : INTENTIONAL_EXTENSION_POINTS.has(name)
           ? "ext"
           : "dead",
@@ -131,7 +149,13 @@ if (process.argv.includes("--json")) {
   console.log("-".repeat(110));
   for (const r of rows) {
     const icon =
-      r.status === "ok" ? "✅" : r.status === "dead" ? "💀" : r.status === "ext" ? "🔌" : "⚠️ ";
+      r.status === "ok"
+        ? "✅"
+        : r.status === "dead"
+          ? "💀"
+          : r.status === "ext" || r.status === "ext-default"
+            ? "🔌"
+            : "⚠️ ";
     console.log(
       pad(r.name, 30),
       pad(icon + " " + r.status, 8),
@@ -140,10 +164,18 @@ if (process.argv.includes("--json")) {
     );
   }
   const dead = rows.filter((r) => r.status === "dead");
-  const ext = rows.filter((r) => r.status === "ext");
+  const ext = rows.filter((r) => r.status === "ext" || r.status === "ext-default");
   const noImpl = rows.filter((r) => r.status === "no-impl");
   console.log("-".repeat(110));
   console.log(
     `总共 ${rows.length} 个槽位; ok=${rows.length - dead.length - noImpl.length - ext.length} dead=${dead.length} ext=${ext.length} no-impl=${noImpl.length}`,
   );
+  if (noImpl.length > 0) {
+    console.log(
+      `no-impl(消费方靠 fallback 活着,插件替换收益为 0): ${noImpl.map((r) => r.name).join(", ")}`,
+    );
+  }
+  if (dead.length > 0) {
+    console.log(`dead(注册了但零消费,能力不可见): ${dead.map((r) => r.name).join(", ")}`);
+  }
 }

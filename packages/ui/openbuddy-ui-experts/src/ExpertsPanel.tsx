@@ -30,7 +30,7 @@ export function ExpertsPanel({ onGoHome, onToast, sessionId }: Props) {
   return (
     <div className="um-market">
       {tab === "experts" && (
-        <ExpertsTab pills={pills} onGoHome={onGoHome} onToast={onToast} />
+        <ExpertsTabContent pills={pills} onGoHome={onGoHome} onToast={onToast} />
       )}
       {tab === "skills" && <SkillsTab pills={pills} onToast={onToast} />}
       {tab === "connectors" && <ConnectorsTab pills={pills} onToast={onToast} />}
@@ -39,6 +39,34 @@ export function ExpertsPanel({ onGoHome, onToast, sessionId }: Props) {
       )}
     </div>
   );
+}
+
+/** 专家网格走内核 `placeholder.experts` 槽位(与下面的 `modules.marketplace`
+ *  同一模式):本包在 `client.tsx` 里把 `ExpertsTab` 注册为默认实现,第三方
+ *  插件可以注册更高优先级实现整体替换;槽位为空时回退到本地组件 ——
+ *  两条路径渲染的是同一个组件,因此卸载插件后视觉零变化。
+ *
+ *  为什么需要这层包装:此前 `placeholder.experts` 注册了却**没有任何消费者**
+ *  (审计里是 dead 槽),插件替换专家的能力等于不存在。 */
+function ExpertsTabContent({
+  pills,
+  onGoHome,
+  onToast,
+}: {
+  pills: ReactNode;
+  onGoHome?: () => void;
+  onToast?: (message: string) => void;
+}) {
+  const slotImpls = useSlotComponents("placeholder.experts");
+  const SlotImpl = slotImpls[0] as
+    | ComponentType<{
+        pills: ReactNode;
+        onGoHome?: () => void;
+        onToast?: (message: string) => void;
+      }>
+    | undefined;
+  const Impl = SlotImpl ?? ExpertsTab;
+  return <Impl pills={pills} onGoHome={onGoHome} onToast={onToast} />;
 }
 
 /** Thin wrapper around <MarketplacePanel /> so the unified market page can
