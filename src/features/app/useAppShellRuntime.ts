@@ -35,6 +35,7 @@ import { usePendingExpertStore } from "@/stores/pending-expert-store";
 import { setToast as pushToast, useToastStore } from "@/stores/toast-store";
 import { useProjectsStore, type ProjectMeta } from "@/stores/projects-store";
 import { getStoredThemeName, useTheme } from "@openbuddy/ui-theme/client";
+import { clearRequestedMarketTab, requestMarketTab } from "@/lib/navigation/market-tab";
 import { useAgentSession } from "@/hooks/useAgentSession";
 import { useOptimisticNewSession } from "@/hooks/useOptimisticNewSession";
 import { newSessionFlow, composeDiscoverBody } from "@/lib/agent/new-session-flow";
@@ -611,8 +612,13 @@ export function useAppShellRuntime(): AppShellRuntime {
     showToast(`${label} 当前不可用`);
   }, [openSettings, showToast]);
 
-  const handleNavigate = useCallback((label: string) => {
+  const handleNavigate = useCallback((label: string, options?: { tab?: string }) => {
     localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+    // R40 — "直达某一页里的某个 tab"。侧栏「腾讯文档」等入口带 `{ tab }` 过来,
+    // 面板未挂载时靠 localStorage、已挂载时靠事件(见 @/lib/navigation/market-tab)。
+    // 普通导航(无 tab 意图)顺手清掉残留意图,否则下次进入会被上一次挟持。
+    if (options?.tab) requestMarketTab(options.tab);
+    else clearRequestedMarketTab();
     setPlaceholderView(label);
     sessionsStore.getState().setCurrent(null);
     sessionStore.getState().reset();

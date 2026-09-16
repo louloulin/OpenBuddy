@@ -22,7 +22,7 @@ export type { SlotMap };
 export { ExpertsPanel } from "./ExpertsPanel";
 export { ExpertsGrid } from "./ExpertsGrid";
 export type { ExpertsGridProps, ExpertCardModel } from "./ExpertsGrid";
-export { MarketPills } from "./MarketHeader";
+export { MarketPills, MARKET_TAB_KEYS } from "./MarketHeader";
 export type { MarketTab } from "./MarketHeader";
 
 // experts/

@@ -174,7 +174,8 @@ export interface AppShellRuntime {
   handleLogout(): Promise<void>;
 
   // 导航/视图
-  handleNavigate(label: string): void;
+  /** `options.tab` 用于"直达某一页里的某个 tab"(如市场页的连接器 tab)。 */
+  handleNavigate(label: string, options?: { tab?: string }): void;
   handleGoHome(): void;
   handleNewSession(): void;
   handlePlaceholder(label: string): void;

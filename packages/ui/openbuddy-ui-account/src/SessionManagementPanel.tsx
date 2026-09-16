@@ -13,6 +13,7 @@ import {
   casdoorStatus,
 } from "@/lib/casdoor/casdoor-client";
 import type { CasdoorSessionBinding, CasdoorSessionKind } from "@/lib/casdoor/casdoor-client";
+import { confirm } from "@/lib/platform/electron-api";
 
 function SectionShell({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
   return (
@@ -74,7 +75,9 @@ export function SessionManagementPanel() {
   }, [sessions]);
 
   const handleUnregister = useCallback(async (sessionId: string) => {
-    if (!confirm(`确认注销会话 ${sessionId}？该会话的所有后续请求会被拒绝。`)) return;
+    // R40 — 原生 `window.confirm` 是系统模态框(阻断渲染进程、不受主题控制);
+    // 全仓统一走 workbuddy 风格 ConfirmDialog。
+    if (!(await confirm(`确认注销会话 ${sessionId}？该会话的所有后续请求会被拒绝。`, { tone: "danger" }))) return;
     setBusyId(sessionId);
     try {
       await casdoorUnregisterSession(sessionId);
@@ -89,7 +92,7 @@ export function SessionManagementPanel() {
 
   const handleUnregisterAll = useCallback(async () => {
     if (sessions.length === 0) return;
-    if (!confirm(`确认注销全部 ${sessions.length} 个活跃会话？`)) return;
+    if (!(await confirm(`确认注销全部 ${sessions.length} 个活跃会话？`, { tone: "danger" }))) return;
     setBusyId("__all__");
     try {
       const results = await Promise.allSettled(sessions.map((session) => casdoorUnregisterSession(session.sessionId)));

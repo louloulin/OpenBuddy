@@ -1,6 +1,13 @@
 import type { ComponentType, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MarketPills, type MarketTab } from "./MarketHeader";
+import {
+  MARKET_TAB_EVENT,
+  clearRequestedMarketTab,
+  consumeRequestedMarketTab,
+  isMarketTab,
+  readRequestedMarketTab,
+} from "@/lib/navigation/market-tab";
 import { ExpertsTab } from "./experts/ExpertsTab";
 import { SkillsTab } from "./skills/SkillsTab";
 import { ConnectorsTab } from "./connectors/ConnectorsTab";
@@ -15,6 +22,8 @@ interface Props {
    *  works without it; the panel falls back to a toast asking the user to
    *  open a session first. */
   sessionId?: string;
+  /** 宿主直接内嵌本面板时的起始 tab。缺省顺序:深链意图 → 本 prop → "experts"。 */
+  initialTab?: MarketTab;
 }
 
 /** 专家·技能·连接器 — WorkBuddy-style unified market page.
@@ -22,8 +31,26 @@ interface Props {
  *  left slot, mirroring WorkBuddy's `headerLeft` pattern. The "插件·市场"
  *  tab is the Pi plugin marketplace (with the official pi.dev catalog as a
  *  built-in remote source) so all resource browsing lives under this entry. */
-export function ExpertsPanel({ onGoHome, onToast, sessionId }: Props) {
-  const [tab, setTab] = useState<MarketTab>("experts");
+export function ExpertsPanel({ onGoHome, onToast, sessionId, initialTab }: Props) {
+  // R40 — tab 不再写死 "experts"。侧栏「腾讯文档 / 乐享知识库」的深链意图
+  // (localStorage + 事件,见 @/lib/navigation/market-tab)优先于宿主传入的
+  // initialTab,于是"提示说打开了连接器目录"和"实际落在哪"第一次真的对齐。
+  const [tab, setTab] = useState<MarketTab>(
+    () => consumeRequestedMarketTab() ?? initialTab ?? "experts",
+  );
+
+  // 面板已在屏幕上时(用户就停在「专家·技能·连接器」页再点侧栏入口),
+  // 不会重新挂载,所以深链必须还有一个即时通道。
+  useEffect(() => {
+    const onRequest = (event: Event) => {
+      const requested = (event as CustomEvent<unknown>).detail;
+      const next = isMarketTab(requested) ? requested : readRequestedMarketTab();
+      clearRequestedMarketTab();
+      if (next) setTab(next);
+    };
+    window.addEventListener(MARKET_TAB_EVENT, onRequest);
+    return () => window.removeEventListener(MARKET_TAB_EVENT, onRequest);
+  }, []);
 
   const pills = <MarketPills active={tab} onChange={setTab} />;
 

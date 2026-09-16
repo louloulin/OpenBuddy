@@ -10,6 +10,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { useGlobalConfirmStore } from "@/stores/global-confirm-store";
 
 const casdoorListResourcesMock = vi.fn();
 const casdoorCreateResourceMock = vi.fn();
@@ -39,6 +40,15 @@ vi.mock("lucide-react", async (importOriginal) => {
 
 import { ResourceCatalogPanel } from "@openbuddy/ui-mcp";
 
+/**
+ * R40 — 删除确认走内核主题化 ConfirmDialog(异步);这里扮演"用户点按钮"。
+ */
+async function answerConfirm(value: boolean) {
+  await waitFor(() => expect(useGlobalConfirmStore.getState().pending).not.toBeNull());
+  const pending = useGlobalConfirmStore.getState().pending!;
+  useGlobalConfirmStore.getState().resolve(pending.id, value);
+}
+
 function projectFixture(id: string, version: number, name: string) {
   return {
     id,
@@ -60,8 +70,8 @@ describe("ResourceCatalogPanel", () => {
     casdoorUpdateResourceMock.mockReset();
     casdoorDeleteResourceMock.mockReset();
     casdoorListResourcesMock.mockResolvedValue([]);
-    // Stub confirm so delete tests work without dialog
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    // 残留的确认框会串到下一个用例,先清干净。
+    useGlobalConfirmStore.getState().dismiss();
   });
 
   it("renders an empty state when no resources match the filter", async () => {
@@ -134,7 +144,17 @@ describe("ResourceCatalogPanel", () => {
     casdoorDeleteResourceMock.mockResolvedValueOnce({ ok: true });
     render(<ResourceCatalogPanel />);
     fireEvent.click(await screen.findByTestId("resource-delete-p1"));
+    await answerConfirm(true);
     await waitFor(() => expect(casdoorDeleteResourceMock).toHaveBeenCalledWith("p1", 7));
+  });
+
+  it("取消删除确认 → 资源不会被删(确认门是真的在等答案)", async () => {
+    casdoorListResourcesMock.mockResolvedValueOnce([projectFixture("p1", 7, "Alpha")]);
+    render(<ResourceCatalogPanel />);
+    fireEvent.click(await screen.findByTestId("resource-delete-p1"));
+    await answerConfirm(false);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(casdoorDeleteResourceMock).not.toHaveBeenCalled();
   });
 
   it("surfaces load errors", async () => {

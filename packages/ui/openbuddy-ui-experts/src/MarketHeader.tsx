@@ -14,6 +14,16 @@ const TABS: { key: MarketTab; label: string; Icon: typeof ExpertTabIcon }[] = [
   { key: "plugins", label: "插件·市场", Icon: RepoIcon },
 ];
 
+/**
+ * 全部 tab key,单一来源 = 上面这份 TABS。
+ *
+ * 内核侧的深链契约(`@/lib/navigation/market-tab` 的 `MARKET_TABS`)需要知道
+ * 有哪些合法 tab,而这里知道有哪些 tab **真的渲染得出来**。两份清单靠
+ * `src/lib/navigation/__tests__/market-tab.test.ts` 对照,避免"能深链但没这个
+ * tab"或"加了 tab 却深链不过去"两种漂移。
+ */
+export const MARKET_TAB_KEYS: readonly MarketTab[] = TABS.map((tab) => tab.key);
+
 /** The dark pill tab group (专家 / 技能 / 连接器 / 插件·市场) shown at
  *  the top-left of every market tab's topbar. The "插件·市场" tab renders
  *  MarketplacePanel (Pi plugin marketplace with pi.dev as a built-in

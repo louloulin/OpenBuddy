@@ -145,12 +145,22 @@ try {
     hasConnectorTab: Array.from(document.querySelectorAll(".um-pills [role='tab']")).some((el) =>
       (el.textContent ?? "").includes("连接器"),
     ),
+    // R40 — 不只是"连接器 pill 存在",而是它**就是当前选中的那个**:
+    // R39 的提示写着"已打开连接器目录",当时落到的却是专家页。
+    selectedPill: document
+      .querySelector(".um-pills [role='tab'][aria-selected='true']")
+      ?.textContent?.trim() ?? null,
   }));
   step("点「腾讯文档」可点", docsClicked, JSON.stringify({ docsClicked }));
   step(
     "点「腾讯文档」落到「专家 · 技能 · 连接器」面板(能配的地方),而不是原地弹一句话",
     landed.pills && landed.hasConnectorTab,
     JSON.stringify(landed),
+  );
+  step(
+    "落到的就是**连接器** tab(不是只把用户丢到专家页)",
+    landed.selectedPill === "连接器",
+    JSON.stringify({ selectedPill: landed.selectedPill }),
   );
 
   if (SHOTS_ENABLED) await page.screenshot({ path: "tests/screenshots/r39-connector-landing.png" });

@@ -367,6 +367,15 @@ function SessionContextMenu({ x, y, sessionId, sessionTitle, isPinned, onClose, 
 }
 
 /**
+ * 导航回调契约。
+ *
+ * R40 — 多了可选 `options.tab`:有些入口的目标不是"某一页"而是"某一页里的
+ * 某个 tab"(「腾讯文档」→「专家·技能·连接器」的**连接器** tab)。以前这种
+ * 意图无处可放,只能跳到大页面然后让用户自己找。
+ */
+export type SidebarNavigate = (label: string, options?: { tab?: string }) => void;
+
+/**
  * "更多" 侧栏按钮的弹出菜单 — 对齐 WorkBuddy：
  * - hover 打开，向右浮出（不向下盖住会话列表）
  * - 菜单项：我的文件 / 腾讯文档 / ima知识库 / 乐享知识库 / 灵感
@@ -378,7 +387,7 @@ function MoreDropdown({
   onToast,
   activeNav,
 }: {
-  onNavigate: (label: string) => void;
+  onNavigate: SidebarNavigate;
   onToast?: (message: string) => void;
   activeNav: string;
 }) {
@@ -484,10 +493,12 @@ function MoreDropdown({
           // R39 — 以前这里只 `onToast("当前不可用")`:点下去什么都没有,用户
           // 既不知道要配什么、也走不到配置的地方。现在它是一条**真路径**:
           // 跳到「专家 · 技能 · 连接器」,那里有连接器目录和安装入口。
+          // R40 — 并且真的落在**连接器** tab(以前提示说"已打开连接器目录",
+          // 实际停在专家页 —— 承诺与结果不一致)。
           action: () => {
             setOpen(false);
-            onToast?.("腾讯文档需要先配置连接器 —— 已为你打开连接器目录");
-            onNavigate("专家·技能·连接器");
+            onToast?.("腾讯文档需要先配置连接器 —— 已打开连接器目录");
+            onNavigate("专家·技能·连接器", { tab: "connectors" });
           },
         },
         {
@@ -518,7 +529,7 @@ function MoreDropdown({
           action: () => {
             setOpen(false);
             onToast?.("乐享知识库需要先配置连接器;本地资料请用同组的「知识库」");
-            onNavigate("专家·技能·连接器");
+            onNavigate("专家·技能·连接器", { tab: "connectors" });
           },
         },
       ],
@@ -840,7 +851,7 @@ export function Sidebar({
 }: {
   onNewSession: () => void;
   onSelect: (sessionId: string, cwd?: string) => void;
-  onNavigate: (label: string) => void;
+  onNavigate: SidebarNavigate;
   onOpenSettings: () => void;
   /** Optional variant that accepts a SettingsSection id (e.g. "notifications")
    *  so footer buttons can deep-link into a specific settings subsection. */

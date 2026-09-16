@@ -127,6 +127,7 @@ import {
 } from "@/lib/casdoor/casdoor-client";
 import { listen } from "@/lib/platform/electron-api";
 import { confirm, invoke } from "@/lib/platform/electron-api";
+import { setToast } from "@/stores/toast-store";
 import type {
   AgentDefaults,
   AgentEntry,
@@ -440,15 +441,21 @@ export function DataSettingsPanel({ onOpenDataDirPicker }: { onOpenDataDirPicker
   }, []);
 
   const handleClearSessions = async () => {
+    // R40 — 这里以前少了 `await`:`confirm()` 是异步的(走 workbuddy 风格
+    // ConfirmDialog),返回 Promise 恒为真值,于是 `!confirm(...)` 永远 false ——
+    // **确认框弹出来的同时缓存已经被清掉了**,用户点什么都没用。
     if (
-      !confirm(
+      !(await confirm(
         "确定清理本地会话缓存？这只影响侧栏列表的显示，pi 的 ~/.pi/sessions/ 历史不会被删除。",
-      )
+        { tone: "warning", confirmLabel: "清理" },
+      ))
     ) {
       return;
     }
     await invoke("agent:session-metadata-clear");
-    alert("已清理。下次刷新会重新加载会话列表。");
+    // 原生 `alert()` 在无边框窗口里是系统模态框(阻断渲染进程、字体和主题都不属于
+    // OpenBuddy);统一走 toast。
+    setToast("已清理本地会话缓存;下次刷新会重新加载会话列表");
   };
 
   return (
@@ -562,10 +569,16 @@ export function AuditSettingsPanel() {
   }, [events, filter]);
 
   const handleClear = async () => {
-    if (!confirm("清空本地审计日志？此操作不可撤销,清空前请确保不再需要这些事件用于排障。")) return;
+    // R40 — 同上:漏 `await` 会让"不可撤销"的确认形同虚设。
+    const ok = await confirm("清空本地审计日志？此操作不可撤销,清空前请确保不再需要这些事件用于排障。", {
+      tone: "danger",
+      confirmLabel: "清空",
+    });
+    if (!ok) return;
     try {
       await auditClear();
       await reload();
+      setToast("已清空本地审计日志");
     } catch (e) {
       setError(String(e).replace(/^Error:\s*/, ""));
     }

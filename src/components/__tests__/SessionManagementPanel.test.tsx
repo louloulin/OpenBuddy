@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { useGlobalConfirmStore } from "@/stores/global-confirm-store";
 
 const casdoorListSessionsMock = vi.fn();
 const casdoorUnregisterSessionMock = vi.fn();
@@ -28,6 +29,17 @@ vi.mock("lucide-react", () => ({
 }));
 
 import { SessionManagementPanel } from "@openbuddy/ui-account";
+
+/**
+ * R40 — 面板的确认走内核主题化 ConfirmDialog(异步),不再有原生 `window.confirm`
+ * 可以同步 stub。这里扮演"用户点按钮":等确认框出现,再按 `value` 答复。
+ * 断言写在调用点之后 —— 因为"点了删除"和"真的删除"之间必须有这一步。
+ */
+async function answerConfirm(value: boolean) {
+  await waitFor(() => expect(useGlobalConfirmStore.getState().pending).not.toBeNull());
+  const pending = useGlobalConfirmStore.getState().pending!;
+  useGlobalConfirmStore.getState().resolve(pending.id, value);
+}
 
 function fixture(overrides: Partial<{ activeTenantId: string | undefined }> = {}) {
   return {
@@ -56,7 +68,8 @@ describe("SessionManagementPanel", () => {
     casdoorStatusMock.mockReset();
     casdoorStatusMock.mockResolvedValue(fixture());
     casdoorListSessionsMock.mockResolvedValue([]);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    // 残留的确认框会串到下一个用例,先清干净。
+    useGlobalConfirmStore.getState().dismiss();
   });
 
   it("prompts the user to sign in when no tenant is active", async () => {
@@ -88,6 +101,7 @@ describe("SessionManagementPanel", () => {
     casdoorUnregisterSessionMock.mockResolvedValueOnce({ removed: true });
     render(<SessionManagementPanel />);
     fireEvent.click(await screen.findByTestId("session-unregister-sess-1"));
+    await answerConfirm(true);
     await waitFor(() => expect(casdoorUnregisterSessionMock).toHaveBeenCalledWith("sess-1"));
     expect(await screen.findByTestId("session-management-message")).toHaveTextContent("已注销 sess-1");
   });
@@ -101,6 +115,7 @@ describe("SessionManagementPanel", () => {
     casdoorUnregisterSessionMock.mockResolvedValue({ removed: true });
     render(<SessionManagementPanel />);
     fireEvent.click(await screen.findByTestId("session-management-unregister-all"));
+    await answerConfirm(true);
     await waitFor(() => expect(casdoorUnregisterSessionMock).toHaveBeenCalledTimes(3));
     expect(casdoorUnregisterSessionMock).toHaveBeenCalledWith("sess-1");
     expect(casdoorUnregisterSessionMock).toHaveBeenCalledWith("sess-2");
@@ -117,6 +132,7 @@ describe("SessionManagementPanel", () => {
       .mockRejectedValueOnce(new Error("SESSION_NOT_FOUND"));
     render(<SessionManagementPanel />);
     fireEvent.click(await screen.findByTestId("session-management-unregister-all"));
+    await answerConfirm(true);
     const msg = await screen.findByTestId("session-management-message");
     expect(msg.textContent).toContain("1 成功");
     expect(msg.textContent).toContain("1 失败");
@@ -127,7 +143,19 @@ describe("SessionManagementPanel", () => {
     casdoorUnregisterSessionMock.mockRejectedValueOnce(new Error("SESSION_REVOKE_DENIED"));
     render(<SessionManagementPanel />);
     fireEvent.click(await screen.findByTestId("session-unregister-sess-1"));
+    await answerConfirm(true);
     expect(await screen.findByTestId("session-management-message")).toHaveTextContent("SESSION_REVOKE_DENIED");
+  });
+
+  it("取消确认框 → 不会真的注销(确认门是真的在等答案)", async () => {
+    casdoorListSessionsMock.mockResolvedValueOnce([sessionFixture("sess-1", "desktop")]);
+    render(<SessionManagementPanel />);
+    fireEvent.click(await screen.findByTestId("session-unregister-sess-1"));
+    await answerConfirm(false);
+    // 取消之后既不能调 IPC,也不能留下"已注销"的假消息。
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(casdoorUnregisterSessionMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("session-management-message")).toBeNull();
   });
 
   it("warns when listing sessions fails", async () => {
