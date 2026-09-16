@@ -6,6 +6,7 @@
 import { clipboard, dialog, ipcMain, shell, type BrowserWindow } from "electron";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import * as fs from "node:fs/promises";
+import { approveSavePath, requireApprovedSavePath } from "./save-path-approval";
 import { agentHost, bindRendererEventEmitter, ensureAgentHostLoaded } from "./agent-host-proxy";
 import { readKnowledgeSources, readNotifyChannels, readPolicyConfig, readStorageSources, readSubagentsConfig, writeKnowledgeSources, writeNotifyChannels, writePolicyConfig, writeSubagentsConfig } from "../agent/pi-resources";
 import type { OpenBuddySubagentsConfig } from "../agent/pi-resources";
@@ -60,25 +61,10 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 	};
 	const currentWindow = () => getWindow();
 
-	// Save-dialog-approved paths: `export_text_file` may only write where the
-	// user explicitly picked a destination in the native save dialog. Without
-	// this, a compromised renderer could write arbitrary absolute paths.
-	const dialogApprovedSavePaths = new Set<string>();
-	const approveSavePath = (candidate: string | null): string | null => {
-		if (!candidate) return null;
-		const resolved = resolve(candidate);
-		dialogApprovedSavePaths.add(resolved);
-		while (dialogApprovedSavePaths.size > 64) {
-			dialogApprovedSavePaths.delete(dialogApprovedSavePaths.values().next().value as string);
-		}
-		return candidate;
-	};
-	const requireApprovedSavePath = (candidate: string): string => {
-		const resolved = resolve(candidate);
-		if (!dialogApprovedSavePaths.has(resolved)) throw new Error("导出路径必须来自保存对话框");
-		dialogApprovedSavePaths.delete(resolved);
-		return resolved;
-	};
+	// Save-dialog-approved paths: `export_text_file` / `audit:export` may only
+	// write where the user explicitly picked a destination in the native save
+	// dialog. R41 — 实现提到 `./save-path-approval`(模块级单例):审计导出复用的是
+	// 同一份安全不变式,而不是第二份复制品。
 	// Write containment only helps if the root is chosen by the main process:
 	// reject any workspaceRoot that is neither the active agent cwd nor a
 	// registered storage source.

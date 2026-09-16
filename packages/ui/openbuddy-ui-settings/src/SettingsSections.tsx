@@ -126,7 +126,7 @@ import {
   type CasdoorUserSummary,
 } from "@/lib/casdoor/casdoor-client";
 import { listen } from "@/lib/platform/electron-api";
-import { confirm, invoke } from "@/lib/platform/electron-api";
+import { confirm, invoke, save } from "@/lib/platform/electron-api";
 import { setToast } from "@/stores/toast-store";
 import type {
   AgentDefaults,
@@ -568,6 +568,33 @@ export function AuditSettingsPanel() {
     ).reverse();
   }, [events, filter]);
 
+  /**
+   * R41 — 导出:先让用户在原生保存对话框选目标,再走 `audit:export`。
+   *
+   * 取消选择就什么都不做(而不是回退到某个默认路径)—— "数据自决"里最重要的
+   * 一条是**不写用户没同意的地方**。目标路径的合法性由主进程复用
+   * `export_text_file` 的一次性审批来保证。
+   */
+  const handleExport = async (format: "jsonl" | "json") => {
+    const stamp = new Date().toISOString().slice(0, 10);
+    const extension = format === "json" ? "json" : "jsonl";
+    const target = await save({
+      title: "导出本地审计日志",
+      defaultPath: `openbuddy-audit-${stamp}.${extension}`,
+      filters: [{ name: format === "json" ? "JSON" : "JSON Lines", extensions: [extension] }],
+    });
+    if (!target) return;
+    const result = await auditExport({ path: target, format });
+    if (result.ok) {
+      // 导出这件事本身也被记进审计(主进程写盘后追加 `audit.export`),
+      // 所以刷新一下列表,用户能当场看到"我导过"。
+      await reload();
+      setToast(`已导出 ${result.count ?? 0} 条审计事件(${((result.bytes ?? 0) / 1024).toFixed(1)} KB)`);
+      return;
+    }
+    setError(result.error ?? "导出失败");
+  };
+
   const handleClear = async () => {
     // R40 — 同上:漏 `await` 会让"不可撤销"的确认形同虚设。
     const ok = await confirm("清空本地审计日志？此操作不可撤销,清空前请确保不再需要这些事件用于排障。", {
@@ -605,6 +632,24 @@ export function AuditSettingsPanel() {
           <button className="settings-reset" onClick={reload} disabled={loading}>
             {loading ? "刷新中…" : "刷新"}
           </button>
+          <button
+            className="settings-reset"
+            data-testid="audit-export-jsonl"
+            onClick={() => void handleExport("jsonl")}
+            disabled={loading}
+            title="导出为 JSON Lines(与磁盘上的 audit.jsonl 同构)"
+          >
+            导出 JSONL
+          </button>
+          <button
+            className="settings-reset"
+            data-testid="audit-export-json"
+            onClick={() => void handleExport("json")}
+            disabled={loading}
+            title="导出为单个 JSON 文档(便于贴进 issue)"
+          >
+            导出 JSON
+          </button>
           <button className="settings-btn settings-btn--danger" onClick={handleClear} disabled={loading}>
             清空本地审计
           </button>
@@ -641,6 +686,11 @@ export function AuditSettingsPanel() {
           </table>
         )}
       </div>
+      <p className="settings-hint">
+        导出会把当前内存里的审计条写到**你选择的**文件(JSONL 与磁盘格式同构,
+        可直接 jq/grep;JSON 是单文档)。导出动作本身也会记一条 `audit.export`,
+        所以"谁在什么时候把日志拿走了"同样可查。
+      </p>
       <p className="settings-hint">
         每条事件携带链式 SHA-256 哈希(前一条 hash + 当前事件 → 截前 16 字符),
         没有前序 hash 无法重新算出相同 hash,可用于校验日志未被单独篡改。
@@ -2594,4 +2644,4 @@ export { TenantPolicyPanel } from "@openbuddy/ui-account";
 export { SessionManagementPanel } from "@openbuddy/ui-account";
 export { TokenIntrospectionPanel } from "@openbuddy/ui-account";
 export { GatewayHealthPanel } from "@openbuddy/ui-account";
-import { auditList, auditClear, type AuditEvent } from "@/lib/audit/audit-client";
+import { auditList, auditClear, auditExport, type AuditEvent } from "@/lib/audit/audit-client";

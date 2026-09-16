@@ -17,6 +17,10 @@
  */
 export { DiscoverPanel } from "./DiscoverPanel";
 export { MarketplacePanel } from "./MarketplacePanel";
+// R41 — 安装预检:纯逻辑 + 确认框,第三方插件可以注册更高优先级实现整体替换。
+export { buildInstallPreflight, resolvePreflightAction } from "./install-preflight";
+export type { InstallPreflight, PreflightItem, PreflightLevel, PreflightAction } from "./install-preflight";
+export { InstallPreflightDialog } from "./InstallPreflightDialog";
 export { NotifyChannelsPanel } from "./NotifyChannelsPanel";
 export { OpenBuddyPluginPanel } from "./OpenBuddyPluginPanel";
 export { PiExtensionsSection } from "./PiExtensionsSection";

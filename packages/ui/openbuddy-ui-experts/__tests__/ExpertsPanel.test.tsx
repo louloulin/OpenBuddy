@@ -112,3 +112,46 @@ describe("ExpertsPanel 子 tab 深链 (R40)", () => {
     expect(selectedTab()).toContain("专家");
   });
 });
+
+
+/**
+ * R42 — 专家 tab 默认视图是 2 列布局:左 TasksPanel + 右 4 列专家网格,
+ * 排序按钮文案是「综合 / 最新」(对应 WorkBuddy v5.4.7 实测)。
+ */
+describe("ExpertsPanel 2-列布局 (R42)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    (window as unknown as { api: unknown }).api = {
+      apiVersion: 1,
+      invoke: async () => undefined,
+      rpc: { request: async () => undefined, onMessage: () => () => void 0 },
+      events: { on: () => () => void 0 },
+      dialog: { open: async () => [], save: async () => null },
+      debug: { enabled: false },
+      clipboard: { readText: async () => "", writeText: async () => void 0 },
+    };
+  });
+
+  it("默认专家 tab 渲染左侧任务栏 + 右侧主区容器", () => {
+    render(<ExpertsPanel />);
+    // 左侧任务栏
+    expect(screen.getByTestId("tasks-panel")).toBeInTheDocument();
+    // 右侧主区
+    expect(screen.getByTestId("experts-page-split")).toBeInTheDocument();
+  });
+
+  it("排序按钮 label 在源码里是「综合 / 最新」(WorkBuddy v5.4.7 实测)", () => {
+    // catalog 异步加载,默认环境下 sort tab 不在 DOM 里。
+    // 这里直接 grep 源码,确保「综合」字面值确实替换了「最热」(防回归)。
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fs = require("fs");
+    const path = require("path");
+    const src = fs.readFileSync(
+      path.join(__dirname, "../src/experts/ExpertsTab.tsx"),
+      "utf8",
+    );
+    expect(src).toMatch(/label:\s*"综合"/);
+    expect(src).toMatch(/label:\s*"最新"/);
+    expect(src).not.toMatch(/label:\s*"最热"/);
+  });
+});

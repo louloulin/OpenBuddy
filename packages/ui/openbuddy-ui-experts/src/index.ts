@@ -31,6 +31,8 @@ export { ExpertCard } from "./experts/ExpertCard";
 export { ExpertDetailModal } from "./experts/ExpertDetailModal";
 export { FeaturedScenes } from "./experts/FeaturedScenes";
 export { MyExpertsEmpty } from "./experts/MyExpertsEmpty";
+export { TasksPanel } from "./experts/TasksPanel";
+export type { TasksPanelProps } from "./experts/TasksPanel";
 
 // skills/
 export { SkillsTab } from "./skills/SkillsTab";

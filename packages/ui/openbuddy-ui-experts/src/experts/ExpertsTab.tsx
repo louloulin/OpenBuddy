@@ -16,6 +16,7 @@ import { ExpertCard } from "./ExpertCard";
 import { ExpertDetailModal } from "./ExpertDetailModal";
 import { FeaturedScenes } from "./FeaturedScenes";
 import { MyExpertsEmpty } from "./MyExpertsEmpty";
+import { TasksPanel } from "./TasksPanel";
 import { usePendingExpertStore } from "@/stores/pending-expert-store";
 
 type ListTab = "expert" | "team";
@@ -31,9 +32,12 @@ interface Props {
   /** Navigate back to the home page (after summoning an expert). */
   onGoHome?: () => void;
   onToast?: (message: string) => void;
+  /** R42 — WorkBuddy v5.4.7 左侧「任务」栏的会话点击回调(shell 的 handleSelectSession)。
+   *  不传则 TasksPanel 退化为只读 + onToast 提示。 */
+  onSelectSession?: (sessionId: string, cwd?: string) => void;
 }
 
-export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
+export function ExpertsTab({ pills, onGoHome, onToast, onSelectSession }: Props) {
   const [view, setView] = useState<"center" | "my">("center");
   const [listTab, setListTab] = useState<ListTab>("expert");
   const [sort, setSort] = useState<Sort>("popular");
@@ -331,22 +335,28 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
   }, [setPendingExpert, onGoHome]);
 
   // ---- no data dir yet ----
+  // R42 — 同样套上 2-列 split(任务栏 + 空态提示),让 WorkBuddy 风格布局始终在场。
   if (needPick && !catalog) {
     return (
       <div className="um-page">
         <header className="um-topbar"><div className="um-topbar-left">{pills}</div></header>
         <div className="um-scroll">
-          <div className="ec-empty">
-            <FolderOpenIcon size="xl" className="ec-empty-icon" />
-            <p>未找到专家数据目录</p>
-            <p className="ec-empty-hint">请选择包含 <code>_meta/_expert_center.json</code> 的 WorkBuddy 数据目录（如 <code>E:\Pi\agents</code>）</p>
-            <button type="button" className="um-btn um-btn--primary" onClick={chooseDir}>
-              <FolderOpenIcon size="sm" /><span>选择来源目录</span>
-            </button>
-            <button type="button" className="um-btn um-btn--primary" onClick={openImport}>
-              <FolderOpenIcon size="sm" /><span>导入 WorkBuddy 专家团</span>
-            </button>
-            <button type="button" className="um-btn" onClick={handleCreate}>创建专家</button>
+          <div className="ec-page-split" data-testid="experts-page-split">
+            <TasksPanel onSelectSession={onSelectSession} onToast={onToast} />
+            <div className="ec-page-main">
+              <div className="ec-empty">
+                <FolderOpenIcon size="xl" className="ec-empty-icon" />
+                <p>未找到专家数据目录</p>
+                <p className="ec-empty-hint">请选择包含 <code>_meta/_expert_center.json</code> 的 WorkBuddy 数据目录（如 <code>E:\Pi\agents</code>）</p>
+                <button type="button" className="um-btn um-btn--primary" onClick={chooseDir}>
+                  <FolderOpenIcon size="sm" /><span>选择来源目录</span>
+                </button>
+                <button type="button" className="um-btn um-btn--primary" onClick={openImport}>
+                  <FolderOpenIcon size="sm" /><span>导入 WorkBuddy 专家团</span>
+                </button>
+                <button type="button" className="um-btn" onClick={handleCreate}>创建专家</button>
+              </div>
+            </div>
           </div>
         </div>
         {createOpen && (
@@ -458,7 +468,6 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
           <button type="button" className="ec-source-btn" onClick={openImport} title="导入 WorkBuddy 专家团">导入 WorkBuddy</button>
         </div>
 
-        {loading && !catalog && <div className="ec-loading">加载专家数据…</div>}
         {error && (
           <div className="ec-error">
             加载失败：{error}
@@ -466,46 +475,55 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
           </div>
         )}
 
-        {catalog && (
-          <>
-            <FeaturedScenes scenes={scenes} expertById={expertById} root={root} onSummon={(e) => setModalExpert(e)} />
+        {/* R42 — 左侧 TasksPanel 始终在场(WorkBuddy v5.4.7 实测),
+         *  只有右侧 main pane 才受 catalog 影响(无 catalog 时显示 loading)。
+         *  这样切换来源目录时左侧任务栏不会闪。 */}
+        <div className="ec-page-split" data-testid="experts-page-split">
+          <TasksPanel onSelectSession={onSelectSession} onToast={onToast} />
+          <div className="ec-page-main">
+            {!catalog && loading && <div className="ec-loading">加载专家数据…</div>}
+            {catalog && (
+              <>
+                <FeaturedScenes scenes={scenes} expertById={expertById} root={root} onSummon={(e) => setModalExpert(e)} />
 
-            <div className="ec-list-head">
-              <SegmentTabs<ListTab>
-                className="ec-list-tabs"
-                items={[{ key: "expert", label: "专家" }, { key: "team", label: "专家团" }]}
-                value={listTab}
-                onChange={(k) => { setListTab(k); setCat(null); }}
-              />
-              <SegmentTabs<Sort>
-                className="ec-sort"
-                items={[{ key: "popular", label: "最热" }, { key: "newest", label: "最新" }]}
-                value={sort}
-                onChange={setSort}
-              />
-            </div>
+                <div className="ec-list-head">
+                  <SegmentTabs<ListTab>
+                    className="ec-list-tabs"
+                    items={[{ key: "expert", label: "专家" }, { key: "team", label: "专家团" }]}
+                    value={listTab}
+                    onChange={(k) => { setListTab(k); setCat(null); }}
+                  />
+                  <SegmentTabs<Sort>
+                    className="ec-sort"
+                    items={[{ key: "popular", label: "综合" }, { key: "newest", label: "最新" }]}
+                    value={sort}
+                    onChange={setSort}
+                  />
+                </div>
 
-            <div className="ec-chips">
-              {chips.map((c) => (
-                <Chip key={c.id ?? "all"} label={c.label}
-                  active={cat === c.id} onClick={() => setCat(c.id)} />
-              ))}
-            </div>
+                <div className="ec-chips">
+                  {chips.map((c) => (
+                    <Chip key={c.id ?? "all"} label={c.label}
+                      active={cat === c.id} onClick={() => setCat(c.id)} />
+                  ))}
+                </div>
 
-            {visible.length === 0 ? (
-              <div className="ec-empty">
-                <SparklesIcon size="xl" className="ec-empty-icon" />
-                <p>{search ? `没有找到与「${search}」匹配的专家` : "暂无该分类的专家"}</p>
-              </div>
-            ) : (
-              <div className="ec-grid">
-                {visible.map((e) => (
-                  <ExpertCard key={e.id} expert={e} root={root} onSummon={() => setModalExpert(e)} />
-                ))}
-              </div>
+                {visible.length === 0 ? (
+                  <div className="ec-empty">
+                    <SparklesIcon size="xl" className="ec-empty-icon" />
+                    <p>{search ? `没有找到与「${search}」匹配的专家` : "暂无该分类的专家"}</p>
+                  </div>
+                ) : (
+                  <div className="ec-grid" data-testid="experts-grid">
+                    {visible.map((e) => (
+                      <ExpertCard key={e.id} expert={e} root={root} onSummon={() => setModalExpert(e)} />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
 
       {/* Detail modal */}

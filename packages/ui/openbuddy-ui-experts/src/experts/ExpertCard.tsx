@@ -31,7 +31,7 @@ export function ExpertCard({
       </button>
       <div className="ec-card-head">
         <ThumbImg name={expert.name} local={expert.avatarLocal} url={expert.avatarUrl} root={root}
-          size={44} shape="square" />
+          size={44} shape="circle" />
         <div className="ec-card-titles">
           <div className="ec-card-title-row">
             <span className="ec-card-title">{title}</span>

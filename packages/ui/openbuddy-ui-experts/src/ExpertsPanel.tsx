@@ -24,6 +24,10 @@ interface Props {
   sessionId?: string;
   /** 宿主直接内嵌本面板时的起始 tab。缺省顺序:深链意图 → 本 prop → "experts"。 */
   initialTab?: MarketTab;
+  /** R42 — WorkBuddy v5.4.7 左侧「任务」栏点击会话时调用,通常指向 shell
+   *  的 handleSelectSession(切换活跃会话 + 加载历史)。不传则 TasksPanel
+   *  退化为只读,点击时只发 toast。 */
+  onSelectSession?: (sessionId: string, cwd?: string) => void;
 }
 
 /** 专家·技能·连接器 — WorkBuddy-style unified market page.
@@ -31,7 +35,7 @@ interface Props {
  *  left slot, mirroring WorkBuddy's `headerLeft` pattern. The "插件·市场"
  *  tab is the Pi plugin marketplace (with the official pi.dev catalog as a
  *  built-in remote source) so all resource browsing lives under this entry. */
-export function ExpertsPanel({ onGoHome, onToast, sessionId, initialTab }: Props) {
+export function ExpertsPanel({ onGoHome, onToast, sessionId, initialTab, onSelectSession }: Props) {
   // R40 — tab 不再写死 "experts"。侧栏「腾讯文档 / 乐享知识库」的深链意图
   // (localStorage + 事件,见 @/lib/navigation/market-tab)优先于宿主传入的
   // initialTab,于是"提示说打开了连接器目录"和"实际落在哪"第一次真的对齐。
@@ -57,7 +61,7 @@ export function ExpertsPanel({ onGoHome, onToast, sessionId, initialTab }: Props
   return (
     <div className="um-market">
       {tab === "experts" && (
-        <ExpertsTabContent pills={pills} onGoHome={onGoHome} onToast={onToast} />
+        <ExpertsTabContent pills={pills} onGoHome={onGoHome} onToast={onToast} onSelectSession={onSelectSession} />
       )}
       {tab === "skills" && <SkillsTab pills={pills} onToast={onToast} />}
       {tab === "connectors" && <ConnectorsTab pills={pills} onToast={onToast} />}
@@ -79,10 +83,12 @@ function ExpertsTabContent({
   pills,
   onGoHome,
   onToast,
+  onSelectSession,
 }: {
   pills: ReactNode;
   onGoHome?: () => void;
   onToast?: (message: string) => void;
+  onSelectSession?: (sessionId: string, cwd?: string) => void;
 }) {
   const slotImpls = useSlotComponents("placeholder.experts");
   const SlotImpl = slotImpls[0] as
@@ -93,7 +99,7 @@ function ExpertsTabContent({
       }>
     | undefined;
   const Impl = SlotImpl ?? ExpertsTab;
-  return <Impl pills={pills} onGoHome={onGoHome} onToast={onToast} />;
+  return <Impl pills={pills} onGoHome={onGoHome} onToast={onToast} onSelectSession={onSelectSession} />;
 }
 
 /** Thin wrapper around <MarketplacePanel /> so the unified market page can

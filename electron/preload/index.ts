@@ -27,7 +27,7 @@ const allowedInvokeChannels = new Set([
   // progress (rendered by progress:* IPC handlers)
   "progress:list", "progress:cancel", "progress:retry",
   // audit (R17 / Phase D — local audit trail viewer)
-  "audit:list", "audit:record", "audit:clear",
+  "audit:list", "audit:record", "audit:clear", "audit:export",
   // R23 — 数据目录(userData)覆盖:读取 / 写入 / 清空 + 重启应用
   "host:data-dir", "host:data-dir-set", "host:data-dir-reset", "host:relaunch",
   // R18 / Phase D — Expert Marketplace Bridge (Pi 扩展市场)
