@@ -1099,6 +1099,20 @@ R20 把其中**有真实产品价值**的三组补完,并把审计本身升级�
 `resolveThemeVars()` 作为 store 与 `ThemeInitializer` 的唯一组合入口(首屏不再
 "挂载后字体跳一次"),新增 `--wb-font-heading` 给 markdown 标题用。
 
+### R20.3b 真机证据:`_probe-theme-fonts.mjs`
+
+单测只能证明"token 写对了",证明不了"界面真的换了字体"。探针启动真 Electron,
+走 设置 → 个性化 → ThemePicker 点 claude / win95,读 **computed style**:
+
+```
+claude → body: "Space Grotesk", -apple-system, …     heading: "Playfair Display", Georgia, serif
+win95  → body: "Pixelated MS Sans Serif", "MS Sans Serif", Tahoma, sans-serif
+```
+
+同时断言两套主题字体不同、内联 `--wb-font` 不含 `var(--wb-font`(自引用会让整条
+声明失效)、`pageErrors` 为空。CI wrapper `_probe-theme-fonts.test.mjs` 与其它探针
+同模式(spawn + JSON 解析 + 无 Electron 时 skip)。
+
 ### R20.4 审计脚本升级:`ext-default`
 
 `dead` 一直把两类东西混着:真漏接线,和"内置默认 + 插件增量"(内置按钮写在组件
