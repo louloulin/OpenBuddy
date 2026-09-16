@@ -43,6 +43,7 @@ docs/*
 !docs/workbuddy-points-system-comparison.md
 !docs/enterprise-live-verification-2026-08-31.md
 !docs/publish-checklist-v0.15.0.md
+!docs/THEMES.md
 !docs/enterprise-live-verification-2026-08-30.md
 !docs/enterprise-live-verification-2026-08-29.md
 !docs/tauri-grok-removal-and-cordis-adoption.md
