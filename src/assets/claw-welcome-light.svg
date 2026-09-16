@@ -1,34 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="OpenBuddy">
   <defs>
-    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#E8E5FF"/>
-      <stop offset=".4" stop-color="#B8B4F8"/>
-      <stop offset="1" stop-color="#5A5588"/>
-    </linearGradient>
-    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#9C95E8"/>
-      <stop offset="1" stop-color="#3A356A"/>
-    </linearGradient>
-    <linearGradient id="visor" x1="0" y1="0" x2="1" y2="0">
-      <stop stop-color="#7A75E0"/>
-      <stop offset=".5" stop-color="#C0BFFF"/>
-      <stop offset="1" stop-color="#E8E5FF"/>
+    <radialGradient id="dome" cx="50%" cy="35%" r="65%">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset=".45" stop-color="#D6D3FF"/>
+      <stop offset="1" stop-color="#7A75E0"/>
+    </radialGradient>
+    <radialGradient id="eye" cx="50%" cy="50%" r="50%">
+      <stop stop-color="#FFFFFF"/>
+      <stop stop-color="#5A5588"/>
+    </radialGradient>
+    <linearGradient id="heart" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#FF8FBE"/>
+      <stop offset="1" stop-color="#E84A8E"/>
     </linearGradient>
   </defs>
-  <line x1="120" y1="32" x2="120" y2="56" stroke="url(#panel)" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="120" cy="28" r="9" fill="url(#visor)"/>
-  <rect x="48" y="68" width="22" height="44" rx="7" fill="url(#panel)"/>
-  <rect x="170" y="68" width="22" height="44" rx="7" fill="url(#panel)"/>
-  <rect x="56" y="68" width="128" height="128" rx="22" fill="url(#body)"/>
-  <rect x="64" y="76" width="112" height="14" rx="5" fill="url(#panel)" opacity=".55"/>
-  <rect x="68" y="106" width="104" height="32" rx="16" fill="url(#visor)"/>
-  <circle cx="98" cy="122" r="13" fill="#0F0D24"/>
-  <circle cx="142" cy="122" r="13" fill="#0F0D24"/>
-  <circle cx="101" cy="119" r="4" fill="#FFFFFF"/>
-  <circle cx="145" cy="119" r="4" fill="#FFFFFF"/>
-  <rect x="72" y="152" width="96" height="36" rx="14" fill="url(#panel)"/>
-  <rect x="84" y="166" width="72" height="10" rx="3" fill="#0F0D24"/>
-  <circle cx="120" cy="171" r="2.2" fill="#7BFFE0"/>
-  <circle cx="80" cy="200" r="7" fill="url(#panel)"/>
-  <circle cx="160" cy="200" r="7" fill="url(#panel)"/>
+  <line x1="120" y1="38" x2="120" y2="60" stroke="#9C95E8" stroke-width="4" stroke-linecap="round"/>
+  <g transform="translate(120 32) scale(0.32)">
+    <path d="M0 14 C-22 -10 -54 -10 -54 18 C-54 42 -22 60 0 84 C22 60 54 42 54 18 C54 -10 22 -10 0 14 Z" fill="url(#heart)"/>
+  </g>
+  <ellipse cx="48" cy="92" rx="10" ry="16" fill="url(#dome)"/>
+  <ellipse cx="192" cy="92" rx="10" ry="16" fill="url(#dome)"/>
+  <rect x="36" y="58" width="168" height="146" rx="74" fill="url(#dome)"/>
+  <ellipse cx="92" cy="124" rx="28" ry="32" fill="#15123A"/>
+  <ellipse cx="148" cy="124" rx="28" ry="32" fill="#15123A"/>
+  <circle cx="92" cy="128" r="22" fill="url(#eye)"/>
+  <circle cx="148" cy="128" r="22" fill="url(#eye)"/>
+  <circle cx="92" cy="132" r="13" fill="#15123A"/>
+  <circle cx="148" cy="132" r="13" fill="#15123A"/>
+  <ellipse cx="98" cy="124" rx="6" ry="8" fill="#FFFFFF"/>
+  <ellipse cx="154" cy="124" rx="6" ry="8" fill="#FFFFFF"/>
+  <circle cx="89" cy="136" r="3" fill="#FFFFFF"/>
+  <circle cx="145" cy="136" r="3" fill="#FFFFFF"/>
+  <path d="M104 178 Q120 192 136 178" fill="none" stroke="#5A5588" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="190" cy="46" r="6" fill="#FFB5D9" opacity=".8"/>
 </svg>
