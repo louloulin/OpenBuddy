@@ -1,49 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="256" viewBox="0 0 1120 256">
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="320" viewBox="0 0 1480 320" role="img" aria-label="OpenBuddy">
   <!--
-    Horizontal lockup: badge mark + wordmark. The type uses a font stack rather
-    than outlined paths, so a viewer without Inter falls back to the platform UI
-    font. Ink colour is picked to stay legible on both white and #0d1117.
+    Horizontal lockup: abstract badge mark + "OpenBuddy" wordmark.
+    Type uses a system stack so it works without Inter installed.
+    Mark is a downscaled version of the badge geometry.
   -->
   <defs>
-    <linearGradient id="badge" x1="512" y1="38" x2="512" y2="986" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1D2450"/><stop offset="1" stop-color="#080B18"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#0E2A2A"/>
+      <stop offset="1" stop-color="#06151A"/>
     </linearGradient>
-    <linearGradient id="rim" x1="120" y1="90" x2="900" y2="940" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#22D3EE"/><stop offset=".5" stop-color="#7C6CFF"/><stop offset="1" stop-color="#FF2FB0"/>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#5BFFD0"/>
+      <stop offset=".55" stop-color="#00C29A"/>
+      <stop offset="1" stop-color="#008C75"/>
     </linearGradient>
-    <linearGradient id="shell" x1="360" y1="240" x2="700" y2="800" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#B2C1E4"/><stop offset="1" stop-color="#66759C"/>
+    <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7BFFE0"/>
+      <stop offset="1" stop-color="#00C29A"/>
     </linearGradient>
-    <linearGradient id="muzzle" x1="512" y1="556" x2="512" y2="778" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F9FBFF"/><stop offset="1" stop-color="#C9D6EF"/>
-    </linearGradient>
-    <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
   </defs>
 
-  <g transform="scale(0.25)">
-    <g clip-path="url(#clip)">
-      <rect x="38" y="38" width="948" height="948" fill="url(#badge)"/>
-      <g transform="matrix(1.05 0 0 1.05 -25.6 -15.1)">
-        <path d="M312 470C276 372 274 262 290 220 324 206 398 296 442 394 396 410 348 438 312 470Z" fill="url(#shell)"/>
-        <path d="M712 470C748 372 750 262 734 220 700 206 626 296 582 394 628 410 676 438 712 470Z" fill="url(#shell)"/>
-        <path d="M344 424C326 356 324 300 336 280 354 274 396 332 412 386 384 396 362 408 344 424Z" fill="#0B0F1E" stroke="#22D3EE" stroke-width="10"/>
-        <path d="M680 424C698 356 700 300 688 280 670 274 628 332 612 386 640 396 662 408 680 424Z" fill="#0B0F1E" stroke="#22D3EE" stroke-width="10"/>
-        <path d="M512 356C660 356 748 452 748 574 748 704 646 792 512 792 378 792 276 704 276 574 276 452 364 356 512 356Z" fill="url(#shell)"/>
-        <path d="M512 556C602 556 664 596 664 656 664 700 640 740 604 760 580 772 546 778 512 778 478 778 444 772 420 760 384 740 360 700 360 656 360 596 422 556 512 556Z" fill="url(#muzzle)"/>
-        <circle cx="424" cy="506" r="52" fill="#0B0F1E"/>
-        <circle cx="600" cy="506" r="52" fill="#0B0F1E"/>
-        <circle cx="424" cy="506" r="30" fill="#22D3EE"/>
-        <circle cx="600" cy="506" r="30" fill="#22D3EE"/>
-        <circle cx="424" cy="506" r="12" fill="#0B0F1E"/>
-        <circle cx="600" cy="506" r="12" fill="#0B0F1E"/>
-        <path d="M466 622C466 606 484 598 512 598 540 598 558 606 558 622 558 648 534 674 512 674 490 674 466 648 466 622Z" fill="#0B0F1E"/>
-        <circle cx="512" cy="616" r="9" fill="#22D3EE"/>
-        <path d="M462 692Q512 738 562 692" fill="none" stroke="#0B0F1E" stroke-width="17" stroke-linecap="round"/>
-      </g>
-      <rect x="46" y="46" width="932" height="932" rx="215" fill="none" stroke="url(#rim)" stroke-width="12" opacity=".5"/>
-    </g>
+  <!-- badge mark, 256x256, top-left aligned -->
+  <g transform="translate(32 32)">
+    <rect x="0" y="0" width="256" height="256" rx="58" fill="url(#bg)"/>
+    <circle cx="208" cy="56" r="96" fill="#00C29A" opacity=".10"/>
+    <circle cx="56" cy="208" r="80" fill="#00C29A" opacity=".07"/>
+    <circle cx="128" cy="128" r="82" fill="none" stroke="url(#ring)" stroke-width="14" stroke-linecap="round" stroke-dasharray="460 50" stroke-dashoffset="55"/>
+    <circle cx="128" cy="128" r="56" fill="none" stroke="#5BFFD0" stroke-width="6" opacity=".55"/>
+    <circle cx="128" cy="128" r="34" fill="url(#core)"/>
+    <circle cx="176" cy="82" r="11" fill="#FFFFFF"/>
+    <path d="M66 66 L66 96" stroke="#5BFFD0" stroke-width="4" stroke-linecap="round" opacity=".35"/>
+    <path d="M190 66 L190 96" stroke="#5BFFD0" stroke-width="4" stroke-linecap="round" opacity=".35"/>
+    <path d="M66 190 L66 160" stroke="#5BFFD0" stroke-width="4" stroke-linecap="round" opacity=".35"/>
+    <path d="M190 190 L190 160" stroke="#5BFFD0" stroke-width="4" stroke-linecap="round" opacity=".35"/>
   </g>
 
-  <text x="300" y="180" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
-        font-size="148" font-weight="700" letter-spacing="-4" fill="#0E86A8">OpenBuddy</text>
+  <!-- wordmark -->
+  <g transform="translate(330 0)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif">
+    <text x="0" y="190" font-size="148" font-weight="700" letter-spacing="-3" fill="#0B1F22">
+      Open<tspan font-weight="700" fill="#00C29A">Buddy</tspan>
+    </text>
+    <text x="4" y="240" font-size="28" font-weight="500" letter-spacing="6" fill="#5C7A78">
+      OPEN · ADAPTIVE · AI WORKBENCH
+    </text>
+  </g>
 </svg>

@@ -1,32 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
   <!--
-    Monochrome OpenBuddy mark: badge removed, features knocked out as holes so
-    the mark works as a stencil on any background. Change the `fill` on the rect
-    below (or inline the SVG and use `currentColor`) to re-colour it.
+    Monochrome stencil variant. Solid silhouette with negative-space knockouts
+    so the mark stays legible on any background. Recolour by changing the
+    fill on the rect below (or inline + use currentColor).
   -->
   <defs>
     <mask id="mono" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
-      <g transform="matrix(1.55 0 0 1.55 -281.6 -281.3)">
-        <g transform="matrix(1.05 0 0 1.05 -25.6 -15.1)">
-          <!-- solid silhouette -->
-          <path d="M312 470C276 372 274 262 290 220 324 206 398 296 442 394 396 410 348 438 312 470Z" fill="#FFF"/>
-          <path d="M712 470C748 372 750 262 734 220 700 206 626 296 582 394 628 410 676 438 712 470Z" fill="#FFF"/>
-          <path d="M512 356C660 356 748 452 748 574 748 704 646 792 512 792 378 792 276 704 276 574 276 452 364 356 512 356Z" fill="#FFF"/>
-
-          <!-- knockouts -->
-          <path d="M344 424C326 356 324 300 336 280 354 274 396 332 412 386 384 396 362 408 344 424Z" fill="#000"/>
-          <path d="M680 424C698 356 700 300 688 280 670 274 628 332 612 386 640 396 662 408 680 424Z" fill="#000"/>
-          <circle cx="424" cy="506" r="52" fill="#000"/>
-          <circle cx="600" cy="506" r="52" fill="#000"/>
-          <circle cx="424" cy="506" r="30" fill="#FFF"/>
-          <circle cx="600" cy="506" r="30" fill="#FFF"/>
-          <circle cx="424" cy="506" r="12" fill="#000"/>
-          <circle cx="600" cy="506" r="12" fill="#000"/>
-          <path d="M466 622C466 606 484 598 512 598 540 598 558 606 558 622 558 648 534 674 512 674 490 674 466 648 466 622Z" fill="#000"/>
-          <path d="M462 692Q512 738 562 692" fill="none" stroke="#000" stroke-width="17" stroke-linecap="round"/>
-        </g>
-      </g>
+      <rect width="1024" height="1024" fill="#FFF"/>
+      <!-- knockouts (subtract these) -->
+      <circle cx="512" cy="512" r="292" fill="#000"/>
+      <circle cx="512" cy="512" r="248" fill="#FFF"/>
+      <circle cx="512" cy="512" r="198" fill="#000"/>
+      <circle cx="700" cy="324" r="40" fill="#000"/>
+      <rect x="232" y="232" width="48" height="176" fill="#000"/>
+      <rect x="744" y="232" width="48" height="176" fill="#000"/>
+      <rect x="232" y="616" width="48" height="176" fill="#000"/>
+      <rect x="744" y="616" width="48" height="176" fill="#000"/>
     </mask>
   </defs>
-  <rect width="1024" height="1024" fill="#1F2328" mask="url(#mono)"/>
+  <rect width="1024" height="1024" fill="currentColor" mask="url(#mono)"/>
 </svg>
