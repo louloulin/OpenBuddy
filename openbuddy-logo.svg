@@ -1,67 +1,90 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
   <!--
-    OpenBuddy mark v3 - pure abstract.
-    Composition: two interlocking geometric primitives (a circle + a square
-    with rounded corners) symbolising Open + Buddy. The two shapes overlap
-    to form a balanced, modern mark with no facial features, no animal forms.
-    Brand palette: #00C29A core, #5BFFD0 highlight, #06151A shadow.
-    Reads at 16px because the silhouette is just two interlocking shapes.
+    OpenBuddy mark v4 - lavender palette.
+    Original stylised geometric buddy companion. Lavender/indigo gradient on a
+    deep navy badge — drops the green/teal palette in favour of cool tones.
+    Composition unchanged from the prior buddy mark: rounded square head,
+    splayed ears, ellipse muzzle, glowing eyes, heart nose, W-smile.
   -->
   <defs>
     <radialGradient id="bgRad" cx="50%" cy="38%" r="70%">
-      <stop stop-color="#0F3A36"/>
-      <stop offset=".55" stop-color="#0B1F22"/>
-      <stop offset="1" stop-color="#04101A"/>
+      <stop stop-color="#1B1838"/>
+      <stop offset=".55" stop-color="#0F0D24"/>
+      <stop offset="1" stop-color="#070514"/>
     </radialGradient>
-    <linearGradient id="ring" x1="120" y1="120" x2="900" y2="900" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#7BFFE0"/>
-      <stop offset=".5" stop-color="#00C29A"/>
-      <stop offset="1" stop-color="#006B58"/>
+    <linearGradient id="fur" x1="280" y1="180" x2="760" y2="840" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E8E5FF"/>
+      <stop offset=".4" stop-color="#C0BFFF"/>
+      <stop offset="1" stop-color="#7A75E0"/>
     </linearGradient>
-    <linearGradient id="block" x1="320" y1="320" x2="720" y2="720" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#7BFFE0"/>
-      <stop offset=".55" stop-color="#00C29A"/>
-      <stop offset="1" stop-color="#005747"/>
+    <linearGradient id="furDark" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#8C85F0"/>
+      <stop offset="1" stop-color="#4A4580"/>
     </linearGradient>
-    <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="0">
-      <stop stop-color="#7BFFE0" stop-opacity=".95"/>
-      <stop offset="1" stop-color="#00C29A" stop-opacity=".75"/>
+    <linearGradient id="muzzle" x1="380" y1="560" x2="640" y2="780" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D6D3FF"/>
     </linearGradient>
+    <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
+      <stop stop-color="#C0BFFF"/>
+      <stop stop-color="#1B1838" stop-opacity="0"/>
+    </radialGradient>
     <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
   </defs>
 
   <g clip-path="url(#clip)">
     <rect x="38" y="38" width="948" height="948" fill="url(#bgRad)"/>
-    <!-- ambient corner halos -->
-    <circle cx="180" cy="180" r="280" fill="#00C29A" opacity=".10"/>
-    <circle cx="860" cy="860" r="320" fill="#00C29A" opacity=".09"/>
+    <!-- ambient halos in lavender -->
+    <circle cx="780" cy="220" r="340" fill="#C0BFFF" opacity=".14"/>
+    <circle cx="220" cy="800" r="300" fill="#7A75E0" opacity=".10"/>
+    <!-- background sparkle dots -->
+    <circle cx="120" cy="180" r="2" fill="#E8E5FF" opacity=".55"/>
+    <circle cx="900" cy="160" r="2.5" fill="#E8E5FF" opacity=".6"/>
+    <circle cx="160" cy="880" r="1.8" fill="#E8E5FF" opacity=".5"/>
+    <circle cx="880" cy="900" r="2.2" fill="#E8E5FF" opacity=".55"/>
 
-    <!-- subtle grid lines (very low opacity) -->
-    <line x1="148" y1="148" x2="876" y2="148" stroke="#5BFFD0" stroke-width="2" opacity=".08"/>
-    <line x1="148" y1="876" x2="876" y2="876" stroke="#5BFFD0" stroke-width="2" opacity=".08"/>
-    <line x1="148" y1="148" x2="148" y2="876" stroke="#5BFFD0" stroke-width="2" opacity=".08"/>
-    <line x1="876" y1="148" x2="876" y2="876" stroke="#5BFFD0" stroke-width="2" opacity=".08"/>
+    <!-- ears -->
+    <path d="M256 248 Q300 158 388 220 Q360 372 296 416 Z" fill="url(#fur)"/>
+    <path d="M768 248 Q724 158 636 220 Q664 372 728 416 Z" fill="url(#fur)"/>
+    <!-- inner ear shadow -->
+    <path d="M296 264 Q330 218 374 256 Q352 348 312 392 Z" fill="url(#furDark)" opacity=".7"/>
+    <path d="M728 264 Q694 218 650 256 Q672 348 712 392 Z" fill="url(#furDark)" opacity=".7"/>
 
-    <!-- the "O" (Open) : outer ring -->
-    <circle cx="420" cy="512" r="296" fill="none" stroke="url(#ring)" stroke-width="64"/>
-    <!-- the "B" (Buddy) : rounded square offset right, overlapping -->
-    <rect x="448" y="216" width="488" height="488" rx="120" fill="url(#block)"/>
-    <!-- inner knockout reveals an "O" within the square -->
-    <circle cx="692" cy="460" r="120" fill="#06151A"/>
-    <circle cx="692" cy="460" r="120" fill="none" stroke="#5BFFD0" stroke-width="14" opacity=".8"/>
-    <!-- second inner knockout lower-right -->
-    <circle cx="692" cy="616" r="74" fill="#04101A"/>
-    <circle cx="692" cy="616" r="74" fill="none" stroke="#7BFFE0" stroke-width="10" opacity=".7"/>
+    <!-- head -->
+    <rect x="276" y="276" width="472" height="472" rx="232" fill="url(#fur)"/>
+    <!-- inner highlight -->
+    <path d="M276 480 Q276 276 508 276 Q740 276 740 480" fill="none" stroke="#FFFFFF" stroke-width="6" opacity=".5"/>
 
-    <!-- thin accent ribbon : the "bridge" linking O + B -->
-    <path d="M460 460 Q580 380 700 400" fill="none" stroke="url(#ribbon)" stroke-width="10" stroke-linecap="round" opacity=".9"/>
-    <path d="M460 564 Q580 644 700 624" fill="none" stroke="url(#ribbon)" stroke-width="10" stroke-linecap="round" opacity=".9"/>
+    <!-- cream muzzle -->
+    <ellipse cx="512" cy="640" rx="190" ry="124" fill="url(#muzzle)"/>
 
-    <!-- AI sparkle at upper right -->
-    <g transform="translate(820 220)">
-      <circle r="20" fill="#FFFFFF"/>
-      <circle r="36" fill="none" stroke="#5BFFD0" stroke-width="4" opacity=".55"/>
-      <circle r="54" fill="none" stroke="#5BFFD0" stroke-width="2" opacity=".25"/>
+    <!-- brow spots -->
+    <circle cx="392" cy="404" r="34" fill="#FFFFFF" opacity=".82"/>
+    <circle cx="632" cy="404" r="34" fill="#FFFFFF" opacity=".82"/>
+
+    <!-- eyes: glowing rings + dark core + sparkle -->
+    <circle cx="412" cy="494" r="58" fill="url(#eyeGlow)"/>
+    <circle cx="612" cy="494" r="58" fill="url(#eyeGlow)"/>
+    <circle cx="412" cy="494" r="40" fill="#0F0D24"/>
+    <circle cx="612" cy="494" r="40" fill="#0F0D24"/>
+    <circle cx="424" cy="482" r="14" fill="#FFFFFF"/>
+    <circle cx="624" cy="482" r="14" fill="#FFFFFF"/>
+    <circle cx="408" cy="502" r="6" fill="#C0BFFF" opacity=".8"/>
+    <circle cx="608" cy="502" r="6" fill="#C0BFFF" opacity=".8"/>
+
+    <!-- heart-shaped nose -->
+    <path d="M484 610 Q484 588 502 588 Q512 588 512 596 Q512 588 522 588 Q540 588 540 610 Q540 640 512 668 Q484 640 484 610 Z" fill="#0F0D24"/>
+
+    <!-- smile -->
+    <path d="M512 670 L512 706" stroke="#0F0D24" stroke-width="16" stroke-linecap="round"/>
+    <path d="M512 706 Q470 752 432 716" fill="none" stroke="#0F0D24" stroke-width="16" stroke-linecap="round"/>
+    <path d="M512 706 Q554 752 592 716" fill="none" stroke="#0F0D24" stroke-width="16" stroke-linecap="round"/>
+
+    <!-- AI sparkle upper-right -->
+    <g transform="translate(780 270)">
+      <circle r="22" fill="#FFFFFF"/>
+      <circle r="40" fill="none" stroke="#C0BFFF" stroke-width="5" opacity=".6"/>
+      <circle r="58" fill="none" stroke="#C0BFFF" stroke-width="2" opacity=".3"/>
     </g>
   </g>
 </svg>
