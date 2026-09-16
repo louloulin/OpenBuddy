@@ -482,6 +482,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 工作区面板打开后,输入卡可能只有 ~270px 宽。这两个选择器默认
+ * `min-width: auto`(按内容撑开),整排底行会被顶出卡片 —— 允许收缩,
+ * 标签自己出省略号。 */
+.model-selector,
+.model-selector__trigger,
+.workspace-picker,
+.workspace-picker__trigger {
+  min-width: 0;
+}
 /* WB 合并标签:触发器前显示 ✓ 表示当前档位已激活。 */
 .model-selector__think-check {
   color: var(--wb-brand, #00c29a);

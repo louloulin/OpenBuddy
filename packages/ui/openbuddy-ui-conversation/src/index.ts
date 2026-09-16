@@ -53,6 +53,28 @@ export { TooltipButton } from "./TooltipButton";
 export type { TooltipButtonProps } from "./TooltipButton";
 export { ToolSidePanel } from "./ToolSidePanel";
 export type { ToolSidePanelMode } from "./ToolSidePanel";
+export {
+  MAIN_MIN_WIDTH,
+  NAV_COLLAPSED_WIDTH,
+  NAV_DEFAULT_WIDTH,
+  NAV_MAX_WIDTH,
+  NAV_MIN_WIDTH,
+  NAV_SASH_WIDTH,
+  PANEL_DEFAULT_WIDTH,
+  PANEL_MAX_VIEWPORT_RATIO,
+  PANEL_MIN_WIDTH,
+  clampNavWidth,
+  clampPanelWidth,
+  maxPanelWidth,
+  resolvePanelLayout,
+  resolvePanelMode,
+} from "./tool-side-panel-layout";
+export type {
+  PanelLayout,
+  PanelLayoutInput,
+  PanelLayoutMode,
+} from "./tool-side-panel-layout";
+export { useViewportWidth } from "./use-viewport-width";
 
 declare module "@openbuddy/ui-slots" {
   interface SlotMap {

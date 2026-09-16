@@ -721,6 +721,12 @@
 }
 .wb-composer {
   position: relative;
+  /* 容器查询上下文:下面的「窄了就藏快捷键提示」按**输入卡自身**宽度判定,
+     而不是按窗口宽度。工作区面板打开后聊天列可能只剩 ~320px,而窗口仍有
+     940px —— 旧的 @media(max-width:540px) 在这种情况下不生效,提示条
+     (white-space: nowrap)会把底行挤出卡片。 */
+  container-type: inline-size;
+  container-name: wb-composer;
   background: var(--wb-bg-elevated, #fff);
   /* WB: 输入卡四边 1px #EBEBEB 描边 (亮色=8% 黑), 内卡 radius 14, 微微阴影把它从
    *     外卡 (radius 20) 与底部灰条带上抬起 1px。 */
@@ -910,6 +916,13 @@
    (IME, virtual keyboards) so the chip is more confusing than
    helpful. The desktop+tablet rendering stays unchanged. */
 @media (max-width: 540px) {
+  .wb-composer__hint {
+    display: none;
+  }
+}
+
+/* 同一件事,但按输入卡自身宽度判定(面板打开 / 聊天列被压窄时)。 */
+@container wb-composer (max-width: 520px) {
   .wb-composer__hint {
     display: none;
   }
