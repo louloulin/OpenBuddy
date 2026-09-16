@@ -23,6 +23,13 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+/**
+ * 截图默认不写盘 —— 探针每次跑都会重排像素,提交进来的 PNG 会被无意义地
+ * 反复改写(真正的 CSS 改动反而淹没在二进制 diff 里)。需要更新视觉资产时:
+ *   OPENBUDDY_PROBE_SHOTS=1 node scripts/electron/<probe>.mjs
+ */
+const SHOTS_ENABLED = process.env.OPENBUDDY_PROBE_SHOTS === "1";
+
 const root = "/Users/louloulin/appx/OpenBuddy";
 const userData = mkdtempSync(join(tmpdir(), "ob-r30-"));
 mkdirSync(join(userData, "pi-agent"), { recursive: true });
@@ -104,7 +111,7 @@ try {
     };
   });
 
-  await page.screenshot({ path: "tests/screenshots/r30-header-density.png" });
+  if (SHOTS_ENABLED) await page.screenshot({ path: "tests/screenshots/r30-header-density.png" });
 } catch (error) {
   report.error = String(error?.stack ?? error);
 } finally {

@@ -11,6 +11,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+/**
+ * 截图默认不写盘 —— 探针每次跑都会重排像素,提交进来的 PNG 会被无意义地
+ * 反复改写(真正的 CSS 改动反而淹没在二进制 diff 里)。需要更新视觉资产时:
+ *   OPENBUDDY_PROBE_SHOTS=1 node scripts/electron/<probe>.mjs
+ */
+const SHOTS_ENABLED = process.env.OPENBUDDY_PROBE_SHOTS === "1";
+
 const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const userData = mkdtempSync(join(tmpdir(), "ob-r27cmp-"));
 mkdirSync(join(ROOT, "tests/screenshots"), { recursive: true });
@@ -191,7 +198,7 @@ try {
         })(),
       };
     });
-    await page.screenshot({ path: join(ROOT, `tests/screenshots/r27-completion-${label}.png`) });
+    if (SHOTS_ENABLED) await page.screenshot({ path: join(ROOT, `tests/screenshots/r27-completion-${label}.png`) });
     // 关掉菜单,免得影响下一次
     await page.keyboard.press("Escape");
     await page.waitForTimeout(400);
