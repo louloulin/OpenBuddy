@@ -1,19 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="OpenBuddy">
   <defs>
     <radialGradient id="body" cx="50%" cy="35%" r="70%">
-      <stop stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#F0E5C8"/>
+      <stop stop-color="#FFFEF8"/>
+      <stop offset="1" stop-color="#E8D8B8"/>
     </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#D4A574"/>
+      <stop offset="1" stop-color="#9C7548"/>
+    </linearGradient>
   </defs>
-  <path d="M64 80 L52 30 L78 42 L96 80 Z" fill="url(#body)" stroke="#1F140A" stroke-width="4" stroke-linejoin="round"/>
-  <path d="M176 80 L188 30 L162 42 L144 80 Z" fill="url(#body)" stroke="#1F140A" stroke-width="4" stroke-linejoin="round"/>
-  <ellipse cx="120" cy="116" rx="68" ry="48" fill="url(#body)" stroke="#1F140A" stroke-width="6"/>
-  <ellipse cx="120" cy="148" rx="34" ry="20" fill="url(#body)" stroke="#1F140A" stroke-width="4"/>
-  <path d="M120 164 Q60 164 48 208 Q42 230 70 240 Q96 248 120 248 Q144 248 170 240 Q198 230 192 208 Q180 164 120 164 Z"
-        fill="url(#body)" stroke="#1F140A" stroke-width="6" stroke-linejoin="round"/>
-  <ellipse cx="120" cy="198" rx="30" ry="20" fill="#09C8A7" stroke="#1F140A" stroke-width="4"/>
-  <ellipse cx="94" cy="246" rx="14" ry="6" fill="url(#body)" stroke="#1F140A" stroke-width="4"/>
-  <ellipse cx="146" cy="246" rx="14" ry="6" fill="url(#body)" stroke="#1F140A" stroke-width="4"/>
-  <path d="M188 208 Q202 198 206 184 Q208 176 200 174 Q194 174 192 184 Q190 192 178 198 Z"
-        fill="url(#body)" stroke="#1F140A" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M58 78 L52 30 Q53 26 60 27 L84 50 Z" fill="url(#body)" stroke="#1F140A" stroke-width="3.6" stroke-linejoin="round"/>
+  <path d="M182 78 L188 30 Q187 26 180 27 L156 50 Z" fill="url(#body)" stroke="#1F140A" stroke-width="3.6" stroke-linejoin="round"/>
+  <path d="M120 56 Q60 56 44 110 Q36 142 64 158 Q88 168 120 168 Q152 168 176 158 Q204 142 196 110 Q180 56 120 56 Z"
+        fill="url(#body)" stroke="#1F140A" stroke-width="5" stroke-linejoin="round"/>
+  <ellipse cx="120" cy="152" rx="44" ry="24" fill="url(#body)" stroke="#1F140A" stroke-width="3.6"/>
+  <path d="M120 168 Q52 168 40 210 Q34 236 62 246 Q88 252 120 252 Q152 252 178 246 Q206 236 200 210 Q188 168 120 168 Z"
+        fill="url(#body)" stroke="#1F140A" stroke-width="5" stroke-linejoin="round"/>
+  <ellipse cx="120" cy="210" rx="36" ry="24" fill="url(#accent)" stroke="#1F140A" stroke-width="3.6"/>
+  <ellipse cx="92" cy="252" rx="14" ry="6" fill="url(#body)" stroke="#1F140A" stroke-width="3.6"/>
+  <ellipse cx="148" cy="252" rx="14" ry="6" fill="url(#body)" stroke="#1F140A" stroke-width="3.6"/>
+  <path d="M200 210 Q212 198 216 184 Q218 176 210 174 Q204 174 202 184 Q200 192 188 198 Z"
+        fill="url(#body)" stroke="#1F140A" stroke-width="3.6" stroke-linejoin="round"/>
 </svg>

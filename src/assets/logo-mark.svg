@@ -1,24 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
   <!--
-    OpenBuddy mark v13 - abstract dog with brand teal accent.
-    Original organic dog silhouette inspired by the user's reference aesthetic:
-    white body + dark brown outline + teal accent. Recognizable as dog via
-    triangular ears + snout + sitting posture. Single teal circle as the
-    only "feature" — no eyes, nose, mouth. Pure shape + color storytelling.
+    OpenBuddy mark v14 - cream abstract dog companion.
+    Original organic dog silhouette on warm cream background. Single warm
+    tan accent shape (no facial features). Inspired by reference color
+    palette without copying any specific character.
   -->
   <defs>
     <radialGradient id="bgRad" cx="50%" cy="50%" r="70%">
-      <stop stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#F2EBDC"/>
+      <stop stop-color="#FCF7E9"/>
+      <stop offset=".7" stop-color="#F5EBD3"/>
+      <stop offset="1" stop-color="#E8D8B8"/>
     </radialGradient>
     <radialGradient id="body" cx="50%" cy="35%" r="70%">
-      <stop stop-color="#FFFFFF"/>
-      <stop offset=".55" stop-color="#FFFCF5"/>
-      <stop offset="1" stop-color="#F0E5C8"/>
+      <stop stop-color="#FFFEF8"/>
+      <stop offset=".55" stop-color="#FCF7E9"/>
+      <stop offset="1" stop-color="#E8D8B8"/>
     </radialGradient>
     <linearGradient id="outline" x1="0" y1="0" x2="0" y2="1">
       <stop stop-color="#3D2A1A"/>
       <stop offset="1" stop-color="#1F140A"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#D4A574"/>
+      <stop offset="1" stop-color="#9C7548"/>
     </linearGradient>
     <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
   </defs>
@@ -26,43 +30,56 @@
   <g clip-path="url(#clip)">
     <rect x="38" y="38" width="948" height="948" fill="url(#bgRad)"/>
 
-    <!-- left triangular ear (filled, organic) -->
-    <path d="M280 320 L256 200 L320 232 L356 320 Z" fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
-    <!-- right triangular ear -->
-    <path d="M744 320 L768 200 L704 232 L668 320 Z" fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
+    <!-- decorative warm cream sparkles -->
+    <circle cx="160" cy="180" r="4" fill="#D4A574" opacity=".4"/>
+    <circle cx="860" cy="200" r="5" fill="#D4A574" opacity=".5"/>
+    <circle cx="150" cy="850" r="3" fill="#9C7548" opacity=".35"/>
+    <circle cx="880" cy="800" r="4" fill="#9C7548" opacity=".4"/>
+    <circle cx="180" cy="500" r="2" fill="#D4A574" opacity=".3"/>
+    <circle cx="840" cy="500" r="2" fill="#D4A574" opacity=".3"/>
 
-    <!-- head dome -->
-    <ellipse cx="512" cy="468" rx="280" ry="200" fill="url(#body)" stroke="url(#outline)" stroke-width="18"/>
+    <!-- triangular ears -->
+    <path d="M260 320 L240 184 Q244 168 268 172 L344 240 Z" fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
+    <path d="M764 320 L784 184 Q780 168 756 172 L680 240 Z" fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
 
-    <!-- snout (lower rounded protrusion) -->
-    <ellipse cx="512" cy="568" rx="140" ry="80" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
-
-    <!-- body: rounded teardrop -->
-    <path d="M512 612
-             Q280 612 244 760
-             Q220 880 320 920
-             Q420 952 512 952
-             Q604 952 704 920
-             Q 804 880 780 760
-             Q 744 612 512 612 Z"
+    <!-- main head: rounded blob -->
+    <path d="M512 240
+             Q300 240 252 416
+             Q224 540 312 596
+             Q384 632 512 632
+             Q640 632 712 596
+             Q800 540 772 416
+             Q724 240 512 240 Z"
           fill="url(#body)" stroke="url(#outline)" stroke-width="18" stroke-linejoin="round"/>
 
-    <!-- teal chest accent (the "feature" - replaces eyes/nose) -->
-    <ellipse cx="512" cy="744" rx="120" ry="80" fill="#09C8A7" stroke="url(#outline)" stroke-width="14"/>
+    <!-- snout (lower rounded chin area) -->
+    <ellipse cx="512" cy="580" rx="160" ry="90" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
 
-    <!-- teal inner detail: smaller offset circle for layering -->
-    <ellipse cx="512" cy="744" rx="64" ry="44" fill="#0AA88C" opacity=".55"/>
+    <!-- body: large rounded teardrop sitting posture -->
+    <path d="M512 632
+             Q260 632 220 800
+             Q200 920 320 956
+             Q420 980 512 980
+             Q604 980 704 956
+             Q824 920 804 800
+             Q764 632 512 632 Z"
+          fill="url(#body)" stroke="url(#outline)" stroke-width="18" stroke-linejoin="round"/>
 
-    <!-- tiny paw nubs at bottom -->
-    <ellipse cx="380" cy="950" rx="48" ry="20" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
-    <ellipse cx="644" cy="950" rx="48" ry="20" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
+    <!-- warm tan accent patch on chest/belly (the only "feature") -->
+    <ellipse cx="512" cy="800" rx="140" ry="90" fill="url(#accent)" stroke="url(#outline)" stroke-width="14"/>
+    <!-- inner darker oval for depth -->
+    <ellipse cx="512" cy="800" rx="80" ry="50" fill="#9C7548" opacity=".45"/>
 
-    <!-- ear inner detail: small teal triangles -->
-    <path d="M286 314 L296 248 L324 270 Z" fill="#09C8A7" opacity=".8"/>
-    <path d="M738 314 L728 248 L700 270 Z" fill="#09C8A7" opacity=".8"/>
+    <!-- ear inner detail: small tan triangles -->
+    <path d="M280 320 L296 232 L324 268 Z" fill="url(#accent)" opacity=".85"/>
+    <path d="M744 320 L728 232 L700 268 Z" fill="url(#accent)" opacity=".85"/>
 
-    <!-- tail: curved organic spike -->
-    <path d="M780 760 Q840 720 856 660 Q860 632 836 624 Q816 624 808 660 Q800 696 740 720 Z"
+    <!-- feet -->
+    <ellipse cx="380" cy="970" rx="54" ry="22" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
+    <ellipse cx="644" cy="970" rx="54" ry="22" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
+
+    <!-- curved organic tail -->
+    <path d="M792 760 Q860 720 880 660 Q886 624 858 620 Q836 624 832 660 Q824 700 760 720 Z"
           fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
   </g>
 </svg>

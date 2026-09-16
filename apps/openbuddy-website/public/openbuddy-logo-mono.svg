@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
-  <path d="M280 320 L256 200 L320 232 L356 320 Z" fill="currentColor"/>
-  <path d="M744 320 L768 200 L704 232 L668 320 Z" fill="currentColor"/>
-  <ellipse cx="512" cy="468" rx="280" ry="200" fill="currentColor"/>
-  <ellipse cx="512" cy="568" rx="140" ry="80" fill="currentColor"/>
-  <path d="M512 612 Q280 612 244 760 Q220 880 320 920 Q420 952 512 952 Q604 952 704 920 Q 804 880 780 760 Q 744 612 512 612 Z" fill="currentColor"/>
-  <ellipse cx="512" cy="744" rx="120" ry="80" fill="#09C8A7"/>
-  <ellipse cx="380" cy="950" rx="48" ry="20" fill="currentColor"/>
-  <ellipse cx="644" cy="950" rx="48" ry="20" fill="currentColor"/>
-  <path d="M780 760 Q840 720 856 660 Q860 632 836 624 Q816 624 808 660 Q800 696 740 720 Z" fill="currentColor"/>
+  <path d="M260 320 L240 184 Q244 168 268 172 L344 240 Z" fill="currentColor"/>
+  <path d="M764 320 L784 184 Q780 168 756 172 L680 240 Z" fill="currentColor"/>
+  <path d="M512 240 Q300 240 252 416 Q224 540 312 596 Q384 632 512 632 Q640 632 712 596 Q800 540 772 416 Q724 240 512 240 Z" fill="currentColor"/>
+  <ellipse cx="512" cy="580" rx="160" ry="90" fill="currentColor"/>
+  <path d="M512 632 Q260 632 220 800 Q200 920 320 956 Q420 980 512 980 Q604 980 704 956 Q824 920 804 800 Q764 632 512 632 Z" fill="currentColor"/>
+  <ellipse cx="512" cy="800" rx="140" ry="90" fill="#D4A574"/>
+  <ellipse cx="380" cy="970" rx="54" ry="22" fill="currentColor"/>
+  <ellipse cx="644" cy="970" rx="54" ry="22" fill="currentColor"/>
+  <path d="M792 760 Q860 720 880 660 Q886 624 858 620 Q836 624 832 660 Q824 700 760 720 Z" fill="currentColor"/>
 </svg>
