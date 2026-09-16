@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Image from 'next/image';
+import Reveal from '@/components/motion/Reveal';
 import type { Locale } from '@/lib/i18n';
 
 interface ProductTabsProps {
@@ -73,7 +74,7 @@ export default function ProductTabs({ locale }: ProductTabsProps) {
     <section className="relative py-20 md:py-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div>
+          <Reveal>
             <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--wb-fg-faint)]">
               { locale === 'zh-CN' ? '产品演示' : 'Product' }
             </p>
@@ -82,7 +83,7 @@ export default function ProductTabs({ locale }: ProductTabsProps) {
                 ? '真实截图 —— 不是 CSS 拼出来的假窗口。'
                 : 'Real screenshots, not CSS mock windows.' }
             </h2>
-          </div>
+          </Reveal>
 
           <div
             role="tablist"
