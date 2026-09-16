@@ -44,6 +44,7 @@ import { friendlyError } from "@/lib/platform/error-format";
 // R9.x — 企业登录入口从侧栏移除后,casdoorLogin/casdoorStatus 调用方消失;
 //   CasdoorSessionView 类型仍保留以备「设置 → 账户」页面按需启用。
 import { casdoorLogin, casdoorLogout, casdoorStatus, type CasdoorSessionView } from "@/lib/casdoor/casdoor-client";
+import { humanizeCasdoorError } from "@/lib/casdoor/casdoor-error";
 import { auditRecord } from "@/lib/audit/audit-client";
 import type { CasdoorLifecycleEvent } from "@openbuddy/auth-casdoor";
 import { getRendererPluginRuntime } from "@/lib/runtime/renderer-plugin-runtime";
@@ -523,6 +524,8 @@ export function useAppShellRuntime(): AppShellRuntime {
   //   openAccountSettings 同时做三件事 —— 打开「设置 → 账户管理」、
   //   刷新 casdoor 状态、未登录时自动拉起 Casdoor 登录页。
   //   左下角用户按钮 / 账户菜单的「企业登录」「账户设置」都走这条路径。
+  // R26 — 多一个前置判断:没配置好(或上次出错)时不再硬拉登录页 —— 那必然失败,
+  //   只会先给用户弹一句他无法处置的报错。这种情况直接把人送到账户设置。
   const openAccountSettings = useCallback(() => {
     setSettingsSection("account");
     setSettingsOpen(true);
@@ -531,11 +534,15 @@ export function useAppShellRuntime(): AppShellRuntime {
         const status = await casdoorStatus();
         setCasdoorSession(status);
         if (status.status === "signed_in") return;
+        if (status.status === "configuration_needed") {
+          setToast(humanizeCasdoorError(status.config.reason ?? status.error ?? ""));
+          return;
+        }
         const result = await casdoorLogin("default");
-        if (!result.ok) setToast(result.error);
+        if (!result.ok) setToast(humanizeCasdoorError(result.error));
         else setToast("已打开 Casdoor 企业登录页面");
       } catch (error) {
-        setToast(String(error).replace(/^Error:\s*/, ""));
+        setToast(humanizeCasdoorError(String(error)));
       }
     })();
   }, [setToast]);
@@ -548,7 +555,7 @@ export function useAppShellRuntime(): AppShellRuntime {
     try {
       const result = await casdoorLogin("default");
       if (!result.ok) {
-        setToast(`登录失败:${result.error}`);
+        setToast(humanizeCasdoorError(result.error));
         void auditRecord({
           event: "casdoor.login",
           outcome: "failure",
@@ -564,7 +571,7 @@ export function useAppShellRuntime(): AppShellRuntime {
         }).catch(() => undefined);
       }
     } catch (error) {
-      setToast(`登录失败:${String(error).replace(/^Error:\s*/, "")}`);
+      setToast(humanizeCasdoorError(String(error)));
       void auditRecord({
         event: "casdoor.login",
         outcome: "failure",

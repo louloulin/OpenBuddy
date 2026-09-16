@@ -1829,22 +1829,35 @@ export function Sidebar({
                     <div className="sidebar__account-menu-name">本地用户</div>
                     <div className="sidebar__account-menu-sub">
                       {accountStatus === "configuration_needed"
-                        ? "需要在设置里配置 Casdoor"
+                        ? "未配置企业身份服务(本地功能不受影响)"
                         : accountStatus === "error"
-                          ? "登录出错,请重试或检查网络"
+                          ? "上次登录出错,可重新登录"
                           : "登录企业账户以同步会话与权限"}
                     </div>
                   </div>
                   {/* R15 — 历史行为:登录入口始终可见(点击打开 Casdoor 登录页),
-                      配置不完整时同时提供「打开设置」引导用户补齐配置。 */}
-                  {(onOpenAccount || onLogin) && (
+                      配置不完整时同时提供「打开设置」引导用户补齐配置。
+                      R26 — 但"点一下必然失败"的按钮不算入口:未配置(或上次出错)时,
+                      主按钮直接是「配置企业登录」并落到账户设置,不再先弹一次
+                      配置无效的报错。用户第一次点登录时最不该看到的就是一句
+                      他无法处置的英文错误。 */}
+                  {accountStatus === "configuration_needed" ? (
+                    <button
+                      type="button"
+                      className="sidebar__account-menu-item sidebar__account-menu-item--primary"
+                      role="menuitem"
+                      onClick={() => { setAccountMenuOpen(false); (onOpenSettingsSection ? () => onOpenSettingsSection("account") : onOpenSettings)(); }}
+                    >
+                      配置企业登录
+                    </button>
+                  ) : (onOpenAccount || onLogin) && (
                     <button
                       type="button"
                       className="sidebar__account-menu-item sidebar__account-menu-item--primary"
                       role="menuitem"
                       onClick={() => { setAccountMenuOpen(false); (onOpenAccount ?? onLogin)?.(); }}
                     >
-                      企业登录
+                      {accountStatus === "error" ? "重新登录" : "企业登录"}
                     </button>
                   )}
                   <button
@@ -1853,7 +1866,7 @@ export function Sidebar({
                     role="menuitem"
                     onClick={() => { setAccountMenuOpen(false); onOpenSettings(); }}
                   >
-                    {accountStatus === "configuration_needed" ? "配置企业登录" : "打开设置"}
+                    打开设置
                   </button>
                   {onOpenFeedback && (
                     <button

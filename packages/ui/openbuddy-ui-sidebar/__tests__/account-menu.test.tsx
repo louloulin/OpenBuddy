@@ -120,10 +120,10 @@ describe("R16 左下角账户菜单", () => {
     expect(onOpenSettings).not.toHaveBeenCalled();
   });
 
-  it("未登录时「企业登录」调用 onOpenAccount(历史 openAccountSettings 流程)", () => {
+  it("已配置但未登录时「企业登录」调用 onOpenAccount(历史 openAccountSettings 流程)", () => {
     const onOpenAccount = vi.fn();
     const onLogin = vi.fn();
-    renderSidebar({ accountStatus: "configuration_needed", onOpenAccount, onLogin });
+    renderSidebar({ accountStatus: "signed_out", onOpenAccount, onLogin });
     fireEvent.click(document.querySelector(".sidebar__user") as HTMLElement);
 
     const primary = document.querySelector(".sidebar__account-menu-item--primary") as HTMLElement;
@@ -133,6 +133,37 @@ describe("R16 左下角账户菜单", () => {
     expect(onLogin).not.toHaveBeenCalled();
     // 点击后菜单关闭
     expect(document.querySelector(".sidebar__account-menu")).toBeNull();
+  });
+
+  it("R26 — 未配置时主按钮是「配置企业登录」,深链到账户设置(不再点一下必失败)", () => {
+    const onOpenSettings = vi.fn();
+    const onOpenSettingsSection = vi.fn();
+    const onOpenAccount = vi.fn();
+    renderSidebar({
+      accountStatus: "configuration_needed",
+      onOpenSettings,
+      onOpenSettingsSection,
+      onOpenAccount,
+    });
+    fireEvent.click(document.querySelector(".sidebar__user") as HTMLElement);
+
+    const primary = document.querySelector(".sidebar__account-menu-item--primary") as HTMLElement;
+    expect(primary?.textContent?.trim()).toBe("配置企业登录");
+    fireEvent.click(primary);
+    // 只把人送到账户设置,不触发必然失败的登录
+    expect(onOpenSettingsSection).toHaveBeenCalledWith("account");
+    expect(onOpenAccount).not.toHaveBeenCalled();
+    expect(onOpenSettings).not.toHaveBeenCalled();
+  });
+
+  it("R26 — 上次登录出错时主按钮是「重新登录」", () => {
+    const onOpenAccount = vi.fn();
+    renderSidebar({ accountStatus: "error", onOpenAccount });
+    fireEvent.click(document.querySelector(".sidebar__user") as HTMLElement);
+    const primary = document.querySelector(".sidebar__account-menu-item--primary") as HTMLElement;
+    expect(primary?.textContent?.trim()).toBe("重新登录");
+    fireEvent.click(primary);
+    expect(onOpenAccount).toHaveBeenCalledTimes(1);
   });
 
   it("未登录 + 只提供 onLogin 时回退到 onLogin", () => {

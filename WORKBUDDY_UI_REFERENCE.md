@@ -1466,6 +1466,49 @@ R23:  ok=20 dead=0 ext=19 no-impl=0    (39 槽)  ← 注册 / 消费 / 分类全
   `tsc --noEmit` → 0 错;`electron-vite build` → 成功;
   真机探针 4 组 16 条全绿(含 R23 新增那组)。
 
+## R26 — 「点击登录没弹出」的真实根因:入口在劝退用户
+
+用户反馈的原始描述是"点击登陆为什么没有弹出,登陆页面分析问题修复问题"。真机探针
+把链路拆开看,三个环节里**没有一个**是"按钮没接线":
+
+| 环节 | 实测 |
+|---|---|
+| 菜单项接线 | ✅ 「企业登录」确实调到了 `openAccountSettings` |
+| 主进程开窗 | ❌ 没开 —— `casdoor:status` 返回 `configuration_needed`(未配置环境) |
+| 用户看到什么 | ⚠️ 设置面板弹出来了,但 toast 是一句运维文案:`Casdoor 配置无效：请检查 issuer、client ID、管理地址和 casdoor://localhost/callback` |
+
+也就是说:**没配置过企业身份服务的新用户,点「登录」得到的必然是一次失败**,
+外加一句他既看不懂也处置不了的报错。这不是 bug,是设计上把"配置前置条件"和
+"登录动作"混在同一个按钮里。
+
+### 修法:让入口诚实地反映当前状态
+
+- **未配置 / 上次出错时,主按钮不再是「企业登录」**:
+  - `configuration_needed` → 「配置企业登录」,直接深链到 `设置 → 账户管理`
+    (那里才有 issuer / client ID 输入框),**不再先弹一次必失败的报错**;
+  - `error` → 「重新登录」;
+  - 已配置但未登录(`signed_out`)→ 「企业登录」维持原样(这条路径本来就能成)。
+- **错误文案人话化**:新增 `src/lib/casdoor/casdoor-error.ts` 的
+  `humanizeCasdoorError()`,把错误分成四类(未配置 / 网络 / 被拒 / 未知)。
+  未配置时说清"去哪儿填什么",其余类别**保留原文**(那些是真异常,用户需要原文
+  才能搜到解法)。runtime 里 `openAccountSettings` / `handleLogin` 的 toast 全部
+  过这一层。
+- **副标题去掉术语**:「需要在设置里配置 Casdoor」→「未配置企业身份服务(本地功能
+  不受影响)」;「登录出错,请重试或检查网络」→「上次登录出错,可重新登录」。
+  第二句尤其重要 —— 用户要知道**这不影响本地使用**,否则会以为应用坏了。
+
+### 测试
+
+- 新增 `scripts/electron/_probe-r26-login-flow.mjs` + CI wrapper(2 条):断言未配置时
+  主按钮是「配置企业登录」、`menuItems` 里**不存在**「企业登录」、点击后没有新窗口、
+  落到账户设置、界面上不出现 `casdoor://localhost/callback`。
+- 新增 `src/lib/casdoor/__tests__/casdoor-error.test.ts`(5 条)覆盖四类错误 + 空错误兜底。
+- `packages/ui/openbuddy-ui-sidebar/__tests__/account-menu.test.tsx` 里那条"未登录时
+  「企业登录」调 onOpenAccount"改成 `signed_out` 语义,并补两条新用例
+  (未配置 → 配置企业登录深链账户设置 / error → 重新登录)。
+- 全量:`npx vitest run` → **780 文件 / 7546 通过 / 0 失败 / 16 跳过**;
+  `tsc --noEmit` → 0 错;`electron-vite build` → 成功。
+
 ## 当前进度(按四期主线)
 
 | 期 | 内容 | 进度 | 说明 |
@@ -1482,11 +1525,10 @@ R23:  ok=20 dead=0 ext=19 no-impl=0    (39 槽)  ← 注册 / 消费 / 分类全
    token 表现在都齐了,缺的只是"照着抄就能跑"的公开文档。
 2. **R25 — Pi 扩展市场多源 registry**:当前是单源,多源 + 权重 + 离线缓存;
    `agent:pi-market-*` 七个 channel 已就位,只需扩 registry 层。
-3. **R26 — 用户可见的遗留问题**(与 WorkBuddy 对齐的最后几处):
-   - 登录入口点击后的弹窗链路(`企业登录` → Casdoor 窗口)在未配置环境下
-     的表现需要一次真机核查;
-   - 深色主题下 Composer 补全菜单与浅色主题的观感差异;
-   - 会话数量大时侧栏滚动的自适应表现。
+3. **R27 — 用户可见的遗留问题**(与 WorkBuddy 对齐的最后几处):
+   - 深色主题下 Composer 补全菜单与浅色主题的观感差异(待真机复核);
+   - 会话数量大时侧栏滚动的自适应表现(待真机复核);
+   - 顶栏 / 菜单栏宽度与信息密度的再平衡。
 4. **加固项**:math / mermaid 编辑侧 round-trip;`details` 浮层的窄屏表现。
 
 ## 用户可见的差距分析(与 WorkBuddy 对比)
