@@ -157,6 +157,7 @@ import { registerAgentsIpc } from "./agents";
 import { registerConnectorsIpc } from "./connectors";
 import { registerMiscIpc } from "./misc";
 import { registerAuditIpc } from "./audit";
+import { registerDataDirIpc } from "./data-dir";
 // R18 / Phase D — Expert Marketplace Bridge (Pi 扩展市场)
 import { createPiMarketBridge, registerPiMarketBridgeIpc } from "../agent/pi-market-bridge";
 import { app } from "electron";
@@ -1116,6 +1117,9 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 
 	// R17 / Phase D — Local Audit Trail (data-management panel).
 	registerAuditIpc(getWindow);
+
+	// R23 — 数据目录(userData)覆盖:设置 → 数据管理里换目录,重启后生效。
+	registerDataDirIpc();
 
 	// Phase A.1 — pi-bridge IPC surface (pi text / image / skill helpers).
 	registerPiBridgeIpc();

@@ -364,6 +364,7 @@ export function SettingsPanel({
   onModelsChanged,
   initialSection = "model",
   onOpenEmailPlan,
+  onOpenDataDirPicker,
 }: {
   open: boolean;
   onClose: () => void;
@@ -372,6 +373,8 @@ export function SettingsPanel({
   onModelsChanged?: () => void | Promise<void>;
   initialSection?: SectionId;
   onOpenEmailPlan?: (planId: string) => void;
+  /** R23 — 打开宿主的「更改数据目录」选择器(内核槽位 `onboarding.data-dir`)。 */
+  onOpenDataDirPicker?: () => void;
 }) {
   const [active, setActive] = useState<SectionId>("model");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
@@ -552,7 +555,7 @@ export function SettingsPanel({
             ) : active === "security" ? (
               <SecuritySettingsPanel />
             ) : active === "data" ? (
-              <DataSettingsPanel />
+              <DataSettingsPanel onOpenDataDirPicker={onOpenDataDirPicker} />
             ) : active === "audit" ? (
               <AuditSettingsPanel />
             ) : active === "general" ? (

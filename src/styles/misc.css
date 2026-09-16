@@ -1874,3 +1874,111 @@ code.language-latex {
   padding: 0;
   list-style: none;
 }
+
+/* ── R23 引导层宿主容器 ────────────────────────────────────────────────────
+ * WhatsNewCard / FeedbackPopup 自身是"卡片",不带遮罩 —— 遮罩与位置属于宿主
+ * (见 src/features/app/WhatsNewGate.tsx / FeedbackGate.tsx)。
+ *   - 更新摘要:右下角浮动,不阻塞操作(用户可以一边看摘要一边继续干活);
+ *   - 反馈卡:居中模态,点遮罩即关闭。
+ */
+.whats-new-gate {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1900;
+  max-width: calc(100vw - 40px);
+}
+
+.feedback-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1960;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in oklch, var(--wb-bg-primary) 88%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+/* ── R23 数据目录选择器 ────────────────────────────────────────────────────
+ * 两态:①选择态(复用 ui-onboarding 的 DataDirPrompt,自带 fixed 遮罩,这里只
+ * 多挂一个"恢复默认目录"的浮动入口);②待重启态(宿主自己的确认卡,需要自带遮罩)。
+ */
+.data-dir-gate--modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1960;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in oklch, var(--wb-bg-primary) 88%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.data-dir-gate__card {
+  width: min(520px, 100%);
+  padding: 20px;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  color: var(--wb-fg-primary);
+  border: 1px solid var(--wb-border-soft, var(--wb-border));
+  border-radius: var(--wb-radius-xl, 16px);
+  box-shadow: var(--wb-shadow-lg, 0 24px 64px rgb(0 0 0 / 32%));
+}
+
+.data-dir-gate__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.data-dir-gate__body {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--wb-fg-secondary);
+}
+
+.data-dir-gate__body code {
+  padding: 1px 5px;
+  border-radius: var(--wb-radius-sm, 4px);
+  background: var(--wb-bg-subtle, color-mix(in oklch, var(--wb-fg-primary) 8%, transparent));
+  font-size: 12px;
+}
+
+.data-dir-gate__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* 「恢复默认目录」浮在 DataDirPrompt 的遮罩之上(它自己 z-index 1950)。 */
+.data-dir-gate__reset {
+  position: fixed;
+  left: 50%;
+  bottom: 36px;
+  z-index: 1960;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border: 1px solid var(--wb-border-soft, var(--wb-border));
+  border-radius: var(--wb-radius-full, 999px);
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  color: var(--wb-fg-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.data-dir-gate__reset:hover {
+  color: var(--wb-fg-primary);
+}
+
+.settings-btn--primary {
+  background: var(--wb-accent, #00c29a);
+  border-color: transparent;
+  color: var(--wb-accent-fg, #04231d);
+}
+
+.settings-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}

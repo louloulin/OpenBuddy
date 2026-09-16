@@ -32,6 +32,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { installDragRegion } from "./window";
+import { applyDataDirOverride, captureDefaultUserDataPath } from "./data-dir";
 import { dispatchHarnessRpc, registerIpc, bindAgentHost, bindRendererEventEmitterFn } from "./ipc/index";
 import { setActiveHarnessServer } from "./harness/harness-server";
 import type { HarnessServer } from "./harness/harness-server";
@@ -86,9 +87,19 @@ function ensureMainLogger(): ReturnType<typeof createMainLogger> {
   return mainLogger;
 }
 
+// R23 — 数据目录解析顺序(必须在 app ready 之前定下来,之后没人再改它):
+//   1. OPENBUDDY_DEV_USER_DATA / dev 构建 → 开发目录(指针文件在开发态不参与,
+//      否则跑一次"换目录"就会把开发环境也一起搬走);
+//   2. `<appData>/OpenBuddy/data-dir.json` → 用户在设置里选过的目录;
+//   3. Electron 默认 userData。
+// 指针文件里的目录若不可用(外接盘没插上 / 只读挂载),`applyDataDirOverride`
+// 会安静地降级成默认目录,不让应用起不来。
+captureDefaultUserDataPath();
 const developmentUserData = process.env.OPENBUDDY_DEV_USER_DATA?.trim();
 if (developmentUserData || process.env.NODE_ENV_ELECTRON_VITE === "development") {
   app.setPath("userData", developmentUserData || join(app.getPath("appData"), "OpenBuddy-dev"));
+} else {
+  applyDataDirOverride();
 }
 
 const devRendererUrl = process.env.ELECTRON_RENDERER_URL;

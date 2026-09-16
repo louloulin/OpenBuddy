@@ -23,6 +23,7 @@
 import { SlotProvider } from "@openbuddy/ui-runtime/client";
 import { ThemeInitializer } from "@openbuddy/ui-theme/client";
 import { AppShell } from "@/features/app/AppShell";
+import { useSlotComponent } from "@/features/app/slot-bridge";
 import { useAppShellRuntime } from "@/features/app/useAppShellRuntime";
 
 /** provider 内部组件 — hook 必须在 provider 内调用 */
@@ -31,11 +32,25 @@ function ShellWithRuntime() {
   return <AppShell runtime={runtime} />;
 }
 
+/**
+ * R23 — 「整壳替换」的落点。
+ *
+ * `root` 槽是本产品唯一一个**包住整个应用**的扩展点:插件(或第三方发行版)
+ * 用更高优先级注册它,就能整体替换 AppShell —— 侧栏 / 顶栏 / 主区 / 全部浮层
+ * 一起换掉,而不是逐块接管。默认实现是内置 AppShell(fallback),所以零注册时
+ * 渲染结果与改造前完全一致;`@openbuddy/ui-layout` 的 `AppFrame` 是同一位置的
+ * **参考实现**(它的 apply() 有意不注册,免得内置包自己把产品外壳顶掉)。
+ */
+function RootSurface() {
+  const Component = useSlotComponent("root", ShellWithRuntime);
+  return <Component />;
+}
+
 export default function App() {
   return (
     <SlotProvider>
       <ThemeInitializer />
-      <ShellWithRuntime />
+      <RootSurface />
     </SlotProvider>
   );
 }

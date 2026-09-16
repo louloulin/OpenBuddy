@@ -20,6 +20,7 @@ import {
   Palette,
   Languages,
   Folder,
+  HardDrive,
   Trash2,
   ExternalLink,
   RefreshCw,
@@ -421,12 +422,21 @@ export function SecuritySettingsPanel() {
 
 // ---------- 数据管理 ----------
 
-export function DataSettingsPanel() {
+export function DataSettingsPanel({ onOpenDataDirPicker }: { onOpenDataDirPicker?: () => void } = {}) {
   const [piHome, setPiHome] = useState("");
+  // R23 — 数据目录(userData)。只读展示 + 一个入口交给宿主去弹选择器:
+  // 切换目录需要 main 侧校验与重启,不属于"设置面板自己就能办完的事"。
+  const [dataDir, setDataDir] = useState<{ path: string; isOverridden: boolean } | null>(null);
 
   useEffect(() => {
     // 从环境推断 pi home 路径（前端无直接 API，给提示用）
     setPiHome("~/.pi");
+  }, []);
+
+  useEffect(() => {
+    invoke<{ path: string; isOverridden: boolean }>("host:data-dir", undefined)
+      .then((described) => setDataDir({ path: described.path, isOverridden: described.isOverridden }))
+      .catch(() => setDataDir(null));
   }, []);
 
   const handleClearSessions = async () => {
@@ -443,6 +453,29 @@ export function DataSettingsPanel() {
 
   return (
     <SectionShell title="数据管理" desc="本地缓存和 pi 数据目录。">
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <HardDrive size={16} />
+          <span>数据目录</span>
+        </div>
+        <div className="settings-row__control">
+          {dataDir ? (
+            <code title={dataDir.path}>
+              {dataDir.path}
+              {dataDir.isOverridden ? "（已自定义）" : ""}
+            </code>
+          ) : (
+            "读取中…"
+          )}
+        </div>
+      </div>
+      {onOpenDataDirPicker && (
+        <div className="settings-actions">
+          <button className="settings-btn" onClick={onOpenDataDirPicker}>
+            <Folder size={14} /> 更改数据目录
+          </button>
+        </div>
+      )}
       <div className="settings-row">
         <div className="settings-row__label">
           <Folder size={16} />

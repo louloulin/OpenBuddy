@@ -66,12 +66,19 @@ describe("微内核装配 — 24 个内置包", () => {
       ["overlay.tasks", "@openbuddy/ui-automation"],
       ["notifications", "@openbuddy/ui-primitives"],
       ["details", "@openbuddy/ui-shell"],
-      ["root", "@openbuddy/ui-layout"],
     ];
     for (const [slot, owner] of required) {
       const entries = core.entries(slot);
       expect(entries.length, `slot ${slot} 应由 ${owner} 提供`).toBeGreaterThan(0);
     }
+  });
+
+  it("root 有意保持零内置注册 —— 内置默认实现是宿主外壳(AppShell),不是参考实现 AppFrame", () => {
+    // R23:整壳替换扩展点的对称性靠"宿主以 AppShell 作 fallback"实现,而不是
+    // 让 ui-layout 把 AppFrame 预注册进去 —— 那样内置参考实现会默认赢过产品
+    // 外壳(用户会看到没有顶栏 / 菜单栏 / 状态栏的 AppFrame)。
+    const core = getRuntime().slots;
+    expect(core.entries("root")).toHaveLength(0);
   });
 
   it("多包共用的 shell.overlay 聚合了 5 个 overlay", () => {

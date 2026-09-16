@@ -160,8 +160,11 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     expect(entries("settings.extension").length).toBe(0);
   });
 
-  it("ui-layout → 'root' slot 注册 AppFrame(原有)", () => {
-    expect(entries("root").length).toBeGreaterThanOrEqual(1);
+  it("ui-layout → 'root' slot 有意不注册(参考实现由使用方显式挂载)", () => {
+    // R23:AppFrame 是 `root` 的参考实现。内置包若在装配阶段无条件抢占 `root`,
+    // 产品外壳(AppShell)就会被它顶掉。整壳替换的主动性属于使用方 ——
+    // 这与 ui-modules 的 `modules.marketplace`(只导出组件、apply() no-op)同一种约定。
+    expect(entries("root").length).toBe(0);
   });
 
   it("ui-theme / ui-locale / ui-hmr 走特殊通道(ThemeProvider / I18nProvider / HMR hook),不在聚合器中", () => {

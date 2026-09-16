@@ -1369,6 +1369,103 @@ R22:  ok=17 dead=4 ext=18 no-impl=0    (39 槽)  ← 幽灵槽也清了
   `_probe-theme-fonts` → **13/13 通过**。
 - 局部回归(settings / conversation / home / experts / components)→ 99 文件 / 765 通过。
 
+## R23 — 最后 4 个 dead 槽:整壳替换 + 首启三件套全部落地
+
+R22 结束时审计表剩 4 个 dead(`root` / `onboarding.data-dir` / `.feedback` /
+`.whats-new`)。这四个都不是"接线漏了",而是**缺消费者或缺数据源**,所以 R23 的
+工作重心不在注册,而在把缺的那一半补出来。
+
+### R23.1 `root` — 「整壳替换」变成真能力(而不是一条死路径)
+
+`root` 是本产品唯一包住**整个应用**的扩展点。此前 `@openbuddy/ui-layout` 在装配
+阶段无条件把 `AppFrame` 注册进去,但没有消费者 —— 等于"留了一扇门,门后却没有
+房间"。
+
+R23 把它的对称性补完:
+
+- `src/App.tsx` 用 `useSlotComponent("root", ShellWithRuntime)` 渲染根,fallback 是
+  内置 `AppShell` —— **零注册时渲染结果与改造前逐像素相同**;
+- `ui-layout` 的 `apply()` 改为 no-op,`AppFrame` 降级为**参考实现**(它把
+  sidebar / conversation / details / shell.overlay 四个命名槽组装成一个通用外壳)。
+  想换布局的第三方发行版显式注册它,即以更高优先级顶掉内置外壳。
+
+为什么不让内置包继续预注册:`AppFrame` 一旦默认赢过 `AppShell`,用户看到的就是
+一个缺顶栏 / 菜单栏 / 状态栏的壳 —— 参考实现不该有"默认赢"的待遇。这与
+`ui-modules` 的 `modules.marketplace`(只导出组件、`apply()` no-op)是同一种约定。
+
+两个断言随之改写(`microkernel-assembly.test.ts` / `builtin-applies-registration.test.ts`):
+从"`root` 应有 1 条 entry"改成"`root` 有意保持零注册 + AppFrame 是参考实现"。
+
+### R23.2 `onboarding.whats-new` — 应用内更新日志
+
+数据源不新增第二份 JSON:`src/lib/changelog/parse-changelog.ts`(纯函数)在构建期把
+仓库根的 `CHANGELOG.md` 用 Vite `?raw` 内联进来解析成结构化条目。CHANGELOG 改完,
+应用内摘要自动跟着变。
+
+- `app-changelog.ts` 导出 `APP_RELEASES` / `decideWhatsNew(appVersion, lastSeen)`。
+  触发时机刻意收窄:**只在从旧版本升上来时弹**。首次安装不弹(首启已经有引导
+  向导,再压一层浮层只会让用户先学会关弹窗);开发版版本号领先 CHANGELOG 时取
+  最新已知条目,免得开发期永远看不到这张卡。
+- `src/features/app/WhatsNewGate.tsx` 是宿主接线:右下角浮动卡(不阻塞操作),
+  关闭后把版本写进 `openbuddy.whats-new.lastSeen`(无论是否勾「不再显示」——
+  勾选框只决定"这次立刻关掉"还是"以后别弹",记版本是避免重复弹的必要条件)。
+- UI 仍走内核槽位:插件可以用更高优先级换掉这张卡。
+
+### R23.3 `onboarding.feedback` — 反馈落本地审计日志
+
+入口放在**左下角账户菜单**(用户想吐槽时第一反应就是点自己那块),提交走既有的
+`audit:record`,写进 `${userData}/audit.jsonl`。不新增 IPC、不上传:
+
+- 反馈里常带路径 / 仓库名 / 报错片段,"顺手提个意见"不该让它们离开这台机器;
+- 审计面板(Settings → 数据管理 → 本地审计追踪)天然就是"这台机器上发生过什么"
+  的观察窗口,用户能自己看到这条记录,也能一键清空。
+
+`src/features/app/FeedbackGate.tsx` 持有时序状态(宿主策略),`FeedbackPopup` 只管
+画卡。侧栏新增可选的 `onOpenFeedback` —— **没接线时菜单里不会出现这一项**,
+UI 包不替宿主决定"要不要有反馈入口"。
+
+### R23.4 `onboarding.data-dir` — 数据目录可换,重启后生效
+
+这是本轮唯一动到 main 进程的一处,因为 Electron 的 `setPath("userData", …)` 必须
+在 app ready 之前调用才彻底生效(缓存 / 日志 / 会话 / 审计全部派生自它)。
+
+- `electron/main/data-dir.ts`:指针文件固定在 `<appData>/OpenBuddy/data-dir.json` ——
+  **必须存在 userData 之外**,否则"换目录"的那一刻就把"我该用哪个目录"的记录
+  一起丢掉了。目标目录不可用(外接盘没插、只读挂载)时安静降级为默认目录,
+  不让应用起不来。
+- `electron/main/ipc/data-dir.ts`:四个 channel(`host:data-dir` / `-set` / `-reset` /
+  `host:relaunch`),与 `audit:*` 同一模式直接挂 `ipcMain`,不动 `dsh:rpc` 的方法
+  schema。校验(绝对路径 / 可创建 / 可写 / 不指向默认目录)全在 main 侧。
+- 渲染侧:`设置 → 数据管理` 新增只读行 + 「更改数据目录」入口;点击开的是内核槽位
+  `onboarding.data-dir`(宿主 `DataDirGate`,两态:选择 → 待重启)。
+- **不在首启时弹**。主题 / 模型 / 数据目录属于"随时可改的设置",不是"必须先答的
+  问卷";首启已经有向导,再压一层模态只会让用户先学会关弹窗。
+- 开发态(`OPENBUDDY_DEV_USER_DATA` / dev 构建)不走指针文件,免得跑一次"换目录"
+  把开发环境也一起搬走。
+
+### R23.5 审计快照
+
+```
+R20:  ok=13 dead=4 ext=6  no-impl=17   (40 槽)
+R21:  ok=17 dead=4 ext=6  no-impl=13   (40 槽)
+R22:  ok=17 dead=4 ext=18 no-impl=0    (39 槽)
+R23:  ok=20 dead=0 ext=19 no-impl=0    (39 槽)  ← 注册 / 消费 / 分类全部对齐
+```
+
+### R23.6 测试
+
+- 新增 `src/lib/changelog/__tests__/parse-changelog.test.ts`(8 条)与
+  `app-changelog.test.ts`(7 条)。后者有一条**真实 CHANGELOG 的格式看门狗**:
+  断言首条发布的标题里不含 `**` / `](`,CHANGELOG 改成解析器认不出的写法会立刻红。
+- 新增真机探针 `scripts/electron/_probe-r23-onboarding-surface.mjs` +
+  CI wrapper(`.test.mjs`,4 条断言):重载后右下角真的出现摘要卡(版本 `v0.15.0`,
+  6 条来自真 CHANGELOG)、关闭后 `lastSeen` 落到 `0.15.0`;账户菜单里有「发送反馈」、
+  提交后 `audit.jsonl` 真的多一条 `user-feedback` + `thumbs-up`;`host:data-dir`
+  可读可写可复位;设置 → 数据管理有入口,选择器打开且**回填了当前目录**。
+- 全量:`npx vitest run` → **778 文件 / 7537 通过 / 0 失败 / 16 跳过**;
+  `tsc --noEmit` → 0 错;`electron-vite build` → 成功;
+  真机探针 4 组 16 条全绿(含 R23 新增那组)。
+
 ## 当前进度(按四期主线)
 
 | 期 | 内容 | 进度 | 说明 |
@@ -1376,18 +1473,20 @@ R22:  ok=17 dead=4 ext=18 no-impl=0    (39 槽)  ← 幽灵槽也清了
 | Phase A | 主题系统 v2 | **100%** | 19 套主题、OKLCh、Match-system、防 FOUC、ThemePicker / Studio、主题字体落地 |
 | Phase B | Workspace 表现层 | **98%** | Resizable sidebar、虚拟化 files-tree 进生产、Artifact Tabs / breadcrumb、Topbar / StatusBar；剩 `details` 浮层接线 |
 | Phase C | 编辑器与富文本 | **95%** | TiPTap 编辑器 + 三个扩展点接上消费者 + Office 四预览；剩 math/mermaid 的编辑侧 round-trip 加固 |
-| Phase D | Onboarding 与差异化 | **90%** | wizard / tour / marketplace / Pi 市场桥接 / Theme Studio 完成；剩 3 个 onboarding 槽需要宿主注入数据,Plugin SDK v1 站点未开工 |
+| Phase D | Onboarding 与差异化 | **95%** | wizard / tour / whats-new / feedback / data-dir / marketplace / Pi 市场桥接 / Theme Studio 全部接线(39 槽 dead=0)；剩 Plugin SDK v1 文档站点未开工 |
 
 ## 后续计划(优先级排序)
 
-1. **R23 — 3 个 onboarding dead 槽 + `root` 槽决策**:`onboarding.data-dir` /
-   `.feedback` 由宿主注入 `onSubmit`;`.whats-new` 需要先有**应用内** changelog 数据源
-   (可从 `apps/openbuddy-website/src/lib/changelog-server.ts` 抽一份共享 JSON)。
-   `root` 槽(R21.5 澄清的"给 AppFrame 路径的第二份注册")要决定:是把它做成真正的
-   整壳替换能力,还是退役这条路径只保留命名 `overlay.*`。
-2. **R25 — Plugin SDK v1 文档站点**:`openbuddy.plugin.v1` manifest 全量公开 +
-   `examples/` + starter 模板。开源差异化的最重要抓手。
-3. **R26 — Pi 扩展市场多源 registry**:当前是单源,多源 + 权重 + 离线缓存。
+1. **R24 — Plugin SDK v1 文档站点**:`openbuddy.plugin.v1` manifest 全量公开 +
+   `examples/` + starter 模板。这是开源差异化最重要的抓手:槽位表 / 事件表 / 主题
+   token 表现在都齐了,缺的只是"照着抄就能跑"的公开文档。
+2. **R25 — Pi 扩展市场多源 registry**:当前是单源,多源 + 权重 + 离线缓存;
+   `agent:pi-market-*` 七个 channel 已就位,只需扩 registry 层。
+3. **R26 — 用户可见的遗留问题**(与 WorkBuddy 对齐的最后几处):
+   - 登录入口点击后的弹窗链路(`企业登录` → Casdoor 窗口)在未配置环境下
+     的表现需要一次真机核查;
+   - 深色主题下 Composer 补全菜单与浅色主题的观感差异;
+   - 会话数量大时侧栏滚动的自适应表现。
 4. **加固项**:math / mermaid 编辑侧 round-trip;`details` 浮层的窄屏表现。
 
 ## 用户可见的差距分析(与 WorkBuddy 对比)
@@ -1399,4 +1498,4 @@ R22:  ok=17 dead=4 ext=18 no-impl=0    (39 槽)  ← 幽灵槽也清了
 | 插件 | 云端市场,不可自托管 | 本地市场 + Pi 扩展桥接 + 微内核槽位可替换任意 UI | 差异化(本地优先) |
 | i18n | 中文为主 | 内核级双语 + 插件可注册词表(子表作用域隔离) | 已对齐 |
 | 数据主权 | 强云依赖 | 本地审计日志 + 自托管 telemetry(Phase D 已落地) | 差异化 |
-| 首启体验 | 引导向导 | wizard / tour / data-dir prompt(3 个槽待宿主注入) | 略落后,见 R23 |
+| 首启体验 | 引导向导 + 更新摘要 | wizard / tour / 升版本自动弹更新摘要 / 反馈落本地 / 数据目录可换 | 已对齐(R23) |

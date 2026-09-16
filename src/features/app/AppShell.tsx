@@ -47,6 +47,9 @@ import {
   MainTopbarToolsSlot,
 } from "./chrome";
 import { RoutePending } from "./RoutePending";
+import { FeedbackGate } from "./FeedbackGate";
+import { DataDirGate } from "./DataDirGate";
+import { WhatsNewGate } from "./WhatsNewGate";
 import type { PluginCommandPayload } from "@openbuddy/ui-workbench";
 import { useSlotComponent, useSlotPayloadValues } from "./slot-bridge";
 import { AppStatusBar } from "./AppStatusBar";
@@ -409,9 +412,13 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
     aboutOpen,
     trustRequest,
     placeholderView,
+    feedbackOpen,
+    dataDirOpen,
     setSettingsOpen,
     setSearchOpen,
     setAboutOpen,
+    setFeedbackOpen,
+    setDataDirOpen,
     setShortcutsOpen,
     setTrustRequest,
     sidebarCollapsed,
@@ -461,6 +468,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
             onOpenAccount={openAccountSettings}
             onLogin={handleLogin}
             onLogout={handleLogout}
+            onOpenFeedback={() => setFeedbackOpen(true)}
             onToggleCollapse={() => setSidebarCollapsed(true)}
             onToggleWorkspace={handleToggleWorkspace}
             onOpenSearch={() => setSearchOpen(true)}
@@ -531,6 +539,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           onClose={() => setSettingsOpen(false)}
           onModelsChanged={refreshModels}
           initialSection={settingsSection}
+          onOpenDataDirPicker={() => setDataDirOpen(true)}
           onOpenEmailPlan={(planId) => {
             localStorage.setItem("openbuddy.email.processing-plan-target", planId);
             setSettingsOpen(false);
@@ -546,6 +555,20 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
         <TasksSurface refreshSignal={runtime.taskRefreshSignal} onToast={showToast} />
         <OnboardingSurface />
         <TourSurface />
+        {/* R23 — 「本次更新」摘要(升版本后一次性)+ 「发送反馈」卡。
+            两者都走内核槽位(onboarding.whats-new / onboarding.feedback),
+            插件可以用更高优先级替换任意一张卡。 */}
+        <WhatsNewGate />
+        <FeedbackGate
+          open={feedbackOpen}
+          onClose={() => setFeedbackOpen(false)}
+          onToast={showToast}
+        />
+        <DataDirGate
+          open={dataDirOpen}
+          onClose={() => setDataDirOpen(false)}
+          onToast={showToast}
+        />
       </Suspense>
       <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <GlobalConfirmHost />

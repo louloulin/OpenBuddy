@@ -122,6 +122,12 @@ export interface AppShellRuntime {
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
   setSearchOpen: Dispatch<SetStateAction<boolean>>;
   setAboutOpen: Dispatch<SetStateAction<boolean>>;
+  /** R23 — 「发送反馈」卡(左下角账户菜单的入口;落本地审计日志)。 */
+  feedbackOpen: boolean;
+  setFeedbackOpen: Dispatch<SetStateAction<boolean>>;
+  /** R23 — 「更改数据目录」选择器(设置 → 数据管理 的入口)。 */
+  dataDirOpen: boolean;
+  setDataDirOpen: Dispatch<SetStateAction<boolean>>;
   setTrustRequest: Dispatch<SetStateAction<{ cwd?: string; reason?: string } | null>>;
   setPlaceholderView: Dispatch<SetStateAction<string | null>>;
 

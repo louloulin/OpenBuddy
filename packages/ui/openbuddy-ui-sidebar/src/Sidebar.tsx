@@ -785,6 +785,7 @@ export function Sidebar({
   onOpenAccount,
   onLogin,
   onLogout,
+  onOpenFeedback,
   onToggleCollapse,
   onToggleWorkspace,
   onOpenSearch,
@@ -814,6 +815,8 @@ export function Sidebar({
   onLogin?: () => void;
   /** 触发 casdoor 登出。 */
   onLogout?: () => void;
+  /** R23 — 打开「发送反馈」卡(落在本地审计日志,不上传)。 */
+  onOpenFeedback?: () => void;
   /** Collapse the sidebar; an expand affordance is rendered over the main area. */
   onToggleCollapse: () => void;
   /** Expand/collapse a 空间 (workspace) node; lazy-loads its sessions. */
@@ -1807,6 +1810,18 @@ export function Sidebar({
                       退出登录
                     </button>
                   )}
+                  {/* R23 — 反馈入口放在"用户"这一侧:用户想吐槽的时候,第一反应
+                      就是点左下角自己那块。落本地审计日志,不上传。 */}
+                  {onOpenFeedback && (
+                    <button
+                      type="button"
+                      className="sidebar__account-menu-item"
+                      role="menuitem"
+                      onClick={() => { setAccountMenuOpen(false); onOpenFeedback(); }}
+                    >
+                      发送反馈
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
@@ -1840,6 +1855,16 @@ export function Sidebar({
                   >
                     {accountStatus === "configuration_needed" ? "配置企业登录" : "打开设置"}
                   </button>
+                  {onOpenFeedback && (
+                    <button
+                      type="button"
+                      className="sidebar__account-menu-item"
+                      role="menuitem"
+                      onClick={() => { setAccountMenuOpen(false); onOpenFeedback(); }}
+                    >
+                      发送反馈
+                    </button>
+                  )}
                 </>
               )}
             </div>,

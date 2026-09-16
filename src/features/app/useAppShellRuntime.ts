@@ -112,6 +112,11 @@ export function useAppShellRuntime(): AppShellRuntime {
   const [casdoorSession, setCasdoorSession] = useState<CasdoorSessionView | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  // R23 — 「发送反馈」卡是否打开。触发点在左下角账户菜单(ui-sidebar),
+  // 状态留在宿主:UI 包只负责"画一个入口",不持有时序策略。
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // R23 — 数据目录选择器(设置 → 数据管理 → 更改数据目录)。
+  const [dataDirOpen, setDataDirOpen] = useState(false);
   const [trustRequest, setTrustRequest] = useState<{ cwd?: string; reason?: string } | null>(null);
   const [taskRefreshSignal, setTaskRefreshSignal] = useState(0);
   const [placeholderView, setPlaceholderView] = useState<string | null>(() => {
@@ -872,6 +877,8 @@ export function useAppShellRuntime(): AppShellRuntime {
     settingsOpen, settingsSection, shortcutsOpen, searchOpen, aboutOpen, trustRequest, placeholderView,
     setSettingsOpen, setShortcutsOpen, setSearchOpen, setAboutOpen, setTrustRequest, setPlaceholderView,
     setSettingsSection,
+    feedbackOpen, setFeedbackOpen,
+    dataDirOpen, setDataDirOpen,
     sidebarCollapsed, setSidebarCollapsed,
     currentModelId, setCurrentModelId, models, workspaces, switchingWorkspace,
     currentSessionId, currentTitle, streaming,
