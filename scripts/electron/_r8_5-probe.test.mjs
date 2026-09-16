@@ -67,9 +67,10 @@ describe.skipIf(!canLaunch)("R8.5 live electron probe", () => {
     expect(report.shell_body.found).toBe(true);
     expect(report.shell_body.display).toBe("flex");
 
-    // Sidebar must be the WorkBuddy 264px column.
+    // Sidebar 默认宽度由 R8.62 的 Resizable 包裹层决定(320px, R8.62.1 加宽);
+    // 未包裹时回退到 --ds-sidebar-width 的同一个值。
     expect(report.shell_sidebar.found).toBe(true);
-    expect(report.shell_sidebar.width).toBe("264px");
+    expect(report.shell_sidebar.width).toBe("320px");
   });
 
   it("dark theme flips app bg + composer bg to dark surfaces", () => {

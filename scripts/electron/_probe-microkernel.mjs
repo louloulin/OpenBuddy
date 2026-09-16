@@ -76,8 +76,8 @@ console.log("=== renderer errors ===");
 console.log(errors.length ? errors.join("\n") : "(none)");
 
 const ok =
-  result.total === 21 &&
-  result.ok === 21 &&
+  result.total === 24 &&
+  result.ok === 24 &&
   result.failed.length === 0 &&
   dom.sidebar > 0 &&
   dom.homeTitle !== null &&
