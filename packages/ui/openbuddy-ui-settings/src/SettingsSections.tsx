@@ -18,6 +18,7 @@ import {
   Moon,
   Type,
   Palette,
+  Languages,
   Folder,
   Trash2,
   ExternalLink,
@@ -25,6 +26,8 @@ import {
   Shield,
 } from "lucide-react";
 import { useTheme, useThemeSnapshot, ThemePicker, ThemeStudio } from "@openbuddy/ui-theme/client";
+import { LanguagePicker, useLocaleName } from "@openbuddy/ui-locale/client";
+import { SlotOutlet } from "@openbuddy/ui-runtime/client";
 import { resolveVars } from "@openbuddy/ui-theme";
 import {
   agentsDefaultsGet,
@@ -181,6 +184,7 @@ export function PersonalizeSettingsPanel() {
   });
   const [studioOpen, setStudioOpen] = useState(false);
   const activeThemeName = useThemeSnapshot((s) => s.currentName());
+  const localeName = useLocaleName();
 
   useEffect(() => {
     localStorage.setItem(FONT_KEY, String(fontSize));
@@ -191,21 +195,39 @@ export function PersonalizeSettingsPanel() {
   return (
     <SectionShell
       title="个性化"
-      desc="调整外观和字号。主题切换立即生效，字号应用到整个界面。"
+      desc="调整外观、语言和字号。主题 / 语言切换立即生效，字号应用到整个界面。"
     >
       <div className="settings-row">
         <div className="settings-row__label">
           {theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
           <span>主题</span>
         </div>
-        <ThemePicker />
+        {/* 这两行走内核槽位（插件可整体替换），内置实现是 ui-theme / ui-locale
+            的默认 picker —— fallback 保证内核缺失时（单测 / 独立挂载）渲染不变。 */}
+        <SlotOutlet
+          name="settings.appearance.theme"
+          props={{ currentTheme: theme }}
+          fallback={<ThemePicker />}
+        />
         <div className="settings-row__label">
           <Palette size={16} />
-          <span>主题库（17 套）</span>
-          <span className="settings-row__hint">点此选择 Claude / Sakura / Cyber / Win95 等</span>
+          <span>主题库（19 套）</span>
+          <span className="settings-row__hint">17 套移植自 cabinet（Claude / Sakura / Cyber / Win95 …）+ 2 套 OpenBuddy 品牌默认</span>
         </div>
         <div className="settings-row__control" style={{ marginLeft: "auto" }}>
           <ThemePicker compact={false} />
+        </div>
+        <div className="settings-row__label">
+          <Languages size={16} />
+          <span>语言</span>
+          <span className="settings-row__hint">简体中文 / English，立即生效并持久化</span>
+        </div>
+        <div className="settings-row__control" style={{ marginLeft: "auto" }}>
+          <SlotOutlet
+            name="settings.appearance.language"
+            props={{ currentLocale: localeName }}
+            fallback={<LanguagePicker />}
+          />
         </div>
         <div className="settings-row__label">
           <Palette size={16} />

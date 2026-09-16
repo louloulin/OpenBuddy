@@ -1149,3 +1149,154 @@ dead(注册了但零消费,能力不可见):
 
 倾向 (1):整壳替换是微内核的对称性(第三方 shell 也能被替换),但要先确认
 AppShell 的浮层容器与 AppFrame 的语义一致。
+
+## R21 — i18n 双系统合并 + 内核服务单例 + 外观行接线
+
+R19 / R20 修的是"注册了没人消费"。R21 修的是更靠下的一层:**内核服务本身
+曾经是假的** —— `ctx.locale` / `ctx.theme` 与 React 树各持一个 store,插件改了
+界面不动、界面改了插件读不到。同一次修里把设置面板的「主题行 / 语言行」接成
+真正的内核槽位。
+
+### R21.1 i18n 从"两套系统"合并成"一套"
+
+之前渲染进程里有**两套互不可见**的 i18n:
+
+| | 状态存放 | 词表 | 消费者 |
+|---|---|---|---|
+| `src/lib/platform/i18n.ts`(旧) | 自己的事件总线 + 自己的 localStorage | `src/locales/{zh-CN,en-US}.json`(12 个命名空间) | 25 处宿主调用点 |
+| `@openbuddy/ui-locale`(内核) | 内核 store | `src/dictionaries/*.json`(1 个 `common`) | 几乎没人 |
+
+后果:插件 `ctx.locale.set("en-US")` 界面不变;界面上切语言插件读不到。
+
+现在 `src/lib/platform/i18n.ts` 只是**宿主适配层**:
+
+1. 模块加载时把产品词表 `merge()` 进内核(一次,幂等);
+2. 保持 `t` / `useT` / `useLocale` / `setLocale` / `getLocale` / `I18nProvider` /
+   `DEFAULT_LOCALE` / `SUPPORTED_LOCALES` 形状不变 —— 25 处调用点零改动;
+3. 把内核订阅转成 React 重渲染。
+
+词表解析顺序(内核侧,写进 `ui-locale/client.tsx` 头注释):
+
+```
+子表 register(locale, ns, dict)   作用域隔离,只有 bind(ns) 读得到
+  → 全局合并层 merge(locale, dict)   宿主产品文案,t() 直接可见
+  → 包内置 dictionaries/<locale>.json  通用词汇
+  → 另一种语言(同 1–3 顺序)          缺翻译时至少是另一种语言,不是空白
+  → key 本身                        缺 key 立刻暴露
+```
+
+`merge` 是**深合并**:产品只补 3 个 key 不会把内置的整棵 `common` 子树替掉。
+
+### R21.2 `ctx.locale` / `ctx.theme` 真的只有一个 store
+
+`getOrCreateLocaleService()` / `getOrCreateThemeService()` 成为唯一入口,
+`I18nProvider` / `ThemeProvider` / `applyLocale` / `applyTheme` / `ui-runtime` 的
+`getRuntimeContext()` 拿到的都是同一个实例。`getRuntimeContext()` 现在是
+`registerAllBuiltinUis` 与 `applyRemotePlugin` **共用**的 ctx —— 远程插件与内置
+包看到同一个内核,这也是 `ctx.sessions` / `ctx.workspaces` / `ctx.ui` 补齐的
+那一轮。
+
+单例带来一个新问题,顺手一起修了:store 只在"构造那一瞬间"写过 DOM。若
+`documentElement` 之后被外部重置(HMR / 单测 `afterEach` / 同文档第二份应用),
+属性缺失 = 整棵 UI 掉回无主题状态,而 store 内部状态却是对的。新增
+`ThemeStoreInternal.syncDocument()`,`<ThemeProvider>` 在 `useLayoutEffect` 里
+调一次(绘制前生效,不闪)。
+
+### R21.3 `settings.appearance.theme` / `.language` 从 no-impl 变成 ok
+
+这两个槽过去是**纯声明**:零注册、零消费。`ui-settings` 现在:
+
+- 在 `client.tsx` 注册默认实现 —— `ThemePicker`(ui-theme)/ `LanguagePicker`(ui-locale);
+- 在 `PersonalizeSettingsPanel` 用 `<SlotOutlet name="settings.appearance.*" fallback=…>`
+  消费,fallback 保证内核缺失时(单测 / Storybook)渲染不变。
+
+插件可以用更高优先级注册同名字槽整体替换这两行,而内置体验零变化 ——
+与 `placeholder.experts` 同一模式。
+
+顺带补了真正缺的功能:**设置 → 个性化 → 语言**下拉(此前只能靠代码改
+localStorage)。`LanguagePicker` 的选项标签用**各自的语言**书写
+(`简体中文` / `English`),这样界面正处在用户看不懂的语言时仍然认得出来。
+样式走 `--wb-*` token(`.settings-select`),不用原生控件本色 —— 否则深色主题下
+会变成一块白底。
+
+### R21.4 真机证据:`_probe-settings-appearance.mjs`
+
+`scripts/electron/_probe-settings-appearance.mjs`(`+ .test.mjs` CI wrapper)
+在真实 Electron 里断言两层:
+
+```
+内核层  settings.appearance.language = { kind: single, entries: 1,
+                                        registrants: ["@openbuddy/ui-settings"] }
+        settings.appearance.theme    = 同上
+表现层  个性化面板里存在 <select class="settings-select">,选项 [zh-CN, en-US]
+        切到 en-US 后:内核 current()=en-US、localStorage= en-US、下拉回读 en-US
+        且界面文案真的翻转(逐行 diff 断言 `始终询问` → `Always Ask`)
+```
+
+实测输出(节选):
+
+```json
+{ "slots": { "language": { "kind": "single", "entries": 1,
+                           "registrants": ["@openbuddy/ui-settings"] },
+             "theme":    { "kind": "single", "entries": 1,
+                           "registrants": ["@openbuddy/ui-settings"] } },
+  "before": { "value": "zh-CN", "options": ["zh-CN","en-US"], "stored": null },
+  "after":  { "value": "en-US", "stored": "en-US" },
+  "text":   { "flipped": ["始终询问 → Always Ask"] },
+  "pageErrors": [], "ok": true }
+```
+
+### R21.5 审计快照变化
+
+```
+R20: 总共 40 个槽位; ok=13 dead=4 ext=6 no-impl=17
+R21: 总共 40 个槽位; ok=15 dead=4 ext=6 no-impl=15
+```
+
+`settings.appearance.language` / `settings.appearance.theme` 从 no-impl → ok。
+
+### R21.6 测试
+
+- 新增 `packages/ui/openbuddy-ui-locale/src/__tests__/locale-store.test.tsx`
+  (19 条):单例同一性(`ctx.locale === provider 的 store`)、`merge` 深合并、
+  子表作用域隔离、`register` disposer、插值、缺 key 的两级兜底、无 Provider
+  回落单例、`LanguagePicker` 列出/写入/类名覆盖。
+- 新增 `scripts/electron/_probe-settings-appearance.test.mjs`(2 条,真机)。
+- 全量:`npx vitest run` → **773 文件 / 7504 通过 / 0 失败 / 16 跳过**;
+  `tsc --noEmit` → 0 错;`electron-vite build` → 成功。
+
+## 当前进度(按四期主线)
+
+| 期 | 内容 | 进度 | 说明 |
+|---|---|---|---|
+| Phase A | 主题系统 v2 | **100%** | 19 套主题、OKLCh、Match-system、防 FOUC、ThemePicker / Studio、主题字体落地 |
+| Phase B | Workspace 表现层 | **95%** | Resizable sidebar、虚拟化 files-tree 进生产、Artifact Tabs / breadcrumb、Topbar / StatusBar；剩 `details` 浮层接线 |
+| Phase C | 编辑器与富文本 | **95%** | TiPTap 编辑器 + 三个扩展点接上消费者 + Office 四预览；剩 math/mermaid 的编辑侧 round-trip 加固 |
+| Phase D | Onboarding 与差异化 | **85%** | wizard / tour / marketplace / Pi 市场桥接 / Theme Studio 完成；剩 3 个 onboarding 槽需要宿主注入数据,Plugin SDK v1 站点未开工 |
+
+## 后续计划(优先级排序)
+
+1. **R22 — `AppFrame` 浮层槽决策**(R20.6 悬案):把 AppFrame 的
+   `shell.overlay` / `notifications` / `details` 渲染接进 `AppShell`,让
+   `ui-dialogs` 注册的 5 个浮层真正可达。这是唯一还"接线了但用户看不到"的地方。
+2. **R23 — 3 个 onboarding dead 槽**:`onboarding.data-dir` / `.feedback` 由宿主注入
+   `onSubmit`;`.whats-new` 需要先有**应用内** changelog 数据源(可从
+   `apps/openbuddy-website/src/lib/changelog-server.ts` 抽一份共享 JSON)。
+3. **R24 — 剩余 no-impl 槽收口**:`conversation.{body,composer,message.markdown,toolside}` /
+   `home.*` / `modules.marketplace*` / `experts.panel` / `composer.toolbar.action`。
+   目标是把"靠 fallback 活着"降到 0,或明确标注为设计如此(`overlay.about` /
+   `overlay.folder-trust` 属后者,应加进 `INTENTIONAL_EXTENSION_POINTS`)。
+4. **R25 — Plugin SDK v1 文档站点**:`openbuddy.plugin.v1` manifest 全量公开 +
+   `examples/` + starter 模板。开源差异化的最重要抓手。
+5. **R26 — Pi 扩展市场多源 registry**:当前是单源,多源 + 权重 + 离线缓存。
+
+## 用户可见的差距分析(与 WorkBuddy 对比)
+
+| 维度 | WorkBuddy | OpenBuddy 现状 | 结论 |
+|---|---|---|---|
+| 主题 | 少(浅/深 + 少量预设) | **19 套 OKLCh + Match-system + Theme Studio 自建** | 已超越 |
+| 编辑器 | 富文本 | TiPTap + slash / mention / math / mermaid + 4 类 Office 预览 | 基本对齐 |
+| 插件 | 云端市场,不可自托管 | 本地市场 + Pi 扩展桥接 + 微内核槽位可替换任意 UI | 差异化(本地优先) |
+| i18n | 中文为主 | 内核级双语 + 插件可注册词表(子表作用域隔离) | 已对齐 |
+| 数据主权 | 强云依赖 | 本地审计日志 + 自托管 telemetry(Phase D 已落地) | 差异化 |
+| 首启体验 | 引导向导 | wizard / tour / data-dir prompt(3 个槽待宿主注入) | 略落后,见 R23 |

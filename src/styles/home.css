@@ -2396,6 +2396,38 @@
   border-radius: 6px;
   cursor: pointer;
 }
+/* 「设置 → 个性化」的语言下拉（ui-locale LanguagePicker 默认类名）。
+   走 --wb-* token 而不是原生控件本色，否则深色主题下会变成一块白底。 */
+.settings-select {
+  appearance: none;
+  min-width: 132px;
+  padding: 5px 26px 5px 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background-color: var(--wb-bg-primary);
+  /* 自绘箭头：原生箭头在 appearance:none 之后会消失。 */
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  color: var(--wb-text-strong);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.settings-select:hover {
+  border-color: var(--wb-border-strong, var(--wb-border-default));
+}
+.settings-select:focus-visible {
+  outline: 2px solid var(--wb-accent, var(--wb-border-strong, var(--wb-border-default)));
+  outline-offset: 1px;
+}
+.settings-select option {
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+}
 .shortcuts-list {
   list-style: none;
   margin: 0;
