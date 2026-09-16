@@ -1,92 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
   <!--
-    OpenBuddy mark v9 - white buddy companion.
-    Original organic round-bodied creature with dark outline + teal accent.
-    Captures the aesthetic direction (white + brown outline + #00C29A
-    highlight) without copying any specific reference character.
-    Symmetric organic form, expressive inner feature, friendly proportions.
+    OpenBuddy mark v10 - ultra-minimal abstract.
+    Composition: a single circle + a small inner ring + one accent dot.
+    No characters, no faces, no limbs, no props — just three geometric
+    primitives. Premium abstract identity.
+    Palette: cream bg + brown ring + teal accent (v9 DNA kept as a hint).
   -->
   <defs>
-    <radialGradient id="bgRad" cx="50%" cy="40%" r="70%">
+    <radialGradient id="bgRad" cx="50%" cy="50%" r="70%">
       <stop stop-color="#FFF7E8"/>
-      <stop offset=".55" stop-color="#F4E9D0"/>
       <stop offset="1" stop-color="#E8D8B8"/>
     </radialGradient>
-    <radialGradient id="body" cx="50%" cy="35%" r="70%">
-      <stop stop-color="#FFFFFF"/>
-      <stop offset=".55" stop-color="#FFFAF0"/>
-      <stop offset="1" stop-color="#F0E5C8"/>
-    </radialGradient>
-    <linearGradient id="outline" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="ring" x1="280" y1="280" x2="744" y2="744" gradientUnits="userSpaceOnUse">
       <stop stop-color="#3D2A1A"/>
       <stop offset="1" stop-color="#1F140A"/>
-    </linearGradient>
-    <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#09C8A7"/>
-      <stop offset="1" stop-color="#008C75"/>
     </linearGradient>
     <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
   </defs>
 
   <g clip-path="url(#clip)">
     <rect x="38" y="38" width="948" height="948" fill="url(#bgRad)"/>
-    <!-- subtle warm sparkles -->
-    <circle cx="180" cy="200" r="4" fill="#09C8A7" opacity=".5"/>
-    <circle cx="850" cy="180" r="5" fill="#09C8A7" opacity=".5"/>
-    <circle cx="150" cy="850" r="3" fill="#3D2A1A" opacity=".4"/>
-    <circle cx="860" cy="860" r="4" fill="#3D2A1A" opacity=".4"/>
-
-    <!-- left horn/ear (rounded organic) -->
-    <path d="M256 312 Q192 220 244 168 Q310 184 332 296 Z" fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
-    <!-- right horn/ear -->
-    <path d="M768 312 Q832 220 780 168 Q714 184 692 296 Z" fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
-
-    <!-- main body: large rounded teardrop pointing up -->
-    <path d="M512 200
-             Q280 200 232 480
-             Q200 720 320 832
-             Q440 920 512 920
-             Q584 920 704 832
-             Q824 720 792 480
-             Q744 200 512 200 Z"
-          fill="url(#body)" stroke="url(#outline)" stroke-width="18" stroke-linejoin="round"/>
-
-    <!-- belly/teal inner shape -->
-    <path d="M512 480
-             Q380 480 360 640
-             Q352 760 460 800
-             Q500 812 512 812
-             Q524 812 564 800
-             Q672 760 664 640
-             Q644 480 512 480 Z"
-          fill="url(#belly)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
-
-    <!-- expressive inner features: two eye dots + smile -->
-    <ellipse cx="456" cy="588" rx="22" ry="28" fill="#1F140A"/>
-    <ellipse cx="568" cy="588" rx="22" ry="28" fill="#1F140A"/>
-    <ellipse cx="464" cy="578" rx="7" ry="9" fill="#FFFFFF"/>
-    <ellipse cx="576" cy="578" rx="7" ry="9" fill="#FFFFFF"/>
-
-    <!-- smile curve -->
-    <path d="M460 680 Q512 736 564 680" fill="none" stroke="#1F140A" stroke-width="16" stroke-linecap="round"/>
-
-    <!-- teal sparkle on body (signature accent) -->
-    <g transform="translate(660 420)">
-      <circle r="22" fill="#09C8A7" opacity=".9"/>
-      <circle r="22" fill="none" stroke="#1F140A" stroke-width="6"/>
-      <path d="M-10 -4 L0 -14 L10 -4 M-10 4 L0 14 L10 4" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
-    </g>
-
-    <!-- cheeks -->
-    <circle cx="320" cy="640" r="36" fill="#FF8FBE" opacity=".55"/>
-    <circle cx="704" cy="640" r="36" fill="#FF8FBE" opacity=".55"/>
-
-    <!-- feet -->
-    <ellipse cx="380" cy="906" rx="70" ry="22" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
-    <ellipse cx="644" cy="906" rx="70" ry="22" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
-
-    <!-- tiny arms tucked at sides -->
-    <ellipse cx="252" cy="700" rx="44" ry="68" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
-    <ellipse cx="772" cy="700" rx="44" ry="68" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
+    <!-- the mark: one bold ring -->
+    <circle cx="512" cy="512" r="280" fill="none" stroke="url(#ring)" stroke-width="48"/>
+    <!-- inner thin ring (subtle layering) -->
+    <circle cx="512" cy="512" r="200" fill="none" stroke="#3D2A1A" stroke-width="6" opacity=".25"/>
+    <!-- single accent dot: teal AI signal, off-center for tension -->
+    <circle cx="700" cy="324" r="36" fill="#09C8A7"/>
+    <circle cx="700" cy="324" r="56" fill="none" stroke="#09C8A7" stroke-width="6" opacity=".5"/>
   </g>
 </svg>

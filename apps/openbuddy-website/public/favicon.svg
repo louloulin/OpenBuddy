@@ -1,14 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="OpenBuddy">
   <rect width="64" height="64" rx="14" fill="#FFF7E8"/>
-  <path d="M16 22 Q12 14 17 11 Q22 12 23 20 Z" fill="#FFFFFF" stroke="#3D2A1A" stroke-width="2" stroke-linejoin="round"/>
-  <path d="M48 22 Q52 14 47 11 Q42 12 41 20 Z" fill="#FFFFFF" stroke="#3D2A1A" stroke-width="2" stroke-linejoin="round"/>
-  <path d="M32 16 Q18 16 14 34 Q12 48 22 54 Q26 56 32 56 Q38 56 42 54 Q52 48 50 34 Q46 16 32 16 Z"
-        fill="#FFFFFF" stroke="#3D2A1A" stroke-width="3" stroke-linejoin="round"/>
-  <path d="M32 36 Q24 36 22 46 Q21 52 30 54 Q32 55 32 55 Q32 55 34 54 Q43 52 42 46 Q40 36 32 36 Z"
-        fill="#09C8A7" stroke="#3D2A1A" stroke-width="1.5" stroke-linejoin="round"/>
-  <ellipse cx="28" cy="44" rx="2" ry="2.4" fill="#1F140A"/>
-  <ellipse cx="36" cy="44" rx="2" ry="2.4" fill="#1F140A"/>
-  <ellipse cx="28.6" cy="43.4" rx="0.7" ry="0.9" fill="#FFFFFF"/>
-  <ellipse cx="36.6" cy="43.4" rx="0.7" ry="0.9" fill="#FFFFFF"/>
-  <path d="M29 50 Q32 53 35 50" fill="none" stroke="#1F140A" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="18" fill="none" stroke="#1F140A" stroke-width="5"/>
+  <circle cx="32" cy="32" r="12" fill="none" stroke="#1F140A" stroke-width="1" opacity=".25"/>
+  <circle cx="48" cy="18" r="4" fill="#09C8A7"/>
 </svg>

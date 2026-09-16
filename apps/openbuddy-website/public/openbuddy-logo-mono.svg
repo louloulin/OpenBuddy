@@ -1,24 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
-  <defs>
-    <mask id="mono" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
-      <rect width="1024" height="1024" fill="#FFF"/>
-      <path d="M256 312 Q192 220 244 168 Q310 184 332 296 Z" fill="#FFF"/>
-      <path d="M768 312 Q832 220 780 168 Q714 184 692 296 Z" fill="#FFF"/>
-      <path d="M512 200 Q280 200 232 480 Q200 720 320 832 Q440 920 512 920 Q584 920 704 832 Q824 720 792 480 Q744 200 512 200 Z" fill="#FFF"/>
-      <path d="M512 480 Q380 480 360 640 Q352 760 460 800 Q500 812 512 812 Q524 812 564 800 Q672 760 664 640 Q644 480 512 480 Z" fill="#FFF"/>
-      <ellipse cx="252" cy="700" rx="44" ry="68" fill="#FFF"/>
-      <ellipse cx="772" cy="700" rx="44" ry="68" fill="#FFF"/>
-      <ellipse cx="380" cy="906" rx="70" ry="22" fill="#FFF"/>
-      <ellipse cx="644" cy="906" rx="70" ry="22" fill="#FFF"/>
-      <g transform="translate(660 420)">
-        <circle r="22" fill="#FFF"/>
-      </g>
-      <ellipse cx="456" cy="588" rx="22" ry="28" fill="#000"/>
-      <ellipse cx="568" cy="588" rx="22" ry="28" fill="#000"/>
-      <ellipse cx="464" cy="578" rx="7" ry="9" fill="#FFF"/>
-      <ellipse cx="576" cy="578" rx="7" ry="9" fill="#FFF"/>
-      <path d="M460 680 Q512 736 564 680" fill="none" stroke="#000" stroke-width="16" stroke-linecap="round"/>
-    </mask>
-  </defs>
-  <rect width="1024" height="1024" fill="currentColor" mask="url(#mono)"/>
+  <circle cx="512" cy="512" r="280" fill="none" stroke="currentColor" stroke-width="48"/>
+  <circle cx="512" cy="512" r="200" fill="none" stroke="currentColor" stroke-width="6" opacity=".25"/>
+  <circle cx="700" cy="324" r="36" fill="currentColor"/>
+  <circle cx="700" cy="324" r="56" fill="none" stroke="currentColor" stroke-width="6" opacity=".5"/>
 </svg>

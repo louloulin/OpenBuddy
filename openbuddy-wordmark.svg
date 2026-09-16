@@ -1,31 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1480" height="320" viewBox="0 0 1480 320" role="img" aria-label="OpenBuddy">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
       <stop stop-color="#FFF7E8"/>
       <stop offset="1" stop-color="#E8D8B8"/>
     </radialGradient>
-    <radialGradient id="body" cx="50%" cy="35%" r="70%">
-      <stop stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#F0E5C8"/>
-    </radialGradient>
-    <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#09C8A7"/>
-      <stop offset="1" stop-color="#008C75"/>
-    </linearGradient>
   </defs>
   <g transform="translate(32 32)">
     <rect x="0" y="0" width="256" height="256" rx="58" fill="url(#bg)"/>
-    <path d="M64 96 Q46 64 66 50 Q86 56 92 90 Z" fill="url(#body)" stroke="#3D2A1A" stroke-width="4" stroke-linejoin="round"/>
-    <path d="M192 96 Q210 64 190 50 Q170 56 164 90 Z" fill="url(#body)" stroke="#3D2A1A" stroke-width="4" stroke-linejoin="round"/>
-    <path d="M128 64 Q70 64 56 132 Q48 198 88 224 Q108 234 128 234 Q148 234 168 224 Q208 198 200 132 Q186 64 128 64 Z"
-          fill="url(#body)" stroke="#3D2A1A" stroke-width="6" stroke-linejoin="round"/>
-    <path d="M128 150 Q90 150 84 196 Q82 220 116 230 Q124 234 128 234 Q132 234 140 230 Q174 220 172 196 Q166 150 128 150 Z"
-          fill="url(#belly)" stroke="#3D2A1A" stroke-width="4" stroke-linejoin="round"/>
-    <ellipse cx="112" cy="180" rx="8" ry="10" fill="#1F140A"/>
-    <ellipse cx="144" cy="180" rx="8" ry="10" fill="#1F140A"/>
-    <ellipse cx="115" cy="177" rx="2.6" ry="3.2" fill="#FFFFFF"/>
-    <ellipse cx="147" cy="177" rx="2.6" ry="3.2" fill="#FFFFFF"/>
-    <path d="M115 208 Q128 220 141 208" fill="none" stroke="#1F140A" stroke-width="4.5" stroke-linecap="round"/>
+    <circle cx="128" cy="128" r="72" fill="none" stroke="#1F140A" stroke-width="14"/>
+    <circle cx="128" cy="128" r="50" fill="none" stroke="#1F140A" stroke-width="2" opacity=".25"/>
+    <circle cx="178" cy="80" r="10" fill="#09C8A7"/>
+    <circle cx="178" cy="80" r="16" fill="none" stroke="#09C8A7" stroke-width="2" opacity=".5"/>
   </g>
   <g transform="translate(330 0)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif">
     <text x="0" y="190" font-size="148" font-weight="700" letter-spacing="-3" fill="#1F140A">Open<tspan font-weight="700" fill="#008C75">Buddy</tspan></text>

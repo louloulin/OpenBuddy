@@ -1,25 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="OpenBuddy">
   <defs>
-    <radialGradient id="body" cx="50%" cy="35%" r="70%">
-      <stop stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#F0E5C8"/>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop stop-color="#FFF7E8"/>
+      <stop offset="1" stop-color="#E8D8B8"/>
     </radialGradient>
-    <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#09C8A7"/>
-      <stop offset="1" stop-color="#008C75"/>
-    </linearGradient>
   </defs>
-  <path d="M60 92 Q46 60 62 48 Q82 52 88 88 Z" fill="url(#body)" stroke="#3D2A1A" stroke-width="4" stroke-linejoin="round"/>
-  <path d="M180 92 Q194 60 178 48 Q158 52 152 88 Z" fill="url(#body)" stroke="#3D2A1A" stroke-width="4" stroke-linejoin="round"/>
-  <path d="M120 60 Q60 60 50 130 Q42 198 80 220 Q100 230 120 230 Q140 230 160 220 Q198 198 190 130 Q180 60 120 60 Z"
-        fill="url(#body)" stroke="#3D2A1A" stroke-width="6" stroke-linejoin="round"/>
-  <path d="M120 142 Q84 142 78 188 Q76 212 110 222 Q116 224 120 224 Q124 224 130 222 Q164 212 162 188 Q156 142 120 142 Z"
-        fill="url(#belly)" stroke="#3D2A1A" stroke-width="4" stroke-linejoin="round"/>
-  <ellipse cx="106" cy="174" rx="8" ry="10" fill="#1F140A"/>
-  <ellipse cx="134" cy="174" rx="8" ry="10" fill="#1F140A"/>
-  <ellipse cx="108" cy="171" rx="2.6" ry="3.2" fill="#FFFFFF"/>
-  <ellipse cx="136" cy="171" rx="2.6" ry="3.2" fill="#FFFFFF"/>
-  <path d="M108 200 Q120 212 132 200" fill="none" stroke="#1F140A" stroke-width="4.5" stroke-linecap="round"/>
-  <ellipse cx="68" cy="180" rx="14" fill="#FF8FBE" opacity=".5"/>
-  <ellipse cx="172" cy="180" rx="14" fill="#FF8FBE" opacity=".5"/>
+  <rect width="240" height="240" fill="url(#bg)"/>
+  <circle cx="120" cy="120" r="68" fill="none" stroke="#1F140A" stroke-width="14"/>
+  <circle cx="120" cy="120" r="48" fill="none" stroke="#1F140A" stroke-width="2" opacity=".25"/>
+  <circle cx="172" cy="74" r="10" fill="#09C8A7"/>
+  <circle cx="172" cy="74" r="16" fill="none" stroke="#09C8A7" stroke-width="3" opacity=".5"/>
 </svg>

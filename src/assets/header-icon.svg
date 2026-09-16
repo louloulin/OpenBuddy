@@ -1,12 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="OpenBuddy">
   <circle cx="16" cy="16" r="14" fill="#FFF7E8"/>
-  <path d="M8 11 Q6 7 9 6 Q11.4 6.4 11.6 10 Z" fill="#FFFFFF" stroke="#3D2A1A" stroke-width="1.2" stroke-linejoin="round"/>
-  <path d="M24 11 Q26 7 23 6 Q20.6 6.4 20.4 10 Z" fill="#FFFFFF" stroke="#3D2A1A" stroke-width="1.2" stroke-linejoin="round"/>
-  <path d="M16 7.6 Q9 7.6 7 17 Q6 24 11 27 Q13 28 16 28 Q19 28 21 27 Q26 24 25 17 Q23 7.6 16 7.6 Z"
-        fill="#FFFFFF" stroke="#3D2A1A" stroke-width="1.6" stroke-linejoin="round"/>
-  <path d="M16 18 Q12 18 11 23 Q10.6 26 14 27 Q15.2 27.4 16 27.4 Q16.8 27.4 18 27 Q21.4 26 21 23 Q20 18 16 18 Z"
-        fill="#09C8A7" stroke="#3D2A1A" stroke-width="1" stroke-linejoin="round"/>
-  <ellipse cx="14" cy="22" rx="1.2" ry="1.4" fill="#1F140A"/>
-  <ellipse cx="18" cy="22" rx="1.2" ry="1.4" fill="#1F140A"/>
-  <path d="M14 25 Q16 26.4 18 25" fill="none" stroke="#1F140A" stroke-width="0.9" stroke-linecap="round"/>
+  <circle cx="16" cy="16" r="9" fill="none" stroke="#1F140A" stroke-width="2.6"/>
+  <circle cx="16" cy="16" r="6" fill="none" stroke="#1F140A" stroke-width=".6" opacity=".25"/>
+  <circle cx="23.5" cy="9" r="2" fill="#09C8A7"/>
 </svg>
