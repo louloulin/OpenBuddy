@@ -42,22 +42,32 @@ try {
   await page.waitForTimeout(800);
 
   async function setTheme(mode) {
-    await page.click(".sidebar__footer .sidebar__icon-btn[aria-label='设置']", { timeout: 5000 }).catch(() => {});
-    await page.waitForTimeout(1200);
-    await page.evaluate(() => {
-      const items = Array.from(document.querySelectorAll(".settings-navigation__item"));
-      const t = items.find((el) => (el.textContent ?? "").includes("个性化"));
-      if (t) t.click();
-    });
-    await page.waitForTimeout(900);
+    // R45 — 旧的 .theme-toggle__btn(浅色/深色双按钮)已被 ThemePicker
+    // 取代。这里通过 ThemePicker 的 ThemeCard 点击切主题。
+    // ThemeMenuButton 在顶栏 aria-label="切换主题",ThemeCard 的内部
+    // 标记包含主题 type(深色/浅色分组)。
+    await page.click("button[aria-label='切换主题']").catch(() => {});
+    await page.waitForTimeout(500);
     await page.evaluate((m) => {
-      const buttons = Array.from(document.querySelectorAll(".theme-toggle__btn"));
-      const target = buttons.find((b) => (b.textContent ?? "").includes(m));
-      if (target) target.click();
-    }, mode === "light" ? "浅色" : "深色");
-    await page.waitForTimeout(1200);
+      // ThemePicker 用深色 / 浅色分组,在每个分组里点第一张卡
+      // 即可确保该 type 有 active 主题被选中。
+      const menus = Array.from(document.querySelectorAll("[role=menu]"));
+      for (const menu of menus) {
+        const headers = Array.from(menu.querySelectorAll("*"));
+        const targetHeader = headers.find((el) =>
+          (el.textContent ?? "").trim() === (m === "light" ? "浅色" : "深色"),
+        );
+        if (!targetHeader) continue;
+        // 找 header 同 section 下的第一张 ThemeCard。
+        const section = targetHeader.closest("div")?.parentElement;
+        if (!section) continue;
+        const card = section.querySelector("button");
+        if (card) { card.click(); break; }
+      }
+    }, mode);
+    await page.waitForTimeout(800);
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(500);
   }
 
   async function snapshot(label) {
