@@ -156,6 +156,16 @@ describe("R16 左下角账户菜单", () => {
     expect(onOpenSettings).not.toHaveBeenCalled();
   });
 
+  it("R36 — 默认态(未配置 IdP / 未登录)左下角不出现「企业登录」字样", () => {
+    for (const status of ["configuration_needed", "signed_out"] as const) {
+      renderSidebar({ accountStatus: status });
+      const sub = document.querySelector(".sidebar__user-sub");
+      expect(sub?.textContent?.trim()).toBe("本地优先 · 开源");
+      expect(document.querySelector(".sidebar__user")?.textContent ?? "").not.toContain("企业登录");
+      cleanup();
+    }
+  });
+
   it("R26 — 上次登录出错时主按钮是「重新登录」", () => {
     const onOpenAccount = vi.fn();
     renderSidebar({ accountStatus: "error", onOpenAccount });

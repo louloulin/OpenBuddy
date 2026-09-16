@@ -1762,13 +1762,15 @@ export function Sidebar({
             <span className="sidebar__user-text">
               <span className="sidebar__user-name">{accountLabel ?? "OpenBuddy"}</span>
               <span className="sidebar__user-sub">
+                {/* R36 — 默认态不再对用户喊「需要配置企业登录」。OpenBuddy 是
+                    本地优先产品,IdP 没配置只说明"没接云端账户",不是错误,
+                    更不该在侧栏常驻一句用户无法处置的提示(用户两次点名删掉
+                    这行字)。企业登录入口仍然在账户菜单里,想用的人点得到。 */}
                 {accountStatus === "signed_in"
                   ? (accountLabel ? "已登录" : "本地账户")
-                  : accountStatus === "configuration_needed"
-                    ? "需要配置企业登录"
-                    : accountStatus === "error"
-                      ? "登录出错"
-                      : "本地优先 · 开源"}
+                  : accountStatus === "error"
+                    ? "登录出错"
+                    : "本地优先 · 开源"}
               </span>
             </span>
             <span className="sidebar__user-chevron" aria-hidden="true">▾</span>
