@@ -1250,10 +1250,21 @@ localStorage)。`LanguagePicker` 的选项标签用**各自的语言**书写
 
 ```
 R20: 总共 40 个槽位; ok=13 dead=4 ext=6 no-impl=17
-R21: 总共 40 个槽位; ok=15 dead=4 ext=6 no-impl=15
+R21: 总共 40 个槽位; ok=17 dead=4 ext=6 no-impl=13
 ```
 
-`settings.appearance.language` / `settings.appearance.theme` 从 no-impl → ok。
+三个变化:
+
+1. `settings.appearance.language` / `.theme`:no-impl → ok(R21.3 接线)。
+2. `overlay.about` / `overlay.folder-trust`:no-impl → ok。这两个是**审计脚本的
+   假阴性** —— `ui-dialogs` 用 `name: dialog.named` 这种变量槽名注册,静态扫描
+   匹配不到字面量,于是它们长期被标成"靠 fallback 活着",其实既注册了也被
+   `AppShell` 消费了。R21 把注册展开成 4 条字面量 register(不再用循环),
+   审计表现在每一行都是真的。多写几行的代价换"审计可信",值。
+
+顺带澄清 R20.6 的悬案:`shell.overlay` 里那两条(about / folder-trust)**不是**
+漏接线,而是给第三方 / 替代外壳(AppFrame 路径)准备的同一份浮层的第二份注册;
+本产品外壳走命名 `overlay.*`。两者并存是有意的。
 
 ### R21.6 测试
 
@@ -1262,7 +1273,7 @@ R21: 总共 40 个槽位; ok=15 dead=4 ext=6 no-impl=15
   子表作用域隔离、`register` disposer、插值、缺 key 的两级兜底、无 Provider
   回落单例、`LanguagePicker` 列出/写入/类名覆盖。
 - 新增 `scripts/electron/_probe-settings-appearance.test.mjs`(2 条,真机)。
-- 全量:`npx vitest run` → **773 文件 / 7504 通过 / 0 失败 / 16 跳过**;
+- 全量:`npx vitest run` → **774 文件 / 7506 通过 / 0 失败 / 16 跳过**;
   `tsc --noEmit` → 0 错;`electron-vite build` → 成功。
 
 ## 当前进度(按四期主线)
@@ -1276,9 +1287,11 @@ R21: 总共 40 个槽位; ok=15 dead=4 ext=6 no-impl=15
 
 ## 后续计划(优先级排序)
 
-1. **R22 — `AppFrame` 浮层槽决策**(R20.6 悬案):把 AppFrame 的
-   `shell.overlay` / `notifications` / `details` 渲染接进 `AppShell`,让
-   `ui-dialogs` 注册的 5 个浮层真正可达。这是唯一还"接线了但用户看不到"的地方。
+1. **R22 — 整壳替换能力落地**:R21.5 已澄清 `shell.overlay` / `notifications` /
+   `details` 不是漏接线,而是"给 AppFrame 路径的第二份注册"。要决定的是**要不要
+   真的把整壳替换做成可用能力**(第三方 shell 通过 `root` 槽替换 AppShell),还是
+   退役这条路径、只保留命名 `overlay.*`。后者能让审计表少 4 个 ext 槽,前者是
+   微内核对称性的最后一块拼图。
 2. **R23 — 3 个 onboarding dead 槽**:`onboarding.data-dir` / `.feedback` 由宿主注入
    `onSubmit`;`.whats-new` 需要先有**应用内** changelog 数据源(可从
    `apps/openbuddy-website/src/lib/changelog-server.ts` 抽一份共享 JSON)。
