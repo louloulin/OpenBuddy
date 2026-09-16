@@ -10,6 +10,7 @@
  * module keeps its "no relative source deps" property while sharing the one
  * canonical agent-home resolver.
  */
+import { realpathSync } from "node:fs";
 import { mkdir, readFile, readdir, realpath, rename, writeFile } from "node:fs/promises";
 import { isAbsolute, dirname, join, relative, resolve } from "node:path";
 import { McpAuthStore, McpRegistry, agentHome, createPlatformSecretStore } from "@openbuddy/storage";
@@ -76,18 +77,106 @@ export async function writeJson(file: string, value: unknown, mode?: number): Pr
   await rename(temporary, file);
 }
 
-export function within(root: string, candidate: string): string {
-  const base = resolve(root);
-  const target = resolve(candidate);
+/**
+ * Canonicalise a path without requiring it to exist.
+ *
+ * `fs.realpath` throws ENOENT on a missing leaf, but callers of `within()`
+ * routinely validate install targets that have not been created yet. So we
+ * walk up to the nearest existing ancestor, realpath that, and re-append the
+ * still-unresolved tail.
+ *
+ * This matters on macOS, where `/var` is a symlink to `/private/var`: a root
+ * the OS handed us (`/private/var/...`) and a candidate we built with `join`
+ * (`/var/...`) would otherwise compare as unrelated and every check would
+ * fail.
+ */
+function canonicalizeSync(input: string): string {
+  const absolute = resolve(input);
+  let current = absolute;
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      const real = realpathSync(current);
+      return tail.length ? join(real, ...tail.reverse()) : real;
+    } catch {
+      const parent = dirname(current);
+      if (parent === current) return absolute;
+      tail.push(current.slice(parent.length + 1));
+      current = parent;
+    }
+  }
+}
+
+async function canonicalize(input: string): Promise<string> {
+  const absolute = resolve(input);
+  let current = absolute;
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      const real = await realpath(current);
+      return tail.length ? join(real, ...tail.reverse()) : real;
+    } catch {
+      const parent = dirname(current);
+      if (parent === current) return absolute;
+      tail.push(current.slice(parent.length + 1));
+      current = parent;
+    }
+  }
+}
+
+/**
+ * Canonicalise everything *except* the final path segment.
+ *
+ * The leaf deliberately stays unresolved so a symlink sitting at the target
+ * itself is reported lexically-inside and can be rejected explicitly by the
+ * caller (`lstat(...).isSymbolicLink()`), rather than being silently followed
+ * out of the root. Intermediate segments are fully resolved, so a symlinked
+ * parent directory that escapes the root is still caught here.
+ */
+function canonicalizeParentSync(input: string): string {
+  const absolute = resolve(input);
+  const parent = dirname(absolute);
+  if (parent === absolute) return absolute;
+  return join(canonicalizeSync(parent), absolute.slice(parent.length + 1));
+}
+
+async function canonicalizeParent(input: string): Promise<string> {
+  const absolute = resolve(input);
+  const parent = dirname(absolute);
+  if (parent === absolute) return absolute;
+  return join(await canonicalize(parent), absolute.slice(parent.length + 1));
+}
+
+/** Lexical containment check on already-canonicalised paths. */
+function isWithin(base: string, target: string): boolean {
   const rel = relative(base, target);
-  if (rel === "" || (rel !== ".." && !rel.startsWith(`..${String.fromCharCode(47)}`) && !isAbsolute(rel))) return target;
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${String.fromCharCode(47)}`) && !isAbsolute(rel));
+}
+
+/**
+ * Resolve `candidate` and assert it stays inside `root`.
+ *
+ * The root is fully canonicalised and the candidate is canonicalised down to
+ * its parent, so a mixed set of resolved / unresolved paths (the common case:
+ * an OS-provided root plus a path we built with `join`) still compares
+ * correctly on platforms where the tmpdir itself is behind a symlink.
+ */
+export function within(root: string, candidate: string): string {
+  const base = canonicalizeSync(root);
+  const target = canonicalizeParentSync(candidate);
+  if (isWithin(base, target)) return target;
   throw new Error(`path is outside allowed root: ${target}`);
 }
 
+/**
+ * Async variant, with the same semantics as `within()`. Kept because several
+ * call sites already sit in async functions and prefer not to block.
+ */
 export async function withinReal(root: string, candidate: string): Promise<string> {
-  const realRoot = await realpath(resolve(root));
-  const realCandidate = await realpath(resolve(candidate));
-  return within(realRoot, realCandidate);
+  const base = await canonicalize(root);
+  const target = await canonicalizeParent(candidate);
+  if (isWithin(base, target)) return target;
+  throw new Error(`path is outside allowed root: ${target}`);
 }
 
 export async function assertResourcePath(candidate: string, allowedRoots: string[]): Promise<string> {
