@@ -1,4 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import Copy from "lucide-react/dist/esm/icons/copy";
+import Check from "lucide-react/dist/esm/icons/check";
 import type { MarkdownConfig, PathType } from "./types";
 import { detectPath, truncatePathDisplay } from "./utils/path-detector";
 
@@ -161,9 +163,81 @@ export const MarkdownInlineCode = memo(function MarkdownInlineCode({
     );
   }
 
+  // R8.55 — Inline code copy button. Track the "copied" state so we can
+  // swap the Copy icon for a Check icon for 2s, mirroring the
+  // CodeBlockActions pattern (PI-Desktop parity). The button is hidden
+  // by default (opacity: 0) and revealed on hover / focus-within so
+  // it never competes with the inline text. Non-visual handler is
+  // always wired (keyboard accessible via Enter on the code element).
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(t);
+  }, [copied]);
+
+  const handleCopy = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const text = code;
+      if (!text) return;
+      const done = () => setCopied(true);
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => {
+          try {
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            ta.style.position = "fixed";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            done();
+          } catch {
+            /* ignore */
+          }
+        });
+        return;
+      }
+      // Fallback for restricted contexts
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        done();
+      } catch {
+        /* ignore */
+      }
+    },
+    [code],
+  );
+
   return (
     <code className={["md-inline-code", className].filter(Boolean).join(" ")}>
-      {children}
+      <span className="md-inline-code__text">{children}</span>
+      <button
+        type="button"
+        className={
+          "md-inline-code__copy" + (copied ? " md-inline-code__copy--ok" : "")
+        }
+        aria-label={copied ? "已复制" : "复制"}
+        title={copied ? "已复制" : "复制代码"}
+        onClick={handleCopy}
+        tabIndex={-1}
+      >
+        {copied ? (
+          <Check size={12} strokeWidth={2} aria-hidden="true" />
+        ) : (
+          <Copy size={12} strokeWidth={2} aria-hidden="true" />
+        )}
+      </button>
     </code>
   );
 });

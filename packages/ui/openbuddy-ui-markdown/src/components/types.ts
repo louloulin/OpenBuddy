@@ -11,6 +11,13 @@ export type CodeBlockAction = {
   icon?: ReactNode;
   onClick: (code: string, language: string) => void;
   condition?: (code: string, language: string) => boolean;
+  /** R8.6 — visual variant. "primary" renders the brand-tinted pill
+   *  style; "default" (or omitted) renders the ghost icon button. */
+  variant?: "default" | "primary";
+  /** R8.6 — disable the action (e.g. while the parent is mid-flight).
+   *  Predicates let the action decide per-snippet; static booleans also
+   *  work. */
+  disabled?: boolean | ((code: string, language: string) => boolean);
 };
 
 export type PathClickHandler = {

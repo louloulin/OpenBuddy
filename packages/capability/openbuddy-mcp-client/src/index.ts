@@ -300,7 +300,7 @@ export const defaultMcpConnectionFactory: McpConnectionFactory = {
 				cwd: text(config.cwd),
 			});
 		}
-		const client = new Client({ name: "openbuddy", version: "0.14.0" }, { capabilities: {} });
+		const client = new Client({ name: "openbuddy", version: "0.15.0" }, { capabilities: {} });
 		let closedListener: (() => void) | undefined;
 		transport.onclose = () => closedListener?.();
 		await client.connect(transport);

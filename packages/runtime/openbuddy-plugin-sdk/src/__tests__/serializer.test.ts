@@ -41,7 +41,7 @@ describe("manifestToExtensionFactory", () => {
   it("builds a factory that registers handlers, tools, and commands", () => {
     const manifest = parsePluginManifest({
       name: "sample",
-      version: "1.0.0",
+      version: "0.15.0",
       pi: {
         handlers: {
           session_start: "./handlers/session-start.js",
@@ -70,7 +70,7 @@ describe("manifestToExtensionFactory", () => {
     const inline = vi.fn();
     const manifest = parsePluginManifest({
       name: "inline",
-      version: "1.0.0",
+      version: "0.15.0",
       pi: { factory: inline as unknown as never },
     });
     const serialized = manifestToExtensionFactory(manifest, "/abs/inline/plugin.json");
@@ -87,7 +87,7 @@ describe("manifestToExtensionFactory", () => {
     };
     const manifest = parsePluginManifest({
       name: "resolver",
-      version: "1.0.0",
+      version: "0.15.0",
       pi: { tools: ["./tools/index.js"] },
     });
     const serialized = manifestToExtensionFactory(manifest, "/abs/r/plugin.json", resolver);
@@ -107,7 +107,7 @@ describe("manifestToExtensionFactory", () => {
     const serialized = manifestToExtensionFactory(
       {
         name: "unknown-event",
-        version: "1.0.0",
+        version: "0.15.0",
         pi: { handlers: { definitely_not_a_pi_event: "./a.js" } },
       },
       "/abs/u/plugin.json",
@@ -121,7 +121,7 @@ describe("manifestToExtensionFactory", () => {
   it("surfaces a diagnostic for empty pi tracks", () => {
     const manifest = parsePluginManifest({
       name: "empty-pi",
-      version: "1.0.0",
+      version: "0.15.0",
       ui: { x: { type: "status-bar", id: "y", getText: "./a.js" } },
     });
     // We need a pi track to be detected by the serializer (so the
@@ -130,7 +130,7 @@ describe("manifestToExtensionFactory", () => {
     const serialized = manifestToExtensionFactory(
       {
         name: "empty-pi",
-        version: "1.0.0",
+        version: "0.15.0",
         pi: { handlers: {}, tools: [], commands: [] },
       },
       "/abs/empty/plugin.json",
@@ -142,7 +142,7 @@ describe("manifestToExtensionFactory", () => {
   it("emits a no-op factory when no pi track is present", () => {
     const manifest = parsePluginManifest({
       name: "ui-only",
-      version: "1.0.0",
+      version: "0.15.0",
       ui: { x: { type: "status-bar", id: "y", getText: "./a.js" } },
     });
     const serialized = manifestToExtensionFactory(manifest, "/abs/ui/plugin.json");
@@ -159,7 +159,7 @@ describe("serializePluginManifest", () => {
     const serialized = serializePluginManifest(
       {
         name: "combo",
-        version: "1.0.0",
+        version: "0.15.0",
         pi: { commands: ["./cmd.js"] },
       },
       "/abs/combo/plugin.json",

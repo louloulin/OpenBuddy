@@ -40,8 +40,8 @@ src/
 {
   "schema": "openbuddy.plugin.v1",
   "name": "@openbuddy/sample-plugin",
-  "version": "0.1.0",
-  "engines": { "openbuddy": ">=0.14.0" },
+  "version": "0.15.0",
+  "engines": { "openbuddy": ">=0.15.0" },
   "main": "./index.js",
   "pi": {
     "handlers": { "session_start": "./handlers/session-start.js" },

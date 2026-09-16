@@ -28,7 +28,7 @@ export const rendererSidebarPlugin = contributionPlugin(
   "openbuddy-renderer-sidebar",
   "sidebar",
   "OpenBuddy Agent",
-  // v0.14.x: WorkBuddy-style sidebar does not surface this entry;
+  // v0.15.0: WorkBuddy-style sidebar does not surface this entry;
   // plugin id 保留以兼容第三方贡献者。
   true,
 );

@@ -13,11 +13,11 @@ describe("TopbarTitle", () => {
       <TopbarTitle
         title="项目复盘"
         onRename={vi.fn()}
-        appVersion="0.14.0"
+        appVersion="0.15.0"
       />,
     );
-    expect(screen.getByText("v0.14.0")).toBeInTheDocument();
-    expect(screen.getByLabelText("OpenBuddy 版本 0.14.0")).toBeInTheDocument();
+    expect(screen.getByText("v0.15.0")).toBeInTheDocument();
+    expect(screen.getByLabelText("OpenBuddy 版本 0.15.0")).toBeInTheDocument();
   });
 
   it("does not render the version pill when appVersion is omitted", () => {
@@ -26,8 +26,8 @@ describe("TopbarTitle", () => {
   });
 
   it("falls back to 未命名会话 when title is empty", () => {
-    render(<TopbarTitle title="" onRename={vi.fn()} appVersion="0.14.0" />);
+    render(<TopbarTitle title="" onRename={vi.fn()} appVersion="0.15.0" />);
     expect(screen.getByText("未命名会话")).toBeInTheDocument();
-    expect(screen.getByText("v0.14.0")).toBeInTheDocument();
+    expect(screen.getByText("v0.15.0")).toBeInTheDocument();
   });
 });

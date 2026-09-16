@@ -22,7 +22,10 @@
 .s_sm { padding: 4px 8px; font-size: 12px; }
 .s_md { padding: 6px 12px; font-size: 13px; }
 .s_lg { padding: 8px 16px; font-size: 14px; }
-.v_primary { background: var(--wb-accent, #2f6feb); color: white; }
+.v_primary {
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+}
 .v_secondary { background: var(--wb-bg-secondary, #f4f5f8); color: var(--wb-fg-primary, #1f2328); border-color: var(--wb-border, #d0d7de); }
 .v_ghost { background: transparent; color: var(--wb-fg-secondary, #57606a); }
 .v_ghost:hover { background: var(--wb-bg-secondary, #f4f5f8); }

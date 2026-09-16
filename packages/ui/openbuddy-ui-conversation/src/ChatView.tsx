@@ -16,6 +16,11 @@ import ListTodo from "lucide-react/dist/esm/icons/list-todo";
 import Package from "lucide-react/dist/esm/icons/package";
 import Search from "lucide-react/dist/esm/icons/search";
 import Users from "lucide-react/dist/esm/icons/users";
+import Bug from "lucide-react/dist/esm/icons/bug";
+import FlaskConical from "lucide-react/dist/esm/icons/flask-conical";
+import BookOpen from "lucide-react/dist/esm/icons/book-open";
+import Zap from "lucide-react/dist/esm/icons/zap";
+import WandSparkles from "lucide-react/dist/esm/icons/wand-2";
 import { shallow } from "zustand/shallow";
 import { PauseIcon } from "@openbuddy/ui-primitives/icons";
 import { useSessionStore, type ToolCallView } from "@/stores/session-store";
@@ -80,6 +85,55 @@ const EMPTY_RENDERER_SESSION_SNAPSHOT: DeepSeekSessionListSnapshot = {
 
 /** Center chat column: scrollable message list + composer pinned at bottom. */
 
+/* R8.10 — Quick-prompt templates shown on the welcome empty state.
+   Each card seeds the composer via the existing `resendText` pipe so the
+   user can refine and send. Keep the list short (5 cards max) so the
+   empty state stays scannable; the cards adapt to current language. */
+const QUICK_PROMPTS: ReadonlyArray<{
+  id: string;
+  icon: typeof FolderTree;
+  title: string;
+  desc: string;
+  prompt: string;
+}> = [
+  {
+    id: "explore",
+    icon: FolderTree,
+    title: "梳理项目结构",
+    desc: "概览代码组织、关键模块、入口文件",
+    prompt: "帮我梳理一下当前项目的目录结构和关键模块。",
+  },
+  {
+    id: "find-bug",
+    icon: Bug,
+    title: "查找 Bug",
+    desc: "审查最近的改动,定位并修复问题",
+    prompt: "审查最近修改的代码,帮我找出潜在的 Bug 并修复。",
+  },
+  {
+    id: "write-tests",
+    icon: FlaskConical,
+    title: "写单元测试",
+    desc: "为关键函数补充覆盖率的测试",
+    prompt: "为当前目录的关键函数补充单元测试,提升覆盖率。",
+  },
+  {
+    id: "explain",
+    icon: BookOpen,
+    title: "解释代码逻辑",
+    desc: "用通俗语言说明某段代码的作用",
+    prompt: "挑一个核心文件,逐段解释它的逻辑和设计意图。",
+  },
+  {
+    id: "optimize",
+    icon: Zap,
+    title: "性能优化",
+    desc: "寻找热点并提出改进建议",
+    prompt: "检查当前代码,找出性能瓶颈并给出优化建议。",
+  },
+];
+
+
 /** Format a millisecond duration as WorkBuddy-style "Xs / Xm Ys". */
 function formatElapsed(ms: number): string {
   if (ms < 1000) return "已完成";
@@ -88,6 +142,18 @@ function formatElapsed(ms: number): string {
   const minutes = Math.floor(totalSec / 60);
   const seconds = totalSec % 60;
   return `已完成 ${minutes}m ${seconds}s`;
+}
+
+/** Streaming-time formatter. Kept short (just "12s" / "1m 5s") so the pill
+ *  doesn't read as a full sentence; the user wants a glance, not a paragraph.
+ *  Seconds-only for the first minute so the value visibly moves at a human
+ *  rate; past 60s we switch to the WorkBuddy-style "1m 5s" form. */
+function formatInFlightElapsed(ms: number): string {
+  const totalSec = Math.max(0, Math.round(ms / 1000));
+  if (totalSec < 60) return `${totalSec}s`;
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  return `${minutes}m ${seconds}s`;
 }
 export function ChatView({
   onSend,
@@ -150,6 +216,7 @@ export function ChatView({
     hiddenThinkingLabel?: string;
     toolsExpanded?: boolean;
   };
+  onOpenSettings?: () => void;
 }) {
   // P0-07: Custom equality — only re-render ChatView when the message list
   // *structure* changes (length or last message id). Streaming deltas
@@ -195,6 +262,12 @@ export function ChatView({
   const [lastTurnMs, setLastTurnMs] = useState<number | null>(null);
   const prevStreamingRef = useRef<boolean>(false);
   const turnStartRef = useRef<number | null>(null);
+  // R7.1 — while streaming, re-render the status pill every second so the
+  // wall-clock elapsed reads live ("12s 正在生成…") rather than the value
+  // captured at the last streaming delta. Same pattern as the cumulative
+  // session timer (single setState/interval). Cheap; the pill is a few
+  // elements.
+  const [, setStreamTick] = useState(0);
   // R6.7 — cumulative session wall-clock elapsed. Ticks every second once
   // the session has at least one message so the status pill can show a
   // `· 共 Xm Ys` suffix alongside the per-turn `已完成 Xs` chip.
@@ -208,6 +281,11 @@ export function ChatView({
       turnStartRef.current = null;
     }
     prevStreamingRef.current = streaming;
+  }, [streaming]);
+  useEffect(() => {
+    if (!streaming) return;
+    const id = setInterval(() => setStreamTick((n) => (n + 1) | 0), 1000);
+    return () => clearInterval(id);
   }, [streaming]);
   // Tick the cumulative timer once per second while the session has any
   // messages. Cheap (single setState/interval, no per-frame work) and
@@ -368,10 +446,54 @@ export function ChatView({
   );
   const [planOpen, setPlanOpen] = useState(false);
 
+  // R8.1 (revision-pager) — id of the user message whose `编辑` button
+  // was last clicked. Used by `handleEditResend` to append the new text
+  // to that message's revision history before re-seeding the composer.
+  const [editResendOriginId, setEditResendOriginId] = useState<string | null>(null);
+  // R8.1 — bound pager stepper. Wraps `useSessionStore.setActiveRevision`
+  // so MessageItem never imports the store directly.
+  const handleStepRevision = useCallback((messageId: string, direction: -1 | 1) => {
+    const s = useSessionStore.getState();
+    const msg = s.messages.find((m) => m.id === messageId);
+    if (!msg || !msg.revisions || msg.revisions.length === 0) return;
+    const cur = Math.min(Math.max(1, msg.activeRevision ?? msg.revisions.length), msg.revisions.length);
+    s.setActiveRevision(messageId, cur + direction);
+  }, []);
+
   // ---- 消息"编辑重发":把消息文本回填到输入框 ----
   const [resendText, setResendText] = useState<string | undefined>(undefined);
   const [resendNonce, setResendNonce] = useState(0);
   const handleEditResend = useCallback((text: string) => {
+    if (!text.trim()) return;
+    // R8.1 (revision-pager) — record this edit on the originating message
+    // so the bubble's footer can show a 上一版/下一版 pager of every text
+    // the user ever submitted from this slot. We piggy-back on the same
+    // resendText signal: Composer still receives the seed text below, but
+    // the bubble now also gains a new revisions entry.
+    if (editResendOriginId) {
+      useSessionStore.getState().appendUserRevision(editResendOriginId, text);
+    }
+    setResendText(text);
+    setResendNonce((n) => n + 1);
+  }, [editResendOriginId]);
+
+  // R8.3 (inline-edit) — submit an inline edit from the bubble editor.
+  // Records the new revision on the originating message and seeds the
+  // composer. We deliberately reuse handleEditResend's path so the two
+  // entry points (inline textarea + composer 回填) converge on the same
+  // canonical "append revision → seed composer" sequence.
+  const handleInlineResend = useCallback((messageId: string, text: string) => {
+    if (!text.trim()) return;
+    useSessionStore.getState().appendUserRevision(messageId, text);
+    setResendText(text);
+    setResendNonce((n) => n + 1);
+  }, []);
+
+  // R8.10 — quick-prompt card click: seed the composer with the preset
+  // text via the same resendText pipe as inline-edit / revision-pager so
+  // a single source of truth seeds the textarea (Composer auto-focuses
+  // when externalTextNonce bumps).
+  const handleQuickPrompt = useCallback((text: string) => {
     if (!text.trim()) return;
     setResendText(text);
     setResendNonce((n) => n + 1);
@@ -651,12 +773,26 @@ export function ChatView({
           <MessageItem
             message={m}
             streaming={streaming && m.id === streamingMessageId}
+            // R8.14 — pass per-turn streaming duration so the meta chip
+            // can render a live "12s 正在生成…" label on the in-flight
+            // bubble. Computed from turnStartRef.current which ChatView
+            // owns; cleared once the turn ends.
+            streamingDurationMs={
+              streaming && m.id === streamingMessageId && turnStartRef.current !== null
+                ? Date.now() - turnStartRef.current
+                : undefined
+            }
             markdownConfig={markdownConfig}
             cwd={cwd}
             sessionId={sessionId ?? undefined}
             onToast={onToast}
             onOpenTool={handleOpenTool}
-            onEditResend={handleEditResend}
+            onEditResend={(text) => {
+              setEditResendOriginId(m.id);
+              handleEditResend(text);
+            }}
+            onStepRevision={handleStepRevision}
+            onInlineResend={m.role === "user" ? handleInlineResend : undefined}
             onRetry={
               isLastAssistant && !streaming && m.complete ? handleRetry : undefined
             }
@@ -674,7 +810,8 @@ export function ChatView({
       onToast,
       handleOpenTool,
       handleEditResend,
-      handleRetry,
+      handleStepRevision,
+      handleInlineResend,
       findOpen,
       findHits,
       findCurrent,
@@ -987,12 +1124,33 @@ export function ChatView({
                   aria-hidden="true"
                 />
                 <span className="chatview__status-text">
+                  {/* Streaming: surface the wall-clock elapsed alongside the
+                      "正在生成" label so the user sees the model is making
+                      progress (and has a clear signal if a long stream is
+                      hung). The timer is per-turn so it resets on each
+                      prompt; the cumulative `共 Xs` suffix only appears
+                      once the turn is long enough to matter. */}
                   {streaming
-                    ? "正在生成…"
+                    ? turnStartRef.current !== null
+                      ? `${formatInFlightElapsed(Date.now() - turnStartRef.current)} 正在生成…`
+                      : "正在生成…"
                     : lastTurnMs !== null
                     ? formatElapsed(lastTurnMs)
                     : "已完成"}
                 </span>
+                {/* R8.20 — model id chip beside the status text. Mirrors
+                    PI-Desktop's status pill: a glanceable model identifier
+                    so the user always knows which model is producing the
+                    answer without having to open the model picker. */}
+                {modelId && (
+                  <span
+                    className="chatview__status-model"
+                    data-testid="chatview-status-model"
+                    title={`当前模型: ${modelId}`}
+                  >
+                    {modelId}
+                  </span>
+                )}
                 {sessionElapsedMs !== null && sessionElapsedMs >= 30_000 && (
                   <span
                     className="chatview__status-total"
@@ -1025,7 +1183,21 @@ export function ChatView({
             )}
             {timeline.length === 0 ? (
               <div className="chatview__empty-state" role="status">
-                <div className="chatview__empty-state-icon" aria-hidden="true">✨</div>
+                {/* R8.27 — Replace the ✨ emoji with a brand-tinted lucide
+                   WandSparkles icon. The previous emoji varied in
+                   rendering across platforms and didn't pick up the
+                   brand colour. The new icon is consistent, scales with
+                   the page, and is wrapped in a halo div so we can
+                   animate it independently. */}
+                <div className="chatview__empty-state-hero">
+                  <div className="chatview__empty-state-halo" aria-hidden="true" />
+                  <WandSparkles
+                    className="chatview__empty-state-icon"
+                    size={28}
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                  />
+                </div>
                 <h2 className="chatview__empty-state-title">开始一段新的对话</h2>
                 <p className="chatview__empty-state-subtitle">
                   OpenBuddy 帮你调度专家 / 技能 / 连接器,在下方输入框描述你的任务即可。
@@ -1040,6 +1212,38 @@ export function ChatView({
                   <li className="chatview__empty-state-tag">自动化</li>
                   <li className="chatview__empty-state-tag">资料库</li>
                 </ul>
+                {/* R8.10 — Quick-prompt cards. Click seeds the composer via the
+                    same resendText pipe as inline-edit / revision-pager; the
+                    user can refine the prompt and hit enter. Each card has
+                    an icon + title + one-line description so first-time users
+                    immediately understand what the assistant can do. */}
+                <div
+                  className="chatview__quick-prompts"
+                  role="group"
+                  aria-label="快速开始模板"
+                >
+                  {QUICK_PROMPTS.map((qp) => {
+                    const Icon = qp.icon;
+                    return (
+                      <button
+                        key={qp.id}
+                        type="button"
+                        className="chatview__quick-prompt"
+                        data-testid={`quick-prompt-${qp.id}`}
+                        onClick={() => handleQuickPrompt(qp.prompt)}
+                        aria-label={qp.title}
+                      >
+                        <span className="chatview__quick-prompt-icon" aria-hidden="true">
+                          <Icon size={18} strokeWidth={1.75} />
+                        </span>
+                        <span className="chatview__quick-prompt-body">
+                          <span className="chatview__quick-prompt-title">{qp.title}</span>
+                          <span className="chatview__quick-prompt-desc">{qp.desc}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             ) : useVirtualList ? (
               <VirtualizedMessageList

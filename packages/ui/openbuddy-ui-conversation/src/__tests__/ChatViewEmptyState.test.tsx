@@ -15,7 +15,28 @@ import { render } from "@testing-library/react";
 function EmptyState() {
   return (
     <div className="chatview__empty-state" role="status">
-      <div className="chatview__empty-state-icon" aria-hidden="true">✨</div>
+      {/* R8.27 — hero illustration: halo div + brand-tinted lucide WandSparkles.
+          Keeps the snapshot test in lockstep with the production JSX. */}
+      <div className="chatview__empty-state-hero">
+        <div className="chatview__empty-state-halo" aria-hidden="true" />
+        <svg
+          className="chatview__empty-state-icon"
+          width={28}
+          height={28}
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path d="M15 4V2" />
+          <path d="M15 16v-2" />
+          <path d="M8 9h2" />
+          <path d="M20 9h2" />
+          <path d="M17.8 11.8 19 13" />
+          <path d="M15 9h0" />
+          <path d="M17.8 6.2 19 5" />
+          <path d="m3 21 9-9" />
+          <path d="M12.2 6.2 11 5" />
+        </svg>
+      </div>
       <h2 className="chatview__empty-state-title">开始一段新的对话</h2>
       <p className="chatview__empty-state-subtitle">
         OpenBuddy 帮你调度专家 / 技能 / 连接器,在下方输入框描述你的任务即可。

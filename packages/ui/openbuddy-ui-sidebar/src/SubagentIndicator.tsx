@@ -195,6 +195,9 @@ export interface SessionRowWithSubagentsProps {
   onUnarchive?: (sessionId: string) => void;
   isSelected?: boolean;
   onToggleSelected?: (sessionId: string, multi: boolean) => void;
+  /** R8.17 — forwarded to SessionRow so the active row can render the
+   *  live-pulse dot. */
+  isStreaming?: boolean;
 }
 
 import { SessionRow } from "./Sidebar";

@@ -36,13 +36,16 @@ export function WorkspacePicker({
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
-  // Shorten a cwd for display: show last 2 path segments.
+  // Shorten a cwd for display: show last 2 path segments. Root ("/") or
+  // empty paths fall back to the placeholder so the composer row mirrors
+  // WorkBuddy's "选择工作空间" default (WorkBuddy parity,).
   const shortName = (p: string) => {
     const parts = p.replace(/\\/g, "/").split("/").filter(Boolean);
-    return parts.slice(-2).join("/") || p;
+    return parts.length ? parts.slice(-2).join("/") : p;
   };
 
-  const triggerLabel = cwd ? shortName(cwd) : "选择工作空间";
+  const triggerLabel =
+    cwd && shortName(cwd) !== cwd ? shortName(cwd) : "选择工作空间";
 
   // 打开系统目录选择框,切换到任意文件夹(不限于历史工作空间)。
   const pickFolder = async () => {

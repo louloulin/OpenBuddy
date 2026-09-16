@@ -2,6 +2,13 @@ import { memo, useCallback, useEffect, useState, type ReactNode } from "react";
 import { Check, Copy } from "lucide-react";
 import type { CodeBlockAction } from "./types";
 
+// R8.6 — extend the per-action metadata the toolbar renders. We accept a
+// `variant: "primary"` to use the new brand-tinted style (for destructive
+// / confirmatory actions like "apply patch" / "insert snippet") and a
+// `disabled` predicate so callers can disable an action while the parent
+// is mid-flight. Both fields are optional and additive — older callers
+// keep working unchanged.
+
 type Props = {
   code: string;
   language: string;
@@ -83,22 +90,37 @@ export const CodeBlockActions = memo(function CodeBlockActions({
           <span className="md-code-action-label">{copied ? "已复制" : "复制"}</span>
         )}
       </button>
-      {visibleActions.map((action) => (
-        <button
-          key={action.id}
-          type="button"
-          className="md-code-action"
-          title={action.description || action.label}
-          aria-label={action.label}
-          onClick={() => {
-            action.onClick(code, language);
-            onAction?.(action.id, code, language, requestId);
-          }}
-        >
-          {action.icon}
-          <span className="md-code-action-label">{action.label}</span>
-        </button>
-      ))}
+      {visibleActions.map((action) => {
+        // R8.6 — variant + disabled propagation. We resolve the disabled
+        // predicate eagerly so the button stays a controlled element;
+        // pointerdown is left enabled so the title tooltip still works on
+        // hover.
+        const isDisabled =
+          typeof action.disabled === "function"
+            ? action.disabled(code, language)
+            : Boolean(action.disabled);
+        const variantCls =
+          action.variant === "primary" ? " md-code-action--primary" : "";
+        return (
+          <button
+            key={action.id}
+            type="button"
+            className={"md-code-action" + variantCls}
+            title={action.description || action.label}
+            aria-label={action.label}
+            aria-disabled={isDisabled || undefined}
+            disabled={isDisabled}
+            onClick={() => {
+              if (isDisabled) return;
+              action.onClick(code, language);
+              onAction?.(action.id, code, language, requestId);
+            }}
+          >
+            {action.icon}
+            <span className="md-code-action-label">{action.label}</span>
+          </button>
+        );
+      })}
       {applyButton ? (
         <>
           <div className="md-code-divider" />

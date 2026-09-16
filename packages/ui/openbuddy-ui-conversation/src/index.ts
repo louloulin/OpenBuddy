@@ -41,6 +41,9 @@ export { AnsiText } from "./AnsiText";
 export { QuestionInlineCard } from "./QuestionInlineCard";
 export { RewindBar } from "./RewindBar";
 export { ToolCallCard, ToolCallDetailBody } from "./ToolCallCard";
+export { TurnErrorCard } from "./TurnErrorCard";
+export { TooltipButton } from "./TooltipButton";
+export type { TooltipButtonProps } from "./TooltipButton";
 export { ToolSidePanel } from "./ToolSidePanel";
 export type { ToolSidePanelMode } from "./ToolSidePanel";
 

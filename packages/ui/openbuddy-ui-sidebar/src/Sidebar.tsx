@@ -1,5 +1,6 @@
 import { memo, useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useSessionsStore, selectHasFilter, selectArchivedCount } from "@/stores/sessions-store";
+import { useSessionStore } from "@/stores/session-store";
 import { useProjectsStore } from "@/stores/projects-store";
 import { StatusIndicator } from "@/components/StatusIndicator";
 import { IS_MACOS } from "@/lib/platform/platform";
@@ -627,6 +628,9 @@ function MoreDropdown({
 type SessionRowProps = {
   session: SessionSummary;
   isCurrent: boolean;
+  /** R8.17 — render the live-pulse dot when the focused session is
+   *  generating. Only meaningful when `isCurrent` is true. */
+  isStreaming?: boolean;
   onSelect: (sessionId: string, cwd?: string) => void;
   onMenuFromButton: (
     e: React.MouseEvent,
@@ -649,6 +653,7 @@ type SessionRowProps = {
 export const SessionRow = memo(function SessionRow({
   session,
   isCurrent,
+  isStreaming,
   onSelect,
   onMenuFromButton,
   onArchive,
@@ -680,7 +685,8 @@ export const SessionRow = memo(function SessionRow({
         (isCurrent ? " sidebar__conv--active" : "") +
         (pinned ? " sidebar__conv--pinned" : "") +
         (archived ? " sidebar__conv--archived" : "") +
-        (isSelected ? " sidebar__conv--selected" : "")
+        (isSelected ? " sidebar__conv--selected" : "") +
+        (isCurrent && isStreaming ? " sidebar__conv--streaming" : "")
       }
       onClick={handleClick}
       aria-pressed={isSelected ? true : undefined}
@@ -691,6 +697,9 @@ export const SessionRow = memo(function SessionRow({
       onContextMenu={(e) => e.preventDefault()}
       title={title}
     >
+      {isCurrent && isStreaming && (
+        <span className="sidebar__conv-status-dot" aria-label="正在生成" />
+      )}
       <span className="sidebar__conv-title">{title}</span>
       {pinned && <PinFilledIcon size="sm" className="sidebar__conv-pin" />}
       {archived && <span className="sidebar__conv-archived-tag" aria-label="已归档">已归档</span>}
@@ -806,6 +815,11 @@ export function Sidebar({
   const spacesOpen = useSessionsStore((s) => s.spacesOpen);
   const expanded = useSessionsStore((s) => s.expanded);
   const currentSessionId = useSessionsStore((s) => s.currentSessionId);
+  // R8.17 — sidebar needs to know which session is currently generating
+  // so the active row can render the live-pulse dot. Reuses the existing
+  // streaming boolean from session-store (already kept in sync with the
+  // agent phase machine), so this is a free selector.
+  const streaming = useSessionStore((s) => s.streaming);
   const upsertSession = useSessionsStore((s) => s.upsert);
   const removeSession = useSessionsStore((s) => s.remove);
   const setTasksOpen = useSessionsStore((s) => s.setTasksOpen);
@@ -1127,6 +1141,10 @@ export function Sidebar({
       key={s.sessionId}
       session={s}
       isCurrent={s.sessionId === currentSessionId}
+      // R8.17 — pass through the streaming flag so the active row
+      // can render the live-pulse dot. Cheap selector: only the focused
+      // session's row changes when the flag flips.
+      isStreaming={s.sessionId === currentSessionId && streaming}
       onSelect={onSelect}
       onMenuFromButton={openMenuFromButton}
       onArchive={handleArchive}

@@ -8,5 +8,5 @@
  */
 export const samplePluginInfo = {
   name: "@openbuddy/sample-plugin",
-  version: "0.1.0",
+  version: "0.15.0",
 };

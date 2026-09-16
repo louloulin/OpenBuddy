@@ -1,6 +1,6 @@
 {
   "name": "@openbuddy/plugin-sdk",
-  "version": "0.1.0",
+  "version": "0.15.0",
   "private": true,
   "description": "OpenBuddyPlugin SDK v0.1 — PI-native plugin manifest serializer. Parses plugin.json, validates it with zod, and converts it into PI ExtensionFactory descriptors. Actual plugin loading still happens through PI's loadExtensions().",
   "type": "module",

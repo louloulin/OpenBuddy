@@ -24,7 +24,7 @@ describe("barrel exports", () => {
   it("round-trips a manifest through the public surface", () => {
     const raw = {
       name: "roundtrip",
-      version: "1.0.0",
+      version: "0.15.0",
       pi: { commands: ["./commands.js"] },
     };
     const parsed = parsePluginManifest(raw);

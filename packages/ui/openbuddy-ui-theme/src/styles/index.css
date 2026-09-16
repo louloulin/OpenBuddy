@@ -8,7 +8,9 @@
   --wb-fg-secondary: #57606a;
   --wb-fg-tertiary: #8c959f;
   --wb-border: #d0d7de;
-  --wb-accent: #2f6feb;
+  /* OpenBuddy 品牌色 —— 与 tokens.css --wb-brand-primary 同源 (#00C29A 青绿)。
+     此前 #2f6feb 是从 Primer 残留下来的 GitHub 蓝,与品牌不符。 */
+  --wb-accent: var(--wb-brand-primary, #00c29a);
   --wb-danger: #cf222e;
   --wb-success: #1a7f37;
   --wb-warning: #9a6700;
@@ -29,7 +31,7 @@
   --wb-fg-secondary: #9da7b3;
   --wb-fg-tertiary: #6e7681;
   --wb-border: #30363d;
-  --wb-accent: #58a6ff;
+  --wb-accent: var(--wb-brand-primary, #00c29a);
   --wb-danger: #f85149;
   --wb-success: #3fb950;
   --wb-warning: #d29922;
@@ -44,7 +46,7 @@
   --wb-fg-secondary: #57606a;
   --wb-fg-tertiary: #8c959f;
   --wb-border: #d0d7de;
-  --wb-accent: #2f6feb;
+  --wb-accent: var(--wb-brand-primary, #00c29a);
   --wb-danger: #cf222e;
   --wb-success: #1a7f37;
   --wb-warning: #9a6700;
