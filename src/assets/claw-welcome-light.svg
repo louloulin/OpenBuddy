@@ -1,45 +1,67 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="OpenBuddy">
   <defs>
     <radialGradient id="bg" cx="50%" cy="50%" r="70%">
-      <stop stop-color="#FFF7E8"/>
-      <stop offset="1" stop-color="#E8D8B8"/>
+      <stop stop-color="#1A0B2E"/>
+      <stop offset="1" stop-color="#06030F"/>
     </radialGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#2D1B4E"/>
+      <stop offset="1" stop-color="#0F0820"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#00F0FF"/>
+      <stop offset="1" stop-color="#7B2BFF"/>
+    </linearGradient>
   </defs>
   <rect width="240" height="240" fill="url(#bg)"/>
-  <g transform="translate(120 120) scale(0.12)">
+  <line x1="0" y1="60" x2="240" y2="60" stroke="#00F0FF" stroke-width=".6" opacity=".18"/>
+  <line x1="0" y1="120" x2="240" y2="120" stroke="#FF1B8D" stroke-width=".6" opacity=".18"/>
+  <line x1="0" y1="180" x2="240" y2="180" stroke="#00F0FF" stroke-width=".6" opacity=".18"/>
+  <line x1="60" y1="0" x2="60" y2="240" stroke="#00F0FF" stroke-width=".6" opacity=".18"/>
+  <line x1="120" y1="0" x2="120" y2="240" stroke="#FF1B8D" stroke-width=".6" opacity=".18"/>
+  <line x1="180" y1="0" x2="180" y2="240" stroke="#00F0FF" stroke-width=".6" opacity=".18"/>
+  <g transform="translate(120 120) scale(0.16)">
     <path d="
-      M -300 0
-      L -280 -80
-      Q -274 -102 -252 -102
-      Q -230 -102 -224 -80
-      L -204 0
-      Q -190 -12 -168 -16
-      Q -120 -24 -72 -24
-      Q -12 -24 32 0
-      Q 68 24 68 80
-      Q 68 128 40 164
-      Q 24 188 12 208
-      L 12 344
-      Q 12 380 44 412
-      Q 60 432 60 460
-      Q 60 488 32 488
-      L -20 488
-      Q -48 488 -48 460
-      L -48 420
-      L -168 420
-      L -168 460
-      Q -168 488 -196 488
-      L -248 488
-      Q -276 488 -276 460
-      Q -276 432 -260 412
-      Q -228 380 -228 344
-      L -228 272
-      Q -252 248 -268 220
-      Q -280 200 -288 176
-      Q -304 136 -304 100
-      Q -304 52 -280 28
+      M 280 380
+      L 300 240
+      L 340 220
+      L 380 280
+      L 410 250
+      L 460 240
+      L 510 250
+      L 550 270
+      L 580 290
+      L 640 320
+      L 690 360
+      L 700 420
+      L 690 470
+      L 660 500
+      L 640 540
+      L 640 660
+      L 680 700
+      L 680 760
+      L 640 780
+      L 580 780
+      L 560 750
+      L 540 720
+      L 540 700
+      L 420 700
+      L 420 740
+      L 400 780
+      L 360 800
+      L 320 800
+      L 280 780
+      L 280 740
+      L 320 700
+      L 340 660
+      L 340 580
+      L 320 540
+      L 290 500
+      L 270 440
       Z
-    " fill="#1F140A" transform="scale(-1 1)"/>
+    " fill="url(#body)" stroke="url(#stroke)" stroke-width="20" stroke-linejoin="miter" transform="scale(-1 1) translate(-1280 0)"/>
   </g>
-  <circle cx="186" cy="56" r="8" fill="#09C8A7"/>
+  <circle cx="60" cy="50" r="6" fill="#FF1B8D"/>
+  <line x1="200" y1="30" x2="186" y2="14" stroke="#00F0FF" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="186" cy="14" r="3" fill="#00F0FF"/>
 </svg>
