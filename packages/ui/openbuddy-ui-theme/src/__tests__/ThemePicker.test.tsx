@@ -87,7 +87,7 @@ describe("@openbuddy/ui-theme/ThemePicker", () => {
     act(() => {
       fireEvent.click(screen.getByRole("button", { name: /choose theme/i }));
     });
-    const matchSystem = await screen.findByText("跟随系统");
+    const matchSystem = await screen.findByText(/^On$/);
     act(() => {
       fireEvent.click(matchSystem);
     });
@@ -111,7 +111,7 @@ describe("@openbuddy/ui-theme/ThemePicker", () => {
     act(() => {
       fireEvent.click(screen.getByRole("button", { name: /choose theme/i }));
     });
-    const matchSystem = await screen.findByText("跟随系统");
+    const matchSystem = await screen.findByText(/^On$/);
     act(() => {
       fireEvent.click(matchSystem);
     });

@@ -157,6 +157,9 @@ import { registerAgentsIpc } from "./agents";
 import { registerConnectorsIpc } from "./connectors";
 import { registerMiscIpc } from "./misc";
 import { registerAuditIpc } from "./audit";
+// R18 / Phase D — Expert Marketplace Bridge (Pi 扩展市场)
+import { createPiMarketBridge, registerPiMarketBridgeIpc } from "../agent/pi-market-bridge";
+import { app } from "electron";
 
 // Phase A.1 — pi-bridge exposes pi-coding-agent text / image / skill
 // helpers to the renderer via typed IPC channels. See
@@ -1110,4 +1113,12 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 
 	// Phase A.1 — pi-bridge IPC surface (pi text / image / skill helpers).
 	registerPiBridgeIpc();
+
+	// R18 / Phase D — Expert Marketplace Bridge (Pi 扩展市场:additive,
+	//   不修改任何既有 IPC channel)。挂载到 ipcMain,通过
+	//   `agent:pi-market-{list,refresh,install,upgrade,rollback,lockfile,audit}`
+	//   七个 channel 提供版本化安装 + 原子提交 + 锁文件 + 审计 + 回滚。
+	const dataDir = app.getPath("userData");
+	const piMarketBridge = createPiMarketBridge({ dataDir, hostVersion: "0.15.0" });
+	registerPiMarketBridgeIpc(piMarketBridge, ipcMain);
 }

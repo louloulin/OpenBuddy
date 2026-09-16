@@ -40,6 +40,10 @@
  *     Extensions into the session's ExtensionRunner so /commands see them.
  */
 
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { app } from "electron";
+
 import { createExtensionRuntime, discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
 
 import { type AgentHostState } from "../_state-shape";
@@ -67,13 +71,46 @@ export interface PiUserExtensionLoadResult {
  *
  * Returns a summary that callers can expose via IPC / renderer state.
  */
+/**
+ * R18 / Phase D — read bridge-installed extensions from
+ * `<userData>/pi-extensions/installed.json` and follow each
+ * `<id>/current` pointer to get the active version directory.
+ *
+ * Returns empty list if the lockfile is missing or malformed; never throws.
+ */
+async function collectBridgeExtensionPaths(): Promise<string[]> {
+  try {
+    const lockfilePath = join(app.getPath("userData"), "pi-extensions", "installed.json");
+    const raw = await readFile(lockfilePath, "utf8");
+    const parsed = JSON.parse(raw) as { extensions?: Record<string, { path?: string }> };
+    if (!parsed.extensions || typeof parsed.extensions !== "object") return [];
+    const out: string[] = [];
+    for (const [, entry] of Object.entries(parsed.extensions)) {
+      if (typeof entry?.path === "string" && entry.path.length > 0) {
+        out.push(entry.path);
+      }
+    }
+    return out;
+  } catch {
+    // No bridge yet, or lockfile unreadable — treat as no bridge extensions.
+    return [];
+  }
+}
+
 export async function initPiUserExtensions(
   deps: InitPiUserExtensionsDeps,
 ): Promise<PiUserExtensionLoadResult> {
   const { state, cwd, emitPluginEvent } = deps;
 
-  // No user plugins declared in the active profile -> no-op.
-  if (state.profilePiPackagePaths.length === 0) {
+  // R18 / Phase D — augment profile pi-package paths with bridge-installed
+  // extensions so the agent-runtime actually loads what the marketplace
+  // bridge put on disk.
+  const bridgePaths = await collectBridgeExtensionPaths();
+  const loadPaths = [...state.profilePiPackagePaths, ...bridgePaths];
+
+  // No user plugins declared in the active profile AND no bridge installs
+  // -> no-op.
+  if (loadPaths.length === 0) {
     return { loaded: 0, failed: 0, failedIds: [] };
   }
 
@@ -87,7 +124,7 @@ export async function initPiUserExtensions(
 
   try {
     const result = await discoverAndLoadExtensions(
-      [...state.profilePiPackagePaths],
+      loadPaths,
       cwd,
       undefined,
       undefined, // eventBus is wired through the global one PI uses internally
@@ -123,6 +160,6 @@ export async function initPiUserExtensions(
       source: "pi-user-extensions",
       error: error instanceof Error ? error.message : String(error),
     });
-    return { loaded: 0, failed: state.profilePiPackagePaths.length, failedIds: ["pi-user-extensions"] };
+    return { loaded: 0, failed: loadPaths.length, failedIds: ["pi-user-extensions"] };
   }
 }

@@ -708,9 +708,18 @@ body.dark,
   color: var(--wb-color-text-primary, rgba(255, 255, 255, 0.92)) !important;
 }
 
-[data-theme="dark"],
-[data-theme="dark"] body,
-[data-theme="dark"] html {
+/* Phase A 修复:把硬编码 !important 暗色 fallback 限定到默认主题
+ *   (openbuddy-dark 或未设置主题名),其它命名暗色主题(black/aurora/
+ *   matrix/forest/ember/midnight-ocean/cyber)由 ui-theme 包写入的 OKLCh
+ *   vars 生效,真正呈现各自色彩身份。
+ *
+ * 注:不能再加 `body, html` 到这个选择器组 — 否则对所有 [data-theme="dark"]
+ *     都会设置 --wb-bg-primary:#1f1f1f,反而把 matrix/aurora 等的 OKLCh
+ *     vars 又压回 #1f1f1f。下面另外的 [data-theme="dark"] body 规则本身
+ *     就通过 var(--wb-bg-primary, #1f1f1f) 走变量,非默认主题会正确
+ *     显示 OKLCh 颜色。 */
+[data-theme="dark"][data-theme-name="openbuddy-dark"],
+[data-theme="dark"]:not([data-theme-name]) {
   --card-bg: #2a2a2a;
   --input-bg: #1f1f1f;
   --modal-bg: #2a2a2a;
@@ -720,8 +729,8 @@ body.dark,
   --subtle-bg: #2d2d2d;
   --pill-bg: #2f2f2f;
   --tooltip-bg: #3a3a3a;
-  /* 关键:用 !important 强制覆盖 ui-theme 包和其它可能的样式,
-     黑色主题绝不允许出现白色背景 */
+  /* 默认黑色主题:用 !important 强制覆盖 ui-theme 包和其它可能的样式,
+     绝不允许出现白色背景 */
   --wb-bg-primary: #1f1f1f !important;
   --wb-bg-secondary: #141414 !important;
   --wb-bg-tertiary: #242424 !important;

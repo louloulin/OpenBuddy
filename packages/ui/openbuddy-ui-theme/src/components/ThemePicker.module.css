@@ -1,3 +1,16 @@
+/**
+ * ThemePicker 弹层样式(cabinet-style):
+ *   - 顶部一行紧凑的「跟随系统 / 手动」模式切换
+ *   - 主题以 3 列网格 chip 卡片列出,深色组在浅色组之前
+ *   - 每个 chip = 圆点 accent + label(label 用主题自己的 headingFont 渲染)
+ *   - 选中态:背景 --wb-accent-soft + 边框 --wb-accent + ✓
+ *
+ * 设计要点:
+ *   - popover 宽度自适应内容(从 240px 改 268px 容纳 3 列 chip)
+ *   - popover 进入用 cabinet 同款 expo-out 140ms
+ *   - 在暗色主题下用 --wb-bg-elevated 而不是 wb-bg-secondary,留出更明显的层次
+ */
+
 .triggerCompact {
   display: inline-flex;
   align-items: center;
@@ -49,21 +62,21 @@
 .menu {
   position: fixed;
   z-index: 99999;
-  width: 240px;
+  width: 268px;
   max-height: 80vh;
   overflow-y: auto;
   background: var(--wb-bg-elevated);
   border: 1px solid var(--wb-border);
   border-radius: var(--wb-radius-lg);
   box-shadow: var(--wb-shadow-lg);
-  padding: 6px;
-  animation: themePickerIn 140ms cubic-bezier(0.32, 0.72, 0, 1);
+  padding: 8px;
+  animation: themePickerIn 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes themePickerIn {
   from {
     opacity: 0;
-    transform: translateY(-4px) scale(0.98);
+    transform: translateY(-6px) scale(0.985);
   }
   to {
     opacity: 1;
@@ -71,35 +84,29 @@
   }
 }
 
-.section {
-  padding: 4px 0;
+@media (prefers-reduced-motion: reduce) {
+  .menu {
+    animation: none;
+  }
 }
 
-.sectionHeader {
-  padding: 4px 8px;
+/* ── Mode toggle row (Match system / 手动) ─────────────────────── */
+
+.modeRow {
+  display: flex;
+  gap: 4px;
+  padding: 0 0 8px;
+  align-items: center;
+}
+
+.modeLabel {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--wb-fg-tertiary);
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.divider {
-  height: 1px;
-  background: var(--wb-border-soft);
-  margin: 4px 4px;
-}
-
-.modeRow {
-  display: flex;
-  gap: 4px;
-  padding: 0 6px;
+  padding-right: 4px;
+  white-space: nowrap;
 }
 
 .modeBtn {
@@ -109,7 +116,8 @@
   border: 1px solid var(--wb-border);
   background: transparent;
   color: var(--wb-fg-secondary);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 120ms ease;
 }
@@ -130,6 +138,45 @@
   color: var(--wb-accent-fg);
 }
 
+/* ── Section group (dark / light) ─────────────────────────────── */
+
+.section {
+  padding: 4px 0 6px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--wb-fg-tertiary);
+}
+
+.sectionHeader svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.divider {
+  height: 1px;
+  background: var(--wb-border-soft);
+  margin: 4px 4px;
+}
+
+/* ── Theme chip grid (cabinet-style 3 columns) ─────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+/* ── System pair row (light / dark pair selectors) ─────────────── */
+
 .pairRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -137,6 +184,7 @@
   padding: 4px 6px 6px;
   border-radius: var(--wb-radius-md);
   background: color-mix(in oklch, var(--wb-accent) 4%, transparent);
+  margin-bottom: 4px;
 }
 
 .pairGroup {
@@ -158,7 +206,7 @@
   border: 1px solid var(--wb-border);
   background: var(--wb-bg-primary);
   color: var(--wb-fg-primary);
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
 }
 

@@ -194,27 +194,25 @@ export function ThemePicker({
           role="menu"
           style={{ top: pos.top, right: pos.right }}
         >
-          <div className={styles.section}>
-            <div className={styles.sectionHeader}>模式</div>
-            <div className={styles.modeRow}>
-              <button
-                type="button"
-                className={styles.modeBtn + (mode === "manual" ? " " + styles.modeActive : "")}
-                onClick={() => onSetMode("manual")}
-                aria-pressed={mode === "manual"}
-              >
-                手动
-              </button>
-              <button
-                type="button"
-                className={styles.modeBtn + (mode === "system" ? " " + styles.modeActive : "")}
-                onClick={() => onSetMode("system")}
-                aria-pressed={mode === "system"}
-                title="Match system"
-              >
-                跟随系统
-              </button>
-            </div>
+          <div className={styles.modeRow}>
+            <span className={styles.modeLabel}>Match system</span>
+            <button
+              type="button"
+              className={styles.modeBtn + (mode === "manual" ? " " + styles.modeActive : "")}
+              onClick={() => onSetMode("manual")}
+              aria-pressed={mode === "manual"}
+            >
+              Off
+            </button>
+            <button
+              type="button"
+              className={styles.modeBtn + (mode === "system" ? " " + styles.modeActive : "")}
+              onClick={() => onSetMode("system")}
+              aria-pressed={mode === "system"}
+              title="Match system"
+            >
+              On
+            </button>
           </div>
           {mode === "system" ? (
             <SystemPairRow
@@ -223,8 +221,8 @@ export function ThemePicker({
               currentName={currentName}
             />
           ) : null}
-          <div className={styles.divider} />
           <ThemeGroup
+            icon={<MoonGlyph />}
             label="深色"
             items={dark}
             currentName={currentName}
@@ -232,6 +230,7 @@ export function ThemePicker({
           />
           <div className={styles.divider} />
           <ThemeGroup
+            icon={<SunGlyph />}
             label="浅色"
             items={light}
             currentName={currentName}
@@ -269,11 +268,13 @@ export function ThemePicker({
 }
 
 function ThemeGroup({
+  icon,
   label,
   items,
   currentName,
   onSelect,
 }: {
+  icon?: React.ReactNode;
   label: string;
   items: ThemeDefinition[];
   currentName: ThemeName;
@@ -281,14 +282,18 @@ function ThemeGroup({
 }) {
   return (
     <div className={styles.section}>
-      <div className={styles.sectionHeader}>{label}</div>
-      <div className={styles.list}>
+      <div className={styles.sectionHeader}>
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className={styles.grid}>
         {items.map((t) => (
           <ThemeCard
             key={t.name}
             theme={t}
             active={t.name === currentName}
             onSelect={onSelect}
+            variant="chip"
           />
         ))}
       </div>
@@ -363,6 +368,23 @@ function PaletteIcon() {
       <circle cx="8.5" cy="7.5" r="0.5" fill="currentColor" />
       <circle cx="6.5" cy="12.5" r="0.5" fill="currentColor" />
       <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.673 0-.43-.18-.812-.437-1.106-.25-.286-.43-.622-.43-1.005 0-.83.673-1.5 1.5-1.5H16c3.314 0 6-2.686 6-6 0-4.5-4.5-8-10-8Z" />
+    </svg>
+  );
+}
+
+function SunGlyph() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
+function MoonGlyph() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
     </svg>
   );
 }

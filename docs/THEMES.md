@@ -1,6 +1,6 @@
 # OpenBuddy Themes (v2)
 
-OpenBuddy ships **17 OKLCh-based themes**, a **Match-system** mode that pairs a
+OpenBuddy ships **19 OKLCh-based themes**, a **Match-system** mode that pairs a
 light and a dark theme, **per-theme font loading**, and a **Theme Studio** for
 building your own theme.
 
@@ -32,6 +32,12 @@ the light/dark-only description in earlier docs.
 | `winxp` | Windows XP | light | `#245edb` |
 
 Definitions live in
+
+> **Note**: the two built-in defaults — `openbuddy` (light) and `openbuddy-dark`
+> (dark) — also live in this list and can be picked explicitly. The list is
+> therefore 19 themes total, not 17.
+
+
 [`packages/ui/openbuddy-ui-theme/src/themes.ts`](../packages/ui/openbuddy-ui-theme/src/themes.ts).
 
 ## 2. Token model
@@ -121,7 +127,7 @@ which kept React 19 from logging a console error on every render.
 - Exposes the `manual` / `follow system` toggle.
 - In system mode, reveals a light/dark pair selector.
 
-It is rendered from the settings panel (`个性化 → 主题库（17 套）`) and may be
+It is rendered from the settings panel (`个性化 → 主题库（19 套）`) and may be
 dropped anywhere else — it manages its own portal and outside-click handling.
 
 ## 7. Fonts
@@ -145,3 +151,28 @@ swapped rather than accumulated.
 - **Theme Studio** (v1.0): an in-app OKLCh editor that exports / imports theme
   JSON. Not shipped in v0.15.x.
 - Per-component radius and density overrides.
+
+
+## 10. Phase A — Dark-theme scoping fix (R17.7)
+
+`src/styles/tokens.css` previously hard-coded a single dark palette with
+`!important` on `[data-theme="dark"]`, which collapsed every named dark theme
+(black / aurora / matrix / forest / ember / midnight-ocean / cyber) to the
+same `#1f1f1f` / `#2a2a2a` surface — killing each theme's colour identity.
+
+The hard-coded `!important` block is now scoped to the **default** dark theme:
+
+```css
+[data-theme="dark"][data-theme-name="openbuddy-dark"],
+[data-theme="dark"]:not([data-theme-name]),
+[data-theme="dark"] body,
+[data-theme="dark"] html {
+  --wb-bg-primary: #1f1f1f !important;
+  ...
+}
+```
+
+All other named dark themes now consume the OKLCh vars written by
+`applyThemeAttrs()` (see `theme-store.ts`). Visual regression assets live in
+`tests/screenshots/themes/` (19 PNGs).
+

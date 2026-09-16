@@ -622,3 +622,337 @@ R12 → R13 整体改动量:
 ### 回归
 - `tsc --noEmit` 无错误;`electron-vite build --mode development` 成功。
 - 单测:`packages/ui/openbuddy-ui-{sidebar,settings,shell}` + `src/components/__tests__` 共 81 文件 637/637 全绿。
+
+## R17 — 微内核回归 + 暗色 composer 输入对齐 + Audit Trail
+
+### R17.1 — Sidebar 账户菜单 portal 修复(Root cause:`.sidebar__footer { overflow:hidden }` 裁掉绝对定位菜单)
+
+**症状**:点击左下角账户/设置,菜单 DOM 已挂载但视觉不可见。
+
+**根因**:`packages/ui/openbuddy-ui-sidebar/src/Sidebar.tsx` 用 `position: absolute` + `top:100%` 渲染菜单,但 `.sidebar__footer { overflow:hidden }` 把绝对定位的后代裁掉了。
+
+**修复**:
+- 菜单改 `createPortal(document.body)`,`position: fixed`
+- `useLayoutEffect` + `ResizeObserver` 从 trigger rect 算 `{left, top, width, placement}`
+- 触发空间不足时翻转向上(优先)/ 向下
+- outside-click 检测包含 `accountMenuRef`
+- 移除双触发 `onOpenSettings()` 兜底
+
+### R17.2 — `AppShell.tsx` `onOpenSettings={openSettings}` 误传 MouseEvent 为 section
+
+**症状**:设置面板 section 显示空白 + audit `subject` 收到 `MouseEvent` 触发 "An object could not be cloned" 错误。
+
+**修复**:四处 `onOpenSettings={openSettings}` 改为 `onOpenSettings={() => openSettings()}`。
+
+### R17.3 — Settings `AccountSettingsPanel` 自动展开 Casdoor config 表单
+
+**症状**:「企业登录」触发 dead-end toast,用户找不到下一步。
+
+**修复**:当 `casdoor.status === "configuration_needed"` 时,`useEffect` 自动展开 config 表单。
+
+### R17.4 — Topbar 48px → 56px
+
+`chrome.css` + `shell.css` 同步上调,匹配 WorkBuddy 顶栏高度。
+
+### R17.5 — Audit Trail(Phase D 缺口)
+
+**新增文件**:
+- `electron/main/audit/audit-log.ts` — JSONL ring buffer(max 1000),链式 SHA-256 hash(prev hash + event → 16 hex chars),原子写入,ENOENT 容忍
+- `electron/main/ipc/audit.ts` — IPC handlers `audit:list` / `audit:record` / `audit:clear`
+- `src/lib/audit/audit-client.ts` — renderer wrappers
+- `electron/main/audit/__tests__/audit-log.test.ts` — **5/5 单测过**(record / 链哈希 / 坏行容忍 / 分页 cursor / clear)
+- `src/styles/settings.css` — `.audit-trail` 表格样式
+
+**修改**:
+- `electron/main/ipc/index.ts` — `registerAuditIpc(getWindow)` 注册
+- `electron/preload/index.ts` — `"audit:list", "audit:record", "audit:clear"` allowlist
+- `src/features/app/useAppShellRuntime.ts` — audit `settings.open` / `casdoor.login` (success/failure) / `casdoor.logout`
+- `packages/ui/openbuddy-ui-settings/src/SettingsSections.tsx` — `AuditSettingsPanel`(搜索 / sticky header / max-height 420px / chain hint)
+- `packages/ui/openbuddy-ui-settings/src/SettingsPanel.tsx` — `{ id: "audit", label: "审计追踪" }` 加入 `data-security` 分组
+
+### R17.6 — Dark-mode composer 输入透明
+
+**症状**:暗色下 chat input 出现 `rgb(31,31,31)` inset 与 elevated 卡片色差。
+
+**根因**:`src/styles/tokens.css` 用 `[data-theme="dark"] input/textarea/select` 全仓覆盖 `#1f1f1f !important`,`.wb-composer__input` 设计上是 `transparent`,被这个规则盖成不透明深色。
+
+**修复**:把全仓覆盖拆成只作用于 `.email-composer` / `.email-rule-editor` / `.settings-modal` / `.onboarding-wizard` / `.audit-trail`。**`.wb-composer__input` 现在两个主题都是透明,贴在 elevated 卡片上**。
+
+验证:probe-r17-composer-theme 显示 `inputBg: "rgba(0, 0, 0, 0)"` 在浅色和深色一致。
+
+### R17.7 — Phase A 暗色主题差异化修复(tests/screenshots/themes/ 全 19 张)
+
+**症状**:所有暗色主题(black/aurora/matrix/forest/ember/midnight-ocean/cyber)渲染后页面 bg 都是 `#1f1f1f`,跟 openbuddy-dark 完全一样,失去各自色彩身份。
+
+**根因**:`src/styles/tokens.css` 行 715 的 `[data-theme="dark"]` 块硬编码 `--wb-bg-primary: #1f1f1f !important` 等,把所有 OKLCh 主题 vars 全部压成了同一份默认值。
+
+**修复**:把 `!important` 限定到 `[data-theme="dark"][data-theme-name="openbuddy-dark"], [data-theme="dark"]:not([data-theme-name])`,其它命名暗色主题由 ui-theme 包写入的 OKLCh vars 生效。
+
+**验证**:全 19 张主题截图重生成于 `tests/screenshots/themes/`,像素采样确认 dark themes 之间中心像素不同(black ≈ `#282828`, openbuddy-dark ≈ `#33343a`, matrix 带绿色字符染色)。
+
+### R17 累计统计
+
+| 项 | 状态 |
+|---|---|
+| Sidebar 菜单 portal | ✅ |
+| AppShell onOpenSettings 不再误传 | ✅ |
+| Casdoor 自动展开配置表单 | ✅ |
+| Topbar 56px | ✅ |
+| Audit Trail 5/5 单测 | ✅ |
+| Composer 暗色输入透明 | ✅ |
+| 19 主题差异化(暗色回归修复) | ✅ |
+| tests/screenshots/themes/ | 19 张 |
+
+
+### R17.8 — Sidebar 已通过 `<Resizable>` 实现 260–480px 拖拽(实测)
+
+**发现**:之前以为 Sidebar 没接 Resizable,但实际在 `src/features/app/AppShell.tsx` 行 172 已经把 `<Sidebar>` 包在 `<Resizable edge="right" min={260} max={480} defaultWidth={320} storageKey="openbuddy.sidebar.width">` 里。`<aside className="sidebar">` 在 Resizable wrapper 内部用 `100%` 填满 wrapper 宽度。
+
+**真实拖拽验证**(`_probe-resizable.mjs`):
+- 初始宽度:`320px`(默认)
+- 向右拖到最大:`480px`(clamp 上限生效)
+- 向左拖到最小:`260px`(clamp 下限生效)
+- 持久化:localStorage key `openbuddy.sidebar.width`
+- 键盘可达:`aria-label="调整侧栏宽度"`、`tabIndex={0}`、ArrowLeft/ArrowRight 调节
+- handle class:`.app__sidebar-handle`(因 `.sidebar { z-index: 20 }` 必须给 handle 显式 class 才能压到「更多」flyout 之上)
+- 拖动时无 page error
+
+### R17.9 — 19 套主题差异化(暗色回归修复)
+
+**症状**:所有 dark 主题(black / aurora / matrix / forest / ember / midnight-ocean / cyber)渲染出来页面 bg 都是 `#1f1f1f` / `#2a2a2a`,跟 openbuddy-dark 完全一样,失去各自色彩身份。
+
+**根因**:`src/styles/tokens.css` 行 715 的 `[data-theme="dark"]` 块硬编码 `--wb-bg-primary: #1f1f1f !important` 等,把 19 套 OKLCh 主题 vars 全部压成了同一份默认值。
+
+**修复**:把 `!important` 限定到默认主题:
+
+```css
+[data-theme="dark"][data-theme-name="openbuddy-dark"],
+[data-theme="dark"]:not([data-theme-name]) {
+  /* 只在默认/未命名主题时强制 #1f1f1f,其它主题由 ui-theme OKLCh vars 生效 */
+  --wb-bg-primary: #1f1f1f !important;
+  ...
+}
+```
+
+**真实验证**(`_probe-theme-regression.mjs` + `_probe-final-summary.mjs`):
+
+| Theme | body bg | 来源 |
+|---|---|---|
+| `openbuddy-dark` | `#1f1f1f` | 默认 !important fallback |
+| `black` | `oklch(0.1 0 0)` | theme vars |
+| `matrix` | `oklch(0.08 0.03 145)` | theme vars(绿) |
+| `aurora` | `oklch(0.14 0.04 200)` | theme vars(青) |
+| `claude` | `oklch(0.13 0.01 45)` | theme vars(暖棕) |
+
+视觉回归资产:`tests/screenshots/themes/` 19 张 PNG(每张对应一套主题)。
+
+### R17.10 — Audit Trail IPC 实测
+
+```
+apiVersion: 1
+api.invoke("audit:record", { event: "probe.test", ... })
+  → { ok: true, id: "72fdb7a8-92e6-454e-944c-7232e3ecc242", at: "..." }
+api.invoke("audit:list", { limit: 10 })
+  → { events: [{ event: "probe.test", hash: "76be5f3e587abb83" }], ... }
+```
+
+链式 SHA-256 哈希实测产生 16 hex char 摘要 ✓。
+
+### R17 综合终验 — `_probe-final-summary.mjs` 一次跑完
+
+| 项 | 实测 |
+|---|---|
+| Sidebar shell 宽度 | `320px` |
+| Sidebar resize handle | ✓ found, `aria-label="调整侧栏宽度"` |
+| ThemePicker 设置入口 | ✓ |
+| Audit Trail 设置入口 | ✓ |
+| 5 个 dark 主题 bg 互不相同 | ✓(见上表) |
+| page errors | `[]`(仅 Electron CSP warning) |
+
+## R17 总结 — 全部 shippable
+
+| Phase | 关键件 | 状态 |
+|---|---|---|
+| A · Theme v2 | 19 主题 OKLCh / Match-system / 防 FOUC / ThemePicker / ThemeStudio | ✅ |
+| A · 暗色主题差异化 | CSS scoping 修复 + 19 张视觉回归资产 | ✅ |
+| B · Sidebar resize | 260–480px 拖拽 + 持久化 + 键盘可达 | ✅ |
+| B · Resizable primitive | `openbuddy-ui-primitives/Resizable` 单测全过 | ✅ |
+| B · CabinetTree | `openbuddy-ui-files-tree` 已注册 `files.tree` slot | ✅ |
+| B · Artifact Tabs | `openbuddy-ui-workbench/ArtifactTabsBar` 已升级 | ✅ |
+| B · Topbar 56px | `chrome.css` + `shell.css` 已上调 | ✅ |
+| C · Tiptap Editor | `openbuddy-ui-editor` 165/165 单测过 | ✅ |
+| C · Office 预览 | `DocxPreview` / `PptxPreview` / `XlsxPreview` 已实现 | ✅ |
+| D · Onboarding | `openbuddy-ui-onboarding` Wizard/Tour/DataDir/Feedback | ✅ |
+| D · Marketplace UI | `MarketplaceCard` / `InstallDialog` / `CapabilityVersionBadge` | ✅ |
+| D · Audit Trail | JSONL ring + SHA-256 chain + 5/5 单测 + IPC 实测 | ✅ |
+| D · Theme Studio | 滑块编辑 OKLCh + 导出导入 JSON(plan roadmap) | ✅ |
+
+**文档交付**:
+- `docs/THEMES.md` — 19 主题 + Phase A scoping 修复(R17.7)
+- `docs/PLUGIN_MARKETPLACE.md` — Marketplace 架构 + Pi-Extension bridge(R17 新增)
+- `WORKBUDDY_UI_REFERENCE.md` — R15/R16/R17 全章节
+
+**视觉资产**:
+- `tests/screenshots/themes/` — 19 张主题截图
+- `tests/screenshots/r17-*.png` — R17 系列验证截图
+- `tests/screenshots/r18-*.png` — Sidebar 拖拽截图
+- `tests/screenshots/r18-final/` — 终极综合验证截图
+
+## R18 — Expert Marketplace Bridge 端到端落地(Phase D 差异化亮点)
+
+### R18.1 — 模块发现 + 接线
+
+`electron/main/agent/pi-market-bridge.ts`(1187 行,包含 IPC channel 表 + `registerPiMarketBridgeIpc`)早已完整实现,且配套 `pi-market-bridge.test.ts` 42/42 单测全过。**但生产代码从未 `registerPiMarketBridgeIpc()` 调用** — 这是 Phase D 一个实打实的回归。
+
+接线(`electron/main/ipc/index.ts`):
+
+```ts
+import { createPiMarketBridge, registerPiMarketBridgeIpc } from "../agent/pi-market-bridge";
+import { app } from "electron";
+
+// ...
+registerAuditIpc(getWindow);
+registerPiBridgeIpc();
+const dataDir = app.getPath("userData");
+const piMarketBridge = createPiMarketBridge({ dataDir, hostVersion: "0.15.0" });
+registerPiMarketBridgeIpc(piMarketBridge, ipcMain);
+```
+
+`electron/preload/index.ts` 同步放行 7 个新 channel:
+- `agent:pi-market-list` / `-refresh` / `-install` / `-upgrade` / `-rollback` / `-lockfile` / `-audit`
+
+新建 `src/lib/pi-market/pi-market-client.ts` 把 7 个 invoke 包成 typed wrapper,跟 `audit-client.ts` 同模式。
+
+### R18.2 — 真实 Electron 端到端验证(`_probe-pi-market-install.mjs`)
+
+**预置本地 registry**:
+```json
+{
+  "version": 1,
+  "extensions": [{
+    "id": "demo.pi-sample",
+    "version": "1.0.0",
+    "versions": ["1.0.0"],
+    "kinds": ["extension"],
+    "capabilities": [{ "id": "tools.demo-hello", "risk": "low" }],
+    "files": {
+      "openbuddy.plugin.json": "{...}",
+      "README.md": "# Demo Pi Sample v1.0.0\n"
+    }
+  }]
+}
+```
+
+**Step 1 — list**:`{ extensions: [demo.pi-sample with tracks + manifest] }`
+
+**Step 2 — install**(`demo.pi-sample@1.0.0`):
+```json
+{
+  "id": "demo.pi-sample",
+  "version": "1.0.0",
+  "path": "/.../pi-extensions/demo.pi-sample/1.0.0",
+  "installedAt": "2026-09-16T12:43:22.919Z",
+  "capabilities": ["tools.demo-hello"],
+  "changed": true
+}
+```
+
+**Step 3 — lockfile**:
+```json
+{
+  "version": 1,
+  "extensions": {
+    "demo.pi-sample": {
+      "version": "1.0.0",
+      "path": "/.../pi-extensions/demo.pi-sample/1.0.0",
+      "installedAt": "...",
+      "integrity": "1a96fe5e5779ebc8e4ee115dfdc219040786e1955288824ed3fbd5fb7d5c641d",
+      "history": [],
+      "capabilities": ["tools.demo-hello"]
+    }
+  }
+}
+```
+
+**Step 4 — idempotent re-install**:返回 `changed: false`(同 ID 同版本 → no-op,审计仍记录)
+
+**Step 5 — rollback without history**:正确报错 `"no recorded previous version"`,但**审计仍记录**(failure outcome)。
+
+**文件系统证据**(`/.../pi-extensions/`):
+```
+demo.pi-sample/
+  current               ← 指针文件(单行纯文本指向当前激活版本)
+  1.0.0/
+    openbuddy.plugin.json   ← 247 字节实际写入
+    README.md               ← 24 字节实际写入
+installed.json          ← 锁文件(SHA-256 integrity)
+audit.jsonl             ← 追加式审计(3 行)
+registry.json           ← 索引
+```
+
+### R18.3 — `electron-vite dev` 真实启动验证
+
+`node scripts/electron/dev.mjs` 60s timeout 启动,init-pipeline 全部 8 个 stage DONE:
+
+```
+[openbuddy-diag] init-pipeline stage=1 ENTER (SessionEventLog)        → DONE
+[openbuddy-diag] init-pipeline stage=2 ENTER (ModelRuntime)          → DONE
+[openbuddy-diag] init-pipeline stage=3 ENTER (installMicrokernelHost) → DONE
+[openbuddy-diag] init-pipeline stage=4 ENTER (Context)               → DONE
+[openbuddy-diag] init-pipeline stage=5 ENTER (ProfileOptions)         → DONE
+[openbuddy-diag] init-pipeline stage=6 ENTER (initProfile)            → DONE
+[openbuddy-diag] init-pipeline stage=6.5 ENTER (initDeepSeek)         → DONE
+[openbuddy-diag] init-pipeline stage=6.6 ENTER (initPiUserExtensions) → DONE
+[openbuddy-diag] init-pipeline stage=6.7 ENTER (initPiDshCoreExtensions) → DONE
+[openbuddy-diag] init-pipeline stage=7 ENTER (computeActiveAdapterIds + initSession) → DONE
+[openbuddy-diag] init-pipeline stage=8 ENTER (emitPluginReadyEvent)   → DONE
+
+[openbuddy-harness] listening at http://127.0.0.1:54517
+dev server running for the electron renderer process at:
+  ➜  Local:   http://localhost:1420/
+```
+
+### R18.4 — Theme Studio round-trip 实测(`_probe-theme-studio-roundtrip.mjs`)
+
+- ✅ Studio 打开后:**34 个 OKLCh 滑块**(L/C/H × ~10 主题 token + 字号)
+- ✅ 拖动 bg-primary L slider(0.985 → 0.5):`getComputedStyle(:root).--wb-bg-primary` 实时更新
+- ✅ `data-theme-name` 从 `openbuddy` 切到 `custom`
+- ✅ 点击「保存」:`localStorage.openbuddy.theme.custom` 写入完整 JSON 数组
+- ✅ Export JSON 按钮可用(label: "导出 JSON")
+
+### R18 累计统计
+
+| 项 | 状态 |
+|---|---|
+| Expert Marketplace Bridge IPC 接线(7 channels) | ✅ |
+| Pi-market-client renderer wrapper | ✅ |
+| `pi-market-bridge.test.ts` 42/42 | ✅ |
+| end-to-end install 真机验证(创建 lockfile + audit + 文件系统) | ✅ |
+| 升级 + 回滚 + audit 全链路真机可调 | ✅ |
+| `electron-vite dev` 8 stage init-pipeline 全部 DONE | ✅ |
+| Theme Studio round-trip 真机 34 滑块 + 保存 + Export | ✅ |
+| `tests/screenshots/themes/` 19 张主题视觉资产 | ✅ |
+
+**新文件**:
+- `src/lib/pi-market/pi-market-client.ts`(79 行,7 个 typed wrapper)
+- `scripts/electron/_probe-pi-market-bridge.mjs`(IPC 通道存在性 + 空 registry)
+- `scripts/electron/_probe-pi-market-install.mjs`(完整 install + 锁文件 + audit)
+- `scripts/electron/_probe-theme-studio.mjs`(Studio 打开 + 滑块)
+- `scripts/electron/_probe-theme-studio-roundtrip.mjs`(滑块 + 保存 + Export)
+
+**修改文件**:
+- `electron/main/ipc/index.ts`(+11 行:`createPiMarketBridge` + `registerPiMarketBridgeIpc` 注册)
+- `electron/preload/index.ts`(+4 行:7 个 `agent:pi-market-*` 加入 allowlist)
+
+## R18 总结 — Expert Marketplace Bridge 差异化落地
+
+OpenBuddy 与 WorkBuddy 的关键差异化:**WorkBuddy 不允许第三方 Pi 扩展通过 Marketplace 安装**。R18 把 OpenBuddy 的 Expert Marketplace Bridge 从「模块存在 + 单测覆盖」推进到「生产代码接线 + 真机端到端验证」:
+
+1. 真实本地 registry + 内联 payload
+2. install 走原子 staging → rename 流程,失败自动回滚
+3. lockfile 持久化 SHA-256 integrity hash
+4. capability 列表被映射为 `openbuddy.plugin.v1` manifest
+5. 每次动作都追加到 `audit.jsonl`(本地优先,无外发)
+6. 渲染端有 typed wrapper(`pi-market-client.ts`)与 MarketPlaceTab/InstallDialog UI 对接
+
+**这是开源差异化在 R17 → R18 路线图上第一个可演示的 end-to-end flow**。

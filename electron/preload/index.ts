@@ -28,6 +28,11 @@ const allowedInvokeChannels = new Set([
   "progress:list", "progress:cancel", "progress:retry",
   // audit (R17 / Phase D — local audit trail viewer)
   "audit:list", "audit:record", "audit:clear",
+  // R18 / Phase D — Expert Marketplace Bridge (Pi 扩展市场)
+  "agent:pi-market-list", "agent:pi-market-refresh",
+  "agent:pi-market-install", "agent:pi-market-upgrade",
+  "agent:pi-market-rollback", "agent:pi-market-lockfile",
+  "agent:pi-market-audit",
   // casdoor
   "casdoor:ai-capabilities", "casdoor:audit-list", "casdoor:authorize", "casdoor:authorize-decision", "casdoor:authorize-resource", "casdoor:billing-order-create", "casdoor:billing-order-expire", "casdoor:billing-order-refund",
   "casdoor:billing-orders", "casdoor:billing-plan-upsert", "casdoor:billing-plans", "casdoor:billing-subscription", "casdoor:can", "casdoor:capabilities", "casdoor:commercial-model-catalog", "casdoor:config-get",
