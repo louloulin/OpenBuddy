@@ -1,0 +1,167 @@
+/**
+ * @openbuddy/ui-editor/styles —— 编辑器正文的全局样式(非 CSS Module)。
+ *
+ * 为什么需要全局样式:ProseMirror 生成的 DOM 结构(如 `p > strong`)由
+ * 扩展决定,组件拿不到类名,只能按元素选择器写。因此这部分刻意放在
+ * `styles/` 而不是 `*.module.css`,与仓库"token 级样式集中管理"的约定一致。
+ */
+
+@import "katex/dist/katex.min.css";
+
+.ob-editor-content {
+  outline: none;
+  font-family: var(--wb-font, inherit);
+  color: var(--wb-fg-primary, inherit);
+  line-height: 1.7;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.ob-editor-content p {
+  margin: 0 0 0.75em;
+}
+
+.ob-editor-content p:last-child {
+  margin-bottom: 0;
+}
+
+.ob-editor-content h1,
+.ob-editor-content h2,
+.ob-editor-content h3,
+.ob-editor-content h4 {
+  margin: 1.1em 0 0.5em;
+  line-height: 1.3;
+  font-weight: 650;
+}
+
+.ob-editor-content h1 { font-size: 1.6em; }
+.ob-editor-content h2 { font-size: 1.35em; }
+.ob-editor-content h3 { font-size: 1.18em; }
+.ob-editor-content h4 { font-size: 1.05em; }
+
+.ob-editor-content ul,
+.ob-editor-content ol {
+  padding-left: 1.4em;
+  margin: 0 0 0.75em;
+}
+
+.ob-editor-content ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.2em;
+}
+
+.ob-editor-content ul[data-type="taskList"] li {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.ob-editor-content ul[data-type="taskList"] li > label {
+  margin-top: 0.25em;
+}
+
+.ob-editor-content blockquote {
+  margin: 0 0 0.75em;
+  padding: 0.2em 0 0.2em 0.9em;
+  border-left: 3px solid var(--wb-accent, #00c29a);
+  color: var(--wb-fg-secondary, inherit);
+}
+
+.ob-editor-content code {
+  font-family: var(--wb-font-mono, ui-monospace, monospace);
+  font-size: 0.9em;
+  padding: 0.15em 0.35em;
+  border-radius: var(--wb-radius-sm, 4px);
+  background: var(--wb-bg-tertiary, rgba(128, 128, 128, 0.14));
+}
+
+.ob-editor-content pre {
+  margin: 0 0 0.75em;
+  padding: 10px 12px;
+  border-radius: var(--wb-radius-md, 8px);
+  background: var(--wb-bg-secondary, rgba(128, 128, 128, 0.08));
+  overflow-x: auto;
+}
+
+.ob-editor-content pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.ob-editor-content a {
+  color: var(--wb-accent, #00c29a);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ob-editor-content hr {
+  border: 0;
+  border-top: 1px solid var(--wb-border, rgba(128, 128, 128, 0.24));
+  margin: 1.2em 0;
+}
+
+.ob-editor-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 0.9em;
+  table-layout: fixed;
+  overflow: hidden;
+}
+
+.ob-editor-content th,
+.ob-editor-content td {
+  border: 1px solid var(--wb-border, rgba(128, 128, 128, 0.24));
+  padding: 6px 8px;
+  vertical-align: top;
+  position: relative;
+}
+
+.ob-editor-content th {
+  background: var(--wb-bg-secondary, rgba(128, 128, 128, 0.08));
+  font-weight: 600;
+  text-align: left;
+}
+
+.ob-editor-content .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--wb-accent-soft, rgba(0, 194, 154, 0.18));
+  pointer-events: none;
+}
+
+.ob-editor-content .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--wb-accent, #00c29a);
+}
+
+/* 占位符(placeholder 扩展):空文档 / 空 block 时显示。 */
+.ob-editor-content p.is-editor-empty:first-child::before,
+.ob-editor-content .is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--wb-fg-tertiary, rgba(128, 128, 128, 0.75));
+}
+
+.ob-editor-content mark {
+  background: var(--wb-warning, #f5c451);
+  color: inherit;
+  padding: 0 0.15em;
+  border-radius: 2px;
+}
+
+.ob-editor-content .ob-editor-mention {
+  color: var(--wb-accent, #00c29a);
+  background: var(--wb-accent-soft, rgba(0, 194, 154, 0.16));
+  border-radius: var(--wb-radius-sm, 4px);
+  padding: 0 0.25em;
+  white-space: nowrap;
+}

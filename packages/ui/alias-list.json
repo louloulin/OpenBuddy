@@ -51,6 +51,22 @@
     "subpaths": {}
   },
   {
+    "dir": "openbuddy-ui-editor",
+    "name": "@openbuddy/ui-editor",
+    "main": "./packages/ui/openbuddy-ui-editor/src/index.ts",
+    "client": "./packages/ui/openbuddy-ui-editor/src/client.tsx",
+    "invariant": "./packages/ui/openbuddy-ui-editor/src/invariant.ts",
+    "subpaths": {
+      "components": "./packages/ui/openbuddy-ui-editor/src/components/index.ts",
+      "components/TiptapEditor": "./packages/ui/openbuddy-ui-editor/src/components/TiptapEditor.tsx",
+      "extensions": "./packages/ui/openbuddy-ui-editor/src/extensions/index.ts",
+      "lib/markdown-bridge": "./packages/ui/openbuddy-ui-editor/src/lib/markdown-bridge.ts",
+      "lib/mention": "./packages/ui/openbuddy-ui-editor/src/lib/mention.ts",
+      "lib/slash-command": "./packages/ui/openbuddy-ui-editor/src/lib/slash-command.ts",
+      "styles": "./packages/ui/openbuddy-ui-editor/src/styles/index.css"
+    }
+  },
+  {
     "dir": "openbuddy-ui-email",
     "name": "@openbuddy/ui-email",
     "main": "./packages/ui/openbuddy-ui-email/src/index.ts",
@@ -73,6 +89,18 @@
     "client": "./packages/ui/openbuddy-ui-files/src/client.tsx",
     "invariant": "./packages/ui/openbuddy-ui-files/src/invariant.ts",
     "subpaths": {}
+  },
+  {
+    "dir": "openbuddy-ui-files-tree",
+    "name": "@openbuddy/ui-files-tree",
+    "main": "./packages/ui/openbuddy-ui-files-tree/src/index.ts",
+    "client": "./packages/ui/openbuddy-ui-files-tree/src/client.tsx",
+    "invariant": "./packages/ui/openbuddy-ui-files-tree/src/invariant.ts",
+    "subpaths": {
+      "components": "./packages/ui/openbuddy-ui-files-tree/src/components/index.ts",
+      "components/FileTree": "./packages/ui/openbuddy-ui-files-tree/src/components/FileTree.tsx",
+      "lib/tree-utils": "./packages/ui/openbuddy-ui-files-tree/src/lib/tree-utils.ts"
+    }
   },
   {
     "dir": "openbuddy-ui-hmr",
@@ -137,7 +165,14 @@
     "main": "./packages/ui/openbuddy-ui-modules/src/index.ts",
     "client": "./packages/ui/openbuddy-ui-modules/src/client.ts",
     "invariant": "./packages/ui/openbuddy-ui-modules/src/invariant.ts",
-    "subpaths": {}
+    "subpaths": {
+      "components": "./packages/ui/openbuddy-ui-modules/src/components/index.ts",
+      "components/CapabilityVersionBadge": "./packages/ui/openbuddy-ui-modules/src/components/CapabilityVersionBadge.tsx",
+      "components/InstallDialog": "./packages/ui/openbuddy-ui-modules/src/components/InstallDialog.tsx",
+      "components/marketplace-model": "./packages/ui/openbuddy-ui-modules/src/components/marketplace-model.ts",
+      "components/MarketplaceCard": "./packages/ui/openbuddy-ui-modules/src/components/MarketplaceCard.tsx",
+      "components/MarketplaceTab": "./packages/ui/openbuddy-ui-modules/src/components/MarketplaceTab.tsx"
+    }
   },
   {
     "dir": "openbuddy-ui-motion",
@@ -148,6 +183,24 @@
     "subpaths": {
       "easings": "./packages/ui/openbuddy-ui-motion/src/easings.ts",
       "presets": "./packages/ui/openbuddy-ui-motion/src/presets.ts"
+    }
+  },
+  {
+    "dir": "openbuddy-ui-onboarding",
+    "name": "@openbuddy/ui-onboarding",
+    "main": "./packages/ui/openbuddy-ui-onboarding/src/index.ts",
+    "client": "./packages/ui/openbuddy-ui-onboarding/src/client.tsx",
+    "invariant": "./packages/ui/openbuddy-ui-onboarding/src/invariant.ts",
+    "subpaths": {
+      "components": "./packages/ui/openbuddy-ui-onboarding/src/components/index.ts",
+      "components/DataDirPrompt": "./packages/ui/openbuddy-ui-onboarding/src/components/DataDirPrompt.tsx",
+      "components/FeedbackPopup": "./packages/ui/openbuddy-ui-onboarding/src/components/FeedbackPopup.tsx",
+      "components/OnboardingWizard": "./packages/ui/openbuddy-ui-onboarding/src/components/OnboardingWizard.tsx",
+      "components/WhatsNewCard": "./packages/ui/openbuddy-ui-onboarding/src/components/WhatsNewCard.tsx",
+      "lib/onboarding-reducer": "./packages/ui/openbuddy-ui-onboarding/src/lib/onboarding-reducer.ts",
+      "tour/tour-steps": "./packages/ui/openbuddy-ui-onboarding/src/tour/tour-steps.ts",
+      "tour/TourModal": "./packages/ui/openbuddy-ui-onboarding/src/tour/TourModal.tsx",
+      "tour/TourSpotlight": "./packages/ui/openbuddy-ui-onboarding/src/tour/TourSpotlight.tsx"
     }
   },
   {
@@ -223,6 +276,10 @@
     "client": "./packages/ui/openbuddy-ui-theme/src/client.tsx",
     "invariant": "./packages/ui/openbuddy-ui-theme/src/invariant.ts",
     "subpaths": {
+      "components": "./packages/ui/openbuddy-ui-theme/src/components/index.ts",
+      "components/ThemeCard": "./packages/ui/openbuddy-ui-theme/src/components/ThemeCard.tsx",
+      "components/ThemeInitializer": "./packages/ui/openbuddy-ui-theme/src/components/ThemeInitializer.tsx",
+      "components/ThemePicker": "./packages/ui/openbuddy-ui-theme/src/components/ThemePicker.tsx",
       "styles": "./packages/ui/openbuddy-ui-theme/src/styles/index.css"
     }
   },

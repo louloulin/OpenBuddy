@@ -1,0 +1,36 @@
+{
+  "name": "@openbuddy/ui-onboarding",
+  "version": "0.15.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.tsx",
+    "./invariant": "./src/invariant.ts",
+    "./components": "./src/components/index.ts",
+    "./components/OnboardingWizard": "./src/components/OnboardingWizard.tsx",
+    "./components/DataDirPrompt": "./src/components/DataDirPrompt.tsx",
+    "./components/FeedbackPopup": "./src/components/FeedbackPopup.tsx",
+    "./components/WhatsNewCard": "./src/components/WhatsNewCard.tsx",
+    "./tour/TourModal": "./src/tour/TourModal.tsx",
+    "./tour/TourSpotlight": "./src/tour/TourSpotlight.tsx",
+    "./tour/tour-steps": "./src/tour/tour-steps.ts",
+    "./lib/onboarding-reducer": "./src/lib/onboarding-reducer.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@openbuddy/cordis": "workspace:*",
+    "@openbuddy/ui-slots": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "peerDependenciesMeta": {
+    "react-dom": {
+      "optional": true
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "@openbuddy/ui-editor",
+  "version": "0.15.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.tsx",
+    "./invariant": "./src/invariant.ts",
+    "./components": "./src/components/index.ts",
+    "./components/TiptapEditor": "./src/components/TiptapEditor.tsx",
+    "./extensions": "./src/extensions/index.ts",
+    "./lib/markdown-bridge": "./src/lib/markdown-bridge.ts",
+    "./lib/slash-command": "./src/lib/slash-command.ts",
+    "./lib/mention": "./src/lib/mention.ts",
+    "./package.json": "./package.json",
+    "./styles": "./src/styles/index.css"
+  },
+  "dependencies": {
+    "@openbuddy/cordis": "workspace:*",
+    "@openbuddy/ui-slots": "workspace:*",
+    "@tiptap/core": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/react": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
+    "lowlight": "^3.3.0"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}

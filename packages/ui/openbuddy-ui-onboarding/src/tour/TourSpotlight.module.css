@@ -1,0 +1,31 @@
+/* TourSpotlight — 漫游暗幕。挖孔用超大 box-shadow 涂暗四周。 */
+.overlay {
+  position: fixed;
+  inset: 0;
+}
+
+.dim {
+  background: color-mix(in oklch, #000 55%, transparent);
+}
+
+.hole {
+  position: fixed;
+  border-radius: 10px;
+  pointer-events: none;
+  background: transparent;
+  /* 四周涂暗:单元素实现,圆角 / 过渡都跟着走 */
+  box-shadow:
+    0 0 0 9999px color-mix(in oklch, #000 55%, transparent),
+    0 0 0 2px var(--wb-accent, #00c29a);
+  transition:
+    top 180ms ease,
+    left 180ms ease,
+    width 180ms ease,
+    height 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hole {
+    transition: none;
+  }
+}

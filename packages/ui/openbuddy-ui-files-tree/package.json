@@ -1,0 +1,24 @@
+{
+  "name": "@openbuddy/ui-files-tree",
+  "version": "0.15.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.tsx",
+    "./invariant": "./src/invariant.ts",
+    "./components": "./src/components/index.ts",
+    "./components/FileTree": "./src/components/FileTree.tsx",
+    "./lib/tree-utils": "./src/lib/tree-utils.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@openbuddy/cordis": "workspace:*",
+    "@openbuddy/ui-slots": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}

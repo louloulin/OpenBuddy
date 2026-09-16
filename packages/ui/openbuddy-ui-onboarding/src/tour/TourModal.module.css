@@ -1,0 +1,126 @@
+/* TourModal — 漫游卡片。fixed 定位 + 由 computeCardPosition 算出坐标。 */
+.card {
+  position: fixed;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  display: flex;
+  flex-direction: column;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  color: var(--wb-fg-primary);
+  border: 1px solid var(--wb-border-soft, var(--wb-border));
+  border-radius: var(--wb-radius-lg, 12px);
+  box-shadow: var(--wb-shadow-lg, 0 18px 48px rgb(0 0 0 / 28%));
+  padding: 14px 16px 12px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.stepCount {
+  font-size: 11px;
+  color: var(--wb-fg-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.close {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--wb-radius-sm);
+  background: transparent;
+  color: var(--wb-fg-secondary);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: color-mix(in oklch, var(--wb-fg-primary) 8%, transparent);
+  color: var(--wb-fg-primary);
+}
+
+.body {
+  min-height: 64px;
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--wb-fg-secondary);
+}
+
+.dots {
+  display: flex;
+  gap: 4px;
+  margin: 10px 0;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wb-border);
+}
+
+.dotActive {
+  background: var(--wb-accent);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.footerRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.primary,
+.ghost {
+  border-radius: var(--wb-radius-md, 8px);
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.primary {
+  border: 1px solid transparent;
+  background: var(--wb-accent);
+  color: var(--wb-accent-fg, #fff);
+  font-weight: 500;
+}
+
+.ghost {
+  border: 1px solid var(--wb-border);
+  background: transparent;
+  color: var(--wb-fg-secondary);
+}
+
+.ghost:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--wb-fg-primary) 6%, transparent);
+  color: var(--wb-fg-primary);
+}
+
+.ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

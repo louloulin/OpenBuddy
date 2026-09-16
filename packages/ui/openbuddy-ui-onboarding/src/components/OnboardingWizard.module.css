@@ -1,0 +1,203 @@
+/* OnboardingWizard — 首启引导卡片。遮罩 + 居中卡片,视觉语言沿用 shell 弹层。 */
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 1900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in oklch, var(--wb-bg-primary) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.card {
+  position: relative;
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  color: var(--wb-fg-primary);
+  border: 1px solid var(--wb-border-soft, var(--wb-border));
+  border-radius: var(--wb-radius-xl, 16px);
+  box-shadow: var(--wb-shadow-lg, 0 24px 64px rgb(0 0 0 / 32%));
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 0;
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--wb-border);
+  cursor: pointer;
+  transition:
+    width 160ms ease,
+    background 160ms ease;
+}
+
+.dot:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.dotDone {
+  background: var(--wb-success, var(--wb-accent));
+}
+
+.dotSkipped {
+  background: var(--wb-warning, var(--wb-border));
+}
+
+.dotActive {
+  width: 22px;
+  border-radius: 999px;
+  background: var(--wb-accent);
+}
+
+.headerMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.counter {
+  font-size: 11px;
+  color: var(--wb-fg-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.close {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--wb-radius-sm);
+  background: transparent;
+  color: var(--wb-fg-secondary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: color-mix(in oklch, var(--wb-fg-primary) 8%, transparent);
+  color: var(--wb-fg-primary);
+}
+
+.body {
+  padding: 18px;
+  min-height: 132px;
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.description {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--wb-fg-secondary);
+}
+
+.content {
+  font-size: 13px;
+  color: var(--wb-fg-primary);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px 16px;
+  border-top: 1px solid var(--wb-border-soft, var(--wb-border));
+}
+
+.footerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.primary,
+.ghost {
+  border-radius: var(--wb-radius-md, 8px);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    opacity 140ms ease;
+}
+
+.primary {
+  border: 1px solid transparent;
+  background: var(--wb-accent);
+  color: var(--wb-accent-fg, #fff);
+  font-weight: 500;
+}
+
+.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ghost {
+  border: 1px solid var(--wb-border);
+  background: transparent;
+  color: var(--wb-fg-secondary);
+}
+
+.ghost:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--wb-fg-primary) 6%, transparent);
+  color: var(--wb-fg-primary);
+}
+
+.ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.progressBar {
+  height: 2px;
+  background: var(--wb-border-soft, var(--wb-border));
+}
+
+.progressBar span {
+  display: block;
+  height: 100%;
+  background: var(--wb-accent);
+  transition: width 220ms ease;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

@@ -1,0 +1,115 @@
+.node {
+  margin: 10px 0;
+  border-radius: var(--wb-radius-lg, 12px);
+  border: 1px solid var(--wb-border, rgba(128, 128, 128, 0.24));
+  background: var(--wb-bg-secondary, rgba(128, 128, 128, 0.06));
+  overflow: hidden;
+}
+
+.nodeSelected {
+  border-color: var(--wb-accent, #00c29a);
+  box-shadow: 0 0 0 2px var(--wb-accent-soft, rgba(0, 194, 154, 0.18));
+}
+
+.nodeEditing {
+  background: var(--wb-bg-primary, #ffffff);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--wb-border-soft, rgba(128, 128, 128, 0.14));
+}
+
+.badge {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--wb-fg-tertiary, rgba(128, 128, 128, 0.9));
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+.action {
+  border: 0;
+  background: transparent;
+  color: var(--wb-fg-secondary, inherit);
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: var(--wb-radius-sm, 6px);
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--wb-bg-tertiary, rgba(128, 128, 128, 0.16));
+}
+
+.canvas {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  overflow: auto;
+}
+
+.canvas svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.placeholder {
+  padding: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--wb-fg-tertiary, rgba(128, 128, 128, 0.9));
+}
+
+.editor {
+  padding: 8px;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  font-family: var(--wb-font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px;
+  border-radius: var(--wb-radius-sm, 6px);
+  border: 1px solid var(--wb-border, rgba(128, 128, 128, 0.24));
+  background: var(--wb-bg-primary, #ffffff);
+  color: var(--wb-fg-primary, inherit);
+}
+
+.error {
+  padding: 12px;
+  font-size: 12px;
+  color: var(--wb-danger, #d64545);
+}
+
+.errorTitle {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.errorMessage {
+  margin-bottom: 8px;
+  opacity: 0.85;
+}
+
+.errorCode {
+  margin: 0;
+  padding: 8px;
+  border-radius: var(--wb-radius-sm, 6px);
+  background: var(--wb-bg-tertiary, rgba(128, 128, 128, 0.12));
+  color: var(--wb-fg-secondary, inherit);
+  font-family: var(--wb-font-mono, ui-monospace, monospace);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}

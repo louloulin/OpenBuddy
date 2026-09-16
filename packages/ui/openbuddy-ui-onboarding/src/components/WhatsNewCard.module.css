@@ -1,0 +1,143 @@
+/* WhatsNewCard — 版本更新摘要卡。 */
+.root {
+  width: min(440px, calc(100vw - 32px));
+  padding: 16px;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  color: var(--wb-fg-primary);
+  border: 1px solid var(--wb-border-soft, var(--wb-border));
+  border-radius: var(--wb-radius-lg, 12px);
+  box-shadow: var(--wb-shadow-md, 0 12px 32px rgb(0 0 0 / 24%));
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.version {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--wb-fg-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.close {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--wb-radius-sm);
+  background: transparent;
+  color: var(--wb-fg-secondary);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: color-mix(in oklch, var(--wb-fg-primary) 8%, transparent);
+}
+
+.items {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.bullet {
+  color: var(--wb-accent);
+  font-size: 9px;
+  line-height: 18px;
+}
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.itemTitle {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.itemDescription {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--wb-fg-secondary);
+}
+
+.empty {
+  font-size: 12px;
+  color: var(--wb-fg-tertiary);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--wb-fg-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.primary,
+.ghost {
+  border-radius: var(--wb-radius-md, 8px);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.primary {
+  border: 1px solid transparent;
+  background: var(--wb-accent);
+  color: var(--wb-accent-fg, #fff);
+  font-weight: 500;
+}
+
+.ghost {
+  border: 1px solid var(--wb-border);
+  background: transparent;
+  color: var(--wb-fg-secondary);
+}
+
+.ghost:hover {
+  background: color-mix(in oklch, var(--wb-fg-primary) 6%, transparent);
+  color: var(--wb-fg-primary);
+}

@@ -1,0 +1,12 @@
+.popup {
+  position: fixed;
+  z-index: 70;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--wb-radius-md, 8px);
+  border: 1px solid var(--wb-border, rgba(128, 128, 128, 0.24));
+  background: var(--wb-bg-elevated, var(--wb-bg-primary, #ffffff));
+  box-shadow: var(--wb-shadow-md, 0 10px 26px rgba(0, 0, 0, 0.18));
+}

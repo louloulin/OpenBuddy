@@ -1,0 +1,86 @@
+/* SuggestionMenu —— 补全列表样式。全部走 --wb-* token,跟随主题。 */
+.menu {
+  min-width: 260px;
+  max-width: 360px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--wb-radius-lg, 12px);
+  border: 1px solid var(--wb-border, rgba(128, 128, 128, 0.24));
+  background: var(--wb-bg-elevated, var(--wb-bg-primary, #ffffff));
+  box-shadow: var(--wb-shadow-lg, 0 18px 40px rgba(0, 0, 0, 0.22));
+  color: var(--wb-fg-primary, inherit);
+  font-family: var(--wb-font, inherit);
+  font-size: 13px;
+}
+
+.group + .group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--wb-border-soft, rgba(128, 128, 128, 0.14));
+}
+
+.groupTitle {
+  padding: 4px 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wb-fg-tertiary, rgba(128, 128, 128, 0.9));
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--wb-radius-sm, 6px);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.itemActive {
+  background: var(--wb-accent-soft, rgba(0, 194, 154, 0.16));
+  color: var(--wb-accent-fg, inherit);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: var(--wb-radius-sm, 6px);
+  background: var(--wb-bg-tertiary, rgba(128, 128, 128, 0.12));
+  font-size: 12px;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.description {
+  font-size: 11px;
+  color: var(--wb-fg-tertiary, rgba(128, 128, 128, 0.9));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty {
+  padding: 14px 10px;
+  text-align: center;
+  color: var(--wb-fg-tertiary, rgba(128, 128, 128, 0.9));
+}

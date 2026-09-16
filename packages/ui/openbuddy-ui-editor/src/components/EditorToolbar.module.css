@@ -1,0 +1,28 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--wb-border-soft, rgba(128, 128, 128, 0.14));
+  background: var(--wb-bg-secondary, rgba(128, 128, 128, 0.05));
+}
+
+.group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.group + .group {
+  margin-left: 4px;
+  padding-left: 6px;
+  border-left: 1px solid var(--wb-border-soft, rgba(128, 128, 128, 0.14));
+}
+
+.trailing {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
