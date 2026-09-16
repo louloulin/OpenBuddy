@@ -6,8 +6,40 @@
     </radialGradient>
   </defs>
   <rect width="240" height="240" fill="url(#bg)"/>
-  <circle cx="120" cy="120" r="68" fill="none" stroke="#1F140A" stroke-width="14"/>
-  <circle cx="120" cy="120" r="48" fill="none" stroke="#1F140A" stroke-width="2" opacity=".25"/>
-  <circle cx="172" cy="74" r="10" fill="#09C8A7"/>
-  <circle cx="172" cy="74" r="16" fill="none" stroke="#09C8A7" stroke-width="3" opacity=".5"/>
+  <g transform="translate(120 120) scale(0.12)">
+    <path d="
+      M -300 0
+      L -280 -80
+      Q -274 -102 -252 -102
+      Q -230 -102 -224 -80
+      L -204 0
+      Q -190 -12 -168 -16
+      Q -120 -24 -72 -24
+      Q -12 -24 32 0
+      Q 68 24 68 80
+      Q 68 128 40 164
+      Q 24 188 12 208
+      L 12 344
+      Q 12 380 44 412
+      Q 60 432 60 460
+      Q 60 488 32 488
+      L -20 488
+      Q -48 488 -48 460
+      L -48 420
+      L -168 420
+      L -168 460
+      Q -168 488 -196 488
+      L -248 488
+      Q -276 488 -276 460
+      Q -276 432 -260 412
+      Q -228 380 -228 344
+      L -228 272
+      Q -252 248 -268 220
+      Q -280 200 -288 176
+      Q -304 136 -304 100
+      Q -304 52 -280 28
+      Z
+    " fill="#1F140A" transform="scale(-1 1)"/>
+  </g>
+  <circle cx="186" cy="56" r="8" fill="#09C8A7"/>
 </svg>

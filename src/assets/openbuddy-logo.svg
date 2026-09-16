@@ -1,31 +1,68 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
   <!--
-    OpenBuddy mark v10 - ultra-minimal abstract.
-    Composition: a single circle + a small inner ring + one accent dot.
-    No characters, no faces, no limbs, no props — just three geometric
-    primitives. Premium abstract identity.
-    Palette: cream bg + brown ring + teal accent (v9 DNA kept as a hint).
+    OpenBuddy mark v11 - abstract dog silhouette.
+    Composition: a single continuous geometric dog outline + one teal
+    accent collar dot. No facial features, no body details, just an
+    iconic side-profile dog form reduced to its essence.
+    Pure silhouette with negative-space ear notch.
   -->
   <defs>
     <radialGradient id="bgRad" cx="50%" cy="50%" r="70%">
       <stop stop-color="#FFF7E8"/>
       <stop offset="1" stop-color="#E8D8B8"/>
     </radialGradient>
-    <linearGradient id="ring" x1="280" y1="280" x2="744" y2="744" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#3D2A1A"/>
-      <stop offset="1" stop-color="#1F140A"/>
+    <linearGradient id="dog" x1="120" y1="120" x2="900" y2="940" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1F140A"/>
+      <stop offset="1" stop-color="#3D2A1A"/>
     </linearGradient>
     <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
   </defs>
 
   <g clip-path="url(#clip)">
     <rect x="38" y="38" width="948" height="948" fill="url(#bgRad)"/>
-    <!-- the mark: one bold ring -->
-    <circle cx="512" cy="512" r="280" fill="none" stroke="url(#ring)" stroke-width="48"/>
-    <!-- inner thin ring (subtle layering) -->
-    <circle cx="512" cy="512" r="200" fill="none" stroke="#3D2A1A" stroke-width="6" opacity=".25"/>
-    <!-- single accent dot: teal AI signal, off-center for tension -->
-    <circle cx="700" cy="324" r="36" fill="#09C8A7"/>
-    <circle cx="700" cy="324" r="56" fill="none" stroke="#09C8A7" stroke-width="6" opacity=".5"/>
+
+    <!-- the dog: continuous geometric silhouette, side profile, sitting -->
+    <!-- Path order: back of head -> ear notch -> face -> snout -> chin ->
+         front chest -> belly -> back leg -> tail -> back -> top of head -->
+    <path d="
+      M 300 280
+      L 320 200
+      Q 326 178 348 178
+      Q 370 178 376 200
+      L 396 280
+      Q 410 268 432 264
+      Q 480 256 528 256
+      Q 588 256 632 280
+      Q 668 304 668 360
+      Q 668 408 640 444
+      Q 624 468 612 488
+      L 612 624
+      Q 612 660 644 692
+      Q 660 712 660 740
+      Q 660 768 632 768
+      L 580 768
+      Q 552 768 552 740
+      L 552 700
+      L 432 700
+      L 432 740
+      Q 432 768 404 768
+      L 352 768
+      Q 324 768 324 740
+      Q 324 712 340 692
+      Q 372 660 372 624
+      L 372 552
+      Q 348 528 332 500
+      Q 320 480 312 456
+      Q 296 416 296 380
+      Q 296 332 320 308
+      Z
+    " fill="url(#dog)"/>
+
+    <!-- single teal collar accent (signature AI element) -->
+    <circle cx="540" cy="364" r="20" fill="#09C8A7"/>
+    <circle cx="540" cy="364" r="34" fill="none" stroke="#09C8A7" stroke-width="6" opacity=".55"/>
+
+    <!-- tiny offset accent dot for asymmetric balance -->
+    <circle cx="820" cy="220" r="14" fill="#09C8A7" opacity=".75"/>
   </g>
 </svg>
