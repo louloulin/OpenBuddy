@@ -748,11 +748,14 @@
 .wb-composer__setup-hint {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  font-size: 14px;
-  color: var(--wb-text-tertiary);
+  /* R30 — 只做点击热区,不再自己画一遍提示文案。
+     以前这里是 `display:flex; align-items:center` + 一行 14px 文字,于是
+     「请先配置 API Key 开始使用」被垂直居中到输入区/底栏接缝(实测 y≈390–405,
+     底栏从 410 开始),而 textarea 的 placeholder 写着同一句话(y≈352)——
+     一屏两遍同样的提示,其中一遍还压着底栏。文案交给 placeholder,
+     这里只保留可点击区域与光标。 */
+  display: block;
+  padding: 0;
   cursor: pointer;
   border-radius: 16px;
   border: none;

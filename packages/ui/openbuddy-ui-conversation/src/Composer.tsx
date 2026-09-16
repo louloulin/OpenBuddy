@@ -882,7 +882,14 @@ export function ComposerInner({
               onOpenSettings?.();
             }}
           >
-            请先配置 API Key 开始使用
+            {/* R30 — 这块是覆盖整张卡片的**点击热区**(点哪儿都跳到设置)。
+                以前它同时把「请先配置 API Key 开始使用」再画一遍,而它
+                `inset: 0` + 垂直居中,文字正好压在输入区与底栏的接缝上
+                (实测文字 y≈390–405,底栏从 410 开始),而 textarea 的
+                placeholder 已经写着同一句话(y≈352)→ 同一句提示出现两次
+                还叠在底栏上。文字改成 sr-only:读屏仍能念出按钮名,视觉
+                上只留 placeholder 那一处。 */}
+            <span className="wb-sr-only">请先配置 API Key 开始使用</span>
           </button>
         )}
 

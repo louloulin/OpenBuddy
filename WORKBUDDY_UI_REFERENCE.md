@@ -1575,7 +1575,7 @@ R23:  ok=20 dead=0 ext=19 no-impl=0    (39 槽)  ← 注册 / 消费 / 分类全
 | 期 | 内容 | 进度 | 说明 |
 |---|---|---|---|
 | Phase A | 主题系统 v2 | **100%** | 19 套主题、OKLCh、Match-system、防 FOUC、ThemePicker / Studio、主题字体落地 |
-| Phase B | Workspace 表现层 | **99%** | Resizable sidebar、虚拟化 files-tree 进生产、Artifact Tabs / breadcrumb、Topbar / StatusBar、`details` 助理导轨(R28)；剩顶栏信息密度再平衡 |
+| Phase B | Workspace 表现层 | **100%** | Resizable sidebar、虚拟化 files-tree 进生产、Artifact Tabs / breadcrumb、Topbar / StatusBar、`details` 助理导轨(R28)、顶栏信息密度(R30) |
 | Phase C | 编辑器与富文本 | **98%** | TiPTap 编辑器 + 三个扩展点接上消费者 + Office 四预览 + 编辑侧 round-trip 保真(R28);剩真实会话里"编辑产物"的端到端截图 |
 | Phase D | Onboarding 与差异化 | **97%** | wizard / tour / whats-new / feedback / data-dir / marketplace(R29 复核可达)/ Pi 市场桥接 / Theme Studio；剩 Plugin SDK v1 文档站点(R24)未开工 |
 
@@ -1672,6 +1672,56 @@ panel: mounted=true  "市场 刷新全部 添加源  1 个源 · 0 个插件 · 
 | 状态栏 | `[data-testid="status-bar"]` 实测渲染 | 在生产路径上 |
 | 主题菜单 | `[data-testid="theme-menu-button"]` 实测渲染 | 在生产路径上 |
 
+## R30 — 顶栏信息密度 + 首页输入卡「同一句提示画两遍」
+
+用户提过"菜单栏加宽点 / 信息密度"。先把真机数字量出来(5 档窗口宽度 × 顶栏各组的盒模型),
+再决定改什么 —— 结果是**侧栏宽度已经健康**(默认 320 / 260–480 可拖),真正坏的是两处别的:
+
+### R30.1 顶栏搜索框在窄窗口溢出容器,压到邻居身上
+
+`.main-topbar__search` 硬写 `min-width: 280px`,而 `.main-topbar__center` 是 `flex: 1`。
+窗口收到 760px(侧栏 320 → 主区 440 → 中间区只剩 232px)时:
+
+| | 修复前 | 修复后 |
+|---|---|---|
+| 760px 中间区 | 232px | 175px(搜索框退化成 34px 图标) |
+| 搜索框 | x=456..736(**超容器 48px**) | 34px,居中 |
+| 与左组重叠 | **24px** | −70px(留白) |
+| 与右组重叠 | **24px** | −71px(留白) |
+| 980px 搜索框 | — | 363px(保留文字标签) |
+| 1280px 搜索框 | 480px | 480px(封顶不变) |
+
+修法(不引入 JS):`.main-topbar__center` 加 `container-type: inline-size`
+(容器宽 ≠ 窗口宽 —— 侧栏可拖宽到 480、可折叠到 64),搜索框 `min-width`
+从 `280px` 改成 `min(280px, 100%)`,并加两条 `@container`:
+
+- 容器 ≤300px → 退化成 34px 纯图标按钮(`aria-label` 仍在,键盘/读屏可用),
+  隐藏文字标签与 `⌘K` 提示片;
+- 容器 ≤96px → 整块收起,把宽度全留给标题与工具按钮。
+
+### R30.2 首页输入卡把「请先配置 API Key 开始使用」画了两遍(其中一遍压着底栏)
+
+`.wb-composer__setup-hint` 是覆盖整张卡片的**点击热区**(点哪儿都跳设置),
+但它同时是一行可见文字,而且 `inset: 0` + `align-items: center`:
+
+| 元素 | 实测 y | 说明 |
+|---|---|---|
+| textarea placeholder(同一句话) | ≈352 | 用户本来就该看到的那一处 |
+| overlay 文字(同一句话) | ≈390–405 | 垂直居中到 **输入区/底栏接缝** |
+| 底栏(`__footer`) | 410–466 | 被上面那行压住 |
+
+修法:热区保留全卡(可点区域不变),文字改成 `wb-sr-only` —— 读屏仍能念出
+按钮名(实测 `sr-only` 盒子 1×1,文字仍在),视觉上只留 placeholder 那一处。
+探针断言"热区里除 `sr-only` 外没有可见文字落进底栏带"。
+
+### R30.3 测试
+
+新增 `scripts/electron/_probe-r30-header-density.mjs`(+ CI wrapper 9 条):
+5 档窗口宽度下断言搜索框与左右组的**重叠量 ≤ 0**、宽窗口保留标签 / 窄窗口
+退化成图标、输入卡提示不重复、热区仍有无障碍名、全程 renderer 零报错。
+截图 `tests/screenshots/r30-header-density.png` 与
+`tests/screenshots/r30-composer-setup-hint.png`。
+
 ## 后续计划(优先级排序)
 
 1. **R24 — Plugin SDK v1 文档站点**:`openbuddy.plugin.v1` manifest 全量公开 +
@@ -1679,10 +1729,13 @@ panel: mounted=true  "市场 刷新全部 添加源  1 个源 · 0 个插件 · 
    token 表现在都齐了,缺的只是"照着抄就能跑"的公开文档。
 2. **R25 — Pi 扩展市场多源 registry**:当前是单源,多源 + 权重 + 离线缓存;
    `agent:pi-market-*` 七个 channel 已就位,只需扩 registry 层。
-3. **R30 — 顶栏信息密度再平衡**(与 WorkBuddy 对齐最后几处):顶栏 56px 高度、
-   搜索框 280–480px、状态胶囊 / 主题入口已就位,待定的是窄窗口(≤980px)下
-   哪些元素降级为图标、哪些收进溢出菜单。
-4. **加固项**:`details` 导轨在窄窗口下与右侧工作面板(ToolSidePanel)的避让;
+3. **R31 — Plugin SDK v1 文档站点**(R24,开源差异化最重要抓手):
+   `openbuddy.plugin.v1` manifest 全量公开 + `examples/` + starter 模板。
+   槽位表(39 条)/ 事件表 / 主题 token 表现在都齐了,缺的只是"照着抄就能跑"
+   的公开文档。
+4. **R32 — Pi 扩展市场多源 registry**(R25):当前单源,多源 + 权重 + 离线缓存;
+   `agent:pi-market-*` 七个 channel 已就位,只需扩 registry 层。
+5. **加固项**:`details` 导轨与右侧工作面板(ToolSidePanel)在窄窗口下的避让;
    真实会话里"编辑产物 → 保存"的端到端截图。
 
 ## 用户可见的差距分析(与 WorkBuddy 对比)
