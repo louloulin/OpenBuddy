@@ -6,7 +6,7 @@ import { defineExtension } from "@openbuddy/plugin-sdk";
 export default defineExtension({
   manifest: {
     name: "openbuddy-plugin-toolbar",
-    version: "0.1.0",
+    version: "0.15.0",
     description: "在 Composer 工具栏注入「插入时间戳」按钮。",
     author: "OpenBuddy Team",
     contributes: {

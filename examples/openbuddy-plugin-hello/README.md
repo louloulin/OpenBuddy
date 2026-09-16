@@ -21,7 +21,7 @@ pnpm dev
 
 ```typescript
 defineExtension({
-  manifest: { name: "openbuddy-plugin-hello", version: "0.1.0", ... },
+  manifest: { name: "openbuddy-plugin-hello", version: "0.15.0", ... },
   setup: (api) => {
     api.registerSlot("home.scene.tab", "list", "root", {
       id: "hello-world-tab",

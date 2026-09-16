@@ -6,7 +6,7 @@ import { defineExtension } from "@openbuddy/plugin-sdk";
 export default defineExtension({
   manifest: {
     name: "openbuddy-plugin-slash",
-    version: "0.1.0",
+    version: "0.15.0",
     description: "注册 /greet <name> slash 命令，输出问候。",
     author: "OpenBuddy Team",
     contributes: {

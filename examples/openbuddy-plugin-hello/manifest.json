@@ -1,7 +1,7 @@
 {
   "schema": "openbuddy.plugin.v1",
   "name": "openbuddy-plugin-hello",
-  "version": "0.1.0",
+  "version": "0.15.0",
   "description": "示例插件 — openbuddy-plugin-hello",
   "author": "OpenBuddy Team",
   "contributes": {}
