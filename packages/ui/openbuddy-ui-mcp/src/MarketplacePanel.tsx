@@ -33,6 +33,7 @@ import {
   type PiPackageCatalogEntry,
 } from "@openbuddy/shared-types";
 import { describeMarketplaceResult } from "./marketplace-priority-toast";
+import { PiExtensionsSection } from "./PiExtensionsSection";
 
 interface MarketplacePanelProps {
   /** 当前会话 id(可选)。marketplace 操作是 profile 级别的,不需要活跃会话;
@@ -268,6 +269,9 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
 
   return (
     <div className="marketplace-panel">
+      {/* R32 — Pi 扩展市场(Expert Marketplace Bridge)独立于 pi 官方 marketplace,
+          数据模型与安装语义都不同,所以放在同一个面板里但分区块呈现。 */}
+      <PiExtensionsSection onToast={onToast} />
       <div className="marketplace-panel__header">
         <h2 className="marketplace-panel__title">市场</h2>
         <div className="marketplace-panel__actions">

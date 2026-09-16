@@ -19,5 +19,20 @@ export { DiscoverPanel } from "./DiscoverPanel";
 export { MarketplacePanel } from "./MarketplacePanel";
 export { NotifyChannelsPanel } from "./NotifyChannelsPanel";
 export { OpenBuddyPluginPanel } from "./OpenBuddyPluginPanel";
+export { PiExtensionsSection } from "./PiExtensionsSection";
+export {
+  describePiMarketError,
+  groupPiMarketEntries,
+  installStateOf,
+  mirrorLabel,
+  sourceChips,
+  sourceLabel,
+  summarizeSources,
+  toMarketplaceEntry,
+  type PiExtensionsGroups,
+  type PiMarketErrorAction,
+  type PiMarketSourceSummary,
+  type PiSourceChip,
+} from "./pi-extensions-model";
 export { PluginsPanel } from "./PluginsPanel";
 export { ResourceCatalogPanel } from "./ResourceCatalogPanel";

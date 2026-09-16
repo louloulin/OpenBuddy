@@ -1583,7 +1583,7 @@ R23:  ok=20 dead=0 ext=19 no-impl=0    (39 槽)  ← 注册 / 消费 / 分类全
 | Phase A | 主题系统 v2 | **100%** | 19 套主题、OKLCh、Match-system、防 FOUC、ThemePicker / Studio、主题字体落地 |
 | Phase B | Workspace 表现层 | **100%** | Resizable sidebar、虚拟化 files-tree 进生产、Artifact Tabs / breadcrumb、Topbar / StatusBar、`details` 助理导轨(R28)、顶栏信息密度(R30) |
 | Phase C | 编辑器与富文本 | **98%** | TiPTap 编辑器 + 三个扩展点接上消费者 + Office 四预览 + 编辑侧 round-trip 保真(R28);剩真实会话里"编辑产物"的端到端截图 |
-| Phase D | Onboarding 与差异化 | **100%** | wizard / tour / whats-new / feedback / data-dir / marketplace(R29 复核可达)/ Pi 市场桥接 / Theme Studio / Plugin SDK v1 文档站点(R31:登记表生成 + CI 守卫 + 5 篇文档上站) |
+| Phase D | Onboarding 与差异化 | **100%** | wizard / tour / whats-new / feedback / data-dir / marketplace(R29 复核可达)/ Pi 市场桥接(**R32:多源 + 权重合并 + 离线缓存 + UI 落地**)/ Theme Studio / Plugin SDK v1 文档站点(R31:登记表生成 + CI 守卫 + 5 篇文档上站) |
 
 ## R28 — 编辑器「打开就丢结构」:嵌套列表被拍平 + `details` 槽接线
 
@@ -1793,12 +1793,119 @@ R31 把它改成从代码生成 + CI 守卫,于是立刻查出两类事实错误
 `npx vitest run packages/ui/openbuddy-ui-runtime/src/__tests__/extension-points.test.ts`
 → 13/13;全量 `npx vitest run` 与 `tsc --noEmit` 见文末进度表。
 
+## R32 — Pi 扩展市场:多源索引 + 线契约单一定义 + UI 落地
+
+R31 之后接续原 R25 的收尾。R18 把 Pi 扩展桥接接进了生产,但市场只有一个索引源,
+而且**渲染端的类型是自己手写的一份** —— R32 把两者一起收口,并在接 UI 的过程中
+查出四个真 bug(三个是类型/契约漂移,一个是重复定义)。
+
+### R32.1 线契约单一定义:wrapper 从 R18 起就是坏的
+
+同一套形状此前手写了三遍(main 生产者 / 渲染端 wrapper / UI 消费方),已经漂移:
+
+| 漂移点 | wrapper 写的 | bridge 实际返回 | 后果 |
+|---|---|---|---|
+| install / upgrade / rollback | `{ ok: true, lock }` | `PiMarketInstallResult` | UI 读 `result.ok` 永远是 `undefined` → **每次安装被当成失败** |
+| audit | `{ events }` | `{ entries }` | 审计列表永远空 |
+| 条目类型 | 缺 `manifest` / `installedVersion` / `updateAvailable` | `PiMarketEntryView` | 卡片读不到已安装状态 |
+| audit action 联合 | 含 `uninstall` / `scan` | `install` / `upgrade` / `rollback` / `refresh` | 穷举 switch 漏分支 |
+
+为什么 `tsc` 一直是绿的:这些 wrapper **R18 之后没有任何 UI 消费**,只在内部互相引用。
+处理方式:
+
+- 新增 `packages/shared/openbuddy-types/src/pi-market.ts` 作为**唯一**线契约
+  (kind / capability / 条目视图 / 安装结果 / lockfile / 审计 / 源状态 / 刷新报告),
+  main 与 renderer 双向 re-export;
+- 新增 `src/lib/pi-market/__tests__/pi-market-client.test.ts`:把 wrapper 接到**真实
+  bridge handler** 上(`window.api.invoke` 转发到 `createPiMarketHandlers`),断言
+  「返回值的形状 == UI 真正会读的字段」。这类漂移以后不可能再"活着通过检查"。
+
+### R32.2 多源 registry:`sources.json` + 权重合并 + 单源离线缓存
+
+配置优先级(同 id 先出现的赢):显式 `options.sources` > `registryUrl` /
+`OPENBUDDY_PI_MARKET_REGISTRY_URL` > `OPENBUDDY_PI_MARKET_SOURCES` >
+`<dataDir>/pi-extensions/sources.json`。
+
+合并规则刻意窄(可预测优先于聪明):权重从大到小、同权重保持声明顺序;同 id
+**只有第一个源赢,不做字段级合并**;低权重源独有 id 照常收录,输的源记进
+winner 的 `alsoOfferedBy`(UI 标「亦有镜像」)。「官方源掉线时镜像接管」不需要额外规则。
+
+离线兜底:每源一份 `<dataDir>/pi-extensions/sources/<id>.json` 独立缓存(不挤进
+`registry.json` —— 后者是"合并视图",缓存是"某源上次成功返回的原始内容");
+单源默认超时 8000ms(**多源下超时是必需品**,否则一个卡死的源拖住整次刷新);
+拉取失败退回该源缓存(`state: "cached"`),全部失败且无缓存才抛 `invalid-registry`;
+本地 `registry.json` 存在时优先,远端源标 `skipped` 且不触网。
+
+**产品立场:默认不内置任何远端源 —— 没配置 = 不联网。**
+
+### R32.3 错误码穿过 IPC
+
+`ipcRenderer.invoke` 只透传 message,挂在 Error 上的 `code` 到不了渲染端,而 UI 必须
+区分「需要高风险同意」/「宿主版本不兼容」/「载荷被外部改写」这三种补救动作完全不同的
+失败。做法:`PiMarketBridgeError` 的 message 统一由 `formatPiMarketError(code, detail)`
+生成(`pi-market[<code>]: <detail>`),渲染端 `parsePiMarketError()` 取回。
+
+UI 里**只有 `describePiMarketError()` 一处**读错误码,单测穷举
+`PI_MARKET_ERROR_CODES` 保证每个码都有专门分支(不会静默落进兜底)。顺带的好处:
+审计里的 `reason` 现在也带码,机器可解析。
+
+### R32.4 UI 落地:市场面板顶部的「Pi 扩展」区块
+
+`packages/ui/openbuddy-ui-mcp/src/PiExtensionsSection.tsx`(挂在 `MarketplacePanel` 之上)。
+
+- **为什么分区块不合表**:MarketplacePanel 走 pi 官方 marketplace(`x.ai/marketplace/*`),
+  数据模型、安装语义、失败模式都不同;两者共享的只有 `marketplace-panel` 的排版约定。
+- 表现层**复用** ui-modules 的 `MarketplaceTab` / `InstallDialog` /
+  `CapabilityVersionBadge`(不重造卡片/对话框),纯逻辑在 `pi-extensions-model.ts`
+  (不 import React / IPC,可直接单测)。
+- 状态自持:加载 / 刷新 / 安装对话框 / 错误码 → 补救动作;宿主只给一个 `onToast`。
+- 没配源时给「源该写在哪里」的空态(`pi-extensions/sources.json` /
+  `OPENBUDDY_PI_MARKET_SOURCES`),而不是渲染一个坏掉的空列表。
+- 顶部来源 chips 优先用刷新报告里的权威每源状态(`fresh` / `cached` / `failed` / `skipped`),
+  没刷新过就从条目的 `sourceId` 反推计数 —— 不为画几个 chip 强制联网。
+- `cached` 与 `failed` 分开提示:前者是「可用但旧了」,后者要用户去修源,混成一句会
+  让用户以为市场坏了。
+
+### R32.5 收口时查出的三个真 bug
+
+1. **`normalizeRegistryFile` 重复定义**:`createPiMarketBridge` 作用域里被声明了两次
+   (前一轮编辑留下的),靠函数提升"碰巧"还能工作。已删掉重复定义。
+2. **本地索引条目不写 `sourceId`**:文档写的契约是「本地 `registry.json` 提供时是
+   `local`」,实现里只有多源合并路径才写 —— 渲染端两条读路径拿到的东西不一致。
+   现在 `toMarketEntry()` 统一回落 `"local"`,同时修掉 `PiMarketRefreshReport.failed`
+   的注释(`cached` 也会进这个字段,不只是 `failed`)。
+3. **两条 Pi 市场探针在第 7 步假失败**:`_probe-pi-market-install.mjs` 与
+   `_probe-pi-market-r18-runtime.mjs` 在 `page.evaluate` 里 `import("node:fs/promises")`
+   —— 渲染进程开不了 `node:fs`(sandbox + contextIsolation),整条探针在那里崩掉。
+   也就是说 R18 文档里"文件系统落盘结构"那一节**从来没有被真机验证过**。改成 node
+   侧读盘后,两条探针 7 步全绿(lockfile / current 指针 / audit 行数都对得上)。
+   另外 `electron.vite.config.ts` 的 ui-* alias 生成补了**按长度从长到短稳定排序**:
+   之前只把 `/client`、`/invariant` 提前,遇上 `components` 与
+   `components/InstallDialog` 这种互相为前缀的 subpath,短的先命中会拼出
+   `.../components/index.ts/InstallDialog` 报 ENOTDIR(这正是 R32 第一次
+   `electron-vite build` 失败的原因)。
+
+### R32.6 测试
+
+| 文件 | 条数 | 覆盖 |
+|---|---|---|
+| `pi-market-multi-source.test.ts` | 22 | 权重 / 去重 / provenance / 缓存落盘 / 单源掉线 / 全掉线 / 超时 / 本地优先 / 单源兼容 |
+| `pi-market-bridge.test.ts` | 42 | bridge 原有行为(零回归) |
+| `pi-market-client.test.ts` | 11 | wrapper 接真 handler:返回值形状 / 错误码穿透 / channel 表逐条一致 |
+| `pi-extensions-model.test.ts` | 17 | 投影 / 安装状态 / 分组 / 来源 chips / 错误码表穷举 |
+| `pi-extensions-section.test.tsx` | 6 | 空态 / 来源展示 / 刷新 / 安装对话框 / 高风险拒绝留在对话框 |
+| `_probe-r32-pi-market-ui.{mjs,test.mjs}` | 真机 + 6 | 真实用户路径:两个真 HTTP 源 + 一个死源 → 权重合并 → 来源 chips → 点安装 → lockfile 落盘 |
+
+文档:`docs/PLUGIN_MARKETPLACE.md` 新增第 8 节(多源配置 + 合并语义 + 离线行为 +
+错误码表 + UI 落点);R18 的接线片段更新为 R32 的 `resolvePiMarketSources()` 版本
+(不传 `sources` 时 `sources.json` 与环境变量都不会被读到)。
+
 ## 后续计划(优先级排序)
 
-1. **R32 — Pi 扩展市场多源 registry**(原 R25):当前单源,多源 + 权重 + 离线缓存;
-   `agent:pi-market-*` 七个 channel 已就位,只需扩 registry 层。
-2. **加固项**:`details` 导轨与右侧工作面板(ToolSidePanel)在窄窗口下的避让;
+1. **加固项**:`details` 导轨与右侧工作面板(ToolSidePanel)在窄窗口下的避让;
    真实会话里"编辑产物 → 保存"的端到端截图。
+2. **可选**:把第二条总线(renderer contributions)也纳入同一张 registry 视图,
+   让插件作者在一个地方看到两条总线的全部插入点。
 
 ## 用户可见的差距分析(与 WorkBuddy 对比)
 

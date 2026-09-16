@@ -159,7 +159,11 @@ import { registerMiscIpc } from "./misc";
 import { registerAuditIpc } from "./audit";
 import { registerDataDirIpc } from "./data-dir";
 // R18 / Phase D — Expert Marketplace Bridge (Pi 扩展市场)
-import { createPiMarketBridge, registerPiMarketBridgeIpc } from "../agent/pi-market-bridge";
+import {
+  createPiMarketBridge,
+  registerPiMarketBridgeIpc,
+  resolvePiMarketSources,
+} from "../agent/pi-market-bridge";
 import { app } from "electron";
 
 // Phase A.1 — pi-bridge exposes pi-coding-agent text / image / skill
@@ -1129,6 +1133,14 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	//   `agent:pi-market-{list,refresh,install,upgrade,rollback,lockfile,audit}`
 	//   七个 channel 提供版本化安装 + 原子提交 + 锁文件 + 审计 + 回滚。
 	const dataDir = app.getPath("userData");
-	const piMarketBridge = createPiMarketBridge({ dataDir, hostVersion: "0.15.0" });
+	// R32 — 多源索引:显式配置 > 环境变量 > `<dataDir>/pi-extensions/sources.json`。
+	// **默认不内置任何远端源**(本地优先 / 数据自决:没配置 = 不联网);源清单在
+	// 启动时定下来,避免"读盘读到一半文件被改"的不确定性。
+	const piMarketSources = await resolvePiMarketSources({ dataDir });
+	const piMarketBridge = createPiMarketBridge({
+		dataDir,
+		hostVersion: "0.15.0",
+		sources: piMarketSources,
+	});
 	registerPiMarketBridgeIpc(piMarketBridge, ipcMain);
 }

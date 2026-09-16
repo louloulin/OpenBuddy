@@ -12,6 +12,8 @@
     "./invariant": "./src/invariant.ts"
   },
   "dependencies": {
+    "@openbuddy/shared-types": "workspace:*",
+    "@openbuddy/ui-modules": "workspace:*",
     "@tanstack/react-virtual": "^3.14.10"
   },
   "peerDependencies": {

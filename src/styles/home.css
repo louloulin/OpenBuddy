@@ -3749,6 +3749,137 @@
 }
 
 /* ========================================================================
+ * PiExtensionsSection — 「Pi 扩展」区块(R32 / Expert Marketplace Bridge)
+ *
+ * 排版刻意跟 `.marketplace-panel` 的既有约定对齐:区块本身不加内边距,
+ * 由父级的 `> *:not(__header)` 规则统一给 24px,这样两张列表的左边线在同一条竖线上。
+ * ===================================================================== */
+.pi-ext {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--wb-border-subtle, var(--wb-border-default));
+}
+.pi-ext__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pi-ext__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.pi-ext__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pi-ext__stat {
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.pi-ext__btn {
+  padding: 6px 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  cursor: pointer;
+}
+.pi-ext__btn:hover:not(:disabled) { border-color: var(--wb-brand); }
+.pi-ext__btn:disabled { opacity: 0.5; cursor: default; }
+
+.pi-ext__sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pi-ext__source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 999px;
+  background: var(--wb-bg-secondary);
+  font-size: 11px;
+  color: var(--wb-text-medium);
+}
+.pi-ext__source-count {
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.pi-ext__source-chip--fresh { border-color: var(--wb-brand); }
+.pi-ext__source-chip--cached { border-color: var(--wb-warning, #d97706); }
+.pi-ext__source-chip--failed { border-color: var(--wb-danger, #dc2626); color: var(--wb-danger, #dc2626); }
+.pi-ext__source-chip--skipped { opacity: 0.7; }
+
+.pi-ext__warning {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  background: rgba(217, 119, 6, 0.08);
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.pi-ext__error {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(220, 38, 38, 0.28);
+  background: rgba(220, 38, 38, 0.08);
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.pi-ext__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--wb-text-weak);
+  line-height: 1.6;
+}
+.pi-ext__empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px dashed var(--wb-border-default);
+  border-radius: 10px;
+  background: var(--wb-bg-secondary);
+}
+.pi-ext__empty-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.pi-ext__empty-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--wb-text-medium);
+}
+.pi-ext__empty-hint code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  font-size: 11px;
+}
+
+/* ========================================================================
  * AgentMailSettingsPanel — 会话通知中心
  * ===================================================================== */
 

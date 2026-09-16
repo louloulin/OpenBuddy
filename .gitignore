@@ -44,6 +44,10 @@ docs/*
 !docs/enterprise-live-verification-2026-08-31.md
 !docs/publish-checklist-v0.15.0.md
 !docs/THEMES.md
+# R32 — 这两篇被文档站点 DOC_INDEX 引用(站点侧边栏/路由的唯一来源),
+# 但从来没进版本库:站上能读到,仓库里却找不到,改坏了也没人拦。
+!docs/PLUGIN_MARKETPLACE.md
+!docs/AGENT_HOST_MICROKERNEL.md
 !docs/enterprise-live-verification-2026-08-30.md
 !docs/enterprise-live-verification-2026-08-29.md
 !docs/tauri-grok-removal-and-cordis-adoption.md

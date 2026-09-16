@@ -74,8 +74,10 @@ const runtime = await page.evaluate(async () => {
 });
 console.log("\nRUNTIME_BRIDGE_STATE:", JSON.stringify(runtime, null, 2));
 
-// 通过 filesystem 验证 plugin 还在
-const fsCheck = await page.evaluate(async ({ userData }) => {
+// 通过 filesystem 验证 plugin 还在 —— 走 node 侧读盘:渲染进程开不了 `node:fs`
+// (sandbox + contextIsolation),之前在 page.evaluate 里 import 会抛
+// "Failed to fetch dynamically imported module" 让探针在这里崩掉。R32 修掉这个假失败。
+const fsCheck = await (async ({ userData }) => {
   const fs = await import("node:fs/promises");
   const out = {};
   try {
@@ -84,7 +86,7 @@ const fsCheck = await page.evaluate(async ({ userData }) => {
     out.pluginJson = await fs.readFile(`${userData}/pi-extensions/demo.pi-sample/1.0.0/openbuddy.plugin.json`, "utf8");
   } catch (e) { out.error = String(e.message); }
   return out;
-}, { userData });
+})({ userData });
 console.log("\nRUNTIME_FS:", JSON.stringify(fsCheck, null, 2));
 
 // 关掉
