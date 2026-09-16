@@ -127,6 +127,12 @@ body[data-vscode-theme-name="IDE Light"] {
   --wb-color-text-warning-default: var(--wb-palette-orange-8);
   --wb-color-text-warning-hover: var(--wb-palette-orange-7);
   --wb-brand-primary: var(--wb-palette-brand-8);
+  /* 2026-09-16 修复 —— `--wb-brand` 短别名此前只定义在 src/styles/global.css,
+   * 而 globals.css 从未 @import global.css, 导致运行时该变量为空字符串,
+   * 全仓 513 处 `var(--wb-brand, <fallback>)` 全部回退到旧版蓝紫 #5b5fc7,
+   * 品牌青绿 #00C29A 从未生效。把短别名补齐到 tokens.css(实际被加载)。 */
+  --wb-brand: var(--wb-brand-primary);
+  --wb-accent: var(--wb-brand-primary);
   --wb-text-strong: var(--wb-color-text-primary);
   --wb-text-medium: var(--wb-color-text-secondary);
   --wb-text-weak: var(--wb-color-text-tertiary);
@@ -154,6 +160,7 @@ body[data-vscode-theme-name="IDE Light"] {
   /* WB 实测：浅色主题下 chip/card 边框 = rgba(0,0,0,0.08)（白底合成后 #EBEBEB）。
    * 早期实现误用 white-alpha，导致白底上边框完全不可见。 */
   --wb-border-default: color-mix(in srgb, var(--wb-palette-black-100) 8%, transparent);
+  --wb-border-soft: rgba(0, 0, 0, 0.08);
   --wb-border-weak: color-mix(in srgb, var(--wb-palette-black-100) 4%, transparent);
   --wb-border-subtle: var(--wb-palette-gray-3);
   --wb-border-strong: var(--wb-color-border-primary);
@@ -278,6 +285,9 @@ body.dark,
   --wb-color-text-warning-default: var(--wb-palette-orange-7);
   --wb-color-text-warning-hover: var(--wb-palette-orange-8);
   --wb-brand-primary: var(--wb-palette-brand-7);
+  /* 暗色主题的品牌短别名 —— 跟随 --wb-brand-primary 切到更亮的青绿 brand-7。 */
+  --wb-brand: var(--wb-brand-primary);
+  --wb-accent: var(--wb-brand-primary);
   --wb-text-strong: var(--wb-color-text-primary);
   --wb-text-medium: var(--wb-color-text-secondary);
   --wb-text-weak: var(--wb-color-text-tertiary);
@@ -301,6 +311,7 @@ body.dark,
   --wb-bg-overlay: var(--wb-palette-black-60);
   /* 暗色主题镜像规则：边框用 white-alpha，在黑底上才可见。 */
   --wb-border-default: color-mix(in srgb, var(--wb-palette-white-100) 12%, transparent);
+  --wb-border-soft: rgba(255, 255, 255, 0.08);
   --wb-border-weak: color-mix(in srgb, var(--wb-palette-white-100) 6%, transparent);
   --wb-border-subtle: color-mix(in srgb, var(--wb-palette-white-100) 6%, transparent);
   --wb-border-strong: var(--wb-color-border-primary);
@@ -398,8 +409,13 @@ body[data-vscode-theme-name="IDE Light"] {
   --wb-badge-success-bg: var(--wb-palette-green-1);
   --wb-badge-success-fg: var(--wb-color-text-success-active);
   --wb-accent-unread: var(--wb-palette-brand-8);
+  /* 主操作胶囊/圆钮(场景 tab 选中态、发送、停止):中性黑底 + 白字。
+     对齐 WorkBuddy 的分段控件观感 —— 品牌青绿只用于强调/激活指示条,
+     不铺在整个实心按钮上。 */
   --wb-bg-pill-active: rgba(0, 0, 0, 0.75);
   --wb-bg-pill-active-hover: rgba(0, 0, 0, 0.82);
+  /* R8.60 — 开关拨杆颜色:跟随主操作填充反转(亮色黑底白拨杆/暗色白底深色拨杆)。*/
+  --wb-toggle-knob: var(--wb-palette-white-100);
   --wb-bg-pill-hover: #fafafa;
   --wb-task-starter-trigger-bg-hover: #ebebeb;
   --wb-quick-action-item-bg-hover: #ebebeb;
@@ -481,6 +497,7 @@ body.dark,
   --wb-accent-unread: var(--wb-color-text-brand-default);
   --wb-bg-pill-active: rgba(255, 255, 255, 0.18);
   --wb-bg-pill-active-hover: rgba(255, 255, 255, 0.22);
+  --wb-toggle-knob: var(--wb-palette-black-90);
   --wb-bg-pill-hover: rgba(255, 255, 255, 0.06);
   --wb-task-starter-trigger-bg-hover: rgba(255, 255, 255, 0.06);
   --wb-quick-action-item-bg-hover: rgba(255, 255, 255, 0.14);
@@ -599,13 +616,34 @@ body.dark,
  * 元数据约定（可选）：在 token 声明前添加 `@usage xxx` 元数据注释。
  */
 /* WB Motion */
+/* R8.9 — added `pop` (160ms overlay fade) / `md` (180ms modal card) /
+   `large` (240ms request modal) to fill the gap between `fast` (120) and
+   `base` (200), and `base` (200) and `slow` (320). All values are
+   overridden to 0ms in the prefers-reduced-motion block below so every
+   component that reads these tokens automatically respects the OS
+   accessibility preference. */
 :root {
   --wb-motion-duration-fast: 120ms;
+  --wb-motion-duration-pop: 160ms;
   --wb-motion-duration-sm: 150ms;
+  --wb-motion-duration-md: 180ms;
   --wb-motion-duration-base: 200ms;
+  --wb-motion-duration-large: 240ms;
   --wb-motion-duration-slow: 320ms;
   --wb-motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --wb-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --wb-motion-duration-fast: 0ms;
+    --wb-motion-duration-pop: 0ms;
+    --wb-motion-duration-sm: 0ms;
+    --wb-motion-duration-md: 0ms;
+    --wb-motion-duration-base: 0ms;
+    --wb-motion-duration-large: 0ms;
+    --wb-motion-duration-slow: 0ms;
+  }
 }
 
 /**
@@ -803,10 +841,6 @@ body.dark,
   color: rgba(254, 215, 170, 0.95) !important;
 }
 
-[data-theme="dark"] .skill-item-toggle-thumb,
-[data-theme="dark"] .sk-toggle-thumb {
-  background-color: #ffffff !important;
-}
 
 [data-theme="dark"] input::placeholder,
 [data-theme="dark"] textarea::placeholder {

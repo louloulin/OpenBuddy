@@ -169,7 +169,7 @@
   transition: border-color 120ms ease;
 }
 .composer-image-attachments__chip:hover {
-  border-color: var(--wb-accent, #3b82f6);
+  border-color: var(--wb-accent, #00c29a);
 }
 .composer-image-attachments__thumb {
   width: 32px;
@@ -200,7 +200,14 @@
   cursor: pointer;
   color: var(--wb-text-medium);
   flex-shrink: 0;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+.composer-image-attachments__remove:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand) 65%, transparent);
+  outline-offset: 1px;
+}
+.composer-image-attachments__remove:active {
+  transform: scale(0.92);
 }
 .composer-image-attachments__remove:hover {
   background: var(--wb-bg-active, #e5e7eb);
@@ -418,7 +425,7 @@
   padding: 10px 12px;
   background: var(--wb-bg-secondary, #fafafa);
   border: 1px solid var(--wb-border-soft, #e5e7eb);
-  border-left: 3px solid var(--wb-accent, #3b82f6);
+  border-left: 3px solid var(--wb-accent, #00c29a);
   border-radius: 8px;
   font-size: 13px;
   color: var(--wb-text-strong);
@@ -432,7 +439,7 @@
 .plan-banner__icon {
   display: inline-flex;
   align-items: center;
-  color: var(--wb-accent, #3b82f6);
+  color: var(--wb-accent, #00c29a);
 }
 .plan-banner__title {
   flex: 1;
@@ -501,7 +508,7 @@
   color: #fff;
 }
 .plan-banner__step--in_progress .plan-banner__step-mark {
-  background: var(--wb-accent, #3b82f6);
+  background: var(--wb-accent, #00c29a);
   color: #fff;
 }
 .plan-banner__step-title {
@@ -533,16 +540,24 @@
 .mention-picker {
   position: absolute;
   z-index: 100;
-  width: 380px;
+  width: 420px;
   max-height: 320px;
   background: var(--wb-bg-primary, #ffffff);
   border: 1px solid var(--wb-border-default);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   font-size: 13px;
+  /* R8.7 — enter animation matching the slash-commands menu. 140ms is
+     short enough to feel snappy on every keystroke; the cubic-bezier
+     is the same "expo-out" curve used by the rest of the popovers. */
+  animation: ob-mention-picker-in var(--wb-motion-duration-fast, 140ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+@keyframes ob-mention-picker-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .mention-picker__header {
   display: flex;
@@ -553,7 +568,9 @@
   color: var(--wb-text-medium);
 }
 .mention-picker__icon {
-  color: var(--wb-accent, #3b82f6);
+  /* R8.61 — Neutral grey so the @ icon doesn't introduce brand
+     colour into the chat input popover. */
+  color: var(--wb-text-medium);
   display: inline-flex;
   align-items: center;
 }
@@ -598,7 +615,9 @@
 }
 .mention-picker__item--active,
 .mention-picker__item:hover {
-  background: var(--wb-bg-hover, #f3f4f6);
+  /* R8.61 — Neutral pill on selected/hover, matching workbuddy's
+     pill-active token. Brand colour reserved for streaming indicators. */
+  background: var(--wb-bg-pill-active);
 }
 .mention-picker__kind-icon {
   display: inline-flex;
@@ -616,14 +635,16 @@
   min-width: 0;
 }
 .mention-picker__kind {
+  /* R8.61 — Neutral chip for the file/folder kind label. */
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--wb-text-medium);
-  background: var(--wb-bg-tertiary, #f3f4f6);
+  background: var(--wb-bg-tertiary);
   padding: 1px 6px;
   border-radius: 4px;
   flex-shrink: 0;
+  font-weight: 500;
 }
 .mention-picker__footer {
   display: flex;
@@ -651,8 +672,11 @@
 }
 [data-theme="dark"] .mention-picker__item--active,
 .dark .mention-picker__item--active,
+[data-theme="dark"] .mention-picker__item--active,
+.dark .mention-picker__item--active,
 .wb-theme--dark .mention-picker__item--active {
-  background: var(--wb-bg-tertiary, #1f2937);
+  /* R8.61 — Dark neutral pill, matching light theme. */
+  background: var(--wb-bg-pill-active);
 }
 
 /* ========================================================================
@@ -1118,6 +1142,16 @@
 .branch-navigator__node-button:hover {
   background: var(--wb-bg-tertiary);
 }
+/* R8.8 — keyboard focus ring on tree nodes. Tree navigation is keyboard-
+   heavy (arrow keys to walk between branches) so the focus state must
+   be visible without breaking the existing active-state outline. */
+.branch-navigator__node-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand) 65%, transparent);
+  outline-offset: 1px;
+}
+.branch-navigator__node-button:active {
+  background: color-mix(in srgb, var(--wb-bg-tertiary) 80%, var(--wb-text-strong, #000) 4%);
+}
 .branch-navigator__node-button--active {
   background: var(--wb-bg-tertiary);
   outline: 1px solid var(--wb-accent);
@@ -1261,9 +1295,9 @@
   cursor: pointer;
 }
 .extension-widgets__action--primary {
-  background: var(--wb-accent);
-  border-color: var(--wb-accent);
-  color: #fff;
+  background: var(--wb-button-primary-bg);
+  border-color: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
 }
 .extension-widgets__action--danger {
   border-color: var(--wb-danger);

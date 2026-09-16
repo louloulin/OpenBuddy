@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState, useCallback, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { MentionPicker } from "./MentionPicker";
-import { Mic, X, type LucideIcon } from "lucide-react";
+import { Mic, Square, X, type LucideIcon } from "lucide-react";
 import { open as openDialog, type ElectronWindowApi } from "@/lib/platform/electron-api";
 import { getCurrentWebview } from "@/lib/platform/electron-api";
 import { ChevronDownIcon, SendPlaneIcon } from "@openbuddy/ui-primitives/icons";
@@ -711,6 +711,37 @@ export function ComposerInner({
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
   const mentionRef = useRef(mention);
   useEffect(() => { mentionRef.current = mention; }, [mention]);
+  // R8.61 - Anchor rect for the @-mention and slash-command popovers.
+  // Rendered via createPortal at document.body level so they are never
+  // clipped by `.wb-composer`'s `overflow: hidden` or covered by sibling
+  // toolbars (the +/skills/file picker row). The rect is recomputed on every
+  // text/cursor change, on window resize, and on scroll of any ancestor.
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const anchorRectRef = useRef<DOMRect | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      if (!anchorRectRef.current ||
+          Math.abs(r.top - anchorRectRef.current.top) > 0.5 ||
+          Math.abs(r.left - anchorRectRef.current.left) > 0.5 ||
+          Math.abs(r.width - anchorRectRef.current.width) > 0.5) {
+        anchorRectRef.current = r;
+        setAnchorRect(r);
+      }
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    if (ro) ro.observe(el);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+      if (ro) ro.disconnect();
+    };
+  }, [text, cursorPos, disabled]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!mentionRef.current) return;
@@ -1076,7 +1107,7 @@ export function ComposerInner({
           open={mention !== null}
           query={mention?.query ?? ""}
           cwd={cwd ?? ""}
-          anchor={{ top: -340, left: 0 }}
+          anchorRect={anchorRect}
           onSelect={handleMentionSelect}
           onDismiss={() => setMention(null)}
         />
@@ -1085,6 +1116,7 @@ export function ComposerInner({
           text={text}
           cursor={cursorPos}
           onPick={handleSlashPick}
+          anchorRect={anchorRect}
         />
         <div className="wb-composer__footer">
           <InputAddMenu
@@ -1171,10 +1203,31 @@ export function ComposerInner({
           {permissionInline && (
             <PermissionPicker onToast={onToast} />
           )}
+          {/* R8.24 — Composer keyboard hint chip (PI-Desktop MessageMeta parity).
+              Visible at-a-glance reminder for the two most-used keys: Enter to
+              send, Shift+Enter to insert a newline. The chip lives on the
+              left side of the footer so it stays visually anchored to the
+              text area, not the action buttons. On phones the chip is
+              hidden via @media (max-width: 540px) since typing shortcuts
+              differ on touch. */}
+          <span
+            className="wb-composer__hint"
+            data-testid="composer-hint"
+            aria-label="Enter 发送，Shift 加 Enter 换行"
+          >
+            <kbd className="wb-composer__hint-key">Enter</kbd>
+            <span className="wb-composer__hint-sep" aria-hidden="true">·</span>
+            <span className="wb-composer__hint-label">发送</span>
+            <span className="wb-composer__hint-divider" aria-hidden="true">/</span>
+            <kbd className="wb-composer__hint-key">Shift+Enter</kbd>
+            <span className="wb-composer__hint-sep" aria-hidden="true">·</span>
+            <span className="wb-composer__hint-label">换行</span>
+          </span>
           <div className="wb-composer__spacer" />
-          {/* 发送前成本预估徽章(对齐 WorkBuddy credit-estimate):纯本地 token 估算,
-              仅在文本非空时显示。不依赖计费后端(BYOK 无计费通道)。 */}
-          {text.trim() && (
+          {/* 发送前成本预估徽章(对齐 WorkBuddy credit-estimate):纯本地 token 估算。
+              仅在估算值有意义(≥100 token)时显示 —— 否则「+7」这类零头会紧贴
+              模型选择器形成噪音,且 WorkBuddy 在该位置本就不渲染任何徽章。 */}
+          {text.trim() && cost.newTokens >= 100 && (
             <span
               className={"wb-composer__cost wb-composer__cost--" + cost.severity}
               title={`预计新增约 ${cost.newTokens} token${
@@ -1247,7 +1300,7 @@ export function ComposerInner({
                 aria-label="停止生成"
                 title="停止生成(若 AI 长时间无响应,可强制中断)"
               >
-                ■
+                <Square size={12} strokeWidth={2.5} aria-hidden="true" />
               </button>
             </>
           ) : (

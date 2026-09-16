@@ -97,7 +97,7 @@
   height: 28px;
   border-radius: 50%;
   background: linear-gradient(135deg, color-mix(in srgb, var(--wb-brand, #00a884) 80%, #6366f1), color-mix(in srgb, var(--wb-brand, #00a884) 55%, #8b5cf6));
-  color: #ffffff;
+  color: #fff;
   font-size: 12px;
   font-weight: 700;
   flex: 0 0 auto;
@@ -632,10 +632,10 @@
   color: var(--wb-text-strong);
 }
 .email-composer__btn--primary {
-  background: var(--wb-brand, #00a884);
-  border-color: var(--wb-brand, #00a884);
-  color: #ffffff;
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--wb-brand, #00a884) 35%, transparent);
+  background: var(--wb-button-primary-bg);
+  border-color: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--wb-text-strong, #000) 8%, transparent);
 }
 .email-composer__btn--primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--wb-brand, #00a884) 88%, #000000);
@@ -770,14 +770,17 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  background: rgba(0, 122, 255, 0.08);
-  border: 2px dashed var(--wb-brand);
+  /* R8.61 — drop indicator tint uses neutral tokens so the chat
+   * input drop zone does not reintroduce brand green. Translucent dark
+   * surface + neutral border, matching workbuddy drop overlay. */
+  background: color-mix(in srgb, var(--wb-text-strong, #000) 6%, transparent);
+  border: 2px dashed var(--wb-border-default);
   border-radius: 16px;
 }
 .wb-composer__dropzone-text {
   font-size: 14px;
   font-weight: 600;
-  color: var(--wb-brand);
+  color: var(--wb-text-strong);
 }
 .wb-composer__input {
   width: 100%;
@@ -790,6 +793,12 @@
   background: transparent;
   color: var(--wb-text-strong);
   min-height: 50px;
+  /* R8.13 — JS caps height at 160px; overflow-y auto lets the user scroll
+     past the cap instead of being silently truncated. Smooth scroll for a
+     polished feel when typing a long prompt. */
+  max-height: 160px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
   box-sizing: border-box;
 }
 .wb-composer--home .wb-composer__input {
@@ -814,6 +823,105 @@
 }
 .wb-composer__spacer {
   flex: 1;
+}
+
+/* R8.24 — Composer keyboard hint chip (PI-Desktop MessageMeta parity).
+   Inline pair of <kbd>+label hints anchoring the user to the two
+   most-used keys: Enter to send, Shift+Enter to insert a newline.
+   Lives on the left side of the footer next to the action buttons
+   so it doesn't compete with the right-side cluster (cost pill,
+   model picker, send button). Brand-tinted background + motion
+   token micro-interactions keep it on-brand without breaking the
+   footer density. */
+.wb-composer__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--wb-bg-tertiary, rgba(0, 0, 0, 0.04));
+  color: var(--wb-text-weak, rgba(0, 0, 0, 0.5));
+  font-size: 11px;
+  line-height: 18px;
+  user-select: none;
+  white-space: nowrap;
+  transition: background var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+              color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.wb-composer__hint:hover {
+  background: color-mix(in srgb, var(--wb-text-strong, #000) 6%, transparent);
+  color: var(--wb-text-strong);
+}
+.wb-composer__hint-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border: 1px solid var(--wb-border-default, rgba(0, 0, 0, 0.1));
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--wb-bg-elevated, #fff);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--wb-text-medium, rgba(0, 0, 0, 0.6));
+  letter-spacing: 0.01em;
+  transition: transform var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.wb-composer__hint:hover .wb-composer__hint-key {
+  transform: translateY(-1px);
+}
+.wb-composer__hint-sep {
+  color: var(--wb-text-tertiary, rgba(0, 0, 0, 0.35));
+  font-size: 10px;
+}
+.wb-composer__hint-label {
+  font-weight: 500;
+  color: var(--wb-text-medium, rgba(0, 0, 0, 0.6));
+}
+.wb-composer__hint:hover .wb-composer__hint-label {
+  color: var(--wb-text-strong);
+}
+.wb-composer__hint-divider {
+  margin: 0 4px;
+  color: var(--wb-text-tertiary, rgba(0, 0, 0, 0.35));
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-composer__hint,
+  .wb-composer__hint-key {
+    transition: none;
+  }
+  .wb-composer__hint:hover .wb-composer__hint-key {
+    transform: none;
+  }
+}
+
+/* R8.24 — Hide the composer keyboard hint on phone-width screens
+   (≤540px). On touchscreens typing shortcuts behave differently
+   (IME, virtual keyboards) so the chip is more confusing than
+   helpful. The desktop+tablet rendering stays unchanged. */
+@media (max-width: 540px) {
+  .wb-composer__hint {
+    display: none;
+  }
+}
+
+/* Dark theme: lift the hint surface so it reads against the
+   dark composer card. Brand-tint background stays brand-coloured
+   but the kbd chips get a darker base. */
+[data-theme="dark"] .wb-composer__hint-key {
+  background: var(--wb-bg-elevated, #2a2a2a);
+  border-color: var(--wb-border-default, rgba(255, 255, 255, 0.12));
+  color: var(--wb-text-medium, rgba(255, 255, 255, 0.7));
+}
+[data-theme="dark"] .wb-composer__hint:hover .wb-composer__hint-label {
+  color: var(--wb-text-strong, #fff);
 }
 /* Expert badge in composer footer (mirrors WorkBuddy's input-area expert tag) */
 .wb-composer__expert-badge {
@@ -882,7 +990,7 @@
   box-shadow: 0 8px 24px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06);
   padding: 6px 0;
   z-index: 1200;
-  animation: iam-fadeIn .15s ease-out;
+  animation: iam-fadeIn var(--wb-motion-duration-sm, 150ms) ease-out;
 }
 @keyframes iam-fadeIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -946,7 +1054,7 @@
   box-shadow: 0 8px 24px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06);
   padding: 6px 0;
   z-index: 1201;
-  animation: iam-fadeIn .12s ease-out;
+  animation: iam-fadeIn var(--wb-motion-duration-fast, 120ms) ease-out;
 }
 .iam-submenu__scroll {
   max-height: 300px;
@@ -976,8 +1084,8 @@
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  background: var(--wb-brand);
-  color: #fff;
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
   font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
@@ -1035,13 +1143,26 @@
   justify-content: center;
   border-radius: var(--wb-radius-lg);
   color: var(--wb-text-medium);
+  /* R8.46 — motion-token transition for hover/active micro-interactions */
+  transition:
+    background var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
 }
 .wb-composer__tool:hover {
   background: var(--wb-bg-hover);
 }
+.wb-composer__tool:active:not(:disabled) {
+  /* R8.18 active-scale parity */
+  transform: scale(0.94);
+}
 .wb-composer__tool--active {
   color: var(--wb-brand);
-  background: rgba(var(--wb-brand-rgb, 0, 122, 255), 0.1);
+  /* R8.46 — Migrate from the legacy rgba(var(--wb-brand-rgb, 0, 122, 255), 0.1)
+     to color-mix on the canonical --wb-brand token. The Apple system
+     blue fallback was leaking into OpenBuddy's theme system; the
+     color-mix approach stays theme-aware. */
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 12%, transparent);
   animation: wb-composer__pulse 1.4s ease-in-out infinite;
 }
 @keyframes wb-composer__pulse {
@@ -1087,8 +1208,12 @@
   cursor: default;
 }
 .wb-composer__send--stop {
+  /* R8.13 — Square icon size is set on the SVG itself (12px). Reset
+     font-size so the container doesn't try to apply 10px to anything
+     else that might leak in. The stop pill stays brand-tinted so users
+     can always find the abort affordance. */
   background: var(--wb-bg-pill-active);
-  font-size: 10px;
+  font-size: 0;
 }
 .wb-composer-meta {
   /* WB: 底部灰条带。margin 横向 -10px 让其扩展到外卡边缘 (与外卡 padding 对消),
@@ -1276,7 +1401,7 @@
   box-shadow:
     0 8px 24px color-mix(in srgb, var(--wb-palette-black-100) 12%, transparent),
     0 2px 8px color-mix(in srgb, var(--wb-palette-black-100) 6%, transparent);
-  animation: permissionPickerFadeIn 0.14s ease-out;
+  animation: permissionPickerFadeIn var(--wb-motion-duration-fast, 140ms) ease-out;
   transform-origin: bottom left;
 }
 @keyframes permissionPickerFadeIn {
@@ -1685,9 +1810,12 @@ body.dark .permission-picker__popover,
 .project-dialog__message { color: var(--wb-text-medium); line-height: 1.6; }
 .proj-picker-body { gap: 6px; }
 .proj-picker-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid var(--wb-border-default, #ececec); border-radius: 8px; background: var(--wb-bg-primary, #fff); font-size: 13px; color: var(--wb-text-medium); cursor: pointer; text-align: left; }
-.proj-picker-item--on { border-color: var(--wb-brand); background: rgba(var(--wb-brand-rgb, 0,122,255), 0.06); }
+.proj-picker-item--on { border-color: var(--wb-brand); background: color-mix(in srgb, var(--wb-brand) 6%, transparent); }
 .proj-picker-check { width: 18px; height: 18px; border: 1px solid var(--wb-border-default, #ccc); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; flex-shrink: 0; }
-.proj-picker-check--on { background: var(--wb-brand); border-color: var(--wb-brand); }
+.proj-picker-check--on {
+  background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
+  border-color: var(--wb-border-default);
+}
 .proj-drawer { width: 520px; }
 .proj-drawer-empty { text-align: center; color: var(--wb-text-tertiary); padding: 24px 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 
@@ -1785,7 +1913,7 @@ body.dark .permission-picker__popover,
 .pd-collaboration__form input:focus, .pd-collaboration__form textarea:focus, .pd-collaboration__form select:focus { border-color: var(--wb-brand); }
 .pd-collaboration__form-row { display: flex; align-items: center; gap: 8px; }
 .pd-collaboration__form-row select { width: auto; min-width: 120px; }
-.pd-collaboration__form-row button, .pd-collaboration__item button { margin-left: auto; border: 1px solid var(--wb-brand); border-radius: 7px; padding: 7px 10px; background: var(--wb-brand); color: #fff; cursor: pointer; font-size: 12px; }
+.pd-collaboration__form-row button, .pd-collaboration__item button { margin-left: auto; border: 1px solid var(--wb-button-primary-bg); border-radius: 7px; padding: 7px 10px; background: var(--wb-button-primary-bg); color: var(--wb-button-primary-fg); cursor: pointer; font-size: 12px; }
 .pd-collaboration__form-row button:disabled { opacity: .5; cursor: default; }
 .pd-collaboration__workflow-form { margin-top: 12px; }
 .pd-collaboration__form-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -2452,11 +2580,17 @@ body.dark .permission-picker__popover,
   color: var(--wb-text);
   font-size: 12px;
   outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  /* R8.48 — migrate to R8.9 motion tokens for consistency. */
+  transition:
+    border-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
 }
 .sidebar__search-input:focus-visible {
-  border-color: var(--wb-accent, #3b82f6);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wb-accent, #3b82f6) 28%, transparent);
+  /* R8.48 — Migrate from the legacy --wb-accent (cool blue) to the
+     canonical --wb-brand token so the focus state stays in lock-step
+     with the chatview tool buttons + jump-bottom button. */
+  border-color: var(--wb-brand, #00c29a);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wb-brand, #00c29a) 28%, transparent);
 }
 .sidebar__search-input::placeholder {
   color: var(--wb-text-low);
@@ -2468,8 +2602,10 @@ body.dark .permission-picker__popover,
   align-items: center;
   gap: 8px;
   border-radius: var(--wb-radius-md);
-  background: color-mix(in srgb, var(--wb-accent, #3b82f6) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--wb-accent, #3b82f6) 24%, transparent);
+  /* R8.49 — Migrate the bulk-toolbar background from --wb-accent
+     (legacy blue) to --wb-brand for token consistency. */
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 24%, transparent);
 }
 .sidebar__bulk-count {
   flex: 1;
@@ -2492,7 +2628,9 @@ body.dark .permission-picker__popover,
   background: var(--wb-bg-hover);
 }
 .sidebar__bulk-btn:focus-visible {
-  outline: 2px solid var(--wb-accent, #3b82f6);
+  /* R8.49 — Migrate the bulk-btn focus outline from --wb-accent
+     to --wb-brand for token consistency with the search input. */
+  outline: 2px solid var(--wb-brand, #00c29a);
   outline-offset: 1px;
 }
 .sidebar__bulk-btn--danger {

@@ -67,8 +67,8 @@
 .project-template-card__action {
   margin-top: auto;
   padding: 6px 12px;
-  background: var(--wb-accent, #4d8eff);
-  color: white;
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
   border: none;
   border-radius: 6px;
   font-size: 12px;
@@ -175,17 +175,32 @@
   outline: none;
 }
 .wb-composer:focus-within {
-  /* WB: 即使输入框自动聚焦, 外卡 + 内卡的边框都保持 #EBEBEB, 不上深。
-   * 仅额外加一圈极淡的中性灰呼吸供键盘 a11y (WCAG 2.4.7) 识别,
-   * 完全不引入品牌色,避免再次出现"像表单校验报错"的视觉误读。 */
-  border-color: var(--wb-border-default);
+  /* R8.29 — Migrate the focus ring to a soft brand-tinted glow so the
+     input area feels "alive" when focused (parity with ChatGPT's
+     composer focus glow). The brand tint replaces the previous
+     text-strong mix that was a plain neutral grey; the brand
+     glow is now ~6% alpha — low enough to read as a halo, not as a
+     validation error. WCAG 2.4.7 keyboard focus remains satisfied
+     because the 4px halo + 1px border combine into a clearly
+     visible focus indicator against the resting surface. */
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 30%, var(--wb-border-default));
   box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--wb-text-strong) 6%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--wb-brand, #00c29a) 10%, transparent),
+    0 2px 8px color-mix(in srgb, var(--wb-brand, #00c29a) 6%, transparent),
     0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: box-shadow var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+              border-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
 }
 [data-theme="dark"] .wb-composer:focus-within {
-  border-color: var(--wb-border-default);
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 45%, var(--wb-border-default));
   box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--wb-text-strong) 14%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--wb-brand, #00c29a) 18%, transparent),
+    0 2px 12px color-mix(in srgb, var(--wb-brand, #00c29a) 10%, transparent),
     0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-composer:focus-within {
+    transition: none;
+  }
 }

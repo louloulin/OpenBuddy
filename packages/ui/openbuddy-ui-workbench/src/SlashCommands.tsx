@@ -4,6 +4,7 @@
  * 数据来自 pi 的 `x.ai/commands/list`（builtin + skills + plugins 注入的命令）。
  * 用户选中后会把命令名插入到 Composer 输入框。
  */
+import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { commandsList } from "@/lib/agent/pi-client";
 import type { SlashCommand } from "@openbuddy/shared-types";
@@ -16,9 +17,14 @@ interface SlashCommandsProps {
   cursor: number;
   /** 选中某命令时的回调，参数是完整命令文本（如 "/commit"）。 */
   onPick: (command: string) => void;
+  /** Textarea bounding rect (viewport coords). When provided, the menu is
+   *  portaled to document.body with fixed positioning so it is never clipped
+   *  by the composer input card's `overflow: hidden` and always floats above
+   *  sibling toolbars (e.g. the + / skills / file picker row). */
+  anchorRect?: DOMRect | null;
 }
 
-export function SlashCommands({ text, cursor, onPick }: SlashCommandsProps) {
+export function SlashCommands({ text, cursor, onPick, anchorRect }: SlashCommandsProps) {
   const [commands, setCommands] = useState<SlashCommand[]>([]);
 
   // R1 - native Pi commands that should always appear in the picker so the
@@ -90,8 +96,30 @@ export function SlashCommands({ text, cursor, onPick }: SlashCommandsProps) {
 
   if (!visible) return null;
 
-  return (
-    <div className="slash-commands" role="listbox">
+  return createPortal(
+    <div
+      className="slash-commands"
+      role="listbox"
+      style={
+        anchorRect
+          ? {
+              // Portal mode: disable CSS positioning (bottom/right/max-height
+              // defined for absolute layout) and reposition as a fixed popup
+              // anchored above the textarea. `maxHeight` is bounded by the
+              // space above the textarea so the menu never overflows the
+              // viewport top.
+              position: "fixed",
+              top: Math.max(8, anchorRect.top - 6 - Math.min(320, Math.max(120, anchorRect.top - 14))),
+              left: anchorRect.left + 12,
+              width: Math.max(280, anchorRect.width - 24),
+              bottom: "auto",
+              right: "auto",
+              maxHeight: Math.min(320, Math.max(120, anchorRect.top - 14)),
+              zIndex: 1100,
+            }
+          : undefined
+      }
+    >
       <div className="slash-commands__header">命令（来自 pi 内置/技能/插件）</div>
       <ul className="slash-commands__list">
         {matches.slice(0, 12).map((cmd, idx) => (
@@ -128,7 +156,8 @@ export function SlashCommands({ text, cursor, onPick }: SlashCommandsProps) {
           </li>
         ))}
       </ul>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

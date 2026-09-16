@@ -21,7 +21,7 @@
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06);
   font-size: 13px;
-  animation: ob-slash-menu-in 140ms var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: ob-slash-menu-in var(--wb-motion-duration-fast, 140ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 
 @keyframes ob-slash-menu-in {
@@ -63,11 +63,41 @@
   color: var(--wb-text-strong);
   text-align: left;
   cursor: pointer;
-  transition: background var(--wb-duration-fast, 120ms) ease;
+  /* R8.26 — Migrate to the R8.9 motion tokens for consistency with
+     the rest of the chat UI. The legacy --wb-duration-fast fallback
+     preserves the existing 120ms feel for any theme that hasn't
+     adopted the new tokens. */
+  transition: background var(--wb-motion-duration-fast, var(--wb-duration-fast, 120ms)) var(--wb-ease-out-expo, ease),
+              color var(--wb-motion-duration-fast, var(--wb-duration-fast, 120ms)) var(--wb-ease-out-expo, ease),
+              padding-left var(--wb-motion-duration-fast, var(--wb-duration-fast, 120ms)) var(--wb-ease-out-expo, ease);
 }
 
-.slash-commands__item--active,
+/* R8.26 — Hover gets a neutral surface lift, distinct from the brand-
+   tinted active state below. Keyboard users can tell at a glance which
+   item is "selected" vs "hovered with the mouse". */
 .slash-commands__item:hover {
+  background: var(--wb-bg-hover);
+  padding-left: 12px;
+}
+
+/* R8.61 — Active item (keyboard-selected) gets a neutral pill
+   background + 3px left bar in the same neutral as the workbuddy-parity
+   pill-active token. Brand colours are reserved for status/streaming
+   accents, not for "selected row" affordances inside a chat popover. */
+.slash-commands__item--active {
+  background: var(--wb-bg-pill-active);
+  color: var(--wb-text-strong);
+  padding-left: 13px;
+  /* 3px left bar uses the brand token ONLY as a single accent indicator,
+     matching the workbuddy-parity selected-pill pattern (subtle inset
+     bar on the left so the row reads as "selected" without colouring the
+     whole surface). */
+  box-shadow: inset 3px 0 0 0 var(--wb-bg-pill-active);
+}
+
+.slash-commands__item--active:hover {
+  /* Active + hover: keep the neutral pill but slightly stronger so the
+     user still sees that hovering is meaningful. */
   background: var(--wb-bg-hover);
 }
 
@@ -81,11 +111,14 @@
 }
 
 .slash-commands__adapter-badge {
+  /* R8.61 — Neutral pill so the small "Adapter" label inside a
+     slash-command item doesn't reintroduce brand colour into the chat
+     input popover. */
   padding: 1px 6px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--wb-brand-primary) 36%, transparent);
-  background: color-mix(in srgb, var(--wb-brand-primary) 12%, transparent);
-  color: var(--wb-brand-primary);
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-text-medium);
   font-family: var(--wb-font-sans, system-ui), sans-serif;
   font-size: 10px;
   line-height: 15px;
@@ -110,5 +143,12 @@
 @media (prefers-reduced-motion: reduce) {
   .slash-commands {
     animation: none;
+  }
+  /* R8.26 — Disable the item's padding-left shift on hover/active when
+     reduced-motion is requested. The user still gets the colour change
+     (instant) but no positional jitter. */
+  .slash-commands__item:hover,
+  .slash-commands__item--active {
+    padding-left: 10px;
   }
 }

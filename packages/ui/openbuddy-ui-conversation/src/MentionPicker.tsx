@@ -12,6 +12,7 @@
  * position, the current query (the text after the @), and a callback for
  * when a result is selected. The Composer owns the textarea state.
  */
+import { createPortal } from "react-dom";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileTextIcon, FolderIcon, AtIcon } from "@openbuddy/ui-primitives/icons";
 import { workspaceSearch, type OpenBuddyWorkspaceHit } from "@/lib/agent/pi-client";
@@ -22,8 +23,8 @@ export interface MentionPickerProps {
   query: string;
   /** Workspace root to search within. */
   cwd: string;
-  /** Position the picker should anchor to (textarea-relative). */
-  anchor?: { top: number; left: number };
+  /** Textarea bounding rect (viewport coords). Used to anchor the picker as a fixed-position portal. */
+  anchorRect?: DOMRect | null;
   onSelect: (hit: OpenBuddyWorkspaceHit) => void;
   onDismiss: () => void;
 }
@@ -32,7 +33,7 @@ export const MentionPicker = memo(function MentionPicker({
   open,
   query,
   cwd,
-  anchor,
+  anchorRect,
   onSelect,
   onDismiss,
 }: MentionPickerProps) {
@@ -111,18 +112,22 @@ export const MentionPicker = memo(function MentionPicker({
     if (item) item.scrollIntoView({ block: "nearest" });
   }, [activeIndex]);
 
+  // Render as a fixed-position portal so the picker is never clipped by
+  // ancestor `overflow: hidden` (composer input card) and always sits above
+  // sibling toolbars. The picker floats ~340px above the textarea top.
   const style = useMemo<React.CSSProperties>(() => {
-    if (!anchor) return { display: "none" };
+    if (!anchorRect) return { display: "none" };
     return {
-      position: "absolute",
-      top: anchor.top,
-      left: anchor.left,
+      position: "fixed",
+      top: anchorRect.top - 340,
+      left: anchorRect.left,
+      zIndex: 1100,
     };
-  }, [anchor]);
+  }, [anchorRect]);
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="mention-picker" style={style} role="listbox" aria-label="工作空间搜索">
       <div className="mention-picker__header">
         <span className="mention-picker__icon" aria-hidden="true">
@@ -163,6 +168,7 @@ export const MentionPicker = memo(function MentionPicker({
         <span><kbd>Enter</kbd> 选择</span>
         <span><kbd>Esc</kbd> 关闭</span>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 });

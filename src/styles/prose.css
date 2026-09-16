@@ -11,7 +11,11 @@
   gap: 4px;
   margin-top: 4px;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  /* R8.18 — drive the hover fade through the R8.9 motion tokens so
+   * the timing stays coherent with the rest of the chat UI. The
+   * 80ms fade-delay also matches PI-Desktop: a snappier reveal than
+   * 150ms makes the row feel like it was always there, just hidden. */
+  transition: opacity var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
   justify-content: flex-end;
 }
 .msg:hover .msg__actions {
@@ -29,36 +33,280 @@
   gap: 4px;
   margin-top: 6px;
   opacity: 0.55;
-  transition: opacity 0.15s ease;
+  /* R8.56 — Migrate the footer opacity transition from the legacy
+     `0.15s ease` shorthand to the canonical R8.9 motion tokens
+     (duration-fast + ease-out-expo) so the timing stays coherent
+     with the rest of the chat UI. */
+  transition: opacity var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
 }
 .msg:hover .msg__footer,
 .msg__footer:focus-within {
   opacity: 1;
 }
-.msg__footer .msg__action-btn {
-  border-color: transparent;
-  background: transparent;
+@media (prefers-reduced-motion: reduce) {
+  .msg__footer {
+    transition: none;
+  }
 }
-.msg__footer .msg__action-btn:hover {
-  border-color: var(--wb-border-default);
-  background: var(--wb-bg-primary);
+/* R8.11 — footer buttons inherit the icon-first .msg__action-btn base;
+
+/* R8.16 — smooth streaming→complete transition. When an assistant
+ * message finalises (its `streaming` flag flips off), MessageItem
+ * stamps a `.msg--just-completed` class for ~320ms. The keyframe
+ * below fades the bubble in (opacity 0 → 1) and slides it up
+ * (translateY 6px → 0). Uses the R8.9 motion tokens so the easing
+ * stays coherent with the rest of the chat UI. */
+.msg--just-completed {
+  animation: msg-just-completed-enter var(--wb-motion-duration-base, 240ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
+@keyframes msg-just-completed-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg--just-completed {
+    animation: none;
+  }
+}
+/* R8.14 — per-message meta chip. Renders a single thin line below the
+   message body with relative timestamp + (for assistant turns) the
+   generation duration. Lives outside the hover-action row so it stays
+   visible at all times — the chip is a glanceable affordance, not a
+   hover-reveal detail. */
+.msg__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--wb-text-weak, rgba(0, 0, 0, 0.5));
+  opacity: 0.55;
+  user-select: none;
+  transition: opacity var(--wb-motion-duration-fast, 120ms) var(--wb-ease-standard, ease-out);
+}
+.msg__meta--user {
+  margin-top: 3px;
+  font-size: 10px;
+  opacity: 0.45;
+}
+.msg:hover .msg__meta,
+.msg__meta:focus-within {
+  opacity: 0.95;
+}
+.msg__meta--streaming {
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 80%, var(--wb-text-strong, #000) 10%);
+  opacity: 0.85;
+  /* R8.9 motion token — the pulse animation re-uses the standard
+     duration so it stays coherent with the rest of the chat UI. */
+  animation: msg-meta-pulse var(--wb-motion-duration-slow, 1200ms) var(--wb-ease-in-out, ease-in-out) infinite;
+}
+.msg__meta-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+.msg__meta-time {
+  font-variant-numeric: tabular-nums;
+}
+.msg__meta-detail {
+  margin-left: 2px;
+  color: var(--wb-text-weak, rgba(0, 0, 0, 0.45));
+  font-variant-numeric: tabular-nums;
+}
+/* R8.15 — model-id + token-throughput pills inside the meta chip.
+ * Mirrors PI-Desktop `.message-meta-chip`: small rounded pill that
+ * renders the producing model + a tok/s throughput estimate. Sits on
+ * the same baseline as the timestamp, separated by a hairline gap. */
+.msg__meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--wb-text-strong, #000) 6%, transparent);
+  color: var(--wb-text-medium, rgba(0, 0, 0, 0.65));
+  font-size: 10px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  max-width: 180px;
+}
+.msg__meta-chip--model {
+  /* Brand-tinted variant for the model name. Reads as a tag without
+     fighting the timestamp for visual weight. */
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 10%, transparent);
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 92%, var(--wb-text-strong, #000) 8%);
+}
+.msg__meta-chip--throughput {
+  /* Neutral surface — the throughput number stands on its own. */
+  background: color-mix(in srgb, var(--wb-text-strong, #000) 7%, transparent);
+}
+.msg__meta-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msg__meta-chip svg {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+@keyframes msg-meta-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg__meta--streaming {
+    animation: none;
+  }
+}
+   the hover state above already paints a subtle bg. No border tinting. */
+/* R8.11 — message action buttons now follow the icon-first pattern used
+   by PI-Desktop `.copy-btn.icon` and cabinet's CopyButton: a 26×26 square
+   that hides its label behind a CSS tooltip. Legacy text-based labels
+   still work (any direct child text renders inside the button), but
+   the modern TooltipButton component is the recommended entry point. */
 .msg__action-btn {
-  padding: 2px 8px;
-  border: 1px solid var(--wb-border-default);
-  background: var(--wb-bg-primary);
-  border-radius: 4px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 6px;
   font-size: 11px;
   color: var(--wb-text-medium);
   cursor: pointer;
-  line-height: 1.4;
+  line-height: 1;
+  transition:
+    background-color var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-color var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    color var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
 }
 .msg__action-btn:hover {
-  border-color: var(--wb-brand);
-  color: var(--wb-brand);
+  background: var(--wb-bg-hover, color-mix(in srgb, var(--wb-text-strong) 8%, transparent));
+  color: var(--wb-text-strong);
 }
 .msg__action-btn:active {
   transform: scale(0.96);
+}
+.msg__action-btn:disabled,
+.msg__action-btn[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.msg__action-btn--danger:hover {
+  color: var(--wb-status-error, #d93b3b);
+  background: color-mix(in srgb, var(--wb-status-error, #d93b3b) 10%, transparent);
+}
+
+/* TooltipButton (R8.11) — shared icon-only button used by MessageItem
+   hover actions and session-level controls. CSS-only tooltip via
+   ::after / data-tooltip attribute (zero React portals / overlays). */
+.tt-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--wb-text-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-color var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    color var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.tt-btn:hover {
+  background: var(--wb-bg-hover, color-mix(in srgb, var(--wb-text-strong) 8%, transparent));
+  color: var(--wb-text-strong);
+}
+.tt-btn:focus-visible {
+  outline: none;
+  border-color: var(--wb-brand, #00c29a);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-brand) 22%, transparent);
+}
+.tt-btn:active {
+  transform: scale(0.94);
+}
+.tt-btn:disabled,
+.tt-btn[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.tt-btn--primary {
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+}
+.tt-btn--primary:hover {
+  background: var(--wb-button-primary-bg-hover);
+  color: var(--wb-button-primary-fg);
+}
+.tt-btn--danger:hover {
+  color: var(--wb-status-error, #d93b3b);
+  background: color-mix(in srgb, var(--wb-status-error, #d93b3b) 10%, transparent);
+}
+
+/* CSS tooltip — appears above (default) or below the button on hover /
+   focus. Uses data-tooltip attribute so JSX stays simple. */
+.tt-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%) translateY(0) scale(0.95);
+  padding: 3px 8px;
+  background: var(--wb-palette-black-100, #000);
+  color: #fff;
+  font-size: 11px;
+  line-height: 14px;
+  white-space: nowrap;
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform var(--wb-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  z-index: 10;
+}
+.tt-btn--top::after {
+  bottom: calc(100% + 6px);
+}
+.tt-btn--bottom::after {
+  top: calc(100% + 6px);
+}
+.tt-btn:hover::after,
+.tt-btn:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+/* When a tooltip button is disabled, hide the tooltip too — users
+   shouldn't see the affordance for an action they can't take. */
+.tt-btn:disabled::after,
+.tt-btn[aria-disabled="true"]::after {
+  display: none;
 }
 /* 消息反馈(对齐 WorkBuddy message-feedback):赞/踩,选中态高亮 */
 .msg__feedback {
@@ -71,9 +319,14 @@
   line-height: 1;
   font-size: 13px;
 }
+/* R8.23 — feedback-btn--active now routes through color-mix on
+ * --wb-brand so dark theme can override the active tint without
+ * per-theme overrides. The 12% alpha is a touch stronger than the
+ * 10% defaults elsewhere because the thumbs-up/thumbs-down row is
+ * already low-contrast. */
 .msg__feedback-btn--active {
-  border-color: var(--wb-brand);
-  background: rgba(0, 122, 255, 0.1);
+  border-color: var(--wb-brand, #00c29a);
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 12%, transparent);
 }
 /* 消息反馈完整评分弹窗(对齐 WorkBuddy message-feedback rating dialog) */
 .feedback-dialog__overlay {
@@ -180,9 +433,9 @@
   border-color: var(--wb-brand);
 }
 .feedback-dialog__btn--primary {
-  background: var(--wb-brand);
-  color: #fff;
-  border-color: var(--wb-brand);
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+  border-color: var(--wb-button-primary-bg);
 }
 .feedback-dialog__btn--primary:hover {
   opacity: 0.9;
@@ -337,7 +590,7 @@
   border-radius: 8px;
   font-size: 11px;
   background: var(--wb-accent-soft, rgba(0, 120, 212, 0.12));
-  color: var(--wb-accent, #0078d4);
+  color: var(--wb-accent, #00c29a);
 }
 /* 文档预览(docx/pptx/sheet) */
 .file-preview__doc-body {
@@ -864,9 +1117,12 @@
   border-color: #d97706;
   color: #d97706;
 }
-/* R6.5 — Floating "jump to bottom" pill. Sticky inside chatview__scroll
-   so it tracks the viewport while the user reads upward. Counter badge
-   uses accent color for legibility. */
+/* R6.5 + R8.41 — Floating "jump to bottom" pill. Sticky inside
+   chatview__scroll so it tracks the viewport while the user reads
+   upward. R8.41 migrates from the legacy --wb-accent token (a
+   cool blue) to the canonical --wb-brand token (parity with the
+   rest of the chat UI). Adds motion-token transitions for the
+   hover state + a brand-tinted box-shadow halo for premium feel. */
 .chatview__jump-bottom {
   position: sticky;
   bottom: 16px;
@@ -879,20 +1135,34 @@
   margin: 0 auto 8px;
   padding: 6px 12px;
   border: 1px solid var(--wb-border-default);
-  background: var(--wb-bg-primary);
+  background: var(--wb-bg-elevated);
   color: var(--wb-text-medium);
   border-radius: 999px;
   font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--wb-text-strong, #000) 6%, transparent);
+  transition:
+    border-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    background var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    transform var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
 }
 .chatview__jump-bottom:hover {
-  border-color: var(--wb-accent);
-  color: var(--wb-accent);
+  border-color: var(--wb-text-strong, #000);
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-primary);
+  transform: translateY(-1px);
+}
+.chatview__jump-bottom:active:not(:disabled) {
+  /* R8.18 active-scale parity — button depresses 0.94x on click */
+  transform: scale(0.94);
 }
 .chatview__jump-bottom-badge {
-  background: var(--wb-accent, #2563eb);
-  color: #fff;
+  /* R8.41 → R8.60 — Migrated to the neutral CTA token. Brand reserved
+     for accent details (status dot, focus ring, left indicator bar). */
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
   padding: 0 6px;
   min-width: 18px;
   height: 18px;
@@ -934,9 +1204,9 @@
 }
 .browser-preview__go {
   padding: 6px 14px;
-  border: 1px solid var(--wb-brand);
-  background: var(--wb-brand);
-  color: #fff;
+  border: 1px solid var(--wb-button-primary-bg);
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
   border-radius: 8px;
   font-size: 12px;
   cursor: pointer;
@@ -980,9 +1250,9 @@
   gap: 8px;
 }
 .kb-panel__add-btn {
-  border: 1px solid var(--wb-brand);
-  background: var(--wb-brand);
-  color: #fff;
+  border: 1px solid var(--wb-button-primary-bg);
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
   border-radius: 6px;
   font-size: 11px;
   padding: 3px 10px;
@@ -1224,8 +1494,8 @@
 }
 /* Composer 流式时的入队按钮 */
 .wb-composer__send--enqueue {
-  background: var(--wb-brand);
-  color: #fff;
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
   border-radius: 8px;
   font-size: 18px;
   font-weight: 700;
@@ -1273,18 +1543,111 @@
   font-weight: 500;
   color: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
 }
+/* R8.12 — assistant avatar. The Sparkles icon + brand-tinted gradient
+   reads as "AI assistant" much more clearly than the old "B" letter. The
+   gradient uses color-mix on the brand token so dark/light themes stay
+   consistent without per-theme overrides. */
 .msg--assistant .msg__avatar {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--wb-brand, #333);
+  border-radius: 8px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--wb-brand, #00c29a) 95%, white 5%),
+    color-mix(in srgb, var(--wb-brand, #00c29a) 70%, #000 5%));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
   color: #fff;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--wb-brand) 25%, transparent);
+  /* R8.44 — When the assistant is actively streaming, the avatar
+     gets a subtle pulse glow so the user sees the model is alive
+     without looking at the streaming caret or status pill. The
+     pulse mirrors the .chatview__status-dot streaming pulse
+     (1.2s ease-in-out infinite) so the visual language stays
+     consistent across the transcript + status pill + avatar. */
+  transition: box-shadow var(--wb-motion-duration-base, 200ms) ease-out;
+}
+/* R8.44 — Streaming avatar pulse. The class is added while a
+   message is actively streaming and removed once it completes.
+   Same 1.2s cycle as the .chatview__status-dot streaming pulse. */
+.msg--assistant.msg--streaming .msg__avatar {
+  animation: msg-avatar-pulse 1.2s ease-in-out infinite;
+}
+@keyframes msg-avatar-pulse {
+  0%, 100% {
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--wb-brand) 25%, transparent),
+                0 0 0 0 color-mix(in srgb, var(--wb-brand) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--wb-brand) 35%, transparent),
+                0 0 0 4px color-mix(in srgb, var(--wb-brand) 18%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg--assistant.msg--streaming .msg__avatar {
+    animation: none;
+  }
+}
+
+/* R8.54 — Streaming bubble bottom fade. While the assistant is
+   actively streaming, lay a soft linear-gradient overlay over the
+   bottom 24px of the bubble so the text "dissolves" into the
+   bubble background — a subtle "more coming" hint borrowed from
+   ChatGPT and PI-Desktop. The overlay uses the bubble's own
+   background colour so it blends seamlessly into the bubble. */
+.msg--assistant.msg--streaming .msg__bubble {
+  position: relative;
+}
+.msg--assistant.msg--streaming .msg__bubble::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 24px;
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--wb-bg-secondary, #ebebeb) 0%, transparent) 0%,
+    var(--wb-bg-secondary, #ebebeb) 100%
+  );
+  pointer-events: none;
+  /* Subtle entrance: fade the overlay in over 240ms when streaming
+     starts so the bubble doesn't snap into its "in-flight" look. */
+  animation: msg-streaming-fade-in var(--wb-motion-duration-large, 240ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+@keyframes msg-streaming-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg--assistant.msg--streaming .msg__bubble::after {
+    animation: none;
+  }
+}
+
+/* R8.12 — small "AI" role badge next to the Buddy name. Tiny uppercase
+   pill so the user always knows they're talking to the assistant (vs
+   another human in a multi-party transcript). */
+/* R8.43 — AI role badge polish. Slightly larger chip with
+   uppercase brand-tinted typography. The 1px brand-tinted border
+   adds definition against the bubble background. */
+.msg--assistant .msg__role {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--wb-brand) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-brand) 24%, transparent);
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 80%, var(--wb-text-strong, #000) 10%);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .msg--assistant .msg__body {
   flex: 1;
@@ -1373,14 +1736,30 @@
   line-height: 22px;
   color: var(--wb-text-weak);
 }
+/* R8.23 — streaming caret. We swap the binary blink for a soft
+ * pulse so the streaming state reads as "alive" rather than a
+ * harsh on/off flicker. The caret is a 2×14px brand-tinted pill
+ * that gently fades between 35% and 100% opacity at 1.1s — slow
+ * enough to feel calm, fast enough to read as live progress. */
 .msg__caret {
   display: inline-block;
-  animation: blink 1s steps(2, start) infinite;
-  color: var(--wb-brand);
+  width: 2px;
+  height: 14px;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  border-radius: 1px;
+  background: var(--wb-brand, #00c29a);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--wb-brand, #00c29a) 50%, transparent);
+  animation: msg-caret-pulse 1.1s var(--wb-ease-in-out, ease-in-out) infinite;
 }
-@keyframes blink {
-  50% {
-    opacity: 0;
+@keyframes msg-caret-pulse {
+  0%, 100% { opacity: 0.35; transform: scaleY(0.92); }
+  50% { opacity: 1; transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg__caret {
+    animation: none;
+    opacity: 0.85;
   }
 }
 /* 流式期间的代码块占位：轻量边框 + 等宽字体背景，等消息 complete 后
@@ -1478,7 +1857,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  animation: ob-tip-fade-in 0.45s ease;
+  animation: ob-tip-fade-in var(--wb-motion-duration-slow, 450ms) ease;
 }
 @keyframes ob-tip-fade-in {
   from {
@@ -1489,6 +1868,54 @@
     opacity: 0.85;
     transform: translateY(0);
   }
+}
+
+/* R8.0 (verb-animation) — 学习 cabinet turn-block 的 PendingIndicator：
+   3 个错位 bounce 小点，紧贴主文案右侧。dots 用 transform 动画（避免
+   触发布局重排），并配合 phase 切换时的轻微 stagger 制造"在动"的感觉。 */
+.msg__loading-dots {
+  display: inline-flex;
+  align-items: flex-end;
+  flex: 0 0 auto;
+  margin-left: 6px;
+  height: 14px;
+  gap: 3px;
+  vertical-align: baseline;
+}
+/* R8.52 — Migrate the loading-dot background from --wb-text-strong
+   (neutral grey) to --wb-brand so the dots feel "alive" and
+   on-brand. The 70% brand alpha keeps the dots subtle so they
+   don't compete with the assistant avatar's gradient. */
+.msg__loading-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 70%, transparent);
+  animation: ob-loading-bounce 1s ease-in-out infinite;
+}
+.msg__loading-dot--1 { animation-delay: -0.3s; }
+.msg__loading-dot--2 { animation-delay: -0.15s; }
+.msg__loading-dot--3 { animation-delay: 0s; }
+@keyframes ob-loading-bounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  40% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+/* R8.0 — elapsed 秒数：tabular-nums 避免宽度跳变；>=60s 自动转 m+s。
+   浅色/深色主题都取主文字色的低透明度，避免抢主文案扫光的视觉权重。 */
+.msg__loading-elapsed {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--wb-text-strong, #1a1a1a) 50%, transparent);
+  opacity: 0.75;
 }
 
 
@@ -1512,7 +1939,7 @@
   --md-code-title: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
   --md-code-action: var(--wb-text-secondary, rgba(0, 0, 0, 0.55));
   --md-code-action-hover-bg: rgba(0, 0, 0, 0.06);
-  --md-link: var(--wb-brand, #5b5fc7);
+  --md-link: var(--wb-brand, #00c29a);
   --md-blockquote-border: var(--wb-border-default, #e1e4e8);
   --md-blockquote-fg: var(--wb-text-medium, rgba(0, 0, 0, 0.65));
 }
@@ -1533,8 +1960,8 @@
   --md-code-border: var(--wb-border-default, #333);
   --md-code-header-bg: var(--wb-bg-tertiary, #2a2a2a);
   --md-code-title: var(--wb-text-strong, rgba(255, 255, 255, 0.9));
-  --md-code-action: var(--wb-text-secondary, rgba(255, 255, 255, 0.55));
-  --md-code-action-hover-bg: rgba(255, 255, 255, 0.08);
+  --md-code-action: var(--wb-text-secondary, rgba(255, 255, 255, 0.68));
+  --md-code-action-hover-bg: rgba(255, 255, 255, 0.10);
   --md-link: #7aa2ff;
   --md-blockquote-border: var(--wb-border-default, #444);
   --md-blockquote-fg: var(--wb-text-medium, rgba(255, 255, 255, 0.65));
@@ -1558,15 +1985,42 @@
   margin: 16px 0 8px;
   font-weight: 600;
   line-height: 1.35;
+  /* R8.57 — tighter letter-spacing (-0.01em) for refined display
+     type that reads as "section break" rather than "paragraph" */
+  letter-spacing: -0.01em;
 }
 .markdown-body h1 { font-size: 1.35em; }
 .markdown-body h2 { font-size: 1.2em; }
 .markdown-body h3 { font-size: 1.08em; }
 .markdown-body h4 { font-size: 1em; }
+/* R8.57 — Markdown heading polish. h1 + h2 pick up a brand-tinted
+   colour (90% brand + 10% text-strong) so they read as "section
+   markers" without overpowering body text. h3 + h4 stay at the
+   default text colour to preserve content hierarchy. Also adds a
+   subtle hairline below h1 only — the strongest divider in the
+   hierarchy, used as a visual anchor for the top-level section. */
+.markdown-body h1 {
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 10%, var(--wb-text-strong, #1a1a2e));
+  padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 18%, transparent);
+}
+.markdown-body h2 {
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 8%, var(--wb-text-strong, #1a1a2e));
+}
+/* R8.51 — Markdown ordered list polish. Use the ::marker pseudo
+   to apply a brand-tinted colour to the numbered bullets so they
+   read as "structured content" (Claude Cowork style) rather than
+   the default browser black numerals. Unordered list bullets stay
+   default to avoid over-styling. */
 .markdown-body ul,
 .markdown-body ol {
   margin: 0 0 12px;
   padding-left: 24px;
+}
+.markdown-body ol > li::marker {
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 75%, var(--wb-text-medium));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .markdown-body li + li {
   margin-top: 4px;
@@ -1574,40 +2028,167 @@
 .markdown-body li > p {
   margin: 0;
 }
+/* R8.36 — Markdown blockquote polish. Add a brand-tinted subtle
+   background + a brand-tinted left border (was neutral grey). The
+   brand tint reads as "this is a citation / quoted source" without
+   being so loud it competes with code blocks. Falls back to the
+   previous --md-blockquote-border token so older themes stay. */
 .markdown-body blockquote {
   margin: 0 0 12px;
-  padding: 4px 0 4px 12px;
-  border-left: 3px solid var(--md-blockquote-border);
+  padding: 8px 12px 8px 14px;
+  border-left: 3px solid color-mix(in srgb, var(--wb-brand, #00c29a) 50%, var(--md-blockquote-border));
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 4%, transparent);
   color: var(--md-blockquote-fg);
+}
+.markdown-body blockquote > :first-child {
+  margin-top: 0;
+}
+.markdown-body blockquote > :last-child {
+  margin-bottom: 0;
+}
+[data-theme="dark"] .markdown-body blockquote {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 8%, transparent);
 }
 .markdown-body hr {
   border: none;
   border-top: 1px solid var(--wb-border-default);
   margin: 16px 0;
 }
+/* R8.38 — Markdown link polish. Add a dotted underline at rest
+   (Claude Cowork style) that becomes solid on hover, with a
+   subtle text colour shift on focus-visible for keyboard
+   accessibility. The dotted underline at rest gives links a
+   subtle visual texture without being noisy; the focus ring
+   uses color-mix so it stays theme-aware. */
 .markdown-body a {
   color: var(--md-link);
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--md-link) 60%, transparent);
+  transition:
+    text-decoration-style var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    text-decoration-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
 }
 .markdown-body a:hover {
-  text-decoration: underline;
+  text-decoration-style: solid;
+  text-decoration-color: var(--md-link);
+  color: color-mix(in srgb, var(--md-link) 85%, var(--wb-text-strong, #000) 10%);
 }
+.markdown-body a:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--md-link) 65%, transparent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+/* R8.45 — Markdown image polish. Add a 1px brand-tinted border
+   so images read as "embedded media" rather than floating pixels,
+   and a subtle hover lift so users know the image is interactive.
+   The hover scales the image up by 2px and brightens the border
+   for premium feel. */
 .markdown-body img {
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 14%, var(--wb-border-default));
   margin: 8px 0;
+  display: block;
+  transition:
+    transform var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    box-shadow var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  cursor: zoom-in;
+}
+.markdown-body img:hover {
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 32%, var(--wb-border-default));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--wb-brand, #00c29a) 12%, rgba(0, 0, 0, 0.08));
+  transform: scale(1.01);
 }
 .markdown-body input[type="checkbox"] {
   margin-right: 6px;
   vertical-align: middle;
 }
+/* R8.39 — Markdown inline code polish. Add a brand-tinted subtle
+   border so the chip has definition against the surrounding text,
+   slightly larger padding for readability, and a subtle bg tint
+   (4% brand) instead of the previous neutral grey. The chip stays
+   understated so it doesn't compete with code blocks but reads
+   as a distinct surface. */
 .markdown-body code.md-inline-code,
 .markdown-body .md-inline-code {
-  background: var(--wb-bg-tertiary);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 5%, var(--wb-bg-tertiary));
   padding: 1px 6px;
   border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 14%, transparent);
   font-family: var(--wb-font-code-family);
   font-size: 0.92em;
+  vertical-align: baseline;
+}
+/* R8.55 — Wrap the children so the copy button can sit next to the
+   text without breaking inline flow. The text span gets a tiny
+   right margin so the button doesn't crowd the last glyph. */
+.markdown-body .md-inline-code__text {
+  display: inline-block;
+  vertical-align: baseline;
+}
+.markdown-body .md-inline-code__copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 65%, var(--wb-text-medium, #6e6e80));
+  cursor: pointer;
+  opacity: 0;
+  /* R8.55 — fade the copy button in on hover / focus-within so
+     it never competes with the text. The same transition tokens
+     used elsewhere in the prose.css surface family. */
+  transition:
+    opacity var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    background-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+.markdown-body code.md-inline-code:hover .md-inline-code__copy,
+.markdown-body .md-inline-code:hover .md-inline-code__copy,
+.markdown-body code.md-inline-code:focus-within .md-inline-code__copy,
+.markdown-body .md-inline-code:focus-within .md-inline-code__copy,
+.markdown-body .md-inline-code__copy:focus-visible {
+  opacity: 1;
+}
+.markdown-body .md-inline-code__copy:hover {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 12%, transparent);
+  color: var(--wb-brand, #00c29a);
+}
+.markdown-body .md-inline-code__copy:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand, #00c29a) 60%, transparent);
+  outline-offset: 1px;
+}
+.markdown-body .md-inline-code__copy--ok {
+  opacity: 1;
+  color: var(--wb-status-success, #1a7f37);
+  background: color-mix(in srgb, var(--wb-status-success, #1a7f37) 10%, transparent);
+}
+[data-theme="dark"] .markdown-body code.md-inline-code,
+[data-theme="dark"] .markdown-body .md-inline-code {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 10%, transparent);
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 24%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .markdown-body .md-inline-code__copy {
+    transition: none;
+  }
 }
 .markdown-body .md-clickable-path {
   cursor: pointer;
@@ -1663,16 +2244,38 @@
   padding: 6px 8px 6px 16px;
   background-color: var(--md-code-header-bg);
 }
+/* R8.32 — Code-block language label pill. Migrate from a plain
+   14px text label to a brand-tinted pill so the user can scan
+   code blocks at a glance and identify the language without
+   reading the syntax. The pill sits at the top-left of the code
+   block header with the line-range label appearing after it.
+   Falls back to the previous text-only style when --wb-brand
+   isn't themed (so legacy themes keep rendering). */
 .md-code-lang {
-  flex: 1;
+  flex: none;
   min-width: 0;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 22px;
-  font-size: 14px;
-  font-weight: 400 !important;
-  color: var(--md-code-title);
+  line-height: 16px;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 24%, transparent);
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 85%, var(--wb-text-strong, #000) 10%);
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+}
+[data-theme="dark"] .md-code-lang {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 18%, transparent);
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 36%, transparent);
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 80%, #fff 20%);
 }
 .md-code-lang--clickable {
   cursor: pointer;
@@ -1710,12 +2313,46 @@
   background-color: var(--md-code-action-hover-bg);
   color: var(--md-code-title);
 }
+/* R8.6 — keyboard focus ring. Native default on a 24×24 icon button is
+   invisible against the code header bg; add an explicit brand-tinted ring
+   so a11y / power users can tab through the actions. */
+.md-code-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand) 65%, transparent);
+  outline-offset: 1px;
+}
+/* R8.6 — active press feedback. A 1px darker bg + slight scale-down makes
+   the button feel "physical" without breaking the lightweight style. */
+.md-code-action:active {
+  background-color: color-mix(in srgb, var(--md-code-action-hover-bg) 70%, var(--wb-text-strong, #000) 5%);
+  transform: translateY(0.5px);
+}
 .md-code-action-icon {
   width: 14px;
   height: 14px;
+  flex-shrink: 0;
 }
 .md-code-action-icon--ok {
   color: var(--wb-status-success, #28b894);
+}
+/* R8.6 — primary variant (used by apply / run / insert buttons). Slight
+   brand tint so destructive / confirmatory actions stand out from the
+   default icon-only ghost buttons. */
+.md-code-action--primary {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 12%, transparent);
+  color: var(--wb-brand, #00c29a);
+  font-weight: 500;
+}
+.md-code-action--primary:hover {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 22%, transparent);
+  color: var(--wb-brand, #00c29a);
+}
+/* R8.6 — disabled state (e.g. while a streaming diff is being applied). */
+.md-code-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.md-code-action:disabled:hover {
+  background-color: transparent;
 }
 .md-code-action-label {
   font-size: 12px;
@@ -1729,6 +2366,18 @@
   background: var(--wb-border-default, #e1e4e8);
   opacity: 0.6;
   margin: 0 2px;
+}
+/* R8.6 — small chip label that appears next to the action buttons when
+   the code is mid-stream (e.g. "applying…"). Hidden by default; the
+   applyButton prop currently drives this via applyButton itself, but the
+   class is exposed so callers can also use it standalone. */
+.md-code-status {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--wb-text-strong, #000) 55%, transparent);
+  padding: 0 6px;
+  white-space: nowrap;
 }
 .md-code-pre {
   background-color: transparent;
@@ -1860,10 +2509,20 @@
   border: 1px solid var(--wb-border-default);
   padding: 6px 10px;
 }
+/* R8.37 — Markdown table header polish. Migrate the th background
+   from a neutral grey to a brand-tinted subtle background so the
+   header row reads as the "title" of the table. Cell borders also
+   pick up a faint brand tint so the table feels cohesive with the
+   rest of the chat UI. */
 .markdown-body th {
-  background: var(--wb-bg-tertiary, #f7f7f7);
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 6%, var(--wb-bg-tertiary, #f7f7f7));
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 18%, var(--wb-border-default));
   font-weight: 600;
 }
 [data-theme="dark"] .markdown-body th {
-  background: var(--wb-bg-tertiary, #2a2a2a);
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 10%, var(--wb-bg-tertiary, #2a2a2a));
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 28%, var(--wb-border-default));
+}
+.markdown-body td {
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 8%, var(--wb-border-default));
 }
