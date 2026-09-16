@@ -35,6 +35,7 @@ import {
   recordValue,
   requiredBoolean,
   requiredString,
+  resolvedCwd,
 } from "./validation";
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
 
@@ -60,7 +61,7 @@ export function registerSessionsIpc(deps: AgentHostIpcDeps): void {
   ipcMain.handle("sessions:delete", async (_e, args: unknown) => {
     casdoorAuth.authorize({ capability: "team.workspace" });
     const input = recordValue(args, "session delete payload");
-    return agentHost.deleteSession(requiredString(input.sessionId, "sessionId"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"));
+    return agentHost.deleteSession(requiredString(input.sessionId, "sessionId"), resolvedCwd(input, () => agentHost.getCwd()));
   });
   ipcMain.handle("sessions:set-pinned", async (_e, args: { id: string; pinned: boolean }) => {
     casdoorAuth.authorize({ capability: "team.workspace" });

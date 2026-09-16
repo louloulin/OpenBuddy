@@ -355,6 +355,25 @@ export function optionalCwd(input: RecordValue, label = "cwd"): string | undefin
 		return input[label] === undefined || input[label] === null ? undefined : absolutePath(input[label], label);
 }
 
+/**
+ * 同 `optionalCwd`,但缺省时回落到宿主当前工作区。
+ *
+ * 为什么必须收敛到这一处:渲染进程的 payload 里「没有指定 cwd」有两种写法 ——
+ * 字段整个省略(`undefined`),或者显式 `null`(`JSON.stringify` 会吃掉
+ * undefined,所以 `pi-client` 统一发 `cwd ?? null`)。历史上只有一半 handler
+ * 同时接受这两种写法,另一半点 `cwd: null` 时直接抛
+ * `cwd must be a non-empty string` —— 表现是**整列文件树渲染成空态**、
+ * 「在文件夹中显示 / 系统打开 / 删除会话」静默失败,而日志里只有一句校验错误。
+ * 落到哪一边都不影响安全性:回退值就是 `agentHost.getCwd()`,和省略 cwd 等价。
+ *
+ * `fallback` 是**惰性**的:agentHost 代理在模块加载完成前访问任何属性都会抛错,
+ * 所以不能在 handler 入口就无条件 `agentHost.getCwd()` —— 那只会在调用方已经
+ * 指定了绝对 cwd 的情况下引入一个全新的失败模式。
+ */
+export function resolvedCwd(input: RecordValue, fallback: () => string, label = "cwd"): string {
+	return optionalCwd(input, label) ?? fallback();
+}
+
 export function memoryScope(value: unknown): "global" | "workspace" {
 		return enumValue(value, "scope", ["global", "workspace"] as const);
 }
