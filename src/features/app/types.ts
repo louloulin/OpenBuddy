@@ -23,7 +23,31 @@ import type { ProjectMeta } from "@/stores/projects-store";
 import type { AgentEntry } from "@openbuddy/shared-types";
 
 /** 设置面板内嵌的子区域选择。 */
-export type SettingsSection = "model" | "account";
+export type SettingsSection =
+  | "model"
+  | "account"
+  | "shortcuts"
+  | "personalize"
+  | "assistant"
+  | "agent-settings"
+  | "data"
+  | "security"
+  | "help"
+  | "general"
+  | "notifications"
+  | "linking"
+  | "members"
+  | "policy"
+  | "resources"
+  | "sessions"
+  | "introspect"
+  | "health"
+  | "agent-mail"
+  | "billing"
+  | "pricing"
+  | "reconciliation"
+  | "wallet"
+  | "webhooks";
 
 /** 一条 toast 的可选 action 描述（与 toast-store 的 shape 对齐）。 */
 export interface ToastActionSpec {
@@ -85,6 +109,7 @@ export interface AppShellRuntime {
   // ---- 快捷键面板 -------------------------------------------------------
   setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
   setSettingsSection: Dispatch<SetStateAction<SettingsSection>>;
+  settingsSection: SettingsSection;
 
   // ---- 弹层/对话框 -------------------------------------------------------
   settingsOpen: boolean;
@@ -131,10 +156,16 @@ export interface AppShellRuntime {
   notifyBridgeUnavailable(): void;
 
   // ---- 业务回调 -----------------------------------------------------------
-  openSettings(): void;
-  openAccountSettings(): void;
+  openSettings(section?: SettingsSection): void;
   showToast(message: string): void;
   setToast(message: string, opts?: ToastOptions): void;
+  /** R15 — 恢复历史功能:打开「设置 → 账户管理」+ 刷新 casdoor 状态 +
+   *  未登录时自动拉起 Casdoor 登录页。左下角用户按钮/账户菜单走这条路径。 */
+  openAccountSettings(): void;
+  /** R15 — 触发 casdoor 企业登录(打开 Casdoor 浏览器窗口)。 */
+  handleLogin(): Promise<void>;
+  /** R15 — 触发 casdoor 登出。 */
+  handleLogout(): Promise<void>;
 
   // 导航/视图
   handleNavigate(label: string): void;

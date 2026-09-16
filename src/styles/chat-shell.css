@@ -385,3 +385,32 @@
 [data-theme="dark"] .chatview__quick-prompt-icon {
   background: color-mix(in srgb, var(--wb-brand) 18%, transparent);
 }
+
+/* === TopbarActions Phase B: 菜单行标签 / 元信息 / 分隔线 === */
+/* 行内三段布局:图标(固定) + 文案(占满) + 快捷键 glyph(右对齐)。 */
+.topbar-actions__item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.topbar-actions__item-meta {
+  flex: none;
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--wb-fg-tertiary, #8a8a8a);
+}
+.topbar-actions__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--wb-border-soft, rgba(127, 127, 127, 0.18));
+}
+.topbar-actions__item--disabled {
+  opacity: 0.55;
+  cursor: default;
+}

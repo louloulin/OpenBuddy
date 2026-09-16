@@ -146,8 +146,8 @@
   color: var(--wb-text-medium);
 }
 [data-theme="dark"] .sidebar__user-avatar {
-  background: var(--wb-user-avatar-bg-dark, rgba(255, 255, 255, 0.10));
-  color: var(--wb-user-avatar-color-dark, var(--wb-text-strong));
+  background: var(--wb-accent-soft, color-mix(in srgb, var(--wb-accent) 18%, transparent));
+  color: var(--wb-accent, #00c29a);
 }
 [data-theme="dark"] .sidebar__user:hover,
 [data-theme="dark"] .sidebar__icon-btn:hover {

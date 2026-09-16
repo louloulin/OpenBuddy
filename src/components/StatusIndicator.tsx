@@ -43,40 +43,55 @@ function StatusIndicatorImpl({
   const providerName = providerLabel ?? providerId;
   // R4.2 — keep the role="status" / aria-live wrapper mounted even when
   // the user has not picked a provider yet, so screen readers always
-  // announce connection state changes (see tests/electron/agent-died.spec.ts
-  // — the agent-died recovery surface expects at least one role="status"
-  // element attached as soon as the renderer mounts). When providerName
-  // is empty we still render the wrapper so aria-live works; we just
-  // hide the visual chrome.
+  // announce connection state changes (see AgentDiedSurface.test.tsx —
+  // the agent-died recovery surface expects at least one role="status"
+  // element attached as soon as the renderer mounts).
+  //
+  // R15 — 用户反馈侧栏底部那枚绿色的 "openbuddy" 胶囊太吵。没有 provider 时
+  // 改为「屏幕阅读器专用」的隐藏节点:role="status" 仍挂载(agent-died 恢复
+  // 流程照常工作),但视觉上不再占位。一旦宿主注入了真实 providerName,
+  // 才渲染可见的 provider · model · rate-limit 行。
+  if (!providerName) {
+    return (
+      <div
+        className="status-indicator status-indicator--builtin wb-sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label={`连接状态：${state}（openbuddy 内核）`}
+        data-connection={connection}
+      >
+        {/* 保留逐状态的可访问名(与有 provider 时一致),屏幕阅读器可查到;
+            视觉上被 .wb-sr-only 隐藏,不再渲染那枚绿色 "openbuddy" 胶囊。 */}
+        <span className={stateClass} aria-label={`连接状态：${state}`} />
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`status-indicator${providerName ? "" : " status-indicator--empty"}`}
+      className="status-indicator"
       role="status"
       aria-live="polite"
       aria-atomic="true"
-      aria-label={providerName ? undefined : `连接状态：${state}`}
       data-connection={connection}
     >
-      {providerName ? (
+      <span className={stateClass} aria-label={`连接状态：${state}`} />
+      <span className="status-indicator__provider" title={providerName}>
+        {providerName}
+      </span>
+      {modelLabel ? (
         <>
-          <span className={stateClass} aria-label={`连接状态：${state}`} />
-          <span className="status-indicator__provider" title={providerName}>
-            {providerName}
+          <span className="status-indicator__sep" aria-hidden="true">·</span>
+          <span className="status-indicator__model" title={modelLabel}>{modelLabel}</span>
+        </>
+      ) : null}
+      {typeof rateLimitRemainingMs === "number" && rateLimitRemainingMs > 0 ? (
+        <>
+          <span className="status-indicator__sep" aria-hidden="true">·</span>
+          <span className="status-indicator__rate-limit" title="速率限制窗口剩余">
+            ⏱ {(rateLimitRemainingMs / 1000).toFixed(1)}s
           </span>
-          {modelLabel ? (
-            <>
-              <span className="status-indicator__sep" aria-hidden="true">·</span>
-              <span className="status-indicator__model" title={modelLabel}>{modelLabel}</span>
-            </>
-          ) : null}
-          {typeof rateLimitRemainingMs === "number" && rateLimitRemainingMs > 0 ? (
-            <>
-              <span className="status-indicator__sep" aria-hidden="true">·</span>
-              <span className="status-indicator__rate-limit" title="速率限制窗口剩余">
-                ⏱ {(rateLimitRemainingMs / 1000).toFixed(1)}s
-              </span>
-            </>
-          ) : null}
         </>
       ) : null}
     </div>

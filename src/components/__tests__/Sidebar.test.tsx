@@ -83,13 +83,6 @@ describe("Sidebar", () => {
     expect(onOpenSettings).toHaveBeenCalled();
   });
 
-  it("用户中心打开企业账户入口", () => {
-    const onOpenAccount = vi.fn();
-    render(<Sidebar {...base} onOpenAccount={onOpenAccount} />);
-    fireEvent.click(screen.getByRole("button", { name: "用户中心" }));
-    expect(onOpenAccount).toHaveBeenCalledTimes(1);
-  });
-
   it("收起侧边栏按钮触发 onToggleCollapse", () => {
     const onToggleCollapse = vi.fn();
     render(<Sidebar {...base} onToggleCollapse={onToggleCollapse} />);

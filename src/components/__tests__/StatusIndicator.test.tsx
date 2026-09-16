@@ -52,7 +52,7 @@ describe("StatusIndicator", () => {
     expect(root?.getAttribute("role")).toBe("status");
     expect(root?.getAttribute("aria-live")).toBe("polite");
     expect(root?.getAttribute("data-connection")).toBe("unknown");
-    expect(root?.classList.contains("status-indicator--empty")).toBe(true);
+    expect(root?.classList.contains("status-indicator--builtin")).toBe(true);
     expect(screen.getByLabelText("连接状态：未知")).toBeTruthy();
   });
 });

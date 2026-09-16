@@ -8,7 +8,7 @@
 
 .sidebar {
   flex: none;
-  width: var(--ds-sidebar-width, 260px);
+  width: var(--ds-sidebar-width, 320px);
   display: flex;
   flex-direction: column;
   background: var(--wb-bg-sidebar, var(--wb-bg-primary));

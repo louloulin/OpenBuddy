@@ -4,6 +4,13 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 // The modular theme package owns the shared semantic tokens. Import it before
 // the app-level styles so any later OpenBuddy token can refine it deliberately.
 import "@openbuddy/ui-theme/styles";
+import { initializeThemeSync } from "@openbuddy/ui-theme/client";
+
+// v2 — paint the document with the saved theme synchronously, before
+// React mounts, so users never see a white flash on cold start. The
+// ThemeInitializer inside <App /> re-applies once the store mounts to
+// guarantee consistency with subsequent storage changes.
+initializeThemeSync();
 import { startRendererPluginEventBridge } from "./lib/runtime/renderer-plugin-runtime";
 import { installPluginSdkBridge } from "@openbuddy/ui-runtime/client";
 import { setToast } from "./stores/toast-store";

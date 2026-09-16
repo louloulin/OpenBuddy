@@ -1082,7 +1082,15 @@ export function usePluginSnapshot(refreshKey = 0): import("@openbuddy/plugin-hos
       }
     };
     void refresh();
-    const off = getRendererPluginRuntime().events.on("plugin/snapshot", refresh);
+    // R-fix: 同 PiReloadFailureBanner —— 守卫 getRendererPluginRuntime()
+    //   与 runtime.events 双向为 undefined 的场景(jsdom 测试 / main 早期),
+    //   退化为不挂监听,行为等价于组件未挂载,避免白屏。
+    const runtime = getRendererPluginRuntime();
+    const events = runtime?.events;
+    if (!events || typeof events.on !== "function") {
+      return () => { cancelled = true; };
+    }
+    const off = events.on("plugin/snapshot", refresh);
     return () => { cancelled = true; off(); };
   }, [refreshKey]);
   return snapshot;
@@ -1107,22 +1115,28 @@ export function usePluginReadiness(refreshKey = 0): PluginReadinessSnapshot {
       }).catch(() => undefined);
     };
     refresh();
+    // R-fix: 守卫 runtime.events 缺失(jsdom 测试 / main 早期握手)—— 与
+    //   R12.4 PiReloadFailureBanner + R13.1 usePluginSnapshot 同根因。
+    const events = runtime?.events;
+    if (!events || typeof events.on !== "function") {
+      return () => { cancelled = true; };
+    }
     const offs = [
-      runtime.events.on("plugin/readiness", refresh),
-      runtime.events.on("plugin/transaction-start", refresh),
-      runtime.events.on("plugin/transaction-start", (payload) => {
+      events.on("plugin/readiness", refresh),
+      events.on("plugin/transaction-start", refresh),
+      events.on("plugin/transaction-start", (payload) => {
         const id = (payload as { transactionId?: unknown } | null | undefined)?.transactionId;
         captureRendererReceiptTransaction(typeof id === "string" ? id : null);
       }),
-      runtime.events.on("plugin/transaction-complete", refresh),
-      runtime.events.on("plugin/transaction-complete", () => {
+      events.on("plugin/transaction-complete", refresh),
+      events.on("plugin/transaction-complete", () => {
         pendingRendererTransactionId = null;
       }),
-      runtime.events.on("plugin/transaction-failed", refresh),
-      runtime.events.on("plugin/transaction-failed", () => {
+      events.on("plugin/transaction-failed", refresh),
+      events.on("plugin/transaction-failed", () => {
         pendingRendererTransactionId = null;
       }),
-      runtime.events.on("pi/extensions-reloaded", refresh),
+      events.on("pi/extensions-reloaded", refresh),
     ];
     return () => {
       cancelled = true;

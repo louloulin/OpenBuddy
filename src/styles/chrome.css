@@ -39,10 +39,12 @@
  * down. Other pages hide it entirely and stick their own headers to the top. */
 .main-topbar {
   flex: none;
-  height: 48px;
+  /* R17 — 顶栏增高 8px,给搜索按钮 + status chip 留出舒适呼吸感 */
+  height: 56px;
+  min-height: 56px;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 20px;
   box-sizing: border-box;
   /* Empty area drags the window, like the title bar; interactive children opt out. */
   -webkit-app-region: drag;
@@ -70,6 +72,60 @@
   min-width: 0;
   -webkit-app-region: no-drag;
 }
+/* Phase B: 顶栏中心搜索触发器 — 填满 __left 与 __right 之间的空白,
+   让用户随时可见一条「按 ⌘K 搜索」的入口,而不是空白一片。 */
+.main-topbar__center {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  -webkit-app-region: no-drag;
+  padding: 0 16px;
+}
+.main-topbar__search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  min-width: 280px;
+  max-width: 480px;
+  width: 100%;
+  background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--wb-border-soft, transparent);
+  border-radius: var(--wb-radius-md, 8px);
+  color: var(--wb-text-medium, #6e6e80);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.main-topbar__search:hover {
+  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.06));
+  border-color: var(--wb-border-strong, rgba(0, 0, 0, 0.12));
+  color: var(--wb-text-strong, #1a1a1a);
+}
+.main-topbar__search-label {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+.main-topbar__search-kbd {
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  padding: 2px 6px;
+  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+  border-radius: 4px;
+  background: var(--wb-bg-elevated, rgba(255, 255, 255, 0.6));
+  color: var(--wb-text-medium, #6e6e80);
+  flex: none;
+  user-select: none;
+}
+
 /* Transparent icon buttons — no background until hover (WorkBuddy style). */
 .main-topbar__btn {
   width: 32px;
@@ -237,6 +293,17 @@
   color: var(--wb-text-weak, #9aa0a6);
   white-space: nowrap;
   overflow: hidden;
+}
+/* R-fix: 当没有 provider 配置时,显示默认 "openbuddy" 内核标识,
+ * 用品牌色软填充让底部状态区不为空。 */
+.status-indicator--builtin {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 8%, transparent);
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 80%, var(--wb-text-strong));
+}
+.status-indicator--builtin .status-indicator__state {
+  background: var(--wb-brand, #00c29a);
 }
 .status-indicator__provider,
 .status-indicator__model,

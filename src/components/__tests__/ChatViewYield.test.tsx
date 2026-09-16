@@ -102,7 +102,7 @@ vi.mock("@/lib/agent/pi-client", async () => {
     "expertsListRoots", "expertsLoad", "expertsThumbnail", "expertsImageBytes",
     "expertsReadAgentPrompt", "expertsLinkAgents", "piClearSessionExpert",
     "skillsList", "skillsAdd", "skillsRemove", "skillsToggle",
-    "collaborationOnUpdate",
+    "collaborationOnUpdate", "agentOnPluginEvent",
   ]) {
     mod[name] = name.startsWith("on") ? handler : asyncArr;
   }
@@ -115,6 +115,9 @@ vi.mock("@/lib/agent/pi-client", async () => {
   mod.subscribePiEvents = async () => () => {};
   mod.permissionModeGet = async () => "default";
   mod.agentsList = asyncArr;
+  // agentOnPluginEvent 注册监听返回 unlisten —— mock 给个 noop 避免
+  // "unlisten is not a function" 把 ChatView 树炸掉。
+  mod.agentOnPluginEvent = async () => () => undefined;
   mod.mcpList = asyncArr;
   mod.tasksList = asyncArr;
   mod.commandsList = asyncArr;

@@ -442,6 +442,17 @@
   max-height: calc(100vh - 220px);
   overflow: auto;
 }
+/* Phase C —— markdown 就地编辑（TipTap 编辑器宿主）。
+   padding 与圆角对齐 .file-preview__body，避免进入编辑态时版面跳动。 */
+.file-preview__editor {
+  padding: 4px 6px 10px;
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+}
+.file-preview__editor > * {
+  min-height: 180px;
+}
+
 .file-preview__err {
   font-size: 12px;
   color: var(--wb-text-medium);

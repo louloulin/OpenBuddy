@@ -41,7 +41,10 @@ import { newSessionFlow, composeDiscoverBody } from "@/lib/agent/new-session-flo
 import { abandonInFlightStream } from "@/lib/agent/abandon-stream";
 import { listenSafe, isElectronBridgeUnavailable, getElectronBridgeStatus } from "@/lib/platform/electron-api";
 import { friendlyError } from "@/lib/platform/error-format";
-import { casdoorLogin, casdoorStatus, type CasdoorSessionView } from "@/lib/casdoor/casdoor-client";
+// R9.x — 企业登录入口从侧栏移除后,casdoorLogin/casdoorStatus 调用方消失;
+//   CasdoorSessionView 类型仍保留以备「设置 → 账户」页面按需启用。
+import { casdoorLogin, casdoorLogout, casdoorStatus, type CasdoorSessionView } from "@/lib/casdoor/casdoor-client";
+import { auditRecord } from "@/lib/audit/audit-client";
 import type { CasdoorLifecycleEvent } from "@openbuddy/auth-casdoor";
 import { getRendererPluginRuntime } from "@/lib/runtime/renderer-plugin-runtime";
 import { createRendererLogger, generateTrace, withTrace } from "@openbuddy/logging-renderer";
@@ -104,6 +107,8 @@ export function useAppShellRuntime(): AppShellRuntime {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("model");
+  // R9.x — casdoorSession 状态保留,但不再驱动侧栏底部的「企业登录」按钮;
+  //   后续「设置 → 账户」页面按需启用时只需 setCasdoorSession(...) 即可。
   const [casdoorSession, setCasdoorSession] = useState<CasdoorSessionView | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -485,6 +490,25 @@ export function useAppShellRuntime(): AppShellRuntime {
   }
 
   // ====== business callbacks =================================================
+  // R9.x — openAccountSettings 已移除(企业登录按钮从侧栏底部消失)。
+  //   Casdoor 集成仍保留,通过「设置 → 账户」按需唤起。
+
+  const openSettings = useCallback((section?: SettingsSection) => {
+    setSettingsSection(section ?? "model");
+    setSettingsOpen(true);
+    // R17 / Phase D — 本地审计:settings 面板打开可追溯。
+    // 故意 catch 静默:audit 失败不影响设置打开。
+    void auditRecord({
+      event: "settings.open",
+      outcome: "info",
+      subject: section ?? "model",
+    }).catch(() => undefined);
+  }, []);
+
+  // R15 — 恢复历史行为(见 git show 536dc0e:src/features/app/useAppShellRuntime.ts):
+  //   openAccountSettings 同时做三件事 —— 打开「设置 → 账户管理」、
+  //   刷新 casdoor 状态、未登录时自动拉起 Casdoor 登录页。
+  //   左下角用户按钮 / 账户菜单的「企业登录」「账户设置」都走这条路径。
   const openAccountSettings = useCallback(() => {
     setSettingsSection("account");
     setSettingsOpen(true);
@@ -494,12 +518,66 @@ export function useAppShellRuntime(): AppShellRuntime {
         setCasdoorSession(status);
         if (status.status === "signed_in") return;
         const result = await casdoorLogin("default");
-        setToast(result.ok ? "已打开 Casdoor 企业登录页面" : result.error);
-      } catch (error) { setToast(String(error).replace(/^Error:\s*/, "")); }
+        if (!result.ok) setToast(result.error);
+        else setToast("已打开 Casdoor 企业登录页面");
+      } catch (error) {
+        setToast(String(error).replace(/^Error:\s*/, ""));
+      }
     })();
   }, [setToast]);
 
-  const openSettings = useCallback(() => { setSettingsSection("model"); setSettingsOpen(true); }, []);
+  // R15 — 左下角账户菜单触发的 casdoor 流程。
+  // 登录:打开 Casdoor 浏览器窗口(主进程通过 IPC 触发),错误以 toast 反馈。
+  // 登出:直接调 casdoorLogout,清掉本地 casdoorSession,后续 IPC 监听器
+  //     会接住 casdoor://lifecycle 事件并自动 reset 会话列表。
+  const handleLogin = useCallback(async () => {
+    try {
+      const result = await casdoorLogin("default");
+      if (!result.ok) {
+        setToast(`登录失败:${result.error}`);
+        void auditRecord({
+          event: "casdoor.login",
+          outcome: "failure",
+          subject: "default",
+          detail: { error: result.error },
+        }).catch(() => undefined);
+      } else {
+        setToast("已打开 Casdoor 企业登录页面");
+        void auditRecord({
+          event: "casdoor.login",
+          outcome: "success",
+          subject: "default",
+        }).catch(() => undefined);
+      }
+    } catch (error) {
+      setToast(`登录失败:${String(error).replace(/^Error:\s*/, "")}`);
+      void auditRecord({
+        event: "casdoor.login",
+        outcome: "failure",
+        subject: "default",
+        detail: { error: String(error) },
+      }).catch(() => undefined);
+    }
+  }, [setToast]);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await casdoorLogout();
+      setCasdoorSession(null);
+      setToast("已退出企业账户");
+      void auditRecord({
+        event: "casdoor.logout",
+        outcome: "success",
+      }).catch(() => undefined);
+    } catch (error) {
+      setToast(`登出失败:${String(error).replace(/^Error:\s*/, "")}`);
+      void auditRecord({
+        event: "casdoor.logout",
+        outcome: "failure",
+        detail: { error: String(error) },
+      }).catch(() => undefined);
+    }
+  }, [setToast]);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -508,10 +586,9 @@ export function useAppShellRuntime(): AppShellRuntime {
   }, [setToast]);
 
   const handlePlaceholder = useCallback((label: string) => {
-    if (label === "用户中心") { openAccountSettings(); return; }
-    if (label === "通知") { openSettings(); return; }
+    if (label === "通知") { openSettings("notifications"); return; }
     showToast(`${label} 当前不可用`);
-  }, [openAccountSettings, openSettings, showToast]);
+  }, [openSettings, showToast]);
 
   const handleNavigate = useCallback((label: string) => {
     localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
@@ -783,7 +860,7 @@ export function useAppShellRuntime(): AppShellRuntime {
   return {
     init, initError, apiReady: init?.auth.ready ?? false,
     toastQueue, dismissToast,
-    settingsOpen, shortcutsOpen, searchOpen, aboutOpen, trustRequest, placeholderView,
+    settingsOpen, settingsSection, shortcutsOpen, searchOpen, aboutOpen, trustRequest, placeholderView,
     setSettingsOpen, setShortcutsOpen, setSearchOpen, setAboutOpen, setTrustRequest, setPlaceholderView,
     setSettingsSection,
     sidebarCollapsed, setSidebarCollapsed,
@@ -792,7 +869,7 @@ export function useAppShellRuntime(): AppShellRuntime {
     casdoorSession, taskRefreshSignal,
     extensionText, extensionTextNonce, extensionUiBySession,
     notifyBridgeUnavailable,
-    openSettings, openAccountSettings, showToast, setToast,
+    openSettings, openAccountSettings, handleLogin, handleLogout, showToast, setToast,
     handleNavigate, handleGoHome, handleNewSession, handlePlaceholder, handleOpenProjectFromSidebar,
     handleSendNew, handleSendCurrent, handleSendContent, handleCancel,
     handleSelectSession, handleToggleWorkspace, handleRenameTitle, handleModelChange, handleSelectWorkspace,

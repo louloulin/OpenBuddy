@@ -945,3 +945,53 @@
 .models-settings-panel__fetch-select-all {
   flex: none;
 }
+
+/* === R17 / Phase D — Audit Trail viewer === */
+.audit-trail {
+  margin-top: 8px;
+  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+  border-radius: 8px;
+  background: var(--wb-bg-secondary, rgba(0, 0, 0, 0.02));
+  overflow: auto;
+  max-height: 420px;
+}
+.audit-trail__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.audit-trail__table thead {
+  position: sticky;
+  top: 0;
+  background: var(--wb-bg-primary, #fff);
+  z-index: 1;
+}
+.audit-trail__table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--wb-text-tertiary, rgba(0, 0, 0, 0.55));
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+}
+.audit-trail__table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.04));
+  color: var(--wb-text-strong);
+  font-family: var(--wb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  vertical-align: top;
+  word-break: break-word;
+}
+.audit-trail__col-time { white-space: nowrap; width: 152px; }
+.audit-trail__col-event { font-weight: 500; }
+.audit-trail__col-outcome { width: 64px; }
+.audit-trail__col-source { width: 72px; color: var(--wb-text-tertiary); }
+.audit-trail__col-subject { width: 160px; }
+.audit-trail__col-hash { width: 96px; color: var(--wb-text-tertiary); }
+.audit-trail__row--deny td,
+.audit-trail__row--failure td { color: var(--wb-danger, #cf222e); }
+.audit-trail__row--allow td,
+.audit-trail__row--success td { color: var(--wb-success, #1f883d); }
+.audit-trail__row--info td { color: var(--wb-text-medium); }

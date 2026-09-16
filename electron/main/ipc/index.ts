@@ -156,6 +156,7 @@ import { registerAgentIpc } from "./agent";
 import { registerAgentsIpc } from "./agents";
 import { registerConnectorsIpc } from "./connectors";
 import { registerMiscIpc } from "./misc";
+import { registerAuditIpc } from "./audit";
 
 // Phase A.1 — pi-bridge exposes pi-coding-agent text / image / skill
 // helpers to the renderer via typed IPC channels. See
@@ -1103,6 +1104,9 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	registerAgentsIpc();
 	registerConnectorsIpc(getWindow);
 	registerMiscIpc(getWindow);
+
+	// R17 / Phase D — Local Audit Trail (data-management panel).
+	registerAuditIpc(getWindow);
 
 	// Phase A.1 — pi-bridge IPC surface (pi text / image / skill helpers).
 	registerPiBridgeIpc();

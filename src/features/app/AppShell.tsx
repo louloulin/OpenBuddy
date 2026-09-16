@@ -25,7 +25,7 @@
  * 参考 PI-Desktop `apps/desktop/src/features/app/AppShell.tsx` 的结构。
  */
 
-import { lazy, memo, Suspense } from "react";
+import { lazy, memo, Suspense, useMemo, type ComponentType } from "react";
 import { GlobalConfirmHost } from "@/components/GlobalConfirmHost";
 import { TitleBar } from "@openbuddy/ui-shell";
 import { TopbarActions, TopbarTitle, KeyboardShortcutsDialog } from "@openbuddy/ui-shell";
@@ -34,6 +34,7 @@ import { ChatView } from "@openbuddy/ui-conversation";
 import { PlaceholderPage } from "@/components/shared/PlaceholderPage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toast } from "@openbuddy/ui-primitives";
+import { Resizable } from "@openbuddy/ui-primitives";
 import { ThumbImg } from "@openbuddy/ui-experts";
 import { TruncationBanner } from "@/components/TruncationBanner";
 import { APP_VERSION } from "@/lib/platform/app-version";
@@ -42,11 +43,13 @@ import {
   CollapsedTopbarFloat,
   InitNotice,
   MainTopbarActions,
+  MainTopbarCenter,
   MainTopbarToolsSlot,
 } from "./chrome";
 import { RoutePending } from "./RoutePending";
 import { useSlotComponent } from "./slot-bridge";
-import type { AppShellRuntime } from "./types";
+import { AppStatusBar } from "./AppStatusBar";
+import type { AppShellRuntime, SettingsSection } from "./types";
 
 // ---- Lazy overlays ----------------------------------------------------------
 const HomePage = lazy(() =>
@@ -55,6 +58,16 @@ const HomePage = lazy(() =>
 const SettingsPanel = lazy(() =>
   import("@openbuddy/ui-settings").then((m) => ({ default: m.SettingsPanel })),
 );
+const OnboardingWizard = lazy(() =>
+  import("@openbuddy/ui-onboarding").then((m) => ({ default: m.OnboardingWizard })),
+);
+// 配置(主题 / 模型服务 / 数据目录)放在设置里随时可改,这里只负责介绍和起步。
+const DEFAULT_ONBOARDING_STEPS = [
+  { id: "welcome", title: "欢迎来到 OpenBuddy", description: "本地优先的 AI 工作台：会话、文件、产物都在你自己的机器上。" },
+  { id: "first-task", title: "交办第一个任务", description: "在输入框里描述你想完成的事，OpenBuddy 会拆解成步骤并给出产物。" },
+  { id: "done", title: "准备就绪", description: "主题、模型服务、数据目录都可以在设置里随时调整。" },
+];
+
 const SearchOverlay = lazy(() =>
   import("@openbuddy/ui-workbench").then((m) => ({ default: m.SearchOverlay })),
 );
@@ -80,6 +93,7 @@ const Topbar = memo(function Topbar({
   pinned,
   onSessionsChanged,
   expertBadge,
+  onOpenSearch,
 }: {
   sidebarCollapsed: boolean;
   onExpandSidebar(): void;
@@ -91,6 +105,7 @@ const Topbar = memo(function Topbar({
   pinned?: boolean;
   onSessionsChanged(patch?: { pinned?: boolean; title?: string }): void;
   expertBadge?: { name: string; avatarLocal?: string };
+  onOpenSearch: () => void;
 }) {
   return (
     <header className="main-topbar" data-openbuddy-drag>
@@ -100,7 +115,7 @@ const Topbar = memo(function Topbar({
           onExpandSidebar={onExpandSidebar}
           onNewSession={onNewSession}
         />
-        <TopbarTitle title={title} appVersion={appVersion} onRename={onRename} />
+        <TopbarTitle title={title} appVersion={appVersion} onRename={onRename} editable={Boolean(sessionId)} />
         {expertBadge && (
           <span className="expert-badge" data-tip={`专家：${expertBadge.name}`}>
             <ThumbImg name={expertBadge.name} local={expertBadge.avatarLocal} size={18} shape="circle" />
@@ -116,6 +131,7 @@ const Topbar = memo(function Topbar({
           />
         )}
       </div>
+      <MainTopbarCenter onOpenSearch={onOpenSearch} />
       <MainTopbarToolsSlot />
     </header>
   );
@@ -144,7 +160,28 @@ function HomeSurface(props: React.ComponentProps<typeof HomePage>) {
 /** 侧栏：内核 `sidebar` slot 优先，回落到 ui-sidebar 的 Sidebar。 */
 function SidebarSurface(props: React.ComponentProps<typeof Sidebar>) {
   const Component = useSlotComponent("sidebar", Sidebar);
-  return <Component {...props} />;
+  // Wrap the sidebar in a Resizable so the user can drag its right edge
+  // (240–480px clamp, persisted under `openbuddy.sidebar.width`). The
+  // wrapper owns the pixel width, so the sidebar's own CSS (which reads
+  // `100%` under `.app__sidebar-shell`) tracks the drag without a JS hop.
+  // Collapsed state still hides the sidebar via `.app__body--collapsed .sidebar`.
+  // `handleClassName` exists because `.sidebar` carries `z-index: 20` (so the
+  // 「更多」flyout can overflow into the main pane), which otherwise paints over
+  // the handle and leaves only a 2px sliver draggable.
+  return (
+    <Resizable
+      edge="right"
+      min={260}
+      max={480}
+      defaultWidth={320}
+      storageKey="openbuddy.sidebar.width"
+      className="app__sidebar-shell"
+      handleClassName="app__sidebar-handle"
+      handleLabel="调整侧栏宽度"
+    >
+      <Component {...props} />
+    </Resizable>
+  );
 }
 
 /** 搜索面板：内核 `overlay.search` slot 优先。 */
@@ -169,6 +206,35 @@ function AboutSurface(props: React.ComponentProps<typeof AboutDialog>) {
 function TrustSurface(props: React.ComponentProps<typeof FolderTrustDialog>) {
   const Component = useSlotComponent("overlay.folder-trust", FolderTrustDialog);
   return <Component {...props} />;
+}
+
+/**
+ * 首启引导：内核 `onboarding.wizard` slot 优先（自带 localStorage 门控：
+ * 已完成 / 已跳过就不再出现），回落用内置步骤直接渲染。
+ */
+function OnboardingSurface() {
+  const Fallback = useMemo(
+    () =>
+      function OnboardingWizardFallback() {
+        return <OnboardingWizard steps={DEFAULT_ONBOARDING_STEPS} />;
+      },
+    [],
+  );
+  const Component = useSlotComponent<ComponentType<Record<string, unknown>>>(
+    "onboarding.wizard",
+    Fallback as unknown as ComponentType<Record<string, unknown>>,
+  );
+  return <Component />;
+}
+
+/** 产品漫游：内核 `onboarding.tour` slot 优先，未注册则不渲染。 */
+function TourSurface() {
+  const Component = useSlotComponent<ComponentType<Record<string, unknown>> | null>(
+    "onboarding.tour",
+    null,
+  );
+  if (!Component) return null;
+  return <Component />;
 }
 
 /** 任务面板：内核 `overlay.tasks` slot 优先。 */
@@ -257,7 +323,7 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
           onSendContent={handleSendContent}
           streaming={streaming}
           apiReady={apiReady}
-          onOpenSettings={openSettings}
+          onOpenSettings={() => openSettings()}
           modelId={currentModelId}
           models={models}
           onModelChange={handleModelChange}
@@ -294,7 +360,7 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
           onToast={showToast}
           onSelectExpert={handleStartWithExpert}
           onNavigateConnectors={() => setPlaceholderView("专家·技能·连接器")}
-          onOpenSettings={openSettings}
+          onOpenSettings={() => openSettings()}
           extensionText={extensionText}
           extensionTextNonce={extensionTextNonce}
           extensionUi={extensionUiBySession[currentSessionId]}
@@ -309,7 +375,7 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
           onSend={handleSendNew}
           streaming={streaming}
           apiReady={apiReady}
-          onOpenSettings={openSettings}
+          onOpenSettings={() => openSettings()}
           onPlaceholder={handlePlaceholder}
           modelId={currentModelId}
           models={models}
@@ -329,6 +395,7 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
 export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellRuntime }) {
   const {
     settingsOpen,
+    settingsSection,
     shortcutsOpen,
     searchOpen,
     aboutOpen,
@@ -352,6 +419,8 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
     handleToggleWorkspace,
     openSettings,
     openAccountSettings,
+    handleLogin,
+    handleLogout,
     showToast,
     handlePlaceholder,
     casdoorSession,
@@ -375,13 +444,15 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
             onNewSession={handleNewSession}
             onSelect={handleSelectSession}
             onNavigate={handleNavigate}
-            onOpenSettings={openSettings}
+            onOpenSettings={() => openSettings()}
+            onOpenSettingsSection={(section: string) => openSettings(section as SettingsSection)}
+            accountLabel={casdoorSession?.status === "signed_in" && casdoorSession.identity
+              ? casdoorSession.identity.displayName ?? casdoorSession.identity.email ?? casdoorSession.identity.subject
+              : undefined}
+            accountStatus={casdoorSession?.status}
             onOpenAccount={openAccountSettings}
-            accountLabel={
-              casdoorSession?.status === "signed_in" && casdoorSession.identity
-                ? casdoorSession.identity.displayName ?? casdoorSession.identity.email ?? casdoorSession.identity.subject
-                : undefined
-            }
+            onLogin={handleLogin}
+            onLogout={handleLogout}
             onToggleCollapse={() => setSidebarCollapsed(true)}
             onToggleWorkspace={handleToggleWorkspace}
             onOpenSearch={() => setSearchOpen(true)}
@@ -393,6 +464,10 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           />
         </ErrorBoundary>
         <main id="main-content" className="app__main">
+          {/* R10 — Topbar 任何时候都该渲染:对话页带会话标题/置顶,首页/占位页
+              至少保留「折叠侧栏 / 新建任务 / 主题切换 / 全局工具」入口,避免
+              侧栏展开时主区域顶上一片空白。CollapsedTopbarFloat 仍然只在
+              sidebarCollapsed=true 时显示悬浮按钮。 */}
           {!placeholderView && currentSessionId ? (
             <Topbar
               sidebarCollapsed={sidebarCollapsed}
@@ -405,14 +480,28 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
               pinned={false}
               onSessionsChanged={() => { /* 由 useSessionsStore 自动刷新 */ }}
               expertBadge={undefined}
+              onOpenSearch={() => setSearchOpen(true)}
             />
           ) : (
-            <CollapsedTopbarFloat
+            <Topbar
               sidebarCollapsed={sidebarCollapsed}
               onExpandSidebar={() => setSidebarCollapsed(false)}
               onNewSession={handleNewSession}
+              title="OpenBuddy"
+              appVersion={APP_VERSION}
+              onRename={async () => { /* 首页无会话,无需改名 */ }}
+              sessionId={undefined}
+              pinned={false}
+              onSessionsChanged={() => { /* 首页无会话 */ }}
+              expertBadge={undefined}
+              onOpenSearch={() => setSearchOpen(true)}
             />
           )}
+          <CollapsedTopbarFloat
+            sidebarCollapsed={sidebarCollapsed}
+            onExpandSidebar={() => setSidebarCollapsed(false)}
+            onNewSession={handleNewSession}
+          />
           <MainContent runtime={runtime} />
         </main>
       </div>
@@ -433,7 +522,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
           onModelsChanged={refreshModels}
-          initialSection="model"
+          initialSection={settingsSection}
           onOpenEmailPlan={(planId) => {
             localStorage.setItem("openbuddy.email.processing-plan-target", planId);
             setSettingsOpen(false);
@@ -447,9 +536,12 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           onToast={showToast}
         />
         <TasksSurface refreshSignal={runtime.taskRefreshSignal} onToast={showToast} />
+        <OnboardingSurface />
+        <TourSurface />
       </Suspense>
       <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <GlobalConfirmHost />
+      <AppStatusBar runtime={runtime} />
     </div>
   );
 });

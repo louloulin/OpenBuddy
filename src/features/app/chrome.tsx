@@ -13,7 +13,8 @@
 
 import type { ReactNode } from "react";
 import { memo } from "react";
-import { NewTaskIcon, SidebarToggleIcon } from "@openbuddy/ui-primitives/icons";
+import { NewTaskIcon, SearchIcon, SidebarToggleIcon } from "@openbuddy/ui-primitives/icons";
+import { ThemeMenuButton } from "@openbuddy/ui-shell";
 
 /** 启动时 / 路由 lazy 时的占位 loading 视图。 */
 export const RoutePending = memo(function RoutePending({
@@ -46,17 +47,21 @@ export const MainTopbarActions = memo(function MainTopbarActions({
   onExpandSidebar,
   onNewSession,
 }: MainTopbarActionsProps) {
-  if (!sidebarCollapsed) return null;
+  // R10.1 — 「新建任务」始终显示,不再仅在侧栏折叠时挂载。
+  // 理由:首页/占位页顶栏需要这个入口触发新会话;原行为要求用户先
+  // 收起侧栏才能看到顶栏按钮,体验割裂。
   return (
     <>
-      <button
-        className="main-topbar__btn"
-        aria-label="展开侧边栏"
-        data-tip="展开侧边栏"
-        onClick={onExpandSidebar}
-      >
-        <SidebarToggleIcon size="md" />
-      </button>
+      {sidebarCollapsed && (
+        <button
+          className="main-topbar__btn"
+          aria-label="展开侧边栏"
+          data-tip="展开侧边栏"
+          onClick={onExpandSidebar}
+        >
+          <SidebarToggleIcon size="md" />
+        </button>
+      )}
       <button
         className="main-topbar__btn"
         aria-label="新建任务"
@@ -69,9 +74,51 @@ export const MainTopbarActions = memo(function MainTopbarActions({
   );
 });
 
-/** 主区域顶栏右侧（ChatView 通过 createPortal 注入工具图标）。 */
+/**
+ * 主区域顶栏中心区域：搜索触发器 + 可选上下文信息。
+ *
+ * Phase B 扩展 —— 顶栏左右两侧（main-topbar__left / main-topbar__right）
+ * 之间有 ~700px 空白，加一个轻量搜索按钮让用户随时呼出全局 SearchOverlay。
+ * 这里不订阅 store，搜索回调完全由 AppShell 通过 prop 注入。
+ */
+export interface MainTopbarCenterProps {
+  onOpenSearch(): void;
+}
+
+export const MainTopbarCenter = memo(function MainTopbarCenter({
+  onOpenSearch,
+}: MainTopbarCenterProps) {
+  return (
+    <div className="main-topbar__center" aria-label="全局工具">
+      <button
+        type="button"
+        className="main-topbar__search"
+        aria-label="搜索 会话/文件/命令"
+        data-tip="搜索 会话/文件/命令  (Ctrl/Cmd+K)"
+        onClick={onOpenSearch}
+      >
+        <SearchIcon size="sm" />
+        <span className="main-topbar__search-label">搜索 会话 / 文件 / 命令</span>
+        <kbd className="main-topbar__search-kbd" aria-hidden="true">⌘K</kbd>
+      </button>
+    </div>
+  );
+});
+
+/**
+ * 主区域顶栏右侧（ChatView 通过 createPortal 注入工具图标）。
+ *
+ * Phase B：在 portal 宿主左侧固定挂一枚主题入口 —— 顶栏常驻的
+ * `@openbuddy/ui-shell` ThemeMenuButton（内部复用 ui-theme 的 ThemePicker，
+ * 自带弹层 / Esc / 外部点击关闭；宿主没有 ThemeProvider 时会自动降级）。
+ * ChatView 的 portal 图标仍追加在同一容器内、排在主题按钮之后。
+ */
 export const MainTopbarToolsSlot = memo(function MainTopbarToolsSlot() {
-  return <div className="main-topbar__right" id="ob-topbar-tools" />;
+  return (
+    <div className="main-topbar__right" id="ob-topbar-tools">
+      <ThemeMenuButton />
+    </div>
+  );
 });
 
 /** 侧栏折叠时的悬浮展开按钮（非对话页）。 */

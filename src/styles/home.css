@@ -240,6 +240,10 @@
      container, not inside the footer) is unaffected. */
   overflow: hidden;
 }
+/* R9.x.1 — 左下角用户区恢复,展示 OpenBuddy 品牌信息(不再是「企业登录」)。
+ *   头像默认 UserIcon,显示 "OpenBuddy" + "本地优先 · 开源" 副标;
+ *   当 accountLabel 注入(例如 SSO 登录后)时切到真实头像首字母 + 登录状态。
+ *   整体走品牌色 token —— 不再有 wb-user-avatar-bg 那种中性灰色。 */
 .sidebar__user {
   display: flex;
   align-items: center;
@@ -255,11 +259,10 @@
   cursor: pointer;
   font-size: 13px;
   color: var(--wb-text-strong);
+  transition: background var(--wb-duration-fast) var(--wb-ease-out-expo);
 }
 .sidebar__user-avatar {
-  /* WB 实测: 头像为 28×28 圆, 浅灰底 (light) / 深灰底 (dark);
-   * 已登录时显示用户名首字母, 未登录回退 UserIcon;
-   * 微内核适配: 用 var(--wb-user-avatar-bg) 让三方插件可覆盖品牌色。 */
+  /* R9.x.1: 头像底用品牌色软填充(打开后看见 OpenBuddy 身份),不再用通用灰色。 */
   flex: 0 0 28px;
   width: 28px;
   height: 28px;
@@ -267,8 +270,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--wb-user-avatar-bg, var(--wb-bg-hover, #EBEBEB));
-  color: var(--wb-user-avatar-color, var(--wb-text-strong));
+  background: var(--wb-accent-soft, color-mix(in srgb, var(--wb-accent) 14%, transparent));
+  color: var(--wb-accent, #00c29a);
   font-size: 13px;
   font-weight: 600;
   line-height: 1;
@@ -304,8 +307,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* “企业登录” wrapped onto a second line when the footer ran out of width —
-   truncate instead. */
+/* 名字超长时截断为省略号 —— "本地优先 · 开源" 副标也走这条规则 */
 .sidebar__user span {
   white-space: nowrap;
   overflow: hidden;
@@ -313,6 +315,129 @@
 }
 .sidebar__user:hover {
   background: var(--wb-bg-hover);
+}
+
+/* R15 — 账户菜单(chevron + popover)。
+   chevron 默认隐藏,菜单展开时按钮高亮,
+   popover 浮在 footer 之上,带阴影与圆角,菜单项走 hover 高亮。 */
+.sidebar__user-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+.sidebar__user-chevron {
+  flex: none;
+  margin-left: 4px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--wb-text-tertiary);
+  opacity: 0.6;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.sidebar__user--open .sidebar__user-chevron {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+.sidebar__user--open {
+  background: var(--wb-bg-active);
+}
+.sidebar__account-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 200px;
+  max-width: 240px;
+  padding: 4px;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+  border-radius: var(--wb-radius-md, 8px);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.10), 0 -1px 3px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 30;
+  animation: account-menu-pop 0.14s ease-out;
+}
+/* R17 — portal 变体:菜单挂在 <body> 下,用 fixed 定位脱离
+   `.sidebar__footer` / `.sidebar` 的 overflow:hidden 裁剪链。
+   位置由组件按触发器 rect 计算(优先向上翻转,空间不足时向下)。 */
+.sidebar__account-menu--portal {
+  position: fixed;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  min-width: 0;
+  max-width: none;
+  max-height: min(70vh, 420px);
+  overflow-y: auto;
+  z-index: 1300;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+/* 向下弹出时箭头方向语义不同,阴影改为向下投。 */
+.sidebar__account-menu--portal[data-placement="bottom"] {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16), 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+@keyframes account-menu-pop {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sidebar__account-menu-head {
+  padding: 8px 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.06));
+  margin-bottom: 2px;
+}
+.sidebar__account-menu-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--wb-text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar__account-menu-sub {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--wb-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar__account-menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--wb-radius-sm, 6px);
+  background: none;
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.sidebar__account-menu-item:hover {
+  background: var(--wb-bg-hover);
+}
+.sidebar__account-menu-item--primary {
+  color: var(--wb-accent, #00c29a);
+  font-weight: 500;
+}
+.sidebar__account-menu-item--primary:hover {
+  background: color-mix(in srgb, var(--wb-accent, #00c29a) 14%, transparent);
+  color: var(--wb-accent, #00c29a);
+}
+.sidebar__account-menu-item--danger {
+  color: var(--wb-danger, #cf222e);
+}
+.sidebar__account-menu-item--danger:hover {
+  background: color-mix(in srgb, var(--wb-danger, #cf222e) 10%, transparent);
+  color: var(--wb-danger, #cf222e);
 }
 
 /* ========================================================================

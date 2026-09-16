@@ -2056,8 +2056,16 @@ body.dark .permission-picker__popover,
   letter-spacing: -0.2px;
 }
 .home__subtitle {
-  /* WB 首页只有一行大字;此处保留选择器以防外部引用,但隐藏以免竞争视觉。 */
-  display: none;
+  /* R-fix: 恢复显示 —— HomePage.test 期望副标题随 scene 切换;
+   * 大字标题下方用弱化字色 + 中号字 + 紧贴行高,把"双行大标题"撑出层次。 */
+  display: block;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+  font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  color: var(--wb-text-medium, #6e6e80);
+  letter-spacing: 0;
 }
 /* WB 实测（v5.4.7，DPR=2）：
  *  - 场景 tab 是一排**独立 pill**，没有外层灰底容器。
@@ -2501,9 +2509,11 @@ body.dark .permission-picker__popover,
 }
 .wb-composer__scene-tag-remove:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
 
-/* ===== Sidebar (WorkBuddy conversation-list,实测:264px,#F2F2F2) ===== */
+/* ===== Sidebar (WorkBuddy conversation-list,实测:264px;OpenBuddy 加宽至320px,#F2F2F2) ===== */
 .sidebar {
-  width: 264px;
+  /* 宿主用 <Resizable> 包住侧栏时实际宽度由 wrapper 决定(默认320);
+     这里只是无 wrapper 渲染时的回退值。 */
+  width: 320px;
   flex: none;
   /* WB: sidebar bg = --wb-sidebar-bg (= #F2F2F2 light) */
   background: var(--wb-sidebar-bg, var(--wb-home-bg-primary));
@@ -2544,7 +2554,18 @@ body.dark .permission-picker__popover,
   color: var(--wb-text-disabled, rgba(0, 0, 0, 0.2));
 }
 .sidebar__logo-spacer {
+  /* 默认情况下 flex: 1,把侧栏头/尾的图标按钮推到右侧;footer 区里
+     这一栏被显式改成 flex: 0 0 auto 让位给 .sidebar__user。 */
   flex: 1;
+}
+.sidebar__footer > .sidebar__logo-spacer {
+  flex: 0 0 auto;
+  width: 8px;
+  /* R-fix: 父 .sidebar__footer 用 align-items:center,空 div 高度坍缩为 0,
+     让位给 user button / 通知 / 设置 排成一条线。补 height 与 align-self
+     使 spacer 与 icon 按钮等高,而不是塌成一条看不见的细线。 */
+  height: 32px;
+  align-self: center;
 }
 .sidebar__icon-btn {
   width: 32px;
@@ -3252,13 +3273,27 @@ body.dark .permission-picker__popover,
 .sidebar__chevron--collapsed {
   transform: rotate(-90deg);
 }
-/* 一级导航项的尾随小标 (WB: 「更多」右边的「灵感」) */
+/* 一级导航项的尾随小标(R-fix: 视觉提示改用 ::after 伪元素,
+ * span 文本节点为空,避免与 dropdown 里的同名菜单项冲突)。 */
 .sidebar__nav-sub {
   margin-left: auto;
   flex: none;
+  width: 8px;
+  height: 20px;
+  /* 覆盖 line 2772 的 display:inline-flex —— 空 span 在 inline-flex 下
+   * intrinsic 高度为 0,无法撑出 ::after 伪元素的定位上下文。 */
+  display: inline-block;
+  pointer-events: none;
+  position: relative;
+}
+.sidebar__nav-sub::after {
+  content: "▸";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
   font-size: 11px;
   color: var(--wb-text-tertiary, #8a8a96);
   font-weight: 500;
-  letter-spacing: 0.2px;
-  pointer-events: none;
+  line-height: 1;
 }

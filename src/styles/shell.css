@@ -2,7 +2,7 @@
  * OpenBuddy application styles.
  *
  * Design tokens (--wb-*) come from tokens.css (ported from WorkBuddy).
- * Layout numbers mirror WorkBuddy: 56px topbar, ~260px sidebar, 800px chat
+ * Layout numbers mirror WorkBuddy: 56px topbar, ~320px sidebar, 800px chat
  * column, 13px base font.
  */
 
@@ -30,10 +30,12 @@
  * down. Other pages hide it entirely and stick their own headers to the top. */
 .main-topbar {
   flex: none;
-  height: 48px;
+  /* R17 — 与 chrome.css 保持一致:加宽到 56px */
+  height: 56px;
+  min-height: 56px;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 20px;
   box-sizing: border-box;
   /* Empty area drags the window, like the title bar; interactive children opt out. */
   -webkit-app-region: drag;
@@ -200,3 +202,121 @@
 }
 
 /* ---- TopbarActions: 更多操作下拉菜单 ---- */
+
+/* ---------- resizable sidebar shell ----------
+ * The SidebarSurface wraps the sidebar in a <Resizable> so the user can
+ * drag its right edge (240–480px, persisted under `openbuddy.sidebar.width`).
+ * The Resizable owns the pixel width; the sidebar itself must fill 100% of
+ * that slot instead of its own fixed `--ds-sidebar-width`. */
+.app__sidebar-shell {
+  height: 100%;
+  flex: none;
+}
+.app__sidebar-shell .sidebar {
+  width: 100%;
+  /* 关键：Resizable 的 .content 是 flex column，而 .sidebar 自身是
+   * `flex: none`，若不显式给高度就会按内容撑开，把 .sidebar__footer
+   * (用户 / 设置) 顶出视口，同时 .sidebar__content 也失去滚动容器。
+   * 固定 100% 后 footer 常驻底部、会话列表内部滚动。 */
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+}
+.app__sidebar-shell .sidebar--collapsed {
+  width: 0;
+}
+
+/* ---------- 侧栏拖拽把手层级 ----------
+ * `.sidebar` 自带 `position: relative; z-index: 20`(让「更多」flyout 溢出到主区),
+ * 而 Resizable 的 handle 只有 z-index: 5,于是把手整条被侧栏盖住 —— 只剩越过侧栏
+ * 右边缘的 ~2px 可命中,实测拖拽完全失效。把把手提到侧栏之上(仍低于 modal/toast),
+ * 让整条 5px 命中带可拖,同时保留 hover 时的高亮竖线反馈。 */
+/* 四段选择器(3 classes + 1 attr)刻意压过 Resizable.module.css 的
+ * `.wrapper[data-resizable-edge="right"] > .handle`,避免依赖 CSS 注入顺序。 */
+.app__sidebar-shell[data-resizable-edge="right"] > .app__sidebar-handle[role="separator"] {
+  z-index: 30;
+}
+
+/* ---------- 侧栏自适应滚动条 ----------
+ * 会话很多时列表在 .sidebar__content 内滚动。滚动条默认隐形，指针进入
+ * 侧栏或滚动时才淡入，避免长列表下出现常驻的粗滚动条。 */
+.app__sidebar-shell .sidebar__content {
+  /* R8.62.1 — 会话很多时常驻一条细滚动条,而不只是 hover 才出现,避免
+   * 用户看不到「还能往下滚」的信号。颜色比 hover 态更浅、宽度同 8px。 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--wb-scrollbar-thumb-idle, rgba(0, 0, 0, 0.18)) transparent;
+  overscroll-behavior: contain;
+  /* R10.2 — .sidebar 是 flex column,__content 必须 flex:1 + min-height:0
+   * 才会真正撑满 sidebar 在 footer 之上剩余的高度,否则 __content 高度
+   * 跟着会话数浮动(只有 33 个会话时实测 238px),footer 与 content 之间
+   * 留出 ~585px 空白,且会话再多时 footer 会被推出视口。补上这一对
+   * 才能让下方的 scrollbar-color / -webkit-scrollbar 真正生效。 */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* 让 footer 仍保持「贴着 content 底部」,不要因为 content 短而把
+   * footer 顶到中间。 */
+  margin-bottom: 0;
+}
+.app__sidebar-shell .sidebar__content::-webkit-scrollbar {
+  width: 8px;
+}
+.app__sidebar-shell .sidebar__content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.app__sidebar-shell .sidebar__content::-webkit-scrollbar-thumb {
+  background-color: var(--wb-scrollbar-thumb-idle, rgba(0, 0, 0, 0.18));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.app__sidebar-shell:hover .sidebar__content::-webkit-scrollbar-thumb,
+.app__sidebar-shell .sidebar__content:focus-within::-webkit-scrollbar-thumb {
+  background-color: var(--wb-scrollbar-thumb, rgba(0, 0, 0, 0.22));
+}
+.app__sidebar-shell .sidebar__content::-webkit-scrollbar-thumb:hover {
+  background-color: var(--wb-scrollbar-thumb-hover, rgba(0, 0, 0, 0.34));
+}
+.app__sidebar-shell:hover .sidebar__content {
+  scrollbar-color: var(--wb-scrollbar-thumb, rgba(0, 0, 0, 0.22)) transparent;
+}
+/* When the app is collapsed the whole shell (including the resize handle)
+ * disappears so the drag target doesn't linger. */
+.app__body--collapsed .app__sidebar-shell {
+  display: none;
+}
+
+/* ---------- TopbarTitle Phase B: 面包屑 ----------
+ * 顶栏标题前的浅色路径(如 项目 / 调研 / 周报)。与 .main-topbar__title-area 的
+ * gap:4px 共享间距,最后一段用 aria-current 标出当前页。长度超过 3 段时由
+ * 组件折叠成 `首段 / … / 末段`。 */
+.main-topbar__breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 32vw;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--wb-fg-tertiary);
+  user-select: none;
+}
+.main-topbar__breadcrumb-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.main-topbar__breadcrumb-sep {
+  color: var(--wb-fg-tertiary);
+  opacity: 0.6;
+}
+.main-topbar__breadcrumb-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 12vw;
+}
+.main-topbar__breadcrumb-label[aria-current="page"] {
+  color: var(--wb-fg-secondary);
+}

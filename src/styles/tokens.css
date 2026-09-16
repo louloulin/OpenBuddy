@@ -404,6 +404,7 @@ body[data-vscode-theme-name="IDE Light"] {
   --wb-text-enterprise: var(--wb-color-text-warning-default);
   --wb-scrollbar-thumb: var(--wb-palette-black-20);
   --wb-scrollbar-thumb-hover: var(--wb-palette-black-30);
+  --wb-scrollbar-thumb-idle: rgba(0, 0, 0, 0.10);
   --wb-badge-warning-bg: var(--wb-status-warning-soft);
   --wb-badge-warning-fg: var(--wb-color-text-warning-default);
   --wb-badge-success-bg: var(--wb-palette-green-1);
@@ -490,6 +491,7 @@ body.dark,
   --wb-text-enterprise: var(--wb-color-text-warning-hover);
   --wb-scrollbar-thumb: var(--wb-palette-white-20);
   --wb-scrollbar-thumb-hover: var(--wb-palette-white-30);
+  --wb-scrollbar-thumb-idle: rgba(255, 255, 255, 0.12);
   --wb-badge-warning-bg: var(--wb-status-warning-soft);
   --wb-badge-warning-fg: var(--wb-color-text-warning-hover);
   --wb-badge-success-bg: color-mix(in srgb, var(--wb-color-text-success-default) 18%, transparent);
@@ -749,13 +751,32 @@ body.dark,
   border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
-[data-theme="dark"] input,
-[data-theme="dark"] textarea,
-[data-theme="dark"] select,
+/* R17 — 把原来对裸 input/textarea/select 的全仓暗色覆盖拆掉:
+ *   .wb-composer__input 设计上 background:transparent(贴在 composer-card 的
+ *   --wb-bg-elevated 上),被暗色规则一刀切涂成 #1f1f1f 后,在暗色下出现一块
+ *   明显的内陷,与浅色主题的「输入卡 = 白卡」观感差距很大。改为只对真正
+ *   需要暗色底板的容器内(邮件 compose / 邮件规则编辑 / settings 表单 /
+ *   onboarding wizard / 搜索过滤 / 自动补全)显式选,。 */
+[data-theme="dark"] .email-composer input,
+[data-theme="dark"] .email-composer textarea,
+[data-theme="dark"] .email-composer select,
+[data-theme="dark"] .email-rule-editor input,
+[data-theme="dark"] .email-rule-editor textarea,
+[data-theme="dark"] .email-rule-editor select,
 [data-theme="dark"] .email-search-filters,
 [data-theme="dark"] .email-folders,
 [data-theme="dark"] .email-bulk-toolbar,
-[data-theme="dark"] .email-ai-actions {
+[data-theme="dark"] .email-ai-actions,
+[data-theme="dark"] .settings-modal input[type="text"],
+[data-theme="dark"] .settings-modal input[type="search"],
+[data-theme="dark"] .settings-modal input[type="number"],
+[data-theme="dark"] .settings-modal input[type="url"],
+[data-theme="dark"] .settings-modal textarea,
+[data-theme="dark"] .settings-modal select,
+[data-theme="dark"] .onboarding-wizard input,
+[data-theme="dark"] .onboarding-wizard textarea,
+[data-theme="dark"] .onboarding-wizard select,
+[data-theme="dark"] .audit-trail input[type="search"] {
   background-color: #1f1f1f !important;
   color: var(--wb-color-text-primary, rgba(255, 255, 255, 0.92)) !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
