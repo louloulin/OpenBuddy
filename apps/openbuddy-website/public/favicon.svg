@@ -1,24 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="OpenBuddy">
-  <!--
-    Favicon: simplified badge. Drops bracket lines + outer ring dasharray so the
-    silhouette stays crisp at 16/32/48 px.
-  -->
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#0E2A2A"/>
-      <stop offset="1" stop-color="#06151A"/>
-    </linearGradient>
-    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#5BFFD0"/>
-      <stop offset="1" stop-color="#008C75"/>
-    </linearGradient>
-    <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#7BFFE0"/>
-      <stop offset="1" stop-color="#00C29A"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
-  <circle cx="32" cy="32" r="20" fill="none" stroke="url(#ring)" stroke-width="4.5"/>
-  <circle cx="32" cy="32" r="12" fill="url(#core)"/>
-  <circle cx="46" cy="20" r="3.2" fill="#FFFFFF"/>
+  <!-- favicon: simplified dog silhouette that survives 16px -->
+  <rect width="64" height="64" rx="14" fill="#0B1F22"/>
+  <path d="M14 14 Q19 6 27 11 Q24 22 19 26 Z" fill="#00C29A"/>
+  <path d="M50 14 Q45 6 37 11 Q40 22 45 26 Z" fill="#00C29A"/>
+  <rect x="16" y="18" width="32" height="32" rx="14" fill="#00C29A"/>
+  <circle cx="25" cy="33" r="3" fill="#06151A"/>
+  <circle cx="39" cy="33" r="3" fill="#06151A"/>
+  <circle cx="26" cy="32" r="1" fill="#FFFFFF"/>
+  <circle cx="40" cy="32" r="1" fill="#FFFFFF"/>
+  <path d="M30 39 Q30 37 32 37 Q34 37 34 39 Q34 41 32 42 Q30 41 30 39 Z" fill="#06151A"/>
+  <path d="M32 42 L32 44" stroke="#06151A" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M32 44 Q29 47 27 45" fill="none" stroke="#06151A" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M32 44 Q35 47 37 45" fill="none" stroke="#06151A" stroke-width="1.2" stroke-linecap="round"/>
+  <circle cx="52" cy="14" r="2.5" fill="#FFFFFF"/>
 </svg>

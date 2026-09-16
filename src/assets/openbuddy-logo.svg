@@ -1,13 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
   <!--
-    Abstract OpenBuddy mark.
-    Composition: nested geometric forms on a rounded badge.
-      - Outer ring  : openness, infinite loop
-      - Inner ring  : focused intelligence / layer 2
-      - Solid core  : the buddy / agent nucleus
-      - Accent dot  : live signal / active inference
-    Brand palette anchored on #00C29A (OpenBuddy mint-teal).
-    Designed to survive 16px: the bold outer ring + solid core stay readable.
+    Stylised geometric buddy. Flat-design construction: simple primitives
+    combined into a friendly face. Brand palette anchored on #00C29A.
+    Reads as a buddy / companion without being literal or photoreal.
   -->
   <defs>
     <linearGradient id="bg" x1="120" y1="90" x2="900" y2="940" gradientUnits="userSpaceOnUse">
@@ -15,41 +10,57 @@
       <stop offset=".55" stop-color="#0B1F22"/>
       <stop offset="1" stop-color="#06151A"/>
     </linearGradient>
-    <linearGradient id="ring" x1="320" y1="200" x2="720" y2="820" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#5BFFD0"/>
+    <linearGradient id="fur" x1="280" y1="200" x2="760" y2="820" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7BFFE0"/>
       <stop offset=".45" stop-color="#00C29A"/>
       <stop offset="1" stop-color="#008C75"/>
     </linearGradient>
-    <linearGradient id="core" x1="380" y1="380" x2="640" y2="640" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#7BFFE0"/>
-      <stop offset="1" stop-color="#00C29A"/>
+    <linearGradient id="muzzle" x1="380" y1="560" x2="640" y2="780" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E8FFF7"/>
+      <stop offset="1" stop-color="#A8E8D4"/>
     </linearGradient>
     <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
   </defs>
 
   <g clip-path="url(#clip)">
     <rect x="38" y="38" width="948" height="948" fill="url(#bg)"/>
+    <!-- soft glow -->
+    <circle cx="800" cy="200" r="320" fill="#00C29A" opacity=".10"/>
+    <circle cx="220" cy="820" r="280" fill="#00C29A" opacity=".07"/>
 
-    <!-- soft glow to keep the badge from feeling flat -->
-    <circle cx="780" cy="220" r="380" fill="#00C29A" opacity=".10"/>
-    <circle cx="220" cy="820" r="320" fill="#00C29A" opacity=".07"/>
+    <!-- ears: rounded triangles, splayed outward -->
+    <path d="M268 240 Q310 170 384 220 Q360 360 300 410 Z" fill="url(#fur)"/>
+    <path d="M756 240 Q714 170 640 220 Q664 360 724 410 Z" fill="url(#fur)"/>
+    <!-- inner ear -->
+    <path d="M298 252 Q330 210 372 244 Q352 330 314 374 Z" fill="#06332C" opacity=".75"/>
+    <path d="M726 252 Q694 210 652 244 Q672 330 710 374 Z" fill="#06332C" opacity=".75"/>
 
-    <!-- outer ring : "Open" -->
-    <circle cx="512" cy="512" r="320" fill="none" stroke="url(#ring)" stroke-width="56" stroke-linecap="round" stroke-dasharray="1820 200" stroke-dashoffset="220"/>
+    <!-- head: rounded square -->
+    <rect x="280" y="280" width="464" height="464" rx="220" fill="url(#fur)"/>
 
-    <!-- inner ring : layered intelligence -->
-    <circle cx="512" cy="512" r="220" fill="none" stroke="#5BFFD0" stroke-width="22" opacity=".55"/>
+    <!-- cream muzzle / lower face -->
+    <ellipse cx="512" cy="640" rx="180" ry="120" fill="url(#muzzle)"/>
 
-    <!-- core : the buddy / agent nucleus -->
-    <circle cx="512" cy="512" r="132" fill="url(#core)"/>
+    <!-- brow spots -->
+    <circle cx="392" cy="408" r="34" fill="#E8FFF7" opacity=".75"/>
+    <circle cx="632" cy="408" r="34" fill="#E8FFF7" opacity=".75"/>
 
-    <!-- accent : live inference signal -->
-    <circle cx="700" cy="324" r="44" fill="#FFFFFF"/>
+    <!-- eyes: solid circles + highlight dot -->
+    <circle cx="412" cy="492" r="42" fill="#06151A"/>
+    <circle cx="612" cy="492" r="42" fill="#06151A"/>
+    <circle cx="424" cy="480" r="14" fill="#FFFFFF"/>
+    <circle cx="624" cy="480" r="14" fill="#FFFFFF"/>
 
-    <!-- subtle bracket lines : framing the geometry (no literal animal) -->
-    <path d="M256 256 L256 384" stroke="#5BFFD0" stroke-width="14" stroke-linecap="round" opacity=".35"/>
-    <path d="M768 256 L768 384" stroke="#5BFFD0" stroke-width="14" stroke-linecap="round" opacity=".35"/>
-    <path d="M256 768 L256 640" stroke="#5BFFD0" stroke-width="14" stroke-linecap="round" opacity=".35"/>
-    <path d="M768 768 L768 640" stroke="#5BFFD0" stroke-width="14" stroke-linecap="round" opacity=".35"/>
+    <!-- nose -->
+    <path d="M484 612 Q484 588 512 588 Q540 588 540 612 Q540 644 512 660 Q484 644 484 612 Z" fill="#06151A"/>
+
+    <!-- smile -->
+    <path d="M512 664 L512 696" stroke="#06151A" stroke-width="14" stroke-linecap="round"/>
+    <path d="M512 696 Q470 740 432 706" fill="none" stroke="#06151A" stroke-width="14" stroke-linecap="round"/>
+    <path d="M512 696 Q554 740 592 706" fill="none" stroke="#06151A" stroke-width="14" stroke-linecap="round"/>
+
+    <!-- subtle AI accent: a small bracket dot at top-right -->
+    <circle cx="780" cy="280" r="22" fill="#FFFFFF" opacity=".92"/>
+    <circle cx="780" cy="280" r="38" fill="none" stroke="#5BFFD0" stroke-width="6" opacity=".5"/>
   </g>
 </svg>
