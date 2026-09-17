@@ -30,12 +30,21 @@ const report = JSON.parse(
   }),
 );
 
-/** 基线 —— R95 实测值。只许上调。 */
+/**
+ * 基线 —— R95 实测值。只许上调。
+ *
+ * 注意 `consumedPct` 从 70 变成 85 不是"接线变多了",而是**审计本身修了一个
+ * 假阴性**:消费点写作 `useSlotComponent<ComponentType<Record<string, unknown>>>("x.y", …)`,
+ * 泛型里有两层 `>`,旧正则要求 `(` 紧跟函数名,于是**所有带泛型的消费点都被
+ * 漏掉**(onboarding.* 全系列),审计把"真有人消费"误报成"注册了也不会渲染"。
+ * 这类假阴性最危险的地方是它会直接误导改造优先级 —— 看起来没人用的槽位,
+ * 其实已经在渲染。
+ */
 const BASELINE = {
   declared: 64,
-  wired: 38,
+  wired: 45,
   registeredPct: 77,
-  consumedPct: 70,
+  consumedPct: 85,
 };
 
 describe("槽位三态审计", () => {
@@ -57,6 +66,19 @@ describe("槽位三态审计", () => {
   it("注册率与消费率不低于基线", () => {
     expect(report.coverage.registeredPct).toBeGreaterThanOrEqual(BASELINE.registeredPct);
     expect(report.coverage.consumedPct).toBeGreaterThanOrEqual(BASELINE.consumedPct);
+  });
+
+  it("带泛型实参的消费点必须被算作消费(修过的假阴性,不许回退)", () => {
+    // `useSlotComponent<ComponentType<Record<string, unknown>>>("onboarding.data-dir", …)`
+    // 曾经因为泛型里有两层 `>` 而漏判。这几个槽位是那次修复的直接证据。
+    const genericsWitnesses = ["onboarding.data-dir", "onboarding.feedback", "onboarding.whats-new", "onboarding.wizard"];
+    const stillMissed = genericsWitnesses.filter(
+      (key) => report.wired.includes(key) === false && report.declaredNotConsumed.includes(key),
+    );
+    expect(
+      stillMissed,
+      `这些槽位有带泛型的消费点,却被判成"没人消费" —— 泛型解析回退了:\n${stillMissed.join("\n")}`,
+    ).toEqual([]);
   });
 
   it("声明了但没人注册的清单是显式已知的(新增必须在这里出现)", () => {

@@ -58,6 +58,41 @@ const files = SCAN_ROOTS.flatMap((dir) => {
 
 const rel = (file) => file.slice(root.length + 1);
 
+/**
+ * 跳过一段可能**嵌套**的泛型实参,返回其后第一个非空白字符的下标。
+ *
+ * 为什么不能用正则:消费点的写法是
+ *   `useSlotComponent<ComponentType<Record<string, unknown>>>("a.b", Fallback)`
+ * 泛型里有两层 `>`。`(?:<[^>]*>\s*)?` 会在**第一个** `>` 处收尾,随后要求
+ * 紧跟字符串字面量,于是匹配失败 —— 这些调用被误判成"没有消费方"。
+ * 审计曾经因此少报了一批真实消费(onboarding.* 全系列),直接误导了改造
+ * 优先级。这里改成按 `<>` 深度配对,`string` 字面量与注释跳过。
+ */
+function skipGenerics(source, startIndex) {
+  let i = startIndex;
+  while (i < source.length && /\s/.test(source[i])) i++;
+  if (source[i] !== "<") return i;
+  let depth = 0;
+  let inString = null;
+  let escape = false;
+  for (; i < source.length; i++) {
+    const ch = source[i];
+    if (inString) {
+      if (escape) escape = false;
+      else if (ch === "\\") escape = true;
+      else if (ch === inString) inString = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") { inString = ch; continue; }
+    if (ch === "<") depth++;
+    else if (ch === ">") {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return startIndex;
+}
+
 /** 从 `(` 开始做括号配对,返回整段调用参数的文本。 */
 function balancedRegion(source, openParenIndex) {
   let depth = 0;
@@ -131,10 +166,17 @@ for (const file of files) {
   // ---- 消费 ----
   const CONSUMERS = ["useSlotComponent", "useSlotComponents", "useSlotEntries", "useSlotPayloads", "useSlotHook", "renderSlotEntry"];
   for (const fn of CONSUMERS) {
-    for (const match of source.matchAll(new RegExp(`\\b${fn}\\(`, "g"))) {
-      const region = balancedRegion(source, match.index + match[0].length - 1);
-      // region 以 `(` 开头;允许一个可选泛型参数后跟字符串字面量。
-      const literal = region.match(/^\(\s*(?:<[^>]*>\s*)?["'`]([^"'`]+)["'`]/);
+    // 函数名之后可能是泛型实参而不是 `(`:
+    //   `useSlotComponent<ComponentType<Record<string, unknown>>>("onboarding.data-dir", …)`
+    // 旧的正则要求 `(` 紧跟函数名,于是**所有带泛型的消费点都被漏掉**
+    // (onboarding.* 全系列),审计把"真有人消费"报成"注册了也不会渲染"。
+    for (const match of source.matchAll(new RegExp(`\\b${fn}\\b`, "g"))) {
+      const openParen = skipGenerics(source, match.index + match[0].length);
+      if (source[openParen] !== "(") continue;
+      const region = balancedRegion(source, openParen);
+      // 消费点允许一个(可嵌套的)泛型实参出现在字符串字面量之前。
+      const afterGenerics = skipGenerics(source, openParen + 1);
+      const literal = source.slice(afterGenerics).match(/^["'`]([^"'`]+)["'`]/);
       if (literal) note(consumed, literal[1], file);
     }
   }
