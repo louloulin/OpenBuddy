@@ -465,3 +465,15 @@ uninstallPiExtension(id, { keepPayload?: false })
    统计行 —— 面板上方文案一变长,统计行被挤出窗口就变成假失败。已改成直接读
    `.marketplace-panel__stats`。
 
+
+
+## 相关文档
+
+- [`docs/PI_EXTENSION_BRIDGE.md`](./PI_EXTENSION_BRIDGE.md) — R74 公开 IPC
+  契约(`listPiMarket / installPiMarket / refreshPiMarket / upgradePiMarket /
+  uninstallPiMarket / rollbackPiMarket / lockfilePiMarket / auditPiMarket`),
+  含第三方插件作者接入示例。
+- [`docs/EXTENSION_POINTS.md`](./EXTENSION_POINTS.md) — 微内核 SlotCore +
+  渲染端贡献总线 总表。
+- [`docs/THEMES.md`](./THEMES.md) — 19 主题 / Theme Studio 导出导入。
+- [`packages/runtime/openbuddy-plugin-host/src/remote-manifest.ts`](../packages/runtime/openbuddy-plugin-host/src/remote-manifest.ts) — 远端 manifest 解析/缓存/签名校验。
