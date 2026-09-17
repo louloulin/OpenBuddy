@@ -130,8 +130,13 @@ try {
     report.problems.push("团队卡没有「内置专家团」ribbon");
   }
 
-  report.steps.push({ step: "starte experts visible", count: envCheck.cards.length });
+  report.steps.push({ step: "starter experts visible", ok: envCheck.cards.length > 0, detail: `count=${envCheck.cards.length}` });
 } finally {
-  console.log(JSON.stringify(report, null, 2).slice(0, 8000));
   await app.close();
 }
+// Emit the full, parseable report. The previous `.slice(0, 8000)` produced
+// truncated JSON, so the vitest wrapper could never parse it.
+report.ok = report.pageErrors.length === 0 && report.problems.length === 0
+  && report.steps.every((s) => s.ok !== false);
+console.log(JSON.stringify(report, null, 2));
+process.exit(report.ok ? 0 : 1);

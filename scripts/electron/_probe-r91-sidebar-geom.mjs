@@ -84,14 +84,16 @@ try {
     const api = window.api;
     const created = [];
     const errors = [];
+    // `agent:new-session` returns the session's own cwd — that is the one the
+    // rename handler needs, because the host resolves the session file from it.
     let cwd = "";
-    try { cwd = await api.invoke("agent:session-info").then((i) => i?.cwd ?? ""); } catch { /* ignore */ }
     for (const title of titles) {
       try {
         const session = await api.invoke("agent:new-session", cwd ? { cwd } : {});
         const sessionId = session?.sessionId ?? session?.id;
         if (!sessionId) { errors.push(`no sessionId for "${title.slice(0, 12)}"`); continue; }
-        await api.invoke("sessions:rename", { sessionId, title, cwd: cwd || null });
+        if (!cwd && typeof session?.cwd === "string") cwd = session.cwd;
+        await api.invoke("sessions:rename", { sessionId, title, cwd });
         created.push(sessionId);
       } catch (error) {
         errors.push(`${String(error).slice(0, 70)}`);
