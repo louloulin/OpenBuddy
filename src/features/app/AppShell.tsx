@@ -185,24 +185,25 @@ function HomeSurface(props: React.ComponentProps<typeof HomePage>) {
 /** 侧栏：内核 `sidebar` slot 优先，回落到 ui-sidebar 的 Sidebar。 */
 function SidebarSurface(props: React.ComponentProps<typeof Sidebar>) {
   const Component = useSlotComponent("sidebar", Sidebar);
-  // Wrap the sidebar in a Resizable so the user can drag its right edge
-  // (240–480px clamp, persisted under `openbuddy.sidebar.width`). The
-  // wrapper owns the pixel width, so the sidebar's own CSS (which reads
-  // `100%` under `.app__sidebar-shell`) tracks the drag without a JS hop.
-  // Collapsed state still hides the sidebar via `.app__body--collapsed .sidebar`.
+  // Wrap the sidebar in a Resizable so the user can drag its right edge.
+  // R65 — clamp 收紧到 220–420(对齐 cabinet),默认宽度 260px 比 R30 的 320
+  // 更紧凑 —— 19px 字号下 320 显得太空,260 在 1440 视口里给主区留出更多
+  // 宽度。用户拖到 clamp 之外的值会被 Resizable 内部的 clamp() 收回边界。
+  // Persisted under `openbuddy.sidebar.width`;existing R30 用户(可能本地
+  // 存了 320+ 的值)重载后会被自动 clamp 到 420,无副作用。
   // `handleClassName` exists because `.sidebar` carries `z-index: 20` (so the
   // 「更多」flyout can overflow into the main pane), which otherwise paints over
   // the handle and leaves only a 2px sliver draggable.
   return (
     <Resizable
       edge="right"
-      min={260}
-      max={480}
-      defaultWidth={320}
+      min={220}
+      max={420}
+      defaultWidth={260}
       storageKey="openbuddy.sidebar.width"
       className="app__sidebar-shell"
       handleClassName="app__sidebar-handle"
-      handleLabel="调整侧栏宽度"
+      handleLabel="拖拽调整侧栏宽度"
     >
       <Component {...props} />
     </Resizable>
