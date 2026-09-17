@@ -4,7 +4,10 @@
  * 显示已安装的 pi 插件（含 skills/agents/hooks/mcp 计数），支持启用/禁用。
  * 对应 WorkBuddy 的 plugins-panel。
  *
- * 插件来源：~/.pi/plugins/、项目 .pi/plugins/、marketplace 安装。
+ * 插件来源：`<agentHome>/plugins/`（用户级，见 pi-resources/marketplace.ts）、
+ * 项目 `.pi/plugins/`、marketplace 安装。agentHome 的真实值由
+ * `useAgentPaths().home` 给出（默认 `~/.openbuddy/agent`）——刻意不复用 pi 的
+ * `~/.pi/agent`，见 @openbuddy/storage 的 `agentHome()`。
  */
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -16,6 +19,7 @@ import {
   McpIcon,
 } from "@openbuddy/ui-primitives/icons";
 import { pluginsAction, pluginsList, reloadPiExtensions } from "@/lib/agent/pi-client";
+import { useAgentPaths } from "@openbuddy/ui-shared/use-agent-paths";
 import type { PluginEntry } from "@openbuddy/shared-types";
 
 interface PluginsPanelProps {
@@ -25,6 +29,7 @@ interface PluginsPanelProps {
 }
 
 export function PluginsPanel({ sessionId, onToast }: PluginsPanelProps) {
+  const agentPaths = useAgentPaths();
   const [plugins, setPlugins] = useState<PluginEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -135,7 +140,7 @@ export function PluginsPanel({ sessionId, onToast }: PluginsPanelProps) {
             <PuzzlePieceIcon size="xl" color="var(--wb-text-tertiary)" />
             <p>暂无插件。</p>
             <p className="plugins-panel__hint">
-              在「市场」tab 安装插件，或把插件放到 <code>~/.pi/plugins/</code>。
+              在「市场」tab 安装插件，或把插件放到 <code>{agentPaths.plugins}/</code>。
             </p>
           </div>
         )}

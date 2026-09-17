@@ -15,6 +15,8 @@
  *
  * @see packages/ui/AGENTS.md 了解 ui-* 包协作约定
  */
+export * from "./agent-paths";
+export * from "./use-agent-paths";
 export * from "./McpEndpointCard";
 export * from "./PermissionPicker";
 export * from "./assistant-workbench-model";

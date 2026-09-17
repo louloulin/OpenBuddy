@@ -30,6 +30,8 @@ const allowedInvokeChannels = new Set([
   "audit:list", "audit:record", "audit:clear", "audit:export",
   // R23 — 数据目录(userData)覆盖:读取 / 写入 / 清空 + 重启应用
   "host:data-dir", "host:data-dir-set", "host:data-dir-reset", "host:relaunch",
+  // R95 — agent 数据目录权威路径快照(renderer 侧 useAgentPaths 消费)
+  "agent:paths",
   // R18 / Phase D — Expert Marketplace Bridge (Pi 扩展市场)
   "agent:pi-market-list", "agent:pi-market-refresh",
   "agent:pi-market-install", "agent:pi-market-upgrade",

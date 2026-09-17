@@ -145,7 +145,7 @@ export async function ensureStarterExperts(root: string = starterExpertsRoot()):
       await writeTextAtomic(leadFile, starterAgentMarkdown(e));
     }
     // Team members — each becomes a real `agents/<id>.md` file with its own
-    // frontmatter, so `expertsLinkAgents()` can copy them into `~/.pi/agents/`
+    // frontmatter, so `expertsLinkAgents()` can copy them into `<agentHome>/agents/`
     // and the lead can dispatch to them by bare name via pi-subagents.
     if (e.members) {
       for (const member of e.members) {

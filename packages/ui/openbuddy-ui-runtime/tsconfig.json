@@ -364,7 +364,9 @@
       "@openbuddy/ui-files-tree/components/LazyFileTree": ["./packages/ui/openbuddy-ui-files-tree/src/components/LazyFileTree.tsx"],
       "@openbuddy/ui-library": ["./packages/ui/openbuddy-ui-library/src/index.ts"],
       "@openbuddy/ui-library/client": ["./packages/ui/openbuddy-ui-library/src/client.tsx"],
-      "@openbuddy/ui-library/invariant": ["./packages/ui/openbuddy-ui-library/src/invariant.ts"]
+      "@openbuddy/ui-library/invariant": ["./packages/ui/openbuddy-ui-library/src/invariant.ts"],
+      "@openbuddy/ui-shared/agent-paths": ["./packages/ui/openbuddy-ui-shared/src/agent-paths.ts"],
+      "@openbuddy/ui-shared/use-agent-paths": ["./packages/ui/openbuddy-ui-shared/src/use-agent-paths.ts"]
     },
     "types": [
       "node"

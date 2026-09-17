@@ -115,11 +115,11 @@ export * from "./pi-client-collaboration";
 
 export interface AuthStatus {
   ready: boolean;
-  /** True if ~/.pi/auth.json exists. */
+  /** True if `<agentHome>/auth.json` exists (agentHome 默认 `~/.openbuddy/agent`). */
   hasAuthFile: boolean;
   /** Human-readable reason when not ready. */
   reason?: string;
-  /** Model ids configured in ~/.pi/agent/models.json (BYOK providers). */
+  /** Model ids configured in `<agentHome>/models.json` (BYOK providers). */
   providers: string[];
 }
 
@@ -1254,7 +1254,7 @@ export async function piDeleteSession(sessionId: string, cwd?: string): Promise<
 /**
  * Pin/unpin a session. pi's Summary has no pinned field, so this is
  * OpenBuddy-only metadata stored in the SQLite session catalog; the legacy
- * `~/.pi/openbuddy-state.json` file is only a compatibility mirror. Returns the
+ * legacy `<agentHome>/openbuddy-state.json` file is only a compatibility mirror. Returns the
  * new pinned value.
  */
 export async function piSetSessionPinned(
@@ -1268,7 +1268,7 @@ export async function piSetSessionPinned(
 /**
  * Archive/unarchive a session. pi's Summary has no archived field, so this is
  * OpenBuddy-only metadata stored in the SQLite session catalog; the legacy
- * `~/.pi/openbuddy-state.json` file is only a compatibility mirror. Archived
+ * legacy `<agentHome>/openbuddy-state.json` file is only a compatibility mirror. Archived
  * sessions are kept in the sidebar (R2.5) — they're rendered in a dedicated
  * "已归档" group with a one-click 恢复 action so an accidental bulk archive
  * is recoverable through the UI. Returns the new archived value.
@@ -1620,7 +1620,7 @@ export async function expertsReadAgentPrompt(
   return invoke<string>("experts_read_agent_prompt", { root, plugin, agentName });
 }
 
-/** Link a team expert's agents/*.md into ~/.pi/agents/ for pi sub-agent discovery. */
+/** Link a team expert's agents/*.md into <agentHome>/agents/ for pi sub-agent discovery. */
 export async function expertsLinkAgents(root: string, plugin: string): Promise<number> {
   return invoke<number>("experts_link_agents", { root, plugin });
 }
@@ -1658,7 +1658,7 @@ export async function piClearSessionExpert(sessionId: string): Promise<boolean> 
   return invoke<boolean>("pi_clear_session_expert", { sessionId });
 }
 
-// ---------- experts / assistants (~/.pi/agents/*.md) ----------
+// ---------- experts / assistants (<agentHome>/agents/*.md) ----------
 
 /** List all agent definitions visible to OpenBuddy. */
 export async function agentsList(cwd?: string): Promise<AgentEntry[]> {
@@ -1670,7 +1670,7 @@ export async function agentsGet(path: string): Promise<string> {
   return invoke<string>("agents_get", { path });
 }
 
-/** Save an agent file (create or overwrite) to ~/.pi/agents/<name>.md. */
+/** Save an agent file (create or overwrite) to <agentHome>/agents/<name>.md. */
 export async function agentsSave(name: string, raw: string): Promise<AgentEntry> {
   return invoke<AgentEntry>("agents_save", { name, raw });
 }
@@ -1698,20 +1698,20 @@ export async function agentsTemplate(
   });
 }
 
-// ---------- permission rules (~/.pi/config.toml [permission]) ----------
+// ---------- permission rules (<agentHome>/settings.json `permission`) ----------
 
-/** List the current permission rules (allow/deny/ask) from config.toml. */
+/** List the current permission rules (allow/deny/ask) from <agentHome>/settings.json. */
 export async function permissionList(): Promise<PermissionRule[]> {
   return invoke<PermissionRule[]>("permission_list");
 }
 
-/** Replace all permission rules. Writes to config.toml atomically.
+/** Replace all permission rules. Atomic write to <agentHome>/settings.json.
  *  NOTE: requires a pi restart to take effect. */
 export async function permissionSave(rules: PermissionRule[]): Promise<void> {
   await invoke<void>("permission_save", { rules });
 }
 
-// ---------- permission mode (~/.pi/config.toml [ui].permission_mode) ----------
+// ---------- permission mode (<agentHome>/settings.json `permission.defaultMode`) ----------
 
 /** OpenBuddy public permission modes; Main maps these to Pi-native modes. */
 // Renderer-side PermissionMode aligned with Pi native 5档 (see packages/auth/openbuddy-permission/src/index.ts:43-54).
@@ -1724,13 +1724,13 @@ export async function permissionModeGet(): Promise<PermissionMode> {
   return invoke<PermissionMode>("permission:mode-get");
 }
 
-/** Set the permission mode: persists to config.toml and live-notifies the
+/** Set the permission mode: persists to <agentHome>/settings.json and live-notifies the
  *  running agent via pi's `x.ai/yolo_mode_changed` extension notification. */
 export async function permissionModeSet(mode: PermissionMode): Promise<void> {
   await invoke<void>("permission:mode-set", mode);
 }
 
-// ---------- memory (资料库 — ~/.pi/memory/) ----------
+// ---------- memory (资料库 — <agentHome>/memory/) ----------
 
 
 // ---------- session search (FTS5) ----------
@@ -1905,14 +1905,14 @@ export async function inspirationGenerate(
   });
 }
 
-// ---------- agent / assistant defaults (~/.pi/config.toml) ----------
+// ---------- agent / assistant defaults (<agentHome>/settings.json) ----------
 
 /** Read the new-session defaults (model + permission + remember-tool-approvals). */
 export async function agentsDefaultsGet(): Promise<AgentDefaults> {
   return invoke<AgentDefaults>("agents_defaults_get");
 }
 
-/** Save the new-session defaults. Atomic write to config.toml. */
+/** Save the new-session defaults. Atomic write to <agentHome>/settings.json. */
 export async function agentsDefaultsSave(defaults: AgentDefaults): Promise<void> {
   await invoke<void>("agents_defaults_save", { defaults });
 }

@@ -97,7 +97,8 @@ declare module "@openbuddy/ui-slots" {
 
     /**
      * 右侧「助理」导轨(SecondarySidebar)—— 会话激活时贴在窗口右缘的竖直
-     * 触发条 + hover 浮层,列出 `~/.pi/agents/*.md` 里的专家,点一下就开新会话。
+     * 触发条 + hover 浮层,列出 `<agentHome>/agents/*.md` 里的专家(agentHome
+     * 默认 `~/.openbuddy/agent`),点一下就开新会话。
      *
      * 为什么声明权在本包而不是 ui-layout:
      *   本包是**注册方**(`client.tsx` 把 SecondarySidebar 注册进来),ui-layout
@@ -122,7 +123,7 @@ declare module "@openbuddy/ui-slots" {
           modelTags?: string[];
         }) => void;
         onToast?: (message: string) => void;
-        /** 导轨为空(全新安装下 `~/.pi/agents/` 一个都没有)时的出口。 */
+        /** 导轨为空(全新安装下 `<agentHome>/agents/` 一个都没有)时的出口。 */
         onOpenExperts?: () => void;
       };
     };

@@ -49,6 +49,7 @@ import {
   type FetchedModel,
 } from "@/lib/agent/pi-client";
 import { confirm } from "@/lib/platform/electron-api";
+import { useAgentPaths } from "@openbuddy/ui-shared/use-agent-paths";
 import {
   AccountLinkingPanel,
   AccountSettingsPanel,
@@ -86,7 +87,7 @@ import { RendererContributionCard, RendererSlotView } from "@openbuddy/ui-workbe
  * 12-item left navigation (mirrors WorkBuddy) and a right panel that swaps
  * per section. Each section is backed by a local Electron/Pi capability.
  *
- * The 模型 section lists configured providers from ~/.pi/agent/models.json and
+ * The 模型 section lists configured providers from `<agentHome>/models.json` and
  * opens a nested "添加模型" editor dialog (560×318) when adding/editing.
  * That editor writes back through providers_save → pi's [model.*] tables.
  */
@@ -671,6 +672,7 @@ const OpenBuddyPluginPanelImpl = (_openbuddyPluginImpl ?? OpenBuddyPluginPanel) 
 type ImportingState = { providerId: string; apiKey: string } | null;
 
 function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void }) {
+  const agentPaths = useAgentPaths();
   const [data, setData] = useState<ProviderListModel>({ providers: [], models: [] });
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -860,7 +862,7 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
         </div>
         <div className="models-settings-panel__card-desc models-settings-panel__grouped-note">
           一个厂商保存一份 API Key / Base URL / 上下文窗口，可挂载多个模型。配置写入{" "}
-          <code className="models-settings-panel__card-link">~/.pi/agent/models.json</code>。
+          <code className="models-settings-panel__card-link">{agentPaths.models}</code>。
         </div>
 
         {loading ? (

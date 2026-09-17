@@ -915,7 +915,8 @@ export function Sidebar({
   // R2.5 — archived group state. We auto-toggle showArchived on the first
   // paint when every active session is archived (or near every), so a
   // single accidental bulk archive is recoverable without the user having
-  // to hand-edit ~/.pi/openbuddy-state.json.
+  // to hand-edit `<agentHome>/openbuddy-state.json`（真实落盘在
+  // `<agentHome>/openbuddy.sqlite`，JSON 只是兼容镜像）。
   const showArchived = useSessionsStore((s) => s.showArchived);
   const setShowArchived = useSessionsStore((s) => s.setShowArchived);
   const archivedCount = useSessionsStore(selectArchivedCount);

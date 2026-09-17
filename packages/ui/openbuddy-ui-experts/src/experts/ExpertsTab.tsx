@@ -276,9 +276,9 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
       } catch { /* fallback: empty prompt */ }
     }
 
-    // For team experts: link member agents into ~/.pi/agents/ so pi's
+    // For team experts: link member agents into <agentHome>/agents/ so pi's
     // Task tool can spawn them by bare name during multi-agent orchestration.
-    // MUST be awaited — pi scans ~/.pi/agents/ at session start, so if the
+    // MUST be awaited — pi scans <agentHome>/agents/ at session start, so if the
     // copy hasn't finished when the user sends their first message, the member
     // agents won't be discoverable.
     if (expert.type === "team" && expert.plugin && root) {

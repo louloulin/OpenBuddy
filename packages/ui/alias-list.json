@@ -252,7 +252,10 @@
     "main": "./packages/ui/openbuddy-ui-shared/src/index.ts",
     "client": "./packages/ui/openbuddy-ui-shared/src/client.tsx",
     "invariant": "./packages/ui/openbuddy-ui-shared/src/invariant.ts",
-    "subpaths": {}
+    "subpaths": {
+      "agent-paths": "./packages/ui/openbuddy-ui-shared/src/agent-paths.ts",
+      "use-agent-paths": "./packages/ui/openbuddy-ui-shared/src/use-agent-paths.ts"
+    }
   },
   {
     "dir": "openbuddy-ui-shell",

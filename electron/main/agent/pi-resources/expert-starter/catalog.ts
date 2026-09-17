@@ -57,7 +57,7 @@ interface StarterExpert {
   prompt: string;
   /**
    * Team members — each becomes a real `agents/<member>.md` file in the plugin
-   * dir, so `expertsLinkAgents()` links them into `~/.pi/agents/` and
+   * dir, so `expertsLinkAgents()` links them into `<agentHome>/agents/` and
    * pi-subagents can dispatch to them by name. The lead prompt should
    * mention `subagent({ agent: "<member.id>" })` so the model actually
    * delegates. Members stay optional for single-agent entries.

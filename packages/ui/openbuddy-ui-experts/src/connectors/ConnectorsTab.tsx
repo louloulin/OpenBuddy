@@ -81,7 +81,7 @@ export function ConnectorsTab({ pills, onToast }: Props) {
   const [mcpEditing, setMcpEditing] = useState(false);
 
   // ---- authorization state ----
-  /** Server names present in ~/.pi/mcp.json (install heuristic). */
+  /** Server names present in `<agentHome>/mcp.json` (install heuristic). */
   const [installedServers, setInstalledServers] = useState<Set<string>>(new Set());
   /** Server names pi flagged as needing OAuth. */
   const [needsAuth, setNeedsAuth] = useState<Set<string>>(new Set());
@@ -223,7 +223,8 @@ export function ConnectorsTab({ pills, onToast }: Props) {
   const [tokenFormConnector, setTokenFormConnector] = useState<ConnectorItem | null>(null);
 
   /** Read the connector's mcp.json, optionally inject token values, merge into
-   *  `~/.pi/mcp.json`, and save (syncs live into pi when a session is
+   *  `<agentHome>/mcp.json` (由 `@openbuddy/storage` 的 agentHome() 决定，默认
+   *  `~/.openbuddy/agent`), and save (syncs live into pi when a session is
    *  given). Returns the installed server names. */
   const installConnector = useCallback(async (
     c: ConnectorItem,

@@ -11,7 +11,7 @@
  *   Pi JSONL tree — ~/.openbuddy/agent/sessions/<encoded-cwd>/*.jsonl
  *
  * OpenBuddy-only metadata (pinned / archived / expert bindings) is owned by
- * the SQLite session catalog; ~/.pi/openbuddy-state.json remains a compatibility
+ * the SQLite session catalog; <agentHome>/openbuddy-state.json remains a compatibility
  * mirror and migration source.
  */
 import { promises as fs } from "node:fs"

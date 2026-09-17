@@ -653,7 +653,7 @@
   color: var(--wb-text-tertiary);
   font-size: 11px;
 }
-/* R28 — 空状态。全新安装下 `~/.pi/agents/` 一个专家都没有,hover 出来的浮层
+/* R28 — 空状态。全新安装下 `<agentHome>/agents/` 一个专家都没有,hover 出来的浮层
    原本是一片空白(实测 items=0),看着像坏了。给一句说明 + 一条明确出口。 */
 .secondary-sidebar__empty {
   display: flex;

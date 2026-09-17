@@ -273,11 +273,11 @@ export interface SessionSummary {
   isGitRepo?: boolean;
   /** True if the session is pinned to the top of the list.
    *  OpenBuddy-only state (pi has no pinned field); stored in
-   *  `~/.pi/openbuddy-state.json`. */
+   *  `<agentHome>/openbuddy-state.json`（真实落盘在 openbuddy.sqlite）。 */
   pinned?: boolean;
   /** True if the session is archived (hidden from the sidebar).
    *  OpenBuddy-only state (pi has no archived field); stored in
-   *  `~/.pi/openbuddy-state.json`. */
+   *  `<agentHome>/openbuddy-state.json`（真实落盘在 openbuddy.sqlite）。 */
   archived?: boolean;
   /** Model id bound to this session, if recorded in summary.json. */
   currentModelId?: string;
@@ -434,7 +434,7 @@ export interface AgentEntry {
   modelTags?: string[];
 }
 
-// ---------- permission rules (~/.pi/config.toml [permission]) ----------
+// ---------- permission rules (<agentHome>/settings.json `permission`) ----------
 
 /** One permission rule. `action` ∈ allow|deny|ask; `tool` ∈ bash|read|edit|grep|mcp|any. */
 export interface PermissionRule {
@@ -443,7 +443,7 @@ export interface PermissionRule {
   pattern?: string;
 }
 
-// ---------- memory (资料库 — ~/.pi/memory/) ----------
+// ---------- memory (资料库 — <agentHome>/memory/) ----------
 
 export interface MemoryEntry {
   /** "global" | "workspace". */
@@ -582,7 +582,7 @@ export interface InspirationStarted {
   count: number;
 }
 
-// ---------- agent / assistant defaults (~/.pi/config.toml) ----------
+// ---------- agent / assistant defaults (<agentHome>/settings.json) ----------
 
 export interface AgentDefaults {
   /** Model id for new sessions (`[models] default`). Empty = pi's built-in. */

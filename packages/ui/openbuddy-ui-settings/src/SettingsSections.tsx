@@ -124,6 +124,7 @@ import {
   type CasdoorRuleSummary,
   type CasdoorUserSummary,
 } from "@/lib/casdoor/casdoor-client";
+import { useAgentPaths } from "@openbuddy/ui-shared/use-agent-paths";
 import { listen } from "@/lib/platform/electron-api";
 import { confirm, invoke, save } from "@/lib/platform/electron-api";
 import { setToast } from "@/stores/toast-store";
@@ -322,6 +323,7 @@ export function HelpSettingsPanel({
 }: {
   onReplayTour?: () => void;
 } = {}) {
+  const agentPaths = useAgentPaths();
   return (
     <SectionShell title="关于" desc="OpenBuddy 的版本、文档与反馈渠道。">
       <ul className="help-list">
@@ -351,7 +353,7 @@ export function HelpSettingsPanel({
       <p className="settings-hint">
         遇到问题？请检查：
         <br />
-        1. <code>~/.pi/auth.json</code> 是否存在（运行过 <code>pi login</code>）
+        1. <code>{agentPaths.auth}</code> 是否存在（运行过 <code>pi login</code>）
         <br />
         2. 「模型」tab 是否配置了至少一个 provider
         <br />
@@ -425,15 +427,15 @@ export function SecuritySettingsPanel() {
 // ---------- 数据管理 ----------
 
 export function DataSettingsPanel({ onOpenDataDirPicker }: { onOpenDataDirPicker?: () => void } = {}) {
-  const [piHome, setPiHome] = useState("");
   // R23 — 数据目录(userData)。只读展示 + 一个入口交给宿主去弹选择器:
   // 切换目录需要 main 侧校验与重启,不属于"设置面板自己就能办完的事"。
   const [dataDir, setDataDir] = useState<{ path: string; isOverridden: boolean } | null>(null);
-
-  useEffect(() => {
-    // 从环境推断 pi home 路径（前端无直接 API，给提示用）
-    setPiHome("~/.pi");
-  }, []);
+  // R95 — agentHome 不再猜测。此前这里硬编码 `setPiHome("~/.pi")`,而
+  // OpenBuddy 的 agent 根是 `~/.openbuddy/agent`(见 storage/paths.ts),
+  // 展示出来的路径与真实落盘不符。现在走 `useAgentPaths()`:main 进程回什么
+  // 就显示什么。
+  const agentPaths = useAgentPaths();
+  const piHome = agentPaths.home;
 
   useEffect(() => {
     invoke<{ path: string; isOverridden: boolean }>("host:data-dir", undefined)
@@ -447,7 +449,7 @@ export function DataSettingsPanel({ onOpenDataDirPicker }: { onOpenDataDirPicker
     // **确认框弹出来的同时缓存已经被清掉了**,用户点什么都没用。
     if (
       !(await confirm(
-        "确定清理本地会话缓存？这只影响侧栏列表的显示，pi 的 ~/.pi/sessions/ 历史不会被删除。",
+        `确定清理本地会话缓存？这只影响侧栏列表的显示，pi 的 ${agentPaths.sessions}/ 历史不会被删除。`,
         { tone: "warning", confirmLabel: "清理" },
       ))
     ) {
@@ -722,7 +724,7 @@ export function GeneralSettingsPanel() {
   return (
     <SectionShell
       title="系统设置"
-      desc="热重载 pi 的配置视图。修改 config.toml 后无需重启整个应用。"
+      desc="热重载 pi 的配置视图。改动 provider / 权限等设置后无需重启整个应用。"
     >
       <div className="settings-actions">
         <button className="settings-btn" onClick={() => handleReload("mcp_all")} disabled={busy}>
@@ -2209,6 +2211,7 @@ export function AccountSettingsPanel() {
  *  与「专家·技能·连接器」面板的数据源相同，但这里是设置视图：只读 + 刷新 +
  *  跳转到对应管理面板。 */
 export function AgentSettingsPanel() {
+  const agentPaths = useAgentPaths();
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [servers, setServers] = useState<McpServerEntry[]>([]);
   const [commands, setCommands] = useState<SlashCommand[]>([]);
@@ -2329,7 +2332,9 @@ export function AgentSettingsPanel() {
         <div className="agent-section__body">
           {servers.length === 0 ? (
             <p className="settings-hint">
-              暂无连接器。编辑 <code>~/.pi/config.toml</code> 的 <code>[mcp_servers.*]</code> 段。
+              暂无连接器。在上方「专家·技能·连接器 → 连接器」里安装，或直接编辑{" "}
+              <code>{agentPaths.mcpConfig}</code> 的 <code>mcpServers</code> 段
+              （OpenBuddy 不再读写 pi 的 <code>config.toml</code>）。
             </p>
           ) : (
             <ul className="agent-list">
@@ -2404,9 +2409,11 @@ const PERMISSION_OPTIONS: { value: string; label: string }[] = [
 ];
 
 /** AssistantSettingsPanel — 助理角色列表 + 新会话默认模型/权限偏好。
- *  agents 来自 ~/.pi/agents/*.md；默认值写入 config.toml 的
- *  [models].default 和 [ui].default_selected_permission。 */
+ *  agents 来自 `<agentHome>/agents/*.md`（`useAgentPaths().agents` 给出真实
+ *  路径）；默认值写入 OpenBuddy 自己的 SQLite 设置，不再写 pi 的
+ *  `config.toml`（electron/main 已不读取该文件）。 */
 export function AssistantSettingsPanel() {
+  const agentPaths = useAgentPaths();
   const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [providers, setProviders] = useState<ModelOptionRow[]>([]);
   const [defaults, setDefaults] = useState<AgentDefaults | null>(null);
@@ -2473,7 +2480,7 @@ export function AssistantSettingsPanel() {
   return (
     <SectionShell
       title="助理设置"
-      desc="管理助理角色（~/.pi/agents/*.md）和新建会话的默认模型/权限偏好。偏好写入 config.toml 的 [models].default 和 [ui].default_selected_permission。"
+      desc={`管理助理角色（${agentPaths.agents}/*.md）和新建会话的默认模型/权限偏好。偏好写入 ${agentPaths.home}/settings.json，不再写 pi 的 config.toml（electron/main 已不读取该文件）。`}
     >
       {loading ? (
         <p className="settings-hint">加载中…</p>
@@ -2488,7 +2495,7 @@ export function AssistantSettingsPanel() {
               {agents.length === 0 ? (
                 <p className="settings-hint">
                   暂无助理。在主界面「助理」面板从模板创建，或把 .md 文件放到
-                  <code>~/.pi/agents/</code>。
+                  <code>{agentPaths.agents}/</code>。
                 </p>
               ) : (
                 <ul className="agent-list">
@@ -2603,7 +2610,7 @@ export function AssistantSettingsPanel() {
           {msg && <p className="settings-msg">{msg}</p>}
 
           <p className="settings-hint">
-            助理定义在 <code>~/.pi/agents/*.md</code>（含 frontmatter + system prompt）。
+            助理定义在 <code>{agentPaths.agents}/*.md</code>（含 frontmatter + system prompt）。
             pi 没有 session 级「切换 agent」的 ACP 方法，OpenBuddy 通过预设 prompt 引导。
           </p>
         </>

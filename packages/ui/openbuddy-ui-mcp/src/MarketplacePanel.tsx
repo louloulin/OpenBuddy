@@ -5,7 +5,9 @@
  * 支持安装/卸载/更新/刷新源 + 添加/移除源。
  * 对应 WorkBuddy 的 UnifiedMarketPage。
  *
- * 市场源配置在 ~/.pi/config.toml 的 [[marketplace.sources]] 段。
+ * 市场源配置在 `<agentHome>/marketplaces.json`（见 pi-resources/marketplace.ts
+ * 的 `readMarketplaceSources`），不再读 pi 的 `config.toml`——electron/main 早已
+ * 不解析该文件。agentHome 由 `useAgentPaths().home` 给出。
  */
 import { useRef } from "react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
@@ -413,7 +415,7 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
           <Store size={48} color="var(--wb-text-tertiary)" />
           <p>暂无市场源。</p>
           <p className="marketplace-panel__hint">
-            点「添加源」输入本地市场目录，或在 config.toml 配置 <code>[[marketplace.sources]]</code>。
+            点「添加源」注册一个本地市场目录。源列表保存在 OpenBuddy 数据目录，重启后仍在。
           </p>
         </div>
       )}
