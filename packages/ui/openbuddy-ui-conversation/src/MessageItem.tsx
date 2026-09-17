@@ -16,6 +16,7 @@ import Clock3 from "lucide-react/dist/esm/icons/clock-3";
 // MessageMeta: a tiny "<model> · 42 tok/s" line below the assistant
 // bubble that lets the user see at a glance what produced the answer.
 import Cpu from "lucide-react/dist/esm/icons/cpu";
+import Hash from "lucide-react/dist/esm/icons/hash";
 import Zap from "lucide-react/dist/esm/icons/zap";
 import { TooltipButton } from "./TooltipButton";
 import { type MarkdownConfig } from "@openbuddy/ui-markdown";
@@ -242,6 +243,9 @@ function MessageItemInner({
       isStreaming,
       modelId: message.modelId,
       outputTokens: message.outputTokens,
+      // R58 — pipe input (prompt) token count so MessageMeta can
+      // render the "1.2k in" chip beside the throughput chip.
+      inputTokens: message.inputTokens,
     };
   })();
 
@@ -442,6 +446,7 @@ function MessageMeta({
   isStreaming,
   modelId,
   outputTokens,
+  inputTokens,
 }: {
   createdAt: number;
   durationMs: number | null;
@@ -453,6 +458,10 @@ function MessageMeta({
    *  a tok/s throughput chip. Only renders when both are present and the
    *  turn has actually finished streaming. */
   outputTokens?: number;
+  /** R58 — prompt (input) token count for this turn. Renders as a
+   *  "<formatted> in" chip before the throughput chip when present.
+   *  Optional for backward compat with pre-R58 history. */
+  inputTokens?: number;
 }) {
   const label = isStreaming
     ? `${formatDurationMs(durationMs ?? 0)} 正在生成…`
@@ -505,6 +514,31 @@ function MessageMeta({
           <span className="msg__meta-chip-text">{modelId}</span>
         </span>
       )}
+      {/* R58 — input (prompt) token chip. Renders before the throughput
+          chip so the "in" / "out" / "tok/s" reading order stays natural.
+          Only shown when inputTokens is present (provider-reported) AND
+          the turn has finished streaming (mirrors the throughput gate). */}
+      {!isStreaming && typeof inputTokens === "number" && inputTokens > 0 && (
+        <span
+          className="msg__meta-chip msg__meta-chip--input"
+          title={`${inputTokens} prompt tokens for this turn`}
+        >
+          <Hash size={9} strokeWidth={1.75} aria-hidden="true" />
+          <span className="msg__meta-chip-text">{formatTokenCount(inputTokens)} in</span>
+        </span>
+      )}
+      {/* R58 — output (completion) token chip. Rendered alongside the
+          input chip so users can see in/out at a glance; the legacy
+          throughput chip below carries the tok/s rate. */}
+      {!isStreaming && typeof outputTokens === "number" && outputTokens > 0 && (
+        <span
+          className="msg__meta-chip msg__meta-chip--output"
+          title={`${outputTokens} completion tokens for this turn`}
+        >
+          <Zap size={9} strokeWidth={1.75} aria-hidden="true" />
+          <span className="msg__meta-chip-text">{formatTokenCount(outputTokens)} out</span>
+        </span>
+      )}
       {throughput !== null && (
         <span className="msg__meta-chip msg__meta-chip--throughput" title={`${outputTokens} completion tokens in ${formatDurationMs(durationMs!)}`}>
           <Zap size={9} strokeWidth={1.75} aria-hidden="true" />
@@ -522,6 +556,15 @@ function formatThroughput(tps: number): string {
   if (tps >= 100) return `${Math.round(tps)}`;
   if (tps >= 10) return tps.toFixed(1);
   return tps.toFixed(2);
+}
+
+/** R58 — "1.2k" / "12k" / "1.5m" formatter for raw token counts.
+ *  Mirrors how ChatMinimap / ContextUsagePill already shorten large
+ *  numbers so the meta chip reads consistently across the app. */
+function formatTokenCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}m`;
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k`;
+  return `${Math.round(n)}`;
 }
 
 /** R8.14 — `12s` / `1m 5s` formatter. Mirrors ChatView's existing

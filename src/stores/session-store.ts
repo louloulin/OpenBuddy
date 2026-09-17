@@ -78,6 +78,12 @@ export interface ChatMessage {
    *  turn (drives the throughput chip "X tok/s" alongside the model
    *  id). Optional for the same reason as `modelId`. */
   outputTokens?: number;
+  /** R58 — prompt (input) token count reported by the provider for
+   *  this turn. Drives the "1.2k in" chip beside the existing
+   *  throughput chip so users can see the full token balance
+   *  (in / out / tok/s) at a glance. Optional for backward
+   *  compatibility with pre-R58 history. */
+  inputTokens?: number;
 }
 
 /** A failed assistant turn, surfaced inline in the transcript. */
@@ -254,7 +260,7 @@ interface UiSessionActions {
   /** R8.15 — accepts optional model id + completion-token count so the
    *  meta chip can show "model: X · 42 tok/s". Backward-compatible:
    *  legacy call sites (cancel path, watchdog) pass nothing. */
-  finishStreamingMessage: (meta?: { modelId?: string; outputTokens?: number }) => void;
+  finishStreamingMessage: (meta?: { modelId?: string; outputTokens?: number; inputTokens?: number }) => void;
   /** Abandon the in-flight assistant message. Called from every error
    *  path (pi://turn-error, pi://agent-died, 60s streaming watchdog,
    *  user cancel) so the orphan LoadingRow is force-finalised and
@@ -753,10 +759,14 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
       // Spread with `undefined` checks so we don't write `modelId:
       // undefined` (which TS would treat as missing but is ugly in
       // devtools / persisted transcripts).
-      const extra: { modelId?: string; outputTokens?: number } = {};
+      const extra: { modelId?: string; outputTokens?: number; inputTokens?: number } = {};
       if (meta?.modelId) extra.modelId = meta.modelId;
       if (typeof meta?.outputTokens === "number" && meta.outputTokens > 0) {
         extra.outputTokens = meta.outputTokens;
+      }
+      // R58 — pipe prompt (input) token count through to the meta chip.
+      if (typeof meta?.inputTokens === "number" && meta.inputTokens > 0) {
+        extra.inputTokens = meta.inputTokens;
       }
       return {
         messages: s.messages.map((m) =>

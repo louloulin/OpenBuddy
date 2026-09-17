@@ -154,6 +154,19 @@
   /* Neutral surface — the throughput number stands on its own. */
   background: color-mix(in srgb, var(--wb-text-strong, #000) 7%, transparent);
 }
+/* R58 — input (prompt) token chip. Subtle brand-tinted surface so
+   it reads as "the data this turn consumed" without overpowering
+   the model chip; sits visually next to its --output sibling. */
+.msg__meta-chip--input {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 7%, transparent);
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 78%, var(--wb-text-strong, #000) 22%);
+}
+/* R58 — output (completion) token chip. Slightly cooler tint to
+   differentiate from input; reads as "what the model produced". */
+.msg__meta-chip--output {
+  background: color-mix(in srgb, var(--wb-text-strong, #000) 7%, transparent);
+  color: color-mix(in srgb, var(--wb-text-strong, #000) 70%, var(--wb-text-medium, #6e6e80) 30%);
+}
 .msg__meta-chip-text {
   overflow: hidden;
   text-overflow: ellipsis;
