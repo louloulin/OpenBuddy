@@ -61,6 +61,7 @@ import {
   AuditSettingsPanel,
   GeneralSettingsPanel,
   HelpSettingsPanel,
+  MicrokernelSettingsPanel,
   PersonalizeSettingsPanel,
   ResourceCatalogPanel,
   SecuritySettingsPanel,
@@ -189,6 +190,7 @@ const NAV_GROUPS: NavGroup[] = [
     flat: true,
     items: [
       { id: "help", label: "关于 OpenBuddy", icon: HelpCircle },
+      { id: "microkernel", label: "系统信息", icon: Activity },
     ],
   },
   {
@@ -557,6 +559,8 @@ export function SettingsPanel({
               <ShortcutsSettingsPanel />
             ) : active === "help" ? (
               <HelpSettingsPanel onReplayTour={onReplayTour} />
+            ) : active === "microkernel" ? (
+              <MicrokernelSettingsPanel />
             ) : active === "security" ? (
               <SecuritySettingsPanel />
             ) : active === "data" ? (

@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useTheme, useThemeSnapshot, ThemePicker, ThemeStudio } from "@openbuddy/ui-theme/client";
 import { LanguagePicker, useLocaleName } from "@openbuddy/ui-locale/client";
-import { SlotOutlet } from "@openbuddy/ui-runtime/client";
+import { SlotOutlet, microkernelSnapshot, type MicrokernelSnapshot } from "@openbuddy/ui-runtime/client";
 import { resolveVars } from "@openbuddy/ui-theme";
 import {
   agentsDefaultsGet,
@@ -2646,3 +2646,139 @@ export { SessionManagementPanel } from "@openbuddy/ui-account";
 export { TokenIntrospectionPanel } from "@openbuddy/ui-account";
 export { GatewayHealthPanel } from "@openbuddy/ui-account";
 import { auditList, auditClear, auditExport, type AuditEvent } from "@/lib/audit/audit-client";
+
+// ---------- 系统信息(微内核健康) ----------
+
+/**
+ * MicrokernelSettingsPanel — 「设置 → 系统信息」。
+ *
+ * 为什么这块值得有 UI 而不是只在探针里断言:
+ *   微内核最容易的失效方式不是崩溃,而是**静默退化** —— 某个 ui-* 包
+ *   apply() 抛错、某个槽位声明了却没人注册、插件注册了但 payload 形状不对。
+ *   这些在界面上通常表现为"某个功能不见了",没有任何报错。把内核自己的
+ *   装配结果摊开给用户和开发者看,是唯一能让这类问题在第一时间被发现的方式。
+ *
+ * 数据来源是 `microkernelSnapshot()` —— 与 e2e 探针读的是同一份真相
+ * (runtime 的 SlotCore + 逐包装配报告),不是另算一遍。
+ */
+export function MicrokernelSettingsPanel() {
+  const [snap, setSnap] = useState<MicrokernelSnapshot | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  const refresh = useCallback(() => {
+    try { setSnap(microkernelSnapshot()); }
+    catch { setSnap(null); }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    // 插件是异步装配的(registerBuiltinUi 返回 Promise),挂载瞬间可能还没装配完。
+    // 这里只做一次短延时补偿 + 用户手动刷新,不做轮询 —— 内核状态在启动后
+    // 基本不变,持续轮询是纯浪费。
+    const t = setTimeout(refresh, 1200);
+    return () => clearTimeout(t);
+  }, [refresh]);
+
+  if (!snap) {
+    return (
+      <SectionShell title="系统信息" desc="UI 微内核的装配状态。">
+        <p className="settings-hint">内核状态读取失败(SlotCore 未挂载)。</p>
+        <div className="settings-actions">
+          <button type="button" className="settings-btn" onClick={refresh} data-testid="microkernel-refresh">
+            <RefreshCw size={14} /> 重新读取
+          </button>
+        </div>
+      </SectionShell>
+    );
+  }
+
+  const okPackages = snap.packages.length - snap.failedPackages;
+  const populated = snap.slots.filter((s) => s.entries > 0).length;
+  // 渲染用 snapshotRows(含隐式 root),因为它就是 slots[] 的长度 —— 列表
+  // 显示多少行、标题就该说多少个,否则展开后行数和标题对不上。
+  // slotCount 是"各包显式登记的槽位数"(不含 root),两个数含义不同,都用。
+  const shown = expanded ? snap.slots : snap.slots.slice(0, 8);
+
+  return (
+    <SectionShell title="系统信息" desc="UI 微内核的装配状态。插件注册的槽位也会出现在这里。">
+      <ul className="help-list" data-testid="microkernel-summary">
+        <li>
+          <Shield size={14} />
+          <span>
+            已登记槽位 <code data-testid="microkernel-slot-count">{snap.snapshotRows}</code> 个,其中{" "}
+            <code>{populated}</code> 个有实现
+            {snap.emptySlots.length > 0 && (
+              <>
+                ,<code data-testid="microkernel-empty-count">{snap.emptySlots.length}</code> 个暂无实现
+              </>
+            )}
+          </span>
+        </li>
+        <li>
+          <HardDrive size={14} />
+          <span>
+            内置 UI 包装配 <code data-testid="microkernel-ok-packages">{okPackages}</code>/
+            <code>{snap.packages.length}</code>
+            {snap.failedPackages === 0 ? (
+              <span data-testid="microkernel-all-ok"> · 全部成功</span>
+            ) : (
+              <span data-testid="microkernel-failed" style={{ color: "var(--wb-danger, #e5484d)" }}>
+                {" "}· {snap.failedPackages} 个失败
+              </span>
+            )}
+          </span>
+        </li>
+      </ul>
+
+      {snap.failedPackages > 0 && (
+        <ul className="help-list" data-testid="microkernel-failures">
+          {snap.packages.filter((p) => !p.ok).map((p) => (
+            <li key={p.pkg}>
+              <span style={{ color: "var(--wb-danger, #e5484d)" }}>
+                ✗ {p.pkg} — {p.error ?? "apply() 抛错"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <ul className="help-list" data-testid="microkernel-slots">
+        {shown.map((slot) => (
+          <li key={slot.name} data-slot={slot.name} data-entries={slot.entries}>
+            <code>{slot.name}</code>
+            <span className="settings-hint">
+              {" "}
+              {slot.kind}
+              {slot.implicitRoot
+                ? " · 内核根槽(等插件整体替换)"
+                : slot.entries === 0
+                  ? " · 暂无实现"
+                  : ` · ${slot.entries} 条 · ${slot.registrants.join(", ")}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="settings-actions">
+        {snap.slots.length > shown.length && (
+          <button
+            type="button"
+            className="settings-btn"
+            onClick={() => setExpanded(true)}
+            data-testid="microkernel-show-all"
+          >
+            展开全部 {snap.snapshotRows} 个槽位
+          </button>
+        )}
+        <button type="button" className="settings-btn" onClick={refresh} data-testid="microkernel-refresh">
+          <RefreshCw size={14} /> 重新读取
+        </button>
+      </div>
+
+      <p className="settings-hint">
+        槽位是插件接入点:注册同名单例槽即可整体替换内置实现,注册 list 槽则追加。
+        详情见 <code>docs/EXTENSION_POINTS.md</code>。
+      </p>
+    </SectionShell>
+  );
+}

@@ -195,6 +195,96 @@ export function lastRegisteredReport(): readonly BuiltinUiPackageReport[] {
   return lastReport;
 }
 
+/**
+ * SlotCore 建立时隐式声明的根槽名。
+ *
+ * 与 `slot-core.ts` 里 `records.set("root", …)` 是同一个名字;提成常量是为了
+ * 让"要跳过 root"这件事在代码里只有一处定义,而不是每处各写一个字符串字面量。
+ */
+const IMPLICIT_ROOT_SLOT = "root";
+
+/** 一个槽位的微内核快照行。 */
+export interface MicrokernelSlotRow {
+  name: string;
+  kind: string;
+  scope: string;
+  /** 当前有几条 entry 注册进来。 */
+  entries: number;
+  /** 谁注册的（`@openbuddy/ui-*` 包名 / 插件 id）。 */
+  registrants: readonly string[];
+  /**
+   * 是否是内核自己隐式声明的 `root` 槽。
+   *
+   * `root` 不是任何包注册的,而是 SlotCore 建立时自带的挂载点(整个 UI 树的根)。
+   * 它永远在 snapshot 里,但**不应该**出现在「有个槽位没人实现」的告警里 ——
+   * 它本来就是空的,等插件来整体替换 AppFrame。
+   *
+   * 这个标记存在的原因:先前 `size()` 刻意减掉了 root(`records.size - 1`),
+   * 而 `snapshot()` 保留它。两个数放在同一块 UI 上就会自相矛盾(57 vs 58),
+   * 排查了半天才发现是"同一个东西的两种算法"。现在把 root 显式标出来,
+   * 两个数字各自的含义就不再有歧义。
+   */
+  implicitRoot: boolean;
+}
+
+/** 微内核健康快照 —— 「设置 → 系统信息」与 e2e 探针共用同一份真相。 */
+export interface MicrokernelSnapshot {
+  /**
+   * 各包 / 插件显式登记的槽位数（不含隐式 root）。
+   * 与 `SlotCore.size()` 同义 —— 两个入口读同一个数,不再各算一遍。
+   */
+  slotCount: number;
+  /** `snapshot()` 的行数,含隐式 root。渲染槽位列表时用这个数。 */
+  snapshotRows: number;
+  /** 内置 ui-* 包的逐包装配结果。 */
+  packages: readonly BuiltinUiPackageReport[];
+  /** 装配失败的内置包数。 */
+  failedPackages: number;
+  /** 每个槽位的登记情况,按名字排序（含隐式 root）。 */
+  slots: readonly MicrokernelSlotRow[];
+  /**
+   * 声明的槽位里「一条 entry 都没有」的 —— 即消费方在等、但没人注册。
+   * 这是微内核最值得盯的一类退化:留白通常不报错,只是功能静默缺失。
+   *
+   * 不含隐式 `root`(见 `MicrokernelSlotRow.implicitRoot`)。
+   */
+  emptySlots: readonly string[];
+}
+
+/**
+ * 读一份微内核健康快照。
+ *
+ * 为什么走函数而不是直接读 `window.__ob_slotcore`:
+ * 那个全局是给 e2e 探针用的调试出口,不是产品 API。设置面板要用同一份数据,
+ * 就得有一个正常导出的入口 —— 否则要么 UI 去读调试全局(耦合到测试设施),
+ * 要么各写一份快照逻辑(两处真相,迟早漂移)。
+ */
+export function microkernelSnapshot(): MicrokernelSnapshot {
+  const runtime = getRuntime();
+  const raw = runtime.slots as SlotCoreHandle;
+  const rawRows = typeof raw.snapshot === "function" ? raw.snapshot() : [];
+  const rows: MicrokernelSlotRow[] = rawRows.map((row) => ({
+    name: row.name,
+    kind: row.spec.kind,
+    scope: row.spec.scope,
+    entries: row.entries.length,
+    registrants: row.entries.map((e) => e.registrant ?? "(unknown)"),
+    implicitRoot: row.name === IMPLICIT_ROOT_SLOT,
+  }));
+  const packages = lastReport;
+  return {
+    slotCount: typeof raw.size === "function" ? raw.size() : rows.filter((r) => !r.implicitRoot).length,
+    snapshotRows: rows.length,
+    packages,
+    failedPackages: packages.filter((row) => !row.ok).length,
+    slots: [...rows].sort((a, b) => a.name.localeCompare(b.name)),
+    emptySlots: rows
+      .filter((row) => row.entries === 0 && !row.implicitRoot)
+      .map((row) => row.name)
+      .sort(),
+  };
+}
+
 /** 测试专用:返回一个全新的、与 runtime 单例隔离的 SlotCore。 */
 export function __makeTestSlotCore(): SlotCoreHandle {
   return createSlotCore();
