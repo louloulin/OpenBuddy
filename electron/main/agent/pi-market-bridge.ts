@@ -56,6 +56,7 @@ import type {
   PiMarketAuditEntry,
   PiMarketCapability,
   PiMarketCapabilityRisk,
+  PiMarketErrorCode,
   PiMarketInstallOptions,
   PiMarketInstallResult,
   PiMarketKind,
@@ -1968,7 +1969,11 @@ export function createPiMarketHandlers(
     },
     [PI_MARKET_IPC_CHANNELS.sourceProbe]: async (args) => {
       const input = optionalRecord(args);
-      const candidate = isRecord(input.source) ? input.source : { url: input.url };
+      // `source` 是渲染端送来的未校验 JSON。先收成 unknown 再交给 bridge ——
+      // bridge 的 `probeSource` 自己会做形状校验并抛 `invalid-registry`,
+      // 这里直接断言成 `PiMarketRegistrySource` 只是把「未校验」伪装成
+      // 「已校验」,还会在 future 字段收紧时静默骗过类型检查。
+      const candidate: unknown = isRecord(input.source) ? input.source : { url: input.url };
       return bridge.probeSource(candidate as PiMarketRegistrySource);
     },
     [PI_MARKET_IPC_CHANNELS.lockfile]: async () => bridge.readLockfile(),
