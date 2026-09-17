@@ -39,24 +39,24 @@ const runProbe = () => {
 const stepOk = (probe, step) => probe.steps.find((s) => s.step === step)?.ok === true;
 
 describe.skipIf(!canLaunch)("live electron probe: R65 侧栏宽度可拖拽 + 持久化", () => {
-  it("handle 存在 + ARIA 范围 + 默认宽度在 220-420 之间", () => {
+  it("handle 存在 + ARIA 范围 + 默认宽度在 260-480 之间", () => {
     const probe = runProbe();
     expect(probe.pageErrors).toEqual([]);
     expect(stepOk(probe, "handle 存在且 edge=right")).toBe(true);
-    expect(stepOk(probe, "handle aria 范围 220-420")).toBe(true);
-    expect(stepOk(probe, "默认 wrapper 宽度介于 220-420")).toBe(true);
+    expect(stepOk(probe, "handle aria 范围 260-480")).toBe(true);
+    expect(stepOk(probe, "默认 wrapper 宽度介于 260-480")).toBe(true);
   });
 
   it("拖拽 → 宽度变化 + localStorage 持久化 + 极值 clamp", () => {
     const probe = runProbe();
     expect(stepOk(probe, "拖拽 +60px 后 wrapper 宽度变化")).toBe(true);
     expect(stepOk(probe, "拖拽后 localStorage 写入新宽度")).toBe(true);
-    expect(stepOk(probe, "拖到极小被 clamp 到 220")).toBe(true);
-    expect(stepOk(probe, "拖到极大被 clamp 到 420")).toBe(true);
+    expect(stepOk(probe, "拖到极小被 clamp 到 260")).toBe(true);
+    expect(stepOk(probe, "拖到极大被 clamp 到 480")).toBe(true);
   });
 
   it("重启后宽度从 localStorage 恢复", () => {
     const probe = runProbe();
-    expect(stepOk(probe, "重启后 wrapper 宽度从 localStorage 恢复为 420")).toBe(true);
+    expect(stepOk(probe, "重启后 wrapper 宽度从 localStorage 恢复为 480")).toBe(true);
   });
 });

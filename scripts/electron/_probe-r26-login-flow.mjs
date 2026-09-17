@@ -63,8 +63,15 @@ try {
     }
   }).catch(() => {});
 
-  // 给 React 树把 onboarding 完成态从 localStorage 读回去、关掉浮层的时间。
-  await page.waitForTimeout(2500);
+  // onboarding 状态只在首屏挂载时读一次;写完必须 reload 才生效,否则
+  // OnboardingWizard 的全屏遮罩(z-index 1900)会盖住左下角账户菜单,
+  // 真实鼠标事件打不到按钮 —— 这是探针 bug,不是产品 bug(R77 排查)。
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => Boolean(window.api?.apiVersion === 1), undefined, { timeout: 40000 });
+  await page.waitForTimeout(2000);
+  report.onboardingCleared = await page.evaluate(
+    () => !document.querySelector("[data-testid='onboarding-wizard']"),
+  );
   await page.keyboard.press("Escape");
   await page.waitForTimeout(500);
 

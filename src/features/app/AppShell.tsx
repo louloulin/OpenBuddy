@@ -186,20 +186,21 @@ function HomeSurface(props: React.ComponentProps<typeof HomePage>) {
 function SidebarSurface(props: React.ComponentProps<typeof Sidebar>) {
   const Component = useSlotComponent("sidebar", Sidebar);
   // Wrap the sidebar in a Resizable so the user can drag its right edge.
-  // R65 — clamp 收紧到 220–420(对齐 cabinet),默认宽度 260px 比 R30 的 320
-  // 更紧凑 —— 19px 字号下 320 显得太空,260 在 1440 视口里给主区留出更多
-  // 宽度。用户拖到 clamp 之外的值会被 Resizable 内部的 clamp() 收回边界。
-  // Persisted under `openbuddy.sidebar.width`;existing R30 用户(可能本地
-  // 存了 320+ 的值)重载后会被自动 clamp 到 420,无副作用。
+  // R79 — clamp 回到 320 默认 / 260–480。R65 曾按 cabinet 收窄到 260/220–420,
+  // 但 R8.62 的守卫与 CSS 回退值(`--ds-sidebar-width` 与 `.sidebar width`)
+  // 都锁在 320 —— 两处不一致会让「无 wrapper 渲染」的侧栏比有 wrapper 时窄
+  // 60px,同时 260 的默认宽度在 19px 字号下偏挤。统一到 320/260/480。
+  // 用户拖到 clamp 之外的值会被 Resizable 内部的 clamp() 收回边界;
+  // persisted under `openbuddy.sidebar.width`。
   // `handleClassName` exists because `.sidebar` carries `z-index: 20` (so the
   // 「更多」flyout can overflow into the main pane), which otherwise paints over
   // the handle and leaves only a 2px sliver draggable.
   return (
     <Resizable
       edge="right"
-      min={220}
-      max={420}
-      defaultWidth={260}
+      min={260}
+      max={480}
+      defaultWidth={320}
       storageKey="openbuddy.sidebar.width"
       className="app__sidebar-shell"
       handleClassName="app__sidebar-handle"

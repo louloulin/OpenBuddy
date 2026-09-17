@@ -43,7 +43,13 @@ try {
       /* */
     }
   }).catch(() => {});
-  await page.waitForTimeout(3000);
+  // 同上:写完 onboarding / tour 状态必须 reload,否则遮罩仍在(R77 排查)。
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => Boolean(window.api?.apiVersion === 1), undefined, { timeout: 40000 });
+  await page.waitForTimeout(2000);
+  report.onboardingCleared = await page.evaluate(
+    () => !document.querySelector("[data-testid='onboarding-wizard']"),
+  );
 
   // 用 evaluate 直接派发 click,因为 page.click 受 sidebar 折叠态影响
   const clickedSettings = await page.evaluate(() => {

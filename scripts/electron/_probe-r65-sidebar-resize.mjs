@@ -47,7 +47,15 @@ try {
       window.localStorage.setItem("openbuddy.tour.state", "seen");
     } catch { /* */ }
   }).catch(() => {});
-  await sleep(2500);
+  // 关键:onboarding 状态只在首屏挂载时读取一次,写完必须 reload 才生效,
+  // 否则 OnboardingWizard 的全屏遮罩(z-index 1900)会盖住侧栏 resize handle,
+  // 真实鼠标事件打不到 handle —— 这是 R77 排查出的探针 bug,不是产品 bug。
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => Boolean(window.api?.apiVersion === 1), undefined, { timeout: 40000 });
+  await sleep(2000);
+  // 二次确认遮罩已消失
+  const maskGone = await page.evaluate(() => !document.querySelector("[data-testid='onboarding-wizard']"));
+  report.onboardingCleared = maskGone;
 
   // 1. handle 存在且 edge=right
   const allSeparators = await page.evaluate(() => {
@@ -78,8 +86,8 @@ try {
     };
   });
   step("handle 存在且 edge=right", handleInfo.found && handleInfo.edge === "right", handleInfo);
-  step("handle aria 范围 220-420", handleInfo.ariaMin === "220" && handleInfo.ariaMax === "420", handleInfo);
-  step("默认 wrapper 宽度介于 220-420", typeof handleInfo.wrapperWidth === "number" && handleInfo.wrapperWidth >= 220 && handleInfo.wrapperWidth <= 420, handleInfo);
+  step("handle aria 范围 260-480", handleInfo.ariaMin === "260" && handleInfo.ariaMax === "480", handleInfo);
+  step("默认 wrapper 宽度介于 260-480", typeof handleInfo.wrapperWidth === "number" && handleInfo.wrapperWidth >= 260 && handleInfo.wrapperWidth <= 480, handleInfo);
 
   // 2. 拖拽 handle 到更大值(往右 60px)
   // R65 探针核心:page.mouse 会发出 trusted PointerEvent(React 的 onPointerDown
@@ -107,8 +115,8 @@ try {
     const w = wrapper?.getBoundingClientRect().width ?? null;
     return { wrapperWidth: w, stored: window.localStorage.getItem("openbuddy.sidebar.width") };
   });
-  step("拖拽 +60px 后 wrapper 宽度变化", typeof afterDrag.wrapperWidth === "number" && afterDrag.wrapperWidth > 260, afterDrag);
-  step("拖拽后 localStorage 写入新宽度", afterDrag.stored !== null && Number(afterDrag.stored) >= 220, afterDrag);
+  step("拖拽 +60px 后 wrapper 宽度变化", typeof afterDrag.wrapperWidth === "number" && afterDrag.wrapperWidth > 320, afterDrag);
+  step("拖拽后 localStorage 写入新宽度", afterDrag.stored !== null && Number(afterDrag.stored) >= 260, afterDrag);
 
   // 3. clamp 极小:从当前位置拖到 -200 (会到 220)
   const handleBox2 = await page.evaluate(() => {
@@ -129,7 +137,7 @@ try {
     const w = document.querySelector(".app__sidebar-shell")?.getBoundingClientRect().width;
     return { wrapperWidth: w, stored: window.localStorage.getItem("openbuddy.sidebar.width") };
   });
-  step("拖到极小被 clamp 到 220", Math.round(afterClampMin.wrapperWidth) === 220, afterClampMin);
+  step("拖到极小被 clamp 到 260", Math.round(afterClampMin.wrapperWidth) === 260, afterClampMin);
 
   // 4. clamp 极大:从当前位置拖到 +600 (会到 420)
   const handleBox3 = await page.evaluate(() => {
@@ -150,7 +158,7 @@ try {
     const w = document.querySelector(".app__sidebar-shell")?.getBoundingClientRect().width;
     return { wrapperWidth: w, stored: window.localStorage.getItem("openbuddy.sidebar.width") };
   });
-  step("拖到极大被 clamp 到 420", Math.round(afterClampMax.wrapperWidth) === 420, afterClampMax);
+  step("拖到极大被 clamp 到 480", Math.round(afterClampMax.wrapperWidth) === 480, afterClampMax);
 
   // 5. 重启后宽度从 localStorage 恢复
   await app.close();
@@ -168,7 +176,7 @@ try {
     const w = document.querySelector(".app__sidebar-shell")?.getBoundingClientRect().width;
     return { wrapperWidth: w, stored: window.localStorage.getItem("openbuddy.sidebar.width") };
   });
-  step("重启后 wrapper 宽度从 localStorage 恢复为 420", Math.round(afterRestart.wrapperWidth) === 420, afterRestart);
+  step("重启后 wrapper 宽度从 localStorage 恢复为 480", Math.round(afterRestart.wrapperWidth) === 480, afterRestart);
   await app2.close().catch(() => {});
 
   report.ok = report.pageErrors.length === 0 && report.steps.every((s) => s.ok);
