@@ -115,10 +115,10 @@ describe("ExpertsPanel 子 tab 深链 (R40)", () => {
 
 
 /**
- * R42 — 专家 tab 默认视图是 2 列布局:左 TasksPanel + 右 4 列专家网格,
- * 排序按钮文案是「综合 / 最新」(对应 WorkBuddy v5.4.7 实测)。
+ * R42/R91 — 专家 tab 现在是单栏布局(左侧「任务」栏已在 R91 移除,任务列表
+ * 由侧边栏承载),排序按钮文案仍是「综合 / 最新」。
  */
-describe("ExpertsPanel 2-列布局 (R42)", () => {
+describe("ExpertsPanel 单栏布局 (R91)", () => {
   beforeEach(() => {
     window.localStorage.clear();
     (window as unknown as { api: unknown }).api = {
@@ -132,11 +132,11 @@ describe("ExpertsPanel 2-列布局 (R42)", () => {
     };
   });
 
-  it("默认专家 tab 渲染左侧任务栏 + 右侧主区容器", () => {
+  it("默认专家 tab 只渲染主区,不再有左侧任务栏", () => {
     render(<ExpertsPanel />);
-    // 左侧任务栏
-    expect(screen.getByTestId("tasks-panel")).toBeInTheDocument();
-    // 右侧主区
+    // R91 — 任务栏已移除:专家页不该再出现 tasks-panel。
+    expect(screen.queryByTestId("tasks-panel")).not.toBeInTheDocument();
+    // 主区容器保留(探针/样式都按这个 testid 取 DOM)。
     expect(screen.getByTestId("experts-page-split")).toBeInTheDocument();
   });
 

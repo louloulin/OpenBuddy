@@ -143,6 +143,11 @@
   gap: 0;
   width: 100%;
   height: 30px;
+  /* R91 — defensive: never let a flex child blow the row's intrinsic width.
+   * `min-width: 0` is the canonical fix for flex children that override
+   * `overflow:hidden` when intrinsic content > available width. */
+  min-width: 0;
+  overflow: hidden;
   /* WB: no leading icon — text aligns with the 任务/空间 section label text */
   padding: 4px 12px;
   box-sizing: border-box;
@@ -187,6 +192,10 @@
 }
 .sidebar__conv-title {
   flex: 1;
+  /* R91 — `min-width: 0` is required so the title actually respects its
+   * sibling time/pin tail; without it flex's default min-content wins and
+   * the row appears to ignore the parent's overflow:hidden. */
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -958,6 +967,9 @@
 .sidebar__conv-pin {
   color: var(--wb-brand);
   margin-left: auto;
+  /* R91 — pin glyph stays a single symbol; prevents accidental wrap when
+   * the row's flex width shrinks. */
+  white-space: nowrap;
 }
 
 /* ========================================================================
@@ -1085,6 +1097,9 @@
 /* Relative-time tail on a session row (e.g. "3小时前"). */
 .sidebar__conv-time {
   flex: none;
+  /* R91 — relative time tail must stay single-line, otherwise the row's
+   * visual rhythm breaks (e.g. "3小时\n前" wrapping to 2 lines). */
+  white-space: nowrap;
   margin-left: 6px;
   font-size: 11px;
   color: var(--wb-text-tertiary);

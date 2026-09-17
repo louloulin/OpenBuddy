@@ -31,13 +31,25 @@
 }
 
 .sidebar__scroll {
-  flex: 1;
+  flex: 1 1 0;
+  /* R91 — min-height: 0 lets flex shrink the scroll region below its
+   * intrinsic content height, so the footer never overlaps. */
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 8px 12px;
+  /* R91 — extra bottom padding so the last session row's hover toolbar
+   * is fully visible above the footer border. */
+  padding: 4px 8px 16px;
   scroll-behavior: smooth;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--wb-text-weak) 35%, transparent) transparent;
+  /* R91 — adaptive scrollbar that only shows while the user is scrolling,
+   * addressing earlier feedback that the always-visible 6px scrollbar eats
+   * usable width when there are 30+ sessions. */
+  overscroll-behavior: contain;
+}
+.sidebar__scroll:not(:hover):not(:focus-within)::-webkit-scrollbar-thumb {
+  background: transparent;
 }
 
 .sidebar__scroll::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -72,7 +84,13 @@
 }
 
 .sidebar__footer {
-  flex: none;
+  /* R91 — explicit `flex-shrink: 0` belt-and-suspenders so the
+   * footer can never collapse below its content even if a future rule
+   * flips `flex: none` to a grow variant. Without this the scroll
+   * region can push the footer (and account/setting affordances)
+   * underneath itself. */
+  flex: 0 0 auto;
+  flex-shrink: 0;
   padding: 8px 12px;
   border-top: 1px solid var(--wb-border-soft);
   display: flex;

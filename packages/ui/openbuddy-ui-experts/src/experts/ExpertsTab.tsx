@@ -16,7 +16,6 @@ import { ExpertCard } from "./ExpertCard";
 import { ExpertDetailModal } from "./ExpertDetailModal";
 import { FeaturedScenes } from "./FeaturedScenes";
 import { MyExpertsEmpty } from "./MyExpertsEmpty";
-import { TasksPanel } from "./TasksPanel";
 import { usePendingExpertStore } from "@/stores/pending-expert-store";
 
 type ListTab = "expert" | "team";
@@ -32,12 +31,13 @@ interface Props {
   /** Navigate back to the home page (after summoning an expert). */
   onGoHome?: () => void;
   onToast?: (message: string) => void;
-  /** R42 — WorkBuddy v5.4.7 左侧「任务」栏的会话点击回调(shell 的 handleSelectSession)。
-   *  不传则 TasksPanel 退化为只读 + onToast 提示。 */
+  /** R91 — 已废弃。此前这里把点击转发给 WorkBuddy 风格的左侧「任务」栏;
+   *  该栏已移除(专家页不再承载任务列表),所以这个回调不再被消费。
+   *  保留字段是为了不破坏 `ExpertsPanel` → shell 的既有 props 契约。 */
   onSelectSession?: (sessionId: string, cwd?: string) => void;
 }
 
-export function ExpertsTab({ pills, onGoHome, onToast, onSelectSession }: Props) {
+export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
   const [view, setView] = useState<"center" | "my">("center");
   const [listTab, setListTab] = useState<ListTab>("expert");
   const [sort, setSort] = useState<Sort>("popular");
@@ -335,14 +335,14 @@ export function ExpertsTab({ pills, onGoHome, onToast, onSelectSession }: Props)
   }, [setPendingExpert, onGoHome]);
 
   // ---- no data dir yet ----
-  // R42 — 同样套上 2-列 split(任务栏 + 空态提示),让 WorkBuddy 风格布局始终在场。
+  // R91 — 单栏:左侧「任务」栏已移除(专家页只讲专家,任务列表留在侧边栏),
+  // 空态直接占满主区,不再留一条永远为空的窄列。
   if (needPick && !catalog) {
     return (
       <div className="um-page">
         <header className="um-topbar"><div className="um-topbar-left">{pills}</div></header>
         <div className="um-scroll">
           <div className="ec-page-split" data-testid="experts-page-split">
-            <TasksPanel onSelectSession={onSelectSession} onToast={onToast} />
             <div className="ec-page-main">
               <div className="ec-empty">
                 <FolderOpenIcon size="xl" className="ec-empty-icon" />
@@ -475,11 +475,10 @@ export function ExpertsTab({ pills, onGoHome, onToast, onSelectSession }: Props)
           </div>
         )}
 
-        {/* R42 — 左侧 TasksPanel 始终在场(WorkBuddy v5.4.7 实测),
-         *  只有右侧 main pane 才受 catalog 影响(无 catalog 时显示 loading)。
-         *  这样切换来源目录时左侧任务栏不会闪。 */}
+        {/* R91 — 单栏主区。此前这里并排放着 WorkBuddy 的「任务(N)」栏,但
+         *  任务列表已经由左侧边栏承载,专家页再放一份既重复又占宽,用户明确
+         *  要求移除。现在主区独占整宽,专家网格获得更多横向空间。 */}
         <div className="ec-page-split" data-testid="experts-page-split">
-          <TasksPanel onSelectSession={onSelectSession} onToast={onToast} />
           <div className="ec-page-main">
             {!catalog && loading && <div className="ec-loading">加载专家数据…</div>}
             {catalog && (

@@ -93,16 +93,16 @@ try {
   writeFileSync('/tmp/r42-dom.html', domDump.pageStackInnerHTML || '');
   console.log("[diag] domDump saved to /tmp/r42-dom.html, length:", (domDump.pageStackInnerHTML || '').length);
 
-  // 1. 左侧任务栏可见
+  // 1. R91 — 左侧「任务」栏已移除(任务列表由左侧边栏承载)。
   step(
-    "左侧「任务」栏可见(data-testid=tasks-panel)",
-    domDump.hasTasksPanel,
+    "左侧「任务」栏已移除(data-testid=tasks-panel 不存在)",
+    !domDump.hasTasksPanel,
     JSON.stringify({ hasTasksPanel: domDump.hasTasksPanel }),
   );
 
-  // 2. 右侧 split 主区
+  // 2. split 容器保留(现在退化为单栏,主区独占整宽)。
   step(
-    "右侧主区是 2 列 split(data-testid=experts-page-split)",
+    "主区容器存在(data-testid=experts-page-split)",
     domDump.hasPageSplit,
     JSON.stringify({ hasPageSplit: domDump.hasPageSplit }),
   );
@@ -123,8 +123,8 @@ try {
     );
   } else {
     step(
-      "catalog 未加载:左侧任务栏 + 右侧 loading 占位(split 仍按 2 列布局)",
-      domDump.hasTasksPanel && domDump.hasPageSplit,
+      "catalog 未加载:主区 loading 占位(split 容器仍在,单栏)",
+      !domDump.hasTasksPanel && domDump.hasPageSplit,
       "skip — depends on real experts catalog",
     );
   }
