@@ -491,6 +491,19 @@ export function ChatView({
     setResendNonce((n) => n + 1);
   }, []);
 
+  // R78 (assistant inline edit) — apply 落库;不需要 resend 路径。
+  const handleEditAssistantMessage = useCallback((messageId: string, newMarkdown: string) => {
+    useSessionStore.getState().editAssistantMessage(messageId, newMarkdown);
+  }, []);
+
+  // R78 — 应用并重新生成:先替换 assistant 内容,再走 handleRetry 同一管线
+  // (回退到上一条 user prompt 重新发送)。
+  const handleResendAfterAssistantEdit = useCallback((_messageId: string) => {
+    if (handleRetryRef.current) {
+      void handleRetryRef.current();
+    }
+  }, []);
+
   // R8.10 — quick-prompt card click: seed the composer with the preset
   // text via the same resendText pipe as inline-edit / revision-pager so
   // a single source of truth seeds the textarea (Composer auto-focuses
@@ -510,6 +523,8 @@ export function ChatView({
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+  const handleRetryRef = useRef<(() => Promise<void>) | null>(null);
+  handleRetryRef.current = null;
   const handleRetry = useCallback(async () => {
     if (!sessionId || streaming || retrying || readOnlySubagent) return;
     // Find the last user message text via the ref to avoid re-creating
@@ -545,6 +560,8 @@ export function ChatView({
       setRetrying(false);
     }
   }, [sessionId, streaming, retrying, readOnlySubagent, onSend, onRewound, onToast]);
+  // R78 — 让 handleResendAfterAssistantEdit 永远拿到当前最新的 handleRetry
+  handleRetryRef.current = handleRetry;
 
   /** R6.6 — error-banner retry. Lighter-weight than handleRetry (no
    *  rewind): the error banner typically surfaces session-level failures
@@ -798,6 +815,12 @@ export function ChatView({
             onRetry={
               isLastAssistant && !streaming && m.complete ? handleRetry : undefined
             }
+            onEditAssistantMessage={
+              m.role === "assistant" && m.complete ? handleEditAssistantMessage : undefined
+            }
+            onResendAfterAssistantEdit={
+              m.role === "assistant" && m.complete ? handleResendAfterAssistantEdit : undefined
+            }
           />
         </div>
       );
@@ -814,6 +837,8 @@ export function ChatView({
       handleEditResend,
       handleStepRevision,
       handleInlineResend,
+      handleEditAssistantMessage,
+      handleResendAfterAssistantEdit,
       findOpen,
       findHits,
       findCurrent,

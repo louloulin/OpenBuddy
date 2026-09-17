@@ -236,6 +236,13 @@ interface UiSessionActions {
   /** R8.1 — switch the displayed revision of a user bubble. 1-based index.
    *  No-op when out of range or when the message isn't a user message. */
   setActiveRevision: (messageId: string, idx: number) => void;
+  /** R78 (assistant inline edit) — replace an assistant message's text parts
+   *  with a single new markdown blob. Tool-call parts / reasoning parts are
+   *  preserved as-is so the structural integrity of the turn is unchanged;
+   *  only the rendered text body is overwritten. No-op when the id does
+   *  not resolve to an assistant message (user bubbles go through
+   *  appendUserRevision + onResend). */
+  editAssistantMessage: (messageId: string, newMarkdown: string) => void;
   setError: (e: string | null) => void;
   /** R1.4 — start a streaming assistant message. Returns its id so subsequent
    *  deltas can target it. Called by App.tsx from `agent_message_chunk` /
@@ -707,6 +714,25 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
   },
 
   setError: (error) => set({ error }),
+
+  editAssistantMessage: (messageId, newMarkdown) => {
+    set((s) => {
+      const idx = s.messages.findIndex((m) => m.id === messageId);
+      if (idx < 0) return s;
+      const target = s.messages[idx];
+      if (target.role !== "assistant") return s;
+      // 保留所有非 text part(tool_call / reasoning / file ...),
+      // 把所有 text part 合并成一个新的 markdown blob(因为用户在
+      // Tiptap 里编辑后,原来按 chunk 切分的边界没有意义了)。
+      const preserved = target.parts.filter((p) => p.kind !== "text");
+      const next = s.messages.slice();
+      next[idx] = {
+        ...target,
+        parts: [...preserved, { kind: "text", text: newMarkdown }],
+      };
+      return { messages: next };
+    });
+  },
 
   beginStreamingMessage: () => {
     // 上一轮可能残留未 flush 的 delta(异常中止路径),丢弃防止串进新消息。

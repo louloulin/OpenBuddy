@@ -69,6 +69,8 @@ function MessageItemInner({
   onStepRevision,
   onRetry,
   onToast,
+  onEditAssistantMessage,
+  onResendAfterAssistantEdit,
   onOpenSettings,
   streamingDurationMs,
 }: {
@@ -91,7 +93,15 @@ function MessageItemInner({
    *  appendUserRevision by ChatView so the revision pager history stays
    *  in sync. */
   onInlineResend?: (messageId: string, text: string) => void;
-  /** R8.1 (revision-pager) — step the displayed revision of a user
+  /** R78 (assistant inline edit) — replace this assistant message's
+   *  rendered text with `newMarkdown` (single blob). Tool-call parts are
+   *  preserved. Wired by ChatView to `editAssistantMessage`. */
+  onEditAssistantMessage?: (messageId: string, newMarkdown: string) => void;
+  /** R78 — optionally regenerate from this assistant message after the
+   *  user has edited it inline (drops the old bubble and resends the
+   *  preceding user prompt). Wired by ChatView to handleRetry-style flow. */
+  onResendAfterAssistantEdit?: (messageId: string) => void;
+    /** R8.1 (revision-pager) — step the displayed revision of a user
    *  bubble. `direction` is -1 (older) or +1 (newer). The pager is only
    *  rendered when `message.revisions && message.revisions.length > 1`. */
   onStepRevision?: (messageId: string, direction: -1 | 1) => void;
@@ -206,6 +216,21 @@ function MessageItemInner({
   // 每个 message 自带草稿态,关闭 / 打开互不影响。
   const [draftOpen, setDraftOpen] = useState(false);
   const [draftInitial, setDraftInitial] = useState("");
+  // R78 — 「✏️ 就地编辑」入口。读 editor.body 槽,空槽时不渲染按钮。
+  // 进入编辑态后,msg__body 整体替换为 EditorImpl;Esc 退出,
+  // Cmd/Ctrl+Enter 应用(并可选 resend)。
+  const [inlineEditing, setInlineEditing] = useState(false);
+  const [inlineDraft, setInlineDraft] = useState("");
+  const inlineEditorImpls = useSlotComponents("editor.body");
+  const InlineEditorImpl = inlineEditorImpls[0] as
+    | ComponentType<{
+        value?: string;
+        format?: "html" | "markdown";
+        onChange?: (next: string) => void;
+        editable?: boolean;
+        placeholder?: string;
+      }>
+    | undefined;
   const draftImpls = useSlotComponents("editor.draft");
   const DraftImpl = draftImpls[0] as
     | ComponentType<{
@@ -279,7 +304,28 @@ function MessageItemInner({
     return null;
   }
 
-  // R8.16 — apply the just-completed class to the assistant root
+  // R78 — Esc 取消 / Cmd+Enter 应用 inline edit
+  useEffect(() => {
+    if (!inlineEditing) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setInlineEditing(false);
+        setInlineDraft("");
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        if (!onEditAssistantMessage) return;
+        e.preventDefault();
+        onEditAssistantMessage(message.id, inlineDraft);
+        setInlineEditing(false);
+        setInlineDraft("");
+        onToast?.("已就地保存");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [inlineEditing, inlineDraft, message.id, onEditAssistantMessage, onToast]);
+
+    // R8.16 — apply the just-completed class to the assistant root
   // for ~320ms after the streaming flag flips off so the bubble
   // fades + slides in instead of popping into existence.
   // R8.44 — additionally apply msg--streaming while the message
@@ -303,6 +349,59 @@ function MessageItemInner({
           <span className="msg__role" aria-label="AI assistant">AI</span>
         </div>
         <div className="msg__body">
+          {inlineEditing && InlineEditorImpl ? (
+            <div className="msg__inline-editor" data-testid="message-inline-editor">
+              <InlineEditorImpl
+                value={inlineDraft}
+                format="markdown"
+                editable
+                onChange={(v) => setInlineDraft(v)}
+                placeholder="在 Tiptap 富文本里修改这条回复..."
+              />
+              <div className="msg__inline-editor-actions">
+                <button
+                  type="button"
+                  className="msg__action-btn"
+                  onClick={() => {
+                    setInlineEditing(false);
+                    setInlineDraft("");
+                  }}
+                  data-testid="message-inline-edit-cancel"
+                >
+                  取消 (Esc)
+                </button>
+                <button
+                  type="button"
+                  className="msg__action-btn"
+                  onClick={() => {
+                    if (!onEditAssistantMessage) return;
+                    onEditAssistantMessage(message.id, inlineDraft);
+                    setInlineEditing(false);
+                    setInlineDraft("");
+                    onToast?.("已就地保存");
+                  }}
+                  data-testid="message-inline-edit-apply"
+                >
+                  应用
+                </button>
+                {onResendAfterAssistantEdit && onEditAssistantMessage && (
+                  <button
+                    type="button"
+                    className="msg__action-btn msg__action-btn--primary"
+                    onClick={() => {
+                      onEditAssistantMessage(message.id, inlineDraft);
+                      setInlineEditing(false);
+                      setInlineDraft("");
+                      onResendAfterAssistantEdit(message.id);
+                    }}
+                    data-testid="message-inline-edit-apply-resend"
+                  >
+                    应用并重新生成
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : null}
           {/* Placeholder state: the assistant message exists but no content
               has streamed in yet. Render the avatar (header above) + the
               shimmering "preparing / waiting for model" loading row with a
@@ -436,6 +535,21 @@ function MessageItemInner({
                 data-testid="message-draft-button"
               >
                 <Pencil size={14} strokeWidth={1.75} />
+              </TooltipButton>
+            )}
+            {InlineEditorImpl && markdownText && !inlineEditing && (
+              <TooltipButton
+                className="msg__action-btn"
+                tooltip="就地编辑这条回复(Tiptap 富文本,Esc 取消,⌘/Ctrl+Enter 应用并可重新生成)"
+                onClick={() => {
+                  setInlineDraft(markdownText);
+                  setInlineEditing(true);
+                }}
+                aria-label="就地编辑"
+                data-testid="message-inline-edit-button"
+              >
+                <Pencil size={14} strokeWidth={1.75} />
+                <span style={{ marginLeft: 2 }}>↳</span>
               </TooltipButton>
             )}
             {onRetry && (
