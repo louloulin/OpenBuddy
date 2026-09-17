@@ -854,7 +854,7 @@ export const OPENBUDDY_DEFAULT_PI_PACKAGES: readonly string[] = Object.freeze([
   "npm:pi-web-access@0.27.0",
   "npm:pi-goal@0.1.7",
   "npm:pi-plan-mode@0.4.8",
-  "npm:pi-subagents@0.59.0",
+  "npm:pi-subagents@0.68.0",
 ]);
 
 export interface DefaultPiPackageResult {

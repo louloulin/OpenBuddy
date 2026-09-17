@@ -21,6 +21,7 @@ import {
   writeJson,
   writeTextAtomic,
 } from "./shared";
+import { starterExpertsRoot, tryEnsureStarterExperts } from "./expert-starter/seed";
 
 function agentDir(scope: "user" | "project", cwd?: string | null): string {
   return scope === "project" ? join(workspaceRoot(cwd), ".pi", "agents") : join(piRoot(), "agents");
@@ -169,14 +170,19 @@ async function buildManifestExpert(root: string, value: unknown): Promise<Record
   const plugin = typeof item.plugin === "string" ? item.plugin : undefined;
   let pluginJson: Record<string, unknown> = {};
   if (plugin) {
-    for (const folder of [".aily-plugin", ".codebuddy-plugin"]) {
+    for (const folder of [".openbuddy-plugin", ".aily-plugin", ".codebuddy-plugin"]) {
       pluginJson = await readJson<Record<string, unknown>>(join(root, plugin, folder, "plugin.json"), {});
       if (Object.keys(pluginJson).length) break;
     }
   }
   const avatar = typeof item.avatar === "string" ? item.avatar : undefined;
   const avatarLocal = plugin && typeof pluginJson.avatar === "string" ? await filePathIfExists(join(root, plugin, pluginJson.avatar)) : undefined;
-  const agentName = typeof pluginJson.agentName === "string" ? pluginJson.agentName : undefined;
+  // `agentName` may live on the manifest entry (built-in catalog, WorkBuddy
+  // import) or on the plugin manifest — accept either, so a plugin folder with
+  // a single `agents/lead.md` still resolves without a plugin.json.
+  const agentName = typeof pluginJson.agentName === "string"
+    ? pluginJson.agentName
+    : typeof item.agentName === "string" ? item.agentName : undefined;
   const tags = Array.isArray(item.tags) ? item.tags.map((tag) => localized(tag)).filter(Boolean).slice(0, 3) : [];
   const quickPrompts = Array.isArray(item.quickPrompts) ? item.quickPrompts.map((prompt) => localized(prompt)).filter(Boolean).slice(0, 5) : [];
   return [{ id, cat: typeof item.categoryId === "string" ? item.categoryId : "general", name: localized(item.displayName) || id, nameEn: localized(item.displayName, "en") || undefined, title: localized(item.profession) || id, titleEn: localized(item.profession, "en") || undefined, desc: localized(item.displayDescription) || localized(item.description) || id, tags, type: item.expertType === "team" ? "team" : "agent", author: localized(item.author) || undefined, ribbon: localized(item.operationalTag) || undefined, init: localized(item.defaultInitPrompt) || undefined, opc: item.isOPC === true, pos: typeof item.displayPosition === "number" ? item.displayPosition : undefined, updated: typeof item.updatedAt === "string" ? item.updatedAt : undefined, avatarLocal, avatarUrl: avatar ? (avatar.startsWith("http") ? avatar : `https://acc-1258344699.cos.accelerate.myqcloud.com/workbuddy/expert-marketplace/${avatar.replace(/^\/+/, "")}`) : undefined, plugin, agentName, quickPrompts }];
@@ -227,8 +233,31 @@ export async function listExpertCatalog(root: string): Promise<Record<string, un
   return { root, categories: categories.length ? categories : [{ id: "general", zh: "通用", en: "General" }], experts, featuredScenes: await readFeaturedScenes(root) };
 }
 
+/**
+ * Resolve the expert catalog root, seeding the built-in starter pack first so a
+ * fresh open-source install never lands on an empty expert page.
+ *
+ * Precedence (highest first):
+ *   1. `OPENBUDDY_AGENTS_DIR` — explicit override (tests / power users).
+ *   2. `<cwd>/.pi/experts`    — project-scoped catalog.
+ *   3. `<agentHome>/workbuddy-experts` — user-imported WorkBuddy catalogs; an
+ *      explicit import always outranks the bundled pack.
+ *   4. `<agentHome>/experts`  — built-in starter pack (seeded here).
+ *   5. `<agentHome>/agents`   — legacy pi agent directory.
+ *
+ * The starter pack is materialized before the candidate walk so step 3 always
+ * exists; `tryEnsureStarterExperts` never throws, so a read-only agent home
+ * degrades to the previous behaviour instead of failing the page.
+ */
 export async function expertDefaultRoot(cwd: string): Promise<string> {
-  const candidates = [process.env.OPENBUDDY_AGENTS_DIR, join(resolve(cwd), ".pi", "experts"), join(agentRoot(), "agents"), join(agentRoot(), "workbuddy-experts")].filter((value): value is string => Boolean(value));
+  await tryEnsureStarterExperts();
+  const candidates = [
+    process.env.OPENBUDDY_AGENTS_DIR,
+    join(resolve(cwd), ".pi", "experts"),
+    join(agentRoot(), "workbuddy-experts"),
+    starterExpertsRoot(),
+    join(agentRoot(), "agents"),
+  ].filter((value): value is string => Boolean(value));
   for (const candidate of candidates) {
     if (await filePathIfExists(join(candidate, "_meta", "_expert_center.json"))) return resolve(candidate);
   }
