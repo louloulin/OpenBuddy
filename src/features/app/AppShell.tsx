@@ -82,6 +82,10 @@ const AboutDialog = lazy(() =>
 const FolderTrustDialog = lazy(() =>
   import("@openbuddy/ui-dialogs").then((m) => ({ default: m.FolderTrustDialog })),
 );
+// R48 — 左下角「登录」入口的落地面板(基于 Casdoor)。
+const CasdoorSignInDialog = lazy(() =>
+  import("@openbuddy/ui-dialogs").then((m) => ({ default: m.CasdoorSignInDialog })),
+);
 const TasksPanel = lazy(() =>
   import("@openbuddy/ui-automation").then((m) => ({ default: m.TasksPanel })),
 );
@@ -217,6 +221,12 @@ function AboutSurface(props: React.ComponentProps<typeof AboutDialog>) {
 /** 目录信任对话框：内核 `overlay.folder-trust` slot 优先。 */
 function TrustSurface(props: React.ComponentProps<typeof FolderTrustDialog>) {
   const Component = useSlotComponent("overlay.folder-trust", FolderTrustDialog);
+  return <Component {...props} />;
+}
+
+/** 登录对话框（Casdoor）：内核 `overlay.sign-in` slot 优先。 */
+function SignInSurface(props: React.ComponentProps<typeof CasdoorSignInDialog>) {
+  const Component = useSlotComponent("overlay.sign-in", CasdoorSignInDialog);
   return <Component {...props} />;
 }
 
@@ -436,6 +446,10 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
     trustRequest,
     placeholderView,
     feedbackOpen,
+    signInOpen,
+    setSignInOpen,
+    setCasdoorSession,
+    openSignIn,
     dataDirOpen,
     setSettingsOpen,
     setSearchOpen,
@@ -457,7 +471,6 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
     handleToggleWorkspace,
     openSettings,
     openAccountSettings,
-    handleLogin,
     handleLogout,
     showToast,
     handlePlaceholder,
@@ -490,7 +503,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
               : undefined}
             accountStatus={casdoorSession?.status}
             onOpenAccount={openAccountSettings}
-            onLogin={handleLogin}
+            onLogin={openSignIn}
             onLogout={handleLogout}
             onOpenFeedback={() => setFeedbackOpen(true)}
             onToggleCollapse={() => setSidebarCollapsed(true)}
@@ -574,6 +587,15 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
         <TrustSurface
           request={trustRequest}
           onResolve={() => setTrustRequest(null)}
+          onToast={showToast}
+        />
+        {/* R48 — 登录对话框:左下角账户菜单「登录」的落地面板,基于 Casdoor。
+            登录成功后把身份写回 runtime,侧栏账户区立即显示已登录态。 */}
+        <SignInSurface
+          open={signInOpen}
+          onClose={() => setSignInOpen(false)}
+          onSessionChange={setCasdoorSession}
+          onOpenSettings={() => openSettings("account")}
           onToast={showToast}
         />
         <TasksSurface refreshSignal={runtime.taskRefreshSignal} onToast={showToast} />

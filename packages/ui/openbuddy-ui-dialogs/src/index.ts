@@ -31,10 +31,19 @@ declare module "@openbuddy/ui-slots" {
     "overlay.about": { kind: "single"; scope: "root" };
     /** 目录信任对话框(single)。同上,payload 是 `FolderTrustDialog` 的 props。 */
     "overlay.folder-trust": { kind: "single"; scope: "root" };
+    /**
+     * 「登录」对话框(single)。基于 Casdoor:未配置时可就地补 issuer /
+     * clientId,已配置时直接拉起授权页;登录成功后监听 `casdoor://auth`
+     * 就地刷新。注册方 `client.tsx`,消费者 `src/features/app/AppShell`。
+     */
+    "overlay.sign-in": { kind: "single"; scope: "root" };
   }
 }
 
 export { AboutDialog } from "./AboutDialog";
+
+export { CasdoorSignInDialog } from "./CasdoorSignInDialog";
+export type { CasdoorSignInDialogProps } from "./CasdoorSignInDialog";
 
 export { ConfirmDialog } from "./ConfirmDialog";
 export type { ConfirmTone } from "./ConfirmDialog";

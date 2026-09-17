@@ -3,7 +3,7 @@
  *
  * 覆盖用户反馈的三件事:
  *   1. 点击用户按钮弹出账户菜单(而不是直接跳设置);
- *   2. 未登录时主按钮「企业登录」走历史 openAccountSettings 流程;
+ *   2. 未登录时主按钮「登录」打开 Casdoor 登录对话框(R48 恢复的历史语义);
  *   3. 已登录时菜单提供「账户管理」+「退出登录」。
  */
 // @vitest-environment jsdom
@@ -120,47 +120,64 @@ describe("R16 左下角账户菜单", () => {
     expect(onOpenSettings).not.toHaveBeenCalled();
   });
 
-  it("已配置但未登录时「企业登录」调用 onOpenAccount(历史 openAccountSettings 流程)", () => {
+  it("R48 — 已配置但未登录时主按钮是「登录」,打开 Casdoor 登录对话框", () => {
     const onOpenAccount = vi.fn();
     const onLogin = vi.fn();
     renderSidebar({ accountStatus: "signed_out", onOpenAccount, onLogin });
     fireEvent.click(document.querySelector(".sidebar__user") as HTMLElement);
 
     const primary = document.querySelector(".sidebar__account-menu-item--primary") as HTMLElement;
-    expect(primary?.textContent?.trim()).toBe("企业登录");
+    expect(primary?.textContent?.trim()).toBe("登录");
     fireEvent.click(primary);
-    expect(onOpenAccount).toHaveBeenCalledTimes(1);
-    expect(onLogin).not.toHaveBeenCalled();
+    // R48 — 登录入口优先走 onLogin(打开 overlay.sign-in 对话框),
+    //   再回落到 onOpenAccount,而不是把人送去设置表单。
+    expect(onLogin).toHaveBeenCalledTimes(1);
+    expect(onOpenAccount).not.toHaveBeenCalled();
     // 点击后菜单关闭
     expect(document.querySelector(".sidebar__account-menu")).toBeNull();
   });
 
-  it("R26 — 未配置时主按钮是「配置企业登录」,深链到账户设置(不再点一下必失败)", () => {
+  it("R48 — 未配置时主按钮仍是「登录」,点一下必须弹出登录流程(不再只是跳设置)", () => {
     const onOpenSettings = vi.fn();
     const onOpenSettingsSection = vi.fn();
     const onOpenAccount = vi.fn();
+    const onLogin = vi.fn();
     renderSidebar({
       accountStatus: "configuration_needed",
       onOpenSettings,
       onOpenSettingsSection,
       onOpenAccount,
+      onLogin,
     });
     fireEvent.click(document.querySelector(".sidebar__user") as HTMLElement);
 
     const primary = document.querySelector(".sidebar__account-menu-item--primary") as HTMLElement;
-    expect(primary?.textContent?.trim()).toBe("配置企业登录");
+    expect(primary?.textContent?.trim()).toBe("登录");
     fireEvent.click(primary);
-    // 只把人送到账户设置,不触发必然失败的登录
-    expect(onOpenSettingsSection).toHaveBeenCalledWith("account");
-    expect(onOpenAccount).not.toHaveBeenCalled();
+    // 登录对话框内部负责"先补 Casdoor 配置再发起授权",入口本身不再分流。
+    expect(onLogin).toHaveBeenCalledTimes(1);
+    expect(onOpenSettingsSection).not.toHaveBeenCalled();
     expect(onOpenSettings).not.toHaveBeenCalled();
   });
 
-  it("R36 — 默认态(未配置 IdP / 未登录)左下角不出现「企业登录」字样", () => {
+  it("R48 — 未登录副标题去术语:不出现「企业登录」「配置企业身份服务」", () => {
+    renderSidebar({ accountStatus: "configuration_needed" });
+    fireEvent.click(document.querySelector(".sidebar__user") as HTMLElement);
+    const head = document.querySelector(".sidebar__account-menu-sub");
+    expect(head?.textContent ?? "").not.toContain("企业");
+    expect(head?.textContent ?? "").toContain("数据只保存在这台机器上");
+  });
+
+  it("R48 — 左下角是单行身份条:头像 + 名字,没有第二行副标", () => {
     for (const status of ["configuration_needed", "signed_out"] as const) {
       renderSidebar({ accountStatus: status });
-      const sub = document.querySelector(".sidebar__user-sub");
-      expect(sub?.textContent?.trim()).toBe("本地优先 · 开源");
+      expect(document.querySelector(".sidebar__user-sub")).toBeNull();
+      expect(document.querySelector(".sidebar__user-chevron")).toBeNull();
+      expect(document.querySelector(".sidebar__user-name")?.textContent?.trim()).toBe("OpenBuddy");
+      // 状态改由圆点 + tooltip 表达,不再写一行小字。
+      const dot = document.querySelector(".sidebar__user-dot");
+      expect(dot?.getAttribute("data-state")).toBe(status);
+      expect(document.querySelector(".sidebar__user")?.getAttribute("data-tip")).toContain("本地优先 · 开源");
       expect(document.querySelector(".sidebar__user")?.textContent ?? "").not.toContain("企业登录");
       cleanup();
     }
@@ -222,9 +239,10 @@ describe("R16 左下角账户菜单", () => {
     ).toBe("true");
   });
 
-  it("已登录时账号名显示在用户名与副标题上", () => {
+  it("已登录时账号名显示在身份条上,并带已登录圆点", () => {
     renderSidebar({ accountStatus: "signed_in", accountLabel: "ada@example.com" });
     expect(screen.getByText("ada@example.com")).toBeTruthy();
-    expect(screen.getByText("已登录")).toBeTruthy();
+    expect(document.querySelector(".sidebar__user-dot")?.getAttribute("data-state")).toBe("signed_in");
+    expect(document.querySelector(".sidebar__user")?.getAttribute("data-tip")).toContain("ada@example.com");
   });
 });

@@ -964,3 +964,128 @@ textarea.mshell-field__control { resize: vertical; min-height: 96px; font-family
   font-size: 11px;
   color: var(--wb-text-tertiary);
 }
+
+/* ── R48 登录对话框(Casdoor)───────────────────────────────────────────── */
+.casdoor-signin .request-modal__body { padding-top: 4px; }
+.casdoor-signin__lead {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  line-height: 19px;
+  color: var(--wb-text-medium);
+}
+.casdoor-signin__form,
+.casdoor-signin__profile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.casdoor-signin__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--wb-text-secondary);
+}
+.casdoor-signin__field > span { font-weight: 500; }
+.casdoor-signin__field input {
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--wb-text-primary);
+  background: var(--wb-bg-secondary);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-sm, 8px);
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.casdoor-signin__field input:focus {
+  border-color: color-mix(in srgb, var(--wb-brand-primary) 60%, var(--wb-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-brand-primary) 16%, transparent);
+}
+.casdoor-signin__identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--wb-bg-secondary);
+  border: 1px solid var(--wb-border-soft, var(--wb-border));
+  border-radius: var(--wb-radius-md, 10px);
+}
+.casdoor-signin__avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--wb-brand-primary), color-mix(in srgb, var(--wb-brand-primary) 55%, #6d5efc));
+}
+.casdoor-signin__identity-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.casdoor-signin__identity-text strong { font-size: 14px; color: var(--wb-text-primary); }
+.casdoor-signin__identity-text span {
+  font-size: 12px;
+  color: var(--wb-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.casdoor-signin__message {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--wb-text-secondary);
+  background: color-mix(in srgb, var(--wb-brand-primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-brand-primary) 22%, transparent);
+  border-radius: var(--wb-radius-sm, 8px);
+}
+.casdoor-signin__link {
+  padding: 0;
+  font-size: 12px;
+  color: var(--wb-brand-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.casdoor-signin__link:hover { text-decoration: underline; }
+.casdoor-signin__btn {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: var(--wb-radius-sm, 8px);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+}
+.casdoor-signin__btn:disabled { opacity: .55; cursor: default; }
+.casdoor-signin__btn--primary {
+  color: #fff;
+  background: var(--wb-brand-primary);
+}
+.casdoor-signin__btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-brand-primary) 88%, #000);
+}
+.casdoor-signin__btn--ghost {
+  color: var(--wb-text-primary);
+  background: var(--wb-bg-secondary);
+  border-color: var(--wb-border);
+}
+.casdoor-signin__btn--ghost:hover:not(:disabled) { background: var(--wb-bg-tertiary); }
+.casdoor-signin__btn--danger {
+  color: var(--wb-danger, #d64545);
+  background: color-mix(in srgb, var(--wb-danger, #d64545) 12%, transparent);
+  border-color: color-mix(in srgb, var(--wb-danger, #d64545) 30%, transparent);
+}
+.casdoor-signin__btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-danger, #d64545) 20%, transparent);
+}

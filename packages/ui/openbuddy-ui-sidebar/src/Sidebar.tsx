@@ -1871,26 +1871,31 @@ export function Sidebar({
                 : "OpenBuddy · 账户菜单"
             }
             title={accountLabel ?? "OpenBuddy"}
-            data-tip={accountStatus === "signed_in" ? `${accountLabel ?? "已登录"} · 账户菜单` : "OpenBuddy · 账户菜单"}
+            data-tip={
+              accountStatus === "signed_in"
+                ? `${accountLabel ?? "已登录"} · 账户菜单`
+                : accountStatus === "error"
+                  ? "登录出错 · 账户菜单"
+                  : "本地优先 · 开源 · 账户菜单"
+            }
           >
             <span className="sidebar__user-avatar" aria-hidden="true">
               {accountInitial(accountLabel) || <UserIcon size="md" />}
             </span>
+            {/* R48 — 左下角回到单行身份条:头像 + 名字(对齐 WorkBuddy 侧栏
+                底部的形状)。原来的第二行副标("本地优先 · 开源" / "登录出错")
+                在 44px 的行高里挤成两行小字,既不是身份也不是状态提示 ——
+                身份状态现在收进 tooltip(`data-tip`)与账户菜单头,不占版面。
+                登录 / 设置 / 反馈 三个入口仍然在点击后的账户菜单里。 */}
             <span className="sidebar__user-text">
               <span className="sidebar__user-name">{accountLabel ?? "OpenBuddy"}</span>
-              <span className="sidebar__user-sub">
-                {/* R36 — 默认态不再对用户喊「需要配置企业登录」。OpenBuddy 是
-                    本地优先产品,IdP 没配置只说明"没接云端账户",不是错误,
-                    更不该在侧栏常驻一句用户无法处置的提示(用户两次点名删掉
-                    这行字)。企业登录入口仍然在账户菜单里,想用的人点得到。 */}
-                {accountStatus === "signed_in"
-                  ? (accountLabel ? "已登录" : "本地账户")
-                  : accountStatus === "error"
-                    ? "登录出错"
-                    : "本地优先 · 开源"}
-              </span>
+              {/* 状态圆点:只表达"是不是登录态",不写字、不占第二行。 */}
+              <span
+                className="sidebar__user-dot"
+                data-state={accountStatus ?? "signed_out"}
+                aria-hidden="true"
+              />
             </span>
-            <span className="sidebar__user-chevron" aria-hidden="true">▾</span>
           </button>
           {accountMenuOpen && accountMenuPos && createPortal(
             <div
@@ -1947,36 +1952,26 @@ export function Sidebar({
                   <div className="sidebar__account-menu-head" role="presentation">
                     <div className="sidebar__account-menu-name">本地用户</div>
                     <div className="sidebar__account-menu-sub">
-                      {accountStatus === "configuration_needed"
-                        ? "未配置企业身份服务(本地功能不受影响)"
-                        : accountStatus === "error"
-                          ? "上次登录出错,可重新登录"
-                          : "登录企业账户以同步会话与权限"}
+                      {accountStatus === "error"
+                        ? "上次登录出错,可重新登录"
+                        : "未登录 · 数据只保存在这台机器上"}
                     </div>
                   </div>
-                  {/* R15 — 历史行为:登录入口始终可见(点击打开 Casdoor 登录页),
-                      配置不完整时同时提供「打开设置」引导用户补齐配置。
-                      R26 — 但"点一下必然失败"的按钮不算入口:未配置(或上次出错)时,
-                      主按钮直接是「配置企业登录」并落到账户设置,不再先弹一次
-                      配置无效的报错。用户第一次点登录时最不该看到的就是一句
-                      他无法处置的英文错误。 */}
-                  {accountStatus === "configuration_needed" ? (
+                  {/* R48 — 登录入口恢复 git 历史(R15 / 536dc0e)的语义:点一下
+                      一定弹出登录流程。R26 把未配置时的主按钮改成「配置企业登录」
+                      并只把人送到设置表单,副作用是这个入口再也不叫"登录"、点完
+                      也没有任何反馈。现在改为打开 `overlay.sign-in`(Casdoor
+                      登录对话框):未配置时可在框内直接补 issuer / clientId 并
+                      立即登录,已配置时直接拉起 Casdoor 授权页。企业登录的编排
+                      仍完全基于 Casdoor,没有新增第二套身份后端。 */}
+                  {(onLogin || onOpenAccount) && (
                     <button
                       type="button"
                       className="sidebar__account-menu-item sidebar__account-menu-item--primary"
                       role="menuitem"
-                      onClick={() => { setAccountMenuOpen(false); (onOpenSettingsSection ? () => onOpenSettingsSection("account") : onOpenSettings)(); }}
+                      onClick={() => { setAccountMenuOpen(false); (onLogin ?? onOpenAccount)?.(); }}
                     >
-                      配置企业登录
-                    </button>
-                  ) : (onOpenAccount || onLogin) && (
-                    <button
-                      type="button"
-                      className="sidebar__account-menu-item sidebar__account-menu-item--primary"
-                      role="menuitem"
-                      onClick={() => { setAccountMenuOpen(false); (onOpenAccount ?? onLogin)?.(); }}
-                    >
-                      {accountStatus === "error" ? "重新登录" : "企业登录"}
+                      {accountStatus === "error" ? "重新登录" : "登录"}
                     </button>
                   )}
                   <button

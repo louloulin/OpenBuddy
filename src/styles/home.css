@@ -277,37 +277,48 @@
   line-height: 1;
   user-select: none;
 }
+/* R48 — 单行身份条:文本块只承载名字,垂直居中(对齐 WorkBuddy 侧栏底部)。 */
 .sidebar__user-text {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 1px;
+  align-items: center;
+  gap: 6px;
   text-align: left;
 }
 .sidebar__user-name {
-  width: 100%;
+  min-width: 0;
   font-size: 13px;
-  font-weight: 500;
+  /* R49 — 对齐参考图:名字用半粗,与右侧图标区形成稳定的身份条。 */
+  font-weight: 600;
   line-height: 16px;
   color: var(--wb-text-strong);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sidebar__user-sub {
-  width: 100%;
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 14px;
-  color: var(--wb-text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* 登录态圆点:绿=已登录,红=出错。只表达状态,不占一行文字。
+   R49 — 默认(未登录 / 未配置)不渲染:参考图的底部身份条只有
+   「头像 + 名字 + 铃铛 + 设置」,本地优先的默认形态不该多出一个灰点;
+   登录成功或出错时才出现,这时它承载的是真实信号。 */
+.sidebar__user-dot {
+  display: none;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wb-text-tertiary) 55%, transparent);
 }
-/* 名字超长时截断为省略号 —— "本地优先 · 开源" 副标也走这条规则 */
+.sidebar__user-dot[data-state="signed_in"] {
+  display: block;
+  background: var(--wb-accent, #00c29a);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-accent, #00c29a) 18%, transparent);
+}
+.sidebar__user-dot[data-state="error"] {
+  display: block;
+  background: var(--wb-danger, #d64545);
+}
+/* 名字超长时截断为省略号 */
 .sidebar__user span {
   white-space: nowrap;
   overflow: hidden;
@@ -325,19 +336,6 @@
   flex: 1;
   min-width: 0;
   display: flex;
-}
-.sidebar__user-chevron {
-  flex: none;
-  margin-left: 4px;
-  font-size: 10px;
-  line-height: 1;
-  color: var(--wb-text-tertiary);
-  opacity: 0.6;
-  transition: transform 0.15s ease, opacity 0.15s ease;
-}
-.sidebar__user--open .sidebar__user-chevron {
-  transform: rotate(180deg);
-  opacity: 1;
 }
 .sidebar__user--open {
   background: var(--wb-bg-active);

@@ -42,10 +42,9 @@ import { newSessionFlow, composeDiscoverBody } from "@/lib/agent/new-session-flo
 import { abandonInFlightStream } from "@/lib/agent/abandon-stream";
 import { listenSafe, isElectronBridgeUnavailable, getElectronBridgeStatus } from "@/lib/platform/electron-api";
 import { friendlyError } from "@/lib/platform/error-format";
-// R9.x — 企业登录入口从侧栏移除后,casdoorLogin/casdoorStatus 调用方消失;
-//   CasdoorSessionView 类型仍保留以备「设置 → 账户」页面按需启用。
-import { casdoorLogin, casdoorLogout, casdoorStatus, type CasdoorSessionView } from "@/lib/casdoor/casdoor-client";
-import { humanizeCasdoorError } from "@/lib/casdoor/casdoor-error";
+// R48 — 登录编排整体搬进 `overlay.sign-in` 对话框(CasdoorSignInDialog),
+//   宿主只保留状态入口(casdoorStatus / casdoorLogout)与身份视图类型。
+import { casdoorLogout, casdoorStatus, type CasdoorSessionView } from "@/lib/casdoor/casdoor-client";
 import { auditRecord } from "@/lib/audit/audit-client";
 import type { CasdoorLifecycleEvent } from "@openbuddy/auth-casdoor";
 import { getRendererPluginRuntime } from "@/lib/runtime/renderer-plugin-runtime";
@@ -117,6 +116,9 @@ export function useAppShellRuntime(): AppShellRuntime {
   // R23 — 「发送反馈」卡是否打开。触发点在左下角账户菜单(ui-sidebar),
   // 状态留在宿主:UI 包只负责"画一个入口",不持有时序策略。
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // R48 — 「登录」对话框(Casdoor)。左下角账户菜单的登录入口打开它,而不是
+  //   直接调 casdoorLogin —— 未配置时入口会先弹一句用户无法处置的错误。
+  const [signInOpen, setSignInOpen] = useState(false);
   // R23 — 数据目录选择器(设置 → 数据管理 → 更改数据目录)。
   const [dataDirOpen, setDataDirOpen] = useState(false);
   const [trustRequest, setTrustRequest] = useState<{ cwd?: string; reason?: string } | null>(null);
@@ -521,66 +523,41 @@ export function useAppShellRuntime(): AppShellRuntime {
     }).catch(() => undefined);
   }, []);
 
-  // R15 — 恢复历史行为(见 git show 536dc0e:src/features/app/useAppShellRuntime.ts):
-  //   openAccountSettings 同时做三件事 —— 打开「设置 → 账户管理」、
-  //   刷新 casdoor 状态、未登录时自动拉起 Casdoor 登录页。
-  //   左下角用户按钮 / 账户菜单的「企业登录」「账户设置」都走这条路径。
-  // R26 — 多一个前置判断:没配置好(或上次出错)时不再硬拉登录页 —— 那必然失败,
-  //   只会先给用户弹一句他无法处置的报错。这种情况直接把人送到账户设置。
+  // R15 恢复的历史语义(见 git show 536dc0e):左下角同时提供登录与设置两条
+  //   路径。R48 把"登录"拆成独立的 `overlay.sign-in` 对话框(点一下必弹出),
+  //   `openAccountSettings` 回归它名字本身 —— 打开「设置 → 账户管理」,
+  //   顺带刷新一次 Casdoor 状态(租户 / 成员 / 权限治理都在那一页)。
   const openAccountSettings = useCallback(() => {
     setSettingsSection("account");
     setSettingsOpen(true);
-    void (async () => {
-      try {
-        const status = await casdoorStatus();
-        setCasdoorSession(status);
-        if (status.status === "signed_in") return;
-        if (status.status === "configuration_needed") {
-          setToast(humanizeCasdoorError(status.config.reason ?? status.error ?? ""));
-          return;
-        }
-        const result = await casdoorLogin("default");
-        if (!result.ok) setToast(humanizeCasdoorError(result.error));
-        else setToast("已打开 Casdoor 企业登录页面");
-      } catch (error) {
-        setToast(humanizeCasdoorError(String(error)));
-      }
-    })();
-  }, [setToast]);
+    void casdoorStatus().then(setCasdoorSession).catch(() => setCasdoorSession(null));
+  }, []);
+
+  // R48 — 「登录」入口统一走 Casdoor 登录对话框(overlay.sign-in)。
+  //   为什么不再直接 casdoorLogin:未配置企业身份时主进程必然返回一句
+  //   用户当场无法处置的错误,而"点登录什么都没弹出"体验上等于入口坏了。
+  //   对话框把「补配置 → 发起授权 → 等回调」收在同一个面板里,登录这件事
+  //   从"跳去设置"变成"点一下就有反馈"。底层编排仍是 Casdoor,没有第二套
+  //   身份后端(见 git 536dc0e / R15 的历史实现)。
+  const openSignIn = useCallback(() => {
+    setSignInOpen(true);
+  }, []);
 
   // R15 — 左下角账户菜单触发的 casdoor 流程。
   // 登录:打开 Casdoor 浏览器窗口(主进程通过 IPC 触发),错误以 toast 反馈。
   // 登出:直接调 casdoorLogout,清掉本地 casdoorSession,后续 IPC 监听器
   //     会接住 casdoor://lifecycle 事件并自动 reset 会话列表。
-  const handleLogin = useCallback(async () => {
-    try {
-      const result = await casdoorLogin("default");
-      if (!result.ok) {
-        setToast(humanizeCasdoorError(result.error));
-        void auditRecord({
-          event: "casdoor.login",
-          outcome: "failure",
-          subject: "default",
-          detail: { error: result.error },
-        }).catch(() => undefined);
-      } else {
-        setToast("已打开 Casdoor 企业登录页面");
-        void auditRecord({
-          event: "casdoor.login",
-          outcome: "success",
-          subject: "default",
-        }).catch(() => undefined);
-      }
-    } catch (error) {
-      setToast(humanizeCasdoorError(String(error)));
-      void auditRecord({
-        event: "casdoor.login",
-        outcome: "failure",
-        subject: "default",
-        detail: { error: String(error) },
-      }).catch(() => undefined);
-    }
-  }, [setToast]);
+  // R48 — 侧栏「登录」按钮:打开 Casdoor 登录对话框。真正的 casdoorLogin
+  //   调用与审计记录都发生在对话框里(失败也留在框内展示,不再是一条
+  //   一闪而过的 toast)。
+  const handleLogin = useCallback(() => {
+    setSignInOpen(true);
+    void auditRecord({
+      event: "casdoor.login",
+      outcome: "info",
+      subject: "sign-in-dialog",
+    }).catch(() => undefined);
+  }, []);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -891,6 +868,7 @@ export function useAppShellRuntime(): AppShellRuntime {
     setSettingsOpen, setShortcutsOpen, setSearchOpen, setAboutOpen, setTrustRequest, setPlaceholderView,
     setSettingsSection,
     feedbackOpen, setFeedbackOpen,
+    signInOpen, setSignInOpen, openSignIn, setCasdoorSession,
     dataDirOpen, setDataDirOpen,
     sidebarCollapsed, setSidebarCollapsed,
     currentModelId, setCurrentModelId, models, workspaces, switchingWorkspace,

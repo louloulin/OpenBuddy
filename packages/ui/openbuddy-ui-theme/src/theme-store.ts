@@ -217,6 +217,16 @@ export interface ThemeService {
    *   覆盖刚 applyCustomVars 写入的 custom 值 —— 用户看到的还是内置主题。
    */
   applyCustomTheme(theme: CustomThemeInput): void;
+  /**
+   * R46 — 把 store 当前状态重新写一遍到 `documentElement`(`data-theme` /
+   * `data-theme-name` + 全部 `--wb-*` inline 变量),并清掉上一个主题留下的
+   * 孤儿 token。
+   *
+   * 调用方:`ThemeStudio` 的 unmount cleanup —— 用户调了滑块做预览、但没保存
+   * 就离开时,用它把 UI 还原到 active theme(否则整棵界面停在最后一次 draft
+   * 的配色,而 picker 没高亮任何一项,看起来"主题坏了")。
+   */
+  syncDocument(): void;
 }
 
 /** 主题 studio 自定义主题的输入 shape。`name` 是字符串(不是 ThemeName
@@ -474,6 +484,11 @@ export function createThemeStore(): ThemeStoreInternal {
       }
       notify();
     },
+    // R46 — ThemeStudio unmount cleanup 的还原入口:把 active theme 重新写回
+    // documentElement(等价于"取消未保存的预览")。Provider 挂载时也走这条。
+    syncDocument() {
+      applyThemeAttrs(activeTheme());
+    },
   };
 
   // Apply on construction so documentElement is correct before first paint.
@@ -504,8 +519,5 @@ export function createThemeStore(): ThemeStoreInternal {
 
   return Object.assign(service, {
     __theme: () => activeTheme(),
-    syncDocument: () => {
-      applyThemeAttrs(activeTheme());
-    },
   });
 }
