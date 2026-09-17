@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import Copy from "lucide-react/dist/esm/icons/copy";
 import FileText from "lucide-react/dist/esm/icons/file-text";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
@@ -20,6 +20,7 @@ import Hash from "lucide-react/dist/esm/icons/hash";
 import Zap from "lucide-react/dist/esm/icons/zap";
 import { TooltipButton } from "./TooltipButton";
 import { type MarkdownConfig } from "@openbuddy/ui-markdown";
+import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { ConversationMarkdown } from "./conversation-slots";
 import { ToolCallCard } from "./ToolCallCard";
 import { LoadingRow } from "./LoadingRow";
@@ -200,6 +201,22 @@ function MessageItemInner({
     .filter(Boolean)
     .join("\n\n");
 
+
+  // R73 — 「📋 编辑为草稿」入口。读 editor.draft 槽,空槽(本环境未挂 ui-editor)时不渲染按钮。
+  // 每个 message 自带草稿态,关闭 / 打开互不影响。
+  const [draftOpen, setDraftOpen] = useState(false);
+  const [draftInitial, setDraftInitial] = useState("");
+  const draftImpls = useSlotComponents("editor.draft");
+  const DraftImpl = draftImpls[0] as
+    | ComponentType<{
+        open: boolean;
+        onClose?: () => void;
+        onApply?: (md: string) => void;
+        onCopy?: (md: string) => void;
+        initialMarkdown?: string;
+        title?: string;
+      }>
+    | undefined;
   if (message.role === "user") {
     // R8.1 (revision-pager) — split attachments (file/image parts) from the
     // text part. The text part gets replaced by the currently selected
@@ -407,6 +424,20 @@ function MessageItemInner({
                 copiedIcon={<Check size={14} strokeWidth={2} />}
               />
             )}
+            {DraftImpl && markdownText && (
+              <TooltipButton
+                className="msg__action-btn"
+                tooltip="把这条回答送进草稿编辑器(用 Tiptap / 表格 / math / mermaid 改写)"
+                onClick={() => {
+                  setDraftInitial(markdownText);
+                  setDraftOpen(true);
+                }}
+                aria-label="编辑为草稿"
+                data-testid="message-draft-button"
+              >
+                <Pencil size={14} strokeWidth={1.75} />
+              </TooltipButton>
+            )}
             {onRetry && (
               <TooltipButton
                 className="msg__action-btn"
@@ -423,6 +454,23 @@ function MessageItemInner({
           </div>
         )}
         {metaProps && <MessageMeta {...metaProps} />}
+        {DraftImpl ? (
+          <DraftImpl
+            open={draftOpen}
+            onClose={() => setDraftOpen(false)}
+            onApply={(md) => {
+              setDraftOpen(false);
+              onToast?.(md ? `草稿已应用（${md.length} 字符）` : "草稿为空");
+            }}
+            onCopy={(md) => {
+              void navigator.clipboard?.writeText(md).then(
+                () => onToast?.("草稿 markdown 已复制到剪贴板"),
+                () => onToast?.("剪贴板不可用"),
+              );
+            }}
+            initialMarkdown={draftInitial}
+          />
+        ) : null}
       </div>
     </div>
   );
