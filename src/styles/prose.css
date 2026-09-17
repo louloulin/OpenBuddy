@@ -1855,6 +1855,28 @@
   text-decoration-color: var(--wb-accent, var(--accent));
   background: color-mix(in oklch, var(--wb-accent, var(--accent)) 8%, transparent);
 }
+
+/* R60 — StreamingMarkdown inline image placeholder. LLMs commonly
+   produce ![alt](url) mid-stream; instead of raw markdown syntax we
+   show a subtle emoji + alt chip so the user knows an image is
+   loading. The final full-Markdown render replaces this with the
+   actual <img> (via Markdown's imageUrlResolver). */
+.streaming-inline-image {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  margin: 0 1px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 6%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--wb-brand, #00c29a) 18%, transparent);
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 78%, var(--wb-text-strong, #000) 22%);
+  font-size: 0.9em;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* 「等待中」loading 行：扫光主文案 + 分隔符 + 轮播淡入 tip，
    对齐 WorkBuddy 的 pending-assistant 观感（avatar 行由其 header 渲染）。 */
 .msg__loading {

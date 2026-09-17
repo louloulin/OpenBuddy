@@ -67,13 +67,22 @@ type Inline =
   | { kind: "code"; value: string }
   | { kind: "strong"; value: string }
   | { kind: "em"; value: string }
-  | { kind: "link"; url: string; value: string };
+  | { kind: "link"; url: string; value: string }
+  | { kind: "image"; alt: string; url: string };
 
-// Match: `code` | **bold** | *italic* | http(s)://url
-// Bold requires two asterisks; italic requires a single asterisk
-// bounded by non-word or string boundary so it doesn't match `1*2`.
+// Match (priority order):
+//   1. ![alt](url)  markdown image (must come BEFORE link so `![…](…)`
+//                   isn't eaten as a bare URL or link)
+//   2. `code`       backtick inline code
+//   3. **bold**     double asterisk
+//   4. *italic*     single asterisk (bounded by non-word / string
+//                   boundary so `1*2` doesn't match)
+//   5. http(s)://   bare URL
+//
+// Image alt allows anything except `]`; image url allows anything except
+// whitespace + `)` to mirror GitHub-flavored markdown.
 const INLINE_RE =
-  /(`[^`\n]+`)|(\*\*[^*\n][^*]*?\*\*)|(\*[^*\s\n][^*\n]*?\*)|(https?:\/\/[^\s<>\)\]]+)/g;
+  /(!\[([^\]]*)\]\(([^\s<>)]+)\))|(`[^`\n]+`)|(\*\*[^*\n][^*]*?\*\*)|(\*[^*\s\n][^*\n]*?\*)|(https?:\/\/[^\s<>)]+)/g;
 
 function tokenizeInline(text: string): Inline[] {
   if (!text) return [];
@@ -85,15 +94,22 @@ function tokenizeInline(text: string): Inline[] {
     if (m.index > lastIndex) {
       out.push({ kind: "text", value: text.slice(lastIndex, m.index) });
     }
+    // Group indices shift with the new image group prepended.
+    //   m[1] = full ![alt](url), m[2] = alt, m[3] = url
+    //   m[4] = `code`
+    //   m[5] = **bold**
+    //   m[6] = *italic*
+    //   m[7] = http(s)://
     if (m[1] != null) {
-      // Strip the surrounding backticks.
-      out.push({ kind: "code", value: m[1].slice(1, -1) });
-    } else if (m[2] != null) {
-      out.push({ kind: "strong", value: m[2].slice(2, -2) });
-    } else if (m[3] != null) {
-      out.push({ kind: "em", value: m[3].slice(1, -1) });
+      out.push({ kind: "image", alt: m[2] ?? "", url: m[3] ?? "" });
     } else if (m[4] != null) {
-      out.push({ kind: "link", url: m[4], value: m[4] });
+      out.push({ kind: "code", value: m[4].slice(1, -1) });
+    } else if (m[5] != null) {
+      out.push({ kind: "strong", value: m[5].slice(2, -2) });
+    } else if (m[6] != null) {
+      out.push({ kind: "em", value: m[6].slice(1, -1) });
+    } else if (m[7] != null) {
+      out.push({ kind: "link", url: m[7], value: m[7] });
     }
     lastIndex = m.index + m[0].length;
   }
@@ -157,6 +173,18 @@ function renderInlineText(text: string, baseKey: string): React.ReactNode {
           >
             {tok.value}
           </a>
+        );
+      case "image":
+        return (
+          <span
+            key={key}
+            className="streaming-inline-image"
+            data-alt={tok.alt}
+            data-src={tok.url}
+            aria-label={tok.alt || "image"}
+          >
+            {tok.alt ? `🖼 ${tok.alt}` : "🖼 image"}
+          </span>
         );
     }
   });

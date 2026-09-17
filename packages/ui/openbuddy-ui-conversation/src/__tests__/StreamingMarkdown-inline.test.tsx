@@ -113,3 +113,40 @@ describe("StreamingMarkdown — inline rendering (R57)", () => {
     expect(container.innerHTML).toBe(before);
   });
 });
+
+describe("StreamingMarkdown — inline image (R60)", () => {
+  it("detects markdown image ![alt](url) and returns image token", () => {
+    const tokens = tokenizeInline("look at ![diagram](https://x.com/d.png) here");
+    expect(tokens).toEqual([
+      { kind: "text", value: "look at " },
+      { kind: "image", alt: "diagram", url: "https://x.com/d.png" },
+      { kind: "text", value: " here" },
+    ]);
+  });
+
+  it("detects image with empty alt", () => {
+    const tokens = tokenizeInline("![](https://x.com/a.png)");
+    expect(tokens).toEqual([
+      { kind: "image", alt: "", url: "https://x.com/a.png" },
+    ]);
+  });
+
+  it("renders .streaming-inline-image span", () => {
+    const { container } = render(
+      <StreamingMarkdown text={"see ![map](https://cdn.example.com/map.png)"} />,
+    );
+    const img = container.querySelector(".streaming-inline-image");
+    expect(img).toBeTruthy();
+    expect(img?.getAttribute("data-alt")).toBe("map");
+    expect(img?.getAttribute("data-src")).toBe("https://cdn.example.com/map.png");
+  });
+
+  it("does not treat plain link [text](url) as image", () => {
+    const tokens = tokenizeInline("[docs](https://x.com)");
+    const kinds = tokens.map((t) => t.kind);
+    // Plain link syntax [text](url) is NOT matched as an image token; it
+    // falls through to bare-URL matching for the url part only.
+    expect(kinds).not.toContain("image");
+    expect(kinds).toContain("link");
+  });
+});
