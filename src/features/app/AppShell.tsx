@@ -33,6 +33,7 @@ import { SecondarySidebar } from "@openbuddy/ui-shell";
 import { Sidebar } from "@openbuddy/ui-sidebar";
 import { ChatView } from "@openbuddy/ui-conversation";
 import { PlaceholderPage } from "@/components/shared/PlaceholderPage";
+import { EXPERTS_ROUTE_LABEL } from "@/lib/navigation/placeholder-routes";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toast } from "@openbuddy/ui-primitives";
 import { Resizable } from "@openbuddy/ui-primitives";
@@ -636,7 +637,12 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           onOpenSettings={() => openSettings("account")}
           onToast={showToast}
         />
-        <TasksSurface refreshSignal={runtime.taskRefreshSignal} onToast={showToast} />
+        {/* R93 — 专家页(智能体域)不展示运行中任务的删除入口:任务调度属于
+            工作台域,混在专家页会让用户误以为「删除专家」。TasksPanel 仍然
+            在其他页面渲染,kill/终止能力不丢。 */}
+        {runtime.placeholderView !== EXPERTS_ROUTE_LABEL && (
+          <TasksSurface refreshSignal={runtime.taskRefreshSignal} onToast={showToast} />
+        )}
         <OnboardingSurface />
         {/* R64 — host 渲染的 TourModal,与 <TourSurface /> 槽位共存:第三方
             注册 onboarding.tour slot 时,这里不会冲突(本组件直接读 host 层
