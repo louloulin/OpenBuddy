@@ -202,3 +202,4 @@ packages/*/*/node_modules
 
 # Local UI screenshots (diagnostics only)
 .tmp-screenshots/
+!docs/PLUGIN_SDK.md

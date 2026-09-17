@@ -474,6 +474,7 @@ uninstallPiExtension(id, { keepPayload?: false })
   uninstallPiMarket / rollbackPiMarket / lockfilePiMarket / auditPiMarket`),
   含第三方插件作者接入示例。
 - [`docs/AUDIT_AND_TELEMETRY.md`](./AUDIT_AND_TELEMETRY.md) — R75 三层本地审计/遥测边界(本地优先差异化卖点)。
+- [`docs/PLUGIN_SDK.md`](./PLUGIN_SDK.md) — 文档站入口 + Recipes 索引
 - [`docs/EXTENSION_POINTS.md`](./EXTENSION_POINTS.md) — 微内核 SlotCore +
   渲染端贡献总线 总表。
 - [`docs/THEMES.md`](./THEMES.md) — 19 主题 / Theme Studio 导出导入。

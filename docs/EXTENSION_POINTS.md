@@ -72,7 +72,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 | `conversation.toolside` | `list` | `session` | 🔌 ext-default | @openbuddy/ui-conversation | — | @openbuddy/ui-conversation |
 | `details` | `single` | `session-maybe` | ✅ ok | @openbuddy/ui-shell | @openbuddy/ui-shell | app(src) |
 | `editor.body` | `single` | `session-maybe` | ✅ ok | @openbuddy/ui-editor | @openbuddy/ui-editor | @openbuddy/ui-conversation |
-| `editor.draft` | `single` | `root` | ✅ ok | @openbuddy/ui-editor | @openbuddy/ui-editor | @openbuddy/ui-shell |
+| `editor.draft` | `single` | `root` | ✅ ok | @openbuddy/ui-editor | @openbuddy/ui-editor | @openbuddy/ui-conversation, @openbuddy/ui-shell |
 | `editor.mention-sources` | `list` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-editor | — | @openbuddy/ui-editor |
 | `editor.slash-commands` | `list` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-editor | — | @openbuddy/ui-editor |
 | `editor.toolbar` | `list` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-editor | — | @openbuddy/ui-editor |
@@ -271,6 +271,7 @@ return SearchPanel ? <SearchPanel open={open} onClose={onClose} /> : null;
 | manifest schema | `openbuddy.plugin.v1`(`packages/runtime/openbuddy-plugin-sdk/src/types.ts`) |
 | 四条贡献轨道 | `pi`(PI 扩展工厂)/ `cordis`(DI 服务)/ `ui`(slot 贡献)/ `harness`(DSH 兼容,过渡) |
 | 市场与多源 registry | `docs/PLUGIN_MARKETPLACE.md` |
+| 插件 SDK 文档站入口(Recipes 索引) | `docs/PLUGIN_SDK.md` |
 | 站点入口 | `apps/openbuddy-website` → `/docs/extension-points` |
 
 一个插件可以只贡献 `ui`,也可以同时贡献 `pi` + `cordis`;manifest 里没写的轨道不会被装配。
