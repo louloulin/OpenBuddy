@@ -60,7 +60,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 
 ### SlotCore 槽位总表
 
-**共 43 个槽位** — `ok=25` · `ext=18` · `dead=0` · `no-impl=0`
+**共 47 个槽位** — `ok=29` · `ext=18` · `dead=0` · `no-impl=0`
 
 | Slot | Kind | Scope | 状态 | 声明于 | 注册方 | 消费方 |
 |---|---|---|---|---|---|---|
@@ -72,6 +72,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 | `conversation.toolside` | `list` | `session` | 🔌 ext-default | @openbuddy/ui-conversation | — | @openbuddy/ui-conversation |
 | `details` | `single` | `session-maybe` | ✅ ok | @openbuddy/ui-shell | @openbuddy/ui-shell | app(src) |
 | `editor.body` | `single` | `session-maybe` | ✅ ok | @openbuddy/ui-editor | @openbuddy/ui-editor | @openbuddy/ui-conversation |
+| `editor.draft` | `single` | `root` | ✅ ok | @openbuddy/ui-editor | @openbuddy/ui-editor | @openbuddy/ui-shell |
 | `editor.mention-sources` | `list` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-editor | — | @openbuddy/ui-editor |
 | `editor.slash-commands` | `list` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-editor | — | @openbuddy/ui-editor |
 | `editor.toolbar` | `list` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-editor | — | @openbuddy/ui-editor |
@@ -107,6 +108,9 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 | `shell.overlay` | `list` | `root` | 🔌 ext | @openbuddy/ui-layout | @openbuddy/ui-automation, @openbuddy/ui-dialogs, @openbuddy/ui-settings, @openbuddy/ui-workbench | — |
 | `shell.statusbar` | `single` | `root` | ✅ ok | @openbuddy/ui-shell | @openbuddy/ui-shell | app(src) |
 | `sidebar` | `single` | `root` | ✅ ok | @openbuddy/ui-layout | @openbuddy/ui-sidebar | app(src) |
+| `workbench.preview.docx` | `single` | `root` | ✅ ok | @openbuddy/ui-workbench | @openbuddy/ui-workbench | @openbuddy/ui-workbench |
+| `workbench.preview.pptx` | `single` | `root` | ✅ ok | @openbuddy/ui-workbench | @openbuddy/ui-workbench | @openbuddy/ui-workbench |
+| `workbench.preview.xlsx` | `single` | `root` | ✅ ok | @openbuddy/ui-workbench | @openbuddy/ui-workbench | @openbuddy/ui-workbench |
 
 **状态含义**
 

@@ -7,6 +7,16 @@ vi.mock("@/lib/agent/pi-client", () => ({
   exportTextFile: vi.fn(async () => undefined),
   piSetSessionPinned: vi.fn(async () => undefined),
   piSetSessionArchived: vi.fn(async () => undefined),
+  collaborationOnUpdate: vi.fn(() => () => {}),
+  calendarList: vi.fn(async () => []),
+}));
+vi.mock("@/lib/agent/assistant-facade", () => ({
+  assistantFacade: {
+    snapshot: vi.fn(async () => ({ rooms: [], events: [], pending: [] })),
+    onUpdate: vi.fn(() => () => {}),
+    propose: vi.fn(async () => ({ taskId: "x" })),
+    execute: vi.fn(async () => ({})),
+  },
 }));
 vi.mock("@/lib/files/export-markdown", () => ({
   buildSessionMarkdown: vi.fn(() => "# export"),
@@ -117,5 +127,35 @@ describe("TopbarActions", () => {
     expect(onShowShortcuts).toHaveBeenCalledTimes(1);
     // 点击后菜单收起。
     expect(screen.queryByTestId("topbar-actions-shortcuts")).toBeNull();
+  });
+});
+
+// === R71 — 「📝 新草稿」入口 =====================================================
+// 通过 SlotProvider 注入 editor.draft 默认实现,验证 TopbarActions 真能消费 slot。
+
+import { SlotProvider, registerAllBuiltinUis } from "@openbuddy/ui-runtime/client";
+
+function withDraftSlot(ui: React.ReactNode) {
+  // 测试环境直接用 getRuntime() 拿单例,把 builtin 全装一遍再渲染。
+  // 与生产一致:ui-editor apply() 注册了 editor.draft。
+  registerAllBuiltinUis();
+  return <SlotProvider>{ui}</SlotProvider>;
+}
+
+describe("R71 — editor.draft 槽位接入", () => {
+  it("slot 装了 DraftEditor 后,菜单里出现「📝 新草稿」按钮", () => {
+    render(withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" />));
+    fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+    expect(screen.getByTestId("topbar-draft-button")).toBeInTheDocument();
+    expect(screen.getByTestId("topbar-draft-button")).toHaveTextContent("新草稿");
+  });
+
+  it("点击「📝 新草稿」关菜单并打开草稿模态", async () => {
+    render(withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" onToast={vi.fn()} />));
+    fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+    fireEvent.click(screen.getByTestId("topbar-draft-button"));
+    // 菜单已关 + DraftEditor 模态已挂(ProseMirror 实例存在)
+    expect(screen.queryByTestId("topbar-draft-button")).toBeNull();
+    expect(document.querySelector(".ProseMirror")).toBeTruthy();
   });
 });

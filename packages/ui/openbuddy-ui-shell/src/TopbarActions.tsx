@@ -21,6 +21,7 @@ import {
   KeyboardIcon,
 } from "@openbuddy/ui-primitives/icons";
 import { useTheme } from "@openbuddy/ui-theme/client";
+import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { useSessionStore } from "@/stores/session-store";
 import {
   exportTextFile,
@@ -59,6 +60,19 @@ export function TopbarActions({
 }: TopbarActionsProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  // R71 — 「📝 新草稿」入口。读 editor.draft slot,空槽(本环境未挂 ui-editor 或插件卸了)时不渲染入口。
+  const [draftOpen, setDraftOpen] = useState(false);
+  const draftImpls = useSlotComponents("editor.draft");
+  const DraftImpl = draftImpls[0] as
+    | React.ComponentType<{
+        open: boolean;
+        onClose?: () => void;
+        onApply?: (md: string) => void;
+        onCopy?: (md: string) => void;
+        initialMarkdown?: string;
+        title?: string;
+      }>
+    | undefined;
   const menuRef = useRef<HTMLDivElement>(null);
 
   // __pending_xxx IDs are renderer-only placeholders created by beginPendingNewSession
@@ -165,6 +179,21 @@ export function TopbarActions({
 
         {open && (
           <div className="topbar-actions__menu" onClick={(e) => e.stopPropagation()}>
+            {DraftImpl ? (
+              <button
+                type="button"
+                className="topbar-actions__item"
+                onClick={() => {
+                  setOpen(false);
+                  setDraftOpen(true);
+                }}
+                data-testid="topbar-draft-button"
+              >
+                <span className="topbar-actions__item-icon">📝</span>
+                <span className="topbar-actions__item-label">新草稿</span>
+                <ShortcutHint chord="MOD+D" />
+              </button>
+            ) : null}
             <button type="button" className="topbar-actions__item" onClick={handleExport}>
               <span className="topbar-actions__item-icon">📄</span>
               <span className="topbar-actions__item-label">导出为 Markdown</span>
@@ -215,6 +244,22 @@ export function TopbarActions({
           </div>
         )}
       </div>
+      {DraftImpl ? (
+        <DraftImpl
+          open={draftOpen}
+          onClose={() => setDraftOpen(false)}
+          onApply={(md) => {
+            setDraftOpen(false);
+            onToast?.(md ? `草稿已应用（${md.length} 字符）` : "草稿为空");
+          }}
+          onCopy={(md) => {
+            void navigator.clipboard?.writeText(md).then(
+              () => onToast?.("草稿 markdown 已复制到剪贴板"),
+              () => onToast?.("剪贴板不可用"),
+            );
+          }}
+        />
+      ) : null}
     </>
   );
 }
