@@ -5,7 +5,7 @@
  *   1. 在真实 textarea.wb-composer__input 里逐字输入
  *   2. 点击真实的「发送」按钮(role=button name=发送)
  *   3. 等真实 DOM 里 .msg--assistant 渲染出非空正文
- *   4. 校验流式过程中的 .msg--assistant 文本单调增长(真流式,不是一次性塞入)
+ *   4. 校验流式:存在「正文非空 且 pi://complete 未到」的采样点(与长度无关)
  *
  * Provider 真注册必须做(否则 pi 回落 ~/.pi/agent/auth.json 旧 key → 429),
  * 复用 scripts/lib/e2e-credentials.mjs 的 resolveE2ECredentials + scrubProviderCredentials。
@@ -115,7 +115,12 @@ try {
     w.__r80uiTimer = setInterval(() => {
       const nodes = [...document.querySelectorAll(".msg--assistant .msg__body")];
       const last = nodes[nodes.length - 1];
-      w.__r80ui.samples.push({ at: Date.now(), count: nodes.length, len: last ? (last.innerText ?? "").length : 0 });
+      w.__r80ui.samples.push({
+        at: Date.now(),
+        count: nodes.length,
+        len: last ? (last.innerText ?? "").length : 0,
+        completed: (w.__r80ui.completes ?? []).length > 0,
+      });
     }, 200);
   });
 
@@ -203,8 +208,12 @@ try {
     const tail = await page.evaluate((since) => {
       const r = window.__r80ui ?? {};
       const fresh = (r.samples ?? []).filter((s) => s.at >= since);
-      const lens = fresh.filter((s) => s.len > 4).map((s) => s.len);
-      // 流式证据:长度序列里有 ≥2 个不同的中间值 → 确实是渐进渲染
+      // 流式证据(与回答长度无关):在 pi://complete 到达**之前**,就已经
+      // 采样到非空正文。这直接证明文本是边生成边渲染的,而不是等回合结束
+      // 一次性塞进去。比"长度序列 ≥2 个不同值"稳 —— 后者对 "2" 这种
+      // 单字符回答永远不成立(只有 0 → 1 一次跳变)。
+      const renderedBeforeComplete = fresh.some((s) => s.len > 0 && !s.completed);
+      const lens = fresh.map((s) => s.len);
       const distinct = [...new Set(lens)].filter((n) => n > 0);
       const nodes = [...document.querySelectorAll(".msg--assistant .msg__body")];
       const rawLast = nodes[nodes.length - 1]?.innerText ?? "";
@@ -218,6 +227,7 @@ try {
         userCount: userNodes.length,
         userLast: userNodes[userNodes.length - 1]?.innerText ?? "",
         distinctLengths: distinct.slice(0, 12),
+        renderedBeforeComplete,
         sampleCount: fresh.length,
         updates: r.updates ?? 0,
         stopReason: (r.completes ?? [])[0]?.stopReason ?? null,
@@ -235,7 +245,10 @@ try {
       text: tail.lastText.slice(0, 200),
       userEchoed: tail.userLast.trim().length > 0 && tail.userLast.trim().includes(prompt.slice(0, 8)),
       streamingDistinctLens: tail.distinctLengths,
-      isStreaming: tail.distinctLengths.length >= 2,
+      renderedBeforeComplete: tail.renderedBeforeComplete,
+      // 主证据:complete 之前就渲染出正文。次证据:观察到 ≥2 个不同的
+      // 中间长度(长回答时的加分项,不作为必要条件)。
+      isStreaming: tail.renderedBeforeComplete || tail.distinctLengths.length >= 2,
       updates: tail.updates,
       stopReason: tail.stopReason,
       turnDone,

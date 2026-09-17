@@ -117,8 +117,10 @@ R09   1750ms stop=stop turnDone=1 len=22 | '超文本传输协议，用于在网
 
 - `typedOk` — 输入框里的字符串与 prompt 完全一致(逐字 `type()`,触发 React onChange)
 - `userEchoed` — 用户消息真的渲染进 `.msg--user .msg__bubble-text`
-- `isStreaming` — 200ms 采样的 `.msg--assistant .msg__body` 长度序列里
-  出现 **≥2 个不同的非零中间值**(证明是渐进渲染,而非一次性)
+- `isStreaming` — 200ms 采样的 `.msg--assistant .msg__body` 里存在
+  **「正文非空 且 `pi://complete` 尚未到达」** 的样本(证明是边生成边渲染)。
+  这个判据与回答长度无关;先前用的"长度序列出现 ≥2 个不同值"对 `2` 这种
+  单字符回答永远不成立(只有 `0 → 1` 一次跳变),会在串行 runner 里偶发假失败。
 - `turnDone` — 等的是本轮的 `pi://complete`,而不是"长度不变"
   (reasoning 阶段的「深度思考」占位会短暂稳定,只看长度会把占位当正文)
 

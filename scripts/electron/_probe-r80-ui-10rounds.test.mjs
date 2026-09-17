@@ -41,10 +41,17 @@ describe.skipIf(!canRun)("live electron probe: R80 AI Chat 真机 10 轮(真实 
     expect(probe.rounds).toHaveLength(10);
   });
 
-  it("每轮都有真实流式渲染(长度序列出现 ≥2 个不同中间值)", () => {
+  it("每轮都是真流式:pi://complete 到达前正文就已渲染", () => {
     const probe = runProbe();
     expect(probe.streamingRounds).toBe(10);
     for (const round of probe.rounds) {
+      // 主证据与回答长度无关:200ms 采样里存在 "非空正文 且 尚未 complete"
+      // 的样本。这证明文本是边生成边渲染的。
+      //
+      // 不能用"长度序列有 ≥2 个不同中间值"当必要条件 —— 对 "2" 这种单字符
+      // 回答永远不成立(只有 0→1 一次跳变),会把正确实现判成失败(实测
+      // 在探针串行 runner 里就是这样偶发失败的)。
+      expect(round.renderedBeforeComplete).toBe(true);
       expect(round.isStreaming).toBe(true);
       expect(round.turnDone).toBe(true);
       expect(round.stopReason).toBe("stop");
