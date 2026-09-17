@@ -1801,16 +1801,26 @@
    Tokenization is single-pass regex; no AST, no sanitize, no
    syntax highlighting — those still run on completion. */
 .streaming-inline-code {
-  font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, monospace);
+  /* R57 (revised) — mirror the final-state .md-inline-code so the
+     streaming → complete transition does not flip background/border
+     color. Uses brand-tinted subtle bg + border instead of neutral
+     grey, matching prose.css line ~2158. We skip the copy-button
+     affordance during streaming (no focus steal mid-typing). */
+  display: inline-block;
+  font-family: var(--wb-font-code-family, var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, monospace));
   font-size: 0.92em;
-  padding: 1px 5px;
-  margin: 0 1px;
+  padding: 1px 6px;
   border-radius: 4px;
-  background: var(--wb-bg-tertiary, rgba(127, 127, 127, 0.12));
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 5%, var(--wb-bg-tertiary, rgba(127, 127, 127, 0.08)));
   color: var(--wb-text-strong, var(--text-strong));
-  border: 1px solid var(--wb-border-subtle, rgba(127, 127, 127, 0.18));
+  border: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 14%, transparent);
   white-space: pre-wrap;
   word-break: break-word;
+  vertical-align: baseline;
+}
+[data-theme="dark"] .streaming-inline-code {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 10%, transparent);
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 24%, transparent);
 }
 .streaming-inline-strong {
   font-weight: 600;
