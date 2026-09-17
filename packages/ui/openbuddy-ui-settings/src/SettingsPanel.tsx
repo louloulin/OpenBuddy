@@ -113,7 +113,9 @@ type SectionId =
   | "data"
   | "security"
   | "help"
-  | "audit";
+  | "audit"
+  // R82 —— 「设置 → 关于 → 系统信息」的微内核健康面板。
+  | "microkernel";
 
 interface NavItem {
   id: SectionId;

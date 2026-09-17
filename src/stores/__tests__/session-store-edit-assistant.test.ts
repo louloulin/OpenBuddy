@@ -80,7 +80,10 @@ describe("R78 — editAssistantMessage", () => {
 
   it("works while assistant is still streaming (no complete flag required)", () => {
     const id = useSessionStore.getState().beginStreamingMessage();
-    useSessionStore.getState().appendStreamingDelta({ kind: "text", text: "drafting" });
+    // 注意签名:appendStreamingDelta(delta: string, kind?: "text" | "thought")。
+    // R78 写这行时传了 `{ kind, text }` 对象 —— 类型是错的(vitest 不做类型
+    // 检查所以一直没暴露),运行时对象被拼成 "[object Object]" 混进正文。
+    useSessionStore.getState().appendStreamingDelta("drafting", "text");
     // 不 finishStreamingMessage —— message.complete 仍是 false
     useSessionStore.getState().editAssistantMessage(id, "rewritten mid-stream");
     const m = useSessionStore.getState().messages.find((x) => x.id === id);

@@ -78,14 +78,15 @@ export function TopbarActions({
 
   // R72 — 「📝 新草稿」键盘快捷键 Mod+Shift+D。
   // 只有当 DraftImpl 真的注册了才绑定(空槽时绑定也没意义 —— 菜单都没渲染)。
+  // useShortcut 的签名是 (options, callback) —— preventDefault 属于 options
+  // 的一部分,不是第三个参数(R71 引入时写成了三参调用,一直是 tsc 报错)。
   useShortcut(
-    { mod: true, shift: true, key: "d" },
+    { mod: true, shift: true, key: "d", preventDefault: true },
     () => {
       if (!DraftImpl) return;
       // 与点菜单按钮一致:开草稿模态。空槽 / 草稿已开时 no-op。
       setDraftOpen((v) => !v);
-    },
-    { preventDefault: true }
+    }
   );
 
   // __pending_xxx IDs are renderer-only placeholders created by beginPendingNewSession
