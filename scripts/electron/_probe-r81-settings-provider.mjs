@@ -194,6 +194,72 @@ try {
   });
   step("IPC providers-list 里有 minimax", disk.providers?.includes("minimax") === true, JSON.stringify(disk.providers));
   report.providerList = disk;
+
+  // ---- 8. 全链路闭环:刚刚在 UI 里配好的厂商,必须真的能聊天 ----
+  // 这是"模型配置"与"AI Chat"两块的接缝。只断言 settings 保存成功、
+  // 或者只断言 chat 能回复,都证明不了这条缝是通的 —— 必须由 UI 配置
+  // 出来的 provider 直接驱动一次真实对话。
+  const closeBtn = page.locator('.models-settings-panel__editor-overlay, [role=dialog]').first();
+  if (await closeBtn.isVisible().catch(() => false)) {
+    await page.keyboard.press("Escape");
+    await sleep(600);
+  }
+  // 关设置面板(切到「模型」页之后需要回到 chat)
+  await page.evaluate(() => {
+    const close = [...document.querySelectorAll("button")]
+      .find((b) => /关闭|Close/i.test(b.getAttribute("aria-label") ?? ""));
+    if (close) close.click();
+  });
+  await sleep(1200);
+  // 保险:再按一次 Escape
+  await page.keyboard.press("Escape");
+  await sleep(800);
+
+  const composer = page.locator("textarea.wb-composer__input").first();
+  const composerUsable = await page.waitForFunction(
+    () => {
+      const t = document.querySelector("textarea.wb-composer__input");
+      return Boolean(t) && !t.disabled;
+    },
+    undefined, { timeout: 60_000, polling: 200 },
+  ).then(() => true).catch(() => false);
+  step("UI 配置后 composer 可用(apiReady=true)", composerUsable);
+
+  if (composerUsable) {
+    const baseline = await page.evaluate(() => document.querySelectorAll(".msg--assistant").length);
+    await composer.click();
+    await composer.fill("");
+    await composer.type("只回复这个词:SETTINGS-OK", { delay: 8 });
+    const sendReady = await page.waitForFunction(
+      () => {
+        const b = document.querySelector('button[aria-label="发送"]');
+        if (!b) return false;
+        const r = b.getBoundingClientRect();
+        return !b.disabled && r.width > 0 && r.height > 0;
+      },
+      undefined, { timeout: 30_000, polling: 150 },
+    ).then(() => true).catch(() => false);
+    if (sendReady) {
+      await page.locator('button[aria-label="发送"]').first().click();
+      const replied = await page.waitForFunction(
+        (base) => {
+          const nodes = [...document.querySelectorAll(".msg--assistant .msg__body")];
+          if (nodes.length <= base) return false;
+          const t = (nodes[nodes.length - 1].innerText ?? "").replace(/^深度思考\s*/u, "").trim();
+          return t.length > 0;
+        },
+        baseline, { timeout: 90_000, polling: 250 },
+      ).then(() => true).catch(() => false);
+      const answer = await page.evaluate(() => {
+        const nodes = [...document.querySelectorAll(".msg--assistant .msg__body")];
+        return (nodes[nodes.length - 1]?.innerText ?? "").replace(/^深度思考\s*/u, "").trim();
+      });
+      step("UI 配置的厂商真的能对话", replied && answer.length > 0, answer.slice(0, 120));
+      report.chatAnswer = answer;
+    } else {
+      step("发送按钮可用", false);
+    }
+  }
 } catch (err) {
   report.error = redact(String(err?.message ?? err));
 } finally {
