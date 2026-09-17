@@ -1,15 +1,21 @@
 /**
- * R26 探针:未配置企业身份服务时,左下角账户菜单点「登录」会发生什么。
+ * R26 探针(R62+ 适配版):「左下角账户菜单点『登录』后真正发生什么」的当前契约。
  *
- * 用户的原始反馈是"点击登录没有弹出"。根因不是按钮没接线,而是当时无论配置
- * 与否都硬拉 Casdoor 登录页 —— 未配置环境下必然失败,用户拿到的只有一句
- * 「Casdoor 配置无效：请检查 issuer、client ID、…」。
+ * 历史:
+ *   - R26 把未配置时的主按钮改成「配置企业登录」,点完把人送进设置表单 ——
+ *     用户拿到的体验是"点登录没弹出任何东西",所以本探针最初是测这个 bug 的。
+ *   - R48 又把它改回 git 历史(R15 / 536dc0e)的形态:菜单主按钮就是「登录」,
+ *     点一下必弹出 overlay.sign-in(Casdoor 登录对话框)。未配置时框内直接
+ *     给 issuer / clientId 输入,已配置时直接拉起 Casdoor 授权页。
+ *   - R62 修了 onboarding 重复弹出,所以这里再预写 onboarding 状态避免被向导
+ *     抢焦点。
  *
- * 现在断言的是**修好之后**的行为:
- *   1. 菜单主按钮是「配置企业登录」(不是一个点一下必失败的「企业登录」);
- *   2. 点击后打开设置 → 账户管理(用户能在这里把 issuer / client ID 填上);
- *   3. toast 是人话(指出"去哪儿填什么"),而不是原样抛出运维文案;
- *   4. 没有新窗口弹出(未配置时不该假装能登录)。
+ * 当下断言的契约:
+ *   1. 菜单主按钮叫「登录」(历史正确的形态),不再叫「配置企业登录」;
+ *   2. 点「登录」→ overlay.sign-in 对话框在 DOM 里出现(用户可见的反馈);
+ *   3. 对话框里有 issuer / clientId 输入框(未配置时不必跳设置);
+ *   4. 没有弹新窗口(未配置时不能假装能登录);
+ *   5. 设置入口(「打开设置」)仍然在菜单里,以兼容历史功能。
  */
 import { _electron as electron } from "playwright";
 import { mkdtempSync } from "node:fs";
@@ -17,6 +23,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const root = "/Users/louloulin/appx/OpenBuddy";
+const report = { steps: [], ok: false, pageErrors: [] };
+const step = (name, ok, detail) =>
+  report.steps.push({ step: name, ok: Boolean(ok), detail });
+
 const userData = mkdtempSync(join(tmpdir(), "ob-login-"));
 const app = await electron.launch({
   args: [`--user-data-dir=${userData}`, root],
@@ -26,16 +36,37 @@ const app = await electron.launch({
   env: { ...process.env, ELECTRON_RENDERER_URL: "", OPENBUDDY_DEBUG_UI: "0" },
 });
 
-const report = { ok: false, steps: [], pageErrors: [] };
-
 try {
   const page = await app.firstWindow();
   page.on("pageerror", (e) => report.pageErrors.push(String(e?.message ?? e)));
   await page.waitForLoadState("domcontentloaded", { timeout: 30000 });
   await page.waitForFunction(() => Boolean(window.api?.apiVersion === 1), undefined, { timeout: 40000 });
+
+  // R62 — onboarding 关闭状态先写好,免得首启引导抢 composer/账户菜单的焦点。
+  // 与 real-chat-multiturn.mjs 同样的策略:WhatsNewGate 故意不写,
+  // 因为首次安装应静默。
+  await page.evaluate(() => {
+    try {
+      const done = JSON.stringify({
+        version: 1,
+        status: "done",
+        index: 0,
+        steps: [],
+        startedAt: Date.now(),
+        updatedAt: Date.now(),
+        completedAt: Date.now(),
+      });
+      window.localStorage.setItem("openbuddy.onboarding.state", done);
+      window.localStorage.setItem("openbuddy.tour.state", "seen");
+    } catch {
+      /* localStorage unavailable */
+    }
+  }).catch(() => {});
+
+  // 给 React 树把 onboarding 完成态从 localStorage 读回去、关掉浮层的时间。
   await page.waitForTimeout(2500);
-  await page.click("[data-testid='onboarding-wizard'] [aria-label='关闭引导']").catch(() => {});
-  await page.waitForTimeout(600);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(500);
 
   report.windowsBefore = app.windows().length;
   report.accountStatus = await page.evaluate(async () => {
@@ -55,8 +86,12 @@ try {
     ),
   );
   report.menuItems = items;
+  step("账户菜单主按钮叫「登录」(不再叫「配置企业登录」)", items.includes("登录") && !items.includes("配置企业登录"), JSON.stringify(items));
+  step("账户菜单保留「打开设置」入口(兼容历史功能)", items.includes("打开设置"), JSON.stringify(items));
+  step("账户菜单含「发送反馈」(R23 feedback 入口)", items.includes("发送反馈"), JSON.stringify(items));
+  step("未配置时 casdoor:status 返回 configuration_needed", report.accountStatus.status === "configuration_needed", JSON.stringify(report.accountStatus));
 
-  const target = "配置企业登录";
+  const target = "登录";
   const clicked = await page.evaluate((label) => {
     const items = Array.from(document.querySelectorAll(".sidebar__account-menu .sidebar__account-menu-item"));
     const el = items.find((n) => n.textContent?.trim() === label);
@@ -64,9 +99,9 @@ try {
     el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     return true;
   }, target);
-  report.steps.push({ step: `菜单项「${target}」存在且被点击`, ok: clicked });
+  step(`菜单项「${target}」存在且被点击`, clicked);
 
-  await page.waitForTimeout(4000);
+  await page.waitForTimeout(1500);
 
   report.windowsAfter = app.windows().length;
   report.windowUrls = app.windows().map((w) => {
@@ -78,36 +113,29 @@ try {
   });
   report.after = await page.evaluate(() => {
     const toast = document.querySelector("[class*='toast']");
-    const dialog = document.querySelector("[role='dialog']");
+    const dialog = document.querySelector("[role='dialog'][aria-label='登录']")
+      ?? Array.from(document.querySelectorAll("[role='dialog']")).find((d) => /登录/.test(d.getAttribute("aria-label") ?? ""));
     return {
       toastText: toast?.textContent?.trim() ?? null,
-      settingsOpen: Boolean(dialog),
-      settingsText: dialog?.textContent?.trim().slice(0, 200) ?? null,
+      dialogOpen: Boolean(dialog),
+      hasForm: Boolean(document.querySelector("[data-testid='casdoor-signin-form']")),
+      hasIssuer: Boolean(document.querySelector("[data-testid='casdoor-signin-issuer']")),
+      hasClientId: Boolean(document.querySelector("[data-testid='casdoor-signin-client-id']")),
+      hasEnterprise: Boolean(document.querySelector("[data-testid='casdoor-signin-enterprise']")),
       casdoorWindowFlag: Boolean(document.querySelector("[data-casdoor-window]")),
     };
   });
 
-  report.steps.push({
-    step: "未配置时不假装能登录(没有新窗口)",
-    ok: report.windowsAfter === report.windowsBefore,
-    detail: { before: report.windowsBefore, after: report.windowsAfter },
-  });
-  report.steps.push({
-    step: "点击后落到账户设置(用户能在这里补齐配置)",
-    ok: report.after.settingsOpen === true && (report.after.settingsText ?? "").includes("账户"),
-    detail: { settingsText: (report.after.settingsText ?? "").slice(0, 80) },
-  });
-  report.steps.push({
-    step: "界面上不出现运维术语(不再甩 casdoor://localhost/callback)",
-    ok: !(report.after.toastText ?? "").includes("casdoor://localhost/callback") &&
-      !(report.after.settingsText ?? "").includes("casdoor://localhost/callback"),
-    detail: { toastText: report.after.toastText },
-  });
+  step("未配置时不假装能登录(没有新窗口)", report.windowsAfter === report.windowsBefore, { before: report.windowsBefore, after: report.windowsAfter });
+  step("点「登录」后 overlay.sign-in 对话框真的弹出", report.after.dialogOpen, JSON.stringify(report.after));
+  step("对话框里有 issuer / clientId 输入框(未配置时不跳设置)", report.after.hasIssuer && report.after.hasClientId && report.after.hasEnterprise, JSON.stringify(report.after));
+  step("界面上不出现运维术语 casdoor://localhost/callback", !(report.after.toastText ?? "").includes("casdoor://localhost/callback"), { toastText: report.after.toastText });
 
-  report.ok = report.pageErrors.length === 0;
+  report.ok = report.pageErrors.length === 0 && report.steps.every((s) => s.ok);
 } catch (error) {
   report.error = String(error?.message ?? error);
 } finally {
   await app.close().catch(() => {});
   console.log(JSON.stringify(report, null, 2));
+  process.exit(report.ok ? 0 : 1);
 }

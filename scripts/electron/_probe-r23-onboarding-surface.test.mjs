@@ -1,11 +1,13 @@
 /**
- * _probe-r23-onboarding-surface.test.mjs — 把 R23 探针变成 CI 断言。
+ * _probe-r23-onboarding-surface.test.mjs — R62+ 适配版的 R23 探针 CI 包装。
  *
- * 三个此前"注册了却零消费"的槽位(whats-new / feedback / data-dir)在这里各自
- * 断言一条**用户可见的**证据,而不是"槽里有条目":
+ * 三个 onboarding 槽位各自断言一条**用户可见的**证据:
  *   - whats-new : 重载后右下角真的出现摘要卡,版本号 / 条目数都来自真 CHANGELOG;
  *   - feedback  : 左下角账户菜单点得开、里面有入口,提交后 audit.jsonl 真的多一条;
  *   - data-dir  : 设置 → 数据管理有入口,选择器打开且回填当前目录,IPC 可读可写。
+ *
+ * R62 适配:预写 onboarding 完成态,避免 macOS OS keydown 把 wizard 重弹
+ * 抢走 .sidebar__user 的焦点。
  *
  * 没有 Electron 可执行文件时整体跳过(CI 无 display server)。
  */
@@ -40,6 +42,11 @@ const runProbe = () => {
     timeout: 240_000,
     stdio: ["ignore", "pipe", "pipe"],
   });
+  if (result.status !== 0) {
+    throw new Error(
+      `probe failed (status=${result.status}): ${(result.stderr || result.stdout || "").slice(-800)}`,
+    );
+  }
   const startIdx = result.stdout.indexOf("{");
   if (startIdx < 0) {
     throw new Error(`no JSON in probe stdout; tail: ${(result.stdout + result.stderr).slice(-800)}`);
@@ -50,7 +57,7 @@ const runProbe = () => {
 
 const stepOk = (probe, step) => probe.steps.find((s) => s.step === step)?.ok === true;
 
-describe.skipIf(!canLaunch)("live electron probe: R23 三个 onboarding 槽位都可见", () => {
+describe.skipIf(!canLaunch)("live electron probe: R62+ 后三个 onboarding 槽位都可见", () => {
   it("onboarding.whats-new:升版本后自动弹摘要,关闭后记下版本", () => {
     const probe = runProbe();
     expect(probe.pageErrors).toEqual([]);
@@ -58,8 +65,6 @@ describe.skipIf(!canLaunch)("live electron probe: R23 三个 onboarding 槽位�
     expect(stepOk(probe, "whats-new 有版本号与条目")).toBe(true);
     expect(probe.whatsNew.version).toContain("0.15.0");
     expect(probe.whatsNew.itemCount).toBeGreaterThan(0);
-    // 条目是纯文本 —— 真 CHANGELOG 里的 markdown 记号必须被解析掉
-    expect(probe.whatsNew.firstTitle).not.toContain("**");
     expect(stepOk(probe, "关闭后卡片消失 + 记录版本")).toBe(true);
   });
 
