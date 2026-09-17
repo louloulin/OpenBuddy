@@ -1791,6 +1791,47 @@
   opacity: 0.7;
   margin-bottom: 4px;
 }
+
+/* R57 — StreamingMarkdown inline styling. The streaming renderer now
+   produces styled <code> / <strong> / <em> / <a> spans during the
+   streaming phase (instead of bare unformatted text). These classes
+   mirror the appearance the final rich renderer produces, so the
+   streaming → complete transition stays smooth and the user no
+   longer watches a long stretch of unformatted prose mid-stream.
+   Tokenization is single-pass regex; no AST, no sanitize, no
+   syntax highlighting — those still run on completion. */
+.streaming-inline-code {
+  font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.92em;
+  padding: 1px 5px;
+  margin: 0 1px;
+  border-radius: 4px;
+  background: var(--wb-bg-tertiary, rgba(127, 127, 127, 0.12));
+  color: var(--wb-text-strong, var(--text-strong));
+  border: 1px solid var(--wb-border-subtle, rgba(127, 127, 127, 0.18));
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.streaming-inline-strong {
+  font-weight: 600;
+  color: var(--wb-text-strong, var(--text-strong));
+}
+.streaming-inline-em {
+  font-style: italic;
+  color: var(--wb-text-default, var(--text-default));
+}
+.streaming-inline-link {
+  color: var(--wb-accent, var(--accent));
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, var(--wb-accent, var(--accent)) 35%, transparent);
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  border-radius: 2px;
+}
+.streaming-inline-link:hover {
+  text-decoration-color: var(--wb-accent, var(--accent));
+  background: color-mix(in oklch, var(--wb-accent, var(--accent)) 8%, transparent);
+}
 /* 「等待中」loading 行：扫光主文案 + 分隔符 + 轮播淡入 tip，
    对齐 WorkBuddy 的 pending-assistant 观感（avatar 行由其 header 渲染）。 */
 .msg__loading {

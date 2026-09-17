@@ -29,8 +29,9 @@ describe("SafeMarkdownBody", () => {
     const btn = screen.getByTestId("safe-md-reveal");
     expect(btn).toBeTruthy();
     expect(btn.textContent).toMatch(/Large message/);
-    // 100_001 bytes → Math.round(100001/1000) = 100 → "100 KB"
-    expect(btn.textContent).toMatch(/100 KB/);
+    // MAX_MARKDOWN_CHARS + 1 bytes → round((N+1)/1000) KB (R57: 250 KB)
+    const expectedKb = `${Math.round((MAX_MARKDOWN_CHARS + 1) / 1000)} KB`;
+    expect(btn.textContent).toMatch(new RegExp(expectedKb));
   });
 
   it("reveals the raw payload after clicking the reveal button", () => {

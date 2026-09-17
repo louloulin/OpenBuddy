@@ -2,7 +2,7 @@
  * SafeMarkdownBody — Phase R3.0 (pi-web-alignment).
  *
  * Markdown with an oversized-content guard. When a chat message exceeds
- * `MAX_MARKDOWN_CHARS` (default 100,000 chars), react-markdown + KaTeX +
+ * `MAX_MARKDOWN_CHARS` (default 250,000 chars — bumped R57), react-markdown + KaTeX +
  * syntax highlighting can freeze the browser main thread on multi-hundred-KB
  * payloads (pasted code, JSON dumps, log captures, etc.).
  *
@@ -19,8 +19,18 @@
 import { useState, type ComponentProps, type ReactNode } from "react";
 import { Markdown } from "@openbuddy/ui-markdown";
 
-/** Mirrors pi-web's threshold. Tune upward if real users need it. */
-export const MAX_MARKDOWN_CHARS = 100_000;
+/**
+ * Mirrors pi-web's threshold as a baseline, but tuned upward for
+ * OpenBuddy's heavier real-world payloads (pasted JSON dumps, build
+ * logs, SQL result sets, long diffs).
+ *
+ * R57 — 100K → 250K. Below the threshold we render the full Markdown
+ * pipeline (gfm + katex + lowlight + sanitize). Above the threshold
+ * we show a click-to-reveal button that swaps in a scrollable <pre>
+ * so the renderer never freezes the main thread on multi-hundred-KB
+ * payloads. Callers can still override via the `threshold` prop.
+ */
+export const MAX_MARKDOWN_CHARS = 250_000;
 
 export interface SafeMarkdownBodyProps
   extends Omit<ComponentProps<typeof Markdown>, "children"> {
