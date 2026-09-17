@@ -203,3 +203,4 @@ packages/*/*/node_modules
 # Local UI screenshots (diagnostics only)
 .tmp-screenshots/
 !docs/PLUGIN_SDK.md
+!docs/THEME_BASELINE_R77.md
