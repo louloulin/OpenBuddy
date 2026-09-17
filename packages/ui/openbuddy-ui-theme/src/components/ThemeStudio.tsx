@@ -338,9 +338,48 @@ export function ThemeStudio({
     onSave?.(theme);
   }, [theme, onSave, themeService]);
 
+  // R55 — 导出走两条路:写剪贴板 + 触发 `<a download>` 下载 JSON 文件。
+  // 之前只走剪贴板,用户要把 JSON 分享给别人必须先粘贴到文本编辑器另存
+ // —— 一旦剪贴板里有别的东西,这段 JSON 就丢了。两路并行后:
+  //   - 剪贴板给"贴到聊天/PR 描述里"用;
+  //   - 下载给"塞进 git 仓库 / 邮件附件"用。
+  // 同步记录一次结果到 setExportStatus,Studio 头部下方显示一行小字提示,
+  // 比 alert() 更轻、不会顶掉用户当前焦点。
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
   const handleExport = useCallback(() => {
     const json = JSON.stringify(theme, null, 2);
-    void navigator.clipboard?.writeText(json).catch(() => {});
+    const fileName = `${theme.name || "theme"}.json`;
+    const lines: string[] = [];
+    // 1) 剪贴板(同步标记 + 异步失败回填)。
+    // 同步 push 一行,这样 setExportStatus 立刻可见;promise 失败时再
+    // 替换文案,用户看到的不是「先没剪贴板、过一会又冒出来」。
+    if (navigator.clipboard?.writeText) {
+      lines.push("剪贴板");
+      void navigator.clipboard.writeText(json).catch(() => {
+        setExportStatus(`已导出(部分): 剪贴板失败(权限被拒) · 文件 ${fileName}`);
+      });
+    } else {
+      lines.push("剪贴板不可用");
+    }
+    // 2) 文件下载
+    try {
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // revoke 推迟到下一帧,Chromium / WebKit 都要求 click 之后
+      // 同一任务内 revoke 会让下载失败。
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      lines.push(`文件 ${fileName}`);
+    } catch (err) {
+      lines.push(`下载失败:${err instanceof Error ? err.message : String(err)}`);
+    }
+    setExportStatus(`已导出: ${lines.join(" · ")}`);
   }, [theme]);
 
   // R54 — 导入 JSON 文件。读 → 解析 → 应用为 draft。
@@ -421,7 +460,7 @@ export function ThemeStudio({
           >
             导入 JSON
           </button>
-          <button type="button" className={styles.btnGhost} onClick={handleExport}>
+          <button type="button" className={styles.btnGhost} onClick={handleExport} data-testid="theme-studio-export">
             导出 JSON
           </button>
           <button type="button" className={styles.btn} onClick={handleSave}>
@@ -441,6 +480,16 @@ export function ThemeStudio({
           data-testid="theme-studio-import-error"
         >
           {importError}
+        </div>
+      ) : null}
+
+      {exportStatus ? (
+        <div
+          className={styles.exportStatus}
+          role="status"
+          data-testid="theme-studio-export-status"
+        >
+          {exportStatus}
         </div>
       ) : null}
 

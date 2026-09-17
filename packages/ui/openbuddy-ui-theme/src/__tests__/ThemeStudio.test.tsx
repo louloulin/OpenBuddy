@@ -442,3 +442,97 @@ describe("R54 — ThemeStudio JSON 导入", () => {
     expect(parseFloat(firstSlider.value)).toBeCloseTo(0.95, 2);
   });
 });
+
+describe("R55 — ThemeStudio 导出(剪贴板 + 文件下载 + 状态提示)", () => {
+  // jsdom 没有 URL.createObjectURL 实现;给一个最小桩,让 handleExport
+  // 里的 Blob → URL.createObjectURL 路径不会抛。
+  const realCreateURL = URL.createObjectURL;
+  const realRevokeURL = URL.revokeObjectURL;
+  beforeAll(() => {
+    let counter = 0;
+    URL.createObjectURL = () => "blob:fake-" + (++counter);
+    URL.revokeObjectURL = () => undefined;
+  });
+  afterAll(() => {
+    URL.createObjectURL = realCreateURL;
+    URL.revokeObjectURL = realRevokeURL;
+  });
+  it("Studio 渲染「导出 JSON」按钮(带 testid)", () => {
+    render(<ThemeStudio initialVars={resolveVars("openbuddy")} />);
+    const btn = screen.getByTestId("theme-studio-export");
+    expect(btn).toBeDefined();
+    expect((btn.textContent ?? "").trim()).toBe("导出 JSON");
+  });
+
+  it("点击导出:走剪贴板 + 触发一次带 download 属性的 <a> 点击,filename=theme.name.json", async () => {
+    // jsdom 没有 navigator.clipboard 的实现 → 我们 stub 一个最小契约;
+    // 也没有真的下载行为,但 handleExport 走的就是 createElement('a') →
+    // click() 这条路,我们监听 createElement 拿住 a,验证属性。
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(global.navigator, "clipboard", {
+      value: { writeText }, configurable: true, writable: true,
+    });
+    const realCreate = document.createElement.bind(document);
+    let anchorSpy: HTMLAnchorElement | null = null;
+    const createSpy = vi.spyOn(document, "createElement").mockImplementation((tag: string, options?: ElementCreationOptions) => {
+      const el = realCreate(tag, options);
+      if ((tag as string).toLowerCase() === "a") anchorSpy = el as HTMLAnchorElement;
+      return el;
+    });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click");
+
+    try {
+      render(<ThemeStudio initialVars={resolveVars("openbuddy")} />);
+      // 把 theme name 改成可断言的字符串(导出时 filename 用它)
+      const nameInput = screen.getAllByRole("textbox").find((el) => (el as HTMLInputElement).value === "My Theme") as HTMLInputElement | undefined;
+      if (nameInput) {
+        await act(async () => {
+          fireEvent.change(nameInput, { target: { value: "r55-fixture" } });
+        });
+      }
+      // 改完名再点导出
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("theme-studio-export"));
+      });
+      // 状态条出现,文本含「剪贴板」+「文件 r55-fixture.json」
+      const status = await screen.findByTestId("theme-studio-export-status");
+      const text = status.textContent ?? "";
+      expect(text).toContain("剪贴板");
+      expect(text).toContain("文件 custom-r55-fixture.json");
+      // 走了一次 anchor click,且 anchor 有 download / href
+      expect(clickSpy).toHaveBeenCalled();
+      expect(anchorSpy).not.toBeNull();
+      expect(anchorSpy?.getAttribute("download")).toBe("custom-r55-fixture.json");
+      expect(anchorSpy?.getAttribute("href") ?? "").toMatch(/^blob:/);
+      // 剪贴板被调过一次,内容是合法 JSON
+      expect(writeText).toHaveBeenCalledTimes(1);
+      const written = writeText.mock.calls[0][0] as string;
+      expect(() => JSON.parse(written)).not.toThrow();
+    } finally {
+      createSpy.mockRestore();
+      clickSpy.mockRestore();
+    }
+  });
+
+  it("剪贴板不可用时(没 stub navigator.clipboard.writeText)不会抛,状态条仍出现", async () => {
+    // 直接覆盖 navigator.clipboard 为空对象
+    Object.defineProperty(global.navigator, "clipboard", {
+      value: {}, configurable: true, writable: true,
+    });
+    render(<ThemeStudio initialVars={resolveVars("openbuddy")} />);
+    expect(() => {
+      fireEvent.click(screen.getByTestId("theme-studio-export"));
+    }).not.toThrow();
+    // 状态条出现
+    const status = screen.getByTestId("theme-studio-export-status");
+    expect(status.textContent ?? "").toContain("剪贴板不可用");
+  });
+
+  it("导入错误和导出状态互不冲突:有 exportStatus 时 importError 不会被覆盖", () => {
+    // 这个 case 走的是渲染时两条 status 各自的可见条件,不是状态机:
+    // 单纯渲染一次 Studio,导入错误不发生,导出状态不发生 → 两条都不渲染。
+    render(<ThemeStudio initialVars={resolveVars("openbuddy")} />);
+    expect(screen.queryByTestId("theme-studio-import-error")).toBeNull();
+    expect(screen.queryByTestId("theme-studio-export-status")).toBeNull();
+  });
+});

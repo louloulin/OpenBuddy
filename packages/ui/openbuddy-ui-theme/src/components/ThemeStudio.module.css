@@ -178,3 +178,17 @@
   line-height: 1.5;
   word-break: break-word;
 }
+
+/* R55 — 导出成功提示条。颜色用品牌色左边线 + 中性背景,和 importError 的
+   danger 红形成「成功 vs 失败」语义对照。 */
+.exportStatus {
+  margin: 8px 14px 0;
+  padding: 6px 10px;
+  border-radius: var(--wb-radius-sm, 4px);
+  background: var(--wb-bg-elevated, color-mix(in srgb, var(--wb-bg-tertiary, #1f2937) 80%, transparent));
+  border-left: 3px solid var(--wb-accent, #00c29a);
+  color: var(--wb-fg-primary);
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}
