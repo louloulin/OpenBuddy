@@ -712,22 +712,6 @@
     transition: top 0.15s ease;
   }
   .skip-link:focus { top: 0; }
-
-  /* Section spacing — tutti 风格: 大量留白 */
-  .section-pad {
-    padding-top: clamp(96px, 12vw, 160px);
-    padding-bottom: clamp(96px, 12vw, 160px);
-    background-color: var(--wb-bg);
-    color: var(--wb-fg);
-  }
-
-  .section-pad-sm {
-    padding-top: clamp(64px, 8vw, 96px);
-    padding-bottom: clamp(64px, 8vw, 96px);
-    background-color: var(--wb-bg);
-    color: var(--wb-fg);
-  }
-
   /* Decorative dotted line (separator) */
   .border-dotted {
     background-image: linear-gradient(to right, var(--wb-border) 50%, transparent 50%);
