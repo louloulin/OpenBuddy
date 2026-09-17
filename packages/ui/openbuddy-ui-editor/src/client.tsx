@@ -16,9 +16,10 @@
  */
 import type { UiRuntimeContext } from "@openbuddy/ui-slots";
 import { TiptapEditor } from "./components/TiptapEditor";
+import { DraftEditor } from "./components/DraftEditor";
 
 export function apply(ctx: UiRuntimeContext): () => void {
-  const dispose = ctx.slots.register(
+  const disposeBody = ctx.slots.register(
     {
       name: "editor.body",
       kind: "single",
@@ -27,5 +28,19 @@ export function apply(ctx: UiRuntimeContext): () => void {
     },
     TiptapEditor as never,
   );
-  return dispose;
+  // R70 — 「📝 新草稿」入口。Modal + TiptapEditor + 应用/复制/取消 三动作面;
+  // 第三方插件以更高 priority 注册同名 single 槽即可整体接管草稿 UI。
+  const disposeDraft = ctx.slots.register(
+    {
+      name: "editor.draft",
+      kind: "single",
+      scope: "root",
+      registrant: "@openbuddy/ui-editor",
+    },
+    DraftEditor as never,
+  );
+  return () => {
+    disposeBody();
+    disposeDraft();
+  };
 }

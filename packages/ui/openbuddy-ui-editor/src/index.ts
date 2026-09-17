@@ -41,6 +41,8 @@ export type { ToolbarButtonProps } from "./components/ToolbarButton";
 export { SuggestionMenu } from "./components/SuggestionMenu";
 export type { SuggestionMenuProps } from "./components/SuggestionMenu";
 export { MermaidNodeView } from "./components/MermaidNodeView";
+export { DraftEditor } from "./components/DraftEditor";
+export type { DraftEditorProps } from "./components/DraftEditor";
 
 // --- 扩展 -----------------------------------------------------------------
 export {
@@ -168,6 +170,15 @@ declare module "@openbuddy/ui-slots" {
       scope: "session-maybe";
       owner: { query: string };
     };
+    /**
+     * R70 — 「📝 新草稿」入口。single slot(scope: root)。默认实现是本包的
+     * `DraftEditor`(Modal + TiptapEditor + 应用/复制/取消 三个动作面);
+     * 第三方插件可整体替换为 Notion/Obsidian/WYSIWYG-only 风格草稿。
+     *
+     * 合约 props:{ open, onClose, onApply(markdown), onCopy?(markdown), initialMarkdown? }。
+     * 卸载时机:跟随宿主 overlay/对话框的卸载;`open=false` 时本组件直接返回 null。
+     */
+    "editor.draft": { kind: "single"; scope: "root" };
   }
 }
 

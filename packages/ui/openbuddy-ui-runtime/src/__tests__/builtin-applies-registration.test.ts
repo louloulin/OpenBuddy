@@ -182,8 +182,11 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     }
   });
 
-  it("ui-editor → 'editor.body' slot 注册 TiptapEditor", () => {
+  it("ui-editor → 'editor.body' + 'editor.draft' slot 注册 TiptapEditor + DraftEditor", () => {
+    // R70 — editor.draft 是「📝 新草稿」入口的 single 槽,默认实现为本包
+    // DraftEditor(Modal + TiptapEditor + 应用/复制/取消 三动作面)。
     expect(entries("editor.body").length).toBeGreaterThanOrEqual(1);
+    expect(entries("editor.draft").length).toBeGreaterThanOrEqual(1);
   });
 
   it("ui-onboarding → 5 个 onboarding.* slot 全部注册", () => {
