@@ -365,6 +365,7 @@ export function SettingsPanel({
   initialSection = "model",
   onOpenEmailPlan,
   onOpenDataDirPicker,
+  onReplayTour,
 }: {
   open: boolean;
   onClose: () => void;
@@ -375,6 +376,10 @@ export function SettingsPanel({
   onOpenEmailPlan?: (planId: string) => void;
   /** R23 — 打开宿主的「更改数据目录」选择器(内核槽位 `onboarding.data-dir`)。 */
   onOpenDataDirPicker?: () => void;
+  /** R64 — 「重新观看引导」入口回调,被「关于」section 的按钮触发。
+   *  host 接到这个 prop 后,会用 `useTourController().start()` +
+   *  `resetOnboarding()` 把首启向导和漫游都重置回未看状态。 */
+  onReplayTour?: () => void;
 }) {
   const [active, setActive] = useState<SectionId>("model");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
@@ -551,7 +556,7 @@ export function SettingsPanel({
             ) : active === "shortcuts" ? (
               <ShortcutsSettingsPanel />
             ) : active === "help" ? (
-              <HelpSettingsPanel />
+              <HelpSettingsPanel onReplayTour={onReplayTour} />
             ) : active === "security" ? (
               <SecuritySettingsPanel />
             ) : active === "data" ? (

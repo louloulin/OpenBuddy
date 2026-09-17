@@ -25,7 +25,7 @@
  * 参考 PI-Desktop `apps/desktop/src/features/app/AppShell.tsx` 的结构。
  */
 
-import { lazy, memo, Suspense, useMemo, type ComponentType } from "react";
+import { lazy, memo, Suspense, useCallback, useMemo, type ComponentType } from "react";
 import { GlobalConfirmHost } from "@/components/GlobalConfirmHost";
 import { TitleBar } from "@openbuddy/ui-shell";
 import { TopbarActions, TopbarTitle, KeyboardShortcutsDialog } from "@openbuddy/ui-shell";
@@ -49,6 +49,22 @@ import {
 } from "./chrome";
 import { RoutePending } from "./RoutePending";
 import { FeedbackGate } from "./FeedbackGate";
+// R64 — 「重新观看引导」入口需要:
+//   - clearOnboardingState / resetTour:清掉持久化痕迹,让首启下次再弹;
+//   - useTourController:拿到一个能立刻打开漫游的控制器;
+//   - TourModal:在 host 顶层直接渲染,而不是依赖 ui-onboarding 注册的
+//     <TourSurface /> (那个 surface 自己又起了一个 useTourController,与
+//     这里 host 层的实例是两份独立 state — 重放时 host 调用 start() 只
+//     影响 host 的实例,不会推动 ui-onboarding 的 surface 弹窗)。host
+//     渲染一份新的 TourModal 等价于在 AppShell 接管漫游的可视化,且不
+//     影响 onboarding.tour slot 的可替换性(第三方想要整张换皮,仍然
+//     可以注册 onboarding.tour slot)。
+import {
+  TourModal,
+  clearOnboardingState as clearOnboardingPersisted,
+  resetTour as clearTourPersisted,
+  useTourController,
+} from "@openbuddy/ui-onboarding";
 import { DataDirGate } from "./DataDirGate";
 import { WhatsNewGate } from "./WhatsNewGate";
 import type { PluginCommandPayload } from "@openbuddy/ui-workbench";
@@ -485,6 +501,25 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
 
   const activeNav = placeholderView ?? (currentSessionId ? "" : "新建任务");
 
+  // R64 — 「重新观看引导」入口:从设置 → 关于 触发。
+  //   1. 抹掉首启向导的持久化状态 → 下次首屏启动 wizard 会再出现一次;
+  //   2. 抹掉漫游 seen 标记 → 下次启动如果仍在向导之后,会再 autoOpen;
+  //   3. 立刻调用 tour.start() 把漫游从当前会话内的状态弹出来,用户立刻
+  //      看到第一步而不是等下次刷新。
+  // 不动主题 / 模型 / 数据目录 / 已登录的会话 —— 「重新观看」只重播引导
+  // 体验,不破坏用户的真实配置。
+  // R64 — host 层的 tour 控制器,独立于 ui-onboarding 注册的 <TourSurface />。
+  // replayTour 调用 tour.start() 直接驱动下面的 <R64TourModal />;关掉时调
+  // tour.stop() 写 localStorage(由 useTourController.stop 内部统一处理)。
+  const tour = useTourController({ autoOpen: false });
+  const replayTour = useCallback(() => {
+    if (typeof window === "undefined") return;
+    clearOnboardingPersisted(window.localStorage);
+    clearTourPersisted(window.localStorage);
+    setSettingsOpen(false);
+    tour.start(0);
+  }, [tour, setSettingsOpen]);
+
   return (
     <div className={"app" + (IS_MACOS ? " app--macos" : "")}>
       {!IS_MACOS && (
@@ -582,6 +617,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
             setSettingsOpen(false);
             handleNavigate("邮件");
           }}
+          onReplayTour={replayTour}
         />
         <AboutSurface open={aboutOpen} onClose={() => setAboutOpen(false)} init={runtime.init} />
         <TrustSurface
@@ -600,6 +636,10 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
         />
         <TasksSurface refreshSignal={runtime.taskRefreshSignal} onToast={showToast} />
         <OnboardingSurface />
+        {/* R64 — host 渲染的 TourModal,与 <TourSurface /> 槽位共存:第三方
+            注册 onboarding.tour slot 时,这里不会冲突(本组件直接读 host 层
+            tour.open 状态,与 ui-onboarding 的 surface 走的是两套 controller)。 */}
+        <TourModal open={tour.open} steps={tour.steps} onFinish={tour.stop} onClose={tour.stop} />
         <TourSurface />
         {/* R23 — 「本次更新」摘要(升版本后一次性)+ 「发送反馈」卡。
             两者都走内核槽位(onboarding.whats-new / onboarding.feedback),

@@ -22,6 +22,7 @@ import {
   Trash2,
   ExternalLink,
   RefreshCw,
+  RotateCcw,
   Shield,
 } from "lucide-react";
 import { useTheme, useThemeSnapshot, ThemePicker, ThemeStudio } from "@openbuddy/ui-theme/client";
@@ -309,7 +310,18 @@ export function ShortcutsSettingsPanel() {
 
 // ---------- 关于 ----------
 
-export function HelpSettingsPanel() {
+export function HelpSettingsPanel({
+  /**
+   * R64 — 「重新观看引导」入口回调。host 接到这个 prop 后,会用
+   * `useTourController().start()` + `resetOnboarding()` 把首启向导和
+   * 漫游都重置回未看状态,然后从当前页面顶端开始重播。ui-settings 不直接
+   * 依赖 ui-onboarding(避免 ui-* 包之间的耦合),由 AppShell 在调用方
+   * 注入。
+   */
+  onReplayTour,
+}: {
+  onReplayTour?: () => void;
+} = {}) {
   return (
     <SectionShell title="关于" desc="OpenBuddy 的版本、文档与反馈渠道。">
       <ul className="help-list">
@@ -345,6 +357,21 @@ export function HelpSettingsPanel() {
         <br />
         3. 重启 OpenBuddy 后再试
       </p>
+      {onReplayTour && (
+        <div className="settings-actions">
+          <button
+            type="button"
+            className="settings-btn"
+            onClick={onReplayTour}
+            data-testid="replay-tour"
+          >
+            <RotateCcw size={14} /> 重新观看引导
+          </button>
+          <p className="settings-hint">
+            从第一屏开始重播首启向导和漫游,主题 / 模型 / 数据目录等已经设置好的内容不会被重置。
+          </p>
+        </div>
+      )}
     </SectionShell>
   );
 }
