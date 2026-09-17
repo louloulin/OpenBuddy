@@ -7,7 +7,7 @@
  *
  * 通过 `filename` + `content`(文本或 data: URL)渲染;`onCopyText` 提供复制回调。
  */
-import { useState } from "react";
+import React, { useState } from "react";
 import { Markdown } from "@openbuddy/ui-markdown/components";
 import {
   detectPreviewKind,
@@ -26,6 +26,7 @@ import { DocxPreview } from "./DocxPreview";
 import { XlsxPreview } from "./XlsxPreview";
 import { PptxPreview } from "./PptxPreview";
 import { pickOfficePreviewKind } from "./office-preview";
+import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { UniverEditor } from "./UniverEditor";
 import { docTextToDocumentData, sheetSourceToWorkbookData } from "./univer-bridge";
 
@@ -81,6 +82,16 @@ export function FilePreview({
   univerEditing,
   richOfficePreview = true,
 }: FilePreviewProps) {
+  // R69 — 始终读 3 个 Office 预览 slot,即便本文件走 markdown / image / pdf 早返;
+  // 这保证 hooks 调用顺序稳定(React 规则),同时让插件可整体接管对应格式。
+  // 空槽时(没注册或第三方插件没装)回落到内置组件,行为向后兼容。
+  const slotDocx = useSlotComponents("workbench.preview.docx");
+  const slotXlsx = useSlotComponents("workbench.preview.xlsx");
+  const slotPptx = useSlotComponents("workbench.preview.pptx");
+  const slotOfficePreviews = React.useMemo(
+    () => ({ docx: slotDocx, xlsx: slotXlsx, pptx: slotPptx }),
+    [slotDocx, slotXlsx, slotPptx],
+  );
   const kind = detectPreviewKind(filename);
 
   if (kind === "image") {
@@ -227,15 +238,25 @@ export function FilePreview({
     // 三者都与 PdfJsPreview 同构(懒加载 + 失败回落 `readOnly`),所以即使
     // 内容是垃圾字节也只是多一次异步失败,视图最终仍是文本提取结果。
     if (richOfficePreview && content.length > 0) {
+      // R69 — 走微内核 slot:workbench.preview.{docx|xlsx|pptx};空槽时回落
+      // 到内置 Docx/Xlsx/PptxPreview。Hooks 已经在函数顶部无条件调用过,
+      // 这里只做组件选择 + 渲染。
       const officeKind = pickOfficePreviewKind(filename);
-      if (officeKind === "docx") {
-        return <DocxPreview filename={filename} content={content} fallback={readOnly} />;
-      }
-      if (officeKind === "xlsx") {
-        return <XlsxPreview filename={filename} content={content} fallback={readOnly} />;
-      }
-      if (officeKind === "pptx") {
-        return <PptxPreview filename={filename} content={content} fallback={readOnly} />;
+      if (officeKind) {
+        // 把 officeKind 显式缩窄为 known keys,避免 TS7053 索引报错。
+        const slotImpls =
+          officeKind === "docx" ? slotOfficePreviews.docx
+          : officeKind === "xlsx" ? slotOfficePreviews.xlsx
+          : slotOfficePreviews.pptx;
+        const SlotImpl = slotImpls[0] as
+          | React.ComponentType<{ filename: string; content: string; fallback: React.ReactNode; className?: string }>
+          | undefined;
+        const Builtin =
+          officeKind === "docx" ? DocxPreview
+          : officeKind === "xlsx" ? XlsxPreview
+          : PptxPreview;
+        const Impl = SlotImpl ?? Builtin;
+        return <Impl filename={filename} content={content} fallback={readOnly} />;
       }
     }
     return readOnly;
