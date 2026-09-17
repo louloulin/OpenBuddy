@@ -40,6 +40,11 @@ export interface AgentPaths {
   plugins: string;
   /** main 进程是否报告了显式环境变量覆盖(UI 可据此提示"你改过目录")。 */
   fromEnv: boolean;
+  /**
+   * pi SDK 实际会用的 agent 目录(`getAgentDir()` 的返回值)。空串 = 未知
+   * (老 preload 不返回该字段),消费方不应把空串当成"不一致"。
+   */
+  piAgentDir: string;
   /** 是否已解析到真实路径(用于避免首帧闪烁时的布局跳变)。 */
   resolved: boolean;
 }
@@ -56,6 +61,8 @@ function deriveFallback(home: string, resolved: boolean, fromEnv = false): Agent
     extensions: extensionInstallDisplayFrom(home),
     plugins: pluginsDisplayFrom(home),
     fromEnv,
+    // 兜底态不知道 pi 的解析结果,留空表示"未知"。
+    piAgentDir: "",
     resolved,
   };
 }
@@ -73,6 +80,7 @@ function fromSnapshot(snapshot: AgentPathsSnapshot): AgentPaths {
     extensions: extensionInstallDisplayFrom(home),
     plugins: pluginsDisplayFrom(home),
     fromEnv: snapshot.fromEnv,
+    piAgentDir: snapshot.piAgentDir ?? "",
     resolved: true,
   };
 }

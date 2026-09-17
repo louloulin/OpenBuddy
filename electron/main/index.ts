@@ -44,6 +44,7 @@ import { initCasdoorSecurity, type CasdoorSecurityController } from "./security/
 import { perfTraceMark } from "./observability/perf-trace";
 import { createMainWindow as buildMainWindow } from "./main-window";
 import { installAppMenu } from "./app-menu";
+import { agentHome, pinPiAgentDirEnv, isPiAgentDirPinnedByUs } from "@openbuddy/storage";
 
 // Heavy module (138 top-level imports including @earendil-works/pi-coding-agent and
 // the OpenBuddy Pi SDK) — lazy-loaded inside bootBackgroundServices so module
@@ -58,6 +59,20 @@ const mainDirname = dirname(mainFilename);
 const execFileAsync = promisify(execFile);
 
 app.setName("OpenBuddy");
+
+// R95 — 把 agent 根钉进 `PI_CODING_AGENT_DIR`,必须发生在**任何 pi 模块被求值之前**。
+//
+// 为什么放在模块顶层、`app.whenReady` 之前:pi-coding-agent 的
+// `getAgentDir()` 只读环境变量(不看 `createAgentSession({ agentDir })`),而
+// 一些扩展在**扩展注册时**就解析自己的目录 —— 等 agent host 懒加载起来再设
+// 已经太晚。这里是 main 进程源文件里最早能设的时机:本模块是入口,而且这段
+// 代码在 `bootBackgroundServices()` 之前同步执行。
+//
+// 为什么必须整体做:不设的话 SDK 会解析到 `~/.pi/agent`(实测见
+// `@openbuddy/storage` 的 `pinPiAgentDirEnv()` 注释),于是 OpenBuddy 与 pi
+// 两个产品互相写对方的数据目录 —— 本机 `~/.pi/agent/agents/Designer.md`
+// 停在 2026-09-04 而 `~/.openbuddy/agent/` 每天在写,就是这个分叉。
+pinPiAgentDirEnv();
 
 let mainLogger: ReturnType<typeof createMainLogger> | null = null;
 function ensureMainLogger(): ReturnType<typeof createMainLogger> {
@@ -81,7 +96,16 @@ function ensureMainLogger(): ReturnType<typeof createMainLogger> {
   // Emit a startup line so operators (and the chat-resilience smoke test) can
   // confirm the file logger + pino-roll transport are wired correctly.
   mainLogger.info(
-    { msg: "main.started", traceId, electronVersion: process.versions.electron ?? null, logsDir: filePath ? filePath.slice(0, filePath.lastIndexOf("/")) : null },
+    {
+      msg: "main.started",
+      traceId,
+      electronVersion: process.versions.electron ?? null,
+      logsDir: filePath ? filePath.slice(0, filePath.lastIndexOf("/")) : null,
+      // R95 — 记下 agent 根与它是否由我们钉入。排查"数据写到 ~/.pi/agent"
+      // 这类问题时,这一行就能区分"用户显式覆盖"与"我们补的默认值"。
+      agentHome: agentHome(),
+      piAgentDirPinnedByUs: isPiAgentDirPinnedByUs(),
+    },
     "openbuddy main started",
   );
   return mainLogger;

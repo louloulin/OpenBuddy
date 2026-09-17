@@ -397,6 +397,10 @@ body[data-vscode-theme-name="IDE Light"] {
   --wb-status-info: var(--wb-palette-brand-8);
   --wb-status-warning-soft: var(--wb-palette-orange-1);
   --wb-status-error-soft: var(--wb-palette-red-1);
+  /* R95 — 与 `--wb-status-{warning,error}-soft` 对称的成功态柔和底色。
+   * `theme-dark-overrides.css` 的深色邮件状态 chip 引用了它,
+   * 此前未定义 → 整条 `background:` 被丢弃,chip 变成透明。 */
+  --wb-status-success-soft: var(--wb-palette-green-1);
   --wb-sidebar-bg: var(--wb-color-bg-primary-default);
   --wb-sidebar-border: var(--wb-color-bg-primary-hover);
   --wb-sidebar-mask-end: var(--wb-sidebar-bg);
@@ -426,6 +430,37 @@ body[data-vscode-theme-name="IDE Light"] {
   --wb-quick-action-item-bg-hover: #ebebeb;
   --wb-quick-action-item-border-hover: #e5e5e5;
   --wb-border-drag-indicator: var(--wb-palette-brand-8);
+  /* R95 — 补齐"被使用但从未定义"的令牌别名。
+   *
+   * 这些令牌在 `src/styles/**` 与 `packages/ui/**` 的 CSS 里被 `var()` 直接
+   * 引用(共 34 处),但**从未在任何被加载的样式表里定义**:
+   *
+   *   --wb-text-secondary  19 处  (automation / home / misc / modals /
+   *                                settings / sidebar / ui-primitives)
+   *   --wb-text-primary     5 处  (home / modals)
+   *   --wb-text-disabled    4 处  (email / home)
+   *   --wb-radius           4 处  (misc)
+   *   --wb-text / --wb-text-low  4 处  (sidebar-menus)
+   *   --wb-bg-surface       2 处  (misc)
+   *   --wb-font-sans        1 处  (misc)
+   *
+   * 没有 fallback 的 `var()` 在变量为空时会**丢弃整条声明** —— `color:` 消失
+   * 则元素回退到继承色,在深色主题上就是"字看不见"。`--wb-text-secondary`
+   * 尤其严重:19 处里包含设置面板与侧栏的次要文字。
+   *
+   * 这些别名只是把消费者**已经在用**的名字指向已存在的定义,不引入新色值。
+   * 不变式由 `scripts/ui-token-audit.mjs --check` 守护。 */
+  --wb-text: var(--wb-color-text-primary);
+  --wb-text-primary: var(--wb-color-text-primary);
+  --wb-text-secondary: var(--wb-color-text-secondary);
+  --wb-text-disabled: var(--wb-color-text-disabled);
+  --wb-text-low: var(--wb-color-text-tertiary);
+  --wb-bg-surface: var(--wb-bg-elevated);
+  /* `--wb-font` 由 `@openbuddy/ui-theme/styles` 定义(随主题切换字体),
+   * 这里只做别名 —— 不要另起一套字体栈,否则主题换字体时这里会脱节。 */
+  --wb-font-sans: var(--wb-font);
+  /* 无名后缀的圆角短别名 —— 与 `--wb-radius-md` 同值,给旧组件兜底。 */
+  --wb-radius: var(--wb-radius-md);
 }
 
 [data-theme=dark],
@@ -488,6 +523,8 @@ body.dark,
   --wb-status-info: var(--wb-color-text-brand-default);
   --wb-status-warning-soft: color-mix(in srgb, var(--wb-color-text-warning-default) 18%, transparent);
   --wb-status-error-soft: color-mix(in srgb, var(--wb-color-text-error-default) 18%, transparent);
+  /* R95 — 同亮色块:深色下用 18% 透明叠色,与 warning/error 一致的配方。 */
+  --wb-status-success-soft: color-mix(in srgb, var(--wb-color-text-success-default) 18%, transparent);
   --wb-sidebar-bg: var(--wb-palette-gray-3);
   --wb-sidebar-border: var(--wb-palette-gray-5);
   --wb-sidebar-mask-end: var(--wb-sidebar-bg);

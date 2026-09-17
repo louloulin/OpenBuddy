@@ -99,6 +99,47 @@ try {
   );
   step("fromEnv=true(显式覆盖被识别)", isShape && snapshot.fromEnv === true, String(snapshot?.fromEnv));
 
+  // ---- 1b. `PI_CODING_AGENT_DIR` 真的被钉进了 main 进程 ----
+  // 这一条修的是数据落盘:pi-coding-agent 的 `getAgentDir()` 只读环境变量,
+  // 不设就会回落到 `~/.pi/agent`(另一个产品的目录)。探针跑在**没有**设该
+  // 变量的环境里,所以这里能看到 main 是否替用户补上了。
+  const pin = await page.evaluate(async () => {
+    // renderer 读不到 main 的 process.env,所以只能通过 IPC 暴露的路径反推:
+    // agent:paths 的 home 就是钉进去的值。真正的 env 断言放在 main 侧单测
+    // (packages/runtime/openbuddy-storage/src/__tests__/paths.test.ts),这里
+    // 只确认它没有把关卡绕过去 —— 即 agents 子路径确实在自定义根之下。
+    try {
+      const paths = await window.api.invoke("agent:paths");
+      return {
+        home: paths?.home ?? null,
+        agents: paths?.agents ?? null,
+        piAgentDir: paths?.piAgentDir ?? null,
+        piAgentDirPinnedByUs: paths?.piAgentDirPinnedByUs ?? null,
+      };
+    } catch (error) {
+      return { error: String(error) };
+    }
+  });
+  report.agentDirPin = pin;
+  step(
+    "main 的 agent 根不含 .pi(未被 SDK 默认值带偏)",
+    typeof pin.home === "string" && !/[\\/]\.pi([\\/]|$)/.test(pin.home),
+    JSON.stringify(pin),
+  );
+  // 这才是"数据写到哪"的直接证据:`PI_CODING_AGENT_DIR` —— 也就是
+  // pi-coding-agent `getAgentDir()` 唯一读取的变量 —— 必须等于 agentHome。
+  // 只看 `home` 不够:home 是我们自己算的,piAgentDir 是 SDK 会去用的。
+  step(
+    "PI_CODING_AGENT_DIR 被钉成 agentHome(pi SDK 与 OpenBuddy 同根)",
+    pin.piAgentDir === pin.home,
+    `piAgentDir=${pin.piAgentDir} home=${pin.home}`,
+  );
+  step(
+    "钉入标记为 true(证明是本进程补的,不是恰好继承了外部环境变量)",
+    pin.piAgentDirPinnedByUs === true,
+    String(pin.piAgentDirPinnedByUs),
+  );
+
   // ---- 2. 打开设置 → 助理设置,看 UI 文案是否真的用了自定义路径 ----
   await page.keyboard.press("Escape").catch(() => {});
   await page.waitForTimeout(300);

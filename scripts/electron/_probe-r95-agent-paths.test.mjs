@@ -54,6 +54,16 @@ describe.skipIf(!canLaunch)("live electron probe: R95 agent 数据目录", () =>
     expect(probe.snapshot.extensions).toBe(`${probe.snapshot.home}/node_modules`);
   });
 
+  it("PI_CODING_AGENT_DIR 被钉成 agentHome(pi SDK 与 OpenBuddy 同根)", () => {
+    const probe = runProbe();
+    // 这条是"数据写到哪"的直接证据:pi-coding-agent 的 getAgentDir() 只读
+    // 这个变量,不看我们传给 createAgentSession 的 agentDir。不钉的话它会
+    // 回落到 ~/.pi/agent(另一个产品的目录)。
+    expect(probe.snapshot?.piAgentDir).toBe(probe.snapshot?.home);
+    expect(probe.snapshot?.piAgentDirPinnedByUs).toBe(true);
+    expect(probe.snapshot.piAgentDir).not.toMatch(/[\\/]\.pi([\\/]|$)/);
+  });
+
   it("UI 文案跟着 agentHome 走(证明 renderer 真在消费 IPC)", () => {
     const probe = runProbe();
     // 关键断言:不是「没有 ~/.pi」,而是「显示了自定义路径」。

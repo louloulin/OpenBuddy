@@ -16,7 +16,7 @@
 import { ipcMain } from "electron";
 import { homedir } from "node:os";
 
-import { agentHome } from "@openbuddy/storage";
+import { agentHome, isPiAgentDirPinnedByUs } from "@openbuddy/storage";
 
 export interface AgentPathsSnapshot {
   /** agentHome 绝对值。 */
@@ -35,6 +35,16 @@ export interface AgentPathsSnapshot {
   plugins: string;
   /** 是否来自显式环境变量覆盖(UI 可以据此提示"你改过目录")。 */
   fromEnv: boolean;
+  /**
+   * pi SDK 实际会用的 agent 目录(`getAgentDir()` 的返回值)。
+   *
+   * 与 `home` 分开返回,是为了让"我们钉进去的值"可被**运行时观测** ——
+   * 否则只能靠读源码或读 main 日志来判断,而这条链路上的分叉(数据被写进
+   * `~/.pi/agent`)曾经真实发生过且没人发现。
+   */
+  piAgentDir: string;
+  /** `PI_CODING_AGENT_DIR` 是不是我们替用户补的默认值。 */
+  piAgentDirPinnedByUs: boolean;
 }
 
 function toDisplay(value: string, home: string): string {
@@ -46,7 +56,11 @@ export function describeAgentPaths(): AgentPathsSnapshot {
   const home = agentHome();
   const userHome = homedir();
   const join = (...segments: string[]) => [home.replace(/\/+$/, ""), ...segments].join("/");
-  const fromEnv = Boolean(process.env.OPENBUDDY_AGENT_DIR ?? process.env.PI_CODING_AGENT_DIR);
+  // `pinPiAgentDirEnv()` 在 main 入口把 `PI_CODING_AGENT_DIR` 补成了 agentHome,
+  // 所以到这里 `PI_CODING_AGENT_DIR` 基本上**永远非空**。不减掉"我们补的",
+  // `fromEnv` 会恒为 true,界面就会一直提示"你改过数据目录" —— 而用户没改。
+  const fromEnv = Boolean(process.env.OPENBUDDY_AGENT_DIR)
+    || (Boolean(process.env.PI_CODING_AGENT_DIR) && !isPiAgentDirPinnedByUs());
   return {
     home,
     homeDisplay: toDisplay(home, userHome),
@@ -62,6 +76,8 @@ export function describeAgentPaths(): AgentPathsSnapshot {
     // 市场安装的插件注册根(见 pi-resources/marketplace.ts 的 agentRoot()/plugins)。
     plugins: join("plugins"),
     fromEnv,
+    piAgentDir: process.env.PI_CODING_AGENT_DIR ?? "",
+    piAgentDirPinnedByUs: isPiAgentDirPinnedByUs(),
   };
 }
 

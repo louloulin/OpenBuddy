@@ -44,6 +44,18 @@ export interface AgentPathsSnapshot {
   extensions: string;
   plugins: string;
   fromEnv: boolean;
+  /**
+   * pi SDK 实际会用的 agent 目录(`getAgentDir()` 的返回值)。
+   *
+   * 与 `home` 分开,是为了让"两边是否同根"可被 UI 观测 —— pi-coding-agent
+   * 只读 `PI_CODING_AGENT_DIR`,不看我们传给 `createAgentSession` 的
+   * `agentDir`。两者分叉时数据会被写进另一个产品的目录,而界面上看不出任何
+   * 异常。老 preload 不返回该字段时为空串,消费方应把空串当成"未知"而不是
+   * "不一致"。
+   */
+  piAgentDir?: string;
+  /** `PI_CODING_AGENT_DIR` 是否由 OpenBuddy 启动时补的默认值。 */
+  piAgentDirPinnedByUs?: boolean;
 }
 
 function joinDisplay(base: string, ...segments: string[]): string {
@@ -116,6 +128,10 @@ export async function resolveAgentPathsSnapshot(): Promise<AgentPathsSnapshot | 
         extensions: `${home}/node_modules`,
         plugins: `${home}/plugins`,
         fromEnv: false,
+        // 这条兼容路径推不出 pi 的解析结果(它只给了 mcp.json 的目录),
+        // 留空让 UI 显示"未知",而不是错误地宣称"不一致"。
+        piAgentDir: "",
+        piAgentDirPinnedByUs: false,
       };
       return cachedSnapshot;
     } catch {

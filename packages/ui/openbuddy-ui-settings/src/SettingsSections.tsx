@@ -495,6 +495,32 @@ export function DataSettingsPanel({ onOpenDataDirPicker }: { onOpenDataDirPicker
           <code>{piHome}</code>
         </div>
       </div>
+      {/* R95 — 这一行回答的是"pi SDK 到底往哪写"。`piHome` 是我们传给
+       *  createAgentSession() 的值,而 pi 的 `getAgentDir()` 只读
+       *  `PI_CODING_AGENT_DIR` —— 两者分叉时数据会被写进另一个产品的目录,
+       *  界面上完全看不出来。启动时会把它钉成同一个根(见
+       *  `@openbuddy/storage` 的 pinPiAgentDirEnv),这里把结果摆出来:
+       *  不一致就是红色告警,而不是让用户自己猜。 */}
+      {agentPaths.resolved && agentPaths.piAgentDir ? (
+        <div className="settings-row">
+          <div className="settings-row__label">
+            <Folder size={16} />
+            <span>pi 引擎实际目录</span>
+          </div>
+          <div className="settings-row__control">
+            {agentPaths.piAgentDir === piHome ? (
+              <code title={agentPaths.piAgentDir}>{agentPaths.piAgentDir}</code>
+            ) : (
+              <code
+                className="settings-code--warn"
+                title="pi 引擎(pi-coding-agent 的 getAgentDir)与本应用的 agent 根不一致，部分数据可能被写入另一个目录"
+              >
+                {agentPaths.piAgentDir}（与上方不一致）
+              </code>
+            )}
+          </div>
+        </div>
+      ) : null}
       <div className="settings-actions">
         <button
           className="settings-btn settings-btn--danger"

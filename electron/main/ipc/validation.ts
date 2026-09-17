@@ -5,7 +5,8 @@
  * RPC dispatch and `registerIpc` handler registrations. No side effects; unit
  * testable in isolation.
  */
-import { isAbsolute, resolve } from "node:path";
+import { homedir } from "node:os";
+import { isAbsolute, join, resolve } from "node:path";
 import { readPolicyConfig } from "../agent/pi-resources";
 import {
 	WorkspaceInvalidPathError,
@@ -139,6 +140,37 @@ export function absolutePath(value: unknown, label: string): string {
 	return result;
 }
 
+/**
+ * 对话枢轴默认目录(`dialog:open` / `dialog:save` 的 `defaultPath`)。
+ *
+ * 与 `absolutePath()` 的契约**刻意不同**:那些是安全边界(越权读一个文件
+ * 是漏洞),这里只是一个"对话框打开在哪"的**提示**。提示无效时正确行为是
+ * "忽略提示、打开系统默认位置",而不是抛错 —— 抛错会让用户点「选择目录」
+ * 之后**什么都不发生**。
+ *
+ * 修的是一个真实故障:专家页/技能页把 Windows 风格默认值 `E:/Pi/agents`
+ * 传进来,而 `isAbsolute("E:/Pi/agents")` 在 macOS/Linux 上是 `false`
+ * (POSIX 的绝对路径必须以 `/` 开头)。旧实现直接 throw,于是
+ * `chooseDir()` 里的 `catch { /* cancelled *\/ }` 把它当成"用户取消了",
+ * 对话框根本不弹。
+ *
+ * 归一化顺序:
+ *   1. `~/...` 展开成 `$HOME/...`(Electron 自己不做这件事);
+ *   2. 展开后仍非绝对(含 Windows 盘符在 POSIX 上、纯相对路径)→ 丢弃;
+ *   3. 存在但不可用(盘符没挂载)→ 交给 Electron,它自己会回落到默认位置。
+ */
+export function dialogDefaultPath(value: unknown, label: string): string | undefined {
+	if (value === undefined || value === null) return undefined;
+	// 空串 / 纯空白的语义是"没给提示",不是"给了个非法提示" —— 调用方常常
+	// 直接传一个可能为空的状态值(`defaultPath: root || undefined` 的反面)。
+	// 用 requiredString() 会把它当类型错误抛掉,又把死按钮放回来。
+	if (typeof value !== "string") throw new Error(`${label} must be a string`);
+	const raw = value.trim();
+	if (!raw) return undefined;
+	const expanded = raw === "~" ? homedir() : raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
+	return isAbsolute(expanded) ? expanded : undefined;
+}
+
 export function enumValue<T extends string>(value: unknown, label: string, values: readonly T[]): T {
 	if (typeof value !== "string" || !values.includes(value as T)) throw new Error(`${label} is invalid`);
 	return value as T;
@@ -164,6 +196,10 @@ export function requiredStringArray(value: unknown, label: string): string[] {
 	const result = optionalStringArray(value, label);
 	if (!result || result.length === 0) throw new Error(`${label} must contain at least one value`);
 	return result;
+}
+
+function optionalProperty<K extends string, V>(key: K, value: V | undefined): Record<K, V> | Record<string, never> {
+	return value === undefined ? {} : { [key]: value } as Record<K, V>;
 }
 
 function emailAddressValue(value: unknown, label: string): { address: string; name?: string } {
@@ -308,7 +344,7 @@ export function openDialogOptions(value: unknown): Electron.OpenDialogOptions {
 	const properties = input.properties === undefined ? undefined : optionalStringArray(input.properties, "properties") as Electron.OpenDialogOptions["properties"];
 	return {
 		...(input.title === undefined ? {} : { title: requiredString(input.title, "title") }),
-		...(input.defaultPath === undefined ? {} : { defaultPath: absolutePath(input.defaultPath, "defaultPath") }),
+		...optionalProperty("defaultPath", dialogDefaultPath(input.defaultPath, "defaultPath")),
 		...(input.buttonLabel === undefined ? {} : { buttonLabel: requiredString(input.buttonLabel, "buttonLabel") }),
 		...(input.message === undefined ? {} : { message: requiredString(input.message, "message") }),
 		...(properties === undefined ? {} : { properties }),
@@ -320,7 +356,7 @@ export function saveDialogOptions(value: unknown): Electron.SaveDialogOptions {
 	const input = value === undefined || value === null ? {} : recordValue(value, "save dialog options");
 	return {
 		...(input.title === undefined ? {} : { title: requiredString(input.title, "title") }),
-		...(input.defaultPath === undefined ? {} : { defaultPath: absolutePath(input.defaultPath, "defaultPath") }),
+		...optionalProperty("defaultPath", dialogDefaultPath(input.defaultPath, "defaultPath")),
 		...(input.buttonLabel === undefined ? {} : { buttonLabel: requiredString(input.buttonLabel, "buttonLabel") }),
 		...(input.message === undefined ? {} : { message: requiredString(input.message, "message") }),
 		...(input.filters === undefined ? {} : { filters: dialogFilters(input.filters) }),

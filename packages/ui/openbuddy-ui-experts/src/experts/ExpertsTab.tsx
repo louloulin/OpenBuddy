@@ -8,6 +8,7 @@ import {
   agentsDelete, agentsList, agentsSave, agentsTemplate, expertsDefaultRoot, expertsLoad, expertsReadAgentPrompt, expertsLinkAgents,
   workbuddyImportConfirm, workbuddyImportPreview,
 } from "@/lib/agent/pi-client";
+import { useAgentPaths } from "@openbuddy/ui-shared/use-agent-paths";
 import type { AgentEntry, ExpertCatalog, ExpertItem, FeaturedScene, WorkBuddyImportPreview } from "@openbuddy/shared-types";
 import { FEATURED_SCENES } from "../data/featured-scenes";
 import { Chip, SegmentTabs } from "../shared/ui";
@@ -24,7 +25,6 @@ const OPC_ID = "00-OPC";
 const LS_ROOT = "expertsRoot";
 /** Manifest label overrides to match the target UI exactly. */
 const LABEL_OVERRIDE: Record<string, string> = { "13-TencentZone": "腾讯专家" };
-const DEFAULT_PICK = "E:/Pi/agents";
 
 interface Props {
   pills: React.ReactNode;
@@ -42,6 +42,13 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
   /** Expert whose detail modal is currently open. */
   const [modalExpert, setModalExpert] = useState<ExpertItem | null>(null);
   const setPendingExpert = usePendingExpertStore((s) => s.set);
+  // R95 — 目录选择器的起点必须是**真实**的专家目录。
+  // 此前写死 `E:/Pi/agents`(Windows 盘符):在 macOS/Linux 上
+  // `isAbsolute("E:/Pi/agents")` 为 false,main 侧校验直接抛错,而
+  // `chooseDir()` 把它当成"用户取消",于是**点「选择目录」什么都不弹**。
+  // 现在用 main 回话的 agentHome:未解析时是 `~/.openbuddy/agent/experts`
+  // (main 侧会展开 `~`),解析后是自定义目录,两种都是合法起点。
+  const agentPaths = useAgentPaths();
 
   const [root, setRoot] = useState<string>(() => {
     try { return localStorage.getItem(LS_ROOT) || ""; } catch { return ""; }
@@ -173,13 +180,14 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
     try {
       const pick = await openOne({
         directory: true, multiple: false, title: "选择专家数据目录",
-        defaultPath: root || DEFAULT_PICK,
+        // 优先当前来源;其次 main 解析出的真实目录;最后让系统决定。
+        defaultPath: root || agentPaths.experts || undefined,
       });
       if (!pick) return;
       await loadCatalog(pick);
       if (!error) onToast?.(`已切换专家数据目录：${pick}`);
     } catch { /* cancelled */ }
-  }, [root, loadCatalog, onToast, error]);
+  }, [root, loadCatalog, onToast, error, agentPaths.experts]);
 
   const handleCreate = () => {
     setCreateError("");
@@ -343,7 +351,9 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
               <div className="ec-empty">
                 <FolderOpenIcon size="xl" className="ec-empty-icon" />
                 <p>未找到专家数据目录</p>
-                <p className="ec-empty-hint">请选择包含 <code>_meta/_expert_center.json</code> 的 WorkBuddy 数据目录（如 <code>E:\Pi\agents</code>）</p>
+                <p className="ec-empty-hint">
+                  请选择包含 <code>_meta/_expert_center.json</code> 的 WorkBuddy 数据目录（内置专家在 <code>{agentPaths.experts}</code>）
+                </p>
                 <button type="button" className="um-btn um-btn--primary" onClick={chooseDir}>
                   <FolderOpenIcon size="sm" /><span>选择来源目录</span>
                 </button>

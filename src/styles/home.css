@@ -2385,6 +2385,12 @@
   border-radius: 4px;
   font-size: 11px;
 }
+/* R95 — 数据目录不一致告警(见 DataSettingsPanel 的「pi 引擎实际目录」)。
+ * 用 token 而不是写死颜色,深浅主题都能保住对比度。 */
+.settings-code--warn {
+  color: var(--wb-status-warning, #b45309) !important;
+  border: 1px solid color-mix(in srgb, var(--wb-status-warning, #b45309) 40%, transparent);
+}
 .theme-toggle {
   display: flex;
   gap: 4px;
