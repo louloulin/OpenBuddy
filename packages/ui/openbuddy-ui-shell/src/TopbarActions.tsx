@@ -22,6 +22,7 @@ import {
 } from "@openbuddy/ui-primitives/icons";
 import { useTheme } from "@openbuddy/ui-theme/client";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
+import { useShortcut } from "./useShortcut";
 import { useSessionStore } from "@/stores/session-store";
 import {
   exportTextFile,
@@ -74,6 +75,18 @@ export function TopbarActions({
       }>
     | undefined;
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // R72 — 「📝 新草稿」键盘快捷键 Mod+Shift+D。
+  // 只有当 DraftImpl 真的注册了才绑定(空槽时绑定也没意义 —— 菜单都没渲染)。
+  useShortcut(
+    { mod: true, shift: true, key: "d" },
+    () => {
+      if (!DraftImpl) return;
+      // 与点菜单按钮一致:开草稿模态。空槽 / 草稿已开时 no-op。
+      setDraftOpen((v) => !v);
+    },
+    { preventDefault: true }
+  );
 
   // __pending_xxx IDs are renderer-only placeholders created by beginPendingNewSession
   // before piNewSession returns the real ID. Pi main has never seen them, so any
@@ -191,7 +204,7 @@ export function TopbarActions({
               >
                 <span className="topbar-actions__item-icon">📝</span>
                 <span className="topbar-actions__item-label">新草稿</span>
-                <ShortcutHint chord="MOD+D" />
+                <ShortcutHint chord={TOPBAR_ACTION_SHORTCUTS.draft} />
               </button>
             ) : null}
             <button type="button" className="topbar-actions__item" onClick={handleExport}>

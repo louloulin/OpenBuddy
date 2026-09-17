@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ThemeProvider } from "@openbuddy/ui-theme/client";
 
 vi.mock("@/lib/platform/electron-api", () => ({ save: vi.fn(async () => null) }));
@@ -157,5 +157,33 @@ describe("R71 — editor.draft 槽位接入", () => {
     // 菜单已关 + DraftEditor 模态已挂(ProseMirror 实例存在)
     expect(screen.queryByTestId("topbar-draft-button")).toBeNull();
     expect(document.querySelector(".ProseMirror")).toBeTruthy();
+  });
+
+  // R72 — 键盘快捷键 Mod+Shift+D 真正打开/关闭草稿模态
+  it("按 Mod+Shift+D 在 editor.draft 装好后切换草稿模态", async () => {
+    render(withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" />));
+    // 第一次按下:打开草稿(ProseMirror 挂出)。setState 后 ProseMirror 异步挂出。
+    fireEvent.keyDown(window, { key: "d", ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(document.querySelector(".ProseMirror")).toBeTruthy());
+    // 第二次按下:关闭草稿(ProseMirror 卸下)
+    fireEvent.keyDown(window, { key: "d", ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(document.querySelector(".ProseMirror")).toBeNull());
+  });
+
+  it("editor.draft 未注册时,Mod+Shift+D 不报错也无副作用", () => {
+    // 不包 SlotProvider → 没有 builtin 注册 → editor.draft 空 → 绑定成 no-op。
+    render(<TopbarActions sessionId="s-1" title="项目复盘" />);
+    expect(() => {
+      fireEvent.keyDown(window, { key: "d", ctrlKey: true, shiftKey: true });
+    }).not.toThrow();
+    expect(document.querySelector(".ProseMirror")).toBeNull();
+  });
+
+  it("菜单里「📝 新草稿」右侧显示快捷键 glyph(Ctrl+Shift+D / ⌘+Shift+D)", () => {
+    render(withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" />));
+    fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+    expect(screen.getByTestId("topbar-draft-button")).toHaveTextContent(/新草稿/);
+    // 平台无关 chord 经过 ShortcutHint 渲染成带图标的 span,只看 label 即可。
+    expect(screen.getByLabelText(/快捷键.*Shift.*D/)).toBeInTheDocument();
   });
 });
