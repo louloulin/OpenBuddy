@@ -26,6 +26,22 @@ declare module "@openbuddy/ui-slots" {
      * `plugin.command` 槽里的插件命令整理成 `pluginCommands` 一起传下去。
      */
     "overlay.search": { kind: "single"; scope: "root" };
+    /**
+     * R68 — Office 三件套预览槽。每个槽都是 single(scope: root),第三方
+     * 插件以更高 priority 注册同名单例槽即可接管对应格式的内嵌预览。
+     *
+     * 默认实现即本包的 DocxPreview / XlsxPreview / PptxPreview,通过
+     * 懒加载的 docx-preview / SheetJS / pptx-preview 渲染为 DOM。FilePreview
+     * 在没有插件接管时走这些默认;有插件接管时,以插件为准。
+     *
+     * 槽的合约:
+     * - props:`{ filename: string; content: string; fallback: ReactNode; className?: string }`
+     * - 卸载时机:跟随文件预览面板的卸载
+     * - 失败语义:内部已经 lazy import 失败兜底到 `fallback`,插槽层无需关心
+     */
+    "workbench.preview.docx": { kind: "single"; scope: "root" };
+    "workbench.preview.xlsx": { kind: "single"; scope: "root" };
+    "workbench.preview.pptx": { kind: "single"; scope: "root" };
   }
 }
 

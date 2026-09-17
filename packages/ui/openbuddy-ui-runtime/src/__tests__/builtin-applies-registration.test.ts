@@ -173,6 +173,15 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     expect(runtime.slots).toBeDefined();
   });
 
+  // R68 — Office 三件套预览槽被 ui-workbench 注册(单例槽,插件可整体替换)。
+  it("ui-workbench → 3 个 workbench.preview.* slot 注册 Docx/Xlsx/Pptx Preview", () => {
+    // 与 ui-shell/ui-files-tree 测试保持一致:用 entries() 验组件落位;
+    // 3 个 slot 都在 builtin apply() 注册,默认实现即本包 Docx/Xlsx/PptxPreview。
+    for (const slot of ["workbench.preview.docx", "workbench.preview.xlsx", "workbench.preview.pptx"]) {
+      expect(entries(slot).length, `slot ${slot}`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it("ui-editor → 'editor.body' slot 注册 TiptapEditor", () => {
     expect(entries("editor.body").length).toBeGreaterThanOrEqual(1);
   });
