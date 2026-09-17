@@ -92,6 +92,7 @@ import { EmailList } from "./EmailList";
 import { EmailDetail } from "./EmailDetail";
 import { EmailSidebar, type EmailFolder, type EmailView } from "./EmailSidebar";
 import "./connection-banner.css";
+import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { EmailComposer } from "./EmailComposer";
 import { ConfirmDialog, type ConfirmTone } from "@openbuddy/ui-dialogs";
 import { PromptDialog } from "@openbuddy/ui-dialogs";
@@ -279,6 +280,9 @@ export function EmailPanel({ onToast, onLaunch, sessionId, onNavigate }: EmailPa
   const [loading, setLoading] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerInitial, setComposerInitial] = useState<Parameters<typeof EmailComposer>[0]["initial"]>();
+  // R92 — 邮件写邮件面板走 `placeholder.email-composer` 槽,插件可整体替换。
+  const [EmailComposerImpl] = useSlotComponents("placeholder.email-composer");
+  const EmailComposerSlot = (EmailComposerImpl ?? EmailComposer) as typeof EmailComposer;
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null);
   const requestConfirm = useCallback((options: Omit<PendingConfirm, "resolve">) => new Promise<boolean>((resolve) => {
@@ -1248,7 +1252,7 @@ ${projectOptions}` : "当前没有可用项目。",
     setComposerOpen(true);
   };
 
-  if (composerOpen && composerAccount) return <EmailComposer account={composerAccount} accounts={accounts} contacts={emailContacts} initial={composerInitial} onSaved={() => undefined} onClose={() => { setComposerOpen(false); setComposerInitial(undefined); }} />;
+  if (composerOpen && composerAccount) return <EmailComposerSlot account={composerAccount} accounts={accounts} contacts={emailContacts} initial={composerInitial} onSaved={() => undefined} onClose={() => { setComposerOpen(false); setComposerInitial(undefined); }} />;
   return <main className="email-panel">
     <EmailHeader
       pendingPlans={pendingPlans}

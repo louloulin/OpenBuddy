@@ -134,7 +134,7 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     expect(entries("placeholder.my-files").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("ui-mcp → 7 个 placeholder.* slot", () => {
+  it("ui-mcp → 6 个 placeholder.* slot", () => {
     const panels = [
       "placeholder.discover",
       "placeholder.marketplace",
@@ -142,7 +142,6 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
       "placeholder.openbuddy-plugin",
       "placeholder.plugins",
       "placeholder.resource-catalog",
-      "placeholder.resources",
     ];
     for (const p of panels) {
       expect(entries(p).length, `slot ${p}`).toBeGreaterThanOrEqual(1);

@@ -60,7 +60,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 
 ### SlotCore 槽位总表
 
-**共 47 个槽位** — `ok=29` · `ext=18` · `dead=0` · `no-impl=0`
+**共 65 个槽位** — `ok=29` · `ext=36` · `dead=0` · `no-impl=0`
 
 | Slot | Kind | Scope | 状态 | 声明于 | 注册方 | 消费方 |
 |---|---|---|---|---|---|---|
@@ -84,7 +84,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 | `home.scene-tabs` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-settings | — | @openbuddy/ui-settings |
 | `home.scene.tab` | `list` | `root` | 🔌 ext-default | @openbuddy/ui-settings | — | @openbuddy/ui-settings |
 | `library.section` | `list` | `root` | ✅ ok | @openbuddy/ui-library | @openbuddy/ui-library | @openbuddy/ui-library |
-| `modules.marketplace` | `single` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-modules | — | @openbuddy/ui-experts |
+| `modules.marketplace` | `single` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-modules | — | — |
 | `modules.marketplace.item` | `list` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-modules | — | — |
 | `notifications` | `list` | `root` | 🔌 ext | @openbuddy/ui-primitives | @openbuddy/ui-primitives | — |
 | `onboarding.data-dir` | `single` | `session-maybe` | ✅ ok | @openbuddy/ui-onboarding | @openbuddy/ui-onboarding | app(src) |
@@ -98,8 +98,26 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 | `overlay.settings` | `single` | `root` | ✅ ok | @openbuddy/ui-settings | @openbuddy/ui-settings | app(src) |
 | `overlay.sign-in` | `single` | `root` | ✅ ok | @openbuddy/ui-dialogs | @openbuddy/ui-dialogs | app(src) |
 | `overlay.tasks` | `single` | `root` | ✅ ok | @openbuddy/ui-automation | @openbuddy/ui-automation | app(src) |
+| `placeholder.billing` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-billing | — | @openbuddy/ui-settings |
+| `placeholder.cloud-storage` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-files | — | app(src) |
+| `placeholder.credit-pricing` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-billing | — | @openbuddy/ui-settings |
+| `placeholder.credit-reconciliation` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-billing | — | @openbuddy/ui-settings |
+| `placeholder.credit-wallet` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-billing | — | @openbuddy/ui-settings |
+| `placeholder.discover` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-mcp | — | app(src) |
+| `placeholder.email` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-email | — | app(src) |
+| `placeholder.email-composer` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-email | — | @openbuddy/ui-email |
 | `placeholder.experts` | `single` | `root` | ✅ ok | @openbuddy/ui-experts | @openbuddy/ui-experts | @openbuddy/ui-experts |
+| `placeholder.knowledge-base` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-files | — | app(src) |
 | `placeholder.library` | `single` | `root` | ✅ ok | @openbuddy/ui-library | @openbuddy/ui-library | app(src) |
+| `placeholder.marketplace` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-mcp | — | @openbuddy/ui-experts |
+| `placeholder.my-files` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-files | — | app(src) |
+| `placeholder.notify-channels` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-mcp | — | app(src) |
+| `placeholder.openbuddy-plugin` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-mcp | — | @openbuddy/ui-settings |
+| `placeholder.plugins` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-mcp | — | @openbuddy/ui-settings |
+| `placeholder.projects` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-collaboration | — | app(src) |
+| `placeholder.resource-catalog` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-mcp | — | @openbuddy/ui-settings |
+| `placeholder.subagent` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-collaboration | — | @openbuddy/ui-conversation |
+| `placeholder.usage-quota` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-billing | — | app(src) |
 | `plugin.command` | `list` | `root` | ✅ ok | @openbuddy/ui-runtime | @openbuddy/ui-runtime | @openbuddy/ui-conversation, app(src) |
 | `root` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-layout | — | app(src) |
 | `settings.appearance.language` | `single` | `root` | ✅ ok | @openbuddy/ui-locale | @openbuddy/ui-settings | @openbuddy/ui-settings |
@@ -121,7 +139,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 
 **非 ok 槽位的判据**
 
-- 内置即默认:消费方自带 fallback,插件注册同名单例槽即整体替换 — `composer.toolbar.action`, `conversation.body`, `conversation.composer`, `conversation.message.markdown`, `conversation.toolside`, `editor.mention-sources`, `editor.slash-commands`, `editor.toolbar`, `experts.panel`, `home.practice-cases`, `home.scene-tabs`, `home.scene.tab`, `root`
+- 内置即默认:消费方自带 fallback,插件注册同名单例槽即整体替换 — `composer.toolbar.action`, `conversation.body`, `conversation.composer`, `conversation.message.markdown`, `conversation.toolside`, `editor.mention-sources`, `editor.slash-commands`, `editor.toolbar`, `experts.panel`, `home.practice-cases`, `home.scene-tabs`, `home.scene.tab`, `placeholder.billing`, `placeholder.cloud-storage`, `placeholder.credit-pricing`, `placeholder.credit-reconciliation`, `placeholder.credit-wallet`, `placeholder.discover`, `placeholder.email`, `placeholder.email-composer`, `placeholder.knowledge-base`, `placeholder.marketplace`, `placeholder.my-files`, `placeholder.notify-channels`, `placeholder.openbuddy-plugin`, `placeholder.plugins`, `placeholder.projects`, `placeholder.resource-catalog`, `placeholder.subagent`, `placeholder.usage-quota`, `root`
 - 已废弃:仅为兼容旧插件的类型引用保留,不要再接线 — `home.page`
 - 参考实现:声明包只导出组件,apply() 有意 no-op — `modules.marketplace`, `modules.marketplace.item`
 - 有意扩展点:留给本产品外壳之外的装配方(第三方外壳/插件可整块接管) — `notifications`, `shell.overlay`

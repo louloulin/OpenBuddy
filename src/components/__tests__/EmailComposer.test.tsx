@@ -4,7 +4,13 @@ import { EmailComposer } from "@openbuddy/ui-email";
 
 const account = { id: "a1", address: "me@example.com", provider: "mcp" as const, status: "connected" as const, capabilities: { read: true, write: true, attachments: true, multipleAccounts: true } };
 const mocks = vi.hoisted(() => ({ emailCreateDraft: vi.fn(), emailPrepareSend: vi.fn(), emailQueueSend: vi.fn(), emailCancelPendingSend: vi.fn(), emailPrepareScheduleSend: vi.fn(), emailScheduleSend: vi.fn() }));
-vi.mock("@/lib/agent/pi-client", () => mocks);
+vi.mock("@/lib/agent/pi-client", async (importOriginal) => {
+  // 用 importOriginal 透传未覆盖的导出,这样未来 import 链引入新模块时
+  // (比如 R92 把 AssistantWorkspacePanel 间接拉进 EmailPanel 的 import 图)
+  // 不会因为协作相关 export 缺失而炸红。test 只关心邮件写邮件行为。
+  const actual = await importOriginal<typeof import("@/lib/agent/pi-client")>();
+  return { ...actual, ...mocks };
+});
 vi.mock("@/lib/platform/electron-api", () => ({ open: vi.fn(async () => null) }));
 
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); mocks.emailCreateDraft.mockResolvedValue({ id: "d1", accountId: "a1", to: [{ address: "you@example.com" }], cc: [], bcc: [], subject: "Hello", body: "Body", attachments: [], status: "draft", createdAt: "now", updatedAt: "now" }); mocks.emailPrepareSend.mockResolvedValue("send:once"); mocks.emailQueueSend.mockResolvedValue({ id: "pending-1", draftId: "d1", accountId: "a1", sendAt: new Date(Date.now() + 5_000).toISOString(), fingerprint: "f", status: "pending", createdAt: "now" }); mocks.emailCancelPendingSend.mockResolvedValue(undefined); mocks.emailPrepareScheduleSend.mockResolvedValue("schedule:once"); mocks.emailScheduleSend.mockResolvedValue({ ok: true }); });

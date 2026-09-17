@@ -40,3 +40,39 @@ export {
 } from "./pi-extensions-model";
 export { PluginsPanel } from "./PluginsPanel";
 export { ResourceCatalogPanel } from "./ResourceCatalogPanel";
+
+
+declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * 发现面板(single)。
+     * 消费者:PlaceholderPage「发现」路由。
+     */
+    "placeholder.discover": { kind: "single"; scope: "root" };
+    /**
+     * 插件市场面板(single)。
+     * 消费者:ExpertsPanel 的「插件·市场」tab。
+     */
+    "placeholder.marketplace": { kind: "single"; scope: "root" };
+    /**
+     * 通知渠道面板(single)。
+     * 消费者:PlaceholderPage「通知渠道」路由。
+     */
+    "placeholder.notify-channels": { kind: "single"; scope: "root" };
+    /**
+     * OpenBuddy 自家插件管理面板(single)。
+     * 消费者:SettingsPanel「OpenBuddy 插件」路由。
+     */
+    "placeholder.openbuddy-plugin": { kind: "single"; scope: "root" };
+    /**
+     * Pi x.ai/plugins 兼容面板(single)。
+     * 消费者:SettingsPanel「Pi 插件」路由。
+     */
+    "placeholder.plugins": { kind: "single"; scope: "root" };
+    /**
+     * 资源目录面板(single)。
+     * 消费者:SettingsPanel「资源目录」路由。
+     */
+    "placeholder.resource-catalog": { kind: "single"; scope: "root" };
+  }
+}

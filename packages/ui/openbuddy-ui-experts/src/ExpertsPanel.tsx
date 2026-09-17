@@ -119,7 +119,9 @@ function PluginsTabContent({
   sessionId?: string;
   onToast?: (message: string) => void;
 }) {
-  const slotImpls = useSlotComponents("modules.marketplace");
+  // R92 — 切换到内核 `placeholder.marketplace` 槽,与 ui-mcp 在 client.tsx 里注册
+  // 的 `MarketplacePanel` 默认实现对齐;插件可以注册更高优先级整体替换这一页。
+  const slotImpls = useSlotComponents("placeholder.marketplace");
   const SlotImpl = slotImpls[0] as
     | ComponentType<{ sessionId?: string; onToast?: (m: string) => void }>
     | undefined;

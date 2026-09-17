@@ -44,6 +44,7 @@ import { QuestionInlineCard } from "./QuestionInlineCard";
 import { ToolSidePanel, type ToolSidePanelMode } from "./ToolSidePanel";
 import { FindBar, isFindHit } from "./FindBar";
 import { FileChangesPanel } from "./FileChangesPanel";
+import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { SubagentPanel } from "@openbuddy/ui-collaboration";
 import { TeamStatusView } from "@openbuddy/ui-workbench";
 import { ShareMenu } from "@openbuddy/ui-workbench";
@@ -386,6 +387,13 @@ export function ChatView({
   const [fileChangesOpen, setFileChangesOpen] = useState(false);
   // 子代理运行时面板(对齐 WorkBuddy team-runtime)。
   const [subagentsOpen, setSubagentsOpen] = useState(false);
+
+
+  // R92 — 子代理面板走 `placeholder.subagent` 槽,插件可整体替换。
+
+  const [SubagentPanelImpl] = useSlotComponents("placeholder.subagent");
+
+  const SubagentPanelResolved = (SubagentPanelImpl ?? SubagentPanel) as typeof SubagentPanel;
   const [teamsOpen, setTeamsOpen] = useState(false);
   // pause/yield(对齐 WorkBuddy session:requestYield):软暂停,保留会话上下文。
   const [yieldStore, setYieldStore] = useState<Record<string, ReturnType<typeof createYieldStore>>["k"]>(() => createYieldStore());
@@ -1238,7 +1246,7 @@ export function ChatView({
               <FileChangesPanel messages={messages} />
             )}
             {subagentsOpen && (
-              <SubagentPanel
+              <SubagentPanelResolved
                 messages={messages}
                 cwd={cwd}
                 onOpenSession={onOpenSession}

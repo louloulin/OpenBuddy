@@ -18,3 +18,24 @@
 export { CloudStoragePanel } from "./CloudStoragePanel";
 export { KnowledgeBasePanel } from "./KnowledgeBasePanel";
 export { MyFilesPanel } from "./MyFilesPanel";
+
+
+declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * 我的文件面板(single)。
+     * 消费者:PlaceholderPage「我的文件」路由。
+     */
+    "placeholder.my-files": { kind: "single"; scope: "root" };
+    /**
+     * 云存储面板(single)。
+     * 消费者:PlaceholderPage「云存储」路由。
+     */
+    "placeholder.cloud-storage": { kind: "single"; scope: "root" };
+    /**
+     * 知识库面板(single)。
+     * 消费者:PlaceholderPage「知识库」路由。
+     */
+    "placeholder.knowledge-base": { kind: "single"; scope: "root" };
+  }
+}
