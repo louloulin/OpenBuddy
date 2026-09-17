@@ -217,4 +217,20 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     }
     expect(total).toBeGreaterThanOrEqual(25);
   });
+
+  // R66 — files.tree slot 全链路:证明 ui-files-tree 在 builtin-applies
+  // 里 + registerAllBuiltinUis() 后能拿到 LazyFileTree 默认实现。
+  it("BUILTIN_UI_APPLIES 包含 @openbuddy/ui-files-tree", async () => {
+    // 直接从 builtin-applies 拿注册表,绕过 client 间接层,这样如果以后
+    // ui-files-tree 被误删,我们能在 CI 立刻看到失败。
+    const { BUILTIN_UI_APPLIES: applies } = await import("../builtin-applies");
+    const pkgs = applies.map((b) => b.pkg);
+    expect(pkgs).toContain("@openbuddy/ui-files-tree");
+  });
+
+  it("registerAllBuiltinUis() 注册后,files.tree slot 有 1 个 entry", () => {
+    // entries() 返回收敛后的组件(去重 + filter),LazyFileTree 是当前唯一注册方
+    expect(entries("files.tree").length).toBe(1);
+  });
 });
+
