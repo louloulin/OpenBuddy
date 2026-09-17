@@ -60,7 +60,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 
 ### SlotCore 槽位总表
 
-**共 42 个槽位** — `ok=24` · `ext=18` · `dead=0` · `no-impl=0`
+**共 43 个槽位** — `ok=25` · `ext=18` · `dead=0` · `no-impl=0`
 
 | Slot | Kind | Scope | 状态 | 声明于 | 注册方 | 消费方 |
 |---|---|---|---|---|---|---|
@@ -95,6 +95,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 | `overlay.folder-trust` | `single` | `root` | ✅ ok | @openbuddy/ui-dialogs | @openbuddy/ui-dialogs | app(src) |
 | `overlay.search` | `single` | `root` | ✅ ok | @openbuddy/ui-workbench | @openbuddy/ui-workbench | app(src) |
 | `overlay.settings` | `single` | `root` | ✅ ok | @openbuddy/ui-settings | @openbuddy/ui-settings | app(src) |
+| `overlay.sign-in` | `single` | `root` | ✅ ok | @openbuddy/ui-dialogs | @openbuddy/ui-dialogs | app(src) |
 | `overlay.tasks` | `single` | `root` | ✅ ok | @openbuddy/ui-automation | @openbuddy/ui-automation | app(src) |
 | `placeholder.experts` | `single` | `root` | ✅ ok | @openbuddy/ui-experts | @openbuddy/ui-experts | @openbuddy/ui-experts |
 | `placeholder.library` | `single` | `root` | ✅ ok | @openbuddy/ui-library | @openbuddy/ui-library | app(src) |

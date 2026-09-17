@@ -82,8 +82,27 @@ describe("微内核装配 — 25 个内置包", () => {
     expect(core.entries("root")).toHaveLength(0);
   });
 
-  it("多包共用的 shell.overlay 聚合了 5 个 overlay", () => {
-    expect(getRuntime().slots.entries("shell.overlay")).toHaveLength(5);
+  it("多包共用的 shell.overlay 聚合了各包投来的 overlay(list 追加语义)", () => {
+    // R62 —— 以前这里断言的是一个魔法数字 5。R48 给左下角身份条接上「登录」
+    // 之后,ui-dialogs 多注册了一个 id=sign-in 的 overlay,数字变成 6,测试
+    // 就开始红了 —— 但**装配本身没有任何问题**。断言"具体是哪些 id"比断言
+    // "有几个"更贴近这条用例真正想守的性质:多个包能往同一个 list 槽投东西,
+    // 且各自的 id 不互相覆盖。
+    // 注意用 entriesOfSlot(带 options 的原始 entry),不是 entries()
+    // —— 后者按设计只吐渲染用的组件,取不到 id。
+    const ids = getRuntime()
+      .slots.entriesOfSlot("shell.overlay")
+      .map((entry) => entry.options?.id)
+      .filter((id): id is string => typeof id === "string")
+      .sort();
+    expect(ids).toEqual([
+      "about",
+      "folder-trust",
+      "search",
+      "settings",
+      "sign-in",
+      "tasks",
+    ]);
   });
 
   it("装配幂等 — 重复 registerAllBuiltinUis 不会翻倍(single)或堆积(list id)", () => {
