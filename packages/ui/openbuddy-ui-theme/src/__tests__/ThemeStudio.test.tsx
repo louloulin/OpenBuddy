@@ -7,6 +7,7 @@ import {
   readCustomThemes,
   writeCustomThemes,
   applyCustomVars,
+  parseCustomThemeJson,
   type CustomTheme,
 } from "../components/ThemeStudio";
 import { resolveVars } from "../themes";
@@ -284,5 +285,160 @@ describe("R46 — ThemeStudio preview 还原 + save 保留", () => {
       document.documentElement.style as unknown as ArrayLike<string>,
     ).some((k) => (k as string).startsWith("--wb-"));
     expect(leftoverWb).toBe(false);
+  });
+});
+
+describe("R54 — ThemeStudio JSON 导入", () => {
+  it("parseCustomThemeJson:合法 dark 主题解析成功", () => {
+    const json = JSON.stringify({
+      name: "test-dark",
+      label: "Test Dark",
+      type: "dark",
+      accent: "#00c29a",
+      vars: {
+        "--wb-bg-primary": "oklch(0.18 0.02 250)",
+        "--wb-bg-secondary": "oklch(0.22 0.02 250)",
+        "--wb-fg-primary": "oklch(0.95 0.01 250)",
+        "--wb-accent": "oklch(0.72 0.14 171)",
+      },
+    });
+    const r = parseCustomThemeJson(json);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.theme.name).toBe("test-dark");
+    expect(r.theme.label).toBe("Test Dark");
+    expect(r.theme.type).toBe("dark");
+    expect(r.theme.accent).toBe("#00c29a");
+    expect(Object.keys(r.theme.vars)).toHaveLength(4);
+  });
+
+  it("parseCustomThemeJson:label 缺省时用 name 兜底", () => {
+    const r = parseCustomThemeJson(JSON.stringify({
+      name: "x", type: "light", accent: "#000", vars: { "--wb-bg-primary": "oklch(0.9 0 0)" },
+    }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.theme.label).toBe("x");
+  });
+
+  it("parseCustomThemeJson:JSON 非法时返回 ok:false + error 文本", () => {
+    const r = parseCustomThemeJson("{ not json");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("JSON 解析失败");
+  });
+
+  it("parseCustomThemeJson:缺字段时明确指出哪些字段缺", () => {
+    const r = parseCustomThemeJson(JSON.stringify({ name: "x" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain("缺字段");
+      expect(r.error).toContain("type");
+      expect(r.error).toContain("accent");
+      expect(r.error).toContain("vars");
+    }
+  });
+
+  it("parseCustomThemeJson:type 不在 dark/light 时拒收", () => {
+    const r = parseCustomThemeJson(JSON.stringify({
+      name: "x", type: "neon", accent: "#000", vars: {},
+    }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("type");
+  });
+
+  it("parseCustomThemeJson:vars 不是对象时拒收", () => {
+    const r = parseCustomThemeJson(JSON.stringify({
+      name: "x", type: "light", accent: "#000", vars: "oops",
+    }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("vars");
+  });
+
+  it("parseCustomThemeJson:vars 单值不是字符串时拒收", () => {
+    const r = parseCustomThemeJson(JSON.stringify({
+      name: "x", type: "light", accent: "#000", vars: { "--wb-bg-primary": 0.5 },
+    }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("--wb-bg-primary");
+  });
+
+  it("parseCustomThemeJson:可选 font / headingFont 透传", () => {
+    const r = parseCustomThemeJson(JSON.stringify({
+      name: "x", type: "light", accent: "#000",
+      vars: { "--wb-bg-primary": "oklch(0.9 0 0)" },
+      font: "Inter", headingFont: "Playfair Display",
+    }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.theme.font).toBe("Inter");
+      expect(r.theme.headingFont).toBe("Playfair Display");
+    }
+  });
+
+  it("Studio 渲染「导入 JSON」按钮 + file input + 错误提示位", () => {
+    render(<ThemeStudio initialVars={resolveVars("openbuddy")} />);
+    expect(screen.getByTestId("theme-studio-import")).toBeDefined();
+    const input = screen.getByTestId("theme-studio-file-input") as HTMLInputElement;
+    expect(input).toBeDefined();
+    expect(input.type).toBe("file");
+    expect(input.accept).toContain(".json");
+    // 没导入过 → 错误提示不渲染
+    expect(screen.queryByTestId("theme-studio-import-error")).toBeNull();
+  });
+
+  it("空文件时静默 return,不渲染错误条;按钮 + file input 链路通", () => {
+    // jsdom 没有 DataTransfer,且 input.files 不能被 React 接受 FileList 替代物,
+    // 所以「真的选了一个坏文件」这条路径留给真机探针(_probe-r54-theme-import)
+    // 覆盖。单元测试只验证空文件 → 静默 return + 按钮 → input 链路。
+    render(<ThemeStudio initialVars={resolveVars("openbuddy")} />);
+    const input = screen.getByTestId("theme-studio-file-input") as HTMLInputElement;
+    const btn = screen.getByTestId("theme-studio-import");
+    expect(btn).toBeDefined();
+    expect(input.type).toBe("file");
+    // 没有文件 → 静默 return,不渲染错误条
+    Object.defineProperty(input, "files", { value: null, configurable: true });
+    act(() => {
+      fireEvent.change(input);
+    });
+    expect(screen.queryByTestId("theme-studio-import-error")).toBeNull();
+  });
+
+  it("合法 JSON 文件导入后:label / type / draft 全部按导入值更新,无需保存即预览", async () => {
+    render(<ThemeStudio initialVars={resolveVars("claude")} />);
+    const input = screen.getByTestId("theme-studio-file-input") as HTMLInputElement;
+    const theme = {
+      name: "imported",
+      label: "Imported Theme",
+      type: "light",
+      accent: "#ff0000",
+      vars: {
+        "--wb-bg-primary": "oklch(0.95 0.01 0)",
+        "--wb-bg-secondary": "oklch(0.90 0.01 0)",
+        "--wb-fg-primary": "oklch(0.10 0.01 0)",
+        "--wb-accent": "oklch(0.70 0.20 30)",
+        "--wb-border": "oklch(0.80 0.01 0)",
+      },
+    };
+    const file = new File([JSON.stringify(theme)], "imported.json", {
+      type: "application/json",
+    });
+    Object.defineProperty(input, "files", {
+      value: [file], writable: false, configurable: true,
+    });
+    await act(async () => {
+      fireEvent.change(input);
+      // 让 file.text() 的 Promise 解析完
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // 名称 / 类型 都按导入值更新
+    const nameInput = screen.getByDisplayValue("Imported Theme") as HTMLInputElement;
+    expect(nameInput).toBeDefined();
+    const select = screen.getByRole("combobox") as HTMLSelectElement;
+    expect(select.value).toBe("light");
+    // 合法导入后,错误条不渲染
+    expect(screen.queryByTestId("theme-studio-import-error")).toBeNull();
+    // 滑块按导入值:第一个 token --wb-bg-primary L 应是 0.95
+    const firstSlider = screen.getAllByRole("slider")[0] as HTMLInputElement;
+    expect(parseFloat(firstSlider.value)).toBeCloseTo(0.95, 2);
   });
 });

@@ -14,7 +14,7 @@
  * Deliberately dependency-free: no color-picker library, no OKLCh parser
  * beyond a small regex. Everything is a number input plus a range slider.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useTheme } from "../client";
 import styles from "./ThemeStudio.module.css";
 
@@ -52,6 +52,74 @@ export function parseOklch(value: string | undefined): OkLChValue | null {
 
 export function formatOklch(v: OkLChValue): string {
   return `oklch(${v.l.toFixed(3)} ${v.c.toFixed(3)} ${v.h.toFixed(1)})`;
+}
+
+/** R54 — ThemeStudio 导入端的纯函数。
+ *
+ * 把一段 JSON 文本解析成 `CustomTheme`,并在结构不合法时返回带 message
+ * 的错误对象(而不是抛异常):Studio 是个 inline 表单,UI 层要在按钮下方
+ * 直接显示提示语,异常抛出绕不开 ErrorBoundary 又会弄坏 Studio 状态机。
+ *
+ * 校验:
+ *   - JSON.parse 失败 → { error: "JSON 解析失败:..." }
+ *   - 顶层缺 name / type / accent / vars → { error: "缺字段:..." }
+ *   - type 不是 "dark" / "light" → { error: "type 必须..." }
+ *   - vars 不是对象 / 任一值不是 string → { error: "vars 必须是..." }
+ *   - label 缺失时用 name 兜底;vars 里 oklch(...) 之外的字符串保留原文
+ *     (Studio 不强求所有 var 都可解 oklch,导入后只解出能解的 token,
+ *      其它的作为 unknown 值不进 draft —— 用户在编辑器里也不会动它们)。
+ */
+export type ParseCustomThemeResult =
+  | { ok: true; theme: CustomTheme }
+  | { ok: false; error: string };
+
+export function parseCustomThemeJson(text: string): ParseCustomThemeResult {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (err) {
+    return { ok: false, error: `JSON 解析失败：${err instanceof Error ? err.message : String(err)}` };
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ok: false, error: "主题 JSON 顶层必须是对象" };
+  }
+  const obj = raw as Record<string, unknown>;
+  const missing: string[] = [];
+  for (const k of ["name", "type", "accent", "vars"]) {
+    if (!(k in obj)) missing.push(k);
+  }
+  if (missing.length) {
+    return { ok: false, error: `主题 JSON 缺字段：${missing.join(", ")}` };
+  }
+  if (obj.type !== "dark" && obj.type !== "light") {
+    return { ok: false, error: `type 必须是 "dark" 或 "light"，当前是 ${JSON.stringify(obj.type)}` };
+  }
+  if (typeof obj.accent !== "string") {
+    return { ok: false, error: "accent 必须是字符串" };
+  }
+  if (!obj.vars || typeof obj.vars !== "object" || Array.isArray(obj.vars)) {
+    return { ok: false, error: "vars 必须是对象（key=token 名,value=oklch 字符串）" };
+  }
+  const vars: Record<string, string> = {};
+  for (const [k, v] of Object.entries(obj.vars as Record<string, unknown>)) {
+    if (typeof v !== "string") {
+      return { ok: false, error: `vars["${k}"] 必须是字符串` };
+    }
+    vars[k] = v;
+  }
+  if (typeof obj.name !== "string" || !obj.name.trim()) {
+    return { ok: false, error: "name 必须是非空字符串" };
+  }
+  const theme: CustomTheme = {
+    name: obj.name,
+    label: typeof obj.label === "string" && obj.label.trim() ? obj.label : obj.name,
+    type: obj.type,
+    accent: obj.accent,
+    vars,
+  };
+  if (typeof obj.font === "string") theme.font = obj.font;
+  if (typeof obj.headingFont === "string") theme.headingFont = obj.headingFont;
+  return { ok: true, theme };
 }
 
 /** Token groups exposed in the editor. */
@@ -275,13 +343,83 @@ export function ThemeStudio({
     void navigator.clipboard?.writeText(json).catch(() => {});
   }, [theme]);
 
+  // R54 — 导入 JSON 文件。读 → 解析 → 应用为 draft。
+  // 不直接写入 customThemes / 不直接 applyCustomTheme:用户应该看到
+  // 导入后的 slider 状态后再点「保存」落地,这样:
+  //   - 「保存」路径(写 localStorage + apply + dispatch 事件)只走一处
+  //   - 用户导入一份随便改改不保存就关掉,unmount 时走 syncDocument 还原
+  // 导入错误时用 setImportError 显式展示在 Studio 头部下方,而不是
+  // alert() / ErrorBoundary。
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const handleImportClick = useCallback(() => {
+    setImportError(null);
+    fileInputRef.current?.click();
+  }, []);
+  const handleImportFile = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      // 重置 input.value,这样下次选同一个文件也能再次触发 onChange。
+      event.target.value = "";
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = parseCustomThemeJson(text);
+        if (!parsed.ok) {
+          setImportError(parsed.error);
+          return;
+        }
+        // 应用为 draft。label / type 用导入的值;vars 里只有 Studio 暴露的
+        // token 会进 draft(同 reset 路径),其它保持 originalRef 不动。
+        const next: Record<string, OkLChValue> = {};
+        for (const group of TOKEN_GROUPS) {
+          for (const token of group.tokens) {
+            const parsed2 = parseOklch(parsed.theme.vars[token]);
+            if (parsed2) next[token] = parsed2;
+          }
+        }
+        setLabel(parsed.theme.label);
+        setType(parsed.theme.type);
+        setDraft(next);
+        hasEditedRef.current = true;
+        // 立即预览(否则 useEffect([draft]) 要等下一帧才落 vars)。
+        const preview: Record<string, string> = {};
+        for (const [token, v] of Object.entries(next)) preview[token] = formatOklch(v);
+        applyCustomVars(preview);
+        setImportError(null);
+      } catch (err) {
+        setImportError(`读取文件失败：${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [],
+  );
+
   return (
     <div className={styles.root} data-testid="theme-studio">
       <div className={styles.header}>
         <span className={styles.title}>Theme Studio</span>
         <div className={styles.headerRight}>
+          {/* R54 — 隐藏的 file input,只通过「导入 JSON」按钮触发。 */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className={styles.fileInput}
+            onChange={handleImportFile}
+            data-testid="theme-studio-file-input"
+            aria-hidden="true"
+            tabIndex={-1}
+          />
           <button type="button" className={styles.btnGhost} onClick={reset}>
             还原
+          </button>
+          <button
+            type="button"
+            className={styles.btnGhost}
+            onClick={handleImportClick}
+            data-testid="theme-studio-import"
+          >
+            导入 JSON
           </button>
           <button type="button" className={styles.btnGhost} onClick={handleExport}>
             导出 JSON
@@ -296,6 +434,15 @@ export function ThemeStudio({
           ) : null}
         </div>
       </div>
+      {importError ? (
+        <div
+          className={styles.importError}
+          role="alert"
+          data-testid="theme-studio-import-error"
+        >
+          {importError}
+        </div>
+      ) : null}
 
       <div className={styles.metaRow}>
         <label className={styles.metaField}>
