@@ -82,8 +82,6 @@ interface PlaceholderPageProps {
   onStartProject?: (project: ProjectMeta) => void;
   /** 项目页：在项目中新建对话（创建真实 pi 会话）。 */
   onStartProjectConversation?: (projectId: string, message: string) => void;
-  /** R42 — WorkBuddy v5.4.7 左侧「任务」栏点击会话的回调。 */
-  onSelectSession?: (sessionId: string, cwd?: string) => void;
 }
 
 /** WorkBuddy 独有功能面板（助理/专家·技能·连接器/项目/自动化/资料库/插件·市场/发现）。 */
@@ -123,7 +121,6 @@ function PlaceholderPageInner({
   onModelChange,
   onStartProject,
   onStartProjectConversation,
-  onSelectSession,
 }: PlaceholderPageProps) {
   const assistantSection = assistantWorkspaceSectionFromRoute(label);
   const assistantExtension = useRendererContributions("assistant").find((contribution) => contribution.payload.route === label);
@@ -257,7 +254,6 @@ function PlaceholderPageInner({
         onGoHome={onGoHome}
         onToast={onToast}
         sessionId={sessionId}
-        onSelectSession={onSelectSession}
       />
     );
   }

@@ -31,10 +31,6 @@ interface Props {
   /** Navigate back to the home page (after summoning an expert). */
   onGoHome?: () => void;
   onToast?: (message: string) => void;
-  /** R91 — 已废弃。此前这里把点击转发给 WorkBuddy 风格的左侧「任务」栏;
-   *  该栏已移除(专家页不再承载任务列表),所以这个回调不再被消费。
-   *  保留字段是为了不破坏 `ExpertsPanel` → shell 的既有 props 契约。 */
-  onSelectSession?: (sessionId: string, cwd?: string) => void;
 }
 
 export function ExpertsTab({ pills, onGoHome, onToast }: Props) {

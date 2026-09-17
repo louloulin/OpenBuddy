@@ -391,7 +391,6 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
           onModelChange={handleModelChange}
           onStartProject={handleStartProject}
           onStartProjectConversation={handleStartProjectConversation}
-          onSelectSession={handleSelectSession}
         />
       </ErrorBoundary>
     );
