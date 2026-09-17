@@ -19,6 +19,31 @@ import {
 } from "./validation";
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
 
+/**
+ * Provider kinds whose wire protocol is Anthropic-Messages
+ * (`POST {baseUrl}/v1/messages`, `x-api-key` + `anthropic-version`).
+ *
+ * These upstreams do NOT expose an OpenAI-style `GET /models` catalog —
+ * `https://api.minimaxi.com/anthropic/models` answers 404 even with a valid
+ * key — so both `providers-fetch-models` and `providers-test` must take the
+ * messages-shaped branch for them.
+ *
+ * `minimax` belongs here: it is pi-ai's built-in MiniMax provider, hard-wired
+ * to `anthropic-messages` against `https://api.minimaxi.com/anthropic`
+ * (see the `minimax` preset in openbuddy-ui-settings). Omitting it made the
+ * Settings "Test connection" button report `404 → degraded` for a perfectly
+ * healthy key, while the same key answered 200 on the chat endpoint.
+ *
+ * `minimax_openai` is deliberately absent — it is the Chat-Completions
+ * variant and keeps the `/models` probe.
+ */
+const ANTHROPIC_MESSAGES_KINDS = new Set([
+  "anthropic",
+  "custom_anthropic",
+  "minimax",
+  "minimax_cn",
+]);
+
 export function registerProvidersIpc(deps: AgentHostIpcDeps): void {
   const { agentHost } = deps;
 
@@ -68,7 +93,7 @@ export function registerProvidersIpc(deps: AgentHostIpcDeps): void {
     const baseUrl = httpUrl(input.baseUrl, "baseUrl");
     const apiKey = requiredString(input.apiKey, "apiKey");
     const providerKind = optionalString(input.providerKind, "providerKind");
-    const isAnthropic = providerKind === "anthropic" || providerKind === "custom_anthropic" || providerKind === "minimax_cn";
+    const isAnthropic = providerKind !== undefined && ANTHROPIC_MESSAGES_KINDS.has(providerKind);
     const headers: Record<string, string> = isAnthropic
       ? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }
       : { Authorization: `Bearer ${apiKey}` };
@@ -115,7 +140,7 @@ export function registerProvidersIpc(deps: AgentHostIpcDeps): void {
     const baseUrl = httpUrl(input.baseUrl, "baseUrl");
     const apiKey = optionalString(input.apiKey, "apiKey") ?? "";
     const providerKind = optionalString(input.providerKind, "providerKind");
-    const isAnthropic = providerKind === "anthropic" || providerKind === "custom_anthropic" || providerKind === "minimax_cn";
+    const isAnthropic = providerKind !== undefined && ANTHROPIC_MESSAGES_KINDS.has(providerKind);
     const headers: Record<string, string> = isAnthropic
       ? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }
       : { Authorization: apiKey ? `Bearer ${apiKey}` : "Bearer " };

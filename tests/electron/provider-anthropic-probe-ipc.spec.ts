@@ -200,4 +200,52 @@ test.describe("agent:providers-test — Anthropic-Messages probe branch", () => 
     expect(Array.isArray(result)).toBe(true);
     expect((result as unknown[]).length).toBe(0);
   });
+
+  // R81 regression — the built-in `minimax` provider kind must take the
+  // Anthropic-Messages branch. It was missing from the predicate, so the
+  // Settings "Test connection" button reported `404 → degraded` for a key
+  // that the chat endpoint accepts with 200 (api.minimaxi.com/anthropic
+  // has no GET /models). These two tests pin both IPC handlers.
+  test("AC-4.2.5: providerKind='minimax' probes POST /v1/messages (not GET /models)", async ({ page }) => {
+    await page.waitForFunction(() => Boolean((window as unknown as { api?: { invoke?: unknown } }).api?.invoke));
+    nextStatus = 200;
+    const snapshot = await page.evaluate(
+      async ({ baseUrl }: { baseUrl: string }) => {
+        const w = window as unknown as { api: { invoke: (ch: string, args?: unknown) => Promise<unknown> } };
+        return await w.api.invoke("agent:providers-test", {
+          baseUrl,
+          apiKey: "test-key",
+          providerKind: "minimax",
+        });
+      },
+      { baseUrl: mockBaseUrl },
+    );
+    expect(snapshot).toMatchObject({ status: "healthy", httpStatus: 200, probe: "messages" });
+    expect(seenMethod).toBe("POST");
+    expect(seenPath).toBe("/v1/messages");
+    expect(seenAuthHeader).toBe("test-key");
+  });
+
+  test("AC-4.2.6: fetch-models with providerKind='minimax' returns [] instead of hitting GET /models", async ({ page }) => {
+    await page.waitForFunction(() => Boolean((window as unknown as { api?: { invoke?: unknown } }).api?.invoke));
+    // The mock answers 404 for the count_tokens fallback — the same shape the
+    // real api.minimaxi.com/anthropic returns. The point of the assertion is
+    // that we never issued a GET /models (which would also 404, but for the
+    // wrong reason and with a confusing error surface).
+    nextStatus = 404;
+    const result = await page.evaluate(
+      async ({ baseUrl }: { baseUrl: string }) => {
+        const w = window as unknown as { api: { invoke: (ch: string, args?: unknown) => Promise<unknown> } };
+        return await w.api.invoke("agent:providers-fetch-models", {
+          baseUrl,
+          apiKey: "test-key",
+          providerKind: "minimax",
+        });
+      },
+      { baseUrl: mockBaseUrl },
+    );
+    expect(Array.isArray(result)).toBe(true);
+    expect(seenMethod).toBe("POST");
+    expect(seenPath).not.toBe("/models");
+  });
 });
