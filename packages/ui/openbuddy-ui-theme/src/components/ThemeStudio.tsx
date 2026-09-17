@@ -15,6 +15,7 @@
  * beyond a small regex. Everything is a number input plus a range slider.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "../client";
 import styles from "./ThemeStudio.module.css";
 
 export interface OkLChValue {
@@ -140,6 +141,17 @@ export function ThemeStudio({
 }: ThemeStudioProps) {
   const [label, setLabel] = useState(initialLabel);
   const [type, setType] = useState<"dark" | "light">("dark");
+  // R46 — 区分「预览调色」与「保存后的自定义主题」。savedRef 在 handleSave
+  // 成功后置 true,unmount 时据此决定是还原到原主题还是保留 custom vars。
+  // 没有这个标志的话,用户调了几个滑块不满意 → 关掉 Studio → 整个 UI
+  // 还停留在最后一次 draft 状态,看起来「主题被改了但 picker 没高亮任何项」。
+  const savedRef = useRef(false);
+  // R46 — 跟踪用户是否真的编辑过 draft。mount 时 draft === initialVars,
+  // 没必要立刻 applyCustomVars(那会把 data-theme-name="custom" 写到
+  // documentElement,污染 active theme 的标记)。只有用户动过滑块后才进入
+  // 预览模式。
+  const hasEditedRef = useRef(false);
+  const themeService = useTheme();
   const [draft, setDraft] = useState<Record<string, OkLChValue>>(() => {
     const out: Record<string, OkLChValue> = {};
     for (const group of TOKEN_GROUPS) {
@@ -155,21 +167,40 @@ export function ThemeStudio({
 
   // Live preview whenever the draft changes.
   useEffect(() => {
+    if (!hasEditedRef.current) return;
     const vars: Record<string, string> = {};
     for (const [token, v] of Object.entries(draft)) vars[token] = formatOklch(v);
     applyCustomVars(vars);
-  }, [draft]);
+  }, [draft, themeService]);
 
-  // Restore the original vars on unmount (unless a save committed them).
+  // R46 — 区分保存 vs 仅预览的还原逻辑:
+  //   - 仅预览(用户调了滑块没点保存就关掉):service.syncDocument() 把
+  //     documentElement 还原到 active theme 的真实 vars(覆盖 preview 写的
+     //     inline 值)。
+  //   - 已保存:savedRef 为 true,unmount 时什么都不做 —— 用户已经主动
+  //     选了这个主题,store 的 lastAppliedType + ACTIVE_CUSTOM_KEY 都已
+  //     落地,documentElement 上的 vars 是「想要的状态」。
+  // 之前 unmount 只 removeAttribute("data-theme-name"),inline vars 残留
+  //  → 用户关掉 Studio 后整个 UI 还停留在最后一次 draft 状态,但 ThemePicker
+  //     里没有任何 custom card 高亮(因为 ACTIVE_CUSTOM_KEY 没写),看起来
+  //     「主题被改坏了」。
   useEffect(() => {
     return () => {
-      // The picker / store will re-apply the real theme on its next notify;
-      // here we just remove our preview marker.
-      document.documentElement.removeAttribute("data-theme-name");
+      if (savedRef.current) return;
+      // 还原:active theme 的 vars 重新落一次。store 自己的 lastAppliedType
+      // 没被 preview 写过,所以 syncDocument 走的是「自写」路径,不会触发
+      // compatObserver 回写。
+      try {
+        themeService.syncDocument();
+      } catch {
+        /* 某些嵌入式 host 没有完整 service,fallback 到裸 removeAttribute */
+        document.documentElement.removeAttribute("data-theme-name");
+      }
     };
-  }, []);
+  }, [themeService]);
 
   const updateToken = useCallback((token: string, next: OkLChValue) => {
+    hasEditedRef.current = true;
     setDraft((prev) => ({ ...prev, [token]: next }));
   }, []);
 
@@ -182,7 +213,19 @@ export function ThemeStudio({
       }
     }
     setDraft(out);
-  }, []);
+    // R46 — 「还原」后 draft 与 initial 一致,标记成「未编辑」。这让
+    // 接下来的 useEffect([draft]) 直接 return,不重新写 applyCustomVars,
+    // syncDocument 的清空才能真正生效。
+    hasEditedRef.current = false;
+    // R46 — 「还原」不只重置滑块值,还要把 documentElement 上的 preview
+    // vars 恢复到 active theme 真实值(否则滑块复位了,UI 还停留在用户
+    // 之前调过的 draft 颜色上)。
+    try {
+      themeService.syncDocument();
+    } catch {
+      /* host 没有完整 service 时忽略,UI 看上去仍跟 draft 一致 */
+    }
+  }, [themeService]);
 
   const theme = useMemo<CustomTheme>(() => {
     const vars: Record<string, string> = {};
@@ -205,13 +248,27 @@ export function ThemeStudio({
     } catch {
       /* ignore */
     }
+    // R46 — 保存即应用:走 service.applyCustomTheme 把 vars 写到
+    // documentElement 并设 ACTIVE_CUSTOM_KEY + data-theme-name,跟 picker
+    // 点击 custom 主题走同一条(避免 compatObserver 回写覆盖)。同时把
+    // hasEditedRef 置 true,让后面的 unmount cleanup 知道当前 doc 上
+    // 的 vars 是「想要的状态」。
+    hasEditedRef.current = true;
+    try {
+      themeService.applyCustomTheme(theme);
+    } catch {
+      /* host 没完整 service 时跳过,只持久化 */
+    }
+    // R46 — 标记本次 Studio 会话已保存。unmount 时不再调用 syncDocument()
+    // 还原(用户主动选了这个主题,documentElement 上的 vars 是想要的)。
+    savedRef.current = true;
     // R44 — 通知同 tab 内的 ThemePicker 实例刷新(custom 主题列表 +
     // active 高亮都依赖这条事件;否则用户保存后还要关掉再开 picker)。
     window.dispatchEvent(
       new CustomEvent("openbuddy:custom-themes-updated"),
     );
     onSave?.(theme);
-  }, [theme, onSave]);
+  }, [theme, onSave, themeService]);
 
   const handleExport = useCallback(() => {
     const json = JSON.stringify(theme, null, 2);
