@@ -100,6 +100,17 @@ describe("pinPiAgentDirEnv", () => {
     pinPiAgentDirEnv();
     expect(process.env.PI_CODING_AGENT_DIR).toBe(agentHome());
   });
+
+  it("无任何环境变量时(生产默认路径)钉成 ~/.openbuddy/agent", () => {
+    // 这一条对应真实安装:用户没设过任何变量。此前 SDK 会解析到
+    // ~/.pi/agent —— 另一个产品的目录。
+    expect(pinPiAgentDirEnv()).toBe(true);
+    const pinned = process.env.PI_CODING_AGENT_DIR!;
+    expect(pinned.endsWith("/.openbuddy/agent")).toBe(true);
+    expect(pinned).not.toMatch(/[\\/]\.pi([\\/]|$)/);
+    // agents 子目录落在 OpenBuddy 自己的根下 —— 这正是用户要求的位置。
+    expect(agentPath("agents")).toBe(`${pinned}/agents`);
+  });
 });
 
 describe("与真实 pi-coding-agent SDK 的一致性", () => {
