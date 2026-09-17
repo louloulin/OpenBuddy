@@ -141,6 +141,24 @@ export function ThemePicker({
   });
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  // R61 — theme search. With 19+ themes (plus user-created custom ones)
+  // a plain grid is hard to scan. A case-insensitive search input that
+  // matches label / name narrows the list without leaving the popover.
+  const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  // Focus the search input when the popover opens so users can start
+  // typing immediately.
+  useEffect(() => {
+    if (open && searchRef.current) {
+      // Small delay so the portal has mounted.
+      const id = window.setTimeout(() => searchRef.current?.focus(), 0);
+      return () => window.clearTimeout(id);
+    }
+  }, [open]);
+  // Reset search when the popover closes so the next open shows all.
+  useEffect(() => {
+    if (!open) setSearch("");
+  }, [open]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -245,13 +263,36 @@ export function ThemePicker({
       }) as ThemeDefinition,
     [],
   );
+  // R61 — case-insensitive search across label + name. When search is
+  // empty we show everything (fast path); otherwise filter each group.
+  // Custom themes are searched too, so a user with 10 saved themes can
+  // still find "my-dark-blue" by typing "blue".
+  const normalizedSearch = search.trim().toLowerCase();
+  const matchesSearch = useCallback(
+    (t: ThemeDefinition) => {
+      if (!normalizedSearch) return true;
+      return (
+        t.label.toLowerCase().includes(normalizedSearch) ||
+        t.name.toLowerCase().includes(normalizedSearch)
+      );
+    },
+    [normalizedSearch],
+  );
   const darkAll = useMemo(
-    () => [...themesByType("dark"), ...customThemes.filter((t) => t.type === "dark").map(customAsDef)],
-    [customThemes, customAsDef],
+    () =>
+      [
+        ...themesByType("dark"),
+        ...customThemes.filter((t) => t.type === "dark").map(customAsDef),
+      ].filter(matchesSearch),
+    [customThemes, customAsDef, matchesSearch],
   );
   const lightAll = useMemo(
-    () => [...themesByType("light"), ...customThemes.filter((t) => t.type === "light").map(customAsDef)],
-    [customThemes, customAsDef],
+    () =>
+      [
+        ...themesByType("light"),
+        ...customThemes.filter((t) => t.type === "light").map(customAsDef),
+      ].filter(matchesSearch),
+    [customThemes, customAsDef, matchesSearch],
   );
 
   // R44 — `usingCustom` 同时覆盖「内置主题里非默认项」与「用户在 Studio
@@ -276,6 +317,47 @@ export function ThemePicker({
           role="menu"
           style={{ top: pos.top, right: pos.right }}
         >
+          {/* R61 — search input. Hidden on very narrow popovers via CSS. */}
+          <div className={styles.searchRow}>
+            <svg
+              className={styles.searchIcon}
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+            <input
+              ref={searchRef}
+              className={styles.searchInput}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索主题…"
+              aria-label="搜索主题"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              data-testid="theme-search"
+            />
+            {search && (
+              <button
+                type="button"
+                className={styles.searchClear}
+                onClick={() => setSearch("")}
+                aria-label="清除搜索"
+              >
+                ×
+              </button>
+            )}
+          </div>
           <div className={styles.modeRow}>
             <span className={styles.modeLabel}>Match system</span>
             <button
