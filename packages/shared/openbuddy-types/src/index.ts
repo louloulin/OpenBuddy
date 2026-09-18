@@ -925,6 +925,15 @@ export interface ExpertItem {
   agentName?: string;
   /** Quick prompts ("试试这样问我") from the manifest. */
   quickPrompts?: string[];
+  /**
+   * Canonical npm-style slug of the matching package on the pi.dev marketplace
+   * (e.g. "@scope/expert-name"). When set, the expert card surfaces a small
+   * "在 pi.dev 查看" link that opens https://pi.dev/packages/<slug> in the
+   * system browser. Optional — starters and WorkBuddy-imported experts do not
+   * carry this, so leaving it absent keeps the UI quiet for the majority of
+   * items.
+   */
+  piDevSlug?: string;
 }
 
 /** Catalog payload returned by `experts_load`. */

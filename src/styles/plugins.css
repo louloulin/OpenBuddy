@@ -89,6 +89,18 @@
   color: var(--wb-button-primary-fg);
 }
 
+/* pi.dev marketplace link (R97 — Expert Marketplace Bridge) */
+.ec-card-pidev {
+  display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+  padding: 0; border: none; background: transparent; cursor: pointer;
+  font-size: 11px; line-height: 1.4; color: var(--wb-text-weak);
+  text-decoration: none; outline: none;
+  transition: color .15s, opacity .15s;
+}
+.ec-card-pidev:hover { color: var(--wb-brand); }
+.ec-card-pidev:focus-visible { color: var(--wb-brand); text-decoration: underline; }
+.ec-card-pidev svg { flex: 0 0 auto; }
+
 /* 我的专家 */
 .ec-my-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px; padding-top: 12px; }
 .ec-my-card { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px; background: var(--wb-bg-primary); border: 1px solid var(--wb-border-default); }

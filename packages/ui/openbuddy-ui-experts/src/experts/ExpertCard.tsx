@@ -1,5 +1,26 @@
 import type { ExpertItem } from "@openbuddy/shared-types";
+import { OpenExternalIcon } from "@openbuddy/ui-primitives/icons";
+import { openUrl } from "@/lib/agent/pi-client";
 import { ThumbImg } from "../shared/ThumbImg";
+
+/**
+ * pi.dev URL builder for an expert's marketplace page. Centralised here so the
+ * detail modal and any future “open in pi.dev” affordance reuse the same shape
+ * (npm-style scoped slug → "@scope/name", unscoped → "name").
+ *
+ * Returns null when the slug is missing / malformed so the caller can decide
+ * whether to surface the link at all — keeps the card quiet for the majority
+ * of items that aren't published on pi.dev.
+ */
+function piDevUrlFor(slug: string | undefined): string | null {
+  if (!slug) return null;
+  const trimmed = slug.trim().replace(/^\/+|\/+$/g, "");
+  if (!trimmed) return null;
+  // Reject anything that isn't a safe npm-style slug (letters, digits, dash,
+  // underscore, dot, slash — scoped packages look like "@scope/name").
+  if (!/^@?[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(trimmed)) return null;
+  return "https://pi.dev/packages/" + trimmed;
+}
 
 /** Subtitle line, mirroring WorkBuddy's `expertUsageText`: teams prefer the
  *  author (e.g. "CodeBuddy Teams"), agents use the display name; whichever is
@@ -57,6 +78,22 @@ export function ExpertCard({
           ))}
         </div>
       )}
+      {(() => {
+        const url = piDevUrlFor(expert.piDevSlug);
+        if (!url) return null;
+        return (
+          <button
+            type="button"
+            className="ec-card-pidev"
+            onClick={(ev) => { ev.stopPropagation(); openUrl(url).catch(() => { /* swallow — toast is optional */ }); }}
+            title={`在 pi.dev 查看 ${expert.piDevSlug}`}
+            aria-label={`在 pi.dev 查看 ${expert.title || expert.name}`}
+          >
+            <OpenExternalIcon size="sm" />
+            <span>在 pi.dev 查看</span>
+          </button>
+        );
+      })()}
     </article>
   );
 }
