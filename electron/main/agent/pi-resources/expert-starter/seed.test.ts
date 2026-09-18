@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +12,7 @@ const originalAgentDir = process.env.OPENBUDDY_AGENT_DIR;
 const originalPiAgent = process.env.PI_CODING_AGENT_DIR;
 const originalPiHome = process.env.PI_HOME;
 const originalAgentsDir = process.env.OPENBUDDY_AGENTS_DIR;
+const originalUserAgentsDir = process.env.OPENBUDDY_USER_AGENTS_DIR;
 
 afterEach(() => {
   for (const [key, value] of [
@@ -19,6 +20,7 @@ afterEach(() => {
     ["PI_CODING_AGENT_DIR", originalPiAgent],
     ["PI_HOME", originalPiHome],
     ["OPENBUDDY_AGENTS_DIR", originalAgentsDir],
+    ["OPENBUDDY_USER_AGENTS_DIR", originalUserAgentsDir],
   ] as const) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
@@ -31,7 +33,15 @@ async function freshHome(): Promise<string> {
   delete process.env.PI_CODING_AGENT_DIR;
   delete process.env.PI_HOME;
   delete process.env.OPENBUDDY_AGENTS_DIR;
+  // Pin the canonical flat user-agents dir into the same tempdir so
+  // linkExpertAgents writes the linked experts where listAgents reads them
+  // (and the test sandbox stays hermetic across pids).
+  process.env.OPENBUDDY_USER_AGENTS_DIR = join(home, "agents-flat");
   return home;
+}
+
+function userAgentsDir(home: string): string {
+  return process.env.OPENBUDDY_USER_AGENTS_DIR ?? join(home, "agents-flat");
 }
 
 async function readJson(file: string): Promise<Record<string, unknown>> {
@@ -177,6 +187,48 @@ describe("built-in starter expert pack", () => {
     // to them via `subagent({ agent: "<id>" })` after discovery).
     const lead = await readFile(join(teamDir, "lead.md"), "utf8");
     for (const id of members) expect(lead, `lead should mention ${id}`).toContain(id);
+  });
+
+  it("links every expert under its runtime name instead of collapsing onto lead.md", async () => {
+    // Regression (R96): `linkExpertAgents()` named the target after the *source
+    // file stem*, and every starter expert keeps its prompt in `agents/lead.md`.
+    // Linking six experts therefore wrote six times to `<agentHome>/agents/lead.md`,
+    // so five of them vanished from the assistant rail. The link target must be
+    // the frontmatter `name` (the identity pi-subagents discovers), not `lead`.
+    const home = await freshHome();
+    const agents = await import("../agents");
+    const root = await agents.expertDefaultRoot(home);
+
+    const catalog = (await agents.listExpertCatalog(root)) as {
+      experts: Array<{ plugin: string; agentName: string; type: string }>;
+    };
+    // The premise of the bug: every lead prompt lives in `lead.md`.
+    expect(new Set(catalog.experts.map((expert) => expert.agentName))).toEqual(new Set(["lead"]));
+
+    for (const expert of catalog.experts) {
+      await agents.linkExpertAgents(root, expert.plugin);
+    }
+
+    const linked = await readdir(userAgentsDir(home));
+    // Every expert must be addressable by its own plugin id, which is what the
+    // starter frontmatter declares as `name`.
+    for (const expert of catalog.experts) {
+      expect(linked, `${expert.plugin} must be discoverable`).toContain(`${expert.plugin}.md`);
+    }
+    // Members of the team plugin are linked alongside their lead.
+    for (const member of ["starter-clarifier", "starter-drafter", "starter-reviewer", "starter-finalizer"]) {
+      expect(linked).toContain(`${member}.md`);
+    }
+    // The collapsed artefact must not survive: nothing declared `name: lead`.
+    expect(linked).not.toContain("lead.md");
+
+    // The link is only useful if the discovered prompt is the matching expert's.
+    const engineer = await readFile(join(userAgentsDir(home), "starter-software-engineer.md"), "utf8");
+    expect(engineer).toMatch(/name: starter-software-engineer\b/);
+    expect(engineer).toContain("你是一名资深全栈工程师");
+    const reviewer = await readFile(join(userAgentsDir(home), "starter-code-reviewer.md"), "utf8");
+    expect(reviewer).toMatch(/name: starter-code-reviewer\b/);
+    expect(reviewer).not.toContain("你是一名资深全栈工程师");
   });
 
 });

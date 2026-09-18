@@ -9,6 +9,7 @@
 import { copyFile, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import { basename, extname, isAbsolute, join, resolve } from "node:path";
 import type { AgentEntry } from "@openbuddy/shared-types";
+import { userAgentsHome } from "@openbuddy/storage";
 import {
   agentRoot,
   assertResourcePath,
@@ -23,8 +24,31 @@ import {
 } from "./shared";
 import { starterExpertsRoot, tryEnsureStarterExperts } from "./expert-starter/seed";
 
-function agentDir(scope: "user" | "project", cwd?: string | null): string {
-  return scope === "project" ? join(workspaceRoot(cwd), ".pi", "agents") : join(piRoot(), "agents");
+/**
+ * Where user-scope agent markdown is read from and written to.
+ *
+ * Two roots are honoured at the same time:
+ *   - Canonical (new): userAgentsHome() — ~/.openbuddy/agents/ by default.
+ *     This is the directory the product tells users to author into,
+ *     and where linkExpertAgents and saveAgent write.
+ *   - Legacy (back-compat): <piHome>/agents = ~/.openbuddy/agent/agents/.
+ *     This is what pi-subagents scans natively via
+ *     path.join(getAgentDir(), 'agents'). We still list it so users who
+ *     hand-edited there keep their agents visible; but new writes never go
+ *     there.
+ *
+ * The two roots are deduplicated by file stem with the canonical root
+ * winning, so a file that exists in both only surfaces once (and from the
+ * canonical path) — that mirrors the precedence pi-subagents uses.
+ */
+function userAgentsRoots(): string[] {
+  const canonical = resolve(userAgentsHome());
+  const legacy = resolve(join(piRoot(), 'agents'));
+  return canonical === legacy ? [canonical] : [canonical, legacy];
+}
+
+function agentDir(scope: 'user' | 'project', cwd?: string | null): string[] {
+  return scope === 'project' ? [join(workspaceRoot(cwd), '.pi', 'agents')] : userAgentsRoots();
 }
 
 function parseAgent(file: string, raw: string, scope: string): AgentEntry {
@@ -35,21 +59,44 @@ function parseAgent(file: string, raw: string, scope: string): AgentEntry {
 
 export async function listAgents(cwd?: string | null): Promise<AgentEntry[]> {
   const result: AgentEntry[] = [];
-  for (const [scope, root] of [["user", agentDir("user", cwd)], ["project", agentDir("project", cwd)]] as const) {
-    for (const file of await filesIn(root, ".md")) result.push(parseAgent(file, await readFile(file, "utf8"), scope));
+  const seen = new Set<string>();
+  // User-scope first so user-defined agents show up under scope = 'user';
+  // within user-scope the canonical root shadows the legacy nested one.
+  for (const root of agentDir('user', cwd)) {
+    for (const file of await filesIn(root, '.md')) {
+      const name = basename(file, '.md');
+      if (seen.has(name)) continue;
+      seen.add(name);
+      result.push(parseAgent(file, await readFile(file, 'utf8'), 'user'));
+    }
+  }
+  for (const file of await filesIn(agentDir('project', cwd)[0]!, '.md')) {
+    const name = basename(file, '.md');
+    if (seen.has(name)) continue;
+    seen.add(name);
+    result.push(parseAgent(file, await readFile(file, 'utf8'), 'project'));
   }
   return result.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function allowedAgentFile(file: string, cwd?: string | null): string {
-  const roots = [agentDir("user", cwd), agentDir("project", cwd)];
+  // User-scope is checked first to match the original semantic and because
+  // most projects don't ship a .pi/agents dir at all — checking project
+  // first would call realpathSync on a non-existent root and bubble an
+  // ENOENT before we ever get to the user's flat layout.
+  //
+  // Within user-scope, the canonical flat root (~/.openbuddy/agents/)
+  // shadows the legacy nested one (~/.openbuddy/agent/agents/), so a
+  // file present in both only resolves to the canonical copy. Project
+  // scope acts as an override later in the loop.
+  const roots = [...agentDir('user', cwd), ...agentDir('project', cwd)];
   for (const root of roots) {
     try {
       const candidate = isAbsolute(file) ? within(root, file) : within(root, join(root, file));
       if (candidate !== root) return candidate;
     } catch { /* try the next allowed root */ }
   }
-  throw new Error("agent path is outside allowed roots");
+  throw new Error('agent path is outside allowed roots');
 }
 
 export async function getAgent(file: string, cwd?: string | null): Promise<string> {
@@ -57,7 +104,8 @@ export async function getAgent(file: string, cwd?: string | null): Promise<strin
 }
 
 export async function saveAgent(name: string, raw: string, cwd?: string | null): Promise<AgentEntry> {
-  const file = join(agentDir("user", cwd), `${safeName(name)}.md`);
+  // Writes always land in the canonical user root, never in the legacy one.
+  const file = join(userAgentsHome(), `${safeName(name)}.md`);
   await writeTextAtomic(file, raw);
   return parseAgent(file, raw, "user");
 }
@@ -185,7 +233,17 @@ async function buildManifestExpert(root: string, value: unknown): Promise<Record
     : typeof item.agentName === "string" ? item.agentName : undefined;
   const tags = Array.isArray(item.tags) ? item.tags.map((tag) => localized(tag)).filter(Boolean).slice(0, 3) : [];
   const quickPrompts = Array.isArray(item.quickPrompts) ? item.quickPrompts.map((prompt) => localized(prompt)).filter(Boolean).slice(0, 5) : [];
-  return [{ id, cat: typeof item.categoryId === "string" ? item.categoryId : "general", name: localized(item.displayName) || id, nameEn: localized(item.displayName, "en") || undefined, title: localized(item.profession) || id, titleEn: localized(item.profession, "en") || undefined, desc: localized(item.displayDescription) || localized(item.description) || id, tags, type: item.expertType === "team" ? "team" : "agent", author: localized(item.author) || undefined, ribbon: localized(item.operationalTag) || undefined, init: localized(item.defaultInitPrompt) || undefined, opc: item.isOPC === true, pos: typeof item.displayPosition === "number" ? item.displayPosition : undefined, updated: typeof item.updatedAt === "string" ? item.updatedAt : undefined, avatarLocal, avatarUrl: avatar ? (avatar.startsWith("http") ? avatar : `https://acc-1258344699.cos.accelerate.myqcloud.com/workbuddy/expert-marketplace/${avatar.replace(/^\/+/, "")}`) : undefined, plugin, agentName, quickPrompts }];
+  // R97 — pi.dev marketplace link. Manifest entries may carry the slug as a
+  // plain string or a localized { zh, en } object; the renderer only needs the
+  // slug (npm-style scoped package name), so prefer zh then en then raw.
+  const piDevRaw = item.piDevSlug;
+  const piDevSlug = typeof piDevRaw === "string"
+    ? piDevRaw.trim() || undefined
+    : piDevRaw && typeof piDevRaw === "object"
+      ? (typeof (piDevRaw as Record<string, unknown>).zh === "string" ? (piDevRaw as Record<string, unknown>).zh as string : undefined) ||
+        (typeof (piDevRaw as Record<string, unknown>).en === "string" ? (piDevRaw as Record<string, unknown>).en as string : undefined)
+      : undefined;
+  return [{ id, cat: typeof item.categoryId === "string" ? item.categoryId : "general", name: localized(item.displayName) || id, nameEn: localized(item.displayName, "en") || undefined, title: localized(item.profession) || id, titleEn: localized(item.profession, "en") || undefined, desc: localized(item.displayDescription) || localized(item.description) || id, tags, type: item.expertType === "team" ? "team" : "agent", author: localized(item.author) || undefined, ribbon: localized(item.operationalTag) || undefined, init: localized(item.defaultInitPrompt) || undefined, opc: item.isOPC === true, pos: typeof item.displayPosition === "number" ? item.displayPosition : undefined, updated: typeof item.updatedAt === "string" ? item.updatedAt : undefined, avatarLocal, avatarUrl: avatar ? (avatar.startsWith("http") ? avatar : `https://acc-1258344699.cos.accelerate.myqcloud.com/workbuddy/expert-marketplace/${avatar.replace(/^\/+/, "")}`) : undefined, plugin, agentName, quickPrompts, piDevSlug }];
 }
 
 async function filePathIfExists(file: string): Promise<string | undefined> {
@@ -257,6 +315,7 @@ export async function expertDefaultRoot(cwd: string): Promise<string> {
     join(agentRoot(), "workbuddy-experts"),
     starterExpertsRoot(),
     join(agentRoot(), "agents"),
+    userAgentsHome(),
   ].filter((value): value is string => Boolean(value));
   for (const candidate of candidates) {
     if (await filePathIfExists(join(candidate, "_meta", "_expert_center.json"))) return resolve(candidate);
@@ -280,6 +339,39 @@ export async function readExpertAgent(root: string, plugin: string, agentName: s
   return readFile(file, "utf8");
 }
 
+/**
+ * The runtime identity of an agent definition: the frontmatter `name:` field.
+ *
+ * Why this exists (real defect, R96)
+ * ----------------------------------
+ * `linkExpertAgents()` used to name the linked file after the **source file
+ * stem**. Every built-in starter expert keeps its lead prompt in `agents/lead.md`
+ * (the manifest's `agent` field is literally `"lead"`), so linking six experts
+ * wrote six times to `<agentHome>/agents/lead.md` — last write won and five
+ * experts silently disappeared from the assistant rail. Measured before/after on
+ * a temp agent home: `["lead","starter-clarifier",…]` for 6 experts.
+ *
+ * pi-subagents keys agents by frontmatter `name` (see its
+ * `loadAgentsFromDefinitionFiles`: `if (!frontmatter.name) continue`), and
+ * OpenBuddy's own `listAgents()` displays the file stem. Naming the link target
+ * after the frontmatter `name` makes those two agree, so one file serves both
+ * the rail label and subagent dispatch.
+ *
+ * Falls back to the file stem when frontmatter is missing/unsafe, preserving the
+ * old behaviour for hand-written agent files that never declared a name.
+ */
+function agentRuntimeName(raw: string, fallback: string): string {
+  const declared = raw.match(/^name:\s*["']?(.+?)["']?\s*$/m)?.[1]?.trim();
+  if (!declared) return fallback;
+  try {
+    return safeName(declared);
+  } catch {
+    // A frontmatter name is still attacker-controlled input from an imported
+    // catalog; never let it escape the target directory.
+    return fallback;
+  }
+}
+
 export async function linkExpertAgents(root: string, plugin: string, agentNames?: string[]): Promise<number> {
   const sourceRoot = resolve(root);
   const pluginName = safeName(plugin);
@@ -287,10 +379,30 @@ export async function linkExpertAgents(root: string, plugin: string, agentNames?
   const names = agentNames?.length
     ? agentNames.map((name) => safeName(name).replace(/\.md$/, ""))
     : (await filesIn(sourceDir, ".md")).map((file) => basename(file, ".md"));
-  const targetDir = join(piRoot(), "agents");
+  // Expert prompts link into the canonical flat user root
+  // (~/.openbuddy/agents/), not the legacy nested one. That is the path
+  // the user is told to author into and the path our listAgents() reports.
+  const targetDir = userAgentsHome();
   await mkdir(targetDir, { recursive: true });
-  for (const name of names) await copyFile(await assertResourcePath(join(sourceDir, `${name}.md`), [sourceDir]), join(targetDir, `${name}.md`));
-  return names.length;
+  let linked = 0;
+  for (const name of names) {
+    const source = await assertResourcePath(join(sourceDir, `${name}.md`), [sourceDir]);
+    const raw = await readFile(source, "utf8");
+    const targetName = agentRuntimeName(raw, name);
+    await copyFile(source, join(targetDir, `${targetName}.md`));
+    // Migration for the collapsed-`lead.md` era: when the runtime name differs
+    // from the source stem, a target file under the *old* name may be a
+    // leftover copy of this exact source (that is how six experts overwrote
+    // each other). Delete it only when the bytes are identical, so a
+    // hand-written `lead.md` a user authored is never touched.
+    if (targetName !== name) {
+      const stale = join(targetDir, `${name}.md`);
+      const staleRaw = await readFile(stale, "utf8").catch(() => null);
+      if (staleRaw !== null && staleRaw === raw) await rm(stale, { force: true });
+    }
+    linked += 1;
+  }
+  return linked;
 }
 
 export async function readImageData(filePath: string, allowedRoots?: string[]): Promise<string> {

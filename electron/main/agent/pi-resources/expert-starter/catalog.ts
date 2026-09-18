@@ -53,6 +53,14 @@ interface StarterExpert {
   ribbon?: Localized;
   opc?: boolean;
   pos: number;
+  /**
+   * Optional pi.dev npm-style slug (e.g. "@openbuddy/code-reviewer"). When set,
+   * the expert card surfaces a small "在 pi.dev 查看" link pointing to
+   * https://pi.dev/packages/<slug>. Built-in starters ship without a slug so
+   * the UI stays quiet by default; the slug is only populated for entries
+   * that have an actual upstream pi.dev counterpart to bridge to.
+   */
+  piDevSlug?: string;
   /** 写入 agents/<agent>.md 的系统提示词主体。 */
   prompt: string;
   /**
@@ -323,6 +331,9 @@ export function starterManifestExperts(): unknown[] {
     displayPosition: e.pos,
     updatedAt: "2026-01-01T00:00:00.000Z",
     source: "builtin",
+    // R97 — only forward the slug when set so built-in starters without an
+    // upstream pi.dev counterpart don't ship a misleading empty link.
+    piDevSlug: e.piDevSlug,
   }));
 }
 
