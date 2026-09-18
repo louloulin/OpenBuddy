@@ -31,11 +31,30 @@
 /** 用户可见的兜底根目录(仅在 IPC 不可用时使用)。 */
 export const FALLBACK_AGENT_HOME = "~/.openbuddy/agent";
 
+/**
+ * 用户可见的兜底 user-agents 路径(扁平布局,仅在 IPC 不可用时使用)。
+ *
+ * 这是 OpenBuddy 的"用户代理 markdown 存放处"的真值 —— 不是
+ * `~/.openbuddy/agent/agents/`(嵌套,与 pi-subagents SDK 原生扫描路径重合),
+ * 而是 `~/.openbuddy/agents/`(扁平,与产品说明书一致)。注意与
+ * `FALLBACK_AGENT_HOME` 的差别:后者是数据根,这个是**子目录**。
+ */
+export const FALLBACK_USER_AGENTS = "~/.openbuddy/agents";
+
 /** main 进程 `agent:paths` 的返回形状(`electron/main/ipc/agent-paths.ts`)。 */
 export interface AgentPathsSnapshot {
   home: string;
   homeDisplay: string;
+  /**
+   * Canonical flat user-agents directory (where OpenBuddy writes new agents
+   * and what the product tells users to author into). Defaults to
+   * `~/.openbuddy/agents/`. Distinct from the SDK's nested
+   * `<agentHome>/agents/`; the latter is still listed via
+   * `PI_SUBAGENT_EXTRA_AGENT_DIRS` so legacy agents stay visible.
+   */
   agents: string;
+  /** Same as `agents`, with the user's $HOME collapsed for display. */
+  agentsDisplay: string;
   experts: string;
   mcpConfig: string;
   models: string;
@@ -116,6 +135,11 @@ export async function resolveAgentPathsSnapshot(): Promise<AgentPathsSnapshot | 
       const cut = configPath.lastIndexOf("/");
       if (cut <= 0) return null;
       const home = configPath.slice(0, cut);
+      // The legacy fallback predates `userAgentsHome()`, so the canonical
+      // user-agents path is not derivable from `home` alone. We report
+      // `<home>/agents` here (the SDK's native scan root) as the closest
+      // approximation and mark it as non-canonical via a missing
+      // `agentsDisplay` — callers fall back to FALLBACK_USER_AGENTS.
       cachedSnapshot = {
         home,
         homeDisplay: home,
@@ -127,6 +151,10 @@ export async function resolveAgentPathsSnapshot(): Promise<AgentPathsSnapshot | 
         sessions: `${home}/sessions`,
         extensions: `${home}/node_modules`,
         plugins: `${home}/plugins`,
+        // Old fallbacks did not return the canonical flat user-agents
+        // path; flag it missing so UI can fall back to FALLBACK_USER_AGENTS
+        // without a false `~` collapse of `~/.openbuddy/agent/agents`.
+        agentsDisplay: "",
         fromEnv: false,
         // 这条兼容路径推不出 pi 的解析结果(它只给了 mcp.json 的目录),
         // 留空让 UI 显示"未知",而不是错误地宣称"不一致"。
@@ -195,3 +223,11 @@ export const AUTH_DISPLAY_FALLBACK = joinDisplay(FALLBACK_AGENT_HOME, "auth.json
 export const SESSIONS_DISPLAY_FALLBACK = joinDisplay(FALLBACK_AGENT_HOME, "sessions");
 export const EXTENSIONS_DISPLAY_FALLBACK = joinDisplay(FALLBACK_AGENT_HOME, "node_modules");
 export const PLUGINS_DISPLAY_FALLBACK = joinDisplay(FALLBACK_AGENT_HOME, "plugins");
+/**
+ * 真实默认 user-agents 显示路径(扁平 `~/.openbuddy/agents`)的兜底常量。
+ * 这个值是**面向用户的真值**:UI 应当让用户看到的"我的代理定义在
+ * ~/.openbuddy/agents/"就是这个值。`AGENTS_DISPLAY_FALLBACK` 在嵌套布局
+ * 下也合法,但默认安装下两者实际不同(嵌套的那个真源是 SDK 扫描目录,
+ * 不是产品说明书告诉用户的)。
+ */
+export const USER_AGENTS_DISPLAY_FALLBACK = FALLBACK_USER_AGENTS;

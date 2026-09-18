@@ -16,14 +16,23 @@
 import { ipcMain } from "electron";
 import { homedir } from "node:os";
 
-import { agentHome, isPiAgentDirPinnedByUs } from "@openbuddy/storage";
+import { agentHome, isPiAgentDirPinnedByUs, userAgentsHome } from "@openbuddy/storage";
 
 export interface AgentPathsSnapshot {
   /** agentHome 绝对值。 */
   home: string;
   /** 折叠 `$HOME` 前缀后的展示形式(便于用户直接对照 Finder)。 */
   homeDisplay: string;
+  /**
+   * The canonical flat user-agents directory (where OpenBuddy writes new
+   * agents and what the product tells users to author into). Defaults to
+   * `~/.openbuddy/agents/`. Distinct from the SDK's nested
+   * `<agentHome>/agents/`; the latter is still listed via
+   * `PI_SUBAGENT_EXTRA_AGENT_DIRS` so legacy agents stay visible.
+   */
   agents: string;
+  /** Same as `agents`, with the user's $HOME collapsed for display. */
+  agentsDisplay: string;
   experts: string;
   mcpConfig: string;
   models: string;
@@ -56,15 +65,21 @@ export function describeAgentPaths(): AgentPathsSnapshot {
   const home = agentHome();
   const userHome = homedir();
   const join = (...segments: string[]) => [home.replace(/\/+$/, ""), ...segments].join("/");
+  // Canonical user-agents root. Default is `~/.openbuddy/agents/`, set by
+  // `userAgentsHome()` in @openbuddy/storage. UI MUST consume this field
+  // rather than recomputing it from `home`.
+  const agentsAbsolute = userAgentsHome();
   // `pinPiAgentDirEnv()` 在 main 入口把 `PI_CODING_AGENT_DIR` 补成了 agentHome,
   // 所以到这里 `PI_CODING_AGENT_DIR` 基本上**永远非空**。不减掉"我们补的",
   // `fromEnv` 会恒为 true,界面就会一直提示"你改过数据目录" —— 而用户没改。
   const fromEnv = Boolean(process.env.OPENBUDDY_AGENT_DIR)
+    || Boolean(process.env.OPENBUDDY_USER_AGENTS_DIR)
     || (Boolean(process.env.PI_CODING_AGENT_DIR) && !isPiAgentDirPinnedByUs());
   return {
     home,
     homeDisplay: toDisplay(home, userHome),
-    agents: join("agents"),
+    agents: agentsAbsolute,
+    agentsDisplay: toDisplay(agentsAbsolute, userHome),
     experts: join("experts"),
     mcpConfig: join("mcp.json"),
     models: join("models.json"),

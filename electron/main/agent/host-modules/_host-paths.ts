@@ -21,7 +21,7 @@
 
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { agentHome } from "@openbuddy/storage";
+import { agentHome, userAgentsHome } from "@openbuddy/storage";
 
 /**
  * Returns the absolute path to OpenBuddy's agent home (~/.openbuddy/agent).
@@ -54,13 +54,22 @@ export function piHome(): string {
  */
 export function ensurePiSubagentAgentDirs(): void {
   const home = piHome();
-  const agentsRoot = join(home, "agents");
+  // Honour two roots: the canonical flat user root (~/.openbuddy/agents/) and
+  // the legacy nested one (<home>/agents) that pi-subagents would otherwise
+  // scan natively via path.join(getAgentDir(), "agents"). The canonical root
+  // is listed first because it is where OpenBuddy writes new agents (linkExpertAgents,
+  // saveAgent) and what our UI tells users to author into.
+  const roots = [userAgentsHome(), join(home, "agents")];
   const delim = (typeof process !== "undefined" && process.platform === "win32") ? ";" : ":";
   const existing = process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS ?? "";
   const parts = existing.split(delim).map((value) => value.trim()).filter(Boolean);
-  if (parts.includes(agentsRoot)) return;
-  parts.push(agentsRoot);
-  process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS = parts.join(delim);
+  let changed = false;
+  for (const root of roots) {
+    if (parts.includes(root)) continue;
+    parts.push(root);
+    changed = true;
+  }
+  if (changed) process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS = parts.join(delim);
 }
 
 // Side-effect at module-load: set the env as early as possible so any pi

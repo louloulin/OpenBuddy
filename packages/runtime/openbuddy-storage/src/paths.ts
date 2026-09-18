@@ -1,3 +1,6 @@
+/**
+ * patch paths.ts — add userAgentsHome()
+ */
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -39,6 +42,44 @@ export function agentHome(): string {
 /** Join `segments` onto `agentHome()`. */
 export function agentPath(...segments: string[]): string {
   return join(agentHome(), ...segments);
+}
+
+/**
+ * Resolve the **flat** user-agents directory.
+ *
+ * Why flat (and not `<agentHome>/agents`)
+ * ---------------------------------------
+ * Two products share the same root prefix but different layouts:
+ *
+ *   - `@earendil-works/pi-coding-agent` keeps its `agents/` directory under
+ *     `<piHome>/agents`, so when `PI_CODING_AGENT_DIR` points at `agentHome()`
+ *     the SDK's native `path.join(getAgentDir(), "agents")` lands at
+ *     `<agentHome>/agents` — i.e. `~/.openbuddy/agent/agents`.
+ *   - OpenBuddy's own agent definitions are authored and discovered by
+ *     OpenBuddy, not the SDK, and the user-facing prompt instructs users to
+ *     drop markdown into the **flat** `~/.openbuddy/agents/` (per the product
+ *     spec) — not the SDK's nested `<agentHome>/agents`.
+ *
+ * Both must be honoured: `<agentHome>/agents` because that is what
+ * pi-subagents scans natively (via `getAgentDir() + "/agents"`); and
+ * `~/.openbuddy/agents` because that is the directory the user is told to
+ * author into. The flat path is the **canonical** user target for OpenBuddy
+ * (linkExpertAgents writes there, saveAgent writes there); the nested path is
+ * the legacy discovery shim and is preserved so existing agents stay visible.
+ *
+ * Resolution precedence (matches `agentHome()`):
+ *   1. `OPENBUDDY_USER_AGENTS_DIR` — explicit override (documented knob)
+ *   2. `<dirname(agentHome())>/agents` — the flat sibling layout
+ *
+ * Returns the absolute path. Callers should not concat `agents` onto
+ * `agentHome()` — that produces the wrong layout under the user-facing flat
+ * convention.
+ */
+export function userAgentsHome(): string {
+  return (
+    process.env.OPENBUDDY_USER_AGENTS_DIR
+    ?? join(agentHome(), "..", "agents")
+  );
 }
 
 /**

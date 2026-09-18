@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   FALLBACK_AGENT_HOME,
+  FALLBACK_USER_AGENTS,
   agentsDisplayFrom,
   authDisplayFrom,
   expertsDisplayFrom,
@@ -28,6 +29,11 @@ import {
 export interface AgentPaths {
   /** agentHome 展示前缀,如 `~/.openbuddy/agent`。 */
   home: string;
+  /**
+   * Canonical flat user-agents display path (e.g. `~/.openbuddy/agents`).
+   * Distinct from the SDK's `<home>/agents`: this is the path users are told
+   * to author into and the path OpenBuddy writes new agent prompts to.
+   */
   agents: string;
   experts: string;
   mcpConfig: string;
@@ -52,7 +58,10 @@ export interface AgentPaths {
 function deriveFallback(home: string, resolved: boolean, fromEnv = false): AgentPaths {
   return {
     home,
-    agents: agentsDisplayFrom(home),
+    // The user-agents path is the **flat** layout (~/.openbuddy/agents) by
+    // default, NOT <home>/agents — that is the SDK's nested scan root and
+    // would mislead users into dropping markdown into the wrong directory.
+    agents: FALLBACK_USER_AGENTS,
     experts: expertsDisplayFrom(home),
     mcpConfig: mcpConfigDisplayFrom(home),
     models: modelsDisplayFrom(home),
@@ -69,9 +78,18 @@ function deriveFallback(home: string, resolved: boolean, fromEnv = false): Agent
 
 function fromSnapshot(snapshot: AgentPathsSnapshot): AgentPaths {
   const home = snapshot.homeDisplay;
+  // Prefer the canonical flat user-agents path returned by main; fall back
+  // to deriving `<home>/agents` for the legacy bridge route where main
+  // can't tell us the layout (no `agentsDisplay` field). Either way, the
+  // derived string MUST be the display form (~/ prefix), not the absolute.
+  const agents = snapshot.agentsDisplay && snapshot.agentsDisplay.length > 0
+    ? snapshot.agentsDisplay
+    : (snapshot.agents.startsWith(home.replace(/^~/, ""))
+        ? "~" + snapshot.agents.slice(home.replace(/^~/, "").length)
+        : snapshot.agents);
   return {
     home,
-    agents: agentsDisplayFrom(home),
+    agents,
     experts: expertsDisplayFrom(home),
     mcpConfig: mcpConfigDisplayFrom(home),
     models: modelsDisplayFrom(home),

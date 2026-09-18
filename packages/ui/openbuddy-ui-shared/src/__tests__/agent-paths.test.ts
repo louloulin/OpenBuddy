@@ -20,8 +20,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AGENTS_DISPLAY_FALLBACK,
   FALLBACK_AGENT_HOME,
+  FALLBACK_USER_AGENTS,
   MCP_CONFIG_DISPLAY_FALLBACK,
   PLUGINS_DISPLAY_FALLBACK,
+  USER_AGENTS_DISPLAY_FALLBACK,
   agentsDisplayFrom,
   extensionInstallDisplayFrom,
   pluginsDisplayFrom,
@@ -36,7 +38,9 @@ import { useAgentPaths } from "../use-agent-paths";
 const SNAPSHOT: AgentPathsSnapshot = {
   home: "/Users/tester/.openbuddy/agent",
   homeDisplay: "~/.openbuddy/agent",
-  agents: "/Users/tester/.openbuddy/agent/agents",
+  // Flat layout: agents is the sibling of home, not a subdir.
+  agents: "/Users/tester/.openbuddy/agents",
+  agentsDisplay: "~/.openbuddy/agents",
   experts: "/Users/tester/.openbuddy/agent/experts",
   mcpConfig: "/Users/tester/.openbuddy/agent/mcp.json",
   models: "/Users/tester/.openbuddy/agent/models.json",
@@ -69,23 +73,28 @@ afterEach(async () => {
 });
 
 describe("兜底常量", () => {
-  it("指向 ~/.openbuddy/agent 而不是 ~/.pi", () => {
+  it("指向 ~/.openbuddy/agent + ~/.openbuddy/agents,而不是 ~/.pi", () => {
     expect(FALLBACK_AGENT_HOME).toBe("~/.openbuddy/agent");
-    expect(AGENTS_DISPLAY_FALLBACK).toBe("~/.openbuddy/agent/agents");
+    // Flat user-agents path is the **canonical** default, not <home>/agents.
+    expect(FALLBACK_USER_AGENTS).toBe("~/.openbuddy/agents");
+    expect(USER_AGENTS_DISPLAY_FALLBACK).toBe("~/.openbuddy/agents");
     expect(MCP_CONFIG_DISPLAY_FALLBACK).toBe("~/.openbuddy/agent/mcp.json");
     // 扩展装在 <agentHome>/node_modules(见 pi-extension-discovery.ts)。
     expect(extensionInstallDisplayFrom(FALLBACK_AGENT_HOME)).toBe("~/.openbuddy/agent/node_modules");
     expect(PLUGINS_DISPLAY_FALLBACK).toBe("~/.openbuddy/agent/plugins");
-    // 任何一个兜底值都不许出现 `.pi/`。
+    // 任何一个兜底值都不许出现 `.pi/`,且 agents 的扁平值不能等于
+    // <home>/agents(那样就把 SDK 的嵌套扫描路径当成默认了)。
     for (const value of [
       FALLBACK_AGENT_HOME,
-      AGENTS_DISPLAY_FALLBACK,
+      FALLBACK_USER_AGENTS,
+      USER_AGENTS_DISPLAY_FALLBACK,
       MCP_CONFIG_DISPLAY_FALLBACK,
       PLUGINS_DISPLAY_FALLBACK,
       extensionInstallDisplayFrom(FALLBACK_AGENT_HOME),
     ]) {
       expect(value).not.toMatch(/~\/\.pi\//);
     }
+    expect(FALLBACK_USER_AGENTS).not.toBe(AGENTS_DISPLAY_FALLBACK);
   });
 
   it("子路径派生不做双斜杠拼接", () => {
@@ -121,6 +130,9 @@ describe("resolveAgentPathsSnapshot", () => {
     expect(snapshot?.home).toBe("/Users/tester/.openbuddy/agent");
     expect(snapshot?.plugins).toBe("/Users/tester/.openbuddy/agent/plugins");
     expect(snapshot?.extensions).toBe("/Users/tester/.openbuddy/agent/node_modules");
+    // 兼容路径下,agentsDisplay 留空表示"未告知真实扁平路径"。
+    expect(snapshot?.agentsDisplay).toBe("");
+    expect(snapshot?.agents).toBe("/Users/tester/.openbuddy/agent/agents");
     // 兼容路径只能自己拼,所以 fromEnv 只能是保守的 false。
     expect(snapshot?.fromEnv).toBe(false);
   });
@@ -168,7 +180,8 @@ describe("useAgentPaths", () => {
     const { result, unmount } = renderHook(() => useAgentPaths());
     expect(result.current.resolved).toBe(false);
     expect(result.current.home).toBe(FALLBACK_AGENT_HOME);
-    expect(result.current.agents).toBe(AGENTS_DISPLAY_FALLBACK);
+    // 扁平用户代理路径才是产品说明书告诉用户的内容。
+    expect(result.current.agents).toBe(FALLBACK_USER_AGENTS);
     unmount();
   });
 
@@ -178,6 +191,8 @@ describe("useAgentPaths", () => {
     await waitFor(() => expect(result.current.resolved).toBe(true));
     expect(result.current.home).toBe("~/.openbuddy/agent");
     expect(result.current.plugins).toBe("~/.openbuddy/agent/plugins");
+    // agents 来自 snapshot.agentsDisplay(扁平 ~/),不是 <home>/agents。
+    expect(result.current.agents).toBe("~/.openbuddy/agents");
     unmount();
   });
 
@@ -186,6 +201,7 @@ describe("useAgentPaths", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(result.current.resolved).toBe(false);
     expect(result.current.home).toBe(FALLBACK_AGENT_HOME);
+    expect(result.current.agents).toBe(FALLBACK_USER_AGENTS);
     unmount();
   });
 });

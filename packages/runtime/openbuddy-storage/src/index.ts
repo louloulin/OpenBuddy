@@ -10,7 +10,7 @@ export {
   type StorageTransaction,
   type MigrationResult,
 } from "./driver/contract";
-export { agentHome, agentPath, pinPiAgentDirEnv, isPiAgentDirPinnedByUs, resetPiAgentDirPinForTests } from "./paths";
+export { agentHome, agentPath, userAgentsHome, pinPiAgentDirEnv, isPiAgentDirPinnedByUs, resetPiAgentDirPinForTests } from "./paths";
 export { hashRedactedValue, redactStorageValue } from "./driver/redact";
 export { SqliteDriver, type JournalMode, type SqliteDriverOptions, type StorageHealthSnapshot } from "./sqlite/driver";
 export { closeStorage, openStorage, openStorageSync, type OpenStorageOptions, type OpenStorageResult, type OpenStorageSyncResult } from "./sqlite/open-storage";
