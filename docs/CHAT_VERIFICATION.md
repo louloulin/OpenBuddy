@@ -23,7 +23,7 @@ MiniMax 上游,不 mock、不打桩。
 # 凭证:任一来源(优先级从高到低)
 #   1) 环境变量 OPENBUDDY_E2E_API_KEY / _BASE_URL / _MODEL_ID
 #   2) 仓库根 .env.e2e.local(gitignore 的 *.local 规则)
-#   3) ~/.pi/agent/auth.json
+#   3) ~/.openbuddy/agent/auth.json   (然后回落 ~/.pi/agent/auth.json)
 cat > .env.e2e.local <<'ENV'
 OPENBUDDY_E2E_API_KEY=<your-minimax-key>
 OPENBUDDY_E2E_BASE_URL=https://api.minimaxi.com/anthropic
@@ -53,7 +53,7 @@ pnpm exec vitest run scripts/electron/_probe-r80-ui-10rounds.test.mjs
 | 完成信号是 `pi://complete` + `PromptComplete.stopReason` | `handle-session-event.ts:485-492` |
 | 上游失败走 `pi://turn-error`(不是 complete) | `handle-session-event.ts:536-545` |
 | `agent:set-model` 需要 `provider/modelId` 全称 | `electron/main/agent/host-modules/agent-model.ts:79-84` |
-| 必须真注册 provider,否则回落 `~/.pi/agent/auth.json` | `scripts/lib/e2e-credentials.mjs` 头部注释 + `agent-model.ts` authStatus |
+| 必须真注册 provider,否则回落 `<agentHome>/auth.json`(默认 `~/.openbuddy/agent/auth.json`,再回落 `~/.pi/agent/auth.json`) | `scripts/lib/e2e-credentials.mjs` 头部注释 + `agent-model.ts` authStatus |
 
 ### 3.1 两个真实陷阱(踩过才写进来)
 

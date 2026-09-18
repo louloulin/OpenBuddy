@@ -1634,7 +1634,7 @@ SecondarySidebar,唯一的消费者是 ui-layout 的 AppFrame,而 R23 之后 App
 2. **宿主接线**:AppShell 新增 `DetailsSurface`(内核槽优先,回落 ui-shell 的
    SecondarySidebar),只在有活跃会话时 `visible`。AppFrame 不再为它留 320px
    网格列(组件本身是 `position: fixed` 贴右缘的导轨)。
-3. **空状态**:专家来自 `~/.pi/agents/*.md`,全新安装下一个都没有 —— 实测
+3. **空状态**:专家来自扁平 `<agentHome>/../agents/*.md`（默认 `~/.openbuddy/agents/*.md`，是产品说明书告诉用户的路径 —— 不是嵌套的 `<agentHome>/agents/*.md`),全新安装下一个都没有 —— 实测
    hover 出来的浮层 `items=0`,一片空白看着像坏了。现在给「还没有专家」+
    一句说明 +「去创建专家」出口(跳到专家页,那里有 9 张内置专家卡)。
 
