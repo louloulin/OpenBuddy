@@ -11,7 +11,15 @@
  * 兼容性：保留原导出名 `ToolSidePanel` / `ToolSidePanelMode` 与 ChatView 的 props，
  * 新增内部状态管理视图/标签/宽度。原 "tool" 模式仍用于展示单个工具调用详情。
  */
-import { memo, useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+} from "react";
 import type { ToolCallView } from "@/stores/session-store";
 import type { SessionArtifact } from "@/lib/agent/session-artifacts";
 import type { FileChange } from "@/lib/files/file-changes";
@@ -23,13 +31,25 @@ import {
 } from "@/lib/ui/use-unified-tabs";
 import { ToolCallDetailBody } from "./ToolCallCard";
 import { openLocalPath } from "@/lib/markdown/markdown-host";
+import { listDir } from "@/lib/agent/pi-client";
 import { invoke } from "@/lib/platform/electron-api";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
+import { ConversationToolSide } from "./conversation-slots";
 import { IS_MACOS } from "@/lib/platform/platform";
 import { ViewSelector, defaultViews } from "@openbuddy/ui-workbench";
 import { ArtifactTabsBar } from "@openbuddy/ui-workbench";
 import { FileTreeView } from "@openbuddy/ui-workbench";
+import type { FileTreeViewProps } from "@openbuddy/ui-workbench";
 import { BrowserPreview } from "@openbuddy/ui-workbench";
+import {
+  NAV_DEFAULT_WIDTH,
+  PANEL_DEFAULT_WIDTH,
+  clampNavWidth,
+  clampPanelWidth,
+  resolvePanelLayout,
+  resolvePanelMode,
+} from "./tool-side-panel-layout";
+import { useViewportWidth } from "./use-viewport-width";
 import {
   WbPinIcon,
   WbUnpinIcon,
@@ -49,14 +69,11 @@ export type ToolSidePanelMode =
   | "changes";
 
 // ---------- 持久化常量 ----------
+// 宽度约束全部收敛在 `tool-side-panel-layout.ts`(纯函数,有单测)。
 const WIDTH_KEY = "tool-side-panel-width";
 const NAV_WIDTH_KEY = "tool-side-panel-nav-width";
-const DEFAULT_WIDTH = 380;
-const DEFAULT_NAV_WIDTH = 200;
-const MIN_WIDTH = 280;
-const MAX_WIDTH_RATIO = 0.6; // 占视口 60%
-const MIN_NAV_WIDTH = 140;
-const MAX_NAV_WIDTH = 360;
+const DEFAULT_WIDTH = PANEL_DEFAULT_WIDTH;
+const DEFAULT_NAV_WIDTH = NAV_DEFAULT_WIDTH;
 
 interface ToolSidePanelProps {
   open: boolean;
@@ -118,11 +135,13 @@ function ToolSidePanelInner({
   // ---- 视图切换 ----
   const handleViewChange = useCallback((v: WorkspaceView) => {
     setView(v);
+    setNarrowList(false);
   }, []);
 
   const handleArtifactSelect = useCallback(
     (id?: string) => {
       setSelectedArtifactId(id);
+      if (id) setNarrowList(false);
       if (id) {
         const a = artifacts.find((x) => x.id === id);
         if (a) onSelectArtifact(a);
@@ -135,6 +154,7 @@ function ToolSidePanelInner({
     (path?: string) => {
       setSelectedFilePath(path);
       if (path) {
+        setNarrowList(false);
         // 复用 onSelectArtifact 把路径包成 SessionArtifact，驱动主列预览。
         onSelectArtifact({
           id: path,
@@ -177,12 +197,32 @@ function ToolSidePanelInner({
   const [maximized, setMaximized] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(false);
+  /** 单栏(窄面板)模式下用户按了「返回列表」;下次选中条目时自动回到详情。 */
+  const [narrowList, setNarrowList] = useState(false);
+  const viewportWidth = useViewportWidth();
+  const panelRef = useRef<HTMLElement | null>(null);
+  /** 面板 + 聊天列 的容器可用宽度(第一次 ResizeObserver 回调前为 0)。 */
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  // 容器宽度比视口更准:窄窗口里左栏还占着一块,"视口 60%"会把转录区挤没。
+  useEffect(() => {
+    if (!open) return;
+    const parent = panelRef.current?.parentElement;
+    if (!parent) return;
+    const apply = () => setContainerWidth(parent.clientWidth);
+    apply();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(apply);
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, [open]);
 
   // 切换会话时重置 selection（避免跨会话残留）。
   useEffect(() => {
     setSelectedArtifactId(undefined);
     setSelectedFilePath(undefined);
     setBrowserUrl(undefined);
+    setNarrowList(false);
   }, [sessionId]);
 
   // 持久化宽度。
@@ -193,7 +233,45 @@ function ToolSidePanelInner({
     localStorage.setItem(NAV_WIDTH_KEY, String(navWidth));
   }, [navWidth]);
 
-  const effectiveNavCollapsed = pinned ? false : navCollapsed;
+  // ---- 自适应布局 ----
+  // 面板宽度按视口收敛、导航列按面板收敛;两栏装不下时折成主从单栏
+  // (列表整列 ↔ 内容整列 + 返回),而不是把两栏都压扁。
+  const layout = resolvePanelLayout({
+    desiredWidth: width,
+    desiredNavWidth: navWidth,
+    viewportWidth,
+    containerWidth,
+    userCollapsed: navCollapsed,
+    pinned,
+  });
+  const listDetailView =
+    view === "fileTree" || view === "artifacts" || view === "changes";
+  const hasSelection = Boolean(
+    selectedFilePath ?? previewPath ?? selectedArtifactId,
+  );
+  const layoutMode = resolvePanelMode({
+    narrow: layout.narrow,
+    listDetailView,
+    hasSelection,
+    forceList: narrowList,
+  });
+  const showNavColumn = layoutMode !== "main";
+  const showMainColumn = layoutMode !== "nav";
+  const navFullWidth = layoutMode === "nav";
+
+  // 面板打开时把宽度广播给 CSS —— 右侧「助理」导轨(fixed / z60)据此让位,
+  // 不再压在面板右缘上(面板 z-index 只有 25)。最大化时推到视口外(等价隐藏)。
+  useEffect(() => {
+    if (!open) return;
+    const px = maximized ? viewportWidth : layout.width;
+    document.documentElement.style.setProperty(
+      "--ob-work-panel-width",
+      `${px}px`,
+    );
+    return () => {
+      document.documentElement.style.removeProperty("--ob-work-panel-width");
+    };
+  }, [open, maximized, layout.width, viewportWidth]);
 
   if (!open) return null;
 
@@ -203,32 +281,40 @@ function ToolSidePanelInner({
 
   return (
     <aside
+      ref={panelRef}
       className={
         "tool-side-panel" +
         (maximized ? " tool-side-panel--maximized" : "")
       }
-      style={
-        maximized
-          ? undefined
-          : { width: `${Math.min(width, window.innerWidth * MAX_WIDTH_RATIO)}px` }
-      }
+      data-panel-layout={layoutMode}
+      data-panel-narrow={layout.narrow ? "true" : undefined}
+      style={maximized ? undefined : { width: `${layout.width}px` }}
       aria-label="工作区面板"
     >
       {/* 面板左边缘：全宽拖拽（非最大化时）。 */}
       {!maximized && (
         <div
           className="tool-side-panel__edge-sash"
-          onPointerDown={(e) => startResizeEdge(e, width, setWidth)}
+          onPointerDown={(e) =>
+            startResizeEdge(e, width, setWidth, viewportWidth, containerWidth)
+          }
         />
       )}
-      {/* 左导航列 */}
+      {/* 左导航列（单栏模式下即"列表页"，占满整列） */}
+      {showNavColumn && (
       <div
         className={
           "tool-side-panel__nav" +
-          (effectiveNavCollapsed ? " tool-side-panel__nav--collapsed" : "")
+          (navFullWidth
+            ? " tool-side-panel__nav--full"
+            : layout.navCollapsed
+              ? " tool-side-panel__nav--collapsed"
+              : "")
         }
         style={
-          effectiveNavCollapsed ? undefined : { width: `${navWidth}px` }
+          navFullWidth || layout.navCollapsed
+            ? undefined
+            : { width: `${layout.navWidth}px` }
         }
       >
         {/* macOS 贴窗口顶边：空白处支持拖动/双击缩放（同 header）。 */}
@@ -247,7 +333,7 @@ function ToolSidePanelInner({
           >
             {pinned ? <WbUnpinIcon size="sm" /> : <WbPinIcon size="sm" />}
           </button>
-          {!pinned && (
+          {!pinned && !layout.narrow && (
             <button
               type="button"
               className="tool-side-panel__icon-btn"
@@ -276,16 +362,18 @@ function ToolSidePanelInner({
           />
         </div>
       </div>
+      )}
 
-      {/* Sash：调整左列宽度 */}
-      {!effectiveNavCollapsed && (
+      {/* Sash：调整左列宽度（只在两栏模式下有意义） */}
+      {showMainColumn && !navFullWidth && !layout.navCollapsed && (
         <div
           className="tool-side-panel__sash"
-          onPointerDown={(e) => startResizeNav(e, navWidth, setNavWidth)}
+          onPointerDown={(e) => startResizeNav(e, navWidth, setNavWidth, layout.width)}
         />
       )}
 
       {/* 主内容列 */}
+      {showMainColumn && (
       <div className="tool-side-panel__main">
         {/* macOS 上这行 header 贴窗口顶边（Overlay 标题栏）：空白处需要
             data-openbuddy-drag 才能拖动窗口 / 双击缩放（红绿灯右侧的
@@ -295,6 +383,19 @@ function ToolSidePanelInner({
           className="tool-side-panel__header"
           {...(IS_MACOS ? { "data-openbuddy-drag": true } : {})}
         >
+          {/* 单栏模式：从内容回到列表。两栏模式下不需要。 */}
+          {layout.narrow && (
+            <button
+              type="button"
+              className="tool-side-panel__icon-btn"
+              onClick={() => setNarrowList(true)}
+              title="返回列表"
+              aria-label="返回列表"
+              data-testid="tool-side-panel-back"
+            >
+              <ChevronLeftIcon size="sm" />
+            </button>
+          )}
           <div
             className="tool-side-panel__tabs"
             {...(IS_MACOS ? { "data-openbuddy-drag": true } : {})}
@@ -370,8 +471,19 @@ function ToolSidePanelInner({
               onToast={onToast}
             />
           )}
+          {/* 内核 `conversation.toolside` 槽(list 语义):插件可以往右侧面板
+              追加自己的区块(例如「运行日志」「审阅记录」)。内置不注册任何
+              内容,因此默认完全不占位 —— 这是追加口子,不是替换口子,所以
+              不需要 fallback,也不会改变现有视觉。 */}
+          <ConversationToolSide
+            view={view}
+            sessionId={sessionId}
+            cwd={cwd}
+            open={open}
+          />
         </div>
       </div>
+      )}
     </aside>
   );
 }
@@ -399,6 +511,26 @@ function NavContent({
   onFileSelect: (path?: string) => void;
   onToast?: (msg: string) => void;
 }) {
+  // `files.tree` 槽:插件可以整列接管文件树(自带数据源)。内核没装任何实现时
+  // 退回 ui-workbench 的 FileTreeView —— 两者满足同一个 props 契约,所以这里
+  // 只需要把「宿主侧 I/O」准备好交给它。hook 必须在所有 early return 之前调用。
+  const treeSlot = useSlotComponents("files.tree");
+  const SlotTree = (treeSlot[0] as ComponentType<FileTreeViewProps> | undefined) ?? null;
+  const slotLoadDir = useCallback(
+    (dirPath: string) => listDir(dirPath),
+    [],
+  );
+  const slotReveal = useCallback(
+    (path: string) => {
+      void invoke("reveal_in_folder", { path, cwd: cwd ?? null }).catch(
+        (e: unknown) => {
+          onToast?.(`无法在文件夹中显示:${String(e).replace(/^Error:\s*/, "")}`);
+        },
+      );
+    },
+    [cwd, onToast],
+  );
+
   if (view === "artifacts") {
     return (
       <ArtifactsNavList
@@ -418,12 +550,15 @@ function NavContent({
     );
   }
   if (view === "fileTree") {
+    const Tree = SlotTree ?? FileTreeView;
     return (
-      <FileTreeView
+      <Tree
         rootPath={cwd}
         selectedPath={selectedFilePath}
         onFileSelect={(p) => onFileSelect(p)}
         onToast={onToast}
+        loadDir={slotLoadDir}
+        onReveal={slotReveal}
       />
     );
   }
@@ -776,6 +911,7 @@ function startResizeNav(
   e: React.PointerEvent<HTMLDivElement>,
   currentWidth: number,
   setWidth: (w: number) => void,
+  panelWidth: number,
 ) {
   e.preventDefault();
   const startX = e.clientX;
@@ -783,11 +919,8 @@ function startResizeNav(
   const onMove = (ev: PointerEvent) => {
     if (ev.pointerId !== pointerId) return;
     const delta = ev.clientX - startX;
-    const next = Math.min(
-      Math.max(currentWidth + delta, MIN_NAV_WIDTH),
-      MAX_NAV_WIDTH,
-    );
-    setWidth(next);
+    // 上限随面板宽度走：导航列永不吃掉主列的最小可用宽度。
+    setWidth(clampNavWidth(currentWidth + delta, panelWidth));
   };
   const onEnd = (ev: PointerEvent) => {
     if (ev.pointerId !== pointerId) return;
@@ -805,20 +938,17 @@ function startResizeEdge(
   e: React.PointerEvent<HTMLDivElement>,
   currentWidth: number,
   setWidth: (w: number) => void,
+  viewportWidth: number,
+  containerWidth: number,
 ) {
   e.preventDefault();
   const startX = e.clientX;
   const pointerId = e.pointerId;
-  const maxWidth = window.innerWidth * MAX_WIDTH_RATIO;
   const onMove = (ev: PointerEvent) => {
     if (ev.pointerId !== pointerId) return;
-    // 向左拖（delta 负）→ 宽度变大。
+    // 向左拖（delta 负）→ 宽度变大。上限 = 视口 60% 与「容器 − 聊天列最小宽」取小。
     const delta = ev.clientX - startX;
-    const next = Math.min(
-      Math.max(currentWidth - delta, MIN_WIDTH),
-      maxWidth,
-    );
-    setWidth(next);
+    setWidth(clampPanelWidth(currentWidth - delta, viewportWidth, containerWidth));
   };
   const onEnd = (ev: PointerEvent) => {
     if (ev.pointerId !== pointerId) return;

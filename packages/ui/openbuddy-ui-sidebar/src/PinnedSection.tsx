@@ -39,9 +39,10 @@ export function PinnedSection() {
 
   const handleUnpin = useCallback(
     async (sessionId: string) => {
-      // Optimistic local update so the row leaves the list immediately;
-      // the round-trip to pi (which writes to ~/.pi/openbuddy-state.json)
-      // re-affirms via SessionSummaryEvent on success.
+      // Optimistic local update so the row leaves the list immediately; the
+      // main-process write (SQLite catalog in `<agentHome>/openbuddy.sqlite`,
+      // plus the legacy `<agentHome>/openbuddy-state.json` mirror) re-affirms
+      // via SessionSummaryEvent on success.
       upsert({ sessionId, pinned: false });
       try {
         await piSetSessionPinned(sessionId, false);

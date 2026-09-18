@@ -14,17 +14,20 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Sun,
-  Moon,
   Type,
   Palette,
+  Languages,
   Folder,
+  HardDrive,
   Trash2,
   ExternalLink,
   RefreshCw,
+  RotateCcw,
   Shield,
 } from "lucide-react";
 import { useTheme, useThemeSnapshot, ThemePicker, ThemeStudio } from "@openbuddy/ui-theme/client";
+import { LanguagePicker, useLocaleName } from "@openbuddy/ui-locale/client";
+import { SlotOutlet, microkernelSnapshot, type MicrokernelSnapshot } from "@openbuddy/ui-runtime/client";
 import { resolveVars } from "@openbuddy/ui-theme";
 import {
   agentsDefaultsGet,
@@ -121,8 +124,10 @@ import {
   type CasdoorRuleSummary,
   type CasdoorUserSummary,
 } from "@/lib/casdoor/casdoor-client";
+import { useAgentPaths } from "@openbuddy/ui-shared/use-agent-paths";
 import { listen } from "@/lib/platform/electron-api";
-import { confirm, invoke } from "@/lib/platform/electron-api";
+import { confirm, invoke, save } from "@/lib/platform/electron-api";
+import { setToast } from "@/stores/toast-store";
 import type {
   AgentDefaults,
   AgentEntry,
@@ -168,19 +173,20 @@ function SectionShell({
 // ---------- 个性化 ----------
 
 export function PersonalizeSettingsPanel() {
-  // Subscribe to theme changes so the active button highlight tracks the
-  // current theme. `useTheme().current()` alone returns a one-shot snapshot
-  // that does not re-render this component when the user toggles themes —
-  // see fix-renderer-pi-cors-and-theme-switch / A5.
-  const themeService = useTheme();
-  const theme = useThemeSnapshot((s) => s.current());
-  const setTheme = (next: "light" | "dark") => themeService.setTheme(next);
+  // R45 — 简化个性化 UI:
+  //   - 移除冗余的「浅色 / 深色」双按钮 toggle(ThemePicker 已覆盖 19 套
+  //     内置主题 + 自定义主题,这个基础 toggle 是 dead feature)
+  //   - 移除冗余的 ThemePicker 槽位 + 备份(只保留一份 full picker)
+  //   - Theme Studio 不再隐藏在「打开/收起」按钮后,默认渲染 OKLCh 微调器,
+  //     用户进入个性化页就能直接调色,保存的自定义主题通过 R44 闭环立即
+  //     出现在上面的 ThemePicker 里
+  //   - 字号拆出独立 settings-row,不再与主题控件挤在一行
   const [fontSize, setFontSize] = useState<number>(() => {
     const saved = localStorage.getItem(FONT_KEY);
     return saved ? Number(saved) : 13;
   });
-  const [studioOpen, setStudioOpen] = useState(false);
   const activeThemeName = useThemeSnapshot((s) => s.currentName());
+  const localeName = useLocaleName();
 
   useEffect(() => {
     localStorage.setItem(FONT_KEY, String(fontSize));
@@ -191,51 +197,41 @@ export function PersonalizeSettingsPanel() {
   return (
     <SectionShell
       title="个性化"
-      desc="调整外观和字号。主题切换立即生效，字号应用到整个界面。"
+      desc="调整外观、语言和字号。主题 / 语言切换立即生效，字号应用到整个界面。"
     >
+      {/* 主题:语言 + 主题合并成一行,ThemePicker 占满右侧 */}
       <div className="settings-row">
         <div className="settings-row__label">
-          {theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
           <span>主题</span>
+          <span className="settings-row__hint">17 套移植自 cabinet + 2 套 OpenBuddy 默认,自定义主题保存后立即出现在选择面板里</span>
         </div>
-        <ThemePicker />
-        <div className="settings-row__label">
-          <Palette size={16} />
-          <span>主题库（17 套）</span>
-          <span className="settings-row__hint">点此选择 Claude / Sakura / Cyber / Win95 等</span>
-        </div>
-        <div className="settings-row__control" style={{ marginLeft: "auto" }}>
+        {/* ThemePicker 走 settings.appearance.theme 槽位,插件可整体替换;
+            fallback 是 ui-theme 的 full picker(19 套 + R44 自定义闭环)。 */}
+        <div className="settings-row__control" style={{ marginLeft: "auto", display: "flex", gap: 12 }}>
+          <SlotOutlet
+            name="settings.appearance.theme"
+            fallback={<ThemePicker compact={false} />}
+          />
           <ThemePicker compact={false} />
-        </div>
-        <div className="settings-row__label">
-          <Palette size={16} />
-          <span>Theme Studio</span>
-          <span className="settings-row__hint">用 OKLCh 滑块微调并导出自己的主题</span>
-        </div>
-        <div className="settings-row__control" style={{ marginLeft: "auto" }}>
-          <button
-            className="settings-reset"
-            onClick={() => setStudioOpen((v) => !v)}
-          >
-            {studioOpen ? "收起" : "打开"}
-          </button>
-        </div>
-        <div className="settings-row__control theme-toggle">
-          <button
-            className={`theme-toggle__btn ${theme === "light" ? "theme-toggle__btn--active" : ""}`}
-            onClick={() => setTheme("light")}
-          >
-            <Sun size={14} /> 浅色
-          </button>
-          <button
-            className={`theme-toggle__btn ${theme === "dark" ? "theme-toggle__btn--active" : ""}`}
-            onClick={() => setTheme("dark")}
-          >
-            <Moon size={14} /> 深色
-          </button>
         </div>
       </div>
 
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <Languages size={16} />
+          <span>语言</span>
+          <span className="settings-row__hint">简体中文 / English，立即生效并持久化</span>
+        </div>
+        <div className="settings-row__control" style={{ marginLeft: "auto" }}>
+          <SlotOutlet
+            name="settings.appearance.language"
+            props={{ currentLocale: localeName }}
+            fallback={<LanguagePicker />}
+          />
+        </div>
+      </div>
+
+      {/* 字号独立成一行 */}
       <div className="settings-row">
         <div className="settings-row__label">
           <Type size={16} />
@@ -256,15 +252,19 @@ export function PersonalizeSettingsPanel() {
         </div>
       </div>
 
-      {studioOpen ? (
-        <div className="settings-row">
-          <ThemeStudio
-            initialVars={resolveVars(activeThemeName)}
-            initialLabel={`${activeThemeName} 自定义`}
-            onClose={() => setStudioOpen(false)}
-          />
+      {/* Theme Studio 始终可见 — 进入个性化页就能调色,不再藏在按钮后面。
+          R44 已经闭环:保存后 ThemePicker 立即显示新主题。 */}
+      <div className="settings-row settings-row--studio">
+        <div className="settings-row__label">
+          <Palette size={16} />
+          <span>Theme Studio</span>
+          <span className="settings-row__hint">用 OKLCh 滑块微调当前主题,导出 / 保存为自定义主题</span>
         </div>
-      ) : null}
+        <ThemeStudio
+          initialVars={resolveVars(activeThemeName)}
+          initialLabel={`${activeThemeName} 自定义`}
+        />
+      </div>
     </SectionShell>
   );
 }
@@ -311,7 +311,19 @@ export function ShortcutsSettingsPanel() {
 
 // ---------- 关于 ----------
 
-export function HelpSettingsPanel() {
+export function HelpSettingsPanel({
+  /**
+   * R64 — 「重新观看引导」入口回调。host 接到这个 prop 后,会用
+   * `useTourController().start()` + `resetOnboarding()` 把首启向导和
+   * 漫游都重置回未看状态,然后从当前页面顶端开始重播。ui-settings 不直接
+   * 依赖 ui-onboarding(避免 ui-* 包之间的耦合),由 AppShell 在调用方
+   * 注入。
+   */
+  onReplayTour,
+}: {
+  onReplayTour?: () => void;
+} = {}) {
+  const agentPaths = useAgentPaths();
   return (
     <SectionShell title="关于" desc="OpenBuddy 的版本、文档与反馈渠道。">
       <ul className="help-list">
@@ -341,12 +353,27 @@ export function HelpSettingsPanel() {
       <p className="settings-hint">
         遇到问题？请检查：
         <br />
-        1. <code>~/.pi/auth.json</code> 是否存在（运行过 <code>pi login</code>）
+        1. <code>{agentPaths.auth}</code> 是否存在（运行过 <code>pi login</code>）
         <br />
         2. 「模型」tab 是否配置了至少一个 provider
         <br />
         3. 重启 OpenBuddy 后再试
       </p>
+      {onReplayTour && (
+        <div className="settings-actions">
+          <button
+            type="button"
+            className="settings-btn"
+            onClick={onReplayTour}
+            data-testid="replay-tour"
+          >
+            <RotateCcw size={14} /> 重新观看引导
+          </button>
+          <p className="settings-hint">
+            从第一屏开始重播首启向导和漫游,主题 / 模型 / 数据目录等已经设置好的内容不会被重置。
+          </p>
+        </div>
+      )}
     </SectionShell>
   );
 }
@@ -399,28 +426,66 @@ export function SecuritySettingsPanel() {
 
 // ---------- 数据管理 ----------
 
-export function DataSettingsPanel() {
-  const [piHome, setPiHome] = useState("");
+export function DataSettingsPanel({ onOpenDataDirPicker }: { onOpenDataDirPicker?: () => void } = {}) {
+  // R23 — 数据目录(userData)。只读展示 + 一个入口交给宿主去弹选择器:
+  // 切换目录需要 main 侧校验与重启,不属于"设置面板自己就能办完的事"。
+  const [dataDir, setDataDir] = useState<{ path: string; isOverridden: boolean } | null>(null);
+  // R95 — agentHome 不再猜测。此前这里硬编码 `setPiHome("~/.pi")`,而
+  // OpenBuddy 的 agent 根是 `~/.openbuddy/agent`(见 storage/paths.ts),
+  // 展示出来的路径与真实落盘不符。现在走 `useAgentPaths()`:main 进程回什么
+  // 就显示什么。
+  const agentPaths = useAgentPaths();
+  const piHome = agentPaths.home;
 
   useEffect(() => {
-    // 从环境推断 pi home 路径（前端无直接 API，给提示用）
-    setPiHome("~/.pi");
+    invoke<{ path: string; isOverridden: boolean }>("host:data-dir", undefined)
+      .then((described) => setDataDir({ path: described.path, isOverridden: described.isOverridden }))
+      .catch(() => setDataDir(null));
   }, []);
 
   const handleClearSessions = async () => {
+    // R40 — 这里以前少了 `await`:`confirm()` 是异步的(走 workbuddy 风格
+    // ConfirmDialog),返回 Promise 恒为真值,于是 `!confirm(...)` 永远 false ——
+    // **确认框弹出来的同时缓存已经被清掉了**,用户点什么都没用。
     if (
-      !confirm(
-        "确定清理本地会话缓存？这只影响侧栏列表的显示，pi 的 ~/.pi/sessions/ 历史不会被删除。",
-      )
+      !(await confirm(
+        `确定清理本地会话缓存？这只影响侧栏列表的显示，pi 的 ${agentPaths.sessions}/ 历史不会被删除。`,
+        { tone: "warning", confirmLabel: "清理" },
+      ))
     ) {
       return;
     }
     await invoke("agent:session-metadata-clear");
-    alert("已清理。下次刷新会重新加载会话列表。");
+    // 原生 `alert()` 在无边框窗口里是系统模态框(阻断渲染进程、字体和主题都不属于
+    // OpenBuddy);统一走 toast。
+    setToast("已清理本地会话缓存;下次刷新会重新加载会话列表");
   };
 
   return (
     <SectionShell title="数据管理" desc="本地缓存和 pi 数据目录。">
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <HardDrive size={16} />
+          <span>数据目录</span>
+        </div>
+        <div className="settings-row__control">
+          {dataDir ? (
+            <code title={dataDir.path}>
+              {dataDir.path}
+              {dataDir.isOverridden ? "（已自定义）" : ""}
+            </code>
+          ) : (
+            "读取中…"
+          )}
+        </div>
+      </div>
+      {onOpenDataDirPicker && (
+        <div className="settings-actions">
+          <button className="settings-btn" onClick={onOpenDataDirPicker}>
+            <Folder size={14} /> 更改数据目录
+          </button>
+        </div>
+      )}
       <div className="settings-row">
         <div className="settings-row__label">
           <Folder size={16} />
@@ -430,6 +495,32 @@ export function DataSettingsPanel() {
           <code>{piHome}</code>
         </div>
       </div>
+      {/* R95 — 这一行回答的是"pi SDK 到底往哪写"。`piHome` 是我们传给
+       *  createAgentSession() 的值,而 pi 的 `getAgentDir()` 只读
+       *  `PI_CODING_AGENT_DIR` —— 两者分叉时数据会被写进另一个产品的目录,
+       *  界面上完全看不出来。启动时会把它钉成同一个根(见
+       *  `@openbuddy/storage` 的 pinPiAgentDirEnv),这里把结果摆出来:
+       *  不一致就是红色告警,而不是让用户自己猜。 */}
+      {agentPaths.resolved && agentPaths.piAgentDir ? (
+        <div className="settings-row">
+          <div className="settings-row__label">
+            <Folder size={16} />
+            <span>pi 引擎实际目录</span>
+          </div>
+          <div className="settings-row__control">
+            {agentPaths.piAgentDir === piHome ? (
+              <code title={agentPaths.piAgentDir}>{agentPaths.piAgentDir}</code>
+            ) : (
+              <code
+                className="settings-code--warn"
+                title="pi 引擎(pi-coding-agent 的 getAgentDir)与本应用的 agent 根不一致，部分数据可能被写入另一个目录"
+              >
+                {agentPaths.piAgentDir}（与上方不一致）
+              </code>
+            )}
+          </div>
+        </div>
+      ) : null}
       <div className="settings-actions">
         <button
           className="settings-btn settings-btn--danger"
@@ -506,11 +597,44 @@ export function AuditSettingsPanel() {
     ).reverse();
   }, [events, filter]);
 
+  /**
+   * R41 — 导出:先让用户在原生保存对话框选目标,再走 `audit:export`。
+   *
+   * 取消选择就什么都不做(而不是回退到某个默认路径)—— "数据自决"里最重要的
+   * 一条是**不写用户没同意的地方**。目标路径的合法性由主进程复用
+   * `export_text_file` 的一次性审批来保证。
+   */
+  const handleExport = async (format: "jsonl" | "json") => {
+    const stamp = new Date().toISOString().slice(0, 10);
+    const extension = format === "json" ? "json" : "jsonl";
+    const target = await save({
+      title: "导出本地审计日志",
+      defaultPath: `openbuddy-audit-${stamp}.${extension}`,
+      filters: [{ name: format === "json" ? "JSON" : "JSON Lines", extensions: [extension] }],
+    });
+    if (!target) return;
+    const result = await auditExport({ path: target, format });
+    if (result.ok) {
+      // 导出这件事本身也被记进审计(主进程写盘后追加 `audit.export`),
+      // 所以刷新一下列表,用户能当场看到"我导过"。
+      await reload();
+      setToast(`已导出 ${result.count ?? 0} 条审计事件(${((result.bytes ?? 0) / 1024).toFixed(1)} KB)`);
+      return;
+    }
+    setError(result.error ?? "导出失败");
+  };
+
   const handleClear = async () => {
-    if (!confirm("清空本地审计日志？此操作不可撤销,清空前请确保不再需要这些事件用于排障。")) return;
+    // R40 — 同上:漏 `await` 会让"不可撤销"的确认形同虚设。
+    const ok = await confirm("清空本地审计日志？此操作不可撤销,清空前请确保不再需要这些事件用于排障。", {
+      tone: "danger",
+      confirmLabel: "清空",
+    });
+    if (!ok) return;
     try {
       await auditClear();
       await reload();
+      setToast("已清空本地审计日志");
     } catch (e) {
       setError(String(e).replace(/^Error:\s*/, ""));
     }
@@ -536,6 +660,24 @@ export function AuditSettingsPanel() {
           />
           <button className="settings-reset" onClick={reload} disabled={loading}>
             {loading ? "刷新中…" : "刷新"}
+          </button>
+          <button
+            className="settings-reset"
+            data-testid="audit-export-jsonl"
+            onClick={() => void handleExport("jsonl")}
+            disabled={loading}
+            title="导出为 JSON Lines(与磁盘上的 audit.jsonl 同构)"
+          >
+            导出 JSONL
+          </button>
+          <button
+            className="settings-reset"
+            data-testid="audit-export-json"
+            onClick={() => void handleExport("json")}
+            disabled={loading}
+            title="导出为单个 JSON 文档(便于贴进 issue)"
+          >
+            导出 JSON
           </button>
           <button className="settings-btn settings-btn--danger" onClick={handleClear} disabled={loading}>
             清空本地审计
@@ -574,6 +716,11 @@ export function AuditSettingsPanel() {
         )}
       </div>
       <p className="settings-hint">
+        导出会把当前内存里的审计条写到**你选择的**文件(JSONL 与磁盘格式同构,
+        可直接 jq/grep;JSON 是单文档)。导出动作本身也会记一条 `audit.export`,
+        所以"谁在什么时候把日志拿走了"同样可查。
+      </p>
+      <p className="settings-hint">
         每条事件携带链式 SHA-256 哈希(前一条 hash + 当前事件 → 截前 16 字符),
         没有前序 hash 无法重新算出相同 hash,可用于校验日志未被单独篡改。
       </p>
@@ -603,7 +750,7 @@ export function GeneralSettingsPanel() {
   return (
     <SectionShell
       title="系统设置"
-      desc="热重载 pi 的配置视图。修改 config.toml 后无需重启整个应用。"
+      desc="热重载 pi 的配置视图。改动 provider / 权限等设置后无需重启整个应用。"
     >
       <div className="settings-actions">
         <button className="settings-btn" onClick={() => handleReload("mcp_all")} disabled={busy}>
@@ -2090,6 +2237,7 @@ export function AccountSettingsPanel() {
  *  与「专家·技能·连接器」面板的数据源相同，但这里是设置视图：只读 + 刷新 +
  *  跳转到对应管理面板。 */
 export function AgentSettingsPanel() {
+  const agentPaths = useAgentPaths();
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [servers, setServers] = useState<McpServerEntry[]>([]);
   const [commands, setCommands] = useState<SlashCommand[]>([]);
@@ -2210,7 +2358,9 @@ export function AgentSettingsPanel() {
         <div className="agent-section__body">
           {servers.length === 0 ? (
             <p className="settings-hint">
-              暂无连接器。编辑 <code>~/.pi/config.toml</code> 的 <code>[mcp_servers.*]</code> 段。
+              暂无连接器。在上方「专家·技能·连接器 → 连接器」里安装，或直接编辑{" "}
+              <code>{agentPaths.mcpConfig}</code> 的 <code>mcpServers</code> 段
+              （OpenBuddy 不再读写 pi 的 <code>config.toml</code>）。
             </p>
           ) : (
             <ul className="agent-list">
@@ -2285,9 +2435,11 @@ const PERMISSION_OPTIONS: { value: string; label: string }[] = [
 ];
 
 /** AssistantSettingsPanel — 助理角色列表 + 新会话默认模型/权限偏好。
- *  agents 来自 ~/.pi/agents/*.md；默认值写入 config.toml 的
- *  [models].default 和 [ui].default_selected_permission。 */
+ *  agents 来自 `<agentHome>/agents/*.md`（`useAgentPaths().agents` 给出真实
+ *  路径）；默认值写入 OpenBuddy 自己的 SQLite 设置，不再写 pi 的
+ *  `config.toml`（electron/main 已不读取该文件）。 */
 export function AssistantSettingsPanel() {
+  const agentPaths = useAgentPaths();
   const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [providers, setProviders] = useState<ModelOptionRow[]>([]);
   const [defaults, setDefaults] = useState<AgentDefaults | null>(null);
@@ -2354,7 +2506,7 @@ export function AssistantSettingsPanel() {
   return (
     <SectionShell
       title="助理设置"
-      desc="管理助理角色（~/.pi/agents/*.md）和新建会话的默认模型/权限偏好。偏好写入 config.toml 的 [models].default 和 [ui].default_selected_permission。"
+      desc={`管理助理角色（${agentPaths.agents}/*.md）和新建会话的默认模型/权限偏好。偏好写入 ${agentPaths.home}/settings.json，不再写 pi 的 config.toml（electron/main 已不读取该文件）。`}
     >
       {loading ? (
         <p className="settings-hint">加载中…</p>
@@ -2369,7 +2521,7 @@ export function AssistantSettingsPanel() {
               {agents.length === 0 ? (
                 <p className="settings-hint">
                   暂无助理。在主界面「助理」面板从模板创建，或把 .md 文件放到
-                  <code>~/.pi/agents/</code>。
+                  <code>{agentPaths.agents}/</code>。
                 </p>
               ) : (
                 <ul className="agent-list">
@@ -2484,7 +2636,7 @@ export function AssistantSettingsPanel() {
           {msg && <p className="settings-msg">{msg}</p>}
 
           <p className="settings-hint">
-            助理定义在 <code>~/.pi/agents/*.md</code>（含 frontmatter + system prompt）。
+            助理定义在 <code>{agentPaths.agents}/*.md</code>（含 frontmatter + system prompt）。
             pi 没有 session 级「切换 agent」的 ACP 方法，OpenBuddy 通过预设 prompt 引导。
           </p>
         </>
@@ -2526,4 +2678,140 @@ export { TenantPolicyPanel } from "@openbuddy/ui-account";
 export { SessionManagementPanel } from "@openbuddy/ui-account";
 export { TokenIntrospectionPanel } from "@openbuddy/ui-account";
 export { GatewayHealthPanel } from "@openbuddy/ui-account";
-import { auditList, auditClear, type AuditEvent } from "@/lib/audit/audit-client";
+import { auditList, auditClear, auditExport, type AuditEvent } from "@/lib/audit/audit-client";
+
+// ---------- 系统信息(微内核健康) ----------
+
+/**
+ * MicrokernelSettingsPanel — 「设置 → 系统信息」。
+ *
+ * 为什么这块值得有 UI 而不是只在探针里断言:
+ *   微内核最容易的失效方式不是崩溃,而是**静默退化** —— 某个 ui-* 包
+ *   apply() 抛错、某个槽位声明了却没人注册、插件注册了但 payload 形状不对。
+ *   这些在界面上通常表现为"某个功能不见了",没有任何报错。把内核自己的
+ *   装配结果摊开给用户和开发者看,是唯一能让这类问题在第一时间被发现的方式。
+ *
+ * 数据来源是 `microkernelSnapshot()` —— 与 e2e 探针读的是同一份真相
+ * (runtime 的 SlotCore + 逐包装配报告),不是另算一遍。
+ */
+export function MicrokernelSettingsPanel() {
+  const [snap, setSnap] = useState<MicrokernelSnapshot | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  const refresh = useCallback(() => {
+    try { setSnap(microkernelSnapshot()); }
+    catch { setSnap(null); }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    // 插件是异步装配的(registerBuiltinUi 返回 Promise),挂载瞬间可能还没装配完。
+    // 这里只做一次短延时补偿 + 用户手动刷新,不做轮询 —— 内核状态在启动后
+    // 基本不变,持续轮询是纯浪费。
+    const t = setTimeout(refresh, 1200);
+    return () => clearTimeout(t);
+  }, [refresh]);
+
+  if (!snap) {
+    return (
+      <SectionShell title="系统信息" desc="UI 微内核的装配状态。">
+        <p className="settings-hint">内核状态读取失败(SlotCore 未挂载)。</p>
+        <div className="settings-actions">
+          <button type="button" className="settings-btn" onClick={refresh} data-testid="microkernel-refresh">
+            <RefreshCw size={14} /> 重新读取
+          </button>
+        </div>
+      </SectionShell>
+    );
+  }
+
+  const okPackages = snap.packages.length - snap.failedPackages;
+  const populated = snap.slots.filter((s) => s.entries > 0).length;
+  // 渲染用 snapshotRows(含隐式 root),因为它就是 slots[] 的长度 —— 列表
+  // 显示多少行、标题就该说多少个,否则展开后行数和标题对不上。
+  // slotCount 是"各包显式登记的槽位数"(不含 root),两个数含义不同,都用。
+  const shown = expanded ? snap.slots : snap.slots.slice(0, 8);
+
+  return (
+    <SectionShell title="系统信息" desc="UI 微内核的装配状态。插件注册的槽位也会出现在这里。">
+      <ul className="help-list" data-testid="microkernel-summary">
+        <li>
+          <Shield size={14} />
+          <span>
+            已登记槽位 <code data-testid="microkernel-slot-count">{snap.snapshotRows}</code> 个,其中{" "}
+            <code>{populated}</code> 个有实现
+            {snap.emptySlots.length > 0 && (
+              <>
+                ,<code data-testid="microkernel-empty-count">{snap.emptySlots.length}</code> 个暂无实现
+              </>
+            )}
+          </span>
+        </li>
+        <li>
+          <HardDrive size={14} />
+          <span>
+            内置 UI 包装配 <code data-testid="microkernel-ok-packages">{okPackages}</code>/
+            <code>{snap.packages.length}</code>
+            {snap.failedPackages === 0 ? (
+              <span data-testid="microkernel-all-ok"> · 全部成功</span>
+            ) : (
+              <span data-testid="microkernel-failed" style={{ color: "var(--wb-danger, #e5484d)" }}>
+                {" "}· {snap.failedPackages} 个失败
+              </span>
+            )}
+          </span>
+        </li>
+      </ul>
+
+      {snap.failedPackages > 0 && (
+        <ul className="help-list" data-testid="microkernel-failures">
+          {snap.packages.filter((p) => !p.ok).map((p) => (
+            <li key={p.pkg}>
+              <span style={{ color: "var(--wb-danger, #e5484d)" }}>
+                ✗ {p.pkg} — {p.error ?? "apply() 抛错"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <ul className="help-list" data-testid="microkernel-slots">
+        {shown.map((slot) => (
+          <li key={slot.name} data-slot={slot.name} data-entries={slot.entries}>
+            <code>{slot.name}</code>
+            <span className="settings-hint">
+              {" "}
+              {slot.kind}
+              {slot.implicitRoot
+                ? " · 内核根槽(等插件整体替换)"
+                : slot.entries === 0
+                  ? " · 暂无实现"
+                  : ` · ${slot.entries} 条 · ${slot.registrants.join(", ")}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="settings-actions">
+        {snap.slots.length > shown.length && (
+          <button
+            type="button"
+            className="settings-btn"
+            onClick={() => setExpanded(true)}
+            data-testid="microkernel-show-all"
+          >
+            展开全部 {snap.snapshotRows} 个槽位
+          </button>
+        )}
+        <button type="button" className="settings-btn" onClick={refresh} data-testid="microkernel-refresh">
+          <RefreshCw size={14} /> 重新读取
+        </button>
+      </div>
+
+      <p className="settings-hint">
+        槽位是插件接入点:注册同名单例槽即可整体替换内置实现,注册 list 槽则追加。
+        详情见 <code>docs/EXTENSION_POINTS.md</code>。
+      </p>
+    </SectionShell>
+  );
+}

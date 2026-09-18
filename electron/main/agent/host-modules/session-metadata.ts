@@ -359,7 +359,7 @@ async function loadSessionsImpl(cwd: string) {
   // pass or accidental bulk archive marked them as archived. Returning the
   // `archived: true` flag lets the sidebar render a dedicated "已归档" group
   // with a one-click 恢复 action instead of forcing the user to hand-edit
-  // ~/.pi/openbuddy-state.json.
+  // <agentHome>/openbuddy-state.json（真实落盘在 openbuddy.sqlite）。
   //
   // registryArchived (DeepSeek workspace registry) is still honoured: it's
   // an intentional "removed from this workspace" tombstone and shouldn't be

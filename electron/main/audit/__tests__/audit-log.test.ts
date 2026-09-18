@@ -7,7 +7,7 @@
  *   - list() 倒序 + 分页 cursor;
  *   - clear() 清空内存 + 文件。
  */
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -38,6 +38,8 @@ vi.mock("electron", () => ({
 }));
 
 let trail: typeof import("../audit-log").auditTrail;
+// R41 — 导出相关:序列化纯函数 + 主类方法直接测。
+import { serializeAuditEvents } from "../audit-log";
 
 beforeEach(async () => {
   const dir = setupUserData();
@@ -120,5 +122,113 @@ describe("audit-log", () => {
     expect(readFileSync(filePath, "utf8")).toBe("");
     const list = await trail.list();
     expect(list.events).toEqual([]);
+  });
+
+  describe("serializeAuditEvents (R41)", () => {
+    it("jsonl:一行一条,与磁盘格式同构", () => {
+      const blob = serializeAuditEvents(
+        [
+          { id: "a", at: "2026-09-17T00:00:00.000Z", event: "x", outcome: "info", source: "main" },
+          { id: "b", at: "2026-09-17T00:00:01.000Z", event: "y", outcome: "success", source: "main" },
+        ],
+        "jsonl",
+        "2026-09-17T00:00:02.000Z",
+      );
+      const lines = blob.split("\n").filter(Boolean);
+      expect(lines).toHaveLength(2);
+      expect(JSON.parse(lines[0])).toMatchObject({ id: "a", event: "x" });
+      expect(JSON.parse(lines[1])).toMatchObject({ id: "b", event: "y" });
+    });
+
+    it("json:单文档导出 + exportedAt 与 count", () => {
+      const blob = serializeAuditEvents(
+        [{ id: "a", at: "2026-09-17T00:00:00.000Z", event: "x", outcome: "info", source: "main" }],
+        "json",
+        "2026-09-17T00:00:02.000Z",
+      );
+      const parsed = JSON.parse(blob);
+      expect(parsed).toMatchObject({
+        exportedAt: "2026-09-17T00:00:02.000Z",
+        count: 1,
+        events: [{ id: "a" }],
+      });
+    });
+
+    it("空 buffer 也能导出,产出一个空字符串而不是 'null'", () => {
+      expect(serializeAuditEvents([], "jsonl", "2026-09-17T00:00:00.000Z")).toBe("");
+    });
+  });
+
+  describe("exportTo (R41)", () => {
+    const tmpExports: string[] = [];
+    function freshTarget(): string {
+      const file = join(setupUserData(), `export-${tmpExports.length + 1}.jsonl`);
+      tmpExports.push(file);
+      return file;
+    }
+
+    it("把内存里的审计条写成 JSONL 文件 + 写后追加 audit.export 事件(成功)", async () => {
+      await trail.record({ event: "ev-a", outcome: "info", source: "main" });
+      await trail.record({ event: "ev-b", outcome: "success", source: "main" });
+      const target = freshTarget();
+      const result = await trail.exportTo(target);
+      expect(result.path).toBe(target);
+      expect(result.count).toBe(2);
+      expect(result.format).toBe("jsonl");
+      expect(result.bytes).toBeGreaterThan(0);
+
+      const lines = readFileSync(target, "utf8").split("\n").filter(Boolean);
+      // 导出文件本身只有 2 条(写盘后才会记 audit.export,所以**不在**里面)。
+      expect(lines).toHaveLength(2);
+      expect(JSON.parse(lines[0])).toMatchObject({ event: "ev-a" });
+      expect(JSON.parse(lines[1])).toMatchObject({ event: "ev-b" });
+
+      // 但 trail 里有 3 条(含成功的那条 audit.export)。
+      const listed = await trail.list(50);
+      const exportEvents = listed.events.filter((e) => e.event === "audit.export");
+      expect(exportEvents).toHaveLength(1);
+      expect(exportEvents[0]).toMatchObject({ outcome: "success", source: "main", subject: target });
+    });
+
+    it("写盘失败时记一条 outcome=failure + 重抛(不假装成功)", async () => {
+      await trail.record({ event: "ev", outcome: "info", source: "main" });
+      const badTarget = join(setupUserData(), "nope-subdir", "out.jsonl"); // 子目录不存在 → 写不进去
+      await expect(trail.exportTo(badTarget)).rejects.toThrow();
+      const listed = await trail.list(50);
+      const failures = listed.events.filter(
+        (e) => e.event === "audit.export" && e.outcome === "failure",
+      );
+      expect(failures).toHaveLength(1);
+    });
+
+    it("json 格式:导出为单个 JSON 文档 + exportedAt/count 字段", async () => {
+      await trail.record({ event: "ev", outcome: "info", source: "main" });
+      const target = freshTarget().replace(/\.jsonl$/, ".json");
+      const result = await trail.exportTo(target, { format: "json" });
+      expect(result.format).toBe("json");
+      const parsed = JSON.parse(readFileSync(target, "utf8"));
+      expect(parsed.count).toBe(1);
+      expect(parsed.events.map((e: { event: string }) => e.event)).toContain("ev");
+    });
+
+    it("limit 限制只导出尾部若干条", async () => {
+      await trail.record({ event: "ev-1", outcome: "info", source: "main" });
+      await trail.record({ event: "ev-2", outcome: "info", source: "main" });
+      await trail.record({ event: "ev-3", outcome: "info", source: "main" });
+      const target = freshTarget();
+      const result = await trail.exportTo(target, { limit: 1 });
+      expect(result.count).toBe(1);
+      const lines = readFileSync(target, "utf8").split("\n").filter(Boolean);
+      expect(JSON.parse(lines[0]).event).toBe("ev-3");
+    });
+
+    it("文件权限 0o600(审计内容含 subject/detail,不读给其他账号)", async () => {
+      await trail.record({ event: "ev", outcome: "info", source: "main", subject: "secret-user" });
+      const target = freshTarget();
+      await trail.exportTo(target);
+      const stats = statSync(target);
+      // 0o600 意味着 (stats.mode & 0o077) === 0
+      expect((stats.mode & 0o077)).toBe(0);
+    });
   });
 });

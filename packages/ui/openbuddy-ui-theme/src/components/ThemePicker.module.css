@@ -90,6 +90,69 @@
   }
 }
 
+/* ── R61 — Search input ───────────────────────────────────────── */
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  margin: 0 0 6px;
+  border: 1px solid var(--wb-border-soft);
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-bg-secondary);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.searchRow:focus-within {
+  border-color: var(--wb-accent);
+  background: var(--wb-bg-primary);
+}
+
+.searchIcon {
+  flex-shrink: 0;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--wb-fg-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 2px 0;
+}
+
+.searchInput::placeholder {
+  color: var(--wb-fg-tertiary);
+}
+
+.searchClear {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--wb-fg-tertiary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.searchClear:hover {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-fg-primary);
+}
+
 /* ── Mode toggle row (Match system / 手动) ─────────────────────── */
 
 .modeRow {

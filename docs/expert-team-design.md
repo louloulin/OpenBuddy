@@ -48,7 +48,7 @@
 `ExpertsTab.handleSummonFromModal`（213–270 行）实现专家召唤全链路：
 
 1. 调用 `expertsReadAgentPrompt(root, plugin, agentName)` 读取 `agents/<agentName>.md`，剥离 frontmatter 取正文；
-2. 若 `type === "team"`，先 `await expertsLinkAgents(root, plugin)`，把团队成员的 agent 文件软链接到 `~/.pi/agents/`，让 Pi `Task` 工具按短名派生（**关键**：必须 await；pi 在 session start 扫描 `~/.pi/agents/`，未完成则子代理不可发现）；
+2. 若 `type === "team"`，先 `await expertsLinkAgents(root, plugin)`，把团队成员的 agent 文件复制到 `<agentHome>/../agents/`（默认 `~/.openbuddy/agents/`，即产品说明书告诉用户的扁平布局 — 不是嵌套的 `<agentHome>/agents/`），让 pi-subagents 按 frontmatter `name` 派生（**关键**：必须 await；pi 在 session start 扫描该目录，未完成则子代理不可发现）。链接目标名取 frontmatter `name` 而不是源文件名 —— 起步专家的 lead prompt 全部存在 `agents/lead.md`，按文件名链接会让 6 个专家互相覆盖成同一个 `lead.md`（R96 实测）；
 3. 写入 `usePendingExpertStore`（`src/stores/pending-expert-store.ts`，59 行），跳转 home；
 4. 后续对话里 Pi session 启动时按 expert 名走 `pi_set_session_expert`，把 persona 持久化到 session metadata（`electron/main/agent-host.ts:3162` 的 `setSessionExpert`）。
 
@@ -412,7 +412,7 @@ type ExpertManifest = {
 | `version` | `version` | marketplace cache、升级检查和 Team preset 兼容矩阵 |
 | `expertType` | `expertType` | `ExpertItem.type`、Team coordinator 路由 |
 | `agentName` / `teamInfo` | `leadAgentId` / `agents[]` | lead `AgentSession`、`TeamMember.agentRef` |
-| `agents[]` | `AgentDefinition[]` | `expertsReadAgentPrompt`、`~/.pi/agents` 软链接或受控资源目录 |
+| `agents[]` | `AgentDefinition[]` | `expertsReadAgentPrompt`、扁平 `<agentHome>/../agents`（`~/.openbuddy/agents/`）复制或受控资源目录 |
 | `skills[]` | `SkillDependency[]` | Pi ResourceLoader / skill catalog 的依赖声明 |
 | `avatar` / `members[].avatar` | `AssetRef[]` | `avatarLocal`、安全的本地资源缓存 |
 | `displayName` / `profession` / `tags` | `ExpertDisplay` | `ExpertItem.name/title/tags` |

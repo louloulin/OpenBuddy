@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDownIcon } from "@openbuddy/ui-primitives/icons";
-import { open as openDialog } from "@/lib/platform/electron-api";
+import { openPaths } from "@/lib/platform/electron-api";
 import {
   SearchIcon,
   AddIcon,
@@ -275,9 +275,8 @@ function LocalFilesTab({
 
   const handlePickFiles = async () => {
     try {
-      const selected = await openDialog({ multiple: true });
-      if (!selected) return;
-      const paths = Array.isArray(selected) ? selected : [selected];
+      const paths = await openPaths({ multiple: true });
+      if (paths.length === 0) return;
       onToast?.(`已选择 ${paths.length} 个文件`);
     } catch {
       onToast?.("文件选择不可用");

@@ -16,6 +16,7 @@
     "@openbuddy/cordis": "workspace:*",
     "@openbuddy/shared-types": "workspace:*",
     "@openbuddy/ui-conversation": "workspace:*",
+    "@openbuddy/ui-runtime": "workspace:*",
     "@openbuddy/ui-sidebar": "workspace:*",
     "@openbuddy/ui-slots": "workspace:*",
     "@openbuddy/ui-theme": "workspace:*",

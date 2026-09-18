@@ -7,12 +7,14 @@
  *  - 支持 hover-peek 时序（100ms 进入延迟 / 300ms 离开缓冲），避免误触
  *  - Escape 关闭浮层
  *
- * 数据来自 agentsList（~/.pi/agents/*.md 专家定义）。
+ * 数据来自 agentsList（`<agentHome>/agents/*.md` 专家定义，agentHome 默认
+ * `~/.openbuddy/agent`，由 @openbuddy/storage 的 agentHome() 单点决定）。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { agentsList } from "@/lib/agent/pi-client";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import { WbAssistantNavIcon, ChevronRightIcon } from "@openbuddy/ui-primitives/icons";
+import { useAgentPaths } from "@openbuddy/ui-shared/use-agent-paths";
 
 // ---- hover-peek timing (mirrors WorkBuddy use-hover-peek) ----
 const ENTER_DELAY_MS = 100;
@@ -117,18 +119,32 @@ function useHoverPeek(disabled: boolean) {
   };
 }
 
-interface SecondarySidebarProps {
+export interface SecondarySidebarProps {
   /** Start a new session guided by the selected agent. */
   onSelectExpert?: (agent: AgentEntry) => void;
   onToast?: (msg: string) => void;
+  /**
+   * 打开「专家·技能·连接器」页(导轨为空时的出口)。
+   *
+   * 为什么需要:专家来自 `<agentHome>/agents/*.md`,全新安装下一个都没有。导轨
+   * hover 出来却是一片空白(实测 items=0),看起来就像坏了 —— 给它一个
+   * 明确的空状态 + 一条"去哪儿建"的路,比空列表有用得多。
+   */
+  onOpenExperts?: () => void;
   /** Show the contextual assistant picker only while a chat session is active. */
   visible?: boolean;
 }
 
-export function SecondarySidebar({ onSelectExpert, onToast, visible = true }: SecondarySidebarProps) {
+export function SecondarySidebar({
+  onSelectExpert,
+  onToast,
+  onOpenExperts,
+  visible = true,
+}: SecondarySidebarProps) {
   // Hooks must be called unconditionally in a stable order, otherwise React
   // throws #310 ("Rendered more hooks than during the previous render") when
   // `visible` flips. The early return lives AFTER every hook.
+  const agentPaths = useAgentPaths();
   const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [previewAgent, setPreviewAgent] = useState<AgentEntry | null>(null);
@@ -177,6 +193,27 @@ export function SecondarySidebar({ onSelectExpert, onToast, visible = true }: Se
       {hoverPeek && (
         <div className="secondary-sidebar__floating" {...floatingBindings}>
           {loading && <div className="secondary-sidebar__loading">加载中…</div>}
+
+          {!loading && agents.length === 0 && (
+            <div className="secondary-sidebar__empty">
+              <div className="secondary-sidebar__empty-title">还没有专家</div>
+              <div className="secondary-sidebar__empty-desc">
+                专家来自 <code>{agentPaths.agents}/</code> 下的 markdown 定义。
+              </div>
+              {onOpenExperts && (
+                <button
+                  type="button"
+                  className="secondary-sidebar__empty-action"
+                  onClick={() => {
+                    onOpenExperts();
+                    closePeek();
+                  }}
+                >
+                  去创建专家
+                </button>
+              )}
+            </div>
+          )}
 
           <ul className="secondary-sidebar__list">
             {agents.map((agent) => (

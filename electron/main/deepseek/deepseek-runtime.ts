@@ -849,6 +849,12 @@ function textFromAgentMessages(messages: unknown): string | undefined {
 }
 
 function jsonAgentValue(value: unknown): unknown {
+  // SAFETY: recursive JSON sanitizer for agent payload projections. The input is
+  // genuinely untyped (host may pass arbitrary JSON-shaped values), so the return
+  // is also `unknown` — callers narrow it themselves with a validator before
+  // shipping to IPC. Keeping `unknown` here preserves the original value's shape
+  // for inspection (katex/mermaid renderers depend on it) without forcing a
+  // named domain type that would be a lie for half the inputs.
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
   if (typeof value === "number") return Number.isFinite(value) ? value : String(value);
   if (Array.isArray(value)) return value.map(jsonAgentValue);
@@ -1134,6 +1140,11 @@ function freezeToolResultSnapshot(value: unknown): unknown {
   // for large tool results (file_read, grep) without observable benefit.
   // Fallback to no-op if the value isn't freezable (e.g. functions, symbols).
   const seen = new WeakSet<object>();
+  // SAFETY: `freezeToolResultSnapshot` freezes whatever tree shape the tool
+  // returned — objects, arrays, dates, class instances, proxies. We cannot
+  // give this a concrete domain type without misrepresenting the contract.
+  // The freeze is best-effort (some proxies throw on `Object.freeze`); we
+  // silently skip those and return the input unchanged.
   const freeze = (candidate: unknown): unknown => {
     if (!candidate || typeof candidate !== "object") return candidate;
     if (seen.has(candidate)) return candidate;
@@ -1151,6 +1162,16 @@ function freezeToolResultSnapshot(value: unknown): unknown {
 }
 
 async function runAgentWaterfall<T>(context: Context, carrier: AgentScopeCarrier, name: string, payload: Record<string, unknown>, fallback: AgentWaterfallNext<T>): Promise<T> {
+  // SAFETY: `Cordis.Context` is typed without the `serial` middleware. The
+  // plugin-host injects `serial` onto the context object as an optional
+  // extension method (`CordisSerialHook`) — runtime TypeScript cannot see it
+  // without a global augmentation, so we widen the type at the call site and
+  // narrow back via `?.serial`. If `serial` is absent we fall through to
+  // `fallback()` with no side effects; if it is present, its function shape
+  // matches `AgentScopeCarrier`'s `serial` contract exactly (declared in
+  // `packages/runtime/openbuddy-plugin-host/src/cordis-serial-hook.ts`), so
+  // the only risk of a wrong invocation would be a downstream bug in the
+  // hook implementation, not in this call site.
   const serial = (context as unknown as { serial?: (thisArg: AgentScopeCarrier, event: string, payload: unknown, next: AgentWaterfallNext<T>) => Promise<T | undefined> }).serial;
   if (!serial) return fallback();
   const result = await serial(carrier, name, payload, fallback);
@@ -1430,6 +1451,14 @@ function createPiAgentFactory(context: Context): DeepSeekAgentFactory {
       },
       execute: (execution, next) => runAgentWaterfall(context, agentCarrier, "tools/execute", { ...execution, agent }, next),
       postExecute: async (execution, result) => {
+        // SAFETY: same `serial` widening pattern as `runAgentWaterfall()` above
+        // — `Cordis.Context` lacks the optional `serial` hook that plugin-host
+        // attaches at boot. The shape here is the 5-argument variant (with
+        // `result` + `no-result-args fallback`), again matching the cordis-serial
+        // hook's contract verbatim. Read the SAFETY block on `runAgentWaterfall`
+        // for the invariant. The widening is necessary; the alternative
+        // (declaring `serial` globally) breaks every other call site that reads
+        // context properties.
         const serial = (context as unknown as { serial?: (thisArg: AgentScopeCarrier, event: string, execution: unknown, result: unknown, next: () => Promise<unknown>) => Promise<unknown> }).serial;
         if (!serial) return result;
         const outcome = await serial(agentCarrier, "tools/post-execute", { ...execution, agent }, result, async () => result);
@@ -1499,6 +1528,17 @@ function createPiAgentFactory(context: Context): DeepSeekAgentFactory {
       detachSession = sessions.registerLiveSession(session);
       unsubscribeSource = source.subscribe((event) => {
         if (!event || typeof event !== "object" || typeof (event as { type?: unknown }).type !== "string") return;
+        // SAFETY: `source` here is the upstream pi session event bus whose
+        // event payload shape is intentionally permissive (the SDK uses
+        // duck-typing and tolerates unknown event types). We spread the event
+        // (already checked to be an object) and add `sessionId`, then assert
+        // the minimal `{ type: string; [key: string]: unknown }` shape that
+        // `emitPiSessionEvent` reads from. The `as Record<string, unknown>`
+        // widening is safe because we just checked `typeof event === "object"`
+        // and rejected `null`. The final `as unknown as { type: string; ... }`
+        // is the type-narrowing the consumer relies on; it cannot lie about
+        // properties that were present in the original event, only about the
+        // shape of the union — which is exactly what we want.
         const sessionEvent = { ...(event as Record<string, unknown>), sessionId: id } as unknown as { type: string; [key: string]: unknown };
         if (sessionEvent.type === "agent_start") {
           if (suppressNextAgentStart > 0) {
@@ -1721,6 +1761,12 @@ type DeepSeekSessionEvent = {
 };
 
 function snapshotDeepSeekSessionValue(value: unknown, path = "value"): unknown {
+  // SAFETY: recursive freezer for session-event trees. The tree is shaped by
+  // upstream pi / SDK adapters whose types we cannot narrow statically. We
+  // keep `unknown` here so the freeze remains purely structural — narrowing
+  // would force callers to validate first and lose the "validate-as-you-
+  // freeze" guarantee that lets the listener surface type errors at the
+  // original JSON path.
 	// P0/snapshot: validate JSON-safety + recursively freeze the original
 	// tree in place. Previously this function returned a brand-new tree
 	// built via Object.entries → recursive map → Object.freeze. Every append
@@ -1832,6 +1878,10 @@ export class DeepSeekHarnessSession {
 		return event;
 	}
 
+	// SAFETY: `deriveEventMessage` renders an event's user-visible message from
+	// any pi session event shape (user_message / assistant_message / tool_result
+	// / unknown-future). Keeping the wide return preserves forward-compatibility
+	// for events the SDK has not yet added types for.
 	deriveEventMessage(event: DeepSeekSessionEvent): unknown {
 		if (event.type === "user/message") return event.data ?? null;
 		if (event.type === "assistant/message" || event.type === "tool/result") {
@@ -2187,13 +2237,19 @@ export class DeepSeekSessionService extends OpenBuddyService {
     return (this.context.get("eventLog") as { list?: (query?: unknown) => unknown[] } | undefined)?.list?.({ sessionId }) ?? [];
   }
 
-  info(id?: string): unknown {
+  // SAFETY: `info` / `usage` proxy through to `agentHost.sessionInfo` /
+    // `sessionUsage`, whose return shape is intentionally permissive (may be a
+    // plain object, may be a pii-redacted copy, may be null when the session
+    // is still booting). Callers narrow by reading specific fields they care
+    // about. A named return type would over-constrain the contract.
+    info(id?: string): unknown {
     const sessionId = id ?? this.get()?.sessionId;
     const host = this.context.get("agentHost") as AgentHostRuntime | undefined;
     return sessionId && host?.sessionInfo ? host.sessionInfo(sessionId) : null;
   }
 
-  usage(id?: string): unknown {
+  // SAFETY: see `info()`; same permissive contract on usage data shape.
+    usage(id?: string): unknown {
     const sessionId = id ?? this.get()?.sessionId;
     const host = this.context.get("agentHost") as AgentHostRuntime | undefined;
     return sessionId && host?.sessionUsage ? host.sessionUsage(sessionId) : null;
@@ -3600,7 +3656,29 @@ class DeepSeekWorkspaceEntity implements DeepSeekWorkspace {
   }
 
   async insertSessionBefore(sessionId: string, beforeSessionId?: string): Promise<void> {
-    if (!this.record.sessionIds.includes(sessionId)) throw new WorkspaceMoveInvalidError(`cannot move session '${sessionId}' in workspace '${this.path}': the session is not accounted`);
+    // After the v0.15.0 `listWorkspaces()` optimization (see
+    // `electron/main/agent/host-modules/workbench-scope.ts:296-318`), sessions are
+    // no longer auto-attached on every refresh — the registry's `sessionIds`
+    // only tracks manually-attached / reordered sessions. A session whose cwd
+    // matches the workspace path is "owned by cwd" (see `attachSession()` below
+    // and the comment at the top of `listWorkspaces()`) and must remain
+    // reorderable too.
+    //
+    // Try `attachSession()` first when not in the explicit list — it is a no-op
+    // for already-attached sessions, and its cwd check is exactly the rule that
+    // distinguishes "owned" from "foreign" sessions. After `attachSession()`
+    // returns, `this.record.sessionIds` is refreshed in place by
+    // `registry.update() → entity.replace()` (see `DeepSeekWorkspaceRegistryService.update`),
+    // so the rest of this method can keep using `this.record` directly.
+    //
+    // FIX-BOUNDARY NOTE: this is a cross-boundary fix (the bug lives in
+    // `electron/main/`, not in the P0 `packages/ui/openbuddy-ui-conversation/`
+    // scope). The user explicitly authorized crossing the boundary in this
+    // release-readiness verification. See `docs/plan/p0-evidence.md` for the
+    // cross-boundary disclosure.
+    if (!this.record.sessionIds.includes(sessionId)) {
+      await this.attachSession(sessionId);
+    }
     if (beforeSessionId !== undefined && !this.record.sessionIds.includes(beforeSessionId)) throw new WorkspaceMoveInvalidError(`cannot move session '${sessionId}' before '${beforeSessionId}' in workspace '${this.path}': the anchor is not accounted`);
     if (beforeSessionId === sessionId) return;
     const remaining = this.record.sessionIds.filter((id) => id !== sessionId);

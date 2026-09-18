@@ -211,6 +211,124 @@ function parseOrdered(line: string): string | null {
   return match ? match[1] : null;
 }
 
+/** 一个列表项行的解析结果(带缩进宽度,用于判定嵌套层级)。 */
+interface ListItemLine {
+  /** 缩进宽度(空格数;tab 按 2 计)。 */
+  indent: number;
+  /** 有序列表项(`1.` / `1)`)还是无序(`-` / `*` / `+`)。 */
+  ordered: boolean;
+  /** 序号(仅有序项有意义,无序项为 null)。 */
+  order: number | null;
+  /** 去掉 marker 之后的正文(可能还带任务标记)。 */
+  text: string;
+}
+
+function indentWidth(leading: string): number {
+  let width = 0;
+  for (const ch of leading) width += ch === "\t" ? 2 : 1;
+  return width;
+}
+
+/**
+ * 列表项行 —— 与 `parseBullet` / `parseOrdered` 的区别是**保留缩进**。
+ *
+ * `parseBullet` 允许 0–3 个前导空格并且把它们丢掉,所以
+ * `- 一级` / `  - 二级` / `- 三级` 三行在旧实现里是"同层的三项",嵌套结构
+ * 在打开编辑器时就被拍平了(用户的大纲变成平铺列表,保存后不可逆)。
+ * 这里把缩进带出来,交给 `parseListBlock` 递归成真正的子列表。
+ */
+function parseListItemLine(line: string): ListItemLine | null {
+  const match = /^([ \t]*)([-*+]|\d+[.)])[ \t]+(.*)$/.exec(line);
+  if (!match) return null;
+  const marker = match[2];
+  const ordered = /^\d/.test(marker);
+  return {
+    indent: indentWidth(match[1]),
+    ordered,
+    order: ordered ? Number.parseInt(marker, 10) : null,
+    text: match[3],
+  };
+}
+
+/**
+ * 把同一缩进层级的连续列表项解析成 HTML,并递归处理缩进更深的子列表。
+ *
+ * 与旧实现的三点差异(都是"打开编辑器不再改写用户文档"的一部分):
+ *   1. 缩进更深的项成为**子列表**,而不是被拍平成同级项;
+ *   2. 有序 / 无序、任务 / 普通混在一起时**分段**输出 —— TipTap 的
+ *      `taskList` 只接受 `taskItem` 子节点,把普通 `<li>` 塞进去会被 schema
+ *      静默丢弃(内容消失);
+ *   3. 有序列表起始序号 ≠ 1 时写上 `start`,不再把 `3.` 开头的列表改回 `1.`。
+ */
+function parseListBlock(
+  lines: string[],
+  start: number,
+  baseIndent: number,
+): { html: string; index: number } {
+  const first = parseListItemLine(lines[start]);
+  if (!first) return { html: "", index: start };
+
+  const ordered = first.ordered;
+  const groups: Array<{ task: boolean; start: number; items: string[] }> = [];
+  let index = start;
+
+  while (index < lines.length) {
+    const item = parseListItemLine(lines[index]);
+    // 更浅 → 本层列表结束(交给外层);更深 → 已由上一项的递归消费;
+    // 类型换了(有序 ↔ 无序)→ 新的一个列表块。
+    if (!item || item.indent !== baseIndent || item.ordered !== ordered) break;
+
+    const task = parseTaskMarker(item.text);
+    const body = task ? task.text : item.text;
+
+    // 正文之后的**更深缩进**行属于这一项(子列表)。
+    let childHtml = "";
+    index += 1;
+    while (index < lines.length) {
+      const lookahead = lines[index];
+      if (isBlank(lookahead)) break;
+      const nested = parseListItemLine(lookahead);
+      if (nested && nested.indent > baseIndent) {
+        const sub = parseListBlock(lines, index, nested.indent);
+        childHtml += sub.html;
+        index = sub.index;
+        continue;
+      }
+      break;
+    }
+
+    const textHtml = `<p>${renderInline(body)}</p>${childHtml}`;
+    const marker = task
+      ? `<li data-type="taskItem" data-checked="${task.checked}">`
+      : "<li>";
+    const groupStart = ordered ? item.order ?? 1 : 1;
+
+    const previous = groups[groups.length - 1];
+    if (previous && previous.task === (task !== null)) {
+      previous.items.push(`${marker}${textHtml}</li>`);
+    } else {
+      groups.push({
+        task: task !== null,
+        start: groupStart,
+        items: [`${marker}${textHtml}</li>`],
+      });
+    }
+  }
+
+  const html = groups
+    .map((group) => {
+      if (group.task) return `<ul data-type="taskList">${group.items.join("")}</ul>`;
+      if (ordered) {
+        const startAttr = group.start !== 1 ? ` start="${group.start}"` : "";
+        return `<ol${startAttr}>${group.items.join("")}</ol>`;
+      }
+      return `<ul>${group.items.join("")}</ul>`;
+    })
+    .join("");
+
+  return { html, index };
+}
+
 /**
  * markdown → TipTap 可加载的 HTML 片段。
  *
@@ -343,32 +461,9 @@ export function markdownToHtml(markdown: string): string {
     const bullet = parseBullet(line);
     const ordered = bullet === null ? parseOrdered(line) : null;
     if (bullet !== null || ordered !== null) {
-      const orderedList = ordered !== null;
-      const items: string[] = [];
-      while (state.index < state.lines.length) {
-        const current = state.lines[state.index];
-        const nextBullet = orderedList ? null : parseBullet(current);
-        const nextOrdered = orderedList ? parseOrdered(current) : null;
-        const item = nextBullet ?? nextOrdered;
-        if (item === null) break;
-        const task = parseTaskMarker(item);
-        if (task) {
-          items.push(
-            `<li data-type="taskItem" data-checked="${task.checked}"><p>${renderInline(task.text)}</p></li>`,
-          );
-        } else {
-          items.push(`<li><p>${renderInline(item)}</p></li>`);
-        }
-        state.index += 1;
-      }
-      const hasTask = items.some((item) => item.includes('data-type="taskItem"'));
-      if (hasTask) {
-        blocks.push(`<ul data-type="taskList">${items.join("")}</ul>`);
-      } else if (orderedList) {
-        blocks.push(`<ol>${items.join("")}</ol>`);
-      } else {
-        blocks.push(`<ul>${items.join("")}</ul>`);
-      }
+      const parsed = parseListBlock(state.lines, state.index, parseListItemLine(line)?.indent ?? 0);
+      blocks.push(parsed.html);
+      state.index = parsed.index;
       continue;
     }
 
@@ -417,6 +512,69 @@ function inlineChildrenToMarkdown(node: Node): string {
     out += nodeToMarkdown(child, true);
   });
   return out;
+}
+
+/**
+ * 列表 → markdown,支持嵌套(子列表每层缩进 2 空格)。
+ *
+ * 旧实现把 `<li>` 的内容整段当**行内**文本处理,于是
+ * `<li><p>一级</p><ul><li><p>二级</p></li></ul></li>` 在保存时被拍平成
+ * `- 一级\n- 二级` —— 嵌套层级不可逆地丢了。这里把嵌套的 `<ul>` / `<ol>`
+ * 拆出来单独递归,用 depth 决定缩进。
+ *
+ * `start` 属性会被保留(编辑器里从 3 开始编号的有序列表不会被打回 1)。
+ */
+/** 最近的祖先 `<li>`(不含自身)—— 用来判定一个列表属于哪一层。 */
+function nearestListItem(el: Element): Element | null {
+  let node = el.parentElement;
+  while (node) {
+    if (node.tagName.toLowerCase() === "li") return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function listToMarkdown(el: Element, depth: number): string {
+  const ordered = el.tagName.toLowerCase() === "ol";
+  const indent = "  ".repeat(depth);
+  const lines: string[] = [];
+  let counter = Number.parseInt(el.getAttribute("start") ?? "1", 10);
+  if (!Number.isFinite(counter) || counter < 1) counter = 1;
+
+  el.childNodes.forEach((child) => {
+    if (child.nodeType !== 1) return;
+    const item = child as Element;
+    if (item.tagName.toLowerCase() !== "li") return;
+
+    // 子列表未必是 <li> 的直接子节点:TipTap 的 taskItem 会渲染成
+    // `<li><label/><div><p>正文</p><ul>子列表</ul></div></li>`,嵌套列表在
+    // `<div>` 里面。所以按"最近的祖先 <li> 是不是当前项"来判定归属层级,
+    // 更深层的子列表由递归处理。
+    const nested: Element[] = [];
+    item.querySelectorAll("ul, ol").forEach((candidate) => {
+      if (nearestListItem(candidate) === item) nested.push(candidate);
+    });
+
+    const clone = item.cloneNode(true) as Element;
+    clone.querySelectorAll("ul, ol").forEach((node) => node.remove());
+    let text = inlineChildrenToMarkdown(clone).trim();
+    // 多段正文压成单行(否则 bullet 行里出现空行,markdown 会把列表拆开)。
+    text = text.replace(/\n{2,}/g, "\n").replace(/\n/g, " ");
+
+    const isTask = item.getAttribute("data-type") === "taskItem";
+    const checked = item.getAttribute("data-checked") === "true";
+    if (isTask) {
+      lines.push(`${indent}- [${checked ? "x" : " "}] ${text}`.trimEnd());
+    } else if (ordered) {
+      lines.push(`${indent}${counter}. ${text}`.trimEnd());
+    } else {
+      lines.push(`${indent}- ${text}`.trimEnd());
+    }
+    counter += 1;
+    nested.forEach((node) => lines.push(listToMarkdown(node, depth + 1)));
+  });
+
+  return lines.join("\n");
 }
 
 function escapeMarkdownText(text: string): string {
@@ -504,26 +662,8 @@ function nodeToMarkdown(node: Node, inline: boolean): string {
         .map((line) => `> ${line}`.trimEnd())
         .join("\n");
     case "ul":
-    case "ol": {
-      const ordered = tag === "ol";
-      const items: string[] = [];
-      let counter = 1;
-      el.childNodes.forEach((child) => {
-        if (child.nodeType !== 1) return;
-        const item = child as Element;
-        if (item.tagName.toLowerCase() !== "li") return;
-        const isTask = item.getAttribute("data-type") === "taskItem";
-        const checked = item.getAttribute("data-checked") === "true";
-        const text = inlineChildrenToMarkdown(item).trim();
-        if (isTask) {
-          items.push(`- [${checked ? "x" : " "}] ${text}`);
-        } else {
-          items.push(ordered ? `${counter}. ${text}` : `- ${text}`);
-        }
-        counter += 1;
-      });
-      return items.join("\n");
-    }
+    case "ol":
+      return listToMarkdown(el, 0);
     case "table": {
       const rows: string[][] = [];
       el.querySelectorAll("tr").forEach((row) => {

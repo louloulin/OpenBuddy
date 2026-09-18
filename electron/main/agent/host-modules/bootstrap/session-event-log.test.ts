@@ -20,7 +20,10 @@ function makeStubState(): AgentHostState {
   } as unknown as AgentHostState;
 }
 
-describe("host-modules/bootstrap/session-event-log", () => {
+// 这些用例真的去开一个 SQLite SessionEventLog(含 schema 迁移),单次 3-7s。
+// vitest 默认 5s/test 的全量并行跑法会把它们判成超时(单独跑则通过),
+// 所以这里显式放宽,而不是把它当成真实失败。
+describe("host-modules/bootstrap/session-event-log", { timeout: 30_000 }, () => {
   let cwd: string;
 
   beforeEach(async () => {

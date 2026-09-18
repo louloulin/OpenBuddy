@@ -21,7 +21,7 @@
 
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { agentHome } from "@openbuddy/storage";
+import { agentHome, userAgentsHome } from "@openbuddy/storage";
 
 /**
  * Returns the absolute path to OpenBuddy's agent home (~/.openbuddy/agent).
@@ -33,6 +33,49 @@ import { agentHome } from "@openbuddy/storage";
 export function piHome(): string {
   return agentHome();
 }
+
+/**
+ * Make pi-subagents (and any other extension that resolves its user agent dir
+ * via `getAgentDir()`) see OpenBuddy's per-tenant agent home.
+ *
+ * The pi-coding-agent SDK passes `agentDir` into `createAgentSession`, but
+ * extensions like `pi-subagents` resolve the user agent dir *independently*
+ * from `process.env.PI_CODING_AGENT_DIR` (falling back to `~/.pi/agent`).
+ * Without this hint, expert agent markdown files linked into
+ * `<piHome>/agents/` would never be discovered — pi-subagents would scan
+ * `~/.pi/agent/agents` instead, which on a clean install is empty.
+ *
+ * `PI_SUBAGENT_EXTRA_AGENT_DIRS` is the official escape hatch pi-subagents
+ * documents for hermetic wrappers: a PATH-style list of additional user-scope
+ * agent directories, scanned at lower precedence than the primary agent dir.
+ *
+ * Idempotent: safe to call from any boot path; multiple calls accumulate
+ * values via the standard delimiter.
+ */
+export function ensurePiSubagentAgentDirs(): void {
+  const home = piHome();
+  // Honour two roots: the canonical flat user root (~/.openbuddy/agents/) and
+  // the legacy nested one (<home>/agents) that pi-subagents would otherwise
+  // scan natively via path.join(getAgentDir(), "agents"). The canonical root
+  // is listed first because it is where OpenBuddy writes new agents (linkExpertAgents,
+  // saveAgent) and what our UI tells users to author into.
+  const roots = [userAgentsHome(), join(home, "agents")];
+  const delim = (typeof process !== "undefined" && process.platform === "win32") ? ";" : ":";
+  const existing = process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS ?? "";
+  const parts = existing.split(delim).map((value) => value.trim()).filter(Boolean);
+  let changed = false;
+  for (const root of roots) {
+    if (parts.includes(root)) continue;
+    parts.push(root);
+    changed = true;
+  }
+  if (changed) process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS = parts.join(delim);
+}
+
+// Side-effect at module-load: set the env as early as possible so any pi
+// extension (notably pi-subagents) that resolves its agent directory at
+// extension registration time picks up OpenBuddy's home.
+ensurePiSubagentAgentDirs();
 
 /**
  * Returns true when `candidate` resolves to a path strictly inside `root`.

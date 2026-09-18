@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import {
   User,
   Mail,
@@ -24,6 +24,7 @@ import {
   Link2,
   Webhook,
   Coins,
+  Puzzle,
   Users,
   Folder,
   Monitor,
@@ -48,6 +49,7 @@ import {
   type FetchedModel,
 } from "@/lib/agent/pi-client";
 import { confirm } from "@/lib/platform/electron-api";
+import { useAgentPaths } from "@openbuddy/ui-shared/use-agent-paths";
 import {
   AccountLinkingPanel,
   AccountSettingsPanel,
@@ -61,6 +63,7 @@ import {
   AuditSettingsPanel,
   GeneralSettingsPanel,
   HelpSettingsPanel,
+  MicrokernelSettingsPanel,
   PersonalizeSettingsPanel,
   ResourceCatalogPanel,
   SecuritySettingsPanel,
@@ -73,6 +76,8 @@ import {
   WebhookSubscriptionPanel,
 } from "./SettingsSections";
 import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
+import { useSlotComponents } from "@openbuddy/ui-runtime/client";
+import { OpenBuddyPluginPanel, PluginsPanel } from "@openbuddy/ui-mcp";
 import { RendererContributionCard, RendererSlotView } from "@openbuddy/ui-workbench";
 
 /**
@@ -82,7 +87,7 @@ import { RendererContributionCard, RendererSlotView } from "@openbuddy/ui-workbe
  * 12-item left navigation (mirrors WorkBuddy) and a right panel that swaps
  * per section. Each section is backed by a local Electron/Pi capability.
  *
- * The 模型 section lists configured providers from ~/.pi/agent/models.json and
+ * The 模型 section lists configured providers from `<agentHome>/models.json` and
  * opens a nested "添加模型" editor dialog (560×318) when adding/editing.
  * That editor writes back through providers_save → pi's [model.*] tables.
  */
@@ -112,7 +117,12 @@ type SectionId =
   | "data"
   | "security"
   | "help"
-  | "audit";
+  | "audit"
+  // R82 —— 「设置 → 关于 → 系统信息」的微内核健康面板。
+  | "microkernel"
+  // R92 — 新增 2 个插件管理子页,走 `placeholder.plugins` / `placeholder.openbuddy-plugin` 槽。
+  | "plugins"
+  | "openbuddy-plugin";
 
 interface NavItem {
   id: SectionId;
@@ -189,6 +199,7 @@ const NAV_GROUPS: NavGroup[] = [
     flat: true,
     items: [
       { id: "help", label: "关于 OpenBuddy", icon: HelpCircle },
+      { id: "microkernel", label: "系统信息", icon: Activity },
     ],
   },
   {
@@ -202,6 +213,8 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "linking", label: "账号绑定", icon: Link2 },
       { id: "webhooks", label: "Webhook 订阅", icon: Webhook },
       { id: "resources", label: "资源目录", icon: Folder },
+      { id: "plugins", label: "Pi 插件", icon: Puzzle },
+      { id: "openbuddy-plugin", label: "OpenBuddy 插件", icon: Bot },
       { id: "policy", label: "租户策略", icon: Shield },
       { id: "sessions", label: "会话管理", icon: Monitor },
       { id: "introspect", label: "Token 内省", icon: KeyRound },
@@ -364,6 +377,8 @@ export function SettingsPanel({
   onModelsChanged,
   initialSection = "model",
   onOpenEmailPlan,
+  onOpenDataDirPicker,
+  onReplayTour,
 }: {
   open: boolean;
   onClose: () => void;
@@ -372,8 +387,31 @@ export function SettingsPanel({
   onModelsChanged?: () => void | Promise<void>;
   initialSection?: SectionId;
   onOpenEmailPlan?: (planId: string) => void;
+  /** R23 — 打开宿主的「更改数据目录」选择器(内核槽位 `onboarding.data-dir`)。 */
+  onOpenDataDirPicker?: () => void;
+  /** R64 — 「重新观看引导」入口回调,被「关于」section 的按钮触发。
+   *  host 接到这个 prop 后,会用 `useTourController().start()` +
+   *  `resetOnboarding()` 把首启向导和漫游都重置回未看状态。 */
+  onReplayTour?: () => void;
 }) {
   const [active, setActive] = useState<SectionId>("model");
+// R92 — 设置面板的 7 个子页走 `placeholder.*` 槽,插件可以注册更高优先级
+// 整体替换任意一页。fallback 用 `./SettingsSections` 里的内置组件,卸载
+// 插件后视觉零变化。
+const _billingImpl = useSlotComponents("placeholder.billing")[0] as ComponentType<unknown> | undefined;
+const _pricingImpl = useSlotComponents("placeholder.credit-pricing")[0] as ComponentType<unknown> | undefined;
+const _reconciliationImpl = useSlotComponents("placeholder.credit-reconciliation")[0] as ComponentType<unknown> | undefined;
+const _walletImpl = useSlotComponents("placeholder.credit-wallet")[0] as ComponentType<unknown> | undefined;
+const _resourcesImpl = useSlotComponents("placeholder.resource-catalog")[0] as ComponentType<unknown> | undefined;
+const _pluginsImpl = useSlotComponents("placeholder.plugins")[0] as ComponentType<unknown> | undefined;
+const _openbuddyPluginImpl = useSlotComponents("placeholder.openbuddy-plugin")[0] as ComponentType<unknown> | undefined;
+const BillingPanelImpl = (_billingImpl ?? BillingPanel) as ComponentType<unknown>;
+const CreditPricingPanelImpl = (_pricingImpl ?? CreditPricingPanel) as ComponentType<unknown>;
+const CreditReconciliationPanelImpl = (_reconciliationImpl ?? CreditReconciliationPanel) as ComponentType<unknown>;
+const CreditWalletPanelImpl = (_walletImpl ?? CreditWalletPanel) as ComponentType<unknown>;
+const ResourceCatalogPanelImpl = (_resourcesImpl ?? ResourceCatalogPanel) as ComponentType<unknown>;
+const PluginsPanelImpl = (_pluginsImpl ?? PluginsPanel) as ComponentType<unknown>;
+const OpenBuddyPluginPanelImpl = (_openbuddyPluginImpl ?? OpenBuddyPluginPanel) as ComponentType<unknown>;
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     for (const g of NAV_GROUPS) if (g.collapsedByDefault) init[g.id] = true;
@@ -548,11 +586,13 @@ export function SettingsPanel({
             ) : active === "shortcuts" ? (
               <ShortcutsSettingsPanel />
             ) : active === "help" ? (
-              <HelpSettingsPanel />
+              <HelpSettingsPanel onReplayTour={onReplayTour} />
+            ) : active === "microkernel" ? (
+              <MicrokernelSettingsPanel />
             ) : active === "security" ? (
               <SecuritySettingsPanel />
             ) : active === "data" ? (
-              <DataSettingsPanel />
+              <DataSettingsPanel onOpenDataDirPicker={onOpenDataDirPicker} />
             ) : active === "audit" ? (
               <AuditSettingsPanel />
             ) : active === "general" ? (
@@ -566,15 +606,19 @@ export function SettingsPanel({
             ) : active === "webhooks" ? (
               <WebhookSubscriptionPanel />
             ) : active === "billing" ? (
-              <BillingPanel />
+              <BillingPanelImpl />
             ) : active === "pricing" ? (
-              <CreditPricingPanel />
+              <CreditPricingPanelImpl />
             ) : active === "reconciliation" ? (
-              <CreditReconciliationPanel />
+              <CreditReconciliationPanelImpl />
             ) : active === "wallet" ? (
-              <CreditWalletPanel />
+              <CreditWalletPanelImpl />
             ) : active === "resources" ? (
-              <ResourceCatalogPanel />
+              <ResourceCatalogPanelImpl />
+            ) : active === "plugins" ? (
+              <PluginsPanelImpl />
+            ) : active === "openbuddy-plugin" ? (
+              <OpenBuddyPluginPanelImpl />
             ) : active === "policy" ? (
               <TenantPolicyPanel />
             ) : active === "sessions" ? (
@@ -628,6 +672,7 @@ export function SettingsPanel({
 type ImportingState = { providerId: string; apiKey: string } | null;
 
 function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void }) {
+  const agentPaths = useAgentPaths();
   const [data, setData] = useState<ProviderListModel>({ providers: [], models: [] });
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -817,7 +862,7 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
         </div>
         <div className="models-settings-panel__card-desc models-settings-panel__grouped-note">
           一个厂商保存一份 API Key / Base URL / 上下文窗口，可挂载多个模型。配置写入{" "}
-          <code className="models-settings-panel__card-link">~/.pi/agent/models.json</code>。
+          <code className="models-settings-panel__card-link">{agentPaths.models}</code>。
         </div>
 
         {loading ? (

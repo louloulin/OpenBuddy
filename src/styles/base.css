@@ -17,7 +17,9 @@ html, body, #root {
 }
 
 body {
-  font-family: var(--wb-font-family-base, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif);
+  /* `--wb-font` 由 @openbuddy/ui-theme 按当前主题写成内联值(19 套主题各自的
+     正文字体)。`--wb-font-family-base` 保留为宿主覆盖点,最后才落到系统栈。 */
+  font-family: var(--wb-font, var(--wb-font-family-base, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif));
   font-size: 13px;
   line-height: 1.5;
   color: var(--wb-text-strong);

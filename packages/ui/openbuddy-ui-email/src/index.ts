@@ -30,3 +30,19 @@ export { EmailDetail } from "./EmailDetail";
 export type { EmailDetailProps } from "./EmailDetail";
 export { EmailSidebar } from "./EmailSidebar";
 export type { EmailSidebarProps, EmailFolder, EmailView } from "./EmailSidebar";
+
+
+declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * 邮件主面板(single)。
+     * 消费者:PlaceholderPage「邮件」路由。
+     */
+    "placeholder.email": { kind: "single"; scope: "root" };
+    /**
+     * 邮件撰写面板(single)。
+     * 消费者:EmailPanel 内部的「新建邮件」模态。
+     */
+    "placeholder.email-composer": { kind: "single"; scope: "root" };
+  }
+}

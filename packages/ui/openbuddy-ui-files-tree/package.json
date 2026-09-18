@@ -11,6 +11,7 @@
     "./invariant": "./src/invariant.ts",
     "./components": "./src/components/index.ts",
     "./components/FileTree": "./src/components/FileTree.tsx",
+    "./components/LazyFileTree": "./src/components/LazyFileTree.tsx",
     "./lib/tree-utils": "./src/lib/tree-utils.ts",
     "./package.json": "./package.json"
   },

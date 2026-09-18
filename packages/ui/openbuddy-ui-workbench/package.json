@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@openbuddy/cordis": "workspace:*",
+    "@openbuddy/ui-files-tree": "workspace:*",
     "@openbuddy/ui-slots": "workspace:*",
     "@openbuddy/ui-theme": "workspace:*"
   },

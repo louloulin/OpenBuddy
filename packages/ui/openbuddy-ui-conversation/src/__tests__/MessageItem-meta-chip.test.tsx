@@ -131,9 +131,13 @@ describe("MessageItem — R8.15 model + throughput chips", () => {
     );
     expect(container.querySelector(".msg__meta-chip--model")).toBeTruthy();
     expect(container.querySelector(".msg__meta-chip--throughput")).toBeTruthy();
-    // Both pills sit inside the same .msg__meta row.
+    // R58 — outputTokens now also renders the "X out" chip alongside the
+    // throughput chip, so the row carries 3 pills total (model +
+    // output + throughput). inputTokens is absent so no input chip.
+    expect(container.querySelector(".msg__meta-chip--output")).toBeTruthy();
+    expect(container.querySelector(".msg__meta-chip--input")).toBeNull();
     const meta = container.querySelector(".msg__meta");
     const chips = meta?.querySelectorAll(".msg__meta-chip");
-    expect(chips?.length).toBe(2);
+    expect(chips?.length).toBe(3);
   });
 });

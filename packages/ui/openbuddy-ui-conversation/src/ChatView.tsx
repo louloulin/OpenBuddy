@@ -34,6 +34,14 @@ import {
 } from "@/lib/agent/session-artifacts";
 import { MessageItem } from "./MessageItem";
 import { Composer } from "./Composer";
+import type { ComposerProps } from "./Composer";
+import { ConversationBody, ConversationComposer } from "./conversation-slots";
+import {
+  ConversationViewOutlet,
+  ConversationViewTabs,
+  useConversationViews,
+} from "./conversation-view";
+import { ConversationApprovals } from "./conversation-approvals";
 import { PiReloadFailureBanner } from "./PiReloadFailureBanner";
 import { PlanPanel } from "@openbuddy/ui-automation";
 import { RewindBar } from "./RewindBar";
@@ -42,6 +50,7 @@ import { QuestionInlineCard } from "./QuestionInlineCard";
 import { ToolSidePanel, type ToolSidePanelMode } from "./ToolSidePanel";
 import { FindBar, isFindHit } from "./FindBar";
 import { FileChangesPanel } from "./FileChangesPanel";
+import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { SubagentPanel } from "@openbuddy/ui-collaboration";
 import { TeamStatusView } from "@openbuddy/ui-workbench";
 import { ShareMenu } from "@openbuddy/ui-workbench";
@@ -55,6 +64,8 @@ import {
 import { buildTimeline, type TimelineNode } from "@/lib/ui/timeline-utils";
 import { formatPiError } from "@/lib/platform/error-format";
 import { useSubagentStore } from "@/stores/subagent-store";
+import { useQuestionStore } from "@/stores/question-store";
+import { usePermissionStore } from "@/stores/permission-store";
 import {
   requestYield,
   confirmYielded,
@@ -384,6 +395,13 @@ export function ChatView({
   const [fileChangesOpen, setFileChangesOpen] = useState(false);
   // 子代理运行时面板(对齐 WorkBuddy team-runtime)。
   const [subagentsOpen, setSubagentsOpen] = useState(false);
+
+
+  // R92 — 子代理面板走 `placeholder.subagent` 槽,插件可整体替换。
+
+  const [SubagentPanelImpl] = useSlotComponents("placeholder.subagent");
+
+  const SubagentPanelResolved = (SubagentPanelImpl ?? SubagentPanel) as typeof SubagentPanel;
   const [teamsOpen, setTeamsOpen] = useState(false);
   // pause/yield(对齐 WorkBuddy session:requestYield):软暂停,保留会话上下文。
   const [yieldStore, setYieldStore] = useState<Record<string, ReturnType<typeof createYieldStore>>["k"]>(() => createYieldStore());
@@ -489,6 +507,19 @@ export function ChatView({
     setResendNonce((n) => n + 1);
   }, []);
 
+  // R78 (assistant inline edit) — apply 落库;不需要 resend 路径。
+  const handleEditAssistantMessage = useCallback((messageId: string, newMarkdown: string) => {
+    useSessionStore.getState().editAssistantMessage(messageId, newMarkdown);
+  }, []);
+
+  // R78 — 应用并重新生成:先替换 assistant 内容,再走 handleRetry 同一管线
+  // (回退到上一条 user prompt 重新发送)。
+  const handleResendAfterAssistantEdit = useCallback((_messageId: string) => {
+    if (handleRetryRef.current) {
+      void handleRetryRef.current();
+    }
+  }, []);
+
   // R8.10 — quick-prompt card click: seed the composer with the preset
   // text via the same resendText pipe as inline-edit / revision-pager so
   // a single source of truth seeds the textarea (Composer auto-focuses
@@ -508,6 +539,8 @@ export function ChatView({
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+  const handleRetryRef = useRef<(() => Promise<void>) | null>(null);
+  handleRetryRef.current = null;
   const handleRetry = useCallback(async () => {
     if (!sessionId || streaming || retrying || readOnlySubagent) return;
     // Find the last user message text via the ref to avoid re-creating
@@ -543,6 +576,8 @@ export function ChatView({
       setRetrying(false);
     }
   }, [sessionId, streaming, retrying, readOnlySubagent, onSend, onRewound, onToast]);
+  // R78 — 让 handleResendAfterAssistantEdit 永远拿到当前最新的 handleRetry
+  handleRetryRef.current = handleRetry;
 
   /** R6.6 — error-banner retry. Lighter-weight than handleRetry (no
    *  rewind): the error banner typically surfaces session-level failures
@@ -623,6 +658,26 @@ export function ChatView({
   // R0.4: Memoize the timeline build so it does not run on every render;
   // it only needs to re-run when the messages reference changes.
   const timeline = useMemo(() => buildTimeline(messages), [messages]);
+
+  // P0-4 — 转录区视图。`live` 是默认视图且**不注册实现**:它走下面
+  // `ConversationViewOutlet` 的 `fallback`(即 `ConversationBody` 的既有
+  // JSX),因此不装插件时渲染结果与改造前逐字一致。`result` / `content`
+  // 由本包 `client.tsx` 注册;插件可注册自己的视图 id。
+  const [activeView, setActiveView] = useState("live");
+  const conversationViews = useConversationViews();
+
+  // P0-5 — 会话内待处理项数量,下发给 `conversation.approvals`(list 追加区)。
+  // **复用既有 store**,不新建状态容器:`question-store` / `permission-store`
+  // 就是上面 `QuestionInlineCard` / `PermissionInlineCard` 用的那两份数据源。
+  // 读 `queues` 整体(而非单条)是因为插件需要的是「还有几项待处理」——
+  // zustand 默认按引用比较,`queues` 仅在请求/清除时换引用,不会造成额外重渲染。
+  const questionQueues = useQuestionStore((s) => s.queues);
+  const permissionQueues = usePermissionStore((s) => s.queues);
+  const pendingApprovalCount =
+    (sessionId ? (questionQueues[sessionId]?.length ?? 0) : 0) +
+    (sessionId ? (permissionQueues[sessionId]?.length ?? 0) : 0);
+  // 有待处理提问/权限时,agent 无法自行继续 —— 这就是“被阻住”的准确含义。
+  const blockedOnApproval = pendingApprovalCount > 0;
 
   // R1.2: Virtualization is enabled when the user opts in via
   // `localStorage["openbuddy.virtual-list"] = "1"` OR the timeline has
@@ -796,6 +851,12 @@ export function ChatView({
             onRetry={
               isLastAssistant && !streaming && m.complete ? handleRetry : undefined
             }
+            onEditAssistantMessage={
+              m.role === "assistant" && m.complete ? handleEditAssistantMessage : undefined
+            }
+            onResendAfterAssistantEdit={
+              m.role === "assistant" && m.complete ? handleResendAfterAssistantEdit : undefined
+            }
           />
         </div>
       );
@@ -812,6 +873,8 @@ export function ChatView({
       handleEditResend,
       handleStepRevision,
       handleInlineResend,
+      handleEditAssistantMessage,
+      handleResendAfterAssistantEdit,
       findOpen,
       findHits,
       findCurrent,
@@ -1002,6 +1065,45 @@ export function ChatView({
     </>
   );
 
+  // 输入区的 props 打成一包:内置 <Composer> 与内核 `conversation.composer` 槽的
+  // 实现收到的是**同一份**契约 —— 插件可以只包一层,把剩余 props 原样转发回去,
+  // 不必自己重新发明一套输入区 API。字段与接线前逐个对应(callbacks 仍由 ChatView
+  // 的 useCallback 稳定,所以 Composer 的 memo 行为不变)。
+  const composerProps: ComposerProps = {
+    streaming,
+    disabled: readOnlySubagent,
+    onSend,
+    onSendContent,
+    onEnqueue: sessionId ? handleComposerEnqueue : undefined,
+    onCancel,
+    modelId,
+    models,
+    onModelChange,
+    cwd,
+    workspaces,
+    onSelectWorkspace: handleComposerWorkspaceChange,
+    workspaceLoading: switchingWorkspace !== null,
+    showDisclaimer: true,
+    permissionInline: true,
+    thinkingLevel,
+    onThinkingChange: handleThinkingChange,
+    onToast,
+    draft,
+    draftKey: sessionId ?? undefined,
+    onDraftChange: sessionId ? handleComposerDraftChange : undefined,
+    externalText: resendText,
+    externalTextNonce: resendNonce,
+    onSelectMode,
+    onSelectExpert,
+    onNavigateConnectors,
+    activeExpertName,
+    activeExpertAvatar,
+    usageSessionId: sessionId ?? undefined,
+    usageMsgCount: messages.length,
+    extensionText,
+    extensionTextNonce,
+  };
+
   return (
     <div className={"chatview" + (panelOpen ? " chatview--with-panel" : "")}>
       <div className="chatview__main">
@@ -1172,7 +1274,7 @@ export function ChatView({
               <FileChangesPanel messages={messages} />
             )}
             {subagentsOpen && (
-              <SubagentPanel
+              <SubagentPanelResolved
                 messages={messages}
                 cwd={cwd}
                 onOpenSession={onOpenSession}
@@ -1181,79 +1283,115 @@ export function ChatView({
             {teamsOpen && (
               <TeamStatusView messages={messages} />
             )}
-            {timeline.length === 0 ? (
-              <div className="chatview__empty-state" role="status">
-                {/* R8.27 — Replace the ✨ emoji with a brand-tinted lucide
-                   WandSparkles icon. The previous emoji varied in
-                   rendering across platforms and didn't pick up the
-                   brand colour. The new icon is consistent, scales with
-                   the page, and is wrapped in a halo div so we can
-                   animate it independently. */}
-                <div className="chatview__empty-state-hero">
-                  <div className="chatview__empty-state-halo" aria-hidden="true" />
-                  <WandSparkles
-                    className="chatview__empty-state-icon"
-                    size={28}
-                    strokeWidth={1.75}
-                    aria-hidden="true"
-                  />
-                </div>
-                <h2 className="chatview__empty-state-title">开始一段新的对话</h2>
-                <p className="chatview__empty-state-subtitle">
-                  OpenBuddy 帮你调度专家 / 技能 / 连接器,在下方输入框描述你的任务即可。
-                </p>
-                <p className="chatview__empty-state-hint">
-                  按 <kbd>?</kbd> 查看全部快捷键,<kbd>/</kbd> 调用技能与指令,<kbd>@</kbd> 引用对话文件。
-                </p>
-                <ul className="chatview__empty-state-tags" aria-label="可用能力">
-                  <li className="chatview__empty-state-tag">助理</li>
-                  <li className="chatview__empty-state-tag">项目</li>
-                  <li className="chatview__empty-state-tag">专家 / 技能 / 连接器</li>
-                  <li className="chatview__empty-state-tag">自动化</li>
-                  <li className="chatview__empty-state-tag">资料库</li>
-                </ul>
-                {/* R8.10 — Quick-prompt cards. Click seeds the composer via the
-                    same resendText pipe as inline-edit / revision-pager; the
-                    user can refine the prompt and hit enter. Each card has
-                    an icon + title + one-line description so first-time users
-                    immediately understand what the assistant can do. */}
-                <div
-                  className="chatview__quick-prompts"
-                  role="group"
-                  aria-label="快速开始模板"
-                >
-                  {QUICK_PROMPTS.map((qp) => {
-                    const Icon = qp.icon;
-                    return (
-                      <button
-                        key={qp.id}
-                        type="button"
-                        className="chatview__quick-prompt"
-                        data-testid={`quick-prompt-${qp.id}`}
-                        onClick={() => handleQuickPrompt(qp.prompt)}
-                        aria-label={qp.title}
-                      >
-                        <span className="chatview__quick-prompt-icon" aria-hidden="true">
-                          <Icon size={18} strokeWidth={1.75} />
-                        </span>
-                        <span className="chatview__quick-prompt-body">
-                          <span className="chatview__quick-prompt-title">{qp.title}</span>
-                          <span className="chatview__quick-prompt-desc">{qp.desc}</span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : useVirtualList ? (
-              <VirtualizedMessageList
-                timeline={timeline}
-                scrollRef={scrollRef as React.RefObject<HTMLElement>}
-                renderItem={renderTimelineNode}
+            {/* 转录区走内核 `conversation.body` 槽(见 conversation-slots.tsx)。
+                插件可以整体接管布局(分组 / 日期轴 / 自定义列表),`fallback` 就是
+                接线前的那段 JSX —— 内核里没有实现时渲染结果逐字一致,所以卸载
+                插件后视觉零变化。`renderNode` 一起交出去,插件只改布局时不必
+                自己实现消息渲染。 */}
+            {conversationViews.length > 0 && (
+              <ConversationViewTabs
+                active={activeView}
+                views={conversationViews}
+                onChange={setActiveView}
               />
-            ) : (
-              timeline.map((node, index) => renderTimelineNode({ node, index }))
             )}
+            {/* P0-4 — 转录区多视图。`conversation.view`(keyed) 出口,`fallback`
+                就是下面那段既有 JSX —— 没有任何 `conversation.view` 实现命中
+                当前 view 时原样渲染它,所以 `live` 视图的行为与改造前完全一致。 */}
+            <ConversationViewOutlet
+              view={activeView}
+              timeline={timeline}
+              renderNode={renderTimelineNode}
+              sessionId={sessionId ?? undefined}
+              streaming={streaming}
+              virtualized={useVirtualList}
+              scrollRef={scrollRef as React.RefObject<HTMLElement | null>}
+              fallback={
+                <ConversationBody
+              timeline={timeline}
+              renderNode={renderTimelineNode}
+              sessionId={sessionId ?? undefined}
+              streaming={streaming}
+              virtualized={useVirtualList}
+              scrollRef={scrollRef as React.RefObject<HTMLElement | null>}
+              fallback={
+                timeline.length === 0 ? (
+                  <div className="chatview__empty-state" role="status">
+                    {/* R8.27 — Replace the ✨ emoji with a brand-tinted lucide
+                       WandSparkles icon. The previous emoji varied in
+                       rendering across platforms and didn't pick up the
+                       brand colour. The new icon is consistent, scales with
+                       the page, and is wrapped in a halo div so we can
+                       animate it independently. */}
+                    <div className="chatview__empty-state-hero">
+                      <div className="chatview__empty-state-halo" aria-hidden="true" />
+                      <WandSparkles
+                        className="chatview__empty-state-icon"
+                        size={28}
+                        strokeWidth={1.75}
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <h2 className="chatview__empty-state-title">开始一段新的对话</h2>
+                    <p className="chatview__empty-state-subtitle">
+                      OpenBuddy 帮你调度专家 / 技能 / 连接器,在下方输入框描述你的任务即可。
+                    </p>
+                    <p className="chatview__empty-state-hint">
+                      按 <kbd>?</kbd> 查看全部快捷键,<kbd>/</kbd> 调用技能与指令,<kbd>@</kbd> 引用对话文件。
+                    </p>
+                    <ul className="chatview__empty-state-tags" aria-label="可用能力">
+                      <li className="chatview__empty-state-tag">助理</li>
+                      <li className="chatview__empty-state-tag">项目</li>
+                      <li className="chatview__empty-state-tag">专家 / 技能 / 连接器</li>
+                      <li className="chatview__empty-state-tag">自动化</li>
+                      <li className="chatview__empty-state-tag">资料库</li>
+                    </ul>
+                    {/* R8.10 — Quick-prompt cards. Click seeds the composer via the
+                        same resendText pipe as inline-edit / revision-pager; the
+                        user can refine the prompt and hit enter. Each card has
+                        an icon + title + one-line description so first-time users
+                        immediately understand what the assistant can do. */}
+                    <div
+                      className="chatview__quick-prompts"
+                      role="group"
+                      aria-label="快速开始模板"
+                    >
+                      {QUICK_PROMPTS.map((qp) => {
+                        const Icon = qp.icon;
+                        return (
+                          <button
+                            key={qp.id}
+                            type="button"
+                            className="chatview__quick-prompt"
+                            data-testid={`quick-prompt-${qp.id}`}
+                            onClick={() => handleQuickPrompt(qp.prompt)}
+                            aria-label={qp.title}
+                          >
+                            <span className="chatview__quick-prompt-icon" aria-hidden="true">
+                              <Icon size={18} strokeWidth={1.75} />
+                            </span>
+                            <span className="chatview__quick-prompt-body">
+                              <span className="chatview__quick-prompt-title">{qp.title}</span>
+                              <span className="chatview__quick-prompt-desc">{qp.desc}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : useVirtualList ? (
+                  <VirtualizedMessageList
+                    timeline={timeline}
+                    scrollRef={scrollRef as React.RefObject<HTMLElement>}
+                    renderItem={renderTimelineNode}
+                  />
+                ) : (
+                  timeline.map((node, index) => renderTimelineNode({ node, index }))
+                )
+                  }
+                />
+              }
+            />
           </div>
           {/* R6.5 — Floating "jump to bottom" button. Visible only when
               the user has scrolled away from the end and new content
@@ -1279,6 +1417,15 @@ export function ChatView({
           {/* Inline permission / question cards: session-scoped, never block sidebar. */}
           <PermissionInlineCard sessionId={sessionId} />
           <QuestionInlineCard sessionId={sessionId} />
+          {/* P0-5 — `conversation.approvals`(list) 追加区。内核默认审批面就是
+              上面两张卡片,它们**不被替换**;这里只给插件「再加一块」的口子。
+              内置零注册 → 渲染 null,所以不装插件时零占位、零视觉变化。
+              `pendingCount` 由既有 store(question/permission)汇总后下发。 */}
+          <ConversationApprovals
+            sessionId={sessionId ?? undefined}
+            pendingCount={pendingApprovalCount}
+            blocked={blockedOnApproval}
+          />
           {/* pause/yield:已暂停横幅 + 恢复按钮(对齐 WorkBuddy session:requestYield)。 */}
           {yielded && (
             <div className="yield-banner" role="status">
@@ -1330,39 +1477,12 @@ export function ChatView({
             <QueuePanel sessionId={sessionId} onSendNow={(t) => onSend(t)} />
           )}
           <PiReloadFailureBanner />
-          <Composer
-            streaming={streaming}
-            disabled={readOnlySubagent}
-            onSend={onSend}
-            onSendContent={onSendContent}
-            onEnqueue={sessionId ? handleComposerEnqueue : undefined}
-            onCancel={onCancel}
-            modelId={modelId}
-            models={models}
-            onModelChange={onModelChange}
-            cwd={cwd}
-            workspaces={workspaces}
-            onSelectWorkspace={handleComposerWorkspaceChange}
-            workspaceLoading={switchingWorkspace !== null}
-            showDisclaimer
-            permissionInline
-            thinkingLevel={thinkingLevel}
-            onThinkingChange={handleThinkingChange}
-            onToast={onToast}
-            draft={draft}
-            draftKey={sessionId ?? undefined}
-            onDraftChange={sessionId ? handleComposerDraftChange : undefined}
-            externalText={resendText}
-            externalTextNonce={resendNonce}
-            onSelectMode={onSelectMode}
-            onSelectExpert={onSelectExpert}
-            onNavigateConnectors={onNavigateConnectors}
-            activeExpertName={activeExpertName}
-            activeExpertAvatar={activeExpertAvatar}
-            usageSessionId={sessionId ?? undefined}
-            usageMsgCount={messages.length}
-            extensionText={extensionText}
-            extensionTextNonce={extensionTextNonce}
+          {/* 输入区走内核 `conversation.composer` 槽:插件可以整体替换输入区,
+              也可以只包一层(加自己的提示条 / 按钮)再把 props 转发给内置 Composer。
+              `fallback` 就是接线前的 `<Composer>` —— 内核里没有实现时逐字一致。 */}
+          <ConversationComposer
+            {...composerProps}
+            fallback={<Composer {...composerProps} />}
           />
         </div>
       </div>

@@ -152,3 +152,43 @@
   width: 100%;
   accent-color: var(--wb-accent);
 }
+/* R54 — 隐藏的文件 input。按钮 + 这个 input 配对;input 本身永远不可见。 */
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+/* R54 — 导入错误提示条。颜色走 --wb-danger / --wb-bg-elevated token,跨主题自适应。 */
+.importError {
+  margin: 8px 14px 0;
+  padding: 6px 10px;
+  border-radius: var(--wb-radius-sm, 4px);
+  background: var(--wb-bg-elevated, color-mix(in srgb, var(--wb-bg-tertiary, #1f2937) 80%, transparent));
+  border-left: 3px solid var(--wb-danger, #d64545);
+  color: var(--wb-fg-primary);
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* R55 — 导出成功提示条。颜色用品牌色左边线 + 中性背景,和 importError 的
+   danger 红形成「成功 vs 失败」语义对照。 */
+.exportStatus {
+  margin: 8px 14px 0;
+  padding: 6px 10px;
+  border-radius: var(--wb-radius-sm, 4px);
+  background: var(--wb-bg-elevated, color-mix(in srgb, var(--wb-bg-tertiary, #1f2937) 80%, transparent));
+  border-left: 3px solid var(--wb-accent, #00c29a);
+  color: var(--wb-fg-primary);
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}

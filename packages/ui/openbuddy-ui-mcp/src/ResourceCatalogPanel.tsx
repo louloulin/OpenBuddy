@@ -15,6 +15,7 @@ import {
 } from "@/lib/casdoor/casdoor-client";
 import type { CasdoorResourceCreateInput, CasdoorResourceRecord, CasdoorResourceType } from "@openbuddy/auth-casdoor";
 import { CASDOOR_RESOURCE_TYPES } from "@openbuddy/auth-casdoor";
+import { confirm } from "@/lib/platform/electron-api";
 
 function SectionShell({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
   return (
@@ -159,7 +160,7 @@ export function ResourceCatalogPanel() {
   }, [editDraft, reload]);
 
   const handleDelete = useCallback(async (record: CasdoorResourceRecord) => {
-    if (!confirm(`确认删除资源 ${record.name}？`)) return;
+    if (!(await confirm(`确认删除资源 ${record.name}？`, { tone: "danger" }))) return;
     setBusy(true);
     try {
       await casdoorDeleteResource(record.id, record.version);

@@ -1,6 +1,13 @@
 import type { ComponentType, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MarketPills, type MarketTab } from "./MarketHeader";
+import {
+  MARKET_TAB_EVENT,
+  clearRequestedMarketTab,
+  consumeRequestedMarketTab,
+  isMarketTab,
+  readRequestedMarketTab,
+} from "@/lib/navigation/market-tab";
 import { ExpertsTab } from "./experts/ExpertsTab";
 import { SkillsTab } from "./skills/SkillsTab";
 import { ConnectorsTab } from "./connectors/ConnectorsTab";
@@ -15,6 +22,8 @@ interface Props {
    *  works without it; the panel falls back to a toast asking the user to
    *  open a session first. */
   sessionId?: string;
+  /** 宿主直接内嵌本面板时的起始 tab。缺省顺序:深链意图 → 本 prop → "experts"。 */
+  initialTab?: MarketTab;
 }
 
 /** 专家·技能·连接器 — WorkBuddy-style unified market page.
@@ -22,15 +31,33 @@ interface Props {
  *  left slot, mirroring WorkBuddy's `headerLeft` pattern. The "插件·市场"
  *  tab is the Pi plugin marketplace (with the official pi.dev catalog as a
  *  built-in remote source) so all resource browsing lives under this entry. */
-export function ExpertsPanel({ onGoHome, onToast, sessionId }: Props) {
-  const [tab, setTab] = useState<MarketTab>("experts");
+export function ExpertsPanel({ onGoHome, onToast, sessionId, initialTab }: Props) {
+  // R40 — tab 不再写死 "experts"。侧栏「腾讯文档 / 乐享知识库」的深链意图
+  // (localStorage + 事件,见 @/lib/navigation/market-tab)优先于宿主传入的
+  // initialTab,于是"提示说打开了连接器目录"和"实际落在哪"第一次真的对齐。
+  const [tab, setTab] = useState<MarketTab>(
+    () => consumeRequestedMarketTab() ?? initialTab ?? "experts",
+  );
+
+  // 面板已在屏幕上时(用户就停在「专家·技能·连接器」页再点侧栏入口),
+  // 不会重新挂载,所以深链必须还有一个即时通道。
+  useEffect(() => {
+    const onRequest = (event: Event) => {
+      const requested = (event as CustomEvent<unknown>).detail;
+      const next = isMarketTab(requested) ? requested : readRequestedMarketTab();
+      clearRequestedMarketTab();
+      if (next) setTab(next);
+    };
+    window.addEventListener(MARKET_TAB_EVENT, onRequest);
+    return () => window.removeEventListener(MARKET_TAB_EVENT, onRequest);
+  }, []);
 
   const pills = <MarketPills active={tab} onChange={setTab} />;
 
   return (
     <div className="um-market">
       {tab === "experts" && (
-        <ExpertsTab pills={pills} onGoHome={onGoHome} onToast={onToast} />
+        <ExpertsTabContent pills={pills} onGoHome={onGoHome} onToast={onToast} />
       )}
       {tab === "skills" && <SkillsTab pills={pills} onToast={onToast} />}
       {tab === "connectors" && <ConnectorsTab pills={pills} onToast={onToast} />}
@@ -39,6 +66,34 @@ export function ExpertsPanel({ onGoHome, onToast, sessionId }: Props) {
       )}
     </div>
   );
+}
+
+/** 专家网格走内核 `placeholder.experts` 槽位(与下面的 `modules.marketplace`
+ *  同一模式):本包在 `client.tsx` 里把 `ExpertsTab` 注册为默认实现,第三方
+ *  插件可以注册更高优先级实现整体替换;槽位为空时回退到本地组件 ——
+ *  两条路径渲染的是同一个组件,因此卸载插件后视觉零变化。
+ *
+ *  为什么需要这层包装:此前 `placeholder.experts` 注册了却**没有任何消费者**
+ *  (审计里是 dead 槽),插件替换专家的能力等于不存在。 */
+function ExpertsTabContent({
+  pills,
+  onGoHome,
+  onToast,
+}: {
+  pills: ReactNode;
+  onGoHome?: () => void;
+  onToast?: (message: string) => void;
+}) {
+  const slotImpls = useSlotComponents("placeholder.experts");
+  const SlotImpl = slotImpls[0] as
+    | ComponentType<{
+        pills: ReactNode;
+        onGoHome?: () => void;
+        onToast?: (message: string) => void;
+      }>
+    | undefined;
+  const Impl = SlotImpl ?? ExpertsTab;
+  return <Impl pills={pills} onGoHome={onGoHome} onToast={onToast} />;
 }
 
 /** Thin wrapper around <MarketplacePanel /> so the unified market page can
@@ -58,7 +113,9 @@ function PluginsTabContent({
   sessionId?: string;
   onToast?: (message: string) => void;
 }) {
-  const slotImpls = useSlotComponents("modules.marketplace");
+  // R92 — 切换到内核 `placeholder.marketplace` 槽,与 ui-mcp 在 client.tsx 里注册
+  // 的 `MarketplacePanel` 默认实现对齐;插件可以注册更高优先级整体替换这一页。
+  const slotImpls = useSlotComponents("placeholder.marketplace");
   const SlotImpl = slotImpls[0] as
     | ComponentType<{ sessionId?: string; onToast?: (m: string) => void }>
     | undefined;

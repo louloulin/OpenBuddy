@@ -73,9 +73,13 @@ export function defineExtension(config: ExtensionConfig): Extension {
         window.dispatchEvent(new CustomEvent("openbuddy:unregister-slot", { detail: { name } }));
       }
     },
-    registerCommand(id, _label, onExecute) {
+    registerCommand(id, label, onExecute) {
+      // label 必须一起发出去:命令面板要拿它做展示与过滤(以前这里丢了 label,
+      // 于是内核里的 plugin.command entry 只有 id,⌘K 根本没法展示这条命令)。
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("openbuddy:register-command", { detail: { id, onExecute } }));
+        window.dispatchEvent(
+          new CustomEvent("openbuddy:register-command", { detail: { id, label, onExecute } })
+        );
       }
       registered.push(() => {
         if (typeof window !== "undefined") {

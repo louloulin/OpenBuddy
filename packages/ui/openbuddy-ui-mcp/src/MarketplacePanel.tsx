@@ -5,7 +5,9 @@
  * 支持安装/卸载/更新/刷新源 + 添加/移除源。
  * 对应 WorkBuddy 的 UnifiedMarketPage。
  *
- * 市场源配置在 ~/.pi/config.toml 的 [[marketplace.sources]] 段。
+ * 市场源配置在 `<agentHome>/marketplaces.json`（见 pi-resources/marketplace.ts
+ * 的 `readMarketplaceSources`），不再读 pi 的 `config.toml`——electron/main 早已
+ * 不解析该文件。agentHome 由 `useAgentPaths().home` 给出。
  */
 import { useRef } from "react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
@@ -33,6 +35,10 @@ import {
   type PiPackageCatalogEntry,
 } from "@openbuddy/shared-types";
 import { describeMarketplaceResult } from "./marketplace-priority-toast";
+import { PiExtensionsSection } from "./PiExtensionsSection";
+import { buildInstallPreflight, type InstallPreflight } from "./install-preflight";
+import { InstallPreflightDialog } from "./InstallPreflightDialog";
+import { auditRecord } from "@/lib/audit/audit-client";
 
 interface MarketplacePanelProps {
   /** 当前会话 id(可选)。marketplace 操作是 profile 级别的,不需要活跃会话;
@@ -48,6 +54,16 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
   const [query, setQuery] = useState("");
   const [addingSource, setAddingSource] = useState(false);
   const [newSourceUrl, setNewSourceUrl] = useState("");
+  // R41 — 待确认的安装 / 升级(预检判定有风险或会覆盖已有版本时才非空)。
+  const [pending, setPending] = useState<
+    | {
+        kind: "install" | "update";
+        source: MarketplaceScanResult;
+        plugin: MarketplacePluginEntry;
+        plan: InstallPreflight;
+      }
+    | null
+  >(null);
   const reload = useCallback(async () => {
     setLoading(true);
     try {
@@ -68,7 +84,7 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
   // Phase R-PhaseB.4: marketplace 操作是 profile 级,无需活跃会话 —— 直接调用,
   // marketplaceAction 内部已经把 sessionId 改为可选(始终 null)。
 
-  const handleInstall = useCallback(
+  const runInstall = useCallback(
     async (source: MarketplaceScanResult, plugin: MarketplacePluginEntry) => {
       const key = `${source.sourceName}/${plugin.name}`;
       setBusy(key);
@@ -111,7 +127,7 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
     [onToast, reload],
   );
 
-  const handleUpdate = useCallback(
+  const runUpdate = useCallback(
     async (source: MarketplaceScanResult, plugin: MarketplacePluginEntry) => {
       const key = `${source.sourceName}/${plugin.name}`;
       setBusy(key);
@@ -130,6 +146,59 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
       }
     },
     [onToast, reload],
+  );
+
+  /**
+   * R41 — 预检:点安装 / 更新之前,先把"会发生什么"摊开(来源、版本、hooks、
+   * 会接管哪个 OpenBuddy 能力、目录条目本身是否缺字段)。判断全在
+   * `install-preflight.ts`(纯函数);这里只负责三件事:
+   *   1. 把预检结论记进本地审计 —— "我什么时候同意装了这个带 hooks 的包"因此与
+   *      安装结果落在同一个 trail 里,不用另开一份日志;
+   *   2. 有硬阻断就当场说清(不发 IPC,不制造一次必然失败);
+   *   3. 需要确认时弹预检框;纯新增且无风险才直接动手(别为仪式感打断人)。
+   */
+  const requestAction = useCallback(
+    (kind: "install" | "update", source: MarketplaceScanResult, plugin: MarketplacePluginEntry) => {
+      const plan = buildInstallPreflight(source, plugin);
+      try {
+        void auditRecord({
+          event: "plugin.install.preflight",
+          outcome: plan.blockers.length > 0 ? "deny" : "info",
+          subject: `${source.sourceName}/${plugin.name}`,
+          detail: {
+            action: plan.action,
+            kind,
+            sourceKind: plan.sourceKind,
+            risks: plan.risks.map((risk) => risk.id),
+            blockers: plan.blockers.map((blocker) => blocker.id),
+            takeover: plan.takeover?.capability ?? null,
+            requiresConfirmation: plan.requiresConfirmation,
+          },
+        }).catch(() => undefined);
+      } catch {
+        /* 审计不可用不该挡住安装 */
+      }
+      if (plan.blockers.length > 0) {
+        onToast?.(`无法安装「${plugin.name}」：${plan.blockers[0]?.detail ?? ""}`);
+        return;
+      }
+      if (!plan.requiresConfirmation) {
+        void (kind === "install" ? runInstall(source, plugin) : runUpdate(source, plugin));
+        return;
+      }
+      setPending({ kind, source, plugin, plan });
+    },
+    [onToast, runInstall, runUpdate],
+  );
+
+  const handleInstall = useCallback(
+    (source: MarketplaceScanResult, plugin: MarketplacePluginEntry) => requestAction("install", source, plugin),
+    [requestAction],
+  );
+
+  const handleUpdate = useCallback(
+    (source: MarketplaceScanResult, plugin: MarketplacePluginEntry) => requestAction("update", source, plugin),
+    [requestAction],
   );
 
   const handleRefreshSource = useCallback(
@@ -268,6 +337,9 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
 
   return (
     <div className="marketplace-panel">
+      {/* R32 — Pi 扩展市场(Expert Marketplace Bridge)独立于 pi 官方 marketplace,
+          数据模型与安装语义都不同,所以放在同一个面板里但分区块呈现。 */}
+      <PiExtensionsSection onToast={onToast} />
       <div className="marketplace-panel__header">
         <h2 className="marketplace-panel__title">市场</h2>
         <div className="marketplace-panel__actions">
@@ -343,7 +415,7 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
           <Store size={48} color="var(--wb-text-tertiary)" />
           <p>暂无市场源。</p>
           <p className="marketplace-panel__hint">
-            点「添加源」输入本地市场目录，或在 config.toml 配置 <code>[[marketplace.sources]]</code>。
+            点「添加源」注册一个本地市场目录。源列表保存在 OpenBuddy 数据目录，重启后仍在。
           </p>
         </div>
       )}
@@ -429,6 +501,18 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
         <div className="marketplace-panel__empty">无匹配的插件</div>
       )}
       {loading && <div className="marketplace-panel__empty">加载中…</div>}
+
+      <InstallPreflightDialog
+        open={pending !== null}
+        plan={pending?.plan ?? null}
+        onCancel={() => setPending(null)}
+        onConfirm={() => {
+          const action = pending;
+          setPending(null);
+          if (!action) return;
+          void (action.kind === "install" ? runInstall(action.source, action.plugin) : runUpdate(action.source, action.plugin));
+        }}
+      />
     </div>
   );
 }

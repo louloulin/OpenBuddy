@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { open as openDialog } from "@/lib/platform/electron-api";
+import { openOne } from "@/lib/platform/electron-api";
 import { XCloseIcon, FolderOpenIcon } from "@openbuddy/ui-primitives/icons";
 import { skillsAdd } from "@/lib/agent/pi-client";
 
@@ -34,19 +34,19 @@ export function ImportSkillModal({
 
   const pickFile = async () => {
     try {
-      const sel = await openDialog({
+      const sel = await openOne({
         multiple: false,
         title: "选择技能文件（SKILL.md 或 .zip）",
         filters: [{ name: "技能", extensions: ["md", "zip"] }],
       });
-      if (sel && !Array.isArray(sel)) await install(sel);
+      if (sel) await install(sel);
     } catch { /* cancelled */ }
   };
 
   const pickFolder = async () => {
     try {
-      const sel = await openDialog({ directory: true, multiple: false, title: "选择技能文件夹" });
-      if (sel && !Array.isArray(sel)) await install(sel);
+      const sel = await openOne({ directory: true, multiple: false, title: "选择技能文件夹" });
+      if (sel) await install(sel);
     } catch { /* cancelled */ }
   };
 

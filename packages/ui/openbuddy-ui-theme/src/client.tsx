@@ -18,6 +18,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useSyncExternalStore,
   type ReactNode,
@@ -48,8 +49,33 @@ export type ThemeStore = ThemeStoreInternal;
 
 const Ctx = createContext<ThemeService | null>(null);
 
+// ─── 单一 store ──────────────────────────────────────────────────────────
+//
+// 与 ui-locale 同样的问题与同样的修法:React 树的 ThemeProvider 与插件上下文
+// `ctx.theme` 曾经各建一个 store —— 插件里 setThemeByName("sakura") 界面纹丝
+// 不动,而界面切主题插件也读不到。现在两处共用这一个实例。
+let singleton: ThemeStoreInternal | null = null;
+
+/** 取进程内唯一的主题 store(没有就创建)。 */
+export function getOrCreateThemeService(): ThemeStoreInternal {
+  if (!singleton) singleton = createThemeStore();
+  return singleton;
+}
+
+/** 测试用:丢弃单例(下一次调用会新建,并重新读 localStorage)。 */
+export function __resetThemeService(): void {
+  singleton = null;
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const store = useMemo(() => createThemeStore(), []);
+  const store = useMemo(() => getOrCreateThemeService(), []);
+  // 单例 store 只在"构造那一瞬间"apply 过 DOM。若 documentElement 之后被外部
+  // 重置(HMR / 单测 afterEach / 同文档第二份应用),属性缺失会让整棵 UI 掉回
+  // 无主题状态,而 store 内部状态却是对的 —— 所以挂载时必须重新落一遍。
+  // 用 layout effect 是为了在浏览器绘制前生效,避免闪一下无主题的界面。
+  useLayoutEffect(() => {
+    store.syncDocument();
+  }, [store]);
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }
 
@@ -74,14 +100,21 @@ export function useThemeSnapshot<T>(selector: (s: ThemeService) => T): T {
 
 /**
  * Plugin apply(): wire the ThemeProvider into the SlotProvider and expose
- * ctx.theme (v2 service). Idempotent — re-invocation just replaces the ctx
- * reference, never double-mounts providers.
+ * ctx.theme (v2 service).
+ *
+ * 必须走 `getOrCreateThemeService()` 而不是再 `createThemeStore()`:再建一个
+ * store 会让 `ctx.theme` 与 React 树的 `<ThemeProvider>` 变成两个独立实例,
+ * 插件里 `ctx.theme.setThemeByName("sakura")` 界面纹丝不动,界面上换主题插件
+ * 也读不到 —— 微内核服务名存实亡。单例之后两处是同一个 store,而且
+ * `matchMedia` / MutationObserver 只会装一次。
+ *
+ * 幂等:重复调用只是把同一个引用重新赋给 ctx.theme。
  */
 export function applyTheme(ctx: {
   slots?: { register: (o: { name: string }, c: unknown) => () => void };
   theme?: ThemeService;
 } & Record<string, unknown>): () => void {
-  const store = createThemeStore();
+  const store = getOrCreateThemeService();
   if (ctx && typeof ctx === "object") {
     (ctx as Record<string, unknown>).theme = store;
   }
@@ -116,7 +149,12 @@ export function useStoreName(): ThemeName | null {
   return getStoredThemeName();
 }
 
-export { getStoredThemeMode, getStoredThemePair, getThemeByName };
+export {
+  getStoredThemeName,
+  getStoredThemeMode,
+  getStoredThemePair,
+  getThemeByName,
+};
 
 // Re-export the React UI building blocks for ergonomic imports:
 //   import { ThemePicker, ThemeInitializer } from "@openbuddy/ui-theme/client";

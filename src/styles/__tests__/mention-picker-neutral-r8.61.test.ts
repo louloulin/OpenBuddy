@@ -37,10 +37,14 @@ describe("R8.61 .mention-picker neutral contract", () => {
     expect(body).not.toMatch(/#00c29a/i);
   });
 
-  it("active & hover: neutral pill-active, NO brand colour-mix", () => {
+  it("active & hover: neutral surface (R27: --wb-bg-active), NO brand colour-mix", () => {
     const body = ruleBody(css, ".mention-picker__item--active,\n.mention-picker__item:hover");
     expect(body).toBeTruthy();
-    expect(body).toMatch(/var\(--wb-bg-pill-active\)/);
+    // R27 — 这里原本断言 --wb-bg-pill-active。真机量出来亮色下它 = 75% 黑,
+    // 配本行文字色 --wb-text-strong 就是黑底黑字(对比度 ≈ 1.0)。改用中性
+    // 活动表面 --wb-bg-active;"不要品牌色"这条契约不变。
+    expect(body).toMatch(/var\(--wb-bg-active\)/);
+    expect(body).not.toMatch(/var\(--wb-bg-pill-active\)/);
     expect(body).not.toMatch(/color-mix\(in srgb,\s*var\(--wb-brand/);
     expect(body).not.toMatch(/#00c29a/i);
   });
@@ -63,7 +67,7 @@ describe("R8.61 .mention-picker neutral contract", () => {
       if (ch === "{") { depth++; if (start < 0) start = i + 1; }
       else if (ch === "}") { depth--; if (depth === 0) {
         const body = css.slice(start, i);
-        expect(body).toMatch(/var\(--wb-bg-pill-active\)/);
+        expect(body).toMatch(/var\(--wb-bg-active\)/);
         expect(body).not.toMatch(/#00c29a/i);
         return;
       }}

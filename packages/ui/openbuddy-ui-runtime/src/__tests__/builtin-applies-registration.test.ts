@@ -49,6 +49,14 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     expect(entries("shell.overlay").length).toBeGreaterThanOrEqual(5);
   });
 
+  it("ui-shell → 'shell.statusbar' slot 注册 StatusBar(插件可整体替换)", () => {
+    // entries() 返回的是收敛后的组件,要看注册者得读 entriesOfSlot 的原始 entry。
+    const raw = runtime.slots.entriesOfSlot("shell.statusbar");
+    expect(raw.length).toBeGreaterThanOrEqual(1);
+    expect(raw[0]?.options.registrant).toBe("@openbuddy/ui-shell");
+    expect(entries("shell.statusbar").length).toBe(1);
+  });
+
   it("ui-primitives → 'notifications' slot 注册 Toast", () => {
     expect(entries("notifications").length).toBeGreaterThanOrEqual(1);
   });
@@ -126,7 +134,7 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     expect(entries("placeholder.my-files").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("ui-mcp → 7 个 placeholder.* slot", () => {
+  it("ui-mcp → 6 个 placeholder.* slot", () => {
     const panels = [
       "placeholder.discover",
       "placeholder.marketplace",
@@ -134,7 +142,6 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
       "placeholder.openbuddy-plugin",
       "placeholder.plugins",
       "placeholder.resource-catalog",
-      "placeholder.resources",
     ];
     for (const p of panels) {
       expect(entries(p).length, `slot ${p}`).toBeGreaterThanOrEqual(1);
@@ -145,12 +152,18 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     expect(entries("placeholder.experts").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("ui-settings-models → 'settings.extension' slot 注册扩展入口", () => {
-    expect(entries("settings.extension").length).toBeGreaterThanOrEqual(1);
+  it("ui-settings-models → 不注册占位槽(设置扩展走渲染端 settings.section)", () => {
+    // 以前这里注册了一个没有契约、没有消费者的 settings.extension + () => null,
+    // 让审计表把这块记成「已实现」。扩展点在渲染端 contribution 注册表里,
+    // 微内核侧保持空,免得用空壳刷注册数。
+    expect(entries("settings.extension").length).toBe(0);
   });
 
-  it("ui-layout → 'root' slot 注册 AppFrame(原有)", () => {
-    expect(entries("root").length).toBeGreaterThanOrEqual(1);
+  it("ui-layout → 'root' slot 有意不注册(参考实现由使用方显式挂载)", () => {
+    // R23:AppFrame 是 `root` 的参考实现。内置包若在装配阶段无条件抢占 `root`,
+    // 产品外壳(AppShell)就会被它顶掉。整壳替换的主动性属于使用方 ——
+    // 这与 ui-modules 的 `modules.marketplace`(只导出组件、apply() no-op)同一种约定。
+    expect(entries("root").length).toBe(0);
   });
 
   it("ui-theme / ui-locale / ui-hmr 走特殊通道(ThemeProvider / I18nProvider / HMR hook),不在聚合器中", () => {
@@ -159,8 +172,20 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     expect(runtime.slots).toBeDefined();
   });
 
-  it("ui-editor → 'editor.body' slot 注册 TiptapEditor", () => {
+  // R68 — Office 三件套预览槽被 ui-workbench 注册(单例槽,插件可整体替换)。
+  it("ui-workbench → 3 个 workbench.preview.* slot 注册 Docx/Xlsx/Pptx Preview", () => {
+    // 与 ui-shell/ui-files-tree 测试保持一致:用 entries() 验组件落位;
+    // 3 个 slot 都在 builtin apply() 注册,默认实现即本包 Docx/Xlsx/PptxPreview。
+    for (const slot of ["workbench.preview.docx", "workbench.preview.xlsx", "workbench.preview.pptx"]) {
+      expect(entries(slot).length, `slot ${slot}`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("ui-editor → 'editor.body' + 'editor.draft' slot 注册 TiptapEditor + DraftEditor", () => {
+    // R70 — editor.draft 是「📝 新草稿」入口的 single 槽,默认实现为本包
+    // DraftEditor(Modal + TiptapEditor + 应用/复制/取消 三动作面)。
     expect(entries("editor.body").length).toBeGreaterThanOrEqual(1);
+    expect(entries("editor.draft").length).toBeGreaterThanOrEqual(1);
   });
 
   it("ui-onboarding → 5 个 onboarding.* slot 全部注册", () => {
@@ -203,4 +228,20 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     }
     expect(total).toBeGreaterThanOrEqual(25);
   });
+
+  // R66 — files.tree slot 全链路:证明 ui-files-tree 在 builtin-applies
+  // 里 + registerAllBuiltinUis() 后能拿到 LazyFileTree 默认实现。
+  it("BUILTIN_UI_APPLIES 包含 @openbuddy/ui-files-tree", async () => {
+    // 直接从 builtin-applies 拿注册表,绕过 client 间接层,这样如果以后
+    // ui-files-tree 被误删,我们能在 CI 立刻看到失败。
+    const { BUILTIN_UI_APPLIES: applies } = await import("../builtin-applies");
+    const pkgs = applies.map((b) => b.pkg);
+    expect(pkgs).toContain("@openbuddy/ui-files-tree");
+  });
+
+  it("registerAllBuiltinUis() 注册后,files.tree slot 有 1 个 entry", () => {
+    // entries() 返回收敛后的组件(去重 + filter),LazyFileTree 是当前唯一注册方
+    expect(entries("files.tree").length).toBe(1);
+  });
 });
+

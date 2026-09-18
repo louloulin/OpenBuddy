@@ -66,10 +66,12 @@ describe("R8.61 .slash-commands__item neutral active/hover", () => {
     expect(body).not.toMatch(/inset 3px 0 0 0 #00c29a/i);
   });
 
-  it("active:hover keeps neutral hover (not stronger brand tint)", () => {
+  it("active:hover keeps a neutral surface (not stronger brand tint)", () => {
     const body = ruleBody(css, ".slash-commands__item--active:hover");
     expect(body).toBeTruthy();
-    expect(body).toMatch(/var\(--wb-bg-hover\)/);
+    // R27 — 原断言要求 --wb-bg-hover(5-6%),比 active 本身(8-10%)更弱,
+    // 悬停时选中态反而"变浅"。现在与 active 用同一个中性表面。
+    expect(body).toMatch(/var\(--wb-bg-active\)/);
     expect(body).not.toMatch(/color-mix\(in srgb,\s*var\(--wb-brand/);
     expect(body).not.toMatch(/#00c29a/i);
   });

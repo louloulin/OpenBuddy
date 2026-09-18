@@ -124,6 +124,12 @@
   margin: 0 auto;
   max-width: 560px;
   color: var(--wb-text-strong);
+  /* 窄窗口 + 工作区面板打开时,聊天列只有 ~320px;flex 项的默认
+     `min-width: auto` 会按**内容**宽度把自己撑到 498px,于是欢迎屏
+     从面板底下穿出去(实机测量确认)。允许收缩,内容自己换行。 */
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 /* R8.27 — Empty-state hero illustration upgrade.
    The hero is now a 64×64 brand-tinted halo + a 28px lucide WandSparkles

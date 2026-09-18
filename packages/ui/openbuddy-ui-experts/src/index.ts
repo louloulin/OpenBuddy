@@ -22,7 +22,7 @@ export type { SlotMap };
 export { ExpertsPanel } from "./ExpertsPanel";
 export { ExpertsGrid } from "./ExpertsGrid";
 export type { ExpertsGridProps, ExpertCardModel } from "./ExpertsGrid";
-export { MarketPills } from "./MarketHeader";
+export { MarketPills, MARKET_TAB_KEYS } from "./MarketHeader";
 export type { MarketTab } from "./MarketHeader";
 
 // experts/
@@ -64,5 +64,11 @@ export { SKILL_CATEGORIES } from "./data/skills-catalog";
 declare module "@openbuddy/ui-slots" {
   interface SlotMap {
     "experts.panel": { kind: "single"; scope: "root" };
+    /**
+     * 专家页主体(single)。注册方 `client.tsx`(`ExpertsTab`,作为**默认实现**),
+     * 消费者 `ExpertsPanel` 的 `ExpertsTabContent`。插件注册更高优先级即可替换
+     * 专家页内容,而默认体验不变(与 `home.scene-tabs` 同一模式)。
+     */
+    "placeholder.experts": { kind: "single"; scope: "root" };
   }
 }

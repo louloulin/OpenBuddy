@@ -8,8 +8,9 @@
  * Left  — bridge health, agent init state
  * Right — app version, active theme
  */
-import { useEffect } from "react";
-import { StatusBar, type StatusItem } from "@openbuddy/ui-shell";
+import { useEffect, type ComponentType } from "react";
+import { StatusBar, type StatusItem, type StatusBarProps } from "@openbuddy/ui-shell";
+import { useSlotComponent } from "./slot-bridge";
 import { useThemeSnapshotV2 } from "@openbuddy/ui-theme/client";
 import { useBridgeHealthStore } from "@/stores/bridge-health-store";
 import { APP_VERSION } from "@/lib/platform/app-version";
@@ -58,5 +59,11 @@ export function AppStatusBar({ runtime }: { runtime: AppShellRuntime }) {
     { key: "version", glyph: "◆", label: `v${APP_VERSION}`, title: "OpenBuddy 版本" },
   ];
 
-  return <StatusBar left={left} right={right} />;
+  // 内核 `shell.statusbar` slot 优先:插件注册同名单例槽即可整体替换状态栏,
+  // 拿到的是与内置实现同一份 props。内核里没有实现时回落到内置 StatusBar。
+  const Component = useSlotComponent<ComponentType<StatusBarProps>>(
+    "shell.statusbar",
+    StatusBar as unknown as ComponentType<StatusBarProps>,
+  );
+  return <Component left={left} right={right} />;
 }

@@ -2,8 +2,18 @@
  * 策略设置面板 —— 企业策略/IOA 替代的 UI。
  *
  * 展示当前策略集(模型白名单、技能上传、权限模式、功能禁用),支持查看/编辑。
+ *
+ * R38 — 面板末尾是**插件可扩展区块**:消费 `settings.policy.section` 槽,
+ * 按 meta.order 渲染。内置的 Pi 扩展准入名单 / 插件策略审计两块也走这条总线
+ * (由本包 `client.tsx` 的 apply() 注册),所以第三方插件既能追加自己的策略
+ * 区块,也能用更高优先级顶掉这两块 —— 不需要改这个文件。
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSlotComponents } from "@openbuddy/ui-runtime/client";
+import {
+  readPolicySectionMeta,
+  type PolicySectionComponent,
+} from "./policy/section-contract";
 import { useT } from "@/lib/platform/i18n";
 import {
   mergeRules,
@@ -67,6 +77,20 @@ export function PolicySettingsPanel({ onToast: _onToast }: { onToast?: (msg: str
   const disabledFeatures = getPolicyValue<string[]>(policy, "disabled-features") ?? [];
   const lockedMode = getLockedPermissionMode(policy);
 
+  // 插件区块:只认带元数据的注册值,并按 order 排序(插件乱序注册不影响顺序)。
+  const slotSections = useSlotComponents("settings.policy.section");
+  const policySections = useMemo(() => {
+    const out: PolicySectionComponent[] = [];
+    for (const entry of slotSections) {
+      if (typeof entry !== "function") continue;
+      if (!readPolicySectionMeta(entry)) continue;
+      out.push(entry as unknown as PolicySectionComponent);
+    }
+    return out.sort(
+      (a, b) => (a.policySection.order ?? 0) - (b.policySection.order ?? 0),
+    );
+  }, [slotSections]);
+
   const addModel = () => {
     const m = modelInput.trim();
     if (!m || whitelist.includes(m)) return;
@@ -103,7 +127,12 @@ export function PolicySettingsPanel({ onToast: _onToast }: { onToast?: (msg: str
   const tBypass = useT("permission.modes.bypassPermissions");
 
   return (
-    <div className="policy-panel" role="region" aria-label="策略设置">
+    <div
+      className="policy-panel"
+      role="region"
+      aria-label="策略设置"
+      data-testid="policy-panel"
+    >
       <div className="policy-panel__head">
         <span className="policy-panel__title">策略设置</span>
         <span className="policy-panel__hint">本地策略管控(企业策略的可移植替代)</span>
@@ -203,6 +232,11 @@ export function PolicySettingsPanel({ onToast: _onToast }: { onToast?: (msg: str
           </span>
         </div>
       </div>
+
+      {/* 插件区块(内置两块也在这里:插件准入名单 order 50 / 策略审计 order 60) */}
+      {policySections.map((Section) => (
+        <Section key={Section.policySection.id} onToast={_onToast} />
+      ))}
     </div>
   );
 }

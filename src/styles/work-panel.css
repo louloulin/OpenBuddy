@@ -54,6 +54,12 @@
 .tool-side-panel__nav--collapsed {
   width: 36px !important;
 }
+/* 单栏(窄面板)模式:导航列就是"列表页",占满整列。 */
+.tool-side-panel__nav--full {
+  flex: 1 1 auto;
+  width: auto;
+  border-right: none;
+}
 .tool-side-panel__nav-header {
   display: flex;
   align-items: center;

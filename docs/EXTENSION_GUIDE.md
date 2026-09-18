@@ -1,6 +1,7 @@
 # OpenBuddy 插件开发指南
 
-> 中文版本（默认） · 英文版见 `EXTENSION_GUIDE.en.md`
+> 完整 slot 清单见 [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md);可复制的完整示例见
+> [`EXTENSION_RECIPES.md`](./EXTENSION_RECIPES.md) 与 `examples/openbuddy-plugin-*`。
 >
 > 本指南带你 10 分钟写出一个 hello-world 插件，并解释 OpenBuddy 微内核扩展 API 的关键概念。
 
@@ -190,7 +191,18 @@ dispose();
 
 ### `api.registerCommand(id, label, onExecute)`
 
-注册一个 slash 命令。`onExecute` 接收 `{ args: string }` 上下文。
+注册一个 slash 命令。`label` 是展示名（会出现在 ⌘K 命令面板与 Composer 的 `/` 菜单里，
+所以别只写 `/greet`，写成 `/greet — 输出问候` 更容易被搜到）；`onExecute` 接收
+`{ args: string }` 上下文。
+
+命令注册进内核的 `plugin.command` 槽（数据型），由宿主提供 UI：
+
+| 入口 | 行为 |
+|---|---|
+| ⌘K 命令面板 | 列出全部命令；`/greet Alice` 只保留匹配项，回车执行 |
+| Composer 的 `/` 补全 | 与 Pi 自带命令同列（同名时 Pi 优先），回车走发送路径分流执行 |
+
+两个入口都在**渲染端**执行回调，不经过 agent。
 
 ### `api.unregisterAll()`
 

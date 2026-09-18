@@ -1,7 +1,7 @@
 /**
  * microkernel-assembly.test.ts — 微内核真实装配证据。
  *
- * 这个文件回答一个可被证伪的问题：**内置 ui-* 包(当前 24 个)是否真的都装进了内核?**
+ * 这个文件回答一个可被证伪的问题：**内置 ui-* 包(当前 25 个)是否真的都装进了内核?**
  *
  * 历史教训：L1/L2 阶段的测试只验证「包存在 + tsc 通过」，而
  * `buildUiRuntime()` 实际上一直在用一个 `DeepSeekSlotCore` 取不到的
@@ -21,15 +21,16 @@ import {
 } from "../client";
 import { BUILTIN_UI_APPLIES } from "../builtin-applies";
 
-describe("微内核装配 — 24 个内置包", () => {
+describe("微内核装配 — 25 个内置包", () => {
   beforeEach(() => {
     registerAllBuiltinUis();
   });
 
   it("包数与 BUILTIN_UI_APPLIES 表一致", () => {
     expect(lastRegisteredReport()).toHaveLength(BUILTIN_UI_APPLIES.length);
-    // 21 个原始包 + ui-files-tree(Phase B)+ ui-editor / ui-onboarding(Phase C/D)。
-    expect(BUILTIN_UI_APPLIES.length).toBe(24);
+    // 21 个原始包 + ui-files-tree(Phase B)+ ui-editor / ui-onboarding(Phase C/D)
+    // + ui-library(R37:资料库分区总线)。
+    expect(BUILTIN_UI_APPLIES.length).toBe(25);
   });
 
   it("没有任何包 apply() 失败", () => {
@@ -66,7 +67,6 @@ describe("微内核装配 — 24 个内置包", () => {
       ["overlay.tasks", "@openbuddy/ui-automation"],
       ["notifications", "@openbuddy/ui-primitives"],
       ["details", "@openbuddy/ui-shell"],
-      ["root", "@openbuddy/ui-layout"],
     ];
     for (const [slot, owner] of required) {
       const entries = core.entries(slot);
@@ -74,8 +74,35 @@ describe("微内核装配 — 24 个内置包", () => {
     }
   });
 
-  it("多包共用的 shell.overlay 聚合了 5 个 overlay", () => {
-    expect(getRuntime().slots.entries("shell.overlay")).toHaveLength(5);
+  it("root 有意保持零内置注册 —— 内置默认实现是宿主外壳(AppShell),不是参考实现 AppFrame", () => {
+    // R23:整壳替换扩展点的对称性靠"宿主以 AppShell 作 fallback"实现,而不是
+    // 让 ui-layout 把 AppFrame 预注册进去 —— 那样内置参考实现会默认赢过产品
+    // 外壳(用户会看到没有顶栏 / 菜单栏 / 状态栏的 AppFrame)。
+    const core = getRuntime().slots;
+    expect(core.entries("root")).toHaveLength(0);
+  });
+
+  it("多包共用的 shell.overlay 聚合了各包投来的 overlay(list 追加语义)", () => {
+    // R62 —— 以前这里断言的是一个魔法数字 5。R48 给左下角身份条接上「登录」
+    // 之后,ui-dialogs 多注册了一个 id=sign-in 的 overlay,数字变成 6,测试
+    // 就开始红了 —— 但**装配本身没有任何问题**。断言"具体是哪些 id"比断言
+    // "有几个"更贴近这条用例真正想守的性质:多个包能往同一个 list 槽投东西,
+    // 且各自的 id 不互相覆盖。
+    // 注意用 entriesOfSlot(带 options 的原始 entry),不是 entries()
+    // —— 后者按设计只吐渲染用的组件,取不到 id。
+    const ids = getRuntime()
+      .slots.entriesOfSlot("shell.overlay")
+      .map((entry) => entry.options?.id)
+      .filter((id): id is string => typeof id === "string")
+      .sort();
+    expect(ids).toEqual([
+      "about",
+      "folder-trust",
+      "search",
+      "settings",
+      "sign-in",
+      "tasks",
+    ]);
   });
 
   it("装配幂等 — 重复 registerAllBuiltinUis 不会翻倍(single)或堆积(list id)", () => {

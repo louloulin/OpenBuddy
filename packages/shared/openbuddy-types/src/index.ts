@@ -273,11 +273,11 @@ export interface SessionSummary {
   isGitRepo?: boolean;
   /** True if the session is pinned to the top of the list.
    *  OpenBuddy-only state (pi has no pinned field); stored in
-   *  `~/.pi/openbuddy-state.json`. */
+   *  `<agentHome>/openbuddy-state.json`（真实落盘在 openbuddy.sqlite）。 */
   pinned?: boolean;
   /** True if the session is archived (hidden from the sidebar).
    *  OpenBuddy-only state (pi has no archived field); stored in
-   *  `~/.pi/openbuddy-state.json`. */
+   *  `<agentHome>/openbuddy-state.json`（真实落盘在 openbuddy.sqlite）。 */
   archived?: boolean;
   /** Model id bound to this session, if recorded in summary.json. */
   currentModelId?: string;
@@ -434,7 +434,7 @@ export interface AgentEntry {
   modelTags?: string[];
 }
 
-// ---------- permission rules (~/.pi/config.toml [permission]) ----------
+// ---------- permission rules (<agentHome>/settings.json `permission`) ----------
 
 /** One permission rule. `action` ∈ allow|deny|ask; `tool` ∈ bash|read|edit|grep|mcp|any. */
 export interface PermissionRule {
@@ -443,7 +443,7 @@ export interface PermissionRule {
   pattern?: string;
 }
 
-// ---------- memory (资料库 — ~/.pi/memory/) ----------
+// ---------- memory (资料库 — <agentHome>/memory/) ----------
 
 export interface MemoryEntry {
   /** "global" | "workspace". */
@@ -582,7 +582,7 @@ export interface InspirationStarted {
   count: number;
 }
 
-// ---------- agent / assistant defaults (~/.pi/config.toml) ----------
+// ---------- agent / assistant defaults (<agentHome>/settings.json) ----------
 
 export interface AgentDefaults {
   /** Model id for new sessions (`[models] default`). Empty = pi's built-in. */
@@ -925,6 +925,15 @@ export interface ExpertItem {
   agentName?: string;
   /** Quick prompts ("试试这样问我") from the manifest. */
   quickPrompts?: string[];
+  /**
+   * Canonical npm-style slug of the matching package on the pi.dev marketplace
+   * (e.g. "@scope/expert-name"). When set, the expert card surfaces a small
+   * "在 pi.dev 查看" link that opens https://pi.dev/packages/<slug> in the
+   * system browser. Optional — starters and WorkBuddy-imported experts do not
+   * carry this, so leaving it absent keeps the UI quiet for the majority of
+   * items.
+   */
+  piDevSlug?: string;
 }
 
 /** Catalog payload returned by `experts_load`. */
@@ -1048,3 +1057,5 @@ export function findPiPackageCatalogEntry(packageName: string): PiPackageCatalog
   if (!packageName) return undefined;
   return PI_PACKAGE_CATALOG.find((entry) => entry.packageNames.includes(packageName));
 }
+// R32 — Pi 扩展市场的 main ↔ renderer 线契约(单一定义,见文件头注释)。
+export * from "./pi-market";

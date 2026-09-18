@@ -19,6 +19,7 @@ import {
   extractGoogleFontFamily,
   buildFontStylesheetUrl,
   getThemeByName,
+  resolveThemeVars,
   type ThemeDefinition,
   type ThemeName,
   type ThemeType,
@@ -142,19 +143,41 @@ export function loadThemeFonts(theme: ThemeDefinition | null): void {
 }
 
 // ─── Apply CSS variables + attributes ───────────────────────────────
+//
+// 必须落下 "base + theme.vars" 的**完整**集合,而不是只落 theme.vars:
+// theme.vars 只是 delta,像 `--wb-bg-overlay` / `--wb-shadow*` / `--wb-font`
+// 只在 LIGHT_BASE / DARK_BASE 里。只写 delta 会让这些 token 停留在上一个
+// 主题的内联值上 —— 浅色画布配深色遮罩、深色画布配浅色阴影,以及最典型的
+// win95/winxp 的 `--wb-radius-*: 0` 会一路泄漏到之后的每一套主题(圆角
+// 永远变不回来,因为内联值永远压过 index.css 里的 `:root` 兜底)。
 function applyThemeAttrs(theme: ThemeDefinition | null): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   if (!theme) {
+    lastAppliedType = null;
     root.removeAttribute("data-theme-name");
     loadThemeFonts(null);
     return;
   }
+  lastAppliedType = theme.type;
   root.setAttribute("data-theme", theme.type);
   root.setAttribute("data-theme-name", theme.name);
-  for (const [k, v] of Object.entries(theme.vars)) {
+  // 字体是主题的顶层字段(不是 delta),且需要展开 `var(--wb-font)` 自引用,
+  // 因此单独解析后覆盖到颜色 token 之上 —— 这样 19 套主题的字体选择才真的生效。
+  const vars = resolveThemeVars(theme.name);
+  const seen = new Set<string>();
+  for (const [k, v] of Object.entries(vars)) {
+    seen.add(k);
     root.style.setProperty(k, v);
   }
+  // 上一个主题写过、这一套不再提供的 token 必须显式清掉,否则它们会继续
+  // 以"更高优先级的内联值"身份生效(见上面的圆角泄漏)。
+  for (const k of lastAppliedKeys) {
+    if (!seen.has(k)) root.style.removeProperty(k);
+  }
+  lastAppliedKeys = [...seen];
+  // 字体按主题懒加载:一次只挂当前主题用到的 family,而不是把 19 套主题的
+  // 30+ 字体全塞进 <head>(会拖慢首屏 LCP)。
   loadThemeFonts(theme);
 }
 
@@ -177,6 +200,44 @@ export interface ThemeService {
   setPair(pair: Partial<{ light: ThemeName; dark: ThemeName }>): void;
   setMode(mode: ThemeMode): void;
   list(): ReadonlyArray<ThemeDefinition>;
+  /**
+   * R44 — 接入用户在 ThemeStudio 保存的自定义主题。`CustomTheme` 的
+   * vars 是 OKLCh inline 值,不走 setThemeByName(后者接 ThemeName
+   * literal union,对 `custom-...` 名字直接拒绝)。
+   *
+   * 顺序很关键:
+   *   1. 先把 lastAppliedType 同步到 custom.type,后续 setAttribute
+   *      `data-theme` 才会被 compatObserver 当成"我们自己写的"。
+   *   2. 写 vars(data-theme-name="custom" + 全部 --wb-*)。
+   *   3. 持久化 ACTIVE_CUSTOM_KEY,通知 subscribers。
+   *
+   * 不在 picker 里直接 `applyCustomVars` + `setAttribute("data-theme")`:
+   *   那条路径会被 compatObserver 误判为"外部修改",触发 onCompatFlip
+   *   把当前 store 主题(openbuddy-dark)的 vars 写回 documentElement,
+   *   覆盖刚 applyCustomVars 写入的 custom 值 —— 用户看到的还是内置主题。
+   */
+  applyCustomTheme(theme: CustomThemeInput): void;
+  /**
+   * R46 — 把 store 当前状态重新写一遍到 `documentElement`(`data-theme` /
+   * `data-theme-name` + 全部 `--wb-*` inline 变量),并清掉上一个主题留下的
+   * 孤儿 token。
+   *
+   * 调用方:`ThemeStudio` 的 unmount cleanup —— 用户调了滑块做预览、但没保存
+   * 就离开时,用它把 UI 还原到 active theme(否则整棵界面停在最后一次 draft
+   * 的配色,而 picker 没高亮任何一项,看起来"主题坏了")。
+   */
+  syncDocument(): void;
+}
+
+/** 主题 studio 自定义主题的输入 shape。`name` 是字符串(不是 ThemeName
+ *  literal union),允许 `custom-` 前缀;`vars` 是 `--wb-*` → OKLCh
+ *  inline 值的字典。 */
+export interface CustomThemeInput {
+  name: string;
+  type: "dark" | "light";
+  vars: Record<string, string>;
+  accent?: string;
+  label?: string;
 }
 
 function pickActiveThemeName(
@@ -197,6 +258,64 @@ function pickActiveThemeName(
 export interface ThemeStoreInternal extends ThemeService {
   /** For tests only: synchronously read the current resolved theme. */
   __theme(): ThemeDefinition | null;
+  /**
+   * 把当前状态重新写一遍到 `documentElement`（`data-theme` /
+   * `data-theme-name` + 全部 `--wb-*` 内联变量）。
+   *
+   * 为什么需要：store 变成进程内单例之后，"构造时 apply 一次"不再等价于
+   * "DOM 上一定是对的"。documentElement 可能被外部重置 —— HMR、单测的
+   * `afterEach`、同一文档里挂载的第二份应用、宿主 IDE 桥接清属性。这时
+   * 属性缺失 = 整棵 UI 掉回无主题状态（`--wb-bg-primary` 走 index.css 的
+   * `:root` 兜底），而 store 自己并不知道。
+   *
+   * Provider 在挂载时调一次即可：写入是幂等的，`lastAppliedType` /
+   * `lastAppliedKeys` 会正确处理"上一次写过、这次不提供"的 token。
+   */
+  syncDocument(): void;
+}
+
+// ─── v1 `data-theme` compatibility bridge ──────────────────────────
+//
+// The theme store writes its resolved OKLCh palette as *inline* custom
+// properties on `documentElement`. Inline values outrank any stylesheet rule,
+// including `[data-theme="dark"] { --wb-bg-elevated: … }`. That means flipping
+// the legacy `data-theme` attribute on its own (which the v1 contract exposes
+// as `Theme = "light" | "dark" | "system"`, and which third-party plugins and
+// older call sites still do) left every `--wb-*` token at the *previous*
+// theme's value. Flipping to dark that way produced a white composer with
+// white text — invisible input.
+//
+// Rather than dropping the attribute, treat it as a real input: observe
+// external writes and re-resolve the theme through the normal path. Our own
+// writes are recognised via `lastAppliedType` so the observer never fights
+// `applyThemeAttrs`.
+type CompatListener = (type: ThemeType) => void;
+
+let lastAppliedType: ThemeType | null = null;
+/** Keys written by the previous apply — used to remove stale tokens. */
+let lastAppliedKeys: string[] = [];
+const compatListeners = new Set<CompatListener>();
+let compatObserver: MutationObserver | null = null;
+
+function installCompatObserver(): void {
+  if (typeof document === "undefined" || typeof MutationObserver === "undefined") return;
+  if (compatObserver) return;
+  compatObserver = new MutationObserver(() => {
+    const raw = document.documentElement.getAttribute("data-theme");
+    if (raw !== "dark" && raw !== "light") return; // removal / unknown → ignore
+    if (raw === lastAppliedType) return; // our own write
+    for (const fn of compatListeners) {
+      try {
+        fn(raw);
+      } catch {
+        /* a broken listener must not stop the others */
+      }
+    }
+  });
+  compatObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
 }
 
 export function createThemeStore(): ThemeStoreInternal {
@@ -211,6 +330,10 @@ export function createThemeStore(): ThemeStoreInternal {
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = (e: MediaQueryListEvent) => {
       systemDark = e.matches;
+      // Match-system 模式下 palette 完全由 systemDark 决定,只 notify() 会让
+      // currentName() 变了、documentElement 上的 OKLCh 变量还是旧值 ——
+      // 组件重渲染读到的是旧配色。所以这里必须真的重新落一遍。
+      applyThemeAttrs(activeTheme());
       notify();
     };
     mql.addEventListener("change", onChange);
@@ -251,6 +374,28 @@ export function createThemeStore(): ThemeStoreInternal {
     setPreference(theme) {
       pref = theme;
       safeSet(STORAGE_KEY, theme);
+      if (theme === "system") {
+        // v1 语义:system = 跟随操作系统,交给系统深/浅色决定。
+        mode = "system";
+        safeSet(STORAGE_MODE_KEY, "system");
+      } else if (activeTheme()?.type !== theme) {
+        // v1 契约:`setPreference("light"|"dark")` 必须真的改变配色。v2 的
+        // 配色由 mode + name 决定,所以这里要把它们一起写上 —— 否则
+        // `preference()` 说 dark、`--wb-*` 还停在浅色,调用方(设置面板的
+        // 浅色/深色按钮、宿主 IDE 的 colorScheme 同步)看起来"点了没反应"。
+        mode = "manual";
+        safeSet(STORAGE_MODE_KEY, "manual");
+        if (name !== null) {
+          // 只有在"已有一个类型不对的命名主题"时才需要钉一个具体名字。
+          // 没存名字时 pref 本身就足以解析出正确的类型,此时保持 name 为
+          // null —— 否则这次写入会被误当成"用户做过显式选择",让宿主 IDE
+          // 的 colorScheme 同步在之后每次启动都被判定为"要尊重用户选择"
+          // 而被挡掉。
+          const nextName = theme === "dark" ? pair.dark : pair.light;
+          name = nextName;
+          safeSet(STORAGE_NAME_KEY, nextName);
+        }
+      }
       applyThemeAttrs(activeTheme());
       notify();
     },
@@ -309,10 +454,68 @@ export function createThemeStore(): ThemeStoreInternal {
     list() {
       return THEMES;
     },
+    applyCustomTheme(theme) {
+      if (typeof document === "undefined") return;
+      const root = document.documentElement;
+      // 顺序:1. lastAppliedType 先同步,2. setAttribute data-theme 让
+      // compatObserver 看到"自写",3. data-theme-name + vars。
+      lastAppliedType = theme.type;
+      root.setAttribute("data-theme", theme.type);
+      root.setAttribute("data-theme-name", theme.name);
+      // 写 vars(custom 主题不依赖 resolveThemeVars,直接用 OKLCh)。
+      // 先清掉旧 --wb-* inline 残留,避免浅色画布配深色遮罩这类泄漏
+      // (切主题时上一个主题只写了 delta,没写的 token 仍走 :root 兜底;
+      // 但切到 custom 时 vars 是用户自选的 delta,必须先把残留清干净)。
+      // 枚举 CSSStyleDeclaration 找带 `--wb-` 前缀的内联属性,避免维护
+      // 一份可能漂移的静态 token 列表。
+      for (let i = root.style.length - 1; i >= 0; i--) {
+        const prop = root.style.item(i);
+        if (prop.startsWith("--wb-")) root.style.removeProperty(prop);
+      }
+      for (const [k, v] of Object.entries(theme.vars)) {
+        root.style.setProperty(k, v);
+      }
+      // custom 主题的 active 持久化:写 ACTIVE_CUSTOM_KEY 让 picker /
+      // ThemeStudio 重开时知道这是 custom,不要回退到内置 active。
+      try {
+        window.localStorage.setItem("openbuddy.theme.custom.active", theme.name);
+      } catch {
+        /* ignore quota */
+      }
+      notify();
+    },
+    // R46 — ThemeStudio unmount cleanup 的还原入口:把 active theme 重新写回
+    // documentElement(等价于"取消未保存的预览")。Provider 挂载时也走这条。
+    syncDocument() {
+      applyThemeAttrs(activeTheme());
+    },
   };
 
   // Apply on construction so documentElement is correct before first paint.
+  //
+  // `lastAppliedType` 也要在这里落地:observer 靠它区分"我们自己写的
+  // data-theme"和"外部(插件 / IDE 桥接 / 测试)改的 data-theme",不初始化
+  // 的话第一次外部翻转会被误判成自写而吞掉。
+  lastAppliedType = activeTheme()?.type ?? null;
   applyThemeAttrs(activeTheme());
+
+  // ── v1 `data-theme` 兼容桥 ──────────────────────────────────────
+  // 外部直接改 data-theme(旧插件、宿主桥接)时,内联 OKLCh 变量不会跟着变,
+  // 于是"属性说 dark、配色还是 light"。这里把它当成一次真正的输入,走正常
+  // 解析路径重算,而不是把属性删掉了事 —— 因为 `[data-theme="dark"] .foo`
+  // 这类后代选择器在 30 个 ui-* 包里被大量使用,属性本身是有意义的。
+  const onCompatFlip: CompatListener = (type) => {
+    if (activeTheme()?.type === type) return; // already there
+    const nextName = type === "dark" ? pair.dark : pair.light;
+    name = nextName;
+    safeSet(STORAGE_NAME_KEY, nextName);
+    mode = "manual";
+    safeSet(STORAGE_MODE_KEY, "manual");
+    applyThemeAttrs(getThemeByName(nextName));
+    notify();
+  };
+  compatListeners.add(onCompatFlip);
+  installCompatObserver();
 
   return Object.assign(service, {
     __theme: () => activeTheme(),

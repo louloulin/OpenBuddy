@@ -19,6 +19,16 @@ import type { SlotMap } from "@openbuddy/ui-slots";
 
 export type { SlotMap };
 
+declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * 任务面板(single,modal)。注册方 `client.tsx`(`TasksPanel`),消费者
+     * `src/AppShell`。payload 是 `TasksPanelProps`。
+     */
+    "overlay.tasks": { kind: "single"; scope: "root" };
+  }
+}
+
 // -------- panels --------
 export { AutomationPanel } from "./AutomationPanel";
 export type { AutomationPanelProps } from "./AutomationPanel";

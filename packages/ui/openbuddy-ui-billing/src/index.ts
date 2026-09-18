@@ -20,3 +20,34 @@ export { CreditPricingPanel } from "./CreditPricingPanel";
 export { CreditReconciliationPanel } from "./CreditReconciliationPanel";
 export { CreditWalletPanel } from "./CreditWalletPanel";
 export { UsageQuotaPanel } from "./UsageQuotaPanel";
+
+
+declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * 账单面板(single)。
+     * 消费者:SettingsPanel 的「企业计费」路由。
+     */
+    "placeholder.billing": { kind: "single"; scope: "root" };
+    /**
+     * 积分定价面板(single)。
+     * 消费者:SettingsPanel「积分定价」路由。
+     */
+    "placeholder.credit-pricing": { kind: "single"; scope: "root" };
+    /**
+     * 成本对账面板(single)。
+     * 消费者:SettingsPanel「成本对账」路由。
+     */
+    "placeholder.credit-reconciliation": { kind: "single"; scope: "root" };
+    /**
+     * 扣费账户面板(single)。
+     * 消费者:SettingsPanel「扣费账户」路由。
+     */
+    "placeholder.credit-wallet": { kind: "single"; scope: "root" };
+    /**
+     * 用量配额面板(single)。
+     * 消费者:PlaceholderPage「用量统计」路由。
+     */
+    "placeholder.usage-quota": { kind: "single"; scope: "root" };
+  }
+}

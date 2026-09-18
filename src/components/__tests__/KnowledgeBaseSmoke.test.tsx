@@ -17,7 +17,15 @@ import userEvent from "@testing-library/user-event";
 
 // --- Mock desktop filesystem layer (让「添加本地文件夹」可在 vitest 下走通) ---
 const openDialog = vi.fn();
-vi.mock("@/lib/platform/electron-api", () => ({ open: (...a: unknown[]) => openDialog(...a), invoke: vi.fn() }));
+// R39 — 组件走 `openOne()`;mock 需要提供同名导出。
+vi.mock("@/lib/platform/electron-api", () => ({
+  openOne: (...a: unknown[]) => openDialog(...a),
+  openPaths: async (...a: unknown[]) => {
+    const one = await openDialog(...a);
+    return one ? [one] : [];
+  },
+  invoke: vi.fn(),
+}));
 
 // 用可控的 DirectoryReader 替代真实 desktop implementation。
 const mockReader = { listDir: vi.fn(), readText: vi.fn(), readBytes: vi.fn() };

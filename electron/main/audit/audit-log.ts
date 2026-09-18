@@ -34,6 +34,35 @@ export interface AuditEvent {
   hash?: string;
 }
 
+export type AuditExportFormat = "jsonl" | "json";
+
+export interface AuditExportResult {
+  /** 实际写入的目标路径(来自保存对话框)。 */
+  path: string;
+  /** 导出的条数。 */
+  count: number;
+  bytes: number;
+  format: AuditExportFormat;
+  exportedAt: string;
+}
+
+/**
+ * 序列化(纯函数,便于单测)。
+ *
+ * - `jsonl`:与磁盘上的 `audit.jsonl` 同构,一行一条 —— 可以直接再接回
+ *   `load()` / 外部 jq / grep,不引入新格式。
+ * - `json`:`{ exportedAt, count, events }`,方便贴进 issue 或不写代码的场合。
+ *
+ * 不导出 `hash` 之外的东西:链式 hash 原样保留,这样"导出件是否被改过"仍可
+ * 用同一套规则复核(每条 hash = 前一条 hash + 本条的 id/at/event/outcome/source/subject)。
+ */
+export function serializeAuditEvents(events: AuditEvent[], format: AuditExportFormat, exportedAt: string): string {
+  if (format === "json") {
+    return `${JSON.stringify({ exportedAt, count: events.length, events }, null, 2)}\n`;
+  }
+  return events.length === 0 ? "" : `${events.map((event) => JSON.stringify(event)).join("\n")}\n`;
+}
+
 const FILE_NAME = "audit.jsonl";
 const DEFAULT_MAX = 1000;
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -138,6 +167,56 @@ class AuditTrail {
     } catch (error) {
       console.warn("[audit] clear failed", error);
     }
+  }
+
+  /**
+   * 导出到用户选择的路径(R41)。
+   *
+   * 调用方必须先经过保存对话框审批(`requireApprovedSavePath`)—— 本方法只负责
+   * "把内存里的审计条写成一个文件",不做路径安全判断,那是 IPC 层的责任。
+   *
+   * 两个刻意的选择:
+   *   1. 文件权限 0o600:审计条含 subject / detail(谁在什么时候做了什么),
+   *      默认不给同机器上的其他账号读。
+   *   2. **先写文件、后记录导出事件**:导出件里因此不含"它自己被导出"这一条。
+   *      反过来做(先记录再写)会让内容与 trail 不一致 —— 写失败时 trail 已经
+   *      声称导出成功。宁可少一条自指记录,也不要一条假的成功记录。
+   */
+  async exportTo(target: string, options?: { format?: AuditExportFormat; limit?: number }): Promise<AuditExportResult> {
+    await this.load();
+    const format: AuditExportFormat = options?.format === "json" ? "json" : "jsonl";
+    const requested = options?.limit ?? this.buffer.length;
+    const limit = Number.isFinite(requested) && requested > 0 ? Math.floor(requested) : this.buffer.length;
+    const events = this.buffer.slice(Math.max(0, this.buffer.length - limit));
+    const exportedAt = new Date().toISOString();
+    const blob = serializeAuditEvents(events, format, exportedAt);
+    try {
+      await writeFile(target, blob, { encoding: "utf8", mode: 0o600 });
+    } catch (error) {
+      await this.record({
+        event: "audit.export",
+        outcome: "failure",
+        source: "main",
+        subject: target,
+        detail: { format, error: String((error as Error)?.message ?? error) },
+      }).catch(() => undefined);
+      throw error;
+    }
+    const result: AuditExportResult = {
+      path: target,
+      count: events.length,
+      bytes: Buffer.byteLength(blob, "utf8"),
+      format,
+      exportedAt,
+    };
+    await this.record({
+      event: "audit.export",
+      outcome: "success",
+      source: "main",
+      subject: target,
+      detail: { format, count: result.count, bytes: result.bytes },
+    }).catch(() => undefined);
+    return result;
   }
 }
 

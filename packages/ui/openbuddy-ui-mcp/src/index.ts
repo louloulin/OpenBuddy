@@ -17,7 +17,62 @@
  */
 export { DiscoverPanel } from "./DiscoverPanel";
 export { MarketplacePanel } from "./MarketplacePanel";
+// R41 — 安装预检:纯逻辑 + 确认框,第三方插件可以注册更高优先级实现整体替换。
+export { buildInstallPreflight, resolvePreflightAction } from "./install-preflight";
+export type { InstallPreflight, PreflightItem, PreflightLevel, PreflightAction } from "./install-preflight";
+export { InstallPreflightDialog } from "./InstallPreflightDialog";
 export { NotifyChannelsPanel } from "./NotifyChannelsPanel";
 export { OpenBuddyPluginPanel } from "./OpenBuddyPluginPanel";
+export { PiExtensionsSection } from "./PiExtensionsSection";
+export {
+  describePiMarketError,
+  groupPiMarketEntries,
+  installStateOf,
+  mirrorLabel,
+  sourceChips,
+  sourceLabel,
+  summarizeSources,
+  toMarketplaceEntry,
+  type PiExtensionsGroups,
+  type PiMarketErrorAction,
+  type PiMarketSourceSummary,
+  type PiSourceChip,
+} from "./pi-extensions-model";
 export { PluginsPanel } from "./PluginsPanel";
 export { ResourceCatalogPanel } from "./ResourceCatalogPanel";
+
+
+declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * 发现面板(single)。
+     * 消费者:PlaceholderPage「发现」路由。
+     */
+    "placeholder.discover": { kind: "single"; scope: "root" };
+    /**
+     * 插件市场面板(single)。
+     * 消费者:ExpertsPanel 的「插件·市场」tab。
+     */
+    "placeholder.marketplace": { kind: "single"; scope: "root" };
+    /**
+     * 通知渠道面板(single)。
+     * 消费者:PlaceholderPage「通知渠道」路由。
+     */
+    "placeholder.notify-channels": { kind: "single"; scope: "root" };
+    /**
+     * OpenBuddy 自家插件管理面板(single)。
+     * 消费者:SettingsPanel「OpenBuddy 插件」路由。
+     */
+    "placeholder.openbuddy-plugin": { kind: "single"; scope: "root" };
+    /**
+     * Pi x.ai/plugins 兼容面板(single)。
+     * 消费者:SettingsPanel「Pi 插件」路由。
+     */
+    "placeholder.plugins": { kind: "single"; scope: "root" };
+    /**
+     * 资源目录面板(single)。
+     * 消费者:SettingsPanel「资源目录」路由。
+     */
+    "placeholder.resource-catalog": { kind: "single"; scope: "root" };
+  }
+}

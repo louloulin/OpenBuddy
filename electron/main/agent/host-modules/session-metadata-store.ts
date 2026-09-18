@@ -1,7 +1,7 @@
 /**
  * host-modules/session-metadata-store.ts — Phase F.2.
  *
- * SQLite-backed replacement for the legacy `~/.pi/openbuddy-state.json`
+ * SQLite-backed replacement for the legacy `<agentHome>/openbuddy-state.json`
  * JSON mirror previously maintained by `session-metadata.ts`. The
  * JSON mirror had three top-level fields (`pinned: string[]`,
  * `archived: string[]`, `experts: Record<sessionId, ExpertInfo>`) and

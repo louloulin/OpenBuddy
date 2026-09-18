@@ -453,6 +453,9 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
         useSessionStore.getState().finishStreamingMessage({
           modelId: currentModelIdRef.current,
           outputTokens: p.usage?.completionTokens,
+          // R58 — pipe prompt (input) token count so the meta chip
+          // can show "1.2k in" beside the throughput chip.
+          inputTokens: p.usage?.promptTokens,
         });
         useSessionStore.getState().setStreaming(false);
         // Let the next turn re-decide its wire shape. Safe to reset only at a

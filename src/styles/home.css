@@ -143,6 +143,11 @@
   gap: 0;
   width: 100%;
   height: 30px;
+  /* R91 — defensive: never let a flex child blow the row's intrinsic width.
+   * `min-width: 0` is the canonical fix for flex children that override
+   * `overflow:hidden` when intrinsic content > available width. */
+  min-width: 0;
+  overflow: hidden;
   /* WB: no leading icon — text aligns with the 任务/空间 section label text */
   padding: 4px 12px;
   box-sizing: border-box;
@@ -187,6 +192,10 @@
 }
 .sidebar__conv-title {
   flex: 1;
+  /* R91 — `min-width: 0` is required so the title actually respects its
+   * sibling time/pin tail; without it flex's default min-content wins and
+   * the row appears to ignore the parent's overflow:hidden. */
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -277,37 +286,48 @@
   line-height: 1;
   user-select: none;
 }
+/* R48 — 单行身份条:文本块只承载名字,垂直居中(对齐 WorkBuddy 侧栏底部)。 */
 .sidebar__user-text {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 1px;
+  align-items: center;
+  gap: 6px;
   text-align: left;
 }
 .sidebar__user-name {
-  width: 100%;
+  min-width: 0;
   font-size: 13px;
-  font-weight: 500;
+  /* R49 — 对齐参考图:名字用半粗,与右侧图标区形成稳定的身份条。 */
+  font-weight: 600;
   line-height: 16px;
   color: var(--wb-text-strong);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sidebar__user-sub {
-  width: 100%;
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 14px;
-  color: var(--wb-text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* 登录态圆点:绿=已登录,红=出错。只表达状态,不占一行文字。
+   R49 — 默认(未登录 / 未配置)不渲染:参考图的底部身份条只有
+   「头像 + 名字 + 铃铛 + 设置」,本地优先的默认形态不该多出一个灰点;
+   登录成功或出错时才出现,这时它承载的是真实信号。 */
+.sidebar__user-dot {
+  display: none;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wb-text-tertiary) 55%, transparent);
 }
-/* 名字超长时截断为省略号 —— "本地优先 · 开源" 副标也走这条规则 */
+.sidebar__user-dot[data-state="signed_in"] {
+  display: block;
+  background: var(--wb-accent, #00c29a);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wb-accent, #00c29a) 18%, transparent);
+}
+.sidebar__user-dot[data-state="error"] {
+  display: block;
+  background: var(--wb-danger, #d64545);
+}
+/* 名字超长时截断为省略号 */
 .sidebar__user span {
   white-space: nowrap;
   overflow: hidden;
@@ -325,19 +345,6 @@
   flex: 1;
   min-width: 0;
   display: flex;
-}
-.sidebar__user-chevron {
-  flex: none;
-  margin-left: 4px;
-  font-size: 10px;
-  line-height: 1;
-  color: var(--wb-text-tertiary);
-  opacity: 0.6;
-  transition: transform 0.15s ease, opacity 0.15s ease;
-}
-.sidebar__user--open .sidebar__user-chevron {
-  transform: rotate(180deg);
-  opacity: 1;
 }
 .sidebar__user--open {
   background: var(--wb-bg-active);
@@ -357,7 +364,7 @@
   flex-direction: column;
   gap: 2px;
   z-index: 30;
-  animation: account-menu-pop 0.14s ease-out;
+  animation: account-menu-pop var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, ease-out);
 }
 /* R17 — portal 变体:菜单挂在 <body> 下,用 fixed 定位脱离
    `.sidebar__footer` / `.sidebar` 的 overflow:hidden 裁剪链。
@@ -481,6 +488,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 工作区面板打开后,输入卡可能只有 ~270px 宽。这两个选择器默认
+ * `min-width: auto`(按内容撑开),整排底行会被顶出卡片 —— 允许收缩,
+ * 标签自己出省略号。 */
+.model-selector,
+.model-selector__trigger,
+.workspace-picker,
+.workspace-picker__trigger {
+  min-width: 0;
 }
 /* WB 合并标签:触发器前显示 ✓ 表示当前档位已激活。 */
 .model-selector__think-check {
@@ -951,6 +967,9 @@
 .sidebar__conv-pin {
   color: var(--wb-brand);
   margin-left: auto;
+  /* R91 — pin glyph stays a single symbol; prevents accidental wrap when
+   * the row's flex width shrinks. */
+  white-space: nowrap;
 }
 
 /* ========================================================================
@@ -1078,6 +1097,9 @@
 /* Relative-time tail on a session row (e.g. "3小时前"). */
 .sidebar__conv-time {
   flex: none;
+  /* R91 — relative time tail must stay single-line, otherwise the row's
+   * visual rhythm breaks (e.g. "3小时\n前" wrapping to 2 lines). */
+  white-space: nowrap;
   margin-left: 6px;
   font-size: 11px;
   color: var(--wb-text-tertiary);
@@ -2363,6 +2385,12 @@
   border-radius: 4px;
   font-size: 11px;
 }
+/* R95 — 数据目录不一致告警(见 DataSettingsPanel 的「pi 引擎实际目录」)。
+ * 用 token 而不是写死颜色,深浅主题都能保住对比度。 */
+.settings-code--warn {
+  color: var(--wb-status-warning, #b45309) !important;
+  border: 1px solid color-mix(in srgb, var(--wb-status-warning, #b45309) 40%, transparent);
+}
 .theme-toggle {
   display: flex;
   gap: 4px;
@@ -2395,6 +2423,38 @@
   font-size: 11px;
   border-radius: 6px;
   cursor: pointer;
+}
+/* 「设置 → 个性化」的语言下拉（ui-locale LanguagePicker 默认类名）。
+   走 --wb-* token 而不是原生控件本色，否则深色主题下会变成一块白底。 */
+.settings-select {
+  appearance: none;
+  min-width: 132px;
+  padding: 5px 26px 5px 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background-color: var(--wb-bg-primary);
+  /* 自绘箭头：原生箭头在 appearance:none 之后会消失。 */
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  color: var(--wb-text-strong);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.settings-select:hover {
+  border-color: var(--wb-border-strong, var(--wb-border-default));
+}
+.settings-select:focus-visible {
+  outline: 2px solid var(--wb-accent, var(--wb-border-strong, var(--wb-border-default)));
+  outline-offset: 1px;
+}
+.settings-select option {
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
 }
 .shortcuts-list {
   list-style: none;
@@ -3082,7 +3142,7 @@
 .model-tags__chip--on {
   background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
   border-color: var(--wb-border-default);
-  color: var(--wb-text-strong);
+  color: var(--wb-pill-active-fg);
 }
 .model-tags__chip:hover {
   border-color: var(--wb-brand);
@@ -3717,6 +3777,243 @@
 }
 
 /* ========================================================================
+ * PiExtensionsSection — 「Pi 扩展」区块(R32 / Expert Marketplace Bridge)
+ *
+ * 排版刻意跟 `.marketplace-panel` 的既有约定对齐:区块本身不加内边距,
+ * 由父级的 `> *:not(__header)` 规则统一给 24px,这样两张列表的左边线在同一条竖线上。
+ * ===================================================================== */
+.pi-ext {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--wb-border-subtle, var(--wb-border-default));
+}
+.pi-ext__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pi-ext__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.pi-ext__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pi-ext__stat {
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.pi-ext__btn {
+  padding: 6px 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  cursor: pointer;
+}
+.pi-ext__btn:hover:not(:disabled) { border-color: var(--wb-brand); }
+.pi-ext__btn:disabled { opacity: 0.5; cursor: default; }
+
+.pi-ext__sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pi-ext__source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 999px;
+  background: var(--wb-bg-secondary);
+  font-size: 11px;
+  color: var(--wb-text-medium);
+}
+.pi-ext__source-count {
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.pi-ext__source-chip--fresh { border-color: var(--wb-brand); }
+.pi-ext__source-chip--cached { border-color: var(--wb-warning, #d97706); }
+.pi-ext__source-chip--failed { border-color: var(--wb-danger, #dc2626); color: var(--wb-danger, #dc2626); }
+.pi-ext__source-chip--skipped { opacity: 0.7; }
+
+.pi-ext__warning {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  background: rgba(217, 119, 6, 0.08);
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.pi-ext__error {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(220, 38, 38, 0.28);
+  background: rgba(220, 38, 38, 0.08);
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.pi-ext__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--wb-text-weak);
+  line-height: 1.6;
+}
+.pi-ext__empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px dashed var(--wb-border-default);
+  border-radius: 10px;
+  background: var(--wb-bg-secondary);
+}
+.pi-ext__empty-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.pi-ext__empty-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--wb-text-medium);
+}
+.pi-ext__empty-hint code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--wb-bg-primary);
+  border: 1px solid var(--wb-border-default);
+  font-size: 11px;
+}
+
+/* ── R35 源管理(pi-ext-src)────────────────────────────────────────────
+ * 一行 = 一个源。网格是「宽输入列 + 窄状态动作列」,窄窗口下自动折行 ——
+ * 源的地址通常很长,把状态挤到第二行比把 URL 截断要好。 */
+.pi-ext__btn--primary {
+  border-color: var(--wb-brand);
+  color: var(--wb-brand);
+}
+.pi-ext-src {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 10px;
+  background: var(--wb-bg-secondary);
+}
+.pi-ext-src__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pi-ext-src__title { font-size: 13px; font-weight: 600; color: var(--wb-text-strong); }
+.pi-ext-src__meta {
+  font-size: 11px;
+  color: var(--wb-text-weak);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+  direction: rtl;
+  text-align: left;
+}
+.pi-ext-src__hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--wb-text-weak);
+}
+.pi-ext-src__list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pi-ext-src__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+}
+.pi-ext-src__row--readonly { opacity: 0.72; }
+.pi-ext-src__row[data-invalid="true"] { border-color: var(--wb-danger, #dc2626); }
+.pi-ext-src__row-main { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.pi-ext-src__input {
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-secondary);
+  color: var(--wb-text-strong);
+  font-size: 12px;
+  font-family: inherit;
+}
+.pi-ext-src__input:read-only { background: transparent; border-color: transparent; padding-left: 2px; }
+.pi-ext-src__input--url { flex: 1 1 220px; font-family: var(--wb-font-mono, ui-monospace, monospace); }
+.pi-ext-src__input--num { flex: 0 1 72px; font-variant-numeric: tabular-nums; }
+.pi-ext-src__row-side { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.pi-ext-src__badge {
+  padding: 2px 6px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--wb-text-weak);
+}
+.pi-ext-src__probe { font-size: 11px; color: var(--wb-text-medium); }
+.pi-ext-src__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-secondary);
+  color: var(--wb-text-medium);
+  font-size: 11px;
+  cursor: pointer;
+}
+.pi-ext-src__icon:hover:not(:disabled) { border-color: var(--wb-brand); color: var(--wb-text-strong); }
+.pi-ext-src__icon:disabled { opacity: 0.4; cursor: default; }
+.pi-ext-src__icon--danger:hover:not(:disabled) { border-color: var(--wb-danger, #dc2626); color: var(--wb-danger, #dc2626); }
+.pi-ext-src__row-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 11px;
+  color: var(--wb-danger, #dc2626);
+}
+.pi-ext-src__foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pi-ext-src__foot .pi-ext__btn { display: inline-flex; align-items: center; gap: 5px; }
+.pi-ext-src__foot .pi-ext-src__meta { flex: 1 1 auto; }
+
+
+/* ========================================================================
  * AgentMailSettingsPanel — 会话通知中心
  * ===================================================================== */
 
@@ -3884,7 +4181,7 @@
 .create-colleague-tag { padding: 6px 14px; border: 1px solid var(--wb-border-default); border-radius: 8px; background: transparent; font-size: 13px; cursor: pointer; color: var(--wb-text-medium); transition: all .15s; }
 .create-colleague-tag--on {
   background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
-  color: var(--wb-text-strong);
+  color: var(--wb-pill-active-fg);
   border-color: var(--wb-border-default);
 }
 
@@ -4225,7 +4522,7 @@
 .quota-panel__period-btn{padding:2px 12px;border:1px solid var(--wb-border-default);background:var(--wb-bg-primary);color:var(--wb-text-medium);border-radius:6px;font-size:11px;cursor:pointer}
 .quota-panel__period-btn.active {
   background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
-  color: var(--wb-text-strong);
+  color: var(--wb-pill-active-fg);
   border-color: var(--wb-border-default);
 }
 .quota-panel__stats{display:flex;gap:16px;padding:12px 14px}
@@ -4938,7 +5235,7 @@
 .email-action-center__filter-group button:hover { border-color: #8bb7ff; background: #f2f7ff; }
 .email-action-center__filter-group button.is-active {
   background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
-  color: var(--wb-text-strong);
+  color: var(--wb-pill-active-fg);
   border-color: var(--wb-border-default);
 }
 .email-action-center__filter-group button small {
@@ -5012,7 +5309,7 @@
 .email-action-center__sort button:hover { border-color: #8bb7ff; background: #f2f7ff; }
 .email-action-center__sort button.is-active {
   background: var(--wb-bg-pill-active, rgba(0, 0, 0, 0.75));
-  color: var(--wb-text-strong);
+  color: var(--wb-pill-active-fg);
   border-color: var(--wb-border-default);
 }
 

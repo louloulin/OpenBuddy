@@ -32,6 +32,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { installDragRegion } from "./window";
+import { applyDataDirOverride, captureDefaultUserDataPath } from "./data-dir";
 import { dispatchHarnessRpc, registerIpc, bindAgentHost, bindRendererEventEmitterFn } from "./ipc/index";
 import { setActiveHarnessServer } from "./harness/harness-server";
 import type { HarnessServer } from "./harness/harness-server";
@@ -43,6 +44,7 @@ import { initCasdoorSecurity, type CasdoorSecurityController } from "./security/
 import { perfTraceMark } from "./observability/perf-trace";
 import { createMainWindow as buildMainWindow } from "./main-window";
 import { installAppMenu } from "./app-menu";
+import { agentHome, pinPiAgentDirEnv, isPiAgentDirPinnedByUs } from "@openbuddy/storage";
 
 // Heavy module (138 top-level imports including @earendil-works/pi-coding-agent and
 // the OpenBuddy Pi SDK) — lazy-loaded inside bootBackgroundServices so module
@@ -57,6 +59,20 @@ const mainDirname = dirname(mainFilename);
 const execFileAsync = promisify(execFile);
 
 app.setName("OpenBuddy");
+
+// R95 — 把 agent 根钉进 `PI_CODING_AGENT_DIR`,必须发生在**任何 pi 模块被求值之前**。
+//
+// 为什么放在模块顶层、`app.whenReady` 之前:pi-coding-agent 的
+// `getAgentDir()` 只读环境变量(不看 `createAgentSession({ agentDir })`),而
+// 一些扩展在**扩展注册时**就解析自己的目录 —— 等 agent host 懒加载起来再设
+// 已经太晚。这里是 main 进程源文件里最早能设的时机:本模块是入口,而且这段
+// 代码在 `bootBackgroundServices()` 之前同步执行。
+//
+// 为什么必须整体做:不设的话 SDK 会解析到 `~/.pi/agent`(实测见
+// `@openbuddy/storage` 的 `pinPiAgentDirEnv()` 注释),于是 OpenBuddy 与 pi
+// 两个产品互相写对方的数据目录 —— 本机 `~/.pi/agent/agents/Designer.md`
+// 停在 2026-09-04 而 `~/.openbuddy/agent/` 每天在写,就是这个分叉。
+pinPiAgentDirEnv();
 
 let mainLogger: ReturnType<typeof createMainLogger> | null = null;
 function ensureMainLogger(): ReturnType<typeof createMainLogger> {
@@ -80,15 +96,34 @@ function ensureMainLogger(): ReturnType<typeof createMainLogger> {
   // Emit a startup line so operators (and the chat-resilience smoke test) can
   // confirm the file logger + pino-roll transport are wired correctly.
   mainLogger.info(
-    { msg: "main.started", traceId, electronVersion: process.versions.electron ?? null, logsDir: filePath ? filePath.slice(0, filePath.lastIndexOf("/")) : null },
+    {
+      msg: "main.started",
+      traceId,
+      electronVersion: process.versions.electron ?? null,
+      logsDir: filePath ? filePath.slice(0, filePath.lastIndexOf("/")) : null,
+      // R95 — 记下 agent 根与它是否由我们钉入。排查"数据写到 ~/.pi/agent"
+      // 这类问题时,这一行就能区分"用户显式覆盖"与"我们补的默认值"。
+      agentHome: agentHome(),
+      piAgentDirPinnedByUs: isPiAgentDirPinnedByUs(),
+    },
     "openbuddy main started",
   );
   return mainLogger;
 }
 
+// R23 — 数据目录解析顺序(必须在 app ready 之前定下来,之后没人再改它):
+//   1. OPENBUDDY_DEV_USER_DATA / dev 构建 → 开发目录(指针文件在开发态不参与,
+//      否则跑一次"换目录"就会把开发环境也一起搬走);
+//   2. `<appData>/OpenBuddy/data-dir.json` → 用户在设置里选过的目录;
+//   3. Electron 默认 userData。
+// 指针文件里的目录若不可用(外接盘没插上 / 只读挂载),`applyDataDirOverride`
+// 会安静地降级成默认目录,不让应用起不来。
+captureDefaultUserDataPath();
 const developmentUserData = process.env.OPENBUDDY_DEV_USER_DATA?.trim();
 if (developmentUserData || process.env.NODE_ENV_ELECTRON_VITE === "development") {
   app.setPath("userData", developmentUserData || join(app.getPath("appData"), "OpenBuddy-dev"));
+} else {
+  applyDataDirOverride();
 }
 
 const devRendererUrl = process.env.ELECTRON_RENDERER_URL;

@@ -73,16 +73,42 @@ describe.skipIf(!canLaunch)("R8.5 live electron probe", () => {
     expect(report.shell_sidebar.width).toBe("320px");
   });
 
-  it("dark theme flips app bg + composer bg to dark surfaces", () => {
+  it("dark theme flips app bg + composer card to dark surfaces", () => {
     const report = runProbe();
     // Light → dark probe flips data-theme via the script itself.
     expect(report.shell_app_dark.found).toBe(true);
     expect(report.shell_app_dark["background-color"]).toMatch(/rgb\(31,\s*31,\s*31\)/);
 
-    expect(report.composer_textarea_dark.found).toBe(true);
-    // The fix for the "white composer in dark theme" audit finding.
-    expect(report.composer_textarea_dark["background-color"]).toMatch(/rgb\(31,\s*31,\s*31\)/);
+    // The composer *card* owns the surface and must actually go dark.
+    expect(report.composer_card_light.found).toBe(true);
+    expect(report.composer_card_dark.found).toBe(true);
+    expect(report.composer_card_light["background-color"]).not.toBe(
+      report.composer_card_dark["background-color"],
+    );
+
     // Text should be light on dark.
+    expect(report.composer_textarea_dark.found).toBe(true);
+    expect(report.composer_textarea_dark.color).toMatch(/rgba\(255,\s*255,\s*255/);
+  });
+
+  it("composer input surface is identical in light and dark (R17 parity)", () => {
+    const report = runProbe();
+    // R17 拆掉了"暗色下给裸 textarea 涂 #1f1f1f"的一刀切规则:
+    // `.wb-composer__input` 设计上 background:transparent,贴在 composer card
+    // 的 --wb-bg-elevated 上。旧规则让浅色=透明、深色=一块 #1f1f1f 内陷,
+    // 这就是"黑色主题下 chatinput 和白色主题差距很大"的根因。
+    // 契约:两种主题下输入区都必须透明,由卡片提供底板。
+    for (const key of [
+      "composer_textarea_light",
+      "composer_textarea_dark",
+      "composer_input_light",
+      "composer_input_dark",
+    ]) {
+      expect(report[key].found, key).toBe(true);
+      expect(report[key]["background-color"], key).toBe("rgba(0, 0, 0, 0)");
+    }
+    // 只有文字颜色翻。
+    expect(report.composer_textarea_light.color).toMatch(/rgba\(0,\s*0,\s*0/);
     expect(report.composer_textarea_dark.color).toMatch(/rgba\(255,\s*255,\s*255/);
   });
 
@@ -188,16 +214,30 @@ describe.skipIf(!canLaunch)("R8.5 live electron probe", () => {
     expect(report.r86_action_disabled.opacity).toBe("0.45");
   });
 
-  it("R8.7 mention-picker has 420px width + 12px radius + enter animation + brand-tinted active item", () => {
+  it("R8.7 mention-picker has 420px width + 12px radius + enter animation + neutral active item", () => {
     const report = runProbe();
     expect(report.r87_mention_picker.found).toBe(true);
     expect(report.r87_mention_picker.width).toBe("420px");
     expect(report.r87_mention_picker.borderRadius).toBe("12px");
     expect(report.r87_mention_picker.hasEnterAnim).toBe("ob-mention-picker-in");
-    // Active item gets the brand-tinted background (8% mix), not generic hover gray.
-    expect(report.r87_mention_picker.activeItemBg).toMatch(/0\.760784\s+0\.603922/);
-    // Kind chip background uses brand 10%.
-    expect(report.r87_mention_picker.kindChipBg).toMatch(/0\.1/);
+    // R8.61 把选中态从"品牌 8% 混合"改成了中性表面,品牌色只留给
+    // streaming 指示条。契约见
+    // src/styles/__tests__/mention-picker-neutral-r8.61.test.ts。
+    // R27 修正:列表行不能用"实心 CTA 胶囊色"(--wb-bg-pill-active,亮色
+    // = 75% 黑),那样配 --wb-text-strong 就是黑底黑字。改用"比容器深一层
+    // 的中性表面" --wb-bg-active;亮色 = color-mix(black 8%, transparent)。
+    expect(report.r87_mention_picker.activeItemBg).toBe("color(srgb 0 0 0 / 0.08)");
+    // 且不能是实心胶囊色(否则又回到黑底黑字)。
+    expect(report.r87_mention_picker.activeItemBg).not.toBe("rgba(0, 0, 0, 0.75)");
+    // 且绝不是品牌色(0.760784 0.603922 是 #00C29A 的 srgb 分量)。
+    expect(report.r87_mention_picker.activeItemBg).not.toMatch(
+      /0\.760784\s+0\.603922/,
+    );
+    // Kind chip background is a neutral surface token, not a brand tint.
+    expect(report.r87_mention_picker.kindChipBg).not.toMatch(
+      /0\.760784\s+0\.603922/,
+    );
+    expect(report.r87_mention_picker.kindChipBg).toMatch(/oklch\(|rgb\(/);
   });
 
   it("R8.7 composer @-mention chips are brand-tinted (not hardcoded blue)", () => {
@@ -242,8 +282,18 @@ describe.skipIf(!canLaunch)("R8.5 live electron probe", () => {
   it("R8.8 branch navigator active outline is brand-tinted", () => {
     const report = runProbe();
     expect(report.r88_branch_navigator.found).toBe(true);
-    // Legacy --wb-accent was the same blue; the active outline must remain visible.
-    expect(report.r88_branch_navigator.activeOutline).toMatch(/rgb\(0,\s*194,\s*154\)/);
+    // 激活描边必须来自 `--wb-accent` 这个 token(而不是写死的颜色或某个
+    // 已经被废弃的 legacy token)。
+    expect(report.r88_branch_navigator.activeOutline).toContain(
+      report.r88_branch_navigator.accentToken,
+    );
+    // 而那个 token 必须就是品牌青绿 #00C29A。这一项由
+    // packages/ui/openbuddy-ui-theme/src/__tests__/brand-accent.test.ts
+    // 精确锁定(oklch → sRGB 往返 = 0/194/154)。theme-v2 曾经把它退化成
+    // 去饱和的 oklch(0.72 0.135 165) = rgb(55,191,143)。
+    expect(report.r88_branch_navigator.accentToken).toBe(
+      "oklch(0.7246 0.142 171)",
+    );
   });
 
   it("R8.8 rewind-bar dropdown has enter animation + transform-origin top right", () => {

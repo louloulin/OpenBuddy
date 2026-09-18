@@ -99,6 +99,7 @@
     "subpaths": {
       "components": "./packages/ui/openbuddy-ui-files-tree/src/components/index.ts",
       "components/FileTree": "./packages/ui/openbuddy-ui-files-tree/src/components/FileTree.tsx",
+      "components/LazyFileTree": "./packages/ui/openbuddy-ui-files-tree/src/components/LazyFileTree.tsx",
       "lib/tree-utils": "./packages/ui/openbuddy-ui-files-tree/src/lib/tree-utils.ts"
     }
   },
@@ -124,6 +125,14 @@
     "main": "./packages/ui/openbuddy-ui-layout/src/index.ts",
     "client": "./packages/ui/openbuddy-ui-layout/src/client.tsx",
     "invariant": "./packages/ui/openbuddy-ui-layout/src/invariant.ts",
+    "subpaths": {}
+  },
+  {
+    "dir": "openbuddy-ui-library",
+    "name": "@openbuddy/ui-library",
+    "main": "./packages/ui/openbuddy-ui-library/src/index.ts",
+    "client": "./packages/ui/openbuddy-ui-library/src/client.tsx",
+    "invariant": "./packages/ui/openbuddy-ui-library/src/invariant.ts",
     "subpaths": {}
   },
   {
@@ -243,7 +252,10 @@
     "main": "./packages/ui/openbuddy-ui-shared/src/index.ts",
     "client": "./packages/ui/openbuddy-ui-shared/src/client.tsx",
     "invariant": "./packages/ui/openbuddy-ui-shared/src/invariant.ts",
-    "subpaths": {}
+    "subpaths": {
+      "agent-paths": "./packages/ui/openbuddy-ui-shared/src/agent-paths.ts",
+      "use-agent-paths": "./packages/ui/openbuddy-ui-shared/src/use-agent-paths.ts"
+    }
   },
   {
     "dir": "openbuddy-ui-shell",

@@ -94,12 +94,47 @@ export function StreamingDoc() {
 
 ## 槽位
 
-| 槽位 | kind | scope | 说明 |
-| --- | --- | --- | --- |
-| `editor.body` | single | session-maybe | 编辑器主体,默认注册 `TiptapEditor` |
-| `editor.toolbar` | list | session-maybe | 工具栏右侧扩展区 |
-| `editor.slash-commands` | list | session-maybe | `/` 命令来源(可只贡献数据) |
-| `editor.mention-sources` | list | session-maybe | `@` 候选来源 |
+| 槽位 | kind | scope | payload | 说明 |
+| --- | --- | --- | --- | --- |
+| `editor.body` | single | session-maybe | 组件 | 编辑器主体,默认注册 `TiptapEditor` |
+| `editor.toolbar` | list | session-maybe | `EditorToolbarAction` | 工具栏追加按钮(内置按钮恒在) |
+| `editor.slash-commands` | list | session-maybe | `EditorSlashCommandContribution` | `/` 菜单追加命令(内置命令恒在) |
+| `editor.mention-sources` | list | session-maybe | `EditorMentionSource` | `@` 候选来源;有来源时自动开启 `@` |
+
+三个扩展点都由 **`TiptapEditor` 自己消费**(`src/lib/use-editor-slots.ts`),
+所以插件"注册即可见",宿主不需要认识编辑器内部类型。缺内核(单测 / 独立
+挂载)时退化为空集,编辑器仍完整可用。
+
+### 插件贡献示例
+
+```ts
+import { defineExtension } from "@openbuddy/plugin-sdk";
+
+export default defineExtension({
+  manifest: { name: "word-count", version: "1.0.0", description: "字数统计" },
+  setup(api) {
+    api.registerSlot("editor.toolbar", "list", "root", {
+      id: "word-count",
+      label: "字数统计",
+      icon: "#",
+      run: (editor) => alert(editor.getText().length),
+    });
+    api.registerSlot("editor.slash-commands", "list", "root", {
+      id: "callout",
+      title: "提示块",
+      group: "插件",
+      run: ({ editor }) => editor.chain().focus().insertContent("> 提示\n").run(),
+    });
+    api.registerSlot("editor.mention-sources", "list", "root", {
+      id: "symbols",
+      getItems: (query) => myIndex.search(query),
+    });
+  },
+});
+```
+
+契约细节:贡献命令与内置命令 **id 撞名时内置优先**;`run` 执行前 `/xxx`
+区间已被删除;`run` / `isActive` / `isDisabled` 抛错会被吞掉,不会弄炸编辑器。
 
 ## 代码高亮为什么不用 `@tiptap/extension-code-block-lowlight`
 
@@ -118,6 +153,8 @@ pnpm vitest run --config vitest.config.ts packages/ui/openbuddy-ui-editor
 - `slash-command.test.ts` / `mention.test.ts` — 触发探测与过滤排序
 - `suggestion-popup.test.ts` — 浮层定位与生命周期
 - `editor-core.test.ts` — headless Editor 上的扩展装配与命令映射
+- `editor-contributions.test.ts` — 三个扩展点的纯逻辑(去重 / 容错 / 默认值)
+- `editor-slot-wiring.test.tsx` — 真内核 + 真插件桥:插件注册 → 界面上可见
 - `TiptapEditor.test.tsx` / `EditorToolbar.test.tsx` / `SuggestionMenu.test.tsx` / `MermaidNodeView.test.tsx` — React 交互
 
 jsdom 缺少 `Range.getClientRects`,会让 ProseMirror 的 `coordsAtPos` 抛错;

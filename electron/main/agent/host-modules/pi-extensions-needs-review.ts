@@ -61,13 +61,22 @@ function resolveVerdict(input: ExtensionPolicyInput, gate: NeedsReviewGate): "al
   return gate.gate({ id: input.id });
 }
 
+/**
+ * Record why a needs-review spec was withheld.
+ *
+ * `blocked` and `denied` are preserved verbatim rather than being folded into
+ * the loader's `disabled` / `failed` states: the first means "waiting for the
+ * user to approve", the second means "the user said no". Collapsing them made
+ * the two indistinguishable in the extension list, so a pending approval
+ * looked like a broken extension.
+ */
 function pushBlockedDiagnostic(
   resolution: PiExtensionResolution,
   specId: string,
   reason: string,
   state: "blocked" | "denied",
 ): void {
-  resolution.diagnostics.push({ id: specId, state: state === "blocked" ? "disabled" : "failed", error: reason });
+  resolution.diagnostics.push({ id: specId, state, error: reason });
 }
 
 function dropFactory(resolution: PiExtensionResolution, specId: string): void {

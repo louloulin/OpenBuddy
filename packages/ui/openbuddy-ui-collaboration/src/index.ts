@@ -17,3 +17,19 @@
  */
 export { ProjectsPanel } from "./ProjectsPanel";
 export { SubagentPanel } from "./SubagentPanel";
+
+
+declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * 项目面板(single)。
+     * 消费者:PlaceholderPage「项目」路由。
+     */
+    "placeholder.projects": { kind: "single"; scope: "root" };
+    /**
+     * 子代理面板(single)。
+     * 消费者:ChatView 的子代理浮层。
+     */
+    "placeholder.subagent": { kind: "single"; scope: "root" };
+  }
+}

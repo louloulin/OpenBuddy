@@ -168,13 +168,20 @@ export function configurePiExtensions(
       ...(entry.commands ? { commands: entry.commands } : {}),
     })),
     ...resolution.diagnostics
-      .filter((diagnostic) => diagnostic.state === "failed")
+      .filter((diagnostic) => diagnostic.state !== "disabled")
       .map((diagnostic) => ({
         id: diagnostic.id,
         name: diagnostic.id,
         kind: "pi" as const,
-        state: "failed" as const,
+        state: diagnostic.state === "blocked" || diagnostic.state === "denied" ? "disabled" as const : "failed" as const,
         managed: true,
+        // The user needs to be able to tell "waiting for your approval" from
+        // "you turned this off" from "it crashed". `disabledReason` carries
+        // that distinction into the UI; `policy` covers both the pending and
+        // rejected cases, with the raw gate state in `error`.
+        ...(diagnostic.state === "blocked" || diagnostic.state === "denied"
+          ? { disabledReason: "policy" as const }
+          : {}),
         ...(diagnostic.error ? { error: diagnostic.error } : {}),
       })),
   ];
@@ -261,10 +268,15 @@ export function configurePiExtensions(
   );
 
   for (const diagnostic of resolution.diagnostics) {
-    emitPluginEventImpl(
-      diagnostic.state === "disabled" ? "pi/extension-disabled" : "pi/extension-failed",
-      diagnostic,
-    );
+    // `blocked` / `denied` reach the renderer as `pi/extension-needs-review`
+    // so the approval prompt can distinguish them from a plain disable.
+    const type =
+      diagnostic.state === "blocked" || diagnostic.state === "denied"
+        ? "pi/extension-needs-review"
+        : diagnostic.state === "disabled"
+          ? "pi/extension-disabled"
+          : "pi/extension-failed";
+    emitPluginEventImpl(type, diagnostic);
   }
   emitPluginEventImpl("pi/extensions-resolved", piExtensionsResolvedPayload(resolution));
 }

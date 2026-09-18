@@ -129,7 +129,13 @@ function buildUiRendererAliases(repoRoot: string): Array<{ find: string; replace
     if (p.invariant)  out.push({ find: `${p.name}/invariant`,  replacement: resolve(repoRoot, p.invariant) });
     out.push(         { find: p.name,                          replacement: resolve(repoRoot, p.main) });
   }
-  return out;
+  // R32 — 再按 find 长度**从长到短**稳定排序。
+  //
+  // 只把 /client 与 /invariant 提前是不够的:subpaths 里也可能出现「一个是另一个
+  // 的前缀」,例如 `components` 与 `components/InstallDialog`。vite/rollup 的 alias
+  // 是 prefix 匹配(`importee.startsWith(pattern + "/")`),短的先命中就会拼出
+  // `.../src/components/index.ts/InstallDialog` 这种路径,报 ENOTDIR。
+  return out.sort((a, b) => b.find.length - a.find.length);
 }
 const uiRendererAliases = buildUiRendererAliases(repoRoot);
 

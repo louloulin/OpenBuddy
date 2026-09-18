@@ -78,6 +78,12 @@ export interface ChatMessage {
    *  turn (drives the throughput chip "X tok/s" alongside the model
    *  id). Optional for the same reason as `modelId`. */
   outputTokens?: number;
+  /** R58 — prompt (input) token count reported by the provider for
+   *  this turn. Drives the "1.2k in" chip beside the existing
+   *  throughput chip so users can see the full token balance
+   *  (in / out / tok/s) at a glance. Optional for backward
+   *  compatibility with pre-R58 history. */
+  inputTokens?: number;
 }
 
 /** A failed assistant turn, surfaced inline in the transcript. */
@@ -230,6 +236,13 @@ interface UiSessionActions {
   /** R8.1 — switch the displayed revision of a user bubble. 1-based index.
    *  No-op when out of range or when the message isn't a user message. */
   setActiveRevision: (messageId: string, idx: number) => void;
+  /** R78 (assistant inline edit) — replace an assistant message's text parts
+   *  with a single new markdown blob. Tool-call parts / reasoning parts are
+   *  preserved as-is so the structural integrity of the turn is unchanged;
+   *  only the rendered text body is overwritten. No-op when the id does
+   *  not resolve to an assistant message (user bubbles go through
+   *  appendUserRevision + onResend). */
+  editAssistantMessage: (messageId: string, newMarkdown: string) => void;
   setError: (e: string | null) => void;
   /** R1.4 — start a streaming assistant message. Returns its id so subsequent
    *  deltas can target it. Called by App.tsx from `agent_message_chunk` /
@@ -254,7 +267,7 @@ interface UiSessionActions {
   /** R8.15 — accepts optional model id + completion-token count so the
    *  meta chip can show "model: X · 42 tok/s". Backward-compatible:
    *  legacy call sites (cancel path, watchdog) pass nothing. */
-  finishStreamingMessage: (meta?: { modelId?: string; outputTokens?: number }) => void;
+  finishStreamingMessage: (meta?: { modelId?: string; outputTokens?: number; inputTokens?: number }) => void;
   /** Abandon the in-flight assistant message. Called from every error
    *  path (pi://turn-error, pi://agent-died, 60s streaming watchdog,
    *  user cancel) so the orphan LoadingRow is force-finalised and
@@ -702,6 +715,25 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
 
   setError: (error) => set({ error }),
 
+  editAssistantMessage: (messageId, newMarkdown) => {
+    set((s) => {
+      const idx = s.messages.findIndex((m) => m.id === messageId);
+      if (idx < 0) return s;
+      const target = s.messages[idx];
+      if (target.role !== "assistant") return s;
+      // 保留所有非 text part(tool_call / reasoning / file ...),
+      // 把所有 text part 合并成一个新的 markdown blob(因为用户在
+      // Tiptap 里编辑后,原来按 chunk 切分的边界没有意义了)。
+      const preserved = target.parts.filter((p) => p.kind !== "text");
+      const next = s.messages.slice();
+      next[idx] = {
+        ...target,
+        parts: [...preserved, { kind: "text", text: newMarkdown }],
+      };
+      return { messages: next };
+    });
+  },
+
   beginStreamingMessage: () => {
     // 上一轮可能残留未 flush 的 delta(异常中止路径),丢弃防止串进新消息。
     discardStreamingBuffer();
@@ -753,10 +785,14 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
       // Spread with `undefined` checks so we don't write `modelId:
       // undefined` (which TS would treat as missing but is ugly in
       // devtools / persisted transcripts).
-      const extra: { modelId?: string; outputTokens?: number } = {};
+      const extra: { modelId?: string; outputTokens?: number; inputTokens?: number } = {};
       if (meta?.modelId) extra.modelId = meta.modelId;
       if (typeof meta?.outputTokens === "number" && meta.outputTokens > 0) {
         extra.outputTokens = meta.outputTokens;
+      }
+      // R58 — pipe prompt (input) token count through to the meta chip.
+      if (typeof meta?.inputTokens === "number" && meta.inputTokens > 0) {
+        extra.inputTokens = meta.inputTokens;
       }
       return {
         messages: s.messages.map((m) =>

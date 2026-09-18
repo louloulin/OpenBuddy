@@ -48,6 +48,33 @@ export interface ThemeDefinition {
   vars: Record<string, string>;
 }
 
+/**
+ * 品牌色 `#00C29A` 的 OKLCh 等价表示(精确往返:oklch→sRGB 取整后仍是
+ * 0/194/154,见 __tests__/brand-accent.test.ts)。
+ *
+ * 之前 `--wb-accent` 在主题里被写成 `oklch(0.72 0.135 165)`(= rgb(55,191,143)),
+ * 那是一个**被去饱和过的薄荷绿**,并不是品牌色。后果:`src/styles/tokens.css`
+ * 里 `--wb-accent: var(--wb-brand-primary)`(=`#00C29A`)被主题的内联值盖掉,
+ * 全站强调色(选中描边、激活指示条)从品牌青绿漂成灰绿,ThemePicker 的色板
+ * 却仍然显示 `#00C29A` —— 色板和实际不符。这里定义成唯一真源,两边都引用它。
+ */
+export const BRAND_ACCENT_OKLCH = "oklch(0.7246 0.142 171)";
+
+/**
+ * 基础字体栈 —— body 与等宽字体的最终兜底。
+ *
+ * 抽成常量(而不是只在 LIGHT_BASE/DARK_BASE 里各写一遍)是一处**功能修复**:
+ * 主题里的 `font: '"Space Grotesk", var(--wb-font)'` 自引用基础栈,若把这段
+ * 字符串原样写回 `--wb-font`,CSS 变量就构成循环引用 → 整条 font-family 失效、
+ * 悄悄退回浏览器默认字体。所以这里在**定义时**把 `var(--wb-font)` /
+ * `var(--wb-font-mono)` 文本展开(见 resolveThemeFontTokens),运行时没有循环。
+ */
+export const BASE_FONT_STACK =
+  '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif';
+
+export const BASE_MONO_STACK =
+  'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
+
 // ─── Base token blocks ───────────────────────────────────────────────
 export const LIGHT_BASE: Record<string, string> = {
   "--wb-bg-primary": "oklch(0.995 0 0)",
@@ -60,8 +87,8 @@ export const LIGHT_BASE: Record<string, string> = {
   "--wb-fg-tertiary": "oklch(0.6 0 0)",
   "--wb-border": "oklch(0.9 0 0)",
   "--wb-border-soft": "oklch(0.93 0 0)",
-  "--wb-accent": "oklch(0.7 0.13 165)",
-  "--wb-accent-soft": "oklch(0.7 0.13 165 / 0.12)",
+  "--wb-accent": BRAND_ACCENT_OKLCH,
+  "--wb-accent-soft": "oklch(0.7246 0.142 171 / 0.12)",
   "--wb-accent-fg": "oklch(0.99 0 0)",
   "--wb-danger": "oklch(0.55 0.2 25)",
   "--wb-success": "oklch(0.6 0.15 145)",
@@ -73,10 +100,8 @@ export const LIGHT_BASE: Record<string, string> = {
   "--wb-radius-md": "6px",
   "--wb-radius-lg": "10px",
   "--wb-radius-xl": "16px",
-  "--wb-font":
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif',
-  "--wb-font-mono":
-    'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+  "--wb-font": BASE_FONT_STACK,
+  "--wb-font-mono": BASE_MONO_STACK,
 };
 
 export const DARK_BASE: Record<string, string> = {
@@ -90,8 +115,8 @@ export const DARK_BASE: Record<string, string> = {
   "--wb-fg-tertiary": "oklch(0.55 0 0)",
   "--wb-border": "oklch(0.32 0 0)",
   "--wb-border-soft": "oklch(0.28 0 0)",
-  "--wb-accent": "oklch(0.74 0.14 165)",
-  "--wb-accent-soft": "oklch(0.74 0.14 165 / 0.16)",
+  "--wb-accent": BRAND_ACCENT_OKLCH,
+  "--wb-accent-soft": "oklch(0.7246 0.142 171 / 0.16)",
   "--wb-accent-fg": "oklch(0.13 0 0)",
   "--wb-danger": "oklch(0.7 0.2 25)",
   "--wb-success": "oklch(0.7 0.16 145)",
@@ -103,10 +128,8 @@ export const DARK_BASE: Record<string, string> = {
   "--wb-radius-md": "6px",
   "--wb-radius-lg": "10px",
   "--wb-radius-xl": "16px",
-  "--wb-font":
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif',
-  "--wb-font-mono":
-    'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+  "--wb-font": BASE_FONT_STACK,
+  "--wb-font-mono": BASE_MONO_STACK,
 };
 
 // ─── 19 themes (R8.8 增 openbuddy + openbuddy-dark) ──────────────────────────────────────────────────────
@@ -129,8 +152,8 @@ export const THEMES: ReadonlyArray<ThemeDefinition> = [
       "--wb-fg-tertiary": "oklch(0.58 0.015 240)",
       "--wb-border": "oklch(0.88 0.01 165)",
       "--wb-border-soft": "oklch(0.92 0.008 165)",
-      "--wb-accent": "oklch(0.72 0.135 165)",
-      "--wb-accent-soft": "oklch(0.72 0.135 165 / 0.14)",
+      "--wb-accent": BRAND_ACCENT_OKLCH,
+      "--wb-accent-soft": "oklch(0.7246 0.142 171 / 0.14)",
       "--wb-accent-fg": "oklch(0.99 0.005 165)",
       "--wb-danger": "oklch(0.55 0.2 25)",
       "--wb-success": "oklch(0.65 0.15 150)",
@@ -155,8 +178,8 @@ export const THEMES: ReadonlyArray<ThemeDefinition> = [
       "--wb-fg-tertiary": "oklch(0.6 0.01 165)",
       "--wb-border": "oklch(0.32 0.01 240)",
       "--wb-border-soft": "oklch(0.28 0.01 240)",
-      "--wb-accent": "oklch(0.76 0.14 165)",
-      "--wb-accent-soft": "oklch(0.76 0.14 165 / 0.18)",
+      "--wb-accent": BRAND_ACCENT_OKLCH,
+      "--wb-accent-soft": "oklch(0.7246 0.142 171 / 0.18)",
       "--wb-accent-fg": "oklch(0.13 0.01 240)",
       "--wb-danger": "oklch(0.7 0.2 25)",
       "--wb-success": "oklch(0.72 0.16 150)",
@@ -540,6 +563,57 @@ export function resolveVars(name: ThemeName): Record<string, string> {
   if (!theme) return {};
   const base = theme.type === "dark" ? DARK_BASE : LIGHT_BASE;
   return { ...base, ...theme.vars };
+}
+
+/**
+ * 把主题字体里的 `var(--wb-font)` / `var(--wb-font-mono)` 引用展开成具体字体栈。
+ *
+ * 为什么必须展开:主题写的是 `'"Space Grotesk", var(--wb-font)'`,而我们的落地
+ * 位置**就是** `--wb-font` —— 直接写回等于 `--wb-font: "Space Grotesk", var(--wb-font)`,
+ * CSS 判定为循环引用 → 整条声明失效,主题字体永远不会生效(现状如此:19 套主题
+ * 的 `font` / `headingFont` 只用在 ThemePicker 预览里,对真实 UI 零影响)。
+ * 展开后运行时不再有自引用。
+ */
+export function expandFontRefs(value: string | undefined): string | null {
+  if (!value) return null;
+  const expanded = value
+    .replace(/var\(\s*--wb-font-mono\s*(?:,[^)]*)?\)/g, BASE_MONO_STACK)
+    .replace(/var\(\s*--wb-font\s*(?:,[^)]*)?\)/g, BASE_FONT_STACK)
+    .trim();
+  return expanded.length > 0 ? expanded : null;
+}
+
+/**
+ * 主题真正落到 DOM 的字体 token。
+ *
+ *   `--wb-font`         body / 编辑器正文字体(全站继承的基线)
+ *   `--wb-font-heading` 标题字体(无 headingFont 的主题与 body 相同)
+ *
+ * 单独成函数而不是塞进 `theme.vars`:字体是**顶层字段**而非 delta,且需要
+ * 展开自引用 —— 与颜色 token 的处理路径不同。
+ */
+export function resolveThemeFontTokens(
+  theme: ThemeDefinition | null | undefined,
+): Record<string, string> {
+  if (!theme) return {};
+  const body = expandFontRefs(theme.font) ?? BASE_FONT_STACK;
+  const heading = expandFontRefs(theme.headingFont) ?? body;
+  return { "--wb-font": body, "--wb-font-heading": heading };
+}
+
+/**
+ * 一套主题落到 DOM 的**完整** token 集合 = 颜色(base + delta)+ 字体。
+ *
+ * 唯一真源:store 与 ThemeInitializer 都走这里,避免"首屏用 resolveVars、
+ * 之后用完整集合"这种两套口径(字体就会在首屏后突然换一次)。
+ */
+export function resolveThemeVars(
+  name: ThemeName | string | null | undefined,
+): Record<string, string> {
+  if (!name) return {};
+  const theme = getThemeByName(name as ThemeName);
+  if (!theme) return {};
+  return { ...resolveVars(theme.name), ...resolveThemeFontTokens(theme) };
 }
 
 const GOOGLE_FONT_RE = /['"]([A-Z][A-Za-z0-9 ]+?)['"]/;

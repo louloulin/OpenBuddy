@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useProjectsStore, PLAN_COLUMNS, type PlanStatus, type AssetItem } from "@/stores/projects-store";
 import { SearchIcon } from "@openbuddy/ui-primitives/icons";
-import { open as openDialog, invoke } from "@/lib/platform/electron-api";
+import { openPaths, openOne, invoke } from "@/lib/platform/electron-api";
 import { collaborationSnapshot } from "@/lib/agent/pi-client";
 import { ProjectInputDialog } from "@openbuddy/ui-dialogs";
 import { PromptDialog } from "@openbuddy/ui-dialogs";
@@ -92,9 +92,8 @@ export function PlanTab({ projectId, onToast }: { projectId: string; onToast?: (
   };
 
   const addSource = async () => {
-    const selected = await openDialog({ directory: true, multiple: false, title: "选择项目数据源" });
-    if (!selected || Array.isArray(selected)) return;
-    const path = selected as string;
+    const path = await openOne({ directory: true, multiple: false, title: "选择项目数据源" });
+    if (!path) return;
     addDataSource(projectId, { path, label: path.split(/[\\/]/).pop() || path });
     onToast?.("已添加项目数据源");
   };
@@ -406,8 +405,7 @@ export function AssetsTab({ projectId, onToast }: { projectId: string; onToast?:
     const project = useProjectsStore.getState().projects.find((item) => item.id === projectId);
     const workspaceRoot = project?.cwd;
     if (!workspaceRoot) return;
-    const selected = await openDialog({ multiple: true, directory: false, title: "选择要导入项目的文件" });
-    const files = Array.isArray(selected) ? selected : selected ? [selected] : [];
+    const files = await openPaths({ multiple: true, directory: false, title: "选择要导入项目的文件" });
     for (const sourcePath of files) {
       try {
         const imported = await invoke<{ path: string; name: string; size: number }>("shellfs:import-file", { sourcePath, workspaceRoot });

@@ -72,6 +72,42 @@ describe("@openbuddy/ui-files-tree/FileTree", () => {
     expect([...last].sort()).toEqual(["readme.md", "src"]);
   });
 
+  it("fires onSelect after every row click (single-click-to-open hosts)", () => {
+    const onSelect = vi.fn();
+    render(<FileTree nodes={SMALL} onSelect={onSelect} />);
+    act(() => {
+      fireEvent.click(screen.getByText("readme.md"));
+    });
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect.mock.calls[0][0].id).toBe("readme.md");
+    act(() => {
+      fireEvent.click(screen.getByText("src"));
+    });
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect.mock.calls[1][0].id).toBe("src");
+  });
+
+  it("Shift+click selects the range from the previous click", () => {
+    // 回归:handleRowClick 曾经先写 anchorRef.current 再拿它做 range 起点,
+    // 起点永远等于终点,框选退化成单选。
+    const onSelectionChange = vi.fn();
+    render(<FileTree nodes={SMALL} onSelectionChange={onSelectionChange} />);
+    act(() => {
+      fireEvent.click(screen.getByText("src"));
+    });
+    act(() => {
+      fireEvent.click(screen.getByText("readme.md"), { shiftKey: true });
+    });
+    const last = onSelectionChange.mock.calls.at(-1)![0] as Set<string>;
+    expect([...last].sort()).toEqual(["readme.md", "src"]);
+  });
+
+  it("dragEnabled=false removes the draggable affordance", () => {
+    render(<FileTree nodes={SMALL} dragEnabled={false} />);
+    const srcRow = screen.getByText("src").closest("[data-node-id]") as HTMLElement;
+    expect(srcRow.getAttribute("draggable")).toBe("false");
+  });
+
   it("only renders a window of rows for a huge tree (virtualization)", () => {
     const big: TreeNode[] = Array.from({ length: 2000 }, (_, i) => ({
       id: `f${i}`,

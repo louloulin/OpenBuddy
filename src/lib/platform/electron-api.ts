@@ -302,6 +302,39 @@ export async function openPiStream(handler: (payload: unknown) => void): Promise
   return api.events.openPiStream(handler);
 }
 
+/**
+ * 原生"选择文件 / 选择目录"对话框 —— 返回**永远是数组**(取消 → 空数组)。
+ *
+ * 这个归一化是 R39 加的,原因是它以前是"有时字符串、有时数组"的:
+ * `dialog:open` 的 main 侧实现直接 `return result.filePaths`,也就是**永远**
+ * 是数组;而 renderer 的类型却写着 `string | string[] | null`。于是仓库里长出了
+ * 两种写法:
+ *   - 正确的:`Array.isArray(selected) ? selected : [selected]`;
+ *   - 看起来更安全、实际永远返回的:`if (!selected || Array.isArray(selected)) return;`
+ * 后者在「打开文件夹(选工作区)」「添加本地知识源」「选云存储目录」
+ * 「导入技能文件」这些流程里意味着**点下去什么都不发生,也不报错**。
+ *
+ * 现在契约只有一种形状:数组。要多选就直接用;只要一个用 `openOne()`。
+ */
+export async function openPaths(options: Record<string, unknown> = {}): Promise<string[]> {
+  const result = await getApi().dialog.open(options);
+  if (!result) return [];
+  return Array.isArray(result) ? result.filter((p) => typeof p === "string" && p.length > 0) : [result];
+}
+
+/**
+ * 单选版本:取第一个路径,取消(或空数组)时返回 `null`。
+ * 目录选择、单文件选择一律用它 —— 这样调用点不再需要自己判断返回形状。
+ */
+export async function openOne(options: Record<string, unknown> = {}): Promise<string | null> {
+  const paths = await openPaths(options);
+  return paths[0] ?? null;
+}
+
+/**
+ * @deprecated 语义含糊的旧入口(类型是 `string | string[] | null`,实际永远是数组)。
+ * 新代码用 `openPaths()`(多选)或 `openOne()`(单选)。
+ */
 export async function open(options: Record<string, unknown> = {}): Promise<string | string[] | null> {
   return getApi().dialog.open(options);
 }

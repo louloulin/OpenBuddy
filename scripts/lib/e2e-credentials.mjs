@@ -29,7 +29,14 @@
  *      — explicit invocation always beats stored config.
  *   2. `.env.e2e.local` at the repo root — machine-local, matched by the
  *      existing `*.local` rule in `.gitignore`, so it is never committed.
- *   3. `~/.pi/agent/auth.json` — where `pi auth login <provider>` stores keys.
+ *   3. `<agentHome>/auth.json` — OpenBuddy's own credential store
+ *      (`~/.openbuddy/agent/auth.json` by default), then pi's
+ *      `~/.pi/agent/auth.json` as a legacy fallback for users who ran
+ *      `pi auth login <provider>` before OpenBuddy owned its data directory.
+ *
+ * Resolution order in (3) matters: OpenBuddy and pi keep separate auth files
+ * with separate provider sets, so reading only pi's silently worked while the
+ * two happened to share one key and would break for every other provider.
  *
  * Nothing here logs a key. `describeSource()` exists so callers can report
  * provenance and key length without exposing the value.
@@ -46,6 +53,27 @@ export const REPO_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))
 export const DOTENV_LOCAL_PATH = join(REPO_ROOT, ".env.e2e.local");
 
 /**
+ * Candidate credential stores, highest precedence first.
+ *
+ * `agentHome()` in `@openbuddy/storage` resolves to
+ * `OPENBUDDY_AGENT_DIR ?? PI_CODING_AGENT_DIR ?? <PI_HOME|~>/.openbuddy/agent`.
+ * It is re-implemented here (4 lines) rather than imported because this module
+ * is standalone `.mjs` loaded by Playwright config — it must not depend on the
+ * TypeScript workspace build.
+ */
+export function credentialStoreCandidates(env = process.env, home = homedir()) {
+  const agentHome =
+    env.OPENBUDDY_AGENT_DIR ?? env.PI_CODING_AGENT_DIR ?? join(env.PI_HOME ?? home, ".openbuddy", "agent");
+  // The first entry usually *is* `~/.openbuddy/agent/auth.json`; dedupe so the
+  // provenance message and the store walk don't list the same file twice.
+  return [...new Set([
+    join(agentHome, "auth.json"),
+    join(home, ".openbuddy", "agent", "auth.json"),
+    join(home, ".pi", "agent", "auth.json"),
+  ])];
+}
+
+/**
  * The MiniMax host that actually accepts these credentials.
  *
  * `~/.pi/agent/models-store.json` records every MiniMax model's baseUrl as
@@ -58,6 +86,20 @@ export const DOTENV_LOCAL_PATH = join(REPO_ROOT, ".env.e2e.local");
 export const DEFAULT_BASE_URL = "https://api.minimaxi.com/anthropic";
 export const DEFAULT_MODEL_ID = "MiniMax-M3";
 export const DEFAULT_PROVIDER = "minimax";
+
+/**
+ * Providers that name the same upstream credential.
+ *
+ * `pi auth login minimax-cn` and `pi auth login minimax` both end up pointing at
+ * MiniMax's API, and a machine may have only one of the two keys stored. The
+ * probe script used to hard-code this fallback (`readPiApiKey("minimax") ||
+ * readPiApiKey("minimax-cn")`); keeping the list here means every consumer gets
+ * it instead of each re-deriving it.
+ */
+export const PROVIDER_ALIASES = {
+  minimax: ["minimax", "minimax-cn"],
+  "minimax-cn": ["minimax-cn", "minimax"],
+};
 
 /**
  * Environment variables that pi treats as a configured auth source.
@@ -167,20 +209,43 @@ export function readDotEnvLocal(path = DOTENV_LOCAL_PATH) {
 }
 
 /**
- * Reads a provider's API key out of the pi credential store. Returns
- * `undefined` rather than throwing so callers can fall through to "skip".
+ * Reads a provider's API key out of the on-disk credential stores, trying
+ * OpenBuddy's own agent home first and pi's directory as a legacy fallback.
+ *
+ * Returns `{ key, source }` or `undefined` rather than throwing, so callers can
+ * fall through to "skip". The `source` is a display path — never the key.
+ */
+export function readStoredApiKey(providerId = DEFAULT_PROVIDER, env = process.env) {
+  const ids = PROVIDER_ALIASES[providerId] ?? [providerId];
+  for (const authPath of credentialStoreCandidates(env)) {
+    let parsed;
+    try {
+      parsed = JSON.parse(readFileSync(authPath, "utf8"));
+    } catch {
+      continue; // Missing or malformed store — try the next candidate.
+    }
+    for (const id of ids) {
+      const entry = parsed?.[id];
+      if (!entry) continue;
+      const key = typeof entry === "string" ? entry : (entry.key ?? entry.apiKey);
+      if (typeof key === "string" && key.length > 0) return { key, source: displayPath(authPath, env) };
+    }
+  }
+  return undefined;
+}
+
+/** Collapse `$HOME` for log output, matching how the UI shows these paths. */
+function displayPath(file, env = process.env) {
+  const home = env.HOME ?? homedir();
+  return file.startsWith(`${home}/`) ? `~${file.slice(home.length)}` : file;
+}
+
+/**
+ * Back-compat alias. Older call sites (and docs) refer to `readPiApiKey`;
+ * it now resolves through `readStoredApiKey` so they pick up OpenBuddy's store.
  */
 export function readPiApiKey(providerId = DEFAULT_PROVIDER) {
-  const authPath = join(homedir(), ".pi", "agent", "auth.json");
-  try {
-    const parsed = JSON.parse(readFileSync(authPath, "utf8"));
-    const entry = parsed?.[providerId];
-    if (!entry) return undefined;
-    const key = typeof entry === "string" ? entry : (entry.key ?? entry.apiKey);
-    return typeof key === "string" && key.length > 0 ? key : undefined;
-  } catch {
-    return undefined;
-  }
+  return readStoredApiKey(providerId)?.key;
 }
 
 /**
@@ -209,8 +274,9 @@ export function resolveE2ECredentials({ provider = DEFAULT_PROVIDER, env = proce
   let apiKey = key?.value;
   let source = key?.source;
   if (!apiKey) {
-    apiKey = readPiApiKey(provider);
-    if (apiKey) source = "~/.pi/agent/auth.json";
+    const stored = readStoredApiKey(provider, env);
+    apiKey = stored?.key;
+    if (stored) source = stored.source;
   }
 
   return {
@@ -224,7 +290,8 @@ export function resolveE2ECredentials({ provider = DEFAULT_PROVIDER, env = proce
 
 /** Human-readable provenance line that never contains the key itself. */
 export function describeSource(creds) {
-  if (!creds.apiKey) return "no credentials found (env, .env.e2e.local, ~/.pi/agent/auth.json)";
+  const stores = credentialStoreCandidates().map((file) => displayPath(file)).join(", ");
+  if (!creds.apiKey) return `no credentials found (env, .env.e2e.local, ${stores})`;
   return `provider=${creds.provider} model=${creds.modelId} baseUrl=${creds.baseUrl} key=<${creds.apiKey.length} chars from ${creds.source}>`;
 }
 

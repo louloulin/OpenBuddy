@@ -157,8 +157,14 @@ import { registerAgentsIpc } from "./agents";
 import { registerConnectorsIpc } from "./connectors";
 import { registerMiscIpc } from "./misc";
 import { registerAuditIpc } from "./audit";
+import { registerDataDirIpc } from "./data-dir";
+import { registerAgentPathsIpc } from "./agent-paths";
 // R18 / Phase D — Expert Marketplace Bridge (Pi 扩展市场)
-import { createPiMarketBridge, registerPiMarketBridgeIpc } from "../agent/pi-market-bridge";
+import {
+  createPiMarketBridge,
+  registerPiMarketBridgeIpc,
+  resolvePiMarketSourcesDetailed,
+} from "../agent/pi-market-bridge";
 import { app } from "electron";
 
 // Phase A.1 — pi-bridge exposes pi-coding-agent text / image / skill
@@ -814,7 +820,13 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	});
 	ipcMain.handle("dsh:remote-unregister", async (_e, args: unknown) => {
 		const input = recordValue(args, "DeepSeek remote unregister payload");
-		return agentHost.unregisterRemote(input.package);
+		// `package` is the dispatcher lookup key. Validating it here (instead of
+		// passing `undefined` through) turns a silent no-op into a loud
+		// bad-request, so a renderer bug can't look like a successful unregister.
+		const packageName = input.package === undefined
+			? requiredString(input.packageName, "packageName")
+			: requiredString(input.package, "package");
+		return agentHost.unregisterRemote(packageName);
 	});
 	ipcMain.handle("dsh:remote", async (_e, args: unknown) => {
 		try {
@@ -1111,6 +1123,14 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	// R17 / Phase D — Local Audit Trail (data-management panel).
 	registerAuditIpc(getWindow);
 
+	// R23 — 数据目录(userData)覆盖:设置 → 数据管理里换目录,重启后生效。
+	registerDataDirIpc();
+
+	// R95 — agent 数据目录的权威路径快照。renderer 侧的 `useAgentPaths()`
+	// 消费 `agent:paths`;所有「文件放在哪儿」的文案都从这里取,不再各自
+	// 硬编码 `~/.pi/...`(OpenBuddy 的 agent 根是 `~/.openbuddy/agent`)。
+	registerAgentPathsIpc();
+
 	// Phase A.1 — pi-bridge IPC surface (pi text / image / skill helpers).
 	registerPiBridgeIpc();
 
@@ -1119,6 +1139,16 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	//   `agent:pi-market-{list,refresh,install,upgrade,rollback,lockfile,audit}`
 	//   七个 channel 提供版本化安装 + 原子提交 + 锁文件 + 审计 + 回滚。
 	const dataDir = app.getPath("userData");
-	const piMarketBridge = createPiMarketBridge({ dataDir, hostVersion: "0.15.0" });
+	// R32 — 多源索引:显式配置 > 环境变量 > `<dataDir>/pi-extensions/sources.json`。
+	// **默认不内置任何远端源**(本地优先 / 数据自决:没配置 = 不联网)。启动时读一次,
+	// 之后由 `setSources()` 就地替换 —— 不在每次 list 时读盘,避免"读到一半文件被改"。
+	// R35 — 只读源(宿主 / 环境变量)与文件源分开传,源管理 UI 才知道哪些能改。
+	const piMarketResolved = await resolvePiMarketSourcesDetailed({ dataDir });
+	const piMarketBridge = createPiMarketBridge({
+		dataDir,
+		hostVersion: "0.15.0",
+		sources: piMarketResolved.readonly,
+		fileSources: piMarketResolved.file,
+	});
 	registerPiMarketBridgeIpc(piMarketBridge, ipcMain);
 }

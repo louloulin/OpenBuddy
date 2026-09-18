@@ -1,11 +1,13 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import { AgentToolIcon } from "@openbuddy/ui-primitives/icons";
 import { assistantWorkspaceSectionFromRoute } from "@openbuddy/ui-shared";
 import { AssistantWorkbenchNav } from "@openbuddy/ui-shell";
 import { invoke } from "@/lib/platform/electron-api";
 import { useRendererContributions } from "@/lib/runtime/renderer-plugin-runtime";
+import { useSlotComponent } from "@/features/app/slot-bridge";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import type { ModelOption } from "@openbuddy/ui-workbench";
+import { EXPERTS_ROUTE_LABEL } from "@/lib/navigation/placeholder-routes";
 import type { ProjectMeta } from "@/stores/projects-store";
 
 /**
@@ -24,8 +26,11 @@ const ProjectsPanel = lazy(() => import("@openbuddy/ui-collaboration").then((m) 
 // 与 ui-collaboration/ExpertsPanel 的 lazy 边界区分开,避免 home overview 与
 // placeholder 视图互相拖入对方的 chunk。
 import { ProjectTemplatesPanel } from "@openbuddy/ui-home";
-import { ExpertsGrid } from "@openbuddy/ui-experts";
 
+// 这些面板同时是「内核槽位的内置 fallback」:第三方插件可以用更高 priority
+// 注册同名 `placeholder.*` 槽来整体替换某个页面(企业内网文件柜、自研邮件
+// 客户端、私有市场……),而内置实现仍是底座。因此这里用 lazy 保持 chunk 边界,
+// 渲染时统一走 `useSlotComponent(name, <built-in>)`。
 const ExpertsPanel = lazy(() => import("@openbuddy/ui-experts").then((m) => ({ default: m.ExpertsPanel })));
 const AutomationPanel = lazy(() => import("@openbuddy/ui-automation").then((m) => ({ default: m.AutomationPanel })));
 const MyFilesPanel = lazy(() => import("@openbuddy/ui-files").then((m) => ({ default: m.MyFilesPanel })));
@@ -36,6 +41,8 @@ const NotifyChannelsPanel = lazy(() => import("@openbuddy/ui-mcp").then((m) => (
 const UsageQuotaPanel = lazy(() => import("@openbuddy/ui-billing").then((m) => ({ default: m.UsageQuotaPanel })));
 const EmailPanel = lazy(() => import("@openbuddy/ui-email").then((m) => ({ default: m.EmailPanel })));
 const PolicySettingsPanel = lazy(() => import("@openbuddy/ui-settings").then((m) => ({ default: m.PolicySettingsPanel })));
+// R37 — 资料库页整体走内核 `placeholder.library` 槽(ui-library 注册默认实现)。
+const LibraryPage = lazy(() => import("@openbuddy/ui-library").then((m) => ({ default: m.LibraryPage })));
 
 interface PlaceholderPageProps {
   label: string;
@@ -117,6 +124,41 @@ function PlaceholderPageInner({
 }: PlaceholderPageProps) {
   const assistantSection = assistantWorkspaceSectionFromRoute(label);
   const assistantExtension = useRendererContributions("assistant").find((contribution) => contribution.payload.route === label);
+  // 「专家·技能·连接器」整块走内核 `experts.panel` 槽:插件可以注册更高优先级
+  // 实现整体替换这个面板(例如换成企业内部的专家目录)。必须在所有 early return
+  // 之前调用 hook —— 与下面 `files.tree` / `editor.body` 的接线方式一致。
+  const ExpertsPanelSlot = useSlotComponent("experts.panel", ExpertsPanel);
+  // R92 — 下面这些页面此前是**直接 import 渲染**的,于是 ui-files / ui-email /
+  // ui-mcp / ui-billing / ui-collaboration 注册的 `placeholder.*` 槽从来没有
+  // 消费方:插件能注册成功,界面却永远不变。现在每条路由都先问内核要实现,
+  // 拿不到才回落到内置组件,插件才真正具备「整体替换某个页面」的能力。
+  const EmailSlot = useSlotComponent("placeholder.email", EmailPanel);
+  const ProjectsSlot = useSlotComponent("placeholder.projects", ProjectsPanel);
+  const MyFilesSlot = useSlotComponent("placeholder.my-files", MyFilesPanel);
+  const KnowledgeBaseSlot = useSlotComponent("placeholder.knowledge-base", KnowledgeBasePanel);
+  const CloudStorageSlot = useSlotComponent("placeholder.cloud-storage", CloudStoragePanel);
+  const DiscoverSlot = useSlotComponent("placeholder.discover", DiscoverPanel);
+  const NotifyChannelsSlot = useSlotComponent("placeholder.notify-channels", NotifyChannelsPanel);
+  const UsageQuotaSlot = useSlotComponent("placeholder.usage-quota", UsageQuotaPanel);
+  // R37 — 「资料库 / 更多」与「灵感」都落到资料库页:`灵感` 是它的一个分区
+  // (`initialSection="inspiration"`),于是这个从 Stage G-1c 起一直空着的
+  // 入口第一次有了真内容;插件注册更高优先级即可整体替换这一页。
+  const LibrarySlot = useSlotComponent("placeholder.library", LibraryPage);
+
+  // 知识条目打开:有 url 就交给系统打开,否则退化成提示。原先这段内联在
+  // 「知识库」分支里,现在资料库分区与独立路由共用同一份实现。
+  const openKnowledgeEntry = useCallback(
+    (id: string, url?: string) => {
+      if (url) {
+        void invoke("open_path", { path: url, cwd: null }).catch(() =>
+          onToast?.(`无法打开知识条目：${id}`),
+        );
+        return;
+      }
+      onToast?.(`打开知识条目 ${id}`);
+    },
+    [onToast],
+  );
   if (label === "助理·本地助理") {
     return (
       <AssistantLocalWorkspace
@@ -180,7 +222,7 @@ function PlaceholderPageInner({
     );
   }
 
-  if (label === "邮件") return <EmailPanel sessionId={sessionId} onNavigate={onNavigate} onToast={onToast} onLaunch={onLaunch ? (prompt) => onLaunch(prompt) : undefined} />;
+  if (label === "邮件") return <EmailSlot sessionId={sessionId} onNavigate={onNavigate} onToast={onToast} onLaunch={onLaunch ? (prompt) => onLaunch(prompt) : undefined} />;
 
   if (label === "项目") {
     return (
@@ -188,7 +230,7 @@ function PlaceholderPageInner({
         <div className="project-templates-host">
           <ProjectTemplatesPanel />
         </div>
-        <ProjectsPanel
+        <ProjectsSlot
           cwd={cwd}
           onSelectWorkspace={onSelectWorkspace}
           onToast={onToast}
@@ -200,20 +242,19 @@ function PlaceholderPageInner({
     );
   }
 
-  if (label === "专家·技能·连接器") {
-    // Phase 7 — WorkBuddy 风格 9 卡 3 列专家网格作为顶部 banner;
-    // 下方仍然渲染原有的 market tabs(专家·技能·连接器·插件)。
+  if (label === EXPERTS_ROUTE_LABEL) {
+    // R42 — 完全复刻 WorkBuddy v5.4.7:左侧「任务」栏 + 右侧 4 列专家网格
+    // 都由 ExpertsPanel 内部 .ec-page-split 提供。
+    // 此前 Phase 7 在这里塞了一个 9 卡 3 列的 ExpertsGrid banner,
+    // 但它跟新的 WorkBuddy 风格布局重复,而且高度 (~700px) 会把新的
+    // 任务栏 + 4 列网格推到屏幕外 —— 用户看到的还是旧 banner,以
+    // 为改造没生效。删除 banner,直接渲染 ExpertsPanel。
     return (
-      <div className="placeholder-page-stack">
-        <div className="experts-grid-host">
-          <ExpertsGrid />
-        </div>
-        <ExpertsPanel
-          onGoHome={onGoHome}
-          onToast={onToast}
-          sessionId={sessionId}
-        />
-      </div>
+      <ExpertsPanelSlot
+        onGoHome={onGoHome}
+        onToast={onToast}
+        sessionId={sessionId}
+      />
     );
   }
 
@@ -223,7 +264,7 @@ function PlaceholderPageInner({
 
   if (label === "发现") {
     return (
-      <DiscoverPanel
+      <DiscoverSlot
         sessionId={sessionId}
         onLaunch={onLaunch}
         onToast={onToast}
@@ -231,52 +272,45 @@ function PlaceholderPageInner({
     );
   }
 
+  // R37 — 资料库:我的文件 / 知识库 / 云存储 / 灵感 四个分区(内置也走
+  // `library.section` 槽,插件可追加或顶替)。此前这里是空壳占位。
   if (label === "更多" || label === "资料库") {
-    // Stage G-1c restoration: ResourcesPanel was removed when openbuddy-memory
-    // Cordis backend was deleted. Replaced with an empty placeholder shell so
-    // route navigation still resolves without breaking.
     return (
-      <div className="placeholder-page placeholder-page--panel">
-        <h2 className="settings-section__title">资料库</h2>
-        <p className="settings-section__desc">
-          资源目录由 pi-resource 接管；本视图在 pi-native 重建完成前先提供占位入口。
-        </p>
-      </div>
+      <LibrarySlot
+        initialSection="my-files"
+        cwd={cwd}
+        sessionId={sessionId}
+        onToast={onToast}
+        onLaunch={onLaunch}
+        onOpenKnowledge={openKnowledgeEntry}
+      />
     );
   }
 
-  // Stage G-1c restoration: InspirationPanel removed (openbuddy-inspiration
-  // backend was deleted in Stage B-2; the panel depended on it). Route still
-  // resolves, just shows a placeholder.
+  // R37 — 「灵感」不再是停用页,它就是资料库的 inspiration 分区
+  // (SceneTabs + PracticeCases,数据来自 HOME_MODES 这一份单一来源)。
   if (label === "灵感") {
     return (
-      <div className="placeholder-page placeholder-page--panel">
-        <h2 className="settings-section__title">灵感</h2>
-        <p className="settings-section__desc">
-          灵感面板后端已迁移至 pi-native 插件；本视图暂时停用。
-        </p>
-      </div>
+      <LibrarySlot
+        initialSection="inspiration"
+        cwd={cwd}
+        sessionId={sessionId}
+        onToast={onToast}
+        onLaunch={onLaunch}
+        onOpenKnowledge={openKnowledgeEntry}
+      />
     );
   }
 
   if (label === "我的文件") {
-    return <MyFilesPanel cwd={cwd} onToast={onToast} />;
+    return <MyFilesSlot cwd={cwd} onToast={onToast} />;
   }
 
   // 知识库(可插拔源,对齐 WorkBuddy knowledge-base-panel)。
   if (label === "知识库") {
     return (
       <div className="placeholder-page placeholder-page--panel">
-        <KnowledgeBasePanel
-          onOpen={(id, url) => {
-            if (url) {
-              void invoke("open_path", { path: url, cwd: null }).catch(() => onToast?.(`无法打开知识条目：${id}`));
-              return;
-            }
-            onToast?.(`打开知识条目 ${id}`);
-          }}
-          onToast={onToast}
-        />
+        <KnowledgeBaseSlot onOpen={openKnowledgeEntry} onToast={onToast} />
       </div>
     );
   }
@@ -294,7 +328,7 @@ function PlaceholderPageInner({
   if (label === "用量统计") {
     return (
       <div className="placeholder-page placeholder-page--panel">
-        <UsageQuotaPanel />
+        <UsageQuotaSlot />
       </div>
     );
   }
@@ -303,7 +337,7 @@ function PlaceholderPageInner({
   if (label === "通知渠道") {
     return (
       <div className="placeholder-page placeholder-page--panel">
-        <NotifyChannelsPanel onToast={onToast} />
+        <NotifyChannelsSlot onToast={onToast} />
       </div>
     );
   }
@@ -321,7 +355,7 @@ function PlaceholderPageInner({
   if (label === "云存储") {
     return (
       <div className="placeholder-page placeholder-page--panel">
-        <CloudStoragePanel onToast={onToast} />
+        <CloudStorageSlot onToast={onToast} />
       </div>
     );
   }
@@ -408,4 +442,3 @@ function AssistantLocalWorkspace({
     </div>
   );
 }
-

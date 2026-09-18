@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { confirm, open as openDialog } from "@/lib/platform/electron-api";
+import { confirm, openOne } from "@/lib/platform/electron-api";
 import {
   SearchIcon, InstalledSkillIcon, AddCircleIcon, RefreshCwIcon,
   PuzzlePieceIcon, DeleteIcon, FolderOpenIcon, ChevronLeftIcon, SparklesIcon,
@@ -8,6 +8,7 @@ import {
   skillsList, skillsRemove, skillsToggle,
   skillsCatalogDefaultRoot, skillsCatalogLoad,
 } from "@/lib/agent/pi-client";
+import { useAgentPaths } from "@openbuddy/ui-shared/use-agent-paths";
 import type { SkillCatalog, SkillItem, SkillInfo } from "@openbuddy/shared-types";
 import { Chip } from "../shared/ui";
 import { SkillCatalogCard } from "./SkillCatalogCard";
@@ -16,7 +17,6 @@ import { ImportSkillModal } from "./ImportSkillModal";
 
 const LS_ROOT = "skillsCatalogRoot";
 const FEATURED_WINDOW = 8;
-const DEFAULT_PICK = "E:/Pi/agents";
 
 interface Props {
   pills: React.ReactNode;
@@ -26,6 +26,9 @@ interface Props {
 /** 技能 tab — a live catalog scanned from the agents tree + workbuddy
  *  built-ins, plus the existing "我安装的" (pi-managed) view. */
 export function SkillsTab({ pills, onToast }: Props) {
+  // R95 — 目录选择器起点用真实路径(理由同 ExpertsTab:写死 Windows 盘符会让
+  // macOS/Linux 上 `dialog:open` 的 defaultPath 校验抛错,对话框根本不弹)。
+  const agentPaths = useAgentPaths();
   // ---- catalog (market) state ----
   const [root, setRoot] = useState<string>(() => {
     try { return localStorage.getItem(LS_ROOT) || ""; } catch { return ""; }
@@ -130,16 +133,15 @@ export function SkillsTab({ pills, onToast }: Props) {
 
   const chooseDir = useCallback(async () => {
     try {
-      const sel = await openDialog({
+      const pick = await openOne({
         directory: true, multiple: false, title: "选择技能数据目录",
-        defaultPath: root || DEFAULT_PICK,
+        defaultPath: root || agentPaths.agents || undefined,
       });
-      const pick = Array.isArray(sel) ? sel[0] : sel;
       if (!pick) return;
       await loadCatalog(pick);
       if (!error) onToast?.(`已切换技能数据目录：${pick}`);
     } catch { /* cancelled */ }
-  }, [root, loadCatalog, onToast, error]);
+  }, [root, loadCatalog, onToast, error, agentPaths.agents]);
 
   const handleAdd = (skill: SkillItem) => setModalSkill(skill);
 

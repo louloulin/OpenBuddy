@@ -123,7 +123,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
-    setupFiles: [resolve(__dirname, "src/test-setup.ts")],
+    // Order matters: `test/node-setup.ts` pins `PI_CODING_AGENT_DIR` to a
+    // per-process sandbox *before* any pi module is imported. Without it, tests
+    // that call `SessionManager.create(cwd)` write into the developer's real
+    // `~/.pi/agent/sessions/`. It lives outside `src/` because the renderer
+    // import-boundary test forbids `node:*` imports anywhere under `src/**`.
+    setupFiles: [resolve(__dirname, "test/node-setup.ts"), resolve(__dirname, "src/test-setup.ts")],
     css: false,
     // OpenBuddy ships a CLI in `bin/` with its own Node-only test file.
     // Mark it as node-environment so the file-system + child-process
@@ -140,6 +145,10 @@ export default defineConfig({
       // Vitest cannot discover their suites (no `describe/it` API surface), so we keep
       // them out of the vitest discovery pass to avoid a noisy "No test suite found" failure.
       "scripts/perf/**/*.test.mjs",
+      // `scripts/electron/_*.test.mjs` are vitest wrappers around live-Electron
+      // probes: they spawn a real Electron process against the packaged app, so
+      // Vitest must not collect them. They are driven via moon/scripts instead.
+      "scripts/electron/_*.test.mjs",
     ],
   },
 });

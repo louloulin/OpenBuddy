@@ -33,7 +33,7 @@ import {
   type OpenBuddyProfilePackage,
   type OpenBuddyResourceInventory,
 } from "@/lib/agent/pi-client";
-import { open as openDialog } from "@/lib/platform/electron-api";
+import { openOne } from "@/lib/platform/electron-api";
 import {
   useMainPluginInventory,
   usePluginSnapshot,
@@ -170,9 +170,8 @@ export function OpenBuddyPluginPanel({ onToast }: OpenBuddyPluginPanelProps) {
   }, [profilePackages]);
 
   const handleInstallPackage = async () => {
-    const selected = await openDialog({ directory: true, multiple: false, title: "选择 profile package 目录" });
-    if (!selected || Array.isArray(selected)) return;
-    const sourcePath = selected;
+    const sourcePath = await openOne({ directory: true, multiple: false, title: "选择 profile package 目录" });
+    if (!sourcePath) return;
     try {
       const installed = await agentInstallProfilePackage(sourcePath);
       setProfilePackages(await agentProfilePackages());

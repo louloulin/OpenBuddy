@@ -88,10 +88,15 @@ describe("plugin-sdk 桥接", () => {
     expect(core.entriesOfSlot("home.scene.tab")).toHaveLength(first);
   });
 
-  it("register-command 进 plugin.command slot", () => {
+  it("register-command 进 plugin.command slot,label 随 payload 保留", () => {
     const before = core.entriesOfSlot("plugin.command").length;
-    fire(target, "openbuddy:register-command", { id: "greet", label: "/greet", onExecute: () => {} });
-    expect(core.entriesOfSlot("plugin.command")).toHaveLength(before + 1);
+    fire(target, "openbuddy:register-command", { id: "greet", label: "/greet — 输出问候", onExecute: () => {} });
+    const entries = core.entriesOfSlot("plugin.command");
+    expect(entries).toHaveLength(before + 1);
+    // label 是 ⌘K 命令面板的展示名;丢了它,面板只能显示 /id 甚至整条命令都列不出来。
+    const added = entries[entries.length - 1];
+    expect(added.options.payload).toMatchObject({ id: "greet", label: "/greet — 输出问候" });
+    expect(typeof (added.options.payload as { onExecute?: unknown }).onExecute).toBe("function");
   });
 
   it("内核变更会通知该 slot 的订阅者(界面能重渲染)", () => {

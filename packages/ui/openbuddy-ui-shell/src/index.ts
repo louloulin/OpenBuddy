@@ -15,7 +15,9 @@
  *
  * @see packages/ui/AGENTS.md 了解 ui-* 包协作约定
  */
+import type { ReactNode } from "react";
 import type { SlotMap } from "@openbuddy/ui-slots";
+import type { StatusItem } from "./StatusBar";
 export type { SlotMap };
 
 export { TitleBar } from "./TitleBar";
@@ -43,6 +45,9 @@ export { OnboardingChecklist } from "./OnboardingChecklist";
 export type { OnboardingChecklistProps } from "./OnboardingChecklist";
 export { StatusBar } from "./StatusBar";
 export type { StatusBarProps, StatusItem } from "./StatusBar";
+/** 右侧「助理」导轨：hover 浮出专家/助理列表，一键开启对话。 */
+export { SecondarySidebar } from "./SecondarySidebar";
+export type { SecondarySidebarProps } from "./SecondarySidebar";
 
 // ── Phase B: 顶栏升级（状态胶囊 / 快捷键提示 / 更新弹窗 / 主题入口） ──────────
 /** 顶栏状态胶囊：ready / working / paused / offline / error 五态 + 颜色点。 */
@@ -71,11 +76,56 @@ export type { TopbarActionShortcut } from "./topbar-shortcuts";
 
 declare module "@openbuddy/ui-slots" {
   interface SlotMap {
-    /** Bottom status strip. Host-owned; plugins may replace it. */
+    /**
+     * Bottom status strip.
+     *
+     * 宿主(ui-shell 的 StatusBar)是默认实现;插件注册同名单例槽即可整体替换。
+     * 替换实现会拿到与内置实现**同一份 props**(items 由宿主从 live state 计算),
+     * 所以只需关心怎么画,不用自己找数据。
+     */
     "shell.statusbar": {
       kind: "single";
       scope: "root";
-      owner: Record<string, never>;
+      owner: {
+        left?: StatusItem[];
+        right?: StatusItem[];
+        renderLeft?(): ReactNode;
+        renderRight?(): ReactNode;
+        className?: string;
+      };
+    };
+
+    /**
+     * 右侧「助理」导轨(SecondarySidebar)—— 会话激活时贴在窗口右缘的竖直
+     * 触发条 + hover 浮层,列出 `<agentHome>/agents/*.md` 里的专家(agentHome
+     * 默认 `~/.openbuddy/agent`),点一下就开新会话。
+     *
+     * 为什么声明权在本包而不是 ui-layout:
+     *   本包是**注册方**(`client.tsx` 把 SecondarySidebar 注册进来),ui-layout
+     *   的 AppFrame 只是消费者之一。之前声明写在 ui-layout 里、注释写着
+     *   "Owned by ui-workbench",owner 形状是 `{open,width}` —— 与真实注册的
+     *   组件 props 完全对不上,宿主也就一直没接过线(R23 之后 AppFrame 变成
+     *   参考实现,这条槽就彻底没人消费了)。
+     *
+     * 组件自身是 `position: fixed` 贴右缘的导轨,所以宿主只需提供"是否可见 +
+     * 两个回调",不需要给它划一列宽度。
+     */
+    "details": {
+      kind: "single";
+      scope: "session-maybe";
+      owner: {
+        /** 只在会话激活时为 true;false 时组件自己返回 null。 */
+        visible?: boolean;
+        onSelectExpert?: (agent: {
+          name: string;
+          description?: string;
+          scope?: string;
+          modelTags?: string[];
+        }) => void;
+        onToast?: (message: string) => void;
+        /** 导轨为空(全新安装下 `<agentHome>/agents/` 一个都没有)时的出口。 */
+        onOpenExperts?: () => void;
+      };
     };
   }
 }

@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { Menu, Search, Bell, User } from "lucide-react";
-import { open as openDialog } from "@/lib/platform/electron-api";
+import { openOne } from "@/lib/platform/electron-api";
 
 export function HomeHeader() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   const handleOpenSettings = () => {
-    openDialog({
+    openOne({
       title: "设置",
       defaultPath: "",
       directory: true,
       canCreateDirectories: true,
-    }).then((path) => {
+    }).then((path: string | null) => {
       if (path) {
         console.log("打开工作目录:", path);
       }

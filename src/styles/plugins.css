@@ -36,6 +36,28 @@
 .ec-sort .um-segment-item--active { background: var(--um-pill-active-bg); color: var(--um-pill-active-fg); border-radius: 7px; }
 
 .ec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px; }
+
+/* R91 — 专家页改为单栏。此前是 WorkBuddy v5.4.7 复刻的「左任务栏 + 右 4 列
+ * 卡片网格」双栏;左栏已移除(任务列表由左侧边栏承载),所以这里保留
+ * `.ec-page-split` 这个类名(测试与探针都按它取 DOM)但让它退化成单列,
+ * 主区独占整宽。网格列数随可用宽度分档,宽屏不再浪费横向空间。 */
+.ec-page-split {
+  display: block;
+  /* 保留 min-width: 0 语义 —— 单列时 grid 容器仍要能收缩,避免把子元素
+   * 的 intrinsic 宽度当成下限撑破外层 flex。 */
+  min-width: 0;
+}
+.ec-page-main { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+
+@media (min-width: 1800px) {
+  .ec-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+}
+@media (min-width: 1400px) and (max-width: 1799px) {
+  .ec-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+}
+@media (min-width: 1100px) and (max-width: 1399px) {
+  .ec-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 .ec-card {
   position: relative; display: flex; flex-direction: column; gap: 10px;
   padding: 16px; border-radius: 14px; cursor: pointer;
@@ -66,6 +88,18 @@
   background: var(--wb-button-primary-bg);
   color: var(--wb-button-primary-fg);
 }
+
+/* pi.dev marketplace link (R97 — Expert Marketplace Bridge) */
+.ec-card-pidev {
+  display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+  padding: 0; border: none; background: transparent; cursor: pointer;
+  font-size: 11px; line-height: 1.4; color: var(--wb-text-weak);
+  text-decoration: none; outline: none;
+  transition: color .15s, opacity .15s;
+}
+.ec-card-pidev:hover { color: var(--wb-brand); }
+.ec-card-pidev:focus-visible { color: var(--wb-brand); text-decoration: underline; }
+.ec-card-pidev svg { flex: 0 0 auto; }
 
 /* 我的专家 */
 .ec-my-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px; padding-top: 12px; }

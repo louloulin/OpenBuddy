@@ -154,6 +154,19 @@
   /* Neutral surface — the throughput number stands on its own. */
   background: color-mix(in srgb, var(--wb-text-strong, #000) 7%, transparent);
 }
+/* R58 — input (prompt) token chip. Subtle brand-tinted surface so
+   it reads as "the data this turn consumed" without overpowering
+   the model chip; sits visually next to its --output sibling. */
+.msg__meta-chip--input {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 7%, transparent);
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 78%, var(--wb-text-strong, #000) 22%);
+}
+/* R58 — output (completion) token chip. Slightly cooler tint to
+   differentiate from input; reads as "what the model produced". */
+.msg__meta-chip--output {
+  background: color-mix(in srgb, var(--wb-text-strong, #000) 7%, transparent);
+  color: color-mix(in srgb, var(--wb-text-strong, #000) 70%, var(--wb-text-medium, #6e6e80) 30%);
+}
 .msg__meta-chip-text {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1791,6 +1804,79 @@
   opacity: 0.7;
   margin-bottom: 4px;
 }
+
+/* R57 — StreamingMarkdown inline styling. The streaming renderer now
+   produces styled <code> / <strong> / <em> / <a> spans during the
+   streaming phase (instead of bare unformatted text). These classes
+   mirror the appearance the final rich renderer produces, so the
+   streaming → complete transition stays smooth and the user no
+   longer watches a long stretch of unformatted prose mid-stream.
+   Tokenization is single-pass regex; no AST, no sanitize, no
+   syntax highlighting — those still run on completion. */
+.streaming-inline-code {
+  /* R57 (revised) — mirror the final-state .md-inline-code so the
+     streaming → complete transition does not flip background/border
+     color. Uses brand-tinted subtle bg + border instead of neutral
+     grey, matching prose.css line ~2158. We skip the copy-button
+     affordance during streaming (no focus steal mid-typing). */
+  display: inline-block;
+  font-family: var(--wb-font-code-family, var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, monospace));
+  font-size: 0.92em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 5%, var(--wb-bg-tertiary, rgba(127, 127, 127, 0.08)));
+  color: var(--wb-text-strong, var(--text-strong));
+  border: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 14%, transparent);
+  white-space: pre-wrap;
+  word-break: break-word;
+  vertical-align: baseline;
+}
+[data-theme="dark"] .streaming-inline-code {
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 10%, transparent);
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 24%, transparent);
+}
+.streaming-inline-strong {
+  font-weight: 600;
+  color: var(--wb-text-strong, var(--text-strong));
+}
+.streaming-inline-em {
+  font-style: italic;
+  color: var(--wb-text-default, var(--text-default));
+}
+.streaming-inline-link {
+  color: var(--wb-accent, var(--accent));
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, var(--wb-accent, var(--accent)) 35%, transparent);
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  border-radius: 2px;
+}
+.streaming-inline-link:hover {
+  text-decoration-color: var(--wb-accent, var(--accent));
+  background: color-mix(in oklch, var(--wb-accent, var(--accent)) 8%, transparent);
+}
+
+/* R60 — StreamingMarkdown inline image placeholder. LLMs commonly
+   produce ![alt](url) mid-stream; instead of raw markdown syntax we
+   show a subtle emoji + alt chip so the user knows an image is
+   loading. The final full-Markdown render replaces this with the
+   actual <img> (via Markdown's imageUrlResolver). */
+.streaming-inline-image {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  margin: 0 1px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 6%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--wb-brand, #00c29a) 18%, transparent);
+  color: color-mix(in srgb, var(--wb-brand, #00c29a) 78%, var(--wb-text-strong, #000) 22%);
+  font-size: 0.9em;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* 「等待中」loading 行：扫光主文案 + 分隔符 + 轮播淡入 tip，
    对齐 WorkBuddy 的 pending-assistant 观感（avatar 行由其 header 渲染）。 */
 .msg__loading {
@@ -1983,6 +2069,9 @@
 .markdown-body h3,
 .markdown-body h4 {
   margin: 16px 0 8px;
+  /* 主题的 headingFont(如 claude 的 Playfair Display)只在标题上生效;
+     未定义 headingFont 的主题回落到正文字体(inherit)。 */
+  font-family: var(--wb-font-heading, inherit);
   font-weight: 600;
   line-height: 1.35;
   /* R8.57 — tighter letter-spacing (-0.01em) for refined display

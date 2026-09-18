@@ -14,6 +14,7 @@ import {
   activeOnboardingStep,
   completeOnboardingStep,
   defaultOnboardingStorage,
+  dismissOnboarding,
   gotoOnboardingStep,
   nextOnboardingStep,
   onboardingProgress,
@@ -65,9 +66,15 @@ export interface OnboardingWizardProps {
   storage?: OnboardingStorageLike | null;
   onStepChange?(step: OnboardingStep, index: number): void;
   onComplete?(): void;
-  /** 跳过整段引导(与逐步跳过不同,不会走完剩余步骤)。 */
+  /**
+   * 跳过整段引导(与逐步跳过不同,不会走完剩余步骤)。
+   * 组件会先把状态落盘为 `dismissed`,宿主不需要自己写 storage。
+   */
   onSkip?(): void;
-  /** 关闭按钮;不传则不渲染关闭按钮。 */
+  /**
+   * 关闭按钮 / Esc;不传则不渲染关闭按钮。
+   * 同样会先落盘 `dismissed`,否则下次启动会再弹一遍。
+   */
   onDismiss?(): void;
   busy?: boolean;
   title?: string;
@@ -149,6 +156,26 @@ export function OnboardingWizard({
     [resolvedStorage],
   );
 
+  /**
+   * R62 —— 关闭 / 跳过整段引导时必须落盘,否则每次启动都会重弹。
+   *
+   * 曾经的实现里,「×」和 Esc 只调用宿主的 `onDismiss`,组件自己不写 storage;
+   * 宿主把 `open` 置 false 只是**本次会话**的显隐。于是用户关掉向导后重启,
+   * `openbuddy.onboarding.state` 仍是 `idle`,向导原样再弹一遍 —— 这就是
+   * "引导过了还弹"的根因(只有一路点「完成」到底才会经 `commit` 落盘)。
+   *
+   * 现在把"关闭"也当成一次终结态(`dismissed`),与 `done` 同等对待:
+   * 组件自己负责持久化,宿主只需处理 UI 副作用。
+   */
+  const dismissWhole = useCallback(
+    (notify?: () => void) => {
+      const next = dismissOnboarding(state);
+      commit(next);
+      notify?.();
+    },
+    [state, commit],
+  );
+
   const goNext = useCallback(() => {
     const next = nextOnboardingStep(state, stepIds);
     commit(next);
@@ -205,7 +232,7 @@ export function OnboardingWizard({
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       if (event.key === "Escape" && (onDismiss || onSkip)) {
         event.preventDefault();
-        (onDismiss ?? onSkip)?.();
+        dismissWhole(onDismiss ?? onSkip);
         return;
       }
       if (event.key === "ArrowRight" && !busy && !step.blocked) {
@@ -219,7 +246,7 @@ export function OnboardingWizard({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [visible, busy, step.blocked, current, goNext, goBack, onDismiss, onSkip]);
+  }, [visible, busy, step.blocked, current, goNext, goBack, onDismiss, onSkip, dismissWhole]);
 
   if (!visible || total === 0) return null;
 
@@ -274,7 +301,7 @@ export function OnboardingWizard({
               <button
                 type="button"
                 className={styles.close}
-                onClick={onDismiss}
+                onClick={() => dismissWhole(onDismiss)}
                 aria-label="关闭引导"
                 data-testid="onboarding-close"
               >

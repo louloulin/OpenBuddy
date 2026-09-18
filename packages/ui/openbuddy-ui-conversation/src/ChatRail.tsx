@@ -4,7 +4,7 @@ import {
   ConnectorTabIcon,
   PlanToolIcon,
 } from "@openbuddy/ui-primitives/icons";
-import { open as openDialog } from "@/lib/platform/electron-api";
+import { openPaths } from "@/lib/platform/electron-api";
 import { useSessionsStore } from "@/stores/sessions-store";
 import type { HomeModeId } from "@openbuddy/ui-shared";
 import type { AgentEntry } from "@openbuddy/shared-types";
@@ -58,9 +58,8 @@ export function ChatRail({
 
   const pickFiles = useCallback(async () => {
     try {
-      const selected = await openDialog({ multiple: true });
-      if (!selected) return;
-      const paths = Array.isArray(selected) ? selected : [selected];
+      const paths = await openPaths({ multiple: true });
+      if (paths.length === 0) return;
       onToast?.(`已选择 ${paths.length} 个文件,正在粘贴到输入框…`);
     } catch {
       /* dialog plugin not available in non-Electron environments. */

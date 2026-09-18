@@ -82,6 +82,10 @@
   min-width: 0;
   -webkit-app-region: no-drag;
   padding: 0 16px;
+  /* R30 — 自身作为容器,让搜索按钮按**可用宽度**收敛,而不是按整个窗口宽度。
+     侧栏可拖宽(260–480)、可折叠(64),窗口宽度并不等于这块地方有多宽。 */
+  container-type: inline-size;
+  container-name: topbarcenter;
 }
 .main-topbar__search {
   display: inline-flex;
@@ -89,7 +93,11 @@
   gap: 8px;
   height: 32px;
   padding: 0 12px;
-  min-width: 280px;
+  /* R30 — 原来是硬写 `min-width: 280px`。窗口收到 760px(侧栏 320 → 主区 440,
+     中间区只剩 232px)时这个下限让它**溢出容器**,左右各压到相邻控件 24px:
+     实测搜索框 x=456..736 与右组主题按钮(x=712)重叠。
+     改成 `min(280px, 100%)`:空间够时保持 280 的下限,不够时先让位,永不溢出。 */
+  min-width: min(280px, 100%);
   max-width: 480px;
   width: 100%;
   background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.04));
@@ -124,6 +132,28 @@
   color: var(--wb-text-medium, #6e6e80);
   flex: none;
   user-select: none;
+}
+
+/* R30 — 顶栏信息密度再平衡:中间区放不下"图标 + 文字 + ⌘K"时,退化成纯图标
+   按钮(aria-label 仍在,键盘 / 读屏可用),而不是让文字挤成一团或压到邻居身上。 */
+@container topbarcenter (max-width: 300px) {
+  .main-topbar__search {
+    min-width: 0;
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+  .main-topbar__search-label,
+  .main-topbar__search-kbd {
+    display: none;
+  }
+}
+
+/* 更窄时连图标按钮也不占坑(flex 收起),把宽度全留给标题 / 工具按钮。 */
+@container topbarcenter (max-width: 96px) {
+  .main-topbar__search {
+    display: none;
+  }
 }
 
 /* Transparent icon buttons — no background until hover (WorkBuddy style). */
@@ -479,7 +509,7 @@
 .secondary-sidebar__trigger {
   position: fixed;
   top: 50%;
-  right: 0;
+  right: var(--ob-work-panel-width, 0);
   transform: translateY(-50%);
   z-index: 60;
   display: flex;
@@ -515,7 +545,7 @@
 .secondary-sidebar__floating {
   position: fixed;
   top: 50%;
-  right: 44px;
+  right: calc(var(--ob-work-panel-width, 0px) + 44px);
   transform: translateY(-50%);
   z-index: 61;
   width: 268px;
@@ -622,6 +652,52 @@
   gap: 2px;
   color: var(--wb-text-tertiary);
   font-size: 11px;
+}
+/* R28 — 空状态。全新安装下 `<agentHome>/agents/` 一个专家都没有,hover 出来的浮层
+   原本是一片空白(实测 items=0),看着像坏了。给一句说明 + 一条明确出口。 */
+.secondary-sidebar__empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 10px;
+  border-radius: 8px;
+  background: var(--wb-bg-secondary);
+}
+.secondary-sidebar__empty-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.secondary-sidebar__empty-desc {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--wb-text-tertiary);
+}
+.secondary-sidebar__empty-desc code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.05));
+  color: var(--wb-text-medium);
+}
+.secondary-sidebar__empty-action {
+  align-self: flex-start;
+  margin-top: 2px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--wb-border-default, rgba(0, 0, 0, 0.12));
+  border-radius: 6px;
+  background: var(--wb-bg-elevated, transparent);
+  color: var(--wb-text-strong);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.secondary-sidebar__empty-action:hover {
+  border-color: color-mix(in srgb, var(--wb-brand-primary) 45%, transparent);
+  color: var(--wb-brand-primary);
 }
 
 /* ---- 文档截断提示条（AppShell 顶部渲染） ---- */

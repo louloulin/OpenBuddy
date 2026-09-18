@@ -1,28 +1,45 @@
 /**
  * 文件树视图 —— 对齐 WorkBuddy `context-viewer-components/DetailPanel/FileTree`。
  *
- * 左列：可展开/折叠的目录树（懒加载 `listDir`，展开时按需拉取子目录）。
+ * 左列:可展开/折叠的目录树(懒加载 `listDir`,展开时按需拉取子目录)。
  * 选中文件由父组件通过 onFileSelect 回调驱动主区域预览。
  *
- * 根目录取 cwd（会话工作区）。隐藏/构建目录已在后端过滤。
+ * 渲染本身交给 `@openbuddy/ui-files-tree` 的 `<LazyFileTree>`:它带虚拟滚动
+ * (只挂载视口附近的约 20 行,万级节点不卡)、多选、键盘导航(↑↓←→ / Enter /
+ * Home / End / ⌘A)、右键菜单(打开 / 复制路径 / 在文件夹中显示 / 刷新)与
+ * 聚焦环。之前这里手写的递归渲染既没有虚拟化,也没有键盘可达性。
+ *
+ * 这个文件只负责把「应用侧 I/O」接进去 —— `listDir` 与 `shellfs:reveal`。
+ * 这两个绑定都可以被覆盖:宿主把 `files.tree` 槽渲染成 `<LazyFileTree>` 时,
+ * 它需要的是同一对回调,于是这里既是 ui-workbench 的默认实现,也是
+ * `files.tree` 槽的 fallback。
+ *
+ * 根目录取 cwd(会话工作区)。隐藏/构建目录已在后端过滤。
+ *
+ * 说明:拖拽移动暂未打开。`LazyFileTree` 只在拿到 `onMove` 时才让行可拖动,
+ * 而当前 IPC 面里没有重命名/移动的通道 —— 与其画一个拖了没反应的落点,
+ * 不如先不给这个手势。
  */
-import { useCallback, useEffect, useState } from "react";
-import { listDir, type DirEntry } from "@/lib/agent/pi-client";
-import { pickFileEmoji } from "./file-tab-icon";
-import { ChevronRightIcon } from "@openbuddy/ui-primitives/icons";
+import { useCallback } from "react";
+import type { ComponentType } from "react";
+import { invoke } from "@/lib/platform/electron-api";
+import { listDir } from "@/lib/agent/pi-client";
+import { LazyFileTree } from "@openbuddy/ui-files-tree";
+import type { LazyFileTreeEntry } from "@openbuddy/ui-files-tree";
 
-/** 已加载的目录条目缓存：path → entries（undefined=未加载，[]=已加载空）。 */
-type LoadedMap = Map<string, DirEntry[] | undefined>;
-
-interface FileTreeViewProps {
-  /** 工作区根目录（绝对路径）。 */
+export interface FileTreeViewProps {
+  /** 工作区根目录(绝对路径)。 */
   rootPath?: string;
-  /** 当前选中的文件路径（高亮）。 */
+  /** 当前选中的文件路径(高亮)。 */
   selectedPath?: string;
   /** 选中文件回调。 */
   onFileSelect: (path: string) => void;
   /** 错误/提示回调。 */
   onToast?: (msg: string) => void;
+  /** 覆盖内置的 `listDir` 绑定(供 `files.tree` 槽复用本组件时使用)。 */
+  loadDir?: (dirPath: string) => Promise<LazyFileTreeEntry[]>;
+  /** 覆盖内置的「在文件夹中显示」绑定。 */
+  onReveal?: (path: string) => void;
 }
 
 export function FileTreeView({
@@ -30,183 +47,41 @@ export function FileTreeView({
   selectedPath,
   onFileSelect,
   onToast,
+  loadDir,
+  onReveal,
 }: FileTreeViewProps) {
-  const [loaded, setLoaded] = useState<LoadedMap>(new Map());
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
-
-  const root = rootPath ?? "";
-  const rootLoaded = loaded.get(root);
-
-  // 加载根目录。
-  const loadDir = useCallback(
-    async (dirPath: string) => {
-      if (loaded.has(dirPath)) return; // 已加载（含空数组）
-      setLoaded((prev) => {
-        const next = new Map(prev);
-        next.set(dirPath, undefined); // 标记为「加载中」
-        return next;
-      });
-      try {
-        const entries = await listDir(dirPath);
-        setLoaded((prev) => {
-          const next = new Map(prev);
-          next.set(dirPath, entries);
-          return next;
-        });
-      } catch (e) {
-        const msg = String(e).replace(/^Error:\s*/, "");
-        onToast?.(`读取目录失败：${msg}`);
-        setLoaded((prev) => {
-          const next = new Map(prev);
-          next.delete(dirPath); // 失败：移除标记，允许重试
-          return next;
-        });
-      }
-    },
-    [loaded, onToast],
+  const boundLoadDir = useCallback(
+    (dirPath: string) => listDir(dirPath),
+    [],
   );
-
-  // 根目录变化时重置并加载。
-  useEffect(() => {
-    setLoaded(new Map());
-    setExpanded(new Set());
-    if (!root) return;
-    setLoading(true);
-    loadDir(root).finally(() => setLoading(false));
-  }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const toggleDir = useCallback(
-    async (dirPath: string) => {
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        if (next.has(dirPath)) next.delete(dirPath);
-        else next.add(dirPath);
-        return next;
+  const boundReveal = useCallback(
+    (path: string) => {
+      void invoke("reveal_in_folder", {
+        path,
+        cwd: rootPath ?? null,
+      }).catch((e: unknown) => {
+        onToast?.(`无法在文件夹中显示:${String(e).replace(/^Error:\s*/, "")}`);
       });
-      await loadDir(dirPath);
     },
-    [loadDir],
+    [onToast, rootPath],
   );
-
-  if (!root) {
-    return (
-      <div className="file-tree__empty">未设置工作区目录（cwd）。</div>
-    );
-  }
-
-  if (loading && rootLoaded === undefined) {
-    return <div className="file-tree__empty">加载文件树中…</div>;
-  }
-
-  const rootEntries = loaded.get(root) ?? [];
-  if (rootEntries.length === 0 && rootLoaded !== undefined) {
-    return <div className="file-tree__empty">空目录。</div>;
-  }
 
   return (
-    <div className="file-tree" role="tree" aria-label="工作区文件树">
-      {rootEntries.map((entry) => (
-        <TreeNode
-          key={entry.path}
-          entry={entry}
-          depth={0}
-          expanded={expanded}
-          loaded={loaded}
-          selectedPath={selectedPath}
-          onToggleDir={toggleDir}
-          onFileSelect={onFileSelect}
-        />
-      ))}
-      {rootEntries.length === 0 && (
-        <div className="file-tree__empty">选择文件查看内容</div>
-      )}
-    </div>
+    <LazyFileTree
+      rootPath={rootPath}
+      loadDir={loadDir ?? boundLoadDir}
+      selectedPath={selectedPath}
+      onFileSelect={onFileSelect}
+      onReveal={onReveal ?? boundReveal}
+      onToast={onToast}
+    />
   );
 }
 
-/** 单个树节点（目录或文件），递归渲染子目录。 */
-function TreeNode({
-  entry,
-  depth,
-  expanded,
-  loaded,
-  selectedPath,
-  onToggleDir,
-  onFileSelect,
-}: {
-  entry: DirEntry;
-  depth: number;
-  expanded: Set<string>;
-  loaded: LoadedMap;
-  selectedPath?: string;
-  onToggleDir: (path: string) => void;
-  onFileSelect: (path: string) => void;
-}) {
-  const isDir = entry.kind === "directory";
-  const isExpanded = expanded.has(entry.path);
-  const isSelected = entry.path === selectedPath;
-  const children = isDir ? loaded.get(entry.path) : undefined;
-  const childLoading = isDir && isExpanded && children === undefined;
-
-  const handleClick = () => {
-    if (isDir) onToggleDir(entry.path);
-    else onFileSelect(entry.path);
-  };
-
-  return (
-    <>
-      <div
-        className={
-          "file-tree__node" +
-          (isDir ? " file-tree__node--dir" : " file-tree__node--file") +
-          (isSelected ? " file-tree__node--selected" : "")
-        }
-        style={{ paddingInlineStart: `${depth * 14 + 8}px` }}
-        role="treeitem"
-        aria-expanded={isDir ? isExpanded : undefined}
-        aria-selected={isSelected}
-        onClick={handleClick}
-        title={entry.path}
-      >
-        {isDir ? (
-          <ChevronRightIcon
-            size="sm"
-            className={
-              "file-tree__chevron" + (isExpanded ? " file-tree__chevron--open" : "")
-            }
-          />
-        ) : (
-          <span className="file-tree__chevron-placeholder" />
-        )}
-        <span className="file-tree__icon">
-          {isDir ? "📁" : pickFileEmoji(entry.name)}
-        </span>
-        <span className="file-tree__name">{entry.name}</span>
-      </div>
-      {isDir &&
-        isExpanded &&
-        children &&
-        children.map((child) => (
-          <TreeNode
-            key={child.path}
-            entry={child}
-            depth={depth + 1}
-            expanded={expanded}
-            loaded={loaded}
-            selectedPath={selectedPath}
-            onToggleDir={onToggleDir}
-            onFileSelect={onFileSelect}
-          />
-        ))}
-      {childLoading && (
-        <div
-          className="file-tree__node file-tree__node--loading"
-          style={{ paddingInlineStart: `${(depth + 1) * 14 + 8}px` }}
-        >
-          …
-        </div>
-      )}
-    </>
-  );
-}
+/**
+ * `files.tree` 槽渲染时宿主需要提供的 props 形状。
+ *
+ * 放在这里是为了让「槽的实现」和「槽的消费方」共用同一个契约:ui-workbench
+ * 的 `FileTreeView` 与 ui-files-tree 的 `LazyFileTree` 都满足它。
+ */
+export type FileTreeSlotComponent = ComponentType<FileTreeViewProps>;

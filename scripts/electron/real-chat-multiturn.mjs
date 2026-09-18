@@ -44,6 +44,18 @@ const DEFAULTS = {
 const PROMPTS = [
   "真实多轮校验第 1 轮：记住校验词 MULTI-TURN-ALPHA，只回复 OK",
   "真实多轮校验第 2 轮：上一轮的校验词是什么？只回复它",
+  // R61 — 10-turn smoke. Each turn either recalls the previous keyword
+  // (context retention) or introduces a new one for the next turn to
+  // recall. Markers follow the pattern `P<N>-<word>` so each turn has
+  // a unique substring to assert on.
+  "真实多轮校验第 3 轮：记住新词 P3-ECHO，只回复 OK",
+  "真实多轮校验第 4 轮：上一轮的词是什么？只回复它",
+  "真实多轮校验第 5 轮：记住新词 P5-DELTA，只回复 OK",
+  "真实多轮校验第 6 轮：上一轮的词是什么？只回复它",
+  "真实多轮校验第 7 轮：记住新词 P7-GAMMA，只回复 OK",
+  "真实多轮校验第 8 轮：上一轮的词是什么？只回复它",
+  "真实多轮校验第 9 轮：请用一句话总结前面 8 轮中出现的所有 P 开头的词",
+  "真实多轮校验第 10 轮：只回复 COMPLETE",
 ];
 
 function parseArgs(argv) {
@@ -184,6 +196,40 @@ try {
   if (auth?.ready !== true) throw new Error(`auth not ready: ${JSON.stringify(auth)}`);
   log("auth-status.ready = true");
 
+  // R61 — dismiss the OnboardingWizard before it can intercept the
+  // composer's send click. The wizard stores its state in localStorage
+  // (`openbuddy.onboarding.state`) and shows on first run; we pre-write
+  // a terminal `done` state so it never mounts. This is a headless
+  // alternative to clicking through the wizard, and it's exactly what
+  // real-ui-smoke.mjs already does for its own flows.
+  await page.evaluate(() => {
+    try {
+      // 1. Skip OnboardingWizard.
+      const done = JSON.stringify({
+        version: 1,
+        status: "done",
+        index: 0,
+        steps: [],
+        startedAt: Date.now(),
+        updatedAt: Date.now(),
+        completedAt: Date.now(),
+      });
+      window.localStorage.setItem("openbuddy.onboarding.state", done);
+      // 2. Skip TourSpotlight (independent from wizard, same first-run
+      //    sequence). Marking it "seen" prevents its overlay from
+      //    intercepting pointer events on the send button.
+      window.localStorage.setItem("openbuddy.tour.state", "seen");
+      // 3. WhatsNewGate: deliberately DO NOT write
+      //    "openbuddy.whats-new.lastSeen". Its policy is "first install is
+      //    silent; only show after an upgrade". Writing a version there
+      //    flips it into the upgrade path and pops the card, which then
+      //    intercepts the composer's send click. Leaving it absent is what
+      //    makes this script behave exactly like a real first launch.
+    } catch {
+      /* localStorage unavailable — wizard may still appear, accept */
+    }
+  });
+
   const created = await invoke("agent:new-session", {
     cwd: workspace,
     modelId: `${opts.providerId}/${opts.modelId}`,
@@ -209,7 +255,22 @@ try {
 
   for (let turn = 0; turn < opts.turns; turn += 1) {
     const prompt = PROMPTS[turn];
-    const marker = prompt.includes("记住") ? "OK" : "MULTI-TURN-ALPHA";
+    // Per-turn marker: "记住 X" turns expect "OK" (the model just
+    // acknowledges); recall turns expect the specific P<N>-WORD or the
+    // turn-9 summary / turn-10 COMPLETE.
+    const MARKERS = [
+      "OK",           // turn 1 — ack only
+      "MULTI-TURN-ALPHA", // turn 2 — recall
+      "OK",           // turn 3 — ack
+      "P3-ECHO",      // turn 4 — recall
+      "OK",           // turn 5 — ack
+      "P5-DELTA",     // turn 6 — recall
+      "OK",           // turn 7 — ack
+      "P7-GAMMA",     // turn 8 — recall
+      "P3-ECHO",      // turn 9 — summary (should contain at least one P word)
+      "COMPLETE",     // turn 10 — final ack
+    ];
+    const marker = MARKERS[turn] ?? "OK";
     log(`turn ${turn + 1}/${opts.turns}: marker="${marker}"`);
     await composer.fill(prompt);
     await page.getByRole("button", { name: "发送", exact: true }).click();

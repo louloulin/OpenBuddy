@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { open as openDialog } from "@/lib/platform/electron-api";
+import { openOne } from "@/lib/platform/electron-api";
 import {
   SearchIcon, AddCircleIcon, FolderOpenIcon, RefreshCwIcon, McpIcon,
 } from "@openbuddy/ui-primitives/icons";
@@ -81,7 +81,7 @@ export function ConnectorsTab({ pills, onToast }: Props) {
   const [mcpEditing, setMcpEditing] = useState(false);
 
   // ---- authorization state ----
-  /** Server names present in ~/.pi/mcp.json (install heuristic). */
+  /** Server names present in `<agentHome>/mcp.json` (install heuristic). */
   const [installedServers, setInstalledServers] = useState<Set<string>>(new Set());
   /** Server names pi flagged as needing OAuth. */
   const [needsAuth, setNeedsAuth] = useState<Set<string>>(new Set());
@@ -206,11 +206,10 @@ export function ConnectorsTab({ pills, onToast }: Props) {
 
   const chooseDir = useCallback(async () => {
     try {
-      const sel = await openDialog({
+      const pick = await openOne({
         directory: true, multiple: false, title: "选择连接器数据目录",
         defaultPath: root || DEFAULT_PICK,
       });
-      const pick = Array.isArray(sel) ? sel[0] : sel;
       if (!pick) return;
       await loadCatalog(pick);
       if (!error) onToast?.(`已切换连接器数据目录：${pick}`);
@@ -224,7 +223,8 @@ export function ConnectorsTab({ pills, onToast }: Props) {
   const [tokenFormConnector, setTokenFormConnector] = useState<ConnectorItem | null>(null);
 
   /** Read the connector's mcp.json, optionally inject token values, merge into
-   *  `~/.pi/mcp.json`, and save (syncs live into pi when a session is
+   *  `<agentHome>/mcp.json` (由 `@openbuddy/storage` 的 agentHome() 决定，默认
+   *  `~/.openbuddy/agent`), and save (syncs live into pi when a session is
    *  given). Returns the installed server names. */
   const installConnector = useCallback(async (
     c: ConnectorItem,

@@ -3,7 +3,8 @@
  *
  * Split out of `./index.ts`.
  */
-import { ipcMain, type BrowserWindow } from "electron";
+import { type BrowserWindow } from "electron";
+import { wrapIpcHandler } from "./_wrap";
 import { agentHost, bindRendererEventEmitter, ensureAgentHostLoaded } from "./agent-host-proxy";
 import {
 	absolutePath,
@@ -49,13 +50,13 @@ import {
 
 export function registerCollaborationIpc(getWindow: () => BrowserWindow | null): void {
 	const ensureAgentHost = async () => { await ensureAgentHostLoaded(); };
-		ipcMain.handle("collaboration:a2a-agent-card", async () => {
+		wrapIpcHandler("collaboration:a2a-agent-card", async () => {
 			await syncCollaborationCapabilityCards();
 			const { collaborationRuntime } = await import("../collaboration/collaboration-runtime");
 			const { createA2ARuntimeFacade } = await import("../collaboration/a2a-runtime-adapter");
 			return createA2ARuntimeFacade(collaborationRuntime).getAgentCard();
 		});
-		ipcMain.handle("collaboration:a2a-task-submit", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:a2a-task-submit", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "A2A task payload");
 			const sender = recordValue(input.sender, "sender");
 			const senderIdentity = {
@@ -90,14 +91,14 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 			const result = createA2ARuntimeFacade(collaborationRuntime).submitTask(request);
 			return { requestId: result.requestId, runtimeTaskId: result.runtimeTaskId, view: result.view };
 		});
-		ipcMain.handle("collaboration:a2a-task-get", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:a2a-task-get", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "A2A task lookup payload");
 			const { collaborationRuntime } = await import("../collaboration/collaboration-runtime");
 			const { createA2ARuntimeFacade } = await import("../collaboration/a2a-runtime-adapter");
 			return createA2ARuntimeFacade(collaborationRuntime).getTask(requiredString(input.taskId, "taskId"));
 		});
-		ipcMain.handle("collaboration:federated-grants", async () => (await import("../collaboration/collaboration-runtime")).collaborationRuntime.federatedRoomGrantSnapshot());
-		ipcMain.handle("collaboration:federated-grant-issue", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:federated-grants", async () => (await import("../collaboration/collaboration-runtime")).collaborationRuntime.federatedRoomGrantSnapshot());
+		wrapIpcHandler("collaboration:federated-grant-issue", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "federated room grant payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.issueFederatedRoomGrant({
 				projectId: requiredString(input.projectId, "projectId"),
@@ -111,13 +112,13 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 				allowedOperations: requiredStringArray(input.allowedOperations, "allowedOperations").map((operation) => enumValue(operation, "allowedOperations", ["endpoint.register", "task.send", "events.query"] as const)),
 				expiresAt: requiredString(input.expiresAt, "expiresAt"),
 			});
-		ipcMain.handle("collaboration:identity-get", async () => {
+		wrapIpcHandler("collaboration:identity-get", async () => {
 			const { sharedBuddyIdentityStore } = await import("../casdoor/buddy-identity-store");
 			const store = sharedBuddyIdentityStore();
 			const file = store.loadOrCreate();
 			return { identity: store.toBuddyIdentity(file), file, filePath: store.fileLocation() };
 		});
-		ipcMain.handle("collaboration:identity-update", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:identity-update", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "buddy identity update payload");
 			const patch: { handle?: string; displayName?: string; organizationId?: string; status?: "idle" | "working" | "offline" } = {};
 			if (input.handle !== undefined) patch.handle = requiredString(input.handle, "handle");
@@ -131,11 +132,11 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 			return { identity, file: updated, filePath: sharedBuddyIdentityStore().fileLocation() };
 		});
 		});
-		ipcMain.handle("collaboration:federated-grant-revoke", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:federated-grant-revoke", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "federated room grant revoke payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.revokeFederatedRoomGrant(requiredString(input.grantId, "grantId"));
 		});
-		ipcMain.handle("collaboration:propose-task", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:propose-task", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration task payload");
 			const title = requiredString(input.title, "title");
 			const objective = requiredString(input.objective, "objective");
@@ -145,7 +146,7 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 			const agentRef = input.agentRef === undefined ? undefined : recordValue(input.agentRef, "agentRef");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.proposeTask({ title, objective, capability, roomId, projectId, ...(agentRef ? { agentRef: { type: enumValue(agentRef.type, "agentRef.type", ["expert", "personal-buddy", "organization-buddy", "external-buddy"] as const), id: requiredString(agentRef.id, "agentRef.id") } } : {}) });
 		});
-		ipcMain.handle("collaboration:propose", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:propose", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "unified collaboration payload");
 			const strings = (value: unknown, name: string): string[] | undefined => value === undefined ? undefined : optionalStringArray(value, name);
 			const agentRef = input.agentRef === undefined ? undefined : recordValue(input.agentRef, "agentRef");
@@ -167,11 +168,11 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 					sideEffectFingerprint: input.sideEffectFingerprint === undefined ? undefined : requiredString(input.sideEffectFingerprint, "sideEffectFingerprint"),
 			});
 		});
-		ipcMain.handle("collaboration:execute", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:execute", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration execute payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.executeCollaborationTask(requiredString(input.taskId, "taskId"));
 		});
-		ipcMain.handle("collaboration:workflow-propose", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:workflow-propose", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "workflow proposal payload");
 			if (!Array.isArray(input.nodes)) throw new Error("nodes must be an array");
 			const nodes = input.nodes.map((value, index) => {
@@ -199,15 +200,15 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 			});
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.proposeWorkflow({ title: requiredString(input.title, "title"), mode: enumValue(input.mode, "mode", ["personal", "organization"] as const), projectId: input.projectId === undefined ? undefined : requiredString(input.projectId, "projectId"), nodes });
 		});
-		ipcMain.handle("collaboration:workflow-execute", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:workflow-execute", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "workflow execute payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.executeWorkflow(requiredString(input.workflowId, "workflowId"));
 		});
-		ipcMain.handle("collaboration:workflow-status", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:workflow-status", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "workflow status payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.workflowStatus(requiredString(input.workflowId, "workflowId"));
 		});
-		ipcMain.handle("collaboration:workflow-control", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:workflow-control", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "workflow control payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.controlWorkflow({
 				workflowId: requiredString(input.workflowId, "workflowId"),
@@ -215,11 +216,11 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 				reason: input.reason === undefined ? undefined : requiredString(input.reason, "reason"),
 			});
 		});
-		ipcMain.handle("collaboration:ack-inbox", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:ack-inbox", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration inbox ack payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.ackInbox(requiredString(input.eventId, "eventId"));
 		});
-		ipcMain.handle("collaboration:organization-member", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:organization-member", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration organization member payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.addOrganizationMember({
 				id: requiredString(input.id, "id"),
@@ -229,11 +230,11 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 				role: input.role === undefined ? undefined : enumValue(input.role, "role", ["owner", "admin", "member", "auditor"] as const),
 			});
 		});
-		ipcMain.handle("collaboration:organization-member-remove", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:organization-member-remove", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration organization member removal payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.removeOrganizationMember({ memberId: requiredString(input.memberId, "memberId") });
 		});
-		ipcMain.handle("collaboration:delegation-grant", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:delegation-grant", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration delegation payload");
 			const strings = (value: unknown, name: string): string[] => {
 				if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) throw new Error(`${name} must be an array of strings`);
@@ -248,7 +249,7 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 				expiresAt: requiredString(input.expiresAt, "expiresAt"),
 			});
 		});
-		ipcMain.handle("collaboration:room-member-add", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:room-member-add", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration room member payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.addOrganizationRoomMember({
 				roomId: requiredString(input.roomId, "roomId"),
@@ -256,14 +257,14 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 				role: input.role === undefined ? undefined : enumValue(input.role, "role", ["member", "observer", "agent"] as const),
 			});
 		});
-		ipcMain.handle("collaboration:room-member-remove", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:room-member-remove", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration room member removal payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.removeOrganizationRoomMember({
 				roomId: requiredString(input.roomId, "roomId"),
 				principalId: requiredString(input.principalId, "principalId"),
 			});
 		});
-		ipcMain.handle("collaboration:approval-request", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:approval-request", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration approval request payload");
 			if (!Array.isArray(input.actions) || !input.actions.every((item) => typeof item === "string")) throw new Error("actions must be an array of strings");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.requestApproval({
@@ -272,11 +273,11 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 				reason: requiredString(input.reason, "reason"),
 			});
 		});
-		ipcMain.handle("collaboration:delegation-revoke", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:delegation-revoke", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration delegation revoke payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.revokeOrganizationDelegation(requiredString(input.delegationId, "delegationId"));
 		});
-		ipcMain.handle("collaboration:approval-decide", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:approval-decide", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration approval payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.decideApproval({
 				approvalId: requiredString(input.approvalId, "approvalId"),
@@ -284,7 +285,7 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 				reason: input.reason === undefined ? undefined : requiredString(input.reason, "reason"),
 			});
 		});
-		ipcMain.handle("collaboration:side-effect-create", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:side-effect-create", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "side-effect intent payload");
 			const runtime = (await import("../collaboration/collaboration-runtime")).collaborationRuntime;
 			return runtime.createSideEffectIntent({
@@ -298,19 +299,19 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 				approvedByUser: input.approvedByUser === undefined ? undefined : requiredBoolean(input.approvedByUser, "approvedByUser"),
 			});
 		});
-		ipcMain.handle("collaboration:side-effect-approve", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:side-effect-approve", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "side-effect approval payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.approveSideEffectIntent(requiredString(input.intentId, "intentId"));
 		});
-		ipcMain.handle("collaboration:side-effect-complete", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:side-effect-complete", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "side-effect completion payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.completeSideEffectIntent(requiredString(input.intentId, "intentId"), input.receipt === undefined ? undefined : requiredString(input.receipt, "receipt"));
 		});
-		ipcMain.handle("collaboration:side-effect-cancel", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:side-effect-cancel", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "side-effect cancellation payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.cancelSideEffectIntent(requiredString(input.intentId, "intentId"), input.reason === undefined ? undefined : requiredString(input.reason, "reason"));
 		});
-		ipcMain.handle("collaboration:task-control", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:task-control", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration task control payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.controlTask({
 				taskId: requiredString(input.taskId, "taskId"),
@@ -318,7 +319,7 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 				reason: input.reason === undefined ? undefined : requiredString(input.reason, "reason"),
 			});
 		});
-		ipcMain.handle("collaboration:network-peer", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:network-peer", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration network peer payload");
 			const identity = recordValue(input.identity, "identity");
 			const capabilities = Array.isArray(input.capabilities) ? input.capabilities : [];
@@ -337,46 +338,46 @@ export function registerCollaborationIpc(getWindow: () => BrowserWindow | null):
 					agentCard: input.agentCard === undefined ? undefined : input.agentCard as import("@openbuddy/collaboration-protocol").BuddyAgentCard,
 			});
 		});
-		ipcMain.handle("collaboration:network-trust", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:network-trust", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration network trust payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.setNetworkPeerTrust(requiredString(input.peerId, "peerId"), enumValue(input.trust, "trust", ["pending", "known", "trusted", "blocked", "revoked"] as const));
 		});
-		ipcMain.handle("collaboration:network-trust-root-add", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:network-trust-root-add", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration trust root payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.addAgentCardTrustRoot(requiredString(input.publicKeyPem, "publicKeyPem"));
 		});
-		ipcMain.handle("collaboration:network-trust-root-revoke", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:network-trust-root-revoke", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration trust root revoke payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.revokeAgentCardTrustRoot(requiredString(input.keyRef, "keyRef"));
 		});
-		ipcMain.handle("collaboration:network-offer", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:network-offer", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration network offer payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.networkPublishOffer({
 				providerId: requiredString(input.providerId, "providerId"), capabilityId: requiredString(input.capabilityId, "capabilityId"), title: requiredString(input.title, "title"), description: requiredString(input.description, "description"),
 				acceptedDataScopes: requiredStringArray(input.acceptedDataScopes, "acceptedDataScopes"), acceptedArtifactTypes: requiredStringArray(input.acceptedArtifactTypes, "acceptedArtifactTypes"), approval: enumValue(input.approval, "approval", ["never", "before_external_commit", "always"] as const), validUntil: requiredString(input.validUntil, "validUntil"), visibility: enumValue(input.visibility, "visibility", ["known_peers", "directory"] as const),
 			});
 		});
-		ipcMain.handle("collaboration:network-proposal", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:network-proposal", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration network proposal payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.networkProposeService({ capabilityId: requiredString(input.capabilityId, "capabilityId"), objective: requiredString(input.objective, "objective"), dataScopes: requiredStringArray(input.dataScopes, "dataScopes"), ...(input.allowedActions === undefined ? {} : { allowedActions: requiredStringArray(input.allowedActions, "allowedActions") }), artifactTypes: requiredStringArray(input.artifactTypes, "artifactTypes"), expiresAt: requiredString(input.expiresAt, "expiresAt") });
 		});
-		ipcMain.handle("collaboration:network-negotiate", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:network-negotiate", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration capability negotiation payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.networkNegotiateCapability({ offerId: requiredString(input.offerId, "offerId"), proposalId: requiredString(input.proposalId, "proposalId"), providerId: requiredString(input.providerId, "providerId") });
 		});
-		ipcMain.handle("collaboration:network-agreement-revoke", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:network-agreement-revoke", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration agreement revoke payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.networkRevokeCapabilityAgreement(requiredString(input.agreementId, "agreementId"), requiredString(input.reason, "reason"));
 		});
-		ipcMain.handle("collaboration:network-bid", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:network-bid", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration network bid payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.networkSubmitBid({ offerId: requiredString(input.offerId, "offerId"), proposalId: requiredString(input.proposalId, "proposalId"), providerId: requiredString(input.providerId, "providerId"), message: requiredString(input.message, "message"), acceptedDataScopes: requiredStringArray(input.acceptedDataScopes, "acceptedDataScopes"), validUntil: requiredString(input.validUntil, "validUntil") });
 		});
-		ipcMain.handle("collaboration:network-award", async (_event, args?: unknown) => {
+		wrapIpcHandler("collaboration:network-award", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "collaboration network award payload");
 			return (await import("../collaboration/collaboration-runtime")).collaborationRuntime.networkAwardBid(requiredString(input.bidId, "bidId"));
 		});
-		ipcMain.handle("collaboration:network-retry", async () => (await import("../collaboration/collaboration-runtime")).collaborationRuntime.retryPendingNetworkDeliveries());
+		wrapIpcHandler("collaboration:network-retry", async () => (await import("../collaboration/collaboration-runtime")).collaborationRuntime.retryPendingNetworkDeliveries());
 	async function syncCollaborationCapabilityCards(): Promise<Awaited<ReturnType<typeof agentHost.resourceInventory>>> {
 		const { collaborationRuntime } = await import("../collaboration/collaboration-runtime");
 		await ensureAgentHost();

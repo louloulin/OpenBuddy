@@ -17,6 +17,12 @@ export const TOPBAR_ACTION_SHORTCUTS = {
    * 所以这里也保持裸键,不做 mod 组合。
    */
   shortcutsHelp: "?",
+  /**
+   * R72 — 打开「📝 新草稿」入口(DraftEditor)。与 exportMarkdown / togglePin /
+   * archive 同一族:Mod + Shift + 单字母,与浏览器原生 D(收藏)/Shift+D 都不冲突。
+   * 真正的事件绑定由 TopbarActions 内的 useShortcut 挂上,本文件只持有展示和弦。
+   */
+  draft: "mod+shift+d",
 } as const;
 
 export type TopbarActionShortcut = keyof typeof TOPBAR_ACTION_SHORTCUTS;

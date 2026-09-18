@@ -5,7 +5,7 @@
  * lib/knowledge-base)。本面板提供搜索框 + 跨源结果列表。无 provider 时显示空态。
  */
 import { useEffect, useState } from "react";
-import { invoke, open as openDialog } from "@/lib/platform/electron-api";
+import { invoke, openOne } from "@/lib/platform/electron-api";
 import { searchKb, listKbProvidersWithStats, registerKbProvider, unregisterKbProvider, rebuildAllKbProviders, type KbEntry, type KbIndexStats } from "@openbuddy/files-kb";
 import { createLocalKbProvider } from "@openbuddy/files-kb";
 import { createElectronDirectoryReader, isElectronAvailable } from "@/lib/files/electron-kb-reader";
@@ -54,9 +54,8 @@ export function KnowledgeBasePanel({ onOpen, onToast }: KnowledgeBasePanelProps)
       return;
     }
     try {
-      const dir = await openDialog({ directory: true, multiple: false });
-      if (!dir || Array.isArray(dir)) return;
-      const root = dir as string;
+      const root = await openOne({ directory: true, multiple: false, title: "选择本地知识源文件夹" });
+      if (!root) return;
       const storedSources = await Promise.resolve(invoke<string[]>("knowledge-sources:list")).catch(() => []);
       const sources = Array.isArray(storedSources) ? storedSources : [];
       const providerId = sources.length === 0 ? "local" : `local:${encodeURIComponent(root)}`;

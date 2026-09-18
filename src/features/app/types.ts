@@ -122,6 +122,18 @@ export interface AppShellRuntime {
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
   setSearchOpen: Dispatch<SetStateAction<boolean>>;
   setAboutOpen: Dispatch<SetStateAction<boolean>>;
+  /** R23 — 「发送反馈」卡(左下角账户菜单的入口;落本地审计日志)。 */
+  feedbackOpen: boolean;
+  setFeedbackOpen: Dispatch<SetStateAction<boolean>>;
+  /** R23 — 「更改数据目录」选择器(设置 → 数据管理 的入口)。 */
+  dataDirOpen: boolean;
+  setDataDirOpen: Dispatch<SetStateAction<boolean>>;
+  /** R48 — 「登录」对话框(Casdoor)。左下角账户菜单的登录入口打开它。 */
+  signInOpen: boolean;
+  setSignInOpen: Dispatch<SetStateAction<boolean>>;
+  openSignIn(): void;
+  /** R48 — 登录对话框回写身份(侧栏账户区据此显示已登录态)。 */
+  setCasdoorSession: Dispatch<SetStateAction<CasdoorSessionView | null>>;
   setTrustRequest: Dispatch<SetStateAction<{ cwd?: string; reason?: string } | null>>;
   setPlaceholderView: Dispatch<SetStateAction<string | null>>;
 
@@ -159,16 +171,17 @@ export interface AppShellRuntime {
   openSettings(section?: SettingsSection): void;
   showToast(message: string): void;
   setToast(message: string, opts?: ToastOptions): void;
-  /** R15 — 恢复历史功能:打开「设置 → 账户管理」+ 刷新 casdoor 状态 +
-   *  未登录时自动拉起 Casdoor 登录页。左下角用户按钮/账户菜单走这条路径。 */
+  /** 打开「设置 → 账户管理」+ 刷新 casdoor 状态(租户/成员/权限治理都在那)。
+   *  R48 — 不再顺带拉起登录页:登录有了自己的 `overlay.sign-in` 对话框。 */
   openAccountSettings(): void;
-  /** R15 — 触发 casdoor 企业登录(打开 Casdoor 浏览器窗口)。 */
-  handleLogin(): Promise<void>;
+  /** R48 — 左下角「登录」入口:打开 Casdoor 登录对话框(点一下必有反馈)。 */
+  handleLogin(): void;
   /** R15 — 触发 casdoor 登出。 */
   handleLogout(): Promise<void>;
 
   // 导航/视图
-  handleNavigate(label: string): void;
+  /** `options.tab` 用于"直达某一页里的某个 tab"(如市场页的连接器 tab)。 */
+  handleNavigate(label: string, options?: { tab?: string }): void;
   handleGoHome(): void;
   handleNewSession(): void;
   handlePlaceholder(label: string): void;

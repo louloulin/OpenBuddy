@@ -44,11 +44,23 @@ describe("Electron IPC contract", () => {
     const root = resolve(process.cwd());
     const rendererSources = await Promise.all((await sourceFiles(resolve(root, "src"))).map((path) => readFile(path, "utf8")));
     const preload = await readFile(resolve(root, "electron/preload/index.ts"), "utf8");
-    const ipcFiles = await sourceFiles(resolve(root, "electron/main/ipc"));
-    const main = (await Promise.all(ipcFiles.map((file) => readFile(file, "utf8")))).join("\n");
+    // Scan all of electron/main (minus tests) instead of a hand-kept list of
+    // directories: bridge modules such as `agent/pi-market-bridge.ts` take
+    // `ipcMain` as a parameter rather than importing it, so a directory
+    // allowlist silently stops covering them.
+    const mainFiles = await sourceFiles(resolve(root, "electron/main"));
+    const main = (await Promise.all(mainFiles.map((file) => readFile(file, "utf8")))).join("\n");
     const invoked = new Set(rendererSources.flatMap((source) => [...literalChannels(source, /(?:invoke|ipcRenderer\.invoke)(?:<[^>]+>)?\(\s*["']([^"']+)["']/g)]));
     const allowlisted = literalChannels(preload, /\s["']([^"']+)["'],?/g);
     const handlers = literalChannels(main, /ipcMain\.handle\(\s*["']([^"']+)["']/g);
+    // Declarative registries (a `*_IPC_CHANNELS` const table handed to a
+    // `register*Ipc(..., ipc)` helper) never appear next to
+    // `ipcMain.handle(`, so fold those channels in explicitly.
+    for (const tableMatch of main.matchAll(
+      /(?:export\s+)?const\s+[A-Z0-9_]*IPC_CHANNELS[A-Z0-9_]*\s*=\s*\{([\s\S]*?)\}\s*as const/g,
+    )) {
+      for (const channel of literalChannels(tableMatch[1], /"(agent:[^"]+)"/g)) handlers.add(channel);
+    }
     for (const rawChannel of invoked) {
       const channel = channelAliases[rawChannel] ?? rawChannel;
       expect(allowlisted.has(channel), `preload allowlist missing ${channel}`).toBe(true);
@@ -77,18 +89,40 @@ describe("Electron IPC contract", () => {
   });
   it("keeps the complete preload allowlist and Main handler registry in sync", async () => {
     const preload = await readFile(resolve(process.cwd(), "electron/preload/index.ts"), "utf8");
-    // Phase A.1: pi-bridge handlers live under electron/main/agent/pi-bridge/,
-    // not under electron/main/ipc/. Scan both directories so the regression
-    // guard still covers the full handler registry.
-    const ipcFiles = await sourceFiles(resolve(process.cwd(), "electron/main/ipc"));
-    const bridgeFiles = await sourceFiles(resolve(process.cwd(), "electron/main/agent/pi-bridge"));
+    // Scan all of electron/main (minus tests) rather than a hand-maintained
+    // list of directories. Bridge modules such as
+    // `agent/pi-market-bridge.ts` deliberately take `ipcMain` as a parameter
+    // instead of importing it, so a directory allowlist silently stops
+    // covering them the moment a new bridge lands elsewhere.
     const mainSources = await Promise.all(
-      [...ipcFiles, ...bridgeFiles].map((file) => readFile(file, "utf8")),
+      (await sourceFiles(resolve(process.cwd(), "electron/main"))).map((file) => readFile(file, "utf8")),
     );
     const main = mainSources.join("\n");
     const allowBlock = preload.match(/const allowedInvokeChannels = new Set\(\[([\s\S]*?)\]\);/)?.[1] ?? "";
     const allowlisted = new Set([...allowBlock.matchAll(/"([^"]+)"/g)].map((match) => match[1]));
+
     const handlers = new Set([...main.matchAll(/ipcMain\.handle\(\s*"([^"]+)"/g)].map((match) => match[1]));
+
+    // Declarative registries: a const object literal of `key: "channel"`
+    // entries that is later handed to a `register*Ipc(..., ipc)` helper.
+    // Those channels never appear next to `ipcMain.handle(`, so collect them
+    // separately — otherwise a new bridge can be wired up and stay invisible
+    // to this guard.
+    for (const tableMatch of main.matchAll(
+      /(?:export\s+)?const\s+([A-Z0-9_]*IPC_CHANNELS[A-Z0-9_]*)\s*=\s*\{([\s\S]*?)\}\s*as const/g,
+    )) {
+      const [, tableName, body] = tableMatch;
+      const channels = [...body.matchAll(/"(agent:[^"]+)"/g)].map((match) => match[1]);
+      if (channels.length === 0) continue;
+      // The table must actually be consumed by a registration helper; a
+      // floating constant would mean the channels are dead wiring.
+      expect(
+        main.includes(`registerPiMarketBridgeIpc(`) && tableName.includes("PI_MARKET"),
+        `IPC channel table ${tableName} is declared but never registered`,
+      ).toBe(true);
+      for (const channel of channels) handlers.add(channel);
+    }
+
     expect([...handlers].filter((channel) => !allowlisted.has(channel))).toEqual([]);
     expect([...allowlisted].filter((channel) => !handlers.has(channel))).toEqual([]);
     expect(allowlisted.size).toBeGreaterThan(190);

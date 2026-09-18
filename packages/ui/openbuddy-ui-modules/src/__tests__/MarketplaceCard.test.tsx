@@ -195,6 +195,36 @@ describe("MarketplaceCard", () => {
     expect(screen.queryByTestId("marketplace-card-menu-list")).toBeNull();
   });
 
+  it("menuItems 的 visible 谓词按条目过滤动作(不适用的不画出来)", () => {
+    const onSelect = vi.fn();
+    const items = [
+      { id: "uninstall", label: "卸载", danger: true, visible: (e: { installedVersion?: string }) => Boolean(e.installedVersion), onSelect },
+      { id: "details", label: "查看详情", onSelect },
+    ];
+    const { unmount } = render(<MarketplaceCard entry={entry()} menuItems={items} />);
+    fireEvent.click(screen.getByTestId("marketplace-card-menu"));
+    // 没安装 → 卸载被过滤掉,无条件项照常显示。
+    expect(screen.getByTestId("marketplace-card-menu-list").textContent).not.toContain("卸载");
+    expect(screen.getByTestId("marketplace-card-menu-list").textContent).toContain("查看详情");
+    unmount();
+
+    render(<MarketplaceCard entry={entry({ installedVersion: "1.0.0" })} menuItems={items} />);
+    fireEvent.click(screen.getByTestId("marketplace-card-menu"));
+    expect(screen.getByTestId("marketplace-card-menu-list").textContent).toContain("卸载");
+  });
+
+  it("全部动都被 visible 过滤掉时不渲染 ⋯ 按钮", () => {
+    render(
+      <MarketplaceCard
+        entry={entry()}
+        menuItems={[
+          { id: "uninstall", label: "卸载", visible: () => false, onSelect: () => {} },
+        ]}
+      />,
+    );
+    expect(screen.queryByTestId("marketplace-card-menu")).toBeNull();
+  });
+
   it("hides the overflow button when no menu items exist", () => {
     render(<MarketplaceCard entry={entry()} />);
     expect(screen.queryByTestId("marketplace-card-menu")).toBeNull();

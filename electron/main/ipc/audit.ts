@@ -1,13 +1,20 @@
 /**
  * IPC surface — Audit Trail (R17 / Phase D).
  *
- * Local-first audit viewer exposed to the renderer. Three channels:
+ * Local-first audit viewer exposed to the renderer. Four channels:
  *   - audit:list      paginated read (newest last)
  *   - audit:record    append a renderer-side event (settings open, ...)
  *   - audit:clear     wipe local file (no remote backup, by design)
+ *   - audit:export    write a copy to a path the user picked (R41)
+ *
+ * 导出是「本地优先 · 数据自决」的最后一公里:数据本来就只在本机,但"能不能
+ * 拿走、拿去给谁看"必须由用户自己决定 —— 所以导出目标一律走原生保存对话框,
+ * 并且复用 `export_text_file` 那套一次性审批(`./save-path-approval`),
+ * 不接受渲染层直接给绝对路径。
  */
 import { ipcMain, type BrowserWindow } from "electron";
 import { auditTrail } from "../audit/audit-log";
+import { requireApprovedSavePath } from "./save-path-approval";
 
 const LIST_LIMIT_MAX = 1000;
 
@@ -38,5 +45,28 @@ export function registerAuditIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle("audit:clear", async () => {
     await auditTrail.clear();
     return { ok: true };
+  });
+
+  ipcMain.handle("audit:export", async (_e, args?: { path?: string; format?: string; limit?: number }) => {
+    if (!args?.path || typeof args.path !== "string") {
+      return { ok: false as const, error: "缺少导出路径:请先在保存对话框里选一个目标文件" };
+    }
+    let target: string;
+    try {
+      target = requireApprovedSavePath(args.path);
+    } catch (error) {
+      // 未经过保存对话框审批 —— 明确报错,绝不"换个地方写"。
+      return { ok: false as const, error: String((error as Error)?.message ?? error) };
+    }
+    const format = args.format === "json" ? "json" : "jsonl";
+    try {
+      const result = await auditTrail.exportTo(target, {
+        format,
+        ...(typeof args.limit === "number" ? { limit: args.limit } : {}),
+      });
+      return { ok: true as const, ...result };
+    } catch (error) {
+      return { ok: false as const, error: String((error as Error)?.message ?? error) };
+    }
   });
 }

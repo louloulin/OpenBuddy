@@ -440,7 +440,21 @@ writeFileSync(join(piAgentDir, "auth.json"), `${JSON.stringify(authEntries, null
 const emailMcpServer = process.env.OPENBUDDY_EMAIL_MCP_SERVER?.trim() || "mail-e2e";
 const emailMcpCommand = process.env.OPENBUDDY_EMAIL_MCP_COMMAND?.trim() || nodeExecutable;
 const emailMcpArgs = process.env.OPENBUDDY_EMAIL_MCP_ARGS_JSON
-  ? JSON.parse(process.env.OPENBUDDY_EMAIL_MCP_ARGS_JSON)
+  ? (() => {
+      // FIX-BOUNDARY: pre-existing `JSON.parse` (smoke harness, not P0) wrapped
+      // in try/catch per pi-lens `slop: $CALL without try/catch` rule. The env
+      // var is operator-supplied for real-MiniMax e2e; on malformed JSON we fall
+      // back to the default echo-server args (same fallback semantics as the
+      // original `process.env.X ? JSON.parse(...) : [default]` ternary).
+      try {
+        return JSON.parse(process.env.OPENBUDDY_EMAIL_MCP_ARGS_JSON);
+      } catch (error) {
+        console.warn(
+          `[smoke] OPENBUDDY_EMAIL_MCP_ARGS_JSON is not valid JSON (${safeErrorMessage(error)}); falling back to default echo-server args`,
+        );
+        return [join(root, "evals", "node", "echo", "email-mcp-server.mjs")];
+      }
+    })()
   : [join(root, "evals", "node", "echo", "email-mcp-server.mjs")];
 const emailMcpPayload = JSON.stringify({
   mcpServers: { [emailMcpServer]: { command: emailMcpCommand, args: emailMcpArgs, reconnect: { enabled: false } } },
@@ -457,8 +471,26 @@ if (Array.isArray(emailMcpArgs)) {
   writeFileSync(join(__workbenchRoot, "mcp.json"), emailMcpPayload, { encoding: "utf8", mode: 0o600 });
 }
 if (realE2E) {
-  const configuredModelProviders = Object.keys(JSON.parse(readFileSync(join(piAgentDir, "models.json"), "utf8")).providers ?? {});
-  const configuredAuthProviders = Object.keys(JSON.parse(readFileSync(join(piAgentDir, "auth.json"), "utf8")));
+  // FIX-BOUNDARY: pre-existing `JSON.parse` (smoke harness, not P0) wrapped in
+  // try/catch per pi-lens `slop: $CALL without try/catch` rule. These two files
+  // are written by the smoke's own setup phase (see writeFileSync blocks for
+  // models.json / auth.json earlier in this file), so a parse failure is a
+  // programming bug in the smoke itself, not operator input — rethrow with a
+  // clear message naming the file so the bug is debuggable.
+  const configuredModelProviders = (() => {
+    try {
+      return Object.keys(JSON.parse(readFileSync(join(piAgentDir, "models.json"), "utf8")).providers ?? {});
+    } catch (error) {
+      throw new Error(`[smoke] malformed models.json in ${piAgentDir}: ${safeErrorMessage(error)}`);
+    }
+  })();
+  const configuredAuthProviders = (() => {
+    try {
+      return Object.keys(JSON.parse(readFileSync(join(piAgentDir, "auth.json"), "utf8")));
+    } catch (error) {
+      throw new Error(`[smoke] malformed auth.json in ${piAgentDir}: ${safeErrorMessage(error)}`);
+    }
+  })();
   if (configuredModelProviders.length !== 1 || configuredModelProviders[0] !== "custom_anthropic"
     || configuredAuthProviders.length !== 1 || configuredAuthProviders[0] !== "custom_anthropic") {
     throw new Error(`Real MiniMax mode must not configure fixture providers: ${JSON.stringify({ configuredModelProviders, configuredAuthProviders })}`);
@@ -676,7 +708,7 @@ try {
   await window.api.invoke("email:update", { accountId: emailAccountId, threadId: "thread-1", kind: "star", value: false });
   await window.api.invoke("email:update", { accountId: emailAccountId, threadId: "thread-1", kind: "label", labelId: "label-starred", value: true });
   const emailTags = await window.api.invoke("email:update-workspace-tags", { accountId: emailAccountId, threadId: "thread-1", tagNames: ["ElectronSmoke"], mode: "replace" });
-  const emailTagSnapshot = await window.api.invoke("email:workspace-tags");
+  const _emailTagSnapshot = await window.api.invoke("email:workspace-tags"); void _emailTagSnapshot;
   const emailTaggedThread = await window.api.invoke("email:thread", { accountId: emailAccountId, threadId: "thread-1" });
   const emailShared = await window.api.invoke("email:share-thread", { accountId: emailAccountId, threadId: "thread-1", channelId: "electron-smoke", message: "preload IPC share" });
   const emailReminder = await window.api.invoke("email:create-reminder", { accountId: emailAccountId, threadId: "thread-1", description: "preload IPC reminder", remindAt: new Date(Date.now() + 3_600_000).toISOString() });
@@ -912,6 +944,24 @@ try {
     throw new Error(`Electron profile rollback failed: ${JSON.stringify({ profileBeforeRollback, rollbackEvidence })}`);
   }
   writeFileSync(profilePatchPath, "[]\n", "utf8");
+
+  // FIX-BOUNDARY: cross-boundary smoke harness patch (release-readiness run;
+  // the user authorized fixing anything that blocks launch verification). The
+  // onboarding wizard (`packages/ui/openbuddy-ui-onboarding/src/components/OnboardingWizard.tsx`)
+  // is a first-run UX feature shown to the smoke's temp user data dir — the
+  // existing dismiss logic only matches `.modal-overlay`, but the wizard is a
+  // `role="dialog" aria-modal="true"` with `data-testid="onboarding-wizard"`,
+  // so it was previously untouchable. Click its `×` close button
+  // (`aria-label="关闭引导"`, `data-testid="onboarding-close"`) once before the
+  // route loop; the wizard commits `dismissed` to storage on click (see
+  // `OnboardingWizard.tsx:162` R62), so the fix is idempotent across reruns.
+  const onboardingWizard = window.locator('[data-testid="onboarding-wizard"]');
+  if (await onboardingWizard.isVisible().catch(() => false)) {
+    const onboardingClose = onboardingWizard.getByRole("button", { name: "关闭引导", exact: true }).first();
+    if (await onboardingClose.count()) await onboardingClose.click();
+    await onboardingWizard.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
+  }
+
   await window.evaluate(async () => window.api.invoke("agent:extensions-reload"));
 
   const supportedRoutes = ["助理", "项目", "专家·技能·连接器", "自动化"];
@@ -933,7 +983,14 @@ try {
     if (!routeState.rootText.trim()) throw new Error(`Navigation route rendered blank: ${route}`);
   }
   await window.getByRole("button", { name: "专家·技能·连接器", exact: true }).click();
-  await window.getByRole("tab", { name: "专家", exact: true }).waitFor({ state: "visible", timeout: 5_000 });
+  // FIX-BOUNDARY: smoke harness patch (release-readiness; user authorized verifying surface).
+  // The experts page now renders TWO tabs named "专家": the top-level nav pill (the
+  // route button we just clicked) and the page-level segment inside the experts
+  // split view (`data-testid="experts-page-split"`). Playwright's `getByRole`
+  // strict mode rejects the ambiguity. The page-level one is the one this test
+  // intends to wait on (it represents the experts page content loaded). Scope
+  // by the page testid so future top-level pill additions won't conflict.
+  await window.getByTestId("experts-page-split").getByRole("tab", { name: "专家", exact: true }).waitFor({ state: "visible", timeout: 5_000 });
   await window.waitForTimeout(500);
   if (!(await window.locator("body").innerText()).includes("未找到专家数据目录")) {
     const myExpertsButton = window.locator("button.um-btn--grey").filter({ hasText: "我的专家" }).first();
@@ -1405,9 +1462,9 @@ try {
     const pluginReset = await window.api.invoke("agent:plugin-state-reset", { id: "electron-smoke-profile" });
     const installedProfile = await window.api.invoke("agent:profile-install", { sourcePath: profileInstallSource });
     const profilePackagesInstalled = await window.api.invoke("agent:profile-packages");
-    const piInventoryAfterInstall = await window.api.invoke("agent:plugin-inventory");
-    const piCommandsAfterInstall = await window.api.invoke("agent:commands-list");
-    const piResourcesAfterInstall = await window.api.invoke("agent:resource-inventory");
+    const _piInventoryAfterInstall = await window.api.invoke("agent:plugin-inventory"); void _piInventoryAfterInstall;
+    const _piCommandsAfterInstall = await window.api.invoke("agent:commands-list"); void _piCommandsAfterInstall;
+    const _piResourcesAfterInstall = await window.api.invoke("agent:resource-inventory"); void _piResourcesAfterInstall;
     const installedPluginBeforeReady = (await window.api.invoke("agent:plugin-list")).find((entry) => entry.id === "electron-smoke-installed-plugin");
     const installedRemoteBeforeReady = await window.api.invoke("agent:remote-contributions");
     await new Promise((resolve, reject) => {
@@ -1560,7 +1617,7 @@ try {
     // pi-native (@juicesharp/rpiv-todo when installed). Smoke skips the
     // tasks:add / tasks:update / tasks:list / tasks:clear-completed / tasks:delete
     // chain here to mirror the deleted IPC.
-    const addedSkill = await window.api.invoke("skills:add", { path: importedSkillSourceDir, cwd: workspaceRoot });
+    const _addedSkill = await window.api.invoke("skills:add", { path: importedSkillSourceDir, cwd: workspaceRoot }); void _addedSkill;
     const skillsAfterAdd = await window.api.invoke("skills:list", { cwd: workspaceRoot });
     const reloadResult = await window.api.invoke("internal_reload", { kind: "skills" });
     const reloadedSkills = await window.api.invoke("skills:list", { cwd: workspaceRoot });
@@ -1576,7 +1633,7 @@ try {
     await window.api.invoke("notifications:mark-read", "stub-id");
     await window.api.invoke("notifications:clear");
     const notificationsSurface = notificationAppendStub === null && notificationsListStub === null;
-    const notifications = notificationsListStub ?? [];
+    const _notifications = notificationsListStub ?? []; void _notifications;
     let filesystem = "skipped";
     if (filesystemSmoke) {
       const fsPath = "electron-smoke.txt";
@@ -1602,7 +1659,7 @@ try {
     // Subagent config is owned by the pi subagents extension; the legacy IPC
     // surface is a passthrough (get reads the pi config, set is a stub).
     const subagentsBefore = await window.api.invoke("subagents:get-config");
-    const subagentsAfter = await window.api.invoke("subagents:set-config", { maxDepth: subagentsBefore?.maxDepth ?? 1 });
+    const _subagentsAfter = await window.api.invoke("subagents:set-config", { maxDepth: subagentsBefore?.maxDepth ?? 1 }); void _subagentsAfter;
     const subagentsConfigReadable = subagentsBefore === null || (typeof subagentsBefore === "object" && subagentsBefore !== null);
     // Stage G-1c: openbuddy-automation removed; automation is owned by
     // pi-background-tasks + pi-goal (passthrough). The legacy
@@ -1890,7 +1947,7 @@ try {
     return catalog?.models?.some((model) => model.modelId === modelId) === true;
   }, uiModelId);
   if (!uiModelCreated) throw new Error(`Settings UI model create failed: ${uiModelId}`);
-  const uiModelRow = uiSettings.locator(".models-settings-panel__model-item", { hasText: uiModelId });
+  const _uiModelRow = uiSettings.locator(".models-settings-panel__model-item", { hasText: uiModelId }); void _uiModelRow;
   await window.evaluate(async (modelId) => {
     await window.api.invoke("agent:providers-delete-model", { providerId: "custom_anthropic", modelId });
   }, uiModelId);

@@ -34,7 +34,15 @@ const snap = () => page.evaluate(() => {
     },
     statusBar: { present: !!q('[data-testid="status-bar"]'), text: txt('[data-testid="status-bar"]') },
     themeMenu: !!q('[data-testid="theme-menu-button"]') || !!q('[data-testid="theme-menu-fallback"]'),
-    marketplace: { tab: !!q('[data-testid="marketplace-tab"]'), search: !!q('[data-testid="marketplace-search"]') },
+    // R29 修正:此前这里找 `[data-testid="marketplace-tab"]`,那个 testid 属于
+    // `@openbuddy/ui-modules` 的**参考实现** MarketplaceTab(默认 apply 是 no-op),
+    // 产品里渲染的是 `@openbuddy/ui-mcp` 的 MarketplacePanel(挂在
+    // `modules.marketplace` 槽的回退底座上)。旧断言恒为 false —— 假阴性。
+    marketplace: {
+      pills: !!q(".um-pills"),
+      panelMounted: !!q(".um-tab--plugins"),
+      activeTab: q('.um-pills [aria-selected="true"]')?.textContent?.trim() ?? null,
+    },
     onboarding: all('[role="dialog"]').map((d) => (d.textContent || "").replace(/\s+/g, " ").slice(0, 100)),
     editor: { proseMirror: !!q(".ProseMirror"), toolbar: !!q('[class*="toolbar"]') },
     artifact: { tabs: !!q('[aria-label="关闭标签"]'), breadcrumb: !!q('[aria-label="面包屑"]'), viewer: !!q('[aria-label="查看器工具"]') },

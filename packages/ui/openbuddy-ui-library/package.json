@@ -1,0 +1,26 @@
+{
+  "name": "@openbuddy/ui-library",
+  "version": "0.15.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.tsx",
+    "./invariant": "./src/invariant.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@openbuddy/shared-types": "workspace:*",
+    "@openbuddy/ui-files": "workspace:*",
+    "@openbuddy/ui-home": "workspace:*",
+    "@openbuddy/ui-primitives": "workspace:*",
+    "@openbuddy/ui-runtime": "workspace:*",
+    "@openbuddy/ui-shared": "workspace:*",
+    "@openbuddy/ui-slots": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}

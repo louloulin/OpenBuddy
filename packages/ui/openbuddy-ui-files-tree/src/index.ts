@@ -17,10 +17,16 @@
  * @see packages/ui/AGENTS.md 了解 ui-* 包协作约定
  */
 import type { SlotMap } from "@openbuddy/ui-slots";
+import type { LazyFileTreeEntry } from "./components/LazyFileTree";
 
 export type { SlotMap };
 
 export { FileTree } from "./components/FileTree";
+export { LazyFileTree } from "./components/LazyFileTree";
+export type {
+  LazyFileTreeProps,
+  LazyFileTreeEntry,
+} from "./components/LazyFileTree";
 export type {
   FileTreeProps,
   FileTreeContextMenuItem,
@@ -43,13 +49,24 @@ export type { TreeNode, TreeNodeId } from "./lib/tree-utils";
 
 declare module "@openbuddy/ui-slots" {
   interface SlotMap {
-    /** Left tree column inside the files/workbench surface. */
+    /**
+     * Left tree column inside the files/workbench surface.
+     *
+     * Props are supplied by the host that renders the column, so any
+     * registrant must be able to work from just these. Data access is the
+     * registrant's own business — the built-in `LazyFileTree` asks the host
+     * for a `loadDir`, a third-party plugin might talk to a remote FS.
+     */
     "files.tree": {
       kind: "single";
       scope: "session-maybe";
       owner: {
-        selectedIds: ReadonlySet<string>;
-        expandedIds: ReadonlySet<string>;
+        rootPath?: string;
+        selectedPath?: string;
+        onFileSelect(path: string): void;
+        onToast?(message: string): void;
+        loadDir?(dirPath: string): Promise<LazyFileTreeEntry[]>;
+        onReveal?(path: string): void;
       };
     };
   }

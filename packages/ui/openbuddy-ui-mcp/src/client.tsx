@@ -16,7 +16,6 @@ const PANELS = [
   { name: "placeholder.openbuddy-plugin", component: OpenBuddyPluginPanel as never },
   { name: "placeholder.plugins", component: PluginsPanel as never },
   { name: "placeholder.resource-catalog", component: ResourceCatalogPanel as never },
-  { name: "placeholder.resources", component: ResourceCatalogPanel as never },
 ];
 
 export function apply(ctx: UiRuntimeContext): () => void {

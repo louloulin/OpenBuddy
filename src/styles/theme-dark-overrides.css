@@ -103,7 +103,7 @@
 [data-theme="dark"] .email-connection-warning button,
 [data-theme="dark"] .email-action-center__filter-group button.is-active,
 [data-theme="dark"] .email-action-center__sort button.is-active {
-  color: var(--wb-text-strong);
+  color: var(--wb-pill-active-fg);
   background: var(--wb-bg-pill-active, rgba(255, 255, 255, 0.18));
   border-color: var(--wb-border-default);
 }

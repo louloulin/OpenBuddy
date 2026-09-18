@@ -4,9 +4,21 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("electron", () => ({ app: { getPath: () => "/tmp/openbuddy-marketplace-advanced-test" }, safeStorage: { isEncryptionAvailable: () => false } }));
 vi.mock("../casdoor/casdoor-auth", () => ({ casdoorAuth: { status: () => ({ config: { configured: false }, identity: null, tenantContext: { activeTenantId: undefined } }) } }));
-const originalPiHome = process.env.PI_HOME;
-afterEach(() => { if (originalPiHome === undefined) delete process.env.PI_HOME; else process.env.PI_HOME = originalPiHome; });
-async function setup(home: string, plugin = "demo", version = "1.0.0") { process.env.PI_HOME = home; const source = await mkdtemp(join(tmpdir(), "openbuddy-marketplace-advanced-source-")); const pluginRoot = join(source, "plugins", plugin); await mkdir(pluginRoot, { recursive: true }); await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: plugin, version })); const resources = await import("../pi-resources"); await resources.marketplaceAddSource(source); return { resources, source, pluginRoot, targetRoot: join(home, ".openbuddy", "agent", "plugins", plugin), index: join(home, ".openbuddy", "agent", "marketplace-installed.json") }; }
+// This suite pins the agent home via `PI_HOME`, but `agentHome()` prefers
+// `PI_CODING_AGENT_DIR` / `OPENBUDDY_AGENT_DIR` over it. Leaving either set
+// (ambient in the developer's shell, or pinned by the global test sandbox)
+// silently redirects every write out of `home/.openbuddy/agent` and the suite
+// fails with ENOENT on paths it just tried to create. Clear all three so the
+// test owns the resolution instead of inheriting it.
+const HOME_KEYS = ["PI_HOME", "PI_CODING_AGENT_DIR", "OPENBUDDY_AGENT_DIR", "OPENBUDDY_USER_AGENTS_DIR"] as const;
+const originalHomeEnv = Object.fromEntries(HOME_KEYS.map((key) => [key, process.env[key]]));
+afterEach(() => {
+  for (const key of HOME_KEYS) {
+    if (originalHomeEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = originalHomeEnv[key];
+  }
+});
+async function setup(home: string, plugin = "demo", version = "1.0.0") { delete process.env.PI_CODING_AGENT_DIR; delete process.env.OPENBUDDY_AGENT_DIR; process.env.PI_HOME = home; const source = await mkdtemp(join(tmpdir(), "openbuddy-marketplace-advanced-source-")); const pluginRoot = join(source, "plugins", plugin); await mkdir(pluginRoot, { recursive: true }); await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: plugin, version })); const resources = await import("../pi-resources"); await resources.marketplaceAddSource(source); return { resources, source, pluginRoot, targetRoot: join(home, ".openbuddy", "agent", "plugins", plugin), index: join(home, ".openbuddy", "agent", "marketplace-installed.json") }; }
 async function install(resources: any, source: string, plugin = "demo") { await resources.marketplaceAction({ type: "install", sourceUrlOrPath: source, pluginRelativePath: plugin }); }
 describe("marketplace advanced POSIX rollback contracts", () => {
   it("rolls back after verification failure", async () => { const home = await mkdtemp(join(tmpdir(), "marketplace-advanced-home-")); const { resources, source, pluginRoot, targetRoot, index } = await setup(home); await install(resources, source); await writeFile(join(targetRoot, "old.txt"), "old"); await writeFile(join(pluginRoot, "package.json"), "invalid-json"); await expect(install(resources, source)).rejects.toThrow(); await expect(readFile(join(targetRoot, "old.txt"), "utf8")).resolves.toBe("old"); await expect(readFile(index, "utf8")).resolves.toContain("demo"); });

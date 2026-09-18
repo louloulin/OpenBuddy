@@ -75,6 +75,34 @@ declare module "@openbuddy/cordis" {
 }
 
 declare module "@openbuddy/ui-slots" {
+  interface SlotMap {
+    /**
+     * 插件通过 Plugin SDK `api.registerCommand(id, label, onExecute)` 贡献的命令
+     * (list,数据型贡献)。本包(`client.tsx`)是唯一的注册方 —— 它把
+     * `openbuddy:register-command` 事件翻成这个槽的一条 entry。
+     *
+     * 消费者有两个,都是宿主渲染、插件零 React 依赖:
+     *   - `@openbuddy/ui-conversation` 的 Composer:`/` 补全菜单 + 发送路径识别;
+     *   - `src/features/app/AppShell.tsx` 的 SearchSurface:⌘K 命令面板。
+     */
+    "plugin.command": {
+      kind: "list";
+      scope: "root";
+      owner: {
+        id: string;
+        label?: string;
+        onExecute?(ctx?: { args?: string }): void;
+      };
+    };
+  }
+  interface UiRuntimeContext {
+    /** 会话列表(与 `useSessions()` 读到的是同一个 store)。 */
+    sessions: Observable<readonly SessionRecord[]>;
+    /** 工作区列表。 */
+    workspaces: Observable<readonly WorkspaceRecord[]>;
+    /** 内核句柄本身(高级用法:注册内置 / 远程插件)。 */
+    ui: UiRuntime;
+  }
   interface GlobalStandardProps {
     useUiRuntime(): UiRuntime;
     useSlot<K extends string>(name: K): {

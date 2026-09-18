@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
@@ -15,12 +15,15 @@ vi.mock("../casdoor/casdoor-auth", () => ({
 
 const originalPiHome = process.env.PI_HOME;
 const originalPiAgent = process.env.PI_CODING_AGENT_DIR;
+const originalUserAgentsDir = process.env.OPENBUDDY_USER_AGENTS_DIR;
 
 afterEach(() => {
   if (originalPiHome === undefined) delete process.env.PI_HOME;
   else process.env.PI_HOME = originalPiHome;
   if (originalPiAgent === undefined) delete process.env.PI_CODING_AGENT_DIR;
   else process.env.PI_CODING_AGENT_DIR = originalPiAgent;
+  if (originalUserAgentsDir === undefined) delete process.env.OPENBUDDY_USER_AGENTS_DIR;
+  else process.env.OPENBUDDY_USER_AGENTS_DIR = originalUserAgentsDir;
 });
 
 async function loadResources() {
@@ -268,16 +271,22 @@ describe("Pi resource adapters", () => {
     await expect(readFile(join(home, ".openbuddy", "agent", "mcp.json"), "utf8")).resolves.toBe(JSON.stringify({ mcpServers: { shared: { command: "user-shared" } } }, null, 2) + "\n");
   });
 
-  it("links expert agent prompts into the Pi agent directory", async () => {
+  it("links expert agent prompts into the flat user-agents root", async () => {
+    // The link target is the **canonical flat** ~/.openbuddy/agents/ (overrideable
+    // via OPENBUDDY_USER_AGENTS_DIR), not the SDK's nested <piHome>/agents/ —
+    // the former is where listAgents() reads from and what users see in the UI.
     const home = await mkdtemp(join(tmpdir(), "openbuddy-experts-link-"));
     const root = await mkdtemp(join(tmpdir(), "openbuddy-expert-source-"));
     process.env.PI_HOME = home;
     delete process.env.PI_CODING_AGENT_DIR;
+    process.env.OPENBUDDY_USER_AGENTS_DIR = join(home, "user-agents");
     const resources = await loadResources();
     await mkdir(join(root, "plugin", "agents"), { recursive: true });
     await writeFile(join(root, "plugin", "agents", "reviewer.md"), "---\ndescription: Review\n---\nReview the change.\n");
     await expect(resources.linkExpertAgents(root, "plugin", ["reviewer"])).resolves.toBe(1);
-    await expect(readFile(join(home, ".openbuddy", "agent", "agents", "reviewer.md"), "utf8")).resolves.toContain("Review the change.");
+    await expect(readFile(join(home, "user-agents", "reviewer.md"), "utf8")).resolves.toContain("Review the change.");
+    // The legacy nested path stays empty (no accidental write there).
+    await expect(stat(join(home, ".openbuddy", "agent", "agents", "reviewer.md")).catch(() => null)).resolves.toBeNull();
     await expect(resources.linkExpertAgents(root, "plugin", ["../escape"])).rejects.toThrow("invalid resource name");
   });
 

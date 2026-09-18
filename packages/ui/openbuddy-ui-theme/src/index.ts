@@ -21,7 +21,17 @@ import type { ThemeName, ThemeDefinition, ThemeType } from "./themes";
 import type { ThemeMode, ThemePreference, ThemeService } from "./theme-store";
 
 export type { ThemeName, ThemeDefinition, ThemeType } from "./themes";
-export { THEMES, getThemeByName, themesByType, resolveVars } from "./themes";
+export {
+  THEMES,
+  BASE_FONT_STACK,
+  BASE_MONO_STACK,
+  expandFontRefs,
+  getThemeByName,
+  resolveThemeFontTokens,
+  resolveThemeVars,
+  resolveVars,
+  themesByType,
+} from "./themes";
 export type { ThemeMode, ThemePreference, ThemeService } from "./theme-store";
 export {
   createThemeStore,
@@ -57,6 +67,15 @@ export {
 export type { ThemeStudioProps, CustomTheme, OkLChValue } from "./components/ThemeStudio";
 
 declare module "@openbuddy/ui-slots" {
+  interface UiRuntimeContext {
+    /**
+     * 主题服务(v2 ThemeService)。
+     *
+     * 与 React 树的 ThemeProvider 是**同一个 store**:插件在 apply(ctx) 里调用
+     * `ctx.theme.setThemeByName("sakura")` 会立刻改变界面,不必走 slot。
+     */
+    theme: ThemeService;
+  }
   interface SlotMap {
     /** Host-rendered region for the theme settings row (light/dark/system). */
     "settings.appearance.theme": {

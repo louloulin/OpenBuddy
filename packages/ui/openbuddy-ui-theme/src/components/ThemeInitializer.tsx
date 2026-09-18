@@ -30,7 +30,7 @@ import {
   getStoredThemeMode,
   getStoredThemePair,
 } from "../theme-store";
-import { resolveVars, getThemeByName } from "../themes";
+import { resolveThemeVars, getThemeByName } from "../themes";
 
 export interface ThemeInitializerProps {
   /** Custom storage keys — defaults match the v2 store. Mostly useful for tests. */
@@ -96,7 +96,8 @@ function paintDocument(): void {
   if (!isThemeName(activeName)) return;
   const theme = getThemeByName(activeName);
   if (!theme) return;
-  const vars = resolveVars(activeName);
+  // 与 store 用同一个组合入口 —— 首屏就带上主题字体,避免挂载后字体跳一次。
+  const vars = resolveThemeVars(activeName);
   const root = document.documentElement;
   // Only paint if the document doesn't already have the right state, to
   // avoid clobbering changes made by the live store between initializeThemeSync

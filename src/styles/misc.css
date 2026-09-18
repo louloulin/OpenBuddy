@@ -615,9 +615,13 @@
 }
 .mention-picker__item--active,
 .mention-picker__item:hover {
-  /* R8.61 — Neutral pill on selected/hover, matching workbuddy's
-     pill-active token. Brand colour reserved for streaming indicators. */
-  background: var(--wb-bg-pill-active);
+  /* R8.61 / R27 — Neutral surface on selected/hover. Brand colour is
+     reserved for streaming indicators.
+     R27 fix — 原本用 `--wb-bg-pill-active`(实心 CTA 胶囊色,亮色 = 75% 黑),
+     而本行的文字色是 `--wb-text-strong`(亮色下接近纯黑)→ 亮色主题里
+     被选中/悬停的那一行是黑底黑字,完全看不见。列表行用"比容器深一层的
+     中性表面"才对,文字色不用跟着换。 */
+  background: var(--wb-bg-active);
 }
 .mention-picker__kind-icon {
   display: inline-flex;
@@ -672,11 +676,11 @@
 }
 [data-theme="dark"] .mention-picker__item--active,
 .dark .mention-picker__item--active,
-[data-theme="dark"] .mention-picker__item--active,
-.dark .mention-picker__item--active,
 .wb-theme--dark .mention-picker__item--active {
-  /* R8.61 — Dark neutral pill, matching light theme. */
-  background: var(--wb-bg-pill-active);
+  /* R8.61 / R27 — 暗色侧同样换成中性活动表面(原注释说"matching light theme",
+     但两边都指向实心胶囊色,结果是两边都不对)。--wb-bg-active 暗色下是
+     10% 白,叠在弹层表面之上,文字仍是 --wb-text-strong。 */
+  background: var(--wb-bg-active);
 }
 
 /* ========================================================================
@@ -1612,6 +1616,78 @@
   font-style: italic;
 }
 
+/* === ExtensionPolicyEditor (R38) ==================================
+ *
+ * allow / deny 名单编辑器,挂在「策略设置」的插件策略区块里。
+ * 走和审计面板同一套 token,保证两块在同一个面板里看起来是一件东西。
+ */
+.extension-policy-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.extension-policy-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.extension-policy-editor__label {
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.extension-policy-editor textarea {
+  min-height: 56px;
+  resize: vertical;
+  padding: 6px 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-surface);
+  color: var(--wb-text-strong);
+  font-family: var(--wb-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.extension-policy-editor textarea:focus-visible {
+  outline: 2px solid var(--wb-accent-primary, var(--link));
+  outline-offset: 1px;
+}
+.extension-policy-editor__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.extension-policy-editor__actions button {
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  background: var(--wb-bg-elevated);
+  color: var(--wb-text-strong);
+  cursor: pointer;
+}
+.extension-policy-editor__actions button:hover {
+  background: var(--wb-bg-surface-hover, var(--wb-bg-elevated));
+}
+.extension-policy-editor__actions output {
+  font-size: 12px;
+  color: var(--wb-text-secondary);
+}
+
+/* 审计面板的「原因」是中文长句,不能像等宽 id 那样截断成一行省略号 ——
+ * 用户要看的恰恰是"为什么被拒"。 */
+.extension-audit-panel__reason {
+  white-space: normal;
+}
+/* 决策行在窄容器里改单列堆叠,避免 id / 徽标 / 原因三列互相挤。 */
+@container (max-width: 560px) {
+  .extension-audit-panel__row {
+    grid-template-columns: 1fr auto;
+  }
+  .extension-audit-panel__reason {
+    grid-column: 1 / -1;
+  }
+}
+
 /* ============================================================================
  * 补齐：跨包零散缺失类（Phase 2 拆分遗漏）
  * 覆盖 proj-*（项目详情）/ um-tab*（专家市场）/ file-preview 变体 /
@@ -1873,4 +1949,112 @@ code.language-latex {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* ── R23 引导层宿主容器 ────────────────────────────────────────────────────
+ * WhatsNewCard / FeedbackPopup 自身是"卡片",不带遮罩 —— 遮罩与位置属于宿主
+ * (见 src/features/app/WhatsNewGate.tsx / FeedbackGate.tsx)。
+ *   - 更新摘要:右下角浮动,不阻塞操作(用户可以一边看摘要一边继续干活);
+ *   - 反馈卡:居中模态,点遮罩即关闭。
+ */
+.whats-new-gate {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1900;
+  max-width: calc(100vw - 40px);
+}
+
+.feedback-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1960;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in oklch, var(--wb-bg-primary) 88%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+/* ── R23 数据目录选择器 ────────────────────────────────────────────────────
+ * 两态:①选择态(复用 ui-onboarding 的 DataDirPrompt,自带 fixed 遮罩,这里只
+ * 多挂一个"恢复默认目录"的浮动入口);②待重启态(宿主自己的确认卡,需要自带遮罩)。
+ */
+.data-dir-gate--modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1960;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in oklch, var(--wb-bg-primary) 88%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.data-dir-gate__card {
+  width: min(520px, 100%);
+  padding: 20px;
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  color: var(--wb-fg-primary);
+  border: 1px solid var(--wb-border-soft, var(--wb-border));
+  border-radius: var(--wb-radius-xl, 16px);
+  box-shadow: var(--wb-shadow-lg, 0 24px 64px rgb(0 0 0 / 32%));
+}
+
+.data-dir-gate__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.data-dir-gate__body {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--wb-fg-secondary);
+}
+
+.data-dir-gate__body code {
+  padding: 1px 5px;
+  border-radius: var(--wb-radius-sm, 4px);
+  background: var(--wb-bg-subtle, color-mix(in oklch, var(--wb-fg-primary) 8%, transparent));
+  font-size: 12px;
+}
+
+.data-dir-gate__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* 「恢复默认目录」浮在 DataDirPrompt 的遮罩之上(它自己 z-index 1950)。 */
+.data-dir-gate__reset {
+  position: fixed;
+  left: 50%;
+  bottom: 36px;
+  z-index: 1960;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border: 1px solid var(--wb-border-soft, var(--wb-border));
+  border-radius: var(--wb-radius-full, 999px);
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  color: var(--wb-fg-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.data-dir-gate__reset:hover {
+  color: var(--wb-fg-primary);
+}
+
+.settings-btn--primary {
+  background: var(--wb-accent, #00c29a);
+  border-color: transparent;
+  color: var(--wb-accent-fg, #04231d);
+}
+
+.settings-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.06);
 }

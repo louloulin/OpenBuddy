@@ -25,13 +25,15 @@
  * 参考 PI-Desktop `apps/desktop/src/features/app/AppShell.tsx` 的结构。
  */
 
-import { lazy, memo, Suspense, useMemo, type ComponentType } from "react";
+import { lazy, memo, Suspense, useCallback, useMemo, type ComponentType } from "react";
 import { GlobalConfirmHost } from "@/components/GlobalConfirmHost";
 import { TitleBar } from "@openbuddy/ui-shell";
 import { TopbarActions, TopbarTitle, KeyboardShortcutsDialog } from "@openbuddy/ui-shell";
+import { SecondarySidebar } from "@openbuddy/ui-shell";
 import { Sidebar } from "@openbuddy/ui-sidebar";
 import { ChatView } from "@openbuddy/ui-conversation";
 import { PlaceholderPage } from "@/components/shared/PlaceholderPage";
+import { EXPERTS_ROUTE_LABEL } from "@/lib/navigation/placeholder-routes";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toast } from "@openbuddy/ui-primitives";
 import { Resizable } from "@openbuddy/ui-primitives";
@@ -47,7 +49,27 @@ import {
   MainTopbarToolsSlot,
 } from "./chrome";
 import { RoutePending } from "./RoutePending";
-import { useSlotComponent } from "./slot-bridge";
+import { FeedbackGate } from "./FeedbackGate";
+// R64 — 「重新观看引导」入口需要:
+//   - clearOnboardingState / resetTour:清掉持久化痕迹,让首启下次再弹;
+//   - useTourController:拿到一个能立刻打开漫游的控制器;
+//   - TourModal:在 host 顶层直接渲染,而不是依赖 ui-onboarding 注册的
+//     <TourSurface /> (那个 surface 自己又起了一个 useTourController,与
+//     这里 host 层的实例是两份独立 state — 重放时 host 调用 start() 只
+//     影响 host 的实例,不会推动 ui-onboarding 的 surface 弹窗)。host
+//     渲染一份新的 TourModal 等价于在 AppShell 接管漫游的可视化,且不
+//     影响 onboarding.tour slot 的可替换性(第三方想要整张换皮,仍然
+//     可以注册 onboarding.tour slot)。
+import {
+  TourModal,
+  clearOnboardingState as clearOnboardingPersisted,
+  resetTour as clearTourPersisted,
+  useTourController,
+} from "@openbuddy/ui-onboarding";
+import { DataDirGate } from "./DataDirGate";
+import { WhatsNewGate } from "./WhatsNewGate";
+import type { PluginCommandPayload } from "@openbuddy/ui-workbench";
+import { useSlotComponent, useSlotPayloadValues } from "./slot-bridge";
 import { AppStatusBar } from "./AppStatusBar";
 import type { AppShellRuntime, SettingsSection } from "./types";
 
@@ -76,6 +98,10 @@ const AboutDialog = lazy(() =>
 );
 const FolderTrustDialog = lazy(() =>
   import("@openbuddy/ui-dialogs").then((m) => ({ default: m.FolderTrustDialog })),
+);
+// R48 — 左下角「登录」入口的落地面板(基于 Casdoor)。
+const CasdoorSignInDialog = lazy(() =>
+  import("@openbuddy/ui-dialogs").then((m) => ({ default: m.CasdoorSignInDialog })),
 );
 const TasksPanel = lazy(() =>
   import("@openbuddy/ui-automation").then((m) => ({ default: m.TasksPanel })),
@@ -160,11 +186,13 @@ function HomeSurface(props: React.ComponentProps<typeof HomePage>) {
 /** 侧栏：内核 `sidebar` slot 优先，回落到 ui-sidebar 的 Sidebar。 */
 function SidebarSurface(props: React.ComponentProps<typeof Sidebar>) {
   const Component = useSlotComponent("sidebar", Sidebar);
-  // Wrap the sidebar in a Resizable so the user can drag its right edge
-  // (240–480px clamp, persisted under `openbuddy.sidebar.width`). The
-  // wrapper owns the pixel width, so the sidebar's own CSS (which reads
-  // `100%` under `.app__sidebar-shell`) tracks the drag without a JS hop.
-  // Collapsed state still hides the sidebar via `.app__body--collapsed .sidebar`.
+  // Wrap the sidebar in a Resizable so the user can drag its right edge.
+  // R79 — clamp 回到 320 默认 / 260–480。R65 曾按 cabinet 收窄到 260/220–420,
+  // 但 R8.62 的守卫与 CSS 回退值(`--ds-sidebar-width` 与 `.sidebar width`)
+  // 都锁在 320 —— 两处不一致会让「无 wrapper 渲染」的侧栏比有 wrapper 时窄
+  // 60px,同时 260 的默认宽度在 19px 字号下偏挤。统一到 320/260/480。
+  // 用户拖到 clamp 之外的值会被 Resizable 内部的 clamp() 收回边界;
+  // persisted under `openbuddy.sidebar.width`。
   // `handleClassName` exists because `.sidebar` carries `z-index: 20` (so the
   // 「更多」flyout can overflow into the main pane), which otherwise paints over
   // the handle and leaves only a 2px sliver draggable.
@@ -177,17 +205,24 @@ function SidebarSurface(props: React.ComponentProps<typeof Sidebar>) {
       storageKey="openbuddy.sidebar.width"
       className="app__sidebar-shell"
       handleClassName="app__sidebar-handle"
-      handleLabel="调整侧栏宽度"
+      handleLabel="拖拽调整侧栏宽度"
     >
       <Component {...props} />
     </Resizable>
   );
 }
 
-/** 搜索面板：内核 `overlay.search` slot 优先。 */
+/**
+ * 搜索面板：内核 `overlay.search` slot 优先。
+ *
+ * 插件命令也在这里注入:⌘K 面板要列出第三方插件通过 Plugin SDK 注册的命令
+ * (`plugin.command` 是数据型槽,插件只贡献 { id, label, onExecute })。
+ * 放在这层薄容器而不是 AppShell 里读,是为了让 AppShell 继续「不订阅 store」。
+ */
 function SearchSurface(props: React.ComponentProps<typeof SearchOverlay>) {
   const Component = useSlotComponent("overlay.search", SearchOverlay);
-  return <Component {...props} />;
+  const pluginCommands = useSlotPayloadValues<PluginCommandPayload>("plugin.command");
+  return <Component {...props} pluginCommands={pluginCommands} />;
 }
 
 /** 设置面板：内核 `overlay.settings` slot 优先。 */
@@ -205,6 +240,12 @@ function AboutSurface(props: React.ComponentProps<typeof AboutDialog>) {
 /** 目录信任对话框：内核 `overlay.folder-trust` slot 优先。 */
 function TrustSurface(props: React.ComponentProps<typeof FolderTrustDialog>) {
   const Component = useSlotComponent("overlay.folder-trust", FolderTrustDialog);
+  return <Component {...props} />;
+}
+
+/** 登录对话框（Casdoor）：内核 `overlay.sign-in` slot 优先。 */
+function SignInSurface(props: React.ComponentProps<typeof CasdoorSignInDialog>) {
+  const Component = useSlotComponent("overlay.sign-in", CasdoorSignInDialog);
   return <Component {...props} />;
 }
 
@@ -240,6 +281,27 @@ function TourSurface() {
 /** 任务面板：内核 `overlay.tasks` slot 优先。 */
 function TasksSurface(props: React.ComponentProps<typeof TasksPanel>) {
   const Component = useSlotComponent("overlay.tasks", TasksPanel);
+  return <Component {...props} />;
+}
+
+/**
+ * 右侧「助理」导轨:内核 `details` slot 优先。
+ *
+ * R28 —— 接线修复。此前 `details` 是"注册了却没人消费"的槽:ui-shell 把
+ * SecondarySidebar 注册进去,唯一的消费者是 ui-layout 的 AppFrame,而 R23
+ * 之后 AppFrame 已降级为参考实现(不进渲染树),于是这条导轨在产品里根本
+ * 看不见 —— 用户拿不到"贴着窗口右缘、hover 就浮出专家列表、点一下开新会话"
+ * 这个 WorkBuddy peek-assistant 的等价能力。
+ *
+ * 组件自己按 `visible` 决定渲染,宿主只负责在"有活跃会话"时打开它。
+ */
+function DetailsSurface(props: {
+  visible: boolean;
+  onSelectExpert: NonNullable<React.ComponentProps<typeof SecondarySidebar>["onSelectExpert"]>;
+  onToast: (message: string) => void;
+  onOpenExperts?: () => void;
+}) {
+  const Component = useSlotComponent("details", SecondarySidebar);
   return <Component {...props} />;
 }
 
@@ -401,9 +463,17 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
     aboutOpen,
     trustRequest,
     placeholderView,
+    feedbackOpen,
+    signInOpen,
+    setSignInOpen,
+    setCasdoorSession,
+    openSignIn,
+    dataDirOpen,
     setSettingsOpen,
     setSearchOpen,
     setAboutOpen,
+    setFeedbackOpen,
+    setDataDirOpen,
     setShortcutsOpen,
     setTrustRequest,
     sidebarCollapsed,
@@ -419,7 +489,6 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
     handleToggleWorkspace,
     openSettings,
     openAccountSettings,
-    handleLogin,
     handleLogout,
     showToast,
     handlePlaceholder,
@@ -429,9 +498,29 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
     refreshModels,
     handleRenameTitle,
     handleStartProjectConversation,
+    handleStartWithExpert,
   } = runtime;
 
   const activeNav = placeholderView ?? (currentSessionId ? "" : "新建任务");
+
+  // R64 — 「重新观看引导」入口:从设置 → 关于 触发。
+  //   1. 抹掉首启向导的持久化状态 → 下次首屏启动 wizard 会再出现一次;
+  //   2. 抹掉漫游 seen 标记 → 下次启动如果仍在向导之后,会再 autoOpen;
+  //   3. 立刻调用 tour.start() 把漫游从当前会话内的状态弹出来,用户立刻
+  //      看到第一步而不是等下次刷新。
+  // 不动主题 / 模型 / 数据目录 / 已登录的会话 —— 「重新观看」只重播引导
+  // 体验,不破坏用户的真实配置。
+  // R64 — host 层的 tour 控制器,独立于 ui-onboarding 注册的 <TourSurface />。
+  // replayTour 调用 tour.start() 直接驱动下面的 <R64TourModal />;关掉时调
+  // tour.stop() 写 localStorage(由 useTourController.stop 内部统一处理)。
+  const tour = useTourController({ autoOpen: false });
+  const replayTour = useCallback(() => {
+    if (typeof window === "undefined") return;
+    clearOnboardingPersisted(window.localStorage);
+    clearTourPersisted(window.localStorage);
+    setSettingsOpen(false);
+    tour.start(0);
+  }, [tour, setSettingsOpen]);
 
   return (
     <div className={"app" + (IS_MACOS ? " app--macos" : "")}>
@@ -451,8 +540,9 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
               : undefined}
             accountStatus={casdoorSession?.status}
             onOpenAccount={openAccountSettings}
-            onLogin={handleLogin}
+            onLogin={openSignIn}
             onLogout={handleLogout}
+            onOpenFeedback={() => setFeedbackOpen(true)}
             onToggleCollapse={() => setSidebarCollapsed(true)}
             onToggleWorkspace={handleToggleWorkspace}
             onOpenSearch={() => setSearchOpen(true)}
@@ -523,11 +613,13 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           onClose={() => setSettingsOpen(false)}
           onModelsChanged={refreshModels}
           initialSection={settingsSection}
+          onOpenDataDirPicker={() => setDataDirOpen(true)}
           onOpenEmailPlan={(planId) => {
             localStorage.setItem("openbuddy.email.processing-plan-target", planId);
             setSettingsOpen(false);
             handleNavigate("邮件");
           }}
+          onReplayTour={replayTour}
         />
         <AboutSurface open={aboutOpen} onClose={() => setAboutOpen(false)} init={runtime.init} />
         <TrustSurface
@@ -535,12 +627,51 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           onResolve={() => setTrustRequest(null)}
           onToast={showToast}
         />
-        <TasksSurface refreshSignal={runtime.taskRefreshSignal} onToast={showToast} />
+        {/* R48 — 登录对话框:左下角账户菜单「登录」的落地面板,基于 Casdoor。
+            登录成功后把身份写回 runtime,侧栏账户区立即显示已登录态。 */}
+        <SignInSurface
+          open={signInOpen}
+          onClose={() => setSignInOpen(false)}
+          onSessionChange={setCasdoorSession}
+          onOpenSettings={() => openSettings("account")}
+          onToast={showToast}
+        />
+        {/* R93 — 专家页(智能体域)不展示运行中任务的删除入口:任务调度属于
+            工作台域,混在专家页会让用户误以为「删除专家」。TasksPanel 仍然
+            在其他页面渲染,kill/终止能力不丢。 */}
+        {runtime.placeholderView !== EXPERTS_ROUTE_LABEL && (
+          <TasksSurface refreshSignal={runtime.taskRefreshSignal} onToast={showToast} />
+        )}
         <OnboardingSurface />
+        {/* R64 — host 渲染的 TourModal,与 <TourSurface /> 槽位共存:第三方
+            注册 onboarding.tour slot 时,这里不会冲突(本组件直接读 host 层
+            tour.open 状态,与 ui-onboarding 的 surface 走的是两套 controller)。 */}
+        <TourModal open={tour.open} steps={tour.steps} onFinish={tour.stop} onClose={tour.stop} />
         <TourSurface />
+        {/* R23 — 「本次更新」摘要(升版本后一次性)+ 「发送反馈」卡。
+            两者都走内核槽位(onboarding.whats-new / onboarding.feedback),
+            插件可以用更高优先级替换任意一张卡。 */}
+        <WhatsNewGate />
+        <FeedbackGate
+          open={feedbackOpen}
+          onClose={() => setFeedbackOpen(false)}
+          onToast={showToast}
+        />
+        <DataDirGate
+          open={dataDirOpen}
+          onClose={() => setDataDirOpen(false)}
+          onToast={showToast}
+        />
       </Suspense>
       <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <GlobalConfirmHost />
+      {/* R28 — 右侧「助理」导轨(内核 details 槽)。 */}
+      <DetailsSurface
+        visible={Boolean(currentSessionId)}
+        onSelectExpert={handleStartWithExpert}
+        onToast={showToast}
+        onOpenExperts={() => handleNavigate("专家·技能·连接器")}
+      />
       <AppStatusBar runtime={runtime} />
     </div>
   );

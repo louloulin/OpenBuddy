@@ -367,6 +367,15 @@ function SessionContextMenu({ x, y, sessionId, sessionTitle, isPinned, onClose, 
 }
 
 /**
+ * 导航回调契约。
+ *
+ * R40 — 多了可选 `options.tab`:有些入口的目标不是"某一页"而是"某一页里的
+ * 某个 tab"(「腾讯文档」→「专家·技能·连接器」的**连接器** tab)。以前这种
+ * 意图无处可放,只能跳到大页面然后让用户自己找。
+ */
+export type SidebarNavigate = (label: string, options?: { tab?: string }) => void;
+
+/**
  * "更多" 侧栏按钮的弹出菜单 — 对齐 WorkBuddy：
  * - hover 打开，向右浮出（不向下盖住会话列表）
  * - 菜单项：我的文件 / 腾讯文档 / ima知识库 / 乐享知识库 / 灵感
@@ -378,7 +387,7 @@ function MoreDropdown({
   onToast,
   activeNav,
 }: {
-  onNavigate: (label: string) => void;
+  onNavigate: SidebarNavigate;
   onToast?: (message: string) => void;
   activeNav: string;
 }) {
@@ -445,12 +454,27 @@ function MoreDropdown({
     label: string;
     icon: React.ReactNode;
     action: () => void;
+    /** 行尾小标签:说明这条为什么不是"点一下就完事"(如「需连接器」)。 */
+    hint?: string;
   };
-  type MoreGroup = { id: string; label: string; items: MoreItem[] };
+  type MoreGroup = {
+    id: string;
+    label: string;
+    items: MoreItem[];
+    /** R37 — 分组标题可点:进入该分组的「主页面」(目前只有资料库有)。 */
+    onOpen?: () => void;
+  };
   const MORE_GROUPS: MoreGroup[] = [
     {
       id: "library",
       label: "资料库",
+      // R37 — 「更多」以前只有一个长下拉:资料库三个面板各自直达,却没有
+      // "我到底有哪些资料"的落点。分组标题现在进资料库页(分区 = 我的文件 /
+      // 知识库 / 云存储 / 灵感,由内核 `library.section` 槽装配)。
+      onOpen: () => {
+        setOpen(false);
+        onNavigate("资料库");
+      },
       items: [
         {
           id: "my_files",
@@ -465,9 +489,16 @@ function MoreDropdown({
           id: "tencent_docs",
           label: "腾讯文档",
           icon: <MoreMenuTencentDocsIcon size="md" />,
+          hint: "需连接器",
+          // R39 — 以前这里只 `onToast("当前不可用")`:点下去什么都没有,用户
+          // 既不知道要配什么、也走不到配置的地方。现在它是一条**真路径**:
+          // 跳到「专家 · 技能 · 连接器」,那里有连接器目录和安装入口。
+          // R40 — 并且真的落在**连接器** tab(以前提示说"已打开连接器目录",
+          // 实际停在专家页 —— 承诺与结果不一致)。
           action: () => {
             setOpen(false);
-            onToast?.("腾讯文档当前不可用：请使用本地文件或已配置的连接器");
+            onToast?.("腾讯文档需要先配置连接器 —— 已打开连接器目录");
+            onNavigate("专家·技能·连接器", { tab: "connectors" });
           },
         },
         {
@@ -492,9 +523,13 @@ function MoreDropdown({
           id: "lexiang_kb",
           label: "乐享知识库",
           icon: <MoreMenuTencentLexiangIcon size="md" />,
+          hint: "需连接器",
+          // 同「腾讯文档」:本地知识库是零配置的那条路(同分组里的「知识库」),
+          // 但企业源要走连接器 —— 至少得把用户送到能配它的地方。
           action: () => {
             setOpen(false);
-            onToast?.("乐享知识库当前不可用：请使用本地知识库");
+            onToast?.("乐享知识库需要先配置连接器;本地资料请用同组的「知识库」");
+            onNavigate("专家·技能·连接器", { tab: "connectors" });
           },
         },
       ],
@@ -598,7 +633,21 @@ function MoreDropdown({
         <div className="sidebar__more-popover" role="menu">
           {MORE_GROUPS.map((group) => (
             <div key={group.id} className="sidebar__more-group">
-              <div className="sidebar__more-group-label">{group.label}</div>
+              {group.onOpen ? (
+                <button
+                  type="button"
+                  className="sidebar__more-group-label sidebar__more-group-label--link"
+                  data-testid={`sidebar-more-group-${group.id}`}
+                  onClick={group.onOpen}
+                >
+                  {group.label}
+                  <span className="sidebar__more-group-label-hint" aria-hidden="true">
+                    打开资料库
+                  </span>
+                </button>
+              ) : (
+                <div className="sidebar__more-group-label">{group.label}</div>
+              )}
               {group.items.map((item) => (
                 <button
                   key={item.id}
@@ -612,6 +661,11 @@ function MoreDropdown({
                 >
                   <span className="sidebar__more-item-icon">{item.icon}</span>
                   <span className="sidebar__more-item-label">{item.label}</span>
+                  {item.hint && (
+                    <span className="sidebar__more-item-hint" data-testid={`sidebar-more-hint-${item.id}`}>
+                      {item.hint}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -785,6 +839,7 @@ export function Sidebar({
   onOpenAccount,
   onLogin,
   onLogout,
+  onOpenFeedback,
   onToggleCollapse,
   onToggleWorkspace,
   onOpenSearch,
@@ -796,7 +851,7 @@ export function Sidebar({
 }: {
   onNewSession: () => void;
   onSelect: (sessionId: string, cwd?: string) => void;
-  onNavigate: (label: string) => void;
+  onNavigate: SidebarNavigate;
   onOpenSettings: () => void;
   /** Optional variant that accepts a SettingsSection id (e.g. "notifications")
    *  so footer buttons can deep-link into a specific settings subsection. */
@@ -814,6 +869,8 @@ export function Sidebar({
   onLogin?: () => void;
   /** 触发 casdoor 登出。 */
   onLogout?: () => void;
+  /** R23 — 打开「发送反馈」卡(落在本地审计日志,不上传)。 */
+  onOpenFeedback?: () => void;
   /** Collapse the sidebar; an expand affordance is rendered over the main area. */
   onToggleCollapse: () => void;
   /** Expand/collapse a 空间 (workspace) node; lazy-loads its sessions. */
@@ -858,7 +915,8 @@ export function Sidebar({
   // R2.5 — archived group state. We auto-toggle showArchived on the first
   // paint when every active session is archived (or near every), so a
   // single accidental bulk archive is recoverable without the user having
-  // to hand-edit ~/.pi/openbuddy-state.json.
+  // to hand-edit `<agentHome>/openbuddy-state.json`（真实落盘在
+  // `<agentHome>/openbuddy.sqlite`，JSON 只是兼容镜像）。
   const showArchived = useSessionsStore((s) => s.showArchived);
   const setShowArchived = useSessionsStore((s) => s.setShowArchived);
   const archivedCount = useSessionsStore(selectArchivedCount);
@@ -1061,6 +1119,45 @@ export function Sidebar({
     setSelectedIds((prev) => applyToggleSelected(prev, sessionId, multi));
   }, []);
 
+  // R43 — 侧栏任务/空间分组自适应滚动条。`.sidebar__scroll` 容器自身
+  // 负责原生滚动 + 纤细的自定义滚动条;`.sidebar__scroll-inner` 通过
+  // mask-image 在内容溢出顶部/底部时显示淡出遮罩,告诉用户「这里还有
+  // 东西」。ResizeObserver 监听内容变化(分组折叠 / 新增会话)以重算
+  // overflow 状态。
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [overflowTop, setOverflowTop] = useState(false);
+  const [overflowBottom, setOverflowBottom] = useState(false);
+  const updateOverflow = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // scrollTop=0 时顶部不溢出;容差 1px 抵消 sub-pixel 抖动。
+    const top = el.scrollTop > 0;
+    const bottom = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    setOverflowTop((prev) => (prev === top ? prev : top));
+    setOverflowBottom((prev) => (prev === bottom ? prev : bottom));
+  }, []);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateOverflow();
+    el.addEventListener("scroll", updateOverflow, { passive: true });
+    // 内容尺寸变化(分组折叠、新增会话、窗口缩放)时重算。
+    // jsdom 没有 ResizeObserver —— 用 typeof 守卫跳过;测试环境靠
+    // 已存在的 scroll listener 兜底(无尺寸变化触发即足够)。
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => updateOverflow());
+      ro.observe(el);
+      const inner = el.firstElementChild;
+      if (inner) ro.observe(inner);
+    }
+    window.addEventListener("resize", updateOverflow);
+    return () => {
+      el.removeEventListener("scroll", updateOverflow);
+      ro?.disconnect();
+      window.removeEventListener("resize", updateOverflow);
+    };
+  }, [updateOverflow]);
   const handleContextMenu = useCallback((_e: React.MouseEvent, _sessionId: string, _sessionTitle: string, _isPinned: boolean) => {
     // No-op: right-click on a session row is intentionally ignored. The
     // actions live on the inline hover icons (more / archive / pin). The
@@ -1342,6 +1439,21 @@ export function Sidebar({
     return sortPinnedFirst(list);
   }, [independent, workspaceSessions]);
 
+  // R43 — 内容列表本身变化(独立会话/工作空间会话加载完成)也可能影响
+  // 滚动容器尺寸。这里单独放在所有派生量之后,避免 TDZ 触发。
+  useEffect(() => {
+    updateOverflow();
+  }, [
+    independent.length,
+    filteredIndependent.length,
+    projects.length,
+    spaceNodes.length,
+    showArchived,
+    tasksOpen,
+    spacesOpen,
+    updateOverflow,
+  ]);
+
   return (
     <>
     <aside className="sidebar">
@@ -1490,7 +1602,15 @@ export function Sidebar({
         <MoreDropdown onNavigate={onNavigate} onToast={onToast} activeNav={activeNav} />
       </nav>
 
-      <div className="sidebar__content">
+      <div className="sidebar__scroll" ref={scrollRef} data-testid="sidebar-scroll">
+        <div
+          className={
+            "sidebar__scroll-inner" +
+            (overflowTop ? " sidebar__scroll-inner--overflow-top" : "") +
+            (overflowBottom ? " sidebar__scroll-inner--overflow-bottom" : "")
+          }
+          data-testid="sidebar-scroll-inner"
+        >
         {/* 任务分组: 收件箱(初始目录)下的会话 */}
         <button
           className="sidebar__section-label"
@@ -1719,6 +1839,7 @@ export function Sidebar({
             )}
           </div>
         )}
+        </div>
       </div>
 
       <div className="sidebar__footer">
@@ -1751,24 +1872,31 @@ export function Sidebar({
                 : "OpenBuddy · 账户菜单"
             }
             title={accountLabel ?? "OpenBuddy"}
-            data-tip={accountStatus === "signed_in" ? `${accountLabel ?? "已登录"} · 账户菜单` : "OpenBuddy · 账户菜单"}
+            data-tip={
+              accountStatus === "signed_in"
+                ? `${accountLabel ?? "已登录"} · 账户菜单`
+                : accountStatus === "error"
+                  ? "登录出错 · 账户菜单"
+                  : "本地优先 · 开源 · 账户菜单"
+            }
           >
             <span className="sidebar__user-avatar" aria-hidden="true">
               {accountInitial(accountLabel) || <UserIcon size="md" />}
             </span>
+            {/* R48 — 左下角回到单行身份条:头像 + 名字(对齐 WorkBuddy 侧栏
+                底部的形状)。原来的第二行副标("本地优先 · 开源" / "登录出错")
+                在 44px 的行高里挤成两行小字,既不是身份也不是状态提示 ——
+                身份状态现在收进 tooltip(`data-tip`)与账户菜单头,不占版面。
+                登录 / 设置 / 反馈 三个入口仍然在点击后的账户菜单里。 */}
             <span className="sidebar__user-text">
               <span className="sidebar__user-name">{accountLabel ?? "OpenBuddy"}</span>
-              <span className="sidebar__user-sub">
-                {accountStatus === "signed_in"
-                  ? (accountLabel ? "已登录" : "本地账户")
-                  : accountStatus === "configuration_needed"
-                    ? "需要配置企业登录"
-                    : accountStatus === "error"
-                      ? "登录出错"
-                      : "本地优先 · 开源"}
-              </span>
+              {/* 状态圆点:只表达"是不是登录态",不写字、不占第二行。 */}
+              <span
+                className="sidebar__user-dot"
+                data-state={accountStatus ?? "signed_out"}
+                aria-hidden="true"
+              />
             </span>
-            <span className="sidebar__user-chevron" aria-hidden="true">▾</span>
           </button>
           {accountMenuOpen && accountMenuPos && createPortal(
             <div
@@ -1807,29 +1935,44 @@ export function Sidebar({
                       退出登录
                     </button>
                   )}
+                  {/* R23 — 反馈入口放在"用户"这一侧:用户想吐槽的时候,第一反应
+                      就是点左下角自己那块。落本地审计日志,不上传。 */}
+                  {onOpenFeedback && (
+                    <button
+                      type="button"
+                      className="sidebar__account-menu-item"
+                      role="menuitem"
+                      onClick={() => { setAccountMenuOpen(false); onOpenFeedback(); }}
+                    >
+                      发送反馈
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
                   <div className="sidebar__account-menu-head" role="presentation">
                     <div className="sidebar__account-menu-name">本地用户</div>
                     <div className="sidebar__account-menu-sub">
-                      {accountStatus === "configuration_needed"
-                        ? "需要在设置里配置 Casdoor"
-                        : accountStatus === "error"
-                          ? "登录出错,请重试或检查网络"
-                          : "登录企业账户以同步会话与权限"}
+                      {accountStatus === "error"
+                        ? "上次登录出错,可重新登录"
+                        : "未登录 · 数据只保存在这台机器上"}
                     </div>
                   </div>
-                  {/* R15 — 历史行为:登录入口始终可见(点击打开 Casdoor 登录页),
-                      配置不完整时同时提供「打开设置」引导用户补齐配置。 */}
-                  {(onOpenAccount || onLogin) && (
+                  {/* R48 — 登录入口恢复 git 历史(R15 / 536dc0e)的语义:点一下
+                      一定弹出登录流程。R26 把未配置时的主按钮改成「配置企业登录」
+                      并只把人送到设置表单,副作用是这个入口再也不叫"登录"、点完
+                      也没有任何反馈。现在改为打开 `overlay.sign-in`(Casdoor
+                      登录对话框):未配置时可在框内直接补 issuer / clientId 并
+                      立即登录,已配置时直接拉起 Casdoor 授权页。企业登录的编排
+                      仍完全基于 Casdoor,没有新增第二套身份后端。 */}
+                  {(onLogin || onOpenAccount) && (
                     <button
                       type="button"
                       className="sidebar__account-menu-item sidebar__account-menu-item--primary"
                       role="menuitem"
-                      onClick={() => { setAccountMenuOpen(false); (onOpenAccount ?? onLogin)?.(); }}
+                      onClick={() => { setAccountMenuOpen(false); (onLogin ?? onOpenAccount)?.(); }}
                     >
-                      企业登录
+                      {accountStatus === "error" ? "重新登录" : "登录"}
                     </button>
                   )}
                   <button
@@ -1838,8 +1981,18 @@ export function Sidebar({
                     role="menuitem"
                     onClick={() => { setAccountMenuOpen(false); onOpenSettings(); }}
                   >
-                    {accountStatus === "configuration_needed" ? "配置企业登录" : "打开设置"}
+                    打开设置
                   </button>
+                  {onOpenFeedback && (
+                    <button
+                      type="button"
+                      className="sidebar__account-menu-item"
+                      role="menuitem"
+                      onClick={() => { setAccountMenuOpen(false); onOpenFeedback(); }}
+                    >
+                      发送反馈
+                    </button>
+                  )}
                 </>
               )}
             </div>,

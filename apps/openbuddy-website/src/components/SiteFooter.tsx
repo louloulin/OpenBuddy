@@ -40,7 +40,7 @@ export default function SiteFooter({ dict, locale }: SiteFooterProps) {
             <Logo size={ 32 } />
           </Link>
 
-          <p className="mt-6 max-w-md text-body-lg text-[var(--wb-fg-muted)]">
+          <p className="mt-6 max-w-md text-[16px] leading-[1.55] text-[var(--wb-fg-muted)]">
             { dict.footer.tagline }
           </p>
 

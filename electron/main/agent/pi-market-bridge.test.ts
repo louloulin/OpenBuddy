@@ -6,7 +6,7 @@
  * 可注入,所以这里只用真实临时目录 + 注入 stub 覆盖安装树的原子性、
  * lockfile / 指针一致性、审计留痕与 IPC 注册。
  */
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, lstat, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -62,6 +62,14 @@ async function writeRegistry(dataDir: string, entries: unknown[]): Promise<void>
     `${JSON.stringify({ version: 1, extensions: entries }, null, 2)}\n`,
     "utf8",
   );
+}
+
+async function existsPath(path: string): Promise<boolean> {
+  return (await lstat(path).catch(() => undefined)) !== undefined;
+}
+
+async function readdirString(path: string): Promise<string[]> {
+  return readdir(path).catch(() => [] as string[]);
 }
 
 function bridgeFor(
@@ -656,7 +664,8 @@ describe("IPC (additive)", () => {
     const bridge = bridgeFor(dataDir);
     const { ipc, handlers } = fakeIpc();
     const dispose = registerPiMarketBridgeIpc(bridge, ipc);
-    expect(handlers.size).toBe(7);
+    // 用 channel 表算数量,而不是写死 —— 加一个 channel 不该让这条测试变红。
+    expect(handlers.size).toBe(Object.keys(PI_MARKET_IPC_CHANNELS).length);
 
     const list = await handlers.get(PI_MARKET_IPC_CHANNELS.list)!(null);
     expect((list as { entries: unknown[] }).entries).toHaveLength(1);
@@ -706,7 +715,139 @@ describe("IPC (additive)", () => {
     const dataDir = "ignored-dir";
     const handler = vi.fn();
     const dispose = registerPiMarketBridgeIpc(bridgeFor(dataDir), { handle: handler });
-    expect(handler).toHaveBeenCalledTimes(7);
+    expect(handler).toHaveBeenCalledTimes(Object.keys(PI_MARKET_IPC_CHANNELS).length);
     expect(() => dispose()).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+/**
+ * R33 — 卸载。
+ *
+ * 在此之前 `PiMarketBridge` 根本没有卸载能力:装了只能去手删目录,审计里也查不出
+ * 「装过又删了」。这里的重点是**四种磁盘/lockfile 组合都要收敛到同一个结果**,
+ * 以及"删到一半"不会留下看起来还在的安装(先 rename 到 .trash-* 再 rm)。
+ */
+describe("uninstallPiExtension (R33)", () => {
+  it("删掉版本目录 + 摘掉 lockfile 记录,并留一条 uninstall 审计", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [extension()]);
+    const bridge = bridgeFor(dataDir);
+    await bridge.installPiExtension("demo");
+
+    const result = await bridge.uninstallPiExtension("demo");
+    expect(result).toMatchObject({ id: "demo", version: "1.0.0", payloadKept: false });
+    expect(result.removedVersions).toEqual(["1.0.0"]);
+    expect(await existsPath(result.removedPath)).toBe(false);
+    expect(Object.keys((await bridge.readLockfile()).extensions)).toEqual([]);
+
+    const audit = await bridge.readAuditTrail(10);
+    expect(audit.at(-1)).toMatchObject({ action: "uninstall", extensionId: "demo", outcome: "success" });
+  });
+
+  it("卸载后市场列表里不再有已安装标记", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [extension()]);
+    const bridge = bridgeFor(dataDir);
+    await bridge.installPiExtension("demo");
+    expect((await bridge.listMarketEntries())[0]).toMatchObject({ installedVersion: "1.0.0" });
+
+    await bridge.uninstallPiExtension("demo");
+    const after = (await bridge.listMarketEntries())[0];
+    expect(after.installedVersion).toBeUndefined();
+    expect(after.updateAvailable).toBeUndefined();
+  });
+
+  it("keepPayload 只摘 lockfile 记录(停用但留着回滚),目录原样保留", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [extension()]);
+    const bridge = bridgeFor(dataDir);
+    await bridge.installPiExtension("demo");
+
+    const result = await bridge.uninstallPiExtension("demo", { keepPayload: true });
+    expect(result).toMatchObject({ id: "demo", payloadKept: true });
+    expect(result.removedVersions).toEqual([]);
+    expect(await existsPath(join(result.removedPath, "1.0.0"))).toBe(true);
+    expect(Object.keys((await bridge.readLockfile()).extensions)).toEqual([]);
+
+    // 载荷还在 → 直接装回来是幂等的(changed: true 因为是重新建立记录)。
+    const again = await bridge.installPiExtension("demo", "1.0.0", { force: true });
+    expect(again).toMatchObject({ id: "demo", version: "1.0.0" });
+  });
+
+  it("只有 lockfile(目录被外部删了)也能收敛", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [extension()]);
+    const bridge = bridgeFor(dataDir);
+    await bridge.installPiExtension("demo");
+    await rm(join(dataDir, "pi-extensions", "demo"), { recursive: true, force: true });
+
+    const result = await bridge.uninstallPiExtension("demo");
+    expect(result.removedVersions).toEqual([]);
+    expect(Object.keys((await bridge.readLockfile()).extensions)).toEqual([]);
+  });
+
+  it("只有目录(手工拷进来的,没有 lockfile 记录)也能卸干净", async () => {
+    const dataDir = await makeDataDir();
+    const bridge = bridgeFor(dataDir);
+    const extDir = join(dataDir, "pi-extensions", "manual");
+    await mkdir(join(extDir, "2.0.0"), { recursive: true });
+
+    const result = await bridge.uninstallPiExtension("manual");
+    expect(result.version).toBeUndefined();
+    expect(result.removedVersions).toEqual(["2.0.0"]);
+    expect(await existsPath(extDir)).toBe(false);
+  });
+
+  it("两者都没有 → not-found,并留一条 failure 审计", async () => {
+    const dataDir = await makeDataDir();
+    const bridge = bridgeFor(dataDir);
+    await expect(bridge.uninstallPiExtension("ghost")).rejects.toMatchObject({ code: "not-found" });
+    const audit = await bridge.readAuditTrail(5);
+    expect(audit.at(-1)).toMatchObject({ action: "uninstall", outcome: "failure" });
+  });
+
+  it("id 不合法 → invalid-id(不会碰到别的扩展)", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [extension(), extension({ id: "keep" })]);
+    const bridge = bridgeFor(dataDir);
+    await bridge.installPiExtension("demo");
+    await bridge.installPiExtension("keep");
+
+    await expect(bridge.uninstallPiExtension("../demo")).rejects.toMatchObject({
+      code: "invalid-id",
+    });
+    expect(Object.keys((await bridge.readLockfile()).extensions).sort()).toEqual(["demo", "keep"]);
+
+    await bridge.uninstallPiExtension("demo");
+    expect(Object.keys((await bridge.readLockfile()).extensions)).toEqual(["keep"]);
+    expect(await existsPath(join(dataDir, "pi-extensions", "keep"))).toBe(true);
+  });
+
+  it("不留 .trash-* 残留", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [extension()]);
+    const bridge = bridgeFor(dataDir);
+    await bridge.installPiExtension("demo");
+    await bridge.uninstallPiExtension("demo");
+
+    const names = await readdirString(join(dataDir, "pi-extensions"));
+    expect(names.filter((name) => name.startsWith(".trash-"))).toEqual([]);
+  });
+
+  it("IPC handler 可用,channel 表包含 pi-market-uninstall", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [extension()]);
+    const bridge = bridgeFor(dataDir);
+    await bridge.installPiExtension("demo");
+    const handlers = createPiMarketHandlers(bridge);
+    expect(PI_MARKET_IPC_CHANNELS.uninstall).toBe("agent:pi-market-uninstall");
+
+    const result = await handlers[PI_MARKET_IPC_CHANNELS.uninstall]({ id: "demo" });
+    expect(result).toMatchObject({ id: "demo", version: "1.0.0", payloadKept: false });
+    await expect(handlers[PI_MARKET_IPC_CHANNELS.uninstall]({})).rejects.toMatchObject({
+      code: "invalid-id",
+    });
   });
 });

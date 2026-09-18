@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { confirm, open as openDialog } from "@/lib/platform/electron-api";
+import { confirm, openOne } from "@/lib/platform/electron-api";
 import {
   SearchIcon, MyExpertIcon, ChevronLeftIcon, DeleteIcon, SparklesIcon,
   FolderOpenIcon, RefreshCwIcon,
@@ -8,6 +8,7 @@ import {
   agentsDelete, agentsList, agentsSave, agentsTemplate, expertsDefaultRoot, expertsLoad, expertsReadAgentPrompt, expertsLinkAgents,
   workbuddyImportConfirm, workbuddyImportPreview,
 } from "@/lib/agent/pi-client";
+import { useAgentPaths } from "@openbuddy/ui-shared/use-agent-paths";
 import type { AgentEntry, ExpertCatalog, ExpertItem, FeaturedScene, WorkBuddyImportPreview } from "@openbuddy/shared-types";
 import { FEATURED_SCENES } from "../data/featured-scenes";
 import { Chip, SegmentTabs } from "../shared/ui";
@@ -24,7 +25,6 @@ const OPC_ID = "00-OPC";
 const LS_ROOT = "expertsRoot";
 /** Manifest label overrides to match the target UI exactly. */
 const LABEL_OVERRIDE: Record<string, string> = { "13-TencentZone": "腾讯专家" };
-const DEFAULT_PICK = "E:/Pi/agents";
 
 interface Props {
   pills: React.ReactNode;
@@ -42,6 +42,13 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
   /** Expert whose detail modal is currently open. */
   const [modalExpert, setModalExpert] = useState<ExpertItem | null>(null);
   const setPendingExpert = usePendingExpertStore((s) => s.set);
+  // R95 — 目录选择器的起点必须是**真实**的专家目录。
+  // 此前写死 `E:/Pi/agents`(Windows 盘符):在 macOS/Linux 上
+  // `isAbsolute("E:/Pi/agents")` 为 false,main 侧校验直接抛错,而
+  // `chooseDir()` 把它当成"用户取消",于是**点「选择目录」什么都不弹**。
+  // 现在用 main 回话的 agentHome:未解析时是 `~/.openbuddy/agent/experts`
+  // (main 侧会展开 `~`),解析后是自定义目录,两种都是合法起点。
+  const agentPaths = useAgentPaths();
 
   const [root, setRoot] = useState<string>(() => {
     try { return localStorage.getItem(LS_ROOT) || ""; } catch { return ""; }
@@ -171,16 +178,16 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
 
   const chooseDir = useCallback(async () => {
     try {
-      const sel = await openDialog({
+      const pick = await openOne({
         directory: true, multiple: false, title: "选择专家数据目录",
-        defaultPath: root || DEFAULT_PICK,
+        // 优先当前来源;其次 main 解析出的真实目录;最后让系统决定。
+        defaultPath: root || agentPaths.experts || undefined,
       });
-      const pick = Array.isArray(sel) ? sel[0] : sel;
       if (!pick) return;
       await loadCatalog(pick);
       if (!error) onToast?.(`已切换专家数据目录：${pick}`);
     } catch { /* cancelled */ }
-  }, [root, loadCatalog, onToast, error]);
+  }, [root, loadCatalog, onToast, error, agentPaths.experts]);
 
   const handleCreate = () => {
     setCreateError("");
@@ -212,8 +219,7 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
   const openImport = useCallback(async () => {
     setImportError(""); setImportPreview(null);
     try {
-      const sel = await openDialog({ directory: true, multiple: false, title: "选择 WorkBuddy 配置目录", defaultPath: importSource || "~/.workbuddy" });
-      const pick = Array.isArray(sel) ? sel[0] : sel;
+      const pick = await openOne({ directory: true, multiple: false, title: "选择 WorkBuddy 配置目录", defaultPath: importSource || "~/.workbuddy" });
       if (pick) { setImportSource(pick); setImportOpen(true); }
     } catch { /* cancelled */ }
   }, [importSource]);
@@ -278,9 +284,9 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
       } catch { /* fallback: empty prompt */ }
     }
 
-    // For team experts: link member agents into ~/.pi/agents/ so pi's
+    // For team experts: link member agents into <agentHome>/agents/ so pi's
     // Task tool can spawn them by bare name during multi-agent orchestration.
-    // MUST be awaited — pi scans ~/.pi/agents/ at session start, so if the
+    // MUST be awaited — pi scans <agentHome>/agents/ at session start, so if the
     // copy hasn't finished when the user sends their first message, the member
     // agents won't be discoverable.
     if (expert.type === "team" && expert.plugin && root) {
@@ -333,22 +339,30 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
   }, [setPendingExpert, onGoHome]);
 
   // ---- no data dir yet ----
+  // R91 — 单栏:左侧「任务」栏已移除(专家页只讲专家,任务列表留在侧边栏),
+  // 空态直接占满主区,不再留一条永远为空的窄列。
   if (needPick && !catalog) {
     return (
       <div className="um-page">
         <header className="um-topbar"><div className="um-topbar-left">{pills}</div></header>
         <div className="um-scroll">
-          <div className="ec-empty">
-            <FolderOpenIcon size="xl" className="ec-empty-icon" />
-            <p>未找到专家数据目录</p>
-            <p className="ec-empty-hint">请选择包含 <code>_meta/_expert_center.json</code> 的 WorkBuddy 数据目录（如 <code>E:\Pi\agents</code>）</p>
-            <button type="button" className="um-btn um-btn--primary" onClick={chooseDir}>
-              <FolderOpenIcon size="sm" /><span>选择来源目录</span>
-            </button>
-            <button type="button" className="um-btn um-btn--primary" onClick={openImport}>
-              <FolderOpenIcon size="sm" /><span>导入 WorkBuddy 专家团</span>
-            </button>
-            <button type="button" className="um-btn" onClick={handleCreate}>创建专家</button>
+          <div className="ec-page-split" data-testid="experts-page-split">
+            <div className="ec-page-main">
+              <div className="ec-empty">
+                <FolderOpenIcon size="xl" className="ec-empty-icon" />
+                <p>未找到专家数据目录</p>
+                <p className="ec-empty-hint">
+                  请选择包含 <code>_meta/_expert_center.json</code> 的 WorkBuddy 数据目录（内置专家在 <code>{agentPaths.experts}</code>）
+                </p>
+                <button type="button" className="um-btn um-btn--primary" onClick={chooseDir}>
+                  <FolderOpenIcon size="sm" /><span>选择来源目录</span>
+                </button>
+                <button type="button" className="um-btn um-btn--primary" onClick={openImport}>
+                  <FolderOpenIcon size="sm" /><span>导入 WorkBuddy 专家团</span>
+                </button>
+                <button type="button" className="um-btn" onClick={handleCreate}>创建专家</button>
+              </div>
+            </div>
           </div>
         </div>
         {createOpen && (
@@ -460,7 +474,6 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
           <button type="button" className="ec-source-btn" onClick={openImport} title="导入 WorkBuddy 专家团">导入 WorkBuddy</button>
         </div>
 
-        {loading && !catalog && <div className="ec-loading">加载专家数据…</div>}
         {error && (
           <div className="ec-error">
             加载失败：{error}
@@ -468,46 +481,54 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
           </div>
         )}
 
-        {catalog && (
-          <>
-            <FeaturedScenes scenes={scenes} expertById={expertById} root={root} onSummon={(e) => setModalExpert(e)} />
+        {/* R91 — 单栏主区。此前这里并排放着 WorkBuddy 的「任务(N)」栏,但
+         *  任务列表已经由左侧边栏承载,专家页再放一份既重复又占宽,用户明确
+         *  要求移除。现在主区独占整宽,专家网格获得更多横向空间。 */}
+        <div className="ec-page-split" data-testid="experts-page-split">
+          <div className="ec-page-main">
+            {!catalog && loading && <div className="ec-loading">加载专家数据…</div>}
+            {catalog && (
+              <>
+                <FeaturedScenes scenes={scenes} expertById={expertById} root={root} onSummon={(e) => setModalExpert(e)} />
 
-            <div className="ec-list-head">
-              <SegmentTabs<ListTab>
-                className="ec-list-tabs"
-                items={[{ key: "expert", label: "专家" }, { key: "team", label: "专家团" }]}
-                value={listTab}
-                onChange={(k) => { setListTab(k); setCat(null); }}
-              />
-              <SegmentTabs<Sort>
-                className="ec-sort"
-                items={[{ key: "popular", label: "最热" }, { key: "newest", label: "最新" }]}
-                value={sort}
-                onChange={setSort}
-              />
-            </div>
+                <div className="ec-list-head">
+                  <SegmentTabs<ListTab>
+                    className="ec-list-tabs"
+                    items={[{ key: "expert", label: "专家" }, { key: "team", label: "专家团" }]}
+                    value={listTab}
+                    onChange={(k) => { setListTab(k); setCat(null); }}
+                  />
+                  <SegmentTabs<Sort>
+                    className="ec-sort"
+                    items={[{ key: "popular", label: "综合" }, { key: "newest", label: "最新" }]}
+                    value={sort}
+                    onChange={setSort}
+                  />
+                </div>
 
-            <div className="ec-chips">
-              {chips.map((c) => (
-                <Chip key={c.id ?? "all"} label={c.label}
-                  active={cat === c.id} onClick={() => setCat(c.id)} />
-              ))}
-            </div>
+                <div className="ec-chips">
+                  {chips.map((c) => (
+                    <Chip key={c.id ?? "all"} label={c.label}
+                      active={cat === c.id} onClick={() => setCat(c.id)} />
+                  ))}
+                </div>
 
-            {visible.length === 0 ? (
-              <div className="ec-empty">
-                <SparklesIcon size="xl" className="ec-empty-icon" />
-                <p>{search ? `没有找到与「${search}」匹配的专家` : "暂无该分类的专家"}</p>
-              </div>
-            ) : (
-              <div className="ec-grid">
-                {visible.map((e) => (
-                  <ExpertCard key={e.id} expert={e} root={root} onSummon={() => setModalExpert(e)} />
-                ))}
-              </div>
+                {visible.length === 0 ? (
+                  <div className="ec-empty">
+                    <SparklesIcon size="xl" className="ec-empty-icon" />
+                    <p>{search ? `没有找到与「${search}」匹配的专家` : "暂无该分类的专家"}</p>
+                  </div>
+                ) : (
+                  <div className="ec-grid" data-testid="experts-grid">
+                    {visible.map((e) => (
+                      <ExpertCard key={e.id} expert={e} root={root} onSummon={() => setModalExpert(e)} />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
 
       {/* Detail modal */}

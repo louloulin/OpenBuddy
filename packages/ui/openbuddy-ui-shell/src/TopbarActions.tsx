@@ -21,6 +21,8 @@ import {
   KeyboardIcon,
 } from "@openbuddy/ui-primitives/icons";
 import { useTheme } from "@openbuddy/ui-theme/client";
+import { useSlotComponents } from "@openbuddy/ui-runtime/client";
+import { useShortcut } from "./useShortcut";
 import { useSessionStore } from "@/stores/session-store";
 import {
   exportTextFile,
@@ -59,7 +61,33 @@ export function TopbarActions({
 }: TopbarActionsProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  // R71 — 「📝 新草稿」入口。读 editor.draft slot,空槽(本环境未挂 ui-editor 或插件卸了)时不渲染入口。
+  const [draftOpen, setDraftOpen] = useState(false);
+  const draftImpls = useSlotComponents("editor.draft");
+  const DraftImpl = draftImpls[0] as
+    | React.ComponentType<{
+        open: boolean;
+        onClose?: () => void;
+        onApply?: (md: string) => void;
+        onCopy?: (md: string) => void;
+        initialMarkdown?: string;
+        title?: string;
+      }>
+    | undefined;
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // R72 — 「📝 新草稿」键盘快捷键 Mod+Shift+D。
+  // 只有当 DraftImpl 真的注册了才绑定(空槽时绑定也没意义 —— 菜单都没渲染)。
+  // useShortcut 的签名是 (options, callback) —— preventDefault 属于 options
+  // 的一部分,不是第三个参数(R71 引入时写成了三参调用,一直是 tsc 报错)。
+  useShortcut(
+    { mod: true, shift: true, key: "d", preventDefault: true },
+    () => {
+      if (!DraftImpl) return;
+      // 与点菜单按钮一致:开草稿模态。空槽 / 草稿已开时 no-op。
+      setDraftOpen((v) => !v);
+    }
+  );
 
   // __pending_xxx IDs are renderer-only placeholders created by beginPendingNewSession
   // before piNewSession returns the real ID. Pi main has never seen them, so any
@@ -165,6 +193,21 @@ export function TopbarActions({
 
         {open && (
           <div className="topbar-actions__menu" onClick={(e) => e.stopPropagation()}>
+            {DraftImpl ? (
+              <button
+                type="button"
+                className="topbar-actions__item"
+                onClick={() => {
+                  setOpen(false);
+                  setDraftOpen(true);
+                }}
+                data-testid="topbar-draft-button"
+              >
+                <span className="topbar-actions__item-icon">📝</span>
+                <span className="topbar-actions__item-label">新草稿</span>
+                <ShortcutHint chord={TOPBAR_ACTION_SHORTCUTS.draft} />
+              </button>
+            ) : null}
             <button type="button" className="topbar-actions__item" onClick={handleExport}>
               <span className="topbar-actions__item-icon">📄</span>
               <span className="topbar-actions__item-label">导出为 Markdown</span>
@@ -215,6 +258,22 @@ export function TopbarActions({
           </div>
         )}
       </div>
+      {DraftImpl ? (
+        <DraftImpl
+          open={draftOpen}
+          onClose={() => setDraftOpen(false)}
+          onApply={(md) => {
+            setDraftOpen(false);
+            onToast?.(md ? `草稿已应用（${md.length} 字符）` : "草稿为空");
+          }}
+          onCopy={(md) => {
+            void navigator.clipboard?.writeText(md).then(
+              () => onToast?.("草稿 markdown 已复制到剪贴板"),
+              () => onToast?.("剪贴板不可用"),
+            );
+          }}
+        />
+      ) : null}
     </>
   );
 }

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
-import { open as openDialog } from "@/lib/platform/electron-api";
+import { openPaths } from "@/lib/platform/electron-api";
 import { ConfirmDialog, type ConfirmTone } from "@openbuddy/ui-dialogs";
 import { PromptDialog } from "@openbuddy/ui-dialogs";
 import { ModalShell, ModalHead, ModalBody, ModalFooter } from "@openbuddy/ui-dialogs";
@@ -212,9 +212,8 @@ export function EmailComposer({ account, accounts = [account], contacts = [], on
 
   const addAttachments = async () => {
     if (!selectedAccount.capabilities.attachments) return;
-    const selected = await openDialog({ multiple: true, title: "选择邮件附件" });
-    if (!selected) return;
-    const paths = Array.isArray(selected) ? selected : [selected];
+    const paths = await openPaths({ multiple: true, title: "选择邮件附件" });
+    if (paths.length === 0) return;
     setAttachments((current) => [...new Set([...current, ...paths])]);
   };
 

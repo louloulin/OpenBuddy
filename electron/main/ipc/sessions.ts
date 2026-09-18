@@ -35,6 +35,7 @@ import {
   recordValue,
   requiredBoolean,
   requiredString,
+  resolvedCwd,
 } from "./validation";
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
 
@@ -54,13 +55,24 @@ export function registerSessionsIpc(deps: AgentHostIpcDeps): void {
   ipcMain.handle("sessions:rename", async (_e, args: unknown) => {
     casdoorAuth.authorize({ capability: "team.workspace" });
     const input = recordValue(args, "sessions:rename payload");
-    await agentHost.renameSession(requiredString(input.sessionId, "sessionId"), requiredString(input.title, "title"));
+    // R91 — `renameSession` on the host is `(sessionId, title, cwd)`: cwd is
+    // how it locates the session file (`SessionManager.list(cwd, ...)`).
+    // This handler used to drop it, so every rename — sidebar rename, expert
+    // summon, WorkBuddy import — threw
+    // `ERR_INVALID_ARG_TYPE: paths[0] must be of type string` from deep inside
+    // node:path. The sibling `sessions:delete` / `agent:prompt` handlers pass
+    // `resolvedCwd`; this one now matches.
+    await agentHost.renameSession(
+      requiredString(input.sessionId, "sessionId"),
+      requiredString(input.title, "title"),
+      resolvedCwd(input, () => agentHost.getCwd()),
+    );
     return { ok: true };
   });
   ipcMain.handle("sessions:delete", async (_e, args: unknown) => {
     casdoorAuth.authorize({ capability: "team.workspace" });
     const input = recordValue(args, "session delete payload");
-    return agentHost.deleteSession(requiredString(input.sessionId, "sessionId"), input.cwd === undefined ? agentHost.getCwd() : absolutePath(input.cwd, "cwd"));
+    return agentHost.deleteSession(requiredString(input.sessionId, "sessionId"), resolvedCwd(input, () => agentHost.getCwd()));
   });
   ipcMain.handle("sessions:set-pinned", async (_e, args: { id: string; pinned: boolean }) => {
     casdoorAuth.authorize({ capability: "team.workspace" });

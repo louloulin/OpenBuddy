@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import Copy from "lucide-react/dist/esm/icons/copy";
 import FileText from "lucide-react/dist/esm/icons/file-text";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
@@ -16,10 +16,12 @@ import Clock3 from "lucide-react/dist/esm/icons/clock-3";
 // MessageMeta: a tiny "<model> · 42 tok/s" line below the assistant
 // bubble that lets the user see at a glance what produced the answer.
 import Cpu from "lucide-react/dist/esm/icons/cpu";
+import Hash from "lucide-react/dist/esm/icons/hash";
 import Zap from "lucide-react/dist/esm/icons/zap";
 import { TooltipButton } from "./TooltipButton";
-import { Markdown, type MarkdownConfig } from "@openbuddy/ui-markdown";
-import { StreamingMarkdown } from "./StreamingMarkdown";
+import { type MarkdownConfig } from "@openbuddy/ui-markdown";
+import { useSlotComponents } from "@openbuddy/ui-runtime/client";
+import { ConversationMarkdown } from "./conversation-slots";
 import { ToolCallCard } from "./ToolCallCard";
 import { LoadingRow } from "./LoadingRow";
 import { TurnErrorCard } from "./TurnErrorCard";
@@ -67,6 +69,8 @@ function MessageItemInner({
   onStepRevision,
   onRetry,
   onToast,
+  onEditAssistantMessage,
+  onResendAfterAssistantEdit,
   onOpenSettings,
   streamingDurationMs,
 }: {
@@ -89,7 +93,15 @@ function MessageItemInner({
    *  appendUserRevision by ChatView so the revision pager history stays
    *  in sync. */
   onInlineResend?: (messageId: string, text: string) => void;
-  /** R8.1 (revision-pager) — step the displayed revision of a user
+  /** R78 (assistant inline edit) — replace this assistant message's
+   *  rendered text with `newMarkdown` (single blob). Tool-call parts are
+   *  preserved. Wired by ChatView to `editAssistantMessage`. */
+  onEditAssistantMessage?: (messageId: string, newMarkdown: string) => void;
+  /** R78 — optionally regenerate from this assistant message after the
+   *  user has edited it inline (drops the old bubble and resends the
+   *  preceding user prompt). Wired by ChatView to handleRetry-style flow. */
+  onResendAfterAssistantEdit?: (messageId: string) => void;
+    /** R8.1 (revision-pager) — step the displayed revision of a user
    *  bubble. `direction` is -1 (older) or +1 (newer). The pager is only
    *  rendered when `message.revisions && message.revisions.length > 1`. */
   onStepRevision?: (messageId: string, direction: -1 | 1) => void;
@@ -199,6 +211,37 @@ function MessageItemInner({
     .filter(Boolean)
     .join("\n\n");
 
+
+  // R73 — 「📋 编辑为草稿」入口。读 editor.draft 槽,空槽(本环境未挂 ui-editor)时不渲染按钮。
+  // 每个 message 自带草稿态,关闭 / 打开互不影响。
+  const [draftOpen, setDraftOpen] = useState(false);
+  const [draftInitial, setDraftInitial] = useState("");
+  // R78 — 「✏️ 就地编辑」入口。读 editor.body 槽,空槽时不渲染按钮。
+  // 进入编辑态后,msg__body 整体替换为 EditorImpl;Esc 退出,
+  // Cmd/Ctrl+Enter 应用(并可选 resend)。
+  const [inlineEditing, setInlineEditing] = useState(false);
+  const [inlineDraft, setInlineDraft] = useState("");
+  const inlineEditorImpls = useSlotComponents("editor.body");
+  const InlineEditorImpl = inlineEditorImpls[0] as
+    | ComponentType<{
+        value?: string;
+        format?: "html" | "markdown";
+        onChange?: (next: string) => void;
+        editable?: boolean;
+        placeholder?: string;
+      }>
+    | undefined;
+  const draftImpls = useSlotComponents("editor.draft");
+  const DraftImpl = draftImpls[0] as
+    | ComponentType<{
+        open: boolean;
+        onClose?: () => void;
+        onApply?: (md: string) => void;
+        onCopy?: (md: string) => void;
+        initialMarkdown?: string;
+        title?: string;
+      }>
+    | undefined;
   if (message.role === "user") {
     // R8.1 (revision-pager) — split attachments (file/image parts) from the
     // text part. The text part gets replaced by the currently selected
@@ -242,6 +285,9 @@ function MessageItemInner({
       isStreaming,
       modelId: message.modelId,
       outputTokens: message.outputTokens,
+      // R58 — pipe input (prompt) token count so MessageMeta can
+      // render the "1.2k in" chip beside the throughput chip.
+      inputTokens: message.inputTokens,
     };
   })();
 
@@ -258,7 +304,28 @@ function MessageItemInner({
     return null;
   }
 
-  // R8.16 — apply the just-completed class to the assistant root
+  // R78 — Esc 取消 / Cmd+Enter 应用 inline edit
+  useEffect(() => {
+    if (!inlineEditing) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setInlineEditing(false);
+        setInlineDraft("");
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        if (!onEditAssistantMessage) return;
+        e.preventDefault();
+        onEditAssistantMessage(message.id, inlineDraft);
+        setInlineEditing(false);
+        setInlineDraft("");
+        onToast?.("已就地保存");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [inlineEditing, inlineDraft, message.id, onEditAssistantMessage, onToast]);
+
+    // R8.16 — apply the just-completed class to the assistant root
   // for ~320ms after the streaming flag flips off so the bubble
   // fades + slides in instead of popping into existence.
   // R8.44 — additionally apply msg--streaming while the message
@@ -282,6 +349,59 @@ function MessageItemInner({
           <span className="msg__role" aria-label="AI assistant">AI</span>
         </div>
         <div className="msg__body">
+          {inlineEditing && InlineEditorImpl ? (
+            <div className="msg__inline-editor" data-testid="message-inline-editor">
+              <InlineEditorImpl
+                value={inlineDraft}
+                format="markdown"
+                editable
+                onChange={(v) => setInlineDraft(v)}
+                placeholder="在 Tiptap 富文本里修改这条回复..."
+              />
+              <div className="msg__inline-editor-actions">
+                <button
+                  type="button"
+                  className="msg__action-btn"
+                  onClick={() => {
+                    setInlineEditing(false);
+                    setInlineDraft("");
+                  }}
+                  data-testid="message-inline-edit-cancel"
+                >
+                  取消 (Esc)
+                </button>
+                <button
+                  type="button"
+                  className="msg__action-btn"
+                  onClick={() => {
+                    if (!onEditAssistantMessage) return;
+                    onEditAssistantMessage(message.id, inlineDraft);
+                    setInlineEditing(false);
+                    setInlineDraft("");
+                    onToast?.("已就地保存");
+                  }}
+                  data-testid="message-inline-edit-apply"
+                >
+                  应用
+                </button>
+                {onResendAfterAssistantEdit && onEditAssistantMessage && (
+                  <button
+                    type="button"
+                    className="msg__action-btn msg__action-btn--primary"
+                    onClick={() => {
+                      onEditAssistantMessage(message.id, inlineDraft);
+                      setInlineEditing(false);
+                      setInlineDraft("");
+                      onResendAfterAssistantEdit(message.id);
+                    }}
+                    data-testid="message-inline-edit-apply-resend"
+                  >
+                    应用并重新生成
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : null}
           {/* Placeholder state: the assistant message exists but no content
               has streamed in yet. Render the avatar (header above) + the
               shimmering "preparing / waiting for model" loading row with a
@@ -307,18 +427,19 @@ function MessageItemInner({
             // for the currently-streaming message.
             const isStreaming = streaming && !message.complete;
             if (p.kind === "text") {
-              return isStreaming ? (
-                <StreamingMarkdown key={i} text={p.text} markdownTheme="loose" />
-              ) : (
-                <Markdown
+              // 正文走内核 `conversation.message.markdown` 槽:插件可以换成
+              // 自己的 markdown 引擎 / 批注视图,内核里没实现时渲染的就是原来
+              // 那对 StreamingMarkdown / Markdown —— 视觉零变化。
+              return (
+                <ConversationMarkdown
                   key={i}
+                  text={p.text}
+                  streaming={isStreaming}
                   complete={message.complete}
                   markdownTheme="loose"
                   theme={theme}
                   config={markdownConfig}
-                >
-                  {p.text}
-                </Markdown>
+                />
               );
             }
             if (p.kind === "thought") {
@@ -326,18 +447,14 @@ function MessageItemInner({
                 <details key={i} className="msg__thought">
                   <summary>深度思考</summary>
                   <div className="msg__thought-body">
-                    {isStreaming ? (
-                      <StreamingMarkdown text={p.text} markdownTheme="reasoning" />
-                    ) : (
-                      <Markdown
-                        complete={message.complete}
-                        markdownTheme="reasoning"
-                        theme={theme}
-                        config={markdownConfig}
-                      >
-                        {p.text}
-                      </Markdown>
-                    )}
+                    <ConversationMarkdown
+                      text={p.text}
+                      streaming={isStreaming}
+                      complete={message.complete}
+                      markdownTheme="reasoning"
+                      theme={theme}
+                      config={markdownConfig}
+                    />
                   </div>
                 </details>
               );
@@ -406,6 +523,35 @@ function MessageItemInner({
                 copiedIcon={<Check size={14} strokeWidth={2} />}
               />
             )}
+            {DraftImpl && markdownText && (
+              <TooltipButton
+                className="msg__action-btn"
+                tooltip="把这条回答送进草稿编辑器(用 Tiptap / 表格 / math / mermaid 改写)"
+                onClick={() => {
+                  setDraftInitial(markdownText);
+                  setDraftOpen(true);
+                }}
+                aria-label="编辑为草稿"
+                data-testid="message-draft-button"
+              >
+                <Pencil size={14} strokeWidth={1.75} />
+              </TooltipButton>
+            )}
+            {InlineEditorImpl && markdownText && !inlineEditing && (
+              <TooltipButton
+                className="msg__action-btn"
+                tooltip="就地编辑这条回复(Tiptap 富文本,Esc 取消,⌘/Ctrl+Enter 应用并可重新生成)"
+                onClick={() => {
+                  setInlineDraft(markdownText);
+                  setInlineEditing(true);
+                }}
+                aria-label="就地编辑"
+                data-testid="message-inline-edit-button"
+              >
+                <Pencil size={14} strokeWidth={1.75} />
+                <span style={{ marginLeft: 2 }}>↳</span>
+              </TooltipButton>
+            )}
             {onRetry && (
               <TooltipButton
                 className="msg__action-btn"
@@ -422,6 +568,23 @@ function MessageItemInner({
           </div>
         )}
         {metaProps && <MessageMeta {...metaProps} />}
+        {DraftImpl ? (
+          <DraftImpl
+            open={draftOpen}
+            onClose={() => setDraftOpen(false)}
+            onApply={(md) => {
+              setDraftOpen(false);
+              onToast?.(md ? `草稿已应用（${md.length} 字符）` : "草稿为空");
+            }}
+            onCopy={(md) => {
+              void navigator.clipboard?.writeText(md).then(
+                () => onToast?.("草稿 markdown 已复制到剪贴板"),
+                () => onToast?.("剪贴板不可用"),
+              );
+            }}
+            initialMarkdown={draftInitial}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -445,6 +608,7 @@ function MessageMeta({
   isStreaming,
   modelId,
   outputTokens,
+  inputTokens,
 }: {
   createdAt: number;
   durationMs: number | null;
@@ -456,6 +620,10 @@ function MessageMeta({
    *  a tok/s throughput chip. Only renders when both are present and the
    *  turn has actually finished streaming. */
   outputTokens?: number;
+  /** R58 — prompt (input) token count for this turn. Renders as a
+   *  "<formatted> in" chip before the throughput chip when present.
+   *  Optional for backward compat with pre-R58 history. */
+  inputTokens?: number;
 }) {
   const label = isStreaming
     ? `${formatDurationMs(durationMs ?? 0)} 正在生成…`
@@ -508,6 +676,31 @@ function MessageMeta({
           <span className="msg__meta-chip-text">{modelId}</span>
         </span>
       )}
+      {/* R58 — input (prompt) token chip. Renders before the throughput
+          chip so the "in" / "out" / "tok/s" reading order stays natural.
+          Only shown when inputTokens is present (provider-reported) AND
+          the turn has finished streaming (mirrors the throughput gate). */}
+      {!isStreaming && typeof inputTokens === "number" && inputTokens > 0 && (
+        <span
+          className="msg__meta-chip msg__meta-chip--input"
+          title={`${inputTokens} prompt tokens for this turn`}
+        >
+          <Hash size={9} strokeWidth={1.75} aria-hidden="true" />
+          <span className="msg__meta-chip-text">{formatTokenCount(inputTokens)} in</span>
+        </span>
+      )}
+      {/* R58 — output (completion) token chip. Rendered alongside the
+          input chip so users can see in/out at a glance; the legacy
+          throughput chip below carries the tok/s rate. */}
+      {!isStreaming && typeof outputTokens === "number" && outputTokens > 0 && (
+        <span
+          className="msg__meta-chip msg__meta-chip--output"
+          title={`${outputTokens} completion tokens for this turn`}
+        >
+          <Zap size={9} strokeWidth={1.75} aria-hidden="true" />
+          <span className="msg__meta-chip-text">{formatTokenCount(outputTokens)} out</span>
+        </span>
+      )}
       {throughput !== null && (
         <span className="msg__meta-chip msg__meta-chip--throughput" title={`${outputTokens} completion tokens in ${formatDurationMs(durationMs!)}`}>
           <Zap size={9} strokeWidth={1.75} aria-hidden="true" />
@@ -525,6 +718,15 @@ function formatThroughput(tps: number): string {
   if (tps >= 100) return `${Math.round(tps)}`;
   if (tps >= 10) return tps.toFixed(1);
   return tps.toFixed(2);
+}
+
+/** R58 — "1.2k" / "12k" / "1.5m" formatter for raw token counts.
+ *  Mirrors how ChatMinimap / ContextUsagePill already shorten large
+ *  numbers so the meta chip reads consistently across the app. */
+function formatTokenCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}m`;
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k`;
+  return `${Math.round(n)}`;
 }
 
 /** R8.14 — `12s` / `1m 5s` formatter. Mirrors ChatView's existing

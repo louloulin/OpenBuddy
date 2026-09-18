@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState, useCallback, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { MentionPicker } from "./MentionPicker";
 import { Mic, Square, X, type LucideIcon } from "lucide-react";
-import { open as openDialog, type ElectronWindowApi } from "@/lib/platform/electron-api";
+import { openPaths, type ElectronWindowApi } from "@/lib/platform/electron-api";
 import { getCurrentWebview } from "@/lib/platform/electron-api";
 import { ChevronDownIcon, SendPlaneIcon } from "@openbuddy/ui-primitives/icons";
 import { ModelSelector, type ModelOption, type ThinkingLevel } from "@openbuddy/ui-workbench";
@@ -21,7 +21,13 @@ import {
 } from "@/lib/ui/input-history";
 import { WorkspacePicker } from "@openbuddy/ui-shell";
 import { PermissionPicker } from "@openbuddy/ui-shared";
-import { SlashCommands } from "@openbuddy/ui-workbench";
+import {
+  SlashCommands,
+  NATIVE_PI_COMMANDS,
+  matchPluginSlashCommand,
+  runPluginCommand,
+  type PluginCommandPayload,
+} from "@openbuddy/ui-workbench";
 import { InputAddMenu } from "./InputAddMenu";
 import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
 import { RendererSlotView } from "@openbuddy/ui-workbench";
@@ -509,6 +515,26 @@ export function ComposerInner({
     const t = text.trim();
     // 允许空消息发送，或者需要有附件
     if (streaming || disabled || !apiReady) return;
+    // 插件命令优先:它是渲染端动作,把 "/greet Alice" 当 prompt 发出去只会得到
+    // 一句模型编的回话。带附件/图片时不拦截 —— 那种情况用户显然想发给 agent。
+    // 保留名单里的名字(plan / fork / …)永远归 Pi,插件同名也不许截胡。
+    if (attachments.length === 0 && images.length === 0 && t.startsWith("/")) {
+      const hit = matchPluginSlashCommand(
+        t,
+        pluginCommands,
+        NATIVE_PI_COMMANDS.map((command) => command.name),
+      );
+      if (hit) {
+        runPluginCommand(hit.command, hit.args, (error) =>
+          onToast?.(
+            `插件命令 /${hit.command.id} 执行失败:${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+        updateText("");
+        setCursorPos(0);
+        return;
+      }
+    }
     // Append attachment paths to the prompt text so pi's read_file tool can
     // pick them up (ACP image/audio needs agent-declared capabilities we
     // don't model yet; ResourceLink behavior is unverified — text is safest).
@@ -581,9 +607,8 @@ export function ComposerInner({
 
   const pickFiles = async () => {
     try {
-      const selected = await openDialog({ multiple: true });
-      if (!selected) return;
-      const paths = Array.isArray(selected) ? selected : [selected];
+      const paths = await openPaths({ multiple: true });
+      if (paths.length === 0) return;
       setAttachments((prev) => {
         const set = new Set(prev);
         paths.forEach((p) => set.add(p));
@@ -599,14 +624,13 @@ export function ComposerInner({
    *  "I want a vision model to look at this" affordance (Codex-style). */
   const pickImages = async () => {
     try {
-      const selected = await openDialog({
+      const paths = await openPaths({
         multiple: true,
         filters: [
           { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] },
         ],
       });
-      if (!selected) return;
-      const paths = Array.isArray(selected) ? selected : [selected];
+      if (paths.length === 0) return;
       // Resolve each path to a File via fetch. The preload bridge returns
       // a file:// URL we can fetch in the renderer. In test environments
       // (no Electron) fetch will reject — we surface a toast and continue.
@@ -703,6 +727,13 @@ export function ComposerInner({
     onClick?: (ctx: { insertText: (text: string) => void }) => void;
     onActivate?: () => void;
   }>("composer.toolbar.action");
+
+  /**
+   * Plugin SDK 注册的命令(内核 `plugin.command` 的数据型 payload)。
+   * 它们既能出现在 `/` 补全菜单里,也在发送路径上被识别成「渲染端动作」而不是
+   * 要发给 agent 的 prompt —— 否则插件注册的命令永远只能靠 ⌘K 才能执行。
+   */
+  const pluginCommands = useSlotPayloads<PluginCommandPayload>("plugin.command");
 
   // Cursor tracking for slash-command autocomplete.
   const [cursorPos, setCursorPos] = useState(0);
@@ -849,7 +880,14 @@ export function ComposerInner({
               onOpenSettings?.();
             }}
           >
-            请先配置 API Key 开始使用
+            {/* R30 — 这块是覆盖整张卡片的**点击热区**(点哪儿都跳到设置)。
+                以前它同时把「请先配置 API Key 开始使用」再画一遍,而它
+                `inset: 0` + 垂直居中,文字正好压在输入区与底栏的接缝上
+                (实测文字 y≈390–405,底栏从 410 开始),而 textarea 的
+                placeholder 已经写着同一句话(y≈352)→ 同一句提示出现两次
+                还叠在底栏上。文字改成 sr-only:读屏仍能念出按钮名,视觉
+                上只留 placeholder 那一处。 */}
+            <span className="wb-sr-only">请先配置 API Key 开始使用</span>
           </button>
         )}
 
@@ -1115,6 +1153,7 @@ export function ComposerInner({
         <SlashCommands
           text={text}
           cursor={cursorPos}
+          pluginCommands={pluginCommands}
           onPick={handleSlashPick}
           anchorRect={anchorRect}
         />
@@ -1435,3 +1474,13 @@ function ensureWebSpeechAsrRegistered(): void {
  * so the default comparator's reference check actually skips work.
  */
 export const Composer = memo(ComposerInner);
+
+/**
+ * 内置 Composer 的 props 契约。
+ *
+ * 导出它是为了让"替换输入区"的插件拿到**同一份**契约:内核
+ * `conversation.composer` 槽的实现会收到与内置组件完全相同的 props
+ * (见 `conversation-slots.tsx`),所以插件可以只包一层、把剩余 props 原样
+ * 转发给内置 Composer —— 不需要自己重新发明一套输入区 API。
+ */
+export type ComposerProps = Parameters<typeof ComposerInner>[0];

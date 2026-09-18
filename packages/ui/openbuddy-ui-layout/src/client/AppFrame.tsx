@@ -73,7 +73,6 @@ export function AppFrame({
   }, [runtime]);
 
   const sidebarWidth = sidebarCollapsed ? 64 : 240;
-  const detailsWidth = detailsOpen ? 320 : 0;
 
   const sidebarEntries = runtime.slots.entries("sidebar");
   const conversationEntries = runtime.slots.entries("conversation");
@@ -118,7 +117,7 @@ export function AppFrame({
       <main
         style={{
           display: "grid",
-          gridTemplateColumns: `${sidebarWidth}px 1fr ${detailsWidth}px`,
+          gridTemplateColumns: `${sidebarWidth}px 1fr`,
           overflow: "hidden",
           transition: "grid-template-columns 0.18s",
         }}
@@ -148,19 +147,11 @@ export function AppFrame({
             : null}
         </section>
 
-        {detailsOpen && DetailsComp ? (
-          <aside
-            aria-label="Details"
-            style={{
-              borderLeft: "1px solid var(--wb-border)",
-              background: "var(--wb-bg-secondary)",
-              overflow: "auto",
-            }}
-          >
-            {renderSlotComponent(DetailsComp, { open: detailsOpen, width: detailsWidth })}
-          </aside>
-        ) : null}
       </main>
+
+      {/* details 槽(右侧助理导轨)不占网格列 —— 注册进来的实现是
+          `position: fixed` 贴右缘的导轨,宿主只负责告诉它"现在可见吗"。 */}
+      {DetailsComp ? renderSlotComponent(DetailsComp, { visible: detailsOpen }) : null}
 
       {overlayEntries.length > 0 ? (
         <div

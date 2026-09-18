@@ -8,7 +8,7 @@
  *
  * What this factory does:
  *   1. On `session_start` — loads the JSON mirror from
- *      `~/.pi/openbuddy-state.json` and emits a snapshot event so
+ *      `<agentHome>/openbuddy-state.json` and emits a snapshot event so
  *      the host + renderer can react without manually reading the file.
  *   2. On `session_shutdown` — emits a checkpoint event so downstream
  *      subscribers know the session is going away (mirrors still

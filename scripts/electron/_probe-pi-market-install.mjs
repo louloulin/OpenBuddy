@@ -88,7 +88,10 @@ const audit = await invoke("agent:pi-market-audit", { limit: 20 });
 console.log(JSON.stringify(audit, null, 2).slice(0, 1500));
 
 console.log("\n=== STEP 7: filesystem check ===");
-const fsCheck = await page.evaluate(async ({ dataDir }) => {
+// 这一段**必须在 node 侧读盘**:渲染进程开不了 `node:fs`(sandbox + contextIsolation),
+// 之前在 page.evaluate 里 import 会直接抛 "Failed to fetch dynamically imported module",
+// 让整条探针在第 7 步崩掉 —— R32 修掉这个假失败。
+const fsCheck = await (async ({ dataDir }) => {
   const fs = await import("node:fs/promises");
   const out = {};
   try {
@@ -111,7 +114,7 @@ const fsCheck = await page.evaluate(async ({ dataDir }) => {
     out.auditLines = auditRaw.split("\n").filter(Boolean).length;
   } catch (e) { out.auditError = String(e.message); }
   return out;
-}, { dataDir: userData });
+})({ dataDir: userData });
 console.log(JSON.stringify(fsCheck, null, 2));
 
 console.log("\nERRORS:", JSON.stringify(errs));
