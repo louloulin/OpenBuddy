@@ -74,6 +74,7 @@ tasks:
       - "@group(sources)"
       - "vitest.config.ts"
       - "src/test-setup.ts"
+      - "test/node-setup.ts"
       - "package.json"
     outputs: []
 
@@ -279,5 +280,4 @@ tasks:
     options:
       cache: false
       runInCI: true
-
 

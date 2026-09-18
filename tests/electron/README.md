@@ -24,7 +24,8 @@ The five "real upstream" specs read credentials from (in order):
 
 1. `OPENBUDDY_E2E_API_KEY` / `OPENBUDDY_E2E_BASE_URL` / `OPENBUDDY_E2E_MODEL_ID`
 2. `.env.e2e.local` (gitignored)
-3. `~/.pi/agent/auth.json` (where `pi auth login minimax` writes)
+3. `~/.openbuddy/agent/auth.json` (OpenBuddy's own store), then
+   `~/.pi/agent/auth.json` (where `pi auth login minimax` writes)
 
 If none of the above contain a MiniMax key, the five specs skip cleanly
 instead of failing, so a machine without credentials runs the rest of

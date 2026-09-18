@@ -39,17 +39,20 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveE2ECredentials } from "../lib/e2e-credentials.mjs";
+
 const root = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const dotEnvPath = join(root, ".env.e2e.local");
 
 /**
- * Mirror `scripts/lib/e2e-credentials.mjs` resolution order so this probe
- * agrees with the rest of the E2E suite: explicit env vars win, then the
- * gitignored `.env.e2e.local`, then `~/.pi/agent/auth.json`. The probe used
- * to throw ENOENT on any machine without `.env.e2e.local` (which is the
- * common case — the file is gitignored). Falling through keeps the script
- * useful as a sanity check whenever a developer has the key anywhere pi
- * itself would find it.
+ * Credentials resolve through `scripts/lib/e2e-credentials.mjs` so this probe
+ * always agrees with the rest of the suite. The local copy used to read only
+ * `~/.pi/agent/auth.json`; once OpenBuddy owned `~/.openbuddy/agent/auth.json`
+ * the two disagreed — the probe would claim "no credentials" while every
+ * real-model spec ran fine (or vice versa).
+ *
+ * Order: explicit env vars, then the gitignored `.env.e2e.local`, then the
+ * on-disk stores (OpenBuddy's agent home, then pi's legacy path).
  */
 function parseDotEnv(text) {
   const out = {};
@@ -71,22 +74,11 @@ function parseDotEnv(text) {
   return out;
 }
 
-function readPiApiKey(provider) {
-  const authPath = join(process.env.USERPROFILE ?? process.env.HOME ?? "", ".pi", "agent", "auth.json");
-  if (!existsSync(authPath)) return undefined;
-  try {
-    const parsed = JSON.parse(readFileSync(authPath, "utf8"));
-    const entry = parsed?.[provider];
-    if (!entry) return undefined;
-    const key = typeof entry === "string" ? entry : (entry.key ?? entry.apiKey);
-    return typeof key === "string" && key.length > 0 ? key : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 const localEnv = existsSync(dotEnvPath) ? parseDotEnv(readFileSync(dotEnvPath, "utf8")) : {};
-const apiKey = process.env.OPENBUDDY_E2E_API_KEY || localEnv.OPENBUDDY_E2E_API_KEY || readPiApiKey("minimax") || readPiApiKey("minimax-cn");
+// `resolveE2ECredentials` handles env → `.env.e2e.local` → credential stores.
+// It also covers the `minimax-cn` alias via `readStoredApiKey`, which the old
+// two-call fallback here duplicated by hand.
+const apiKey = resolveE2ECredentials({ provider: "minimax" }).apiKey ?? localEnv.OPENBUDDY_E2E_API_KEY;
 const report = {
   schema: "openbuddy.minimax-probe.v1",
   generatedAt: new Date().toISOString(),

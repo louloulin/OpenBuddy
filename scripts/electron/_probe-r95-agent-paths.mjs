@@ -33,6 +33,11 @@ const userData = mkdtempSync(join(tmpdir(), "ob-r95-paths-"));
 const agentDir = mkdtempSync(join(tmpdir(), "ob-r95-agent-"));
 mkdirSync(join(agentDir, "agents"), { recursive: true });
 mkdirSync(join(agentDir, "experts"), { recursive: true });
+// Canonical flat user-agents dir is the **sibling** of agentDir, not inside it.
+// Pin both so the probe can observe the flat layout independently from
+// the legacy nested one.
+const userAgentsDir = join(agentDir, "..", "user-agents-flat");
+mkdirSync(userAgentsDir, { recursive: true });
 
 const app = await electron.launch({
   args: [`--user-data-dir=${userData}`, root],
@@ -44,6 +49,7 @@ const app = await electron.launch({
     ELECTRON_RENDERER_URL: "",
     OPENBUDDY_DEBUG_UI: "0",
     OPENBUDDY_AGENT_DIR: agentDir,
+    OPENBUDDY_USER_AGENTS_DIR: userAgentsDir,
   },
 });
 
@@ -90,12 +96,17 @@ try {
     snapshot?.home,
   );
   step(
-    "子路径与 main 落盘一致(agents/plugins/node_modules)",
+    "agents 是扁平 OPENBUDDY_USER_AGENTS_DIR(不是 <home>/agents)",
+    isShape && snapshot.agents === userAgentsDir && snapshot.agentsDisplay === userAgentsDir,
+    JSON.stringify({ agents: snapshot?.agents, agentsDisplay: snapshot?.agentsDisplay, expected: userAgentsDir }),
+  );
+  step(
+    "其他子路径仍挂在 <home>/ 下(experts/plugins/node_modules)",
     isShape
-      && snapshot.agents === `${agentDir}/agents`
+      && snapshot.experts === `${agentDir}/experts`
       && snapshot.plugins === `${agentDir}/plugins`
       && snapshot.extensions === `${agentDir}/node_modules`,
-    JSON.stringify({ agents: snapshot?.agents, plugins: snapshot?.plugins, extensions: snapshot?.extensions }),
+    JSON.stringify({ experts: snapshot?.experts, plugins: snapshot?.plugins, extensions: snapshot?.extensions }),
   );
   step("fromEnv=true(显式覆盖被识别)", isShape && snapshot.fromEnv === true, String(snapshot?.fromEnv));
 
@@ -124,6 +135,11 @@ try {
   step(
     "main 的 agent 根不含 .pi(未被 SDK 默认值带偏)",
     typeof pin.home === "string" && !/[\\/]\.pi([\\/]|$)/.test(pin.home),
+    JSON.stringify(pin),
+  );
+  step(
+    "agents 也不含 .pi(扁平布局而非 SDK 的 ~/.pi/agents)",
+    typeof pin.agents === "string" && !/[\\/]\.pi([\\/]|$)/.test(pin.agents),
     JSON.stringify(pin),
   );
   // 这才是"数据写到哪"的直接证据:`PI_CODING_AGENT_DIR` —— 也就是

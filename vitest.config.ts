@@ -123,7 +123,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
-    setupFiles: [resolve(__dirname, "src/test-setup.ts")],
+    // Order matters: `test/node-setup.ts` pins `PI_CODING_AGENT_DIR` to a
+    // per-process sandbox *before* any pi module is imported. Without it, tests
+    // that call `SessionManager.create(cwd)` write into the developer's real
+    // `~/.pi/agent/sessions/`. It lives outside `src/` because the renderer
+    // import-boundary test forbids `node:*` imports anywhere under `src/**`.
+    setupFiles: [resolve(__dirname, "test/node-setup.ts"), resolve(__dirname, "src/test-setup.ts")],
     css: false,
     // OpenBuddy ships a CLI in `bin/` with its own Node-only test file.
     // Mark it as node-environment so the file-system + child-process
