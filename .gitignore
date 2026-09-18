@@ -205,3 +205,6 @@ packages/*/*/node_modules
 .tmp-screenshots/
 !docs/PLUGIN_SDK.md
 !docs/THEME_BASELINE_R77.md
+
+# Probe scripts' scratch output (e.g. probe-r96-expert-link discover probes)
+scripts/probe-tmp/
