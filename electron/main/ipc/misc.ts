@@ -3,7 +3,8 @@
  *
  * Split out of `./index.ts`.
  */
-import { clipboard, dialog, ipcMain, shell, type BrowserWindow } from "electron";
+import { clipboard, dialog, shell, type BrowserWindow } from "electron";
+import { wrapIpcHandler } from "./_wrap";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import * as fs from "node:fs/promises";
 import { approveSavePath, requireApprovedSavePath } from "./save-path-approval";
@@ -79,11 +80,11 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		return root;
 	};
 
-		ipcMain.handle("clipboard:read-text", () => clipboard.readText());
-		ipcMain.handle("clipboard:write-text", (_event, text: unknown) => {
+		wrapIpcHandler("clipboard:read-text", () => clipboard.readText());
+		wrapIpcHandler("clipboard:write-text", (_event, text: unknown) => {
 			clipboard.writeText(stringValue(text, "text"));
 		});
-		ipcMain.handle("dialog:open", async (_event, options?: Electron.OpenDialogOptions) => {
+		wrapIpcHandler("dialog:open", async (_event, options?: Electron.OpenDialogOptions) => {
 			const safeOptions = openDialogOptions(options);
 			const win = currentWindow();
 			const result = win
@@ -91,7 +92,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				: await dialog.showOpenDialog(safeOptions);
 			return result.canceled ? null : result.filePaths;
 		});
-		ipcMain.handle("dialog:save", async (_event, options?: Electron.SaveDialogOptions) => {
+		wrapIpcHandler("dialog:save", async (_event, options?: Electron.SaveDialogOptions) => {
 			const safeOptions = saveDialogOptions(options);
 			const win = currentWindow();
 			const result = win
@@ -100,11 +101,11 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			return approveSavePath(result.canceled ? null : result.filePath ?? null);
 		});
 		
-		ipcMain.handle("window:minimize", () => currentWindow()?.minimize());
-		ipcMain.handle("window:toggle-maximize", () => currentWindow()?.isMaximized() ? currentWindow()?.unmaximize() : currentWindow()?.maximize());
-		ipcMain.handle("window:close", () => currentWindow()?.close());
-		ipcMain.handle("window:is-maximized", () => currentWindow()?.isMaximized() ?? false);
-		ipcMain.handle("debug:toggle-devtools", async () => {
+		wrapIpcHandler("window:minimize", () => currentWindow()?.minimize());
+		wrapIpcHandler("window:toggle-maximize", () => currentWindow()?.isMaximized() ? currentWindow()?.unmaximize() : currentWindow()?.maximize());
+		wrapIpcHandler("window:close", () => currentWindow()?.close());
+		wrapIpcHandler("window:is-maximized", () => currentWindow()?.isMaximized() ?? false);
+		wrapIpcHandler("debug:toggle-devtools", async () => {
 			const contents = currentWindow()?.webContents;
 			if (!contents) return false;
 			if (contents.isDevToolsOpened()) {
@@ -122,7 +123,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			await opened;
 			return contents.isDevToolsOpened();
 		});
-		ipcMain.handle("debug:reload", () => {
+		wrapIpcHandler("debug:reload", () => {
 			const win = currentWindow();
 			if (!win || win.isDestroyed()) {
 				console.warn("[openbuddy-pi] debug:reload ignored — no main window");
@@ -131,7 +132,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			win.webContents.reload();
 			return true;
 		});
-		ipcMain.handle("debug:force-reload", () => {
+		wrapIpcHandler("debug:force-reload", () => {
 			const win = currentWindow();
 			if (!win || win.isDestroyed()) {
 				console.warn("[openbuddy-pi] debug:force-reload ignored — no main window");
@@ -140,7 +141,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			win.webContents.reloadIgnoringCache();
 			return true;
 		});
-		ipcMain.handle("debug:info", () => {
+		wrapIpcHandler("debug:info", () => {
 			const win = currentWindow();
 			return {
 				url: win?.webContents.getURL() ?? "",
@@ -152,121 +153,121 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		// Stage C-1: openbuddy-folder-trust removed; folder trust is owned by the
 		// system (no plugin). Handlers intentionally throw so callers see a clear
 		// "removed" error rather than a silent no-op.
-		ipcMain.handle("folder-trust:list", async () => {
+		wrapIpcHandler("folder-trust:list", async () => {
 			throw new Error("folder-trust:list is removed (Stage C-1); folder trust is owned by the system");
 		});
-		ipcMain.handle("folder-trust:is-trusted", async (_e, _cwd: unknown) => {
+		wrapIpcHandler("folder-trust:is-trusted", async (_e, _cwd: unknown) => {
 			throw new Error("folder-trust:is-trusted is removed (Stage C-1); folder trust is owned by the system");
 		});
-		ipcMain.handle("folder-trust:grant", async (_e, _cwd: unknown) => {
+		wrapIpcHandler("folder-trust:grant", async (_e, _cwd: unknown) => {
 			throw new Error("folder-trust:grant is removed (Stage C-1); folder trust is owned by the system");
 		});
-		ipcMain.handle("folder-trust:revoke", async (_e, _cwd: unknown) => {
+		wrapIpcHandler("folder-trust:revoke", async (_e, _cwd: unknown) => {
 			throw new Error("folder-trust:revoke is removed (Stage C-1); folder trust is owned by the system");
 		});
-		ipcMain.handle("folder_trust_respond", async (_e, _args: unknown) => {
+		wrapIpcHandler("folder_trust_respond", async (_e, _args: unknown) => {
 			throw new Error("folder_trust_respond is removed (Stage C-1); folder trust is owned by the system");
 		});
 		// Stage C-4: openbuddy-memory removed; memory is owned by pi-hermes-memory
 		// (passthrough). Handlers intentionally throw so callers see a clear
 		// "removed" error rather than a silent no-op.
-		ipcMain.handle("memory:list", async () => {
+		wrapIpcHandler("memory:list", async () => {
 			throw new Error("memory:list is removed (Stage C-4); memory is owned by pi-hermes-memory");
 		});
-		ipcMain.handle("memory:get", async (_e, _id: unknown) => {
+		wrapIpcHandler("memory:get", async (_e, _id: unknown) => {
 			throw new Error("memory:get is removed (Stage C-4); memory is owned by pi-hermes-memory");
 		});
-		ipcMain.handle("memory:save", async (_e, _payload: unknown) => {
+		wrapIpcHandler("memory:save", async (_e, _payload: unknown) => {
 			throw new Error("memory:save is removed (Stage C-4); memory is owned by pi-hermes-memory");
 		});
-		ipcMain.handle("memory:delete", async (_e, _id: unknown) => {
+		wrapIpcHandler("memory:delete", async (_e, _id: unknown) => {
 			throw new Error("memory:delete is removed (Stage C-4); memory is owned by pi-hermes-memory");
 		});
-		ipcMain.handle("memory:rewrite", async (_e, _payload: unknown) => {
+		wrapIpcHandler("memory:rewrite", async (_e, _payload: unknown) => {
 			throw new Error("memory:rewrite is removed (Stage C-4); memory is owned by pi-hermes-memory");
 		});
-		ipcMain.handle("memory_list", async () => {
+		wrapIpcHandler("memory_list", async () => {
 			throw new Error("memory_list is removed (Stage C-4); memory is owned by pi-hermes-memory");
 		});
-		ipcMain.handle("memory_get", async (_e, _id: unknown) => {
+		wrapIpcHandler("memory_get", async (_e, _id: unknown) => {
 			throw new Error("memory_get is removed (Stage C-4); memory is owned by pi-hermes-memory");
 		});
-		ipcMain.handle("memory_save", async (_e, _payload: unknown) => {
+		wrapIpcHandler("memory_save", async (_e, _payload: unknown) => {
 			throw new Error("memory_save is removed (Stage C-4); memory is owned by pi-hermes-memory");
 		});
-		ipcMain.handle("memory_delete", async (_e, _id: unknown) => {
+		wrapIpcHandler("memory_delete", async (_e, _id: unknown) => {
 			throw new Error("memory_delete is removed (Stage C-4); memory is owned by pi-hermes-memory");
 		});
-		ipcMain.handle("memory_rewrite", async (_e, _payload: unknown) => {
+		wrapIpcHandler("memory_rewrite", async (_e, _payload: unknown) => {
 			throw new Error("memory_rewrite is removed (Stage C-4); memory is owned by pi-hermes-memory");
 		});
-		ipcMain.handle("memory_flush", async () => null);
-		ipcMain.handle("subagents:get-config", async () => {
+		wrapIpcHandler("memory_flush", async () => null);
+		wrapIpcHandler("subagents:get-config", async () => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			return readSubagentsConfig();
 		});
 		// Stub channels for legacy / 3rd-party IPC keep preload allowlist in sync.
 		// Stage G-1c: storage:automation-bootstrap removed; automation is owned by pi-background-tasks (passthrough).
 		// The handler intentionally throws so callers see a clear "removed" error rather than a silent no-op.
-		ipcMain.handle("storage:automation-bootstrap", async () => {
+		wrapIpcHandler("storage:automation-bootstrap", async () => {
 			throw new Error("storage:automation-bootstrap is removed (Stage G-1c); automation is owned by pi-background-tasks (passthrough)");
 		});
-		ipcMain.handle("toggle_plan_mode", async () => null);
-		ipcMain.handle("web_search_config_get", async () => null);
-		ipcMain.handle("web_search_config_save", async () => null);
-		ipcMain.handle("websearch:fetch", async () => null);
-		ipcMain.handle("websearch:get-config", async () => null);
-		ipcMain.handle("websearch:search", async () => null);
-		ipcMain.handle("websearch:set-config", async () => null);
-		ipcMain.handle("websearch:set-enabled", async () => null);
-		ipcMain.handle("plan-mode:approve", async () => null);
-		ipcMain.handle("plan-mode:get", async () => null);
-		ipcMain.handle("plan-mode:reject", async () => null);
-		ipcMain.handle("plan-mode:set-enabled", async () => null);
-		ipcMain.handle("plan-mode:set-plan", async () => null);
-		ipcMain.handle("tasks:add", async (_e, args: unknown) => {
+		wrapIpcHandler("toggle_plan_mode", async () => null);
+		wrapIpcHandler("web_search_config_get", async () => null);
+		wrapIpcHandler("web_search_config_save", async () => null);
+		wrapIpcHandler("websearch:fetch", async () => null);
+		wrapIpcHandler("websearch:get-config", async () => null);
+		wrapIpcHandler("websearch:search", async () => null);
+		wrapIpcHandler("websearch:set-config", async () => null);
+		wrapIpcHandler("websearch:set-enabled", async () => null);
+		wrapIpcHandler("plan-mode:approve", async () => null);
+		wrapIpcHandler("plan-mode:get", async () => null);
+		wrapIpcHandler("plan-mode:reject", async () => null);
+		wrapIpcHandler("plan-mode:set-enabled", async () => null);
+		wrapIpcHandler("plan-mode:set-plan", async () => null);
+		wrapIpcHandler("tasks:add", async (_e, args: unknown) => {
 			const input = recordValue(args, "tasks:add payload");
 			requiredString(input.sessionId, "sessionId");
 			return null;
 		});
-		ipcMain.handle("tasks:clear-completed", async () => null);
-		ipcMain.handle("tasks:delete", async (_e, args: unknown) => {
+		wrapIpcHandler("tasks:clear-completed", async () => null);
+		wrapIpcHandler("tasks:delete", async (_e, args: unknown) => {
 			const input = recordValue(args, "tasks:delete payload");
 			requiredString(input.id, "id");
 			return null;
 		});
-		ipcMain.handle("tasks:list", async () => null);
-		ipcMain.handle("tasks:update", async (_e, args: unknown) => {
+		wrapIpcHandler("tasks:list", async () => null);
+		wrapIpcHandler("tasks:update", async (_e, args: unknown) => {
 			const input = recordValue(args, "tasks:update payload");
 			requiredString(input.id, "id");
 			return null;
 		});
-		ipcMain.handle("automations:archive", async () => null);
-		ipcMain.handle("automations:delete", async () => null);
-		ipcMain.handle("automations:run", async () => null);
-		ipcMain.handle("automations:save", async () => null);
-		ipcMain.handle("automations:set-status", async () => null);
-		ipcMain.handle("inspiration:list", async () => null);
-		ipcMain.handle("inspiration:next", async () => null);
-		ipcMain.handle("notification_append", async () => null);
-		ipcMain.handle("notification_clear", async () => null);
-		ipcMain.handle("notification_list", async () => null);
-		ipcMain.handle("notification_mark_all_read", async () => null);
-		ipcMain.handle("notification_mark_read", async () => null);
-		ipcMain.handle("notifications:append", async () => null);
-		ipcMain.handle("notifications:clear", async () => null);
-		ipcMain.handle("notifications:list", async () => null);
-		ipcMain.handle("notifications:mark-all-read", async () => null);
-		ipcMain.handle("notifications:mark-read", async () => null);
-		ipcMain.handle("subagents:set-config", async (_e, args: unknown) => {
+		wrapIpcHandler("automations:archive", async () => null);
+		wrapIpcHandler("automations:delete", async () => null);
+		wrapIpcHandler("automations:run", async () => null);
+		wrapIpcHandler("automations:save", async () => null);
+		wrapIpcHandler("automations:set-status", async () => null);
+		wrapIpcHandler("inspiration:list", async () => null);
+		wrapIpcHandler("inspiration:next", async () => null);
+		wrapIpcHandler("notification_append", async () => null);
+		wrapIpcHandler("notification_clear", async () => null);
+		wrapIpcHandler("notification_list", async () => null);
+		wrapIpcHandler("notification_mark_all_read", async () => null);
+		wrapIpcHandler("notification_mark_read", async () => null);
+		wrapIpcHandler("notifications:append", async () => null);
+		wrapIpcHandler("notifications:clear", async () => null);
+		wrapIpcHandler("notifications:list", async () => null);
+		wrapIpcHandler("notifications:mark-all-read", async () => null);
+		wrapIpcHandler("notifications:mark-read", async () => null);
+		wrapIpcHandler("subagents:set-config", async (_e, args: unknown) => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			const input = recordValue(args, "subagents set-config payload");
 			const patch: OpenBuddySubagentsConfig = {};
 			if (input.maxDepth !== undefined) patch.maxDepth = optionalFiniteInteger(input.maxDepth, "maxDepth", 1, 1, 8);
 			return writeSubagentsConfig(patch);
 		});
-		ipcMain.handle("policy:get", async () => readPolicyConfig());
-		ipcMain.handle("policy:save", async (_e, args: unknown) => {
+		wrapIpcHandler("policy:get", async () => readPolicyConfig());
+		wrapIpcHandler("policy:save", async (_e, args: unknown) => {
 			const input = recordValue(args, "policy save payload");
 			const policy = recordValue(input.policy, "policy");
 			if (!Array.isArray(policy.rules)) throw new Error("policy.rules must be an array");
@@ -280,8 +281,8 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				};
 			}) });
 		});
-		ipcMain.handle("notify-channels:list", async () => readNotifyChannels());
-		ipcMain.handle("notify-channels:save", async (_e, args: unknown) => {
+		wrapIpcHandler("notify-channels:list", async () => readNotifyChannels());
+		wrapIpcHandler("notify-channels:save", async (_e, args: unknown) => {
 			const input = recordValue(args, "notify channels save payload");
 			if (!Array.isArray(input.channels)) throw new Error("channels must be an array");
 			const channels = input.channels.map((entry, index) => {
@@ -297,7 +298,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			});
 			return writeNotifyChannels(channels);
 		});
-		ipcMain.handle("notify:dispatch", async (_e, args: unknown) => {
+		wrapIpcHandler("notify:dispatch", async (_e, args: unknown) => {
 			const input = recordValue(args, "notification dispatch payload");
 			const message = recordValue(input.message, "notification message");
 			return dispatchMainNotifications(await readNotifyChannels(), {
@@ -307,8 +308,8 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				...(message.sessionId === undefined ? {} : { sessionId: requiredString(message.sessionId, "message.sessionId") }),
 			});
 		});
-		ipcMain.handle("knowledge-sources:list", async () => readKnowledgeSources());
-		ipcMain.handle("knowledge-sources:save", async (_e, args: unknown) => {
+		wrapIpcHandler("knowledge-sources:list", async () => readKnowledgeSources());
+		wrapIpcHandler("knowledge-sources:save", async (_e, args: unknown) => {
 			const input = recordValue(args, "knowledge sources save payload");
 			if (!Array.isArray(input.sources)) throw new Error("sources must be an array");
 			const sources = input.sources.map((source, index) => {
@@ -318,41 +319,41 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			});
 			return writeKnowledgeSources([...new Set(sources)]);
 		});
-		ipcMain.handle("teams:create", async (_e, args: unknown) => {
+		wrapIpcHandler("teams:create", async (_e, args: unknown) => {
 			const input = recordValue(args, "team create payload");
 			const { teamToolsHandlers } = await import("@openbuddy/team-team");
 			return teamToolsHandlers.create(requiredString(input.goal, "goal"), input.size === undefined ? "medium" : enumValue(input.size, "size", ["small", "medium", "large"] as const));
 		});
-		ipcMain.handle("teams:status", async (_e, teamId: unknown) => {
+		wrapIpcHandler("teams:status", async (_e, teamId: unknown) => {
 			const { teamToolsHandlers } = await import("@openbuddy/team-team");
 			return teamToolsHandlers.status(requiredString(teamId, "teamId"));
 		});
-		ipcMain.handle("teams:delete", async (_e, teamId: unknown) => {
+		wrapIpcHandler("teams:delete", async (_e, teamId: unknown) => {
 			const { teamToolsHandlers } = await import("@openbuddy/team-team");
 			return teamToolsHandlers.delete(requiredString(teamId, "teamId"));
 		});
-		ipcMain.handle("shellfs:open-url", async (_e, url: string) => {
+		wrapIpcHandler("shellfs:open-url", async (_e, url: string) => {
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			return shellFsHandlers.openUrl(httpUrl(url, "url"));
 		});
-		ipcMain.handle("shellfs:open-path", async (_e, args: unknown) => {
+		wrapIpcHandler("shellfs:open-path", async (_e, args: unknown) => {
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "open path payload");
 			return shellFsHandlers.openPath(requiredString(input.path, "path"), resolvedCwd(input, () => agentHost.getCwd()));
 		});
-		ipcMain.handle("shellfs:reveal", async (_e, args: unknown) => {
+		wrapIpcHandler("shellfs:reveal", async (_e, args: unknown) => {
 			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "reveal payload");
 			return shellFsHandlers.reveal(requiredString(input.path, "path"), resolvedCwd(input, () => agentHost.getCwd()));
 		});
-		ipcMain.handle("shellfs:stat", async (_e, args: unknown) => {
+		wrapIpcHandler("shellfs:stat", async (_e, args: unknown) => {
 			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "stat payload");
 			return shellFsHandlers.stat(requiredString(input.path, "path"), resolvedCwd(input, () => agentHost.getCwd()));
 		});
-		ipcMain.handle("shellfs:read-text", async (_e, args: { path: string; cwd?: string; maxBytes?: number }) => {
+		wrapIpcHandler("shellfs:read-text", async (_e, args: { path: string; cwd?: string; maxBytes?: number }) => {
 			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "read text payload");
@@ -364,24 +365,24 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				: optionalFiniteInteger(input.maxBytes, "maxBytes", 256 * 1024, 1, 50 * 1024 * 1024);
 			return shellFsHandlers.readTextFile(pathValue, cwd, maxBytes);
 		});
-		ipcMain.handle("shellfs:read-file-base64", async (_e, args: { path: string; cwd?: string; maxBytes?: number }) => {
+		wrapIpcHandler("shellfs:read-file-base64", async (_e, args: { path: string; cwd?: string; maxBytes?: number }) => {
 			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "read file payload");
 			const cwd = resolvedCwd(input, () => agentHost.getCwd());
 			return shellFsHandlers.readFileBase64(requiredString(input.path, "path"), cwd, optionalFiniteInteger(input.maxBytes, "maxBytes", 20 * 1024 * 1024, 1, 50 * 1024 * 1024));
 		});
-		ipcMain.handle("shellfs:write-text", async (_e, args: unknown) => {
+		wrapIpcHandler("shellfs:write-text", async (_e, args: unknown) => {
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "write text payload");
 			return shellFsHandlers.writeTextFile(requiredString(input.path, "path"), stringValue(input.content, "content"), await resolveWriteRoot(input.workspaceRoot));
 		});
-		ipcMain.handle("shellfs:export-text", async (_e, args: unknown) => {
+		wrapIpcHandler("shellfs:export-text", async (_e, args: unknown) => {
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "export text payload");
 			return shellFsHandlers.exportTextFile(requireApprovedSavePath(absolutePath(input.path, "path")), stringValue(input.content, "content"));
 		});
-		ipcMain.handle("shellfs:import-file", async (_e, args: unknown) => {
+		wrapIpcHandler("shellfs:import-file", async (_e, args: unknown) => {
 			const input = recordValue(args, "import file payload");
 			const sourcePath = absolutePath(input.sourcePath, "sourcePath");
 			const workspaceRoot = writeAllowedRoot(absolutePath(input.workspaceRoot, "workspaceRoot"));
@@ -394,7 +395,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			await fs.copyFile(sourcePath, destination);
 			return { path: destination, size: sourceStat.size, name: requestedName };
 		});
-		ipcMain.handle("shellfs:remove", async (_e, args: unknown) => {
+		wrapIpcHandler("shellfs:remove", async (_e, args: unknown) => {
 			const input = recordValue(args, "remove path payload");
 			const workspaceRoot = await resolveWriteRoot(input.workspaceRoot);
 			const target = resolve(workspaceRoot, requiredString(input.path, "path"));
@@ -403,7 +404,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			await fs.rm(target, { recursive: true, force: false });
 			return { ok: true };
 		});
-		ipcMain.handle("inspiration_generate", async (_e, args: unknown) => {
+		wrapIpcHandler("inspiration_generate", async (_e, args: unknown) => {
 			await ensureAgentHost();
 			const input = recordValue(args, "inspiration payload");
 			const request = input.request === undefined ? {} : recordValue(input.request, "request");
@@ -414,44 +415,44 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				request.cwd === undefined ? undefined : absolutePath(request.cwd, "cwd"),
 			);
 		});
-		ipcMain.handle("shellfs:mkdir", async (_e, args: unknown) => {
+		wrapIpcHandler("shellfs:mkdir", async (_e, args: unknown) => {
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "make directory payload");
 			return shellFsHandlers.makeDirectory(requiredString(input.path, "path"), await resolveWriteRoot(input.workspaceRoot));
 		});
-		ipcMain.handle("shellfs:list-dir", async (_e, args: unknown) => {
+		wrapIpcHandler("shellfs:list-dir", async (_e, args: unknown) => {
 			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "list directory payload");
 			return shellFsHandlers.listDir(requiredString(input.path, "path"), resolvedCwd(input, () => agentHost.getCwd()), optionalFiniteInteger(input.maxEntries, "maxEntries", 2000, 1, 10000));
 		});
-		ipcMain.handle("shellfs:browse-directory", async (_e, args: unknown) => {
+		wrapIpcHandler("shellfs:browse-directory", async (_e, args: unknown) => {
 			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			if (typeof args === "string") return shellFsHandlers.browseDirectory(requiredString(args, "path"), agentHost.getCwd());
 			const input = recordValue(args, "browse directory payload");
 			return shellFsHandlers.browseDirectory(requiredString(input.path, "path"), resolvedCwd(input, () => agentHost.getCwd()));
 		});
-		ipcMain.handle("list_dir", async (_e, args: unknown) => {
+		wrapIpcHandler("list_dir", async (_e, args: unknown) => {
 			await ensureAgentHost();
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "list directory payload");
 			return shellFsHandlers.listDir(requiredString(input.path, "path"), resolvedCwd(input, () => agentHost.getCwd()), optionalFiniteInteger(input.maxEntries, "maxEntries", 2000, 1, 10000));
 		});
-		ipcMain.handle("open_url", async (_e, args: { url: string } | string) => {
+		wrapIpcHandler("open_url", async (_e, args: { url: string } | string) => {
 			const url = httpUrl(typeof args === "string" ? args : recordValue(args, "open URL payload").url, "url");
 			await shell.openExternal(url);
 		});
-		ipcMain.handle("export_text_file", async (_e, args: unknown) => {
+		wrapIpcHandler("export_text_file", async (_e, args: unknown) => {
 			const { shellFsHandlers } = await import("@openbuddy/fs-fs-local");
 			const input = recordValue(args, "export text payload");
 			return shellFsHandlers.exportTextFile(requireApprovedSavePath(absolutePath(input.path, "path")), stringValue(input.content, "content"));
 		});
-		ipcMain.handle("shell:open-external", async (_e, url: string) => {
+		wrapIpcHandler("shell:open-external", async (_e, url: string) => {
 			await shell.openExternal(httpUrl(url, "url"));
 			return { ok: true };
 		});
-		ipcMain.handle("automations:snapshot", async () => {
+		wrapIpcHandler("automations:snapshot", async () => {
 			// Stage G-1c + H-4: openbuddy-automation removed; the canonical
 			// automation backplane is `pi-goal-list-loop-audit`
 			// (npm 18,959 downloads/month, source of truth for goal-loop
@@ -465,15 +466,15 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		// consistent; every call rejects with the same migration message
 		// so the UI stops emitting fake success toasts.
 		const automationRetired = "automations:* IPC has been retired — automation is now owned by pi-goal-list-loop-audit (passthrough). Install via /marketplace and use /goal to manage automations.";
-		ipcMain.handle("automations_snapshot", async () => { throw new Error(automationRetired); });
-		ipcMain.handle("automations_save", async () => { throw new Error(automationRetired); });
-		ipcMain.handle("automations_delete", async () => { throw new Error(automationRetired); });
-		ipcMain.handle("automations_set_status", async () => { throw new Error(automationRetired); });
-		ipcMain.handle("automations_run", async () => { throw new Error(automationRetired); });
-		ipcMain.handle("automation_records_archive", async () => { throw new Error(automationRetired); });
-		ipcMain.handle("automation_records_delete", async () => { throw new Error(automationRetired); });
-		ipcMain.handle("subagents_config_get", async () => readSubagentsConfig());
-		ipcMain.handle("subagents_config_save", async (_e, args: unknown) => {
+		wrapIpcHandler("automations_snapshot", async () => { throw new Error(automationRetired); });
+		wrapIpcHandler("automations_save", async () => { throw new Error(automationRetired); });
+		wrapIpcHandler("automations_delete", async () => { throw new Error(automationRetired); });
+		wrapIpcHandler("automations_set_status", async () => { throw new Error(automationRetired); });
+		wrapIpcHandler("automations_run", async () => { throw new Error(automationRetired); });
+		wrapIpcHandler("automation_records_archive", async () => { throw new Error(automationRetired); });
+		wrapIpcHandler("automation_records_delete", async () => { throw new Error(automationRetired); });
+		wrapIpcHandler("subagents_config_get", async () => readSubagentsConfig());
+		wrapIpcHandler("subagents_config_save", async (_e, args: unknown) => {
 			const input = recordValue(args, "subagents_config_save payload");
 			const patch: OpenBuddySubagentsConfig = {};
 			if (input.maxDepth !== undefined) patch.maxDepth = optionalFiniteInteger(input.maxDepth, "maxDepth", 1, 1, 8);
@@ -486,7 +487,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		//   automations_set_status / automations_run / automation_records_archive
 		// These channels now throw "unknown channel" — see preload/index.ts
 		// (allowedInvokeChannels) for the deleted entries.
-		ipcMain.handle("calendar:list", async (_e, args?: { from?: string; to?: string; roomId?: string; contextRef?: string }) => {
+		wrapIpcHandler("calendar:list", async (_e, args?: { from?: string; to?: string; roomId?: string; contextRef?: string }) => {
 			const input = args === undefined ? {} : recordValue(args, "calendar list payload");
 			const { calendarHandlers } = await import("@openbuddy/capability-calendar");
 			return calendarHandlers.list({
@@ -496,7 +497,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				...(input.contextRef === undefined ? {} : { contextRef: requiredString(input.contextRef, "contextRef") }),
 			});
 		});
-		ipcMain.handle("calendar:create", async (_e, args: unknown) => {
+		wrapIpcHandler("calendar:create", async (_e, args: unknown) => {
 			const input = recordValue(args, "calendar create payload");
 			const { calendarHandlers } = await import("@openbuddy/capability-calendar");
 			return calendarHandlers.create({
@@ -513,7 +514,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				...(input.attendees === undefined ? {} : { attendees: requiredStringArray(input.attendees, "attendees") }),
 			});
 		});
-		ipcMain.handle("calendar:update", async (_e, args: unknown) => {
+		wrapIpcHandler("calendar:update", async (_e, args: unknown) => {
 			const input = recordValue(args, "calendar update payload");
 			const patch = recordValue(input.patch, "calendar update patch");
 			const { calendarHandlers } = await import("@openbuddy/capability-calendar");
@@ -530,29 +531,29 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				...(patch.attendees === undefined ? {} : { attendees: requiredStringArray(patch.attendees, "patch.attendees") }),
 			});
 		});
-		ipcMain.handle("calendar:delete", async (_e, id: string) => {
+		wrapIpcHandler("calendar:delete", async (_e, id: string) => {
 			const { calendarHandlers } = await import("@openbuddy/capability-calendar");
 			return calendarHandlers.remove(requiredString(id, "id"));
 		});
-		ipcMain.handle("permission:list", async () => {
+		wrapIpcHandler("permission:list", async () => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			await ensureAgentHost();
 			const { permissionHandlers } = await import("@openbuddy/auth-permission");
 			return permissionHandlers.readRules();
 		});
-		ipcMain.handle("permission:save", async (_e, rules: unknown) => {
+		wrapIpcHandler("permission:save", async (_e, rules: unknown) => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			await ensureAgentHost();
 			const { permissionHandlers } = await import("@openbuddy/auth-permission");
 			return permissionHandlers.writeRules(permissionRules(rules) as never);
 		});
-		ipcMain.handle("permission:mode-get", async () => {
+		wrapIpcHandler("permission:mode-get", async () => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			await ensureAgentHost();
 			const { permissionHandlers } = await import("@openbuddy/auth-permission");
 			return fromPiPermissionMode(await permissionHandlers.readMode());
 		});
-		ipcMain.handle("permission:mode-set", async (_e, mode: unknown) => {
+		wrapIpcHandler("permission:mode-set", async (_e, mode: unknown) => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			await ensureAgentHost();
 			const { permissionHandlers } = await import("@openbuddy/auth-permission");

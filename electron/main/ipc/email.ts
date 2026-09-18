@@ -3,7 +3,8 @@
  *
  * Split out of `./index.ts`.
  */
-import { ipcMain, type BrowserWindow } from "electron";
+import { type BrowserWindow } from "electron";
+import { wrapIpcHandler } from "./_wrap";
 import {
 	absolutePath,
 	assertPolicyModelAllowed,
@@ -61,82 +62,82 @@ function loadEmailHandlers(): Promise<EmailHandlers> {
 export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 	const currentWindow = () => getWindow();
 
-		ipcMain.handle("email:provider-diagnostics", async () => (await loadEmailHandlers()).providerDiagnostics());
-		ipcMain.handle("email:registry-list", async () => (await loadEmailHandlers()).registryList());
-		ipcMain.handle("email:registry-readiness", async () => (await loadEmailHandlers()).registryReadiness());
-		ipcMain.handle("email:registry-set-enabled", async (_e, args: unknown) => { const input = recordValue(args, "email registry-set-enabled payload"); return (await loadEmailHandlers()).registrySetEnabled(requiredString(input.id, "id"), requiredBoolean(input.enabled, "enabled")); });
-		ipcMain.handle("email:registry-reauthorize", async (_e, args: unknown) => { const input = recordValue(args, "email registry-reauthorize payload"); return (await loadEmailHandlers()).registryReauthorize(requiredString(input.id, "id")); });
-		ipcMain.handle("email:registry-register", async (_e, args: unknown) => { const input = recordValue(args, "email registry-register payload"); return (await loadEmailHandlers()).registryRegister({ ...(input.id === undefined ? {} : { id: requiredString(input.id, "id") }), providerType: enumValue(input.providerType, "providerType", ["mcp", "gmail-api", "graph-api", "jmap-api"] as const), displayName: requiredString(input.displayName, "displayName"), ...(input.credentialRef === undefined ? {} : { credentialRef: requiredString(input.credentialRef, "credentialRef") }), ...(input.mcpServerName === undefined ? {} : { mcpServerName: requiredString(input.mcpServerName, "mcpServerName") }), ...(input.scopes === undefined ? {} : { scopes: optionalStringArray(input.scopes, "scopes") }), ...(input.enabledCapabilities === undefined ? {} : { enabledCapabilities: optionalStringArray(input.enabledCapabilities, "enabledCapabilities") }), ...(input.enabled === undefined ? {} : { enabled: requiredBoolean(input.enabled, "enabled") }) }); });
-		ipcMain.handle("email:registry-remove", async (_e, args: unknown) => { const input = recordValue(args, "email registry-remove payload"); return (await loadEmailHandlers()).registryRemove(requiredString(input.id, "id")); });
-		ipcMain.handle("email:registry-diagnostics", async () => (await loadEmailHandlers()).registryDiagnostics());
-		ipcMain.handle("email:accounts", async () => (await loadEmailHandlers()).accounts());
-		ipcMain.handle("email:rules", async () => (await loadEmailHandlers()).rules());
-		ipcMain.handle("email:save-rule", async (_e, args: unknown) => { const input = recordValue(args, "email save-rule payload"); if (!Array.isArray(input.actions)) throw new Error("actions must be an array"); const schedule = input.schedule === null ? null : input.schedule === undefined ? undefined : emailRuleSchedule(input.schedule); return (await loadEmailHandlers()).saveRule({ id: input.ruleId === undefined ? undefined : requiredString(input.ruleId, "ruleId"), name: requiredString(input.name, "name"), enabled: input.enabled === undefined ? true : requiredBoolean(input.enabled, "enabled"), condition: input.condition as never, actions: input.actions as never, ...(schedule === undefined ? {} : { schedule }) }); });
-		ipcMain.handle("email:delete-rule", async (_e, args: unknown) => { const input = recordValue(args, "email delete-rule payload"); return (await loadEmailHandlers()).deleteRule(requiredString(input.ruleId, "ruleId")); });
-		ipcMain.handle("email:run-rule", async (_e, args: unknown) => { const input = recordValue(args, "email run-rule payload"); return (await loadEmailHandlers()).runRule(requiredString(input.ruleId, "ruleId")); });
-		ipcMain.handle("email:run-scheduled-rules", async () => (await loadEmailHandlers()).runScheduledRules());
-		ipcMain.handle("email:sync", async (_e, args: unknown) => {
+		wrapIpcHandler("email:provider-diagnostics", async () => (await loadEmailHandlers()).providerDiagnostics());
+		wrapIpcHandler("email:registry-list", async () => (await loadEmailHandlers()).registryList());
+		wrapIpcHandler("email:registry-readiness", async () => (await loadEmailHandlers()).registryReadiness());
+		wrapIpcHandler("email:registry-set-enabled", async (_e, args: unknown) => { const input = recordValue(args, "email registry-set-enabled payload"); return (await loadEmailHandlers()).registrySetEnabled(requiredString(input.id, "id"), requiredBoolean(input.enabled, "enabled")); });
+		wrapIpcHandler("email:registry-reauthorize", async (_e, args: unknown) => { const input = recordValue(args, "email registry-reauthorize payload"); return (await loadEmailHandlers()).registryReauthorize(requiredString(input.id, "id")); });
+		wrapIpcHandler("email:registry-register", async (_e, args: unknown) => { const input = recordValue(args, "email registry-register payload"); return (await loadEmailHandlers()).registryRegister({ ...(input.id === undefined ? {} : { id: requiredString(input.id, "id") }), providerType: enumValue(input.providerType, "providerType", ["mcp", "gmail-api", "graph-api", "jmap-api"] as const), displayName: requiredString(input.displayName, "displayName"), ...(input.credentialRef === undefined ? {} : { credentialRef: requiredString(input.credentialRef, "credentialRef") }), ...(input.mcpServerName === undefined ? {} : { mcpServerName: requiredString(input.mcpServerName, "mcpServerName") }), ...(input.scopes === undefined ? {} : { scopes: optionalStringArray(input.scopes, "scopes") }), ...(input.enabledCapabilities === undefined ? {} : { enabledCapabilities: optionalStringArray(input.enabledCapabilities, "enabledCapabilities") }), ...(input.enabled === undefined ? {} : { enabled: requiredBoolean(input.enabled, "enabled") }) }); });
+		wrapIpcHandler("email:registry-remove", async (_e, args: unknown) => { const input = recordValue(args, "email registry-remove payload"); return (await loadEmailHandlers()).registryRemove(requiredString(input.id, "id")); });
+		wrapIpcHandler("email:registry-diagnostics", async () => (await loadEmailHandlers()).registryDiagnostics());
+		wrapIpcHandler("email:accounts", async () => (await loadEmailHandlers()).accounts());
+		wrapIpcHandler("email:rules", async () => (await loadEmailHandlers()).rules());
+		wrapIpcHandler("email:save-rule", async (_e, args: unknown) => { const input = recordValue(args, "email save-rule payload"); if (!Array.isArray(input.actions)) throw new Error("actions must be an array"); const schedule = input.schedule === null ? null : input.schedule === undefined ? undefined : emailRuleSchedule(input.schedule); return (await loadEmailHandlers()).saveRule({ id: input.ruleId === undefined ? undefined : requiredString(input.ruleId, "ruleId"), name: requiredString(input.name, "name"), enabled: input.enabled === undefined ? true : requiredBoolean(input.enabled, "enabled"), condition: input.condition as never, actions: input.actions as never, ...(schedule === undefined ? {} : { schedule }) }); });
+		wrapIpcHandler("email:delete-rule", async (_e, args: unknown) => { const input = recordValue(args, "email delete-rule payload"); return (await loadEmailHandlers()).deleteRule(requiredString(input.ruleId, "ruleId")); });
+		wrapIpcHandler("email:run-rule", async (_e, args: unknown) => { const input = recordValue(args, "email run-rule payload"); return (await loadEmailHandlers()).runRule(requiredString(input.ruleId, "ruleId")); });
+		wrapIpcHandler("email:run-scheduled-rules", async () => (await loadEmailHandlers()).runScheduledRules());
+		wrapIpcHandler("email:sync", async (_e, args: unknown) => {
 			const input = recordValue(args, "email sync payload");
 			return (await loadEmailHandlers()).sync({ accountId: requiredString(input.accountId, "accountId"), ...(input.cursor === undefined ? {} : { cursor: requiredString(input.cursor, "cursor") }), ...(input.limit === undefined ? {} : { limit: optionalFiniteInteger(input.limit, "limit", 100, 1, 500) }), ...(input.full === undefined ? {} : { full: requiredBoolean(input.full, "full") }) });
 		});
-		ipcMain.handle("email:sync-states", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:sync-states", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "email sync states payload");
 			return (await loadEmailHandlers()).syncStates(input.accountId === undefined ? undefined : requiredString(input.accountId, "accountId"));
 		});
-		ipcMain.handle("email:triage", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:triage", async (_e, args?: unknown) => {
 			return (await loadEmailHandlers()).triage(emailSearchPayload(args === undefined || args === null ? {} : args) as never);
 		});
-		ipcMain.handle("email:prepare-processing-plan", async (_e, args: unknown) => {
+		wrapIpcHandler("email:prepare-processing-plan", async (_e, args: unknown) => {
 			const input = recordValue(args, "email processing plan payload");
 			if (!Array.isArray(input.operations)) throw new Error("operations must be an array");
 			return (await loadEmailHandlers()).prepareProcessingPlan({ operations: input.operations as never, ...(input.expiresInMs === undefined ? {} : { expiresInMs: optionalFiniteInteger(input.expiresInMs, "expiresInMs", 300000, 30000, 1800000) }) });
 		});
-		ipcMain.handle("email:confirm-processing-plan", async (_e, args: unknown) => {
+		wrapIpcHandler("email:confirm-processing-plan", async (_e, args: unknown) => {
 			const input = recordValue(args, "email confirm processing plan payload");
 			const planId = requiredString(input.planId, "planId");
 			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
 			requireConfirmation(confirmed, "执行邮件处理计划");
 			return (await loadEmailHandlers()).confirmProcessingPlan(planId, confirmed === true);
 		});
-			ipcMain.handle("email:execute-processing-plan", async (_e, args: unknown) => {
+			wrapIpcHandler("email:execute-processing-plan", async (_e, args: unknown) => {
 			const input = recordValue(args, "email execute processing plan payload");
 				return (await loadEmailHandlers()).executeProcessingPlan(requiredString(input.planId, "planId"), requiredString(input.confirmationToken, "confirmationToken"));
 			});
-			ipcMain.handle("email:cancel-processing-plan", async (_e, args: unknown) => {
+			wrapIpcHandler("email:cancel-processing-plan", async (_e, args: unknown) => {
 				const input = recordValue(args, "email cancel processing plan payload");
 				return (await loadEmailHandlers()).cancelProcessingPlan(requiredString(input.planId, "planId"));
 			});
-		ipcMain.handle("email:processing-plans", async () => (await loadEmailHandlers()).processingPlans());
-		ipcMain.handle("email:threads", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:processing-plans", async () => (await loadEmailHandlers()).processingPlans());
+		wrapIpcHandler("email:threads", async (_e, args?: unknown) => {
 			return (await loadEmailHandlers()).threads(emailSearchPayload(args === undefined || args === null ? {} : args) as never);
 		});
-		ipcMain.handle("email:threads-page", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:threads-page", async (_e, args?: unknown) => {
 			return (await loadEmailHandlers()).threadsPage(emailSearchPayload(args === undefined || args === null ? {} : args) as never);
 		});
-		ipcMain.handle("email:reply-zero", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:reply-zero", async (_e, args?: unknown) => {
 			return (await loadEmailHandlers()).replyZero(emailSearchPayload(args === undefined || args === null ? {} : args) as never);
 		});
-		ipcMain.handle("email:ack-inbox", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:ack-inbox", async (_e, args?: unknown) => {
 			const input = recordValue(args === undefined || args === null ? {} : args, "email inbox acknowledgement payload");
 			return (await loadEmailHandlers()).acknowledgeInbox(requiredString(input.accountId, "accountId"), requiredString(input.threadId, "threadId"), input.messageDate === undefined ? undefined : requiredString(input.messageDate, "messageDate"));
 		});
-		ipcMain.handle("email:digest", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:digest", async (_e, args?: unknown) => {
 			return (await loadEmailHandlers()).digest(emailSearchPayload(args === undefined || args === null ? {} : args) as never);
 		});
-		ipcMain.handle("email:drafts", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:drafts", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "email drafts payload");
 			return (await loadEmailHandlers()).drafts(input.accountId === undefined ? undefined : requiredString(input.accountId, "accountId"));
 		});
-		ipcMain.handle("email:scheduled-sends", async () => (await loadEmailHandlers()).scheduledSends());
-		ipcMain.handle("email:pending-sends", async () => (await loadEmailHandlers()).pendingSends());
-		ipcMain.handle("email:analyses", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:scheduled-sends", async () => (await loadEmailHandlers()).scheduledSends());
+		wrapIpcHandler("email:pending-sends", async () => (await loadEmailHandlers()).pendingSends());
+		wrapIpcHandler("email:analyses", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "email analyses payload");
 			return (await loadEmailHandlers()).listAnalyses({
 				...(input.accountId === undefined ? {} : { accountId: requiredString(input.accountId, "accountId") }),
 				...(input.threadId === undefined ? {} : { threadId: requiredString(input.threadId, "threadId") }),
 			});
 		});
-		ipcMain.handle("email:action-center-query", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:action-center-query", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "email action-center-query payload");
 			const categories = input.categories === undefined ? undefined : optionalStringArray(input.categories, "categories");
 			const reviewStates = input.reviewStates === undefined ? undefined : optionalStringArray(input.reviewStates, "reviewStates");
@@ -152,7 +153,7 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 				...(input.limit === undefined ? {} : { limit: optionalFiniteInteger(input.limit, "limit", 50, 1, 200) }),
 			});
 		});
-		ipcMain.handle("email:contact-projection", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:contact-projection", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "email contact-projection payload");
 			return (await loadEmailHandlers()).projectContacts({
 				...(input.accountId === undefined ? {} : { accountId: requiredString(input.accountId, "accountId") }),
@@ -166,7 +167,7 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 				...(input.returnRawAddresses === undefined ? {} : { returnRawAddresses: requiredBoolean(input.returnRawAddresses, "returnRawAddresses") }),
 			});
 		});
-		ipcMain.handle("email:action-center-create-reminders", async (_e, args?: unknown) => {
+		wrapIpcHandler("email:action-center-create-reminders", async (_e, args?: unknown) => {
 			const input = args === undefined || args === null ? {} : recordValue(args, "email action-center-create-reminders payload");
 			const categories = input.categories === undefined ? undefined : optionalStringArray(input.categories, "categories");
 			return (await loadEmailHandlers()).actionCenterCreateReminders({
@@ -180,7 +181,7 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 				...(input.dryRun === undefined ? {} : { dryRun: requiredBoolean(input.dryRun, "dryRun") }),
 			});
 		});
-		ipcMain.handle("email:save-analysis", async (_e, args: unknown) => {
+		wrapIpcHandler("email:save-analysis", async (_e, args: unknown) => {
 			const input = recordValue(args, "email save-analysis payload");
 			const confidence = input.confidence === undefined ? NaN : optionalFiniteNumber(input.confidence, "confidence", 0, 0, 1);
 			if (Number.isNaN(confidence)) throw new Error("confidence must be a number between 0 and 1");
@@ -203,7 +204,7 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 				...(input.linkedCalendarEventId === undefined ? {} : { linkedCalendarEventId: stringValue(input.linkedCalendarEventId, "linkedCalendarEventId") }),
 			} as never);
 		});
-		ipcMain.handle("email:review-analysis", async (_e, args: unknown) => {
+		wrapIpcHandler("email:review-analysis", async (_e, args: unknown) => {
 			const input = recordValue(args, "email review-analysis payload");
 			return (await loadEmailHandlers()).reviewAnalysis({
 				id: requiredString(input.id, "id"),
@@ -211,7 +212,7 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 				...(input.reviewNote === undefined ? {} : { reviewNote: stringValue(input.reviewNote, "reviewNote") }),
 			});
 		});
-		ipcMain.handle("email:link-analysis", async (_e, args: unknown) => {
+		wrapIpcHandler("email:link-analysis", async (_e, args: unknown) => {
 			const input = recordValue(args, "email link-analysis payload");
 			return (await loadEmailHandlers()).linkAnalysis({
 				id: requiredString(input.id, "id"),
@@ -221,59 +222,59 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 				...(input.linkedTaskIds === undefined ? {} : { linkedTaskIds: optionalStringArray(input.linkedTaskIds, "linkedTaskIds") }),
 			});
 		});
-		ipcMain.handle("email:create-reminders-from-analysis", async (_e, args: unknown) => {
+		wrapIpcHandler("email:create-reminders-from-analysis", async (_e, args: unknown) => {
 			const input = recordValue(args, "email create-reminders-from-analysis payload");
 			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
 			requireConfirmation(confirmed, "创建跟进提醒");
 			const actionIndexes = optionalNonNegativeIntegerArray(input.actionIndexes, "actionIndexes");
 			return (await loadEmailHandlers()).createRemindersFromAnalysis({ analysisId: requiredString(input.analysisId, "analysisId"), ...(actionIndexes === undefined ? {} : { actionIndexes }), confirmed: confirmed === true });
 		});
-		ipcMain.handle("email:prepare-schedule-send", async (_e, args: unknown) => {
+		wrapIpcHandler("email:prepare-schedule-send", async (_e, args: unknown) => {
 			const input = recordValue(args, "email prepare-schedule-send payload");
 			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
 			requireConfirmation(confirmed, "创建计划发送");
 			return (await loadEmailHandlers()).prepareScheduleSend(requiredString(input.draftId, "draftId"), requiredString(input.scheduledAt, "scheduledAt"), confirmed === true);
 		});
-		ipcMain.handle("email:schedule-send", async (_e, args: unknown) => {
+		wrapIpcHandler("email:schedule-send", async (_e, args: unknown) => {
 			const input = recordValue(args, "email schedule-send payload");
 			return (await loadEmailHandlers()).scheduleSend(requiredString(input.draftId, "draftId"), requiredString(input.scheduledAt, "scheduledAt"), input.confirmationToken === undefined ? undefined : requiredString(input.confirmationToken, "confirmationToken"));
 		});
-		ipcMain.handle("email:cancel-scheduled-send", async (_e, args: unknown) => {
+		wrapIpcHandler("email:cancel-scheduled-send", async (_e, args: unknown) => {
 			const input = recordValue(args, "email cancel-scheduled-send payload");
 			return (await loadEmailHandlers()).cancelScheduledSend(requiredString(input.scheduleId, "scheduleId"));
 		});
-		ipcMain.handle("email:cancel-pending-send", async (_e, args: unknown) => {
+		wrapIpcHandler("email:cancel-pending-send", async (_e, args: unknown) => {
 			const input = recordValue(args, "email cancel-pending-send payload");
 			return (await loadEmailHandlers()).cancelPendingSend(requiredString(input.pendingId, "pendingId"));
 		});
-		ipcMain.handle("email:thread", async (_e, args: unknown) => {
+		wrapIpcHandler("email:thread", async (_e, args: unknown) => {
 			const input = recordValue(args, "email thread payload");
 			return (await loadEmailHandlers()).thread(requiredString(input.accountId, "accountId"), requiredString(input.threadId, "threadId"));
 		});
-		ipcMain.handle("email:project-threads", async (_e, args: unknown) => {
+		wrapIpcHandler("email:project-threads", async (_e, args: unknown) => {
 			const input = recordValue(args, "email project-threads payload");
 			return (await loadEmailHandlers()).projectThreads(requiredString(input.projectId, "projectId"), input.limit === undefined ? undefined : optionalFiniteInteger(input.limit, "limit", 50, 1, 100));
 		});
-		ipcMain.handle("email:labels", async (_e, args: unknown) => {
+		wrapIpcHandler("email:labels", async (_e, args: unknown) => {
 			const input = recordValue(args, "email labels payload");
 			return (await loadEmailHandlers()).labels(requiredString(input.accountId, "accountId"));
 		});
-		ipcMain.handle("email:workspace-tags", async () => (await loadEmailHandlers()).workspaceTags());
-		ipcMain.handle("email:update-workspace-tags", async (_e, args: unknown) => (await loadEmailHandlers()).updateWorkspaceTags(emailTagMutationPayload(args) as never));
-		ipcMain.handle("email:update", async (_e, args: unknown) => {
+		wrapIpcHandler("email:workspace-tags", async () => (await loadEmailHandlers()).workspaceTags());
+		wrapIpcHandler("email:update-workspace-tags", async (_e, args: unknown) => (await loadEmailHandlers()).updateWorkspaceTags(emailTagMutationPayload(args) as never));
+		wrapIpcHandler("email:update", async (_e, args: unknown) => {
 			const input = emailMutationPayload(args);
 			const destructive = input.kind === "trash" || input.kind === "spam";
 			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
 			if (destructive) requireConfirmation(confirmed, input.kind === "trash" ? "删除线程" : "标记垃圾邮件");
 			return (await loadEmailHandlers()).update({ ...input, confirmed: destructive ? confirmed === true : input.confirmed } as never, destructive && confirmed === true);
 		});
-		ipcMain.handle("email:unsubscribe", async (_e, args: unknown) => {
+		wrapIpcHandler("email:unsubscribe", async (_e, args: unknown) => {
 			const input = recordValue(args, "email unsubscribe payload");
 			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
 			requireConfirmation(confirmed, "退订邮件列表");
 			return (await loadEmailHandlers()).unsubscribe({ accountId: requiredString(input.accountId, "accountId"), messageId: requiredString(input.messageId, "messageId"), ...(input.threadId === undefined ? {} : { threadId: requiredString(input.threadId, "threadId") }), confirmed: confirmed === true }, confirmed === true);
 		});
-		ipcMain.handle("email:sender-policy", async (_e, args: unknown) => {
+		wrapIpcHandler("email:sender-policy", async (_e, args: unknown) => {
 			const input = recordValue(args, "email sender-policy payload");
 			const policy = enumValue(input.policy, "policy", ["signal", "noise", "block"] as const);
 			const senderEmail = requiredString(input.senderEmail, "senderEmail");
@@ -282,45 +283,45 @@ export function registerEmailIpc(getWindow: () => BrowserWindow | null): void {
 			if (policy === "block") requireConfirmation(confirmed, "阻断发件人");
 			return (await loadEmailHandlers()).setSenderPolicy({ senderEmail, policy, ...(input.accountId === undefined ? {} : { accountId: requiredString(input.accountId, "accountId") }), ...(input.threadId === undefined ? {} : { threadId: requiredString(input.threadId, "threadId") }), confirmed: confirmed === true }, confirmed === true);
 		});
-		ipcMain.handle("email:share-thread", async (_e, args: unknown) => {
+		wrapIpcHandler("email:share-thread", async (_e, args: unknown) => {
 			const input = recordValue(args, "email share-thread payload");
 			return (await loadEmailHandlers()).shareThread({ accountId: requiredString(input.accountId, "accountId"), threadId: requiredString(input.threadId, "threadId"), channelId: requiredString(input.channelId, "channelId"), ...(input.message === undefined ? {} : { message: stringValue(input.message, "message") }) });
 		});
-		ipcMain.handle("email:create-reminder", async (_e, args: unknown) => {
+		wrapIpcHandler("email:create-reminder", async (_e, args: unknown) => {
 			const input = recordValue(args, "email reminder payload");
 			return (await loadEmailHandlers()).createReminder({ accountId: requiredString(input.accountId, "accountId"), threadId: requiredString(input.threadId, "threadId"), description: requiredString(input.description, "description"), remindAt: requiredString(input.remindAt, "remindAt") });
 		});
-		ipcMain.handle("email:move-to-project", async (_e, args: unknown) => {
+		wrapIpcHandler("email:move-to-project", async (_e, args: unknown) => {
 			const input = recordValue(args, "email move-to-project payload");
 			return (await loadEmailHandlers()).moveToProject({ accountId: requiredString(input.accountId, "accountId"), threadId: requiredString(input.threadId, "threadId"), ...(input.projectId === undefined ? {} : { projectId: requiredString(input.projectId, "projectId") }) });
 		});
-		ipcMain.handle("email:attachments", async (_e, args: unknown) => {
+		wrapIpcHandler("email:attachments", async (_e, args: unknown) => {
 			const input = recordValue(args, "email attachments payload");
 			return (await loadEmailHandlers()).listAttachments(requiredString(input.accountId, "accountId"), requiredString(input.messageId, "messageId"));
 		});
-		ipcMain.handle("email:attachment-download", async (_e, args: unknown) => {
+		wrapIpcHandler("email:attachment-download", async (_e, args: unknown) => {
 			const input = recordValue(args, "email attachment-download payload");
 			return (await loadEmailHandlers()).downloadAttachment(requiredString(input.accountId, "accountId"), requiredString(input.attachmentId, "attachmentId"), requiredString(input.messageId, "messageId"), absolutePath(input.destinationDir, "destinationDir"));
 		});
-		ipcMain.handle("email:create-draft", async (_e, args: unknown) => {
+		wrapIpcHandler("email:create-draft", async (_e, args: unknown) => {
 			return (await loadEmailHandlers()).createDraft(emailComposePayload(args) as never);
 		});
-		ipcMain.handle("email:prepare-send", async (_e, args: unknown) => {
+		wrapIpcHandler("email:prepare-send", async (_e, args: unknown) => {
 			const input = recordValue(args, "email prepare-send payload");
 			const confirmed = input.confirmed === undefined ? undefined : requiredBoolean(input.confirmed, "confirmed");
 			requireConfirmation(confirmed, "发送邮件");
 			return (await loadEmailHandlers()).prepareSend(requiredString(input.draftId, "draftId"), confirmed === true);
 		});
-		ipcMain.handle("email:queue-send", async (_e, args: unknown) => {
+		wrapIpcHandler("email:queue-send", async (_e, args: unknown) => {
 			const input = recordValue(args, "email queue-send payload");
 			return (await loadEmailHandlers()).queueSend(requiredString(input.draftId, "draftId"), requiredString(input.confirmationToken, "confirmationToken"), input.undoWindowMs === undefined ? undefined : optionalFiniteInteger(input.undoWindowMs, "undoWindowMs", 5000, 1000, 30000));
 		});
-		ipcMain.handle("email:send-draft", async (_e, args: unknown) => {
+		wrapIpcHandler("email:send-draft", async (_e, args: unknown) => {
 			const input = recordValue(args, "email send payload");
 			return (await loadEmailHandlers()).sendDraft(requiredString(input.draftId, "draftId"), input.confirmationToken === undefined ? undefined : requiredString(input.confirmationToken, "confirmationToken"));
 		});
-		ipcMain.handle("email:invalidate-provider", async () => (await loadEmailHandlers()).invalidateProvider());
-		ipcMain.handle("email:audit", async () => (await loadEmailHandlers()).audit());
+		wrapIpcHandler("email:invalidate-provider", async () => (await loadEmailHandlers()).invalidateProvider());
+		wrapIpcHandler("email:audit", async () => (await loadEmailHandlers()).audit());
 		/**
 		 * `requireConfirmation` replaces the previous native
 		 * `dialog.showMessageBox` confirmation. The renderer-side flows now

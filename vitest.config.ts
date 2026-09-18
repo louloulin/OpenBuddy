@@ -145,6 +145,10 @@ export default defineConfig({
       // Vitest cannot discover their suites (no `describe/it` API surface), so we keep
       // them out of the vitest discovery pass to avoid a noisy "No test suite found" failure.
       "scripts/perf/**/*.test.mjs",
+      // `scripts/electron/_*.test.mjs` are vitest wrappers around live-Electron
+      // probes: they spawn a real Electron process against the packaged app, so
+      // Vitest must not collect them. They are driven via moon/scripts instead.
+      "scripts/electron/_*.test.mjs",
     ],
   },
 });

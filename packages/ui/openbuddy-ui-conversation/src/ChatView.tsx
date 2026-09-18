@@ -36,6 +36,12 @@ import { MessageItem } from "./MessageItem";
 import { Composer } from "./Composer";
 import type { ComposerProps } from "./Composer";
 import { ConversationBody, ConversationComposer } from "./conversation-slots";
+import {
+  ConversationViewOutlet,
+  ConversationViewTabs,
+  useConversationViews,
+} from "./conversation-view";
+import { ConversationApprovals } from "./conversation-approvals";
 import { PiReloadFailureBanner } from "./PiReloadFailureBanner";
 import { PlanPanel } from "@openbuddy/ui-automation";
 import { RewindBar } from "./RewindBar";
@@ -58,6 +64,8 @@ import {
 import { buildTimeline, type TimelineNode } from "@/lib/ui/timeline-utils";
 import { formatPiError } from "@/lib/platform/error-format";
 import { useSubagentStore } from "@/stores/subagent-store";
+import { useQuestionStore } from "@/stores/question-store";
+import { usePermissionStore } from "@/stores/permission-store";
 import {
   requestYield,
   confirmYielded,
@@ -650,6 +658,26 @@ export function ChatView({
   // R0.4: Memoize the timeline build so it does not run on every render;
   // it only needs to re-run when the messages reference changes.
   const timeline = useMemo(() => buildTimeline(messages), [messages]);
+
+  // P0-4 — 转录区视图。`live` 是默认视图且**不注册实现**:它走下面
+  // `ConversationViewOutlet` 的 `fallback`(即 `ConversationBody` 的既有
+  // JSX),因此不装插件时渲染结果与改造前逐字一致。`result` / `content`
+  // 由本包 `client.tsx` 注册;插件可注册自己的视图 id。
+  const [activeView, setActiveView] = useState("live");
+  const conversationViews = useConversationViews();
+
+  // P0-5 — 会话内待处理项数量,下发给 `conversation.approvals`(list 追加区)。
+  // **复用既有 store**,不新建状态容器:`question-store` / `permission-store`
+  // 就是上面 `QuestionInlineCard` / `PermissionInlineCard` 用的那两份数据源。
+  // 读 `queues` 整体(而非单条)是因为插件需要的是「还有几项待处理」——
+  // zustand 默认按引用比较,`queues` 仅在请求/清除时换引用,不会造成额外重渲染。
+  const questionQueues = useQuestionStore((s) => s.queues);
+  const permissionQueues = usePermissionStore((s) => s.queues);
+  const pendingApprovalCount =
+    (sessionId ? (questionQueues[sessionId]?.length ?? 0) : 0) +
+    (sessionId ? (permissionQueues[sessionId]?.length ?? 0) : 0);
+  // 有待处理提问/权限时,agent 无法自行继续 —— 这就是“被阻住”的准确含义。
+  const blockedOnApproval = pendingApprovalCount > 0;
 
   // R1.2: Virtualization is enabled when the user opts in via
   // `localStorage["openbuddy.virtual-list"] = "1"` OR the timeline has
@@ -1260,7 +1288,26 @@ export function ChatView({
                 接线前的那段 JSX —— 内核里没有实现时渲染结果逐字一致,所以卸载
                 插件后视觉零变化。`renderNode` 一起交出去,插件只改布局时不必
                 自己实现消息渲染。 */}
-            <ConversationBody
+            {conversationViews.length > 0 && (
+              <ConversationViewTabs
+                active={activeView}
+                views={conversationViews}
+                onChange={setActiveView}
+              />
+            )}
+            {/* P0-4 — 转录区多视图。`conversation.view`(keyed) 出口,`fallback`
+                就是下面那段既有 JSX —— 没有任何 `conversation.view` 实现命中
+                当前 view 时原样渲染它,所以 `live` 视图的行为与改造前完全一致。 */}
+            <ConversationViewOutlet
+              view={activeView}
+              timeline={timeline}
+              renderNode={renderTimelineNode}
+              sessionId={sessionId ?? undefined}
+              streaming={streaming}
+              virtualized={useVirtualList}
+              scrollRef={scrollRef as React.RefObject<HTMLElement | null>}
+              fallback={
+                <ConversationBody
               timeline={timeline}
               renderNode={renderTimelineNode}
               sessionId={sessionId ?? undefined}
@@ -1341,6 +1388,8 @@ export function ChatView({
                 ) : (
                   timeline.map((node, index) => renderTimelineNode({ node, index }))
                 )
+                  }
+                />
               }
             />
           </div>
@@ -1368,6 +1417,15 @@ export function ChatView({
           {/* Inline permission / question cards: session-scoped, never block sidebar. */}
           <PermissionInlineCard sessionId={sessionId} />
           <QuestionInlineCard sessionId={sessionId} />
+          {/* P0-5 — `conversation.approvals`(list) 追加区。内核默认审批面就是
+              上面两张卡片,它们**不被替换**;这里只给插件「再加一块」的口子。
+              内置零注册 → 渲染 null,所以不装插件时零占位、零视觉变化。
+              `pendingCount` 由既有 store(question/permission)汇总后下发。 */}
+          <ConversationApprovals
+            sessionId={sessionId ?? undefined}
+            pendingCount={pendingApprovalCount}
+            blocked={blockedOnApproval}
+          />
           {/* pause/yield:已暂停横幅 + 恢复按钮(对齐 WorkBuddy session:requestYield)。 */}
           {yielded && (
             <div className="yield-banner" role="status">

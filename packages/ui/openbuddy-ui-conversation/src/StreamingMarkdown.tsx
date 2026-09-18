@@ -1,4 +1,4 @@
-import { Fragment, memo } from "react";
+import { Fragment, memo, useDeferredValue } from "react";
 
 /**
  * StreamingMarkdown -- ultra-lightweight renderer used while an assistant
@@ -197,15 +197,24 @@ function StreamingMarkdownInner({
   text: string;
   markdownTheme?: "loose" | "reasoning" | "legacy";
 }) {
+  // R3 (Phase 2) — `useDeferredValue` lets React batch same-frame text deltas into a
+  // single tokenize + re-render. For a typical streaming turn the model emits
+  // dozens of chunks per second; without this, every delta triggers a full
+  // `tokenize(text)` pass + DOM diff, dominating UI latency. React keeps showing
+  // the previous tokenized output until the new one is ready, then swaps — which
+  // is exactly the streaming semantics we want (user sees incremental text, not
+  // flicker). Replaces a hand-rolled rAF coalesce; React-18-native, no manual
+  // scheduler hookup.
+  const deferredText = useDeferredValue(text);
   // Fast path: plain prose streaming in -- skip tokenization entirely.
-  if (text.indexOf("```") === -1) {
+  if (deferredText.indexOf("```") === -1) {
     return (
       <div className="markdown-body md-font-size-fixed" data-md-theme={markdownTheme}>
-        {renderInlineText(text, "s")}
+        {renderInlineText(deferredText, "s")}
       </div>
     );
   }
-  const tokens = tokenize(text);
+  const tokens = tokenize(deferredText);
   return (
     <div className="markdown-body md-font-size-fixed" data-md-theme={markdownTheme}>
       {tokens.map((tok, idx) => {

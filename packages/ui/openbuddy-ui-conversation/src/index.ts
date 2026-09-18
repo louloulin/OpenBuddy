@@ -23,6 +23,8 @@ import type {
   ConversationMarkdownProps,
   ConversationToolSideProps,
 } from "./conversation-slots";
+import type { ConversationViewProps } from "./conversation-view";
+import type { ConversationApprovalProps } from "./conversation-approvals";
 
 export type { SlotMap };
 
@@ -114,6 +116,37 @@ declare module "@openbuddy/ui-slots" {
       scope: "session";
       owner: ComposerToolbarAction;
     };
+    /**
+     * 会话转录区的**视图切换**(keyed,key = 视图 id)。消费者:`ChatView`。
+     *
+     * 用途:插件可以给转录区加一个完全不同的呈现方式(只看结果 / 只看正文 /
+     * diff 视图 / 任务看板……),用户通过宿主渲染的视图切换器切换。
+     *
+     * 关键回退语义(见分册 05 R5):内置视图 `live` **刻意不注册实现**,
+     * 它走 `ChatView` 现有的转录 JSX —— 所以不装插件时界面与改造前逐像素
+     * 一致,也不会出现「内置视图与内核默认两套实现都在跑」。内置只注册
+     * `result` / `content` 两个增量视图。
+     *
+     * 注册载荷:`payload: { label?: string }` 供切换器显示标签(本包不依赖
+     * i18n,标签由注册方提供;不提供时退回 key)。
+     */
+    "conversation.view": {
+      kind: "keyed";
+      scope: "session";
+      owner: ConversationViewProps;
+    };
+    /**
+     * 会话内审批面的**追加**区(list,内置零注册)。消费者:`ChatView`。
+     *
+     * 内核默认审批面是 `PermissionInlineCard` + `QuestionInlineCard`,它们
+     * **不被替换**(替换会破坏既有行为)。这个槽只提供「再加一块」的口子:
+     * 不装插件 → 渲染 `null`(零占位);装了 → 按 `order` 追加在既有卡片旁。
+     */
+    "conversation.approvals": {
+      kind: "list";
+      scope: "session";
+      owner: ConversationApprovalProps;
+    };
   }
 }
 
@@ -143,3 +176,18 @@ export type {
 export type { ComposerProps } from "./Composer";
 export { MentionPicker } from "./MentionPicker";
 export type { MentionPickerProps } from "./MentionPicker";
+
+// ─── P0-4 / P0-5 新增槽位（见 docs/plan/06-roadmap.md） ──────────────
+export {
+  ConversationViewOutlet,
+  ConversationViewTabs,
+  ConversationResultView,
+  ConversationContentView,
+  useConversationViews,
+} from "./conversation-view";
+export type { ConversationViewProps, ConversationViewPayload } from "./conversation-view";
+export { ConversationApprovals } from "./conversation-approvals";
+export type {
+  ConversationApprovalProps,
+  ConversationApprovalImpl,
+} from "./conversation-approvals";

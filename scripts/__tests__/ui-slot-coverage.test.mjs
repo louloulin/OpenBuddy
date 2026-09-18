@@ -39,12 +39,27 @@ const report = JSON.parse(
  * 漏掉**(onboarding.* 全系列),审计把"真有人消费"误报成"注册了也不会渲染"。
  * 这类假阴性最危险的地方是它会直接误导改造优先级 —— 看起来没人用的槽位,
  * 其实已经在渲染。
+ *
+ * **P0（docs/plan/06-roadmap.md P0-4 / P0-5）下调基线说明**：本次新增了两个
+ * 会话扩展点,数字变化是有意的,不是接線缩减:
+ *   - `conversation.view`(keyed / session) —— 内置注册 `result` + `content`
+ *     两个增量视图(参见 packages/ui/openbuddy-ui-conversation/src/client.tsx),
+ *     由宿主用 `useConversationViews()` / `ConversationViewOutlet` 消费。
+ *   - `conversation.approvals`(list / session) —— 插件**追加**区,内置零
+ *     注册(R5 回退语义,见 docs/plan/05-target-architecture.md):宿主用
+ *     `useSlotComponents("conversation.approvals")` 消费,内置审批面
+ *     (`PermissionInlineCard` / `QuestionInlineCard`)不被替换。
+ *
+ * 因此:`declared` +2 (64→66),`wired` +1 (45→46,`conversation.view`
+ * 已三态齐备),`registeredPct` 77→76(`conversation.approvals` 是有意
+ * declared-only 的插件扩展点,扩大了分母),`consumedPct` 85→86(两个新槽
+ * 都有消费者)。
  */
 const BASELINE = {
-  declared: 64,
-  wired: 45,
-  registeredPct: 77,
-  consumedPct: 85,
+  declared: 66,
+  wired: 46,
+  registeredPct: 76,
+  consumedPct: 86,
 };
 
 describe("槽位三态审计", () => {
@@ -86,10 +101,12 @@ describe("槽位三态审计", () => {
     // 把它们列出来是为了让"新增一个没人注册的声明"变成一次有意识的决定。
     const KNOWN_UNREGISTERED = new Set([
       "composer.toolbar.action",
+      "conversation.approvals",
       "conversation.body",
       "conversation.composer",
       "conversation.message.markdown",
       "conversation.toolside",
+      "conversation.view",
       "editor.mention-sources",
       "editor.slash-commands",
       "editor.toolbar",

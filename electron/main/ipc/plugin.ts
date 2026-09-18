@@ -17,7 +17,7 @@
  * for `setPluginEnabled` to keep the marketplace module out of the
  * cold-start path (matches `plugins_list`).
  */
-import { ipcMain } from "electron";
+import { wrapIpcHandler } from "./_wrap";
 import { progressSnapshot, cancelProgress, retryProgress } from "../agent/progress-runs";
 import { MultiSurfaceSessionRegistry } from "../agent/multi-surface-session";
 import { pluginEventLogCursor } from "../agent/plugin-event-log-cursor";
@@ -43,7 +43,7 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     return undefined;
   });
 
-  ipcMain.handle("agent:session-surface-acquire", async (_e, args: unknown) => {
+  wrapIpcHandler("agent:session-surface-acquire", async (_e, args: unknown) => {
     await ensureAgentHost();
     const input = recordValue(args, "session surface acquire payload");
     const lease = multiSurfaceSessions.acquire(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
@@ -51,7 +51,7 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     return { sessionId: lease.sessionId, surfaceId: lease.surfaceId, generation: lease.generation, shared: (multiSurfaceSessions.snapshot(lease.sessionId)[0]?.refCount ?? 0) > 1 };
 
   });
-  ipcMain.handle("agent:session-surface-release", async (_e, args: unknown) => {
+  wrapIpcHandler("agent:session-surface-release", async (_e, args: unknown) => {
     const input = recordValue(args, "session surface release payload");
     return multiSurfaceSessions.release(
       requiredString(input.sessionId, "sessionId"),
@@ -63,24 +63,24 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
       },
     );
   });
-  ipcMain.handle("agent:session-surface-list", async (_e, args?: unknown) => {
+  wrapIpcHandler("agent:session-surface-list", async (_e, args?: unknown) => {
     const input = args === undefined || args === null ? {} : recordValue(args, "session surface list payload");
     return multiSurfaceSessions.snapshot(input.sessionId === undefined ? undefined : requiredString(input.sessionId, "sessionId"));
   });
 
-  ipcMain.handle("progress:list", async () => progressSnapshot());
-  ipcMain.handle("progress:cancel", async (_e, args: unknown) => cancelProgress(String((args as { runId?: unknown })?.runId ?? "")));
-  ipcMain.handle("progress:retry", async (_e, args: unknown) => retryProgress(String((args as { runId?: unknown })?.runId ?? "")));
+  wrapIpcHandler("progress:list", async () => progressSnapshot());
+  wrapIpcHandler("progress:cancel", async (_e, args: unknown) => cancelProgress(String((args as { runId?: unknown })?.runId ?? "")));
+  wrapIpcHandler("progress:retry", async (_e, args: unknown) => retryProgress(String((args as { runId?: unknown })?.runId ?? "")));
 
-  ipcMain.handle("agent:plugin-list", async () => {
+  wrapIpcHandler("agent:plugin-list", async () => {
     await ensureAgentHost();
     return agentHost.listPlugins();
   });
-  ipcMain.handle("agent:plugin-inventory", async () => {
+  wrapIpcHandler("agent:plugin-inventory", async () => {
     await ensureAgentHost();
     return agentHost.pluginInventory();
   });
-  ipcMain.handle("agent:tools-list", async () => {
+  wrapIpcHandler("agent:tools-list", async () => {
     await ensureAgentHost();
     // Surface every tool the active pi runtime exposes (G-1d
     // compatibilityAdapter tools + built-in pi tools), tagged with
@@ -106,30 +106,30 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
       };
     });
   });
-  ipcMain.handle("agent:plugin-snapshot", async () => {
+  wrapIpcHandler("agent:plugin-snapshot", async () => {
     await ensureAgentHost();
     return agentHost.pluginSnapshot();
   });
-  ipcMain.handle("agent:plugin-readiness", async () => {
+  wrapIpcHandler("agent:plugin-readiness", async () => {
     await ensureAgentHost();
     return agentHost.pluginReadiness();
   });
-  ipcMain.handle("agent:plugin-events", async () => {
+  wrapIpcHandler("agent:plugin-events", async () => {
     await ensureAgentHost();
     return agentHost.pluginEvents();
   });
-  ipcMain.handle("agent:transaction-receipt", async (_e, args: unknown) => {
+  wrapIpcHandler("agent:transaction-receipt", async (_e, args: unknown) => {
     const input = recordValue(args, "transaction-receipt payload");
     const transactionId = requiredString(input.transactionId, "transactionId");
     const surface = requiredString(input.surface, "surface");
     const details = input.details === undefined ? undefined : recordValue(input.details, "details");
     return agentHost.reportActivePluginTransaction(transactionId, surface, details);
   });
-  ipcMain.handle("agent:transaction-list", async () => {
+  wrapIpcHandler("agent:transaction-list", async () => {
     await ensureAgentHost();
     return agentHost.listActivePluginTransactions();
   });
-  ipcMain.handle("agent:event-log", async (_e, args?: unknown) => {
+  wrapIpcHandler("agent:event-log", async (_e, args?: unknown) => {
     const input = args === undefined || args === null ? {} : recordValue(args, "event log payload");
     return agentHost.pluginEvents({
       ...(input.sessionId === undefined ? {} : { sessionId: requiredString(input.sessionId, "sessionId") }),
@@ -137,22 +137,22 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
       ...(input.limit === undefined ? {} : { limit: optionalFiniteInteger(input.limit, "limit", 2000, 1, 2000) }),
     });
   });
-  ipcMain.handle("agent:document-restore", async (_e, args: unknown) => {
+  wrapIpcHandler("agent:document-restore", async (_e, args: unknown) => {
     const input = recordValue(args, "document restore payload");
     const sessionId = requiredString(input.sessionId, "sessionId");
     const session = agentHost.getSession();
     if (!session || session.sessionId !== sessionId) return { ok: false, code: "disposed", message: `session ${sessionId} is unavailable` };
     return { ok: false, code: "unsupported", message: "complete source document restoration is not available for this session" };
   });
-  ipcMain.handle("agent:event-log-surface-attach", async (_e, args: unknown) => {
+  wrapIpcHandler("agent:event-log-surface-attach", async (_e, args: unknown) => {
     const input = recordValue(args, "event log surface attach payload");
     return pluginEventLogCursor.attachSurface(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
   });
-  ipcMain.handle("agent:event-log-surface-detach", async (_e, args: unknown) => {
+  wrapIpcHandler("agent:event-log-surface-detach", async (_e, args: unknown) => {
     const input = recordValue(args, "event log surface detach payload");
     return pluginEventLogCursor.detachSurface(requiredString(input.sessionId, "sessionId"), requiredString(input.surfaceId, "surfaceId"));
   });
-  ipcMain.handle("agent:event-log-replay", async (_e, args?: unknown) => {
+  wrapIpcHandler("agent:event-log-replay", async (_e, args?: unknown) => {
     // Cursor-based replay used after bridge recovery. Returns events
     // from `fromSequence` forward so the renderer can rehydrate
     // stores without a full reload. The `cursor` payload reports
@@ -167,22 +167,22 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     const replay = pluginEventLogCursor.readSince(sessionId, surfaceId, input.sinceEventId === undefined ? undefined : requiredString(input.sinceEventId, "sinceEventId"), input.limit === undefined ? 2000 : optionalFiniteInteger(input.limit, "limit", 2000, 1, 2000));
     return replay;
   });
-  ipcMain.handle("agent:plugin-enable", async (_e, args: { id: string; enabled: boolean }) => {
+  wrapIpcHandler("agent:plugin-enable", async (_e, args: { id: string; enabled: boolean }) => {
     const input = recordValue(args, "plugin-enable payload");
     return agentHost.setPluginEnabled(requiredString(input.id, "plugin id"), requiredBoolean(input.enabled, "enabled"));
   });
-  ipcMain.handle("agent:plugin-reload", async (_e, args: { id: string }) => {
+  wrapIpcHandler("agent:plugin-reload", async (_e, args: { id: string }) => {
     return agentHost.reloadPlugin(requiredString(recordValue(args, "plugin-reload payload").id, "plugin id"));
   });
-  ipcMain.handle("agent:extensions-reload", async () => agentHost.reloadPiExtensions());
-  ipcMain.handle("agent:extension-policy-reload", async (_e, args: unknown) => {
+  wrapIpcHandler("agent:extensions-reload", async () => agentHost.reloadPiExtensions());
+  wrapIpcHandler("agent:extension-policy-reload", async (_e, args: unknown) => {
     const input = recordValue(args, "extension policy payload");
     const allowlist = Array.isArray(input.allowlistPackageNames) ? input.allowlistPackageNames : [];
     const denylist = Array.isArray(input.denylistPackageNames) ? input.denylistPackageNames : [];
     return agentHost.updateExtensionPolicy({ allowlistPackageNames: allowlist, denylistPackageNames: denylist });
   });
-  ipcMain.handle("agent:extension-policy-get", async () => readExtensionPolicyConfig());
-  ipcMain.handle("agent:extension-policy-save", async (_e, args: unknown) => {
+  wrapIpcHandler("agent:extension-policy-get", async () => readExtensionPolicyConfig());
+  wrapIpcHandler("agent:extension-policy-save", async (_e, args: unknown) => {
     const input = recordValue(args, "extension policy save payload");
     const config = await writeExtensionPolicyConfig({
       allowlistPackageNames: Array.isArray(input.allowlistPackageNames) ? input.allowlistPackageNames.filter((entry): entry is string => typeof entry === "string") : [],
@@ -190,36 +190,36 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     });
     return agentHost.updateExtensionPolicy(config);
   });
-  ipcMain.handle("agent:plugin-config", async (_e, args: { id: string; config: unknown }) => {
+  wrapIpcHandler("agent:plugin-config", async (_e, args: { id: string; config: unknown }) => {
     const input = recordValue(args, "plugin-config payload");
     return agentHost.updatePluginConfig(requiredString(input.id, "plugin id"), input.config);
   });
-  ipcMain.handle("agent:plugin-state-get", async () => agentHost.getStoredPluginState());
-  ipcMain.handle("agent:plugin-state-reset", async (_e, args: { id: string }) => {
+  wrapIpcHandler("agent:plugin-state-get", async () => agentHost.getStoredPluginState());
+  wrapIpcHandler("agent:plugin-state-reset", async (_e, args: { id: string }) => {
     return agentHost.resetPluginState(requiredString(recordValue(args, "plugin-state-reset payload").id, "plugin id"));
   });
-  ipcMain.handle("agent:renderer-plugin-entries", async () => {
+  wrapIpcHandler("agent:renderer-plugin-entries", async () => {
     await ensureAgentHost();
     return agentHost.listRendererPluginEntries();
   });
-  ipcMain.handle("agent:renderer-plugin-boot", async () => {
+  wrapIpcHandler("agent:renderer-plugin-boot", async () => {
     await ensureAgentHost();
     return agentHost.rendererPluginBootGraph();
   });
-  ipcMain.handle("agent:renderer-plugin-module", async (_e, args: unknown) => {
+  wrapIpcHandler("agent:renderer-plugin-module", async (_e, args: unknown) => {
     await ensureAgentHost();
     return agentHost.resolveRendererPluginModule(requiredString(recordValue(args, "renderer plugin module payload").moduleKey, "moduleKey"));
   });
-  ipcMain.handle("agent:remote-contributions", async () => {
+  wrapIpcHandler("agent:remote-contributions", async () => {
     await ensureAgentHost();
     return agentHost.listProfileRemoteContributions();
   });
-  ipcMain.handle("plugins_list", async () => {
+  wrapIpcHandler("plugins_list", async () => {
     // P2-13: listPlugins lives in the heavy marketplace module.
     const { listPlugins } = await import("../agent/pi-resources/marketplace");
     return { plugins: await listPlugins(agentHost.getCwd()) };
   });
-  ipcMain.handle("plugins_action", async (_e, args: unknown) => {
+  wrapIpcHandler("plugins_action", async (_e, args: unknown) => {
     const input = recordValue(args, "plugins action payload");
     const action = recordValue(input.action, "action");
     const pluginName = requiredString(action.pluginName, "pluginName");
@@ -241,10 +241,10 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
   // (also emitted by the resolver) and replies through these three
   // channels. After every approve / reject we call `reloadPiExtensions`
   // so the next agent loop sees the new factory set.
-  ipcMain.handle("extension:needs-review-state", async () => {
+  wrapIpcHandler("extension:needs-review-state", async () => {
     return summarizeNeedsReviewState(getNeedsReviewGate().snapshot());
   });
-  ipcMain.handle("extension:approve-needs-review", async (_e, args: unknown) => {
+  wrapIpcHandler("extension:approve-needs-review", async (_e, args: unknown) => {
     const input = recordValue(args, "needs-review approve payload");
     const id = requiredString(input.id, "id");
     const gate = getNeedsReviewGate();
@@ -259,7 +259,7 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     await agentHost.reloadPiExtensions();
     return { ok: true, id, state: "allow", summary: summarizeNeedsReviewState(gate.snapshot()) };
   });
-  ipcMain.handle("extension:reject-needs-review", async (_e, args: unknown) => {
+  wrapIpcHandler("extension:reject-needs-review", async (_e, args: unknown) => {
     const input = recordValue(args, "needs-review reject payload");
     const id = requiredString(input.id, "id");
     const gate = getNeedsReviewGate();
