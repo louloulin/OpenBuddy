@@ -68,19 +68,19 @@ describe("Electron debug reload menu", () => {
 
 describe("Electron debug IPC handlers (debug:reload / debug:force-reload)", () => {
   it("debug:reload returns a boolean and logs a warning when the window is gone", () => {
-    const re = /ipcMain\.handle\(\s*"debug:reload"\s*,\s*\(\)\s*=>\s*\{[\s\S]*?return\s+(true|false);?\s*\}?\s*\)\s*;/;
+    const re = /(?:ipcMain\.handle|wrapIpcHandler)\(\s*"debug:reload"\s*,\s*\(\)\s*=>\s*\{[\s\S]*?return\s+(true|false);?\s*\}?\s*\)\s*;/;
     expect(MISC_SRC).toMatch(re);
     expect(MISC_SRC).toMatch(/debug:reload ignored/);
   });
 
   it("debug:force-reload returns a boolean and logs a warning when the window is gone", () => {
-    const re = /ipcMain\.handle\(\s*"debug:force-reload"\s*,\s*\(\)\s*=>\s*\{[\s\S]*?return\s+(true|false);?\s*\}?\s*\)\s*;/;
+    const re = /(?:ipcMain\.handle|wrapIpcHandler)\(\s*"debug:force-reload"\s*,\s*\(\)\s*=>\s*\{[\s\S]*?return\s+(true|false);?\s*\}?\s*\)\s*;/;
     expect(MISC_SRC).toMatch(re);
     expect(MISC_SRC).toMatch(/debug:force-reload ignored/);
   });
 
   it("neither handler is the old silent one-liner that swallowed missing-window cases", () => {
-    expect(MISC_SRC).not.toMatch(/ipcMain\.handle\(\s*"debug:reload"\s*,\s*\(\)\s*=>\s*currentWindow\(\)\?\.webContents\.reload\(\)\s*\);/);
-    expect(MISC_SRC).not.toMatch(/ipcMain\.handle\(\s*"debug:force-reload"\s*,\s*\(\)\s*=>\s*currentWindow\(\)\?\.webContents\.reloadIgnoringCache\(\)\s*\);/);
+    expect(MISC_SRC).not.toMatch(/(?:ipcMain\.handle|wrapIpcHandler)\(\s*"debug:reload"\s*,\s*\(\)\s*=>\s*currentWindow\(\)\?\.webContents\.reload\(\)\s*\);/);
+    expect(MISC_SRC).not.toMatch(/(?:ipcMain\.handle|wrapIpcHandler)\(\s*"debug:force-reload"\s*,\s*\(\)\s*=>\s*currentWindow\(\)\?\.webContents\.reloadIgnoringCache\(\)\s*\);/);
   });
 });

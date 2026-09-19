@@ -52,10 +52,14 @@ describe("Electron IPC contract", () => {
     const main = (await Promise.all(mainFiles.map((file) => readFile(file, "utf8")))).join("\n");
     const invoked = new Set(rendererSources.flatMap((source) => [...literalChannels(source, /(?:invoke|ipcRenderer\.invoke)(?:<[^>]+>)?\(\s*["']([^"']+)["']/g)]));
     const allowlisted = literalChannels(preload, /\s["']([^"']+)["'],?/g);
-    const handlers = literalChannels(main, /ipcMain\.handle\(\s*["']([^"']+)["']/g);
+    // Handlers register through either `ipcMain.handle(...)` directly or the
+    // `wrapIpcHandler(channel, fn)` shim (Phase 2 R1+R4 adds try/catch +
+    // structured logging). Both forms keep the channel literal, so scan for
+    // either one — omitting `wrapIpcHandler` silently under-counts handlers.
+    const handlers = literalChannels(main, /(?:ipcMain\.handle|wrapIpcHandler)\(\s*["']([^"']+)["']/g);
     // Declarative registries (a `*_IPC_CHANNELS` const table handed to a
     // `register*Ipc(..., ipc)` helper) never appear next to
-    // `ipcMain.handle(`, so fold those channels in explicitly.
+    // `ipcMain.handle(` / `wrapIpcHandler(`, so fold those channels in explicitly.
     for (const tableMatch of main.matchAll(
       /(?:export\s+)?const\s+[A-Z0-9_]*IPC_CHANNELS[A-Z0-9_]*\s*=\s*\{([\s\S]*?)\}\s*as const/g,
     )) {
@@ -82,7 +86,7 @@ describe("Electron IPC contract", () => {
     ];
     for (const channel of protectedChannels) {
       const escaped = channel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const handler = source.match(new RegExp(`ipcMain\\.handle\\(\\"${escaped}\\"[\\s\\S]*?(?=\\n\\s*ipcMain\\.handle\\(|\\n\\s*//|$)`))?.[0] ?? "";
+      const handler = source.match(new RegExp(`(?:ipcMain\\.handle|wrapIpcHandler)\\(\\"${escaped}\\"[\\s\\S]*?(?=\\n\\s*(?:ipcMain\\.handle|wrapIpcHandler)\\(|\\n\\s*//|$)`))?.[0] ?? "";
       expect(handler, `missing IPC handler ${channel}`).not.toBe("");
       expect(handler, `unprotected IPC handler ${channel}`).toMatch(/assertWorkbenchAccess|authorizeSession|casdoorAuth\.(assertAuthorized|authorize|authorizeResource)|casdoorResources\.|(list|save|update|delete)Casdoor/);
     }
@@ -101,11 +105,11 @@ describe("Electron IPC contract", () => {
     const allowBlock = preload.match(/const allowedInvokeChannels = new Set\(\[([\s\S]*?)\]\);/)?.[1] ?? "";
     const allowlisted = new Set([...allowBlock.matchAll(/"([^"]+)"/g)].map((match) => match[1]));
 
-    const handlers = new Set([...main.matchAll(/ipcMain\.handle\(\s*"([^"]+)"/g)].map((match) => match[1]));
+    const handlers = new Set([...main.matchAll(/(?:ipcMain\.handle|wrapIpcHandler)\(\s*"([^"]+)"/g)].map((match) => match[1]));
 
     // Declarative registries: a const object literal of `key: "channel"`
     // entries that is later handed to a `register*Ipc(..., ipc)` helper.
-    // Those channels never appear next to `ipcMain.handle(`, so collect them
+    // Those channels never appear next to `ipcMain.handle(`/`wrapIpcHandler(`, so collect them
     // separately — otherwise a new bridge can be wired up and stay invisible
     // to this guard.
     for (const tableMatch of main.matchAll(
@@ -149,7 +153,7 @@ describe("Electron IPC contract", () => {
   });
   it("keeps namespaced capability handlers reachable through preload", async () => {
     const allowlisted = literalChannels(preload, /\s["']([^"']+)["'],?/g);
-    const handlers = literalChannels(main, /ipcMain\.handle\(\s*["']([^"']+)["']/g);
+    const handlers = literalChannels(main, /(?:ipcMain\.handle|wrapIpcHandler)\(\s*["']([^"']+)["']/g);
     for (const channel of handlers) {
       if (!channel.includes(":")) continue;
       expect(allowlisted.has(channel), `preload allowlist missing Main capability ${channel}`).toBe(true);
