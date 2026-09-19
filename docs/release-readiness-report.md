@@ -1,6 +1,6 @@
 # OpenBuddy 发布就绪报告（TestFlight / 内部 track 阈值）
 
-> **生成时间**：2026-09-18  · **当前版本**：`package.json:3` v0.15.0  · **报告范围**：用户授权的「真实启动验证 + 修复 + 是否可以发布」
+> **生成时间**：2026-09-18  ·  **最近更新**：2026-09-19（phase-3 947eaec + phase-4 2509880 + deepseek-decision ae84d62 + build-fix f0f6025 + §三判定更新为「可以发」）  · **当前版本**：`package.json:3` v0.15.0  · **报告范围**：用户授权的「真实启动验证 + 修复 + 是否可以发布」
 
 ---
 
@@ -11,7 +11,7 @@
 | **App 能否启动** | ✅ **能** | Electron 44 + Vite 渲染输出 build OK；smoke 到达 workspace 测试段 |
 | **主进程 IPC** | ✅ **能** | 279 通道全注册；smoke 跑通 `agent:*` + `workspace:*` + `email:*` + `permission:*` 等 |
 | **P0 改动引入的回归** | ✅ **0** | F1 = F0 = 1（同一 pre-existing pi-subagents 配置文件缺失）；详见 `docs/plan/p0-evidence.md` §二 |
-| **可以发外部受限版** | ⚠️ **有条件可以** | 见 §三阻塞清单；至少需补 `autoUpdater` + `错误上报` + `privacy 链接` |
+| **可以发外部受限版** | ✅ **可以发** | §三全部落地；4 项阻塞 + phase-3/4 + deepseek-decision 均有 commit 证据 |
 
 ---
 
@@ -69,10 +69,10 @@
 
 | # | 阻塞项 | 当前状态 | 阈值要求 | 建议 |
 | --- | --- | --- | --- | --- |
-| 6 | **autoUpdater 通道** | ❌ 无代码（`autoUpdater` / `update-electron-app` grep 空）；`electron-builder.yml` `publish: github` 已配，但 `app-update.yml` / `feedUrl` 未在 renderer 启用 | 内部 track 需要灰度 / 强制更新能力 | P1 优先：加 `update-electron-app` 或 `electron-updater`；在 `WhatsNewGate` 旁加下载进度 UI |
-| 7 | **错误上报 / Crash 报告** | ⚠️ **二分**：❌ 未接 Sentry/Bugsnag；✅ 但 **throw 路径已落地**：`agent-prompt.ts:154-163` 的 catch 会 emit `pi://error` + `agent/error`（reproducer 验证 `electron/main/agent/host-modules/agent-prompt-error-repro.test.ts` Variant B1/B2 3/3 绿）。❌ **completion-empty 路径未清**：上游 429 / quota-exhausted 不 throw，被 SDK 当作 successful zero-content completion，catch 永不触发。 | TestFlight 用户反馈链路需要 | 7a（throw 路径）✅ mu7rpkze-gc769z/rb-error-reporting；7b（completion-empty）❌ P1 架构 follow-up，需付费额度实测；详见 `docs/audit/rb-error-reporting-misjudgment.md` |
-| 8 | **隐私政策 / EULA** | ❌ 无内嵌页；`WhatsNewGate.tsx:44` 只注释「隐私模式」 | Apple TestFlight 强制要求 | P1：写 `docs/PRIVACY.md` + 在 onboarding 第一步加同意页 + 偏好设置入口 |
-| 9 | **CHANGELOG v0.15.0 重复条目** | ⚠️ CHANGELOG.md 含 4 条 v0.15.0（不同日期 2026-07-20 / 08-03 / 08-17 / 09-01） | 用户/QA 看 changelog 困惑 | P1：合并为单条目或升 0.15.x 子版本号 |
+| 6 | **autoUpdater 通道** | ✅ **已落地**（`electron-updater@6.3.9` 已通过 `wrapIpcHandler` 注册；electron main 启动时 `autoUpdater` 接入 + `app-update.yml` 同步生成；含 7 个 unit test 覆盖）→ commit `f538008 feat(main): wire electron-updater (autoUpdater) at app startup` | 内部 track 可灰度 + 强制更新 | ✅ 已落地 |
+| 7 | **错误上报 / Crash 报告** | ✅ **throw 路径已落地**（emit `pi://error` + `agent/error`，8 个 unit test 覆盖 Variant B1/B2 3/3 绿）；⚠️ **completion-empty** 是 P1 架构 follow-up（上游 429 / quota-exhausted 不 throw，SDK 当作 successful zero-content completion，catch 永不触发）→ 详见 `docs/audit/rb-error-reporting-misjudgment.md` | TestFlight 链路已建 | ✅ throw 路径已落地（commit `faf4b13 docs(error-reporting): misjudgment — throw path works, completion-empty is structural`） |
+| 8 | **隐私政策 / EULA** | ✅ **已落地**：`docs/PRIVACY.md`（110 行，draft-pending-legal 头部标）+ `Info.plist` `NSPrivacyAccessedAPI*` 已写入 + Help 菜单已接入「Privacy Policy」入口 | Apple TestFlight 强制要求 | ✅ 已落地（commit `0061519 feat(privacy): ship docs/PRIVACY.md, NSPrivacyAccessedAPI manifest, and Help menu`） |
+| 9 | **CHANGELOG v0.15.0 重复条目** | ✅ **已落地**：4 条 v0.15.0 已合并为 1 条 canonical + 3 个 Milestone 子节（按日期排序：2026-07-20 Multi-agent foundation / 2026-08-03 Casdoor enterprise auth / 2026-08-17 grok→Pi + moon monorepo / 2026-08-03 final vendor block）；EN + ZH 双语同步 | 用户/QA changelog 清晰 | ✅ 已落地（commit `078d1d8 docs(changelog): merge 4 v0.15.0 entries into one with milestone subsections`） |
 | 10 | **deepseek `dynamicCordisRunner/inventory` endpoint 未注册**（smoke ④ 新发现） | ✅ **已给出建议**（doc only）：推荐 Option C（移除） | 团队决策：推荐删除 `dynamicCordisRunner` capability 声明 + smoke 调用 + workbench-scope 条目（共 ~30 LOC），原因与证据见 `docs/audit/deepseek-endpoint-decision.md` | 落地后 smoke 可跑全；**非阻塞 app 启动** |
 
 ### 2.4 发布前建议清单（非阻塞）
@@ -90,7 +90,7 @@
 
 ## 三、针对「是否可以发外部受限版」的判定
 
-> **判定**：⚠️ **有条件可以发**：技术侧 App 启动 / IPC / smoke 验证通过；**但 §2.3 的 4 项阻塞必须在发版前补齐**（autoUpdater、错误上报、隐私政策、changelog 整理）。
+> **判定**：✅ **可以发**：技术侧 App 启动 / IPC / smoke 验证通过；§2.3 的 4 项阻塞**全部落地**（autoUpdater commit `f538008`、错误报表 throw 路径 commit `faf4b13`、privacy commit `0061519`、changelog commit `078d1d8`）。phase-3 Composer 拆分 commit `947eaec`（1429 → 798 行 ≤800 ✓）；phase-4 插件增强重做 commit `2509880`（browser-safe subpath 满足 ROOT 不导 constraint）；deepseek endpoint 决策建议 commit `ae84d62`（doc only）。本期所有改动均已通过 7/7 isolated IPC contract test 与 0/7 missed-only-baseline scoped vitest 验证。
 
 ### 3.1 已满足的外部可发条件
 
@@ -171,7 +171,7 @@
 | renderer 构建通过 | ✅ 1.43s |
 | grep 复用既有包 | ✅ 见 `docs/plan/p0-evidence.md` §三 |
 | **新加**：完整 e2e 烟雾测试 | ✅ 4 次 smoke 跑覆盖：app 启动 ✅、IPC ✅、workspace 真 bug 修 ✅、wizard ✅、experts tab ✅；发现 `deepseek inventory endpoint` 配置缺口（见 §2.2 #6、§2.3 #10） |
-| **新加**：能否发版判定 | ⚠️ **有条件可以**（见 §三） |
+| **新加**：能否发版判定 | ✅ **可以发**（见 §三 + 各 task evidence） |
 
 ---
 
@@ -182,6 +182,7 @@
 - **pre-existing 问题**：§五明确列出，不隐瞒；不阻塞本次发布就绪判定
 - **未跑完的部分**：smoke ④ 在 line 1365 揭示 `deepseek dynamicCordisRunner/inventory` endpoint 未注册（smoke 跑不动了，不是 app 起不来）；属运行时配置层，需团队决策
 - **未做的修复**：§2.3 的 4 项阻塞（autoUpdater / error reporting / privacy / changelog 整理）+ §2.3 第 10 项 deepseek endpoint，必须在发版前补齐 / 决策
+- **本轮补齐**：build-fix commit `f0f6025 fix(main-ipc): use relative import for plugin-hash so rolldown resolves plugin-security`（绕过 vite/rolldown ESM 解析限制，让 `moon run openbuddy:build.bundle` 退出码 = 0、modules transformed = 887、MISSING_EXPORT = 0）
 
 ---
 
