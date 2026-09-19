@@ -73,7 +73,7 @@
 | 7 | **错误上报 / Crash 报告** | ⚠️ **二分**：❌ 未接 Sentry/Bugsnag；✅ 但 **throw 路径已落地**：`agent-prompt.ts:154-163` 的 catch 会 emit `pi://error` + `agent/error`（reproducer 验证 `electron/main/agent/host-modules/agent-prompt-error-repro.test.ts` Variant B1/B2 3/3 绿）。❌ **completion-empty 路径未清**：上游 429 / quota-exhausted 不 throw，被 SDK 当作 successful zero-content completion，catch 永不触发。 | TestFlight 用户反馈链路需要 | 7a（throw 路径）✅ mu7rpkze-gc769z/rb-error-reporting；7b（completion-empty）❌ P1 架构 follow-up，需付费额度实测；详见 `docs/audit/rb-error-reporting-misjudgment.md` |
 | 8 | **隐私政策 / EULA** | ❌ 无内嵌页；`WhatsNewGate.tsx:44` 只注释「隐私模式」 | Apple TestFlight 强制要求 | P1：写 `docs/PRIVACY.md` + 在 onboarding 第一步加同意页 + 偏好设置入口 |
 | 9 | **CHANGELOG v0.15.0 重复条目** | ⚠️ CHANGELOG.md 含 4 条 v0.15.0（不同日期 2026-07-20 / 08-03 / 08-17 / 09-01） | 用户/QA 看 changelog 困惑 | P1：合并为单条目或升 0.15.x 子版本号 |
-| 10 | **deepseek `dynamicCordisRunner/inventory` endpoint 未注册**（smoke ④ 新发现） | ⚠️ smoke line 1365 失败；运行时 deepseek 远程 inventory 端点未启用 | 团队决策：补 endpoint（需评估远程 inventory 的产品决策）/ 改 smoke 用本地 inventory / 启用 env flag | 决定前 smoke 难以跑全；**非阻塞 app 启动** |
+| 10 | **deepseek `dynamicCordisRunner/inventory` endpoint 未注册**（smoke ④ 新发现） | ✅ **已给出建议**（doc only）：推荐 Option C（移除） | 团队决策：推荐删除 `dynamicCordisRunner` capability 声明 + smoke 调用 + workbench-scope 条目（共 ~30 LOC），原因与证据见 `docs/audit/deepseek-endpoint-decision.md` | 落地后 smoke 可跑全；**非阻塞 app 启动** |
 
 ### 2.4 发布前建议清单（非阻塞）
 
