@@ -81,6 +81,11 @@ extraResources:
   # Ship the nested copy explicitly so the main process can boot.
   - from: "node_modules/brace-expansion/node_modules/balanced-match"
     to: "app/node_modules/brace-expansion/node_modules/balanced-match"
+  # Bundle docs/PRIVACY.md at top of extraResources so it sits alongside
+  # the app/ subtree in Contents/Resources/. The Help menu opens it via
+  # shell.openPath(process.resourcesPath/PRIVACY.md).
+  - from: "docs/PRIVACY.md"
+    to: "PRIVACY.md"
 
 asar: false
 # asar: false is a workaround for the pnpm + electron-builder
@@ -183,6 +188,29 @@ mac:
   notarize: true
   gatekeeperAssess: false
   artifactName: ${productName}-${version}-${arch}.${ext}
+  # Apple requires apps that use any of the "required-reason" APIs to
+  # declare which categories and reasons they touch. Electron framework
+  # itself touches UserDefaults, file timestamps, boot time, disk space,
+  # and active network for its own runtime; we declare each with the
+  # "same app, per documentation" reason code. None of this data leaves
+  # the machine (see docs/PRIVACY.md §2.2).
+  extendInfo:
+    NSPrivacyAccessedAPI:
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryUserDefaults
+        NSPrivacyAccessedAPITypeReasons:
+          - CA92
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryFileTimestamp
+        NSPrivacyAccessedAPITypeReasons:
+          - C617
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategorySystemBootTime
+        NSPrivacyAccessedAPITypeReasons:
+          - 35AB
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryDiskSpace
+        NSPrivacyAccessedAPITypeReasons:
+          - E174
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryActiveNetwork
+        NSPrivacyAccessedAPITypeReasons:
+          - E523
 
 linux:
   target:
