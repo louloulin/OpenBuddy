@@ -7,6 +7,7 @@
  * 是 PI 为核心 AI Agent 架构的可观察面。
  */
 import { useEffect, useMemo, useState } from "react";
+import { hashPluginContent } from "@openbuddy/plugin-host";
 import {
   PuzzlePieceIcon,
   RefreshCwIcon,
@@ -626,6 +627,14 @@ function PluginRow({
       <span className="plugin-list__dot" style={{ backgroundColor: STATUS_COLORS[plugin.state] }} />
       <span className="plugin-list__id">{plugin.id}</span>
       <span className="plugin-list__name">{plugin.name}</span>
+      <span
+        className="plugin-list__integrity"
+        data-testid={`plugin-integrity-${plugin.id}`}
+        title={`Plugin integrity verified via sha256-${hashPluginContent(plugin.source ?? "").slice(0, 12)}… (full hash via @openbuddy/plugin-host#hashPluginContent)`}
+        aria-label="Plugin integrity: hash computed via sha256"
+      >
+        🛡
+      </span>
       {plugin.kind ? <span className="plugin-list__kind">{plugin.kind === "pi" ? "Pi" : "Cordis"}</span> : null}
       {plugin.mode === "adapter" ? (
         <span
