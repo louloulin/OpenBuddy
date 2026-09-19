@@ -228,7 +228,7 @@ export function ComposerInner({
   const [text, setText] = useState("");
   // Phase 3 wiring: state extracted to useComposerAttachments hook (state only this step).
   //   后续 step 会把 readImageFile / pickFiles / pickImages / drag 逐步迁出。
-  const { attachments, setAttachments, images, setImages, imagesRef } = useComposerAttachments({ onToast });
+  const { attachments, setAttachments, images, setImages, imagesRef, dragActive } = useComposerAttachments({ onToast });
   // Mirror `text` into a ref so updateText can read the latest value when
   // given a functional updater, without making onDraftChange side effects
   // happen inside React's setText callback. Functional updaters must be
@@ -654,61 +654,6 @@ export function ComposerInner({
     }
   };
 
-  // ---------- 拖拽文件附件(对齐 WorkBuddy drop-zone)----------
-  // Electron-compatible webview 的 DOM onDrop 拿不到本地文件绝对路径(只给 File blob),
-  // 必须用原生 drag-drop 事件。enter/over 显示遮罩;drop 收集路径并入附件;
-  // leave 隐藏遮罩。非 Electron-compatible 环境(vitest)getCurrentWebview 会抛错,安全降级。
-  const [dragActive, setDragActive] = useState(false);
-  useEffect(() => {
-    let unlisten: (() => void) | null = null;
-    let cancelled = false;
-    try {
-      const webview = getCurrentWebview();
-      webview
-        .onDragDropEvent((event) => {
-          // Electron-compatible 把 DragDropEvent 包在 Event<T>.payload 里。
-          const e = event.payload as DragDropEvent;
-          if (isDragDrop(e)) {
-            const incoming = collectDroppedPaths(e.paths);
-            if (incoming.length > 0) {
-              setAttachments((prev) => {
-                const seen = new Set(prev);
-                const out = [...prev];
-                for (const p of incoming) {
-                  if (!seen.has(p)) {
-                    seen.add(p);
-                    out.push(p);
-                  }
-                }
-                return out;
-              });
-            }
-            setDragActive(false);
-          } else {
-            setDragActive(isDragHovering(e));
-          }
-        })
-        .then((un) => {
-          if (cancelled) {
-            // 组件已卸载,立刻解绑。
-            try { un(); } catch { /* noop */ }
-          } else {
-            unlisten = un;
-          }
-        })
-        .catch(() => {
-          /* 非 Electron-compatible 环境无此事件 — 静默降级 */
-        });
-    } catch {
-      /* getCurrentWebview 在非 Electron-compatible 环境抛错 — 静默降级 */
-    }
-    return () => {
-      cancelled = true;
-      if (unlisten) {
-        try { unlisten(); } catch { /* noop */ }
-      }
-    };
-  }, []);
 
   const ph = (label: string) => onPlaceholder?.(label);
   const pluginComposerContributions = useRendererContributions("composer");
