@@ -77,7 +77,7 @@ function computeHash(
 export function registerPluginHashIpc(
   hashFn: (content: string | Uint8Array) => string = (content) => `sha256-${content.length}`,
 ): void {
-  wrapIpcHandler<HashContentArgs, HashContentResult>(
+  wrapIpcHandler(
     "plugin:hash-content",
     (_event, args) => computeHash(args, hashFn),
   );

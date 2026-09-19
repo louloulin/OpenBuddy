@@ -32,7 +32,7 @@ export { agentHostReady, bindAgentHost, bindRendererEventEmitterFn, ensureAgentH
 import { getActiveHarnessServer, getHarnessServerAddress } from "../harness/harness-server";
 import { dispatchMainNotifications } from "../notifications";
 import { createRpcId, parseRpcMessage, rpcError, rpcValue, RpcId, serverResponse, validateRpcRequestPayload, type ClientRequest } from "@openbuddy/plugin-host";
-import { hashPluginContent } from "@openbuddy/plugin-host/plugin-security";
+import { hashPluginContent } from "../../../packages/runtime/openbuddy-plugin-host/src/plugin-security";
 import { registerPluginHashIpc } from "../plugin-hash";
 import { remoteRequestFromHarnessRequest } from "../harness/harness-remote-request";
 import type { DeepSeekConnectionDispatchContext } from "../deepseek/deepseek-runtime";
