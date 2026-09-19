@@ -50,7 +50,7 @@ for (const [name, jobPattern, targetPattern] of targets) {
     builderTarget: targetPattern.test(builder),
   });
 }
-check("release:ci-gates", /pnpm typecheck && pnpm workspace:typecheck/.test(workflow) && /pnpm test/.test(workflow) && /pnpm build/.test(workflow));
+check("release:ci-gates", /pnpm typecheck[\s\S]*?pnpm workspace:typecheck/.test(workflow) && /pnpm test/.test(workflow) && /pnpm build/.test(workflow));
 check("release:runner-matrix", /build-windows:[\s\S]*?runs-on: windows-latest/.test(workflow) && /build-macos:[\s\S]*?runs-on: macos-latest/.test(workflow) && /build-linux:[\s\S]*?runs-on: ubuntu-latest/.test(workflow), {
   windows: /build-windows:[\s\S]*?runs-on: windows-latest/.test(workflow),
   macos: /build-macos:[\s\S]*?runs-on: macos-latest/.test(workflow),
@@ -59,11 +59,11 @@ check("release:runner-matrix", /build-windows:[\s\S]*?runs-on: windows-latest/.t
 check("release:artifact-upload", /actions\/upload-artifact@v4/.test(workflow) && /release\/\*\.(exe|dmg|AppImage)/.test(workflow));
 check("release:publishing-contract", /publish-release:/.test(workflow) && /provider:\s*github/.test(builder) && /owner:\s*louloulin/.test(builder) && /repo:\s*OpenBuddy/.test(builder));
 const signingContract = {
-  windowsBuild: /pnpm electron:build:win/.test(workflow) && workflow.includes("path: release/*.exe"),
+  windowsBuild: /pnpm electron:build:win/.test(workflow) && /path:\s*[\s\S]*?release\/\*\.exe/.test(workflow),
   macSecrets: /MACOS_CSC_LINK_BASE64/.test(workflow) && /MACOS_CSC_KEY_PASSWORD/.test(workflow) && /MACOS_API_KEY_BASE64/.test(workflow) && /MACOS_API_KEY_ID/.test(workflow) && /MACOS_API_ISSUER/.test(workflow),
   macImport: /CSC_LINK=\$RUNNER_TEMP/.test(workflow) && /APPLE_API_KEY=\$RUNNER_TEMP/.test(workflow),
   macRelease: /pnpm electron:release:mac/.test(workflow) && /notarize:\s*true/.test(builder) && /hardenedRuntime:\s*true/.test(builder),
-  linuxBuild: /pnpm electron:build:linux/.test(workflow) && workflow.includes("path: release/*.AppImage"),
+  linuxBuild: /pnpm electron:build:linux/.test(workflow) && /path:\s*[\s\S]*?release\/\*\.AppImage/.test(workflow),
   publishNeedsAll: /needs:\s*\[build-windows, build-macos, build-linux\]/.test(workflow),
 };
 check("release:installer-signing-contract", Object.values(signingContract).every(Boolean), {
