@@ -44,6 +44,7 @@ import { initCasdoorSecurity, type CasdoorSecurityController } from "./security/
 import { perfTraceMark } from "./observability/perf-trace";
 import { createMainWindow as buildMainWindow } from "./main-window";
 import { installAppMenu } from "./app-menu";
+import { installAutoUpdater, type AutoUpdaterHandle } from "./auto-updater";
 import { agentHome, pinPiAgentDirEnv, isPiAgentDirPinnedByUs } from "@openbuddy/storage";
 
 // Heavy module (138 top-level imports including @earendil-works/pi-coding-agent and
@@ -142,6 +143,7 @@ const preloadPath = preloadCandidates.find((path) => existsSync(path)) ?? preloa
 // `ReferenceError: harnessServer is not defined` (the warning users saw at startup).
 let mainWindow: BrowserWindow | null = null;
 let harnessServer: HarnessServer | null = null;
+let autoUpdaterHandle: AutoUpdaterHandle | null = null;
 // Phase 8.3 §40: casdoor protocol + state extracted to security/casdoor.ts.
 // The controller owns pendingCasdoorUrls, lastCasdoorScope, lifecycleQueue,
 // and registers the macOS open-url handler at module init.
@@ -228,6 +230,10 @@ installAppLifecycle({
     // We just init the controller here so the listener registration is the
     // final piece of bootstrap before the first paint fires.
     casdoorController!.setStatusListener();
+    // Wire electron-updater (Phase 1 of rb-autoupdater). The handle is kept
+    // on a module-level ref so onBeforeQuit can detach the listeners.
+    autoUpdaterHandle = installAutoUpdater();
+    void autoUpdaterHandle.trigger();
   },
   bootBackgroundServices,
   onBeforeQuit: () => {
@@ -237,6 +243,8 @@ installAppLifecycle({
       setActiveHarnessServer(undefined);
       void server.close().catch((error) => console.error("[openbuddy-harness] server close failed:", error));
     }
+    autoUpdaterHandle?.stop();
+    autoUpdaterHandle = null;
   },
 });
 
