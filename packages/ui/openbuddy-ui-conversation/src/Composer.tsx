@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, useCallback, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useComposerAttachments } from "./composer/use-composer-attachments";
 import { MentionPicker } from "./MentionPicker";
 import { Mic, Square, X, type LucideIcon } from "lucide-react";
 import { openPaths, type ElectronWindowApi } from "@/lib/platform/electron-api";
@@ -225,12 +226,9 @@ export function ComposerInner({
   extensionTextNonce?: number;
 }) {
   const [text, setText] = useState("");
-  const [attachments, setAttachments] = useState<string[]>([]);
-  // R1 — inline image attachments (paste / drop). Stored as base64 so they
-  // round-trip through piSendContent without re-reading the original file.
-  const [images, setImages] = useState<ImageAttachment[]>([]);
-  const imagesRef = useRef<ImageAttachment[]>([]);
-  useEffect(() => { imagesRef.current = images; }, [images]);
+  // Phase 3 wiring: state extracted to useComposerAttachments hook (state only this step).
+  //   后续 step 会把 readImageFile / pickFiles / pickImages / drag 逐步迁出。
+  const { attachments, setAttachments, images, setImages, imagesRef } = useComposerAttachments({ onToast });
   // Mirror `text` into a ref so updateText can read the latest value when
   // given a functional updater, without making onDraftChange side effects
   // happen inside React's setText callback. Functional updaters must be
