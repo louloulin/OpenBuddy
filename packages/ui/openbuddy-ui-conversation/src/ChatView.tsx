@@ -74,7 +74,6 @@ import {
   createYieldStore,
 } from "@/lib/ui/yield-state";
 import type { ModelOption, ThinkingLevel } from "@openbuddy/ui-workbench";
-import type { HomeModeId } from "@openbuddy/ui-shared";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import type { WorkspaceInfo } from "@/lib/agent/pi-client";
 import { StatusIndicator } from "@/components/StatusIndicator";
@@ -213,7 +212,7 @@ export function ChatView({
   onOpenSession?: (sessionId: string, cwd?: string) => void | Promise<void>;
   /** Surface transient feedback from the rewind/fork toolbar. */
   onToast?: (msg: string) => void;
-  onSelectMode?: (modeId: HomeModeId) => void;
+  onSelectMode?: (modeId: string) => void;
   onSelectExpert?: (agent: AgentEntry) => void;
   onNavigateConnectors?: () => void;
   extensionText?: string;

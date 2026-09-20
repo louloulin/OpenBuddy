@@ -30,7 +30,7 @@ export interface UsePluginSlotsResult {
       onActivate?: () => void;
     }>
   >;
-  pluginCommands: PluginCommandPayload[];
+  pluginCommands: readonly PluginCommandPayload[];
 }
 
 export function usePluginSlots(_args: UsePluginSlotsArgs = {}): UsePluginSlotsResult {
