@@ -37,6 +37,7 @@ export interface ErrorReporter {
   /** 获取本地缓冲(用于 Settings 显示最近 N 条)。 */
   recent(limit?: number): ReadonlyArray<ReportedError>;
   /** 清空缓冲。 */
+  subscribe(listener: () => void): () => void;
   clear(): void;
 }
 

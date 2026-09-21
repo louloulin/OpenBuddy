@@ -164,8 +164,8 @@ export function createEmailDataProvider(
           ...(input?.accountId ? { accountId: input.accountId } : {}),
         });
         const out: Record<string, Array<"priority" | "reply" | "action" | "muted">> = {};
-        if (!snapshot || !Array.isArray(snapshot.suggestions)) return out;
-        for (const s of snapshot.suggestions) {
+        if (!snapshot || !Array.isArray(snapshot.items)) return out;
+        for (const s of snapshot.items) {
           const chip = SUGGESTION_TO_CHIP[s.category ?? ""] ?? "priority";
           out[s.threadId] = [chip];
         }

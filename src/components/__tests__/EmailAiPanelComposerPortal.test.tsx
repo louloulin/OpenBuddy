@@ -27,7 +27,7 @@ vi.mock("@/lib/agent/pi-client-email", () => ipcMocks);
 
 const account = { id: "a1", address: "me@example.com", provider: "mcp" as const, status: "connected" as const, capabilities: { read: true, write: true, attachments: true, multipleAccounts: true } };
 const threads = [
-  { id: "t-1", accountId: "a1", subject: "客户报价", from: "customer@example.com", snippet: "请确认", date: "2026-09-15T11:00:00.000Z", unread: true, aiChips: ["priority"] },
+  { id: "t-1", accountId: "a1", subject: "客户报价", from: { address: "customer@example.com" }, snippet: "请确认", date: "2026-09-15T11:00:00.000Z", unread: true, messageCount: 1, labels: [], aiChips: ["priority"] as Array<"priority" | "reply" | "action" | "muted"> },
 ];
 
 describe("EmailAiPanel.onAdopt → useComposerStore pipeline", () => {

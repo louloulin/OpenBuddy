@@ -19,6 +19,8 @@ import {
   emailTriage,
 } from "@/lib/agent/pi-client-email";
 import type { CapabilityBindings } from "@openbuddy/ui-email/ai";
+import type { AiAction } from "@openbuddy/ui-email/ai";
+import type { EmailMutationKind } from "@openbuddy/capability-email";
 
 export interface CreateDefaultEmailAiBindingsOptions {
   /** 可选:自定义 LLM 路由(用于生产环境的真正 AI 规划)。 */
@@ -52,10 +54,11 @@ export function createDefaultEmailAiBindings(
       return { items: items.map((item) => ({ summary: item.summary, confidence: item.confidence })) };
     },
 
-    async updateThread(input: { threadId: string; mutation: string; label?: string; snoozeUntil?: string }) {
+    async updateThread(input: { threadId: string; mutation: AiAction["kind"]; label?: string; snoozeUntil?: string }) {
       const result = await emailUpdateThread({
+        accountId,
         threadId: input.threadId,
-        mutation: input.mutation as never,
+        kind: input.mutation as EmailMutationKind,
         ...(input.label !== undefined ? { label: input.label } : {}),
         ...(input.snoozeUntil !== undefined ? { snoozeUntil: input.snoozeUntil } : {}),
       });
@@ -79,7 +82,7 @@ export function createDefaultEmailAiBindings(
 
     async routePrompt(prompt: string) {
       if (options.routePrompt) {
-        return await options.routePrompt(prompt);
+        return (await options.routePrompt(prompt)) as AiAction[];
       }
       // 默认降级:返回空 action 数组,让 UI 显示 "无可执行行动",
       // 而不是误清空 — 真实 LLM 路由器在生产环境注入即可。
