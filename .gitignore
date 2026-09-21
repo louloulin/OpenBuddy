@@ -208,3 +208,7 @@ packages/*/*/node_modules
 
 # Probe scripts' scratch output (e.g. probe-r96-expert-link discover probes)
 scripts/probe-tmp/
+
+# Playwright diagnostic screenshots written by tests/electron/_prod-fixtures
+# (only-on-failure); never committed.
+tests/electron/__screenshots__/
