@@ -44,6 +44,7 @@ We run **309+ test files** at the bottom of the pyramid on every PR. Above that 
 | Type-check all 32 projects | `pnpm workspace:typecheck` |
 | Storage boundaries | `pnpm storage:boundaries` |
 | IPC surface regression | `pnpm test:electron:surface` |
+| Packaged-installer smoke | `OPENBUDDY_INSTALLER=release/OpenBuddy-<ver>-setup.exe OPENBUDDY_INSTALLED_ROOT=<dir> pnpm test:electron:packaged` |
 | Electron smoke | `pnpm test:electron` |
 | Real-UI smoke | `pnpm test:electron:real-ui` |
 | Closed-loop capability eval | `pnpm test:closed-loop` |

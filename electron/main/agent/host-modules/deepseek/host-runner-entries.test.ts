@@ -13,29 +13,58 @@ vi.mock("electron", () => ({
 import {
   baseHostRunnerEntries,
   composeHostRunnerEntries,
+  unshippedDshHostRunnerEntries,
 } from "./host-runner-entries";
+import { resolveDeepSeekRuntimeModule } from "../../../deepseek/deepseek-runtime";
 
 describe("host-runner-entries / baseHostRunnerEntries", () => {
-  it("returns a frozen-style array with the canonical 41 OpenBuddy DSH entries", () => {
+  it("only ships entries whose package name resolves to a local shim", () => {
     const entries = baseHostRunnerEntries();
-    // 40 DSH defaults + dsh-tool-jobs is one of them, total = 41 (see source).
-    expect(entries.length).toBeGreaterThanOrEqual(40);
-    // Every entry must have id + name.
+    // LUM-1320: the default assembly must never contain an entry that cannot
+    // be resolved. `electron/main/deepseek/deepseek-runtime.ts` is the single
+    // source of local DSH shims, so every shipped entry must be one of its
+    // `deepSeekRuntimeAliases` keys.
     for (const entry of entries) {
+      expect(resolveDeepSeekRuntimeModule(entry.name), `${entry.name} has no runtime alias`).toBeDefined();
+    }
+    expect(entries.map((entry) => entry.name).sort()).toEqual([
+      "@deepseek-ai/dsh-agent",
+      "@deepseek-ai/dsh-client-connection",
+      "@deepseek-ai/dsh-session",
+      "@deepseek-ai/dsh-session-persistence-jsonl",
+      "@deepseek-ai/dsh-session-query",
+      "@deepseek-ai/dsh-typert-registry",
+      "@deepseek-ai/dsh-workspace",
+    ]);
+  });
+
+  it("keeps id/name shapes for the shipped entries", () => {
+    for (const entry of baseHostRunnerEntries()) {
       expect(typeof entry.id).toBe("string");
       expect(entry.id.startsWith("openbuddy-dsh-")).toBe(true);
       expect(typeof entry.name).toBe("string");
       expect(entry.name.startsWith("@deepseek-ai/")).toBe(true);
     }
-    // The list is order-stable: dsh-llm is first (services root),
-    // dsh-web is last (model-facing tool adapters close out).
-    expect(entries[0]?.id).toBe("openbuddy-dsh-llm");
-    expect(entries[entries.length - 1]?.id).toBe("openbuddy-dsh-web");
+  });
+
+  it("keeps the 36 unshipped DSH names as a documented migration inventory", () => {
+    const unshipped = unshippedDshHostRunnerEntries();
+    // Dev + installer have no `@deepseek-ai/*` dependency closure, so these
+    // names cannot be mounted; they stay listed for the PI-native migration
+    // table and for user profiles that install the upstream closure.
+    expect(unshipped).toHaveLength(36);
+    expect(baseHostRunnerEntries().length + unshipped.length).toBe(43);
+    const ids = new Set([...baseHostRunnerEntries(), ...unshipped].map((entry) => entry.id));
+    expect(ids.size).toBe(43);
+    for (const entry of unshipped) {
+      expect(resolveDeepSeekRuntimeModule(entry.name)).toBeUndefined();
+      expect(entry.id.startsWith("openbuddy-dsh-")).toBe(true);
+      expect(entry.name.startsWith("@deepseek-ai/")).toBe(true);
+    }
   });
 
   it("preserves config and inject shapes for entries that carry them", () => {
-    const entries = baseHostRunnerEntries();
-    const byId = new Map(entries.map((entry) => [entry.id, entry]));
+    const byId = new Map(unshippedDshHostRunnerEntries().map((entry) => [entry.id, entry]));
 
     const instructions = byId.get("openbuddy-dsh-agent-instructions");
     expect(instructions?.config).toEqual({
@@ -79,9 +108,9 @@ describe("host-runner-entries / composeHostRunnerEntries", () => {
     // baseProfile entries come first (e.g. addons beyond DSH defaults).
     expect(ids.indexOf("openbuddy-base-foo")).toBe(0);
     expect(ids.indexOf("openbuddy-base-bar")).toBe(1);
-    // Then the 41 default DSH entries.
-    expect(ids.indexOf("openbuddy-dsh-llm")).toBe(2);
-    expect(ids.indexOf("openbuddy-dsh-web")).toBe(2 + baseHostRunnerEntries().length - 1);
+    // Then the shipped default DSH entries.
+    expect(ids.indexOf("openbuddy-dsh-session")).toBe(2);
+    expect(ids.indexOf("openbuddy-dsh-session-query")).toBe(2 + baseHostRunnerEntries().length - 1);
     // Phase K.2: core capability entries slot in between defaults and
     // profileBundle so marketplace bundles can override them when needed.
     expect(ids.indexOf("@deepseek-ai/dsh-commands")).toBe(2 + baseHostRunnerEntries().length);
@@ -89,10 +118,24 @@ describe("host-runner-entries / composeHostRunnerEntries", () => {
     expect(ids[ids.length - 1]).toBe("marketplace-baz");
   });
 
+  it("never composes an unshipped DSH entry by default", () => {
+    const merged = composeHostRunnerEntries([], [], []);
+    const unshippedIds = new Set(unshippedDshHostRunnerEntries().map((entry) => entry.id));
+    const leaked = merged.filter((entry) => unshippedIds.has(entry.id));
+    expect(leaked).toEqual([]);
+  });
+
+  it("still honours an explicit profile-bundle declaration of an unshipped DSH name", () => {
+    const merged = composeHostRunnerEntries([], [
+      { id: "openbuddy-dsh-llm", name: "@deepseek-ai/dsh-llm" },
+    ]);
+    expect(merged.some((entry) => entry.id === "openbuddy-dsh-llm")).toBe(true);
+  });
+
   it("tolerates empty baseProfile, coreCapability, and empty profileBundle", () => {
     const merged = composeHostRunnerEntries([], [], []);
     expect(merged.length).toBe(baseHostRunnerEntries().length);
-    expect(merged[0]?.id).toBe("openbuddy-dsh-llm");
+    expect(merged[0]?.id).toBe("openbuddy-dsh-session");
   });
 
   it("applies normalizeDeepSeekRuntimeEntry defaults on session-persistence entry", () => {

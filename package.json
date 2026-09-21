@@ -33,6 +33,7 @@
     "test:electron:ui": "playwright test --ui",
     "test:electron:report": "playwright show-report playwright-report",
     "test:electron:surface": "node scripts/electron/surface-regression.mjs",
+    "test:electron:packaged": "node scripts/electron/packaged-smoke.mjs",
     "test:electron:real-ui": "node scripts/electron/real-ui-smoke.mjs",
     "test:electron:real-chat": "node scripts/electron/real-chat-verify.mjs",
     "test:electron:real-chat:multiturn": "node scripts/electron/real-chat-multiturn.mjs",
