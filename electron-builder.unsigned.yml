@@ -1,0 +1,248 @@
+# ============================================================================
+# Unsigned / un-notarized build profile.
+#
+# Identical to `electron-builder.yml` except the macOS section disables
+# code signing (`hardenedRuntime`) and notarization. Use this for local
+# builds, CI smoke tests, and unsigned public releases when the project
+# does not yet have an Apple Developer ID Application certificate.
+#
+# Consumers of unsigned DMGs must:
+#   - Right-click the .app → Open (first time only), OR
+#   - System Settings → Privacy & Security → "Open Anyway"
+#
+# Required environment for invocation:
+#   CSC_IDENTITY_AUTO_DISCOVERY=false \
+#     scripts/electron-builder.sh --mac --config electron-builder.unsigned.yml
+#
+# The canonical, signed+notarized profile lives in `electron-builder.yml`.
+# Regenerate this file from it after any upstream config change:
+#   sed -e '/^  hardenedRuntime: true$/d' \
+#       -e '/^  notarize: true$/d' \
+#       electron-builder.yml > electron-builder.unsigned.yml
+# ============================================================================
+# ============================================================================
+# electron-builder configuration for OpenBuddy.
+#
+# electron-vite produces three bundles under `out/` (see electron.vite.config.ts):
+#   - out/main/index.js        Electron main process (ESM)
+#   - out/preload/index.js     Preload script (CJS)
+#   - out/renderer/index.html  React renderer
+#
+# The package.json `main` field points at `./out/main/index.js`, which is
+# what Electron loads when launched in production. Main-process workspace
+# packages are compiled into the entry and its adjacent ESM chunks by
+# electron-vite; remaining dependencies are packaged from `node_modules/`.
+# ============================================================================
+appId: com.openbuddy.desktop
+productName: OpenBuddy
+copyright: Copyright (c) 2026 OpenBuddy contributors
+
+protocols:
+  - name: Casdoor OAuth callback
+    schemes:
+      - casdoor
+
+directories:
+  buildResources: build
+  output: release
+
+# ---------------------------------------------------------------------------
+# Mirror configuration
+#
+# electron-builder downloads two things from GitHub releases by default:
+#   - Electron binaries (`github.com/electron/electron/releases`)
+#   - app-builder-bin (`github.com/develar/app-builder-bin/releases`)
+#
+# Both URLs are slow / unreliable from many networks (including most CN
+# networks). Point them at the npmmirror mirrors, which are CDN-backed and
+# reliably fast. `electronDownload.mirror` covers the Electron binary;
+# `app-builder-bin` is read from the `ELECTRON_BUILDER_BINARIES_MIRROR`
+# environment variable (set by `scripts/electron-builder.sh`).
+#
+# Override mirrors with the `ELECTRON_MIRROR` and
+# `ELECTRON_BUILDER_BINARIES_MIRROR` env vars if a different mirror is
+# preferred. Set `ELECTRON_MIRROR=` to an empty string to fall back to
+# GitHub.
+# ---------------------------------------------------------------------------
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/
+
+# electron-builder considers every file outside this list to be source and
+# prunes it. Anything electron-vite emits lives under `out/`; everything
+# else needed at runtime is resolved through node_modules / package.json.
+files:
+  - "out/**/*"
+  - "package.json"
+  - "!**/*.map"
+  - "!**/__tests__/**"
+  - "!**/*.test.*"
+  - "!**/.DS_Store"
+  - "!**/.git/**"
+
+# Hoisted layout (see pnpm-workspace.yaml): chord and esbuild live at
+# flat `node_modules/<pkg>` paths, not inside `node_modules/.pnpm/<hash>/...`.
+# Pin those flat paths here so they are guaranteed to be copied into the
+# app bundle, regardless of which collector path electron-builder takes.
+# With the node_modules collector these are technically redundant (the
+# collector follows the production closure), but the explicit copy makes
+# the dependency on these two packages visible in the packaging config
+# and survives if the collector ever changes again.
+extraResources:
+  - from: "node_modules/@earendil-works/chord"
+    to: "app/node_modules/@earendil-works/chord"
+  - from: "node_modules/esbuild"
+    to: "app/node_modules/esbuild"
+  # brace-expansion@5 is ESM (`import { balanced } from "balanced-match"`) and
+  # requires balanced-match@^4, but the hoisted root can only carry one
+  # balanced-match: minimatch@3 pins balanced-match@1.0.2 (CJS) there, so pnpm
+  # keeps 4.x nested under brace-expansion. electron-builder's pnpm collector
+  # flattens that nesting, the packaged app loaded the root 1.0.2 instead and
+  # the main process died before opening a window with:
+  #   SyntaxError: The requested module 'balanced-match' does not provide an
+  #   export named 'balanced'
+  # Ship the nested copy explicitly so the main process can boot.
+  - from: "node_modules/brace-expansion/node_modules/balanced-match"
+    to: "app/node_modules/brace-expansion/node_modules/balanced-match"
+  # Bundle docs/PRIVACY.md at top of extraResources so it sits alongside
+  # the app/ subtree in Contents/Resources/. The Help menu opens it via
+  # shell.openPath(process.resourcesPath/PRIVACY.md).
+  - from: "docs/PRIVACY.md"
+    to: "PRIVACY.md"
+
+asar: false
+# asar: false is a workaround for the pnpm + electron-builder
+# "duplicate dependency references" + "cannot find path for dependency"
+# chain — asar symlinks don't survive Electron's runtime fs, so any
+# transitive dep that only lives in .pnpm/<hash>/node_modules/<pkg>/
+# silently drops at packaging time and the runtime throws
+# ERR_MODULE_NOT_FOUND on the first import. Until that interaction
+# is fixed upstream, building without asar (each file unpacked) is
+# the only reliable way to ship a working desktop binary. The
+# trade-off: ~2x install footprint and slightly slower cold start.
+# See commit message for the longer-term followup.
+# Keep the entire pnpm virtual store unpacked (alongside app.asar) so
+# Electron's Node loader can resolve the symlinks that pnpm creates
+# between `node_modules/<pkg>` and `node_modules/.pnpm/<hash>/node_modules/<pkg>/`.
+# Without this, every transitive dep of @earendil-works/pi-coding-agent
+# (cross-spawn, cors, ajv, express, openai, debug, ...) silently drops
+# out of the asar at packaging time, and the runtime throws
+# ERR_MODULE_NOT_FOUND on first import.
+asarUnpack:
+  - "**/node_modules/.pnpm/**"
+  - "**/node_modules/cross-spawn/**"
+  - "**/node_modules/cors/**"
+  - "**/node_modules/express/**"
+  - "**/node_modules/ajv/**"
+  - "**/node_modules/ajv-formats/**"
+  - "**/node_modules/express-rate-limit/**"
+  - "**/node_modules/eventsource/**"
+  - "**/node_modules/openai/**"
+  - "**/node_modules/http-proxy-agent/**"
+  - "**/node_modules/https-proxy-agent/**"
+  - "**/node_modules/raw-body/**"
+  - "**/node_modules/zod-to-json-schema/**"
+  - "**/node_modules/loose-envify/**"
+  - "**/node_modules/unist-util-visit-parents/**"
+  - "**/node_modules/debug/**"
+  - "**/node_modules/chalk/**"
+  - "**/node_modules/diff/**"
+  - "**/node_modules/ignore/**"
+  - "**/node_modules/jiti/**"
+  - "**/node_modules/minimatch/**"
+  - "**/node_modules/semver/**"
+  - "**/node_modules/yaml/**"
+  - "**/node_modules/undici/**"
+  - "**/node_modules/partial-json/**"
+  - "**/node_modules/proper-lockfile/**"
+  - "**/node_modules/hosted-git-info/**"
+  - "**/node_modules/grok-mermaid/**"
+  - "**/node_modules/highlight.js/**"
+  - "**/node_modules/@anthropic-ai/**"
+  - "**/node_modules/@aws-sdk/**"
+  - "**/node_modules/@google/**"
+  - "**/node_modules/@smithy/**"
+  - "**/node_modules/@hono/**"
+  - "**/node_modules/@silvia-odwyer/**"
+  - "**/node_modules/@earendil-works/**"
+  - "**/node_modules/which/**"
+  - "**/node_modules/shell-quote/**"
+  - "**/node_modules/isexe/**"
+  - "**/node_modules/yallist/**"
+  - "**/node_modules/colorette/**"
+  - "**/node_modules/form-data/**"
+  - "**/node_modules/mime-db/**"
+  - "**/node_modules/mime-types/**"
+  - "**/node_modules/ms/**"
+  - "**/node_modules/get-stream/**"
+  - "**/node_modules/pump/**"
+  - "**/node_modules/has-flag/**"
+  - "**/node_modules/shebang-command/**"
+  - "**/node_modules/shebang-regex/**"
+  - "**/node_modules/json5/**"
+  - "**/node_modules/lodash/**"
+  - "**/node_modules/lodash.merge/**"
+  - "**/node_modules/ltgt/**"
+  - "**/node_modules/proto-list/**"
+  - "**/node_modules/strnum/**"
+  - "**/node_modules/long/**"
+  - "**/node_modules/protobufjs/**"
+  - "**/node_modules/bytebuffer.js/**"
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.developer-tools
+  gatekeeperAssess: false
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  # Apple requires apps that use any of the "required-reason" APIs to
+  # declare which categories and reasons they touch. Electron framework
+  # itself touches UserDefaults, file timestamps, boot time, disk space,
+  # and active network for its own runtime; we declare each with the
+  # "same app, per documentation" reason code. None of this data leaves
+  # the machine (see docs/PRIVACY.md §2.2).
+  extendInfo:
+    NSPrivacyAccessedAPI:
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryUserDefaults
+        NSPrivacyAccessedAPITypeReasons:
+          - CA92
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryFileTimestamp
+        NSPrivacyAccessedAPITypeReasons:
+          - C617
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategorySystemBootTime
+        NSPrivacyAccessedAPITypeReasons:
+          - 35AB
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryDiskSpace
+        NSPrivacyAccessedAPITypeReasons:
+          - E174
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryActiveNetwork
+        NSPrivacyAccessedAPITypeReasons:
+          - E523
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Development
+  artifactName: ${productName}-${version}.${ext}
+
+publish:
+  provider: github
+  # Set explicitly: without these, electron-builder infers the release target
+  # from package.json "repository", which is easy to get wrong.
+  owner: louloulin
+  repo: OpenBuddy
+  releaseType: release
