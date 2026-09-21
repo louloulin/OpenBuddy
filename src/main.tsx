@@ -16,6 +16,7 @@ import { installPluginSdkBridge } from "@openbuddy/ui-runtime/client";
 import { setToast } from "./stores/toast-store";
 import { useSessionStore } from "./stores/session-store";
 import { abandonInFlightStream } from "./lib/agent/abandon-stream";
+import { initTelemetry } from "./lib/email/telemetry-init";
 // Phase 2 — modular CSS. globals.css transitively imports tokens / base /
 // theme / chrome / per-domain 拆分文件。automation-wb.css 保留兜底兼容。
 // R8.4 — 删除了原 app.css 单体（15633 行 / 477KB，从未 import 验证为死
@@ -52,6 +53,9 @@ void startRendererPluginEventBridge().then((stop) => {
 }).catch((error) => {
   console.error("[openbuddy] renderer plugin bridge failed", error);
 });
+
+// Telemetry 初始化 — fire-and-forget,DSN 为空时不阻塞启动。
+void initTelemetry();
 
 // R6.8 — 全局兜底:任何未处理的 promise rejection 都不能让用户面对死锁的 UI。
 // 1) console.error 保留(开发调试用);
@@ -160,9 +164,18 @@ const fireWatchdog = (): void => {
   // bubble spinning forever — see src/lib/agent/abandon-stream.ts).
   const focusedSessionId = useSessionStore.getState().sessionId;
   if (focusedSessionId) {
+    // R-err-provider-chat — streaming watchdog typically trips when the
+    // provider's SSE connection silently dies (network drop, CDN outage,
+    // long-tail tool hang). Surface an inline TurnErrorCard with
+    // network_error so the chip reads "网络连接中断" + 复制/重试,
+    // instead of the placeholder "（已中断：流式 60s 看门狗）".
     abandonInFlightStream({
       sessionId: focusedSessionId,
       reason: "流式 60s 看门狗",
+      error: {
+        message: "AI 引擎长时间无响应,已自动结束当前轮次。可重发或重新加载。",
+        code: "network_error",
+      },
     });
   } else {
     // No focused session — best-effort cleanup of the orphan streaming

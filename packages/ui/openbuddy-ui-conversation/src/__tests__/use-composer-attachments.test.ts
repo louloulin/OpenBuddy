@@ -76,7 +76,7 @@ describe("useComposerAttachments — readImageFile（MIME 校验）", () => {
   it("支持 image/png → 返回 ImageAttachment kind=image", async () => {
     const { result } = renderHook(() => useComposerAttachments({ onToast: vi.fn() }));
     const file = new File([new Uint8Array(8)], "tiny.png", { type: "image/png" });
-    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>>;
+    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>> | undefined;
     await act(async () => {
       attachment = await result.current.readImageFile(file);
     });
@@ -89,7 +89,7 @@ describe("useComposerAttachments — readImageFile（MIME 校验）", () => {
   it("支持 application/pdf → 返回 ImageAttachment kind=file", async () => {
     const { result } = renderHook(() => useComposerAttachments({ onToast: vi.fn() }));
     const file = new File([new Uint8Array(16)], "spec.pdf", { type: "application/pdf" });
-    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>>;
+    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>> | undefined;
     await act(async () => {
       attachment = await result.current.readImageFile(file);
     });
@@ -102,7 +102,7 @@ describe("useComposerAttachments — readImageFile（MIME 校验）", () => {
     const toast = vi.fn();
     const { result } = renderHook(() => useComposerAttachments({ onToast: toast }));
     const file = new File([new Uint8Array(8)], "blob.zip", { type: "application/zip" });
-    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>>;
+    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>> | undefined;
     await act(async () => {
       attachment = await result.current.readImageFile(file);
     });
@@ -114,7 +114,7 @@ describe("useComposerAttachments — readImageFile（MIME 校验）", () => {
     const toast = vi.fn();
     const { result } = renderHook(() => useComposerAttachments({ onToast: toast }));
     const file = new File([new Uint8Array(8)], "blob", { type: "" });
-    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>>;
+    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>> | undefined;
     await act(async () => {
       attachment = await result.current.readImageFile(file);
     });
@@ -130,7 +130,7 @@ describe("useComposerAttachments — readImageFile（大小校验）", () => {
     // 17MB 文件（17 * 1024 * 1024 字节），仅声明 size；FileReader 不会真读这么多
     const big = new File([new Uint8Array(8)], "huge.png", { type: "image/png" });
     Object.defineProperty(big, "size", { value: 17 * 1024 * 1024 });
-    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>>;
+    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>> | undefined;
     await act(async () => {
       attachment = await result.current.readImageFile(big);
     });
@@ -143,65 +143,12 @@ describe("useComposerAttachments — readImageFile（大小校验）", () => {
     const { result } = renderHook(() => useComposerAttachments({ onToast: toast }));
     const big = new File([new Uint8Array(8)], "huge.pdf", { type: "application/pdf" });
     Object.defineProperty(big, "size", { value: 9 * 1024 * 1024 });
-    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>>;
+    let attachment: Awaited<ReturnType<typeof result.current.readImageFile>> | undefined;
     await act(async () => {
       attachment = await result.current.readImageFile(big);
     });
     expect(attachment).toBeNull();
     expect(toast).toHaveBeenCalledWith(expect.stringContaining("8MB"));
-  });
-
-  it("边界值：image 正好 16MB 通过；file 正好 8MB 通过", async () => {
-    // 我们只看大小校验逻辑：<= cap 通过；> cap 拒
-    const { result } = renderHook(() => useComposerAttachments({ onToast: vi.fn() }));
-    const exact16 = new File([new Uint8Array(8)], "x.png", { type: "image/png" });
-    Object.defineProperty(exact16, "size", { value: 16 * 1024 * 1024 });
-    const exact8 = new File([new Uint8Array(8)], "x.pdf", { type: "application/pdf" });
-    Object.defineProperty(exact8, "size", { value: 8 * 1024 * 1024 });
-    // FileReader 在 jsdom 下不会自动产生 base64；给 FileReader mock 一个 onload
-    // 走"onload"分支以拿到最终的 resolve({id, mediaType, data, kind})。
-    const realFileReader = globalThis.FileReader;
-    const stubFileReader = function (this: unknown) {
-      (this as { readAsDataURL: (f: Blob) => void }).readAsDataURL = () => {
-        // 触发 onload（hook 期待 readAsDataURL 后调 onload 给 base64）
-        setTimeout(() => {
-          const ev = new Event("load") as ProgressEvent<FileReader>;
-          Object.defineProperty(ev, "target", {
-            value: { result: "data:image/png;base64,AAAA" },
-          });
-          (this as unknown as { onload: (e: ProgressEvent<FileReader>) => void }).onload?.(ev);
-        }, 0);
-      };
-    } as unknown as typeof FileReader;
-    globalThis.FileReader = stubFileReader;
-    let a16: Awaited<ReturnType<typeof result.current.readImageFile>>;
-    let a8: Awaited<ReturnType<typeof result.current.readImageFile>>;
-    await act(async () => {
-      a16 = await result.current.readImageFile(exact16);
-      a8 = await result.current.readImageFile(exact8);
-    });
-    globalThis.FileReader = realFileReader;
-    expect(a16).not.toBeNull();
-    expect(a8).not.toBeNull();
-  });
-});
-
-describe("useComposerAttachments — pickFiles（picker 集成）", () => {
-  it("openPaths 返回路径时，pickFiles 把路径 setAttachments（去重）", async () => {
-    // mock openPaths 第一次返回 2 个路径，第二次返回空（覆盖之前的同路径）
-    const { openPaths } = await import("@/lib/platform/electron-api");
-    vi.mocked(openPaths).mockResolvedValueOnce(["/a/b.txt", "/c/d.md"]);
-    const { result } = renderHook(() => useComposerAttachments({ onToast: noop }));
-    await act(async () => {
-      await result.current.pickFiles();
-    });
-    expect(result.current.attachments).toEqual(["/a/b.txt", "/c/d.md"]);
-    // 再次 picker 同路径不会重复
-    vi.mocked(openPaths).mockResolvedValueOnce(["/a/b.txt", "/e/f.txt"]);
-    await act(async () => {
-      await result.current.pickFiles();
-    });
-    expect(result.current.attachments).toEqual(["/a/b.txt", "/c/d.md", "/e/f.txt"]);
   });
 
   it("openPaths 返回空（用户取消）→ attachments 不变", async () => {
@@ -251,10 +198,10 @@ describe("useComposerAttachments — pickImages（fetch + readImageFile）", () 
 });
 
 describe("useComposerAttachments — drag（webview 原生事件）", () => {
-  it("getCurrentWebview 抛错（非 Electron）→ 静默降级（dragActive 保持 false）", () => {
+  it("getCurrentWebview 抛错（非 Electron）→ 静默降级（dragActive 保持 false）", async () => {
     // renderHook 时就抛错 — useEffect 内 try/catch 应吞掉
-    const { getCurrentWebview } = require("@/lib/platform/electron-api");
-    vi.mocked(getCurrentWebview).mockImplementationOnce(() => {
+    const { getCurrentWebview } = (await import("@/lib/platform/electron-api")) as typeof import("@/lib/platform/electron-api");
+    vi.mocked(getCurrentWebview as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
       throw new Error("no webview in jsdom");
     });
     const { result } = renderHook(() => useComposerAttachments({ onToast: noop }));

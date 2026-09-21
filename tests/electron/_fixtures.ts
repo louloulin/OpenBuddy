@@ -117,6 +117,75 @@ function assertBuildArtifacts(): void {
   );
 }
 
+/**
+ * First-run onboarding — seeded as already-completed before any spec sees the page.
+ *
+ * Why this is needed: `src/features/app/AppShell.tsx` renders `<OnboardingSurface />`
+ * with **no props**, and `OnboardingWizard` only renders its close control when the
+ * host passes `onDismiss`/`onSkip` ("关闭按钮 / Esc;不传则不渲染关闭按钮"). So a spec
+ * cannot click the modal away — the persisted state the wizard reads at mount is the
+ * only lever.
+ *
+ * Left in place the dialog is `aria-modal="true"` and swallows every pointer event
+ * aimed at the composer. That failure is actively misleading: the send button
+ * resolves and is visible/enabled, yet Playwright reports
+ * `<div ... data-testid="onboarding-wizard"> intercepts pointer events`, which reads
+ * like a chat-rendering regression. Six `chat-ui-minimax-real` specs failed exactly
+ * that way, and the screenshot shows a perfectly rendered transcript behind the modal.
+ *
+ * It only appears here because this fixture boots a pristine `--user-data-dir` (so
+ * concurrent specs get separate SQLite databases) — an empty origin means empty
+ * `localStorage`, which means the wizard always shows. A real user dismisses it once.
+ *
+ * The seed is deliberately tolerant. `isValidState()` in
+ * `packages/ui/openbuddy-ui-onboarding/src/lib/onboarding-reducer.ts` validates only
+ * `version`, `steps[].id`, `steps[].status`, `index` and `status`, and the wizard's
+ * visibility is decided solely by `state.status !== "done" && state.status !== "dismissed"`.
+ * `syncOnboardingSteps()` rebuilds `steps` from the host's step ids but never touches
+ * `status`, so step ids do not have to track `DEFAULT_ONBOARDING_STEPS` for this to
+ * work — a drift there degrades to "still hidden", never to a silent skip.
+ */
+const ONBOARDING_STORAGE_KEY = "openbuddy.onboarding.state";
+/** Mirrors `ONBOARDING_STATE_VERSION` in `onboarding-reducer.ts`. */
+const ONBOARDING_STATE_VERSION = 1;
+
+const COMPLETED_ONBOARDING_STATE = JSON.stringify({
+  version: ONBOARDING_STATE_VERSION,
+  status: "done",
+  index: 0,
+  steps: [] as { id: string; status: string }[],
+  updatedAt: 0,
+  completedAt: 0,
+});
+
+/**
+ * Seed the persisted onboarding state, then reload so the seed is in place *before*
+ * any renderer script runs.
+ *
+ * The reload is what makes this deterministic. `addInitScript` only applies to
+ * documents created after it is registered, and `_electron.launch()` has already
+ * committed the first document by the time this fixture body runs — so the wizard
+ * would have read an empty `localStorage` on its one and only mount. Seeding without
+ * the reload is a race that the lazy `@openbuddy/ui-onboarding` chunk wins often
+ * enough to look intermittent rather than broken.
+ */
+async function dismissFirstRunOnboarding(window: import("@playwright/test").Page): Promise<void> {
+  await window.addInitScript(
+    (seed: { key: string; value: string }) => {
+      try {
+        globalThis.localStorage.setItem(seed.key, seed.value);
+      } catch {
+        /* Storage unavailable — leave the wizard up. A spec that clicks the composer
+           then fails loudly on the intercepted pointer event, which is the safe
+           direction: a silent skip would be worse than a visible failure. */
+      }
+    },
+    { key: ONBOARDING_STORAGE_KEY, value: COMPLETED_ONBOARDING_STATE },
+  );
+  await window.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+  await window.locator("#root").waitFor({ state: "attached", timeout: 30_000 });
+}
+
 export const test = base.extend<ElectronAppFixture>({
   electronApp: async ({}, use) => {
     assertBuildArtifacts();
@@ -159,6 +228,9 @@ export const test = base.extend<ElectronAppFixture>({
     const window = await electronApp.firstWindow();
     await window.waitForLoadState("domcontentloaded", { timeout: 30_000 });
     await window.locator("#root").waitFor({ state: "attached", timeout: 30_000 });
+    // Must happen before the spec gets the page: the onboarding modal intercepts
+    // every pointer event aimed at the composer, and it cannot be clicked away.
+    await dismissFirstRunOnboarding(window);
     await use(window);
   },
 });

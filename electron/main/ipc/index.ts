@@ -32,6 +32,8 @@ export { agentHostReady, bindAgentHost, bindRendererEventEmitterFn, ensureAgentH
 import { getActiveHarnessServer, getHarnessServerAddress } from "../harness/harness-server";
 import { dispatchMainNotifications } from "../notifications";
 import { createRpcId, parseRpcMessage, rpcError, rpcValue, RpcId, serverResponse, validateRpcRequestPayload, type ClientRequest } from "@openbuddy/plugin-host";
+import { hashPluginContent } from "../../../packages/runtime/openbuddy-plugin-host/src/plugin-security";
+import { registerPluginHashIpc } from "../plugin-hash";
 import { remoteRequestFromHarnessRequest } from "../harness/harness-remote-request";
 import type { DeepSeekConnectionDispatchContext } from "../deepseek/deepseek-runtime";
 import { describeTypertCatalog } from "../agent/typert-catalog";
@@ -1151,4 +1153,11 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		fileSources: piMarketResolved.file,
 	});
 	registerPiMarketBridgeIpc(piMarketBridge, ipcMain);
+	// Goal mu7rpkze-gc769z / phase4-plugin-redo: integrity hash bridge for the
+	// OpenBuddyPluginPanel badge. Renderer calls
+	// `window.api.invoke("plugin:hash-content", { content })`; this main-side
+	// handler delegates to `@openbuddy/plugin-host/plugin-security`
+	// (subpath, NOT the ROOT re-export which pulls in ./include.ts's Node-only
+	// top-level imports — see commit 6cd232b revert).
+	registerPluginHashIpc(hashPluginContent);
 }

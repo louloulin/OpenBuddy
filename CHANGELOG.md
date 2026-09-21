@@ -74,20 +74,20 @@ Once those 6 are done, declare production-ready.
 
 ---
 
-### v0.15.0 (2026-08-17) — grok → Pi + moon monorepo
+#### Milestone (2026-08-17) — grok → Pi + moon monorepo
 
 - **`grok-build` upgraded to 5163763** (xai-grok-shell 1.0.0 → 1.0.4; 8 sync batches upstream).
   - New capabilities: `ask_user_question` non-interactive optimization, web search domain filter, tool protocol frame extension.
   - Adaptation: memory switch config merged (`memory_enabled_override`), semantically compatible.
 - **Team tooling zero-patch refactor** — `create_team` / `team_status` / `team_delete` moved from "modify grok source" to **embedded MCP server** (standard protocol, listens on `127.0.0.1`), zero intrusion into the grok kernel — future grok upgrades no longer require runtime patches.
 
-### v0.15.0 (2026-08-03) — Casdoor enterprise auth
+#### Milestone (2026-08-03) — Casdoor enterprise auth
 
 - OIDC PKCE for desktop.
 - Tenant policy + audit log.
 - 6 admin REST endpoints.
 
-### v0.15.0 (2026-07-20) — Multi-agent foundation
+#### Milestone (2026-07-20) — Multi-agent foundation
 
 - A2A protocol package.
 - Rooms / inbox / task graph.

@@ -70,6 +70,26 @@ extraResources:
     to: "app/node_modules/@earendil-works/chord"
   - from: "node_modules/esbuild"
     to: "app/node_modules/esbuild"
+  # brace-expansion@5 ships as the hoisted root because minimatch@^10.2.5
+  # (a direct dependency, pulled in transitively by `@earendil-works/pi-coding-agent`)
+  # declares `brace-expansion: ^5.0.0`. electron-builder's pnpm collector
+  # walks `pnpm list --prod --depth Infinity` and then resolves each package
+  # via `locateFromDepOrRoot` (node_modules/app-builder-lib/out/node-module-collector/pnpmNodeModulesCollector.js).
+  # When the workspace also pulls in `minimatch@3/5/9` (through dev-only
+  # chains like `app-builder-lib` -> `ejs` -> `jake` -> `filelist` -> `minimatch@5`
+  # -> `brace-expansion@2.1.4`), pnpm sometimes hoists the older `2.x` to
+  # `node_modules/brace-expansion` and the collector then ships that copy.
+  # `minimatch@10.x`'s ESM build does `import { expand } from 'brace-expansion'`,
+  # which the v2.1.4 CJS package does not export, so the main process dies
+  # before opening a window with:
+  #   SyntaxError: The requested module 'brace-expansion' does not provide an
+  #   export named 'expand'
+  # Ship the workspace-root v5 explicitly so the collector cannot downgrade
+  # it. The nested `balanced-match@^4` (required by brace-expansion@5's
+  # `import { balanced } from 'balanced-match'`) is shipped by the
+  # `balanced-match` extraResource entry further down -- keep both in sync.
+  - from: "node_modules/brace-expansion"
+    to: "app/node_modules/brace-expansion"
   # brace-expansion@5 is ESM (`import { balanced } from "balanced-match"`) and
   # requires balanced-match@^4, but the hoisted root can only carry one
   # balanced-match: minimatch@3 pins balanced-match@1.0.2 (CJS) there, so pnpm
@@ -81,6 +101,11 @@ extraResources:
   # Ship the nested copy explicitly so the main process can boot.
   - from: "node_modules/brace-expansion/node_modules/balanced-match"
     to: "app/node_modules/brace-expansion/node_modules/balanced-match"
+  # Bundle docs/PRIVACY.md at top of extraResources so it sits alongside
+  # the app/ subtree in Contents/Resources/. The Help menu opens it via
+  # shell.openPath(process.resourcesPath/PRIVACY.md).
+  - from: "docs/PRIVACY.md"
+    to: "PRIVACY.md"
 
 asar: false
 # asar: false is a workaround for the pnpm + electron-builder
@@ -183,6 +208,29 @@ mac:
   notarize: true
   gatekeeperAssess: false
   artifactName: ${productName}-${version}-${arch}.${ext}
+  # Apple requires apps that use any of the "required-reason" APIs to
+  # declare which categories and reasons they touch. Electron framework
+  # itself touches UserDefaults, file timestamps, boot time, disk space,
+  # and active network for its own runtime; we declare each with the
+  # "same app, per documentation" reason code. None of this data leaves
+  # the machine (see docs/PRIVACY.md §2.2).
+  extendInfo:
+    NSPrivacyAccessedAPI:
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryUserDefaults
+        NSPrivacyAccessedAPITypeReasons:
+          - CA92
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryFileTimestamp
+        NSPrivacyAccessedAPITypeReasons:
+          - C617
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategorySystemBootTime
+        NSPrivacyAccessedAPITypeReasons:
+          - 35AB
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryDiskSpace
+        NSPrivacyAccessedAPITypeReasons:
+          - E174
+      - NSPrivacyAccessedAPIType: NSPrivacyAccessedAPICategoryActiveNetwork
+        NSPrivacyAccessedAPITypeReasons:
+          - E523
 
 linux:
   target:

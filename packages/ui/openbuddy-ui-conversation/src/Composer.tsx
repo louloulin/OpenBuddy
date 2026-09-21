@@ -1,9 +1,9 @@
-import { memo, useEffect, useMemo, useRef, useState, useCallback, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useComposerAttachments } from "./composer/use-composer-attachments";
 import { MentionPicker } from "./MentionPicker";
-import { Mic, Square, X, type LucideIcon } from "lucide-react";
-import { openPaths, type ElectronWindowApi } from "@/lib/platform/electron-api";
-import { getCurrentWebview } from "@/lib/platform/electron-api";
-import { ChevronDownIcon, SendPlaneIcon } from "@openbuddy/ui-primitives/icons";
+import { Mic, X, type LucideIcon } from "lucide-react";
+import type { ElectronWindowApi } from "@/lib/platform/electron-api";
+import { ChevronDownIcon } from "@openbuddy/ui-primitives/icons";
 import { ModelSelector, type ModelOption, type ThinkingLevel } from "@openbuddy/ui-workbench";
 import { ThumbImg } from "@openbuddy/ui-experts";
 import { ContextUsagePill } from "./ContextUsagePill";
@@ -15,35 +15,24 @@ import {
 } from "@/lib/markdown/content-blocks";
 import {
   createInputHistory,
-  pushHistory,
-  navigateHistory,
   type InputHistory,
 } from "@/lib/ui/input-history";
 import { WorkspacePicker } from "@openbuddy/ui-shell";
 import { PermissionPicker } from "@openbuddy/ui-shared";
-import {
-  SlashCommands,
-  NATIVE_PI_COMMANDS,
-  matchPluginSlashCommand,
-  runPluginCommand,
-  type PluginCommandPayload,
-} from "@openbuddy/ui-workbench";
+import { SlashCommands } from "@openbuddy/ui-workbench";
 import { InputAddMenu } from "./InputAddMenu";
-import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
-import { RendererSlotView } from "@openbuddy/ui-workbench";
-import { useSlotPayloads } from "@openbuddy/ui-runtime/client";
-import {
-  collectDroppedPaths,
-  isDragHovering,
-  isDragDrop,
-  type DragDropEvent,
-} from "@/lib/files/drop-utils";
-import {
-  registerAsrProvider,
-  getActiveAsr,
-  createWebSpeechAsrProvider,
-} from "@/lib/agent/voice-contract";
-import type { HomeModeId } from "@openbuddy/ui-shared";
+
+
+import { toggleVoice as toggleVoiceImpl, type VoiceRecognition } from "./composer/voice-recognition";
+import { readImageFile as readImageFileImpl, pickFiles as pickFilesImpl, pickImages as pickImagesImpl } from "./composer/send-payload";
+import { send as sendImpl, enqueue as enqueueImpl } from "./composer/send";
+import { useExtensionText } from "./composer/use-extension-text";
+import { usePopovers } from "./composer/use-popovers";
+import { usePluginSlots } from "./composer/use-plugin-slots";
+import { useInputHistory } from "./composer/use-input-history";
+import { PluginToolbar } from "./composer/PluginToolbar";
+import { ActionButtons } from "./composer/ActionButtons";
+
 import type { AgentEntry } from "@openbuddy/shared-types";
 import type { WorkspaceInfo } from "@/lib/agent/pi-client";
 
@@ -203,7 +192,7 @@ export function ComposerInner({
   /** 用户输入时回调,父组件据此把草稿写回 store。 */
   onDraftChange?: (text: string) => void;
   /** 加号菜单:选择模式(日常办公/代码开发/设计创意)。 */
-  onSelectMode?: (modeId: HomeModeId) => void;
+  onSelectMode?: (modeId: string) => void;
   /** 加号菜单:选择专家。 */
   onSelectExpert?: (agent: AgentEntry) => void;
   /** 加号菜单:选择技能(插入 /skillName)。 */
@@ -225,12 +214,9 @@ export function ComposerInner({
   extensionTextNonce?: number;
 }) {
   const [text, setText] = useState("");
-  const [attachments, setAttachments] = useState<string[]>([]);
-  // R1 — inline image attachments (paste / drop). Stored as base64 so they
-  // round-trip through piSendContent without re-reading the original file.
-  const [images, setImages] = useState<ImageAttachment[]>([]);
-  const imagesRef = useRef<ImageAttachment[]>([]);
-  useEffect(() => { imagesRef.current = images; }, [images]);
+  // Phase 3 wiring: state extracted to useComposerAttachments hook (state only this step).
+  //   后续 step 会把 readImageFile / pickFiles / pickImages / drag 逐步迁出。
+  const { attachments, setAttachments, images, setImages, dragActive } = useComposerAttachments({ onToast });
   // Mirror `text` into a ref so updateText can read the latest value when
   // given a functional updater, without making onDraftChange side effects
   // happen inside React's setText callback. Functional updaters must be
@@ -282,165 +268,26 @@ export function ComposerInner({
     onDraftChange?.(value);
   };
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 160) + "px";
-  }, [text]);
 
-  useEffect(() => {
-    if (extensionTextNonce === undefined) return;
-    updateText(extensionText ?? "");
-    setCursorPos((extensionText ?? "").length);
-    requestAnimationFrame(() => {
-      const el = ref.current;
-      if (!el) return;
-      el.focus();
-      el.selectionStart = el.selectionEnd = el.value.length;
-    });
-    // The nonce deliberately controls repeated identical extension updates.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extensionTextNonce]);
-
-  // One-shot seed: when the parent supplies initialText, fill the textarea and
-  // focus it so the user can immediately edit/send.
-  useEffect(() => {
-    if (initialText !== undefined && initialText !== null) {
-      updateText(initialText);
-      setCursorPos(initialText.length);
-      onInitialTextConsumed?.();
-      requestAnimationFrame(() => ref.current?.focus());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialText]);
-
-  // 受控填充:点击模板/切换标签时由父组件驱动,把内容写入输入框并聚焦。
-  // 用 nonce 而不是 externalText 本身做依赖,这样连续点同一个模板也能重新触发。
-  useEffect(() => {
-    if (externalTextNonce === undefined) return;
-    const next = externalText ?? "";
-    updateText(next); // 同步草稿:模板写入也算当前草稿内容。
-    setCursorPos(next.length);
-    requestAnimationFrame(() => {
-      const el = ref.current;
-      if (!el) return;
-      el.focus();
-      el.selectionStart = el.selectionEnd = next.length;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalTextNonce]);
-
-  // 持久化草稿回填:切到另一个会话(draftKey 变化)时,把该会话保存的草稿
-  // 写回输入框。注意:这里直接用 setText 而非 updateText,因为这是"恢复"
-  // 而不是"用户输入",不该触发 onDraftChange 把同样的内容再写一遍 store。
-  // 依赖只看 draftKey(通常是 sessionId),draft 值变化不重新触发——否则用户
-  // 每敲一个字都会被这个 effect 重置光标。
-  useEffect(() => {
-    if (draftKey === undefined) return;
-    const next = draft ?? "";
-    setText(next);
-    setCursorPos(next.length);
-    // 切到任意会话都尝试把光标放进输入框,这样 fork / 新会话后用户
-    // 直接敲字就行,不用先点一下输入框(对刚分叉出的新会话尤其重要——
-    // 见 ChatView.readOnlySubagent 在 piSubagentMode 异步收敛前的处理)。
-    requestAnimationFrame(() => {
-      const el = ref.current;
-      if (!el || el.disabled) return;
-      el.focus();
-      el.selectionStart = el.selectionEnd = next.length;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey]);
 
   // Voice input: use the browser's SpeechRecognition API (Electron-compatible's WebView2/
   // WKWebView support it on most systems). On languages where the API isn't
   // exposed (older webviews, no microphone permission), we surface a toast.
   // pi has a voice crate but doesn't expose it over ACP, so this is the
   // lightest path that works today.
-  const toggleVoice = () => {
-    if (listening) {
-      recognitionRef.current?.stop();
-      return;
-    }
-    // 优先走 provider-agnostic 注册表(对齐 WorkBuddy asr:* 契约):外部 provider
-    // 注册后优先级更高,否则回落到内建 Web Speech。
-    ensureWebSpeechAsrRegistered();
-    const provider = getActiveAsr();
-    if (provider) {
-      let finalText = "";
-      const stop = provider.listen("zh-CN", {
-        onInterim: (interim) => {
-          updateText((prev) => {
-            const base = finalText || prev;
-            return interim ? base + interim : base;
-          });
-        },
-        onFinal: (text) => {
-          finalText += text;
-          updateText((prev) => (finalText ? finalText : prev));
-        },
-        onError: (reason) => {
-          setListening(false);
-          const msg = reason === "not-allowed"
-            ? "未授予麦克风权限"
-            : `语音识别错误：${reason}`;
-          onToast?.(msg);
-        },
-        onEnd: () => setListening(false),
-      });
-      // 用 recognitionRef 持有 stop 句柄,与既有「再次点击停止」逻辑兼容。
-      recognitionRef.current = {
-        lang: "zh-CN",
-        interimResults: true,
-        continuous: false,
-        start: () => {},
-        stop,
-      } as VoiceRecognition;
-      setListening(true);
-      return;
-    }
-    const Ctor = getSpeechRecognitionCtor();
-    if (!Ctor) {
-      onToast?.("当前环境不支持语音输入（需要 WebView2/WKWebView）");
-      onPlaceholder?.("语音输入");
-      return;
-    }
-    const rec = new Ctor();
-    rec.lang = "zh-CN";
-    rec.interimResults = true;
-    rec.continuous = false;
-    let finalText = "";
-    rec.onresult = (event: SpeechRecognitionEventLike) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const r = event.results[i];
-        if (r.isFinal) finalText += r[0].transcript;
-        else interim += r[0].transcript;
-      }
-      updateText((prev) => {
-        // Replace the trailing interim segment each time so the user sees
-        // live transcription without duplicating finalized text.
-        const base = finalText || prev;
-        return interim ? base + interim : base;
-      });
-    };
-    rec.onerror = (e: SpeechRecognitionErrorEventLike) => {
-      setListening(false);
-      const msg = e.error === "not-allowed"
-        ? "未授予麦克风权限"
-        : `语音识别错误：${e.error}`;
-      onToast?.(msg);
-    };
-    rec.onend = () => setListening(false);
-    recognitionRef.current = rec;
-    try {
-      rec.start();
-      setListening(true);
-    } catch {
-      onToast?.("无法启动语音识别");
-    }
-  };
+  // toggleVoice was a ~100-line inline function with two code paths
+  // (provider-agnostic registry + Web Speech fallback); phase-3 split moved
+  // the body to `./composer/voice-recognition`. This wrapper preserves the
+  // existing call shape (button onClick={() => toggleVoice()}).
+  const toggleVoice = () =>
+    toggleVoiceImpl({
+      listening,
+      setListening,
+      recognitionRef,
+      updateText,
+      onToast,
+      onPlaceholder,
+    });
 
   useEffect(() => {
     return () => {
@@ -448,407 +295,74 @@ export function ComposerInner({
     };
   }, []);
 
-  /** Read a File (from paste/drop/picker) and convert it to an ImageAttachment
-   *  that piSendContent can ship through the agent prompt. Returns null when
-   *  the file is not a supported MIME type or exceeds the per-flavour cap
-   *  (16MB for images, 8MB for documents).
-   *
-   *  The flavour (image vs file) is inferred from the MIME type:
-   *  - image/{png,jpeg,webp,gif}          -> kind: "image", cap 16MB
-   *  - application/pdf, text/*, json, xml -> kind: "file",  cap 8MB
-   *  - application/...wordprocessingml.document (docx), spreadsheetml.sheet (xlsx),
-   *    presentationml.presentation (pptx) -> kind: "file"
-   *  - everything else (executables, archives) -> null + toast
-   */
-  const readImageFile = (file: File): Promise<ImageAttachment | null> => {
-    return new Promise((resolve) => {
-      const SUPPORTED_IMAGE = /^image\/(png|jpe?g|webp|gif)$/i;
-      const SUPPORTED_DOC =
-        /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation))$/i;
-      const IMAGE_CAP = 16 * 1024 * 1024;
-      const FILE_CAP = 8 * 1024 * 1024;
-      let kind: "image" | "file";
-      let cap: number;
-      let capLabel: string;
-      if (SUPPORTED_IMAGE.test(file.type)) {
-        kind = "image";
-        cap = IMAGE_CAP;
-        capLabel = "16MB";
-      } else if (SUPPORTED_DOC.test(file.type)) {
-        kind = "file";
-        cap = FILE_CAP;
-        capLabel = "8MB";
-      } else {
-        onToast?.(`不支持的文件类型: ${file.type || "未知"}（图片/文档）`);
-        return resolve(null);
-      }
-      if (file.size > cap) {
-        onToast?.(`附件过大(>${capLabel}),已拒绝：${file.name || file.type}`);
-        return resolve(null);
-      }
-      const reader = new FileReader();
-      reader.onerror = () => {
-        onToast?.("读取附件失败");
-        resolve(null);
-      };
-      reader.onload = () => {
-        const result = reader.result;
-        if (typeof result !== "string") return resolve(null);
-        // result is a data URL like "data:image/png;base64,XXXX"; strip the
-        // prefix so the IPC payload is just the raw base64.
-        const comma = result.indexOf(",");
-        if (comma === -1) return resolve(null);
-        const data = result.slice(comma + 1);
-        resolve({
-          id: `${kind}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          mediaType: file.type,
-          data,
-          name: file.name || undefined,
-          kind,
-        });
-      };
-      reader.readAsDataURL(file);
+  // readImageFile / pickFiles / pickImages were 50 + 14 + 40 inline lines
+  // respectively; phase-3 split moved them to `./composer/send-payload`.
+  // Thin wrappers below preserve the call shape used in the onPaste handler
+  // and in the InputAddMenu's onPickFiles/onPickImages props.
+  const readImageFile = (file: File) => readImageFileImpl(file, onToast);
+
+  // send / enqueue were ~80 + ~10 inline lines; phase-3 split moved the
+  // bodies to `./composer/send`. These wrappers preserve the call shape
+  // (button onClick) by delegating to the extracted implementation with
+  // the local state.
+  const send = () =>
+    sendImpl({
+      text, attachments, images, sceneTag, pluginCommands,
+      streaming, disabled, apiReady,
+      onSend, onSendContent, onEnqueue, onClearSceneTag, onToast,
+      setAttachments, setImages, setCursorPos, updateText,
+      histRef, histCursorRef, draftRef,
     });
-  };
+  const enqueue = () =>
+    enqueueImpl({
+      text, attachments, images, sceneTag, pluginCommands,
+      streaming, disabled, apiReady,
+      onSend, onSendContent, onEnqueue, onClearSceneTag, onToast,
+      setAttachments, setImages, setCursorPos, updateText,
+      histRef, histCursorRef, draftRef,
+    });
 
-  const send = () => {
-    const t = text.trim();
-    // 允许空消息发送，或者需要有附件
-    if (streaming || disabled || !apiReady) return;
-    // 插件命令优先:它是渲染端动作,把 "/greet Alice" 当 prompt 发出去只会得到
-    // 一句模型编的回话。带附件/图片时不拦截 —— 那种情况用户显然想发给 agent。
-    // 保留名单里的名字(plan / fork / …)永远归 Pi,插件同名也不许截胡。
-    if (attachments.length === 0 && images.length === 0 && t.startsWith("/")) {
-      const hit = matchPluginSlashCommand(
-        t,
-        pluginCommands,
-        NATIVE_PI_COMMANDS.map((command) => command.name),
-      );
-      if (hit) {
-        runPluginCommand(hit.command, hit.args, (error) =>
-          onToast?.(
-            `插件命令 /${hit.command.id} 执行失败:${error instanceof Error ? error.message : String(error)}`,
-          ),
-        );
-        updateText("");
-        setCursorPos(0);
-        return;
-      }
-    }
-    // Append attachment paths to the prompt text so pi's read_file tool can
-    // pick them up (ACP image/audio needs agent-declared capabilities we
-    // don't model yet; ResourceLink behavior is unverified — text is safest).
-    let body = t;
-    if (attachments.length > 0) {
-      const fileList = attachments.map((p) => `- ${p}`).join("\n");
-      body = body
-        ? `${body}\n\n相关文件:\n${fileList}`
-        : `请查看以下文件:\n${fileList}`;
-    }
-    // 把"操作类型"标签作为上下文前缀一并发出(后端正文仍是可运行的 prompt)。
-    if (sceneTag) {
-      body = body ? `【${sceneTag.label}】${body}` : `【${sceneTag.label}】`;
-    }
-    // R1 — when there are inline image attachments, prefer the content-based
-    // IPC so the model receives the actual image bytes instead of a path
-    // string. Path-only attachments still flow through onSend(text) with the
-    // existing "相关文件" prefix so the existing tools/read_file path keeps
-    // working.
-    const inlineAttachments = images;
-    if (inlineAttachments.length > 0 && onSendContent) {
-      const textPart = body || "请查看以下附件";
-      const content: Array<
-        { type: "text"; text: string }
-        | { type: "image"; mediaType: string; data: string; name?: string }
-        | { type: "file"; mediaType: string; data: string; name?: string }
-      > = [{ type: "text", text: textPart }];
-      for (const att of inlineAttachments) {
-        if (att.kind === "file") {
-          content.push({ type: "file", mediaType: att.mediaType, data: att.data, ...(att.name ? { name: att.name } : {}) });
-        } else {
-          content.push({ type: "image", mediaType: att.mediaType, data: att.data, ...(att.name ? { name: att.name } : {}) });
-        }
-      }
-      // Path attachments get appended as text the agent can resolve.
-      if (attachments.length > 0) {
-        const fileList = attachments.map((p) => `- ${p}`).join("\n");
-        content[0] = { type: "text", text: `${textPart}\n\n相关文件:\n${fileList}` };
-      }
-      void Promise.resolve(onSendContent(content)).catch((e) => {
-        console.error("onSendContent failed", e);
-        onToast?.(`发送失败:${e instanceof Error ? e.message : String(e)}`);
-      });
-    } else {
-      onSend(body || "你好");
-    }
-    // 记入输入历史(arrow-key recall)。
-    if (body && body.trim()) {
-      histRef.current = pushHistory(histRef.current, body);
-      histCursorRef.current = histRef.current.items.length;
-      draftRef.current = "";
-    }
-    updateText(""); // 发送后清空输入框,同时把草稿也清掉(否则切回还会带回来)。
-    setAttachments([]);
-    setImages([]);
-    onClearSceneTag?.();
-  };
+  const pickFiles = async () => pickFilesImpl(setAttachments);
+  const pickImages = async () => pickImagesImpl(setImages, onToast);
 
-  /** 流式时入队(对齐 WorkBuddy message-queue):文本非空才入队。 */
-  const enqueue = () => {
-    const t = text.trim();
-    if (!t || disabled || !apiReady) return;
-    let body = t;
-    if (sceneTag) body = body ? `【${sceneTag.label}】${body}` : `【${sceneTag.label}】`;
-    onEnqueue?.(body);
-    updateText("");
-    setAttachments([]);
-    onClearSceneTag?.();
-  };
-
-  const pickFiles = async () => {
-    try {
-      const paths = await openPaths({ multiple: true });
-      if (paths.length === 0) return;
-      setAttachments((prev) => {
-        const set = new Set(prev);
-        paths.forEach((p) => set.add(p));
-        return [...set];
-      });
-    } catch {
-      // dialog plugin not available in non-Electron-compatible env (vitest) — no-op.
-    }
-  };
-
-  /** R1 — open the OS file picker scoped to image MIME types. The user can
-   *  still attach non-image files via "添加文件"; this entry is the explicit
-   *  "I want a vision model to look at this" affordance (Codex-style). */
-  const pickImages = async () => {
-    try {
-      const paths = await openPaths({
-        multiple: true,
-        filters: [
-          { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] },
-        ],
-      });
-      if (paths.length === 0) return;
-      // Resolve each path to a File via fetch. The preload bridge returns
-      // a file:// URL we can fetch in the renderer. In test environments
-      // (no Electron) fetch will reject — we surface a toast and continue.
-      for (const p of paths) {
-        try {
-          // Use a fetch with file:// to read the bytes; this is supported
-          // when the page is loaded from a file:// origin or has the
-          // necessary permission via Electron.
-          const fileUrl = p.startsWith("file:") ? p : `file://${p}`;
-          const resp = await fetch(fileUrl);
-          const blob = await resp.blob();
-          const ext = p.split(".").pop()?.toLowerCase() ?? "";
-          const mime = blob.type || (ext === "jpg" ? "image/jpeg" : `image/${ext}`);
-          const file = new File([blob], p.split(/[\\/]/).pop() ?? "image", { type: mime });
-          const img = await readImageFile(file);
-          if (img) setImages((prev) => [...prev, img]);
-        } catch (err) {
-          onToast?.(`无法读取图片:${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
-    } catch {
-      // dialog plugin not available in non-Electron-compatible env (vitest) — no-op.
-    }
-  };
-
-  // ---------- 拖拽文件附件(对齐 WorkBuddy drop-zone)----------
-  // Electron-compatible webview 的 DOM onDrop 拿不到本地文件绝对路径(只给 File blob),
-  // 必须用原生 drag-drop 事件。enter/over 显示遮罩;drop 收集路径并入附件;
-  // leave 隐藏遮罩。非 Electron-compatible 环境(vitest)getCurrentWebview 会抛错,安全降级。
-  const [dragActive, setDragActive] = useState(false);
-  useEffect(() => {
-    let unlisten: (() => void) | null = null;
-    let cancelled = false;
-    try {
-      const webview = getCurrentWebview();
-      webview
-        .onDragDropEvent((event) => {
-          // Electron-compatible 把 DragDropEvent 包在 Event<T>.payload 里。
-          const e = event.payload as DragDropEvent;
-          if (isDragDrop(e)) {
-            const incoming = collectDroppedPaths(e.paths);
-            if (incoming.length > 0) {
-              setAttachments((prev) => {
-                const seen = new Set(prev);
-                const out = [...prev];
-                for (const p of incoming) {
-                  if (!seen.has(p)) {
-                    seen.add(p);
-                    out.push(p);
-                  }
-                }
-                return out;
-              });
-            }
-            setDragActive(false);
-          } else {
-            setDragActive(isDragHovering(e));
-          }
-        })
-        .then((un) => {
-          if (cancelled) {
-            // 组件已卸载,立刻解绑。
-            try { un(); } catch { /* noop */ }
-          } else {
-            unlisten = un;
-          }
-        })
-        .catch(() => {
-          /* 非 Electron-compatible 环境无此事件 — 静默降级 */
-        });
-    } catch {
-      /* getCurrentWebview 在非 Electron-compatible 环境抛错 — 静默降级 */
-    }
-    return () => {
-      cancelled = true;
-      if (unlisten) {
-        try { unlisten(); } catch { /* noop */ }
-      }
-    };
-  }, []);
 
   const ph = (label: string) => onPlaceholder?.(label);
-  const pluginComposerContributions = useRendererContributions("composer");
-  const pluginComposerSlots = useRendererSlot("conversation.input.dock");
-  // 插件贡献的工具栏按钮（`composer.toolbar.action` slot）。
-  // 数据型贡献：插件只描述按钮长什么样、点了做什么，UI 由 Composer 渲染。
-  const pluginToolbarActions = useSlotPayloads<{
-    id: string;
-    label: string;
-    icon?: React.ReactNode;
-    description?: string;
-    insertText?: string;
-    placeholder?: string;
-    onClick?: (ctx: { insertText: (text: string) => void }) => void;
-    onActivate?: () => void;
-  }>("composer.toolbar.action");
-
-  /**
-   * Plugin SDK 注册的命令(内核 `plugin.command` 的数据型 payload)。
-   * 它们既能出现在 `/` 补全菜单里,也在发送路径上被识别成「渲染端动作」而不是
-   * 要发给 agent 的 prompt —— 否则插件注册的命令永远只能靠 ⌘K 才能执行。
-   */
-  const pluginCommands = useSlotPayloads<PluginCommandPayload>("plugin.command");
+  // Plugin slot wiring (contributions, slots, toolbar actions, command payloads)
+  // used to live inline here (~40 lines); phase-3 split moved it into the
+  // `usePluginSlots` hook. `ph` stays local because it's invoked from JSX
+  // (`onClick={() => ph("...")}`) and would otherwise need to round-trip
+  // through the hook's return value.
+  const { pluginComposerContributions, pluginComposerSlots, pluginToolbarActions, pluginCommands } = usePluginSlots();
 
   // Cursor tracking for slash-command autocomplete.
   const [cursorPos, setCursorPos] = useState(0);
-  // R1 - @-mention picker state. `mention` is null when the picker is closed.
-  // The query is the text after the most recent `@` token at the cursor.
-  const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
-  const mentionRef = useRef(mention);
-  useEffect(() => { mentionRef.current = mention; }, [mention]);
-  // R8.61 - Anchor rect for the @-mention and slash-command popovers.
-  // Rendered via createPortal at document.body level so they are never
-  // clipped by `.wb-composer`'s `overflow: hidden` or covered by sibling
-  // toolbars (the +/skills/file picker row). The rect is recomputed on every
-  // text/cursor change, on window resize, and on scroll of any ancestor.
-  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
-  const anchorRectRef = useRef<DOMRect | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      const r = el.getBoundingClientRect();
-      if (!anchorRectRef.current ||
-          Math.abs(r.top - anchorRectRef.current.top) > 0.5 ||
-          Math.abs(r.left - anchorRectRef.current.left) > 0.5 ||
-          Math.abs(r.width - anchorRectRef.current.width) > 0.5) {
-        anchorRectRef.current = r;
-        setAnchorRect(r);
-      }
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
-    if (ro) ro.observe(el);
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
-      if (ro) ro.disconnect();
-    };
-  }, [text, cursorPos, disabled]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!mentionRef.current) return;
-      const fn = (window as Window & { __openbuddyMentionKeyDown?: (e: KeyboardEvent) => void }).__openbuddyMentionKeyDown;
-      if (fn) fn(e);
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, []);
-  // Is the user currently typing a "/xxx" command? Drives SlashCommands menu.
-  const wordBeforeCursor = (() => {
-    const before = text.slice(0, cursorPos);
-    const m = before.match(/\/[\w-]*$/);
-    return m ? m[0] : "";
-  })();
-  const slashVisible = wordBeforeCursor.length > 0 && apiReady && !streaming;
+  // The 5 useEffects that sync the textarea with externally-driven text
+  // sources (autosize, extensionText, initialText, externalText, draftKey)
+  // used to live inline here; phase-3 split moved them into the
+  // `useExtensionText` hook. Lives after setCursorPos declaration so all
+  // dependencies are in scope.
+  useExtensionText({
+    ref, text, setText, setCursorPos,
+    initialText, onInitialTextConsumed,
+    extensionText, extensionTextNonce,
+    externalText, externalTextNonce,
+    draft, draftKey, updateText,
+  });
+  // R1 - @-mention picker state, anchor rect, slash detection, and the two
+  // pick-handlers used to live inline here (~110 lines); phase-3 split moved
+  // them into the `usePopovers` hook.
+  const { mention, setMention, anchorRect, handleMentionSelect, handleSlashPick, slashVisible } = usePopovers({
+    ref, text, cursorPos, apiReady, streaming, disabled, updateText, setCursorPos,
+  });
 
-  // R1 - detect @-mention trigger at the cursor. We look back from the
-  // cursor for an `@` that is at the start of a token (preceded by
-  // whitespace or BOF) and capture the text after it as the query.
-  useEffect(() => {
-    if (!apiReady || streaming) {
-      if (mention) setMention(null);
-      return;
-    }
-    const before = text.slice(0, cursorPos);
-    // Match an @ that is at the start of a token and not part of an email.
-    const m = before.match(/(^|\s)@([\w./\\-]*)$/);
-    if (m) {
-      const query = m[2];
-      const at = before.lastIndexOf("@", cursorPos);
-      setMention({ start: at, query });
-    } else {
-      if (mention) setMention(null);
-    }
-    // We intentionally do not depend on `mention` to avoid loops; the effect
-    // reads/writes it through a ref-like pattern via the conditional check.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, cursorPos, apiReady, streaming]);
-
-  // R1 - select a mention: replace the `@query` token with `@<path> `.
-  const handleMentionSelect = useCallback((hit: import("@/lib/agent/pi-client").OpenBuddyWorkspaceHit) => {
-    if (!mention) return;
-    const before = text.slice(0, mention.start);
-    const after = text.slice(cursorPos);
-    const inserted = `@${hit.path} `;
-    const next = before + inserted + after;
-    updateText(next);
-    const newCursor = before.length + inserted.length;
-    setCursorPos(newCursor);
-    setMention(null);
-    requestAnimationFrame(() => {
-      if (ref.current) {
-        ref.current.focus();
-        ref.current.selectionStart = ref.current.selectionEnd = newCursor;
-      }
-    });
-  }, [mention, text, cursorPos, updateText]);
-
-  const handleSlashPick = (command: string) => {
-    // Replace the "/xxx" fragment (up to cursor) with the picked command + " ".
-    const before = text.slice(0, cursorPos);
-    const after = text.slice(cursorPos);
-    const newBefore = before.replace(/\/[\w-]*$/, command + " ");
-    const next = newBefore + after;
-    updateText(next);
-    const newPos = newBefore.length;
-    setCursorPos(newPos);
-    // Refocus + put caret at the insertion point.
-    requestAnimationFrame(() => {
-      const el = ref.current;
-      if (!el) return;
-      el.focus();
-      el.selectionStart = el.selectionEnd = newPos;
-    });
-  };
+  // The onKeyDown handler for the textarea (Enter → send + ↑/↓ arrow-key recall)
+  // used to live inline here (~45 lines); phase-3 split moved it into the
+  // `useInputHistory` hook. Lives after `usePopovers` so `slashVisible` is
+  // in scope, and after `send` is declared so the hook can call it.
+  const { onKeyDown: onTextareaKeyDown } = useInputHistory({
+    ref, text, cursorPos, updateText, slashVisible,
+    histRef, histCursorRef, draftRef, onSend: send,
+  });
 
   const showModelPicker = !!onModelChange && !!models;
   const showWorkspacePicker = !!onSelectWorkspace && !!workspaces;
@@ -1088,55 +602,7 @@ export function ComposerInner({
           onKeyUp={(e) =>
             setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? cursorPos)
           }
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              if (slashVisible) {
-                return;
-              }
-              e.preventDefault();
-              send();
-              return;
-            }
-            // 输入历史 arrow-key recall(对齐 WorkBuddy use-input-history)。
-            // 仅在未组合输入(中文输入法)且非 slash 菜单可见时响应。
-            if (!slashVisible && !e.nativeEvent.isComposing) {
-              const el = e.target as HTMLTextAreaElement;
-              const atFirstLine = el.selectionStart === 0 || text.length === 0;
-              const atLastLine = el.selectionStart === text.length;
-              // 已在历史导航中(cursor < items.length)时,↑/↓ 持续翻页,不受光标位置约束。
-              const navigating = histCursorRef.current < histRef.current.items.length;
-              if (e.key === "ArrowUp" && (atFirstLine || navigating)) {
-                if (histCursorRef.current === histRef.current.items.length) {
-                  draftRef.current = text; // 进入历史前暂存当前草稿
-                }
-                const r = navigateHistory(histRef.current, histCursorRef.current, "up", draftRef.current);
-                if (r.text !== text) {
-                  e.preventDefault();
-                  histCursorRef.current = r.cursor;
-                  updateText(r.text);
-                  requestAnimationFrame(() => {
-                    const t = ref.current;
-                    if (t) {
-                      t.selectionStart = t.selectionEnd = r.text.length;
-                    }
-                  });
-                }
-              } else if (e.key === "ArrowDown" && (atLastLine || navigating)) {
-                const r = navigateHistory(histRef.current, histCursorRef.current, "down", draftRef.current);
-                if (r.cursor !== histCursorRef.current) {
-                  e.preventDefault();
-                  histCursorRef.current = r.cursor;
-                  updateText(r.text);
-                  requestAnimationFrame(() => {
-                    const t = ref.current;
-                    if (t) {
-                      t.selectionStart = t.selectionEnd = r.text.length;
-                    }
-                  });
-                }
-              }
-            }
-          }}
+          onKeyDown={onTextareaKeyDown}
         />
         {/* R1 - @-mention picker. Floats above the composer when the user
             is typing an @ token. The picker handles its own keyboard nav
@@ -1175,64 +641,14 @@ export function ComposerInner({
             }}
             onNavigateConnectors={onNavigateConnectors}
           />
-          {pluginComposerContributions.map((contribution) => {
-            const payload = contribution.payload;
-            // 与侧栏贡献一致:payload.hidden 的占位条目只保留 id,不渲染。
-            if (payload.hidden === true) return null;
-            const label = payload.label ?? payload.title ?? contribution.id;
-            return (
-              <button
-                key={contribution.id}
-                type="button"
-                className="wb-composer__plugin-action"
-                title={payload.description ?? label}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (payload.insertText !== undefined) {
-                    updateText((prev) => {
-                      const prefix = prev === "" || prev.endsWith(" ") ? "" : " ";
-                      return prev + prefix + payload.insertText;
-                    });
-                    requestAnimationFrame(() => ref.current?.focus());
-                  }
-                  if (payload.placeholder) ph(payload.placeholder);
-                  if (typeof payload.onActivate === "function") payload.onActivate();
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-          {pluginComposerSlots.map((entry) => (
-            <RendererSlotView key={String(entry.options.id ?? entry.options.key ?? entry.options.name)} entry={entry} className="wb-composer__plugin-action" />
-          ))}
-          {/* 微内核 `composer.toolbar.action` slot 的插件按钮。第三方插件通过
-              plugin-sdk 的 api.registerSlot 注册，无需打包 React 组件。 */}
-          {pluginToolbarActions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              className="wb-composer__plugin-action"
-              title={action.description ?? action.label}
-              onClick={(event) => {
-                event.stopPropagation();
-                const insert = (snippet: string) => {
-                  updateText((prev) => {
-                    const prefix = prev === "" || prev.endsWith(" ") ? "" : " ";
-                    return prev + prefix + snippet;
-                  });
-                  requestAnimationFrame(() => ref.current?.focus());
-                };
-                if (action.insertText !== undefined) insert(action.insertText);
-                if (action.placeholder) ph(action.placeholder);
-                action.onClick?.({ insertText: insert });
-                action.onActivate?.();
-              }}
-            >
-              {action.icon ? <span aria-hidden="true">{action.icon}</span> : null}
-              {action.label}
-            </button>
-          ))}
+          <PluginToolbar
+            contributions={pluginComposerContributions as never}
+            slots={pluginComposerSlots as never}
+            toolbarActions={pluginToolbarActions as never}
+            updateText={updateText}
+            textareaRef={ref}
+            onPlaceholder={ph}
+          />
           {activeExpertName && (
             <span className="wb-composer__expert-badge" title={`当前专家：${activeExpertName}`}>
               <ThumbImg name={activeExpertName} local={activeExpertAvatar} size={18} shape="circle" />
@@ -1309,64 +725,17 @@ export function ComposerInner({
           >
             <Mic size={16} />
           </button>
-          {streaming ? (
-            <>
-              {/* 流式时可加入待发送队列(对齐 WorkBuddy message-queue)。 */}
-              {onEnqueue && text.trim() !== "" && (
-                <button
-                  className="wb-composer__send wb-composer__send--enqueue"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    enqueue();
-                  }}
-                  disabled={disabled || !apiReady}
-                  aria-label="加入待发送队列"
-                  title="加入待发送队列(agent 完成后自动发送)"
-                >
-                  +
-                </button>
-              )}
-              <button
-                className="wb-composer__send wb-composer__send--stop"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCancel();
-                }}
-                // R6.8 — 停止按钮必须永远可点。即便 apiReady=false / disabled=true,
-                // 用户面对"AI 卡死但 UI 整体还能动"时,这是唯一的逃生口。
-                // 取消本身不依赖 apiReady(走 piCancel 单独的 IPC 通道)。
-                disabled={false}
-                aria-label="停止生成"
-                title="停止生成(若 AI 长时间无响应,可强制中断)"
-              >
-                <Square size={12} strokeWidth={2.5} aria-hidden="true" />
-              </button>
-            </>
-          ) : (
-            <button
-              className={
-                "wb-composer__send" +
-                (text.trim() === "" && attachments.length === 0
-                  ? " wb-composer__send--empty"
-                  : "")
-              }
-              // R0.8: disable send when there's no content AND no attachments,
-              // when disabled by parent (e.g. api not ready), or while streaming.
-              disabled={
-                (text.trim() === "" && attachments.length === 0) ||
-                disabled ||
-                streaming
-              }
-              onClick={(e) => {
-                e.stopPropagation();
-                send();
-              }}
-              aria-label="发送"
-              title={!apiReady ? "请先配置 API Key" : "发送消息"}
-            >
-              <SendPlaneIcon size="md" />
-            </button>
-          )}
+          <ActionButtons
+            streaming={streaming}
+            apiReady={apiReady}
+            disabled={disabled}
+            text={text}
+            attachmentCount={attachments.length}
+            listening={listening}
+            onEnqueue={onEnqueue ? () => enqueue() : undefined}
+            onSend={send}
+            onCancel={onCancel}
+          />
         </div>
       </section>
       {/* WB: meta 行在白卡外下方,透明背景,与卡片间距4px。permissionInline 时
@@ -1397,67 +766,10 @@ export function ComposerInner({
   );
 }
 
-// ---------- SpeechRecognition minimal typing ----------
-// The browser SpeechRecognition API isn't in the TS DOM lib by default, and
-// vendor prefixes vary. We type only the surface we use and resolve the ctor
-// defensively at runtime.
-interface SpeechRecognitionResultLike {
-  isFinal: boolean;
-  0: { transcript: string };
-}
-interface SpeechRecognitionEventLike {
-  resultIndex: number;
-  results: ArrayLike<SpeechRecognitionResultLike>;
-}
-interface SpeechRecognitionErrorEventLike {
-  error: string;
-}
-interface VoiceRecognition {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  start: () => void;
-  stop: () => void;
-  abort?: () => void;
-  onresult: (e: SpeechRecognitionEventLike) => void;
-  onerror: (e: SpeechRecognitionErrorEventLike) => void;
-  onend: () => void;
-}
-type VoiceRecognitionCtor = new () => VoiceRecognition;
-
-function getSpeechRecognitionCtor(): VoiceRecognitionCtor | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as {
-    SpeechRecognition?: VoiceRecognitionCtor;
-    webkitSpeechRecognition?: VoiceRecognitionCtor;
-  };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
-
-/**
- * 注册内建 Web Speech ASR provider 到 voice-contract 注册表(provider-agnostic,
- * 对齐 WorkBuddy `asr:*` 契约)。外部 provider(如云端 STT)注册后会因其更高
- * 优先级而被优先使用。仅在首次调用时注册一次。
- */
-let webSpeechAsrRegistered = false;
-function ensureWebSpeechAsrRegistered(): void {
-  if (webSpeechAsrRegistered) return;
-  webSpeechAsrRegistered = true;
-  const Ctor = getSpeechRecognitionCtor();
-  if (!Ctor) return;
-  registerAsrProvider(
-    createWebSpeechAsrProvider({
-      isAvailable: () => getSpeechRecognitionCtor() !== null,
-      createRecognition: (lang) => {
-        const rec = new Ctor();
-        rec.lang = lang;
-        rec.interimResults = true;
-        rec.continuous = false;
-        return rec as never;
-      },
-    }),
-  );
-}
+// SpeechRecognition types + getSpeechRecognitionCtor + ensureWebSpeechAsrRegistered
+// live in `./composer/voice-recognition` (phase-3 split; canonical declaration
+// there). The duplicates were never removed from Composer.tsx (half-done P0 split
+// per `docs/plan/06-roadmap.md` P0-1); phase-3 cleanup removes them.
 
 /**
  * R1.3 — Memoized Composer. Default shallow compare on the prop bag.

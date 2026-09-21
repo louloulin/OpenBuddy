@@ -74,7 +74,6 @@ import {
   createYieldStore,
 } from "@/lib/ui/yield-state";
 import type { ModelOption, ThinkingLevel } from "@openbuddy/ui-workbench";
-import type { HomeModeId } from "@openbuddy/ui-shared";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import type { WorkspaceInfo } from "@/lib/agent/pi-client";
 import { StatusIndicator } from "@/components/StatusIndicator";
@@ -145,27 +144,6 @@ const QUICK_PROMPTS: ReadonlyArray<{
 ];
 
 
-/** Format a millisecond duration as WorkBuddy-style "Xs / Xm Ys". */
-function formatElapsed(ms: number): string {
-  if (ms < 1000) return "已完成";
-  const totalSec = Math.round(ms / 1000);
-  if (totalSec < 60) return `已完成 ${totalSec}s`;
-  const minutes = Math.floor(totalSec / 60);
-  const seconds = totalSec % 60;
-  return `已完成 ${minutes}m ${seconds}s`;
-}
-
-/** Streaming-time formatter. Kept short (just "12s" / "1m 5s") so the pill
- *  doesn't read as a full sentence; the user wants a glance, not a paragraph.
- *  Seconds-only for the first minute so the value visibly moves at a human
- *  rate; past 60s we switch to the WorkBuddy-style "1m 5s" form. */
-function formatInFlightElapsed(ms: number): string {
-  const totalSec = Math.max(0, Math.round(ms / 1000));
-  if (totalSec < 60) return `${totalSec}s`;
-  const minutes = Math.floor(totalSec / 60);
-  const seconds = totalSec % 60;
-  return `${minutes}m ${seconds}s`;
-}
 export function ChatView({
   onSend,
   onSendContent,
@@ -213,7 +191,7 @@ export function ChatView({
   onOpenSession?: (sessionId: string, cwd?: string) => void | Promise<void>;
   /** Surface transient feedback from the rewind/fork toolbar. */
   onToast?: (msg: string) => void;
-  onSelectMode?: (modeId: HomeModeId) => void;
+  onSelectMode?: (modeId: string) => void;
   onSelectExpert?: (agent: AgentEntry) => void;
   onNavigateConnectors?: () => void;
   extensionText?: string;
@@ -266,65 +244,19 @@ export function ChatView({
   const error = useSessionStore((s) => s.error);
   const plan = useSessionStore((s) => s.plan);
   const sessionId = useSessionStore((s) => s.sessionId);
-  // R — chat status timing (mirror WorkBuddy "已完成 Xs" header chip).
-  // Captures the wall-clock span of the most recent assistant turn so the
-  // status pill can render "已完成 1s / 12s / 1m 5s" alongside the boolean
-  // 完成态. Reset whenever a new session is loaded or a fresh prompt is sent.
-  const [lastTurnMs, setLastTurnMs] = useState<number | null>(null);
-  const prevStreamingRef = useRef<boolean>(false);
+  // Captures the wall-clock start of the most recent assistant turn so
+  // per-message streaming labels (e.g. the meta chip inside MessageItem)
+  // can render a live "正在生成" duration.
   const turnStartRef = useRef<number | null>(null);
-  // R7.1 — while streaming, re-render the status pill every second so the
-  // wall-clock elapsed reads live ("12s 正在生成…") rather than the value
-  // captured at the last streaming delta. Same pattern as the cumulative
-  // session timer (single setState/interval). Cheap; the pill is a few
-  // elements.
-  const [, setStreamTick] = useState(0);
-  // R6.7 — cumulative session wall-clock elapsed. Ticks every second once
-  // the session has at least one message so the status pill can show a
-  // `· 共 Xm Ys` suffix alongside the per-turn `已完成 Xs` chip.
-  const [sessionElapsedMs, setSessionElapsedMs] = useState<number | null>(null);
-  const sessionStartedAtRef = useRef<number | null>(null);
   useEffect(() => {
-    if (streaming && !prevStreamingRef.current) {
-      turnStartRef.current = Date.now();
-    } else if (!streaming && prevStreamingRef.current && turnStartRef.current !== null) {
-      setLastTurnMs(Date.now() - turnStartRef.current);
+    if (streaming) {
+      if (turnStartRef.current === null) turnStartRef.current = Date.now();
+    } else {
       turnStartRef.current = null;
     }
-    prevStreamingRef.current = streaming;
   }, [streaming]);
   useEffect(() => {
-    if (!streaming) return;
-    const id = setInterval(() => setStreamTick((n) => (n + 1) | 0), 1000);
-    return () => clearInterval(id);
-  }, [streaming]);
-  // Tick the cumulative timer once per second while the session has any
-  // messages. Cheap (single setState/interval, no per-frame work) and
-  // lets the pill render the live wall-clock duration without forcing a
-  // parent-level re-render.
-  useEffect(() => {
-    if (messages.length === 0 || !sessionId) {
-      sessionStartedAtRef.current = null;
-      setSessionElapsedMs(null);
-      return;
-    }
-    if (sessionStartedAtRef.current === null) {
-      sessionStartedAtRef.current = Date.now();
-    }
-    const tick = () => {
-      const startedAt = sessionStartedAtRef.current;
-      if (startedAt !== null) setSessionElapsedMs(Date.now() - startedAt);
-    };
-    tick();
-    const handle = window.setInterval(tick, 1000);
-    return () => window.clearInterval(handle);
-  }, [messages.length, sessionId]);
-  useEffect(() => {
-    setLastTurnMs(null);
     turnStartRef.current = null;
-    prevStreamingRef.current = false;
-    sessionStartedAtRef.current = null;
-    setSessionElapsedMs(null);
   }, [sessionId]);
   // R1 — plan-mode toggle (Codex/Claude Code-style persistent plan banner).
   // Independent from panelMode because the banner is always-on when active
@@ -1211,59 +1143,6 @@ export function ChatView({
               <h1 className="chatview__title" title={sessionRecord.title}>
                 {sessionRecord.title}
               </h1>
-            )}
-            {messages.length > 0 && (
-              <div
-                className={
-                  "chatview__status" +
-                  (streaming ? " chatview__status--streaming" : "")
-                }
-                role="status"
-                aria-live="polite"
-              >
-                <span
-                  className="chatview__status-dot"
-                  aria-hidden="true"
-                />
-                <span className="chatview__status-text">
-                  {/* Streaming: surface the wall-clock elapsed alongside the
-                      "正在生成" label so the user sees the model is making
-                      progress (and has a clear signal if a long stream is
-                      hung). The timer is per-turn so it resets on each
-                      prompt; the cumulative `共 Xs` suffix only appears
-                      once the turn is long enough to matter. */}
-                  {streaming
-                    ? turnStartRef.current !== null
-                      ? `${formatInFlightElapsed(Date.now() - turnStartRef.current)} 正在生成…`
-                      : "正在生成…"
-                    : lastTurnMs !== null
-                    ? formatElapsed(lastTurnMs)
-                    : "已完成"}
-                </span>
-                {/* R8.20 — model id chip beside the status text. Mirrors
-                    PI-Desktop's status pill: a glanceable model identifier
-                    so the user always knows which model is producing the
-                    answer without having to open the model picker. */}
-                {modelId && (
-                  <span
-                    className="chatview__status-model"
-                    data-testid="chatview-status-model"
-                    title={`当前模型: ${modelId}`}
-                  >
-                    {modelId}
-                  </span>
-                )}
-                {sessionElapsedMs !== null && sessionElapsedMs >= 30_000 && (
-                  <span
-                    className="chatview__status-total"
-                    aria-label="会话累计耗时"
-                    title="会话累计耗时"
-                    data-testid="chatview-status-total"
-                  >
-                    · 共 {formatElapsed(sessionElapsedMs)}
-                  </span>
-                )}
-              </div>
             )}
             {readOnlySubagent && (
               <div className="subagent-readonly-banner" role="status">

@@ -1,35 +1,52 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1480" height="320" viewBox="0 0 1480 320" role="img" aria-label="OpenBuddy">
+  <!--
+    OpenBuddy wordmark v15.
+    Left: 256x256 mark tile (same composition as openbuddy-logo.svg,
+    scaled to 32px offset).
+    Right: "OpenBuddy" wordmark + tagline. The "B" of "Buddy" is tinted
+    warm amber to echo the companion sphere on the mark.
+  -->
   <defs>
-    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
-      <stop stop-color="#FCF7E9"/>
-      <stop offset="1" stop-color="#E8D8B8"/>
-    </radialGradient>
-    <radialGradient id="body" cx="50%" cy="35%" r="70%">
-      <stop stop-color="#FFFEF8"/>
-      <stop offset="1" stop-color="#E8D8B8"/>
-    </radialGradient>
-    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#D4A574"/>
-      <stop offset="1" stop-color="#9C7548"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#1E2640"/>
+      <stop offset="1" stop-color="#0B0F1E"/>
     </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFFEF8"/>
+      <stop offset=".55" stop-color="#F5E6CC"/>
+      <stop offset="1" stop-color="#D4A574"/>
+    </linearGradient>
+    <radialGradient id="spark" cx="35%" cy="35%" r="65%">
+      <stop stop-color="#FFD78A"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </radialGradient>
+    <radialGradient id="sparkGlow" cx="50%" cy="50%" r="50%">
+      <stop stop-color="#F59E0B" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#F59E0B" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="clip"><rect x="32" y="32" width="256" height="256" rx="58"/></clipPath>
   </defs>
-  <g transform="translate(32 32)">
-    <rect x="0" y="0" width="256" height="256" rx="58" fill="url(#bg)"/>
-    <path d="M58 82 L52 30 Q53 26 60 27 L84 50 Z" fill="url(#body)" stroke="#1F140A" stroke-width="3.6" stroke-linejoin="round"/>
-    <path d="M198 82 L204 30 Q203 26 196 27 L172 50 Z" fill="url(#body)" stroke="#1F140A" stroke-width="3.6" stroke-linejoin="round"/>
-    <path d="M128 60 Q72 60 56 110 Q48 142 76 158 Q100 168 128 168 Q156 168 180 158 Q208 142 200 110 Q184 60 128 60 Z"
-          fill="url(#body)" stroke="#1F140A" stroke-width="5" stroke-linejoin="round"/>
-    <ellipse cx="128" cy="152" rx="44" ry="24" fill="url(#body)" stroke="#1F140A" stroke-width="3.6"/>
-    <path d="M128 168 Q60 168 48 210 Q42 236 70 246 Q96 252 128 252 Q160 252 186 246 Q214 236 208 210 Q196 168 128 168 Z"
-          fill="url(#body)" stroke="#1F140A" stroke-width="5" stroke-linejoin="round"/>
-    <ellipse cx="128" cy="210" rx="36" ry="24" fill="url(#accent)" stroke="#1F140A" stroke-width="3.6"/>
-    <ellipse cx="100" cy="252" rx="14" ry="6" fill="url(#body)" stroke="#1F140A" stroke-width="3.6"/>
-    <ellipse cx="156" cy="252" rx="14" ry="6" fill="url(#body)" stroke="#1F140A" stroke-width="3.6"/>
-    <path d="M208 210 Q220 198 224 184 Q226 176 218 174 Q212 174 210 184 Q208 192 196 198 Z"
-          fill="url(#body)" stroke="#1F140A" stroke-width="3.6" stroke-linejoin="round"/>
+
+  <!-- Mark tile (256x256) -->
+  <g transform="translate(0 0)">
+    <g clip-path="url(#clip)">
+      <rect x="32" y="32" width="256" height="256" fill="url(#bg)"/>
+      <circle cx="160" cy="160" r="96" fill="#F5E6CC" opacity=".04"/>
+      <!-- 3/4 ring centered at (160,160), r=70 -->
+      <path d="M 224.71 124.29 A 70 70 0 1 1 224.71 195.71"
+            fill="none"
+            stroke="url(#ring)"
+            stroke-width="24"
+            stroke-linecap="round"/>
+      <circle cx="235" cy="104" r="32" fill="url(#sparkGlow)"/>
+      <circle cx="235" cy="104" r="17" fill="url(#spark)"/>
+      <circle cx="229" cy="98" r="5" fill="#FFFEF8" opacity=".55"/>
+    </g>
   </g>
-  <g transform="translate(330 0)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif">
-    <text x="0" y="190" font-size="148" font-weight="700" letter-spacing="-3" fill="#1F140A">Open<tspan font-weight="700" fill="#9C7548">Buddy</tspan></text>
-    <text x="4" y="240" font-size="28" font-weight="500" letter-spacing="6" fill="#7A6E50">OPEN · ADAPTIVE · AI WORKBENCH</text>
+
+  <!-- Wordmark + tagline -->
+  <g transform="translate(338 0)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif">
+    <text x="0" y="190" font-size="148" font-weight="700" letter-spacing="-4" fill="#1E2640">Open<tspan font-weight="700" fill="#F59E0B">Buddy</tspan></text>
+    <text x="4" y="240" font-size="26" font-weight="500" letter-spacing="6" fill="#7A6E50">OPEN · ADAPTIVE · AI WORKBENCH</text>
   </g>
 </svg>

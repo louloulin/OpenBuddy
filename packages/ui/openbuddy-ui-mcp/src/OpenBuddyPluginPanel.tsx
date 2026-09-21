@@ -26,7 +26,7 @@ import {
   agentInstallProfilePackage,
   agentRemoveProfilePackage,
   agentInstallDefaultPiPackages,
-  type OpenBuddyDefaultPiPackageResult,
+  agentHashContent,
   type OpenBuddyPluginStateSnapshot,
   type OpenBuddyPluginStatus,
   type OpenBuddySessionEventRecord,
@@ -106,7 +106,67 @@ export function OpenBuddyPluginPanel({ onToast }: OpenBuddyPluginPanelProps) {
   const [resources, setResources] = useState<OpenBuddyResourceInventory>({ extensions: [], agents: [], skills: [], prompts: [], themes: [], hooks: [], diagnostics: [] });
   const [packageSource, setPackageSource] = useState("");
   const [installingSource, setInstallingSource] = useState(false);
+  // Goal mu7rpkze-gc769z / phase4-plugin-redo: integrity hash cache keyed by
+  // package name, populated by an effect that hashes each package's manifest
+  // via the `agentHashContent` IPC handler (see `electron/main/plugin-hash.ts`).
+  const [packageHashes, setPackageHashes] = useState<Record<string, string>>({});
+  // Marketplace search/filter term (substring match against name + version +
+  // manifest.namespaces). Empty string means "show everything".
+  const [marketplaceSearchTerm, setMarketplaceSearchTerm] = useState("");
   const providers = useMemo(() => [...(inventory.providers ?? [])].sort((a, b) => a.id.localeCompare(b.id)), [inventory.providers]);
+
+  // Goal mu7rpkze-gc769z / phase4-plugin-redo: marketplace search/filter memo.
+  // Substring match against name + version + joined manifest.namespaces.
+  // Empty term = show all packages. Memoized so the filter runs at most
+  // once per term/profilePackages change (re-renders on every keystroke
+  // don't re-run the .filter scan).
+  const filteredPackages = useMemo(() => {
+    const term = marketplaceSearchTerm.trim().toLowerCase();
+    if (!term) return profilePackages;
+    return profilePackages.filter((item) => {
+      const namespaceString = item.manifest.namespaces.join(" ").toLowerCase();
+      return (
+        item.name.toLowerCase().includes(term) ||
+        (item.version?.toLowerCase().includes(term) ?? false) ||
+        namespaceString.includes(term)
+      );
+    });
+  }, [profilePackages, marketplaceSearchTerm]);
+
+  // Goal mu7rpkze-gc769z / phase4-plugin-redo: fetch an integrity hash for
+  // each installed package whenever the marketplace list changes. The hash is
+  // computed main-side from `@openbuddy/plugin-host/plugin-security` (Node-only,
+  // browser-safe subpath; see plugin-hash.ts), so the renderer never imports
+  // `@openbuddy/plugin-host` ROOT (the half-done P0 split regression reverted
+  // in 6cd232b).
+  useEffect(() => {
+    if (profilePackages.length === 0) {
+      setPackageHashes({});
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(
+      profilePackages.map(async (item) => {
+        try {
+          const content = JSON.stringify(item.manifest);
+          const result = await agentHashContent(content);
+          return { name: item.name, hash: result.hash };
+        } catch {
+          return { name: item.name, hash: null };
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      const next: Record<string, string> = {};
+      for (const entry of entries) {
+        if (entry.hash) next[entry.name] = entry.hash;
+      }
+      setPackageHashes(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profilePackages]);
 
   const refreshStored = async () => {
     try {
@@ -374,9 +434,38 @@ export function OpenBuddyPluginPanel({ onToast }: OpenBuddyPluginPanelProps) {
             {installingSource ? "安装中…" : "安装 source"}
           </button>
         </div>
+        {/* Goal mu7rpkze-gc769z / phase4-plugin-redo: marketplace search/filter.
+            Substring match against name + version + joined manifest.namespaces.
+            Empty term = show all packages. The filteredPackages memo is
+            declared alongside the other useMemos above (see Batch 4b follow-up)
+            so this region stays purely declarative JSX. */}
+        <div className="plugin-list__search">
+          <input
+            aria-label="Search packages"
+            data-testid="marketplace-search-input"
+            placeholder="搜索 package 名称、版本、命名空间..."
+            value={marketplaceSearchTerm}
+            onChange={(event) => setMarketplaceSearchTerm(event.target.value)}
+          />
+          {marketplaceSearchTerm && (
+            <button
+              type="button"
+              className="plugin-list__reload"
+              data-testid="marketplace-search-clear"
+              onClick={() => setMarketplaceSearchTerm("")}
+            >
+              清空
+            </button>
+          )}
+        </div>
+        {marketplaceSearchTerm && (
+          <p className="panel-section__hint" data-testid="marketplace-search-count">
+            匹配 {filteredPackages.length} / {profilePackages.length} 个 package
+          </p>
+        )}
         <ul className="plugin-list">
-          {profilePackages.map((item) => (
-            <li className="plugin-list__row" key={item.name}>
+          {filteredPackages.map((item) => (
+            <li className="plugin-list__row" key={item.name} data-testid={`profile-package-row-${item.name}`}>
               <span className="plugin-list__id">{item.name}</span>
               <span className="plugin-list__name">{item.version ?? "本地"}</span>
               <span className="plugin-list__kind">
@@ -407,6 +496,19 @@ export function OpenBuddyPluginPanel({ onToast }: OpenBuddyPluginPanelProps) {
                     .join("；")}
                 </span>
               ) : null}
+              {/* Goal mu7rpkze-gc769z / phase4-plugin-redo: integrity hash badge.
+                  Pulled from `packageHashes` (populated by the effect above).
+                  Hidden while loading (hash === undefined) or on error (hash === null);
+                  the data-testid lets the test stub the value. */}
+              <span
+                className="plugin-list__hash"
+                data-testid={`plugin-hash-${item.name}`}
+                title={packageHashes[item.name] ? `sha256 digest of ${item.name} manifest` : "computing..."}
+              >
+                {packageHashes[item.name]
+                  ? `${packageHashes[item.name].slice(0, 12)}…`
+                  : "—"}
+              </span>
               <button type="button" className="plugin-list__reset" onClick={() => void handleRemovePackage(item.name)}>移除</button>
             </li>
           ))}

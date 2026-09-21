@@ -13,7 +13,7 @@
 import { ipcMain, type IpcMainInvokeEvent } from "electron";
 import { createMainLogger } from "@openbuddy/logging-main";
 
-const log = createMainLogger("ipc-wrap");
+const log = createMainLogger({ name: "ipc-wrap" });
 
 export type WrappedHandler<TArgs, TResult> = (
   event: IpcMainInvokeEvent,
@@ -29,7 +29,7 @@ export function wrapIpcHandler<TArgs = unknown, TResult = unknown>(
       return await fn(event, args as TArgs);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      log.error(`ipc:${channel} handler failed`, { message });
+      log.error(`ipc:${channel} handler failed: ${message}`);
       throw error;
     }
   });

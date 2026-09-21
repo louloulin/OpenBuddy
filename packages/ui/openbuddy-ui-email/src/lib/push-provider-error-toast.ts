@@ -18,6 +18,8 @@
  *    `rate_limited / network_error / token_expired` 三类 UX。
  */
 import { setToast } from "@/stores/toast-store";
+import type { AiActionReceipt } from "@openbuddy/ui-email/ai";
+import { recordTelemetry } from "@openbuddy/ui-email/ai";
 
 export type ProviderErrorCode =
   | "provider_unavailable"
@@ -48,6 +50,7 @@ const NAVIGATE_TO_CONNECTORS = "请前往「专家·技能·连接器」授权�
 
 export function pushProviderErrorToast(input: PushProviderErrorToastInput): void {
   const { message, code, sessionId, onNavigate, onToast, cancelAi } = input;
+  recordTelemetry("provider_error", { code: code ?? "unknown", hasSession: Boolean(sessionId) });
 
   // 1) provider_unavailable: 终结态。8s TTL + 强动作按钮(默认行为)。
   if (code === "provider_unavailable") {
@@ -129,6 +132,38 @@ export function pushProviderErrorToast(input: PushProviderErrorToastInput): void
 
   // 8) 兜底:走 onToast 老 API,避免破坏现有调用方。
   onToast?.(message);
+}
+
+/**
+ * P3-1:把 AI 行动回执推到 toast-store,统一与 provider error 走同一份队列。
+ * ReceiptToast 组件继续渲染(双轨),但内部走 pushReceipt,这样撤销按钮、
+ * 去重窗口、FIFO 规则与 provider error 一致。
+ */
+export interface PushReceiptInput {
+  receipts: AiActionReceipt[];
+  /** 撤销入口 — 30s 内可点 toast 上的"↶ 撤销"按钮。 */
+  undo?: () => void;
+}
+
+export function pushReceipt({ receipts, undo }: PushReceiptInput): string {
+  if (receipts.length === 0) return "";
+  const executed = receipts.filter((r) => r.status === "executed");
+  const failed = receipts.filter((r) => r.status === "failed");
+  // toast-store ToastKind = info | warning | error — 把 success 映射成 info。
+  const kind: "info" | "warning" | "error" =
+    failed.length === 0 ? "info" : executed.length === 0 ? "error" : "warning";
+  const message =
+    failed.length === 0
+      ? `已执行 ${executed.length} 项`
+      : executed.length === 0
+        ? `失败 ${failed.length} 项`
+        : `已执行 ${executed.length} 项 · 失败 ${failed.length}`;
+  return setToast(message, {
+    kind,
+    id: "email:receipt",
+    ttlMs: 30_000,
+    ...(undo ? { action: { label: "↶ 撤销", onClick: undo } } : {}),
+  });
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   Database,
   Shield,
   HelpCircle,
+  ShieldCheck,
   Plus,
   X,
   Eye,
@@ -65,6 +66,7 @@ import {
   HelpSettingsPanel,
   MicrokernelSettingsPanel,
   PersonalizeSettingsPanel,
+  PrivacySettingsPanel,
   ResourceCatalogPanel,
   SecuritySettingsPanel,
   SessionManagementPanel,
@@ -122,7 +124,8 @@ type SectionId =
   | "microkernel"
   // R92 — 新增 2 个插件管理子页,走 `placeholder.plugins` / `placeholder.openbuddy-plugin` 槽。
   | "plugins"
-  | "openbuddy-plugin";
+  | "openbuddy-plugin"
+  | "privacy";
 
 interface NavItem {
   id: SectionId;
@@ -585,6 +588,8 @@ const OpenBuddyPluginPanelImpl = (_openbuddyPluginImpl ?? OpenBuddyPluginPanel) 
               <PersonalizeSettingsPanel />
             ) : active === "shortcuts" ? (
               <ShortcutsSettingsPanel />
+            ) : active === "privacy" ? (
+              <PrivacySettingsPanel />
             ) : active === "help" ? (
               <HelpSettingsPanel onReplayTour={onReplayTour} />
             ) : active === "microkernel" ? (
@@ -1119,7 +1124,7 @@ interface ProviderDraft {
   contextWindow: string;
 }
 
-function ProviderEditor({
+export function ProviderEditor({
   draft,
   original,
   onCancel,
@@ -1142,7 +1147,7 @@ function ProviderEditor({
 
   const handleTestConnection = async () => {
     setTestStatus("testing");
-    setTestMessage("Testing…");
+    setTestMessage("测试中…");
     try {
       const w = window as unknown as { api: { invoke: (ch: string, args: unknown) => Promise<unknown> } };
       const snap = (await w.api.invoke("agent:providers-test", {
@@ -1158,22 +1163,22 @@ function ProviderEditor({
         // number is genuinely zero for the chat-endpoint probe path and
         // is not a failure.
         const summary = snap.probe === "messages"
-          ? `✓ chat endpoint reachable (${snap.latencyMs ?? "?"} ms)`
-          : `✓ ${snap.modelsCount ?? 0} models reachable (${snap.latencyMs ?? "?"} ms)`;
+          ? `✓ 聊天端点可达 (${snap.latencyMs ?? "?"} 毫秒)`
+          : `✓ ${snap.modelsCount ?? 0} 个模型可达 (${snap.latencyMs ?? "?"} 毫秒)`;
         setTestMessage(summary);
       } else if (snap.status === "degraded") {
         setTestStatus("degraded");
-        setTestMessage(`⚠ ${snap.errorCode ?? "?"} — ${snap.errorMessage ?? "Provider returned a non-2xx status"}`);
+        setTestMessage(`⚠ ${snap.errorCode ?? "?"} — ${snap.errorMessage ?? "服务返回非 2xx 状态"}`);
       } else if (snap.status === "unreachable") {
         setTestStatus("unreachable");
-        setTestMessage(`✗ ${snap.errorCode ?? "?"} — ${snap.errorMessage ?? "Cannot reach provider"}`);
+        setTestMessage(`✗ ${snap.errorCode ?? "?"} — ${snap.errorMessage ?? "无法连接服务"}`);
       } else {
         setTestStatus("error");
-        setTestMessage(`? Unexpected status: ${snap.status}`);
+        setTestMessage(`? 未知状态: ${snap.status}`);
       }
     } catch (err) {
       setTestStatus("error");
-      setTestMessage(`IPC bridge error: ${err instanceof Error ? err.message : String(err)}`);
+      setTestMessage(`IPC 桥接错误: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -1424,7 +1429,7 @@ function ProviderEditor({
             data-testid="provider-test-button"
           >
             <span className="cb-button__content">
-              {testStatus === "testing" ? "Testing…" : "Test connection"}
+              {testStatus === "testing" ? "测试中…" : "测试连接"}
             </span>
           </button>
           <button

@@ -848,10 +848,23 @@ export function useAppShellRuntime(): AppShellRuntime {
 
   const handleAgentDied = useCallback(({ reason }: { reason: string }) => {
     console.error('[OpenBuddy] Agent thread died:', reason);
-    sessionStore.getState().setError(`AI 引擎异常退出：${reason}`);
-    reportEvent("agent_died", "error", { reason });
+    // R-err-provider-chat — agent-died is not a provider error per se, but
+    // the chat transcript still needs an inline TurnErrorCard instead of a
+    // bare "（已中断：agent-died: ...）" placeholder. Treat the agent-died
+    // reason as the card body and pin `provider_error` so the chip renders
+    // a localised title ("模型服务暂时不可用") rather than the generic
+    // fallback. The top banner + toast keep their existing copy.
     const focusedSessionId = sessionStore.getState().sessionId;
-    if (focusedSessionId) abandonInFlightStream({ sessionId: focusedSessionId, reason: `agent-died: ${reason}` });
+    const bannerMsg = `AI 引擎异常退出：${reason}`;
+    sessionStore.getState().setError(bannerMsg);
+    reportEvent("agent_died", "error", { reason });
+    if (focusedSessionId) {
+      abandonInFlightStream({
+        sessionId: focusedSessionId,
+        reason: `agent-died: ${reason}`,
+        error: { message: bannerMsg, code: "provider_error" },
+      });
+    }
     setToast(`⚠️ AI 引擎异常退出：${reason}。正在尝试自动恢复…`, {
       kind: "error", ttlMs: 0, id: "agent-died",
       action: { label: "立即重连", hint: "↵", onClick: () => { void sessionEvents.resubscribe(); setToast("已尝试重新连接 AI 引擎。", { kind: "info", ttlMs: 3000, id: "agent-died-resub-attempted" }); } },

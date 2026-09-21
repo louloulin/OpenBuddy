@@ -756,9 +756,9 @@ export function HomePage({
             draft={homeDraft}
             draftKey={HOME_DRAFT_KEY}
             onDraftChange={(t) => setDraft(HOME_DRAFT_KEY, t)}
-            onSelectMode={(id) => {
-              setModeId(id);
-              onSelectMode?.(id);
+            onSelectMode={(id) => { const modeId = id as HomeModeId;
+              setModeId(modeId);
+              onSelectMode?.(modeId);
             }}
             onSelectExpert={onSelectExpert}
             onNavigateConnectors={onNavigateConnectors}

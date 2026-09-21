@@ -45,6 +45,7 @@ beforeEach(() => {
     planMode: false,
     plan: null,
     abandonCalls: [],
+    abandonCallsArgs: [] as Array<unknown>,
     setStreamingCalls: [],
     finishCalls: 0,
   };
@@ -56,7 +57,7 @@ beforeEach(() => {
     },
   };
   // Attach mutable spy helpers.
-  stateRef.abandonStreamingMessage = (reason: string) => {
+  stateRef.abandonStreamingMessage = (reason: string, error?: { message: string; code?: string }) => {
     // Mirror the real implementation: if `streamingMessageId` is null and
     // there's no trailing incomplete assistant, the call is a no-op.
     const target =
@@ -64,11 +65,19 @@ beforeEach(() => {
       [...stateRef.messages].reverse().find((m: any) => m.role === "assistant" && !m.complete);
     if (!target) return;
     stateRef.abandonCalls.push(reason);
+    stateRef.abandonCallsArgs.push(error);
     stateRef.messages = stateRef.messages.map((m: any) =>
       m.id === target.id
         ? {
             ...m,
-            parts: [{ kind: "text", text: `（已中断：${reason}）` }],
+            // R-err-provider-chat — when the caller passes a structured
+            // error, the real store attaches `m.error` instead of writing
+            // a placeholder text part. Mirror that here so the contract is
+            // testable without spinning up the full Zustand store.
+            ...(error ? { error } : {}),
+            parts: error
+              ? target.parts
+              : [{ kind: "text", text: `（已中断：${reason}）` }],
             complete: true,
           }
         : m,
@@ -125,5 +134,70 @@ describe("abandonInFlightStream", () => {
     expect(stateRef.abandonCalls).toEqual(["first"]);
     // streamingMessageId is null after the first call → second call is no-op
     expect(stateRef.abandonCalls.filter((c: string) => c === "second")).toHaveLength(0);
+  });
+
+  // R-err-provider-chat — every error / cancel path that knows *why* the
+  // turn failed must forward the structured error so TurnErrorCard renders
+  // (instead of the "（已中断：...）" placeholder). Pin each path that
+  // regressed back to a blank bubble before this fix landed.
+  it("forwards a structured error to abandonStreamingMessage (turn-error path)", () => {
+    abandonInFlightStream({
+      sessionId: "sess-1",
+      reason: "turn-error: rate_limit",
+      error: { message: "429 已达到 Token Plan 用量上限", code: "rate_limit_error" },
+    });
+    expect(stateRef.abandonCallsArgs).toEqual([
+      { message: "429 已达到 Token Plan 用量上限", code: "rate_limit_error" },
+    ]);
+    // Bubble keeps its empty parts and gains the structured error metadata
+    // so MessageItem renders a TurnErrorCard instead of a placeholder line.
+    expect(stateRef.messages[0].parts).toHaveLength(0);
+    expect(stateRef.messages[0].error).toEqual({
+      message: "429 已达到 Token Plan 用量上限",
+      code: "rate_limit_error",
+    });
+  });
+
+  it("forwards a structured error to abandonStreamingMessage (agent-died path)", () => {
+    abandonInFlightStream({
+      sessionId: "sess-1",
+      reason: "agent-died: pipe closed",
+      error: { message: "AI 引擎异常退出：pipe closed", code: "provider_error" },
+    });
+    expect(stateRef.abandonCallsArgs).toEqual([
+      { message: "AI 引擎异常退出：pipe closed", code: "provider_error" },
+    ]);
+    expect(stateRef.messages[0].error?.code).toBe("provider_error");
+  });
+
+  it("forwards a structured error to abandonStreamingMessage (streaming watchdog path)", () => {
+    abandonInFlightStream({
+      sessionId: "sess-1",
+      reason: "流式 60s 看门狗",
+      error: {
+        message: "AI 引擎长时间无响应,已自动结束当前轮次。",
+        code: "network_error",
+      },
+    });
+    expect(stateRef.abandonCallsArgs).toEqual([
+      {
+        message: "AI 引擎长时间无响应,已自动结束当前轮次。",
+        code: "network_error",
+      },
+    ]);
+    expect(stateRef.messages[0].error?.code).toBe("network_error");
+  });
+
+  it("forwards undefined for cancel (user-initiated, not an error)", () => {
+    abandonInFlightStream({
+      sessionId: "sess-1",
+      reason: "用户取消",
+      status: "completed",
+    });
+    expect(stateRef.abandonCallsArgs).toEqual([undefined]);
+    // No error metadata → keep the legacy placeholder text behaviour so
+    // existing user-cancel UX (a polite "（已中断：用户取消）" sentence)
+    // doesn't regress into a TurnErrorCard.
+    expect(stateRef.messages[0].error).toBeUndefined();
   });
 });

@@ -13,7 +13,8 @@
  *   - 主窗口创建 (`./main-window.ts`)
  *   - 应用菜单调用方的主进程启动顺序 (`./index.ts`)
  */
-import { BrowserWindow, Menu } from "electron";
+import { BrowserWindow, Menu, shell } from "electron";
+import { join } from "node:path";
 
 export interface InstallAppMenuOptions {
   /**
@@ -79,6 +80,25 @@ export function installAppMenu(opts: InstallAppMenuOptions): void {
         ],
       },
       { role: "windowMenu" },
+      {
+        role: "help",
+        submenu: [
+          {
+            label: "Privacy Policy",
+            click: async () => {
+              // docs/PRIVACY.md is bundled at extraResources/PRIVACY.md (see
+              // electron-builder.yml). Resolve via process.resourcesPath so
+              // it works in both packaged and unpackaged builds.
+              const policyPath = join(process.resourcesPath, "PRIVACY.md");
+              const result = await shell.openPath(policyPath);
+              if (result) {
+                // Non-empty string = error message from Electron.
+                console.warn(`[openbuddy-pi] failed to open PRIVACY.md at ${policyPath}: ${result}`);
+              }
+            },
+          },
+        ],
+      },
     ]),
   );
 }

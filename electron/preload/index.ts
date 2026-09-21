@@ -8,6 +8,10 @@
 import { contextBridge, ipcRenderer } from "electron";
 
 const allowedInvokeChannels = new Set([
+  // Goal mu7rpkze-gc769z / phase4-plugin-redo: integrity hash bridge for the
+  // OpenBuddyPluginPanel badge (must be allowlisted at the top so it sits
+  // near the existing plugin:* channels for reviewer discoverability).
+  "plugin:hash-content",
   // agent-runtime
   "agent:abort", "agent:auth-status", "agent:commands-list", "agent:current-model", "agent:deepseek-cordis-invoke", "agent:deepseek-cordis-snapshot", "agent:deepseek-pi-describe", "agent:dispose",
   "agent:event-log", "agent:event-log-replay", "agent:event-log-surface-attach", "agent:event-log-surface-detach", "agent:document-restore", "agent:extensions-reload", "agent:follow-up", "agent:init", "agent:ensure-new-session", "agent:load-session", "agent:new-session", "agent:plugin-config", "agent:plugin-enable", "agent:plugin-list", "agent:plugin-inventory", "agent:plugin-snapshot", "agent:plugin-readiness", "agent:plugin-events", "agent:tools-list",
@@ -39,6 +43,13 @@ const allowedInvokeChannels = new Set([
   "agent:pi-market-lockfile", "agent:pi-market-audit",
   "agent:pi-market-sources-get", "agent:pi-market-sources-set",
   "agent:pi-market-source-probe",
+  // Goal mu7rpkze-gc769z / phase4-plugin-redo: integrity hash bridge for the
+  // OpenBuddyPluginPanel badge. Main-side handler lives in
+  // electron/main/plugin-hash.ts and calls hashPluginContent from
+  // @openbuddy/plugin-host/plugin-security (subpath, NOT the ROOT
+  // re-export which pulls in ./include.ts's Node-only top-level imports —
+  // see commit 6cd232b revert).
+  "plugin:hash-content",
   // casdoor
   "casdoor:ai-capabilities", "casdoor:audit-list", "casdoor:authorize", "casdoor:authorize-decision", "casdoor:authorize-resource", "casdoor:billing-order-create", "casdoor:billing-order-expire", "casdoor:billing-order-refund",
   "casdoor:billing-orders", "casdoor:billing-plan-upsert", "casdoor:billing-plans", "casdoor:billing-subscription", "casdoor:can", "casdoor:capabilities", "casdoor:commercial-model-catalog", "casdoor:config-get",

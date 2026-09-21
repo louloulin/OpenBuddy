@@ -32,6 +32,7 @@ import { TopbarActions, TopbarTitle, KeyboardShortcutsDialog } from "@openbuddy/
 import { SecondarySidebar } from "@openbuddy/ui-shell";
 import { Sidebar } from "@openbuddy/ui-sidebar";
 import { ChatView } from "@openbuddy/ui-conversation";
+import { EmailAiStyles } from "@openbuddy/ui-email/ai";
 import { PlaceholderPage } from "@/components/shared/PlaceholderPage";
 import { EXPERTS_ROUTE_LABEL } from "@/lib/navigation/placeholder-routes";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -595,6 +596,7 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           <MainContent runtime={runtime} />
         </main>
       </div>
+      <EmailAiStyles />
       <Toast entries={toastQueue} onDismiss={dismissToast} />
       <Suspense fallback={null}>
         <SearchSurface

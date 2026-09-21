@@ -14,6 +14,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { useToastStore } from "@/stores/toast-store";
 import {
   pushProviderErrorToast,
+  pushReceipt,
   PROVIDER_ERROR_TOAST_TABLE,
 } from "../push-provider-error-toast";
 
@@ -142,5 +143,68 @@ describe("PROVIDER_ERROR_TOAST_TABLE — spec alignment", () => {
         "token_expired",
       ].sort()
     );
+  });
+});
+
+describe("pushReceipt (P3-1)", () => {
+  beforeEach(() => useToastStore.getState().clear());
+
+  it("pushes a 'success' toast with undo action for all-executed receipts", () => {
+    const undo = vi.fn();
+    const id = pushReceipt({
+      receipts: [{ actionId: "a1", threadId: "t1", kind: "archive", status: "executed" }],
+      undo,
+    });
+    expect(id).toBe("email:receipt");
+    const toasts = useToastStore.getState().queue;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]?.message).toBe("已执行 1 项");
+    expect(toasts[0]?.kind).toBe("info");
+    expect(toasts[0]?.action?.label).toBe("↶ 撤销");
+  });
+
+  it("warning tone when some receipts failed", () => {
+    pushReceipt({
+      receipts: [
+        { actionId: "a1", threadId: "t1", kind: "archive", status: "executed" },
+        { actionId: "a2", threadId: "t2", kind: "label", status: "failed" },
+      ],
+    });
+    const toasts = useToastStore.getState().queue;
+    expect(toasts[0]?.kind).toBe("warning");
+    expect(toasts[0]?.message).toContain("已执行 1 项");
+    expect(toasts[0]?.message).toContain("失败 1");
+  });
+
+  it("error tone when all failed", () => {
+    pushReceipt({
+      receipts: [{ actionId: "a1", threadId: "t1", kind: "label", status: "failed", reason: "nope" }],
+    });
+    const toasts = useToastStore.getState().queue;
+    expect(toasts[0]?.kind).toBe("error");
+  });
+
+  it("empty receipts is a no-op", () => {
+    const id = pushReceipt({ receipts: [] });
+    expect(id).toBe("");
+    expect(useToastStore.getState().queue).toHaveLength(0);
+  });
+
+  it("action.onClick invokes undo when user clicks ↶ 撤销", () => {
+    const undo = vi.fn();
+    pushReceipt({
+      receipts: [{ actionId: "a1", threadId: "t1", kind: "archive", status: "executed" }],
+      undo,
+    });
+    const action = useToastStore.getState().queue[0]?.action;
+    action?.onClick();
+    expect(undo).toHaveBeenCalledTimes(1);
+  });
+
+  it("no action when undo is omitted", () => {
+    pushReceipt({
+      receipts: [{ actionId: "a1", threadId: "t1", kind: "archive", status: "executed" }],
+    });
+    expect(useToastStore.getState().queue[0]?.action).toBeUndefined();
   });
 });

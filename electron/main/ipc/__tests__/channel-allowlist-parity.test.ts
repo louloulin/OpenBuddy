@@ -1,7 +1,7 @@
 /**
  * Channel allowlist parity —— 全仓守卫。
  *
- * 每个 `ipcMain.handle("X")` 处理的通道,**必须**也出现在
+ * 每个 `ipcMain.handle("X")` 或 `wrapIpcHandler("X")` 处理的通道,**必须**也出现在
  * `electron/preload/index.ts` 的 `allowedInvokeChannels` 集合里,否则渲染层
  * 的 `invoke` 会被静默拒绝(`invalid IPC channel`)。
  *
@@ -29,7 +29,11 @@ const mainFiles = walk(join("electron", "main"));
 const handledChannels = new Set<string>();
 for (const file of mainFiles) {
   const text = readFileSync(file, "utf8");
-  for (const match of text.matchAll(/ipcMain\.handle\(\s*["']([a-zA-Z0-9:_-]+)["']/g)) {
+  // Both registration forms keep the channel as a literal next to the call:
+  // direct `ipcMain.handle("X", ...)` and the `wrapIpcHandler("X", ...)` shim
+  // used by the 6 largest IPC modules. Scanning only the former silently
+  // shrinks the guard's surface (530 -> 142) and defeats its whole purpose.
+  for (const match of text.matchAll(/(?:ipcMain\.handle|wrapIpcHandler)\(\s*["']([a-zA-Z0-9:_-]+)["']/g)) {
     handledChannels.add(match[1]);
   }
 }

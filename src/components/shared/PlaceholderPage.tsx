@@ -1,10 +1,14 @@
-import { lazy, Suspense, useCallback } from "react";
+import { lazy, Suspense, useCallback, useMemo } from "react";
 import { AgentToolIcon } from "@openbuddy/ui-primitives/icons";
 import { assistantWorkspaceSectionFromRoute } from "@openbuddy/ui-shared";
 import { AssistantWorkbenchNav } from "@openbuddy/ui-shell";
 import { invoke } from "@/lib/platform/electron-api";
 import { useRendererContributions } from "@/lib/runtime/renderer-plugin-runtime";
 import { useSlotComponent } from "@/features/app/slot-bridge";
+import { useEmailAiRuntime } from "@openbuddy/ui-email/ai";
+import { createEmailDataProvider } from "@/lib/email/createEmailDataProvider";
+import { createDefaultEmailAiBindings } from "@/lib/email/createDefaultEmailAiBindings";
+import { useComposerStore } from "@/stores/composer-store";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import type { ModelOption } from "@openbuddy/ui-workbench";
 import { EXPERTS_ROUTE_LABEL } from "@/lib/navigation/placeholder-routes";
@@ -222,7 +226,47 @@ function PlaceholderPageInner({
     );
   }
 
-  if (label === "邮件") return <EmailSlot sessionId={sessionId} onNavigate={onNavigate} onToast={onToast} onLaunch={onLaunch ? (prompt) => onLaunch(prompt) : undefined} />;
+  // 第 4 周(渐进迁移):把 capability-email 的真实 IPC 绑到 EmailAiPanel,
+  // 不依赖 mock bindings。开箱即用的 List/Archive/Snooze/Draft 全部走能力层。
+  // R92 fix:dataProvider 让 EmailAiPanel 真的能拉取邮件数据(accounts / threads / counts / triage)。
+  const emailDataProvider = useMemo(() => createEmailDataProvider({
+    defaultAccountId: sessionId ?? "self",
+  }), [sessionId]);
+  const emailBindings = useMemo(() => createDefaultEmailAiBindings({
+    accountId: sessionId ?? "self",
+  }), [sessionId]);
+  const emailRuntime = useEmailAiRuntime({ bindings: emailBindings });
+  // P1-A:Composer 预填通过共享 store 触发。EmailAiPanel 内部 onAdopt 调用
+  // onOpenComposer({subject, body, threadId}) → 推到 store → 顶层 ComposerPortal 渲染。
+  const openComposer = useComposerStore((state) => state.openComposer);
+  if (label === "邮件") {
+    const handleOpenComposer = useMemo(
+      () => (init?: { subject: string; body: string; threadId: string }) => {
+        openComposer({
+          ...(init?.subject !== undefined ? { subject: init.subject } : {}),
+          ...(init?.body !== undefined ? { body: init.body } : {}),
+          ...(init?.threadId !== undefined ? { threadId: init.threadId } : {}),
+        });
+      },
+      [openComposer],
+    );
+    const RuntimeInjectedEmailSlot = useMemo(() => {
+      const Wrapped: React.FC<typeof EmailSlot extends React.ComponentType<infer P> ? P : never> = (props: typeof EmailSlot extends React.ComponentType<infer P> ? P : never) => (
+        // @ts-expect-error EmailAiPanel accepts runtime/onOpenComposer + dataProvider; legacy panel ignores extra props.
+        <EmailSlot {...props} runtime={emailRuntime} dataProvider={emailDataProvider} onOpenComposer={handleOpenComposer as never} />
+      );
+      Wrapped.displayName = "RuntimeInjectedEmailSlot";
+      return Wrapped;
+    }, [emailRuntime, handleOpenComposer]);
+    return (
+      <RuntimeInjectedEmailSlot
+        sessionId={sessionId}
+        onNavigate={onNavigate}
+        onToast={onToast}
+        onLaunch={onLaunch ? (prompt) => onLaunch(prompt) : undefined}
+      />
+    );
+  }
 
   if (label === "项目") {
     return (

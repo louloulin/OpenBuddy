@@ -1259,7 +1259,7 @@ ${projectOptions}` : "当前没有可用项目。",
       actionCenterLoading={actionCenterLoading}
       accountId={accountId}
       canCompose={canCompose}
-      onOpenPendingPlan={(plan) => setProcessingPlan(plan)}
+      onOpenPendingPlan={(plan) => setProcessingPlan(plan as EmailProcessingPlan | null)}
       onOpenActionCenter={() => void loadActionCenter()}
       onRunReplyZero={(kind) => void loadReplyZero(kind)}
       onRunDigest={() => void loadDigest()}

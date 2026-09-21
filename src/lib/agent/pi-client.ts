@@ -1197,6 +1197,20 @@ export async function agentRemoveProfilePackage(name: string): Promise<void> {
   await invoke("agent:profile-remove", { name });
 }
 
+/**
+ * Goal mu7rpkze-gc769z / phase4-plugin-redo: integrity hash bridge for the
+ * OpenBuddyPluginPanel badge. Renderer calls
+ * `window.api.invoke("plugin:hash-content", { content })`; the main-side
+ * handler in `electron/main/plugin-hash.ts` wraps
+ * `hashPluginContent` from `@openbuddy/plugin-host/plugin-security`
+ * (subpath, NOT the ROOT re-export which pulls in ./include.ts's Node-only
+ * top-level imports — see commit 6cd232b revert). Returns the sha256-<hex>
+ * digest or `{ hash: null, error }` on invalid input.
+ */
+export async function agentHashContent(content: string): Promise<{ hash: string | null; error?: string }> {
+  return invoke<{ hash: string | null; error?: string }>("plugin:hash-content", { content });
+}
+
 /** C6: Trigger install of the curated default Pi package bundle via IPC.
  *  Returns the per-package status list — already-installed packages are skipped
  *  unless `force` is true. */
