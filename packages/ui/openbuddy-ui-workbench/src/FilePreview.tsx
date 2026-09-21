@@ -140,7 +140,10 @@ export function FilePreview({
           <span className="file-preview__kind">{previewKindLabel(kind)}</span>
         </div>
         <div className="file-preview__media">
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          {/* 无字幕轨：预览的是用户本地打开的音频文件，不存在 caption 源。
+              原处有一条 `eslint-disable jsx-a11y/media-has-caption`，但本仓库
+              从没装过 eslint-plugin-jsx-a11y，该指令只会让 ESLint 9 报
+              “Definition for rule … was not found”，故改为说明性注释。 */}
           <audio className="file-preview__audio" src={content} controls>
             您的浏览器不支持音频预览。
           </audio>
@@ -157,7 +160,7 @@ export function FilePreview({
           <span className="file-preview__kind">{previewKindLabel(kind)}</span>
         </div>
         <div className="file-preview__media">
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          {/* 同音频分支：本地视频预览没有字幕轨。 */}
           <video className="file-preview__video" src={content} controls>
             您的浏览器不支持视频预览。
           </video>

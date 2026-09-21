@@ -82,11 +82,14 @@ export function NoticeStoreProvider({ children }: { children: ReactNode }) {
 
 export function useNoticeStore(): NoticeStore {
   const ctx = useContext(NoticeStoreContext);
-  if (ctx) return ctx;
-  // Fallback: a fresh hook-local store so tests + non-provider mount-sites
-  // still get a working shelf.
+  // LUM-1326: the fallback store is created UNCONDITIONALLY. This hook used to
+  // `return ctx` early and only then call useReducer/useMemo, so its hook count
+  // depended on whether a provider happened to be mounted — the same class of
+  // rules-of-hooks violation that crashed the workbench (LUM-1315). The
+  // local store stays unused whenever a provider supplies one, so behaviour is
+  // unchanged; only the hook order is now fixed.
   const [state, dispatch] = useReducer(noticeReducer, INITIAL_NOTICE_STATE);
-  return useMemo<NoticeStore>(
+  const fallback = useMemo<NoticeStore>(
     () => ({
       state,
       push: (message, type = "info") => {
@@ -99,6 +102,9 @@ export function useNoticeStore(): NoticeStore {
     }),
     [state],
   );
+  // Fallback: a fresh hook-local store so tests + non-provider mount-sites
+  // still get a working shelf.
+  return ctx ?? fallback;
 }
 
 /**

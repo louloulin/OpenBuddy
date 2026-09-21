@@ -406,6 +406,55 @@ try {
     return { surfaces: results.length, entries: results.map((entry) => entry.label) };
   });
 
+  await check("ui-about-dialog-walk", async () => {
+    // LUM-1326: `AppShell.tsx:626` mounts `<AboutSurface open={aboutOpen} …>`
+    // UNCONDITIONALLY, so opening 「关于」 walks the same component from
+    // open=false to open=true. That used to add a 6th hook (an inline
+    // `useT("common.close")` below the `if (!open) return null` early return)
+    // and throw React #310 — i.e. this dialog crashed the whole workbench.
+    await dismissOverlays(page);
+    await page.keyboard.press("Escape").catch(() => undefined);
+    await page.waitForTimeout(300);
+
+    const help = page.locator("button", { hasText: /^帮助$/ }).first();
+    if (!(await help.count())) throw new Error("title-bar 帮助 menu button not found");
+    await help.click({ timeout: 10_000 });
+    await page.waitForTimeout(400);
+    const aboutItem = page.getByText("关于 OpenBuddy", { exact: true }).first();
+    if (!(await aboutItem.count())) throw new Error("帮助 menu has no 「关于 OpenBuddy」 item");
+    await aboutItem.click({ timeout: 10_000 });
+    await page.waitForTimeout(900);
+
+    const opened = await page.evaluate(() => ({
+      dialog: Boolean(document.querySelector(".about-dialog")),
+      closeLabel: document.querySelector(".about-dialog__close")?.getAttribute("aria-label") ?? "",
+      errorBoundary: Boolean(
+        document.querySelector("[data-error-boundary], .error-boundary, .error-boundary-fallback"),
+      ),
+      crashed: (document.querySelector("main")?.innerText ?? "").includes("出现错误"),
+    }));
+    const openedShot = join(evidenceDir, "ui-about-dialog-open.png");
+    await page.screenshot({ path: openedShot }).catch(() => undefined);
+    screenshots.push(openedShot);
+    if (!opened.dialog) throw new Error(`「关于」 dialog did not open: ${JSON.stringify(opened)}`);
+    if (!opened.closeLabel)
+      throw new Error(`「关于」 close button has an empty aria-label: ${JSON.stringify(opened)}`);
+    if (opened.errorBoundary || opened.crashed)
+      throw new Error(`「关于」 dialog took the workbench down: ${JSON.stringify(opened)}`);
+
+    // Close it again: the same instance must survive the reverse transition
+    // (6 hooks → 5) as well.
+    await page.locator(".about-dialog__close").first().click({ timeout: 5_000 }).catch(() => undefined);
+    await page.waitForTimeout(500);
+    const closed = await page.evaluate(() => ({
+      dialog: Boolean(document.querySelector(".about-dialog")),
+      crashed: (document.querySelector("main")?.innerText ?? "").includes("出现错误"),
+    }));
+    if (closed.dialog || closed.crashed)
+      throw new Error(`「关于」 close path broken: ${JSON.stringify(closed)}`);
+    return { opened: true, closeLabel: opened.closeLabel, closed: true };
+  });
+
   await check("no-renderer-errors", async () => {
     const relevant = pageErrors.concat(
       consoleErrors.filter((entry) => !/DevTools|Autofill|preloaded using link preload/i.test(entry)),

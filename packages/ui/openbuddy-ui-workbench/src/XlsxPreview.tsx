@@ -103,7 +103,10 @@ export function XlsxPreview({ filename, content, fallback, className }: XlsxPrev
           {visibleSheets.map((sheet) => (
             <section key={sheet.name} className={styles.sheet}>
               <h4 className={styles.sheetName}>{sheet.name}</h4>
-              {/* eslint-disable-next-line react/no-danger -- SheetJS 自产表格标签 */}
+              {/* SheetJS 自产表格标签，不经过用户输入。原处有一条
+                  `eslint-disable react/no-danger`，但本仓库从没装过
+                  eslint-plugin-react，该指令只会让 ESLint 9 报
+                  “Definition for rule … was not found”，故改为说明性注释。 */}
               <div
                 className={styles.sheetBody}
                 dangerouslySetInnerHTML={{ __html: sheet.html }}

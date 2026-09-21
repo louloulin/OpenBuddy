@@ -42,6 +42,7 @@ We run **309+ test files** at the bottom of the pyramid on every PR. Above that 
 | Just renderer | `pnpm test` |
 | Just one package | `cd packages/<group>/<name> && pnpm test` |
 | Type-check all 32 projects | `pnpm workspace:typecheck` |
+| React hook rules (blocking) | `pnpm lint:react-hooks` |
 | Storage boundaries | `pnpm storage:boundaries` |
 | IPC surface regression | `pnpm test:electron:surface` |
 | Packaged-installer smoke | `OPENBUDDY_INSTALLER=release/OpenBuddy-<ver>-setup.exe OPENBUDDY_INSTALLED_ROOT=<dir> pnpm test:electron:packaged` |

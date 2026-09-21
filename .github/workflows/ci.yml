@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    # LUM-1326: the mainline is `main` (`origin/HEAD -> origin/main`); `master`
+    # does not exist in this repo, so this workflow never fired on a push to
+    # the release line or on a PR targeting it. Keep both so a future rename
+    # cannot silently disable the gate again.
+    branches: [main, master]
   pull_request:
-    branches: [master]
+    branches: [main, master]
 
 permissions:
   contents: read
@@ -39,6 +43,13 @@ jobs:
 
       - name: Sync moon workspace
         run: pnpm moon:sync
+
+      - name: React Rules-of-Hooks (blocking)
+        # LUM-1326: `eslint-plugin-react-hooks` was never registered, so
+        # `rules-of-hooks` never ran anywhere and six conditional-hook crashes
+        # reached the 0.15.0 installer. Deliberately NOT part of the
+        # report-only `lint-tools` job: a violation here must block the PR.
+        run: pnpm lint:react-hooks
 
       - name: Typecheck all 32 projects
         run: |

@@ -18,6 +18,7 @@
 import tseslint from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import importPlugin from "eslint-plugin-import";
+import reactHooks from "eslint-plugin-react-hooks";
 import sheriff from "@softarc/eslint-plugin-sheriff";
 
 export default [
@@ -44,6 +45,7 @@ export default [
     plugins: {
       "@typescript-eslint": tseslint,
       import: importPlugin,
+      "react-hooks": reactHooks,
       sheriff,
     },
     settings: {
@@ -78,6 +80,17 @@ export default [
       "import/no-cycle": ["warn", { maxDepth: 5 }],
       "import/no-self-import": "error",
       "import/no-useless-path-segments": "warn",
+      // ── react-hooks ──
+      // LUM-1325: `eslint-plugin-react-hooks` was never registered here, so
+      // `react-hooks/rules-of-hooks` never ran anywhere in the repo. Three
+      // conditional-hook crashes (PlaceholderPage → React #310/#300,
+      // MessageItem, MarkdownInlineCode) therefore passed every gate and
+      // shipped inside the 0.15.0 installer. This rule is an `error` on
+      // purpose: it must block, not annotate.
+      "react-hooks/rules-of-hooks": "error",
+      // Noise budget for `exhaustive-deps` is still owned by B-17; keep it off
+      // until that backlog is worked down.
+      "react-hooks/exhaustive-deps": "off",
       // ── sheriff (module boundaries) ──
       // See sheriff.config.ts. Phase J.1 (v6 §26.4) promotes specific tag
       // pairs to "error" once the v6 §3.4 layer model stabilizes. The
@@ -111,6 +124,16 @@ export default [
     },
     rules: {
       "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+    },
+  },
+  {
+    // Playwright fixture callbacks are named `use` (`async ({}, use) => …`) —
+    // that is Playwright's API, not a React hook. The blocking gate
+    // (`pnpm lint:react-hooks`) scopes itself to `src/ packages/ electron/`,
+    // so this override only matters for the report-only `eslint .` run.
+    files: ["tests/**/*.ts", "tests/**/*.tsx"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
     },
   },
   {

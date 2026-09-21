@@ -29,6 +29,12 @@ export function AboutDialog({ open, onClose, init }: AboutDialogProps) {
 
   const title = useT("about.title");
   const versionLabel = useT("about.version");
+  // LUM-1326: this must stay ABOVE `if (!open) return null`. It used to be an
+  // inline `aria-label={useT("common.close")}` inside the JSX below, i.e. the
+  // 6th hook was only reached once the dialog opened — `AppShell` mounts this
+  // component unconditionally, so `open=false → open=true` changed the hook
+  // count and threw React #310 ("Rendered more hooks than expected").
+  const closeLabel = useT("common.close");
 
   useEffect(() => {
     if (!open) return;
@@ -50,7 +56,7 @@ export function AboutDialog({ open, onClose, init }: AboutDialogProps) {
         role="dialog"
         aria-label={title}
       >
-        <button className="about-dialog__close" onClick={onClose} aria-label={useT("common.close")}>
+        <button className="about-dialog__close" onClick={onClose} aria-label={closeLabel}>
           <XCloseIcon size="md" />
         </button>
         <div className="about-dialog__header">
