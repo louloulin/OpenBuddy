@@ -54,8 +54,9 @@ describe("EmailAiPanel + createDefaultEmailAiBindings (real wiring)", () => {
 
     expect(ipcMocks.emailUpdateThread).toHaveBeenCalledTimes(1);
     expect(ipcMocks.emailUpdateThread).toHaveBeenCalledWith({
+      accountId: "self",
       threadId: "t-noise",
-      mutation: "archive",
+      kind: "archive",
     });
     expect(receipts).toHaveLength(1);
     expect(receipts[0]?.status).toBe("executed");

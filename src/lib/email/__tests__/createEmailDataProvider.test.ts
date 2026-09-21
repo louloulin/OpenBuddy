@@ -171,14 +171,16 @@ describe("createEmailDataProvider", () => {
   describe("triage", () => {
     it("把 suggestion category 映射到 chip", async () => {
       const snapshot: EmailTriageSnapshot = {
-        suggestions: [
-          { threadId: "t1", category: "priority", confidence: 0.9 },
-          { threadId: "t2", category: "reply", confidence: 0.85 },
-          { threadId: "t3", category: "action", confidence: 0.7 },
-          { threadId: "t4", category: "noise", confidence: 0.95 },
-          { threadId: "t5", category: "unknown-category" as never, confidence: 0.5 },
+        items: [
+          { threadId: "t1", category: "priority", score: 0.9 },
+          { threadId: "t2", category: "reply", score: 0.85 },
+          { threadId: "t3", category: "action", score: 0.7 },
+          { threadId: "t4", category: "noise", score: 0.95 },
+          { threadId: "t5", category: "unknown-category" as never, score: 0.5 },
         ],
-        totalThreads: 5,
+        total: 5,
+        generatedAt: "2026-09-22T00:00:00.000Z",
+        counts: { urgent: 0, "needs-reply": 0, "waiting-for-reply": 0, noise: 0, normal: 0 },
       };
       const provider = createEmailDataProvider({
         client: { triage: vi.fn().mockResolvedValue(snapshot) },
@@ -202,7 +204,7 @@ describe("createEmailDataProvider", () => {
 
     it("snapshot 无 suggestions → {}", async () => {
       const provider = createEmailDataProvider({
-        client: { triage: vi.fn().mockResolvedValue({ suggestions: [] }) },
+        client: { triage: vi.fn().mockResolvedValue({ items: [], total: 0, generatedAt: "", counts: { urgent: 0, "needs-reply": 0, "waiting-for-reply": 0, noise: 0, normal: 0 } }) },
       });
       expect(await provider.triage({})).toEqual({});
     });

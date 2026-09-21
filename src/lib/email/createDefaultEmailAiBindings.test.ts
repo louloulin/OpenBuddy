@@ -51,8 +51,9 @@ describe("createDefaultEmailAiBindings", () => {
       snoozeUntil: "2026-09-30T09:00:00.000Z",
     });
     expect(ipcMocks.emailUpdateThread).toHaveBeenCalledWith({
+      accountId: "self",
       threadId: "t-arc",
-      mutation: "archive",
+      kind: "archive",
       label: "INBOX",
       snoozeUntil: "2026-09-30T09:00:00.000Z",
     });
@@ -63,8 +64,9 @@ describe("createDefaultEmailAiBindings", () => {
     const bindings = createDefaultEmailAiBindings();
     await bindings.updateThread!({ threadId: "t-mark", mutation: "mark-read" });
     expect(ipcMocks.emailUpdateThread).toHaveBeenCalledWith({
+      accountId: "self",
       threadId: "t-mark",
-      mutation: "mark-read",
+      kind: "mark-read",
     });
   });
 
