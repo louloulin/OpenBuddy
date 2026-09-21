@@ -5,9 +5,8 @@
  * Before R8.44 the assistant avatar was a static gradient. R8.44
  * adds a subtle pulse glow when the assistant message is
  * actively streaming so the user sees the model is alive without
- * having to look at the caret or status pill. The 1.2s cycle
- * mirrors .chatview__status-dot so the visual language stays
- * consistent.
+ * having to look at the caret. The 1.2s cycle keeps the visual
+ * language consistent with other streaming affordances.
  *
  * Coverage:
  *   - .msg--assistant.msg--streaming .msg__avatar carries a 1.2s

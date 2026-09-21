@@ -729,9 +729,8 @@ function formatTokenCount(n: number): string {
   return `${Math.round(n)}`;
 }
 
-/** R8.14 — `12s` / `1m 5s` formatter. Mirrors ChatView's existing
- *  `formatInFlightElapsed` so the per-message chip and the per-turn
- *  status pill stay visually consistent. */
+/** R8.14 — `12s` / `1m 5s` formatter for the per-message streaming
+ *  duration chip. */
 function formatDurationMs(ms: number): string {
   const totalSec = Math.max(0, Math.round(ms / 1000));
   if (totalSec < 60) return `${totalSec}s`;

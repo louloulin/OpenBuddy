@@ -1575,15 +1575,14 @@
   box-shadow: 0 1px 2px color-mix(in srgb, var(--wb-brand) 25%, transparent);
   /* R8.44 — When the assistant is actively streaming, the avatar
      gets a subtle pulse glow so the user sees the model is alive
-     without looking at the streaming caret or status pill. The
-     pulse mirrors the .chatview__status-dot streaming pulse
-     (1.2s ease-in-out infinite) so the visual language stays
-     consistent across the transcript + status pill + avatar. */
+     without looking at the streaming caret. The pulse uses the
+     same 1.2s ease-in-out cycle so the visual language stays
+     consistent across the transcript and avatar. */
   transition: box-shadow var(--wb-motion-duration-base, 200ms) ease-out;
 }
 /* R8.44 — Streaming avatar pulse. The class is added while a
    message is actively streaming and removed once it completes.
-   Same 1.2s cycle as the .chatview__status-dot streaming pulse. */
+   1.2s ease-in-out cycle. */
 .msg--assistant.msg--streaming .msg__avatar {
   animation: msg-avatar-pulse 1.2s ease-in-out infinite;
 }
