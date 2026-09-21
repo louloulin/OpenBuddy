@@ -164,9 +164,18 @@ const fireWatchdog = (): void => {
   // bubble spinning forever — see src/lib/agent/abandon-stream.ts).
   const focusedSessionId = useSessionStore.getState().sessionId;
   if (focusedSessionId) {
+    // R-err-provider-chat — streaming watchdog typically trips when the
+    // provider's SSE connection silently dies (network drop, CDN outage,
+    // long-tail tool hang). Surface an inline TurnErrorCard with
+    // network_error so the chip reads "网络连接中断" + 复制/重试,
+    // instead of the placeholder "（已中断：流式 60s 看门狗）".
     abandonInFlightStream({
       sessionId: focusedSessionId,
       reason: "流式 60s 看门狗",
+      error: {
+        message: "AI 引擎长时间无响应,已自动结束当前轮次。可重发或重新加载。",
+        code: "network_error",
+      },
     });
   } else {
     // No focused session — best-effort cleanup of the orphan streaming

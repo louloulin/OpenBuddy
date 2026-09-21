@@ -86,7 +86,7 @@ import { dispatchNotification } from "@/lib/notify/notify-channels";
 import { reportEvent } from "@/lib/telemetry/telemetry-contract";
 import { recordUsage, loadUsage, loadQuotaConfig } from "@/lib/billing/usage-quota";
 import { createUpdateCoalescer, type UpdateCoalescer } from "@/lib/stream/update-coalescer";
-import { friendlyError } from "@/lib/platform/error-format";
+import { friendlyError, formatPiError } from "@/lib/platform/error-format";
 import { abandonInFlightStream } from "@/lib/agent/abandon-stream";
 import { withTrace, createRendererLogger } from "@openbuddy/logging-renderer";
 import type {
@@ -359,7 +359,20 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
       // circular import (useAgentSession ↔ abandon-stream).
       void import("@/lib/agent/abandon-stream").then(({ abandonInFlightStream }) => {
         const sid = store.sessionId;
-        if (sid) abandonInFlightStream({ sessionId: sid, reason: "watchdog-15s" });
+        if (sid) {
+          // R-err-provider-chat — 15s no-first-chunk watchdog typically trips
+          // because the provider never started streaming (auth/key/endpoint).
+          // Forward a structured network_error so TurnErrorCard renders the
+          // "网络连接中断" chip instead of a blank placeholder.
+          abandonInFlightStream({
+            sessionId: sid,
+            reason: "watchdog-15s",
+            error: {
+              message: "AI 引擎长时间无响应,已自动结束当前轮次。可重发或重新加载。",
+              code: "network_error",
+            },
+          });
+        }
       });
     }, STREAMING_WATCHDOG_MS);
   };
@@ -597,21 +610,45 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
         log.warn("pi://turn-error", { msg: "pi.turn-error.received", traceId: e.traceId, sessionId: e.sessionId, kind: e.kind });
         const currentSessionId = useSessionStore.getState().sessionId;
         if (currentSessionId && e.sessionId && e.sessionId !== currentSessionId) return;
-        const msg =
-          e.kind === "rate_limit"
+        // R-err-provider-chat — turn-error must surface in TWO places at once:
+        //   1. Top banner (`sessionStore.error`) so a brand-new session without
+        //      any assistant bubble yet still gets a readable explanation.
+        //   2. Inline TurnErrorCard on the failed assistant bubble so the user
+        //      can copy the raw reason / open Settings for auth issues / retry
+        //      in one click.
+        // Previously the inline card was missing because abandonInFlightStream
+        // was called WITHOUT an `error` option, so `abandonStreamingMessage`
+        // fell back to the generic "（已中断：...）" placeholder. We now run
+        // the raw detail through formatPiError (provider-aware friendly text)
+        // and inferErrorCodeSafe (machine code for the card's chip + the
+        // Settings shortcut wiring in TurnErrorCard.CONFIGURATION_CODES).
+        const rawDetail = e.detail ?? "";
+        const inferredCode = rawDetail ? inferErrorCodeSafe(rawDetail) : undefined;
+        const code = inferredCode ?? (e.kind === "rate_limit" ? "rate_limit_error" : undefined);
+        const bannerMsg =
+          formatPiError(rawDetail) ??
+          (e.kind === "rate_limit"
             ? "⚠️ API 速率限制已触发（执行工具期间）。请等待 1-2 分钟后重试，或缩短对话上下文（新建会话）。"
-            : e.detail
-              ? `⚠️ 本轮执行出错：${e.detail}`
-              : "⚠️ 本轮执行出错，请重试。";
-        useSessionStore.getState().setError(msg);
+            : rawDetail
+              ? `⚠️ 本轮执行出错：${rawDetail}`
+              : "⚠️ 本轮执行出错，请重试。");
+        useSessionStore.getState().setError(bannerMsg);
         reportEvent("turn_error", "error", { sessionId: e.sessionId, kind: e.kind });
         // Force-finalise the in-flight assistant bubble — without this the
         // LoadingRow spins forever after a fatal turn error (the user
         // reported a "你是谁" message stuck for 8h+ because the backend
         // never sent a matching pi://complete). See abandon-stream.ts.
+        // Pass a structured error so TurnErrorCard replaces the
+        // "（已中断：...）" placeholder with a real card + copy/去设置/重试.
+        const cardMessage =
+          rawDetail ||
+          (e.kind === "rate_limit"
+            ? "API 速率限制已触发（执行工具期间）。"
+            : "本轮执行出错，请重试。");
         abandonInFlightStream({
           sessionId: e.sessionId,
           reason: `turn-error: ${e.kind ?? "error"}`,
+          error: { message: cardMessage, ...(code ? { code } : {}) },
         });
       },
       onExtensionUi: (event: { sessionId?: string; method: string; key?: string; text?: string; statusKey?: string; widgetKey?: string; widgetLines?: string[]; widgetPlacement?: string; content?: string[]; statusText?: string; message?: string; visible?: boolean; options?: unknown; label?: string; expanded?: boolean; title?: string; theme?: string; value?: string }) => {
