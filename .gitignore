@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-pnpm-lock.yaml
 package-lock.json
 
 # Build output
@@ -205,6 +204,11 @@ packages/*/*/node_modules
 .tmp-screenshots/
 !docs/PLUGIN_SDK.md
 !docs/THEME_BASELINE_R77.md
+# Shipped inside the installer as extraResources (electron-builder.yml) and
+# opened by the Help → Privacy Policy menu entry (electron/main/app-menu.ts).
+# Without this allowlist entry the file is untracked, every fresh checkout
+# lacks it, and electron-builder silently ships an installer without it.
+!docs/PRIVACY.md
 
 # Probe scripts' scratch output (e.g. probe-r96-expert-link discover probes)
 scripts/probe-tmp/

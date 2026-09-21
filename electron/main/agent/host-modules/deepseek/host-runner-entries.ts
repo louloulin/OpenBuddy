@@ -34,28 +34,53 @@ import { normalizeDeepSeekRuntimeEntry } from "./normalize-entry";
  * 任何新增项必须放在其依赖项之后;否则 `loadProfile` 会因
  * missing service 而 abort。
  *
- * 注: `openbuddy-dsh-tool-*` 系列在运行时被 Pi 适配器覆盖 (见
- * `pi-extensions.ts` 的 compatibility adapter 注册);但 DSH 包名仍
- * 需要在 profile 里出现,这样 Cordis 工具注册表能找到对应的 tool
- * descriptor,Harness 才能把 `/bash` 等 slash command 路由到 Pi。
+ * LUM-1320 — 默认装配只包含**在本仓库里真能解析到实现**的 DSH 包。
+ * 历史原因: 这里曾列出 43 个上游 `@deepseek-ai/dsh-*` 包,但仓库既没有声明
+ * 这些依赖,也没有随包发布闭包,Phase L.4 又把 DSH 装配删掉了——结果是每次
+ * `loadProfile` 都有 36 个条目以 `ERR_MODULE_NOT_FOUND` 失败(dev 与安装包
+ * 都一样,一次 profile 加载 = 36 条 `plugin/failed`,UI 侧插件列表全红)。
+ *
+ * 所以现在分成两张表:
+ *   - `BASE_HOST_RUNNER_ENTRIES` —— 真的能解析的 7 个入口(由
+ *     `electron/main/deepseek/deepseek-runtime.ts` 的 `deepSeekRuntimeAliases`
+ *     提供本地 shim),默认参与装配。
+ *   - `UNSHIPPED_DSH_HOST_RUNNER_ENTRIES` —— 另外 36 个上游包名。本仓库没有
+ *     它们的依赖,装了也解析不到,因此**不进入默认 profile**;保留在这里作为
+ *     PI-native 迁移对照表,用户/市场 profile 仍可按包名声明加载(如果将来把
+ *     这些闭包 pin 成依赖,把对应行搬回上面的表即可)。
+ *
+ * 注: `openbuddy-dsh-tool-*` 系列曾计划由 Pi 适配器覆盖 (见
+ * `pi-extensions.ts` 的 compatibility adapter 注册);但 DSH 包名解析失败时
+ * harness 根本拿不到 tool descriptor,Pi 侧的工具走的是 Pi 自己的注册路径。
  */
 const BASE_HOST_RUNNER_ENTRIES: ReadonlyArray<PluginEntryOptions> = [
-  { id: "openbuddy-dsh-llm", name: "@deepseek-ai/dsh-llm" },
-  { id: "openbuddy-dsh-settings", name: "@deepseek-ai/dsh-settings-file" },
-  { id: "openbuddy-dsh-credentials", name: "@deepseek-ai/dsh-credentials-local" },
   { id: "openbuddy-dsh-session", name: "@deepseek-ai/dsh-session" },
   { id: "openbuddy-dsh-workspace", name: "@deepseek-ai/dsh-workspace" },
   { id: "openbuddy-dsh-typert", name: "@deepseek-ai/dsh-typert-registry" },
-  { id: "openbuddy-dsh-typert-loader", name: "@deepseek-ai/dsh-typert-loader" },
-  { id: "openbuddy-dsh-api-gateway", name: "@deepseek-ai/dsh-api-gateway" },
   { id: "openbuddy-dsh-client-connection", name: "@deepseek-ai/dsh-client-connection" },
   { id: "openbuddy-dsh-agent", name: "@deepseek-ai/dsh-agent" },
+  { id: "openbuddy-dsh-session-persistence", name: "@deepseek-ai/dsh-session-persistence-jsonl" },
+  { id: "openbuddy-dsh-session-query", name: "@deepseek-ai/dsh-session-query" },
+] as const;
+
+/**
+ * 上游 DSH 包名清单 —— 本仓库没有依赖/闭包,解析不到实现,所以不参与默认装配。
+ *
+ * 保留完整的 id / name / config / inject 形状:
+ *   - 迁移对照表 (docs/OPENBUDDY_PI_NATIVE_PLAN.md 的 DSH 残余清单);
+ *   - 用户或市场 bundle 按包名重新声明时,可直接复用这里的 config 形状;
+ *   - 将来若把 DSH 闭包 pin 成依赖,把对应行搬回 `BASE_HOST_RUNNER_ENTRIES`。
+ */
+export const UNSHIPPED_DSH_HOST_RUNNER_ENTRIES: ReadonlyArray<PluginEntryOptions> = [
+  { id: "openbuddy-dsh-llm", name: "@deepseek-ai/dsh-llm" },
+  { id: "openbuddy-dsh-settings", name: "@deepseek-ai/dsh-settings-file" },
+  { id: "openbuddy-dsh-credentials", name: "@deepseek-ai/dsh-credentials-local" },
+  { id: "openbuddy-dsh-typert-loader", name: "@deepseek-ai/dsh-typert-loader" },
+  { id: "openbuddy-dsh-api-gateway", name: "@deepseek-ai/dsh-api-gateway" },
   { id: "openbuddy-dsh-agent-loop", name: "@deepseek-ai/dsh-agent-loop" },
   { id: "openbuddy-dsh-agent-instructions", name: "@deepseek-ai/dsh-agent-instructions", config: { maxBytes: 128 * 1024, maxSourceBytes: 1024 * 1024 } },
   { id: "openbuddy-dsh-agent-presets", name: "@deepseek-ai/dsh-agent-presets" },
   { id: "openbuddy-dsh-agent-default-model", name: "@deepseek-ai/dsh-agent-default-model", config: { provider: "pi", model: "" } },
-  { id: "openbuddy-dsh-session-persistence", name: "@deepseek-ai/dsh-session-persistence-jsonl" },
-  { id: "openbuddy-dsh-session-query", name: "@deepseek-ai/dsh-session-query" },
   { id: "openbuddy-dsh-plan-mode", name: "@deepseek-ai/dsh-plan-mode", config: { section: "Use plan mode for complex multi-step work; present a complete plan before execution." } },
   { id: "openbuddy-dsh-commands", name: "@deepseek-ai/dsh-commands" },
   { id: "openbuddy-dsh-goal", name: "@deepseek-ai/dsh-goal" },
@@ -66,11 +91,6 @@ const BASE_HOST_RUNNER_ENTRIES: ReadonlyArray<PluginEntryOptions> = [
   { id: "openbuddy-dsh-cordis-host-runner", name: "@deepseek-ai/dsh-cordis-host-runner" },
   { id: "openbuddy-dsh-user-questions", name: "@deepseek-ai/dsh-user-questions" },
   { id: "openbuddy-dsh-user-approval", name: "@deepseek-ai/dsh-user-approval" },
-  // Pi-backed implementations for the Harness model-facing tools. Pi ships
-  // the same core operations, so these adapters preserve the existing
-  // WorkBuddy behavior while exposing DSH package names. Keep them at the
-  // tail so the harness tool registry sees them last and any user override
-  // wins via patch overlay.
   { id: "openbuddy-dsh-tool-bash", name: "@deepseek-ai/dsh-tool-bash" },
   { id: "openbuddy-dsh-tool-fs", name: "@deepseek-ai/dsh-tool-fs" },
   { id: "openbuddy-dsh-tool-fs-search", name: "@deepseek-ai/dsh-tool-fs-search" },
@@ -95,6 +115,11 @@ export function baseHostRunnerEntries(): readonly PluginEntryOptions[] {
   return BASE_HOST_RUNNER_ENTRIES;
 }
 
+/** 未随包发布、因而不参与默认装配的 DSH 包名清单(迁移对照表)。 */
+export function unshippedDshHostRunnerEntries(): readonly PluginEntryOptions[] {
+  return UNSHIPPED_DSH_HOST_RUNNER_ENTRIES;
+}
+
 /**
  * Compose final entries array passed to `HarnessPluginLoader.loadProfile`.
  *
@@ -103,6 +128,11 @@ export function baseHostRunnerEntries(): readonly PluginEntryOptions[] {
  * (marketplace + runtime overrides). The merged list is normalized via
  * `normalizeDeepSeekRuntimeEntry` so `disabled` flags and `config` shapes
  * become Cordis-compatible.
+ *
+ * LUM-1320: 默认装配的 host-runner 条目只剩真能解析到实现的 7 个(见
+ * `BASE_HOST_RUNNER_ENTRIES`);无法解析的 36 个上游包名不再默认入 profile,
+ * 否则每次加载都会产生 36 条 `plugin/failed` (`ERR_MODULE_NOT_FOUND`)。
+ * 用户/市场 bundle 仍可在 `profileBundleEntries` 里按包名声明它们。
  */
 export function composeHostRunnerEntries(
   baseProfileEntries: readonly PluginEntryOptions[] = [],

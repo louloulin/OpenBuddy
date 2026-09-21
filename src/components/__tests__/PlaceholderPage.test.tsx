@@ -54,6 +54,25 @@ describe("PlaceholderPage", () => {
     expect(screen.getByText("某个未实现功能")).toBeInTheDocument();
     expect(screen.getByText(/当前入口未配置可用功能/)).toBeInTheDocument();
   });
+
+  // LUM-1320 回归:安装包里「助理 → 其它入口」的导航会命中 React error
+  // #310("Rendered more hooks than during the previous render"),工作台被
+  // ErrorBoundary 兜成「工作台视图出现错误」,除助理首页外全部页面打不开。
+  // 根因是 PlaceholderPageInner 的 email/composer hook 落在 `助理` 系列
+  // early return 之后。同一个组件实例跨 label 重渲染时 hook 数量必须恒定。
+  it("同一实例跨路由重渲染时 hook 数量恒定(不留驻助理分支)", async () => {
+    const view = render(<PlaceholderPage label="助理" onNavigate={() => {}} apiReady />);
+    expect(await screen.findByRole("heading", { name: "助理工作台" })).toBeInTheDocument();
+
+    expect(() => view.rerender(<PlaceholderPage label="某个未实现功能" onNavigate={() => {}} apiReady />)).not.toThrow();
+    expect(screen.getByText("某个未实现功能")).toBeInTheDocument();
+
+    expect(() => view.rerender(<PlaceholderPage label="项目" onNavigate={() => {}} apiReady />)).not.toThrow();
+    expect(await screen.findByLabelText("项目模板")).toBeInTheDocument();
+
+    expect(() => view.rerender(<PlaceholderPage label="助理" onNavigate={() => {}} apiReady />)).not.toThrow();
+    expect(await screen.findByRole("heading", { name: "助理工作台" })).toBeInTheDocument();
+  });
 });
 
 // 插件·市场 现在归在"专家·技能·连接器"视图下作为 MarketPills 的子 tab,
