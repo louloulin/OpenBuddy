@@ -67,6 +67,7 @@ export const WB_TOKEN_FALLBACK = {
   "--wb-fg-tertiary": "oklch(0.58 0 0)",
   // 字体
   "--wb-font": 'system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+  "--wb-font-mono": 'ui-monospace, "SF Mono", Monaco, "Cascadia Mono", "Courier New", monospace',
   // 状态色
   "--wb-success": "oklch(0.65 0.18 145)",
   "--wb-warning": "oklch(0.78 0.16 75)",
@@ -107,24 +108,65 @@ export function buildTokenStyleSheet(): string {
   return lines.join("\n");
 }
 
+
+/**
+ * parseCssTokenDefinitions — 从 CSS 文本里抽取 `--name: value` 声明。
+ *
+ * 使用场景:
+ *   - 校验时,把 tokens.css 的全集当作"权威来源"传入,
+ *     允许 ai-tokens 只声明 AI 模块真正需要的子集(subset)。
+ *   - 不依赖文件 I/O(测试可注入字符串)。
+ *
+ * 实现:
+ *   - 跳过注释(避免 style 注释里的示例被误识别)
+ *   - 跳过 var() 引用 — 这些是 alias 不是定义
+ */
+export function parseCssTokenDefinitions(css: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const cleaned = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const regex = /--([a-z][a-z0-9-]*)\s*:\s*([^;]+);/gi;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(cleaned)) !== null) {
+    const name = `--${match[1].toLowerCase()}`;
+    const value = match[2].trim();
+    if (/^var\(/i.test(value)) continue;
+    // 第一次出现的非 var() 值就是 base:root 的定义。
+    if (typeof out[name] !== "string") {
+      out[name] = value;
+    }
+  }
+  return out;
+}
+
 /**
  * validateTokensConsistency — 测试 / CI 工具。
- * 校验 ai.css 实际引用的所有 var(--wb-*) token 都已声明在 WB_TOKEN_FALLBACK,
- * 避免遗漏 token 导致 CSS 不生效(浏览器会无声失败)。
+ * 校验引用的所有 var(--wb-*) token 都能被解析:
+ *   1. 在 WB_TOKEN_FALLBACK 声明(AI 模块私有 fallback)
+ *   2. 或者在传入的 globalTokenSource 中声明(tokens.css 等权威来源)
+ *
+ * 任意一条命中即视为 OK。这样 AI 模块可以只声明子集,
+ * 全局 token 提供兜底,EmailAiStyles 也不需要重复注入整套 global tokens。
  *
  * @returns { missing: string[];  unused: string[] }
- *   - missing: ai.css 引用但 fallback 没声明
- *   - unused:  fallback 声明但 ai.css 没引用(可清理)
+ *   - missing: 引用但 fallback 和 globalSource 都未声明
+ *   - unused:  fallback 声明但 ai.css 没引用(可清理;不消费 globalSource)
  */
-export function validateTokensConsistency(referencedTokens: ReadonlyArray<string>): {
+export function validateTokensConsistency(
+  referencedTokens: ReadonlyArray<string>,
+  globalTokenSource?: Readonly<Record<string, string>>,
+): {
   missing: string[];
   unused: string[];
 } {
   const fallbackSet = new Set(Object.keys(WB_TOKEN_FALLBACK));
-  const refSet = new Set(referencedTokens.map((t) => t.startsWith("--") ? t : `--${t}`));
+  const refSet = new Set(
+    referencedTokens.map((t) => (t.startsWith("--") ? t : `--${t}`)),
+  );
   const missing: string[] = [];
   for (const t of refSet) {
-    if (!fallbackSet.has(t)) missing.push(t);
+    if (fallbackSet.has(t)) continue;
+    if (globalTokenSource && Object.prototype.hasOwnProperty.call(globalTokenSource, t)) continue;
+    missing.push(t);
   }
   const unused: string[] = [];
   for (const t of fallbackSet) {
