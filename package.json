@@ -164,6 +164,8 @@
     "@openbuddy/ui-editor": "workspace:*",
     "@openbuddy/ui-files-tree": "workspace:*",
     "@openbuddy/ui-onboarding": "workspace:*",
+    "@sentry/electron": "^7.19.0",
+    "@sentry/react": "^10.75.0",
     "@silvia-odwyer/photon-node": "^0.3.4",
     "@smithy/node-http-handler": "^4.7.3",
     "@tiptap/core": "^3.31.3",

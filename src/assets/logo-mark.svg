@@ -1,85 +1,57 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
   <!--
-    OpenBuddy mark v14 - cream abstract dog companion.
-    Original organic dog silhouette on warm cream background. Single warm
-    tan accent shape (no facial features). Inspired by reference color
-    palette without copying any specific character.
+    OpenBuddy mark v15 - "Open Ring".
+    A 3/4 circle (open ring) represents Open + openness/transparency.
+    A small companion sphere floats just outside the gap, representing
+    Buddy + the AI spark. Modern, geometric, scales cleanly from favicon
+    to 1024px app icon.
   -->
   <defs>
-    <radialGradient id="bgRad" cx="50%" cy="50%" r="70%">
-      <stop stop-color="#FCF7E9"/>
-      <stop offset=".7" stop-color="#F5EBD3"/>
-      <stop offset="1" stop-color="#E8D8B8"/>
-    </radialGradient>
-    <radialGradient id="body" cx="50%" cy="35%" r="70%">
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#1E2640"/>
+      <stop offset="1" stop-color="#0B0F1E"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
       <stop stop-color="#FFFEF8"/>
-      <stop offset=".55" stop-color="#FCF7E9"/>
-      <stop offset="1" stop-color="#E8D8B8"/>
+      <stop offset=".55" stop-color="#F5E6CC"/>
+      <stop offset="1" stop-color="#D4A574"/>
+    </linearGradient>
+    <radialGradient id="spark" cx="35%" cy="35%" r="65%">
+      <stop stop-color="#FFD78A"/>
+      <stop offset="1" stop-color="#F59E0B"/>
     </radialGradient>
-    <linearGradient id="outline" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#3D2A1A"/>
-      <stop offset="1" stop-color="#1F140A"/>
-    </linearGradient>
-    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#D4A574"/>
-      <stop offset="1" stop-color="#9C7548"/>
-    </linearGradient>
+    <radialGradient id="sparkGlow" cx="50%" cy="50%" r="50%">
+      <stop stop-color="#F59E0B" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#F59E0B" stop-opacity="0"/>
+    </radialGradient>
     <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
   </defs>
 
   <g clip-path="url(#clip)">
-    <rect x="38" y="38" width="948" height="948" fill="url(#bgRad)"/>
+    <rect x="38" y="38" width="948" height="948" fill="url(#bg)"/>
 
-    <!-- decorative warm cream sparkles -->
-    <circle cx="160" cy="180" r="4" fill="#D4A574" opacity=".4"/>
-    <circle cx="860" cy="200" r="5" fill="#D4A574" opacity=".5"/>
-    <circle cx="150" cy="850" r="3" fill="#9C7548" opacity=".35"/>
-    <circle cx="880" cy="800" r="4" fill="#9C7548" opacity=".4"/>
-    <circle cx="180" cy="500" r="2" fill="#D4A574" opacity=".3"/>
-    <circle cx="840" cy="500" r="2" fill="#D4A574" opacity=".3"/>
+    <!-- subtle warm wash for depth -->
+    <circle cx="512" cy="512" r="360" fill="#F5E6CC" opacity=".04"/>
+    <circle cx="512" cy="512" r="260" fill="#F5E6CC" opacity=".06"/>
 
-    <!-- triangular ears -->
-    <path d="M260 320 L240 184 Q244 168 268 172 L344 240 Z" fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
-    <path d="M764 320 L784 184 Q780 168 756 172 L680 240 Z" fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
+    <!--
+      Open ring: 3/4 of a circle. The arc starts at top-right (~-45deg)
+      and sweeps 270deg clockwise, leaving a gap at the top-right where
+      the companion sphere sits just outside.
+      Stroke-linecap round gives the open ends a soft terminal.
+    -->
+    <path d="M 798.82 384.94 A 280 280 0 1 0 798.82 639.06"
+          fill="none"
+          stroke="url(#ring)"
+          stroke-width="96"
+          stroke-linecap="round"/>
 
-    <!-- main head: rounded blob -->
-    <path d="M512 240
-             Q300 240 252 416
-             Q224 540 312 596
-             Q384 632 512 632
-             Q640 632 712 596
-             Q800 540 772 416
-             Q724 240 512 240 Z"
-          fill="url(#body)" stroke="url(#outline)" stroke-width="18" stroke-linejoin="round"/>
+    <!-- glow halo behind the companion sphere -->
+    <circle cx="838" cy="298" r="120" fill="url(#sparkGlow)"/>
 
-    <!-- snout (lower rounded chin area) -->
-    <ellipse cx="512" cy="580" rx="160" ry="90" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
-
-    <!-- body: large rounded teardrop sitting posture -->
-    <path d="M512 632
-             Q260 632 220 800
-             Q200 920 320 956
-             Q420 980 512 980
-             Q604 980 704 956
-             Q824 920 804 800
-             Q764 632 512 632 Z"
-          fill="url(#body)" stroke="url(#outline)" stroke-width="18" stroke-linejoin="round"/>
-
-    <!-- warm tan accent patch on chest/belly (the only "feature") -->
-    <ellipse cx="512" cy="800" rx="140" ry="90" fill="url(#accent)" stroke="url(#outline)" stroke-width="14"/>
-    <!-- inner darker oval for depth -->
-    <ellipse cx="512" cy="800" rx="80" ry="50" fill="#9C7548" opacity=".45"/>
-
-    <!-- ear inner detail: small tan triangles -->
-    <path d="M280 320 L296 232 L324 268 Z" fill="url(#accent)" opacity=".85"/>
-    <path d="M744 320 L728 232 L700 268 Z" fill="url(#accent)" opacity=".85"/>
-
-    <!-- feet -->
-    <ellipse cx="380" cy="970" rx="54" ry="22" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
-    <ellipse cx="644" cy="970" rx="54" ry="22" fill="url(#body)" stroke="url(#outline)" stroke-width="14"/>
-
-    <!-- curved organic tail -->
-    <path d="M792 760 Q860 720 880 660 Q886 624 858 620 Q836 624 832 660 Q824 700 760 720 Z"
-          fill="url(#body)" stroke="url(#outline)" stroke-width="14" stroke-linejoin="round"/>
+    <!-- companion sphere (the Buddy spark / AI companion) -->
+    <circle cx="838" cy="298" r="68" fill="url(#spark)"/>
+    <!-- specular highlight on the sphere -->
+    <circle cx="816" cy="278" r="20" fill="#FFFEF8" opacity=".55"/>
   </g>
 </svg>

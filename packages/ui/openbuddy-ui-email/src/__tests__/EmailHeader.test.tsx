@@ -1,56 +1,78 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { EmailProcessingPlan } from "@openbuddy/capability-email";
 import { EmailHeader } from "../EmailHeader";
 
-const plan = { id: "plan-1", status: "pending", operations: [], createdAt: "2026-01-01", expiresAt: "2026-01-02" } as unknown as EmailProcessingPlan;
 const baseProps = () => ({
-  pendingPlans: [plan], actionCenterLoading: false, accountId: "account-1", canCompose: true,
-  onOpenPendingPlan: vi.fn(), onOpenActionCenter: vi.fn(), onRunReplyZero: vi.fn(), onRunDigest: vi.fn(), onRunTriage: vi.fn(), onRunSummary: vi.fn(), onCompose: vi.fn(),
+  onSearch: vi.fn(),
+  onCompose: vi.fn(),
+  onOpenPendingPlan: vi.fn(),
+  onOpenActionCenter: vi.fn(),
+  onRunReplyZero: vi.fn(),
+  onRunDigest: vi.fn(),
+  onRunTriage: vi.fn(),
+  onRunSummary: vi.fn(),
+  pendingPlanCount: 0,
+  accountId: "a1",
+  canCompose: true,
 });
 
-describe("EmailHeader", () => {
-  it("renders title and primary actions", () => {
+describe("EmailHeader (simplified)", () => {
+  it("renders title + search + compose only (no 7 buttons)", () => {
     render(<EmailHeader {...baseProps()} />);
     expect(screen.getByRole("heading", { name: "邮件" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /AI 行动中心/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "写邮件" })).toBeTruthy();
+    expect(screen.getByLabelText("搜索邮件")).toBeTruthy();
+    // 旧 7 个 AI 按钮不再渲染
+    expect(screen.queryByRole("button", { name: /待确认计划/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /待我回复/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /今日简报/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /AI 分诊/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /AI 摘要/ })).toBeNull();
   });
-  it("opens first pending plan", () => {
-    const props = baseProps(); render(<EmailHeader {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: /待确认计划/ }));
-    expect(props.onOpenPendingPlan).toHaveBeenCalledWith(plan);
+
+  it("calls onCompose when 新建 clicked", () => {
+    const props = baseProps();
+    render(<EmailHeader {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: /新建/ }));
+    expect(props.onCompose).toHaveBeenCalled();
   });
-  it("disables pending plan when empty", () => {
-    render(<EmailHeader {...baseProps()} pendingPlans={[]} />);
-    expect(screen.getByRole("button", { name: /待确认计划/ }).hasAttribute("disabled")).toBe(true);
+
+  it("calls onSearch on Enter", () => {
+    const props = baseProps();
+    render(<EmailHeader {...props} />);
+    const input = screen.getByLabelText("搜索邮件");
+    fireEvent.change(input, { target: { value: "Q4" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(props.onSearch).toHaveBeenCalledWith("Q4");
   });
-  it("opens action center", () => {
-    const props = baseProps(); render(<EmailHeader {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: /AI 行动中心/ }));
-    expect(props.onOpenActionCenter).toHaveBeenCalledTimes(1);
+
+  it("disables compose when no account", () => {
+    const props = { ...baseProps(), accountId: "" };
+    render(<EmailHeader {...props} />);
+    expect(screen.getByRole("button", { name: /新建/ }).hasAttribute("disabled")).toBe(true);
   });
-  it("groups AI secondary actions in a menu", () => {
-    render(<EmailHeader {...baseProps()} />);
-    fireEvent.click(screen.getByText("AI 助手"));
-    expect(screen.getByRole("menu")).toBeTruthy();
-    expect(screen.getByRole("menuitem", { name: "今日简报" })).toBeTruthy();
+
+  it("disables compose when canCompose is false", () => {
+    const props = { ...baseProps(), canCompose: false };
+    render(<EmailHeader {...props} />);
+    expect(screen.getByRole("button", { name: /新建/ }).hasAttribute("disabled")).toBe(true);
   });
-  it("routes AI menu actions", () => {
-    const props = baseProps(); render(<EmailHeader {...props} />); fireEvent.click(screen.getByText("AI 助手"));
-    fireEvent.click(screen.getByRole("menuitem", { name: "待我回复" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "AI 分诊" }));
-    expect(props.onRunReplyZero).toHaveBeenCalledWith("needs_reply"); expect(props.onRunTriage).toHaveBeenCalledTimes(1);
+
+  it("shows pending plan count on legacy AI action button", () => {
+    render(<EmailHeader {...baseProps()} pendingPlanCount={3} />);
+    const btn = screen.getByTitle(/AI 行动中心/);
+    expect(btn.textContent).toContain("3");
   });
-  it("disables account actions without account", () => {
-    render(<EmailHeader {...baseProps()} accountId="" />); fireEvent.click(screen.getByText("AI 助手"));
-    expect(screen.getByRole("menuitem", { name: "今日简报" }).hasAttribute("disabled")).toBe(true);
+
+  it("legacy callbacks still fire (backward compat)", () => {
+    const props = baseProps();
+    render(<EmailHeader {...props} />);
+    fireEvent.click(screen.getByTitle(/AI 行动中心/));
+    expect(props.onOpenActionCenter).toHaveBeenCalled();
   });
-  it("routes compose and respects canCompose", () => {
-    const props = baseProps(); render(<EmailHeader {...props} />); fireEvent.click(screen.getByRole("button", { name: "写邮件" })); expect(props.onCompose).toHaveBeenCalledTimes(1);
-    render(<EmailHeader {...baseProps()} canCompose={false} />); expect(screen.getAllByRole("button", { name: "写邮件" }).at(-1)?.hasAttribute("disabled")).toBe(true);
-  });
-  it("shows loading label and disables action center", () => {
-    render(<EmailHeader {...baseProps()} actionCenterLoading />); expect(screen.getByRole("button", { name: "加载 AI 行动中心…" }).hasAttribute("disabled")).toBe(true);
+
+  it("default noop callbacks don't crash when no provider", () => {
+    render(<EmailHeader onCompose={vi.fn()} />);
+    fireEvent.click(screen.getByTitle(/AI 行动中心/));
+    expect(screen.getByRole("button", { name: /新建/ })).toBeTruthy();
   });
 });

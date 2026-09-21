@@ -11,6 +11,7 @@ import {
   Database,
   Shield,
   HelpCircle,
+  ShieldCheck,
   Plus,
   X,
   Eye,
@@ -65,6 +66,7 @@ import {
   HelpSettingsPanel,
   MicrokernelSettingsPanel,
   PersonalizeSettingsPanel,
+  PrivacySettingsPanel,
   ResourceCatalogPanel,
   SecuritySettingsPanel,
   SessionManagementPanel,
@@ -585,6 +587,8 @@ const OpenBuddyPluginPanelImpl = (_openbuddyPluginImpl ?? OpenBuddyPluginPanel) 
               <PersonalizeSettingsPanel />
             ) : active === "shortcuts" ? (
               <ShortcutsSettingsPanel />
+            ) : active === "privacy" ? (
+              <PrivacySettingsPanel />
             ) : active === "help" ? (
               <HelpSettingsPanel onReplayTour={onReplayTour} />
             ) : active === "microkernel" ? (

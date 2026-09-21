@@ -72,7 +72,10 @@
     "main": "./packages/ui/openbuddy-ui-email/src/index.ts",
     "client": "./packages/ui/openbuddy-ui-email/src/client.tsx",
     "invariant": "./packages/ui/openbuddy-ui-email/src/invariant.ts",
-    "subpaths": {}
+    "subpaths": {
+      "ai": "./packages/ui/openbuddy-ui-email/src/ai/index.ts",
+      "ai/styles.css": "./packages/ui/openbuddy-ui-email/src/ai/ai.css"
+    }
   },
   {
     "dir": "openbuddy-ui-experts",

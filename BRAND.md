@@ -4,7 +4,7 @@
 
 ### Logo
 
-The OpenBuddy logo is the Shiba mascot: a ginger dog face with a cream muzzle and brow spots, on a deep-teal squircle. Flat geometry, three colors — ginger coat `#FCA23F`, cream `#FFF6E8`, ink `#2B1A11` — so it stays legible from 16 px to 1024 px.
+The OpenBuddy logo is the **"Open Ring"** mark: a 3/4 circle (open ring) representing *Open* and transparency, with a small companion sphere floating outside the gap representing *Buddy* and the AI spark. Flat geometric composition, three accent tones — cream `#FFFEF8 → #F5E6CC → #D4A574`, warm spark `#F59E0B`, ink `#0B0F1E → #1E2640` — readable from 16 px favicon to 1024 px app icon and any scale in between.
 
 | Asset | File | Format | Recommended size |
 |---|---|---|---|

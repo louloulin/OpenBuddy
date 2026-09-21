@@ -2815,3 +2815,20 @@ export function MicrokernelSettingsPanel() {
     </SectionShell>
   );
 }
+
+
+// ---------- 隐私 · 埋点 · 错误上报 ----------
+
+/**
+ * R-P3 收尾 — 隐私 / 埋点 / 错误上报 设置面板。
+ *
+ * 把 telemetry 与 error reporter 暴露给用户,允许:
+ *   - 一键开启/关闭本地埋点(默认关闭,opt-in)
+ *   - 暂停/恢复错误上报(默认开启)
+ *   - 查看最近 20 条事件 + 最近 20 条错误
+ *   - 清空本地缓冲
+ *
+ * 实现来自 @openbuddy/ui-email/ai — 这是跨包耦合,但只发生在设置面板,
+ * 不影响 ui-email 自身模块边界。
+ */
+export { PrivacySettingsPanel } from "@openbuddy/ui-email/ai";

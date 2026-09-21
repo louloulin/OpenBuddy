@@ -1,11 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
-  <path d="M260 320 L240 184 Q244 168 268 172 L344 240 Z" fill="currentColor"/>
-  <path d="M764 320 L784 184 Q780 168 756 172 L680 240 Z" fill="currentColor"/>
-  <path d="M512 240 Q300 240 252 416 Q224 540 312 596 Q384 632 512 632 Q640 632 712 596 Q800 540 772 416 Q724 240 512 240 Z" fill="currentColor"/>
-  <ellipse cx="512" cy="580" rx="160" ry="90" fill="currentColor"/>
-  <path d="M512 632 Q260 632 220 800 Q200 920 320 956 Q420 980 512 980 Q604 980 704 956 Q824 920 804 800 Q764 632 512 632 Z" fill="currentColor"/>
-  <ellipse cx="512" cy="800" rx="140" ry="90" fill="#D4A574"/>
-  <ellipse cx="380" cy="970" rx="54" ry="22" fill="currentColor"/>
-  <ellipse cx="644" cy="970" rx="54" ry="22" fill="currentColor"/>
-  <path d="M792 760 Q860 720 880 660 Q886 624 858 620 Q836 624 832 660 Q824 700 760 720 Z" fill="currentColor"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy mark">
+  <!--
+    OpenBuddy mark v15 - monochrome.
+    Single-color version of openbuddy-logo.svg for embossing, single-ink
+    print, watermarks, and dark/light auto-theming. Uses currentColor for
+    the foreground so the host page controls the tint.
+  -->
+  <g fill="currentColor">
+    <!-- Open ring (3/4 circle, gap at top-right) -->
+    <path d="M 798.82 384.94 A 280 280 0 1 0 798.82 639.06"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="96"
+          stroke-linecap="round"/>
+    <!-- Companion sphere (Buddy spark) -->
+    <circle cx="838" cy="298" r="68"/>
+  </g>
 </svg>

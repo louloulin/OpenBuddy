@@ -1,24 +1,49 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="OpenBuddy">
+  <!--
+    OpenBuddy welcome graphic v15 - matches openbuddy-logo.svg.
+    3/4 ring + companion sphere + soft cream backdrop. Used in welcome
+    screens and onboarding surfaces.
+  -->
   <defs>
-    <radialGradient id="body" cx="50%" cy="35%" r="70%">
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
       <stop stop-color="#FFFEF8"/>
-      <stop offset="1" stop-color="#E8D8B8"/>
+      <stop offset="1" stop-color="#F5E6CC"/>
     </radialGradient>
-    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#D4A574"/>
-      <stop offset="1" stop-color="#9C7548"/>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1E2640"/>
+      <stop offset="1" stop-color="#3D4A6E"/>
     </linearGradient>
+    <radialGradient id="spark" cx="35%" cy="35%" r="65%">
+      <stop stop-color="#FFD78A"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </radialGradient>
+    <radialGradient id="sparkGlow" cx="50%" cy="50%" r="50%">
+      <stop stop-color="#F59E0B" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#F59E0B" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-  <path d="M58 78 L52 30 Q53 26 60 27 L84 50 Z" fill="url(#body)" stroke="#1F140A" stroke-width="3.6" stroke-linejoin="round"/>
-  <path d="M182 78 L188 30 Q187 26 180 27 L156 50 Z" fill="url(#body)" stroke="#1F140A" stroke-width="3.6" stroke-linejoin="round"/>
-  <path d="M120 56 Q60 56 44 110 Q36 142 64 158 Q88 168 120 168 Q152 168 176 158 Q204 142 196 110 Q180 56 120 56 Z"
-        fill="url(#body)" stroke="#1F140A" stroke-width="5" stroke-linejoin="round"/>
-  <ellipse cx="120" cy="152" rx="44" ry="24" fill="url(#body)" stroke="#1F140A" stroke-width="3.6"/>
-  <path d="M120 168 Q52 168 40 210 Q34 236 62 246 Q88 252 120 252 Q152 252 178 246 Q206 236 200 210 Q188 168 120 168 Z"
-        fill="url(#body)" stroke="#1F140A" stroke-width="5" stroke-linejoin="round"/>
-  <ellipse cx="120" cy="210" rx="36" ry="24" fill="url(#accent)" stroke="#1F140A" stroke-width="3.6"/>
-  <ellipse cx="92" cy="252" rx="14" ry="6" fill="url(#body)" stroke="#1F140A" stroke-width="3.6"/>
-  <ellipse cx="148" cy="252" rx="14" ry="6" fill="url(#body)" stroke="#1F140A" stroke-width="3.6"/>
-  <path d="M200 210 Q212 198 216 184 Q218 176 210 174 Q204 174 202 184 Q200 192 188 198 Z"
-        fill="url(#body)" stroke="#1F140A" stroke-width="3.6" stroke-linejoin="round"/>
+
+  <rect x="0" y="0" width="240" height="240" fill="url(#bg)"/>
+
+  <!-- decorative warm sparkles -->
+  <circle cx="32" cy="38" r="2" fill="#D4A574" opacity=".5"/>
+  <circle cx="210" cy="42" r="2.4" fill="#D4A574" opacity=".55"/>
+  <circle cx="40" cy="200" r="1.6" fill="#9C7548" opacity=".4"/>
+  <circle cx="200" cy="196" r="2" fill="#9C7548" opacity=".5"/>
+  <circle cx="46" cy="118" r="1" fill="#D4A574" opacity=".4"/>
+  <circle cx="198" cy="120" r="1" fill="#D4A574" opacity=".4"/>
+
+  <!-- open ring centered, r=64 -->
+  <path d="M 185.65 88.32 A 64 64 0 1 0 185.65 151.68"
+        fill="none"
+        stroke="url(#ring)"
+        stroke-width="22"
+        stroke-linecap="round"/>
+
+  <!-- glow halo behind companion sphere -->
+  <circle cx="194" cy="68" r="32" fill="url(#sparkGlow)"/>
+
+  <!-- companion sphere -->
+  <circle cx="194" cy="68" r="16" fill="url(#spark)"/>
+  <circle cx="188" cy="62" r="4.5" fill="#FFFEF8" opacity=".55"/>
 </svg>

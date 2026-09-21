@@ -155,7 +155,9 @@
       "@openbuddy/ui-library/client": ["./packages/ui/openbuddy-ui-library/src/client.tsx"],
       "@openbuddy/ui-library/invariant": ["./packages/ui/openbuddy-ui-library/src/invariant.ts"],
       "@openbuddy/ui-shared/agent-paths": ["./packages/ui/openbuddy-ui-shared/src/agent-paths.ts"],
-      "@openbuddy/ui-shared/use-agent-paths": ["./packages/ui/openbuddy-ui-shared/src/use-agent-paths.ts"]
+      "@openbuddy/ui-shared/use-agent-paths": ["./packages/ui/openbuddy-ui-shared/src/use-agent-paths.ts"],
+      "@openbuddy/ui-email/ai": ["./packages/ui/openbuddy-ui-email/src/ai/index.ts"],
+      "@openbuddy/ui-email/ai/styles.css": ["./packages/ui/openbuddy-ui-email/src/ai/ai.css"]
     },
     "types": [
       "node"

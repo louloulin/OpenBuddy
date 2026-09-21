@@ -106,6 +106,21 @@ function TourSurface() {
     }, 1200);
     return () => window.clearInterval(id);
   }, [armed]);
+  // R10.4 — 当向导在首次挂载时就已经完成（回访用户 / 测试夹具 / 任何跳过向导的
+  // 入口）,上面的轮询会因为 `armed === true` 提前 return,从来不会执行
+  // markTourSeen。结果:useTourController 的 shouldAutoOpenTour() 仍返回 true,
+  // 暗幕一加载就压在 home/composer 上面,拦截所有 pointer 事件,用户拿不到任何
+  // 交互入口。把"标记 seen"这一步独立出来:armed === true 时在挂载时直接同步
+  // 写一次 localStorage,然后让 useTourController 通过自己的 shouldAutoOpenTour
+  // 判断不开。轮询路径不变,继续覆盖"向导在本会话内刚刚走完"的情况。
+  useEffect(() => {
+    if (!armed) return;
+    try {
+      if (window.localStorage.getItem(TOUR_STORAGE_KEY) !== "seen") {
+        markTourSeen();
+      }
+    } catch { /* localStorage 不可用,useTourController 内部会再判断 */ }
+  }, [armed]);
   const tour = useTourController({ autoOpen: armed });
   if (!tour.open) return null;
   return <TourModal open={tour.open} steps={tour.steps} onFinish={tour.stop} onClose={tour.stop} />;

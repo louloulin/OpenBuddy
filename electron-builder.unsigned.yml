@@ -1,26 +1,4 @@
 # ============================================================================
-# Unsigned / un-notarized build profile.
-#
-# Identical to `electron-builder.yml` except the macOS section disables
-# code signing (`hardenedRuntime`) and notarization. Use this for local
-# builds, CI smoke tests, and unsigned public releases when the project
-# does not yet have an Apple Developer ID Application certificate.
-#
-# Consumers of unsigned DMGs must:
-#   - Right-click the .app → Open (first time only), OR
-#   - System Settings → Privacy & Security → "Open Anyway"
-#
-# Required environment for invocation:
-#   CSC_IDENTITY_AUTO_DISCOVERY=false \
-#     scripts/electron-builder.sh --mac --config electron-builder.unsigned.yml
-#
-# The canonical, signed+notarized profile lives in `electron-builder.yml`.
-# Regenerate this file from it after any upstream config change:
-#   sed -e '/^  hardenedRuntime: true$/d' \
-#       -e '/^  notarize: true$/d' \
-#       electron-builder.yml > electron-builder.unsigned.yml
-# ============================================================================
-# ============================================================================
 # electron-builder configuration for OpenBuddy.
 #
 # electron-vite produces three bundles under `out/` (see electron.vite.config.ts):
@@ -92,6 +70,26 @@ extraResources:
     to: "app/node_modules/@earendil-works/chord"
   - from: "node_modules/esbuild"
     to: "app/node_modules/esbuild"
+  # brace-expansion@5 ships as the hoisted root because minimatch@^10.2.5
+  # (a direct dependency, pulled in transitively by `@earendil-works/pi-coding-agent`)
+  # declares `brace-expansion: ^5.0.0`. electron-builder's pnpm collector
+  # walks `pnpm list --prod --depth Infinity` and then resolves each package
+  # via `locateFromDepOrRoot` (node_modules/app-builder-lib/out/node-module-collector/pnpmNodeModulesCollector.js).
+  # When the workspace also pulls in `minimatch@3/5/9` (through dev-only
+  # chains like `app-builder-lib` -> `ejs` -> `jake` -> `filelist` -> `minimatch@5`
+  # -> `brace-expansion@2.1.4`), pnpm sometimes hoists the older `2.x` to
+  # `node_modules/brace-expansion` and the collector then ships that copy.
+  # `minimatch@10.x`'s ESM build does `import { expand } from 'brace-expansion'`,
+  # which the v2.1.4 CJS package does not export, so the main process dies
+  # before opening a window with:
+  #   SyntaxError: The requested module 'brace-expansion' does not provide an
+  #   export named 'expand'
+  # Ship the workspace-root v5 explicitly so the collector cannot downgrade
+  # it. The nested `balanced-match@^4` (required by brace-expansion@5's
+  # `import { balanced } from 'balanced-match'`) is shipped by the
+  # `balanced-match` extraResource entry further down -- keep both in sync.
+  - from: "node_modules/brace-expansion"
+    to: "app/node_modules/brace-expansion"
   # brace-expansion@5 is ESM (`import { balanced } from "balanced-match"`) and
   # requires balanced-match@^4, but the hoisted root can only carry one
   # balanced-match: minimatch@3 pins balanced-match@1.0.2 (CJS) there, so pnpm

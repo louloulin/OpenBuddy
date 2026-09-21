@@ -22,6 +22,7 @@
 
 import { SlotProvider } from "@openbuddy/ui-runtime/client";
 import { ThemeInitializer } from "@openbuddy/ui-theme/client";
+import { ComposerPortal } from "@/components/ComposerPortal";
 import { AppShell } from "@/features/app/AppShell";
 import { useSlotComponent } from "@/features/app/slot-bridge";
 import { useAppShellRuntime } from "@/features/app/useAppShellRuntime";
@@ -51,6 +52,9 @@ export default function App() {
     <SlotProvider>
       <ThemeInitializer />
       <RootSurface />
+      {/* 第 4-5 周(P1-A):全局 ComposerPortal 监听 composer-store,
+          让任意面板都能从顶层打开预填好的 EmailComposer。 */}
+      <ComposerPortal />
     </SlotProvider>
   );
 }
