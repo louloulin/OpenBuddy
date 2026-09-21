@@ -242,6 +242,33 @@ function MessageItemInner({
         title?: string;
       }>
     | undefined;
+  // R78 — Esc 取消 / Cmd+Enter 应用 inline edit。
+  // R93 fix:这个 effect 原先声明在「用户气泡早退」和「空白 assistant 气泡
+  // 返回 null」之后。同一 MessageItem 实例(同一 message.id)在
+  // `streaming=true, parts=[]` → `complete=true, parts=[]` 之间切换时
+  // 会提前返回 null,hook 数量骤减 → React #300/#310。所有 hook 必须在
+  // 任何 early return 之前无条件执行。它仅在 inlineEditing(=只可能由助理
+  // 分支触发的状态)为真时挂监听,对用户气泡是无副作用的空转。
+  useEffect(() => {
+    if (!inlineEditing) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setInlineEditing(false);
+        setInlineDraft("");
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        if (!onEditAssistantMessage) return;
+        e.preventDefault();
+        onEditAssistantMessage(message.id, inlineDraft);
+        setInlineEditing(false);
+        setInlineDraft("");
+        onToast?.("已就地保存");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [inlineEditing, inlineDraft, message.id, onEditAssistantMessage, onToast]);
+
   if (message.role === "user") {
     // R8.1 (revision-pager) — split attachments (file/image parts) from the
     // text part. The text part gets replaced by the currently selected
@@ -304,28 +331,7 @@ function MessageItemInner({
     return null;
   }
 
-  // R78 — Esc 取消 / Cmd+Enter 应用 inline edit
-  useEffect(() => {
-    if (!inlineEditing) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setInlineEditing(false);
-        setInlineDraft("");
-      } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        if (!onEditAssistantMessage) return;
-        e.preventDefault();
-        onEditAssistantMessage(message.id, inlineDraft);
-        setInlineEditing(false);
-        setInlineDraft("");
-        onToast?.("已就地保存");
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [inlineEditing, inlineDraft, message.id, onEditAssistantMessage, onToast]);
-
-    // R8.16 — apply the just-completed class to the assistant root
+  // R8.16 — apply the just-completed class to the assistant root
   // for ~320ms after the streaming flag flips off so the bubble
   // fades + slides in instead of popping into existence.
   // R8.44 — additionally apply msg--streaming while the message

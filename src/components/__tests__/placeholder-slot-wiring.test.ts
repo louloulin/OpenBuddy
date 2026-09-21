@@ -21,6 +21,13 @@ import { describe, expect, it } from "vitest";
 const ROOT = process.cwd();
 const SKIP = new Set(["node_modules", "out", "dist", ".turbo", ".git", "coverage", "__tests__"]);
 
+/** Windows 上 `join()` 产出反斜杠,任何以 `/` 锚定的路径正则都会静默匹配不到 ——
+ *  于是整条接线守卫在本机(以及打包机,同样是 Windows)退化成空扫描。统一把路径
+ *  归一化成 `/` 再做判定。 */
+function toPosix(p: string): string {
+  return p.replace(/\\/g, "/");
+}
+
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     if (SKIP.has(entry)) continue;
@@ -36,10 +43,10 @@ function walk(dir: string, out: string[] = []): string[] {
 function registeredPlaceholderSlots(): Map<string, string> {
   const found = new Map<string, string>();
   for (const file of walk(join(ROOT, "packages", "ui"))) {
-    if (!/\/client\.tsx?$/.test(file)) continue;
+    if (!/\/client\.tsx?$/.test(toPosix(file))) continue;
     const source = readFileSync(file, "utf8");
     for (const match of source.matchAll(/name:\s*["'`](placeholder\.[a-z0-9.-]+)["'`]/g)) {
-      found.set(match[1], file.replace(`${ROOT}/`, ""));
+      found.set(match[1], toPosix(file).replace(`${toPosix(ROOT)}/`, ""));
     }
   }
   return found;
@@ -55,7 +62,7 @@ function consumedSlots(): Set<string> {
   const roots = [join(ROOT, "src"), join(ROOT, "packages", "ui")];
   for (const root of roots) {
     for (const file of walk(root)) {
-      if (/\/client\.tsx?$/.test(file)) continue;
+      if (/\/client\.tsx?$/.test(toPosix(file))) continue;
       const source = readFileSync(file, "utf8");
       for (const match of source.matchAll(/useSlotComponents?\(\s*["'`]([a-zA-Z0-9._:-]+)["'`]/g)) {
         consumed.add(match[1]);

@@ -129,40 +129,10 @@ export const MarkdownInlineCode = memo(function MarkdownInlineCode({
     pathDetection,
   ]);
 
-  if (shouldHighlight && finalType) {
-    const titleText =
-      finalType === "symbol"
-        ? "跳转到符号"
-        : finalType === "file"
-          ? "打开文件"
-          : "打开目录";
-    const iconNode = renderPathIcon?.({
-      code,
-      purePath: pathDetection.purePath || code,
-      type: finalType,
-    });
-    return (
-      <code
-        className={[className, "md-inline-code", "md-clickable-path", `md-path-type-${finalType}`]
-          .filter(Boolean)
-          .join(" ")}
-        onClick={handleClick}
-        title={titleText}
-        role="link"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handleClick();
-          }
-        }}
-      >
-        {iconNode ? <span className="md-clickable-path-icon">{iconNode}</span> : null}
-        {truncatePathDisplay(code)}
-      </code>
-    );
-  }
-
+  // R93 fix:下面 3 个 hook 原先声明在 `if (shouldHighlight && finalType)`
+  // 的 early return 之后。同一实例的 `code` 随 Markdown 重渲染变化时
+  // (流式输出 / 就地重新渲染),命中/不命中路径分支会翻转,hook 数量随之
+  // 变化 → React #300/#310。统一上移到第一个 early return 之前。
   // R8.55 — Inline code copy button. Track the "copied" state so we can
   // swap the Copy icon for a Check icon for 2s, mirroring the
   // CodeBlockActions pattern (PI-Desktop parity). The button is hidden
@@ -218,6 +188,40 @@ export const MarkdownInlineCode = memo(function MarkdownInlineCode({
     },
     [code],
   );
+
+  if (shouldHighlight && finalType) {
+    const titleText =
+      finalType === "symbol"
+        ? "跳转到符号"
+        : finalType === "file"
+          ? "打开文件"
+          : "打开目录";
+    const iconNode = renderPathIcon?.({
+      code,
+      purePath: pathDetection.purePath || code,
+      type: finalType,
+    });
+    return (
+      <code
+        className={[className, "md-inline-code", "md-clickable-path", `md-path-type-${finalType}`]
+          .filter(Boolean)
+          .join(" ")}
+        onClick={handleClick}
+        title={titleText}
+        role="link"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleClick();
+          }
+        }}
+      >
+        {iconNode ? <span className="md-clickable-path-icon">{iconNode}</span> : null}
+        {truncatePathDisplay(code)}
+      </code>
+    );
+  }
 
   return (
     <code className={["md-inline-code", className].filter(Boolean).join(" ")}>
