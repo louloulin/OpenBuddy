@@ -7,6 +7,7 @@
  * checked-out release contract and built Electron inputs are complete, and
  * records why desktop smoke can or cannot run in this environment.
  */
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -38,6 +39,54 @@ for (const relative of requiredFiles) {
   const path = join(root, relative);
   check(`file:${relative}`, existsSync(path), existsSync(path) ? { bytes: statSync(path).size } : { reason: "missing; run pnpm build" });
 }
+
+// ---------------------------------------------------------------------------
+// extraResources sources must exist AND be tracked.
+//
+// electron-builder copies every `extraResources.from` entry verbatim and does
+// NOT fail the build when a source is missing: the installer simply ships
+// without the file while the runtime still points at it. That is how
+// `resources/PRIVACY.md` went missing -- Help -> Privacy Policy calls
+// `shell.openPath(process.resourcesPath/PRIVACY.md)`, the source file was
+// untracked because `.gitignore`'s `docs/*` allowlist had no entry for it, so
+// every fresh checkout (and therefore every installer) shipped without it.
+// Gate both the on-disk presence and the git tracking state here, so that a
+// silent drop fails the release gate instead of the end user.
+// ---------------------------------------------------------------------------
+const builderConfigs = ["electron-builder.yml", "electron-builder.unsigned.yml"]
+  .filter((relative) => existsSync(join(root, relative)));
+const extraResourceSources = [
+  ...new Set(
+    builderConfigs.flatMap((relative) =>
+      [...fileText(join(root, relative)).matchAll(/^\s*-\s*from:\s*"([^"]+)"/gm)].map((match) => match[1]),
+    ),
+  ),
+];
+const isTracked = (relative) => {
+  if (!existsSync(join(root, ".git"))) return null;
+  try {
+    execFileSync("git", ["ls-files", "--error-unmatch", relative], { cwd: root, stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+};
+const missingExtraResources = extraResourceSources.filter((relative) => !existsSync(join(root, relative)));
+// `node_modules/**` sources arrive through `pnpm install`; every other source is
+// repository content and must therefore be tracked, or a fresh checkout (and the
+// installer built from it) loses the file even though this working tree has it.
+const untrackedExtraResources = extraResourceSources.filter(
+  (relative) => !relative.startsWith("node_modules/") && existsSync(join(root, relative)) && isTracked(relative) === false,
+);
+check("release:extra-resources-present", missingExtraResources.length === 0 && untrackedExtraResources.length === 0, {
+  configs: builderConfigs,
+  sources: extraResourceSources,
+  missing: missingExtraResources,
+  untracked: untrackedExtraResources,
+  reason: missingExtraResources.length === 0 && untrackedExtraResources.length === 0
+    ? undefined
+    : "electron-builder would silently ship an installer without these extraResources",
+});
 
 const targets = [
   ["windows", /build-windows:/, /target:\s*nsis/],
