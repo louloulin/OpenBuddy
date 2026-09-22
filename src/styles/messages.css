@@ -1247,3 +1247,182 @@ button.diff__path {
     font-size: 9px;
   }
 }
+
+/* ============================================================================
+ * Phase B.1 — Streaming caret (打字机 caret)
+ * ============================================================================ */
+.streaming-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 1em;
+  vertical-align: text-bottom;
+  margin-left: 1px;
+  background: var(--wb-color-text-medium, #6e6e80);
+  opacity: 0;
+  pointer-events: none;
+  animation: streaming-caret-blink 700ms ease-in-out infinite;
+}
+.streaming-caret--reasoning {
+  background: var(--wb-palette-brand-8, #00C29A);
+}
+@keyframes streaming-caret-blink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+/* ============================================================================
+ * Phase B.2 — Thought streaming card (推理实时可视化)
+ * ============================================================================ */
+.msg__thought {
+  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+  border-left: 3px solid var(--wb-palette-brand-8, #00C29A);
+  background: var(--wb-color-bg-secondary-default, rgba(0, 0, 0, 0.02));
+  border-radius: 8px;
+  margin: 6px 0;
+  padding: 6px 10px;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+.msg__thought > summary {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--wb-color-text-medium, #6e6e80);
+  list-style: none;
+  user-select: none;
+}
+.msg__thought > summary::-webkit-details-marker {
+  display: none;
+}
+.msg__thought-icon {
+  display: inline-flex;
+  align-items: center;
+}
+.msg__thought-icon-stream {
+  animation: streaming-caret-blink 700ms ease-in-out infinite;
+}
+.msg__thought-label {
+  font-weight: 500;
+}
+.msg__thought-elapsed {
+  color: var(--wb-color-text-soft, rgba(0, 0, 0, 0.5));
+  font-variant-numeric: tabular-nums;
+  margin-left: 2px;
+}
+.msg__thought--streaming {
+  background: linear-gradient(
+    180deg,
+    var(--wb-color-bg-secondary-default, rgba(0, 0, 0, 0.02)) 0%,
+    var(--wb-color-bg-primary-default, transparent) 100%
+  );
+}
+.msg__thought--streaming > summary::after {
+  content: "";
+  display: inline-block;
+  width: 60px;
+  height: 2px;
+  margin-left: auto;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--wb-palette-brand-8, #00C29A) 50%,
+    transparent 100%
+  );
+  animation: streaming-caret-blink 1500ms ease-in-out infinite;
+}
+.msg__thought-body {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--wb-color-text-medium, #6e6e80);
+}
+
+/* ============================================================================
+ * Phase B.3 — Tool inline expand (工具卡 inline 展开)
+ * ============================================================================ */
+.toolcall--expanded {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--wb-color-bg-secondary-default, rgba(0, 0, 0, 0.02));
+  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+  border-left: 3px solid var(--wb-palette-brand-8, #00C29A);
+  animation: toolcall-expand 200ms ease-out;
+}
+.toolcall--expanded .toolcall__title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+@keyframes toolcall-expand {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.toolcall__expand-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 4px;
+  background: transparent;
+  border: 0;
+  color: var(--wb-color-text-medium, #6e6e80);
+  cursor: pointer;
+  font-size: 11px;
+  margin-left: auto;
+}
+.toolcall__expand-toggle:hover {
+  color: var(--wb-color-text-strong, #1a1a2e);
+}
+
+/* ============================================================================
+ * Phase B.8 — Empty state v2 (Claude/Codex 风格 hero + 6+ 网格)
+ * ============================================================================ */
+.chatview__empty-state-title {
+  margin: 12px 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--wb-color-text-strong, #1a1a2e);
+}
+.chatview__empty-state-subtitle {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--wb-color-text-medium, #6e6e80);
+}
+.chatview__quick-prompt-desc {
+  display: block;
+  font-size: 11.5px;
+  color: var(--wb-color-text-soft, rgba(0, 0, 0, 0.5));
+  margin-top: 2px;
+}
+.chatview__quick-prompt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
+  background: var(--wb-color-bg-primary-default, #ffffff);
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.chatview__quick-prompt:hover {
+  background: var(--wb-color-bg-secondary-hover-active, rgba(0, 0, 0, 0.03));
+  border-color: var(--wb-palette-brand-7, rgba(0, 194, 154, 0.4));
+  transform: translateY(-1px);
+}
+.chatview__quick-prompt-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+.chatview__quick-prompt-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--wb-color-text-strong, #1a1a2e);
+}

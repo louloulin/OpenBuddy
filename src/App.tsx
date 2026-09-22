@@ -22,6 +22,7 @@
 
 import { SlotProvider } from "@openbuddy/ui-runtime/client";
 import { ThemeInitializer } from "@openbuddy/ui-theme/client";
+import { ChatShortcutOverlay } from "@openbuddy/ui-conversation";
 import { ComposerPortal } from "@/components/ComposerPortal";
 import { AppShell } from "@/features/app/AppShell";
 import { useSlotComponent } from "@/features/app/slot-bridge";
@@ -55,6 +56,10 @@ export default function App() {
       {/* 第 4-5 周(P1-A):全局 ComposerPortal 监听 composer-store,
           让任意面板都能从顶层打开预填好的 EmailComposer。 */}
       <ComposerPortal />
+      {/* Plan5 Phase B.6 — 全局快捷键发现面板。
+          监听 Shift+/("?") 与 Ctrl/Cmd+/(mac/win 自动适配),按"?" 在任意焦点位置触发;
+          与 Topbar 的 `KeyboardShortcutsDialog` 并存但触发路径不同。 */}
+      <ChatShortcutOverlay />
     </SlotProvider>
   );
 }

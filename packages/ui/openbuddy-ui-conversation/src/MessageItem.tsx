@@ -21,8 +21,8 @@ import Zap from "lucide-react/dist/esm/icons/zap";
 import { TooltipButton } from "./TooltipButton";
 import { type MarkdownConfig } from "@openbuddy/ui-markdown";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
-import { ConversationMarkdown } from "./conversation-slots";
-import { ToolCallCard } from "./ToolCallCard";
+import { MessagePartRegistry } from "./MessagePartRegistry";
+import { StreamingCaret } from "./StreamingCaret";
 import { LoadingRow } from "./LoadingRow";
 import { TurnErrorCard } from "./TurnErrorCard";
 import { FeedbackDialog } from "@openbuddy/ui-dialogs";
@@ -418,65 +418,25 @@ function MessageItemInner({
               onToast={onToast}
             />
           )}
-          {message.parts.map((p, i) => {
-            // Active streaming: skip the full markdown pipeline (gfm, math,
-            // katex, sanitize, lowlight) and render raw text instead. The
-            // pipeline re-parses on every delta which is the dominant cost
-            // during streaming; once the message is complete we fall back
-            // to the rich renderer. streaming===true is only set by ChatView
-            // for the currently-streaming message.
-            const isStreaming = streaming && !message.complete;
-            if (p.kind === "text") {
-              // 正文走内核 `conversation.message.markdown` 槽:插件可以换成
-              // 自己的 markdown 引擎 / 批注视图,内核里没实现时渲染的就是原来
-              // 那对 StreamingMarkdown / Markdown —— 视觉零变化。
-              return (
-                <ConversationMarkdown
-                  key={i}
-                  text={p.text}
-                  streaming={isStreaming}
-                  complete={message.complete}
-                  markdownTheme="loose"
-                  theme={theme}
-                  config={markdownConfig}
-                />
+          {/* Plan A.2 — 部件派发统一走 MessagePartRegistry。新增 part 类型只需在
+              `parts/registry-defaults.tsx` 加一行,不需要修改本组件主干。
+              视觉与 data-testid 与改造前完全一致(快照测试覆盖)。 */}
+          <MessagePartRegistry
+            parts={message.parts}
+            messageId={message.id}
+            isStreaming={streaming && !message.complete}
+            complete={message.complete}
+            theme={theme}
+            markdownConfig={markdownConfig}
+            onOpenTool={onOpenTool ? (toolCallId) => {
+              // Phase A.2 — 从 toolCallId 找回完整 ToolCallView 并打开。
+              const target = message.parts.find(
+                (part) => part.kind === "tool_call" && part.toolCall.toolCallId === toolCallId,
               );
-            }
-            if (p.kind === "thought") {
-              return (
-                <details key={i} className="msg__thought">
-                  <summary>深度思考</summary>
-                  <div className="msg__thought-body">
-                    <ConversationMarkdown
-                      text={p.text}
-                      streaming={isStreaming}
-                      complete={message.complete}
-                      markdownTheme="reasoning"
-                      theme={theme}
-                      config={markdownConfig}
-                    />
-                  </div>
-                </details>
-              );
-            }
-            if (p.kind === "file") {
-              return (
-                <FilePreview
-                  key={i}
-                  filename={p.name || "attachment"}
-                  content={toPreviewDataUrl(p.mediaType, p.data)}
-                />
-              );
-            }
-            if (p.kind !== "tool_call") return null;
-            return (
-              <ToolCallCard
-                key={p.toolCall.toolCallId || i}
-                tc={p.toolCall}
-                onOpen={onOpenTool}
-              />
-            );
-          })}
+              if (target && target.kind === "tool_call") onOpenTool(target.toolCall);
+            } : undefined}
+            onToast={onToast}
+          />
           {pluginMessageContributions.map((contribution) => (
             <div key={contribution.id} className="msg__plugin-contribution">
               <RendererContributionView contribution={contribution} onPlaceholder={onToast} />
@@ -485,20 +445,16 @@ function MessageItemInner({
           {pluginMessageSlots.map((entry) => (
             <RendererSlotView key={String(entry.options.id ?? entry.options.key ?? entry.options.name)} entry={entry} className="msg__plugin-contribution" />
           ))}
-          {/* R8.23 — streaming caret. Was the unicode ▋ block char; we
-              now render a 2×14 brand-tinted pill with a soft pulse so
-              the streaming state reads as "alive" rather than a
-              flickering terminal cursor. The aria-label keeps the
-              screen-reader experience stable across the visual swap. */}
-          {streaming &&
-            message.complete === false &&
-            message.parts.length > 0 && (
-              <span
-                className="msg__caret"
-                aria-label="正在生成"
-                role="status"
-              />
-            )}
+          {/* R8.23 → Plan5 B.1 — streaming caret.
+              Was the unicode ▋ block char, then a hand-rolled
+              `.msg__caret` span; now the shared `StreamingCaret`
+              primitive so the caret can be themed (loose / reasoning)
+              and reused by plugins. Only rendered when there is already
+              streamed text — a `LoadingRow` owns the empty state, and a
+              caret floating above it would read as a stray cursor. */}
+          {message.parts.length > 0 && (
+            <StreamingCaret active={streaming && message.complete !== true} />
+          )}
         </div>
         {/* R8.11 — message footer actions (复制 / MD / 重试 / 赞踩). Icon-only
             buttons; copy buttons briefly swap to a checkmark on success

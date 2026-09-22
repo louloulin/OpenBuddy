@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import React, { memo, useEffect, useState } from "react";
 import type { ToolCallView } from "@/stores/session-store";
 import type { DiffContent, CommandOutputContent } from "@openbuddy/shared-types";
 import { checkCommandRisk, riskLabel } from "@/lib/security/command-risk";
@@ -17,6 +17,13 @@ type ToolCallCardProps = {
   tc: ToolCallView;
   /** Open the right-side detail drawer (Phase 2). */
   onOpen?: (tc: ToolCallView) => void;
+  /**
+   * Phase B.3 — inline expand mode.
+   *   - `auto`    : default; small `↕` toggle button on the right
+   *   - `expanded` : always expanded (inline body visible)
+   *   - `compact`  : always one-line (no toggle)
+   */
+  expandMode?: "auto" | "expanded" | "compact";
 };
 
 /**
@@ -30,7 +37,7 @@ type ToolCallCardProps = {
  *   - `completed` / `failed` tools show "完成 1.2s" / "失败 12s"
  *   - Tools without `startedAt` (legacy data) just show status
  */
-function ToolCallCardInner({ tc, onOpen }: ToolCallCardProps) {
+function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProps) {
   // Phase R3.0 — re-render every second while the tool is in_progress so the
   // elapsed-time chip ticks up. The interval is cleared when status flips
   // to completed/failed so the chip freezes at the final value.
@@ -54,14 +61,45 @@ function ToolCallCardInner({ tc, onOpen }: ToolCallCardProps) {
 
   // 状态符号：完成态用 SVG 对勾（文本 "✓" U+2713 在 macOS WKWebView 下依赖
   // 字体回退，可能渲染成 tofu/emoji 样式）；"!" / "…" 是 ASCII/通用字符，安全。
-  const statusMark =
-    tc.status === "completed" ? (
-      <CheckIcon size={10} strokeWidth={3} />
-    ) : tc.status === "failed" ? (
-      "!"
-    ) : (
-      "…"
-    );
+  // 状态符号:完成态用 SVG 对勾(文本 "✓" U+2713 在 macOS WKWebView 下依赖
+  // 字体回退,可能渲染成 tofu/emoji 样式);"!" / "…" 是 ASCII/通用字符,安全。
+  // R8.2 — `.toolcall__status-mark` 包裹元素 + `--<status>` 修饰符 class,
+  // 让 CSS 给不同状态用不同颜色,而不依赖文本。
+  const statusMark = (
+    <span
+      className={
+        "toolcall__status-mark toolcall__status-mark--" + tc.status
+      }
+      aria-hidden="true"
+    >
+      {tc.status === "completed" ? (
+        <CheckIcon size={10} strokeWidth={3} />
+      ) : tc.status === "failed" ? (
+        "!"
+      ) : (
+        "…"
+      )}
+    </span>
+  );
+
+  // Phase B.3 — inline expand state.
+  const [expanded, setExpanded] = useState(expandMode === "expanded");
+  const isExpanded = expandMode === "expanded" || (expandMode === "auto" && expanded);
+  const canToggleInline = expandMode === "auto";
+
+  const onCardClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (canToggleInline && (e.altKey || e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      setExpanded((v) => !v);
+      return;
+    }
+    onOpen?.(tc);
+  };
+  const onDoubleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!canToggleInline) return;
+    e.preventDefault();
+    setExpanded((v) => !v);
+  };
 
   const shortTitle = shortenTitle(tc.title, tc.kind);
 
@@ -80,28 +118,61 @@ function ToolCallCardInner({ tc, onOpen }: ToolCallCardProps) {
     : prettyKind(tc.kind);
   const summary = specialized ? summarizeTool(tc, renderer) : shortTitle;
 
+  if (isExpanded) {
+    return (
+      <div className="toolcall toolcall--expanded" data-testid="toolcall-expanded" data-toolcall-id={tc.toolCallId}>
+        <div className="toolcall__header">
+          <span className="toolcall__kind">{kindLabel}</span>
+          <span className="toolcall__title">{summary}</span>
+          <span className={"toolcall__status " + statusCls}>{statusMark} {statusLabel}</span>
+          {durationLabel && <span className="toolcall__duration">{durationLabel}</span>}
+          {canToggleInline && (
+            <button
+              type="button"
+              className="toolcall__expand-toggle"
+              onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
+              aria-label="折叠"
+              data-testid="toolcall-collapse"
+            >
+              ▴ 折叠
+            </button>
+          )}
+        </div>
+        <ToolCallDetailBody tc={tc} onOpenPath={() => {}} />
+      </div>
+    );
+  }
   return (
     <button
       type="button"
       className={"toolcall toolcall--compact " + statusCls}
-      onClick={() => onOpen?.(tc)}
-      title={`${tc.kind}: ${tc.title}（${statusLabel}${durationLabel ? " · " + durationLabel : ""}，点击查看详情）`}
+      onClick={onCardClick}
+      onDoubleClick={onDoubleClick}
+      title={`${tc.kind}: ${tc.title}（${statusLabel}${durationLabel ? " · " + durationLabel : ""}，点击查看详情,双击或 ⌘+点击 inline 展开）`}
       aria-label={`${tc.kind} ${summary} ${statusLabel}${durationLabel ? " " + durationLabel : ""}`}
     >
+      {statusMark}
       <span className="toolcall__kind">{kindLabel}</span>
       <span className="toolcall__title">{summary}</span>
       {durationLabel && (
+          <span
+            className="toolcall__duration"
+            data-testid="toolcall-duration"
+            data-duration-ms={elapsedMs ?? 0}
+          >
+            {durationLabel}
+          </span>
+        )}
+      {canToggleInline && (
         <span
-          className="toolcall__duration"
-          data-testid="toolcall-duration"
-          data-duration-ms={elapsedMs ?? 0}
+          className="toolcall__expand-toggle"
+          onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
+          title="内联展开"
+          data-testid="toolcall-expand"
         >
-          {durationLabel}
+          ▾
         </span>
       )}
-      <span className={"toolcall__status-mark toolcall__status-mark--" + tc.status}>
-        {statusMark}
-      </span>
     </button>
   );
 }

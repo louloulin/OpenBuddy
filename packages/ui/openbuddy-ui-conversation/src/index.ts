@@ -29,6 +29,8 @@ import type { ConversationApprovalProps } from "./conversation-approvals";
 export type { SlotMap };
 
 export { ChatView } from "./ChatView";
+export { ChatShortcutOverlay, CHAT_SHORTCUTS } from "./chatview/ChatShortcutOverlay";
+export type { ChatShortcutOverlayProps } from "./chatview/ChatShortcutOverlay";
 export { ChatRail } from "./ChatRail";
 export { ChatMinimap, minimapColor } from "./ChatMinimap";
 export type { ChatMinimapProps, ChatMinimapSegment, ChatMinimapSegmentKind } from "./ChatMinimap";
