@@ -1,6 +1,10 @@
 /**
  * @openbuddy/payment · 支付通道适配器
  *
+ * ⚠️ NOT WIRED — 本包无任何外部消费者，全仓仅被自身文档注释提及。
+ *    pnpm-workspace glob 修正后已是正式 workspace 成员（可 typecheck/test），
+ *    但仍未被任何调用方 import。详见 packages/README.md § 未接线包。
+ *
  * 目标：把 OpenBuddy Resource Gateway 的 HMAC 支付回调契约
  *      适配到具体支付通道（Stripe / WeChat Pay / Alipay）。
  *

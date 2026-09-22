@@ -1,6 +1,10 @@
 /**
  * @openbuddy/webhook-outbox · 持久化 webhook 重试队列
  *
+ * ⚠️ NOT WIRED — 本包无任何外部消费者，全仓仅被自身文档注释提及。
+ *    pnpm-workspace glob 修正后已是正式 workspace 成员（可 typecheck/test），
+ *    但仍未被任何调用方 import。详见 packages/README.md § 未接线包。
+ *
  * 问题：Casdoor → Gateway webhook 幂等但不持久化重试队列；SIEM/审计/支付回调
  *       一旦网络抖动就丢消息。生产必须 Outbox + 指数回退。
  *

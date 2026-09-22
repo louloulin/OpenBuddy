@@ -1,6 +1,10 @@
 /**
  * @openbuddy/scim · SCIM v2 端点
  *
+ * ⚠️ NOT WIRED — 本包无任何外部消费者，全仓仅被自身文档注释提及。
+ *    pnpm-workspace glob 修正后已是正式 workspace 成员（可 typecheck/test），
+ *    但仍未被任何调用方 import。详见 packages/README.md § 未接线包。
+ *
  * 适用场景：
  *   - 企业 IdP（Okta / Azure AD / OneLogin）自动同步用户/组到 Casdoor
  *   - 离职/转岗自动撤销 OpenBuddy 访问

@@ -49,15 +49,21 @@ packages:
   - 'packages/collaboration/*'
   - 'packages/core/*'
   - 'packages/fs/*'
-  - 'packages/payment/*'
+  # Flat packages: their `package.json` sits directly in
+  # `packages/<name>/`. A `packages/<name>/*` glob matches only their
+  # SUBDIRECTORIES (e.g. `src`), never the package itself, so these four
+  # were silently excluded from the workspace (0 refs in `pnpm-lock.yaml`,
+  # no `node_modules/@openbuddy/<name>` link). Bare directory globs below
+  # are what actually match a flat package.
+  - 'packages/payment'
   - 'packages/renderer/*'
   - 'packages/runtime/*'
-  - 'packages/saml/*'
-  - 'packages/scim/*'
+  - 'packages/saml'
+  - 'packages/scim'
   - 'packages/shared/*'
   - 'packages/team/*'
   - 'packages/ui/*'
-  - 'packages/webhook-outbox/*'
+  - 'packages/webhook-outbox'
 
 allowBuilds:
   '@google/genai': true

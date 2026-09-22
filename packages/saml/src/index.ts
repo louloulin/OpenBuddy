@@ -1,6 +1,10 @@
 /**
  * @openbuddy/saml · SAML 2.0 SSO 适配器
  *
+ * ⚠️ NOT WIRED — 本包无任何外部消费者，全仓仅被自身文档注释提及。
+ *    pnpm-workspace glob 修正后已是正式 workspace 成员（可 typecheck/test），
+ *    但仍未被任何调用方 import。详见 packages/README.md § 未接线包。
+ *
  * 适用场景：
  *   - 企业已有 SAML 2.0 IdP（Okta / Azure AD / OneLogin / Ping / 自建）
  *   - WorkBuddy / Code42 / 飞书 等产品的 SSO 集成
