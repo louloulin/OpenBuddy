@@ -154,7 +154,7 @@ describe("wrapper 的返回值形状 == UI 会读的字段", () => {
     await installPiMarket({ id: "demo.one", version: "1.1.0" });
     const result = await uninstallPiMarket({ id: "demo.one" });
     expect(result).toMatchObject({ id: "demo.one", version: "1.1.0", payloadKept: false });
-    expect(result.removedVersions.sort()).toEqual(["1.0.0", "1.1.0"]);
+    expect(result.removedVersions.slice().sort()).toEqual(["1.0.0", "1.1.0"]);
 
     const lock = await lockfilePiMarket();
     expect(Object.keys(lock.extensions)).toEqual([]);

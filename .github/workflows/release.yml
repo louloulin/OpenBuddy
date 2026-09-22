@@ -70,10 +70,11 @@ jobs:
         run: pnpm workspace:typecheck
 
       # Renderer + unit-test suite. This suite has known pre-existing
-      # failures (WIP version bump to 0.15.0 + SDK drift) unrelated to
-      # packaging, so we run it best-effort: a failure is reported in the
-      # run summary but does not block the platform builds that follow.
-      # Once `pnpm test` is green again, drop `continue-on-error: true`.
+      # failures (a handful of `@openbuddy/*` subpath aliases that Vitest
+      # cannot resolve from inside `packages/ui/*`) unrelated to packaging,
+      # so we run it best-effort: a failure is reported in the run summary
+      # but does not block the platform builds that follow. Once `pnpm test`
+      # is green again, drop `continue-on-error: true`.
       - name: Renderer tests (best-effort)
         if: ${{ always() }}
         continue-on-error: true
@@ -271,6 +272,7 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           sparse-checkout: |
             CHANGELOG.md
+            scripts/extract-release-notes.mjs
 
       - name: Download all artifacts
         uses: actions/download-artifact@v8
@@ -290,17 +292,10 @@ jobs:
         run: |
             set -euo pipefail
             TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
-            VER="${TAG#v}"
-            NOTES=""
-            if [[ -f CHANGELOG.md ]]; then
-              NOTES="$(awk -v ver="## ${TAG#v}" '
-                $0 ~ "^## v" {
-                  if (found) exit
-                  if (index($0, ver) == 1) { found = 1; next }
-                }
-                found { print }
-              ' CHANGELOG.md | sed '/^---$/d' | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba} -e '}')"
-            fi
+            # `scripts/extract-release-notes.mjs` 按 CHANGELOG 的真实标题层级
+            # (H3) 匹配,并跳过段落里的历史里程碑小节;此前的内联 awk 写的是
+            # `^## v`(H2),永远匹配不到,正文只能退化成提交列表。
+            NOTES="$(node scripts/extract-release-notes.mjs "${TAG}" 2>/dev/null || true)"
             {
               echo "body<<RELEASE_NOTES_EOF"
               if [[ -n "$NOTES" ]]; then

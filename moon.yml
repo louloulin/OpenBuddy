@@ -9,7 +9,7 @@ fileGroups:
     - "electron/**/*"
     # The Electron renderer resolves workspace packages from source. Keep
     # their implementation files in the application build hash so a renderer
-    # host change cannot be hidden behind a stale `out/` bundle.
+    # host change cannot be hidden behind a stale `dist/` bundle.
     - "packages/renderer/openbuddy-renderer-host/src/**/*"
     - "packages/ui/**/src/**/*"
     - "packages/bundle/openbuddy-base/src/**/*"
@@ -39,13 +39,13 @@ tasks:
   # root tsconfig. Cascades to `app-desktop:typecheck` so the electron main
   # + preload TypeScript in `electron/{main,preload}/**` is also checked.
   #
-  # 2026-09 改造:`tsc --noEmit` 改为 `tsc -b`(solution-style + composite)。
-  #   - 根 tsconfig.json 是 solution-style:files:[] + references 列全部工作区包
-  #   - 每个工作区包 tsconfig.json 是 composite:true,产出 .d.ts 到 ./dist/.types
-  #   - tsc -b 走增量构建,只在 .tsbuildinfo 失效时重编译对应包
-  #   - 错误码 0/1 与原 --noEmit 兼容
+  # 2026-09 改造:`tsc -b` (solution-style) 退回 `tsc --noEmit`。原因:
+  #   - 每个 packages/*/tsconfig.json 极简 extends package-base.json,
+  #     未开启 composite:true,无法作为 `references` 子项目被 tsc -b 接受(TS6306/TS6310)
+  #   - 根 tsc 单 project 走 --noEmit,依赖 paths 解析跨包源码,等价于 --noEmit 的全量类型检查
+  #   - 增量构建收益改由 vite-tsconfig-paths 单源 paths 取得(新增包仅改 tsconfig.json 一处)
   typecheck:
-    script: "./node_modules/.bin/tsc -b"
+    script: "./node_modules/.bin/tsc --noEmit"
     deps:
       - "app-desktop:typecheck"
     inputs:
@@ -54,11 +54,10 @@ tasks:
       - "package.json"
     outputs: []
 
-  # Lint is the same effective command as typecheck (tsc -b 在 solution-style
-  # 模式下做增量构建并校验类型,无 emit 行为等价于 --noEmit)。Kept as a separate
-  # task so CI / `pnpm lint` can target it specifically.
+  # Lint is the same effective command as typecheck (both run `tsc --noEmit`).
+  # Kept as a separate task so CI / `pnpm lint` can target it specifically.
   lint:
-    script: "./node_modules/.bin/tsc -b"
+    script: "./node_modules/.bin/tsc --noEmit"
     deps:
       - "app-desktop:lint"
     inputs:
@@ -99,10 +98,10 @@ tasks:
       - "electron.vite.config.ts"
       - "index.html"
     outputs:
-      - "out"
+      - "dist"
 
   # Alias kept for callers that previously expected a flat renderer build
-  # task. Produces the same `out/` as `build.bundle`; the renderer is the
+  # task. Produces the same `dist/` as `build.bundle`; the renderer is the
   # largest bundle so it dominates wall time.
   build.renderer:
     script: "./node_modules/.bin/electron-vite build"
@@ -111,7 +110,7 @@ tasks:
       - "electron.vite.config.ts"
       - "index.html"
     outputs:
-      - "out"
+      - "dist"
     options:
       runInCI: true
 
@@ -147,7 +146,7 @@ tasks:
       persistent: true
       cache: false
     inputs:
-      - "out/**/*"
+      - "dist/**/*"
       - "package.json"
 
   electron.smoke:
@@ -158,7 +157,7 @@ tasks:
       cache: false
     inputs:
       - "scripts/electron/smoke.mjs"
-      - "out/**/*"
+      - "dist/**/*"
       - "package.json"
 
   electron.harness-smoke:
@@ -169,7 +168,7 @@ tasks:
       cache: false
     inputs:
       - "scripts/electron/harness-smoke.mjs"
-      - "out/**/*"
+      - "dist/**/*"
       - "package.json"
 
   electron.build:
@@ -179,7 +178,7 @@ tasks:
     inputs:
       - "scripts/electron-builder.sh"
       - "electron-builder.yml"
-      - "out/**/*"
+      - "dist/**/*"
       - "package.json"
     outputs:
       - "release"
@@ -201,7 +200,7 @@ tasks:
       - "scripts/check-macos-signing.mjs"
       - "scripts/electron-builder.sh"
       - "electron-builder.yml"
-      - "out/**/*"
+      - "dist/**/*"
       - "package.json"
     outputs:
       - "release"
@@ -225,7 +224,7 @@ tasks:
     inputs:
       - "scripts/electron-builder.sh"
       - "electron-builder.yml"
-      - "out/**/*"
+      - "dist/**/*"
       - "package.json"
     outputs:
       - "release"
@@ -239,7 +238,7 @@ tasks:
     inputs:
       - "scripts/electron-builder.sh"
       - "electron-builder.yml"
-      - "out/**/*"
+      - "dist/**/*"
       - "package.json"
     outputs:
       - "release"
@@ -253,7 +252,7 @@ tasks:
     inputs:
       - "scripts/electron-builder.sh"
       - "electron-builder.yml"
-      - "out/**/*"
+      - "dist/**/*"
       - "package.json"
     outputs:
       - "release"

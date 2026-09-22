@@ -46,19 +46,35 @@ For patches, work directly on `master`.
 
 #### 2. Bump versions
 
-Edit version numbers in:
-
-- `package.json` (root)
-- `packages/*/*/package.json` (each package)
-- `apps/*/package.json`
-- `electron-builder.yml` (if relevant)
+One command — `scripts/bump-version.mjs` is the single source of truth for every
+place the version is consumed (74 workspace `package.json` manifests, the Electron
+main-process `hostVersion`, the website JSON-LD / installer filenames / i18n chips,
+the example plugin manifests, and the DMG + onboarding probes):
 
 ```bash
-# Use moon's bump task (planned)
-pnpm moon:version v0.15.0
+# Preview every file that would change (no writes)
+pnpm version:bump:dry 0.16.0
+
+# Apply, then self-check
+pnpm version:bump 0.16.0
+
+# What is the current version?
+pnpm version:current
 ```
 
-For now, do it manually and use `pnpm -r --filter @openbuddy/* version X.Y.Z`.
+The script exits non-zero if a write silently fails to land, so a partial bump
+cannot slip through. Test fixtures under `__fixtures__/` and `tests/fixtures/`
+are deliberately left on the old version — they are the "old plugin" samples the
+marketplace E2E asserts against.
+
+Then add the release section to [`CHANGELOG.md`](../CHANGELOG.md) (step 3). The
+GitHub Release body is extracted from it by
+`scripts/extract-release-notes.mjs`, which matches the CHANGELOG's real heading
+depth (`### vX.Y.Z`) and stops before the historical milestone subsections:
+
+```bash
+pnpm release:notes v0.16.0   # print the release body for this tag
+```
 
 #### 3. Update CHANGELOG.md
 
@@ -186,13 +202,15 @@ For critical security issues:
 | `gh workflow run release.yml` | Trigger release workflow |
 | `gh release download` | Download artifacts |
 | `gh release edit` | Edit release body |
-| `pnpm moon:version` | Bump versions (planned) |
+| `pnpm version:bump <x.y.z>` | Bump the version across every consumer (+ `:dry` to preview) |
+| `pnpm version:current` | Print the current version |
+| `pnpm release:notes <tag>` | Extract a CHANGELOG section for the GitHub Release body |
 | `bash scripts/build-release-bundle.sh` | Build release artifacts + extract CHANGELOG |
 
 ### Release checklist (quick)
 
 ```
-[ ] Version bumped in package.json × N
+[ ] Version bumped via `pnpm version:bump X.Y.Z` (covers package.json × N + hostVersion + site + probes)
 [ ] CHANGELOG.md updated with new section
 [ ] Local typecheck + tests + smoke pass
 [ ] gh workflow run release.yml -f tag=vX.Y.Z

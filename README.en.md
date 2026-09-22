@@ -169,7 +169,7 @@ System tray, native notifications, deep links (`casdoor://`), clipboard integrat
 >
 > Reproduce locally:
 > ```bash
-> pnpm build                 # compile out/main + out/renderer
+> pnpm build                 # compile dist/main + dist/renderer
 > # one-time: put real-LLM keys in .env.e2e.local (gitignored)
 > pnpm docs:screenshots      # regenerates docs/screenshots/01..07 from the live renderer
 > ```

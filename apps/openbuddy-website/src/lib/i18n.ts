@@ -9,6 +9,7 @@
  */
 
 import { SITE_LICENSE, SITE_STATS } from './constants';
+import { SITE_VERSION, SITE_VERSION_TAG } from './site-version';
 
 export type Locale = 'en' | 'zh-CN';
 
@@ -289,7 +290,7 @@ const en: Dict = {
     hintClose: 'close'
   },
   hero: {
-    chip: `v0.15.0 · MIT licensed · ${SITE_STATS.testFiles} test files`,
+    chip: `${SITE_VERSION_TAG} · MIT licensed · ${SITE_STATS.testFiles} test files`,
     titlePre: 'The open desktop',
     titleHighlight: 'AI workspace',
     titlePost: 'you can actually read, fork, and own.',
@@ -896,7 +897,7 @@ const en: Dict = {
     copied: 'Copied'
   },
   installBlock: {
-    installLabel: 'install · v0.15.0',
+    installLabel: `install · ${SITE_VERSION_TAG}`,
     installHint: 'Other platforms, see Getting Started →',
     platform: 'macOS',
     installCommand: 'brew tap louloulin/openbuddy && brew install --cask openbuddy',
@@ -998,7 +999,7 @@ const zhCN: Dict = {
     hintClose: '关闭'
   },
   hero: {
-    chip: `v0.15.0 · MIT 协议 · ${SITE_STATS.testFiles} 个测试文件`,
+    chip: `${SITE_VERSION_TAG} · MIT 协议 · ${SITE_STATS.testFiles} 个测试文件`,
     titlePre: '开源的桌面',
     titleHighlight: 'AI 工作台,',
     titlePost: '你可以真正阅读、fork 并拥有。',
@@ -1518,7 +1519,7 @@ const zhCN: Dict = {
     copied: '已复制'
   },
   installBlock: {
-    installLabel: '安装 · v0.15.0',
+    installLabel: `安装 · ${SITE_VERSION_TAG}`,
     installHint: '其他平台 → 见 Getting Started',
     platform: 'macOS',
     installCommand: 'brew tap louloulin/openbuddy && brew install --cask openbuddy',

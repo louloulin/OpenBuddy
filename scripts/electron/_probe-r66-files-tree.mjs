@@ -77,7 +77,7 @@ try {
   let filesTreeInBundle = false;
   let lazyFileTreeInSource = false;
   try {
-    const indexJs = execSync("ls out/renderer/assets/index-*.js", { cwd: root, encoding: "utf8" }).trim().split("\n")[0];
+    const indexJs = execSync("ls dist/renderer/assets/index-*.js", { cwd: root, encoding: "utf8" }).trim().split("\n")[0];
     const bundle = readFileSync(join(root, indexJs), "utf8");
     lazyFileTreeInBundle = bundle.includes("LazyFileTree");
     filesTreeInBundle = bundle.includes('"files.tree"') || bundle.includes("files.tree");

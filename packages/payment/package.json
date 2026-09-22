@@ -1,6 +1,6 @@
 {
   "name": "@openbuddy/payment",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "type": "module",
   "description": "OpenBuddy 支付通道适配器（Stripe · WeChat Pay · Alipay · 平台无关 HMAC）",

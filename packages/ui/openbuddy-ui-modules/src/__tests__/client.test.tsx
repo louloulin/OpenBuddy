@@ -23,6 +23,7 @@ function fakeContext() {
     },
     inject: () => () => {},
     entries: () => [],
+    entriesOfSlot: () => [],
     spec: () => undefined,
   };
   return { ctx: { slots } as unknown as UiRuntimeContext, registrations, disposed };

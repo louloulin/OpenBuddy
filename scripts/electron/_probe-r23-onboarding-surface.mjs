@@ -102,7 +102,7 @@ try {
   }));
   step(
     "关闭后卡片消失 + 记录版本",
-    afterDismiss.stillThere === false && afterDismiss.lastSeen === "0.15.0",
+    afterDismiss.stillThere === false && afterDismiss.lastSeen === "0.16.0",
     afterDismiss,
   );
 

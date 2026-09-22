@@ -5,6 +5,7 @@ import CopyButton from '@/components/CopyButton';
 import Reveal from '@/components/motion/Reveal';
 import { PageHeader, SectionHeader } from '@/components/PageHeader';
 import { SITE_STATS } from '@/lib/constants';
+import { SITE_VERSION } from '@/lib/site-version';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import { localizedPath } from '@/lib/i18n';
 import Link from 'next/link';
@@ -20,15 +21,15 @@ interface DownloadPlatform {
 }
 
 const PLATFORMS_EN: DownloadPlatform[] = [
-  { icon: Apple, name: 'macOS', file: 'OpenBuddy-0.15.0-macOS.dmg', size: '124 MB', arch: 'Apple Silicon & Intel', installHint: 'Open the .dmg and drag OpenBuddy.app to /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Monitor, name: 'Windows', file: 'OpenBuddy-0.15.0-win-x64.exe', size: '108 MB', arch: 'x64 · NSIS installer', installHint: 'Run the installer. SmartScreen warning? Click "More info" → "Run anyway".', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Terminal, name: 'Linux', file: 'openbuddy_0.15.0_amd64.deb', size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: 'sudo dpkg -i openbuddy_0.15.0_amd64.deb · or run the AppImage directly', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
+  { icon: Apple, name: 'macOS', file: `OpenBuddy-${SITE_VERSION}-macOS.dmg`, size: '124 MB', arch: 'Apple Silicon & Intel', installHint: 'Open the .dmg and drag OpenBuddy.app to /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Monitor, name: 'Windows', file: `OpenBuddy-${SITE_VERSION}-win-x64.exe`, size: '108 MB', arch: 'x64 · NSIS installer', installHint: 'Run the installer. SmartScreen warning? Click "More info" → "Run anyway".', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Terminal, name: 'Linux', file: `openbuddy_${SITE_VERSION}_amd64.deb`, size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: `sudo dpkg -i openbuddy_${SITE_VERSION}_amd64.deb · or run the AppImage directly`, downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
 ];
 
 const PLATFORMS_ZH: DownloadPlatform[] = [
-  { icon: Apple, name: 'macOS', file: 'OpenBuddy-0.15.0-macOS.dmg', size: '124 MB', arch: 'Apple Silicon & Intel', installHint: '打开 .dmg,将 OpenBuddy.app 拖入 /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Monitor, name: 'Windows', file: 'OpenBuddy-0.15.0-win-x64.exe', size: '108 MB', arch: 'x64 · NSIS 安装器', installHint: '运行安装器。SmartScreen 警告?点击"更多信息" → "仍要运行"。', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Terminal, name: 'Linux', file: 'openbuddy_0.15.0_amd64.deb', size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: 'sudo dpkg -i openbuddy_0.15.0_amd64.deb · 或直接运行 AppImage', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
+  { icon: Apple, name: 'macOS', file: `OpenBuddy-${SITE_VERSION}-macOS.dmg`, size: '124 MB', arch: 'Apple Silicon & Intel', installHint: '打开 .dmg,将 OpenBuddy.app 拖入 /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Monitor, name: 'Windows', file: `OpenBuddy-${SITE_VERSION}-win-x64.exe`, size: '108 MB', arch: 'x64 · NSIS 安装器', installHint: '运行安装器。SmartScreen 警告?点击"更多信息" → "仍要运行"。', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
+  { icon: Terminal, name: 'Linux', file: `openbuddy_${SITE_VERSION}_amd64.deb`, size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: `sudo dpkg -i openbuddy_${SITE_VERSION}_amd64.deb · 或直接运行 AppImage`, downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
 ];
 
 const COPY_EN = {

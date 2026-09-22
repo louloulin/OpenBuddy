@@ -170,7 +170,7 @@ describe("createEmailDataProvider", () => {
 
   describe("triage", () => {
     it("把 suggestion category 映射到 chip", async () => {
-      const snapshot: EmailTriageSnapshot = {
+      const snapshot = {
         items: [
           { threadId: "t1", category: "priority", score: 0.9 },
           { threadId: "t2", category: "reply", score: 0.85 },

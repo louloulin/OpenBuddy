@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const APP_EXEC = "/Volumes/OpenBuddy 0.15.0-arm64/OpenBuddy.app/Contents/MacOS/OpenBuddy";
+const APP_EXEC = "/Volumes/OpenBuddy 0.16.0-arm64/OpenBuddy.app/Contents/MacOS/OpenBuddy";
 const ROOT = "/Users/louloulin/appx/OpenBuddy";
 const SHOT_DIR = "/Users/louloulin/.codex/visualizations/2026/09/21/01a0c1f8-2ad3-7cb3-9840-907fe43f8964";
 

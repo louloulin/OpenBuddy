@@ -815,7 +815,7 @@ import { app } from "electron";
 registerAuditIpc(getWindow);
 registerPiBridgeIpc();
 const dataDir = app.getPath("userData");
-const piMarketBridge = createPiMarketBridge({ dataDir, hostVersion: "0.15.0" });
+const piMarketBridge = createPiMarketBridge({ dataDir, hostVersion: "0.16.0" });
 registerPiMarketBridgeIpc(piMarketBridge, ipcMain);
 ```
 

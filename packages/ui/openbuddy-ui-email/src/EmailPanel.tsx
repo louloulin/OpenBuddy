@@ -104,7 +104,6 @@ import { useProjectsStore } from "@/stores/projects-store";
 import { collectEmailContacts } from "@/lib/email/email-contacts";
 import { sanitizeEmailHtml } from "./lib/safe-email-html";
 
-const AI_DRAFT_CONTEXT_KEY = "openbuddy.email.ai-draft-context";
 
 type PendingConfirm = {
   title: string;

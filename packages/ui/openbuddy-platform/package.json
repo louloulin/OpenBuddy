@@ -1,6 +1,6 @@
 {
   "name": "@openbuddy/platform",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "type": "module",
   "description": "渲染层平台能力契约面（platform / files / security / email / billing / collaboration / notify）",

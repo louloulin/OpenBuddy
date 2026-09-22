@@ -1,6 +1,6 @@
 {
   "name": "@openbuddy/ui-state",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "type": "module",
   "description": "渲染层共享状态（stores）契约面（阶段2 反向依赖收敛目标）",

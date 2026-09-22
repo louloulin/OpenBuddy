@@ -63,7 +63,7 @@ describe.skipIf(!canLaunch)("live electron probe: R62+ 后三个 onboarding 槽�
     expect(probe.pageErrors).toEqual([]);
     expect(stepOk(probe, "whats-new 卡片出现")).toBe(true);
     expect(stepOk(probe, "whats-new 有版本号与条目")).toBe(true);
-    expect(probe.whatsNew.version).toContain("0.15.0");
+    expect(probe.whatsNew.version).toContain("0.16.0");
     expect(probe.whatsNew.itemCount).toBeGreaterThan(0);
     expect(stepOk(probe, "关闭后卡片消失 + 记录版本")).toBe(true);
   });

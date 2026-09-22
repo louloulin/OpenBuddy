@@ -158,7 +158,7 @@ chore(deps): 升级 cordis 到 3.18.1
 
 OpenBuddy 使用[语义化版本](https://semver.org/),每 2–4 周发布一次。发布流程完全由 `.github/workflows/release.yml` 自动化:
 
-1. 维护者用 `workflow_dispatch` 触发,填入新 tag(如 `v0.15.0`)。
+1. 维护者用 `workflow_dispatch` 触发,填入新 tag(如 `v0.16.0`)。
 2. CI 跑全部 moon 工程的 typecheck + tests。
 3. CI 构建 Windows NSIS+MSI、macOS DMG(签名)、Linux AppImage+deb。
 4. CI 用 `CHANGELOG.md` 抽取的内容发布草稿 GitHub Release。

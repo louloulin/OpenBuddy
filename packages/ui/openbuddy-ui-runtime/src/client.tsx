@@ -292,8 +292,9 @@ export function __makeTestSlotCore(): SlotCoreHandle {
 
 let builtinDisposer: (() => void) | null = null;
 
-export function SlotProvider({ children }: { children: ReactNode }) {
-  const runtime = useMemo(() => getOrCreateSingleton(), []);
+export function SlotProvider({ children, runtime: runtimeProp }: { children: ReactNode; runtime?: UiRuntime }) {
+  // 测试可注入 runtime prop(单例由 getOrCreateSingleton 提供);默认走单例。
+  const runtime = useMemo(() => runtimeProp ?? getOrCreateSingleton(), [runtimeProp]);
   useEffect(() => {
     if (builtinRegistered) return;
     builtinRegistered = true;

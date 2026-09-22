@@ -10,6 +10,7 @@ function makeProvider(overrides: Partial<EmailDataProvider> = {}): EmailDataProv
     counts: overrides.counts ?? vi.fn().mockImplementation(async () => ({
       today: 0, later: 0, done: 0, inbox: 0, drafts: 0, scheduled: 0, snoozed: 0,
     })),
+    triage: overrides.triage ?? vi.fn().mockImplementation(async () => ({})),
     ...overrides,
   };
 }

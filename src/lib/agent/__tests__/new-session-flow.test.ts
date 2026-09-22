@@ -393,7 +393,7 @@ describe("composeDiscoverBody", () => {
       description: "简介",
       scope: "user",
       raw: undefined,
-    } as Parameters<typeof composeDiscoverBody>[1];
+    } as unknown as Parameters<typeof composeDiscoverBody>[1];
     const body = composeDiscoverBody("用户问题", agent);
     expect(body).toContain("【角色设定 — 专家甲】");
     expect(body).toContain("简介");
@@ -407,7 +407,7 @@ describe("composeDiscoverBody", () => {
       description: "",
       scope: "user",
       raw: "---\nname: X\n---\n\nactual body",
-    } as Parameters<typeof composeDiscoverBody>[1];
+    } as unknown as Parameters<typeof composeDiscoverBody>[1];
     const body = composeDiscoverBody("q", agent);
     expect(body).toContain("actual body");
     expect(body).not.toContain("name: X");

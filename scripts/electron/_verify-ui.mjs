@@ -10,7 +10,7 @@ mkdirSync(outDir, { recursive: true });
 const electronPath = join(root, "node_modules", ".bin", "electron");
 const app = await electron.launch({
   executablePath: electronPath,
-  args: [join(root, "out/main/index.js")],
+  args: [join(root, "dist/main/index.js")],
   cwd: root,
 });
 

@@ -8,8 +8,11 @@
  */
 import type { ChatMessage } from "@/stores/session-store";
 
-/** 带可选元数据的消息(前向兼容:缺省字段视为不存在)。 */
-export type TimelineMessage = ChatMessage & {
+/** 带可选元数据的消息(前向兼容:缺省字段视为不存在)。
+ *  createdAt 用 Omit 重写:ChatMessage.createdAt 是 number,但 timeline-utils
+ *  兼容 ISO 字符串时间戳(string),否则 Omit 后再 & 会把类型交叉退化为 number。
+ */
+export type TimelineMessage = Omit<ChatMessage, "createdAt"> & {
   modelId?: string;
   createdAt?: string | number;
 };

@@ -2,9 +2,9 @@
  * electron-vite configuration for OpenBuddy.
  *
  * Three bundles:
- *   - main:    `electron/main/index.ts` → `out/main/index.js`    (ESM, electron 28+)
- *   - preload: `electron/preload/index.ts` → `out/preload/index.js` (CJS, contextBridge)
- *   - renderer: repo-root `index.html` + `src/` → `out/renderer/index.html` (ESM, Vite + React)
+ *   - main:    `electron/main/index.ts` → `dist/main/index.js`    (ESM, electron 28+)
+ *   - preload: `electron/preload/index.ts` → `dist/preload/index.js` (CJS, contextBridge)
+ *   - renderer: repo-root `index.html` + `src/` → `dist/renderer/index.html` (ESM, Vite + React)
  *
  * Workspace package strategy:
  *   - The 17 `@openbuddy/*` packages live in `packages/<group>/<pkg>/src/index.ts`. We
@@ -18,7 +18,7 @@
  *     AND use `rollupOptions.external` with a tight allow-list of just
  *     `electron` + `node:*` + the Pi SDK. Everything else - workspace
  *     packages AND runtime deps like react / katex / mermaid / pi-coding-agent
- *     - gets bundled into `out/main/index.js` so the runtime never has to
+ *     - gets bundled into `dist/main/index.js` so the runtime never has to
  *     resolve them.
  *   - Main-process workspace dependencies are bundled into the generated
  *     chunks. Dynamic imports stay as relative chunks so the agent host and
@@ -54,14 +54,12 @@ const repoRoot = import.meta.dirname;
 // 替代 50+ 个手写 alias 条目。这是 vite-tsconfig-paths 插件的等效内联
 // 实现,保留 electron-vite 兼容(main / preload 走 electron-vite wrapper)。
 import { readFileSync } from "node:fs";
+import ts from "typescript";
 function loadTsconfigAliases(repoRoot: string): Record<string, string> {
   const tsconfigPath = resolve(repoRoot, "tsconfig.json");
-  const raw = JSON.parse(
-    readFileSync(tsconfigPath, "utf8")
-      // Strip JSONC comments for parsing
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/[^\n]*/g, "")
-  );
+  const parsed = ts.parseConfigFileTextToJson(tsconfigPath, readFileSync(tsconfigPath, "utf8"), true);
+  if (parsed.error) throw new Error("Failed to parse " + tsconfigPath + ": " + parsed.error.messageText);
+  const raw = parsed.config;
   const paths = raw?.compilerOptions?.paths ?? {};
   const out: Record<string, string> = {};
   for (const [alias, targets] of Object.entries(paths)) {
@@ -449,8 +447,9 @@ export default defineConfig({
   // mermaid, etc.) stays externalized and is loaded from node_modules.
   // ---------------------------------------------------------------------------
   main: {
+    plugins: [tsconfigPaths()],
     build: {
-      outDir: "out/main",
+      outDir: "dist/main",
       lib: {
         entry: resolve(repoRoot, "electron/main/index.ts"),
         formats: ["es"],
@@ -461,7 +460,7 @@ export default defineConfig({
       // workspace packages end up as bare imports at runtime.
       externalizeDeps: false,
       rollupOptions: {
-        // Anything not in this list gets bundled into out/main/index.js.
+        // Anything not in this list gets bundled into dist/main/index.js.
         // We keep only the Electron runtime + Node built-ins external;
         // everything else — including all `@openbuddy/*` workspace
         // packages that alias to `.ts` source — is inlined because
@@ -606,9 +605,6 @@ export default defineConfig({
         },
       },
     },
-    resolve: {
-      alias: workspacePackageAliases,  // 由 vite-tsconfig-paths 插件自动注入(workspacePackageAliases 留作兼容占位)
-    },
   },
 
   // ---------------------------------------------------------------------------
@@ -617,8 +613,9 @@ export default defineConfig({
   // `@openbuddy/*` import that preload does gets inlined.
   // ---------------------------------------------------------------------------
   preload: {
+    plugins: [tsconfigPaths()],
     build: {
-      outDir: "out/preload",
+      outDir: "dist/preload",
       lib: {
         entry: resolve(repoRoot, "electron/preload/index.ts"),
         formats: ["cjs"],
@@ -631,9 +628,6 @@ export default defineConfig({
         ],
       },
     },
-    resolve: {
-      alias: workspacePackageAliases,  // 由 vite-tsconfig-paths 插件自动注入(workspacePackageAliases 留作兼容占位)
-    },
   },
 
   // ---------------------------------------------------------------------------
@@ -643,12 +637,15 @@ export default defineConfig({
   // externalizeDeps.exclude because Vite bundles everything by default.
   // ---------------------------------------------------------------------------
   renderer: {
-    plugins: [tsconfigPaths()],
+    // plugins: see below — `react()` + `nodeExternalPatch()` must come first
+    // so the JSX transform and Node-built-in shim land before module graph is
+    // built. `tsconfigPaths()` is registered inside the `vite-tsconfig-paths`
+    // plugin to keep alias resolution single-source.
 
     root: repoRoot,
     base: "./",
     build: {
-      outDir: "out/renderer",
+      outDir: "dist/renderer",
       // P0-02: Disable Vite's __vitePreload() polyfill wrapper AND filter out
       // heavy chunks from the auto-generated <link rel="modulepreload">
       // tags. The polyfill stop alone doesn't prevent Vite from emitting

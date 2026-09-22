@@ -8,16 +8,46 @@
  *
  * `vite-tsconfig-paths` 同时被 vite.config.ts 和 electron.vite.config.ts 使用,
  * 三个配置文件共享同一份 tsconfig.json paths 作为单一来源。
+ *
+ * 环境策略:
+ *   - 默认 jsdom — React DOM / window.localStorage / document 等 DOM API 测试必需
+ *   - bin/ 和 tests/integration/ 走 node — 避免 jsdom 开销,允许 child_process
+ *   - 单一 setup 文件(`src/test-setup.ts`) — jsdom 全局 mock,vi globals
  */
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
+
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     include: ["src/**/__tests__/**/*.{test,spec}.{ts,tsx}", "packages/**/__tests__/**/*.{test,spec}.{ts,tsx}"],
-    exclude: ["**/node_modules/**", "**/dist/**"],
-    environment: "node",
-    globals: false,
+    exclude: [
+      "**/node_modules/**",
+      "**/.worktrees/**",
+      "**/dist/**",
+      "tests/electron/**",
+      // `scripts/perf/*.test.mjs` use `node:test` and run via `pnpm perf:cold-start:test`.
+      // Vitest cannot discover their suites (no `describe/it` API surface), so we keep
+      // them out of the vitest discovery pass to avoid a noisy "No test suite found" failure.
+      "scripts/perf/**/*.test.mjs",
+      // `scripts/electron/_*.test.mjs` are vitest wrappers around live-Electron
+      // probes: they spawn a real Electron process against the packaged app, so
+      // Vitest must not collect them. They are driven via moon/scripts instead.
+      "scripts/electron/_*.test.mjs",
+    ],
+    globals: true,
+    environment: "jsdom",
+    setupFiles: [resolve(__dirname, "src/test-setup.ts")],
+    css: false,
+    // Mark `bin/__tests__/**` and `tests/integration/**` as node-environment so
+    // the file-system + child-process helpers work without jsdom overhead.
+    environmentMatchGlobs: [
+      ["bin/__tests__/**", "node"],
+      ["tests/integration/**", "node"],
+    ],
   },
 });

@@ -1148,7 +1148,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	const piMarketResolved = await resolvePiMarketSourcesDetailed({ dataDir });
 	const piMarketBridge = createPiMarketBridge({
 		dataDir,
-		hostVersion: "0.15.0",
+		hostVersion: app.getVersion(),
 		sources: piMarketResolved.readonly,
 		fileSources: piMarketResolved.file,
 	});

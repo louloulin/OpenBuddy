@@ -8,7 +8,7 @@
 
 ## 🇨🇳 简体中文 · 文档入口
 
-> 📅 最近一次全面核验:2026-09-05 · 📦 对应版本:`0.15.0` · 🌿 git HEAD:`a9d240ff feat(pi-observability): forward session_tree / session_before_fork / provider hooks`
+> 📅 最近一次全面核验:2026-09-22 · 📦 对应版本:`0.16.0` · 🌿 git HEAD:`23f91d8 refactor(tsconfig): collapse per-package paths into tsconfig.package-base.json + vite-tsconfig-paths`
 
 ### 🚀 30 秒速览
 
@@ -156,7 +156,7 @@
 ### 💼 商业模式
 
 - [`openbuddy-commercial-model.md`](openbuddy-commercial-model.md) — 商业模式
-- [`publish-checklist-v0.15.0.md`](publish-checklist-v0.15.0.md) — v0.15.0 发布清单
+- [`publish-checklist-v0.15.0.md`](publish-checklist-v0.15.0.md) — 企业/服务端发布清单(离线 bundle 推到生产主机)
 
 ### 🌏 社区
 

@@ -2,7 +2,7 @@
 /**
  * P2-11 — Bundle topology + perf-budget gate.
  *
- * Reads the renderer build output (out/renderer/assets/*.js) and asserts:
+ * Reads the renderer build output (dist/renderer/assets/*.js) and asserts:
  *   - Entry chunk ≤ 1.5 MB (was 3.1 MB before perf work)
  *   - Heavy chunks (markdown / katex / mermaid) are only loaded lazily
  *     (their chunk files exist but should NOT be referenced from the

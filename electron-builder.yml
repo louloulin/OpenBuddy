@@ -1,12 +1,12 @@
 # ============================================================================
 # electron-builder configuration for OpenBuddy.
 #
-# electron-vite produces three bundles under `out/` (see electron.vite.config.ts):
-#   - out/main/index.js        Electron main process (ESM)
-#   - out/preload/index.js     Preload script (CJS)
-#   - out/renderer/index.html  React renderer
+# electron-vite produces three bundles under `dist/` (see electron.vite.config.ts):
+#   - dist/main/index.js        Electron main process (ESM)
+#   - dist/preload/index.js     Preload script (CJS)
+#   - dist/renderer/index.html  React renderer
 #
-# The package.json `main` field points at `./out/main/index.js`, which is
+# The package.json `main` field points at `./dist/main/index.js`, which is
 # what Electron loads when launched in production. Main-process workspace
 # packages are compiled into the entry and its adjacent ESM chunks by
 # electron-vite; remaining dependencies are packaged from `node_modules/`.
@@ -46,10 +46,10 @@ electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
 
 # electron-builder considers every file outside this list to be source and
-# prunes it. Anything electron-vite emits lives under `out/`; everything
+# prunes it. Anything electron-vite emits lives under `dist/`; everything
 # else needed at runtime is resolved through node_modules / package.json.
 files:
-  - "out/**/*"
+  - "dist/**/*"
   - "package.json"
   - "!**/*.map"
   - "!**/__tests__/**"
@@ -74,7 +74,7 @@ extraResources:
   # (a direct dependency, pulled in transitively by `@earendil-works/pi-coding-agent`)
   # declares `brace-expansion: ^5.0.0`. electron-builder's pnpm collector
   # walks `pnpm list --prod --depth Infinity` and then resolves each package
-  # via `locateFromDepOrRoot` (node_modules/app-builder-lib/out/node-module-collector/pnpmNodeModulesCollector.js).
+  # via `locateFromDepOrRoot` (node_modules/app-builder-lib/dist/node-module-collector/pnpmNodeModulesCollector.js).
   # When the workspace also pulls in `minimatch@3/5/9` (through dev-only
   # chains like `app-builder-lib` -> `ejs` -> `jake` -> `filelist` -> `minimatch@5`
   # -> `brace-expansion@2.1.4`), pnpm sometimes hoists the older `2.x` to

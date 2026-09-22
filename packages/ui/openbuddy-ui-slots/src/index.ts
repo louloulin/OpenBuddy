@@ -252,6 +252,12 @@ export interface SlotCoreLike {
   inject(name: string, register: () => () => void): () => void;
   /** 默认 entries:按 kind 返回单组件 / 列表 / Map。 */
   entries(name: string): readonly unknown[];
+  /**
+   * 原始 entry 列表(含 options),对齐 renderer-host 的 entriesOfSlot。
+   * 与 entries() 的区别:entries() 按设计只吐渲染用的组件,取不到 id /
+   * registrant 等 metadata —— 测试与诊断面板要这些就用 entriesOfSlot。
+   */
+  entriesOfSlot(name: string): readonly { options?: { id?: string; registrant?: string; [k: string]: unknown }; component: unknown }[];
   /** keyed 模式下按 key 查单个组件。 */
   entryForKey?(name: string, key: string): unknown | undefined;
   /** chain 模式下返回包装后的最终组件(从外到内逐层包)。 */

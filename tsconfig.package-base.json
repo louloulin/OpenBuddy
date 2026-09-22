@@ -177,7 +177,7 @@
         "./packages/ui/openbuddy-ui-conversation/src/index.ts"
       ],
       "@openbuddy/ui-conversation/client": [
-        "./packages/ui/openbuddy-ui-conversation/src/client.ts"
+        "./packages/ui/openbuddy-ui-conversation/src/client.tsx"
       ],
       "@openbuddy/ui-conversation/invariant": [
         "./packages/ui/openbuddy-ui-conversation/src/invariant.ts"
@@ -186,7 +186,7 @@
         "./packages/ui/openbuddy-ui-dialogs/src/index.ts"
       ],
       "@openbuddy/ui-dialogs/client": [
-        "./packages/ui/openbuddy-ui-dialogs/src/client.ts"
+        "./packages/ui/openbuddy-ui-dialogs/src/client.tsx"
       ],
       "@openbuddy/ui-dialogs/invariant": [
         "./packages/ui/openbuddy-ui-dialogs/src/invariant.ts"
@@ -204,7 +204,7 @@
         "./packages/ui/openbuddy-ui-experts/src/index.ts"
       ],
       "@openbuddy/ui-experts/client": [
-        "./packages/ui/openbuddy-ui-experts/src/client.ts"
+        "./packages/ui/openbuddy-ui-experts/src/client.tsx"
       ],
       "@openbuddy/ui-experts/invariant": [
         "./packages/ui/openbuddy-ui-experts/src/invariant.ts"
@@ -222,7 +222,7 @@
         "./packages/ui/openbuddy-ui-hmr/src/index.ts"
       ],
       "@openbuddy/ui-hmr/client": [
-        "./packages/ui/openbuddy-ui-hmr/src/client.ts"
+        "./packages/ui/openbuddy-ui-hmr/src/client.tsx"
       ],
       "@openbuddy/ui-hmr/invariant": [
         "./packages/ui/openbuddy-ui-hmr/src/invariant.ts"
@@ -249,7 +249,7 @@
         "./packages/ui/openbuddy-ui-locale/src/index.ts"
       ],
       "@openbuddy/ui-locale/client": [
-        "./packages/ui/openbuddy-ui-locale/src/client.ts"
+        "./packages/ui/openbuddy-ui-locale/src/client.tsx"
       ],
       "@openbuddy/ui-locale/invariant": [
         "./packages/ui/openbuddy-ui-locale/src/invariant.ts"
@@ -258,7 +258,7 @@
         "./packages/ui/openbuddy-ui-markdown/src/index.ts"
       ],
       "@openbuddy/ui-markdown/client": [
-        "./packages/ui/openbuddy-ui-markdown/src/client.ts"
+        "./packages/ui/openbuddy-ui-markdown/src/client.tsx"
       ],
       "@openbuddy/ui-markdown/components": [
         "./packages/ui/openbuddy-ui-markdown/src/components/index.ts"
@@ -321,7 +321,7 @@
         "./packages/ui/openbuddy-ui-runtime/src/index.ts"
       ],
       "@openbuddy/ui-runtime/client": [
-        "./packages/ui/openbuddy-ui-runtime/src/client.ts"
+        "./packages/ui/openbuddy-ui-runtime/src/client.tsx"
       ],
       "@openbuddy/ui-runtime/invariant": [
         "./packages/ui/openbuddy-ui-runtime/src/invariant.ts"
@@ -333,13 +333,13 @@
         "./packages/ui/openbuddy-ui-settings-models/src/index.ts"
       ],
       "@openbuddy/ui-settings-models/client": [
-        "./packages/ui/openbuddy-ui-settings-models/src/client.ts"
+        "./packages/ui/openbuddy-ui-settings-models/src/client.tsx"
       ],
       "@openbuddy/ui-settings-models/invariant": [
         "./packages/ui/openbuddy-ui-settings-models/src/invariant.ts"
       ],
       "@openbuddy/ui-settings/client": [
-        "./packages/ui/openbuddy-ui-settings/src/client.ts"
+        "./packages/ui/openbuddy-ui-settings/src/client.tsx"
       ],
       "@openbuddy/ui-settings/invariant": [
         "./packages/ui/openbuddy-ui-settings/src/invariant.ts"
@@ -357,7 +357,7 @@
         "./packages/ui/openbuddy-ui-shell/src/index.ts"
       ],
       "@openbuddy/ui-shell/client": [
-        "./packages/ui/openbuddy-ui-shell/src/client.ts"
+        "./packages/ui/openbuddy-ui-shell/src/client.tsx"
       ],
       "@openbuddy/ui-shell/invariant": [
         "./packages/ui/openbuddy-ui-shell/src/invariant.ts"
@@ -366,7 +366,7 @@
         "./packages/ui/openbuddy-ui-sidebar/src/index.ts"
       ],
       "@openbuddy/ui-sidebar/client": [
-        "./packages/ui/openbuddy-ui-sidebar/src/client.ts"
+        "./packages/ui/openbuddy-ui-sidebar/src/client.tsx"
       ],
       "@openbuddy/ui-sidebar/invariant": [
         "./packages/ui/openbuddy-ui-sidebar/src/invariant.ts"
@@ -384,7 +384,7 @@
         "./packages/ui/openbuddy-ui-theme/src/index.ts"
       ],
       "@openbuddy/ui-theme/client": [
-        "./packages/ui/openbuddy-ui-theme/src/client.ts"
+        "./packages/ui/openbuddy-ui-theme/src/client.tsx"
       ],
       "@openbuddy/ui-theme/invariant": [
         "./packages/ui/openbuddy-ui-theme/src/invariant.ts"
@@ -396,7 +396,7 @@
         "./packages/ui/openbuddy-ui-workbench/src/index.ts"
       ],
       "@openbuddy/ui-workbench/client": [
-        "./packages/ui/openbuddy-ui-workbench/src/client.ts"
+        "./packages/ui/openbuddy-ui-workbench/src/client.tsx"
       ],
       "@openbuddy/ui-workbench/invariant": [
         "./packages/ui/openbuddy-ui-workbench/src/invariant.ts"
@@ -404,7 +404,6 @@
       "@openbuddy/ui-motion": ["./packages/ui/openbuddy-ui-motion/src/index.ts"],
       "@openbuddy/ui-motion/client": ["./packages/ui/openbuddy-ui-motion/src/client.ts"],
       "@openbuddy/ui-motion/easings": ["./packages/ui/openbuddy-ui-motion/src/easings.ts"],
-      "@openbuddy/ui-motion/invariant": ["./packages/ui/openbuddy-ui-motion/src/invariant.ts"],
       "@openbuddy/ui-motion/presets": ["./packages/ui/openbuddy-ui-motion/src/presets.ts"],
       "@openbuddy/ui-files-tree": ["./packages/ui/openbuddy-ui-files-tree/src/index.ts"],
       "@openbuddy/ui-files-tree/client": ["./packages/ui/openbuddy-ui-files-tree/src/client.tsx"],

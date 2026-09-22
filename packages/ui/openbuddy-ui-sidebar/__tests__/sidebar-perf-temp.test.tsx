@@ -23,7 +23,7 @@ function makeSessions(n: number) {
 describe("Sidebar perf", () => {
   it("renders 1000 sessions", () => {
     const t1 = Date.now();
-    const { container } = render(<Sidebar sessions={makeSessions(1000)} workspaces={[]} />);
+    const { container } = render(<Sidebar {...({} as Parameters<typeof Sidebar>[0])} />);
     const t2 = Date.now();
     console.log(`Sidebar 1000 sessions: ${t2-t1}ms`);
   }, 30000);

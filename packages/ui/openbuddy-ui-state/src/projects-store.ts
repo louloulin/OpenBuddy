@@ -105,6 +105,8 @@ export interface ProjectMeta {
   templateId?: string;
   instructions?: string;
   createdAt: string;
+  /** 最后更新时间(ISO 字符串)。可选,旧数据 / 测试 fixture 可能缺省。 */
+  updatedAt?: string;
   /** 跨项目/邮件/任务搜索使用的本地工作区标签。 */
   tags?: string[];
   // 详情

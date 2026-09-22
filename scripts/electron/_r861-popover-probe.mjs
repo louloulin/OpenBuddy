@@ -4,7 +4,7 @@ import { join } from "node:path";
 mkdirSync("/tmp/openbuddy-screenshots/r861", { recursive: true });
 const app = await electron.launch({
   executablePath: join(process.cwd(), "node_modules", ".bin", "electron"),
-  args: [join(process.cwd(), "out/main/index.js"), "--no-sandbox"],
+  args: [join(process.cwd(), "dist/main/index.js"), "--no-sandbox"],
   cwd: process.cwd(),
   timeout: 90000,
 });

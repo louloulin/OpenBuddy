@@ -23,7 +23,7 @@ import Zap from "lucide-react/dist/esm/icons/zap";
 import WandSparkles from "lucide-react/dist/esm/icons/wand-2";
 import { shallow } from "zustand/shallow";
 import { PauseIcon } from "@openbuddy/ui-primitives/icons";
-import { useSessionStore, type ToolCallView } from "@/stores/session-store";
+import { useSessionStore, type ChatMessage, type ToolCallView } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { createMarkdownHostConfig } from "@/lib/markdown/markdown-host";
 import { piListSessions, piSetThinkingLevel, rewindExecute, rewindPoints } from "@/lib/agent/pi-client";
@@ -758,7 +758,7 @@ export function ChatView({
       return (
         <div key={m.id} className={"msg-wrap" + findCls} data-msg-id={m.id}>
           <MessageItem
-            message={m}
+            message={m as ChatMessage}
             streaming={streaming && m.id === streamingMessageId}
             // R8.14 — pass per-turn streaming duration so the meta chip
             // can render a live "12s 正在生成…" label on the in-flight

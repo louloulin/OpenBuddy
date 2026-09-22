@@ -1,7 +1,7 @@
 import { _electron as electron } from "playwright";
 const app = await electron.launch({
   executablePath: join(process.cwd(), "node_modules", ".bin", "electron"),
-  args: [join(process.cwd(), "out/main/index.js"), "--no-sandbox", "--disable-gpu"],
+  args: [join(process.cwd(), "dist/main/index.js"), "--no-sandbox", "--disable-gpu"],
   cwd: process.cwd(),
   timeout: 60000,
 });

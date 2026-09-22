@@ -2,7 +2,7 @@ import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { PinnedSection } from "../src/PinnedSection";
 import { useSessionsStore } from "@/stores/sessions-store";
-
+import type { SessionSummary } from "@openbuddy/shared-types";
 // Mock pi-client — we only care about whether the section calls it
 // on unpin, not about the IPC round-trip itself.
 vi.mock("@/lib/agent/pi-client", () => ({
@@ -23,7 +23,7 @@ function resetStore() {
   });
 }
 
-function setSessions(sessions: Array<{ sessionId: string; title: string; pinned?: boolean; archived?: boolean; cwd?: string; updatedAt?: string }>) {
+function setSessions(sessions: Array<Partial<SessionSummary> & { sessionId: string; title: string }>) {
   const independent = sessions.filter((s) => !s.cwd);
   const byCwd: Record<string, typeof sessions> = {};
   for (const s of sessions.filter((s) => s.cwd)) {
@@ -31,8 +31,8 @@ function setSessions(sessions: Array<{ sessionId: string; title: string; pinned?
     byCwd[s.cwd!].push(s);
   }
   useSessionsStore.setState({
-    independent,
-    workspaceSessions: byCwd,
+    independent: independent as SessionSummary[],
+    workspaceSessions: byCwd as Record<string, SessionSummary[]>,
   });
 }
 

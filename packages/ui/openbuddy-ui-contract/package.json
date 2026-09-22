@@ -1,6 +1,6 @@
 {
   "name": "@openbuddy/ui-contract",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "type": "module",
   "description": "渲染层 UI 帮助层契约面（ui helpers / markdown / renderer plugin runtime）",

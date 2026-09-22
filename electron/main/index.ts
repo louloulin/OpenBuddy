@@ -128,7 +128,7 @@ if (developmentUserData || process.env.NODE_ENV_ELECTRON_VITE === "development")
 }
 
 const devRendererUrl = process.env.ELECTRON_RENDERER_URL;
-const rendererIndex = join(mainDirname, "../../out/renderer/index.html");
+const rendererIndex = join(mainDirname, "../../dist/renderer/index.html");
 const preloadCandidates = [
   join(mainDirname, "../preload/index.cjs"),
   join(mainDirname, "../preload/index.js"),

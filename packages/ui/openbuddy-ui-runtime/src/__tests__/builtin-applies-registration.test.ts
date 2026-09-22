@@ -53,7 +53,7 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
     // entries() 返回的是收敛后的组件,要看注册者得读 entriesOfSlot 的原始 entry。
     const raw = runtime.slots.entriesOfSlot("shell.statusbar");
     expect(raw.length).toBeGreaterThanOrEqual(1);
-    expect(raw[0]?.options.registrant).toBe("@openbuddy/ui-shell");
+    expect(raw[0]?.options?.registrant).toBe("@openbuddy/ui-shell");
     expect(entries("shell.statusbar").length).toBe(1);
   });
 

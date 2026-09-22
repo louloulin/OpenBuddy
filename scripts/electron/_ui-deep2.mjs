@@ -9,7 +9,7 @@ mkdirSync(outDir, { recursive: true });
 
 const app = await electron.launch({
   executablePath: join(root, "node_modules", ".bin", "electron"),
-  args: [join(root, "out/main/index.js")],
+  args: [join(root, "dist/main/index.js")],
   cwd: root,
 });
 const page = await app.firstWindow();

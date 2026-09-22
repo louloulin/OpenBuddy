@@ -2,6 +2,55 @@
 
 **English** · [简体中文](CHANGELOG.zh-CN.md)
 
+### v0.16.0 (2026-09-22) — Microkernel slots, plugin trust, and a self-updating desktop
+
+#### 🧩 Microkernel slot surface reaches zero dead ends
+
+- **Every declared slot now has a consumer**: the `placeholder.*` family (11 slots) plus the last 4 dead slots (shell replacement / What's New / feedback / data dir) are wired, so "declared but nobody consumes it" is 0.
+- **New three-state slot audit** (`scripts/ui-slot-coverage.mjs` + `ui-slot-audit.mjs`): static scan of declared → registered → consumed, with a CI guard that fails when type holes appear or wiring regresses.
+- **Slot-driven surfaces**: Office preview (Workbench) takeover, `editor.draft` new-draft entry (`⌘⇧D`), `view` / `approvals` conversation surfaces, details rail, `files.tree` virtualization, and `plugin.command` in both `⌘K` and the composer's `/` menu.
+- **Microkernel health panel** in Settings → System info (registered / consumed / missing counts, with the off-by-one `size()` / `snapshot()` bug fixed).
+
+#### 🔐 Plugin trust and a working marketplace
+
+- **Plugin integrity badge**: new browser-safe `plugin:hash-content` IPC bridge + SHA-256 badge in the OpenBuddy plugin panel, so a plugin's identity is visible before it runs.
+- **Pi extension marketplace**: multi-source index (host / env / file), source management UI (add / edit / remove / probe), per-entry action predicates, uninstall, and search / filter over the catalog.
+- **Expert Marketplace Bridge**: expert cards gain a "view on pi.dev" link; the bridge resolves remote expert contributions instead of silently rendering an empty state.
+- **Bundled starter experts**: an in-repo starter-expert catalog materializes into `<agentHome>/experts` on first run, so an open-source first launch no longer depends on an external WorkBuddy data directory.
+
+#### 🔄 Auto-update and privacy
+
+- **`electron-updater` wired at app start**: the `publish:` block drives feeds; update events are logged and broadcast to renderer windows. `autoDownload=false` (no silent bandwidth use), `autoInstallOnAppQuit=true`.
+- **Unsigned DMG profile** (`electron-builder.unsigned.yml`): a credential-free local macOS package path for contributors without a Developer ID.
+- **Privacy surface**: `docs/PRIVACY.md` bundled as `extraResources/PRIVACY.md` with a Help-menu entry, an AI privacy section in settings, and localized provider test status.
+
+#### 🏗️ Architecture: the renderer contract gets a single source of truth
+
+- **4 contract packages** — `@openbuddy/ui-contract`, `@openbuddy/platform`, `@openbuddy/agent-rpc`, `@openbuddy/ui-state` — with `package.json#exports` as the only source of truth for aliases.
+- **Module migration**: ~76 renderer modules move out of `src/lib` into those packages, with import rewriting verified by a scanner (batches that broke `pi-client`'s sibling imports were rolled back rather than force-landed).
+- **tsconfig collapse**: 67 per-package `tsconfig.json` files reduce to `{ "extends": "…/tsconfig.package-base.json" }`; `vite` / `electron-vite` / `vitest` all derive aliases via `vite-tsconfig-paths`, so `scripts/sync-ui-aliases.mjs` and `packages/ui/alias-list.json` are gone.
+- **`pnpm-workspace.yaml` glob fix**: flat packages (`packages/payment`, `packages/saml`, `packages/scim`, `packages/webhook-outbox`) were silently excluded from the workspace; bare directory globs now match them.
+
+#### 📦 Build output moves to `dist/`
+
+- **Single build output directory**: `electron-vite` writes `dist/{main,preload,renderer}`, `electron-builder` packages from it, and `package.json#main` points at `./dist/main/index.js`. The old `out/` directory is gone from config, `moon.yml` inputs/outputs, `.gitignore`, and the release scripts.
+- **134 stray emit artifacts deleted**: `.js` files next to `src/*.ts` and `__tests__/*.test.ts` (leftovers from an earlier `tsc -b` experiment) are removed, with a `packages/**/__tests__/**/*.test.js` ignore rule as a defense. Hand-written fixtures and `.d.ts` shims preserved.
+- **Convention documented** in `docs/build-output-conventions.md`.
+- **Typecheck repaired**: the solution-style `tsc -b` refactor was reverted to `tsc --noEmit` (3774 errors → 0) and ~50 real type errors surfaced by the stricter paths were fixed.
+
+#### ✅ Quality
+
+- Typecheck: **0 errors** (`tsc --noEmit`, renderer + electron main/preload).
+- Test suite: **855 test / spec files** across the workspace; CI gates run typecheck → workspace typecheck → tests → build.
+- `macOS` end-to-end verified: `pnpm electron:build:mac` produces `release/OpenBuddy-0.16.0-{arm64,x64}.dmg`.
+
+#### 🧰 New release tooling
+
+- **`scripts/bump-version.mjs`** — one command bumps the version across **88 files** (74 `package.json` manifests + `hostVersion` + website JSON-LD / installer filenames / i18n chips + example plugin manifests), with `--dry-run`, `--json`, `--current`, and a post-write self-check.
+- Release note extraction fixed to match the CHANGELOG's actual heading depth (`### vX.Y.Z`), so the GitHub Release body is the release section rather than a generated commit list.
+
+---
+
 ### v0.15.0 (2026-09-01) — Enterprise Casdoor × NewAPI × OpenBuddy integration
 
 #### 🎯 Commercial architecture

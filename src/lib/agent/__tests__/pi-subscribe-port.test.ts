@@ -68,7 +68,7 @@ describe("subscribePiEvents — stream port transport", () => {
 
   afterEach(() => {
     delete (window as unknown as { api?: unknown }).api;
-    bridge = undefined;
+    bridge = null;
     bridgeState.portHandler = null;
   });
 
@@ -95,7 +95,7 @@ describe("subscribePiEvents — stream port transport", () => {
   });
 
   it("falls back to the IPC listener when the bridge has no port API", async () => {
-    bridge = makeBridge(false);
+    bridge = makeBridge();
     bridgeState.withPort = false;
     (window as unknown as { api?: unknown }).api = bridge;
     const onUpdate = vi.fn((u: { __sessionId?: string; type: string }) => {

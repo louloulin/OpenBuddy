@@ -12,6 +12,7 @@
  *
  * 只断言"槽位里有几条 entry"是不够的 —— 那正是这次要修的毛病。
  */
+const noop = () => {};
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -186,6 +187,8 @@ describe("conversation.composer", () => {
     mount(
       <ConversationComposer
         streaming={false}
+        onSend={noop}
+        onCancel={noop}
         fallback={<div data-testid="fallback-composer">内置输入区</div>}
       />,
     );
@@ -201,6 +204,8 @@ describe("conversation.composer", () => {
     mount(
       <ConversationComposer
         streaming
+        onSend={noop}
+        onCancel={noop}
         modelId="gpt-x"
         fallback={<div data-testid="fallback-composer">内置输入区</div>}
       />,

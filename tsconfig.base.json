@@ -18,7 +18,6 @@
     // electron-vite / vite 直接 polyfill,不需要降级到 ES2017。
     "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "composite": false,  // 工作区包用 tsconfig.package-base.json 开启;根项目保持 false
 
     // ─── 模块系统 ────────────────────────────────────────────────
     // ESNext + Bundler 解析:配合 vite/electron-vite 的 esbuild 解析,
@@ -42,7 +41,6 @@
     // ─── 输出控制 ────────────────────────────────────────────────
     // 所有构建都走 vite/electron-vite/tsc --noEmit;本项目从不直接 tsc emit,
     // 所以这里统一关掉 emit + declaration 等,需要时由具体 tsconfig 覆盖。
-    "noEmit": true,
     "skipLibCheck": true,
 
     // ─── 类型严格性 ──────────────────────────────────────────────

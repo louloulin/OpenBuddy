@@ -4,7 +4,7 @@
 // 降低单文件复杂度。逻辑等价,只是把 useRef / useEffect / waitForAiDraft
 // 抽到独立 hook。EmailPanel.tsx 调用 useAiDraftPolling({ onToast, openDraft })。
 import { useEffect, useRef } from "react";
-import { emailListDrafts } from "@/lib/agent/pi-client";
+import { emailListDrafts, type EmailDraft } from "@/lib/agent/pi-client";
 
 export const AI_DRAFT_CONTEXT_KEY = "openbuddy:email:ai-draft-context";
 
@@ -15,16 +15,8 @@ interface AiDraftContext {
   baseline: Map<string, string>;
 }
 
-interface EmailDraftLite {
-  id: string;
-  accountId: string;
-  threadId?: string;
-  subject: string;
-  updatedAt: string;
-}
-
 export interface UseAiDraftPollingParams {
-  onDraftReady: (draft: EmailDraftLite) => void;
+  onDraftReady: (draft: EmailDraft) => void;
   onToast?: (message: string) => void;
   pollIntervalMs?: number;
   maxAttempts?: number;
@@ -69,7 +61,7 @@ export function useAiDraftPolling({
           aiDraftPoll.current = setTimeout(resolve, pollIntervalMs);
         });
         try {
-          const candidates: EmailDraftLite[] = await emailListDrafts(context!.accountId);
+          const candidates: EmailDraft[] = await emailListDrafts(context!.accountId);
           const draft = candidates.find(
             (item) =>
               item.accountId === context!.accountId &&

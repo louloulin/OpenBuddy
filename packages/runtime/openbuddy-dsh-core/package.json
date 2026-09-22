@@ -1,6 +1,6 @@
 {
   "name": "@openbuddy/dsh-core",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "description": "Phase B.3 step 2b — DSH core state machines as PI-native extensions. Extracts the per-session goal + message-feedback state machines from electron/main/agent/host-modules/bootstrap/wire-dsh-services.ts into PI ExtensionFactory wrappers that can be loaded by PI discoverAndLoadExtensions() instead of the legacy DSH HarnessPluginLoader.",
   "type": "module",
