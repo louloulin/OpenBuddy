@@ -6,7 +6,13 @@
   "description": "渲染层 ↔ 主进程的 agent RPC 契约面（阶段2 反向依赖收敛目标）",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./voice-contract": "./src/voice-contract.ts",
+    "./extension-audit-event-parser": "./src/extension-audit-event-parser.ts",
+    "./stream/agent-phase": "./src/stream/agent-phase.ts",
+    "./navigation/market-tab": "./src/navigation/market-tab.ts"
+  },
   "engines": {
     "node": ">=22.5.0"
   },

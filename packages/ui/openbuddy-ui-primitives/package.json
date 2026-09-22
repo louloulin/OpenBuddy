@@ -10,7 +10,10 @@
     "./client": "./src/client.ts",
     "./invariant": "./src/invariant.ts",
     "./icons": "./src/icons/index.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./components/StatusIndicator": "./src/components/StatusIndicator.tsx",
+    "./components/ErrorBoundary": "./src/components/ErrorBoundary.tsx",
+    "./hooks/useExtensionAuditPanel": "./src/hooks/useExtensionAuditPanel.ts"
   },
   "dependencies": {
     "@openbuddy/ui-slots": "workspace:*",
