@@ -13,13 +13,7 @@
     "./voice-contract": "./src/voice-contract.ts",
     "./navigation/market-tab": "./src/navigation/market-tab.ts",
     "./stream/agent-phase": "./src/stream/agent-phase.ts",
-    "./stream/streaming-message": "./src/stream/streaming-message.ts",
-    "./pi-client": "./src/pi-client.ts",
-    "./session-artifacts": "./src/session-artifacts.ts",
-    "./subagents": "./src/subagents.ts",
-    "./team-derive": "./src/team-derive.ts",
-    "./audit/audit-client": "./src/audit/audit-client.ts",
-    "./casdoor/casdoor-client": "./src/casdoor/casdoor-client.ts"
+    "./stream/streaming-message": "./src/stream/streaming-message.ts"
   },
   "engines": {
     "node": ">=22.5.0"
