@@ -91,6 +91,11 @@ export interface InstallHostModuleDepsClosures {
   scheduleProfileReload: (...args: any[]) => any;
   artifactPackageJsonByName: (...args: any[]) => any;
   discoverRendererPluginManifest: (...args: any[]) => any;
+  /** Profile-artifact-reconciler (Phase 8.5): bridge the missing discoverRemote wiring so
+   *  reconcileProfileArtifacts() can populate state.profileRemoteContributions.
+   *  Optional on the reconciler side; defaults to no-op when omitted.
+   */
+  discoverRemoteManifest: () => Promise<Map<string, unknown>>;
   // Host-functions required by installPiRuntimeFactories
   promptImpl: (...args: any[]) => any;
   abortImpl: (...args: any[]) => any;
@@ -196,6 +201,9 @@ export function buildInstallHostModuleDeps(
     scheduleProfileReload: () => { void closures.scheduleProfileReload(); },
     artifactPackageJsonByName: closures.artifactPackageJsonByName,
     discoverRendererPluginManifest: async (...args: any[]) => Array.from(await closures.discoverRendererPluginManifest(...args)),
+    discoverRemoteManifest: closures.discoverRemoteManifest,
+    // Profile-artifact-reconciler (Phase 8.5) reconciler-side alias of the closure.
+    discoverRemote: () => closures.discoverRemoteManifest(),
     promptImpl: closures.promptImpl,
     abortImpl: closures.abortImpl,
     listSessionsImpl: closures.listSessionsImpl,

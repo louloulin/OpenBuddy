@@ -123,6 +123,9 @@ import {
   discoverRendererPluginManifestUncached as discoverRendererPluginManifestUncachedImpl,
 } from "./host-modules/profile/renderer-manifest";
 import {
+  discoverProfileRemoteContributionsImpl,
+} from "./host-modules/profile/remote-contributions";
+import {
   startProfileWatchers as startProfileWatchersImpl,
   stopProfileWatchers as stopProfileWatchersImpl,
 } from "./host-modules/profile/watchers";
@@ -1102,6 +1105,13 @@ const installMicrokernelDepsClosures = {
   reportPiExtensionErrors, captureReloadableContextServices,
   restoreCapturedContextServices, rollbackPiProfile, scheduleProfileReload,
   artifactPackageJsonByName, discoverRendererPluginManifest,
+  // profile-artifact-reconciler deps (Phase 8.5): wire discover+serialize so
+  // reconcileProfileArtifacts() can populate state.profileRemoteContributions.
+  // Without this, profile-package `exports["./remote"]` modules never reach
+  // state.remoteDispatcher — smoke/installedRemote* check stayed false forever.
+  // discoverTypert/serializeRemote/remoteServiceContext stay default (no-op) for
+  // the same scope reasons renderer-manifest.ts only wires its own discovery.
+  discoverRemoteManifest: () => discoverProfileRemoteContributionsImpl(state, profileArtifactModuleUrl),
   promptImpl, abortImpl, listSessionsImpl, listSubagentChildrenImpl,
   promptSubagentImpl, interruptSubagentImpl, ensureContinuableSubagentImpl,
   setModel: setModelImpl, getSession: getSessionImpl, getModel: getModelImpl,

@@ -80,9 +80,11 @@ describe("init-deepseek / Phase B.3 step 2c — DSH core excluded from HarnessPl
     ]);
   });
 
-  it("profileEntriesFromManifests emits 7 entries for the canonical DSH core list", () => {
+  it("profileEntriesFromManifests emits 6 entries for the canonical DSH core list", () => {
+    // dynamicCordisRunner was REMOVED in 57f41b1 (Option C of
+    // docs/audit/deepseek-endpoint-decision.md), so the manifest now has 6 entries.
     const rows = profileEntriesFromManifests(coreCapabilityManifests);
-    expect(rows).toHaveLength(7);
+    expect(rows).toHaveLength(6);
     expect(rows.map((row) => row.id).sort()).toEqual(
       [...DEEPSEEK_CORE_CAPABILITY_PACKAGES].sort(),
     );
