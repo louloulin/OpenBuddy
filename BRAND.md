@@ -4,7 +4,7 @@
 
 ### Logo
 
-The OpenBuddy logo is the **"Open Ring"** mark: a 3/4 circle (open ring) representing *Open* and transparency, with a small companion sphere floating outside the gap representing *Buddy* and the AI spark. Flat geometric composition, three accent tones — cream `#FFFEF8 → #F5E6CC → #D4A574`, warm spark `#F59E0B`, ink `#0B0F1E → #1E2640` — readable from 16 px favicon to 1024 px app icon and any scale in between.
+The OpenBuddy logo is **"Buddy the Whale"**: a Teemo-style chibi whale mascot in League-of-Legends character energy. The character features an oversized round body, oversized expressive eyes, a tiny tail and flippers, a signature captain's cap, and a dynamic amber water spout. Brand palette stays in three tones — sky/cream `#A8DCF0 → #FFE5C2 → #FFD09A`, ocean/spark `#6FC0E8 → #2E78C8 → #F59E0B → #FFD78A`, coral `#FF6B6B → #FF9A8B` — with `#1E2640` reserved as a small navy accent. No pure black; readable from 16 px favicon to 1024 px app icon and any scale in between.
 
 | Asset | File | Format | Recommended size |
 |---|---|---|---|
@@ -13,6 +13,11 @@ The OpenBuddy logo is the **"Open Ring"** mark: a 3/4 circle (open ring) represe
 | App icon (raster master) | `app-icon.png` | PNG | 1024×1024 |
 | Monochrome | `openbuddy-logo-mono.svg` | SVG | ≥ 48 px |
 | Wordmark | `openbuddy-wordmark.svg` | SVG | width ≥ 240 px |
+| Header icon (light) | `src/assets/header-icon.svg` | SVG | 16–32 px |
+| Header icon (dark) | `src/assets/header-icon-dark.svg` | SVG | 16–32 px |
+| Mascot (raster) | `src/assets/mascot-new.png` | PNG | ≥ 256 px |
+| Welcome (light) | `src/assets/claw-welcome-light.svg` | SVG | 240 px |
+| Welcome (dark) | `src/assets/claw-welcome-dark.svg` | SVG | 240 px |
 | Favicon | `public/favicon.ico` | ICO | 16 / 32 / 48 |
 | macOS app | `build/icon.icns` | ICNS | generated |
 | Windows app | `build/icon.ico` | ICO | generated |
@@ -44,7 +49,7 @@ Requires `librsvg` and `imagemagick` (`brew install librsvg imagemagick`).
 - Don't add drop shadows, glows, or other effects.
 - Don't place on busy backgrounds without a solid-color panel underneath.
 - Don't use the logo to represent an unrelated product.
-- Don't modify the monogram to spell other words.
+- Don't modify the whale mascot to other characters (without written permission).
 
 ### Clear space
 

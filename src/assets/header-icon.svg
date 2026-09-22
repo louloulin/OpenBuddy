@@ -1,17 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="OpenBuddy">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="OpenBuddy" color="#1E2640">
   <!--
-    OpenBuddy header icon v15 - matches openbuddy-logo.svg.
-    Simplified open ring + companion sphere for tight UI spots.
-    Sized for 16-32 px display; uses currentColor so the host theme
-    controls the tint.
+    OpenBuddy header icon v18 - matches logo-mark.svg.
+    Simplified "Buddy the Whale" silhouette for 16-32 px display. Body
+    uses currentColor so the host theme tints the silhouette; eye
+    accents stay amber to echo the spout/spark in the full logo.
   -->
-  <g fill="none">
-    <!-- open ring: 3/4 circle, gap at top-right -->
-    <path d="M 24.7 12.3 A 9 9 0 1 0 24.7 19.7"
-          stroke="currentColor"
-          stroke-width="3.2"
-          stroke-linecap="round"/>
+  <g fill="currentColor">
+    <!-- body -->
+    <ellipse cx="16" cy="18" rx="11.5" ry="9.5"/>
+    <!-- tail flukes -->
+    <path d="M 15.4 26 Q 12 27.5 11 29.5 Q 12 29.6 13.5 29 Q 14.7 28.3 15.8 27.4 Z"/>
+    <path d="M 16.6 26 Q 20 27.5 21 29.5 Q 20 29.6 18.5 29 Q 17.3 28.3 16.2 27.4 Z"/>
+    <!-- captain's cap -->
+    <ellipse cx="16" cy="9" rx="7.5" ry="1.4"/>
+    <path d="M 11 9 C 11 6.4, 12.4 5, 16 5 C 19.6 5, 21 6.4, 21 9 Z"/>
+    <!-- navy band -->
+    <rect x="11" y="8.6" width="10" height="1.6" fill="#1E4A78"/>
   </g>
-  <!-- companion sphere -->
-  <circle cx="26" cy="8.6" r="2.6" fill="#F59E0B"/>
+  <!-- amber eye accents -->
+  <circle cx="13.5" cy="16.5" r="1.1" fill="#F59E0B"/>
+  <circle cx="18.5" cy="16.5" r="1.1" fill="#F59E0B"/>
 </svg>

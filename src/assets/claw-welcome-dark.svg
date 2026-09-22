@@ -1,16 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="OpenBuddy">
   <!--
-    OpenBuddy welcome graphic v18 - "Buddy the Whale" (light).
-    Compact 240x240 version of the brand mark for welcome screens and
-    onboarding surfaces. Sky-cream background, vibrant whale, no pure
-    black. Brand palette: cream #FFFEF8 -> #F5E6CC, spark #FFD78A ->
-    #F59E0B, ocean #6FC0E8 -> #1E5BA8, sky #A8DCF0 -> #FFE5C2.
+    OpenBuddy welcome graphic v18 - "Buddy the Whale" (dark).
+    Dark-surface variant of claw-welcome-light.svg. Background stays
+    deep ink so it integrates with dark UI; whale stays vibrant so the
+    silhouette pops. Brand palette: cream #FFFEF8 -> #F5E6CC,
+    spark #FFD78A -> #F59E0B, ocean #6FC0E8 -> #1E5BA8, ink #0B0F1E -> #1E2640.
   -->
   <defs>
-    <radialGradient id="bg" cx="50%" cy="46%" r="62%">
-      <stop stop-color="#A8DCF0"/>
-      <stop offset=".55" stop-color="#FFE5C2"/>
-      <stop offset="1" stop-color="#FFD09A"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#1E2640"/>
+      <stop offset="1" stop-color="#0B0F1E"/>
+    </linearGradient>
+    <radialGradient id="bgGlow" cx="50%" cy="46%" r="60%">
+      <stop stop-color="#5478B5" stop-opacity=".4"/>
+      <stop offset="1" stop-color="#5478B5" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="body" x1="0.2" y1="0" x2="0.8" y2="1">
       <stop stop-color="#6FC0E8"/>
@@ -37,55 +40,44 @@
   </defs>
 
   <rect width="240" height="240" fill="url(#bg)"/>
+  <rect width="240" height="240" fill="url(#bgGlow)"/>
 
-  <!-- confetti sparkles -->
-  <g fill="#F59E0B" opacity=".9">
+  <g fill="#FFD78A" opacity=".85">
     <path d="M 36 80 l 1.4 -5 l 1.4 5 l 5 1.4 l -5 1.4 l -1.4 5 l -1.4 -5 l -5 -1.4 z"/>
     <path d="M 204 84 l 1.2 -4 l 1.2 4 l 4 1.2 l -4 1.2 l -1.2 4 l -1.2 -4 l -4 -1.2 z"/>
-    <path d="M 28 168 l 1 -4 l 1 4 l 4 1 l -4 1 l -1 4 l -1 -4 l -4 -1 z"/>
   </g>
 
   <g transform="rotate(-7 120 126)">
-    <!-- spout -->
     <path d="M 113 50 C 108 36, 124 24, 142 14 C 152 8, 162 8, 156 20 C 146 32, 130 44, 122 54 Z" fill="url(#spark)"/>
     <circle cx="142" cy="18" r="2.6" fill="#FFD78A"/>
     <circle cx="156" cy="12" r="2" fill="#FFD78A"/>
     <circle cx="130" cy="10" r="1.8" fill="#FFD78A"/>
 
-    <!-- tail flukes -->
     <path d="M 117 180 Q 98 188 92 204 Q 92 208 100 204 Q 110 198 120 192 Z" fill="url(#body)"/>
     <path d="M 123 180 Q 142 188 148 204 Q 148 208 140 204 Q 130 198 120 192 Z" fill="url(#body)"/>
 
-    <!-- body -->
     <path d="M 120 56 C 164 56, 196 92, 196 132 C 196 174, 164 196, 120 196 C 76 196, 44 174, 44 132 C 44 92, 76 56, 120 56 Z" fill="url(#body)"/>
 
-    <!-- raised flipper waving -->
     <g transform="rotate(-35 188 138)">
       <path d="M 174 128 C 196 124, 208 128, 210 136 C 210 144, 200 148, 188 148 C 178 148, 172 144, 172 140 C 172 134, 174 130, 174 128 Z" fill="url(#body)"/>
     </g>
 
-    <!-- belly -->
     <path d="M 120 112 C 148 112, 168 130, 168 158 C 168 188, 148 196, 120 196 C 92 196, 72 188, 72 158 C 72 130, 92 112, 120 112 Z" fill="url(#belly)"/>
 
-    <!-- cheeks -->
     <ellipse cx="64" cy="150" rx="14" ry="8" fill="url(#cheek)"/>
     <ellipse cx="176" cy="150" rx="14" ry="8" fill="url(#cheek)"/>
 
-    <!-- left eye -->
     <ellipse cx="92" cy="120" rx="18" ry="23" fill="#FFFEF8"/>
     <ellipse cx="95" cy="124" rx="12" ry="17" fill="#1E2640"/>
     <circle cx="100" cy="116" r="5.5" fill="#FFFEF8"/>
     <circle cx="91" cy="130" r="2.8" fill="#FFFEF8"/>
 
-    <!-- right wink -->
     <path d="M 136 120 Q 148 134 160 120" fill="none" stroke="#1E2640" stroke-width="4" stroke-linecap="round"/>
     <path d="M 160 120 l 3.5 -2" stroke="#1E2640" stroke-width="2" stroke-linecap="round"/>
 
-    <!-- mouth -->
     <path d="M 107 150 Q 107 168, 120 170 Q 133 168, 133 150 Q 133 162, 120 162 Q 107 162, 107 150 Z" fill="#FF6B6B"/>
     <path d="M 113 162 Q 120 170, 127 162 Q 127 167, 120 167 Q 113 167, 113 162 Z" fill="#FF9A8B"/>
 
-    <!-- cap -->
     <g transform="rotate(8 120 60)">
       <ellipse cx="120" cy="70" rx="46" ry="5" fill="#1E4A78"/>
       <path d="M 92 70 C 92 52, 102 42, 120 42 C 138 42, 148 52, 148 70 Z" fill="url(#hat)"/>

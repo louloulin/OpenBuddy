@@ -1,57 +1,218 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy">
   <!--
-    OpenBuddy mark v15 - "Open Ring".
-    A 3/4 circle (open ring) represents Open + openness/transparency.
-    A small companion sphere floats just outside the gap, representing
-    Buddy + the AI spark. Modern, geometric, scales cleanly from favicon
-    to 1024px app icon.
+    OpenBuddy mark v18 - "Buddy the Whale" (vivid sky).
+    Teemo-style chibi whale, League-of-Legends character energy.
+    Bright sky-to-cream background, vibrant ocean-blue body, warm coral
+    mouth/cheeks, amber spark spout. No pure black: navy retained only
+    as small accent (hat band, eye pupils). Brand palette:
+    cream #FFFEF8 -> #F5E6CC -> #FFB088, spark #FFD78A -> #F59E0B,
+    sky #A8DCF0 -> #5BA8D8, ink accent #1E2640.
   -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#1E2640"/>
-      <stop offset="1" stop-color="#0B0F1E"/>
+      <stop stop-color="#A8DCF0"/>
+      <stop offset=".55" stop-color="#FFE5C2"/>
+      <stop offset="1" stop-color="#FFD09A"/>
     </linearGradient>
-    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+    <radialGradient id="bgGlow" cx="50%" cy="42%" r="60%">
+      <stop stop-color="#FFFEF8" stop-opacity=".6"/>
+      <stop offset="1" stop-color="#FFFEF8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="body" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop stop-color="#6FC0E8"/>
+      <stop offset=".45" stop-color="#2E78C8"/>
+      <stop offset="1" stop-color="#1E5BA8"/>
+    </linearGradient>
+    <linearGradient id="bodyShade" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#2E78C8" stop-opacity="0"/>
+      <stop offset="1" stop-color="#1E4A78" stop-opacity=".55"/>
+    </linearGradient>
+    <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1">
       <stop stop-color="#FFFEF8"/>
-      <stop offset=".55" stop-color="#F5E6CC"/>
-      <stop offset="1" stop-color="#D4A574"/>
+      <stop offset=".55" stop-color="#FFE0C0"/>
+      <stop offset="1" stop-color="#FFB088"/>
+    </linearGradient>
+    <linearGradient id="hat" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#FFFEF8"/>
+      <stop offset="1" stop-color="#FFE0C0"/>
+    </linearGradient>
+    <linearGradient id="flipperWave" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#6FC0E8"/>
+      <stop offset="1" stop-color="#1E5BA8"/>
     </linearGradient>
     <radialGradient id="spark" cx="35%" cy="35%" r="65%">
-      <stop stop-color="#FFD78A"/>
+      <stop stop-color="#FFEFB0"/>
       <stop offset="1" stop-color="#F59E0B"/>
     </radialGradient>
-    <radialGradient id="sparkGlow" cx="50%" cy="50%" r="50%">
-      <stop stop-color="#F59E0B" stop-opacity=".35"/>
-      <stop offset="1" stop-color="#F59E0B" stop-opacity="0"/>
+    <radialGradient id="cheek" cx="50%" cy="50%" r="50%">
+      <stop stop-color="#FF7A6B" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#FF7A6B" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bubble" cx="35%" cy="35%" r="65%">
+      <stop stop-color="#FFFEF8" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#FFFEF8" stop-opacity=".3"/>
     </radialGradient>
     <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
   </defs>
 
   <g clip-path="url(#clip)">
     <rect x="38" y="38" width="948" height="948" fill="url(#bg)"/>
+    <rect x="38" y="38" width="948" height="948" fill="url(#bgGlow)"/>
 
-    <!-- subtle warm wash for depth -->
-    <circle cx="512" cy="512" r="360" fill="#F5E6CC" opacity=".04"/>
-    <circle cx="512" cy="512" r="260" fill="#F5E6CC" opacity=".06"/>
+    <!-- background confetti sparkles (4-point stars) -->
+    <g fill="#F59E0B" opacity=".95">
+      <path d="M 150 320 l 6 -22 l 6 22 l 22 6 l -22 6 l -6 22 l -6 -22 l -22 -6 z"/>
+      <path d="M 880 380 l 5 -18 l 5 18 l 18 5 l -18 5 l -5 18 l -5 -18 l -18 -5 z"/>
+      <path d="M 130 700 l 4 -16 l 4 16 l 16 4 l -16 4 l -4 16 l -4 -16 l -16 -4 z"/>
+      <path d="M 900 700 l 5 -18 l 5 18 l 18 5 l -18 5 l -5 18 l -5 -18 l -18 -5 z"/>
+    </g>
+    <g fill="#FFFEF8" opacity=".85">
+      <path d="M 220 200 l 3 -12 l 4 12 l 12 3 l -12 4 l -4 12 l -3 -12 l -12 -4 z"/>
+      <path d="M 820 140 l 3 -12 l 4 12 l 12 3 l -12 4 l -4 12 l -3 -12 l -12 -4 z"/>
+      <path d="M 820 880 l 3 -12 l 4 12 l 12 3 l -12 4 l -4 12 l -3 -12 l -12 -4 z"/>
+      <path d="M 180 820 l 3 -10 l 3 10 l 10 3 l -10 3 l -3 10 l -3 -10 l -10 -3 z"/>
+    </g>
 
-    <!--
-      Open ring: 3/4 of a circle. The arc starts at top-right (~-45deg)
-      and sweeps 270deg clockwise, leaving a gap at the top-right where
-      the companion sphere sits just outside.
-      Stroke-linecap round gives the open ends a soft terminal.
-    -->
-    <path d="M 798.82 384.94 A 280 280 0 1 0 798.82 639.06"
-          fill="none"
-          stroke="url(#ring)"
-          stroke-width="96"
-          stroke-linecap="round"/>
+    <!-- ambient bubbles -->
+    <circle cx="180" cy="500" r="14" fill="url(#bubble)" opacity=".65"/>
+    <circle cx="240" cy="540" r="8"  fill="url(#bubble)" opacity=".75"/>
+    <circle cx="860" cy="540" r="12" fill="url(#bubble)" opacity=".7"/>
+    <circle cx="900" cy="600" r="6"  fill="url(#bubble)" opacity=".8"/>
+    <circle cx="160" cy="860" r="10" fill="url(#bubble)" opacity=".7"/>
 
-    <!-- glow halo behind the companion sphere -->
-    <circle cx="838" cy="298" r="120" fill="url(#sparkGlow)"/>
+    <!-- whale group (slightly tilted for energy) -->
+    <g transform="rotate(-7 512 540)">
+      <!-- dynamic spout (curving arc up and to the right) -->
+      <g>
+        <path d="M 478 200
+                 C 460 150, 520 110, 600 70
+                 C 640 50, 680 50, 660 90
+                 C 620 130, 560 160, 520 220 Z"
+              fill="url(#spark)"/>
+        <path d="M 500 180
+                 C 510 130, 580 100, 640 90
+                 C 670 86, 660 110, 620 130
+                 C 580 150, 540 180, 520 220 Z"
+              fill="url(#spark)" opacity=".7"/>
+        <circle cx="640" cy="80"  r="10" fill="#FFD78A"/>
+        <circle cx="700" cy="60"  r="8"  fill="#FFD78A"/>
+        <circle cx="580" cy="50"  r="7"  fill="#FFD78A"/>
+        <circle cx="730" cy="110" r="6"  fill="#FFD78A"/>
+        <circle cx="660" cy="40"  r="5"  fill="#FFD78A"/>
+        <circle cx="540" cy="90"  r="6"  fill="#FFD78A"/>
+      </g>
 
-    <!-- companion sphere (the Buddy spark / AI companion) -->
-    <circle cx="838" cy="298" r="68" fill="url(#spark)"/>
-    <!-- specular highlight on the sphere -->
-    <circle cx="816" cy="278" r="20" fill="#FFFEF8" opacity=".55"/>
+      <!-- tail flukes -->
+      <g>
+        <path d="M 500 770 Q 420 800 380 870 Q 380 882 410 870 Q 460 850 510 810 Z"
+              fill="url(#body)"/>
+        <path d="M 524 770 Q 604 800 644 870 Q 644 882 614 870 Q 564 850 514 810 Z"
+              fill="url(#body)"/>
+      </g>
+
+      <!-- main body -->
+      <path d="M 512 240
+               C 696 240, 826 380, 826 560
+               C 826 740, 696 840, 512 840
+               C 328 840, 198 740, 198 560
+               C 198 380, 328 240, 512 240 Z"
+            fill="url(#body)"/>
+      <path d="M 512 240
+               C 696 240, 826 380, 826 560
+               C 826 740, 696 840, 512 840
+               C 328 840, 198 740, 198 560
+               C 198 380, 328 240, 512 240 Z"
+            fill="url(#bodyShade)"/>
+
+      <!-- left side flipper -->
+      <path d="M 240 580
+               C 200 600, 178 650, 198 690
+               C 220 720, 270 700, 296 660
+               C 314 630, 286 580, 240 580 Z"
+            fill="url(#body)"/>
+
+      <!-- raised flipper (waving hello!) -->
+      <g transform="rotate(-35 790 600)">
+        <path d="M 740 540
+                 C 820 530, 870 540, 880 580
+                 C 880 620, 840 640, 790 640
+                 C 750 640, 720 620, 720 590
+                 C 720 560, 730 545, 740 540 Z"
+              fill="url(#flipperWave)"/>
+        <path d="M 820 600 Q 830 590 840 600"
+              stroke="#1E4A78" stroke-width="3" fill="none" stroke-linecap="round" opacity=".5"/>
+      </g>
+
+      <!-- belly -->
+      <path d="M 512 480
+               C 632 480, 712 560, 712 690
+               C 712 800, 632 840, 512 840
+               C 392 840, 312 800, 312 690
+               C 312 560, 392 480, 512 480 Z"
+            fill="url(#belly)"/>
+
+      <!-- cheeks (warm coral) -->
+      <ellipse cx="278" cy="640" rx="60" ry="34" fill="url(#cheek)"/>
+      <ellipse cx="746" cy="640" rx="60" ry="34" fill="url(#cheek)"/>
+
+      <!-- left eye (big open, navy pupil) -->
+      <ellipse cx="396" cy="510" rx="78" ry="98" fill="#FFFEF8"/>
+      <ellipse cx="408" cy="530" rx="50" ry="68" fill="#1E2640"/>
+      <circle cx="424" cy="496" r="22" fill="#FFFEF8"/>
+      <circle cx="394" cy="556" r="11" fill="#FFFEF8"/>
+      <circle cx="442" cy="546" r="6"  fill="#FFFEF8"/>
+
+      <!-- right eye (winking - happy curve) -->
+      <path d="M 580 510
+               Q 628 568 676 510"
+            fill="none" stroke="#1E2640"
+            stroke-width="16" stroke-linecap="round"/>
+      <path d="M 676 510 l 14 -8"
+            stroke="#1E2640" stroke-width="8" stroke-linecap="round"/>
+
+      <!-- mouth (open laughing smile, coral interior) -->
+      <path d="M 462 640
+                  Q 462 710, 512 720
+                  Q 562 710, 562 640
+                  Q 562 690, 512 690
+                  Q 462 690, 462 640 Z"
+            fill="#FF6B6B"/>
+      <!-- tongue (brighter pink) -->
+      <path d="M 484 678
+               Q 512 712, 540 678
+               Q 540 700, 512 700
+               Q 484 700, 484 678 Z"
+            fill="#FF9A8B"/>
+      <!-- tooth highlight -->
+      <path d="M 502 642 L 502 656 L 510 656 L 510 642 Z" fill="#FFFEF8"/>
+
+      <!-- captain's cap (tilted) -->
+      <g transform="rotate(8 512 250)">
+        <ellipse cx="512" cy="294" rx="194" ry="20" fill="#1E4A78"/>
+        <path d="M 392 294
+                 C 392 224, 432 188, 512 188
+                 C 592 188, 632 224, 632 294 Z"
+              fill="url(#hat)"/>
+        <path d="M 392 280 L 632 280
+                 L 632 308
+                 C 632 318, 622 324, 608 324
+                 L 416 324
+                 C 402 324, 392 318, 392 308 Z"
+              fill="#1E2640"/>
+        <g transform="translate(512 302)">
+          <circle r="15" fill="#FFD78A"/>
+          <path d="M 0 -8 L 2 -2 L 8 -2 L 3 2 L 5 8 L 0 4 L -5 8 L -3 2 L -8 -2 L -2 -2 Z"
+                fill="#1E2640"/>
+        </g>
+      </g>
+    </g>
+
+    <!-- comic burst behind the waving flipper -->
+    <g transform="translate(800 240)" opacity=".95">
+      <path d="M 0 -56 L 12 -36 L 36 -42 L 24 -20 L 52 -8 L 28 4 L 36 28 L 14 22 L 4 50 L -8 24 L -32 32 L -22 8 L -50 0 L -22 -10 L -32 -34 L -8 -28 L -2 -54 Z"
+            fill="#F59E0B"/>
+      <path d="M 0 -36 L 8 -22 L 22 -26 L 16 -12 L 32 -6 L 18 0 L 22 16 L 8 12 L 0 30 L -8 14 L -22 18 L -14 0 L -32 -6 L -14 -8 L -22 -22 L -8 -18 Z"
+            fill="#FFD78A"/>
+    </g>
   </g>
 </svg>

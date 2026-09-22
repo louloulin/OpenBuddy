@@ -1,41 +1,107 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy Admin Portal">
+  <!--
+    OpenBuddy admin portal mark v18 - "Buddy the Whale".
+    Sub-project tile that inherits the OpenBuddy brand identity.
+  -->
   <defs>
-    <linearGradient id="badge" x1="120" y1="90" x2="900" y2="940" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#13665C"/><stop offset=".52" stop-color="#0C4A48"/><stop offset="1" stop-color="#083034"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#A8DCF0"/>
+      <stop offset=".55" stop-color="#FFE5C2"/>
+      <stop offset="1" stop-color="#FFD09A"/>
     </linearGradient>
-    <linearGradient id="coat" x1="290" y1="210" x2="750" y2="800" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFCB86"/><stop offset=".5" stop-color="#FCA23F"/><stop offset="1" stop-color="#EF7E27"/>
+    <linearGradient id="body" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop stop-color="#6FC0E8"/>
+      <stop offset=".45" stop-color="#2E78C8"/>
+      <stop offset="1" stop-color="#1E5BA8"/>
     </linearGradient>
+    <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#FFFEF8"/>
+      <stop offset=".55" stop-color="#FFE0C0"/>
+      <stop offset="1" stop-color="#FFB088"/>
+    </linearGradient>
+    <linearGradient id="hat" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#FFFEF8"/>
+      <stop offset="1" stop-color="#FFE0C0"/>
+    </linearGradient>
+    <radialGradient id="spark" cx="35%" cy="35%" r="65%">
+      <stop stop-color="#FFEFB0"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </radialGradient>
+    <radialGradient id="cheek" cx="50%" cy="50%" r="50%">
+      <stop stop-color="#FF7A6B" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#FF7A6B" stop-opacity="0"/>
+    </radialGradient>
     <clipPath id="clip"><rect x="38" y="38" width="948" height="948" rx="224"/></clipPath>
   </defs>
 
   <g clip-path="url(#clip)">
-    <rect x="38" y="38" width="948" height="948" rx="224" fill="url(#badge)"/>
-    <circle cx="286" cy="232" r="430" fill="#FFFFFF" opacity=".07"/>
+    <rect x="38" y="38" width="948" height="948" fill="url(#bg)"/>
 
-    <g transform="matrix(1.05 0 0 1.05 -25.6 -15.1)">
-      <!-- ears: big, splayed, with a deep notch so the silhouette survives 16px -->
-      <path d="M312 470C276 372 274 262 290 220C324 206 398 296 442 394C396 410 348 438 312 470Z" fill="url(#coat)"/>
-      <path d="M712 470C748 372 750 262 734 220C700 206 626 296 582 394C628 410 676 438 712 470Z" fill="url(#coat)"/>
-      <path d="M344 424C326 356 324 300 336 280C354 274 396 332 412 386C384 396 362 408 344 424Z" fill="#FFF6E8"/>
-      <path d="M680 424C698 356 700 300 688 280C670 274 628 332 612 386C640 396 662 408 680 424Z" fill="#FFF6E8"/>
+    <!-- confetti -->
+    <g fill="#F59E0B" opacity=".9">
+      <path d="M 150 320 l 6 -22 l 6 22 l 22 6 l -22 6 l -6 22 l -6 -22 l -22 -6 z"/>
+      <path d="M 880 380 l 5 -18 l 5 18 l 18 5 l -18 5 l -5 18 l -5 -18 l -18 -5 z"/>
+    </g>
 
-      <!-- head -->
-      <path d="M512 356C660 356 748 452 748 574C748 704 646 792 512 792C378 792 276 704 276 574C276 452 364 356 512 356Z" fill="url(#coat)"/>
+    <g transform="rotate(-7 512 540)">
+      <!-- spout -->
+      <g>
+        <path d="M 478 200 C 460 150, 520 110, 600 70 C 640 50, 680 50, 660 90 C 620 130, 560 160, 520 220 Z" fill="url(#spark)"/>
+        <circle cx="640" cy="80" r="10" fill="#FFD78A"/>
+        <circle cx="700" cy="60" r="8" fill="#FFD78A"/>
+        <circle cx="580" cy="50" r="7" fill="#FFD78A"/>
+      </g>
 
-      <!-- cream mask: wide muzzle wrapping the lower face, plus brow spots -->
-      <path d="M512 556C602 556 664 596 664 656C664 700 640 740 604 760C580 772 546 778 512 778C478 778 444 772 420 760C384 740 360 700 360 656C360 596 422 556 512 556Z" fill="#FFF6E8"/>
-      <circle cx="416" cy="434" r="31" fill="#FFF6E8"/><circle cx="608" cy="434" r="31" fill="#FFF6E8"/>
+      <!-- tail -->
+      <path d="M 500 770 Q 420 800 380 870 Q 380 882 410 870 Q 460 850 510 810 Z" fill="url(#body)"/>
+      <path d="M 524 770 Q 604 800 644 870 Q 644 882 614 870 Q 564 850 514 810 Z" fill="url(#body)"/>
 
-      <!-- eyes -->
-      <ellipse cx="426" cy="506" rx="34" ry="38" fill="#2B1A11"/>
-      <ellipse cx="598" cy="506" rx="34" ry="38" fill="#2B1A11"/>
-      <circle cx="415" cy="494" r="11" fill="#FFFFFF"/><circle cx="587" cy="494" r="11" fill="#FFFFFF"/>
+      <!-- body -->
+      <path d="M 512 240 C 696 240, 826 380, 826 560 C 826 740, 696 840, 512 840 C 328 840, 198 740, 198 560 C 198 380, 328 240, 512 240 Z" fill="url(#body)"/>
 
-      <!-- nose + smile -->
-      <path d="M466 622C466 606 484 598 512 598C540 598 558 606 558 622C558 648 534 674 512 674C490 674 466 648 466 622Z" fill="#2B1A11"/>
-      <path d="M512 676V700" stroke="#2B1A11" stroke-width="18" stroke-linecap="round"/>
-      <path d="M512 700C512 732 474 742 455 720M512 700C512 732 550 742 569 720" fill="none" stroke="#2B1A11" stroke-width="18" stroke-linecap="round"/>
+      <!-- raised flipper waving -->
+      <g transform="rotate(-35 790 600)">
+        <path d="M 740 540 C 820 530, 870 540, 880 580 C 880 620, 840 640, 790 640 C 750 640, 720 620, 720 590 C 720 560, 730 545, 740 540 Z" fill="url(#body)"/>
+      </g>
+
+      <!-- belly -->
+      <path d="M 512 480 C 632 480, 712 560, 712 690 C 712 800, 632 840, 512 840 C 392 840, 312 800, 312 690 C 312 560, 392 480, 512 480 Z" fill="url(#belly)"/>
+
+      <!-- cheeks -->
+      <ellipse cx="278" cy="640" rx="60" ry="34" fill="url(#cheek)"/>
+      <ellipse cx="746" cy="640" rx="60" ry="34" fill="url(#cheek)"/>
+
+      <!-- left eye -->
+      <ellipse cx="396" cy="510" rx="78" ry="98" fill="#FFFEF8"/>
+      <ellipse cx="408" cy="530" rx="50" ry="68" fill="#1E2640"/>
+      <circle cx="424" cy="496" r="22" fill="#FFFEF8"/>
+      <circle cx="394" cy="556" r="11" fill="#FFFEF8"/>
+
+      <!-- right wink -->
+      <path d="M 580 510 Q 628 568 676 510" fill="none" stroke="#1E2640" stroke-width="16" stroke-linecap="round"/>
+      <path d="M 676 510 l 14 -8" stroke="#1E2640" stroke-width="8" stroke-linecap="round"/>
+
+      <!-- mouth -->
+      <path d="M 462 640 Q 462 710, 512 720 Q 562 710, 562 640 Q 562 690, 512 690 Q 462 690, 462 640 Z" fill="#FF6B6B"/>
+      <path d="M 484 678 Q 512 712, 540 678 Q 540 700, 512 700 Q 484 700, 484 678 Z" fill="#FF9A8B"/>
+      <path d="M 502 642 L 502 656 L 510 656 L 510 642 Z" fill="#FFFEF8"/>
+
+      <!-- cap -->
+      <g transform="rotate(8 512 250)">
+        <ellipse cx="512" cy="294" rx="194" ry="20" fill="#1E4A78"/>
+        <path d="M 392 294 C 392 224, 432 188, 512 188 C 592 188, 632 224, 632 294 Z" fill="url(#hat)"/>
+        <path d="M 392 280 L 632 280 L 632 308 C 632 318, 622 324, 608 324 L 416 324 C 402 324, 392 318, 392 308 Z" fill="#1E2640"/>
+        <g transform="translate(512 302)">
+          <circle r="15" fill="#FFD78A"/>
+          <path d="M 0 -8 L 2 -2 L 8 -2 L 3 2 L 5 8 L 0 4 L -5 8 L -3 2 L -8 -2 L -2 -2 Z" fill="#1E2640"/>
+        </g>
+      </g>
+    </g>
+
+    <!-- "Admin" sub-label badge -->
+    <g transform="translate(512 920)">
+      <rect x="-180" y="-44" width="360" height="88" rx="44" fill="#FFFEF8"/>
+      <text x="0" y="14" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="44" font-weight="700" fill="#1E5BA8" letter-spacing="6">ADMIN</text>
     </g>
   </g>
 </svg>

@@ -4,7 +4,7 @@
 
 ### Logo
 
-OpenBuddy logo 是 **"Open Ring" 标志**:一个 3/4 圆环(开口环)代表 *Open* 与透明,环外一颗小球代表 *Buddy* 与 AI 火花。扁平几何、三组配色 —— 暖米白 `#FFFEF8 → #F5E6CC → #D4A574`、暖琥珀 `#F59E0B`、深墨蓝 `#0B0F1E → #1E2640` —— 16 px favicon 到 1024 px app icon 任何尺寸都清晰。
+OpenBuddy logo 是 **"Buddy the Whale" 标志**:一只提莫风格的萌系鲸鱼,沿用英雄联盟角色化设计语言。圆胖身、超大表情眼、迷你尾鳍与胸鳍、标志性船长帽、动感的暖琥珀水柱。品牌三组配色 —— 天蓝/奶油 `#A8DCF0 → #FFE5C2 → #FFD09A`、海洋/火花 `#6FC0E8 → #2E78C8 → #F59E0B → #FFD78A`、珊瑚 `#FF6B6B → #FF9A8B` —— `#1E2640` 仅作小面积海军蓝装饰,无纯黑色,16 px favicon 到 1024 px app icon 任何尺寸都清晰。
 
 | 资产 | 文件 | 格式 | 推荐尺寸 |
 |---|---|---|---|
@@ -13,6 +13,11 @@ OpenBuddy logo 是 **"Open Ring" 标志**:一个 3/4 圆环(开口环)代表 *Op
 | App 图标(位图主) | `app-icon.png` | PNG | 1024×1024 |
 | 单色版 | `openbuddy-logo-mono.svg` | SVG | ≥ 48 px |
 | 字标 | `openbuddy-wordmark.svg` | SVG | 宽 ≥ 240 px |
+| 顶栏图标(浅色) | `src/assets/header-icon.svg` | SVG | 16–32 px |
+| 顶栏图标(深色) | `src/assets/header-icon-dark.svg` | SVG | 16–32 px |
+| 吉祥物位图 | `src/assets/mascot-new.png` | PNG | ≥ 256 px |
+| 欢迎页(浅色) | `src/assets/claw-welcome-light.svg` | SVG | 240 px |
+| 欢迎页(深色) | `src/assets/claw-welcome-dark.svg` | SVG | 240 px |
 | 网站图标 | `public/favicon.ico` | ICO | 16 / 32 / 48 |
 | macOS 应用 | `build/icon.icns` | ICNS | 脚本生成 |
 | Windows 应用 | `build/icon.ico` | ICO | 脚本生成 |
@@ -44,7 +49,7 @@ pnpm brand:icons
 - 不要加投影、发光等效果
 - 不要放在杂乱背景上,除非底下垫纯色面板
 - 不要用来代表不相关产品
-- 不要修改字母组合拼其他词
+- 不要把鲸鱼吉祥物改成别的形象(未经允许)
 
 ### 清晰空间
 
