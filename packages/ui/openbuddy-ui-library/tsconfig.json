@@ -153,7 +153,16 @@
       "@openbuddy/ui-shared/agent-paths": ["./packages/ui/openbuddy-ui-shared/src/agent-paths.ts"],
       "@openbuddy/ui-shared/use-agent-paths": ["./packages/ui/openbuddy-ui-shared/src/use-agent-paths.ts"],
       "@openbuddy/ui-email/ai": ["./packages/ui/openbuddy-ui-email/src/ai/index.ts"],
-      "@openbuddy/ui-email/ai/styles.css": ["./packages/ui/openbuddy-ui-email/src/ai/ai.css"]
+      "@openbuddy/ui-email/ai/styles.css": ["./packages/ui/openbuddy-ui-email/src/ai/ai.css"],
+      "@openbuddy/agent-rpc": ["./packages/ui/openbuddy-agent-rpc/src/index.ts"],
+      "@openbuddy/platform": ["./packages/ui/openbuddy-platform/src/index.ts"],
+      "@openbuddy/platform/app-version": ["./packages/ui/openbuddy-platform/src/app-version.ts"],
+      "@openbuddy/platform/electron-api": ["./packages/ui/openbuddy-platform/src/electron-api.ts"],
+      "@openbuddy/platform/i18n": ["./packages/ui/openbuddy-platform/src/i18n.ts"],
+      "@openbuddy/platform/platform": ["./packages/ui/openbuddy-platform/src/platform.ts"],
+      "@openbuddy/ui-contract": ["./packages/ui/openbuddy-ui-contract/src/index.ts"],
+      "@openbuddy/ui-state": ["./packages/ui/openbuddy-ui-state/src/index.ts"],
+      "@openbuddy/ui-state/projects-store": ["./packages/ui/openbuddy-ui-state/src/projects-store.ts"]
     },
     "rootDir": "../.."
   },

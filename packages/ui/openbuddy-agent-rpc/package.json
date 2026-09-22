@@ -1,0 +1,19 @@
+{
+  "name": "@openbuddy/agent-rpc",
+  "version": "0.15.0",
+  "private": true,
+  "type": "module",
+  "description": "渲染层 ↔ 主进程的 agent RPC 契约面（阶段2 反向依赖收敛目标）",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "typescript": "^5.6.3",
+    "vitest": "2.1.9"
+  }
+}

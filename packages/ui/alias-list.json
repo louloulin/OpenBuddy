@@ -1,5 +1,26 @@
 [
   {
+    "dir": "openbuddy-agent-rpc",
+    "name": "@openbuddy/agent-rpc",
+    "main": "./packages/ui/openbuddy-agent-rpc/src/index.ts",
+    "client": null,
+    "invariant": null,
+    "subpaths": {}
+  },
+  {
+    "dir": "openbuddy-platform",
+    "name": "@openbuddy/platform",
+    "main": "./packages/ui/openbuddy-platform/src/index.ts",
+    "client": null,
+    "invariant": null,
+    "subpaths": {
+      "app-version": "./packages/ui/openbuddy-platform/src/app-version.ts",
+      "electron-api": "./packages/ui/openbuddy-platform/src/electron-api.ts",
+      "i18n": "./packages/ui/openbuddy-platform/src/i18n.ts",
+      "platform": "./packages/ui/openbuddy-platform/src/platform.ts"
+    }
+  },
+  {
     "dir": "openbuddy-ui-account",
     "name": "@openbuddy/ui-account",
     "main": "./packages/ui/openbuddy-ui-account/src/index.ts",
@@ -32,6 +53,14 @@
     "main": "./packages/ui/openbuddy-ui-collaboration/src/index.ts",
     "client": "./packages/ui/openbuddy-ui-collaboration/src/client.tsx",
     "invariant": "./packages/ui/openbuddy-ui-collaboration/src/invariant.ts",
+    "subpaths": {}
+  },
+  {
+    "dir": "openbuddy-ui-contract",
+    "name": "@openbuddy/ui-contract",
+    "main": "./packages/ui/openbuddy-ui-contract/src/index.ts",
+    "client": null,
+    "invariant": null,
     "subpaths": {}
   },
   {
@@ -191,7 +220,7 @@
     "name": "@openbuddy/ui-motion",
     "main": "./packages/ui/openbuddy-ui-motion/src/index.ts",
     "client": "./packages/ui/openbuddy-ui-motion/src/client.ts",
-    "invariant": "./packages/ui/openbuddy-ui-motion/src/invariant.ts",
+    "invariant": null,
     "subpaths": {
       "easings": "./packages/ui/openbuddy-ui-motion/src/easings.ts",
       "presets": "./packages/ui/openbuddy-ui-motion/src/presets.ts"
@@ -283,6 +312,16 @@
     "client": "./packages/ui/openbuddy-ui-slots/src/client.ts",
     "invariant": "./packages/ui/openbuddy-ui-slots/src/invariant.ts",
     "subpaths": {}
+  },
+  {
+    "dir": "openbuddy-ui-state",
+    "name": "@openbuddy/ui-state",
+    "main": "./packages/ui/openbuddy-ui-state/src/index.ts",
+    "client": null,
+    "invariant": null,
+    "subpaths": {
+      "projects-store": "./packages/ui/openbuddy-ui-state/src/projects-store.ts"
+    }
   },
   {
     "dir": "openbuddy-ui-theme",

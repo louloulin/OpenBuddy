@@ -18,6 +18,15 @@ const repoRoot = resolve(fileURLToPath(import.meta.url), "../..");
 const uiDir = join(repoRoot, "packages/ui");
 const aliasListPath = join(uiDir, "alias-list.json");
 
+// 契约包（阶段2）：这些目录同样位于 packages/ui/ 下并需要生成 paths / alias，
+// 但目录名不带 `ui-` 前缀 —— `packageName()` 由 `openbuddy-agent-rpc` 得到
+// `@openbuddy/agent-rpc`、由 `openbuddy-platform` 得到 `@openbuddy/platform`，
+// 正是目标包名，所以不能靠改目录名去迁就 `openbuddy-ui-*` 过滤器。
+const CONTRACT_PACKAGE_DIRS = new Set([
+  "openbuddy-agent-rpc",
+  "openbuddy-platform",
+]);
+
 // 工作区非 ui-* 包的别名(供 ui-* 包跨包 import)
 const workspacePackageAliases = {
   "@openbuddy/shared-types": "packages/shared/openbuddy-types/src/index.ts",
@@ -35,7 +44,11 @@ const workspacePackageAliases = {
 function listUiPackages() {
   if (!existsSync(uiDir)) return [];
   return readdirSync(uiDir, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && e.name.startsWith("openbuddy-ui-"))
+    .filter(
+      (e) =>
+        e.isDirectory() &&
+        (e.name.startsWith("openbuddy-ui-") || CONTRACT_PACKAGE_DIRS.has(e.name)),
+    )
     .map((e) => e.name)
     .sort();
 }
@@ -75,8 +88,19 @@ function buildDesiredPaths(packages) {
   for (const dir of packages) {
     const name = packageName(dir);
     paths.push([name, [srcEntry(dir)]]);
-    paths.push([name + "/client", [srcEntry(dir, "client")]]);
-    paths.push([name + "/invariant", [srcEntry(dir, "invariant")]]);
+    // client / invariant 是**可选**表面：只有文件真的存在时才写这条 alias，
+    // 否则会生成指向不存在文件的路径（契约包两者都没有）。注意
+    // patchTsconfigPaths 只做插入、从不删除，所以一旦写错就撒不回来，
+    // 必须靠这个存在性判断在源头拦住。
+    if (
+      existsSync(join(uiDir, dir, "src", "client.ts")) ||
+      existsSync(join(uiDir, dir, "src", "client.tsx"))
+    ) {
+      paths.push([name + "/client", [srcEntry(dir, "client")]]);
+    }
+    if (existsSync(join(uiDir, dir, "src", "invariant.ts"))) {
+      paths.push([name + "/invariant", [srcEntry(dir, "invariant")]]);
+    }
 
     const pkgPath = join(uiDir, dir, "package.json");
     if (existsSync(pkgPath)) {
@@ -198,8 +222,15 @@ function buildPackageUiPaths(packages, thisPackageName) {
     // 不跳过自身:其他包(被 paths 间接拉入 program)的文件可能反向引用本包,
     // 此时需要 `@openbuddy/<self>` 也可解析。
     paths.push([name, [srcEntry(dir)]]);
-    paths.push([name + "/client", [srcEntry(dir, "client")]]);
-    paths.push([name + "/invariant", [srcEntry(dir, "invariant")]]);
+    if (
+      existsSync(join(uiDir, dir, "src", "client.ts")) ||
+      existsSync(join(uiDir, dir, "src", "client.tsx"))
+    ) {
+      paths.push([name + "/client", [srcEntry(dir, "client")]]);
+    }
+    if (existsSync(join(uiDir, dir, "src", "invariant.ts"))) {
+      paths.push([name + "/invariant", [srcEntry(dir, "invariant")]]);
+    }
 
     // Subpath exports
     const pkgPath = join(uiDir, dir, "package.json");
@@ -391,16 +422,29 @@ function writeAliasList(packages) {
   // 既给 vite alias 用,也给 consumers(文档/编辑器)用:每个 ui-* 包的所有
   // subpath(./、./client、./invariant、./styles、./icons、./schedule-utils …)
   // 一并展开。读取 buildDesiredPaths 的同一份数据,避免漏写。
+  // 阶段2 起 packages/ui/ 下还包含契约包(`@openbuddy/agent-rpc`、
+  // `@openbuddy/platform`)，其包名不带 `ui-` 前缀 —— 所以这里不能再靠正则
+  // 从包名**反推**目录名，必须用 dir → name 映射正查。否则这些包会**静默**
+  // 缺席 alias-list.json，使 vite alias 侧与 tsconfig paths 侧不一致。
+  const dirByName = new Map();
+  for (const dir of packages) dirByName.set(packageName(dir), dir);
+
   const desired = buildDesiredPaths(packages);
   const byName = new Map();
   for (const [name, targetList] of desired) {
-    if (!name.startsWith("@openbuddy/ui-")) continue;
-    const seg = name.replace(/^@openbuddy\//, "");
-    const m = seg.match(/^ui-([a-z\-]+)(\/(.*))?$/);
-    if (!m) continue;
-    const [, pkgName, , subpath] = m;
-    if (!byName.has(pkgName)) byName.set(pkgName, { dir: "openbuddy-ui-" + pkgName, name: "@openbuddy/ui-" + pkgName, main: null, client: null, invariant: null, subpaths: {} });
-    const entry = byName.get(pkgName);
+    // scoped 包名的前缀是**两段**(`@openbuddy/<pkg>`)，不能用 split("/")[0]
+    // —— 那样 `@openbuddy/ui-theme/client` 会被当成 `@openbuddy`，
+    // dirByName 查不到就 continue，于是**所有带子路径的条目被静默丢弃**
+    // (client / invariant / subpaths 全丢)，vite 侧只剩裸包名 alias，
+    // 子路径 import 退化成 `<main>/client` 拼接 → ENOTDIR 构建失败。
+    const base = dirByName.has(name) ? name : name.split("/").slice(0, 2).join("/");
+    const dir = dirByName.get(base);
+    if (!dir) continue;
+    const subpath = name === base ? "" : name.slice(base.length + 1);
+    if (!byName.has(base)) {
+      byName.set(base, { dir, name: base, main: null, client: null, invariant: null, subpaths: {} });
+    }
+    const entry = byName.get(base);
     const target = targetList[0];
     if (!subpath) entry.main = target;
     else if (subpath === "client") entry.client = target;
