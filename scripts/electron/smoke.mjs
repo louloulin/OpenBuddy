@@ -1360,14 +1360,32 @@ try {
     isolatedRoom: "electron-smoke-room",
     deleted: calendarDeleted === true,
   };
+  // Per docs/audit/deepseek-endpoint-decision.md Option C, dynamicCordisRunner
+  // was removed from the capability table. Smoke treats the explicit
+  // `endpoint-not-registered` reply as the expected state, not a failure.
   const dshInventory = await invoke("dsh:remote", { namespace: "dynamicCordisRunner", method: "inventory" });
-  if (!dshInventory?.ok || !Array.isArray(dshInventory.value?.packages) || !Array.isArray(dshInventory.value?.tasks)) {
+  const dshInventoryEndpointMissing =
+    dshInventory &&
+    dshInventory.ok === false &&
+    dshInventory.error?.code === "endpoint-not-registered" &&
+    dshInventory.error?.details?.endpoint === "dynamicCordisRunner/inventory";
+  if (!dshInventoryEndpointMissing &&
+      (!dshInventory?.ok || !Array.isArray(dshInventory.value?.packages) || !Array.isArray(dshInventory.value?.tasks))) {
     throw new Error(`DeepSeek host runner inventory failed: ${JSON.stringify(dshInventory)}`);
   }
+  // Smoke uses a `messageFeedbackList` descriptor because `messageFeedback`
+  // is one of the two services that `wireDshServices` actually populates
+  // into `dshRemotes`. After dynamicCordisRunner was removed (Option C in
+  // docs/audit/deepseek-endpoint-decision.md), the original
+  // `{service:"commands",method:"list"}` descriptor no longer resolves to a
+  // real implementation, and the round-trip started returning
+  // `service-unavailable`. Switching to `messageFeedback` exercises the same
+  // IPC chain without depending on a capability that may not be wired in
+  // a given build.
   const dshRemotePackage = `electron-smoke-remote-${Date.now()}`;
   const dshRegistration = await invoke("dsh:remote-register", {
     package: dshRemotePackage,
-    descriptors: [{ namespace: "smoke", method: "list", service: "commands", implementation: "list" }],
+    descriptors: [{ namespace: "smoke", method: "list", service: "messageFeedback", implementation: "list" }],
   });
   const dshInvocation = await invoke("dsh:remote", { package: dshRemotePackage, namespace: "smoke", method: "list" });
   const dshUnregistration = await invoke("dsh:remote-unregister", { package: dshRemotePackage });

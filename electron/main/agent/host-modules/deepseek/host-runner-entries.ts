@@ -63,7 +63,8 @@ const BASE_HOST_RUNNER_ENTRIES: ReadonlyArray<PluginEntryOptions> = [
   { id: "openbuddy-dsh-plugin-inventory", name: "@deepseek-ai/dsh-host-plugin-inventory" },
   { id: "openbuddy-dsh-message-feedback", name: "@deepseek-ai/dsh-message-feedback" },
   { id: "openbuddy-dsh-session-reference", name: "@deepseek-ai/dsh-session-reference" },
-  { id: "openbuddy-dsh-cordis-host-runner", name: "@deepseek-ai/dsh-cordis-host-runner" },
+  // dynamicCordisRunner removed per docs/audit/deepseek-endpoint-decision.md
+  // Option C — see init-deepseek.ts DEEPSEEK_CORE_CAPABILITY_PACKAGES comment.
   { id: "openbuddy-dsh-user-questions", name: "@deepseek-ai/dsh-user-questions" },
   { id: "openbuddy-dsh-user-approval", name: "@deepseek-ai/dsh-user-approval" },
   // Pi-backed implementations for the Harness model-facing tools. Pi ships

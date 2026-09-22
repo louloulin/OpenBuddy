@@ -88,23 +88,20 @@ const definitions: readonly CapabilityDefinition[] = [
     methods: ["candidates"],
     descriptors: [{ namespace: "sessionReferenceResolver", method: "candidates", implementation: "candidates", service: "sessionReferenceResolver", parameters: [{ name: "agent", wire: "agent" }, { name: "query", wire: "query" }] }],
   },
-  {
-    packageName: "@deepseek-ai/dsh-cordis-host-runner",
-    serviceKey: "dynamicCordisRunner",
-    exportName: "DynamicCordisRunnerService",
-    methods: [
-      "define", "undefine", "undefineFromPanel", "runHostHalf", "getClientCode",
-      "resolveRequestRun", "settleUserRun", "stop", "stopFromPanel", "syncInspectManifest",
-      "resolveInspectQuery", "inventory", "reportRenderFailure", "reportClientGuardFailure", "invoke",
-    ],
-    descriptors: [
-      { namespace: "dynamicCordisRunner", method: "inventory", implementation: "inventory", service: "dynamicCordisRunner" },
-      { namespace: "dynamicCordisRunner", method: "invoke", implementation: "invoke", service: "dynamicCordisRunner" },
-      { namespace: "dynamicCordisRunner", method: "stopFromPanel", implementation: "stopFromPanel", service: "dynamicCordisRunner" },
-      { namespace: "dynamicCordisRunner", method: "undefineFromPanel", implementation: "undefineFromPanel", service: "dynamicCordisRunner" },
-    ],
-  },
-];
+]
+// dynamicCordisRunner capability was REMOVED per
+// docs/audit/deepseek-endpoint-decision.md §2.3 Option C:
+//   - The hosting package `@deepseek-ai/dsh-cordis-host-runner` is not in
+//     package.json and is not present under node_modules/@deepseek-ai/.
+//   - Without that package, the 15 declared methods + 4 descriptors were
+//     never wired to a real implementation; the only attempted call site
+//     (scripts/electron/smoke.mjs `dynamicCordisRunner/inventory`) raised
+//     `endpoint-not-registered`. Rather than ship a half-implemented
+//     capability, drop the declaration entirely. The remaining 7
+//     capability services (sessionQuery / commands / goals /
+//     fileReferences / pluginInventory / messageFeedback /
+//     sessionReferenceResolver) continue to be registered as before.
+;
 
 function capabilityMethod(ctx: Context, serviceKey: string, method: string, args: readonly unknown[]): unknown {
   const remotes = ctx.get("dshRemotes") as Record<string, CapabilityMethod> | undefined;
@@ -132,7 +129,6 @@ function createCapabilityService(definition: CapabilityDefinition): new (ctx: Co
     Object.defineProperty(CapabilityService.prototype, method, {
       configurable: true,
       value(this: OpenBuddyService, ...args: unknown[]) {
-        if (definition.serviceKey === "dynamicCordisRunner" && method === "stop" && args.length === 0) return undefined;
         return capabilityMethod(this.ctx, definition.serviceKey, method, args);
       },
     });

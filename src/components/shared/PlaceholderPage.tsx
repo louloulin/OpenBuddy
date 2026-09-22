@@ -163,7 +163,54 @@ function PlaceholderPageInner({
     },
     [onToast],
   );
-  if (label === "助理·本地助理") {
+  // 第 4 周(渐进迁移):把 capability-email 的真实 IPC 绑到 EmailAiPanel,
+  // 不依赖 mock bindings。开箱即用的 List/Archive/Snooze/Draft 全部走能力层。
+  // R92 fix:dataProvider 让 EmailAiPanel 真的能拉取邮件数据(accounts / threads / counts / triage)。
+  //
+  // 注意:所有 hook 必须无条件地写在所有 early return 之前(Rules of Hooks)。
+  // 之前把这些 useMemo 放在 `if (label === "邮件")` 内部,导致该分支被 React 跳过
+  // 时,hook 调用顺序会变 → "Rendered more hooks than during the previous render"(#310),
+  // 进而让错误边界吃掉整页,smoke 测试也就找不到 experts-page-split 的 "专家" tab。
+  const emailDataProvider = useMemo(() => createEmailDataProvider({
+    defaultAccountId: sessionId ?? "self",
+  }), [sessionId]);
+  const emailBindings = useMemo(() => createDefaultEmailAiBindings({
+    accountId: sessionId ?? "self",
+  }), [sessionId]);
+  const emailRuntime = useEmailAiRuntime({ bindings: emailBindings });
+  // P1-A:Composer 预填通过共享 store 触发。EmailAiPanel 内部 onAdopt 调用
+  // onOpenComposer({subject, body, threadId}) → 推到 store → 顶层 ComposerPortal 渲染。
+  const openComposer = useComposerStore((state) => state.openComposer);
+  const handleOpenComposer = useMemo(
+    () => (init?: { subject: string; body: string; threadId: string }) => {
+      openComposer({
+        ...(init?.subject !== undefined ? { subject: init.subject } : {}),
+        ...(init?.body !== undefined ? { body: init.body } : {}),
+        ...(init?.threadId !== undefined ? { threadId: init.threadId } : {}),
+      });
+    },
+    [openComposer],
+  );
+  const RuntimeInjectedEmailSlot = useMemo(() => {
+    const Wrapped: React.FC<typeof EmailSlot extends React.ComponentType<infer P> ? P : never> = (props: typeof EmailSlot extends React.ComponentType<infer P> ? P : never) => (
+      // @ts-expect-error EmailAiPanel accepts runtime/onOpenComposer + dataProvider; legacy panel ignores extra props.
+      <EmailSlot {...props} runtime={emailRuntime} dataProvider={emailDataProvider} onOpenComposer={handleOpenComposer as never} />
+    );
+    Wrapped.displayName = "RuntimeInjectedEmailSlot";
+    return Wrapped;
+  }, [emailRuntime, handleOpenComposer]);
+  if (label === "邮件") {
+    return (
+      <RuntimeInjectedEmailSlot
+        sessionId={sessionId}
+        onNavigate={onNavigate}
+        onToast={onToast}
+        onLaunch={onLaunch ? (prompt) => onLaunch(prompt) : undefined}
+      />
+    );
+  }
+
+    if (label === "助理·本地助理") {
     return (
       <AssistantLocalWorkspace
         onNavigate={onNavigate}
@@ -226,47 +273,6 @@ function PlaceholderPageInner({
     );
   }
 
-  // 第 4 周(渐进迁移):把 capability-email 的真实 IPC 绑到 EmailAiPanel,
-  // 不依赖 mock bindings。开箱即用的 List/Archive/Snooze/Draft 全部走能力层。
-  // R92 fix:dataProvider 让 EmailAiPanel 真的能拉取邮件数据(accounts / threads / counts / triage)。
-  const emailDataProvider = useMemo(() => createEmailDataProvider({
-    defaultAccountId: sessionId ?? "self",
-  }), [sessionId]);
-  const emailBindings = useMemo(() => createDefaultEmailAiBindings({
-    accountId: sessionId ?? "self",
-  }), [sessionId]);
-  const emailRuntime = useEmailAiRuntime({ bindings: emailBindings });
-  // P1-A:Composer 预填通过共享 store 触发。EmailAiPanel 内部 onAdopt 调用
-  // onOpenComposer({subject, body, threadId}) → 推到 store → 顶层 ComposerPortal 渲染。
-  const openComposer = useComposerStore((state) => state.openComposer);
-  if (label === "邮件") {
-    const handleOpenComposer = useMemo(
-      () => (init?: { subject: string; body: string; threadId: string }) => {
-        openComposer({
-          ...(init?.subject !== undefined ? { subject: init.subject } : {}),
-          ...(init?.body !== undefined ? { body: init.body } : {}),
-          ...(init?.threadId !== undefined ? { threadId: init.threadId } : {}),
-        });
-      },
-      [openComposer],
-    );
-    const RuntimeInjectedEmailSlot = useMemo(() => {
-      const Wrapped: React.FC<typeof EmailSlot extends React.ComponentType<infer P> ? P : never> = (props: typeof EmailSlot extends React.ComponentType<infer P> ? P : never) => (
-        // @ts-expect-error EmailAiPanel accepts runtime/onOpenComposer + dataProvider; legacy panel ignores extra props.
-        <EmailSlot {...props} runtime={emailRuntime} dataProvider={emailDataProvider} onOpenComposer={handleOpenComposer as never} />
-      );
-      Wrapped.displayName = "RuntimeInjectedEmailSlot";
-      return Wrapped;
-    }, [emailRuntime, handleOpenComposer]);
-    return (
-      <RuntimeInjectedEmailSlot
-        sessionId={sessionId}
-        onNavigate={onNavigate}
-        onToast={onToast}
-        onLaunch={onLaunch ? (prompt) => onLaunch(prompt) : undefined}
-      />
-    );
-  }
 
   if (label === "项目") {
     return (

@@ -1213,16 +1213,9 @@ const standardRemoteContributions = [
     package: "@deepseek-ai/dsh-session-reference",
     descriptors: [{ namespace: "sessionReferenceResolver", method: "candidates", implementation: "candidates", service: "sessionReferenceResolver", parameters: [{ name: "agent", wire: "agent" }, { name: "query", wire: "query" }] }],
   },
-  {
-    package: "@deepseek-ai/dsh-cordis-host-runner",
-    descriptors: [
-      { namespace: "dynamicCordisRunner", method: "inventory", implementation: "inventory", service: "dynamicCordisRunner" },
-      { namespace: "dynamicCordisRunner", method: "invoke", implementation: "invoke", service: "dynamicCordisRunner" },
-      { namespace: "dynamicCordisRunner", method: "stopFromPanel", implementation: "stopFromPanel", service: "dynamicCordisRunner" },
-      { namespace: "dynamicCordisRunner", method: "undefineFromPanel", implementation: "undefineFromPanel", service: "dynamicCordisRunner" },
-    ],
-  },
 ] as const;
+// dynamicCordisRunner REMOVED per docs/audit/deepseek-endpoint-decision.md
+// Option C — was a stub capability whose hosting package never shipped.
 
 const deepSeekConnectionClient = {
   default: { apply: (ctx: Context) => new DeepSeekConnectionService(ctx), ConnectionHandle: DeepSeekConnectionService },

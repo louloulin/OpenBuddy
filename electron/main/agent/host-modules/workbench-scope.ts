@@ -106,8 +106,12 @@ const deepSeekCapabilityEntries = [
 	["openbuddy-dsh-plugin-inventory", "pluginInventory", "@deepseek-ai/dsh-host-plugin-inventory"],
 	["openbuddy-dsh-message-feedback", "messageFeedback", "@deepseek-ai/dsh-message-feedback"],
 	["openbuddy-dsh-session-reference", "sessionReferenceResolver", "@deepseek-ai/dsh-session-reference"],
-	["openbuddy-dsh-cordis-host-runner", "dynamicCordisRunner", "@deepseek-ai/dsh-cordis-host-runner"],
 ] as const;
+// dynamicCordisRunner entry was REMOVED per docs/audit/deepseek-endpoint-decision.md
+// Option C — the hosting package does not exist on npm and never received a
+// real implementation; the entry only existed to drive dead capability-method
+// descriptors. Drop it; the remaining 7 entries continue to back the
+// @deepseek-ai/dsh-* capability services.
 
 function captureDeepSeekCapabilityServices(): Map<string, unknown> {
 	const captured = new Map<string, unknown>();

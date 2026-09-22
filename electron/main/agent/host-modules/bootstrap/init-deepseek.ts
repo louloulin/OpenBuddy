@@ -84,8 +84,10 @@ export const DEEPSEEK_CORE_CAPABILITY_PACKAGES = [
   "@deepseek-ai/dsh-host-plugin-inventory",
   "@deepseek-ai/dsh-message-feedback",
   "@deepseek-ai/dsh-session-reference",
-  "@deepseek-ai/dsh-cordis-host-runner",
 ] as const;
+// dynamicCordisRunner removed per docs/audit/deepseek-endpoint-decision.md
+// Option C — its hosting package is not in package.json and never received a
+// real implementation.
 
 /**
  * Phase K.2 — OpenBuddyPlugin manifests for the 7 DSH core capability packages.
