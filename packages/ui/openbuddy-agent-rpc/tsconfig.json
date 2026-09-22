@@ -191,7 +191,12 @@
       "@openbuddy/ui-state/permission-store": ["./packages/ui/openbuddy-ui-state/src/permission-store.ts"],
       "@openbuddy/ui-state/question-store": ["./packages/ui/openbuddy-ui-state/src/question-store.ts"],
       "@openbuddy/ui-state/subagent-store": ["./packages/ui/openbuddy-ui-state/src/subagent-store.ts"],
-      "@openbuddy/ui-state/toast-store": ["./packages/ui/openbuddy-ui-state/src/toast-store.ts"]
+      "@openbuddy/ui-state/toast-store": ["./packages/ui/openbuddy-ui-state/src/toast-store.ts"],
+      "@openbuddy/agent-rpc/extension-audit-accumulator": ["./packages/ui/openbuddy-agent-rpc/src/extension-audit-accumulator.ts"],
+      "@openbuddy/agent-rpc/stream/streaming-message": ["./packages/ui/openbuddy-agent-rpc/src/stream/streaming-message.ts"],
+      "@openbuddy/ui-primitives/ErrorBoundary": ["./packages/ui/openbuddy-ui-primitives/src/ErrorBoundary.tsx"],
+      "@openbuddy/ui-primitives/StatusIndicator": ["./packages/ui/openbuddy-ui-primitives/src/StatusIndicator.tsx"],
+      "@openbuddy/ui-state/global-confirm-store": ["./packages/ui/openbuddy-ui-state/src/global-confirm-store.ts"]
     }
   },
   "include": ["./src/**/*.ts", "./src/**/*.tsx"]

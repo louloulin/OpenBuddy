@@ -5,7 +5,14 @@
     "main": "./packages/ui/openbuddy-agent-rpc/src/index.ts",
     "client": null,
     "invariant": null,
-    "subpaths": {}
+    "subpaths": {
+      "extension-audit-accumulator": "./packages/ui/openbuddy-agent-rpc/src/extension-audit-accumulator.ts",
+      "extension-audit-event-parser": "./packages/ui/openbuddy-agent-rpc/src/extension-audit-event-parser.ts",
+      "navigation/market-tab": "./packages/ui/openbuddy-agent-rpc/src/navigation/market-tab.ts",
+      "stream/agent-phase": "./packages/ui/openbuddy-agent-rpc/src/stream/agent-phase.ts",
+      "stream/streaming-message": "./packages/ui/openbuddy-agent-rpc/src/stream/streaming-message.ts",
+      "voice-contract": "./packages/ui/openbuddy-agent-rpc/src/voice-contract.ts"
+    }
   },
   {
     "dir": "openbuddy-platform",
@@ -13,7 +20,21 @@
     "main": "./packages/ui/openbuddy-platform/src/index.ts",
     "client": null,
     "invariant": null,
-    "subpaths": {}
+    "subpaths": {
+      "billing/usage-quota": "./packages/ui/openbuddy-platform/src/billing/usage-quota.ts",
+      "browser-preview": "./packages/ui/openbuddy-platform/src/browser-preview.ts",
+      "error-format": "./packages/ui/openbuddy-platform/src/error-format.ts",
+      "files/cloud-storage": "./packages/ui/openbuddy-platform/src/files/cloud-storage.ts",
+      "files/drop-utils": "./packages/ui/openbuddy-platform/src/files/drop-utils.ts",
+      "files/file-kind": "./packages/ui/openbuddy-platform/src/files/file-kind.ts",
+      "files/file-utils": "./packages/ui/openbuddy-platform/src/files/file-utils.ts",
+      "files/unified-diff": "./packages/ui/openbuddy-platform/src/files/unified-diff.ts",
+      "loading-tips": "./packages/ui/openbuddy-platform/src/loading-tips.ts",
+      "platform": "./packages/ui/openbuddy-platform/src/platform.ts",
+      "security/command-risk": "./packages/ui/openbuddy-platform/src/security/command-risk.ts",
+      "security/policy-engine": "./packages/ui/openbuddy-platform/src/security/policy-engine.ts",
+      "security/sandbox-guard": "./packages/ui/openbuddy-platform/src/security/sandbox-guard.ts"
+    }
   },
   {
     "dir": "openbuddy-ui-account",
@@ -56,7 +77,12 @@
     "main": "./packages/ui/openbuddy-ui-contract/src/index.ts",
     "client": null,
     "invariant": null,
-    "subpaths": {}
+    "subpaths": {
+      "input-history": "./packages/ui/openbuddy-ui-contract/src/input-history.ts",
+      "markdown/content-blocks": "./packages/ui/openbuddy-ui-contract/src/markdown/content-blocks.ts",
+      "plan-utils": "./packages/ui/openbuddy-ui-contract/src/plan-utils.ts",
+      "yield-state": "./packages/ui/openbuddy-ui-contract/src/yield-state.ts"
+    }
   },
   {
     "dir": "openbuddy-ui-conversation",
@@ -246,7 +272,9 @@
     "client": "./packages/ui/openbuddy-ui-primitives/src/client.ts",
     "invariant": "./packages/ui/openbuddy-ui-primitives/src/invariant.ts",
     "subpaths": {
-      "icons": "./packages/ui/openbuddy-ui-primitives/src/icons/index.ts"
+      "ErrorBoundary": "./packages/ui/openbuddy-ui-primitives/src/ErrorBoundary.tsx",
+      "icons": "./packages/ui/openbuddy-ui-primitives/src/icons/index.ts",
+      "StatusIndicator": "./packages/ui/openbuddy-ui-primitives/src/StatusIndicator.tsx"
     }
   },
   {
@@ -314,7 +342,16 @@
     "main": "./packages/ui/openbuddy-ui-state/src/index.ts",
     "client": null,
     "invariant": null,
-    "subpaths": {}
+    "subpaths": {
+      "feedback-store": "./packages/ui/openbuddy-ui-state/src/feedback-store.ts",
+      "global-confirm-store": "./packages/ui/openbuddy-ui-state/src/global-confirm-store.ts",
+      "pending-expert-store": "./packages/ui/openbuddy-ui-state/src/pending-expert-store.ts",
+      "permission-store": "./packages/ui/openbuddy-ui-state/src/permission-store.ts",
+      "projects-store": "./packages/ui/openbuddy-ui-state/src/projects-store.ts",
+      "question-store": "./packages/ui/openbuddy-ui-state/src/question-store.ts",
+      "subagent-store": "./packages/ui/openbuddy-ui-state/src/subagent-store.ts",
+      "toast-store": "./packages/ui/openbuddy-ui-state/src/toast-store.ts"
+    }
   },
   {
     "dir": "openbuddy-ui-theme",
