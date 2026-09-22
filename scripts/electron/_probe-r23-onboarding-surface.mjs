@@ -17,6 +17,7 @@ import { _electron as electron } from "playwright";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { version as APP_VERSION } from "../../package.json";
 
 const root = "/Users/louloulin/appx/OpenBuddy";
 const userData = mkdtempSync(join(tmpdir(), "ob-r23-"));
@@ -102,7 +103,7 @@ try {
   }));
   step(
     "关闭后卡片消失 + 记录版本",
-    afterDismiss.stillThere === false && afterDismiss.lastSeen === "0.16.0",
+    afterDismiss.stillThere === false && afterDismiss.lastSeen === APP_VERSION,
     afterDismiss,
   );
 

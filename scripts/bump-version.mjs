@@ -2,25 +2,25 @@
 /**
  * scripts/bump-version.mjs — 把版本号从「散落各处」收敛成「一条命令改完」。
  *
- * 背景:OpenBuddy 的版本号不只活在 `package.json`。它同时被下面这些地方消费,
- * 任何一处漏改都会在发布时变成真实的偏差 ——
+ * 背景:OpenBuddy 的版本号首先活在仓库根 `package.json`(其它 74 个 workspace
+ * 包 + 1 个 services 包跟随)。它同时被以下两类「版本消费点」引用:
  *
- *   1. 74 个 workspace 包的 `package.json#version`;
- *   2. Electron 主进程传给 Pi 扩展市场的 `hostVersion`(引擎区间校验);
- *   3. 官网的 `softwareVersion`(JSON-LD)、安装包文件名、i18n 版本 chip;
- *   4. `examples/` 下三个示例插件的 manifest;
- *   5. DMG / onboarding 真机探针里写死的当前构建版本。
+ *   - 「跟随 bump 改写」类 —— 字面量版本,必须跟着新版本走:
+ *       * 所有 `package.json`(`pnpm-workspace.yaml` 的 `packages:` 块派生);
+ *       * `examples/*` 三个示例插件的 manifest / defineExtension。
  *
- * **不包含**测试 fixture(`__fixtures__/`、`tests/fixtures/`):它们是「老版本
- * 插件」的样本数据,故意停留在旧版本号,跟着 bump 会让 e2e 断言失去意义。
+ *   - 「从配置读源」类 —— 这些文件已经从硬编码改成 `app.getVersion()` /
+ *     `SITE_VERSION` / `APP_VERSION` / 读自己的 `package.json`,但 bummp
+ *     时还得确认它们**没有遗漏的字面量版本**。脚本会扫这些文件,若发现
+ *     硬编码就报错(退出码 2)。
  *
- * 以前只能靠 `pnpm -r version` 改第 1 类,其余手改 —— 手改必漏。本脚本把
- * **单一来源**定义成这里的 `SITES` 表:改版本号只走一条路径,改完还自检。
+ * 测试 fixture(`__fixtures__/`、`tests/fixtures/`)故意保留旧版本号:它们是
+ * 「老版本插件」的样本数据,跟着 bump 会让 e2e 断言失去意义。
  *
  * 用法:
- *   node scripts/bump-version.mjs 0.16.0
- *   node scripts/bump-version.mjs 0.16.0 --dry-run   # 只报告,不落盘
- *   node scripts/bump-version.mjs 0.16.0 --json      # 机器可读报告
+ *   node scripts/bump-version.mjs <X.Y.Z>
+ *   node scripts/bump-version.mjs <X.Y.Z> --dry-run   # 只报告,不落盘
+ *   node scripts/bump-version.mjs <X.Y.Z> --json      # 机器可读报告
  *   node scripts/bump-version.mjs --current          # 打印当前版本
  *
  * 退出码:
@@ -101,36 +101,17 @@ for (const service of ["services/casdoor-resource-gateway/package.json"]) {
 const isFixture = (relative) => relative.includes("__fixtures__/") || relative.includes("tests/fixtures/");
 
 // ---------------------------------------------------------------------------
-// 2. 非 package.json 的版本站点
+// 2. SITES 表 —— 两类「版本消费点」的合并注册表
 //
-// 每个站点是一条精确重写规则。全部用「形态锚点」(前缀/字段名)而不是裸版本
-// 字符串替换,避免误伤 CHANGELOG 里同版本号的历史段落。
+//   `rewrite: (text) => text`  —— 「跟随 bump 改写」:用形态锚点替换字面量。
+//                                  用锚点(前缀/字段名)而不是裸版本字符串,
+//                                  避免误伤 CHANGELOG 里同版本号的历史段落。
+//
+//   `expectNoLiteral: RegExp`  —— 「守卫」:文件应该从配置读源,本脚本只验证
+//                                  没有遗漏的字面量。命中就报错(退出码 2)。
 // ---------------------------------------------------------------------------
 const SITES = [
-  {
-    path: "electron/main/ipc/index.ts",
-    why: "Pi 扩展市场 hostVersion(引擎区间校验)",
-    rewrite: (t) => t.replace(/(hostVersion:\s*")[0-9][^"]*(")/g, `$1${nextVersion}$2`),
-  },
-  {
-    path: "apps/openbuddy-website/src/app/layout.tsx",
-    why: "官网 JSON-LD softwareVersion",
-    rewrite: (t) => t.replace(/(softwareVersion:\s*')[^']*(')/g, `$1${nextVersion}$2`),
-  },
-  {
-    path: "apps/openbuddy-website/src/components/DownloadView.tsx",
-    why: "官网下载区安装包文件名",
-    rewrite: (t) => t
-      .replace(/(OpenBuddy-)[0-9]+\.[0-9]+\.[0-9]+/g, `$1${nextVersion}`)
-      .replace(/(openbuddy_)[0-9]+\.[0-9]+\.[0-9]+/g, `$1${nextVersion}`),
-  },
-  {
-    path: "apps/openbuddy-website/src/lib/i18n.ts",
-    why: "官网 i18n 版本 chip / 安装标签",
-    rewrite: (t) => t
-      .replace(/(chip:\s*`v)[0-9]+\.[0-9]+\.[0-9]+/g, `$1${nextVersion}`)
-      .replace(/(installLabel:\s*'[^']*?v)[0-9]+\.[0-9]+\.[0-9]+/g, `$1${nextVersion}`),
-  },
+  // 仍然是「单一来源硬编码」的位置 —— 跟着 bump 走。
   ...[
     "examples/openbuddy-plugin-hello",
     "examples/openbuddy-plugin-toolbar",
@@ -138,46 +119,62 @@ const SITES = [
   ].flatMap((dir) => [
     {
       path: `${dir}/manifest.json`,
-      why: "示例插件 manifest 版本",
+      why: "示例插件 manifest 版本(每个插件独立声明自己的版本)",
       rewrite: (t) => t.replace(/("version":\s*")[0-9][^"]*(")/, `$1${nextVersion}$2`),
     },
     {
       path: `${dir}/index.tsx`,
-      why: "示例插件 defineExtension 版本",
+      why: "示例插件 defineExtension 版本(同上)",
       rewrite: (t) => t.replace(/(version:\s*")[0-9][^"]*(")/, `$1${nextVersion}$2`),
     },
   ]),
+
+  // 「已经从硬编码改成读源」的位置 —— 不再需要 bump 时改写,但要确认它们
+  // 真的没有遗留字面量(否则下次 release 会再次漂移)。
+  {
+    path: "electron/main/ipc/index.ts",
+    why: "Pi 扩展市场 hostVersion 应该读 `app.getVersion()`,不能有字面量",
+    expectNoLiteral: /(hostVersion:\s*")[0-9][^"]*(")/,
+  },
+  {
+    path: "apps/openbuddy-website/src/app/layout.tsx",
+    why: "官网 JSON-LD softwareVersion 应该读 `SITE_VERSION`,不能有字面量",
+    expectNoLiteral: /(softwareVersion:\s*')[0-9][^']*(')/,
+  },
+  {
+    path: "apps/openbuddy-website/src/components/DownloadView.tsx",
+    why: "官网安装包文件名应该拼 `${SITE_VERSION}`,不能有字面量",
+    expectNoLiteral: /(OpenBuddy-)[0-9]+\.[0-9]+\.[0-9]+|(openbuddy_)[0-9]+\.[0-9]+\.[0-9]+/,
+  },
+  {
+    path: "apps/openbuddy-website/src/lib/i18n.ts",
+    why: "官网 i18n chip / installLabel 应该拼 `${SITE_VERSION_TAG}`,不能有字面量",
+    expectNoLiteral: /(chip:\s*`v)[0-9]+\.[0-9]+\.[0-9]+|(installLabel:\s*'[^']*?v)[0-9]+\.[0-9]+\.[0-9]+/,
+  },
   {
     path: "scripts/electron/_probe-r23-onboarding-surface.mjs",
-    why: "R23 真机探针:WhatsNew lastSeen 落盘的是当前应用版本",
-    rewrite: (t) => t.replace(
-      /(lastSeen === ")[0-9]+\.[0-9]+\.[0-9]+(")/,
-      `$1${nextVersion}$2`,
-    ),
+    why: "R23 真机探针应该读 `APP_VERSION`,不能有字面量",
+    expectNoLiteral: /lastSeen === "[0-9]\.[0-9]+\.[0-9]+"/,
   },
   {
     path: "scripts/electron/_probe-r23-onboarding-surface.test.mjs",
-    why: "R23 探针 CI 包装:断言摘要卡版本号 = 当前应用版本",
-    rewrite: (t) => t.replace(
-      /(probe\.whatsNew\.version\)\.toContain\(")[0-9]+\.[0-9]+\.[0-9]+("\))/,
-      `$1${nextVersion}$2`,
-    ),
+    why: "R23 探针 CI 包装应该读 `APP_VERSION`,不能有字面量",
+    expectNoLiteral: /toContain\("[0-9]+\.[0-9]+\.[0-9]+"\)/,
   },
   {
     path: "scripts/electron/probe-dmg.mjs",
-    why: "DMG 真机探针:挂载卷名含构建版本",
-    rewrite: (t) => t.replace(
-      /(\/Volumes\/OpenBuddy )[0-9]+\.[0-9]+\.[0-9]+/,
-      `$1${nextVersion}`,
-    ),
+    why: "DMG 探针应该读 `APP_VERSION`,不能有字面量",
+    expectNoLiteral: /\/Volumes\/OpenBuddy [0-9]+\.[0-9]+\.[0-9]+/,
   },
   {
     path: "scripts/electron/probe-dmg2.mjs",
-    why: "DMG 真机探针 v2:挂载卷名含构建版本",
-    rewrite: (t) => t.replace(
-      /(\/Volumes\/OpenBuddy )[0-9]+\.[0-9]+\.[0-9]+/,
-      `$1${nextVersion}`,
-    ),
+    why: "DMG 探针 v2 应该读 `APP_VERSION`,不能有字面量",
+    expectNoLiteral: /\/Volumes\/OpenBuddy [0-9]+\.[0-9]+\.[0-9]+/,
+  },
+  {
+    path: "packages/capability/openbuddy-mcp-client/src/index.ts",
+    why: "MCP 客户端 SDK 标识应该读自己的 package.json,不能有字面量",
+    expectNoLiteral: /\{\s*name:\s*"openbuddy",\s*version:\s*"[0-9][^"]*"\s*\}/,
   },
 ];
 
@@ -214,6 +211,15 @@ for (const site of SITES) {
     continue;
   }
   const before = readFileSync(absolute, "utf8");
+  if (site.expectNoLiteral) {
+    // 这类文件已经从「硬编码」改成「读源」—— 验证没有遗留字面量。
+    if (site.expectNoLiteral.test(before)) {
+      problems.push(`${site.path}: hard-coded version detected; should read from ${site.why}`);
+    } else {
+      changes.push({ path: site.path, kind: "guard", why: site.why });
+    }
+    continue;
+  }
   const after = site.rewrite(before);
   if (after === before) continue;
   changes.push({ path: site.path, kind: "site", why: site.why });
@@ -223,6 +229,7 @@ for (const site of SITES) {
 // 4. 落盘后自检 —— 静默失败比报错更贵。
 if (!dryRun) {
   for (const change of changes) {
+    if (change.kind === "guard") continue; // 验证在 apply 阶段就完成了
     const text = readFileSync(join(repoRoot, change.path), "utf8");
     if (change.kind === "manifest") {
       try {

@@ -98,10 +98,18 @@ describe("scripts/bump-version.mjs", () => {
     expect(parsed.problems).toEqual([]);
 
     const paths = parsed.changes.map((change) => change.path);
-    // 三类必须被覆盖:workspace manifest、Electron hostVersion、官网。
+    const kinds = Object.fromEntries(parsed.changes.map((c) => [c.path, c.kind]));
+
+    // 三类必须被覆盖:workspace manifest、示例插件、已经从硬编码改成读源的「守卫」位置。
     expect(paths).toContain("package.json");
-    expect(paths).toContain("electron/main/ipc/index.ts");
-    expect(paths).toContain("apps/openbuddy-website/src/app/layout.tsx");
+    expect(paths).toContain("examples/openbuddy-plugin-hello/manifest.json");
+    expect(kinds["electron/main/ipc/index.ts"]).toBe("guard");
+    expect(kinds["apps/openbuddy-website/src/app/layout.tsx"]).toBe("guard");
+    expect(kinds["apps/openbuddy-website/src/components/DownloadView.tsx"]).toBe("guard");
+    expect(kinds["apps/openbuddy-website/src/lib/i18n.ts"]).toBe("guard");
+    expect(kinds["packages/capability/openbuddy-mcp-client/src/index.ts"]).toBe("guard");
+    expect(kinds["scripts/electron/probe-dmg.mjs"]).toBe("guard");
+    expect(kinds["scripts/electron/probe-dmg2.mjs"]).toBe("guard");
     expect(paths.filter((path) => path.endsWith("package.json")).length).toBeGreaterThan(50);
 
     // fixture 故意不跟着 bump —— 它们是「老版本插件」样本。
@@ -109,5 +117,27 @@ describe("scripts/bump-version.mjs", () => {
 
     // dry-run 真的没写盘。
     expect(readFileSync(join(repoRoot, "package.json"), "utf8")).toBe(before);
+  });
+
+  it("--dry-run 在已经漂移的仓库上会报错(守卫拦截硬编码回归)", () => {
+    // 把守卫位置之一临时写上一个字面量版本,确认守卫能拦住。
+    const guardPath = "electron/main/ipc/index.ts";
+    const absolute = join(repoRoot, guardPath);
+    const original = readFileSync(absolute, "utf8");
+    const tampered = original.replace("hostVersion: app.getVersion()", 'hostVersion: "9.9.9"');
+    if (tampered === original) {
+      throw new Error("guard test could not locate the hostVersion line to tamper with");
+    }
+    try {
+      // 重置 status 到 0,失败时设 2
+      require("node:fs").writeFileSync(absolute, tampered, "utf8");
+      const result = run("scripts/bump-version.mjs", ["9.9.10", "--dry-run", "--json"], true);
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe(2);
+      const parsed = JSON.parse(result.stdout) as { problems: string[] };
+      expect(parsed.problems.some((p) => p.includes(guardPath) && p.includes("hard-coded"))).toBe(true);
+    } finally {
+      require("node:fs").writeFileSync(absolute, original, "utf8");
+    }
   });
 });
