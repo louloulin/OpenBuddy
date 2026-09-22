@@ -7,11 +7,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./input-history": "./src/input-history.ts",
-    "./yield-state": "./src/yield-state.ts",
-    "./plan-utils": "./src/plan-utils.ts",
-    "./markdown/content-blocks": "./src/markdown/content-blocks.ts"
+    ".": "./src/index.ts"
   },
   "engines": {
     "node": ">=22.5.0"

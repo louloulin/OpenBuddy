@@ -1,5 +1,105 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  agentOnPluginEvent,
+  agentPluginEvents,
+} from "../lib/agent/pi-client";
+import {
+  createExtensionAuditAccumulator,
+  type ExtensionAuditAccumulator,
+  type ExtensionAuditPluginEvent,
+} from "../lib/agent/extension-audit-accumulator";
+import type {
+  ExtensionAuditReport,
+  ExtensionAuditSummary,
+} from "../lib/agent/extension-audit-event-parser";
+
 /**
- * re-export 兼容层（阶段2b）。实现已迁至 `@openbuddy/ui-primitives/hooks/useExtensionAuditPanel`。
- * 保留本路径转发，使 `src/` 与 `electron/` 侧既有的 `@/hooks/useExtensionAuditPanel` 引用与行为不变。
+ * useExtensionAuditPanel — React hook that subscribes the renderer to
+ * `pi/extension-policy-report` plugin events emitted by the agent-host
+ * (plan4.5 §A, closes the policy-report → renderer gap identified in
+ * audit round 10).
+ *
+ * The hook owns a single `ExtensionAuditAccumulator` for the lifetime of
+ * the component and re-renders the host when a new policy report arrives
+ * so the Extension Audit panel can show "N allowed · M denied · K
+ * needs-review" in real time.
+ *
+ * Pure hook — no DOM, no IPC channels outside the documented
+ * `openbuddy://plugin-event` listener. SSR-safe (the `agentOnPluginEvent`
+ * call is gated behind `useEffect`).
  */
-export * from "@openbuddy/ui-primitives/hooks/useExtensionAuditPanel";
+export interface UseExtensionAuditPanelResult {
+  reports: ExtensionAuditReport[];
+  summary: ExtensionAuditSummary;
+  clear: () => void;
+}
+
+export function useExtensionAuditPanel(): UseExtensionAuditPanelResult {
+  const accumulatorRef = useRef<ExtensionAuditAccumulator | null>(null);
+  if (accumulatorRef.current === null) {
+    accumulatorRef.current = createExtensionAuditAccumulator();
+  }
+  const accumulator = accumulatorRef.current;
+  const [reports, setReports] = useState<ExtensionAuditReport[]>(() => accumulator.snapshot());
+  const [summary, setSummary] = useState<ExtensionAuditSummary>(() => accumulator.summary());
+
+  const refresh = useCallback(() => {
+    setReports(accumulator.snapshot());
+    setSummary(accumulator.summary());
+  }, [accumulator]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    // Install the live subscription FIRST so synchronous dispatchers
+    // (and tests that don't `await` after `render`) still see a
+    // handler. The catch-up read below runs after the subscription
+    // is wired and feeds historical events into the same accumulator.
+    (async () => {
+      try {
+        const dispose = await agentOnPluginEvent((event: ExtensionAuditPluginEvent) => {
+          accumulator.handle(event);
+          refresh();
+        });
+        if (cancelled) {
+          dispose();
+          return;
+        }
+        unlisten = dispose;
+      } catch {
+        // Subscription failure is non-fatal: the renderer simply won't
+        // show extension audit telemetry until the IPC channel recovers.
+        return;
+      }
+      // 2. Catch up on reports emitted before the panel mounted.
+      //    The main-side ring buffer (`agentPluginEvents`) keeps the
+      //    last N events; if `resolvePiExtensions` already fired once,
+      //    the report is sitting in the cache. Hydrate from it so the
+      //    panel doesn't show "awaiting first report" until the next
+      //    resolve.
+      try {
+        const cached = await agentPluginEvents();
+        if (cancelled) return;
+        for (const event of cached) {
+          accumulator.handle(event as ExtensionAuditPluginEvent);
+        }
+        refresh();
+      } catch {
+        // Bridge down / IPC failure — non-fatal. The live subscription
+        // above still works once the bridge recovers; the panel just
+        // starts empty.
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, [accumulator, refresh]);
+
+  const clear = useCallback(() => {
+    accumulator.clear();
+    refresh();
+  }, [accumulator, refresh]);
+
+  return { reports, summary, clear };
+}

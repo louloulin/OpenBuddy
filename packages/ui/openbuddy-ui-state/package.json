@@ -7,14 +7,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./projects-store": "./src/projects-store.ts",
-    "./toast-store": "./src/toast-store.ts",
-    "./subagent-store": "./src/subagent-store.ts",
-    "./question-store": "./src/question-store.ts",
-    "./permission-store": "./src/permission-store.ts",
-    "./pending-expert-store": "./src/pending-expert-store.ts",
-    "./feedback-store": "./src/feedback-store.ts"
+    ".": "./src/index.ts"
   },
   "engines": {
     "node": ">=22.5.0"

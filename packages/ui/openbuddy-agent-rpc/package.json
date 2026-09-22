@@ -7,11 +7,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./voice-contract": "./src/voice-contract.ts",
-    "./extension-audit-event-parser": "./src/extension-audit-event-parser.ts",
-    "./stream/agent-phase": "./src/stream/agent-phase.ts",
-    "./navigation/market-tab": "./src/navigation/market-tab.ts"
+    ".": "./src/index.ts"
   },
   "engines": {
     "node": ">=22.5.0"
