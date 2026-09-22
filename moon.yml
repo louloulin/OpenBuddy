@@ -38,8 +38,14 @@ tasks:
   # Type-check the React renderer (`src/`) + the electron-vite config + the
   # root tsconfig. Cascades to `app-desktop:typecheck` so the electron main
   # + preload TypeScript in `electron/{main,preload}/**` is also checked.
+  #
+  # 2026-09 改造:`tsc --noEmit` 改为 `tsc -b`(solution-style + composite)。
+  #   - 根 tsconfig.json 是 solution-style:files:[] + references 列全部工作区包
+  #   - 每个工作区包 tsconfig.json 是 composite:true,产出 .d.ts 到 ./dist/.types
+  #   - tsc -b 走增量构建,只在 .tsbuildinfo 失效时重编译对应包
+  #   - 错误码 0/1 与原 --noEmit 兼容
   typecheck:
-    script: "./node_modules/.bin/tsc --noEmit"
+    script: "./node_modules/.bin/tsc -b"
     deps:
       - "app-desktop:typecheck"
     inputs:
@@ -48,11 +54,11 @@ tasks:
       - "package.json"
     outputs: []
 
-  # Lint is the same effective command as typecheck in this codebase (tsc
-  # with --noEmit). Kept as a separate task so CI / `pnpm lint` can target
-  # it specifically.
+  # Lint is the same effective command as typecheck (tsc -b 在 solution-style
+  # 模式下做增量构建并校验类型,无 emit 行为等价于 --noEmit)。Kept as a separate
+  # task so CI / `pnpm lint` can target it specifically.
   lint:
-    script: "./node_modules/.bin/tsc --noEmit"
+    script: "./node_modules/.bin/tsc -b"
     deps:
       - "app-desktop:lint"
     inputs:

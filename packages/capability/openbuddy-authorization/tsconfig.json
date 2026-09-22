@@ -1,9 +1,3 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "lib": ["ES2022", "ES2024.Promise", "DOM"]
-  },
-  "include": ["./src/**/*.ts"]
+  "extends": "../../../tsconfig.package-base.json"
 }

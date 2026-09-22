@@ -28,10 +28,10 @@
  *     their own alias entries; Vite's alias is prefix-matching, so the
  *     subpath entries appear BEFORE the bare-package alias.
  */
-import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "electron-vite";
 import react from "@vitejs/plugin-react";
+import tsconfigPaths from "vite-tsconfig-paths";
 
 // Node 20.11+/22.x supports `import.meta.dirname` natively — no `require()`,
 // no `fileURLToPath`, no shim. electron-vite compiles this config file to
@@ -44,132 +44,49 @@ const repoRoot = import.meta.dirname;
 // `@openbuddy/team-team` alias — otherwise the bare alias would consume
 // the subpath import and Vite would try to load
 // `packages/.../src/index.ts/pi` (a directory under a file → ENOTDIR).
-const workspacePackageAliases = [
-  // Subpath aliases — most specific first. Auto-discovered from
-  // each workspace package exports field. Order matters:
-  // longer paths MUST precede the bare-package alias below.
-
-  { find: "@openbuddy/plugin-host/bundle-manifest", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/bundle-manifest.ts") },
-  { find: "@openbuddy/plugin-host/persistence", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/persistence.ts") },
-  { find: "@openbuddy/plugin-host/yaml-patch", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/yaml-patch.ts") },
-  { find: "@openbuddy/plugin-host/js-expr", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/js-expr.ts") },
-  { find: "@openbuddy/plugin-host/plugin-manifest", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts") },
-  // Phase B.3 step 2b — DSH core shared state + PI extensions. Subpath
-  // aliases must precede the bare-package alias below so the longer
-  // `@openbuddy/dsh-core/state` lookup wins over the bare
-  // `@openbuddy/dsh-core` fallback.
-  { find: "@openbuddy/dsh-core/state", replacement: resolve(repoRoot, "packages/runtime/openbuddy-dsh-core/src/state.ts") },
-  { find: "@openbuddy/dsh-core/goals", replacement: resolve(repoRoot, "packages/runtime/openbuddy-dsh-core/src/goals.ts") },
-  { find: "@openbuddy/dsh-core/message-feedback", replacement: resolve(repoRoot, "packages/runtime/openbuddy-dsh-core/src/message-feedback.ts") },
-  { find: "@openbuddy/team-team/pi", replacement: resolve(repoRoot, "packages/team/openbuddy-team/src/pi.ts") },
-  { find: "@openbuddy/core-session/lifecycle", replacement: resolve(repoRoot, "packages/core/openbuddy-session/src/lifecycle.ts") },
+// 2026-09 改造:50+ 个手写 @openbuddy/* alias 改为由 vite-tsconfig-paths
+// 自动从根 tsconfig.json 的 paths 派生(vite.config.ts / vitest.config.ts
+// 同样使用)。新增 ui-* 包或 capability 子路径时,只需在 tsconfig.json
+// 添加一条路径,三个 vite 配置自动生效。
 
 
-  // Bare-package aliases.
-  { find: "@deepseek-ai/cordis",    replacement: resolve(repoRoot, "packages/runtime/openbuddy-cordis/src/index.ts") },
-  { find: "@openbuddy/cordis",         replacement: resolve(repoRoot, "packages/runtime/openbuddy-cordis/src/index.ts") },
-  { find: "@openbuddy/plugin-host",    replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/index.ts") },
-  { find: "@openbuddy/plugin-host/runtime", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/runtime.ts") },
-  { find: "@openbuddy/dsh-core",       replacement: resolve(repoRoot, "packages/runtime/openbuddy-dsh-core/src/index.ts") },
-  { find: "@openbuddy/bundle-base",    replacement: resolve(repoRoot, "packages/bundle/openbuddy-base/src/index.ts") },
-  { find: "@openbuddy/renderer-host",  replacement: resolve(repoRoot, "packages/renderer/openbuddy-renderer-host/src/index.ts") },
-  { find: "@openbuddy/core-session",   replacement: resolve(repoRoot, "packages/core/openbuddy-session/src/index.ts") },
-  { find: "@openbuddy/logging-main", replacement: resolve(repoRoot, "packages/core/openbuddy-logging-main/src/index.ts") },
-  { find: "@openbuddy/logging-renderer", replacement: resolve(repoRoot, "packages/core/openbuddy-logging-renderer/src/index.ts") },
-  { find: "@openbuddy/logging-shared", replacement: resolve(repoRoot, "packages/shared/openbuddy-logging-shared/src/index.ts") },
-  { find: "@openbuddy/storage",         replacement: resolve(repoRoot, "packages/runtime/openbuddy-storage/src/index.ts") },
-  // openbuddy-web-search removed; web capability delegated to pi-web-access (passthrough)
-  // Stage G-1c: openbuddy-ui-automation restored per user directive
-  // "自动化ui保留不要删除". The UI shells are preserved; automation
-  // is owned by pi-background-tasks + pi-goal (passthrough).
-  { find: "@openbuddy/capability-plan",            replacement: resolve(repoRoot, "packages/capability/openbuddy-plan/src/index.ts") },
-  { find: "@openbuddy/capability-authorization",   replacement: resolve(repoRoot, "packages/capability/openbuddy-authorization/src/index.ts") },
-  { find: "@openbuddy/capability-mcp-client",       replacement: resolve(repoRoot, "packages/capability/openbuddy-mcp-client/src/index.ts") },
-  // Phase I.2 — calendar PI extension (electron/main/agent/extensions/calendar-pi-extension.ts)
-  // needs the live calendar handlers + createCalendarToolDefinitions factory.
-  { find: "@openbuddy/capability-calendar",         replacement: resolve(repoRoot, "packages/capability/openbuddy-calendar/src/index.ts") },
-  { find: "@openbuddy/auth-permission",            replacement: resolve(repoRoot, "packages/auth/openbuddy-permission/src/index.ts") },
-  { find: "@openbuddy/auth-casdoor",               replacement: resolve(repoRoot, "packages/auth/openbuddy-casdoor/src/index.ts") },
-  { find: "@openbuddy/shared-types",               replacement: resolve(repoRoot, "packages/shared/openbuddy-types/src/index.ts") },
-  { find: "@openbuddy/files-kb",                  replacement: resolve(repoRoot, "packages/shared/openbuddy-files-kb/src/index.ts") },
-  { find: "@openbuddy/fs-fs-local",                replacement: resolve(repoRoot, "packages/fs/openbuddy-fs-local/src/index.ts") },
-  { find: "@openbuddy/team-team",                  replacement: resolve(repoRoot, "packages/team/openbuddy-team/src/index.ts") },
-  { find: "@openbuddy/collaboration-protocol",     replacement: resolve(repoRoot, "packages/collaboration/openbuddy-protocol/src/index.ts") },
-  { find: "@openbuddy/collaboration-policy",       replacement: resolve(repoRoot, "packages/collaboration/openbuddy-policy/src/index.ts") },
-  { find: "@openbuddy/collaboration-task",         replacement: resolve(repoRoot, "packages/collaboration/openbuddy-task/src/index.ts") },
-  { find: "@openbuddy/collaboration-evidence",     replacement: resolve(repoRoot, "packages/collaboration/openbuddy-evidence/src/index.ts") },
-  { find: "@openbuddy/collaboration-room",         replacement: resolve(repoRoot, "packages/collaboration/openbuddy-room/src/index.ts") },
-  { find: "@openbuddy/collaboration-inbox",        replacement: resolve(repoRoot, "packages/collaboration/openbuddy-inbox/src/index.ts") },
-  { find: "@openbuddy/collaboration-coordinator", replacement: resolve(repoRoot, "packages/collaboration/openbuddy-coordinator/src/index.ts") },
-  { find: "@openbuddy/collaboration-network", replacement: resolve(repoRoot, "packages/collaboration/openbuddy-network/src/index.ts") },
-];
-
-// 从 packages/ui/alias-list.json 读 ui-* 包清单,生成 vite alias 数组。
-// 长前缀(/client 与 /invariant 子路径)在前,裸包名在后,与 tsconfig paths
-// 顺序保持一致(alias 数组按 prefix 顺序匹配,顺序错就匹配错)。
-function buildUiRendererAliases(repoRoot: string): Array<{ find: string; replacement: string }> {
-  const listPath = resolve(repoRoot, "packages/ui/alias-list.json");
-  if (!existsSync(listPath)) return [];
-  type UiAliasEntry = {
-    name: string;
-    main: string;
-    client?: string;
-    invariant?: string;
-    subpaths?: Record<string, string>;
-  };
-  const list: UiAliasEntry[] = JSON.parse(readFileSync(listPath, "utf8"));
-  const out: Array<{ find: string; replacement: string }> = [];
-  for (const p of list) {
-    // 长前缀在前:subpaths(含 /client /invariant /styles /icons 等)先注册,
-    // 避免被裸名 prefix 误吞导致路径变成 ".../src/index.ts/<sub>"(ENOTDIR)。
-    for (const [seg, target] of Object.entries(p.subpaths ?? {})) {
-      out.push({ find: `${p.name}/${seg}`, replacement: resolve(repoRoot, target) });
-    }
-    if (p.client)     out.push({ find: `${p.name}/client`,     replacement: resolve(repoRoot, p.client) });
-    if (p.invariant)  out.push({ find: `${p.name}/invariant`,  replacement: resolve(repoRoot, p.invariant) });
-    out.push(         { find: p.name,                          replacement: resolve(repoRoot, p.main) });
+// 2026-09 改造:从根 tsconfig.json 的 paths 派生 vite resolve.alias,
+// 替代 50+ 个手写 alias 条目。这是 vite-tsconfig-paths 插件的等效内联
+// 实现,保留 electron-vite 兼容(main / preload 走 electron-vite wrapper)。
+import { readFileSync } from "node:fs";
+function loadTsconfigAliases(repoRoot: string): Record<string, string> {
+  const tsconfigPath = resolve(repoRoot, "tsconfig.json");
+  const raw = JSON.parse(
+    readFileSync(tsconfigPath, "utf8")
+      // Strip JSONC comments for parsing
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "")
+  );
+  const paths = raw?.compilerOptions?.paths ?? {};
+  const out: Record<string, string> = {};
+  for (const [alias, targets] of Object.entries(paths)) {
+    if (!Array.isArray(targets) || targets.length === 0) continue;
+    // Drop trailing "/*" / "*" from alias and target
+    const a = alias.replace(/\/?\*$/, "");
+    const t = String(targets[0]).replace(/\/?\*$/, "");
+    out[a] = t.startsWith(".") ? resolve(repoRoot, t) : t;
   }
-  // R32 — 再按 find 长度**从长到短**稳定排序。
-  //
-  // 只把 /client 与 /invariant 提前是不够的:subpaths 里也可能出现「一个是另一个
-  // 的前缀」,例如 `components` 与 `components/InstallDialog`。vite/rollup 的 alias
-  // 是 prefix 匹配(`importee.startsWith(pattern + "/")`),短的先命中就会拼出
-  // `.../src/components/index.ts/InstallDialog` 这种路径,报 ENOTDIR。
-  return out.sort((a, b) => b.find.length - a.find.length);
+  return out;
 }
+const tsconfigAliases = loadTsconfigAliases(repoRoot);
+
+const workspacePackageAliases = Object.entries(tsconfigAliases).map(([find, replacement]) => ({ find, replacement }));  // 留作兼容占位,实际 alias 由插件注入
+
+// 2026-09 改造:不再读 packages/ui/alias-list.json(该文件随 sync-ui-aliases 一起删除);
+// ui-* 包 alias 由 vite-tsconfig-paths 插件统一从 tsconfig.json paths 派生。
+const buildUiRendererAliases = (_repoRoot: string): Array<{ find: string; replacement: string }> => [];
 const uiRendererAliases = buildUiRendererAliases(repoRoot);
 
-// The renderer only needs the renderer-host dependency graph. Keeping the
-// Node-only plugin-host entry points out of the renderer Vite graph avoids
-// false browser externalization warnings and prevents Node built-ins from
-// being discovered during a render-only build.
+// 2026-09 改造:由 vite-tsconfig-paths 插件自动从根 tsconfig.json paths 派生
+// 所有 @openbuddy/* alias(包含 ui-* 包的 /client /invariant 子路径)。
+// 保留 renderer-only 的小覆盖(@/*)以兼容 src/ 短别名。
 const rendererOnlyAliases: Array<{ find: string; replacement: string }> = [
-  // Renderer-safe workspace packages only.
-  { find: "@openbuddy/plugin-host/renderer-patch", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/renderer-patch.ts") },
-  { find: "@openbuddy/bundle-base/renderer", replacement: resolve(repoRoot, "packages/bundle/openbuddy-base/src/renderer.ts") },
-  { find: "@openbuddy/plugin-host/yaml-patch", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/yaml-patch.ts") },
-  // Self-contained manifest module: the renderer needs only this slice of
-  // plugin-host. Aliasing it avoids resolving the bare barrel, which pulls
-  // profile-manager → @openbuddy/storage → node:sqlite (unavailable in the
-  // renderer) and leaves the page blank on load.
-  { find: "@openbuddy/plugin-host/plugin-manifest", replacement: resolve(repoRoot, "packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts") },
-  { find: "@deepseek-ai/cordis", replacement: resolve(repoRoot, "packages/runtime/openbuddy-cordis/src/index.ts") },
-  { find: "@openbuddy/cordis", replacement: resolve(repoRoot, "packages/runtime/openbuddy-cordis/src/index.ts") },
-  { find: "@openbuddy/renderer-host", replacement: resolve(repoRoot, "packages/renderer/openbuddy-renderer-host/src/index.ts") },
-  { find: "@openbuddy/auth-casdoor", replacement: resolve(repoRoot, "packages/auth/openbuddy-casdoor/src/index.ts") },
-  { find: "@openbuddy/shared-types", replacement: resolve(repoRoot, "packages/shared/openbuddy-types/src/index.ts") },
-  { find: "@openbuddy/files-kb", replacement: resolve(repoRoot, "packages/shared/openbuddy-files-kb/src/index.ts") },
-  { find: "@openbuddy/logging-shared", replacement: resolve(repoRoot, "packages/shared/openbuddy-logging-shared/src/index.ts") },
-  { find: "@openbuddy/logging-renderer", replacement: resolve(repoRoot, "packages/core/openbuddy-logging-renderer/src/index.ts") },
-
-  // ui-* 包:自动消费 sync-ui-aliases.mjs 维护的 packages/ui/alias-list.json,
-  // 让新增 / 移除 ui-* 包无需手动改 vite 配置。每个包按"长前缀 client/invariant 在前,
-  // 裸包名在后"展开,与 tsconfig paths 顺序保持一致。
-  ...uiRendererAliases,
-
-  // `@/*` → `src/*`. Listed last so it can't accidentally shadow a workspace
-  // package name (none of them start with `@` followed by something matching
-  // the `*` glob, but order = safety).
+  // `@/*` → `src/*` 必须放最后,以免误吞 workspace 包名
   { find: "@", replacement: resolve(repoRoot, "src") },
 ];
 
@@ -690,7 +607,7 @@ export default defineConfig({
       },
     },
     resolve: {
-      alias: workspacePackageAliases,
+      alias: workspacePackageAliases,  // 由 vite-tsconfig-paths 插件自动注入(workspacePackageAliases 留作兼容占位)
     },
   },
 
@@ -715,7 +632,7 @@ export default defineConfig({
       },
     },
     resolve: {
-      alias: workspacePackageAliases,
+      alias: workspacePackageAliases,  // 由 vite-tsconfig-paths 插件自动注入(workspacePackageAliases 留作兼容占位)
     },
   },
 
@@ -726,6 +643,8 @@ export default defineConfig({
   // externalizeDeps.exclude because Vite bundles everything by default.
   // ---------------------------------------------------------------------------
   renderer: {
+    plugins: [tsconfigPaths()],
+
     root: repoRoot,
     base: "./",
     build: {

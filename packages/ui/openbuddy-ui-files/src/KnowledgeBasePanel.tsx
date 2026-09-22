@@ -6,8 +6,8 @@
  */
 import { useEffect, useState } from "react";
 import { invoke, openOne } from "@/lib/platform/electron-api";
-import { searchKb, listKbProvidersWithStats, registerKbProvider, unregisterKbProvider, rebuildAllKbProviders, type KbEntry, type KbIndexStats } from "@openbuddy/files-kb";
-import { createLocalKbProvider } from "@openbuddy/files-kb";
+import { searchKb, listKbProvidersWithStats, registerKbProvider, unregisterKbProvider, rebuildAllKbProviders, type KbEntry, type KbIndexStats } from "@openbuddy/files-kb/renderer";
+import { createLocalKbProvider } from "@openbuddy/files-kb/renderer";
 import { createElectronDirectoryReader, isElectronAvailable } from "@/lib/files/electron-kb-reader";
 
 interface KnowledgeBasePanelProps {

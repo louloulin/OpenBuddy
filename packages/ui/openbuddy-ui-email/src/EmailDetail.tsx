@@ -4,7 +4,7 @@
  * 详情组件只负责渲染和把用户意图转成 callbacks；AI 生成、审阅、草稿采纳、
  * 任务/提醒/日历链接仍由 EmailPanel 的 orchestration 层执行。
  */
-import type { EmailAccount, EmailAnalysisRecord, EmailManagementCapability, EmailThread } from "@openbuddy/capability-email";
+import type { EmailAccount, EmailAnalysisRecord, EmailManagementCapability, EmailThread } from "@openbuddy/capability-email/renderer";
 import { sanitizeEmailHtml } from "./lib/safe-email-html";
 
 export interface EmailDetailProps {

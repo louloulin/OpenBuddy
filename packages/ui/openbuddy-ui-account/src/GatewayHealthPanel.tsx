@@ -17,7 +17,7 @@ import {
 import type {
   CasdoorGatewayHealth,
   CasdoorTenantHealth,
-} from "@openbuddy/auth-casdoor";
+} from "@openbuddy/auth-casdoor/renderer";
 
 function SectionShell({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
   return (

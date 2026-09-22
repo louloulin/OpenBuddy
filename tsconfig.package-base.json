@@ -1,28 +1,21 @@
-// =====================================================================
-// tsconfig.json — OpenBuddy 根项目(solution-style)
-//
-// 整个仓库的 tsconfig 体系(2026 改造后):
-//   1. ./tsconfig.base.json                       — 全局 compilerOptions 基座(composite: false)
-//   2. ./tsconfig.package-base.json                — 工作区包基座(composite: true)
-//   3. ./packages/ui/tsconfig.base.client.json    — ui-* 客户端覆盖(DOM/JSX)
-//   4. ./tsconfig.json(本文件)                    — solution-style 根入口
-//   5. ./packages/*/tsconfig.json                  — 极简 extends package-base.json
-//
-// 本文件是"总入口":
-//   - files: []     不直接编译源码(根 App 走 tsc -p tsconfig.node.json)
-//   - references   列出全部工作区包,tsc -b 走增量构建
-//   - paths        单一来源的别名表(vite-tsconfig-paths 自动派生)
-//
-// L3 改造记录(2026-09):
-//   - 33 份 packages/ui/openbuddy-ui-*/tsconfig.json 从 ~370 行/份精简到 7 行
-//   - 34 份非 ui-* 包 tsconfig.json 从 8 行精简到 3 行 extends
-//   - 根 tsconfig 改为 solution-style(references),与 TypeScript 5+ / Nx 推荐一致
-//   - paths 收敛为单源(根 tsconfig),消除 33 × 141 = 4,653 条重复条目
-// =====================================================================
 {
+  // =====================================================================
+  // tsconfig.package-base.json — OpenBuddy 工作区包的编译基座
+  //
+  // 所有 packages/*/tsconfig.json 都应该 extends 本文件,避免每个包重复
+  // 写 ~85% 同源的 compilerOptions。本文件是"单一来源":
+  //   - compilerOptions:跨包共用的最小配置 + paths 别名表
+  //
+  // 设计依据(TypeScript 5+ / Nx 推荐):
+  //   - paths 收敛到此文件,所有包 extends 即可,无需各自维护
+  //   - 不在 base 启用 composite / outDir / rootDir — 它们是 per-package 设置
+  //     (composite 强制 rootDir 检查会与 paths 别名指向其他包 src 冲突)
+  //   - 单一来源维护,vite-tsconfig-paths 直接读 paths 派生 alias
+  // =====================================================================
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    // paths 单一来源 — vite-tsconfig-paths 直接读取
+    "baseUrl": ".",
+    "noEmit": true,
     "paths": {
       "@/*": [
         "./src/*"
@@ -499,88 +492,7 @@
       "@openbuddy/platform/app-version": ["./packages/ui/openbuddy-platform/src/app-version.ts"],
       "@openbuddy/platform/electron-api": ["./packages/ui/openbuddy-platform/src/electron-api.ts"],
       "@openbuddy/ui-state/session-store": ["./packages/ui/openbuddy-ui-state/src/session-store.ts"]
-        },
-    "types": ["node"]
+            }
   },
-  "include": ["src", "packages/ui/openbuddy-ui-runtime/src/client.tsx", "packages/ui/openbuddy-ui-runtime/src/index.ts"],
-  "references": [
-    { "path": "./packages/auth/openbuddy-casdoor/tsconfig.json" },
-    { "path": "./packages/auth/openbuddy-permission/tsconfig.json" },
-    { "path": "./packages/bundle/openbuddy-base/tsconfig.json" },
-    { "path": "./packages/bundle/openbuddy-bundle-desktop/tsconfig.json" },
-    { "path": "./packages/capability/openbuddy-authorization/tsconfig.json" },
-    { "path": "./packages/capability/openbuddy-calendar/tsconfig.json" },
-    { "path": "./packages/capability/openbuddy-email/tsconfig.json" },
-    { "path": "./packages/capability/openbuddy-folder-trust/tsconfig.json" },
-    { "path": "./packages/capability/openbuddy-mcp-client/tsconfig.json" },
-    { "path": "./packages/collaboration/openbuddy-coordinator/tsconfig.json" },
-    { "path": "./packages/collaboration/openbuddy-evidence/tsconfig.json" },
-    { "path": "./packages/collaboration/openbuddy-inbox/tsconfig.json" },
-    { "path": "./packages/collaboration/openbuddy-network/tsconfig.json" },
-    { "path": "./packages/collaboration/openbuddy-policy/tsconfig.json" },
-    { "path": "./packages/collaboration/openbuddy-protocol/tsconfig.json" },
-    { "path": "./packages/collaboration/openbuddy-room/tsconfig.json" },
-    { "path": "./packages/collaboration/openbuddy-task/tsconfig.json" },
-    { "path": "./packages/core/openbuddy-logging-main/tsconfig.json" },
-    { "path": "./packages/core/openbuddy-logging-renderer/tsconfig.json" },
-    { "path": "./packages/core/openbuddy-session/tsconfig.json" },
-    { "path": "./packages/fs/openbuddy-fs-local/tsconfig.json" },
-    { "path": "./packages/payment/tsconfig.json" },
-    { "path": "./packages/renderer/openbuddy-renderer-host/tsconfig.json" },
-    { "path": "./packages/runtime/openbuddy-cordis/tsconfig.json" },
-    { "path": "./packages/runtime/openbuddy-dsh-core/tsconfig.json" },
-    { "path": "./packages/runtime/openbuddy-plugin-host/tsconfig.json" },
-    { "path": "./packages/runtime/openbuddy-plugin-sdk/tsconfig.json" },
-    { "path": "./packages/runtime/openbuddy-storage/tsconfig.json" },
-    { "path": "./packages/saml/tsconfig.json" },
-    { "path": "./packages/scim/tsconfig.json" },
-    { "path": "./packages/shared/openbuddy-files-kb/tsconfig.json" },
-    { "path": "./packages/shared/openbuddy-logging-shared/tsconfig.json" },
-    { "path": "./packages/shared/openbuddy-types/tsconfig.json" },
-    { "path": "./packages/team/openbuddy-team/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-agent-rpc/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-platform/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-account/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-automation/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-billing/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-collaboration/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-contract/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-conversation/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-dialogs/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-editor/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-email/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-experts/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-files/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-files-tree/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-hmr/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-home/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-layout/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-library/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-locale/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-markdown/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-mcp/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-modules/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-motion/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-onboarding/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-primitives/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-runtime/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-settings/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-settings-models/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-shared/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-shell/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-sidebar/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-slots/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-state/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-theme/tsconfig.json" },
-    { "path": "./packages/ui/openbuddy-ui-workbench/tsconfig.json" },
-    { "path": "./packages/webhook-outbox/tsconfig.json" }
-  ],
-  "exclude": [
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/lib/**",
-    "**/.worktrees/**",
-    "apps/**",
-    "services/**"
-  ]
+  "include": ["src/**/*"]
 }
