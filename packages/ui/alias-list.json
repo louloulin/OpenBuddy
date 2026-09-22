@@ -21,8 +21,10 @@
     "client": null,
     "invariant": null,
     "subpaths": {
+      "app-version": "./packages/ui/openbuddy-platform/src/app-version.ts",
       "billing/usage-quota": "./packages/ui/openbuddy-platform/src/billing/usage-quota.ts",
       "browser-preview": "./packages/ui/openbuddy-platform/src/browser-preview.ts",
+      "electron-api": "./packages/ui/openbuddy-platform/src/electron-api.ts",
       "error-format": "./packages/ui/openbuddy-platform/src/error-format.ts",
       "files/cloud-storage": "./packages/ui/openbuddy-platform/src/files/cloud-storage.ts",
       "files/drop-utils": "./packages/ui/openbuddy-platform/src/files/drop-utils.ts",
@@ -349,6 +351,7 @@
       "permission-store": "./packages/ui/openbuddy-ui-state/src/permission-store.ts",
       "projects-store": "./packages/ui/openbuddy-ui-state/src/projects-store.ts",
       "question-store": "./packages/ui/openbuddy-ui-state/src/question-store.ts",
+      "session-store": "./packages/ui/openbuddy-ui-state/src/session-store.ts",
       "subagent-store": "./packages/ui/openbuddy-ui-state/src/subagent-store.ts",
       "toast-store": "./packages/ui/openbuddy-ui-state/src/toast-store.ts"
     }

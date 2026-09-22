@@ -15,7 +15,8 @@
     "./projects-store": "./src/projects-store.ts",
     "./question-store": "./src/question-store.ts",
     "./subagent-store": "./src/subagent-store.ts",
-    "./toast-store": "./src/toast-store.ts"
+    "./toast-store": "./src/toast-store.ts",
+    "./session-store": "./src/session-store.ts"
   },
   "engines": {
     "node": ">=22.5.0"

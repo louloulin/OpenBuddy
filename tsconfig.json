@@ -492,7 +492,10 @@
       "@openbuddy/ui-state/projects-store": ["./packages/ui/openbuddy-ui-state/src/projects-store.ts"],
       "@openbuddy/ui-state/question-store": ["./packages/ui/openbuddy-ui-state/src/question-store.ts"],
       "@openbuddy/ui-state/subagent-store": ["./packages/ui/openbuddy-ui-state/src/subagent-store.ts"],
-      "@openbuddy/ui-state/toast-store": ["./packages/ui/openbuddy-ui-state/src/toast-store.ts"]
+      "@openbuddy/ui-state/toast-store": ["./packages/ui/openbuddy-ui-state/src/toast-store.ts"],
+      "@openbuddy/platform/app-version": ["./packages/ui/openbuddy-platform/src/app-version.ts"],
+      "@openbuddy/platform/electron-api": ["./packages/ui/openbuddy-platform/src/electron-api.ts"],
+      "@openbuddy/ui-state/session-store": ["./packages/ui/openbuddy-ui-state/src/session-store.ts"]
     }
   },
   // ── include(明确范围) ────────────────────────────────────────────

@@ -196,7 +196,8 @@
       "@openbuddy/agent-rpc/stream/streaming-message": ["./packages/ui/openbuddy-agent-rpc/src/stream/streaming-message.ts"],
       "@openbuddy/ui-primitives/ErrorBoundary": ["./packages/ui/openbuddy-ui-primitives/src/ErrorBoundary.tsx"],
       "@openbuddy/ui-primitives/StatusIndicator": ["./packages/ui/openbuddy-ui-primitives/src/StatusIndicator.tsx"],
-      "@openbuddy/ui-state/global-confirm-store": ["./packages/ui/openbuddy-ui-state/src/global-confirm-store.ts"]
+      "@openbuddy/ui-state/global-confirm-store": ["./packages/ui/openbuddy-ui-state/src/global-confirm-store.ts"],
+      "@openbuddy/ui-state/session-store": ["./packages/ui/openbuddy-ui-state/src/session-store.ts"]
     }
   },
   "include": ["./src/**/*.ts", "./src/**/*.tsx"]
