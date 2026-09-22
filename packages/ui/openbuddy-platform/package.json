@@ -22,7 +22,11 @@
     "./security/policy-engine": "./src/security/policy-engine.ts",
     "./security/sandbox-guard": "./src/security/sandbox-guard.ts",
     "./electron-api": "./src/electron-api.ts",
-    "./app-version": "./src/app-version.ts"
+    "./app-version": "./src/app-version.ts",
+    "./billing/token-estimate": "./src/billing/token-estimate.ts",
+    "./files/electron-kb-reader": "./src/files/electron-kb-reader.ts",
+    "./files/export-markdown": "./src/files/export-markdown.ts",
+    "./files/extract-text": "./src/files/extract-text.ts"
   },
   "engines": {
     "node": ">=22.5.0"

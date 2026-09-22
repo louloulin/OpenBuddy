@@ -404,7 +404,17 @@
       "@openbuddy/ui-state/toast-store": ["./packages/ui/openbuddy-ui-state/src/toast-store.ts"],
       "@openbuddy/platform/app-version": ["./packages/ui/openbuddy-platform/src/app-version.ts"],
       "@openbuddy/platform/electron-api": ["./packages/ui/openbuddy-platform/src/electron-api.ts"],
-      "@openbuddy/ui-state/session-store": ["./packages/ui/openbuddy-ui-state/src/session-store.ts"]
+      "@openbuddy/ui-state/session-store": ["./packages/ui/openbuddy-ui-state/src/session-store.ts"],
+      "@openbuddy/agent-rpc/audit/audit-client": ["./packages/ui/openbuddy-agent-rpc/src/audit/audit-client.ts"],
+      "@openbuddy/agent-rpc/casdoor/casdoor-client": ["./packages/ui/openbuddy-agent-rpc/src/casdoor/casdoor-client.ts"],
+      "@openbuddy/agent-rpc/pi-client": ["./packages/ui/openbuddy-agent-rpc/src/pi-client.ts"],
+      "@openbuddy/agent-rpc/session-artifacts": ["./packages/ui/openbuddy-agent-rpc/src/session-artifacts.ts"],
+      "@openbuddy/agent-rpc/subagents": ["./packages/ui/openbuddy-agent-rpc/src/subagents.ts"],
+      "@openbuddy/agent-rpc/team-derive": ["./packages/ui/openbuddy-agent-rpc/src/team-derive.ts"],
+      "@openbuddy/platform/billing/token-estimate": ["./packages/ui/openbuddy-platform/src/billing/token-estimate.ts"],
+      "@openbuddy/platform/files/electron-kb-reader": ["./packages/ui/openbuddy-platform/src/files/electron-kb-reader.ts"],
+      "@openbuddy/platform/files/export-markdown": ["./packages/ui/openbuddy-platform/src/files/export-markdown.ts"],
+      "@openbuddy/platform/files/extract-text": ["./packages/ui/openbuddy-platform/src/files/extract-text.ts"]
     }
   },
   "include": [
