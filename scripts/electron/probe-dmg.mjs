@@ -1,11 +1,12 @@
 // Probe the FRESHLY REBUILT DMG's app to verify the brace-expansion fix
 // is shipped and the app stays healthy through deeper UI interactions.
+import { version as APP_VERSION } from "../../package.json";
 import { _electron as electron } from "playwright";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const APP_EXEC = "/Volumes/OpenBuddy 0.16.0-arm64/OpenBuddy.app/Contents/MacOS/OpenBuddy";
+const APP_EXEC = `/Volumes/OpenBuddy ${APP_VERSION}-arm64/OpenBuddy.app/Contents/MacOS/OpenBuddy`;
 const ROOT = "/Users/louloulin/appx/OpenBuddy";
 const SHOT_DIR = "/Users/louloulin/.codex/visualizations/2026/09/21/01a0c1f8-2ad3-7cb3-9840-907fe43f8964";
 
