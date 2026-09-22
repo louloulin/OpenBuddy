@@ -127,7 +127,7 @@
     "sync:ui-aliases": "node scripts/sync-ui-aliases.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.124.0",
+    "@anthropic-ai/sdk": "^0.127.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1048.0",
     "@cordisjs/core": "^3.18.1",
     "@earendil-works/chord": "^0.85.1",
@@ -262,12 +262,12 @@
     "which": "^2.0.2",
     "xlsx": "^0.18.5",
     "yallist": "^4.0.0",
-    "yaml": "^2.9.0",
+    "yaml": "^2.9.1",
     "zod-to-json-schema": "^3.25.2",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
-    "@moonrepo/cli": "2.5.4",
+    "@moonrepo/cli": "2.5.5",
     "@playwright/test": "1.63.0",
     "@softarc/eslint-plugin-sheriff": "^0.19.6",
     "@softarc/sheriff-core": "^0.19.6",
@@ -277,7 +277,7 @@
     "@types/hast": "^3.0.5",
     "@types/linkify-it": "^5.0.0",
     "@types/mdast": "^4.0.4",
-    "@types/node": "26.4.1",
+    "@types/node": "26.6.2",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^19.2.7",
