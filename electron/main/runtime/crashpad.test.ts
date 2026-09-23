@@ -9,6 +9,7 @@ import { join } from "node:path";
 import {
   _resetForTests,
   getCrashpadDir,
+  recordMainCrash,
   recordRendererCrash,
   startCrashpad,
   type CrashReportLike,
@@ -80,5 +81,43 @@ describe("crashpad", () => {
     const jsonl = readFileSync(join(crashpadDir, "renderer-crashes.jsonl"), "utf8");
     expect(jsonl.split("\n").filter(Boolean).length).toBe(1);
     expect(JSON.parse(jsonl.trim()).windowLabel).toBe("main");
+  });
+
+  it("recordMainCrash writes JSONL + structured dump for uncaughtException", () => {
+    scratch = mkdtempSync(join(tmpdir(), "ob-crash-"));
+    const fake: CrashReportLike = { start: () => {}, getLastCrashReport: () => null, getUploadedReports: () => [] };
+    const { crashpadDir } = startCrashpad({ dataDir: scratch, crashReport: fake });
+    const entry = recordMainCrash(crashpadDir, {
+      kind: "uncaughtException",
+      name: "TypeError",
+      message: "boom",
+      stack: "TypeError: boom\n    at test",
+    });
+    expect(entry.schema).toBe("openbuddy.crashpad.main.v1");
+    expect(entry.kind).toBe("uncaughtException");
+    expect(entry.message).toBe("boom");
+    expect(entry.name).toBe("TypeError");
+    // JSONL stream should have one line
+    const jsonl = readFileSync(join(crashpadDir, "main-crashes.jsonl"), "utf8");
+    expect(jsonl.split("\n").filter(Boolean)).toHaveLength(1);
+    // Structured dump file should exist with the schema
+    const files = readdirSync(crashpadDir).filter((f) => f.startsWith("main-uncaughtException-"));
+    expect(files).toHaveLength(1);
+    const parsed = JSON.parse(readFileSync(join(crashpadDir, files[0]), "utf8"));
+    expect(parsed.schema).toBe("openbuddy.crashpad.main.v1");
+    expect(parsed.kind).toBe("uncaughtException");
+    expect(parsed.stack).toContain("TypeError");
+  });
+
+  it("recordMainCrash supports unhandledRejection kind", () => {
+    scratch = mkdtempSync(join(tmpdir(), "ob-crash-"));
+    const fake: CrashReportLike = { start: () => {}, getLastCrashReport: () => null, getUploadedReports: () => [] };
+    const { crashpadDir } = startCrashpad({ dataDir: scratch, crashReport: fake });
+    const entry = recordMainCrash(crashpadDir, {
+      kind: "unhandledRejection",
+      message: "promise rejected",
+    });
+    expect(entry.kind).toBe("unhandledRejection");
+    expect(entry.stack).toBeUndefined();
   });
 });

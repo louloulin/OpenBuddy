@@ -40,6 +40,7 @@ import { createBridgeStatusBroadcaster, notifyBridgeUnavailable } from "./collab
 import { bootHarnessServer } from "./bootstrap/boot-harness-server";
 import { installAppLifecycle } from "./bootstrap/app-lifecycle";
 import { bootHostCore } from "./host-boot";
+import { getCrashpadDir, recordMainCrash, startCrashpad } from "./runtime/crashpad";
 import { casdoorAuth } from "./casdoor/casdoor-auth";
 import { initCasdoorSecurity, type CasdoorSecurityController } from "./security/casdoor";
 import { perfTraceMark } from "./observability/perf-trace";
@@ -136,6 +137,44 @@ if (developmentUserData || process.env.NODE_ENV_ELECTRON_VITE === "development")
 if (process.env.PI_OPENBUDDY_DATA_DIR) {
   app.setPath("userData", process.env.PI_OPENBUDDY_DATA_DIR);
 }
+
+// R26 + Phase 3 — Crashpad local-only 与 main 进程未捕获异常落盘。
+// 在 userData 落地之后、申请单实例锁之前装上,这样:
+//   - Crashpad 的 dump 目录钉在真实数据目录,跨升级不丢;
+//   - 即便 startCrashpad 在 app.whenReady 之前抛错,异常处理也已就位。
+startCrashpad({ dataDir: app.getPath("userData") });
+const MAIN_CRASH_DUMP_DIR = getCrashpadDir() ?? join(app.getPath("userData"), "crash-dumps");
+
+/**
+ * 把 main 进程的未捕获异常落盘到 Crashpad 目录后,**不再尝试恢复**:
+ * Electron main 是单例,异常逃出这个处理器意味着进程已经在退出通道,
+ * 让它干净退出比挣扎式 recovery 更可靠(测试覆盖见
+ * `electron/main/runtime/crashpad.test.ts`)。
+ *
+ * handler 必须保持 `void` —— Electron 的事件循环下一拍会把异常吞掉,
+ * 同步抛错只会让日志里再叠一条 uncaughtException,反而掩盖原始信息。
+ */
+function dumpMainCrash(kind: "uncaughtException" | "unhandledRejection", err: unknown): void {
+  const message = err instanceof Error ? err.message : String(err);
+  const name = err instanceof Error ? err.name : undefined;
+  const stack = err instanceof Error ? err.stack : undefined;
+  try {
+    recordMainCrash(MAIN_CRASH_DUMP_DIR, { kind, name, message, stack });
+  } catch (dumpErr) {
+    // 不能让落盘本身把进程再炸一次 —— 用 stderr 兜底。
+    // eslint-disable-next-line no-console
+    console.error(`[openbuddy-crashpad] failed to persist ${kind} dump:`, dumpErr);
+  }
+  // eslint-disable-next-line no-console
+  console.error(`[openbuddy-crashpad] main ${kind}:`, err);
+}
+
+process.on("uncaughtException", (err) => {
+  dumpMainCrash("uncaughtException", err);
+});
+process.on("unhandledRejection", (reason) => {
+  dumpMainCrash("unhandledRejection", reason);
+});
 
 // R26 — 单实例锁。第二个 OpenBuddy 进程启动时直接退出,避免两个 host-core
 // 同时写同一个数据目录造成 SQLite 锁竞争 / 日志交错(参考 PI-Desktop
