@@ -143,6 +143,15 @@ try {
   await page.waitForFunction(() => Boolean(window.api?.apiVersion === 1), undefined, { timeout: 30_000 });
   log("renderer attached, apiVersion = 1");
 
+  // The first-run OnboardingWizard is a modal dialog: on a fresh
+  // `--user-data-dir` it covers the composer and Playwright refuses the send
+  // click ("intercepts pointer events"). Dismiss it before driving the UI.
+  await page.waitForTimeout(2500);
+  await page.click("[data-testid='onboarding-wizard'] [aria-label='关闭引导']", { timeout: 3000 })
+    .then(() => log("dismissed first-run onboarding wizard"))
+    .catch(() => { /* already dismissed / not shown — fine */ });
+  await page.waitForTimeout(800);
+
   // Configure provider directly via IPC — same path as diagnose-chat-stall.
   log(`configuring provider ${opts.providerId} → ${opts.baseUrl} (${opts.modelId})`);
   await invoke("agent:providers-save-provider", {
