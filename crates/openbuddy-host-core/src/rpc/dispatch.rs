@@ -6,6 +6,7 @@
 //! is responsible for translating the latter into a JSON-RPC error envelope.
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::OnceLock;
 
@@ -94,15 +95,21 @@ pub fn install_app_handlers() {
                     vec![
                         "app.handshake",
                         "app.listMethods",
+                        "app.shutdown",
                         "secrets.set",
                         "secrets.get",
                         "secrets.delete",
                         "secrets.list",
                         "permissions.evaluate",
-                        "permissions.list",
+                        "permissions.readRules",
+                        "permissions.writeRules",
+                        "permissions.readMode",
+                        "permissions.writeMode",
                         "session.search",
+                        "session.message",
                         "workspace.resolve",
                         "workspace.check",
+                        "workspace.listIgnored",
                         "audit.append",
                         "audit.tail",
                     ]
@@ -232,6 +239,194 @@ pub fn install_capability_handlers() {
                     .audit
                     .tail(parsed)
                     .map_err(|err| map_capability_error("audit.tail", err))?;
+                serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    use crate::permissions::{EvaluateParams, WriteModeParams, WriteRulesParams};
+
+    register(
+        "permissions.evaluate",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: EvaluateParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                let result = state
+                    .permissions
+                    .evaluate(&parsed.tool, parsed.pattern.as_deref())
+                    .map_err(|err| map_capability_error("permissions.evaluate", err))?;
+                serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    register(
+        "permissions.readRules",
+        Arc::new(|state, _params| {
+            Box::pin(async move {
+                let rules = state
+                    .permissions
+                    .read_rules_from_disk()
+                    .map_err(|err| map_capability_error("permissions.readRules", err))?;
+                serde_json::to_value(rules).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    register(
+        "permissions.writeRules",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: WriteRulesParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                state
+                    .permissions
+                    .write_rules(&parsed.rules)
+                    .map_err(|err| map_capability_error("permissions.writeRules", err))?;
+                Ok(serde_json::json!({ "ok": true, "count": parsed.rules.len() }))
+            })
+        }),
+    );
+
+    register(
+        "permissions.readMode",
+        Arc::new(|state, _params| {
+            Box::pin(async move {
+                let mode = state
+                    .permissions
+                    .read_mode()
+                    .map_err(|err| map_capability_error("permissions.readMode", err))?;
+                serde_json::to_value(mode).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    register(
+        "permissions.writeMode",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: WriteModeParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                state
+                    .permissions
+                    .write_mode(parsed.mode)
+                    .map_err(|err| map_capability_error("permissions.writeMode", err))?;
+                Ok(serde_json::json!({ "ok": true, "mode": parsed.mode }))
+            })
+        }),
+    );
+
+    use crate::workspace::{CheckParams, ResolveParams, SetRootParams};
+
+    register(
+        "workspace.setRoot",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: SetRootParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                state
+                    .workspace
+                    .set_workspace_root(PathBuf::from(parsed.workspace_root))
+                    .map_err(|err| map_capability_error("workspace.setRoot", err))?;
+                Ok(serde_json::json!({ "ok": true }))
+            })
+        }),
+    );
+
+    register(
+        "workspace.resolve",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: ResolveParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                let result = state
+                    .workspace
+                    .resolve(Path::new(&parsed.path))
+                    .map_err(|err| map_capability_error("workspace.resolve", err))?;
+                serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    register(
+        "workspace.check",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: CheckParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                let result = state
+                    .workspace
+                    .check(Path::new(&parsed.path))
+                    .map_err(|err| map_capability_error("workspace.check", err))?;
+                serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    register(
+        "workspace.listIgnored",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                #[derive(Deserialize)]
+                struct Params {
+                    #[serde(default = "default_max")]
+                    max: usize,
+                }
+                fn default_max() -> usize { 256 }
+                let parsed: Params = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                let result = state
+                    .workspace
+                    .list_ignored(parsed.max)
+                    .map_err(|err| map_capability_error("workspace.listIgnored", err))?;
+                serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    use crate::session_search::{MessageParams, SearchParams, SetRootParams as SessionsRootParams};
+
+    register(
+        "session.setRoot",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: SessionsRootParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                state
+                    .session_search
+                    .set_sessions_root(PathBuf::from(parsed.sessions_root))
+                    .map_err(|err| map_capability_error("session.setRoot", err))?;
+                Ok(serde_json::json!({ "ok": true }))
+            })
+        }),
+    );
+
+    register(
+        "session.search",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: SearchParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                let result = state
+                    .session_search
+                    .search(&parsed.query, parsed.max_results)
+                    .map_err(|err| map_capability_error("session.search", err))?;
+                serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    register(
+        "session.message",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: MessageParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                let result = state
+                    .session_search
+                    .message(&parsed.session_id, parsed.line_no)
+                    .map_err(|err| map_capability_error("session.message", err))?;
                 serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
             })
         }),

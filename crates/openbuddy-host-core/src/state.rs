@@ -74,7 +74,8 @@ impl AppState {
             data_dir: data_dir.clone(),
             secrets: crate::secrets::SecretsHandle::open(&data_dir.0)
                 .context("failed to open secrets handle")?,
-            permissions: crate::permissions::PermissionsHandle::default(),
+            permissions: crate::permissions::PermissionsHandle::open(&data_dir.0)
+                .context("failed to open permissions handle")?,
             session_search: crate::session_search::SessionSearchHandle::default(),
             workspace: crate::workspace::WorkspaceHandle::default(),
             audit: crate::audit::AuditHandle::open(&data_dir.0)
