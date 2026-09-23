@@ -493,7 +493,9 @@
 /* === messages === */
 .msg {
   display: flex;
-  gap: 8px;
+  gap: 12px;
+  /* More breathing room between turns — Claude/ChatGPT feel. */
+  padding: 4px 0;
 }
 .msg--user {
   display: block;
@@ -529,12 +531,14 @@
   max-width: 75%;
   text-align: left;
 }
+/* Minimal user bubble — single subtle fill, no chat tail. The previous
+   "BR=0" tail was cute but visually noisy once we add actions/reactions. */
 .msg__bubble {
   max-width: 100%;
-  padding: 8px 12px;
+  padding: 10px 14px;
   background: var(--wb-bg-secondary, #ebebeb);
   color: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
-  border-radius: 16px 16px 0 16px;
+  border-radius: 18px;
   font-size: 14px;
   line-height: 22px;
   white-space: pre-wrap;
@@ -552,8 +556,17 @@
  *  旧实现 `.msg__bubble { border-radius: 16px 16px 0 16px }` 让两边都 BR=0,
  *  助理气泡看起来像"右对齐气泡" — 视觉割裂, 像没有说话的占位气泡。
  *  修复后两侧气泡明确朝自己方向收尾, 视觉更接近 WorkBuddy 风格。 */
+/* ChatGPT/Claude/Codex style: assistant messages render as plain text —
+   no background fill, no decorative bubble. The chat-tail corner was a
+   WorkBuddy/WeChat imitation; we found it noisy in practice. */
 .msg--assistant .msg__bubble {
-  border-radius: 16px 16px 16px 0;
+  background: transparent;
+  color: var(--wb-text-strong);
+  padding: 0;
+  max-width: 100%;
+  border-radius: 0;
+  font-size: 15px;
+  line-height: 1.65;
 /* R8.1 (revision-pager) — split text + attachments inside the user
  * bubble so we can replace the text span alone when scrubbing through
  * revisions (file/image previews stay mounted across revisions).
@@ -1352,7 +1365,7 @@ button.diff__path {
   background: var(--wb-color-bg-secondary-default, rgba(0, 0, 0, 0.02));
   border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
   border-left: 3px solid var(--wb-palette-brand-8, #00C29A);
-  animation: toolcall-expand 200ms ease-out;
+  animation: toolcall-expand var(--wb-motion-duration-base, 200ms) ease-out;
 }
 .toolcall--expanded .toolcall__title {
   font-weight: 600;
@@ -1425,4 +1438,210 @@ button.diff__path {
   font-size: 13.5px;
   font-weight: 500;
   color: var(--wb-color-text-strong, #1a1a2e);
+}
+
+/* ============================================================================
+ * Phase B.5 — Citation & Artifact chips (Plan5)
+ *
+ * Inline chips rendered when the markdown tokenizer detects
+ *   `[[cite:<source-id>]]`    → `<CitationChip>` (上标角标 + 来源标题)
+ *   `[[artifact:<id-or-hash>]]` → `<ArtifactChip>` (产物 chip,带 hash 头 6 位)
+ *
+ * 视觉对齐 ChatGPT / Codex / Perplexity 的引用 / 产物标记。配色走 `--wb-*`
+ * 令牌,自动跟随 dark/light;无硬编码颜色。
+ * ============================================================================ */
+.citation-chip,
+.artifact-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  margin: 0 2px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-subtle, rgba(127, 127, 127, 0.35));
+  background: var(--wb-bg-tertiary, rgba(127, 127, 127, 0.08));
+  color: var(--wb-color-text-medium, #6e6e80);
+  font-size: 0.82em;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  vertical-align: baseline;
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.citation-chip:hover,
+.artifact-chip:hover {
+  background: var(--wb-bg-quaternary, rgba(127, 127, 127, 0.14));
+  border-color: var(--wb-brand, #00c29a);
+  color: var(--wb-color-text-strong, #1a1a23);
+}
+.citation-chip:focus-visible,
+.artifact-chip:focus-visible {
+  outline: 2px solid var(--wb-brand, #00c29a);
+  outline-offset: 2px;
+}
+.citation-chip__icon,
+.artifact-chip__icon {
+  display: inline-flex;
+  color: var(--wb-brand, #00c29a);
+}
+.citation-chip[data-citation-resolved="false"] {
+  opacity: 0.65;
+  font-style: italic;
+}
+.artifact-chip__hash {
+  font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.78em;
+  color: var(--wb-color-text-soft, rgba(0, 0, 0, 0.5));
+}
+
+/* ============================================================================
+ * Phase B.9/B.10 — ToolGroupSummary + MessageRewindMenu (Plan5)
+ * ============================================================================ */
+.tool-group-summary {
+  display: block;
+  border: 1px solid var(--wb-border-subtle, rgba(127, 127, 127, 0.35));
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: 6px 0;
+  background: var(--wb-color-bg-secondary-default, rgba(0, 0, 0, 0.02));
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.tool-group-summary--running {
+  border-color: var(--wb-brand, #00c29a);
+}
+.tool-group-summary__header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: var(--wb-color-text-medium, #6e6e80);
+  padding: 2px 0;
+}
+.tool-group-summary__icon {
+  display: inline-flex;
+  color: var(--wb-color-text-medium, #6e6e80);
+}
+.tool-group-summary--running .tool-group-summary__icon {
+  color: var(--wb-brand, #00c29a);
+}
+.tool-group-summary__icon--active {
+  animation: streaming-caret-blink 1200ms ease-in-out infinite;
+}
+.tool-group-summary__label {
+  font-weight: 500;
+}
+.tool-group-summary__tools {
+  color: var(--wb-color-text-soft, rgba(0, 0, 0, 0.5));
+  font-size: 12px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-group-summary__progress {
+  font-variant-numeric: tabular-nums;
+  color: var(--wb-color-text-soft, rgba(0, 0, 0, 0.5));
+  font-size: 12px;
+}
+.tool-group-summary__list {
+  list-style: none;
+  margin: 6px 0 2px 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* MessageRewindMenu — hover-only entry near assistant bubbles. */
+.msg-rewind-menu {
+  display: inline-flex;
+  gap: 4px;
+  opacity: 0.4;
+  transition: opacity 120ms ease;
+}
+.msg-rewind-menu:hover,
+.msg-rewind-menu:focus-within {
+  opacity: 1;
+}
+.msg-rewind-menu__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--wb-border-subtle, rgba(127, 127, 127, 0.35));
+  border-radius: 4px;
+  background: var(--wb-color-bg-primary-default, transparent);
+  color: var(--wb-color-text-medium, #6e6e80);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.msg-rewind-menu__btn:hover:not(:disabled),
+.msg-rewind-menu__btn:focus-visible {
+  background: var(--wb-bg-tertiary, rgba(127, 127, 127, 0.08));
+  border-color: var(--wb-brand, #00c29a);
+  color: var(--wb-color-text-strong, #1a1a23);
+}
+.msg-rewind-menu__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Plan5 B.4 — inline approval hint surfaced at the trailing assistant
+   message so the user notices pending permissions/questions at the
+   point of attention, not only in the footer. */
+.msg__approval-hint {
+  margin: 8px 0 0;
+  border: 1px solid var(--wb-border-default);
+  border-radius: var(--wb-radius-md, 8px);
+  background: var(--wb-color-bg-warning-default, rgba(217, 119, 6, 0.06));
+  overflow: hidden;
+  transition: max-height var(--wb-motion-duration-base, 200ms) ease-out;
+}
+.msg__approval-hint--expanded {
+  background: var(--wb-color-bg-warning-subtle, rgba(217, 119, 6, 0.10));
+}
+.msg__approval-hint-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--wb-text-strong);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: inherit;
+}
+.msg__approval-hint-toggle:hover {
+  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.04));
+}
+.msg__approval-hint-icon {
+  color: rgb(161, 88, 0);
+  flex-shrink: 0;
+}
+.msg__approval-hint-summary {
+  flex: 1;
+  font-weight: 500;
+}
+.msg__approval-hint-chevron {
+  color: var(--wb-text-medium);
+  transition: transform var(--wb-motion-duration-fast, 120ms) ease-out;
+  flex-shrink: 0;
+}
+.msg__approval-hint-chevron--open {
+  transform: rotate(180deg);
+}
+.msg__approval-hint-body {
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--wb-border-light, rgba(0, 0, 0, 0.08));
 }

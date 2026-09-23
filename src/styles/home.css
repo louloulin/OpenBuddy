@@ -640,6 +640,48 @@
   background: rgba(20, 184, 138, 0.10);
   color: rgb(8, 142, 105);
 }
+/* Plan5 B.7 — capability hint chips (视觉/工具/推理/JSON/流式). Visual
+   weight is intentionally lighter than the protocol badge so the
+   label + protocol remain the primary scan anchors. Colors ride on
+   --wb-* tokens for dark/light/high-contrast. */
+.model-selector__item-cap {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9px;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--wb-border-light, rgba(0, 0, 0, 0.12));
+  background: var(--wb-bg-soft, rgba(0, 0, 0, 0.04));
+  color: var(--wb-text-medium);
+  user-select: none;
+  cursor: default;
+}
+.model-selector__item-cap--vision {
+  border-color: var(--wb-color-border-emphasis, rgba(120, 120, 200, 0.32));
+  background: var(--wb-color-bg-secondary-default, rgba(120, 120, 200, 0.08));
+  color: var(--wb-color-text-secondary, rgb(70, 70, 140));
+}
+.model-selector__item-cap--tools {
+  border-color: rgba(16, 163, 127, 0.32);
+  background: rgba(16, 163, 127, 0.10);
+  color: rgb(11, 121, 92);
+}
+.model-selector__item-cap--reasoning {
+  border-color: rgba(217, 119, 6, 0.32);
+  background: rgba(217, 119, 6, 0.10);
+  color: rgb(161, 88, 0);
+}
+.model-selector__item-cap--json_mode,
+.model-selector__item-cap--streaming {
+  border-color: rgba(107, 114, 128, 0.32);
+  background: rgba(107, 114, 128, 0.08);
+  color: var(--wb-text-medium);
+}
+
 .model-selector__item-protocol--messages {
   /* Anthropic Messages: warm orange tint matching Anthropic's brand. */
   border-color: rgba(217, 119, 6, 0.36);

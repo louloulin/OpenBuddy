@@ -7,7 +7,6 @@
  *   - 文件变更面板(可折叠)
  *   - 子代理面板
  *   - 团队状态视图
- *   - 转录区视图切换器(`conversation.view` tabs)
  *   - 转录区(`conversation.view` 出口 → `conversation.body` 出口 → fallback)
  *   - 跳到底浮动按钮
  *
@@ -48,12 +47,7 @@ export type ChatViewScrollStageProps = {
   messages: readonly ChatMessage[];
   cwd?: string;
   onOpenSession?: (sessionId: string, cwd?: string) => void | Promise<void>;
-  /** 已注册的 `conversation.view` 视图(用于 tabs;为空时不渲染)。 */
-  conversationViews: ReadonlyArray<{ key: string; label: string }>;
   activeView: string;
-  setActiveView: (view: string) => void;
-  /** `<ConversationViewTabs />` 元素(由 ChatView 构造,保留其 i18n 标签)。 */
-  conversationViewTabs?: ReactNode;
   /** 空状态节点(由 ChatView 构造,保留 handleQuickPrompt 接线)。 */
   emptyState: ReactNode;
   /** 非空时的转录列表节点(普通列表或虚拟列表)。 */
@@ -96,8 +90,6 @@ export function ChatViewScrollStage(props: ChatViewScrollStageProps) {
         {props.teamsOpen && (
           <TeamStatusView messages={[...props.messages]} />
         )}
-        {/* 会话视图标签(仅在插件注册了 `conversation.view` 时渲染)。 */}
-        {props.conversationViewTabs}
         {/* 转录区走内核 `conversation.body` 槽(见 conversation-slots.tsx)。
             插件可以整体接管布局(分组 / 日期轴 / 自定义列表),`fallback` 就是
             接线前的那段 JSX —— 内核里没有实现时渲染结果逐字一致,所以卸载

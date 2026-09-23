@@ -162,18 +162,20 @@
   /* Subtle pulsing glow keeps the hero feeling alive without being noisy */
   animation: chatview__empty-hero-pulse 4s ease-in-out infinite;
 }
+/* R5 — Minimal hero icon. The previous version had a heavy brand-tinted
+   box-shadow that fought the rest of the page; we use a clean border-only
+   treatment that matches the composer card's depth cue. */
 .chatview__empty-state-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--wb-brand, #00c29a);
+  color: var(--wb-text-medium);
   background: var(--wb-bg-elevated);
-  border: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 20%, var(--wb-border-default));
+  border: 1px solid var(--wb-border-default);
   border-radius: 50%;
   width: 56px;
   height: 56px;
   padding: 14px;
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--wb-brand, #00c29a) 14%, transparent);
 }
 @keyframes chatview__empty-hero-in {
   from {

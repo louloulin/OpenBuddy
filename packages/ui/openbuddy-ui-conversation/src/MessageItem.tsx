@@ -23,6 +23,8 @@ import { type MarkdownConfig } from "@openbuddy/ui-markdown";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { MessagePartRegistry } from "./MessagePartRegistry";
 import { StreamingCaret } from "./StreamingCaret";
+import { MessageRewindMenu } from "./parts/MessageRewindMenu";
+import { InlineApprovalHint } from "./parts/InlineApprovalHint";
 import { LoadingRow } from "./LoadingRow";
 import { TurnErrorCard } from "./TurnErrorCard";
 import { FeedbackDialog } from "@openbuddy/ui-dialogs";
@@ -72,6 +74,10 @@ function MessageItemInner({
   onEditAssistantMessage,
   onResendAfterAssistantEdit,
   onOpenSettings,
+  rewindPromptIndex,
+  onRewindTo,
+  allowFork,
+  onForkFromHere,
   streamingDurationMs,
 }: {
   message: ChatMessage;
@@ -111,6 +117,14 @@ function MessageItemInner({
   /** Navigate to the settings panel — wired into TurnErrorCard so auth /
    *  model-config errors offer a one-click escape instead of an opaque retry. */
   onOpenSettings?: () => void;
+  /** Plan5 B.10 — 该 assistant 消息对应的 promptIndex(0-based)。
+   *  由 ChatView 从 `rewindPoints` 解析后下发;undefined 时重发入口禁用。 */
+  rewindPromptIndex?: number;
+  /** Plan5 B.10 — 执行"从此消息重发"(回溯 + 重发该轮 prompt)。 */
+  onRewindTo?: (promptIndex: number) => Promise<void> | void;
+  /** Plan5 B.10 — 是否允许"从此处分叉"。 */
+  allowFork?: boolean;
+  onForkFromHere?: () => void;
   /** R8.14 — wall-clock ms since the current streaming turn started.
    *  ChatView passes `Date.now() - turnStartRef.current` while the
    *  message is still streaming so the meta chip can render a live
@@ -461,7 +475,8 @@ function MessageItemInner({
             (matches cabinet's CopyButton pattern). Failure turns keep
             重试 + 赞踩 only. Buttons stay always-visible at low opacity
             and brighten on hover/focus. */}
-        {message.complete && (plainText || message.error) && (
+        {message.complete &&
+          (plainText || message.error || typeof rewindPromptIndex === "number") && (
           <div className="msg__footer">
             {plainText && (
               <CopyIconButton
@@ -518,6 +533,19 @@ function MessageItemInner({
                 <RefreshCw size={14} strokeWidth={1.75} />
               </TooltipButton>
             )}
+            {/* Plan5 B.10 — 消息级"从此消息重发/分叉"。放在赞踩之前,
+                保持既有按钮顺序不变(快照 / 既有选择器全部命中)。 */}
+            {message.role === "assistant" && (
+              <MessageRewindMenu
+                messageId={message.id}
+                promptIndex={rewindPromptIndex}
+                sessionId={sessionId}
+                allowFork={allowFork}
+                onRewind={onRewindTo ? (p) => onRewindTo(p.promptIndex) : undefined}
+                onFork={onForkFromHere}
+                onToast={onToast}
+              />
+            )}
             {sessionId && (
               <FeedbackButtons sessionId={sessionId} messageId={message.id} />
             )}
@@ -541,6 +569,14 @@ function MessageItemInner({
             initialMarkdown={draftInitial}
           />
         ) : null}
+        {/* Plan5 B.4 — pending permission/question requests at the
+            trailing assistant message so the user notices inline
+            instead of only at the footer. The component reads the
+            stores itself (via memo) so it's safe to render here
+            without prop-drilling. */}
+        {message.role === "assistant" && sessionId && (
+          <InlineApprovalHint sessionId={sessionId} />
+        )}
       </div>
     </div>
   );

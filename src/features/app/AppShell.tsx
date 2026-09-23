@@ -28,7 +28,8 @@
 import { lazy, memo, Suspense, useCallback, useMemo, type ComponentType } from "react";
 import { GlobalConfirmHost } from "@/components/GlobalConfirmHost";
 import { TitleBar } from "@openbuddy/ui-shell";
-import { TopbarActions, TopbarTitle, KeyboardShortcutsDialog } from "@openbuddy/ui-shell";
+import { TopbarActions, TopbarTitle } from "@openbuddy/ui-shell";
+import { ChatShortcutOverlay } from "@openbuddy/ui-conversation";
 import { SecondarySidebar } from "@openbuddy/ui-shell";
 import { Sidebar } from "@openbuddy/ui-sidebar";
 import { ChatView } from "@openbuddy/ui-conversation";
@@ -665,7 +666,13 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           onToast={showToast}
         />
       </Suspense>
-      <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      {/* Plan5 B.6 — 快捷键发现面板。单一实例、受控开关:`shortcutsOpen` 由
+          `useAppShellRuntime` 的全局 keydown(`?` 与 Ctrl/Cmd+/)驱动。
+          面板条目 = ui-shell DEFAULT_SHORTCUTS + ui-conversation CHAT_SHORTCUTS。 */}
+      <ChatShortcutOverlay
+        open={shortcutsOpen}
+        onOpenChange={(next) => { if (!next) setShortcutsOpen(false); }}
+      />
       <GlobalConfirmHost />
       {/* R28 — 右侧「助理」导轨(内核 details 槽)。 */}
       <DetailsSurface

@@ -28,6 +28,7 @@ import { ChatViewFooter } from "./chatview/ChatViewFooter";
 import { useChatViewPauseYield } from "./chatview/useChatViewPauseYield";
 import { useChatViewStreaming } from "./chatview/useChatViewStreaming";
 import { useChatViewRetry } from "./chatview/useChatViewRetry";
+import { useChatViewRewind } from "./chatview/useChatViewRewind";
 import { useChatViewTimeline } from "./chatview/useChatViewTimeline";
 import { ChatViewEmptyState } from "./chatview/ChatViewEmptyState";
 import {
@@ -37,7 +38,8 @@ import {
 import { useSessionStore, type ChatMessage, type ToolCallView } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { createMarkdownHostConfig } from "@/lib/markdown/markdown-host";
-import { piListSessions, piSetThinkingLevel } from "@/lib/agent/pi-client";
+import { piListSessions, piSetThinkingLevel, sessionFork } from "@/lib/agent/pi-client";
+import { confirm } from "@/lib/platform/electron-api";
 import {
   collectSessionArtifacts,
   findToolCall,
@@ -47,11 +49,7 @@ import { MessageItem } from "./MessageItem";
 import { Composer } from "./Composer";
 import type { ComposerProps } from "./Composer";
 import { ConversationBody } from "./conversation-slots";
-import {
-  ConversationViewOutlet,
-  ConversationViewTabs,
-  useConversationViews,
-} from "./conversation-view";
+import { ConversationViewOutlet } from "./conversation-view";
 import { PlanPanel } from "@openbuddy/ui-automation";
 import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
 import { QuestionInlineCard } from "./QuestionInlineCard";
@@ -412,6 +410,42 @@ export function ChatView({
     onToast,
   });
 
+  // Plan5 B.10 — 消息级"从此重发":把 rewindPoints 拉一次并解析成
+  // `messageId → promptIndex`,下发给 MessageItem 的 MessageRewindMenu。
+  // 与 useChatViewRetry 共用同一套 rewind IPC 语义,只是目标从"最后一条"
+  // 变成"用户点的那一条"。
+  const {
+    promptIndexByMessageId,
+    handleRewindTo,
+  } = useChatViewRewind({
+    sessionId,
+    streaming,
+    readOnlySubagent,
+    messages,
+    onSend,
+    onRewound,
+    onToast,
+  });
+
+  // Plan5 B.10 — 消息级"从此处分叉"。`RewindBar` 里已有同一套
+  // `sessionFork(sessionId, cwd)` + 确认弹窗流程;这里把同样的语义下放到
+  // 单条消息,复用 `onForked` 让宿主导航到新会话。
+  const handleForkRequest = useCallback(async () => {
+    if (!sessionId || streaming || readOnlySubagent) return;
+    const ok = await confirm("从此处分叉此会话？", {
+      tone: "warning",
+      description: "会复制到新会话，原会话保留。",
+    });
+    if (!ok) return;
+    try {
+      const newId = await sessionFork(sessionId, cwd);
+      onToast?.(`已分叉到新会话 ${newId.slice(0, 8)}`);
+      onForked?.(newId);
+    } catch (e) {
+      onToast?.(`分叉失败：${String(e).replace(/^Error:\s*/, "")}`);
+    }
+  }, [sessionId, streaming, readOnlySubagent, cwd, onToast, onForked]);
+
   // ---- Phase 2/3: tool detail + artifacts side panel ----
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState<ToolSidePanelMode>("tool");
@@ -468,12 +502,6 @@ export function ChatView({
   // R0.4: Memoize the timeline build so it does not run on every render;
   // it only needs to re-run when the messages reference changes.
 
-  // P0-4 — 转录区视图。`live` 是默认视图且**不注册实现**:它走下面
-  // `ConversationViewOutlet` 的 `fallback`(即 `ConversationBody` 的既有
-  // JSX),因此不装插件时渲染结果与改造前逐字一致。`result` / `content`
-  // 由本包 `client.tsx` 注册;插件可注册自己的视图 id。
-  const [activeView, setActiveView] = useState("live");
-  const conversationViews = useConversationViews();
 
   // P0-5 — 会话内待处理项数量,下发给 `conversation.approvals`(list 追加区)。
   // **复用既有 store**,不新建状态容器:`question-store` / `permission-store`
@@ -615,6 +643,12 @@ export function ChatView({
     findOpen,
     findHits,
     findCurrent,
+    promptIndexByMessageId,
+    onRewindTo: handleRewindTo,
+    allowFork: !readOnlySubagent,
+    onForkFromHere: sessionId
+      ? () => { void handleForkRequest(); }
+      : undefined,
   });
 
   const useVirtualList = useMemo(
@@ -860,18 +894,7 @@ export function ChatView({
           messages={messages}
           cwd={cwd}
           onOpenSession={onOpenSession}
-          conversationViews={conversationViews}
-          activeView={activeView ?? "live"}
-          setActiveView={setActiveView}
-          conversationViewTabs={
-            conversationViews.length > 0 ? (
-              <ConversationViewTabs
-                active={activeView}
-                views={conversationViews}
-                onChange={setActiveView}
-              />
-            ) : null
-          }
+          activeView="live"
           emptyState={
             <ChatViewEmptyState onPickPrompt={handleQuickPrompt} />
           }

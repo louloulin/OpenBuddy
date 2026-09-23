@@ -174,6 +174,10 @@ const allowedEventChannels = new Set([
   "casdoor://auth",
   "casdoor://lifecycle",
   "openbuddy://workbench-scope",
+  // Provider/model catalog mutated (Settings dialog, plugin, or IPC caller).
+  // The renderer re-runs auth-status + providers-list off this so the
+  // composer is not left disabled after an out-of-band save.
+  "openbuddy://providers-changed",
   "casdoor://member-revocation",
   "casdoor://casdoor-webhook",
 ]);

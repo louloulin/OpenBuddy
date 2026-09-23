@@ -728,19 +728,23 @@
   container-type: inline-size;
   container-name: wb-composer;
   background: var(--wb-bg-elevated, #fff);
-  /* WB: 输入卡四边 1px #EBEBEB 描边 (亮色=8% 黑), 内卡 radius 14, 微微阴影把它从
-   *     外卡 (radius 20) 与底部灰条带上抬起 1px。 */
+  /* R5 — minimal composer card. Border is the only depth cue; the previous
+     stacked dual-card wrap (radius 20 outer, radius 14 inner, 2 stacked
+     borders) felt heavy compared to ChatGPT/Claude/Codex. */
   border: 1px solid var(--wb-border-default);
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  padding: 12px 12px 12px;
+  border-radius: 16px;
+  box-shadow: none;
+  padding: 12px 12px;
   display: flex;
   flex-direction: column;
+  transition: border-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
 }
-/* 暗色下浅色阴影几乎不可见:加深投影 + 1px 微亮描边把输入卡从近黑背景上托起 */
+/* Minimal hover/focus ring replaces the heavy stacked shadow. The
+   original 0/12/28/-6 shadow lifted the card off the page too aggressively,
+   which fought with the surrounding chatview frame. */
 [data-theme="dark"] .wb-composer {
-  box-shadow: 0 12px 28px -6px rgba(0, 0, 0, .55), 0 2px 8px rgba(0, 0, 0, .35);
-  border: 1px solid rgba(255, 255, 255, .06);
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, .08);
 }
 /* WB: 首页卡片底行高56、底部padding 0 → 卡片高138;meta行在卡片外下方(透明背景,间距4) */
 .wb-composer--home {

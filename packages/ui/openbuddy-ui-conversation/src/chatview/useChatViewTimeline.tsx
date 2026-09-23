@@ -45,6 +45,14 @@ export type UseChatViewTimelineParams = {
   findOpen: boolean;
   findHits: readonly string[];
   findCurrent: string | null;
+  /** Plan5 B.10 — assistant 消息 id → 该轮 promptIndex(0-based)。 */
+  promptIndexByMessageId?: ReadonlyMap<string, number>;
+  /** Plan5 B.10 — "从此消息重发"。 */
+  onRewindTo?: (promptIndex: number) => Promise<void> | void;
+  /** Plan5 B.10 — 是否允许"从此处分叉"。 */
+  allowFork?: boolean;
+  /** Plan5 B.10 — 从这条消息处分叉。 */
+  onForkFromHere?: () => void;
 };
 
 export type UseChatViewTimelineResult = {
@@ -72,6 +80,10 @@ export function useChatViewTimeline({
   findOpen,
   findHits,
   findCurrent,
+  promptIndexByMessageId,
+  onRewindTo,
+  allowFork,
+  onForkFromHere,
 }: UseChatViewTimelineParams): UseChatViewTimelineResult {
   const timeline = useMemo(() => buildTimeline(messages), [messages]);
   const messagesLength = messages.length;
@@ -133,6 +145,14 @@ export function useChatViewTimeline({
                 ? handleResendAfterAssistantEdit
                 : undefined
             }
+            // Plan5 B.10 — 消息级"从此重发/分叉"。promptIndex 查不到时
+            // MessageRewindMenu 自适应为禁用态(不会指向错误的回溯点)。
+            rewindPromptIndex={
+              m.role === "assistant" ? promptIndexByMessageId?.get(m.id) : undefined
+            }
+            onRewindTo={m.role === "assistant" ? onRewindTo : undefined}
+            allowFork={allowFork}
+            onForkFromHere={m.role === "assistant" ? onForkFromHere : undefined}
           />
         </div>
       );
@@ -157,6 +177,10 @@ export function useChatViewTimeline({
       findOpen,
       findHits,
       findCurrent,
+      promptIndexByMessageId,
+      onRewindTo,
+      allowFork,
+      onForkFromHere,
     ],
   );
 

@@ -22,7 +22,6 @@
 
 import { SlotProvider } from "@openbuddy/ui-runtime/client";
 import { ThemeInitializer } from "@openbuddy/ui-theme/client";
-import { ChatShortcutOverlay } from "@openbuddy/ui-conversation";
 import { ComposerPortal } from "@/components/ComposerPortal";
 import { AppShell } from "@/features/app/AppShell";
 import { useSlotComponent } from "@/features/app/slot-bridge";
@@ -56,10 +55,11 @@ export default function App() {
       {/* 第 4-5 周(P1-A):全局 ComposerPortal 监听 composer-store,
           让任意面板都能从顶层打开预填好的 EmailComposer。 */}
       <ComposerPortal />
-      {/* Plan5 Phase B.6 — 全局快捷键发现面板。
-          监听 Shift+/("?") 与 Ctrl/Cmd+/(mac/win 自动适配),按"?" 在任意焦点位置触发;
-          与 Topbar 的 `KeyboardShortcutsDialog` 并存但触发路径不同。 */}
-      <ChatShortcutOverlay />
+      {/* Plan5 Phase B.6 — 快捷键发现面板**不再**在这里挂载。
+          面板需要与"应用级快捷键派发"(useAppShellRuntime 的全局 keydown)共用
+          同一个开关,否则 `?` 会被两个监听器各开一个面板(实测出现过两层叠加)。
+          现在由 `<AppShell>` 渲染唯一的受控实例;此处保留说明以便后续读者
+          不会再把第二份挂回来。 */}
     </SlotProvider>
   );
 }
