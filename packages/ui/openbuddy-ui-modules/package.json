@@ -15,7 +15,8 @@
     "./components/MarketplaceCard": "./src/components/MarketplaceCard.tsx",
     "./components/MarketplaceTab": "./src/components/MarketplaceTab.tsx",
     "./components/marketplace-model": "./src/components/marketplace-model.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./components/pi-market": "./src/components/pi-market/index.ts"
   },
   "dependencies": {
     "@openbuddy/cordis": "workspace:*",

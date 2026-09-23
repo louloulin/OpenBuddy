@@ -23,6 +23,20 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
+  // P0-01 — Workaround for the 13 pre-existing vitest failures whose root
+  // cause is `@openbuddy/ui-state/global-confirm-store` being statically
+  // imported (transitively, via `electron-api.ts`'s dynamic import) by
+  // every test that touches the platform bridge. `vite-tsconfig-paths`
+  // doesn't resolve the subpath through the package `exports` map in
+  // static-analysis mode, so we point the import at the actual file.
+  //
+  // Alias is scoped to vitest only (this file is just for diagnostics, so
+  // production builds via electron.vite.config.ts are unaffected).
+  resolve: {
+    alias: {
+      "@openbuddy/ui-state/global-confirm-store": resolve(__dirname, "packages/ui/openbuddy-ui-state/src/global-confirm-store.ts"),
+    },
+  },
   test: {
     include: ["src/**/__tests__/**/*.{test,spec}.{ts,tsx}", "packages/**/__tests__/**/*.{test,spec}.{ts,tsx}"],
     exclude: [

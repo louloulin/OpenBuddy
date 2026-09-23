@@ -421,7 +421,7 @@ export function ComposerInner({
             apiReady
               ? sceneTag
                 ? "" // 有操作类型标签时不显示占位文案(匹配 WorkBuddy)
-                : placeholder ?? "今天帮你做些什么? @ 引用对话文件,/ 调用技能与指令"
+                : placeholder ?? "问点什么 — @ 引用、/ 指令、⏎ 发送"
               : "请先配置 API Key 开始使用"
           }
           onChange={(e) => {

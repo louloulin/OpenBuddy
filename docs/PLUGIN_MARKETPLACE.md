@@ -467,6 +467,126 @@ uninstallPiExtension(id, { keepPayload?: false })
 
 
 
+## 11. R83:pi.dev 风格目录布局(新增并列路径)
+
+> 设计目标:把现有 MarketplaceTab 旁边开一条 pi.dev/packages 风格的并列路径,
+> 视觉与信息架构对齐 pi.dev(顶部 hero + Recently published + 类型徽章 + downloads
+> 排序 + `$ pi install npm:<name>` 命令 + Copy + npm/repo/report 链接 + 50/页分页),
+> 但保留 OpenBuddy 已有的多源 IPC / 锁文件 / 审计 / 能力 chips / 主题 token。
+>
+> 设计文档:[`PLUGIN_MARKETPLACE_PI_REDESIGN.md`](./PLUGIN_MARKETPLACE_PI_REDESIGN.md)
+
+### 11.1 入口与开关
+
+`MarketplacePanel` 顶部新增 `R83 布局:[切换 pi.dev 布局 / 切回旧布局]` 按钮
+(`data-testid="marketplace-layout-toggle-btn"`)。默认关闭,沿用老
+`PiExtensionsSection`;开启后渲染新的 `PiMarketSection`。
+
+```tsx
+// packages/ui/openbuddy-ui-mcp/src/MarketplacePanel.tsx
+{usePiMarketLayout ? (
+  <PiMarketSection onToast={onToast} usePiMarketLayout />
+) : (
+  <PiExtensionsSection onToast={onToast} />
+)}
+```
+
+### 11.2 组件树
+
+```
+PiMarketTab              ← ui-modules,纯 props,默认 50/页
+├── PiMarketToolbar      ← hero + 简介 + 安装命令 + search + type + sort + 分页
+├── PiRecentlyPublished  ← 顶部最近 7 条(按 updatedAt desc)
+└── <ul> × PiPackageCard ← preview-frame / name / desc / meta / type pill
+                          / npm | repo | report 链接 / install 命令 / Copy
+```
+
+文件清单(全部位于 `packages/ui/openbuddy-ui-modules/src/components/pi-market/`):
+- `format.ts` — `formatDownloads / formatRelative / buildInstallCommand / previewAccent / buildSearchBlob / formatSize`
+- `usePiMarketPage.ts` — 纯派生 hook(query + type + sort + page → filtered/sorted/paged)
+- `PiMarketToolbar.tsx + .module.css`
+- `PiPackageCard.tsx + .module.css`
+- `PiRecentlyPublished.tsx + .module.css`
+- `PiMarketTab.tsx + .module.css`
+- `index.ts` — 出口
+- `__tests__/` — 5 个测试文件,38 个 case 全绿
+
+### 11.3 数据契约扩展(向后兼容)
+
+`MarketplaceEntry`(`marketplace-model.ts`)新增可选字段,**不破坏任何现有调用**:
+
+```ts
+npmName?: string;                // 用于 $ pi install npm:<x>
+downloadsLastMonth?: number;     // pi.dev 风格排序锚
+searchBlob?: string;             // 全文检索(由 host 计算)
+primaryKind?: MarketplaceKind;   // 主类型徽章(单值)
+extraKinds?: readonly MarketplaceKind[];   // 多 kind(向后兼容)
+sourceLabel?: string;            // registry 名(由 pi-market-bridge 填)
+sourceKind?: "official" | "community" | "local";
+npmUrl?: string; repoUrl?: string; reportUrl?: string;
+installCommand?: string;         // 默认 buildInstallCommand(npmName, id)
+```
+
+`MarketplaceKind` 追加 `"prompt"`(`theme / extension / skill / mcp / plugin` 仍合法)。
+`MarketplaceSortKey` 追加 `"downloads"`。
+
+### 11.4 与 OpenBuddy IPC 的桥接
+
+新增 `packages/ui/openbuddy-ui-mcp/src/pi-package-bridge.ts`,导出 `toPiPackageEntry` /
+`toPiPackageEntries` / `inferPrimaryKind` / `piSourceKind` / `downloadsFromMirrors`。
+输入是现有的 `PiMarketEntryView` + `PiMarketRegistrySource`,输出是 ui-modules 的
+`MarketplaceEntry`(已带 pi-market 字段)。
+
+`PiMarketSection` 直接调用 `listPiMarket / refreshPiMarket / installPiMarket /
+upgradePiMarket / uninstallPiMarket / auditPiMarket`,**未引入新的 IPC**,与 R18
+pi-market-client 完全共用一份线契约。
+
+### 11.5 R83 测试
+
+| 文件 | 条数 | 覆盖 |
+|---|---|---|
+| `format.test.ts` | 13 | downloads/relative/install-command/accent/searchBlob/size 全部分支 |
+| `usePiMarketPage.test.tsx` | 8 | query 过滤 / type 过滤 / 三种排序 / 分页 / 钳位 / searchBlob 优先级 / reset |
+| `PiPackageCard.test.tsx` | 9 | 必填字段 / 复制命令 / 官方源无 UI 安装按钮 / community 源有 / npm/repo/report 链接 / 状态机 / 高亮 / blocked |
+| `PiMarketToolbar.test.tsx` | 4 | hero / query+type+sort+page 转发 / 边界禁用 / 默认 labels |
+| `PiMarketTab.test.tsx` | 4 | 列表/空态/loading/错误 |
+
+合计 38 个新 case,全部通过;既有 137 个 ui-modules 用例与 81 个 ui-mcp 用例全部通过。
+仓库中其它无关的 110+ 个 ui-* 包级集成失败(slot 注册 / confirm() / openPaths() 等)
+是预存在问题,与 R83 无关(已在 stash 状态下复现)。
+
+### 11.6 与 pi.dev 的对位
+
+| pi.dev | OpenBuddy R83 | 备注 |
+|---|---|---|
+| Hero + 一句话简介 | `PiMarketToolbar.hero` | |
+| `pi install npm:<x>` 命令 + Copy | `PiPackageCard.installCmd + Copy` | 复用 `navigator.clipboard` |
+| Recently published 区 | `PiRecentlyPublished` | 按 `updatedAt desc`,前 7 条 |
+| Filter / Type / Sort | `PiMarketToolbar.search / type / sort` | 排序锚:downloads / recent / A-Z |
+| `1-50 / 5697` 分页 | `PiMarketToolbar.range + pageButtons` | 默认 50/页 |
+| `npm / repo / report` 链接 | `PiPackageCard.links` | |
+| preview-frame 占位 | `PiPackageCard.preview`(stub) | 留 Theme Studio 接入点 |
+| 类型 meta-chip(pill) | `PiPackageCard.kindPill` | 6 种 kind 各有配色 |
+
+### 11.7 R83 真机验证脚本(待执行)
+
+```
+scripts/electron/_probe-r83-pi-market-layout.mjs
+```
+
+走 UI:点 `marketplace-layout-toggle-btn` → 渲染 `<PiMarketTab>` → 截图
+`marketplace-pi-layout.png` → 验证 Hero / Recently published / 4 张卡片 / Copy /
+分页 forward/back 全可交互。
+
+### 11.8 不在本次范围
+
+- 真实接入 NPM Registry(目前 `PiMarketSection` 走的是 `listPiMarket` 桥接的 mock)
+- 主题 preview 真实渲染(留 stub,等 Theme Studio 同步需求)
+- 多语言 i18n(沿用 ui-modules 路径,本次只补 zh-CN/en-US 文案表)
+- Storybook 快照
+
+---
+
 ## 相关文档
 
 - [`docs/PI_EXTENSION_BRIDGE.md`](./PI_EXTENSION_BRIDGE.md) — R74 公开 IPC

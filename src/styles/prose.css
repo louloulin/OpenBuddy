@@ -673,25 +673,38 @@
 .file-preview__placeholder-text {
   font-size: 13px;
 }
-/* 消息时间线分隔符(对齐 WorkBuddy message-timeline) */
+/* 消息时间线分隔符(P0 综合轮 — P3-7 视觉加强,对标 Codex)
+ *   - 日期分隔符:中等字重 + 上下微 gap,边界更清晰
+ *   - 模型分隔符:品牌色 + 加粗 + 弱左右分隔线
+ *   - 浅色/深色对称,品牌色用 --wb-brand token */
 .timeline-divider {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 12px 0 4px;
-  color: var(--wb-text-light);
-  font-size: 11px;
+  gap: 10px;
+  margin: 18px 0 6px;
+  color: var(--wb-text-medium);
+  font-size: 12px;
+  font-weight: 500;
   text-align: center;
+  letter-spacing: 0.02em;
 }
 .timeline-divider::before,
 .timeline-divider::after {
   content: "";
   flex: 1;
   height: 1px;
-  background: var(--wb-border-default);
+  background: linear-gradient(to right, transparent, var(--wb-border-default) 20%, var(--wb-border-default) 80%, transparent);
+}
+.timeline-divider--date {
+  /* 日期粗体,左右分隔线渐隐 */
+  font-weight: 600;
 }
 .timeline-divider--model {
   color: var(--wb-brand);
+  font-weight: 600;
+}
+[data-theme="dark"] .timeline-divider {
+  color: var(--wb-text-medium);
 }
 /* 文件变更聚合面板(对齐 WorkBuddy file-changes-panel) */
 .file-changes {

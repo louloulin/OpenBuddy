@@ -1,0 +1,225 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px 12px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-fg-primary);
+  border-bottom: 1px solid var(--wb-border-soft);
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.blurb {
+  margin: 0;
+  font-size: 13px;
+  color: var(--wb-fg-secondary);
+  line-height: 1.5;
+}
+
+.code {
+  font-family: var(--wb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-fg-primary);
+}
+
+.sourceHint {
+  font-size: 11px;
+  color: var(--wb-fg-tertiary);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)) minmax(0, auto);
+  gap: 10px;
+  align-items: end;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.label {
+  font-size: 11px;
+  color: var(--wb-fg-tertiary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.searchWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search {
+  all: unset;
+  flex: 1;
+  font-size: 13px;
+  color: var(--wb-fg-primary);
+  padding: 6px 28px 6px 10px;
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-md);
+  background: var(--wb-bg-secondary);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.search:focus-visible {
+  border-color: var(--wb-accent);
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 1px;
+}
+
+.search::placeholder {
+  color: var(--wb-fg-tertiary);
+}
+
+/* 隐藏 type=search 自带的清空按钮(我们用自定义 ×) */
+.search::-webkit-search-cancel-button,
+.search::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.searchClear {
+  position: absolute;
+  right: 6px;
+  all: unset;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--wb-fg-tertiary);
+  font-size: 14px;
+}
+
+.searchClear:hover {
+  color: var(--wb-fg-primary);
+  background: var(--wb-bg-tertiary);
+}
+
+.select {
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: var(--wb-radius-md);
+  border: 1px solid var(--wb-border);
+  background: var(--wb-bg-secondary);
+  color: var(--wb-fg-primary);
+  appearance: none;
+}
+
+.select:focus-visible {
+  border-color: var(--wb-accent);
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 1px;
+}
+
+.hints {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hintChip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-fg-secondary);
+}
+
+.hintLabel {
+  color: var(--wb-fg-tertiary);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--wb-border-soft);
+  padding: 8px 0 0;
+}
+
+.range {
+  font-size: 11px;
+  color: var(--wb-fg-tertiary);
+}
+
+.pageButtons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pageButton {
+  all: unset;
+  cursor: pointer;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--wb-fg-secondary);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-md);
+  background: var(--wb-bg-secondary);
+}
+
+.pageButton:hover:not(:disabled) {
+  border-color: var(--wb-accent);
+  color: var(--wb-fg-primary);
+}
+
+.pageButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pageButton:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 1px;
+}
+
+.pageIndicator {
+  font-size: 11px;
+  color: var(--wb-fg-tertiary);
+  padding: 0 4px;
+}
+
+@media (max-width: 720px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+  /* 窄屏:pagination 上下两行(range 在上,buttons 在下)避免挤压 */
+  .pagination {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .pageButtons {
+    justify-content: flex-end;
+  }
+}

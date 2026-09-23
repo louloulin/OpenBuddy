@@ -1,0 +1,11 @@
+[package]
+name = "openbuddy-ignore"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = ".openbuddyignore loader backed by the ignore crate"
+
+[dependencies]
+ignore.workspace = true
+anyhow.workspace = true

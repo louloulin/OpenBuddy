@@ -36,7 +36,7 @@ describe("@openbuddy/ui-modules public surface", () => {
         "function",
       );
     }
-    expect(api.MARKETPLACE_KINDS).toEqual(["plugin", "skill", "extension", "mcp", "theme"]);
+    expect(api.MARKETPLACE_KINDS).toEqual(["plugin", "skill", "extension", "mcp", "theme", "prompt"]);
     expect(api.INSTALL_STATE_LABELS.installed).toBe("已安装");
   });
 });

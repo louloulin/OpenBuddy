@@ -24,6 +24,16 @@ export { InstallPreflightDialog } from "./InstallPreflightDialog";
 export { NotifyChannelsPanel } from "./NotifyChannelsPanel";
 export { OpenBuddyPluginPanel } from "./OpenBuddyPluginPanel";
 export { PiExtensionsSection } from "./PiExtensionsSection";
+// R83: pi.dev 风格市场 section。R84 之后是 MarketplacePanel 顶层唯一路径,
+// PiExtensionsSection 仅保留给旧测试和独立使用,不在这里并列。
+export { PiMarketSection } from "./PiMarketSection";
+export {
+  toPiPackageEntry,
+  toPiPackageEntries,
+  inferPrimaryKind,
+  piSourceKind,
+  downloadsFromMirrors,
+} from "./pi-package-bridge";
 export {
   describePiMarketError,
   groupPiMarketEntries,

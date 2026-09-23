@@ -1,0 +1,357 @@
+.card {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) minmax(132px, 200px);
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-lg);
+  background: var(--wb-bg-elevated);
+  color: var(--wb-fg-primary);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.card:hover {
+  border-color: var(--wb-accent);
+  box-shadow: var(--wb-shadow);
+}
+
+.card:focus-within {
+  border-color: var(--wb-accent);
+}
+
+/* 键盘 roving focus 高亮(由 usePiMarketRovingFocus 控制) */
+.cardActive {
+  border-color: var(--wb-accent);
+  box-shadow: 0 0 0 1px var(--wb-accent-soft), var(--wb-shadow);
+}
+
+.card[data-install-state="blocked"] {
+  opacity: 0.78;
+}
+
+@media (max-width: 640px) {
+  .card {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+  .install {
+    grid-column: 1 / -1;
+  }
+}
+
+.preview {
+  all: unset;
+  cursor: pointer;
+  width: 88px;
+  height: 88px;
+  border-radius: var(--wb-radius-md);
+  background: var(--pi-card-accent, var(--wb-bg-tertiary));
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 2px;
+}
+
+.previewFrame {
+  position: relative;
+  width: 64px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 3px 4px;
+  gap: 2px;
+}
+
+.previewStripeA,
+.previewStripeB,
+.previewStripeC {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.previewStripeB {
+  width: 70%;
+}
+.previewStripeC {
+  width: 45%;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.headRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameButton {
+  all: unset;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.nameButton:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 2px;
+  border-radius: var(--wb-radius-sm);
+}
+
+.kindPill {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: lowercase;
+  padding: 1px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  background: var(--wb-accent-soft);
+  color: var(--wb-accent);
+  border: 1px solid transparent;
+}
+
+.kindPill.k_plugin {
+  background: color-mix(in srgb, var(--wb-accent) 14%, transparent);
+}
+.kindPill.k_extension {
+  background: color-mix(in srgb, var(--wb-info, #2f7bf6) 14%, transparent);
+  color: var(--wb-info, #2f7bf6);
+}
+.kindPill.k_skill {
+  background: color-mix(in srgb, var(--wb-success, #4caf50) 14%, transparent);
+  color: var(--wb-success, #4caf50);
+}
+.kindPill.k_theme {
+  background: color-mix(in srgb, #b5651d 14%, transparent);
+  color: #b5651d;
+}
+.kindPill.k_mcp {
+  background: color-mix(in srgb, #6a1b9a 14%, transparent);
+  color: #6a1b9a;
+}
+.kindPill.k_prompt {
+  background: color-mix(in srgb, var(--wb-warning, #d49a09) 18%, transparent);
+  color: var(--wb-warning, #d49a09);
+}
+
+.statePill {
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border);
+  color: var(--wb-fg-secondary);
+}
+
+.statePill.s_installed {
+  color: var(--wb-success);
+  background: color-mix(in srgb, var(--wb-success) 16%, transparent);
+  border-color: color-mix(in srgb, var(--wb-success) 40%, transparent);
+}
+
+.statePill.s_update-available {
+  color: var(--wb-accent);
+  background: color-mix(in srgb, var(--wb-accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--wb-accent) 40%, transparent);
+}
+
+.statePill.s_installing {
+  color: var(--wb-warning);
+  background: color-mix(in srgb, var(--wb-warning) 16%, transparent);
+  border-color: color-mix(in srgb, var(--wb-warning) 40%, transparent);
+}
+
+.statePill.s_blocked {
+  color: var(--wb-danger);
+  background: color-mix(in srgb, var(--wb-danger) 16%, transparent);
+  border-color: color-mix(in srgb, var(--wb-danger) 40%, transparent);
+}
+
+.description {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--wb-fg-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--wb-fg-tertiary);
+}
+
+.metaPart {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.metaDot {
+  color: var(--wb-fg-tertiary);
+  margin: 0 2px;
+}
+
+.sourceLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--wb-fg-tertiary);
+  opacity: 0.85;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--wb-fg-secondary);
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: var(--wb-radius-sm);
+  border: 1px solid transparent;
+}
+
+.link:hover {
+  color: var(--wb-fg-primary);
+  background: var(--wb-bg-tertiary);
+  border-color: var(--wb-border);
+}
+
+.linkIcon {
+  font-size: 11px;
+  width: 12px;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.mark {
+  background: color-mix(in srgb, var(--wb-accent) 24%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.install {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: flex-start;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.blockedNote {
+  display: block;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--wb-danger);
+  background: color-mix(in srgb, var(--wb-danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-danger) 30%, transparent);
+  border-radius: var(--wb-radius-md);
+  padding: 6px 8px;
+  word-break: break-word;
+}
+
+.installCmd {
+  font-family: var(--wb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-fg-primary);
+  padding: 6px 8px;
+  border-radius: var(--wb-radius-md);
+  overflow-x: auto;
+  white-space: nowrap;
+  border: 1px solid var(--wb-border-soft);
+  line-height: 1.4;
+}
+
+.installActions {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.copyButton,
+.installButton {
+  all: unset;
+  cursor: pointer;
+  flex: 1 1 80px;
+  text-align: center;
+  font-size: 11px;
+  padding: 5px 8px;
+  border-radius: var(--wb-radius-md);
+  border: 1px solid var(--wb-border);
+  background: var(--wb-bg-secondary);
+  color: var(--wb-fg-primary);
+  box-sizing: border-box;
+}
+
+.copyButton:hover,
+.installButton:hover:not(:disabled) {
+  border-color: var(--wb-accent);
+}
+
+.copyButton:focus-visible,
+.installButton:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 1px;
+}
+
+.installButton {
+  background: var(--wb-accent);
+  color: var(--wb-accent-fg, var(--wb-bg-primary));
+  border-color: var(--wb-accent);
+}
+
+.installButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

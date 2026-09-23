@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>OpenBuddy · Pi-market demo (pi.dev 风格)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --wb-bg-primary: #0e1116;
+    --wb-bg-secondary: #161b22;
+    --wb-bg-elevated: #1c2129;
+    --wb-bg-tertiary: #232830;
+    --wb-fg-primary: #e6edf3;
+    --wb-fg-secondary: #adbac7;
+    --wb-fg-tertiary: #768390;
+    --wb-border: #30363d;
+    --wb-border-soft: #21262d;
+    --wb-accent: #58a6ff;
+    --wb-accent-soft: rgba(88, 166, 255, 0.18);
+    --wb-success: #3fb950;
+    --wb-warning: #d29922;
+    --wb-danger: #f85149;
+    --wb-info: #2f7bf6;
+    --wb-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+    --wb-radius-sm: 4px;
+    --wb-radius-md: 6px;
+    --wb-radius-lg: 10px;
+    --wb-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--wb-bg-primary);
+    color: var(--wb-fg-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+  }
+  main { display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* Toolbar */
+  header.toolbar {
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--wb-border-soft);
+    background: var(--wb-bg-primary);
+  }
+  .hero h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .hero p { margin: 4px 0 0; color: var(--wb-fg-secondary); line-height: 1.5; }
+  .hero code {
+    font-family: var(--wb-font-mono);
+    font-size: 12px; padding: 1px 6px; border-radius: var(--wb-radius-sm);
+    background: var(--wb-bg-tertiary); color: var(--wb-fg-primary);
+  }
+  .controls {
+    display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)) auto;
+    gap: 10px; align-items: end;
+  }
+  .control { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .label {
+    font-size: 11px; color: var(--wb-fg-tertiary);
+    letter-spacing: 0.02em; text-transform: uppercase;
+  }
+  .search-wrap { display: flex; }
+  input[type="search"], select {
+    width: 100%; padding: 6px 8px; font-size: 13px;
+    border: 1px solid var(--wb-border); border-radius: var(--wb-radius-md);
+    background: var(--wb-bg-secondary); color: var(--wb-fg-primary);
+  }
+  select { font-size: 12px; appearance: none; }
+  input::placeholder { color: var(--wb-fg-tertiary); }
+  .hints { display: inline-flex; gap: 6px; }
+  .hint-chip {
+    font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    background: var(--wb-bg-tertiary); color: var(--wb-fg-secondary);
+  }
+  .hint-label { color: var(--wb-fg-tertiary); text-transform: uppercase; font-size: 10px; }
+  nav.pagination {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0 0; border-top: 1px dashed var(--wb-border-soft);
+  }
+  .range { font-size: 11px; color: var(--wb-fg-tertiary); }
+  .page-buttons { display: inline-flex; gap: 6px; align-items: center; }
+  .page-btn {
+    cursor: pointer; padding: 4px 10px; font-size: 11px;
+    color: var(--wb-fg-secondary); border: 1px solid var(--wb-border);
+    border-radius: var(--wb-radius-md); background: var(--wb-bg-secondary);
+  }
+  .page-btn:hover { border-color: var(--wb-accent); color: var(--wb-fg-primary); }
+  .page-ind { font-size: 11px; color: var(--wb-fg-tertiary); padding: 0 4px; }
+
+  /* Recently published */
+  section.recent {
+    padding: 12px 18px; border-bottom: 1px solid var(--wb-border-soft);
+  }
+  .recent h2 {
+    margin: 0; font-size: 14px; font-weight: 600;
+    color: var(--wb-fg-secondary); text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  ul.recent-list {
+    list-style: none; margin: 8px 0 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 4px 16px;
+  }
+  .recent-list a {
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 8px;
+    padding: 6px 8px; border-radius: var(--wb-radius-md);
+    color: var(--wb-fg-primary); text-decoration: none;
+  }
+  .recent-list a:hover { background: var(--wb-bg-secondary); }
+  .recent-list strong { font-size: 13px; font-weight: 600; grid-column: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-list span.desc { grid-column: 1/-1; font-size: 11px; color: var(--wb-fg-tertiary); }
+  .recent-list span.age { grid-column: 2; grid-row: 1; font-size: 10px; color: var(--wb-fg-tertiary); }
+
+  /* Results */
+  section.results { padding: 12px 18px 16px; display: flex; flex-direction: column; gap: 8px; }
+  ul.cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  article.card {
+    display: grid; grid-template-columns: 88px minmax(0,1fr) minmax(132px, 200px);
+    gap: 14px; padding: 14px 16px;
+    border: 1px solid var(--wb-border); border-radius: var(--wb-radius-lg);
+    background: var(--wb-bg-elevated); transition: border-color 120ms ease;
+  }
+  article.card:hover { border-color: var(--wb-accent); }
+
+  .preview {
+    width: 88px; height: 88px; border-radius: var(--wb-radius-md);
+    background: var(--pi-card-accent, var(--wb-bg-tertiary));
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  .preview-frame {
+    width: 64px; height: 48px; background: rgba(255,255,255,.18);
+    border-radius: 4px; padding: 3px 4px; display: flex; flex-direction: column;
+    justify-content: flex-end; gap: 2px;
+  }
+  .preview-frame span {
+    display: block; height: 4px; border-radius: 2px; background: rgba(255,255,255,.55);
+  }
+  .preview-frame span:nth-child(2) { width: 70%; }
+  .preview-frame span:nth-child(3) { width: 45%; }
+
+  .body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .head-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .name { margin: 0; font-size: 14px; font-weight: 600; }
+  .pill {
+    font-size: 10px; padding: 1px 8px; border-radius: 999px;
+    background: var(--wb-accent-soft); color: var(--wb-accent);
+  }
+  .pill.ext { background: rgba(47,123,246,.14); color: var(--wb-info); }
+  .pill.skill { background: rgba(63,185,80,.14); color: var(--wb-success); }
+  .pill.theme { background: rgba(181,101,29,.14); color: #b5651d; }
+  .pill.prompt { background: rgba(210,153,2,.18); color: var(--wb-warning); }
+  .pill.mcp { background: rgba(106,27,154,.14); color: #6a1b9a; }
+  .state {
+    font-size: 10px; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid var(--wb-border); color: var(--wb-fg-secondary);
+  }
+  .state.up { color: var(--wb-accent); background: rgba(88,166,255,.16); border-color: rgba(88,166,255,.4); }
+  .desc {
+    margin: 0; font-size: 12px; line-height: 1.5; color: var(--wb-fg-secondary);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .meta { display: flex; gap: 4px; font-size: 11px; color: var(--wb-fg-tertiary); flex-wrap: wrap; }
+  .meta-dot { color: var(--wb-fg-tertiary); margin: 0 2px; }
+  .links { display: flex; gap: 8px; }
+  .links a {
+    font-size: 11px; color: var(--wb-fg-secondary); text-decoration: none;
+    padding: 2px 6px; border-radius: var(--wb-radius-sm);
+  }
+  .links a:hover { color: var(--wb-fg-primary); background: var(--wb-bg-tertiary); }
+
+  .install { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .install-cmd {
+    font-family: var(--wb-font-mono); font-size: 11px;
+    background: var(--wb-bg-tertiary); color: var(--wb-fg-primary);
+    padding: 6px 8px; border-radius: var(--wb-radius-md); border: 1px solid var(--wb-border-soft);
+    overflow-x: auto; white-space: nowrap;
+  }
+  .install-actions { display: flex; gap: 6px; }
+  .copy-btn, .install-btn {
+    flex: 1 1 80px; text-align: center; cursor: pointer;
+    font-size: 11px; padding: 5px 8px; border-radius: var(--wb-radius-md);
+    border: 1px solid var(--wb-border); background: var(--wb-bg-secondary);
+    color: var(--wb-fg-primary);
+  }
+  .install-btn { background: var(--wb-accent); color: var(--wb-bg-primary); border-color: var(--wb-accent); }
+  footer.summary {
+    padding: 8px 18px 14px; font-size: 11px; color: var(--wb-fg-tertiary);
+    border-top: 1px solid var(--wb-border-soft);
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="toolbar">
+    <div class="hero">
+      <h1>Package Catalog</h1>
+      <p>
+        Extensions, skills, prompt templates, and themes published to npm.
+        Install with <code>pi install npm:&lt;package&gt;</code>.
+      </p>
+    </div>
+    <div class="controls">
+      <div class="control">
+        <span class="label">Filter packages</span>
+        <div class="search-wrap">
+          <input type="search" placeholder="Filter packages by name, description, or author" />
+        </div>
+      </div>
+      <div class="control">
+        <span class="label">Filter by package type</span>
+        <select><option>All types</option><option>extension</option><option>skill</option><option>theme</option><option>prompt</option><option>mcp</option><option>plugin</option></select>
+      </div>
+      <div class="control">
+        <span class="label">Sort packages</span>
+        <select><option>Most downloads</option><option>Recently published</option><option>A-Z</option></select>
+      </div>
+      <div class="hints">
+        <span class="hint-chip"><span class="hint-label">top:</span> 1M/mo</span>
+        <span class="hint-chip"><span class="hint-label">latest:</span> 1h ago</span>
+      </div>
+    </div>
+    <nav class="pagination">
+      <span class="range">1-50 / 5697</span>
+      <div class="page-buttons">
+        <button class="page-btn" disabled>← Previous</button>
+        <span class="page-ind">1 / 114</span>
+        <button class="page-btn">Next →</button>
+      </div>
+    </nav>
+  </header>
+
+  <section class="recent">
+    <h2>Recently published</h2>
+    <ul class="recent-list">
+      <li><a><strong>pi-zense</strong><span class="desc">Spec-gated, human-signed SDLC harness for pi</span><span class="age">1m ago</span></a></li>
+      <li><a><strong>@trim21/personal-pi-extensions</strong><span class="desc">Custom pi coding-agent extensions: bwrap sandbox, workspace guard</span><span class="age">5m ago</span></a></li>
+      <li><a><strong>pi-extensible-workflows</strong><span class="desc">Deterministic multi-agent workflow orchestration for Pi</span><span class="age">8m ago</span></a></li>
+      <li><a><strong>hotmilk</strong><span class="desc">Pi meta-package: prompts, skills, themes, agents, and lazy-loaded bundled extensions</span><span class="age">9m ago</span></a></li>
+      <li><a><strong>pi-auto</strong><span class="desc">Automatically select thinking effort for each task without changing the current Pi model</span><span class="age">11m ago</span></a></li>
+      <li><a><strong>pi-orchestrator-config</strong><span class="desc">Orchestrator pattern for pi: specialist subagents, enforcement, code review loop</span><span class="age">20m ago</span></a></li>
+      <li><a><strong>@sugarforever/pi-zvec-grep</strong><span class="desc">Zero-command, continuously fresh zvec workspace search for Pi</span><span class="age">20m ago</span></a></li>
+    </ul>
+  </section>
+
+  <section class="results">
+    <ul class="cards">
+      <li>
+        <article class="card" style="--pi-card-accent: hsl(190 60% 55%);">
+          <button class="preview"><div class="preview-frame"><span></span><span></span><span></span></div></button>
+          <div class="body">
+            <div class="head-row">
+              <h3 class="name">pi-mcp-adapter</h3>
+              <span class="pill ext">extension</span>
+              <span class="state up">可更新</span>
+            </div>
+            <p class="desc">MCP (Model Context Protocol) adapter extension for Pi coding agent</p>
+            <div class="meta"><span>nicopreme</span><span class="meta-dot">·</span><span>1M/mo</span><span class="meta-dot">·</span><span>1h ago</span></div>
+            <div class="links">
+              <a href="#">📦 npm</a><a href="#">↗ repo</a><a href="#">! report</a>
+            </div>
+          </div>
+          <div class="install">
+            <code class="install-cmd">$ pi install npm:pi-mcp-adapter</code>
+            <div class="install-actions">
+              <button class="copy-btn">Copy</button>
+              <button class="install-btn">Install</button>
+            </div>
+          </div>
+        </article>
+      </li>
+      <li>
+        <article class="card" style="--pi-card-accent: hsl(280 55% 60%);">
+          <button class="preview"><div class="preview-frame"><span></span><span></span><span></span></div></button>
+          <div class="body">
+            <div class="head-row">
+              <h3 class="name">pi-fabric</h3>
+              <span class="pill ext">extension</span>
+            </div>
+            <p class="desc">Custom LLM-agnostic coding agent runtime for Pi</p>
+            <div class="meta"><span>monotykamary</span><span class="meta-dot">·</span><span>22.6K/mo</span><span class="meta-dot">·</span><span>2h ago</span></div>
+            <div class="links">
+              <a href="#">📦 npm</a><a href="#">↗ repo</a><a href="#">! report</a>
+            </div>
+          </div>
+          <div class="install">
+            <code class="install-cmd">$ pi install npm:pi-fabric</code>
+            <div class="install-actions">
+              <button class="copy-btn">Copy</button>
+              <button class="install-btn">Install</button>
+            </div>
+          </div>
+        </article>
+      </li>
+      <li>
+        <article class="card" style="--pi-card-accent: hsl(140 55% 50%);">
+          <button class="preview"><div class="preview-frame"><span></span><span></span><span></span></div></button>
+          <div class="body">
+            <div class="head-row">
+              <h3 class="name">@braintrust/pi-extension</h3>
+              <span class="pill ext">extension</span>
+            </div>
+            <p class="desc">Braintrust extension for pi. Includes automatic tracing for pi sessions, turns, LLM calls, and tool executions to Braintrust.</p>
+            <div class="meta"><span>braintrust</span><span class="meta-dot">·</span><span>21.7K/mo</span><span class="meta-dot">·</span><span>7d ago</span></div>
+            <div class="links">
+              <a href="#">📦 npm</a><a href="#">↗ repo</a><a href="#">! report</a>
+            </div>
+          </div>
+          <div class="install">
+            <code class="install-cmd">$ pi install npm:@braintrust/pi-extension</code>
+            <div class="install-actions">
+              <button class="copy-btn">Copy</button>
+              <button class="install-btn">Install</button>
+            </div>
+          </div>
+        </article>
+      </li>
+      <li>
+        <article class="card" style="--pi-card-accent: hsl(20 60% 55%);">
+          <button class="preview"><div class="preview-frame"><span></span><span></span><span></span></div></button>
+          <div class="body">
+            <div class="head-row">
+              <h3 class="name">pi-auto-model</h3>
+              <span class="pill ext">extension</span>
+            </div>
+            <p class="desc">Native, explainable automatic model routing for the Pi coding agent</p>
+            <div class="meta"><span>earendil</span><span class="meta-dot">·</span><span>15.3K/mo</span><span class="meta-dot">·</span><span>22m ago</span></div>
+            <div class="links">
+              <a href="#">📦 npm</a><a href="#">↗ repo</a><a href="#">! report</a>
+            </div>
+          </div>
+          <div class="install">
+            <code class="install-cmd">$ pi install npm:pi-auto-model</code>
+            <div class="install-actions">
+              <button class="copy-btn">Copy</button>
+              <button class="install-btn">Install</button>
+            </div>
+          </div>
+        </article>
+      </li>
+    </ul>
+  </section>
+
+  <footer class="summary">
+    Showing 1-50 of 5697 · Page 1 of 114
+  </footer>
+</main>
+</body>
+</html>

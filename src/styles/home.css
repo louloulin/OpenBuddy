@@ -3322,6 +3322,65 @@
   flex-direction: column;
   gap: 8px;
 }
+
+/* R85: pi-market-section 在 MarketplacePanel 内,但有自己 header,补基本样式
+   避免显示成无样式裸 HTML。视觉上和 marketplace-panel__header 同构。 */
+.pi-market-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0 12px;
+  border-bottom: 1px solid var(--wb-border-soft);
+  margin-bottom: 8px;
+}
+
+.pi-market-section__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pi-market-section__header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wb-fg-primary);
+}
+
+.pi-market-section__header p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--wb-fg-secondary);
+}
+
+.pi-market-section__header code {
+  font-family: var(--wb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-bg-tertiary);
+}
+
+.pi-market-section__header button {
+  align-self: flex-start;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--wb-radius-md);
+  border: 1px solid var(--wb-border);
+  background: var(--wb-bg-secondary);
+  color: var(--wb-fg-primary);
+  cursor: pointer;
+}
+
+.pi-market-section__header button:hover:not(:disabled) {
+  border-color: var(--wb-accent);
+}
+
+.pi-market-section__header button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 .plugins-panel__item {
   display: flex;
   gap: 12px;

@@ -13,7 +13,7 @@
  */
 
 /** 市场条目类型。一个条目可以同时属于多个 kind(例如插件内置主题)。 */
-export type MarketplaceKind = "plugin" | "skill" | "extension" | "mcp" | "theme";
+export type MarketplaceKind = "plugin" | "skill" | "extension" | "mcp" | "theme" | "prompt";
 
 export const MARKETPLACE_KINDS: readonly MarketplaceKind[] = [
   "plugin",
@@ -21,6 +21,7 @@ export const MARKETPLACE_KINDS: readonly MarketplaceKind[] = [
   "extension",
   "mcp",
   "theme",
+  "prompt",
 ];
 
 export const MARKETPLACE_KIND_LABELS: Record<MarketplaceKind, string> = {
@@ -29,6 +30,7 @@ export const MARKETPLACE_KIND_LABELS: Record<MarketplaceKind, string> = {
   extension: "扩展",
   mcp: "MCP",
   theme: "主题",
+  prompt: "提示词",
 };
 
 /** 安装状态徽标的取值。由宿主计算后传入,组件只负责呈现。 */
@@ -81,6 +83,10 @@ export interface MarketplaceEntry {
   /** 市场推荐(最新)版本。 */
   version: string;
   kinds: readonly MarketplaceKind[];
+  /** pi.dev 风格:主类型徽章。`kinds` 可保留多 kind,`primaryKind` 用于徽章展示。 */
+  primaryKind?: MarketplaceKind;
+  /** 同一包的多 kind(向后兼容)。 */
+  extraKinds?: readonly MarketplaceKind[];
   capabilities?: readonly MarketplaceCapability[];
   installedVersion?: string;
   /** 宿主标记的兼容性结论(通常是引擎区间不匹配)。 */
@@ -93,9 +99,26 @@ export interface MarketplaceEntry {
   /** 用于 `sort=recent` 的 ISO 时间戳。 */
   updatedAt?: string;
   installedBytes?: number;
+
+  // ---- R83 pi-market 新增字段(全部可选,向后兼容) ----
+  /** pi.dev 风格:每个条目有唯一 npm 名,用于 `pi install npm:<x>`。 */
+  npmName?: string;
+  /** 最近 30 天 NPM 下载量。 */
+  downloadsLastMonth?: number;
+  /** 全文检索串(name + description + author + tags),由 host 计算,避免 client 拼。 */
+  searchBlob?: string;
+  /** 来源 registry 名(由 pi-market-bridge 填)。 */
+  sourceLabel?: string;
+  sourceKind?: "official" | "community" | "local";
+  /** 详情链接(npm / repo / report)。 */
+  npmUrl?: string;
+  repoUrl?: string;
+  reportUrl?: string;
+  /** 安装命令模板,默认 `pi install npm:<npmName>`。 */
+  installCommand?: string;
 }
 
-export type MarketplaceSortKey = "relevance" | "name" | "publisher" | "recent" | "size";
+export type MarketplaceSortKey = "relevance" | "name" | "publisher" | "recent" | "size" | "downloads";
 
 export const MARKETPLACE_SORT_LABELS: Record<MarketplaceSortKey, string> = {
   relevance: "相关度",
@@ -103,6 +126,7 @@ export const MARKETPLACE_SORT_LABELS: Record<MarketplaceSortKey, string> = {
   publisher: "发布者",
   recent: "最近更新",
   size: "体积",
+  downloads: "下载量",
 };
 
 export interface MarketplaceFilter {
@@ -389,6 +413,11 @@ export function sortMarketplaceEntries(
       case "size":
         return (
           compareNumbersDesc(a.installedBytes, b.installedBytes) || compareTextAsc(a.name, b.name)
+        );
+      case "downloads":
+        return (
+          compareNumbersDesc(a.downloadsLastMonth, b.downloadsLastMonth) ||
+          compareTextAsc(a.name, b.name)
         );
       case "relevance":
       default: {

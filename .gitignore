@@ -225,3 +225,6 @@ tests/electron/__screenshots__/
 # 历史 vitest 配置会在测试运行时把这些写到 source 旁边,污染工作树。
 # 当前 vitest 不会再生,但保留规则防止未来配置回退。
 packages/**/__tests__/**/*.test.js
+**/target/
+# Ad-hoc dev/analyze scripts in repo root
+.tmp-*.mjs
