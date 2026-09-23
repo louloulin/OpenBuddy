@@ -40,6 +40,8 @@
 
 ---
 
+- **AI Chat 全面升级(Plan5)**:流式 caret、推理实时卡片、工具 inline 展开、引用 / 产物 chip、消息级重发入口、并行工具可视化、快捷键发现面板 — 详见 `WORKBUDDY_UI_REFERENCE.md`。
+
 ## 📑 目录
 
 - [为什么是 OpenBuddy?](#-为什么是-openbuddy)

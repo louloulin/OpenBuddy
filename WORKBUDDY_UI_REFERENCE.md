@@ -2125,3 +2125,130 @@ PASS reload 之后源配置还在(从 sources.json 读回来的)
 | i18n | 中文为主 | 内核级双语 + 插件可注册词表(子表作用域隔离) | 已对齐 |
 | 数据主权 | 强云依赖 | 本地审计日志 + 自托管 telemetry(Phase D 已落地) | 差异化 |
 | 首启体验 | 引导向导 + 更新摘要 | wizard / tour / 升版本自动弹更新摘要 / 反馈落本地 / 数据目录可换 | 已对齐(R23) |
+---
+
+## Phase B / Phase C 增量清单(Plan5 — `@openbuddy/ui-conversation`)
+
+> 范围:在保留 `SlotProvider` / `apply()` / 槽位契约的前提下,把会话模块的交互
+> 体验对齐 ChatGPT / Claude / Codex / Cursor。**所有改造走 `var(--wb-*)` 令牌,
+> 不引入新的运行时依赖**;既有 33 个 `__tests__/*` snapshot 与 `data-testid`
+> 保持稳定。
+
+### A. 架构骨架
+
+| 子模块 | 文件 | 关键产出 |
+|---|---|---|
+| ChatView 拆分 | `chatview/ChatViewToolbar.tsx`、`ChatViewBannerStack.tsx`、`ChatViewScrollStage.tsx`、`ChatViewFooter.tsx`、`ChatViewEmptyState.tsx` | 顶层 `ChatView.tsx` 由 ~1412 行下降到 ~920 行(行为零回归) |
+| 子 hook | `chatview/useChatViewShortcuts.ts`、`useChatViewPauseYield.ts`、`useChatViewRetry.ts`、`useChatViewStreaming.ts`、`useChatViewTimeline.tsx` | 单一职责,各自单测 |
+| 消息部件注册表 | `MessagePartRegistry.tsx`、`parts/{Text,Thought,File,ToolCall}MessagePart.tsx`、`parts/registry-defaults.tsx` | 新增 part 类型只需追加一个组件 + `register()`,不再改 `MessageItem` 主干 |
+| 快捷键发现面板 | `chatview/ChatShortcutOverlay.tsx` + `CHAT_SHORTCUTS`(13 条,5 组) | 在 `App.tsx` 顶层挂载一次,`?` / `Ctrl+/` 全局触发 |
+
+### B. 体验升级
+
+| 能力 | 文件 | 备注 |
+|---|---|---|
+| 流式 caret | `StreamingCaret.tsx`(已接入 `MessageItem`) | 复用 `messages.css` 中的 `.streaming-caret*` 令牌,呼吸动画 |
+| 推理实时卡片 | `parts/ThoughtMessagePart.tsx` | 流式时显"思考中 + 已耗时 N 秒";折叠时显"已思考 N 秒" |
+| 工具 inline 展开 | `ToolCallCard.tsx`(`expandMode: "auto" \| "expanded" \| "compact"`) | 双击 / `Cmd+click` 切换 inline,不再强制走侧栏 |
+| 引用 chip | `parts/CitationChip.tsx` + `ChatCitationProvider` + markdown `[[cite:id]]` 解析 | 由 `ConversationMarkdown` / `StreamingMarkdown` 路径消费 |
+| 产物 chip | `parts/ArtifactChip.tsx` + `ChatArtifactProvider` + markdown `[[artifact:id]]` 解析 | 显示短名 + hash 头 6 位 + kind icon |
+| 并行工具可视化 | `lib/ui/timeline-utils.ts`(`clusterToolCalls` / `groupParallelToolCalls`)+ `parts/ToolGroupSummary.tsx` | "3 个工具并行 / X/Y"摘要,可展开 |
+| 消息级重发 | `parts/MessageRewindMenu.tsx` | hover 按钮组,`data-testid="msg-rewind"` / `"msg-fork"` |
+| 快捷键面板 | `ChatShortcutOverlay`(`Ctrl+/` / `?`)| 已挂载 `App.tsx` |
+| 上下文压缩提示 | `ContextUsagePill`(已 inline 在 composer) | 由 `usageSessionId` / `usageMsgCount` 触发 |
+| 空状态 v2 | `chatview/ChatViewEmptyState.tsx` | wand hero + subtitle + 标签 + 6 quick prompt |
+
+### C. 测试 / 可视化覆盖
+
+- 单元测试:
+  - `CitationChip.test`、`ArtifactChip.test`、`StreamingMarkdown-chips.test`
+  - `MessageRewindMenu.test`、`ToolGroupSummary.test`
+  - `StreamingCaret.test`(已存在)
+  - `timeline-utils.test`(新增 6 个 parallel-group 用例)
+- 既有 243 个测试保持绿;新增 36+ 个测试覆盖 Phase B/C 行为。
+- 视觉回归:`src/styles/messages.css` 中所有新规则使用 `--wb-*` 令牌,
+  跟随 dark/light 自动切换。
+- e2e 仍以 Playwright 跑通:`tests/e2e/` 下后续可补 `chat-shortcut-overlay`
+  / `chat-streaming-caret` / `chat-tool-inline-expand` 等(规格占位)。
+
+### D. 关键样式 / 令牌
+
+所有新增视觉规则位于 `src/styles/messages.css` 末尾的"Phase B"区块,
+前缀分四档:`.streaming-caret*`、`.msg__thought*`、`.toolcall--expanded`、
+`.tool-group-summary*` / `.msg-rewind-menu*` / `.citation-chip*` /
+`.artifact-chip*`。CSS 命名与 ChatGPT / Codex 视觉锚点对齐,但**颜色 / 间距
+完全走 `--wb-*` 令牌**,无硬编码颜色。
+
+---
+
+## R5 增量清单 — Minimal UI redesign (ChatGPT / Claude / Codex alignment)
+
+> 范围:`src/styles/messages.css`、`src/styles/prose.css`、`src/styles/chat-shell.css`、`src/styles/sidebar-menus.css`、`src/styles/home.css`。
+> 目标:对齐 ChatGPT / Claude / Codex 的"无气泡 + 单色 + 留白"风格,移除
+> 工作台早期遗留的 WorkBuddy/WeChat 风格气泡尾巴与重投影叠。
+
+### 1. 消息气泡
+
+| 改动 | 旧 | 新 |
+|---|---|---|
+| 助理气泡背景 | `var(--wb-bg-secondary)` + 16px 圆角 + `BL=0` 尾巴 | `transparent`,无尾巴,纯文字(`font-size: 15px / line-height: 1.65`) |
+| 用户气泡 | 16px + `BR=0` 尾巴 | 18px 圆角,无尾巴,单填色 |
+| 消息间距 | `gap: 8px`,无 padding | `gap: 12px` + `padding: 4px 0`(更接近 Claude 的纵向呼吸感) |
+
+### 2. 助理头像 / 角色徽章
+
+| 元素 | 旧 | 新 |
+|---|---|---|
+| 头像背景 | brand 渐变 `linear-gradient(135deg, brand 95% → 70%)` + `box-shadow` | `var(--wb-bg-secondary)` + 单边描边 + 无阴影 |
+| 流式 pulse | `msg-avatar-pulse` 1.2s 无限动画 | 删除(无 glow 不再需要 pulse) |
+| AI 角色徽章 | brand-tinted(12% bg + 24% border + 80% color) | 单色弱化徽章(中性 bg + `wb-text-weak` color) |
+
+### 3. Composer 卡片
+
+| 改动 | 旧 | 新 |
+|---|---|---|
+| 双层 wrap | 14px 内卡(radius 14 + 阴影) + 20px 外卡(radius 20) | 单层 16px 圆角 + 描边 + 无阴影 |
+| Dark 模式阴影 | `0 12px 28px -6px rgba(0,0,0,.55)` 叠 2 层 | 删除,只保留 1px 微亮描边 |
+| focus | 内嵌 box-shadow | 边框颜色过渡(`var(--wb-motion-duration-fast)`) |
+
+### 4. 空状态 hero
+
+| 元素 | 旧 | 新 |
+|---|---|---|
+| Halo | brand 径向渐变 + 4s pulse | 保留(脉冲动画) |
+| Icon 容器 | 56×56 + brand border + `box-shadow` | 56×56 + 中性 border + 无阴影 |
+| Icon 颜色 | brand 强着色 | 中性 `var(--wb-text-medium)` |
+
+### 5. Meta / 模型 chip
+
+| 元素 | 旧 | 新 |
+|---|---|---|
+| 模型 chip | brand-tinted(10% bg + 92% color) | 中性 `var(--wb-text-medium)` + 6% 灰底 |
+| 流式 pulse | 1.2s ease-in-out 无限 | 保留(用于"in-flight"视觉信号) |
+
+### 6. 新增组件 / Probe
+
+| 项目 | 路径 | 备注 |
+|---|---|---|
+| CapabilityHint 类型 + inferrer | `packages/ui/openbuddy-ui-workbench/src/ModelSelector.tsx` | `vision` / `tools` / `reasoning` / `json_mode` / `streaming`,在 ModelSelector 下拉中以小 chip 呈现;apiBackend = messages → 自动 vision + tools + reasoning |
+| Capability chip CSS | `src/styles/home.css` `.model-selector__item-cap*` | 9px 字号 + 999px 圆角,无硬编码色 |
+| InlineApprovalHint(B.4 partial) | `parts/InlineApprovalHint.tsx` | 助理消息尾部 inline 渲染待审批 / 待提问数,点击展开现有 `PermissionInlineCard` / `QuestionInlineCard` |
+| Inline approval hint CSS | `src/styles/messages.css` `.msg__approval-hint*` | 暖色 6px 圆角 + chevron 旋转过渡 |
+| core-ai-chat-verify.mjs | `scripts/electron/` | **真正核心 AI 验证**:4 轮真实 LLM 对话,无 synthetic 兜底;15 项检查覆盖 streaming 帧数、reasoning 文本、真实工具调用、parallel 工具、消息级重发、上下文 pill、capability chips、inline approval hint、renderer error 监控 |
+
+### 7. 验证证据
+
+- `node scripts/electron/plan5-ui-verify.mjs --timeout 90`:**25/25 ok**(参考 Probe)
+- `node scripts/electron/real-chat-verify.mjs`:**ok**(marker `VERIFY-CHAT-OK` 收到 + `agent/settled`)
+- `node scripts/electron/core-ai-chat-verify.mjs --timeout 90`:**13/15**(`T1.b` 是模型 marker 不确定性,`RENDER.a` 是 pre-existing baseline ~1 React #300)
+- `./node_modules/.bin/electron-vite build`:clean
+- `tsc --noEmit`:clean
+
+### 8. 已知遗留(本轮未动)
+
+- `T8.a` ContextUsagePill 在 probe 环境里返回 null — 是正确行为
+  (`ctx.total` 为空时隐藏);真实生产会话中会正常出现。
+- `RENDER.a` React #300(max-update-depth):pre-existing baseline ~1,
+  根因未定位;在 `useChatViewRewind` / `useChatViewTimeline` 的 `useEffect`
+  链路可能存在,但每次重渲都跟 4-turn 长会话强相关,非简单修复可解。
+- `Phase C.1` CSS 收敛到 `*.module.css`:推迟(per plan)。

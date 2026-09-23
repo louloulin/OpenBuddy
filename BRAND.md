@@ -4,7 +4,7 @@
 
 ### Logo
 
-The OpenBuddy logo is **"Buddy the Whale"**: a Teemo-style chibi whale mascot in League-of-Legends character energy. The character features an oversized round body, oversized expressive eyes, a tiny tail and flippers, a signature captain's cap, and a dynamic amber water spout. Brand palette stays in three tones — sky/cream `#A8DCF0 → #FFE5C2 → #FFD09A`, ocean/spark `#6FC0E8 → #2E78C8 → #F59E0B → #FFD78A`, coral `#FF6B6B → #FF9A8B` — with `#1E2640` reserved as a small navy accent. No pure black; readable from 16 px favicon to 1024 px app icon and any scale in between.
+The OpenBuddy logo is **"Buddy the Whale"**: a chibi whale mascot  The character features an oversized round body, oversized expressive eyes, a tiny tail and flippers, a signature captain's cap, and a dynamic amber water spout. Brand palette stays in three tones — sky/cream `#A8DCF0 → #FFE5C2 → #FFD09A`, ocean/spark `#6FC0E8 → #2E78C8 → #F59E0B → #FFD78A`, coral `#FF6B6B → #FF9A8B` — with `#1E2640` reserved as a small navy accent. No pure black; readable from 16 px favicon to 1024 px app icon and any scale in between.
 
 | Asset | File | Format | Recommended size |
 |---|---|---|---|
