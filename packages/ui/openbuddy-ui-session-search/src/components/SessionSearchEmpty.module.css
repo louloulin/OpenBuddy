@@ -1,0 +1,13 @@
+.wrap {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--buddy-fg-muted, #888);
+}
+.message {
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.hint {
+  font-size: 12px;
+  color: var(--buddy-fg-muted, #666);
+}

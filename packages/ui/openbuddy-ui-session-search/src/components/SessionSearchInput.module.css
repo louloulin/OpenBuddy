@@ -1,0 +1,19 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--buddy-border, #2a2a30);
+  background: var(--buddy-bg-elev, #1a1a1f);
+  color: var(--buddy-fg, #f5f5f5);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.input:focus {
+  border-color: var(--buddy-accent, #6366f1);
+}

@@ -1,0 +1,18 @@
+.wrap { padding: 16px; color: var(--buddy-fg, #f5f5f5); font-family: var(--buddy-font, system-ui); }
+.header { margin-bottom: 12px; }
+.title { font-size: 16px; font-weight: 600; margin: 0; }
+.subtitle { font-size: 12px; color: var(--buddy-fg-muted, #999); margin: 4px 0 0 0; }
+.create { display: flex; gap: 8px; margin-bottom: 12px; }
+.lineInput { flex: 1; padding: 6px 10px; border: 1px solid var(--buddy-border, #2a2a30); background: var(--buddy-bg-elev, #1a1a1f); color: var(--buddy-fg, #f5f5f5); border-radius: 6px; font-size: 12px; outline: none; }
+.createBtn { padding: 6px 12px; border: 1px solid var(--buddy-border, #2a2a30); background: var(--buddy-accent, #6366f1); color: white; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.createBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.tree { list-style: none; padding: 0; margin: 0; }
+.branchLi { list-style: none; }
+.children { list-style: none; padding: 0; }
+.branch { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.branch:hover { background: var(--buddy-bg-hover, #1f1f24); }
+.branchActive { background: var(--buddy-bg-active, #26262c); border: 1px solid var(--buddy-accent, #6366f1); }
+.label { font-weight: 600; }
+.meta { color: var(--buddy-fg-muted, #888); font-size: 11px; margin-left: auto; }
+.deleteBtn { background: none; border: none; color: var(--buddy-fg-muted, #777); cursor: pointer; font-size: 14px; padding: 0 4px; }
+.deleteBtn:hover { color: var(--buddy-danger, #f87171); }
