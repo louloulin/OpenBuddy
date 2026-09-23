@@ -48,6 +48,12 @@ export type ChatViewScrollStageProps = {
   cwd?: string;
   onOpenSession?: (sessionId: string, cwd?: string) => void | Promise<void>;
   activeView: string;
+  /** P0-4 — 由 ChatView 解析 useConversationViews() 得到的注册视图列表。
+   *  0 个插件 / 0 个内置时为 null/空,views 仅承担"是否真的存在切换器"这一语义开关。 */
+  conversationViews?: ReadonlyArray<{ key: string; label: string }>;
+  /** P0-4 — ChatView 渲染的 <ConversationViewTabs /> 节点,空时为 null。
+   *  ScrollStage 只负责把它放进 .chatview__tabs 容器,不重复实现切换器逻辑。 */
+  conversationViewTabs?: ReactNode;
   /** 空状态节点(由 ChatView 构造,保留 handleQuickPrompt 接线)。 */
   emptyState: ReactNode;
   /** 非空时的转录列表节点(普通列表或虚拟列表)。 */
@@ -66,6 +72,11 @@ export function ChatViewScrollStage(props: ChatViewScrollStageProps) {
   const SubagentPanelResolved = props.SubagentPanelImpl ?? SubagentPanel;
   return (
     <div className="chatview__scroll" ref={props.scrollRef as unknown as React.Ref<HTMLDivElement>}>
+      {/* P0-4 — 视图切换器浮在滚动容器顶部,仅在 ChatView 真的有可切换视图时
+          才出现。R5 约束保证 0 插件时整块 JSX 不存在,行为与改造前逐字一致。 */}
+      {props.conversationViewTabs && (
+        <div className="chatview__tabs">{props.conversationViewTabs}</div>
+      )}
       <div className="chatview__inner">
         {hasMessages && props.sessionTitle && (
           <h1 className="chatview__title" title={props.sessionTitle}>

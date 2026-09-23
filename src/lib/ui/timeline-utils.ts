@@ -24,7 +24,27 @@ export type TimelineNode =
   | { kind: "message"; message: TimelineMessage; index: number };
 
 /**
- * 把消息序列展开成「分隔符 + 消息」的时间线节点序列。
+ * 把 `modelId`(`<provider>/<model>` 形)压缩成面向用户的简短标签。
+ *
+ * 输入  `custom_anthropic/minimax/MiniMax-M3` → 输出 `MiniMax-M3`
+ * 输入  `openai/gpt-4o`                       → 输出 `gpt-4o`
+ * 输入  `MiniMax-M3`(无前缀)                  → 输出 `MiniMax-M3`
+ *
+ * 设计理由:`timeline-utils` 生成的「已切换到 X」分隔符与 MessageMeta
+ * 的模型 chip 都直接拿 `m.modelId` 渲染,会把内部 provider 路径
+ * (`custom_anthropic/minimax/...`)整段外泄到 UI。Codex / ChatGPT 在
+ * 模型切换处只显示模型名本身,所以这里抽到工具层统一收口。
+ */
+export function shortModelLabel(modelId: string | undefined | null): string {
+  if (!modelId) return "";
+  // 一段不切,两段也不切:保留 `sub-provider/model` 这种语义上有用的二级路径。
+  // 三段及以上(通常是 `<provider>/<sub-provider>/<model>`)只保留末两段。
+  const parts = modelId.split("/");
+  if (parts.length <= 2) return modelId;
+  return parts.slice(-2).join("/");
+}
+
+/** 把消息序列展开成「分隔符 + 消息」的时间线节点序列。
  *
  *  - 日期分隔:相邻消息跨「天」(按 createdAt)时插入。
  *  - 模型分隔:相邻消息的 modelId 变化时插入(显示「已切换到 X」)。
@@ -47,7 +67,7 @@ export function buildTimeline(messages: TimelineMessage[]): TimelineNode[] {
     if (m.modelId && m.modelId !== prevModel) {
       nodes.push({
         kind: "model-divider",
-        label: `已切换到 ${m.modelId}`,
+        label: `已切换到 ${shortModelLabel(m.modelId) || m.modelId}`,
         key: `model-${m.modelId}-${i}`,
       });
       prevModel = m.modelId;

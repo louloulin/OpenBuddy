@@ -567,6 +567,7 @@
   border-radius: 0;
   font-size: 15px;
   line-height: 1.65;
+}
 /* R8.1 (revision-pager) — split text + attachments inside the user
  * bubble so we can replace the text span alone when scrubbing through
  * revisions (file/image previews stay mounted across revisions).
@@ -726,9 +727,6 @@
 }
 .msg--user:hover .msg__bubble--editable {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--wb-brand) 18%, transparent);
-}
-  /* 助理气泡用更浅的灰底, 与用户气泡区分(WB 实测) */
-  background: var(--wb-bg-tertiary, #f4f5f8);
 }
 .msg--user .msg__bubble {
   /* 用户气泡: BR=0 (默认已正确), 用品牌/次级灰底凸显发送方 */
@@ -1644,4 +1642,114 @@ button.diff__path {
 .msg__approval-hint-body {
   padding: 6px 10px 8px;
   border-top: 1px solid var(--wb-border-light, rgba(0, 0, 0, 0.08));
+}
+
+/* === conversation.view (P0-4) ================================================
+ * 新组件化视图 (live/result/content) 的切换器与视图容器。原本这些 class
+ * 只在 conversation-view.tsx 里有定义、CSS 里没有任何规则 -> 即使 ChatView
+ * 把切换器接上,也是裸样式、没法上色。这是 R5/R6 之外第二个组件化完成度缺口。
+ *
+ * 视觉规则:
+ *   - chatview__tabs:贴滚动容器顶部、center-aligned、最大 800px,与 .chatview__inner 同宽。
+ *     透明分隔与字色用 weak/medium,主色用 brand。
+ *   - conversation-view-tabs:左对齐 tab pill,激活态用 brand 色块 + 白字。
+ *   - result / content 视图:把转录区里的某些节点收敛成更紧凑的只读视图,
+ *     间距、字号与主转录区对齐(Codex/ChatGPT 阅读模式视觉密度)。
+ * ============================================================================ */
+.chatview__tabs {
+  display: flex;
+  justify-content: center;
+  padding: 10px 24px 0;
+  /* 与 .chatview__inner 同宽,纯靠 flex 把切换器居中;
+   * 容器本身不限定最大宽,这样 0 视图时整块 JSX 不渲染(R5 行为)。 */
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--wb-border-soft, rgba(127, 127, 127, 0.12));
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--wb-bg-primary, #ffffff) 92%, transparent),
+    transparent
+  );
+}
+[data-theme="dark"] .chatview__tabs {
+  border-bottom-color: color-mix(in srgb, var(--wb-border-soft, rgba(127, 127, 127, 0.18)) 70%, transparent);
+}
+.conversation-view-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 auto 10px;
+  padding: 3px;
+  background: var(--wb-bg-tertiary, #f1f2f5);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--wb-text-medium, rgba(0, 0, 0, 0.6));
+}
+[data-theme="dark"] .conversation-view-tabs {
+  background: color-mix(in srgb, var(--wb-bg-tertiary, #1a1a1f) 80%, transparent);
+}
+.conversation-view-tabs__tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.conversation-view-tabs__tab:hover {
+  color: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
+}
+.conversation-view-tabs__tab:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand, #00c29a) 50%, transparent);
+  outline-offset: 1px;
+}
+.conversation-view-tabs__tab--active {
+  background: var(--wb-bg-primary, #ffffff);
+  color: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 1px var(--wb-border-soft, rgba(127, 127, 127, 0.18));
+}
+[data-theme="dark"] .conversation-view-tabs__tab--active {
+  background: var(--wb-bg-primary, #0f0f12);
+  color: var(--wb-text-strong, rgba(255, 255, 255, 0.92));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--wb-border-soft, rgba(127, 127, 127, 0.25));
+}
+@media (prefers-reduced-motion: reduce) {
+  .conversation-view-tabs__tab { transition: none; }
+}
+
+/* result / content 视图容器 — 沿用主转录区最大宽 800 + 上下内边距,降低与主
+ * 转录区的视觉落差。 */
+.conversation-view-result,
+.conversation-view-content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.conversation-view-result__node,
+.conversation-view-content__node {
+  /* 视图内的节点由宿主 renderNode 提供,容器只负责布局 —— 与主转录区一致。 */
+}
+.conversation-view-result--empty,
+.conversation-view-content--empty {
+  align-items: center;
+  text-align: center;
+  color: var(--wb-text-medium, rgba(0, 0, 0, 0.6));
+  padding: 56px 24px;
+}
+.conversation-view-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--wb-text-medium, rgba(0, 0, 0, 0.6));
+  line-height: 1.6;
 }

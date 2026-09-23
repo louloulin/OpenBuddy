@@ -29,6 +29,7 @@ import {
   formatThroughput,
   formatTokenCount,
 } from "@/lib/ui/duration";
+import { shortModelLabel } from "@/lib/ui/timeline-utils";
 
 export function MessageMeta({
   createdAt,
@@ -99,9 +100,9 @@ export function MessageMeta({
         </span>
       )}
       {showModelChip && (
-        <span className="msg__meta-chip msg__meta-chip--model" title={`model: ${modelId}`}>
+        <span className="msg__meta-chip msg__meta-chip--model" title={modelId ?? undefined}>
           <Cpu size={9} strokeWidth={1.75} aria-hidden="true" />
-          <span className="msg__meta-chip-text">{modelId}</span>
+          <span className="msg__meta-chip-text">{shortModelLabel(modelId)}</span>
         </span>
       )}
       {/* R58 — input (prompt) token chip. Renders before the throughput

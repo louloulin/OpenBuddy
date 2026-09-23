@@ -50,7 +50,11 @@ import { MessageItem } from "./MessageItem";
 import { Composer } from "./Composer";
 import type { ComposerProps } from "./Composer";
 import { ConversationBody } from "./conversation-slots";
-import { ConversationViewOutlet } from "./conversation-view";
+import {
+  ConversationViewOutlet,
+  ConversationViewTabs,
+  useConversationViews,
+} from "./conversation-view";
 import { PlanPanel } from "@openbuddy/ui-automation";
 import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
 import { QuestionInlineCard } from "./QuestionInlineCard";
@@ -261,6 +265,12 @@ export function ChatView({
   const [fileChangesOpen, setFileChangesOpen] = useState(false);
   // 子代理运行时面板(对齐 WorkBuddy team-runtime)。
   const [subagentsOpen, setSubagentsOpen] = useState(false);
+  // P0-4 — 会话视图切换。Plan5 A.1 refactor 之前 ChatView 已经持有这个状态 +
+  // ConversationViewTabs 接线,后把 activeView 写死成 "live",导致
+  // result/content 这两个新组件化视图变成死代码。这里补回去:0 插件时 views
+  // 长度为 0、切换器不渲染,完全等价于原状 —— 行为契约与改造前逐字一致(分册 05 R5)。
+  const [activeView, setActiveView] = useState<string>("live");
+  const conversationViews = useConversationViews();
 
 
   // R92 — 子代理面板走 `placeholder.subagent` 槽,插件可整体替换。
@@ -847,7 +857,17 @@ export function ChatView({
           messages={messages}
           cwd={cwd}
           onOpenSession={onOpenSession}
-          activeView="live"
+          activeView={activeView}
+          conversationViews={conversationViews}
+          conversationViewTabs={
+            conversationViews.length > 0 ? (
+              <ConversationViewTabs
+                active={activeView}
+                views={conversationViews}
+                onChange={setActiveView}
+              />
+            ) : null
+          }
           emptyState={
             <ChatViewEmptyState onPickPrompt={handleQuickPrompt} />
           }
