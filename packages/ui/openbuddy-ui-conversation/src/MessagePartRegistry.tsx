@@ -18,7 +18,7 @@
  *       (d) 把 `parts/MessagePartKind` 联合扩展
  *     即可;`MessageItem` 与 `ChatView` 主干不需要改。
  */
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 import type { ComponentType } from "react";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import type { MessagePart } from "@openbuddy/ui-state/session-store";
@@ -27,6 +27,8 @@ import {
   type MessagePartKind,
   type MessagePartRenderProps,
 } from "./parts/registry-defaults";
+import { ToolGroupSummary } from "./parts/ToolGroupSummary";
+import { buildPartRenderables } from "@/lib/ui/message-part-renderables";
 
 /**
  * `MessagePartRegistry` — 渲染一条消息的所有 parts。
@@ -54,21 +56,38 @@ export function MessagePartRegistry({
   parts: readonly MessagePart[];
   messageId: string;
 }) {
+  // Plan5 B.9 — consecutive tool_calls that started within the same window
+  // collapse into ONE `ToolGroupSummary` row ("3 个工具并行") instead of
+  // three stacked cards. Everything else keeps the flat 1:1 dispatch, so the
+  // rendered DOM of a serial transcript is byte-for-byte what it was.
+  const partRenderables = useMemo(() => buildPartRenderables(partsProp), [partsProp]);
+
   return (
     <>
-      {partsProp.map((part, i) => (
-        <PartDispatcher
-          key={`${messageId}-${i}-${part.kind}`}
-          part={part}
-          messageId={messageId}
-          isStreaming={isStreaming}
-          complete={complete}
-          theme={theme}
-          markdownConfig={markdownConfig}
-          onOpenTool={onOpenTool}
-          onToast={onToast}
-        />
-      ))}
+      {partRenderables.map((item, i) => {
+        if (item.type === "cluster") {
+          return (
+            <ToolGroupSummary
+              key={`${messageId}-cluster-${i}-${item.cluster.toolCallIds.join("_")}`}
+              cluster={item.cluster}
+              onOpenTool={(tc) => onOpenTool?.(tc.toolCallId)}
+            />
+          );
+        }
+        return (
+          <PartDispatcher
+            key={`${messageId}-${i}-${item.part.kind}`}
+            part={item.part}
+            messageId={messageId}
+            isStreaming={isStreaming}
+            complete={complete}
+            theme={theme}
+            markdownConfig={markdownConfig}
+            onOpenTool={onOpenTool}
+            onToast={onToast}
+          />
+        );
+      })}
     </>
   );
 }
@@ -104,6 +123,10 @@ function PartDispatcher(props: MessagePartRenderProps) {
 function slotNameForKind(kind: MessagePartKind): string {
   return `conversation.message.${kind}`;
 }
+
+/** 兼容旧引用:分组算法已抽到 `@/lib/ui/message-part-renderables`。 */
+export { buildPartRenderables as buildRenderables } from "@/lib/ui/message-part-renderables";
+export type { PartRenderable } from "@/lib/ui/message-part-renderables";
 
 /** 给测试使用:导出派发器与默认渲染器集合。 */
 export const __test__ = {

@@ -84,3 +84,40 @@ export function countModelSwitches(messages: TimelineMessage[]): number {
   }
   return n;
 }
+
+// Plan5 B.9 — 工具并行 / 串行可视化。
+//
+// 聚类算法本体在 `./message-part-renderables`(零依赖、可直接单测);
+// 这里只:
+//   1. 重新导出,让既有的 `@/lib/ui/timeline-utils` 引用路径继续可用;
+//   2. 提供"整段会话"维度的聚合 helper。
+import {
+  clusterToolCalls,
+  type ToolCallCluster,
+} from "./message-part-renderables";
+
+export { clusterToolCalls, DEFAULT_PARALLEL_WINDOW_MS } from "./message-part-renderables";
+export type { ToolCallCluster, PartRenderable } from "./message-part-renderables";
+
+/**
+ * 整段会话维度:把所有消息里的 tool_call 拉平再聚类,便于顶部 banner / minimap 用。
+ */
+export function groupParallelToolCalls(
+  messages: Array<Pick<ChatMessage, "role" | "parts">>,
+  windowMs: number = 3000,
+): ToolCallCluster[] {
+  const all: ToolCallCluster[] = [];
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    all.push(...clusterToolCalls(m.parts, windowMs));
+  }
+  return all;
+}
+
+/**
+ * 便利 helper:统计当前会话里同时运行的工具组数(= parallel/ ≥ 2 的 cluster 数)。
+ * 给 ChatView / StatusIndicator 用,避免每次重渲染都做完整 cluster。
+ */
+export function countParallelClusters(clusters: readonly ToolCallCluster[]): number {
+  return clusters.filter((c) => c.kind === "parallel").length;
+}
