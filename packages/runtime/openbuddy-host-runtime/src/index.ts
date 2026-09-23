@@ -42,3 +42,40 @@ export {
   StableErrorCodeNames,
   stripProxyEnv,
 } from "@openbuddy/shared-error-codes";
+
+// Phase 1 — typed capability wrappers (one helper per host-core method).
+export {
+  callSecretsSet,
+  callSecretsGet,
+  callSecretsDelete,
+  callSecretsList,
+  callPermissionsEvaluate,
+  callPermissionsReadRules,
+  callPermissionsWriteRules,
+  callPermissionsReadMode,
+  callPermissionsWriteMode,
+  callSessionSearch,
+  callSessionMessage,
+  callSessionSetRoot,
+  callWorkspaceSetRoot,
+  callWorkspaceResolve,
+  callWorkspaceCheck,
+  callWorkspaceListIgnored,
+  callAuditAppend,
+  callAuditTail,
+} from "./capabilities.js";
+export type {
+  SecretMeta,
+  SecretSetResult,
+  PermissionAction,
+  PermissionMode,
+  PermissionRule,
+  PermissionDecision,
+  SearchHit,
+  SearchResult,
+  MessageResult,
+  ResolveResult,
+  CheckResult,
+  IgnoredEntry,
+  AuditEntry,
+} from "./capabilities.js";
