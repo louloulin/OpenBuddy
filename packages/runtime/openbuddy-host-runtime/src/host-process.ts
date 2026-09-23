@@ -177,7 +177,7 @@ export class HostProcess {
       method,
       params,
     });
-    this.child.stdin.write(line);
+    this.writeLine(line);
   }
 
   /** Gracefully shut down the host. */
@@ -236,6 +236,21 @@ export class HostProcess {
     }
   }
 
+
+  /**
+   * Write a single NDJSON line to the host-core's stdin. PI-Desktop's
+   * `host-process.ts` uses the same plain `child.stdin.write(payload,
+   * callback)` pattern; backpressure is handled via the `drain` event on
+   * the underlying Writable if it ever returns `false`.
+   */
+  private writeLine(line: string): void {
+    const stdin = this.child.stdin;
+    if (!stdin || stdin.destroyed || stdin.writableEnded) {
+      throw new Error("host-core stdin is no longer writable");
+    }
+    stdin.write(line);
+  }
+
   private callOnce<T>(method: string, params: unknown, timeoutMs: number): Promise<T> {
     const id = randomUUID();
     const request: JsonRpcRequest = {
@@ -258,7 +273,7 @@ export class HostProcess {
       });
 
       try {
-        this.child.stdin.write(formatRequest(request));
+        this.writeLine(formatRequest(request));
       } catch (err) {
         clearTimeout(timer);
         this.pending.delete(id);
@@ -281,11 +296,17 @@ export class HostProcess {
           }
           continue;
         }
+        // JSON-RPC allows `id` to be `null` for parse-error responses; we
+        // do not register any pending call with `null`, so just skip those
+        // frames — the diagnostic stderr message above already covered the
+        // parse failure itself.
+        const id = parsed.id;
+        if (id === null) continue;
         if ("error" in parsed) {
-          const entry = this.pending.get(parsed.id);
+          const entry = this.pending.get(id);
           if (entry) {
             clearTimeout(entry.timer);
-            this.pending.delete(parsed.id);
+            this.pending.delete(id);
             const errorCode =
               parsed.error.data?.errorCode ?? StableErrorCodeNames[parsed.error.code] ?? "INTERNAL_ERROR";
             entry.reject(
@@ -295,10 +316,10 @@ export class HostProcess {
           continue;
         }
         if ("result" in parsed) {
-          const entry = this.pending.get(parsed.id);
+          const entry = this.pending.get(id);
           if (entry) {
             clearTimeout(entry.timer);
-            this.pending.delete(parsed.id);
+            this.pending.delete(id);
             entry.resolve(parsed.result);
           }
           continue;

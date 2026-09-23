@@ -39,6 +39,7 @@ import type { HarnessServer } from "./harness/harness-server";
 import { createBridgeStatusBroadcaster, notifyBridgeUnavailable } from "./collaboration/send-safe";
 import { bootHarnessServer } from "./bootstrap/boot-harness-server";
 import { installAppLifecycle } from "./bootstrap/app-lifecycle";
+import { bootHostCore } from "./host-boot";
 import { casdoorAuth } from "./casdoor/casdoor-auth";
 import { initCasdoorSecurity, type CasdoorSecurityController } from "./security/casdoor";
 import { perfTraceMark } from "./observability/perf-trace";
@@ -126,6 +127,41 @@ if (developmentUserData || process.env.NODE_ENV_ELECTRON_VITE === "development")
 } else {
   applyDataDirOverride();
 }
+
+// R26 (PI-Desktop借鉴) — PI_OPENBUDDY_DATA_DIR 环境变量强制指定 host-core
+// 子进程的 userData 目录,优先级高于现有 dev/指针机制。这条路径供 Rust
+// 侧的 `DataDir::resolve()` 直接消费(参考 PI-Desktop
+// `crates/host-core/src/process-model.md §3`),把"产品数据"与"开发数据"
+// 解耦——CI/沙盒/profile 场景下用同一个二进制换数据目录,不必重启 Electron。
+if (process.env.PI_OPENBUDDY_DATA_DIR) {
+  app.setPath("userData", process.env.PI_OPENBUDDY_DATA_DIR);
+}
+
+// R26 — 单实例锁。第二个 OpenBuddy 进程启动时直接退出,避免两个 host-core
+// 同时写同一个数据目录造成 SQLite 锁竞争 / 日志交错(参考 PI-Desktop
+// `docs/spec/03-runtime/07-process-model.md §3`)。"second-instance" 事件
+// 把已经存在的那一个唤醒并聚焦。
+const SINGLE_INSTANCE_TAG = "openbuddy-desktop";
+const gotSingleInstanceLock = app.requestSingleInstanceLock({
+  additionalData: [SINGLE_INSTANCE_TAG],
+});
+if (!gotSingleInstanceLock) {
+  // Another instance owns the userData dir; let it take over and quit
+  // cleanly so the user only ever interacts with one window.
+  app.quit();
+  process.exit(0);
+}
+app.on("second-instance", () => {
+  // The first instance handles this — focus its main window if one exists.
+  const all = BrowserWindow.getAllWindows();
+  if (all.length > 0) {
+    const win = all[0];
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  } else {
+    // No window yet (still booting) — nothing to focus.
+  }
+});
 
 const devRendererUrl = process.env.ELECTRON_RENDERER_URL;
 const rendererIndex = join(mainDirname, "../../dist/renderer/index.html");
@@ -294,5 +330,19 @@ async function bootBackgroundServices(): Promise<void> {
     await agentHost.init();
   } catch (err) {
     console.error("[openbuddy-pi] agent host init failed:", err);
+  }
+
+  // Phase 0 — bring up the Rust host-core sidecar. Failure here is logged
+  // but non-fatal for Phase 0 so the UI still loads while we land Phase 1
+  // capability wiring (secrets / permissions / audit). Phase 1 will turn
+  // the boot failure into a hard error once the capabilities are live.
+  try {
+    const { handshake } = await bootHostCore({
+      onSlowHint: () => console.warn("[openbuddy-boot] host-core boot > 30s"),
+      onStalled: () => console.error("[openbuddy-boot] host-core boot > 180s; please restart"),
+    });
+    perfTraceMark("host-core-ready", { capabilities: handshake.capabilities.length });
+  } catch (err) {
+    console.error("[openbuddy-boot] host-core boot failed:", err);
   }
 }

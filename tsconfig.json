@@ -101,6 +101,12 @@
       "@openbuddy/logging-shared": [
         "./packages/shared/openbuddy-logging-shared/src/index.ts"
       ],
+      "@openbuddy/host-runtime": [
+        "./packages/runtime/openbuddy-host-runtime/src/index.ts"
+      ],
+      "@openbuddy/shared-error-codes": [
+        "./packages/shared/openbuddy-error-codes/src/index.ts"
+      ],
       "@openbuddy/logging-main": [
         "./packages/core/openbuddy-logging-main/src/index.ts"
       ],

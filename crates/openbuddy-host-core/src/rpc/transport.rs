@@ -29,7 +29,7 @@ pub enum DispatchEvent {
 
 /// Spawn the stdin reader thread and return a future that resolves once
 /// stdin closes or the reader thread reports a fatal error.
-pub async fn run(outbound: mpsc::Sender<DispatchEvent>) -> Result<()> {
+pub async fn run(outbound: std_mpsc::Sender<DispatchEvent>) -> Result<()> {
     let (ready_tx, ready_rx) = std_mpsc::channel::<Result<()>>();
     let (stdin_tx, stdin_rx) = std_mpsc::channel::<DispatchEvent>();
 
@@ -38,14 +38,21 @@ pub async fn run(outbound: mpsc::Sender<DispatchEvent>) -> Result<()> {
         return Err(err);
     }
 
-    // Forward stdin events into the tokio channel.
-    tokio::spawn(async move {
-        while let Ok(event) = stdin_rx.recv() {
-            if outbound.send(event).await.is_err() {
-                break;
+    // Forward stdin events into the dispatcher thread. The forwarder used
+    // to be a tokio task that pushed events into a `tokio::sync::mpsc`
+    // channel; under `current_thread` + `std::future::pending` the
+    // dispatcher never woke up reliably. Sending directly through the
+    // `std::sync::mpsc` channel owned by `rpc::serve` removes that pitfall.
+    std::thread::Builder::new()
+        .name("openbuddy-forwarder".into())
+        .spawn(move || {
+            while let Ok(event) = stdin_rx.recv() {
+                if outbound.send(event).is_err() {
+                    break;
+                }
             }
-        }
-    });
+        })
+        .map_err(|e| anyhow!("failed to spawn forwarder thread: {e}"))?;
 
     // Spawn the stdout writer thread.
     spawn_stdout_writer()?;
@@ -65,6 +72,9 @@ fn spawn_stdin_reader(
         .spawn(move || {
             let stdin = io::stdin();
             let mut reader = BufReader::new(stdin.lock());
+
+            // Signal readiness after thread spawn so callers can wire the
+            // outbound channel before the first event arrives.
             // Signal readiness after thread spawn so callers can wire the
             // outbound channel before the first event arrives.
             let _ = ready_tx.send(Ok(()));
@@ -200,37 +210,20 @@ fn read_line_with_limit<R: BufRead>(
     buf: &mut String,
     max: usize,
 ) -> io::Result<ReadOutcome> {
-    // Drain the stream in chunks, appending into `buf` until a LF or EOF.
-    // `chunk` is dropped before `reader.consume()` is called so the borrow
-    // checker stays happy.
-    let mut total = buf.len();
-    loop {
-        let chunk = reader.fill_buf()?.to_vec();
-        if chunk.is_empty() {
-            if total == buf.len() {
-                return Ok(ReadOutcome::Eof);
-            }
-            // Stream ended mid-line; treat as terminated (PI-Desktop §2).
-            return Ok(ReadOutcome::Line(total));
-        }
-        if let Some(pos) = chunk.iter().position(|b| *b == b'\n') {
-            let take = pos + 1;
-            buf.push_str(std::str::from_utf8(&chunk[..take]).unwrap_or(""));
-            reader.consume(take);
-            total += take;
-            return Ok(ReadOutcome::Line(total));
-        }
-        // No LF yet — drain everything but bail if we'd exceed the cap.
-        let chunk_len = chunk.len();
-        if total + chunk_len > max {
-            let _ = reader.consume(chunk_len);
-            buf.push_str(std::str::from_utf8(&chunk).unwrap_or(""));
-            return Ok(ReadOutcome::Oversize);
-        }
-        buf.push_str(std::str::from_utf8(&chunk).unwrap_or(""));
-        reader.consume(chunk_len);
-        total += chunk_len;
+    // Plain `BufRead::read_line` (PI-Desktop reference
+    // `crates/host-core/src/rpc/mod.rs:spawn_stdin_reader`). The
+    // implementation reads until LF or EOF without blocking on the
+    // underlying pipe to fill a fixed buffer, which is the behaviour we
+    // need when Node's `child.stdin.write` is delivering bytes through a
+    // Unix-socket-backed stdio pipe.
+    let read = reader.read_line(buf)?;
+    if read == 0 {
+        return Ok(ReadOutcome::Eof);
     }
+    if buf.len() > max {
+        return Ok(ReadOutcome::Oversize);
+    }
+    Ok(ReadOutcome::Line(read))
 }
 
 /// Best-effort id extraction from a possibly truncated NDJSON line. Mirrors

@@ -1,3 +1,14 @@
+/**
+ * @vitest-environment node
+ *
+ * The host-process integration suite spawns a real Rust sidecar and drives
+ * JSON-RPC over stdio. jsdom (the project default for `packages/ui/*`) is
+ * inappropriate here because it intercepts `child_process.spawn` and can
+ * leave the parent end of the stdio pipe buffered, so the binary never
+ * observes the request bytes. Forcing the `node` environment makes the
+ * Writable pass through writes immediately and matches the runtime that
+ * Electron itself uses when it embeds this package.
+ */
 import { describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
 import { join } from "node:path";

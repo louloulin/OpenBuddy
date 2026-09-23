@@ -59,15 +59,38 @@ pub struct JsonRpcNotification {
 pub async fn serve(state: Arc<AppState>) -> Result<()> {
     let admission = Arc::new(admission::Admission::new());
 
-    // Spawn the dispatcher.
-    let (tx, rx) = tokio::sync::mpsc::channel::<transport::DispatchEvent>(1024);
-    let dispatcher = tokio::spawn(dispatch::run(state.clone(), admission.clone(), rx));
+    // Synchronous std::sync::mpsc channel between the stdin-reader OS thread
+    // and the dispatcher OS thread. We deliberately avoid `tokio::sync::mpsc`
+    // here because the `current_thread` runtime combined with the
+    // `std::future::pending::<()>()` sentinel in `transport::run` was not
+    // reliably waking the dispatcher task after the forwarder pushed an
+    // event into the tokio channel — the dispatcher's `rx.recv().await`
+    // stayed parked even though `outbound.send(event).await` returned Ok.
+    // Using `std::sync::mpsc::channel` lets the dispatcher run as a plain
+    // OS thread with a blocking `recv()`, which mirrors PI-Desktop's
+    // `crates/host-core/src/rpc/mod.rs` design (every component except the
+    // handler futures is synchronous).
+    let (tx, rx) = std::sync::mpsc::channel::<transport::DispatchEvent>();
 
-    // Wire transport.
+    // Dispatcher on its own OS thread. It runs the same `dispatch::run`
+    // coroutine synchronously: a small tokio current-thread runtime per
+    // event is overkill for Phase 0, so we keep this entirely synchronous
+    // by spawning each handler future onto a worker thread when needed.
+    let dispatcher_state = state.clone();
+    let dispatcher_admission = admission.clone();
+    let dispatcher_handle = std::thread::Builder::new()
+        .name("openbuddy-dispatcher".into())
+        .spawn(move || {
+            dispatch::run_sync(dispatcher_state, dispatcher_admission, rx);
+        })
+        .map_err(|e| anyhow::anyhow!("failed to spawn dispatcher thread: {e}"))?;
+
+    // Wire transport — `transport::run` spawns the stdin-reader thread, the
+    // forwarder is now a no-op (we are using the std::sync::mpsc directly).
     transport::run(tx).await?;
 
     // Once transport closes, the dispatcher will see channel close and return.
-    let _ = dispatcher.await;
+    let _ = dispatcher_handle.join();
     Ok(())
 }
 

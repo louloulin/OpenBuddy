@@ -55,9 +55,12 @@ impl DataDir {
 /// Top-level application state shared by all handlers.
 pub struct AppState {
     pub data_dir: DataDir,
-    /// Capability handles. Each is `Option<Arc<...>>` until Phase 1 wires them
-    /// in; in Phase 0 the dispatcher returns `method_not_found` for any
-    /// capability call.
+    /// Capability handles. Each one is opened against the data dir at boot
+    /// (Phase 1); for capabilities that have not landed yet we still keep a
+    /// `Default` placeholder so the dispatcher can return `METHOD_NOT_FOUND`
+    /// uniformly. The placeholder types are wrapped in `Arc` so we can swap
+    /// them out without invalidating the `Arc<AppState>` clones held by
+    /// long-running tasks.
     pub secrets: crate::secrets::SecretsHandle,
     pub permissions: crate::permissions::PermissionsHandle,
     pub session_search: crate::session_search::SessionSearchHandle,
@@ -69,11 +72,13 @@ impl AppState {
     pub fn open(data_dir: DataDir) -> Result<Arc<Self>> {
         let state = Arc::new(Self {
             data_dir: data_dir.clone(),
-            secrets: crate::secrets::SecretsHandle::default(),
+            secrets: crate::secrets::SecretsHandle::open(&data_dir.0)
+                .context("failed to open secrets handle")?,
             permissions: crate::permissions::PermissionsHandle::default(),
             session_search: crate::session_search::SessionSearchHandle::default(),
             workspace: crate::workspace::WorkspaceHandle::default(),
-            audit: crate::audit::AuditHandle::default(),
+            audit: crate::audit::AuditHandle::open(&data_dir.0)
+                .context("failed to open audit handle")?,
         });
         Ok(state)
     }

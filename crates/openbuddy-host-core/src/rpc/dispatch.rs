@@ -13,7 +13,6 @@ use anyhow::Result;
 use openbuddy_error_codes::RpcError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::mpsc;
 
 use crate::state::AppState;
 
@@ -142,71 +141,204 @@ pub fn install_app_handlers() {
     );
 }
 
+/// Install the Phase 1 capability handlers. Idempotent. Wired from
+/// `state::AppState::open` so all capability entry points are live by the
+/// time the dispatcher starts processing the first request.
+pub fn install_capability_handlers() {
+    use crate::secrets::{DeleteParams, GetParams, SetParams};
+
+    register(
+        "secrets.set",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: SetParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                let result = state
+                    .secrets
+                    .set(parsed)
+                    .map_err(|err| map_capability_error("secrets.set", err))?;
+                serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    register(
+        "secrets.get",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: GetParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                let result = state
+                    .secrets
+                    .get(parsed)
+                    .map_err(|err| map_capability_error("secrets.get", err))?;
+                serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    register(
+        "secrets.delete",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: DeleteParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                state
+                    .secrets
+                    .delete(parsed)
+                    .map_err(|err| map_capability_error("secrets.delete", err))?;
+                Ok(serde_json::json!({ "ok": true }))
+            })
+        }),
+    );
+
+    register(
+        "secrets.list",
+        Arc::new(|state, _params| {
+            Box::pin(async move {
+                let result = state
+                    .secrets
+                    .list()
+                    .map_err(|err| map_capability_error("secrets.list", err))?;
+                serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    use crate::audit::{AppendParams, TailParams};
+
+    register(
+        "audit.append",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: AppendParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                let result = state
+                    .audit
+                    .append(parsed)
+                    .map_err(|err| map_capability_error("audit.append", err))?;
+                serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+
+    register(
+        "audit.tail",
+        Arc::new(|state, params| {
+            Box::pin(async move {
+                let parsed: TailParams = serde_json::from_value(params)
+                    .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
+                let result = state
+                    .audit
+                    .tail(parsed)
+                    .map_err(|err| map_capability_error("audit.tail", err))?;
+                serde_json::to_value(result).map_err(|e| RpcError::Internal(e.to_string()))
+            })
+        }),
+    );
+}
+
+/// Translate an `anyhow::Error` from a capability handler into the right
+/// JSON-RPC error code. The capability modules raise typed errors via
+/// `openbuddy_error_codes::RpcError` for invalid params / not found; anything
+/// else is treated as `INTERNAL_ERROR` so the renderer can render a sane
+/// message without exposing internal paths.
+fn map_capability_error(method: &'static str, err: anyhow::Error) -> RpcError {
+    use openbuddy_error_codes::RpcError as E;
+    if let Some(rpc) = err.downcast_ref::<E>() {
+        return match rpc {
+            E::SecretNotFound(_) => E::SecretNotFound(err.to_string()),
+            E::SecretBackendUnavailable(_) => E::SecretBackendUnavailable(err.to_string()),
+            E::InvalidParams(_) => E::InvalidParams(err.to_string()),
+            other => {
+                // Log and bubble up as INTERNAL_ERROR so capability
+                // errors that escape their namespace never poison the
+                // renderer with internals.
+                tracing::error!(target: "openbuddy.host.rpc", method, error = %err, "capability handler error");
+                E::Internal(format!("{other}: {err}"))
+            }
+        };
+    }
+    tracing::error!(target: "openbuddy.host.rpc", method, error = %err, "capability handler error");
+    RpcError::Internal(err.to_string())
+}
+
 /// Tokio task that consumes `DispatchEvent`s and writes responses / notifications
 /// onto the stdout writer thread.
-pub async fn run(
+pub fn run_sync(
     state: Arc<AppState>,
     admission: Arc<Admission>,
-    mut rx: mpsc::Receiver<DispatchEvent>,
-) -> Result<()> {
+    rx: std::sync::mpsc::Receiver<DispatchEvent>,
+) {
     install_app_handlers();
-    while let Some(event) = rx.recv().await {
-        match event {
-            DispatchEvent::Request(req) => {
-                let admission = admission.clone();
-                let state = state.clone();
-                tokio::spawn(async move {
-                    let method = req.method.clone();
-                    let id = req.id.clone();
-                    let params = req.params.clone();
-                    let _guard = match admission.acquire().await {
-                        Some(g) => g,
-                        None => {
-                            let err = JsonRpcError::host_overloaded();
-                            let _ = submit_response(JsonRpcResponse {
-                                jsonrpc: "2.0",
-                                id,
-                                result: None,
-                                error: Some(err),
-                            });
-                            return;
-                        }
-                    };
-                    dispatch_one(state, &method, id, params).await;
-                });
-            }
-            DispatchEvent::Oversize { id } => {
-                let err = JsonRpcError::invalid_params(format!(
-                    "frame exceeded {} bytes",
-                    crate::MAX_STDIN_LINE_BYTES
-                ));
-                let _ = submit_response(JsonRpcResponse {
-                    jsonrpc: "2.0",
-                    id,
-                    result: None,
-                    error: Some(err),
-                });
-            }
-            DispatchEvent::StdinError(message) => {
-                tracing::warn!(target: "openbuddy.host.rpc", %message, "stdin parse error");
-                let err = JsonRpcError::parse(message);
-                let _ = submit_response(JsonRpcResponse {
-                    jsonrpc: "2.0",
-                    id: Value::Null,
-                    result: None,
-                    error: Some(err),
-                });
-            }
-            DispatchEvent::Eof => {
-                // Give spawned dispatch tasks a chance to flush before exit.
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                tracing::info!(target: "openbuddy.host.rpc", "stdin closed; shutting down");
-                std::process::exit(0);
-            }
+    install_capability_handlers();
+    let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+        Ok(rt) => rt,
+        Err(err) => {
+            eprintln!("[openbuddy-dispatcher] failed to build runtime: {err}");
+            return;
+        }
+    };
+    while let Ok(event) = rx.recv() {
+        rt.block_on(dispatch_one_event(state.clone(), admission.clone(), event));
+    }
+}
+
+async fn dispatch_one_event(
+    state: Arc<AppState>,
+    admission: Arc<Admission>,
+    event: DispatchEvent,
+) {
+    match event {
+        DispatchEvent::Request(req) => {
+            let method = req.method.clone();
+            let id = req.id.clone();
+            let params = req.params.clone();
+            let _guard = match admission.acquire().await {
+                Some(g) => g,
+                None => {
+                    let err = JsonRpcError::host_overloaded();
+                    let _ = submit_response(JsonRpcResponse {
+                        jsonrpc: "2.0",
+                        id,
+                        result: None,
+                        error: Some(err),
+                    });
+                    return;
+                }
+            };
+            dispatch_one(state, &method, id, params).await;
+        }
+        DispatchEvent::Oversize { id } => {
+            let err = JsonRpcError::invalid_params(format!(
+                "frame exceeded {} bytes",
+                crate::MAX_STDIN_LINE_BYTES
+            ));
+            let _ = submit_response(JsonRpcResponse {
+                jsonrpc: "2.0",
+                id,
+                result: None,
+                error: Some(err),
+            });
+        }
+        DispatchEvent::StdinError(message) => {
+            tracing::warn!(target: "openbuddy.host.rpc", %message, "stdin parse error");
+            let err = JsonRpcError::parse(message);
+            let _ = submit_response(JsonRpcResponse {
+                jsonrpc: "2.0",
+                id: Value::Null,
+                result: None,
+                error: Some(err),
+            });
+        }
+        DispatchEvent::Eof => {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            tracing::info!(target: "openbuddy.host.rpc", "stdin closed; shutting down");
+            std::process::exit(0);
         }
     }
-    Ok(())
 }
+
 
 async fn dispatch_one(state: Arc<AppState>, method: &str, id: Value, params: Value) {
     let handler = handlers().read().get(method).cloned();
