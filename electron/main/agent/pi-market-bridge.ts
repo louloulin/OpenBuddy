@@ -1204,6 +1204,7 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
   }
 
   async function setSources(next: readonly PiMarketRegistrySource[]): Promise<PiMarketSourcesView> {
+    invalidateReadRegistryCache();
     const validated = validateRegistrySourcesForWrite(next);
     await writeJsonAtomic(sourcesFile, { version: 1, sources: validated }, 0o600);
     fileSources = validated;
@@ -1299,17 +1300,63 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
     };
   }
 
+  // R89 — readRegistry 内存 TTL + registry.json 指纹失效。
+  // 一次 install 链路里 findEntry / commitVersion / listMarketEntries 都会读
+  // entries;如果没缓存,每次都跑 readConfiguredSources 重新 probe 所有源(含
+  // 不可达 URL,8s timeout),单次 install 会拖到 N × 8s。TTL 命中后纯内存读,
+  // 大幅降低 install/upgrade/rollback 的端到端延迟。
+  //
+  // 但测试 / 外部工具可能直接覆写 registry.json(不走 addSource 等 cache
+  // invalidation 钩子),所以对 local 源额外跟踪 registryFile 的 mtime+size
+  // 指纹:文件被修改就立刻作废缓存,避免读到过期 entries。
+  const READ_REGISTRY_TTL_MS = 30_000;
+  type ReadRegistryCache = {
+    entries: PiMarketRegistryEntry[];
+    source: "local" | "remote" | "empty";
+    updatedAt?: string;
+    sources?: PiMarketSourceStatus[];
+    _cachedAt: number;
+    _registryFingerprint: string | undefined;
+  };
+  let readRegistryCache: ReadRegistryCache | undefined;
+  function invalidateReadRegistryCache(): void {
+    readRegistryCache = undefined;
+  }
+
+  async function registryFileFingerprint(): Promise<string | undefined> {
+    // 不存在文件 → 指纹 undefined(与"远程源命中"等价,只走 TTL)。
+    const info = await stat(registryFile).catch(() => undefined);
+    if (!info) return undefined;
+    return `${info.mtimeMs}:${info.size}`;
+  }
+
   async function readRegistry(): Promise<{
     entries: PiMarketRegistryEntry[];
     source: "local" | "remote" | "empty";
     updatedAt?: string;
     sources?: PiMarketSourceStatus[];
   }> {
+    const nowMs = now().getTime();
+    // R89 — local 源要先看 registry.json 指纹;指纹变了 → 文件被外部覆写,
+    // 直接作废,避免读到过期 entries(典型场景:测试 / 离线分发拷入)。
+    const currentFingerprint = await registryFileFingerprint();
+    const ttlHit =
+      readRegistryCache !== undefined &&
+      nowMs - readRegistryCache._cachedAt < READ_REGISTRY_TTL_MS &&
+      readRegistryCache._registryFingerprint === currentFingerprint;
+    if (ttlHit && readRegistryCache) {
+      return {
+        entries: readRegistryCache.entries,
+        source: readRegistryCache.source,
+        ...(readRegistryCache.updatedAt ? { updatedAt: readRegistryCache.updatedAt } : {}),
+        ...(readRegistryCache.sources ? { sources: readRegistryCache.sources } : {}),
+      };
+    }
     // 传统本地索引优先:它由 refresh 写入,也可能是内网 / 离线分发直接拷进来的。
     const local = await readJsonFile<unknown>(registryFile);
     if (local !== undefined) {
       const parsed = normalizeRegistryFile(local);
-      return {
+      const result: ReadRegistryCache = {
         entries: [...parsed.extensions],
         source: "local",
         ...(parsed.updatedAt ? { updatedAt: parsed.updatedAt } : {}),
@@ -1320,6 +1367,15 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
               ),
             }
           : {}),
+        _cachedAt: nowMs,
+        _registryFingerprint: currentFingerprint,
+      };
+      readRegistryCache = result;
+      return {
+        entries: result.entries,
+        source: result.source,
+        ...(result.updatedAt ? { updatedAt: result.updatedAt } : {}),
+        ...(result.sources ? { sources: result.sources } : {}),
       };
     }
     if (sources.length > 0) {
@@ -1333,13 +1389,29 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
         );
       }
       const fetchedAt = newestFetchedAt(statuses);
-      return {
+      const result: ReadRegistryCache = {
         entries,
         source: entries.length > 0 ? "remote" : "empty",
         ...(fetchedAt ? { updatedAt: fetchedAt } : {}),
         sources: statuses,
+        _cachedAt: nowMs,
+        _registryFingerprint: currentFingerprint,
+      };
+      readRegistryCache = result;
+      return {
+        entries: result.entries,
+        source: result.source,
+        ...(result.updatedAt ? { updatedAt: result.updatedAt } : {}),
+        ...(result.sources ? { sources: result.sources } : {}),
       };
     }
+    const result: ReadRegistryCache = {
+      entries: [],
+      source: "empty",
+      _cachedAt: nowMs,
+      _registryFingerprint: currentFingerprint,
+    };
+    readRegistryCache = result;
     return { entries: [], source: "empty" };
   }
 
@@ -1885,6 +1957,7 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
    * 让 UI 提示「N 个源不可达,已用缓存」。
    */
   async function refreshRegistry(): Promise<PiMarketRefreshReport> {
+    invalidateReadRegistryCache();
     const updatedAt = now().toISOString();
     if (sources.length === 0) {
       const { entries } = await readRegistry();
