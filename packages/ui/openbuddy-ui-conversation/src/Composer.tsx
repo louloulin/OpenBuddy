@@ -25,6 +25,7 @@ import { toggleVoice as toggleVoiceImpl, type VoiceRecognition } from "./compose
 import { readImageFile as readImageFileImpl, pickFiles as pickFilesImpl, pickImages as pickImagesImpl } from "./composer/send-payload";
 import { send as sendImpl, enqueue as enqueueImpl } from "./composer/send";
 import { useExtensionText } from "./composer/use-extension-text";
+import { useComposerPaste } from "./composer/use-composer-paste";
 import { usePopovers } from "./composer/use-popovers";
 import { usePluginSlots } from "./composer/use-plugin-slots";
 import { useInputHistory } from "./composer/use-input-history";
@@ -353,6 +354,13 @@ export function ComposerInner({
     externalText, externalTextNonce,
     draft, draftKey, updateText,
   });
+  // Paste handler — image/document intercept + caret restoration.
+  // Extracted from inline JSX (~80 lines) into a custom hook so the
+  // textarea block stays compact and the paste branch is unit-testable.
+  const onPaste = useComposerPaste({
+    ref, text, setImages, updateText, setCursorPos, onToast,
+    electronApi: (window as unknown as { api?: ElectronWindowApi }).api,
+  });
   // R1 - @-mention picker state, anchor rect, slash detection, and the two
   // pick-handlers used to live inline here (~110 lines); phase-3 split moved
   // them into the `usePopovers` hook.
@@ -425,77 +433,7 @@ export function ComposerInner({
           onSelect={(e) =>
             setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? cursorPos)
           }
-          onPaste={(e) => {
-            // R0.8: Intercept image/* items from the clipboard so that pasting
-            // a screenshot is no longer silently dropped. We synthesize a
-            // Markdown image placeholder with the original file name when
-            // available; full image-upload pipeline is tracked separately.
-            //
-            // R2: Accept any file kind that `readImageFile` (now
-            // `readAttachmentFile`) accepts — image/* OR document/* types
-            // (PDF, plain text, markdown, csv, html, xml, json, yaml, docx).
-            // Documents skip the placeholder-text path (they ride through
-            // `piSendContent` as `type:"file"` parts instead of being
-            // inlined into the prompt body).
-            const fileItem = Array.from(e.clipboardData.items ?? []).find(
-              (it) => it.kind === "file" && (it.type.startsWith("image/") || /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation))$/i.test(it.type)),
-            );
-            if (fileItem) {
-              e.preventDefault();
-              const file = fileItem.getAsFile();
-              if (!file) return;
-              void readImageFile(file).then((att) => {
-                if (!att) return;
-                setImages((prev) => [...prev, att]);
-                // Image attachments keep the legacy Markdown placeholder so
-                // the user sees something appear in the textarea even
-                // though the real bytes ride through `piSendContent`.
-                // Documents do not need a placeholder — they show up as a
-                // chip in `.composer-image-attachments` and ship as
-                // base64 alongside the user's prompt.
-                if (att.kind !== "file") {
-                  const ph = att.name ? `![pasted image: ${att.name}]()` : "![pasted image]()";
-                  const start = ref.current?.selectionStart ?? text.length;
-                  const end = ref.current?.selectionEnd ?? text.length;
-                  const next = text.slice(0, start) + ph + text.slice(end);
-                  updateText(next);
-                  const caret = start + ph.length;
-                  setCursorPos(caret);
-                  requestAnimationFrame(() => {
-                    if (ref.current) {
-                      ref.current.focus();
-                      ref.current.selectionStart = ref.current.selectionEnd = caret;
-                    }
-                  });
-                }
-              });
-              return;
-            }
-            const eventText = e.clipboardData.getData("text/plain");
-            const el = e.currentTarget;
-            const start = el.selectionStart ?? text.length;
-            const end = el.selectionEnd ?? text.length;
-            e.preventDefault();
-            const insert = (pasted: string) => {
-              if (pasted.length === 0) return;
-              const next = text.slice(0, start) + pasted + text.slice(end);
-              updateText(next);
-              const caret = start + pasted.length;
-              setCursorPos(caret);
-              requestAnimationFrame(() => {
-                if (ref.current) {
-                  ref.current.focus();
-                  ref.current.selectionStart = ref.current.selectionEnd = caret;
-                }
-              });
-            };
-            const nativeReadText = (window as unknown as { api?: ElectronWindowApi }).api?.clipboard?.readText;
-            if (typeof nativeReadText !== "function") {
-              insert(eventText);
-              return;
-            }
-            void nativeReadText().then((nativeText) => insert(nativeText || eventText)).catch(() => insert(eventText));
-          }}
+          onPaste={onPaste}
           onClick={(e) =>
             setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? cursorPos)
           }
