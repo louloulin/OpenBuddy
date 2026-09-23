@@ -851,3 +851,96 @@ describe("uninstallPiExtension (R33)", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// R89 — permissionGateway hook
+// ---------------------------------------------------------------------------
+
+describe("permission gateway hook", () => {
+  it("calls grantPlugin on install with the plugin id, version and capability ids", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [
+      extension({
+        id: "demo",
+        capabilities: [
+          { id: "tools.demo-hello", risk: "low" },
+          { id: "tools.demo-other", risk: "low" },
+        ],
+      }),
+    ]);
+    const grantCalls: any[] = [];
+    const gateway = {
+      grantPlugin: vi.fn(async (input) => {
+        grantCalls.push(input);
+      }),
+      revokePlugin: vi.fn(async () => {}),
+    };
+    const bridge = bridgeFor(dataDir, { permissionGateway: gateway });
+    await bridge.installPiExtension("demo");
+    expect(grantCalls.length).toBe(1);
+    expect(grantCalls[0].id).toBe("demo");
+    expect(grantCalls[0].version).toBe("1.0.0");
+    expect(grantCalls[0].capabilities.map((c: any) => c.id).sort()).toEqual([
+      "tools.demo-hello",
+      "tools.demo-other",
+    ]);
+  });
+
+  it("calls revokePlugin on uninstall", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [extension()]);
+    const grantCalls: any[] = [];
+    const revokeCalls: any[] = [];
+    const gateway = {
+      grantPlugin: vi.fn(async (input) => { grantCalls.push(input); }),
+      revokePlugin: vi.fn(async (id) => { revokeCalls.push(id); }),
+    };
+    const bridge = bridgeFor(dataDir, { permissionGateway: gateway });
+    await bridge.installPiExtension("demo");
+    expect(grantCalls.length).toBe(1);
+    await bridge.uninstallPiExtension("demo");
+    expect(revokeCalls).toEqual(["demo"]);
+  });
+
+  it("does not block install when grantPlugin throws (logs and continues)", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [extension()]);
+    const gateway = {
+      grantPlugin: vi.fn(async () => {
+        throw new Error("host-core unavailable");
+      }),
+      revokePlugin: vi.fn(async () => {}),
+    };
+    const bridge = bridgeFor(dataDir, { permissionGateway: gateway });
+    const result = await bridge.installPiExtension("demo");
+    expect(result.id).toBe("demo");
+    expect(result.version).toBe("1.0.0");
+  });
+
+  it("does not block uninstall when revokePlugin throws", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [extension()]);
+    const gateway = {
+      grantPlugin: vi.fn(async () => {}),
+      revokePlugin: vi.fn(async () => {
+        throw new Error("network down");
+      }),
+    };
+    const bridge = bridgeFor(dataDir, { permissionGateway: gateway });
+    await bridge.installPiExtension("demo");
+    const result = await bridge.uninstallPiExtension("demo");
+    expect(result.id).toBe("demo");
+    expect(result.payloadKept).toBe(false);
+  });
+
+  it("is a no-op when no permissionGateway is configured", async () => {
+    const dataDir = await makeDataDir();
+    await writeRegistry(dataDir, [extension()]);
+    const bridge = bridgeFor(dataDir); // no permissionGateway
+    const result = await bridge.installPiExtension("demo");
+    expect(result.id).toBe("demo");
+    // uninstall also does not throw
+    const out = await bridge.uninstallPiExtension("demo");
+    expect(out.id).toBe("demo");
+  });
+});

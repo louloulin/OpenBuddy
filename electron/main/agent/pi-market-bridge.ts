@@ -198,8 +198,33 @@ export interface PiMarketBridgeOptions {
   ) => Promise<void>;
   /** 宿主版本,用于 engines.openbuddy 兼容判定。 */
   hostVersion?: string;
+  /**
+   * R89 — 权限网关桥接(可选)。bridge 在 install/upgrade/rollback/uninstall
+   * 成功后调用,把插件的 capabilities 同步到 host-core 的权限系统;后续插件
+   * 调用工具时不再被 `ask` 拦截。
+   *
+   * 不传则 bridge 跳过权限同步,完全向后兼容(测试 / 不依赖 host-core 的
+   * 场景)。失败仅记日志,不阻塞 install — 权限可在 UI 里手工重授。
+   */
+  permissionGateway?: PermissionGateway;
   /** 注入时钟(测试用)。 */
   now?: () => Date;
+}
+
+/**
+ * R89 — bridge → host-core 权限网关契约。
+ *
+ * `grantPlugin` 调 host-core `permissions.writeRules` 把 non-high-risk
+ * capabilities 注册成 `allow`;`revokePlugin` 在 uninstall 时移除这些
+ * `plugin:<id>:*` 命名规则。
+ */
+export interface PermissionGateway {
+  grantPlugin(input: {
+    id: string;
+    version: string;
+    capabilities: readonly { id: string; risk?: "low" | "medium" | "high" }[];
+  }): Promise<void>;
+  revokePlugin(id: string): Promise<void>;
 }
 
 export class PiMarketBridgeError extends Error {
@@ -962,6 +987,9 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
   // 返回的原始内容" —— 语义不同,混在一起就分不清"这条数据来自哪个源、什么时候"。
   const sourcesDir = join(root, "sources");
   const now = options.now ?? (() => new Date());
+  // R89 — 权限网关(可选)。bridge 仅在宿主注入时才同步权限,默认 no-op
+  // 保持向后兼容。
+  const permissionGateway: PermissionGateway | undefined = options.permissionGateway;
 
   const sourcesFile = join(root, PI_MARKET_SOURCES_FILE);
   // 只读源 = 宿主注入 / registryUrl(部署事实,UI 里改不动)。
@@ -1549,6 +1577,9 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
       ...(previous && previous !== version ? { from: previous } : {}),
       outcome: "success",
     });
+    // R89 — 插件装好后把 non-high-risk capabilities 同步到 host-core 权限
+    // 系统,后续插件调工具不会再被 ask 拦截。失败仅记日志,不阻塞安装。
+    await syncPermissionsForInstall(id, version, capabilities);
     return {
       id,
       version,
@@ -1717,6 +1748,41 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
     }
   }
 
+  /**
+   * R89 — 把插件的 capabilities 同步到 host-core 权限系统。
+   * non-high-risk capabilities 一律 `allow`,high-risk 由用户在 UI 显式
+   * 授权(已在 `guard()` 里通过 `allowHighRisk` 强制弹窗)。
+   */
+  async function syncPermissionsForInstall(
+    id: string,
+    version: string,
+    capabilityIds: readonly string[],
+  ): Promise<void> {
+    if (!permissionGateway) return;
+    const payload = capabilityIds.map((capId) => ({ id: capId }));
+    try {
+      await permissionGateway.grantPlugin({ id, version, capabilities: payload });
+    } catch (err) {
+      // 权限同步失败不应阻塞 install — 用户可在 UI 里手工授权。
+      console.warn(
+        `[pi-market-bridge] permissionGateway.grantPlugin failed for ${id}@${version}:`,
+        errorMessage(err),
+      );
+    }
+  }
+
+  async function syncPermissionsForUninstall(id: string): Promise<void> {
+    if (!permissionGateway) return;
+    try {
+      await permissionGateway.revokePlugin(id);
+    } catch (err) {
+      console.warn(
+        `[pi-market-bridge] permissionGateway.revokePlugin failed for ${id}:`,
+        errorMessage(err),
+      );
+    }
+  }
+
   /** 清掉历史遗留的 `.trash-*`(上一次 uninstall 的 rm 失败时留下的)。 */
   async function sweepTrash(): Promise<void> {
     const names = await readdir(root).catch(() => [] as string[]);
@@ -1787,6 +1853,9 @@ export function createPiMarketBridge(options: PiMarketBridgeOptions): PiMarketBr
         outcome: "success",
         ...(keepPayload ? { reason: "payload kept (lockfile entry removed)" } : {}),
       });
+
+      // R89 — 卸载后撤销该插件的 host-core 权限路径。失败仅记日志。
+      await syncPermissionsForUninstall(safeId);
 
       return {
         id: safeId,
