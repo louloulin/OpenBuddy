@@ -567,6 +567,7 @@ import {
   sessionInfo as sessionInfoImpl,
   sessionUsage as sessionUsageImpl,
   sessionFile as sessionFileImpl,
+  sessionFileResult as sessionFileResultImpl,
   rewindSession as rewindSessionImpl,
   formatBranchSummaryText as formatBranchSummaryTextImpl,
   renameSession as renameSessionImpl,
@@ -1434,7 +1435,11 @@ export const agentHost = buildAgentHostFacade({
   loadSession: loadSessionImpl,
   sessionInfo: sessionInfoImpl,
   sessionUsage: sessionUsageImpl,
-  sessionFile: sessionFileImpl,
+  // Facade shape `{ ok, path?, sizeBytes?, error? }` — NOT the raw string
+  // `sessionFile` primitive. See `sessionFileResult` in
+  // host-modules/session-store for why (rewind_points / session_fork both
+  // read `.path` and silently broke when this bound the sync helper).
+  sessionFile: sessionFileResultImpl,
   rewindSession: rewindSessionImpl,
   reloadMcp: () => reloadMcpImpl(state),
   authorizeMcp: (serverName, signal) => authorizeMcpImpl(state, serverName, signal),
