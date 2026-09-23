@@ -30,6 +30,7 @@ import { useChatViewStreaming } from "./chatview/useChatViewStreaming";
 import { useChatViewRetry } from "./chatview/useChatViewRetry";
 import { useChatViewRewind } from "./chatview/useChatViewRewind";
 import { useChatViewTimeline } from "./chatview/useChatViewTimeline";
+import { useChatViewRevision } from "./chatview/useChatViewRevision";
 import { ChatViewEmptyState } from "./chatview/ChatViewEmptyState";
 import {
   useChatViewGlobalShortcuts,
@@ -326,71 +327,6 @@ export function ChatView({
   );
   const [planOpen, setPlanOpen] = useState(false);
 
-  // R8.1 (revision-pager) — id of the user message whose `编辑` button
-  // was last clicked. Used by `handleEditResend` to append the new text
-  // to that message's revision history before re-seeding the composer.
-  const [editResendOriginId, setEditResendOriginId] = useState<string | null>(null);
-  // R8.1 — bound pager stepper. Wraps `useSessionStore.setActiveRevision`
-  // so MessageItem never imports the store directly.
-  const handleStepRevision = useCallback((messageId: string, direction: -1 | 1) => {
-    const s = useSessionStore.getState();
-    const msg = s.messages.find((m) => m.id === messageId);
-    if (!msg || !msg.revisions || msg.revisions.length === 0) return;
-    const cur = Math.min(Math.max(1, msg.activeRevision ?? msg.revisions.length), msg.revisions.length);
-    s.setActiveRevision(messageId, cur + direction);
-  }, []);
-
-  // ---- 消息"编辑重发":把消息文本回填到输入框 ----
-  const [resendText, setResendText] = useState<string | undefined>(undefined);
-  const [resendNonce, setResendNonce] = useState(0);
-  const handleEditResend = useCallback((text: string) => {
-    if (!text.trim()) return;
-    // R8.1 (revision-pager) — record this edit on the originating message
-    // so the bubble's footer can show a 上一版/下一版 pager of every text
-    // the user ever submitted from this slot. We piggy-back on the same
-    // resendText signal: Composer still receives the seed text below, but
-    // the bubble now also gains a new revisions entry.
-    if (editResendOriginId) {
-      useSessionStore.getState().appendUserRevision(editResendOriginId, text);
-    }
-    setResendText(text);
-    setResendNonce((n) => n + 1);
-  }, [editResendOriginId]);
-
-  // R8.3 (inline-edit) — submit an inline edit from the bubble editor.
-  // Records the new revision on the originating message and seeds the
-  // composer. We deliberately reuse handleEditResend's path so the two
-  // entry points (inline textarea + composer 回填) converge on the same
-  // canonical "append revision → seed composer" sequence.
-  const handleInlineResend = useCallback((messageId: string, text: string) => {
-    if (!text.trim()) return;
-    useSessionStore.getState().appendUserRevision(messageId, text);
-    setResendText(text);
-    setResendNonce((n) => n + 1);
-  }, []);
-
-  // R78 (assistant inline edit) — apply 落库;不需要 resend 路径。
-  const handleEditAssistantMessage = useCallback((messageId: string, newMarkdown: string) => {
-    useSessionStore.getState().editAssistantMessage(messageId, newMarkdown);
-  }, []);
-
-  // R78 — 应用并重新生成:先替换 assistant 内容,再走 handleRetry 同一管线
-  // (回退到上一条 user prompt 重新发送)。
-  const handleResendAfterAssistantEdit = useCallback((_messageId: string) => {
-    if (handleRetryRef.current) {
-      void handleRetryRef.current();
-    }
-  }, []);
-
-  // R8.10 — quick-prompt card click: seed the composer with the preset
-  // text via the same resendText pipe as inline-edit / revision-pager so
-  // a single source of truth seeds the textarea (Composer auto-focuses
-  // when externalTextNonce bumps).
-  const handleQuickPrompt = useCallback((text: string) => {
-    if (!text.trim()) return;
-    setResendText(text);
-    setResendNonce((n) => n + 1);
-  }, []);
 
   // ---- 消息级"重试":回溯到最后一条用户 prompt 并重新发送（重新生成回复） ----
   // Plan5 Phase A.1 — retry 抽到 useChatViewRetry hook(行为逐字等价)。
@@ -409,6 +345,23 @@ export function ChatView({
     onRewound,
     onToast,
   });
+
+  // Plan5 — revision / inline-edit / quick-prompt handlers + composer
+  // seed signals are owned by useChatViewRevision. ChatView only reads
+  // the resulting callbacks and forwards them to MessageItem / Composer.
+  const {
+    resendText,
+    resendNonce,
+    setResendText,
+    setResendNonce,
+    setEditResendOriginId,
+    handleStepRevision,
+    handleEditResend,
+    handleInlineResend,
+    handleEditAssistantMessage,
+    handleResendAfterAssistantEdit,
+    handleQuickPrompt,
+  } = useChatViewRevision({ handleRetryRef });
 
   // Plan5 B.10 — 消息级"从此重发":把 rewindPoints 拉一次并解析成
   // `messageId → promptIndex`,下发给 MessageItem 的 MessageRewindMenu。
