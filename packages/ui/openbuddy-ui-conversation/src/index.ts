@@ -80,6 +80,40 @@ export type {
 } from "./tool-side-panel-layout";
 export { useViewportWidth } from "./use-viewport-width";
 
+export { StreamingCaret } from "./StreamingCaret";
+export type { StreamingCaretProps } from "./StreamingCaret";
+export {
+  CitationChip,
+  ChatCitationProvider,
+  useCitationResolver,
+} from "./parts/CitationChip";
+export type { Citation, CitationResolver, ChatCitationProviderProps } from "./parts/CitationChip";
+export {
+  ArtifactChip,
+  ChatArtifactProvider,
+  useArtifactResolver,
+} from "./parts/ArtifactChip";
+export type {
+  ArtifactMeta,
+  ArtifactKind,
+  ArtifactResolver,
+  ChatArtifactProviderProps,
+} from "./parts/ArtifactChip";
+export {
+  MessagePartRegistry,
+} from "./MessagePartRegistry";
+export type { MessagePartKind, MessagePartRenderProps } from "./parts/registry-defaults";
+export { MessageRewindMenu } from "./parts/MessageRewindMenu";
+export type { MessageRewindMenuProps } from "./parts/MessageRewindMenu";
+export { ToolGroupSummary } from "./parts/ToolGroupSummary";
+export type { ToolGroupSummaryProps } from "./parts/ToolGroupSummary";
+export {
+  clusterToolCalls,
+  groupParallelToolCalls,
+  countParallelClusters,
+} from "@/lib/ui/timeline-utils";
+export type { ToolCallCluster } from "@/lib/ui/timeline-utils";
+
 declare module "@openbuddy/ui-slots" {
   interface SlotMap {
     /** 转录区(空态 / 列表 / 虚拟列表)整块布局。消费者:`ChatView`。 */
