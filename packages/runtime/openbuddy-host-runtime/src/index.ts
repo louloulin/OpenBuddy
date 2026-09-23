@@ -79,3 +79,6 @@ export type {
   IgnoredEntry,
   AuditEntry,
 } from "./capabilities.js";
+
+// Phase 1.5 — runtime-side adapter wiring HostProcess → UI packages.
+export { HostRuntimeSearchClient } from "./session-search-client.js";
