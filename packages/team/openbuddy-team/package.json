@@ -12,6 +12,6 @@
   "dependencies": {
     "@openbuddy/cordis": "workspace:*",
     "@openbuddy/storage": "workspace:*",
-    "@earendil-works/pi-coding-agent": "^0.85.0"
+    "@earendil-works/pi-coding-agent": "^0.87.1"
   }
 }

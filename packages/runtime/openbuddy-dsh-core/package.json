@@ -12,7 +12,7 @@
     "./message-feedback": "./src/message-feedback.ts"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "^0.85.0",
+    "@earendil-works/pi-coding-agent": "^0.87.1",
     "@openbuddy/cordis": "workspace:*"
   },
   "files": [
