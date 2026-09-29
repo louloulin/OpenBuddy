@@ -1058,4 +1058,3 @@ export function findPiPackageCatalogEntry(packageName: string): PiPackageCatalog
   return PI_PACKAGE_CATALOG.find((entry) => entry.packageNames.includes(packageName));
 }
 // R32 — Pi 扩展市场的 main ↔ renderer 线契约(单一定义,见文件头注释)。
-export * from "./pi-market";

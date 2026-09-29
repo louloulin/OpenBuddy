@@ -1,13 +1,21 @@
 /**
- * 市场面板 - 对接 pi 的 x.ai/marketplace/list + x.ai/marketplace/action
+ * MarketplacePanel — 「插件·市场」面板的事实唯一实现。
  *
- * 显示 pi 配置的所有插件市场源（marketplace sources）及其插件，
- * 支持安装/卸载/更新/刷新源 + 添加/移除源。
- * 对应 WorkBuddy 的 UnifiedMarketPage。
+ * R83 引入,R97 收敛:删除孤儿实现(MarketplaceTab / PiMarketSection /
+ * PiExtensionsSection / pi-extensions-model),只保留 MarketplacePanel
+ * 作为 ui-mcp 顶层唯一对外契约。详见 ADR-0011。
+ *
+ * 对接 pi 的 x.ai/marketplace/list + x.ai/marketplace/action:
+ *   显示 pi 配置的所有插件市场源（marketplace sources）及其插件，
+ *   支持安装/卸载/更新/刷新源 + 添加/移除源。
+ *   对应 WorkBuddy 的 UnifiedMarketPage。
  *
  * 市场源配置在 `<agentHome>/marketplaces.json`（见 pi-resources/marketplace.ts
  * 的 `readMarketplaceSources`），不再读 pi 的 `config.toml`——electron/main 早已
  * 不解析该文件。agentHome 由 `useAgentPaths().home` 给出。
+ *
+ * 完全兼容 pi 生态:所有 marketplace 操作走 `@/lib/agent/pi-client`
+ * 的 `marketplaceList` / `marketplaceAction`,无 fork。
  */
 import { useRef } from "react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
@@ -35,7 +43,6 @@ import {
   type PiPackageCatalogEntry,
 } from "@openbuddy/shared-types";
 import { describeMarketplaceResult } from "./marketplace-priority-toast";
-import { PiMarketSection } from "./PiMarketSection";
 import { buildInstallPreflight, type InstallPreflight } from "./install-preflight";
 import { InstallPreflightDialog } from "./InstallPreflightDialog";
 import { auditRecord } from "@/lib/audit/audit-client";
@@ -339,7 +346,6 @@ export function MarketplacePanel({ sessionId: _sessionId, onToast }: Marketplace
     <div className="marketplace-panel">
       {/* R32 — Pi 扩展市场(Expert Marketplace Bridge)独立于 pi 官方 marketplace,
           数据模型与安装语义都不同,所以放在同一个面板里但分区块呈现。 */}
-      <PiMarketSection onToast={onToast} />
       <div className="marketplace-panel__header">
         <h2 className="marketplace-panel__title">市场</h2>
         <div className="marketplace-panel__actions">

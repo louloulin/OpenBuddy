@@ -5,20 +5,22 @@
  *   - requestHookPermission — 异步触发 session/permission IPC,等待
  *     用户 allow/allow_always/deny 决议,内部分级决策:
  *       1. sessionRules (session-local allow/deny list)
- *       2. persistentRules (cross-session permissionHandlers.readRules)
+ *       2. persistentRules (cross-session agentPermissionBridge.readRules)
  *       3. UI dialog via emitRendererEvent("pi://permission")
  *
  * 设计:
  *   - state / emitPluginEvent / emitRendererEvent 通过环形 import 自
  *     ../agent-host
- *   - permissionHandlers / resolvePermissionAction 直接从
- *     @openbuddy/auth-permission
+ *   - agentPermissionBridge (P2.1) 从 ../../agent-permission-bridge
+ *     (host-core IPC 优先,失败降级到 @openbuddy/auth-permission)
+ *   - resolvePermissionAction 直接从 @openbuddy/auth-permission
  *   - any / any 从 ./agent-hooks
  *
  * agent-host.ts 保留 0-arg wrapper (params: title, message, request)
  * 让 configurePiExtensions 内的 confirm binding 无须改动。
  */
-import { permissionHandlers, resolvePermissionAction } from "@openbuddy/auth-permission";
+import { resolvePermissionAction } from "@openbuddy/auth-permission";
+import { agentPermissionBridge } from "../agent-permission-bridge";
 type HookPermissionDecision = any;
 type HookPermissionRequest = any;
 
@@ -55,7 +57,7 @@ async function requestHookPermission(title: string, message: string, request?: a
   const sessionDecision = resolvePermissionAction(sessionRules, request.toolName, request.pattern);
   if (sessionDecision === "deny") return "deny";
   if (sessionDecision === "allow") return "allow";
-  const persistentDecision = resolvePermissionAction(await permissionHandlers.readRules(), request.toolName, request.pattern);
+  const persistentDecision = resolvePermissionAction(await agentPermissionBridge.readRules(), request.toolName, request.pattern);
   if (persistentDecision === "deny") return "deny";
   if (persistentDecision === "allow") return "allow";
   return new Promise<any>((resolvePromise) => {

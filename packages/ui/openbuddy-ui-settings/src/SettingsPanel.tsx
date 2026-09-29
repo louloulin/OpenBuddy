@@ -61,7 +61,6 @@ import {
   CreditReconciliationPanel,
   CreditWalletPanel,
   DataSettingsPanel,
-  AuditSettingsPanel,
   GeneralSettingsPanel,
   HelpSettingsPanel,
   MicrokernelSettingsPanel,
@@ -77,6 +76,7 @@ import {
   GatewayHealthPanel,
   WebhookSubscriptionPanel,
 } from "./SettingsSections";
+import { AuditSettingsPanel } from "./AuditSettingsPanel.js";
 import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { OpenBuddyPluginPanel, PluginsPanel } from "@openbuddy/ui-mcp";

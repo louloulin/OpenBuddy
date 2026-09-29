@@ -142,7 +142,8 @@ import {
 } from "./pi-extensions";
 import { createProfileArtifactResolvers, discoverProfilePackageJsons, toModuleUrl } from "./profile-artifact-resolution";
 import { createOpenBuddyRpcUiContext } from "./pi-rpc-ui-context";
-import { permissionHandlers, resolvePermissionAction, type PermissionRule } from "@openbuddy/auth-permission";
+import { resolvePermissionAction, type PermissionRule } from "@openbuddy/auth-permission";
+import { agentPermissionBridge } from "./agent-permission-bridge";
 import type { HookPermissionDecision, HookPermissionRequest } from "./agent-hooks";
 import type { DeepSeekWorkspace, DeepSeekWorkspaceId } from "../deepseek/deepseek-runtime";
 import { WorkspaceOrderInvalidError } from "../deepseek/deepseek-runtime";
@@ -1120,7 +1121,7 @@ const installMicrokernelDepsClosures = {
   onEvent: onEventImpl, prompt: promptImpl, abort: abortImpl,
   persistPiSessionHeaderImpl, stopProfileWatchers,
   disposeProfileTypertRegistrations, disposeActiveHookProcesses,
-  drainActiveHookProcesses, permissionHandlers,
+  drainActiveHookProcesses, permissionBridge: agentPermissionBridge,
 };
 const buildMicrokernelHostDeps = (): InstallHostModuleDepsWithDomains => buildInstallHostModuleDeps(installMicrokernelDepsClosures);
 

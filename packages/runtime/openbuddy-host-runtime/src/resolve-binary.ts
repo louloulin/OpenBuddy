@@ -31,7 +31,7 @@ function pathExists(p: string | undefined): p is string {
  * Returns the directory that contains `crates/` (or `target/` for the
  * alternative layout). Stops after 16 hops or at the filesystem root.
  */
-function resolveRepoRoot(start: string): string {
+export function resolveRepoRoot(start: string): string {
   let cur = start;
   for (let i = 0; i < 16; i += 1) {
     // OpenBuddy layout: Cargo.toml lives inside `crates/`.
@@ -56,7 +56,7 @@ export function resolveHostBinary(env: NodeJS.ProcessEnv = process.env): string 
   // Packaged Electron resources: process.resourcesPath is set when running
   // from a packaged build. We gate on `process.resourcesPath` to avoid
   // resolving to an empty string in `electron-vite dev`.
-  const resources = process.env["process.resourcesPath"] ?? "";
+  const resources = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath ?? "";
   const packaged = join(resources, `bin/openbuddy-host-core${EXE_SUFFIX}`);
   if (pathExists(packaged)) {
     return packaged;

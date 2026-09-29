@@ -538,25 +538,25 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		wrapIpcHandler("permission:list", async () => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			await ensureAgentHost();
-			const { permissionHandlers } = await import("@openbuddy/auth-permission");
+			const { agentPermissionBridge: permissionHandlers } = await import("../agent/agent-permission-bridge");
 			return permissionHandlers.readRules();
 		});
 		wrapIpcHandler("permission:save", async (_e, rules: unknown) => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			await ensureAgentHost();
-			const { permissionHandlers } = await import("@openbuddy/auth-permission");
+			const { agentPermissionBridge: permissionHandlers } = await import("../agent/agent-permission-bridge");
 			return permissionHandlers.writeRules(permissionRules(rules) as never);
 		});
 		wrapIpcHandler("permission:mode-get", async () => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			await ensureAgentHost();
-			const { permissionHandlers } = await import("@openbuddy/auth-permission");
+			const { agentPermissionBridge: permissionHandlers } = await import("../agent/agent-permission-bridge");
 			return fromPiPermissionMode(await permissionHandlers.readMode());
 		});
 		wrapIpcHandler("permission:mode-set", async (_e, mode: unknown) => {
 			casdoorAuth.authorize({ capability: "team.workspace" });
 			await ensureAgentHost();
-			const { permissionHandlers } = await import("@openbuddy/auth-permission");
+			const { agentPermissionBridge: permissionHandlers } = await import("../agent/agent-permission-bridge");
 			return permissionHandlers.writeMode(toPiPermissionMode(publicPermissionMode(mode)));
 		});
 }

@@ -1,21 +1,16 @@
 /**
  * @openbuddy/ui-modules/components — 组件与模型层聚合出口。
  *
- * 组件全部为纯 props 组件(不直接调用 IPC / 不读写全局 store),便于宿主
- * 或第三方面板在自己的数据层之上复用。
+ * 历史包袱清理(R97):曾在这里导出整套 marketplace 表现层
+ * (MarketplaceTab / MarketplaceCard / InstallDialog / CapabilityVersionBadge /
+ * marketplace-model))。R83 之后「插件·市场」面板的事实唯一实现是
+ * `@openbuddy/ui-mcp` 的 `MarketplacePanel`(自带 IPC 取数据 + 虚拟化 + 预检),
+ * ui-modules 的这份只导出组件、没有宿主装配,于是形成"两份 marketplace 实现"
+ * 却只有一份在跑。R97 把这套孤儿参考实现删除,避免新人误以为有两套契约。
  *
- * `MarketplaceTab` 仍是默认的市场面板;`PiMarketTab`(pi.dev 风格)是
- * R83 引入的镜像目录式布局,由宿主通过 `usePiMarketLayout` 配置开关。
+ * 仍然保留的模块(ClientModuleSystem / 模块注册)走 `./index.ts` 顶层导出。
+ *
+ * @see packages/ui/openbuddy-ui-modules/src/index.ts
  */
-export { MarketplaceTab } from "./MarketplaceTab";
-export type { MarketplaceTabProps } from "./MarketplaceTab";
-export { MarketplaceCard, primaryActionFor } from "./MarketplaceCard";
-export type { MarketplaceCardProps, MarketplaceMenuItem } from "./MarketplaceCard";
-export { InstallDialog } from "./InstallDialog";
-export type { InstallDialogProps, InstallProgress } from "./InstallDialog";
-export { CapabilityVersionBadge, resolveBadgeRelation } from "./CapabilityVersionBadge";
-export type { CapabilityVersionBadgeProps } from "./CapabilityVersionBadge";
-export * from "./marketplace-model";
 
-// R83: pi.dev 风格市场(目录 + 命令复制 + 类型徽章 + 分页)
-export * from "./pi-market";
+export {};

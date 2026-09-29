@@ -101,6 +101,18 @@ extraResources:
   # Ship the nested copy explicitly so the main process can boot.
   - from: "node_modules/brace-expansion/node_modules/balanced-match"
     to: "app/node_modules/brace-expansion/node_modules/balanced-match"
+  # Rust host-core sidecar binary (P3 打包发布)
+  # Mirrors PI-Desktop `crates/host-core`:
+  #   - Built via `.github/workflows/rust-host-core.yml` (8 triple matrix).
+  #   - Injected into `Contents/Resources/bin/` (macOS),
+  #     `resources/bin/` (Linux / Windows) by electron-builder.
+  #   - Resolved at runtime by `@openbuddy/host-runtime/resolve-binary.ts`
+  #     (order: env override > packaged `bin/` > monorepo `crates/target/{debug,release}`).
+  #   - Each platform appends `.exe` automatically via `extraResources` glob filter.
+  - from: "crates/target/release/openbuddy-host-core${exe}"
+    to: "bin/openbuddy-host-core${exe}"
+    filter:
+      - "openbuddy-host-core*"
   # Bundle docs/PRIVACY.md at top of extraResources so it sits alongside
   # the app/ subtree in Contents/Resources/. The Help menu opens it via
   # shell.openPath(process.resourcesPath/PRIVACY.md).
@@ -189,7 +201,7 @@ asarUnpack:
 win:
   target:
     - target: nsis
-      arch: [x64]
+      arch: [x64, arm64]
   artifactName: ${productName}-${version}-setup.${ext}
 
 nsis:
@@ -235,9 +247,9 @@ mac:
 linux:
   target:
     - target: AppImage
-      arch: [x64]
+      arch: [x64, arm64]
   category: Development
-  artifactName: ${productName}-${version}.${ext}
+  artifactName: ${productName}-${version}-${arch}.${ext}
 
 publish:
   provider: github

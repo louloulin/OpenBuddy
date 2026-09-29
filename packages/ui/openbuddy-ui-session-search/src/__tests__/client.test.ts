@@ -4,9 +4,9 @@ import { createHostSessionSearchClient, InMemorySessionSearchClient } from "../c
 describe("createHostSessionSearchClient", () => {
   it("forwards search params to the underlying call", async () => {
     const calls: any[] = [];
-    const client = createHostSessionSearchClient(async (method, params) => {
+    const client = createHostSessionSearchClient(async <T>(method: string, params?: unknown): Promise<T> => {
       calls.push({ method, params });
-      return { hits: [], total: 0 };
+      return { hits: [], total: 0 } as unknown as T;
     });
     await client.search("rust", 25);
     expect(calls).toEqual([
@@ -15,7 +15,7 @@ describe("createHostSessionSearchClient", () => {
   });
 
   it("returns an empty result when the host returns null/undefined", async () => {
-    const client = createHostSessionSearchClient(async () => undefined);
+    const client = createHostSessionSearchClient(async <T>(_m: string, _p?: unknown): Promise<T> => undefined as unknown as T);
     expect(await client.search("anything")).toEqual({ hits: [], total: 0 });
   });
 });
@@ -50,6 +50,6 @@ describe("InMemorySessionSearchClient", () => {
 
   it("message() throws for unknown session/line", async () => {
     const c = new InMemorySessionSearchClient();
-    await expect(c.message("unknown")).rejects.toThrow(/not found/);
+    await expect(c.message("unknown", 1)).rejects.toThrow(/not found/);
   });
 });

@@ -21,6 +21,7 @@ export type { SlotMap };
 
 export { HomePage } from "./HomePage";
 export { SettingsPanel } from "./SettingsPanel";
+export { AuditSettingsPanel } from "./AuditSettingsPanel.js";
 export { AssistantsPanel } from "./AssistantsPanel";
 export { PolicySettingsPanel } from "./PolicySettingsPanel";
 

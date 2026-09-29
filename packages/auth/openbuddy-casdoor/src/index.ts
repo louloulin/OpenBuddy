@@ -18,5 +18,6 @@ export * from "./authorization";
 export * from "./capabilities";
 export * from "./lifecycle";
 export * from "./oidc-auth";
+export * from "./refresh-coalescer";
 export * from "./resources";
 export * from "./resource-backend";

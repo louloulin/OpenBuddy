@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@openbuddy/auth-casdoor": "workspace:*",
+    "@openbuddy/ui-audit-center": "workspace:*",
     "@openbuddy/cordis": "workspace:*",
     "@openbuddy/shared-types": "workspace:*",
     "@openbuddy/ui-conversation": "workspace:*",

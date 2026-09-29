@@ -14,6 +14,7 @@ import { realpathSync } from "node:fs";
 import { mkdir, readFile, readdir, realpath, rename, writeFile } from "node:fs/promises";
 import { isAbsolute, dirname, join, relative, resolve } from "node:path";
 import { McpAuthStore, McpRegistry, agentHome, createPlatformSecretStore } from "@openbuddy/storage";
+import { HostCoreSecretStoreBridge } from "../agent-secret-store-bridge";
 
 export { agentHome };
 
@@ -43,7 +44,11 @@ export function mcpAuthStore(): Promise<McpAuthStore> {
   const databasePath = join(agentRoot(), "openbuddy.sqlite");
   const existing = mcpAuthStorePromises.get(databasePath);
   if (existing) return existing;
-  const secretStore = createPlatformSecretStore({ service: "OpenBuddy MCP" });
+  // P2.1-secrets — host-core IPC 优先,失败静默降级到 platform store。
+  // host 句柄由 electron/main/index.ts 在 bootHostCore() 之后通过
+  // attachHostCoreSecretStore() 注入;此处只在模块加载时读取一次当前状态。
+  const fallbackSecretStore = createPlatformSecretStore({ service: "OpenBuddy MCP" });
+  const secretStore = new HostCoreSecretStoreBridge(fallbackSecretStore);
   const created = Promise.resolve(new McpAuthStore({
     databasePath,
     secretStore,

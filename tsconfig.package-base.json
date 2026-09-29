@@ -131,6 +131,9 @@
       "@openbuddy/ui-account": [
         "./packages/ui/openbuddy-ui-account/src/index.ts"
       ],
+      "@openbuddy/ui-audit-center": [
+        "./packages/ui/openbuddy-ui-audit-center/src/index.ts"
+      ],
       "@openbuddy/ui-account/client": [
         "./packages/ui/openbuddy-ui-account/src/client.tsx"
       ],

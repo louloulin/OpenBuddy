@@ -78,6 +78,7 @@ export type {
   CheckResult,
   IgnoredEntry,
   AuditEntry,
+  AuditOutcome,
 } from "./capabilities.js";
 
 // Phase 1.5 — runtime-side adapter wiring HostProcess → UI packages.

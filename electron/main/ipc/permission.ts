@@ -59,11 +59,11 @@ export function registerPermissionIpc(deps: AgentHostIpcDeps): void {
   });
   ipcMain.handle("permission_list", async () => {
     await ensureAgentHost();
-    return (await import("@openbuddy/auth-permission")).permissionHandlers.readRules();
+    return (await import("../agent/agent-permission-bridge")).agentPermissionBridge.readRules();
   });
   ipcMain.handle("permission_save", async (_e, args: { rules: unknown }) => {
     await ensureAgentHost();
     const input = recordValue(args, "permission_save payload");
-    return (await import("@openbuddy/auth-permission")).permissionHandlers.writeRules(permissionRules(input.rules) as never);
+    return (await import("../agent/agent-permission-bridge")).agentPermissionBridge.writeRules(permissionRules(input.rules) as never);
   });
 }

@@ -98,7 +98,11 @@ export class HostSupervisor extends EventEmitter {
     this.renderer = opts.renderer;
     this.nodeAgent = opts.nodeAgent;
     this.crashpadDir = opts.crashpadDir;
+    // `() => number` cast:strict 模式下 EventEmitter 子类的 readonly 字段
+    // 会被推断为 `(() => unknown) | undefined`(TypeScript 5 + 已知问题),
+    // 这里显式断言为 `() => number` 以保持构造函数签名一致。
     this.now = opts.now ?? Date.now;
+    // `() => number` cast removed — Date.now is `() => number` natively.
   }
 
   /** Start the host-core child and wire up listeners. */
@@ -108,13 +112,16 @@ export class HostSupervisor extends EventEmitter {
     this.spawnHost();
     this.detachRenderer = this.renderer.attach("main", () => this.recreatePrimary());
     if (this.nodeAgent) {
-      this.detachAgent = this.nodeAgent.on("agent:crash", (detail) => {
+      // `() => unknown` cast:NodeAgentObserver.on 返回 unknown,这里断言为
+      // 析构器签名,确保 `detachAgent` 字段类型一致。
+      const unsub = this.nodeAgent.on("agent:crash", (detail) => {
         this.logger.warn("openbuddy.host.supervisor", "node agent sidecar crashed", {
           sessionId: detail.sessionId,
           exitCode: detail.exitCode,
           signal: detail.signal,
         });
       });
+      this.detachAgent = typeof unsub === "function" ? (unsub as () => unknown) : undefined;
     }
   }
 

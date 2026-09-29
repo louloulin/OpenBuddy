@@ -146,17 +146,114 @@ describe("capability wrappers — workspace", () => {
   });
 });
 
-describe("capability wrappers — audit", () => {
-  it("append", async () => {
-    const { host, calls } = fakeHost({ "audit.append": { id: "1", kind: "test", outcome: "success", action: "x", payloadHash: "h", at: "2026-09-23" } });
-    await callAuditAppend(host, { kind: "test", outcome: "success", action: "x" });
+describe("capability wrappers — audit (wire shape v1, ADR-0012)", () => {
+  it("append forwards kind/outcome/action", async () => {
+    const { host, calls } = fakeHost({
+      "audit.append": { id: "1", at: "2026-09-23T00:00:00Z", payloadHash: "abcdef0123456789" },
+    });
+    const res = await callAuditAppend(host, {
+      kind: "permission",
+      outcome: "denied",
+      action: "bash.run",
+      subject: "rm -rf /",
+    });
     expect(calls[0].method).toBe("audit.append");
+    expect(calls[0].params).toEqual({
+      kind: "permission",
+      outcome: "denied",
+      action: "bash.run",
+      subject: "rm -rf /",
+    });
+    expect(res).toEqual({ id: "1", at: "2026-09-23T00:00:00Z", payloadHash: "abcdef0123456789" });
   });
 
-  it("tail", async () => {
-    const { host } = fakeHost({ "audit.tail": { entries: [], rotatedFiles: 0 } });
-    const res = await callAuditTail(host, { limit: 10 });
+  it("append forwards optional structured fields (tenant_id / resource / provider / target)", async () => {
+    const { host, calls } = fakeHost({ "audit.append": { id: "2", at: "t", payloadHash: "h" } });
+    await callAuditAppend(host, {
+      kind: "host",
+      outcome: "failure",
+      action: "secrets.resolve",
+      tenant_id: "acme",
+      resource: "secret:provider:openai",
+      reason: "missing",
+      code: "SECRET_NOT_FOUND",
+      provider: "openai",
+      target: "sk-...",
+    });
+    expect(calls[0].params).toMatchObject({
+      tenant_id: "acme",
+      resource: "secret:provider:openai",
+      reason: "missing",
+      code: "SECRET_NOT_FOUND",
+      provider: "openai",
+      target: "sk-...",
+    });
+  });
+
+  it("tail parses AuditEntry wire shape (event / source / hash / detail)", async () => {
+    const wireEntry = {
+      id: "01HXYZW",
+      at: "2026-09-23T01:00:00Z",
+      event: "bash.run",
+      outcome: "deny",
+      source: "main",
+      subject: "rm -rf /",
+      detail: {
+        kind: "permission",
+        tenant_id: "acme",
+        resource: "shell:bash",
+        reason: "deny-rule-match",
+        code: "PERMISSION_DENIED",
+        provider: undefined,
+        target: undefined,
+      },
+      hash: "deadbeef0123456789abcdef",
+    };
+    const { host } = fakeHost({
+      "audit.tail": { entries: [wireEntry], rotatedFiles: 0 },
+    });
+    const res = await callAuditTail(host, { limit: 50 });
     expect(res.rotatedFiles).toBe(0);
+    expect(res.entries[0]).toEqual(wireEntry);
+    // 关键契约:detail.kind / event / source / hash 全部存在
+    expect(res.entries[0].detail.kind).toBe("permission");
+    expect(res.entries[0].event).toBe("bash.run");
+    expect(res.entries[0].source).toBe("main");
+    expect(res.entries[0].hash).toBe("deadbeef0123456789abcdef");
+    expect(res.entries[0].outcome).toBe("deny");
+  });
+
+  it("wire shape 拒绝旧字段(payloadHash / action 顶层 / kind 顶层)— 类型层不兼容", () => {
+    // 旧 shape:{ id, kind, outcome, action, subject?, payloadHash, at }
+    // 新 shape:{ id, at, event, outcome, source, subject?, detail, hash }
+    //
+    // 这是一个类型层契约断言:旧 shape 对象不应该「结构兼容」AuditEntry。
+    // 如果未来有人改回旧 wire shape,这里 typecheck 会失败。
+    //
+    // 实现:用 `as unknown as AuditEntry` 强制 cast 绕过 excess property check,
+    // 然后用 `Expect<...>` 类型层断言:如果旧 shape 的所有 key 都能映射到 AuditEntry,
+    // `_MustBeNever` 会被赋值为 string,触发 TS2322 错误。
+    type AuditEntryLike = import("../capabilities.js").AuditEntry;
+    type ExcessKeys<T, U> = Exclude<keyof U, keyof T>;
+    type Expect<T extends never> = T;
+
+    // 旧 shape 1:顶层 `action`(新 AuditEntry 没有)
+    const bad1 = { id: "1", at: "2026-09-23", action: "bash.run" } as unknown as AuditEntryLike;
+    type _Old1MustBeEmpty = Expect<ExcessKeys<AuditEntryLike, typeof bad1>>;
+    void (null as unknown as _Old1MustBeEmpty);
+
+    // 旧 shape 2:顶层 `payloadHash`(新 AuditEntry 只有 `hash`)
+    const bad2 = { id: "1", at: "2026-09-23", payloadHash: "h" } as unknown as AuditEntryLike;
+    type _Old2MustBeEmpty = Expect<ExcessKeys<AuditEntryLike, typeof bad2>>;
+    void (null as unknown as _Old2MustBeEmpty);
+
+    // 旧 shape 3:顶层 `kind`(新 AuditEntry 只有 `detail.kind`)
+    const bad3 = { id: "1", at: "2026-09-23", kind: "permission" } as unknown as AuditEntryLike;
+    type _Old3MustBeEmpty = Expect<ExcessKeys<AuditEntryLike, typeof bad3>>;
+    void (null as unknown as _Old3MustBeEmpty);
+
+    // 抑制未使用警告
+    void bad1; void bad2; void bad3;
   });
 });
 

@@ -40,6 +40,11 @@ import { createBridgeStatusBroadcaster, notifyBridgeUnavailable } from "./collab
 import { bootHarnessServer } from "./bootstrap/boot-harness-server";
 import { installAppLifecycle } from "./bootstrap/app-lifecycle";
 import { bootHostCore } from "./host-boot";
+import { attachHostCorePermissions } from "./agent/agent-permission-bridge";
+import { attachHostCoreSecretStore } from "./agent/agent-secret-store-bridge";
+import { attachHostCoreSessionSearch } from "./agent/agent-session-search-bridge";
+import { attachHostCoreWorkspace } from "./agent/agent-workspace-bridge";
+import { attachHostCoreAudit } from "./agent/agent-audit-bridge";
 import { getCrashpadDir, recordMainCrash, startCrashpad } from "./runtime/crashpad";
 import { casdoorAuth } from "./casdoor/casdoor-auth";
 import { initCasdoorSecurity, type CasdoorSecurityController } from "./security/casdoor";
@@ -376,11 +381,31 @@ async function bootBackgroundServices(): Promise<void> {
   // capability wiring (secrets / permissions / audit). Phase 1 will turn
   // the boot failure into a hard error once the capabilities are live.
   try {
-    const { handshake } = await bootHostCore({
+    const { host, handshake } = await bootHostCore({
       onSlowHint: () => console.warn("[openbuddy-boot] host-core boot > 30s"),
       onStalled: () => console.error("[openbuddy-boot] host-core boot > 180s; please restart"),
     });
     perfTraceMark("host-core-ready", { capabilities: handshake.capabilities.length });
+    // P2.1 — wire host-core into the permission bridge so 9 调用点
+    // (agent-host + 4 ipc/* handlers + hook-permission) 走 host-core IPC,
+    // 失败时静默降级到 @openbuddy/auth-permission.
+    attachHostCorePermissions(host.inner);
+    // P2.1-secrets — wire host-core into the secret-store bridge used by
+    // McpAuthStore (pi-resources/shared.ts:mcpAuthStore). host-core 不存在时
+    // 桥接器自动 fall back 到 createPlatformSecretStore (keychain / ephemeral)。
+    attachHostCoreSecretStore(host.inner);
+    // P2.1-session-search — wire host-core into session_search.
+    // host-core 不存在时返回空索引,不阻塞 UI。
+    attachHostCoreSessionSearch(host.inner);
+    // P2.1-workspace — wire host-core into workspace 路径解析/边界检查。
+    // host-core 不存在时返回 null,业务层 fallback 到 _host-paths.ts 的 isPathWithin。
+    attachHostCoreWorkspace(host.inner);
+    // P2.1-audit — wire host-core into audit.jsonl (统一审计日志,
+    // 与 casdoor-audit.jsonl 是两条独立审计流)。
+    // 失败时 fallback 到 <userData>/audit-fallback.jsonl JSONL append。
+    attachHostCoreAudit(host.inner, {
+      fallbackPath: join(app.getPath("userData"), "audit-fallback.jsonl"),
+    });
   } catch (err) {
     console.error("[openbuddy-boot] host-core boot failed:", err);
   }

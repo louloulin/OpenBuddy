@@ -96,6 +96,7 @@ export class InMemorySessionSearchClient implements SessionSearchClient {
     const lines = this.store.get(sessionId);
     const line = lines?.find((l) => l.lineNo === lineNo);
     if (!line) throw new Error(`session ${sessionId} line ${lineNo} not found`);
-    return { sessionId, lineNo, ...line };
+    const { lineNo: _lineNo, ...rest } = line;
+    return { sessionId, lineNo, ...rest };
   }
 }
