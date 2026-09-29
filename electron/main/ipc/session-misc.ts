@@ -94,6 +94,9 @@ export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
 
     // host-core 优先:它对会话正文做 FTS 索引,能命中 session 标题之外的内容。
     // 未命中或不可用时落回 pi 的内存搜索,两条路径产出同一 SearchHit 形状。
+    // 冷启动直接搜索(还没碰过任何会话)时 piSessionDir 不会触发,这里补一次设根。
+    const { ensureSessionsRootSynced } = await import("../agent/host-modules/_host-paths");
+    await ensureSessionsRootSynced();
     const { sessionSearchViaBridge } = await import("../agent/agent-session-search-bridge");
     const hostHits = await sessionSearchViaBridge(query, limit);
     if (hostHits.length > 0) {

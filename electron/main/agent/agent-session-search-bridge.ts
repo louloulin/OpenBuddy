@@ -2,20 +2,22 @@
  * agent-session-search-bridge — Session search 双路径适配层 (P2.1-session-search)
  *
  * 与 permission/secret bridge 同款模式:
- *   - session.search / session.message / session.setRoot
- *   - 优先 host-core IPC (callSessionSearch/Message/SetRoot)
- *   - 失败静默降级到 in-memory fallback (空索引)
+ *   - session.search / session.setRoot
+ *   - 优先 host-core IPC,失败静默降级到 in-memory fallback (空索引)
  *   - 5 秒 backoff
+ *
+ * `session.message`(按行号取单条消息)不在本 bridge:它的消费方是
+ * `@openbuddy/host-runtime` 的 HostRuntimeSearchClient,与这里的
+ * session_search IPC 链路无关。
  *
  * 集成路径:
  *   bootHostCore() 之后调用 attachHostCoreSessionSearch(host.inner)
- *   IPC handlers 调用 createBridgeSessionSearchClient() 拿到 client
+ *   ipc/session-misc.ts 的 session_search handler 消费
  *
  * 单元测试: `electron/main/agent/__tests__/agent-session-search-bridge.test.ts`
  */
 
 import {
-  callSessionMessage,
   callSessionSearch,
   callSessionSetRoot,
   type HostProcess,
@@ -79,19 +81,6 @@ export async function sessionSearchViaBridge(query: string, limit?: number): Pro
     }
   }
   return [];
-}
-
-export async function sessionMessageViaBridge(sessionId: string, lineNo: number): Promise<string | undefined> {
-  if (shouldTryHostCore()) {
-    try {
-      const res = await callSessionMessage(state.host!, { sessionId, lineNo });
-      recordHostCoreSuccess();
-      return res.content;
-    } catch (err) {
-      recordHostCoreFailure(err);
-    }
-  }
-  return undefined;
 }
 
 export async function sessionSetRootViaBridge(sessionsRoot: string): Promise<void> {

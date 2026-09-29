@@ -7,18 +7,15 @@ import {
   attachHostCoreAudit,
   auditAppendViaBridge,
   auditBridgeState,
-  auditTailViaBridge,
   resetAgentAuditBridge,
 } from "../agent-audit-bridge";
 
-const { callAuditAppend, callAuditTail } = vi.hoisted(() => ({
+const { callAuditAppend } = vi.hoisted(() => ({
   callAuditAppend: vi.fn(),
-  callAuditTail: vi.fn(),
 }));
 
 vi.mock("@openbuddy/host-runtime", () => ({
   callAuditAppend,
-  callAuditTail,
 }));
 
 const fakeHost = { call: vi.fn(), dispose: vi.fn() } as unknown as { call: unknown };
@@ -28,7 +25,6 @@ let fallbackPath: string;
 
 beforeEach(async () => {
   callAuditAppend.mockReset();
-  callAuditTail.mockReset();
   resetAgentAuditBridge();
   tmpDir = await mkdtemp(join(tmpdir(), "audit-bridge-test-"));
   fallbackPath = join(tmpDir, "audit-fallback.jsonl");
@@ -81,12 +77,6 @@ describe("audit-bridge — fallback path (no host)", () => {
     const res = await auditAppendViaBridge({ kind: "host", outcome: "info", action: "boot" });
     expect(res.id).toBe("dropped");
   });
-
-  it("tail returns empty when no fallback file", async () => {
-    attachHostCoreAudit(null, { fallbackPath });
-    const result = await auditTailViaBridge(10);
-    expect(result).toEqual([]);
-  });
 });
 
 describe("audit-bridge — host-core path", () => {
@@ -105,18 +95,6 @@ describe("audit-bridge — host-core path", () => {
     expect(callAuditAppend).toHaveBeenCalledWith(fakeHost, expect.objectContaining({ kind: "permission", action: "bash.run" }));
   });
 
-  it("tail uses host-core on happy path", async () => {
-    callAuditTail.mockResolvedValue({
-      entries: [
-        { id: "1", at: "2026-09-24T00:00:00Z", event: "x", outcome: "success", source: "main", detail: { kind: "host" } },
-      ],
-    });
-
-    const result = await auditTailViaBridge(5);
-
-    expect(result).toHaveLength(1);
-    expect(callAuditTail).toHaveBeenCalledWith(fakeHost, { limit: 5 });
-  });
 });
 
 describe("audit-bridge — degradation + fallback file", () => {
@@ -134,19 +112,6 @@ describe("audit-bridge — degradation + fallback file", () => {
     expect(entry.detail.kind).toBe("host");
   });
 
-  it("falls back to JSONL when host-core tail fails", async () => {
-    // First write some entries via append — make append also fail so JSONL fallback is exercised
-    callAuditAppend.mockRejectedValue(new Error("rpc timeout"));
-    await auditAppendViaBridge({ kind: "host", outcome: "info", action: "boot.ok" });
-
-    // Now make tail fail so it also falls back to JSONL (which now has the entry above)
-    callAuditTail.mockRejectedValue(new Error("rpc timeout"));
-
-    const result = await auditTailViaBridge(10);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].event).toBe("boot.ok");
-  });
 });
 
 describe("audit-bridge — backoff", () => {

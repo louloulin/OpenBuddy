@@ -2,9 +2,8 @@
  * agent-workspace-bridge — Workspace 双路径适配层 (P2.1-workspace)
  *
  * 与 permission/secret bridge 同款模式:
- *   - workspace.resolve / .check / .listIgnored / .setRoot
- *   - 优先 host-core IPC (callWorkspaceResolve/Check/ListIgnored/SetRoot)
- *   - 失败静默降级到 in-memory fallback
+ *   - workspace.check / .setRoot
+ *   - 优先 host-core IPC,失败静默降级到 in-memory fallback
  *   - 5 秒 backoff
  *
  * 单元测试: `electron/main/agent/__tests__/agent-workspace-bridge.test.ts`
@@ -12,13 +11,9 @@
 
 import {
   callWorkspaceCheck,
-  callWorkspaceListIgnored,
-  callWorkspaceResolve,
   callWorkspaceSetRoot,
   type CheckResult,
-  type IgnoredEntry,
   type HostProcess,
-  type ResolveResult,
 } from "@openbuddy/host-runtime";
 
 interface BridgeState {
@@ -67,17 +62,6 @@ function recordHostCoreSuccess(): void {
   }
 }
 
-export async function workspaceResolveViaBridge(path: string): Promise<ResolveResult | null> {
-  if (shouldTryHostCore()) {
-    try {
-      return await callWorkspaceResolve(state.host!, { path });
-    } catch (err) {
-      recordHostCoreFailure(err);
-    }
-  }
-  return null;
-}
-
 export async function workspaceCheckViaBridge(path: string): Promise<CheckResult | null> {
   if (shouldTryHostCore()) {
     try {
@@ -87,19 +71,6 @@ export async function workspaceCheckViaBridge(path: string): Promise<CheckResult
     }
   }
   return null;
-}
-
-export async function workspaceListIgnoredViaBridge(): Promise<IgnoredEntry[]> {
-  if (shouldTryHostCore()) {
-    try {
-      const res = await callWorkspaceListIgnored(state.host!);
-      recordHostCoreSuccess();
-      return res;
-    } catch (err) {
-      recordHostCoreFailure(err);
-    }
-  }
-  return [];
 }
 
 export async function workspaceSetRootViaBridge(workspaceRoot: string): Promise<void> {

@@ -2,9 +2,8 @@
  * agent-audit-bridge — Audit log 双路径适配层 (P2.1-audit)
  *
  * 与 permission/secret bridge 同款模式:
- *   - audit.append / audit.tail
- *   - 优先 host-core IPC (callAuditAppend/Tail)
- *   - 失败静默降级到 JSONL 文件 fallback (write to <data_dir>/audit-fallback.jsonl)
+ *   - audit.append
+ *   - 优先 host-core IPC,失败静默降级到 JSONL 文件 fallback
  *   - 5 秒 backoff
  *
  * 注意: 这与 casdoor-audit.jsonl 是独立的两条审计流,本桥接器针对
@@ -13,14 +12,13 @@
  * 单元测试: `electron/main/agent/__tests__/agent-audit-bridge.test.ts`
  */
 
-import { appendFile, mkdir, readFile, rename } from "node:fs/promises";
+import { appendFile, mkdir, rename } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import type { AuditOutcome } from "@openbuddy/host-runtime";
 import { dirname, join } from "node:path";
 
 import {
   callAuditAppend,
-  callAuditTail,
   type AuditEntry,
   type HostProcess,
 } from "@openbuddy/host-runtime";
@@ -117,19 +115,6 @@ export async function auditAppendViaBridge(params: AppendParams): Promise<{ id: 
   return appendToFallbackJsonl(params);
 }
 
-export async function auditTailViaBridge(limit = 50): Promise<AuditEntry[]> {
-  if (shouldTryHostCore()) {
-    try {
-      const res = await callAuditTail(state.host!, { limit });
-      recordHostCoreSuccess();
-      return res.entries;
-    } catch (err) {
-      recordHostCoreFailure(err);
-    }
-  }
-  return readFallbackJsonl(limit);
-}
-
 async function appendToFallbackJsonl(params: AppendParams): Promise<{ id: string; at: string }> {
   if (!state.fallbackPath) {
     // No fallback path configured — silently drop (host-core unavailable + no fallback)
@@ -159,26 +144,6 @@ async function appendToFallbackJsonl(params: AppendParams): Promise<{ id: string
   await mkdir(dirname(state.fallbackPath), { recursive: true });
   await appendFile(state.fallbackPath, line, "utf-8");
   return { id: entry.id, at: entry.at };
-}
-
-async function readFallbackJsonl(limit: number): Promise<AuditEntry[]> {
-  if (!state.fallbackPath) return [];
-  try {
-    const text = await readFile(state.fallbackPath, "utf-8");
-    const lines = text.split("\n").filter((l) => l.trim().length > 0);
-    const tail = lines.slice(-limit);
-    const entries: AuditEntry[] = [];
-    for (const line of tail) {
-      try {
-        entries.push(JSON.parse(line) as AuditEntry);
-      } catch {
-        // skip malformed line
-      }
-    }
-    return entries;
-  } catch {
-    return [];
-  }
 }
 
 export function auditBridgeState(): { hostAttached: boolean; available: boolean; inBackoff: boolean; fallbackConfigured: boolean } {

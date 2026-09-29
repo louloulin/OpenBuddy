@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   attachHostCoreSessionSearch,
   resetAgentSessionSearchBridge,
-  sessionMessageViaBridge,
   sessionSearchBridgeState,
   sessionSearchViaBridge,
   sessionSetRootViaBridge,
@@ -11,17 +10,14 @@ import {
 
 const {
   callSessionSearch,
-  callSessionMessage,
   callSessionSetRoot,
 } = vi.hoisted(() => ({
   callSessionSearch: vi.fn(),
-  callSessionMessage: vi.fn(),
   callSessionSetRoot: vi.fn(),
 }));
 
 vi.mock("@openbuddy/host-runtime", () => ({
   callSessionSearch,
-  callSessionMessage,
   callSessionSetRoot,
 }));
 
@@ -29,7 +25,6 @@ const fakeHost = { call: vi.fn(), dispose: vi.fn() } as unknown as { call: unkno
 
 beforeEach(() => {
   callSessionSearch.mockReset();
-  callSessionMessage.mockReset();
   callSessionSetRoot.mockReset();
   resetAgentSessionSearchBridge();
 });
@@ -40,12 +35,6 @@ describe("session-search-bridge — fallback path", () => {
     const result = await sessionSearchViaBridge("test");
     expect(result).toEqual([]);
     expect(callSessionSearch).not.toHaveBeenCalled();
-  });
-
-  it("message returns undefined when no host", async () => {
-    const result = await sessionMessageViaBridge("sess-1", 5);
-    expect(result).toBeUndefined();
-    expect(callSessionMessage).not.toHaveBeenCalled();
   });
 
   it("setRoot is a no-op when no host", async () => {
@@ -66,15 +55,6 @@ describe("session-search-bridge — host-core path", () => {
     expect(callSessionSearch).toHaveBeenCalledWith(fakeHost, { query: "error", limit: 20 });
   });
 
-  it("message uses host-core on happy path", async () => {
-    callSessionMessage.mockResolvedValue({ content: "line content" });
-
-    const result = await sessionMessageViaBridge("s1", 5);
-
-    expect(result).toBe("line content");
-    expect(callSessionMessage).toHaveBeenCalledWith(fakeHost, { sessionId: "s1", lineNo: 5 });
-  });
-
   it("setRoot uses host-core on happy path", async () => {
     callSessionSetRoot.mockResolvedValue({ ok: true });
 
@@ -93,14 +73,6 @@ describe("session-search-bridge — degradation", () => {
     const result = await sessionSearchViaBridge("test");
 
     expect(result).toEqual([]);
-  });
-
-  it("falls back to undefined when message fails", async () => {
-    callSessionMessage.mockRejectedValue(new Error("ENOENT"));
-
-    const result = await sessionMessageViaBridge("s1", 5);
-
-    expect(result).toBeUndefined();
   });
 });
 

@@ -20,7 +20,6 @@ import { RpcCallError } from "@openbuddy/shared-error-codes";
 
 import {
   attachHostCoreSecretStore,
-  createBridgeSecretStore,
   HostCoreSecretStoreBridge,
   resetAgentSecretStoreBridge,
   secretStoreBridgeState,
@@ -111,13 +110,6 @@ describe("agent-secret-store-bridge — fallback path (no host-core)", () => {
     expect(callSecretsDelete).not.toHaveBeenCalled();
     expect(fallback.values.has("secret:x")).toBe(false);
   });
-
-  it("createBridgeSecretStore returns fallback as-is when host is null", () => {
-    const fallback = makeFakeFallback();
-    const result = createBridgeSecretStore({ host: null, fallback });
-
-    expect(result).toBe(fallback);
-  });
 });
 
 describe("agent-secret-store-bridge — host-core path (attached)", () => {
@@ -169,11 +161,11 @@ describe("agent-secret-store-bridge — host-core path (attached)", () => {
     expect(fallback.values.size).toBe(0);
   });
 
-  it("createBridgeSecretStore wraps fallback when host is provided", async () => {
+  it("HostCoreSecretStoreBridge routes put through host-core", async () => {
     const fallback = makeFakeFallback();
     callSecretsSet.mockResolvedValue({ ref: "x", backend: "keychain", updatedAt: "2026-09-24T00:00:00Z" });
 
-    const store = createBridgeSecretStore({ host: fakeHost as never, fallback });
+    const store = new HostCoreSecretStoreBridge(fallback);
     await store.put("x", "v");
 
     expect(callSecretsSet).toHaveBeenCalledWith(fakeHost, { ref: "x", value: "v", label: undefined });

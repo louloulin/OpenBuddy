@@ -175,19 +175,6 @@ export class HostCoreSecretStoreBridge implements SecretStore {
 }
 
 /**
- * Factory: wire host-core IPC into a fallback SecretStore.
- * Pass `host: null` to bypass host-core entirely (returns the fallback as-is).
- */
-export function createBridgeSecretStore(options: {
-  host: HostProcess | null;
-  fallback: SecretStore;
-}): SecretStore {
-  attachHostCoreSecretStore(options.host);
-  if (!options.host) return options.fallback;
-  return new HostCoreSecretStoreBridge(options.fallback);
-}
-
-/**
  * Inspector/调试用:返回当前 bridge 状态(无敏感信息)。
  */
 export function secretStoreBridgeState(): { hostAttached: boolean; available: boolean; inBackoff: boolean } {
