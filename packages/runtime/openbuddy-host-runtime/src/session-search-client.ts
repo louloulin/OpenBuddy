@@ -1,9 +1,8 @@
 /**
- * Bridge the typed `HostProcess` to the `@openbuddy/ui-session-search`
- * client interface.
+ * Bridge the typed `HostProcess` to a session-search client interface.
  *
- * Lives in a runtime-specific file (not the UI package) so the UI package
- * stays host-runtime-agnostic and easy to use in tests/storybook.
+ * Lives in the runtime layer so transport/adapter code stays out of the
+ * UI packages entirely.
  */
 import {
   callSessionSearch,
@@ -14,14 +13,8 @@ import {
 import type { HostProcess } from "./host-process.js";
 
 /**
- * Minimal session-search client interface — mirrors the one defined in
- * `@openbuddy/ui-session-search/src/client.ts`. Inlined here so we don't
- * create a hard dependency on the UI package's subpath (which has no
- * `index.ts` and tsc + vite-tsconfig-paths can't always resolve).
- *
- * Keep this in sync with the canonical definition; if you change one,
- * change both. (We accept the duplication in exchange for not having a
- * cross-package import in the runtime layer.)
+ * Minimal session-search client interface, defined here rather than in a
+ * UI package so the runtime layer owns no cross-package dependency.
  */
 export interface SessionSearchClient {
   search(query: string, maxResults?: number): Promise<SearchResult>;
