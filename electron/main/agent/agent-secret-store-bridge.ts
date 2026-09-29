@@ -9,9 +9,18 @@
  *
  * 集成路径:
  *   1. 在 bootHostCore() 之后调用 attachHostCoreSecretStore(host.inner)
- *   2. 把 createPlatformSecretStore(...) 替换为 createBridgeSecretStore({...})
- *      或直接 new HostCoreSecretStoreBridge(host.inner, fallback)
+ *   2. 用 new HostCoreSecretStoreBridge(fallback) 包装现有 SecretStore
  *   3. 其它调用点无需修改 —— SecretStore 接口签名不变
+ *
+ * 懒迁移(legacy credentials):
+ *   host-core 一旦能响应 secrets.get 就成为权威源,但用户 keychain 里已有的
+ *   MCP 凭据在 host 端并不存在。若不处理,升级后的用户会看到"凭据全没了"。
+ *   因此 get() 在 host 未命中时回读 platform store,命中则回填 host —— 每个
+ *   ref 只迁移一次(migratedRefs),之后 host 端即为唯一来源。
+ *
+ *   顺带修正一个语义错误:host 对"ref 不存在"返回 SECRET_NOT_FOUND 错误而非
+ *   空值。若把它当作 host-core 故障,一次正常的未命中读取就会触发
+ *   recordHostCoreFailure 并让整个 bridge 降级 5 秒。
  *
  * 单元测试: `electron/main/agent/__tests__/agent-secret-store-bridge.test.ts`
  */
@@ -22,6 +31,7 @@ import {
   callSecretsSet,
   type HostProcess,
 } from "@openbuddy/host-runtime";
+import { RpcCallError } from "@openbuddy/shared-error-codes";
 import type { SecretRef, SecretStore } from "@openbuddy/storage";
 
 interface BridgeState {
@@ -40,6 +50,9 @@ const INITIAL_STATE: BridgeState = {
 
 let state: BridgeState = { ...INITIAL_STATE };
 
+/** 每个 ref 只做一次懒迁移,避免每次未命中都回读 keychain。 */
+const migratedRefs = new Set<string>();
+
 export function attachHostCoreSecretStore(host: HostProcess | null): void {
   state = {
     ...state,
@@ -51,6 +64,7 @@ export function attachHostCoreSecretStore(host: HostProcess | null): void {
 
 export function resetAgentSecretStoreBridge(): void {
   state = { ...INITIAL_STATE };
+  migratedRefs.clear();
 }
 
 function shouldTryHostCore(): boolean {
@@ -75,6 +89,11 @@ function recordHostCoreSuccess(): void {
   if (!state.available || state.lastFailureMs > 0) {
     state = { ...state, available: true, lastFailureMs: 0 };
   }
+}
+
+/** host 对"ref 不存在"返回 SECRET_NOT_FOUND,而非空值 —— 这是正常的未命中,不是故障。 */
+function isSecretNotFound(err: unknown): boolean {
+  return err instanceof RpcCallError && err.errorCode === "SECRET_NOT_FOUND";
 }
 
 /**
@@ -113,12 +132,32 @@ export class HostCoreSecretStoreBridge implements SecretStore {
       try {
         const res = await callSecretsGet(state.host!, { ref });
         recordHostCoreSuccess();
-        return res.value ?? undefined;
+        if (res.value != null) return res.value;
       } catch (err) {
-        recordHostCoreFailure(err);
+        // host 未命中不是故障:回落到 platform store,并尝试一次性懒迁移。
+        if (!isSecretNotFound(err)) recordHostCoreFailure(err);
+        else recordHostCoreSuccess();
       }
+      return this.migrateFromFallback(ref);
     }
     return this.fallback.get(ref);
+  }
+
+  /**
+   * host 未命中时回读 platform store;若 legacy 凭据存在则回填 host,
+   * 使 host 端成为后续读取的权威源。每个 ref 只尝试一次。
+   */
+  private async migrateFromFallback(ref: string): Promise<string | undefined> {
+    if (migratedRefs.has(ref)) return this.fallback.get(ref);
+    migratedRefs.add(ref);
+    const legacy = await this.fallback.get(ref);
+    if (legacy == null) return undefined;
+    try {
+      await callSecretsSet(state.host!, { ref, value: legacy });
+    } catch (err) {
+      recordHostCoreFailure(err);
+    }
+    return legacy;
   }
 
   async delete(ref: string): Promise<void> {

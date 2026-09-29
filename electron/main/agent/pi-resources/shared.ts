@@ -67,8 +67,31 @@ export async function closeMcpRegistries(): Promise<void> {
   for (const entry of authEntries) await entry.then((store) => store.close()).catch(() => undefined);
 }
 
+/** 最近一次已下发给 host-core 的 workspace 根,用于去重。 */
+let lastSyncedWorkspaceRoot: string | null = null;
+
 export function workspaceRoot(cwd?: string | null): string {
-  return resolve(cwd || process.cwd());
+  const root = resolve(cwd || process.cwd());
+  void syncWorkspaceRootToHostCore(root);
+  return root;
+}
+
+/**
+ * 让 host-core 侧知道当前 workspace 根,它的 workspace/secrets 判定都以它为基准。
+ *
+ * workspaceRoot() 是同步函数(被 skills / agents / mcp / memory / marketplace 的
+ * 资源解析共用),因此这里 fire-and-forget:同 root 不重复下发,host-core 不可用
+ * 时静默跳过。失败不影响任何调用方 —— 本地路径解析不依赖 host-core。
+ */
+async function syncWorkspaceRootToHostCore(root: string): Promise<void> {
+  if (lastSyncedWorkspaceRoot === root) return;
+  lastSyncedWorkspaceRoot = root;
+  try {
+    const { workspaceSetRootViaBridge } = await import("../agent-workspace-bridge");
+    await workspaceSetRootViaBridge(root);
+  } catch {
+    // 同步失败无需重试:下次 root 变化时会再试。
+  }
 }
 
 export async function readJson<T>(file: string, fallback: T): Promise<T> {
@@ -186,11 +209,40 @@ export async function withinReal(root: string, candidate: string): Promise<strin
 
 export async function assertResourcePath(candidate: string, allowedRoots: string[]): Promise<string> {
   if (!allowedRoots.length) throw new Error("no allowed resource roots");
+  void shadowCheckWorkspace(candidate);
   let lastError: unknown;
   for (const root of allowedRoots) {
     try { return await withinReal(root, candidate); } catch (error) { lastError = error; }
   }
   throw lastError instanceof Error ? lastError : new Error("resource path is outside allowed roots");
+}
+
+/**
+ * 影子模式:让 host-core 也判定一次同一条路径,只对比不拦截。
+ *
+ * host-core 的 `workspace.check` 返回的是自己的 CheckResult 语义(含 ignored /
+ * exists),与本地 `withinReal` 的 realpath 边界检查不等价,因此这里刻意**不**
+ * 用它的结论做任何放行/拒绝 —— 真正的判定仍在上面的 withinReal。目的是让
+ * host-core 侧的能力在真实流量下被验证,确认两边一致后再讨论是否切换。
+ *
+ * 由 OPENBUDDY_WORKSPACE_SHADOW=1 开启;host-core 不可用时静默跳过。
+ */
+async function shadowCheckWorkspace(candidate: string): Promise<void> {
+  if (process.env.OPENBUDDY_WORKSPACE_SHADOW !== "1") return;
+  try {
+    const { workspaceCheckViaBridge } = await import("../agent-workspace-bridge");
+    const verdict = await workspaceCheckViaBridge(candidate);
+    if (verdict) {
+      console.debug("[workspace-shadow] host-core verdict", {
+        candidate,
+        inWorkspace: verdict.inWorkspace,
+        exists: verdict.exists,
+        ignored: verdict.ignored,
+      });
+    }
+  } catch {
+    // 影子模式永不影响主路径。
+  }
 }
 
 export function safeName(value: string): string {

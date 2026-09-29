@@ -11,9 +11,6 @@
   "engines": {
     "node": ">=22.5.0"
   },
-  "dependencies": {
-    "@openbuddy/ui-shared/agent-paths": "workspace:*"
-  },
   "peerDependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

@@ -16,6 +16,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { RpcCallError } from "@openbuddy/shared-error-codes";
+
 import {
   attachHostCoreSecretStore,
   createBridgeSecretStore,
@@ -272,5 +274,99 @@ describe("agent-secret-store-bridge — reset semantics", () => {
 
     expect(secretStoreBridgeState().hostAttached).toBe(false);
     expect(secretStoreBridgeState().available).toBe(true);
+  });
+});
+
+describe("agent-secret-store-bridge — legacy credential lazy migration", () => {
+  // host 对不存在的 ref 抛 SECRET_NOT_FOUND 而非返回空值。若把它当成 host-core
+  // 故障,一次正常的未命中读取就会让整个 bridge 进入 5 秒 backoff。
+  const notFound = () =>
+    new RpcCallError("secret not found", -32001, "SECRET_NOT_FOUND");
+
+  beforeEach(() => {
+    attachHostCoreSecretStore(fakeHost as never);
+    callSecretsSet.mockResolvedValue({ backend: "keychain", updatedAt: "2026-09-29T00:00:00Z" });
+  });
+
+  it("SECRET_NOT_FOUND does not degrade the bridge", async () => {
+    const bridge = new HostCoreSecretStoreBridge(makeFakeFallback());
+    callSecretsGet.mockRejectedValue(notFound());
+
+    await bridge.get("secret:absent");
+
+    const state = secretStoreBridgeState();
+    expect(state.available).toBe(true);
+    expect(state.inBackoff).toBe(false);
+  });
+
+  it("a genuine host failure still degrades the bridge", async () => {
+    const bridge = new HostCoreSecretStoreBridge(makeFakeFallback());
+    callSecretsGet.mockRejectedValue(new Error("host-core disconnected"));
+
+    await bridge.get("secret:x");
+
+    expect(secretStoreBridgeState().available).toBe(false);
+  });
+
+  it("backfills a legacy keychain credential into host-core on first miss", async () => {
+    const fallback = makeFakeFallback();
+    await fallback.put("secret:openai:api_key", "sk-legacy");
+    const bridge = new HostCoreSecretStoreBridge(fallback);
+    callSecretsGet.mockRejectedValue(notFound());
+
+    const result = await bridge.get("secret:openai:api_key");
+
+    expect(result).toBe("sk-legacy");
+    expect(callSecretsSet).toHaveBeenCalledWith(fakeHost, {
+      ref: "secret:openai:api_key",
+      value: "sk-legacy",
+    });
+  });
+
+  it("migrates each ref only once", async () => {
+    const fallback = makeFakeFallback();
+    await fallback.put("secret:x", "legacy-value");
+    const bridge = new HostCoreSecretStoreBridge(fallback);
+    callSecretsGet.mockRejectedValue(notFound());
+
+    await bridge.get("secret:x");
+    await bridge.get("secret:x");
+    await bridge.get("secret:x");
+
+    expect(callSecretsSet).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failed backfill still returns the legacy value to the caller", async () => {
+    const fallback = makeFakeFallback();
+    await fallback.put("secret:x", "legacy-value");
+    const bridge = new HostCoreSecretStoreBridge(fallback);
+    callSecretsGet.mockRejectedValue(notFound());
+    callSecretsSet.mockRejectedValue(new Error("host-core write refused"));
+
+    const result = await bridge.get("secret:x");
+
+    expect(result).toBe("legacy-value");
+  });
+
+  it("does not backfill when the ref is absent from both stores", async () => {
+    const bridge = new HostCoreSecretStoreBridge(makeFakeFallback());
+    callSecretsGet.mockRejectedValue(notFound());
+
+    const result = await bridge.get("secret:never-existed");
+
+    expect(result).toBeUndefined();
+    expect(callSecretsSet).not.toHaveBeenCalled();
+  });
+
+  it("does not consult the fallback when host-core returns a value", async () => {
+    const fallback = makeFakeFallback();
+    await fallback.put("secret:x", "stale-legacy-value");
+    const bridge = new HostCoreSecretStoreBridge(fallback);
+    callSecretsGet.mockResolvedValue({ backend: "keychain", value: "authoritative" });
+
+    const result = await bridge.get("secret:x");
+
+    expect(result).toBe("authoritative");
+    expect(callSecretsSet).not.toHaveBeenCalled();
   });
 });

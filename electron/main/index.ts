@@ -400,12 +400,13 @@ async function bootBackgroundServices(): Promise<void> {
     // P2.1-workspace — wire host-core into workspace 路径解析/边界检查。
     // host-core 不存在时返回 null,业务层 fallback 到 _host-paths.ts 的 isPathWithin。
     attachHostCoreWorkspace(host.inner);
-    // P2.1-audit — wire host-core into audit.jsonl (统一审计日志,
-    // 与 casdoor-audit.jsonl 是两条独立审计流)。
-    // 失败时 fallback 到 <userData>/audit-fallback.jsonl JSONL append。
-    attachHostCoreAudit(host.inner, {
-      fallbackPath: join(app.getPath("userData"), "audit-fallback.jsonl"),
-    });
+    // P2.1-audit — wire host-core into the audit stream (统一审计日志,
+    // 与 casdoor-audit.jsonl 是两条独立审计流:后者记企业身份事件,语义不同源)。
+    //
+    // 不配置 fallbackPath:AuditTrail.record 自身已经把条目写进 audit.jsonl,
+    // 若这里再让 bridge 落到 audit-fallback.jsonl,同一事件会在两个文件里各留
+    // 一份,审计流反而分裂。bridge 失败时静默丢弃即可 —— 本地文件才是权威落点。
+    attachHostCoreAudit(host.inner);
   } catch (err) {
     console.error("[openbuddy-boot] host-core boot failed:", err);
   }
