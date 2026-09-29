@@ -114,7 +114,11 @@ export class HostProcess {
     this.child.stderr?.on("data", (chunk: string) => {
       for (const h of this.stderrHandlers) h(chunk);
     });
-    this.child.on("exit", (code, signal) => this.handleExit(code, signal, true));
+    // 这里必须传 false:走到 child "exit" 意味着**没有**走 dispose()(dispose
+    // 会先置 disposed 抑制本回调,再自己派发 intentional:true)—— 所以这是一次
+    // 真实崩溃。之前传 true 导致所有崩溃都被上层观测者当作主动退出过滤掉,
+    // host-core 崩溃对用户完全不可见(2026-09-29 e2e 验证时发现)。
+    this.child.on("exit", (code, signal) => this.handleExit(code, signal, false));
   }
 
   /** `true` once the handshake completed and the host is speaking our protocol. */
