@@ -191,6 +191,10 @@ const bridgeHealth = {
   consecutiveFailures: 0,
   lastError: null as Error | null,
   lastUpdated: Date.now(),
+  // host-core(Rust sidecar)的存活状态,由主进程随 electron-bridge-status 心跳下发。
+  // 放在这里是为了让已有的 getElectronBridgeStatus() 快照自然带出去 ——
+  // 渲染层因此不需要新增 IPC 通道或新的订阅源。
+  hostCore: null as { mode: "ok" | "degraded" | "unavailable"; crashes: number; lastReason?: string } | null,
 };
 
 // Bug fix (R7 / chat-session audit): previous version marked the bridge
@@ -239,6 +243,7 @@ const api = {
     consecutiveFailures: bridgeHealth.consecutiveFailures,
     lastErrorMessage: bridgeHealth.lastError?.message ?? null,
     lastUpdated: bridgeHealth.lastUpdated,
+    hostCore: bridgeHealth.hostCore ?? undefined,
   }),
   isElectronBridgeUnavailable: (error: unknown) => isElectronBridgeUnavailable(error),
 
@@ -406,9 +411,9 @@ const api = {
         }
       };
     },
-    onBridgeStatusChange: (handler: (status: { available: boolean; lastErrorMessage: string | null }) => void) => {
+    onBridgeStatusChange: (handler: (status: { available: boolean; lastErrorMessage: string | null; hostCore?: { mode: "ok" | "degraded" | "unavailable"; crashes: number; lastReason?: string } }) => void) => {
       const wrapped = (_event: unknown, payload: unknown) => {
-        try { handler(payload as { available: boolean; lastErrorMessage: string | null }); }
+        try { handler(payload as { available: boolean; lastErrorMessage: string | null; hostCore?: { mode: "ok" | "degraded" | "unavailable"; crashes: number; lastReason?: string } }); }
         catch { /* swallow */ }
       }
       ipcRenderer.on("electron-bridge-status", wrapped);
@@ -603,5 +608,16 @@ const api = {
 } as const;
 
 contextBridge.exposeInMainWorld("api", api);
+
+// 主进程每 30s 广播一次 host-core 存活状态。preload 把它并进 bridgeHealth,
+// 让 getElectronBridgeStatus() 一次带全 —— 渲染层沿用已有的轮询即可拿到,
+// 不必再单独订阅一条通道。
+ipcRenderer.on("electron-bridge-status", (_event, payload: unknown) => {
+  const hostCore = (payload as { hostCore?: unknown } | null)?.hostCore;
+  if (!hostCore || typeof hostCore !== "object") return;
+  const next = hostCore as { mode?: unknown };
+  if (next.mode !== "ok" && next.mode !== "degraded" && next.mode !== "unavailable") return;
+  bridgeHealth.hostCore = hostCore as typeof bridgeHealth.hostCore;
+});
 
 export type Api = typeof api;

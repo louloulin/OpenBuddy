@@ -56,11 +56,37 @@ export interface ElectronWindowApi {
   };
 }
 
-export function getElectronBridgeStatus(): { available: boolean; reason?: string; apiVersion?: number } {
-  const api = (window as Window & { api?: { apiVersion?: unknown } }).api;
+/**
+ * host-core(Rust sidecar)存活状态,由 preload 随 `electron-bridge-status` 心跳缓存。
+ * 缺失 = 主进程尚未广播过(启动 30s 内)或主进程版本较老,两种情况都退回到只看 `available`。
+ */
+export interface HostCoreStatus {
+  mode: "ok" | "degraded" | "unavailable";
+  crashes: number;
+  lastReason?: string;
+}
+
+export function getElectronBridgeStatus(): {
+  available: boolean;
+  reason?: string;
+  apiVersion?: number;
+  hostCore?: HostCoreStatus;
+} {
+  const api = (window as Window & { api?: { apiVersion?: unknown; getElectronBridgeStatus?: () => { hostCore?: unknown } } }).api;
   if (!api) return { available: false, reason: "preload-not-loaded" };
   if (api.apiVersion !== 1) return { available: false, reason: "unsupported-version", apiVersion: typeof api.apiVersion === "number" ? api.apiVersion : undefined };
-  return { available: true, apiVersion: 1 };
+  const hostCore = api.getElectronBridgeStatus?.().hostCore;
+  return {
+    available: true,
+    apiVersion: 1,
+    ...(isHostCoreStatus(hostCore) ? { hostCore } : {}),
+  };
+}
+
+function isHostCoreStatus(value: unknown): value is HostCoreStatus {
+  if (!value || typeof value !== "object") return false;
+  const mode = (value as { mode?: unknown }).mode;
+  return mode === "ok" || mode === "degraded" || mode === "unavailable";
 }
 
 export class ElectronBridgeUnavailableError extends Error {

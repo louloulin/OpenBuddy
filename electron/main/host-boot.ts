@@ -31,6 +31,7 @@ import { PROTOCOL_VERSION, RpcCallError } from "@openbuddy/shared-error-codes";
 import type { HandshakeResult } from "@openbuddy/host-runtime";
 
 import { ElectronHostProcess, diagnoseHostFailure } from "./host-process";
+import { recordHostExit } from "./runtime/host-health";
 
 const STARTUP_SLOW_HINT_MS = 30_000;
 const STARTUP_STALLED_MS = 180_000;
@@ -50,6 +51,11 @@ export interface BootedHost {
 export async function bootHostCore(options: HostBootOptions = {}): Promise<BootedHost> {
   const host = new ElectronHostProcess({
     dataDir: app.getPath("userData"),
+    // 崩溃对用户可见:记录到 host-health 后经 electron-bridge-status 广播。
+    // 主动 dispose（应用退出 / 协议不匹配）会被 intentional 标志排除。
+    onExit: (info) => {
+      recordHostExit(info);
+    },
   });
 
   const slowHintTimer = setTimeout(() => {

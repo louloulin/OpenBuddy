@@ -15,6 +15,8 @@
  *   happen via deps callbacks bound in index.ts.
  */
 import { app, BrowserWindow } from "electron";
+import type { BridgeStatusPayload } from "../collaboration/send-safe";
+import { hostCoreHealth } from "../runtime/host-health";
 import { perfTraceMark } from "../observability/perf-trace";
 import { installProcessGuards } from "./process-guards";
 import { quitGateState } from "../agent/host-modules/bootstrap/install-host-modules";
@@ -37,7 +39,7 @@ export interface AppLifecycleDeps {
   onSecondInstance: (commandLine: ReadonlyArray<string>) => void;
   /** Bridge status broadcaster lifecycle (start + stop hooks). */
   bridgeBroadcaster?: {
-    start: (probe: () => { available: boolean; consecutiveFailures: number; lastErrorMessage: string | null; lastUpdated: number }) => void;
+    start: (probe: () => BridgeStatusPayload) => void;
     stop: () => void;
   };
   /** Called after the main window has been created, before background boot. */
@@ -92,6 +94,8 @@ export function installAppLifecycle(deps: AppLifecycleDeps): void {
         consecutiveFailures: 0,
         lastErrorMessage: null,
         lastUpdated: Date.now(),
+        // host-core 崩溃对用户可见：主进程独占这个状态，只能从这里随心跳下发。
+        hostCore: hostCoreHealth(),
       }));
       app.on("before-quit", () => bridgeBroadcaster.stop());
     }
