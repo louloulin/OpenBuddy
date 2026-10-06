@@ -80,7 +80,7 @@ export function ToolGroupSummary({
         </span>
       </button>
       {expanded && (
-        <ul className="tool-group-summary__list" role="list">
+        <ul className="tool-group-summary__list">
           {cluster.toolCalls.map((tc) => (
             <li key={tc.toolCallId} className="tool-group-summary__item">
               <ToolCallCard

@@ -222,6 +222,10 @@
   justify-content: center;
   width: 22px;
   height: 22px;
+  /* 2026-10-07 a11y:这些原先是 `<span role="button">`(键盘不可达),已换成真button。
+     button 的 UA 默认 padding 会把图标挤偏,而盒宽是写死的 22px,所以必须显式
+     清零 —— 否则每个调用点都得挂 inline style 兜底。 */
+  padding: 0;
   border-radius: 6px;
   color: var(--wb-text-tertiary);
   cursor: pointer;
@@ -1191,6 +1195,9 @@
   justify-content: center;
   width: 20px;
   height: 20px;
+  /* 同 .sidebar__conv-action:这些原本是 span role="button",换成真 button 后
+     必须清掉 UA 默认 padding,否则写死的 20px 盒子里图标会偏。 */
+  padding: 0;
   border-radius: 4px;
   color: var(--wb-text-tertiary);
   opacity: 0;
@@ -4216,7 +4223,7 @@
 .colleague-avatar { position: relative; flex-shrink: 0; }
 .colleague-avatar-face { display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 600; user-select: none; text-transform: uppercase; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
 .colleague-avatar-dot { position: absolute; bottom: 1px; right: 1px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--wb-bg-primary); }
-.colleague-avatar-dot--idle { background: #00c29a; }
+.colleague-avatar-dot--idle { background: var(--wb-brand-primary); }
 .colleague-avatar-dot--working { background: #5284ff; }
 .colleague-avatar-dot--abnormal { background: #e5484d; }
 

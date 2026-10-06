@@ -71,6 +71,7 @@ describe("ComposerChips (Plan5 componentization)", () => {
   describe("ComposerImageAttachmentChips", () => {
     const sample: ImageAttachment = {
       id: "img1",
+      kind: "image",
       mediaType: "image/png",
       data: "abc",
       name: "shot.png",

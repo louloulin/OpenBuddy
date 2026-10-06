@@ -96,7 +96,9 @@ export function PermissionPanel(props: PermissionPanelProps) {
         </select>
       </section>
 
-      <section className="permission-panel__view-tabs" role="tablist" aria-label="视图筛选">
+      {/* 原为 <section role="tablist">：section 是地标元素，赋予 tablist 角色
+          语义冲突（且会污染地标导航）。tablist 不需要地标语义，改用 div。 */}
+      <div className="permission-panel__view-tabs" role="tablist" aria-label="视图筛选">
         {VIEW_TABS.map((tab) => (
           <button
             key={tab.id}
@@ -110,7 +112,7 @@ export function PermissionPanel(props: PermissionPanelProps) {
             {tab.label} ({countByAction(rules, tab.id)})
           </button>
         ))}
-      </section>
+      </div>
 
       {onRuleAdd && (
         <section className="permission-panel__add" aria-labelledby="add-heading">

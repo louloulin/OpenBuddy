@@ -193,7 +193,9 @@ export function RewindBar({
             </button>
           </div>
 
-          {/* Mode selector — radiogroup + aria-pressed per button (R4.1) */}
+          {/* Mode selector — 互斥单选(radiogroup + aria-checked per radio)。
+              不要加 aria-pressed:role="radio" 不支持它,且 radio 组本身已由
+              aria-checked 表达选中态;两套状态属性并存会让 AT 播报冲突。 */}
           <div className="rewind-bar__modes" role="radiogroup" aria-label="回溯模式">
             {(Object.keys(MODE_LABELS) as RewindMode[]).map((mode) => (
               <button
@@ -206,7 +208,6 @@ export function RewindBar({
                 title={MODE_TITLES[mode]}
                 role="radio"
                 aria-checked={selectedMode === mode}
-                aria-pressed={selectedMode === mode}
               >
                 {MODE_LABELS[mode]}
               </button>

@@ -60,13 +60,16 @@ describe("R8.15 .msg__meta-chip base", () => {
 });
 
 describe("R8.15 .msg__meta-chip--model variant", () => {
-  it("brand-tints the pill so the model name reads as a tag", () => {
+  it("stays on the neutral surface — brand tinting was removed (R8.41 → R8.60)", () => {
     const body = ruleBody(prose, ".msg__meta-chip--model");
     expect(body).toBeTruthy();
-    expect(body!).toMatch(/color-mix\(in srgb,\s*var\(--wb-brand/);
-    // Model chip background uses brand at ~10% so it stays subtle on
-    // both light and dark themes.
-    expect(body!).toMatch(/var\(--wb-brand[\s\S]*?\)\s+10%/);
+    // The model chip used to be brand-tinted at ~10% so it read as a tag.
+    // It is now a neutral `--wb-text-strong` wash like its throughput
+    // sibling: brand is reserved for primary CTAs, and tinting every
+    // transcript chip drained the accent. Guard the removal so it does
+    // not creep back one declaration at a time.
+    expect(body!).not.toMatch(/var\(--wb-brand/);
+    expect(body!).toMatch(/color-mix\(in srgb,\s*var\(--wb-text-strong[^)]*\)\s+6%/);
   });
 });
 

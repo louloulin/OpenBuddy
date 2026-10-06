@@ -1140,6 +1140,11 @@
   text-align: center;
 }
 .iam-sub-footer {
+  /* 2026-10-07 a11y:这是真 <button>(此前是带 onClick 的 div,键盘不可达)。
+     button 的 UA 默认 display:inline-block + 内容宽度会让它比原来的 div 窄,
+     所以这里显式补成块级满宽 —— 与同组的 .iam-sub-item 保持同一套约定。 */
+  display: block;
+  width: 100%;
   padding: 8px 12px;
   font-size: 12px;
   color: var(--wb-brand);
@@ -1696,6 +1701,8 @@ body.dark .permission-picker__popover,
   flex: 1;
   min-width: 0;
   cursor: pointer;
+  /* 原为 div：按钮默认居中，标题/描述会跑偏。 */
+  text-align: left;
 }
 .project-card2__glyph {
   flex-shrink: 0;

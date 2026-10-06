@@ -53,6 +53,8 @@ describe("OpenBuddy Pi extension resolution", () => {
 
   it("adapts goal, plan, task, session, and fs pi backends to canonical OpenBuddy services", async () => {
     const emit = vi.fn();
+    const servicePinCalls: string[] = [];
+    const hostPinCalls: Array<[string, boolean]> = [];
     const services: Record<string, unknown> = {
       team: { list: async () => [{ id: "team-1" }] },
       plan: { list: async () => [{ sessionId: "s1", enabled: true }] },
@@ -66,8 +68,8 @@ describe("OpenBuddy Pi extension resolution", () => {
       sessions: {
         list: async () => [{ sessionId: "s-1" }],
         listWorkspaces: async () => [{ cwd: "/tmp", sessionCount: 1 }],
-        setPinned: async () => undefined,
-        setArchived: async () => undefined,
+        setPinned: async () => { servicePinCalls.push("pinned"); },
+        setArchived: async () => { servicePinCalls.push("archived"); },
       },
       fsLocal: {
         stat: async () => ({ exists: true, kind: "file" }),
@@ -152,7 +154,17 @@ describe("OpenBuddy Pi extension resolution", () => {
     expect(policyPayload.total).toBeGreaterThan(0);
     expect(policyPayload.allowed + policyPayload.denied + policyPayload.needsReview).toBe(policyPayload.total);
 
-    const ctx = { cwd: "/tmp/workspace", sessionManager: { getSessionId: () => "s-1" }, ui: { notify } };
+    // Pin/archive slash verbs must NOT land on the Cordis session service:
+    // it writes `sessions.pinned` in the catalog, while the sidebar reads the
+    // host metadata store. Two tables, one flag — and the slash verb's change
+    // never reached the UI. `invokeSessionCommand` routes these through
+    // `context.sessionMetadata` (agent-host's writer) instead.
+    const sessionMetadata = {
+      setPinned: async (id: string, pinned: boolean) => { hostPinCalls.push([id, pinned]); },
+      setArchived: async (id: string, archived: boolean) => { hostPinCalls.push([id, archived]); },
+    };
+
+    const ctx = { cwd: "/tmp/workspace", sessionManager: { getSessionId: () => "s-1" }, sessionMetadata, ui: { notify } };
 
     await commands.get("goal")!.handler("list", ctx);
     // Stage G-1d: goal now goes through invokeGoalCommand (real path)
@@ -168,6 +180,14 @@ describe("OpenBuddy Pi extension resolution", () => {
     expect(notify.mock.calls.at(-1)?.[0] as string).toContain("Task completed: t-1");
     await commands.get("sessions")!.handler("pin s-1", ctx);
     expect(notify.mock.calls.at(-1)?.[0] as string).toContain("Session pinned: s-1");
+    // Routed to the host metadata store (what the sidebar reads)…
+    expect(hostPinCalls).toEqual([["s-1", true]]);
+    // …and NOT to the catalog-backed service, which is the other half of the
+    // dual-track bug.
+    expect(servicePinCalls).toEqual([]);
+    await commands.get("sessions")!.handler("unarchive s-2", ctx);
+    expect(hostPinCalls).toEqual([["s-1", true], ["s-2", false]]);
+    expect(servicePinCalls).toEqual([]);
     await commands.get("fs")!.handler("read README.md", ctx);
     expect(notify.mock.calls.at(-1)?.[0] as string).toContain("stub content");
   });
@@ -859,31 +879,22 @@ describe("OpenBuddy Pi extension resolution", () => {
     expect(listResult.content[0]?.text).toContain("2 active team(s)");
   });
 
-  // Phase I.1 — task decision: keep Cordis, drop the orphan PI tool.
-  // The Stage G-1d `openbuddy_tasks` tool was retired in Phase I.1 because
-  // every verb it delegated to already exists as a slash command
-  // (`/tasks list|add|done|remove|clear`) that users invoke directly.
-  // The Cordis `task` service now owns the surface exclusively, so this
-  // test verifies the tool is NOT registered — only the slash commands
-  // `/tasks` and `/todo` (handled by the same adapter) project onto Pi.
-  it("Phase I.1: does NOT register an `openbuddy_tasks` pi tool (orphan removed)", async () => {
-    const services: Record<string, unknown> = {
-      "openbuddy-task": {
-        list: async () => [{ id: "t-1", status: "pending" }],
-        add: async () => ({ id: "t-2" }),
-      },
-    };
+  // Phase I.1 keeps `task` off the PI tool surface
+  // (OPENBUDDY_PI_NATIVE_PLAN.md v3 §I.1: 保留 Cordis，删 PI extension
+  // adapter). An agent-facing `openbuddy_tasks` tool was drafted and reverted.
+  // pi-todo therefore registers no tools at all — assert that explicitly, so
+  // re-adding one without amending §I.1 fails here rather than passing quietly.
+  it("pi-todo adapter registers no PI tools under Phase I.1", () => {
     const result = resolvePiExtensions(
       [{ id: "pi-todo" }],
       {
         profileDir: "/tmp/profile",
         resolveSource: () => { throw new Error("unused"); },
         emit: () => undefined,
-        resolveService: (owner) => services[owner],
+        resolveService: () => undefined,
       },
     );
-    const tools = collectRegisteredTools(result);
-    expect(tools.has("openbuddy_tasks")).toBe(false);
+    expect(collectRegisteredTools(result).size).toBe(0);
   });
 
   // Phase I.1 — task adapter still owns the slash commands `/tasks` and
@@ -952,25 +963,6 @@ describe("OpenBuddy Pi extension resolution", () => {
     const readResult = await tool.execute("tc-1", { verb: "read", path: "README.md" }, undefined, undefined, { cwd: "/tmp/workspace" } as never);
     expect(readResult.details.ok).toBe(true);
     expect(readResult.content[0]?.text).toContain("// contents of README.md");
-  });
-
-  // Phase I.1 — orphan `openbuddy_tasks` tool is gone; the Cordis path
-  // replaces it entirely. This test replaces the old "graceful error when
-  // service not mounted" test because that path no longer exists.
-  it("Phase I.1: pi-todo adapter ships zero tools (orphan removed, Cordis owns surface)", async () => {
-    const result = resolvePiExtensions(
-      [{ id: "pi-todo" }],
-      {
-        profileDir: "/tmp/profile",
-        resolveSource: () => { throw new Error("unused"); },
-        emit: () => undefined,
-        resolveService: () => undefined,
-      },
-    );
-    const tools = collectRegisteredTools(result);
-    // No tools at all — the only surface the LLM has today is the
-    // slash commands `/tasks` and `/todo`, both owned by Cordis.
-    expect(tools.size).toBe(0);
   });
 });
 

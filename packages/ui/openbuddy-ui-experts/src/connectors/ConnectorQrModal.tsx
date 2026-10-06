@@ -55,8 +55,9 @@ export function ConnectorQrModal({ connector, root, url, showQr, logs, onCancel,
     );
   };
 
+  // role="presentation":遮罩点击是纯指针便利;键盘/读屏用户走 × 按钮或 Escape。
   return (
-    <div className="ec-modal-overlay" ref={overlayRef}
+    <div className="ec-modal-overlay" ref={overlayRef} role="presentation"
       onClick={(e) => { if (e.target === overlayRef.current) onCancel(); }}>
       <div className="ec-modal">
         <button type="button" className="ec-modal-close" onClick={onCancel} aria-label="关闭">×</button>

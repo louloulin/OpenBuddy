@@ -34,7 +34,7 @@
  *   (this is a leaf module inside the ui-runtime package).
  */
 
-import type { ComponentType, ReactNode } from "react";
+import { createElement, type ComponentType, type FunctionComponent, type ReactNode } from "react";
 import type { SlotMap } from "@openbuddy/ui-slots";
 
 /**
@@ -161,10 +161,19 @@ export class PluginUIHost {
     if (!Widget) {
       // Fire-and-forget: we await the dispatcher in the host loop
       // so consumers can compose async sinks (e.g. metrics flush).
-      void this.dispatcher.dispatch(type, props as Record<string, unknown>);
+      //
+      // `type` is a plugin widget type, not necessarily a declared slot key,
+      // so it is narrowed the same way the runtime has always treated it: the
+      // dispatcher receives it and decides whether anything is registered.
+      void this.dispatcher.dispatch(type as SlotKey, props as Record<string, unknown>);
       return null;
     }
-    return Widget({ props });
+    // `ComponentType` is `ComponentClass | FunctionComponent`. Only the
+    // function form is directly callable; the class form must go through
+    // `createElement`, which is also what the renderer ends up doing for it.
+    return typeof Widget === "function"
+      ? createElement(Widget as FunctionComponent<{ props: P }>, { props })
+      : createElement(Widget, { props });
   }
 
   /** Forward a PI UI event to the slot system. Used by

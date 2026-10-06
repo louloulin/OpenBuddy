@@ -118,7 +118,10 @@ describe("confirm():异步契约与全局 store 路由", () => {
 
 const ROOTS = ["src", "packages/ui"];
 const SKIP_DIRS = new Set(["node_modules", "__tests__", "dist", "out", ".turbo"]);
+// The wrapper itself lives in `@openbuddy/platform`; the
+// `src/lib/platform/electron-api.ts` path is now a re-export of it.
 const ELECTRON_API = join("src", "lib", "platform", "electron-api.ts");
+const PLATFORM_ELECTRON_API = join("packages", "ui", "openbuddy-platform", "src", "electron-api.ts");
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -163,7 +166,7 @@ describe("原生模态框的全仓守卫", () => {
   it("每个 `confirm(` 都来自包装层(不许用全局 window.confirm)", () => {
     const offenders = [...sourceText.entries()]
       .filter(([file, text]) => {
-        if (file.endsWith(ELECTRON_API)) return false; // 包装层自身
+        if (file.endsWith(ELECTRON_API) || file.endsWith(PLATFORM_ELECTRON_API)) return false; // 包装层自身
         if (!/(^|[^\w.$])confirm\s*\(/.test(text)) return false;
         return !/import\s*\{[^}]*\bconfirm\b[^}]*\}\s*from\s*"@\/lib\/platform\/electron-api"/.test(
           readFileSync(file, "utf8"),
@@ -176,7 +179,7 @@ describe("原生模态框的全仓守卫", () => {
   it("每个 `confirm(` 调用点都被 await(R40 之前的漏 await 是安全门漏洞)", () => {
     const offenders: string[] = [];
     for (const [file, text] of sourceText.entries()) {
-      if (file.endsWith(ELECTRON_API)) continue;
+      if (file.endsWith(ELECTRON_API) || file.endsWith(PLATFORM_ELECTRON_API)) continue;
       for (const match of text.matchAll(/(^|[^\w.$])confirm\s*\(/g)) {
         const before = text.slice(Math.max(0, match.index - 6), match.index + match[1].length);
         // 合法写法只允许 `await confirm(`:漏 await 会让 `!confirm(...)` 恒假,

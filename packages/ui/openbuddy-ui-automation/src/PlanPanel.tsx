@@ -421,19 +421,21 @@ function PlanRow({
         )}
         <div className="plan-panel__row-meta">
           <button
+            type="button"
             className="plan-panel__row-priority plan-panel__row-priority--clickable"
             onClick={onCyclePriority}
             title="点击切换优先级"
           >
             {PRIORITY_LABEL[entry.priority]}
           </button>
-          <span
+          <button
+            type="button"
             className="plan-panel__row-status plan-panel__row-status--clickable"
             onClick={onCycleStatus}
             title="点击切换状态"
           >
             {STATUS_LABEL[entry.status]}
-          </span>
+          </button>
           {elapsed !== undefined && (
             <span className="plan-panel__row-elapsed">
               ⏱ {formatElapsed(elapsed)}

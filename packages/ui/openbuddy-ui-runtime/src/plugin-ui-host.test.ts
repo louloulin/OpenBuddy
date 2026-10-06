@@ -4,7 +4,10 @@
  * Verifies the PI ExtensionRunner UI bridge: PluginWidgetRegistry
  * + ConsoleSlotDispatcher + CompositeSlotDispatcher + PluginUIHost.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { act } from "react";
+import { Component, createElement, Fragment } from "react";
+import { createRoot } from "react-dom/client";
 import {
   PluginWidgetRegistry,
   ConsoleSlotDispatcher,
@@ -14,6 +17,15 @@ import {
 } from "./plugin-ui-host";
 
 describe("Phase E.2 — plugin-ui-host", () => {
+  // `act()` is a no-op unless the environment opts in, which makes the
+  // render assertions below pass for the wrong reason.
+  beforeAll(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  });
+  afterAll(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
+  });
+
   describe("PluginWidgetRegistry", () => {
     it("registers, resolves, unregisters a widget", () => {
       const reg = new PluginWidgetRegistry();
@@ -93,6 +105,47 @@ describe("Phase E.2 — plugin-ui-host", () => {
       // a React-element (we don't assert on its identity here).
       const node = host.render("custom", { x: 1 });
       expect(node).toBeDefined();
+    });
+
+    it("render() actually mounts the widget with the props it was given", () => {
+      // `render()` returns an unrendered React element, so the widget body has
+      // NOT run yet — asserting on the returned node alone (as the test above
+      // does) would pass even if the widget were never invoked at all. Render
+      // it for real and assert the widget saw the props.
+      const Widget = ({ props }: { props: { label: string } }) =>
+        createElement("span", null, props.label);
+      const host = new PluginUIHost();
+      host.widgets.register("custom", Widget as never);
+
+      const node = host.render("custom", { label: "hello-from-widget" });
+
+      const container = document.createElement("div");
+      act(() => {
+        createRoot(container).render(createElement(Fragment, null, node));
+      });
+      expect(container.textContent).toBe("hello-from-widget");
+    });
+
+    it("render() mounts a class-component widget, not just a function one", () => {
+      // `PluginWidget` is `ComponentType`, i.e. `ComponentClass | FunctionComponent`.
+      // Calling the union as a function type-checks for neither and would throw
+      // at runtime for the class form, so `render()` must route both through
+      // `createElement`.
+      class ClassWidget extends Component<{ props: { label: string } }> {
+        override render() {
+          return createElement("span", null, this.props.props.label);
+        }
+      }
+      const host = new PluginUIHost();
+      host.widgets.register("custom", ClassWidget as never);
+
+      const node = host.render("custom", { label: "from-class" });
+
+      const container = document.createElement("div");
+      act(() => {
+        createRoot(container).render(createElement(Fragment, null, node));
+      });
+      expect(container.textContent).toBe("from-class");
     });
 
     it("render() falls back to dispatcher and returns null when no widget is registered", async () => {

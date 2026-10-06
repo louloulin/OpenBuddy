@@ -29,12 +29,12 @@ name: Rust Host Core
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - "crates/**"
       - ".github/workflows/rust-host-core.yml"
   pull_request:
-    branches: [master]
+    branches: [main]
     paths:
       - "crates/**"
       - ".github/workflows/rust-host-core.yml"

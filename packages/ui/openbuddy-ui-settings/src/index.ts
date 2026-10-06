@@ -66,7 +66,8 @@ export {
 // 同一个区域,但没有任何消费者(见该包里的 deprecation 说明)。
 //
 // 其中 `home.scene.tab` 此前**完全没有声明** —— 而它是全仓最久经考验的插件
-// 扩展点之一:`examples/openbuddy-plugin-hello`、`scripts/electron/_probe-plugin-sdk.mjs`
+// 扩展点之一:`examples/openbuddy-plugin-hello`、
+// `scripts/_archive/electron-probes/_probe-plugin-sdk.mjs`
 // 与 plugin-sdk 的 `author.ts` 文档都在用它,插件作者却在编辑器里拿不到类型。
 declare module "@openbuddy/ui-slots" {
   interface SlotMap {

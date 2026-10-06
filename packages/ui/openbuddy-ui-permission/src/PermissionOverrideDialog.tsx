@@ -56,17 +56,25 @@ export function PermissionOverrideDialog(props: PermissionOverrideDialogProps) {
   };
 
   return (
+    // 外层遮罩只负责"点击空白处关闭"，本身不是控件，标为 presentation 移出无障碍树；
+    // role="dialog" 落在真正的对话框容器上，并补上 Esc 键盘等价路径。
     <div
       className="permission-override-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="permission-override-title"
+      role="presentation"
       data-testid="permission-override-dialog"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="permission-override-modal">
+      <div
+        className="permission-override-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="permission-override-title"
+      >
         <header className="permission-override-modal__header">
           <h2 id="permission-override-title">本次会话权限覆盖</h2>
           <p className="permission-override-modal__session">

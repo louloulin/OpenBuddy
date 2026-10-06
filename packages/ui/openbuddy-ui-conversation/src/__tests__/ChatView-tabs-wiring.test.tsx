@@ -27,11 +27,11 @@ vi.mock("@/lib/platform/electron-api", () => ({
 }));
 // Partial mock: keep every other export, only stub the three methods ChatView pulls in.
 vi.mock(import("@/lib/agent/pi-client"), async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import("@/lib/agent/pi-client")>();
   return {
     ...actual,
     piListSessions: () => Promise.resolve([]),
-    piSetThinkingLevel: () => Promise.resolve(),
+    piSetThinkingLevel: () => Promise.resolve({ ok: true as const, level: "off" as const }),
     sessionFork: () => Promise.resolve("fork"),
   };
 });

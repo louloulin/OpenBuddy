@@ -16,9 +16,17 @@ export function SkillCatalogCard({
   onOpen: (skill: SkillItem) => void;
   root?: string;
 }) {
+  // 卡片内嵌了一个真实 <button>(安装),把容器换成 <button> 会产生非法的
+  // 按钮嵌套;保留容器元素并补 role + tabIndex + 键盘事件,让键盘用户能激活卡片。
+  const openFromCard = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(skill); }
+  };
   return (
-    <article className={`sk-card${installed ? " sk-card--installed" : ""}`}
-      onClick={() => onOpen(skill)} style={{ cursor: "pointer" }}>
+    <div className={`sk-card${installed ? " sk-card--installed" : ""}`}
+      role="button" tabIndex={0}
+      onClick={() => onOpen(skill)}
+      onKeyDown={openFromCard}
+      style={{ cursor: "pointer" }}>
       <div className="sk-card-top">
         {skill.iconLocal ? (
           <ConnectorIcon local={skill.iconLocal} name={skill.name} size={32} shape="square" root={root} />
@@ -38,6 +46,6 @@ export function SkillCatalogCard({
         <span className="sk-card-name-text">{skill.name}</span>
       </div>
       <p className="sk-card-desc">{skill.desc || "（无描述）"}</p>
-    </article>
+    </div>
   );
 }

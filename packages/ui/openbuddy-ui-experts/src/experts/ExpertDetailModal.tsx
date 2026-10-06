@@ -32,10 +32,12 @@ export function ExpertDetailModal({ expert, root, onClose, onSummon }: Props) {
   const sub = expert.name !== title ? expert.name : "";
   const quickPrompts = (expert.quickPrompts ?? []).filter(Boolean).slice(0, 5);
 
+  // role="presentation":遮罩点击是纯指针便利;键盘/读屏用户走 × 按钮或 Escape。
   return (
     <div
       className="ec-modal-overlay"
       ref={overlayRef}
+      role="presentation"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
       <div className="ec-modal">

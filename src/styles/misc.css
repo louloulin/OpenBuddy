@@ -1020,7 +1020,7 @@
   white-space: nowrap;
 }
 .sidebar__subagent-stat--running { color: #00a3ff; }
-.sidebar__subagent-stat--completed { color: #00c29a; }
+.sidebar__subagent-stat--completed { color: var(--wb-brand-primary); }
 .sidebar__subagent-stat--failed { color: #ef4444; }
 .sidebar__subagent-label {
   opacity: 0.7;
@@ -1056,7 +1056,7 @@
   opacity: 0.55;
 }
 .sidebar__subagent-row--running .sidebar__subagent-glyph { color: #00a3ff; }
-.sidebar__subagent-row--completed .sidebar__subagent-glyph { color: #00c29a; }
+.sidebar__subagent-row--completed .sidebar__subagent-glyph { color: var(--wb-brand-primary); }
 .sidebar__subagent-row--failed .sidebar__subagent-glyph { color: #ef4444; }
 .sidebar__subagent-row--cancelled .sidebar__subagent-glyph { color: #94a3b8; }
 .sidebar__subagent-glyph {

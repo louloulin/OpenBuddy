@@ -6,7 +6,7 @@
  * Unlike WorkBuddy (which inlines the view), we use a full-screen overlay so
  * the back button returns to the skill grid without disturbing the grid state.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { SkillItem, SkillInfo } from "@openbuddy/shared-types";
 import { parseSkillFrontmatter, skillsCatalogReadSkill, skillsAdd } from "@/lib/agent/pi-client";
 import { useFrontmatter } from "@openbuddy/ui-shared";
@@ -32,6 +32,7 @@ export function SkillDetailModal({ skill, installed = [], onClose, onInstalled, 
   const [rawMd, setRawMd] = useState("");
   const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -77,9 +78,11 @@ export function SkillDetailModal({ skill, installed = [], onClose, onInstalled, 
   const displayName = meta.name || skill.name;
   const description = skill.desc || meta.description || "";
 
+  // role="presentation":遮罩点击是纯指针便利;键盘/读屏用户走 × 按钮或 Escape。
   return (
-    <div className="sk-detail-overlay" onClick={onClose}>
-      <div className="sk-detail" onClick={(e) => e.stopPropagation()}>
+    <div className="sk-detail-overlay" ref={overlayRef} role="presentation"
+      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}>
+      <div className="sk-detail">
         {/* Header bar with back button */}
         <div className="sk-detail-bar">
           <button type="button" className="um-back" onClick={onClose}>
@@ -105,7 +108,8 @@ export function SkillDetailModal({ skill, installed = [], onClose, onInstalled, 
                       <CheckIcon size="sm" /><span>已安装</span>
                     </span>
                     <label className="sk-toggle" title={installedEntry.enabled ? "已启用" : "已禁用"}>
-                      <input type="checkbox" checked={installedEntry.enabled} readOnly />
+                      <input type="checkbox" checked={installedEntry.enabled} readOnly
+                        aria-label={`${displayName} 启用状态`} />
                       <span className="sk-toggle-track"><span className="sk-toggle-thumb" /></span>
                     </label>
                   </>

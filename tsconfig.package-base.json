@@ -13,9 +13,38 @@
   //   - 单一来源维护,vite-tsconfig-paths 直接读 paths 派生 alias
   // =====================================================================
   "extends": "./tsconfig.base.json",
+  // Shared ambient declarations, injected into every package program via
+  // the one key that MERGES down the extends chain (`include` is replaced).
+  //   - types/ambient.d.ts — must stay a script (no top-level import)
+  //   - types/setup-types.d.ts — the jest-dom side that does need imports
+  //   - types/vite-env.d.ts — Vite injects `import.meta.env` into every
+  //     bundled module; without it a package that pulls such a store in
+  //     through a `paths` alias fails TS2339, because the store's own
+  //     src/vite-env.d.ts is only in the program when it sits inside that
+  //     package's own include.
+  //   - electron/main/ws.d.ts — the ambient `declare module "ws"` shim
+  //     lives next to its main consumer; without it any package program
+  //     that reaches the harness gets an implicit-any TS7016.
+  "files": [
+    "types/ambient.d.ts",
+    "types/setup-types.d.ts",
+    "types/vite-env.d.ts",
+    "electron/main/ws.d.ts"
+  ],
   "compilerOptions": {
     "baseUrl": ".",
     "noEmit": true,
+    // ES2022 made the compiler reject code that Node 24 / esbuild already run:
+    // `findLast` is ES2023 and `Promise.withResolvers` is ES2024. The old lib
+    // declaration was simply out of date — widen it rather than rewrite working
+    // code (overrides tsconfig.base.json's ES2022).
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    // NOTE: there is deliberately no `include` here. A relative `include` in an
+    // extended config resolves against THIS file's directory (the repo root),
+    // so `["src/**/*"]` would mean the root `src/`, not the deriving package's.
+    // Worse, `files` suppresses the default `**/*` include entirely, so a
+    // package that declares only `files` compiles nothing and still reports
+    // zero errors. Each package therefore declares its own `include`.
     "paths": {
       "@/*": [
         "./src/*"
@@ -429,11 +458,7 @@
       "@openbuddy/ui-editor/lib/slash-command": ["./packages/ui/openbuddy-ui-editor/src/lib/slash-command.ts"],
       "@openbuddy/ui-editor/styles": ["./packages/ui/openbuddy-ui-editor/src/styles/index.css"],
       "@openbuddy/ui-modules/components": ["./packages/ui/openbuddy-ui-modules/src/components/index.ts"],
-      "@openbuddy/ui-modules/components/CapabilityVersionBadge": ["./packages/ui/openbuddy-ui-modules/src/components/CapabilityVersionBadge.tsx"],
-      "@openbuddy/ui-modules/components/InstallDialog": ["./packages/ui/openbuddy-ui-modules/src/components/InstallDialog.tsx"],
       "@openbuddy/ui-modules/components/marketplace-model": ["./packages/ui/openbuddy-ui-modules/src/components/marketplace-model.ts"],
-      "@openbuddy/ui-modules/components/MarketplaceCard": ["./packages/ui/openbuddy-ui-modules/src/components/MarketplaceCard.tsx"],
-      "@openbuddy/ui-modules/components/MarketplaceTab": ["./packages/ui/openbuddy-ui-modules/src/components/MarketplaceTab.tsx"],
       "@openbuddy/ui-onboarding": ["./packages/ui/openbuddy-ui-onboarding/src/index.ts"],
       "@openbuddy/ui-onboarding/client": ["./packages/ui/openbuddy-ui-onboarding/src/client.tsx"],
       "@openbuddy/ui-onboarding/components": ["./packages/ui/openbuddy-ui-onboarding/src/components/index.ts"],
@@ -481,6 +506,12 @@
       "@openbuddy/ui-contract/markdown/content-blocks": ["./packages/ui/openbuddy-ui-contract/src/markdown/content-blocks.ts"],
       "@openbuddy/ui-contract/plan-utils": ["./packages/ui/openbuddy-ui-contract/src/plan-utils.ts"],
       "@openbuddy/ui-contract/yield-state": ["./packages/ui/openbuddy-ui-contract/src/yield-state.ts"],
+      "@openbuddy/ui-contract/pi-client": ["./packages/ui/openbuddy-ui-contract/src/pi-client.ts"],
+      "@openbuddy/ui-contract/pi-client-email": ["./packages/ui/openbuddy-ui-contract/src/pi-client-email.ts"],
+      "@openbuddy/ui-contract/pi-client-collaboration": ["./packages/ui/openbuddy-ui-contract/src/pi-client-collaboration.ts"],
+      "@openbuddy/ui-contract/pi-client-providers": ["./packages/ui/openbuddy-ui-contract/src/pi-client-providers.ts"],
+      "@openbuddy/ui-contract/progress-runs": ["./packages/ui/openbuddy-ui-contract/src/progress-runs.ts"],
+      "@openbuddy/ui-contract/pi-bridge-client": ["./packages/ui/openbuddy-ui-contract/src/pi-bridge-client.ts"],
       "@openbuddy/ui-primitives/ErrorBoundary": ["./packages/ui/openbuddy-ui-primitives/src/ErrorBoundary.tsx"],
       "@openbuddy/ui-primitives/StatusIndicator": ["./packages/ui/openbuddy-ui-primitives/src/StatusIndicator.tsx"],
       "@openbuddy/ui-state/feedback-store": ["./packages/ui/openbuddy-ui-state/src/feedback-store.ts"],
@@ -495,6 +526,5 @@
       "@openbuddy/platform/electron-api": ["./packages/ui/openbuddy-platform/src/electron-api.ts"],
       "@openbuddy/ui-state/session-store": ["./packages/ui/openbuddy-ui-state/src/session-store.ts"]
             }
-  },
-  "include": ["src/**/*"]
+  }
 }

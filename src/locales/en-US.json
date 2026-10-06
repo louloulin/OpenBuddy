@@ -59,6 +59,7 @@
     "attachFile": "Attach file"
   },
   "skill": {
+    "bar": { "title": "Recommended Skills" },
     "title": "Skills",
     "install": "Install",
     "installed": "Installed",

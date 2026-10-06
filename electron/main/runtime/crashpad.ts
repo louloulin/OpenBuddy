@@ -167,3 +167,73 @@ export function _resetForTests(): void {
   started = false;
   activeCrashpadDir = null;
 }
+
+/**
+ * Exit code the main process uses when an uncaughtException is fatal.
+ * Distinct from the `0` used by the second-instance bail-out so a crash-loop
+ * supervisor can tell "another instance owned the lock" from "we crashed".
+ */
+export const MAIN_CRASH_EXIT_CODE = 1;
+
+export interface MainCrashHandlerDeps {
+  crashpadDir: string;
+  /** Injectable so tests can assert the exit without killing the runner. */
+  exit?: (code: number) => void;
+  log?: (...args: unknown[]) => void;
+}
+
+/**
+ * Install the main-process `uncaughtException` / `unhandledRejection`
+ * handlers that pair with `recordMainCrash`.
+ *
+ * The asymmetry is deliberate and load-bearing:
+ *
+ *   - `uncaughtException` **terminates**. Node's default behaviour is to exit
+ *     on an uncaught exception, but registering *any* `uncaughtException`
+ *     listener suppresses that default — so a handler that merely logs turns a
+ *     fatal main-process crash into a silently limping process whose Electron
+ *     state (window handles, host-core IPC, SQLite cursors) is now undefined.
+ *     We dump synchronously (`recordMainCrash` uses `writeFileSync`, so the
+ *     bytes are on disk before we return) and then exit.
+ *   - `unhandledRejection` does **not** terminate. The rejection has already
+ *     been swallowed by the time the handler fires and many code paths are
+ *     best-effort by design; Node 15+ agrees by not exiting either.
+ *
+ * Returns a disposer that removes both listeners (tests; also lets a future
+ * shutdown path hand control back to Node's default handling).
+ */
+export function installMainCrashHandlers(deps: MainCrashHandlerDeps): () => void {
+  const exit = deps.exit ?? ((code: number): void => process.exit(code));
+  const log = deps.log ?? ((...args: unknown[]): void => console.error(...args));
+
+  const dump = (kind: MainCrashEntry["kind"], err: unknown): void => {
+    try {
+      recordMainCrash(deps.crashpadDir, {
+        kind,
+        name: err instanceof Error ? err.name : undefined,
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+    } catch (dumpErr) {
+      // Never let the recorder itself re-crash the process; stderr is the
+      // last resort so the original failure is not buried under a second one.
+      log("[openbuddy-crashpad] failed to persist dump:", dumpErr);
+    }
+    log(`[openbuddy-crashpad] main ${kind}:`, err);
+  };
+
+  const onUncaught = (err: unknown): void => {
+    dump("uncaughtException", err);
+    exit(MAIN_CRASH_EXIT_CODE);
+  };
+  const onRejection = (reason: unknown): void => {
+    dump("unhandledRejection", reason);
+  };
+
+  process.on("uncaughtException", onUncaught);
+  process.on("unhandledRejection", onRejection);
+  return () => {
+    process.off("uncaughtException", onUncaught);
+    process.off("unhandledRejection", onRejection);
+  };
+}

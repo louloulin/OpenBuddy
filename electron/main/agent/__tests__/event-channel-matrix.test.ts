@@ -149,10 +149,11 @@ describe("event channel matrix", () => {
       if (row.status !== "live") continue;
       if (!row.consumer.includes(":")) continue; // skip channels with no consumer path
       const [file] = row.consumer.split(":");
-      // Accept absolute consumer paths (electron/...), src-prefixed paths, or bare src paths.
+      // Consumer paths are repo-relative: `electron/...` in main, `src/...` for
+      // app code, and `packages/...` for anything that has been descended out of
+      // the app (阶段2b/2c). Only bare names get the legacy `src/` prefix.
       let resolved: string;
-      if (file.startsWith("src/")) resolved = file;
-      else if (file.startsWith("electron/")) resolved = file;
+      if (file.startsWith("src/") || file.startsWith("electron/") || file.startsWith("packages/")) resolved = file;
       else resolved = `src/${file}`;
       const src = readText(resolved);
       expect(src.includes(row.channel), `${row.channel}: consumer column references ${file} but channel string is not present`).toBe(true);

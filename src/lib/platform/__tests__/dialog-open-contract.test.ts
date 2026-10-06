@@ -131,6 +131,10 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const sourceFiles = ROOTS.flatMap((root) => walk(root));
 
+// The dialog wrapper itself lives in `@openbuddy/platform`; the
+// `src/lib/platform/electron-api.ts` path is now a re-export of it.
+const PLATFORM_ELECTRON_API = join("packages", "ui", "openbuddy-platform", "src", "electron-api.ts");
+
 describe("对话框入口的全仓守卫", () => {
   it("扫描面不为空(守卫本身有意义)", () => {
     expect(sourceFiles.length).toBeGreaterThan(200);
@@ -149,13 +153,20 @@ describe("对话框入口的全仓守卫", () => {
     const offenders = sourceFiles.filter(
       (file) =>
         !file.endsWith(join("src", "lib", "platform", "electron-api.ts")) &&
+        !file.endsWith(PLATFORM_ELECTRON_API) &&
         /\.dialog\.open\s*\(/.test(readFileSync(file, "utf8")),
     );
     expect(offenders).toEqual([]);
   });
 
-  it("旧入口在 electron-api 里仍保留(deprecated,不破坏第三方插件)", async () => {
-    const source = readFileSync(join("src", "lib", "platform", "electron-api.ts"), "utf8");
-    expect(source).toMatch(/@deprecated/);
+  it("旧入口仍保留且标注 @deprecated(不破坏第三方插件)", async () => {
+    // The implementation moved to `@openbuddy/platform` in stage 2b;
+    // `src/lib/platform/electron-api.ts` is now a `export *` re-export of
+    // it. Both properties matter: the deprecated export must survive the
+    // move for third-party plugins, and the marker must travel with it.
+    const legacy = readFileSync(join("src", "lib", "platform", "electron-api.ts"), "utf8");
+    expect(legacy).toMatch(/export \* from "\@openbuddy\/platform\/electron-api"/);
+    const implementation = readFileSync(PLATFORM_ELECTRON_API, "utf8");
+    expect(implementation).toMatch(/@deprecated[\s\S]*?export async function open\(/);
   });
 });

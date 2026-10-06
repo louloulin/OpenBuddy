@@ -13,7 +13,7 @@ This document is the result of running **structural queries only** (`ls`, `find`
 | `[I]` | Reasonable inference from neighbouring verified facts. Treat as a hypothesis until you re-check. |
 | `[OOS]` | Out of scope of this snapshot — listed for orientation, not analysed. |
 
-The repo already contains [PROJECT_ANALYSIS.md](../PROJECT_ANALYSIS.md) and [openbuddy-capability-matrix.md](openbuddy-capability-matrix.md). Those documents predate this one and use slightly different counts; treat this file as the canonical 2026-09-05 reference.
+The repo already contains [PROJECT_ANALYSIS.md](_archive/PROJECT_ANALYSIS.md) and [openbuddy-capability-matrix.md](openbuddy-capability-matrix.md). Those documents predate this one and use slightly different counts; treat this file as the canonical 2026-09-05 reference.
 
 ---
 

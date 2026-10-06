@@ -59,6 +59,7 @@
     "attachFile": "附加文件"
   },
   "skill": {
+    "bar": { "title": "推荐技能" },
     "title": "技能",
     "install": "安装",
     "installed": "已安装",

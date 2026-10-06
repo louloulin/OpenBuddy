@@ -96,7 +96,7 @@ export function ExtensionPolicyEditor({ initial, onSaved, onToast }: ExtensionPo
           保存并重新解析
         </button>
         {status && (
-          <output role="status" data-testid="extension-policy-status">
+          <output data-testid="extension-policy-status">
             {status}
           </output>
         )}

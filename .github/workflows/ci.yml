@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 permissions:
   contents: read
@@ -45,6 +45,28 @@ jobs:
           pnpm typecheck
           pnpm workspace:typecheck
           pnpm verify:agent-host-boundaries
+
+      # Dictionary parity + ratcheting hardcoded-CJK gate. Separate from
+      # typecheck because it needs no compiler: a new untranslated string or a
+      # new hardcoded literal fails here even though every type is correct.
+      - name: i18n consistency gate
+        run: pnpm verify:i18n
+
+      # Ratcheting hardcoded-color gate. Also compiler-free: a literal that
+      # silently ignores dark mode is a theme bug that no type or unit test
+      # will ever catch.
+      - name: hardcoded color gate
+        run: pnpm verify:colors
+
+      # Accessibility gate. This cannot live in the `lint-tools` job: that job
+      # is `continue-on-error: true` (it also runs Sheriff and Prettier, which
+      # are report-only), so an a11y error there would block nothing. jsx-a11y
+      # is enabled as errors in eslint.config.mjs and was previously gated on
+      # exactly one rule, which let 210 keyboard-unreachable fake buttons
+      # (`<span role="button" onClick>`) accumulate. No ratchet baseline here:
+      # the debt is paid, so any new finding is a regression.
+      - name: accessibility gate
+        run: pnpm verify:a11y
 
   test:
     name: Unit Tests

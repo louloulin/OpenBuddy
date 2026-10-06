@@ -33,6 +33,14 @@ export interface AdapterToolSpec<TParams extends TSchema = TSchema> {
    * the lambda so the bridge stays free of TypeBox-specific typing.
    */
   serializeArgs: (args: unknown) => string;
+  /**
+   * Responder for the passthrough-fallback path (see
+   * `registerDescribeFallbackTool`). Required when the owning adapter has no
+   * command with an `invokeInvocation`; ignored when one exists, because the
+   * invoke handler is the real capability. Adapters with *some* commands can
+   * omit it and let the factory borrow the first command's describe handler.
+   */
+  describeInvocation?: (service: unknown, args: string) => string | Promise<string>;
 }
 
 export interface AdapterToolContext {
@@ -76,7 +84,11 @@ export function registerAdapterTool<TParams extends TSchema>(
       const context = buildContextFromExtension(ctx);
       try {
         const summary = await options.invokeInvocation(service, argString, context);
-        const text = summary ?? "OpenBuddy adapter tool completed without text summary.";
+        // A verb the service does not implement yields undefined rather than
+        // throwing; the describe handler explains that better than a generic
+        // "completed without text summary" stub.
+        const text = summary ?? (spec.describeInvocation ? await spec.describeInvocation(service, argString) : undefined)
+          ?? "OpenBuddy adapter tool completed without text summary.";
         return {
           content: [{ type: "text", text }],
           details: { ok: true, summary: text, capability: spec.name },

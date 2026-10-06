@@ -47,7 +47,7 @@ export function resolveRepoRoot(start: string): string {
   return start;
 }
 
-export function resolveHostBinary(env: NodeJS.ProcessEnv = process.env): string {
+export function resolveHostBinary(env: NodeJS.ProcessEnv = process.env, repoRootOverride?: string): string {
   const override = env.PI_OPENBUDDY_HOST_BIN;
   if (pathExists(override)) {
     return override;
@@ -64,9 +64,11 @@ export function resolveHostBinary(env: NodeJS.ProcessEnv = process.env): string 
 
   // Monorepo dev / build paths. We compute the repo root from this module's
   // URL so the resolver works regardless of how the package is consumed
-  // (monorepo symlink, hoisted install, etc.).
+  // (monorepo symlink, hoisted install, etc.). The override exists so tests
+  // can point at a fixture tree instead of whichever checkout — or
+  // whether or not anyone has run `cargo build` — happens to be on disk.
   const here = dirname(fileURLToPath(import.meta.url));
-  const repoRoot = resolveRepoRoot(here);
+  const repoRoot = repoRootOverride ?? resolveRepoRoot(here);
   const candidates = [
     join(repoRoot, `crates/target/release/openbuddy-host-core${EXE_SUFFIX}`),
     join(repoRoot, `crates/target/debug/openbuddy-host-core${EXE_SUFFIX}`),

@@ -33,12 +33,12 @@ const jsonOut = [...args].find((arg) => arg.startsWith("--json="))?.split("=", 2
   ?? (args.has("--json") ? "dist/bundle-baseline.json" : null);
 
 const targets = [
-  { dir: join(repoRoot, "out", "renderer", "assets"), label: "renderer" },
+  { dir: join(repoRoot, "dist", "renderer", "assets"), label: "renderer" },
 ];
 if (includeMain) {
   targets.push(
-    { dir: join(repoRoot, "out", "main"), label: "main" },
-    { dir: join(repoRoot, "out", "preload"), label: "preload" },
+    { dir: join(repoRoot, "dist", "main"), label: "main" },
+    { dir: join(repoRoot, "dist", "preload"), label: "preload" },
   );
 }
 

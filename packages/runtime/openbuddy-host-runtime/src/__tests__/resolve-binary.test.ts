@@ -75,10 +75,10 @@ describe("resolveHostBinary — PI_OPENBUDDY_HOST_BIN 优先级", () => {
 
   it("env override 指向不存在的路径时 fallback 到其他候选", () => {
     const tmp = buildMonorepo({ release: true, debug: true });
-    const result = resolveHostBinary({
-      ...process.env,
-      PI_OPENBUDDY_HOST_BIN: "/nonexistent/path/to/host-core",
-    });
+    const result = resolveHostBinary(
+      { ...process.env, PI_OPENBUDDY_HOST_BIN: "/nonexistent/path/to/host-core" },
+      tmp,
+    );
     expect(result.endsWith(`target/release/openbuddy-host-core${EXE_SUFFIX}`)).toBe(true);
     rmSync(tmp, { recursive: true, force: true });
   });
@@ -113,7 +113,7 @@ describe("resolveHostBinary — packaged resourcesPath", () => {
     delete (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
     delete process.env.PI_OPENBUDDY_HOST_BIN;
     try {
-      const result = resolveHostBinary();
+      const result = resolveHostBinary(process.env, tmp);
       expect(result.endsWith(`target/release/openbuddy-host-core${EXE_SUFFIX}`)).toBe(true);
     } finally {
       (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath = originalResourcesPath;
@@ -133,7 +133,7 @@ describe("resolveHostBinary — packaged resourcesPath", () => {
     (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath = tmp;
     delete process.env.PI_OPENBUDDY_HOST_BIN;
     try {
-      const result = resolveHostBinary();
+      const result = resolveHostBinary(process.env, tmp);
       // 必须等于 packaged 路径(否则说明又退化到 process.env 路径)
       expect(result).toBe(packagedPath);
     } finally {
@@ -154,7 +154,7 @@ describe("resolveHostBinary — monorepo target/", () => {
     delete (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
     delete process.env.PI_OPENBUDDY_HOST_BIN;
     try {
-      const result = resolveHostBinary();
+      const result = resolveHostBinary(process.env, tmp);
       expect(result.endsWith(`target/release/openbuddy-host-core${EXE_SUFFIX}`)).toBe(true);
     } finally {
       (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath = originalResourcesPath;

@@ -138,20 +138,20 @@ impl SecretsHandle {
             .with_context(|| format!("failed to create secrets dir {}", dir.display()))?;
 
         let key_path = dir.join(".machine-key");
-        let cipher = if key_path.exists() {
+        // The raw key bytes are the single source of truth: whatever we
+        // persist MUST be the same bytes the in-memory cipher is built from.
+        // Deriving the cipher and the file separately (the old shape) meant
+        // first-run secrets were written under one key and read back under a
+        // different one, i.e. every credential entered before the first
+        // restart was silently undecryptable forever.
+        let key_bytes = if key_path.exists() {
             load_key(&key_path)?
         } else {
-            let cipher = generate_key();
-            save_key(&key_path, &cipher)?;
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let perms = std::fs::Permissions::from_mode(0o600);
-                std::fs::set_permissions(&key_path, perms)
-                    .with_context(|| format!("failed to chmod 0o600 on {}", key_path.display()))?;
-            }
-            cipher
+            let bytes = generate_key();
+            save_key(&key_path, &bytes)?;
+            bytes
         };
+        let cipher = cipher_from_key(&key_bytes)?;
 
         Ok(Self {
             inner: Arc::new(Mutex::new(SecretsState { dir, cipher })),
@@ -303,37 +303,67 @@ fn entry_path(dir: &Path, secret_ref: &str) -> PathBuf {
     dir.join(format!("{hash}.json"))
 }
 
-fn generate_key() -> Aes256Gcm {
+/// Draw 32 fresh bytes from the OS CSPRNG. The returned bytes — not the
+/// `Aes256Gcm` built from them — are what gets persisted, so that a restart
+/// derives the identical cipher.
+fn generate_key() -> [u8; 32] {
     let mut bytes = [0u8; 32];
     OsRng.fill_bytes(&mut bytes);
-    let key = Key::<Aes256Gcm>::from_slice(&bytes);
-    Aes256Gcm::new(key)
+    bytes
 }
 
-fn load_key(path: &Path) -> Result<Aes256Gcm> {
-    let mut f = fs::File::open(path).with_context(|| format!("open {}", path.display()))?;
-    let mut bytes = Vec::new();
-    f.read_to_end(&mut bytes)?;
+fn cipher_from_key(bytes: &[u8]) -> Result<Aes256Gcm> {
     if bytes.len() != 32 {
         return Err(anyhow!(
             "machine key has invalid length {} (expected 32)",
             bytes.len()
         ));
     }
-    let key = Key::<Aes256Gcm>::from_slice(&bytes);
-    Ok(Aes256Gcm::new(key))
+    Ok(Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(bytes)))
 }
 
-fn save_key(path: &Path, cipher: &Aes256Gcm) -> Result<()> {
-    // Aes256Gcm doesn't expose the raw key directly; reconstruct by
-    // encrypting a 32-byte probe of zeros and using the first 32 bytes of
-    // the key block would be incorrect — instead re-generate and write.
-    let _ = cipher; // placeholder: see generate_key_then_save
-    let mut bytes = [0u8; 32];
-    OsRng.fill_bytes(&mut bytes);
-    let mut f = fs::File::create(path).with_context(|| format!("create {}", path.display()))?;
-    f.write_all(&bytes)?;
+fn load_key(path: &Path) -> Result<[u8; 32]> {
+    let mut f = fs::File::open(path).with_context(|| format!("open {}", path.display()))?;
+    let mut bytes = Vec::new();
+    f.read_to_end(&mut bytes)?;
+    // Fail closed on a truncated/garbage key rather than silently rotating:
+    // rotating would orphan every existing entry with an unrecoverable error.
+    if bytes.len() != 32 {
+        return Err(anyhow!(
+            "machine key has invalid length {} (expected 32)",
+            bytes.len()
+        ));
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&bytes);
+    Ok(key)
+}
+
+/// Persist the machine key.
+///
+/// The file is created 0o600 at `open()` time rather than chmod'd afterwards:
+/// a create-then-chmod sequence leaves a window where the key sits on disk
+/// under the default umask (world-readable on many systems), which for a file
+/// whose entire job is to protect every other credential is not a window worth
+/// having. Content is `sync_all`ed before returning so a crash immediately
+/// after first launch cannot leave a half-written key that fails `load_key`.
+fn save_key(path: &Path, bytes: &[u8; 32]) -> Result<()> {
+    let mut f = create_private(path)
+        .with_context(|| format!("create {}", path.display()))?;
+    f.write_all(bytes)?;
+    f.sync_all()?;
     Ok(())
+}
+
+fn create_private(path: &Path) -> io::Result<fs::File> {
+    let mut opts = fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    opts.open(path)
 }
 
 fn encrypt(cipher: &Aes256Gcm, plaintext: &[u8]) -> Result<(String, String)> {
@@ -498,5 +528,137 @@ mod tests {
         assert!(validate_ref("../escape").is_err());
         assert!(validate_ref("").is_err());
         assert!(validate_ref("ok-ref.with.dots").is_ok());
+    }
+
+    fn scratch_dir(tag: &str) -> std::path::PathBuf {
+        let tmp = std::env::temp_dir().join(format!(
+            "openbuddy-secrets-{tag}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&tmp).unwrap();
+        tmp
+    }
+
+    /// P0-9 — 首启密钥。The bug this pins: `open()` built the in-memory cipher
+    /// from one random key and then persisted a *second*, unrelated random
+    /// key. Everything written during the first session was therefore
+    /// unreadable from the second launch onward — API keys silently lost,
+    /// with the only symptom being "failed to decrypt secret (key may have
+    /// changed)" much later, far from the launch that caused it.
+    ///
+    /// The regression shape has to be a real reopen, not two `get`s on one
+    /// handle: only a second `open()` reads `.machine-key` back.
+    #[test]
+    fn first_launch_secrets_survive_a_restart() {
+        let dir = scratch_dir("restart");
+        let secret_ref = "secret:provider:openai:api_key";
+
+        // Session 1 — the very first launch after install, so `open()` takes
+        // the generate-and-persist branch.
+        let first = SecretsHandle::open(&dir).unwrap();
+        first
+            .set(SetParams {
+                secret_ref: secret_ref.into(),
+                value: "sk-written-on-first-launch".into(),
+                label: Some("OpenAI API key".into()),
+                kind: Some("provider".into()),
+            })
+            .unwrap();
+        // Still readable within the session it was written in.
+        assert_eq!(
+            first
+                .get(GetParams {
+                    secret_ref: secret_ref.into()
+                })
+                .unwrap()
+                .value,
+            "sk-written-on-first-launch"
+        );
+
+        // Session 2 — a fresh handle over the same data dir, i.e. a restart.
+        let second = SecretsHandle::open(&dir).unwrap();
+        assert_eq!(
+            second
+                .get(GetParams {
+                    secret_ref: secret_ref.into()
+                })
+                .unwrap()
+                .value,
+            "sk-written-on-first-launch"
+        );
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// The persisted key must be the exact 32 bytes the cipher was built from,
+    /// not merely *a* key that decrypts this session.
+    #[test]
+    fn persisted_machine_key_is_the_one_in_use() {
+        let dir = scratch_dir("key-identity");
+        let handle = SecretsHandle::open(&dir).unwrap();
+        handle
+            .set(SetParams {
+                secret_ref: "secret:x".into(),
+                value: "v".into(),
+                label: None,
+                kind: None,
+            })
+            .unwrap();
+
+        let raw = fs::read(dir.join("secrets").join(".machine-key")).unwrap();
+        assert_eq!(raw.len(), 32);
+        assert_eq!(load_key(&dir.join("secrets").join(".machine-key")).unwrap().to_vec(), raw);
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = fs::metadata(dir.join("secrets").join(".machine-key"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777;
+            assert_eq!(mode, 0o600, "machine key must not be group/world readable");
+        }
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A corrupted key must fail closed. Silently rotating would orphan every
+    /// existing entry behind an unrecoverable "wrong key" error, so the user
+    /// would lose all credentials without being told why.
+    #[test]
+    fn truncated_machine_key_fails_closed_instead_of_rotating() {
+        let dir = scratch_dir("corrupt-key");
+        let handle = SecretsHandle::open(&dir).unwrap();
+        handle
+            .set(SetParams {
+                secret_ref: "secret:x".into(),
+                value: "v".into(),
+                label: None,
+                kind: None,
+            })
+            .unwrap();
+
+        let key_path = dir.join("secrets").join(".machine-key");
+        fs::write(&key_path, b"too short").unwrap();
+
+        let err = match SecretsHandle::open(&dir) {
+            Ok(_) => panic!("a truncated machine key must not be silently rotated"),
+            Err(e) => e,
+        };
+        assert!(
+            err.to_string().contains("invalid length"),
+            "expected a fail-closed length error, got: {err}"
+        );
+
+        // The bad key is left in place for forensics rather than being
+        // overwritten — overwriting is what makes the loss unrecoverable.
+        assert_eq!(fs::read(&key_path).unwrap(), b"too short");
+
+        fs::remove_dir_all(&dir).ok();
     }
 }

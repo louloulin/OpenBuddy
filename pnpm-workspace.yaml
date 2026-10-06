@@ -49,21 +49,20 @@ packages:
   - 'packages/collaboration/*'
   - 'packages/core/*'
   - 'packages/fs/*'
-  # Flat packages: their `package.json` sits directly in
-  # `packages/<name>/`. A `packages/<name>/*` glob matches only their
-  # SUBDIRECTORIES (e.g. `src`), never the package itself, so these four
-  # were silently excluded from the workspace (0 refs in `pnpm-lock.yaml`,
-  # no `node_modules/@openbuddy/<name>` link). Bare directory globs below
-  # are what actually match a flat package.
-  - 'packages/payment'
   - 'packages/renderer/*'
   - 'packages/runtime/*'
-  - 'packages/saml'
-  - 'packages/scim'
   - 'packages/shared/*'
   - 'packages/team/*'
   - 'packages/ui/*'
-  - 'packages/webhook-outbox'
+  # `experimental/` is deliberately OUT of the workspace. Those packages are
+  # never imported by anything; keeping them out of the workspace is what keeps
+  # them out of `pnpm install`, out of moon's `packages/*/*` glob, and out of
+  # the root tsconfig project.
+  #
+  # Flat packages (whose `package.json` sits directly in `<dir>/`, with no
+  # `packages/<name>/*` glob to match them) need a bare directory entry here,
+  # e.g. `'packages/foo'` — a `packages/<name>/*` glob matches only their
+  # SUBDIRECTORIES like `src`, never the package itself.
 
 allowBuilds:
   '@google/genai': true

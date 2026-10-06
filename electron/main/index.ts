@@ -45,7 +45,7 @@ import { attachHostCoreSecretStore } from "./agent/agent-secret-store-bridge";
 import { attachHostCoreSessionSearch } from "./agent/agent-session-search-bridge";
 import { attachHostCoreWorkspace } from "./agent/agent-workspace-bridge";
 import { attachHostCoreAudit } from "./agent/agent-audit-bridge";
-import { getCrashpadDir, recordMainCrash, startCrashpad } from "./runtime/crashpad";
+import { getCrashpadDir, installMainCrashHandlers, startCrashpad } from "./runtime/crashpad";
 import { casdoorAuth } from "./casdoor/casdoor-auth";
 import { initCasdoorSecurity, type CasdoorSecurityController } from "./security/casdoor";
 import { perfTraceMark } from "./observability/perf-trace";
@@ -151,35 +151,20 @@ startCrashpad({ dataDir: app.getPath("userData") });
 const MAIN_CRASH_DUMP_DIR = getCrashpadDir() ?? join(app.getPath("userData"), "crash-dumps");
 
 /**
- * 把 main 进程的未捕获异常落盘到 Crashpad 目录后,**不再尝试恢复**:
- * Electron main 是单例,异常逃出这个处理器意味着进程已经在退出通道,
- * 让它干净退出比挣扎式 recovery 更可靠(测试覆盖见
- * `electron/main/runtime/crashpad.test.ts`)。
+ * 未捕获异常 → 落盘 → `uncaughtException` 直接退进程。
  *
- * handler 必须保持 `void` —— Electron 的事件循环下一拍会把异常吞掉,
- * 同步抛错只会让日志里再叠一条 uncaughtException,反而掩盖原始信息。
+ * 「注册了 uncaughtException 监听器」这件事本身就会**关掉** Node 的默认
+ * 退出行为:只记日志不退出,等于把一次致命崩溃变成一个继续跑、但
+ * Electron 状态(window 句柄、host-core IPC、SQLite 游标)已不可信的进程。
+ * 所以两条路线的分工是:
+ *   - `uncaughtException` → 同步落盘后 `process.exit(1)`(落盘是 writeFileSync,
+ *     返回时字节已经在盘上,不存在丢数据的竞态);
+ *   - `unhandledRejection` → 只落盘不退出(Node 15+ 默认也不退出,且很多
+ *     路径本就是 best-effort)。
+ *
+ * 实现在 `installMainCrashHandlers`,单测见 `crashpad.test.ts`。
  */
-function dumpMainCrash(kind: "uncaughtException" | "unhandledRejection", err: unknown): void {
-  const message = err instanceof Error ? err.message : String(err);
-  const name = err instanceof Error ? err.name : undefined;
-  const stack = err instanceof Error ? err.stack : undefined;
-  try {
-    recordMainCrash(MAIN_CRASH_DUMP_DIR, { kind, name, message, stack });
-  } catch (dumpErr) {
-    // 不能让落盘本身把进程再炸一次 —— 用 stderr 兜底。
-    // eslint-disable-next-line no-console
-    console.error(`[openbuddy-crashpad] failed to persist ${kind} dump:`, dumpErr);
-  }
-  // eslint-disable-next-line no-console
-  console.error(`[openbuddy-crashpad] main ${kind}:`, err);
-}
-
-process.on("uncaughtException", (err) => {
-  dumpMainCrash("uncaughtException", err);
-});
-process.on("unhandledRejection", (reason) => {
-  dumpMainCrash("unhandledRejection", reason);
-});
+installMainCrashHandlers({ crashpadDir: MAIN_CRASH_DUMP_DIR });
 
 // R26 — 单实例锁。第二个 OpenBuddy 进程启动时直接退出,避免两个 host-core
 // 同时写同一个数据目录造成 SQLite 锁竞争 / 日志交错(参考 PI-Desktop

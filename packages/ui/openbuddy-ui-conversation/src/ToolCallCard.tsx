@@ -87,7 +87,11 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
   const isExpanded = expandMode === "expanded" || (expandMode === "auto" && expanded);
   const canToggleInline = expandMode === "auto";
 
-  const onCardClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  // 紧凑态整行是一个 role="button" 容器(不是原生 <button>):行内还嵌着
+  // 「内联展开」按钮，原生 button 里再套 button 是非法 HTML，屏幕阅读器也会
+  // 因为 button 的 children-are-presentational 而吞掉内层按钮。容器自己补
+  // tabIndex + Enter/Space。
+  const onCardClick = (e: React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => {
     if (canToggleInline && (e.altKey || e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       setExpanded((v) => !v);
@@ -95,7 +99,7 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
     }
     onOpen?.(tc);
   };
-  const onDoubleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const onDoubleClick = (e: React.MouseEvent<HTMLElement>) => {
     if (!canToggleInline) return;
     e.preventDefault();
     setExpanded((v) => !v);
@@ -143,11 +147,18 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
     );
   }
   return (
-    <button
-      type="button"
+    <div
       className={"toolcall toolcall--compact " + statusCls}
+      role="button"
+      tabIndex={0}
       onClick={onCardClick}
       onDoubleClick={onDoubleClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onCardClick(e);
+        }
+      }}
       title={`${tc.kind}: ${tc.title}（${statusLabel}${durationLabel ? " · " + durationLabel : ""}，点击查看详情,双击或 ⌘+点击 inline 展开）`}
       aria-label={`${tc.kind} ${summary} ${statusLabel}${durationLabel ? " " + durationLabel : ""}`}
     >
@@ -164,16 +175,18 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
           </span>
         )}
       {canToggleInline && (
-        <span
+        <button
+          type="button"
           className="toolcall__expand-toggle"
           onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
           title="内联展开"
+          aria-label="内联展开"
           data-testid="toolcall-expand"
         >
           ▾
-        </span>
+        </button>
       )}
-    </button>
+    </div>
   );
 }
 

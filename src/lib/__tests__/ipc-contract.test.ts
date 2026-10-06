@@ -38,7 +38,7 @@ describe("Electron IPC contract", () => {
     root = resolve(process.cwd());
     preload = await readFile(resolve(root, "electron/preload/index.ts"), "utf8");
     main = await readFile(resolve(root, "electron/main/ipc/index.ts"), "utf8");
-    client = await readFile(resolve(root, "src/lib/agent/pi-client.ts"), "utf8");
+    client = await readFile(resolve(root, "packages/ui/openbuddy-ui-contract/src/pi-client.ts"), "utf8");
   });
   it("keeps renderer invoke channels allowlisted and implemented by Main", async () => {
     const root = resolve(process.cwd());
@@ -140,7 +140,7 @@ describe("Electron IPC contract", () => {
     }
   });
   it("exposes durable recovery controls through every Electron layer", async () => {
-    const client = await readFile(resolve(process.cwd(), "src/lib/agent/pi-client.ts"), "utf8");
+    const client = await readFile(resolve(process.cwd(), "packages/ui/openbuddy-ui-contract/src/pi-client.ts"), "utf8");
     const harnessMain = await readFile(resolve(process.cwd(), "electron/main/ipc/harness.ts"), "utf8");
     for (const channel of ["harness:recovery-status", "harness:recovery-list", "harness:recovery-claim", "harness:recovery-resolve"]) {
       expect(preload).toContain(`"${channel}"`);
@@ -176,7 +176,7 @@ describe("Electron IPC contract", () => {
   });
   it("keeps the renderer agent API on the dedicated AgentSession event channel", async () => {
     const root = resolve(process.cwd());
-    const client = await readFile(resolve(root, "src/lib/agent/pi-client.ts"), "utf8");
+    const client = await readFile(resolve(root, "packages/ui/openbuddy-ui-contract/src/pi-client.ts"), "utf8");
     const runtime = await readFile(resolve(root, "src/lib/runtime/renderer-plugin-runtime.ts"), "utf8");
     const preload = await readFile(resolve(root, "electron/preload/index.ts"), "utf8");
     const main = await readFile(resolve(root, "electron/main/ipc/index.ts"), "utf8");

@@ -39,7 +39,10 @@ describe("useEmailData", () => {
     });
     const { result } = renderHook(() => useEmailData({ provider, filters: baseFilters }));
     await waitFor(() => expect(result.current.accounts).toEqual(accounts));
-    expect(result.current.threads).toEqual(threads);
+    // The hook runs triage after listing and merges its chips onto every
+    // row, so the returned threads carry `aiChips: []` even though the
+    // provider's fixture did not.
+    expect(result.current.threads).toEqual([{ ...threads[0], aiChips: [] }]);
     expect(result.current.counts.today).toBe(1);
   });
 

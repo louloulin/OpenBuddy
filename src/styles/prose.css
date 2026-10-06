@@ -1474,6 +1474,8 @@
   white-space: pre-wrap;
   word-break: break-word;
   cursor: text;
+  /* 原为 span；改成 button 后要补回 span 的默认左对齐。 */
+  text-align: left;
 }
 .queue-row__edit {
   flex: 1;

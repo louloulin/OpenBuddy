@@ -57,6 +57,7 @@ function seedPermission(sessionId: string, requestId: string, options = [
         {
           requestId,
           sessionId,
+          toolCallId: `${requestId}-tool`,
           toolKind: "bash",
           rawInput: { cmd: "echo" },
           title: "执行 shell",
@@ -77,8 +78,9 @@ function seedQuestion(sessionId: string, requestId: string) {
         {
           requestId,
           sessionId,
-          question: "选择模型?",
-          options: [{ label: "M2", description: "快速" }],
+          toolCallId: `${requestId}-tool`,
+          title: "选择模型?",
+          questions: [{ id: "q1", question: "选择模型?", options: ["M2"] }],
           createdAt: Date.now(),
         },
       ],

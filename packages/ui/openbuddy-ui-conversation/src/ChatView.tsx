@@ -91,6 +91,39 @@ const EMPTY_RENDERER_SESSION_SNAPSHOT: DeepSeekSessionListSnapshot = {
   error: undefined,
 };
 
+/**
+ * Selector equality for `messages`: shallow element-wise reference compare.
+ *
+ * Compared by `id` instead? That silently breaks live streaming —
+ * `mergeStreamingDelta` appends text to the *same* message id without
+ * changing the array length, so an id-based compare reports "unchanged" for
+ * every delta and Zustand never notifies this component. `MessageItem`
+ * receives its message as a prop and memoizes on `prev.message ===
+ * next.message` (MessageItem.tsx:335), so a stale array pins the whole
+ * transcript: a single-assistant-message turn renders as an empty bubble
+ * with the LoadingRow spinning forever.
+ *
+ * The previous version compared only the LAST element's reference. That is
+ * too weak in the other direction: `appendUserRevision` and
+ * `setActiveRevision` (session-store.ts) replace a *user* message in the
+ * middle of the transcript, changing neither the length nor the last
+ * element's identity — a user message is never the tail, since the tail is
+ * the assistant's reply. The comparator reported "unchanged", ChatView never
+ * re-rendered, and the revision pager silently did nothing.
+ *
+ * Comparing every element costs nothing when messages did not change: an
+ * unrelated store write (`streaming`, `plan`, …) leaves the array reference
+ * itself untouched, so `a === b` short-circuits first.
+ */
+export function messagesEqual(a: ChatMessage[], b: ChatMessage[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 /** Center chat column: scrollable message list + composer pinned at bottom. */
 
 
@@ -159,36 +192,11 @@ export function ChatView({
   onOpenSettings?: () => void;
 }) {
   // P0-07: Custom equality — only re-render ChatView when the message list
-  // *structure* changes (length or last message id). Streaming deltas
-  // mutate the last message's `parts` reference but keep length+last-id
-  // stable; the streaming MessageItem re-renders on its own via memo.
-  // Cuts ChatView re-renders from ~60/s (one per coalesced flush) to
-  // ~1/turn-start during streaming.
-  // The equality below compares the last entry by REFERENCE, not by `id`.
-  //
-  // Comparing by `id` looks like a cheap win but silently breaks live
-  // streaming: `mergeStreamingDelta` appends text to the *same* message id
-  // without changing the array length, so an id-based compare reports
-  // "unchanged" for every delta and Zustand never notifies this component.
-  // The old comment here claimed the streaming `MessageItem` would
-  // "re-render on its own via memo" — it can't. `MessageItem` receives its
-  // message as a prop and memoizes on `prev.message === next.message`
-  // (MessageItem.tsx:335), so a stale array from this selector pins the
-  // whole transcript. A single-assistant-message turn then renders as an
-  // empty bubble with the LoadingRow spinning forever.
-  //
-  // Reference-comparing the tail keeps the useful part of the optimization
-  // (unrelated store writes still don't re-render the transcript) while
-  // letting content mutations through. The per-delta render cost stays
-  // bounded because `appendStreamingDelta` already coalesces deltas to one
-  // store write per frame, and `MessageItem`'s memo still keeps the other
-  // N-1 rows from re-rendering.
+  // actually changes. See `messagesEqual` above for why it compares element
+  // references rather than ids, and why comparing only the tail was wrong.
   const messages = useSessionStore(
     (s) => s.messages,
-    (a, b) =>
-      a === b ||
-      (a.length === b.length &&
-        (a.length === 0 || a[a.length - 1] === b[b.length - 1])),
+    messagesEqual,
   );
   const streaming = useSessionStore((s) => s.streaming);
   const streamingMessageId = useSessionStore((s) => s.streamingMessageId);
@@ -661,6 +669,24 @@ export function ChatView({
     enabled: messages.length > 0,
     onOpenFind: () => setFindOpen(true),
   });
+  // 容器内快捷键挂在真实 DOM 监听上,而不是 `<div onKeyDown>`:这个 div 只是
+  // 版面容器(内部全是别的控件),它自身既不该可聚焦也不该被读屏播报,给它挂
+  // 一个交互 handler 属于"静态元素可交互"的反模式。事件从子控件冒泡上来时
+  // 行为与原来的 React onKeyDown 等价。走 ref 存回调 → 监听只挂一次。
+  const chatViewRef = useRef<HTMLDivElement>(null);
+  const chatViewKeyDownRef = useRef(handleChatViewKeyDown);
+  chatViewKeyDownRef.current = handleChatViewKeyDown;
+  useEffect(() => {
+    const node = chatViewRef.current;
+    if (!node) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      chatViewKeyDownRef.current(
+        event as unknown as React.KeyboardEvent<HTMLDivElement>,
+      );
+    };
+    node.addEventListener("keydown", onKeyDown);
+    return () => node.removeEventListener("keydown", onKeyDown);
+  }, []);
   useEffect(() => {
     if (!findCurrent) return;
     const node = scrollRef.current?.querySelector(
@@ -795,10 +821,11 @@ export function ChatView({
 
   return (
     <div
+      ref={chatViewRef}
       className={"chatview" + (panelOpen ? " chatview--with-panel" : "")}
       // Plan5 Phase A.1/B.6 — 容器内快捷键(Ctrl/Cmd+F 打开查找,Esc 关闭)。
       // 全局 `?` / Ctrl+/ 由 App 顶层的 <ChatShortcutOverlay /> 承接。
-      onKeyDown={handleChatViewKeyDown}
+      // handler 走上面 chatViewRef 上挂的原生 keydown 监听。
     >
       <div className="chatview__main">
         {/* Plan5 Phase A.1 — 横幅堆叠由 ChatViewBannerStack 接管。

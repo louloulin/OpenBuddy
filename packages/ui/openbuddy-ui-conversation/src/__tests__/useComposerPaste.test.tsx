@@ -9,6 +9,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useComposerPaste } from "../composer/use-composer-paste";
+import type { ImageAttachment } from "../composer/types";
 import type { RefObject } from "react";
 
 // mock send-payload 中的 readImageFile
@@ -51,7 +52,7 @@ describe("useComposerPaste (Plan5 componentization)", () => {
         focus,
         selectionStart: 0,
         selectionEnd: 0,
-      } as HTMLTextAreaElement,
+      } as unknown as HTMLTextAreaElement,
     };
 
     const { result } = renderHook(() =>
@@ -79,13 +80,15 @@ describe("useComposerPaste (Plan5 componentization)", () => {
   it("图片粘贴:image/* → 走 readImageFile → push 到 images 状态", async () => {
     const updateText = vi.fn();
     const setCursorPos = vi.fn();
-    const setImages = vi.fn((updater: (prev: unknown[]) => unknown[]) => updater([]));
+    const setImages = vi.fn((updater: (prev: ImageAttachment[]) => ImageAttachment[]) => {
+      updater([]);
+    });
     const ref: RefObject<HTMLTextAreaElement> = {
       current: {
         focus: vi.fn(),
         selectionStart: 0,
         selectionEnd: 0,
-      } as HTMLTextAreaElement,
+      } as unknown as HTMLTextAreaElement,
     };
 
     const { result } = renderHook(() =>

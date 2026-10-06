@@ -38,7 +38,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/__tests__/**/*.{test,spec}.{ts,tsx}", "packages/**/__tests__/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.test.{ts,mjs}", "electron/main/**/*.test.ts"],
+    include: ["src/**/__tests__/**/*.{test,spec}.{ts,tsx}", "packages/**/__tests__/**/*.{test,spec}.{ts,tsx}", "packages/**/src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.test.{ts,mjs}", "electron/main/**/*.test.ts", "experimental/**/__tests__/**/*.{test,spec}.{ts,tsx}", "experimental/**/src/**/*.{test,spec}.{ts,tsx}"],
     exclude: [
       "**/node_modules/**",
       "**/.worktrees/**",
@@ -52,6 +52,10 @@ export default defineConfig({
       // probes: they spawn a real Electron process against the packaged app, so
       // Vitest must not collect them. They are driven via moon/scripts instead.
       "scripts/electron/_*.test.mjs",
+      // `scripts/_archive/**` holds 400+ one-off playwright probe snapshots moved
+      // out of `scripts/electron/` (2026-10); the same live-Electron rule applies
+      // to the 41 `*.test.mjs` wrappers that moved with them.
+      "scripts/_archive/**",
     ],
     globals: true,
     environment: "jsdom",

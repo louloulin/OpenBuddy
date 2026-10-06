@@ -11,7 +11,7 @@
  * Storage: ~/.openbuddy/agent/openbuddy-teams.json
  */
 import { agentHome } from "@openbuddy/storage";
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import type { Context } from "@openbuddy/cordis"
@@ -73,14 +73,35 @@ function teamsFile(): string {
 	return join(agentHome(), "openbuddy-teams.json")
 }
 
+/**
+ * Read the team registry.
+ *
+ * Only a *missing* file means "no teams yet". Every other failure has to
+ * propagate: the previous shape caught everything and returned `{}`, so a
+ * transient EACCES/EMFILE — or a single truncated byte from a bad shutdown —
+ * looked identical to a fresh install, and the very next `writeTeams()` then
+ * overwrote the real registry with an empty object. Permanent, silent
+ * destruction of every team's history.
+ *
+ * A parse failure additionally preserves the raw bytes next to the original
+ * (same contract as `openbuddy-email`'s store) so the data is recoverable
+ * instead of being replaced on the next mutation.
+ */
 async function readTeams(file = teamsFile()): Promise<TeamsFile> {
-	if (!(await stat(file, { throwIfNoEntry: false }))) return {}
+	let raw: string
 	try {
-		const raw = await readFile(file, "utf8")
+		raw = await readFile(file, "utf8")
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return {}
+		throw error
+	}
+	try {
 		const parsed = JSON.parse(raw) as Record<string, Partial<TeamRecord>>
 		return Object.fromEntries(Object.entries(parsed).map(([id, team]) => [id, { ...team, id: team.id ?? id, tenantId: team.tenantId ?? "local" } as TeamRecord]))
-	} catch {
-		return {}
+	} catch (error) {
+		const backup = `${file}.corrupt-${Date.now()}`
+		await writeFile(backup, raw, { encoding: "utf8", mode: 0o600 }).catch(() => undefined)
+		throw new Error(`openbuddy-teams store is corrupt; a copy was preserved at ${backup} (${String(error)})`)
 	}
 }
 

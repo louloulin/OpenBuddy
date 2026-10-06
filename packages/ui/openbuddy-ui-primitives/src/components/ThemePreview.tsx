@@ -33,6 +33,10 @@ export function ThemePreview({ tokens, heading, className }: ThemePreviewProps) 
     <section className={className}>
       {heading}
       <style>{stylesheet}</style>
+      {/* role="list" 在这里不是冗余:上面 inline style 设了 listStyle:none,
+          Safari / VoiceOver 会因此丢掉整个列表语义(读屏不再播报"列表,共 N 项")。
+          eslint 的 no-redundant-roles 看不到这一点,已在 eslint.config.mjs 里
+          针对 ul 做了豁免。删掉它会静默地让 VoiceOver 用户失去列表结构。 */}
       <ul role="list" style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", padding: 0, margin: 0, listStyle: "none" }}>
         {tokens.map((token) => (
           <li key={token.id} style={{ display: "flex", flexDirection: "column", gap: 4 }}>

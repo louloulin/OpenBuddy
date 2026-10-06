@@ -17,7 +17,7 @@ on:
     # → Run workflow`). Required because cron-only workflows can sit for
     # weeks unused and then fail for unrelated reasons on the first run.
   push:
-    branches: [feature/pi0911, master]
+    branches: [feature/pi0911, main]
     # Run on push so changes to either perf script trigger a fresh
     # measurement immediately. Path-scoped below.
     paths:

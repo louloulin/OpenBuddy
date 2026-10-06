@@ -11,7 +11,13 @@
     "./markdown/content-blocks": "./src/markdown/content-blocks.ts",
     "./input-history": "./src/input-history.ts",
     "./plan-utils": "./src/plan-utils.ts",
-    "./yield-state": "./src/yield-state.ts"
+    "./yield-state": "./src/yield-state.ts",
+    "./pi-client": "./src/pi-client.ts",
+    "./pi-client-email": "./src/pi-client-email.ts",
+    "./pi-client-collaboration": "./src/pi-client-collaboration.ts",
+    "./pi-client-providers": "./src/pi-client-providers.ts",
+    "./progress-runs": "./src/progress-runs.ts",
+    "./pi-bridge-client": "./src/pi-bridge-client.ts"
   },
   "engines": {
     "node": ">=22.5.0"

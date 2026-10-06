@@ -64,9 +64,13 @@ describe.sequential("core-session: Pi session metadata", () => {
       expertAvatar: "/tmp/research.png",
     });
 
-    const state = JSON.parse(await readFile(join(home, "openbuddy-state.json"), "utf-8"));
-    expect(state.pinned).toContain("session-2");
-    expect(state.experts["session-1"].expertId).toBe("expert-42");
+    // `openbuddy-state.json` is read-only compatibility input now. Assert the
+    // mirror is *not* produced: a second live copy of pin/archive/expert state
+    // is exactly the dual-track this change removes — the host metadata store
+    // owns those flags and deliberately deletes this file on migration.
+    await expect(
+      readFile(join(home, "openbuddy-state.json"), "utf-8").then(() => true, () => false),
+    ).resolves.toBe(false);
 
     const storage = await openStorage({ filePath: join(home, "openbuddy.sqlite") });
     try {

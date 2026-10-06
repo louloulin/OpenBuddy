@@ -124,11 +124,11 @@ describe("R8.55 MarkdownInlineCode copy button", () => {
       writable: true,
     });
     const parentClick = vi.fn();
-    const { container } = render(
-      <div onClick={parentClick}>
-        <MarkdownInlineCode>{"nested"}</MarkdownInlineCode>
-      </div>,
-    );
+    const { container } = render(<MarkdownInlineCode>{"nested"}</MarkdownInlineCode>);
+    // 「外层有个 click 监听器」用 document.body 上的原生监听来模拟，而不是
+    // 包一层带 onClick 的 div —— 后者对键盘是假的可点击元素，而且 React 的
+    // 根监听和容器监听在同一节点上，stopPropagation 拦不住同节点的兄弟监听。
+    document.body.addEventListener("click", parentClick);
     const btn = container.querySelector(
       "button.md-inline-code__copy",
     ) as HTMLButtonElement;
@@ -137,6 +137,7 @@ describe("R8.55 MarkdownInlineCode copy button", () => {
     });
     expect(parentClick).not.toHaveBeenCalled();
     expect(writeText).toHaveBeenCalledWith("nested");
+    document.body.removeEventListener("click", parentClick);
   });
 
   it("falls back to document.execCommand when navigator.clipboard throws", async () => {

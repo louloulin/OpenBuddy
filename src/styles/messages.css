@@ -884,7 +884,7 @@ button.diff__path {
 }
 .rewind-bar__badge--file { background: color-mix(in srgb, #4d8eff 16%, transparent); color: #2f6feb; }
 .rewind-bar__badge--memory { background: color-mix(in srgb, #a855f7 16%, transparent); color: #7e3ff2; }
-.rewind-bar__badge--tool { background: color-mix(in srgb, #00c29a 16%, transparent); color: #00926f; }
+.rewind-bar__badge--tool { background: color-mix(in srgb, var(--wb-brand-primary) 16%, transparent); color: var(--wb-brand-primary); }
 
 .rewind-bar__dropdown {
   position: absolute;

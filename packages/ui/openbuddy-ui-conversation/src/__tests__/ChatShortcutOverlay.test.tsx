@@ -22,7 +22,8 @@ describe("ChatShortcutOverlay (Phase B.6)", () => {
 
   it("includes the help shortcut (this panel)", () => {
     const help = CHAT_SHORTCUTS.find((s) => s.id === "chat-shortcuts");
-    expect(help?.keys).toBe("?");
+    // Both bindings open the panel: `?` on a Latin keyboard, `⌘/` on macOS.
+    expect(help?.keys).toBe("? / ⌘ /");
     expect(help?.category).toBe("帮助");
   });
 

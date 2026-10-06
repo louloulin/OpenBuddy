@@ -5,8 +5,15 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
+import { ThemeProvider } from "@openbuddy/ui-theme/client";
 import { MessagePartRegistry } from "../MessagePartRegistry";
 import type { ChatMessage } from "@openbuddy/ui-state/session-store";
+
+// The markdown slot reads the theme store, so every render needs the provider
+// the app root always mounts.
+function mount(node: React.ReactElement) {
+  return render(<ThemeProvider>{node}</ThemeProvider>);
+}
 
 function makeMessage(parts: ChatMessage["parts"]): ChatMessage {
   return {
@@ -19,7 +26,7 @@ function makeMessage(parts: ChatMessage["parts"]): ChatMessage {
 
 describe("MessagePartRegistry", () => {
   it("dispatches text parts via ConversationMarkdown", () => {
-    const { container } = render(
+    const { container } = mount(
       <MessagePartRegistry
         parts={[{ kind: "text", text: "hello" }]}
         messageId="m-1"
@@ -31,7 +38,7 @@ describe("MessagePartRegistry", () => {
   });
 
   it("renders thought parts with msg__thought wrapper", () => {
-    const { container } = render(
+    const { container } = mount(
       <MessagePartRegistry
         parts={[{ kind: "thought", text: "considering…" }]}
         messageId="m-1"
@@ -45,7 +52,7 @@ describe("MessagePartRegistry", () => {
 
   it("renders tool_call parts via ToolCallCard", () => {
     const onOpen = vi.fn();
-    const { container } = render(
+    const { container } = mount(
       <MessagePartRegistry
         parts={[
           {
@@ -70,7 +77,7 @@ describe("MessagePartRegistry", () => {
   });
 
   it("renders file parts via FilePreview", () => {
-    const { container } = render(
+    const { container } = mount(
       <MessagePartRegistry
         parts={[
           {
@@ -104,7 +111,7 @@ describe("MessagePartRegistry", () => {
       },
       { kind: "text", text: "done" },
     ]);
-    const { container } = render(
+    const { container } = mount(
       <MessagePartRegistry
         parts={message.parts}
         messageId={message.id}
@@ -118,7 +125,7 @@ describe("MessagePartRegistry", () => {
   });
 
   it("marks streaming thought with data-thinking-streaming=true", () => {
-    const { container } = render(
+    const { container } = mount(
       <MessagePartRegistry
         parts={[{ kind: "thought", text: "still thinking…" }]}
         messageId="m-1"

@@ -217,6 +217,31 @@ export function ModelSelector({
     }
   };
 
+  // 选中第 idx 个 option(模型在前、推理档位在后)。键盘 Enter/Space 与鼠标
+  // 点击共用这一份逻辑 —— 鼠标点击通过 <ul> 上的事件委托派发过来,
+  // 因为 role="option" 的 <li> 本身不该带 onClick:listbox 用的是
+  // aria-activedescendant,焦点始终停在 <ul> 上(option 不能单独 tab),
+  // 键盘契约由下面的 onMenuKey 完整承担。
+  const selectIndex = (idx: number) => {
+    if (idx < 0 || idx >= total) return;
+    if (idx < models.length) {
+      onModelChange(models[idx].id);
+      setOpen(false);
+      triggerRef.current?.focus();
+    } else if (hasThinking) {
+      // 档位切换不关菜单:用户常想连续调整模型+档位,看得见勾选移动。
+      onThinkingChange(THINKING_OPTIONS[idx - models.length].value);
+    }
+  };
+
+  const onMenuClick = (e: React.MouseEvent<HTMLUListElement>) => {
+    const li = (e.target as HTMLElement).closest<HTMLLIElement>("li[data-option-index]");
+    // 空态行 / 「推理档位」标题行没有 data-option-index,不该触发选中;
+    // closest 还会越过 <ul> 往上找,所以再确认一次命中在菜单内。
+    if (!li || !e.currentTarget.contains(li)) return;
+    selectIndex(Number(li.dataset.optionIndex));
+  };
+
   const onMenuKey = (e: React.KeyboardEvent<HTMLUListElement>) => {
     if (total === 0) return;
     switch (e.key) {
@@ -243,16 +268,7 @@ export function ModelSelector({
       case "Enter":
       case " ": {
         e.preventDefault();
-        if (activeIndex >= 0 && activeIndex < total) {
-          if (activeIndex < models.length) {
-            onModelChange(models[activeIndex].id);
-            setOpen(false);
-            triggerRef.current?.focus();
-          } else if (hasThinking) {
-            // 档位切换不关菜单:用户常想连续调整模型+档位,看得见勾选移动。
-            onThinkingChange(THINKING_OPTIONS[activeIndex - models.length].value);
-          }
-        }
+        selectIndex(activeIndex);
         break;
       }
       case "Escape": {
@@ -309,6 +325,7 @@ export function ModelSelector({
           aria-activedescendant={activeId}
           tabIndex={-1}
           onKeyDown={onMenuKey}
+          onClick={onMenuClick}
           ref={(node) => {
             // Auto-focus the menu when opened so keyboard users land inside
             // the listbox without an extra Tab press.
@@ -341,6 +358,7 @@ export function ModelSelector({
                 key={m.id}
                 id={`${menuId}-opt-${idx}`}
                 role="option"
+                data-option-index={idx}
                 aria-selected={isActive}
                 className={
                   "model-selector__item" +
@@ -348,11 +366,6 @@ export function ModelSelector({
                   (isFocused ? " model-selector__item--focused" : "")
                 }
                 onMouseEnter={() => setActiveIndex(idx)}
-                onClick={() => {
-                  onModelChange(m.id);
-                  setOpen(false);
-                  triggerRef.current?.focus();
-                }}
               >
                 <span className="model-selector__item-label">{m.label || m.id}</span>
                 {apiBackendLabel(m.apiBackend) && (
@@ -395,6 +408,7 @@ export function ModelSelector({
                     key={opt.value}
                     id={`${menuId}-opt-${idx}`}
                     role="option"
+                    data-option-index={idx}
                     aria-selected={isActive}
                     className={
                       "model-selector__item" +
@@ -402,7 +416,6 @@ export function ModelSelector({
                       (isFocused ? " model-selector__item--focused" : "")
                     }
                     onMouseEnter={() => setActiveIndex(idx)}
-                    onClick={() => onThinkingChange?.(opt.value)}
                     title={opt.title}
                   >
                     <span className="model-selector__item-label">{opt.label}</span>
