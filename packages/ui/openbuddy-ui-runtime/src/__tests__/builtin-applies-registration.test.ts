@@ -23,7 +23,8 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
   beforeEach(async () => {
     const mod = await import("../client");
     runtime = mod.getRuntime();
-    mod.registerAllBuiltinUis();
+    // P1/P2-09:装配异步,等 done 落定再断言。
+    await mod.registerAllBuiltinUis().done;
     entries = (name: string) => runtime.slots.entries(name);
   });
 

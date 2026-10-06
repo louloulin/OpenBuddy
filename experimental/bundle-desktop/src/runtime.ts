@@ -20,10 +20,10 @@ import {
 
 /** 启动桌面端 UI 运行时(注册 22 个内置 ui-* 包到 SlotProvider)。 */
 export function bootstrapDesktopRuntime(): () => void {
-  const dispose = registerAllBuiltinUis();
+  const reg = registerAllBuiltinUis();
   // 触达 getRuntime() 确保 singleton 初始化完成,即使调用方还没用 useUiRuntime。
   void getRuntime();
-  return dispose;
+  return () => reg.dispose();
 }
 
 /** 当前已注册的 ui-* 包数量(用于调试 / 健康检查)。 */

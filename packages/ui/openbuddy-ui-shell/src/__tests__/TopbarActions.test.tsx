@@ -135,23 +135,24 @@ describe("TopbarActions", () => {
 
 import { SlotProvider, registerAllBuiltinUis } from "@openbuddy/ui-runtime/client";
 
-function withDraftSlot(ui: React.ReactNode) {
+async function withDraftSlot(ui: React.ReactNode) {
   // 测试环境直接用 getRuntime() 拿单例,把 builtin 全装一遍再渲染。
   // 与生产一致:ui-editor apply() 注册了 editor.draft。
-  registerAllBuiltinUis();
+  // P1/P2-09 后装配异步,先等 done 再返回 JSX。
+  await registerAllBuiltinUis().done;
   return <SlotProvider>{ui}</SlotProvider>;
 }
 
 describe("R71 — editor.draft 槽位接入", () => {
-  it("slot 装了 DraftEditor 后,菜单里出现「📝 新草稿」按钮", () => {
-    render(withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" />));
+  it("slot 装了 DraftEditor 后,菜单里出现「📝 新草稿」按钮", async () => {
+    render(await withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" />));
     fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
     expect(screen.getByTestId("topbar-draft-button")).toBeInTheDocument();
     expect(screen.getByTestId("topbar-draft-button")).toHaveTextContent("新草稿");
   });
 
   it("点击「📝 新草稿」关菜单并打开草稿模态", async () => {
-    render(withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" onToast={vi.fn()} />));
+    render(await withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" onToast={vi.fn()} />));
     fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
     fireEvent.click(screen.getByTestId("topbar-draft-button"));
     // 菜单已关 + DraftEditor 模态已挂(ProseMirror 实例存在)
@@ -161,7 +162,7 @@ describe("R71 — editor.draft 槽位接入", () => {
 
   // R72 — 键盘快捷键 Mod+Shift+D 真正打开/关闭草稿模态
   it("按 Mod+Shift+D 在 editor.draft 装好后切换草稿模态", async () => {
-    render(withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" />));
+    render(await withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" />));
     // 第一次按下:打开草稿(ProseMirror 挂出)。setState 后 ProseMirror 异步挂出。
     fireEvent.keyDown(window, { key: "d", ctrlKey: true, shiftKey: true });
     await waitFor(() => expect(document.querySelector(".ProseMirror")).toBeTruthy());
@@ -179,8 +180,8 @@ describe("R71 — editor.draft 槽位接入", () => {
     expect(document.querySelector(".ProseMirror")).toBeNull();
   });
 
-  it("菜单里「📝 新草稿」右侧显示快捷键 glyph(Ctrl+Shift+D / ⌘+Shift+D)", () => {
-    render(withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" />));
+  it("菜单里「📝 新草稿」右侧显示快捷键 glyph(Ctrl+Shift+D / ⌘+Shift+D)", async () => {
+    render(await withDraftSlot(<TopbarActions sessionId="s-1" title="项目复盘" />));
     fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
     expect(screen.getByTestId("topbar-draft-button")).toHaveTextContent(/新草稿/);
     // 平台无关 chord 经过 ShortcutHint 渲染成带图标的 span,只看 label 即可。

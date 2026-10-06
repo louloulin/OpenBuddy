@@ -290,7 +290,7 @@ export function __makeTestSlotCore(): SlotCoreHandle {
   return createSlotCore();
 }
 
-let builtinDisposer: (() => void) | null = null;
+let builtinDisposer: BuiltinUiRegistration | null = null;
 
 export function SlotProvider({ children, runtime: runtimeProp }: { children: ReactNode; runtime?: UiRuntime }) {
   // 测试可注入 runtime prop(单例由 getOrCreateSingleton 提供);默认走单例。
@@ -298,9 +298,10 @@ export function SlotProvider({ children, runtime: runtimeProp }: { children: Rea
   useEffect(() => {
     if (builtinRegistered) return;
     builtinRegistered = true;
+    // 装配异步完成(表项是动态 import);slot 订阅是响应式的,落定后 UI 自动补齐。
     builtinDisposer = registerAllBuiltinUis();
     return () => {
-      builtinDisposer?.();
+      builtinDisposer?.dispose();
       builtinDisposer = null;
       builtinRegistered = false;
     };
@@ -505,10 +506,15 @@ export function applyUiRuntime(ctx: { ui?: UiRuntime; slots?: SlotCoreLike; sess
 }
 
 /**
- * registerAllBuiltinUis — 遍历 BUILTIN_UI_APPLIES,对每个内置 ui-* 包调用其
- * apply(ctx)。这是"包结构 -> 运行时装配"的桥梁;SlotProvider 挂载时同步触发。
+ * registerAllBuiltinUis — 遍历 BUILTIN_UI_APPLIES,对每个内置 ui-* 包动态加载
+ * 并调用其 apply(ctx)。这是"包结构 -> 运行时装配"的桥梁;SlotProvider 挂载时
+ * 触发,装配本身异步完成(P1/P2-09:表项是动态 import,25 个内置包因此不进
+ * renderer entry chunk)。slot 订阅是响应式的(useSyncExternalStore),装配
+ * 落定后消费方自动重渲染。
  *
- * 返回的 disposer 数组按注册反序执行,HMR / teardown 时统一释放。
+ * 返回 `dispose`(按注册反序释放已注册的包,并取消未完成的装载循环)与
+ * `done`(全部包装载+注册落定后 resolve —— 测试/e2e 用它等装配完成,不再
+ * 能假设同步返回时已注册完)。
  *
  * 实现细节:
  *   - Phase K.2: 通过 `serializeBuiltinUiSlotTrack()` 把每个 builtin 表项
@@ -518,7 +524,7 @@ export function applyUiRuntime(ctx: { ui?: UiRuntime; slots?: SlotCoreLike; sess
  *     "实际装载依然走 PI loadExtensions()" 作为 Phase K 的不变式;这里
  *     的 `apply(ctx)` 已经是 in-process 装载,不需要再经过 PI。
  *   - ctx.ui / ctx.slots / ctx.events 由 getOrCreateSingleton() 提供
- *   - 失败的 apply 不影响后续包(per-listener error swallow,事件层同策略)
+ *   - 失败的 load/apply 不影响后续包(per-listener error swallow,事件层同策略)
  *   - 包内 ctx.slots.register() 注册的内容会被 SlotCore 持有,dispose 由各包负责
  */
 let runtimeCtx: UiRuntimeContext | null = null;
@@ -549,40 +555,53 @@ export function getRuntimeContext(): UiRuntimeContext {
   return runtimeCtx;
 }
 
-export function registerAllBuiltinUis(): () => void {
+/** registerAllBuiltinUis 的返回值:装配控制句柄。 */
+export interface BuiltinUiRegistration {
+  /** 反序释放已注册的包;并取消尚未完成的装载循环(已加载未 apply 的包直接跳过)。 */
+  dispose(): void;
+  /** 全部包装载+注册落定(逐包失败也算落定,失败记录在 report 里)后 resolve。 */
+  done: Promise<void>;
+}
+
+export function registerAllBuiltinUis(): BuiltinUiRegistration {
   const rt = getOrCreateSingleton();
   const core = rt.slots as SlotCoreHandle;
   const ctx = getRuntimeContext();
   const disposers: Array<() => void> = [];
   const report: BuiltinUiPackageReport[] = [];
   let okCount = 0;
+  let cancelled = false;
 
-  for (const { pkg, apply, ...rest } of BUILTIN_UI_APPLIES) {
-    const started = Date.now();
-    // 记录 apply() 前 core 的 slot 快照，apply() 后求差即可得到「这个包注册了什么」，
-    // 不需要包自己上报 —— 这是 report 能零侵入的原因。
-    // 注意必须比对 entry 数而不是 slot 名集合：多个包会注册进同一个 slot
-    // （ui-settings / ui-workbench / ui-dialogs / ui-automation → shell.overlay），
-    // 只看新增 slot 名会把它们误判成 0。
-    const beforeCounts = new Map(core.snapshot().map((row) => [row.name, row.entries.length]));
-    try {
-      // Materialise the Phase K.1 SDK slot track row up front so any
-      // manifest-level validation errors surface before the apply() call.
-      // The serialised row is unused at runtime (the in-process apply()
-      // is the source of truth) but the manifest gives inventory + plugin
-      // panel a stable view of which packages are wired up.
-      const track = serializeBuiltinUiSlotTrack({
-        pkg,
-        apply,
-        ...(rest as { description?: string; configDefaults?: Record<string, unknown> }),
-      });
-      if (track.disabled) {
-        report.push({ pkg, ok: true, slotsRegistered: 0, slotNames: [], durationMs: 0 });
-        continue;
-      }
-      const dispose = apply(ctx as never, undefined);
-      if (typeof dispose === "function") disposers.push(() => dispose());
-      okCount++;
+  const done = (async () => {
+    for (const { pkg, load, ...rest } of BUILTIN_UI_APPLIES) {
+      if (cancelled) return;
+      const started = Date.now();
+      // 记录 apply() 前 core 的 slot 快照，apply() 后求差即可得到「这个包注册了什么」，
+      // 不需要包自己上报 —— 这是 report 能零侵入的原因。
+      // 注意必须比对 entry 数而不是 slot 名集合：多个包会注册进同一个 slot
+      // （ui-settings / ui-workbench / ui-dialogs / ui-automation → shell.overlay），
+      // 只看新增 slot 名会把它们误判成 0。
+      const beforeCounts = new Map(core.snapshot().map((row) => [row.name, row.entries.length]));
+      try {
+        // Materialise the Phase K.1 SDK slot track row up front so any
+        // manifest-level validation errors surface before the apply() call.
+        // The serialised row is unused at runtime (the in-process apply()
+        // is the source of truth) but the manifest gives inventory + plugin
+        // panel a stable view of which packages are wired up.
+        const track = serializeBuiltinUiSlotTrack({
+          pkg,
+          load,
+          ...(rest as { description?: string; configDefaults?: Record<string, unknown> }),
+        });
+        if (track.disabled) {
+          report.push({ pkg, ok: true, slotsRegistered: 0, slotNames: [], durationMs: 0 });
+          continue;
+        }
+        const apply = await load();
+        if (cancelled) return;
+        const dispose = apply(ctx as never, undefined);
+        if (typeof dispose === "function") disposers.push(() => dispose());
+        okCount++;
 
       const touched: string[] = [];
       let slotsRegistered = 0;
@@ -645,10 +664,17 @@ export function registerAllBuiltinUis(): () => void {
     );
   }
 
-  return () => {
-    for (let i = disposers.length - 1; i >= 0; i--) {
-      try { disposers[i](); } catch { /* swallow */ }
-    }
+  })();
+
+  return {
+    dispose() {
+      cancelled = true;
+      for (let i = disposers.length - 1; i >= 0; i--) {
+        try { disposers[i](); } catch { /* swallow */ }
+      }
+      disposers.length = 0;
+    },
+    done,
   };
 }
 
