@@ -38,7 +38,7 @@ import { EXPERTS_ROUTE_LABEL } from "@/lib/navigation/placeholder-routes";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toast } from "@openbuddy/ui-primitives";
 import { Resizable } from "@openbuddy/ui-primitives";
-import { ThumbImg } from "@openbuddy/ui-experts";
+import { ThumbImg } from "@openbuddy/ui-experts/first-screen";
 import { TruncationBanner } from "@/components/TruncationBanner";
 import { APP_VERSION } from "@/lib/platform/app-version";
 import { IS_MACOS } from "@/lib/platform/platform";
@@ -657,10 +657,6 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           <TasksSurface refreshSignal={runtime.taskRefreshSignal} onToast={showToast} />
         )}
         <OnboardingSurface />
-        {/* R64 — host 渲染的 TourModal,与 <TourSurface /> 槽位共存:第三方
-            注册 onboarding.tour slot 时,这里不会冲突(本组件直接读 host 层
-            tour.open 状态,与 ui-onboarding 的 surface 走的是两套 controller)。 */}
-        <TourModal open={tour.open} steps={tour.steps} onFinish={tour.stop} onClose={tour.stop} />
         <TourSurface />
         {/* R23 — 「本次更新」摘要(升版本后一次性)+ 「发送反馈」卡。
             两者都走内核槽位(onboarding.whats-new / onboarding.feedback),

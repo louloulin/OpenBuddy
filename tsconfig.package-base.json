@@ -238,6 +238,9 @@
       "@openbuddy/ui-experts/client": [
         "./packages/ui/openbuddy-ui-experts/src/client.tsx"
       ],
+      "@openbuddy/ui-experts/first-screen": [
+        "./packages/ui/openbuddy-ui-experts/src/first-screen.ts"
+      ],
       "@openbuddy/ui-experts/invariant": [
         "./packages/ui/openbuddy-ui-experts/src/invariant.ts"
       ],

@@ -53,22 +53,24 @@ export function ComposerPortal(): JSX.Element | null {
 
   return (
     <div className="composer-portal" role="dialog" aria-modal="true">
-      <EmailComposer
-        account={placeholderAccount}
-        accounts={[placeholderAccount]}
-        contacts={contacts}
-        initial={{
-          ...(initial.subject !== undefined ? { subject: initial.subject } : {}),
-          ...(initial.body !== undefined ? { body: initial.body } : {}),
-          ...(initial.threadId !== undefined ? { threadId: initial.threadId } : {}),
-          ...(initial.draftId !== undefined ? { draftId: initial.draftId } : {}),
-          ...(initial.to !== undefined ? { to: initial.to } : {}),
-          ...(initial.cc !== undefined ? { cc: initial.cc } : {}),
-          ...(initial.bcc !== undefined ? { bcc: initial.bcc } : {}),
-        }}
-        onSaved={() => close()}
-        onClose={() => close()}
-      />
+      <Suspense fallback={null}>
+        <EmailComposer
+          account={placeholderAccount}
+          accounts={[placeholderAccount]}
+          contacts={contacts}
+          initial={{
+            ...(initial.subject !== undefined ? { subject: initial.subject } : {}),
+            ...(initial.body !== undefined ? { body: initial.body } : {}),
+            ...(initial.threadId !== undefined ? { threadId: initial.threadId } : {}),
+            ...(initial.draftId !== undefined ? { draftId: initial.draftId } : {}),
+            ...(initial.to !== undefined ? { to: initial.to } : {}),
+            ...(initial.cc !== undefined ? { cc: initial.cc } : {}),
+            ...(initial.bcc !== undefined ? { bcc: initial.bcc } : {}),
+          }}
+          onSaved={() => close()}
+          onClose={() => close()}
+        />
+      </Suspense>
     </div>
   );
 }

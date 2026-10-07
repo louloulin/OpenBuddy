@@ -9,7 +9,7 @@ import {
 } from "@openbuddy/ui-primitives/icons";
 import { skillsList, agentsList, agentToolsList, type AgentToolDescriptor } from "@/lib/agent/pi-client";
 import { HOME_MODES, type HomeModeId } from "@openbuddy/ui-shared";
-import { CONNECTOR_LIST } from "@openbuddy/ui-experts";
+import { CONNECTOR_LIST } from "@openbuddy/ui-experts/first-screen";
 import type { AgentEntry, SkillInfo } from "@openbuddy/shared-types";
 
 interface InputAddMenuProps {

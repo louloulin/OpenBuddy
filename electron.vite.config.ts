@@ -703,6 +703,29 @@ export default defineConfig({
           codeSplitting: {
             groups: [
               {
+                // host 共享工具/叶子模块:同时被首屏 entry 图与懒加载面板包引用,
+                // 不分组时 rolldown 把它们同置进面板 chunk,导致整个面板包
+                // (ResourceCatalogPanel/UsageQuotaPanel/WebhookSubscriptionPanel/
+                //  ui-experts 211KB)被 modulepreload。覆盖五类:
+                //  - app 侧 re-export shim(src/lib/{notify,billing,audit})
+                //  - shim 的实体(openbuddy-platform/src/{billing,notify,audit})
+                //  - market-tab 意图通道(openbuddy-agent-rpc/src/navigation)
+                //  - ui-experts 被 entry 图引用的叶子(shared/ThumbImg+LetterAvatar、
+                //    data/connectors-catalog;消费方=AppShell/Composer/InputAddMenu)
+                //  - @tanstack/react-virtual(VirtualizedMessageList 与面板共用)
+                name: "host-shared-utils",
+                test: /\/src\/lib\/(notify|billing|audit)\/|openbuddy-platform\/src\/(billing|notify|audit)\/|openbuddy-agent-rpc\/src\/navigation\/|openbuddy-ui-experts\/src\/(shared|data)\/|tanstack[\/+]react-virtual/,
+                priority: 40,
+              },
+              {
+                // lucide 图标是逐文件小模块,首屏(ChatView/ArtifactChip 等)与面板
+                // 包(MarketplacePanel 的 Database、设置面板的 Shield)共用;不分组
+                // 时图标会随首个引用方落进大面板 chunk,把整个 chunk 拖进闭包。
+                name: "lucide-icons",
+                test: (id: string) => /node_modules[\/]lucide-react[\/]/.test(id),
+                priority: 30,
+              },
+              {
                 name: "markdown",
                 test: (id: string) =>
                   /node_modules\/(react-markdown|remark-gfm|remark-breaks|remark-math|rehype-highlight|rehype-sanitize|lowlight)(\/|$)/.test(id),

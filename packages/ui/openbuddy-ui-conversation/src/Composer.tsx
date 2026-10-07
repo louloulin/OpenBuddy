@@ -5,7 +5,7 @@ import { Mic, type LucideIcon } from "lucide-react";
 import type { ElectronWindowApi } from "@/lib/platform/electron-api";
 import { ChevronDownIcon } from "@openbuddy/ui-primitives/icons";
 import { ModelSelector, type ModelOption, type ThinkingLevel } from "@openbuddy/ui-workbench";
-import { ThumbImg } from "@openbuddy/ui-experts";
+import { ThumbImg } from "@openbuddy/ui-experts/first-screen";
 import { ContextUsagePill } from "./ContextUsagePill";
 import { estimateSendCost } from "@/lib/billing/token-estimate";
 import {

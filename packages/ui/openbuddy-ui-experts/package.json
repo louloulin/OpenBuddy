@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./client": "./src/client.tsx",
     "./invariant": "./src/invariant.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./first-screen": "./src/first-screen.ts"
   },
   "dependencies": {
     "@openbuddy/cordis": "workspace:*",
