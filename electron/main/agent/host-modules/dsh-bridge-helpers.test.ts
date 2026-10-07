@@ -73,7 +73,8 @@ describe("dsh-bridge-helpers", () => {
 
   it("invokeDeepSeekCordis throws when runtime is null", async () => {
     installDshBridgeHelpers({ state: createDefaultAgentHostState() });
-    await expect(invokeDeepSeekCordis({} as any)).rejects.toThrow(/not initialized/);
+    // 契约文案由 deepseek/bridge 统一提供 (冒烟的 deepSeekCordisInvoke 按此正则判定).
+    await expect(invokeDeepSeekCordis({} as any)).rejects.toThrow(/runtime is not active/);
   });
 
   it("invokeDeepSeekCordis delegates to runtime.invoke", async () => {

@@ -25,7 +25,7 @@
  * 参考 PI-Desktop `apps/desktop/src/features/app/AppShell.tsx` 的结构。
  */
 
-import { lazy, memo, Suspense, useCallback, useMemo, type ComponentType } from "react";
+import { lazy, memo, Suspense, useCallback, useMemo, useRef, type ComponentType } from "react";
 import { GlobalConfirmHost } from "@/components/GlobalConfirmHost";
 import { TitleBar } from "@openbuddy/ui-shell";
 import { TopbarActions, TopbarTitle } from "@openbuddy/ui-shell";
@@ -33,7 +33,6 @@ import { ChatShortcutOverlay } from "@openbuddy/ui-conversation";
 import { SecondarySidebar } from "@openbuddy/ui-shell";
 import { Sidebar } from "@openbuddy/ui-sidebar";
 import { ChatView } from "@openbuddy/ui-conversation";
-import { EmailAiStyles } from "@openbuddy/ui-email/ai";
 import { PlaceholderPage } from "@/components/shared/PlaceholderPage";
 import { EXPERTS_ROUTE_LABEL } from "@/lib/navigation/placeholder-routes";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -52,28 +51,20 @@ import {
 } from "./chrome";
 import { RoutePending } from "./RoutePending";
 import { FeedbackGate } from "./FeedbackGate";
-// R64 — 「重新观看引导」入口需要:
-//   - clearOnboardingState / resetTour:清掉持久化痕迹,让首启下次再弹;
-//   - useTourController:拿到一个能立刻打开漫游的控制器;
-//   - TourModal:在 host 顶层直接渲染,而不是依赖 ui-onboarding 注册的
-//     <TourSurface /> (那个 surface 自己又起了一个 useTourController,与
-//     这里 host 层的实例是两份独立 state — 重放时 host 调用 start() 只
-//     影响 host 的实例,不会推动 ui-onboarding 的 surface 弹窗)。host
-//     渲染一份新的 TourModal 等价于在 AppShell 接管漫游的可视化,且不
-//     影响 onboarding.tour slot 的可替换性(第三方想要整张换皮,仍然
-//     可以注册 onboarding.tour slot)。
-import {
-  TourModal,
-  clearOnboardingState as clearOnboardingPersisted,
-  resetTour as clearTourPersisted,
-  useTourController,
-} from "@openbuddy/ui-onboarding";
+// R64 — 「重新观看引导」入口:从设置 → 关于 触发。host 层漫游岛收在
+// ./TourModalHost.tsx(懒加载岛);这里只持有命令式 handle,重播时动态导入
+// onboarding 的持久化清理函数 —— AppShell 不再静态依赖
+// @openbuddy/ui-onboarding,整张 onboarding 图只在漫游真正渲染时加载。
+// host 岛与 ui-onboarding 注册的 <TourSurface /> 是两套独立 controller:
+// 重放只驱动 host 岛,不推动槽位侧 surface;第三方仍可整张换皮
+// onboarding.tour slot。
 import { DataDirGate } from "./DataDirGate";
 import { WhatsNewGate } from "./WhatsNewGate";
 import type { PluginCommandPayload } from "@openbuddy/ui-workbench";
 import { useSlotComponent, useSlotPayloadValues } from "./slot-bridge";
 import { AppStatusBar } from "./AppStatusBar";
 import type { AppShellRuntime, SettingsSection } from "./types";
+import type { TourModalHostHandle } from "./TourModalHost";
 
 // ---- Lazy overlays ----------------------------------------------------------
 const HomePage = lazy(() =>
@@ -84,6 +75,15 @@ const SettingsPanel = lazy(() =>
 );
 const OnboardingWizard = lazy(() =>
   import("@openbuddy/ui-onboarding").then((m) => ({ default: m.OnboardingWizard })),
+);
+// EmailAiStyles 是纯 CSS-in-JS 全局样式注入,挂载点在 Toast 旁;样式表
+// 属于 ui-email/ai 图 —— 懒加载后 email 图不再因 AppShell 静态导入而进首屏。
+const EmailAiStyles = lazy(() =>
+  import("@openbuddy/ui-email/ai").then((m) => ({ default: m.EmailAiStyles })),
+);
+// host 层漫游岛:useTourController + TourModal 的懒加载封装(见 R64 注释)。
+const TourModalHost = lazy(() =>
+  import("./TourModalHost").then((m) => ({ default: m.TourModalHost })),
 );
 // 配置(主题 / 模型服务 / 数据目录)放在设置里随时可改,这里只负责介绍和起步。
 const DEFAULT_ONBOARDING_STEPS = [
@@ -515,14 +515,20 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
   // R64 — host 层的 tour 控制器,独立于 ui-onboarding 注册的 <TourSurface />。
   // replayTour 调用 tour.start() 直接驱动下面的 <R64TourModal />;关掉时调
   // tour.stop() 写 localStorage(由 useTourController.stop 内部统一处理)。
-  const tour = useTourController({ autoOpen: false });
+  // R64 — host 层漫游岛的命令式 handle。replayTour(设置 → 关于 → 重新观看
+  // 引导)动态导入持久化清理函数后,驱动岛内 controller 立刻 start。
+  const tourHostRef = useRef<TourModalHostHandle>(null);
   const replayTour = useCallback(() => {
     if (typeof window === "undefined") return;
-    clearOnboardingPersisted(window.localStorage);
-    clearTourPersisted(window.localStorage);
-    setSettingsOpen(false);
-    tour.start(0);
-  }, [tour, setSettingsOpen]);
+    void import("@openbuddy/ui-onboarding")
+      .then((m) => {
+        m.clearOnboardingState(window.localStorage);
+        m.resetTour(window.localStorage);
+        setSettingsOpen(false);
+        tourHostRef.current?.start(0);
+      })
+      .catch(() => undefined);
+  }, [setSettingsOpen]);
 
   return (
     <div className={"app" + (IS_MACOS ? " app--macos" : "")}>
@@ -597,7 +603,12 @@ export const AppShell = memo(function AppShell({ runtime }: { runtime: AppShellR
           <MainContent runtime={runtime} />
         </main>
       </div>
-      <EmailAiStyles />
+      <Suspense fallback={null}>
+        <EmailAiStyles />
+      </Suspense>
+      <Suspense fallback={null}>
+        <TourModalHost ref={tourHostRef} />
+      </Suspense>
       <Toast entries={toastQueue} onDismiss={dismissToast} />
       <Suspense fallback={null}>
         <SearchSurface

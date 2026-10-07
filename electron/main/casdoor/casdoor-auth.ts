@@ -811,6 +811,9 @@ export class CasdoorAuthService {
   }
 
   assertAuthorized(requirement: CasdoorAuthorizationRequirement, message = "当前账户没有访问当前租户资源的权限"): void {
+    // 未配置 Casdoor = 本地模式,与 assertCapability 同语义放行 —— 否则默认安装
+    // 的 sessions:list 等基础 IPC 全部 CASDOOR_SIGNED_OUT(electron 冒烟实测)。
+    if (!this.config.configured) return;
     const decision = this.authorizationDecision(requirement);
     if (!decision.allowed) {
       const error = new Error(`${decision.code}: ${message}`) as Error & { code?: string; reason?: string; tenantId?: string; subject?: string; resource?: string; action?: string };
@@ -957,6 +960,8 @@ export class CasdoorAuthService {
   }
 
   assertResourceAuthorized(request: CasdoorResourceAuthorizationRequest, message = "当前账户没有访问当前租户资源的权限"): void {
+    // 同 assertAuthorized:本地模式放行,已配置始终强制。
+    if (!this.config.configured) return;
     if (!this.authorizeResource(request)) {
       const decision = this.authorizationDecision({ resource: request.resource, resourceId: request.resourceId, action: request.action });
       const error = new Error(`${decision.code}: ${message}`) as Error & { code?: string; reason?: string; tenantId?: string; subject?: string; resource?: string; action?: string };

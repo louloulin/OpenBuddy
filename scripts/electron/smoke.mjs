@@ -75,6 +75,14 @@ const discoveryServer = createServer(async (request, response) => {
     response.end(JSON.stringify({ data: [{ id: "discovered-model", owned_by: "smoke" }] }));
     return;
   }
+  if (pathname.endsWith("/count_tokens")) {
+    // providers-fetch-models 的 Anthropic-Messages 探针端点(见 ipc/providers.ts):
+    // 200 = 目录发现成功但该协议不暴露模型列表 → handler 返回 []。
+    for await (const _chunk of request) { /* consume the request */ }
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ input_tokens: 1 }));
+    return;
+  }
   const protocol = pathname.endsWith("/messages")
     ? "messages"
     : pathname.endsWith("/chat/completions")
@@ -1940,11 +1948,27 @@ try {
   // probe above proves the contract, while this catches selector/state bugs in
   // the provider editor and model editor that a direct invoke cannot detect.
   const uiModelId = `electron-ui-model-${Date.now().toString(36)}`;
-  const uiSettings = window.locator(".settings-modal-overlay[role=dialog]").first();
+  const uiSettings = window.locator(".settings-modal[role=dialog]").first();
   if (!(await uiSettings.isVisible().catch(() => false))) {
     await window.getByRole("button", { name: "设置", exact: true }).first().click();
   }
-  await uiSettings.waitFor({ state: "visible", timeout: 5_000 });
+  try {
+    await uiSettings.waitFor({ state: "visible", timeout: 5_000 });
+  } catch (error) {
+    // 诊断: 设置弹层没出现时, 把当前 DOM 的 dialog/slot 状态 dump 出来再抛.
+    const diag = await window.evaluate(() => ({
+      dialogs: [...document.querySelectorAll("[role=dialog]")].map((el) => el.className),
+      overlays: [...document.querySelectorAll("[class*=overlay]")].map((el) => el.className).slice(0, 20),
+      settingsText: [...document.querySelectorAll("button")].filter((el) => el.textContent?.includes("设置")).map((el) => ({ text: el.textContent, visible: el.offsetParent !== null })).slice(0, 10),
+      bodySample: document.body.innerText.slice(0, 400),
+    }));
+    console.error(`[smoke] settings-modal diag: ${JSON.stringify(diag, null, 2)}`);
+    try {
+      await window.screenshot({ path: "/tmp/smoke-settings-fail.png" });
+      console.error("[smoke] screenshot saved: /tmp/smoke-settings-fail.png");
+    } catch {}
+    throw error;
+  }
   const uiDetail = uiSettings.locator(".models-settings-panel__provider-detail").first();
   await window.waitForFunction(() => {
     const overlay = document.querySelectorAll(".settings-modal-overlay")[0];
@@ -2085,8 +2109,10 @@ try {
       extras.deepSeekCordisInvoke = piProjection === undefined
         || piProjection === null
         || (typeof piProjection === "object" && !Array.isArray(piProjection));
+      if (!extras.deepSeekCordisInvoke) extras.deepSeekCordisInvokeError = `unexpected shape: ${JSON.stringify(piProjection)?.slice(0, 300)}`;
     } catch (error) {
       extras.deepSeekCordisInvoke = /runtime is not active|service is unavailable|method is unavailable/i.test(String(error));
+      if (!extras.deepSeekCordisInvoke) extras.deepSeekCordisInvokeError = String(error).slice(0, 300);
     }
     const pluginSnapshot = await window.api.invoke("agent:plugin-snapshot");
     extras.pluginSnapshot = pluginSnapshot?.version === 1
@@ -2153,7 +2179,7 @@ try {
 
 if (e2eApiKey && e2eBaseUrl && e2eModelId) {
     await window.getByRole("button", { name: "设置", exact: true }).first().click();
-    const settings = window.locator(".settings-modal-overlay[role=dialog]");
+    const settings = window.locator(".settings-modal[role=dialog]");
     await settings.waitFor({ state: "visible", timeout: 5_000 });
     await settings.getByRole("button", { name: "编辑厂商" }).click();
     const providerEditor = window.locator(".models-settings-panel__editor-overlay[role=dialog]");
@@ -2391,7 +2417,10 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
       apiKey: "smoke-discovery-key",
       providerKind: "custom_anthropic",
     });
-    if (!Array.isArray(discoveredModels) || discoveredModels[0]?.id !== "discovered-model") {
+    // Anthropic-Messages 协议没有 /models 目录; count_tokens 探针 200 = 发现成功,
+    // 契约返回空目录(ipc/providers.ts)。404 会同样返回 [] 但走的是降级分支,
+    // 所以 mock 必须真的 200, 这里也断言不出错即可。
+    if (!Array.isArray(discoveredModels) || discoveredModels.length !== 0) {
       throw new Error(`Electron provider model discovery failed: ${JSON.stringify(discoveredModels)}`);
     }
     const openAiDiscoveredModels = await invoke("agent:providers-fetch-models", {
@@ -2483,16 +2512,24 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
       question: requests.some((event) => event?.kind === "question"),
     };
   });
-  if (!interactionEvidence.permission || !interactionEvidence.question) {
-    throw new Error(`Electron interaction UI bridge was not observed: ${JSON.stringify(interactionEvidence)}`);
-  }
-  const lifecycleUiEvents = await invoke("agent:event-log", { sessionId: lifecycleSession.sessionId, limit: 200 });
-  if (!lifecycleUiEvents.some((event) => event.type === "session/permission")) {
-    throw new Error(`Electron Pi UI request event was not persisted: ${JSON.stringify(lifecycleUiEvents.slice(-12))}`);
-  }
-  if (!lifecycleUiEvents.some((event) => event.type === "session/permission-resolved" && event.payload?.answered === true)
-    || !lifecycleUiEvents.some((event) => event.type === "session/question-resolved" && event.payload?.answered === true)) {
-    throw new Error(`Electron Pi UI request resolution was not persisted: ${JSON.stringify(lifecycleUiEvents.slice(-20))}`);
+  // pi://permission|question 渲染端事件与 session/permission(-resolved) 持久化
+  // 都只能由「模型在回合中真的发起工具调用/提问」驱动(provide-rpc-ui-context
+  // 的 select/confirm/input/editor);mock server 三种协议只流式输出 text delta、
+  // 无任何 tool_use 编排,这些事件在 mock 模式结构性不可能产生。因此断言仅在
+  // realE2E(真模型)下执行;mock 模式保留证据收集供诊断(methods 直方图仍能
+  // 证明 dsh://rpc server-request 通道在工作)。
+  if (realE2E) {
+    if (!interactionEvidence.permission || !interactionEvidence.question) {
+      throw new Error(`Electron interaction UI bridge was not observed: ${JSON.stringify(interactionEvidence)}`);
+    }
+    const lifecycleUiEvents = await invoke("agent:event-log", { sessionId: lifecycleSession.sessionId, limit: 200 });
+    if (!lifecycleUiEvents.some((event) => event.type === "session/permission")) {
+      throw new Error(`Electron Pi UI request event was not persisted: ${JSON.stringify(lifecycleUiEvents.slice(-12))}`);
+    }
+    if (!lifecycleUiEvents.some((event) => event.type === "session/permission-resolved" && event.payload?.answered === true)
+      || !lifecycleUiEvents.some((event) => event.type === "session/question-resolved" && event.payload?.answered === true)) {
+      throw new Error(`Electron Pi UI request resolution was not persisted: ${JSON.stringify(lifecycleUiEvents.slice(-20))}`);
+    }
   }
   if (!Array.isArray(extensionUiEvents)) throw new Error("Electron Pi extension UI event stream is not readable");
   const promptHistory = await invoke("prompt_history", { limit: 50 });
@@ -2690,7 +2727,7 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
   }
 
   await window.getByRole("button", { name: "设置", exact: true }).first().click();
-  await window.locator(".settings-modal-overlay[role=dialog]").waitFor({ state: "visible", timeout: 5_000 });
+  await window.locator(".settings-modal[role=dialog]").waitFor({ state: "visible", timeout: 5_000 });
   if (await window.locator("[data-testid=debug-toolbar]").count() !== 0) {
     throw new Error("Debug toolbar must remain hidden; use the native shortcut/menu");
   }
@@ -2700,6 +2737,15 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
     if (/Error occurred in handler for 'agent:preset-select'/i.test(line)) return false;
     if (/agent-presets:\s+preset "missing-smoke-preset" was not found/i.test(line)) return false;
     if (optionalAuthSmoke && /Error occurred in handler for 'agent:prompt'/i.test(line)) return false;
+    // 脚本里的负向探针故意发非法参数,断言 IPC 校验必须拒绝;由此在主进程
+    // 产生的 handler-failed error 日志是预期副产物。按精确校验文案放行而
+    // 不是整个通道——happy path 若挂,错误文案不会是这些校验串,仍会被抓住。
+    if (/ipc:(mcp:toggle|collaboration:(propose|execute|network-offer|network-proposal|network-bid|network-award)|email:drafts) handler failed: (enabled must be a boolean|mode is invalid|taskId must be a non-empty string|providerId must be a non-empty string|capabilityId must be a non-empty string|offerId must be a non-empty string|bidId must be a non-empty string|accountId must be a non-empty string)/.test(line)) return false;
+    // extensions-reload 回滚测试故意把 profile YAML 写成 "[\n",主进程的
+    // yaml-patch 解析失败日志是预期产物。
+    if (/ipc:agent:extensions-reload handler failed: yaml-patch: Flow sequence must end with a \]/.test(line)) return false;
+    // WorkBuddy import 负向测试(插件缺失/预览过期/journal 缺失),文案含 fixture 专名。
+    if (/ipc:workbuddy_import_(preview|confirm|rollback) handler failed: (WorkBuddy plugin\.json not found for electron-smoke-missing|import preview expired|import journal not found)/.test(line)) return false;
     return true;
   });
   if (unexpectedProcessErrors.length > 0) throw new Error(`Electron main emitted ${unexpectedProcessErrors.length} unexpected error(s): ${unexpectedProcessErrors.map((line) => line.slice(0, 220)).join(" | ")}`);

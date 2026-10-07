@@ -37,6 +37,44 @@ function configuredService(): CasdoorAuthService {
   return service;
 }
 
+/** 已配置 Casdoor 但未登录(本地默认安装的 config 就是 configured:false,
+ *  这个 helper 构造的是「管理员配了 Casdoor 但还没登录」的中间态)。 */
+function configuredSignedOutService(): CasdoorAuthService {
+  const service = new CasdoorAuthService();
+  const internal = service as unknown as { config: Record<string, unknown> };
+  internal.config = {
+    ...internal.config,
+    issuer: "https://casdoor.test",
+    clientId: "client-id",
+    enforcerId: "openbuddy-enforcer",
+    configured: true,
+  };
+  return service;
+}
+
+describe("assert* 本地模式旁路(electron 冒烟回归)", () => {
+  it("未配置 Casdoor 时 assertAuthorized 放行(本地模式)", () => {
+    const service = new CasdoorAuthService();
+    expect(() => service.assertAuthorized({ capability: "team.workspace" })).not.toThrow();
+    expect(() => service.assertAuthorized({ permission: "tenant.users.write" })).not.toThrow();
+  });
+
+  it("未配置 Casdoor 时 assertResourceAuthorized 放行", () => {
+    const service = new CasdoorAuthService();
+    expect(() => service.assertResourceAuthorized({ resource: "workspace", action: "read" })).not.toThrow();
+  });
+
+  it("已配置但未登录时 assertAuthorized 仍强制拒绝(CASDOOR_SIGNED_OUT)", () => {
+    const service = configuredSignedOutService();
+    expect(() => service.assertAuthorized({ capability: "team.workspace" })).toThrow("CASDOOR_SIGNED_OUT");
+  });
+
+  it("已配置但未登录时 assertResourceAuthorized 仍强制拒绝", () => {
+    const service = configuredSignedOutService();
+    expect(() => service.assertResourceAuthorized({ resource: "workspace", action: "read" })).toThrow();
+  });
+});
+
 describe("Casdoor remote resource authorization", () => {
   beforeEach(() => {
     vi.restoreAllMocks();

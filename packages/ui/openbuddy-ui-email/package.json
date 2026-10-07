@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./ai": "./src/ai/index.ts",
+    "./ai/sentry-reporter": "./src/ai/sentry-reporter.ts",
     "./ai/styles.css": "./src/ai/ai.css",
     "./package.json": "./package.json",
     "./client": "./src/client.tsx",

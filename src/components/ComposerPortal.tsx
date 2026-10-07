@@ -7,10 +7,16 @@
  * 渲染层级:放在 AppShell 顶层,优先级最高。
  * 简化模式:只渲染一个预填 subject/body 的弹窗,即使未连接账户也不会崩。
  */
-import { useEffect } from "react";
-import { EmailComposer } from "@openbuddy/ui-email";
+import { lazy, Suspense, useEffect } from "react";
 import { useEmailContacts } from "@/lib/email/use-email-contacts";
 import { useComposerStore } from "@/stores/composer-store";
+
+// EmailComposer 属于 @openbuddy/ui-email 图。静态导入会把整张 email 面板
+// (EmailComposer/push-provider-error-toast 等)拖进首屏 entry;composer 是
+// 用户点开才出现的模态,懒加载后首屏不再背这个包。
+const EmailComposer = lazy(() =>
+  import("@openbuddy/ui-email").then((m) => ({ default: m.EmailComposer })),
+);
 
 export function ComposerPortal(): JSX.Element | null {
   const open = useComposerStore((state) => state.open);

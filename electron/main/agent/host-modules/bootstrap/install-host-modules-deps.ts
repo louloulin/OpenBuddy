@@ -12,6 +12,7 @@ import { PresetSessionRuntime } from "../../preset-session-runtime";
 import { casdoorAuth } from "../../../casdoor/casdoor-auth";
 import { agentPermissionBridge } from "../../agent-permission-bridge";
 import * as piResources from "../../pi-resources";
+import { refreshPiHookConfigs } from "../profile/resource-paths";
 import type { PiSessionRuntime } from "../../pi-session-runtime";
 import type { PiRuntimeCoordinator } from "../../pi-runtime-coordinator";
 import type { AgentHostState } from "../_state-shape";
@@ -154,6 +155,7 @@ export function buildInstallHostModuleDeps(
     pluginLifecycleQueue: closures.pluginLifecycleQueue,
     setProfilePiResourcePaths: closures.setProfilePiResourcePaths,
     refreshMarketplacePiResourcePaths: closures.refreshMarketplacePiResourcePaths,
+    refreshHookConfigs: () => refreshPiHookConfigs(),
     sessionPresetSelection: closures.sessionPresetSelection,
     replaceSession: ((opts: any) => closures.piSessionRuntime.replace(opts)) as any,
     sessionManagerOpen: ((sessionPath: string, options: any, cwd: string) =>

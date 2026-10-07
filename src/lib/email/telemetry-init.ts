@@ -18,7 +18,7 @@
 import {
   createSentryReporter,
   installSentryReporter,
-} from "@openbuddy/ui-email/ai";
+} from "@openbuddy/ui-email/ai/sentry-reporter";
 
 interface InitTelemetryOptions {
   /** 测试用:覆盖 DSN 来源。 */
