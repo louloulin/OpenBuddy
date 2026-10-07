@@ -35,6 +35,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@openbuddy/ui-state/global-confirm-store": resolve(__dirname, "packages/ui/openbuddy-ui-state/src/global-confirm-store.ts"),
+      "@openbuddy/ui-state/canvas-store": resolve(__dirname, "packages/ui/openbuddy-ui-state/src/canvas-store.ts"),
     },
   },
   test: {

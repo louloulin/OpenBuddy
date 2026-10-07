@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback, useSyncExternalStore } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, useCallback, useSyncExternalStore } from "react";
 // Phase A4 — pull each icon directly from its per-icon ESM module. The
 // barrel re-exports ~1500 icons and the bundler would otherwise drag the
 // whole tree through the entry chunk even with tree-shaking (lucide-react
@@ -12,6 +12,7 @@ import {
   ChatViewToolbar,
   defaultArtifactsButton,
   defaultBrowserButton,
+  defaultCanvasButton,
   defaultFileChangesButton,
   defaultFileTreeButton,
   defaultFindButton,
@@ -32,6 +33,10 @@ import { useChatViewRewind } from "./chatview/useChatViewRewind";
 import { useChatViewTimeline } from "./chatview/useChatViewTimeline";
 import { useChatViewRevision } from "./chatview/useChatViewRevision";
 import { ChatViewEmptyState } from "./chatview/ChatViewEmptyState";
+// Canvas 的承载(Tiptap/pdf.js/mermaid 依赖图)不进首包 —— entryChunkMB=5.0 是 CI 硬门禁。
+const CanvasPanel = lazy(() =>
+  import("./canvas/CanvasPanel").then((m) => ({ default: m.CanvasPanel })),
+);
 import {
   useChatViewGlobalShortcuts,
   useChatViewShortcuts,
@@ -71,6 +76,7 @@ import type { TimelineNode } from "@/lib/ui/timeline-utils";
 import { useSubagentStore } from "@/stores/subagent-store";
 import { useQuestionStore } from "@/stores/question-store";
 import { usePermissionStore } from "@/stores/permission-store";
+import { useCanvasStore } from "@/stores/canvas-store";
 
 import type { ModelOption, ThinkingLevel } from "@openbuddy/ui-workbench";
 import type { AgentEntry } from "@openbuddy/shared-types";
@@ -422,6 +428,38 @@ export function ChatView({
   const [panelMode, setPanelMode] = useState<ToolSidePanelMode>("tool");
   const [activeTool, setActiveTool] = useState<ToolCallView | null>(null);
   const [previewPath, setPreviewPath] = useState<string | null>(null);
+  // Canvas 与工具面板都是右侧工作区,同时开会把转录区挤没 —— 互斥。
+  const canvasOpen = useCanvasStore((s) => s.open);
+  const canvasTabs = useCanvasStore((s) => s.tabs);
+  const closeCanvas = useCanvasStore((s) => s.close);
+  const openCanvasTab = useCanvasStore((s) => s.openTab);
+  useEffect(() => {
+    if (canvasOpen) setPanelOpen(false);
+  }, [canvasOpen]);
+  // 开工具面板时让位给工具面板。
+  useEffect(() => {
+    if (panelOpen) closeCanvas();
+  }, [panelOpen]);
+
+  // 没有画布时按开关 → 开一张空白 markdown 画布,而不是弹一个空面板。
+  const handleToggleCanvas = useCallback(() => {
+    if (useCanvasStore.getState().open) {
+      useCanvasStore.getState().close();
+      return;
+    }
+    const state = useCanvasStore.getState();
+    const last = state.tabs[state.tabs.length - 1];
+    if (last) {
+      state.openTab(last);
+      return;
+    }
+    openCanvasTab({
+      canvasId: `canvas-${sessionId ?? "draft"}`,
+      kind: "markdown",
+      title: "新画布",
+      content: "",
+    });
+  }, [openCanvasTab, sessionId]);
 
   // R2.5 — workspace switch loading flag. Drives the WorkspacePicker's
   // spinner overlay; non-null while a switch is in flight (preventing
@@ -663,6 +701,7 @@ export function ChatView({
     },
     findOpen,
     hasMessages: messages.length > 0,
+    onToggleCanvas: handleToggleCanvas,
   });
   // 全局监听(改造前的 window listener 语义:无需焦点即可触发)。
   useChatViewGlobalShortcuts({
@@ -736,6 +775,11 @@ export function ChatView({
         if (panelOpen && panelMode === "artifacts") setPanelOpen(false);
         else handleOpenArtifacts();
       },
+    }),
+    defaultCanvasButton({
+      active: canvasOpen,
+      canvasCount: canvasTabs.length,
+      onClick: handleToggleCanvas,
     }),
     defaultFindButton({
       active: findOpen,
@@ -822,7 +866,11 @@ export function ChatView({
   return (
     <div
       ref={chatViewRef}
-      className={"chatview" + (panelOpen ? " chatview--with-panel" : "")}
+      className={
+        "chatview" +
+        (panelOpen ? " chatview--with-panel" : "") +
+        (canvasOpen ? " chatview--with-canvas" : "")
+      }
       // Plan5 Phase A.1/B.6 — 容器内快捷键(Ctrl/Cmd+F 打开查找,Esc 关闭)。
       // 全局 `?` / Ctrl+/ 由 App 顶层的 <ChatShortcutOverlay /> 承接。
       // handler 走上面 chatViewRef 上挂的原生 keydown 监听。
@@ -955,6 +1003,14 @@ export function ChatView({
         onOpenArtifacts={handleOpenArtifacts}
         findToolCall={findToolCallStable}
       />
+
+      {/* Canvas 工作区 —— 与 ToolSidePanel 互斥(打开画布会关掉工具面板)。
+          lazy:面板的 Tiptap/pdf.js 依赖图不进首包。 */}
+      {canvasOpen && (
+        <Suspense fallback={null}>
+          <CanvasPanel />
+        </Suspense>
+      )}
     </div>
   );
 }

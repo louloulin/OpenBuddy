@@ -41,6 +41,7 @@ export const CHAT_SHORTCUTS: ShortcutEntry[] = [
   { id: "chat-history-prev", keys: "↑", label: "上一条历史输入", category: "编辑" },
   { id: "chat-history-next", keys: "↓", label: "下一条历史输入", category: "编辑" },
   { id: "chat-tools-panel", keys: "⌘ ⇧ T", label: "切换工具面板", category: "工具" },
+  { id: "chat-canvas", keys: "⌘ ⇧ C", label: "切换画布面板", category: "工具" },
   { id: "chat-shortcuts", keys: "? / ⌘ /", label: "显示快捷键面板", category: "帮助" },
 ];
 

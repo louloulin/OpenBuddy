@@ -42,6 +42,32 @@
     "lockSection": "锁定权限模式"
   },
   "conversation": {
+    "canvas": {
+      "button": "画布 (⌘ ⇧ C)",
+      "buttonWithCount": "画布 ({count})",
+      "close": "关闭画布",
+      "closeTab": "关闭 {title}",
+      "empty": "没有打开的画布",
+      "fileMissing": "该画布没有关联文件",
+      "kind": {
+        "code": "代码",
+        "html": "HTML",
+        "image": "图片",
+        "markdown": "文档",
+        "pdf": "PDF",
+        "react": "React",
+        "svg": "SVG"
+      },
+      "loading": "加载画布…",
+      "newTitle": "新画布",
+      "panelLabel": "画布",
+      "previewTitle": "画布预览",
+      "reactLoadFailed": "React 画布加载失败：",
+      "resize": "调整画布宽度",
+      "shortcut": "切换画布面板",
+      "sourceLabel": "画布源码",
+      "untitled": "未命名"
+    },
     "title": "会话",
     "newSession": "新建会话",
     "pinnedSection": "置顶",
@@ -59,7 +85,9 @@
     "attachFile": "附加文件"
   },
   "skill": {
-    "bar": { "title": "推荐技能" },
+    "bar": {
+      "title": "推荐技能"
+    },
     "title": "技能",
     "install": "安装",
     "installed": "已安装",

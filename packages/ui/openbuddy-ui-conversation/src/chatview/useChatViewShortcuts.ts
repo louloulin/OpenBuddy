@@ -26,6 +26,8 @@ export type UseChatViewShortcutsParams = {
   findOpen?: boolean;
   /** 会话里是否有消息;无消息时 Ctrl/Cmd+F 不抢键(与改造前一致)。 */
   hasMessages?: boolean;
+  /** Ctrl/Cmd+Shift+C 切换画布面板。 */
+  onToggleCanvas?: () => void;
 };
 
 export type UseChatViewShortcutsResult = {
@@ -50,6 +52,7 @@ function isEditingTarget(target: EventTarget | null): boolean {
 export function useChatViewShortcuts({
   onToggleFind,
   onCloseFind,
+  onToggleCanvas,
   findOpen,
   hasMessages = true,
 }: UseChatViewShortcutsParams): UseChatViewShortcutsResult {
@@ -60,13 +63,19 @@ export function useChatViewShortcuts({
         onCloseFind?.();
         return;
       }
+      if (isMetaOrCtrl(event) && event.shiftKey && event.key.toLowerCase() === "c") {
+        if (!onToggleCanvas) return;
+        event.preventDefault();
+        onToggleCanvas();
+        return;
+      }
       if (isMetaOrCtrl(event) && event.key.toLowerCase() === "f") {
         if (!hasMessages) return;
         event.preventDefault();
         onToggleFind?.();
       }
     },
-    [findOpen, hasMessages, onToggleFind, onCloseFind],
+    [findOpen, hasMessages, onToggleFind, onCloseFind, onToggleCanvas],
   );
 
   return { handleKeyDown };

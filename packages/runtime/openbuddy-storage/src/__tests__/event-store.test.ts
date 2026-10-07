@@ -115,9 +115,11 @@ describe("MigrationRunner", () => {
     const runner = new MigrationRunner({ steps: DEFAULT_MIGRATIONS });
     const first = await runner.run(driver);
     const second = await runner.run(driver);
-    expect(first.applied).toBe(11);
+    // 断言从迁移表本身推导,而不是写死版本号——加一条 migration 不该逼着改断言。
+    const expected = DEFAULT_MIGRATIONS.length;
+    expect(first.applied).toBe(expected);
     expect(second.applied).toBe(0);
-    expect(first.finalVersion).toBe(11);
+    expect(first.finalVersion).toBe(Math.max(...DEFAULT_MIGRATIONS.map((step) => step.version)));
   });
 
   it("fails on a broken migration and records the failure", async () => {

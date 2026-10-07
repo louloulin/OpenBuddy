@@ -749,6 +749,13 @@ export default defineConfig({
     },
     resolve: {
       alias: rendererOnlyAliases,
+      // 024f6214 按 vite 8 的迁移提示删掉了 renderer 的 vite-tsconfig-paths
+      // 插件,但没补上 vite 8 的原生开关(默认 false)。后果只显形在 dev:
+      // build 走 rolldown 自己的解析器(照读 tsconfig paths,所以绿),dev 的
+      // import-analysis 管线不读 paths,而 `@openbuddy/*` 里多数包没进根
+      // package.json 依赖(node_modules 无软链),于是 src/main.tsx 一开始就
+      // "Failed to resolve import @openbuddy/ui-theme/styles" 满屏。
+      tsconfigPaths: true,
     },
     // Node-only surface is shimmed at runtime by `./renderer-node-shim.ts`,
     // imported first from `src/main.tsx`. Doing it as a real import

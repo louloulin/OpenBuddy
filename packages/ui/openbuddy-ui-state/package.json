@@ -8,6 +8,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./canvas-store": "./src/canvas-store.ts",
     "./feedback-store": "./src/feedback-store.ts",
     "./global-confirm-store": "./src/global-confirm-store.ts",
     "./pending-expert-store": "./src/pending-expert-store.ts",

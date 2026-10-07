@@ -504,6 +504,7 @@
       "@openbuddy/ui-contract/pi-bridge-client": ["./packages/ui/openbuddy-ui-contract/src/pi-bridge-client.ts"],
       "@openbuddy/ui-primitives/ErrorBoundary": ["./packages/ui/openbuddy-ui-primitives/src/ErrorBoundary.tsx"],
       "@openbuddy/ui-primitives/StatusIndicator": ["./packages/ui/openbuddy-ui-primitives/src/StatusIndicator.tsx"],
+      "@openbuddy/ui-state/canvas-store": ["./packages/ui/openbuddy-ui-state/src/canvas-store.ts"],
       "@openbuddy/ui-state/feedback-store": ["./packages/ui/openbuddy-ui-state/src/feedback-store.ts"],
       "@openbuddy/ui-state/global-confirm-store": ["./packages/ui/openbuddy-ui-state/src/global-confirm-store.ts"],
       "@openbuddy/ui-state/pending-expert-store": ["./packages/ui/openbuddy-ui-state/src/pending-expert-store.ts"],

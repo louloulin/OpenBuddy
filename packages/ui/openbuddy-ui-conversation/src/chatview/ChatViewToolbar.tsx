@@ -14,6 +14,7 @@ import {
   Globe,
   ListTodo,
   Package,
+  PanelRight,
   Search,
   Users,
 } from "lucide-react";
@@ -131,6 +132,21 @@ export function defaultArtifactsButton(props: {
     onClick: props.onClick,
     label: `本会话产物 (${props.artifactCount})`,
     icon: <Package size={15} strokeWidth={1.75} />,
+  };
+}
+
+export function defaultCanvasButton(props: {
+  active: boolean;
+  canvasCount: number;
+  onClick: () => void;
+}): ToolButtonDescriptor {
+  return {
+    id: "canvas",
+    active: props.active,
+    visible: true,
+    onClick: props.onClick,
+    label: props.canvasCount > 0 ? `画布 (${props.canvasCount})` : "画布 (⌘ ⇧ C)",
+    icon: <PanelRight size={15} strokeWidth={1.75} />,
   };
 }
 
