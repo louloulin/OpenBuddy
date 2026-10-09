@@ -140,7 +140,7 @@ impl RpcError {
         match self {
             Self::HostOverloaded => "HOST_OVERLOADED".to_string(),
             Self::AuditExhausted => "AUDIT_EXHAUSTED".to_string(),
-            other => format!("{}", other),
+            other => format!("{other}"),
         }
     }
 }

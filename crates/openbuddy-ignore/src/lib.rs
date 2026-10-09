@@ -26,14 +26,14 @@ impl WorkspaceIgnore {
                 if trimmed.is_empty() || trimmed.starts_with('#') {
                     continue;
                 }
-                builder
-                    .add_line(None, trimmed)
-                    .with_context(|| {
-                        format!("failed to add line {} of .openbuddyignore", idx + 1)
-                    })?;
+                builder.add_line(None, trimmed).with_context(|| {
+                    format!("failed to add line {} of .openbuddyignore", idx + 1)
+                })?;
             }
         }
-        let inner = builder.build().context("failed to build gitignore matcher")?;
+        let inner = builder
+            .build()
+            .context("failed to build gitignore matcher")?;
         Ok(Self { inner })
     }
 

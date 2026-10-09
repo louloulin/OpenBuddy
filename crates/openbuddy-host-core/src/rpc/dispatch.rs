@@ -48,7 +48,11 @@ pub fn registered_methods() -> Vec<&'static str> {
     handlers().read().keys().copied().collect()
 }
 
+/// Fields mirror the client's handshake payload. Only `protocol_version` is
+/// consumed today (it is the compatibility gate); the rest are kept because
+/// they are part of the documented wire contract the client sends.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct HandshakeParams {
     #[serde(rename = "protocolVersion")]
     protocol_version: u32,
@@ -88,32 +92,32 @@ pub fn install_app_handlers() {
                     )));
                 }
                 let supports = vec!["stdio-jsonrpc", "ndjson", "method-namespaces"];
-                let capabilities: Vec<&'static str> = if std::env::var("OPENBUDDY_PHASE0_ONLY").is_ok()
-                {
-                    vec!["app.handshake", "app.listMethods"]
-                } else {
-                    vec![
-                        "app.handshake",
-                        "app.listMethods",
-                        "app.shutdown",
-                        "secrets.set",
-                        "secrets.get",
-                        "secrets.delete",
-                        "secrets.list",
-                        "permissions.evaluate",
-                        "permissions.readRules",
-                        "permissions.writeRules",
-                        "permissions.readMode",
-                        "permissions.writeMode",
-                        "session.search",
-                        "session.message",
-                        "workspace.resolve",
-                        "workspace.check",
-                        "workspace.listIgnored",
-                        "audit.append",
-                        "audit.tail",
-                    ]
-                };
+                let capabilities: Vec<&'static str> =
+                    if std::env::var("OPENBUDDY_PHASE0_ONLY").is_ok() {
+                        vec!["app.handshake", "app.listMethods"]
+                    } else {
+                        vec![
+                            "app.handshake",
+                            "app.listMethods",
+                            "app.shutdown",
+                            "secrets.set",
+                            "secrets.get",
+                            "secrets.delete",
+                            "secrets.list",
+                            "permissions.evaluate",
+                            "permissions.readRules",
+                            "permissions.writeRules",
+                            "permissions.readMode",
+                            "permissions.writeMode",
+                            "session.search",
+                            "session.message",
+                            "workspace.resolve",
+                            "workspace.check",
+                            "workspace.listIgnored",
+                            "audit.append",
+                            "audit.tail",
+                        ]
+                    };
                 let result = HandshakeResult {
                     protocol_version: crate::PROTOCOL_VERSION,
                     host_version: crate::HOST_VERSION,
@@ -373,7 +377,9 @@ pub fn install_capability_handlers() {
                     #[serde(default = "default_max")]
                     max: usize,
                 }
-                fn default_max() -> usize { 256 }
+                fn default_max() -> usize {
+                    256
+                }
                 let parsed: Params = serde_json::from_value(params)
                     .map_err(|err| RpcError::InvalidParams(err.to_string()))?;
                 let result = state
@@ -467,7 +473,10 @@ pub fn run_sync(
 ) {
     install_app_handlers();
     install_capability_handlers();
-    let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
         Ok(rt) => rt,
         Err(err) => {
             eprintln!("[openbuddy-dispatcher] failed to build runtime: {err}");
@@ -479,11 +488,7 @@ pub fn run_sync(
     }
 }
 
-async fn dispatch_one_event(
-    state: Arc<AppState>,
-    admission: Arc<Admission>,
-    event: DispatchEvent,
-) {
+async fn dispatch_one_event(state: Arc<AppState>, admission: Arc<Admission>, event: DispatchEvent) {
     match event {
         DispatchEvent::Request(req) => {
             let method = req.method.clone();
@@ -533,7 +538,6 @@ async fn dispatch_one_event(
         }
     }
 }
-
 
 async fn dispatch_one(state: Arc<AppState>, method: &str, id: Value, params: Value) {
     let handler = handlers().read().get(method).cloned();

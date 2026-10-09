@@ -84,12 +84,9 @@ impl WorkspaceHandle {
 
     pub fn resolve(&self, path: &Path) -> Result<ResolveResult> {
         let canonical = canonicalize(path)?;
-        let root = self
-            .inner
-            .read()
-            .workspace_root
-            .clone()
-            .ok_or_else(|| anyhow!("workspace root not configured; call set_workspace_root first"))?;
+        let root = self.inner.read().workspace_root.clone().ok_or_else(|| {
+            anyhow!("workspace root not configured; call set_workspace_root first")
+        })?;
         let in_workspace = canonical.starts_with(&root);
         let is_directory = canonical.is_dir();
         Ok(ResolveResult {
@@ -170,10 +167,7 @@ impl WorkspaceHandle {
 
 fn canonicalize_existing(path: &Path) -> Result<PathBuf> {
     if !path.exists() {
-        return Err(anyhow!(
-            "workspace root does not exist: {}",
-            path.display()
-        ));
+        return Err(anyhow!("workspace root does not exist: {}", path.display()));
     }
     std::fs::canonicalize(path).with_context(|| format!("canonicalize {}", path.display()))
 }
@@ -211,7 +205,7 @@ fn build_matcher(root: &Path) -> Result<Gitignore> {
     if global.exists() {
         let _ = builder.add(&global);
     }
-    Ok(builder.build().context("build gitignore matcher")?)
+    builder.build().context("build gitignore matcher")
 }
 
 #[derive(Debug, Deserialize)]
@@ -311,14 +305,18 @@ mod tests {
         let h = WorkspaceHandle::open();
         h.set_workspace_root(root.clone()).unwrap();
         // Try to escape via `..` segments
-        let sneaky = root.join("subdir").join("..").join("..").join("..").join("etc");
+        let sneaky = root
+            .join("subdir")
+            .join("..")
+            .join("..")
+            .join("..")
+            .join("etc");
         let res = h.resolve(&sneaky).unwrap();
         // canonicalize of non-existent "etc" will normalize the path but
         // strip_parent removes the parent dirs, leaving the path "etc" —
         // which does not start with the workspace root, so in_workspace=false.
         assert!(!res.in_workspace);
     }
-
 
     #[test]
     fn check_reports_ignored_secret_dir() {
@@ -339,7 +337,10 @@ mod tests {
         let res = h.check(&root.join("important.log")).unwrap();
         assert!(res.in_workspace);
         assert!(res.is_file);
-        assert!(!res.ignored, "negation pattern should not mark important.log as ignored");
+        assert!(
+            !res.ignored,
+            "negation pattern should not mark important.log as ignored"
+        );
     }
 
     #[test]
@@ -358,7 +359,12 @@ mod tests {
         h.set_workspace_root(root.clone()).unwrap();
         let entries = h.list_ignored(64).unwrap();
         let paths: Vec<String> = entries.iter().map(|e| e.path.clone()).collect();
-        assert!(paths.iter().any(|p| p.ends_with("secret") || p.contains("secret/key")), "secret dir should be listed; got {:?}", paths);
+        assert!(
+            paths
+                .iter()
+                .any(|p| p.ends_with("secret") || p.contains("secret/key")),
+            "secret dir should be listed; got {paths:?}"
+        );
         assert!(paths.iter().any(|p| p.ends_with("debug.log")));
         assert!(!paths.iter().any(|p| p.ends_with("important.log")));
     }
@@ -366,7 +372,9 @@ mod tests {
     #[test]
     fn missing_workspace_root_returns_error() {
         let h = WorkspaceHandle::open();
-        let err = h.set_workspace_root(PathBuf::from("/does/not/exist/at/all/anywhere")).unwrap_err();
+        let err = h
+            .set_workspace_root(PathBuf::from("/does/not/exist/at/all/anywhere"))
+            .unwrap_err();
         assert!(err.to_string().contains("does not exist"));
     }
 

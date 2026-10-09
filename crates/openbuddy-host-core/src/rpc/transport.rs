@@ -12,7 +12,6 @@ use std::thread;
 
 use anyhow::{anyhow, Result};
 use serde_json::Value;
-use tokio::sync::mpsc;
 
 use super::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
 
@@ -20,7 +19,9 @@ use super::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
 pub enum DispatchEvent {
     Request(Box<JsonRpcRequest>),
     /// Oversize frame (the line exceeded `MAX_STDIN_LINE_BYTES`).
-    Oversize { id: Value },
+    Oversize {
+        id: Value,
+    },
     /// IO error reading stdin.
     StdinError(String),
     /// Final EOF marker.
@@ -34,9 +35,9 @@ pub async fn run(outbound: std_mpsc::Sender<DispatchEvent>) -> Result<()> {
     let (stdin_tx, stdin_rx) = std_mpsc::channel::<DispatchEvent>();
 
     spawn_stdin_reader(ready_tx, stdin_tx)?;
-    if let Err(err) = ready_rx.recv()? {
-        return Err(err);
-    }
+    // Outer `?` unwraps the channel `RecvError`, inner `?` the reader thread's
+    // own result.
+    ready_rx.recv()??;
 
     // Forward stdin events into the dispatcher thread. The forwarder used
     // to be a tokio task that pushed events into a `tokio::sync::mpsc`
@@ -88,7 +89,10 @@ fn spawn_stdin_reader(
                             serde_json::from_str(trimmed);
                         match parse_result {
                             Ok(req) => {
-                                if event_tx.send(DispatchEvent::Request(Box::new(req))).is_err() {
+                                if event_tx
+                                    .send(DispatchEvent::Request(Box::new(req)))
+                                    .is_err()
+                                {
                                     return;
                                 }
                             }
@@ -166,7 +170,8 @@ enum Outbound {
     Notification(JsonRpcNotification),
 }
 
-static STDOUT_TX: std::sync::OnceLock<parking_lot::Mutex<Option<std_mpsc::Sender<Outbound>>>> = std::sync::OnceLock::new();
+static STDOUT_TX: std::sync::OnceLock<parking_lot::Mutex<Option<std_mpsc::Sender<Outbound>>>> =
+    std::sync::OnceLock::new();
 fn stdout_tx() -> &'static parking_lot::Mutex<Option<std_mpsc::Sender<Outbound>>> {
     STDOUT_TX.get_or_init(|| parking_lot::Mutex::new(None))
 }
@@ -273,8 +278,7 @@ fn peek_id(prefix: &str) -> Value {
         }
         // Numeric id — read digits.
         let mut k = j;
-        while k < bytes.len()
-            && (bytes[k].is_ascii_digit() || bytes[k] == b'-' || bytes[k] == b'+')
+        while k < bytes.len() && (bytes[k].is_ascii_digit() || bytes[k] == b'-' || bytes[k] == b'+')
         {
             k += 1;
         }

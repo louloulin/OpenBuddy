@@ -75,28 +75,24 @@ impl SessionSearchHandle {
 
     pub fn set_sessions_root(&self, root: PathBuf) -> Result<()> {
         if !root.exists() {
-            return Err(anyhow!(
-                "sessions root does not exist: {}",
-                root.display()
-            ));
+            return Err(anyhow!("sessions root does not exist: {}", root.display()));
         }
         let mut state = self.inner.write();
         state.sessions_root = Some(root);
         Ok(())
     }
 
-    pub fn search(
-        &self,
-        query: &str,
-        max_results: usize,
-    ) -> Result<SearchResult> {
+    pub fn search(&self, query: &str, max_results: usize) -> Result<SearchResult> {
         let state = self.inner.read();
         let root = state
             .sessions_root
             .clone()
             .ok_or_else(|| anyhow!("sessions root not configured"))?;
         if query.trim().is_empty() {
-            return Ok(SearchResult { hits: Vec::new(), total: 0 });
+            return Ok(SearchResult {
+                hits: Vec::new(),
+                total: 0,
+            });
         }
         let q_lower = query.to_lowercase();
         let mut all_hits: Vec<SearchHit> = Vec::new();
@@ -108,25 +104,28 @@ impl SessionSearchHandle {
             all_hits.extend(hits);
         }
         // Sort by rank descending, then take top N.
-        all_hits.sort_by(|a, b| b.rank.partial_cmp(&a.rank).unwrap_or(std::cmp::Ordering::Equal));
+        all_hits.sort_by(|a, b| {
+            b.rank
+                .partial_cmp(&a.rank)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         all_hits.truncate(max_results);
-        Ok(SearchResult { hits: all_hits, total })
+        Ok(SearchResult {
+            hits: all_hits,
+            total,
+        })
     }
 
-    pub fn message(
-        &self,
-        session_id: &str,
-        line_no: usize,
-    ) -> Result<MessageResult> {
+    pub fn message(&self, session_id: &str, line_no: usize) -> Result<MessageResult> {
         let state = self.inner.read();
         let root = state
             .sessions_root
             .clone()
             .ok_or_else(|| anyhow!("sessions root not configured"))?;
         let path = find_session_file(&root, session_id)
-            .ok_or_else(|| anyhow!("session not found: {}", session_id))?;
-        let file = File::open(&path)
-            .with_context(|| format!("open session file {}", path.display()))?;
+            .ok_or_else(|| anyhow!("session not found: {session_id}"))?;
+        let file =
+            File::open(&path).with_context(|| format!("open session file {}", path.display()))?;
         let reader = BufReader::new(file);
         for (idx, line) in reader.lines().enumerate() {
             if idx + 1 != line_no {
@@ -135,7 +134,10 @@ impl SessionSearchHandle {
             let line = line?;
             let parsed: serde_json::Value = serde_json::from_str(&line)
                 .with_context(|| format!("parse line {} of {}", line_no, path.display()))?;
-            let role = parsed.get("role").and_then(|v| v.as_str()).map(str::to_string);
+            let role = parsed
+                .get("role")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
             let content = parsed
                 .get("content")
                 .and_then(|v| v.as_str())
@@ -154,7 +156,7 @@ impl SessionSearchHandle {
                 created_at,
             });
         }
-        Err(anyhow!("line {} not found in session {}", line_no, session_id))
+        Err(anyhow!("line {line_no} not found in session {session_id}"))
     }
 }
 
@@ -169,7 +171,9 @@ fn walk_recursive(dir: &Path, out: &mut Vec<Result<PathBuf>>) {
     let entries = match fs::read_dir(dir) {
         Ok(e) => e,
         Err(err) => {
-            out.push(Err(anyhow!(err).context(format!("read_dir {}", dir.display()))));
+            out.push(Err(
+                anyhow!(err).context(format!("read_dir {}", dir.display()))
+            ));
             return;
         }
     };
@@ -193,7 +197,7 @@ fn walk_recursive(dir: &Path, out: &mut Vec<Result<PathBuf>>) {
 fn find_session_file(root: &Path, session_id: &str) -> Option<PathBuf> {
     // Pi-style sessions live in `<parent>/<session_id>.jsonl`. We accept
     // either the bare id or a `cwd--<id>--` path-encoded cwd.
-    let direct = root.join(format!("{}.jsonl", session_id));
+    let direct = root.join(format!("{session_id}.jsonl"));
     if direct.exists() {
         return Some(direct);
     }
@@ -213,8 +217,7 @@ fn scan_file(
     query_orig: &str,
     cap: usize,
 ) -> Result<(Vec<SearchHit>, u64)> {
-    let file = File::open(path)
-        .with_context(|| format!("open {}", path.display()))?;
+    let file = File::open(path).with_context(|| format!("open {}", path.display()))?;
     let reader = BufReader::new(file);
     let session_id = path
         .file_stem()
@@ -247,9 +250,7 @@ fn scan_file(
             title = Some(truncate(content, 80));
         }
         let content_lower = content.to_lowercase();
-        let occurrences: usize = content_lower
-            .match_indices(query_lower)
-            .count();
+        let occurrences: usize = content_lower.match_indices(query_lower).count();
         if occurrences == 0 {
             continue;
         }
@@ -257,9 +258,9 @@ fn scan_file(
         if hits.len() < cap {
             let snippet = build_snippet(content, query_orig, 80);
             let recency_bonus = match last_ts {
-                    Some(ts) => recency_score(ts),
-                    None => 0.0,
-                };
+                Some(ts) => recency_score(ts),
+                None => 0.0,
+            };
             let rank = (occurrences as f32) * 10.0 + recency_bonus;
             hits.push(SearchHit {
                 session_id: session_id.clone(),
@@ -287,7 +288,7 @@ fn recency_score(ts: DateTime<Utc>) -> f32 {
         .unwrap_or(0);
     let then = ts.timestamp();
     let days = ((now - then).max(0) as f64) / 86_400.0;
-    (1.0_f32 / (1.0_f32 + days as f32))
+    1.0_f32 / (1.0_f32 + days as f32)
 }
 
 fn truncate(text: &str, max: usize) -> String {
@@ -306,11 +307,6 @@ fn build_snippet(content: &str, query: &str, radius: usize) -> String {
     let Some(pos) = lower_content.find(&lower_query) else {
         return truncate(content, radius * 2);
     };
-    let start_byte = lower_content[..pos]
-        .char_indices()
-        .nth(0)
-        .map(|(b, _)| b)
-        .unwrap_or(0);
     let before_chars = lower_content[..pos].chars().count();
     let chars_before = before_chars.min(radius);
     let char_indices: Vec<(usize, char)> = content.char_indices().collect();
@@ -322,7 +318,11 @@ fn build_snippet(content: &str, query: &str, radius: usize) -> String {
         .map(|(_, c)| *c)
         .collect();
     let prefix = if start_idx > 0 { "…" } else { "" };
-    let suffix = if end_idx < char_indices.len() { "…" } else { "" };
+    let suffix = if end_idx < char_indices.len() {
+        "…"
+    } else {
+        ""
+    };
     format!("{prefix}{snippet}{suffix}")
 }
 
@@ -357,33 +357,37 @@ pub struct SetRootParams {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     fn fresh() -> std::path::PathBuf {
+        // Parallel test threads share a process, so pid+nanoseconds can repeat
+        // and two tests would then share (and step on) one directory.
+        static SEQ: AtomicU64 = AtomicU64::new(0);
         let n = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
         let pid = std::process::id();
-        let p = std::env::temp_dir().join(format!("ob-sess-{pid}-{n}"));
+        let seq = SEQ.fetch_add(1, Ordering::Relaxed);
+        let p = std::env::temp_dir().join(format!("ob-sess-{pid}-{n}-{seq}"));
         fs::create_dir_all(&p).unwrap();
         p
     }
 
     fn write_session(path: &Path, id: &str, lines: &[&str]) {
         let p = path.join(format!("{id}.jsonl"));
-        let body: String = lines
-            .iter()
-            .map(|l| format!("{l}\n"))
-            .collect();
+        let body: String = lines.iter().map(|l| format!("{l}\n")).collect();
         fs::write(&p, body).unwrap();
     }
 
     #[test]
     fn empty_query_returns_no_hits() {
         let root = fresh();
-        write_session(&root, "s1", &[
-            r#"{"role":"user","content":"hello world","timestamp":"2026-09-23T10:00:00Z"}"#,
-        ]);
+        write_session(
+            &root,
+            "s1",
+            &[r#"{"role":"user","content":"hello world","timestamp":"2026-09-23T10:00:00Z"}"#],
+        );
         let h = SessionSearchHandle::open();
         h.set_sessions_root(root.clone()).unwrap();
         let res = h.search("", 10).unwrap();
@@ -394,10 +398,14 @@ mod tests {
     #[test]
     fn finds_substring_case_insensitively() {
         let root = fresh();
-        write_session(&root, "s1", &[
-            r#"{"role":"user","content":"Find the Rust compiler","timestamp":"2026-09-23T10:00:00Z"}"#,
-            r#"{"role":"assistant","content":"The RUST compiler is rustc.","timestamp":"2026-09-23T10:00:05Z"}"#,
-        ]);
+        write_session(
+            &root,
+            "s1",
+            &[
+                r#"{"role":"user","content":"Find the Rust compiler","timestamp":"2026-09-23T10:00:00Z"}"#,
+                r#"{"role":"assistant","content":"The RUST compiler is rustc.","timestamp":"2026-09-23T10:00:05Z"}"#,
+            ],
+        );
         let h = SessionSearchHandle::open();
         h.set_sessions_root(root.clone()).unwrap();
         let res = h.search("rust", 10).unwrap();
@@ -409,12 +417,18 @@ mod tests {
     #[test]
     fn ranks_repeated_hits_higher() {
         let root = fresh();
-        write_session(&root, "s1", &[
-            r#"{"role":"user","content":"hello","timestamp":"2026-09-23T10:00:00Z"}"#,
-        ]);
-        write_session(&root, "s2", &[
-            r#"{"role":"user","content":"foo foo foo foo bar","timestamp":"2026-09-23T10:00:00Z"}"#,
-        ]);
+        write_session(
+            &root,
+            "s1",
+            &[r#"{"role":"user","content":"hello","timestamp":"2026-09-23T10:00:00Z"}"#],
+        );
+        write_session(
+            &root,
+            "s2",
+            &[
+                r#"{"role":"user","content":"foo foo foo foo bar","timestamp":"2026-09-23T10:00:00Z"}"#,
+            ],
+        );
         let h = SessionSearchHandle::open();
         h.set_sessions_root(root.clone()).unwrap();
         let res = h.search("foo", 10).unwrap();
@@ -426,10 +440,14 @@ mod tests {
     #[test]
     fn message_lookup_returns_role_and_content() {
         let root = fresh();
-        write_session(&root, "s1", &[
-            r#"{"role":"user","content":"first line","timestamp":"2026-09-23T10:00:00Z"}"#,
-            r#"{"role":"assistant","content":"second line","timestamp":"2026-09-23T10:00:05Z"}"#,
-        ]);
+        write_session(
+            &root,
+            "s1",
+            &[
+                r#"{"role":"user","content":"first line","timestamp":"2026-09-23T10:00:00Z"}"#,
+                r#"{"role":"assistant","content":"second line","timestamp":"2026-09-23T10:00:05Z"}"#,
+            ],
+        );
         let h = SessionSearchHandle::open();
         h.set_sessions_root(root.clone()).unwrap();
         let res = h.message("s1", 2).unwrap();
@@ -450,16 +468,22 @@ mod tests {
     #[test]
     fn set_sessions_root_rejects_missing_dir() {
         let h = SessionSearchHandle::open();
-        let err = h.set_sessions_root(PathBuf::from("/no/such/path/at/all")).unwrap_err();
+        let err = h
+            .set_sessions_root(PathBuf::from("/no/such/path/at/all"))
+            .unwrap_err();
         assert!(err.to_string().contains("does not exist"));
     }
 
     #[test]
     fn search_handles_unicode_query_and_content() {
         let root = fresh();
-        write_session(&root, "u1", &[
-            r#"{"role":"user","content":"你好，世界 — 这是中文测试","timestamp":"2026-09-23T10:00:00Z"}"#,
-        ]);
+        write_session(
+            &root,
+            "u1",
+            &[
+                r#"{"role":"user","content":"你好，世界 — 这是中文测试","timestamp":"2026-09-23T10:00:00Z"}"#,
+            ],
+        );
         let h = SessionSearchHandle::open();
         h.set_sessions_root(root.clone()).unwrap();
         let res = h.search("中文", 10).unwrap();

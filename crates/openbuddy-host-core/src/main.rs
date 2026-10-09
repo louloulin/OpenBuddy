@@ -8,6 +8,11 @@
 //! 5. Hand control to `rpc::serve` which spawns the stdin reader, stdout
 //!    writer, and dispatcher tasks.
 
+// `main` below is compiled out of the test harness's binary target, so in
+// `cargo test` every import here and `ensure_subdirs` look unused. Allow that
+// only for the test crate; the release build must stay warning-clean.
+#![cfg_attr(test, allow(unused_imports, dead_code))]
+
 use std::process::ExitCode;
 use std::sync::Arc;
 

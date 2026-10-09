@@ -101,9 +101,14 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert!(count > 0, "schema should expose tables / indexes after bootstrap");
+        assert!(
+            count > 0,
+            "schema should expose tables / indexes after bootstrap"
+        );
 
-        let user_version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0)).unwrap();
+        let user_version: i64 = conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
         assert_eq!(user_version, schema::SCHEMA_VERSION);
     }
 }

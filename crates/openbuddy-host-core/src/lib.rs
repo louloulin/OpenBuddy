@@ -7,11 +7,11 @@
 pub mod rpc;
 pub mod state;
 
-pub mod secrets;
+pub mod audit;
 pub mod permissions;
+pub mod secrets;
 pub mod session_search;
 pub mod workspace;
-pub mod audit;
 
 /// Bumped whenever the wire protocol (JSON-RPC method names, params, results)
 /// changes in a backward-incompatible way. The TS side refuses to speak to a

@@ -30,7 +30,6 @@
 //! is NOT encrypted — only the value is). That keeps the on-disk format
 //! resilient against index corruption.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -161,7 +160,7 @@ impl SecretsHandle {
     pub fn set(&self, params: SetParams) -> Result<SetResult> {
         validate_ref(&params.secret_ref)?;
         let value = params.value;
-        let mut state = self.inner.lock();
+        let state = self.inner.lock();
         let (ciphertext, nonce) = encrypt(&state.cipher, value.as_bytes())?;
         let entry = OnDiskEntry {
             secret_ref: params.secret_ref.clone(),
@@ -240,7 +239,9 @@ impl SecretsHandle {
                     secrets,
                 });
             }
-            Err(err) => return Err(err).with_context(|| format!("readdir {}", state.dir.display())),
+            Err(err) => {
+                return Err(err).with_context(|| format!("readdir {}", state.dir.display()))
+            }
         };
         for entry in entries {
             let entry = entry?;
@@ -288,10 +289,9 @@ fn validate_ref(secret_ref: &str) -> Result<()> {
         return Err(RpcError::InvalidParams("ref too long (> 256 chars)".into()).into());
     }
     if secret_ref.contains('/') || secret_ref.contains("\\") || secret_ref.contains("..") {
-        return Err(RpcError::InvalidParams(
-            "ref must not contain path separators or '..'".into(),
-        )
-        .into());
+        return Err(
+            RpcError::InvalidParams("ref must not contain path separators or '..'".into()).into(),
+        );
     }
     Ok(())
 }
@@ -348,8 +348,7 @@ fn load_key(path: &Path) -> Result<[u8; 32]> {
 /// having. Content is `sync_all`ed before returning so a crash immediately
 /// after first launch cannot leave a half-written key that fails `load_key`.
 fn save_key(path: &Path, bytes: &[u8; 32]) -> Result<()> {
-    let mut f = create_private(path)
-        .with_context(|| format!("create {}", path.display()))?;
+    let mut f = create_private(path).with_context(|| format!("create {}", path.display()))?;
     f.write_all(bytes)?;
     f.sync_all()?;
     Ok(())
@@ -611,7 +610,12 @@ mod tests {
 
         let raw = fs::read(dir.join("secrets").join(".machine-key")).unwrap();
         assert_eq!(raw.len(), 32);
-        assert_eq!(load_key(&dir.join("secrets").join(".machine-key")).unwrap().to_vec(), raw);
+        assert_eq!(
+            load_key(&dir.join("secrets").join(".machine-key"))
+                .unwrap()
+                .to_vec(),
+            raw
+        );
 
         #[cfg(unix)]
         {

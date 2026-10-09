@@ -18,12 +18,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use chrono::Utc;
 use globset::{Glob, GlobMatcher};
 use serde::{Deserialize, Serialize};
-
-use openbuddy_error_codes::RpcError;
 
 /// Action precedence — `Deny > Ask > Allow`. Matches the TS
 /// `resolvePermissionAction` ordering exactly.
@@ -53,20 +51,15 @@ pub struct PermissionRule {
     pub pattern: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PermissionMode {
+    #[default]
     Default,
     AcceptEdits,
     DontAsk,
     Plan,
     BypassPermissions,
-}
-
-impl Default for PermissionMode {
-    fn default() -> Self {
-        PermissionMode::Default
-    }
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -91,10 +84,11 @@ struct Settings {
 }
 
 /// Compiled view of a single rule — the glob matcher is built once and
-/// re-used for every `evaluate` call.
+/// re-used for every `evaluate` call. The rule's action is deliberately not
+/// stored here: `evaluate` zips the compiled slice with the source rules and
+/// reads the action from the latter, so a copy would only be dead state.
 #[derive(Debug, Clone)]
 struct CompiledRule {
-    action: PermissionAction,
     tool_matcher: GlobMatcher,
     pattern_matcher: Option<GlobMatcher>,
 }
@@ -107,13 +101,12 @@ impl CompiledRule {
         let pattern_matcher = match &rule.pattern {
             Some(p) => Some(
                 Glob::new(p)
-                    .with_context(|| format!("invalid pattern glob `{}`", p))?
+                    .with_context(|| format!("invalid pattern glob `{p}`"))?
                     .compile_matcher(),
             ),
             None => None,
         };
         Ok(Self {
-            action: rule.action,
             tool_matcher,
             pattern_matcher,
         })
@@ -155,12 +148,12 @@ impl PermissionsHandle {
 
     fn read_settings(&self) -> Result<Settings> {
         match fs::read_to_string(&self.settings_path) {
-            Ok(text) => serde_json::from_str(&text)
-                .with_context(|| format!("parse settings.json at {}", self.settings_path.display())),
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(Settings::default()),
-            Err(err) => Err(err).with_context(|| {
-                format!("read settings.json at {}", self.settings_path.display())
+            Ok(text) => serde_json::from_str(&text).with_context(|| {
+                format!("parse settings.json at {}", self.settings_path.display())
             }),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(Settings::default()),
+            Err(err) => Err(err)
+                .with_context(|| format!("read settings.json at {}", self.settings_path.display())),
         }
     }
 
@@ -171,9 +164,10 @@ impl PermissionsHandle {
         // Mirror TS tmp-rename atomic write.
         let pid = std::process::id();
         let now = Utc::now().timestamp_millis();
-        let tmp = self.settings_path.with_extension(format!("json.{pid}.{now}.tmp"));
-        let body = serde_json::to_string_pretty(settings)
-            .context("serialize settings.json")?;
+        let tmp = self
+            .settings_path
+            .with_extension(format!("json.{pid}.{now}.tmp"));
+        let body = serde_json::to_string_pretty(settings).context("serialize settings.json")?;
         fs::write(&tmp, format!("{body}\n"))
             .with_context(|| format!("write tmp settings at {}", tmp.display()))?;
         // 0o600 on unix (matches TS).
@@ -236,13 +230,7 @@ impl PermissionsHandle {
             };
             if let Some(arr) = arr {
                 for v in arr {
-                    if let Ok(rule) = serde_json::from_value::<PermissionRule>(
-                        serde_json::json!({ "action": action, "tool": v }),
-                    ) {
-                        out.push(Self::parse_compact(v, action));
-                    } else {
-                        out.push(Self::parse_compact(v, action));
-                    }
+                    out.push(Self::parse_compact(v, action));
                 }
             }
         }
@@ -277,7 +265,9 @@ impl PermissionsHandle {
                 PermissionAction::Ask => ask.push(compact),
             }
         }
-        let block = settings.permission.get_or_insert(PermissionBlock::default());
+        let block = settings
+            .permission
+            .get_or_insert(PermissionBlock::default());
         block.deny = if deny.is_empty() { None } else { Some(deny) };
         block.allow = if allow.is_empty() { None } else { Some(allow) };
         block.ask = if ask.is_empty() { None } else { Some(ask) };
@@ -296,7 +286,9 @@ impl PermissionsHandle {
 
     pub fn write_mode(&self, mode: PermissionMode) -> Result<()> {
         let mut settings = self.read_settings().unwrap_or_default();
-        let block = settings.permission.get_or_insert(PermissionBlock::default());
+        let block = settings
+            .permission
+            .get_or_insert(PermissionBlock::default());
         block.default_mode = Some(mode);
         self.write_settings(&settings)
     }
@@ -309,8 +301,8 @@ impl PermissionsHandle {
             .collect::<Result<Vec<_>>>()?;
         let mut winning: Option<(PermissionAction, &PermissionRule)> = None;
         for (rule, c) in rules.iter().zip(compiled.iter()) {
-                let m = c.matches(tool, pattern);
-                if !m {
+            let m = c.matches(tool, pattern);
+            if !m {
                 continue;
             }
             let take = match winning {
@@ -370,9 +362,20 @@ pub struct WriteModeParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     fn fresh_handle() -> PermissionsHandle {
-        let tmp = std::env::temp_dir().join(format!("ob-perm-{}-{}", std::process::id(), Utc::now().timestamp_nanos_opt().unwrap_or(0)));
+        // Tests run in parallel threads of one process, so the pid+nanosecond
+        // pair is not enough to keep these directories apart: several tests can
+        // land in the same microsecond and then delete each other's fixtures.
+        // The counter makes the path unique per call.
+        static SEQ: AtomicU64 = AtomicU64::new(0);
+        let tmp = std::env::temp_dir().join(format!(
+            "ob-perm-{}-{}-{}",
+            std::process::id(),
+            Utc::now().timestamp_nanos_opt().unwrap_or(0),
+            SEQ.fetch_add(1, Ordering::Relaxed)
+        ));
         let _ = std::fs::remove_dir_all(&tmp);
         PermissionsHandle::open(&tmp).expect("open")
     }
@@ -380,14 +383,24 @@ mod tests {
     #[test]
     fn evaluate_denies_priority_over_ask_and_allow() {
         let h = fresh_handle();
-        // Sanity check the glob matcher itself.
-        use globset::Glob;
-        let g = Glob::new("ls /etc/**").unwrap().compile_matcher();
         h.write_rules(&[
-            PermissionRule { action: PermissionAction::Allow, tool: "bash".into(), pattern: Some("ls *".into()) },
-            PermissionRule { action: PermissionAction::Deny, tool: "bash".into(), pattern: Some("ls /etc/**".into()) },
-            PermissionRule { action: PermissionAction::Ask, tool: "bash".into(), pattern: Some("ls *".into()) },
-        ]).unwrap();
+            PermissionRule {
+                action: PermissionAction::Allow,
+                tool: "bash".into(),
+                pattern: Some("ls *".into()),
+            },
+            PermissionRule {
+                action: PermissionAction::Deny,
+                tool: "bash".into(),
+                pattern: Some("ls /etc/**".into()),
+            },
+            PermissionRule {
+                action: PermissionAction::Ask,
+                tool: "bash".into(),
+                pattern: Some("ls *".into()),
+            },
+        ])
+        .unwrap();
         let res = h.evaluate("bash", Some("ls /etc/passwd")).unwrap();
         assert_eq!(res.action, PermissionAction::Deny);
         assert!(res.matched_rule.unwrap().contains("ls /etc"));
@@ -400,7 +413,8 @@ mod tests {
             action: PermissionAction::Allow,
             tool: "bash".into(),
             pattern: Some("ls *".into()),
-        }]).unwrap();
+        }])
+        .unwrap();
         let res = h.evaluate("bash", Some("rm -rf /")).unwrap();
         assert_eq!(res.action, PermissionAction::Ask);
         assert!(res.matched_rule.is_none());
@@ -413,8 +427,11 @@ mod tests {
             action: PermissionAction::Allow,
             tool: "edit".into(),
             pattern: Some("**/*.ts".into()),
-        }]).unwrap();
-        let res = h.evaluate("edit", Some("packages/auth/foo/bar.ts")).unwrap();
+        }])
+        .unwrap();
+        let res = h
+            .evaluate("edit", Some("packages/auth/foo/bar.ts"))
+            .unwrap();
         assert_eq!(res.action, PermissionAction::Allow);
     }
 
@@ -422,15 +439,27 @@ mod tests {
     fn round_trip_compact_and_structured_forms() {
         let h = fresh_handle();
         let rules = vec![
-            PermissionRule { action: PermissionAction::Allow, tool: "bash".into(), pattern: Some("ls *".into()) },
-            PermissionRule { action: PermissionAction::Deny, tool: "edit".into(), pattern: None },
+            PermissionRule {
+                action: PermissionAction::Allow,
+                tool: "bash".into(),
+                pattern: Some("ls *".into()),
+            },
+            PermissionRule {
+                action: PermissionAction::Deny,
+                tool: "edit".into(),
+                pattern: None,
+            },
         ];
         h.write_rules(&rules).unwrap();
         let read = h.read_rules_from_disk().unwrap();
         // read_rules_from_disk deduplicates via parse_compact → structured;
         // we only check the action precedence survives.
-        assert!(read.iter().any(|r| r.action == PermissionAction::Allow && r.tool == "bash" && r.pattern.as_deref() == Some("ls *")));
-        assert!(read.iter().any(|r| r.action == PermissionAction::Deny && r.tool == "edit" && r.pattern.is_none()));
+        assert!(read.iter().any(|r| r.action == PermissionAction::Allow
+            && r.tool == "bash"
+            && r.pattern.as_deref() == Some("ls *")));
+        assert!(read.iter().any(|r| r.action == PermissionAction::Deny
+            && r.tool == "edit"
+            && r.pattern.is_none()));
     }
 
     #[test]

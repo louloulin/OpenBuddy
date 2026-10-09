@@ -95,9 +95,8 @@ impl AuditHandle {
         // Don't create the file here; the first append does so. We do want
         // to make sure the parent directory exists.
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).with_context(|| {
-                format!("failed to create audit dir {}", parent.display())
-            })?;
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create audit dir {}", parent.display()))?;
         }
         Ok(Self {
             inner: Arc::new(Mutex::new(AuditState { path })),
@@ -105,7 +104,11 @@ impl AuditHandle {
     }
 
     pub fn append(&self, params: AppendParams) -> Result<AppendResult> {
-        let mut entry = AuditEntry::new(parse_kind(&params.kind)?, parse_outcome(&params.outcome)?, params.action);
+        let mut entry = AuditEntry::new(
+            parse_kind(&params.kind)?,
+            parse_outcome(&params.outcome)?,
+            params.action,
+        );
         entry.subject = params.subject;
         entry.tenant_id = params.tenant_id;
         entry.resource = params.resource;
@@ -133,22 +136,24 @@ impl AuditHandle {
             f.write_all(&bytes)?;
             f.flush()?;
         }
-        let len = fs::metadata(&state.path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let len = fs::metadata(&state.path).map(|m| m.len()).unwrap_or(0);
 
         // Rotation policy — keep file <= MAX_AUDIT_BYTES and <= MAX_AUDIT_ENTRIES.
         if len > MAX_AUDIT_BYTES {
             rotate_if_needed(&state.path, MAX_AUDIT_ENTRIES)?;
         }
 
-        Ok(AppendResult { id, at, payload_hash })
+        Ok(AppendResult {
+            id,
+            at,
+            payload_hash,
+        })
     }
 
     pub fn tail(&self, params: TailParams) -> Result<TailResult> {
         let state = self.inner.lock();
         let rotated = rotated_file_count(&state.path)?;
-        let entries = read_last_n(&state.path, params.limit.max(1).min(MAX_AUDIT_ENTRIES))?;
+        let entries = read_last_n(&state.path, params.limit.clamp(1, MAX_AUDIT_ENTRIES))?;
         Ok(TailResult {
             entries,
             rotated_files: rotated,
@@ -183,12 +188,14 @@ fn parse_outcome(s: &str) -> Result<AuditOutcome> {
 
 /// On-disk audit line — TS-compatible JSON shape.
 ///
-/// The renderer (packages/runtime/openbuddy-host-runtime/src/capabilities.ts
-/// + electron/main/audit/audit-log.ts) reads <userData>/audit.jsonl and
+/// The renderer (`packages/runtime/openbuddy-host-runtime/src/capabilities.ts`
+/// plus `electron/main/audit/audit-log.ts`) reads `<userData>/audit.jsonl` and
 /// expects every line to conform to:
-//
-//     { id, at, event, outcome, source, subject?, detail?, hash? }
-//
+///
+/// ```text
+/// { id, at, event, outcome, source, subject?, detail?, hash? }
+/// ```
+///
 /// To keep Rust <-> TS wiring safe, we serialize AuditEntry through this
 /// wrapper so the on-disk JSON has the same keys the TS reader expects.
 /// The structured fields Rust cares about (kind, tenant_id, resource,
@@ -266,22 +273,35 @@ fn compute_payload_hash(entry: &AuditEntry) -> String {
     hasher.update(format!("{:?}", entry.kind).as_bytes());
     hasher.update(format!("{:?}", entry.outcome).as_bytes());
     hasher.update(entry.action.as_bytes());
-    if let Some(s) = &entry.subject { hasher.update(s.as_bytes()); }
-    if let Some(s) = &entry.resource { hasher.update(s.as_bytes()); }
-    if let Some(s) = &entry.code { hasher.update(s.as_bytes()); }
-    if let Some(s) = &entry.provider { hasher.update(s.as_bytes()); }
-    if let Some(s) = &entry.target { hasher.update(s.as_bytes()); }
+    if let Some(s) = &entry.subject {
+        hasher.update(s.as_bytes());
+    }
+    if let Some(s) = &entry.resource {
+        hasher.update(s.as_bytes());
+    }
+    if let Some(s) = &entry.code {
+        hasher.update(s.as_bytes());
+    }
+    if let Some(s) = &entry.provider {
+        hasher.update(s.as_bytes());
+    }
+    if let Some(s) = &entry.target {
+        hasher.update(s.as_bytes());
+    }
     let digest = hasher.finalize();
     let mut out = String::with_capacity(24);
     for b in &digest[..12] {
-        out.push_str(&format!("{:02x}", b));
+        out.push_str(&format!("{b:02x}"));
     }
     out
 }
 
 fn rotated_file_count(path: &Path) -> Result<usize> {
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let stem = path.file_name().and_then(|s| s.to_str()).unwrap_or("audit.jsonl");
+    let stem = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audit.jsonl");
     let mut count = 0;
     for entry in fs::read_dir(parent)? {
         let entry = entry?;
@@ -296,12 +316,18 @@ fn rotated_file_count(path: &Path) -> Result<usize> {
 
 fn rotate_if_needed(path: &Path, max_entries: usize) -> Result<()> {
     let bytes = fs::read(path).unwrap_or_default();
-    let entries: Vec<&[u8]> = bytes.split(|b| *b == b'\n').filter(|l| !l.is_empty()).collect();
+    let entries: Vec<&[u8]> = bytes
+        .split(|b| *b == b'\n')
+        .filter(|l| !l.is_empty())
+        .collect();
     if entries.len() <= max_entries {
         return Ok(());
     }
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let stem = path.file_name().and_then(|s| s.to_str()).unwrap_or("audit.jsonl");
+    let stem = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audit.jsonl");
     let rotated = parent.join(format!("{stem}.rotated.{}", Utc::now().timestamp_millis()));
     fs::rename(path, &rotated)?;
     Ok(())
@@ -319,7 +345,7 @@ fn read_last_n(path: &Path, n: usize) -> Result<Vec<AuditLogLine>> {
     }
     // Read up to ~256 KiB from the tail — enough for 256 short JSONL rows.
     let window = 256u64 * 1024u64;
-    let offset = if len > window { len - window } else { 0 };
+    let offset = len.saturating_sub(window);
     file.seek(SeekFrom::Start(offset))?;
     let mut buf = Vec::with_capacity((len - offset) as usize);
     file.read_to_end(&mut buf)?;
@@ -424,21 +450,42 @@ mod tests {
 
         // 1. 顶层 TS 字段必须存在
         for key in ["id", "at", "event", "outcome", "source", "detail", "hash"] {
-            assert!(v.get(key).is_some(), "missing top-level field {key} on disk");
+            assert!(
+                v.get(key).is_some(),
+                "missing top-level field {key} on disk"
+            );
         }
         // 2. subject? 也写入(本测试有 subject)
         assert!(v.get("subject").is_some(), "subject missing");
 
         // 3. detail 必须聚合 kind / tenant_id / resource / reason / code
         let detail = v.get("detail").unwrap();
-        assert_eq!(detail.get("kind").and_then(|x| x.as_str()), Some("permission"));
-        assert_eq!(detail.get("tenant_id").and_then(|x| x.as_str()), Some("acme"));
-        assert_eq!(detail.get("resource").and_then(|x| x.as_str()), Some("/etc"));
-        assert_eq!(detail.get("reason").and_then(|x| x.as_str()), Some("deny-rule-match"));
-        assert_eq!(detail.get("code").and_then(|x| x.as_str()), Some("PERMISSION_DENIED"));
+        assert_eq!(
+            detail.get("kind").and_then(|x| x.as_str()),
+            Some("permission")
+        );
+        assert_eq!(
+            detail.get("tenant_id").and_then(|x| x.as_str()),
+            Some("acme")
+        );
+        assert_eq!(
+            detail.get("resource").and_then(|x| x.as_str()),
+            Some("/etc")
+        );
+        assert_eq!(
+            detail.get("reason").and_then(|x| x.as_str()),
+            Some("deny-rule-match")
+        );
+        assert_eq!(
+            detail.get("code").and_then(|x| x.as_str()),
+            Some("PERMISSION_DENIED")
+        );
 
         // 4. 旧 Rust shape 的 key 必须不在顶层(payload_hash / kind / action)
-        assert!(v.get("payload_hash").is_none(), "old payload_hash leaked to top level");
+        assert!(
+            v.get("payload_hash").is_none(),
+            "old payload_hash leaked to top level"
+        );
         assert!(v.get("kind").is_none(), "old top-level kind leaked");
         assert!(v.get("action").is_none(), "old top-level action leaked");
 
