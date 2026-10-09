@@ -29,9 +29,14 @@ jobs:
       # store path via pnpm itself, so with the two steps the other way round
       # setup-node dies with "Unable to locate executable file: pnpm" and
       # every job fails at step 1.
+      #
+      # No `version:` input on purpose. action-setup compares it to
+      # packageManager by plain string equality after stripping only the
+      # `pnpm@` prefix, so `11.24.0` never equals `11.24.0+sha512...` from
+      # package.json and it throws "Multiple versions of pnpm specified".
+      # Left unset it installs packageManager verbatim, hash included — that
+      # field in package.json is the single source of truth.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11.24.0
 
       - uses: actions/setup-node@v4
         with:
@@ -88,9 +93,14 @@ jobs:
       # store path via pnpm itself, so with the two steps the other way round
       # setup-node dies with "Unable to locate executable file: pnpm" and
       # every job fails at step 1.
+      #
+      # No `version:` input on purpose. action-setup compares it to
+      # packageManager by plain string equality after stripping only the
+      # `pnpm@` prefix, so `11.24.0` never equals `11.24.0+sha512...` from
+      # package.json and it throws "Multiple versions of pnpm specified".
+      # Left unset it installs packageManager verbatim, hash included — that
+      # field in package.json is the single source of truth.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11.24.0
 
       - uses: actions/setup-node@v4
         with:
@@ -112,8 +122,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11.24.0
 
       - uses: actions/setup-node@v4
         with:
@@ -131,8 +139,6 @@ jobs:
         with:
           submodules: recursive
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11.24.0
 
       - uses: actions/setup-node@v4
         with:
@@ -149,8 +155,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11.24.0
 
       - uses: actions/setup-node@v4
         with:
@@ -182,8 +186,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11.24.0
 
       - uses: actions/setup-node@v4
         with:
@@ -214,8 +216,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11.24.0
 
       - uses: actions/setup-node@v4
         with:
@@ -240,8 +240,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11.24.0
 
       - uses: actions/setup-node@v4
         with:

@@ -22,12 +22,15 @@ permissions:
 
 env:
   APP_NAME: OpenBuddy
-  # Keep this in lockstep with `packageManager` in the root package.json.
-  # Every step below uses this version, which the electron-builder wrapper
-  # also pins (`scripts/electron-builder.sh` generates a `node_modules/.open
-  # buddy-pnpm/pnpm` shim so `app-builder-lib`'s pnpm collector — which requires
-  # pnpm ≥ 11 — cannot silently downgrade via the proto PATH shim).
-  PNPM_VERSION: 11.24.0
+  # The pnpm version is not pinned here: `pnpm/action-setup` reads
+  # `packageManager` from the root package.json, and passing a `version:` input
+  # as well throws "Multiple versions of pnpm specified" (it compares the input
+  # to `packageManager` with plain string equality, so it can never match a
+  # `11.24.0+sha512...` value).
+  # The electron-builder wrapper pins the same version independently
+  # (`scripts/electron-builder.sh` generates a `node_modules/.openbuddy-pnpm/pnpm`
+  # shim so `app-builder-lib`'s pnpm collector — which requires pnpm ≥ 11 —
+  # cannot silently downgrade via the proto PATH shim).
 
 jobs:
   ci:
@@ -38,10 +41,8 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
-      - name: Setup pnpm ${{ env.PNPM_VERSION }}
+      - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -95,10 +96,8 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
-      - name: Setup pnpm ${{ env.PNPM_VERSION }}
+      - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -140,10 +139,8 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
-      - name: Setup pnpm ${{ env.PNPM_VERSION }}
+      - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -215,10 +212,8 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
-      - name: Setup pnpm ${{ env.PNPM_VERSION }}
+      - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
