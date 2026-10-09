@@ -9,6 +9,13 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { clampCanvasWidth, useCanvasStore, type CanvasTab } from "@openbuddy/ui-state/canvas-store";
 import CanvasPanel from "../canvas/CanvasPanel";
+import {
+  canvasKindForPath,
+  canvasTabIdForPath,
+  canvasTitleForPath,
+  isBinaryCanvasKind,
+  openPathInCanvas,
+} from "../canvas/open-path";
 
 vi.mock("@openbuddy/ui-markdown", () => ({
   Markdown: ({ children }: { children: string }) => <div data-testid="md">{children}</div>,
@@ -114,6 +121,56 @@ describe("CanvasPanel", () => {
     const source = screen.getByTestId("canvas-markdown-source") as HTMLTextAreaElement;
     fireEvent.change(source, { target: { value: "# 编辑后" } });
     expect(source.value).toBe("# 编辑后");
+  });
+});
+
+describe("open-path → canvas", () => {
+  it("maps extensions to carrier kinds, unknown → code", () => {
+    expect(canvasKindForPath("a/b/README.md")).toBe("markdown");
+    expect(canvasKindForPath("x.html")).toBe("html");
+    expect(canvasKindForPath("diagram.svg")).toBe("svg");
+    expect(canvasKindForPath("photo.JPG")).toBe("image");
+    expect(canvasKindForPath("doc.pdf")).toBe("pdf");
+    expect(canvasKindForPath("main.rs")).toBe("code");
+    // 无扩展名的文件不该崩,也不该猜成 markdown。
+    expect(canvasKindForPath("Makefile")).toBe("code");
+  });
+
+  it("derives stable ids and titles across path separators", () => {
+    expect(canvasTabIdForPath("/a/b.md")).toBe("file:/a/b.md");
+    expect(canvasTitleForPath("/a/b.md")).toBe("b.md");
+    expect(canvasTitleForPath("C:\\x\\y\\z.ts")).toBe("z.ts");
+  });
+
+  it("treats image/pdf as binary carriers", () => {
+    expect(isBinaryCanvasKind("image")).toBe(true);
+    expect(isBinaryCanvasKind("pdf")).toBe(true);
+    expect(isBinaryCanvasKind("code")).toBe(false);
+    expect(isBinaryCanvasKind("markdown")).toBe(false);
+  });
+
+  it("opening a path really lands a matching tab in the store", () => {
+    openPathInCanvas("/w/notes.md", "# hi");
+    const s1 = useCanvasStore.getState();
+    expect(s1.open).toBe(true);
+    expect(s1.tabs).toHaveLength(1);
+    expect(s1.tabs[0]).toMatchObject({
+      canvasId: "file:/w/notes.md",
+      kind: "markdown",
+      title: "notes.md",
+      content: "# hi",
+      sourcePath: "/w/notes.md",
+    });
+
+    // 二进制承载不带正文 —— 画布会用 file:// 渲染 sourcePath。
+    openPathInCanvas("/w/pic.png", "should be ignored");
+    const png = useCanvasStore.getState().tabs.find((t) => t.canvasId === "file:/w/pic.png");
+    expect(png?.kind).toBe("image");
+    expect(png?.content).toBeUndefined();
+
+    // 同一文件重复打开不新增 tab。
+    openPathInCanvas("/w/notes.md", "# hi");
+    expect(useCanvasStore.getState().tabs).toHaveLength(2);
   });
 });
 

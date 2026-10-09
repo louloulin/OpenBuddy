@@ -60,6 +60,7 @@
       },
       "loading": "加载画布…",
       "newTitle": "新画布",
+      "openInCanvas": "在画布中打开",
       "panelLabel": "画布",
       "previewTitle": "画布预览",
       "reactLoadFailed": "React 画布加载失败：",

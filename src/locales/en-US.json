@@ -60,6 +60,7 @@
       },
       "loading": "Loading canvas…",
       "newTitle": "New canvas",
+      "openInCanvas": "Open in canvas",
       "panelLabel": "Canvas",
       "previewTitle": "Canvas preview",
       "reactLoadFailed": "React canvas failed to load: ",

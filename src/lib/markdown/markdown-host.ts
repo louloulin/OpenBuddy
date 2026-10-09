@@ -242,6 +242,33 @@ export function createMarkdownHostConfig(
     })();
   };
 
+  // mermaid 的「下载」按钮此前走组件内的 Blob fallback(`<a download>`),
+  // 在 Electron 里既不进系统保存对话框、也提示不了失败。这里接管成
+  // 原生保存 → shellfs 落盘,与 onApplyCode 同一套路径校验。
+  const onDownloadMermaid: MarkdownConfig["onDownloadMermaid"] = (svg) => {
+    void (async () => {
+      if (!cwd) {
+        toast("无工作区，无法保存图表");
+        return;
+      }
+      try {
+        const target = await save({
+          defaultPath: joinPath(cwd, "diagram.svg"),
+          filters: [{ name: "SVG", extensions: ["svg"] }],
+        });
+        if (!target) return;
+        const written = await invoke<string>("write_text_file", {
+          path: target,
+          content: svg,
+          workspaceRoot: cwd,
+        });
+        toast(`已保存 ${written}`);
+      } catch (e) {
+        toast(String(e).replace(/^Error:\s*/, ""));
+      }
+    })();
+  };
+
   return {
     cwd,
     requestId: sessionId ?? undefined,
@@ -250,6 +277,7 @@ export function createMarkdownHostConfig(
     openCodeLink,
     onLinkClick,
     onApplyCode,
+    onDownloadMermaid,
   };
 }
 

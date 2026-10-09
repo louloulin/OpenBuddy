@@ -50,6 +50,8 @@ import {
   resolvePanelMode,
 } from "./tool-side-panel-layout";
 import { useViewportWidth } from "./use-viewport-width";
+import { useT } from "@openbuddy/ui-locale/client";
+import { openPathInCanvas } from "./canvas/open-path";
 import {
   WbPinIcon,
   WbUnpinIcon,
@@ -767,6 +769,11 @@ function FilePreview({
   const isMarkdown = /\.(md|markdown|mdx)$/i.test(path);
   const canEdit = isMarkdown && EditorBody != null && text != null;
 
+  // 画布 store 是模块级的(不像 editor.body 槽那样可能缺席),所以按钮恒可用,
+  // 不存在"点了没反应"的死按钮。
+  const openInCanvasLabel = useT("conversation.canvas.openInCanvas");
+  const openInCanvas = useCallback(() => openPathInCanvas(path, text), [path, text]);
+
   const beginEdit = useCallback(() => {
     setDraft(text ?? "");
     setEditing(true);
@@ -861,6 +868,15 @@ function FilePreview({
             </button>
           </>
         )}
+        <button
+          type="button"
+          className="file-preview__open"
+          data-testid="file-preview-open-canvas"
+          onClick={openInCanvas}
+          aria-label={openInCanvasLabel}
+        >
+          {openInCanvasLabel}
+        </button>
         <button type="button" className="file-preview__open" onClick={onOpenOs}>
           系统打开
         </button>
