@@ -14,7 +14,7 @@
 //   This script regenerates the same seven filenames from the live
 //   Electron renderer against the real MiniMax upstream, so the README
 //   and the live UI can never disagree. It mirrors the launch envelope
-//   used by tests/electron/_fixtures.ts (compiled out/main over file://,
+//   used by tests/electron/_fixtures.ts (compiled dist/main over file://,
 //   isolated user-data-dir, provider credentials scrubbed) so a
 //   regression in the chat pipeline produces a bad screenshot — never
 //   a silent fall-back to "looks fine in the doc".

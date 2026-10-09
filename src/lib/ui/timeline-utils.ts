@@ -8,8 +8,11 @@
  */
 import type { ChatMessage } from "@/stores/session-store";
 
-/** 带可选元数据的消息(前向兼容:缺省字段视为不存在)。 */
-export type TimelineMessage = ChatMessage & {
+/** 带可选元数据的消息(前向兼容:缺省字段视为不存在)。
+ *  createdAt 用 Omit 重写:ChatMessage.createdAt 是 number,但 timeline-utils
+ *  兼容 ISO 字符串时间戳(string),否则 Omit 后再 & 会把类型交叉退化为 number。
+ */
+export type TimelineMessage = Omit<ChatMessage, "createdAt"> & {
   modelId?: string;
   createdAt?: string | number;
 };
@@ -21,7 +24,27 @@ export type TimelineNode =
   | { kind: "message"; message: TimelineMessage; index: number };
 
 /**
- * 把消息序列展开成「分隔符 + 消息」的时间线节点序列。
+ * 把 `modelId`(`<provider>/<model>` 形)压缩成面向用户的简短标签。
+ *
+ * 输入  `custom_anthropic/minimax/MiniMax-M3` → 输出 `MiniMax-M3`
+ * 输入  `openai/gpt-4o`                       → 输出 `gpt-4o`
+ * 输入  `MiniMax-M3`(无前缀)                  → 输出 `MiniMax-M3`
+ *
+ * 设计理由:`timeline-utils` 生成的「已切换到 X」分隔符与 MessageMeta
+ * 的模型 chip 都直接拿 `m.modelId` 渲染,会把内部 provider 路径
+ * (`custom_anthropic/minimax/...`)整段外泄到 UI。Codex / ChatGPT 在
+ * 模型切换处只显示模型名本身,所以这里抽到工具层统一收口。
+ */
+export function shortModelLabel(modelId: string | undefined | null): string {
+  if (!modelId) return "";
+  // 一段不切,两段也不切:保留 `sub-provider/model` 这种语义上有用的二级路径。
+  // 三段及以上(通常是 `<provider>/<sub-provider>/<model>`)只保留末两段。
+  const parts = modelId.split("/");
+  if (parts.length <= 2) return modelId;
+  return parts.slice(-2).join("/");
+}
+
+/** 把消息序列展开成「分隔符 + 消息」的时间线节点序列。
  *
  *  - 日期分隔:相邻消息跨「天」(按 createdAt)时插入。
  *  - 模型分隔:相邻消息的 modelId 变化时插入(显示「已切换到 X」)。
@@ -44,7 +67,7 @@ export function buildTimeline(messages: TimelineMessage[]): TimelineNode[] {
     if (m.modelId && m.modelId !== prevModel) {
       nodes.push({
         kind: "model-divider",
-        label: `已切换到 ${m.modelId}`,
+        label: `已切换到 ${shortModelLabel(m.modelId) || m.modelId}`,
         key: `model-${m.modelId}-${i}`,
       });
       prevModel = m.modelId;
@@ -80,4 +103,41 @@ export function countModelSwitches(messages: TimelineMessage[]): number {
     }
   }
   return n;
+}
+
+// Plan5 B.9 — 工具并行 / 串行可视化。
+//
+// 聚类算法本体在 `./message-part-renderables`(零依赖、可直接单测);
+// 这里只:
+//   1. 重新导出,让既有的 `@/lib/ui/timeline-utils` 引用路径继续可用;
+//   2. 提供"整段会话"维度的聚合 helper。
+import {
+  clusterToolCalls,
+  type ToolCallCluster,
+} from "./message-part-renderables";
+
+export { clusterToolCalls, DEFAULT_PARALLEL_WINDOW_MS } from "./message-part-renderables";
+export type { ToolCallCluster, PartRenderable } from "./message-part-renderables";
+
+/**
+ * 整段会话维度:把所有消息里的 tool_call 拉平再聚类,便于顶部 banner / minimap 用。
+ */
+export function groupParallelToolCalls(
+  messages: Array<Pick<ChatMessage, "role" | "parts">>,
+  windowMs: number = 3000,
+): ToolCallCluster[] {
+  const all: ToolCallCluster[] = [];
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    all.push(...clusterToolCalls(m.parts, windowMs));
+  }
+  return all;
+}
+
+/**
+ * 便利 helper:统计当前会话里同时运行的工具组数(= parallel/ ≥ 2 的 cluster 数)。
+ * 给 ChatView / StatusIndicator 用,避免每次重渲染都做完整 cluster。
+ */
+export function countParallelClusters(clusters: readonly ToolCallCluster[]): number {
+  return clusters.filter((c) => c.kind === "parallel").length;
 }

@@ -1,13 +1,13 @@
 # OpenSSF Scorecard weekly scan.
 # https://github.com/ossf/scorecard
-# Triggers: weekly (Monday 06:00 UTC) + on push to master + manual dispatch.
+# Triggers: weekly (Monday 06:00 UTC) + on push to main + manual dispatch.
 name: Scorecard
 
 on:
   schedule:
     - cron: "0 6 * * 1"
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 permissions: read-all

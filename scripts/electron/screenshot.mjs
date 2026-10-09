@@ -10,7 +10,7 @@
 // text, shipped as the project's headline screenshot.
 //
 // So: launch Electron exactly like the e2e fixture does (compiled
-// out/main/index.js over file://, isolated user-data-dir, provider credentials
+// dist/main/index.js over file://, isolated user-data-dir, provider credentials
 // scrubbed), drive the real UI, and refuse to write a frame that looks blank.
 //
 // Usage:  pnpm build && pnpm docs:screenshots

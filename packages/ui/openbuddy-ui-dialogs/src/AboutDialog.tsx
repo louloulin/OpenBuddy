@@ -42,11 +42,17 @@ export function AboutDialog({ open, onClose, init }: AboutDialogProps) {
 
   if (!open) return null;
 
+  // 遮罩只负责「点到面板外关闭」——它不是控件(role="presentation" 让 AT 跳过),
+  // 用 target===currentTarget 判定就够,面板内部不需要再 stopPropagation。
+  // 键盘用户走面板内的关闭按钮 / Esc。
   return (
-    <div className="about-dialog__overlay" onClick={onClose}>
+    <div
+      className="about-dialog__overlay"
+      role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <div
         className="about-dialog"
-        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label={title}
       >

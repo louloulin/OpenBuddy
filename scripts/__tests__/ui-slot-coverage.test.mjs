@@ -54,9 +54,23 @@ const report = JSON.parse(
  * 已三态齐备),`registeredPct` 77→76(`conversation.approvals` 是有意
  * declared-only 的插件扩展点,扩大了分母),`consumedPct` 85→86(两个新槽
  * 都有消费者)。
+ *
+ * **R97 下调基线说明**:本次删除 2 个孤儿 marketplace slot:
+ *   - `modules.marketplace`(single / session-maybe / owner: MarketplaceTabProps)
+ *   - `modules.marketplace.item`(list / session-maybe / owner: MarketplaceCardProps)
+ *
+ *   这两个 slot 是 `@openbuddy/ui-modules` 包的孤儿 marketplace 扩展点,
+ *   仅服务于被 R97 一起删除的 MarketplaceTab / MarketplaceCard。R97 与孤儿
+ *   实现一并删除后,`@openbuddy/ui-mcp` 的 MarketplacePanel 接管了「插件·
+ *   市场」面板的事实唯一实现,但 MarketplacePanel 不依赖这两个 slot
+ *   (它走 placeholder.marketplace + direct IPC,见 ADR-0011)。
+ *
+ *   因此:`declared` 66→64(不是接線缩减,是孤儿扩展点随孤儿实现一并删除),
+ *   `wired` 不变(46),`registeredPct` / `consumedPct` 因分母减小而
+ *   自然上调 —— 视为「分母正常收缩」。
  */
 const BASELINE = {
-  declared: 66,
+  declared: 64,
   wired: 46,
   registeredPct: 76,
   consumedPct: 86,

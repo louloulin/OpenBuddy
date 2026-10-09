@@ -17,7 +17,7 @@ export default defineConfig({
   },
   ssr: { noExternal: true },
   build: {
-    outDir: process.env.OPENBUDDY_PROCESS_WORKER_OUT ?? resolve(root, "out/collaboration-process-worker"),
+    outDir: process.env.OPENBUDDY_PROCESS_WORKER_OUT ?? resolve(root, "dist/collaboration-process-worker"),
     emptyOutDir: true,
     ssr: resolve(root, "electron/main/collaboration/collaboration-process-worker.ts"),
     target: "node20",

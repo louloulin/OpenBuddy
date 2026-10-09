@@ -28,9 +28,9 @@ const packageJson = JSON.parse(fileText(join(root, "package.json")) || "{}");
 const builder = fileText(join(root, "electron-builder.yml"));
 const workflow = fileText(join(root, ".github/workflows/release.yml"));
 const requiredFiles = [
-  "out/main/index.js",
-  "out/preload/index.cjs",
-  "out/renderer/index.html",
+  "dist/main/index.js",
+  "dist/preload/index.cjs",
+  "dist/renderer/index.html",
   "electron-builder.yml",
   ".github/workflows/release.yml",
 ];
@@ -81,7 +81,7 @@ check("release:signing-is-ci-only", !process.env.CSC_LINK && !process.env.CSC_KE
 
 const digest = createHash("sha256");
 let hashedFiles = 0;
-for (const relative of ["out/main/index.js", "out/preload/index.cjs", "out/renderer/index.html"]) {
+for (const relative of ["dist/main/index.js", "dist/preload/index.cjs", "dist/renderer/index.html"]) {
   const path = join(root, relative);
   if (!existsSync(path)) continue;
   digest.update(relative);

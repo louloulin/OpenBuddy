@@ -17,7 +17,7 @@ on:
     # → Run workflow`). Required because cron-only workflows can sit for
     # weeks unused and then fail for unrelated reasons on the first run.
   push:
-    branches: [feature/pi0911, master]
+    branches: [feature/pi0911, main]
     # Run on push so changes to either perf script trigger a fresh
     # measurement immediately. Path-scoped below.
     paths:
@@ -48,14 +48,12 @@ jobs:
         with:
           submodules: recursive
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -93,14 +91,12 @@ jobs:
         with:
           submodules: recursive
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -140,14 +136,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Install
         run: pnpm install --frozen-lockfile

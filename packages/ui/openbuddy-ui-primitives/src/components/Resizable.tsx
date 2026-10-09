@@ -170,6 +170,9 @@ export function Resizable({
 
   const handle = disabled ? null : (
     <div
+      // 可拖拽把手 = WAI-ARIA「Window Splitter」：role="separator" +
+      // aria-valuenow/min/max + tabIndex=0 是规范里明确可聚焦的形态，
+      // 键盘路径见下方 handleKeyDown（方向键 8px / Shift 32px，Home/End 到端点）。
       role="separator"
       aria-orientation="vertical"
       aria-label={handleLabel}

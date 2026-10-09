@@ -64,17 +64,22 @@ export function FeedbackDialog({
 
   const shown = hover || stars;
 
+  // 遮罩不是控件:role="presentation" 让 AT 跳过它,点击只做「点到面板外关闭」
+  // 的鼠标便利判断。dialog 角色落在真正的面板上。
   return (
     <div
       className="feedback-dialog__overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label="消息反馈"
+      role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="feedback-dialog">
+      <div
+        className="feedback-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="消息反馈"
+      >
         <div className="feedback-dialog__head">
           <span>{rating === "up" ? "👍 你对这条回复满意" : "👎 这条回复有待改进"}</span>
           <button

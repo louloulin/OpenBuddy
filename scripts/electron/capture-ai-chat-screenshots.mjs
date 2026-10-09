@@ -13,7 +13,7 @@
  *
  * This script uses the same credential resolver as the verification specs
  * (`scripts/lib/e2e-credentials.mjs`), the same IPC channels, and the
- * production renderer loaded from `out/main/index.html`. Screenshots
+ * production renderer loaded from `dist/main/index.html`. Screenshots
  * therefore show the actual UI the user sees — not a mock or hand-rolled
  * markup. If the chat pipeline regressed, these PNGs would capture the
  * regression rather than hide it.

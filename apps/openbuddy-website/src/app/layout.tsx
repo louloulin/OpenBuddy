@@ -6,6 +6,7 @@ import SearchDialog from '@/components/search/SearchDialog';
 import BackToTop from '@/components/BackToTop';
 import { getSearchIndex } from '@/lib/docs-search';
 import { SITE_STATS, SITE_URL } from '@/lib/constants';
+import { SITE_VERSION } from '@/lib/site-version';
 import '../styles/globals.css';
 
 export const viewport: Viewport = {
@@ -59,7 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   operatingSystem: 'Windows, macOS, Linux',
                   description:
                     'OpenBuddy is a 100% open source (MIT) desktop AI workspace rebuilt on Electron + Pi.',
-                  softwareVersion: '0.15.0',
+                  softwareVersion: SITE_VERSION,
                   datePublished: '2026-08-01',
                   offers: {
                     '@type': 'Offer',

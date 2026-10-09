@@ -203,7 +203,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		});
 		wrapIpcHandler("memory_flush", async () => null);
 		wrapIpcHandler("subagents:get-config", async () => {
-			casdoorAuth.authorize({ capability: "team.workspace" });
+			casdoorAuth.assertAuthorized({ capability: "team.workspace" });
 			return readSubagentsConfig();
 		});
 		// Stub channels for legacy / 3rd-party IPC keep preload allowlist in sync.
@@ -260,7 +260,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		wrapIpcHandler("notifications:mark-all-read", async () => null);
 		wrapIpcHandler("notifications:mark-read", async () => null);
 		wrapIpcHandler("subagents:set-config", async (_e, args: unknown) => {
-			casdoorAuth.authorize({ capability: "team.workspace" });
+			casdoorAuth.assertAuthorized({ capability: "team.workspace" });
 			const input = recordValue(args, "subagents set-config payload");
 			const patch: OpenBuddySubagentsConfig = {};
 			if (input.maxDepth !== undefined) patch.maxDepth = optionalFiniteInteger(input.maxDepth, "maxDepth", 1, 1, 8);
@@ -385,7 +385,7 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		wrapIpcHandler("shellfs:import-file", async (_e, args: unknown) => {
 			const input = recordValue(args, "import file payload");
 			const sourcePath = absolutePath(input.sourcePath, "sourcePath");
-			const workspaceRoot = writeAllowedRoot(absolutePath(input.workspaceRoot, "workspaceRoot"));
+			const workspaceRoot = await resolveWriteRoot(input.workspaceRoot);
 			const sourceStat = await fs.stat(sourcePath);
 			if (!sourceStat.isFile()) throw new Error("sourcePath must be a file");
 			const requestedName = input.fileName === undefined ? sourcePath.split(/[\\/]/).pop() : requiredString(input.fileName, "fileName");
@@ -536,27 +536,27 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			return calendarHandlers.remove(requiredString(id, "id"));
 		});
 		wrapIpcHandler("permission:list", async () => {
-			casdoorAuth.authorize({ capability: "team.workspace" });
+			casdoorAuth.assertAuthorized({ capability: "team.workspace" });
 			await ensureAgentHost();
-			const { permissionHandlers } = await import("@openbuddy/auth-permission");
+			const { agentPermissionBridge: permissionHandlers } = await import("../agent/agent-permission-bridge");
 			return permissionHandlers.readRules();
 		});
 		wrapIpcHandler("permission:save", async (_e, rules: unknown) => {
-			casdoorAuth.authorize({ capability: "team.workspace" });
+			casdoorAuth.assertAuthorized({ capability: "team.workspace" });
 			await ensureAgentHost();
-			const { permissionHandlers } = await import("@openbuddy/auth-permission");
+			const { agentPermissionBridge: permissionHandlers } = await import("../agent/agent-permission-bridge");
 			return permissionHandlers.writeRules(permissionRules(rules) as never);
 		});
 		wrapIpcHandler("permission:mode-get", async () => {
-			casdoorAuth.authorize({ capability: "team.workspace" });
+			casdoorAuth.assertAuthorized({ capability: "team.workspace" });
 			await ensureAgentHost();
-			const { permissionHandlers } = await import("@openbuddy/auth-permission");
+			const { agentPermissionBridge: permissionHandlers } = await import("../agent/agent-permission-bridge");
 			return fromPiPermissionMode(await permissionHandlers.readMode());
 		});
 		wrapIpcHandler("permission:mode-set", async (_e, mode: unknown) => {
-			casdoorAuth.authorize({ capability: "team.workspace" });
+			casdoorAuth.assertAuthorized({ capability: "team.workspace" });
 			await ensureAgentHost();
-			const { permissionHandlers } = await import("@openbuddy/auth-permission");
+			const { agentPermissionBridge: permissionHandlers } = await import("../agent/agent-permission-bridge");
 			return permissionHandlers.writeMode(toPiPermissionMode(publicPermissionMode(mode)));
 		});
 }

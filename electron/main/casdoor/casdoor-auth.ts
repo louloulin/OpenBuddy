@@ -259,6 +259,8 @@ export class CasdoorAuthService {
   private refreshToken: string | null = null;
   private activeTenantId: string | undefined;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  /** In-flight refresh() Promise — 用于把 5 个并发 caller 合并为 1 次实际网络请求。 */
+  private refreshPromise: Promise<CasdoorSessionView> | null = null;
   private loginCapabilities: CasdoorLoginCapabilities | null = null;
   private statusListener: ((kind: CasdoorLifecycleKind) => void) | null = null;
 
@@ -635,7 +637,34 @@ export class CasdoorAuthService {
     }
   }
 
+  /**
+   * 刷新 access_token(同 key 合并语义)。
+   *
+   * 单实例保证刷新场景与原本「OpenBuddy 的 token 刷新触发点至少有 4 处」造成
+   * 的 stampede 风险消失:
+   *   1. Webview 渲染层 API 调用方(检测到 401)
+   *   2. 主进程 IPC 调用方(同 1)
+   *   3. scheduleRefresh() 定时器
+   *   4. 用户手动点「刷新会话」UI
+   *
+   * 5 个并发调用方 → 1 次实际 HTTP + 1 次 side-effects + 5 个 caller 都
+   * await 同一个 Promise。
+   *
+   * 实现要点:
+   *   - 内存级 in-flight Promise(实例字段),不引入新的工具类型
+   *   - finally 清空,允许下一次 refresh 重入
+   *   - clearSession() 时一并清空 in-flight(避免过期 Promise 复活)
+   */
   async refresh(): Promise<CasdoorSessionView> {
+    if (!this.refreshToken) return this.status();
+    if (this.refreshPromise) return this.refreshPromise;
+    this.refreshPromise = this.runRefresh().finally(() => {
+      this.refreshPromise = null;
+    });
+    return this.refreshPromise;
+  }
+
+  private async runRefresh(): Promise<CasdoorSessionView> {
     if (!this.refreshToken) return this.status();
     try {
       const previousTenantId = this.activeTenantId;
@@ -709,6 +738,7 @@ export class CasdoorAuthService {
 
   private async clearSession(): Promise<void> {
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshPromise = null;
     this.refreshTimer = null;
     this.pending.clear();
     this.identity = null;
@@ -781,6 +811,9 @@ export class CasdoorAuthService {
   }
 
   assertAuthorized(requirement: CasdoorAuthorizationRequirement, message = "当前账户没有访问当前租户资源的权限"): void {
+    // 未配置 Casdoor = 本地模式,与 assertCapability 同语义放行 —— 否则默认安装
+    // 的 sessions:list 等基础 IPC 全部 CASDOOR_SIGNED_OUT(electron 冒烟实测)。
+    if (!this.config.configured) return;
     const decision = this.authorizationDecision(requirement);
     if (!decision.allowed) {
       const error = new Error(`${decision.code}: ${message}`) as Error & { code?: string; reason?: string; tenantId?: string; subject?: string; resource?: string; action?: string };
@@ -927,6 +960,8 @@ export class CasdoorAuthService {
   }
 
   assertResourceAuthorized(request: CasdoorResourceAuthorizationRequest, message = "当前账户没有访问当前租户资源的权限"): void {
+    // 同 assertAuthorized:本地模式放行,已配置始终强制。
+    if (!this.config.configured) return;
     if (!this.authorizeResource(request)) {
       const decision = this.authorizationDecision({ resource: request.resource, resourceId: request.resourceId, action: request.action });
       const error = new Error(`${decision.code}: ${message}`) as Error & { code?: string; reason?: string; tenantId?: string; subject?: string; resource?: string; action?: string };

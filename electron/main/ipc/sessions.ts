@@ -43,17 +43,17 @@ export function registerSessionsIpc(deps: AgentHostIpcDeps): void {
   const { agentHost, casdoorAuth, ensureAgentHost } = deps;
 
   ipcMain.handle("sessions:list", async (_e, cwd: string) => {
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     await ensureAgentHost();
     return agentHost.listSessions(absolutePath(cwd, "cwd"));
   });
   ipcMain.handle("sessions:list-workspaces", async () => {
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     await ensureAgentHost();
     return agentHost.listWorkspaces();
   });
   ipcMain.handle("sessions:rename", async (_e, args: unknown) => {
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     const input = recordValue(args, "sessions:rename payload");
     // R91 — `renameSession` on the host is `(sessionId, title, cwd)`: cwd is
     // how it locates the session file (`SessionManager.list(cwd, ...)`).
@@ -70,28 +70,28 @@ export function registerSessionsIpc(deps: AgentHostIpcDeps): void {
     return { ok: true };
   });
   ipcMain.handle("sessions:delete", async (_e, args: unknown) => {
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     const input = recordValue(args, "session delete payload");
     return agentHost.deleteSession(requiredString(input.sessionId, "sessionId"), resolvedCwd(input, () => agentHost.getCwd()));
   });
   ipcMain.handle("sessions:set-pinned", async (_e, args: { id: string; pinned: boolean }) => {
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     const input = recordValue(args, "session pin payload");
     return agentHost.setSessionPinned(requiredString(input.id, "session id"), requiredBoolean(input.pinned, "pinned"));
   });
   ipcMain.handle("sessions:set-archived", async (_e, args: { id: string; archived: boolean }) => {
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     const input = recordValue(args, "session archive payload");
     return agentHost.setSessionArchived(requiredString(input.id, "session id"), requiredBoolean(input.archived, "archived"));
   });
   // R2.5 — bulk archive/unarchive for the Sidebar's 恢复全部 / 归档全部 actions.
   ipcMain.handle("sessions:set-all-archived", async (_e, args: { archived: boolean }) => {
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     const input = recordValue(args, "bulk archive payload");
     return agentHost.setAllArchived(requiredBoolean(input.archived, "archived"));
   });
   ipcMain.handle("sessions:set-expert", async (_e, args: { id: string; expertId?: string; expertName?: string; avatarLocal?: string }) => {
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     const input = recordValue(args, "session expert payload");
     const id = requiredString(input.id, "session id");
     const binding = input.expertId && input.expertName

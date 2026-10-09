@@ -6,6 +6,8 @@
 // `triageCategory`, and a `triageByThread` Map). We reproduce the same logic
 // here; if the implementation changes, update both sides.
 
+import { describe, it, expect } from "vitest";
+
 interface EmailThreadLite {
   accountId: string;
   id: string;

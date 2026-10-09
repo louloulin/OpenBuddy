@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { EmailThreadPreview } from "@openbuddy/capability-email";
+import type { EmailThreadPreview } from "@openbuddy/capability-email/renderer";
 import { EmailList } from "../EmailList";
 
 const item = (id: string, overrides: Partial<EmailThreadPreview> = {}): EmailThreadPreview => ({ id, accountId: "a1", subject: `Subject ${id}`, snippet: "Preview", from: { address: `${id}@example.com` }, date: "2026-01-01T00:00:00.000Z", messageCount: 1, unread: false, labels: [], ...overrides });

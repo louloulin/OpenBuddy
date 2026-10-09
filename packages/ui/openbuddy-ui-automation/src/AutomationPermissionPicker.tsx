@@ -47,6 +47,7 @@ export function AutomationPermissionPicker({
         type="button"
         className={`automation-permission-picker__trigger ${isFullAccess ? "automation-permission-picker__trigger--warning" : "automation-permission-picker__trigger--safe"}`}
         disabled={disabled}
+        aria-expanded={isOpen}
         onClick={() => setIsOpen((v) => !v)}
       >
         {isFullAccess ? <WarningOutlineIcon size="sm" /> : <ShieldCheckIcon size="sm" />}
@@ -58,8 +59,11 @@ export function AutomationPermissionPicker({
         </span>
       </button>
       {isOpen && (
-        <div className="automation-permission-picker__dropdown">
-          <div
+        <div className="automation-permission-picker__dropdown" role="radiogroup" aria-label="权限模式">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={isFullAccess}
             className={`automation-permission-picker__item${isFullAccess ? " automation-permission-picker__item--selected" : ""}`}
             onClick={() => select("fullAccess")}
           >
@@ -78,8 +82,11 @@ export function AutomationPermissionPicker({
                 允许 AI 在无人值守任务中自动执行操作，可能涉及敏感数据或文件修改，仅在信任任务时使用，用户可随时恢复默认权限。
               </span>
             </div>
-          </div>
-          <div
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!isFullAccess}
             className={`automation-permission-picker__item automation-permission-picker__item--divider${!isFullAccess ? " automation-permission-picker__item--selected" : ""}`}
             onClick={() => select("default")}
           >
@@ -95,7 +102,7 @@ export function AutomationPermissionPicker({
                 敏感操作需用户确认。如果你离开屏幕，任务会停在等待状态。仅推荐在本地调试/手动监管时使用。
               </span>
             </div>
-          </div>
+          </button>
         </div>
       )}
     </div>

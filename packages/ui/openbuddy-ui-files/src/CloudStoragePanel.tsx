@@ -144,9 +144,14 @@ export function CloudStoragePanel({ onToast }: { onToast?: (msg: string) => void
           {entries.map((e) => (
             <li key={e.path} className={"storage-panel__entry" + (e.isDir ? " dir" : "")}>
               <span className="storage-panel__entry-icon">{e.isDir ? "📁" : "📄"}</span>
-              <span className="storage-panel__entry-name" onClick={() => openEntry(e)} title={e.isDir ? "打开目录" : undefined}>
+              <button
+                type="button"
+                className="storage-panel__entry-name"
+                onClick={() => openEntry(e)}
+                title={e.isDir ? "打开目录" : `打开 ${e.name}`}
+              >
                 {e.name}
-              </span>
+              </button>
               {!e.isDir && e.size != null && (
                 <span className="storage-panel__entry-size">{formatSize(e.size)}</span>
               )}

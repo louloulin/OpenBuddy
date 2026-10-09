@@ -1,13 +1,22 @@
 import { create } from "zustand";
 import { getElectronBridgeStatus } from "@/lib/platform/electron-api";
 
+/** host-core(Rust sidecar)存活状态,由主进程经 electron-bridge-status 心跳带回。 */
+export interface HostCoreStatus {
+  mode: "ok" | "degraded" | "unavailable";
+  crashes: number;
+  lastReason?: string;
+}
+
 interface BridgeHealthState {
   available: boolean;
   reason?: string;
   apiVersion?: number;
   lastCheckedAt: number;
+  /** 缺失表示主进程还没广播过(老版本主进程 / 启动 30s 内),UI 退回到只看 `available`。 */
+  hostCore?: HostCoreStatus;
   /** Mutated after every status probe so subscribers can react. */
-  set: (next: { available: boolean; reason?: string; apiVersion?: number }) => void;
+  set: (next: { available: boolean; reason?: string; apiVersion?: number; hostCore?: HostCoreStatus }) => void;
   /** Re-read window.api right now and update the store. Cheap; safe to call
    *  on a timer or after vite reconnects. */
   refresh: () => void;
@@ -25,6 +34,7 @@ export const useBridgeHealthStore = create<BridgeHealthState>((set, get) => {
     available: initial.available,
     reason: initial.reason,
     apiVersion: initial.apiVersion,
+    hostCore: initial.hostCore,
     lastCheckedAt: Date.now(),
     set: (next) => set({ ...next, lastCheckedAt: Date.now() }),
     refresh: () => {

@@ -13,6 +13,15 @@ import { ChevronDown, Check, Settings2 } from "lucide-react";
  *   - empty state distinguishes "未配置模型" + a "前往设置" affordance
  *   - Type-ahead: typing jumps to the option whose label starts with the letter
  */
+/**
+ * Capability hint surfaced as a small chip next to each model in the
+ * dropdown. Provider-declared (or inferred conservatively from apiBackend
+ * when omitted) so the UI never claims a capability we can't verify.
+ * B.7 alignment — users can tell at a glance whether a model supports
+ * vision / tools / reasoning before attaching an image or invoking a tool.
+ */
+export type CapabilityHint = "vision" | "tools" | "reasoning" | "json_mode" | "streaming";
+
 export interface ModelOption {
   id: string;
   label?: string;
@@ -26,6 +35,44 @@ export interface ModelOption {
    * OpenAI Responses, or Anthropic Messages. Mirrors pi's ApiBackend enum.
    */
   apiBackend?: "chat_completions" | "responses" | "messages";
+  /**
+   * Optional explicit capability declaration. When omitted, `inferCapabilities`
+   * derives a conservative set from `apiBackend` + the model id.
+   */
+  capabilities?: CapabilityHint[];
+}
+
+/**
+ * Conservative capability inference — better to under-promise than mislead.
+ *   - messages (Anthropic) → vision + tools + reasoning + json_mode
+ *   - responses (OpenAI Responses) → vision + tools + json_mode
+ *   - chat_completions or missing → fall back to id-pattern matching
+ */
+export function inferCapabilities(m: ModelOption): CapabilityHint[] {
+  if (m.capabilities && m.capabilities.length > 0) return m.capabilities;
+  const id = (m.id + " " + (m.label ?? "")).toLowerCase();
+  const out: CapabilityHint[] = [];
+  if (m.apiBackend === "messages") {
+    out.push("vision", "tools", "reasoning", "json_mode");
+    return out;
+  }
+  if (m.apiBackend === "responses") {
+    out.push("vision", "tools", "json_mode");
+    return out;
+  }
+  if (/gpt-4|gpt-5|o3|o4|claude|gemini|grok|qwen-vl|deepseek-vl|llava|vision|vl/i.test(id)) {
+    out.push("vision");
+  }
+  if (/gpt-4|gpt-5|o3|o4|claude|gemini|grok|qwen|function[-_ ]?calling|tools/i.test(id)) {
+    out.push("tools");
+  }
+  if (/o3|o4|deepseek-r1|reasoning|claude.*opus|claude.*sonnet.*4|qwen.*qwen|thinking/i.test(id)) {
+    out.push("reasoning");
+  }
+  if (/gpt-4|gpt-3\.5|claude|gemini/i.test(id)) {
+    out.push("json_mode");
+  }
+  return out;
 }
 
 /**
@@ -40,6 +87,15 @@ const THINKING_OPTIONS: ReadonlyArray<{ value: ThinkingLevel; label: string; tit
   { value: "medium", label: "均衡", title: "均衡推理(默认)" },
   { value: "high", label: "深度", title: "深度推理" },
 ];
+
+/** Human-friendly label for a capability chip. */
+const CAPABILITY_LABEL: Record<CapabilityHint, { label: string; title: string }> = {
+  vision: { label: "视觉", title: "支持图像/视觉输入" },
+  tools: { label: "工具", title: "支持函数调用 / 工具" },
+  reasoning: { label: "推理", title: "支持推理档位(慢但更准)" },
+  json_mode: { label: "JSON", title: "支持结构化 JSON 输出" },
+  streaming: { label: "流式", title: "支持增量流式输出" },
+};
 
 /** Human-friendly label for the wire-protocol badge. */
 function apiBackendLabel(apiBackend: ModelOption["apiBackend"]): string | null {
@@ -161,6 +217,31 @@ export function ModelSelector({
     }
   };
 
+  // 选中第 idx 个 option(模型在前、推理档位在后)。键盘 Enter/Space 与鼠标
+  // 点击共用这一份逻辑 —— 鼠标点击通过 <ul> 上的事件委托派发过来,
+  // 因为 role="option" 的 <li> 本身不该带 onClick:listbox 用的是
+  // aria-activedescendant,焦点始终停在 <ul> 上(option 不能单独 tab),
+  // 键盘契约由下面的 onMenuKey 完整承担。
+  const selectIndex = (idx: number) => {
+    if (idx < 0 || idx >= total) return;
+    if (idx < models.length) {
+      onModelChange(models[idx].id);
+      setOpen(false);
+      triggerRef.current?.focus();
+    } else if (hasThinking) {
+      // 档位切换不关菜单:用户常想连续调整模型+档位,看得见勾选移动。
+      onThinkingChange(THINKING_OPTIONS[idx - models.length].value);
+    }
+  };
+
+  const onMenuClick = (e: React.MouseEvent<HTMLUListElement>) => {
+    const li = (e.target as HTMLElement).closest<HTMLLIElement>("li[data-option-index]");
+    // 空态行 / 「推理档位」标题行没有 data-option-index,不该触发选中;
+    // closest 还会越过 <ul> 往上找,所以再确认一次命中在菜单内。
+    if (!li || !e.currentTarget.contains(li)) return;
+    selectIndex(Number(li.dataset.optionIndex));
+  };
+
   const onMenuKey = (e: React.KeyboardEvent<HTMLUListElement>) => {
     if (total === 0) return;
     switch (e.key) {
@@ -187,16 +268,7 @@ export function ModelSelector({
       case "Enter":
       case " ": {
         e.preventDefault();
-        if (activeIndex >= 0 && activeIndex < total) {
-          if (activeIndex < models.length) {
-            onModelChange(models[activeIndex].id);
-            setOpen(false);
-            triggerRef.current?.focus();
-          } else if (hasThinking) {
-            // 档位切换不关菜单:用户常想连续调整模型+档位,看得见勾选移动。
-            onThinkingChange(THINKING_OPTIONS[activeIndex - models.length].value);
-          }
-        }
+        selectIndex(activeIndex);
         break;
       }
       case "Escape": {
@@ -253,6 +325,7 @@ export function ModelSelector({
           aria-activedescendant={activeId}
           tabIndex={-1}
           onKeyDown={onMenuKey}
+          onClick={onMenuClick}
           ref={(node) => {
             // Auto-focus the menu when opened so keyboard users land inside
             // the listbox without an extra Tab press.
@@ -285,6 +358,7 @@ export function ModelSelector({
                 key={m.id}
                 id={`${menuId}-opt-${idx}`}
                 role="option"
+                data-option-index={idx}
                 aria-selected={isActive}
                 className={
                   "model-selector__item" +
@@ -292,11 +366,6 @@ export function ModelSelector({
                   (isFocused ? " model-selector__item--focused" : "")
                 }
                 onMouseEnter={() => setActiveIndex(idx)}
-                onClick={() => {
-                  onModelChange(m.id);
-                  setOpen(false);
-                  triggerRef.current?.focus();
-                }}
               >
                 <span className="model-selector__item-label">{m.label || m.id}</span>
                 {apiBackendLabel(m.apiBackend) && (
@@ -307,6 +376,19 @@ export function ModelSelector({
                     {apiBackendLabel(m.apiBackend)}
                   </span>
                 )}
+                {inferCapabilities(m).slice(0, 3).map((cap) => {
+                  const meta = CAPABILITY_LABEL[cap];
+                  return (
+                    <span
+                      key={cap}
+                      className={"model-selector__item-cap model-selector__item-cap--" + cap}
+                      title={meta.title}
+                      data-cap={cap}
+                    >
+                      {meta.label}
+                    </span>
+                  );
+                })}
                 <span className="model-selector__item-id">{m.id}</span>
                 {isActive && <Check size={14} className="model-selector__check" />}
               </li>
@@ -326,6 +408,7 @@ export function ModelSelector({
                     key={opt.value}
                     id={`${menuId}-opt-${idx}`}
                     role="option"
+                    data-option-index={idx}
                     aria-selected={isActive}
                     className={
                       "model-selector__item" +
@@ -333,7 +416,6 @@ export function ModelSelector({
                       (isFocused ? " model-selector__item--focused" : "")
                     }
                     onMouseEnter={() => setActiveIndex(idx)}
-                    onClick={() => onThinkingChange?.(opt.value)}
                     title={opt.title}
                   >
                     <span className="model-selector__item-label">{opt.label}</span>

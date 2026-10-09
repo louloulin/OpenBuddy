@@ -368,12 +368,13 @@ export function SearchOverlay({
 
   if (!open) return null;
 
+  {/* 遮罩是纯装饰层,dialog 语义落在内层 .conversation-search-modal 上。
+      Tab 焦点陷阱的 keydown 监听留在遮罩上 —— 事件冒泡,内层 dialog 上的
+      Tab 依旧会走到这里,焦点查询也仍然覆盖整个弹窗。 */}
   return (
     <div
       className="conversation-search-modal__overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label="全局搜索"
+      role="presentation"
       ref={dialogRef}
       onKeyDown={handleDialogKeyDown}
       onClick={(e) => {
@@ -382,6 +383,9 @@ export function SearchOverlay({
     >
       <div
         className="conversation-search-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="全局搜索"
       >
         <div className="conversation-search-modal__input-wrapper">
           <Search size={16} strokeWidth={1.75} className="conversation-search-modal__icon" />

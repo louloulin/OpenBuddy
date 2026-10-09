@@ -11,12 +11,12 @@
 #   scripts/build-release-bundle.sh [output-dir]
 #   scripts/build-release-bundle.sh /tmp/openbuddy-release
 #
-# Default output directory: ./out/release
+# Default output directory: ./dist/release
 
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-output_dir=${1:-${repo_root}/out/release}
+output_dir=${1:-${repo_root}/dist/release}
 release_version=${RELEASE_VERSION:-$(git -C "${repo_root}" rev-parse --short=12 HEAD)}
 release_label=${RELEASE_LABEL:-openbuddy-release-${release_version}}
 bundle_dir="${output_dir}/${release_label}"

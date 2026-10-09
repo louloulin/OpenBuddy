@@ -10,6 +10,7 @@ function makeProvider(overrides: Partial<EmailDataProvider> = {}): EmailDataProv
     counts: overrides.counts ?? vi.fn().mockImplementation(async () => ({
       today: 0, later: 0, done: 0, inbox: 0, drafts: 0, scheduled: 0, snoozed: 0,
     })),
+    triage: overrides.triage ?? vi.fn().mockImplementation(async () => ({})),
     ...overrides,
   };
 }
@@ -38,7 +39,10 @@ describe("useEmailData", () => {
     });
     const { result } = renderHook(() => useEmailData({ provider, filters: baseFilters }));
     await waitFor(() => expect(result.current.accounts).toEqual(accounts));
-    expect(result.current.threads).toEqual(threads);
+    // The hook runs triage after listing and merges its chips onto every
+    // row, so the returned threads carry `aiChips: []` even though the
+    // provider's fixture did not.
+    expect(result.current.threads).toEqual([{ ...threads[0], aiChips: [] }]);
     expect(result.current.counts.today).toBe(1);
   });
 

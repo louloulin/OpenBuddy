@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach, vi } from "vitest";
+import { describe, expect, it, afterEach, beforeAll, afterAll, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
   ThemeStudio,
@@ -502,8 +502,8 @@ describe("R55 — ThemeStudio 导出(剪贴板 + 文件下载 + 状态提示)", 
       // 走了一次 anchor click,且 anchor 有 download / href
       expect(clickSpy).toHaveBeenCalled();
       expect(anchorSpy).not.toBeNull();
-      expect(anchorSpy?.getAttribute("download")).toBe("custom-r55-fixture.json");
-      expect(anchorSpy?.getAttribute("href") ?? "").toMatch(/^blob:/);
+      expect((anchorSpy as HTMLAnchorElement | null)?.getAttribute("download")).toBe("custom-r55-fixture.json");
+      expect((anchorSpy as HTMLAnchorElement | null)?.getAttribute("href") ?? "").toMatch(/^blob:/);
       // 剪贴板被调过一次,内容是合法 JSON
       expect(writeText).toHaveBeenCalledTimes(1);
       const written = writeText.mock.calls[0][0] as string;

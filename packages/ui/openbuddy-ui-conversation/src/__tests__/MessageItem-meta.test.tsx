@@ -105,8 +105,8 @@ describe("MessageItem — R8.14 per-message meta chip", () => {
           role: "assistant",
           parts: [{ kind: "text", text: "old" }],
           complete: true,
-          // @ts-expect-error — createdAt is required in TS but we want
-          // to verify the runtime guard for legacy transcripts.
+          // createdAt 是可选的(legacy transcripts 允许缺失),运行时用
+          // guard 处理。这里不再需要 @ts-expect-error。
         }}
         streaming={false}
       />,

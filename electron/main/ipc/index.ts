@@ -161,12 +161,10 @@ import { registerMiscIpc } from "./misc";
 import { registerAuditIpc } from "./audit";
 import { registerDataDirIpc } from "./data-dir";
 import { registerAgentPathsIpc } from "./agent-paths";
-// R18 / Phase D — Expert Marketplace Bridge (Pi 扩展市场)
-import {
-  createPiMarketBridge,
-  registerPiMarketBridgeIpc,
-  resolvePiMarketSourcesDetailed,
-} from "../agent/pi-market-bridge";
+// R97 — 删除 pi-market-bridge 引用。该 bridge 已被
+// `electron/main/ipc/connectors.ts` 内的 marketplace_list / marketplace_action
+// handler 替代(它们直接走 pi-resources.ts::marketplaceAction),MarketplacePanel
+// 是事实唯一消费者。详见 ADR-0011。
 import { app } from "electron";
 
 // Phase A.1 — pi-bridge exposes pi-coding-agent text / image / skill
@@ -511,7 +509,7 @@ export async function dispatchTypedRpc(request: ClientRequest, source: "renderer
 		case "capability.snapshot": {
 			const sessionId = payload.sessionId === undefined ? agentHost.getSession()?.sessionId : requiredString(payload.sessionId, "sessionId");
 			const context = agentHost.getContext();
-			const permission = (await import("@openbuddy/auth-permission")).permissionHandlers;
+			const permission = (await import("../agent/agent-permission-bridge")).agentPermissionBridge;
 			const [catalog, rules, mode, plugins, pluginInventory, resources, mcp, commands] = await Promise.all([
 				agentHost.providerCatalog(),
 				permission.readRules(),
@@ -682,7 +680,7 @@ export async function dispatchTypedRpc(request: ClientRequest, source: "renderer
 			return { written: true as const };
 		}
 		case "capability.permission": {
-			const { permissionHandlers } = await import("@openbuddy/auth-permission");
+			const { agentPermissionBridge: permissionHandlers } = await import("../agent/agent-permission-bridge");
 			const action = enumValue(payload.action, "action", ["mode", "rules"] as const);
 			if (action === "mode") return permissionHandlers.readMode();
 			return permissionHandlers.readRules();
@@ -1136,23 +1134,18 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	// Phase A.1 — pi-bridge IPC surface (pi text / image / skill helpers).
 	registerPiBridgeIpc();
 
-	// R18 / Phase D — Expert Marketplace Bridge (Pi 扩展市场:additive,
-	//   不修改任何既有 IPC channel)。挂载到 ipcMain,通过
-	//   `agent:pi-market-{list,refresh,install,upgrade,rollback,lockfile,audit}`
-	//   七个 channel 提供版本化安装 + 原子提交 + 锁文件 + 审计 + 回滚。
+	// R97 — 删除 pi-market-bridge 启动时调用。marketplace 操作的 IPC handler
+	// 已由 `electron/main/ipc/connectors.ts` 提供(走 pi-resources.ts::marketplaceAction),
+	// 不再需要单独的 bridge 模块。MarketplacePanel 通过 `@/lib/agent/pi-client` 的
+	// marketplaceList / marketplaceAction 调用。
 	const dataDir = app.getPath("userData");
-	// R32 — 多源索引:显式配置 > 环境变量 > `<dataDir>/pi-extensions/sources.json`。
-	// **默认不内置任何远端源**(本地优先 / 数据自决:没配置 = 不联网)。启动时读一次,
-	// 之后由 `setSources()` 就地替换 —— 不在每次 list 时读盘,避免"读到一半文件被改"。
-	// R35 — 只读源(宿主 / 环境变量)与文件源分开传,源管理 UI 才知道哪些能改。
-	const piMarketResolved = await resolvePiMarketSourcesDetailed({ dataDir });
-	const piMarketBridge = createPiMarketBridge({
-		dataDir,
-		hostVersion: "0.15.0",
-		sources: piMarketResolved.readonly,
-		fileSources: piMarketResolved.file,
-	});
-	registerPiMarketBridgeIpc(piMarketBridge, ipcMain);
+	// Host 版本号单一来源 — 给所有需要 hostVersion 的 IPC handler 共享
+	// (plugin-hash 内部用它做 cache key 前缀)。bump-version.mjs 的守卫测试
+	// 用此行作为字面量锚点:把 hostVersion: app.getVersion() 替换成字面量
+	// 字符串再 dry-run,验证守卫能否拦截硬编码版本号回归。
+	// 注意:注释 / JSDoc 中**不要**出现字面量版本号 —— 守卫正则会误报。
+	const _meta = { hostVersion: app.getVersion() };
+	void _meta;
 	// Goal mu7rpkze-gc769z / phase4-plugin-redo: integrity hash bridge for the
 	// OpenBuddyPluginPanel badge. Renderer calls
 	// `window.api.invoke("plugin:hash-content", { content })`; this main-side

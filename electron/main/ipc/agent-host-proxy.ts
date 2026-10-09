@@ -22,6 +22,10 @@ export function bindAgentHost(host: typeof AgentHostModule.agentHost): void {
   _agentHostLoadPromise = Promise.resolve(host);
 }
 
+/** Resolved agent-host module (module-level exports like `emitRendererEvent`
+ *  are NOT on the facade object, so we keep the namespace too). */
+let _agentHostModule: typeof AgentHostModule | null = null;
+
 let _bindRendererEventEmitter: typeof AgentHostModule.bindRendererEventEmitter | null = null;
 export function bindRendererEventEmitterFn(fn: typeof AgentHostModule.bindRendererEventEmitter): void {
   _bindRendererEventEmitter = fn;
@@ -36,6 +40,7 @@ export function ensureAgentHostLoaded(): Promise<typeof AgentHostModule.agentHos
   _agentHostLoadPromise = (async () => {
     const mod = await import("../agent/agent-host");
     _agentHostBinding = mod.agentHost;
+    _agentHostModule = mod;
     if (!_bindRendererEventEmitter) _bindRendererEventEmitter = mod.bindRendererEventEmitter;
     return mod.agentHost;
   })();
@@ -77,6 +82,30 @@ export const bindRendererEventEmitter: typeof AgentHostModule.bindRendererEventE
   }
   return _bindRendererEventEmitter(callback);
 }) as typeof AgentHostModule.bindRendererEventEmitter;
+
+/**
+ * Forward an event to the renderer over the *bound* emitter.
+ *
+ * This MUST go through the agent-host module (bound by `ipc/index.ts` via
+ * `bindRendererEventEmitter`). There is a second, unbound emitter module at
+ * `agent/host-modules/_surface/renderer-event-emitter.ts` — importing that
+ * one directly compiles fine but silently drops every event, because nothing
+ * ever registers a sink on it. IPC sub-modules (e.g. `providers.ts`) use this
+ * helper so a broadcast actually reaches the renderer.
+ *
+ * Fire-and-forget: if the agent-host module is still loading, we queue on the
+ * load promise instead of dropping the event.
+ */
+export function emitRendererEvent(channel: string, payload: unknown): void {
+  if (_agentHostModule) {
+    _agentHostModule.emitRendererEvent(channel, payload);
+    return;
+  }
+  // Not loaded yet — do not drop. Load, then emit.
+  void ensureAgentHostLoaded()
+    .then(() => { _agentHostModule?.emitRendererEvent(channel, payload); })
+    .catch(() => { /* renderer events are best-effort */ });
+}
 
 /** Exposed for testing + boot orchestration that wants to await the load. */
 export function agentHostReady(): Promise<typeof AgentHostModule.agentHost> {

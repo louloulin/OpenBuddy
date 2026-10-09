@@ -141,25 +141,22 @@ export const MarkdownInlineCode = memo(function MarkdownInlineCode({
       purePath: pathDetection.purePath || code,
       type: finalType,
     });
-    return (
-      <code
+    // 路径 chip 是一个真正的按钮，不是「<code role="link">」——code 是非交互
+// 元素，硬塞 role="link" 既不合法也不会被正确播报。CSS 按 class 选择器
+// 写的（.markdown-body .md-inline-code / .md-clickable-path），换成 button
+// 后外观不变，全局 button reset 负责清掉底色和边框。
+return (
+      <button
+        type="button"
         className={[className, "md-inline-code", "md-clickable-path", `md-path-type-${finalType}`]
           .filter(Boolean)
           .join(" ")}
         onClick={handleClick}
         title={titleText}
-        role="link"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handleClick();
-          }
-        }}
       >
         {iconNode ? <span className="md-clickable-path-icon">{iconNode}</span> : null}
         {truncatePathDisplay(code)}
-      </code>
+      </button>
     );
   }
 

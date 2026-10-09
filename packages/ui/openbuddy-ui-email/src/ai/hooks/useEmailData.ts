@@ -28,8 +28,8 @@ export interface EmailDataProvider {
   listAccounts(): Promise<AiInboxAccount[]>;
   listThreads(filters: EmailListFilters): Promise<AiInboxThread[]>;
   counts(): Promise<RailCounts>;
-  /** 可选:triage 用于自动写 aiChips。 */
-  triage?(input: { accountId?: string }): Promise<Record<string, Array<"priority" | "reply" | "action" | "muted">>>;
+  /** createEmailDataProvider 总是提供 triage。 */
+  triage(input: { accountId?: string }): Promise<Record<string, Array<"priority" | "reply" | "action" | "muted">>>;
 }
 
 export interface UseEmailDataArgs {

@@ -53,53 +53,49 @@ describe("R8.12 .msg__avatar visual upgrade", () => {
     expect(a!).not.toMatch(/border-radius:\s*50%/);
   });
 
-  it("uses a brand-tinted linear gradient (inherits dark/light via tokens)", () => {
+  it("uses a neutral surface — the brand gradient was reverted (R5)", () => {
     const a = ruleBody(prose, ".msg--assistant .msg__avatar");
     expect(a).toBeTruthy();
-    expect(a!).toMatch(/background:\s*linear-gradient\(135deg,/);
-    expect(a!).toMatch(/color-mix\(in srgb,\s*var\(--wb-brand/);
-    // The dark stop should mix brand with a small amount of black for
-    // depth (otherwise the gradient looks flat). Match both gradient
-    // stops; each starts with `color-mix(in srgb, var(--wb-brand`.
-    expect(a!).toMatch(/color-mix\(in srgb,\s*var\(--wb-brand[\s\S]*?\)\s+\d+%,\s*white/);
-    expect(a!).toMatch(/color-mix\(in srgb,\s*var\(--wb-brand[\s\S]*?\)\s+\d+%,\s*#000/);
+    // R8.12 gave the avatar a brand-tinted 135deg gradient with white
+    // glyphs. The R5 visual pass replaced it with a flat neutral chip:
+    // a coloured gradient on every assistant message made the
+    // transcript read as marketing. Guard the removal.
+    expect(a!).not.toMatch(/linear-gradient/);
+    expect(a!).not.toMatch(/var\(--wb-brand/);
+    expect(a!).toMatch(/background:\s*var\(--wb-bg-secondary/);
+    expect(a!).toMatch(/border:\s*1px solid var\(--wb-border-default\)/);
   });
 
-  it("centres its content + paints white text + drops a subtle brand shadow", () => {
+  it("centres its content in the weak text token", () => {
     const a = ruleBody(prose, ".msg--assistant .msg__avatar");
     expect(a).toBeTruthy();
     expect(a!).toMatch(/display:\s*flex/);
     expect(a!).toMatch(/align-items:\s*center/);
     expect(a!).toMatch(/justify-content:\s*center/);
-    expect(a!).toMatch(/color:\s#fff/);
-    expect(a!).toMatch(/box-shadow:[^;]*wb-brand/);
+    expect(a!).toMatch(/color:\s*var\(--wb-text-medium\)/);
   });
 });
 
-describe('R8.12 .msg__role "AI" badge', () => {
+describe('.msg__role "AI" badge', () => {
   it("renders a tiny uppercase pill next to the Buddy name", () => {
     const r = ruleBody(prose, ".msg--assistant .msg__role");
     expect(r).toBeTruthy();
     expect(r!).toMatch(/display:\s*inline-flex/);
     expect(r!).toMatch(/align-items:\s*center/);
-    // R8.43 — AI role badge grew to 18px + picked up a 1px brand-tinted
-    // border + tightened letter-spacing (0.04em → 0.06em) for a
-    // more premium feel. The badge padding bumped from "0 5px" to
-    // "0 6px" so the wider letter-spacing has breathing room.
     expect(r!).toMatch(/height:\s*18px/);
     expect(r!).toMatch(/padding:\s*0 6px/);
     expect(r!).toMatch(/border-radius:\s*4px/);
-    expect(r!).toMatch(/border:\s*1px solid color-mix/);
     expect(r!).toMatch(/font-size:\s*10px/);
-    expect(r!).toMatch(/font-weight:\s*600/);
-    expect(r!).toMatch(/letter-spacing:[^;]*0\.06em/);
+    expect(r!).toMatch(/font-weight:\s*500/);
+    expect(r!).toMatch(/letter-spacing:[^;]*0\.04em/);
   });
 
-  it("uses color-mix on the brand token for consistent tinting across themes", () => {
+  it("carries no brand tint — the badge is monochrome (R5)", () => {
     const r = ruleBody(prose, ".msg--assistant .msg__role");
     expect(r).toBeTruthy();
-    // bg mixes brand at 12% (subtle pill), color is the brand directly.
-    expect(r!).toMatch(/background:[^;]*color-mix\(in srgb,\s*var\(--wb-brand\)\s*12%/);
-    expect(r!).toMatch(/color:[^;]*wb-brand/);
+    expect(r!).not.toMatch(/var\(--wb-brand/);
+    expect(r!).not.toMatch(/border:\s*1px solid/);
+    expect(r!).toMatch(/background:\s*var\(--wb-bg-secondary/);
+    expect(r!).toMatch(/color:\s*var\(--wb-text-weak/);
   });
 });

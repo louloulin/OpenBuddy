@@ -113,14 +113,39 @@ class AuditTrail {
 
   async record(input: Omit<AuditEvent, "id" | "at" | "hash"> & Partial<Pick<AuditEvent, "id" | "at">>): Promise<AuditEvent> {
     await this.load();
+    // host-core 优先:把审计条同时投递到 Rust 侧的链式存储。失败时 bridge 静默
+    // 降级到本地 jsonl,不影响本方法的主路径。
+    //
+    // 注意 host 返回的 payloadHash 走的是 host 自己的链,公式与下面的本地链
+    // 不同,因此只写进 detail.hostHash —— 绝不覆盖 event.hash,否则会破坏
+    // "审计条不可被单独篡改"的承诺。
+    let hostHash: string | undefined;
+    let hostId: string | undefined;
+    let hostAt: string | undefined;
+    try {
+      const { auditAppendViaBridge } = await import("../agent/agent-audit-bridge");
+      const appended = await auditAppendViaBridge({
+        kind: input.event,
+        outcome: input.outcome,
+        action: input.event,
+        ...(input.subject ? { subject: input.subject } : {}),
+        ...(input.detail ? { detail: input.detail } : {}),
+      });
+      hostHash = appended.hash;
+      hostId = appended.id;
+      hostAt = appended.at;
+    } catch (error) {
+      console.warn("[audit] host-core append failed", error);
+    }
+
     const event: AuditEvent = {
-      id: input.id ?? randomUUID(),
-      at: input.at ?? new Date().toISOString(),
+      id: hostId ?? input.id ?? randomUUID(),
+      at: hostAt ?? input.at ?? new Date().toISOString(),
       event: input.event,
       outcome: input.outcome,
       source: input.source,
       subject: input.subject,
-      detail: input.detail,
+      detail: hostHash ? { ...input.detail, hostHash } : input.detail,
     };
     // 链式哈希:上一条 hash + 当前 event + at → SHA-256 截前 16 字符。
     // 让审计条不可被单独篡改(没有前序 hash 时无法重新算出相同 hash)。

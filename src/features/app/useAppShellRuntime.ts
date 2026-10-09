@@ -281,6 +281,23 @@ export function useAppShellRuntime(): AppShellRuntime {
     return () => { disposed = true; unlisten?.(); };
   }, [sessionStore, sessionsStore, setToast, notifyBridgeUnavailable]);
 
+  // Plan5 / real-Electron audit — provider & model catalog mutations.
+  // The Settings dialog calls `onModelsChanged` itself, but a save coming
+  // from anywhere else (IPC harness, plugin, CLI) previously left the
+  // composer disabled forever: `apiReady` is `init.auth.ready`, a one-shot
+  // snapshot. Re-derive it whenever main broadcasts that the catalog moved.
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void listenSafe<{ reason?: string }>("openbuddy://providers-changed", () => {
+      if (disposed) return;
+      void refreshModelsRef.current();
+    }, () => notifyBridgeUnavailable()).then((cleanup) => {
+      if (disposed) cleanup?.(); else unlisten = cleanup ?? undefined;
+    });
+    return () => { disposed = true; unlisten?.(); };
+  }, [notifyBridgeUnavailable]);
+
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
@@ -476,6 +493,10 @@ export function useAppShellRuntime(): AppShellRuntime {
           ? target.value.length > 0
           : (target?.textContent?.length ?? 0) > 0);
       if (e.key === "?" && !typedIntoEditable && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); setShortcutsOpen((v) => !v); }
+      // Plan5 B.6 — Ctrl/Cmd+/ 是 `?` 的跨键盘布局别名(美式键盘 `?` 需要
+      // Shift,其它布局不一定有 `?` 键)。两条路径都收敛到同一个
+      // `shortcutsOpen`,所以永远只渲染一个面板。
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key === "/") { e.preventDefault(); setShortcutsOpen((v) => !v); }
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === "k" || e.key === "K")) { e.preventDefault(); setSearchOpen(true); }
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === ",") { e.preventDefault(); setSettingsOpen(true); }
     };

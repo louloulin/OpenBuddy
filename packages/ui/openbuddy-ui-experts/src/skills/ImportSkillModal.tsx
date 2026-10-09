@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { openOne } from "@/lib/platform/electron-api";
 import { XCloseIcon, FolderOpenIcon } from "@openbuddy/ui-primitives/icons";
 import { skillsAdd } from "@/lib/agent/pi-client";
@@ -17,6 +17,7 @@ export function ImportSkillModal({
   const [dragging, setDragging] = useState(false);
   const [autoInstall, setAutoInstall] = useState(true);
   const [busy, setBusy] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   const install = async (path: string) => {
     setBusy(true);
@@ -60,9 +61,11 @@ export function ImportSkillModal({
     else onToast?.("无法读取拖入文件的路径，请点击选择");
   };
 
+  // role="presentation":遮罩点击是纯指针便利;键盘/读屏用户走 × 按钮或 Escape。
   return (
-    <div className="modal-overlay sk-import-overlay" onClick={onClose}>
-      <div className="sk-import" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay sk-import-overlay" ref={overlayRef} role="presentation"
+      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}>
+      <div className="sk-import">
         <div className="sk-import-head">
           <h3>导入技能</h3>
           <button type="button" className="sk-import-close" onClick={onClose}>
@@ -70,7 +73,8 @@ export function ImportSkillModal({
           </button>
         </div>
         <div className="sk-import-body">
-          <div
+          <button
+            type="button"
             className={`sk-drop${dragging ? " sk-drop--drag" : ""}${busy ? " sk-drop--busy" : ""}`}
             onClick={pickFile}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -79,7 +83,7 @@ export function ImportSkillModal({
           >
             <FolderOpenIcon size="xl" className="sk-drop-icon" />
             <div className="sk-drop-title">{dragging ? "松开以导入" : busy ? "导入中…" : "拖拽文件或点击上传"}</div>
-          </div>
+          </button>
           <button type="button" className="sk-import-folder" onClick={pickFolder}>
             或选择一个含 SKILL.md 的文件夹
           </button>

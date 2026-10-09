@@ -16,6 +16,22 @@
 export interface CompatibilityCommandContext {
   cwd?: string;
   sessionManager?: { getSessionId?: () => string };
+  /**
+   * The authoritative pin/archive writers (agent-host's metadata store).
+   *
+   * `/sessions pin <id>` used to call `openbuddy-session.setPinned`, which
+   * writes a *different* column (`sessions.pinned` in the catalog) than the
+   * one the sidebar reads (the `session-metadata` settings namespace). Two
+   * writers, two sources of truth, and the slash verb's change simply never
+   * appeared in the UI — while the sidebar's own pin toggle never appeared in
+   * `/sessions list`. When present these setters are used instead; when absent
+   * (bare tool/test contexts) the code falls back to the service so nothing
+   * hard-fails.
+   */
+  sessionMetadata?: {
+    setPinned?: (id: string, pinned: boolean) => Promise<unknown>;
+    setArchived?: (id: string, archived: boolean) => Promise<unknown>;
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -140,8 +156,8 @@ export async function describeSessionCommand(service: unknown, args: string): Pr
     return "OpenBuddy session ledger is delegated to openbuddy-session; WorkBuddy's Sidebar renders the same set, pinned and archived states round-trip through ~/.openbuddy/agent/sessions.";
   }
   if (verb === "workspaces") return "OpenBuddy workspace discovery is delegated to openbuddy-session.listWorkspaces; groups every cwd in the session store by session count.";
-  if (verb === "pin" || verb === "unpin") return `OpenBuddy pin toggle is delegated to openbuddy-session.setPinned; /sessions ${verb} is an alias for setPinned(<id>, ${verb === "pin"}).`;
-  if (verb === "archive" || verb === "unarchive") return `OpenBuddy archive toggle is delegated to openbuddy-session.setArchived; /sessions ${verb} is an alias for setArchived(<id>, ${verb === "archive"}).`;
+  if (verb === "pin" || verb === "unpin") return `OpenBuddy pin toggle is delegated to agent-host's session metadata store (the same writer the sidebar uses); /sessions ${verb} is an alias for setSessionPinned(<id>, ${verb === "pin"}).`;
+  if (verb === "archive" || verb === "unarchive") return `OpenBuddy archive toggle is delegated to agent-host's session metadata store (the same writer the sidebar uses); /sessions ${verb} is an alias for setSessionArchived(<id>, ${verb === "archive"}).`;
   return `OpenBuddy does not load pi-session natively; command '/sessions ${args.trim()}' is delegated to openbuddy-session.`;
 }
 
@@ -156,6 +172,51 @@ export async function describeFsCommand(service: unknown, args: string): Promise
   if (verb === "reveal") return "OpenBuddy reveal-in-folder is delegated to openbuddy-fs-local.reveal; pass a path after /fs reveal to focus the parent in Finder/Explorer.";
   if (verb === "mkdir") return "OpenBuddy directory create is delegated to openbuddy-fs-local.makeDirectory; pass a workspace-relative path after /fs mkdir. Requires an active workspace.";
   return `OpenBuddy does not load pi-fs natively; command '/fs ${args.trim()}' is delegated to openbuddy-fs-local.`;
+}
+
+/**
+ * Stage G-1d tool fallbacks for the pure-whitelist adapters (pi-lens,
+ * pi-simplify, pi-hashline-edit-pro, @dietrichgebert/ponytail). These entries
+ * exist so the packages show up as known surfaces; per docs/OPENBUDDY-PI-VISION.md
+ * §8-11 they have **no Cordis service** behind them, so there is nothing to
+ * invoke — the honest answer is "install the package, it runs natively".
+ * Describing a capability we do not implement would be worse than silence.
+ */
+export async function describeLensCommand(_service: unknown, args: string): Promise<string> {
+  return whitelistedPackageNotice("pi-lens", "the `lens-*` command family, bundled skills and reload support (docs/pi-extension-architecture.md §pi-lens)", args);
+}
+
+export async function describeSimplifyCommand(_service: unknown, args: string): Promise<string> {
+  return whitelistedPackageNotice("pi-simplify", "its own simplify surface", args);
+}
+
+export async function describeHashlineCommand(_service: unknown, args: string): Promise<string> {
+  return whitelistedPackageNotice("pi-hashline-edit-pro", "its own hashline-edit surface", args);
+}
+
+export async function describeWorktreeCommand(_service: unknown, args: string): Promise<string> {
+  return whitelistedPackageNotice("@dietrichgebert/ponytail", "its own worktree surface", args);
+}
+
+function whitelistedPackageNotice(packageName: string, provides: string, args: string): string {
+  const requested = args.trim();
+  const suffix = requested ? ` Requested verb: \`${requested}\`.` : "";
+  return `OpenBuddy keeps a whitelist entry for \`${packageName}\` but mounts no Cordis service for it — the capability is provided by the npm package itself (${provides}). Install \`${packageName}\` and OpenBuddy lets the native Pi extension own the surface.${suffix}`;
+}
+
+/**
+ * Stage H-4: the openbuddy-automation Cordis plugin was deleted, so this
+ * adapter has no invoke path. The upstream package owns the whole surface.
+ */
+export async function describeAutomationCommand(_service: unknown, args: string): Promise<string> {
+  const verb = commandParts(args).verb;
+  if (!verb || verb === "status") {
+    return "OpenBuddy's automation backplane was removed (Stage H-4); it is delegated entirely to pi-goal-list-loop-audit, which owns interview-drafted goals, the audited task queue, and forever-loops (metric / spec / project-audit). Install it to use /goal, /loop and /audit.";
+  }
+  if (verb === "goal") return "Goal drafting is delegated to pi-goal-list-loop-audit (/goal): interview-drafted objectives with a detached auditor re-verifying every completion against raw evidence.";
+  if (verb === "loop") return "Loop execution is delegated to pi-goal-list-loop-audit (/loop): long-running forever-loops of kind metric, spec or project-audit.";
+  if (verb === "audit") return "Audit inspection is delegated to pi-goal-list-loop-audit (/audit), which re-verifies completions in a detached extension-less process.";
+  return `Command '/automation ${args.trim()}' is delegated to pi-goal-list-loop-audit (the OpenBuddy automation plugin was removed in Stage H-4); install that package to run it.`;
 }
 
 function commandParts(args: string): { verb: string; rest: string } {
@@ -220,11 +281,23 @@ export async function invokeSessionCommand(service: unknown, args: string, conte
   if (verb === "workspaces") return `Workspaces: ${JSON.stringify(await (sessions.listWorkspaces as () => Promise<unknown[]>).call(sessions))}.`;
   if (!rest) throw new Error(`/sessions ${verb} requires a session id`);
   if (verb === "pin" || verb === "unpin") {
-    await (sessions.setPinned as (id: string, pinned: boolean) => Promise<void>).call(sessions, rest, verb === "pin");
+    const pinned = verb === "pin";
+    // Prefer the host metadata store — it is what listSessions projects, so
+    // writing here is the only way the sidebar reflects the change.
+    if (context.sessionMetadata?.setPinned) {
+      await context.sessionMetadata.setPinned(rest, pinned);
+      return `Session ${verb}ned: ${rest}.`;
+    }
+    await (sessions.setPinned as (id: string, pinned: boolean) => Promise<void>).call(sessions, rest, pinned);
     return `Session ${verb}ned: ${rest}.`;
   }
   if (verb === "archive" || verb === "unarchive") {
-    await (sessions.setArchived as (id: string, archived: boolean) => Promise<void>).call(sessions, rest, verb === "archive");
+    const archived = verb === "archive";
+    if (context.sessionMetadata?.setArchived) {
+      await context.sessionMetadata.setArchived(rest, archived);
+      return `Session ${verb}d: ${rest}.`;
+    }
+    await (sessions.setArchived as (id: string, archived: boolean) => Promise<void>).call(sessions, rest, archived);
     return `Session ${verb}d: ${rest}.`;
   }
   return undefined;

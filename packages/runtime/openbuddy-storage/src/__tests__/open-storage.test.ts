@@ -8,6 +8,11 @@ import { openStorage } from "../sqlite/open-storage";
 import { DurableOperationStore, WriterLeaseStore } from "../sqlite/coordination";
 import { MigrationIssueStore } from "../sqlite/migration-issues";
 import { restoreStorageBackup } from "../sqlite/restore";
+import { DEFAULT_MIGRATIONS } from "../sqlite/migration";
+
+/** 迁移版本从迁移表本身推导,新增一条 migration 不该逼着改这里的所有断言。 */
+const LATEST = Math.max(...DEFAULT_MIGRATIONS.map((step) => step.version));
+const MIGRATION_COUNT = DEFAULT_MIGRATIONS.length;
 
 let root = "";
 afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = ""; });
@@ -17,8 +22,8 @@ describe("openStorage", () => {
     root = await mkdtemp(join(tmpdir(), "openbuddy-open-storage-"));
     const databasePath = join(root, "profile", "openbuddy.sqlite");
     const result = await openStorage({ filePath: databasePath });
-    expect(result.migration.finalVersion).toBe(11);
-    expect(result.migration.applied).toBe(11);
+    expect(result.migration.finalVersion).toBe(LATEST);
+    expect(result.migration.applied).toBe(MIGRATION_COUNT);
     expect(result.driver.database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'").get()).toBeTruthy();
     await expect(result.driver.integrityCheck()).resolves.toMatchObject({ ok: true });
     const backupPath = join(root, "profile", "backup.sqlite");
@@ -29,7 +34,7 @@ describe("openStorage", () => {
     await mkdir(join(root, "restored"), { recursive: true });
     await copyFile(backupPath, restoredPath);
     const restored = await openStorage({ filePath: restoredPath });
-    expect(restored.driver.database.prepare("SELECT version, status FROM schema_meta WHERE status = 'applied' ORDER BY version").all()).toHaveLength(11);
+    expect(restored.driver.database.prepare("SELECT version, status FROM schema_meta WHERE status = 'applied' ORDER BY version").all()).toHaveLength(MIGRATION_COUNT);
     await expect(restored.driver.integrityCheck()).resolves.toMatchObject({ ok: true });
     restored.driver.close();
   });
@@ -58,9 +63,9 @@ describe("openStorage", () => {
     root = await mkdtemp(join(tmpdir(), "openbuddy-concurrent-open-"));
     const databasePath = join(root, "profile", "openbuddy.sqlite");
     const results = await Promise.all(Array.from({ length: 4 }, () => openStorage({ filePath: databasePath, busyTimeoutMs: 5_000 })));
-    expect(results.map((result) => result.migration.finalVersion)).toEqual([11, 11, 11, 11]);
-    expect(results.map((result) => result.migration.applied).sort((a, b) => a - b)).toEqual([0, 0, 0, 11]);
-    expect(results[0]?.driver.database.prepare("SELECT COUNT(*) AS count FROM schema_meta WHERE status = 'applied'").get()).toMatchObject({ count: 11 });
+    expect(results.map((result) => result.migration.finalVersion)).toEqual([LATEST, LATEST, LATEST, LATEST]);
+    expect(results.map((result) => result.migration.applied).sort((a, b) => a - b)).toEqual([0, 0, 0, MIGRATION_COUNT]);
+    expect(results[0]?.driver.database.prepare("SELECT COUNT(*) AS count FROM schema_meta WHERE status = 'applied'").get()).toMatchObject({ count: MIGRATION_COUNT });
     await expect(results[0]?.driver.integrityCheck()).resolves.toMatchObject({ ok: true });
     for (const result of results) result.driver.close();
   });
@@ -110,7 +115,7 @@ describe("openStorage", () => {
     source.driver.close();
 
     const destination = join(root, "restored", "openbuddy.sqlite");
-    await expect(restoreStorageBackup({ backupPath, destinationPath: destination })).resolves.toMatchObject({ path: destination, schemaVersion: 11, integrity: { ok: true } });
+    await expect(restoreStorageBackup({ backupPath, destinationPath: destination })).resolves.toMatchObject({ path: destination, schemaVersion: LATEST, integrity: { ok: true } });
     const restored = await openStorage({ filePath: destination });
     expect(restored.driver.database.prepare("SELECT value_json FROM settings WHERE namespace = ? AND setting_key = ?").get("restore", "marker")).toMatchObject({ value_json: JSON.stringify({ ok: true }) });
     restored.driver.close();

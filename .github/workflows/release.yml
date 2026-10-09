@@ -22,12 +22,15 @@ permissions:
 
 env:
   APP_NAME: OpenBuddy
-  # Keep this in lockstep with `packageManager` in the root package.json.
-  # Every step below uses this version, which the electron-builder wrapper
-  # also pins (`scripts/electron-builder.sh` generates a `node_modules/.open
-  # buddy-pnpm/pnpm` shim so `app-builder-lib`'s pnpm collector — which requires
-  # pnpm ≥ 11 — cannot silently downgrade via the proto PATH shim).
-  PNPM_VERSION: 11.24.0
+  # The pnpm version is not pinned here: `pnpm/action-setup` reads
+  # `packageManager` from the root package.json, and passing a `version:` input
+  # as well throws "Multiple versions of pnpm specified" (it compares the input
+  # to `packageManager` with plain string equality, so it can never match a
+  # `11.24.0+sha512...` value).
+  # The electron-builder wrapper pins the same version independently
+  # (`scripts/electron-builder.sh` generates a `node_modules/.openbuddy-pnpm/pnpm`
+  # shim so `app-builder-lib`'s pnpm collector — which requires pnpm ≥ 11 —
+  # cannot silently downgrade via the proto PATH shim).
 
 jobs:
   ci:
@@ -38,16 +41,14 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-
-      - name: Setup pnpm ${{ env.PNPM_VERSION }}
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -70,10 +71,11 @@ jobs:
         run: pnpm workspace:typecheck
 
       # Renderer + unit-test suite. This suite has known pre-existing
-      # failures (WIP version bump to 0.15.0 + SDK drift) unrelated to
-      # packaging, so we run it best-effort: a failure is reported in the
-      # run summary but does not block the platform builds that follow.
-      # Once `pnpm test` is green again, drop `continue-on-error: true`.
+      # failures (a handful of `@openbuddy/*` subpath aliases that Vitest
+      # cannot resolve from inside `packages/ui/*`) unrelated to packaging,
+      # so we run it best-effort: a failure is reported in the run summary
+      # but does not block the platform builds that follow. Once `pnpm test`
+      # is green again, drop `continue-on-error: true`.
       - name: Renderer tests (best-effort)
         if: ${{ always() }}
         continue-on-error: true
@@ -94,16 +96,14 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-
-      - name: Setup pnpm ${{ env.PNPM_VERSION }}
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -139,16 +139,14 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-
-      - name: Setup pnpm ${{ env.PNPM_VERSION }}
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -214,16 +212,14 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-
-      - name: Setup pnpm ${{ env.PNPM_VERSION }}
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       # electron-builder's AppImage target needs libfuse2 (libfuse was
       # dropped from Ubuntu 22.04+) plus xvfb so it can run headlessly
@@ -271,6 +267,7 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           sparse-checkout: |
             CHANGELOG.md
+            scripts/extract-release-notes.mjs
 
       - name: Download all artifacts
         uses: actions/download-artifact@v8
@@ -290,17 +287,10 @@ jobs:
         run: |
             set -euo pipefail
             TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
-            VER="${TAG#v}"
-            NOTES=""
-            if [[ -f CHANGELOG.md ]]; then
-              NOTES="$(awk -v ver="## ${TAG#v}" '
-                $0 ~ "^## v" {
-                  if (found) exit
-                  if (index($0, ver) == 1) { found = 1; next }
-                }
-                found { print }
-              ' CHANGELOG.md | sed '/^---$/d' | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba} -e '}')"
-            fi
+            # `scripts/extract-release-notes.mjs` 按 CHANGELOG 的真实标题层级
+            # (H3) 匹配,并跳过段落里的历史里程碑小节;此前的内联 awk 写的是
+            # `^## v`(H2),永远匹配不到,正文只能退化成提交列表。
+            NOTES="$(node scripts/extract-release-notes.mjs "${TAG}" 2>/dev/null || true)"
             {
               echo "body<<RELEASE_NOTES_EOF"
               if [[ -n "$NOTES" ]]; then

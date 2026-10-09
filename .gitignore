@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
-pnpm-lock.yaml
+# pnpm-lock.yaml is committed on purpose: CI runs `pnpm install --frozen-lockfile`
+# and `actions/setup-node` with `cache: pnpm`, both of which require it. Keep the
+# Rust side's convention too — crates/Cargo.lock is tracked for the same reason.
 package-lock.json
 
 # Build output
@@ -32,6 +34,7 @@ test-grok-connection.mjs
 
 # Documentation (allowlist specific files below)
 docs/*
+!docs/adr/
 !docs/storage-verification-report.md
 !docs/distributed-buddy-network-architecture.md
 !docs/migration-pi-electron.md
@@ -47,6 +50,7 @@ docs/*
 !docs/publish-checklist-v0.15.0.md
 !docs/THEMES.md
 !docs/CHAT_VERIFICATION.md
+!docs/PLAN5_COMPONENTIZATION_AUDIT.md
 # R32 — 这两篇被文档站点 DOC_INDEX 引用(站点侧边栏/路由的唯一来源),
 # 但从来没进版本库:站上能读到,仓库里却找不到,改坏了也没人拦。
 !docs/PLUGIN_MARKETPLACE.md
@@ -101,7 +105,7 @@ scripts/compare-dom-structure.js
 scripts/cdp-audit.py
 screenshot.png
 .moon/cache/
-out/
+dist/
 !docs/pi-extension-architecture.md
 !docs/electron-testing.md
 !docs/ai-agent-test-plan.md
@@ -212,3 +216,18 @@ scripts/probe-tmp/
 # Playwright diagnostic screenshots written by tests/electron/_prod-fixtures
 # (only-on-failure); never committed.
 tests/electron/__screenshots__/
+
+# Build artifacts leaking from electron-vite / tsc composite.
+# When the project is rebuilt, in-place .ts files can leave behind .js/.d.ts
+# siblings (especially after `tsc -b` was attempted but didn't fully emit).
+# Vite then tries to import the stale .js as if it were source and fails
+# alias resolution. Keep these out of source control.
+*.js.map
+
+# vitest SWC transform artifacts (paired with .test.tsx/.test.ts).
+# 历史 vitest 配置会在测试运行时把这些写到 source 旁边,污染工作树。
+# 当前 vitest 不会再生,但保留规则防止未来配置回退。
+packages/**/__tests__/**/*.test.js
+**/target/
+# Ad-hoc dev/analyze scripts in repo root
+.tmp-*.mjs

@@ -1,0 +1,36 @@
+{
+  "name": "@openbuddy/platform",
+  "version": "0.16.0",
+  "private": true,
+  "type": "module",
+  "description": "渲染层平台能力契约面（platform / files / security / email / billing / collaboration / notify）",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./billing/usage-quota": "./src/billing/usage-quota.ts",
+    "./files/cloud-storage": "./src/files/cloud-storage.ts",
+    "./files/drop-utils": "./src/files/drop-utils.ts",
+    "./files/file-kind": "./src/files/file-kind.ts",
+    "./files/file-utils": "./src/files/file-utils.ts",
+    "./files/unified-diff": "./src/files/unified-diff.ts",
+    "./browser-preview": "./src/browser-preview.ts",
+    "./error-format": "./src/error-format.ts",
+    "./loading-tips": "./src/loading-tips.ts",
+    "./platform": "./src/platform.ts",
+    "./security/command-risk": "./src/security/command-risk.ts",
+    "./security/policy-engine": "./src/security/policy-engine.ts",
+    "./security/sandbox-guard": "./src/security/sandbox-guard.ts",
+    "./electron-api": "./src/electron-api.ts",
+    "./app-version": "./src/app-version.ts"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "typescript": "^5.6.3",
+    "vitest": "2.1.9"
+  }
+}

@@ -14,7 +14,7 @@
  *
  * @see docs/comet/changes/email-module-architecture-review/specs/email/spec.md §2.5 EmailSidebar
  */
-import type { EmailConnection, EmailConnectionReadiness } from "@openbuddy/capability-email";
+import type { EmailConnection, EmailConnectionReadiness } from "@openbuddy/capability-email/renderer";
 
 export interface ProviderRegistryCardProps {
   connections: EmailConnection[];

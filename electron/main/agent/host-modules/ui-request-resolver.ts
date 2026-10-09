@@ -83,10 +83,26 @@ export function resolveUiRequest(requestId: string, value: AgentHostUiRequestVal
       ? (value as any).decision
       : value === true ? "allow" : "deny";
     if (decision === "allow_always") {
-      void permissionReadRulesImpl().then((rules) => permissionWriteRulesImpl([
-        ...rules,
-        { action: "allow", tool: request.permission?.toolName ?? "", ...(request.permission?.pattern ? { pattern: request.permission.pattern } : {}) },
-      ])).catch((error: unknown) => console.warn("[openbuddy] failed to persist hook permission", error));
+      // Only persist a durable rule when the request carries a pattern.
+      // `matchesPermissionRule` treats a rule without `pattern` as matching
+      // every invocation of the tool, so persisting `{ action: "allow",
+      // tool: "write" }` would turn one click on a single prompt into a
+      // permanent, silent allow for every later write/edit — including
+      // ones the user never saw. Without a pattern the grant stays
+      // session-scoped (the "allow" branch below), which still honours the
+      // user's intent for the current session; deliberate permanent rules
+      // go through `permission_save` in settings.
+      const pattern = request.permission?.pattern;
+      if (pattern) {
+        void permissionReadRulesImpl().then((rules) => permissionWriteRulesImpl([
+          ...rules,
+          { action: "allow", tool: request.permission?.toolName ?? "", pattern },
+        ])).catch((error: unknown) => console.warn("[openbuddy] failed to persist hook permission", error));
+        state.hookPermissionSessionRules.set(request.sessionId, [
+          ...(state.hookPermissionSessionRules.get(request.sessionId) ?? []),
+          { action: "allow", tool: request.permission!.toolName, pattern },
+        ]);
+      }
     } else if (decision === "allow") {
       const sessionRules = state.hookPermissionSessionRules.get(request.sessionId) ?? [];
       state.hookPermissionSessionRules.set(request.sessionId, [...sessionRules, {

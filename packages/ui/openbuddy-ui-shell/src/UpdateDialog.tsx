@@ -153,7 +153,9 @@ export function UpdateDialog({
   );
 
   const node = (
-    <div className={styles.overlay} onClick={handleBackdrop} data-testid="update-dialog-overlay">
+    // 遮罩只做「点到面板外关闭」的鼠标便利判断,不是控件;dialog 角色和
+    // tabIndex={-1} 的焦点管理都留在面板上。
+    <div className={styles.overlay} role="presentation" onClick={handleBackdrop} data-testid="update-dialog-overlay">
       <div
         ref={panelRef}
         className={styles.panel}
@@ -162,7 +164,6 @@ export function UpdateDialog({
         aria-labelledby="ob-update-title"
         aria-describedby={error ? "ob-update-error" : undefined}
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
       >
         <header className={styles.header}>
           <h2 id="ob-update-title" className={styles.title}>

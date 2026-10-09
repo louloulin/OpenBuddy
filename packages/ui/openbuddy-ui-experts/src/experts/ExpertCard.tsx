@@ -44,8 +44,17 @@ export function ExpertCard({
 }) {
   const sub = subtitle(expert);
   const title = expert.title || expert.name;
+  // 卡片内嵌了两个真实 <button>(召唤 / pi.dev 链接),把容器换成 <button>
+  // 会产生非法的按钮嵌套;保留容器元素并补 role + tabIndex + 键盘事件,
+  // 让键盘用户也能召唤专家。
+  const summonFromCard = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSummon(expert); }
+  };
   return (
-    <article className="ec-card" onClick={() => onSummon(expert)} title="召唤该专家开始对话">
+    <div className="ec-card" role="button" tabIndex={0}
+      onClick={() => onSummon(expert)}
+      onKeyDown={summonFromCard}
+      title="召唤该专家开始对话">
       <button type="button" className="ec-card-summon"
         onClick={(ev) => { ev.stopPropagation(); onSummon(expert); }}>
         召唤
@@ -94,6 +103,6 @@ export function ExpertCard({
           </button>
         );
       })()}
-    </article>
+    </div>
   );
 }

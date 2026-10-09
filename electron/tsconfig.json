@@ -29,6 +29,12 @@
       "@openbuddy/bundle-base": [
         "../packages/bundle/openbuddy-base/src/index.ts"
       ],
+      "@openbuddy/host-runtime": [
+        "../packages/runtime/openbuddy-host-runtime/src/index.ts"
+      ],
+      "@openbuddy/shared-error-codes": [
+        "../packages/shared/openbuddy-error-codes/src/index.ts"
+      ],
       "@openbuddy/renderer-host": [
         "../packages/renderer/openbuddy-renderer-host/src/index.ts"
       ],

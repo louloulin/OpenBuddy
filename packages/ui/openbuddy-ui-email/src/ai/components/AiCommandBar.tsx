@@ -62,9 +62,24 @@ export function AiCommandBar({
   if (!open) return null;
 
   return (
-    <div ref={containerRef} className="ai-command-bar" role="dialog" aria-modal="true" aria-label="AI 命令栏">
-      <div className="ai-command-bar__scrim" onClick={onClose} />
-      <div className="ai-command-bar__panel">
+    <div className="ai-command-bar">
+      {/* 遮罩是个真的 button（无内容，可以安全替换 div）。tabIndex={-1}：
+          键盘用户用 Esc 或面板里的关闭路径，不需要在 Tab 序列里撞上一个
+          看不见的全屏控件。它同时被排除在焦点陷阱之外（陷阱只包住面板）。 */}
+      <button
+        type="button"
+        className="ai-command-bar__scrim"
+        aria-label="关闭 AI 命令栏"
+        tabIndex={-1}
+        onClick={onClose}
+      />
+      <div
+        ref={containerRef}
+        className="ai-command-bar__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="AI 命令栏"
+      >
         <div className="ai-command-bar__input">
           <span aria-hidden="true">✨</span>
           <input

@@ -156,7 +156,7 @@ If your change adds new IPC channels, also run `node scripts/electron/audit-agen
 
 OpenBuddy uses [semantic versioning](https://semver.org/) and ships every 2–4 weeks. The release process is fully automated via `.github/workflows/release.yml`:
 
-1. Maintainer triggers a `workflow_dispatch` with the new tag (e.g. `v0.15.0`).
+1. Maintainer triggers a `workflow_dispatch` with the new tag (e.g. `v0.16.0`).
 2. CI runs typecheck + tests across all 32 projects.
 3. CI builds Windows NSIS+MSI, macOS DMG (signed), and Linux AppImage+deb.
 4. CI publishes a draft GitHub Release with auto-extracted notes from `CHANGELOG.md`.

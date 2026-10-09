@@ -20,7 +20,7 @@ const networkFailures = [];
 
 const app = await electron.launch({
   executablePath: electronBin,
-  args: ["out/main/index.js"],
+  args: ["dist/main/index.js"],
   env: { ...process.env, ELECTRON_ENABLE_LOGGING: "1", OPENBUDDY_USER_DATA: userData },
 });
 

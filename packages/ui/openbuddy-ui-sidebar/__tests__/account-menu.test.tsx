@@ -90,7 +90,7 @@ vi.mock("@openbuddy/ui-slots", () => ({
 import { Sidebar } from "../src/Sidebar";
 
 function renderSidebar(overrides: Record<string, unknown> = {}) {
-  const props = {
+  const props: Record<string, unknown> = {
     onNewSession: noop,
     onSelect: noop,
     onNavigate: noop,
@@ -102,7 +102,7 @@ function renderSidebar(overrides: Record<string, unknown> = {}) {
     activeNav: "新建任务",
     ...overrides,
   };
-  return render(<Sidebar {...(props as never)} />);
+  return render(<Sidebar {...(props as Parameters<typeof Sidebar>[0])} />);
 }
 
 describe("R16 左下角账户菜单", () => {

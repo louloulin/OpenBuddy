@@ -1,7 +1,6 @@
-import { AssistantsPanel } from "@openbuddy/ui-settings";
 import { AssistantCalendarPanel } from "./AssistantCalendarPanel";
 import { CalendarDays, ChevronRight, FileCheck, GitBranch, Inbox, ListTodo, ShieldCheck, Users } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useProjectsStore } from "@/stores/projects-store";
 import { assistantFacade, type CollaborationSnapshot } from "@/lib/agent/assistant-facade";
@@ -17,6 +16,14 @@ import {
   assistantRouteForSection,
   type AssistantWorkspaceSection,
 } from "@openbuddy/ui-shared";
+
+// AssistantsPanel 只在 buddies 分区渲染,但本模块经 ui-workbench 的根 barrel
+// 被首屏 conversation 图(RendererSlotView/ModelSelector…)静态可达;静态
+// import 会把整个 ui-settings 图(SettingsSections 再导出的 ui-mcp/ui-billing/
+// ui-account 全部面板)拖进首屏闭包。buddies 分区挂载时才加载。
+const AssistantsPanel = lazy(() =>
+  import("@openbuddy/ui-settings").then((m) => ({ default: m.AssistantsPanel })),
+);
 
 export type { AssistantWorkspaceSection } from "@openbuddy/ui-shared";
 
@@ -164,7 +171,9 @@ export function AssistantWorkspacePanel({ section, onToast, onNavigate, onGoHome
             onRevoke={async (delegationId) => { await assistantFacade.revokeDelegation(delegationId); await refresh(); }}
             onToast={onToast}
           />
-          <AssistantsPanel onToast={onToast} />
+          <Suspense fallback={null}>
+            <AssistantsPanel onToast={onToast} />
+          </Suspense>
           <ProjectionNotice snapshot={snapshot} loading={loading} onRefresh={refresh} onNavigate={onNavigate} section={section} />
         </section>
       </div>

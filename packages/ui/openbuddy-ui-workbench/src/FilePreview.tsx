@@ -19,8 +19,9 @@ import {
   extractDocxFromZip,
   extractPptxFromZip,
   extractSheetFromZip,
-} from "@openbuddy/files-kb";
-import { readZipFromBase64, makeDocZipReader } from "@openbuddy/files-kb";
+  readZipFromBase64,
+  makeDocZipReader,
+} from "@openbuddy/files-kb/renderer";
 import { PdfJsPreview } from "./PdfJsPreview";
 import { DocxPreview } from "./DocxPreview";
 import { XlsxPreview } from "./XlsxPreview";

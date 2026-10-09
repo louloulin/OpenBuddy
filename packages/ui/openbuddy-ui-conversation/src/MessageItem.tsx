@@ -1,5 +1,4 @@
 import { memo, useCallback, useEffect, useRef, useState, type ComponentType } from "react";
-import Copy from "lucide-react/dist/esm/icons/copy";
 import FileText from "lucide-react/dist/esm/icons/file-text";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import Check from "lucide-react/dist/esm/icons/check";
@@ -7,36 +6,24 @@ import Pencil from "lucide-react/dist/esm/icons/pencil";
 import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
 import Sparkles from "lucide-react/dist/esm/icons/sparkles";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
-// R8.14 — per-message meta chip (timestamp + completion duration).
-// `hourglass` pulses while streaming; `clock-3` is the static mark
-// on completed bubbles.
-import Hourglass from "lucide-react/dist/esm/icons/hourglass";
-import Clock3 from "lucide-react/dist/esm/icons/clock-3";
-// R8.15 — model id + token-throughput chips. Mirrors PI-Desktop's
-// MessageMeta: a tiny "<model> · 42 tok/s" line below the assistant
-// bubble that lets the user see at a glance what produced the answer.
-import Cpu from "lucide-react/dist/esm/icons/cpu";
-import Hash from "lucide-react/dist/esm/icons/hash";
-import Zap from "lucide-react/dist/esm/icons/zap";
 import { TooltipButton } from "./TooltipButton";
 import { type MarkdownConfig } from "@openbuddy/ui-markdown";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
-import { ConversationMarkdown } from "./conversation-slots";
-import { ToolCallCard } from "./ToolCallCard";
+import { MessagePartRegistry } from "./MessagePartRegistry";
+import { StreamingCaret } from "./StreamingCaret";
+import { MessageRewindMenu } from "./parts/MessageRewindMenu";
+import { InlineApprovalHint } from "./parts/InlineApprovalHint";
+import { MessageMeta } from "./parts/MessageMeta";
+import { UserBubble } from "./parts/UserBubble";
+import { CopyIconButton } from "./parts/CopyIconButton";
+import { FeedbackButtons } from "./parts/FeedbackButtons";
 import { LoadingRow } from "./LoadingRow";
 import { TurnErrorCard } from "./TurnErrorCard";
-import { FeedbackDialog } from "@openbuddy/ui-dialogs";
 import { useThemeSnapshot } from "@openbuddy/ui-theme/client";
-import { useFeedbackStore, type FeedbackRating } from "@/stores/feedback-store";
 import type { ChatMessage, ToolCallView } from "@/stores/session-store";
 import { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "./persona-markers";
 import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
-import { RendererContributionView, RendererSlotView, FilePreview } from "@openbuddy/ui-workbench";
-
-function toPreviewDataUrl(mediaType: string, data: string): string {
-  if (data.startsWith("data:")) return data;
-  return `data:${mediaType || "application/octet-stream"};base64,${data}`;
-}
+import { RendererContributionView, RendererSlotView } from "@openbuddy/ui-workbench";
 
 /** Strip the hidden expert persona block from text (used on history replay). */
 function stripPersona(text: string): string {
@@ -72,6 +59,10 @@ function MessageItemInner({
   onEditAssistantMessage,
   onResendAfterAssistantEdit,
   onOpenSettings,
+  rewindPromptIndex,
+  onRewindTo,
+  allowFork,
+  onForkFromHere,
   streamingDurationMs,
 }: {
   message: ChatMessage;
@@ -111,6 +102,14 @@ function MessageItemInner({
   /** Navigate to the settings panel — wired into TurnErrorCard so auth /
    *  model-config errors offer a one-click escape instead of an opaque retry. */
   onOpenSettings?: () => void;
+  /** Plan5 B.10 — 该 assistant 消息对应的 promptIndex(0-based)。
+   *  由 ChatView 从 `rewindPoints` 解析后下发;undefined 时重发入口禁用。 */
+  rewindPromptIndex?: number;
+  /** Plan5 B.10 — 执行"从此消息重发"(回溯 + 重发该轮 prompt)。 */
+  onRewindTo?: (promptIndex: number) => Promise<void> | void;
+  /** Plan5 B.10 — 是否允许"从此处分叉"。 */
+  allowFork?: boolean;
+  onForkFromHere?: () => void;
   /** R8.14 — wall-clock ms since the current streaming turn started.
    *  ChatView passes `Date.now() - turnStartRef.current` while the
    *  message is still streaming so the meta chip can render a live
@@ -418,65 +417,25 @@ function MessageItemInner({
               onToast={onToast}
             />
           )}
-          {message.parts.map((p, i) => {
-            // Active streaming: skip the full markdown pipeline (gfm, math,
-            // katex, sanitize, lowlight) and render raw text instead. The
-            // pipeline re-parses on every delta which is the dominant cost
-            // during streaming; once the message is complete we fall back
-            // to the rich renderer. streaming===true is only set by ChatView
-            // for the currently-streaming message.
-            const isStreaming = streaming && !message.complete;
-            if (p.kind === "text") {
-              // 正文走内核 `conversation.message.markdown` 槽:插件可以换成
-              // 自己的 markdown 引擎 / 批注视图,内核里没实现时渲染的就是原来
-              // 那对 StreamingMarkdown / Markdown —— 视觉零变化。
-              return (
-                <ConversationMarkdown
-                  key={i}
-                  text={p.text}
-                  streaming={isStreaming}
-                  complete={message.complete}
-                  markdownTheme="loose"
-                  theme={theme}
-                  config={markdownConfig}
-                />
+          {/* Plan A.2 — 部件派发统一走 MessagePartRegistry。新增 part 类型只需在
+              `parts/registry-defaults.tsx` 加一行,不需要修改本组件主干。
+              视觉与 data-testid 与改造前完全一致(快照测试覆盖)。 */}
+          <MessagePartRegistry
+            parts={message.parts}
+            messageId={message.id}
+            isStreaming={streaming && !message.complete}
+            complete={message.complete}
+            theme={theme}
+            markdownConfig={markdownConfig}
+            onOpenTool={onOpenTool ? (toolCallId) => {
+              // Phase A.2 — 从 toolCallId 找回完整 ToolCallView 并打开。
+              const target = message.parts.find(
+                (part) => part.kind === "tool_call" && part.toolCall.toolCallId === toolCallId,
               );
-            }
-            if (p.kind === "thought") {
-              return (
-                <details key={i} className="msg__thought">
-                  <summary>深度思考</summary>
-                  <div className="msg__thought-body">
-                    <ConversationMarkdown
-                      text={p.text}
-                      streaming={isStreaming}
-                      complete={message.complete}
-                      markdownTheme="reasoning"
-                      theme={theme}
-                      config={markdownConfig}
-                    />
-                  </div>
-                </details>
-              );
-            }
-            if (p.kind === "file") {
-              return (
-                <FilePreview
-                  key={i}
-                  filename={p.name || "attachment"}
-                  content={toPreviewDataUrl(p.mediaType, p.data)}
-                />
-              );
-            }
-            if (p.kind !== "tool_call") return null;
-            return (
-              <ToolCallCard
-                key={p.toolCall.toolCallId || i}
-                tc={p.toolCall}
-                onOpen={onOpenTool}
-              />
-            );
-          })}
+              if (target && target.kind === "tool_call") onOpenTool(target.toolCall);
+            } : undefined}
+            onToast={onToast}
+          />
           {pluginMessageContributions.map((contribution) => (
             <div key={contribution.id} className="msg__plugin-contribution">
               <RendererContributionView contribution={contribution} onPlaceholder={onToast} />
@@ -485,27 +444,24 @@ function MessageItemInner({
           {pluginMessageSlots.map((entry) => (
             <RendererSlotView key={String(entry.options.id ?? entry.options.key ?? entry.options.name)} entry={entry} className="msg__plugin-contribution" />
           ))}
-          {/* R8.23 — streaming caret. Was the unicode ▋ block char; we
-              now render a 2×14 brand-tinted pill with a soft pulse so
-              the streaming state reads as "alive" rather than a
-              flickering terminal cursor. The aria-label keeps the
-              screen-reader experience stable across the visual swap. */}
-          {streaming &&
-            message.complete === false &&
-            message.parts.length > 0 && (
-              <span
-                className="msg__caret"
-                aria-label="正在生成"
-                role="status"
-              />
-            )}
+          {/* R8.23 → Plan5 B.1 — streaming caret.
+              Was the unicode ▋ block char, then a hand-rolled
+              `.msg__caret` span; now the shared `StreamingCaret`
+              primitive so the caret can be themed (loose / reasoning)
+              and reused by plugins. Only rendered when there is already
+              streamed text — a `LoadingRow` owns the empty state, and a
+              caret floating above it would read as a stray cursor. */}
+          {message.parts.length > 0 && (
+            <StreamingCaret active={streaming && message.complete !== true} />
+          )}
         </div>
         {/* R8.11 — message footer actions (复制 / MD / 重试 / 赞踩). Icon-only
             buttons; copy buttons briefly swap to a checkmark on success
             (matches cabinet's CopyButton pattern). Failure turns keep
             重试 + 赞踩 only. Buttons stay always-visible at low opacity
             and brighten on hover/focus. */}
-        {message.complete && (plainText || message.error) && (
+        {message.complete &&
+          (plainText || message.error || typeof rewindPromptIndex === "number") && (
           <div className="msg__footer">
             {plainText && (
               <CopyIconButton
@@ -562,6 +518,19 @@ function MessageItemInner({
                 <RefreshCw size={14} strokeWidth={1.75} />
               </TooltipButton>
             )}
+            {/* Plan5 B.10 — 消息级"从此消息重发/分叉"。放在赞踩之前,
+                保持既有按钮顺序不变(快照 / 既有选择器全部命中)。 */}
+            {message.role === "assistant" && (
+              <MessageRewindMenu
+                messageId={message.id}
+                promptIndex={rewindPromptIndex}
+                sessionId={sessionId}
+                allowFork={allowFork}
+                onRewind={onRewindTo ? (p) => onRewindTo(p.promptIndex) : undefined}
+                onFork={onForkFromHere}
+                onToast={onToast}
+              />
+            )}
             {sessionId && (
               <FeedbackButtons sessionId={sessionId} messageId={message.id} />
             )}
@@ -585,543 +554,16 @@ function MessageItemInner({
             initialMarkdown={draftInitial}
           />
         ) : null}
-      </div>
-    </div>
-  );
-}
-
-/**
- * R8.14 — Per-message meta chip.
- *
- * Renders a single thin line under the assistant bubble with:
- *   - relative timestamp (`刚刚` / `5 分钟前` / `2 小时前` / `昨天` / `3 天前`)
- *   - generation duration when `completedAt` is stamped (`12s` / `1m 5s`)
- *   - live streaming label (`12s 正在生成…`) while the turn is in-flight
- *
- * Visibility: always rendered at low opacity (0.55); the message-wrap
- * `:hover` brings it to full opacity (matches the PI-Desktop MessageMeta
- * pattern where meta info lives one tap away, not always loud).
- */
-function MessageMeta({
-  createdAt,
-  durationMs,
-  isStreaming,
-  modelId,
-  outputTokens,
-  inputTokens,
-}: {
-  createdAt: number;
-  durationMs: number | null;
-  isStreaming: boolean;
-  /** R8.15 — model id used to produce this turn. Drives the .msg__meta-chip--model
-   *  pill rendered alongside the timestamp (PI-Desktop parity). */
-  modelId?: string;
-  /** R8.15 — completion token count. Combined with `durationMs` to derive
-   *  a tok/s throughput chip. Only renders when both are present and the
-   *  turn has actually finished streaming. */
-  outputTokens?: number;
-  /** R58 — prompt (input) token count for this turn. Renders as a
-   *  "<formatted> in" chip before the throughput chip when present.
-   *  Optional for backward compat with pre-R58 history. */
-  inputTokens?: number;
-}) {
-  const label = isStreaming
-    ? `${formatDurationMs(durationMs ?? 0)} 正在生成…`
-    : formatRelativeTime(Date.now() - createdAt);
-  const detail =
-    !isStreaming && typeof durationMs === "number" && durationMs > 0
-      ? formatDurationMs(durationMs)
-      : null;
-  // R8.15 — derive throughput from completed output tokens / duration.
-  // Require ≥ 1s so we don't render "inf tok/s" on sub-second turns
-  // (also matches PI-Desktop's `calculateTokenRate` floor).
-  const throughput =
-    !isStreaming &&
-    typeof outputTokens === "number" &&
-    outputTokens > 0 &&
-    typeof durationMs === "number" &&
-    durationMs >= 1000
-      ? outputTokens / (durationMs / 1000)
-      : null;
-  const ariaLabel = isStreaming
-    ? `正在生成, ${formatDurationMs(durationMs ?? 0)}`
-    : detail
-      ? `${label}, 用时 ${detail}`
-      : label;
-  const showModelChip = !isStreaming && typeof modelId === "string" && modelId.length > 0;
-  return (
-    <div
-      className={
-        "msg__meta" + (isStreaming ? " msg__meta--streaming" : "")
-      }
-      aria-label={ariaLabel}
-      title={ariaLabel}
-    >
-      <span className="msg__meta-icon" aria-hidden="true">
-        {isStreaming ? (
-          <Hourglass size={10} strokeWidth={1.75} />
-        ) : (
-          <Clock3 size={10} strokeWidth={1.75} />
-        )}
-      </span>
-      <span className="msg__meta-time">{label}</span>
-      {detail && (
-        <span className="msg__meta-detail" aria-hidden="true">
-          · {detail}
-        </span>
-      )}
-      {showModelChip && (
-        <span className="msg__meta-chip msg__meta-chip--model" title={`model: ${modelId}`}>
-          <Cpu size={9} strokeWidth={1.75} aria-hidden="true" />
-          <span className="msg__meta-chip-text">{modelId}</span>
-        </span>
-      )}
-      {/* R58 — input (prompt) token chip. Renders before the throughput
-          chip so the "in" / "out" / "tok/s" reading order stays natural.
-          Only shown when inputTokens is present (provider-reported) AND
-          the turn has finished streaming (mirrors the throughput gate). */}
-      {!isStreaming && typeof inputTokens === "number" && inputTokens > 0 && (
-        <span
-          className="msg__meta-chip msg__meta-chip--input"
-          title={`${inputTokens} prompt tokens for this turn`}
-        >
-          <Hash size={9} strokeWidth={1.75} aria-hidden="true" />
-          <span className="msg__meta-chip-text">{formatTokenCount(inputTokens)} in</span>
-        </span>
-      )}
-      {/* R58 — output (completion) token chip. Rendered alongside the
-          input chip so users can see in/out at a glance; the legacy
-          throughput chip below carries the tok/s rate. */}
-      {!isStreaming && typeof outputTokens === "number" && outputTokens > 0 && (
-        <span
-          className="msg__meta-chip msg__meta-chip--output"
-          title={`${outputTokens} completion tokens for this turn`}
-        >
-          <Zap size={9} strokeWidth={1.75} aria-hidden="true" />
-          <span className="msg__meta-chip-text">{formatTokenCount(outputTokens)} out</span>
-        </span>
-      )}
-      {throughput !== null && (
-        <span className="msg__meta-chip msg__meta-chip--throughput" title={`${outputTokens} completion tokens in ${formatDurationMs(durationMs!)}`}>
-          <Zap size={9} strokeWidth={1.75} aria-hidden="true" />
-          <span className="msg__meta-chip-text">{formatThroughput(throughput)} tok/s</span>
-        </span>
-      )}
-    </div>
-  );
-}
-
-/** R8.15 — "42 tok/s" / "1.2k tok/s" formatter. Mirrors PI-Desktop's
- *  `formatTokenCount` rounding so the chip is glanceable. */
-function formatThroughput(tps: number): string {
-  if (tps >= 1000) return `${(tps / 1000).toFixed(tps >= 10000 ? 0 : 1)}k`;
-  if (tps >= 100) return `${Math.round(tps)}`;
-  if (tps >= 10) return tps.toFixed(1);
-  return tps.toFixed(2);
-}
-
-/** R58 — "1.2k" / "12k" / "1.5m" formatter for raw token counts.
- *  Mirrors how ChatMinimap / ContextUsagePill already shorten large
- *  numbers so the meta chip reads consistently across the app. */
-function formatTokenCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}m`;
-  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k`;
-  return `${Math.round(n)}`;
-}
-
-/** R8.14 — `12s` / `1m 5s` formatter for the per-message streaming
- *  duration chip. */
-function formatDurationMs(ms: number): string {
-  const totalSec = Math.max(0, Math.round(ms / 1000));
-  if (totalSec < 60) return `${totalSec}s`;
-  const minutes = Math.floor(totalSec / 60);
-  const seconds = totalSec % 60;
-  return `${minutes}m ${seconds}s`;
-}
-
-/** R8.14 — Chinese relative-time formatter. Mirrors how iOS / WeChat
- *  surface chat timestamps: 0–59s → `刚刚`, 1–59m → `X 分钟前`, 1–23h →
- *  `X 小时前`, 1d → `昨天`, 2–6d → `X 天前`, ≥7d → absolute MM-DD. */
-function formatRelativeTime(deltaMs: number): string {
-  const ms = Math.max(0, deltaMs);
-  const sec = Math.floor(ms / 1000);
-  if (sec < 60) return "刚刚";
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} 分钟前`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} 小时前`;
-  const day = Math.floor(hr / 24);
-  if (day === 1) return "昨天";
-  if (day < 7) return `${day} 天前`;
-  const date = new Date(Date.now() - ms);
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${mm}-${dd}`;
-}
-
-/**
- * R8.3 (inline-edit) — user-message bubble as its own component so the
- * inline-edit textarea can hold local state without bloating MessageItemInner.
- *
- * Lifecycle:
- *   - Mount: read-only display of the active revision text.
- *   - Double-click on the bubble body → enter edit mode; the textarea is
- *     auto-focused and pre-seeded with the active revision text.
- *   - Esc → cancel; Cmd/Ctrl+Enter → submit. Click 发送 button as an alt.
- *   - Submitting fires `onInlineResend(messageId, text)`. ChatView wires
- *     this to the same appendUserRevision + composer seed path so the
- *     revision pager history stays in sync.
- *
- * Design notes:
- *   - File/image parts stay mounted above the textarea so the user keeps
- *     visibility into attachments while editing the prompt.
- *   - The textarea grows between 3..12 rows based on line count, mirroring
- *     PI-Desktop's `Math.min(12, Math.max(3, lines))` heuristic.
- *   - We deliberately do NOT swallow Enter into submit; users paste
- *     multi-line prompts often and Enter should add a newline. Cmd/Ctrl
- *     +Enter is the universal "send" shortcut.
- */
-type RevisionPagerInfo =
-  | { current: number; total: number }
-  | null;
-
-function UserBubble({
-  message,
-  userDisplayedText,
-  fileParts,
-  revisionPager,
-  onStepRevision,
-  onEditResend,
-  onInlineResend,
-  onToast,
-  copyText,
-}: {
-  message: ChatMessage;
-  userDisplayedText: string;
-  fileParts: Array<{ name: string; mediaType: string; data: string }>;
-  revisionPager: RevisionPagerInfo;
-  onStepRevision?: (messageId: string, direction: -1 | 1) => void;
-  onEditResend?: (text: string) => void;
-  onInlineResend?: (messageId: string, text: string) => void;
-  onToast?: (msg: string) => void;
-  copyText: (text: string, label: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(userDisplayedText);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-
-  // When the user scrubs the revision pager, sync the draft so cancelling
-  // a mid-edit pager switch doesn't lose the prior version's text.
-  useEffect(() => {
-    if (!editing) setDraft(userDisplayedText);
-  }, [userDisplayedText, editing]);
-
-  // Auto-focus + auto-grow rows once we enter edit mode.
-  useEffect(() => {
-    if (!editing) return;
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.focus();
-    // Place caret at end so the user can keep typing without re-positioning.
-    const len = ta.value.length;
-    ta.setSelectionRange(len, len);
-    // Adjust rows to current line count, clamped 3..12.
-    const lines = ta.value.split("\n").length;
-    ta.rows = Math.min(12, Math.max(3, lines));
-  }, [editing]);
-
-  const startEdit = () => {
-    if (!onInlineResend) return;
-    setDraft(userDisplayedText);
-    setEditing(true);
-  };
-
-  const cancelEdit = () => {
-    setDraft(userDisplayedText);
-    setEditing(false);
-  };
-
-  const submit = () => {
-    const trimmed = draft.trim();
-    if (!trimmed) return;
-    if (trimmed === userDisplayedText.trim()) {
-      // No change → cancel silently so the user doesn't accidentally
-      // trigger a re-send of the same text.
-      setEditing(false);
-      return;
-    }
-    onInlineResend?.(message.id, trimmed);
-    setEditing(false);
-  };
-
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      cancelEdit();
-    } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      submit();
-    }
-  };
-
-  return (
-    <div className="msg msg--user">
-      <div>
-        {/* Attachments stay mounted above the text in both display and edit
-            modes so the user always sees what they uploaded. */}
-        {fileParts.map((p, i) => (
-          <FilePreview
-            key={`f-${i}`}
-            filename={p.name || "attachment"}
-            content={toPreviewDataUrl(p.mediaType, p.data)}
-          />
-        ))}
-        {editing ? (
-          <div className="msg__edit" data-testid="user-bubble-edit">
-            <textarea
-              ref={textareaRef}
-              className="msg__edit-input selectable"
-              value={draft}
-              onChange={(e) => {
-                setDraft(e.target.value);
-                const lines = e.target.value.split("\n").length;
-                e.target.rows = Math.min(12, Math.max(3, lines));
-              }}
-              onKeyDown={onKeyDown}
-              rows={Math.min(12, Math.max(3, draft.split("\n").length))}
-              aria-label="编辑消息"
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-              data-testid="user-bubble-edit-input"
-            />
-            <div className="msg__edit-actions">
-              <span className="msg__edit-hint">Esc 取消 · ⌘/Ctrl+Enter 发送</span>
-              <TooltipButton
-                className="msg__action-btn"
-                tooltip="取消（Esc）"
-                onClick={cancelEdit}
-                aria-label="取消编辑"
-                tooltipSide="bottom"
-              >
-                <span style={{ fontSize: 11, padding: "0 4px" }}>取消</span>
-              </TooltipButton>
-              <TooltipButton
-                className="msg__action-btn msg__action-btn--primary"
-                tooltip="重新发送（⌘/Ctrl+Enter）"
-                onClick={submit}
-                disabled={!draft.trim() || draft.trim() === userDisplayedText.trim()}
-                data-testid="user-bubble-edit-submit"
-                aria-label="发送编辑"
-                variant="primary"
-                tooltipSide="bottom"
-              >
-                <span style={{ fontSize: 11, padding: "0 4px" }}>发送</span>
-              </TooltipButton>
-            </div>
-          </div>
-        ) : (
-          <div
-            className="msg__bubble msg__bubble--editable"
-            onDoubleClick={startEdit}
-            title={onInlineResend ? "双击编辑" : undefined}
-            data-testid="user-bubble-display"
-          >
-            <span className="msg__bubble-text" key={`r-${revisionPager?.current ?? 0}`}>
-              {userDisplayedText}
-            </span>
-          </div>
-        )}
-        {/* R8.1 — revision pager sits inside the hover-actions row so it
-            inherits the same fade-in / opacity-0.55 styling. Hidden when
-            there is only one revision. */}
-        {revisionPager && onStepRevision ? (
-          <div
-            className="msg__revision-pager"
-            role="group"
-            aria-label={`版本 ${revisionPager.current} / ${revisionPager.total}`}
-          >
-            <button
-              type="button"
-              className="msg__revision-btn"
-              onClick={() => onStepRevision(message.id, -1)}
-              disabled={revisionPager.current <= 1}
-              title="上一版"
-              aria-label="上一版"
-            >
-              ‹
-            </button>
-            <span className="msg__revision-label">
-              {revisionPager.current} / {revisionPager.total}
-            </span>
-            <button
-              type="button"
-              className="msg__revision-btn"
-              onClick={() => onStepRevision(message.id, 1)}
-              disabled={revisionPager.current >= revisionPager.total}
-              title="下一版"
-              aria-label="下一版"
-            >
-              ›
-            </button>
-          </div>
-        ) : null}
-        {/* Hover actions (only when not editing) — icon-only TooltipButtons.
-            复制 swaps to a check on success; 编辑 triggers inline edit
-            (double-click on the bubble does the same). */}
-        {!editing && (
-          <div className="msg__actions">
-            <CopyIconButton
-              tooltip="复制"
-              copiedTooltip="已复制"
-              onCopy={() => copyText(userDisplayedText, "已复制")}
-            />
-            {onInlineResend && (
-              <TooltipButton
-                className="msg__action-btn"
-                tooltip="编辑（双击消息也可）"
-                onClick={startEdit}
-                data-testid="user-bubble-edit-btn"
-                aria-label="编辑消息"
-              >
-                <Pencil size={14} strokeWidth={1.75} />
-              </TooltipButton>
-            )}
-            {onEditResend && !onInlineResend && (
-              <TooltipButton
-                className="msg__action-btn"
-                tooltip="编辑并重新发送"
-                onClick={() => onEditResend(userDisplayedText)}
-                aria-label="编辑并重新发送"
-              >
-                <Pencil size={14} strokeWidth={1.75} />
-              </TooltipButton>
-            )}
-          </div>
-        )}
-        {/* R8.14 — relative-timestamp chip beneath the user bubble.
-            Always rendered (no hover gate) so the chat transcript reads
-            like a normal messenger scroll: you can scroll back and see
-            "5 分钟前" next to an old prompt without having to hover. */}
-        {typeof message.createdAt === "number" && (
-          <div className="msg__meta msg__meta--user" aria-label={formatRelativeTime(Date.now() - message.createdAt)}>
-            <span className="msg__meta-icon" aria-hidden="true">
-              <Clock3 size={10} strokeWidth={1.75} />
-            </span>
-            <span className="msg__meta-time">{formatRelativeTime(Date.now() - message.createdAt)}</span>
-          </div>
+        {/* Plan5 B.4 — pending permission/question requests at the
+            trailing assistant message so the user notices inline
+            instead of only at the footer. The component reads the
+            stores itself (via memo) so it's safe to render here
+            without prop-drilling. */}
+        {message.role === "assistant" && sessionId && (
+          <InlineApprovalHint sessionId={sessionId} />
         )}
       </div>
     </div>
-  );
-}
-
-/**
- * R8.11 — CopyIconButton: 26×26 icon-only copy button that briefly swaps
- * to a checkmark on success (mirrors cabinet's CopyButton pattern).
- * Keeps the toast for screen-reader / non-visual confirmation. */
-function CopyIconButton({
-  tooltip,
-  copiedTooltip,
-  onCopy,
-  idleIcon,
-  copiedIcon,
-}: {
-  tooltip: string;
-  copiedTooltip: string;
-  onCopy: () => void;
-  idleIcon?: React.ReactNode;
-  copiedIcon?: React.ReactNode;
-}) {
-  const [copied, setCopied] = useState(false);
-  const handle = useCallback(() => {
-    onCopy();
-    setCopied(true);
-    const t = window.setTimeout(() => setCopied(false), 1500);
-    return () => window.clearTimeout(t);
-  }, [onCopy]);
-  const Icon = copied
-    ? (copiedIcon ?? <Check size={14} strokeWidth={2} />)
-    : (idleIcon ?? <Copy size={14} strokeWidth={1.75} />);
-  return (
-    <TooltipButton
-      className="msg__action-btn"
-      tooltip={copied ? copiedTooltip : tooltip}
-      onClick={handle}
-      aria-label={copied ? copiedTooltip : tooltip}
-    >
-      {Icon}
-    </TooltipButton>
-  );
-}
-
-/**
- * 反馈按钮(👍/👎)—— 对齐 WorkBuddy message-feedback。
- *
- * 本地持久化(toggle:再点同向取消)。无后端上报(OpenBuddy 是 BYOK,无可上报通道)。
- * 选中的方向高亮(填充),未选中保持描边。
- */
-function FeedbackButtons({
-  sessionId,
-  messageId,
-}: {
-  sessionId: string;
-  messageId: string;
-}) {
-  const entry = useFeedbackStore(
-    (s) => s.entries[`${sessionId}:${messageId}`] ?? null,
-  );
-  const setRating = useFeedbackStore((s) => s.setRating);
-  const current = entry?.rating ?? null;
-  // 点赞/踩:记录方向并打开完整评分弹窗(对齐 WorkBuddy rating bar + 弹窗)。
-  const [dialogOpen, setDialogOpen] = useState<FeedbackRating | null>(null);
-  const click = (r: FeedbackRating) => {
-    // 再点已选中方向 → 取消(不弹窗)。
-    if (current === r) {
-      setRating(sessionId, messageId, r);
-      return;
-    }
-    setRating(sessionId, messageId, r);
-    setDialogOpen(r);
-  };
-  return (
-    <span className="msg__feedback">
-      <button
-        type="button"
-        className={
-          "msg__action-btn msg__feedback-btn" +
-          (current === "up" ? " msg__feedback-btn--active" : "")
-        }
-        onClick={() => click("up")}
-        title={current === "up" ? "取消赞" : "赞"}
-        aria-label="赞"
-        aria-pressed={current === "up"}
-      >
-        👍
-      </button>
-      <button
-        type="button"
-        className={
-          "msg__action-btn msg__feedback-btn" +
-          (current === "down" ? " msg__feedback-btn--active" : "")
-        }
-        onClick={() => click("down")}
-        title={current === "down" ? "取消踩" : "踩"}
-        aria-label="踩"
-        aria-pressed={current === "down"}
-      >
-        👎
-      </button>
-      {dialogOpen && (
-        <FeedbackDialog
-          open={dialogOpen !== null}
-          sessionId={sessionId}
-          messageId={messageId}
-          rating={dialogOpen}
-          onClose={() => setDialogOpen(null)}
-        />
-      )}
-    </span>
   );
 }
 

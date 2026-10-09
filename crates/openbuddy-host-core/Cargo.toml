@@ -1,0 +1,40 @@
+[package]
+name = "openbuddy-host-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "OpenBuddy Rust host core — privileged local backend"
+
+[[bin]]
+name = "openbuddy-host-core"
+path = "src/main.rs"
+
+[dependencies]
+openbuddy-error-codes = { path = "../openbuddy-error-codes" }
+openbuddy-audit-types = { path = "../openbuddy-audit-types" }
+openbuddy-db = { path = "../openbuddy-db" }
+openbuddy-ignore = { path = "../openbuddy-ignore" }
+
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+dirs.workspace = true
+parking_lot.workspace = true
+
+# Phase 1 deps (locked at workspace level even though unused in Phase 0)
+rusqlite.workspace = true
+sha2.workspace = true
+hex.workspace = true
+aes-gcm.workspace = true
+rand.workspace = true
+base64.workspace = true
+globset.workspace = true
+ignore.workspace = true
+walkdir.workspace = true

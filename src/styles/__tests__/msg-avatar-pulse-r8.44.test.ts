@@ -1,21 +1,15 @@
 /**
- * msg-avatar-pulse-r8.44.test.ts — guard spec for the R8.44
- * streaming avatar pulse animation.
+ * msg-avatar-pulse-r8.44.test.ts — guard spec for the assistant
+ * avatar's streaming state.
  *
- * Before R8.44 the assistant avatar was a static gradient. R8.44
- * adds a subtle pulse glow when the assistant message is
- * actively streaming so the user sees the model is alive without
- * having to look at the caret. The 1.2s cycle keeps the visual
- * language consistent with other streaming affordances.
+ * R8.44 added a 1.2s box-shadow pulse on the avatar while the
+ * assistant message streamed. The R5 visual pass removed it again:
+ * the avatar had reverted to a flat border-only chip, so there was no
+ * glow left to pulse, and the streaming caret already signals "live".
  *
- * Coverage:
- *   - .msg--assistant.msg--streaming .msg__avatar carries a 1.2s
- *     ease-in-out infinite pulse animation
- *   - the pulse keyframes animate box-shadow between 0px and 4px
- *     brand-tinted halo
- *   - the resting avatar gets a transition on box-shadow so the
- *     stream start/stop feels smooth
- *   - reduced-motion guard disables the pulse
+ * These guards describe the current state: the resting avatar keeps a
+ * box-shadow transition, and no `msg-avatar-pulse` keyframes or
+ * streaming animation exist anywhere in prose.css.
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -49,36 +43,18 @@ describe("R8.44 .msg--assistant .msg__avatar resting transition", () => {
   });
 });
 
-describe("R8.44 .msg--assistant.msg--streaming .msg__avatar pulse", () => {
-  it("uses the msg-avatar-pulse animation on a 1.2s ease-in-out infinite cycle", () => {
-    const body = ruleBody(
-      prose,
-      ".msg--assistant.msg--streaming .msg__avatar"
-    );
-    expect(body).toBeTruthy();
-    expect(body!).toMatch(/animation:\s*msg-avatar-pulse\s+1\.2s\s+ease-in-out\s+infinite/);
-  });
-});
-
-describe("R8.44 @keyframes msg-avatar-pulse", () => {
-  it("animates box-shadow from 0px halo to 4px brand-tinted halo", () => {
-    // The keyframes use 0 0 0 0 at 0%/100% and 0 0 0 4px at 50%.
-    expect(prose).toMatch(/@keyframes msg-avatar-pulse[\s\S]*?0 0 0 0/);
-    expect(prose).toMatch(/@keyframes msg-avatar-pulse[\s\S]*?0 0 0 4px/);
+describe("R8.44 pulse removal (R5)", () => {
+  it("the streaming avatar carries no pulse animation", () => {
+    // R5 removed the pulse outright: with the border-only avatar there is
+    // no glow to animate, and the streaming caret plus status indicators
+    // already convey "live". Guard the absence so the keyframes do not
+    // come back half-wired.
+    expect(prose).not.toMatch(/msg-avatar-pulse/);
   });
 
-  it("brand-tinted halo uses color-mix (18% alpha) at peak", () => {
-    expect(prose).toMatch(/@keyframes msg-avatar-pulse[\s\S]*?color-mix\(in srgb,\s*var\(--wb-brand[\s\S]*?\)\s+18%/);
-  });
-});
-
-describe("R8.44 reduced-motion guard", () => {
-  it("disables the pulse when prefers-reduced-motion is set", () => {
-    // The reduced-motion block disables the animation. Search for
-    // the .msg--assistant.msg--streaming .msg__avatar line.
-    const m = prose.match(
-      /\.msg--assistant\.msg--streaming \.msg__avatar\s*\{[^}]*animation:\s*none/
-    );
-    expect(m).toBeTruthy();
+  it("the reduced-motion guard needs no avatar-pulse entry", () => {
+    expect(
+      prose.match(/\.msg--assistant\.msg--streaming \.msg__avatar\s*\{[^}]*animation:\s*none/),
+    ).toBeNull();
   });
 });

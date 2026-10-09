@@ -21,7 +21,7 @@ const { registry } = vi.hoisted(() => {
 vi.mock("electron", () => {
   const reg = (globalThis as unknown as { __registry: Map<string, CapturedHandler> }).__registry;
   return {
-    app: { getPath: (key: string) => key === "userData" ? "/tmp/openbuddy-comprehensive-test" : "/tmp", on: vi.fn(), exit: vi.fn(), setPath: vi.fn(), quit: vi.fn() },
+    app: { getVersion: () => "0.0.0-test", getPath: (key: string) => key === "userData" ? "/tmp/openbuddy-comprehensive-test" : "/tmp", on: vi.fn(), exit: vi.fn(), setPath: vi.fn(), quit: vi.fn() },
     ipcMain: {
       handle: vi.fn((channel: string, handler: CapturedHandler["fn"]) => { reg.set(channel, { channel, fn: handler }); }),
       removeHandler: vi.fn((channel: string) => { reg.delete(channel); }),
@@ -57,6 +57,7 @@ const { casdoorAuthMock, capabilityMocks } = vi.hoisted(() => {
         },
       }),
       authorize: vi.fn().mockReturnValue(true),
+      assertAuthorized: vi.fn(),
       can: vi.fn().mockReturnValue(true),
     },
     capabilityMocks: {

@@ -192,7 +192,7 @@ export function TopbarActions({
         </button>
 
         {open && (
-          <div className="topbar-actions__menu" onClick={(e) => e.stopPropagation()}>
+          <div className="topbar-actions__menu" role="presentation" onClick={(e) => e.stopPropagation()}>
             {DraftImpl ? (
               <button
                 type="button"

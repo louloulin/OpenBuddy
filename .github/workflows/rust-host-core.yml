@@ -1,0 +1,273 @@
+# Rust host-core CI matrix — see ADR-0011 (PI-Desktop 借鉴) and the v1
+# plan's §6 (binary dispatch matrix).
+#
+# Four jobs:
+#   1. `rust-test`           — cargo test on the 3 host platforms the CI
+#                              image pool supports natively. Each entry
+#                              runs the workspace lib + integration tests
+#                              to catch regressions on the platform where
+#                              they actually ship to end users.
+#   2. `rust-cross-release`  — `cargo build --release` on 8 cross-compile
+#                              targets via `cross`. macOS targets run on
+#                              macos-latest (apple toolchain is not
+#                              cross-installable); the other 6 targets run
+#                              on ubuntu-latest via cross. No tests run
+#                              here; tests are duplicated in `rust-test`
+#                              because cross-compiled binaries can't be
+#                              executed on the host runner (and QEMU
+#                              emulation is unreliable for SQLite/rusqlite
+#                              bundled).
+#   3. `rust-lint`           — clippy + rustfmt with `-D warnings` on
+#                              the pinned stable toolchain. Gates commits
+#                              that introduce lints or formatting drift.
+#   4. `build-summary`       — fail-fast aggregator for the other 3.
+#
+# Toolchain pin lives in `crates/rust-toolchain.toml` (channel = "1.88.0").
+# If you bump it, also bump the `RUSTUP_TOOLCHAIN` env var below and the
+# `--channel` flag on `dtolnay/rust-toolchain` action.
+name: Rust Host Core
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/**"
+      - ".github/workflows/rust-host-core.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "crates/**"
+      - ".github/workflows/rust-host-core.yml"
+  # Allow maintainers to run the matrix on-demand (e.g. before a
+  # release) without having to open a throw-away PR.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  # 1.88 is the workspace floor (see crates/rust-toolchain.toml).
+  # When bumping the toolchain, also bump the rust-toolchain action
+  # `toolchain:` field below.
+  RUSTUP_TOOLCHAIN: 1.88.0
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-test:
+    name: Rust test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
+
+      - name: Cache cargo registry & target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            crates/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('crates/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache sccache (linux only)
+        if: matrix.os == 'ubuntu-latest'
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.10.0"
+
+      - name: Cargo test
+        working-directory: crates
+        run: |
+          # mtime-based snapshots live under crates/target; reuse via cache
+          cargo test --workspace --locked
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-test-${{ matrix.os }}
+          path: crates/target/test-results-*.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  rust-cross-release:
+    name: Rust release build (${{ matrix.target }})
+    # macOS targets must run on macOS runners (apple toolchain is not
+    # cross-installable). Each matrix entry pins its own runner.
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # 8 targets matching the v1 plan §6 binary dispatch matrix.
+        include:
+          # macOS — Apple Silicon (arm64)
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+            cross_image: null
+            artifact_name: openbuddy-host-core-darwin-arm64
+            artifact_path: target/aarch64-apple-darwin/release/openbuddy-host-core
+          # macOS — Intel (x64)
+          - target: x86_64-apple-darwin
+            runner: macos-latest
+            cross_image: null
+            artifact_name: openbuddy-host-core-darwin-x64
+            artifact_path: target/x86_64-apple-darwin/release/openbuddy-host-core
+          # Linux — glibc x64
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            cross_image: ghcr.io/cross-rs/x86_64-unknown-linux-gnu:main
+            artifact_name: openbuddy-host-core-linux-x64
+            artifact_path: target/x86_64-unknown-linux-gnu/release/openbuddy-host-core
+          # Linux — glibc arm64
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-latest
+            cross_image: ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main
+            artifact_name: openbuddy-host-core-linux-arm64
+            artifact_path: target/aarch64-unknown-linux-gnu/release/openbuddy-host-core
+          # Linux — musl x64 (Alpine / static)
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+            cross_image: ghcr.io/cross-rs/x86_64-unknown-linux-musl:main
+            artifact_name: openbuddy-host-core-linux-x64-musl
+            artifact_path: target/x86_64-unknown-linux-musl/release/openbuddy-host-core
+          # Linux — musl arm64
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-latest
+            cross_image: ghcr.io/cross-rs/aarch64-unknown-linux-musl:main
+            artifact_name: openbuddy-host-core-linux-arm64-musl
+            artifact_path: target/aarch64-unknown-linux-musl/release/openbuddy-host-core
+          # Windows — x64 MSVC
+          - target: x86_64-pc-windows-msvc
+            runner: ubuntu-latest
+            cross_image: ghcr.io/cross-rs/x86_64-pc-windows-msvc:main
+            artifact_name: openbuddy-host-core-windows-x64
+            artifact_path: target/x86_64-pc-windows-msvc/release/openbuddy-host-core.exe
+          # Windows — arm64 MSVC
+          - target: aarch64-pc-windows-msvc
+            runner: ubuntu-latest
+            cross_image: ghcr.io/cross-rs/aarch64-pc-windows-msvc:main
+            artifact_name: openbuddy-host-core-windows-arm64
+            artifact_path: target/aarch64-pc-windows-msvc/release/openbuddy-host-core.exe
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
+
+
+      - name: Install cross (for non-darwin targets)
+        if: matrix.cross_image != null
+        run: cargo install cross --locked
+
+      - name: Cache cargo registry & target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            crates/target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('crates/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-
+
+      - name: Cargo build --release
+        working-directory: crates
+        run: |
+          if [[ -n "${{ matrix.cross_image }}" ]]; then
+            cross build --release \
+              --target ${{ matrix.target }} \
+              -p openbuddy-host-core \
+              --locked
+          else
+            cargo build --release \
+              --target ${{ matrix.target }} \
+              -p openbuddy-host-core \
+              --locked
+          fi
+
+      - name: Upload binary artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: crates/${{ matrix.artifact_path }}
+          if-no-files-found: error
+          retention-days: 30
+
+  rust-lint:
+    name: Rust lint (clippy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry & target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            crates/target
+          key: ${{ runner.os }}-lint-cargo-${{ hashFiles('crates/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-lint-cargo-
+
+      - name: Cargo fmt --check
+        working-directory: crates
+        run: cargo fmt --all -- --check
+
+      - name: Cargo clippy
+        working-directory: crates
+        run: |
+          cargo clippy --workspace --all-targets --locked -- \
+            -D warnings \
+            -A clippy::needless_return \
+            -A clippy::too_many_arguments
+
+  build-summary:
+    name: Rust CI Summary
+    runs-on: ubuntu-latest
+    needs: [rust-test, rust-cross-release, rust-lint]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "rust-test: ${{ needs.rust-test.result }}"
+          echo "rust-cross-release: ${{ needs.rust-cross-release.result }}"
+          echo "rust-lint: ${{ needs.rust-lint.result }}"
+          if [ "${{ needs.rust-test.result }}" != "success" ] || \
+             [ "${{ needs.rust-cross-release.result }}" != "success" ] || \
+             [ "${{ needs.rust-lint.result }}" != "success" ]; then
+            echo "::error::Rust CI matrix failed"
+            exit 1
+          fi

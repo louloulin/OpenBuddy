@@ -547,4 +547,38 @@ export const DEFAULT_MIGRATIONS: readonly MigrationStep[] = [
       `);
     },
   },
+  {
+    version: 12,
+    description: "create canvas document and revision tables",
+    up: (driver) => {
+      driver.database.exec(`
+        CREATE TABLE IF NOT EXISTS canvas_documents(
+          canvas_id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          kind TEXT NOT NULL CHECK (kind IN ('markdown','html','react','svg','code','image','pdf')),
+          title TEXT NOT NULL DEFAULT '',
+          source_ref TEXT,
+          source_path TEXT,
+          metadata_json TEXT NOT NULL DEFAULT '{}',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY(session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS canvas_documents_session_idx
+          ON canvas_documents(session_id, updated_at DESC);
+        CREATE TABLE IF NOT EXISTS canvas_revisions(
+          canvas_id TEXT NOT NULL,
+          seq INTEGER NOT NULL,
+          content TEXT NOT NULL,
+          content_hash TEXT NOT NULL,
+          author TEXT NOT NULL DEFAULT 'user',
+          created_at TEXT NOT NULL,
+          PRIMARY KEY(canvas_id, seq),
+          FOREIGN KEY(canvas_id) REFERENCES canvas_documents(canvas_id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS canvas_revisions_latest_idx
+          ON canvas_revisions(canvas_id, seq DESC);
+      `);
+    },
+  },
 ];

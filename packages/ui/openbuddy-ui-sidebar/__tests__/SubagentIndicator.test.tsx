@@ -219,7 +219,7 @@ describe("SubagentIndicator — expanded", () => {
         parentSessionId="p5"
         parentCwd="/repo"
         onSelect={(id, cwd) => {
-          captured = { id, cwd };
+          captured = { id, cwd: cwd ?? "" };
         }}
       />,
     );

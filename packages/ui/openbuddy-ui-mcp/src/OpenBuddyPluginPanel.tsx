@@ -296,14 +296,17 @@ export function OpenBuddyPluginPanel({ onToast }: OpenBuddyPluginPanelProps) {
     }
   };
 
-  const handleConfigSave = async (id: string, config: unknown) => {
+  const handleConfigSave = async (id: string, config: unknown): Promise<string | undefined> => {
     try {
       await agentUpdatePluginConfig(id, config);
       await refreshStored();
       setInventoryRevision((revision) => revision + 1);
       onToast?.(`已保存「${id}」的配置`);
+      return undefined;
     } catch (error) {
-      throw new Error(`保存失败：${String(error).replace(/^Error:\s*/, "")}`);
+      // R100-FIX: 不 throw — 改返回错误信息,row 的 setConfigError 接收,
+      // 避免 React ErrorBoundary 被触发。
+      return `保存失败：${String(error).replace(/^Error:\s*/, "")}`;
     }
   };
 
@@ -681,7 +684,11 @@ interface PluginRowProps {
   onToggle: (id: string, enabled: boolean) => void;
   onReload: (id: string) => void;
   onReset: (id: string) => void;
-  onConfigSave: (id: string, config: unknown) => Promise<void>;
+  /**
+   * 父组件保存配置。返回错误信息字符串(而不是抛出)以避免触发 React
+   * ErrorBoundary,见 R100-FIX。如果保存成功返回 undefined。
+   */
+  onConfigSave: (id: string, config: unknown) => Promise<string | undefined>;
   saved: { disabled?: boolean; config?: unknown; updatedAt: string } | null;
 }
 
@@ -715,9 +722,8 @@ function PluginRow({
     setConfigError(null);
     setSavingConfig(true);
     try {
-      await onConfigSave(plugin.id, config);
-    } catch (error) {
-      setConfigError(String(error).replace(/^Error:\s*/, ""));
+      const errorMessage = await onConfigSave(plugin.id, config);
+      if (errorMessage) setConfigError(errorMessage);
     } finally {
       setSavingConfig(false);
     }

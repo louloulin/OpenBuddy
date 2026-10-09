@@ -144,11 +144,12 @@
   white-space: nowrap;
   max-width: 180px;
 }
+/* R5 — Neutral model chip. The previous brand-tinted version was
+   visually loud for a meta element; the neutral surface reads as
+   "secondary metadata" rather than "primary tag". */
 .msg__meta-chip--model {
-  /* Brand-tinted variant for the model name. Reads as a tag without
-     fighting the timestamp for visual weight. */
-  background: color-mix(in srgb, var(--wb-brand, #00c29a) 10%, transparent);
-  color: color-mix(in srgb, var(--wb-brand, #00c29a) 92%, var(--wb-text-strong, #000) 8%);
+  background: color-mix(in srgb, var(--wb-text-strong, #000) 6%, transparent);
+  color: var(--wb-text-medium, rgba(0, 0, 0, 0.65));
 }
 .msg__meta-chip--throughput {
   /* Neutral surface — the throughput number stands on its own. */
@@ -672,25 +673,38 @@
 .file-preview__placeholder-text {
   font-size: 13px;
 }
-/* 消息时间线分隔符(对齐 WorkBuddy message-timeline) */
+/* 消息时间线分隔符(P0 综合轮 — P3-7 视觉加强,对标 Codex)
+ *   - 日期分隔符:中等字重 + 上下微 gap,边界更清晰
+ *   - 模型分隔符:品牌色 + 加粗 + 弱左右分隔线
+ *   - 浅色/深色对称,品牌色用 --wb-brand token */
 .timeline-divider {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 12px 0 4px;
-  color: var(--wb-text-light);
-  font-size: 11px;
+  gap: 10px;
+  margin: 18px 0 6px;
+  color: var(--wb-text-medium);
+  font-size: 12px;
+  font-weight: 500;
   text-align: center;
+  letter-spacing: 0.02em;
 }
 .timeline-divider::before,
 .timeline-divider::after {
   content: "";
   flex: 1;
   height: 1px;
-  background: var(--wb-border-default);
+  background: linear-gradient(to right, transparent, var(--wb-border-default) 20%, var(--wb-border-default) 80%, transparent);
+}
+.timeline-divider--date {
+  /* 日期粗体,左右分隔线渐隐 */
+  font-weight: 600;
 }
 .timeline-divider--model {
   color: var(--wb-brand);
+  font-weight: 600;
+}
+[data-theme="dark"] .timeline-divider {
+  color: var(--wb-text-medium);
 }
 /* 文件变更聚合面板(对齐 WorkBuddy file-changes-panel) */
 .file-changes {
@@ -1460,6 +1474,8 @@
   white-space: pre-wrap;
   word-break: break-word;
   cursor: text;
+  /* 原为 span；改成 button 后要补回 span 的默认左对齐。 */
+  text-align: left;
 }
 .queue-row__edit {
   flex: 1;
@@ -1560,19 +1576,21 @@
    reads as "AI assistant" much more clearly than the old "B" letter. The
    gradient uses color-mix on the brand token so dark/light themes stay
    consistent without per-theme overrides. */
+/* R5 — Minimal avatar. The previous brand-tinted gradient + box-shadow
+   was visually heavy next to the now-borderless assistant bubble; the
+   monochrome subtle variant is closer to ChatGPT/Claude/Codex while
+   keeping the Sparkles icon's identity clear. */
 .msg--assistant .msg__avatar {
   width: 28px;
   height: 28px;
   flex-shrink: 0;
   border-radius: 8px;
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--wb-brand, #00c29a) 95%, white 5%),
-    color-mix(in srgb, var(--wb-brand, #00c29a) 70%, #000 5%));
+  background: var(--wb-bg-secondary, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--wb-border-default);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--wb-brand) 25%, transparent);
+  color: var(--wb-text-medium);
   /* R8.44 — When the assistant is actively streaming, the avatar
      gets a subtle pulse glow so the user sees the model is alive
      without looking at the streaming caret. The pulse uses the
@@ -1583,24 +1601,8 @@
 /* R8.44 — Streaming avatar pulse. The class is added while a
    message is actively streaming and removed once it completes.
    1.2s ease-in-out cycle. */
-.msg--assistant.msg--streaming .msg__avatar {
-  animation: msg-avatar-pulse 1.2s ease-in-out infinite;
-}
-@keyframes msg-avatar-pulse {
-  0%, 100% {
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--wb-brand) 25%, transparent),
-                0 0 0 0 color-mix(in srgb, var(--wb-brand) 0%, transparent);
-  }
-  50% {
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--wb-brand) 35%, transparent),
-                0 0 0 4px color-mix(in srgb, var(--wb-brand) 18%, transparent);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .msg--assistant.msg--streaming .msg__avatar {
-    animation: none;
-  }
-}
+/* R5 — Avatar pulse removed (no glow with the border-only avatar).
+   The streaming caret + status indicators already convey "live" status. */
 
 /* R8.54 — Streaming bubble bottom fade. While the assistant is
    actively streaming, lay a soft linear-gradient overlay over the
@@ -1646,19 +1648,21 @@
 /* R8.43 — AI role badge polish. Slightly larger chip with
    uppercase brand-tinted typography. The 1px brand-tinted border
    adds definition against the bubble background. */
+/* R5 — Subtle AI role badge. The previous brand-tinted chip was
+   visually heavy; monochrome + low-contrast is closer to ChatGPT's
+   neutral "AI" label. */
 .msg--assistant .msg__role {
   display: inline-flex;
   align-items: center;
   height: 18px;
   padding: 0 6px;
   border-radius: 4px;
-  background: color-mix(in srgb, var(--wb-brand) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--wb-brand) 24%, transparent);
-  color: color-mix(in srgb, var(--wb-brand, #00c29a) 80%, var(--wb-text-strong, #000) 10%);
+  background: var(--wb-bg-secondary, rgba(0, 0, 0, 0.04));
+  color: var(--wb-text-weak, rgba(0, 0, 0, 0.5));
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 .msg--assistant .msg__body {

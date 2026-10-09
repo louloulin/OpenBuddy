@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-vi.mock("@/lib/platform/electron-api", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/platform/electron-api")>("@/lib/platform/electron-api");
+// Mock the specifier the implementation actually imports. The package-side
+// module resolves `@openbuddy/platform/electron-api` directly, so mocking the
+// app-side shim path would silently stop intercepting the bridge.
+vi.mock("@openbuddy/platform/electron-api", async () => {
+  const actual = await vi.importActual<typeof import("@openbuddy/platform/electron-api")>("@openbuddy/platform/electron-api");
   return {
     ...actual,
     listen: vi.fn(async () => () => {}),
@@ -10,13 +13,13 @@ vi.mock("@/lib/platform/electron-api", async () => {
 });
 
 import { subscribePiEvents } from "@/lib/agent/pi-client";
-import { listen } from "@/lib/platform/electron-api";
+import { listen } from "@openbuddy/platform/electron-api";
 
 const setBridge = (api?: unknown) => {
   if (api === undefined) {
-    delete (window as Window & { api?: unknown }).api;
+    delete (window as unknown as { api?: unknown }).api;
   } else {
-    (window as Window & { api?: unknown }).api = api;
+    (window as unknown as { api?: unknown }).api = api;
   }
 };
 

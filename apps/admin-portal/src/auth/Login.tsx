@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { LogIn, Shield } from "lucide-react";
 import {
   DEFAULT_OIDC_CONFIG,
@@ -14,7 +13,6 @@ import {
  * 然后走标准 OIDC/PKCE 流程。
  */
 export function Login() {
-  const navigate = useNavigate();
   const [cfg, setCfg] = useState<OidcConfig>(() => loadOidcConfig() ?? DEFAULT_OIDC_CONFIG);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

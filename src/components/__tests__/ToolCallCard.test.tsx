@@ -18,7 +18,10 @@ describe("ToolCallCard", () => {
     // edit 属专用渲染器,kind 标签显示为「✏️ 文件编辑」。
     expect(screen.getByText("✏️ 文件编辑")).toBeInTheDocument();
     expect(screen.getByText(/hello\.txt/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button"));
+    // 卡片行是 role="button" 容器（内层还嵌着「内联展开」按钮，原生 button
+    // 不能嵌套 button），所以这里必须按可访问名精确定位卡片行，不能用裸的
+    // getByRole("button") —— 那会同时命中内层展开按钮。
+    fireEvent.click(screen.getByRole("button", { name: /^edit\b/ }));
     expect(onOpen).toHaveBeenCalledWith(base);
   });
 

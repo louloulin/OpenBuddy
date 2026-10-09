@@ -33,7 +33,7 @@ export {
 } from "./AssistantTopTabs";
 export type { AssistantTopTabItem } from "./AssistantTopTabs";
 export { SessionControls } from "./SessionControls";
-export { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
+export { KeyboardShortcutsDialog, DEFAULT_SHORTCUTS } from "./KeyboardShortcutsDialog";
 export type { ShortcutEntry } from "./KeyboardShortcutsDialog";
 export { PlanModeBanner } from "./PlanModeBanner";
 

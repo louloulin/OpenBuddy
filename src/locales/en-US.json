@@ -42,6 +42,33 @@
     "lockSection": "Locked Permission Mode"
   },
   "conversation": {
+    "canvas": {
+      "button": "Canvas (⌘ ⇧ C)",
+      "buttonWithCount": "Canvas ({count})",
+      "close": "Close canvas",
+      "closeTab": "Close {title}",
+      "empty": "No canvas open",
+      "fileMissing": "This canvas has no file attached",
+      "kind": {
+        "code": "Code",
+        "html": "HTML",
+        "image": "Image",
+        "markdown": "Document",
+        "pdf": "PDF",
+        "react": "React",
+        "svg": "SVG"
+      },
+      "loading": "Loading canvas…",
+      "newTitle": "New canvas",
+      "openInCanvas": "Open in canvas",
+      "panelLabel": "Canvas",
+      "previewTitle": "Canvas preview",
+      "reactLoadFailed": "React canvas failed to load: ",
+      "resize": "Resize canvas",
+      "shortcut": "Toggle canvas panel",
+      "sourceLabel": "Canvas source",
+      "untitled": "Untitled"
+    },
     "title": "Conversations",
     "newSession": "New session",
     "pinnedSection": "Pinned",
@@ -59,6 +86,9 @@
     "attachFile": "Attach file"
   },
   "skill": {
+    "bar": {
+      "title": "Recommended Skills"
+    },
     "title": "Skills",
     "install": "Install",
     "installed": "Installed",

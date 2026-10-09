@@ -5,10 +5,6 @@ import { AssistantWorkbenchNav } from "@openbuddy/ui-shell";
 import { invoke } from "@/lib/platform/electron-api";
 import { useRendererContributions } from "@/lib/runtime/renderer-plugin-runtime";
 import { useSlotComponent } from "@/features/app/slot-bridge";
-import { useEmailAiRuntime } from "@openbuddy/ui-email/ai";
-import { createEmailDataProvider } from "@/lib/email/createEmailDataProvider";
-import { createDefaultEmailAiBindings } from "@/lib/email/createDefaultEmailAiBindings";
-import { useComposerStore } from "@/stores/composer-store";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import type { ModelOption } from "@openbuddy/ui-workbench";
 import { EXPERTS_ROUTE_LABEL } from "@/lib/navigation/placeholder-routes";
@@ -43,8 +39,10 @@ const CloudStoragePanel = lazy(() => import("@openbuddy/ui-files").then((m) => (
 const DiscoverPanel = lazy(() => import("@openbuddy/ui-mcp").then((m) => ({ default: m.DiscoverPanel })));
 const NotifyChannelsPanel = lazy(() => import("@openbuddy/ui-mcp").then((m) => ({ default: m.NotifyChannelsPanel })));
 const UsageQuotaPanel = lazy(() => import("@openbuddy/ui-billing").then((m) => ({ default: m.UsageQuotaPanel })));
-const EmailPanel = lazy(() => import("@openbuddy/ui-email").then((m) => ({ default: m.EmailPanel })));
 const PolicySettingsPanel = lazy(() => import("@openbuddy/ui-settings").then((m) => ({ default: m.PolicySettingsPanel })));
+// 「邮件」路由的运行时注入实现收在 ./EmailPlaceholder(懒加载)——
+// useEmailAiRuntime/ui-email 图不再因本模块静态保留而进首屏 entry。
+const EmailPlaceholder = lazy(() => import("./EmailPlaceholder").then((m) => ({ default: m.EmailPlaceholder })));
 // R37 — 资料库页整体走内核 `placeholder.library` 槽(ui-library 注册默认实现)。
 const LibraryPage = lazy(() => import("@openbuddy/ui-library").then((m) => ({ default: m.LibraryPage })));
 
@@ -136,7 +134,6 @@ function PlaceholderPageInner({
   // ui-mcp / ui-billing / ui-collaboration 注册的 `placeholder.*` 槽从来没有
   // 消费方:插件能注册成功,界面却永远不变。现在每条路由都先问内核要实现,
   // 拿不到才回落到内置组件,插件才真正具备「整体替换某个页面」的能力。
-  const EmailSlot = useSlotComponent("placeholder.email", EmailPanel);
   const ProjectsSlot = useSlotComponent("placeholder.projects", ProjectsPanel);
   const MyFilesSlot = useSlotComponent("placeholder.my-files", MyFilesPanel);
   const KnowledgeBaseSlot = useSlotComponent("placeholder.knowledge-base", KnowledgeBasePanel);
@@ -163,50 +160,16 @@ function PlaceholderPageInner({
     },
     [onToast],
   );
-  // 第 4 周(渐进迁移):把 capability-email 的真实 IPC 绑到 EmailAiPanel,
-  // 不依赖 mock bindings。开箱即用的 List/Archive/Snooze/Draft 全部走能力层。
-  // R92 fix:dataProvider 让 EmailAiPanel 真的能拉取邮件数据(accounts / threads / counts / triage)。
-  //
-  // 注意:所有 hook 必须无条件地写在所有 early return 之前(Rules of Hooks)。
-  // 之前把这些 useMemo 放在 `if (label === "邮件")` 内部,导致该分支被 React 跳过
-  // 时,hook 调用顺序会变 → "Rendered more hooks than during the previous render"(#310),
-  // 进而让错误边界吃掉整页,smoke 测试也就找不到 experts-page-split 的 "专家" tab。
-  const emailDataProvider = useMemo(() => createEmailDataProvider({
-    defaultAccountId: sessionId ?? "self",
-  }), [sessionId]);
-  const emailBindings = useMemo(() => createDefaultEmailAiBindings({
-    accountId: sessionId ?? "self",
-  }), [sessionId]);
-  const emailRuntime = useEmailAiRuntime({ bindings: emailBindings });
-  // P1-A:Composer 预填通过共享 store 触发。EmailAiPanel 内部 onAdopt 调用
-  // onOpenComposer({subject, body, threadId}) → 推到 store → 顶层 ComposerPortal 渲染。
-  const openComposer = useComposerStore((state) => state.openComposer);
-  const handleOpenComposer = useMemo(
-    () => (init?: { subject: string; body: string; threadId: string }) => {
-      openComposer({
-        ...(init?.subject !== undefined ? { subject: init.subject } : {}),
-        ...(init?.body !== undefined ? { body: init.body } : {}),
-        ...(init?.threadId !== undefined ? { threadId: init.threadId } : {}),
-      });
-    },
-    [openComposer],
-  );
-  const RuntimeInjectedEmailSlot = useMemo(() => {
-    const Wrapped: React.FC<typeof EmailSlot extends React.ComponentType<infer P> ? P : never> = (props: typeof EmailSlot extends React.ComponentType<infer P> ? P : never) => (
-      // @ts-expect-error EmailAiPanel accepts runtime/onOpenComposer + dataProvider; legacy panel ignores extra props.
-      <EmailSlot {...props} runtime={emailRuntime} dataProvider={emailDataProvider} onOpenComposer={handleOpenComposer as never} />
-    );
-    Wrapped.displayName = "RuntimeInjectedEmailSlot";
-    return Wrapped;
-  }, [emailRuntime, handleOpenComposer]);
   if (label === "邮件") {
     return (
-      <RuntimeInjectedEmailSlot
-        sessionId={sessionId}
-        onNavigate={onNavigate}
-        onToast={onToast}
-        onLaunch={onLaunch ? (prompt) => onLaunch(prompt) : undefined}
-      />
+      <Suspense fallback={<PanelSuspenseFallback label={label} />}>
+        <EmailPlaceholder
+          sessionId={sessionId}
+          onNavigate={onNavigate}
+          onToast={onToast}
+          onLaunch={onLaunch}
+        />
+      </Suspense>
     );
   }
 

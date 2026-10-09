@@ -23,6 +23,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useId,
   type ReactNode,
 } from "react";
 import {
@@ -160,6 +161,13 @@ export function FileTree({
   // ----- selection -------------------------------------------------------
   const anchorRef = useRef<TreeNodeId | null>(null);
   const [focusedId, setFocusedId] = useState<TreeNodeId | null>(null);
+  // 焦点常驻在 role="tree" 容器上（下方 tabIndex={0}），当前行通过
+  // aria-activedescendant 播报 —— 读屏用户跟着方向键走时能听到行名。
+  const treeId = useId();
+  const rowDomId = useCallback(
+    (id: TreeNodeId) => `${treeId}-item-${id}`,
+    [treeId],
+  );
 
   const toggleExpand = useCallback(
     (id: TreeNodeId) => {
@@ -399,8 +407,12 @@ export function FileTree({
     [renderContextMenu, selected, setSelected],
   );
 
+  const ctxMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ctxMenu) return;
+    // 菜单打开就把焦点送进去；关闭时（Esc / 外部点击 / 选中项）把焦点还给
+    // 树，否则键盘用户会被丢在 <body> 上。
+    ctxMenuRef.current?.focus();
     const close = () => setCtxMenu(null);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
@@ -410,6 +422,7 @@ export function FileTree({
     return () => {
       document.removeEventListener("mousedown", close);
       document.removeEventListener("keydown", onKey);
+      scrollRef.current?.focus();
     };
   }, [ctxMenu]);
 
@@ -435,6 +448,7 @@ export function FileTree({
         onKeyDown={handleKeyDown}
         tabIndex={0}
         role="tree"
+        aria-activedescendant={focusedId ? rowDomId(focusedId) : undefined}
         aria-label="文件树"
       >
         <div className={styles.spacer} style={{ height: totalHeight }}>
@@ -454,6 +468,7 @@ export function FileTree({
                   focused={focusedId === node.id}
                   dropTarget={dropTargetId === node.id}
                   draggable={dragEnabled}
+                  domId={rowDomId(node.id)}
                   onClick={handleRowClick}
                   onDoubleClick={handleDoubleClick}
                   onChevronClick={handleChevronClick}
@@ -472,10 +487,30 @@ export function FileTree({
 
       {ctxMenu ? (
         <div
+          ref={ctxMenuRef}
           className={styles.contextMenu}
           style={{ left: ctxMenu.x, top: ctxMenu.y }}
           role="menu"
+          aria-label="文件操作"
+          // role="menu" 不是原生可聚焦元素，但它必须能接住焦点，
+          // 否则右键弹出的菜单键盘用户根本进不去。
+          tabIndex={-1}
           onMouseDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
+            const items = Array.from(
+              ctxMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [],
+            );
+            if (items.length === 0) return;
+            e.preventDefault();
+            const at = items.indexOf(document.activeElement as HTMLButtonElement);
+            const next =
+              e.key === "Home" ? 0
+              : e.key === "End" ? items.length - 1
+              : e.key === "ArrowDown" ? (at + 1 + items.length) % items.length
+              : (at - 1 + items.length) % items.length;
+            items[next]?.focus();
+          }}
         >
           {ctxMenu.items.map((item, idx) => (
             <div key={idx}>

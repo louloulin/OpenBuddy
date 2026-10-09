@@ -227,6 +227,37 @@ function sessionFile(sessionId: string): string {
   return file;
 }
 
+/**
+ * Facade-shaped variant of {@link sessionFile}.
+ *
+ * `sessionFile()` is a *synchronous* string-returning helper that throws.
+ * The `agentHost.sessionFile` facade contract is
+ * `Promise<{ ok, path?, sizeBytes?, error? }>`, and both IPC consumers
+ * (`rewind_points` in `ipc/session-misc.ts`, `session_fork` via
+ * `forkSessionFromFile`) read `.path`. Binding the raw sync helper to the
+ * facade made `.path` permanently `undefined`, so `rewind_points` always
+ * threw "session file path unavailable" and the renderer's per-message
+ * rewind entry could never enable.
+ *
+ * Keeping the adaptation here (next to the primitive it wraps) means every
+ * facade builder — including the legacy `facade/session-facade.ts` — gets the
+ * correct shape instead of each re-deriving it.
+ */
+async function sessionFileResult(sessionId: string): Promise<{
+  ok: boolean;
+  path?: string;
+  sizeBytes?: number;
+  error?: string;
+}> {
+  try {
+    const filePath = sessionFile(sessionId);
+    const sizeBytes = await stat(filePath).then((info) => info.size).catch(() => undefined);
+    return sizeBytes === undefined ? { ok: true, path: filePath } : { ok: true, path: filePath, sizeBytes };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 async function rewindSession(sessionId: string, targetPromptIndex: number, mode = "conversation"): Promise<void> {
   if (!["conversation", "files", "all"].includes(mode)) throw new Error(`invalid rewind mode: ${mode}`);
   const session = state.session;
@@ -319,6 +350,7 @@ export {
   sessionInfo,
   sessionUsage,
   sessionFile,
+  sessionFileResult,
   rewindSession,
   formatBranchSummaryText,
   renameSession,

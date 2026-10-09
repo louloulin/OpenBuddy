@@ -163,7 +163,7 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
         </span>
       </button>
       {open && (
-        <div className="context-usage__popover" onClick={(e) => e.stopPropagation()}>
+        <div className="context-usage__popover">
           <div className="context-usage__popover-header">
             <span className="context-usage__popover-title">上下文容量</span>
             <span className="context-usage__popover-summary">

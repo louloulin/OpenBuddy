@@ -28,6 +28,15 @@ export interface BridgeStatusPayload {
   consecutiveFailures: number;
   lastErrorMessage: string | null;
   lastUpdated: number;
+  /**
+   * host-core(Rust sidecar)的存活状态。可选字段 —— 旧渲染层不带也会正常解析,
+   * 缺失时 UI 退回到只看 `available`。
+   */
+  hostCore?: {
+    mode: "ok" | "degraded" | "unavailable";
+    crashes: number;
+    lastReason?: string;
+  };
 }
 
 export function sendSafe(

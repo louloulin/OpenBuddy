@@ -222,6 +222,10 @@
   justify-content: center;
   width: 22px;
   height: 22px;
+  /* 2026-10-07 a11y:这些原先是 `<span role="button">`(键盘不可达),已换成真button。
+     button 的 UA 默认 padding 会把图标挤偏,而盒宽是写死的 22px,所以必须显式
+     清零 —— 否则每个调用点都得挂 inline style 兜底。 */
+  padding: 0;
   border-radius: 6px;
   color: var(--wb-text-tertiary);
   cursor: pointer;
@@ -640,6 +644,48 @@
   background: rgba(20, 184, 138, 0.10);
   color: rgb(8, 142, 105);
 }
+/* Plan5 B.7 — capability hint chips (视觉/工具/推理/JSON/流式). Visual
+   weight is intentionally lighter than the protocol badge so the
+   label + protocol remain the primary scan anchors. Colors ride on
+   --wb-* tokens for dark/light/high-contrast. */
+.model-selector__item-cap {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9px;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--wb-border-light, rgba(0, 0, 0, 0.12));
+  background: var(--wb-bg-soft, rgba(0, 0, 0, 0.04));
+  color: var(--wb-text-medium);
+  user-select: none;
+  cursor: default;
+}
+.model-selector__item-cap--vision {
+  border-color: var(--wb-color-border-emphasis, rgba(120, 120, 200, 0.32));
+  background: var(--wb-color-bg-secondary-default, rgba(120, 120, 200, 0.08));
+  color: var(--wb-color-text-secondary, rgb(70, 70, 140));
+}
+.model-selector__item-cap--tools {
+  border-color: rgba(16, 163, 127, 0.32);
+  background: rgba(16, 163, 127, 0.10);
+  color: rgb(11, 121, 92);
+}
+.model-selector__item-cap--reasoning {
+  border-color: rgba(217, 119, 6, 0.32);
+  background: rgba(217, 119, 6, 0.10);
+  color: rgb(161, 88, 0);
+}
+.model-selector__item-cap--json_mode,
+.model-selector__item-cap--streaming {
+  border-color: rgba(107, 114, 128, 0.32);
+  background: rgba(107, 114, 128, 0.08);
+  color: var(--wb-text-medium);
+}
+
 .model-selector__item-protocol--messages {
   /* Anthropic Messages: warm orange tint matching Anthropic's brand. */
   border-color: rgba(217, 119, 6, 0.36);
@@ -1149,6 +1195,9 @@
   justify-content: center;
   width: 20px;
   height: 20px;
+  /* 同 .sidebar__conv-action:这些原本是 span role="button",换成真 button 后
+     必须清掉 UA 默认 padding,否则写死的 20px 盒子里图标会偏。 */
+  padding: 0;
   border-radius: 4px;
   color: var(--wb-text-tertiary);
   opacity: 0;
@@ -3280,6 +3329,65 @@
   flex-direction: column;
   gap: 8px;
 }
+
+/* R85: pi-market-section 在 MarketplacePanel 内,但有自己 header,补基本样式
+   避免显示成无样式裸 HTML。视觉上和 marketplace-panel__header 同构。 */
+.pi-market-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0 12px;
+  border-bottom: 1px solid var(--wb-border-soft);
+  margin-bottom: 8px;
+}
+
+.pi-market-section__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pi-market-section__header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wb-fg-primary);
+}
+
+.pi-market-section__header p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--wb-fg-secondary);
+}
+
+.pi-market-section__header code {
+  font-family: var(--wb-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-bg-tertiary);
+}
+
+.pi-market-section__header button {
+  align-self: flex-start;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--wb-radius-md);
+  border: 1px solid var(--wb-border);
+  background: var(--wb-bg-secondary);
+  color: var(--wb-fg-primary);
+  cursor: pointer;
+}
+
+.pi-market-section__header button:hover:not(:disabled) {
+  border-color: var(--wb-accent);
+}
+
+.pi-market-section__header button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 .plugins-panel__item {
   display: flex;
   gap: 12px;
@@ -4115,7 +4223,7 @@
 .colleague-avatar { position: relative; flex-shrink: 0; }
 .colleague-avatar-face { display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 600; user-select: none; text-transform: uppercase; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
 .colleague-avatar-dot { position: absolute; bottom: 1px; right: 1px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--wb-bg-primary); }
-.colleague-avatar-dot--idle { background: #00c29a; }
+.colleague-avatar-dot--idle { background: var(--wb-brand-primary); }
 .colleague-avatar-dot--working { background: #5284ff; }
 .colleague-avatar-dot--abnormal { background: #e5484d; }
 

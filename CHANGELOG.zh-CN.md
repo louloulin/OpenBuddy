@@ -2,6 +2,55 @@
 
 [English](CHANGELOG.md) · **简体中文**
 
+## v0.16.0（2026-09-22）· 微内核槽位收口 × 插件信任 × 自更新桌面端
+
+### 🧩 微内核槽位面「零悬挂」
+
+- **所有声明过的槽位都有消费者**：`placeholder.*` 家族 11 个 + 最后 4 个 dead 槽（整壳替换 / 更新摘要 / 反馈 / 数据目录）全部接线，「声明了却没人消费」归零
+- **新增槽位三态审计**（`scripts/ui-slot-coverage.mjs` + `ui-slot-audit.mjs`）：静态扫描「声明 → 注册 → 消费」，并加 CI 守卫 —— 出现类型漏洞或接线回退就失败
+- **槽位驱动的界面**：Office 三件套预览接管、`editor.draft` 新建草稿入口（`⌘⇧D`）、`view` / `approvals` 会话面、右侧助理导轨、`files.tree` 虚拟化、`⌘K` 与 Composer `/` 菜单里的 `plugin.command`
+- **微内核健康面板**：设置 → 系统信息（注册 / 消费 / 缺失计数，并修掉 `size()` / `snapshot()` 差 1 的 bug）
+
+### 🔐 插件信任与真正可用的市场
+
+- **插件完整性徽章**：新增浏览器安全的 `plugin:hash-content` IPC 桥 + OpenBuddy 插件面板里的 SHA-256 徽章，插件身份在运行前可见
+- **Pi 扩展市场**：多源索引（宿主 / 环境变量 / 文件）、源管理 UI（增删改 + 探活）、逐条目动作谓词、卸载、目录搜索与过滤
+- **Expert Marketplace Bridge**：专家卡片加「在 pi.dev 查看」链接；远端专家贡献真的会被解析，不再静默渲染空态
+- **内置起步专家**：仓库内起步专家目录在首启物化到 `<agentHome>/experts`，开源首启不再依赖外部 WorkBuddy 数据目录
+
+### 🔄 自动更新与隐私
+
+- **`electron-updater` 在应用启动时接通**：`publish:` 块驱动更新源；更新事件写日志并广播到渲染窗口。`autoDownload=false`（不偷跑流量），`autoInstallOnAppQuit=true`
+- **未签名 DMG 构建档**（`electron-builder.unsigned.yml`）：没有 Developer ID 的贡献者也能本地出 macOS 包
+- **隐私面**：`docs/PRIVACY.md` 打包为 `extraResources/PRIVACY.md` 并接入帮助菜单、设置里新增 AI 隐私区块、provider 测试状态本地化
+
+### 🏗️ 架构：渲染层契约收敛到单一来源
+
+- **4 个契约包** —— `@openbuddy/ui-contract`、`@openbuddy/platform`、`@openbuddy/agent-rpc`、`@openbuddy/ui-state` —— 以 `package.json#exports` 作为别名的唯一真源
+- **模块迁移**：约 76 个渲染层模块从 `src/lib` 迁入契约包；改写后的导入由扫描器校验（破坏 `pi-client` 兄弟导入的批次被回滚，而不是硬着头皮落地）
+- **tsconfig 收拢**：67 个包级 `tsconfig.json` 缩成 `{ "extends": "…/tsconfig.package-base.json" }`；`vite` / `electron-vite` / `vitest` 统一用 `vite-tsconfig-paths` 派生别名，`scripts/sync-ui-aliases.mjs` 与 `packages/ui/alias-list.json` 随之删除
+- **`pnpm-workspace.yaml` glob 修复**：扁平包（`packages/payment`、`packages/saml`、`packages/scim`、`packages/webhook-outbox`）此前被静默排除在 workspace 之外，现在用裸目录 glob 正确匹配
+
+### 📦 构建产物迁移到 `dist/`
+
+- **唯一构建输出目录**：`electron-vite` 写 `dist/{main,preload,renderer}`，`electron-builder` 从它打包，`package.json#main` 指向 `./dist/main/index.js`；旧的 `out/` 从配置、`moon.yml` 输入输出、`.gitignore`、发布脚本中全部移除
+- **删除 134 个游离编译产物**：`src/*.ts`、`__tests__/*.test.ts` 旁边的 `.js`（早期 `tsc -b` 实验的残留）清掉，并加 `packages/**/__tests__/**/*.test.js` 忽略规则兜底；手写 fixture 与 `.d.ts` 垫片保留
+- **约定文档化**：`docs/build-output-conventions.md`
+- **修复类型检查**：solution-style `tsc -b` 重构回退为 `tsc --noEmit`（3774 错误 → 0），并修掉更严格 paths 暴露出的约 50 个真实类型错误
+
+### ✅ 质量
+
+- 类型检查：**0 错误**（`tsc --noEmit`，覆盖渲染层 + Electron 主进程/preload）
+- 测试规模：全仓 **855 个 test / spec 文件**；CI 门禁依次跑 typecheck → workspace typecheck → tests → build
+- **macOS 端到端验证**：`pnpm electron:build:mac` 产出 `release/OpenBuddy-0.16.0-{arm64,x64}.dmg`
+
+### 🧰 新增发布脚本
+
+- **`scripts/bump-version.mjs`** —— 一条命令改完 **88 个文件**（74 个 `package.json` + `hostVersion` + 官网 JSON-LD / 安装包文件名 / i18n 版本 chip + 示例插件 manifest），支持 `--dry-run`、`--json`、`--current`，并在落盘后自检
+- 修复 Release note 抽取：现在匹配 CHANGELOG 真实的标题层级（`### vX.Y.Z`），GitHub Release 正文是真的发布段落，而不是自动生成的提交列表
+
+---
+
 ## v0.15.0（2026-09-01）· 企业级 Casdoor × NewAPI × OpenBuddy 集成
 
 ### 🎯 商业化架构

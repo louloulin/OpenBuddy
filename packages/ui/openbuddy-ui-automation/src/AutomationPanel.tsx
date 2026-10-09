@@ -128,8 +128,20 @@ function ConfirmDialog({
   onCancel: () => void;
 }) {
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="atm-confirm-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+    // 遮罩只是"点击空白处关闭"的鼠标便利区，不是控件本身：
+    // 键盘/读屏用户通过「取消」按钮或 Esc 关闭，故标为 presentation 移出无障碍树。
+    // 用 target === currentTarget 判定"点在遮罩本体"，对话框内部无需再写 stopPropagation。
+    <div
+      className="modal-overlay"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onCancel();
+      }}
+    >
+      <div className="atm-confirm-dialog" role="dialog" aria-modal="true" aria-label={title}>
         <h3 className="atm-confirm-title">{title}</h3>
         <p className="atm-confirm-content">{content}</p>
         <div className="atm-confirm-actions">
@@ -876,8 +888,10 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
             const isCollapsed = collapsedGroups.has(group.label);
             return (
               <div className="atm-records-group" key={group.label}>
-                <div
+                <button
+                  type="button"
                   className="atm-records-group-label"
+                  aria-expanded={!isCollapsed}
                   onClick={() =>
                     setCollapsedGroups((prev) => {
                       const next = new Set(prev);
@@ -893,7 +907,7 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
                     height={14}
                     className={`atm-records-group-chevron${isCollapsed ? " atm-records-group-chevron--collapsed" : ""}`}
                   />
-                </div>
+                </button>
                 {!isCollapsed &&
                   group.items.map((item) => (
                     <InboxRow
@@ -908,14 +922,19 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
           })}
           {archivedRecords.length > 0 && (
             <div className="atm-records-group atm-records-group--archived">
-              <div className="atm-records-group-label" onClick={() => setArchivedGroupOpen((v) => !v)}>
+              <button
+                type="button"
+                className="atm-records-group-label"
+                aria-expanded={archivedGroupOpen}
+                onClick={() => setArchivedGroupOpen((v) => !v)}
+              >
                 已归档
                 <ChevronDownIcon
                   width={14}
                   height={14}
                   className={`atm-records-group-chevron${archivedGroupOpen ? "" : " atm-records-group-chevron--collapsed"}`}
                 />
-              </div>
+              </button>
               {archivedGroupOpen &&
                 archivedRecords.map((item) => (
                   <InboxRow key={item.id} item={item} archived onArchive={handleArchiveRecord} onDelete={handleDeleteRecord} />
@@ -987,9 +1006,24 @@ function AutomationRow({
     return () => document.removeEventListener("mousedown", handler);
   }, [menuOpen]);
 
+  // 行内嵌套了「测试运行」「更多」等真实 <button>，把整行改成 button 会产生
+  // 非法嵌套按钮；因此行本身走 role + tabIndex + 键盘处理。
+  // 事件只在行自身是事件源时响应，避免行内按钮的按键被行重复消费。
+  const handleRowKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    if (isBatchMode) onToggleSelect(automation.id);
+    else onEdit(automation);
+  };
+
   return (
     <div
       className={`atm-row${isBatchMode ? " atm-row--batch" : ""}${menuOpen ? " atm-row--menu-open" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-label={isBatchMode ? `选择自动化任务 ${automation.name}` : `打开自动化任务 ${automation.name}`}
+      onKeyDown={handleRowKeyDown}
       onClick={() => (isBatchMode ? onToggleSelect(automation.id) : onEdit(automation))}
     >
       <div className="atm-row-left">
@@ -1045,17 +1079,25 @@ function AutomationRow({
               <PlayIcon width={16} height={16} />
             </button>
             <div className="atm-row-menu-wrap" ref={menuRef}>
-              <span
+              <button
+                type="button"
                 className="atm-row-more-hint"
+                aria-label="更多操作"
+                aria-expanded={menuOpen}
                 onClick={(e) => {
                   e.stopPropagation();
                   setMenuOpen((v) => !v);
                 }}
               >
                 <MoreDotsIcon width={16} height={16} />
-              </span>
+              </button>
               {menuOpen && (
-                <div className="atm-row-menu" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="atm-row-menu"
+                  // 只是防止菜单内点击冒泡到行的守卫容器，不是控件本身
+                  role="presentation"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     type="button"
                     className="atm-row-menu-item"

@@ -1,37 +1,44 @@
-import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useComposerAttachments } from "./composer/use-composer-attachments";
 import { MentionPicker } from "./MentionPicker";
-import { Mic, X, type LucideIcon } from "lucide-react";
+import { Mic, type LucideIcon } from "lucide-react";
 import type { ElectronWindowApi } from "@/lib/platform/electron-api";
 import { ChevronDownIcon } from "@openbuddy/ui-primitives/icons";
 import { ModelSelector, type ModelOption, type ThinkingLevel } from "@openbuddy/ui-workbench";
-import { ThumbImg } from "@openbuddy/ui-experts";
+import { ThumbImg } from "@openbuddy/ui-experts/first-screen";
 import { ContextUsagePill } from "./ContextUsagePill";
 import { estimateSendCost } from "@/lib/billing/token-estimate";
 import {
   blocks,
   assemblePrompt,
-  blockLabel,
 } from "@/lib/markdown/content-blocks";
 import {
   createInputHistory,
   type InputHistory,
 } from "@/lib/ui/input-history";
-import { WorkspacePicker } from "@openbuddy/ui-shell";
-import { PermissionPicker } from "@openbuddy/ui-shared";
 import { SlashCommands } from "@openbuddy/ui-workbench";
 import { InputAddMenu } from "./InputAddMenu";
+import { PermissionPicker } from "@openbuddy/ui-shared";
 
 
 import { toggleVoice as toggleVoiceImpl, type VoiceRecognition } from "./composer/voice-recognition";
 import { readImageFile as readImageFileImpl, pickFiles as pickFilesImpl, pickImages as pickImagesImpl } from "./composer/send-payload";
 import { send as sendImpl, enqueue as enqueueImpl } from "./composer/send";
 import { useExtensionText } from "./composer/use-extension-text";
+import { useComposerPaste } from "./composer/use-composer-paste";
 import { usePopovers } from "./composer/use-popovers";
 import { usePluginSlots } from "./composer/use-plugin-slots";
 import { useInputHistory } from "./composer/use-input-history";
 import { PluginToolbar } from "./composer/PluginToolbar";
 import { ActionButtons } from "./composer/ActionButtons";
+import { ComposerSetupHint, ComposerDropzone } from "./composer/ComposerOverlays";
+import {
+  ComposerBlocks,
+  ComposerAttachmentChips,
+  ComposerImageAttachmentChips,
+} from "./composer/ComposerChips";
+import { ComposerSceneTag } from "./composer/ComposerSceneTag";
+import { ComposerMetaRow, ComposerDisclaimer } from "./composer/ComposerMetaRow";
 
 import type { AgentEntry } from "@openbuddy/shared-types";
 import type { WorkspaceInfo } from "@/lib/agent/pi-client";
@@ -247,7 +254,6 @@ export function ComposerInner({
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeExpertName, sceneTag, attachments]);
-  const hasRefs = blockList.length > 0;
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<VoiceRecognition | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -348,6 +354,13 @@ export function ComposerInner({
     externalText, externalTextNonce,
     draft, draftKey, updateText,
   });
+  // Paste handler — image/document intercept + caret restoration.
+  // Extracted from inline JSX (~80 lines) into a custom hook so the
+  // textarea block stays compact and the paste branch is unit-testable.
+  const onPaste = useComposerPaste({
+    ref, text, setImages, updateText, setCursorPos, onToast,
+    electronApi: (window as unknown as { api?: ElectronWindowApi }).api,
+  });
   // R1 - @-mention picker state, anchor rect, slash detection, and the two
   // pick-handlers used to live inline here (~110 lines); phase-3 split moved
   // them into the `usePopovers` hook.
@@ -380,128 +393,23 @@ export function ComposerInner({
       }
     >
       <section className={composerCls}>
-        {!apiReady && (
-          <button
-            type="button"
-            className="wb-composer__setup-hint"
-            onKeyDown={(event: ReactKeyboardEvent<HTMLButtonElement>) => {
-              if (event.key !== "Enter" && event.key !== " ") return;
-              event.preventDefault();
-              onOpenSettings?.();
-            }}
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenSettings?.();
-            }}
-          >
-            {/* R30 — 这块是覆盖整张卡片的**点击热区**(点哪儿都跳到设置)。
-                以前它同时把「请先配置 API Key 开始使用」再画一遍,而它
-                `inset: 0` + 垂直居中,文字正好压在输入区与底栏的接缝上
-                (实测文字 y≈390–405,底栏从 410 开始),而 textarea 的
-                placeholder 已经写着同一句话(y≈352)→ 同一句提示出现两次
-                还叠在底栏上。文字改成 sr-only:读屏仍能念出按钮名,视觉
-                上只留 placeholder 那一处。 */}
-            <span className="wb-sr-only">请先配置 API Key 开始使用</span>
-          </button>
-        )}
+        <ComposerSetupHint visible={!apiReady} onOpenSettings={onOpenSettings} />
 
-        {/* 拖拽文件落区遮罩(对齐 WorkBuddy drop-zone) */}
-        {dragActive && (
-          <div className="wb-composer__dropzone" role="status" aria-live="polite">
-            <span className="wb-composer__dropzone-text">松开以添加文件到对话</span>
-          </div>
-        )}
+        <ComposerDropzone visible={dragActive} />
 
-        {/* 多块提示预览(对齐 WorkBuddy content-blocks):引用块 chip 行 */}
-        {hasRefs && (
-          <div className="composer-blocks" title={assemblePrompt(blockList)}>
-            {blockList.map((b) => (
-              <span key={b.id} className="composer-blocks__chip">
-                {blockLabel(b)}
-              </span>
-            ))}
-          </div>
-        )}
+        <ComposerBlocks blocks={blockList} fullTitle={assemblePrompt(blockList)} />
 
-        {/* Attachment chips (file paths) */}
-        {attachments.length > 0 && (
-          <div className="composer-attachments">
-            {attachments.map((path) => (
-              <span key={path} className="composer-attachments__chip" title={path}>
-                <span className="composer-attachments__chip-name">
-                  {path.replace(/\\/g, "/").split("/").pop()}
-                </span>
-                <button
-                  type="button"
-                  className="composer-attachments__chip-remove"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setAttachments((prev) => prev.filter((p) => p !== path));
-                  }}
-                  aria-label="移除附件"
-                >
-                  <X size={12} strokeWidth={2} />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+        <ComposerAttachmentChips
+          attachments={attachments}
+          onRemove={(path) => setAttachments((prev) => prev.filter((p) => p !== path))}
+        />
 
-        {/* R1 — image attachment chips with thumbnail preview. Real bytes
-            are stored in `images` state and shipped via piSendContent. */}
-        {images.length > 0 && (
-          <div className="composer-image-attachments" role="list" aria-label="图片附件">
-            {images.map((img) => (
-              <span
-                key={img.id}
-                className="composer-image-attachments__chip"
-                title={img.name ?? img.mediaType}
-                role="listitem"
-              >
-                <img
-                  className="composer-image-attachments__thumb"
-                  src={`data:${img.mediaType};base64,${img.data}`}
-                  alt={img.name ?? "pasted image"}
-                />
-                <span className="composer-image-attachments__name">
-                  {img.name ?? "pasted image"}
-                </span>
-                <button
-                  type="button"
-                  className="composer-image-attachments__remove"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setImages((prev) => prev.filter((p) => p.id !== img.id));
-                  }}
-                  aria-label="移除图片"
-                >
-                  <X size={12} strokeWidth={2} />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+        <ComposerImageAttachmentChips
+          images={images}
+          onRemove={(id) => setImages((prev) => prev.filter((p) => p.id !== id))}
+        />
 
-        {/* "操作类型"黑色标签(首页选中能力分类后插入,× 可删除) */}
-        {sceneTag && (
-          <div className="wb-composer__scene-tag" role="group" aria-label={`操作类型 ${sceneTag.label}`}>
-            <span className="wb-composer__scene-tag-icon" aria-hidden="true">
-              <sceneTag.icon size={14} />
-            </span>
-            <span className="wb-composer__scene-tag-text">{sceneTag.label}</span>
-            <button
-              type="button"
-              className="wb-composer__scene-tag-remove"
-              aria-label={`移除 ${sceneTag.label}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onClearSceneTag?.();
-              }}
-            >
-              <X size={12} strokeWidth={2} />
-            </button>
-          </div>
-        )}
+        <ComposerSceneTag sceneTag={sceneTag} onClear={onClearSceneTag} />
 
         <textarea
           ref={ref}
@@ -513,7 +421,7 @@ export function ComposerInner({
             apiReady
               ? sceneTag
                 ? "" // 有操作类型标签时不显示占位文案(匹配 WorkBuddy)
-                : placeholder ?? "今天帮你做些什么? @ 引用对话文件,/ 调用技能与指令"
+                : placeholder ?? "问点什么 — @ 引用、/ 指令、⏎ 发送"
               : "请先配置 API Key 开始使用"
           }
           onChange={(e) => {
@@ -525,77 +433,7 @@ export function ComposerInner({
           onSelect={(e) =>
             setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? cursorPos)
           }
-          onPaste={(e) => {
-            // R0.8: Intercept image/* items from the clipboard so that pasting
-            // a screenshot is no longer silently dropped. We synthesize a
-            // Markdown image placeholder with the original file name when
-            // available; full image-upload pipeline is tracked separately.
-            //
-            // R2: Accept any file kind that `readImageFile` (now
-            // `readAttachmentFile`) accepts — image/* OR document/* types
-            // (PDF, plain text, markdown, csv, html, xml, json, yaml, docx).
-            // Documents skip the placeholder-text path (they ride through
-            // `piSendContent` as `type:"file"` parts instead of being
-            // inlined into the prompt body).
-            const fileItem = Array.from(e.clipboardData.items ?? []).find(
-              (it) => it.kind === "file" && (it.type.startsWith("image/") || /^(application\/pdf|text\/(plain|markdown|csv|html|xml)|application\/(json|xml|yaml)|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation))$/i.test(it.type)),
-            );
-            if (fileItem) {
-              e.preventDefault();
-              const file = fileItem.getAsFile();
-              if (!file) return;
-              void readImageFile(file).then((att) => {
-                if (!att) return;
-                setImages((prev) => [...prev, att]);
-                // Image attachments keep the legacy Markdown placeholder so
-                // the user sees something appear in the textarea even
-                // though the real bytes ride through `piSendContent`.
-                // Documents do not need a placeholder — they show up as a
-                // chip in `.composer-image-attachments` and ship as
-                // base64 alongside the user's prompt.
-                if (att.kind !== "file") {
-                  const ph = att.name ? `![pasted image: ${att.name}]()` : "![pasted image]()";
-                  const start = ref.current?.selectionStart ?? text.length;
-                  const end = ref.current?.selectionEnd ?? text.length;
-                  const next = text.slice(0, start) + ph + text.slice(end);
-                  updateText(next);
-                  const caret = start + ph.length;
-                  setCursorPos(caret);
-                  requestAnimationFrame(() => {
-                    if (ref.current) {
-                      ref.current.focus();
-                      ref.current.selectionStart = ref.current.selectionEnd = caret;
-                    }
-                  });
-                }
-              });
-              return;
-            }
-            const eventText = e.clipboardData.getData("text/plain");
-            const el = e.currentTarget;
-            const start = el.selectionStart ?? text.length;
-            const end = el.selectionEnd ?? text.length;
-            e.preventDefault();
-            const insert = (pasted: string) => {
-              if (pasted.length === 0) return;
-              const next = text.slice(0, start) + pasted + text.slice(end);
-              updateText(next);
-              const caret = start + pasted.length;
-              setCursorPos(caret);
-              requestAnimationFrame(() => {
-                if (ref.current) {
-                  ref.current.focus();
-                  ref.current.selectionStart = ref.current.selectionEnd = caret;
-                }
-              });
-            };
-            const nativeReadText = (window as unknown as { api?: ElectronWindowApi }).api?.clipboard?.readText;
-            if (typeof nativeReadText !== "function") {
-              insert(eventText);
-              return;
-            }
-            void nativeReadText().then((nativeText) => insert(nativeText || eventText)).catch(() => insert(eventText));
-          }}
+          onPaste={onPaste}
           onClick={(e) =>
             setCursorPos((e.target as HTMLTextAreaElement).selectionStart ?? cursorPos)
           }
@@ -740,28 +578,17 @@ export function ComposerInner({
       </section>
       {/* WB: meta 行在白卡外下方,透明背景,与卡片间距4px。permissionInline 时
           权限选择器已在卡片 footer 内,meta 行只补 WorkspacePicker(工作空间)。 */}
-      {showMeta && (
-        <div className="wb-composer-meta">
-          {showWorkspacePicker ? (
-            <WorkspacePicker
-              cwd={cwd}
-              workspaces={workspaces!}
-              onSelectWorkspace={onSelectWorkspace!}
-              loading={workspaceLoading}
-            />
-          ) : (
-            <button className="wb-composer-meta__btn" onClick={() => ph("选择工作空间")}>
-              选择工作空间 <ChevronDownIcon size="sm" />
-            </button>
-          )}
-          {!permissionInline && <PermissionPicker onToast={onToast} />}
-        </div>
-      )}
-      {showDisclaimer && (
-        <div className="wb-composer__disclaimer">
-          内容由 AI 生成，请核实重要信息
-        </div>
-      )}
+      <ComposerMetaRow
+        showWorkspacePicker={showWorkspacePicker}
+        cwd={cwd}
+        workspaces={workspaces}
+        onSelectWorkspace={onSelectWorkspace}
+        workspaceLoading={workspaceLoading}
+        permissionInline={permissionInline}
+        onToast={onToast}
+        onPlaceholder={ph}
+      />
+      <ComposerDisclaimer visible={showDisclaimer} />
     </div>
   );
 }

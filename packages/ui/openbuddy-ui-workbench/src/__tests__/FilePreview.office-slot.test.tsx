@@ -35,8 +35,8 @@ beforeEach(() => {
 });
 
 describe("FilePreview × workbench.preview.* slot", () => {
-  it("无插件覆盖时,docx 文件回落到内置 DocxPreview(data-office-kind='docx')", () => {
-    registerAllBuiltinUis();
+  it("无插件覆盖时,docx 文件回落到内置 DocxPreview(data-office-kind='docx')", async () => {
+    await registerAllBuiltinUis().done;
     render(
       <SlotProvider runtime={getRuntime()}>
         <FilePreview filename="report.docx" content={base64} docExtractor={() => null} />
@@ -48,9 +48,9 @@ describe("FilePreview × workbench.preview.* slot", () => {
     expect(screen.queryByTestId("custom-docx-preview")).toBeNull();
   });
 
-  it("第三方插件覆盖 workbench.preview.docx 后,FilePreview 渲染插件版本", () => {
+  it("第三方插件覆盖 workbench.preview.docx 后,FilePreview 渲染插件版本", async () => {
     const rt = getRuntime();
-    registerAllBuiltinUis();
+    await registerAllBuiltinUis().done;
 
     function CustomDocxPreview(props: Record<string, unknown>) {
       const p = customPreviewProps(props);
@@ -86,9 +86,9 @@ describe("FilePreview × workbench.preview.* slot", () => {
     }
   });
 
-  it("插件卸载后,FilePreview 自动回落到内置 DocxPreview(契约完整)", () => {
+  it("插件卸载后,FilePreview 自动回落到内置 DocxPreview(契约完整)", async () => {
     const rt = getRuntime();
-    registerAllBuiltinUis();
+    await registerAllBuiltinUis().done;
 
     function CustomDocxPreview(props: Record<string, unknown>) {
       return (

@@ -13,7 +13,7 @@ import {
   loadSession as loadSessionImpl,
   sessionInfo as sessionInfoImpl,
   sessionUsage as sessionUsageImpl,
-  sessionFile as sessionFileImpl,
+  sessionFileResult as sessionFileResultImpl,
   rewindSession as rewindSessionImpl,
 } from "../session-store";
 import {
@@ -45,7 +45,9 @@ export function buildSessionFacade(_state: AgentHostState) {
       loadSessionImpl(sessionId, cwd, options),
     sessionInfo: (sessionId: string) => sessionInfoImpl(sessionId),
     sessionUsage: (sessionId: string) => sessionUsageImpl(sessionId),
-    sessionFile: (sessionId: string) => sessionFileImpl(sessionId),
+    // Facade contract is `Promise<{ ok, path?, ... }>` — use the adapting
+    // wrapper, not the raw string primitive (see session-store.sessionFileResult).
+    sessionFile: (sessionId: string) => sessionFileResultImpl(sessionId),
     rewindSession: (sessionId: string, targetPromptIndex: number, mode = "conversation") =>
       rewindSessionImpl(sessionId, targetPromptIndex, mode),
     // --- session metadata ---

@@ -13,7 +13,7 @@
  *
  * @see docs/comet/changes/email-module-architecture-review/specs/email/spec.md §2.5 EmailSidebar
  */
-import type { EmailProviderDiagnostic } from "@openbuddy/capability-email";
+import type { EmailProviderDiagnostic } from "@openbuddy/capability-email/renderer";
 
 export interface ProviderDiagnosticCardProps {
   diagnostic: EmailProviderDiagnostic;

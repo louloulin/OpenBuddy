@@ -36,7 +36,7 @@ export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
   ipcMain.handle("agent:load-session", async (_e, args: { sessionId: string; cwd: string; traceId?: string }) => {
     await ensureAgentHost();
     const input = recordValue(args, "load session payload");
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     const sessionId = requiredString(input.sessionId, "session id");
     const traceId = optionalString(input.traceId, "traceId") ?? generateTraceId();
     hostReceived("agent:load-session", traceId, sessionId);
@@ -51,7 +51,7 @@ export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
   });
   ipcMain.handle("agent:session-info", async (_e, args: { sessionId: string }) => {
     await ensureAgentHost();
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     try {
       return agentHost.sessionInfo(requiredString(recordValue(args, "session info payload").sessionId, "session id"));
     } catch (error) {
@@ -61,13 +61,13 @@ export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
   });
   ipcMain.handle("agent:session-messages", async (_e, args: { sessionId: string }) => {
     await ensureAgentHost();
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     const input = recordValue(args, "session messages payload");
     return agentHost.readSessionEntries(requiredString(input.sessionId, "session id"));
   });
   ipcMain.handle("agent:session-usage", async (_e, args: { sessionId: string }) => {
     await ensureAgentHost();
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     try {
       return agentHost.sessionUsage(requiredString(recordValue(args, "session usage payload").sessionId, "session id"));
     } catch (error) {
@@ -86,17 +86,34 @@ export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
     return readPromptHistory(optionalFiniteInteger(input.limit, "limit", 100, 1, 500));
   });
   ipcMain.handle("session_search", async (_e, args: { query: string; cwd?: string | null; limit?: number | null }) => {
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     const input = recordValue(args, "session search payload");
+    const query = requiredString(input.query, "query");
+    const cwd = input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd");
+    const limit = optionalFiniteInteger(input.limit, "limit", 50, 1, 200);
+
+    // host-core 优先:它对会话正文做 FTS 索引,能命中 session 标题之外的内容。
+    // 未命中或不可用时落回 pi 的内存搜索,两条路径产出同一 SearchHit 形状。
+    // 冷启动直接搜索(还没碰过任何会话)时 piSessionDir 不会触发,这里补一次设根。
+    const { ensureSessionsRootSynced } = await import("../agent/host-modules/_host-paths");
+    await ensureSessionsRootSynced();
+    const { sessionSearchViaBridge } = await import("../agent/agent-session-search-bridge");
+    const hostHits = await sessionSearchViaBridge(query, limit);
+    if (hostHits.length > 0) {
+      return hostHits.map((hit) => ({
+        sessionId: hit.sessionId,
+        ...(hit.title ? { title: hit.title } : {}),
+        ...(hit.snippet ? { snippet: hit.snippet } : {}),
+        ...(hit.rank !== undefined ? { rank: hit.rank } : {}),
+        ...(hit.matchedAt ? { updatedAt: hit.matchedAt } : {}),
+      }));
+    }
+
     const { searchSessions } = await import("../agent/pi-resources/memory");
-    return searchSessions(
-      requiredString(input.query, "query"),
-      input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd"),
-      optionalFiniteInteger(input.limit, "limit", 50, 1, 200),
-    );
+    return searchSessions(query, cwd, limit);
   });
   ipcMain.handle("session_fork", async (_e, args: { sessionId: string; cwd?: string | null }) => {
-    casdoorAuth.authorize({ capability: "team.workspace" });
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     const input = recordValue(args, "session fork payload");
     const sessionId = requiredString(input.sessionId, "session id");
     const cwd = input.cwd === null || input.cwd === undefined ? undefined : absolutePath(input.cwd, "cwd");

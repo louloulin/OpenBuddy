@@ -142,7 +142,8 @@ import {
 } from "./pi-extensions";
 import { createProfileArtifactResolvers, discoverProfilePackageJsons, toModuleUrl } from "./profile-artifact-resolution";
 import { createOpenBuddyRpcUiContext } from "./pi-rpc-ui-context";
-import { permissionHandlers, resolvePermissionAction, type PermissionRule } from "@openbuddy/auth-permission";
+import { resolvePermissionAction, type PermissionRule } from "@openbuddy/auth-permission";
+import { agentPermissionBridge } from "./agent-permission-bridge";
 import type { HookPermissionDecision, HookPermissionRequest } from "./agent-hooks";
 import type { DeepSeekWorkspace, DeepSeekWorkspaceId } from "../deepseek/deepseek-runtime";
 import { WorkspaceOrderInvalidError } from "../deepseek/deepseek-runtime";
@@ -567,6 +568,7 @@ import {
   sessionInfo as sessionInfoImpl,
   sessionUsage as sessionUsageImpl,
   sessionFile as sessionFileImpl,
+  sessionFileResult as sessionFileResultImpl,
   rewindSession as rewindSessionImpl,
   formatBranchSummaryText as formatBranchSummaryTextImpl,
   renameSession as renameSessionImpl,
@@ -1119,7 +1121,7 @@ const installMicrokernelDepsClosures = {
   onEvent: onEventImpl, prompt: promptImpl, abort: abortImpl,
   persistPiSessionHeaderImpl, stopProfileWatchers,
   disposeProfileTypertRegistrations, disposeActiveHookProcesses,
-  drainActiveHookProcesses, permissionHandlers,
+  drainActiveHookProcesses, permissionBridge: agentPermissionBridge,
 };
 const buildMicrokernelHostDeps = (): InstallHostModuleDepsWithDomains => buildInstallHostModuleDeps(installMicrokernelDepsClosures);
 
@@ -1434,7 +1436,11 @@ export const agentHost = buildAgentHostFacade({
   loadSession: loadSessionImpl,
   sessionInfo: sessionInfoImpl,
   sessionUsage: sessionUsageImpl,
-  sessionFile: sessionFileImpl,
+  // Facade shape `{ ok, path?, sizeBytes?, error? }` — NOT the raw string
+  // `sessionFile` primitive. See `sessionFileResult` in
+  // host-modules/session-store for why (rewind_points / session_fork both
+  // read `.path` and silently broke when this bound the sync helper).
+  sessionFile: sessionFileResultImpl,
   rewindSession: rewindSessionImpl,
   reloadMcp: () => reloadMcpImpl(state),
   authorizeMcp: (serverName, signal) => authorizeMcpImpl(state, serverName, signal),

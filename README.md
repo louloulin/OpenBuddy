@@ -40,6 +40,8 @@ It ships the polished UI, plan mode, skills, MCP connectors, and an enterprise-g
 
 ---
 
+- **AI Chat overhaul (Plan5)**: streaming caret, live reasoning card, inline tool expand, citation/artifact chips, message-level rewind/fork, parallel-tool visualization, shortcut overlay — see `WORKBUDDY_UI_REFERENCE.md`.
+
 ## 📑 Table of Contents
 
 - [Why OpenBuddy?](#-why-openbuddy)

@@ -1,0 +1,34 @@
+{
+  "name": "@openbuddy/ui-state",
+  "version": "0.16.0",
+  "private": true,
+  "type": "module",
+  "description": "渲染层共享状态（stores）契约面（阶段2 反向依赖收敛目标）",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./canvas-store": "./src/canvas-store.ts",
+    "./feedback-store": "./src/feedback-store.ts",
+    "./global-confirm-store": "./src/global-confirm-store.ts",
+    "./pending-expert-store": "./src/pending-expert-store.ts",
+    "./permission-store": "./src/permission-store.ts",
+    "./projects-store": "./src/projects-store.ts",
+    "./question-store": "./src/question-store.ts",
+    "./subagent-store": "./src/subagent-store.ts",
+    "./toast-store": "./src/toast-store.ts",
+    "./session-store": "./src/session-store.ts"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "typescript": "^5.6.3",
+    "vitest": "2.1.9"
+  }
+}

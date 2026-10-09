@@ -45,7 +45,9 @@ describe("MessageItem — R8.15 model + throughput chips", () => {
     const pill = container.querySelector(".msg__meta-chip--model");
     expect(pill).toBeTruthy();
     expect(pill?.textContent).toContain("claude-opus-4-7");
-    expect(pill?.getAttribute("title")).toBe("model: claude-opus-4-7");
+    // The tooltip shows the same shortened label as the pill body — a raw
+    // provider path (`custom_anthropic/minimax/…`) must never leak into UI.
+    expect(pill?.getAttribute("title")).toBe("claude-opus-4-7");
     // The pill must carry a lucide icon (Cpu).
     expect(pill?.querySelector("svg")).toBeTruthy();
   });

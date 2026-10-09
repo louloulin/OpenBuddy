@@ -20,6 +20,7 @@ import type { DeepSeekCordisInvocation, DeepSeekCordisRuntimeSnapshot } from "@o
 import { type AgentHostState } from "./_state-shape";
 import type { AgentHostUiRequestValue as UiRequestValue } from "./_state-shape";
 import { createDefaultAgentHostState } from "./_default-state";
+import { invokeDeepSeekCordis as invokeDeepSeekCordisOnRuntime } from "./deepseek/bridge";
 
 // ---------------------------------------------------------------------------
 // Phase L.1 — DSH Pi bridge constants moved in from `electron/main/deepseek/
@@ -130,9 +131,11 @@ export function deepSeekPiBridgeDescription(): {
 /**
  * 调用 DSH Cordis plugin entry.
  * 用于 IPC `invokeDeepSeekCordis` 让 renderer 触发 plugin 执行.
+ * runtime 未激活时报错文案走 bridge 的契约 ("deepseek-cordis: runtime is
+ * not active") —— 此前这里自己抛 "not initialized", 与契约文案分叉,
+ * electron 冒烟的 deepSeekCordisInvoke 检查按契约正则匹配不到.
  */
 export async function invokeDeepSeekCordis(invocation: DeepSeekCordisInvocation): Promise<unknown> {
   if (!state) throw new Error("dsh-bridge-helpers: not installed");
-  if (!state.deepSeekCordisRuntime) throw new Error("dsh-bridge-helpers: deepSeekCordisRuntime not initialized");
-  return state.deepSeekCordisRuntime.invoke(invocation);
+  return invokeDeepSeekCordisOnRuntime(state.deepSeekCordisRuntime, invocation);
 }

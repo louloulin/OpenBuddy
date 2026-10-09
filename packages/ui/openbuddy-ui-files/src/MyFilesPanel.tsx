@@ -358,6 +358,20 @@ function LocalFilesTab({
               key={file.path}
               className={`myfiles-row ${file.isDir ? "myfiles-row--folder" : ""}`}
               onClick={() => file.isDir && handleEnterFolder(file.path)}
+              // 只有文件夹真的可点，文件行保持纯展示 —— 不给不可用的东西
+              // 加上按钮语义。role + tabIndex + 方向无关的 Enter/Space 路径，
+              // 因为这一行是网格布局，里面还有若干 span，套 <button> 会改版式。
+              role={file.isDir ? "button" : undefined}
+              tabIndex={file.isDir ? 0 : undefined}
+              onKeyDown={
+                file.isDir
+                  ? (e) => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault();
+                      handleEnterFolder(file.path);
+                    }
+                  : undefined
+              }
             >
               <span className="myfiles-col-name">
                 <FileTypeIcon type={file.type} size={18} />

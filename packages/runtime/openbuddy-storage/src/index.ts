@@ -38,6 +38,14 @@ export { TaskCatalog, type TaskCatalogEntry, type TaskCatalogOptions } from "./s
 export { ApprovalCatalog, type ApprovalCatalogOptions, type ApprovalCatalogRecord } from "./sqlite/approval-catalog";
 export { McpRegistry, type McpRegistryRecord } from "./sqlite/mcp-registry";
 export { MemoryIndex, type MemoryDocument } from "./sqlite/memory";
+export {
+  CanvasCatalog,
+  type CanvasCatalogOptions,
+  type CanvasDocument,
+  type CanvasDocumentInput,
+  type CanvasKind,
+  type CanvasRevision,
+} from "./sqlite/canvas-catalog";
 export { EmailStateStore, type EmailStateDocument, type EmailStateStoreOptions } from "./sqlite/email-state";
 export { WorkspaceCatalog, type WorkspaceCatalogDocument, type WorkspaceCatalogOptions, type WorkspaceCatalogRecord } from "./sqlite/workspace-catalog";
 export { CalendarCatalog, type CalendarCatalogEvent, type CalendarCatalogOptions, type CalendarCatalogQuery, type CalendarEventStatus } from "./sqlite/calendar-catalog";

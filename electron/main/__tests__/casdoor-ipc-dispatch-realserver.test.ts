@@ -98,6 +98,7 @@ vi.mock("electron", () => {
   const reg = (globalThis as unknown as { __registry: Map<string, CapturedHandler> }).__registry;
   return {
     app: {
+      getVersion: () => "0.0.0-test",
       getPath: (key: string) => key === "userData" ? "/tmp/openbuddy-casdoor-ipc-test" : "/tmp",
       on: vi.fn(), exit: vi.fn(), setPath: vi.fn(), quit: vi.fn(),
     },
@@ -432,10 +433,9 @@ describe("casdoor IPC dispatch 真实端到端", () => {
     });
 
     it("casdoor:introspect-token 调用 introspectCasdoorToken (handler 硬编码空 token)", async () => {
-      casdoorAuthMock.authorize.mockReturnValue(true);
       casdoorManagementMock.introspectCasdoorToken.mockResolvedValue({ active: true, sub: "u1" });
       const result = await callHandler("casdoor:introspect-token");
-      expect(casdoorAuthMock.authorize).toHaveBeenCalledWith({ permission: "tenant.users.read" });
+      expect(casdoorAuthMock.assertAuthorized).toHaveBeenCalledWith({ permission: "tenant.users.read" });
       expect(casdoorManagementMock.introspectCasdoorToken).toHaveBeenCalledWith({ token: "" });
       expect(result).toEqual({ active: true, sub: "u1" });
     });

@@ -1,0 +1,12 @@
+[package]
+name = "openbuddy-error-codes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "OpenBuddy error code constants mirroring @openbuddy/shared/error-codes"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

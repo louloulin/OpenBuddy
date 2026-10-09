@@ -107,8 +107,8 @@ describe("EmailAiPanel + createDefaultEmailAiBindings (real wiring)", () => {
     const bindings = createDefaultEmailAiBindings();
     const runtime = makeRuntime(bindings);
 
-    const threads = [
-      { id: "t-customer", accountId: "a1", subject: "客户报价", from: "customer@example.com", snippet: "请确认", date: "2026-09-15T11:00:00.000Z", unread: true, aiChips: ["priority"] as Array<"priority" | "reply" | "noise"> },
+    const threads: Array<{ id: string; accountId: string; subject: string; from: { name?: string; address: string }; snippet: string; date: string; unread: boolean; aiChips: Array<"priority" | "reply" | "action" | "muted">; messageCount: number; labels: string[] }> = [
+      { id: "t-customer", accountId: "a1", subject: "客户报价", from: { address: "customer@example.com" }, snippet: "请确认", date: "2026-09-15T11:00:00.000Z", unread: true, aiChips: ["priority"] as Array<"priority" | "reply" | "action" | "muted">, messageCount: 1, labels: [] as string[] },
     ];
 
     expect(() =>
@@ -185,7 +185,6 @@ function makeRuntime(bindings: CapabilityBindings): AiInboxRuntime {
             await bindings.createDraft({
               taskTitle: action.taskTitle,
               ...(action.taskDueAt !== undefined ? { dueAt: action.taskDueAt } : {}),
-              ...(action.taskOwner !== undefined ? { taskOwner: action.taskOwner } : {}),
             });
           }
           receipts.push({ actionId: action.id, threadId: action.threadId, kind: action.kind, status: "executed" });

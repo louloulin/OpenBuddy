@@ -29,7 +29,6 @@ import { microkernelSnapshot } from "../client";
  * 并给每行打 `implicitRoot` 标记,使"等插件替换的根槽"不会被误报成
  * "有个槽位没人实现"。
  */
-import { microkernelSnapshot } from "../client";
 
 describe("microkernelSnapshot — 与 SlotCore 的一致性", () => {
   it("snapshotRows 等于 slots.length,且 slotCount 等于 size()(不含隐式 root)", () => {

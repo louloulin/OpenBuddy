@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
-import { createWebHarnessTransport } from "./harness-transport";
+import { createWebHarnessTransport, type HarnessTransportEvent } from "./harness-transport";
 import { HarnessServer, type HarnessServerAgent } from "../../../../electron/main/harness/harness-server";
 
 class FakeSocket {

@@ -228,7 +228,7 @@ interface StripShellProps {
 
 function StripShell({ tone, icon, title, meta, children, actions }: StripShellProps): JSX.Element {
   return (
-    <section className={`ai-action-strip ai-action-strip--${tone}`} data-tone={tone} role="region" aria-label="AI 行动计划">
+    <section className={`ai-action-strip ai-action-strip--${tone}`} data-tone={tone} aria-label="AI 行动计划">
       <span className="ai-action-strip__icon" aria-hidden="true">
         {icon}
       </span>

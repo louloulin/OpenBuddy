@@ -32,8 +32,12 @@ export function ProjectInputDialog({
   }, [onCancel, onConfirm, value]);
 
   return (
-    <div className="modal-overlay project-dialog-overlay" onClick={onCancel}>
-      <div className="create-colleague-dialog project-dialog" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
+    <div
+      className="modal-overlay project-dialog-overlay"
+      role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div className="create-colleague-dialog project-dialog" role="dialog" aria-modal="true" aria-label={title}>
         <div className="create-colleague-header">
           <h3>{title}</h3>
           <button type="button" className="create-colleague-close" onClick={onCancel} aria-label="关闭">×</button>
@@ -71,8 +75,12 @@ export function ProjectConfirmDialog({
   onConfirm: () => void;
 }) {
   return (
-    <div className="modal-overlay project-dialog-overlay" onClick={onCancel}>
-      <div className="create-colleague-dialog project-dialog" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
+    <div
+      className="modal-overlay project-dialog-overlay"
+      role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div className="create-colleague-dialog project-dialog" role="dialog" aria-modal="true" aria-label={title}>
         <div className="create-colleague-header">
           <h3>{title}</h3>
           <button type="button" className="create-colleague-close" onClick={onCancel} aria-label="关闭">×</button>

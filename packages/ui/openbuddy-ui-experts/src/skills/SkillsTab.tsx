@@ -214,6 +214,7 @@ export function SkillsTab({ pills, onToast }: Props) {
                   </div>
                   <label className="sk-toggle" title={s.enabled ? "已启用" : "已禁用"}>
                     <input type="checkbox" checked={s.enabled}
+                      aria-label={`启用 ${s.displayName || s.name}`}
                       onChange={() => handleToggle(s, !s.enabled)} />
                     <span className="sk-toggle-track"><span className="sk-toggle-thumb" /></span>
                   </label>

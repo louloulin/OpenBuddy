@@ -4,7 +4,7 @@
  * 通过 callbacks 接收所有 mutation，避免列表行直接依赖 provider/IPC；这让 500+
  * 线程的虚拟化和独立性能测试成为可能，也让错误统一回到 EmailPanel 的 UX 层。
  */
-import type { EmailThreadPreview, EmailManagementCapability } from "@openbuddy/capability-email";
+import type { EmailThreadPreview, EmailManagementCapability } from "@openbuddy/capability-email/renderer";
 
 export interface EmailListProps {
   threads: EmailThreadPreview[];

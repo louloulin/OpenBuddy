@@ -131,7 +131,7 @@ describe("ui-request-resolver", () => {
     stub.state.pendingUiRequests.set("r1", {
       kind: "permission",
       sessionId: "s1",
-      permission: { toolName: "bash" },
+      permission: { toolName: "bash", pattern: "git status" },
       resolve: vi.fn(),
     });
     stub.permissionReadRules.mockResolvedValueOnce([{ action: "deny", tool: "other" }]);
@@ -141,8 +141,21 @@ describe("ui-request-resolver", () => {
     expect(stub.permissionReadRules).toHaveBeenCalled();
     expect(stub.permissionWriteRules).toHaveBeenCalledWith([
       { action: "deny", tool: "other" },
-      { action: "allow", tool: "bash" },
+      { action: "allow", tool: "bash", pattern: "git status" },
     ]);
+  });
+
+  it("allow_always without a pattern stays session-scoped (never a tool-wide permanent allow)", async () => {
+    stub.state.pendingUiRequests.set("r1", {
+      kind: "permission",
+      sessionId: "s1",
+      permission: { toolName: "write" },
+      resolve: vi.fn(),
+    });
+    resolveUiRequest("r1", { decision: "allow_always" });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(stub.permissionWriteRules).not.toHaveBeenCalled();
+    expect(stub.state.hookPermissionSessionRules.get("s1")).toBeUndefined();
   });
 
   it("allow (single) writes session-scoped rules", () => {
@@ -186,7 +199,7 @@ describe("ui-request-resolver", () => {
     stub.state.pendingUiRequests.set("r1", {
       kind: "permission",
       sessionId: "s1",
-      permission: { toolName: "bash" },
+      permission: { toolName: "bash", pattern: "git status" },
       resolve: vi.fn(),
     });
     stub.permissionWriteRules.mockRejectedValueOnce(new Error("write failed"));

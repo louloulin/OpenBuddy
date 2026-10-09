@@ -19,6 +19,7 @@ import type { AppShellRuntime } from "./types";
 export function AppStatusBar({ runtime }: { runtime: AppShellRuntime }) {
   const bridgeAvailable = useBridgeHealthStore((s) => s.available);
   const bridgeReason = useBridgeHealthStore((s) => s.reason);
+  const hostCore = useBridgeHealthStore((s) => s.hostCore);
   const refresh = useBridgeHealthStore((s) => s.refresh);
   const themeSnap = useThemeSnapshotV2();
 
@@ -33,14 +34,28 @@ export function AppStatusBar({ runtime }: { runtime: AppShellRuntime }) {
   const initError = runtime.initError;
   const initState = initError ? "error" : init ? "ready" : "idle";
 
+  // bridge 活着 ≠ 本地内核活着:host-core 连续崩溃时 IPC 通道依旧通畅,
+  // 但权限 / 密钥 / 搜索都已退到 TS 兜底实现。此时要让用户看见,否则「一切正常」
+  // 的假象会掩盖真实的降级。
+  const hostCoreDegraded = hostCore?.mode === "degraded" || hostCore?.mode === "unavailable";
+  const bridgeItem: StatusItem = hostCoreDegraded
+    ? {
+        key: "bridge",
+        tone: "error",
+        label: `本地内核降级（崩溃 ${hostCore?.crashes ?? 0} 次）`,
+        title: `host-core ${hostCore?.mode ?? "unavailable"}${hostCore?.lastReason ? `：${hostCore.lastReason}` : ""} —— 相关能力已降级到内置实现`,
+        onClick: refresh,
+      }
+    : {
+        key: "bridge",
+        tone: bridgeAvailable ? "ok" : "error",
+        label: bridgeAvailable ? "本地内核已连接" : `内核离线${bridgeReason ? `（${bridgeReason}）` : ""}`,
+        title: bridgeAvailable ? "Electron bridge available" : bridgeReason ?? "bridge unavailable",
+        onClick: refresh,
+      };
+
   const left: StatusItem[] = [
-    {
-      key: "bridge",
-      tone: bridgeAvailable ? "ok" : "error",
-      label: bridgeAvailable ? "本地内核已连接" : `内核离线${bridgeReason ? `（${bridgeReason}）` : ""}`,
-      title: bridgeAvailable ? "Electron bridge available" : bridgeReason ?? "bridge unavailable",
-      onClick: refresh,
-    },
+    bridgeItem,
     {
       key: "agent",
       tone: initState === "ready" ? "ok" : initState === "error" ? "error" : "busy",

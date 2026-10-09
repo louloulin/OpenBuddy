@@ -2,7 +2,7 @@
 
 This is the **public roadmap** for OpenBuddy. It is updated quarterly and reflects what the maintainer team plans to ship in the next 3 release cycles. For the full backlog see [`../TODO.md`](../TODO.md).
 
-**Last updated:** 2026-09-01 · **Next refresh:** 2026-12-01
+**Last updated:** 2026-09-22 · **Next refresh:** 2026-12-22
 
 ---
 
@@ -12,9 +12,10 @@ This is the **public roadmap** for OpenBuddy. It is updated quarterly and reflec
 ```
 2026 Q3 ──────────────────────────────────────────►
    ▲
-   │ ✅ v0.15.0 — Casdoor × NewAPI × OpenBuddy (you are here)
-   │ 🚧 v0.15.0 — Linux builds + permission panel
-   │ 🔮 v0.15.0 — Plugin marketplace + voice input
+   │ ✅ v0.15.0 — Casdoor × NewAPI × OpenBuddy
+   │ ✅ v0.16.0 — Microkernel slots + plugin trust (you are here)
+   │ 🚧 v0.17.0 — Linux builds + permission panel
+   │ 🔮 v0.18.0 — Marketplace + voice input
 ```
 
 ### Themes
@@ -27,7 +28,7 @@ We're organizing the roadmap around 5 themes. Each theme is owned by a maintaine
 4. **Harden the platform** — code signing, notarization, audit log shipping
 5. **Grow the community** — docs i18n, regional meetups, OpenBuddyCon
 
-### v0.15.0 — Linux first-class (target: 2026 Q4)
+### v0.17.0 — Linux first-class (target: 2026 Q4)
 
 | Theme | Item | Status |
 |---|---|---|
@@ -41,7 +42,7 @@ We're organizing the roadmap around 5 themes. Each theme is owned by a maintaine
 | 📚 Docs | Architecture deep-dive video | planned |
 | 🧪 Tests | Bump to 1,300+ tests | planned |
 
-### v0.15.0 — Marketplace + Voice (target: 2027 Q1)
+### v0.18.0 — Marketplace + Voice (target: 2027 Q1)
 
 | Theme | Item | Status |
 |---|---|---|
@@ -55,7 +56,7 @@ We're organizing the roadmap around 5 themes. Each theme is owned by a maintaine
 | 🔎 Search | Cross-session full-text search | planned |
 | 🧪 Tests | Bump to 1,500+ tests | planned |
 
-### v0.15.0 — Multi-agent at scale (target: 2027 Q2)
+### v0.19.0 — Multi-agent at scale (target: 2027 Q2)
 
 | Theme | Item | Status |
 |---|---|---|
@@ -67,7 +68,7 @@ We're organizing the roadmap around 5 themes. Each theme is owned by a maintaine
 | 🌐 i18n | Spanish, German localization | planned |
 | 🧪 Tests | Bump to 1,700+ tests | planned |
 
-### Beyond v0.15.0
+### Beyond v0.19.0
 
 We're tracking longer-horizon ideas in GitHub Discussions with the `roadmap-far` label. Some favorites:
 
@@ -91,6 +92,16 @@ To propose a new item, open a [GitHub Discussion](https://github.com/louloulin/O
 
 ### Recently shipped (last 4 releases)
 
+#### ✅ v0.16.0 (2026-09-22) — Microkernel slots × plugin trust × self-updating desktop
+
+- Microkernel slot surface: `placeholder.*` + last 4 dead slots wired, "declared but unconsumed" = 0
+- Three-state slot audit (`ui-slot-coverage.mjs` / `ui-slot-audit.mjs`) with a CI guard
+- Plugin integrity badge (`plugin:hash-content`) + Pi extension marketplace (multi-source, search, uninstall)
+- `electron-updater` wired at startup + unsigned DMG build profile + `docs/PRIVACY.md`
+- Renderer contract packages (`ui-contract` / `platform` / `agent-rpc` / `ui-state`) + tsconfig collapse
+- Build output moved `out/` → `dist/`; 134 stray emit artifacts removed
+- New release tooling: `scripts/bump-version.mjs` (88 files, one command) + `scripts/extract-release-notes.mjs`
+
 #### ✅ v0.15.0 (2026-09-01) — Casdoor × NewAPI × OpenBuddy
 
 - Casdoor OIDC + admin REST
@@ -100,21 +111,21 @@ To propose a new item, open a [GitHub Discussion](https://github.com/louloulin/O
 - Admin Portal SPA
 - 309 → 400 tests added
 
-#### ✅ v0.15.0 (2026-08-17) — grok → Pi + moon
+#### ✅ Milestone (2026-08-17) — grok → Pi + moon
 
 - In-process Pi agent over Electron bridge
 - 32-project moon DAG monorepo
 - Plugin-host + plugin discovery
 - Tauri removal (gated by moon migration)
 
-#### ✅ v0.15.0 (2026-08-03) — Casdoor enterprise auth
+#### ✅ Milestone (2026-08-03) — Casdoor enterprise auth
 
 - OIDC PKCE
 - Tenant policy
 - Audit log
 - 6 admin REST endpoints
 
-#### ✅ v0.15.0 (2026-07-20) — Multi-agent foundation
+#### ✅ Milestone (2026-07-20) — Multi-agent foundation
 
 - A2A protocol package
 - Room / inbox / task graph
@@ -132,9 +143,10 @@ Items marked **deprecated** stay functional for at least 2 minor releases before
 ```
 2026 Q3 ──────────────────────────────────────────►
    ▲
-   │ ✅ v0.15.0 — Casdoor × NewAPI × OpenBuddy(你在这里)
-   │ 🚧 v0.15.0 — Linux 构建 + 权限面板
-   │ 🔮 v0.15.0 — 插件市场 + 语音输入
+   │ ✅ v0.15.0 — Casdoor × NewAPI × OpenBuddy
+   │ ✅ v0.16.0 — 微内核槽位 + 插件信任(你在这里)
+   │ 🚧 v0.17.0 — Linux 构建 + 权限面板
+   │ 🔮 v0.18.0 — 插件市场 + 语音输入
 ```
 
 ### 主题
@@ -147,7 +159,7 @@ Items marked **deprecated** stay functional for at least 2 minor releases before
 4. **硬化平台** —— 代码签名、公证、审计日志外发
 5. **壮大社区** —— 文档 i18n、地区聚会、OpenBuddyCon
 
-### v0.15.0 — Linux 一等公民(目标:2026 Q4)
+### v0.17.0 — Linux 一等公民(目标:2026 Q4)
 
 | 主题 | 项 | 状态 |
 |---|---|---|
@@ -161,7 +173,7 @@ Items marked **deprecated** stay functional for at least 2 minor releases before
 | 📚 文档 | 架构深度视频 | 计划 |
 | 🧪 测试 | 提到 1,300+ 测试 | 计划 |
 
-### v0.15.0 — 市场 + 语音(目标:2027 Q1)
+### v0.18.0 — 市场 + 语音(目标:2027 Q1)
 
 | 主题 | 项 | 状态 |
 |---|---|---|
@@ -175,7 +187,7 @@ Items marked **deprecated** stay functional for at least 2 minor releases before
 | 🔎 搜索 | 跨会话全文搜索 | 计划 |
 | 🧪 测试 | 提到 1,500+ 测试 | 计划 |
 
-### v0.15.0 — 多 Agent 规模化(目标:2027 Q2)
+### v0.19.0 — 多 Agent 规模化(目标:2027 Q2)
 
 | 主题 | 项 | 状态 |
 |---|---|---|
@@ -187,7 +199,7 @@ Items marked **deprecated** stay functional for at least 2 minor releases before
 | 🌐 i18n | 西语、德语本地化 | 计划 |
 | 🧪 测试 | 提到 1,700+ 测试 | 计划 |
 
-### v0.15.0 之后
+### v0.19.0 之后
 
 我们在 GitHub Discussions 里用 `roadmap-far` 标签跟踪更长远的想法。亮点:
 
@@ -211,6 +223,16 @@ Items marked **deprecated** stay functional for at least 2 minor releases before
 
 ### 最近发布(过去 4 个版本)
 
+#### ✅ v0.16.0(2026-09-22)· 微内核槽位 × 插件信任 × 自更新桌面端
+
+- 微内核槽位面:`placeholder.*` + 最后 4 个 dead 槽接线完成,「声明了却没人消费」归零
+- 槽位三态审计(`ui-slot-coverage.mjs` / `ui-slot-audit.mjs`)+ CI 守卫
+- 插件完整性徽章(`plugin:hash-content`)+ Pi 扩展市场(多源 / 搜索 / 卸载)
+- 启动时接通 `electron-updater` + 未签名 DMG 构建档 + `docs/PRIVACY.md`
+- 渲染层契约包(`ui-contract` / `platform` / `agent-rpc` / `ui-state`)+ tsconfig 收拢
+- 构建产物 `out/` → `dist/`;清理 134 个游离编译产物
+- 新增发布脚本:`scripts/bump-version.mjs`(一条命令改 88 个文件)+ `scripts/extract-release-notes.mjs`
+
 #### ✅ v0.15.0(2026-09-01)— Casdoor × NewAPI × OpenBuddy
 
 - Casdoor OIDC + 管理 REST
@@ -220,21 +242,21 @@ Items marked **deprecated** stay functional for at least 2 minor releases before
 - Admin Portal SPA
 - 新增 309 → 400 测试
 
-#### ✅ v0.15.0(2026-08-17)— grok → Pi + moon
+#### ✅ 里程碑(2026-08-17)· grok → Pi + moon
 
 - 进程内 Pi Agent 跨 Electron bridge
 - 32 工程 moon DAG monorepo
 - Plugin-host + 插件发现
 - Tauri 移除(在 moon 迁移后)
 
-#### ✅ v0.15.0(2026-08-03)— Casdoor 企业鉴权
+#### ✅ 里程碑(2026-08-03)· Casdoor 企业鉴权
 
 - OIDC PKCE
 - 租户策略
 - 审计日志
 - 6 个管理 REST 端点
 
-#### ✅ v0.15.0(2026-07-20)— 多 Agent 基底
+#### ✅ 里程碑(2026-07-20)· 多 Agent 基底
 
 - A2A 协议包
 - Room / inbox / 任务图
