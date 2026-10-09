@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
-pnpm-lock.yaml
+# pnpm-lock.yaml is committed on purpose: CI runs `pnpm install --frozen-lockfile`
+# and `actions/setup-node` with `cache: pnpm`, both of which require it. Keep the
+# Rust side's convention too — crates/Cargo.lock is tracked for the same reason.
 package-lock.json
 
 # Build output
