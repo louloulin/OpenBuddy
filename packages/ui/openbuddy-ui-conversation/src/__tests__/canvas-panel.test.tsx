@@ -106,6 +106,26 @@ describe("CanvasPanel", () => {
     expect(useCanvasStore.getState().open).toBe(false);
   });
 
+  // 这两条是那处 a11y 豁免(eslint.config.mjs 里 CanvasPanel.tsx 与
+  // Resizable.tsx 同组)的背书:豁免的理由是"键盘路径是真的",所以必须有
+  // 测试真的按一次方向键。没有断言的豁免就是装饰。
+  it("exposes the resize sash as an accessible separator", () => {
+    useCanvasStore.getState().openTab(TAB_A);
+    render(<CanvasPanel />);
+    expect(screen.getByRole("separator")).toBeTruthy();
+  });
+
+  it("resizes with arrow keys: 8px, or 32px with shift", () => {
+    useCanvasStore.getState().openTab(TAB_A);
+    useCanvasStore.getState().setWidth(300);
+    render(<CanvasPanel />);
+    const sash = screen.getByRole("separator");
+    fireEvent.keyDown(sash, { key: "ArrowRight" });
+    expect(useCanvasStore.getState().width).toBe(292);
+    fireEvent.keyDown(sash, { key: "ArrowLeft", shiftKey: true });
+    expect(useCanvasStore.getState().width).toBe(324);
+  });
+
   it("sandbox frame runs without allow-same-origin so it cannot reach the host", async () => {
     useCanvasStore.getState().openTab(TAB_B);
     render(<CanvasPanel />);

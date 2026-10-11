@@ -567,8 +567,9 @@ const recordProcessError = (line) => {
   // assertions (automation / memory / folder-trust): the throw IS the
   // expected contract, so it must not count as an unexpected main error.
   if (/automation is now owned by pi-goal-list-loop-audit|automations_snapshot[^\n]*retired/i.test(line)) return false;
-  if (/(?:memory(?:_list|_save|_get|_rewrite|_delete)?[^\n]*is removed \(Stage C-4\))/i.test(line)) return false;
-  if (/(?:folder-trust:[^\n]*is removed \(Stage C-1\)|folder_trust_respond[^\n]*is removed \(Stage C-1\))/i.test(line)) return false;
+  // (memory / folder-trust 的"已移除"文案在阶段 0/1 之后不再产生:前者的通道
+  //  整体删除,后者接回了真实能力包。原先的两条豁免已删除 —— 留着就是无对象的
+  //  豁免,会悄悄吞掉未来真出问题的日志。)
   processErrors.push(line);
   return true;
 };
@@ -972,7 +973,14 @@ try {
 
   await window.evaluate(async () => window.api.invoke("agent:extensions-reload"));
 
-  const supportedRoutes = ["助理", "项目", "专家·技能·连接器", "自动化"];
+  // 「自动化」在阶段 0 下线(后端 Stage G-1c 删除,面板每个读写都抛错)。
+  // 这里不仅把它从路由表里拿掉,还反过来断言入口**不存在** —— 否则哪天有人
+  // 把 nav item 加回来,冒烟会安静地变绿,而用户点进去看到的是死面。
+  const removedNavLabel = "自动化";
+  if (await window.getByRole("button", { name: removedNavLabel, exact: true }).count()) {
+    throw new Error(`导航项「${removedNavLabel}」不应存在(阶段 0 已下线其入口)`);
+  }
+  const supportedRoutes = ["助理", "项目", "专家·技能·连接器"];
   for (const route of supportedRoutes) {
     const blockingOverlays = window.locator(".modal-overlay:visible");
     for (let index = 0; index < await blockingOverlays.count(); index += 1) {
@@ -1432,9 +1440,17 @@ try {
   if (retiredPlanRpc?.result?.ok !== false || retiredPlanRpc?.result?.error?.code !== "method-unavailable") {
     throw new Error(`capability.plan should be retired (method-unavailable), got: ${JSON.stringify(retiredPlanRpc)}`);
   }
-  const planModeStub = await invoke("plan-mode:get");
-  if (planModeStub !== null) {
-    throw new Error(`plan-mode:get passthrough stub expected null, got: ${JSON.stringify(planModeStub)}`);
+  // 阶段 0:plan-mode:* 通道**整体删除**(既不是空桩、也不是 passthrough stub)。
+  // 计划模式归 pi-plan-mode,渲染层通过 /plan 指令 + pi://plan-mode 事件交互,
+  // 所以这里断言的是"通道不存在"——invoke 必须被 preload/主进程拒绝。
+  let planModeChannelGone = false;
+  try {
+    await invoke("plan-mode:get");
+  } catch {
+    planModeChannelGone = true;
+  }
+  if (!planModeChannelGone) {
+    throw new Error("plan-mode:get 应该已被移除(阶段 0),但调用仍然成功");
   }
   // Stage B: openbuddy-task capability removed; task RPCs now go through pi-native
   // (@juicesharp/rpiv-todo when installed). The smoke test deliberately skips
@@ -1575,23 +1591,26 @@ try {
       || rendererContributionAfterRemove) {
       throw new Error(`Renderer profile package lifecycle failed: ${JSON.stringify({ rendererEntriesAfterInstall, rendererBootAfterInstall, rendererEntriesAfterRemove, rendererBootAfterRemove, rendererContributionAfterInstall, rendererContributionAfterRemove })}`);
     }
-    // Stage C-4: memory IPC retired to pi-hermes-memory (passthrough). The
-    // legacy memory_list/memory_save/... channels must answer a loud,
-    // intentional error with the owning plugin named — same contract as the
-    // automation + plan retirements above.
-    const memoryRetiredError = await window.api.invoke("memory_list", { cwd: workspaceRoot }).then(
-      () => null,
-      (error) => String(error),
-    );
-    if (!memoryRetiredError || !memoryRetiredError.includes("pi-hermes-memory")) {
-      throw new Error(`memory_list should be retired to pi-hermes-memory, got: ${memoryRetiredError}`);
+    // 记忆归 pi-hermes-memory(passthrough)。阶段 0 把 memory:* 这 11 条通道
+    // 连同其它无消费者的死面一起**删除**了 —— 此前它们是"已移除"抛出,再之前
+    // 是 `async () => null` 空桩。所以现在断言的是"调用必须被拒绝",而不是
+    // 某个错误文案(文案会随实现漂移,通道存不存在不会)。
+    const expectGone = async (channel, payload) => {
+      try {
+        await window.api.invoke(channel, payload);
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    if (!(await expectGone("memory_list", { cwd: workspaceRoot }))) {
+      throw new Error("memory_list 应已在阶段 0 移除,但调用仍然成功");
     }
     let memoryLifecycle = true;
-    for (const channel of ["memory_save", "memory_get", "memory_rewrite", "memory_delete"]) {
-      const error = await window.api.invoke(channel, {}).then(() => null, (e) => String(e));
-      if (!error || !error.includes("pi-hermes-memory")) { memoryLifecycle = false; break; }
+    for (const channel of ["memory_save", "memory_get", "memory_rewrite", "memory_delete", "memory_get_profile"]) {
+      if (!(await expectGone(channel, {}))) { memoryLifecycle = false; break; }
     }
-    if (!memoryLifecycle) throw new Error("retired memory channels must name pi-hermes-memory");
+    if (!memoryLifecycle) throw new Error("legacy memory 通道应全部被拒绝(阶段 0 已移除)");
     const mcpFixture = `electron-smoke-mcp-${Date.now()}`;
     await window.api.invoke("mcp:upsert", { server: { name: mcpFixture, command: "node", args: ["-e", "process.exit(0)"], disabled: true } });
     const mcp = await window.api.invoke("mcp:list");
@@ -1608,19 +1627,21 @@ try {
     await window.api.invoke("permission:mode-set", "default");
     await window.api.invoke("permission:save", [{ action: "allow", tool: "read", pattern: "*.md" }]);
     const permissionRules = await window.api.invoke("permission:list");
-    // Stage C-1: folder-trust IPC retired ("owned by the system"). Assert the
-    // removal is loud and intentional on every legacy channel; folder trust
-    // reaches the renderer through the `pi://folder-trust` event channel
-    // (asserted separately via capabilityEvents.folderTrust).
-    const folderTrustRetirement = await Promise.all(
-      ["folder-trust:grant", "folder-trust:is-trusted", "folder-trust:revoke"]
-        .map(async (channel) => {
-          const error = await window.api.invoke(channel, workspaceRoot).then(() => null, (e) => String(e));
-          return error !== null && error.includes("Stage C-1");
-        }),
-    );
-    const folderTrust = folderTrustRetirement;
-    const trusted = folderTrust.every(Boolean);
+    // folder-trust:阶段 1 把它接回了真实能力包。此前 @openbuddy/folder-trust
+    // 一直在仓库里、却从没在生产调用过 mountFolderTrust(),于是 store 未挂载、
+    // 每个 handler 只会抛 "store is not mounted";Stage C-1 索性把通道删了,
+    // 而 FolderTrustDialog 还在调它们(点了只会失败)。现在真跑一遍往返:
+    // grant → is-trusted 为真 → revoke → 为假,并落盘到 piHome/folder-trust.json。
+    await window.api.invoke("folder-trust:grant", workspaceRoot);
+    const trustedAfterGrant = await window.api.invoke("folder-trust:is-trusted", workspaceRoot);
+    const listed = await window.api.invoke("folder-trust:list");
+    await window.api.invoke("folder-trust:revoke", workspaceRoot);
+    const trustedAfterRevoke = await window.api.invoke("folder-trust:is-trusted", workspaceRoot);
+    const folderTrust = trustedAfterGrant === true && trustedAfterRevoke === false && Array.isArray(listed);
+    if (!folderTrust) {
+      throw new Error(`folder-trust 应答链路失效:grant→${JSON.stringify(trustedAfterGrant)} list→${Array.isArray(listed)} revoke→${JSON.stringify(trustedAfterRevoke)}`);
+    }
+    const trusted = folderTrust;
     // openbuddy-plan removed; plan-mode is delegated to pi-plan-mode (passthrough).
     // The legacy plan-mode:* / toggle_plan_mode IPC round-trips are skipped here
     // to mirror the deleted capability.
@@ -1639,10 +1660,37 @@ try {
     const agents = await window.api.invoke("agents_list", { cwd: workspaceRoot });
     const agentText = await window.api.invoke("agents_get", { path: `${agentName}.md`, cwd: workspaceRoot });
     await window.api.invoke("agents_delete", { path: `${agentName}.md`, cwd: workspaceRoot });
-    // Stage B: openbuddy-task capability removed; todo lifecycle is owned by
-    // pi-native (@juicesharp/rpiv-todo when installed). Smoke skips the
-    // tasks:add / tasks:update / tasks:list / tasks:clear-completed / tasks:delete
-    // chain here to mirror the deleted IPC.
+    // 阶段 0 之前这里写的是"跳过 tasks:* —— 通道已删除"。实际是它们当时是
+    // `async () => null` 空桩(所以邮件采纳行动项会假成功、统一搜索任务域恒空)。
+    // 现在这条链是真实现(TaskCatalog/session_tasks),所以冒烟**真跑**一遍:
+    // 加 → 读回 → 改状态 → 删 → 清除已完成。
+    {
+      const todoSessionId = workspaceSession.sessionId;
+      const created = await window.api.invoke("tasks:add", { sessionId: todoSessionId, title: "smoke-todo-甲" });
+      if (typeof created?.id !== "string") {
+        throw new Error(`tasks:add 应返回真实 id,得到 ${JSON.stringify(created)}`);
+      }
+      const listedAfterAdd = await window.api.invoke("tasks:list", { sessionId: todoSessionId });
+      if (!Array.isArray(listedAfterAdd) || !listedAfterAdd.some((t) => t.id === created.id && t.content === "smoke-todo-甲")) {
+        throw new Error(`tasks:list 未读回刚写入的条目:${JSON.stringify(listedAfterAdd)}`);
+      }
+      await window.api.invoke("tasks:update", { sessionId: todoSessionId, id: created.id, patch: { status: "completed" } });
+      const listedAfterUpdate = await window.api.invoke("tasks:list", { sessionId: todoSessionId });
+      if (!listedAfterUpdate.some((t) => t.id === created.id && t.status === "completed")) {
+        throw new Error(`tasks:update 未生效:${JSON.stringify(listedAfterUpdate)}`);
+      }
+      const keep = await window.api.invoke("tasks:add", { sessionId: todoSessionId, title: "smoke-todo-乙" });
+      await window.api.invoke("tasks:clear-completed", { sessionId: todoSessionId });
+      const listedAfterClear = await window.api.invoke("tasks:list", { sessionId: todoSessionId });
+      if (listedAfterClear.some((t) => t.id === created.id) || !listedAfterClear.some((t) => t.id === keep.id)) {
+        throw new Error(`tasks:clear-completed 语义不对(应只清 completed):${JSON.stringify(listedAfterClear)}`);
+      }
+      await window.api.invoke("tasks:delete", { sessionId: todoSessionId, id: keep.id });
+      const listedAfterDelete = await window.api.invoke("tasks:list", { sessionId: todoSessionId });
+      if (listedAfterDelete.some((t) => t.id === keep.id)) {
+        throw new Error(`tasks:delete 未生效:${JSON.stringify(listedAfterDelete)}`);
+      }
+    }
     const _addedSkill = await window.api.invoke("skills:add", { path: importedSkillSourceDir, cwd: workspaceRoot }); void _addedSkill;
     const skillsAfterAdd = await window.api.invoke("skills:list", { cwd: workspaceRoot });
     const reloadResult = await window.api.invoke("internal_reload", { kind: "skills" });
@@ -1651,15 +1699,23 @@ try {
     await window.api.invoke("internal_reload", { kind: "skills" });
     const skillsAfterRemove = await window.api.invoke("skills:list", { cwd: workspaceRoot });
     for (const unlisten of eventUnlisteners) unlisten();
-    // notifications:* IPC are passthrough stubs (dispatchMainNotifications is
-    // the real surface wired to configured channels). Assert the stub contract
-    // so the smoke does not read a notification id that no longer exists.
-    const notificationAppendStub = await window.api.invoke("notifications:append", { kind: "info", title: "Electron smoke", body: "round-trip" });
-    const notificationsListStub = await window.api.invoke("notifications:list");
-    await window.api.invoke("notifications:mark-read", "stub-id");
-    await window.api.invoke("notifications:clear");
-    const notificationsSurface = notificationAppendStub === null && notificationsListStub === null;
-    const _notifications = notificationsListStub ?? []; void _notifications;
+    // 阶段 0:站内通知收件箱的 10 条通道(notifications:* / notification_*)连同
+    // 一组同类死面一起删除 —— 它们此前是 `async () => null` 空桩,且没有任何 UI
+    // 消费者。真正的通知分发面是 dispatchMainNotifications(通知渠道面板 + 系统通知),
+    // 那条路径没动。这里断言的是"调用必须被拒绝"。
+    const expectChannelRejected = async (channel, payload) => {
+      try {
+        await window.api.invoke(channel, payload);
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    const notificationsSurface =
+      (await expectChannelRejected("notifications:append", { kind: "info", title: "Electron smoke", body: "round-trip" })) &&
+      (await expectChannelRejected("notifications:list")) &&
+      (await expectChannelRejected("notifications:mark-read", "stub-id")) &&
+      (await expectChannelRejected("notifications:clear"));
     let filesystem = "skipped";
     if (filesystemSmoke) {
       const fsPath = "electron-smoke.txt";
@@ -1860,7 +1916,8 @@ try {
       mcp: Array.isArray(mcp) && mcpEntry?.enabled === false && mcpEnabled?.enabled === true && mcpDisabled?.enabled === false && typeof mcpConfig?.content === "string" && Array.isArray(mcpAuth),
       permissionMode,
       permissionRules: permissionRules.some((rule) => rule.action === "allow" && rule.tool === "read"),
-      folderTrust: Array.isArray(folderTrust) && trusted === true,
+      // 阶段 1 起 folderTrust 是布尔(真实往返成功),不再是"每个 legacy 通道都抛错"的数组。
+      folderTrust: folderTrust === true && trusted === true,
       // Plan surface is owned by pi-plan-mode (passthrough): the legacy
       // `capability.plan` RPC is retired (asserted above), `plan-mode:*` IPC
       // stubs exist, and the `pi://plan-mode` event channel is asserted
@@ -2066,8 +2123,10 @@ try {
     extras.togglePlanMode = true;
     const permissionLegacy = await window.api.invoke("permission_list");
     extras.permissionLegacy = Array.isArray(permissionLegacy);
-    const folderTrustLegacyError = await window.api.invoke("folder_trust_respond", { cwd, trusted: true }).then(() => null, (e) => String(e));
-    extras.folderTrustLegacy = folderTrustLegacyError !== null && folderTrustLegacyError.includes("Stage C-1");
+    // folder_trust_respond 现在写的是真存储(阶段 1 接线),所以断言"写入成功
+    // 且回执里 trusted=true",而不是"抛 Stage C-1"。
+    const folderTrustResponse = await window.api.invoke("folder_trust_respond", { cwd, trusted: true }).catch(() => null);
+    extras.folderTrustLegacy = folderTrustResponse?.trusted === true;
     const sessionMetadataCleared = await window.api.invoke("agent:session-metadata-clear");
     extras.sessionMetadataCleared = sessionMetadataCleared?.ok === true;
     const invalid = await window.api.invoke("permission_save", { rules: [{ action: "allow", tool: "read", pattern: "*.md" }] });
@@ -2076,12 +2135,21 @@ try {
     // subsystem contracts without writing external state. `folder-trust:list`
     // and `notifications:mark-all-read` all return to their original
     // observable state.
-    const folderTrustListedError = await window.api.invoke("folder-trust:list").then(() => null, (e) => String(e));
-    extras.folderTrustList = folderTrustListedError !== null && folderTrustListedError.includes("Stage C-1");
+    const folderTrustListed = await window.api.invoke("folder-trust:list").catch(() => null);
+    extras.folderTrustList = Array.isArray(folderTrustListed);
     // openbuddy-web-search removed; web capability is delegated to pi-web-access.
     extras.webSearchToggle = true;
-    await window.api.invoke("notifications:mark-all-read");
-    extras.notificationsMarkAllRead = true;
+    // notifications:* 与 notification_* 共 10 条通道在阶段 0 删除(空桩且无 UI
+    // 消费者);真正的分发面 dispatchMainNotifications 未动。断言调用被拒绝。
+    const channelGone = async (channel, payload) => {
+      try {
+        await window.api.invoke(channel, payload);
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    extras.notificationsMarkAllRead = await channelGone("notifications:mark-all-read");
     const currentModel = await window.api.invoke("agent:current-model");
     extras.currentModel = !!currentModel || currentModel === null;
     const sessionEvents = await window.api.invoke("agent:event-log", { limit: 5 });
@@ -2130,17 +2198,13 @@ try {
     const workbuddyImportStatus = await window.api.invoke("workbuddy_import_status", { importId: "electron-smoke-missing" });
     extras.workbuddyImportStatus = workbuddyImportStatus === undefined || workbuddyImportStatus === null;
     try { await window.api.invoke("workbuddy_import_rollback", { importId: "electron-smoke-missing" }); extras.workbuddyImportRollback = false; } catch { extras.workbuddyImportRollback = true; }
-    // Notification underscore aliases (the colon form is exercised above; verify
-    // the underscore form so legacy caller paths stay wired to Main).
-    // notification_* underscore aliases follow the notifications:* passthrough
-    // stub contract (null responses, no local store).
-    const notificationListStub = await window.api.invoke("notification_list");
-    const notificationAppendStub = await window.api.invoke("notification_append", { kind: "info", title: "Smoke underscore", body: "alias probe" });
-    extras.notificationList = notificationListStub === null;
-    extras.notificationAppend = notificationAppendStub === null;
-    extras.notificationMarkRead = (await window.api.invoke("notification_mark_read", "smoke-placeholder")) === null;
-    extras.notificationMarkAllRead = (await window.api.invoke("notification_mark_all_read")) === null;
-    extras.notificationClear = (await window.api.invoke("notification_clear")) === null;
+    // notification_* 下划线别名与 notifications:* 一起在阶段 0 删除(两条命名
+    // 代际同为死面)。断言全部被拒绝 —— 不再是"返回 null 的 passthrough 契约"。
+    extras.notificationList = await channelGone("notification_list");
+    extras.notificationAppend = await channelGone("notification_append", { kind: "info", title: "Smoke underscore", body: "alias probe" });
+    extras.notificationMarkRead = await channelGone("notification_mark_read", "smoke-placeholder");
+    extras.notificationMarkAllRead = await channelGone("notification_mark_all_read");
+    extras.notificationClear = await channelGone("notification_clear");
     // Mid-session model change round-trip: prove the IPC layer can persist
     // multiple custom models and that agent:current-model reflects the
     // currently configured model. A full set-model swap is exercised below

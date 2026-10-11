@@ -154,7 +154,16 @@ function readAllowlist() {
   const block = source.match(/allowedInvokeChannels[^=]*=\s*new Set\(\[([\s\S]*?)\]/);
   if (!block) fail("在 preload/index.ts 里找不到 allowedInvokeChannels 数组");
   const channels = new Set();
-  for (const match of block[1].matchAll(CHANNEL_LITERAL)) channels.add(match[1]);
+  // 必须**先剥掉注释**:preload 里有一行 `// permissions-memory "mcp:config-path",
+  // "mcp:config-read", "mcp:config-save",` —— 三个通道自最初提交起就被注释掉了,
+  // 而 main 侧有真实现、UI(McpConfigEditor/ConnectorsTab)也在调。第一版门禁把
+  // 注释里的名字也算作"已放行",于是这一整类缺陷(注释掉的 allowlist 项)对门禁
+  // 隐形。parity 测试同样只看文本,所以也漏了。
+  const uncommented = block[1]
+    .split("\n")
+    .map((line) => line.replace(/\/\/.*$/, ""))
+    .join("\n");
+  for (const match of uncommented.matchAll(CHANNEL_LITERAL)) channels.add(match[1]);
   if (channels.size === 0) fail("allowedInvokeChannels 解析出 0 条 —— 解析坏了(测试 fixture 也要求非空)");
   return channels;
 }

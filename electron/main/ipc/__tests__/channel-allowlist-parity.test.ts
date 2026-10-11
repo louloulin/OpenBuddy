@@ -42,7 +42,16 @@ const preload = readFileSync(join("electron", "preload", "index.ts"), "utf8");
 const setStart = preload.indexOf("allowedInvokeChannels = new Set([");
 const setEnd = preload.indexOf("]);", setStart);
 if (setStart === -1 || setEnd === -1) throw new Error("preload allowlist 形状变了,这个测试需要同步");
-const allowedText = preload.slice(setStart, setEnd);
+// 必须**先剥掉注释**再取名字。2026-10-11 的教训:allowlist 里有一行
+//   // permissions-memory "mcp:config-path", "mcp:config-read", "mcp:config-save",
+// 三个通道自最初提交起就是注释状态,而这条守卫从文本里照样读到了它们,于是
+// 一直报"全部对齐";同时 McpConfigEditor / ConnectorsTab 的每次调用都被 preload
+// 拒掉 —— 一个真功能坏了很久,而守卫把它当成绿的。
+const allowedText = preload
+  .slice(setStart, setEnd)
+  .split("\n")
+  .map((line) => line.replace(/\/\/.*$/, ""))
+  .join("\n");
 const allowed = new Set<string>();
 for (const match of allowedText.matchAll(/["']([a-zA-Z0-9:_-]+)["']/g)) {
   allowed.add(match[1]);

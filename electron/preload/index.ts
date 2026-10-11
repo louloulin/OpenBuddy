@@ -71,7 +71,12 @@ const allowedInvokeChannels = new Set([
   "prompt_history", "rewind_execute", "rewind_points", "session_fork", "session_search", "sessions:delete", "sessions:list", "sessions:list-workspaces",
   "sessions:rename", "sessions:set-all-archived", "sessions:set-archived", "sessions:set-expert", "sessions:set-pinned", "workspace:archive-session", "workspace:create", "workspace:delete", "workspace:insert-before",
   "workspace:insert-session-before", "workspace:list", "workspace:rename",
-  // permissions-memory "mcp:config-path", "mcp:config-read", "mcp:config-save",
+  // MCP 配置文件读写(mcp.json)。这三个通道自最初提交起就被注释掉了,而
+  // main 侧一直有真处理(connectors.ts 的 mcpConfigPath/Read/Save),UI 也一直在调
+  // —— McpConfigEditor / ConnectorsTab 的每条调用都被 preload 直接拒掉,
+  // 也就是说"MCP 配置查看/编辑"这块从上线起就是坏的。2026-10-11 真实启动
+  // 验证(scripts/electron/smoke.mjs)撞到 invalid IPC channel 才暴露。
+  "mcp:config-path", "mcp:config-read", "mcp:config-save",
   "mcp:delete", "mcp:list", "mcp:status", "mcp:toggle", "mcp:upsert",
   "permission:list", "permission:mode-get", "permission:mode-set", "permission:save", "permission_list", "permission_save", "storage:collaboration-bootstrap", "storage:metrics", "storage:metrics-history",
   "storage:renderer-list", "storage:renderer-read", "storage:renderer-remove", "storage:renderer-write",

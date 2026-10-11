@@ -188,6 +188,28 @@ describe("check-ipc-stubs", () => {
     }
   });
 
+  it("allowlist 里被注释掉的通道不算放行(真实缺陷:三个 mcp:config-* 曾整行注释)", () => {
+    // 造一个 fixture:通道只出现在注释里,而 UI 在调它 → 必须报"通道不在 allowlist"。
+    const root = mkdtempSync(join(tmpdir(), "ipc-stub-gate-"));
+    try {
+      mkdirSync(join(root, "electron", "main", "ipc"), { recursive: true });
+      mkdirSync(join(root, "electron", "preload"), { recursive: true });
+      mkdirSync(join(root, "packages", "ui", "probe", "src"), { recursive: true });
+      writeFileSync(
+        join(root, "electron", "preload", "index.ts"),
+        'const allowedInvokeChannels = new Set([\n  "demo:ok",\n  // "mcp:config-read",\n]);\n',
+      );
+      writeFileSync(join(root, "electron", "main", "ipc", "connectors.ts"), 'wrapIpcHandler("mcp:config-read", async () => await readConfig());\n');
+      writeFileSync(join(root, "packages", "ui", "probe", "src", "client.ts"), 'export const f = () => invoke("mcp:config-read", {});\n');
+      const { status, out } = run(root);
+      expect(status).toBe(1);
+      expect(out).toContain("通道不在 allowlist");
+      expect(out).toContain("mcp:config-read");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("真实仓库当前是绿的(棘轮:新增一个假成功就红)", () => {
     const { status, out } = run(REPO_ROOT);
     expect(out).toContain("门禁通过");

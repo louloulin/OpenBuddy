@@ -166,7 +166,14 @@ export default [
     // [min,max]),Resizable.test.tsx 也断言了 getByRole("separator") 与
     // aria-valuenow。规则在这一个点上是误报,不是缺陷 —— 所以豁免要窄、要写理由,
     // 并且留在配置里让下一个人看得见,而不是散落成一行 eslint-disable。
-    files: ["packages/ui/openbuddy-ui-primitives/src/components/Resizable.tsx"],
+    // CanvasPanel 的 sash 是同一个构造(div + role="separator" + 指针/键盘
+    // handler),同一份理由逐字适用;canvas-panel.test.tsx 有两条断言背书:
+    // getByRole("separator") 存在、方向键 8px / Shift 32px 真的改宽度。
+    // 仍不放到全局:div 太通用,全局放行等于把这半条规则关掉。
+    files: [
+      "packages/ui/openbuddy-ui-primitives/src/components/Resizable.tsx",
+      "packages/ui/openbuddy-ui-conversation/src/canvas/CanvasPanel.tsx",
+    ],
     rules: {
       // 这个规则的豁免是按**元素类型**取的:`config[type]` 里列出的 prop 会被
       // 从该元素的属性里剔除,剩下的才拿去比对 handlers。所以要两样都给:
