@@ -40,6 +40,34 @@ describe("team service", () => {
     }
   });
 
+  it("取消/删除团队时成员落终态,不再永远停在 running", async () => {
+    const home = await mkdtemp(join(tmpdir(), "openbuddy-team-"));
+    const previous = process.env.PI_CODING_AGENT_DIR;
+    process.env.PI_CODING_AGENT_DIR = home;
+    try {
+      const ctx = new Context();
+      ctx.provide("teamTenantContext", { getActiveTenantId: () => "tenant-a", canUseTeamWorkspace: () => true });
+      // 成员永不返回:模拟真网关把请求挂在流上 / 用户中途删除团队。
+      // runner 故意**不**响应 signal —— 此时也必须由 deleteTeam 落终态。
+      ctx.provide("teamRunner", { runMember: () => new Promise<string>(() => {}) });
+      const team = mountTeam(ctx);
+      const created = await team.create("slow goal", "small");
+      await vi.waitFor(async () => {
+        const status = await team.status(created.id);
+        expect(status?.members.every((member) => member.status === "running")).toBe(true);
+      }, { timeout: 2_000, interval: 10 });
+
+      expect(await team.deleteTeam(created.id)).toBe(true);
+      const status = await team.status(created.id);
+      expect(status?.status).toBe("deleted");
+      expect(status?.members.every((member) => member.status === "cancelled")).toBe(true);
+      expect(status?.members.every((member) => typeof member.endedAt === "number")).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
+      else process.env.PI_CODING_AGENT_DIR = previous;
+    }
+  });
+
   it("isolates team records by the trusted active tenant", async () => {
     const home = await mkdtemp(join(tmpdir(), "openbuddy-team-"));
     const previous = process.env.PI_CODING_AGENT_DIR;

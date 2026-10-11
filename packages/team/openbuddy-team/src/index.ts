@@ -21,7 +21,7 @@ export interface TeamMember {
 	id: string
 	role: string
 	model?: string
-	status: "idle" | "running" | "done" | "failed"
+	status: "idle" | "running" | "done" | "failed" | "cancelled"
 	output?: string
 	startedAt?: number
 	endedAt?: number
@@ -175,12 +175,17 @@ export class Team extends OpenBuddyService {
 		await Promise.all(team.members.map(async (member) => {
 			try {
 				const output = await runner.runMember({ tenantId: team.tenantId, teamId: team.id, memberId: member.id, role: member.role, goal: team.goal }, controller.signal)
-				if (controller.signal.aborted) return
 				const text = typeof output === "string" ? output : output.text
-				await this.updateMember(team.id, member.id, { status: "done", output: text, endedAt: Date.now() }, team.tenantId)
+				// 中止(删除团队 / 应用退出)时 runMember 可能已经正常返回,但成员
+				// 也必须落终态:否则记录与 UI 会永远停在 running。取消时保留已产出
+				// 的文本,标记为 cancelled 而不是 done —— 它确实没跑完。
+				await this.updateMember(team.id, member.id, controller.signal.aborted
+					? { status: "cancelled", output: text, endedAt: Date.now() }
+					: { status: "done", output: text, endedAt: Date.now() }, team.tenantId)
 			} catch (error) {
-				const cancelled = controller.signal.aborted
-				if (!cancelled) await this.updateMember(team.id, member.id, { status: "failed", output: String(error), endedAt: Date.now() }, team.tenantId)
+				await this.updateMember(team.id, member.id, controller.signal.aborted
+					? { status: "cancelled", output: "", endedAt: Date.now() }
+					: { status: "failed", output: String(error), endedAt: Date.now() }, team.tenantId)
 			}
 		}))
 		if (!controller.signal.aborted) {
@@ -223,9 +228,21 @@ export class Team extends OpenBuddyService {
 		if (!current) return false
 		await this.requireResourceAccess({ tenantId, resource: "team", resourceId: teamId, action: "delete" })
 		this.activeRuns.get(teamId)?.abort()
+		// runMember 不保证一定会对 signal 做出响应(真网关慢/挂在流上时可能一直
+		// 不返回),所以取消时在这里直接把没落终态的成员标成 cancelled;
+		// 与 execute() 的 catch 重复写入同值是幂等的。
+		await this.markPendingMembersCancelled(teamId, tenantId)
 		await this.updateTeam(teamId, (current) => ({ ...current, status: "deleted" }), tenantId)
 		this.ctx.emit("team/deleted", { id: teamId })
 		return true
+	}
+
+	private async markPendingMembersCancelled(teamId: string, tenantId: string): Promise<void> {
+		const current = await this.status(teamId)
+		if (!current) return
+		await Promise.all(current.members
+			.filter((member) => member.status === "idle" || member.status === "running")
+			.map((member) => this.updateMember(teamId, member.id, { status: "cancelled", endedAt: Date.now() }, tenantId)))
 	}
 
 	private requireTenantId(): string {

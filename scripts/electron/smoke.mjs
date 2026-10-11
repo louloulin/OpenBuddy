@@ -2,7 +2,7 @@ import { _electron as electron } from "playwright";
 import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
@@ -1861,8 +1861,9 @@ try {
     let teamStatus = await window.api.invoke("teams:status", team.id);
     // Team members use the configured real model, so allow a full provider
     // round-trip window rather than failing while one member is still in its
-    // first streamed response.
-    for (let attempt = 0; attempt < 240 && teamStatus?.status === "active"; attempt += 1) {
+    // first streamed response. 真实网关慢时 60s 不够(2026-10-11 实测两个成员
+    // 60s 时仍在 running),放宽到 300s;超时后带上成员状态便于定位。
+    for (let attempt = 0; attempt < 1200 && teamStatus?.status === "active"; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 250));
       teamStatus = await window.api.invoke("teams:status", team.id);
     }
@@ -2297,10 +2298,14 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
     await modelTrigger.click();
     await window.getByRole("option").filter({ hasText: `custom_anthropic/${e2eModelId}` }).click();
     const composer = window.locator("textarea").first();
+    // 真实对话验证:像人一样多轮聊一个有确定答案的问题。
+    //   轮1 纯问答(答案可断言)→ 轮2 依赖轮1答案(验证多轮上下文)
+    //   → 轮3 指名调用工具并复述返回(验证工具链路)。
+    // 断言的对象是模型的**真实回答内容**,不是要求模型回显哨兵字符串。
     const realConversationTurns = [
-      { prompt: "请只回复 REAL-E2E-TURN-1，并记住数字 7314。不要解释。", marker: "REAL-E2E-TURN-1" },
-      { prompt: "基于上一条消息，只回复 REAL-E2E-TURN-2-7314。不要重新询问数字，不要解释。", marker: "REAL-E2E-TURN-2-7314" },
-      { prompt: "继续保持同一会话。必须调用 openbuddy_e2e_tool，参数 marker 填 REAL-E2E-TURN-3-7314；收到工具结果后只回复该 marker，不要解释。", marker: "REAL-E2E-TURN-3-7314" },
+      { prompt: "帮我算一下 37 × 3 等于多少？只回答数字。", marker: "111" },
+      { prompt: "把刚才那个结果再加上 9，只回答数字。", marker: "120" },
+      { prompt: "用 openbuddy_e2e_tool 查一下标记 7314，然后把它返回的内容原样告诉我。", marker: "7314" },
     ];
     const conversationSessionIds = new Set();
     const waitForConversationReply = async (promptText, marker, previousAssistantCount) => {
@@ -2532,23 +2537,25 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
       return body.includes(firstMarker) && body.includes(thirdMarker);
     }, { firstMarker: realConversationTurns[0].marker, thirdMarker: realConversationTurns[2].marker }, { timeout: 30_000 });
     const persistedAssistantCount = await window.locator(".msg--assistant .msg__body").count();
-    await composer.fill("reload 后继续同一会话，只回复 REAL-E2E-TURN-4-7314。不要解释。");
+    const reloadPrompt = "刷新之后回到这个会话：我们刚才算过 37 × 3，那个结果是多少？只回答数字。";
+    const reloadMarker = "111";
+    await composer.fill(reloadPrompt);
     await window.getByRole("button", { name: "发送" }).click();
-    await waitForConversationReply("reload 后继续同一会话，只回复 REAL-E2E-TURN-4-7314。不要解释。", "REAL-E2E-TURN-4-7314", persistedAssistantCount);
+    await waitForConversationReply(reloadPrompt, reloadMarker, persistedAssistantCount);
     // 窗口开满(上限 2000)。硬断言只保留"刚发生"的那两件:第 4 轮的 marker 进了
     // assistant/update、以及本会话有 agent/settled —— 它们必然落在窗口尾部。
     // `session/input` 累计条数不再硬断言:有界环形缓冲装不下啰嗦模型的全部轮次,
     // 而每一轮的输入都已经被 waitForConversationReply 单独验证过。
     const afterReloadEvents = await invoke("agent:event-log", { sessionId: realSessionId, limit: 2000 });
     const inputCountAfterReload = afterReloadEvents.filter((event) => event.type === "session/input").length;
-    if (!afterReloadEvents.some((event) => event.type === "assistant/update" && JSON.stringify(event.payload ?? event).includes("REAL-E2E-TURN-4-7314"))
+    if (!afterReloadEvents.some((event) => event.type === "assistant/update" && JSON.stringify(event.payload ?? event).includes(reloadMarker))
       || !afterReloadEvents.some((event) => event.type === "agent/settled" && event.sessionId === realSessionId)) {
       throw new Error(`Real conversation reload continuation failed: ${JSON.stringify(eventSummary(afterReloadEvents.slice(-16)))}`);
     }
     if (inputCountAfterReload < 4) {
       console.log(`[smoke] note: reload 后窗口里只看到 ${inputCountAfterReload}/4 个 session/input(有界缓冲;每轮已单独断言)`);
     }
-    realE2eEvidence.turns.push("REAL-E2E-TURN-4-7314");
+    realE2eEvidence.turns.push(reloadMarker);
     const persisted = await window.evaluate(async (expectedModel) => {
       const auth = await window.api.invoke("agent:auth-status");
       const catalog = await window.api.invoke("agent:providers-list");
@@ -2794,6 +2801,12 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
 
   // Restart the real Electron process with the same userData and Pi home.
   // This catches persistence bugs hidden by an in-memory renderer reload.
+  // 退出前记下事件日志尾部指纹(type#sequence 各 40 条),重启后据此断言
+  // "日志被恢复"——不能钉死某个中途会话:环形窗口 + 重启自启动产生的新事件
+  // 会把更早的记录挤出去,那是契约内的行为,不是缺陷。
+  const preQuitTail = (await invoke("agent:event-log", { limit: 2000 }))
+    .slice(-40).map((event) => `${event.type}#${event.sequence}`);
+
   intentionalElectronClose = true;
   await app.close();
   intentionalElectronClose = false;
@@ -2836,15 +2849,32 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
     throw new Error(`Electron restart persistence failed: ${JSON.stringify({ apiVersion: restartState.apiVersion, initOk: restartState.initOk, session: restartState.session, sessions: restartState.sessions })}`);
   }
   if (restartState.storageSources?.[0] !== storageRoot) throw new Error(`Storage source restart persistence failed: ${JSON.stringify(restartState.storageSources)}`);
-  const restartedEvents = await restartedWindow.evaluate((sessionId) => window.api.invoke("agent:event-log", { sessionId, limit: 200 }), lifecycleSession.sessionId);
-  if (!restartedEvents.some((event) => event.type === "session/input" && event.sessionId === lifecycleSession.sessionId)) {
-    throw new Error("Electron process restart did not restore persisted event log");
+  // (a) 持久化契约:退出前的事确实写进了 JSONL。直接读盘,与内存窗口无关。
+  const eventsFile = join(piAgentDir, "openbuddy-events.jsonl");
+  const onDisk = readFileSync(eventsFile, "utf8").split("\n").filter(Boolean)
+    .map((line) => { try { return JSON.parse(line); } catch { return null; } })
+    .filter(Boolean);
+  if (!onDisk.some((record) => record.type === "session/input" && record.sessionId === lifecycleSession.sessionId)) {
+    const diskTypes = [...new Set(onDisk.map((record) => record.type))].slice(0, 12);
+    throw new Error(`Electron restart: session/input never persisted to ${basename(eventsFile)} (${onDisk.length} records, types=${JSON.stringify(diskTypes)})`);
   }
+  // (b) 恢复契约:重启后日志里应能看到退出前尾部的记录(至少一半)。
+  //     恢复窗口 = JSONL 最后 2000 条 − 重启自启动的新事件,所以不要求 100%。
+  const restartedLog = await restartedWindow.evaluate(() => window.api.invoke("agent:event-log", { limit: 2000 }));
+  const restoredKeys = new Set(restartedLog.map((event) => `${event.type}#${event.sequence}`));
+  const restoredTailMatches = preQuitTail.filter((key) => restoredKeys.has(key)).length;
+  if (restoredTailMatches < Math.ceil(preQuitTail.length / 2)) {
+    throw new Error(`Electron process restart did not restore persisted event log: only ${restoredTailMatches}/${preQuitTail.length} tail records restored (restarted log has ${restartedLog.length})`);
+  }
+  console.log(`[smoke] 重启后事件日志恢复: 尾部 ${restoredTailMatches}/${preQuitTail.length} 条在窗口内(重启后共 ${restartedLog.length} 条)`);
   window = restartedWindow;
 
   if (realE2eSessionId && realE2eEvidence) {
+    // 重启后续聊的自然问法(与 reload 轮同一算术上下文)。
+    const restartPrompt = "应用重启之后回到这个会话：37 × 3 的结果是多少？只回答数字。";
+    const restartMarker = "111";
     const sessionDigest = sha256(realE2eSessionId).slice(0, 12);
-    const restartConversation = await restartedWindow.evaluate(async ({ sessionId, sessionDigest: redactedSessionId, cwd, modelId }) => {
+    const restartConversation = await restartedWindow.evaluate(async ({ sessionId, sessionDigest: redactedSessionId, cwd, modelId, restartPrompt, restartMarker }) => {
       await window.api.invoke("agent:load-session", { sessionId, cwd });
       const loaded = await window.api.invoke("agent:session-info", { sessionId });
       if (loaded?.sessionId !== sessionId) throw new Error(`MiniMax session did not load after Electron restart: ${JSON.stringify(loaded)}`);
@@ -2856,8 +2886,8 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
       // 否则下面这步 prompt 会报 "Pi session is not loaded"。
       // 真实用户路径同样经过"选中会话 → 切模型 → 发送",这里按同样的顺序走。
       await window.api.invoke("agent:load-session", { sessionId, cwd });
-      await window.api.invoke("agent:prompt", { sessionId, text: "Electron 重启后继续同一 Pi 会话，只回复 REAL-E2E-TURN-5-7314。不要解释。" });
-      const marker = "REAL-E2E-TURN-5-7314";
+      await window.api.invoke("agent:prompt", { sessionId, text: restartPrompt });
+      const marker = restartMarker;
       const deadline = Date.now() + 90_000;
       let events = [];
       let fifthInputSequence;
@@ -2865,7 +2895,7 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
         events = await window.api.invoke("agent:event-log", { sessionId, limit: 600 });
         const fifthInput = events.find((event) => event.type === "session/input"
           && event.sessionId === sessionId
-          && event.payload?.text?.preview?.includes("Electron 重启后继续同一 Pi 会话"));
+          && event.payload?.text?.preview?.includes(restartPrompt));
         fifthInputSequence = fifthInput?.sequence;
         const fifthTurnEvents = typeof fifthInputSequence === "number"
           ? events.filter((event) => event.sessionId === sessionId && event.sequence >= fifthInputSequence)
@@ -2887,11 +2917,11 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
         fifthInputSequence,
         fifthTurnTypes: fifthTurnEvents.slice(-16).map((event) => ({ type: event.type, sequence: event.sequence })),
       };
-    }, { sessionId: realE2eSessionId, sessionDigest, cwd: root, modelId: realE2eEvidence.modelId });
+    }, { sessionId: realE2eSessionId, sessionDigest, cwd: root, modelId: realE2eEvidence.modelId, restartPrompt, restartMarker });
     if (!restartConversation.loaded || restartConversation.modelId !== realE2eEvidence.modelId || !restartConversation.markerSeen || !restartConversation.assistantEnd || restartConversation.inputCount < 5) {
       throw new Error(`Real MiniMax conversation did not survive Electron restart: ${JSON.stringify(restartConversation)}`);
     }
-    realE2eEvidence.turns.push("REAL-E2E-TURN-5-7314");
+    realE2eEvidence.turns.push(restartMarker);
     realE2eEvidence.restart = restartConversation;
 
     const finalEvents = await restartedWindow.evaluate((sessionId) => window.api.invoke("agent:event-log", { sessionId, limit: 600 }), realE2eSessionId);
@@ -3017,6 +3047,10 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
   await Promise.race([app.close(), delay(3_000)]).catch(() => undefined);
   await new Promise((resolve) => discoveryServer.close(resolve)).catch(() => undefined);
   if (electronProcess && !electronProcess.killed && electronProcess.exitCode === null) electronProcess.kill("SIGTERM");
-  try { rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch {}
+  if (process.env.SMOKE_KEEP) {
+    console.log(`[smoke] SMOKE_KEEP=1,保留现场: ${userData}`);
+  } else {
+    try { rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch {}
+  }
   process.exit(passed ? 0 : 1);
 }
