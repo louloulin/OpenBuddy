@@ -157,6 +157,10 @@ const allowedEventChannels = new Set([
   "pi://notification",
   "pi://permission",
   "pi://question",
+  // 请求被判定的通知(允许/拒绝/回答,不论是谁判定的)。缺了它,权限/提问弹窗
+  // 只能靠自身按钮关闭 —— 外部判定(harness/RPC/另一个窗口/自动批准)之后会
+  // 永久挡住界面。见 electron/main/agent/host-modules/ui-request-resolver.ts。
+  "pi://request-resolved",
   "pi://summary",
   "pi://turn-error",
   "pi://telemetry",

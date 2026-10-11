@@ -18,17 +18,21 @@ import { ConversationMarkdown } from "../conversation-slots";
 import { formatDurationMs } from "@/lib/ui/duration";
 import type { MessagePartRenderProps } from "./registry-defaults";
 
-function formatSecondsZh(ms: number): string {
-  if (ms < 1000) return "思考中";
-  return `已思考 ${formatDurationMs(ms)}`;
-}
-
 export function ThoughtMessagePart(props: MessagePartRenderProps) {
   if (props.part.kind !== "thought") return null;
   const currentTheme = useThemeSnapshot((s) => s.current());
   const resolvedTheme = (props.theme ?? currentTheme) as "light" | "dark";
   // 流式时显示"思考中 X 秒",每秒刷新一次;折叠时显示"已思考 X 秒"。
-  const [tickMs, setTickMs] = useState(0);
+  /**
+   * 自身计时:流式期间每 500ms 刷新,结束后**冻结**。
+   *
+   * 这里的坑:原实现用 `props.isStreaming ? tickMs : null` 取耗时,完成时拿到 null,
+   * 于是回退到 `formatSecondsZh(0)` —— 而 `<1000ms` 恰好返回「思考中」。结果一个
+   * **已经回答完**的思考块标题写着「深度思考 思考中」(2026-10-11 真机截图可见)。
+   * 现在:计时值自己保存,完成时保留最后读数;从未在本组件里流式过(例如重载后
+   * 直接看到历史)就不显示耗时,而不是显示一句错的。
+   */
+  const [tickMs, setTickMs] = useState<number | null>(null);
   useEffect(() => {
     if (!props.isStreaming || props.complete) return;
     const start = Date.now();
@@ -36,8 +40,20 @@ export function ThoughtMessagePart(props: MessagePartRenderProps) {
     const handle = window.setInterval(() => setTickMs(Date.now() - start), 500);
     return () => window.clearInterval(handle);
   }, [props.isStreaming, props.complete, props.part.text]);
-  const elapsedMs = props.isStreaming ? tickMs : null;
-  const label = elapsedMs !== null ? formatSecondsZh(elapsedMs) : formatSecondsZh(0);
+  const streaming = props.isStreaming && !props.complete;
+  /**
+   * 耗时只在**测到 ≥1s** 时才显示,且流式与完成用两套措辞:
+   *   - 流式中:`· 3s`(主标签已经是「思考中」,再写一次「思考中」就是重复 ——
+   *     旧实现在 <1s 时正是这样:标题渲染出「思考中 思考中」)
+   *   - 已完成:`已思考 3s`
+   * 从未在本组件里流式过(重载后直接看历史)时留空,不编一个数字。
+   */
+  const elapsedText =
+    tickMs === null || tickMs < 1000
+      ? ""
+      : streaming
+        ? `· ${formatDurationMs(tickMs)}`
+        : `已思考 ${formatDurationMs(tickMs)}`;
 
   return (
     <details
@@ -57,9 +73,9 @@ export function ThoughtMessagePart(props: MessagePartRenderProps) {
           )}
         </span>
         <span className="msg__thought-label">
-          {props.isStreaming && !props.complete ? "思考中" : "深度思考"}
+          {streaming ? "思考中" : "深度思考"}
         </span>
-        <span className="msg__thought-elapsed">{label}</span>
+        <span className="msg__thought-elapsed">{elapsedText}</span>
       </summary>
       <div className="msg__thought-body">
         <ConversationMarkdown

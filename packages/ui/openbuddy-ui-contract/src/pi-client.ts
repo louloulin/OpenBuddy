@@ -2156,6 +2156,8 @@ export interface PiEventHandlers {
   onMcpStatus?: (p: unknown) => void;
   onFolderTrust?: (p: unknown) => void;
   onPlanMode?: (p: unknown) => void;
+  /** 某个 UI 请求(权限/提问)被判定后触发 —— 不论判定来自哪里。 */
+  onRequestResolved?: (p: unknown) => void;
   onPermissionMode?: (p: unknown) => void;
   onModelsUpdate?: (p: unknown) => void;
   onTaskUpdate?: (p: unknown) => void;
@@ -2279,6 +2281,7 @@ export async function subscribePiEvents(handlers: PiEventHandlers, options?: Sub
   await wire("pi://mcp-status", handlers.onMcpStatus);
   await wire("pi://folder-trust", handlers.onFolderTrust);
   await wire("pi://plan-mode", handlers.onPlanMode);
+  await wire("pi://request-resolved", handlers.onRequestResolved);
   await wire("pi://permission-mode", handlers.onPermissionMode);
   await wire("pi://models-update", handlers.onModelsUpdate);
   await wire("pi://task-update", handlers.onTaskUpdate);

@@ -1,6 +1,20 @@
 /**
- * _ui-shot-tmp.mjs — 真实启动截图(用完即删)。
- * 用途:给「UI 对齐 WorkBuddy」提供当前真实界面作为基线,而不是靠猜。
+ * ui-shots.mjs — 真实启动 UI 截图（UI 对照用）。
+ *
+ * 为什么要有它：这个仓库反复出现"文档说 UI 已对齐、实际不是"的情况（WORKBUDDY_UI_REFERENCE
+ * 里 §6 与 R 章节自相矛盾）。所以 UI 改动之后不要靠描述验收 —— 起真 Electron 截图，
+ * 逐张对照。2026-10-11 靠它发现并修掉了：任务面板盖住正文、模型选择器显示
+ * "unknown/unknown"、空状态残留「自动化」入口、错误横幅双警告符、思考块完成后
+ * 仍写「思考中」。
+ *
+ * 用法：
+ *   node scripts/electron/ui-shots.mjs                     # 只截未配置状态（主页/空会话/任务面板）
+ *   set -a; . /tmp/ob-e2e.env; set +a; node scripts/electron/ui-shots.mjs   # 真模型:额外配 provider 并截一轮真回答
+ * 输出：/tmp/ob-ui/*.png
+ *
+ * 踩坑（都写进下面代码了）：首启 onboarding 向导会拦截指针事件，必须先关；
+ * 用 IPC 建会话**不会**进 ChatView，要点侧栏会话行 `.sidebar__conv`;
+ * Settings 里没有 provider 时按钮是「添加厂商」，有才是「编辑厂商」。
  */
 import { _electron as electron } from "playwright";
 import { join } from "node:path";

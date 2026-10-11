@@ -293,6 +293,19 @@ const piRuntimeCoordinator = new PiRuntimeCoordinator({
       if (request.generation !== undefined && request.generation !== generation) {
         state.pendingUiRequests.delete(requestId);
         request.resolve(undefined);
+        /**
+         * 取消同样必须让**界面**知道。此前只发了 plugin 事件(渲染层收不到这条路),
+         * 于是弹窗的 store 条目永远留着、遮罩**永久挡住整个界面**,而 agent 那边
+         * 早已放弃这次请求 —— 之后用户/外部再想判定只会拿到 ok:false。
+         * 2026-10-11 真机冒烟实测:发送键被 `.request-modal-overlay` 拦到点不动,
+         * 根因正是 pi 运行时 reload 取消了 pending 请求却没通知渲染层。
+         */
+        emitRendererEvent("pi://request-resolved", {
+          kind: request.kind,
+          requestId,
+          sessionId: request.sessionId,
+          cancelled: true,
+        });
         emitPluginEvent("pi/ui-request-cancelled", {
           requestId,
           sessionId: request.sessionId,

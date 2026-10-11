@@ -81,6 +81,9 @@ export function inferCapabilities(m: ModelOption): CapabilityHint[] {
  */
 export type ThinkingLevel = "off" | "low" | "medium" | "high";
 
+/** 没有可用模型时的统一文案:下拉空态与触发器共用,避免两处各写一份。 */
+const EMPTY_LABEL = "未配置模型";
+
 const THINKING_OPTIONS: ReadonlyArray<{ value: ThinkingLevel; label: string; title: string }> = [
   { value: "off", label: "关", title: "关闭推理" },
   { value: "low", label: "轻", title: "轻度推理" },
@@ -288,7 +291,11 @@ export function ModelSelector({
   };
 
   const current = models.find((m) => m.id === modelId);
-  const modelLabel = current?.label || current?.id || modelId || "";
+  // 只在**真的匹配到条目**时用它的标签。此前这里在匹配不到时会回退到上游传进来的
+  // `modelId` 原值,而一个 provider 都没配置时上游塞的是占位 id(实测渲染出字面量
+  // "unknown/unknown") —— 用户会以为存在这么个模型。下拉里本来就有正确的空态
+  // (「未配置模型」+ 前往设置),触发器应当和它一致。
+  const modelLabel = current?.label || current?.id || (models.length === 0 ? "" : modelId || "");
   const thinkOpt = hasThinking
     ? THINKING_OPTIONS.find((o) => o.value === thinkingLevel) ?? THINKING_OPTIONS[2]
     : null;
@@ -297,7 +304,7 @@ export function ModelSelector({
     ? modelLabel
       ? `${thinkOpt.label} (${modelLabel})`
       : thinkOpt.label
-    : modelLabel || "Auto";
+    : modelLabel || (models.length === 0 ? EMPTY_LABEL : "Auto");
 
   return (
     <div className="model-selector" ref={rootRef}>
@@ -334,7 +341,7 @@ export function ModelSelector({
         >
           {models.length === 0 && (
             <li className="model-selector__empty" role="presentation">
-              <span>未配置模型</span>
+              <span>{EMPTY_LABEL}</span>
               {onOpenSettings ? (
                 <button
                   type="button"

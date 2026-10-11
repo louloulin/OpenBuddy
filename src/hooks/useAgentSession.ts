@@ -693,12 +693,33 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
           });
         }
       },
-      onPluginEvent: (event: { type: string }) => {
+      onPluginEvent: (event: { type: string; payload?: { requestId?: string; sessionId?: string } }) => {
         if (event.type === "workspace/changed") {
           void piListWorkspaceRegistry().then((registry) => {
             useSessionsStore.getState().setWorkspaces(registry.items);
             setWorkspaces(registry.items);
           }).catch(() => { /* non-fatal refresh */ });
+          return;
+        }
+      },
+      /**
+       * 请求在 pi 侧被判定 —— 可能是本弹窗点的允许/拒绝,也可能是**别处**判定的
+       * (harness / RPC / 另一个窗口 / 自动批准)。后者此前没有任何人清 store,
+       * 于是待处理项永远留着,权限/提问弹窗**永久挡住界面**。
+       *
+       * 2026-10-11 真机冒烟实测:一串真模型工具调用之后,composer 的发送键被
+       * `request-modal-overlay` 持续拦截、点不动。当时先试着监听 plugin 事件
+       * (`session/permission-resolved`),实测那条路**收不到**(渲染层的 plugin
+       * 流里没有这类事件),所以改成由判定方直接发渲染事件 —— 与创建请求的
+       * `pi://permission` / `pi://question` 对称。
+       */
+      onRequestResolved: (payload: unknown) => {
+        const resolved = (payload ?? {}) as { kind?: string; requestId?: string; sessionId?: string };
+        if (!resolved.requestId) return;
+        if (resolved.kind === "permission") {
+          usePermissionStore.getState().dismiss(resolved.requestId, resolved.sessionId);
+        } else {
+          useQuestionStore.getState().dismiss(resolved.requestId, resolved.sessionId);
         }
       },
     } as Parameters<typeof subscribePiEvents>[0];

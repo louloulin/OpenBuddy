@@ -1,7 +1,7 @@
 /**
  * R2.1 — ModelSelector a11y & keyboard navigation tests.
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ModelSelector, type ModelOption, type CapabilityHint, inferCapabilities } from "@openbuddy/ui-workbench";
@@ -126,7 +126,10 @@ describe("ModelSelector a11y", () => {
     const onOpenSettings = vi.fn();
     render(<ModelSelector models={[]} onModelChange={() => {}} onOpenSettings={onOpenSettings} />);
     await userEvent.click(screen.getByRole("button"));
-    expect(screen.getByText("未配置模型")).toBeTruthy();
+    // 触发器现在也显示空态文案(不再把上游的占位 id "unknown/unknown" 原样渲染),
+    // 所以断言必须限定在 listbox 内,否则 getByText 会匹配到两处。
+    const menuOpen = screen.getByRole("listbox");
+    expect(within(menuOpen).getByText("未配置模型")).toBeTruthy();
     await userEvent.click(screen.getByText("前往设置"));
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
     // Menu closed after action
@@ -136,7 +139,7 @@ describe("ModelSelector a11y", () => {
   it("empty state without onOpenSettings hides the affordance gracefully", async () => {
     render(<ModelSelector models={[]} onModelChange={() => {}} />);
     await userEvent.click(screen.getByRole("button"));
-    expect(screen.getByText("未配置模型")).toBeTruthy();
+    expect(within(screen.getByRole("listbox")).getByText("未配置模型")).toBeTruthy();
     expect(screen.queryByText("前往设置")).toBeNull();
   });
 });

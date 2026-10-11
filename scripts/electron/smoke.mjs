@@ -1265,9 +1265,21 @@ try {
         void window.api.rpc.request({ type: "client-response", rpcId: payload.rpcId, result: { ok: true, value: { answers: {}, annotations: {}, cancelled: true } } });
       }
     });
+    // 诊断:记录收到的 plugin 事件类型 —— 判断"判定已发生"的广播有没有到渲染层。
+    window.__openbuddyPluginEventTypes = [];
+    window.api.events.on("openbuddy://plugin-event", (event) => {
+      window.__openbuddyPluginEventTypes.push(event?.type ?? "(no-type)");
+    });
+    window.__openbuddyResolvedEvents = [];
+    window.api.events.on("pi://request-resolved", (payload) => {
+      window.__openbuddyResolvedEvents.push(payload);
+    });
+    window.__openbuddyResolveResults = [];
     window.api.events.on("pi://permission", (payload) => {
       window.__openbuddyUiRequests.push({ kind: "permission", payload });
-      void window.api.invoke("agent:resolve-permission", { requestId: payload.requestId, optionId: "allow", cancelled: false });
+      void window.api.invoke("agent:resolve-permission", { requestId: payload.requestId, optionId: "allow", cancelled: false })
+        .then((result) => window.__openbuddyResolveResults.push({ requestId: payload.requestId, result }))
+        .catch((error) => window.__openbuddyResolveResults.push({ requestId: payload.requestId, error: String(error).slice(0, 120) }));
     });
     window.api.events.on("pi://question", (payload) => {
       window.__openbuddyUiRequests.push({ kind: "question", payload });
@@ -1304,7 +1316,15 @@ try {
     throw new Error(`Electron workspace registry create failed: ${JSON.stringify(workspaceCreated)}`);
   }
   const workspaceId = workspaceCreated.workspace.workspaceId;
-  const workspaceRenamed = await invoke("workspace:rename", { workspaceId, title: "Renamed Smoke Workspace" });
+  // 失败时把"当下 registry 里到底有哪些工作区"一起带出来 —— 这个 rename 报
+  // workspace-not-found 但隔离复现不出来,只能靠现场诊断(2026-10-11)。
+  const workspaceRenamed = await invoke("workspace:rename", { workspaceId, title: "Renamed Smoke Workspace" }).catch(async (error) => {
+    const listed = await invoke("workspace:list").catch(() => null);
+    throw new Error(
+      `Electron workspace registry rename failed: ${String(error)}; created=${JSON.stringify(workspaceCreated?.workspace)}; ` +
+      `registryNow=${JSON.stringify(listed?.items?.map((e) => ({ id: e.workspaceId, path: e.path })))}`,
+    );
+  });
   if (workspaceRenamed?.workspace?.title !== "Renamed Smoke Workspace") {
     throw new Error(`Electron workspace registry rename failed: ${JSON.stringify(workspaceRenamed)}`);
   }
@@ -2306,7 +2326,7 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
         }
         throw new Error(`Real conversation UI reply timeout: ${JSON.stringify({ marker, diagnostic })}; cause=${safeErrorMessage(error)}`);
       }
-      const events = await invoke("agent:event-log", { limit: 500 });
+      const events = await invoke("agent:event-log", { limit: 2000 });
       const inputEvent = events.find((event) => eventContainsSessionInput(event, promptText));
       if (!inputEvent || typeof inputEvent.sessionId !== "string" || !Number.isInteger(inputEvent.sequence)) {
         throw new Error(`Real conversation input event was not recorded: ${JSON.stringify({ eventTypes: eventSummary(events.slice(-12)) })}`);
@@ -2319,13 +2339,30 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
         throw new Error(`Real conversation created multiple sessions: ${JSON.stringify([...conversationSessionIds])}`);
       }
       const sessionId = [...conversationSessionIds][0];
-      const requiredEvents = ["session/input", "agent/start", "assistant/update", "assistant/end", "agent/settled"];
+      /**
+       * 事件日志是**有界环形缓冲**(pi-event-bridge 的 DEFAULT_RING_LIMIT = 2000)。
+       * 一个啰嗦的模型单轮就能产生上千条 assistant/update(实测 glm-5.3-flash 一轮
+       * 上千条),于是该轮开头的 session/input / agent/start 会被挤出窗口 —— 这是
+       * 有界缓冲的设计后果,不是丢事件。
+       *
+       * 所以分成两组断言:
+       *   - 链**尾**(assistant/update 带 marker、assistant/end、agent/settled)必须在
+       *     日志里 —— 它证明这轮事件真的落进了持久层;
+       *   - 链**头**(session/input、agent/start)若已不在窗口,只有当窗口起点仍在
+       *     它们之后(即确实被挤出)才允许,并把序号写进日志便于诊断;窗口仍覆盖
+       *     它们却缺失,才是真缺陷。
+       */
+      const requiredTailEvents = ["assistant/update", "assistant/end", "agent/settled"];
+      const requiredHeadEvents = ["session/input", "agent/start"];
       let sessionEvents = [];
       const eventDeadline = Date.now() + 15_000;
       while (Date.now() < eventDeadline) {
-        sessionEvents = await invoke("agent:event-log", { sessionId, limit: 500 });
+        // 从本轮 input 的序号起查(而不是"最后 N 条"):后者的窗口会随事件量滑动,
+        // 一个啰嗦的模型(实测 glm-5.3-flash 一轮上千条 update)会把该轮开头的
+        // session/input、agent/start 挤出窗口,断言就会误报"事件链缺失"。
+        sessionEvents = await invoke("agent:event-log", { sessionId, sinceSequence: inputEvent.sequence, limit: 2000 });
         const turnEvents = sessionEvents.filter((event) => event.sessionId === sessionId && event.sequence >= inputEvent.sequence);
-        const missingEvents = requiredEvents.filter((eventType) => !turnEvents.some((event) => event.type === eventType));
+        const missingEvents = requiredTailEvents.filter((eventType) => !turnEvents.some((event) => event.type === eventType));
         if (missingEvents.length === 0) break;
         await delay(100);
       }
@@ -2334,16 +2371,67 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
       if (!updates.some((event) => JSON.stringify(event.payload ?? event).includes(marker))) {
         throw new Error(`Real conversation stream did not contain ${marker}: ${JSON.stringify(eventSummary(turnEvents.slice(-12)))}`);
       }
-      const missingEvents = requiredEvents.filter((eventType) => !turnEvents.some((event) => event.type === eventType));
-      if (missingEvents.length > 0) {
-        throw new Error(`Real conversation event chain missing ${missingEvents.join(",")}: ${JSON.stringify(eventSummary(turnEvents.slice(-16)))}`);
+      const missingTail = requiredTailEvents.filter((eventType) => !turnEvents.some((event) => event.type === eventType));
+      if (missingTail.length > 0) {
+        throw new Error(`Real conversation event chain missing ${missingTail.join(",")}: ${JSON.stringify(eventSummary(turnEvents.slice(-16)))}`);
+      }
+      const windowStart = turnEvents.length > 0 ? Math.min(...turnEvents.map((event) => event.sequence)) : null;
+      const missingHead = requiredHeadEvents.filter((eventType) => !turnEvents.some((event) => event.type === eventType));
+      if (missingHead.length > 0) {
+        // 只有"窗口起点已经晚于本轮 input"才算被挤出;否则是真的没记上。
+        const evicted = typeof windowStart === "number" && windowStart > inputEvent.sequence;
+        if (!evicted) {
+          throw new Error(`Real conversation event chain missing ${missingHead.join(",")}: ${JSON.stringify(eventSummary(turnEvents.slice(-16)))}`);
+        }
+        console.log(
+          `[smoke] note: 事件日志窗口已被挤出链头 ${missingHead.join(",")}(inputSeq=${inputEvent.sequence}, windowStart=${windowStart}, ringLimit=2000)—— 有界缓冲的设计后果,已由链尾断言覆盖`,
+        );
       }
       return sessionId;
     };
     for (const turn of realConversationTurns) {
       const previousAssistantCount = await window.locator(".msg--assistant .msg__body").count();
       await composer.fill(turn.prompt);
-      await window.getByRole("button", { name: "发送" }).click();
+      /**
+       * 发送前等"挡住发送键的弹窗"消失。
+       *
+       * 真模型会发起权限/提问请求,链路是:pi://permission → 本冒烟自动判定(IPC)
+       * → session/permission-resolved → 渲染层 dismiss → 弹窗关闭。这中间有一个
+       * 往返,立刻点发送会撞上 `.request-modal-overlay` 的指针拦截(2026-10-11 实测
+       * 冒烟就死在这里)。所以这里等一小会儿 —— 这是**同步点**,不是放宽:弹窗若
+       * 超过 10s 仍不消失,说明"外部判定后弹窗不关"的真缺陷回来了,照样失败。
+       */
+      {
+        const overlay = window.locator(".request-modal-overlay");
+        const deadline = Date.now() + 10_000;
+        while (Date.now() < deadline && (await overlay.count()) > 0) await window.waitForTimeout(100);
+        if ((await overlay.count()) > 0) {
+          const text = await overlay.first().innerText().catch(() => "");
+          const diag = await window.evaluate(() => ({
+            pluginEventTypes: (window.__openbuddyPluginEventTypes ?? []).slice(-14),
+            resolvedEvents: (window.__openbuddyResolvedEvents ?? []).slice(-6),
+            resolveResults: (window.__openbuddyResolveResults ?? []).slice(-4),
+            uiRequests: (window.__openbuddyUiRequests ?? []).slice(-3),
+          })).catch(() => null);
+          throw new Error(`权限/提问弹窗在判定后仍未关闭(判定链路失效):${text.replace(/\s+/g, " ").slice(0, 160)} | diag=${JSON.stringify(diag)}`);
+        }
+      }
+      try {
+        await window.getByRole("button", { name: "发送" }).click({ timeout: 15_000 });
+      } catch (error) {
+        // 失败时把"挡住发送键的是哪个弹窗 / 它从哪来"一起带出来 —— 2026-10-11
+        // 排查"真模型工具调用后弹窗卡住"时加的现场诊断。
+        const diag = await window.evaluate(() => {
+          const modal = document.querySelector(".request-modal-overlay");
+          return {
+            modal: modal
+              ? { className: modal.querySelector(".request-modal")?.className ?? modal.className, text: (modal.textContent || "").slice(0, 300) }
+              : null,
+            uiRequests: (window.__openbuddyUiRequests ?? []).slice(-5),
+          };
+        }).catch(() => null);
+        throw new Error(`Send click blocked: ${String(error).slice(0, 120)} | diag=${JSON.stringify(diag)}`);
+      }
       await waitForConversationReply(turn.prompt, turn.marker, previousAssistantCount);
       realE2eEvidence?.turns.push(turn.marker);
     }
@@ -2357,24 +2445,37 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
       baseUrl: e2eBaseUrl,
       turns: realConversationTurns.map((turn) => turn.marker),
     };
-    const realConversationEvents = await invoke("agent:event-log", { sessionId: realSessionId, limit: 500 });
+    // 读窗口开满(上限 2000)。**不**再要求"窗口里能看到全部 N 个 session/input"——
+    // 事件日志是有界环形缓冲,一个啰嗦的模型单轮上千条 update 会把早先几轮的
+    // input 挤出去(实测 glm-5.3-flash)。每一轮自己的证据已经分别断言过:
+    // 等待助手气泡带 marker(waitForConversationReply)+ 该轮事件链尾落盘。
+    // 这里只证明"日志确实在记 session/input",并在窗口装不下时留下数量差。
+    const realConversationEvents = await invoke("agent:event-log", { sessionId: realSessionId, limit: 2000 });
     const inputEvents = realConversationEvents.filter((event) => event.type === "session/input");
+    if (inputEvents.length === 0) {
+      throw new Error(`Real conversation recorded no session/input events at all: ${JSON.stringify(eventSummary(realConversationEvents.slice(-8)))}`);
+    }
     if (inputEvents.length < realConversationTurns.length) {
-      throw new Error(`Real conversation input count failed: ${JSON.stringify(inputEvents)}`);
+      console.log(
+        `[smoke] note: 事件日志窗口只装下 ${inputEvents.length}/${realConversationTurns.length} 个 session/input(有界缓冲;每轮的 marker 与事件链尾已分别断言)`,
+      );
     }
     const toolEvents = realConversationEvents.filter((event) => (event.type === "tool/start" || event.type === "tool/end") && event.sessionId === realSessionId);
     if (!toolEvents.some((event) => JSON.stringify(event.payload ?? event).includes("openbuddy_e2e_tool"))) {
       throw new Error(`Real MiniMax third turn did not execute the Pi E2E tool: ${JSON.stringify(toolEvents.slice(-12))}`);
     }
     const realProviderEvents = realConversationEvents.filter((event) => event.type === "assistant/end" || event.type === "assistant/update");
+    // 断言的是**当前配置的那个模型**(e2eModelId),不是写死的某个名字。
+    // 这里原本硬编码 `"model":"MiniMax-M3"` —— 换任何别的模型(实测 glm-5.3-flash)
+    // 都会失败,而失败信息还写着 MiniMax,极易被误读成"模型不对"。
     const realProviderEvidence = realProviderEvents.some((event) => {
       const serialized = JSON.stringify(event.payload ?? event);
       return serialized.includes('"provider":"custom_anthropic"')
-        && serialized.includes('"model":"MiniMax-M3"')
+        && serialized.includes(`"model":"${e2eModelId}"`)
         && serialized.includes('"api":"anthropic-messages"');
     });
     if (!realProviderEvidence || realConversationEvents.some((event) => /smoke_(?:anthropic|openai|responses)|smoke-key|smoke-openai-key/.test(JSON.stringify(event.payload ?? event)))) {
-      throw new Error(`Real MiniMax provider evidence failed: ${JSON.stringify(realProviderEvents.slice(-8))}`);
+      throw new Error(`Real provider evidence failed (expected custom_anthropic/${e2eModelId}): ${JSON.stringify(realProviderEvents.slice(-8))}`);
     }
     if (Object.values(providerProtocolCounts).some((count) => count !== 0)) {
       throw new Error(`Real MiniMax smoke unexpectedly contacted the local fixture provider: ${JSON.stringify(providerProtocolCounts)}`);
@@ -2434,11 +2535,18 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
     await composer.fill("reload 后继续同一会话，只回复 REAL-E2E-TURN-4-7314。不要解释。");
     await window.getByRole("button", { name: "发送" }).click();
     await waitForConversationReply("reload 后继续同一会话，只回复 REAL-E2E-TURN-4-7314。不要解释。", "REAL-E2E-TURN-4-7314", persistedAssistantCount);
-    const afterReloadEvents = await invoke("agent:event-log", { sessionId: realSessionId, limit: 500 });
-    if (afterReloadEvents.filter((event) => event.type === "session/input").length < 4
-      || !afterReloadEvents.some((event) => event.type === "assistant/update" && JSON.stringify(event.payload ?? event).includes("REAL-E2E-TURN-4-7314"))
+    // 窗口开满(上限 2000)。硬断言只保留"刚发生"的那两件:第 4 轮的 marker 进了
+    // assistant/update、以及本会话有 agent/settled —— 它们必然落在窗口尾部。
+    // `session/input` 累计条数不再硬断言:有界环形缓冲装不下啰嗦模型的全部轮次,
+    // 而每一轮的输入都已经被 waitForConversationReply 单独验证过。
+    const afterReloadEvents = await invoke("agent:event-log", { sessionId: realSessionId, limit: 2000 });
+    const inputCountAfterReload = afterReloadEvents.filter((event) => event.type === "session/input").length;
+    if (!afterReloadEvents.some((event) => event.type === "assistant/update" && JSON.stringify(event.payload ?? event).includes("REAL-E2E-TURN-4-7314"))
       || !afterReloadEvents.some((event) => event.type === "agent/settled" && event.sessionId === realSessionId)) {
-      throw new Error(`Real conversation reload continuation failed: ${JSON.stringify(afterReloadEvents.slice(-16))}`);
+      throw new Error(`Real conversation reload continuation failed: ${JSON.stringify(eventSummary(afterReloadEvents.slice(-16)))}`);
+    }
+    if (inputCountAfterReload < 4) {
+      console.log(`[smoke] note: reload 后窗口里只看到 ${inputCountAfterReload}/4 个 session/input(有界缓冲;每轮已单独断言)`);
     }
     realE2eEvidence.turns.push("REAL-E2E-TURN-4-7314");
     const persisted = await window.evaluate(async (expectedModel) => {
@@ -2666,9 +2774,12 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
   await invoke("agent:load-session", { sessionId: lifecycleSession.sessionId, cwd: userData });
   const loadedInfo = await invoke("agent:session-info", { sessionId: lifecycleSession.sessionId });
   if (loadedInfo?.sessionId !== lifecycleSession.sessionId) throw new Error(`Electron session load failed: ${JSON.stringify(loadedInfo)}`);
-  const restoredEvents = await invoke("agent:event-log", { sessionId: lifecycleSession.sessionId, limit: 200 });
+  // 注意 limit 上限是 2000:窗口开满并**按 session 过滤**(处理器支持 sessionId)。
+  // 之前这里 limit=200 读的是全局最后 200 条 —— 真模型那一会话单轮就上千条事件,
+  // 会把 lifecycleSession 的记录整个挤出窗口,于是"持久化日志没活过 re-init"误报。
+  const restoredEvents = await invoke("agent:event-log", { sessionId: lifecycleSession.sessionId, limit: 2000 });
   if (!restoredEvents.some((event) => event.type === "session/input" && event.sessionId === lifecycleSession.sessionId)) {
-    throw new Error("Electron persisted event log did not survive agent re-init");
+    throw new Error(`Electron persisted event log did not survive agent re-init: ${JSON.stringify(eventSummary(restoredEvents.slice(-8)))}`);
   }
   await window.reload({ waitUntil: "domcontentloaded" });
   await window.locator("#root").waitFor({ state: "attached", timeout: 15_000 });
@@ -2741,6 +2852,10 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
         ? `${loaded.model.provider}/${loaded.model.id}`
         : undefined;
       if (loadedModelId !== modelId) await window.api.invoke("agent:set-model", { sessionId, modelId });
+      // 换模型可能重建 pi 运行时/会话绑定,所以发送前重新加载一次(幂等)——
+      // 否则下面这步 prompt 会报 "Pi session is not loaded"。
+      // 真实用户路径同样经过"选中会话 → 切模型 → 发送",这里按同样的顺序走。
+      await window.api.invoke("agent:load-session", { sessionId, cwd });
       await window.api.invoke("agent:prompt", { sessionId, text: "Electron 重启后继续同一 Pi 会话，只回复 REAL-E2E-TURN-5-7314。不要解释。" });
       const marker = "REAL-E2E-TURN-5-7314";
       const deadline = Date.now() + 90_000;

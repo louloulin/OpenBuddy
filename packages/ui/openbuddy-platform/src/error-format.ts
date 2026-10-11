@@ -157,7 +157,7 @@ export function formatPiError(raw: string): string | null {
       lower.includes("unauthorized") ||
       lower.includes("invalid api key")
     ) {
-      return "⚠️ API 认证失败。请检查 Settings 中的 API Key 配置是否正确。";
+      return "API 认证失败。请检查 Settings 中的 API Key 配置是否正确。";
     }
     if (
       lower.includes("no api key") ||
@@ -165,17 +165,17 @@ export function formatPiError(raw: string): string | null {
       lower.includes("missing api key") ||
       lower.includes("api key not set")
     ) {
-      return "⚠️ 当前模型未配置 API Key。请在 Settings → 模型 中添加对应的 API Key 后重试。";
+      return "当前模型未配置 API Key。请在 Settings → 模型 中添加对应的 API Key 后重试。";
     }
     if (
       lower.includes("connection") ||
       lower.includes("timeout") ||
       lower.includes("econnrefused")
     ) {
-      return "⚠️ 网络连接失败。请检查网络/代理设置，确认 API endpoint 可达。";
+      return "网络连接失败。请检查网络/代理设置，确认 API endpoint 可达。";
     }
     if (lower.includes("429") || lower.includes("rate limit")) {
-      return "⚠️ API 速率限制已触发。请等待 1-2 分钟后重试。";
+      return "API 速率限制已触发。请等待 1-2 分钟后重试。";
     }
     // Show the cleaned inner message instead of the raw IPC wrapper.
     return cleaned ? `⚠️ ${cleaned}` : null;
@@ -225,7 +225,7 @@ export function formatPiError(raw: string): string | null {
     lowerInner.includes("api key not set") ||
     (lowerInner.includes("api key") && lowerInner.includes("found"))
   ) {
-    return "⚠️ 当前模型未配置 API Key。请在 Settings → 模型 中添加对应的 API Key 后重试。";
+    return "当前模型未配置 API Key。请在 Settings → 模型 中添加对应的 API Key 后重试。";
   }
   if (
     innerMsg.includes("401") ||
@@ -234,12 +234,12 @@ export function formatPiError(raw: string): string | null {
     lowerInner === "auth" ||
     lowerInner.includes("authentication")
   ) {
-    return "⚠️ API 认证失败。请检查 Settings 中的 API Key 配置是否正确。";
+    return "API 认证失败。请检查 Settings 中的 API Key 配置是否正确。";
   }
 
   // Connection errors
   if (innerMsg.includes("connection") || innerMsg.includes("timeout") || innerMsg.includes("ECONNREFUSED")) {
-    return "⚠️ 网络连接失败。请检查网络/代理设置，确认 API endpoint 可达。";
+    return "网络连接失败。请检查网络/代理设置，确认 API endpoint 可达。";
   }
 
   // Model not found

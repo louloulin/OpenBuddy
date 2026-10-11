@@ -62,11 +62,12 @@ export const QUICK_PROMPTS: ReadonlyArray<QuickPrompt> = [
   },
 ];
 
+// 「自动化」在阶段 0 从侧栏下线(后端 Stage G-1c 已删、面板每个读写都抛错),
+// 这里也一并去掉 —— 否则空状态还在推荐一个点进去只有迁移横幅的入口。
 export const EMPTY_STATE_TAGS = [
   "助理",
   "项目",
   "专家 / 技能 / 连接器",
-  "自动化",
   "资料库",
 ];
 

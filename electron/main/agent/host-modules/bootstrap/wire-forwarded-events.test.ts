@@ -55,7 +55,13 @@ describe("host-modules/bootstrap/wire-forwarded-events", () => {
     for (const event of FORWARDED_REMOTE_EVENTS) {
       expect(context.events).toContain(event);
     }
-    expect(FORWARDED_REMOTE_EVENTS.length).toBe(12);
+    // 不钉死数量:"恰好 12 条"是当年的快照,而这条断言的**意图**是"表里每一项
+    // 都被注册"(上面逐项断言已覆盖)。给个下界防止表被误删空。
+    // 注意:请求判定事件(`session/permission-resolved` / `session/question-resolved`)
+    // **不**走这条路 —— 它们由 plugin-event 总线直接转发到渲染层
+    // (electron/main/ipc/index.ts 的 agentHost.onPluginEvent → openbuddy://plugin-event),
+    // 形状是扁平的 { type, payload }。别把它们加到这里,加了也不会触发。
+    expect(FORWARDED_REMOTE_EVENTS.length).toBeGreaterThanOrEqual(12);
   });
 
   it("forwarded event handler emits an openbuddy://plugin-event with cloned args", () => {
