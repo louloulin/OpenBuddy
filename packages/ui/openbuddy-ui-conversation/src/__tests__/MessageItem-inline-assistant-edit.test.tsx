@@ -13,7 +13,7 @@
  * 设计的健壮性保证,在 builtin-applies-registration.test 里已经有"L3 接线证据"
  * (editor.body 注册了 TiptapEditor);R78 测试专注消息级契约。
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { SlotProvider } from "@openbuddy/ui-runtime/client";
@@ -33,6 +33,16 @@ vi.mock("@openbuddy/ui-theme/client", async (importOriginal) => {
     useThemeSnapshot: (selector: (s: { current: () => string }) => unknown) =>
       selector({ current: () => "light" }),
   };
+});
+
+// P1/P2-09:内置 UI 的装配自 7328dab0 起是**异步**的(registerAllBuiltinUis()
+// 返回 { done })。这个测试依赖 editor.body 槽里已有 TiptapEditor,所以必须等
+// 装配落定再渲染 —— 否则槽是空的,「就地编辑」按钮按设计不渲染,测试报
+// "Unable to find message-inline-edit-button"。同一个契约其余 7 个测试文件
+// 都已跟进,只有这个漏了(分支既有的红灯,2026-10-11 修)。
+beforeAll(async () => {
+  const mod = await import("@openbuddy/ui-runtime/client");
+  await mod.registerAllBuiltinUis().done;
 });
 
 const mount = (node: ReactNode) => render(<SlotProvider>{node}</SlotProvider>);

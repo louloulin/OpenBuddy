@@ -912,3 +912,23 @@
   border-radius: 999px;
   cursor: pointer;
 }
+
+
+/* ---- 右侧栏面板:任务 / 计划(阶段 1.3 / 1.2) ----
+   与 `.tool-side-panel` 同一套视觉语言:flex 兄弟节点 + 左边框 + 主色底 + 轻阴影。
+   它们此前一个是绝对定位浮层、一个完全没有定位样式,都会盖住或挤乱正文。
+   阴影用 token(--wb-shadow-md)而不是 rgba 字面量:颜色门禁不放行新字面量,
+   而且 token 在深浅主题下都成立。 */
+.chatview__tasks-panel,
+.chatview__plan-panel {
+  flex: none;
+  width: 340px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  border-left: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+  box-shadow: var(--wb-shadow-md);
+  position: relative;
+  z-index: 25;
+}

@@ -931,23 +931,6 @@ export function ChatView({
           messages={messages}
           onShareDone={onToast}
         />
-        {tasksOpen && (
-          <div className="chatview__tasks-panel">
-            <SessionTasksPanel
-              sessionId={sessionId ?? undefined}
-              onToast={onToast}
-            />
-          </div>
-        )}
-        {planOpen && (
-          <div className="chatview__plan-panel">
-            <PlanPanel
-              sessionId={sessionId ?? undefined}
-              onSend={onSend}
-              onToast={onToast}
-            />
-          </div>
-        )}
         <FindBar
           messages={messages}
           open={findOpen}
@@ -1028,6 +1011,20 @@ export function ChatView({
           onSend={onSend}
         />
       </div>
+
+      {/* 右侧栏面板:任务三态 / 执行计划。位置与 ToolSidePanel / CanvasPanel 同级
+          —— 之前它们是 chatview__main 内部的绝对定位浮层,会盖住正文(空状态卡片、
+          用户消息气泡都点不到)。改成 flex 兄弟节点后由布局让位,不再遮挡内容。 */}
+      {tasksOpen && (
+        <div className="chatview__tasks-panel">
+          <SessionTasksPanel sessionId={sessionId ?? undefined} onToast={onToast} />
+        </div>
+      )}
+      {planOpen && (
+        <div className="chatview__plan-panel">
+          <PlanPanel sessionId={sessionId ?? undefined} onSend={onSend} onToast={onToast} />
+        </div>
+      )}
 
       <ToolSidePanel
         open={panelOpen}

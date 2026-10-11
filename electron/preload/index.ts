@@ -74,7 +74,7 @@ const allowedInvokeChannels = new Set([
   // MCP 配置文件读写(mcp.json)。这三个通道自最初提交起就被注释掉了,而
   // main 侧一直有真处理(connectors.ts 的 mcpConfigPath/Read/Save),UI 也一直在调
   // —— McpConfigEditor / ConnectorsTab 的每条调用都被 preload 直接拒掉,
-  // 也就是说"MCP 配置查看/编辑"这块从上线起就是坏的。2026-10-11 真实启动
+  // 也就是说 MCP 配置的查看/编辑这块从上线起就是坏的。2026-10-11 真实启动
   // 验证(scripts/electron/smoke.mjs)撞到 invalid IPC channel 才暴露。
   "mcp:config-path", "mcp:config-read", "mcp:config-save",
   "mcp:delete", "mcp:list", "mcp:status", "mcp:toggle", "mcp:upsert",

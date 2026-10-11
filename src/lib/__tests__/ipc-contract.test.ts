@@ -51,7 +51,9 @@ describe("Electron IPC contract", () => {
     const mainFiles = await sourceFiles(resolve(root, "electron/main"));
     const main = (await Promise.all(mainFiles.map((file) => readFile(file, "utf8")))).join("\n");
     const invoked = new Set(rendererSources.flatMap((source) => [...literalChannels(source, /(?:invoke|ipcRenderer\.invoke)(?:<[^>]+>)?\(\s*["']([^"']+)["']/g)]));
-    const allowlisted = literalChannels(preload, /\s["']([^"']+)["'],?/g);
+    // 同样先剥注释:否则注释里的带引号文字会混进 allowlist 集合。
+    const preloadUncommented = preload.split("\n").map((line) => line.replace(/\/\/.*$/, "")).join("\n");
+    const allowlisted = literalChannels(preloadUncommented, /\s["']([^"']+)["'],?/g);
     // Handlers register through either `ipcMain.handle(...)` directly or the
     // `wrapIpcHandler(channel, fn)` shim (Phase 2 R1+R4 adds try/catch +
     // structured logging). Both forms keep the channel literal, so scan for
@@ -103,7 +105,15 @@ describe("Electron IPC contract", () => {
     );
     const main = mainSources.join("\n");
     const allowBlock = preload.match(/const allowedInvokeChannels = new Set\(\[([\s\S]*?)\]\);/)?.[1] ?? "";
-    const allowlisted = new Set([...allowBlock.matchAll(/"([^"]+)"/g)].map((match) => match[1]));
+    // 先剥掉整行注释再取名字。2026-10-11 教训:allowlist 块里的注释出现一个
+    // 带引号的说明文字(比如中文标签),就会被当成一个"已放行的通道",于是
+    // 断言②(allowlisted 必须在 handlers 里)报一个只存在于注释里的通道名。
+    // 同一类"文本守卫读注释"的坑,check-ipc-stubs 与 parity 测试也各有一处。
+    const allowBlockUncommented = allowBlock
+      .split("\n")
+      .map((line) => line.replace(/\/\/.*$/, ""))
+      .join("\n");
+    const allowlisted = new Set([...allowBlockUncommented.matchAll(/"([^"]+)"/g)].map((match) => match[1]));
 
     const handlers = new Set([...main.matchAll(/(?:ipcMain\.handle|wrapIpcHandler)\(\s*"([^"]+)"/g)].map((match) => match[1]));
 
@@ -152,7 +162,9 @@ describe("Electron IPC contract", () => {
     expect(client).toContain("harnessRecoveryResolve");
   });
   it("keeps namespaced capability handlers reachable through preload", async () => {
-    const allowlisted = literalChannels(preload, /\s["']([^"']+)["'],?/g);
+    // 同样先剥注释:否则注释里的带引号文字会混进 allowlist 集合。
+    const preloadUncommented = preload.split("\n").map((line) => line.replace(/\/\/.*$/, "")).join("\n");
+    const allowlisted = literalChannels(preloadUncommented, /\s["']([^"']+)["'],?/g);
     const handlers = literalChannels(main, /(?:ipcMain\.handle|wrapIpcHandler)\(\s*["']([^"']+)["']/g);
     for (const channel of handlers) {
       if (!channel.includes(":")) continue;
