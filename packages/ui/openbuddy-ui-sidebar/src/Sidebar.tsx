@@ -20,7 +20,6 @@ import {
   WbAssistantNavIcon,
   WbProjectNavIcon,
   WbExpertNavIcon,
-  WbAutomationNavIcon,
   WbMoreNavIcon,
   SearchIcon,
   FilterIcon,
@@ -76,7 +75,11 @@ const NAV = [
   // "专家·技能·连接器" 视图内已经包含"插件·市场"子 tab(Pi 官方市场 +
   // 本地插件浏览/安装),所以插件市场入口归在这里,主导航不再单独列项。
   { label: "专家·技能·连接器", icon: WbExpertNavIcon },
-  { label: "自动化", icon: WbAutomationNavIcon },
+  // 「自动化」入口在阶段 0 下线:openbuddy-automation 后端已在 Stage G-1c 删除,
+  // 面板每个读写都抛迁移错误 —— 留着入口等于给用户一个点了没反应的一级导航。
+  // UI 外壳与测试按「保留auto」约束保留(openbuddy-ui-automation),等阶段 1.4
+  // 用 rrule 调度 + 运行历史把它接回真实后端后再恢复这一行。
+  // { label: "自动化", icon: WbAutomationNavIcon },  // 恢复时记得同时恢复上方 import
   { label: "邮件", icon: MailIcon },
 ];
 

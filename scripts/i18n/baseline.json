@@ -1,6 +1,6 @@
 {
-  "_comment": "棘轮基线,由 `node scripts/check-i18n.mjs --update-baseline` 生成。硬编码文案只能减少:新增即失败。刻意调高基线等于放弃这笔债,请单独评审。\n\n【2026-10-07 有记录的调高 2046 → 2061(+15)】\n来源:无障碍改造(jsx-a11y 从「只开 1 条规则」改为 recommended 全量,210 处 → 0)。\n这 +15 条**全部是新增的 aria-label / title**,集中在 13 个文件(见 files 里 0→1 或 n→n+1 的那些)。\n它们不是新增文案,而是**之前根本不存在的可访问名**:这些元素原先是 `<span role=\"button\" onClick>` /\n图标按钮 / 无 role 的容器,屏幕阅读器读不出任何名字 —— 那正是本次要修的缺陷。补上名字是不可移除的:\n删掉就等于把刚修好的 WCAG 失败原样装回去。\n为什么是硬编码中文而不是 t():这 13 个文件**目前完全没有接入 i18n**(无 useT/useLocale),\n整文件就是中文界面(就是上面 2046 的主体)。只把这 20 条翻成 t() 会在无词表绑定的组件里\n产出「一半中文一半 key」的界面,比现状更糟。真正的偿还动作是给这些组件整体接入 i18n,\n届时这 15 条连同存量一起降到 0 —— 那是独立的迁移工作,不在本次范围内。\n棘轮对其余 192 个文件仍然照常收紧:本次只动了上列 13 个,没有放宽任何其他条目。",
-  "hardcodedTotal": 2061,
+  "_comment": "棘轮基线,由 `node scripts/check-i18n.mjs --update-baseline` 生成。硬编码文案只能减少:新增即失败。刻意调高基线等于放弃这笔债,请单独评审。",
+  "hardcodedTotal": 2059,
   "files": {
     "electron/main/agent/host-modules/docx-text-extractor.ts": 1,
     "electron/main/agent/host-modules/session-queue-items.ts": 1,
@@ -25,7 +25,6 @@
     "packages/ui/openbuddy-ui-automation/src/controls.tsx": 8,
     "packages/ui/openbuddy-ui-automation/src/PlanPanel.tsx": 14,
     "packages/ui/openbuddy-ui-automation/src/QueuePanel.tsx": 11,
-    "packages/ui/openbuddy-ui-automation/src/SidebarAutomationPanel.tsx": 2,
     "packages/ui/openbuddy-ui-automation/src/TasksPanel.tsx": 3,
     "packages/ui/openbuddy-ui-automation/src/WorkflowCanvas.tsx": 3,
     "packages/ui/openbuddy-ui-billing/src/BillingPanel.tsx": 12,

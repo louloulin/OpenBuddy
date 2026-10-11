@@ -35,6 +35,8 @@ export type { AutomationPanelProps } from "./AutomationPanel";
 export { TasksPanel } from "./TasksPanel";
 export type { TasksPanelProps } from "./TasksPanel";
 export { PlanPanel } from "./PlanPanel";
+export { SessionTasksPanel } from "./SessionTasksPanel";
+export type { SessionTasksPanelProps } from "./SessionTasksPanel";
 export type { PlanPanelProps } from "./PlanPanel";
 export { QueuePanel } from "./QueuePanel";
 export type { QueuePanelProps } from "./QueuePanel";

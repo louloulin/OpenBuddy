@@ -333,6 +333,18 @@
 .chatview--with-panel .chatview__plan-panel {
   right: 16px;
 }
+.chatview__tasks-panel {
+  position: absolute;
+  top: 64px;
+  right: 16px;
+  width: 340px;
+  z-index: 30;
+  max-height: min(60vh, 480px);
+  overflow-y: auto;
+}
+.chatview--with-panel .chatview__tasks-panel {
+  right: 16px;
+}
 .chatview__error {
   color: var(--wb-status-error, #e5484d);
   font-size: 13px;

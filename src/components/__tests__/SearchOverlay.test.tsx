@@ -153,7 +153,7 @@ describe("SearchOverlay unified search", () => {
   });
 
   it("searches current-session tasks and calendar events without widening task scope", async () => {
-    mocks.tasksListForSession.mockResolvedValue([{ id: "task-1", description: "跟进报价", status: "pending", createdAt: "2026-08-30T09:00:00.000Z", updatedAt: "2026-08-30T09:00:00.000Z", order: 0 }]);
+    mocks.tasksListForSession.mockResolvedValue([{ id: "task-1", content: "跟进报价", status: "pending", createdAt: "2026-08-30T09:00:00.000Z", updatedAt: "2026-08-30T09:00:00.000Z", order: 0 }]);
     mocks.calendarList.mockResolvedValue([{ id: "event-1", title: "报价评审", start: "2026-08-31T10:00:00.000Z", end: "2026-08-31T11:00:00.000Z", allDay: false, status: "confirmed", roomId: "personal-room", contextRefs: [], attendees: [], createdAt: "2026-08-30T09:00:00.000Z", updatedAt: "2026-08-30T09:00:00.000Z" }]);
     render(<SearchOverlay open onClose={vi.fn()} onSelect={vi.fn()} currentSessionId="session-1" onSelectCalendar={vi.fn()} />);
     fireEvent.change(screen.getByPlaceholderText("搜索会话标题或内容…"), { target: { value: "报价" } });

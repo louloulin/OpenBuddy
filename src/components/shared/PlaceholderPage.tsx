@@ -151,7 +151,7 @@ function PlaceholderPageInner({
   const openKnowledgeEntry = useCallback(
     (id: string, url?: string) => {
       if (url) {
-        void invoke("open_path", { path: url, cwd: null }).catch(() =>
+        void invoke("shellfs:open-path", { path: url, cwd: null }).catch(() =>
           onToast?.(`无法打开知识条目：${id}`),
         );
         return;

@@ -77,6 +77,17 @@ jobs:
       - name: accessibility gate
         run: pnpm verify:a11y
 
+      # IPC stub gate. The preload/main channel *parity* test only compares
+      # channel sets, so `async () => null` is the cheapest way to pass it —
+      # which is how "adopt email action items as tasks" ended up toasting
+      # success while writing nothing, and how the unified-search task scope
+      # stayed permanently empty. This gate reads the handler bodies: a channel
+      # the UI calls that resolves to a stub, to nothing, or to an unregistered
+      # channel fails here. Explicitly-removed channels must be declared with a
+      # reason in scripts/ipc-stub-baseline.json.
+      - name: IPC stub gate
+        run: pnpm verify:ipc-stubs
+
   test:
     name: Unit Tests
     runs-on: ${{ matrix.os }}

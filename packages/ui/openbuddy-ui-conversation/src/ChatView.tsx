@@ -17,6 +17,7 @@ import {
   defaultFileTreeButton,
   defaultFindButton,
   defaultPlanButton,
+  defaultTasksButton,
   defaultSubagentButton,
   defaultTeamStatusButton,
 } from "./chatview/ChatViewToolbar";
@@ -44,7 +45,8 @@ import {
 import { useSessionStore, type ChatMessage, type ToolCallView } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { createMarkdownHostConfig } from "@/lib/markdown/markdown-host";
-import { piListSessions, piSetThinkingLevel, sessionFork } from "@/lib/agent/pi-client";
+import { piListSessions, piSetThinkingLevel, sessionFork, tasksListForSession } from "@/lib/agent/pi-client";
+import { useT } from "@openbuddy/ui-locale/client";
 import { confirm } from "@/lib/platform/electron-api";
 import {
   collectSessionArtifacts,
@@ -60,7 +62,7 @@ import {
   ConversationViewTabs,
   useConversationViews,
 } from "./conversation-view";
-import { PlanPanel } from "@openbuddy/ui-automation";
+import { PlanPanel, SessionTasksPanel } from "@openbuddy/ui-automation";
 import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
 import { QuestionInlineCard } from "./QuestionInlineCard";
 import { ToolSidePanel, type ToolSidePanelMode } from "./ToolSidePanel";
@@ -79,7 +81,7 @@ import { usePermissionStore } from "@/stores/permission-store";
 import { useCanvasStore } from "@/stores/canvas-store";
 
 import type { ModelOption, ThinkingLevel } from "@openbuddy/ui-workbench";
-import type { AgentEntry } from "@openbuddy/shared-types";
+import type { AgentEntry, SessionTask } from "@openbuddy/shared-types";
 import type { WorkspaceInfo } from "@/lib/agent/pi-client";
 import { getRendererPluginRuntime } from "@/lib/runtime/renderer-plugin-runtime";
 import type { DeepSeekSessionListSnapshot } from "@openbuddy/renderer-host";
@@ -349,7 +351,32 @@ export function ChatView({
     },
     shallow,
   );
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const [sessionTasks, setSessionTasks] = useState<SessionTask[]>([]);
+  // 会话任务角标:会话切换或开关面板时刷新。面板内部的增删改由面板自己
+  // reload;角标可能短暂滞后,不为角标单独引入事件订阅(最小实现)。
+  useEffect(() => {
+    if (!sessionId) {
+      setSessionTasks([]);
+      return;
+    }
+    let cancelled = false;
+    tasksListForSession(sessionId)
+      .then((tasks) => {
+        if (!cancelled) setSessionTasks(tasks);
+      })
+      .catch(() => {
+        if (!cancelled) setSessionTasks([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, tasksOpen]);
   const [planOpen, setPlanOpen] = useState(false);
+  const tasksBadgeLabel = useT("tasks.badge", {
+    completed: sessionTasks.filter((t) => t.status === "completed").length,
+    total: sessionTasks.length,
+  });
 
 
   // ---- 消息级"重试":回溯到最后一条用户 prompt 并重新发送（重新生成回复） ----
@@ -768,6 +795,13 @@ export function ChatView({
       active: planOpen,
       onClick: () => setPlanOpen((v) => !v),
     }),
+    defaultTasksButton({
+      taskCount: sessionTasks.length,
+      taskCompleted: sessionTasks.filter((t) => t.status === "completed").length,
+      active: tasksOpen,
+      label: tasksBadgeLabel,
+      onClick: () => setTasksOpen((v) => !v),
+    }),
     defaultArtifactsButton({
       artifactCount: artifacts.length,
       active: panelOpen && panelMode === "artifacts",
@@ -897,6 +931,14 @@ export function ChatView({
           messages={messages}
           onShareDone={onToast}
         />
+        {tasksOpen && (
+          <div className="chatview__tasks-panel">
+            <SessionTasksPanel
+              sessionId={sessionId ?? undefined}
+              onToast={onToast}
+            />
+          </div>
+        )}
         {planOpen && (
           <div className="chatview__plan-panel">
             <PlanPanel

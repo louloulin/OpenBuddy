@@ -12,6 +12,7 @@ import { agentHost, bindRendererEventEmitter, ensureAgentHostLoaded } from "./ag
 import { readKnowledgeSources, readNotifyChannels, readPolicyConfig, readStorageSources, readSubagentsConfig, writeKnowledgeSources, writeNotifyChannels, writePolicyConfig, writeSubagentsConfig } from "../agent/pi-resources";
 import type { OpenBuddySubagentsConfig } from "../agent/pi-resources";
 import { dispatchMainNotifications } from "../notifications";
+import { piHome } from "../agent/host-modules/_host-paths";
 import { casdoorAuth } from "../casdoor/casdoor-auth";
 import {
 	absolutePath,
@@ -54,6 +55,7 @@ import {
 // dynamic: @openbuddy/capability-automation
 // dynamic: @openbuddy/capability-calendar
 // dynamic: @openbuddy/fs-fs-local
+// dynamic: @openbuddy/folder-trust
 // dynamic: @openbuddy/team-team
 
 export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
@@ -150,115 +152,42 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 				userAgent: win?.webContents.getUserAgent() ?? "",
 			};
 		});
-		// Stage C-1: openbuddy-folder-trust removed; folder trust is owned by the
-		// system (no plugin). Handlers intentionally throw so callers see a clear
-		// "removed" error rather than a silent no-op.
-		wrapIpcHandler("folder-trust:list", async () => {
-			throw new Error("folder-trust:list is removed (Stage C-1); folder trust is owned by the system");
+		// Folder trust — backed by @openbuddy/folder-trust. That capability package
+		// existed all along, but `mountFolderTrust()` was never called in
+		// production, so `folderTrustHandlers.*` threw "store is not mounted";
+		// Stage C-1 then removed the IPC channels entirely while
+		// FolderTrustDialog (packages/ui/openbuddy-ui-dialogs) kept calling them —
+		// the user's "信任此目录" click could only ever throw. Mount lazily here so
+		// the decision actually persists.
+		let folderTrustModule: typeof import("@openbuddy/folder-trust") | null = null;
+		const folderTrust = async () => {
+			folderTrustModule ??= await import("@openbuddy/folder-trust");
+			if (!folderTrustModule.getFolderTrustStore()) {
+				folderTrustModule.mountFolderTrust({ storagePath: join(piHome(), "folder-trust.json") });
+			}
+			return folderTrustModule.folderTrustHandlers;
+		};
+		wrapIpcHandler("folder-trust:list", async () => (await folderTrust()).list());
+		wrapIpcHandler("folder-trust:is-trusted", async (_e, cwd: unknown) =>
+			(await folderTrust()).isTrusted(requiredString(cwd, "cwd")));
+		wrapIpcHandler("folder-trust:grant", async (_e, cwd: unknown) => {
+			return (await folderTrust()).grant(requiredString(cwd, "cwd"));
 		});
-		wrapIpcHandler("folder-trust:is-trusted", async (_e, _cwd: unknown) => {
-			throw new Error("folder-trust:is-trusted is removed (Stage C-1); folder trust is owned by the system");
+		wrapIpcHandler("folder-trust:revoke", async (_e, cwd: unknown) => {
+			return (await folderTrust()).revoke(requiredString(cwd, "cwd"));
 		});
-		wrapIpcHandler("folder-trust:grant", async (_e, _cwd: unknown) => {
-			throw new Error("folder-trust:grant is removed (Stage C-1); folder trust is owned by the system");
+		wrapIpcHandler("folder_trust_respond", async (_e, args: unknown) => {
+			const input = recordValue(args, "folder trust payload");
+			return (await folderTrust()).respond(
+				requiredString(input.cwd, "cwd"),
+				requiredBoolean(input.trusted, "trusted"),
+			);
 		});
-		wrapIpcHandler("folder-trust:revoke", async (_e, _cwd: unknown) => {
-			throw new Error("folder-trust:revoke is removed (Stage C-1); folder trust is owned by the system");
-		});
-		wrapIpcHandler("folder_trust_respond", async (_e, _args: unknown) => {
-			throw new Error("folder_trust_respond is removed (Stage C-1); folder trust is owned by the system");
-		});
-		// Stage C-4: openbuddy-memory removed; memory is owned by pi-hermes-memory
-		// (passthrough). Handlers intentionally throw so callers see a clear
-		// "removed" error rather than a silent no-op.
-		wrapIpcHandler("memory:list", async () => {
-			throw new Error("memory:list is removed (Stage C-4); memory is owned by pi-hermes-memory");
-		});
-		wrapIpcHandler("memory:get", async (_e, _id: unknown) => {
-			throw new Error("memory:get is removed (Stage C-4); memory is owned by pi-hermes-memory");
-		});
-		wrapIpcHandler("memory:save", async (_e, _payload: unknown) => {
-			throw new Error("memory:save is removed (Stage C-4); memory is owned by pi-hermes-memory");
-		});
-		wrapIpcHandler("memory:delete", async (_e, _id: unknown) => {
-			throw new Error("memory:delete is removed (Stage C-4); memory is owned by pi-hermes-memory");
-		});
-		wrapIpcHandler("memory:rewrite", async (_e, _payload: unknown) => {
-			throw new Error("memory:rewrite is removed (Stage C-4); memory is owned by pi-hermes-memory");
-		});
-		wrapIpcHandler("memory_list", async () => {
-			throw new Error("memory_list is removed (Stage C-4); memory is owned by pi-hermes-memory");
-		});
-		wrapIpcHandler("memory_get", async (_e, _id: unknown) => {
-			throw new Error("memory_get is removed (Stage C-4); memory is owned by pi-hermes-memory");
-		});
-		wrapIpcHandler("memory_save", async (_e, _payload: unknown) => {
-			throw new Error("memory_save is removed (Stage C-4); memory is owned by pi-hermes-memory");
-		});
-		wrapIpcHandler("memory_delete", async (_e, _id: unknown) => {
-			throw new Error("memory_delete is removed (Stage C-4); memory is owned by pi-hermes-memory");
-		});
-		wrapIpcHandler("memory_rewrite", async (_e, _payload: unknown) => {
-			throw new Error("memory_rewrite is removed (Stage C-4); memory is owned by pi-hermes-memory");
-		});
-		wrapIpcHandler("memory_flush", async () => null);
 		wrapIpcHandler("subagents:get-config", async () => {
 			casdoorAuth.assertAuthorized({ capability: "team.workspace" });
 			return readSubagentsConfig();
 		});
-		// Stub channels for legacy / 3rd-party IPC keep preload allowlist in sync.
-		// Stage G-1c: storage:automation-bootstrap removed; automation is owned by pi-background-tasks (passthrough).
 		// The handler intentionally throws so callers see a clear "removed" error rather than a silent no-op.
-		wrapIpcHandler("storage:automation-bootstrap", async () => {
-			throw new Error("storage:automation-bootstrap is removed (Stage G-1c); automation is owned by pi-background-tasks (passthrough)");
-		});
-		wrapIpcHandler("toggle_plan_mode", async () => null);
-		wrapIpcHandler("web_search_config_get", async () => null);
-		wrapIpcHandler("web_search_config_save", async () => null);
-		wrapIpcHandler("websearch:fetch", async () => null);
-		wrapIpcHandler("websearch:get-config", async () => null);
-		wrapIpcHandler("websearch:search", async () => null);
-		wrapIpcHandler("websearch:set-config", async () => null);
-		wrapIpcHandler("websearch:set-enabled", async () => null);
-		wrapIpcHandler("plan-mode:approve", async () => null);
-		wrapIpcHandler("plan-mode:get", async () => null);
-		wrapIpcHandler("plan-mode:reject", async () => null);
-		wrapIpcHandler("plan-mode:set-enabled", async () => null);
-		wrapIpcHandler("plan-mode:set-plan", async () => null);
-		wrapIpcHandler("tasks:add", async (_e, args: unknown) => {
-			const input = recordValue(args, "tasks:add payload");
-			requiredString(input.sessionId, "sessionId");
-			return null;
-		});
-		wrapIpcHandler("tasks:clear-completed", async () => null);
-		wrapIpcHandler("tasks:delete", async (_e, args: unknown) => {
-			const input = recordValue(args, "tasks:delete payload");
-			requiredString(input.id, "id");
-			return null;
-		});
-		wrapIpcHandler("tasks:list", async () => null);
-		wrapIpcHandler("tasks:update", async (_e, args: unknown) => {
-			const input = recordValue(args, "tasks:update payload");
-			requiredString(input.id, "id");
-			return null;
-		});
-		wrapIpcHandler("automations:archive", async () => null);
-		wrapIpcHandler("automations:delete", async () => null);
-		wrapIpcHandler("automations:run", async () => null);
-		wrapIpcHandler("automations:save", async () => null);
-		wrapIpcHandler("automations:set-status", async () => null);
-		wrapIpcHandler("inspiration:list", async () => null);
-		wrapIpcHandler("inspiration:next", async () => null);
-		wrapIpcHandler("notification_append", async () => null);
-		wrapIpcHandler("notification_clear", async () => null);
-		wrapIpcHandler("notification_list", async () => null);
-		wrapIpcHandler("notification_mark_all_read", async () => null);
-		wrapIpcHandler("notification_mark_read", async () => null);
-		wrapIpcHandler("notifications:append", async () => null);
-		wrapIpcHandler("notifications:clear", async () => null);
-		wrapIpcHandler("notifications:list", async () => null);
-		wrapIpcHandler("notifications:mark-all-read", async () => null);
-		wrapIpcHandler("notifications:mark-read", async () => null);
 		wrapIpcHandler("subagents:set-config", async (_e, args: unknown) => {
 			casdoorAuth.assertAuthorized({ capability: "team.workspace" });
 			const input = recordValue(args, "subagents set-config payload");
@@ -451,16 +380,6 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 		wrapIpcHandler("shell:open-external", async (_e, url: string) => {
 			await shell.openExternal(httpUrl(url, "url"));
 			return { ok: true };
-		});
-		wrapIpcHandler("automations:snapshot", async () => {
-			// Stage G-1c + H-4: openbuddy-automation removed; the canonical
-			// automation backplane is `pi-goal-list-loop-audit`
-			// (npm 18,959 downloads/month, source of truth for goal-loop
-			// queue + audit). This legacy IPC channel throws so the UI
-			// surfaces a clear migration message instead of silently
-			// rendering empty data; AutomationPanel still exists (per
-			// "保留auto" user constraint) and points users at the new path.
-			throw new Error("automations:snapshot has been retired — automation is now owned by pi-goal-list-loop-audit (passthrough). Install it via /marketplace and run /goal to manage automations.");
 		});
 		// Legacy snake_case aliases kept so the preload allowlist stays
 		// consistent; every call rejects with the same migration message

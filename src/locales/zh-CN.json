@@ -152,5 +152,33 @@
       "design": "设计创意"
     },
     "fallback": "日常办公"
+  },
+  "tasks": {
+    "title": "任务",
+    "badge": "任务 {completed}/{total}",
+    "addPlaceholder": "新增一个任务…",
+    "add": "添加",
+    "clearCompleted": "清除已完成",
+    "status": {
+      "pending": "待处理",
+      "in_progress": "进行中",
+      "completed": "已完成"
+    },
+    "statusToggle": "任务「{content}」状态：{status}，点击切换",
+    "delete": "删除任务「{content}」",
+    "empty": "暂无任务。用输入框新增，或让 agent 用 /tasks 添加。",
+    "noSession": "当前没有打开的会话",
+    "noSessionHint": "打开一个会话后，这里显示它的待办任务。",
+    "loading": "加载中…",
+    "loadFailed": "加载任务失败：{message}",
+    "addFailed": "新增任务失败：{message}",
+    "updateFailed": "更新任务失败：{message}",
+    "deleteFailed": "删除任务失败：{message}",
+    "clearFailed": "清除失败：{message}"
+  },
+  "plan": {
+    "syncToPi": "把修改发回 pi",
+    "synced": "已把修改发给 pi，以 pi 的回报为准",
+    "localDirty": "计划有未同步的本地修改"
   }
 }

@@ -102,6 +102,11 @@ vi.mock("@/lib/agent/pi-client", async () => {
     "expertsListRoots", "expertsLoad", "expertsThumbnail", "expertsImageBytes",
     "expertsReadAgentPrompt", "expertsLinkAgents", "piClearSessionExpert",
     "skillsList", "skillsAdd", "skillsRemove", "skillsToggle",
+    // ChatView 工具栏的任务角标会在挂载时拉一次会话任务(tasks:list)。
+    // mock 是"铺满所有被引用导出"的白名单,新增引用必须同步加进来,
+    // 否则报 No export defined 把整棵 ChatView 树炸掉。
+    "tasksListForSession", "tasksAddForSession", "tasksUpdateForSession",
+    "tasksDeleteForSession", "tasksClearCompleted",
     "collaborationOnUpdate", "agentOnPluginEvent",
   ]) {
     mod[name] = name.startsWith("on") ? handler : asyncArr;

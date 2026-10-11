@@ -239,7 +239,7 @@ function LocalFilesTab({
         is_dir: boolean;
         size: number;
         modified_at: number;
-      }> = await invoke("browse_directory", { path: dir });
+      }> = await invoke("shellfs:browse-directory", { path: dir });
       const items: LocalFileItem[] = entries.map((e) => ({
         name: e.name,
         path: e.path,

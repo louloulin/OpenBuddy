@@ -752,3 +752,163 @@
   color: var(--wb-text-strong);
   font-size: 12px;
 }
+
+
+/* ---- 会话任务面板(SessionTasksPanel,阶段 1.3 任务三态) ----
+   结构与 .plan-panel 同构:头部计数 + 三态行 + 新增输入。
+   颜色全部走 --wb-* token,深浅主题自动成立。 */
+.session-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 12px;
+  background: var(--wb-bg-elevated);
+}
+.session-tasks--empty {
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.session-tasks__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.session-tasks__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wb-text-strong);
+}
+.session-tasks__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.session-tasks__progress-text {
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.session-tasks__clear {
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--wb-text-medium);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.session-tasks__clear:hover {
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-hover);
+}
+.session-tasks__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.session-tasks__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+}
+.session-tasks__row--completed .session-tasks__content {
+  text-decoration: line-through;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.session-tasks__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--wb-text-medium);
+  background: var(--wb-bg-tertiary);
+}
+.session-tasks__status:hover {
+  outline: 1px solid var(--wb-border-default);
+}
+.session-tasks__status--in_progress {
+  color: var(--wb-brand, #00c29a);
+}
+.session-tasks__status--completed {
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.session-tasks__content {
+  flex: 1;
+  font-size: 13px;
+  color: var(--wb-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-tasks__delete {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 3px;
+  border-radius: 6px;
+  color: var(--wb-text-weak, #9aa0a6);
+  cursor: pointer;
+}
+.session-tasks__delete:hover {
+  color: var(--wb-status-error, #e5484d);
+  background: var(--wb-bg-hover);
+}
+.session-tasks__add {
+  display: flex;
+  gap: 6px;
+}
+.session-tasks__add-input {
+  flex: 1;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.session-tasks__add-btn {
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-text-strong);
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.session-tasks__add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.session-tasks__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+
+.plan-panel__sync-btn {
+  border: 1px solid var(--wb-brand, #00c29a);
+  background: color-mix(in srgb, var(--wb-brand, #00c29a) 12%, transparent);
+  color: var(--wb-brand, #00c29a);
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}

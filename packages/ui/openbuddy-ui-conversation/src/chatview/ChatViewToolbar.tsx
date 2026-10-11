@@ -120,6 +120,26 @@ export function defaultPlanButton(props: {
   };
 }
 
+export function defaultTasksButton(props: {
+  taskCount: number;
+  taskCompleted: number;
+  active: boolean;
+  /** i18n 由调用方(useT)解析后传入 —— 这是个普通函数,不能在里面调 hook。 */
+  label: string;
+  onClick: () => void;
+}): ToolButtonDescriptor {
+  return {
+    id: "tasks",
+    active: props.active,
+    // 任务入口始终可见:和计划不同,用户需要能从零创建第一条任务,
+    // "有任务才显示"会让面板永远无法被第一次打开。
+    visible: true,
+    onClick: props.onClick,
+    label: props.label,
+    icon: <ListTodo size={15} strokeWidth={1.75} />,
+  };
+}
+
 export function defaultArtifactsButton(props: {
   artifactCount: number;
   active: boolean;

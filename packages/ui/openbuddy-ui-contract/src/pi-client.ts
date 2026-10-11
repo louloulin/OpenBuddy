@@ -32,6 +32,7 @@ import type {
   PromptComplete,
   RewindPoint,
   RunningTask,
+  SessionTask,
   SearchHit,
   SessionInfoResponse,
   SessionSummary,
@@ -1821,14 +1822,40 @@ export async function tasksList(): Promise<RunningTask[]> {
   return invoke<RunningTask[]>("tasks_list");
 }
 
-/** List tasks scoped to a single session (used by unified search). */
-export async function tasksListForSession(sessionId: string): Promise<RunningTask[]> {
-  return invoke<RunningTask[]>("tasks:list", { sessionId });
+/**
+ * List the todo entries scoped to a single session — the same list the
+ * `/tasks` slash command reads and writes (`session_tasks` table).
+ *
+ * Note this is NOT `tasksList()` above: that one reports *running agent jobs*.
+ * The `tasks:*` channels used to be `async () => null` stubs, so this returned
+ * null and unified search showed an always-empty "当前会话任务" section.
+ */
+export async function tasksListForSession(sessionId: string): Promise<SessionTask[]> {
+  return invoke<SessionTask[]>("tasks:list", { sessionId });
 }
 
-/** Add a task entry scoped to the given session. */
-export async function tasksAddForSession(sessionId: string, title: string): Promise<{ id: string } | null> {
-  return invoke<{ id: string } | null>("tasks:add", { sessionId, title });
+/** Add a todo entry scoped to the given session. Rejects if the write fails. */
+export async function tasksAddForSession(sessionId: string, title: string): Promise<{ id: string }> {
+  return invoke<{ id: string }>("tasks:add", { sessionId, title });
+}
+
+/** Cycle a todo entry's status (`pending` → `in_progress` → `completed`). */
+export async function tasksUpdateForSession(
+  sessionId: string,
+  id: string,
+  patch: { status?: string },
+): Promise<{ id: string } | null> {
+  return invoke<{ id: string } | null>("tasks:update", { sessionId, id, patch });
+}
+
+/** Delete a todo entry. */
+export async function tasksDeleteForSession(sessionId: string, id: string): Promise<void> {
+  await invoke<void>("tasks:delete", { sessionId, id });
+}
+
+/** Remove completed todo entries from the session. */
+export async function tasksClearCompleted(sessionId: string): Promise<void> {
+  await invoke<void>("tasks:clear-completed", { sessionId });
 }
 
 /** Kill a running task or subagent. */
@@ -1838,7 +1865,12 @@ export async function taskKill(taskId: string): Promise<void> {
 
 // ---------- folder trust ----------
 
-/** Respond to a folder-trust request from pi. */
+/**
+ * Respond to a folder-trust request from pi, persisting the decision.
+ * Backed by the `@openbuddy/folder-trust` capability (`folderTrustHandlers.respond`).
+ * Stage C-1 had removed this channel while the capability package stayed in the
+ * tree but was never mounted — so the dialog's "trust" button could only throw.
+ */
 export async function folderTrustRespond(cwd: string, trusted: boolean): Promise<void> {
   await invoke<void>("folder_trust_respond", { cwd, trusted });
 }

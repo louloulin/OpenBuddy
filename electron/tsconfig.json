@@ -53,6 +53,9 @@
       "@openbuddy/fs-fs-local": [
         "../packages/fs/openbuddy-fs-local/src/index.ts"
       ],
+      "@openbuddy/folder-trust": [
+        "../packages/capability/openbuddy-folder-trust/src/index.ts"
+      ],
       "@openbuddy/team-team": [
         "../packages/team/openbuddy-team/src/index.ts"
       ],

@@ -10,13 +10,13 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSessionStore } from "@/stores/session-store";
-import { togglePlanMode } from "@/lib/agent/pi-client";
 import type { PlanEntry, PlanEntryPriority, PlanEntryStatus } from "@openbuddy/shared-types";
 import {
   reorderPlan,
   addPlanEntry,
   cycleEntryStatus,
 } from "@/lib/ui/plan-utils";
+import { useLocale } from "@openbuddy/ui-locale/client";
 import {
   CheckIcon,
   ClockIcon,
@@ -49,12 +49,23 @@ export interface PlanPanelProps {
   onToast?: (msg: string) => void;
 }
 
-export function PlanPanel({ sessionId, onSend, onToast }: PlanPanelProps) {
+export function PlanPanel({ onSend, onToast }: PlanPanelProps) {
   const plan = useSessionStore((s) => s.plan);
   const planMode = useSessionStore((s) => s.planMode);
-  const setPlanMode = useSessionStore((s) => s.setPlanMode);
-  const setPlan = useSessionStore((s) => s.setPlan);
+  const setPlanRaw = useSessionStore((s) => s.setPlan);
+  const setPlan: typeof setPlanRaw = useCallback(
+    (next) => {
+      setLocalDirty(true);
+      setPlanRaw(next);
+    },
+    [setPlanRaw],
+  );
 
+  const locale = useLocale();
+  // 计划内容由 pi 拥有;下面的编辑都先落在本地(立即反馈),改动通过
+  // 「把修改发回 pi」一次性以 `/plan set` 交给 pi,pi 回报后界面以它为准。
+  // 这取代了旧做法——静默只改本地,下一次 pi 计划事件就把编辑冲掉。
+  const [localDirty, setLocalDirty] = useState(false);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [elapsed, setElapsed] = useState<Record<number, number>>({});
@@ -97,16 +108,24 @@ export function PlanPanel({ sessionId, onSend, onToast }: PlanPanelProps) {
     setElapsed({});
   }, [plan?.entries.length]);
 
-  const handleTogglePlanMode = useCallback(async () => {
-    if (!sessionId) return;
-    try {
-      await togglePlanMode(sessionId, !planMode);
-      setPlanMode(!planMode);
-      onToast?.(planMode ? "已退出计划模式" : "已进入计划模式");
-    } catch (e) {
-      onToast?.(`切换失败：${String(e).replace(/^Error:\s*/, "")}`);
+  /**
+   * 计划模式由 pi-plan-mode 拥有(Stage G-1b:`openbuddy-plan` 已删除,
+   * `toggle_plan_mode` 通道随之移除)。渲染进程**不能**直接改状态 ——
+   * 旧实现调用一个 no-op 的 `togglePlanMode()`、再本地翻转 store 并弹
+   * 「已进入计划模式」,那句话是假的:pi 完全不知情,下一次 `pi://plan-mode`
+   * 事件就把界面打回原样。
+   *
+   * 正确做法是把 `/plan enable|disable` 当作一条消息发给 agent,由 pi 执行,
+   * 状态经由 `pi://plan-mode` 事件回流(见 useAgentSession.ts 的 setPlanMode)。
+   */
+  const handleTogglePlanMode = useCallback(() => {
+    if (!onSend) {
+      onToast?.("当前界面没有可发送指令的会话入口，无法切换计划模式");
+      return;
     }
-  }, [sessionId, planMode, setPlanMode, onToast]);
+    onSend(planMode ? "/plan disable" : "/plan enable");
+    onToast?.("已发送 /plan 指令，计划模式状态以 pi 的回报为准");
+  }, [onSend, planMode, onToast]);
 
   const handleApprove = useCallback(() => {
     if (!onSend) return;
@@ -194,6 +213,22 @@ export function PlanPanel({ sessionId, onSend, onToast }: PlanPanelProps) {
     [plan, editText, setPlan],
   );
 
+  /**
+   * 把本地编辑后的计划以 checklist 文本交给 pi(`/plan set` 透传给
+   * pi-plan-mode)。放在显式按钮后面而不是每次编辑都发 —— 后者会一次性
+   * 刷出 N 条消息,而且 pi 每次回报都会打断编辑。
+   */
+  const syncToPi = useCallback(() => {
+    if (!onSend || !plan) return;
+    const lines = plan.entries.map((entry) => {
+      const box = entry.status === "completed" ? "[x]" : "[ ]";
+      return `- ${box} ${entry.content}`;
+    });
+    onSend(`/plan set ${lines.join("\n")}`);
+    setLocalDirty(false);
+    onToast?.(locale.t("plan.synced"));
+  }, [onSend, plan, locale, onToast]);
+
   // Empty states
   if (planMode && (!plan || plan.entries.length === 0)) {
     return (
@@ -237,6 +272,16 @@ export function PlanPanel({ sessionId, onSend, onToast }: PlanPanelProps) {
           <TaskListIcon size="sm" /> 执行计划
         </h3>
         <div className="plan-panel__header-actions">
+          {localDirty && (
+            <button
+              type="button"
+              className="plan-panel__sync-btn"
+              onClick={syncToPi}
+              title={locale.t("plan.localDirty")}
+            >
+              {locale.t("plan.syncToPi")}
+            </button>
+          )}
           <span className="plan-panel__progress-text">
             {completed}/{total}
           </span>

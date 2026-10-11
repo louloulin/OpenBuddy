@@ -19,7 +19,9 @@ const base = {
 describe("Sidebar", () => {
   it("渲染导航项", () => {
     render(<Sidebar {...base} />);
-    for (const label of ["新建任务", "助理", "项目", "专家·技能·连接器", "自动化", "更多"]) {
+    // 「自动化」入口在阶段 0 下线(后端在 Stage G-1c 删除、面板每个读写都抛错),
+    // 阶段 1.4 接回真实调度后再加回这个断言。
+    for (const label of ["新建任务", "助理", "项目", "专家·技能·连接器", "更多"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
   });
@@ -41,7 +43,7 @@ describe("Sidebar", () => {
     expect(screen.queryByText("证据与审计")).toBeNull();
 
     // 其他一级入口仍保持原状。
-    for (const label of ["项目", "专家·技能·连接器", "自动化", "邮件", "更多"]) {
+    for (const label of ["项目", "专家·技能·连接器", "邮件", "更多"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
 

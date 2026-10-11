@@ -99,7 +99,9 @@ describe("IPC contract 真实端到端", () => {
     expect(countByPrefix("agent")).toBeGreaterThanOrEqual(40);
     expect(countByPrefix("email")).toBeGreaterThanOrEqual(50);
     expect(countByPrefix("collaboration")).toBeGreaterThanOrEqual(35);
-    expect(countByPrefix("storage")).toBeGreaterThanOrEqual(10);
+    // 10 → 9:storage:automation-bootstrap 是 Stage G-1c 移除 automation 后端时
+      // 留下的"已移除"桩,阶段 0 连同 48 个同类死通道一起删掉了。
+      expect(countByPrefix("storage")).toBeGreaterThanOrEqual(9);
     expect(countByPrefix("harness")).toBeGreaterThanOrEqual(5);
     expect(countByPrefix("weknora")).toBeGreaterThanOrEqual(3);
     expect(countByPrefix("shellfs")).toBeGreaterThanOrEqual(10);

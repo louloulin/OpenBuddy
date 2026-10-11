@@ -1086,11 +1086,10 @@ ${projectOptions}` : "留空表示移出项目。",
         const owner = action.owner ? `；负责人 ${action.owner}` : "";
         const due = action.dueAt ? `；截止 ${action.dueAt}` : "";
         const title = `邮件行动项：${action.content}${owner}${due}；来源消息：${citations}`;
-        const result = await tasksAddForSession(sessionId, title);
-        const resultRecord = result as { id?: unknown } | null | undefined;
-        const id = typeof resultRecord?.id === "string"
-          ? resultRecord.id
-          : `email-task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        // 后端 (`tasks:add` → TaskCatalog) 是权威来源。以前这里是空桩,于是
+        // 调用方自造一个 `email-task-<ts>` id 再弹成功 toast —— 任务从未存在。
+        // 现在写入失败会抛错,由外层 catch 报「加入会话任务失败」。
+        const { id } = await tasksAddForSession(sessionId, title);
         created.push({ id });
       }
       await emailLinkAnalysis({ id: analysis.id, linkedTaskIds: created.map((task) => task.id) });

@@ -71,14 +71,11 @@ const allowedInvokeChannels = new Set([
   "prompt_history", "rewind_execute", "rewind_points", "session_fork", "session_search", "sessions:delete", "sessions:list", "sessions:list-workspaces",
   "sessions:rename", "sessions:set-all-archived", "sessions:set-archived", "sessions:set-expert", "sessions:set-pinned", "workspace:archive-session", "workspace:create", "workspace:delete", "workspace:insert-before",
   "workspace:insert-session-before", "workspace:list", "workspace:rename",
-  // permissions-memory
-  "folder-trust:grant", "folder-trust:is-trusted", "folder-trust:list", "folder-trust:revoke", "folder_trust_respond", "mcp:config-path", "mcp:config-read", "mcp:config-save",
-  "mcp:delete", "mcp:list", "mcp:status", "mcp:toggle", "mcp:upsert", "memory:delete", "memory:get", "memory:list",
-  "memory:rewrite", "memory:save", "memory_delete", "memory_flush", "memory_get", "memory_list", "memory_rewrite", "memory_save",
-  "permission:list", "permission:mode-get", "permission:mode-set", "permission:save", "permission_list", "permission_save", "storage:automation-bootstrap", "storage:collaboration-bootstrap", "storage:metrics", "storage:metrics-history",
+  // permissions-memory "mcp:config-path", "mcp:config-read", "mcp:config-save",
+  "mcp:delete", "mcp:list", "mcp:status", "mcp:toggle", "mcp:upsert",
+  "permission:list", "permission:mode-get", "permission:mode-set", "permission:save", "permission_list", "permission_save", "storage:collaboration-bootstrap", "storage:metrics", "storage:metrics-history",
   "storage:renderer-list", "storage:renderer-read", "storage:renderer-remove", "storage:renderer-write",
-  "storage:task-bootstrap", "storage:workspace-bootstrap", "subagents:get-config", "subagents:set-config", "subagents_config_get", "subagents_config_save", "toggle_plan_mode", "web_search_config_get",
-  "web_search_config_save", "websearch:fetch", "websearch:get-config", "websearch:search", "websearch:set-config", "websearch:set-enabled",
+  "storage:task-bootstrap", "storage:workspace-bootstrap", "subagents:get-config", "subagents:set-config", "subagents_config_get", "subagents_config_save",
   "weknora:ask", "weknora:list-knowledge-bases", "weknora:status",
   // skills
   "skills:add", "skills:list", "skills:remove", "skills:toggle",
@@ -90,14 +87,14 @@ const allowedInvokeChannels = new Set([
   "pi-bridge-skills:load", "pi-bridge-skills:load-from-dir", "pi-bridge-skills:format-for-prompt",
   // task-policy
   "calendar:create", "calendar:delete", "calendar:list", "calendar:update", "knowledge-sources:list", "knowledge-sources:save", "notify-channels:list", "notify-channels:save",
-  "notify:dispatch", "plan-mode:approve", "plan-mode:get", "plan-mode:reject", "plan-mode:set-enabled", "plan-mode:set-plan", "policy:get", "policy:save",
+  // folder trust — 由 @openbuddy/folder-trust 落盘(FolderTrustDialog 的应答路径)
+  "folder-trust:grant", "folder-trust:is-trusted", "folder-trust:list", "folder-trust:revoke", "folder_trust_respond",
+  "notify:dispatch", "policy:get", "policy:save",
   "storage-sources:list", "storage-sources:save", "task_kill", "tasks:add", "tasks:clear-completed", "tasks:delete", "tasks:list", "tasks:update",
   "teams:create", "teams:delete", "teams:status",
   // automations-notifications
-  "automation_records_archive", "automation_records_delete", "automations:archive", "automations:delete", "automations:run", "automations:save", "automations:set-status", "automations:snapshot",
-  "automations_delete", "automations_run", "automations_save", "automations_set_status", "automations_snapshot", "inspiration:list", "inspiration:next", "inspiration_generate",
-  "notification_append", "notification_clear", "notification_list", "notification_mark_all_read", "notification_mark_read", "notifications:append", "notifications:clear", "notifications:list",
-  "notifications:mark-all-read", "notifications:mark-read",
+  "automation_records_archive", "automation_records_delete",
+  "automations_delete", "automations_run", "automations_save", "automations_set_status", "automations_snapshot", "inspiration_generate",
   // plugins-experts
   "connectors_cli_auth", "connectors_cli_auth_cancel", "connectors_cli_skills_dir", "connectors_cli_status", "connectors_cli_unauth", "connectors_default_root", "connectors_icon", "connectors_list_roots",
   // extension (needs-review gate wired by Phase I.2)

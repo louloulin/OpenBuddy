@@ -73,13 +73,13 @@ export async function openLocalPath(
   }
   try {
     if (type === "directory") {
-      await invoke("open_path", { path, cwd: cwd ?? null });
+      await invoke("shellfs:open-path", { path, cwd: cwd ?? null });
       return;
     }
     try {
-      await invoke("reveal_in_folder", { path, cwd: cwd ?? null });
+      await invoke("shellfs:reveal", { path, cwd: cwd ?? null });
     } catch {
-      await invoke("open_path", { path, cwd: cwd ?? null });
+      await invoke("shellfs:open-path", { path, cwd: cwd ?? null });
     }
   } catch (e) {
     toast?.(String(e).replace(/^Error:\s*/, ""));
@@ -118,7 +118,7 @@ export function createMarkdownHostConfig(
       return "symbol";
     }
     try {
-      const stat = await invoke<PathStat>("path_stat", {
+      const stat = await invoke<PathStat>("shellfs:stat", {
         path: pure,
         cwd: cwd ?? null,
       });
@@ -183,7 +183,7 @@ export function createMarkdownHostConfig(
           return;
         }
         try {
-          const written = await invoke<string>("write_text_file", {
+          const written = await invoke<string>("shellfs:write-text", {
             path: preferredPath.trim(),
             content: code,
             workspaceRoot: cwd,
@@ -230,7 +230,7 @@ export function createMarkdownHostConfig(
       }
 
       try {
-        const written = await invoke<string>("write_text_file", {
+        const written = await invoke<string>("shellfs:write-text", {
           path: target,
           content: code,
           workspaceRoot: cwd,
@@ -257,7 +257,7 @@ export function createMarkdownHostConfig(
           filters: [{ name: "SVG", extensions: ["svg"] }],
         });
         if (!target) return;
-        const written = await invoke<string>("write_text_file", {
+        const written = await invoke<string>("shellfs:write-text", {
           path: target,
           content: svg,
           workspaceRoot: cwd,

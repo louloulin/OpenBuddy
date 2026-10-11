@@ -502,6 +502,20 @@ export interface RunningTask {
   sessionId?: string;
 }
 
+/**
+ * A per-session todo entry — the list `/tasks` manages, stored in the
+ * `session_tasks` table (`TaskCatalog`). Distinct from `RunningTask`, which
+ * describes a *running agent job*.
+ */
+export interface SessionTask {
+  id: string;
+  content: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  order: number;
+}
+
 // ---------- subagent live events (pi://subagent) ----------
 
 /** A live subagent lifecycle event forwarded from pi's `x.ai/session_notification`. */

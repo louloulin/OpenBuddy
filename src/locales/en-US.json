@@ -152,5 +152,33 @@
       "design": "Design Studio"
     },
     "fallback": "Daily Work"
+  },
+  "tasks": {
+    "title": "Tasks",
+    "badge": "Tasks {completed}/{total}",
+    "addPlaceholder": "Add a task…",
+    "add": "Add",
+    "clearCompleted": "Clear completed",
+    "status": {
+      "pending": "Pending",
+      "in_progress": "In progress",
+      "completed": "Done"
+    },
+    "statusToggle": "Task \"{content}\" is {status}; click to change",
+    "delete": "Delete task \"{content}\"",
+    "empty": "No tasks yet. Add one below, or let the agent use /tasks.",
+    "noSession": "No session is open",
+    "noSessionHint": "Open a session to see its tasks here.",
+    "loading": "Loading…",
+    "loadFailed": "Failed to load tasks: {message}",
+    "addFailed": "Failed to add task: {message}",
+    "updateFailed": "Failed to update task: {message}",
+    "deleteFailed": "Failed to delete task: {message}",
+    "clearFailed": "Failed to clear: {message}"
+  },
+  "plan": {
+    "syncToPi": "Send changes to pi",
+    "synced": "Changes sent to pi; pi's reply is authoritative",
+    "localDirty": "Local plan changes not yet synced"
   }
 }

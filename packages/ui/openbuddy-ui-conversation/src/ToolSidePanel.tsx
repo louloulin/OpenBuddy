@@ -524,7 +524,7 @@ function NavContent({
   );
   const slotReveal = useCallback(
     (path: string) => {
-      void invoke("reveal_in_folder", { path, cwd: cwd ?? null }).catch(
+      void invoke("shellfs:reveal", { path, cwd: cwd ?? null }).catch(
         (e: unknown) => {
           onToast?.(`无法在文件夹中显示:${String(e).replace(/^Error:\s*/, "")}`);
         },
@@ -788,7 +788,7 @@ function FilePreview({
     if (saving) return;
     setSaving(true);
     try {
-      await invoke("write_text_file", {
+      await invoke("shellfs:write-text", {
         path,
         content: draft,
         workspaceRoot: cwd ?? null,
@@ -810,7 +810,7 @@ function FilePreview({
     setText(null);
     (async () => {
       try {
-        const content = await invoke<string>("read_text_file", {
+        const content = await invoke<string>("shellfs:read-text", {
           path,
           cwd: cwd ?? null,
           maxBytes: 256 * 1024,
