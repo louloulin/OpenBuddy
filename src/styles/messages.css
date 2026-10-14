@@ -728,9 +728,11 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--wb-brand) 18%, transparent);
 }
 .msg--user .msg__bubble {
-  /* 用户气泡: BR=0 (默认已正确), 用品牌/次级灰底凸显发送方 */
+  /* 用户气泡: BR=0 (默认已正确)。底色用中性灰而不是 --wb-bg-secondary:
+     默认主题的 bg-secondary 带绿色调(oklch 0.965 0.008 165,审计 B6),
+     用户气泡跟着发绿,Claude 范式是中性灰。暗色由 theme-dark-overrides 管。 */
   border-radius: 16px 16px 0 16px;
-  background: var(--wb-bg-secondary, #e9eaef);
+  background: var(--wb-palette-gray-2, #e9eaef);
   color: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
 }
 
@@ -2101,4 +2103,25 @@ button.diff__path {
   .working-dot__core {
     animation: none;
   }
+}
+
+/* B4(审计 2026-10-14):消息 footer 分组分隔 —— 1px 竖线,与按钮同高。 */
+.msg__actions-divider {
+  align-self: center;
+  width: 1px;
+  height: 14px;
+  margin: 0 2px;
+  background: var(--wb-border-default);
+}
+
+/* B1(审计 2026-10-14):视图切换条防跳动 —— 此前首条消息出现时这块才
+   渲染,header 高度瞬间 +40px,整个转录区向下跳。常驻占位(空态下
+   透明、无边框、不可交互),有视图时原样浮现。 */
+.chatview__tabs--reserved {
+  min-height: 40px;
+  border-bottom-color: transparent;
+  pointer-events: none;
+}
+.chatview__tabs--reserved > * {
+  visibility: hidden;
 }

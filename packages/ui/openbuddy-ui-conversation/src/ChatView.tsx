@@ -47,7 +47,7 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { createMarkdownHostConfig } from "@/lib/markdown/markdown-host";
 import { piListSessions, piSetThinkingLevel, sessionFork, tasksListForSession } from "@/lib/agent/pi-client";
 import { useT } from "@openbuddy/ui-locale/client";
-import { confirm } from "@/lib/platform/electron-api";
+import { confirm, invoke } from "@/lib/platform/electron-api";
 import {
   collectSessionArtifacts,
   findToolCall,
@@ -78,6 +78,7 @@ import {
   VirtualizedMessageList,
   shouldUseVirtualList,
 } from "./VirtualizedMessageList";
+import { LoadingRow } from "./LoadingRow";
 import type { TimelineNode } from "@/lib/ui/timeline-utils";
 import { useSubagentStore } from "@/stores/subagent-store";
 import { useQuestionStore } from "@/stores/question-store";
@@ -285,6 +286,31 @@ export function ChatView({
   const [fileChangesOpen, setFileChangesOpen] = useState(false);
   // 阶段 1:chat 底部终端(VS Code 风格),cwd=信任工作区。
   const [terminalOpen, setTerminalOpen] = useState(false);
+  // 审计 A1:terminal:create 要求 cwd 在信任根内;未信任时按钮直接隐藏,
+  // 而不是点开一个必失败的 dock。信任状态随 cwd 变化重查。
+  const [cwdTrusted, setCwdTrusted] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setCwdTrusted(false);
+    if (!cwd) return;
+    // folder-trust 没有变更广播;未信任时轻量轮询(5s),信任即停。
+    // 授权通常发生在首轮对话的信任提示里,晚于本查询的首次返回。
+    const query = () =>
+      invoke("folder-trust:is-trusted", cwd)
+        .then((trusted) => {
+          if (!cancelled) setCwdTrusted(Boolean(trusted));
+          return Boolean(trusted);
+        })
+        .catch(() => false);
+    let timer: ReturnType<typeof setInterval> | null = null;
+    void query().then((trusted) => {
+      if (!trusted && !cancelled) timer = setInterval(() => void query(), 5_000);
+    });
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [cwd]);
   // 子代理运行时面板(对齐 WorkBuddy team-runtime)。
   const [subagentsOpen, setSubagentsOpen] = useState(false);
   // P0-4 — 会话视图切换。Plan5 A.1 refactor 之前 ChatView 已经持有这个状态 +
@@ -874,7 +900,9 @@ export function ChatView({
       id: "terminal",
       active: terminalOpen,
       // 终端在空会话就有用(先开 shell 再干活),不受"有消息"门控。
-      visible: Boolean(cwd),
+      // 但必须等 folder-trust 信任了本工作区(terminal:create 的后端硬约束,
+      // 未信任时点了必失败,审计 A1)。
+      visible: Boolean(cwd && cwdTrusted),
       onClick: () => setTerminalOpen((v) => !v),
       label: terminalLabel,
       icon: <SquareTerminal size={15} strokeWidth={1.75} />,
@@ -1036,6 +1064,10 @@ export function ChatView({
               ) : (
                 timeline.map((node, index) => renderTimelineNode({ node, index }))
               )}
+              {/* 审计 A3:回合已开始但助手消息还没建出来(等首 token)的窗口,
+                  正文不能是空白 —— 挂一行 LoadingRow(含 WorkingDot 呼吸点),
+                  首个 assistant 消息出现后由时间线自然接管。 */}
+              {streaming && !streamingMessageId && <LoadingRow />}
             </div>
           }
           SubagentPanelImpl={SubagentPanelResolved as React.ComponentType<{

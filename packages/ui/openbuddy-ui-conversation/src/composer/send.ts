@@ -177,4 +177,6 @@ export function enqueue(deps: SendDeps): void {
   deps.updateText("");
   deps.setAttachments([]);
   deps.onClearSceneTag?.();
+  // 明确反馈:消息去哪了、什么时候发(审计 A4:用户以为按了没反应)。
+  deps.onToast?.("已加入队列,当前回复完成后自动发送");
 }

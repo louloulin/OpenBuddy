@@ -646,6 +646,10 @@ export default defineConfig({
     base: "./",
     build: {
       outDir: "dist/renderer",
+      // OB_NO_MINIFY=1:诊断生产专有问题(如 React #300)时用非压缩包,
+      // 抛错栈直接带真实函数名。CI/正常构建不受影响。
+      minify: process.env.OB_NO_MINIFY ? false : undefined,
+      sourcemap: process.env.OB_SOURCEMAP ? true : undefined,
       // P0-02: Disable Vite's __vitePreload() polyfill wrapper AND filter out
       // heavy chunks from the auto-generated <link rel="modulepreload">
       // tags. The polyfill stop alone doesn't prevent Vite from emitting

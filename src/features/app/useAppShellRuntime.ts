@@ -81,7 +81,20 @@ function readPersistedActiveSession(): PersistedActiveSession | null {
 function deriveTitle(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return "新会话";
-  return trimmed.length > 28 ? `${trimmed.slice(0, 28)}…` : trimmed;
+  // B7(审计 2026-10-14):标题不再是「首条消息原文硬截 28 字」——
+  // 先剥掉 markdown 记号(# 标题、` 代码、* emphasis、[link](url)、
+  // 图片),压掉换行,再在自然边界(句读/空白)处截断。
+  const stripped = trimmed
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[#*`>~_]{1,3}/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const source = stripped || trimmed;
+  if (source.length <= 20) return source;
+  const head = source.slice(0, 20);
+  const boundary = Math.max(head.lastIndexOf(" "), head.lastIndexOf(","), head.lastIndexOf("，"), head.lastIndexOf("。"), head.lastIndexOf(";"), head.lastIndexOf("；"));
+  return `${boundary >= 10 ? head.slice(0, boundary) : head}…`;
 }
 
 function isStreamDebugEnabled(): boolean {

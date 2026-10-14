@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+
+import { shortModelLabel } from "../../openbuddy-ui-shared/src/model-label";
 import { ChevronDown, Check, Settings2 } from "lucide-react";
 
 /**
@@ -295,7 +297,10 @@ export function ModelSelector({
   // `modelId` 原值,而一个 provider 都没配置时上游塞的是占位 id(实测渲染出字面量
   // "unknown/unknown") —— 用户会以为存在这么个模型。下拉里本来就有正确的空态
   // (「未配置模型」+ 前往设置),触发器应当和它一致。
-  const modelLabel = current?.label || current?.id || (models.length === 0 ? "" : modelId || "");
+  // 触发按钮只显示模型短名(custom_* 内部前缀剥掉,审计 A5);完整 id
+  // 放在 trigger 的 title 里。
+  const rawModelLabel = current?.label || current?.id || (models.length === 0 ? "" : modelId || "");
+  const modelLabel = shortModelLabel(rawModelLabel) || rawModelLabel;
   const thinkOpt = hasThinking
     ? THINKING_OPTIONS.find((o) => o.value === thinkingLevel) ?? THINKING_OPTIONS[2]
     : null;
@@ -311,6 +316,7 @@ export function ModelSelector({
       <button
         id={triggerId}
         ref={triggerRef}
+        title={rawModelLabel || undefined}
         className="model-selector__trigger"
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onTriggerKey}

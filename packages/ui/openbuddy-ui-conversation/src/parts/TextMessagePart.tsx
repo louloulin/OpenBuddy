@@ -14,9 +14,11 @@ import { ConversationMarkdown } from "../conversation-slots";
 import type { MessagePartRenderProps } from "./registry-defaults";
 
 export function TextMessagePart(props: MessagePartRenderProps) {
+  // hook 必须在类型守卫之前调用(React 错误 300 号):虽然 MessagePartRouter 按 kind
+  // 派发,但虚拟化/复用时同一位置换 kind 的部件会让 hook 数量先降后升。
+  const currentTheme = useThemeSnapshot((s) => s.current());
   // 类型守卫:本部件只处理 `kind: "text"`,由 `MessagePartRouter` 在派发前保证。
   if (props.part.kind !== "text") return null;
-  const currentTheme = useThemeSnapshot((s) => s.current());
   const resolvedTheme = (props.theme ?? currentTheme) as "light" | "dark";
   return (
     <ConversationMarkdown

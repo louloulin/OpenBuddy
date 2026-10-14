@@ -300,11 +300,18 @@
    an icon left + title/desc stacked on the right. */
 .chatview__quick-prompts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  /* B8(审计 2026-10-14):固定两列,5 张卡自然成 2-2-1 且左右对称;
+     auto-fit 220px 在 560px 容器里会排出 2-2-1 不均的残行。窄屏回落单列。 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 18px;
   width: 100%;
   max-width: 560px;
+}
+@media (max-width: 640px) {
+  .chatview__quick-prompts {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .chatview__quick-prompt {
   display: flex;
@@ -488,4 +495,27 @@
   flex: 1;
   min-height: 0;
   padding: 0 8px 6px;
+}
+
+/* B3(审计 2026-10-14):回溯/分叉并入 dock —— 不再是两颗悬浮药丸。
+   作为 dock 的一行工具条:通栏、贴合、图标+文字弱化,hover 才点亮。 */
+.chat-dock .rewind-bar {
+  align-self: stretch;
+  gap: 2px;
+  padding: 5px 10px;
+  background: var(--wb-bg-secondary, transparent);
+}
+.chat-dock .rewind-bar__btn {
+  height: 24px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--wb-text-weak);
+  border-radius: var(--wb-radius-xs, 4px);
+}
+.chat-dock .rewind-bar__btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.chat-dock .rewind-bar__btn + .rewind-bar__btn {
+  margin-left: 4px;
 }

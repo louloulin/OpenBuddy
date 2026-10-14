@@ -116,6 +116,7 @@ export function ChatViewEmptyState({ onPickPrompt }: ChatViewEmptyStateProps) {
               data-testid={`quick-prompt-${qp.id}`}
               onClick={() => onPickPrompt(qp.prompt)}
               aria-label={qp.title}
+              title={`点击直接发送:${qp.prompt.slice(0, 24)}…`}
             >
               <span className="chatview__quick-prompt-icon" aria-hidden="true">
                 <Icon size={18} strokeWidth={1.75} />

@@ -133,12 +133,10 @@ export function TopbarTitle({
         </button>
       )}
       {status && <TopbarStatusChip tone={status} label={statusLabel(status)} detail={detail} />}
+      {/* B7(审计 2026-10-14):版本徽章不再常驻标题栏 —— 版本信息在底部
+          状态栏与「设置 → 关于」都有,标题栏让位给会话标题。 */}
       {appVersion && (
-        <span
-          className="main-topbar__version-pill"
-          title={`OpenBuddy 版本 ${appVersion}`}
-          aria-label={`OpenBuddy 版本 ${appVersion}`}
-        >
+        <span className="wb-sr-only" aria-label={`OpenBuddy 版本 ${appVersion}`}>
           v{appVersion}
         </span>
       )}

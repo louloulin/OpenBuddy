@@ -6,6 +6,8 @@
  * 消息可携带 `modelId` / `createdAt`。无这些字段时退化为「无分隔符」(不影响渲染)。
  * 纯函数、无副作用,便于单测。
  */
+import { shortModelLabel } from "@openbuddy/ui-shared";
+
 import type { ChatMessage } from "@/stores/session-store";
 
 /** 带可选元数据的消息(前向兼容:缺省字段视为不存在)。
@@ -35,14 +37,6 @@ export type TimelineNode =
  * (`custom_anthropic/minimax/...`)整段外泄到 UI。Codex / ChatGPT 在
  * 模型切换处只显示模型名本身,所以这里抽到工具层统一收口。
  */
-export function shortModelLabel(modelId: string | undefined | null): string {
-  if (!modelId) return "";
-  // 一段不切,两段也不切:保留 `sub-provider/model` 这种语义上有用的二级路径。
-  // 三段及以上(通常是 `<provider>/<sub-provider>/<model>`)只保留末两段。
-  const parts = modelId.split("/");
-  if (parts.length <= 2) return modelId;
-  return parts.slice(-2).join("/");
-}
 
 /** 把消息序列展开成「分隔符 + 消息」的时间线节点序列。
  *
@@ -141,3 +135,6 @@ export function groupParallelToolCalls(
 export function countParallelClusters(clusters: readonly ToolCallCluster[]): number {
   return clusters.filter((c) => c.kind === "parallel").length;
 }
+
+// 真源在 @openbuddy/ui-shared(model-label.ts);这里 re-export 保持旧引用路径。
+export { shortModelLabel };

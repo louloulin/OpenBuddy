@@ -74,9 +74,11 @@ export function ChatViewScrollStage(props: ChatViewScrollStageProps) {
     <div className="chatview__scroll" ref={props.scrollRef as unknown as React.Ref<HTMLDivElement>}>
       {/* P0-4 — 视图切换器浮在滚动容器顶部,仅在 ChatView 真的有可切换视图时
           才出现。R5 约束保证 0 插件时整块 JSX 不存在,行为与改造前逐字一致。 */}
-      {props.conversationViewTabs && (
-        <div className="chatview__tabs">{props.conversationViewTabs}</div>
-      )}
+      {/* B1(审计):tabs 常驻占位。此前「对话/结果/内容」只在有视图时渲染,
+          首条消息一出现 header 高度跳变(空态截图 vs 首回合截图对比可见)。 */}
+      <div className={"chatview__tabs" + (props.conversationViewTabs ? "" : " chatview__tabs--reserved")}>
+        {props.conversationViewTabs}
+      </div>
       <div className="chatview__inner">
         {hasMessages && props.sessionTitle && (
           <h1 className="chatview__title" title={props.sessionTitle}>

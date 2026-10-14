@@ -61,3 +61,24 @@ input, textarea, select {
     scroll-behavior: auto !important;
   }
 }
+
+/* B9(审计 2026-10-14):全局滚动条细化。原生 12px+ 灰条在内容区左缘
+   非常突兀(任务面板截图可见)。8px、圆角、token 化,hover 加深;
+   暗色由 token 跟随。 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--wb-border-default, rgba(127, 127, 127, 0.3));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--wb-text-weak, rgba(127, 127, 127, 0.5));
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

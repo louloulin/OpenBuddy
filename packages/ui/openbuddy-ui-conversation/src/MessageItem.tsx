@@ -241,6 +241,31 @@ function MessageItemInner({
         title?: string;
       }>
     | undefined;
+  // Hooks 规则(R78 + React 错误 300 号):本组件有两条提前 return(user 分支、空
+  // parts 完成分支),所有 hook 必须在它们之前调用 —— 否则一条先以空 parts
+  // 完成、随后又收到 error/parts 的助手消息,hook 数量先降后升,生产包直接
+  // 抛 React error 300 号(rendered fewer hooks)。这个 effect 原本就写在分支
+  // 之后,2026-10-14 真机探针在生产构建下复现过,已上移。
+  // R78 — Esc 取消 / Cmd+Enter 应用 inline edit
+  useEffect(() => {
+    if (!inlineEditing) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setInlineEditing(false);
+        setInlineDraft("");
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        if (!onEditAssistantMessage) return;
+        e.preventDefault();
+        onEditAssistantMessage(message.id, inlineDraft);
+        setInlineEditing(false);
+        setInlineDraft("");
+        onToast?.("已就地保存");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [inlineEditing, inlineDraft, message.id, onEditAssistantMessage, onToast]);
   if (message.role === "user") {
     // R8.1 (revision-pager) — split attachments (file/image parts) from the
     // text part. The text part gets replaced by the currently selected
@@ -302,27 +327,6 @@ function MessageItemInner({
   ) {
     return null;
   }
-
-  // R78 — Esc 取消 / Cmd+Enter 应用 inline edit
-  useEffect(() => {
-    if (!inlineEditing) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setInlineEditing(false);
-        setInlineDraft("");
-      } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        if (!onEditAssistantMessage) return;
-        e.preventDefault();
-        onEditAssistantMessage(message.id, inlineDraft);
-        setInlineEditing(false);
-        setInlineDraft("");
-        onToast?.("已就地保存");
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [inlineEditing, inlineDraft, message.id, onEditAssistantMessage, onToast]);
 
     // R8.16 — apply the just-completed class to the assistant root
   // for ~320ms after the streaming flag flips off so the bubble
@@ -508,6 +512,11 @@ function MessageItemInner({
                 <span style={{ marginLeft: 2 }}>↳</span>
               </TooltipButton>
             )}
+            {/* B4(审计):footer 分组分隔 —— 复制组 | 编辑组 | 重发/反馈组。
+                9 个 icon 一次全出没有边界,视觉上是一把乱码。 */}
+            {(plainText || (DraftImpl && markdownText)) && (
+              <span className="msg__actions-divider" aria-hidden="true" />
+            )}
             {onRetry && (
               <TooltipButton
                 className="msg__action-btn"
@@ -518,6 +527,7 @@ function MessageItemInner({
                 <RefreshCw size={14} strokeWidth={1.75} />
               </TooltipButton>
             )}
+            <span className="msg__actions-divider" aria-hidden="true" />
             {/* Plan5 B.10 — 消息级"从此消息重发/分叉"。放在赞踩之前,
                 保持既有按钮顺序不变(快照 / 既有选择器全部命中)。 */}
             {message.role === "assistant" && (

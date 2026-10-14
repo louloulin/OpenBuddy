@@ -19,8 +19,20 @@ import { formatDurationMs } from "@/lib/ui/duration";
 import type { MessagePartRenderProps } from "./registry-defaults";
 
 export function ThoughtMessagePart(props: MessagePartRenderProps) {
-  if (props.part.kind !== "thought") return null;
+  // hook 必须在类型守卫之前调用(React 错误 300 号,同 TextMessagePart)。
   const currentTheme = useThemeSnapshot((s) => s.current());
+  const [tickMs, setTickMs] = useState<number | null>(null);
+  // 守卫上移后 TS 的窄化失效,这里显式收窄(effect 依赖里要用到 part.text)。
+  const thoughtText = props.part.kind === "thought" ? props.part.text : "";
+  useEffect(() => {
+    if (!props.isStreaming || props.complete) return;
+    const start = Date.now();
+    setTickMs(0);
+    const handle = window.setInterval(() => setTickMs(Date.now() - start), 500);
+    return () => window.clearInterval(handle);
+  }, [props.isStreaming, props.complete, thoughtText]);
+  if (props.part.kind !== "thought") return null;
+
   const resolvedTheme = (props.theme ?? currentTheme) as "light" | "dark";
   // 流式时显示"思考中 X 秒",每秒刷新一次;折叠时显示"已思考 X 秒"。
   /**
@@ -32,14 +44,6 @@ export function ThoughtMessagePart(props: MessagePartRenderProps) {
    * 现在:计时值自己保存,完成时保留最后读数;从未在本组件里流式过(例如重载后
    * 直接看到历史)就不显示耗时,而不是显示一句错的。
    */
-  const [tickMs, setTickMs] = useState<number | null>(null);
-  useEffect(() => {
-    if (!props.isStreaming || props.complete) return;
-    const start = Date.now();
-    setTickMs(0);
-    const handle = window.setInterval(() => setTickMs(Date.now() - start), 500);
-    return () => window.clearInterval(handle);
-  }, [props.isStreaming, props.complete, props.part.text]);
   const streaming = props.isStreaming && !props.complete;
   /**
    * 耗时只在**测到 ≥1s** 时才显示,且流式与完成用两套措辞:

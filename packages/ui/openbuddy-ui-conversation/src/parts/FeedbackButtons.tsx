@@ -8,6 +8,7 @@
  * `useFeedbackStore` 并显示本地条目。
  */
 import { useState } from "react";
+import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { FeedbackDialog } from "@openbuddy/ui-dialogs";
 import { useFeedbackStore, type FeedbackRating } from "@/stores/feedback-store";
 
@@ -47,7 +48,7 @@ export function FeedbackButtons({
         aria-label="赞"
         aria-pressed={current === "up"}
       >
-        👍
+        <ThumbsUp size={14} strokeWidth={1.75} />
       </button>
       <button
         type="button"
@@ -60,7 +61,7 @@ export function FeedbackButtons({
         aria-label="踩"
         aria-pressed={current === "down"}
       >
-        👎
+        <ThumbsDown size={14} strokeWidth={1.75} />
       </button>
       {dialogOpen && (
         <FeedbackDialog

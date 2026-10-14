@@ -67,6 +67,13 @@ jobs:
       - name: hardcoded color gate
         run: pnpm verify:colors
 
+      # React hook-order gate (scripts/check-hook-order.mjs). 2026-10-14 生产
+      # 事故:四处「提前 return 之后还有 hook」的组件在生产包抛 React #300
+      # (rendered fewer hooks),dev 模式不复现。该模式编译器查不出、单测跑
+      # 不红,只有静态 AST 门禁能拦。
+      - name: hook order gate
+        run: pnpm verify:hook-order
+
       # Accessibility gate. This cannot live in the `lint-tools` job: that job
       # is `continue-on-error: true` (it also runs Sheriff and Prettier, which
       # are report-only), so an a11y error there would block nothing. jsx-a11y

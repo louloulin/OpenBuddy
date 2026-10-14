@@ -3324,3 +3324,26 @@ body.dark .permission-picker__popover,
   font-weight: 500;
   line-height: 1;
 }
+
+/* B2(审计 2026-10-14):kbd 教学改为「聚焦时浮现」。
+   常驻时它和白名单 cost pill / 模型 chip 抢一行宽度,窄面板下把
+   「均衡」截成「均…」。默认 0 透明度(保留布局占位避免跳动),
+   composer 聚焦或 hint 悬停时浮现;窄面板与触屏仍彻底隐藏。 */
+.wb-composer__hint {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--wb-motion-duration-base, 200ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+              background var(--wb-motion-duration-fast, 120ms),
+              color var(--wb-motion-duration-fast, 120ms);
+}
+.wb-composer:focus-within .wb-composer__hint,
+.wb-composer__hint:hover,
+.wb-composer__hint:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (max-width: 900px), (hover: none) {
+  .wb-composer__hint {
+    display: none;
+  }
+}

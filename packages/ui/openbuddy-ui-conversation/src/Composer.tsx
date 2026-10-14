@@ -403,7 +403,11 @@ export function ComposerInner({
   // in scope, and after `send` is declared so the hook can call it.
   const { onKeyDown: onTextareaKeyDown } = useInputHistory({
     ref, text, cursorPos, updateText, slashVisible,
-    histRef, histCursorRef, draftRef, onSend: send,
+    histRef, histCursorRef, draftRef,
+    // Enter 分流:非流式发送;流式(回合进行中)直接入队——此前文本会留在
+    // 输入框,只有一个无 tooltip 的「+」按钮,用户不知道消息没发出去
+    // (2026-10-14 审计 A4)。入队成功由 enqueue 的 toast 反馈。
+    onSend: () => (streaming ? enqueue() : send()),
   });
 
   const showModelPicker = !!onModelChange && !!models;

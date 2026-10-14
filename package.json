@@ -135,7 +135,8 @@
     "sync:ui-aliases": "node scripts/sync-ui-aliases.mjs",
     "verify:ipc-stubs": "node scripts/check-ipc-stubs.mjs",
     "test:electron:tasks-probe": "node scripts/electron/tasks-panel-probe.mjs",
-    "test:electron:ui-shots": "node scripts/electron/ui-shots.mjs"
+    "test:electron:ui-shots": "node scripts/electron/ui-shots.mjs",
+    "verify:hook-order": "node scripts/check-hook-order.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
