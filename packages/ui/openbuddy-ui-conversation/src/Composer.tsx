@@ -411,6 +411,7 @@ export function ComposerInner({
 
   const composerCls = [
     "wb-composer",
+    composerExpanded ? "wb-composer--expanded" : "",
     !apiReady && "wb-composer--disabled",
     showMeta && "wb-composer--home",
   ].filter(Boolean).join(" ");

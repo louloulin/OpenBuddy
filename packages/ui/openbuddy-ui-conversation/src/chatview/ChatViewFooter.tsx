@@ -20,6 +20,7 @@ import { PiReloadFailureBanner } from "../PiReloadFailureBanner";
 import { QuestionInlineCard } from "../QuestionInlineCard";
 import { RewindBar } from "../RewindBar";
 import { QueuedMessages } from "../composer/QueuedMessages";
+import { useLocale } from "@openbuddy/ui-locale/client";
 import { Composer, type ComposerProps } from "../Composer";
 
 export type ChatViewFooterProps = {
@@ -47,7 +48,8 @@ export type ChatViewFooterProps = {
 };
 
 export function ChatViewFooter(props: ChatViewFooterProps) {
-  const composerFallback = props.composerFallback ?? (
+
+  const locale = useLocale();  const composerFallback = props.composerFallback ?? (
     <Composer {...props.composerProps} />
   );
   return (
@@ -64,23 +66,23 @@ export function ChatViewFooter(props: ChatViewFooterProps) {
       <div className="chat-dock">
       {props.yielded && (
         <div className="yield-banner" role="status">
-          <span>已暂停(会话上下文已保留)</span>
+          <span>{locale.t("chat.footer.yieldBanner")}</span>
           <div className="yield-banner__actions">
             <button
               type="button"
               className="yield-banner__resume"
               onClick={props.onResume}
-              title="仅恢复,不触发新回复(可继续输入)"
+              title={locale.t("chat.footer.resumeTitle")}
             >
-              恢复
+              {locale.t("chat.footer.resume")}
             </button>
             <button
               type="button"
               className="yield-banner__resume yield-banner__resume--primary"
               onClick={props.onResumeAndContinue}
-              title="恢复并发送「请继续」让 agent 接着生成"
+              title={locale.t("chat.footer.resumeContinueTitle")}
             >
-              恢复并继续
+              {locale.t("chat.footer.resumeContinue")}
             </button>
           </div>
         </div>
@@ -90,9 +92,9 @@ export function ChatViewFooter(props: ChatViewFooterProps) {
           type="button"
           className="chatview__pause-btn"
           onClick={props.onPause}
-          title="暂停生成(保留会话,可继续)"
+          title={locale.t("chat.footer.pauseTitle")}
         >
-          <PauseIcon size="sm" style={{ verticalAlign: "text-bottom" }} /> 暂停
+          <PauseIcon size="sm" style={{ verticalAlign: "text-bottom" }} /> {locale.t("chat.footer.pause")}
         </button>
       )}
       {props.sessionId && !props.streaming && !props.readOnlySubagent && (

@@ -534,10 +534,10 @@
    "BR=0" tail was cute but visually noisy once we add actions/reactions. */
 .msg__bubble {
   max-width: 100%;
-  padding: 10px 14px;
+  padding: var(--wb-spacing-3, 8px) var(--wb-spacing-4, 12px);
   background: var(--wb-bg-secondary, #ebebeb);
   color: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
-  border-radius: 18px;
+  border-radius: var(--wb-radius-lg, 14px);
   font-size: 14px;
   line-height: 22px;
   white-space: pre-wrap;

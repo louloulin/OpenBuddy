@@ -990,3 +990,9 @@ body {
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+/* C3:统一 focus 环(对齐 Claude --cds-focus-shadow):
+   inset 1px 页面底色断开元素自身描边 + 外圈 accent。 */
+:root {
+  --wb-focus-shadow: inset 0 0 0 1px var(--wb-bg-primary), 0 0 0 1px var(--wb-accent);
+}

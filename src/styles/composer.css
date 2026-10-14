@@ -248,3 +248,8 @@
 .wb-composer--expanded .wb-composer__input {
   max-height: 70vh;
 }
+
+.wb-composer__expand:focus-visible {
+  outline: none;
+  box-shadow: var(--wb-focus-shadow);
+}

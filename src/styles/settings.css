@@ -1015,3 +1015,10 @@
   color: var(--wb-accent);
   background: color-mix(in srgb, var(--wb-accent) 8%, transparent);
 }
+
+/* C3:新增控件用统一 focus 环(替代默认 outline,对齐 Claude --cds-focus-shadow)。 */
+.settings-density__btn:focus-visible,
+.wb-composer__expand:focus-visible {
+  outline: none;
+  box-shadow: var(--wb-focus-shadow);
+}

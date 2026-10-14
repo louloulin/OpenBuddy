@@ -226,6 +226,40 @@
       "resume": "恢复该条",
       "sendNow": "立即发送",
       "remove": "从队列移除"
+    },
+    "chat.loading.preparing": "准备中",
+    "chat.loading.waiting": "等待中",
+    "loading": {
+      "preparing": "准备中",
+      "waiting": "等待中",
+      "verb1": "梳理信息",
+      "verb2": "理清思路",
+      "verb3": "抽丝剥茧",
+      "verb4": "提炼要点",
+      "verb5": "整理素材",
+      "verb6": "打磨措辞",
+      "verb7": "组织语言",
+      "verb8": "编织答复",
+      "verb9": "核对细节",
+      "verb10": "校准结论",
+      "verb11": "斟酌用词",
+      "verb12": "润色表达",
+      "verb13": "梳理脉络",
+      "verb14": "梳理结构"
+    },
+    "footer": {
+      "footer.yieldBanner": "已暂停（会话上下文已保留）",
+      "footer.resumeTitle": "仅恢复，不触发新回复（可继续输入）",
+      "footer.resume": "恢复",
+      "footer.resumeContinueTitle": "恢复并发送「请继续」让 agent 接着生成",
+      "footer.resumeContinue": "恢复并继续",
+      "footer.pauseTitle": "暂停生成（保留会话，可继续）",
+      "footer.pause": "暂停"
+    },
+    "tool": {
+      "tool.collapse": "折叠",
+      "tool.expand": "内联展开",
+      "tool.detailHint": "点击查看详情，Enter 内联展开，Shift+Enter 开详情面板"
     }
   }
 }

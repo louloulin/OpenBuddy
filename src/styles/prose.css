@@ -18,7 +18,11 @@
   transition: opacity var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
   justify-content: flex-end;
 }
-.msg:hover .msg__actions {
+/* C3:focus-visible 路径(hover-action-r8.18 同步):hover-reveal 的操作行
+   对键盘用户同样可达 —— 对齐 Claude message-actions 的 focus-within → 1。 */
+.msg:hover .msg__actions,
+.msg:focus-within .msg__actions,
+.msg__actions:focus-within {
   opacity: 1;
 }
 .msg__actions--inline {

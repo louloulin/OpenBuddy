@@ -1,4 +1,5 @@
 import React, { memo, useEffect, useState } from "react";
+import { useLocale } from "@openbuddy/ui-locale/client";
 import type { ToolCallView } from "@/stores/session-store";
 import type { DiffContent, CommandOutputContent } from "@openbuddy/shared-types";
 import { checkCommandRisk, riskLabel } from "@/lib/security/command-risk";
@@ -82,6 +83,7 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
     </span>
   );
 
+  const locale = useLocale();
   // Phase B.3 — inline expand state.
   const [expanded, setExpanded] = useState(expandMode === "expanded");
   const isExpanded = expandMode === "expanded" || (expandMode === "auto" && expanded);
@@ -176,7 +178,7 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
           onOpen?.(tc);
         }
       }}
-      title={`${tc.kind}: ${tc.title}（${statusLabel}${durationLabel ? " · " + durationLabel : ""}，点击查看详情，Enter 内联展开，Shift+Enter 开详情面板）`}
+      title={`${tc.kind}: ${tc.title}（${statusLabel}${durationLabel ? " · " + durationLabel : ""}，${locale.t("chat.tool.detailHint")}）`}
       aria-label={`${tc.kind} ${summary} ${statusLabel}${durationLabel ? " " + durationLabel : ""}`}
     >
       {statusMark}
@@ -196,8 +198,8 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
           type="button"
           className="toolcall__expand-toggle"
           onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
-          title="内联展开"
-          aria-label="内联展开"
+          title={locale.t("chat.tool.expand")}
+          aria-label={locale.t("chat.tool.expand")}
           data-testid="toolcall-expand"
         >
           ▾

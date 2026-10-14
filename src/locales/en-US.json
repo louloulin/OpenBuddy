@@ -226,6 +226,40 @@
       "resume": "Resume this item",
       "sendNow": "Send now",
       "remove": "Remove from queue"
+    },
+    "chat.loading.preparing": "Preparing",
+    "chat.loading.waiting": "Waiting",
+    "loading": {
+      "preparing": "Preparing",
+      "waiting": "Waiting",
+      "verb1": "Organizing info",
+      "verb2": "Clarifying thoughts",
+      "verb3": "Digging into details",
+      "verb4": "Distilling points",
+      "verb5": "Gathering material",
+      "verb6": "Polishing wording",
+      "verb7": "Structuring the answer",
+      "verb8": "Weaving a reply",
+      "verb9": "Verifying details",
+      "verb10": "Calibrating conclusions",
+      "verb11": "Choosing words",
+      "verb12": "Refining expression",
+      "verb13": "Tracing threads",
+      "verb14": "Structuring output"
+    },
+    "footer": {
+      "footer.yieldBanner": "Paused (session context preserved)",
+      "footer.resumeTitle": "Resume only — no new reply (keep typing)",
+      "footer.resume": "Resume",
+      "footer.resumeContinueTitle": "Resume and send \"please continue\" so the agent keeps going",
+      "footer.resumeContinue": "Resume & continue",
+      "footer.pauseTitle": "Pause generation (session kept, resumable)",
+      "footer.pause": "Pause"
+    },
+    "tool": {
+      "tool.collapse": "Collapse",
+      "tool.expand": "Expand inline",
+      "tool.detailHint": "Click for details, Enter to expand inline, Shift+Enter for the detail panel"
     }
   }
 }

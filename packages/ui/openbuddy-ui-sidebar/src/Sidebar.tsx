@@ -95,6 +95,26 @@ function basename(p: string): string {
   return name || "默认空间";
 }
 
+/**
+ * C2(2026-10-14)—— 会话行的方向键导航(Claude row-panel 范式):
+ * ↑/↓ 把焦点移到文档序的上/下一个会话行(跨置顶/分组/空间各段连续移动),
+ * Home/End 跳到第一/最后一行。焦点不在行上时 no-op(列表正常滚动)。
+ */
+function focusAdjacentConvRow(current: HTMLElement, dir: "up" | "down" | "first" | "last"): void {
+  const rows = Array.from(document.querySelectorAll<HTMLElement>(".sidebar__conv")).filter(
+    (el) => !el.hidden && el.style.display !== "none",
+  );
+  if (rows.length === 0) return;
+  const index = rows.indexOf(current);
+  if (index < 0) return;
+  let next: number;
+  if (dir === "first") next = 0;
+  else if (dir === "last") next = rows.length - 1;
+  else if (dir === "down") next = Math.min(rows.length - 1, index + 1);
+  else next = Math.max(0, index - 1);
+  if (next !== index) rows[next]?.focus();
+}
+
 /** Compact, locale-friendly relative time for the sidebar row tail. */
 function relativeTime(iso: string): string {
   const t = new Date(iso).getTime();
@@ -766,6 +786,14 @@ export const SessionRow = memo(function SessionRow({
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           handleClick(e);
+          return;
+        }
+        // C2:方向键在会话行间移动(不劫持无焦点时的滚动 —— 本 handler 只在
+        // 行聚焦时触发,天然满足)。
+        if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End") {
+          e.preventDefault();
+          const dir = e.key === "ArrowDown" ? "down" : e.key === "ArrowUp" ? "up" : e.key === "Home" ? "first" : "last";
+          focusAdjacentConvRow(e.currentTarget as HTMLElement, dir);
         }
       }}
       aria-pressed={isSelected ? true : undefined}
