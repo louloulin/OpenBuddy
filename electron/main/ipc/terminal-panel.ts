@@ -47,21 +47,31 @@ function sendTo(win: BrowserWindow | null | undefined, channel: string, payload:
 
 export function registerTerminalPanelIpc(options: {
   getWindow: () => Electron.BrowserWindow | null;
-  /** 信任工作区根(来自 agentHost 的 cwd,与 apply_patch 同源)。 */
+  /**
+   * 信任判定(审计 A1,2026-10-14):folder-trust 是真正的用户授权源
+   * (首轮对话的信任提示写的就是它);此前用 agentHost.getCwd() 当信任根,
+   * 会话 cwd 与 host cwd 不一致时按钮在但创建必失败。 containment 判定
+   * (agentHost 根内)保留为兜底。
+   */
+  isTrustedCwd: (cwd: string) => Promise<boolean>;
+  /** agentHost 的当前工作区(兜底 containment 判定)。 */
   getTrustedRoot: () => string | null;
 }): void {
   broadcast = (channel, payload) => sendTo(options.getWindow(), channel, payload);
 
-  ipcMain.handle("terminal:create", (_e, args: unknown) => {
+  ipcMain.handle("terminal:create", async (_e, args: unknown) => {
     const input = (args ?? {}) as { cwd?: unknown; cols?: unknown; rows?: unknown };
     const requested = typeof input.cwd === "string" && input.cwd.trim() ? input.cwd : options.getTrustedRoot() ?? "";
     if (!requested) throw new Error("terminal: cwd is required (no trusted workspace)");
     const cwd = resolve(isAbsolute(requested) ? requested : resolve(process.cwd(), requested));
     const trusted = options.getTrustedRoot();
-    // 信任约束:终端必须落在信任工作区内(与 apply_patch 同一根)。
-    const rel = trusted ? relative(trusted, cwd) : "..";
-    if (!trusted || rel.startsWith("..") || isAbsolute(rel)) {
-      throw new Error(`terminal: cwd is outside the trusted workspace: ${cwd}`);
+    // 信任约束:folder-trust 明确授权,或落在 agentHost 工作区内(兜底)。
+    const contained = trusted ? (() => {
+      const rel = relative(trusted, cwd);
+      return !rel.startsWith("..") && !isAbsolute(rel);
+    })() : false;
+    if (!contained && !(await options.isTrustedCwd(cwd))) {
+      throw new Error(`terminal: cwd is not a trusted workspace (grant folder trust first): ${cwd}`);
     }
     if (sessions.size >= MAX_SESSIONS) {
       throw new Error(`terminal: too many sessions (max ${MAX_SESSIONS})`);

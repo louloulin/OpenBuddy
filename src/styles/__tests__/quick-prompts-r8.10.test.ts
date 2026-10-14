@@ -5,7 +5,8 @@
  * makes the cards feel polished.
  *
  * Coverage:
- *   - .chatview__quick-prompts is a CSS grid (auto-fit, min 220px)
+ *   - .chatview__quick-prompts is a CSS grid (fixed 2 columns; 2026-10-14
+ *     审计 B8:auto-fit 220px 在 560px 容器里把 5 张卡排成 2-2-1 不均残行)
  *   - .chatview__quick-prompt renders as a flex row with icon left, body right
  *   - .chatview__quick-prompt:hover lifts 1px + brand-tinted bg + shadow
  *   - .chatview__quick-prompt:focus-visible paints a brand ring (no default outline)
@@ -46,13 +47,17 @@ function ruleBody(css: string, selector: string): string | null {
 }
 
 describe("R8.10 quick-prompt grid container", () => {
-  it("uses CSS grid auto-fit with a 220px minimum column width", () => {
+  it("uses a fixed two-column grid (B8: 2-2-1 balanced rows for 5 cards)", () => {
     const m = ruleBody(chatShell, ".chatview__quick-prompts");
     expect(m).toBeTruthy();
     expect(m!).toMatch(/display:\s*grid/);
-    expect(m!).toMatch(/grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(220px,\s*1fr\)\)/);
+    // 2026-10-14 审计 B8:auto-fit 220px 在 560px 容器里把 5 张卡排出
+    // 2-2-1 不均残行;固定两列 + 窄屏单列回落,残行对称。
+    expect(m!).toMatch(/grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
     expect(m!).toMatch(/gap:\s*10px/);
     expect(m!).toMatch(/max-width:\s*560px/);
+    // 窄屏回落单列。
+    expect(chatShell).toMatch(/@media \(max-width: 640px\)[\s\S]*?\.chatview__quick-prompts \{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/);
   });
 });
 

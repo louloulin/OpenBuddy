@@ -42,21 +42,35 @@ interface RewindSnapshotFile {
 }
 
 let rewindSnapshotCache: RewindSnapshotFile | null = null;
+/** 缓存对应的文件 mtime;文件被外部改写(如另一进程/恢复流程)时重读。 */
+let rewindSnapshotCacheMtimeMs: number | null = null;
 
 async function rewindSnapshotPath(): Promise<string> {
   return join(piHome(), "openbuddy-rewind-snapshots.json");
 }
 
 async function loadRewindSnapshots(): Promise<RewindSnapshotFile> {
-  if (rewindSnapshotCache) return rewindSnapshotCache;
+  // 阶段 5:artifacts:index 会在会话打开时就读这个文件,早于部分写入方;
+  // 无条件信内存缓存会把外部写入永远挡在门外。用 mtime 做失效判定
+  // (单个小 JSON 文件,stat 成本可忽略)。
+  let mtimeMs: number | null = null;
+  try {
+    const info = await stat(await rewindSnapshotPath(), { throwIfNoEntry: false });
+    mtimeMs = info ? info.mtimeMs : null;
+  } catch {
+    mtimeMs = null;
+  }
+  if (rewindSnapshotCache && rewindSnapshotCacheMtimeMs === mtimeMs) return rewindSnapshotCache;
   try {
     const raw = await readFile(await rewindSnapshotPath(), "utf8");
     rewindSnapshotCache = JSON.parse(raw) as RewindSnapshotFile;
+    rewindSnapshotCacheMtimeMs = mtimeMs;
     if (!rewindSnapshotCache || typeof rewindSnapshotCache !== "object" || !rewindSnapshotCache.sessions) {
       rewindSnapshotCache = { sessions: {} };
     }
   } catch {
     rewindSnapshotCache = { sessions: {} };
+    rewindSnapshotCacheMtimeMs = null;
   }
   return rewindSnapshotCache;
 }
@@ -68,6 +82,8 @@ async function persistRewindSnapshots(): Promise<void> {
   const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(temporary, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
   await rename(temporary, path);
+  // 写入后让下次 load 走 mtime 校验(外部写入也能被发现)。
+  rewindSnapshotCacheMtimeMs = null;
 }
 
 async function captureFileSnapshot(

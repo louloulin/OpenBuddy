@@ -147,12 +147,12 @@ function ToolSidePanelInner({
     (id?: string) => {
       setSelectedArtifactId(id);
       if (id) setNarrowList(false);
-      if (id) {
-        const a = artifacts.find((x) => x.id === id);
-        if (a) onSelectArtifact(a);
-      }
+      // 审计 B(2026-10-14):产物列表里点击 = 选中并展示版本历史,
+      // 不再整体切到预览模式 —— 此前一击就把用户带离产物视图,时间线
+      // (ArtifactHistory)永远没有机会出现。预览入口保留:统一标签页、
+      // 文件树视图、以及「在画布中打开 / 系统打开」。
     },
-    [artifacts, onSelectArtifact],
+    [],
   );
 
   const handleFileSelect = useCallback(
@@ -461,6 +461,7 @@ function ToolSidePanelInner({
               view={view}
               artifacts={artifacts}
               cwd={cwd}
+              sessionId={sessionId}
               previewPath={previewPath}
               selectedArtifactId={selectedArtifactId}
               selectedFilePath={selectedFilePath}
@@ -472,6 +473,7 @@ function ToolSidePanelInner({
                 handleArtifactSelect(a.id);
               }}
               onBrowserUrlChange={setBrowserUrl}
+              onFileRestored={() => setRefreshKey((k) => k + 1)}
               onOpenOs={(path) => {
                 void openLocalPath(path, { cwd, type: "file", onToast });
               }}
@@ -544,17 +546,14 @@ function NavContent({
   );
 
   if (view === "artifacts") {
-    const selected = artifacts.find((item) => item.id === selectedArtifactId);
+    // 版本历史(ArtifactHistory)在主列渲染:面板窄屏时导航列会整体收起,
+    // 挂在这里的历史区块会跟着消失(2026-10-14 审计)。
     return (
-      <div className="artifacts-nav">
-        <ArtifactsNavList
-          artifacts={artifacts}
-          selectedId={selectedArtifactId}
-          onSelect={(a) => onArtifactSelect(a.id)}
-        />
-        {/* 阶段 5 产物中心:选中文件的版本时间线 + 恢复。 */}
-        <ArtifactHistory sessionId={sessionId} path={selected?.path} onToast={onToast} onRestored={onFileRestored} />
-      </div>
+      <ArtifactsNavList
+        artifacts={artifacts}
+        selectedId={selectedArtifactId}
+        onSelect={(a) => onArtifactSelect(a.id)}
+      />
     );
   }
   if (view === "changes") {
@@ -672,6 +671,7 @@ function MainContent({
   view,
   artifacts,
   cwd,
+  sessionId,
   previewPath,
   selectedArtifactId,
   selectedFilePath,
@@ -680,10 +680,12 @@ function MainContent({
   onBrowserUrlChange,
   onOpenOs,
   onToast,
+  onFileRestored,
 }: {
   view: WorkspaceView;
   artifacts: SessionArtifact[];
   cwd?: string;
+  sessionId?: string;
   previewPath?: string | null;
   selectedArtifactId?: string;
   selectedFilePath?: string;
@@ -692,6 +694,8 @@ function MainContent({
   onBrowserUrlChange: (url?: string) => void;
   onOpenOs: (path: string) => void;
   onToast?: (msg: string) => void;
+  /** 恢复文件版本后由外层刷新主列预览。 */
+  onFileRestored?: () => void;
 }) {
   if (view === "preview") {
     return (
@@ -732,6 +736,8 @@ function MainContent({
     if (!path) return <p className="tool-side-panel__empty">无文件路径</p>;
     return (
       <div className="tool-side-panel__preview-wrap">
+      {/* 阶段 5 产物中心:版本历史 + 恢复(主列,预览之上;窄屏也可见)。 */}
+      <ArtifactHistory sessionId={sessionId} path={path} onToast={onToast} onRestored={onFileRestored} />
         {a && (
           <button
             type="button"

@@ -45,9 +45,18 @@ await page.waitForTimeout(1000);
 
 // 建会话 + 信任工作区(等价真实用户走完信任提示)
 const session = await page.evaluate(([cwd]) => window.api.invoke("agent:new-session", { cwd }), [ws]);
-const grantResult = await page.evaluate(([cwd]) => window.api.invoke("folder-trust:grant", cwd), [ws]);
+// 侧栏第一个会话的实际工作区可能不是 ws(启动默认会话落在仓库根);
+// 授权必须授给 ChatView 当前 cwd,否则信任门会按设计藏掉终端按钮。
+const activeCwd = await page.evaluate(() => {
+  const text = Array.from(document.querySelectorAll("[data-tip], .wb-composer-wrap, .composer-meta"))
+    .map((el) => el.textContent || "").join("|");
+  return text.includes("appx/OpenBuddy") ? "/Users/louloulin/appx/OpenBuddy" : null;
+});
+const grantTarget = activeCwd ?? ws;
+log("信任授予目标:", grantTarget);
+const grantResult = await page.evaluate(([cwd]) => window.api.invoke("folder-trust:grant", cwd), [grantTarget]);
 log("grant 结果:", JSON.stringify(grantResult));
-const trustedNow = await page.evaluate(([cwd]) => window.api.invoke("folder-trust:is-trusted", cwd), [ws]);
+const trustedNow = await page.evaluate(([cwd]) => window.api.invoke("folder-trust:is-trusted", cwd), [grantTarget]);
 log("is-trusted 直查:", trustedNow);
 await page.locator(".sidebar__conv").first().click().catch(() => {});
 await page.waitForTimeout(1500);
@@ -90,7 +99,8 @@ check("A5 UI 不再泄漏 custom_ 前缀", !afterTurn.includes("custom_anthropic
 const termBtn = page.locator("[data-tip*='终端']").first();
 const toolbarDebug = await page.evaluate(() => ({
   topbarHost: Boolean(document.getElementById("ob-topbar-tools")),
-  allTips: Array.from(document.querySelectorAll("[data-tip]")).map((el) => el.getAttribute("data-tip")).slice(0, 20),
+  workspaceText: (document.querySelector(".wb-composer-wrap, .composer-meta")?.textContent || "").slice(0, 80),
+  allTips: Array.from(document.querySelectorAll("[data-tip]")).map((el) => el.getAttribute("data-tip")).slice(0, 60),
 }));
 log("toolbar 调试:", JSON.stringify(toolbarDebug));
 check("A1 终端按钮可见(信任后)", (await termBtn.count()) > 0);
@@ -116,13 +126,6 @@ check("B1 tabs 常驻占位存在", await page.locator(".chatview__tabs").count(
 check("B7 标题栏无版本徽章", (await page.locator(".main-topbar__version-pill").count()) === 0);
 await page.screenshot({ path: join(out, "23-done.png") });
 
-// 批5:产物中心 UI 端到端 —— 种子快照(捕获路径由主进程测试覆盖;
-// agent 真跑写文件要过权限闸,探针不模拟)。
-await page.evaluate(async ([sessionId, dir]) => {
-  const fs = await import("node:fs");
-  // 渲染端没有 node:fs —— 走主进程 shellfs 写种子文件
-  await window.api.invoke("shellfs:write-text", { path: "probe-x.txt", content: "alpha", workspaceRoot: dir });
-}, [session.sessionId, ws]);
 const seedSnap = { sessions: { [session.sessionId]: { "p1": [
   { toolCallId: "t1", promptId: "p1", tool: "write", path: join(ws, "probe-x.txt"), exists: true, content: "alpha", capturedAt: Date.now() - 60000 },
   { toolCallId: "t2", promptId: "p2", tool: "edit", path: join(ws, "probe-x.txt"), exists: true, content: "beta", capturedAt: Date.now() - 30000 },
@@ -144,13 +147,24 @@ if (artIndex.length > 0) {
   const hist = await page.evaluate(async ([sessionId, path]) => window.api.invoke("artifacts:history", { sessionId, path }), [session.sessionId, artIndex[0].path]);
   check("批5 版本历史 >=1", hist.versions.length >= 1);
   // UI:打开产物面板,选文件,看时间线
-  const artBtn = page.locator("[data-tip*='产物'], [title*='产物'], [aria-label*='产物']").first();
+  // 重载让 ChatView 重新查询快照计数(按钮 visible 依赖它;真实场景里
+  // 转录工具调用也会把计数顶起来,这里是种子数据的时序限制)。
+  await page.reload();
+  await page.waitForTimeout(6000);
+  const artBtn = page.locator("[data-tip*='本会话产物'], [aria-label*='本会话产物']").first();
   if (await artBtn.count()) {
     await artBtn.click();
     await page.waitForTimeout(2000);
     const item = page.locator(".artifacts-list__main").first();
     if (await item.count()) await item.click();
     await page.waitForTimeout(1500);
+    log("面板状态:", JSON.stringify(await page.evaluate(() => ({
+      views: Array.from(document.querySelectorAll(".tool-side-panel [class*='view'], .tool-side-panel nav button")).map((b) => b.textContent?.trim()).filter(Boolean).slice(0, 8),
+      listItems: document.querySelectorAll(".artifacts-list__item").length,
+      history: document.querySelectorAll(".artifacts-history__item").length,
+      historyRoot: document.querySelectorAll(".artifacts-history").length,
+      empty: document.querySelector(".tool-side-panel__empty")?.textContent?.slice(0, 40) ?? null,
+    }))));
     check("批5 版本时间线渲染", await page.locator(".artifacts-history__item").count() > 0);
     await page.screenshot({ path: join(out, "24-artifacts.png") });
   } else {

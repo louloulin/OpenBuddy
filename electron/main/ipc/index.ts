@@ -11,6 +11,7 @@ import { clipboard, dialog, ipcMain, shell, type BrowserWindow } from "electron"
 import { promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { piHome } from "../agent/host-modules/_host-paths";
 // P1-04 / P0-04: agent-host transitively pulls 138 top-level imports
 // (pi-coding-agent, plugin-host, deepseek-runtime, pi-resources, ...).
 // The Proxy lives in `./agent-host-proxy` so IPC sub-modules can import
@@ -1126,6 +1127,14 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	registerTerminalPanelIpc({
 		getWindow,
 		getTrustedRoot: () => agentHost.getCwd() ?? null,
+		isTrustedCwd: async (cwd) => {
+			// 与 misc.ts 的 folder-trust 同一存储(mountFolderTrust 幂等)。
+			const mod = await import("@openbuddy/folder-trust");
+			if (!mod.getFolderTrustStore()) {
+				mod.mountFolderTrust({ storagePath: join(piHome(), "folder-trust.json") });
+			}
+			return mod.folderTrustHandlers.isTrusted(cwd);
+		},
 	});
 	// 阶段 5 产物中心:文件版本时间线 / 恢复(复用 rewind 快照存储)。
 	registerArtifactsIpc();

@@ -311,6 +311,30 @@ export function ChatView({
       if (timer) clearInterval(timer);
     };
   }, [cwd]);
+  // 阶段 5(审计):产物按钮不再只看转录里的工具调用 —— rewind 快照存储
+  // (artifacts:index)里有版本记录的会话也应该有入口,否则重启/历史会话
+  // 的产物永远找不到。
+  interface SnapshotArtifactEntry {
+    path: string;
+    name: string;
+    revisions: number;
+    tools: string[];
+    lastTouchedAt: number;
+  }
+  const [snapshotArtifacts, setSnapshotArtifacts] = useState<SnapshotArtifactEntry[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    setSnapshotArtifacts([]);
+    if (!sessionId) return;
+    void invoke<{ artifacts?: SnapshotArtifactEntry[] }>("artifacts:index", { sessionId })
+      .then((result) => {
+        if (!cancelled) setSnapshotArtifacts(Array.isArray(result?.artifacts) ? result.artifacts : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
   // 子代理运行时面板(对齐 WorkBuddy team-runtime)。
   const [subagentsOpen, setSubagentsOpen] = useState(false);
   // P0-4 — 会话视图切换。Plan5 A.1 refactor 之前 ChatView 已经持有这个状态 +
@@ -595,7 +619,24 @@ export function ChatView({
     }
     return `${messages.length}|${lastToolKey}`;
   }, [messages]);
-  const artifacts = useMemo(() => collectSessionArtifacts(messages), [artifactFingerprint, messages]);
+  const artifacts = useMemo(() => {
+    const transcriptArtifacts = collectSessionArtifacts(messages);
+    // 阶段 5(审计):把快照存储里的文件并进产物列表 —— 否则重启/历史会话
+    // 的产物在面板里永远不可见(转录里没有 tool-call 条目)。按 path 去重,
+    // 转录条目优先(它们带工具状态)。
+    const seen = new Set(transcriptArtifacts.map((a) => a.path.replace(/\\/g, "/").toLowerCase()));
+    const fromSnapshots = snapshotArtifacts
+      .filter((entry) => !seen.has(entry.path.replace(/\\/g, "/").toLowerCase()))
+      .map((entry) => ({
+        id: `snapshot:${entry.path}`,
+        path: entry.path,
+        kind: "file",
+        title: entry.name,
+        toolCallId: "",
+        status: "completed" as const,
+      }));
+    return [...transcriptArtifacts, ...fromSnapshots];
+  }, [artifactFingerprint, messages, snapshotArtifacts]);
 
   // R0.4: Memoize the timeline build so it does not run on every render;
   // it only needs to re-run when the messages reference changes.
