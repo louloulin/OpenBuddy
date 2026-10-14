@@ -6,13 +6,5 @@
     "登记必须写清:谁在引用、为什么还留着、打算在哪一步偿还。",
     "基线腐烂(登记了但代码里已无该引用)会被门禁判为失败,所以条目只能减少。"
   ],
-  "removedButReferenced": {
-    "automations_snapshot": "引用者 packages/ui/openbuddy-ui-automation(AutomationPanel)。后端在 Stage G-1c 删除,能力归 pi-goal-list-loop-audit;UI 外壳按「保留auto」约束保留,入口已从侧栏下线。阶段 1.4 用 rrule 调度 + 运行历史重接线后再从本清单移除。",
-    "automations_save": "同上(阶段 1.4 重接线)。",
-    "automations_delete": "同上(阶段 1.4 重接线)。",
-    "automations_set_status": "同上(阶段 1.4 重接线)。",
-    "automations_run": "同上(阶段 1.4 重接线)。",
-    "automation_records_archive": "同上(阶段 1.4 重接线)。",
-    "automation_records_delete": "同上(阶段 1.4 重接线)。"
-  }
+  "removedButReferenced": []
 }

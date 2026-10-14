@@ -148,6 +148,17 @@
       "compact": "Compact",
       "standard": "Standard",
       "relaxed": "Relaxed"
+    },
+    "update": {
+      "title": "Software update",
+      "check": "Check for updates",
+      "checking": "Checking for updates…",
+      "available": "Version {version} available",
+      "downloading": "Downloading… {percent}%",
+      "downloaded": "Update ready, install on restart",
+      "error": "Check failed: {error}",
+      "upToDate": "You are up to date",
+      "restart": "Restart and install"
     }
   },
   "auth": {
@@ -248,18 +259,40 @@
       "verb14": "Structuring output"
     },
     "footer": {
-      "footer.yieldBanner": "Paused (session context preserved)",
-      "footer.resumeTitle": "Resume only — no new reply (keep typing)",
-      "footer.resume": "Resume",
-      "footer.resumeContinueTitle": "Resume and send \"please continue\" so the agent keeps going",
-      "footer.resumeContinue": "Resume & continue",
-      "footer.pauseTitle": "Pause generation (session kept, resumable)",
-      "footer.pause": "Pause"
+      "yieldBanner": "Paused (session context preserved)",
+      "resumeTitle": "Resume only — no new reply (keep typing)",
+      "resume": "Resume",
+      "resumeContinueTitle": "Resume and send \"please continue\" so the agent keeps going",
+      "resumeContinue": "Resume & continue",
+      "pauseTitle": "Pause generation (session kept, resumable)",
+      "pause": "Pause"
     },
     "tool": {
-      "tool.collapse": "Collapse",
-      "tool.expand": "Expand inline",
-      "tool.detailHint": "Click for details, Enter to expand inline, Shift+Enter for the detail panel"
+      "collapse": "Collapse",
+      "expand": "Expand inline",
+      "detailHint": "Click for details, Enter to expand inline, Shift+Enter for the detail panel"
+    },
+    "terminal": {
+      "dockTitle": "Terminal · {name}",
+      "close": "Close terminal",
+      "label": "Terminal (workspace shell)",
+      "exit": "Process exited, code {code}",
+      "createFailed": "Terminal failed to start: {error}"
     }
+  },
+  "artifacts": {
+    "history": "Version history",
+    "historyAria": "File version history",
+    "noVersions": "No versions recorded for this file yet.",
+    "refresh": "Refresh",
+    "restore": "Restore this version",
+    "restoring": "Restoring…",
+    "restored": "Restored {restored} file(s), skipped {skipped}.",
+    "restoreFailed": "Restore failed: {error}",
+    "restoreNeedsPrompt": "This version has no linked prompt, so the rewind point is unknown.",
+    "deletedState": "did not exist",
+    "diffAria": "Difference from current content",
+    "noDiff": "Identical to current content",
+    "historyFailed": "Failed to load version history: {error}"
   }
 }

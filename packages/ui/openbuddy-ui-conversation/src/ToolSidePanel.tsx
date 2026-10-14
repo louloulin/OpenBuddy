@@ -22,6 +22,7 @@ import {
 } from "react";
 import type { ToolCallView } from "@/stores/session-store";
 import type { SessionArtifact } from "@/lib/agent/session-artifacts";
+import { ArtifactHistory } from "./chatview/ArtifactHistory";
 import type { FileChange } from "@/lib/files/file-changes";
 import { aggregateFileChanges } from "@/lib/files/file-changes";
 import type { ChatMessage } from "@/stores/session-store";
@@ -68,7 +69,7 @@ export type ToolSidePanelMode =
   | "preview"
   | "fileTree"
   | "browser"
-  | "changes";
+  | "changes"
 
 // ---------- 持久化常量 ----------
 // 宽度约束全部收敛在 `tool-side-panel-layout.ts`(纯函数,有单测)。
@@ -124,6 +125,8 @@ function ToolSidePanelInner({
 
   // ---- selection 状态 ----
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | undefined>();
+  // 恢复文件后让主列预览重新读盘(数字变化即可,内容由各自 effect 拉)。
+  const [, setRefreshKey] = useState(0);
   const [selectedFilePath, setSelectedFilePath] = useState<string | undefined>();
   const [browserUrl, setBrowserUrl] = useState<string | undefined>();
 
@@ -356,11 +359,13 @@ function ToolSidePanelInner({
             artifacts={artifacts}
             changes={changes}
             cwd={cwd}
+            sessionId={sessionId}
             selectedArtifactId={selectedArtifactId}
             selectedFilePath={selectedFilePath}
             onArtifactSelect={handleArtifactSelect}
             onFileSelect={handleFileSelect}
             onToast={onToast}
+            onFileRestored={() => setRefreshKey((k) => k + 1)}
           />
         </div>
       </div>
@@ -497,21 +502,26 @@ function NavContent({
   artifacts,
   changes,
   cwd,
+  sessionId,
   selectedArtifactId,
   selectedFilePath,
   onArtifactSelect,
   onFileSelect,
   onToast,
+  onFileRestored,
 }: {
   view: WorkspaceView;
   artifacts: SessionArtifact[];
   changes: FileChange[];
   cwd?: string;
+  sessionId?: string;
   selectedArtifactId?: string;
   selectedFilePath?: string;
   onArtifactSelect: (id?: string) => void;
   onFileSelect: (path?: string) => void;
   onToast?: (msg: string) => void;
+  /** 恢复某个文件版本后由外层刷新主列预览。 */
+  onFileRestored?: () => void;
 }) {
   // `files.tree` 槽:插件可以整列接管文件树(自带数据源)。内核没装任何实现时
   // 退回 ui-workbench 的 FileTreeView —— 两者满足同一个 props 契约,所以这里
@@ -534,12 +544,17 @@ function NavContent({
   );
 
   if (view === "artifacts") {
+    const selected = artifacts.find((item) => item.id === selectedArtifactId);
     return (
-      <ArtifactsNavList
-        artifacts={artifacts}
-        selectedId={selectedArtifactId}
-        onSelect={(a) => onArtifactSelect(a.id)}
-      />
+      <div className="artifacts-nav">
+        <ArtifactsNavList
+          artifacts={artifacts}
+          selectedId={selectedArtifactId}
+          onSelect={(a) => onArtifactSelect(a.id)}
+        />
+        {/* 阶段 5 产物中心:选中文件的版本时间线 + 恢复。 */}
+        <ArtifactHistory sessionId={sessionId} path={selected?.path} onToast={onToast} onRestored={onFileRestored} />
+      </div>
     );
   }
   if (view === "changes") {

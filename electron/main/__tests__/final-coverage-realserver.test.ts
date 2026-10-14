@@ -231,12 +231,11 @@ describe("final coverage 真实端到端", () => {
     });
   });
 
-  // Stage G-1c: automation:* IPC channels are removed (Cordis backend deleted,
-  // automation owned by pi-background-tasks + pi-goal passthrough). These tests
-  // are preserved as regression markers — each call throws "no handler registered"
-  // and expectThrows catches it as a successful absence check.
-  describe("automations legacy + records (G-1c: backend removed, passthrough to pi)", () => {
-    it("automations_save → throw (handler removed)", async () => {
+  // 阶段 1.4:automations:* / automation_records_* 已在 automations.ts 提供
+  // 真实实现(本地调度引擎)。这里只锁「缺必填字段必须拒绝」这条契约;
+  // 完整的存取往返与调度数学见 automation-scheduler.test.ts。
+  describe("automations 载荷校验", () => {
+    it("automations_save 缺 name/prompt → throw", async () => {
       await expectThrows("automations_save", {});
     });
     it("automations_delete 缺 id → throw", async () => {

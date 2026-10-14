@@ -92,15 +92,26 @@ function applyHunks(original: string, parsed: ParsedDiff): string {
   return origLines.join("\n");
 }
 
+/** 结构化沙箱接口(避免扩展直接依赖 deepseek 运行时;实现=SubprocessRuntime 侧 SandboxRuntime)。 */
+export interface ApplyCommandSandbox {
+  confine(
+    argv: readonly string[],
+    policy?: { mode?: "read-only" | "workspace-write" | "danger-full-access"; workspaceRoot?: string },
+  ): { argv: readonly string[]; enforcement: string };
+}
+
 export interface OpenBuddyApplyPatchConfig {
   trustedCwd: string;
   dryRun?: boolean;
+  /** OS 级沙箱(seatbelt/bwrap)。缺省时 apply_command 退回"仅权限弹窗"。 */
+  sandbox?: ApplyCommandSandbox;
 }
 
 export default function openBuddyApplyPatch(
   config: OpenBuddyApplyPatchConfig,
 ): ExtensionFactory {
   const trustedRoot = resolve(config.trustedCwd);
+  const sandbox = config.sandbox;
   return (pi) => {
   const api = pi;
   if (typeof api.registerTool !== "function") return;
@@ -212,8 +223,21 @@ export default function openBuddyApplyPatch(
           details: { exit_code: 1, stdout: "", stderr: "permission denied by user", duration_ms: Date.now() - start, error: "permission denied by user" },
         };
       }
+      // 阶段 3:OS 级沙箱(seatbelt/bwrap)包裹 —— workspace-write 只允许写信任
+      // 工作区与 /tmp,其余路径写操作由内核拒绝。danger-full-access 直通。
+      let argv: readonly string[] = ["/bin/sh", "-c", command];
+      let sandboxed = false;
+      if (sandbox) {
+        try {
+          const confined = sandbox.confine(argv, { mode: "workspace-write", workspaceRoot: trustedRoot });
+          argv = confined.argv;
+          sandboxed = confined.enforcement === "full";
+        } catch {
+          // 无可用 enforcing provider(如无 sandbox-exec/bwrap)→ 退回直跑。
+        }
+      }
       try {
-        const { stdout, stderr } = await execFileAsync("/bin/sh", ["-c", command], {
+        const { stdout, stderr } = await execFileAsync(argv[0], argv.slice(1) as string[], {
           cwd: resolve(cwd),
           timeout,
           maxBuffer: 16 * 1024 * 1024,

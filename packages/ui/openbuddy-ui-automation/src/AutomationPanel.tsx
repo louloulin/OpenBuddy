@@ -193,31 +193,14 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
     action: () => Promise<void>;
   } | null>(null);
 
-  // When the automations backend throws the Stage H-4 migration message
-  // (openbuddy-automation removed, pi-goal-list-loop-audit is the canonical
-  // backplane), we render a persistent banner instead of a transient toast
-  // so the user has a clear pointer to /goal.
-  const [migrationMessage, setMigrationMessage] = useState<string | null>(null);
-
   const refresh = useCallback(
     async (silent = false) => {
       if (!silent) setLoading(true);
       try {
         setSnapshot(await automationsSnapshot());
       } catch (e) {
-        // Stage H-4: openbuddy-automation removed (Stage G-1c); the
-        // canonical automation backplane is pi-goal-list-loop-audit. The
-        // IPC channel throws a migration message which we surface here so
-        // the user has a clear pointer to /marketplace + /goal. The panel
-        // intentionally stays mounted per the "保留auto" constraint.
-        const raw = String(e).replace(/^Error:\s*/, "");
-        if (raw.includes("pi-goal-list-loop-audit")) {
-          setMigrationMessage(raw);
-          console.warn("[automation] migration message:", raw);
-        } else {
-          setMigrationMessage(null);
-          onToast?.(`加载自动化数据失败：${raw}`);
-        }
+        // 阶段 1.4 后端接回真实实现,失败只可能是真问题,直接报给用户。
+        onToast?.(`加载自动化数据失败：${String(e).replace(/^Error:\s*/, "")}`);
       } finally {
         if (!silent) setLoading(false);
       }
@@ -254,14 +237,10 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
     return () => document.removeEventListener("mousedown", handler);
   }, [filterOpen]);
 
-  // Helper: format IPC errors so the toast surfaces the migration message
-  // (pi-goal-list-loop-audit) instead of a generic "保存自动化任务失败".
+  // 错误统一带上前端语义,主进程原始信息附在后面(不再有"迁移"分支:
+  // 阶段 1.4 后端是真实实现,没有别的后端要指向)。
   const formatAutomationError = useCallback((e: unknown, fallback: string): string => {
-    const raw = String(e).replace(/^Error:\s*/, "");
-    if (raw.includes("pi-goal-list-loop-audit")) {
-      return `${raw}\n请通过 /marketplace 安装该扩展，然后使用 /goal 命令管理自动化任务。`;
-    }
-    return `${fallback}: ${raw}`;
+    return `${fallback}: ${String(e).replace(/^Error:\s*/, "")}`;
   }, []);
 
   // ---------- 创建 / 编辑 ----------
@@ -627,42 +606,6 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
   // ============================================================
   return (
     <div className="automation-panel code-buddy-automation">
-      {/* UX-2: persistent migration banner. Replaces the dead-link toast
-          with clickable actions that route the user to the marketplace
-          (where pi-goal-list-loop-audit can be installed) and to the
-          PI-PRIORITY doc explaining the priority decision. The banner
-          stays mounted until the user dismisses it so the next session
-          does not have to re-discover the migration. */}
-      {migrationMessage && (
-        <div className="atm-migration-banner" role="status" data-migration="pi-goal-list-loop-audit">
-          <div className="atm-migration-banner__icon" aria-hidden="true">⚙️</div>
-          <div className="atm-migration-banner__body">
-            <div className="atm-migration-banner__title">定时自动化已升级为 Goal 任务</div>
-            <div className="atm-migration-banner__detail">
-              自动化能力已整合进 Goal 任务管理。在输入框输入 <code>/goal</code> 即可创建和管理定时自动化任务。
-            </div>
-          </div>
-          <div className="atm-migration-banner__actions">
-            <button
-              type="button"
-              className="atm-migration-banner__btn atm-migration-banner__btn--primary"
-              onClick={() => onNavigate?.("专家·技能·连接器")}
-              data-action="open-marketplace"
-            >
-              去市场安装
-            </button>
-            <button
-              type="button"
-              className="atm-migration-banner__btn atm-migration-banner__btn--ghost"
-              onClick={() => setMigrationMessage(null)}
-              aria-label="关闭迁移提示"
-              data-action="dismiss"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
       {/* ---------- 工具栏(顶部拖拽条,Electron 需 data-openbuddy-drag) ---------- */}
       {showTemplatePage ? (
         <div className="atm-toolbar atm-toolbar--breadcrumb" data-openbuddy-drag>

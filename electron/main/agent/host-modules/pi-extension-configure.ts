@@ -231,11 +231,14 @@ export function configurePiExtensions(
       const applyPatchFactory = builtinPiExtensionFactories["openbuddy-apply-patch"];
       if (!applyPatchFactory) return null;
       const t = telemetrySinkImpl();
+      const sandboxRuntime = state!.context?.get("sandbox") as
+        | { confine(argv: readonly string[], policy?: { mode?: string; workspaceRoot?: string }): { argv: readonly string[]; enforcement: string } }
+        | undefined;
       return {
         name: "openbuddy-apply-patch",
         factory: applyPatchFactory(
           emitPluginEventImpl,
-          { trustedCwd: state!.cwd ?? process.cwd() },
+          { trustedCwd: state!.cwd ?? process.cwd(), ...(sandboxRuntime ? { sandbox: sandboxRuntime } : {}) },
           {
             profileDir: resolveProfileDirectoryImpl(),
             resolveSource: (source) => {

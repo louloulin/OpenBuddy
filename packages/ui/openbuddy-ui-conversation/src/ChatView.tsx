@@ -64,6 +64,8 @@ import {
 } from "./conversation-view";
 import { PlanPanel, SessionTasksPanel } from "@openbuddy/ui-automation";
 import { useRowPanelNav } from "./chatview/useRowPanelNav";
+import { TerminalPanel } from "./chatview/TerminalPanel";
+import { SquareTerminal } from "lucide-react";
 import { useChatShortcuts } from "./chatview/useChatShortcuts";
 import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
 import { QuestionInlineCard } from "./QuestionInlineCard";
@@ -281,6 +283,8 @@ export function ChatView({
   const [findCurrent, setFindCurrent] = useState<string | null>(null);
   // 文件变更聚合面板(对齐 WorkBuddy file-changes-panel)。
   const [fileChangesOpen, setFileChangesOpen] = useState(false);
+  // 阶段 1:chat 底部终端(VS Code 风格),cwd=信任工作区。
+  const [terminalOpen, setTerminalOpen] = useState(false);
   // 子代理运行时面板(对齐 WorkBuddy team-runtime)。
   const [subagentsOpen, setSubagentsOpen] = useState(false);
   // P0-4 — 会话视图切换。Plan5 A.1 refactor 之前 ChatView 已经持有这个状态 +
@@ -383,6 +387,10 @@ export function ChatView({
     };
   }, [sessionId, tasksOpen]);
   const [planOpen, setPlanOpen] = useState(false);
+  // 工具栏按钮定义在 useMemo 里,不能在那里调 hook —— 先在顶层取好文案。
+  const terminalLabel = useT("chat.terminal.label");
+  const terminalDockTitle = useT("chat.terminal.dockTitle", { name: cwd ? cwd.split("/").pop() || cwd : "" });
+  const terminalCloseLabel = useT("chat.terminal.close");
   const tasksBadgeLabel = useT("tasks.badge", {
     completed: sessionTasks.filter((t) => t.status === "completed").length,
     total: sessionTasks.length,
@@ -862,6 +870,15 @@ export function ChatView({
       hasMessages: messages.length > 0,
       onClick: () => setFileChangesOpen((v) => !v),
     }),
+    {
+      id: "terminal",
+      active: terminalOpen,
+      // 终端在空会话就有用(先开 shell 再干活),不受"有消息"门控。
+      visible: Boolean(cwd),
+      onClick: () => setTerminalOpen((v) => !v),
+      label: terminalLabel,
+      icon: <SquareTerminal size={15} strokeWidth={1.75} />,
+    },
     defaultSubagentButton({
       active: subagentsOpen,
       hasMessages: messages.length > 0,
@@ -1029,6 +1046,24 @@ export function ChatView({
           unreadCount={unreadCount}
           onJumpToBottom={handleJumpToBottom}
         />
+        {/* 阶段 1:终端 dock(VS Code 风格,底部 40% 高度)。
+            cwd=信任工作区;关闭即杀会话(见 TerminalPanel cleanup)。 */}
+        {terminalOpen && cwd && (
+          <div className="chatview__terminal-dock" data-testid="terminal-dock">
+            <div className="chatview__terminal-dock-head">
+              <span className="chatview__terminal-dock-title">{terminalDockTitle}</span>
+              <button
+                type="button"
+                className="chatview__terminal-dock-close"
+                aria-label={terminalCloseLabel}
+                onClick={() => setTerminalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <TerminalPanel cwd={cwd} />
+          </div>
+        )}
         {/* Pinned footer — composer + yield/permission cards always sit at
             the bottom of `chatview__main`, not at the bottom of the
             transcript. */}

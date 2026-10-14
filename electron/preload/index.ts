@@ -95,8 +95,11 @@ const allowedInvokeChannels = new Set([
   // folder trust — 由 @openbuddy/folder-trust 落盘(FolderTrustDialog 的应答路径)
   "folder-trust:grant", "folder-trust:is-trusted", "folder-trust:list", "folder-trust:revoke", "folder_trust_respond",
   "notify:dispatch", "policy:get", "policy:save",
-  "storage-sources:list", "storage-sources:save", "task_kill", "tasks:add", "tasks:clear-completed", "tasks:delete", "tasks:list", "tasks:update",
+  "app:auto-update-state", "app:check-updates", "app:install-updates", "storage-sources:list", "storage-sources:save", "task_kill", "tasks:add", "tasks:clear-completed", "tasks:delete", "tasks:list", "tasks:update",
   "memory:add", "memory:delete", "memory:list", "memory:update",
+  "terminal:create", "terminal:input", "terminal:kill", "terminal:resize",
+  // 阶段 5 产物中心
+  "artifacts:index", "artifacts:history", "artifacts:restore", "artifacts:diff",
   "teams:create", "teams:delete", "teams:status",
   // automations-notifications
   "automation_records_archive", "automation_records_delete",
@@ -142,6 +145,8 @@ const channelAliases: Record<string, string> = {
 };
 
 const allowedEventChannels = new Set([
+  "app:auto-update-available",
+  "terminal:output", "terminal:exit", "app:auto-update-progress", "app:auto-update-downloaded", "app:auto-update-state",
   "connector://cli-auth-url",
   "connector://cli-auth-log",
   "connector://cli-auth-done",

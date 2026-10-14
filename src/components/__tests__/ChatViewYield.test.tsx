@@ -171,7 +171,7 @@ describe("ChatView pause/yield/resume 闭环", () => {
   it("流式时显示「暂停」按钮,点击触发 onCancel", () => {
     setStore({ streaming: true, streamingMessageId: "a1" });
     renderChat();
-    const pauseBtn = screen.getByTitle("暂停生成(保留会话,可继续)");
+    const pauseBtn = screen.getByTitle("暂停生成（保留会话，可继续）");
     fireEvent.click(pauseBtn);
     expect(baseProps.onCancel).toHaveBeenCalledTimes(1);
   });
@@ -180,7 +180,7 @@ describe("ChatView pause/yield/resume 闭环", () => {
     // 初始流式 → 点暂停。
     setStore({ streaming: true, streamingMessageId: "a1" });
     const { rerender } = renderChat();
-    fireEvent.click(screen.getByTitle("暂停生成(保留会话,可继续)"));
+    fireEvent.click(screen.getByTitle("暂停生成（保留会话，可继续）"));
     expect(baseProps.onCancel).toHaveBeenCalled();
     // 模拟 pi complete:streaming → false。yield 状态在 streaming 结束后确认。
     setStore({ streaming: false, streamingMessageId: null });
@@ -189,7 +189,7 @@ describe("ChatView pause/yield/resume 闭环", () => {
         <ChatView {...baseProps} />
       </ThemeProvider>,
     );
-    await waitFor(() => expect(screen.getByText("已暂停(会话上下文已保留)")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("已暂停（会话上下文已保留）")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "恢复" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "恢复并继续" })).toBeInTheDocument();
   });
@@ -197,40 +197,40 @@ describe("ChatView pause/yield/resume 闭环", () => {
   it("「恢复」仅清状态,不触发 onSend", async () => {
     setStore({ streaming: true, streamingMessageId: "a1" });
     const { rerender } = renderChat();
-    fireEvent.click(screen.getByTitle("暂停生成(保留会话,可继续)"));
+    fireEvent.click(screen.getByTitle("暂停生成（保留会话，可继续）"));
     setStore({ streaming: false, streamingMessageId: null });
     rerender(
       <ThemeProvider>
         <ChatView {...baseProps} />
       </ThemeProvider>,
     );
-    await waitFor(() => expect(screen.getByText("已暂停(会话上下文已保留)")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("已暂停（会话上下文已保留）")).toBeInTheDocument());
     act(() => {
       fireEvent.click(screen.getByRole("button", { name: "恢复" }));
     });
     expect(baseProps.onSend).not.toHaveBeenCalled();
     await waitFor(() =>
-      expect(screen.queryByText("已暂停(会话上下文已保留)")).toBeNull(),
+      expect(screen.queryByText("已暂停（会话上下文已保留）")).toBeNull(),
     );
   });
 
   it("「恢复并继续」清状态 + onSend(\"请继续。\")", async () => {
     setStore({ streaming: true, streamingMessageId: "a1" });
     const { rerender } = renderChat();
-    fireEvent.click(screen.getByTitle("暂停生成(保留会话,可继续)"));
+    fireEvent.click(screen.getByTitle("暂停生成（保留会话，可继续）"));
     setStore({ streaming: false, streamingMessageId: null });
     rerender(
       <ThemeProvider>
         <ChatView {...baseProps} />
       </ThemeProvider>,
     );
-    await waitFor(() => expect(screen.getByText("已暂停(会话上下文已保留)")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("已暂停（会话上下文已保留）")).toBeInTheDocument());
     act(() => {
       fireEvent.click(screen.getByRole("button", { name: "恢复并继续" }));
     });
     expect(baseProps.onSend).toHaveBeenCalledWith("请继续。");
     await waitFor(() =>
-      expect(screen.queryByText("已暂停(会话上下文已保留)")).toBeNull(),
+      expect(screen.queryByText("已暂停（会话上下文已保留）")).toBeNull(),
     );
   });
 

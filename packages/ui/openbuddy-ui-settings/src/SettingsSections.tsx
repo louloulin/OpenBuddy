@@ -26,6 +26,7 @@ import {
   Shield,
 } from "lucide-react";
 import { useTheme, useThemeSnapshot, ThemePicker, ThemeStudio } from "@openbuddy/ui-theme/client";
+import { invoke as electronInvoke } from "@/lib/platform/electron-api";
 import {
   DENSITY_LABELS,
   getDensity,
@@ -385,9 +386,76 @@ export function HelpSettingsPanel({
 }: {
   onReplayTour?: () => void;
 } = {}) {
+  const locale = useLocale();
   const agentPaths = useAgentPaths();
+  // P0(发布工程):消费 auto-updater 的状态/事件通道。
+  const [updateState, setUpdateState] = useState<{
+    status: "idle" | "checking" | "available" | "not-available" | "downloading" | "downloaded" | "error";
+    version?: string;
+    percent?: number;
+    error?: string;
+  }>({ status: "idle" });
+  useEffect(() => {
+    void electronInvoke<{ status: typeof updateState }>("app:auto-update-state").then((s) => {
+      if (s && typeof s === "object" && "status" in s) setUpdateState(s as unknown as typeof updateState);
+    }).catch(() => undefined);
+    const off = [
+      "app:auto-update-state",
+      "app:auto-update-available",
+      "app:auto-update-progress",
+      "app:auto-update-downloaded",
+    ].map((channel) =>
+      // 事件桥:window.api.events.on(与 ChatShortcutOverlay 同一模式)
+      (window as unknown as { api?: { events?: { on: (c: string, cb: (p: unknown) => void) => () => void } } }).api?.events?.on(channel, (payload: unknown) => {
+        if (payload && typeof payload === "object" && "status" in (payload as Record<string, unknown>)) {
+          setUpdateState(payload as typeof updateState);
+        } else if (channel.endsWith("available") && payload && typeof payload === "object") {
+          setUpdateState((prev) => ({ ...prev, status: "available", version: (payload as { version?: string }).version }));
+        } else if (channel.endsWith("progress") && payload && typeof payload === "object") {
+          setUpdateState((prev) => ({ ...prev, status: "downloading", percent: (payload as { percent?: number }).percent }));
+        } else if (channel.endsWith("downloaded")) {
+          setUpdateState((prev) => ({ ...prev, status: "downloaded" }));
+        }
+      }),
+    );
+    return () => off.forEach((fn) => fn?.());
+  }, []);
+  const t = locale.t;
+  const updateLabel =
+    updateState.status === "checking" ? t("settings.update.checking")
+    : updateState.status === "available" ? t("settings.update.available", { version: updateState.version ?? "" })
+    : updateState.status === "downloading" ? t("settings.update.downloading", { percent: Math.round(updateState.percent ?? 0) })
+    : updateState.status === "downloaded" ? t("settings.update.downloaded")
+    : updateState.status === "error" ? t("settings.update.error", { error: updateState.error ?? "" })
+    : updateState.status === "not-available" ? t("settings.update.upToDate")
+    : t("settings.update.check");
   return (
     <SectionShell title="关于" desc="OpenBuddy 的版本、文档与反馈渠道。">
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <span>{t("settings.update.title")}</span>
+          <span className="settings-row__hint">{updateLabel}</span>
+        </div>
+        <div className="settings-row__control" style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            className="settings-btn"
+            disabled={updateState.status === "checking" || updateState.status === "downloading"}
+            onClick={() => void electronInvoke("app:check-updates").catch(() => undefined)}
+          >
+            {t("settings.update.check")}
+          </button>
+          {updateState.status === "downloaded" && (
+            <button
+              type="button"
+              className="settings-btn settings-btn--primary"
+              onClick={() => void electronInvoke("app:install-updates").catch(() => undefined)}
+            >
+              {t("settings.update.restart")}
+            </button>
+          )}
+        </div>
+      </div>
       <ul className="help-list">
         <li>
           <ExternalLink size={14} />

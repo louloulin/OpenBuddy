@@ -563,10 +563,8 @@ const recordProcessError = (line) => {
   if (/Error occurred in handler for 'agent:preset-select'/i.test(line)) return false;
   if (/agent-presets:\s+preset "missing-smoke-preset" was not found/i.test(line)) return false;
   if (optionalAuthSmoke && /Error occurred in handler for 'agent:prompt'/i.test(line)) return false;
-  // Retired-surface probes the smoke deliberately triggers as passthrough
-  // assertions (automation / memory / folder-trust): the throw IS the
-  // expected contract, so it must not count as an unexpected main error.
-  if (/automation is now owned by pi-goal-list-loop-audit|automations_snapshot[^\n]*retired/i.test(line)) return false;
+  // 阶段 1.4 之后 automations:* 已有真实实现,原先那条"退休文案"豁免已删除 ——
+  // 它不可能再出现,留着只会悄悄吞掉未来真出问题的日志。
   // (memory / folder-trust 的"已移除"文案在阶段 0/1 之后不再产生:前者的通道
   //  整体删除,后者接回了真实能力包。原先的两条豁免已删除 —— 留着就是无对象的
   //  豁免,会悄悄吞掉未来真出问题的日志。)
@@ -973,12 +971,18 @@ try {
 
   await window.evaluate(async () => window.api.invoke("agent:extensions-reload"));
 
-  // 「自动化」在阶段 0 下线(后端 Stage G-1c 删除,面板每个读写都抛错)。
-  // 这里不仅把它从路由表里拿掉,还反过来断言入口**不存在** —— 否则哪天有人
-  // 把 nav item 加回来,冒烟会安静地变绿,而用户点进去看到的是死面。
-  const removedNavLabel = "自动化";
-  if (await window.getByRole("button", { name: removedNavLabel, exact: true }).count()) {
-    throw new Error(`导航项「${removedNavLabel}」不应存在(阶段 0 已下线其入口)`);
+  // 阶段 1.4:自动化入口恢复,断言反过来 —— 入口必须存在,而且点进去要出
+  // 面板(不是死面)。阶段 0 那条"入口不应存在"的断言正是它退役时的对照,
+  // 现在它的反面才是真契约。
+  const automationNav = window.getByRole("button", { name: "自动化", exact: true }).first();
+  if (!(await automationNav.count())) {
+    throw new Error("导航项「自动化」缺失(阶段 1.4 已恢复调度引擎与入口)");
+  }
+  await automationNav.click();
+  await window.locator(".automation-panel").waitFor({ state: "visible", timeout: 10_000 });
+  const automationSurface = await window.evaluate(() => document.body.innerText);
+  if (!automationSurface.includes("定时任务") || !automationSurface.includes("运行记录")) {
+    throw new Error(`自动化面板未渲染出预期区块: ${automationSurface.slice(0, 200)}`);
   }
   const supportedRoutes = ["助理", "项目", "专家·技能·连接器"];
   for (const route of supportedRoutes) {
@@ -1777,11 +1781,38 @@ try {
     const subagentsBefore = await window.api.invoke("subagents:get-config");
     const _subagentsAfter = await window.api.invoke("subagents:set-config", { maxDepth: subagentsBefore?.maxDepth ?? 1 }); void _subagentsAfter;
     const subagentsConfigReadable = subagentsBefore === null || (typeof subagentsBefore === "object" && subagentsBefore !== null);
-    // Stage G-1c: openbuddy-automation removed; automation is owned by
-    // pi-background-tasks + pi-goal (passthrough). The legacy
-    // automations_snapshot IPC channel no longer exists; renderer reaches
-    // the pi-native tool surface. (No renderer import of the main-process
-    // passthrough registry here — that registration lives in main/ipc.)
+    // 阶段 1.4:自动化调度引擎接回真实实现(electron/main/ipc/automations.ts)。
+    // 冒烟只走「不烧 token」的那一段:保存 → 快照回读 → 暂停/恢复 → 删除。
+    // 真跑一次(automations_run 会新建会话跑完整回合)由 /tmp 探针覆盖,
+    // 不放进每次冒烟。
+    const automationsSnapshotBefore = await window.api.invoke("automations_snapshot");
+    await window.api.invoke("automations_save", {
+      automation: {
+        id: "smoke-automation",
+        name: "smoke-automation",
+        prompt: "smoke",
+        cwds: workspaceRoot,
+        status: "PAUSED",
+        skills: [],
+        connectorIds: [],
+        permissionMode: "default",
+        scheduleType: "recurring",
+        schedule: { freq: "DAILY", interval: 1, byday: [], bymonthday: [], bymonth: [], byhour: 3, byminute: 0, intervalHours: 1 },
+        pushToWeChat: false,
+      },
+    });
+    const automationsSnapshotAfter = await window.api.invoke("automations_snapshot");
+    await window.api.invoke("automations_set_status", { id: "smoke-automation", status: "ACTIVE" });
+    const automationsResumed = await window.api.invoke("automations_snapshot");
+    await window.api.invoke("automations_delete", { id: "smoke-automation" });
+    const automationsSnapshotFinal = await window.api.invoke("automations_snapshot");
+    const automationsLifecycle = {
+      listed: Array.isArray(automationsSnapshotBefore?.automations),
+      saved: automationsSnapshotAfter?.automations?.some((item) => item.id === "smoke-automation") === true,
+      // ACTIVE 时必须排上下次(PAUSED 时 nextRunAt 为空),这正是「启用/暂停」的真语义。
+      scheduled: typeof automationsResumed?.automations?.find((item) => item.id === "smoke-automation")?.nextRunAt === "string",
+      removed: automationsSnapshotFinal?.automations?.some((item) => item.id === "smoke-automation") === false,
+    };
     await window.api.invoke("marketplace_action", { action: { type: "add_source", sourceUrlOrPath: marketplaceSource } });
     const marketplaceAvailable = await window.api.invoke("marketplace_action", { action: { type: "refresh" } });
     await window.api.invoke("marketplace_action", { action: { type: "install", sourceUrlOrPath: marketplaceSource, pluginRelativePath: "electron-smoke-market" } });
@@ -1983,10 +2014,13 @@ try {
       notifications: notificationsSurface,
       filesystem,
       subagents: subagentsConfigReadable,
-      // Automation surface is owned by pi-background-tasks + pi-goal-loop-audit
-      // (passthrough, asserted in main-process tests); the legacy IPC is
-      // retired and the renderer reaches automation via the pi native tools.
-      automations: true,
+      // 阶段 1.4:自动化真实生命周期的四步证据(保存/排程/删除),不再写死 true。
+      automations:
+        automationsLifecycle.listed &&
+        automationsLifecycle.saved &&
+        automationsLifecycle.scheduled &&
+        automationsLifecycle.removed,
+      automationsLifecycle,
       plugins: Array.isArray(pluginsInstalled?.plugins) && pluginsInstalled.plugins.some((plugin) => plugin.name === "electron-smoke-market"),
       // Marketplace lifecycle state machine: refresh returns a source list,
       // the installed plugin's resources are loaded (asserted by the
@@ -3065,7 +3099,7 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
     capabilities: [
       "startup-bridge", "session-lifecycle", "provider-model-crud", "clipboard",
       "pi-extensions", "profile-packages", "memory", "mcp", "permissions-questions",
-      "plan-tasks", "web-search-fetch", "automation-passthrough-registry", "plugins-marketplace",
+      "plan-tasks", "web-search-fetch", "automations-scheduler", "plugins-marketplace",
       "connectors", "teams-subagents", "calendar", "persistence-restart", "security-boundaries",
       "debug-surface", "hooks",
     ],
@@ -3106,7 +3140,7 @@ if (e2eApiKey && e2eBaseUrl && e2eModelId) {
         ["tasks", capabilityProbe.tasks],
         ["notifications", capabilityProbe.notifications],
         ["subagents", capabilityProbe.subagents],
-        ["automations-passthrough", capabilityProbe.automations],
+        ["automations", capabilityProbe.automations],
         ["plugins", capabilityProbe.plugins],
         ["marketplace", capabilityProbe.marketplace],
         ["connectors", capabilityProbe.connectors && capabilityProbe.connectorCancel],

@@ -44,6 +44,7 @@ import {
   PuzzlePieceIcon,
   MailIcon,
   MemoryIcon,
+  WbAutomationNavIcon,
 } from "@openbuddy/ui-primitives/icons";
 import { APP_VERSION } from "@/lib/platform/app-version";
 import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
@@ -76,11 +77,9 @@ const NAV = [
   // "专家·技能·连接器" 视图内已经包含"插件·市场"子 tab(Pi 官方市场 +
   // 本地插件浏览/安装),所以插件市场入口归在这里,主导航不再单独列项。
   { label: "专家·技能·连接器", icon: WbExpertNavIcon },
-  // 「自动化」入口在阶段 0 下线:openbuddy-automation 后端已在 Stage G-1c 删除,
-  // 面板每个读写都抛迁移错误 —— 留着入口等于给用户一个点了没反应的一级导航。
-  // UI 外壳与测试按「保留auto」约束保留(openbuddy-ui-automation),等阶段 1.4
-  // 用 rrule 调度 + 运行历史把它接回真实后端后再恢复这一行。
-  // { label: "自动化", icon: WbAutomationNavIcon },  // 恢复时记得同时恢复上方 import
+  // 阶段 1.4 恢复:主进程调度引擎 + 运行历史已接回(automations:* IPC),
+  // 面板的 list/save/toggle/runNow/记录归档全部走真实通道。
+  { label: "自动化", icon: WbAutomationNavIcon },
   { label: "邮件", icon: MailIcon },
   // 阶段 1.5:本地两层记忆(全局 + 工作区)。云层明确不做。
   { label: "记忆", icon: MemoryIcon },

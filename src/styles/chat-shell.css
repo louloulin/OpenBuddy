@@ -450,3 +450,42 @@
   align-self: flex-start;
   margin: var(--wb-spacing-2, 8px) var(--wb-spacing-3, 8px) 0;
 }
+
+/* ---- 阶段 1:终端 dock(VS Code 风格底部面板) ---- */
+.chatview__terminal-dock {
+  display: flex;
+  flex-direction: column;
+  height: 40%;
+  min-height: 220px;
+  border-top: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+}
+.chatview__terminal-dock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.06));
+}
+.chatview__terminal-dock-title {
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.chatview__terminal-dock-close {
+  border: none;
+  background: none;
+  color: var(--wb-text-medium);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--wb-radius-sm, 6px);
+}
+.chatview__terminal-dock-close:hover {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-text-strong);
+}
+.terminal-panel,
+.terminal-panel__host {
+  flex: 1;
+  min-height: 0;
+  padding: 0 8px 6px;
+}

@@ -753,6 +753,8 @@ export interface AutomationRunRecord {
   startedAt: string;
   finishedAt?: string;
   sessionId?: string;
+  /** 执行摘要(主进程回填,截断 500 字符)。 */
+  summary?: string;
   archived: boolean;
   tenantId?: string;
   creatorSubject?: string;

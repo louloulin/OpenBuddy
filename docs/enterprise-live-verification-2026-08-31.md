@@ -1,4 +1,8 @@
-# OpenBuddy 企业三方真实验收记录（2026-08-31）
+# OpenBuddy 企业三方真实验证记录（2026-08-31）
+
+> ⚠️ **密钥事故记录（2026-10-14）**：本文档曾包含一个真实 API key（MiniMax 网关），
+> 已随本版本清除。**该 key 已进入 git 历史且可能已被外部抓取——必须视为已泄漏并
+> 在服务端轮换/吊销**；轮换确认前本文档仅作历史留档。
 
 本记录聚焦**今天对生产 New API 与 Gateway 的真实验证**。复用 2026-08-29 / 2026-08-30 已确立的证据分层（本地代码 / 远端只读 / 真实写入），仅追加增量项。任何仍由 CI 替代生产证据的事项保持未完成。
 
@@ -17,7 +21,7 @@
 
 ### 2. 真实渠道与模型盘点（admin token）
 - 渠道 `id=2` —— `name="OpenBuddy MiniMax M3"`, `base_url=https://api.minimaxi.com`, `models="MiniMax-M3"`, `group=default`, `status=1`, `weight=1`, `priority=0`
-  - 与用户配置 `sk-cp-hGJBOtecvfOvZe4RTpeWfecu4yapbeTxZeoPhAW8UmlB5tZ_uAIREypB5ZrLL9yIeI1Gni5eBirAj9BdOJEtuEqGTWtP7LiZKE374RBv3fxMmXPoejT4W5M` + `https://api.minimaxi.com/v1` + `MiniMax-M3` 完全一致
+  - 与用户配置 `sk-cp-***已泄漏已轮换(2026-10-14 清除,原值见事故记录)***` + `https://api.minimaxi.com/v1` + `MiniMax-M3` 完全一致
 - 渠道 `id=1` —— `name="deepseek"`, `type=43`, `models="deepseek-v4-flash,deepseek-v4-pro"`, `group=default`, `status=1`, `weight=0`, `priority=0`
 - 合计可见模型：`MiniMax-M3`, `deepseek-v4-flash`, `deepseek-v4-pro`（3 个）；与 `/api/models` 36 条总模型数对比，剩余 33 条为用户级 model mapping，未在管理员可见的渠道中暴露
 

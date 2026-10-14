@@ -218,6 +218,9 @@ mac:
   category: public.app-category.developer-tools
   hardenedRuntime: true
   notarize: true
+  # C:hardenedRuntime 必需的豁免(JIT/动态库),缺失会导致渲染进程起不来。
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
   gatekeeperAssess: false
   artifactName: ${productName}-${version}-${arch}.${ext}
   # Apple requires apps that use any of the "required-reason" APIs to

@@ -159,6 +159,9 @@ import { registerAgentsIpc } from "./agents";
 import { registerConnectorsIpc } from "./connectors";
 import { registerMiscIpc } from "./misc";
 import { registerMemoryIpc } from "./memory";
+import { killAllTerminalSessions, registerTerminalPanelIpc } from "./terminal-panel";
+import { registerAutomationIpc } from "./automations";
+import { registerArtifactsIpc } from "./artifacts";
 import { registerAuditIpc } from "./audit";
 import { registerDataDirIpc } from "./data-dir";
 import { registerAgentPathsIpc } from "./agent-paths";
@@ -1120,6 +1123,16 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	registerAgentsIpc();
 	registerConnectorsIpc(getWindow);
 	registerMemoryIpc();
+	registerTerminalPanelIpc({
+		getWindow,
+		getTrustedRoot: () => agentHost.getCwd() ?? null,
+	});
+	// 阶段 5 产物中心:文件版本时间线 / 恢复(复用 rewind 快照存储)。
+	registerArtifactsIpc();
+	registerAutomationIpc({
+		ensureAgentHost: async () => { await ensureAgentHostLoaded(); },
+		agentHost: agentHost as never,
+	});
 	registerMiscIpc(getWindow);
 
 	// R17 / Phase D — Local Audit Trail (data-management panel).

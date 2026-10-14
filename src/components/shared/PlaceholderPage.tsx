@@ -280,8 +280,13 @@ function PlaceholderPageInner({
     );
   }
 
+  // 阶段 1.4:定时自动化面板(主进程调度引擎已接回,读写全真实)。
   if (label === "自动化") {
-    return <AutomationPanel onToast={onToast} onNavigate={onNavigate} />;
+    return (
+      <Suspense fallback={<PanelSuspenseFallback label={label} />}>
+        <AutomationPanel onToast={onToast} onNavigate={onNavigate} />
+      </Suspense>
+    );
   }
 
   if (label === "发现") {

@@ -212,7 +212,23 @@ async function restoreFileSnapshots(
   return { restored, skipped };
 }
 
+/**
+ * 阶段 5 产物中心:把快照存储按「文件」维度暴露给 IPC 层。
+ * 只读投影 —— 不复制内容,内容仍由 restoreFileSnapshots 从磁盘写回。
+ */
+async function listFileSnapshots(sessionId: string): Promise<FileSnapshot[]> {
+  const snapshot = await loadRewindSnapshots();
+  const sessionMap = snapshot.sessions[sessionId] ?? {};
+  const out: FileSnapshot[] = [];
+  for (const entries of Object.values(sessionMap)) {
+    for (const entry of entries) out.push(entry);
+  }
+  return out.sort((a, b) => b.capturedAt - a.capturedAt);
+}
+
 export {
   captureFileSnapshot,
   restoreFileSnapshots,
+  listFileSnapshots,
 };
+export type { FileSnapshot };

@@ -381,17 +381,8 @@ export function registerMiscIpc(getWindow: () => BrowserWindow | null): void {
 			await shell.openExternal(httpUrl(url, "url"));
 			return { ok: true };
 		});
-		// Legacy snake_case aliases kept so the preload allowlist stays
-		// consistent; every call rejects with the same migration message
-		// so the UI stops emitting fake success toasts.
-		const automationRetired = "automations:* IPC has been retired — automation is now owned by pi-goal-list-loop-audit (passthrough). Install via /marketplace and use /goal to manage automations.";
-		wrapIpcHandler("automations_snapshot", async () => { throw new Error(automationRetired); });
-		wrapIpcHandler("automations_save", async () => { throw new Error(automationRetired); });
-		wrapIpcHandler("automations_delete", async () => { throw new Error(automationRetired); });
-		wrapIpcHandler("automations_set_status", async () => { throw new Error(automationRetired); });
-		wrapIpcHandler("automations_run", async () => { throw new Error(automationRetired); });
-		wrapIpcHandler("automation_records_archive", async () => { throw new Error(automationRetired); });
-		wrapIpcHandler("automation_records_delete", async () => { throw new Error(automationRetired); });
+		// automations:* / automation_records_* 由 automations.ts 提供真实实现
+		// (阶段 1.4 恢复调度引擎,模型与 UI 契约共用 shared-types)。
 		wrapIpcHandler("subagents_config_get", async () => readSubagentsConfig());
 		wrapIpcHandler("subagents_config_save", async (_e, args: unknown) => {
 			const input = recordValue(args, "subagents_config_save payload");
