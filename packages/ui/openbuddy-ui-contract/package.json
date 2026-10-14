@@ -17,7 +17,8 @@
     "./pi-client-collaboration": "./src/pi-client-collaboration.ts",
     "./pi-client-providers": "./src/pi-client-providers.ts",
     "./progress-runs": "./src/progress-runs.ts",
-    "./pi-bridge-client": "./src/pi-bridge-client.ts"
+    "./pi-bridge-client": "./src/pi-bridge-client.ts",
+    "./memory-client": "./src/memory-client.ts"
   },
   "engines": {
     "node": ">=22.5.0"

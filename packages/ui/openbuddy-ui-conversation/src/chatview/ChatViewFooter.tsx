@@ -18,8 +18,8 @@ import { ConversationApprovals } from "../conversation-approvals";
 import { ConversationComposer } from "../conversation-slots";
 import { PiReloadFailureBanner } from "../PiReloadFailureBanner";
 import { QuestionInlineCard } from "../QuestionInlineCard";
-import { QueuePanel } from "@openbuddy/ui-automation";
 import { RewindBar } from "../RewindBar";
+import { QueuedMessages } from "../composer/QueuedMessages";
 import { Composer, type ComposerProps } from "../Composer";
 
 export type ChatViewFooterProps = {
@@ -59,6 +59,9 @@ export function ChatViewFooter(props: ChatViewFooterProps) {
         pendingCount={props.pendingApprovalCount}
         blocked={props.blockedOnApproval}
       />
+      {/* C1 dock 外壳:Notices(RewindBar / 队列 / 桥失败横幅)与 Composer
+          同住一个圆角容器 —— 对齐 Claude ChatComposerDock 的插槽结构。 */}
+      <div className="chat-dock">
       {props.yielded && (
         <div className="yield-banner" role="status">
           <span>已暂停(会话上下文已保留)</span>
@@ -102,10 +105,11 @@ export function ChatViewFooter(props: ChatViewFooterProps) {
         />
       )}
       {props.sessionId && !props.readOnlySubagent && (
-        <QueuePanel sessionId={props.sessionId} onSendNow={props.onSend} />
+        <QueuedMessages sessionId={props.sessionId} onSendNow={props.onSend} />
       )}
-      <PiReloadFailureBanner />
-      <ConversationComposer {...props.composerProps} fallback={composerFallback} />
+        <PiReloadFailureBanner />
+        <ConversationComposer {...props.composerProps} fallback={composerFallback} />
+      </div>
     </div>
   );
 }

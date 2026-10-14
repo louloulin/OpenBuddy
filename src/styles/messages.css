@@ -901,7 +901,7 @@ button.diff__path {
     0 24px 64px -12px rgba(0, 0, 0, .22);
   /* R8.8 — slide-in animation matching the mention-picker / slash-commands
      popovers. 140ms feels snappy on the click that opens the timeline. */
-  animation: ob-rewind-dropdown-in var(--wb-motion-duration-fast, 140ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: ob-rewind-dropdown-in var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
   transform-origin: top right;
 }
 @keyframes ob-rewind-dropdown-in {
@@ -1283,14 +1283,17 @@ button.diff__path {
 /* ============================================================================
  * Phase B.2 — Thought streaming card (推理实时可视化)
  * ============================================================================ */
+/* Claude Desktop 对齐(2026-10-12):思考块应是**一行可折叠的次要信息**,
+   不是一张卡片。此前 border + 背景 + 左侧品牌色块把它抬成了和正文同级
+   的"内容块",于是每条消息下面先出现一个盒子,再出现答案,读起来像两张卡。
+   Claude 的处理是去掉全部框线,只留一行 muted 文字 + 展开箭头。 */
 .msg__thought {
-  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
-  border-left: 3px solid var(--wb-palette-brand-8, #00C29A);
-  background: var(--wb-color-bg-secondary-default, rgba(0, 0, 0, 0.02));
-  border-radius: 8px;
-  margin: 6px 0;
-  padding: 6px 10px;
-  transition: border-color 200ms ease, background 200ms ease;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  margin: 4px 0;
+  padding: 2px 0;
+  transition: color 200ms ease;
 }
 .msg__thought > summary {
   cursor: pointer;
@@ -1304,6 +1307,21 @@ button.diff__path {
 }
 .msg__thought > summary::-webkit-details-marker {
   display: none;
+}
+/* Claude Desktop 对齐:折叠态也要有 disclosure 箭头(›/⌄),否则一行
+   "深度思考" 看起来像静态文本,用户不知道能点开。此前我们只有 hover
+   才隐去原生箭头、折叠后完全无指示。 */
+.msg__thought > summary::before {
+  content: "›";
+  display: inline-block;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--wb-color-text-soft, rgba(0, 0, 0, 0.45));
+  transition: transform 150ms ease;
+  transform: rotate(0deg);
+}
+.msg__thought[open] > summary::before {
+  transform: rotate(90deg);
 }
 .msg__thought-icon {
   display: inline-flex;
@@ -2039,5 +2057,48 @@ button.diff__path {
   }
   .chatview__empty-state-subtitle {
     font-weight: 600;
+  }
+}
+
+/* ---- WorkingDot(统一流式工作指示,对齐 Claude cds-working-dot-halo) ----
+   呼吸点 = halo 层(扩散淡出)+ 实心层(轻微脉动)。2.5s ease-in-out 循环,
+   对齐 Claude Desktop 的 cds-working-dot-halo 节奏。reduce-motion 下静止。 */
+.working-dot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.working-dot__halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--wb-palette-brand-8, #00c29a);
+  opacity: 0.35;
+  animation: working-dot-halo 2.5s ease-in-out infinite;
+}
+.working-dot__core {
+  width: 45%;
+  height: 45%;
+  border-radius: 999px;
+  background: var(--wb-palette-brand-8, #00c29a);
+  animation: working-dot-core 2.5s ease-in-out infinite;
+}
+@keyframes working-dot-halo {
+  0%, 100% { transform: scale(1); opacity: 0.35; }
+  50% { transform: scale(1.9); opacity: 0; }
+}
+@keyframes working-dot-core {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.72); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .working-dot__halo {
+    animation: none;
+    opacity: 0.3;
+  }
+  .working-dot__core {
+    animation: none;
   }
 }

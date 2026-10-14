@@ -43,6 +43,7 @@ import {
   MoreMenuTencentLexiangIcon,
   PuzzlePieceIcon,
   MailIcon,
+  MemoryIcon,
 } from "@openbuddy/ui-primitives/icons";
 import { APP_VERSION } from "@/lib/platform/app-version";
 import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
@@ -81,6 +82,8 @@ const NAV = [
   // 用 rrule 调度 + 运行历史把它接回真实后端后再恢复这一行。
   // { label: "自动化", icon: WbAutomationNavIcon },  // 恢复时记得同时恢复上方 import
   { label: "邮件", icon: MailIcon },
+  // 阶段 1.5:本地两层记忆(全局 + 工作区)。云层明确不做。
+  { label: "记忆", icon: MemoryIcon },
 ];
 
 /** Last path segment of a working directory, used as a 空间 node label. */

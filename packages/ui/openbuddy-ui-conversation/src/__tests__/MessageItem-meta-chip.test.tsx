@@ -114,7 +114,8 @@ describe("MessageItem — R8.15 model + throughput chips", () => {
     // But the streaming pulse label still shows.
     const streaming = container.querySelector(".msg__meta--streaming");
     expect(streaming).toBeTruthy();
-    expect(streaming?.textContent).toContain("正在生成");
+    // 2026-10-14 Claude 对齐:streaming meta 只显示时长(指示收敛到 WorkingDot)。
+    expect(streaming?.textContent).toMatch(/^\d+s$/);
   });
 
   it("renders both chips together when modelId + outputTokens + duration are set", () => {

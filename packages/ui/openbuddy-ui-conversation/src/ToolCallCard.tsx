@@ -97,6 +97,13 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
       setExpanded((v) => !v);
       return;
     }
+    // Claude row-panel 对齐(2026-10-14):键盘 Enter/Space = 内联展开切换
+    //(纯折叠行的主键语义),开右侧抽屉是鼠标点击 / Shift+Enter。
+    if ("shiftKey" in e && e.shiftKey) {
+      e.preventDefault();
+      onOpen?.(tc);
+      return;
+    }
     onOpen?.(tc);
   };
   const onDoubleClick = (e: React.MouseEvent<HTMLElement>) => {
@@ -124,7 +131,7 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
 
   if (isExpanded) {
     return (
-      <div className="toolcall toolcall--expanded" data-testid="toolcall-expanded" data-toolcall-id={tc.toolCallId}>
+      <div className="toolcall toolcall--expanded" data-testid="toolcall-expanded" data-toolcall-id={tc.toolCallId} tabIndex={-1}>
         <div className="toolcall__header">
           <span className="toolcall__kind">{kindLabel}</span>
           <span className="toolcall__title">{summary}</span>
@@ -154,12 +161,22 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
       onClick={onCardClick}
       onDoubleClick={onDoubleClick}
       onKeyDown={(e) => {
+        // Claude 对齐:Enter/Space = 内联展开切换;Shift+Enter = 右侧抽屉。
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onCardClick(e);
+          if (canToggleInline) {
+            setExpanded((v) => !v);
+          } else {
+            onOpen?.(tc);
+          }
+          return;
+        }
+        if (e.key === "Enter" && e.shiftKey) {
+          e.preventDefault();
+          onOpen?.(tc);
         }
       }}
-      title={`${tc.kind}: ${tc.title}（${statusLabel}${durationLabel ? " · " + durationLabel : ""}，点击查看详情,双击或 ⌘+点击 inline 展开）`}
+      title={`${tc.kind}: ${tc.title}（${statusLabel}${durationLabel ? " · " + durationLabel : ""}，点击查看详情，Enter 内联展开，Shift+Enter 开详情面板）`}
       aria-label={`${tc.kind} ${summary} ${statusLabel}${durationLabel ? " " + durationLabel : ""}`}
     >
       {statusMark}

@@ -253,12 +253,34 @@ export function configurePiExtensions(
       };
     })();
 
+  // 阶段 1.5:记忆工具(模型侧)与「记忆」面板读写同一份 memory.json。
+  const memoryExtension =
+    state.piExtensionFactories.find((extension) => extension.name === "openbuddy-memory") ??
+    (() => {
+      const memoryFactory = builtinPiExtensionFactories["openbuddy-memory"];
+      if (!memoryFactory) return null;
+      return {
+        name: "openbuddy-memory",
+        factory: memoryFactory(emitPluginEventImpl, { cwd: state!.cwd ?? process.cwd() }, {
+          profileDir: resolveProfileDirectoryImpl(),
+          resolveSource: (source) => {
+            if (!state!.profilePackageJson) throw new Error("Pi extension profile is not initialized");
+            return createRequireImpl(state!.profilePackageJson).resolve(source);
+          },
+          emit: emitPluginEventImpl,
+          resolveService: (owner) => state!.context?.get(owner),
+        } satisfies PiExtensionResolutionOptions),
+        hidden: true as const,
+      };
+    })();
+
   const builtIns: Array<{ name: string; factory: ExtensionFactory; hidden: true }> = [
     toolExtension,
     planExtension,
     hooksExtension,
   ];
   if (applyPatchExtension) builtIns.push(applyPatchExtension);
+  if (memoryExtension) builtIns.push(memoryExtension);
 
   state.piExtensionFactories.splice(
     0,

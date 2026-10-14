@@ -97,7 +97,8 @@ describe("MessageItem — R58 input / output token chips", () => {
     expect(container.querySelector(".msg__meta-chip--input")).toBeNull();
     expect(container.querySelector(".msg__meta-chip--output")).toBeNull();
     // Streaming label is rendered instead
-    expect(container.querySelector(".msg__meta")?.textContent).toContain("正在生成");
+    // 2026-10-14 Claude 对齐:streaming meta 只显示时长(指示收敛到 WorkingDot)。
+    expect(container.querySelector(".msg__meta")?.textContent).toMatch(/^\d+s$/);
   });
 
   it("backward compat: chips absent when tokens are missing (no visual regression)", () => {

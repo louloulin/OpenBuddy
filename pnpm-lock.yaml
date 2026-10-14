@@ -1289,6 +1289,21 @@ importers:
         specifier: ^18.3.1
         version: 18.3.1
 
+  packages/ui/openbuddy-ui-memory:
+    dependencies:
+      '@openbuddy/ui-contract':
+        specifier: workspace:*
+        version: link:../openbuddy-ui-contract
+      '@openbuddy/ui-locale':
+        specifier: workspace:*
+        version: link:../openbuddy-ui-locale
+      '@openbuddy/ui-primitives':
+        specifier: workspace:*
+        version: link:../openbuddy-ui-primitives
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+
   packages/ui/openbuddy-ui-modules:
     dependencies:
       '@openbuddy/cordis':

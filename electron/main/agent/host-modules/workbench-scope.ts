@@ -281,9 +281,31 @@ function workspaceRegistry(): WorkspaceRegistryContext | undefined {
 	return state.context?.get("workspaceRegistry") as WorkspaceRegistryContext | undefined;
 }
 
+/**
+ * 取 workspace registry,但对"服务短暂缺席"做有界等待。
+ *
+ * profile reload / cordis 重建期间 context 上的 `workspaceRegistry` 会被注销
+ * 再重新 provide,这段窗口里 `workspace:create|rename|delete` 会把"瞬时缺席"
+ * 误报成"工作区不存在"(2026-10-11 真网关冒烟实测:`create` 成功、几毫秒后的
+ * `rename` 报 workspace-not-found,而 `workspace:list` 退化成只有 cwd 的兜底
+ * 投影 —— 同样流程重启后 100% 正常)。重新 provide 出来的实例会从
+ * dsh-workspaces.json hydrate,所以等一下就能拿到同一个工作区。
+ *
+ * 只等"服务缺席";服务在而 id 不存在时照常抛错 —— 那是真实的未知 id。
+ */
+async function waitForWorkspaceRegistry(timeoutMs = 2_000): Promise<WorkspaceRegistryContext | undefined> {
+	const deadline = Date.now() + timeoutMs
+	for (;;) {
+		const registry = workspaceRegistry()
+		if (registry) return registry
+		if (Date.now() >= deadline) return undefined
+		await new Promise((resolve) => setTimeout(resolve, 100))
+	}
+}
+
 async function listWorkspaces(): Promise<WorkspaceProjection[]> {
 	const discovered = await listPiWorkspaces();
-	const registry = workspaceRegistry();
+	const registry = await waitForWorkspaceRegistry();
 	if (!registry) {
 		return discovered.map((entry) => ({
 			workspaceId: entry.cwd,
@@ -357,7 +379,7 @@ async function listWorkspaces(): Promise<WorkspaceProjection[]> {
 }
 
 async function createWorkspace(path: string, title?: string): Promise<{ workspace: WorkspaceProjection; created: boolean }> {
-	const registry = workspaceRegistry();
+	const registry = await waitForWorkspaceRegistry();
 	if (!registry) throw new Error("dsh-workspace: registry is unavailable");
 	const existing = await registry.resolveByPath(path);
 	const workspace = existing ?? await registry.create(path, title);
@@ -376,7 +398,7 @@ async function createWorkspace(path: string, title?: string): Promise<{ workspac
 }
 
 async function renameWorkspace(id: string, title: string): Promise<WorkspaceProjection> {
-	const registry = workspaceRegistry();
+	const registry = await waitForWorkspaceRegistry();
 	const workspace = registry?.get(id as DeepSeekWorkspaceId);
 	if (!workspace) throw new WorkspaceOrderInvalidError(id as DeepSeekWorkspaceId);
 	await workspace.setTitle(title);
@@ -384,7 +406,7 @@ async function renameWorkspace(id: string, title: string): Promise<WorkspaceProj
 }
 
 async function deleteWorkspace(id: string): Promise<boolean> {
-	const registry = workspaceRegistry();
+	const registry = await waitForWorkspaceRegistry();
 	if (!registry) throw new Error("dsh-workspace: registry is unavailable");
 	const deleted = await registry.delete(id as DeepSeekWorkspaceId);
 	if (!deleted) throw new WorkspaceOrderInvalidError(id as DeepSeekWorkspaceId);
@@ -392,13 +414,13 @@ async function deleteWorkspace(id: string): Promise<boolean> {
 }
 
 async function insertWorkspaceBefore(id: string, beforeId?: string): Promise<string[]> {
-	const registry = workspaceRegistry();
+	const registry = await waitForWorkspaceRegistry();
 	if (!registry) throw new Error("dsh-workspace: registry is unavailable");
 	return (await registry.insertBefore(id as DeepSeekWorkspaceId, beforeId as DeepSeekWorkspaceId | undefined)).map(String);
 }
 
 async function insertWorkspaceSessionBefore(id: string, sessionId: string, beforeSessionId?: string): Promise<WorkspaceProjection> {
-	const registry = workspaceRegistry();
+	const registry = await waitForWorkspaceRegistry();
 	const workspace = registry?.get(id as DeepSeekWorkspaceId);
 	if (!workspace) throw new WorkspaceOrderInvalidError(id as DeepSeekWorkspaceId);
 	await workspace.insertSessionBefore(sessionId, beforeSessionId);
@@ -406,7 +428,7 @@ async function insertWorkspaceSessionBefore(id: string, sessionId: string, befor
 }
 
 async function archiveWorkspaceSession(sessionId: string, archived = true): Promise<string[]> {
-	const registry = workspaceRegistry();
+	const registry = await waitForWorkspaceRegistry();
 	if (!registry) throw new Error("dsh-workspace: registry is unavailable");
 	return [...await registry.archiveSession(sessionId, archived)];
 }

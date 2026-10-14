@@ -22,7 +22,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const root = "/Users/louloulin/appx/OpenBuddy";
-const out = "/tmp/ob-ui";
+const out = process.env.OB_UI_OUT || "/tmp/ob-ui";
 mkdirSync(out, { recursive: true });
 const userData = mkdtempSync(join(tmpdir(), "ob-ui-"));
 const piAgentDir = join(userData, "pi-agent");

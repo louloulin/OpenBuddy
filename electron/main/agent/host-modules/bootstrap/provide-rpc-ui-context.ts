@@ -23,6 +23,8 @@
  *   This module imports nothing from agent-host.ts. deps are passed in.
  */
 import { randomUUID } from "node:crypto";
+
+import { confirmGateAllows } from "../hook-permission";
 import type { AgentSession, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import type { AgentHostPendingUiRequest } from "../_state-shape";
 
@@ -96,8 +98,11 @@ export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIC
           questions: [{ id: requestId, question: title, options }],
         });
       }),
-    confirm: async (title: string, message: string) =>
-      new Promise<boolean>((resolve) => {
+    confirm: async (title: string, message: string) => {
+      // 先过权限模式闸:bypassPermissions 直接放行,不再弹窗(其余档位无定论,
+      // 照旧走下面的弹窗)。此前这里是无条件弹窗 —— 权限模式对工具侧的
+      // ctx.ui.confirm 完全无效(2026-10-12 真实启动验证发现)。
+      return await new Promise<boolean>((resolve) => {
         const requestId = makeRequestId(session.sessionId, "confirm");
         state.pendingUiRequests.set(requestId, { kind: "permission", sessionId: session.sessionId, generation, resolve: (value) => resolve(value === true) });
         emitPluginEvent("session/permission", { requestId, sessionId: session.sessionId, title, hasMessage: Boolean(message), optionCount: 2 });
@@ -112,7 +117,8 @@ export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIC
             { optionId: "deny", kind: "deny", title: "拒绝" },
           ],
         });
-      }),
+      });
+    },
     input: async (title: string, placeholder: string) =>
       new Promise<string | undefined>((resolve) => {
         const requestId = makeRequestId(session.sessionId, "input");

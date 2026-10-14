@@ -18,6 +18,7 @@
  *
  * 该组件是纯展示:不订阅 store、不调用 hook。所有数据来自 props。
  */
+import { useEffect, useState } from "react";
 import Hourglass from "lucide-react/dist/esm/icons/hourglass";
 import Clock3 from "lucide-react/dist/esm/icons/clock-3";
 import Cpu from "lucide-react/dist/esm/icons/cpu";
@@ -30,6 +31,22 @@ import {
   formatTokenCount,
 } from "@/lib/ui/duration";
 import { shortModelLabel } from "@/lib/ui/timeline-utils";
+
+/**
+ * A5 —— 相对时间的自动刷新 tick。
+ *
+ * streaming 时 1s(耗时 chip 实时);完成态 30s(相对时间"刚刚→N 分钟前");
+ * 完成超过 60 分钟后文案不再随时间变化,停止 interval(长会话不积定时器)。
+ */
+function useNowTick(isStreaming: boolean, createdAt: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isStreaming && Date.now() - createdAt > 60 * 60_000) return;
+    const id = window.setInterval(() => setNow(Date.now()), isStreaming ? 1_000 : 30_000);
+    return () => window.clearInterval(id);
+  }, [isStreaming, createdAt]);
+  return now;
+}
 
 export function MessageMeta({
   createdAt,
@@ -54,9 +71,15 @@ export function MessageMeta({
    *  Optional for backward compat with pre-R58 history. */
   inputTokens?: number;
 }) {
+  // A5(2026-10-14):相对时间自动刷新 —— 此前 `Date.now()` 只在重渲染时求值,
+  // 长会话里旧气泡永远停在"刚刚"。tick 节奏:streaming 1s、完成态 30s;
+  // 完成 60 分钟后时间戳文案不再变化,停止 tick。
+  const now = useNowTick(isStreaming, createdAt);
   const label = isStreaming
-    ? `${formatDurationMs(durationMs ?? 0)} 正在生成…`
-    : formatRelativeTime(Date.now() - createdAt);
+    ? // Claude 对齐(A3):WorkingDot 是唯一"正在工作"指示,meta 只留时长,
+      // 不再重复"正在生成…"文字。
+      formatDurationMs(durationMs ?? 0)
+    : formatRelativeTime(now - createdAt);
   const detail =
     !isStreaming && typeof durationMs === "number" && durationMs > 0
       ? formatDurationMs(durationMs)

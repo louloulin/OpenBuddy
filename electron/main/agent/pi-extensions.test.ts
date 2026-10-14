@@ -587,6 +587,8 @@ describe("OpenBuddy Pi extension resolution", () => {
       "openbuddy-pi-model-bridge",
       // Phase I.2 — 7th builtin ExtensionFactory for calendar PI tools.
       "openbuddy-pi-calendar",
+      // 阶段 1.5 — 记忆工具(memory_save / memory_recall),与记忆面板同一份存储。
+      "openbuddy-memory",
     ]);
   });
 

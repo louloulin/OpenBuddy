@@ -493,6 +493,8 @@
       "@openbuddy/platform/security/policy-engine": ["./packages/ui/openbuddy-platform/src/security/policy-engine.ts"],
       "@openbuddy/platform/security/sandbox-guard": ["./packages/ui/openbuddy-platform/src/security/sandbox-guard.ts"],
       "@openbuddy/ui-contract/input-history": ["./packages/ui/openbuddy-ui-contract/src/input-history.ts"],
+      "@openbuddy/ui-contract/memory-client": ["./packages/ui/openbuddy-ui-contract/src/memory-client.ts"],
+      "@openbuddy/ui-memory": ["./packages/ui/openbuddy-ui-memory/src/index.ts"],
       "@openbuddy/ui-contract/markdown/content-blocks": ["./packages/ui/openbuddy-ui-contract/src/markdown/content-blocks.ts"],
       "@openbuddy/ui-contract/plan-utils": ["./packages/ui/openbuddy-ui-contract/src/plan-utils.ts"],
       "@openbuddy/ui-contract/yield-state": ["./packages/ui/openbuddy-ui-contract/src/yield-state.ts"],

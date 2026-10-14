@@ -523,7 +523,7 @@
    short enough not to feel sluggish when 3 tools land within a second. */
 @media (prefers-reduced-motion: no-preference) {
   .toolcall {
-    animation: toolcall-enter var(--wb-motion-duration-fast, 140ms) ease-out;
+    animation: toolcall-enter var(--wb-motion-duration-fast, 120ms) ease-out;
   }
 }
 @keyframes toolcall-enter {

@@ -128,7 +128,10 @@ export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
   ipcMain.handle("rewind_points", async (_e, args: { sessionId: string }) => {
     const { rewindPoints } = await import("../agent/pi-resources/memory");
     const sessionFileResult = await agentHost.sessionFile(requiredString(recordValue(args, "rewind points payload").sessionId, "session id"));
-    if (!sessionFileResult.path) throw new Error("rewind_points: session file path unavailable");
+    // 会话还没加载/解析不到文件路径(典型:重启后渲染层先于 load-session 发起
+    // 查询)时,语义上就是"没有可回溯点" —— 返回空集而不是抛错;抛错只会在主
+    // 进程日志里留下一条 handler 错误,并把 UI 推进与空态不同的拒绝分支。
+    if (!sessionFileResult.path) return [];
     return rewindPoints(sessionFileResult.path);
   });
   ipcMain.handle("rewind_execute", async (_e, args: { sessionId: string; targetPromptIndex: number; mode?: string; force?: boolean }) => {

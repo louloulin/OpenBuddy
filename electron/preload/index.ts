@@ -96,6 +96,7 @@ const allowedInvokeChannels = new Set([
   "folder-trust:grant", "folder-trust:is-trusted", "folder-trust:list", "folder-trust:revoke", "folder_trust_respond",
   "notify:dispatch", "policy:get", "policy:save",
   "storage-sources:list", "storage-sources:save", "task_kill", "tasks:add", "tasks:clear-completed", "tasks:delete", "tasks:list", "tasks:update",
+  "memory:add", "memory:delete", "memory:list", "memory:update",
   "teams:create", "teams:delete", "teams:status",
   // automations-notifications
   "automation_records_archive", "automation_records_delete",

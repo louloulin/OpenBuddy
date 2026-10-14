@@ -137,7 +137,18 @@
     "language": "Language",
     "advanced": "Advanced",
     "save": "Save settings",
-    "saved": "Settings saved"
+    "saved": "Settings saved",
+    "display": {
+      "density": "Density",
+      "densityHint": "Compact / Standard / Relaxed — scales the whole UI, applies instantly",
+      "reduceMotion": "Reduce motion",
+      "reduceMotionHint": "Turns off all in-app animation and transitions (independent of the OS setting)",
+      "reduceMotionOn": "On",
+      "reduceMotionOff": "Off",
+      "compact": "Compact",
+      "standard": "Standard",
+      "relaxed": "Relaxed"
+    }
   },
   "auth": {
     "login": "Login",
@@ -180,5 +191,41 @@
     "syncToPi": "Send changes to pi",
     "synced": "Changes sent to pi; pi's reply is authoritative",
     "localDirty": "Local plan changes not yet synced"
+  },
+  "memory": {
+    "title": "Memory",
+    "subtitle": "Two local layers: global memories plus this workspace. No cloud memory.",
+    "searchPlaceholder": "Search title / body / tags",
+    "scopeAll": "All",
+    "scopeUser": "Global",
+    "scopeWorkspace": "Workspace",
+    "composerTitle": "Title (e.g. answer in Chinese)",
+    "composerBody": "Details (optional)",
+    "writeUser": "Save as global",
+    "writeWorkspace": "Save to workspace",
+    "add": "Add memory",
+    "count": "{count} memories",
+    "loading": "Loading…",
+    "empty": "No memories yet.",
+    "emptySearch": "No matching memories.",
+    "scopeBadgeUser": "Global",
+    "scopeBadgeWorkspace": "Workspace",
+    "renameAria": "Rename {title}",
+    "deleteAria": "Delete {title}",
+    "listFailed": "Failed to load memories: {message}",
+    "addFailed": "Failed to add memory: {message}",
+    "deleteFailed": "Failed to delete memory: {message}",
+    "updateFailed": "Failed to update memory: {message}"
+  },
+  "chat": {
+    "queue": {
+      "aria": "Queued messages",
+      "count": "{count} queued",
+      "hint": "Next one sends automatically after the reply",
+      "pause": "Pause this item",
+      "resume": "Resume this item",
+      "sendNow": "Send now",
+      "remove": "Remove from queue"
+    }
   }
 }

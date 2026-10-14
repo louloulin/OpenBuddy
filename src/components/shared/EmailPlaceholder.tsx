@@ -30,7 +30,7 @@ export function EmailPlaceholder({ sessionId, onNavigate, onToast, onLaunch }: E
   // R92 fix:dataProvider 让 EmailAiPanel 真的能拉取邮件数据(accounts / threads / counts / triage)。
   //
   // 注意:本组件自身的 hook 全部无条件调用,没有 early return(Rules of Hooks);
-  // 相关历史见 PlaceholderPage 内 #310 注释。
+  // 相关历史见 PlaceholderPage 内 错误 310 注释。
   const emailDataProvider = useMemo(() => createEmailDataProvider({
     defaultAccountId: sessionId ?? "self",
   }), [sessionId]);

@@ -193,12 +193,25 @@ export default function openBuddyApplyPatch(
       },
       required: ["command"],
     },
-    execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       const p = (params ?? {}) as { command?: unknown; cwd?: unknown; timeout_ms?: unknown };
       const command = String(p.command ?? "");
       const cwd = String(p.cwd ?? trustedRoot);
       const timeout = Number(p.timeout_ms ?? 30000);
       const start = Date.now();
+      // 执行任意 shell 前必须过权限闸(此前这里**直接 execFileAsync**,default
+      // 模式下模型可以静默跑任意命令 —— 2026-10-12 真实启动验证发现)。
+      // ctx.ui.confirm 接的是宿主的 requestHookPermission:规则 → 权限模式
+      // (bypass 放行 / plan 强制问 / default 弹窗)→ 用户决议。
+      if (ctx?.ui?.confirm && !(await ctx.ui.confirm(
+        "执行命令",
+        `${command}${cwd !== trustedRoot ? `（cwd: ${cwd}）` : ""}`,
+      ))) {
+        return {
+          content: [{ type: "text" as const, text: "用户拒绝执行该命令。" }],
+          details: { exit_code: 1, stdout: "", stderr: "permission denied by user", duration_ms: Date.now() - start, error: "permission denied by user" },
+        };
+      }
       try {
         const { stdout, stderr } = await execFileAsync("/bin/sh", ["-c", command], {
           cwd: resolve(cwd),

@@ -559,7 +559,7 @@
   border-radius: 12px;
   background: var(--wb-bg-elevated, var(--wb-bg-primary));
   box-shadow: var(--wb-shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.16));
-  animation: ob-scale-in var(--wb-motion-duration-fast, 140ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: ob-scale-in var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 .secondary-sidebar__loading {
   padding: 12px;

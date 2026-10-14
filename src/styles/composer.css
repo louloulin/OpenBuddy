@@ -21,7 +21,7 @@
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06);
   font-size: 13px;
-  animation: ob-slash-menu-in var(--wb-motion-duration-fast, 140ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: ob-slash-menu-in var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 
 @keyframes ob-slash-menu-in {
@@ -155,4 +155,96 @@
   .slash-commands__item--active {
     padding-left: 10px;
   }
+}
+
+/* ---- QueuedMessages(composer 一等队列插槽,A1,对齐 Claude ChatComposerDock)----
+   紧凑条:一行一条,头部常显计数。间距/圆角全部 token(批B rem 化时自动接入缩放)。 */
+.composer-queued {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wb-spacing-1, 4px);
+  padding: var(--wb-spacing-2, 8px);
+  border: 1px solid var(--wb-border-default);
+  border-radius: var(--wb-radius-md, 10px);
+  background: var(--wb-bg-secondary);
+  margin-bottom: var(--wb-spacing-2, 8px);
+}
+.composer-queued__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--wb-spacing-2, 8px);
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.composer-queued__hint {
+  font-size: 11px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.composer-queued__row {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-spacing-2, 8px);
+  padding: var(--wb-spacing-1, 4px) var(--wb-spacing-2, 8px);
+  border-radius: var(--wb-radius-sm, 8px);
+}
+.composer-queued__row:hover,
+.composer-queued__row:focus-visible {
+  background: var(--wb-bg-tertiary);
+  outline: none;
+}
+.composer-queued__row--paused {
+  opacity: 0.6;
+}
+.composer-queued__index {
+  flex: none;
+  min-width: 16px;
+  text-align: right;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.composer-queued__summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--wb-text-strong);
+}
+.composer-queued__btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 2px;
+  border-radius: var(--wb-radius-sm, 6px);
+  color: var(--wb-text-medium);
+  cursor: pointer;
+}
+.composer-queued__btn:hover {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-text-strong);
+}
+
+/* C1:编辑区展开 toggle(点击后 textarea 高度无上限,再点收回)。 */
+.wb-composer__expand {
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--wb-text-weak, #9aa0a6);
+  cursor: pointer;
+  border-radius: var(--wb-radius-sm, 6px);
+}
+.wb-composer__expand:hover {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-text-strong);
+}
+.wb-composer--expanded .wb-composer__input {
+  max-height: 70vh;
 }

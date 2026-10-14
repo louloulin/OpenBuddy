@@ -38,7 +38,7 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 4px 8px rgba(0, 0, 0, 0.04);
   padding: 8px;
   z-index: 1200;
-  animation: taskFilterFadeIn var(--wb-motion-duration-fast, 140ms) ease-out;
+  animation: taskFilterFadeIn var(--wb-motion-duration-fast, 120ms) ease-out;
 }
 @keyframes taskFilterFadeIn {
   from { opacity: 0; transform: translateY(-4px); }

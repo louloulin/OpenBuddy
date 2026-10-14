@@ -67,7 +67,7 @@ describe("R8.7 Composer visual polish CSS", () => {
     expect(allCss).toMatch(/@keyframes\s+ob-mention-picker-in\b/);
     const m = ruleBody(allCss, ".mention-picker");
     expect(m).toBeTruthy();
-    expect(m!).toMatch(/animation:\s*ob-mention-picker-in\s+var\(--wb-motion-duration-fast,\s*140ms\)/);
+    expect(m!).toMatch(/animation:\s*ob-mention-picker-in\s+var\(--wb-motion-duration-fast,\s*120ms\)/);
   });
 
   it("mention-picker__kind chip uses neutral tertiary bg (NOT brand colour-mix)", () => {

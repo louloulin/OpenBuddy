@@ -32,16 +32,27 @@
   align-items: center;
   gap: 4px;
   margin-top: 6px;
-  opacity: 0.55;
-  /* R8.56 — Migrate the footer opacity transition from the legacy
-     `0.15s ease` shorthand to the canonical R8.9 motion tokens
-     (duration-fast + ease-out-expo) so the timing stays coherent
-     with the rest of the chat UI. */
-  transition: opacity var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+  /* Claude Desktop 对齐(2026-10-12 REA 实测 Claude Desktop 2.31226.1 的
+     --cds-message-actions-opacity: 1 → 0):操作栏**默认完全隐藏**,hover /
+     focus-within 才浮现。我们此前是常驻 0.55,一屏 6-8 条消息时图标行把
+     正文切成"斑马",读起来像表格而不像对话。
+     Claude 的模式还有两个细节一并对齐:
+       - focus-within 保持可见(键盘用户不会"丢失"操作栏);
+       - 离场用 --cds-dur-fast(60ms) 级快,进场 120ms —— 轻,不做动画表演。 */
+  opacity: 0;
+  transition: opacity var(--wb-motion-duration-fast, 60ms) var(--wb-ease-standard, ease-out);
 }
 .msg:hover .msg__footer,
-.msg__footer:focus-within {
+.msg__footer:focus-within,
+.msg:focus-within .msg__footer {
   opacity: 1;
+  transition-duration: var(--wb-motion-duration-base, 120ms);
+}
+/* 触摸设备没有 hover:常驻显示,否则操作永远点不到。 */
+@media (hover: none) {
+  .msg__footer {
+    opacity: 1;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .msg__footer {
@@ -89,9 +100,22 @@
   line-height: 1;
   letter-spacing: 0.01em;
   color: var(--wb-text-weak, rgba(0, 0, 0, 0.5));
-  opacity: 0.55;
+  /* Claude Desktop 对齐:同 footer,meta(时间 / 模型徽标)默认隐藏、hover 浮现。
+     这行信息是"回看"用的,不是阅读时要抢注意力的东西。 */
+  opacity: 0;
   user-select: none;
-  transition: opacity var(--wb-motion-duration-fast, 120ms) var(--wb-ease-standard, ease-out);
+  transition: opacity var(--wb-motion-duration-fast, 60ms) var(--wb-ease-standard, ease-out);
+}
+.msg:hover .msg__meta,
+.msg__meta:focus-within,
+.msg:focus-within .msg__meta {
+  opacity: 0.95;
+  transition-duration: var(--wb-motion-duration-base, 120ms);
+}
+@media (hover: none) {
+  .msg__meta {
+    opacity: 0.95;
+  }
 }
 .msg__meta--user {
   margin-top: 3px;

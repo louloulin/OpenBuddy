@@ -328,6 +328,32 @@ export function ComposerInner({
       histRef, histCursorRef, draftRef,
     });
 
+  // A2(2026-10-14):⌘L 清空输入、⌘⏎ 任意焦点发送/入队 —— 快捷键面板
+  // (chat-clear / chat-send)宣称的键位。清空走 setText("") + updateText
+  //(含草稿回写);⌘⏎ 复用 send 的分流(非 streaming 发送,streaming 入队)。
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (disabled || !apiReady) return;
+      if (e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        setText("");
+        updateText("");
+        return;
+      }
+      if (e.key === "Enter" && text.trim()) {
+        // textarea 自己的 Enter 处理(onTextareaKeyDown)已覆盖聚焦场景;
+        // 这里是"焦点在任意位置"的兜底。非 streaming 发送、streaming 入队。
+        e.preventDefault();
+        if (streaming) enqueue();
+        else send();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, streaming, disabled, apiReady, setText, updateText, enqueue, send]);
+
   const pickFiles = async () => pickFilesImpl(setAttachments);
   const pickImages = async () => pickImagesImpl(setImages, onToast);
 
@@ -347,12 +373,15 @@ export function ComposerInner({
   // used to live inline here; phase-3 split moved them into the
   // `useExtensionText` hook. Lives after setCursorPos declaration so all
   // dependencies are in scope.
+  // C1:展开编辑区(对齐 Claude 的编辑器展开):展开后高度无上限。
+  const [composerExpanded, setComposerExpanded] = useState(false);
   useExtensionText({
     ref, text, setText, setCursorPos,
     initialText, onInitialTextConsumed,
     extensionText, extensionTextNonce,
     externalText, externalTextNonce,
     draft, draftKey, updateText,
+    expanded: composerExpanded,
   });
   // Paste handler — image/document intercept + caret restoration.
   // Extracted from inline JSX (~80 lines) into a custom hook so the
@@ -503,6 +532,16 @@ export function ComposerInner({
               text area, not the action buttons. On phones the chip is
               hidden via @media (max-width: 540px) since typing shortcuts
               differ on touch. */}
+          <button
+            type="button"
+            className="wb-composer__expand"
+            aria-expanded={composerExpanded}
+            aria-label={composerExpanded ? "收起编辑区" : "展开编辑区"}
+            title={composerExpanded ? "收起编辑区" : "展开编辑区(长文本不被压缩)"}
+            onClick={() => setComposerExpanded((v) => !v)}
+          >
+            {composerExpanded ? "▾" : "▴"}
+          </button>
           <span
             className="wb-composer__hint"
             data-testid="composer-hint"

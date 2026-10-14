@@ -422,3 +422,31 @@
   opacity: 0.55;
   cursor: default;
 }
+
+/* 时间线行导航容器(A4 工具折叠行 ↑↓ 导航):无视觉,仅作键盘范围。 */
+.chatview__timeline-rows {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ---- C1 Composer dock 外壳(对齐 Claude ChatComposerDock)----
+   Notices(RewindBar / 队列 / 桥横幅)与 Composer 同住一个圆角容器:
+   统一外壳描边与底色,插槽之间用细分隔线,内部组件自身的 margin 归零。 */
+.chat-dock {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--wb-border-default);
+  border-radius: var(--wb-radius-lg, 14px);
+  background: var(--wb-bg-primary);
+  box-shadow: var(--wb-shadow-sm);
+  overflow: hidden;
+}
+.chat-dock > * + * {
+  border-top: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.06));
+}
+.chat-dock .chatview__pause-btn,
+.chat-dock .yield-banner {
+  align-self: flex-start;
+  margin: var(--wb-spacing-2, 8px) var(--wb-spacing-3, 8px) 0;
+}

@@ -28,6 +28,8 @@ export type UseChatViewShortcutsParams = {
   hasMessages?: boolean;
   /** Ctrl/Cmd+Shift+C 切换画布面板。 */
   onToggleCanvas?: () => void;
+  /** Ctrl/Cmd+Shift+T 切换工具侧栏面板(2026-10-14 兑现 chat-tools-panel 宣称)。 */
+  onToggleToolPanel?: () => void;
 };
 
 export type UseChatViewShortcutsResult = {
@@ -53,6 +55,7 @@ export function useChatViewShortcuts({
   onToggleFind,
   onCloseFind,
   onToggleCanvas,
+  onToggleToolPanel,
   findOpen,
   hasMessages = true,
 }: UseChatViewShortcutsParams): UseChatViewShortcutsResult {
@@ -69,13 +72,20 @@ export function useChatViewShortcuts({
         onToggleCanvas();
         return;
       }
+      // chat-tools-panel(⌘⇧T):切换工具侧栏面板(2026-10-14 兑现宣称)。
+      if (isMetaOrCtrl(event) && event.shiftKey && event.key.toLowerCase() === "t") {
+        if (!onToggleToolPanel) return;
+        event.preventDefault();
+        onToggleToolPanel();
+        return;
+      }
       if (isMetaOrCtrl(event) && event.key.toLowerCase() === "f") {
         if (!hasMessages) return;
         event.preventDefault();
         onToggleFind?.();
       }
     },
-    [findOpen, hasMessages, onToggleFind, onCloseFind, onToggleCanvas],
+    [findOpen, hasMessages, onToggleFind, onCloseFind, onToggleCanvas, onToggleToolPanel],
   );
 
   return { handleKeyDown };

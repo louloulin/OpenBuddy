@@ -63,6 +63,8 @@ import {
   useConversationViews,
 } from "./conversation-view";
 import { PlanPanel, SessionTasksPanel } from "@openbuddy/ui-automation";
+import { useRowPanelNav } from "./chatview/useRowPanelNav";
+import { useChatShortcuts } from "./chatview/useChatShortcuts";
 import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
 import { QuestionInlineCard } from "./QuestionInlineCard";
 import { ToolSidePanel, type ToolSidePanelMode } from "./ToolSidePanel";
@@ -312,6 +314,14 @@ export function ChatView({
 
   // Plan5 Phase A.1 — scrollRef 仍由 ChatView 持有(对外要挂到 <div>)。
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Claude row-panel 对齐(2026-10-14):↑/↓ 在时间线里的工具折叠行之间移动
+  // 焦点(Enter 切换折叠,见 ToolCallCard)。挂在时间线容器上,虚拟化/非
+  // 虚拟化两种渲染都覆盖。
+  const timelineRowsRef = useRef<HTMLDivElement>(null);
+  useRowPanelNav({
+    containerRef: timelineRowsRef,
+    rowSelector: '[data-testid="toolcall-compact"], [data-testid="toolcall-expanded"]',
+  });
   // Plan5 Phase A.1 — Scroll / jump-to-bottom / unread-count 抽到 useChatViewStreaming。
   const {
     turnStartRef,
@@ -408,11 +418,29 @@ export function ChatView({
     setEditResendOriginId,
     handleStepRevision,
     handleEditResend,
-    handleInlineResend,
-    handleEditAssistantMessage,
+    handleInlineResend,    handleEditAssistantMessage,
     handleResendAfterAssistantEdit,
     handleQuickPrompt,
   } = useChatViewRevision({ handleRetryRef });
+
+  // A2(2026-10-14):兑现快捷键面板宣称的对话键位(⌘R/⌘E/⌘P/⌘L)。
+  // ⌘G/⌘⇧G 在 FindBar 内部注册;⌘F 在 useChatViewShortcuts;⌘⏎ 在 Composer。
+  const composerPrefill = useCallback(
+    (text: string) => {
+      setResendText(text);
+      setResendNonce((n: number) => n + 1);
+    },
+    [setResendText, setResendNonce],
+  );
+  useChatShortcuts({
+    messages,
+    streaming,
+    sessionId: sessionId ?? undefined,
+    onSend,
+    onPause: handlePause,
+    onPrefillComposer: composerPrefill,
+  });
+
 
   // Plan5 B.10 — 消息级"从此重发":把 rewindPoints 拉一次并解析成
   // `messageId → promptIndex`,下发给 MessageItem 的 MessageRewindMenu。
@@ -729,6 +757,15 @@ export function ChatView({
     findOpen,
     hasMessages: messages.length > 0,
     onToggleCanvas: handleToggleCanvas,
+    onToggleToolPanel: () => {
+      // chat-tools-panel(⌘⇧T):工具面板开/关;画布开着时先收画布(互斥)。
+      if (canvasOpen) {
+        closeCanvas();
+        setPanelOpen(true);
+        return;
+      }
+      setPanelOpen((v) => !v);
+    },
   });
   // 全局监听(改造前的 window listener 语义:无需焦点即可触发)。
   useChatViewGlobalShortcuts({
@@ -972,15 +1009,17 @@ export function ChatView({
             <ChatViewEmptyState onPickPrompt={handleQuickPrompt} />
           }
           timelineList={
-            useVirtualList ? (
-              <VirtualizedMessageList
-                timeline={timeline as TimelineNode[]}
-                scrollRef={scrollRef as React.RefObject<HTMLElement>}
-                renderItem={renderTimelineNode}
-              />
-            ) : (
-              timeline.map((node, index) => renderTimelineNode({ node, index }))
-            )
+            <div ref={timelineRowsRef} className="chatview__timeline-rows">
+              {useVirtualList ? (
+                <VirtualizedMessageList
+                  timeline={timeline as TimelineNode[]}
+                  scrollRef={scrollRef as React.RefObject<HTMLElement>}
+                  renderItem={renderTimelineNode}
+                />
+              ) : (
+                timeline.map((node, index) => renderTimelineNode({ node, index }))
+              )}
+            </div>
           }
           SubagentPanelImpl={SubagentPanelResolved as React.ComponentType<{
             messages: ChatMessage[];

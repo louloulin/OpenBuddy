@@ -80,7 +80,7 @@ describe("R8.8 ChatView control polish CSS", () => {
   it("rewind-bar__dropdown has enter animation + transform-origin top right", () => {
     const dd = ruleBody(allCss, ".rewind-bar__dropdown");
     expect(dd).toBeTruthy();
-    expect(dd!).toMatch(/animation:\s*ob-rewind-dropdown-in\s+var\(--wb-motion-duration-fast,\s*140ms\)/);
+    expect(dd!).toMatch(/animation:\s*ob-rewind-dropdown-in\s+var\(--wb-motion-duration-fast,\s*120ms\)/);
     expect(dd!).toMatch(/transform-origin:\s*top right/);
     expect(allCss).toMatch(/@keyframes\s+ob-rewind-dropdown-in\b/);
   });

@@ -77,6 +77,20 @@ export function FindBar({ messages, open, onClose, onActiveChange, onHitsChange 
     [total],
   );
 
+  // A2(2026-10-14):⌘G / ⌘⇧G 全局下一个/上一个 —— 面板(ChatShortcutOverlay
+  // 的 chat-find-next / chat-find-prev)宣称的键位。只在查找打开时注册,
+  // 输入框聚焦与否都能触发(与 VS Code 查找语义一致)。
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "g") return;
+      e.preventDefault();
+      step(e.shiftKey ? -1 : 1);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, step]);
+
   // 键盘:Enter 下一个,Shift+Enter 上一个,Esc 关闭。
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {

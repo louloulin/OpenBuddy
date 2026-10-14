@@ -4,6 +4,7 @@ import { Type } from "@earendil-works/pi-ai";
 import { shouldCompact } from "@earendil-works/pi-agent-core";
 import { buildOpenbuddyCompactionSettings } from "./host-modules/openbuddy-compaction-settings";
 import openBuddyApplyPatch, { type OpenBuddyApplyPatchConfig } from "./extensions/apply-patch";
+import openBuddyMemory, { type OpenBuddyMemoryConfig } from "./extensions/memory";
 import {
   createExtensionPolicy,
   describeExtensionPolicyReport,
@@ -1114,6 +1115,20 @@ export const BUILTIN_PI_PLUGIN_MANIFESTS: readonly OpenBuddyPluginManifest[] = [
       },
     ],
   },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-memory",
+    packageName: "@openbuddy/builtin-memory",
+    version: "1.0.0",
+    description: "本地两层记忆(用户级 + 工作区级)的模型侧工具:memory_save / memory_recall。",
+    tracks: [
+      {
+        kind: "pi",
+        inline: "openbuddy-memory",
+        config: { schema: "openbuddy.memory.v1" },
+      },
+    ],
+  },
 ];
 
 /**
@@ -1314,6 +1329,9 @@ export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResol
   // capability-plugins.ts) remains the canonical backend; the tools
   // here just adapt the Cordis service surface to the PI ExtensionAPI.
   "openbuddy-pi-calendar": (_emit, _config, _options) => calendarPiFactory,
+  // 阶段 1.5:本地两层记忆的模型侧工具(memory_save / memory_recall)——
+  // 与「记忆」面板读写同一份 <agentHome>/memory.json,不是另一套存储。
+  "openbuddy-memory": (_emit, config, _options) => openBuddyMemory((config as Partial<OpenBuddyMemoryConfig> | undefined) ?? {}),
 };
 
 export function resolvePiExtensions(

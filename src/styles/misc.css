@@ -553,7 +553,7 @@
   /* R8.7 — enter animation matching the slash-commands menu. 140ms is
      short enough to feel snappy on every keystroke; the cubic-bezier
      is the same "expo-out" curve used by the rest of the popovers. */
-  animation: ob-mention-picker-in var(--wb-motion-duration-fast, 140ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: ob-mention-picker-in var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 @keyframes ob-mention-picker-in {
   from { opacity: 0; transform: translateY(6px) scale(0.985); }

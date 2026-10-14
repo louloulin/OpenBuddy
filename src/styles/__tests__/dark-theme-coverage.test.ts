@@ -90,11 +90,18 @@ describe("P1-01 dark theme coverage", () => {
     expect(ratio).toBeGreaterThanOrEqual(0.7);
   });
 
-  it("reasoning 卡 brand strip 在深色下保持品牌色(对齐 Codex)", () => {
-    // .msg__thought 的 border-left 在浅色下是 var(--wb-palette-brand-8),
-    // 深色下应该保持品牌色(可能略亮)而不是变灰色。
+  it("reasoning 块是纯文字行:无卡片边框、保留 disclosure 箭头", () => {
+    // Claude Desktop 对齐(2026-10-12):.msg__thought 已去卡片化 —— 无 border /
+    // 无背景 / 无左侧品牌色条,改为一行 muted 文字 + 折叠箭头。旧的
+    // "brand strip 深色保持品牌色" 守卫保护的是**已废弃**的视觉,这里换成
+    // 守护新契约:去卡片 + 有箭头 + 深浅都靠 token 的文字色。
     const reasoning = css.match(/\.msg__thought\s*\{([\s\S]*?)\}/)?.[1] ?? "";
-    expect(reasoning).toMatch(/border-left:\s*3px\s+solid\s+var\(--wb-palette-brand/);
+    expect(reasoning).toMatch(/border:\s*none/);
+    expect(reasoning).not.toMatch(/border-left/);
+    expect(reasoning).toMatch(/background:\s*transparent/);
+    // 折叠态与展开态都要有 disclosure 指示箭头。
+    expect(css).toMatch(/\.msg__thought\s*>\s*summary::before/);
+    expect(css).toMatch(/\.msg__thought\[open\]\s*>\s*summary::before/);
   });
 
   it("timeline-divider 在深色下保留色(不是被吞成全灰)", () => {

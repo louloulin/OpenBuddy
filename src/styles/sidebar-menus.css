@@ -1426,7 +1426,7 @@
   box-shadow:
     0 8px 24px color-mix(in srgb, var(--wb-palette-black-100) 12%, transparent),
     0 2px 8px color-mix(in srgb, var(--wb-palette-black-100) 6%, transparent);
-  animation: permissionPickerFadeIn var(--wb-motion-duration-fast, 140ms) ease-out;
+  animation: permissionPickerFadeIn var(--wb-motion-duration-fast, 120ms) ease-out;
   transform-origin: bottom left;
 }
 @keyframes permissionPickerFadeIn {

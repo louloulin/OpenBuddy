@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { WorkingDot } from "./chatview/WorkingDot";
 import { LOADING_TIPS } from "@/lib/platform/loading-tips";
 import { phaseLabel, type AgentPhase } from "@/lib/stream/agent-phase";
 import { useSessionStore } from "@/stores/session-store";
@@ -221,11 +222,9 @@ export function LoadingRow() {
       <span className="msg__loading-main ob-shining-text" key={phaseLabelText ? "phase" : rotatingVerb.key}>
         {mainText}
       </span>
-      <span className="msg__loading-dots" aria-hidden="true">
-        <span className="msg__loading-dot msg__loading-dot--1" />
-        <span className="msg__loading-dot msg__loading-dot--2" />
-        <span className="msg__loading-dot msg__loading-dot--3" />
-      </span>
+      {/* Claude 对齐(2026-10-14):三点 bounce 换成单一呼吸点 —— 它是全局
+          唯一的"正在工作"指示源(对齐 cds-working-dot-halo)。 */}
+      <WorkingDot />
       {showElapsed && (
         <span className="msg__loading-elapsed" aria-live="polite">
           {formatElapsed(elapsed)}

@@ -24,6 +24,8 @@ export interface UseExtensionTextArgs {
   /** Controlled fill from external templates (nonce-keyed). */
   externalText?: string;
   externalTextNonce?: number;
+  /** C1:展开态(不设高度上限)。 */
+  expanded?: boolean;
   /** Persisted draft hydration: when draftKey changes, restore the draft. */
   draft?: string;
   draftKey?: string | number;
@@ -56,15 +58,19 @@ export function useExtensionText(args: UseExtensionTextArgs): void {
     draft,
     draftKey,
     updateText,
+    /** C1:展开态 —— 不设上限,内容多高编辑区就多高(外层滚动接管)。 */
+    expanded = false,
   } = args;
 
-  // 1. Autosize: keep textarea height in lockstep with content (capped at 160px).
+  // 1. Autosize: keep textarea height in lockstep with content.
+  //    Cap 320px = CSS max-height(min(320px, 46vh))的 JS 侧对应值(原 160px
+  //    与 CSS 不一致,"写长文被压扁");展开态不设上限。
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 160) + "px";
-  }, [text]);
+    el.style.height = (expanded ? el.scrollHeight : Math.min(el.scrollHeight, 320)) + "px";
+  }, [text, expanded]);
 
   // 2. Extension-driven text. The nonce deliberately controls repeated
   //    identical extension updates so callers can re-emit without dedup.

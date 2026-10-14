@@ -34,6 +34,15 @@ export {
 } from "./themes";
 export type { ThemeMode, ThemePreference, ThemeService } from "./theme-store";
 export {
+  initDisplayPreferences,
+  getDensity,
+  setDensity,
+  getReduceMotion,
+  setReduceMotion,
+  DENSITY_LABELS,
+  type DensityName,
+} from "./density-store";
+export {
   createThemeStore,
   getStoredThemeName,
   getStoredThemeMode,

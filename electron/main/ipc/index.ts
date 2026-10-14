@@ -158,6 +158,7 @@ import { registerAgentIpc } from "./agent";
 import { registerAgentsIpc } from "./agents";
 import { registerConnectorsIpc } from "./connectors";
 import { registerMiscIpc } from "./misc";
+import { registerMemoryIpc } from "./memory";
 import { registerAuditIpc } from "./audit";
 import { registerDataDirIpc } from "./data-dir";
 import { registerAgentPathsIpc } from "./agent-paths";
@@ -1118,6 +1119,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	registerAgentIpc(getWindow);
 	registerAgentsIpc();
 	registerConnectorsIpc(getWindow);
+	registerMemoryIpc();
 	registerMiscIpc(getWindow);
 
 	// R17 / Phase D — Local Audit Trail (data-management panel).

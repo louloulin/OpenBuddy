@@ -80,7 +80,8 @@ describe("MessageItem — R8.14 per-message meta chip", () => {
     );
     const meta = container.querySelector(".msg__meta.msg__meta--streaming");
     expect(meta).toBeTruthy();
-    expect(meta?.textContent).toContain("正在生成");
+    // 2026-10-14 Claude 对齐:「正在生成」指示收敛到 WorkingDot,meta 只留时长。
+    expect(meta?.textContent).toMatch(/^\d+s$/);
     expect(meta?.textContent).toContain("12s");
   });
 

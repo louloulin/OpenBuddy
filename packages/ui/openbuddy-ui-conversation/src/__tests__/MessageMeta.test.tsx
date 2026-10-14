@@ -12,7 +12,7 @@ import { render, screen } from "@testing-library/react";
 import { MessageMeta } from "../parts/MessageMeta";
 
 describe("MessageMeta (Plan5 componentization)", () => {
-  it("streaming 时显示「正在生成…」+ 用时", () => {
+  it("streaming 时只显示时长(「正在生成」指示已收敛到 WorkingDot)", () => {
     render(
       <MessageMeta
         createdAt={Date.now() - 1000}
@@ -20,7 +20,11 @@ describe("MessageMeta (Plan5 componentization)", () => {
         isStreaming
       />,
     );
-    expect(screen.getByText(/4s 正在生成/)).toBeTruthy();
+    // Claude 对齐(2026-10-14):meta 不再重复「正在生成…」文字 —— 那是
+    // WorkingDot 的职责;时长(hourglass + Ns)保留。
+    expect(screen.getByText(/^4s$/)).toBeTruthy();
+    expect(screen.queryByText(/正在生成/)).toBeNull();
+    // 无障碍标签仍描述状态。
     expect(screen.getByLabelText(/正在生成/)).toBeTruthy();
   });
 

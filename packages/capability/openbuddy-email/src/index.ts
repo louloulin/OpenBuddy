@@ -1645,15 +1645,40 @@ async function readStore(): Promise<EmailStore> {
 	}
 }
 let storeWriteQueue: Promise<void> = Promise.resolve()
+
+/** 不加队列、直接落盘。只给队列内部用(自行入队会自等死锁)。 */
+async function writeStoreNow(store: EmailStore): Promise<void> {
+	const target = storePath()
+	await mkdir(path.dirname(target), { recursive: true })
+	const temporary = `${target}.${process.pid}.${randomUUID()}.tmp`
+	await writeFile(temporary, `${JSON.stringify(store, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
+	try { await rename(temporary, target) } catch (error) { await rm(temporary, { force: true }).catch(() => undefined); throw error }
+}
+
 function writeStore(store: EmailStore): Promise<void> {
-	const operation = storeWriteQueue.then(async () => {
-		const target = storePath()
-		await mkdir(path.dirname(target), { recursive: true })
-		const temporary = `${target}.${process.pid}.${randomUUID()}.tmp`
-		await writeFile(temporary, `${JSON.stringify(store, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
-		try { await rename(temporary, target) } catch (error) { await rm(temporary, { force: true }).catch(() => undefined); throw error }
-	})
+	const operation = storeWriteQueue.then(() => writeStoreNow(store))
 	storeWriteQueue = operation.catch(() => undefined)
+	return operation
+}
+
+/**
+ * 读-改-写临界区。**队列是模块级的**(writeStore 是模块级函数),但 `enqueue()`
+ * 是实例级的 —— 所以两处"先 readStore 再 writeStore"的写法(尤其 audit():几乎
+ * 每个操作都会调它)会互相覆盖:并发写者读到旧快照、后落盘,把别人刚写的 tags/
+ * reminders 覆盖掉(2026-10-12 全量跑测时 openbuddy-email 的 tags 断言随机失败,
+ * 根因就是它)。
+ *
+ * 约定:凡是"读出来改一改再写回去"的改动都必须走这里;只写自己构造好的完整
+ * store 的调用点可以继续用 writeStore。
+ */
+export function mutateStore<T>(mutator: (store: EmailStore) => T | Promise<T>): Promise<T> {
+	const operation = storeWriteQueue.then(async () => {
+		const store = await readStore()
+		const result = await mutator(store)
+		await writeStoreNow(store)
+		return result
+	})
+	storeWriteQueue = operation.then(() => undefined, () => undefined)
 	return operation
 }
 
@@ -1959,7 +1984,7 @@ export class Email extends OpenBuddyService {
 		const base = Number.isFinite(candidate) && candidate > now ? candidate : now
 		return new Date(base + interval * 60_000).toISOString()
 	}
-	private async audit(entry: Omit<EmailAuditEntry, "id" | "at">): Promise<EmailAuditEntry> { const auditEntry: EmailAuditEntry = { ...entry, id: id("mail-audit"), at: new Date().toISOString() }; const store = await readStore(); store.audit = [auditEntry, ...store.audit].slice(0, 500); await writeStore(store); return auditEntry }
+	private async audit(entry: Omit<EmailAuditEntry, "id" | "at">): Promise<EmailAuditEntry> { const auditEntry: EmailAuditEntry = { ...entry, id: id("mail-audit"), at: new Date().toISOString() }; await mutateStore((store) => { store.audit = [auditEntry, ...store.audit].slice(0, 500) }); return auditEntry }
 	private async requireConfirmation(title: string, message: string, bypass = false): Promise<void> {
 		if (bypass) return
 		const ui = this.ctx.get("piUi") as { confirm?: (title: string, message: string) => Promise<boolean> } | undefined
@@ -2540,21 +2565,18 @@ export class Email extends OpenBuddyService {
 					continue
 				}
 				const reminder = { id: id("email-reminder"), accountId: target.accountId, threadId: target.threadId, description: `邮件行动项：${action.content}${action.owner ? `；负责人：${action.owner}` : ""}`, remindAt: dueAt, analysisId: target.id, actionIndex: index }
-				const next = await readStore()
-				next.reminders = [reminder, ...next.reminders].slice(0, 500)
-				await writeStore(next)
+				await mutateStore((next) => { next.reminders = [reminder, ...next.reminders].slice(0, 500) })
 				created.push({ analysisId: target.id, threadId: target.threadId, accountId: target.accountId, actionIndex: index, content: action.content, ...(action.owner ? { owner: action.owner } : {}), dueAt, receipt: reminder.id })
 			}
 			if (!dryRun) {
-				const next = await readStore()
-				const current = next.analyses.find((item) => item.id === analysisId)
-				if (current) {
+				await mutateStore((next) => {
+					const current = next.analyses.find((item) => item.id === analysisId)
+					if (!current) return
 					const ids = created.filter((item) => item.analysisId === analysisId && item.receipt).map((item) => item.receipt!).filter((value): value is string => Boolean(value))
 					current.linkedReminderIds = [...new Set([...(current.linkedReminderIds ?? []), ...ids])]
 					current.review = "accepted"
 					current.reviewedAt = new Date().toISOString()
-					await writeStore(next)
-				}
+				})
 			}
 		}
 		const result: EmailActionCenterReminderResult = {
@@ -3016,18 +3038,20 @@ export class Email extends OpenBuddyService {
 		return target
 	}
 	async linkAnalysis(input: EmailAnalysisLinkInput): Promise<EmailAnalysisRecord> {
-		const store = await readStore()
-		const target = store.analyses.find((item) => item.id === input.id)
-		if (!target) throw new EmailError("invalid_input", `邮件分析不存在: ${input.id}`)
-		if (input.linkedDraftId !== undefined) target.linkedDraftId = input.linkedDraftId
-		if (input.linkedReminderId !== undefined) target.linkedReminderId = input.linkedReminderId
-		if (input.linkedReminderIds !== undefined) target.linkedReminderIds = [...new Set(input.linkedReminderIds)]
-		if (input.linkedTaskControlId !== undefined) target.linkedTaskControlId = input.linkedTaskControlId
-		if (input.linkedTaskIds !== undefined) target.linkedTaskIds = [...new Set(input.linkedTaskIds)]
-		if (input.linkedProjectTaskIds !== undefined) target.linkedProjectTaskIds = [...new Set(input.linkedProjectTaskIds)]
-		if (input.linkedCalendarTaskId !== undefined) target.linkedCalendarTaskId = input.linkedCalendarTaskId
-		if (input.linkedCalendarEventId !== undefined) target.linkedCalendarEventId = input.linkedCalendarEventId
-		await writeStore(store)
+		// 读-改-写走模块级临界区:审计等并发写者的快照不能再覆盖这次链接结果。
+		const target = await mutateStore((store) => {
+			const found = store.analyses.find((item) => item.id === input.id)
+			if (!found) throw new EmailError("invalid_input", `邮件分析不存在: ${input.id}`)
+			if (input.linkedDraftId !== undefined) found.linkedDraftId = input.linkedDraftId
+			if (input.linkedReminderId !== undefined) found.linkedReminderId = input.linkedReminderId
+			if (input.linkedReminderIds !== undefined) found.linkedReminderIds = [...new Set(input.linkedReminderIds)]
+			if (input.linkedTaskControlId !== undefined) found.linkedTaskControlId = input.linkedTaskControlId
+			if (input.linkedTaskIds !== undefined) found.linkedTaskIds = [...new Set(input.linkedTaskIds)]
+			if (input.linkedProjectTaskIds !== undefined) found.linkedProjectTaskIds = [...new Set(input.linkedProjectTaskIds)]
+			if (input.linkedCalendarTaskId !== undefined) found.linkedCalendarTaskId = input.linkedCalendarTaskId
+			if (input.linkedCalendarEventId !== undefined) found.linkedCalendarEventId = input.linkedCalendarEventId
+			return found
+		})
 		await this.audit({ accountId: target.accountId, operation: "analysis-link", status: "completed", resourceId: target.threadId, provider: "openbuddy-local" })
 		return target
 	}

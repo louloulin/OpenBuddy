@@ -17,6 +17,7 @@ import type { ProjectMeta } from "@/stores/projects-store";
  * 静态拖住、ui-mcp/ui-billing 被 ui-settings 拖住,拆不动但 lazy 无成本,
  * 待 A2/A3 分层债收敛后自动生效。
  */
+const MemoryPanelLazy = lazy(() => import("@openbuddy/ui-memory").then((m) => ({ default: m.MemoryPanel })));
 const LocalAssistantView = lazy(() => import("@openbuddy/ui-workbench").then((m) => ({ default: m.LocalAssistantView })));
 const AssistantWorkspacePanel = lazy(() => import("@openbuddy/ui-workbench").then((m) => ({ default: m.AssistantWorkspacePanel })));
 const AssistantExtensionPanel = lazy(() => import("@openbuddy/ui-workbench").then((m) => ({ default: m.AssistantExtensionPanel })));
@@ -160,6 +161,14 @@ function PlaceholderPageInner({
     },
     [onToast],
   );
+  // 阶段 1.5:本地两层记忆面板。cwd 决定 workspace 层可见范围(不传=只看全局)。
+  if (label === "记忆") {
+    return (
+      <Suspense fallback={<PanelSuspenseFallback label={label} />}>
+        <MemoryPanelLazy cwd={cwd} onToast={onToast} invoke={invoke} />
+      </Suspense>
+    );
+  }
   if (label === "邮件") {
     return (
       <Suspense fallback={<PanelSuspenseFallback label={label} />}>

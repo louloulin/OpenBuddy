@@ -932,3 +932,158 @@
   position: relative;
   z-index: 25;
 }
+
+/* ---- 记忆面板(MemoryPanel,阶段 1.5 本地两层记忆) ----
+   两层语义直接体现在 badge 上:全局 vs 工作区;不传 cwd 时只显示全局层。
+   颜色全部走 --wb-* token。 */
+.memory-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  color: var(--wb-text-strong);
+}
+.memory-panel__title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+.memory-panel__hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.memory-panel__filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.memory-panel__search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  background: var(--wb-bg-elevated);
+  color: var(--wb-text-medium);
+}
+.memory-panel__search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--wb-text-strong);
+  font-size: 13px;
+}
+.memory-panel__composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 10px;
+  background: var(--wb-bg-elevated);
+}
+.memory-panel__composer input,
+.memory-panel__composer textarea {
+  border: 1px solid var(--wb-border-default);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+  resize: vertical;
+}
+.memory-panel__composer-row {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.memory-panel__count {
+  margin: 0;
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.memory-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.memory-panel__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 10px;
+  background: var(--wb-bg-elevated);
+}
+.memory-panel__item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.memory-panel__item-head strong {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+}
+.memory-panel__item-head input {
+  flex: 1;
+  border: 1px solid var(--wb-border-strong);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 13px;
+  background: var(--wb-bg-primary);
+  color: var(--wb-text-strong);
+}
+.memory-panel__item-head button {
+  border: none;
+  background: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--wb-text-medium);
+  border-radius: 6px;
+}
+.memory-panel__item-head button:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.memory-panel__badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--wb-border-default);
+  color: var(--wb-text-medium);
+}
+.memory-panel__badge--workspace {
+  border-color: var(--wb-accent);
+  color: var(--wb-accent);
+}
+.memory-panel__body {
+  margin: 0;
+  font-size: 13px;
+  color: var(--wb-text-medium);
+  white-space: pre-wrap;
+}
+.memory-panel__tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.memory-panel__tag {
+  font-size: 11px;
+  color: var(--wb-text-weak, #9aa0a6);
+}
+.memory-panel__empty {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--wb-text-weak, #9aa0a6);
+}

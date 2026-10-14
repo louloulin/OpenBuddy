@@ -137,7 +137,18 @@
     "language": "语言",
     "advanced": "高级",
     "save": "保存设置",
-    "saved": "设置已保存"
+    "saved": "设置已保存",
+    "display": {
+      "density": "界面密度",
+      "densityHint": "紧凑 / 标准 / 宽松，整套界面等比缩放，立即生效",
+      "reduceMotion": "减少动效",
+      "reduceMotionHint": "开启后界面动画与过渡全部关闭（不影响系统设置）",
+      "reduceMotionOn": "已开启",
+      "reduceMotionOff": "已关闭",
+      "compact": "紧凑",
+      "standard": "标准",
+      "relaxed": "宽松"
+    }
   },
   "auth": {
     "login": "登录",
@@ -180,5 +191,41 @@
     "syncToPi": "把修改发回 pi",
     "synced": "已把修改发给 pi，以 pi 的回报为准",
     "localDirty": "计划有未同步的本地修改"
+  },
+  "memory": {
+    "title": "记忆",
+    "subtitle": "本地两层：全局记忆 + 当前工作区记忆。云端记忆不提供。",
+    "searchPlaceholder": "搜索标题 / 正文 / 标签",
+    "scopeAll": "全部",
+    "scopeUser": "全局",
+    "scopeWorkspace": "本工作区",
+    "composerTitle": "标题（例如：回答偏好用中文）",
+    "composerBody": "正文（可选）",
+    "writeUser": "写入全局",
+    "writeWorkspace": "写入本工作区",
+    "add": "新增记忆",
+    "count": "{count} 条记忆",
+    "loading": "读取中…",
+    "empty": "还没有记忆。",
+    "emptySearch": "没有匹配的记忆。",
+    "scopeBadgeUser": "全局",
+    "scopeBadgeWorkspace": "工作区",
+    "renameAria": "重命名 {title}",
+    "deleteAria": "删除 {title}",
+    "listFailed": "记忆读取失败：{message}",
+    "addFailed": "记忆新增失败：{message}",
+    "deleteFailed": "记忆删除失败：{message}",
+    "updateFailed": "记忆更新失败：{message}"
+  },
+  "chat": {
+    "queue": {
+      "aria": "待发送队列",
+      "count": "排队中 {count} 条",
+      "hint": "回复完成后自动发送下一条",
+      "pause": "暂停该条",
+      "resume": "恢复该条",
+      "sendNow": "立即发送",
+      "remove": "从队列移除"
+    }
   }
 }

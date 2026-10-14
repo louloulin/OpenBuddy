@@ -26,7 +26,15 @@ import {
   Shield,
 } from "lucide-react";
 import { useTheme, useThemeSnapshot, ThemePicker, ThemeStudio } from "@openbuddy/ui-theme/client";
-import { LanguagePicker, useLocaleName } from "@openbuddy/ui-locale/client";
+import {
+  DENSITY_LABELS,
+  getDensity,
+  getReduceMotion,
+  setDensity,
+  setReduceMotion,
+  type DensityName,
+} from "@openbuddy/ui-theme";
+import { LanguagePicker, useLocale, useLocaleName } from "@openbuddy/ui-locale/client";
 import { SlotOutlet, microkernelSnapshot, type MicrokernelSnapshot } from "@openbuddy/ui-runtime/client";
 import { resolveVars } from "@openbuddy/ui-theme";
 import {
@@ -173,6 +181,7 @@ function SectionShell({
 // ---------- 个性化 ----------
 
 export function PersonalizeSettingsPanel() {
+  const locale = useLocale();
   // R45 — 简化个性化 UI:
   //   - 移除冗余的「浅色 / 深色」双按钮 toggle(ThemePicker 已覆盖 19 套
   //     内置主题 + 自定义主题,这个基础 toggle 是 dead feature)
@@ -181,6 +190,13 @@ export function PersonalizeSettingsPanel() {
   //     用户进入个性化页就能直接调色,保存的自定义主题通过 R44 闭环立即
   //     出现在上面的 ThemePicker 里
   //   - 字号拆出独立 settings-row,不再与主题控件挤在一行
+  // 批B:密度 / reduce-motion 的当前值(仅驱动按钮高亮;应用由 density-store 做)。
+  const [densityName, setDensityName] = useState<DensityName>(() => getDensity());
+  const [reduceMotion, setReduceMotionState] = useState<boolean>(() => getReduceMotion());
+  const forceDisplaySection = useCallback(() => {
+    setDensityName(getDensity());
+    setReduceMotionState(getReduceMotion());
+  }, []);
   const [fontSize, setFontSize] = useState<number>(() => {
     const saved = localStorage.getItem(FONT_KEY);
     return saved ? Number(saved) : 13;
@@ -248,6 +264,52 @@ export function PersonalizeSettingsPanel() {
           />
           <button className="settings-reset" onClick={() => setFontSize(13)}>
             重置
+          </button>
+        </div>
+      </div>
+
+      {/* 批B:界面密度三档(body zoom,对齐 Claude --cds-rem-scale 的用户
+          可见效果)。即时生效 + 持久化(density-store 自应用)。 */}
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <span>{locale.t("settings.display.density")}</span>
+          <span className="settings-row__hint">{locale.t("settings.display.densityHint")}</span>
+        </div>
+        <div className="settings-row__control" style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          {(Object.keys(DENSITY_LABELS) as DensityName[]).map((name) => (
+            <button
+              key={name}
+              type="button"
+              className={"settings-density__btn" + (getDensity() === name ? " settings-density__btn--active" : "")}
+              aria-pressed={getDensity() === name}
+              onClick={() => {
+                setDensity(name);
+                forceDisplaySection();
+              }}
+            >
+              {name === "compact" ? locale.t("settings.display.compact") : name === "relaxed" ? locale.t("settings.display.relaxed") : locale.t("settings.display.standard")}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 应用内 reduce-motion(对齐 Claude data-reduce-motion):不依赖系统偏好。 */}
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <span>{locale.t("settings.display.reduceMotion")}</span>
+          <span className="settings-row__hint">{locale.t("settings.display.reduceMotionHint")}</span>
+        </div>
+        <div className="settings-row__control" style={{ marginLeft: "auto" }}>
+          <button
+            type="button"
+            className={"settings-density__btn" + (reduceMotion ? " settings-density__btn--active" : "")}
+            aria-pressed={reduceMotion}
+            onClick={() => {
+              setReduceMotion(!reduceMotion);
+              forceDisplaySection();
+            }}
+          >
+            {reduceMotion ? locale.t("settings.display.reduceMotionOn") : locale.t("settings.display.reduceMotionOff")}
           </button>
         </div>
       </div>
