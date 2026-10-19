@@ -97,9 +97,13 @@ const allowedInvokeChannels = new Set([
   "notify:dispatch", "policy:get", "policy:save",
   "app:auto-update-state", "app:check-updates", "app:install-updates", "storage-sources:list", "storage-sources:save", "task_kill", "tasks:add", "tasks:clear-completed", "tasks:delete", "tasks:list", "tasks:update",
   "memory:add", "memory:delete", "memory:list", "memory:update",
+  // P0.8/P1 数据备份/恢复(数据§7)
+  "storage:backup-create", "storage:backup-restore",
   "terminal:create", "terminal:input", "terminal:kill", "terminal:resize",
   // 阶段 5 产物中心
   "artifacts:index", "artifacts:history", "artifacts:restore", "artifacts:diff",
+  // Git 面板(parity 2.2)
+  "git:status", "git:diff", "git:log", "git:stage", "git:commit",
   "teams:create", "teams:delete", "teams:status",
   // automations-notifications
   "automation_records_archive", "automation_records_delete",

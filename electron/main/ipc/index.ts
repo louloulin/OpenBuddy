@@ -163,6 +163,7 @@ import { registerMemoryIpc } from "./memory";
 import { killAllTerminalSessions, registerTerminalPanelIpc } from "./terminal-panel";
 import { registerAutomationIpc } from "./automations";
 import { registerArtifactsIpc } from "./artifacts";
+import { registerGitPanelIpc } from "./git-panel";
 import { registerAuditIpc } from "./audit";
 import { registerDataDirIpc } from "./data-dir";
 import { registerAgentPathsIpc } from "./agent-paths";
@@ -1138,6 +1139,18 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	});
 	// 阶段 5 产物中心:文件版本时间线 / 恢复(复用 rewind 快照存储)。
 	registerArtifactsIpc();
+	// parity 2.2 / chat UI 计划批 5:Git 面板(状态/diff/log/暂存/提交)。
+	registerGitPanelIpc({
+		getTrustedRoot: () => agentHost.getCwd() ?? null,
+		isTrustedCwd: async (cwd) => {
+			// 与 misc.ts 的 folder-trust 同一存储(mountFolderTrust 幂等)。
+			const mod = await import("@openbuddy/folder-trust");
+			if (!mod.getFolderTrustStore()) {
+				mod.mountFolderTrust({ storagePath: join(piHome(), "folder-trust.json") });
+			}
+			return mod.folderTrustHandlers.isTrusted(cwd);
+		},
+	});
 	registerAutomationIpc({
 		ensureAgentHost: async () => { await ensureAgentHostLoaded(); },
 		agentHost: agentHost as never,

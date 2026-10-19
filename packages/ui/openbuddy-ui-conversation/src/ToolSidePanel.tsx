@@ -23,6 +23,8 @@ import {
 import type { ToolCallView } from "@/stores/session-store";
 import type { SessionArtifact } from "@/lib/agent/session-artifacts";
 import { ArtifactHistory } from "./chatview/ArtifactHistory";
+import { GitDiffView, GitSection } from "./chatview/GitPanel";
+import { useGitStatus, type UseGitStatusResult, type GitStatusState } from "./chatview/use-git-status";
 import type { FileChange } from "@/lib/files/file-changes";
 import { aggregateFileChanges } from "@/lib/files/file-changes";
 import type { ChatMessage } from "@/stores/session-store";
@@ -135,7 +137,12 @@ function ToolSidePanelInner({
     () => (messages ? aggregateFileChanges(messages).files : []),
     [messages],
   );
-  const hasChanges = changes.length > 0;
+  // git 工作区状态(面板层统一拉取):①「变更」视图在有 git 改动时也必须可见
+  // —— 否则会话里没有工具改过文件时,git 面板整块不可达;② 导航列与主列
+  // 共用同一份状态,不会一边显示有改动一边显示无差异。
+  const gitStatus = useGitStatus(cwd, open && Boolean(cwd));
+  const hasChanges =
+    changes.length > 0 || (gitStatus.status?.entries.length ?? 0) > 0;
 
   // ---- 视图切换 ----
   const handleViewChange = useCallback((v: WorkspaceView) => {
@@ -358,6 +365,7 @@ function ToolSidePanelInner({
             view={view}
             artifacts={artifacts}
             changes={changes}
+            gitStatus={gitStatus}
             cwd={cwd}
             sessionId={sessionId}
             selectedArtifactId={selectedArtifactId}
@@ -460,6 +468,7 @@ function ToolSidePanelInner({
             <MainContent
               view={view}
               artifacts={artifacts}
+              gitStatus={gitStatus.status}
               cwd={cwd}
               sessionId={sessionId}
               previewPath={previewPath}
@@ -503,6 +512,7 @@ function NavContent({
   view,
   artifacts,
   changes,
+  gitStatus,
   cwd,
   sessionId,
   selectedArtifactId,
@@ -515,6 +525,7 @@ function NavContent({
   view: WorkspaceView;
   artifacts: SessionArtifact[];
   changes: FileChange[];
+  gitStatus: UseGitStatusResult;
   cwd?: string;
   sessionId?: string;
   selectedArtifactId?: string;
@@ -544,6 +555,7 @@ function NavContent({
     },
     [cwd, onToast],
   );
+  const sessionSectionLabel = useT("git.sessionSection");
 
   if (view === "artifacts") {
     // 版本历史(ArtifactHistory)在主列渲染:面板窄屏时导航列会整体收起,
@@ -558,11 +570,29 @@ function NavContent({
   }
   if (view === "changes") {
     return (
-      <ChangesNavList
-        changes={changes}
-        selectedPath={selectedArtifactId}
-        onSelect={(path) => onArtifactSelect(path)}
-      />
+      <>
+        {/* Git 真实状态(状态/diff/log/暂存/提交)——此前这里只有会话消息聚合的近似 diff。 */}
+        <GitSection
+          cwd={cwd}
+          selectedPath={selectedArtifactId}
+          onSelect={(path) => onArtifactSelect(path)}
+          onToast={onToast}
+          status={gitStatus.status}
+          loading={gitStatus.loading}
+          error={gitStatus.error}
+          onReload={gitStatus.reload}
+        />
+        <div className="git-panel__group">
+          <header className="git-panel__group-head">
+            <span>{sessionSectionLabel}</span>
+          </header>
+          <ChangesNavList
+            changes={changes}
+            selectedPath={selectedArtifactId}
+            onSelect={(path) => onArtifactSelect(path)}
+          />
+        </div>
+      </>
     );
   }
   if (view === "fileTree") {
@@ -670,6 +700,7 @@ function ChangesNavList({
 function MainContent({
   view,
   artifacts,
+  gitStatus,
   cwd,
   sessionId,
   previewPath,
@@ -684,6 +715,7 @@ function MainContent({
 }: {
   view: WorkspaceView;
   artifacts: SessionArtifact[];
+  gitStatus: GitStatusState | null;
   cwd?: string;
   sessionId?: string;
   previewPath?: string | null;
@@ -720,7 +752,13 @@ function MainContent({
       return <p className="tool-side-panel__empty">在左侧选择文件查看变更</p>;
     }
     return (
-      <FilePreview path={path} cwd={cwd} onToast={onToast} onOpenOs={() => onOpenOs(path)} />
+      <ChangedFileView
+        path={path}
+        cwd={cwd}
+        gitStatus={gitStatus}
+        onToast={onToast}
+        onOpenOs={() => onOpenOs(path)}
+      />
     );
   }
   // artifacts：选中产物时预览其文件。
@@ -753,6 +791,39 @@ function MainContent({
     );
   }
   return null;
+}
+
+// ---------- ChangedFileView（变更视图主列：git 差异优先，其余回退文件预览） ----------
+
+function ChangedFileView({
+  path,
+  cwd,
+  gitStatus,
+  onToast,
+  onOpenOs,
+}: {
+  path: string;
+  cwd?: string;
+  gitStatus: GitStatusState | null;
+  onToast?: (msg: string) => void;
+  onOpenOs: () => void;
+}) {
+  const t = useT("git.loading");
+  const status = gitStatus;
+  // git 状态里的路径是相对仓库根的,状态未就绪时无法判定是不是 git 变更 ——
+  // 此时按会话改动(绝对路径)处理,别把相对路径喂给文件预览。
+  const looksAbsolute = path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+  if (cwd && !status && !looksAbsolute) {
+    return <p className="tool-side-panel__empty">{t}</p>;
+  }
+  // 非 git 仓库 / 该文件不在 git 变更里 → 回退文件预览（会话改动仍可用）。
+  const isGitChange = Boolean(
+    status?.isRepo && status.entries.some((e) => e.path === path),
+  );
+  if (!isGitChange) {
+    return <FilePreview path={path} cwd={cwd} onToast={onToast} onOpenOs={onOpenOs} />;
+  }
+  return <GitDiffView path={path} cwd={cwd} onToast={onToast} />;
 }
 
 // ---------- FilePreview（保留原实现） ----------

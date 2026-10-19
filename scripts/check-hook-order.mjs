@@ -26,7 +26,7 @@ const HOOK_NAMES = new Set([
   "useT", "useLocale", "useLocaleName", "useTheme", "useThemeSnapshot",
   "useShortcut", "useSlotComponent", "useSlotComponents", "useAgentPaths",
   "useRendererContributions", "useRendererSlot", "useUnifiedTabs",
-  "useNowTick", "useRowPanelNav", "useSessionStore",
+  "useNowTick", "useRowPanelNav", "useSessionStore", "useGitStatus",
 ]);
 
 function walk(dir, acc = []) {

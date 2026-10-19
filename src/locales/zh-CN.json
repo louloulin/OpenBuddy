@@ -159,6 +159,20 @@
       "error": "检查失败:{error}",
       "upToDate": "已是最新版本",
       "restart": "重启并安装"
+    },
+    "backup": {
+      "title": "备份与恢复",
+      "create": "立即备份",
+      "backingUp": "备份中…",
+      "restoreThis": "恢复此备份",
+      "restoring": "恢复中…",
+      "ok": "已备份到 {path}",
+      "failed": "备份/恢复失败：{error}",
+      "needBackupFirst": "请先创建一次备份(或填入已有备份的完整路径)",
+      "confirmRestore": "确定用该备份恢复数据？当前数据会先保留为 .pre-restore-<时间戳>,应用重启后生效。",
+      "readyAfterRestart": "恢复已就绪 —— 重启应用后生效。",
+      "hint": "备份存于 {home}/backups/",
+      "restore": "恢复"
     }
   },
   "auth": {
@@ -294,5 +308,35 @@
     "diffAria": "与当前内容的差异",
     "noDiff": "与当前内容一致",
     "historyFailed": "读取版本历史失败：{error}"
+  },
+  "git": {
+    "sessionSection": "本会话改动",
+    "branch": "当前分支",
+    "staged": "已暂存",
+    "unstaged": "未暂存",
+    "untracked": "未跟踪",
+    "noStaged": "没有已暂存的改动。",
+    "noUnstaged": "没有未暂存的改动。",
+    "stage": "暂存此文件",
+    "unstage": "取消暂存",
+    "stageShort": "暂存",
+    "unstageShort": "取消",
+    "commitPlaceholder": "提交信息…",
+    "commit": "提交",
+    "committing": "提交中…",
+    "commitEmpty": "请先填写提交信息。",
+    "commitNoStaged": "没有已暂存的改动，先暂存要提交的文件。",
+    "commitOk": "已提交 {hash}",
+    "commitFailed": "提交失败：{error}",
+    "stageFailed": "暂存操作失败：{error}",
+    "recentCommits": "最近提交",
+    "noCommits": "还没有提交记录。",
+    "refresh": "刷新",
+    "loading": "正在读取…",
+    "notRepo": "当前工作区不是 git 仓库。",
+    "loadFailed": "读取 git 状态失败：{error}",
+    "logFailed": "读取提交记录失败：{error}",
+    "diffFailed": "读取差异失败：{error}",
+    "noDiff": "与 HEAD 一致，没有差异。"
   }
 }

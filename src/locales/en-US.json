@@ -159,6 +159,20 @@
       "error": "Check failed: {error}",
       "upToDate": "You are up to date",
       "restart": "Restart and install"
+    },
+    "backup": {
+      "title": "Backup & restore",
+      "create": "Back up now",
+      "backingUp": "Backing up…",
+      "restoreThis": "Restore this backup",
+      "restoring": "Restoring…",
+      "ok": "Backed up to {path}",
+      "failed": "Backup/restore failed: {error}",
+      "needBackupFirst": "Create a backup first (or enter the full path of an existing backup)",
+      "confirmRestore": "Restore data from this backup? The current data is kept as .pre-restore-<timestamp>; takes effect after the app restarts.",
+      "readyAfterRestart": "Restore is staged — restart the app to apply it.",
+      "hint": "Backups live in {home}/backups/",
+      "restore": "Restore"
     }
   },
   "auth": {
@@ -294,5 +308,35 @@
     "diffAria": "Difference from current content",
     "noDiff": "Identical to current content",
     "historyFailed": "Failed to load version history: {error}"
+  },
+  "git": {
+    "sessionSection": "This session",
+    "branch": "Current branch",
+    "staged": "Staged",
+    "unstaged": "Changes",
+    "untracked": "Untracked",
+    "noStaged": "No staged changes.",
+    "noUnstaged": "No unstaged changes.",
+    "stage": "Stage this file",
+    "unstage": "Unstage",
+    "stageShort": "Stage",
+    "unstageShort": "Unstage",
+    "commitPlaceholder": "Commit message…",
+    "commit": "Commit",
+    "committing": "Committing…",
+    "commitEmpty": "Enter a commit message first.",
+    "commitNoStaged": "Nothing staged yet — stage the files you want to commit.",
+    "commitOk": "Committed {hash}",
+    "commitFailed": "Commit failed: {error}",
+    "stageFailed": "Staging failed: {error}",
+    "recentCommits": "Recent commits",
+    "noCommits": "No commits yet.",
+    "refresh": "Refresh",
+    "loading": "Loading…",
+    "notRepo": "This workspace is not a git repository.",
+    "loadFailed": "Failed to read git status: {error}",
+    "logFailed": "Failed to load commits: {error}",
+    "diffFailed": "Failed to read the diff: {error}",
+    "noDiff": "Identical to HEAD — no changes."
   }
 }
