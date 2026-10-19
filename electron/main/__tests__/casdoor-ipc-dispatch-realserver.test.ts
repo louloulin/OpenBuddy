@@ -110,7 +110,8 @@ vi.mock("electron", () => {
     safeStorage: { isEncryptionAvailable: () => false, encryptString: vi.fn((s: string) => Buffer.from(s)), decryptString: vi.fn((b: Buffer) => b.toString()) },
     shell: { openExternal: vi.fn(async () => undefined) },
     BrowserWindow: vi.fn(),
-    dialog: { showOpenDialog: vi.fn(), showSaveDialog: vi.fn(), showMessageBox: vi.fn() },
+    // P0.2:config-save 会弹原生确认,测试 stub 直接允许(response 0)。
+    dialog: { showOpenDialog: vi.fn(), showSaveDialog: vi.fn(), showMessageBox: vi.fn(async () => ({ response: 0 })) },
     clipboard: { writeText: vi.fn(), readText: vi.fn() },
   };
 });

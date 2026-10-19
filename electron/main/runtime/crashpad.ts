@@ -18,7 +18,7 @@
  * tests can drive it without touching Electron's globals. Tests use a
  * stub for `electron.crashReport.start` to assert the parameters we pass.
  */
-import { existsSync, mkdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 
 /** Subset of `Electron.CrashReport` we depend on. Tests can stub this. */
@@ -44,12 +44,41 @@ export interface CrashpadOptions {
  * Must be called once, before `app.whenReady()`. Idempotent: a second call
  * with a different directory is ignored.
  */
+/** 启动时裁剪崩溃目录(有界保留;失败静默,不能挡住启动)。 */
+function pruneCrashpadDir(crashpadDir: string): void {
+  try {
+    const jsonlPath = join(crashpadDir, "renderer-crashes.jsonl");
+    if (existsSync(jsonlPath)) {
+      const lines = readFileSync(jsonlPath, "utf8").split("\n").filter((line) => line.trim().length > 0);
+      if (lines.length > 200) {
+        writeFileSync(jsonlPath, `${lines.slice(-200).join("\n")}\n`);
+      }
+    }
+    const dumps = readdirSync(crashpadDir)
+      .filter((name) => /^renderer-.*\.json$/.test(name))
+      .map((name) => {
+        const full = join(crashpadDir, name);
+        try { return { full, mtime: statSync(full).mtimeMs }; } catch { return null; }
+      })
+      .filter((entry): entry is { full: string; mtime: number } => entry !== null)
+      .sort((a, b) => b.mtime - a.mtime);
+    for (const stale of dumps.slice(100)) {
+      try { rmSync(stale.full, { force: true }); } catch { /* best-effort */ }
+    }
+  } catch {
+    /* 裁剪失败不影响崩溃捕获 */
+  }
+}
+
 export function startCrashpad(opts: CrashpadOptions): { crashpadDir: string } {
   if (started) {
     return { crashpadDir: activeCrashpadDir ?? opts.crashpadDir ?? join(opts.dataDir, "crash-dumps") };
   }
   const crashpadDir = opts.crashpadDir ?? join(opts.dataDir, "crash-dumps");
   if (!existsSync(crashpadDir)) mkdirSync(crashpadDir, { recursive: true });
+  // 数据§8(2026-10-19 生产评审):崩溃转储此前无上限。启动时保留最新:
+  // renderer-crashes.jsonl 截到最后 200 行,单个 dump 文件按 mtime 保留最新 100 个。
+  pruneCrashpadDir(crashpadDir);
   // Always local-only — never upload. PI-Desktop reference behaviour.
   const report = opts.crashReport ?? (require("electron")?.crashReport as CrashReportLike | undefined);
   if (report && typeof report.start === "function") {

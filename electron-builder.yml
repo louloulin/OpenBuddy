@@ -66,6 +66,9 @@ files:
 # the dependency on these two packages visible in the packaging config
 # and survives if the collector ever changes again.
 extraResources:
+  # P0.9(2026-10-19):第三方许可清单随包分发(scripts/generate-notices.mjs 生成)。
+  - from: "THIRD-PARTY-NOTICES.md"
+    to: "THIRD-PARTY-NOTICES.md"
   - from: "node_modules/@earendil-works/chord"
     to: "app/node_modules/@earendil-works/chord"
   - from: "node_modules/esbuild"
@@ -214,6 +217,10 @@ nsis:
 mac:
   target:
     - target: dmg
+      arch: [x64, arm64]
+    # A5(2026-10-19 生产评审):electron-updater 的 MacUpdater 只支持 zip
+    # 自更新 —— 只有 dmg 时"检查得到、装不上"。latest-mac.yml 由 zip 目标生成。
+    - target: zip
       arch: [x64, arm64]
   category: public.app-category.developer-tools
   hardenedRuntime: true

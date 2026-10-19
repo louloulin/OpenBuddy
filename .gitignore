@@ -167,7 +167,14 @@ dist/
 
 # Symlinks to host project dependencies (worktree shortcut)
 /node_modules
-build/
+# build/ 存放打包资产:发布必需的四件(icon.png/icns/ico + entitlements)入库
+# (A7,2026-10-19 生产评审 —— CI 检出后没有它们打不出图标/签不了名);
+# 其余(shots 等机器本地产物)保持忽略。
+build/*
+!build/icon.png
+!build/icon.icns
+!build/icon.ico
+!build/entitlements.mac.plist
 
 # Playwright MCP server runtime artifacts (machine-local state)
 .playwright-mcp/

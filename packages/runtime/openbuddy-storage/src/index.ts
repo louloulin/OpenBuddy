@@ -15,6 +15,7 @@ export { hashRedactedValue, redactStorageValue } from "./driver/redact";
 export { SqliteDriver, type JournalMode, type SqliteDriverOptions, type StorageHealthSnapshot } from "./sqlite/driver";
 export { closeStorage, openStorage, openStorageSync, type OpenStorageOptions, type OpenStorageResult, type OpenStorageSyncResult } from "./sqlite/open-storage";
 export { restoreStorageBackup, type RestoreStorageBackupOptions, type RestoreStorageBackupResult } from "./sqlite/restore";
+export { applyPendingStorageRestore, applyPendingStorageRestoreSync, createStorageBackup, stageStorageRestore, type ApplyPendingRestoreResult, type StageStorageRestoreOptions, type StageStorageRestoreResult } from "./sqlite/pending-restore";
 export { DurableOperationStore, WriterLeaseStore, type DurableOperation, type DurableOperationStatus, type WriterLease } from "./sqlite/coordination";
 export { MigrationIssueStore, type MigrationIssue, type MigrationIssueInput } from "./sqlite/migration-issues";
 export { HarnessCursorStore } from "./sqlite/harness-state";
@@ -22,7 +23,7 @@ export { CollaborationContractStore, CollaborationInboxCursorStore, type Collabo
 export { EventStore, type EventConsumerCursor, type EventProjector, type EventReplayOptions, type EventReplaySummary, type StoredEventRow } from "./sqlite/events";
 export { SyncEventCollection, type SyncEventCollectionOptions } from "./sqlite/sync-event-collection";
 export { TeamCatalog, type TeamCatalogMember, type TeamCatalogRecord } from "./sqlite/team-catalog";
-export { DEFAULT_MIGRATIONS, MigrationRunner, type MigrationStep } from "./sqlite/migration";
+export { DEFAULT_MIGRATIONS, DowngradeBlockedError, MigrationRunner, type MigrationStep } from "./sqlite/migration";
 export { SessionCatalog, type SessionCatalogRecord, type SessionCatalogQuery } from "./sqlite/session-catalog";
 export { SettingsRegistry, type StoredSetting } from "./sqlite/settings";
 export {

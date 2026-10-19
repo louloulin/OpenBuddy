@@ -41,6 +41,24 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
+      # A8(2026-10-19 生产评审):tag 必须与 package.json 版本一致,否则产物名
+      # 与 release tag 漂移;workflow_dispatch 空 tag 会退化成分支名,在 main 上
+      # 打出名为 "main" 的正式 Release —— 直接 fail。
+      - name: Assert tag matches package.json version
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          VERSION="v$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} != package.json version ${VERSION} — bump the version or fix the tag"
+            exit 1
+          fi
+
+      - name: Require explicit tag for dispatch builds
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.tag == '' }}
+        run: |
+          echo "::error::workflow_dispatch requires an explicit tag input (refusing to publish a release named after a branch)"
+          exit 1
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -70,15 +88,9 @@ jobs:
       - name: Typecheck (workspace libraries)
         run: pnpm workspace:typecheck
 
-      # Renderer + unit-test suite. This suite has known pre-existing
-      # failures (a handful of `@openbuddy/*` subpath aliases that Vitest
-      # cannot resolve from inside `packages/ui/*`) unrelated to packaging,
-      # so we run it best-effort: a failure is reported in the run summary
-      # but does not block the platform builds that follow. Once `pnpm test`
-      # is green again, drop `continue-on-error: true`.
-      - name: Renderer tests (best-effort)
-        if: ${{ always() }}
-        continue-on-error: true
+      # Renderer + unit-test suite(C2,2026-10-19):测试现在全绿,发布不再
+      # 对测试放行 —— 挂了就停,不带病发包。
+      - name: Renderer tests
         run: pnpm test
 
       # electron-vite orchestrates three bundles (main + preload +
@@ -111,6 +123,16 @@ jobs:
       - name: Sync moon workspace
         run: pnpm moon:sync
 
+      # A6(2026-10-19 生产评审):host-core sidecar 必须随包构建 —— 此前没有任何
+      # job 产出 crates/target/release/openbuddy-host-core.exe,打包要么失败要么
+      # 发出一个能力被摘掉(权限/密钥/会话检索/审计静默降级)的 app。
+      - name: Setup Rust toolchain (host-core sidecar)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build host-core sidecar
+        working-directory: crates
+        run: cargo build --release
+
       # Builds the three electron-vite bundles first (cached from `ci`'s
       # build if the runner cached it; otherwise rebuilt locally) and then
       # runs electron-builder to produce `OpenBuddy-<version>-setup.exe`
@@ -129,6 +151,7 @@ jobs:
           path: |
             release/*.exe
             release/*.exe.blockmap
+            release/latest.yml
 
   build-macos:
     needs: [ci]
@@ -153,6 +176,14 @@ jobs:
 
       - name: Sync moon workspace
         run: pnpm moon:sync
+
+      # A6:host-core sidecar 随包构建(见 Windows job 注释)。
+      - name: Setup Rust toolchain (host-core sidecar)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build host-core sidecar
+        working-directory: crates
+        run: cargo build --release
 
       # Apple Developer ID Application certificate. Base64-encoded in
       # the secret; decoded to a tmp .p12 and pointed at via CSC_LINK +
@@ -202,6 +233,8 @@ jobs:
           path: |
             release/*.dmg
             release/*.dmg.blockmap
+            release/*.zip
+            release/latest-mac.yml
 
   build-linux:
     needs: [ci]
@@ -239,6 +272,14 @@ jobs:
 
       - name: Sync moon workspace
         run: pnpm moon:sync
+
+      # A6:host-core sidecar 随包构建(见 Windows job 注释)。
+      - name: Setup Rust toolchain (host-core sidecar)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build host-core sidecar
+        working-directory: crates
+        run: cargo build --release
 
       # Builds the AppImage (`OpenBuddy-<version>.AppImage`). No signing
       # step — AppImages are self-contained executables. Any Linux-

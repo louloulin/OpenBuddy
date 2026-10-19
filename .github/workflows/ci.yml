@@ -164,8 +164,26 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm moon:sync
+      # C1(2026-10-19 生产评审):两个 smoke 起的是真实 Electron(指向
+      # dist/,package.json main)—— 本 job 此前没有构建步骤,在干净 runner
+      # 上结构性无法通过(本机能过只是因为磁盘留着旧 dist/)。
+      - run: pnpm exec electron-vite build
       - run: pnpm test:electron:ipc-surface
       - run: pnpm test:electron:surface
+
+  secrets:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # B1(2026-10-19 生产评审):真实 API key 曾进过公开仓库历史。全量扫描
+      # (fetch-depth: 0)拦住新增泄露;历史清洗另由轮换兜底。
+      - name: gitleaks (full history)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   perf-budget:
     name: Performance Budget Gate

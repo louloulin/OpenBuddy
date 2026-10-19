@@ -100,6 +100,15 @@ export class SqliteDriver implements StorageDriver {
     runStatement(this.database, `PRAGMA busy_timeout = ${Math.max(0, busyTimeoutMs | 0)}`);
     runStatement(this.database, `PRAGMA foreign_keys = ${options.foreignKeys === false ? "OFF" : "ON"}`);
     runStatement(this.database, `PRAGMA journal_mode = ${determineJournalMode(options.filePath, options.journalMode)}`);
+    // 数据§11(2026-10-19 生产评审):WAL 无上限会长到数百 MB。checkpoint 后
+    // 把 -wal 截到 64MB 上限;每 1000 页(≈4MB)自动 checkpoint。非 WAL 模式下
+    // 这两条 PRAGMA 是 no-op(个别旧 SQLite 会报错,忽略即可)。
+    try {
+      runStatement(this.database, "PRAGMA journal_size_limit = 67108864");
+      runStatement(this.database, "PRAGMA wal_autocheckpoint = 1000");
+    } catch {
+      /* 非 WAL / 旧引擎:保持默认 */
+    }
     runStatement(this.database, `PRAGMA synchronous = NORMAL`);
   }
 

@@ -5,6 +5,7 @@
  */
 import { shell, type BrowserWindow } from "electron";
 import { wrapIpcHandler } from "./_wrap";
+import { confirmDangerousAction } from "./native-confirm";
 import { casdoorAuth } from "../casdoor/casdoor-auth";
 import { casdoorAudit } from "../casdoor/casdoor-audit";
 import { casdoorResources } from "../casdoor/casdoor-resources";
@@ -59,6 +60,23 @@ import {
 } from "../casdoor/casdoor-management";
 
 export function registerCasdoorIpc(getWindow: () => BrowserWindow | null): void {
+	// P0.2(2026-10-19 生产评审 B3):鉴权相关字段的写入必须过原生确认 ——
+	// 渲染进程一发 { scope: "profile" } 就能让 configured=false,全部断言
+	// fail-open。确认在原生层,渲染进程无法绕过。
+	const AUTH_FIELDS = ["issuer", "clientId", "clientSecret", "scope", "redirectUri"] as const;
+	wrapIpcHandler("casdoor:config-save", async (_e, patch: Record<string, unknown>) => {
+		const touched = AUTH_FIELDS.filter((field) => field in (patch ?? {}));
+		if (touched.length > 0) {
+			await confirmDangerousAction({
+				window: getWindow(),
+				title: "修改企业登录配置",
+				message: "应用请求修改企业鉴权(Casdoor)配置",
+				detail: `变更字段:${touched.join(", ")}。鉴权配置被改动后,企业资源授权将按新配置重新判定。`,
+				confirmLabel: "允许修改",
+			});
+		}
+		return casdoorAuth.saveConfig(patch);
+	});
 		wrapIpcHandler("casdoor:workbench-summary", async () => {
 			const status = casdoorAuth.status();
 			const identity = status.identity ? {
@@ -87,7 +105,6 @@ export function registerCasdoorIpc(getWindow: () => BrowserWindow | null): void 
 		wrapIpcHandler("casdoor:status", async () => casdoorAuth.status());
 		wrapIpcHandler("casdoor:capabilities", async () => casdoorAuth.getLoginCapabilities());
 		wrapIpcHandler("casdoor:config-get", async () => casdoorAuth.getConfig());
-		wrapIpcHandler("casdoor:config-save", async (_e, patch: Record<string, unknown>) => casdoorAuth.saveConfig(patch));
 		wrapIpcHandler("casdoor:login", async (_e, provider: "default" | "sms" | "wechat") => casdoorAuth.startLogin(provider));
 		wrapIpcHandler("casdoor:refresh", async () => casdoorAuth.refresh());
 		wrapIpcHandler("casdoor:logout", async () => casdoorAuth.logout());

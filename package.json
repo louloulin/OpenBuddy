@@ -55,6 +55,8 @@
     "release:notes": "node scripts/extract-release-notes.mjs",
     "provider:e3:fixture": "node scripts/provider-e3-fixture-preflight.mjs",
     "verify:agent-host-boundaries": "node scripts/architecture/check-agent-host-boundaries.mjs",
+    "notices": "node scripts/generate-notices.mjs",
+    "icons": "node scripts/build-app-icons.mjs",
     "verify:i18n": "node scripts/check-i18n.mjs",
     "verify:colors": "node scripts/check-hardcoded-colors.mjs",
     "verify:a11y": "node scripts/check-a11y.mjs",

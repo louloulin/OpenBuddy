@@ -18,6 +18,7 @@
  * cold-start path (matches `plugins_list`).
  */
 import { wrapIpcHandler } from "./_wrap";
+import { confirmDangerousAction } from "./native-confirm";
 import { progressSnapshot, cancelProgress, retryProgress } from "../agent/progress-runs";
 import { MultiSurfaceSessionRegistry } from "../agent/multi-surface-session";
 import { pluginEventLogCursor } from "../agent/plugin-event-log-cursor";
@@ -175,10 +176,26 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
     return agentHost.reloadPlugin(requiredString(recordValue(args, "plugin-reload payload").id, "plugin id"));
   });
   wrapIpcHandler("agent:extensions-reload", async () => agentHost.reloadPiExtensions());
+  // P0.2(2026-10-19 生产评审 B4):扩展 allowlist/denylist 的写入让渲染进程
+  // 可以打开"装任意代码"的口子,必须过原生确认(reload 与 save 是同一条
+  // 写路径的两个入口,一并收口)。
+  const confirmExtensionPolicy = async (allowlist: string[], denylist: string[]) => {
+    await confirmDangerousAction({
+      window: deps.getWindow(),
+      title: "修改扩展策略",
+      message: "应用请求修改扩展(插件)安装策略",
+      detail: `允许名单 ${allowlist.length} 项 / 拒绝名单 ${denylist.length} 项。放宽 allowlist 等于允许这些来源的代码在本机执行。`,
+      confirmLabel: "允许修改",
+    });
+  };
   wrapIpcHandler("agent:extension-policy-reload", async (_e, args: unknown) => {
     const input = recordValue(args, "extension policy payload");
     const allowlist = Array.isArray(input.allowlistPackageNames) ? input.allowlistPackageNames : [];
     const denylist = Array.isArray(input.denylistPackageNames) ? input.denylistPackageNames : [];
+    await confirmExtensionPolicy(
+      allowlist.filter((entry): entry is string => typeof entry === "string"),
+      denylist.filter((entry): entry is string => typeof entry === "string"),
+    );
     return agentHost.updateExtensionPolicy({ allowlistPackageNames: allowlist, denylistPackageNames: denylist });
   });
   wrapIpcHandler("agent:extension-policy-get", async () => readExtensionPolicyConfig());
@@ -188,6 +205,7 @@ export function registerPluginIpc(deps: AgentHostIpcDeps): void {
       allowlistPackageNames: Array.isArray(input.allowlistPackageNames) ? input.allowlistPackageNames.filter((entry): entry is string => typeof entry === "string") : [],
       denylistPackageNames: Array.isArray(input.denylistPackageNames) ? input.denylistPackageNames.filter((entry): entry is string => typeof entry === "string") : [],
     });
+    await confirmExtensionPolicy(config.allowlistPackageNames, config.denylistPackageNames);
     return agentHost.updateExtensionPolicy(config);
   });
   wrapIpcHandler("agent:plugin-config", async (_e, args: { id: string; config: unknown }) => {

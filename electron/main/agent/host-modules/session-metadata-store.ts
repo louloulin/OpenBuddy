@@ -40,7 +40,7 @@ import { rm, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { openStorageSync, SettingsStore, agentHome } from "@openbuddy/storage";
+import { applyPendingStorageRestoreSync, openStorageSync, SettingsStore, agentHome } from "@openbuddy/storage";
 
 import { bumpCacheEpoch } from "./_cache";
 import { piHome } from "./_host-paths";
@@ -140,8 +140,26 @@ export class SessionMetadataStore {
     if (options.settings) {
       this.settings = options.settings;
     } else {
+      const databasePath = options.databasePath ?? defaultDatabasePath();
+      // P0.8/P1(2026-10-19 生产评审 数据§7):开库前执行"暂存的恢复"。
+      // 设置页的「恢复备份」不直接换文件(运行中 swap 是未定义行为),而是
+      // stage + 标记,重启后在这里生效;现库被挪到 .pre-restore-<时间戳>,
+      // 数据不丢。失败则清标记按无恢复处理(见 applyPendingStorageRestore)。
+      try {
+        const applied = applyPendingStorageRestoreSync(databasePath);
+        if (applied) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[session-metadata] pending restore applied: schema v${applied.schemaVersion}, ` +
+              `previous db quarantined at ${applied.quarantined[0] ?? "(none)"}`,
+          );
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("[session-metadata] pending restore failed; keeping current db:", error);
+      }
       this.settings = new SettingsStore({
-        driver: openStorageSync({ filePath: options.databasePath ?? defaultDatabasePath() }).driver,
+        driver: openStorageSync({ filePath: databasePath }).driver,
       });
     }
     this.legacyJsonPath = options.legacyJsonPath ?? defaultLegacyJsonPath();

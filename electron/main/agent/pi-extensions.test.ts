@@ -32,7 +32,7 @@ describe("OpenBuddy Pi extension resolution", () => {
     return { emit, handlers };
   }
 
-  it("resolves built-ins and profile-local extension sources", () => {
+  it("resolves built-ins and allowlisted profile-local extension sources", () => {
     const emit = vi.fn();
     const result = resolvePiExtensions([
       { id: "openbuddy-pi-observability", config: { toolEvents: false } },
@@ -41,6 +41,8 @@ describe("OpenBuddy Pi extension resolution", () => {
       profileDir: "/tmp/profile",
       resolveSource: (source) => `/tmp/profile/node_modules/${source}/index.js`,
       emit,
+      // B5(2026-10-19)deny 落地后,第三方 source 必须显式 allowlist。
+      allowlistPackageNames: ["external-extension"],
     });
     expect(result.factories.map((entry) => entry.name)).toEqual(["openbuddy-pi-observability"]);
     expect(result.paths).toEqual(["/tmp/profile/node_modules/external-extension/index.js"]);
@@ -49,6 +51,46 @@ describe("OpenBuddy Pi extension resolution", () => {
       { id: "external-extension", source: "/tmp/profile/node_modules/external-extension/index.js", builtIn: false },
     ]);
     expect(result.diagnostics).toEqual([]);
+  });
+
+  it("B5 回归:deny 的第三方扩展不进 paths/resolved(此前只进审计报告)", () => {
+    const emit = vi.fn();
+    const result = resolvePiExtensions([
+      { id: "openbuddy-pi-observability", config: {} },
+      { id: "evil-extension", source: "evil-extension" },
+    ], {
+      profileDir: "/tmp/profile",
+      resolveSource: () => "/tmp/profile/node_modules/evil-extension/index.js",
+      emit,
+      allowlistPackageNames: [],
+      denylistPackageNames: ["evil-extension"],
+    });
+    // 被拒的 spec 既不进 paths 也不进 resolved —— 拒绝就是拒绝。
+    expect(result.paths).toEqual([]);
+    expect(result.resolved.map((entry) => entry.id)).toEqual(["openbuddy-pi-observability"]);
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({ id: "evil-extension", state: "failed" }),
+    ]);
+    // deny 同时出现在策略审计事件里。
+    const reportEvent = emit.mock.calls.find(([event]) => event === "pi/extension-policy-report");
+    expect(reportEvent).toBeTruthy();
+    const denied = (reportEvent?.[1] as { decisions: Array<{ id: string; action: string }> }).decisions
+      .filter((entry) => entry.action === "deny");
+    expect(denied.map((entry) => entry.id)).toContain("evil-extension");
+  });
+
+  it("B5 回归:未 allowlist 的第三方扩展默认拒绝(最小权限默认值被真实执行)", () => {
+    const emit = vi.fn();
+    const result = resolvePiExtensions(
+      [{ id: "some-extension", source: "some-extension" }],
+      {
+        profileDir: "/tmp/profile",
+        resolveSource: () => "/tmp/profile/node_modules/some-extension/index.js",
+        emit,
+      },
+    );
+    expect(result.paths).toEqual([]);
+    expect(result.resolved).toEqual([]);
   });
 
   it("adapts goal, plan, task, session, and fs pi backends to canonical OpenBuddy services", async () => {
@@ -366,6 +408,9 @@ describe("OpenBuddy Pi extension resolution", () => {
         profileDir: "/tmp/profile",
         resolveSource: (source) => `/tmp/profile/node_modules/${source}/index.js`,
         emit,
+        // B5(2026-10-19)deny 落地后第三方 source 须显式 allowlist(生产路径
+        // 由 profile 依赖清单自动并入,见 pi-extension-configure)。
+        allowlistPackageNames: ["pi-web-access", "pi-subagents", "@juicesharp/rpiv-todo"],
       },
     );
 
@@ -400,6 +445,7 @@ describe("OpenBuddy Pi extension resolution", () => {
       [{ id: "pi-subagents", source: "pi-subagents" }],
       {
         profileDir: "/tmp/profile",
+        allowlistPackageNames: ["pi-subagents"],
         resolveSource: (source) => `/tmp/profile/node_modules/${source}/index.js`,
         emit,
       },
@@ -604,6 +650,7 @@ describe("OpenBuddy Pi extension resolution", () => {
       { id: "absolute-extension", source: "/tmp/extensions/absolute.ts" },
     ], {
       profileDir: "/tmp/profile",
+      allowlistPackageNames: ["/tmp/extensions/absolute.ts"],
       resolveSource: () => { throw new Error("host resolution must not be used"); },
       emit: () => undefined,
     });

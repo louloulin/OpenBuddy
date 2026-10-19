@@ -370,6 +370,29 @@ function buildOpenBuddyDepsPatch(): string {
   return buildOpenBuddyExternalPatch().replace(/export default __openbuddyExports;/, "");
 }
 
+/**
+ * P0.3(2026-10-19 生产评审 B6)—— dev 时放宽 index.html 的 CSP。
+ *
+ * index.html 里的 CSP meta 是生产口径(script-src 禁 inline)。dev 下
+ * `@vitejs/plugin-react` 会注入内联的 react-refresh preamble 模块脚本,
+ * 会被该 meta 拦掉(白屏)。此插件只在 **dev server** 路径
+ * (`transformIndexHtml` 的 `ctx.server` 存在时)把 script-src 追加
+ * `unsafe-inline`;构建产物不受影响。
+ */
+function cspDevRelax() {
+  return {
+    name: "openbuddy:csp-dev-relax",
+    transformIndexHtml(html: string, ctx: { server?: unknown }) {
+      if (!ctx?.server) return html;
+      return html.replace(
+        /(<meta[^>]*http-equiv="Content-Security-Policy"[^>]*content=")([^"]*)(")/,
+        (_m, head: string, content: string, tail: string) =>
+          `${head}${content.replace("script-src 'self' file:", "script-src 'self' file: 'unsafe-inline'")} ${tail}`,
+      );
+    },
+  } as const;
+}
+
 function nodeExternalPatch() {
   const patchBody = buildOpenBuddyExternalPatch();
   // Optimize-deps files already end with their own `export default` /
@@ -768,7 +791,7 @@ export default defineConfig({
     // directly, which `process.platform`, `global`, and `fileURLToPath`
     // look up against. `define` strings only replace top-level
     // identifiers and don't reach that object.
-    plugins: [react(), nodeExternalPatch()],
+    plugins: [react(), nodeExternalPatch(), cspDevRelax()],
     server: {
       // Electron main reads ELECTRON_RENDERER_URL (set automatically by
       // electron-vite). The port here must match the Vite dev port the main

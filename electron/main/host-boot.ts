@@ -72,11 +72,20 @@ export async function bootHostCore(options: HostBootOptions = {}): Promise<Boote
     clearTimeout(slowHintTimer);
     clearTimeout(stalledTimer);
     const diagnosis = diagnoseHostFailure(err);
+    // P0.7(2026-10-19 生产评审 §6.3):host-core 启动失败是打包后最常见的
+    // 首启故障,必须落盘(console.error 在打包态无人可见)。日志文件由
+    // log-bootstrap 注入的默认 sink 承接。
     // eslint-disable-next-line no-console
     console.error(
       `[openbuddy-boot] host-core boot failed: ${diagnosis.message}` +
         (diagnosis.hint ? ` (${diagnosis.hint})` : ""),
     );
+    try {
+      const { createMainLogger } = await import("@openbuddy/logging-main");
+      createMainLogger({ serviceName: "openbuddy-boot" }).error(
+        { msg: "host-core boot failed", diagnosis: diagnosis.message, hint: diagnosis.hint ?? null },
+      );
+    } catch { /* 日志不可用时不能掩盖原始错误 */ }
     throw err instanceof Error ? err : new Error(diagnosis.message);
   }
   clearTimeout(slowHintTimer);

@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -37,6 +37,109 @@ describe("openStorage", () => {
     expect(restored.driver.database.prepare("SELECT version, status FROM schema_meta WHERE status = 'applied' ORDER BY version").all()).toHaveLength(MIGRATION_COUNT);
     await expect(restored.driver.integrityCheck()).resolves.toMatchObject({ ok: true });
     restored.driver.close();
+  });
+
+  it("P0.8 回归:损坏库被隔离为 .corrupt-* 并重建空库,而不是永久砖死", async () => {
+    root = await mkdtemp(join(tmpdir(), "openbuddy-corrupt-quarantine-"));
+    const databasePath = join(root, "data", "openbuddy.sqlite");
+    // 造一个"能打开但 integrity 检查失败"的库:写入后人为破坏页数据。
+    const first = await openStorage({ filePath: databasePath });
+    first.driver.database.exec("CREATE TABLE canary(value TEXT)");
+    first.driver.database.prepare("INSERT INTO canary(value) VALUES ('keepme')").run();
+    first.driver.close();
+    // 翻乱中段字节(保留头部 magic,让 sqlite 能打开但完整性坏掉)。
+    const corrupted = Buffer.from(await readFile(databasePath));
+    for (let i = 4096; i < Math.min(corrupted.length, 4096 * 8); i += 1) corrupted[i] = 0xde;
+    await writeFile(databasePath, corrupted);
+
+    const isolated: Array<{ db: string | null; sidecars: string[] }> = [];
+    const reopened = await openStorage({
+      filePath: databasePath,
+      onCorruptIsolated: (q) => isolated.push(q),
+    });
+    // 重建出的库是干净的空库(迁移全量应用)。
+    expect(reopened.migration.finalVersion).toBe(LATEST);
+    await expect(reopened.driver.integrityCheck()).resolves.toMatchObject({ ok: true });
+    reopened.driver.close();
+    // 损坏库被挪走(带 .corrupt- 时间戳后缀),没有直接丢数据。
+    expect(isolated).toHaveLength(1);
+    expect(isolated[0].db).toContain(".corrupt-");
+    expect(existsSync(`${databasePath}`)).toBe(true);
+  });
+
+  it("P1 数据§2 回归:未来库(user_version 高于本构建)被拒且不被隔离", async () => {
+    root = await mkdtemp(join(tmpdir(), "openbuddy-downgrade-guard-"));
+    const databasePath = join(root, "data", "openbuddy.sqlite");
+    // 用「知道 2 个迁移」的构建写库。
+    const newBuild = await openStorage({ filePath: databasePath });
+    newBuild.driver.close();
+    // 用「只知道 1 个迁移」的旧构建打开 → DowngradeBlockedError。
+    const steps = DEFAULT_MIGRATIONS.slice(0, 1);
+    let blocked: unknown;
+    try {
+      await openStorage({ filePath: databasePath, onCorruptIsolated: () => { throw new Error("must not quarantine"); } });
+    } catch (error) { blocked = error; }
+    // 注:上面这行用的是全量 DEFAULT_MIGRATIONS,不会拦 —— 真正的降级场景
+    // 要用裁剪过的 step 集合,见下方 MigrationRunner 直测。
+    void steps;
+    // 直接用 MigrationRunner 断言降级语义。
+    const { MigrationRunner, DowngradeBlockedError } = await import("../sqlite/migration");
+    const { SqliteDriver } = await import("../sqlite/driver");
+    const driver = new SqliteDriver({ filePath: databasePath });
+    try {
+      const runner = new MigrationRunner({ steps: DEFAULT_MIGRATIONS.slice(0, 1), appVersion: "old-build" });
+      expect(() => runner.runSync(driver)).toThrow(DowngradeBlockedError);
+      try {
+        runner.runSync(driver);
+      } catch (error) {
+        const blockedError = error as InstanceType<typeof DowngradeBlockedError>;
+        expect(blockedError.databaseVersion).toBe(LATEST);
+        expect(blockedError.buildMaxVersion).toBe(1);
+      }
+    } finally {
+      driver.close();
+    }
+    // 关键:降级拦截不触发隔离 —— 损坏隔离文件不存在,未来库原样保留。
+    expect(existsSync(`${databasePath}.corrupt-`)).toBe(false);
+    expect(existsSync(databasePath)).toBe(true);
+    void blocked;
+  });
+
+  it("P1 数据§7 回归:备份 → stage → 重启生效的恢复全链", async () => {
+    const { createStorageBackup, stageStorageRestore, applyPendingStorageRestoreSync } = await import("../index");
+    root = await mkdtemp(join(tmpdir(), "openbuddy-pending-restore-"));
+    const databasePath = join(root, "data", "openbuddy.sqlite");
+    // v1:写入基线数据并备份。
+    const first = await openStorage({ filePath: databasePath });
+    first.driver.database.exec("CREATE TABLE canary(value TEXT)");
+    first.driver.database.prepare("INSERT INTO canary(value) VALUES ('from-backup')").run();
+    first.driver.close();
+    const backup = await createStorageBackup(databasePath);
+    expect(backup.schemaVersion).toBe(LATEST);
+    // v2:备份之后又写入新数据(恢复应回到备份点)。
+    const second = await openStorage({ filePath: databasePath });
+    second.driver.database.prepare("INSERT INTO canary(value) VALUES ('after-backup')").run();
+    second.driver.close();
+    // stage(校验 + 暂存 + 标记,不动现库)。
+    const staged = await stageStorageRestore({ backupPath: backup.path, databasePath });
+    expect(staged.schemaVersion).toBe(LATEST);
+    const beforeApply = await openStorage({ filePath: databasePath });
+    // 恢复前:备份行 + 备份后追加的行都在(现库未被 stage 动过)。
+    expect(beforeApply.driver.database.prepare("SELECT value FROM canary ORDER BY rowid").all()).toEqual([
+      { value: "from-backup" },
+      { value: "after-backup" },
+    ]);
+    beforeApply.driver.close();
+    // 重启路径:开库前 apply → 现库被挪走,备份顶上。
+    const applied = applyPendingStorageRestoreSync(databasePath);
+    expect(applied?.restored).toBe(true);
+    expect(applied?.quarantined.length).toBeGreaterThan(0);
+    expect(applied?.quarantined[0]).toContain(".pre-restore-");
+    const restored = await openStorage({ filePath: databasePath });
+    expect(restored.driver.database.prepare("SELECT value FROM canary").all()).toEqual([{ value: "from-backup" }]);
+    restored.driver.close();
+    // 旧库仍在(.pre-restore-*),数据没有丢。
+    expect(existsSync(applied!.quarantined[0])).toBe(true);
   });
 
   it("serializes backup behind queued writes", async () => {

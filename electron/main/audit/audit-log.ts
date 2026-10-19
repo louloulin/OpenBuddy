@@ -17,7 +17,7 @@
  *   - 超出限额时按时间顺序 trim。
  */
 import { app } from "electron";
-import { appendFile, readFile, truncate, writeFile } from "node:fs/promises";
+import { appendFile, readFile, rename, truncate, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 
@@ -165,8 +165,11 @@ class AuditTrail {
       try {
         const blob = `${this.buffer.map((e) => JSON.stringify(e)).join("\n")}\n`;
         if (Buffer.byteLength(blob, "utf8") > MAX_BYTES) {
-          await truncate(auditPath(), 0);
-          await writeFile(auditPath(), blob, "utf8");
+          // 数据§4(2026-10-19 生产评审):先 truncate(0) 再 write 会在中途
+          // 崩溃/ENOSPC 时留下 0 字节审计日志。改 tmp + rename(原子替换)。
+          const temporary = `${auditPath()}.${process.pid}.${Date.now()}.trim.tmp`;
+          await writeFile(temporary, blob, "utf8");
+          await rename(temporary, auditPath());
         }
       } catch (error) {
         console.warn("[audit] trim failed", error);

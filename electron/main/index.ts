@@ -1,3 +1,6 @@
+// 必须最先求值:给所有后续 createMainLogger 注入默认文件 sink(P0.7)。
+// 注意它必须位于所有会构造 logger 的 import 之前 —— 移到文件第一个 import。
+import "./log-bootstrap";
 import { EventEmitter } from "node:events";
 // PR-D: raise default max-listener threshold so heavy pi-subagents fan-out
 // (one listener per child session) does not pollute the run with
@@ -297,8 +300,13 @@ installAppLifecycle({
     casdoorController!.setStatusListener();
     // Wire electron-updater (Phase 1 of rb-autoupdater). The handle is kept
     // on a module-level ref so onBeforeQuit can detach the listeners.
-    autoUpdaterHandle = installAutoUpdater();
-    void autoUpdaterHandle.trigger();
+    // P0.6(2026-10-19 生产评审 A4):dev/未打包态不连更新 feed —— checkForUpdates
+    // 在 dev 下必然失败(app-update.yml 不存在),每次开窗白打一次网络请求。
+    // 渲染端仍可手动点「检查更新」(打包态才有效)。
+    if (app.isPackaged) {
+      autoUpdaterHandle = installAutoUpdater();
+      void autoUpdaterHandle.trigger();
+    }
   },
   bootBackgroundServices,
   onBeforeQuit: () => {

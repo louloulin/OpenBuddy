@@ -85,16 +85,31 @@ try {
 </body></html>`;
 }
 
+/**
+ * 为什么 iframe 用 data: URL 而不是 srcdoc:P0.3(2026-10-19)给宿主文档加了
+ * CSP(script-src 禁 inline),**srcdoc 文档会继承父文档的 CSP**,画布里
+ * 模型/用户写的内联脚本会被拦掉。data: URL 是不透明源、不继承父 CSP,
+ * 且 iframe 本就 sandbox(无 allow-same-origin)—— 行为等价,无能力回退。
+ */
+function toDataUrl(html: string): string {
+  const bytes = new TextEncoder().encode(html);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return `data:text/html;charset=utf-8;base64,${btoa(binary)}`;
+}
+
 export function CanvasSandboxFrame({ kind, content }: CanvasSandboxFrameProps) {
   const previewTitle = useT("conversation.canvas.previewTitle");
   const reactLoadFailed = useT("conversation.canvas.reactLoadFailed");
-  const srcdoc = useMemo(
-    () => buildSrcdoc(kind, content, reactLoadFailed),
+  const src = useMemo(
+    () => toDataUrl(buildSrcdoc(kind, content, reactLoadFailed)),
     [kind, content, reactLoadFailed],
   );
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
   // 预览里的外链交给系统浏览器 —— 与 markdown 链接同一处理,避免在 iframe 内导航。
+  // 注意:sandbox(无 allow-same-origin)下 contentDocument 恒为 null,此路径
+  // 实际不可达;保留是因为不透明源行为由浏览器保证,这里不做额外假设。
   useEffect(() => {
     const frame = frameRef.current;
     if (!frame) return undefined;
@@ -112,7 +127,7 @@ export function CanvasSandboxFrame({ kind, content }: CanvasSandboxFrameProps) {
     };
     frame.addEventListener("load", onLoad);
     return () => frame.removeEventListener("load", onLoad);
-  }, [srcdoc]);
+  }, [src]);
 
   return (
     <iframe
@@ -124,7 +139,7 @@ export function CanvasSandboxFrame({ kind, content }: CanvasSandboxFrameProps) {
       // 无 allow-same-origin → 不透明源,iframe 内代码拿不到 parent / IPC。
       sandbox={IFRAME_SANDBOX}
       referrerPolicy="no-referrer"
-      srcDoc={srcdoc}
+      src={src}
     />
   );
 }

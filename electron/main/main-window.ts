@@ -43,7 +43,10 @@ export function createMainWindow(opts: CreateMainWindowOptions): BrowserWindow {
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      // P0.3(2026-10-19 生产评审 B6):preload 只用 contextBridge + ipcRenderer
+      // (polyfill 覆盖的 process.platform/versions/env 在沙箱 preload 里可用),
+      // 渲染进程不需要 Node —— 沙箱化把渲染层漏洞的爆炸半径压到最低。
+      sandbox: true,
     },
   });
 

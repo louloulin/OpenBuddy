@@ -1339,6 +1339,36 @@ export function resolvePiExtensions(
   options: PiExtensionResolutionOptions,
 ): PiExtensionResolution {
   const result: PiExtensionResolution = { factories: [], paths: [], resolved: [], diagnostics: [] };
+  // P0.2(2026-10-19 生产评审 B5):deny 决策必须在**进 paths/resolved 之前**
+  // 做出 —— 此前 policy 在循环之后才算,deny 只进审计报告,被拒扩展的路径
+  // 已经进了加载清单(等于没拒)。policy 提前创建,循环内逐 spec 裁决。
+  const policy = createExtensionPolicy({
+    // Compatibility-adapter packages are vetted by the loader — they
+    // belong to the implicit allowlist. We rely on the adapter branch
+    // above to push the `resolved` entry; the policy report still
+    // describes them as "allow" with the package allowlist rationale.
+    allowlistPackageNames: [
+      ...compatibilityAdapters.flatMap((entry) => entry.packageNames),
+      ...(options.allowlistPackageNames ?? []),
+    ],
+    ...(options.denylistPackageNames && options.denylistPackageNames.length > 0
+      ? { denylistPackageNames: options.denylistPackageNames }
+      : {}),
+    // All built-in extensions are always allowed — the existing
+    // `builtinPiExtensionFactories` check above already filtered the
+    // list, but we still report it for audit completeness.
+    allowBuiltins: true,
+    // plan4.5 §B — let the caller mark specific ids / packages as
+    // needs-review so the gate can block them until the user signs off.
+    ...(options.needsReviewIds && options.needsReviewIds.length > 0 ? { needsReviewIds: options.needsReviewIds } : {}),
+    ...(options.needsReviewPackageNames && options.needsReviewPackageNames.length > 0 ? { needsReviewPackageNames: options.needsReviewPackageNames } : {}),
+  });
+  const decisionInput = (spec: OpenBuddyPiExtensionSpec) => ({
+    id: typeof spec?.id === "string" ? spec.id : "<unknown>",
+    packageName: typeof spec?.source === "string" ? spec.source : undefined,
+    builtIn: typeof spec?.id === "string" && spec.id in builtinPiExtensionFactories,
+  });
+  const decisions: Array<{ input: ReturnType<typeof decisionInput>; decision: ReturnType<typeof policy.decide> }> = [];
   for (const spec of specs) {
     if (!spec || typeof spec.id !== "string" || !spec.id.trim()) {
       result.diagnostics.push({ id: String(spec?.id ?? "<unknown>"), state: "failed", error: "Pi extension id is required" });
@@ -1348,6 +1378,9 @@ export function resolvePiExtensions(
       result.diagnostics.push({ id: spec.id, state: "disabled" });
       continue;
     }
+    const input = decisionInput(spec);
+    const decision = policy.decide(input);
+    decisions.push({ input, decision });
     const adapter = findCompatibilityAdapter(spec);
     if (adapter) {
       result.factories.push({
@@ -1390,6 +1423,14 @@ export function resolvePiExtensions(
       result.diagnostics.push({ id: spec.id, state: "failed", error: `Unknown Pi extension ${spec.id}; source is required` });
       continue;
     }
+    // P0.2(2026-10-19 生产评审 B5):deny 在**进 paths/resolved 之前**裁决 ——
+    // 此前 policy 在循环之后才算,deny 只进审计报告,被拒扩展的路径已经进了
+    // 加载清单(等于没拒)。adapter/builtin 分支由构造保证受信(上方已 continue),
+    // 这里强制的对象是第三方 source。
+    if (decision.action === "deny") {
+      result.diagnostics.push({ id: spec.id, state: "failed", error: `Denied by extension policy: ${decision.reason}` });
+      continue;
+    }
     try {
       const source = isAbsolute(spec.source) ? resolve(spec.source) : options.resolveSource(spec.source);
       result.paths.push(source);
@@ -1404,41 +1445,6 @@ export function resolvePiExtensions(
   // The decisions list mirrors the spec list order; the report object is
   // frozen by `describeExtensionPolicyReport` so consumers can't mutate
   // it after the event lands in renderer state.
-  const policy = createExtensionPolicy({
-    // Compatibility-adapter packages are vetted by the loader — they
-    // belong to the implicit allowlist. We rely on the adapter branch
-    // above to push the `resolved` entry; the policy report still
-    // describes them as "allow" with the package allowlist rationale.
-    allowlistPackageNames: [
-      ...compatibilityAdapters.flatMap((entry) => entry.packageNames),
-      ...(options.allowlistPackageNames ?? []),
-    ],
-    ...(options.denylistPackageNames && options.denylistPackageNames.length > 0
-      ? { denylistPackageNames: options.denylistPackageNames }
-      : {}),
-    // All built-in extensions are always allowed — the existing
-    // `builtinPiExtensionFactories` check above already filtered the
-    // list, but we still report it for audit completeness.
-    allowBuiltins: true,
-    // plan4.5 §B — let the caller mark specific ids / packages as
-    // needs-review so the gate can block them until the user signs off.
-    ...(options.needsReviewIds && options.needsReviewIds.length > 0 ? { needsReviewIds: options.needsReviewIds } : {}),
-    ...(options.needsReviewPackageNames && options.needsReviewPackageNames.length > 0
-      ? { needsReviewPackageNames: options.needsReviewPackageNames }
-      : {}),
-  });
-  const decisions = specs.map((spec) => ({
-    input: {
-      id: typeof spec?.id === "string" ? spec.id : "<unknown>",
-      packageName: typeof spec?.source === "string" ? spec.source : undefined,
-      builtIn: typeof spec?.id === "string" && spec.id in builtinPiExtensionFactories,
-    },
-    decision: policy.decide({
-      id: typeof spec?.id === "string" ? spec.id : "<unknown>",
-      packageName: typeof spec?.source === "string" ? spec.source : undefined,
-      builtIn: typeof spec?.id === "string" && spec.id in builtinPiExtensionFactories,
-    }),
-  }));
   const report = describeExtensionPolicyReport(decisions);
   options.emit("pi/extension-policy-report", {
     generatedAt: new Date().toISOString(),

@@ -83,14 +83,13 @@ export async function createSentryReporter(
   return makeReporter(sentry);
 }
 
-/** 默认 loader — 用 eval 包裹 import,绕开 vite 静态解析。 */
+/** 默认 loader — 运行时动态 import,绕开 vite 静态解析。 */
 async function defaultSentryLoader(moduleName: string): Promise<unknown> {
-  // 用 Function 构造器包一层,运行时才解析,编译期不分析。
-  const dynamicImport = new Function("m", "return import(m);") as (
-    m: string,
-  ) => Promise<unknown>;
+  // P0.3(2026-10-19):宿主 CSP 禁 unsafe-eval,`new Function` 在**定义时**
+  // 就会抛 CSP 违规(它在模块顶层求值,白屏)。`@vite-ignore` 让 vite 不做
+  // 静态分析,编译成真正的动态 import —— CSP 合法且行为不变。
   try {
-    return await dynamicImport(moduleName);
+    return await import(/* @vite-ignore */ moduleName);
   } catch {
     return null;
   }

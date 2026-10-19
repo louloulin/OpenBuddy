@@ -132,7 +132,11 @@ describe("CanvasPanel", () => {
     const frame = await screen.findByTestId("canvas-sandbox-frame");
     // 不透明源:iframe 内的代码触碰 parent.* 会抛 SecurityError。
     expect(frame.getAttribute("sandbox")).not.toContain("allow-same-origin");
-    expect(frame.getAttribute("srcdoc")).toContain("<p>B</p>");
+    // P0.3(2026-10-19):宿主文档有 CSP(禁 inline script),srcdoc 会继承父
+    // CSP 拦掉画布内联脚本 —— 改用 data: URL(不透明源,不继承父 CSP)。
+    const src = frame.getAttribute("src") ?? "";
+    expect(src.startsWith("data:text/html;charset=utf-8;base64,")).toBe(true);
+    expect(atob(src.split(",")[1] ?? "")).toContain("<p>B</p>");
   });
 
   it("editing markdown keeps the source textarea in sync", () => {

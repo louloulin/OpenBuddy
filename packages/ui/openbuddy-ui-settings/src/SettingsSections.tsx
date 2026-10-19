@@ -662,7 +662,90 @@ export function DataSettingsPanel({ onOpenDataDirPicker }: { onOpenDataDirPicker
       <p className="settings-hint">
         完全删除历史会话请在侧栏右键单个会话选「删除」。
       </p>
+
+      {/* P0.8/P1(2026-10-19 生产评审 数据§7):备份/恢复。
+          driver.backup(VACUUM INTO)与恢复链路早已实现但此前零调用方。 */}
+      <BackupRestoreRow piHome={piHome} />
     </SectionShell>
+  );
+}
+
+/** 数据管理的备份/恢复行:备份立即生效;恢复走 stage + 重启生效。 */
+function BackupRestoreRow({ piHome }: { piHome: string }) {
+  const locale = useLocale();
+  const t = locale.t;
+  const [busy, setBusy] = useState<"backup" | "restore" | null>(null);
+  const [lastBackup, setLastBackup] = useState<string | null>(null);
+  const [pendingRestart, setPendingRestart] = useState(false);
+
+  const handleBackup = async () => {
+    setBusy("backup");
+    try {
+      const result = await invoke<{ path: string; schemaVersion: number }>("storage:backup-create", undefined);
+      setLastBackup(result.path);
+      setToast(t("settings.backup.ok", { path: result.path }));
+    } catch (e) {
+      setToast(t("settings.backup.failed", { error: String(e).replace(/^Error:\s*/, "") }));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleRestore = async () => {
+    const backupPath = lastBackup?.trim();
+    if (!backupPath) {
+      setToast(t("settings.backup.needBackupFirst"));
+      return;
+    }
+    if (
+      !(await confirm(
+        t("settings.backup.confirmRestore"),
+        { tone: "warning", confirmLabel: t("settings.backup.restore") },
+      ))
+    ) {
+      return;
+    }
+    setBusy("restore");
+    try {
+      const result = await invoke<{ ok: true; requiresRestart: boolean }>("storage:backup-restore", {
+        backupPath,
+      });
+      if (result.requiresRestart) {
+        setPendingRestart(true);
+        setToast(t("settings.backup.readyAfterRestart"));
+      }
+    } catch (e) {
+      setToast(t("settings.backup.failed", { error: String(e).replace(/^Error:\s*/, "") }));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="settings-row">
+      <div className="settings-row__label">
+        <HardDrive size={16} />
+        <span>{t("settings.backup.title")}</span>
+      </div>
+      <div className="settings-row__control" style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+        <div className="settings-actions">
+          <button className="settings-btn" onClick={handleBackup} disabled={busy !== null}>
+            {busy === "backup" ? t("settings.backup.backingUp") : t("settings.backup.create")}
+          </button>
+          <button className="settings-btn settings-btn--danger" onClick={handleRestore} disabled={busy !== null || !lastBackup}>
+            {busy === "restore" ? t("settings.backup.restoring") : t("settings.backup.restoreThis")}
+          </button>
+        </div>
+        {lastBackup ? (
+          <code title={lastBackup} style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {lastBackup}
+          </code>
+        ) : (
+          <span className="settings-hint">{t("settings.backup.hint", { home: piHome })}</span>
+        )}
+        {pendingRestart ? <span className="settings-hint">{t("settings.backup.readyAfterRestart")}</span> : null}
+      </div>
+    </div>
   );
 }
 
