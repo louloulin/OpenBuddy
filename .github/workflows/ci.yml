@@ -300,7 +300,11 @@ jobs:
       - name: Check markdown links
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --no-progress --exclude-loopback --max-concurrency 16
+          # --offline:只校验本地相对链接(仓内死链是门禁;外部站点可用性
+          # 不是我们的门禁,外网抖动不该让流水线变红)。
+          # --exclude-path:THIRD-PARTY-NOTICES.md 是第三方许可原文,内含
+          # 指向各上游仓的相对路径,不对本仓有效。
+          args: --no-progress --exclude-loopback --offline --exclude-path THIRD-PARTY-NOTICES.md --max-concurrency 16
           fail: true
 
   build-summary:

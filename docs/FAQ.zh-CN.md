@@ -121,7 +121,7 @@ Tauri 是最初的选择,我们迁移到 Electron 因为:
 - 跨平台安装包(electron-builder)工具成熟
 - 通过 Chrome DevTools 更容易调试
 
-完整迁移故事见 [`tauri-grok-removal-and-cordis-adoption.md`](tauri-grok-removal-and-cordis-adoption.md)。
+完整迁移故事见 `tauri-grok-removal-and-cordis-adoption.md`。
 
 #### 为什么不选 Turborepo / Nx 而是 moon?
 

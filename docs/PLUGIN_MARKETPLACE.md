@@ -589,7 +589,7 @@ scripts/electron/_probe-r83-pi-market-layout.mjs
 
 ## 相关文档
 
-- [`docs/PI_EXTENSION_BRIDGE.md`](./PI_EXTENSION_BRIDGE.md) — R74 公开 IPC
+- `docs/PI_EXTENSION_BRIDGE.md` — R74 公开 IPC
   契约(`listPiMarket / installPiMarket / refreshPiMarket / upgradePiMarket /
   uninstallPiMarket / rollbackPiMarket / lockfilePiMarket / auditPiMarket`),
   含第三方插件作者接入示例。

@@ -98,7 +98,7 @@ OpenBuddy/
 
 ### 3.1 微内核增量基线（2026-09-07）
 
-OpenBuddy 当前采用“微内核 + 领域模块 + Pi 兼容运行时”方向。完整的差距矩阵、目标架构图、WorkBuddy 现场观察和分阶段计划见 [`docs/ARCHITECTURE_MICROKERNEL.zh-CN.md`](docs/ARCHITECTURE_MICROKERNEL.zh-CN.md)。
+OpenBuddy 当前采用“微内核 + 领域模块 + Pi 兼容运行时”方向。完整的差距矩阵、目标架构图、WorkBuddy 现场观察和分阶段计划见 [`docs/ARCHITECTURE_MICROKERNEL.zh-CN.md`](../ARCHITECTURE_MICROKERNEL.zh-CN.md)。
 
 当前 composition root 为 `electron/main/agent/agent-host.ts`；行为分别落在 profile、session、plugin、runtime 四个领域。初始化统一经过 `electron/main/agent/host-modules/bootstrap/init-pipeline.ts`，通过 `microkernel-host.ts` 安装 host-modules。`InstallHostModuleDeps`、`InitPipelineDeps` 和 facade 是下一阶段需要进一步收紧的契约。
 
@@ -855,11 +855,11 @@ new BrowserWindow({
 | 文档 | 用途 |
 |------|------|
 | [README.md](README.md) | 项目首页 |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构深度解析 |
-| [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) | 30 分钟开发者设置 |
-| [docs/PLUGIN_DEVELOPMENT.md](docs/PLUGIN_DEVELOPMENT.md) | 插件开发指南 |
-| [docs/TESTING.md](docs/TESTING.md) | 测试策略 |
-| [docs/FAQ.md](docs/FAQ.md) | 常见问题 |
+| [docs/ARCHITECTURE.md](../ARCHITECTURE.md) | 架构深度解析 |
+| [docs/GETTING_STARTED.md](../GETTING_STARTED.md) | 30 分钟开发者设置 |
+| [docs/PLUGIN_DEVELOPMENT.md](../PLUGIN_DEVELOPMENT.md) | 插件开发指南 |
+| [docs/TESTING.md](../TESTING.md) | 测试策略 |
+| [docs/FAQ.md](../FAQ.md) | 常见问题 |
 
 ---
 

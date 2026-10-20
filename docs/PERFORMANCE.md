@@ -121,4 +121,4 @@ Recent performance work (last 6 months):
 - ⚡ Memory leak in session store fixed — long-running sessions now stay at 250 MB.
 - ⚡ SQLite WAL enabled — writes 6× faster.
 
-See [`evidence/coverage-report/`](../../evidence/coverage-report/) for per-PR trends.
+See `evidence/coverage-report/` for per-PR trends.

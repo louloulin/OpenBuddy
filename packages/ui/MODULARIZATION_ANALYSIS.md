@@ -117,7 +117,7 @@ packages/ui/openbuddy-ui-*/tsconfig.json  ← 每包独立 paths(同源)
 | `npx tsc -p <pkg>` 26 个包 | **26/26 全部通过** | 逐包 `npx tsc -p <pkg> --noEmit` |
 | `sync-ui-aliases.mjs` 幂等性 | **3 轮全部 already up to date** | 连续 3 次 `node scripts/sync-ui-aliases.mjs` |
 | 类型检查是真检查非假阳性 | **✓ 真实** | 在 `ui-shared` 加非法 import → `ui-collaboration` tsc 立刻报 1 错 |
-| `packages/ui/*` 不依赖 root `src/`(源码层) | **✓ 0 处 deep-relative** | `grep -rE 'from\s+["\'](\\.\\./){3,}src/' packages/ui/openbuddy-ui-*/src/` 为空 |
+| `packages/ui/*` 不依赖 root `src/`(源码层) | **✓ 0 处 deep-relative** | `grep -rE 'from\s+["\'](.){3,}src/' packages/ui/openbuddy-ui-*/src/` 为空 |
 | L2:Icon 体系已迁入 ui-primitives 包 | **✓** | `packages/ui/openbuddy-ui-primitives/src/icons/_foundation/` 含 208 个文件,无任何 `../../../../../src/` 路径 |
 | L2:tsconfig.json 0 处 `src/src` 或 `.//Users` 坏路径 | **✓** | 精确扫描(去除注释)后 0 处 |
 | L2:sync-ui-aliases.mjs tier 化门禁工作正常 | **✓** | 合成 deep-relative 违规 → exit 1 + 精确定位;还原 → exit 0 |

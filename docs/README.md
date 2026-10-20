@@ -73,7 +73,7 @@ Welcome to the OpenBuddy documentation index. This directory is the **single sou
 - [`openbuddy-product-vs-pi.md`](openbuddy-product-vs-pi.md) — how OpenBuddy extends Pi
 - [`pi-core-capabilities.md`](pi-core-capabilities.md) — Pi core capabilities
 - [`pi-extension-architecture.md`](pi-extension-architecture.md) — Pi extension points
-- [`pi-capability-gap-analysis.md`](pi-capability-gap-analysis.md) — gaps we filled
+- `pi-capability-gap-analysis.md` — gaps we filled
 - [`pi-analysis-critique.md`](pi-analysis-critique.md) — critique of Pi's analysis
 - [`pi-runtime-next-roadmap.md`](pi-runtime-next-roadmap.md) — Pi runtime roadmap
 - [`pi-real-plugin-compatibility.md`](pi-real-plugin-compatibility.md) — Pi plugin compatibility
@@ -97,7 +97,7 @@ Welcome to the OpenBuddy documentation index. This directory is the **single sou
 
 ### 🔄 Migration history
 
-- [`migration-pi-electron.md`](migration-pi-electron.md) — Pi → Electron migration notes
+- `migration-pi-electron.md` — Pi → Electron migration notes
 - [`moon-monorepo-refactor.md`](moon-monorepo-refactor.md) — moon monorepo refactor
 - [`deepseek-cordis-runtime-status.md`](deepseek-cordis-runtime-status.md) — DeepSeek Cordis runtime status
 - [`dsh-version-compatibility-matrix.md`](dsh-version-compatibility-matrix.md) — DSH version compatibility
