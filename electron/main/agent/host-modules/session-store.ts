@@ -343,6 +343,16 @@ async function deleteSession(sessionId: string, cwd: string): Promise<void> {
   if (!entry) return;
   if (state.session?.sessionId === sessionId) await dispose();
   await unlink(entry.path);
+  // 数据§9(2026-10-19 生产评审):附件此前永不删除。删会话时一并清理其
+  // 附件目录(失败只记日志,不让删除动作回滚)。
+  try {
+    const { SessionAttachmentStore } = await import("../../session/session-attachments");
+    const { agentHome } = await import("@openbuddy/storage");
+    const { join } = await import("node:path");
+    await new SessionAttachmentStore(join(agentHome(), "openbuddy-attachments")).remove(sessionId);
+  } catch (error) {
+    console.warn("[session-store] attachment cleanup failed:", error);
+  }
 }
 
 export {

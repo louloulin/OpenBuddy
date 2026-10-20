@@ -126,6 +126,11 @@ export class SessionAttachmentStore {
 		}
 	}
 
+	/** 删除某个会话的全部附件(会话删除时调用,数据§9:此前附件永不清理)。 */
+	async remove(sessionId: string): Promise<void> {
+		await rm(this.directory(sessionId), { recursive: true, force: true });
+	}
+
 	async read(sessionId: string, attachmentId: string): Promise<StoredSessionAttachment> {
 		const metadataPath = this.metadataPath(sessionId, attachmentId);
 		const dataPath = this.dataPath(sessionId, attachmentId);

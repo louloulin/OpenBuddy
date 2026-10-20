@@ -23,6 +23,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -152,7 +153,11 @@ export function setDataDir(rawDir: string): { ok: true; path: string; requiresRe
   const file = pointerFilePath();
   if (!file) throw new Error("无法定位数据目录指针文件");
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, `${JSON.stringify({ path: target }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  // 数据§5(2026-10-19 生产评审):指针文件原子写 —— 中途崩溃不会留下
+  // 半截 JSON(解析失败会静默回退默认目录,用户看到空 app)。
+  const temporary = `${file}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify({ path: target }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  renameSync(temporary, file);
   return { ok: true, path: target, requiresRestart: true };
 }
 

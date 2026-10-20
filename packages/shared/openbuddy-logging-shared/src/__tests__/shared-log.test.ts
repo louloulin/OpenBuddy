@@ -7,4 +7,12 @@ describe("shared logging primitives", () => {
   it("generates UUID-shaped trace IDs", () => expect(generateTraceId()).toMatch(/^[0-9a-f-]{36}$/));
   it("redacts long text without logging the full value", () => expect(redactText("a".repeat(100), 10)).toBe("aaaaaaaaaa…[TRUNC 100]"));
   it("handles absent diagnostic text", () => expect(redactText(undefined)).toBe(""));
+  it("redacts common secret shapes before truncation(§4 真脱敏)", () => {
+    expect(redactText("call failed with sk-abcdefgh12345678")).toBe("call failed with sk-***");
+    expect(redactText("token ghp_abcdefghijklmnopqrstuvwxyz0123")).toBe("token ghp_***");
+    expect(redactText("Authorization: Bearer abcdefgh12345678")).toBe("Authorization: Bearer ***");
+    expect(redactText('{"apiKey": "abcdef1234567890"}')).toBe('{"apiKey": "***"}');
+    // 无密钥形态:与旧版截断行为一致。
+    expect(redactText("a".repeat(100), 10)).toBe("aaaaaaaaaa…[TRUNC 100]");
+  });
 });

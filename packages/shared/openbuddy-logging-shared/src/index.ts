@@ -26,7 +26,23 @@ export function generateTraceId(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+/**
+ * 诊断文本脱敏 + 截断(可观测性§4,2026-10-19 生产评审)。
+ *
+ * 此前这个函数**只截断不脱敏**,名字在骗人(前 80 字符原样输出)。现在先按
+ * 常见密钥形态打码,再截断;无密钥形态时行为与旧版一致(测试锁死)。
+ */
+const SECRET_PATTERNS: ReadonlyArray<[RegExp, string]> = [
+  [/\b(sk-[A-Za-z0-9_-]{8,})/g, "sk-***"],
+  [/\b(ghp_[A-Za-z0-9]{20,})/g, "ghp_***"],
+  [/\b(AKIA[0-9A-Z]{12,})/g, "AKIA***"],
+  [/(Bearer\s+)[A-Za-z0-9._~+/-]{8,}/gi, "$1***"],
+  [/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret|password)["']?\s*[:=]\s*["']?)[^\s,;"'}]{6,}/gi, "$1***"],
+];
+
 export function redactText(value: string | null | undefined, max = 80): string {
   if (value == null) return "";
-  return value.length <= max ? value : `${value.slice(0, max)}…[TRUNC ${value.length}]`;
+  let text = String(value);
+  for (const [pattern, replacement] of SECRET_PATTERNS) text = text.replace(pattern, replacement);
+  return text.length <= max ? text : `${text.slice(0, max)}…[TRUNC ${value.length}]`;
 }

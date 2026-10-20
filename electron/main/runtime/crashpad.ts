@@ -75,18 +75,33 @@ export function startCrashpad(opts: CrashpadOptions): { crashpadDir: string } {
     return { crashpadDir: activeCrashpadDir ?? opts.crashpadDir ?? join(opts.dataDir, "crash-dumps") };
   }
   const crashpadDir = opts.crashpadDir ?? join(opts.dataDir, "crash-dumps");
-  if (!existsSync(crashpadDir)) mkdirSync(crashpadDir, { recursive: true });
-  // 数据§8(2026-10-19 生产评审):崩溃转储此前无上限。启动时保留最新:
-  // renderer-crashes.jsonl 截到最后 200 行,单个 dump 文件按 mtime 保留最新 100 个。
-  pruneCrashpadDir(crashpadDir);
+  // 数据§6(2026-10-19 生产评审):启动可因只读/满盘 userData 硬崩 —— 这里
+  // 在 app.whenReady 之前、模块路径上执行,mkdir 失败不能炸掉整个启动。
+  try {
+    if (!existsSync(crashpadDir)) mkdirSync(crashpadDir, { recursive: true });
+    // 数据§8:崩溃转储此前无上限。启动时保留最新:jsonl 截到最后 200 行,
+    // 单个 dump 文件按 mtime 保留最新 100 个。
+    pruneCrashpadDir(crashpadDir);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn("[crashpad] directory unavailable; crash capture disabled:", error);
+    started = true;
+    activeCrashpadDir = crashpadDir;
+    return { crashpadDir };
+  }
   // Always local-only — never upload. PI-Desktop reference behaviour.
   const report = opts.crashReport ?? (require("electron")?.crashReport as CrashReportLike | undefined);
   if (report && typeof report.start === "function") {
-    report.start({
-      uploadToServer: false,
-      crashpadDir,
-      // `submitURL` is intentionally omitted — local-only.
-    });
+    try {
+      report.start({
+        uploadToServer: false,
+        crashpadDir,
+        // `submitURL` is intentionally omitted — local-only.
+      });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn("[crashpad] start failed; continuing without crash capture:", error);
+    }
   }
   started = true;
   activeCrashpadDir = crashpadDir;
