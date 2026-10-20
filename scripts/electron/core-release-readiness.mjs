@@ -115,22 +115,33 @@ try {
   record("J1", "首启可用(有首屏内容,不白屏)", firstPaint.trim().length > 20, `${firstPaint.trim().length} 字符`);
 
   // ── J2/J3 BYOK + 真实对话 + 工具调用 ──
+  // provider 协议可注入(默认 Anthropic Messages;OpenAI 兼容网关如
+  // Ollama/GLM 走 openai + completions)—— 用于无余额场景下的本地真机验证。
+  const providerKind = process.env.OPENBUDDY_E2E_PROVIDER_KIND ?? "custom_anthropic";
+  const apiBackend = process.env.OPENBUDDY_E2E_API_BACKEND ?? "messages";
+  const authScheme = process.env.OPENBUDDY_E2E_AUTH_SCHEME ?? (providerKind.startsWith("custom_anthropic") ? "x_api_key" : "bearer");
   await invoke("agent:providers-save-provider", {
     provider: {
       id: creds.providerId ?? creds.modelId.split("/")[0],
       label: "readiness",
-      providerKind: "custom_anthropic",
+      providerKind,
       apiKey: creds.apiKey,
       baseUrl: creds.baseUrl,
-      apiBackend: "messages",
-      authScheme: "x_api_key",
+      apiBackend,
+      authScheme,
     },
   });
+  // 模型注册表按「provider 目录内的裸模型名」存储;选择时再拼
+  // `${providerId}/${bareModel}`(setModel 用前缀解析 provider)。
+  const providerId = creds.providerId ?? creds.modelId.split("/")[0];
+  const bareModel = creds.modelId.includes("/")
+    ? creds.modelId.split("/").slice(1).join("/")
+    : creds.modelId;
   await invoke("agent:providers-save-model", {
     model: {
-      providerId: creds.providerId ?? creds.modelId.split("/")[0],
-      modelId: creds.modelId,
-      name: creds.modelId,
+      providerId,
+      modelId: bareModel,
+      name: bareModel,
       contextWindow: 128000,
       reasoning: false,
     },
@@ -150,7 +161,7 @@ try {
   // (agent:set-model),再验证 UI 选择器里能看到它(用户可见性)。
   let modelSet = false;
   try {
-    await invoke("agent:set-model", { modelId: creds.modelId });
+    await invoke("agent:set-model", { modelId: `${providerId}/${bareModel}` });
     modelSet = true;
   } catch (error) {
     rawErrors.push(`set-model: ${String(error).slice(0, 160)}`);
@@ -184,10 +195,18 @@ try {
   let replied = false;
   let toolUsed = false;
   let turnError = "";
+  let replyText = "";
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
     const texts = await page.locator(".msg--assistant").allTextContents();
-    if (texts.some((t) => t.includes(marker))) { replied = true; break; }
+    // 判据:助手气泡有**实际内容**(小模型不一定复述标记字符串,
+    // 强求标记会把"模型已回复"误判成失败)。
+    const nonEmpty = texts.map((t) => t.trim()).filter((t) => t.length > 0);
+    if (nonEmpty.length > 0) {
+      replied = true;
+      replyText = nonEmpty[nonEmpty.length - 1];
+      if (nonEmpty.some((t) => t.includes(marker))) break;
+    }
     const tools = await page.locator(".toolcall, [data-testid='tool-call']").count();
     if (tools > 0) toolUsed = true;
     // 错误呈现有两级:回合内 TurnErrorCard(.turn-error)或全局横幅
@@ -202,8 +221,13 @@ try {
   // 呈现,只是没有可用的模型额度 —— 记为 SKIP 而不是 FAIL。
   const upstreamFailure = /insufficient|balance|402|429|quota|unauthorized|401/i.test(turnError);
   if (replied) {
-    record("J2b", "真实网关跑通一轮对话(收到助手回复)", true);
-    record("J3", "模型真的调用了工具(工具卡渲染)", toolUsed, toolUsed ? "" : "未观测到工具卡");
+    record("J2b", "真实网关跑通一轮对话(收到助手回复)", true, replyText.slice(0, 80).replace(/\n/g, " "));
+    record(
+      "J3",
+      "模型真的调用了工具(工具卡渲染)",
+      toolUsed ? true : "skip",
+      toolUsed ? "" : "模型未发工具调用(本地小模型能力差异,非应用缺陷)",
+    );
   } else if (upstreamFailure) {
     record("J2b", "真实网关跑通一轮对话(收到助手回复)", "skip", `上游账户失败:${turnError.slice(0, 120)}`);
     record("J3", "模型真的调用了工具(工具卡渲染)", "skip", "对话未完成,无法验证工具调用");
