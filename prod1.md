@@ -142,6 +142,23 @@
 | P1.4 | 死面清理复核 | 111 条零调用通道的棘轮继续收紧；`stub(name)` 断言接线 | ⚠️ `stub` 已接线（facade Proxy 兜底，缺键给可读错误而非 TypeError）；通道存量清单未清 |
 | P1.5 | 门禁转正 | lint-tools/audit 从 report-only 转硬门禁；release 去 continue-on-error | ⚠️ release 硬门禁✅；lint-tools/audit 仍 report-only |
 
+### 核心功能真机就绪（2026-10-20,探针 scripts/electron/core-release-readiness.mjs）
+
+真实网关跑「用户核心旅程」18 项:**16 通过 / 2 跳过(外部原因) / 0 失败**。
+跳过的两项(收到助手回复、工具调用)被上游 MiniMax key 余额不足(402
+insufficient_balance_error)阻塞 —— 属外部凭据问题,非应用缺陷;失败本身
+以红色错误横幅 + 重试按钮如实呈现给用户(J2c 验证)。
+
+探针暴露并修复两个发布阻塞级缺陷(已提交):
+1. 失败回合静默消失(pi://complete 丢弃 errorMessage,空气泡 + 误导性
+   "会话完成"通知);
+2. 计划入口死门(visible=planCount>0,与「变更」视图同类)。
+
+**发布判定**:核心交互链路(首启/BYOK/会话/任务/计划/记忆/产物/Git/
+设置/备份/错误呈现)全部真机可用;唯一未验证的是"收到模型回复"这一步,
+需要一次**有余额的 key** 做验收 —— 这应作为 v0.16.0 发布前的最后一道
+人工检查项,而不是继续开发阻塞项。
+
 ### 进度快照（2026-10-20）
 
 | 阶段 | 完成度 | 依据 |
