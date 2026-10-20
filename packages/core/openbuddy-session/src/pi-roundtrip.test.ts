@@ -89,7 +89,7 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
     expect(ids).toContain(idB);
   });
 
-  it("setPinned writes to both SQLite catalog and the legacy JSON mirror", async () => {
+  it("setPinned writes the SQLite catalog and does not resurrect the legacy JSON mirror", async () => {
     // Hand-author a JSONL session header so the Cordis service has something
     // to scan.
     sessionsRoot = join(home, ".openbuddy", "agent");
@@ -122,13 +122,17 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
       await closeStorage(storage);
     }
 
-    // Legacy JSON mirror must also contain the pin (it's the migration source).
-    const mirror = JSON.parse(
-      await import("node:fs/promises").then((m) =>
-        m.readFile(join(home, ".openbuddy", "agent", "openbuddy-state.json"), "utf-8"),
-      ),
+    // The `openbuddy-state.json` mirror is read-only compatibility input now.
+    // Nothing writes it: keeping a second live copy meant the host-side
+    // metadata store (which owns what listSessions projects, and which
+    // deletes this file on migration) and this catalog disagreed whenever a
+    // value came in through the other one.
+    const mirrorExists = await import("node:fs/promises").then((m) =>
+      m
+        .stat(join(home, ".openbuddy", "agent", "openbuddy-state.json"))
+        .then(() => true, () => false),
     );
-    expect(mirror.pinned).toContain("session-r1");
+    expect(mirrorExists, "setPinned must not resurrect the legacy JSON mirror").toBe(false);
   });
 
   it("setExpert persists across a fresh SQLite handle (authority = SQLite)", async () => {

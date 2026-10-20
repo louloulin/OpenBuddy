@@ -112,7 +112,7 @@ flowchart LR
 
 目标架构中，所有需要持久化一致性的面板共享 `@openbuddy/storage` 的 Gateway；renderer 不直接读文件或数据库，只拿版本化 IPC DTO。当前 change 不新增 renderer storage IPC/DTO，既有 renderer 继续使用 localStorage 与既有 IPC。面板按域拆分而不是按后端拆分，是为了和 WorkBuddy UI 1:1 对齐的同时不破坏 Pi adapter 与 Cordis/plugin host 边界。
 
-> 配套证据见 [`docs/storage-cross-product-survey.md`](./storage-cross-product-survey.md)（独立可读版，含 Codex/Grok-build/Pi/Pi-Heremes/OpenClaw(public)/DeepSeek-harness/WorkBuddy/OpenBuddy 八类对照，每条都带源码路径或公开 commit 引用）。本节是摘要，survey 是完整依据。
+> 配套证据见 `docs/storage-cross-product-survey.md`（独立可读版，含 Codex/Grok-build/Pi/Pi-Heremes/OpenClaw(public)/DeepSeek-harness/WorkBuddy/OpenBuddy 八类对照，每条都带源码路径或公开 commit 引用）。本节是摘要，survey 是完整依据。
 
 ## 跨项目证据矩阵（用于决策而不是历史叙述）
 

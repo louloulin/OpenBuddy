@@ -38,20 +38,22 @@ describe("Electron IPC contract", () => {
     root = resolve(process.cwd());
     preload = await readFile(resolve(root, "electron/preload/index.ts"), "utf8");
     main = await readFile(resolve(root, "electron/main/ipc/index.ts"), "utf8");
-    client = await readFile(resolve(root, "src/lib/agent/pi-client.ts"), "utf8");
+    client = await readFile(resolve(root, "packages/ui/openbuddy-ui-contract/src/pi-client.ts"), "utf8");
   });
   it("keeps renderer invoke channels allowlisted and implemented by Main", async () => {
     const root = resolve(process.cwd());
     const rendererSources = await Promise.all((await sourceFiles(resolve(root, "src"))).map((path) => readFile(path, "utf8")));
     const preload = await readFile(resolve(root, "electron/preload/index.ts"), "utf8");
     // Scan all of electron/main (minus tests) instead of a hand-kept list of
-    // directories: bridge modules such as `agent/pi-market-bridge.ts` take
-    // `ipcMain` as a parameter rather than importing it, so a directory
-    // allowlist silently stops covering them.
+    // directories: bridge modules that take `ipcMain` as a parameter rather
+    // than importing it (R97 之后主要在 `electron/main/ipc/connectors.ts`)
+    // would silently stop being covered by a directory allowlist.
     const mainFiles = await sourceFiles(resolve(root, "electron/main"));
     const main = (await Promise.all(mainFiles.map((file) => readFile(file, "utf8")))).join("\n");
     const invoked = new Set(rendererSources.flatMap((source) => [...literalChannels(source, /(?:invoke|ipcRenderer\.invoke)(?:<[^>]+>)?\(\s*["']([^"']+)["']/g)]));
-    const allowlisted = literalChannels(preload, /\s["']([^"']+)["'],?/g);
+    // 同样先剥注释:否则注释里的带引号文字会混进 allowlist 集合。
+    const preloadUncommented = preload.split("\n").map((line) => line.replace(/\/\/.*$/, "")).join("\n");
+    const allowlisted = literalChannels(preloadUncommented, /\s["']([^"']+)["'],?/g);
     // Handlers register through either `ipcMain.handle(...)` directly or the
     // `wrapIpcHandler(channel, fn)` shim (Phase 2 R1+R4 adds try/catch +
     // structured logging). Both forms keep the channel literal, so scan for
@@ -94,16 +96,24 @@ describe("Electron IPC contract", () => {
   it("keeps the complete preload allowlist and Main handler registry in sync", async () => {
     const preload = await readFile(resolve(process.cwd(), "electron/preload/index.ts"), "utf8");
     // Scan all of electron/main (minus tests) rather than a hand-maintained
-    // list of directories. Bridge modules such as
-    // `agent/pi-market-bridge.ts` deliberately take `ipcMain` as a parameter
-    // instead of importing it, so a directory allowlist silently stops
-    // covering them the moment a new bridge lands elsewhere.
+    // list of directories. Bridge modules that deliberately take `ipcMain`
+    // as a parameter instead of importing it (R97 之后主要在
+    // `electron/main/ipc/connectors.ts`) would silently stop being covered
+    // by a directory allowlist the moment a new bridge lands elsewhere.
     const mainSources = await Promise.all(
       (await sourceFiles(resolve(process.cwd(), "electron/main"))).map((file) => readFile(file, "utf8")),
     );
     const main = mainSources.join("\n");
     const allowBlock = preload.match(/const allowedInvokeChannels = new Set\(\[([\s\S]*?)\]\);/)?.[1] ?? "";
-    const allowlisted = new Set([...allowBlock.matchAll(/"([^"]+)"/g)].map((match) => match[1]));
+    // 先剥掉整行注释再取名字。2026-10-11 教训:allowlist 块里的注释出现一个
+    // 带引号的说明文字(比如中文标签),就会被当成一个"已放行的通道",于是
+    // 断言②(allowlisted 必须在 handlers 里)报一个只存在于注释里的通道名。
+    // 同一类"文本守卫读注释"的坑,check-ipc-stubs 与 parity 测试也各有一处。
+    const allowBlockUncommented = allowBlock
+      .split("\n")
+      .map((line) => line.replace(/\/\/.*$/, ""))
+      .join("\n");
+    const allowlisted = new Set([...allowBlockUncommented.matchAll(/"([^"]+)"/g)].map((match) => match[1]));
 
     const handlers = new Set([...main.matchAll(/(?:ipcMain\.handle|wrapIpcHandler)\(\s*"([^"]+)"/g)].map((match) => match[1]));
 
@@ -140,7 +150,7 @@ describe("Electron IPC contract", () => {
     }
   });
   it("exposes durable recovery controls through every Electron layer", async () => {
-    const client = await readFile(resolve(process.cwd(), "src/lib/agent/pi-client.ts"), "utf8");
+    const client = await readFile(resolve(process.cwd(), "packages/ui/openbuddy-ui-contract/src/pi-client.ts"), "utf8");
     const harnessMain = await readFile(resolve(process.cwd(), "electron/main/ipc/harness.ts"), "utf8");
     for (const channel of ["harness:recovery-status", "harness:recovery-list", "harness:recovery-claim", "harness:recovery-resolve"]) {
       expect(preload).toContain(`"${channel}"`);
@@ -152,7 +162,9 @@ describe("Electron IPC contract", () => {
     expect(client).toContain("harnessRecoveryResolve");
   });
   it("keeps namespaced capability handlers reachable through preload", async () => {
-    const allowlisted = literalChannels(preload, /\s["']([^"']+)["'],?/g);
+    // 同样先剥注释:否则注释里的带引号文字会混进 allowlist 集合。
+    const preloadUncommented = preload.split("\n").map((line) => line.replace(/\/\/.*$/, "")).join("\n");
+    const allowlisted = literalChannels(preloadUncommented, /\s["']([^"']+)["'],?/g);
     const handlers = literalChannels(main, /(?:ipcMain\.handle|wrapIpcHandler)\(\s*["']([^"']+)["']/g);
     for (const channel of handlers) {
       if (!channel.includes(":")) continue;
@@ -176,7 +188,7 @@ describe("Electron IPC contract", () => {
   });
   it("keeps the renderer agent API on the dedicated AgentSession event channel", async () => {
     const root = resolve(process.cwd());
-    const client = await readFile(resolve(root, "src/lib/agent/pi-client.ts"), "utf8");
+    const client = await readFile(resolve(root, "packages/ui/openbuddy-ui-contract/src/pi-client.ts"), "utf8");
     const runtime = await readFile(resolve(root, "src/lib/runtime/renderer-plugin-runtime.ts"), "utf8");
     const preload = await readFile(resolve(root, "electron/preload/index.ts"), "utf8");
     const main = await readFile(resolve(root, "electron/main/ipc/index.ts"), "utf8");

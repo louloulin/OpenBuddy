@@ -153,10 +153,10 @@ const coverageClasses = {
     "memory:list", "memory:get", "memory:save", "memory:delete", "memory:rewrite",
     // memory_* underscore aliases (renderer compatibility shims)
     "memory_delete", "memory_flush", "memory_get", "memory_list", "memory_rewrite", "memory_save",
-    // Stage G-1c: openbuddy-automation removed; automation is owned by
-    // pi-background-tasks + pi-goal (passthrough). The legacy
-    // automations:* / automation_records_archive IPC channels no
-    // longer exist.
+    // 阶段 1.4:自动化接回真实实现(electron/main/ipc/automations.ts)。
+    // 生命周期的存储部分由冒烟断言,真正跑一轮会新建会话烧 token,
+    // 交给专用探针 —— 所以这里仍按"冒烟不必覆盖"分类。
+    // 冒烟若没覆盖到,应该在这里改的是探针而不是分类,所以保留豁免。
     "automation_records_archive", "automation_records_delete",
     "automations:archive", "automations:delete", "automations:run", "automations:save", "automations:set-status", "automations:snapshot",
     "automations_delete", "automations_run", "automations_save", "automations_set_status", "automations_snapshot",

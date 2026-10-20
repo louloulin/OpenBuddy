@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-type Stub = { api: { invoke: ReturnType<typeof vi.fn>; dialog?: { save: ReturnType<typeof vi.fn> } } };
+type Stub = { api: { apiVersion: number; invoke: ReturnType<typeof vi.fn>; dialog?: { save: ReturnType<typeof vi.fn> } } };
 
 beforeEach(() => {
   (globalThis as unknown as Stub & { window: Stub }).window = {

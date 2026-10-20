@@ -13,6 +13,25 @@ export interface MigrationResult {
   history: readonly { version: number; status: "applied" | "failed"; detail?: string }[];
 }
 
+/**
+ * 数据§2(2026-10-19 生产评审):旧版本打开新版本库会**静默接受**——schema_meta
+ * 的 MAX(version) 高于本构建已知迁移数时,旧构建跳过全部迁移继续写。用
+ * `PRAGMA user_version` 做权威版本戳:开库先比对,未来库抛
+ * {@link DowngradeBlockedError};迁移成功后回写。user_version 与 schema_meta
+ * 分离的意义:即便 meta 表损坏,版本戳仍可读。
+ */
+export class DowngradeBlockedError extends Error {
+  constructor(readonly databaseVersion: number, readonly buildMaxVersion: number) {
+    super(
+      `database schema v${databaseVersion} is newer than this build supports (v${buildMaxVersion}); ` +
+        `upgrade the app before opening this data directory`,
+    );
+    this.name = "DowngradeBlockedError";
+  }
+}
+
+const USER_VERSION_MAX = "user_version";
+
 export class MigrationRunner {
   private readonly sortedSteps: readonly MigrationStep[];
   private readonly appVersion: string;
@@ -30,6 +49,7 @@ export class MigrationRunner {
   private async runUnlocked(driver: SqliteDriver, targetVersion: number): Promise<MigrationResult> {
     ensureMetaTable(driver.database);
     const history: { version: number; status: "applied" | "failed"; detail?: string }[] = [];
+    assertNotFromFuture(driver.database, this.buildMaxVersion());
     let current = readCurrentVersion(driver.database);
     let applied = 0;
     for (const step of this.sortedSteps) {
@@ -48,7 +68,10 @@ export class MigrationRunner {
       history.push({ version: step.version, status: "applied" });
       current = step.version;
       applied += 1;
+      // 每步成功即回写版本戳:后续步骤失败时,戳仍反映已应用的最高版本。
+      writeUserVersion(driver.database, current);
     }
+    writeUserVersion(driver.database, current);
     return { applied, finalVersion: current, history };
   }
 
@@ -59,6 +82,7 @@ export class MigrationRunner {
   private runInternal(driver: SqliteDriver, targetVersion: number): MigrationResult {
     ensureMetaTable(driver.database);
     const history: { version: number; status: "applied" | "failed"; detail?: string }[] = [];
+    assertNotFromFuture(driver.database, this.buildMaxVersion());
     let current = readCurrentVersion(driver.database);
     let applied = 0;
     for (const step of this.sortedSteps) {
@@ -79,8 +103,16 @@ export class MigrationRunner {
       history.push({ version: step.version, status: "applied" });
       current = step.version;
       applied += 1;
+      // 每步成功即回写版本戳:后续步骤失败时,戳仍反映已应用的最高版本。
+      writeUserVersion(driver.database, current);
     }
+    writeUserVersion(driver.database, current);
     return { applied, finalVersion: current, history };
+  }
+
+  /** 本构建已知的最高迁移版本(降级判定的分母)。 */
+  private buildMaxVersion(): number {
+    return this.sortedSteps.length > 0 ? this.sortedSteps[this.sortedSteps.length - 1].version : 0;
   }
 }
 
@@ -115,6 +147,28 @@ function recordMeta(raw: DatabaseSync, appVersion: string, version: number, stat
 function readCurrentVersion(raw: DatabaseSync): number {
   const row = raw.prepare(`SELECT MAX(version) AS version FROM schema_meta WHERE status = 'applied'`).get() as { version: number | null } | undefined;
   return row?.version ?? 0;
+}
+
+function readUserVersion(raw: DatabaseSync): number {
+  const row = raw.prepare(`PRAGMA ${USER_VERSION_MAX}`).get() as { user_version: number } | undefined;
+  return Number(row?.user_version ?? 0);
+}
+
+function writeUserVersion(raw: DatabaseSync, version: number): void {
+  raw.exec(`PRAGMA ${USER_VERSION_MAX} = ${Number(version)}`);
+}
+
+/**
+ * 未来库判定:优先看 user_version(权威戳);老库(user_version=0 但 schema_meta
+ * 有更高版本)用 schema_meta 兜底 —— 两种来源任一高于本构建即拒绝。
+ */
+function assertNotFromFuture(raw: DatabaseSync, buildMaxVersion: number): void {
+  const userVersion = readUserVersion(raw);
+  const schemaVersion = readCurrentVersion(raw);
+  const effective = Math.max(userVersion === 0 ? 0 : userVersion, schemaVersion);
+  if (effective > buildMaxVersion) {
+    throw new DowngradeBlockedError(effective, buildMaxVersion);
+  }
 }
 
 export const DEFAULT_MIGRATIONS: readonly MigrationStep[] = [
@@ -544,6 +598,40 @@ export const DEFAULT_MIGRATIONS: readonly MigrationStep[] = [
           state_id INTEGER PRIMARY KEY CHECK (state_id = 1),
           initialized_at TEXT NOT NULL
         );
+      `);
+    },
+  },
+  {
+    version: 12,
+    description: "create canvas document and revision tables",
+    up: (driver) => {
+      driver.database.exec(`
+        CREATE TABLE IF NOT EXISTS canvas_documents(
+          canvas_id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          kind TEXT NOT NULL CHECK (kind IN ('markdown','html','react','svg','code','image','pdf')),
+          title TEXT NOT NULL DEFAULT '',
+          source_ref TEXT,
+          source_path TEXT,
+          metadata_json TEXT NOT NULL DEFAULT '{}',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY(session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS canvas_documents_session_idx
+          ON canvas_documents(session_id, updated_at DESC);
+        CREATE TABLE IF NOT EXISTS canvas_revisions(
+          canvas_id TEXT NOT NULL,
+          seq INTEGER NOT NULL,
+          content TEXT NOT NULL,
+          content_hash TEXT NOT NULL,
+          author TEXT NOT NULL DEFAULT 'user',
+          created_at TEXT NOT NULL,
+          PRIMARY KEY(canvas_id, seq),
+          FOREIGN KEY(canvas_id) REFERENCES canvas_documents(canvas_id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS canvas_revisions_latest_idx
+          ON canvas_revisions(canvas_id, seq DESC);
       `);
     },
   },

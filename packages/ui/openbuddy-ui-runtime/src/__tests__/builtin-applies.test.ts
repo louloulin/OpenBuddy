@@ -4,8 +4,9 @@
  * 为什么需要这个测试:
  *   - L1/L2 完成时声称"26 个 ui-* 包接入 SlotTree",实际只验证了 tsconfig 编译
  *     与源码静态扫描,未验证运行时 26 个 apply() 真的被触发。
- *   - 本测试通过就地修改 BUILTIN_UI_APPLIES 里每一项的 apply,确认聚合器入口
- *     registerAllBuiltinUis() 真的调用了全部 N 项 apply。
+ *   - 本测试通过就地修改 BUILTIN_UI_APPLIES 里每一项的 load(注入 stub
+ *     apply),确认聚合器入口 registerAllBuiltinUis() 真的调用了全部 N 项
+ *     apply。装配是异步的,用 registerAllBuiltinUis().done 等落定。
  *   - 任何后续增删包,如果忘了同步 BUILTIN_UI_APPLIES,本测试 fail。
  */
 
@@ -45,9 +46,9 @@ describe("BUILTIN_UI_APPLIES 聚合完整性", () => {
     }
   });
 
-  it("每项都有 apply 函数,且签名兼容 UiPlugin.apply", () => {
+  it("每项都有 load 函数(P1/P2-09:动态 import,签名解析到 UiPlugin.apply)", () => {
     for (const entry of BUILTIN_UI_APPLIES) {
-      expect(typeof entry.apply).toBe("function");
+      expect(typeof entry.load).toBe("function");
     }
   });
 
@@ -64,67 +65,71 @@ describe("BUILTIN_UI_APPLIES 聚合完整性", () => {
 });
 
 describe("registerAllBuiltinUis 行为", () => {
-  // 保存原始 apply,以便 afterEach 还原
-  const originals: Array<{ entry: (typeof BUILTIN_UI_APPLIES)[number]; apply: unknown }> = [];
+  // 保存原始 load,以便 afterEach 还原
+  const originals: Array<{ entry: (typeof BUILTIN_UI_APPLIES)[number]; load: unknown }> = [];
 
   beforeEach(() => {
     for (const e of BUILTIN_UI_APPLIES) {
-      originals.push({ entry: e, apply: e.apply });
+      originals.push({ entry: e, load: e.load });
     }
   });
 
   afterEach(() => {
-    for (const o of originals) o.entry.apply = o.apply as never;
+    for (const o of originals) o.entry.load = o.load as never;
     originals.length = 0;
     vi.restoreAllMocks();
   });
 
-  it("遍历每一项并调用其 apply(ctx)", async () => {
+  it("遍历每一项并通过 load() 调用其 apply(ctx)", async () => {
     const spies: Array<ReturnType<typeof vi.fn>> = [];
     for (const e of BUILTIN_UI_APPLIES) {
       const spy = vi.fn(() => () => {});
       spies.push(spy);
-      e.apply = spy as never;
+      e.load = () => Promise.resolve(spy as never);
     }
 
     const { registerAllBuiltinUis } = await import("../client");
-    const dispose = registerAllBuiltinUis();
+    const reg = registerAllBuiltinUis();
+    await reg.done;
 
     for (const spy of spies) {
       expect(spy).toHaveBeenCalledTimes(1);
     }
-    dispose();
+    reg.dispose();
   });
 
   it("apply 抛错时不影响后续包", async () => {
     const allCalls: Array<string> = [];
     // 让第一项抛错
-    BUILTIN_UI_APPLIES[0].apply = (() => { throw new Error("synthetic"); }) as never;
+    BUILTIN_UI_APPLIES[0].load = (() => Promise.resolve((() => { throw new Error("synthetic"); }) as never));
     // 其余包记录
     for (let i = 1; i < BUILTIN_UI_APPLIES.length; i++) {
       const idx = i;
       const pkgName = BUILTIN_UI_APPLIES[idx].pkg;
-      BUILTIN_UI_APPLIES[idx].apply = (() => { allCalls.push(pkgName); }) as never;
+      BUILTIN_UI_APPLIES[idx].load = () => Promise.resolve((() => { allCalls.push(pkgName); }) as never);
     }
 
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { registerAllBuiltinUis } = await import("../client");
-    registerAllBuiltinUis();
+    const reg = registerAllBuiltinUis();
+    await reg.done;
 
     expect(allCalls.length).toBe(BUILTIN_UI_APPLIES.length - 1);
     errSpy.mockRestore();
+    reg.dispose();
   });
 
   it("dispose() 反向释放所有 disposer", async () => {
     const disposeOrder: string[] = [];
     for (let i = 0; i < BUILTIN_UI_APPLIES.length; i++) {
       const pkg = BUILTIN_UI_APPLIES[i].pkg;
-      BUILTIN_UI_APPLIES[i].apply = (() => () => { disposeOrder.push(pkg); }) as never;
+      BUILTIN_UI_APPLIES[i].load = () => Promise.resolve((() => () => { disposeOrder.push(pkg); }) as never);
     }
     const { registerAllBuiltinUis } = await import("../client");
-    const dispose = registerAllBuiltinUis();
+    const reg = registerAllBuiltinUis();
+    await reg.done;
     expect(disposeOrder.length).toBe(0); // register 阶段不释放
-    dispose();
+    reg.dispose();
     expect(disposeOrder.length).toBe(BUILTIN_UI_APPLIES.length);
     // 验证反序
     for (let i = 0; i < BUILTIN_UI_APPLIES.length; i++) {

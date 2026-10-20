@@ -4,7 +4,7 @@
  * Extracted so the virtualization layer can render it in isolation and so
  * the row's DOM shape (chevron / icon / label / badge) stays consistent.
  */
-import type { ReactNode } from "react";
+import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import type { TreeNode } from "../lib/tree-utils";
 import styles from "./FileTree.module.css";
 
@@ -15,6 +15,8 @@ export interface FileTreeRowProps {
   selected: boolean;
   focused: boolean;
   dropTarget: boolean;
+  /** 稳定的 DOM id，供树容器的 `aria-activedescendant` 指向当前行。 */
+  domId: string;
   /** Whether folders can be picked up. Hosts disable it when they have no
    *  drop handler, so the UI does not advertise a move it cannot perform. */
   draggable: boolean;
@@ -38,6 +40,7 @@ export function FileTreeRow({
   selected,
   focused,
   dropTarget,
+  domId,
   draggable,
   badge,
   onClick,
@@ -52,6 +55,7 @@ export function FileTreeRow({
   const isDir = node.kind === "dir";
   return (
     <div
+      id={domId}
       className={
         styles.row +
         (selected ? " " + styles.rowSelected : "") +
@@ -63,10 +67,21 @@ export function FileTreeRow({
       aria-selected={selected}
       aria-expanded={isDir ? expanded : undefined}
       aria-level={depth + 1}
+      // 焦点常驻在 role="tree" 容器上，由容器的方向键 / Home / End / Enter
+      // 驱动，再用 aria-activedescendant 告诉读屏「当前第几行」。所以行本身
+      // 不进 Tab 序列，但仍可编程聚焦。
+      tabIndex={-1}
       draggable={isDir && draggable}
       onClick={(e) => onClick(node, e)}
       onDoubleClick={() => onDoubleClick(node)}
       onContextMenu={(e) => onContextMenu(node, e)}
+      // 行被直接聚焦时的等价路径（容器 handler 不在冒泡链上时生效）。
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        e.stopPropagation();
+        onClick(node, e as unknown as ReactMouseEvent);
+      }}
       onDragStart={(e) => onDragStart(node, e)}
       onDragOver={(e) => onDragOver(node, e)}
       onDragLeave={() => onDragLeave(node)}

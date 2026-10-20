@@ -20,7 +20,10 @@ const mocks = vi.hoisted(() => {
   return { invokeMock, traceGenerator, stubLogger };
 });
 
-vi.mock("@/lib/platform/electron-api", () => ({
+// Mock the specifier the implementation actually imports. The package-side
+// module resolves `@openbuddy/platform/electron-api` directly, so mocking the
+// app-side shim path would silently stop intercepting the bridge.
+vi.mock("@openbuddy/platform/electron-api", () => ({
   invoke: mocks.invokeMock,
   listen: vi.fn(async () => () => undefined),
   ensureRendererRpcChannel: vi.fn(),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useId, useMemo, useState, type ComponentType } from "react";
 import {
   User,
   Mail,
@@ -61,7 +61,6 @@ import {
   CreditReconciliationPanel,
   CreditWalletPanel,
   DataSettingsPanel,
-  AuditSettingsPanel,
   GeneralSettingsPanel,
   HelpSettingsPanel,
   MicrokernelSettingsPanel,
@@ -77,6 +76,7 @@ import {
   GatewayHealthPanel,
   WebhookSubscriptionPanel,
 } from "./SettingsSections";
+import { AuditSettingsPanel } from "./AuditSettingsPanel.js";
 import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { OpenBuddyPluginPanel, PluginsPanel } from "@openbuddy/ui-mcp";
@@ -454,18 +454,18 @@ const OpenBuddyPluginPanelImpl = (_openbuddyPluginImpl ?? OpenBuddyPluginPanel) 
 
   if (!open) return null;
 
+  {/* 遮罩是纯装饰层,语义放在内层 .settings-modal 上。点遮罩关闭用
+      e.target === e.currentTarget 判断,所以外层不需要 stopPropagation。 */}
   return (
     <div
       className="settings-modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label="设置"
+      role="presentation"
       onClick={(e) => {
         // 仅当点击遮罩本身(而非弹窗内容)时关闭,与 WorkBuddy 一致。
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="settings-modal">
+      <div className="settings-modal" role="dialog" aria-modal="true" aria-label="设置">
         <nav className="settings-modal__nav">
           <ul className="settings-navigation">
             {NAV_GROUPS.map((group) => {
@@ -1139,6 +1139,9 @@ export function ProviderEditor({
   const [showKey, setShowKey] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(draft.providerKind === "custom" || draft.providerKind === "new_api");
   const [error, setError] = useState<string | null>(null);
+  // label 与 input/select 之间是兄弟关系(不是 label 包裹控件),所以用
+  // useId 生成成对的 htmlFor / id 做显式关联。
+  const fieldId = useId();
   // Test connection status (separate from save `error` so a red save-error
   // banner doesn't get overwritten by a later test result, and vice versa).
   type TestStatus = "idle" | "testing" | "ok" | "degraded" | "unreachable" | "error";
@@ -1247,9 +1250,10 @@ export function ProviderEditor({
 
         <div className="models-settings-panel__editor-body">
           <div className="models-settings-panel__field">
-            <label className="models-settings-panel__label">提供商</label>
+            <label className="models-settings-panel__label" htmlFor={`${fieldId}-kind`}>提供商</label>
             <div className="models-settings-panel__select-shell">
               <select
+                id={`${fieldId}-kind`}
                 className="models-settings-panel__select"
                 value={form.providerKind}
                 onChange={(e) => handleProviderChange(e.target.value as ProviderKind)}
@@ -1279,9 +1283,10 @@ export function ProviderEditor({
           </div>
 
           <div className="models-settings-panel__field">
-            <label className="models-settings-panel__label">{form.providerKind === "new_api" ? "企业会话" : "API Key"}</label>
+            <label className="models-settings-panel__label" htmlFor={`${fieldId}-key`}>{form.providerKind === "new_api" ? "企业会话" : "API Key"}</label>
             <div className="models-settings-panel__input-shell">
               <input
+                id={`${fieldId}-key`}
                 className="models-settings-panel__input models-settings-panel__input--with-trailing-icon"
                 type={showKey ? "text" : "password"}
                 value={form.apiKey}
@@ -1301,9 +1306,10 @@ export function ProviderEditor({
           </div>
 
           <div className="models-settings-panel__field">
-            <label className="models-settings-panel__label">上下文窗口（tokens，可选）</label>
+            <label className="models-settings-panel__label" htmlFor={`${fieldId}-ctx`}>上下文窗口（tokens，可选）</label>
             <div className="models-settings-panel__input-shell">
               <input
+                id={`${fieldId}-ctx`}
                 className="models-settings-panel__input"
                 type="number"
                 min={1}
@@ -1333,9 +1339,10 @@ export function ProviderEditor({
           {showAdvanced && (
             <div className="models-settings-panel__advanced">
               <div className="models-settings-panel__field">
-                <label className="models-settings-panel__label">Base URL</label>
+                <label className="models-settings-panel__label" htmlFor={`${fieldId}-baseurl`}>Base URL</label>
                 <div className="models-settings-panel__input-shell">
                   <input
+                    id={`${fieldId}-baseurl`}
                     className="models-settings-panel__input"
                     value={form.baseUrl}
                     onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
@@ -1346,7 +1353,7 @@ export function ProviderEditor({
               </div>
               <div className="models-settings-panel__field-row">
                 <div className="models-settings-panel__field">
-                  <label className="models-settings-panel__label">
+                  <label className="models-settings-panel__label" htmlFor={`${fieldId}-backend`}>
                     协议
                     {preset.apiBackend && form.apiBackend !== preset.apiBackend && (
                       <span
@@ -1359,6 +1366,7 @@ export function ProviderEditor({
                   </label>
                   <div className="models-settings-panel__select-shell">
                     <select
+                      id={`${fieldId}-backend`}
                       className="models-settings-panel__select"
                       value={form.apiBackend}
                       onChange={(e) =>
@@ -1373,7 +1381,7 @@ export function ProviderEditor({
                   </div>
                 </div>
                 <div className="models-settings-panel__field">
-                  <label className="models-settings-panel__label">
+                  <label className="models-settings-panel__label" htmlFor={`${fieldId}-auth`}>
                     认证方式
                     {preset.authScheme && form.authScheme !== preset.authScheme && (
                       <span
@@ -1386,6 +1394,7 @@ export function ProviderEditor({
                   </label>
                   <div className="models-settings-panel__select-shell">
                     <select
+                      id={`${fieldId}-auth`}
                       className="models-settings-panel__select"
                       value={form.authScheme}
                       onChange={(e) =>
@@ -1471,6 +1480,8 @@ function ModelEditor({
   const [contextWindow, setContextWindow] = useState(initialContextWindow);
   const [reasoning, setReasoning] = useState(initialReasoning);
   const [error, setError] = useState<string | null>(null);
+  // label 与 input 是兄弟关系,用 useId 生成成对的 htmlFor / id 做显式关联。
+  const fieldId = useId();
 
   const canSave = modelId.trim().length > 0;
 
@@ -1507,9 +1518,10 @@ function ModelEditor({
 
         <div className="models-settings-panel__editor-body">
           <div className="models-settings-panel__field">
-            <label className="models-settings-panel__label">模型 ID</label>
+            <label className="models-settings-panel__label" htmlFor={`${fieldId}-model-id`}>模型 ID</label>
             <div className="models-settings-panel__input-shell">
               <input
+                id={`${fieldId}-model-id`}
                 className="models-settings-panel__input"
                 value={modelId}
                 onChange={(e) => setModelId(e.target.value)}
@@ -1519,9 +1531,10 @@ function ModelEditor({
             </div>
           </div>
           <div className="models-settings-panel__field">
-            <label className="models-settings-panel__label">显示名称（可选）</label>
+            <label className="models-settings-panel__label" htmlFor={`${fieldId}-model-name`}>显示名称（可选）</label>
             <div className="models-settings-panel__input-shell">
               <input
+                id={`${fieldId}-model-name`}
                 className="models-settings-panel__input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -1530,11 +1543,12 @@ function ModelEditor({
             </div>
           </div>
           <div className="models-settings-panel__field">
-            <label className="models-settings-panel__label">
+            <label className="models-settings-panel__label" htmlFor={`${fieldId}-model-ctx`}>
               上下文窗口（tokens，可选，覆盖厂商设置）
             </label>
             <div className="models-settings-panel__input-shell">
               <input
+                id={`${fieldId}-model-ctx`}
                 className="models-settings-panel__input"
                 type="number"
                 min={1}

@@ -1,0 +1,19 @@
+{
+  "name": "@openbuddy/payment",
+  "version": "0.16.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenBuddy 支付通道适配器（Stripe · WeChat Pay · Alipay · 平台无关 HMAC）",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./stripe": "./src/adapters/stripe.ts",
+    "./wechat-pay": "./src/adapters/wechat-pay.ts",
+    "./alipay": "./src/adapters/alipay.ts",
+    "./hmac": "./src/adapters/hmac.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

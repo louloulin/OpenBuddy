@@ -11,7 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("electron", () => ({
-  app: { getPath: () => "/tmp/openbuddy-public-test", on: vi.fn(), exit: vi.fn(), setPath: vi.fn(), quit: vi.fn() },
+  app: { getVersion: () => "0.0.0-test", getPath: () => "/tmp/openbuddy-public-test", on: vi.fn(), exit: vi.fn(), setPath: vi.fn(), quit: vi.fn() },
   shell: { openExternal: vi.fn() },
   BrowserWindow: vi.fn(),
   dialog: { showOpenDialog: vi.fn(), showSaveDialog: vi.fn(), showMessageBox: vi.fn() },

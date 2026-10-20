@@ -36,13 +36,10 @@ const allowedInvokeChannels = new Set([
   "host:data-dir", "host:data-dir-set", "host:data-dir-reset", "host:relaunch",
   // R95 — agent 数据目录权威路径快照(renderer 侧 useAgentPaths 消费)
   "agent:paths",
-  // R18 / Phase D — Expert Marketplace Bridge (Pi 扩展市场)
-  "agent:pi-market-list", "agent:pi-market-refresh",
-  "agent:pi-market-install", "agent:pi-market-upgrade",
-  "agent:pi-market-rollback", "agent:pi-market-uninstall",
-  "agent:pi-market-lockfile", "agent:pi-market-audit",
-  "agent:pi-market-sources-get", "agent:pi-market-sources-set",
-  "agent:pi-market-source-probe",
+  // R97 — 删除 agent:pi-market-* 孤儿 channels。原 pi-market-bridge.ts
+  // 已删除(ADR-0011),marketplace 操作统一走 marketplace_list / marketplace_action
+  // 两个 channel(由 electron/main/ipc/connectors.ts 提供),不再有 11 个独立
+  // agent:pi-market-* channels。
   // Goal mu7rpkze-gc769z / phase4-plugin-redo: integrity hash bridge for the
   // OpenBuddyPluginPanel badge. Main-side handler lives in
   // electron/main/plugin-hash.ts and calls hashPluginContent from
@@ -74,14 +71,16 @@ const allowedInvokeChannels = new Set([
   "prompt_history", "rewind_execute", "rewind_points", "session_fork", "session_search", "sessions:delete", "sessions:list", "sessions:list-workspaces",
   "sessions:rename", "sessions:set-all-archived", "sessions:set-archived", "sessions:set-expert", "sessions:set-pinned", "workspace:archive-session", "workspace:create", "workspace:delete", "workspace:insert-before",
   "workspace:insert-session-before", "workspace:list", "workspace:rename",
-  // permissions-memory
-  "folder-trust:grant", "folder-trust:is-trusted", "folder-trust:list", "folder-trust:revoke", "folder_trust_respond", "mcp:config-path", "mcp:config-read", "mcp:config-save",
-  "mcp:delete", "mcp:list", "mcp:status", "mcp:toggle", "mcp:upsert", "memory:delete", "memory:get", "memory:list",
-  "memory:rewrite", "memory:save", "memory_delete", "memory_flush", "memory_get", "memory_list", "memory_rewrite", "memory_save",
-  "permission:list", "permission:mode-get", "permission:mode-set", "permission:save", "permission_list", "permission_save", "storage:automation-bootstrap", "storage:collaboration-bootstrap", "storage:metrics", "storage:metrics-history",
+  // MCP 配置文件读写(mcp.json)。这三个通道自最初提交起就被注释掉了,而
+  // main 侧一直有真处理(connectors.ts 的 mcpConfigPath/Read/Save),UI 也一直在调
+  // —— McpConfigEditor / ConnectorsTab 的每条调用都被 preload 直接拒掉,
+  // 也就是说 MCP 配置的查看/编辑这块从上线起就是坏的。2026-10-11 真实启动
+  // 验证(scripts/electron/smoke.mjs)撞到 invalid IPC channel 才暴露。
+  "mcp:config-path", "mcp:config-read", "mcp:config-save",
+  "mcp:delete", "mcp:list", "mcp:status", "mcp:toggle", "mcp:upsert",
+  "permission:list", "permission:mode-get", "permission:mode-set", "permission:save", "permission_list", "permission_save", "storage:collaboration-bootstrap", "storage:metrics", "storage:metrics-history",
   "storage:renderer-list", "storage:renderer-read", "storage:renderer-remove", "storage:renderer-write",
-  "storage:task-bootstrap", "storage:workspace-bootstrap", "subagents:get-config", "subagents:set-config", "subagents_config_get", "subagents_config_save", "toggle_plan_mode", "web_search_config_get",
-  "web_search_config_save", "websearch:fetch", "websearch:get-config", "websearch:search", "websearch:set-config", "websearch:set-enabled",
+  "storage:task-bootstrap", "storage:workspace-bootstrap", "subagents:get-config", "subagents:set-config", "subagents_config_get", "subagents_config_save",
   "weknora:ask", "weknora:list-knowledge-bases", "weknora:status",
   // skills
   "skills:add", "skills:list", "skills:remove", "skills:toggle",
@@ -93,14 +92,22 @@ const allowedInvokeChannels = new Set([
   "pi-bridge-skills:load", "pi-bridge-skills:load-from-dir", "pi-bridge-skills:format-for-prompt",
   // task-policy
   "calendar:create", "calendar:delete", "calendar:list", "calendar:update", "knowledge-sources:list", "knowledge-sources:save", "notify-channels:list", "notify-channels:save",
-  "notify:dispatch", "plan-mode:approve", "plan-mode:get", "plan-mode:reject", "plan-mode:set-enabled", "plan-mode:set-plan", "policy:get", "policy:save",
-  "storage-sources:list", "storage-sources:save", "task_kill", "tasks:add", "tasks:clear-completed", "tasks:delete", "tasks:list", "tasks:update",
+  // folder trust — 由 @openbuddy/folder-trust 落盘(FolderTrustDialog 的应答路径)
+  "folder-trust:grant", "folder-trust:is-trusted", "folder-trust:list", "folder-trust:revoke", "folder_trust_respond",
+  "notify:dispatch", "policy:get", "policy:save",
+  "app:auto-update-state", "app:check-updates", "app:install-updates", "storage-sources:list", "storage-sources:save", "task_kill", "tasks:add", "tasks:clear-completed", "tasks:delete", "tasks:list", "tasks:update",
+  "memory:add", "memory:delete", "memory:list", "memory:update",
+  // P0.8/P1 数据备份/恢复(数据§7)
+  "storage:backup-create", "storage:backup-restore",
+  "terminal:create", "terminal:input", "terminal:kill", "terminal:resize",
+  // 阶段 5 产物中心
+  "artifacts:index", "artifacts:history", "artifacts:restore", "artifacts:diff",
+  // Git 面板(parity 2.2)
+  "git:status", "git:diff", "git:log", "git:stage", "git:commit",
   "teams:create", "teams:delete", "teams:status",
   // automations-notifications
-  "automation_records_archive", "automation_records_delete", "automations:archive", "automations:delete", "automations:run", "automations:save", "automations:set-status", "automations:snapshot",
-  "automations_delete", "automations_run", "automations_save", "automations_set_status", "automations_snapshot", "inspiration:list", "inspiration:next", "inspiration_generate",
-  "notification_append", "notification_clear", "notification_list", "notification_mark_all_read", "notification_mark_read", "notifications:append", "notifications:clear", "notifications:list",
-  "notifications:mark-all-read", "notifications:mark-read",
+  "automation_records_archive", "automation_records_delete",
+  "automations_delete", "automations_run", "automations_save", "automations_set_status", "automations_snapshot", "inspiration_generate",
   // plugins-experts
   "connectors_cli_auth", "connectors_cli_auth_cancel", "connectors_cli_skills_dir", "connectors_cli_status", "connectors_cli_unauth", "connectors_default_root", "connectors_icon", "connectors_list_roots",
   // extension (needs-review gate wired by Phase I.2)
@@ -142,6 +149,8 @@ const channelAliases: Record<string, string> = {
 };
 
 const allowedEventChannels = new Set([
+  "app:auto-update-available",
+  "terminal:output", "terminal:exit", "app:auto-update-progress", "app:auto-update-downloaded", "app:auto-update-state",
   "connector://cli-auth-url",
   "connector://cli-auth-log",
   "connector://cli-auth-done",
@@ -158,6 +167,10 @@ const allowedEventChannels = new Set([
   "pi://notification",
   "pi://permission",
   "pi://question",
+  // 请求被判定的通知(允许/拒绝/回答,不论是谁判定的)。缺了它,权限/提问弹窗
+  // 只能靠自身按钮关闭 —— 外部判定(harness/RPC/另一个窗口/自动批准)之后会
+  // 永久挡住界面。见 electron/main/agent/host-modules/ui-request-resolver.ts。
+  "pi://request-resolved",
   "pi://summary",
   "pi://turn-error",
   "pi://telemetry",
@@ -174,6 +187,10 @@ const allowedEventChannels = new Set([
   "casdoor://auth",
   "casdoor://lifecycle",
   "openbuddy://workbench-scope",
+  // Provider/model catalog mutated (Settings dialog, plugin, or IPC caller).
+  // The renderer re-runs auth-status + providers-list off this so the
+  // composer is not left disabled after an out-of-band save.
+  "openbuddy://providers-changed",
   "casdoor://member-revocation",
   "casdoor://casdoor-webhook",
 ]);
@@ -190,6 +207,10 @@ const bridgeHealth = {
   consecutiveFailures: 0,
   lastError: null as Error | null,
   lastUpdated: Date.now(),
+  // host-core(Rust sidecar)的存活状态,由主进程随 electron-bridge-status 心跳下发。
+  // 放在这里是为了让已有的 getElectronBridgeStatus() 快照自然带出去 ——
+  // 渲染层因此不需要新增 IPC 通道或新的订阅源。
+  hostCore: null as { mode: "ok" | "degraded" | "unavailable"; crashes: number; lastReason?: string } | null,
 };
 
 // Bug fix (R7 / chat-session audit): previous version marked the bridge
@@ -238,6 +259,7 @@ const api = {
     consecutiveFailures: bridgeHealth.consecutiveFailures,
     lastErrorMessage: bridgeHealth.lastError?.message ?? null,
     lastUpdated: bridgeHealth.lastUpdated,
+    hostCore: bridgeHealth.hostCore ?? undefined,
   }),
   isElectronBridgeUnavailable: (error: unknown) => isElectronBridgeUnavailable(error),
 
@@ -405,9 +427,9 @@ const api = {
         }
       };
     },
-    onBridgeStatusChange: (handler: (status: { available: boolean; lastErrorMessage: string | null }) => void) => {
+    onBridgeStatusChange: (handler: (status: { available: boolean; lastErrorMessage: string | null; hostCore?: { mode: "ok" | "degraded" | "unavailable"; crashes: number; lastReason?: string } }) => void) => {
       const wrapped = (_event: unknown, payload: unknown) => {
-        try { handler(payload as { available: boolean; lastErrorMessage: string | null }); }
+        try { handler(payload as { available: boolean; lastErrorMessage: string | null; hostCore?: { mode: "ok" | "degraded" | "unavailable"; crashes: number; lastReason?: string } }); }
         catch { /* swallow */ }
       }
       ipcRenderer.on("electron-bridge-status", wrapped);
@@ -602,5 +624,16 @@ const api = {
 } as const;
 
 contextBridge.exposeInMainWorld("api", api);
+
+// 主进程每 30s 广播一次 host-core 存活状态。preload 把它并进 bridgeHealth,
+// 让 getElectronBridgeStatus() 一次带全 —— 渲染层沿用已有的轮询即可拿到,
+// 不必再单独订阅一条通道。
+ipcRenderer.on("electron-bridge-status", (_event, payload: unknown) => {
+  const hostCore = (payload as { hostCore?: unknown } | null)?.hostCore;
+  if (!hostCore || typeof hostCore !== "object") return;
+  const next = hostCore as { mode?: unknown };
+  if (next.mode !== "ok" && next.mode !== "degraded" && next.mode !== "unavailable") return;
+  bridgeHealth.hostCore = hostCore as typeof bridgeHealth.hostCore;
+});
 
 export type Api = typeof api;

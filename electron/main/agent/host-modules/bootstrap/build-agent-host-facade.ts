@@ -308,7 +308,28 @@ export function buildAgentHostFacade(deps: Partial<Record<keyof AgentHostFacade,
   // The cast through unknown is required because deps is intentionally typed
   // loosely (any returns) but the returned object must conform to the strict
   // AgentHostFacade contract. Bidirectional any-assignability makes this safe.
-  return deps as unknown as AgentHostFacade;
+  //
+  // P1.4(2026-10-19 生产评审 §7.2):stub 此前定义了却从未使用 —— 缺键时调用
+  // 得到的是 "TypeError: x is not a function"。改为 Proxy 兜底:访问缺失成员
+  // 时返回可读的错误 stub,同时保持 Object.keys / has 语义不变。
+  // 探测类属性不能 stub:`await facade` / JSON.stringify / util.inspect 会
+  // 探测 then/toJSON/inspect —— 返回函数会让 facade 变成 thenable 或破坏
+  // 序列化(实测 33 个 realserver 测试炸在 "agentHost.then is not implemented")。
+  const NEVER_STUBBED = new Set(["then", "catch", "finally", "toJSON", "inspect", "constructor", "prototype", "toString", "valueOf"]);
+  return new Proxy(deps, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (
+        value === undefined &&
+        typeof property === "string" &&
+        !NEVER_STUBBED.has(property) &&
+        !(property in target)
+      ) {
+        return stub(property);
+      }
+      return value;
+    },
+  }) as unknown as AgentHostFacade;
 }
 
 // Re-export AgentSession type so consumers don't have to reach into

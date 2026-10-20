@@ -41,9 +41,32 @@ export function Toast({
             key={e.id}
             className={"toast toast--" + (e.kind ?? "info")}
             role="status"
-            onClick={() => onDismiss?.(e.id)}
           >
-            <span className="toast__message">{e.message}</span>
+            {/* 整条 toast 之前是一个带 onClick 的 div（点击即消失）。
+                现在关闭入口是一个真正的 button —— 键盘可达，且不会因为
+                误触文本就丢掉提示。同时 role="status" 不再被覆盖。 */}
+            <button
+              type="button"
+              onClick={() => onDismiss?.(e.id)}
+              aria-label={`关闭提示：${e.message}`}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 8,
+                flex: "1 1 auto",
+                minWidth: 0,
+                padding: 0,
+                background: "none",
+                border: 0,
+                font: "inherit",
+                color: "inherit",
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+            >
+              <span className="toast__message">{e.message}</span>
+              <span aria-hidden="true" style={{ marginLeft: "auto", opacity: 0.6, lineHeight: 1 }}>×</span>
+            </button>
             {e.action ? (
               <button
                 type="button"

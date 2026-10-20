@@ -8,7 +8,7 @@ We release security patches for the **latest minor release** and the previous mi
 
 | Version | Supported |
 |---|---|
-| `0.15.0` (latest) | ✅ |
+| `0.16.0` (latest) | ✅ |
 | `0.15.0` | ✅ |
 | `< 0.15.0` | ❌ |
 

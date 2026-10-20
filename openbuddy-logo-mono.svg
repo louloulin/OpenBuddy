@@ -1,18 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy mark">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenBuddy mark" color="#1E2640">
   <!--
-    OpenBuddy mark v15 - monochrome.
-    Single-color version of openbuddy-logo.svg for embossing, single-ink
-    print, watermarks, and dark/light auto-theming. Uses currentColor for
-    the foreground so the host page controls the tint.
+    OpenBuddy mark v18 - monochrome silhouette.
+    Single-color silhouette of "Buddy the Whale" for embossing, single-ink
+    print, watermarks, and dark/light auto-theming. Uses currentColor; small
+    navy band + amber eye are the only non-currentColor accents so the
+    silhouette stays recognizable when tinted by the host page.
   -->
   <g fill="currentColor">
-    <!-- Open ring (3/4 circle, gap at top-right) -->
-    <path d="M 798.82 384.94 A 280 280 0 1 0 798.82 639.06"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="96"
-          stroke-linecap="round"/>
-    <!-- Companion sphere (Buddy spark) -->
-    <circle cx="838" cy="298" r="68"/>
+    <!-- whale group (slightly tilted for energy) -->
+    <g transform="rotate(-7 512 540)">
+      <!-- dynamic spout -->
+      <path d="M 478 200
+               C 460 150, 520 110, 600 70
+               C 640 50, 680 50, 660 90
+               C 620 130, 560 160, 520 220 Z"/>
+      <path d="M 500 180
+               C 510 130, 580 100, 640 90
+               C 670 86, 660 110, 620 130
+               C 580 150, 540 180, 520 220 Z" opacity=".7"/>
+      <circle cx="640" cy="80" r="10"/>
+      <circle cx="700" cy="60" r="8"/>
+      <circle cx="580" cy="50" r="7"/>
+      <circle cx="730" cy="110" r="6"/>
+      <circle cx="660" cy="40" r="5"/>
+      <circle cx="540" cy="90" r="6"/>
+
+      <!-- tail flukes -->
+      <path d="M 500 770 Q 420 800 380 870 Q 380 882 410 870 Q 460 850 510 810 Z"/>
+      <path d="M 524 770 Q 604 800 644 870 Q 644 882 614 870 Q 564 850 514 810 Z"/>
+
+      <!-- main body -->
+      <path d="M 512 240
+               C 696 240, 826 380, 826 560
+               C 826 740, 696 840, 512 840
+               C 328 840, 198 740, 198 560
+               C 198 380, 328 240, 512 240 Z"/>
+
+      <!-- side flipper -->
+      <path d="M 240 580
+               C 200 600, 178 650, 198 690
+               C 220 720, 270 700, 296 660
+               C 314 630, 286 580, 240 580 Z"/>
+
+      <!-- raised flipper (waving) -->
+      <g transform="rotate(-35 790 600)">
+        <path d="M 740 540
+                 C 820 530, 870 540, 880 580
+                 C 880 620, 840 640, 790 640
+                 C 750 640, 720 620, 720 590
+                 C 720 560, 730 545, 740 540 Z"/>
+      </g>
+
+      <!-- captain's cap (tilted) -->
+      <g transform="rotate(8 512 250)">
+        <ellipse cx="512" cy="294" rx="194" ry="20"/>
+        <path d="M 392 294
+                 C 392 224, 432 188, 512 188
+                 C 592 188, 632 224, 632 294 Z"/>
+      </g>
+    </g>
+  </g>
+  <!-- comic burst next to waving flipper (amber accent stays amber in mono) -->
+  <g transform="translate(800 240)" opacity=".95">
+    <path d="M 0 -56 L 12 -36 L 36 -42 L 24 -20 L 52 -8 L 28 4 L 36 28 L 14 22 L 4 50 L -8 24 L -32 32 L -22 8 L -50 0 L -22 -10 L -32 -34 L -8 -28 L -2 -54 Z"
+          fill="#F59E0B"/>
   </g>
 </svg>

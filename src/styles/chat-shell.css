@@ -162,18 +162,20 @@
   /* Subtle pulsing glow keeps the hero feeling alive without being noisy */
   animation: chatview__empty-hero-pulse 4s ease-in-out infinite;
 }
+/* R5 — Minimal hero icon. The previous version had a heavy brand-tinted
+   box-shadow that fought the rest of the page; we use a clean border-only
+   treatment that matches the composer card's depth cue. */
 .chatview__empty-state-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--wb-brand, #00c29a);
+  color: var(--wb-text-medium);
   background: var(--wb-bg-elevated);
-  border: 1px solid color-mix(in srgb, var(--wb-brand, #00c29a) 20%, var(--wb-border-default));
+  border: 1px solid var(--wb-border-default);
   border-radius: 50%;
   width: 56px;
   height: 56px;
   padding: 14px;
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--wb-brand, #00c29a) 14%, transparent);
 }
 @keyframes chatview__empty-hero-in {
   from {
@@ -298,11 +300,18 @@
    an icon left + title/desc stacked on the right. */
 .chatview__quick-prompts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  /* B8(审计 2026-10-14):固定两列,5 张卡自然成 2-2-1 且左右对称;
+     auto-fit 220px 在 560px 容器里会排出 2-2-1 不均的残行。窄屏回落单列。 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 18px;
   width: 100%;
   max-width: 560px;
+}
+@media (max-width: 640px) {
+  .chatview__quick-prompts {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .chatview__quick-prompt {
   display: flex;
@@ -419,4 +428,94 @@
 .topbar-actions__item--disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+/* 时间线行导航容器(A4 工具折叠行 ↑↓ 导航):无视觉,仅作键盘范围。 */
+.chatview__timeline-rows {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ---- C1 Composer dock 外壳(对齐 Claude ChatComposerDock)----
+   Notices(RewindBar / 队列 / 桥横幅)与 Composer 同住一个圆角容器:
+   统一外壳描边与底色,插槽之间用细分隔线,内部组件自身的 margin 归零。 */
+.chat-dock {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--wb-border-default);
+  border-radius: var(--wb-radius-lg, 14px);
+  background: var(--wb-bg-primary);
+  box-shadow: var(--wb-shadow-sm);
+  overflow: hidden;
+}
+.chat-dock > * + * {
+  border-top: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.06));
+}
+.chat-dock .chatview__pause-btn,
+.chat-dock .yield-banner {
+  align-self: flex-start;
+  margin: var(--wb-spacing-2, 8px) var(--wb-spacing-3, 8px) 0;
+}
+
+/* ---- 阶段 1:终端 dock(VS Code 风格底部面板) ---- */
+.chatview__terminal-dock {
+  display: flex;
+  flex-direction: column;
+  height: 40%;
+  min-height: 220px;
+  border-top: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-primary);
+}
+.chatview__terminal-dock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.06));
+}
+.chatview__terminal-dock-title {
+  font-size: 12px;
+  color: var(--wb-text-medium);
+}
+.chatview__terminal-dock-close {
+  border: none;
+  background: none;
+  color: var(--wb-text-medium);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--wb-radius-sm, 6px);
+}
+.chatview__terminal-dock-close:hover {
+  background: var(--wb-bg-tertiary);
+  color: var(--wb-text-strong);
+}
+.terminal-panel,
+.terminal-panel__host {
+  flex: 1;
+  min-height: 0;
+  padding: 0 8px 6px;
+}
+
+/* B3(审计 2026-10-14):回溯/分叉并入 dock —— 不再是两颗悬浮药丸。
+   作为 dock 的一行工具条:通栏、贴合、图标+文字弱化,hover 才点亮。 */
+.chat-dock .rewind-bar {
+  align-self: stretch;
+  gap: 2px;
+  padding: 5px 10px;
+  background: var(--wb-bg-secondary, transparent);
+}
+.chat-dock .rewind-bar__btn {
+  height: 24px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--wb-text-weak);
+  border-radius: var(--wb-radius-xs, 4px);
+}
+.chat-dock .rewind-bar__btn:hover {
+  background: var(--wb-bg-hover);
+  color: var(--wb-text-strong);
+}
+.chat-dock .rewind-bar__btn + .rewind-bar__btn {
+  margin-left: 4px;
 }

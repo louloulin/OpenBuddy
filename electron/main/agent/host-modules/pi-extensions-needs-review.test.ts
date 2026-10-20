@@ -38,8 +38,13 @@ function buildFixtures(specs: Array<{ id: string; action: ExtensionPolicyDecisio
   };
   const decisions: Fixtures["decisions"] = [];
   for (const spec of specs) {
+    // Mirror the production shape: a third-party spec contributes BOTH a
+    // factory and a `paths` entry (pi jiti-requires every path in the
+    // main process), so the gate has to remove both.
+    const source = `/ext/${spec.id}.js`;
     resolution.factories.push({ name: spec.id, factory: () => undefined as never, hidden: true });
-    resolution.resolved.push({ id: spec.id, source: `<inline:${spec.id}>`, builtIn: false });
+    resolution.paths.push(source);
+    resolution.resolved.push({ id: spec.id, source, builtIn: false });
     decisions.push({
       input: { id: spec.id, packageName: `pkg-${spec.id}`, builtIn: false },
       decision: { action: spec.action, reason: spec.reason },
@@ -170,6 +175,41 @@ describe("applyNeedsReviewGate (plan4.5 §B — resolver ↔ gate wiring)", () =
     expect(emit).toHaveBeenCalledTimes(1);
     expect(emit.mock.calls[0][1].pendingCount).toBe(1);
     expect(emit.mock.calls[0][1].pending[0].id).toBe("pi-flag-a");
+  });
+
+  it("drops the blocked spec's extension path, not just its factory", () => {
+    const fixtures = buildFixtures([
+      { id: "pi-allow", action: "allow", reason: "allowlisted" },
+      { id: "pi-flagged", action: "needs-review", reason: "requires manual review" },
+    ]);
+    const gate = createNeedsReviewGate();
+    const emit = vi.fn();
+
+    applyNeedsReviewGate(fixtures.resolution, fixtures.decisions, gate, emit);
+
+    // The path survives only if pi would jiti-require the extension in the
+    // main process anyway — that made the gate decorative.
+    expect(fixtures.resolution.paths).toEqual(["/ext/pi-allow.js"]);
+  });
+
+  it("drops the denied spec's extension path too", () => {
+    const fixtures = buildFixtures([
+      { id: "pi-flagged", action: "needs-review", reason: "requires manual review" },
+    ]);
+    const gate = createNeedsReviewGate();
+    const emit = vi.fn();
+
+    gate.track({
+      id: "pi-flagged",
+      packageName: "pkg-pi-flagged",
+      reason: "requires manual review",
+      requestedAt: "2026-09-13T00:00:00.000Z",
+    });
+    gate.reject("pi-flagged");
+
+    applyNeedsReviewGate(fixtures.resolution, fixtures.decisions, gate, emit);
+
+    expect(fixtures.resolution.paths).toEqual([]);
   });
 
   it("ignores specs without an id and survives a null decisions list (defensive)", () => {

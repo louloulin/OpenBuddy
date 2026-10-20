@@ -4,6 +4,7 @@
  * Split out of `./index.ts`.
  */
 import { ipcMain, type BrowserWindow } from "electron";
+import { confirmDangerousAction } from "./native-confirm";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { readStorageSources, writeStorageSources } from "../agent/pi-resources";
@@ -54,6 +55,35 @@ import {
 } from "./validation";
 
 export function registerStorageIpc(getWindow: () => BrowserWindow | null): void {
+		// P0.8/P1(2026-10-19 生产评审 数据§7):用户可见的备份/恢复入口。
+		// driver.backup()(VACUUM INTO)与 restoreStorageBackup() 早已存在但
+		// 此前零调用方。恢复不直接换文件 —— stage + 标记,重启后由
+		// SessionMetadataStore 开库前生效(见 pending-restore.ts)。
+		ipcMain.handle("storage:backup-create", async () => {
+			const { createStorageBackup } = await import("@openbuddy/storage");
+			return createStorageBackup(join(agentHome(), "openbuddy.sqlite"));
+		});
+		ipcMain.handle("storage:backup-restore", async (_e, args: unknown) => {
+			const input = recordValue(args ?? {}, "storage:backup-restore payload");
+			const backupPath = absolutePath(input.backupPath, "backupPath");
+			const { basename } = await import("node:path");
+			const { existsSync, statSync } = await import("node:fs");
+			if (!existsSync(backupPath)) throw new Error(`备份文件不存在: ${backupPath}`);
+			if (!statSync(backupPath).isFile()) throw new Error(`备份路径不是文件: ${backupPath}`);
+			await confirmDangerousAction({
+				window: getWindow(),
+				title: "恢复备份",
+				message: "应用请求用备份覆盖当前数据",
+				detail: `备份文件:${basename(backupPath)}\n当前数据将挪到 .pre-restore-<时间戳> 保留,应用重启后生效。`,
+				confirmLabel: "允许恢复",
+			});
+			const { stageStorageRestore } = await import("@openbuddy/storage");
+			const staged = await stageStorageRestore({
+				backupPath,
+				databasePath: join(agentHome(), "openbuddy.sqlite"),
+			});
+			return { ok: true, stagedPath: staged.stagedPath, schemaVersion: staged.schemaVersion, requiresRestart: true };
+		});
 		ipcMain.handle("storage-sources:list", async () => readStorageSources());
 		ipcMain.handle("storage-sources:save", async (_e, args: unknown) => {
 			const input = recordValue(args, "storage sources save payload");

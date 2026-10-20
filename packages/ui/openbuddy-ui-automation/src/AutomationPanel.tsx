@@ -128,8 +128,20 @@ function ConfirmDialog({
   onCancel: () => void;
 }) {
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="atm-confirm-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+    // 遮罩只是"点击空白处关闭"的鼠标便利区，不是控件本身：
+    // 键盘/读屏用户通过「取消」按钮或 Esc 关闭，故标为 presentation 移出无障碍树。
+    // 用 target === currentTarget 判定"点在遮罩本体"，对话框内部无需再写 stopPropagation。
+    <div
+      className="modal-overlay"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onCancel();
+      }}
+    >
+      <div className="atm-confirm-dialog" role="dialog" aria-modal="true" aria-label={title}>
         <h3 className="atm-confirm-title">{title}</h3>
         <p className="atm-confirm-content">{content}</p>
         <div className="atm-confirm-actions">
@@ -181,31 +193,14 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
     action: () => Promise<void>;
   } | null>(null);
 
-  // When the automations backend throws the Stage H-4 migration message
-  // (openbuddy-automation removed, pi-goal-list-loop-audit is the canonical
-  // backplane), we render a persistent banner instead of a transient toast
-  // so the user has a clear pointer to /goal.
-  const [migrationMessage, setMigrationMessage] = useState<string | null>(null);
-
   const refresh = useCallback(
     async (silent = false) => {
       if (!silent) setLoading(true);
       try {
         setSnapshot(await automationsSnapshot());
       } catch (e) {
-        // Stage H-4: openbuddy-automation removed (Stage G-1c); the
-        // canonical automation backplane is pi-goal-list-loop-audit. The
-        // IPC channel throws a migration message which we surface here so
-        // the user has a clear pointer to /marketplace + /goal. The panel
-        // intentionally stays mounted per the "保留auto" constraint.
-        const raw = String(e).replace(/^Error:\s*/, "");
-        if (raw.includes("pi-goal-list-loop-audit")) {
-          setMigrationMessage(raw);
-          console.warn("[automation] migration message:", raw);
-        } else {
-          setMigrationMessage(null);
-          onToast?.(`加载自动化数据失败：${raw}`);
-        }
+        // 阶段 1.4 后端接回真实实现,失败只可能是真问题,直接报给用户。
+        onToast?.(`加载自动化数据失败：${String(e).replace(/^Error:\s*/, "")}`);
       } finally {
         if (!silent) setLoading(false);
       }
@@ -242,14 +237,10 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
     return () => document.removeEventListener("mousedown", handler);
   }, [filterOpen]);
 
-  // Helper: format IPC errors so the toast surfaces the migration message
-  // (pi-goal-list-loop-audit) instead of a generic "保存自动化任务失败".
+  // 错误统一带上前端语义,主进程原始信息附在后面(不再有"迁移"分支:
+  // 阶段 1.4 后端是真实实现,没有别的后端要指向)。
   const formatAutomationError = useCallback((e: unknown, fallback: string): string => {
-    const raw = String(e).replace(/^Error:\s*/, "");
-    if (raw.includes("pi-goal-list-loop-audit")) {
-      return `${raw}\n请通过 /marketplace 安装该扩展，然后使用 /goal 命令管理自动化任务。`;
-    }
-    return `${fallback}: ${raw}`;
+    return `${fallback}: ${String(e).replace(/^Error:\s*/, "")}`;
   }, []);
 
   // ---------- 创建 / 编辑 ----------
@@ -615,42 +606,6 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
   // ============================================================
   return (
     <div className="automation-panel code-buddy-automation">
-      {/* UX-2: persistent migration banner. Replaces the dead-link toast
-          with clickable actions that route the user to the marketplace
-          (where pi-goal-list-loop-audit can be installed) and to the
-          PI-PRIORITY doc explaining the priority decision. The banner
-          stays mounted until the user dismisses it so the next session
-          does not have to re-discover the migration. */}
-      {migrationMessage && (
-        <div className="atm-migration-banner" role="status" data-migration="pi-goal-list-loop-audit">
-          <div className="atm-migration-banner__icon" aria-hidden="true">⚙️</div>
-          <div className="atm-migration-banner__body">
-            <div className="atm-migration-banner__title">定时自动化已升级为 Goal 任务</div>
-            <div className="atm-migration-banner__detail">
-              自动化能力已整合进 Goal 任务管理。在输入框输入 <code>/goal</code> 即可创建和管理定时自动化任务。
-            </div>
-          </div>
-          <div className="atm-migration-banner__actions">
-            <button
-              type="button"
-              className="atm-migration-banner__btn atm-migration-banner__btn--primary"
-              onClick={() => onNavigate?.("专家·技能·连接器")}
-              data-action="open-marketplace"
-            >
-              去市场安装
-            </button>
-            <button
-              type="button"
-              className="atm-migration-banner__btn atm-migration-banner__btn--ghost"
-              onClick={() => setMigrationMessage(null)}
-              aria-label="关闭迁移提示"
-              data-action="dismiss"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
       {/* ---------- 工具栏(顶部拖拽条,Electron 需 data-openbuddy-drag) ---------- */}
       {showTemplatePage ? (
         <div className="atm-toolbar atm-toolbar--breadcrumb" data-openbuddy-drag>
@@ -876,8 +831,10 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
             const isCollapsed = collapsedGroups.has(group.label);
             return (
               <div className="atm-records-group" key={group.label}>
-                <div
+                <button
+                  type="button"
                   className="atm-records-group-label"
+                  aria-expanded={!isCollapsed}
                   onClick={() =>
                     setCollapsedGroups((prev) => {
                       const next = new Set(prev);
@@ -893,7 +850,7 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
                     height={14}
                     className={`atm-records-group-chevron${isCollapsed ? " atm-records-group-chevron--collapsed" : ""}`}
                   />
-                </div>
+                </button>
                 {!isCollapsed &&
                   group.items.map((item) => (
                     <InboxRow
@@ -908,14 +865,19 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
           })}
           {archivedRecords.length > 0 && (
             <div className="atm-records-group atm-records-group--archived">
-              <div className="atm-records-group-label" onClick={() => setArchivedGroupOpen((v) => !v)}>
+              <button
+                type="button"
+                className="atm-records-group-label"
+                aria-expanded={archivedGroupOpen}
+                onClick={() => setArchivedGroupOpen((v) => !v)}
+              >
                 已归档
                 <ChevronDownIcon
                   width={14}
                   height={14}
                   className={`atm-records-group-chevron${archivedGroupOpen ? "" : " atm-records-group-chevron--collapsed"}`}
                 />
-              </div>
+              </button>
               {archivedGroupOpen &&
                 archivedRecords.map((item) => (
                   <InboxRow key={item.id} item={item} archived onArchive={handleArchiveRecord} onDelete={handleDeleteRecord} />
@@ -987,9 +949,24 @@ function AutomationRow({
     return () => document.removeEventListener("mousedown", handler);
   }, [menuOpen]);
 
+  // 行内嵌套了「测试运行」「更多」等真实 <button>，把整行改成 button 会产生
+  // 非法嵌套按钮；因此行本身走 role + tabIndex + 键盘处理。
+  // 事件只在行自身是事件源时响应，避免行内按钮的按键被行重复消费。
+  const handleRowKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    if (isBatchMode) onToggleSelect(automation.id);
+    else onEdit(automation);
+  };
+
   return (
     <div
       className={`atm-row${isBatchMode ? " atm-row--batch" : ""}${menuOpen ? " atm-row--menu-open" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-label={isBatchMode ? `选择自动化任务 ${automation.name}` : `打开自动化任务 ${automation.name}`}
+      onKeyDown={handleRowKeyDown}
       onClick={() => (isBatchMode ? onToggleSelect(automation.id) : onEdit(automation))}
     >
       <div className="atm-row-left">
@@ -1045,17 +1022,25 @@ function AutomationRow({
               <PlayIcon width={16} height={16} />
             </button>
             <div className="atm-row-menu-wrap" ref={menuRef}>
-              <span
+              <button
+                type="button"
                 className="atm-row-more-hint"
+                aria-label="更多操作"
+                aria-expanded={menuOpen}
                 onClick={(e) => {
                   e.stopPropagation();
                   setMenuOpen((v) => !v);
                 }}
               >
                 <MoreDotsIcon width={16} height={16} />
-              </span>
+              </button>
               {menuOpen && (
-                <div className="atm-row-menu" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="atm-row-menu"
+                  // 只是防止菜单内点击冒泡到行的守卫容器，不是控件本身
+                  role="presentation"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     type="button"
                     className="atm-row-menu-item"

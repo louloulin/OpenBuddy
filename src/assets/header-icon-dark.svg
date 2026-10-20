@@ -1,19 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="OpenBuddy">
   <!--
-    OpenBuddy header icon (dark theme) v15.
-    Same composition as header-icon.svg but tuned for dark surfaces:
-    ring uses the warm cream gradient, sphere stays amber.
+    OpenBuddy header icon (dark theme) v18.
+    Same "Buddy the Whale" silhouette as header-icon.svg, but tuned for
+    dark surfaces: body uses the cream/amber gradient so it stays
+    readable, amber eye accents remain.
   -->
   <defs>
-    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
       <stop stop-color="#FFFEF8"/>
-      <stop offset="1" stop-color="#D4A574"/>
+      <stop offset="1" stop-color="#F5E6CC"/>
     </linearGradient>
   </defs>
-  <path d="M 24.7 12.3 A 9 9 0 1 0 24.7 19.7"
-        fill="none"
-        stroke="url(#ring)"
-        stroke-width="3.2"
-        stroke-linecap="round"/>
-  <circle cx="26" cy="8.6" r="2.6" fill="#F59E0B"/>
+  <g fill="url(#body)">
+    <!-- body -->
+    <ellipse cx="16" cy="18" rx="11.5" ry="9.5"/>
+    <!-- tail flukes -->
+    <path d="M 15.4 26 Q 12 27.5 11 29.5 Q 12 29.6 13.5 29 Q 14.7 28.3 15.8 27.4 Z"/>
+    <path d="M 16.6 26 Q 20 27.5 21 29.5 Q 20 29.6 18.5 29 Q 17.3 28.3 16.2 27.4 Z"/>
+    <!-- captain's cap -->
+    <ellipse cx="16" cy="9" rx="7.5" ry="1.4"/>
+    <path d="M 11 9 C 11 6.4, 12.4 5, 16 5 C 19.6 5, 21 6.4, 21 9 Z"/>
+    <!-- navy band -->
+    <rect x="11" y="8.6" width="10" height="1.6" fill="#1E2640"/>
+  </g>
+  <!-- amber eye accents -->
+  <circle cx="13.5" cy="16.5" r="1.1" fill="#F59E0B"/>
+  <circle cx="18.5" cy="16.5" r="1.1" fill="#F59E0B"/>
 </svg>

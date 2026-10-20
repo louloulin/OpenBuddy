@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { WorkingDot } from "./chatview/WorkingDot";
+import { useLocale } from "@openbuddy/ui-locale/client";
 import { LOADING_TIPS } from "@/lib/platform/loading-tips";
 import { phaseLabel, type AgentPhase } from "@/lib/stream/agent-phase";
 import { useSessionStore } from "@/stores/session-store";
@@ -24,7 +26,7 @@ import { useSessionStore } from "@/stores/session-store";
  *   - LOADING_TIPS 轮播保持不变（节奏与 cabinet 一致：3500ms 延迟 + 9s 间隔）。
  */
 
-const PREPARING_TEXT = "准备中";
+const PREPARING_KEY = "chat.loading.preparing";
 const PREPARING_DURATION_MS = 1200;
 const TIP_INITIAL_DELAY_MS = 3500;
 const TIP_ROTATION_INTERVAL_MS = 9000;
@@ -37,22 +39,8 @@ const TIP_ROTATION_INTERVAL_MS = 9000;
  *   - 不暗示具体能力（不写"联网" / "搜索"等 OpenBuddy 不一定有的功能）
  * 词序每 4 个一档做轻微语义梯度（信息/思维/状态），循环时不单调。
  */
-const THINKING_VERBS: readonly string[] = [
-  "梳理信息",
-  "理清思路",
-  "抽丝剥茧",
-  "提炼要点",
-  "整理素材",
-  "打磨措辞",
-  "组织语言",
-  "编织答复",
-  "核对细节",
-  "校准结论",
-  "斟酌用词",
-  "润色表达",
-  "梳理脉络",
-  "梳理结构",
-];
+/** 动词键位(chat.loading.verb1..14),文案在词表(批D i18n 迁移)。 */
+const THINKING_VERB_KEYS: readonly string[] = Array.from({ length: 14 }, (_, i) => `chat.loading.verb${i + 1}`);
 
 /**
  * 把 phaseLabel 文本（来自 `phaseLabel()`，通常是"等待模型响应" / "运行 3 个工具: foo, bar"
@@ -69,7 +57,7 @@ function verbForPhase(phase: AgentPhase): string | null {
     case "waiting_model":
       return null; // 走 THINKING_VERBS 轮换
     case "running_command":
-      return "打磨措辞";
+      return "chat.loading.verb6"; // 打磨措辞
     case "running_tools":
       return null;
     default:
@@ -91,9 +79,9 @@ function usePreparingTransition(): boolean {
   return requesting;
 }
 
-function useRotatingVerb(streaming: boolean, intervalMs: number): { text: string; key: number } {
-  const [verb, setVerb] = useState<{ text: string; key: number }>(() => ({
-    text: THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)],
+function useRotatingVerb(streaming: boolean, intervalMs: number): { keyName: string; key: number } {
+  const [verb, setVerb] = useState<{ keyName: string; key: number }>(() => ({
+    keyName: THINKING_VERB_KEYS[Math.floor(Math.random() * THINKING_VERB_KEYS.length)],
     key: 0,
   }));
   useEffect(() => {
@@ -101,9 +89,9 @@ function useRotatingVerb(streaming: boolean, intervalMs: number): { text: string
     const id = setInterval(() => {
       setVerb((v) => {
         const nextIdx =
-          (THINKING_VERBS.indexOf(v.text) + 1 + Math.floor(Math.random() * 3)) %
-          THINKING_VERBS.length;
-        return { text: THINKING_VERBS[nextIdx], key: v.key + 1 };
+          (THINKING_VERB_KEYS.indexOf(v.keyName) + 1 + Math.floor(Math.random() * 3)) %
+          THINKING_VERB_KEYS.length;
+        return { keyName: THINKING_VERB_KEYS[nextIdx], key: v.key + 1 };
       });
     }, intervalMs);
     return () => clearInterval(id);
@@ -199,6 +187,7 @@ export function LoadingRow() {
   const rotatingVerb = useRotatingVerb(streaming, 2400);
   const tip = useRotatingTip(LOADING_TIPS, TIP_INITIAL_DELAY_MS, TIP_ROTATION_INTERVAL_MS);
   const elapsed = useElapsedSeconds(streaming);
+  const locale = useLocale();
 
   // 文案优先级：
   //   1. phase 驱动的具体标签（如 "运行 3 个工具"）—— 这是最准确的，告诉用户
@@ -209,8 +198,8 @@ export function LoadingRow() {
   // running_tools 阶段我们仍展示 phase label（更准确），不切换动词；
   // 但动词 2400ms 仍在背后轮换，避免 running_tools 长时间时静止。
   const verbOverride = verbForPhase(phase);
-  const verbText = verbOverride ?? rotatingVerb.text;
-  const mainText = phaseLabelText ?? verbText ?? (showPreparing ? PREPARING_TEXT : "等待中");
+  const verbText = verbOverride ?? locale.t(rotatingVerb.keyName);
+  const mainText = phaseLabelText ?? verbText ?? (showPreparing ? locale.t(PREPARING_KEY) : locale.t("chat.loading.waiting"));
 
   // 任何 loading 文案右侧都跟 dots + elapsed，对齐 cabinet PendingIndicator。
   // elapsed 前 2s 不显示，避免"闪一下 1s 又消失"的视觉噪音。
@@ -221,11 +210,9 @@ export function LoadingRow() {
       <span className="msg__loading-main ob-shining-text" key={phaseLabelText ? "phase" : rotatingVerb.key}>
         {mainText}
       </span>
-      <span className="msg__loading-dots" aria-hidden="true">
-        <span className="msg__loading-dot msg__loading-dot--1" />
-        <span className="msg__loading-dot msg__loading-dot--2" />
-        <span className="msg__loading-dot msg__loading-dot--3" />
-      </span>
+      {/* Claude 对齐(2026-10-14):三点 bounce 换成单一呼吸点 —— 它是全局
+          唯一的"正在工作"指示源(对齐 cds-working-dot-halo)。 */}
+      <WorkingDot />
       {showElapsed && (
         <span className="msg__loading-elapsed" aria-live="polite">
           {formatElapsed(elapsed)}

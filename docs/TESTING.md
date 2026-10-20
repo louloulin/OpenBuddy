@@ -126,7 +126,7 @@ describe("MyComponent", () => {
 | Electron main IPC | 90% lines | per-package |
 | Eval harness | 60% lines | per-package |
 
-Coverage is reported nightly in [`evidence/coverage-report/`](../../evidence/coverage-report/). Drops > 5% block the release.
+Coverage is reported nightly in `evidence/coverage-report/`. Drops > 5% block the release.
 
 ### Flaky tests
 
@@ -154,7 +154,7 @@ GitHub Actions runs:
 | `real-ui-smoke` | merge to master | ✅ |
 | `closed-loop` | release tag | ✅ |
 
-See [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) for the full matrix.
+See `.github/workflows/ci.yml` for the full matrix.
 
 ---
 
@@ -221,7 +221,7 @@ See [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) for the full ma
 | Electron 主进程 IPC | 90% 行 | 每包 |
 | 评测 harness | 60% 行 | 每包 |
 
-每晚在 [`evidence/coverage-report/`](../../evidence/coverage-report/) 报告覆盖率。跌幅 > 5% 阻塞发布。
+每晚在 `evidence/coverage-report/` 报告覆盖率。跌幅 > 5% 阻塞发布。
 
 ### Flaky 测试
 

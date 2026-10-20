@@ -29,3 +29,4 @@ export * from "./use-horizontal-scroll";
 // that needs to render a frontmatter header + body without re-doing
 // the IPC + useState/useEffect ceremony.
 export * from "./use-frontmatter";
+export * from "./model-label";

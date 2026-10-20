@@ -293,10 +293,11 @@ export function DiscoverPanel({ onLaunch, onToast }: DiscoverPanelProps) {
           {/* 助理选择（可选） */}
           {agents.length > 0 && (
             <div className="discover-launcher__field">
-              <label className="discover-launcher__field-label">
+              <label className="discover-launcher__field-label" htmlFor="discover-launcher-agent">
                 使用助理（可选，作为 prompt 的角色引导）
               </label>
               <select
+                id="discover-launcher-agent"
                 className="discover-launcher__select"
                 value={chosenAgent?.path ?? ""}
                 onChange={(e) =>
@@ -315,8 +316,9 @@ export function DiscoverPanel({ onLaunch, onToast }: DiscoverPanelProps) {
 
           {/* Prompt 编辑器 */}
           <div className="discover-launcher__field">
-            <label className="discover-launcher__field-label">Prompt</label>
+            <label className="discover-launcher__field-label" htmlFor="discover-launcher-prompt">Prompt</label>
             <textarea
+              id="discover-launcher-prompt"
               className="discover-launcher__textarea"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}

@@ -13,7 +13,7 @@
  *   - 主窗口创建 (`./main-window.ts`)
  *   - 应用菜单调用方的主进程启动顺序 (`./index.ts`)
  */
-import { BrowserWindow, Menu, shell } from "electron";
+import { app, BrowserWindow, Menu, shell } from "electron";
 import { join } from "node:path";
 
 export interface InstallAppMenuOptions {
@@ -95,6 +95,31 @@ export function installAppMenu(opts: InstallAppMenuOptions): void {
                 // Non-empty string = error message from Electron.
                 console.warn(`[openbuddy-pi] failed to open PRIVACY.md at ${policyPath}: ${result}`);
               }
+            },
+          },
+          // P0.7(2026-10-19 生产评审 §6.5):诊断出口 —— 用户报问题时能自己
+          // 找到日志、把诊断信息交给维护者。
+          {
+            label: "打开日志文件夹",
+            click: async () => {
+              const error = await shell.openPath(app.getPath("logs"));
+              if (error) console.warn(`[openbuddy-pi] failed to open logs dir: ${error}`);
+            },
+          },
+          {
+            label: "复制诊断信息",
+            click: async () => {
+              const { clipboard } = await import("electron");
+              const lines = [
+                `OpenBuddy ${app.getVersion()}`,
+                `Electron ${process.versions.electron} / Chrome ${process.versions.chrome} / Node ${process.versions.node}`,
+                `Platform: ${process.platform} ${process.arch} / ${process.getSystemVersion()}`,
+                `Packaged: ${app.isPackaged}`,
+                `Logs: ${app.getPath("logs")}`,
+                `UserData: ${app.getPath("userData")}`,
+                `Generated: ${new Date().toISOString()}`,
+              ];
+              clipboard.writeText(lines.join("\n"));
             },
           },
         ],

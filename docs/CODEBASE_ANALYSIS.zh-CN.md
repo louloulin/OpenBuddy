@@ -13,7 +13,7 @@
 | `[I]` | 由相邻已核验事实合理推断,需自行复核 |
 | `[OOS]` | 超出本次快照范围——仅列出方向,未深入分析 |
 
-仓库已有 [PROJECT_ANALYSIS.md](../PROJECT_ANALYSIS.md) 与 [openbuddy-capability-matrix.md](openbuddy-capability-matrix.md)。这两份文档早于此文档,使用略不同的计数;本文为 2026-09-05 权威参考。
+仓库已有 [PROJECT_ANALYSIS.md](_archive/PROJECT_ANALYSIS.md) 与 [openbuddy-capability-matrix.md](openbuddy-capability-matrix.md)。这两份文档早于此文档,使用略不同的计数;本文为 2026-09-05 权威参考。
 
 ---
 

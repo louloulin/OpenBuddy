@@ -93,7 +93,9 @@ function QuestionInlineCardInner({ sessionId }: { sessionId: string | null }) {
   if (!head) return null;
 
   return (
-    <div className="request-modal-overlay" onMouseDown={(event) => {
+    // 遮罩点击关闭只是鼠标便利路径：真正的关闭入口是 Esc（上方 window 监听）
+    // 和面板内的按钮，所以遮罩本身不是控件，声明为 presentation 让 AT 跳过它。
+    <div className="request-modal-overlay" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !busy) void handleCancel();
     }}>
       <div className="request-modal request-modal--question" role="dialog" aria-modal="true" aria-labelledby="question-dialog-title">

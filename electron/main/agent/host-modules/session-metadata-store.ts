@@ -40,8 +40,9 @@ import { rm, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { openStorageSync, SettingsStore, agentHome } from "@openbuddy/storage";
+import { applyPendingStorageRestoreSync, openStorageSync, SettingsStore, agentHome } from "@openbuddy/storage";
 
+import { bumpCacheEpoch } from "./_cache";
 import { piHome } from "./_host-paths";
 
 const NAMESPACE = "session-metadata";
@@ -122,13 +123,43 @@ export class SessionMetadataStore {
   private readonly legacyJsonPath: string;
   private migrationPromise: Promise<void> | null = null;
   private migrationDone = false;
+  /**
+   * Serialises every read-modify-write in this store.
+   *
+   * `updateMetadata` reads the whole snapshot, hands it to a mutator, then
+   * writes all three fields back. Two overlapping calls (a pin toggle plus an
+   * expert assignment, say — they arrive from independent IPC handlers) both
+   * read the *same* pre-state and the second write silently discards the
+   * first's change. That is the classic lost update, and it is not
+   * theoretical: `updateMetadata` is exactly the entry point slash commands
+   * use, and those fan out concurrently.
+   */
+  private writeQueue: Promise<unknown> = Promise.resolve();
 
   constructor(options: SessionMetadataStoreOptions = {}) {
     if (options.settings) {
       this.settings = options.settings;
     } else {
+      const databasePath = options.databasePath ?? defaultDatabasePath();
+      // P0.8/P1(2026-10-19 生产评审 数据§7):开库前执行"暂存的恢复"。
+      // 设置页的「恢复备份」不直接换文件(运行中 swap 是未定义行为),而是
+      // stage + 标记,重启后在这里生效;现库被挪到 .pre-restore-<时间戳>,
+      // 数据不丢。失败则清标记按无恢复处理(见 applyPendingStorageRestore)。
+      try {
+        const applied = applyPendingStorageRestoreSync(databasePath);
+        if (applied) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[session-metadata] pending restore applied: schema v${applied.schemaVersion}, ` +
+              `previous db quarantined at ${applied.quarantined[0] ?? "(none)"}`,
+          );
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("[session-metadata] pending restore failed; keeping current db:", error);
+      }
       this.settings = new SettingsStore({
-        driver: openStorageSync({ filePath: options.databasePath ?? defaultDatabasePath() }).driver,
+        driver: openStorageSync({ filePath: databasePath }).driver,
       });
     }
     this.legacyJsonPath = options.legacyJsonPath ?? defaultLegacyJsonPath();
@@ -204,6 +235,9 @@ export class SessionMetadataStore {
     }
     // Delete the legacy file on success — it's now redundant.
     await rm(this.legacyJsonPath, { force: true });
+    // Migrating the mirror changes what listSessions projects, so cached
+    // session lists captured before migration are stale by construction.
+    bumpCacheEpoch();
   }
 
   async getPinned(): Promise<string[]> {
@@ -247,34 +281,49 @@ export class SessionMetadataStore {
   /**
    * Atomically read+update+write the three top-level fields. Mirrors
    * the legacy `updateSessionMetadata(updateFn)` contract.
+   *
+   * Runs on the store's write queue, so concurrent callers compose instead of
+   * overwriting one another, and bumps the session-list cache epoch so a
+   * rename/pin is visible in the UI immediately rather than after the TTL.
    */
-  async updateMetadata(update: (snapshot: SessionMetadataSnapshot) => void): Promise<void> {
-    await this.ensureMigrated();
-    const pinned = await this.getPinned();
-    const archived = await this.getArchived();
-    const experts = await this.getAllExperts();
-    const existingExpertIds = new Set(Object.keys(experts));
-    const next: SessionMetadataSnapshot = { pinned, archived, experts: { ...experts } };
-    update(next);
-    this.settings.set(NAMESPACE, KEY_PINNED, next.pinned);
-    this.settings.set(NAMESPACE, KEY_ARCHIVED, next.archived);
-    // Diff the experts map so we delete entries that the update removed.
-    for (const existing of existingExpertIds) {
-      if (!(existing in next.experts)) {
-        this.settings.delete(NAMESPACE, `${KEY_EXPERT_PREFIX}${existing}`);
+  updateMetadata(update: (snapshot: SessionMetadataSnapshot) => void): Promise<void> {
+    const operation = this.writeQueue.then(async () => {
+      await this.ensureMigrated();
+      const pinned = await this.getPinned();
+      const archived = await this.getArchived();
+      const experts = await this.getAllExperts();
+      const existingExpertIds = new Set(Object.keys(experts));
+      const next: SessionMetadataSnapshot = { pinned, archived, experts: { ...experts } };
+      update(next);
+      this.settings.set(NAMESPACE, KEY_PINNED, next.pinned);
+      this.settings.set(NAMESPACE, KEY_ARCHIVED, next.archived);
+      // Diff the experts map so we delete entries that the update removed.
+      for (const existing of existingExpertIds) {
+        if (!(existing in next.experts)) {
+          this.settings.delete(NAMESPACE, `${KEY_EXPERT_PREFIX}${existing}`);
+        }
       }
-    }
-    for (const [sessionId, info] of Object.entries(next.experts)) {
-      this.settings.set(NAMESPACE, `${KEY_EXPERT_PREFIX}${sessionId}`, info);
-    }
+      for (const [sessionId, info] of Object.entries(next.experts)) {
+        this.settings.set(NAMESPACE, `${KEY_EXPERT_PREFIX}${sessionId}`, info);
+      }
+      bumpCacheEpoch();
+    });
+    // A rejected mutation must not wedge every later one behind a dead queue.
+    this.writeQueue = operation.catch(() => undefined);
+    return operation;
   }
 
   async clearAll(): Promise<void> {
-    await this.ensureMigrated();
-    this.settings.deleteNamespace(NAMESPACE);
-    // Also remove the legacy file in case the user is clearing
-    // after a partial migration.
-    await rm(this.legacyJsonPath, { force: true });
+    const operation = this.writeQueue.then(async () => {
+      await this.ensureMigrated();
+      this.settings.deleteNamespace(NAMESPACE);
+      // Also remove the legacy file in case the user is clearing
+      // after a partial migration.
+      await rm(this.legacyJsonPath, { force: true });
+      bumpCacheEpoch();
+    });
+    this.writeQueue = operation.catch(() => undefined);
+    return operation;
   }
 }
 

@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi, afterEach, beforeEach } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthGuard } from "../AuthGuard";
 
@@ -16,6 +16,11 @@ vi.mock("../oidc-client", () => ({
 }));
 
 describe("AuthGuard", () => {
+  // vitest.config sets `globals: false`, so @testing-library/react's automatic
+  // afterEach cleanup never registers and each render() stacks onto the last
+  // one's DOM. Same pattern as the other .tsx suites in packages/ui.
+  afterEach(() => cleanup());
+
   beforeEach(() => {
     mockLoadTokens.mockReset();
   });

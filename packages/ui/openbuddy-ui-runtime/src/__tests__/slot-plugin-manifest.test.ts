@@ -33,7 +33,7 @@ describe("Phase K.2 — slot-plugin-manifest", () => {
     const apply = vi.fn(() => () => undefined);
     const manifest = toOpenBuddyPluginManifest({
       pkg: "@openbuddy/ui-test",
-      apply,
+      load: () => Promise.resolve(apply),
       description: "test fixture",
     });
     expect(manifest.id).toBe("@openbuddy/ui-test");
@@ -46,7 +46,7 @@ describe("Phase K.2 — slot-plugin-manifest", () => {
     const apply = vi.fn(() => () => undefined);
     const row = serializeBuiltinUiSlotTrack({
       pkg: "@openbuddy/ui-callable",
-      apply,
+      load: () => Promise.resolve(apply),
     });
     expect(row.trackKind).toBe("slot");
     expect(row.source).toBe("@openbuddy/ui-callable");
@@ -58,7 +58,7 @@ describe("Phase K.2 — slot-plugin-manifest", () => {
     expect(() =>
       serializeBuiltinUiSlotTrack({
         pkg: "@openbuddy/ui-bad",
-        apply: () => () => undefined,
+        load: () => Promise.resolve(() => () => undefined),
       }),
     ).not.toThrow();
   });

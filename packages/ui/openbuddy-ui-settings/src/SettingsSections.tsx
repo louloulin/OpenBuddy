@@ -26,7 +26,16 @@ import {
   Shield,
 } from "lucide-react";
 import { useTheme, useThemeSnapshot, ThemePicker, ThemeStudio } from "@openbuddy/ui-theme/client";
-import { LanguagePicker, useLocaleName } from "@openbuddy/ui-locale/client";
+import { invoke as electronInvoke } from "@/lib/platform/electron-api";
+import {
+  DENSITY_LABELS,
+  getDensity,
+  getReduceMotion,
+  setDensity,
+  setReduceMotion,
+  type DensityName,
+} from "@openbuddy/ui-theme";
+import { LanguagePicker, useLocale, useLocaleName } from "@openbuddy/ui-locale/client";
 import { SlotOutlet, microkernelSnapshot, type MicrokernelSnapshot } from "@openbuddy/ui-runtime/client";
 import { resolveVars } from "@openbuddy/ui-theme";
 import {
@@ -173,6 +182,7 @@ function SectionShell({
 // ---------- 个性化 ----------
 
 export function PersonalizeSettingsPanel() {
+  const locale = useLocale();
   // R45 — 简化个性化 UI:
   //   - 移除冗余的「浅色 / 深色」双按钮 toggle(ThemePicker 已覆盖 19 套
   //     内置主题 + 自定义主题,这个基础 toggle 是 dead feature)
@@ -181,6 +191,13 @@ export function PersonalizeSettingsPanel() {
   //     用户进入个性化页就能直接调色,保存的自定义主题通过 R44 闭环立即
   //     出现在上面的 ThemePicker 里
   //   - 字号拆出独立 settings-row,不再与主题控件挤在一行
+  // 批B:密度 / reduce-motion 的当前值(仅驱动按钮高亮;应用由 density-store 做)。
+  const [densityName, setDensityName] = useState<DensityName>(() => getDensity());
+  const [reduceMotion, setReduceMotionState] = useState<boolean>(() => getReduceMotion());
+  const forceDisplaySection = useCallback(() => {
+    setDensityName(getDensity());
+    setReduceMotionState(getReduceMotion());
+  }, []);
   const [fontSize, setFontSize] = useState<number>(() => {
     const saved = localStorage.getItem(FONT_KEY);
     return saved ? Number(saved) : 13;
@@ -248,6 +265,52 @@ export function PersonalizeSettingsPanel() {
           />
           <button className="settings-reset" onClick={() => setFontSize(13)}>
             重置
+          </button>
+        </div>
+      </div>
+
+      {/* 批B:界面密度三档(body zoom,对齐 Claude --cds-rem-scale 的用户
+          可见效果)。即时生效 + 持久化(density-store 自应用)。 */}
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <span>{locale.t("settings.display.density")}</span>
+          <span className="settings-row__hint">{locale.t("settings.display.densityHint")}</span>
+        </div>
+        <div className="settings-row__control" style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          {(Object.keys(DENSITY_LABELS) as DensityName[]).map((name) => (
+            <button
+              key={name}
+              type="button"
+              className={"settings-density__btn" + (getDensity() === name ? " settings-density__btn--active" : "")}
+              aria-pressed={getDensity() === name}
+              onClick={() => {
+                setDensity(name);
+                forceDisplaySection();
+              }}
+            >
+              {name === "compact" ? locale.t("settings.display.compact") : name === "relaxed" ? locale.t("settings.display.relaxed") : locale.t("settings.display.standard")}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 应用内 reduce-motion(对齐 Claude data-reduce-motion):不依赖系统偏好。 */}
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <span>{locale.t("settings.display.reduceMotion")}</span>
+          <span className="settings-row__hint">{locale.t("settings.display.reduceMotionHint")}</span>
+        </div>
+        <div className="settings-row__control" style={{ marginLeft: "auto" }}>
+          <button
+            type="button"
+            className={"settings-density__btn" + (reduceMotion ? " settings-density__btn--active" : "")}
+            aria-pressed={reduceMotion}
+            onClick={() => {
+              setReduceMotion(!reduceMotion);
+              forceDisplaySection();
+            }}
+          >
+            {reduceMotion ? locale.t("settings.display.reduceMotionOn") : locale.t("settings.display.reduceMotionOff")}
           </button>
         </div>
       </div>
@@ -323,9 +386,76 @@ export function HelpSettingsPanel({
 }: {
   onReplayTour?: () => void;
 } = {}) {
+  const locale = useLocale();
   const agentPaths = useAgentPaths();
+  // P0(发布工程):消费 auto-updater 的状态/事件通道。
+  const [updateState, setUpdateState] = useState<{
+    status: "idle" | "checking" | "available" | "not-available" | "downloading" | "downloaded" | "error";
+    version?: string;
+    percent?: number;
+    error?: string;
+  }>({ status: "idle" });
+  useEffect(() => {
+    void electronInvoke<{ status: typeof updateState }>("app:auto-update-state").then((s) => {
+      if (s && typeof s === "object" && "status" in s) setUpdateState(s as unknown as typeof updateState);
+    }).catch(() => undefined);
+    const off = [
+      "app:auto-update-state",
+      "app:auto-update-available",
+      "app:auto-update-progress",
+      "app:auto-update-downloaded",
+    ].map((channel) =>
+      // 事件桥:window.api.events.on(与 ChatShortcutOverlay 同一模式)
+      (window as unknown as { api?: { events?: { on: (c: string, cb: (p: unknown) => void) => () => void } } }).api?.events?.on(channel, (payload: unknown) => {
+        if (payload && typeof payload === "object" && "status" in (payload as Record<string, unknown>)) {
+          setUpdateState(payload as typeof updateState);
+        } else if (channel.endsWith("available") && payload && typeof payload === "object") {
+          setUpdateState((prev) => ({ ...prev, status: "available", version: (payload as { version?: string }).version }));
+        } else if (channel.endsWith("progress") && payload && typeof payload === "object") {
+          setUpdateState((prev) => ({ ...prev, status: "downloading", percent: (payload as { percent?: number }).percent }));
+        } else if (channel.endsWith("downloaded")) {
+          setUpdateState((prev) => ({ ...prev, status: "downloaded" }));
+        }
+      }),
+    );
+    return () => off.forEach((fn) => fn?.());
+  }, []);
+  const t = locale.t;
+  const updateLabel =
+    updateState.status === "checking" ? t("settings.update.checking")
+    : updateState.status === "available" ? t("settings.update.available", { version: updateState.version ?? "" })
+    : updateState.status === "downloading" ? t("settings.update.downloading", { percent: Math.round(updateState.percent ?? 0) })
+    : updateState.status === "downloaded" ? t("settings.update.downloaded")
+    : updateState.status === "error" ? t("settings.update.error", { error: updateState.error ?? "" })
+    : updateState.status === "not-available" ? t("settings.update.upToDate")
+    : t("settings.update.check");
   return (
     <SectionShell title="关于" desc="OpenBuddy 的版本、文档与反馈渠道。">
+      <div className="settings-row">
+        <div className="settings-row__label">
+          <span>{t("settings.update.title")}</span>
+          <span className="settings-row__hint">{updateLabel}</span>
+        </div>
+        <div className="settings-row__control" style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            className="settings-btn"
+            disabled={updateState.status === "checking" || updateState.status === "downloading"}
+            onClick={() => void electronInvoke("app:check-updates").catch(() => undefined)}
+          >
+            {t("settings.update.check")}
+          </button>
+          {updateState.status === "downloaded" && (
+            <button
+              type="button"
+              className="settings-btn settings-btn--primary"
+              onClick={() => void electronInvoke("app:install-updates").catch(() => undefined)}
+            >
+              {t("settings.update.restart")}
+            </button>
+          )}
+        </div>
+      </div>
       <ul className="help-list">
         <li>
           <ExternalLink size={14} />
@@ -532,204 +662,94 @@ export function DataSettingsPanel({ onOpenDataDirPicker }: { onOpenDataDirPicker
       <p className="settings-hint">
         完全删除历史会话请在侧栏右键单个会话选「删除」。
       </p>
+
+      {/* P0.8/P1(2026-10-19 生产评审 数据§7):备份/恢复。
+          driver.backup(VACUUM INTO)与恢复链路早已实现但此前零调用方。 */}
+      <BackupRestoreRow piHome={piHome} />
     </SectionShell>
   );
 }
 
-// ---------- 本地审计追踪 (R17 / Phase D) ----------
+/** 数据管理的备份/恢复行:备份立即生效;恢复走 stage + 重启生效。 */
+function BackupRestoreRow({ piHome }: { piHome: string }) {
+  const locale = useLocale();
+  const t = locale.t;
+  const [busy, setBusy] = useState<"backup" | "restore" | null>(null);
+  const [lastBackup, setLastBackup] = useState<string | null>(null);
+  const [pendingRestart, setPendingRestart] = useState(false);
 
-const AUDIT_OUTCOME_LABEL: Record<AuditEvent["outcome"], string> = {
-  allow: "允许",
-  deny: "拒绝",
-  success: "成功",
-  failure: "失败",
-  info: "信息",
-};
-
-function formatLocalTime(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    const pad = (n: number) => `${n}`.padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  } catch {
-    return iso;
-  }
-}
-
-/**
- * 数据管理 → 本地审计追踪:
- *  - 只读展示最近 200 条事件,JSONL 来自 ~/.openbuddy/audit.jsonl;
- *  - 一键清空本地审计,不做远端备份(本地优先 · 数据自决)。
- */
-export function AuditSettingsPanel() {
-  const [events, setEvents] = useState<AuditEvent[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState("");
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const handleBackup = async () => {
+    setBusy("backup");
     try {
-      const result = await auditList({ limit: 200 });
-      setEvents(result.events);
+      const result = await invoke<{ path: string; schemaVersion: number }>("storage:backup-create", undefined);
+      setLastBackup(result.path);
+      setToast(t("settings.backup.ok", { path: result.path }));
     } catch (e) {
-      setError(String(e).replace(/^Error:\s*/, ""));
-      setEvents([]);
+      setToast(t("settings.backup.failed", { error: String(e).replace(/^Error:\s*/, "") }));
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
-  }, []);
-
-  useEffect(() => {
-    reload();
-  }, [reload]);
-
-  const visible = useMemo(() => {
-    if (!events) return [];
-    const q = filter.trim().toLowerCase();
-    if (!q) return events.slice().reverse();
-    return events.filter((e) =>
-      [e.event, e.subject, e.outcome, e.source, JSON.stringify(e.detail ?? {})].some((field) =>
-        String(field ?? "").toLowerCase().includes(q),
-      ),
-    ).reverse();
-  }, [events, filter]);
-
-  /**
-   * R41 — 导出:先让用户在原生保存对话框选目标,再走 `audit:export`。
-   *
-   * 取消选择就什么都不做(而不是回退到某个默认路径)—— "数据自决"里最重要的
-   * 一条是**不写用户没同意的地方**。目标路径的合法性由主进程复用
-   * `export_text_file` 的一次性审批来保证。
-   */
-  const handleExport = async (format: "jsonl" | "json") => {
-    const stamp = new Date().toISOString().slice(0, 10);
-    const extension = format === "json" ? "json" : "jsonl";
-    const target = await save({
-      title: "导出本地审计日志",
-      defaultPath: `openbuddy-audit-${stamp}.${extension}`,
-      filters: [{ name: format === "json" ? "JSON" : "JSON Lines", extensions: [extension] }],
-    });
-    if (!target) return;
-    const result = await auditExport({ path: target, format });
-    if (result.ok) {
-      // 导出这件事本身也被记进审计(主进程写盘后追加 `audit.export`),
-      // 所以刷新一下列表,用户能当场看到"我导过"。
-      await reload();
-      setToast(`已导出 ${result.count ?? 0} 条审计事件(${((result.bytes ?? 0) / 1024).toFixed(1)} KB)`);
-      return;
-    }
-    setError(result.error ?? "导出失败");
   };
 
-  const handleClear = async () => {
-    // R40 — 同上:漏 `await` 会让"不可撤销"的确认形同虚设。
-    const ok = await confirm("清空本地审计日志？此操作不可撤销,清空前请确保不再需要这些事件用于排障。", {
-      tone: "danger",
-      confirmLabel: "清空",
-    });
-    if (!ok) return;
+  const handleRestore = async () => {
+    const backupPath = lastBackup?.trim();
+    if (!backupPath) {
+      setToast(t("settings.backup.needBackupFirst"));
+      return;
+    }
+    if (
+      !(await confirm(
+        t("settings.backup.confirmRestore"),
+        { tone: "warning", confirmLabel: t("settings.backup.restore") },
+      ))
+    ) {
+      return;
+    }
+    setBusy("restore");
     try {
-      await auditClear();
-      await reload();
-      setToast("已清空本地审计日志");
+      const result = await invoke<{ ok: true; requiresRestart: boolean }>("storage:backup-restore", {
+        backupPath,
+      });
+      if (result.requiresRestart) {
+        setPendingRestart(true);
+        setToast(t("settings.backup.readyAfterRestart"));
+      }
     } catch (e) {
-      setError(String(e).replace(/^Error:\s*/, ""));
+      setToast(t("settings.backup.failed", { error: String(e).replace(/^Error:\s*/, "") }));
+    } finally {
+      setBusy(null);
     }
   };
 
   return (
-    <SectionShell
-      title="本地审计追踪"
-      desc="只记录在你本机( ~/.openbuddy/audit.jsonl )的事件:设置打开、登录尝试、插件市场安装、关键文件操作等。本地优先,不上传,不与 WorkBuddy 等云端 AI 工作台共享。"
-    >
-      <div className="settings-row">
-        <div className="settings-row__label">
-          <span>最近事件</span>
-          <span className="settings-row__hint">{events ? `${events.length} 条 · 默认显示全部` : "加载中…"}</span>
-        </div>
-        <div className="settings-row__control" style={{ gap: 8 }}>
-          <input
-            type="search"
-            placeholder="按事件名 / 主体 / 详情搜索…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            style={{ minWidth: 240 }}
-          />
-          <button className="settings-reset" onClick={reload} disabled={loading}>
-            {loading ? "刷新中…" : "刷新"}
-          </button>
-          <button
-            className="settings-reset"
-            data-testid="audit-export-jsonl"
-            onClick={() => void handleExport("jsonl")}
-            disabled={loading}
-            title="导出为 JSON Lines(与磁盘上的 audit.jsonl 同构)"
-          >
-            导出 JSONL
-          </button>
-          <button
-            className="settings-reset"
-            data-testid="audit-export-json"
-            onClick={() => void handleExport("json")}
-            disabled={loading}
-            title="导出为单个 JSON 文档(便于贴进 issue)"
-          >
-            导出 JSON
-          </button>
-          <button className="settings-btn settings-btn--danger" onClick={handleClear} disabled={loading}>
-            清空本地审计
-          </button>
-        </div>
+    <div className="settings-row">
+      <div className="settings-row__label">
+        <HardDrive size={16} />
+        <span>{t("settings.backup.title")}</span>
       </div>
-      {error ? <p className="settings-hint" style={{ color: "var(--wb-danger, #cf222e)" }}>{error}</p> : null}
-      <div className="audit-trail">
-        {visible.length === 0 ? (
-          <p className="settings-hint">暂无事件 — 开始使用 OpenBuddy,审计会自动填充。</p>
+      <div className="settings-row__control" style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+        <div className="settings-actions">
+          <button className="settings-btn" onClick={handleBackup} disabled={busy !== null}>
+            {busy === "backup" ? t("settings.backup.backingUp") : t("settings.backup.create")}
+          </button>
+          <button className="settings-btn settings-btn--danger" onClick={handleRestore} disabled={busy !== null || !lastBackup}>
+            {busy === "restore" ? t("settings.backup.restoring") : t("settings.backup.restoreThis")}
+          </button>
+        </div>
+        {lastBackup ? (
+          <code title={lastBackup} style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {lastBackup}
+          </code>
         ) : (
-          <table className="audit-trail__table">
-            <thead>
-              <tr>
-                <th className="audit-trail__col-time">时间</th>
-                <th className="audit-trail__col-event">事件</th>
-                <th className="audit-trail__col-outcome">结果</th>
-                <th className="audit-trail__col-source">来源</th>
-                <th className="audit-trail__col-subject">主体</th>
-                <th className="audit-trail__col-hash">哈希</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((event) => (
-                <tr key={event.id} className={`audit-trail__row audit-trail__row--${event.outcome}`}>
-                  <td className="audit-trail__col-time">{formatLocalTime(event.at)}</td>
-                  <td className="audit-trail__col-event">{event.event}</td>
-                  <td className="audit-trail__col-outcome">{AUDIT_OUTCOME_LABEL[event.outcome] ?? event.outcome}</td>
-                  <td className="audit-trail__col-source">{event.source}</td>
-                  <td className="audit-trail__col-subject">{event.subject ?? "—"}</td>
-                  <td className="audit-trail__col-hash" title={event.hash}>{event.hash ? event.hash.slice(0, 8) : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <span className="settings-hint">{t("settings.backup.hint", { home: piHome })}</span>
         )}
+        {pendingRestart ? <span className="settings-hint">{t("settings.backup.readyAfterRestart")}</span> : null}
       </div>
-      <p className="settings-hint">
-        导出会把当前内存里的审计条写到**你选择的**文件(JSONL 与磁盘格式同构,
-        可直接 jq/grep;JSON 是单文档)。导出动作本身也会记一条 `audit.export`,
-        所以"谁在什么时候把日志拿走了"同样可查。
-      </p>
-      <p className="settings-hint">
-        每条事件携带链式 SHA-256 哈希(前一条 hash + 当前事件 → 截前 16 字符),
-        没有前序 hash 无法重新算出相同 hash,可用于校验日志未被单独篡改。
-      </p>
-    </SectionShell>
+    </div>
   );
 }
 
 
-// ---------- 系统设置 ----------
 
 export function GeneralSettingsPanel() {
   const [busy, setBusy] = useState(false);
@@ -2678,7 +2698,7 @@ export { TenantPolicyPanel } from "@openbuddy/ui-account";
 export { SessionManagementPanel } from "@openbuddy/ui-account";
 export { TokenIntrospectionPanel } from "@openbuddy/ui-account";
 export { GatewayHealthPanel } from "@openbuddy/ui-account";
-import { auditList, auditClear, auditExport, type AuditEvent } from "@/lib/audit/audit-client";
+
 
 // ---------- 系统信息(微内核健康) ----------
 

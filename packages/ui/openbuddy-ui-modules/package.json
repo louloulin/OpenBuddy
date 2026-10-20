@@ -1,6 +1,6 @@
 {
   "name": "@openbuddy/ui-modules",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
@@ -10,11 +10,6 @@
     "./client": "./src/client.ts",
     "./invariant": "./src/invariant.ts",
     "./components": "./src/components/index.ts",
-    "./components/InstallDialog": "./src/components/InstallDialog.tsx",
-    "./components/CapabilityVersionBadge": "./src/components/CapabilityVersionBadge.tsx",
-    "./components/MarketplaceCard": "./src/components/MarketplaceCard.tsx",
-    "./components/MarketplaceTab": "./src/components/MarketplaceTab.tsx",
-    "./components/marketplace-model": "./src/components/marketplace-model.ts",
     "./package.json": "./package.json"
   },
   "dependencies": {

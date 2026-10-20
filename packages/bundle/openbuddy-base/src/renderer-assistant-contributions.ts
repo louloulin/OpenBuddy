@@ -88,7 +88,7 @@ export const rendererAssistantResearchBuddyPlugin: RendererPlugin & { id: string
     route: "助理·研究 Buddy",
     order: 420,
     modes: ["personal", "organization", "network"],
-    capabilityIds: ["research:brief", "memory:list", "web-search"],
+    capabilityIds: ["research:brief", "web-search"],
     requiredTrust: "org",
   });
 

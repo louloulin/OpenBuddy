@@ -413,12 +413,40 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
           "warn",
         );
       },
-      onComplete: (p: { sessionId: string; stopReason?: string; usage?: { promptTokens?: number; completionTokens?: number } }) => {
+      onComplete: (p: { sessionId: string; stopReason?: string; errorMessage?: string; usage?: { promptTokens?: number; completionTokens?: number } }) => {
         if (p.stopReason === "error" || p.stopReason === "rate_limit") {
           // Only the failure path stays in console — happy-path completions
           // were firing dozens of console.log lines per turn that drowned
           // out real diagnostics.
           console.warn("[OpenBuddy] pi turn completed with failure stopReason", p);
+          // 发布工程(2026-10-20 真机探针):失败回合此前按"正常完成"收尾 ——
+          // 空气泡 + 误导性"会话完成"通知,TurnErrorCard 在实时路径永不出现。
+          // 走与 pi://turn-error 相同的 abandon 路径,把结构化错误交给卡片。
+          const rawDetail = p.errorMessage ?? "";
+          const code = rawDetail ? inferErrorCodeSafe(rawDetail) : p.stopReason === "rate_limit" ? "rate_limit_error" : undefined;
+          const bannerMsg =
+            formatPiError(rawDetail) ??
+            (rawDetail ? `⚠️ 本轮执行出错：${rawDetail}` : "⚠️ 本轮执行出错，请重试。");
+          useSessionStore.getState().setError(bannerMsg);
+          reportEvent("turn_error", "error", { sessionId: p.sessionId, stopReason: p.stopReason });
+          clearStreamingWatchdog();
+          abortedRef.current = true;
+          useSessionStore.getState().abandonStreamingMessage(
+            rawDetail || "本轮执行出错",
+            { message: rawDetail || "本轮执行出错", ...(code ? { code } : {}) },
+          );
+          useSessionStore.getState().setStreaming(false);
+          textShapeRef.current = null;
+          thoughtShapeRef.current = null;
+          useSessionsStore.getState().upsert({ sessionId: p.sessionId, status: "completed" });
+          void notificationAppend(
+            "turn_error",
+            `会话失败（${(rawDetail || p.stopReason || "error").slice(0, 80)}）`,
+            undefined,
+            p.sessionId,
+            "warn",
+          );
+          return;
         }
         reportEvent("session_complete", "info", { sessionId: p.sessionId, stopReason: p.stopReason });
         const currentSessionId = useSessionStore.getState().sessionId;
@@ -693,12 +721,33 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
           });
         }
       },
-      onPluginEvent: (event: { type: string }) => {
+      onPluginEvent: (event: { type: string; payload?: { requestId?: string; sessionId?: string } }) => {
         if (event.type === "workspace/changed") {
           void piListWorkspaceRegistry().then((registry) => {
             useSessionsStore.getState().setWorkspaces(registry.items);
             setWorkspaces(registry.items);
           }).catch(() => { /* non-fatal refresh */ });
+          return;
+        }
+      },
+      /**
+       * 请求在 pi 侧被判定 —— 可能是本弹窗点的允许/拒绝,也可能是**别处**判定的
+       * (harness / RPC / 另一个窗口 / 自动批准)。后者此前没有任何人清 store,
+       * 于是待处理项永远留着,权限/提问弹窗**永久挡住界面**。
+       *
+       * 2026-10-11 真机冒烟实测:一串真模型工具调用之后,composer 的发送键被
+       * `request-modal-overlay` 持续拦截、点不动。当时先试着监听 plugin 事件
+       * (`session/permission-resolved`),实测那条路**收不到**(渲染层的 plugin
+       * 流里没有这类事件),所以改成由判定方直接发渲染事件 —— 与创建请求的
+       * `pi://permission` / `pi://question` 对称。
+       */
+      onRequestResolved: (payload: unknown) => {
+        const resolved = (payload ?? {}) as { kind?: string; requestId?: string; sessionId?: string };
+        if (!resolved.requestId) return;
+        if (resolved.kind === "permission") {
+          usePermissionStore.getState().dismiss(resolved.requestId, resolved.sessionId);
+        } else {
+          useQuestionStore.getState().dismiss(resolved.requestId, resolved.sessionId);
         }
       },
     } as Parameters<typeof subscribePiEvents>[0];

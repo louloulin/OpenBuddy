@@ -82,7 +82,10 @@ export function LibraryPage({
 
   return (
     <div className={styles.root} data-testid="library-page">
-      <nav className={styles.rail} role="tablist" aria-label="资料库分区">
+      {/* 这是一条 tabs 控件,不是导航地标:<nav> 是非交互元素,挂 role="tablist"
+          属于对读屏撒谎。改用无隐式角色的 <div> 承载 tablist,与右侧
+          role="tabpanel" 组成完整 tabs 模式。 */}
+      <div className={styles.rail} role="tablist" aria-label="资料库分区">
         <span className={styles.railTitle}>资料库</span>
         {sections.map((Section) => {
           const meta = Section.librarySection;
@@ -106,7 +109,7 @@ export function LibraryPage({
             </button>
           );
         })}
-      </nav>
+      </div>
       <div
         className={styles.content}
         role="tabpanel"

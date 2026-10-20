@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { RpcId, type ClientRequest } from "@openbuddy/plugin-host";
 
 vi.mock("electron", () => ({
-  app: { getPath: (key: string) => key === "userData" ? "/tmp/openbuddy-capability-ipc-test" : "/tmp", on: vi.fn(), exit: vi.fn(), setPath: vi.fn(), quit: vi.fn() },
+  app: { getVersion: () => "0.0.0-test", getPath: (key: string) => key === "userData" ? "/tmp/openbuddy-capability-ipc-test" : "/tmp", on: vi.fn(), exit: vi.fn(), setPath: vi.fn(), quit: vi.fn() },
   ipcMain: { handle: vi.fn(), removeHandler: vi.fn(), on: vi.fn(), removeListener: vi.fn(), removeAllListeners: vi.fn() },
   safeStorage: { isEncryptionAvailable: () => false },
   shell: { openExternal: vi.fn() },

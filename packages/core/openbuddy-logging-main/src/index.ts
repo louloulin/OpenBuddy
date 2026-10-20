@@ -1,10 +1,26 @@
 import pino, { type Logger as PinoLogger } from "pino";
 import { Writable } from "node:stream";
-import { createWriteStream, existsSync, renameSync, statSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, renameSync, statSync } from "node:fs";
+import { dirname } from "node:path";
 import { generateTraceId, isLogLevel, redactText, type LogContext, type LogLevel } from "@openbuddy/logging-shared";
 
 export type { LogContext, LogLevel };
 export type MainLogger = PinoLogger;
+
+/**
+ * P0.7(2026-10-19 生产评审 §6.2):主进程**所有** logger 默认落同一个文件。
+ *
+ * 此前只有显式传 `filePath` 的 logger 写文件(openbuddy.log 一家),其余
+ * (ipc/_wrap、process-guards、auto-updater、pi-event-bridge、agent-runtime)
+ * 只有 stdout —— 打包后这些通道的失败在磁盘上零痕迹。应用启动时用
+ * `setDefaultLogFile(<logs>/openbuddy.log)` 一次性注入,未显式传 filePath 的
+ * `createMainLogger` 调用全部跟随。显式传 filePath 仍优先生效。
+ */
+let defaultLogFilePath: string | null = null;
+
+export function setDefaultLogFile(filePath: string | null): void {
+  defaultLogFilePath = filePath;
+}
 
 export interface CreateMainLoggerOptions {
   filePath?: string;
@@ -97,9 +113,15 @@ function createRollingFileStream(filePath: string, maxBytes: number, maxFiles: n
 export function createMainLogger(options: CreateMainLoggerOptions = {}): MainLogger {
   const level = levelFor(options);
   const destinations: Array<{ level: LogLevel; stream: NodeJS.WritableStream }> = [{ level, stream: process.stdout }];
-  if (options.filePath) {
+  const filePath = options.filePath ?? defaultLogFilePath;
+  if (filePath) {
+    // 默认路径可能来自任意调用方 —— 父目录尽力创建(只读盘等失败降级为
+    // 无文件 sink,不能让 logger 构造抛错)。
+    if (!existsSync(filePath)) {
+      try { mkdirSync(dirname(filePath), { recursive: true }); } catch { /* best-effort */ }
+    }
     const stream = createRollingFileStream(
-      options.filePath,
+      filePath,
       parseSize(options.size ?? "10m"),
       options.maxFiles ?? 5,
     );

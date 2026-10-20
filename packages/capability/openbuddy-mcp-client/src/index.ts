@@ -8,6 +8,7 @@ import { CallToolResultSchema, ToolListChangedNotificationSchema, type CallToolR
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { OAuthClientMetadata, OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import { name as PKG_NAME, version as PKG_VERSION } from "../package.json";
 
 export interface McpServerConfig {
 	transport?: string;
@@ -300,7 +301,7 @@ export const defaultMcpConnectionFactory: McpConnectionFactory = {
 				cwd: text(config.cwd),
 			});
 		}
-		const client = new Client({ name: "openbuddy", version: "0.15.0" }, { capabilities: {} });
+		const client = new Client({ name: PKG_NAME, version: PKG_VERSION }, { capabilities: {} });
 		let closedListener: (() => void) | undefined;
 		transport.onclose = () => closedListener?.();
 		await client.connect(transport);

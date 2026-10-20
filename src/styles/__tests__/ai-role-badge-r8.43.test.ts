@@ -1,20 +1,19 @@
 /**
- * ai-role-badge-r8.43.test.ts — guard spec for the R8.43 AI role
- * badge polish.
+ * ai-role-badge-r8.43.test.ts — guard spec for the "AI" role badge.
  *
- * Before R8.43 the "AI" role badge was a small 16px-tall pill with
- * no border. R8.43 lifts it to 18px, adds a 1px brand-tinted
- * border, and tightens the colour-mix on the text colour so the
- * "AI" label reads cleanly against both light and dark surfaces.
+ * R8.43 originally lifted the badge to 18px with a brand-tinted
+ * border and brand-mixed text colour. The R5 visual pass reverted
+ * that: the brand-tinted chip was judged visually heavy, and the
+ * badge is now a monochrome low-contrast chip (closer to ChatGPT's
+ * neutral "AI" label). These guards describe the badge as it exists
+ * now, and pin the removal of the brand tint so it cannot creep back
+ * one declaration at a time.
  *
  * Coverage:
- *   - .msg--assistant .msg__role is now 18px tall (was 16px)
- *   - 1px brand-tinted border via color-mix (24% alpha)
- *   - text colour uses color-mix (80% brand + 10% strong) so it
- *     reads on both light + dark themes without per-theme overrides
- *   - padding bumped to 0 6px for better horizontal breathing room
- *   - letter-spacing tightened to 0.06em for a more premium feel
- *   - uppercase typography preserved
+ *   - .msg--assistant .msg__role is 18px tall
+ *   - padding is 0 6px for horizontal breathing room
+ *   - surface + text come from neutral tokens, never --wb-brand
+ *   - uppercase preserved at weight 500, letter-spacing 0.04em
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -40,35 +39,37 @@ function ruleBody(input: string, selector: string): string | null {
   return null;
 }
 
-describe("R8.43 .msg--assistant .msg__role badge", () => {
-  it("is 18px tall (was 16px before R8.43)", () => {
+describe(".msg--assistant .msg__role badge", () => {
+  it("is 18px tall", () => {
     const body = ruleBody(prose, ".msg--assistant .msg__role");
     expect(body).toBeTruthy();
     expect(body!).toMatch(/height:\s*18px/);
   });
 
-  it("uses 1px brand-tinted border (24% alpha) for definition", () => {
+  it("uses 0 6px padding for horizontal breathing room", () => {
     const body = ruleBody(prose, ".msg--assistant .msg__role");
     expect(body).toBeTruthy();
-    expect(body!).toMatch(/border:\s*1px solid color-mix\(in srgb,\s*var\(--wb-brand[\s\S]*?\)\s+24%/);
+    expect(body!).toMatch(/padding:\s*0 6px/);
   });
 
-  it("text colour uses color-mix (80% brand + 10% strong) so it reads on both themes", () => {
+  it("stays monochrome — no brand tint on surface, border or text (R5)", () => {
     const body = ruleBody(prose, ".msg--assistant .msg__role");
     expect(body).toBeTruthy();
-    expect(body!).toMatch(/color:\s*color-mix\(in srgb,\s*var\(--wb-brand[\s\S]*?\)\s+80%/);
+    expect(body!).not.toMatch(/var\(--wb-brand/);
+    expect(body!).toMatch(/background:\s*var\(--wb-bg-secondary/);
+    expect(body!).toMatch(/color:\s*var\(--wb-text-weak/);
   });
 
-  it("preserves uppercase + 600 font weight", () => {
+  it("preserves uppercase at weight 500", () => {
     const body = ruleBody(prose, ".msg--assistant .msg__role");
     expect(body).toBeTruthy();
     expect(body!).toMatch(/text-transform:\s*uppercase/);
-    expect(body!).toMatch(/font-weight:\s*600/);
+    expect(body!).toMatch(/font-weight:\s*500/);
   });
 
-  it("tightens letter-spacing to 0.06em for premium feel", () => {
+  it("keeps 0.04em letter-spacing", () => {
     const body = ruleBody(prose, ".msg--assistant .msg__role");
     expect(body).toBeTruthy();
-    expect(body!).toMatch(/letter-spacing:\s*0\.06em/);
+    expect(body!).toMatch(/letter-spacing:\s*0\.04em/);
   });
 });

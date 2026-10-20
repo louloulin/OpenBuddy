@@ -966,6 +966,6 @@ The whole point of the migration: every capability OpenBuddy has today maps onto
 - [@ferris1225/pi-subagents](https://pi.dev/packages/@ferris1225/pi-subagents)
 - [pi-ultracode (tested with Pi 0.84)](https://www.npmjs.com/package/pi-ultracode)
 - [ACP spec](https://agentclientprotocol.com/)
-- [Companion: `docs/migration-pi-electron.md`](./migration-pi-electron.md)
-- [Companion: `docs/pi-capability-gap-analysis.md`](./pi-capability-gap-analysis.md)
+- Companion: `docs/migration-pi-electron.md`
+- Companion: `docs/pi-capability-gap-analysis.md`
 - [Companion: `docs/pi-sdk-implementation-plan.md`](./pi-sdk-implementation-plan.md)

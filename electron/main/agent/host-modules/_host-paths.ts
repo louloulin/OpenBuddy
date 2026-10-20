@@ -97,5 +97,31 @@ export function isPathWithin(root: string, candidate: string): boolean {
  */
 export function piSessionDir(cwd: string): string {
   const encoded = resolve(cwd).replace(/^[/\\]/, "").replace(/[\\/:]/g, "-");
-  return join(piHome(), "sessions", `--${encoded}--`);
+  const dir = join(piHome(), "sessions", `--${encoded}--`);
+  void ensureSessionsRootSynced();
+  return dir;
+}
+
+/** 最近一次已下发给 host-core 的会话根,用于去重。 */
+let lastSyncedSessionsRoot: string | null = null;
+
+/**
+ * host-core 的 `sessions.search` 在未配置 sessions root 时直接返回
+ * `sessions root not configured`,不设根的话这条能力永远走不通(而且每次
+ * 失败都会被记成 host 故障,白白触发 5s backoff)。
+ *
+ * 会话根由 agentHome 决定,整个进程生命周期内不变,所以去重后只发一次。
+ * `piSessionDir()` 与 session_search handler 都会调用它 —— 前者覆盖
+ * 「先开会话再搜索」的常规路径,后者覆盖「冷启动直接搜索」。
+ */
+export async function ensureSessionsRootSynced(): Promise<void> {
+  const root = join(piHome(), "sessions");
+  if (lastSyncedSessionsRoot === root) return;
+  lastSyncedSessionsRoot = root;
+  try {
+    const { sessionSetRootViaBridge } = await import("../agent-session-search-bridge");
+    await sessionSetRootViaBridge(root);
+  } catch {
+    /* 首次失败不重试:下次进程重启会再走一遍 */
+  }
 }

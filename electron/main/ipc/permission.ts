@@ -20,7 +20,7 @@ import {
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
 
 export function registerPermissionIpc(deps: AgentHostIpcDeps): void {
-  const { agentHost, ensureAgentHost } = deps;
+  const { agentHost, casdoorAuth, ensureAgentHost } = deps;
 
   ipcMain.handle("agent:resolve-permission", async (_e, args: { requestId: string; optionId?: string; cancelled?: boolean }) => {
     const input = recordValue(args, "permission response payload");
@@ -59,11 +59,13 @@ export function registerPermissionIpc(deps: AgentHostIpcDeps): void {
   });
   ipcMain.handle("permission_list", async () => {
     await ensureAgentHost();
-    return (await import("@openbuddy/auth-permission")).permissionHandlers.readRules();
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
+    return (await import("../agent/agent-permission-bridge")).agentPermissionBridge.readRules();
   });
   ipcMain.handle("permission_save", async (_e, args: { rules: unknown }) => {
     await ensureAgentHost();
+    casdoorAuth.assertAuthorized({ capability: "team.workspace" });
     const input = recordValue(args, "permission_save payload");
-    return (await import("@openbuddy/auth-permission")).permissionHandlers.writeRules(permissionRules(input.rules) as never);
+    return (await import("../agent/agent-permission-bridge")).agentPermissionBridge.writeRules(permissionRules(input.rules) as never);
   });
 }

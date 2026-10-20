@@ -18,6 +18,7 @@
  */
 
 import { type AgentHostState } from "./_state-shape";
+import { readFileSync } from "node:fs";
 import { discoveredPiPackagePaths } from "../pi-extension-discovery";
 import {
   applyPiExtensionOverrides,
@@ -41,6 +42,22 @@ import { readExtensionPolicyConfigSync } from "../pi-resources/config";
 // ---------------------------------------------------------------------------
 
 let state: AgentHostState | null = null;
+
+/**
+ * profile 包 package.json 的 dependencies 键名(即随 profile 安装的扩展包名)。
+ * package.json 缺失/损坏时返回空 —— profile 扩展退回显式 allowlist 管理。
+ */
+function readProfileDependencyNames(profilePackageJson: string | undefined): string[] {
+  if (!profilePackageJson) return [];
+  try {
+    const parsed = JSON.parse(readFileSync(profilePackageJson, "utf8")) as {
+      dependencies?: Record<string, unknown>;
+    };
+    return Object.keys(parsed.dependencies ?? {}).filter((name) => name.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
 
 let emitPluginEventImpl: (type: string, payload: unknown) => void = () => undefined;
 let telemetrySinkImpl: () => unknown = () => undefined;
@@ -114,6 +131,14 @@ export function configurePiExtensions(
   if (state.piExtensionPolicy.allowlistPackageNames.length === 0 && state.piExtensionPolicy.denylistPackageNames.length === 0) {
     state.piExtensionPolicy = readExtensionPolicyConfigSync();
   }
+  // B5(2026-10-19):deny 落到加载路径后,allowlist 语义 = 「显式信任清单」。
+  // profile 包是**原生确认过的信任单元**(安装走 profile-install 原生确认),
+  // 其依赖清单里的包名随安装自动并入 allowlist —— 否则装完的 profile 扩展
+  // 永远加载不了(默认拒绝把合法安装也拦死)。
+  const profileDependencyNames = readProfileDependencyNames(state.profilePackageJson);
+  const effectiveAllowlist = [
+    ...new Set([...state.piExtensionPolicy.allowlistPackageNames, ...profileDependencyNames]),
+  ];
   const specs = applyPiExtensionOverrides(manifestSpecs, state.piExtensionOverrides);
   const telemetry = telemetrySinkImpl() as Parameters<typeof resolvePiExtensions>[1] extends infer _ ? never : never;
   // plan4.5 §B — the gate is the same singleton exposed to IPC; the
@@ -138,7 +163,7 @@ export function configurePiExtensions(
     ...(telemetry ? { telemetrySink: telemetry as any } : {}),
     needsReviewGate,
     ...(needsReviewIds.length > 0 ? { needsReviewIds } : {}),
-    allowlistPackageNames: state.piExtensionPolicy.allowlistPackageNames,
+    allowlistPackageNames: effectiveAllowlist,
     denylistPackageNames: state.piExtensionPolicy.denylistPackageNames,
   };
   const resolution = resolvePiExtensions(specs, resolutionOptions);
@@ -231,11 +256,14 @@ export function configurePiExtensions(
       const applyPatchFactory = builtinPiExtensionFactories["openbuddy-apply-patch"];
       if (!applyPatchFactory) return null;
       const t = telemetrySinkImpl();
+      const sandboxRuntime = state!.context?.get("sandbox") as
+        | { confine(argv: readonly string[], policy?: { mode?: string; workspaceRoot?: string }): { argv: readonly string[]; enforcement: string } }
+        | undefined;
       return {
         name: "openbuddy-apply-patch",
         factory: applyPatchFactory(
           emitPluginEventImpl,
-          { trustedCwd: state!.cwd ?? process.cwd() },
+          { trustedCwd: state!.cwd ?? process.cwd(), ...(sandboxRuntime ? { sandbox: sandboxRuntime } : {}) },
           {
             profileDir: resolveProfileDirectoryImpl(),
             resolveSource: (source) => {
@@ -253,12 +281,34 @@ export function configurePiExtensions(
       };
     })();
 
+  // 阶段 1.5:记忆工具(模型侧)与「记忆」面板读写同一份 memory.json。
+  const memoryExtension =
+    state.piExtensionFactories.find((extension) => extension.name === "openbuddy-memory") ??
+    (() => {
+      const memoryFactory = builtinPiExtensionFactories["openbuddy-memory"];
+      if (!memoryFactory) return null;
+      return {
+        name: "openbuddy-memory",
+        factory: memoryFactory(emitPluginEventImpl, { cwd: state!.cwd ?? process.cwd() }, {
+          profileDir: resolveProfileDirectoryImpl(),
+          resolveSource: (source) => {
+            if (!state!.profilePackageJson) throw new Error("Pi extension profile is not initialized");
+            return createRequireImpl(state!.profilePackageJson).resolve(source);
+          },
+          emit: emitPluginEventImpl,
+          resolveService: (owner) => state!.context?.get(owner),
+        } satisfies PiExtensionResolutionOptions),
+        hidden: true as const,
+      };
+    })();
+
   const builtIns: Array<{ name: string; factory: ExtensionFactory; hidden: true }> = [
     toolExtension,
     planExtension,
     hooksExtension,
   ];
   if (applyPatchExtension) builtIns.push(applyPatchExtension);
+  if (memoryExtension) builtIns.push(memoryExtension);
 
   state.piExtensionFactories.splice(
     0,

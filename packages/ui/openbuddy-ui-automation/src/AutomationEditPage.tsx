@@ -235,11 +235,13 @@ function ExpertChip({
 // ============================================================
 
 function WorkspaceInput({
+  id,
   workspaces,
   value,
   onChange,
   disabled,
 }: {
+  id?: string;
   workspaces: WorkspaceInfo[];
   value: string;
   onChange: (cwd: string) => void;
@@ -260,6 +262,7 @@ function WorkspaceInput({
   return (
     <div className="atm-workspace-input" ref={containerRef}>
       <input
+        id={id}
         type="text"
         className="atm-modal-input"
         value={value}
@@ -648,8 +651,9 @@ export function AutomationEditPage({
       <div className="atm-detail-content">
         <div className="atm-modal-body">
           {/* 名称 */}
-          <label className="atm-modal-label">名称</label>
+          <label className="atm-modal-label" htmlFor="atm-edit-name">名称</label>
           <input
+            id="atm-edit-name"
             type="text"
             className="atm-modal-input"
             value={draft.name}
@@ -658,11 +662,12 @@ export function AutomationEditPage({
           />
 
           {/* 工作空间 */}
-          <label className="atm-modal-label">
+          <label className="atm-modal-label" htmlFor="atm-edit-cwd">
             工作空间
             <span className="atm-modal-hint atm-modal-hint-inline">(可选)</span>
           </label>
           <WorkspaceInput
+            id="atm-edit-cwd"
             workspaces={workspaces}
             value={selectedCwd}
             disabled={saving}
@@ -670,9 +675,10 @@ export function AutomationEditPage({
           />
 
           {/* 提示词 */}
-          <label className="atm-modal-label">提示词</label>
+          <label className="atm-modal-label" htmlFor="atm-edit-prompt">提示词</label>
           <div className="atm-modal-chat-input">
             <textarea
+              id="atm-edit-prompt"
               className="atm-prompt-textarea"
               value={draft.prompt}
               disabled={saving}
@@ -721,18 +727,21 @@ export function AutomationEditPage({
             disabled={saving}
           />
 
-          {/* 执行频率 */}
-          <label className="atm-modal-label">执行频率</label>
-          <Segmented
-            className="atm-schedule-tabs"
-            value={scheduleMode}
-            onChange={(v) => handleScheduleModeChange(v as ScheduleMode)}
-            options={[
-              { value: "periodic", label: "周期" },
-              { value: "interval", label: "按间隔" },
-              { value: "once", label: "单次" },
-            ]}
-          />
+          {/* 执行频率 —— 分段控件是一组 role="tab" 的按钮，
+              没有单一可标注的表单控件，故用 group + aria-labelledby 关联标题 */}
+          <span className="atm-modal-label" id="atm-schedule-label">执行频率</span>
+          <div role="group" aria-labelledby="atm-schedule-label">
+            <Segmented
+              className="atm-schedule-tabs"
+              value={scheduleMode}
+              onChange={(v) => handleScheduleModeChange(v as ScheduleMode)}
+              options={[
+                { value: "periodic", label: "周期" },
+                { value: "interval", label: "按间隔" },
+                { value: "once", label: "单次" },
+              ]}
+            />
+          </div>
 
           {scheduleMode === "periodic" && (
             <div className="atm-schedule-daily">
@@ -845,19 +854,22 @@ export function AutomationEditPage({
             </div>
           )}
 
-          {/* 生效日期区间 */}
+          {/* 生效日期区间 —— 日历选择器是复合控件，
+              没有单一可标注的表单控件，故用 group + aria-labelledby 关联标题 */}
           {scheduleMode !== "once" && (
             <>
-              <label className="atm-modal-label">
+              <span className="atm-modal-label" id="atm-validity-label">
                 生效日期区间
                 <span className="atm-modal-hint atm-modal-hint-inline">(可选，留空表示始终生效。)</span>
-              </label>
-              <ValidityRangePicker
-                startDate={draft.validFromDate}
-                endDate={draft.validUntilDate}
-                disabled={saving}
-                onChange={(validFromDate, validUntilDate) => set({ validFromDate, validUntilDate })}
-              />
+              </span>
+              <div role="group" aria-labelledby="atm-validity-label">
+                <ValidityRangePicker
+                  startDate={draft.validFromDate}
+                  endDate={draft.validUntilDate}
+                  disabled={saving}
+                  onChange={(validFromDate, validUntilDate) => set({ validFromDate, validUntilDate })}
+                />
+              </div>
             </>
           )}
 

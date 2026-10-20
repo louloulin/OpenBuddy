@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { EmailConnection, EmailConnectionReadiness } from "@openbuddy/capability-email";
+import type { EmailConnection, EmailConnectionReadiness } from "@openbuddy/capability-email/renderer";
 import { ProviderRegistryCard } from "../ProviderRegistryCard";
 
 function makeConnection(overrides: Partial<EmailConnection> = {}): EmailConnection {

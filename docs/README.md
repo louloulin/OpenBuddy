@@ -8,7 +8,7 @@ Welcome to the OpenBuddy documentation index. This directory is the **single sou
 
 ## 🇬🇧 English · Documentation entry point
 
-> 📅 Most recent full verification: **2026-09-05** · 📦 Version: `0.15.0` · 🌿 git HEAD: `a9d240ff feat(pi-observability): forward session_tree / session_before_fork / provider hooks`
+> 📅 Most recent full verification: **2026-09-22** · 📦 Version: `0.16.0` · 🌿 git HEAD: `23f91d8 refactor(tsconfig): collapse per-package paths into tsconfig.package-base.json + vite-tsconfig-paths`
 
 ### 🚀 30-second tour
 
@@ -73,7 +73,7 @@ Welcome to the OpenBuddy documentation index. This directory is the **single sou
 - [`openbuddy-product-vs-pi.md`](openbuddy-product-vs-pi.md) — how OpenBuddy extends Pi
 - [`pi-core-capabilities.md`](pi-core-capabilities.md) — Pi core capabilities
 - [`pi-extension-architecture.md`](pi-extension-architecture.md) — Pi extension points
-- [`pi-capability-gap-analysis.md`](pi-capability-gap-analysis.md) — gaps we filled
+- `pi-capability-gap-analysis.md` — gaps we filled
 - [`pi-analysis-critique.md`](pi-analysis-critique.md) — critique of Pi's analysis
 - [`pi-runtime-next-roadmap.md`](pi-runtime-next-roadmap.md) — Pi runtime roadmap
 - [`pi-real-plugin-compatibility.md`](pi-real-plugin-compatibility.md) — Pi plugin compatibility
@@ -97,7 +97,7 @@ Welcome to the OpenBuddy documentation index. This directory is the **single sou
 
 ### 🔄 Migration history
 
-- [`migration-pi-electron.md`](migration-pi-electron.md) — Pi → Electron migration notes
+- `migration-pi-electron.md` — Pi → Electron migration notes
 - [`moon-monorepo-refactor.md`](moon-monorepo-refactor.md) — moon monorepo refactor
 - [`deepseek-cordis-runtime-status.md`](deepseek-cordis-runtime-status.md) — DeepSeek Cordis runtime status
 - [`dsh-version-compatibility-matrix.md`](dsh-version-compatibility-matrix.md) — DSH version compatibility
@@ -156,7 +156,7 @@ Welcome to the OpenBuddy documentation index. This directory is the **single sou
 ### 💼 Commercial model
 
 - [`openbuddy-commercial-model.md`](openbuddy-commercial-model.md) — commercial model
-- [`publish-checklist-v0.15.0.md`](publish-checklist-v0.15.0.md) — v0.15.0 publish checklist
+- [`publish-checklist-v0.15.0.md`](publish-checklist-v0.15.0.md) — enterprise/server publish checklist (offline bundle to the production host)
 
 ### 🌏 Community
 

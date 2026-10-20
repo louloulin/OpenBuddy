@@ -46,13 +46,25 @@ export function AutomationPermissionConfirmDialog({
 
   if (!open) return null;
   return (
-    <div className="modal-overlay automation-permission-confirm__overlay" onClick={handleCancel}>
-      <div
-        className="automation-permission-confirm__dialog"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
+    // 遮罩只是"点击空白处关闭"的鼠标便利区，不是控件本身：
+  // 键盘/读屏用户通过对话框内的按钮或 Esc 关闭，故标为 presentation 移出无障碍树。
+  // 用 target === currentTarget 判定"点在遮罩本体"，对话框内部无需再写 stopPropagation。
+  <div
+    className="modal-overlay automation-permission-confirm__overlay"
+    role="presentation"
+    onClick={(e) => {
+      if (e.target === e.currentTarget) handleCancel();
+    }}
+    onKeyDown={(e) => {
+      if (e.key === "Escape") handleCancel();
+    }}
+  >
+    <div
+      className="automation-permission-confirm__dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-label="这条自动化任务将以完全访问权限运行"
+    >
         <div className="automation-permission-confirm__header">
           <span className="automation-permission-confirm__icon">
             <WarningIcon />

@@ -4,11 +4,13 @@ import { Type } from "@earendil-works/pi-ai";
 import { shouldCompact } from "@earendil-works/pi-agent-core";
 import { buildOpenbuddyCompactionSettings } from "./host-modules/openbuddy-compaction-settings";
 import openBuddyApplyPatch, { type OpenBuddyApplyPatchConfig } from "./extensions/apply-patch";
+import openBuddyMemory, { type OpenBuddyMemoryConfig } from "./extensions/memory";
 import {
   createExtensionPolicy,
   describeExtensionPolicyReport,
 } from "./host-modules/extension-policy";
 import { applyNeedsReviewGate } from "./host-modules/pi-extensions-needs-review";
+import { setSessionArchived, setSessionPinned } from "./host-modules/session-metadata";
 import type { NeedsReviewGate } from "./host-modules/needs-review-gate";
 import { sessionMetadataBridgeFactory } from "./extensions/session-metadata-bridge";
 import { modelBridgeFactory } from "./extensions/model-bridge";
@@ -35,14 +37,19 @@ import {
   type AdapterToolSpec,
 } from "./pi-tool-bridge";
 import {
+  describeAutomationCommand,
   describeFsCommand,
   describeGoalCommand,
+  describeHashlineCommand,
+  describeLensCommand,
   describeMcpAuthCommand,
   describeMcpCommand,
   describePermissionSystemCommand,
   describePlanCommand,
   describeSessionCommand,
+  describeSimplifyCommand,
   describeTasksCommand,
+  describeWorktreeCommand,
   invokeFsCommand,
   invokeGoalCommand,
   invokeMcpCommand,
@@ -240,7 +247,7 @@ type PiExtensionContextApi = {
   compact?: (options?: { customInstructions?: string }) => void;
 };
 
-interface PiCompatibilityAdapter {
+export interface PiCompatibilityAdapter {
   packageNames: readonly string[];
   capability: string;
   /**
@@ -308,7 +315,12 @@ export interface CompatibilityCommandSpec {
   invokeInvocation?: (service: unknown, args: string, context: CompatibilityCommandContext) => Promise<string | undefined>;
 }
 
-const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
+/**
+ * Exported so the tool-coverage guard test can drive every entry through the
+ * real factory rather than asserting on declared data alone — the failure mode
+ * this guards is a tool that is declared but never reaches `pi.registerTool`.
+ */
+export const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
   {
     packageNames: ["pi-mcp-adapter"],
     capability: "mcp",
@@ -447,6 +459,29 @@ const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
         describeInvocation: (service, args) => describePlanCommand(service, args),
       },
     ],
+    // Passthrough-only: /plan has no invokeInvocation, so this takes the
+    // describe-fallback path. The LLM still gets a tool and learns that plan
+    // mode lives in the upstream package rather than getting silence.
+    tools: [
+      {
+        name: "openbuddy_plan",
+        description: "Inspect the OpenBuddy plan-mode projection: read how many plans pi-plan-mode owns, or learn how to toggle plan mode / set plan content. Plan state itself is owned by the pi-plan-mode extension, not OpenBuddy.",
+        parameters: Type.Object({
+          verb: Type.Union([
+            Type.Literal("status"),
+            Type.Literal("show"),
+            Type.Literal("enable"),
+            Type.Literal("disable"),
+            Type.Literal("set"),
+          ]),
+          text: Type.Optional(Type.String()),
+        }),
+        serializeArgs: (args: unknown) => {
+          const a = args as { verb: string; text?: string };
+          return a.text ? `${a.verb} ${a.text}` : a.verb;
+        },
+      },
+    ],
   },
   {
     packageNames: ["pi-todo", "pi-tasks", "pi-tasklist", "@narumitw/pi-todo", "@anthropic/pi-todo"],
@@ -471,22 +506,14 @@ const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
         invokeInvocation: invokeTasksCommand,
       },
     ],
-    // Phase I.1 — task decision: keep Cordis, drop the orphan PI tool.
-    // The `openbuddy_tasks` tool was registered here as a Stage G-1d
-    // experiment so the LLM could drive the per-session task list from
-    // inside the agent loop, but every verb it delegated to already
-    // existed as a slash command (`/tasks list|add|done|remove|clear`)
-    // that users invoke directly. Keeping both surfaces confused the
-    // LLM and doubled the codebase paths to maintain. The Cordis
-    // `task` service (TaskService + openbuddy-core-plugin.ts `ctx.get("task")`)
-    // now owns the surface exclusively, so this `tools` block is gone.
-    //
-    // Refs: docs/OPENBUDDY_PI_NATIVE_PLAN.md v3 §I.1
-    // ("决策保留 Cordis（用户已在用），删 PI extension adapter（孤儿）").
-    //
-    // No `tools` here — the slash commands `/tasks` + `/todo` cover the
-    // user-visible surface, and the Cordis `task` service remains the
-    // canonical backend (see `electron/main/agent/host-modules/task-service.ts`).
+    // Phase I.1 deliberately keeps task out of the PI extension surface:
+    // 「决策保留 Cordis（用户已在用），删 PI extension adapter（孤儿）」,
+    // docs/OPENBUDDY_PI_NATIVE_PLAN.md v3 §I.1. `invokeTasksCommand` still
+    // backs the `/tasks` slash command and the Cordis service — the human
+    // surface. An agent-facing `openbuddy_tasks` tool was drafted and then
+    // reverted: it is a real capability gap (the agent loop cannot reach
+    // session tasks today), but reversing a recorded architecture decision is
+    // the user's call, not an implementer's. Revisit via plan §I.1.
   },
   {
     packageNames: ["pi-session", "pi-sessions", "pi-history", "pi-bookmark", "pi-session-manager", "@anthropic/pi-session"],
@@ -609,6 +636,20 @@ const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
     passthrough: true,
     piPackageHint: "pi-lens",
     commands: [],
+    tools: [
+      {
+        name: "openbuddy_lens",
+        description: "Check the OpenBuddy lens projection and how to enable it. OpenBuddy mounts no Cordis service for lens; the capability ships in the pi-lens npm package (lens-* commands, bundled skills, reload) and runs natively once installed.",
+        parameters: Type.Object({
+          verb: Type.Union([
+            Type.Literal("status"),
+            Type.Literal("install"),
+          ]),
+        }),
+        serializeArgs: (args: unknown) => (args as { verb: string }).verb,
+        describeInvocation: (service, args) => describeLensCommand(service, args),
+      },
+    ],
   },
   {
     packageNames: ["pi-simplify"],
@@ -618,6 +659,20 @@ const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
     passthrough: true,
     piPackageHint: "pi-simplify",
     commands: [],
+    tools: [
+      {
+        name: "openbuddy_simplify",
+        description: "Check the OpenBuddy simplify projection and how to enable it. OpenBuddy mounts no Cordis service for simplify; the capability ships in the pi-simplify npm package and runs natively once installed.",
+        parameters: Type.Object({
+          verb: Type.Union([
+            Type.Literal("status"),
+            Type.Literal("install"),
+          ]),
+        }),
+        serializeArgs: (args: unknown) => (args as { verb: string }).verb,
+        describeInvocation: (service, args) => describeSimplifyCommand(service, args),
+      },
+    ],
   },
   {
     packageNames: ["pi-hashline-edit-pro", "pi-hashline-edit"],
@@ -627,6 +682,20 @@ const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
     passthrough: true,
     piPackageHint: "pi-hashline-edit-pro",
     commands: [],
+    tools: [
+      {
+        name: "openbuddy_hashline_edit",
+        description: "Check the OpenBuddy hashline-edit projection and how to enable it. OpenBuddy mounts no Cordis service for hashline editing; the capability ships in the pi-hashline-edit-pro npm package and runs natively once installed.",
+        parameters: Type.Object({
+          verb: Type.Union([
+            Type.Literal("status"),
+            Type.Literal("install"),
+          ]),
+        }),
+        serializeArgs: (args: unknown) => (args as { verb: string }).verb,
+        describeInvocation: (service, args) => describeHashlineCommand(service, args),
+      },
+    ],
   },
   {
     packageNames: ["@dietrichgebert/ponytail", "ponytail"],
@@ -636,6 +705,20 @@ const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
     passthrough: true,
     piPackageHint: "@dietrichgebert/ponytail",
     commands: [],
+    tools: [
+      {
+        name: "openbuddy_worktree",
+        description: "Check the OpenBuddy worktree projection and how to enable it. OpenBuddy mounts no Cordis service for git worktrees; the capability ships in the @dietrichgebert/ponytail npm package and runs natively once installed.",
+        parameters: Type.Object({
+          verb: Type.Union([
+            Type.Literal("status"),
+            Type.Literal("install"),
+          ]),
+        }),
+        serializeArgs: (args: unknown) => (args as { verb: string }).verb,
+        describeInvocation: (service, args) => describeWorktreeCommand(service, args),
+      },
+    ],
   },
   // Stage H-4: openbuddy-automation removed (Stage G-1c). The canonical
   // automation backplane is now `pi-goal-list-loop-audit` (npm 18,959
@@ -652,6 +735,23 @@ const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
     passthrough: true,
     piPackageHint: "pi-goal-list-loop-audit",
     commands: [],
+    tools: [
+      {
+        name: "openbuddy_automation",
+        description: "Check the OpenBuddy automation projection and how to enable it. OpenBuddy's automation Cordis plugin was removed (Stage H-4); pi-goal-list-loop-audit now owns the whole surface — interview-drafted goals, an audited task queue, and forever-loops (metric / spec / project-audit) verified by a detached auditor.",
+        parameters: Type.Object({
+          verb: Type.Union([
+            Type.Literal("status"),
+            Type.Literal("goal"),
+            Type.Literal("loop"),
+            Type.Literal("audit"),
+            Type.Literal("install"),
+          ]),
+        }),
+        serializeArgs: (args: unknown) => (args as { verb: string }).verb,
+        describeInvocation: (service, args) => describeAutomationCommand(service, args),
+      },
+    ],
   },
 ];
 
@@ -749,7 +849,7 @@ export function describeCompatibilityAdapterCommandsMarkdown(
   return sections.join("\n");
 }
 
-function createCompatibilityAdapterFactory(
+export function createCompatibilityAdapterFactory(
   spec: OpenBuddyPiExtensionSpec,
   adapter: PiCompatibilityAdapter,
   options: PiExtensionResolutionOptions,
@@ -767,7 +867,61 @@ function createCompatibilityAdapterFactory(
       tools: (adapter.tools ?? []).map((tool) => tool.name),
       passthrough: adapter.passthrough === true,
     });
+    // Pin/archive slash verbs must land in the same store the sidebar reads,
+    // otherwise `/sessions pin <id>` succeeds and nothing on screen changes.
+    // A caller-supplied `sessionMetadata` wins (test seam); pi's own context
+    // never carries the key.
+    const slashSessionMetadata = {
+      setPinned: (id: string, pinned: boolean) => setSessionPinned(id, pinned),
+      setArchived: (id: string, archived: boolean) => setSessionArchived(id, archived),
+    };
     const api = pi as unknown as { registerCommand?: (name: string, options: { description?: string; argumentHint?: string; handler: (args: string, ctx: CompatibilityCommandContext & { ui: { notify: (message: string, level?: "info" | "warning" | "error") => void } }) => Promise<void> }) => void };
+    const resolveService = () => {
+      const resolve = options.resolveService;
+      if (!resolve) return undefined;
+      const byKey = resolve(adapter.serviceKey);
+      const byOwner = byKey ?? resolve(adapter.owner as ServiceKey);
+      return byKey ?? byOwner;
+    };
+    // Stage G-1d: register one pi tool per entry in adapter.tools so the LLM
+    // can reach the canonical OpenBuddy service from inside the agent loop.
+    //
+    // Two paths, chosen per tool rather than per adapter:
+    //  - an adapter command carrying `invokeInvocation` backs a real tool;
+    //  - a passthrough-only adapter (no invoke handler exists, by design)
+    //    backs a describe-fallback tool, so the LLM still learns the
+    //    capability exists and how to enable the upstream package instead of
+    //    silently having no tool at all.
+    //
+    // Deliberately outside the registerCommand guard below: an adapter whose
+    // runtime lacks slash commands must still expose its tools to the LLM.
+    const toolSourceCommand = adapter.commands.find((command) => typeof command.invokeInvocation === "function");
+    const describeSourceCommand = adapter.commands.find((command) => typeof command.describeInvocation === "function");
+    for (const tool of adapter.tools ?? []) {
+      if (toolSourceCommand?.invokeInvocation) {
+        // Hand the describe handler along as the degradation path: an
+        // invokeInvocation that returns undefined (service unmounted, verb
+        // unsupported) then yields the projection text instead of a stub.
+        registerAdapterTool(
+          pi,
+          { ...tool, describeInvocation: tool.describeInvocation ?? describeSourceCommand?.describeInvocation },
+          { invokeInvocation: toolSourceCommand.invokeInvocation, resolveService },
+        );
+        continue;
+      }
+      const describe = tool.describeInvocation ?? describeSourceCommand?.describeInvocation;
+      if (!describe) {
+        // Reachable only if a tool is added without either responder; surface
+        // it rather than dropping the tool silently.
+        emit("pi/extension-tool-describe-missing", {
+          id: spec.id,
+          capability: adapter.capability,
+          tool: tool.name,
+        });
+        continue;
+      }
+      registerDescribeFallbackTool(pi, { ...tool, describeInvocation: describe, resolveService });
+    }
     if (typeof api.registerCommand !== "function") return;
     for (const command of adapter.commands) {
       api.registerCommand(command.name, {
@@ -787,34 +941,13 @@ function createCompatibilityAdapterFactory(
             const byOwner = !byKey && resolve ? resolve(adapter.owner as ServiceKey) : undefined;
             const resolved = byKey ?? byOwner;
             summary = resolved && command.invokeInvocation
-              ? await command.invokeInvocation(resolved, args, ctx) ?? await command.describeInvocation(resolved, args)
+              ? await command.invokeInvocation(resolved, args, { ...ctx, sessionMetadata: ctx.sessionMetadata ?? slashSessionMetadata }) ?? await command.describeInvocation(resolved, args)
               : await command.describeInvocation(resolved, args);
           } catch (error) {
             summary = `OpenBuddy adapter /${command.name} failed: ${error instanceof Error ? error.message : String(error)}`;
           }
           ctx.ui.notify(summary, "info");
         },
-      });
-    }
-    // Stage G-1d: register one pi tool per entry in adapter.tools so the
-    // LLM can invoke the canonical OpenBuddy service from inside the
-    // agent loop. We pick the first command with an invokeInvocation as
-    // the handler (slash commands sharing the same verb set are aliases);
-    // adapters without an invokeInvocation cannot back a tool so they are
-    // skipped here.
-    const toolSourceCommand = adapter.commands.find((command) => typeof command.invokeInvocation === "function");
-    if (!toolSourceCommand || !toolSourceCommand.invokeInvocation) return;
-    const resolveService = () => {
-      const resolve = options.resolveService;
-      if (!resolve) return undefined;
-      const byKey = resolve(adapter.serviceKey);
-      const byOwner = byKey ?? resolve(adapter.owner as ServiceKey);
-      return byKey ?? byOwner;
-    };
-    for (const tool of adapter.tools ?? []) {
-      registerAdapterTool(pi, tool, {
-        invokeInvocation: toolSourceCommand.invokeInvocation,
-        resolveService,
       });
     }
   };
@@ -979,6 +1112,20 @@ export const BUILTIN_PI_PLUGIN_MANIFESTS: readonly OpenBuddyPluginManifest[] = [
           schema: "openbuddy.pi-calendar.v1",
           defaults: { readOnly: false },
         },
+      },
+    ],
+  },
+  {
+    schema: openbuddyPluginManifestSchema,
+    id: "openbuddy-memory",
+    packageName: "@openbuddy/builtin-memory",
+    version: "1.0.0",
+    description: "本地两层记忆(用户级 + 工作区级)的模型侧工具:memory_save / memory_recall。",
+    tracks: [
+      {
+        kind: "pi",
+        inline: "openbuddy-memory",
+        config: { schema: "openbuddy.memory.v1" },
       },
     ],
   },
@@ -1182,6 +1329,9 @@ export const builtinPiExtensionFactories: Record<string, (emit: PiExtensionResol
   // capability-plugins.ts) remains the canonical backend; the tools
   // here just adapt the Cordis service surface to the PI ExtensionAPI.
   "openbuddy-pi-calendar": (_emit, _config, _options) => calendarPiFactory,
+  // 阶段 1.5:本地两层记忆的模型侧工具(memory_save / memory_recall)——
+  // 与「记忆」面板读写同一份 <agentHome>/memory.json,不是另一套存储。
+  "openbuddy-memory": (_emit, config, _options) => openBuddyMemory((config as Partial<OpenBuddyMemoryConfig> | undefined) ?? {}),
 };
 
 export function resolvePiExtensions(
@@ -1189,6 +1339,36 @@ export function resolvePiExtensions(
   options: PiExtensionResolutionOptions,
 ): PiExtensionResolution {
   const result: PiExtensionResolution = { factories: [], paths: [], resolved: [], diagnostics: [] };
+  // P0.2(2026-10-19 生产评审 B5):deny 决策必须在**进 paths/resolved 之前**
+  // 做出 —— 此前 policy 在循环之后才算,deny 只进审计报告,被拒扩展的路径
+  // 已经进了加载清单(等于没拒)。policy 提前创建,循环内逐 spec 裁决。
+  const policy = createExtensionPolicy({
+    // Compatibility-adapter packages are vetted by the loader — they
+    // belong to the implicit allowlist. We rely on the adapter branch
+    // above to push the `resolved` entry; the policy report still
+    // describes them as "allow" with the package allowlist rationale.
+    allowlistPackageNames: [
+      ...compatibilityAdapters.flatMap((entry) => entry.packageNames),
+      ...(options.allowlistPackageNames ?? []),
+    ],
+    ...(options.denylistPackageNames && options.denylistPackageNames.length > 0
+      ? { denylistPackageNames: options.denylistPackageNames }
+      : {}),
+    // All built-in extensions are always allowed — the existing
+    // `builtinPiExtensionFactories` check above already filtered the
+    // list, but we still report it for audit completeness.
+    allowBuiltins: true,
+    // plan4.5 §B — let the caller mark specific ids / packages as
+    // needs-review so the gate can block them until the user signs off.
+    ...(options.needsReviewIds && options.needsReviewIds.length > 0 ? { needsReviewIds: options.needsReviewIds } : {}),
+    ...(options.needsReviewPackageNames && options.needsReviewPackageNames.length > 0 ? { needsReviewPackageNames: options.needsReviewPackageNames } : {}),
+  });
+  const decisionInput = (spec: OpenBuddyPiExtensionSpec) => ({
+    id: typeof spec?.id === "string" ? spec.id : "<unknown>",
+    packageName: typeof spec?.source === "string" ? spec.source : undefined,
+    builtIn: typeof spec?.id === "string" && spec.id in builtinPiExtensionFactories,
+  });
+  const decisions: Array<{ input: ReturnType<typeof decisionInput>; decision: ReturnType<typeof policy.decide> }> = [];
   for (const spec of specs) {
     if (!spec || typeof spec.id !== "string" || !spec.id.trim()) {
       result.diagnostics.push({ id: String(spec?.id ?? "<unknown>"), state: "failed", error: "Pi extension id is required" });
@@ -1198,6 +1378,9 @@ export function resolvePiExtensions(
       result.diagnostics.push({ id: spec.id, state: "disabled" });
       continue;
     }
+    const input = decisionInput(spec);
+    const decision = policy.decide(input);
+    decisions.push({ input, decision });
     const adapter = findCompatibilityAdapter(spec);
     if (adapter) {
       result.factories.push({
@@ -1240,6 +1423,14 @@ export function resolvePiExtensions(
       result.diagnostics.push({ id: spec.id, state: "failed", error: `Unknown Pi extension ${spec.id}; source is required` });
       continue;
     }
+    // P0.2(2026-10-19 生产评审 B5):deny 在**进 paths/resolved 之前**裁决 ——
+    // 此前 policy 在循环之后才算,deny 只进审计报告,被拒扩展的路径已经进了
+    // 加载清单(等于没拒)。adapter/builtin 分支由构造保证受信(上方已 continue),
+    // 这里强制的对象是第三方 source。
+    if (decision.action === "deny") {
+      result.diagnostics.push({ id: spec.id, state: "failed", error: `Denied by extension policy: ${decision.reason}` });
+      continue;
+    }
     try {
       const source = isAbsolute(spec.source) ? resolve(spec.source) : options.resolveSource(spec.source);
       result.paths.push(source);
@@ -1254,41 +1445,6 @@ export function resolvePiExtensions(
   // The decisions list mirrors the spec list order; the report object is
   // frozen by `describeExtensionPolicyReport` so consumers can't mutate
   // it after the event lands in renderer state.
-  const policy = createExtensionPolicy({
-    // Compatibility-adapter packages are vetted by the loader — they
-    // belong to the implicit allowlist. We rely on the adapter branch
-    // above to push the `resolved` entry; the policy report still
-    // describes them as "allow" with the package allowlist rationale.
-    allowlistPackageNames: [
-      ...compatibilityAdapters.flatMap((entry) => entry.packageNames),
-      ...(options.allowlistPackageNames ?? []),
-    ],
-    ...(options.denylistPackageNames && options.denylistPackageNames.length > 0
-      ? { denylistPackageNames: options.denylistPackageNames }
-      : {}),
-    // All built-in extensions are always allowed — the existing
-    // `builtinPiExtensionFactories` check above already filtered the
-    // list, but we still report it for audit completeness.
-    allowBuiltins: true,
-    // plan4.5 §B — let the caller mark specific ids / packages as
-    // needs-review so the gate can block them until the user signs off.
-    ...(options.needsReviewIds && options.needsReviewIds.length > 0 ? { needsReviewIds: options.needsReviewIds } : {}),
-    ...(options.needsReviewPackageNames && options.needsReviewPackageNames.length > 0
-      ? { needsReviewPackageNames: options.needsReviewPackageNames }
-      : {}),
-  });
-  const decisions = specs.map((spec) => ({
-    input: {
-      id: typeof spec?.id === "string" ? spec.id : "<unknown>",
-      packageName: typeof spec?.source === "string" ? spec.source : undefined,
-      builtIn: typeof spec?.id === "string" && spec.id in builtinPiExtensionFactories,
-    },
-    decision: policy.decide({
-      id: typeof spec?.id === "string" ? spec.id : "<unknown>",
-      packageName: typeof spec?.source === "string" ? spec.source : undefined,
-      builtIn: typeof spec?.id === "string" && spec.id in builtinPiExtensionFactories,
-    }),
-  }));
   const report = describeExtensionPolicyReport(decisions);
   options.emit("pi/extension-policy-report", {
     generatedAt: new Date().toISOString(),

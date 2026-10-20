@@ -272,6 +272,14 @@
 
 **现状（已部分落地）**：`src/App.tsx` 已引入 P1-01 路由级 `React.lazy` + `Suspense`（HomePage / SettingsPanel / SearchOverlay / AboutDialog / FolderTrustDialog / TasksPanel 等）；markdown / katex / mermaid / cytoscape / cynefin 均为 lazy chunk，`index.html` 已无 `modulepreload`。`bundle-topology` 实测 entry 仍为 3.12 MB——对话壳（`@openbuddy/ui-conversation`）+ React/Zustand 基座仍在入口，后续按 P1/P2-09 目标把基座移出入口、entry 收敛到 ≤ 1.5 MB。
 
+**归因取证（2026-10-07，带测量）**：entry 3.12 → **4.589 MB**（五周 +47%），首屏 5.438 MB / 16 chunks（entry 占 84%）。首屏逐 chunk 拆解：除 entry 外最大单项仅 icons 0.268 MB —— **entry 就是整个 `packages/ui` 静态网（33 包中 31 个静态可达）+ src/ 的总和，没有 ≥0.3 MB 的单点可切**。静态边全景（构建日志 `INEFFECTIVE_DYNAMIC_IMPORT` + grep 交叉验证）：
+
+- **枢纽是 ui-runtime 的 `builtin-applies.ts`（根因,一张表锁死整个 UI 层）**：`ui-runtime/client.tsx:32` 静态 import 它,它静态 import 全部 25 个内置包的 `/client`（apply 聚合表,「包结构 → 运行时装配」的桥梁）,各包 client 又静态 import 自己的面板组件 —— 因此 **33 个包全部静态可达 entry,无一逃逸**。实测验证：entry chunk 里能 grep 到 ui-library 的字符串（「知识库」×37、「云存储」×11）,而 ui-library 连 Conversation 的静态边都没有 —— 纯经 builtin-applies 一条边就进来了。
+- **二级静态边（builtin-applies 之外的重复锁定）**：conversation 枢纽 7 文件静态 import workbench/collaboration/automation/experts/dialogs 的 index barrel（ChatView.tsx:58/59/64、ChatViewScrollStage.tsx:26/27、Composer/MessageItem/ToolSidePanel/ChatViewFooter/InputAddMenu）；部分还带静态 fallback（ChatView.tsx:288 `SubagentPanelImpl ?? SubagentPanel`,槽位未注册时的兜底）。AppShell 直连 ui-shell/ui-sidebar/ui-conversation/ui-experts(ThumbImg)/ui-email(/ai)。
+- **单父候选均不存在**：ui-email 有 6 条静态边（ComposerPortal index / AppShell `/ai` / PlaceholderPage `/ai`·useEmailAiRuntime **render 期 hook** / telemetry-init / ui-settings re-export / builtin-applies client）；ui-onboarding 外部静态父只有 AppShell 但 `useTourController` 是 render 期 hook（R64 注释明确要求 host 层独立 tour state,AppShell:55-64）。两者的懒化都依赖根因先解。
+- **P1-01 的第一个多米诺由此明确**：把 `BUILTIN_UI_APPLIES` 的每项改为 SlotProvider 挂载时的**动态 import**（`apply` 异步化）,即可一次性把全部 25 个包从 entry 静态图释放;AGENTS.md 的「每包调用一次 apply」契约不变,只是时机异步化。随后再清 conversation 枢纽的二级静态边与静态 fallback。这是一次注册时序的架构改动（槽位从「挂载即注册」变「挂载后异步注册」,渲染需容忍槽位未就绪）,需要单独设计与回归。
+- **测量教训（两次都以「取证再判定」纠错）**：① rolldown `codeSplitting.groups` 会被合并,按组构建的 chunk 大小**不能**用于逐包归因 —— ui-collaboration 组 chunk 吸入了 ui-workbench 模块,且 ui-library 的组 chunk 是 **0 字节幻影**（模块被吸进别处）,差点据此误判「ui-library 成功逃逸」;可靠的归因是「对目标包源码里的独特字符串 grep 产物 chunk」。② 构建日志的 `INEFFECTIVE_DYNAMIC_IMPORT` 精确列出每条被静态边击穿的动态 import 及其全部静态父文件,是边清单的权威来源,但只覆盖「同时有动态 import」的 barrel,会漏掉 `/client`、`/ai` 等子路径边 —— 必须再补一轮全仓 grep。③ rolldown 生成的 sourcemap `mappings` 无字段分隔符（45 万段全为单字段）,不可用于归因。
+
 **Codex / pi-web 参考**：
 - pi-web：Next.js App Router 每条路由独立 chunk；ChatWindow / ChatInput / ModelsConfig 各为 dynamic import。
 - codex-cli：TUI 走 ratatui，无 bundle 问题，但 Electron 端 desktop app 用 component-level lazy。

@@ -64,10 +64,12 @@ export function ConnectorDetailModal({
     : connector.authMode || connector.kind === "cli" ? "授权连接"
     : "配置连接";
 
+  // role="presentation":遮罩点击是纯指针便利;键盘/读屏用户走 × 按钮或 Escape。
   return (
     <div
       className="ec-modal-overlay"
       ref={overlayRef}
+      role="presentation"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
       <div className="ec-modal">

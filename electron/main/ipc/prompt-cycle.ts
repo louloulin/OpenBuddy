@@ -434,7 +434,7 @@ export function registerPromptCycleIpc(deps: AgentHostIpcDeps): void {
     const mode = publicPermissionMode(payload.mode, "mode");
     hostReceived("agent:set-permission-mode", traceId, sessionId);
     try {
-      const handlers = (await import("@openbuddy/auth-permission")).permissionHandlers;
+      const handlers = (await import("../agent/agent-permission-bridge")).agentPermissionBridge;
       // writeMode takes the PermissionMode string directly (not an object).
       handlers.writeMode(mode as never);
       hostDispatched("agent:set-permission-mode", traceId, sessionId);

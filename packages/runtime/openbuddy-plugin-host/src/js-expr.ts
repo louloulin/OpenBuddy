@@ -30,13 +30,25 @@ export function isJsExpr(value: unknown): value is JsExpr {
  * Evaluate `expr` against `ctx` using `with(ctx)` — same shape as
  * `@cordisjs/plugin-loader`'s `evaluate`. Callers control the scope so this
  * is no less safe than the deepseek source we are mirroring.
+ *
+ * P0.3(2026-10-19):宿主 CSP 禁 unsafe-eval。这里**不能在模块顶层 new Function**
+ * —— 打包器会把常量参数的 `new Function` 保留为模块级求值,模块一加载就触发
+ * CSP 违规(白屏)。Reflect.construct 与 new Function 语义等价,但源码无
+ * `new Function` 字面量,编译器无从常量折叠;构造延迟到首次调用。
  */
-export const evaluate: (ctx: Record<string, unknown>, expr: string) => unknown =
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-  new Function("ctx", "expr", "with (ctx) { return eval(expr) }") as (
-    ctx: Record<string, unknown>,
-    expr: string,
-  ) => unknown;
+const EVAL_ARGS: readonly string[] = ["ctx", "expr", "with (ctx) { return eval(expr) }"];
+let cachedEvaluate: ((ctx: Record<string, unknown>, expr: string) => unknown) | null = null;
+
+export function evaluate(ctx: Record<string, unknown>, expr: string): unknown {
+  if (!cachedEvaluate) {
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+    cachedEvaluate = Reflect.construct(Function, [...EVAL_ARGS]) as (
+      ctx: Record<string, unknown>,
+      expr: string,
+    ) => unknown;
+  }
+  return cachedEvaluate(ctx, expr);
+}
 
 /**
  * Recursively replace `JsExpr` nodes inside an arbitrary structure with the

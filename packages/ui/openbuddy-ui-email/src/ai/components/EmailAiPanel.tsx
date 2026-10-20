@@ -183,6 +183,7 @@ function createNoopProvider(): EmailDataProvider {
     listAccounts: async () => [],
     listThreads: async () => [],
     counts: async () => ({ today: 0, later: 0, done: 0, inbox: 0, drafts: 0, scheduled: 0, snoozed: 0 }),
+    triage: async () => ({}),
   };
 }
 

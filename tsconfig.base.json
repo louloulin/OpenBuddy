@@ -41,7 +41,6 @@
     // ─── 输出控制 ────────────────────────────────────────────────
     // 所有构建都走 vite/electron-vite/tsc --noEmit;本项目从不直接 tsc emit,
     // 所以这里统一关掉 emit + declaration 等,需要时由具体 tsconfig 覆盖。
-    "noEmit": true,
     "skipLibCheck": true,
 
     // ─── 类型严格性 ──────────────────────────────────────────────

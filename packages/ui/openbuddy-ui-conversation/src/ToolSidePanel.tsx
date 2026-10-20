@@ -22,6 +22,9 @@ import {
 } from "react";
 import type { ToolCallView } from "@/stores/session-store";
 import type { SessionArtifact } from "@/lib/agent/session-artifacts";
+import { ArtifactHistory } from "./chatview/ArtifactHistory";
+import { GitDiffView, GitSection } from "./chatview/GitPanel";
+import { useGitStatus, type UseGitStatusResult, type GitStatusState } from "./chatview/use-git-status";
 import type { FileChange } from "@/lib/files/file-changes";
 import { aggregateFileChanges } from "@/lib/files/file-changes";
 import type { ChatMessage } from "@/stores/session-store";
@@ -50,6 +53,8 @@ import {
   resolvePanelMode,
 } from "./tool-side-panel-layout";
 import { useViewportWidth } from "./use-viewport-width";
+import { useT } from "@openbuddy/ui-locale/client";
+import { openPathInCanvas } from "./canvas/open-path";
 import {
   WbPinIcon,
   WbUnpinIcon,
@@ -66,7 +71,7 @@ export type ToolSidePanelMode =
   | "preview"
   | "fileTree"
   | "browser"
-  | "changes";
+  | "changes"
 
 // ---------- 持久化常量 ----------
 // 宽度约束全部收敛在 `tool-side-panel-layout.ts`(纯函数,有单测)。
@@ -122,6 +127,8 @@ function ToolSidePanelInner({
 
   // ---- selection 状态 ----
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | undefined>();
+  // 恢复文件后让主列预览重新读盘(数字变化即可,内容由各自 effect 拉)。
+  const [, setRefreshKey] = useState(0);
   const [selectedFilePath, setSelectedFilePath] = useState<string | undefined>();
   const [browserUrl, setBrowserUrl] = useState<string | undefined>();
 
@@ -130,7 +137,12 @@ function ToolSidePanelInner({
     () => (messages ? aggregateFileChanges(messages).files : []),
     [messages],
   );
-  const hasChanges = changes.length > 0;
+  // git 工作区状态(面板层统一拉取):①「变更」视图在有 git 改动时也必须可见
+  // —— 否则会话里没有工具改过文件时,git 面板整块不可达;② 导航列与主列
+  // 共用同一份状态,不会一边显示有改动一边显示无差异。
+  const gitStatus = useGitStatus(cwd, open && Boolean(cwd));
+  const hasChanges =
+    changes.length > 0 || (gitStatus.status?.entries.length ?? 0) > 0;
 
   // ---- 视图切换 ----
   const handleViewChange = useCallback((v: WorkspaceView) => {
@@ -142,12 +154,12 @@ function ToolSidePanelInner({
     (id?: string) => {
       setSelectedArtifactId(id);
       if (id) setNarrowList(false);
-      if (id) {
-        const a = artifacts.find((x) => x.id === id);
-        if (a) onSelectArtifact(a);
-      }
+      // 审计 B(2026-10-14):产物列表里点击 = 选中并展示版本历史,
+      // 不再整体切到预览模式 —— 此前一击就把用户带离产物视图,时间线
+      // (ArtifactHistory)永远没有机会出现。预览入口保留:统一标签页、
+      // 文件树视图、以及「在画布中打开 / 系统打开」。
     },
-    [artifacts, onSelectArtifact],
+    [],
   );
 
   const handleFileSelect = useCallback(
@@ -353,12 +365,15 @@ function ToolSidePanelInner({
             view={view}
             artifacts={artifacts}
             changes={changes}
+            gitStatus={gitStatus}
             cwd={cwd}
+            sessionId={sessionId}
             selectedArtifactId={selectedArtifactId}
             selectedFilePath={selectedFilePath}
             onArtifactSelect={handleArtifactSelect}
             onFileSelect={handleFileSelect}
             onToast={onToast}
+            onFileRestored={() => setRefreshKey((k) => k + 1)}
           />
         </div>
       </div>
@@ -453,7 +468,9 @@ function ToolSidePanelInner({
             <MainContent
               view={view}
               artifacts={artifacts}
+              gitStatus={gitStatus.status}
               cwd={cwd}
+              sessionId={sessionId}
               previewPath={previewPath}
               selectedArtifactId={selectedArtifactId}
               selectedFilePath={selectedFilePath}
@@ -465,6 +482,7 @@ function ToolSidePanelInner({
                 handleArtifactSelect(a.id);
               }}
               onBrowserUrlChange={setBrowserUrl}
+              onFileRestored={() => setRefreshKey((k) => k + 1)}
               onOpenOs={(path) => {
                 void openLocalPath(path, { cwd, type: "file", onToast });
               }}
@@ -494,22 +512,29 @@ function NavContent({
   view,
   artifacts,
   changes,
+  gitStatus,
   cwd,
+  sessionId,
   selectedArtifactId,
   selectedFilePath,
   onArtifactSelect,
   onFileSelect,
   onToast,
+  onFileRestored,
 }: {
   view: WorkspaceView;
   artifacts: SessionArtifact[];
   changes: FileChange[];
+  gitStatus: UseGitStatusResult;
   cwd?: string;
+  sessionId?: string;
   selectedArtifactId?: string;
   selectedFilePath?: string;
   onArtifactSelect: (id?: string) => void;
   onFileSelect: (path?: string) => void;
   onToast?: (msg: string) => void;
+  /** 恢复某个文件版本后由外层刷新主列预览。 */
+  onFileRestored?: () => void;
 }) {
   // `files.tree` 槽:插件可以整列接管文件树(自带数据源)。内核没装任何实现时
   // 退回 ui-workbench 的 FileTreeView —— 两者满足同一个 props 契约,所以这里
@@ -522,7 +547,7 @@ function NavContent({
   );
   const slotReveal = useCallback(
     (path: string) => {
-      void invoke("reveal_in_folder", { path, cwd: cwd ?? null }).catch(
+      void invoke("shellfs:reveal", { path, cwd: cwd ?? null }).catch(
         (e: unknown) => {
           onToast?.(`无法在文件夹中显示:${String(e).replace(/^Error:\s*/, "")}`);
         },
@@ -530,8 +555,11 @@ function NavContent({
     },
     [cwd, onToast],
   );
+  const sessionSectionLabel = useT("git.sessionSection");
 
   if (view === "artifacts") {
+    // 版本历史(ArtifactHistory)在主列渲染:面板窄屏时导航列会整体收起,
+    // 挂在这里的历史区块会跟着消失(2026-10-14 审计)。
     return (
       <ArtifactsNavList
         artifacts={artifacts}
@@ -542,11 +570,29 @@ function NavContent({
   }
   if (view === "changes") {
     return (
-      <ChangesNavList
-        changes={changes}
-        selectedPath={selectedArtifactId}
-        onSelect={(path) => onArtifactSelect(path)}
-      />
+      <>
+        {/* Git 真实状态(状态/diff/log/暂存/提交)——此前这里只有会话消息聚合的近似 diff。 */}
+        <GitSection
+          cwd={cwd}
+          selectedPath={selectedArtifactId}
+          onSelect={(path) => onArtifactSelect(path)}
+          onToast={onToast}
+          status={gitStatus.status}
+          loading={gitStatus.loading}
+          error={gitStatus.error}
+          onReload={gitStatus.reload}
+        />
+        <div className="git-panel__group">
+          <header className="git-panel__group-head">
+            <span>{sessionSectionLabel}</span>
+          </header>
+          <ChangesNavList
+            changes={changes}
+            selectedPath={selectedArtifactId}
+            onSelect={(path) => onArtifactSelect(path)}
+          />
+        </div>
+      </>
     );
   }
   if (view === "fileTree") {
@@ -654,7 +700,9 @@ function ChangesNavList({
 function MainContent({
   view,
   artifacts,
+  gitStatus,
   cwd,
+  sessionId,
   previewPath,
   selectedArtifactId,
   selectedFilePath,
@@ -663,10 +711,13 @@ function MainContent({
   onBrowserUrlChange,
   onOpenOs,
   onToast,
+  onFileRestored,
 }: {
   view: WorkspaceView;
   artifacts: SessionArtifact[];
+  gitStatus: GitStatusState | null;
   cwd?: string;
+  sessionId?: string;
   previewPath?: string | null;
   selectedArtifactId?: string;
   selectedFilePath?: string;
@@ -675,6 +726,8 @@ function MainContent({
   onBrowserUrlChange: (url?: string) => void;
   onOpenOs: (path: string) => void;
   onToast?: (msg: string) => void;
+  /** 恢复文件版本后由外层刷新主列预览。 */
+  onFileRestored?: () => void;
 }) {
   if (view === "preview") {
     return (
@@ -699,7 +752,13 @@ function MainContent({
       return <p className="tool-side-panel__empty">在左侧选择文件查看变更</p>;
     }
     return (
-      <FilePreview path={path} cwd={cwd} onToast={onToast} onOpenOs={() => onOpenOs(path)} />
+      <ChangedFileView
+        path={path}
+        cwd={cwd}
+        gitStatus={gitStatus}
+        onToast={onToast}
+        onOpenOs={() => onOpenOs(path)}
+      />
     );
   }
   // artifacts：选中产物时预览其文件。
@@ -715,6 +774,8 @@ function MainContent({
     if (!path) return <p className="tool-side-panel__empty">无文件路径</p>;
     return (
       <div className="tool-side-panel__preview-wrap">
+      {/* 阶段 5 产物中心:版本历史 + 恢复(主列,预览之上;窄屏也可见)。 */}
+      <ArtifactHistory sessionId={sessionId} path={path} onToast={onToast} onRestored={onFileRestored} />
         {a && (
           <button
             type="button"
@@ -730,6 +791,39 @@ function MainContent({
     );
   }
   return null;
+}
+
+// ---------- ChangedFileView（变更视图主列：git 差异优先，其余回退文件预览） ----------
+
+function ChangedFileView({
+  path,
+  cwd,
+  gitStatus,
+  onToast,
+  onOpenOs,
+}: {
+  path: string;
+  cwd?: string;
+  gitStatus: GitStatusState | null;
+  onToast?: (msg: string) => void;
+  onOpenOs: () => void;
+}) {
+  const t = useT("git.loading");
+  const status = gitStatus;
+  // git 状态里的路径是相对仓库根的,状态未就绪时无法判定是不是 git 变更 ——
+  // 此时按会话改动(绝对路径)处理,别把相对路径喂给文件预览。
+  const looksAbsolute = path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+  if (cwd && !status && !looksAbsolute) {
+    return <p className="tool-side-panel__empty">{t}</p>;
+  }
+  // 非 git 仓库 / 该文件不在 git 变更里 → 回退文件预览（会话改动仍可用）。
+  const isGitChange = Boolean(
+    status?.isRepo && status.entries.some((e) => e.path === path),
+  );
+  if (!isGitChange) {
+    return <FilePreview path={path} cwd={cwd} onToast={onToast} onOpenOs={onOpenOs} />;
+  }
+  return <GitDiffView path={path} cwd={cwd} onToast={onToast} />;
 }
 
 // ---------- FilePreview（保留原实现） ----------
@@ -767,6 +861,11 @@ function FilePreview({
   const isMarkdown = /\.(md|markdown|mdx)$/i.test(path);
   const canEdit = isMarkdown && EditorBody != null && text != null;
 
+  // 画布 store 是模块级的(不像 editor.body 槽那样可能缺席),所以按钮恒可用,
+  // 不存在"点了没反应"的死按钮。
+  const openInCanvasLabel = useT("conversation.canvas.openInCanvas");
+  const openInCanvas = useCallback(() => openPathInCanvas(path, text), [path, text]);
+
   const beginEdit = useCallback(() => {
     setDraft(text ?? "");
     setEditing(true);
@@ -781,7 +880,7 @@ function FilePreview({
     if (saving) return;
     setSaving(true);
     try {
-      await invoke("write_text_file", {
+      await invoke("shellfs:write-text", {
         path,
         content: draft,
         workspaceRoot: cwd ?? null,
@@ -803,7 +902,7 @@ function FilePreview({
     setText(null);
     (async () => {
       try {
-        const content = await invoke<string>("read_text_file", {
+        const content = await invoke<string>("shellfs:read-text", {
           path,
           cwd: cwd ?? null,
           maxBytes: 256 * 1024,
@@ -861,6 +960,15 @@ function FilePreview({
             </button>
           </>
         )}
+        <button
+          type="button"
+          className="file-preview__open"
+          data-testid="file-preview-open-canvas"
+          onClick={openInCanvas}
+          aria-label={openInCanvasLabel}
+        >
+          {openInCanvasLabel}
+        </button>
         <button type="button" className="file-preview__open" onClick={onOpenOs}>
           系统打开
         </button>

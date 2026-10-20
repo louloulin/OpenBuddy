@@ -1,0 +1,21 @@
+{
+  "name": "@openbuddy/ui-memory",
+  "version": "0.16.0",
+  "private": true,
+  "type": "module",
+  "description": "本地两层记忆面板(用户级 + 工作区级)",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  },
+  "dependencies": {
+    "@openbuddy/ui-contract": "workspace:*",
+    "@openbuddy/ui-primitives": "workspace:*",
+    "@openbuddy/ui-locale": "workspace:*"
+  }
+}

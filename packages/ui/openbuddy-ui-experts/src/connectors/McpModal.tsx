@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   XCloseIcon, SearchIcon, ConfigureIcon, McpIcon, OpenExternalIcon, DeleteIcon,
 } from "@openbuddy/ui-primitives/icons";
@@ -33,6 +33,7 @@ export function McpModal({
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [updatingProfile, setUpdatingProfile] = useState<string | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -71,9 +72,11 @@ export function McpModal({
     finally { setUpdatingProfile(null); }
   };
 
+  // role="presentation":遮罩点击是纯指针便利;键盘/读屏用户走 × 按钮或 Escape。
   return (
-    <div className="modal-overlay mcp-overlay" onClick={onClose}>
-      <div className="mcp-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay mcp-overlay" ref={overlayRef} role="presentation"
+      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}>
+      <div className="mcp-modal">
         <div className="mcp-modal-head">
           <div className="mcp-modal-titlewrap">
             <span className="mcp-modal-glyph"><McpIcon size="md" /></span>
@@ -152,6 +155,7 @@ export function McpModal({
                       </div>
                       <label className="sk-toggle" title={s.enabled ? "已启用" : "已禁用"}>
                         <input type="checkbox" checked={s.enabled}
+                          aria-label={`启用 ${s.name}`}
                           onChange={() => handleToggle(s, !s.enabled)} />
                         <span className="sk-toggle-track"><span className="sk-toggle-thumb" /></span>
                       </label>

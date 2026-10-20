@@ -315,5 +315,5 @@ Sources: `earendil-works/pi` v0.84.1 `packages/coding-agent/docs/sdk.md`, `packa
 - [Agent Loop & State Machine (DeepWiki)](https://deepwiki.com/badlogic/pi-mono/3.1-agent-state-management)
 - [pi-coding-agent npm](https://www.npmjs.com/package/@mariozechner/pi-coding-agent)
 - [从底层看懂 Pi-Mono: Agent 与 AI 核心机制揭秘](https://juejin.cn/post/7644856152429641779)
-- Companion: [`docs/migration-pi-electron.md`](./migration-pi-electron.md)
-- Companion: [`docs/pi-capability-gap-analysis.md`](./pi-capability-gap-analysis.md)
+- Companion: `docs/migration-pi-electron.md`
+- Companion: `docs/pi-capability-gap-analysis.md`

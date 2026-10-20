@@ -559,7 +559,7 @@
   border-radius: 12px;
   background: var(--wb-bg-elevated, var(--wb-bg-primary));
   box-shadow: var(--wb-shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.16));
-  animation: ob-scale-in var(--wb-motion-duration-fast, 140ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: ob-scale-in var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }
 .secondary-sidebar__loading {
   padding: 12px;
@@ -730,4 +730,21 @@
 .truncation-banner button:hover {
   border-color: var(--wb-brand-primary);
   color: var(--wb-text-strong);
+}
+
+/* B5(审计 2026-10-14):右缘「助理」导轨降权 —— 保留 peek 能力,但平时
+   半收进边缘、降透明度,hover 才完整浮出。此前是一块常驻白卡贴在内容上。 */
+.secondary-sidebar__trigger {
+  opacity: 0.45;
+  transition: opacity var(--wb-motion-duration-base, 200ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+              transform var(--wb-motion-duration-base, 200ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.secondary-sidebar__trigger:hover,
+.secondary-sidebar__trigger:focus-within {
+  opacity: 1;
+}
+@media (hover: none) {
+  .secondary-sidebar__trigger {
+    opacity: 1;
+  }
 }

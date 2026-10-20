@@ -30,8 +30,10 @@ describe("plugin-sdk 桥接", () => {
   let dispose: () => void;
   let core: ReturnType<typeof createSlotCore>;
 
-  beforeEach(() => {
-    registerAllBuiltinUis();
+  beforeEach(async () => {
+    // P1/P2-09:装配异步;本 describe 只需要内核在位,不依赖 slot 内容,
+    // 但等 done 可避免后续测试读到装配中间态。
+    await registerAllBuiltinUis().done;
     core = getRuntime().slots as ReturnType<typeof createSlotCore>;
     target = makeFakeTarget();
     dispose = installPluginSdkBridge({ target });

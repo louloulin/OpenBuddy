@@ -1,0 +1,24 @@
+{
+  "name": "@openbuddy/host-runtime",
+  "version": "0.16.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./resolve-binary": "./src/resolve-binary.ts",
+    "./protocol": "./src/protocol.ts"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "@openbuddy/shared-error-codes": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "typescript": "^5.6.3",
+    "vitest": "2.1.9"
+  }
+}

@@ -72,16 +72,17 @@
 
 本包与根项目共用 vitest 配置,覆盖在 `src/__tests__/`:
 
-- `marketplace-model.test.ts` — 版本解析 / 比较 / 状态派生 / 过滤排序 / 高亮 / 体积格式化
-- `MarketplaceTab.test.tsx` — 过滤、排序、视图切换、四种状态(加载/错误/空/结果)、回调接线
-- `MarketplaceCard.test.tsx` — 状态徽标、主操作路由、溢出菜单、能力截断、高亮
-- `InstallDialog.test.tsx` — portal、Esc / 背板关闭、焦点环、版本选择(受控 + 非受控)、风险确认、进度与错误
-- `CapabilityVersionBadge.test.tsx` — 版本关系、破坏性升级、回滚入口
-- `client.test.tsx` / `index-exports.test.ts` — 槽位注册契约与公共导出面
+- `client.test.tsx` — ClientModuleSystem 加载 / 注册契约
+- `index-exports.test.ts` — 顶层导出面与槽位注册
+
+> R97 清理:曾在本目录下导出整套 marketplace 表现层组件 + 测试
+> (`MarketplaceTab` / `MarketplaceCard` / `InstallDialog` / `CapabilityVersionBadge` /
+> `marketplace-model` + 13 个相关测试)。R83 之后 `@openbuddy/ui-mcp` 的
+> `MarketplacePanel` 是「插件·市场」面板的事实唯一实现,R97 把孤儿
+> 参考实现一并删除,详见 ADR-0011。
 
 ## 参考
 
 - `packages/ui/AGENTS.md` — UI 包整体约定
 - `WORKBUDDY_UI_REFERENCE.md` — WorkBuddy UI 对照
 - `docs/PLUGIN_SYSTEM.md` — 插件 manifest 与加载链路
-- `electron/main/agent/pi-market-bridge.ts` — Pi 扩展市场桥接(main 进程,数据来源)

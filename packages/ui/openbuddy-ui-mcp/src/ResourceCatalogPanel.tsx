@@ -14,7 +14,7 @@ import {
   casdoorDeleteResource,
 } from "@/lib/casdoor/casdoor-client";
 import type { CasdoorResourceCreateInput, CasdoorResourceRecord, CasdoorResourceType } from "@openbuddy/auth-casdoor";
-import { CASDOOR_RESOURCE_TYPES } from "@openbuddy/auth-casdoor";
+import { CASDOOR_RESOURCE_TYPES } from "@openbuddy/auth-casdoor/renderer";
 import { confirm } from "@/lib/platform/electron-api";
 
 function SectionShell({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {

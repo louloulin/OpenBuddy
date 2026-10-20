@@ -49,6 +49,15 @@ describe("R8.18 .msg__revision-btn active scale parity", () => {
 });
 
 describe("R8.18 .msg__actions motion-token coherence", () => {
+  it("C3:操作行有 focus-within 可达路径(focus 环统一,对齐 Claude)", () => {
+    const prose = readFileSync(join(__dirname, "..", "prose.css"), "utf8");
+    // .msg:focus-within .msg__actions 或 .msg__actions:focus-within 至少一条
+    expect(prose).toMatch(/\.msg:focus-within \.msg__actions|\.msg__actions:focus-within/);
+    // 统一 focus 环 token 已定义
+    const tokens = readFileSync(join(__dirname, "..", "..", "..", "src", "styles", "tokens.css"), "utf8");
+    expect(tokens).toMatch(/--wb-focus-shadow:/);
+  });
+
   it("drives the opacity transition through the R8.9 motion tokens", () => {
     const body = ruleBody(prose, ".msg__actions");
     expect(body).toBeTruthy();
@@ -61,6 +70,7 @@ describe("R8.18 .msg__actions motion-token coherence", () => {
     // shifted to motion tokens. Pin both endpoints so a future
     // refactor can't accidentally make the row always-visible.
     expect(prose).toMatch(/\.msg__actions\s*\{[^}]*opacity:\s*0/);
-    expect(prose).toMatch(/\.msg:hover\s+\.msg__actions\s*\{[^}]*opacity:\s*1/);
+    // 选择器列表(与 focus-within 合并声明)也接受:[^{]* 跨逗号行。
+    expect(prose).toMatch(/\.msg:hover\s+\.msg__actions[^{]*\{[^}]*opacity:\s*1/);
   });
 });

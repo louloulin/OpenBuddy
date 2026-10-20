@@ -1,6 +1,6 @@
 {
   "name": "@openbuddy/admin-portal",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "type": "module",
   "description": "OpenBuddy 企业级 Web 管理控制台（独立部署）",

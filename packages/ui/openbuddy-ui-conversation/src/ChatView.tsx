@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback, useSyncExternalStore } from "react";
-import { createPortal } from "react-dom";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, useCallback, useSyncExternalStore } from "react";
 // Phase A4 — pull each icon directly from its per-icon ESM module. The
 // barrel re-exports ~1500 icons and the bundler would otherwise drag the
 // whole tree through the entry chunk even with tree-shaking (lucide-react
@@ -8,25 +7,47 @@ import { createPortal } from "react-dom";
 // their default binding — see `lucide-icons.d.ts`. `.mjs` extension is
 // omitted because lucide-react's package.json `main` points at `.js` and
 // esbuild/Vite resolve the deeper file by that side-effect anyway.
-import Bot from "lucide-react/dist/esm/icons/bot";
-import FileDiff from "lucide-react/dist/esm/icons/file-diff";
-import FolderTree from "lucide-react/dist/esm/icons/folder-tree";
-import Globe from "lucide-react/dist/esm/icons/globe";
-import ListTodo from "lucide-react/dist/esm/icons/list-todo";
-import Package from "lucide-react/dist/esm/icons/package";
-import Search from "lucide-react/dist/esm/icons/search";
-import Users from "lucide-react/dist/esm/icons/users";
-import Bug from "lucide-react/dist/esm/icons/bug";
-import FlaskConical from "lucide-react/dist/esm/icons/flask-conical";
-import BookOpen from "lucide-react/dist/esm/icons/book-open";
-import Zap from "lucide-react/dist/esm/icons/zap";
-import WandSparkles from "lucide-react/dist/esm/icons/wand-2";
 import { shallow } from "zustand/shallow";
-import { PauseIcon } from "@openbuddy/ui-primitives/icons";
-import { useSessionStore, type ToolCallView } from "@/stores/session-store";
+import {
+  ChatViewToolbar,
+  defaultArtifactsButton,
+  defaultBrowserButton,
+  defaultCanvasButton,
+  defaultFileChangesButton,
+  defaultFileTreeButton,
+  defaultFindButton,
+  defaultPlanButton,
+  defaultTasksButton,
+  defaultSubagentButton,
+  defaultTeamStatusButton,
+} from "./chatview/ChatViewToolbar";
+import {
+  ChatViewBannerStack,
+  type ExtensionUi,
+} from "./chatview/ChatViewBannerStack";
+import { ChatViewScrollStage } from "./chatview/ChatViewScrollStage";
+import { ChatViewFooter } from "./chatview/ChatViewFooter";
+import { useChatViewPauseYield } from "./chatview/useChatViewPauseYield";
+import { useChatViewStreaming } from "./chatview/useChatViewStreaming";
+import { useChatViewRetry } from "./chatview/useChatViewRetry";
+import { useChatViewRewind } from "./chatview/useChatViewRewind";
+import { useChatViewTimeline } from "./chatview/useChatViewTimeline";
+import { useChatViewRevision } from "./chatview/useChatViewRevision";
+import { ChatViewEmptyState } from "./chatview/ChatViewEmptyState";
+// Canvas 的承载(Tiptap/pdf.js/mermaid 依赖图)不进首包 —— entryChunkMB=5.0 是 CI 硬门禁。
+const CanvasPanel = lazy(() =>
+  import("./canvas/CanvasPanel").then((m) => ({ default: m.CanvasPanel })),
+);
+import {
+  useChatViewGlobalShortcuts,
+  useChatViewShortcuts,
+} from "./chatview/useChatViewShortcuts";
+import { useSessionStore, type ChatMessage, type ToolCallView } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { createMarkdownHostConfig } from "@/lib/markdown/markdown-host";
-import { piListSessions, piSetThinkingLevel, rewindExecute, rewindPoints } from "@/lib/agent/pi-client";
+import { piListSessions, piSetThinkingLevel, sessionFork, tasksListForSession } from "@/lib/agent/pi-client";
+import { useT } from "@openbuddy/ui-locale/client";
+import { confirm, invoke } from "@/lib/platform/electron-api";
 import {
   collectSessionArtifacts,
   findToolCall,
@@ -35,48 +56,38 @@ import {
 import { MessageItem } from "./MessageItem";
 import { Composer } from "./Composer";
 import type { ComposerProps } from "./Composer";
-import { ConversationBody, ConversationComposer } from "./conversation-slots";
+import { ConversationBody } from "./conversation-slots";
 import {
   ConversationViewOutlet,
   ConversationViewTabs,
   useConversationViews,
 } from "./conversation-view";
-import { ConversationApprovals } from "./conversation-approvals";
-import { PiReloadFailureBanner } from "./PiReloadFailureBanner";
-import { PlanPanel } from "@openbuddy/ui-automation";
-import { RewindBar } from "./RewindBar";
+import { PlanPanel, SessionTasksPanel } from "@openbuddy/ui-automation";
+import { useRowPanelNav } from "./chatview/useRowPanelNav";
+import { TerminalPanel } from "./chatview/TerminalPanel";
+import { SquareTerminal } from "lucide-react";
+import { useChatShortcuts } from "./chatview/useChatShortcuts";
 import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
 import { QuestionInlineCard } from "./QuestionInlineCard";
 import { ToolSidePanel, type ToolSidePanelMode } from "./ToolSidePanel";
-import { FindBar, isFindHit } from "./FindBar";
-import { FileChangesPanel } from "./FileChangesPanel";
+import { FindBar } from "./FindBar";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { SubagentPanel } from "@openbuddy/ui-collaboration";
-import { TeamStatusView } from "@openbuddy/ui-workbench";
-import { ShareMenu } from "@openbuddy/ui-workbench";
-import { QueuePanel } from "@openbuddy/ui-automation";
-import { PlanModeBanner } from "@openbuddy/ui-shell";
 import { useMessageQueueStore } from "@/stores/message-queue-store";
 import {
   VirtualizedMessageList,
   shouldUseVirtualList,
 } from "./VirtualizedMessageList";
-import { buildTimeline, type TimelineNode } from "@/lib/ui/timeline-utils";
-import { formatPiError } from "@/lib/platform/error-format";
+import { LoadingRow } from "./LoadingRow";
+import type { TimelineNode } from "@/lib/ui/timeline-utils";
 import { useSubagentStore } from "@/stores/subagent-store";
 import { useQuestionStore } from "@/stores/question-store";
 import { usePermissionStore } from "@/stores/permission-store";
-import {
-  requestYield,
-  confirmYielded,
-  clearYield,
-  isYielded,
-  createYieldStore,
-} from "@/lib/ui/yield-state";
+import { useCanvasStore } from "@/stores/canvas-store";
+
 import type { ModelOption, ThinkingLevel } from "@openbuddy/ui-workbench";
-import type { AgentEntry } from "@openbuddy/shared-types";
+import type { AgentEntry, SessionTask } from "@openbuddy/shared-types";
 import type { WorkspaceInfo } from "@/lib/agent/pi-client";
-import { StatusIndicator } from "@/components/StatusIndicator";
 import { getRendererPluginRuntime } from "@/lib/runtime/renderer-plugin-runtime";
 import type { DeepSeekSessionListSnapshot } from "@openbuddy/renderer-host";
 
@@ -93,55 +104,41 @@ const EMPTY_RENDERER_SESSION_SNAPSHOT: DeepSeekSessionListSnapshot = {
   error: undefined,
 };
 
+/**
+ * Selector equality for `messages`: shallow element-wise reference compare.
+ *
+ * Compared by `id` instead? That silently breaks live streaming —
+ * `mergeStreamingDelta` appends text to the *same* message id without
+ * changing the array length, so an id-based compare reports "unchanged" for
+ * every delta and Zustand never notifies this component. `MessageItem`
+ * receives its message as a prop and memoizes on `prev.message ===
+ * next.message` (MessageItem.tsx:335), so a stale array pins the whole
+ * transcript: a single-assistant-message turn renders as an empty bubble
+ * with the LoadingRow spinning forever.
+ *
+ * The previous version compared only the LAST element's reference. That is
+ * too weak in the other direction: `appendUserRevision` and
+ * `setActiveRevision` (session-store.ts) replace a *user* message in the
+ * middle of the transcript, changing neither the length nor the last
+ * element's identity — a user message is never the tail, since the tail is
+ * the assistant's reply. The comparator reported "unchanged", ChatView never
+ * re-rendered, and the revision pager silently did nothing.
+ *
+ * Comparing every element costs nothing when messages did not change: an
+ * unrelated store write (`streaming`, `plan`, …) leaves the array reference
+ * itself untouched, so `a === b` short-circuits first.
+ */
+export function messagesEqual(a: ChatMessage[], b: ChatMessage[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 /** Center chat column: scrollable message list + composer pinned at bottom. */
 
-/* R8.10 — Quick-prompt templates shown on the welcome empty state.
-   Each card seeds the composer via the existing `resendText` pipe so the
-   user can refine and send. Keep the list short (5 cards max) so the
-   empty state stays scannable; the cards adapt to current language. */
-const QUICK_PROMPTS: ReadonlyArray<{
-  id: string;
-  icon: typeof FolderTree;
-  title: string;
-  desc: string;
-  prompt: string;
-}> = [
-  {
-    id: "explore",
-    icon: FolderTree,
-    title: "梳理项目结构",
-    desc: "概览代码组织、关键模块、入口文件",
-    prompt: "帮我梳理一下当前项目的目录结构和关键模块。",
-  },
-  {
-    id: "find-bug",
-    icon: Bug,
-    title: "查找 Bug",
-    desc: "审查最近的改动,定位并修复问题",
-    prompt: "审查最近修改的代码,帮我找出潜在的 Bug 并修复。",
-  },
-  {
-    id: "write-tests",
-    icon: FlaskConical,
-    title: "写单元测试",
-    desc: "为关键函数补充覆盖率的测试",
-    prompt: "为当前目录的关键函数补充单元测试,提升覆盖率。",
-  },
-  {
-    id: "explain",
-    icon: BookOpen,
-    title: "解释代码逻辑",
-    desc: "用通俗语言说明某段代码的作用",
-    prompt: "挑一个核心文件,逐段解释它的逻辑和设计意图。",
-  },
-  {
-    id: "optimize",
-    icon: Zap,
-    title: "性能优化",
-    desc: "寻找热点并提出改进建议",
-    prompt: "检查当前代码,找出性能瓶颈并给出优化建议。",
-  },
-];
 
 
 export function ChatView({
@@ -208,56 +205,18 @@ export function ChatView({
   onOpenSettings?: () => void;
 }) {
   // P0-07: Custom equality — only re-render ChatView when the message list
-  // *structure* changes (length or last message id). Streaming deltas
-  // mutate the last message's `parts` reference but keep length+last-id
-  // stable; the streaming MessageItem re-renders on its own via memo.
-  // Cuts ChatView re-renders from ~60/s (one per coalesced flush) to
-  // ~1/turn-start during streaming.
-  // The equality below compares the last entry by REFERENCE, not by `id`.
-  //
-  // Comparing by `id` looks like a cheap win but silently breaks live
-  // streaming: `mergeStreamingDelta` appends text to the *same* message id
-  // without changing the array length, so an id-based compare reports
-  // "unchanged" for every delta and Zustand never notifies this component.
-  // The old comment here claimed the streaming `MessageItem` would
-  // "re-render on its own via memo" — it can't. `MessageItem` receives its
-  // message as a prop and memoizes on `prev.message === next.message`
-  // (MessageItem.tsx:335), so a stale array from this selector pins the
-  // whole transcript. A single-assistant-message turn then renders as an
-  // empty bubble with the LoadingRow spinning forever.
-  //
-  // Reference-comparing the tail keeps the useful part of the optimization
-  // (unrelated store writes still don't re-render the transcript) while
-  // letting content mutations through. The per-delta render cost stays
-  // bounded because `appendStreamingDelta` already coalesces deltas to one
-  // store write per frame, and `MessageItem`'s memo still keeps the other
-  // N-1 rows from re-rendering.
+  // actually changes. See `messagesEqual` above for why it compares element
+  // references rather than ids, and why comparing only the tail was wrong.
   const messages = useSessionStore(
     (s) => s.messages,
-    (a, b) =>
-      a === b ||
-      (a.length === b.length &&
-        (a.length === 0 || a[a.length - 1] === b[b.length - 1])),
+    messagesEqual,
   );
   const streaming = useSessionStore((s) => s.streaming);
   const streamingMessageId = useSessionStore((s) => s.streamingMessageId);
   const error = useSessionStore((s) => s.error);
   const plan = useSessionStore((s) => s.plan);
   const sessionId = useSessionStore((s) => s.sessionId);
-  // Captures the wall-clock start of the most recent assistant turn so
-  // per-message streaming labels (e.g. the meta chip inside MessageItem)
-  // can render a live "正在生成" duration.
-  const turnStartRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (streaming) {
-      if (turnStartRef.current === null) turnStartRef.current = Date.now();
-    } else {
-      turnStartRef.current = null;
-    }
-  }, [streaming]);
-  useEffect(() => {
-    turnStartRef.current = null;
-  }, [sessionId]);
+  // Plan5 Phase A.1 — turnStartRef 由 useChatViewStreaming 接管。
   // R1 — plan-mode toggle (Codex/Claude Code-style persistent plan banner).
   // Independent from panelMode because the banner is always-on when active
   // (we don't want it to disappear behind a side panel toggle).
@@ -325,8 +284,65 @@ export function ChatView({
   const [findCurrent, setFindCurrent] = useState<string | null>(null);
   // 文件变更聚合面板(对齐 WorkBuddy file-changes-panel)。
   const [fileChangesOpen, setFileChangesOpen] = useState(false);
+  // 阶段 1:chat 底部终端(VS Code 风格),cwd=信任工作区。
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  // 审计 A1:terminal:create 要求 cwd 在信任根内;未信任时按钮直接隐藏,
+  // 而不是点开一个必失败的 dock。信任状态随 cwd 变化重查。
+  const [cwdTrusted, setCwdTrusted] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setCwdTrusted(false);
+    if (!cwd) return;
+    // folder-trust 没有变更广播;未信任时轻量轮询(5s),信任即停。
+    // 授权通常发生在首轮对话的信任提示里,晚于本查询的首次返回。
+    const query = () =>
+      invoke("folder-trust:is-trusted", cwd)
+        .then((trusted) => {
+          if (!cancelled) setCwdTrusted(Boolean(trusted));
+          return Boolean(trusted);
+        })
+        .catch(() => false);
+    let timer: ReturnType<typeof setInterval> | null = null;
+    void query().then((trusted) => {
+      if (!trusted && !cancelled) timer = setInterval(() => void query(), 5_000);
+    });
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [cwd]);
+  // 阶段 5(审计):产物按钮不再只看转录里的工具调用 —— rewind 快照存储
+  // (artifacts:index)里有版本记录的会话也应该有入口,否则重启/历史会话
+  // 的产物永远找不到。
+  interface SnapshotArtifactEntry {
+    path: string;
+    name: string;
+    revisions: number;
+    tools: string[];
+    lastTouchedAt: number;
+  }
+  const [snapshotArtifacts, setSnapshotArtifacts] = useState<SnapshotArtifactEntry[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    setSnapshotArtifacts([]);
+    if (!sessionId) return;
+    void invoke<{ artifacts?: SnapshotArtifactEntry[] }>("artifacts:index", { sessionId })
+      .then((result) => {
+        if (!cancelled) setSnapshotArtifacts(Array.isArray(result?.artifacts) ? result.artifacts : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
   // 子代理运行时面板(对齐 WorkBuddy team-runtime)。
   const [subagentsOpen, setSubagentsOpen] = useState(false);
+  // P0-4 — 会话视图切换。Plan5 A.1 refactor 之前 ChatView 已经持有这个状态 +
+  // ConversationViewTabs 接线,后把 activeView 写死成 "live",导致
+  // result/content 这两个新组件化视图变成死代码。这里补回去:0 插件时 views
+  // 长度为 0、切换器不渲染,完全等价于原状 —— 行为契约与改造前逐字一致(分册 05 R5)。
+  const [activeView, setActiveView] = useState<string>("live");
+  const conversationViews = useConversationViews();
 
 
   // R92 — 子代理面板走 `placeholder.subagent` 槽,插件可整体替换。
@@ -335,39 +351,44 @@ export function ChatView({
 
   const SubagentPanelResolved = (SubagentPanelImpl ?? SubagentPanel) as typeof SubagentPanel;
   const [teamsOpen, setTeamsOpen] = useState(false);
-  // pause/yield(对齐 WorkBuddy session:requestYield):软暂停,保留会话上下文。
-  const [yieldStore, setYieldStore] = useState<Record<string, ReturnType<typeof createYieldStore>>["k"]>(() => createYieldStore());
-  const yielded = sessionId ? isYielded(yieldStore, sessionId) : false;
-  const handlePause = useCallback(() => {
-    if (!sessionId || !streaming) return;
-    setYieldStore((s) => requestYield(s, sessionId));
-    // pi 无原生 yield,用 cancel 软停止(保留会话);yield 状态在 complete 后确认。
-    onCancel();
-  }, [sessionId, streaming, onCancel]);
-  const handleResume = useCallback(() => {
-    if (!sessionId) return;
-    setYieldStore((s) => clearYield(s, sessionId));
-    onToast?.("已恢复(可继续发送消息)");
-  }, [sessionId, onToast]);
-  /** 恢复并重新触发 agent:清除 yield 状态 + 发送「请继续」让 agent 接着生成。
-   *  形成完整闭环(暂停 → 显式恢复并续跑),区别于仅清状态的「恢复」。 */
-  const handleResumeAndContinue = useCallback(() => {
-    if (!sessionId) return;
-    setYieldStore((s) => clearYield(s, sessionId));
-    onSend("请继续。");
-    onToast?.("已恢复并继续生成");
-  }, [sessionId, onSend, onToast]);
+  // Plan5 Phase A.1 — pause/yield 抽到 useChatViewPauseYield hook。
+  // 行为与改造前完全一致;既有 yield/Resume+Continue/toast 文案与调用顺序不变。
+  const {
+    yielded,
+    handlePause,
+    handleResume,
+    handleResumeAndContinue,
+  } = useChatViewPauseYield({
+    sessionId,
+    streaming,
+    onCancel,
+    onSend,
+    onToast,
+  });
 
-  // R6.5 — Scroll to bottom when the user clicks the floating jump button.
-  // We force scroll, then mark pinnedRef=true so subsequent streaming
-  // deltas continue to follow until the user scrolls up again.
-  const handleJumpToBottom = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-    pinnedRef.current = true;
-    setUnreadCount(0);
-  }, []);
+  // Plan5 Phase A.1 — scrollRef 仍由 ChatView 持有(对外要挂到 <div>)。
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Claude row-panel 对齐(2026-10-14):↑/↓ 在时间线里的工具折叠行之间移动
+  // 焦点(Enter 切换折叠,见 ToolCallCard)。挂在时间线容器上,虚拟化/非
+  // 虚拟化两种渲染都覆盖。
+  const timelineRowsRef = useRef<HTMLDivElement>(null);
+  useRowPanelNav({
+    containerRef: timelineRowsRef,
+    rowSelector: '[data-testid="toolcall-compact"], [data-testid="toolcall-expanded"]',
+  });
+  // Plan5 Phase A.1 — Scroll / jump-to-bottom / unread-count 抽到 useChatViewStreaming。
+  const {
+    turnStartRef,
+    unreadCount,
+    setUnreadCount,
+    pinnedRef,
+    handleJumpToBottom,
+  } = useChatViewStreaming({
+    streaming,
+    streamingMessageId,
+    scrollRef,
+    messages,
+  });
   // 按会话持久化的输入草稿:切到本会话时回填,每次输入回写 store。
   // 选 setDraft 的稳定引用做回调,避免 sessionId 变化时让 Composer 收到新函数。
   const setDraft = useSessionsStore((s) => s.setDraft);
@@ -394,151 +415,164 @@ export function ChatView({
     },
     shallow,
   );
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const [sessionTasks, setSessionTasks] = useState<SessionTask[]>([]);
+  // 会话任务角标:会话切换或开关面板时刷新。面板内部的增删改由面板自己
+  // reload;角标可能短暂滞后,不为角标单独引入事件订阅(最小实现)。
+  useEffect(() => {
+    if (!sessionId) {
+      setSessionTasks([]);
+      return;
+    }
+    let cancelled = false;
+    tasksListForSession(sessionId)
+      .then((tasks) => {
+        if (!cancelled) setSessionTasks(tasks);
+      })
+      .catch(() => {
+        if (!cancelled) setSessionTasks([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, tasksOpen]);
   const [planOpen, setPlanOpen] = useState(false);
+  // 工具栏按钮定义在 useMemo 里,不能在那里调 hook —— 先在顶层取好文案。
+  const terminalLabel = useT("chat.terminal.label");
+  const terminalDockTitle = useT("chat.terminal.dockTitle", { name: cwd ? cwd.split("/").pop() || cwd : "" });
+  const terminalCloseLabel = useT("chat.terminal.close");
+  const tasksBadgeLabel = useT("tasks.badge", {
+    completed: sessionTasks.filter((t) => t.status === "completed").length,
+    total: sessionTasks.length,
+  });
 
-  // R8.1 (revision-pager) — id of the user message whose `编辑` button
-  // was last clicked. Used by `handleEditResend` to append the new text
-  // to that message's revision history before re-seeding the composer.
-  const [editResendOriginId, setEditResendOriginId] = useState<string | null>(null);
-  // R8.1 — bound pager stepper. Wraps `useSessionStore.setActiveRevision`
-  // so MessageItem never imports the store directly.
-  const handleStepRevision = useCallback((messageId: string, direction: -1 | 1) => {
-    const s = useSessionStore.getState();
-    const msg = s.messages.find((m) => m.id === messageId);
-    if (!msg || !msg.revisions || msg.revisions.length === 0) return;
-    const cur = Math.min(Math.max(1, msg.activeRevision ?? msg.revisions.length), msg.revisions.length);
-    s.setActiveRevision(messageId, cur + direction);
-  }, []);
-
-  // ---- 消息"编辑重发":把消息文本回填到输入框 ----
-  const [resendText, setResendText] = useState<string | undefined>(undefined);
-  const [resendNonce, setResendNonce] = useState(0);
-  const handleEditResend = useCallback((text: string) => {
-    if (!text.trim()) return;
-    // R8.1 (revision-pager) — record this edit on the originating message
-    // so the bubble's footer can show a 上一版/下一版 pager of every text
-    // the user ever submitted from this slot. We piggy-back on the same
-    // resendText signal: Composer still receives the seed text below, but
-    // the bubble now also gains a new revisions entry.
-    if (editResendOriginId) {
-      useSessionStore.getState().appendUserRevision(editResendOriginId, text);
-    }
-    setResendText(text);
-    setResendNonce((n) => n + 1);
-  }, [editResendOriginId]);
-
-  // R8.3 (inline-edit) — submit an inline edit from the bubble editor.
-  // Records the new revision on the originating message and seeds the
-  // composer. We deliberately reuse handleEditResend's path so the two
-  // entry points (inline textarea + composer 回填) converge on the same
-  // canonical "append revision → seed composer" sequence.
-  const handleInlineResend = useCallback((messageId: string, text: string) => {
-    if (!text.trim()) return;
-    useSessionStore.getState().appendUserRevision(messageId, text);
-    setResendText(text);
-    setResendNonce((n) => n + 1);
-  }, []);
-
-  // R78 (assistant inline edit) — apply 落库;不需要 resend 路径。
-  const handleEditAssistantMessage = useCallback((messageId: string, newMarkdown: string) => {
-    useSessionStore.getState().editAssistantMessage(messageId, newMarkdown);
-  }, []);
-
-  // R78 — 应用并重新生成:先替换 assistant 内容,再走 handleRetry 同一管线
-  // (回退到上一条 user prompt 重新发送)。
-  const handleResendAfterAssistantEdit = useCallback((_messageId: string) => {
-    if (handleRetryRef.current) {
-      void handleRetryRef.current();
-    }
-  }, []);
-
-  // R8.10 — quick-prompt card click: seed the composer with the preset
-  // text via the same resendText pipe as inline-edit / revision-pager so
-  // a single source of truth seeds the textarea (Composer auto-focuses
-  // when externalTextNonce bumps).
-  const handleQuickPrompt = useCallback((text: string) => {
-    if (!text.trim()) return;
-    setResendText(text);
-    setResendNonce((n) => n + 1);
-  }, []);
 
   // ---- 消息级"重试":回溯到最后一条用户 prompt 并重新发送（重新生成回复） ----
-  const [retrying, setRetrying] = useState(false);
-  // Read the current `messages` array through a ref so handleRetry's identity
-  // stays stable across streaming deltas — otherwise every ChatView re-render
-  // would invalidate the React.memo on MessageItem.
-  const messagesRef = useRef(messages);
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-  const handleRetryRef = useRef<(() => Promise<void>) | null>(null);
-  handleRetryRef.current = null;
-  const handleRetry = useCallback(async () => {
-    if (!sessionId || streaming || retrying || readOnlySubagent) return;
-    // Find the last user message text via the ref to avoid re-creating
-    // handleRetry on every delta.
-    const snapshot = messagesRef.current;
-    const lastUserMsg = [...snapshot].reverse().find((m) => m.role === "user");
-    if (!lastUserMsg) {
-      onToast?.("没有可重试的消息");
-      return;
-    }
-    const userText = lastUserMsg.parts
-      .filter((p) => p.kind === "text")
-      .map((p) => p.text)
-      .join("\n");
-    if (!userText.trim()) return;
+  // Plan5 Phase A.1 — retry 抽到 useChatViewRetry hook(行为逐字等价)。
+  const {
+    retrying,
+    handleRetry,
+    handleRetryLast,
+    handleRetryRef,
+    messagesRef,
+  } = useChatViewRetry({
+    sessionId,
+    streaming,
+    readOnlySubagent,
+    messages,
+    onSend,
+    onRewound,
+    onToast,
+  });
 
-    setRetrying(true);
+  // Plan5 — revision / inline-edit / quick-prompt handlers + composer
+  // seed signals are owned by useChatViewRevision. ChatView only reads
+  // the resulting callbacks and forwards them to MessageItem / Composer.
+  const {
+    resendText,
+    resendNonce,
+    setResendText,
+    setResendNonce,
+    setEditResendOriginId,
+    handleStepRevision,
+    handleEditResend,
+    handleInlineResend,    handleEditAssistantMessage,
+    handleResendAfterAssistantEdit,
+    handleQuickPrompt,
+  } = useChatViewRevision({ handleRetryRef });
+
+  // A2(2026-10-14):兑现快捷键面板宣称的对话键位(⌘R/⌘E/⌘P/⌘L)。
+  // ⌘G/⌘⇧G 在 FindBar 内部注册;⌘F 在 useChatViewShortcuts;⌘⏎ 在 Composer。
+  const composerPrefill = useCallback(
+    (text: string) => {
+      setResendText(text);
+      setResendNonce((n: number) => n + 1);
+    },
+    [setResendText, setResendNonce],
+  );
+  useChatShortcuts({
+    messages,
+    streaming,
+    sessionId: sessionId ?? undefined,
+    onSend,
+    onPause: handlePause,
+    onPrefillComposer: composerPrefill,
+  });
+
+
+  // Plan5 B.10 — 消息级"从此重发":把 rewindPoints 拉一次并解析成
+  // `messageId → promptIndex`,下发给 MessageItem 的 MessageRewindMenu。
+  // 与 useChatViewRetry 共用同一套 rewind IPC 语义,只是目标从"最后一条"
+  // 变成"用户点的那一条"。
+  const {
+    promptIndexByMessageId,
+    handleRewindTo,
+  } = useChatViewRewind({
+    sessionId,
+    streaming,
+    readOnlySubagent,
+    messages,
+    onSend,
+    onRewound,
+    onToast,
+  });
+
+  // Plan5 B.10 — 消息级"从此处分叉"。`RewindBar` 里已有同一套
+  // `sessionFork(sessionId, cwd)` + 确认弹窗流程;这里把同样的语义下放到
+  // 单条消息,复用 `onForked` 让宿主导航到新会话。
+  const handleForkRequest = useCallback(async () => {
+    if (!sessionId || streaming || readOnlySubagent) return;
+    const ok = await confirm("从此处分叉此会话？", {
+      tone: "warning",
+      description: "会复制到新会话，原会话保留。",
+    });
+    if (!ok) return;
     try {
-      const points = await rewindPoints(sessionId);
-      if (points.length === 0) {
-        onToast?.("没有可回退的点，无法重试");
-        return;
-      }
-      const lastPoint = points.reduce((a, b) =>
-        b.promptIndex > a.promptIndex ? b : a,
-      );
-      await rewindExecute(sessionId, lastPoint.promptIndex, "conversation", true);
-      onRewound?.();
-      onSend(userText);
+      const newId = await sessionFork(sessionId, cwd);
+      onToast?.(`已分叉到新会话 ${newId.slice(0, 8)}`);
+      onForked?.(newId);
     } catch (e) {
-      onToast?.(`重试失败：${String(e).replace(/^Error:\s*/, "")}`);
-    } finally {
-      setRetrying(false);
+      onToast?.(`分叉失败：${String(e).replace(/^Error:\s*/, "")}`);
     }
-  }, [sessionId, streaming, retrying, readOnlySubagent, onSend, onRewound, onToast]);
-  // R78 — 让 handleResendAfterAssistantEdit 永远拿到当前最新的 handleRetry
-  handleRetryRef.current = handleRetry;
-
-  /** R6.6 — error-banner retry. Lighter-weight than handleRetry (no
-   *  rewind): the error banner typically surfaces session-level failures
-   *  (e.g. agent:init errors, IPC bridge drops) where a fresh send is the
-   *  natural recovery action. Reuses messagesRef so it stays stable across
-   *  streaming deltas. */
-  const handleRetryLast = useCallback(() => {
-    if (!sessionId || streaming) return;
-    const snapshot = messagesRef.current;
-    const lastUserMsg = [...snapshot].reverse().find((m) => m.role === "user");
-    if (!lastUserMsg) {
-      onToast?.("没有可重试的消息");
-      return;
-    }
-    const userText = lastUserMsg.parts
-      .filter((p) => p.kind === "text")
-      .map((p) => p.text)
-      .join("\n");
-    if (!userText.trim()) return;
-    // Clear the error so the banner does not linger over the new turn.
-    useSessionStore.getState().setError(null);
-    onSend(userText);
-  }, [sessionId, streaming, onSend, onToast]);
+  }, [sessionId, streaming, readOnlySubagent, cwd, onToast, onForked]);
 
   // ---- Phase 2/3: tool detail + artifacts side panel ----
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState<ToolSidePanelMode>("tool");
   const [activeTool, setActiveTool] = useState<ToolCallView | null>(null);
   const [previewPath, setPreviewPath] = useState<string | null>(null);
+  // Canvas 与工具面板都是右侧工作区,同时开会把转录区挤没 —— 互斥。
+  const canvasOpen = useCanvasStore((s) => s.open);
+  const canvasTabs = useCanvasStore((s) => s.tabs);
+  const closeCanvas = useCanvasStore((s) => s.close);
+  const openCanvasTab = useCanvasStore((s) => s.openTab);
+  useEffect(() => {
+    if (canvasOpen) setPanelOpen(false);
+  }, [canvasOpen]);
+  // 开工具面板时让位给工具面板。
+  useEffect(() => {
+    if (panelOpen) closeCanvas();
+  }, [panelOpen]);
+
+  // 没有画布时按开关 → 开一张空白 markdown 画布,而不是弹一个空面板。
+  const handleToggleCanvas = useCallback(() => {
+    if (useCanvasStore.getState().open) {
+      useCanvasStore.getState().close();
+      return;
+    }
+    const state = useCanvasStore.getState();
+    const last = state.tabs[state.tabs.length - 1];
+    if (last) {
+      state.openTab(last);
+      return;
+    }
+    openCanvasTab({
+      canvasId: `canvas-${sessionId ?? "draft"}`,
+      kind: "markdown",
+      title: "新画布",
+      content: "",
+    });
+  }, [openCanvasTab, sessionId]);
 
   // R2.5 — workspace switch loading flag. Drives the WorkspacePicker's
   // spinner overlay; non-null while a switch is in flight (preventing
@@ -585,18 +619,28 @@ export function ChatView({
     }
     return `${messages.length}|${lastToolKey}`;
   }, [messages]);
-  const artifacts = useMemo(() => collectSessionArtifacts(messages), [artifactFingerprint, messages]);
+  const artifacts = useMemo(() => {
+    const transcriptArtifacts = collectSessionArtifacts(messages);
+    // 阶段 5(审计):把快照存储里的文件并进产物列表 —— 否则重启/历史会话
+    // 的产物在面板里永远不可见(转录里没有 tool-call 条目)。按 path 去重,
+    // 转录条目优先(它们带工具状态)。
+    const seen = new Set(transcriptArtifacts.map((a) => a.path.replace(/\\/g, "/").toLowerCase()));
+    const fromSnapshots = snapshotArtifacts
+      .filter((entry) => !seen.has(entry.path.replace(/\\/g, "/").toLowerCase()))
+      .map((entry) => ({
+        id: `snapshot:${entry.path}`,
+        path: entry.path,
+        kind: "file",
+        title: entry.name,
+        toolCallId: "",
+        status: "completed" as const,
+      }));
+    return [...transcriptArtifacts, ...fromSnapshots];
+  }, [artifactFingerprint, messages, snapshotArtifacts]);
 
   // R0.4: Memoize the timeline build so it does not run on every render;
   // it only needs to re-run when the messages reference changes.
-  const timeline = useMemo(() => buildTimeline(messages), [messages]);
 
-  // P0-4 — 转录区视图。`live` 是默认视图且**不注册实现**:它走下面
-  // `ConversationViewOutlet` 的 `fallback`(即 `ConversationBody` 的既有
-  // JSX),因此不装插件时渲染结果与改造前逐字一致。`result` / `content`
-  // 由本包 `client.tsx` 注册;插件可注册自己的视图 id。
-  const [activeView, setActiveView] = useState("live");
-  const conversationViews = useConversationViews();
 
   // P0-5 — 会话内待处理项数量,下发给 `conversation.approvals`(list 追加区)。
   // **复用既有 store**,不新建状态容器:`question-store` / `permission-store`
@@ -616,10 +660,9 @@ export function ChatView({
   // ≥ VIRTUAL_THRESHOLD nodes. Off by default — the existing flat
   // render path is the default, so regression risk for the main user
   // is zero until the flag is enabled.
-  const useVirtualList = useMemo(
-    () => shouldUseVirtualList(timeline.length),
-    [timeline.length],
-  );
+
+
+
 
   // R1.2: Render a single timeline node — used by both the flat
   // timeline.map (default) and the VirtualizedMessageList (opt-in).
@@ -718,6 +761,40 @@ export function ChatView({
     [cwd, sessionId],
   );
 
+  // Plan5 Phase A.1 — timeline + 消息节点渲染抽到 useChatViewTimeline。
+  const { timeline, renderTimelineNode } = useChatViewTimeline({
+    messages,
+    streaming,
+    streamingMessageId,
+    markdownConfig,
+    cwd,
+    sessionId,
+    onToast,
+    handleOpenTool,
+    handleEditResend,
+    setEditResendOriginId,
+    handleStepRevision,
+    handleInlineResend,
+    handleEditAssistantMessage,
+    handleResendAfterAssistantEdit,
+    handleRetry,
+    turnStartRef,
+    findOpen,
+    findHits,
+    findCurrent,
+    promptIndexByMessageId,
+    onRewindTo: handleRewindTo,
+    allowFork: !readOnlySubagent,
+    onForkFromHere: sessionId
+      ? () => { void handleForkRequest(); }
+      : undefined,
+  });
+
+  const useVirtualList = useMemo(
+    () => shouldUseVirtualList(timeline.length),
+    [timeline.length],
+  );
+
   // R1.2: Render a single timeline node — used by both the flat
   // timeline.map (default) and the VirtualizedMessageList (opt-in).
   // Stable across renders as long as its captured deps are stable;
@@ -729,89 +806,7 @@ export function ChatView({
   // (and therefore a fresh JSX subtree) every time any part of any
   // message changed during a turn.
   const messagesLength = messages.length;
-  const renderTimelineNode = useCallback(
-    ({ node, index: _index }: { node: TimelineNode; index: number }) => {
-      if (node.kind === "date-divider") {
-        return (
-          <div key={node.key} className="timeline-divider timeline-divider--date">
-            {node.label}
-          </div>
-        );
-      }
-      if (node.kind === "model-divider") {
-        return (
-          <div key={node.key} className="timeline-divider timeline-divider--model">
-            {node.label}
-          </div>
-        );
-      }
-      const m = node.message;
-      const idx = node.index;
-      const isLastAssistant =
-        m.role === "assistant" && idx === messagesLength - 1;
-      const findCls =
-        findOpen && isFindHit(findHits, m.id)
-          ? m.id === findCurrent
-            ? " msg-wrap--find-current"
-            : " msg-wrap--find-hit"
-          : "";
-      return (
-        <div key={m.id} className={"msg-wrap" + findCls} data-msg-id={m.id}>
-          <MessageItem
-            message={m}
-            streaming={streaming && m.id === streamingMessageId}
-            // R8.14 — pass per-turn streaming duration so the meta chip
-            // can render a live "12s 正在生成…" label on the in-flight
-            // bubble. Computed from turnStartRef.current which ChatView
-            // owns; cleared once the turn ends.
-            streamingDurationMs={
-              streaming && m.id === streamingMessageId && turnStartRef.current !== null
-                ? Date.now() - turnStartRef.current
-                : undefined
-            }
-            markdownConfig={markdownConfig}
-            cwd={cwd}
-            sessionId={sessionId ?? undefined}
-            onToast={onToast}
-            onOpenTool={handleOpenTool}
-            onEditResend={(text) => {
-              setEditResendOriginId(m.id);
-              handleEditResend(text);
-            }}
-            onStepRevision={handleStepRevision}
-            onInlineResend={m.role === "user" ? handleInlineResend : undefined}
-            onRetry={
-              isLastAssistant && !streaming && m.complete ? handleRetry : undefined
-            }
-            onEditAssistantMessage={
-              m.role === "assistant" && m.complete ? handleEditAssistantMessage : undefined
-            }
-            onResendAfterAssistantEdit={
-              m.role === "assistant" && m.complete ? handleResendAfterAssistantEdit : undefined
-            }
-          />
-        </div>
-      );
-    },
-    [
-      messagesLength,
-      streaming,
-      streamingMessageId,
-      markdownConfig,
-      cwd,
-      sessionId,
-      onToast,
-      handleOpenTool,
-      handleEditResend,
-      handleStepRevision,
-      handleInlineResend,
-      handleEditAssistantMessage,
-      handleResendAfterAssistantEdit,
-      findOpen,
-      findHits,
-      findCurrent,
-    ],
-  );
+
 
   // R6.5 — Pin-aware auto-follow (DeepSeek ChatView pattern).
   //
@@ -822,58 +817,54 @@ export function ChatView({
   // When not pinned and new content arrives, surface a floating
   // "jump to bottom" button so the user can opt in without losing
   // their place.
-  const PIN_THRESHOLD = 32; // px — roughly one line of body text
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const pinnedRef = useRef(true);
-  const [unreadCount, setUnreadCount] = useState(0);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const recomputePinned = () => {
-      pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight <= PIN_THRESHOLD;
-      // Going back to bottom resets the unread badge.
-      if (pinnedRef.current) setUnreadCount(0);
-    };
-    recomputePinned();
-    el.addEventListener("scroll", recomputePinned, { passive: true });
-    // ResizeObserver catches content reflow that didn't fire a scroll event
-    // (text-append collapses, image load, virtualizer settle, etc.). Guarded
-    // for jsdom (jsdom < 27 doesn't ship ResizeObserver) and any SSR shim.
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(() => recomputePinned());
-      ro.observe(el);
-    }
-    return () => {
-      el.removeEventListener("scroll", recomputePinned);
-      ro?.disconnect();
-    };
-  }, []);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (pinnedRef.current) {
-      el.scrollTop = el.scrollHeight;
-    } else {
-      // Track how many streaming deltas landed while the user was reading.
-      // The badge shows the count and clears on next pin or on click.
-      setUnreadCount((c) => c + 1);
-    }
-  }, [messages]);
-
   // 会话内查找:Ctrl/Cmd+F 打开;当前命中滚入视野。
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
-        if (messages.length > 0) {
-          e.preventDefault();
-          setFindOpen(true);
-        }
+  // Plan5 Phase A.1/B.6 — 键盘关注点抽到 useChatViewShortcuts:
+  //   - Ctrl/Cmd+F → 打开查找(仅在有消息时,与改造前一致)
+  //   - Escape(查找打开时)→ 关闭查找并清空命中
+  // 行为逐字等价;`?` / Ctrl+/ 由 App 顶层挂载的 <ChatShortcutOverlay /> 承接。
+  const { handleKeyDown: handleChatViewKeyDown } = useChatViewShortcuts({
+    onToggleFind: () => setFindOpen(true),
+    onCloseFind: () => {
+      setFindOpen(false);
+      setFindHits([]);
+      setFindCurrent(null);
+    },
+    findOpen,
+    hasMessages: messages.length > 0,
+    onToggleCanvas: handleToggleCanvas,
+    onToggleToolPanel: () => {
+      // chat-tools-panel(⌘⇧T):工具面板开/关;画布开着时先收画布(互斥)。
+      if (canvasOpen) {
+        closeCanvas();
+        setPanelOpen(true);
+        return;
       }
+      setPanelOpen((v) => !v);
+    },
+  });
+  // 全局监听(改造前的 window listener 语义:无需焦点即可触发)。
+  useChatViewGlobalShortcuts({
+    enabled: messages.length > 0,
+    onOpenFind: () => setFindOpen(true),
+  });
+  // 容器内快捷键挂在真实 DOM 监听上,而不是 `<div onKeyDown>`:这个 div 只是
+  // 版面容器(内部全是别的控件),它自身既不该可聚焦也不该被读屏播报,给它挂
+  // 一个交互 handler 属于"静态元素可交互"的反模式。事件从子控件冒泡上来时
+  // 行为与原来的 React onKeyDown 等价。走 ref 存回调 → 监听只挂一次。
+  const chatViewRef = useRef<HTMLDivElement>(null);
+  const chatViewKeyDownRef = useRef(handleChatViewKeyDown);
+  chatViewKeyDownRef.current = handleChatViewKeyDown;
+  useEffect(() => {
+    const node = chatViewRef.current;
+    if (!node) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      chatViewKeyDownRef.current(
+        event as unknown as React.KeyboardEvent<HTMLDivElement>,
+      );
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [messages.length]);
+    node.addEventListener("keydown", onKeyDown);
+    return () => node.removeEventListener("keydown", onKeyDown);
+  }, []);
   useEffect(() => {
     if (!findCurrent) return;
     const node = scrollRef.current?.querySelector(
@@ -881,15 +872,7 @@ export function ChatView({
     );
     node?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [findCurrent]);
-  // 流式结束后确认 yield(yielding → yielded,显示「已暂停」横幅)。
-  useEffect(() => {
-    if (!sessionId) return;
-    if (!streaming) {
-      setYieldStore((s) => confirmYielded(s, sessionId));
-    }
-  }, [sessionId, streaming]);
-
-  // 推理档位:并入模型选择器(WB "✓均衡" 标签)。会话切换时回默认档。
+// 推理档位:并入模型选择器(WB "✓均衡" 标签)。会话切换时回默认档。
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("medium");
   useEffect(() => {
     setThinkingLevel("medium");
@@ -914,88 +897,89 @@ export function ChatView({
     setTopbarHost(document.getElementById("ob-topbar-tools"));
   }, []);
 
-  const toolButtons = (
-    <>
-      {plan && plan.entries.length > 0 && (
-        <ToolButton
-          icon={<ListTodo size={15} strokeWidth={1.75} />}
-          label={`执行计划 ${plan.entries.filter((e) => e.status === "completed").length}/${plan.entries.length}`}
-          active={planOpen}
-          onClick={() => setPlanOpen((v) => !v)}
-        />
-      )}
-      {artifacts.length > 0 && (
-        <ToolButton
-          icon={<Package size={15} strokeWidth={1.75} />}
-          label={`本会话产物 (${artifacts.length})`}
-          active={panelOpen && panelMode === "artifacts"}
-          onClick={() => {
-            if (panelOpen && panelMode === "artifacts") setPanelOpen(false);
-            else handleOpenArtifacts();
-          }}
-        />
-      )}
-      {messages.length > 0 && (
-        <ToolButton
-          icon={<Search size={15} strokeWidth={1.75} />}
-          label="在当前对话中查找 (Ctrl/Cmd+F)"
-          active={findOpen}
-          onClick={() => setFindOpen((v) => !v)}
-        />
-      )}
-      {messages.length > 0 && (
-        <ToolButton
-          icon={<FileDiff size={15} strokeWidth={1.75} />}
-          label="本会话文件变更"
-          active={fileChangesOpen}
-          onClick={() => setFileChangesOpen((v) => !v)}
-        />
-      )}
-      {messages.length > 0 && (
-        <ToolButton
-          icon={<Bot size={15} strokeWidth={1.75} />}
-          label="子代理运行时"
-          active={subagentsOpen}
-          onClick={() => setSubagentsOpen((v) => !v)}
-        />
-      )}
-      {messages.length > 0 && (
-        <ToolButton
-          icon={<Users size={15} strokeWidth={1.75} />}
-          label="团队状态"
-          active={teamsOpen}
-          onClick={() => setTeamsOpen((v) => !v)}
-        />
-      )}
-      {cwd && (
-        <ToolButton
-          icon={<FolderTree size={15} strokeWidth={1.75} />}
-          label="工作区文件树"
-          active={panelOpen && panelMode === "fileTree"}
-          onClick={() => {
-            if (panelOpen && panelMode === "fileTree") setPanelOpen(false);
-            else {
-              setPanelMode("fileTree");
-              setPanelOpen(true);
-            }
-          }}
-        />
-      )}
-      <ToolButton
-        icon={<Globe size={15} strokeWidth={1.75} />}
-        label="网页预览"
-        active={panelOpen && panelMode === "browser"}
-        onClick={() => {
-          if (panelOpen && panelMode === "browser") setPanelOpen(false);
-          else {
-            setPanelMode("browser");
-            setPanelOpen(true);
-          }
-        }}
-      />
-      {messages.length > 0 && <ShareMenu messages={messages} onDone={onToast} />}
-    </>
-  );
+  // Plan5 Phase A.1 — 工具按钮集群抽到 ChatViewToolbar。
+  // 视觉与 button 顺序与改造前完全一致;所有原 data-tip / aria-label / aria-pressed
+  // 通过 ToolButtonDescriptor 透传给 ChatViewToolbar 内的 ToolButton。
+  const toolButtons = [
+    defaultPlanButton({
+      planCount: plan?.entries.length ?? 0,
+      planCompleted: plan?.entries.filter((e) => e.status === "completed").length ?? 0,
+      active: planOpen,
+      onClick: () => setPlanOpen((v) => !v),
+    }),
+    defaultTasksButton({
+      taskCount: sessionTasks.length,
+      taskCompleted: sessionTasks.filter((t) => t.status === "completed").length,
+      active: tasksOpen,
+      label: tasksBadgeLabel,
+      onClick: () => setTasksOpen((v) => !v),
+    }),
+    defaultArtifactsButton({
+      artifactCount: artifacts.length,
+      active: panelOpen && panelMode === "artifacts",
+      onClick: () => {
+        if (panelOpen && panelMode === "artifacts") setPanelOpen(false);
+        else handleOpenArtifacts();
+      },
+    }),
+    defaultCanvasButton({
+      active: canvasOpen,
+      canvasCount: canvasTabs.length,
+      onClick: handleToggleCanvas,
+    }),
+    defaultFindButton({
+      active: findOpen,
+      hasMessages: messages.length > 0,
+      onClick: () => setFindOpen((v) => !v),
+    }),
+    defaultFileChangesButton({
+      active: fileChangesOpen,
+      hasMessages: messages.length > 0,
+      onClick: () => setFileChangesOpen((v) => !v),
+    }),
+    {
+      id: "terminal",
+      active: terminalOpen,
+      // 终端在空会话就有用(先开 shell 再干活),不受"有消息"门控。
+      // 但必须等 folder-trust 信任了本工作区(terminal:create 的后端硬约束,
+      // 未信任时点了必失败,审计 A1)。
+      visible: Boolean(cwd && cwdTrusted),
+      onClick: () => setTerminalOpen((v) => !v),
+      label: terminalLabel,
+      icon: <SquareTerminal size={15} strokeWidth={1.75} />,
+    },
+    defaultSubagentButton({
+      active: subagentsOpen,
+      hasMessages: messages.length > 0,
+      onClick: () => setSubagentsOpen((v) => !v),
+    }),
+    defaultTeamStatusButton({
+      active: teamsOpen,
+      hasMessages: messages.length > 0,
+      onClick: () => setTeamsOpen((v) => !v),
+    }),
+    defaultFileTreeButton({
+      active: panelOpen && panelMode === "fileTree",
+      hasWorkspace: !!cwd,
+      onClick: () => {
+        if (panelOpen && panelMode === "fileTree") setPanelOpen(false);
+        else {
+          setPanelMode("fileTree");
+          setPanelOpen(true);
+        }
+      },
+    }),
+    defaultBrowserButton({
+      active: panelOpen && panelMode === "browser",
+      onClick: () => {
+        if (panelOpen && panelMode === "browser") setPanelOpen(false);
+        else {
+          setPanelMode("browser");
+          setPanelOpen(true);
+        }
+      },
+    }),
+  ];
 
   // 输入区的 props 打成一包:内置 <Composer> 与内核 `conversation.composer` 槽的
   // 实现收到的是**同一份**契约 —— 插件可以只包一层,把剩余 props 原样转发回去,
@@ -1037,95 +1021,39 @@ export function ChatView({
   };
 
   return (
-    <div className={"chatview" + (panelOpen ? " chatview--with-panel" : "")}>
+    <div
+      ref={chatViewRef}
+      className={
+        "chatview" +
+        (panelOpen ? " chatview--with-panel" : "") +
+        (canvasOpen ? " chatview--with-canvas" : "")
+      }
+      // Plan5 Phase A.1/B.6 — 容器内快捷键(Ctrl/Cmd+F 打开查找,Esc 关闭)。
+      // 全局 `?` / Ctrl+/ 由 App 顶层的 <ChatShortcutOverlay /> 承接。
+      // handler 走上面 chatViewRef 上挂的原生 keydown 监听。
+    >
       <div className="chatview__main">
-        {extensionUi && Object.keys(extensionUi.widgets).length > 0 && (
-          <div className="chatview__extension-widgets" aria-label="Pi 扩展组件">
-            {Object.entries(extensionUi.widgets).map(([key, lines]) => (
-              <div className="chatview__extension-widget" key={key}>
-                {lines.map((line) => <div key={line}>{line}</div>)}
-              </div>
-            ))}
-          </div>
-        )}
-        {extensionUi && Object.keys(extensionUi.statuses).length > 0 && (
-          <div className="chatview__extension-status" aria-label="Pi 扩展状态">
-            {Object.values(extensionUi.statuses).join(" · ")}
-          </div>
-        )}
-        {extensionUi?.workingVisible && (
-          <div className="chatview__extension-working" role="status" aria-label="Pi 扩展工作状态">
-            <span className="chatview__extension-working-dot" aria-hidden="true" />
-            <span>{extensionUi.workingMessage || extensionUi.hiddenThinkingLabel || "Pi 扩展正在工作"}</span>
-            {extensionUi.toolsExpanded && <span className="chatview__extension-working-tools">工具已展开</span>}
-          </div>
-        )}
-        {/* R4.2 — provider / connection / rate-limit indicator. Always
-            mounted so screen-reader users get a live region even when
-            no toasts are active. */}
-        <StatusIndicator connection="unknown" />
-
-        {error && (
-          <div className="chatview__error-banner" role="alert">
-            <span className="chatview__error-icon" aria-hidden="true">⚠</span>
-            <span className="chatview__error-text" style={{ whiteSpace: "pre-wrap" }}>
-              {formatPiError(error) ?? error}
-            </span>
-            {sessionId && !streaming && messagesRef.current.some((m) => m.role === "user") && (
-              <button
-                className="chatview__error-retry"
-                onClick={handleRetryLast}
-                aria-label="重试最后一条消息"
-                title="重试最后一条消息"
-                data-testid="chatview-error-retry"
-              >
-                ↻ 重试
-              </button>
-            )}
-            <button
-              className="chatview__error-close"
-              onClick={() => useSessionStore.getState().setError(null)}
-              aria-label="关闭错误提示"
-              title="关闭"
-            >
-              ×
-            </button>
-          </div>
-        )}
-        {/* R1 — Plan mode persistent banner. Shows the current plan steps
-            inline so the user can approve / reject without opening the
-            side panel. */}
-        {planMode && (
-          <PlanModeBanner
-            plan={plan}
-            visible={planMode}
-            onExit={() => {/* parent owns planMode toggle — wired in App.tsx */}}
-            onToast={onToast}
-          />
-        )}
+        {/* Plan5 Phase A.1 — 横幅堆叠由 ChatViewBannerStack 接管。
+            渲染顺序、className、data-testid 与改造前完全一致(快照测试覆盖)。 */}
+        <ChatViewBannerStack
+          extensionUi={extensionUi as ExtensionUi | undefined}
+          error={error}
+          canRetry={!!(sessionId && !streaming && messagesRef.current.some((m) => m.role === "user"))}
+          onRetry={handleRetryLast}
+          onCloseError={() => useSessionStore.getState().setError(null)}
+          planMode={planMode}
+          plan={plan ?? undefined}
+          onPlanExit={() => {/* parent owns planMode toggle — wired in App.tsx */}}
+          onToast={onToast}
+        />
         {/* 会话工具按钮:WB 风格纯图标,portal 进顶栏右侧槽位(不占正文一行);
-            顶栏未挂载时回退为正文内的图标行。 */}
-        {topbarHost ? (
-          createPortal(
-            <div className="chatview__toolbar" role="toolbar" aria-label="会话工具">
-              {toolButtons}
-            </div>,
-            topbarHost,
-          )
-        ) : (
-          <div className="chatview__toolbar chatview__toolbar--fallback" role="toolbar" aria-label="会话工具">
-            {toolButtons}
-          </div>
-        )}
-        {planOpen && (
-          <div className="chatview__plan-panel">
-            <PlanPanel
-              sessionId={sessionId ?? undefined}
-              onSend={onSend}
-              onToast={onToast}
-            />
-          </div>
-        )}
+            顶栏未挂载时回退为正文内的图标行(由 ChatViewToolbar 内部处理)。 */}
+        <ChatViewToolbar
+          topbarHost={topbarHost}
+          buttons={toolButtons}
+          messages={messages}
+          onShareDone={onToast}
+        />
         <FindBar
           messages={messages}
           open={findOpen}
@@ -1137,234 +1065,113 @@ export function ChatView({
           onHitsChange={setFindHits}
           onActiveChange={setFindCurrent}
         />
-        <div className="chatview__scroll" ref={scrollRef}>
-          <div className="chatview__inner">
-            {messages.length > 0 && sessionRecord?.title && (
-              <h1 className="chatview__title" title={sessionRecord.title}>
-                {sessionRecord.title}
-              </h1>
-            )}
-            {readOnlySubagent && (
-              <div className="subagent-readonly-banner" role="status">
-                单次子代理仅支持查看历史记录
-              </div>
-            )}
-            {fileChangesOpen && (
-              <FileChangesPanel messages={messages} />
-            )}
-            {subagentsOpen && (
-              <SubagentPanelResolved
-                messages={messages}
-                cwd={cwd}
-                onOpenSession={onOpenSession}
-              />
-            )}
-            {teamsOpen && (
-              <TeamStatusView messages={messages} />
-            )}
-            {/* 转录区走内核 `conversation.body` 槽(见 conversation-slots.tsx)。
-                插件可以整体接管布局(分组 / 日期轴 / 自定义列表),`fallback` 就是
-                接线前的那段 JSX —— 内核里没有实现时渲染结果逐字一致,所以卸载
-                插件后视觉零变化。`renderNode` 一起交出去,插件只改布局时不必
-                自己实现消息渲染。 */}
-            {conversationViews.length > 0 && (
+        <ChatViewScrollStage
+          scrollRef={scrollRef}
+          sessionTitle={sessionRecord?.title}
+          readOnlySubagent={readOnlySubagent}
+          fileChangesOpen={fileChangesOpen}
+          subagentsOpen={subagentsOpen}
+          teamsOpen={teamsOpen}
+          timeline={timeline}
+          renderNode={renderTimelineNode}
+          sessionId={sessionId ?? undefined}
+          streaming={streaming}
+          useVirtualList={useVirtualList}
+          messages={messages}
+          cwd={cwd}
+          onOpenSession={onOpenSession}
+          activeView={activeView}
+          conversationViews={conversationViews}
+          conversationViewTabs={
+            conversationViews.length > 0 ? (
               <ConversationViewTabs
                 active={activeView}
                 views={conversationViews}
                 onChange={setActiveView}
               />
-            )}
-            {/* P0-4 — 转录区多视图。`conversation.view`(keyed) 出口,`fallback`
-                就是下面那段既有 JSX —— 没有任何 `conversation.view` 实现命中
-                当前 view 时原样渲染它,所以 `live` 视图的行为与改造前完全一致。 */}
-            <ConversationViewOutlet
-              view={activeView}
-              timeline={timeline}
-              renderNode={renderTimelineNode}
-              sessionId={sessionId ?? undefined}
-              streaming={streaming}
-              virtualized={useVirtualList}
-              scrollRef={scrollRef as React.RefObject<HTMLElement | null>}
-              fallback={
-                <ConversationBody
-              timeline={timeline}
-              renderNode={renderTimelineNode}
-              sessionId={sessionId ?? undefined}
-              streaming={streaming}
-              virtualized={useVirtualList}
-              scrollRef={scrollRef as React.RefObject<HTMLElement | null>}
-              fallback={
-                timeline.length === 0 ? (
-                  <div className="chatview__empty-state" role="status">
-                    {/* R8.27 — Replace the ✨ emoji with a brand-tinted lucide
-                       WandSparkles icon. The previous emoji varied in
-                       rendering across platforms and didn't pick up the
-                       brand colour. The new icon is consistent, scales with
-                       the page, and is wrapped in a halo div so we can
-                       animate it independently. */}
-                    <div className="chatview__empty-state-hero">
-                      <div className="chatview__empty-state-halo" aria-hidden="true" />
-                      <WandSparkles
-                        className="chatview__empty-state-icon"
-                        size={28}
-                        strokeWidth={1.75}
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <h2 className="chatview__empty-state-title">开始一段新的对话</h2>
-                    <p className="chatview__empty-state-subtitle">
-                      OpenBuddy 帮你调度专家 / 技能 / 连接器,在下方输入框描述你的任务即可。
-                    </p>
-                    <p className="chatview__empty-state-hint">
-                      按 <kbd>?</kbd> 查看全部快捷键,<kbd>/</kbd> 调用技能与指令,<kbd>@</kbd> 引用对话文件。
-                    </p>
-                    <ul className="chatview__empty-state-tags" aria-label="可用能力">
-                      <li className="chatview__empty-state-tag">助理</li>
-                      <li className="chatview__empty-state-tag">项目</li>
-                      <li className="chatview__empty-state-tag">专家 / 技能 / 连接器</li>
-                      <li className="chatview__empty-state-tag">自动化</li>
-                      <li className="chatview__empty-state-tag">资料库</li>
-                    </ul>
-                    {/* R8.10 — Quick-prompt cards. Click seeds the composer via the
-                        same resendText pipe as inline-edit / revision-pager; the
-                        user can refine the prompt and hit enter. Each card has
-                        an icon + title + one-line description so first-time users
-                        immediately understand what the assistant can do. */}
-                    <div
-                      className="chatview__quick-prompts"
-                      role="group"
-                      aria-label="快速开始模板"
-                    >
-                      {QUICK_PROMPTS.map((qp) => {
-                        const Icon = qp.icon;
-                        return (
-                          <button
-                            key={qp.id}
-                            type="button"
-                            className="chatview__quick-prompt"
-                            data-testid={`quick-prompt-${qp.id}`}
-                            onClick={() => handleQuickPrompt(qp.prompt)}
-                            aria-label={qp.title}
-                          >
-                            <span className="chatview__quick-prompt-icon" aria-hidden="true">
-                              <Icon size={18} strokeWidth={1.75} />
-                            </span>
-                            <span className="chatview__quick-prompt-body">
-                              <span className="chatview__quick-prompt-title">{qp.title}</span>
-                              <span className="chatview__quick-prompt-desc">{qp.desc}</span>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : useVirtualList ? (
-                  <VirtualizedMessageList
-                    timeline={timeline}
-                    scrollRef={scrollRef as React.RefObject<HTMLElement>}
-                    renderItem={renderTimelineNode}
-                  />
-                ) : (
-                  timeline.map((node, index) => renderTimelineNode({ node, index }))
-                )
-                  }
+            ) : null
+          }
+          emptyState={
+            <ChatViewEmptyState onPickPrompt={handleQuickPrompt} />
+          }
+          timelineList={
+            <div ref={timelineRowsRef} className="chatview__timeline-rows">
+              {useVirtualList ? (
+                <VirtualizedMessageList
+                  timeline={timeline as TimelineNode[]}
+                  scrollRef={scrollRef as React.RefObject<HTMLElement>}
+                  renderItem={renderTimelineNode}
                 />
-              }
-            />
+              ) : (
+                timeline.map((node, index) => renderTimelineNode({ node, index }))
+              )}
+              {/* 审计 A3:回合已开始但助手消息还没建出来(等首 token)的窗口,
+                  正文不能是空白 —— 挂一行 LoadingRow(含 WorkingDot 呼吸点),
+                  首个 assistant 消息出现后由时间线自然接管。 */}
+              {streaming && !streamingMessageId && <LoadingRow />}
+            </div>
+          }
+          SubagentPanelImpl={SubagentPanelResolved as React.ComponentType<{
+            messages: ChatMessage[];
+            cwd?: string;
+            onOpenSession?: (sessionId: string, cwd?: string) => void | Promise<void>;
+          }>}
+          unreadCount={unreadCount}
+          onJumpToBottom={handleJumpToBottom}
+        />
+        {/* 阶段 1:终端 dock(VS Code 风格,底部 40% 高度)。
+            cwd=信任工作区;关闭即杀会话(见 TerminalPanel cleanup)。 */}
+        {terminalOpen && cwd && (
+          <div className="chatview__terminal-dock" data-testid="terminal-dock">
+            <div className="chatview__terminal-dock-head">
+              <span className="chatview__terminal-dock-title">{terminalDockTitle}</span>
+              <button
+                type="button"
+                className="chatview__terminal-dock-close"
+                aria-label={terminalCloseLabel}
+                onClick={() => setTerminalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <TerminalPanel cwd={cwd} />
           </div>
-          {/* R6.5 — Floating "jump to bottom" button. Visible only when
-              the user has scrolled away from the end and new content
-              has arrived (unreadCount > 0). Clicking scrolls to bottom
-              and resets pinnedRef via the scroll handler. */}
-          {unreadCount > 0 && (
-            <button
-              type="button"
-              className="chatview__jump-bottom"
-              onClick={handleJumpToBottom}
-              aria-label={`跳到末尾,有 ${unreadCount} 条新消息`}
-              title="回到末尾"
-            >
-              <span aria-hidden="true">↓</span>
-              <span className="chatview__jump-bottom-badge">{unreadCount}</span>
-            </button>
-          )}
-        </div>
+        )}
         {/* Pinned footer — composer + yield/permission cards always sit at
             the bottom of `chatview__main`, not at the bottom of the
             transcript. */}
-        <div className="chatview__footer">
-          {/* Inline permission / question cards: session-scoped, never block sidebar. */}
-          <PermissionInlineCard sessionId={sessionId} />
-          <QuestionInlineCard sessionId={sessionId} />
-          {/* P0-5 — `conversation.approvals`(list) 追加区。内核默认审批面就是
-              上面两张卡片,它们**不被替换**;这里只给插件「再加一块」的口子。
-              内置零注册 → 渲染 null,所以不装插件时零占位、零视觉变化。
-              `pendingCount` 由既有 store(question/permission)汇总后下发。 */}
-          <ConversationApprovals
-            sessionId={sessionId ?? undefined}
-            pendingCount={pendingApprovalCount}
-            blocked={blockedOnApproval}
-          />
-          {/* pause/yield:已暂停横幅 + 恢复按钮(对齐 WorkBuddy session:requestYield)。 */}
-          {yielded && (
-            <div className="yield-banner" role="status">
-              <span>已暂停(会话上下文已保留)</span>
-              <div className="yield-banner__actions">
-                <button
-                  type="button"
-                  className="yield-banner__resume"
-                  onClick={handleResume}
-                  title="仅恢复,不触发新回复(可继续输入)"
-                >
-                  恢复
-                </button>
-                <button
-                  type="button"
-                  className="yield-banner__resume yield-banner__resume--primary"
-                  onClick={handleResumeAndContinue}
-                  title="恢复并发送「请继续」让 agent 接着生成"
-                >
-                  恢复并继续
-                </button>
-              </div>
-            </div>
-          )}
-          {/* 流式时提供「暂停」按钮(软停止,区别于停止按钮的硬取消)。 */}
-          {sessionId && streaming && !yielded && (
-            <button
-              type="button"
-              className="chatview__pause-btn"
-              onClick={handlePause}
-              title="暂停生成(保留会话,可继续)"
-            >
-              <PauseIcon size="sm" style={{ verticalAlign: "text-bottom" }} /> 暂停
-            </button>
-          )}
-          {/* Rewind / fork: 会话级工具，放在输入框正上方（不再漂浮到左上角挡标题栏）。 */}
-          {sessionId && !streaming && !readOnlySubagent && (
-            <RewindBar
-              sessionId={sessionId}
-              cwd={cwd}
-              onRewound={onRewound}
-              onForked={onForked}
-              onToast={onToast}
-            />
-          )}
-          {/* 消息队列(对齐 WorkBuddy message-queue):流式时可继续排队 prompt。
-              非流式时面板为空(QueuePanel 内部 queue.length===0 直接 return null)。 */}
-          {sessionId && !readOnlySubagent && (
-            <QueuePanel sessionId={sessionId} onSendNow={(t) => onSend(t)} />
-          )}
-          <PiReloadFailureBanner />
-          {/* 输入区走内核 `conversation.composer` 槽:插件可以整体替换输入区,
-              也可以只包一层(加自己的提示条 / 按钮)再把 props 转发给内置 Composer。
-              `fallback` 就是接线前的 `<Composer>` —— 内核里没有实现时逐字一致。 */}
-          <ConversationComposer
-            {...composerProps}
-            fallback={<Composer {...composerProps} />}
-          />
-        </div>
+        <ChatViewFooter
+          sessionId={sessionId}
+          streaming={streaming}
+          readOnlySubagent={readOnlySubagent}
+          yielded={yielded}
+          onResume={handleResume}
+          onResumeAndContinue={handleResumeAndContinue}
+          onPause={handlePause}
+          pendingApprovalCount={pendingApprovalCount}
+          blockedOnApproval={blockedOnApproval}
+          composerProps={composerProps}
+          cwd={cwd}
+          onRewound={onRewound}
+          onForked={onForked}
+          onToast={onToast}
+          onSend={onSend}
+        />
       </div>
+
+      {/* 右侧栏面板:任务三态 / 执行计划。位置与 ToolSidePanel / CanvasPanel 同级
+          —— 之前它们是 chatview__main 内部的绝对定位浮层,会盖住正文(空状态卡片、
+          用户消息气泡都点不到)。改成 flex 兄弟节点后由布局让位,不再遮挡内容。 */}
+      {tasksOpen && (
+        <div className="chatview__tasks-panel">
+          <SessionTasksPanel sessionId={sessionId ?? undefined} onToast={onToast} />
+        </div>
+      )}
+      {planOpen && (
+        <div className="chatview__plan-panel">
+          <PlanPanel sessionId={sessionId ?? undefined} onSend={onSend} onToast={onToast} />
+        </div>
+      )}
 
       <ToolSidePanel
         open={panelOpen}
@@ -1382,31 +1189,14 @@ export function ChatView({
         onOpenArtifacts={handleOpenArtifacts}
         findToolCall={findToolCallStable}
       />
-    </div>
-  );
-}
 
-function ToolButton({
-  icon,
-  label,
-  active,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={"chatview__tool-btn" + (active ? " chatview__tool-btn--active" : "")}
-      aria-label={label}
-      aria-pressed={active}
-      data-tip={label}
-      onClick={onClick}
-    >
-      {icon}
-    </button>
+      {/* Canvas 工作区 —— 与 ToolSidePanel 互斥(打开画布会关掉工具面板)。
+          lazy:面板的 Tiptap/pdf.js 依赖图不进首包。 */}
+      {canvasOpen && (
+        <Suspense fallback={null}>
+          <CanvasPanel />
+        </Suspense>
+      )}
+    </div>
   );
 }

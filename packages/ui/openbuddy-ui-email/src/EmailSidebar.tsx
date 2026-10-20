@@ -1,4 +1,4 @@
-import type { EmailAccount } from "@openbuddy/capability-email";
+import type { EmailAccount } from "@openbuddy/capability-email/renderer";
 
 export type EmailFolder = "inbox" | "sent" | "drafts" | "scheduled" | "pending" | "archive" | "trash" | "spam" | "starred" | "important" | "snoozed";
 export type EmailView = "all" | "signal" | "noise";

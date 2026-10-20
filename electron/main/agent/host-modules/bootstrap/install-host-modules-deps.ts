@@ -10,8 +10,9 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { PresetSessionRuntime } from "../../preset-session-runtime";
 import { casdoorAuth } from "../../../casdoor/casdoor-auth";
-import { permissionHandlers } from "@openbuddy/auth-permission";
+import { agentPermissionBridge } from "../../agent-permission-bridge";
 import * as piResources from "../../pi-resources";
+import { refreshPiHookConfigs } from "../profile/resource-paths";
 import type { PiSessionRuntime } from "../../pi-session-runtime";
 import type { PiRuntimeCoordinator } from "../../pi-runtime-coordinator";
 import type { AgentHostState } from "../_state-shape";
@@ -64,8 +65,8 @@ export interface InstallHostModuleDepsClosures {
   requestHookPermission: (...args: any[]) => any;
   createPiToolExtension: (...args: any[]) => any;
   sessionHasConversation: (...args: any[]) => any;
-  // Auth + permissions
-  permissionHandlers: any;
+  // Auth + permissions (P2.1 — backed by host-core IPC via agent-permission-bridge)
+  permissionBridge: typeof agentPermissionBridge;
   // Profile snapshot
   capturePiProfileSnapshot: (...args: any[]) => any;
   restorePiProfileSnapshot: (...args: any[]) => any;
@@ -154,6 +155,7 @@ export function buildInstallHostModuleDeps(
     pluginLifecycleQueue: closures.pluginLifecycleQueue,
     setProfilePiResourcePaths: closures.setProfilePiResourcePaths,
     refreshMarketplacePiResourcePaths: closures.refreshMarketplacePiResourcePaths,
+    refreshHookConfigs: () => refreshPiHookConfigs(),
     sessionPresetSelection: closures.sessionPresetSelection,
     replaceSession: ((opts: any) => closures.piSessionRuntime.replace(opts)) as any,
     sessionManagerOpen: ((sessionPath: string, options: any, cwd: string) =>
@@ -176,8 +178,8 @@ export function buildInstallHostModuleDeps(
     disposeActiveHookProcesses: closures.disposeActiveHookProcesses,
     drainActiveHookProcesses: closures.drainActiveHookProcesses,
     casdoorStatus: () => casdoorAuth.status(),
-    permissionReadRules: () => closures.permissionHandlers.readRules(),
-    permissionWriteRules: (rules: any) => closures.permissionHandlers.writeRules(rules),
+    permissionReadRules: () => closures.permissionBridge.readRules(),
+    permissionWriteRules: (rules: any) => closures.permissionBridge.writeRules(rules),
     capturePiProfileSnapshot: closures.capturePiProfileSnapshot as any,
     restorePiProfileSnapshot: closures.restorePiProfileSnapshot as any,
     captureDeepSeekCapabilityServices: closures.captureDeepSeekCapabilityServices,

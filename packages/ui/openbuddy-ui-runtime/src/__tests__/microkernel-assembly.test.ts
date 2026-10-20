@@ -22,8 +22,9 @@ import {
 import { BUILTIN_UI_APPLIES } from "../builtin-applies";
 
 describe("微内核装配 — 25 个内置包", () => {
-  beforeEach(() => {
-    registerAllBuiltinUis();
+  beforeEach(async () => {
+    // P1/P2-09 后装配是异步的(load() 动态 import),等 done 落定再断言。
+    await registerAllBuiltinUis().done;
   });
 
   it("包数与 BUILTIN_UI_APPLIES 表一致", () => {
@@ -105,11 +106,13 @@ describe("微内核装配 — 25 个内置包", () => {
     ]);
   });
 
-  it("装配幂等 — 重复 registerAllBuiltinUis 不会翻倍(single)或堆积(list id)", () => {
+  it("装配幂等 — 重复 registerAllBuiltinUis 不会翻倍(single)或堆积(list id)", async () => {
     const core = getRuntime().slots;
     const sidebarBefore = core.entries("sidebar").length;
     const overlayBefore = core.entries("shell.overlay").length;
-    registerAllBuiltinUis();
+    const first = registerAllBuiltinUis();
+    const second = registerAllBuiltinUis();
+    await Promise.all([first.done, second.done]);
     expect(core.entries("sidebar")).toHaveLength(sidebarBefore);
     expect(core.entries("shell.overlay")).toHaveLength(overlayBefore);
   });

@@ -19,7 +19,7 @@
  *     └── 16 capability files that translate renderer invoke calls into
  *         microkernel facade calls. May import from Layer 2 only.
  *
- *   Layer 4  Renderer  (packages/ui/openbuddy-ui-*/src + src/)
+ *   Layer 4  Renderer  (packages/ui/openbuddy-ui-<name>/src + src/)
  *     └── 7 ui packages + renderer-only state. May import from
  *         `core:*` tag group (the public IPC types).
  *

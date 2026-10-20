@@ -26,8 +26,10 @@ export function ConnectorAuthModal({ connector, root, error, onClose }: Props) {
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  // role="presentation":点击遮罩关闭是纯指针便利,不是可感知的控件 —— 键盘/读屏
+  // 用户已可通过 × 按钮与 Escape 关闭,声明成 button 反而是对读屏的撒谎。
   return (
-    <div className="ec-modal-overlay" ref={overlayRef}
+    <div className="ec-modal-overlay" ref={overlayRef} role="presentation"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}>
       <div className="ec-modal">
         <button type="button" className="ec-modal-close" onClick={onClose} aria-label="关闭">×</button>

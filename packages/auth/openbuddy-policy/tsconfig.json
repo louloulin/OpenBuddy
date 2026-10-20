@@ -1,0 +1,7 @@
+{
+  "extends": "../../../tsconfig.package-base.json",
+  // No rootDir/outDir: the base is noEmit, and the package is consumed
+  // through the shared `paths` alias table, which pulls other packages'
+  // src files into this program — a rootDir would make those TS6059.
+  "include": ["src/**/*"]
+}

@@ -72,19 +72,10 @@ async function readState(): Promise<StateFile> {
 	}
 }
 
-// R2.5 — JSON mirror write. The renderer reads `openbuddy-state.json`
-// directly through `agentHost.listSessions()`, so we keep it in sync with
-// the SQLite catalog even though SQLite is the long-term source of truth.
-// The JSON file is rewritten atomically (write-temp + rename) so a crash
-// mid-write never leaves a partial file behind.
-async function writeState(state: StateFile): Promise<void> {
-	const target = statePath()
-	const temp = `${target}.${process.pid}.${Date.now()}.tmp`
-	const payload = JSON.stringify({ ...emptyState, ...state }, null, 2)
-	await fs.mkdir(path.dirname(target), { recursive: true })
-	await fs.writeFile(temp, payload, "utf-8")
-	await fs.rename(temp, target)
-}
+// There is deliberately no `writeState()` here any more. `openbuddy-state.json`
+// was a pre-SQLite bridge; it is now read-only compatibility input for
+// `PiSessionCatalogAdapter` on first import. Nothing writes it — see the
+// note on `setPinned`.
 
 function piAgentRoot(): string {
 	return agentHome()
@@ -267,28 +258,20 @@ export class Session extends OpenBuddyService {
 	async setPinned(id: string, pinned: boolean): Promise<void> {
 		const catalog = await this.#ensureCatalogSession(id)
 		catalog.setPinned(id, pinned)
-		// R2.5 — mirror to JSON so the renderer keeps working while we
-		// migrate to SQLite as the single source of truth.
-		const state = await readState()
-		const set = new Set(state.pinned)
-		if (pinned) set.add(id)
-		else set.delete(id)
-		state.pinned = Array.from(set)
-		await writeState(state)
+		// The `openbuddy-state.json` mirror is deliberately NOT written here.
+		// It was a bridge from before SQLite, and keeping it alive meant every
+		// pin/archive resurrected a file that the host-side metadata store
+		// had already migrated away and deleted — so each new process start
+		// re-scanned a stale duplicate of state SQLite already owned, and any
+		// value written through the host store (the sidebar, and now the
+		// `/sessions` verbs) was absent from it. One source of truth: the
+		// catalog. The file stays readable for legacy imports only.
 		this.ctx.emit("sessions/pinned", { id, pinned })
 	}
 
 	async setArchived(id: string, archived: boolean): Promise<void> {
 		const catalog = await this.#ensureCatalogSession(id)
 		catalog.setArchived(id, archived)
-		// R2.5 — mirror to JSON so agentHost.listSessions() sees the
-		// flag immediately (it reads the JSON mirror, not the catalog).
-		const state = await readState()
-		const set = new Set(state.archived)
-		if (archived) set.add(id)
-		else set.delete(id)
-		state.archived = Array.from(set)
-		await writeState(state)
 		this.ctx.emit("sessions/archived", { id, archived })
 	}
 
@@ -298,18 +281,6 @@ export class Session extends OpenBuddyService {
 	): Promise<void> {
 		const catalog = await this.#ensureCatalogSession(id)
 		catalog.setExpert(id, expert?.expertId, expert ? { expertName: expert.expertName, ...(expert.avatarLocal ? { avatarLocal: expert.avatarLocal } : {}) } : {})
-		// R2.5 — mirror to JSON so listSessions keeps the binding visible.
-		const state = await readState()
-		if (expert) {
-			state.experts[id] = {
-				expertId: expert.expertId,
-				expertName: expert.expertName,
-				...(expert.avatarLocal ? { avatarLocal: expert.avatarLocal } : {}),
-			}
-		} else {
-			delete state.experts[id]
-		}
-		await writeState(state)
 		this.ctx.emit("sessions/expert-set", { id, binding: expert })
 	}
 

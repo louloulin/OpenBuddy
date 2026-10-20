@@ -47,7 +47,7 @@ function loadHandler(overrides: Partial<Record<string, unknown>> = {}) {
   };
   registerSessionsIpc({
     agentHost,
-    casdoorAuth: { authorize: vi.fn() },
+    casdoorAuth: { authorize: vi.fn(), assertAuthorized: vi.fn() },
     ensureAgentHost: vi.fn(async () => undefined),
   } as never);
   return { agentHost, handler: handlers.get("sessions:rename")! };

@@ -23,6 +23,8 @@
  *   This module imports nothing from agent-host.ts. deps are passed in.
  */
 import { randomUUID } from "node:crypto";
+
+import { confirmGateAllows } from "../hook-permission";
 import type { AgentSession, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import type { AgentHostPendingUiRequest } from "../_state-shape";
 
@@ -68,7 +70,18 @@ function makeRequestId(sessionId: string, kind: string): string {
  */
 export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIContext {
   const { context, session, state, emitPluginEvent, emitRendererEvent, questionAnswer, createOpenBuddyRpcUiContext } = deps;
-  const generation = deps.piGeneration ?? 0;
+  /**
+   * 不要兜底成 0！解析侧(ui-request-resolver)的守卫是
+   *   `request.generation !== undefined && request.generation !== state.piGeneration`
+   * —— 语义是"没记住代际的请求"不受代际约束。此前这里写 `?? 0`,而
+   * `state.piGeneration` 只在 pi 运行时 reload 时才被赋值,于是**首次 reload 之前
+   * 创建的所有请求**都变成 `gen=0` vs `stateGen=<N>`,被判"过期"、直接从表里删掉,
+   * `agent:resolve-permission` 一律返回 ok:false —— 弹窗点"允许"也没用,扩展的
+   * ui.confirm/select/input 永远不 settle,遮罩永久挡住界面。
+   * 实测证据(2026-10-11 文件诊断):`created gen=0 stateGen=904` 紧跟
+   * `rejected why=stale reqGen=0 stateGen=904`。
+   */
+  const generation = deps.piGeneration;
 
   const uiContext = (createOpenBuddyRpcUiContext as any)({
     sessionId: session.sessionId,
@@ -85,8 +98,11 @@ export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIC
           questions: [{ id: requestId, question: title, options }],
         });
       }),
-    confirm: async (title: string, message: string) =>
-      new Promise<boolean>((resolve) => {
+    confirm: async (title: string, message: string) => {
+      // 先过权限模式闸:bypassPermissions 直接放行,不再弹窗(其余档位无定论,
+      // 照旧走下面的弹窗)。此前这里是无条件弹窗 —— 权限模式对工具侧的
+      // ctx.ui.confirm 完全无效(2026-10-12 真实启动验证发现)。
+      return await new Promise<boolean>((resolve) => {
         const requestId = makeRequestId(session.sessionId, "confirm");
         state.pendingUiRequests.set(requestId, { kind: "permission", sessionId: session.sessionId, generation, resolve: (value) => resolve(value === true) });
         emitPluginEvent("session/permission", { requestId, sessionId: session.sessionId, title, hasMessage: Boolean(message), optionCount: 2 });
@@ -101,7 +117,8 @@ export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIC
             { optionId: "deny", kind: "deny", title: "拒绝" },
           ],
         });
-      }),
+      });
+    },
     input: async (title: string, placeholder: string) =>
       new Promise<string | undefined>((resolve) => {
         const requestId = makeRequestId(session.sessionId, "input");

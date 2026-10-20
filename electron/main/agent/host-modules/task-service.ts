@@ -23,9 +23,10 @@
  * `ctx.get("task")` lookup at line 89 of that file starts resolving.
  */
 import { TaskCatalog, type TaskCatalogEntry } from "@openbuddy/storage";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+
+import { piHome } from "./_host-paths";
 
 export interface TaskServiceEntry {
   id: string;
@@ -105,14 +106,19 @@ export class TaskService {
 }
 
 /**
- * Build a TaskService for the current user's app-data folder. Mirrors the
- * existing `core-session` SQLite path so the two stores stay in sync.
+ * Build a TaskService over the session database the rest of the host uses
+ * (`<piHome>/openbuddy.sqlite`, the same file `session-metadata-store.ts`
+ * opens). The `session_tasks` table is created by that database's migration
+ * set, so the todo list lands next to the session data it belongs to.
+ *
+ * Until 2026-10-11 this pointed at `$OPENBUDDY_DATA_DIR ?? ~/.config/openbuddy`
+ * + `sessions.db` — a path no other store reads and no migration provisions.
+ * `/tasks add` therefore wrote rows into a database the rest of the app never
+ * looked at. `OPENBUDDY_DATA_DIR` is not read anywhere else in the main
+ * process either.
  */
 export function defaultTaskService(): TaskService {
-  const dbPath = join(
-    process.env.OPENBUDDY_DATA_DIR ?? join(homedir(), ".config", "openbuddy"),
-    "sessions.db",
-  );
+  const dbPath = join(piHome(), "openbuddy.sqlite");
   const catalog = new TaskCatalog({ databasePath: dbPath });
   return new TaskService(catalog);
 }

@@ -20,7 +20,7 @@ const { registry } = vi.hoisted(() => {
 vi.mock("electron", () => {
   const reg = (globalThis as unknown as { __registry: Map<string, CapturedHandler> }).__registry;
   return {
-    app: { getPath: (key: string) => key === "userData" ? "/tmp/openbuddy-asm-test" : "/tmp", on: vi.fn(), exit: vi.fn(), setPath: vi.fn(), quit: vi.fn() },
+    app: { getVersion: () => "0.0.0-test", getPath: (key: string) => key === "userData" ? "/tmp/openbuddy-asm-test" : "/tmp", on: vi.fn(), exit: vi.fn(), setPath: vi.fn(), quit: vi.fn() },
     ipcMain: {
       handle: vi.fn((channel: string, handler: CapturedHandler["fn"]) => { reg.set(channel, { channel, fn: handler }); }),
       removeHandler: vi.fn((channel: string) => { reg.delete(channel); }),

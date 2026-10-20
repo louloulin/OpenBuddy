@@ -57,6 +57,15 @@ describe("models-config", () => {
     const auth = JSON.parse(await readFile(join(home, "auth.json"), "utf8"));
     expect(auth.minimax).toEqual({ type: "api_key", key: "sk-test" });
     expect(config.providers.minimax.apiKey).toBeUndefined();
+    // B2(2026-10-11 生产评审):凭据文件与所在目录必须私有 —— auth.json 0600、
+    // agentHome 0700。改回宽松 mode 必失败。
+    // Windows 没有 POSIX mode 位(node 恒报 0o666),该断言只在 POSIX 上有意义。
+    if (process.platform === "win32") return;
+    const { stat: statCb } = await import("node:fs/promises");
+    const authStat = await statCb(join(home, "auth.json"));
+    expect(authStat.mode & 0o777).toBe(0o600);
+    const dirStat = await statCb(home);
+    expect(dirStat.mode & 0o777).toBe(0o700);
   });
 
   it("saveModel throws for an unknown provider and adds a model otherwise", async () => {

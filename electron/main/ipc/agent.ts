@@ -92,7 +92,7 @@ import { registerPromptCycleIpc } from "./prompt-cycle";
 import { registerProvidersIpc } from "./providers";
 import { registerSessionMiscIpc } from "./session-misc";
 import { registerSessionsIpc } from "./sessions";
-import { registerTaskIpc } from "./task";
+import { registerSessionTaskIpc, registerTaskIpc } from "./task";
 import { registerWorkspaceIpc } from "./workspace";
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
 
@@ -117,6 +117,8 @@ export function registerAgentIpc(getWindow: () => BrowserWindow | null): void {
 
   registerPresetIpc(sharedDeps);
   registerTaskIpc(sharedDeps);
+  // 会话待办列表(`tasks:*`)—— 与 `/tasks` 斜杠命令同一份存储(TaskCatalog)。
+  registerSessionTaskIpc();
   registerPermissionIpc(sharedDeps);
   registerSessionMiscIpc(sharedDeps);
   registerAgentInfoIpc(sharedDeps);

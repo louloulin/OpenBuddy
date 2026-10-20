@@ -11,7 +11,8 @@
  *   - .msg__meta--streaming pulses via a keyframes animation tied to the
  *     R8.9 motion-duration token (so reduced-motion can dampen it)
  *   - .msg__meta--user is the smaller variant rendered under user bubbles
- *   - hover gate lifts opacity 0.55 → 0.95
+ *   - Claude 对齐(2026-10-13):meta 默认隐藏(0),hover/focus-within 浮现 0.95;
+ *     触摸设备(hover: none)常驻,否则时间戳永远看不到
  *   - @media (prefers-reduced-motion: reduce) disables the pulse
  */
 import { describe, expect, it } from "vitest";
@@ -55,25 +56,30 @@ describe("R8.14 .msg__meta (assistant timestamp + duration chip)", () => {
     expect(body!).toMatch(/font-size:\s*11px/);
   });
 
-  it("uses the text-weak token (so dark/light themes stay consistent)", () => {
+  it("uses the text-weak token and defaults to hidden (Claude 对齐)", () => {
     const body = ruleBody(prose, ".msg__meta");
     expect(body).toBeTruthy();
     expect(body!).toMatch(/color:\s*var\(--wb-text-weak/);
-    // Default opacity is low (0.55) so the chip is a glanceable affordance
-    // and doesn't compete with the message body.
-    expect(body!).toMatch(/opacity:\s*0\.55/);
+    // Claude Desktop 对齐:meta(时间 / 模型徽标)是"回看"信息,默认完全隐藏,
+    // hover / focus-within 浮现 —— 不与正文抢注意力。
+    expect(body!).toMatch(/opacity:\s*0/);
   });
 
-  it("brightens on .msg :hover / :focus-within (matches the .msg__footer gate)", () => {
-    // We assert via regex on the whole prose block because the hover rule
-    // targets `.msg:hover .msg__meta` rather than a single-class selector
-    // that ruleBody() can extract directly.
-    const hoverMatch = prose.match(/\.msg:hover\s+\.msg__meta[\s\S]*?\{[\s\S]*?\}/);
+  it("reveals on .msg :hover / :focus-within, and stays visible on touch", () => {
+    const cleaned = prose;
+    const hoverMatch = cleaned.match(/\.msg:hover\s+\.msg__meta[\s\S]*?\{[\s\S]*?\}/);
     expect(hoverMatch).toBeTruthy();
     expect(hoverMatch![0]).toMatch(/opacity:\s*0\.95/);
-    const focusMatch = prose.match(/\.msg__meta:focus-within\s*\{[\s\S]*?\}/);
+    const focusMatch = cleaned.match(/\.msg__meta:focus-within\s*\{[\s\S]*?\}/);
     expect(focusMatch).toBeTruthy();
     expect(focusMatch![0]).toMatch(/opacity:\s*0\.95/);
+    // 触摸设备没有 hover:常驻,否则时间戳永远看不到。
+    // (footer 与 meta 各有一个 hover:none 块;meta 的是第二个,直接按顺序
+    // 全局找 "meta 紧跟 touch 块" 的形态:匹配 touch 块之后最近的 .msg__meta 规则。)
+    const allTouchBlocks = [...cleaned.matchAll(/@media \(hover: none\)\s*\{([\s\S]*?)\n\}/g)].map((m) => m[1]);
+    const metaTouch = allTouchBlocks.map((block) => block.match(/\.msg__meta\s*\{([\s\S]*?)\}/)?.[1] ?? "").find((body) => body.trim().length > 0);
+    expect(metaTouch).toBeTruthy();
+    expect(metaTouch!).toMatch(/opacity:\s*0\.95/);
   });
 
   it("uses the R8.9 motion-duration tokens (so reduced-motion works uniformly)", () => {
@@ -83,7 +89,9 @@ describe("R8.14 .msg__meta (assistant timestamp + duration chip)", () => {
     // standard easing fallback. Both var() + the literal fallback must
     // be present so JS-driven animation libraries (or older browsers)
     // still get a sensible value.
-    expect(body!).toMatch(/var\(--wb-motion-duration-fast,\s*120ms\)/);
+    // 2026-10-13 Claude 对齐:离场 60ms(快),进场 120ms —— fallback 数值
+    // 跟随实现,但 motion token 本身必须在。
+    expect(body!).toMatch(/var\(--wb-motion-duration-fast,\s*\d+ms\)/);
     expect(body!).toMatch(/var\(--wb-ease-standard,\s*ease-out\)/);
   });
 });

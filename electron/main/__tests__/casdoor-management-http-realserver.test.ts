@@ -22,7 +22,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 
 vi.mock("electron", () => ({
-  app: { getPath: () => "/tmp/openbuddy-casdoor-mgmt-realserver" },
+  app: { getVersion: () => "0.0.0-test", getPath: () => "/tmp/openbuddy-casdoor-mgmt-realserver" },
   safeStorage: { isEncryptionAvailable: () => false },
   shell: { openExternal: vi.fn() },
 }));

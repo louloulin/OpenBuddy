@@ -291,13 +291,17 @@ function ProjectCard({
 
   return (
     <div className="project-card2" ref={ref}>
-      <div className="project-card2__main" onClick={onEnter}>
+      <button
+        type="button"
+        className="project-card2__main"
+        onClick={onEnter}
+      >
         <span className="project-card2__glyph"><ProjectGlyph /></span>
         <span className="project-card2__body">
           <span className="project-card2__name">{project.name}</span>
           <span className="project-card2__sub">{addedLabel(project.createdAt)}</span>
         </span>
-      </div>
+      </button>
       <div className="project-card2__more-wrap">
         <button
           type="button"
@@ -308,11 +312,16 @@ function ProjectCard({
           <MoreDotsIcon size="sm" />
         </button>
         {menuOpen && (
-          <div className="project-card2__menu" onClick={(e) => e.stopPropagation()}>
-            <button className="project-card2__menu-item" onClick={() => { setMenuOpen(false); onEnter(); }}>进入项目</button>
-            <button className="project-card2__menu-item" onClick={() => { setMenuOpen(false); onRename(); }}>重命名</button>
+          <div
+            className="project-card2__menu"
+            // 仅用于阻止菜单内点击冒泡到卡片，不是控件本身
+            role="presentation"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button type="button" className="project-card2__menu-item" onClick={() => { setMenuOpen(false); onEnter(); }}>进入项目</button>
+            <button type="button" className="project-card2__menu-item" onClick={() => { setMenuOpen(false); onRename(); }}>重命名</button>
             <div className="project-card2__menu-sep" />
-            <button className="project-card2__menu-item project-card2__menu-item--danger" onClick={() => { setMenuOpen(false); onDelete(); }}>删除</button>
+            <button type="button" className="project-card2__menu-item project-card2__menu-item--danger" onClick={() => { setMenuOpen(false); onDelete(); }}>删除</button>
           </div>
         )}
       </div>
@@ -396,24 +405,37 @@ function CreateProjectDialog({
   };
 
   return (
-    <div className="modal-overlay create-colleague-overlay" onClick={onCancel}>
-      <div className="create-colleague-dialog create-project-dialog" onClick={(e) => e.stopPropagation()} role="dialog">
+    // 遮罩只是"点击空白处关闭"的鼠标便利区，不是控件本身：
+    // 键盘/读屏用户通过「关闭」按钮或 Esc 关闭，故标为 presentation 移出无障碍树。
+    // 用 target === currentTarget 判定"点在遮罩本体"，对话框内部无需再写 stopPropagation。
+    <div
+      className="modal-overlay create-colleague-overlay"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onCancel();
+      }}
+    >
+      <div className="create-colleague-dialog create-project-dialog" role="dialog" aria-modal="true" aria-label="新建项目">
         <div className="create-colleague-header">
           <h3>新建项目</h3>
-          <button className="create-colleague-close" onClick={onCancel} aria-label="关闭">×</button>
+          <button type="button" className="create-colleague-close" onClick={onCancel} aria-label="关闭">×</button>
         </div>
 
         <div className="create-colleague-body">
           {enterpriseContext && (
-            <label className="create-colleague-field">
+            <label className="create-colleague-field" htmlFor="create-project-enterprise">
               <span className="create-colleague-label">项目范围</span>
               <span className="settings-hint">租户：{enterpriseContext.tenantId}</span>
-              <span><input type="checkbox" checked={enterprise} onChange={(event) => setEnterprise(event.target.checked)} /> 创建为企业共享项目（受 Casdoor 权限控制）</span>
+              <span><input id="create-project-enterprise" type="checkbox" checked={enterprise} onChange={(event) => setEnterprise(event.target.checked)} /> 创建为企业共享项目（受 Casdoor 权限控制）</span>
             </label>
           )}
           <div className="create-colleague-field">
-            <label className="create-colleague-label">项目名称</label>
+            <label className="create-colleague-label" htmlFor="create-project-name">项目名称</label>
             <input
+              id="create-project-name"
               type="text"
               className="create-colleague-input"
               value={name}
@@ -426,9 +448,14 @@ function CreateProjectDialog({
 
           <div className="create-colleague-field">
             <div className="proj-field-head">
-              <label className="create-colleague-label">指令</label>
+              <label className="create-colleague-label" htmlFor="create-project-instructions">指令</label>
               <div className="proj-tpl-select" ref={tplRef}>
-                <button type="button" className="proj-tpl-select__btn" onClick={() => setTplOpen((v) => !v)}>
+                <button
+                  type="button"
+                  aria-label="选择指令模板"
+                  className="proj-tpl-select__btn"
+                  onClick={() => setTplOpen((v) => !v)}
+                >
                   {currentTpl && currentTpl.id !== "custom" ? currentTpl.title : "选择模板"}
                   <ChevronDownIcon size="sm" />
                 </button>
@@ -449,6 +476,7 @@ function CreateProjectDialog({
               </div>
             </div>
             <textarea
+              id="create-project-instructions"
               className="create-colleague-textarea"
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}

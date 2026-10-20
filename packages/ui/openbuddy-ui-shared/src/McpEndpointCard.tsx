@@ -33,8 +33,6 @@ const RENDERER_BUILTIN_EXPORTERS: readonly McpExporterPackage[] = [
     packageId: "openbuddy-memory",
     label: "OpenBuddy Memory (read-only)",
     capabilities: [
-      { id: "memory:list", description: "读取本地长效记忆索引；只返回标题和标签。" },
-      { id: "memory:get", description: "按 id 读取单条记忆的标题和正文。" },
     ],
   },
   {

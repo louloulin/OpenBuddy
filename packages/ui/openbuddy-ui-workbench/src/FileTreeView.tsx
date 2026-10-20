@@ -56,7 +56,7 @@ export function FileTreeView({
   );
   const boundReveal = useCallback(
     (path: string) => {
-      void invoke("reveal_in_folder", {
+      void invoke("shellfs:reveal", {
         path,
         cwd: rootPath ?? null,
       }).catch((e: unknown) => {

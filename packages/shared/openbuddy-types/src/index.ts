@@ -502,6 +502,20 @@ export interface RunningTask {
   sessionId?: string;
 }
 
+/**
+ * A per-session todo entry — the list `/tasks` manages, stored in the
+ * `session_tasks` table (`TaskCatalog`). Distinct from `RunningTask`, which
+ * describes a *running agent job*.
+ */
+export interface SessionTask {
+  id: string;
+  content: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  order: number;
+}
+
 // ---------- subagent live events (pi://subagent) ----------
 
 /** A live subagent lifecycle event forwarded from pi's `x.ai/session_notification`. */
@@ -739,6 +753,8 @@ export interface AutomationRunRecord {
   startedAt: string;
   finishedAt?: string;
   sessionId?: string;
+  /** 执行摘要(主进程回填,截断 500 字符)。 */
+  summary?: string;
   archived: boolean;
   tenantId?: string;
   creatorSubject?: string;
@@ -1058,4 +1074,3 @@ export function findPiPackageCatalogEntry(packageName: string): PiPackageCatalog
   return PI_PACKAGE_CATALOG.find((entry) => entry.packageNames.includes(packageName));
 }
 // R32 — Pi 扩展市场的 main ↔ renderer 线契约(单一定义,见文件头注释)。
-export * from "./pi-market";

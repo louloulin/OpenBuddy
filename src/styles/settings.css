@@ -995,3 +995,30 @@
 .audit-trail__row--allow td,
 .audit-trail__row--success td { color: var(--wb-success, #1f883d); }
 .audit-trail__row--info td { color: var(--wb-text-medium); }
+
+/* ---- 界面密度 / reduce-motion(批B) ---- */
+.settings-density__btn {
+  border: 1px solid var(--wb-border-default);
+  background: var(--wb-bg-elevated);
+  color: var(--wb-text-medium);
+  border-radius: var(--wb-radius-sm, 8px);
+  padding: 4px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.settings-density__btn:hover {
+  border-color: var(--wb-border-strong);
+  color: var(--wb-text-strong);
+}
+.settings-density__btn--active {
+  border-color: var(--wb-accent);
+  color: var(--wb-accent);
+  background: color-mix(in srgb, var(--wb-accent) 8%, transparent);
+}
+
+/* C3:新增控件用统一 focus 环(替代默认 outline,对齐 Claude --cds-focus-shadow)。 */
+.settings-density__btn:focus-visible,
+.wb-composer__expand:focus-visible {
+  outline: none;
+  box-shadow: var(--wb-focus-shadow);
+}

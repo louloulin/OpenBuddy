@@ -42,6 +42,33 @@
     "lockSection": "锁定权限模式"
   },
   "conversation": {
+    "canvas": {
+      "button": "画布 (⌘ ⇧ C)",
+      "buttonWithCount": "画布 ({count})",
+      "close": "关闭画布",
+      "closeTab": "关闭 {title}",
+      "empty": "没有打开的画布",
+      "fileMissing": "该画布没有关联文件",
+      "kind": {
+        "code": "代码",
+        "html": "HTML",
+        "image": "图片",
+        "markdown": "文档",
+        "pdf": "PDF",
+        "react": "React",
+        "svg": "SVG"
+      },
+      "loading": "加载画布…",
+      "newTitle": "新画布",
+      "openInCanvas": "在画布中打开",
+      "panelLabel": "画布",
+      "previewTitle": "画布预览",
+      "reactLoadFailed": "React 画布加载失败：",
+      "resize": "调整画布宽度",
+      "shortcut": "切换画布面板",
+      "sourceLabel": "画布源码",
+      "untitled": "未命名"
+    },
     "title": "会话",
     "newSession": "新建会话",
     "pinnedSection": "置顶",
@@ -59,6 +86,9 @@
     "attachFile": "附加文件"
   },
   "skill": {
+    "bar": {
+      "title": "推荐技能"
+    },
     "title": "技能",
     "install": "安装",
     "installed": "已安装",
@@ -107,7 +137,43 @@
     "language": "语言",
     "advanced": "高级",
     "save": "保存设置",
-    "saved": "设置已保存"
+    "saved": "设置已保存",
+    "display": {
+      "density": "界面密度",
+      "densityHint": "紧凑 / 标准 / 宽松，整套界面等比缩放，立即生效",
+      "reduceMotion": "减少动效",
+      "reduceMotionHint": "开启后界面动画与过渡全部关闭（不影响系统设置）",
+      "reduceMotionOn": "已开启",
+      "reduceMotionOff": "已关闭",
+      "compact": "紧凑",
+      "standard": "标准",
+      "relaxed": "宽松"
+    },
+    "update": {
+      "title": "软件更新",
+      "check": "检查更新",
+      "checking": "正在检查更新…",
+      "available": "发现新版本 {version}",
+      "downloading": "正在下载更新… {percent}%",
+      "downloaded": "更新已就绪,重启后安装",
+      "error": "检查失败:{error}",
+      "upToDate": "已是最新版本",
+      "restart": "重启并安装"
+    },
+    "backup": {
+      "title": "备份与恢复",
+      "create": "立即备份",
+      "backingUp": "备份中…",
+      "restoreThis": "恢复此备份",
+      "restoring": "恢复中…",
+      "ok": "已备份到 {path}",
+      "failed": "备份/恢复失败：{error}",
+      "needBackupFirst": "请先创建一次备份(或填入已有备份的完整路径)",
+      "confirmRestore": "确定用该备份恢复数据？当前数据会先保留为 .pre-restore-<时间戳>,应用重启后生效。",
+      "readyAfterRestart": "恢复已就绪 —— 重启应用后生效。",
+      "hint": "备份存于 {home}/backups/",
+      "restore": "恢复"
+    }
   },
   "auth": {
     "login": "登录",
@@ -122,5 +188,155 @@
       "design": "设计创意"
     },
     "fallback": "日常办公"
+  },
+  "tasks": {
+    "title": "任务",
+    "badge": "任务 {completed}/{total}",
+    "addPlaceholder": "新增一个任务…",
+    "add": "添加",
+    "clearCompleted": "清除已完成",
+    "status": {
+      "pending": "待处理",
+      "in_progress": "进行中",
+      "completed": "已完成"
+    },
+    "statusToggle": "任务「{content}」状态：{status}，点击切换",
+    "delete": "删除任务「{content}」",
+    "empty": "暂无任务。用输入框新增，或让 agent 用 /tasks 添加。",
+    "noSession": "当前没有打开的会话",
+    "noSessionHint": "打开一个会话后，这里显示它的待办任务。",
+    "loading": "加载中…",
+    "loadFailed": "加载任务失败：{message}",
+    "addFailed": "新增任务失败：{message}",
+    "updateFailed": "更新任务失败：{message}",
+    "deleteFailed": "删除任务失败：{message}",
+    "clearFailed": "清除失败：{message}"
+  },
+  "plan": {
+    "syncToPi": "把修改发回 pi",
+    "synced": "已把修改发给 pi，以 pi 的回报为准",
+    "localDirty": "计划有未同步的本地修改"
+  },
+  "memory": {
+    "title": "记忆",
+    "subtitle": "本地两层：全局记忆 + 当前工作区记忆。云端记忆不提供。",
+    "searchPlaceholder": "搜索标题 / 正文 / 标签",
+    "scopeAll": "全部",
+    "scopeUser": "全局",
+    "scopeWorkspace": "本工作区",
+    "composerTitle": "标题（例如：回答偏好用中文）",
+    "composerBody": "正文（可选）",
+    "writeUser": "写入全局",
+    "writeWorkspace": "写入本工作区",
+    "add": "新增记忆",
+    "count": "{count} 条记忆",
+    "loading": "读取中…",
+    "empty": "还没有记忆。",
+    "emptySearch": "没有匹配的记忆。",
+    "scopeBadgeUser": "全局",
+    "scopeBadgeWorkspace": "工作区",
+    "renameAria": "重命名 {title}",
+    "deleteAria": "删除 {title}",
+    "listFailed": "记忆读取失败：{message}",
+    "addFailed": "记忆新增失败：{message}",
+    "deleteFailed": "记忆删除失败：{message}",
+    "updateFailed": "记忆更新失败：{message}"
+  },
+  "chat": {
+    "queue": {
+      "aria": "待发送队列",
+      "count": "排队中 {count} 条",
+      "hint": "回复完成后自动发送下一条",
+      "pause": "暂停该条",
+      "resume": "恢复该条",
+      "sendNow": "立即发送",
+      "remove": "从队列移除"
+    },
+    "chat.loading.preparing": "准备中",
+    "chat.loading.waiting": "等待中",
+    "loading": {
+      "preparing": "准备中",
+      "waiting": "等待中",
+      "verb1": "梳理信息",
+      "verb2": "理清思路",
+      "verb3": "抽丝剥茧",
+      "verb4": "提炼要点",
+      "verb5": "整理素材",
+      "verb6": "打磨措辞",
+      "verb7": "组织语言",
+      "verb8": "编织答复",
+      "verb9": "核对细节",
+      "verb10": "校准结论",
+      "verb11": "斟酌用词",
+      "verb12": "润色表达",
+      "verb13": "梳理脉络",
+      "verb14": "梳理结构"
+    },
+    "footer": {
+      "yieldBanner": "已暂停（会话上下文已保留）",
+      "resumeTitle": "仅恢复，不触发新回复（可继续输入）",
+      "resume": "恢复",
+      "resumeContinueTitle": "恢复并发送「请继续」让 agent 接着生成",
+      "resumeContinue": "恢复并继续",
+      "pauseTitle": "暂停生成（保留会话，可继续）",
+      "pause": "暂停"
+    },
+    "tool": {
+      "collapse": "折叠",
+      "expand": "内联展开",
+      "detailHint": "点击查看详情，Enter 内联展开，Shift+Enter 开详情面板"
+    },
+    "terminal": {
+      "dockTitle": "终端 · {name}",
+      "close": "关闭终端",
+      "label": "终端(工作区 shell)",
+      "exit": "进程已退出,code {code}",
+      "createFailed": "终端创建失败:{error}"
+    }
+  },
+  "artifacts": {
+    "history": "版本历史",
+    "historyAria": "文件版本历史",
+    "noVersions": "该文件还没有版本记录。",
+    "refresh": "刷新",
+    "restore": "恢复此版本",
+    "restoring": "正在恢复…",
+    "restored": "已恢复 {restored} 个文件（跳过 {skipped} 个）。",
+    "restoreFailed": "恢复失败：{error}",
+    "restoreNeedsPrompt": "该版本没有关联的对话轮次，无法定位回退点。",
+    "deletedState": "当时不存在",
+    "diffAria": "与当前内容的差异",
+    "noDiff": "与当前内容一致",
+    "historyFailed": "读取版本历史失败：{error}"
+  },
+  "git": {
+    "sessionSection": "本会话改动",
+    "branch": "当前分支",
+    "staged": "已暂存",
+    "unstaged": "未暂存",
+    "untracked": "未跟踪",
+    "noStaged": "没有已暂存的改动。",
+    "noUnstaged": "没有未暂存的改动。",
+    "stage": "暂存此文件",
+    "unstage": "取消暂存",
+    "stageShort": "暂存",
+    "unstageShort": "取消",
+    "commitPlaceholder": "提交信息…",
+    "commit": "提交",
+    "committing": "提交中…",
+    "commitEmpty": "请先填写提交信息。",
+    "commitNoStaged": "没有已暂存的改动，先暂存要提交的文件。",
+    "commitOk": "已提交 {hash}",
+    "commitFailed": "提交失败：{error}",
+    "stageFailed": "暂存操作失败：{error}",
+    "recentCommits": "最近提交",
+    "noCommits": "还没有提交记录。",
+    "refresh": "刷新",
+    "loading": "正在读取…",
+    "notRepo": "当前工作区不是 git 仓库。",
+    "loadFailed": "读取 git 状态失败：{error}",
+    "logFailed": "读取提交记录失败：{error}",
+    "diffFailed": "读取差异失败：{error}",
+    "noDiff": "与 HEAD 一致，没有差异。"
   }
 }

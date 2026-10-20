@@ -208,7 +208,9 @@ export function TitleBar({
             </button>
             {openMenu === name && (
               <>
-                <div className="titlebar__backdrop" onClick={() => setOpenMenu(null)} />
+                {/* 纯视觉遮罩:点它等于「点空白处收起菜单」,不是控件,
+                    声明 presentation 让 AT 跳过(关闭入口是菜单按钮/Esc)。 */}
+                <div className="titlebar__backdrop" role="presentation" onClick={() => setOpenMenu(null)} />
                 <div className="titlebar__dropdown" role="menu">
                   {MENUS[name].map((item) => (
                     <button

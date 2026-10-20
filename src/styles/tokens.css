@@ -561,6 +561,8 @@ body.dark,
  */
 /* WB Spacing */
 :root {
+  /* 界面密度缩放(批B):body zoom 由设置(紧凑/标准/宽松)驱动,全 app 等比缩放。 */
+  --wb-rem-scale: 1;
   --wb-spacing-0: 0;
   --wb-spacing-1: 2px;
   --wb-spacing-2: 4px;
@@ -942,10 +944,10 @@ body.dark,
 
   /* Duration scale（统一动画时长，避免散落的 magic number） */
   --wb-duration-instant: 80ms;
-  --wb-duration-fast: 120ms;
-  --wb-duration-base: 200ms;
+  --wb-duration-fast: var(--wb-motion-duration-fast);
+  --wb-duration-base: var(--wb-motion-duration-base);
   --wb-duration-medium: 280ms;
-  --wb-duration-slow: 380ms;
+  --wb-duration-slow: var(--wb-motion-duration-slow);
   --wb-duration-slower: 540ms;
 
   /* Common composite tokens（直接用于常见场景） */
@@ -967,4 +969,30 @@ body.dark,
     --wb-duration-slow: 0ms;
     --wb-duration-slower: 0ms;
   }
+}
+
+/* ---- 批B:界面密度 + 应用内 reduce-motion ----
+   zoom 是标准化属性(css-viewport),Chromium/Electron 全支持:
+   body 级 zoom 让全部 UI(含 portal 到 body 的弹层)随一个变量等比缩放,
+   等价于把全仓几何 px 逐个 calc 化,但不引入 1180 处改造面。 */
+body {
+  zoom: var(--wb-rem-scale, 1);
+}
+
+/* 应用内 reduce-motion(设置开关,对齐 Claude data-reduce-motion):
+   与 prefers-reduced-motion 媒体查询并行 —— 前者用户显式选择,后者系统偏好。
+   全局归零动画/过渡(0.01ms 而非 0,保留 transitionend/animationend 事件)。 */
+:root[data-reduce-motion="true"] *,
+:root[data-reduce-motion="true"] *::before,
+:root[data-reduce-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* C3:统一 focus 环(对齐 Claude --cds-focus-shadow):
+   inset 1px 页面底色断开元素自身描边 + 外圈 accent。 */
+:root {
+  --wb-focus-shadow: inset 0 0 0 1px var(--wb-bg-primary), 0 0 0 1px var(--wb-accent);
 }

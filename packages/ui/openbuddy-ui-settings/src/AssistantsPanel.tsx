@@ -8,7 +8,7 @@
  *  - CreateColleagueDialog: modal 弹窗，含 "从模板创建" / "从专家雇佣" 两个 tab
  *  - 点击卡片 → 助理个人资料页(profile)
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import {
   AssistantIcon,
   AddCircleIcon,
@@ -265,6 +265,19 @@ export function AssistantsPanel({ onUseAssistant, onToast }: AssistantsPanelProp
                   <div key={agent.path} className="colleague-card-wrapper">
                     <div
                       className={`colleague-card${isOpen ? " is-menu-open" : ""}`}
+                      // 卡片本身可点开个人资料,但内部还嵌了「更多」和「对话」两个
+                      // <button>,所以不能换成真正的 <button>(嵌套 button 是非法
+                      // HTML)。改用 role=button + tabIndex + onKeyDown 走 Option 2。
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`查看 ${agent.name} 的资料`}
+                      onKeyDown={(e) => {
+                        // 焦点在内部 button 上时事件也会冒泡上来,必须让内部控件自己处理。
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key !== "Enter" && e.key !== " ") return;
+                        e.preventDefault();
+                        setProfileAgent(agent);
+                      }}
                       onClick={(e) => {
                         if ((e.target as HTMLElement).closest(".colleague-card-more, .colleague-card-menu")) return;
                         setProfileAgent(agent);
@@ -277,8 +290,12 @@ export function AssistantsPanel({ onUseAssistant, onToast }: AssistantsPanelProp
                       >
                         <MoreDotsIcon size="sm" />
                       </button>
+                      {/* 这个 stopPropagation 是多余的:卡片自己的 onClick 里有
+                          closest(".colleague-card-more, .colleague-card-menu") 提前
+                          return,菜单内点击根本不会冒泡到卡片那里。删掉它避免
+                          jsx-a11y 报"可点击的静态元素"。 */}
                       {isOpen && (
-                        <div className="colleague-card-menu" onClick={(e) => e.stopPropagation()}>
+                        <div className="colleague-card-menu">
                           <button className="colleague-card-menu-item" onClick={() => { openEdit(agent); setMenuOpen(null); }}>
                             <EditToolIcon size="sm" /><span>编辑</span>
                           </button>
@@ -338,7 +355,15 @@ export function AssistantsPanel({ onUseAssistant, onToast }: AssistantsPanelProp
             {filteredTemplates.map((tpl) => {
               return (
                 <div key={tpl.id} className="colleague-card-wrapper">
-                  <div className="colleague-card colleague-card--template" onClick={() => openFromTemplate(tpl)}>
+                  {/* 模板卡片内部没有任何交互子元素,所以可以用真正的 <button>(Option 1)。
+                      button 的 UA 默认 text-align:center 会让描述和角色文案居中,
+                      base.css 的全局 button reset 不覆盖这一项,这里行内兜住。 */}
+                  <button
+                    type="button"
+                    className="colleague-card colleague-card--template"
+                    style={{ textAlign: "left" }}
+                    onClick={() => openFromTemplate(tpl)}
+                  >
                     <div className="colleague-card-identity">
                       <ColleagueAvatar index={tpl.defaultAvatar} name={tpl.name} size={48} overrideColor={tpl.color} />
                       <div className="colleague-card-identity-text">
@@ -356,7 +381,7 @@ export function AssistantsPanel({ onUseAssistant, onToast }: AssistantsPanelProp
                         </span>
                       ))}
                     </div>
-                  </div>
+                  </button>
                 </div>
               );
             })}
@@ -490,6 +515,7 @@ function CreateColleagueDialog({
 }) {
   const [d, setD] = useState<EditorDraft>(draft);
   const [tab, setTab] = useState<"create" | "hire">(draft.isNew && !draft.name ? "create" : "create");
+  const fieldId = useId();
   const set = <K extends keyof EditorDraft>(k: K, v: EditorDraft[K]) =>
     setD((prev) => ({ ...prev, [k]: v }));
 
@@ -502,12 +528,19 @@ function CreateColleagueDialog({
     }));
   };
 
+  {/* 背景遮罩:纯装饰层,语义由内层 .create-colleague-dialog 承载。
+      点遮罩关闭用 e.target === e.currentTarget 判断,不需要在内层再
+      stopPropagation(内层 .modal-overlay > [role="dialog"] 的 CSS 依赖保留)。 */}
   return (
-    <div className="modal-overlay create-colleague-overlay" onClick={onCancel}>
-      <div className="create-colleague-dialog" onClick={(e) => e.stopPropagation()} role="dialog">
+    <div
+      className="modal-overlay create-colleague-overlay"
+      role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div className="create-colleague-dialog" role="dialog">
         <div className="create-colleague-header">
           <h3>{d.isNew ? "创建助理" : `编辑 ${d.name}`}</h3>
-          <button className="create-colleague-close" onClick={onCancel}>
+          <button type="button" className="create-colleague-close" onClick={onCancel} aria-label="关闭">
             <XCloseIcon size="md" />
           </button>
         </div>
@@ -554,8 +587,10 @@ function CreateColleagueDialog({
           <div className="create-colleague-body">
             {/* Avatar picker */}
             <div className="create-colleague-field">
-              <label className="create-colleague-label">头像</label>
-              <div className="create-colleague-avatar-picker">
+              {/* 头像选择器是一组按钮,不是单个表单控件 —— <label> 语义上不成立,
+                  改用 role="group" + aria-labelledby 给这组按钮一个可读的名字。 */}
+              <span className="create-colleague-label" id={`${fieldId}-avatar`}>头像</span>
+              <div className="create-colleague-avatar-picker" role="group" aria-labelledby={`${fieldId}-avatar`}>
                 <ColleagueAvatar index={d.avatar} name={d.name || "?"} size={56} />
                 <div className="create-colleague-avatar-grid">
                   {AVATAR_PRESETS.map((preset, i) => (
@@ -575,8 +610,9 @@ function CreateColleagueDialog({
 
             {/* Name */}
             <div className="create-colleague-field">
-              <label className="create-colleague-label">名称 *</label>
+              <label className="create-colleague-label" htmlFor={`${fieldId}-name`}>名称 *</label>
               <input
+                id={`${fieldId}-name`}
                 type="text"
                 className="create-colleague-input"
                 value={d.name}
@@ -587,8 +623,9 @@ function CreateColleagueDialog({
 
             {/* Description */}
             <div className="create-colleague-field">
-              <label className="create-colleague-label">描述</label>
+              <label className="create-colleague-label" htmlFor={`${fieldId}-desc`}>描述</label>
               <input
+                id={`${fieldId}-desc`}
                 type="text"
                 className="create-colleague-input"
                 value={d.description}
@@ -599,8 +636,9 @@ function CreateColleagueDialog({
 
             {/* Model tags */}
             <div className="create-colleague-field">
-              <label className="create-colleague-label">模型能力标签</label>
-              <div className="create-colleague-tags">
+              {/* 同头像:这是一组多选标签按钮,不是单个控件。 */}
+              <span className="create-colleague-label" id={`${fieldId}-tags`}>模型能力标签</span>
+              <div className="create-colleague-tags" role="group" aria-labelledby={`${fieldId}-tags`}>
                 {MODEL_TAGS.map((tag) => (
                   <button
                     key={tag.key}
@@ -617,8 +655,9 @@ function CreateColleagueDialog({
 
             {/* System Prompt */}
             <div className="create-colleague-field">
-              <label className="create-colleague-label">System Prompt</label>
+              <label className="create-colleague-label" htmlFor={`${fieldId}-prompt`}>System Prompt</label>
               <textarea
+                id={`${fieldId}-prompt`}
                 className="create-colleague-textarea"
                 value={d.systemPrompt}
                 onChange={(e) => set("systemPrompt", e.target.value)}

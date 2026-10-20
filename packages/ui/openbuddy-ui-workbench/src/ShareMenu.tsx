@@ -67,8 +67,10 @@ export function ShareMenu({ messages, title, openUrl, onDone }: ShareMenuProps) 
       >
         <Share2 size={15} strokeWidth={1.75} />
       </button>
+      {/* 弹层容器只是视觉包裹,语义由里面的 <button> 提供 —— 加 role="presentation"
+          让它对读屏隐藏(与 TopbarActions 的弹层同一写法)。 */}
       {open && (
-        <div className="share-menu__popover" onClick={(e) => e.stopPropagation()}>
+        <div className="share-menu__popover" role="presentation" onClick={(e) => e.stopPropagation()}>
           <button type="button" className="share-menu__item" onClick={() => exportAs("markdown")}>
             导出 Markdown
           </button>

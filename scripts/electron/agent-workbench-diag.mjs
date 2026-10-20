@@ -78,7 +78,7 @@ async function main() {
   console.log(`userData: ${userData}`);
   const app = await electron.launch({
     executablePath: electronBin,
-    args: [join(root, "out/main/index.js"), "--user-data-dir=" + userData, "--no-sandbox", "--disable-gpu"],
+    args: [join(root, "dist/main/index.js"), "--user-data-dir=" + userData, "--no-sandbox", "--disable-gpu"],
     cwd: root,
     env: { ...process.env, NODE_ENV: "development", OPENBUDDY_USER_DATA: userData },
   });

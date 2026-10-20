@@ -29,6 +29,12 @@
       "@openbuddy/bundle-base": [
         "../packages/bundle/openbuddy-base/src/index.ts"
       ],
+      "@openbuddy/host-runtime": [
+        "../packages/runtime/openbuddy-host-runtime/src/index.ts"
+      ],
+      "@openbuddy/shared-error-codes": [
+        "../packages/shared/openbuddy-error-codes/src/index.ts"
+      ],
       "@openbuddy/renderer-host": [
         "../packages/renderer/openbuddy-renderer-host/src/index.ts"
       ],
@@ -46,6 +52,9 @@
       ],
       "@openbuddy/fs-fs-local": [
         "../packages/fs/openbuddy-fs-local/src/index.ts"
+      ],
+      "@openbuddy/folder-trust": [
+        "../packages/capability/openbuddy-folder-trust/src/index.ts"
       ],
       "@openbuddy/team-team": [
         "../packages/team/openbuddy-team/src/index.ts"

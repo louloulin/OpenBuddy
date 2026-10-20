@@ -81,7 +81,12 @@ describe("RendererPluginLoader", () => {
   it("provides conversation registries and session scope primitives", () => {
     const modules = createDeepSeekClientCompatibilityModules({ createElement: () => null });
     const runtime = modules["@deepseek-ai/dsh-client-runtime/client"] as {
-      ConversationEventRegistry: new () => { register: (definition: { kind: string }) => () => void; entries: () => readonly unknown[] };
+      ConversationEventRegistry: new () => {
+        register: (definition: { kind: string; target?: string; buildViewNode?: () => unknown }) => () => void;
+        registerFallback: (definition: { kind: string; target: string; buildViewNode: () => unknown }) => () => void;
+        fallbackEntry?: () => { kind: string } | undefined;
+        entries: () => readonly unknown[];
+      };
       createScope: (ctx: Context, sessionId: string) => { ctx: Context; dispose: () => void };
       scopeOf: (ctx: Context) => string | undefined;
     };

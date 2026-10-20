@@ -40,6 +40,8 @@ It ships the polished UI, plan mode, skills, MCP connectors, and an enterprise-g
 
 ---
 
+- **AI Chat overhaul (Plan5)**: streaming caret, live reasoning card, inline tool expand, citation/artifact chips, message-level rewind/fork, parallel-tool visualization, shortcut overlay — see `WORKBUDDY_UI_REFERENCE.md`.
+
 ## 📑 Table of Contents
 
 - [Why OpenBuddy?](#-why-openbuddy)
@@ -169,7 +171,7 @@ System tray, native notifications, deep links (`casdoor://`), clipboard integrat
 >
 > Reproduce locally:
 > ```bash
-> pnpm build                 # compile out/main + out/renderer
+> pnpm build                 # compile dist/main + dist/renderer
 > # one-time: put real-LLM keys in .env.e2e.local (gitignored)
 > pnpm docs:screenshots      # regenerates docs/screenshots/01..07 from the live renderer
 > ```

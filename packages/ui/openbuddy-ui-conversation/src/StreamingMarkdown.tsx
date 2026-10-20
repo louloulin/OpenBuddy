@@ -1,4 +1,6 @@
 import { Fragment, memo, useDeferredValue } from "react";
+import { CitationChip } from "./parts/CitationChip";
+import { ArtifactChip } from "./parts/ArtifactChip";
 
 /**
  * StreamingMarkdown -- ultra-lightweight renderer used while an assistant
@@ -68,21 +70,27 @@ type Inline =
   | { kind: "strong"; value: string }
   | { kind: "em"; value: string }
   | { kind: "link"; url: string; value: string }
-  | { kind: "image"; alt: string; url: string };
+  | { kind: "image"; alt: string; url: string }
+  // Plan5 B.5 — inline citation / artifact chips.
+  // Source: any text containing `[[cite:id]]` / `[[artifact:id]]` will
+  // be tokenized into these. Default visual lives in
+  // `CitationChip` / `ArtifactChip`; consumers may swap them through
+  // `<ChatCitationProvider>` / `<ChatArtifactProvider>`.
+  | { kind: "citation"; id: string }
+  | { kind: "artifact"; id: string };
 
 // Match (priority order):
-//   1. ![alt](url)  markdown image (must come BEFORE link so `![…](…)`
-//                   isn't eaten as a bare URL or link)
-//   2. `code`       backtick inline code
-//   3. **bold**     double asterisk
-//   4. *italic*     single asterisk (bounded by non-word / string
-//                   boundary so `1*2` doesn't match)
-//   5. http(s)://   bare URL
+//   1. [[cite:id]] / [[artifact:id]]  inline citation / artifact chips
+//   2. ![alt](url)                    markdown image (must come BEFORE link)
+//   3. `code`                         backtick inline code
+//   4. **bold**                       double asterisk
+//   5. *italic*                       single asterisk (bounded so 1*2 doesn't match)
+//   6. http(s)://                     bare URL
 //
 // Image alt allows anything except `]`; image url allows anything except
 // whitespace + `)` to mirror GitHub-flavored markdown.
 const INLINE_RE =
-  /(!\[([^\]]*)\]\(([^\s<>)]+)\))|(`[^`\n]+`)|(\*\*[^*\n][^*]*?\*\*)|(\*[^*\s\n][^*\n]*?\*)|(https?:\/\/[^\s<>)]+)/g;
+  /(\[\[cite:([^\]\s]+)\]\])|(\[\[artifact:([^\]\s]+)\]\])|(!\[([^\]]*)\]\(([^\s<>)]+)\))|(`[^`\n]+`)|(\*\*[^*\n][^*]*?\*\*)|(\*[^*\s\n][^*\n]*?\*)|(https?:\/\/[^\s<>)]+)/g;
 
 function tokenizeInline(text: string): Inline[] {
   if (!text) return [];
@@ -101,15 +109,19 @@ function tokenizeInline(text: string): Inline[] {
     //   m[6] = *italic*
     //   m[7] = http(s)://
     if (m[1] != null) {
-      out.push({ kind: "image", alt: m[2] ?? "", url: m[3] ?? "" });
-    } else if (m[4] != null) {
-      out.push({ kind: "code", value: m[4].slice(1, -1) });
+      out.push({ kind: "citation", id: m[2] ?? "" });
+    } else if (m[3] != null) {
+      out.push({ kind: "artifact", id: m[4] ?? "" });
     } else if (m[5] != null) {
-      out.push({ kind: "strong", value: m[5].slice(2, -2) });
-    } else if (m[6] != null) {
-      out.push({ kind: "em", value: m[6].slice(1, -1) });
-    } else if (m[7] != null) {
-      out.push({ kind: "link", url: m[7], value: m[7] });
+      out.push({ kind: "image", alt: m[6] ?? "", url: m[7] ?? "" });
+    } else if (m[8] != null) {
+      out.push({ kind: "code", value: m[8].slice(1, -1) });
+    } else if (m[9] != null) {
+      out.push({ kind: "strong", value: m[9].slice(2, -2) });
+    } else if (m[10] != null) {
+      out.push({ kind: "em", value: m[10].slice(1, -1) });
+    } else if (m[11] != null) {
+      out.push({ kind: "link", url: m[11], value: m[11] });
     }
     lastIndex = m.index + m[0].length;
   }
@@ -186,6 +198,10 @@ function renderInlineText(text: string, baseKey: string): React.ReactNode {
             {tok.alt ? `🖼 ${tok.alt}` : "🖼 image"}
           </span>
         );
+      case "citation":
+        return <CitationChip key={key} sourceId={tok.id} />;
+      case "artifact":
+        return <ArtifactChip key={key} id={tok.id} />;
     }
   });
 }

@@ -29,6 +29,14 @@ import { type AgentHostState, type AgentHostUiRequestValue } from "./_state-shap
 let state: AgentHostState | null = null;
 
 let emitPluginEventImpl: (type: string, payload: unknown) => void = () => undefined;
+/**
+ * 渲染层通知。判定必须让**界面**知道,而不只是进日志 —— 否则从"非弹窗按钮"
+ * 这条路径判定的请求(harness / RPC / 另一个窗口 / 自动批准)会让弹窗永远留着,
+ * 遮罩挡住整个界面(2026-10-11 真机冒烟实测:发送键被 .request-modal-overlay
+ * 拦到点不动)。创建请求的那条路(provide-rpc-ui-context.ts)本来就是
+ * emitRendererEvent("pi://permission"/"pi://question"),这里是它的对称面。
+ */
+let emitRendererEventImpl: (channel: string, payload: unknown) => void = () => undefined;
 let permissionReadRulesImpl: () => Promise<any[]> = async () => [];
 let permissionWriteRulesImpl: (rules: any[]) => Promise<void> = async () => undefined;
 
@@ -39,6 +47,7 @@ let permissionWriteRulesImpl: (rules: any[]) => Promise<void> = async () => unde
 export interface InstallUiRequestResolverDeps {
   state: AgentHostState;
   emitPluginEvent: (type: string, payload: unknown) => void;
+  emitRendererEvent: (channel: string, payload: unknown) => void;
   permissionReadRules: () => Promise<any[]>;
   permissionWriteRules: (rules: any[]) => Promise<void>;
 }
@@ -49,6 +58,7 @@ export interface InstallUiRequestResolverDeps {
 export function installUiRequestResolver(deps: InstallUiRequestResolverDeps): void {
   if (deps.state) state = deps.state;
   if (deps.emitPluginEvent) emitPluginEventImpl = deps.emitPluginEvent;
+  if (deps.emitRendererEvent) emitRendererEventImpl = deps.emitRendererEvent;
   if (deps.permissionReadRules) permissionReadRulesImpl = deps.permissionReadRules;
   if (deps.permissionWriteRules) permissionWriteRulesImpl = deps.permissionWriteRules;
 }
@@ -57,6 +67,7 @@ export function installUiRequestResolver(deps: InstallUiRequestResolverDeps): vo
 export function __resetUiRequestResolverForTest(): void {
   state = null;
   emitPluginEventImpl = () => undefined;
+  emitRendererEventImpl = () => undefined;
   permissionReadRulesImpl = async () => [];
   permissionWriteRulesImpl = async () => undefined;
 }
@@ -83,10 +94,26 @@ export function resolveUiRequest(requestId: string, value: AgentHostUiRequestVal
       ? (value as any).decision
       : value === true ? "allow" : "deny";
     if (decision === "allow_always") {
-      void permissionReadRulesImpl().then((rules) => permissionWriteRulesImpl([
-        ...rules,
-        { action: "allow", tool: request.permission?.toolName ?? "", ...(request.permission?.pattern ? { pattern: request.permission.pattern } : {}) },
-      ])).catch((error: unknown) => console.warn("[openbuddy] failed to persist hook permission", error));
+      // Only persist a durable rule when the request carries a pattern.
+      // `matchesPermissionRule` treats a rule without `pattern` as matching
+      // every invocation of the tool, so persisting `{ action: "allow",
+      // tool: "write" }` would turn one click on a single prompt into a
+      // permanent, silent allow for every later write/edit — including
+      // ones the user never saw. Without a pattern the grant stays
+      // session-scoped (the "allow" branch below), which still honours the
+      // user's intent for the current session; deliberate permanent rules
+      // go through `permission_save` in settings.
+      const pattern = request.permission?.pattern;
+      if (pattern) {
+        void permissionReadRulesImpl().then((rules) => permissionWriteRulesImpl([
+          ...rules,
+          { action: "allow", tool: request.permission?.toolName ?? "", pattern },
+        ])).catch((error: unknown) => console.warn("[openbuddy] failed to persist hook permission", error));
+        state.hookPermissionSessionRules.set(request.sessionId, [
+          ...(state.hookPermissionSessionRules.get(request.sessionId) ?? []),
+          { action: "allow", tool: request.permission!.toolName, pattern },
+        ]);
+      }
     } else if (decision === "allow") {
       const sessionRules = state.hookPermissionSessionRules.get(request.sessionId) ?? [];
       state.hookPermissionSessionRules.set(request.sessionId, [...sessionRules, {
@@ -101,6 +128,11 @@ export function resolveUiRequest(requestId: string, value: AgentHostUiRequestVal
       ? (value as any).decision
       : value === true ? "allow" : "deny"
     : undefined;
+  emitRendererEventImpl("pi://request-resolved", {
+    kind: request.kind,
+    requestId,
+    sessionId: request.sessionId,
+  });
   emitPluginEventImpl(
     request.kind === "permission" ? "session/permission-resolved" : "session/question-resolved",
     {

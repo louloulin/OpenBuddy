@@ -4,8 +4,23 @@ import {
   dayLabel,
   isModelSwitch,
   countModelSwitches,
+  groupParallelToolCalls,
+  clusterToolCalls,
+  countParallelClusters,
   type TimelineMessage,
 } from "../ui/timeline-utils";
+import type { ChatMessage, MessagePart, ToolCallView } from "@/stores/session-store";
+
+function toolCall(id: string, startedAt: number, status: ToolCallView["status"] = "in_progress"): ToolCallView {
+  return {
+    toolCallId: id,
+    title: id,
+    kind: "bash",
+    status,
+    content: [],
+    startedAt,
+  };
+}
 
 function m(id: string, extra: Partial<TimelineMessage> = {}): TimelineMessage {
   return { id, role: "assistant", parts: [], complete: true, ...extra };
@@ -127,5 +142,92 @@ describe("countModelSwitches", () => {
   });
   it("单一 modelId 返回 0", () => {
     expect(countModelSwitches([m("a", { modelId: "x" }), m("b", { modelId: "x" })])).toBe(0);
+  });
+});
+
+describe("groupParallelToolCalls (Plan5 B.9)", () => {
+  it("single tool_call → single cluster", () => {
+    const parts: MessagePart[] = [
+      { kind: "tool_call", toolCall: toolCall("a", 1000) },
+    ];
+    const clusters = clusterToolCalls(parts);
+    expect(clusters).toEqual([{ kind: "single", toolCallId: "a", toolCall: expect.objectContaining({ toolCallId: "a" }) }]);
+  });
+
+  it("two tool_calls within window → parallel cluster", () => {
+    const parts: MessagePart[] = [
+      { kind: "tool_call", toolCall: toolCall("a", 1000) },
+      { kind: "tool_call", toolCall: toolCall("b", 1050) },
+    ];
+    const clusters = clusterToolCalls(parts);
+    expect(clusters.length).toBe(1);
+    expect(clusters[0].kind).toBe("parallel");
+    if (clusters[0].kind === "parallel") {
+      expect(clusters[0].toolCallIds).toEqual(["a", "b"]);
+    }
+  });
+
+  it("two tool_calls outside window → two single clusters", () => {
+    const parts: MessagePart[] = [
+      { kind: "tool_call", toolCall: toolCall("a", 1000) },
+      { kind: "tool_call", toolCall: toolCall("b", 10000) },
+    ];
+    const clusters = clusterToolCalls(parts);
+    expect(clusters.length).toBe(2);
+    expect(clusters[0].kind).toBe("single");
+    expect(clusters[1].kind).toBe("single");
+  });
+
+  it("three parallel + one serial", () => {
+    const parts: MessagePart[] = [
+      { kind: "tool_call", toolCall: toolCall("a", 1000) },
+      { kind: "tool_call", toolCall: toolCall("b", 1010) },
+      { kind: "tool_call", toolCall: toolCall("c", 1020) },
+      { kind: "tool_call", toolCall: toolCall("d", 20000) },
+    ];
+    const clusters = clusterToolCalls(parts);
+    expect(clusters.length).toBe(2);
+    expect(clusters[0].kind).toBe("parallel");
+    if (clusters[0].kind === "parallel") {
+      expect(clusters[0].toolCallIds).toEqual(["a", "b", "c"]);
+    }
+    expect(clusters[1].kind).toBe("single");
+  });
+
+  it("non-tool_call parts reset the buffer", () => {
+    const parts: MessagePart[] = [
+      { kind: "tool_call", toolCall: toolCall("a", 1000) },
+      { kind: "tool_call", toolCall: toolCall("b", 1010) },
+      { kind: "text", text: "..." },
+      { kind: "tool_call", toolCall: toolCall("c", 1020) },
+    ];
+    const clusters = clusterToolCalls(parts);
+    expect(clusters.length).toBe(2);
+    expect(clusters[0].kind).toBe("parallel");
+    expect(clusters[1].kind).toBe("single");
+  });
+
+  it("groupParallelToolCalls flattens across messages, skips user msgs", () => {
+    const messages: ChatMessage[] = [
+      { id: "u", role: "user", parts: [], complete: true },
+      {
+        id: "a1",
+        role: "assistant",
+        parts: [
+          { kind: "tool_call", toolCall: toolCall("a", 1000) },
+          { kind: "tool_call", toolCall: toolCall("b", 1010) },
+        ],
+        complete: true,
+      },
+      {
+        id: "a2",
+        role: "assistant",
+        parts: [{ kind: "tool_call", toolCall: toolCall("c", 2000) }],
+        complete: true,
+      },
+    ];
+    const clusters = groupParallelToolCalls(messages);
+    expect(clusters.length).toBe(2);
+    expect(countParallelClusters(clusters)).toBe(1);
   });
 });

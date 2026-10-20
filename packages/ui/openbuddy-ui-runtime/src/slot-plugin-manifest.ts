@@ -41,16 +41,21 @@ import type { UiPlugin } from "@openbuddy/ui-slots";
  * `OpenBuddyPluginManifest` so the resolver in `client.tsx` can keep a
  * single mental model for every track (pi / harness / slot / cordis).
  *
- * `apply` is intentionally mutable so the builtin-applies test suite can
- * patch individual entries without forking the table. All other fields
- * are readonly metadata.
+ * `load` is a dynamic import, not the apply reference itself. Keeping the
+ * 25 builtin packages out of ui-runtime's static import graph is what
+ * keeps their bundles out of the renderer entry chunk — with the table
+ * holding direct references, every builtin package was statically
+ * reachable from the entry and shipped on first paint (P1/P2-09). The
+ * `load` field is intentionally mutable so the builtin-applies test suite
+ * can patch individual entries without forking the table. All other
+ * fields are readonly metadata.
  */
 export interface BuiltinUiPluginSlotTrack {
   /** NPM package id (e.g. `@openbuddy/ui-account`). Used as the slot
    *  track's `source` and `packageName`. */
   readonly pkg: string;
-  /** The package's `apply(ctx, config?)` implementation. */
-  apply: UiPlugin["apply"];
+  /** Dynamic import resolving to the package's `apply(ctx, config?)`. */
+  load: () => Promise<UiPlugin["apply"]>;
   /** Optional display description used by inventory + docs. */
   readonly description?: string;
   /** Optional config defaults merged into the loadable track row. */

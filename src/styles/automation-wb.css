@@ -738,6 +738,9 @@
   align-items: center;
   gap: 4px;
   user-select: none;
+  /* 原为 div：块级撑满整行且左对齐；button 两点都要显式补回。 */
+  width: 100%;
+  text-align: left;
 }
 .atm-records-group-chevron { flex-shrink: 0; transition: transform 0.15s; }
 .atm-records-group-chevron--collapsed { transform: rotate(-90deg); }
@@ -1702,6 +1705,9 @@
   cursor: pointer;
   border-top: 1px solid var(--atm-border-soft);
   transition: background-color 0.12s ease;
+  /* 原为 div：块级铺满整列且左对齐。 */
+  width: 100%;
+  text-align: left;
 }
 .connector-selector-field__manage:hover { background-color: var(--atm-surface-hover); color: var(--atm-text-primary); }
 .connector-selector-field__manage svg { flex-shrink: 0; }
@@ -1755,6 +1761,8 @@
   border-radius: 6px;
   cursor: pointer;
   box-sizing: border-box;
+  /* 原为 div：标题/描述块在 button 的默认居中对齐下会跑偏。 */
+  text-align: left;
 }
 .automation-permission-picker__item:hover { background: var(--atm-surface-hover); }
 .automation-permission-picker__item--divider { border-top: 1px solid var(--atm-border-soft); }

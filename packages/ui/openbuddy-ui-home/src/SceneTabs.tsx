@@ -16,15 +16,14 @@ interface SceneTabsProps {
 const MODES: readonly HomeModeId[] = ["working", "coding", "design"] as const;
 
 export function SceneTabs({ activeMode, onChange }: SceneTabsProps) {
-  const labels = useMemo(
-    () => ({
-      working: useT("scene.modes.working"),
-      coding: useT("scene.modes.coding"),
-      design: useT("scene.modes.design"),
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+  // useT 是 hook,必须在组件顶层调用。之前它们被塞进 useMemo 的回调里:首次渲染
+  // 会记进 hook 列表,命中缓存的那次渲染又不会 → 违反 Hooks 规则,重渲染时抛
+  // "Rendered fewer hooks than expected"(2026-10-12 真实启动复查时由资料库
+  // Inspiration 分区复用 SceneTabs 暴露:LibraryPage 测试直接崩在这一层)。
+  const working = useT("scene.modes.working");
+  const coding = useT("scene.modes.coding");
+  const design = useT("scene.modes.design");
+  const labels = useMemo(() => ({ working, coding, design }), [working, coding, design]);
 
   return (
     <div className="scene-tabs-wrap">

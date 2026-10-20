@@ -4,7 +4,7 @@
  * Pins the new motion token additions and the conversion of magic-number
  * animation durations to tokens, plus the prefers-reduced-motion safety
  * net. This makes it impossible for future refactors to silently re-introduce
- * hard-coded 120ms / 140ms / 160ms / 180ms / 240ms values, or to ship a UI
+ * hard-coded 120ms / 120ms / 160ms / 180ms / 240ms values, or to ship a UI
  * that ignores the OS-level "reduce motion" accessibility setting.
  *
  * Coverage:
@@ -12,7 +12,7 @@
  *   - tokens.css overrides all motion durations to 0ms in reduced motion
  *   - base.css installs a global prefers-reduced-motion safety net
  *   - the 9 previously magic-numbered animation declarations now use tokens
- *   - the additional "140ms"/"120ms" + token-ease declarations also use
+ *   - the additional "120ms"/"120ms" + token-ease declarations also use
  *     motion-duration tokens (chrome/composer/messages/misc)
  *   - short-second entrance animations (0.12s/0.14s/0.15s/0.18s/0.2s/0.45s)
  *     are also tokenised; only infinite pulses keep their cadence literals
@@ -94,12 +94,12 @@ describe("R8.9 magic-number animation conversion (originally-listed 9 sites)", (
     ["modals.css",     "wb-request-modal-in var(--wb-motion-duration-large, 240ms)",   "wb-request-modal-in 240ms "],
     ["settings.css",   "wb-modal-overlay-in var(--wb-motion-duration-pop, 160ms)",     "wb-modal-overlay-in 160ms "],
     ["settings.css",   "wb-modal-card-in var(--wb-motion-duration-md, 180ms)",         "wb-modal-card-in 180ms "],
-    ["tool-call.css",  "toolcall-enter var(--wb-motion-duration-fast, 140ms)",         "toolcall-enter 140ms "],
-    ["chrome.css",     "ob-scale-in var(--wb-motion-duration-fast, 140ms)",             "ob-scale-in 140ms "],
-    ["composer.css",   "ob-slash-menu-in var(--wb-motion-duration-fast, 140ms)",       "ob-slash-menu-in 140ms "],
+    ["tool-call.css",  "toolcall-enter var(--wb-motion-duration-fast, 120ms)",         "toolcall-enter 120ms "],
+    ["chrome.css",     "ob-scale-in var(--wb-motion-duration-fast, 120ms)",             "ob-scale-in 120ms "],
+    ["composer.css",   "ob-slash-menu-in var(--wb-motion-duration-fast, 120ms)",       "ob-slash-menu-in 120ms "],
     ["messages.css",   "ob-findbar-in var(--wb-motion-duration-fast, 120ms)",          "ob-findbar-in 120ms "],
-    ["messages.css",   "ob-rewind-dropdown-in var(--wb-motion-duration-fast, 140ms)", "ob-rewind-dropdown-in 140ms "],
-    ["misc.css",       "ob-mention-picker-in var(--wb-motion-duration-fast, 140ms)",   "ob-mention-picker-in 140ms "],
+    ["messages.css",   "ob-rewind-dropdown-in var(--wb-motion-duration-fast, 120ms)", "ob-rewind-dropdown-in 120ms "],
+    ["misc.css",       "ob-mention-picker-in var(--wb-motion-duration-fast, 120ms)",   "ob-mention-picker-in 120ms "],
   ];
   for (const [file, expected, forbidden] of cases) {
     it(`${file} uses motion token (e.g. "${expected.slice(0, 40)}…")`, () => {
@@ -112,16 +112,16 @@ describe("R8.9 magic-number animation conversion (originally-listed 9 sites)", (
 
 describe("R8.9 short-second entrance animation conversion (~13 sites)", () => {
   const cases: Array<[string, string, string]> = [
-    ["automation.css",     "sidebarMoreFadeIn var(--wb-motion-duration-fast, 140ms)",  "sidebarMoreFadeIn 0.14s "],
+    ["automation.css",     "sidebarMoreFadeIn var(--wb-motion-duration-fast, 120ms)",  "sidebarMoreFadeIn 0.14s "],
     ["chat-shell.css",     "topbar-actions__fade-in var(--wb-motion-duration-fast, 120ms)", "topbar-actions__fade-in 0.12s "],
-    ["home.css",           "taskFilterFadeIn var(--wb-motion-duration-fast, 140ms)",  "taskFilterFadeIn 0.14s "],
+    ["home.css",           "taskFilterFadeIn var(--wb-motion-duration-fast, 120ms)",  "taskFilterFadeIn 0.14s "],
     ["home.css",           "settings-fade-in var(--wb-motion-duration-fast, 120ms)",  "settings-fade-in 0.12s "],
     ["home.css",           "settings-slide-up var(--wb-motion-duration-md, 180ms)",   "settings-slide-up 0.18s "],
     ["settings.css",       "settings-fade-in var(--wb-motion-duration-sm, 150ms)",    "settings-fade-in 0.15s "],
     ["settings.css",       "settings-slide-up var(--wb-motion-duration-base, 200ms)", "settings-slide-up 0.2s "],
     ["sidebar-menus.css",  "iam-fadeIn var(--wb-motion-duration-sm, 150ms)",          "iam-fadeIn .15s "],
     ["sidebar-menus.css",  "iam-fadeIn var(--wb-motion-duration-fast, 120ms)",        "iam-fadeIn .12s "],
-    ["sidebar-menus.css",  "permissionPickerFadeIn var(--wb-motion-duration-fast, 140ms)", "permissionPickerFadeIn 0.14s "],
+    ["sidebar-menus.css",  "permissionPickerFadeIn var(--wb-motion-duration-fast, 120ms)", "permissionPickerFadeIn 0.14s "],
     ["prose.css",          "ob-tip-fade-in var(--wb-motion-duration-slow, 450ms)",    "ob-tip-fade-in 0.45s "],
   ];
   for (const [file, expected, forbidden] of cases) {

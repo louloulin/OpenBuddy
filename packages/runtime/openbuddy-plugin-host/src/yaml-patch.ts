@@ -15,7 +15,7 @@
  *     `interpolate()` at apply time, matching deepseek-harness semantics)
  */
 import { parseAllDocuments } from "yaml";
-import { isJsExpr, type JsExpr } from "./js-expr";
+import { evaluate as evaluateJsExpr, isJsExpr, type JsExpr } from "./js-expr";
 
 export interface PatchEntry {
   id: string;
@@ -250,11 +250,7 @@ function interpolate(
   effective: Record<string, unknown> = scope,
 ): unknown {
   if (isJsExpr(value)) {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-    return (new Function("ctx", "expr", "with (ctx) { return eval(expr) }") as (
-      ctx: Record<string, unknown>,
-      expr: string,
-    ) => unknown)(effective, value.__jsExpr);
+    return evaluateJsExpr(effective, value.__jsExpr);
   }
   if (value === null || value === undefined) return value;
   if (typeof value !== "object") return value;

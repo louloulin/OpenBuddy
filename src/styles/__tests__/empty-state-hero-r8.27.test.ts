@@ -91,25 +91,30 @@ describe("R8.27 .chatview__empty-state-halo glow", () => {
 });
 
 describe("R8.27 .chatview__empty-state-icon lucide chip", () => {
-  it("is a 56×56 circle with brand-coloured icon", () => {
+  it("is a 56×56 circle with a neutral icon colour", () => {
     const body = ruleBody(css, ".chatview__empty-state-icon");
     expect(body).toBeTruthy();
     expect(body!).toMatch(/width:\s*56px/);
     expect(body!).toMatch(/height:\s*56px/);
     expect(body!).toMatch(/border-radius:\s*50%/);
-    expect(body!).toMatch(/color:\s*var\(--wb-brand/);
+    // R5 replaced the brand-coloured glyph with the muted text token —
+    // see the rule comment in chat-shell.css ("Minimal hero icon …
+    // clean border-only treatment"). Guard the neutral, not the brand.
+    expect(body!).toMatch(/color:\s*var\(--wb-text-medium\)/);
+    expect(body!).not.toMatch(/var\(--wb-brand/);
   });
 
-  it("border uses color-mix to blend brand tint with the default border (theme-safe)", () => {
+  it("uses the plain default border (no brand color-mix)", () => {
     const body = ruleBody(css, ".chatview__empty-state-icon");
     expect(body).toBeTruthy();
-    expect(body!).toMatch(/border:\s*1px solid color-mix\(in srgb,\s*var\(--wb-brand[\s\S]*?\)\s+20%/);
+    expect(body!).toMatch(/border:\s*1px solid var\(--wb-border-default\)/);
   });
 
-  it("box-shadow carries a brand-tinted glow (14% alpha)", () => {
+  it("carries no box-shadow glow", () => {
     const body = ruleBody(css, ".chatview__empty-state-icon");
     expect(body).toBeTruthy();
-    expect(body!).toMatch(/box-shadow:\s*0 4px 16px color-mix\(in srgb,\s*var\(--wb-brand[\s\S]*?\)\s+14%/);
+    // The heavy brand glow fought the rest of the page and was dropped.
+    expect(body!).not.toMatch(/box-shadow/);
   });
 });
 

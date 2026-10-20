@@ -85,13 +85,18 @@ describe("微内核槽位接线守卫 (R92)", () => {
 
   it("已接线的页面走 useSlotComponent,不再裸渲染内置组件", () => {
     // 抽样验明接线方式:这些页面必须是 `<XxxSlot ...>` 而不是 `<XxxPanel ...>`。
+    // 「邮件」的槽位消费在 ./EmailPlaceholder(懒加载岛,首屏体积优化时抽出),
+    // 其余页面仍在 PlaceholderPage 本体。
     const shell = readFileSync(join(ROOT, "src/components/shared/PlaceholderPage.tsx"), "utf8");
-    for (const slotVar of ["EmailSlot", "ProjectsSlot", "MyFilesSlot", "KnowledgeBaseSlot", "CloudStorageSlot", "DiscoverSlot", "NotifyChannelsSlot", "UsageQuotaSlot"]) {
+    const email = readFileSync(join(ROOT, "src/components/shared/EmailPlaceholder.tsx"), "utf8");
+    for (const slotVar of ["ProjectsSlot", "MyFilesSlot", "KnowledgeBaseSlot", "CloudStorageSlot", "DiscoverSlot", "NotifyChannelsSlot", "UsageQuotaSlot"]) {
       expect(shell, `${slotVar} 应当被渲染`).toMatch(new RegExp(`<${slotVar}[\\s/>]`));
     }
+    expect(email, "EmailSlot 应当被渲染").toMatch(/<EmailSlot[\s/>]/);
     // 反向:被替换掉的内置组件不应再出现在 JSX 里(import 保留作为 fallback)。
+    const shellAndEmail = shell + email;
     for (const bare of ["<EmailPanel ", "<ProjectsPanel ", "<MyFilesPanel ", "<KnowledgeBasePanel ", "<CloudStoragePanel ", "<DiscoverPanel ", "<NotifyChannelsPanel ", "<UsageQuotaPanel "]) {
-      expect(shell, `${bare} 应已改走槽位`).not.toContain(bare);
+      expect(shellAndEmail, `${bare} 应已改走槽位`).not.toContain(bare);
     }
   });
 });

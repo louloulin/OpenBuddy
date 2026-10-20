@@ -246,8 +246,13 @@ async function providerCatalog(): Promise<{ providers: readonly ProviderConfig[]
   });
   const models = allModels.flatMap((model) => {
     const value = model as unknown as { provider?: string; id?: string; name?: string; contextWindow?: number; reasoning?: boolean };
-    const providerId = value.provider ?? "custom";
-    const modelId = value.id ?? "unknown";
+    // pi 的默认模型表里有**不携带 provider/id** 的条目(一个 provider 都没配时尤其
+    // 明显)。此前它们被兜底成 provider="custom" / id="unknown" 原样透出,模型选择器
+    // 于是显示字面量 "unknown/unknown" —— 用户看到一个并不存在的模型。没有 id 或
+    // provider 的条目根本不是可选模型,直接跳过(下一条注释的 xai/grok 过滤同理)。
+    if (!value.id || !value.provider) return [];
+    const providerId = value.provider;
+    const modelId = value.id;
     // Pi ships xAI/Grok models for its own CLI defaults. OpenBuddy is Pi-first
     // but intentionally does not expose that legacy provider in its UI.
     if (providerId === "xai" || /(^|[/:-])grok([/:-]|$)/i.test(modelId) || /grok/i.test(value.name ?? "")) return [];

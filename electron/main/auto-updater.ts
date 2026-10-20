@@ -21,7 +21,7 @@
  * first time `autoUpdater` is *accessed*, NOT at module load. Importing
  * the package here is therefore safe to evaluate at top-of-module.
  */
-import { BrowserWindow } from "electron";
+import { BrowserWindow, ipcMain } from "electron";
 import { autoUpdater, type ProgressInfo, type UpdateInfo } from "electron-updater";
 import { createMainLogger, type MainLogger } from "@openbuddy/logging-main";
 
@@ -94,28 +94,68 @@ export function installAutoUpdater(opts: AutoUpdaterOptions = {}): AutoUpdaterHa
       }
     }
   };
-  const onAvailableIpc = (info: UpdateInfo) =>
-    broadcast(`${prefix}-available`, { version: info.version });
-  const onProgressIpc = (p: ProgressInfo) =>
-    broadcast(`${prefix}-progress`, { percent: p.percent });
-  const onDownloadedIpc = (info: UpdateInfo) =>
-    broadcast(`${prefix}-downloaded`, { version: info.version });
+  // P0(发布工程):渲染端可查询的状态 + 主动检查/安装通道。此前事件只广播
+  // 一次,渲染端错过即永久丢失;状态通道补齐这个缺口。全部状态更新并入下方
+  // *Ipc 监听器,stop() 统一摘除。
+  type UpdateState = {
+    status: "idle" | "checking" | "available" | "not-available" | "downloading" | "downloaded" | "error";
+    version?: string;
+    percent?: number;
+    error?: string;
+  };
+  let state: UpdateState = { status: "idle" };
+  const setState = (patch: UpdateState) => {
+    state = { ...state, ...patch };
+    broadcast(`${prefix}-state`, state);
+  };
 
+  const onCheckingIpc = () => setState({ status: "checking" });
+  const onAvailableIpc = (info: UpdateInfo) => {
+    setState({ status: "available", version: info.version });
+    broadcast(`${prefix}-available`, { version: info.version });
+  };
+  const onNotAvailableIpc = (info: UpdateInfo) => setState({ status: "not-available", version: info.version });
+  const onProgressIpc = (p: ProgressInfo) => {
+    setState({ status: "downloading", percent: p.percent });
+    broadcast(`${prefix}-progress`, { percent: p.percent });
+  };
+  const onDownloadedIpc = (info: UpdateInfo) => {
+    setState({ status: "downloaded", version: info.version });
+    broadcast(`${prefix}-downloaded`, { version: info.version });
+  };
+  const onErrorIpc = (err: Error) => setState({ status: "error", error: err?.message });
+
+  autoUpdater.on("checking-for-update", onCheckingIpc);
   autoUpdater.on("update-available", onAvailableIpc);
+  autoUpdater.on("update-not-available", onNotAvailableIpc);
   autoUpdater.on("download-progress", onProgressIpc);
   autoUpdater.on("update-downloaded", onDownloadedIpc);
+  autoUpdater.on("error", onErrorIpc);
+
+  ipcMain.handle("app:auto-update-state", () => state);
+  ipcMain.handle("app:check-updates", async () => {
+    started = false;
+    await triggerCheck();
+    return state;
+  });
+  ipcMain.handle("app:install-updates", () => {
+    if (state.status !== "downloaded") return { ok: false, error: "no downloaded update" };
+    autoUpdater.quitAndInstall(false, true);
+    return { ok: true };
+  });
 
   let started = false;
+  const triggerCheck = async (): Promise<void> => {
+    if (started) return;
+    started = true;
+    try {
+      await autoUpdater.checkForUpdates();
+    } catch (err) {
+      log.error({ err: err instanceof Error ? err.message : String(err) }, "checkForUpdates threw");
+    }
+  };
   return {
-    trigger: async () => {
-      if (started) return;
-      started = true;
-      try {
-        await autoUpdater.checkForUpdates();
-      } catch (err) {
-        log.error({ err: err instanceof Error ? err.message : String(err) }, "checkForUpdates threw");
-      }
-    },
+    trigger: triggerCheck,
     stop: () => {
       autoUpdater.off("error", onError);
       autoUpdater.off("checking-for-update", onChecking);
@@ -123,9 +163,12 @@ export function installAutoUpdater(opts: AutoUpdaterOptions = {}): AutoUpdaterHa
       autoUpdater.off("update-not-available", onNotAvailable);
       autoUpdater.off("download-progress", onProgress);
       autoUpdater.off("update-downloaded", onDownloaded);
+      autoUpdater.off("checking-for-update", onCheckingIpc);
       autoUpdater.off("update-available", onAvailableIpc);
+      autoUpdater.off("update-not-available", onNotAvailableIpc);
       autoUpdater.off("download-progress", onProgressIpc);
       autoUpdater.off("update-downloaded", onDownloadedIpc);
+      autoUpdater.off("error", onErrorIpc);
     },
   };
 }

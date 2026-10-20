@@ -127,10 +127,7 @@ try {
     if (pluginInventory.entries.some((entry) => entry.id === "openbuddy-automation")) {
       throw new Error(`removed automation plugin must not be mounted: ${JSON.stringify(pluginInventory.entries)}`);
     }
-    // Stage G-1c: openbuddy-automation removed; automation is owned
-    // by pi-background-tasks + pi-goal (passthrough). The legacy
-    // automations:* / automation_records_delete IPC channels no
-    // longer exist; renderer reaches the pi-native tool surface.
+    // 阶段 1.4:automations_* 已有真实实现(见 electron/main/ipc/automations.ts)。
 
     const experts = await window.api.invoke("experts_load", { root: expertPath });
     const prompt = await window.api.invoke("experts_read_agent_prompt", { root: expertPath, plugin: "reviewer", agentName: "reviewer" });

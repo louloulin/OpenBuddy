@@ -16,6 +16,7 @@
  */
 
 import * as piResources from "../../pi-resources";
+import { discoverHookConfigs } from "../../agent-hooks";
 import { type AgentHostState } from "../_state-shape";
 
 // ---------------------------------------------------------------------------
@@ -95,6 +96,25 @@ export async function refreshMarketplacePiResourcePaths(): Promise<void> {
   state.piMarketplaceResourcePaths.themes.splice(0, state.piMarketplaceResourcePaths.themes.length, ...new Set(next.themes));
   state.piMarketplaceAgentFiles.splice(0, state.piMarketplaceAgentFiles.length, ...agentFiles.map(({ path, content }) => ({ path, content })));
   syncPiNativeResourcePaths();
+  await refreshPiHookConfigs();
+}
+
+/**
+ * 扫描 profile 包 + 已启用 marketplace 插件包根目录的 hook 声明
+ * (package.json 的 openbuddy.hooks / dsh.hooks), 灌入 state.hookConfigs.
+ *
+ * 历史缺口: install-host-modules 的 `refreshHookConfigs` deps 槽位一直没人
+ * 绑真实现, 两个消费点 (plugin-mutations / profile-reload-transaction) 调的
+ * 都是默认 no-op, state.hookConfigs 永远为空 → marketplace hooks 从不生效.
+ */
+export async function refreshPiHookConfigs(): Promise<void> {
+  if (!state) throw new Error("profile/resource-paths: not installed");
+  const resources = await piResources.listPiPluginResourcePaths(state.cwd);
+  const configs = await discoverHookConfigs([
+    ...state.profilePiPackagePaths,
+    ...resources.map((entry) => entry.plugin.root),
+  ]);
+  state.hookConfigs.splice(0, state.hookConfigs.length, ...configs);
 }
 
 /**

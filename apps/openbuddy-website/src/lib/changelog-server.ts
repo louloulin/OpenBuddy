@@ -25,7 +25,7 @@ export interface ChangelogRelease {
   githubHref: string;
 }
 
-/** `### v0.15.0 (2026-09-01) — Title` (en) OR `## v0.15.0（2026-09-01）· Title` (zh-CN) */
+/** `### v0.16.0 (2026-09-22) — Title` (en) OR `## v0.16.0（2026-09-22）· Title` (zh-CN) */
 const RELEASE_RE_EN = /^###\s+(v\S+)\s+\(([^)]+)\)\s*[—–-]+\s*(.*)$/;
 const RELEASE_RE_ZH = /^##\s+(v\S+)\s*[（(]([^)）]+)[)）]\s*[·•\-—–]+\s*(.*)$/;
 

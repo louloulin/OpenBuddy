@@ -7,7 +7,7 @@
 | 文档 | 用途 |
 |---|---|
 | [`docs/EXTENSION_POINTS.md`](./EXTENSION_POINTS.md) | SlotCore 47 槽位审计表(声明 / 注册 / 消费 三方对照) |
-| [`docs/PI_EXTENSION_BRIDGE.md`](./PI_EXTENSION_BRIDGE.md) | Pi 扩展市场 IPC 速记 + 第三方索引源接入 |
+| `docs/PI_EXTENSION_BRIDGE.md` | Pi 扩展市场 IPC 速记 + 第三方索引源接入 |
 | [`docs/AUDIT_AND_TELEMETRY.md`](./AUDIT_AND_TELEMETRY.md) | 本地审计 / 遥测三层边界(本地优先卖点) |
 | [`docs/EXTENSION_RECIPES.md`](./EXTENSION_RECIPES.md) | 5 个常用场景的 manifest + index.tsx 可运行示例 |
 | [`docs/PLUGIN_DEVELOPMENT.md`](./PLUGIN_DEVELOPMENT.md) | 9 步从命名到 PR 的完整流程(双语) |
@@ -138,5 +138,5 @@ XlsxPreview / PptxPreview`(基于 docx-preview / SheetJS / pptx-preview)。
 ## 下一步
 
 - 想替换某块 UI → 选 recipe 改写,`api.registerSlot` 高 priority 即可整体替换。
-- 想接 Pi 扩展市场 → [`PI_EXTENSION_BRIDGE.md`](./PI_EXTENSION_BRIDGE.md)。
+- 想接 Pi 扩展市场 → `PI_EXTENSION_BRIDGE.md`。
 - 想把审计/遥测作为本地优先卖点 → [`AUDIT_AND_TELEMETRY.md`](./AUDIT_AND_TELEMETRY.md)。

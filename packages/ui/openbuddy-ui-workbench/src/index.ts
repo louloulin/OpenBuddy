@@ -54,7 +54,11 @@ export {
   runPluginCommand,
 } from "./plugin-commands";
 export type { PluginCommandPayload } from "./plugin-commands";
-export { ModelSelector } from "./ModelSelector";
+export {
+  ModelSelector,
+  inferCapabilities,
+  type CapabilityHint,
+} from "./ModelSelector";
 export type { ModelOption, ThinkingLevel } from "./ModelSelector";
 export { AssistantCalendarPanel } from "./AssistantCalendarPanel";
 export { AssistantWorkspacePanel, AssistantExtensionPanel } from "./AssistantWorkspacePanel";

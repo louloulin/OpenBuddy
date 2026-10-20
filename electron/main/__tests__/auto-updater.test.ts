@@ -26,6 +26,8 @@ vi.mock("electron", () => ({
       { isDestroyed: () => true, webContents: { send: deadSend } }, // must be skipped
     ],
   },
+  // P0:installAutoUpdater 现在注册渲染端查询/触发通道(app:auto-update-*)。
+  ipcMain: { handle: vi.fn(), off: vi.fn() },
 }));
 
 // Mock electron-updater with a TypedEmitter-like surface that we can drive.
@@ -147,5 +149,15 @@ describe("installAutoUpdater (minimal wire-up)", () => {
     expect(liveSend).not.toHaveBeenCalled();
     // Second stop must not throw.
     expect(() => handle.stop()).not.toThrow();
+  });
+
+  it("P0:注册渲染端查询/触发通道(app:auto-update-state 等)", async () => {
+    const { installAutoUpdater } = await importModule();
+    const { ipcMain } = await import("electron");
+    installAutoUpdater();
+    const channels = vi.mocked(ipcMain.handle).mock.calls.map((call) => call[0]);
+    for (const channel of ["app:auto-update-state", "app:check-updates", "app:install-updates"]) {
+      expect(channels).toContain(channel);
+    }
   });
 });

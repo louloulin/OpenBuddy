@@ -96,6 +96,9 @@ export function AiInboxShell({
   className,
 }: AiInboxShellProps): JSX.Element {
   const [view, setView] = useState<RailView>("today");
+  // listbox 里的漫游 tabindex：整个列表只有一个 Tab 落点，上下键在行之间
+  // 移动。没有它，role="option" 的行键盘完全够不着。
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [folder, setFolder] = useState<RailFolder>("inbox");
   const [commandOpen, setCommandOpen] = useState(false);
   const [recentPrompts, setRecentPrompts] = useState<Array<{ id: string; prompt: string; ranAt: string }>>([]);
@@ -139,6 +142,32 @@ export function AiInboxShell({
     if (view === "done") return [];
     return threads;
   }, [threads, view]);
+
+  // 漫游 tabindex 移动后，把 DOM 焦点同步到那一行（VirtualList 只挂载
+  // 视口附近的行，所以按 data 属性反查，且不能假设它一定已渲染）。
+  useEffect(() => {
+    if (!activeThreadId) return;
+    for (const el of document.querySelectorAll<HTMLElement>("[data-thread-id]")) {
+      if (el.dataset.threadId === activeThreadId) {
+        if (document.activeElement !== el) el.focus();
+        return;
+      }
+    }
+  }, [activeThreadId, filteredThreads]);
+
+  // listbox 行内的方向键：↑/↓ 换行，Home/End 跳首尾。
+  const moveActive = useCallback(
+    (step: number | "home" | "end") => {
+      if (filteredThreads.length === 0) return;
+      const at = filteredThreads.findIndex((t) => t.id === activeThreadId);
+      const next =
+        step === "home" ? 0
+        : step === "end" ? filteredThreads.length - 1
+        : Math.max(0, Math.min(filteredThreads.length - 1, at + step));
+      setActiveThreadId(filteredThreads[next]?.id ?? null);
+    },
+    [filteredThreads, activeThreadId],
+  );
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.id === selectedThreadId) ?? null,
@@ -444,7 +473,10 @@ export function AiInboxShell({
                   className={rowClass}
                   role="option"
                   aria-selected={isSelected || thread.id === selectedThreadId}
+                  tabIndex={activeThreadId === thread.id ? 0 : -1}
+                  onFocus={() => setActiveThreadId(thread.id)}
                   onClick={(event) => {
+                    setActiveThreadId(thread.id);
                     if (event.shiftKey) {
                       multi.handleRangeSelect(thread.id);
                     } else if (event.ctrlKey || event.metaKey) {
@@ -454,12 +486,34 @@ export function AiInboxShell({
                       onSelectThread?.(thread.id);
                     }
                   }}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      moveActive(1);
+                    } else if (event.key === "ArrowUp") {
+                      event.preventDefault();
+                      moveActive(-1);
+                    } else if (event.key === "Home") {
+                      event.preventDefault();
+                      moveActive("home");
+                    } else if (event.key === "End") {
+                      event.preventDefault();
+                      moveActive("end");
+                    } else if (event.key === "Enter" || event.key === " ") {
+                      // Enter 打开线程，Space 切换多选 —— 与鼠标语义一致。
+                      event.preventDefault();
+                      if (event.key === " " || event.ctrlKey || event.metaKey) {
+                        multi.handleToggleSelect(thread.id);
+                      } else {
+                        onSelectThread?.(thread.id);
+                      }
+                    }
+                  }}
                   data-thread-id={thread.id}
                   data-testid={`thread-row-${thread.id}`}
                 >
                   <label
                     className="ai-inbox-shell__row-check"
-                    onClick={(event) => event.stopPropagation()}
                     aria-label={`选择 ${thread.subject || "（无主题）"}`}
                   >
                     <input

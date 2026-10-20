@@ -26,7 +26,7 @@ assignees: ''
 
 ## Environment
 
-- **OpenBuddy version:** <!-- e.g. v0.15.0 or commit SHA -->
+- **OpenBuddy version:** <!-- e.g. v0.16.0 or commit SHA -->
 - **OS + version:** <!-- e.g. Windows 11 23H2, macOS 14.5, Ubuntu 22.04 -->
 - **Provider:** <!-- Anthropic / OpenAI / NewAPI / other — NEVER include the actual key -->
 - **Install method:** <!-- NSIS / DMG / AppImage / dev source -->

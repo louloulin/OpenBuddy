@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- hardenedRuntime 打包(required)下 Electron 运行必需的豁免项。
+         缺这些会导致渲染进程无法启动 JIT / 无法加载动态库。 -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <!-- 自动更新(electron-updater)下载安装包后需要 spawn 子进程。 -->
+    <key>com.apple.security.cs.allow-distributed-notification-usage</key>
+    <true/>
+  </dict>
+</plist>

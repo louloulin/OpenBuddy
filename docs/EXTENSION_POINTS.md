@@ -60,7 +60,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 
 ### SlotCore 槽位总表
 
-**共 67 个槽位** — `ok=30` · `ext=37` · `dead=0` · `no-impl=0`
+**共 65 个槽位** — `ok=30` · `ext=35` · `dead=0` · `no-impl=0`
 
 | Slot | Kind | Scope | 状态 | 声明于 | 注册方 | 消费方 |
 |---|---|---|---|---|---|---|
@@ -86,8 +86,6 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 | `home.scene-tabs` | `single` | `root` | 🔌 ext-default | @openbuddy/ui-settings | — | @openbuddy/ui-settings |
 | `home.scene.tab` | `list` | `root` | 🔌 ext-default | @openbuddy/ui-settings | — | @openbuddy/ui-settings |
 | `library.section` | `list` | `root` | ✅ ok | @openbuddy/ui-library | @openbuddy/ui-library | @openbuddy/ui-library |
-| `modules.marketplace` | `single` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-modules | — | — |
-| `modules.marketplace.item` | `list` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-modules | — | — |
 | `notifications` | `list` | `root` | 🔌 ext | @openbuddy/ui-primitives | @openbuddy/ui-primitives | — |
 | `onboarding.data-dir` | `single` | `session-maybe` | ✅ ok | @openbuddy/ui-onboarding | @openbuddy/ui-onboarding | app(src) |
 | `onboarding.feedback` | `single` | `root` | ✅ ok | @openbuddy/ui-onboarding | @openbuddy/ui-onboarding | app(src) |
@@ -143,7 +141,6 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 
 - 内置即默认:消费方自带 fallback,插件注册同名单例槽即整体替换 — `composer.toolbar.action`, `conversation.approvals`, `conversation.body`, `conversation.composer`, `conversation.message.markdown`, `conversation.toolside`, `editor.mention-sources`, `editor.slash-commands`, `editor.toolbar`, `experts.panel`, `home.practice-cases`, `home.scene-tabs`, `home.scene.tab`, `placeholder.billing`, `placeholder.cloud-storage`, `placeholder.credit-pricing`, `placeholder.credit-reconciliation`, `placeholder.credit-wallet`, `placeholder.discover`, `placeholder.email`, `placeholder.email-composer`, `placeholder.knowledge-base`, `placeholder.marketplace`, `placeholder.my-files`, `placeholder.notify-channels`, `placeholder.openbuddy-plugin`, `placeholder.plugins`, `placeholder.projects`, `placeholder.resource-catalog`, `placeholder.subagent`, `placeholder.usage-quota`, `root`
 - 已废弃:仅为兼容旧插件的类型引用保留,不要再接线 — `home.page`
-- 参考实现:声明包只导出组件,apply() 有意 no-op — `modules.marketplace`, `modules.marketplace.item`
 - 有意扩展点:留给本产品外壳之外的装配方(第三方外壳/插件可整块接管) — `notifications`, `shell.overlay`
 
 ### 渲染端贡献总线(第二条总线,与 SlotCore 并列)

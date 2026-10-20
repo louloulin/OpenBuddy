@@ -207,40 +207,35 @@ export const MarkdownPre = memo(function MarkdownPre({
       <div className="md-code-container">
         {showHeader ? (
           <div className="md-code-header">
-            <strong
-              className={
-                clickable ? "md-code-lang md-code-lang--clickable" : "md-code-lang"
-              }
-              title={
-                clickable && fileInfo
-                  ? `${fileInfo.startLine}:${fileInfo.endLine}:${fileInfo.filePath}`
-                  : language || "code"
-              }
-              onClick={clickable ? handleClickTitle : undefined}
-              role={clickable ? "button" : undefined}
-              tabIndex={clickable ? 0 : undefined}
-              onKeyDown={
-                clickable
-                  ? (e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleClickTitle();
-                      }
-                    }
-                  : undefined
-              }
-            >
-              {clickable && fileInfo ? (
-                <>
-                  {fileInfo.fileName}
-                  <span className="md-code-line-range">
-                    L{fileInfo.startLine}-L{fileInfo.endLine}
-                  </span>
-                </>
-              ) : (
-                language || "code"
-              )}
-            </strong>
+            {/* 可点击时是真 button；不可点击时保持 <strong>。两者都靠 .md-code-lang
+                这个 class 取样式，换元素不影响外观。 */}
+            {clickable ? (
+              <button
+                type="button"
+                className="md-code-lang md-code-lang--clickable"
+                title={
+                  fileInfo
+                    ? `${fileInfo.startLine}:${fileInfo.endLine}:${fileInfo.filePath}`
+                    : language || "code"
+                }
+                onClick={handleClickTitle}
+              >
+                {fileInfo ? (
+                  <>
+                    {fileInfo.fileName}
+                    <span className="md-code-line-range">
+                      L{fileInfo.startLine}-L{fileInfo.endLine}
+                    </span>
+                  </>
+                ) : (
+                  language || "code"
+                )}
+              </button>
+            ) : (
+              <strong className="md-code-lang" title={language || "code"}>
+                {language || "code"}
+              </strong>
+            )}
             <CodeBlockActions
               code={code}
               language={language}

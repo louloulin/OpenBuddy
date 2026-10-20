@@ -33,8 +33,10 @@ import { Markdown } from "@openbuddy/ui-markdown";
 export const MAX_MARKDOWN_CHARS = 250_000;
 
 export interface SafeMarkdownBodyProps
-  extends Omit<ComponentProps<typeof Markdown>, "children"> {
+  extends Omit<ComponentProps<typeof Markdown>, "children" | "className"> {
   children: string;
+  /** 外层 className(包在 Markdown wrapper div 上,因 Markdown 本身不接受 className)。 */
+  className?: string;
   /** Optional i18n hook. Falls back to literal strings. */
   t?: (key: string, params?: Record<string, string | number>) => string;
   /** Test override for the threshold. */
@@ -57,11 +59,12 @@ export function SafeMarkdownBody({
   const [showRaw, setShowRaw] = useState(false);
 
   // Below threshold — render through the regular Markdown pipeline.
+  // Markdown 不收 className,所以用 wrapper div 承载外层 className。
   if (children.length <= threshold) {
     return (
-      <Markdown className={className} {...rest}>
-        {children}
-      </Markdown>
+      <div className={className}>
+        <Markdown {...rest}>{children}</Markdown>
+      </div>
     );
   }
 

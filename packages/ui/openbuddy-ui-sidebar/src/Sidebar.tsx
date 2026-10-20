@@ -20,7 +20,6 @@ import {
   WbAssistantNavIcon,
   WbProjectNavIcon,
   WbExpertNavIcon,
-  WbAutomationNavIcon,
   WbMoreNavIcon,
   SearchIcon,
   FilterIcon,
@@ -44,6 +43,8 @@ import {
   MoreMenuTencentLexiangIcon,
   PuzzlePieceIcon,
   MailIcon,
+  MemoryIcon,
+  WbAutomationNavIcon,
 } from "@openbuddy/ui-primitives/icons";
 import { APP_VERSION } from "@/lib/platform/app-version";
 import { useRendererContributions, useRendererSlot } from "@/lib/runtime/renderer-plugin-runtime";
@@ -76,8 +77,12 @@ const NAV = [
   // "专家·技能·连接器" 视图内已经包含"插件·市场"子 tab(Pi 官方市场 +
   // 本地插件浏览/安装),所以插件市场入口归在这里,主导航不再单独列项。
   { label: "专家·技能·连接器", icon: WbExpertNavIcon },
+  // 阶段 1.4 恢复:主进程调度引擎 + 运行历史已接回(automations:* IPC),
+  // 面板的 list/save/toggle/runNow/记录归档全部走真实通道。
   { label: "自动化", icon: WbAutomationNavIcon },
   { label: "邮件", icon: MailIcon },
+  // 阶段 1.5:本地两层记忆(全局 + 工作区)。云层明确不做。
+  { label: "记忆", icon: MemoryIcon },
 ];
 
 /** Last path segment of a working directory, used as a 空间 node label. */
@@ -87,6 +92,26 @@ function basename(p: string): string {
   const i = Math.max(norm.lastIndexOf("/"), norm.lastIndexOf("\\"));
   const name = i >= 0 ? norm.slice(i + 1) : norm;
   return name || "默认空间";
+}
+
+/**
+ * C2(2026-10-14)—— 会话行的方向键导航(Claude row-panel 范式):
+ * ↑/↓ 把焦点移到文档序的上/下一个会话行(跨置顶/分组/空间各段连续移动),
+ * Home/End 跳到第一/最后一行。焦点不在行上时 no-op(列表正常滚动)。
+ */
+function focusAdjacentConvRow(current: HTMLElement, dir: "up" | "down" | "first" | "last"): void {
+  const rows = Array.from(document.querySelectorAll<HTMLElement>(".sidebar__conv")).filter(
+    (el) => !el.hidden && el.style.display !== "none",
+  );
+  if (rows.length === 0) return;
+  const index = rows.indexOf(current);
+  if (index < 0) return;
+  let next: number;
+  if (dir === "first") next = 0;
+  else if (dir === "last") next = rows.length - 1;
+  else if (dir === "down") next = Math.min(rows.length - 1, index + 1);
+  else next = Math.max(0, index - 1);
+  if (next !== index) rows[next]?.focus();
 }
 
 /** Compact, locale-friendly relative time for the sidebar row tail. */
@@ -326,6 +351,8 @@ function SessionContextMenu({ x, y, sessionId, sessionTitle, isPinned, onClose, 
     <div
       className="context-menu"
       style={{ position: "fixed", left: x, top: y, zIndex: 1000 }}
+      // 只做「点菜单内部不要被 document 级点击监听关掉」的冒泡拦截,不是控件。
+      role="presentation"
       onClick={(e) => e.stopPropagation()}
     >
       {renaming ? (
@@ -727,7 +754,7 @@ export const SessionRow = memo(function SessionRow({
   // R2.2 — multi-select support. Hold Shift/Cmd/Ctrl while clicking a row to
   // toggle selection without opening the session. Long-click (300ms) also
   // works for mouse-only users; the toolbar then takes over.
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleClick = (e: React.MouseEvent | React.KeyboardEvent) => {
     const multi = e.shiftKey || e.metaKey || e.ctrlKey;
     if (onToggleSelected) {
       onToggleSelected(s.sessionId, multi);
@@ -737,7 +764,7 @@ export const SessionRow = memo(function SessionRow({
     onSelect(s.sessionId, s.cwd);
   };
   return (
-    <button
+    <div
       className={
         "sidebar__conv" +
         (isCurrent ? " sidebar__conv--active" : "") +
@@ -746,7 +773,28 @@ export const SessionRow = memo(function SessionRow({
         (isSelected ? " sidebar__conv--selected" : "") +
         (isCurrent && isStreaming ? " sidebar__conv--streaming" : "")
       }
+      // 行本身是一个 role="button" 容器而不是原生 <button>:行尾挂着
+      // 更多/归档/置顶三个真按钮，原生 button 里再套 button 是非法 HTML，
+      // 且 button 的 children-are-presentational 会让读屏吞掉内层按钮。
+      // 容器补 tabIndex + Enter/Space(.sidebar__conv 的 CSS 自成一体,
+      // div 上排版与 button 完全一致)。
+      role="button"
+      tabIndex={0}
       onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleClick(e);
+          return;
+        }
+        // C2:方向键在会话行间移动(不劫持无焦点时的滚动 —— 本 handler 只在
+        // 行聚焦时触发,天然满足)。
+        if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End") {
+          e.preventDefault();
+          const dir = e.key === "ArrowDown" ? "down" : e.key === "ArrowUp" ? "up" : e.key === "Home" ? "first" : "last";
+          focusAdjacentConvRow(e.currentTarget as HTMLElement, dir);
+        }
+      }}
       aria-pressed={isSelected ? true : undefined}
       // Suppress the browser's native context menu — actions live on the
       // inline hover icons (more / archive / pin). Right-clicking the row
@@ -762,20 +810,24 @@ export const SessionRow = memo(function SessionRow({
       {pinned && <PinFilledIcon size="sm" className="sidebar__conv-pin" />}
       {archived && <span className="sidebar__conv-archived-tag" aria-label="已归档">已归档</span>}
       {s.updatedAt && <span className="sidebar__conv-time">{relativeTime(s.updatedAt)}</span>}
-      <span className="sidebar__conv-actions" onClick={(e) => e.stopPropagation()}>
-        <span
-          role="button"
+      {/* 只做「点了行尾按钮不要连带选中/切换会话」的冒泡拦截,本身不是控件。
+          .sidebar__conv-action / .sidebar__node-action 只声明了尺寸和颜色,
+          没写 width/padding —— 原生 button 会带上 UA 的 1px 6px padding,
+          在 22px 的 border-box 盒子里把图标挤到 10px,所以这里补 padding:0。 */}
+      <span className="sidebar__conv-actions" role="presentation" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
           className="sidebar__conv-action"
           aria-label="更多"
           data-tip="更多"
           onClick={(e) => onMenuFromButton(e, s.sessionId, title, pinned)}
         >
           <MoreDotsIcon size="sm" />
-        </span>
+        </button>
         {archived ? (
           onUnarchive ? (
-            <span
-              role="button"
+            <button
+              type="button"
               className="sidebar__conv-action sidebar__conv-action--restore"
               aria-label="恢复"
               data-tip="恢复"
@@ -786,30 +838,30 @@ export const SessionRow = memo(function SessionRow({
                   by reusing the Archive outline rotated; instead we just
                   keep the Archive glyph and flip the meaning via aria/tooltip. */}
               <ArchiveIcon size="sm" />
-            </span>
+            </button>
           ) : null
         ) : (
-          <span
-            role="button"
+          <button
+            type="button"
             className="sidebar__conv-action"
             aria-label="归档"
             data-tip="归档"
             onClick={() => onArchive(s.sessionId)}
           >
             <ArchiveIcon size="sm" />
-          </span>
+          </button>
         )}
-        <span
-          role="button"
+        <button
+          type="button"
           className="sidebar__conv-action"
           aria-label={pinned ? "取消置顶" : "置顶"}
           data-tip={pinned ? "取消置顶" : "置顶"}
           onClick={() => onPin(s.sessionId, !pinned)}
         >
           {pinned ? <WbUnpinIcon size="sm" /> : <WbPinIcon size="sm" />}
-        </span>
+        </button>
       </span>
-    </button>
+    </div>
   );
 });
 
@@ -1660,15 +1712,25 @@ export function Sidebar({
               const open = !!expandedProjects[proj.id];
               return (
                 <div key={proj.id} className="sidebar__node-wrap">
-                  <button
+                  {/* 同 SessionRow：行内挂了「新建对话」按钮，行本身只能是
+                      role="button" 容器（原生 button 套 button 是非法 HTML）。 */}
+                  <div
                     className="sidebar__node sidebar__node--project"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onOpenProject?.(proj.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onOpenProject?.(proj.id);
+                      }
+                    }}
                     title={proj.name}
                   >
                     <ProjectNodeIcon />
                     <span className="sidebar__node-name">{proj.name}</span>
-                    <span
-                      role="button"
+                    <button
+                      type="button"
                       className="sidebar__node-action"
                       aria-label="新建对话"
                       data-tip="新建对话"
@@ -1678,7 +1740,7 @@ export function Sidebar({
                       }}
                     >
                       <AddIcon size="sm" />
-                    </span>
+                    </button>
                     <ChevronDownIcon
                       size="sm"
                       className={"sidebar__chevron" + (open ? "" : " sidebar__chevron--collapsed")}
@@ -1687,7 +1749,7 @@ export function Sidebar({
                         setExpandedProjects((prev) => ({ ...prev, [proj.id]: !prev[proj.id] }));
                       }}
                     />
-                  </button>
+                  </div>
                   {open && (
                     <div className="sidebar__children">
                       {proj.conversations.length === 0 && (

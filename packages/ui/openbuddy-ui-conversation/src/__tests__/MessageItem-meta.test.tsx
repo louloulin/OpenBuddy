@@ -80,7 +80,8 @@ describe("MessageItem — R8.14 per-message meta chip", () => {
     );
     const meta = container.querySelector(".msg__meta.msg__meta--streaming");
     expect(meta).toBeTruthy();
-    expect(meta?.textContent).toContain("正在生成");
+    // 2026-10-14 Claude 对齐:「正在生成」指示收敛到 WorkingDot,meta 只留时长。
+    expect(meta?.textContent).toMatch(/^\d+s$/);
     expect(meta?.textContent).toContain("12s");
   });
 
@@ -105,8 +106,8 @@ describe("MessageItem — R8.14 per-message meta chip", () => {
           role: "assistant",
           parts: [{ kind: "text", text: "old" }],
           complete: true,
-          // @ts-expect-error — createdAt is required in TS but we want
-          // to verify the runtime guard for legacy transcripts.
+          // createdAt 是可选的(legacy transcripts 允许缺失),运行时用
+          // guard 处理。这里不再需要 @ts-expect-error。
         }}
         streaming={false}
       />,

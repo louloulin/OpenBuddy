@@ -248,9 +248,16 @@ export function ProjectDetailView({
           onConfirm={(items) => setPicked(pickerFor, items)}
         />
       )}
+      {/* 遮罩是纯装饰层;点遮罩关闭用 e.target === e.currentTarget 判断,内层
+          dialog 不再需要 stopPropagation(role="dialog" 要保留:
+          settings.css 的 `.modal-overlay > [role="dialog"]` 入场动画靠它)。 */}
       {automationOpen && (
-        <div className="modal-overlay" onClick={() => setAutomationOpen(false)}>
-          <div className="proj-automation-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-label="自动化管理">
+        <div
+          className="modal-overlay"
+          role="presentation"
+          onClick={(e) => { if (e.target === e.currentTarget) setAutomationOpen(false); }}
+        >
+          <div className="proj-automation-modal" role="dialog" aria-label="自动化管理">
             <div className="proj-automation-modal__head">
               <h3>自动化管理</h3>
               <button type="button" className="create-colleague-close" onClick={() => setAutomationOpen(false)} aria-label="关闭">×</button>
@@ -295,11 +302,15 @@ function ConfigDrawer({
   const card = CONFIG_CARDS.find((c) => c.key === drawer)!;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="create-colleague-dialog proj-drawer" onClick={(e) => e.stopPropagation()} role="dialog">
+    <div
+      className="modal-overlay"
+      role="presentation"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="create-colleague-dialog proj-drawer" role="dialog">
         <div className="create-colleague-header">
           <h3>{card.title}</h3>
-          <button className="create-colleague-close" onClick={onClose} aria-label="关闭">×</button>
+          <button type="button" className="create-colleague-close" onClick={onClose} aria-label="关闭">×</button>
         </div>
         <div className="create-colleague-body">
           {drawer === "instruction" && (

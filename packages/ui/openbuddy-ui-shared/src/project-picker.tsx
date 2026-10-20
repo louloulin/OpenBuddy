@@ -210,8 +210,32 @@ export function RefPickerDialog({
     );
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="create-colleague-dialog proj-picker-dialog" onClick={(e) => e.stopPropagation()} role="dialog">
+    <div className="modal-overlay">
+      {/* 遮罩是个真正的 button（tabIndex={-1}：键盘走 Esc 或右上角关闭按钮）。
+          原来靠「外层 div 的 onClick + 内层 div 的 stopPropagation」来区分
+          点遮罩和点弹窗 —— 那是纯鼠标路径，键盘用户两种点击都做不到。 */}
+      <button
+        type="button"
+        aria-label={`关闭${title}选择`}
+        tabIndex={-1}
+        onClick={onCancel}
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          background: "transparent",
+          border: 0,
+          padding: 0,
+          cursor: "default",
+        }}
+      />
+      <div
+        className="create-colleague-dialog proj-picker-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`添加${title}`}
+        style={{ position: "relative", zIndex: 1 }}
+      >
         <div className="create-colleague-header">
           <h3>添加{title}</h3>
           <button className="create-colleague-close" onClick={onCancel} aria-label="关闭">

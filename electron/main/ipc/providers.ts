@@ -18,6 +18,7 @@ import {
   requiredString,
 } from "./validation";
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
+import { emitRendererEvent } from "./agent-host-proxy";
 
 /**
  * Provider kinds whose wire protocol is Anthropic-Messages
@@ -61,12 +62,20 @@ export function registerProvidersIpc(deps: AgentHostIpcDeps): void {
       ...(provider.authScheme === undefined ? {} : { authScheme: enumValue(provider.authScheme, "authScheme", ["bearer", "x_api_key"] as const) }),
       ...(provider.contextWindow === undefined ? {} : { contextWindow: optionalFiniteInteger(provider.contextWindow, "contextWindow", 128000, 1, 10_000_000) }),
     };
-    return agentHost.saveProvider(normalized);
+    const result = await agentHost.saveProvider(normalized);
+    // Broadcast so the renderer re-syncs `auth.ready` + the model catalog.
+    // Without this, a provider saved outside the Settings dialog (test
+    // harness, plugin, CLI-driven IPC) left the composer disabled forever:
+    // `apiReady` is derived from a one-shot init snapshot that only the
+    // Settings panel refreshed. The renderer treats this as "re-run
+    // auth-status + providers-list".
+    emitRendererEvent("openbuddy://providers-changed", { reason: "provider-saved", id: normalized.id });
+    return result;
   });
   ipcMain.handle("agent:providers-save-model", async (_e, args: unknown) => {
     const input = recordValue(args, "model save payload");
     const model = recordValue(input.model, "model");
-    return agentHost.saveModel({
+    const savedModel = await agentHost.saveModel({
       ...model,
       providerId: providerId(model.providerId),
       modelId: modelId(model.modelId),
@@ -80,13 +89,19 @@ export function registerProvidersIpc(deps: AgentHostIpcDeps): void {
       // omits it (e.g. a hand-added MiniMax-M3, which does reason).
       ...(model.reasoning === undefined ? {} : { reasoning: Boolean(model.reasoning) }),
     });
+    emitRendererEvent("openbuddy://providers-changed", { reason: "model-saved" });
+    return savedModel;
   });
   ipcMain.handle("agent:providers-delete-provider", async (_e, args: unknown) => {
-    return agentHost.deleteProvider(providerId(recordValue(args, "provider delete payload").id));
+    const deleted = await agentHost.deleteProvider(providerId(recordValue(args, "provider delete payload").id));
+    emitRendererEvent("openbuddy://providers-changed", { reason: "provider-deleted" });
+    return deleted;
   });
   ipcMain.handle("agent:providers-delete-model", async (_e, args: unknown) => {
     const input = recordValue(args, "model delete payload");
-    return agentHost.deleteModel(providerId(input.providerId), modelId(input.modelId));
+    const deletedModel = await agentHost.deleteModel(providerId(input.providerId), modelId(input.modelId));
+    emitRendererEvent("openbuddy://providers-changed", { reason: "model-deleted" });
+    return deletedModel;
   });
   ipcMain.handle("agent:providers-fetch-models", async (_e, args: unknown) => {
     const input = recordValue(args, "model discovery payload");

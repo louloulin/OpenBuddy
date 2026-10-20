@@ -13,6 +13,10 @@
  *   - ./client        → apply() 槽位注册入口(由 ui-runtime 在 SlotProvider 挂载时调用)
  *   - ./invariant     → 不变式同伴(debug 模式下激活)
  *
+ * R97 清理:删除 ./pi-extensions-model 顶层导出(R83 起 MarketplacePanel
+ * 已自包含实现 marketplace 数据加载,孤儿 model 整文件删除;R100 决定仅
+ * MarketplacePanel 作为事实唯一对外契约)。
+ *
  * @see packages/ui/AGENTS.md 了解 ui-* 包协作约定
  */
 export { DiscoverPanel } from "./DiscoverPanel";
@@ -23,24 +27,8 @@ export type { InstallPreflight, PreflightItem, PreflightLevel, PreflightAction }
 export { InstallPreflightDialog } from "./InstallPreflightDialog";
 export { NotifyChannelsPanel } from "./NotifyChannelsPanel";
 export { OpenBuddyPluginPanel } from "./OpenBuddyPluginPanel";
-export { PiExtensionsSection } from "./PiExtensionsSection";
-export {
-  describePiMarketError,
-  groupPiMarketEntries,
-  installStateOf,
-  mirrorLabel,
-  sourceChips,
-  sourceLabel,
-  summarizeSources,
-  toMarketplaceEntry,
-  type PiExtensionsGroups,
-  type PiMarketErrorAction,
-  type PiMarketSourceSummary,
-  type PiSourceChip,
-} from "./pi-extensions-model";
 export { PluginsPanel } from "./PluginsPanel";
 export { ResourceCatalogPanel } from "./ResourceCatalogPanel";
-
 
 declare module "@openbuddy/ui-slots" {
   interface SlotMap {

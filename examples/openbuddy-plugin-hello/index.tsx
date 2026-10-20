@@ -8,7 +8,7 @@ import { defineExtension } from "@openbuddy/plugin-sdk";
 export default defineExtension({
   manifest: {
     name: "openbuddy-plugin-hello",
-    version: "0.15.0",
+    version: "0.16.0",
     description: "在 HomePage 注册一个 'Hello' 场景 tab，点击弹出问候。",
     author: "OpenBuddy Team",
     contributes: {

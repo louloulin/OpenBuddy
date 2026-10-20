@@ -1,33 +1,17 @@
 /// <reference types="vitest" />
 /**
- * Vitest-only configuration for OpenBuddy.
+ * Vitest configuration for OpenBuddy.
  *
  * The renderer/build/dev pipeline is driven by `electron.vite.config.ts`;
- * this file keeps the renderer's dependency graph small. Tests use the
- * separate `vitest.config.ts`, which carries the full workspace alias map.
+ * this file keeps the renderer's dependency graph small.
  *
- * If a new workspace package is used by the renderer, mirror its alias here
- * and in `electron.vite.config.ts`.
+ * 2026-09 改造:用 `vite-tsconfig-paths` 从根 tsconfig.json 自动派生 alias,
+ * 不再手写 ~50 个 `@openbuddy/*` 别名。新增包时只需在 tsconfig.json 的
+ * paths 里加一条,本配置无需修改。
  */
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 import { defineConfig } from "vite";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-const rendererPackageAliases = {
-  "@openbuddy/plugin-host/renderer-patch": resolve(__dirname, "packages/runtime/openbuddy-plugin-host/src/renderer-patch.ts"),
-  "@openbuddy/plugin-host/yaml-patch": resolve(__dirname, "packages/runtime/openbuddy-plugin-host/src/yaml-patch.ts"),
-  "@openbuddy/plugin-host/plugin-manifest": resolve(__dirname, "packages/runtime/openbuddy-plugin-host/src/openbuddy-plugin-manifest.ts"),
-  "@openbuddy/cordis": resolve(__dirname, "packages/runtime/openbuddy-cordis/src/index.ts"),
-  "@openbuddy/renderer-host": resolve(__dirname, "packages/renderer/openbuddy-renderer-host/src/index.ts"),
-};
+import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      "@": resolve(__dirname, "src"),
-      ...rendererPackageAliases,
-    },
-  },
+  plugins: [tsconfigPaths()],
 });

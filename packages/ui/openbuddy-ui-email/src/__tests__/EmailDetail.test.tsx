@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { EmailThread } from "@openbuddy/capability-email";
+import type { EmailThread } from "@openbuddy/capability-email/renderer";
 import { EmailDetail } from "../EmailDetail";
 
 const thread = { id: "t1", accountId: "a1", subject: "Project", labels: [], messages: [{ id: "m1", threadId: "t1", from: { address: "sender@example.com" }, to: [], cc: [], subject: "Project", date: "2026-01-01T00:00:00.000Z", text: "Hello", html: undefined, unread: true, attachments: [] }] } as unknown as EmailThread;

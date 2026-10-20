@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const mainDir = process.argv[2] ?? "out/main";
+const mainDir = process.argv[2] ?? "dist/main";
 if (!existsSync(mainDir)) {
   console.error(`[main-chunks] missing build directory: ${mainDir}`);
   process.exit(1);

@@ -8,7 +8,7 @@
 
 ## 🇨🇳 简体中文 · 文档入口
 
-> 📅 最近一次全面核验:2026-09-05 · 📦 对应版本:`0.15.0` · 🌿 git HEAD:`a9d240ff feat(pi-observability): forward session_tree / session_before_fork / provider hooks`
+> 📅 最近一次全面核验:2026-09-22 · 📦 对应版本:`0.16.0` · 🌿 git HEAD:`23f91d8 refactor(tsconfig): collapse per-package paths into tsconfig.package-base.json + vite-tsconfig-paths`
 
 ### 🚀 30 秒速览
 
@@ -73,7 +73,7 @@
 - [`openbuddy-product-vs-pi.md`](openbuddy-product-vs-pi.md) — OpenBuddy 如何扩展 Pi
 - [`pi-core-capabilities.md`](pi-core-capabilities.md) — Pi 核心能力
 - [`pi-extension-architecture.md`](pi-extension-architecture.md) — Pi 扩展点
-- [`pi-capability-gap-analysis.md`](pi-capability-gap-analysis.md) — 我们填补的能力空白
+- `pi-capability-gap-analysis.md` — 我们填补的能力空白
 - [`pi-analysis-critique.md`](pi-analysis-critique.md) — 对 Pi 分析的批判
 - [`pi-runtime-next-roadmap.md`](pi-runtime-next-roadmap.md) — Pi 运行时路线图
 - [`pi-real-plugin-compatibility.md`](pi-real-plugin-compatibility.md) — Pi 插件兼容性
@@ -97,7 +97,7 @@
 
 ### 🔄 迁移历史
 
-- [`migration-pi-electron.md`](migration-pi-electron.md) — Pi → Electron 迁移记录
+- `migration-pi-electron.md` — Pi → Electron 迁移记录
 - [`moon-monorepo-refactor.md`](moon-monorepo-refactor.md) — moon monorepo 重构
 - [`deepseek-cordis-runtime-status.md`](deepseek-cordis-runtime-status.md) — DeepSeek Cordis 运行时状态
 - [`dsh-version-compatibility-matrix.md`](dsh-version-compatibility-matrix.md) — DSH 版本兼容矩阵
@@ -156,7 +156,7 @@
 ### 💼 商业模式
 
 - [`openbuddy-commercial-model.md`](openbuddy-commercial-model.md) — 商业模式
-- [`publish-checklist-v0.15.0.md`](publish-checklist-v0.15.0.md) — v0.15.0 发布清单
+- [`publish-checklist-v0.15.0.md`](publish-checklist-v0.15.0.md) — 企业/服务端发布清单(离线 bundle 推到生产主机)
 
 ### 🌏 社区
 

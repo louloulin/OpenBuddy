@@ -6,8 +6,8 @@
  */
 import { useEffect, useState } from "react";
 import { invoke, openOne } from "@/lib/platform/electron-api";
-import { searchKb, listKbProvidersWithStats, registerKbProvider, unregisterKbProvider, rebuildAllKbProviders, type KbEntry, type KbIndexStats } from "@openbuddy/files-kb";
-import { createLocalKbProvider } from "@openbuddy/files-kb";
+import { searchKb, listKbProvidersWithStats, registerKbProvider, unregisterKbProvider, rebuildAllKbProviders, type KbEntry, type KbIndexStats } from "@openbuddy/files-kb/renderer";
+import { createLocalKbProvider } from "@openbuddy/files-kb/renderer";
 import { createElectronDirectoryReader, isElectronAvailable } from "@/lib/files/electron-kb-reader";
 
 interface KnowledgeBasePanelProps {
@@ -202,12 +202,31 @@ export function KnowledgeBasePanel({ onOpen, onToast }: KnowledgeBasePanelProps)
               <li
                 key={`${e.source}:${e.id}`}
                 className="kb-panel__row"
-                onClick={() => onOpen?.(e.id, e.url)}
-                title={e.url ?? e.title}
               >
-                <span className="kb-panel__row-source">{e.source}</span>
-                <span className="kb-panel__row-title">{e.title}</span>
-                {e.snippet && <span className="kb-panel__row-snippet">{e.snippet}</span>}
+                {/* 行原本是「li + onClick」，键盘完全够不着。改为 li 只负责
+                    排版，真正的入口是一个撑满整行的 button。 */}
+                <button
+                  type="button"
+                  onClick={() => onOpen?.(e.id, e.url)}
+                  title={e.url ?? e.title}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                    width: "100%",
+                    padding: 0,
+                    border: 0,
+                    background: "none",
+                    font: "inherit",
+                    color: "inherit",
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span className="kb-panel__row-source">{e.source}</span>
+                  <span className="kb-panel__row-title">{e.title}</span>
+                  {e.snippet && <span className="kb-panel__row-snippet">{e.snippet}</span>}
+                </button>
               </li>
             ))
           )}

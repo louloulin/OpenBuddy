@@ -117,7 +117,8 @@ function QueueRow({
           }}
         />
       ) : (
-        <span
+        <button
+          type="button"
           className="queue-row__text"
           title="点击编辑"
           onClick={() => {
@@ -126,7 +127,7 @@ function QueueRow({
           }}
         >
           {item.text}
-        </span>
+        </button>
       )}
       <span className="queue-row__actions">
         <button

@@ -23,8 +23,16 @@ export function ConnectorCard({
 }) {
   const badge = BADGE[authState];
   const connected = authState === "installed" || authState === "authed";
+  // 卡片内嵌了一个真实 <button>(配置 / 连接),把容器本身换成 <button>
+  // 会产生非法的按钮嵌套,因此这里保留容器元素,补上 role + tabIndex + 键盘
+  // 事件,让键盘用户至少能激活卡片主体打开详情。
+  const openFromCard = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(connector); }
+  };
   return (
-    <article className="cn-card" onClick={() => onOpen(connector)}>
+    <div className="cn-card" role="button" tabIndex={0}
+      onClick={() => onOpen(connector)}
+      onKeyDown={openFromCard}>
       <ConnectorIcon local={connector.iconLocal} name={connector.name} size={36} shape="square" root={root} />
       <div className="cn-card-info">
         <div className="cn-card-name">
@@ -38,6 +46,6 @@ export function ConnectorCard({
         onClick={(e) => { e.stopPropagation(); onConfigure(connector); }}>
         {connected ? <CheckIcon size="sm" /> : authState === "needs-auth" ? <RefreshCwIcon size="sm" /> : <AddIcon size="sm" />}
       </button>
-    </article>
+    </div>
   );
 }

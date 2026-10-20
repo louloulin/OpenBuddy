@@ -106,17 +106,20 @@ describe("ToolCallCard duration display", () => {
 
   it("includes duration in aria-label and title for accessibility", () => {
     const startedAt = Date.now() - 1_500;
-    render(
+    const { container } = render(
       <ToolCallCard tc={makeTc({ status: "completed", startedAt })} />,
     );
-    const button = screen.getByRole("button");
+    // 紧凑行是 role="button" 的容器 div,行内还有一个真正的「内联展开」按钮,
+    // 所以 getByRole("button") 会命中两个 —— 直接按行 class 取(与
+    // ToolCallCard-expanded.test.tsx 的写法一致)。
+    const button = container.querySelector(".toolcall--compact") as HTMLElement;
     expect(button.getAttribute("aria-label")).toMatch(/1\.5s/);
     expect(button.getAttribute("title")).toMatch(/1\.5s/);
   });
 
   it("does not include duration in title when startedAt is missing (graceful degradation)", () => {
-    render(<ToolCallCard tc={makeTc({ status: "completed" })} />);
-    const button = screen.getByRole("button");
+    const { container } = render(<ToolCallCard tc={makeTc({ status: "completed" })} />);
+    const button = container.querySelector(".toolcall--compact") as HTMLElement;
     // Title should still include status, just no " · 1.5s" suffix
     expect(button.getAttribute("title")).not.toMatch(/·/);
   });

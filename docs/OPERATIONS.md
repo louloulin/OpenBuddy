@@ -108,7 +108,7 @@ For OpenBuddy to call NewAPI on behalf of users:
 
 ### Resource Gateway (billing + admin)
 
-The Resource Gateway is the REST backend for the Admin Portal. It's at [`services/casdoor-resource-gateway/`](../../services/casdoor-resource-gateway/) and runs separately from OpenBuddy.
+The Resource Gateway is the REST backend for the Admin Portal. It's at `services/casdoor-resource-gateway/` and runs separately from OpenBuddy.
 
 #### Deploy
 
@@ -146,7 +146,7 @@ See `services/casdoor-resource-gateway/openapi.yaml` for the full OpenAPI spec.
 
 ### Admin Portal
 
-The Admin Portal is at [`apps/admin-portal/`](../../apps/admin-portal/). It's a standalone React SPA that calls the Resource Gateway.
+The Admin Portal is at `apps/admin-portal/`. It's a standalone React SPA that calls the Resource Gateway.
 
 #### Build
 
@@ -166,7 +166,7 @@ Output: `apps/admin-portal/dist/` (211 KB JS / 2.7 KB CSS).
 - `nginx.conf` — API reverse-proxy + SPA fallback + security headers
 - `Caddyfile` — alternative reverse proxy
 
-Reference: [`apps/admin-portal/README.md`](../../apps/admin-portal/README.md).
+Reference: `apps/admin-portal/README.md`.
 
 ### SAML 2.0 + SCIM v2
 
@@ -382,7 +382,7 @@ Recommended alerts:
 
 ### Resource Gateway(计费 + 管理)
 
-Resource Gateway 是 Admin Portal 的 REST 后端,在 [`services/casdoor-resource-gateway/`](../../services/casdoor-resource-gateway/),独立于 OpenBuddy 跑。
+Resource Gateway 是 Admin Portal 的 REST 后端,在 `services/casdoor-resource-gateway/`,独立于 OpenBuddy 跑。
 
 (其余内容同英文版)
 

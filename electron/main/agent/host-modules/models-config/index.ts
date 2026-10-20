@@ -13,7 +13,7 @@
  */
 
 import { join } from "node:path";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import type { AgentHostState } from "../_state-shape";
 
 export interface ProviderDraft {
@@ -55,9 +55,19 @@ function authFile(): string {
 }
 
 async function atomicWrite(file: string, contents: string): Promise<void> {
-  await mkdir(hostPiHome(), { recursive: true });
+  // 0o700:agentHome 存的是凭据文件(auth.json),目录对组/其他不可进入;
+  // 0o600:auth.json/models.json 均按私有文件落盘(tmp + rename 后新 inode
+  // 自带该 mode,存量 0644 文件在下次保存时自动收紧)。目录可能由其他模块
+  // 先创建(宽松 mode),mkdir 的 mode 参数对已存在目录无效 —— 所以每次
+  // 写入时显式 chmod 收紧。生产评审 B2(2026-10-11)。
+  await mkdir(hostPiHome(), { recursive: true, mode: 0o700 });
+  try {
+    await chmod(hostPiHome(), 0o700);
+  } catch {
+    /* 只读盘等场景降级为不收紧,不能挡住凭据写入 */
+  }
   const temporary = `${file}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(temporary, contents, "utf8");
+  await writeFile(temporary, contents, { encoding: "utf8", mode: 0o600 });
   await rename(temporary, file);
 }
 

@@ -79,9 +79,32 @@ function pushBlockedDiagnostic(
   resolution.diagnostics.push({ id: specId, state, error: reason });
 }
 
-function dropFactory(resolution: PiExtensionResolution, specId: string): void {
-  const index = resolution.factories.findIndex((entry) => entry.name === specId);
-  if (index >= 0) resolution.factories.splice(index, 1);
+/**
+ * Remove every trace of a spec the gate has not cleared.
+ *
+ * Dropping only `factories` is not enough: a third-party spec is
+ * resolved as a *path* (`result.paths.push(source)` in
+ * `resolvePiExtensions`), and `piExtensionPaths` is handed to pi as
+ * `additionalExtensionPaths` — pi jiti-requires every entry in the
+ * main process. A pending/denied spec whose path survived the gate
+ * was therefore fully loaded with only its factory missing, which
+ * defeated the gate entirely.
+ *
+ * Paths are matched via the spec's own `resolved` entry rather than by
+ * string-guessing, so a blocked spec can only ever drop the path it
+ * contributed. Shared sources are removed completely: two spec ids
+ * pointing at one file are one module, and a module under review must
+ * not load just because a sibling id happens to be approved.
+ */
+function dropSpec(resolution: PiExtensionResolution, specId: string): void {
+  const factoryIndex = resolution.factories.findIndex((entry) => entry.name === specId);
+  if (factoryIndex >= 0) resolution.factories.splice(factoryIndex, 1);
+
+  const source = resolution.resolved.find((entry) => entry.id === specId)?.source;
+  if (!source) return;
+  for (let index = resolution.paths.length - 1; index >= 0; index -= 1) {
+    if (resolution.paths[index] === source) resolution.paths.splice(index, 1);
+  }
 }
 
 /**
@@ -113,13 +136,13 @@ export function applyNeedsReviewGate(
           reason: decision.reason,
           requestedAt: new Date().toISOString(),
         });
-        dropFactory(resolution, input.id);
+        dropSpec(resolution, input.id);
         pushBlockedDiagnostic(resolution, input.id, decision.reason, "blocked");
         continue;
       }
 
       if (verdict === "deny") {
-        dropFactory(resolution, input.id);
+        dropSpec(resolution, input.id);
         pushBlockedDiagnostic(resolution, input.id, decision.reason, "denied");
         continue;
       }

@@ -30,6 +30,7 @@ import {
   getStoredThemeMode,
   getStoredThemePair,
 } from "../theme-store";
+import { initDisplayPreferences } from "../density-store";
 import { resolveThemeVars, getThemeByName } from "../themes";
 
 export interface ThemeInitializerProps {
@@ -112,6 +113,8 @@ function paintDocument(): void {
 
 export function ThemeInitializer(_props: ThemeInitializerProps = {}): null {
   useLayoutEffect(() => {
+    // 批B:密度(zoom)与应用内 reduce-motion 随主题一起在首帧前应用。
+    initDisplayPreferences();
     paintDocument();
   }, []);
   return null;

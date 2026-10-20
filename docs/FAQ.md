@@ -121,7 +121,7 @@ Tauri was the original choice; we migrated to Electron because:
 - Mature tooling for cross-platform installers (electron-builder)
 - Easier debugging via Chrome DevTools
 
-See [`tauri-grok-removal-and-cordis-adoption.md`](tauri-grok-removal-and-cordis-adoption.md) for the full migration story.
+See `tauri-grok-removal-and-cordis-adoption.md` for the full migration story.
 
 #### Why moon instead of Turborepo / Nx?
 

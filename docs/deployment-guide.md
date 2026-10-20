@@ -355,9 +355,9 @@ RESOURCE_GATEWAY_SIEM_FILE=/var/lib/openbuddy-resource-gateway/audit-siem.csv
 
 ### 6.0 模板与导入脚本
 
-[`docs/casdoor-providers/`](../casdoor-providers/) 提供 7 个常用 Provider 的 JSON 模板：
+[`docs/casdoor-providers/`](.) 提供 7 个常用 Provider 的 JSON 模板：
 微信开放平台 / 微信公众号 / 阿里云短信 / 腾讯云短信 / GitHub / Google / 邮箱验证码。
-[`scripts/import-casdoor-providers.sh`](../../scripts/import-casdoor-providers.sh) 用 Casdoor admin
+`scripts/import-casdoor-providers.sh` 用 Casdoor admin
 API 一键批量导入，并支持 `DRY_RUN=1` 干跑和 `STRICT=1` 拒绝占位符未替换的模板。
 
 ### 6.1 微信 OAuth（开放平台）

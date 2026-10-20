@@ -73,13 +73,13 @@ export async function openLocalPath(
   }
   try {
     if (type === "directory") {
-      await invoke("open_path", { path, cwd: cwd ?? null });
+      await invoke("shellfs:open-path", { path, cwd: cwd ?? null });
       return;
     }
     try {
-      await invoke("reveal_in_folder", { path, cwd: cwd ?? null });
+      await invoke("shellfs:reveal", { path, cwd: cwd ?? null });
     } catch {
-      await invoke("open_path", { path, cwd: cwd ?? null });
+      await invoke("shellfs:open-path", { path, cwd: cwd ?? null });
     }
   } catch (e) {
     toast?.(String(e).replace(/^Error:\s*/, ""));
@@ -118,7 +118,7 @@ export function createMarkdownHostConfig(
       return "symbol";
     }
     try {
-      const stat = await invoke<PathStat>("path_stat", {
+      const stat = await invoke<PathStat>("shellfs:stat", {
         path: pure,
         cwd: cwd ?? null,
       });
@@ -183,7 +183,7 @@ export function createMarkdownHostConfig(
           return;
         }
         try {
-          const written = await invoke<string>("write_text_file", {
+          const written = await invoke<string>("shellfs:write-text", {
             path: preferredPath.trim(),
             content: code,
             workspaceRoot: cwd,
@@ -230,12 +230,39 @@ export function createMarkdownHostConfig(
       }
 
       try {
-        const written = await invoke<string>("write_text_file", {
+        const written = await invoke<string>("shellfs:write-text", {
           path: target,
           content: code,
           workspaceRoot: cwd,
         });
         toast(`已写入 ${written}`);
+      } catch (e) {
+        toast(String(e).replace(/^Error:\s*/, ""));
+      }
+    })();
+  };
+
+  // mermaid 的「下载」按钮此前走组件内的 Blob fallback(`<a download>`),
+  // 在 Electron 里既不进系统保存对话框、也提示不了失败。这里接管成
+  // 原生保存 → shellfs 落盘,与 onApplyCode 同一套路径校验。
+  const onDownloadMermaid: MarkdownConfig["onDownloadMermaid"] = (svg) => {
+    void (async () => {
+      if (!cwd) {
+        toast("无工作区，无法保存图表");
+        return;
+      }
+      try {
+        const target = await save({
+          defaultPath: joinPath(cwd, "diagram.svg"),
+          filters: [{ name: "SVG", extensions: ["svg"] }],
+        });
+        if (!target) return;
+        const written = await invoke<string>("shellfs:write-text", {
+          path: target,
+          content: svg,
+          workspaceRoot: cwd,
+        });
+        toast(`已保存 ${written}`);
       } catch (e) {
         toast(String(e).replace(/^Error:\s*/, ""));
       }
@@ -250,6 +277,7 @@ export function createMarkdownHostConfig(
     openCodeLink,
     onLinkClick,
     onApplyCode,
+    onDownloadMermaid,
   };
 }
 

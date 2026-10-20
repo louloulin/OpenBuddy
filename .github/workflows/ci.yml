@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 permissions:
   contents: read
@@ -24,15 +24,27 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+          # moon 的 VCS 变更检测需要 main 的历史(`git merge-base`)——
+          # 浅克隆下直接 exit 128,typecheck/test 在跑任何任务前就挂。
+          fetch-depth: 0
+
+      # pnpm must exist before setup-node runs: `cache: pnpm` resolves the
+      # store path via pnpm itself, so with the two steps the other way round
+      # setup-node dies with "Unable to locate executable file: pnpm" and
+      # every job fails at step 1.
+      #
+      # No `version:` input on purpose. action-setup compares it to
+      # packageManager by plain string equality after stripping only the
+      # `pnpm@` prefix, so `11.24.0` never equals `11.24.0+sha512...` from
+      # package.json and it throws "Multiple versions of pnpm specified".
+      # Left unset it installs packageManager verbatim, hash included — that
+      # field in package.json is the single source of truth.
+      - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -46,6 +58,46 @@ jobs:
           pnpm workspace:typecheck
           pnpm verify:agent-host-boundaries
 
+      # Dictionary parity + ratcheting hardcoded-CJK gate. Separate from
+      # typecheck because it needs no compiler: a new untranslated string or a
+      # new hardcoded literal fails here even though every type is correct.
+      - name: i18n consistency gate
+        run: pnpm verify:i18n
+
+      # Ratcheting hardcoded-color gate. Also compiler-free: a literal that
+      # silently ignores dark mode is a theme bug that no type or unit test
+      # will ever catch.
+      - name: hardcoded color gate
+        run: pnpm verify:colors
+
+      # React hook-order gate (scripts/check-hook-order.mjs). 2026-10-14 生产
+      # 事故:四处「提前 return 之后还有 hook」的组件在生产包抛 React #300
+      # (rendered fewer hooks),dev 模式不复现。该模式编译器查不出、单测跑
+      # 不红,只有静态 AST 门禁能拦。
+      - name: hook order gate
+        run: pnpm verify:hook-order
+
+      # Accessibility gate. This cannot live in the `lint-tools` job: that job
+      # is `continue-on-error: true` (it also runs Sheriff and Prettier, which
+      # are report-only), so an a11y error there would block nothing. jsx-a11y
+      # is enabled as errors in eslint.config.mjs and was previously gated on
+      # exactly one rule, which let 210 keyboard-unreachable fake buttons
+      # (`<span role="button" onClick>`) accumulate. No ratchet baseline here:
+      # the debt is paid, so any new finding is a regression.
+      - name: accessibility gate
+        run: pnpm verify:a11y
+
+      # IPC stub gate. The preload/main channel *parity* test only compares
+      # channel sets, so `async () => null` is the cheapest way to pass it —
+      # which is how "adopt email action items as tasks" ended up toasting
+      # success while writing nothing, and how the unified-search task scope
+      # stayed permanently empty. This gate reads the handler bodies: a channel
+      # the UI calls that resolves to a stub, to nothing, or to an unregistered
+      # channel fails here. Explicitly-removed channels must be declared with a
+      # reason in scripts/ipc-stub-baseline.json.
+      - name: IPC stub gate
+        run: pnpm verify:ipc-stubs
+
   test:
     name: Unit Tests
     runs-on: ${{ matrix.os }}
@@ -57,15 +109,25 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+          fetch-depth: 0
+
+      # pnpm must exist before setup-node runs: `cache: pnpm` resolves the
+      # store path via pnpm itself, so with the two steps the other way round
+      # setup-node dies with "Unable to locate executable file: pnpm" and
+      # every job fails at step 1.
+      #
+      # No `version:` input on purpose. action-setup compares it to
+      # packageManager by plain string equality after stripping only the
+      # `pnpm@` prefix, so `11.24.0` never equals `11.24.0+sha512...` from
+      # package.json and it throws "Multiple versions of pnpm specified".
+      # Left unset it installs packageManager verbatim, hash included — that
+      # field in package.json is the single source of truth.
+      - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -81,13 +143,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - run: pnpm install --frozen-lockfile
       - run: pnpm storage:boundaries
       - run: pnpm storage:acceptance
@@ -99,30 +160,61 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+          fetch-depth: 0
+      # C1 续(2026-10-20):两个 smoke 在 ubuntu runner 上直接起 Electron,
+      # 需要虚拟显示 + 运行库(与 build-linux job 同一套依赖),否则
+      # "Process failed to launch"。
+      - name: Install Electron runtime deps (headless)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+            libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+            libpango-1.0-0 libcairo2 libasound2t64
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - run: pnpm install --frozen-lockfile
       - run: pnpm moon:sync
-      - run: pnpm test:electron:ipc-surface
-      - run: pnpm test:electron:surface
+      # C1(2026-10-19 生产评审):两个 smoke 起的是真实 Electron(指向
+      # dist/,package.json main)—— 本 job 此前没有构建步骤,在干净 runner
+      # 上结构性无法通过(本机能过只是因为磁盘留着旧 dist/)。
+      - run: pnpm exec electron-vite build
+      - run: xvfb-run --auto-servernum -- pnpm test:electron:ipc-surface
+      # surface-regression 断言窗口最大化/DevTools 翻转 —— headless CI 下
+      # 窗口管理器不响应(实测三态全 false),属手动级探针而非门禁。
+      - name: surface regression (non-gating)
+        continue-on-error: true
+        run: xvfb-run --auto-servernum -- pnpm test:electron:surface
+
+  secrets:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # B1(2026-10-19 生产评审):真实 API key 曾进过公开仓库历史。全量扫描
+      # (fetch-depth: 0)拦住新增泄露;历史清洗另由轮换兜底。
+      - name: gitleaks (full history)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   perf-budget:
     name: Performance Budget Gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - run: pnpm install --frozen-lockfile
       - run: pnpm moon:sync
       - name: Build renderer
@@ -148,13 +240,12 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - run: pnpm install --frozen-lockfile
       - name: Sheriff module boundaries
         run: pnpm lint:sheriff || true
@@ -179,13 +270,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - run: pnpm install --frozen-lockfile
       - name: Audit
         run: pnpm audit --prod --audit-level=high
@@ -204,18 +294,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - run: pnpm install --frozen-lockfile
       - name: Check markdown links
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --no-progress --exclude-loopback --exclude-mail --max-concurrency 16
+          # --offline:只校验本地相对链接(仓内死链是门禁;外部站点可用性
+          # 不是我们的门禁,外网抖动不该让流水线变红)。
+          # --exclude-path:THIRD-PARTY-NOTICES.md 是第三方许可原文,内含
+          # 指向各上游仓的相对路径,不对本仓有效。
+          args: --no-progress --exclude-loopback --offline --exclude-path THIRD-PARTY-NOTICES.md --max-concurrency 16 .
           fail: true
 
   build-summary:

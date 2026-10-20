@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { EmailProviderDiagnostic } from "@openbuddy/capability-email";
+import type { EmailProviderDiagnostic } from "@openbuddy/capability-email/renderer";
 import { ProviderDiagnosticCard } from "../ProviderDiagnosticCard";
 
 function makeDiagnostic(overrides: Partial<EmailProviderDiagnostic> = {}): EmailProviderDiagnostic {

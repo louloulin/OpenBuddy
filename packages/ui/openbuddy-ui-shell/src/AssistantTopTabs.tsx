@@ -145,7 +145,14 @@ export function AssistantTopTabs({ activeRoute, onNavigate, onGoHome, builtin, p
   };
 
   return (
-    <div className={"assistant-top-tabs" + (!onGoHome ? " assistant-top-tabs--standalone" : "")} role="tablist" aria-label="助理工作台菜单" onKeyDown={onKeyDown}>
+    <div
+      className={"assistant-top-tabs" + (!onGoHome ? " assistant-top-tabs--standalone" : "")}
+      role="tablist"
+      aria-label="助理工作台菜单"
+      // tablist 是交互角色,必须可聚焦:方向键漫游就挂在这个容器上。
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+    >
       {onGoHome && (
         <button
           type="button"

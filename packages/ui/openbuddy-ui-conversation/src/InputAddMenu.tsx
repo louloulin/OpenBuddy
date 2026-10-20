@@ -9,7 +9,7 @@ import {
 } from "@openbuddy/ui-primitives/icons";
 import { skillsList, agentsList, agentToolsList, type AgentToolDescriptor } from "@/lib/agent/pi-client";
 import { HOME_MODES, type HomeModeId } from "@openbuddy/ui-shared";
-import { CONNECTOR_LIST } from "@openbuddy/ui-experts";
+import { CONNECTOR_LIST } from "@openbuddy/ui-experts/first-screen";
 import type { AgentEntry, SkillInfo } from "@openbuddy/shared-types";
 
 interface InputAddMenuProps {
@@ -336,9 +336,13 @@ export function InputAddMenu({
               <span className="iam-sub-name">{c.name}</span>
             </button>
           ))}
-          <div className="iam-sub-footer" onClick={handleSelectConnector}>
+          <button
+            type="button"
+            className="iam-sub-footer"
+            onClick={handleSelectConnector}
+          >
             管理连接器 →
-          </div>
+          </button>
         </>
       );
     }
@@ -447,6 +451,18 @@ export function InputAddMenu({
                     onMouseEnter={() => handleItemEnter(item.id)}
                     onMouseLeave={handleItemLeave}
                     onClick={() => handleItemClick(item.id)}
+                    onKeyDown={(e) => {
+                      // div 不会像原生 button 那样在 Enter/Space 上派发 click，
+                      // 键盘用户必须自己补上，否则这一项只能看不能按。
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleItemClick(item.id);
+                      }
+                    }}
+                    // role="menuitem" 需要可聚焦才会进 Tab 序列。这里没有实现
+                    // 方向键漫游（见 report），tabIndex=0 是当前唯一能让菜单项
+                    // 被键盘到达的写法。
+                    tabIndex={0}
                     role="menuitem"
                   >
                     <span className="iam-item__icon">{item.icon}</span>

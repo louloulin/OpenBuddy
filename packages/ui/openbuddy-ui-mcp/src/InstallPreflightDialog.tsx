@@ -8,7 +8,7 @@
  * 摊开一列事实与风险(来源、版本、hooks、能力接管),所以自带一个面板 —— 但
  * 视觉 token、Esc 关闭、role="alertdialog" 都沿用同一套约定。
  */
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { InstallPreflight, PreflightItem, PreflightLevel } from "./install-preflight";
 import styles from "./InstallPreflightDialog.module.css";
@@ -71,21 +71,29 @@ export function InstallPreflightDialog({ open, plan, onCancel, onConfirm }: Inst
     if (open) confirmRef.current?.focus();
   }, [open]);
 
-  const stopPropagation = useCallback((event: React.MouseEvent) => event.stopPropagation(), []);
-
   if (!open || !plan) return null;
 
   const blocked = plan.blockers.length > 0;
   const target = `${plan.pluginName}${plan.version ? ` v${plan.version}` : ""}`;
 
   return createPortal(
-    <div className={styles.overlay} data-testid="install-preflight" onClick={onCancel}>
+    // 遮罩只是"点击空白处关闭"的鼠标便利区，不是控件本身：
+    // 键盘/读屏用户通过对话框按钮或（已有的）document 级 Esc 关闭，
+    // 故标为 presentation 移出无障碍树。
+    // 用 target === currentTarget 判定"点在遮罩本体"，面板内部无需再写 stopPropagation。
+    <div
+      className={styles.overlay}
+      data-testid="install-preflight"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
       <div
         className={styles.panel}
         role="alertdialog"
         aria-modal="true"
         aria-label={`安装 ${target}`}
-        onClick={stopPropagation}
       >
         <div>
           <p className={styles.eyebrow}>安装预检 · {ACTION_LABEL[plan.action]}</p>

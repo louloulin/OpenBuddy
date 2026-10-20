@@ -129,53 +129,6 @@ export const MarkdownInlineCode = memo(function MarkdownInlineCode({
     pathDetection,
   ]);
 
-  if (shouldHighlight && finalType) {
-    const titleText =
-      finalType === "symbol"
-        ? "跳转到符号"
-        : finalType === "file"
-          ? "打开文件"
-          : "打开目录";
-    const iconNode = renderPathIcon?.({
-      code,
-      purePath: pathDetection.purePath || code,
-      type: finalType,
-    });
-    return (
-      <code
-        className={[className, "md-inline-code", "md-clickable-path", `md-path-type-${finalType}`]
-          .filter(Boolean)
-          .join(" ")}
-        onClick={handleClick}
-        title={titleText}
-        role="link"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handleClick();
-          }
-        }}
-      >
-        {iconNode ? <span className="md-clickable-path-icon">{iconNode}</span> : null}
-        {truncatePathDisplay(code)}
-      </code>
-    );
-  }
-
-  // R8.55 — Inline code copy button. Track the "copied" state so we can
-  // swap the Copy icon for a Check icon for 2s, mirroring the
-  // CodeBlockActions pattern (PI-Desktop parity). The button is hidden
-  // by default (opacity: 0) and revealed on hover / focus-within so
-  // it never competes with the inline text. Non-visual handler is
-  // always wired (keyboard accessible via Enter on the code element).
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const t = window.setTimeout(() => setCopied(false), 2000);
-    return () => window.clearTimeout(t);
-  }, [copied]);
-
   const handleCopy = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
@@ -218,6 +171,54 @@ export const MarkdownInlineCode = memo(function MarkdownInlineCode({
     },
     [code],
   );
+
+  // Hooks 规则(React 错误 300 号):下面两个分支会提前 return,copied 状态的
+  // hook 必须在它们之前调用,否则同一位置的代码元素在可点击/普通两种
+  // 形态间切换时 hook 数量会变化(生产包直接抛 300 号错误)。
+  // R8.55 — Inline code copy button. Track the "copied" state so we can
+  // swap the Copy icon for a Check icon for 2s, mirroring the
+  // CodeBlockActions pattern (PI-Desktop parity). The button is hidden
+  // by default (opacity: 0) and revealed on hover / focus-within so
+  // it never competes with the inline text. Non-visual handler is
+  // always wired (keyboard accessible via Enter on the code element).
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(t);
+  }, [copied]);
+  if (shouldHighlight && finalType) {
+    const titleText =
+      finalType === "symbol"
+        ? "跳转到符号"
+        : finalType === "file"
+          ? "打开文件"
+          : "打开目录";
+    const iconNode = renderPathIcon?.({
+      code,
+      purePath: pathDetection.purePath || code,
+      type: finalType,
+    });
+    // 路径 chip 是一个真正的按钮，不是「<code role="link">」——code 是非交互
+// 元素，硬塞 role="link" 既不合法也不会被正确播报。CSS 按 class 选择器
+// 写的（.markdown-body .md-inline-code / .md-clickable-path），换成 button
+// 后外观不变，全局 button reset 负责清掉底色和边框。
+return (
+      <button
+        type="button"
+        className={[className, "md-inline-code", "md-clickable-path", `md-path-type-${finalType}`]
+          .filter(Boolean)
+          .join(" ")}
+        onClick={handleClick}
+        title={titleText}
+      >
+        {iconNode ? <span className="md-clickable-path-icon">{iconNode}</span> : null}
+        {truncatePathDisplay(code)}
+      </button>
+    );
+  }
+
+
 
   return (
     <code className={["md-inline-code", className].filter(Boolean).join(" ")}>

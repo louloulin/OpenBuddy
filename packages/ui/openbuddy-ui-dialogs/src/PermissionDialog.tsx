@@ -38,7 +38,9 @@ export function PermissionInlineCard({ sessionId }: { sessionId: string | null }
   if (!head) return null;
 
   return (
-    <div className="request-modal-overlay" onMouseDown={(event) => {
+    // 遮罩点击关闭只是鼠标便利路径:面板内有「拒绝」按钮,窗口级监听也接了
+    // Esc,所以遮罩本身不是控件,声明 presentation 让 AT 跳过它。
+    <div className="request-modal-overlay" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !busy) void resolve(undefined, true);
     }}>
       <div className="request-modal request-modal--permission" role="dialog" aria-modal="true" aria-labelledby="permission-dialog-title">

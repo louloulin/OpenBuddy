@@ -19,6 +19,7 @@ import {
   flattenFrontmatter,
   useFrontmatter,
   type FrontmatterParseFn,
+  type UseFrontmatterResult,
 } from "../use-frontmatter";
 
 // React 18 + testing-library v16 fires "Should not already be working"
@@ -152,7 +153,7 @@ describe("useFrontmatter", () => {
     const parse: FrontmatterParseFn = (raw) => new Promise((resolve) => {
       resolveParse = (v) => resolve(v);
     });
-    let hook!: ReturnType<typeof renderHook>;
+    let hook!: ReturnType<typeof renderHook<UseFrontmatterResult, unknown>>;
     await act(async () => {
       hook = renderHook(() => useFrontmatter("---\nname: foo\n---\nbody", { parse }));
     });

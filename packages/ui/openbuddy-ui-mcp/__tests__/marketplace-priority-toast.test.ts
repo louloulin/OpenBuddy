@@ -30,7 +30,7 @@ describe("Phase I.3: describeMarketplaceResult", () => {
   });
 
   it("falls back to the simple toast when install has no priority fields", () => {
-    const msg = describeMarketplaceResult("demo", "install", { ok: true });
+    const msg = describeMarketplaceResult("demo", "install", {});
     expect(msg).toBe("已安装「demo」");
   });
 
@@ -62,7 +62,7 @@ describe("Phase I.3: describeMarketplaceResult", () => {
   });
 
   it("emits the simple uninstall toast when the package was not priority", () => {
-    const msg = describeMarketplaceResult("demo", "uninstall", { ok: true });
+    const msg = describeMarketplaceResult("demo", "uninstall", {});
     expect(msg).toBe("已卸载「demo」");
   });
 

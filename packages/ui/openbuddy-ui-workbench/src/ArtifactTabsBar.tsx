@@ -455,6 +455,33 @@ export function ArtifactTabsBar({
               (dragSnapshot?.id === tab.id ? " artifact-tab--drag-placeholder" : "")
             }
             onClick={() => handleSelect(tab.id)}
+            // 内层嵌了「关闭」<button>,换成真正的 <button> 是非法 HTML,所以走
+            // Option 2:tabIndex 让 tab 可聚焦,onKeyDown 补上键盘路径。
+            // WAI-ARIA tabs 规范要求方向键在 tab 间移动、Enter/Space 激活。
+            tabIndex={0}
+            onKeyDown={(e) => {
+              // 焦点在内层「关闭」按钮上时,事件也会冒泡上来,必须让它自己处理。
+              if (e.target !== e.currentTarget) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleSelect(tab.id);
+                return;
+              }
+              if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home" && e.key !== "End") return;
+              const order = renderedTabs.map((t) => t.id);
+              const cur = order.indexOf(tab.id);
+              if (cur < 0) return;
+              const next =
+                e.key === "Home" ? 0
+                : e.key === "End" ? order.length - 1
+                : (cur + (e.key === "ArrowRight" ? 1 : -1) + order.length) % order.length;
+              const nextId = order[next];
+              if (!nextId) return;
+              e.preventDefault();
+              // 方向键移动焦点的同时切标签(tab 条惯用的「焦点跟随激活」)。
+              handleSelect(nextId);
+              tabRefs.current.get(nextId)?.focus();
+            }}
             onPointerDown={(e) => handlePointerDown(e, tab.id)}
             onMouseDown={(e) => {
               // 中键：阻止 Chromium 的自动滚动光标，并交给 onAuxClick 关闭。

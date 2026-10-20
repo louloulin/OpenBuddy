@@ -14,6 +14,7 @@
  */
 import { ipcMain, type BrowserWindow } from "electron";
 import { auditTrail } from "../audit/audit-log";
+import { confirmDangerousAction } from "./native-confirm";
 import { requireApprovedSavePath } from "./save-path-approval";
 
 const LIST_LIMIT_MAX = 1000;
@@ -43,6 +44,15 @@ export function registerAuditIpc(getWindow: () => BrowserWindow | null): void {
   });
 
   ipcMain.handle("audit:clear", async () => {
+    // B7(2026-10-19 生产评审):audit:clear 此前无任何确认 —— 渲染进程被注入
+    // 即可擦除审计痕迹。与鉴权/安装类写操作同级:过原生确认。
+    await confirmDangerousAction({
+      window: getWindow(),
+      title: "清空审计日志",
+      message: "应用请求清空本地审计日志",
+      detail: "该操作不可撤销(无远端备份)。",
+      confirmLabel: "清空",
+    });
     await auditTrail.clear();
     return { ok: true };
   });

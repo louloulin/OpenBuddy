@@ -10,9 +10,9 @@
  */
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { SlotProvider, getOrCreateSingleton } from "@openbuddy/ui-runtime/client";
+import { SlotProvider, getRuntime, registerAllBuiltinUis } from "@openbuddy/ui-runtime/client";
 import { PolicySettingsPanel } from "../../PolicySettingsPanel";
 import {
   POLICY_SECTION_IDS,
@@ -52,8 +52,14 @@ vi.mock("@/hooks/useExtensionAuditPanel", () => ({
 
 const disposers: Array<() => void> = [];
 
+// 内置两块策略区块是**异步装配**进槽位总线的(7328dab0 起),渲染前必须等装配
+// 落定 —— 否则断言会随机失败(实测间歇红)。其余同族测试文件都跟进了这一行。
+beforeEach(async () => {
+  await registerAllBuiltinUis().done;
+});
+
 function contributeSection(id: string, Component: unknown) {
-  const rt = getOrCreateSingleton();
+  const rt = getRuntime();
   disposers.push(
     rt.slots.register(
       {
@@ -70,7 +76,7 @@ function contributeSection(id: string, Component: unknown) {
 
 function mount() {
   return render(
-    <SlotProvider>
+    <SlotProvider runtime={getRuntime()}>
       <PolicySettingsPanel />
     </SlotProvider>,
   );

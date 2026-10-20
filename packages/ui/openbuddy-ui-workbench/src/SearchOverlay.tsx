@@ -11,7 +11,7 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { calendarList, collaborationSnapshot, emailListThreadsPage, emailListWorkspaceTags, sessionSearch, tasksListForSession } from "@/lib/agent/pi-client";
 import { useProjectsStore, type ProjectMeta } from "@/stores/projects-store";
 import { searchStoredKnowledge } from "@/lib/files/knowledge-base-runtime";
-import type { SearchHit, SessionSummary, RunningTask } from "@openbuddy/shared-types";
+import type { SearchHit, SessionSummary, SessionTask } from "@openbuddy/shared-types";
 import type { CalendarEvent, CollaborationSnapshot, EmailThreadPreview } from "@/lib/agent/pi-client";
 import type { KbEntry } from "@openbuddy/files-kb";
 import {
@@ -90,7 +90,7 @@ export function SearchOverlay({
   const [scope, setScope] = useState<SearchScope>("all");
   const [remoteHits, setRemoteHits] = useState<SearchHit[]>([]);
   const [emailHits, setEmailHits] = useState<EmailThreadPreview[]>([]);
-  const [taskHits, setTaskHits] = useState<RunningTask[]>([]);
+  const [taskHits, setTaskHits] = useState<SessionTask[]>([]);
   const [calendarHits, setCalendarHits] = useState<CalendarEvent[]>([]);
   const [projectHits, setProjectHits] = useState<ProjectMeta[]>([]);
   const [inboxHits, setInboxHits] = useState<CollaborationSnapshot["inbox"]>([]);
@@ -157,7 +157,7 @@ export function SearchOverlay({
         shouldSearch("sessions") ? sessionSearch(q.trim(), undefined, 30) : Promise.resolve<SearchHit[]>([]),
         shouldSearch("email") ? emailListThreadsPage({ query: q.trim(), limit: 20 }) : Promise.resolve<{ items: EmailThreadPreview[] }>({ items: [] }),
         // Stage B: todo list moved to pi-native; no IPC binding to query.
-        shouldSearch("tasks") && currentSessionId ? tasksListForSession(currentSessionId) : Promise.resolve<RunningTask[]>([]),
+        shouldSearch("tasks") && currentSessionId ? tasksListForSession(currentSessionId) : Promise.resolve<SessionTask[]>([]),
         shouldSearch("calendar") ? calendarList() : Promise.resolve<CalendarEvent[]>([]),
         scope === "all" ? collaborationSnapshot() : Promise.resolve<Pick<CollaborationSnapshot, "inbox">>({ inbox: [] }),
         shouldSearch("knowledge") ? searchStoredKnowledge(q.trim()) : Promise.resolve<KbEntry[]>([]),
@@ -182,7 +182,7 @@ export function SearchOverlay({
 
       const emailByKey = new Map([...directEmailHits, ...tagEmailHits].map((hit) => [`${hit.accountId}:${hit.id}`, hit]));
       setEmailHits(rankEmailHits([...emailByKey.values()], q));
-      setTaskHits(taskResult.status === "fulfilled" ? taskResult.value.filter((task) => searchable(task.description ?? "", q)) : []);
+      setTaskHits(taskResult.status === "fulfilled" ? taskResult.value.filter((task) => searchable(task.content, q)) : []);
       setCalendarHits(calendarResult.status === "fulfilled" ? calendarResult.value.filter((event) => searchable([event.title, event.description, event.location, ...event.attendees].filter(Boolean).join(" "), q)) : []);
       setProjectHits(scope === "all" ? projects.filter((project) => searchable([
         project.name,
@@ -368,12 +368,13 @@ export function SearchOverlay({
 
   if (!open) return null;
 
+  {/* 遮罩是纯装饰层,dialog 语义落在内层 .conversation-search-modal 上。
+      Tab 焦点陷阱的 keydown 监听留在遮罩上 —— 事件冒泡,内层 dialog 上的
+      Tab 依旧会走到这里,焦点查询也仍然覆盖整个弹窗。 */}
   return (
     <div
       className="conversation-search-modal__overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label="全局搜索"
+      role="presentation"
       ref={dialogRef}
       onKeyDown={handleDialogKeyDown}
       onClick={(e) => {
@@ -382,6 +383,9 @@ export function SearchOverlay({
     >
       <div
         className="conversation-search-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="全局搜索"
       >
         <div className="conversation-search-modal__input-wrapper">
           <Search size={16} strokeWidth={1.75} className="conversation-search-modal__icon" />
@@ -589,11 +593,11 @@ export function SearchOverlay({
                         if (currentSessionId) onSelect(currentSessionId);
                         onClose();
                       }}
-                      title={task.description ?? ""}
+                      title={task.content}
                     >
                       <ListTodo size={14} strokeWidth={1.75} className="conversation-search-modal__item-icon" />
                       <div className="conversation-search-modal__item-body">
-                        <div className="conversation-search-modal__item-title">{task.description ?? ""}</div>
+                        <div className="conversation-search-modal__item-title">{task.content}</div>
                         <div className="conversation-search-modal__item-cwd">任务 · {task.status}</div>
                       </div>
                     </button>

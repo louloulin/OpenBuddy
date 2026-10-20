@@ -63,13 +63,17 @@ export function ConnectorSelector({
   const connected = options.filter((c) => c.connected);
 
   return (
+    // 触发器是 button、内部是一组 Checkbox，没有单一可标注的表单控件，
+    // 故用 group + aria-labelledby 关联标题。
     <div className="connector-selector-field" ref={containerRef}>
-      <label className="atm-modal-label">
+      <span className="atm-modal-label" id="connector-selector-label">
         连接器
         <span className="atm-modal-hint atm-modal-hint-inline">(勾选即授权该连接器在任务中免确认使用)</span>
-      </label>
+      </span>
       <button
+        id="connector-selector-trigger"
         type="button"
+        aria-expanded={isOpen}
         className={`connector-selector-field__trigger${isOpen ? " connector-selector-field__trigger--open" : ""}${disabled ? " connector-selector-field__trigger--disabled" : ""}`}
         onClick={() => !disabled && setIsOpen((v) => !v)}
         disabled={disabled}
@@ -86,11 +90,17 @@ export function ConnectorSelector({
         </span>
       </button>
       {isOpen && (
-        <div className="connector-selector-field__dropdown">
+        <div className="connector-selector-field__dropdown" role="group" aria-labelledby="connector-selector-label">
           <div className="connector-selector-field__list">
             {connected.length > 0 ? (
               connected.map((connector) => (
-                <div className="connector-selector-field__item" key={connector.id} onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="connector-selector-field__item"
+                  key={connector.id}
+                  // 仅用于阻止点击冒泡到外层，不是控件本身
+                  role="presentation"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Checkbox
                     className="connector-selector-field__checkbox"
                     checked={validSelectedIds.includes(connector.id)}
@@ -104,7 +114,8 @@ export function ConnectorSelector({
             )}
           </div>
           {onManageConnectors && (
-            <div
+            <button
+              type="button"
               className="connector-selector-field__manage"
               onClick={() => {
                 setIsOpen(false);
@@ -117,7 +128,7 @@ export function ConnectorSelector({
                 <path d="M6 8L12.5 1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span>管理连接器</span>
-            </div>
+            </button>
           )}
         </div>
       )}

@@ -9,9 +9,9 @@
  */
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { afterEach, describe, expect, it } from "vitest";
+import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { SlotProvider, getOrCreateSingleton } from "@openbuddy/ui-runtime/client";
+import { SlotProvider, getRuntime, registerAllBuiltinUis } from "@openbuddy/ui-runtime/client";
 import { LibraryPage } from "../LibraryPage";
 import { LIBRARY_SECTION_IDS, defineLibrarySection } from "../section-contract";
 
@@ -19,7 +19,7 @@ const disposers: Array<() => void> = [];
 
 /** 往真内核里注册一个分区(等价于插件 registerSlot 的效果)。 */
 function contributeSection(id: string, Component: unknown) {
-  const rt = getOrCreateSingleton();
+  const rt = getRuntime();
   disposers.push(
     rt.slots.register(
       {
@@ -54,9 +54,15 @@ function railIds(): string[] {
     .filter((id) => id.startsWith("library-rail-"));
 }
 
+// 内置 4 个分区是**异步装配**进槽位总线的(7328dab0 起)。装配没落定就渲染
+// 会让断言间歇失败 —— 显式等 `registerAllBuiltinUis().done`,别靠时序。
+beforeEach(async () => {
+  await registerAllBuiltinUis().done;
+});
+
 function mount(props: Parameters<typeof LibraryPage>[0] = {}) {
   return render(
-    <SlotProvider>
+    <SlotProvider runtime={getRuntime()}>
       <LibraryPage {...props} />
     </SlotProvider>,
   );
