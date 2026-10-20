@@ -31,8 +31,12 @@ describe("defineExtension", () => {
     });
   };
 
+  // 本包 vitest 环境是 node(自述"纯 Node 模块"),但 defineExtension 的
+  // 派发面走 window CustomEvent —— 用 EventTarget stub 补齐(node 18+ 全局
+  // 自带 EventTarget),CI 的 node 环境即可跑。
   beforeEach(() => {
     captured = [];
+    vi.stubGlobal("window", new EventTarget());
     for (const type of ["openbuddy:register-slot", "openbuddy:register-command", "openbuddy:unregister-command"]) {
       window.addEventListener(type, listener);
     }
@@ -42,6 +46,7 @@ describe("defineExtension", () => {
     for (const type of ["openbuddy:register-slot", "openbuddy:register-command", "openbuddy:unregister-command"]) {
       window.removeEventListener(type, listener);
     }
+    vi.unstubAllGlobals();
   });
 
   it("作者入口可从包根导入(示例插件的 import 路径)", async () => {
