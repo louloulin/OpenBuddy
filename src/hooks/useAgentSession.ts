@@ -413,12 +413,40 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
           "warn",
         );
       },
-      onComplete: (p: { sessionId: string; stopReason?: string; usage?: { promptTokens?: number; completionTokens?: number } }) => {
+      onComplete: (p: { sessionId: string; stopReason?: string; errorMessage?: string; usage?: { promptTokens?: number; completionTokens?: number } }) => {
         if (p.stopReason === "error" || p.stopReason === "rate_limit") {
           // Only the failure path stays in console — happy-path completions
           // were firing dozens of console.log lines per turn that drowned
           // out real diagnostics.
           console.warn("[OpenBuddy] pi turn completed with failure stopReason", p);
+          // 发布工程(2026-10-20 真机探针):失败回合此前按"正常完成"收尾 ——
+          // 空气泡 + 误导性"会话完成"通知,TurnErrorCard 在实时路径永不出现。
+          // 走与 pi://turn-error 相同的 abandon 路径,把结构化错误交给卡片。
+          const rawDetail = p.errorMessage ?? "";
+          const code = rawDetail ? inferErrorCodeSafe(rawDetail) : p.stopReason === "rate_limit" ? "rate_limit_error" : undefined;
+          const bannerMsg =
+            formatPiError(rawDetail) ??
+            (rawDetail ? `⚠️ 本轮执行出错：${rawDetail}` : "⚠️ 本轮执行出错，请重试。");
+          useSessionStore.getState().setError(bannerMsg);
+          reportEvent("turn_error", "error", { sessionId: p.sessionId, stopReason: p.stopReason });
+          clearStreamingWatchdog();
+          abortedRef.current = true;
+          useSessionStore.getState().abandonStreamingMessage(
+            rawDetail || "本轮执行出错",
+            { message: rawDetail || "本轮执行出错", ...(code ? { code } : {}) },
+          );
+          useSessionStore.getState().setStreaming(false);
+          textShapeRef.current = null;
+          thoughtShapeRef.current = null;
+          useSessionsStore.getState().upsert({ sessionId: p.sessionId, status: "completed" });
+          void notificationAppend(
+            "turn_error",
+            `会话失败（${(rawDetail || p.stopReason || "error").slice(0, 80)}）`,
+            undefined,
+            p.sessionId,
+            "warn",
+          );
+          return;
         }
         reportEvent("session_complete", "info", { sessionId: p.sessionId, stopReason: p.stopReason });
         const currentSessionId = useSessionStore.getState().sessionId;

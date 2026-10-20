@@ -113,7 +113,9 @@ export function defaultPlanButton(props: {
   return {
     id: "plan",
     active: props.active,
-    visible: props.planCount > 0,
+    // 与任务入口同一决定(2026-10-20 真机探针):"有计划才显示"会让计划面板
+    // 永远无法被第一次打开 —— 用户没有入口创建第一条计划。常显。
+    visible: true,
     onClick: props.onClick,
     label: `执行计划 ${props.planCompleted}/${props.planCount}`,
     icon: <ListTodo size={15} strokeWidth={1.75} />,

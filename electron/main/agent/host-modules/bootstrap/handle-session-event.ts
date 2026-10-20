@@ -483,13 +483,18 @@ export function handleSessionEvent(
   if (event.type === "turn_end" || event.type === "agent_end" || event.type === "agent_settled") {
     const alreadyCompleted = turnCompletedSessions.has(session);
     if (event.type === "turn_end" || !alreadyCompleted) {
-      const msg = event.message as { stopReason?: string } | undefined;
+      const msg = event.message as { stopReason?: string; errorMessage?: string } | undefined;
       const stopReason = typeof msg?.stopReason === "string" ? msg.stopReason : "end_turn";
+      // 发布工程(2026-10-20 真机探针):失败回合此前丢弃 errorMessage,渲染层
+      // 按"正常完成"收尾 —— 用户看到空气泡 + 误导性"会话完成"通知,错误卡片
+      // (TurnErrorCard)在实时路径永远不出现。带上原始错误文本。
+      const errorMessage = typeof msg?.errorMessage === "string" ? msg.errorMessage : undefined;
       turnCompletedSessions.add(session);
       emitRendererEvent("pi://complete", {
         sessionId: session.sessionId,
         promptId: "",
         stopReason,
+        errorMessage,
       });
     }
   }
