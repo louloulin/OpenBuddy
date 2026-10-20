@@ -358,7 +358,8 @@ mod tests {
         let h = WorkspaceHandle::open();
         h.set_workspace_root(root.clone()).unwrap();
         let entries = h.list_ignored(64).unwrap();
-        let paths: Vec<String> = entries.iter().map(|e| e.path.clone()).collect();
+        // Windows 上路径分隔符是 `\` —— 断言前归一化,否则 CI 必红。
+        let paths: Vec<String> = entries.iter().map(|e| e.path.replace('\\', "/")).collect();
         assert!(
             paths
                 .iter()

@@ -24,6 +24,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+          # moon 的 VCS 变更检测需要 main 的历史(`git merge-base`)——
+          # 浅克隆下直接 exit 128,typecheck/test 在跑任何任务前就挂。
+          fetch-depth: 0
 
       # pnpm must exist before setup-node runs: `cache: pnpm` resolves the
       # store path via pnpm itself, so with the two steps the other way round
@@ -106,6 +109,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+          fetch-depth: 0
 
       # pnpm must exist before setup-node runs: `cache: pnpm` resolves the
       # store path via pnpm itself, so with the two steps the other way round
@@ -156,6 +160,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+          fetch-depth: 0
+      # C1 续(2026-10-20):两个 smoke 在 ubuntu runner 上直接起 Electron,
+      # 需要虚拟显示 + 运行库(与 build-linux job 同一套依赖),否则
+      # "Process failed to launch"。
+      - name: Install Electron runtime deps (headless)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+            libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+            libpango-1.0-0 libcairo2 libasound2t64
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
@@ -168,8 +183,8 @@ jobs:
       # dist/,package.json main)—— 本 job 此前没有构建步骤,在干净 runner
       # 上结构性无法通过(本机能过只是因为磁盘留着旧 dist/)。
       - run: pnpm exec electron-vite build
-      - run: pnpm test:electron:ipc-surface
-      - run: pnpm test:electron:surface
+      - run: xvfb-run --auto-servernum -- pnpm test:electron:ipc-surface
+      - run: xvfb-run --auto-servernum -- pnpm test:electron:surface
 
   secrets:
     name: Secret Scan (gitleaks)
@@ -285,7 +300,7 @@ jobs:
       - name: Check markdown links
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --no-progress --exclude-loopback --exclude-mail --max-concurrency 16
+          args: --no-progress --exclude-loopback --max-concurrency 16
           fail: true
 
   build-summary:

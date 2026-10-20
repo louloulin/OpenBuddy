@@ -193,6 +193,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ matrix.target }}-cargo-
 
+      - name: Install cross-compilation target
+        run: rustup target add ${{ matrix.target }}
       - name: Cargo build --release
         working-directory: crates
         run: |

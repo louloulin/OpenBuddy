@@ -40,6 +40,8 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          # 与 ci.yml 同一原因:moon 需要 main 的完整历史做 VCS 检测。
+          fetch-depth: 0
 
       # A8(2026-10-19 生产评审):tag 必须与 package.json 版本一致,否则产物名
       # 与 release tag 漂移;workflow_dispatch 空 tag 会退化成分支名,在 main 上
