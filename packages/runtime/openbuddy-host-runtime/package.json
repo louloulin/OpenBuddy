@@ -17,7 +17,7 @@
     "@openbuddy/shared-error-codes": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "26.4.1",
+    "@types/node": "26.6.5",
     "typescript": "^5.6.3",
     "vitest": "2.1.9"
   }

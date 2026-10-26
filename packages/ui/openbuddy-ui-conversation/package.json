@@ -17,7 +17,7 @@
     "@openbuddy/shared-types": "workspace:*",
     "@openbuddy/ui-markdown": "workspace:*",
     "@openbuddy/ui-slots": "workspace:*",
-    "@tanstack/react-virtual": "^3.14.10"
+    "@tanstack/react-virtual": "^3.14.22"
   },
   "peerDependencies": {
     "react": "^18.3.1"
