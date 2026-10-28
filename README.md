@@ -30,8 +30,8 @@
 
 <br/><br/>
 
-**OpenBuddy is a WorkBuddy-style desktop AI workspace, rebuilt as 100% open source (MIT) on Electron + Pi.**
-It ships the polished UI, plan mode, skills, MCP connectors, and an enterprise-grade Casdoor × NewAPI integration — every byte auditable, every provider BYOK.
+**OpenBuddy is a self-hostable, auditable desktop AI agent for enterprise email and collaboration — 100% open source (MIT) on Electron + Pi.**
+Five real mailbox protocols, Casdoor × NewAPI identity, a tenant-scoped audit ledger, and every provider BYOK. Every byte auditable.
 
 [Quick Start](#-quick-start) · [Features](#-features) · [Architecture](#-architecture) · [Documentation](#-documentation) · [Contributing](CONTRIBUTING.md) · [Community](docs/COMMUNITY.md)
 
@@ -46,7 +46,7 @@ It ships the polished UI, plan mode, skills, MCP connectors, and an enterprise-g
 - [Why OpenBuddy?](#-why-openbuddy)
 - [✨ Features](#-features)
 - [🎬 Demo & Screenshots](#-demo--screenshots)
-- [⚔️ OpenBuddy vs WorkBuddy](#%EF%B8%8F-openbuddy-vs-workbuddy)
+- [🏢 Self-hostable, auditable, enterprise-ready](#%EF%B8%8F-self-hostable-auditable-enterprise-ready)
 - [🚀 Quick Start](#-quick-start)
 - [🏗️ Architecture](#-architecture)
 - [🧩 Capabilities](#-capabilities)
@@ -64,36 +64,28 @@ It ships the polished UI, plan mode, skills, MCP connectors, and an enterprise-g
 
 ## 💡 Why OpenBuddy?
 
-[**Tencent WorkBuddy**](https://workbuddy.tencent.com/) showed the world what a great desktop AI agent workspace should feel like — polished UI, plan mode, skills, MCP connectors. It's a genuinely capable product.
+**OpenBuddy is a self-hostable, auditable desktop AI agent for enterprise email and collaboration.** It lets an AI work inside a mailbox and collaboration space you control — and leaves a trail of everything it did.
 
-**But it's closed-source, and your data flows through Tencent's backend.**
+Three things are hard to get right, and they are what this project is actually about:
 
-**OpenBuddy is the open answer** — the same shape of experience, rebuilt from the ground up on Electron + Pi, with a Cordis capability mesh that any contributor can extend:
+1. **It talks to real mailboxes.** IMAP, SMTP, Gmail API, Graph API and JMAP — five real protocol paths, with acceptance scripts that exercise them end to end.
+2. **Enterprise identity fits in.** Casdoor OIDC, multi-tenant isolation, a NewAPI gateway, SCIM v2, SAML 2.0, and an audit ledger.
+3. **Every action is traceable.** Local audit log, tenant-scoped audit chain, tool-call records — when something goes wrong you can answer *who, when, which mailbox, what*.
 
 <table>
 <tr><td>🔓</td><td><strong>100% open source (MIT)</strong><br/>No telemetry black box, no vendor lock-in. The whole repo is auditable.</td></tr>
 <tr><td>⚡</td><td><strong>Electron + Pi runtime</strong><br/>One tested desktop host with a versioned preload bridge; the renderer only sees a typed API surface.</td></tr>
 <tr><td>🔁</td><td><strong>Restart-safe sessions</strong><br/>Pi sessions, provider settings, capability state, and audit logs persist across renderer reloads and Electron restarts.</td></tr>
 <tr><td>🤖</td><td><strong>Pi as the agent runtime</strong><br/>The in-process <code>AgentSession</code> owns prompts, tools, permissions, plans, tasks, and streaming events.</td></tr>
-<tr><td>🌐</td><td><strong>Truly cross-platform</strong><br/>One codebase, Windows, macOS, and Linux. <a href="electron-builder.yml">electron-builder</a> produces signed installers for each.</td></tr>
-<tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>66 projects (1 root + 1 Electron + 64 workspace packages), type-check/test/build incrementally. CI runs the same <code>moon run</code> commands you run locally.</td></tr>
-<tr><td>🧩</td><td><strong>Cordis capability mesh</strong><br/>59 workspace packages (5 capability, 8 collaboration, 26 UI, …) (<code>@openbuddy/*</code>) — skills, memory, plan, task, email, calendar, MCP, payment, SCIM, SAML… pick what you need.</td></tr>
+<tr><td>🌐</td><td><strong>Truly cross-platform</strong><br/>One codebase, Windows, macOS, and Linux. <a href="electron-builder.yml">electron-builder</a> produces installers for each.</td></tr>
+<tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>77 moon projects (see [`docs/stats.json`](docs/stats.json)), type-check/test/build incrementally. CI runs the same commands you run locally.</td></tr>
+<tr><td>🧩</td><td><strong>Cordis capability mesh</strong><br/>81 workspace packages (capability / collaboration / UI / …) (<code>@openbuddy/*</code>) — skills, memory, plan, task, email, calendar, MCP, payment, SCIM, SAML… pick what you need.</td></tr>
 <tr><td>🏢</td><td><strong>Enterprise-ready</strong><br/>Casdoor OIDC, NewAPI gateway, 4 payment channels, SCIM v2, SAML 2.0, transactional outbox webhooks, audit ledger — production-ready building blocks.</td></tr>
 </table>
 
-> *"If WorkBuddy is the polished product, OpenBuddy is the one you can actually read, fork, and own."*
+> *"A desktop AI agent you can host yourself, read every line of, and audit afterwards."*
 
-<div align="center">
-
-### 🌟 If this project matters to you, please give it a ⭐
-
-It helps others discover OpenBuddy and keeps development moving.
-
-<a href="https://github.com/louloulin/OpenBuddy/stargazers"><img src="https://img.shields.io/github/stars/louloulin/OpenBuddy?style=social" alt="stars"></a>
-
-</div>
-
----
+The full one-page positioning statement lives in [`POSITIONING.md`](POSITIONING.md).
 
 ## ✨ Features
 
@@ -146,7 +138,7 @@ Windows (NSIS `.exe` + MSI), macOS (`.dmg`), Linux (AppImage + `.deb`). CI-built
 <td valign="top">
 
 **🧪 Battle-tested quality**
-- **309 test files** across the monorepo (Vitest)
+- **Every test file is in the repo** — current count in [`docs/stats.json`](docs/stats.json) (Vitest)
 - **Live integration tests** against public Casdoor + NewAPI endpoints
 - **Closed-loop capability evals** for end-to-end agent runs
 - **Type-safe IPC** — every preload channel is allowlisted in `electron/preload/index.ts`
@@ -233,7 +225,7 @@ System tray, native notifications, deep links (`casdoor://`), clipboard integrat
 ### 30-second tour — what you get
 
 <p align="center">
-  <img src="docs/diagrams/tour-30s.svg" alt="OpenBuddy 30-second tour — WorkBuddy-grade UI, 64 Cordis capabilities, enterprise-ready, verifiable, fast" />
+  <img src="docs/diagrams/tour-30s.svg" alt="OpenBuddy 30-second tour — desktop agent UI, Cordis capabilities, enterprise-ready, verifiable, fast" />
 </p>
 
 ### Architecture overview
@@ -245,7 +237,7 @@ System tray, native notifications, deep links (`casdoor://`), clipboard integrat
 ### Capability matrix
 
 <p align="center">
-  <img src="docs/diagrams/capability-matrix.svg" alt="OpenBuddy capability matrix — 64 workspace packages across 8 groups" />
+  <img src="docs/diagrams/capability-matrix.svg" alt="OpenBuddy capability matrix — workspace packages across 8 groups" />
 </p>
 
 ### Data flow — prompt to tool result
@@ -254,10 +246,10 @@ System tray, native notifications, deep links (`casdoor://`), clipboard integrat
   <img src="docs/diagrams/data-flow-end-to-end.svg" alt="OpenBuddy data flow — every prompt crosses 5 typed boundaries before reaching the model, and 4 on the way back" />
 </p>
 
-### WorkBuddy parity
+### Capability parity (evidence-backed)
 
 <p align="center">
-  <img src="docs/diagrams/workbuddy-parity.svg" alt="OpenBuddy vs WorkBuddy capability parity" />
+  <img src="docs/diagrams/workbuddy-parity.svg" alt="OpenBuddy capability parity" />
 </p>
 
 ### Bilingual support
@@ -290,32 +282,23 @@ See [`docs/diagrams/`](docs/diagrams/) for the full set of system architecture d
 
 ---
 
-## ⚔️ OpenBuddy vs WorkBuddy
+## 🏢 Self-hostable, auditable, enterprise-ready
 
-Only rows we can publicly substantiate — see [`docs/workbuddy-parity-matrix.md`](docs/workbuddy-parity-matrix.md) for the full matrix.
+The table below is the short version of what makes this usable inside an organization — each row points at code that exists in this repository.
 
-| Capability | WorkBuddy | OpenBuddy |
-|---|---|---|
-| License | Closed-source | **MIT (open)** |
-| Data path | Tencent backend | **Local + your gateway** |
-| Plan mode | ✅ | ✅ |
-| Skills | ✅ | ✅ + open catalog |
-| MCP connectors | ✅ | ✅ |
-| Experts / Assistants | ✅ | ✅ (local files) |
-| Rewind & fork | ✅ | ✅ |
-| Sub-agent Tasks | ✅ | ✅ |
-| Automations | ✅ | ✅ (local scheduler) |
-| Slash commands | ✅ | ✅ |
-| Local persistence | ✅ | ✅ (restart-safe) |
-| Provider choice | Limited | **BYOK — Anthropic / OpenAI / NewAPI / custom** |
-| Casdoor OIDC | ❌ | ✅ |
-| NewAPI gateway | ❌ | ✅ (BYOK + Service Token) |
-| SCIM v2 | ❌ | ✅ (RFC 7644) |
-| SAML 2.0 | ❌ | ✅ |
-| Plugin SDK | Closed | **Cordis open capability mesh** |
-| Tests visible to users | ❌ | **309 test files in the repo** |
-| Cross-platform | Win / macOS | **Win / macOS / Linux** |
-| Audit log | Backend | **Local + Casdoor tenant ledger** |
+| Capability | Where it lives |
+|---|---|
+| License | MIT — every line auditable, fork it |
+| Data path | Local + your own gateway (BYOK), never a vendor backend |
+| Mailbox protocols | IMAP · SMTP · Gmail API · Graph API · JMAP — five real protocol paths |
+| Provider choice | BYOK — Anthropic / OpenAI / NewAPI / custom |
+| Identity | Casdoor OIDC · SCIM v2 · SAML 2.0 · multi-tenant isolation |
+| Audit | Local audit log + tenant-scoped audit ledger, exportable |
+| Plugin SDK | Open Cordis capability mesh (`@openbuddy/*`), versioned contracts |
+| Tests | Every test file is in this repository (count: `docs/stats.json`) |
+| Cross-platform | Windows · macOS · Linux |
+
+A full, evidence-backed capability matrix — including the parts that are **not** done yet — lives in [`docs/workbuddy-parity-matrix.md`](docs/workbuddy-parity-matrix.md). We would rather point you at the matrix than at a marketing table.
 
 ---
 
@@ -364,10 +347,10 @@ pnpm electron:build:all
 ### Verify your environment
 
 ```bash
-# Type-check the entire 32-project monorepo
+# Type-check the entire monorepo
 pnpm workspace:typecheck
 
-# Run the full Vitest suite (309 test files)
+# Run the full Vitest suite (every test file is in the repo)
 pnpm workspace:test
 
 # Closed-loop capability evaluation (real agent run + scoring)
@@ -462,7 +445,7 @@ packages/                # one moon project per capability (50+ packages)
   ui/openbuddy-{shell,sidebar,settings,workbench,…} (19 packages)
 
 .moon/                   # moon workspace + task configuration
-  workspace.yml          # 32-project graph (renderer + Electron + packages)
+  workspace.yml          # project graph (renderer + Electron + packages)
   tasks/                 # typecheck / test / build / dev / electron.* presets
   toolchains.yml         # node 22 / pnpm 10 / typescript 5.6
 
@@ -602,13 +585,13 @@ The full backlog lives in [`TODO.md`](TODO.md). The public roadmap is in **[`doc
 
 - Core layout: Sidebar / HomePage / ChatView / Composer
 - In-process Pi agent over the Electron bridge
-- WorkBuddy design tokens & 207-icon foundation (all implemented, zero stubs)
+- Design tokens & 207-icon foundation (all implemented, zero stubs)
 - BYOK multi-provider config
 - Skills / MCP / Experts surfaces
 - Plan mode · Rewind · Tasks · Slash Commands · Automations
 - Windows (NSIS + MSI) & macOS (DMG) installers
 - CI release workflow (GitHub Actions)
-- moon-managed monorepo (`moon run` everywhere, 32-project DAG, incremental builds)
+- moon-managed monorepo (`moon run` everywhere, incremental DAG builds)
 - Casdoor OIDC + NewAPI gateway + payment adapters + SCIM v2 + SAML 2.0
 
 ### 🚧 In progress
@@ -698,7 +681,7 @@ If OpenBuddy has earned its place on your daily-driver list, please consider giv
 
 OpenBuddy stands on the shoulders of giants:
 
-- **[Tencent WorkBuddy](https://workbuddy.tencent.com/)** — the design north star. OpenBuddy reuses WorkBuddy's `--wb-*` design tokens, 207-icon foundation (all implemented), and brand atoms for a pixel-close visual experience.
+- **[Tencent WorkBuddy](https://workbuddy.tencent.com/)** — the design north star. OpenBuddy reuses WorkBuddy's `--wb-*` design tokens, 207-icon foundation (all implemented), and brand atoms for a pixel-close visual experience. *(Attribution: the visual foundation is theirs; everything else in this repository is not.)*
 - **[Pi coding agent](https://github.com/badlogic/pi-mono)** — the in-process agent runtime behind OpenBuddy's Electron host.
 - **[Cordis](https://github.com/cordisjs/cordis)** — the dependency-injection framework that powers our capability mesh.
 - **[moon](https://moonrepo.dev)** · **[Electron](https://www.electronjs.org/)** · **[React](https://react.dev/)** · **[Vite](https://vitejs.dev/)** — moon orchestrates every task; Electron hosts the Cordis/Pi runtime; React + Vite ship the renderer.

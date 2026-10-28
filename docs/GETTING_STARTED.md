@@ -90,7 +90,7 @@ A slightly larger first change: pick a `feat(good-first-issue)` from the GitHub 
 # Type-check the full monorepo
 pnpm workspace:typecheck
 
-# Run all unit tests (309 test files)
+# Run all unit tests (every test file is in the repo)
 pnpm workspace:test
 
 # Run just the test for a single package

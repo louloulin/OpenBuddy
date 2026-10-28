@@ -30,8 +30,8 @@
 
 <br/><br/>
 
-**OpenBuddy 是 WorkBuddy 风格的桌面 AI 工作台,在 Electron + Pi 之上以 100% MIT 开源重建。**
-它带来 WorkBuddy 同款精致 UI、Plan 模式、Skills、MCP 连接器,以及企业级 Casdoor × NewAPI 集成——每一字节都可审计,每一个 Provider 都支持自带 Key。
+**OpenBuddy 是一个可自托管、可审计的企业桌面 AI 邮件 / 协作 Agent —— 在 Electron + Pi 之上,100% MIT 开源。**
+五条真实邮箱协议链路、Casdoor × NewAPI 企业身份、租户级审计账本,每一个 Provider 都支持自带 Key。每一字节都可审计。
 
 [快速开始](#-快速开始) · [特性](#-主要特性) · [架构](#-架构) · [文档](#-文档) · [贡献指南](CONTRIBUTING.md) · [社区](docs/COMMUNITY.md)
 
@@ -46,7 +46,7 @@
 - [为什么是 OpenBuddy?](#-为什么是-openbuddy)
 - [✨ 主要特性](#-主要特性)
 - [🎬 演示与截图](#-演示与截图)
-- [⚔️ OpenBuddy vs WorkBuddy](#%EF%B8%8F-openbuddy-vs-workbuddy)
+- [🏢 可自托管、可审计、企业级](#%EF%B8%8F-%E5%8F%AF%E8%87%AA%E7%BB%B4%E6%8A%A4%E5%8F%AF%E5%AE%A1%E8%AE%A1%E4%BC%81%E4%B8%9A%E7%BA%A7)
 - [🚀 快速开始](#-快速开始)
 - [🏗️ 架构](#-架构)
 - [🧩 能力包清单](#-能力包清单)
@@ -64,11 +64,13 @@
 
 ## 💡 为什么是 OpenBuddy?
 
-[**腾讯 WorkBuddy**](https://workbuddy.tencent.com/) 告诉了所有人:一个优秀的桌面 AI Agent 工作台应该长什么样——精致 UI、Plan 模式、Skills、MCP 连接器。这确实是个能打的产品。
+**OpenBuddy 是一个可自托管、可审计的企业桌面 AI 邮件 / 协作 Agent —— 让 AI 在你控制的邮箱与协作空间里干活,并且每一步都留痕。**
 
-**但它闭源,且数据链路走腾讯后端。**
+三件真正难做、也真正值钱的事,就是这个项目的主题:
 
-**OpenBuddy 是开源的答案**——同样的体验形态,在 Electron + Pi 上从零重建,底层是 Cordis 能力网格,任何贡献者都可以扩展:
+1. **接得住真实邮箱** —— IMAP、SMTP、Gmail API、Graph API、JMAP,五条真实协议链路,每条都有跑通的验收脚本。
+2. **企业身份能落进去** —— Casdoor OIDC、多租户隔离、NewAPI 网关、SCIM v2、SAML 2.0、审计账本。
+3. **行为能追回来** —— 本地审计日志、租户级审计链、工具调用留痕;出事时你能回答"谁、什么时候、对哪个邮箱、做了什么"。
 
 <table>
 <tr><td>🔓</td><td><strong>100% 开源 (MIT)</strong><br/>没有黑箱遥测,没有供应商锁定。整个仓库可审计。</td></tr>
@@ -76,12 +78,14 @@
 <tr><td>🔁</td><td><strong>会话可重启恢复</strong><br/>Pi 会话、Provider 设置、能力状态、审计日志跨渲染进程 reload 和 Electron 重启持久化。</td></tr>
 <tr><td>🤖</td><td><strong>Pi 作为 Agent Runtime</strong><br/>进程内 <code>AgentSession</code> 掌管提示词、工具、权限、计划、任务和流式事件。</td></tr>
 <tr><td>🌐</td><td><strong>真正的跨平台</strong><br/>一套代码,Windows、macOS、Linux。<a href="electron-builder.yml">electron-builder</a> 为每个平台产出签名安装包。</td></tr>
-<tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>66 个工程(1 根 + 1 Electron + 64 个 workspace 包),typecheck/test/build 增量执行。CI 跑的 <code>moon run</code> 与本地完全一致。</td></tr>
-<tr><td>🧩</td><td><strong>Cordis 能力网格</strong><br/>64 个 workspace 包(12 capability、27 UI、8 collaboration ……)(<code>@openbuddy/*</code>)——skills、memory、plan、task、email、calendar、MCP、payment、SCIM、SAML……按需取用。</td></tr>
+<tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>77 个 moon 工程(见 [`docs/stats.json`](docs/stats.json)),typecheck/test/build 增量执行。CI 跑的 <code>moon run</code> 与本地完全一致。</td></tr>
+<tr><td>🧩</td><td><strong>Cordis 能力网格</strong><br/>81 个 workspace 包(capability / UI / collaboration ……)(<code>@openbuddy/*</code>)——skills、memory、plan、task、email、calendar、MCP、payment、SCIM、SAML……按需取用。</td></tr>
 <tr><td>🏢</td><td><strong>企业就绪</strong><br/>Casdoor OIDC、NewAPI 网关、4 个支付通道、SCIM v2、SAML 2.0、事务性 Outbox Webhooks、审计账本——生产级构件。</td></tr>
 </table>
 
-> *"WorkBuddy 是成品,OpenBuddy 是你能真正读懂、能 fork、能拥有的那一个。"*
+> *"一个你能自己托管、能读完每一行、事后还能审计的桌面 AI Agent。"*
+
+完整的一页定位声明在 [`POSITIONING.md`](POSITIONING.md)。
 
 <div align="center">
 
@@ -146,7 +150,7 @@ Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 G
 <td valign="top">
 
 **🧪 经实战检验的质量**
-- **309 个测试文件**(Vitest)
+- **测试文件全部在仓库里** —— 当前数量见 [`docs/stats.json`](docs/stats.json)(Vitest)
 - **实时集成测试**面向公网 Casdoor + NewAPI 端点
 - **闭环能力评测**支持端到端 Agent 运行
 - **类型化 IPC** — 每个 preload 通道都在 `electron/preload/index.ts` 白名单中
@@ -225,7 +229,7 @@ Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 G
 ### 30 秒速览 — 你将获得什么
 
 <p align="center">
-  <img src="docs/diagrams/tour-30s.svg" alt="OpenBuddy 30 秒速览 — WorkBuddy 级 UI、64 个 Cordis 能力、企业级、可验证、高性能" />
+  <img src="docs/diagrams/tour-30s.svg" alt="OpenBuddy 30 秒速览 — 桌面 Agent UI、Cordis 能力、企业级、可验证、高性能" />
 </p>
 
 ### 架构总览
@@ -237,7 +241,7 @@ Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 G
 ### 能力矩阵
 
 <p align="center">
-  <img src="docs/diagrams/capability-matrix.svg" alt="OpenBuddy 能力矩阵 — 64 个 workspace 包,分为 8 个能力组" />
+  <img src="docs/diagrams/capability-matrix.svg" alt="OpenBuddy 能力矩阵 — workspace 包,分为 8 个能力组" />
 </p>
 
 ### 数据流 — 提示词到工具结果
@@ -246,10 +250,10 @@ Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 G
   <img src="docs/diagrams/data-flow-end-to-end.svg" alt="OpenBuddy 数据流 — 每个提示词跨过 5 个类型化边界才到达模型,返回时再跨过 4 个" />
 </p>
 
-### WorkBuddy 能力对等
+### 能力对等(有证据的)
 
 <p align="center">
-  <img src="docs/diagrams/workbuddy-parity.svg" alt="OpenBuddy vs WorkBuddy 能力对等矩阵" />
+  <img src="docs/diagrams/workbuddy-parity.svg" alt="OpenBuddy 能力对等矩阵" />
 </p>
 
 ### 双语支持
@@ -283,32 +287,23 @@ OpenBuddy 原生提供 **`zh-CN`(默认)** 与 **`en-US`** 双语界面。翻译
 
 ---
 
-## ⚔️ OpenBuddy vs WorkBuddy
+## 🏢 可自托管、可审计、企业级
 
-只列出可公开佐证的能力——完整对比见 [`docs/workbuddy-parity-matrix.md`](docs/workbuddy-parity-matrix.md)。
+下表是"能不能进公司用"的最短版本 —— 每一行都指向仓库里真实存在的代码。
 
-| 能力 | WorkBuddy | OpenBuddy |
-|---|---|---|
-| 许可证 | 闭源 | **MIT(开源)** |
-| 数据路径 | 腾讯后端 | **本地 + 你的网关** |
-| Plan 模式 | ✅ | ✅ |
-| Skills | ✅ | ✅ + 开源目录 |
-| MCP 连接器 | ✅ | ✅ |
-| Experts / Assistants | ✅ | ✅(本地文件) |
-| Rewind & fork | ✅ | ✅ |
-| 子 Agent Tasks | ✅ | ✅ |
-| Automations | ✅ | ✅(本地调度器) |
-| Slash commands | ✅ | ✅ |
-| 本地持久化 | ✅ | ✅(重启安全) |
-| Provider 选择 | 有限 | **BYOK — Anthropic / OpenAI / NewAPI / 自定义** |
-| Casdoor OIDC | ❌ | ✅ |
-| NewAPI 网关 | ❌ | ✅(BYOK + Service Token) |
-| SCIM v2 | ❌ | ✅(RFC 7644) |
-| SAML 2.0 | ❌ | ✅ |
-| Plugin SDK | 闭源 | **Cordis 开源能力网格** |
-| 用户可见的测试 | ❌ | **仓库中 309 个测试文件** |
-| 跨平台 | Win / macOS | **Win / macOS / Linux** |
-| 审计日志 | 后端 | **本地 + Casdoor 租户账本** |
+| 能力 | 落在哪里 |
+|---|---|
+| 许可 | MIT —— 每一行可审计,可 fork |
+| 数据路径 | 本地 + 你自己的网关(BYOK),不经过厂商后端 |
+| 邮箱协议 | IMAP · SMTP · Gmail API · Graph API · JMAP —— 五条真实协议链路 |
+| 模型来源 | BYOK —— Anthropic / OpenAI / NewAPI / 自定义 |
+| 身份 | Casdoor OIDC · SCIM v2 · SAML 2.0 · 多租户隔离 |
+| 审计 | 本地审计日志 + 租户级审计账本,可导出 |
+| 插件 SDK | 开放的 Cordis 能力网格(`@openbuddy/*`),契约带版本 |
+| 测试 | 测试文件全部在仓库里(数量见 `docs/stats.json`) |
+| 跨平台 | Windows · macOS · Linux |
+
+完整的能力矩阵 —— **包括还没做完的部分** —— 在 [`docs/workbuddy-parity-matrix.md`](docs/workbuddy-parity-matrix.md)。比起一张宣传表,我们更愿意把你指向矩阵。
 
 ---
 
@@ -360,7 +355,7 @@ pnpm electron:build:all
 # 类型检查整个 32 工程 monorepo
 pnpm workspace:typecheck
 
-# 跑完整 Vitest 套件(309 个测试文件)
+# 跑完整 Vitest 套件(测试文件全部在仓库里)
 pnpm workspace:test
 
 # 闭环能力评测(真实 Agent 运行 + 评分)

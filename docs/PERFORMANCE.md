@@ -14,7 +14,7 @@
 | IPC dispatch hot path (validator + extraction) | ≤ 5 µs p99 per call | `node scripts/perf/ipc-latency.mjs` |
 | Memory baseline (idle) | ≤ 250 MB | `process.memoryUsage()` |
 | Memory per active session | ≤ 50 MB | `process.memoryUsage()` |
-| Test suite (309 test files) | ≤ 3 min | CI log |
+| Test suite (all test files) | ≤ 3 min | CI log |
 
 Any release that **exceeds the budget by > 10%** on the renderer entry chunk or renderer total fails the `perf-budget` job in CI and is therefore blocked from merge.
 

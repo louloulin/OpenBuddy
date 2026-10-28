@@ -68,7 +68,7 @@ A side-by-side comparison of OpenBuddy against the most popular AI coding / agen
 | Auto-updater | ✅ electron-updater | ✅ | ❌ | ❌ | ✅ | ❌ |
 | Plugin SDK | ✅ Cordis | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Hot-reload plugins | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Open test suite | ✅ 309 test files | ❌ | ✅ | ✅ | ❌ | ❌ |
+| Open test suite | ✅ every test file is in the repo | ❌ | ✅ | ✅ | ❌ | ❌ |
 | Open evaluation suite | ✅ GAIA-style | ❌ | partial | ✅ | ❌ | ❌ |
 
 ### What OpenBuddy is best at
@@ -76,7 +76,7 @@ A side-by-side comparison of OpenBuddy against the most popular AI coding / agen
 1. **Enterprise AI workspaces.** Casdoor OIDC + NewAPI gateway + 4 payment adapters + SCIM v2 + SAML 2.0 + transactional outbox — out of the box.
 2. **Plugin / capability ecosystem.** A 30+ package Cordis mesh any contributor can extend, with a runtime plugin loader for hot-install.
 3. **Multi-agent.** Full A2A protocol, rooms, inbox, task graph, evidence audit. The only open-source desktop tool with a complete multi-agent runtime.
-4. **Open the whole stack.** MIT license, 309 visible test files, GAIA-style eval harness, monorepo tooling — every byte auditable.
+4. **Open the whole stack.** MIT license, every test file visible, GAIA-style eval harness, monorepo tooling — every byte auditable.
 5. **WorkBuddy parity.** Pixel-close UI without vendor lock-in.
 
 ### What we're not (yet)
@@ -133,7 +133,7 @@ Last verified: 2026-09-01. If you spot a stale claim, open an issue labeled `doc
 1. **企业 AI 工作台**。Casdoor OIDC + NewAPI 网关 + 4 个支付适配器 + SCIM v2 + SAML 2.0 + 事务性 Outbox——开箱即用。
 2. **插件 / 能力生态**。30+ 包 Cordis 网格,任何贡献者可扩展,带运行时热加载。
 3. **多 Agent**。完整 A2A 协议、rooms、inbox、任务图、证据审计。唯一带完整多 Agent 运行时的开源桌面工具。
-4. **整栈开源**。MIT 许可、309 个可见测试文件、GAIA 风格评测 harness、monorepo 工具——每一字节可审计。
+4. **整栈开源**。MIT 许可、测试文件全部可见、GAIA 风格评测 harness、monorepo 工具——每一字节可审计。
 5. **WorkBuddy 兼容**。像素级贴近 UI,但无供应商锁定。
 
 ### 我们还不做的

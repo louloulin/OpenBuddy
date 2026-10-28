@@ -34,6 +34,35 @@ updates:
       # 且 --reporter=line 在 v5 也不是内置 reporter（nightly 连续红）。
       # 需要升级时人工评估并同步改配置。
       - dependency-name: "vitest"
+      # ---- 以下是"大版本收敛"：major 一律人工评估 ----
+      #
+      # 2026-10-28 的判断：本仓的价值锚点是"门禁能跑"，不是"依赖最新"。
+      # 一次 major 升级如果同时改动了 vitest 配置 / React 运行时 / 构建链，
+      # 排查成本远高于它带来的收益。patch/minor（含安全补丁）继续自动流。
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "openai"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "highlight.js"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "strnum"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "express-rate-limit"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
     groups:
       patch-and-minor:
         patterns:
@@ -50,6 +79,14 @@ updates:
       - "louloulin"
     labels:
       - "ci"
+    ignore:
+      # 同上：Actions 的 major 也走人工评估。原因是本仓的 CI 有两处
+      # 非标准交互 —— package.json 的 packageManager 带 sha512 哈希
+      # （pnpm/action-setup 对 version: 输入会直接报错），以及
+      # checkout@v7 已是当前在用版本。自动升 major 等于在门禁还没绿过
+      # 的时候改门禁本身。
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/apps/admin-portal"

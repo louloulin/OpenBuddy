@@ -10,6 +10,16 @@ on:
         description: 'Tag to build (e.g. v0.1.0). Leave empty to build HEAD.'
         required: false
         type: string
+      unsigned:
+        description: 'Build without code signing / notarization (no Apple secrets needed).'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Create the release as a draft (not published to the releases page).'
+        required: false
+        default: false
+        type: boolean
 
 # Cancel in-flight runs for the same tag/ref — only the latest build should
 # race to populate a GitHub Release.
@@ -139,8 +149,14 @@ jobs:
       # build if the runner cached it; otherwise rebuilt locally) and then
       # runs electron-builder to produce `OpenBuddy-<version>-setup.exe`
       # + blockmap under `release/`.
+      # unsigned 模式走 electron-builder.unsigned.yml:不签名,也不需要任何
+      # 证书 secret。目的是"先让人拿到可安装的包",不是冒充正式发布。
       - name: Build Windows installer (electron-vite + electron-builder)
+        if: ${{ inputs.unsigned != true }}
         run: pnpm electron:build:win
+      - name: Build Windows installer (unsigned)
+        if: ${{ inputs.unsigned == true }}
+        run: pnpm electron:build:unsigned:win
 
       - name: List artifacts
         run: dir release\
@@ -191,6 +207,7 @@ jobs:
       # the secret; decoded to a tmp .p12 and pointed at via CSC_LINK +
       # CSC_KEY_PASSWORD so electron-builder picks it up.
       - name: Import macOS Developer ID certificate
+        if: ${{ inputs.unsigned != true }}
         env:
           MACOS_CSC_LINK_BASE64: ${{ secrets.MACOS_CSC_LINK_BASE64 }}
           MACOS_CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
@@ -204,6 +221,7 @@ jobs:
       # App Store Connect API key for notarization. electron-builder reads
       # APPLE_API_KEY (path to .p8), APPLE_API_KEY_ID and APPLE_API_ISSUER.
       - name: Import App Store Connect notarization key
+        if: ${{ inputs.unsigned != true }}
         env:
           MACOS_API_KEY_BASE64: ${{ secrets.MACOS_API_KEY_BASE64 }}
           MACOS_API_KEY_ID: ${{ secrets.MACOS_API_KEY_ID }}
@@ -223,7 +241,11 @@ jobs:
       # are missing — the unsigned `electron.build.mac.dir` fallback lives
       # one task away for local iteration.
       - name: Build signed and notarized macOS DMG
+        if: ${{ inputs.unsigned != true }}
         run: pnpm electron:release:mac
+      - name: Build unsigned macOS DMG
+        if: ${{ inputs.unsigned == true }}
+        run: pnpm electron:build:unsigned:mac
 
       - name: List artifacts
         run: ls -la release/
@@ -287,7 +309,11 @@ jobs:
       # step — AppImages are self-contained executables. Any Linux-
       # specific patches should land in `.github/actions/build-linux/`.
       - name: Build Linux AppImage (electron-vite + electron-builder)
+        if: ${{ inputs.unsigned != true }}
         run: pnpm electron:build:linux
+      - name: Build Linux AppImage (unsigned)
+        if: ${{ inputs.unsigned == true }}
+        run: pnpm electron:build:unsigned:linux
 
       - name: List artifacts
         run: ls -la release/
@@ -311,6 +337,7 @@ jobs:
           sparse-checkout: |
             CHANGELOG.md
             scripts/extract-release-notes.mjs
+            scripts/generate-checksums.mjs
 
       - name: Download all artifacts
         uses: actions/download-artifact@v8
@@ -319,6 +346,14 @@ jobs:
 
       - name: List downloaded artifacts
         run: find artifacts -type f
+
+      # 生成 SHA256SUMS.txt 并挂到 release 上。
+      #
+      # 官网下载页要展示每个安装包的 SHA-256(P1-2 的验收标准)。GitHub
+      # Releases API 不提供 release 资产的校验和,所以必须由发布流水线自己
+      # 算。文件名用**发布资产名**(basename)—— 官网按资产名匹配。
+      - name: Generate SHA256SUMS.txt
+        run: node scripts/generate-checksums.mjs artifacts -o artifacts/SHA256SUMS.txt
 
       # Pulls the section for this tag out of CHANGELOG.md (if present)
       # and falls back to a generated commit list when the file hasn't
@@ -353,7 +388,9 @@ jobs:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           name: ${{ env.APP_NAME }} ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           body: ${{ steps.notes.outputs.body }}
-          draft: false
+          # draft:true 时 release 不会出现在 releases 页面(只有拿到链接的人
+          # 能看到)。unsigned 首版用它来"先产出可安装的包,再决定要不要公开"。
+          draft: ${{ inputs.draft == true }}
           prerelease: false
           generate_release_notes: true
           files: |
@@ -363,5 +400,6 @@ jobs:
             artifacts/macos-dmg/*.dmg.blockmap
             artifacts/linux-appimage/*.AppImage
             artifacts/linux-appimage/latest-linux.yml
+            artifacts/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

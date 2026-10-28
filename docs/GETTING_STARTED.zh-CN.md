@@ -90,7 +90,7 @@ Key 通过 Electron `safeStorage` API 加密存到 OS 钥匙串。
 # 检查整个 monorepo 类型
 pnpm workspace:typecheck
 
-# 跑所有单元测试(309 个测试文件)
+# 跑所有单元测试(测试文件全部在仓库里)
 pnpm workspace:test
 
 # 只跑单个包的测试

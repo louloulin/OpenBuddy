@@ -16,7 +16,7 @@ OpenBuddy is a 100% open-source (MIT) desktop AI workspace. It has the same shap
 | Data path | Tencent backend | Local + your gateway |
 | Provider choice | Limited | BYOK — any provider |
 | Plugin SDK | Closed | Cordis open capability mesh |
-| Visible tests | ❌ | 309 test files in the repo |
+| Visible tests | ❌ | Every test file is in the repo |
 
 See [`workbuddy-parity-matrix.md`](workbuddy-parity-matrix.md) for the full comparison.
 

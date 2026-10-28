@@ -114,7 +114,7 @@ To propose a new item, open a [GitHub Discussion](https://github.com/louloulin/O
 #### ✅ Milestone (2026-08-17) — grok → Pi + moon
 
 - In-process Pi agent over Electron bridge
-- 32-project moon DAG monorepo
+- moon DAG monorepo
 - Plugin-host + plugin discovery
 - Tauri removal (gated by moon migration)
 

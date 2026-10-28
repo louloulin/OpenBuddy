@@ -16,7 +16,7 @@ OpenBuddy 是一个 100% 开源(MIT)的桌面 AI 工作台。它有与腾讯 Wor
 | 数据路径 | 腾讯后端 | 本地 + 你的网关 |
 | Provider 选择 | 有限 | BYOK —— 任何 Provider |
 | Plugin SDK | 闭源 | Cordis 开源能力网格 |
-| 用户可见测试 | ❌ | 仓库中 309 个测试文件 |
+| 用户可见测试 | ❌ | 测试文件全部在仓库里 |
 
 完整对比见 [`workbuddy-parity-matrix.md`](workbuddy-parity-matrix.md)。
 

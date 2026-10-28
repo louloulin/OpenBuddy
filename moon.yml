@@ -214,6 +214,41 @@ tasks:
     options:
       cache: false
 
+  # ---------------------------------------------------------------------------
+  # Unsigned builds (plan1029.md P1-1)
+  #
+  # 同一套 electron-builder 配置,但用 electron-builder.unsigned.yml:
+  # 不签名、不公证、不需要 Apple Developer ID / notarization 凭证。
+  #
+  # 存在的理由:正式签名需要四个 secret(MACOS_CSC_LINK_BASE64 /
+  # MACOS_CSC_KEY_PASSWORD / MACOS_API_KEY_* / MACOS_API_ISSUER)。
+  # 在这些凭证配好之前,"0 release" 这个事实就无法改变 —— 而**没有任何人
+  # 下载过的东西不构成开源项目**。unsigned 版本解决的是"先让人拿到",
+  # 不是"冒充正式发布"。
+  #
+  # macOS 上未签名的产物会被 Gatekeeper 隔离,安装说明见 docs/RELEASING.md。
+  # ---------------------------------------------------------------------------
+  electron.build.unsigned.win:
+    deps:
+      - "~:build"
+    script: "CSC_IDENTITY_AUTO_DISCOVERY=false scripts/electron-builder.sh --win --config electron-builder.unsigned.yml"
+    options:
+      cache: false
+
+  electron.build.unsigned.mac:
+    deps:
+      - "~:build"
+    script: "CSC_IDENTITY_AUTO_DISCOVERY=false scripts/electron-builder.sh --mac dmg --config electron-builder.unsigned.yml"
+    options:
+      cache: false
+
+  electron.build.unsigned.linux:
+    deps:
+      - "~:build"
+    script: "CSC_IDENTITY_AUTO_DISCOVERY=false scripts/electron-builder.sh --linux --config electron-builder.unsigned.yml"
+    options:
+      cache: false
+
   # Quick local preview without notarization preflight. Produces an unsigned
   # `.app` bundle so developers can iterate without Apple Developer ID secrets.
   # `:release:mac` is the alias that gates on `check-macos-signing.mjs`.

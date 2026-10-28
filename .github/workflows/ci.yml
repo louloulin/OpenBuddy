@@ -351,6 +351,16 @@ jobs:
       - name: Check markdown links
         run: node scripts/check-doc-links.mjs
 
+      # 文档数字防漂移门禁。
+      #
+      # 仓里曾经到处写死"309 个测试文件""66 个 project"这类数字,而实测早已
+      # 不是这样 —— 三个 README 甚至写着三个不同的测试文件数(455 / 3047 /
+      # 455)。这类数字是"证明这是真项目"的素材,也是最容易变成假话的地方。
+      # 现在数字只保留一份:docs/stats.json,由 scripts/docs-stats.mjs 生成,
+      # 这个门禁保证它永远是真的。
+      - name: Docs stats freshness gate
+        run: node scripts/check-doc-stats.mjs
+
   build-summary:
     name: Build Summary
     runs-on: ubuntu-latest

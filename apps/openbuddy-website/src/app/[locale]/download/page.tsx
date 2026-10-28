@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { DownloadView, DOWNLOAD_COPY } from '@/components/DownloadView';
 import { buildMetadata } from '@/lib/build-metadata';
+import { getLatestRelease } from '@/lib/releases-server';
 import { locales, type Locale } from '@/lib/i18n';
 
 export const dynamicParams = false;
@@ -30,5 +31,8 @@ export default async function LocaleDownloadPage({
 }) {
   const { locale } = await params;
   if (!locales.includes(locale as Locale)) notFound();
-  return <DownloadView locale={ locale as Locale } />;
+  // 下载页展示**真实**的 release 资产与 SHA-256(而不是写死的文件名/编造的
+  // 校验和)。没有 release 时如实显示"尚未发布版本"。
+  const release = await getLatestRelease();
+  return <DownloadView locale={ locale as Locale } release={ release } />;
 }
