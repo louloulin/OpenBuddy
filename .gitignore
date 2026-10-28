@@ -35,6 +35,9 @@ test-grok-connection.mjs
 # Documentation (allowlist specific files below)
 docs/*
 !docs/adr/
+# docs/stats.json 是仓内数字的唯一来源(scripts/docs-stats.mjs 生成,
+# scripts/check-doc-stats.mjs 在 CI 校验),必须入库 —— 官网也直接读它。
+!docs/stats.json
 !docs/storage-verification-report.md
 !docs/distributed-buddy-network-architecture.md
 !docs/migration-pi-electron.md
