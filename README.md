@@ -69,7 +69,7 @@ Five real mailbox protocols, Casdoor × NewAPI identity, a tenant-scoped audit l
 Three things are hard to get right, and they are what this project is actually about:
 
 1. **It talks to real mailboxes.** IMAP, SMTP, Gmail API, Graph API and JMAP — five real protocol paths, with acceptance scripts that exercise them end to end.
-2. **Enterprise identity fits in.** Casdoor OIDC, multi-tenant isolation, a NewAPI gateway, SCIM v2, SAML 2.0, and an audit ledger.
+2. **Enterprise identity fits in.** Casdoor OIDC (wired into the main process), multi-tenant isolation, a NewAPI gateway, and an audit ledger. SCIM v2 / SAML 2.0 exist as tested but **unwired** seed implementations (archived 2026-10-28, recoverable from git history) — we don't claim them as shipped.
 3. **Every action is traceable.** Local audit log, tenant-scoped audit chain, tool-call records — when something goes wrong you can answer *who, when, which mailbox, what*.
 
 <table>
@@ -79,8 +79,8 @@ Three things are hard to get right, and they are what this project is actually a
 <tr><td>🤖</td><td><strong>Pi as the agent runtime</strong><br/>The in-process <code>AgentSession</code> owns prompts, tools, permissions, plans, tasks, and streaming events.</td></tr>
 <tr><td>🌐</td><td><strong>Truly cross-platform</strong><br/>One codebase, Windows, macOS, and Linux. <a href="electron-builder.yml">electron-builder</a> produces installers for each.</td></tr>
 <tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>77 moon projects (see [`docs/stats.json`](docs/stats.json)), type-check/test/build incrementally. CI runs the same commands you run locally.</td></tr>
-<tr><td>🧩</td><td><strong>Cordis capability mesh</strong><br/>81 workspace packages (capability / collaboration / UI / …) (<code>@openbuddy/*</code>) — skills, memory, plan, task, email, calendar, MCP, payment, SCIM, SAML… pick what you need.</td></tr>
-<tr><td>🏢</td><td><strong>Enterprise-ready</strong><br/>Casdoor OIDC, NewAPI gateway, 4 payment channels, SCIM v2, SAML 2.0, transactional outbox webhooks, audit ledger — production-ready building blocks.</td></tr>
+<tr><td>🧩</td><td><strong>Cordis capability mesh</strong><br/>Workspace packages (capability / collaboration / UI / …) (<code>@openbuddy/*</code>) — skills, memory, plan, task, email, calendar, MCP… pick what you need.</td></tr>
+<tr><td>🏢</td><td><strong>Enterprise building blocks</strong><br/>Casdoor OIDC and the audit ledger are wired; NewAPI gateway integration is in the tree. SCIM v2 / SAML 2.0 exist as tested seeds in git history, not yet wired.</td></tr>
 </table>
 
 > *"A desktop AI agent you can host yourself, read every line of, and audit afterwards."*
@@ -129,10 +129,6 @@ Windows (NSIS `.exe` + MSI), macOS (`.dmg`), Linux (AppImage + `.deb`). CI-built
 **🏢 Enterprise integration**
 - **Casdoor** — OIDC SSO + tenant policy + audit log
 - **NewAPI** — model aggregation gateway (BYOK + Service Token)
-- **Stripe / WeChat Pay / Alipay** — 4 payment adapters
-- **SCIM v2** — RFC 7644 user/group provisioning
-- **SAML 2.0** — AuthnRequest/Response/LogoutRequest
-- **Transactional outbox** — webhook delivery with exponential backoff
 
 </td>
 <td valign="top">
@@ -292,7 +288,7 @@ The table below is the short version of what makes this usable inside an organiz
 | Data path | Local + your own gateway (BYOK), never a vendor backend |
 | Mailbox protocols | IMAP · SMTP · Gmail API · Graph API · JMAP — five real protocol paths |
 | Provider choice | BYOK — Anthropic / OpenAI / NewAPI / custom |
-| Identity | Casdoor OIDC · SCIM v2 · SAML 2.0 · multi-tenant isolation |
+| Identity | Casdoor OIDC (wired) · multi-tenant isolation · SCIM/SAML seeds (unwired, in git history) |
 | Audit | Local audit log + tenant-scoped audit ledger, exportable |
 | Plugin SDK | Open Cordis capability mesh (`@openbuddy/*`), versioned contracts |
 | Tests | Every test file is in this repository (count: `docs/stats.json`) |
@@ -401,10 +397,6 @@ core/         session
 fs/           fs-local
 shared/       files-kb · types
 collaboration/ coordinator · evidence · inbox · network · policy · protocol · room · task
-payment/      Stripe / WeChat Pay / Alipay / HMAC adapters
-saml/         SAML 2.0 primitives
-scim/         SCIM v2 endpoints (RFC 7644)
-webhook-outbox/ transactional outbox + retry/backoff
 ui/           26 UI packages (shell, sidebar, settings, workbench, …)
 ```
 
@@ -438,10 +430,6 @@ packages/                # one moon project per capability (50+ packages)
   shared/openbuddy-{files-kb,types}/
   collaboration/openbuddy-{coordinator,evidence,inbox,network,policy,
               protocol,room,task}/
-  payment/               # Stripe / WeChat Pay / Alipay / HMAC
-  saml/                  # SAML 2.0 primitives
-  scim/                  # SCIM v2 endpoints
-  webhook-outbox/        # transactional outbox
   ui/openbuddy-{shell,sidebar,settings,workbench,…} (19 packages)
 
 .moon/                   # moon workspace + task configuration
@@ -506,10 +494,6 @@ OpenBuddy ships with **63 workspace packages (12 capability, 26 UI, 8 collaborat
 |---|---|
 | `@openbuddy/auth-casdoor` | Casdoor OIDC client + admin REST |
 | `@openbuddy/auth-permission` | Permission prompts & policy UI |
-| `@openbuddy/payment` | Stripe / WeChat Pay / Alipay / HMAC |
-| `@openbuddy/saml` | SAML 2.0 primitives |
-| `@openbuddy/scim` | SCIM v2 endpoints (RFC 7644) |
-| `@openbuddy/webhook-outbox` | Transactional outbox + retry/backoff |
 
 ### Email & calendar
 
@@ -592,7 +576,7 @@ The full backlog lives in [`TODO.md`](TODO.md). The public roadmap is in **[`doc
 - Windows (NSIS + MSI) & macOS (DMG) installers
 - CI release workflow (GitHub Actions)
 - moon-managed monorepo (`moon run` everywhere, incremental DAG builds)
-- Casdoor OIDC + NewAPI gateway + payment adapters + SCIM v2 + SAML 2.0
+- Casdoor OIDC + NewAPI gateway
 
 ### 🚧 In progress
 

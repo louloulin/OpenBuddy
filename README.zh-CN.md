@@ -69,7 +69,7 @@
 三件真正难做、也真正值钱的事,就是这个项目的主题:
 
 1. **接得住真实邮箱** —— IMAP、SMTP、Gmail API、Graph API、JMAP,五条真实协议链路,每条都有跑通的验收脚本。
-2. **企业身份能落进去** —— Casdoor OIDC、多租户隔离、NewAPI 网关、SCIM v2、SAML 2.0、审计账本。
+2. **企业身份能落进去** —— Casdoor OIDC(主进程真实接线)、多租户隔离、NewAPI 网关、审计账本。SCIM v2 / SAML 2.0 目前是**有测试但未接线的种子实现**(2026-10-28 随 experimental/ 归档,git 历史可找回)—— 我们不把它们说成已交付。
 3. **行为能追回来** —— 本地审计日志、租户级审计链、工具调用留痕;出事时你能回答"谁、什么时候、对哪个邮箱、做了什么"。
 
 <table>
@@ -79,8 +79,8 @@
 <tr><td>🤖</td><td><strong>Pi 作为 Agent Runtime</strong><br/>进程内 <code>AgentSession</code> 掌管提示词、工具、权限、计划、任务和流式事件。</td></tr>
 <tr><td>🌐</td><td><strong>真正的跨平台</strong><br/>一套代码,Windows、macOS、Linux。<a href="electron-builder.yml">electron-builder</a> 为每个平台产出签名安装包。</td></tr>
 <tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>77 个 moon 工程(见 [`docs/stats.json`](docs/stats.json)),typecheck/test/build 增量执行。CI 跑的 <code>moon run</code> 与本地完全一致。</td></tr>
-<tr><td>🧩</td><td><strong>Cordis 能力网格</strong><br/>81 个 workspace 包(capability / UI / collaboration ……)(<code>@openbuddy/*</code>)——skills、memory、plan、task、email、calendar、MCP、payment、SCIM、SAML……按需取用。</td></tr>
-<tr><td>🏢</td><td><strong>企业就绪</strong><br/>Casdoor OIDC、NewAPI 网关、4 个支付通道、SCIM v2、SAML 2.0、事务性 Outbox Webhooks、审计账本——生产级构件。</td></tr>
+<tr><td>🧩</td><td><strong>Cordis 能力网格</strong><br/>workspace 包(capability / UI / collaboration ……)(<code>@openbuddy/*</code>)——skills、memory、plan、task、email、calendar、MCP……按需取用。</td></tr>
+<tr><td>🏢</td><td><strong>企业级构件</strong><br/>Casdoor OIDC 与审计账本已接线;NewAPI 网关集成在仓内。SCIM v2 / SAML 2.0 是有测试的种子,在 git 历史里,尚未接线。</td></tr>
 </table>
 
 > *"一个你能自己托管、能读完每一行、事后还能审计的桌面 AI Agent。"*
@@ -141,10 +141,6 @@ Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 G
 **🏢 企业级集成**
 - **Casdoor** — OIDC SSO + 租户策略 + 审计日志
 - **NewAPI** — 模型聚合网关(BYOK + Service Token)
-- **Stripe / WeChat Pay / Alipay** — 4 个支付适配器
-- **SCIM v2** — RFC 7644 用户/组预置
-- **SAML 2.0** — AuthnRequest/Response/LogoutRequest
-- **事务性 Outbox** — Webhook 投递,带指数退避
 
 </td>
 <td valign="top">
@@ -297,7 +293,7 @@ OpenBuddy 原生提供 **`zh-CN`(默认)** 与 **`en-US`** 双语界面。翻译
 | 数据路径 | 本地 + 你自己的网关(BYOK),不经过厂商后端 |
 | 邮箱协议 | IMAP · SMTP · Gmail API · Graph API · JMAP —— 五条真实协议链路 |
 | 模型来源 | BYOK —— Anthropic / OpenAI / NewAPI / 自定义 |
-| 身份 | Casdoor OIDC · SCIM v2 · SAML 2.0 · 多租户隔离 |
+| 身份 | Casdoor OIDC(已接线)· 多租户隔离 · SCIM/SAML 种子(未接线,在 git 历史) |
 | 审计 | 本地审计日志 + 租户级审计账本,可导出 |
 | 插件 SDK | 开放的 Cordis 能力网格(`@openbuddy/*`),契约带版本 |
 | 测试 | 测试文件全部在仓库里(数量见 `docs/stats.json`) |
@@ -406,10 +402,6 @@ core/         session
 fs/           fs-local
 shared/       files-kb · types
 collaboration/ coordinator · evidence · inbox · network · policy · protocol · room · task
-payment/      Stripe / WeChat Pay / Alipay / HMAC 适配器
-saml/         SAML 2.0 原语
-scim/         SCIM v2 端点(RFC 7644)
-webhook-outbox/ 事务性 Outbox + 重试/退避
 ui/           26 个 UI 包(shell, sidebar, settings, workbench, …)
 ```
 
@@ -443,10 +435,6 @@ packages/                # 每个能力一个 moon 工程(30+ 包)
   shared/openbuddy-{files-kb,types}/
   collaboration/openbuddy-{coordinator,evidence,inbox,network,policy,
               protocol,room,task}/
-  payment/               # Stripe / WeChat Pay / Alipay / HMAC
-  saml/                  # SAML 2.0 原语
-  scim/                  # SCIM v2 端点
-  webhook-outbox/        # 事务性 Outbox
   ui/openbuddy-{shell,sidebar,settings,workbench,…} (14 包)
 
 .moon/                   # moon workspace + task 配置
@@ -512,10 +500,6 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 |---|---|
 | `@openbuddy/auth-casdoor` | Casdoor OIDC 客户端 + 管理 REST |
 | `@openbuddy/auth-permission` | 权限弹窗与策略 UI |
-| `@openbuddy/payment` | Stripe / WeChat Pay / Alipay / HMAC |
-| `@openbuddy/saml` | SAML 2.0 原语 |
-| `@openbuddy/scim` | SCIM v2 端点(RFC 7644) |
-| `@openbuddy/webhook-outbox` | 事务性 Outbox + 重试/退避 |
 
 ### 邮件与日历
 
@@ -540,7 +524,7 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 <tr><td>能力网格</td><td><a href="https://github.com/cordisjs/cordis">Cordis 3</a>、<a href="https://modelcontextprotocol.io/">MCP SDK 1.25</a></td></tr>
 <tr><td>Monorepo</td><td><a href="https://moonrepo.dev">moon 2.5</a>、<a href="https://pnpm.io/">pnpm 11</a></td></tr>
 <tr><td>质量</td><td><a href="https://vitest.dev/">Vitest 2</a>、<a href="https://playwright.dev/">Playwright 1.58</a>、<a href="https://testing-library.com/">Testing Library</a>、TypeScript 5.6 strict</td></tr>
-<tr><td>后端集成</td><td>Casdoor、NewAPI、Stripe、WeChat Pay、Alipay、IMAP、SMTP、Gmail API、Graph API、JMAP</td></tr>
+<tr><td>后端集成</td><td>Casdoor、NewAPI、IMAP、SMTP、Gmail API、Graph API、JMAP</td></tr>
 </table>
 
 ---
@@ -599,7 +583,7 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 - Windows(NSIS + MSI)与 macOS(DMG)安装包
 - CI 发布流水线(GitHub Actions)
 - moon 化 monorepo(`moon run` 一统天下,32 工程 DAG,增量构建)
-- Casdoor OIDC + NewAPI 网关 + 支付适配器 + SCIM v2 + SAML 2.0
+- Casdoor OIDC + NewAPI 网关
 
 ### 🚧 进行中
 
@@ -654,8 +638,6 @@ OpenBuddy 把安全当作一等公民:
 - **文件夹级信任授予** 经 `@openbuddy/capability-folder-trust`
 - **能力级策略** 经 `@openbuddy/capability-authorization`
 - **Casdoor OIDC** 带 PKCE 与 refresh token 轮换
-- **SCIM v2** 预置 + **SAML 2.0** 联合身份
-- **事务性 Outbox** Webhook 投递(零事件丢失)
 - **本地优先审计账本**,跨重启持久化
 
 完整策略与漏洞上报见 **[`SECURITY.md`](SECURITY.md)**。

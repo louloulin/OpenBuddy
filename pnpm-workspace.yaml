@@ -54,10 +54,11 @@ packages:
   - 'packages/shared/*'
   - 'packages/team/*'
   - 'packages/ui/*'
-  # `experimental/` is deliberately OUT of the workspace. Those packages are
-  # never imported by anything; keeping them out of the workspace is what keeps
-  # them out of `pnpm install`, out of moon's `packages/*/*` glob, and out of
-  # the root tsconfig project.
+  # `experimental/` is deliberately OUT of the workspace (and was removed from
+  # the tree on 2026-10-28; the seed packages are recoverable from git history).
+  # They were never imported by anything; keeping them out of the workspace is
+  # what kept them out of `pnpm install`, moon's `packages/*/*` glob, and the
+  # root tsconfig project.
   #
   # Flat packages (whose `package.json` sits directly in `<dir>/`, with no
   # `packages/<name>/*` glob to match them) need a bare directory entry here,

@@ -53,10 +53,10 @@ const concurrencyArg = args.indexOf("--concurrency");
 const concurrency = concurrencyArg >= 0 ? Number(args[concurrencyArg + 1]) : Math.max(1, Math.min(4, (os.cpus?.().length ?? 4) - 1));
 const includeRoot = args.includes("--include-root");
 
-// 这些目录不属于 CI 的门禁范围：experimental/ 已被刻意排除在 pnpm
-// workspace 之外（见 pnpm-workspace.yaml 注释），scripts/_archive 是归档。
 const SCAN_ROOTS = ["packages", "apps", "electron"];
-const SKIP_SEGMENTS = new Set(["node_modules", "scripts", "experimental", "_archive", "dist", "build"]);
+// scripts/ 与 docs/ 的 _archive 已于 2026-10-28 整体移出仓库(git 历史留档),
+// 不再是门禁扫描对象;这里保留跳过规则以防归档目录再次出现。
+const SKIP_SEGMENTS = new Set(["node_modules", "scripts", "_archive", "dist", "build"]);
 
 /** @type {{dir: string, rel: string, task: {command?: string, script?: string}}[]} */
 const jobs = [];

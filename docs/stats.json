@@ -1,9 +1,9 @@
 {
   "_comment": "本文件由 scripts/docs-stats.mjs 生成,不要手工编辑。CI 的 scripts/check-doc-stats.mjs 会校验它是否与仓库现状一致,过期即门禁失败。",
   "generatedFrom": "git ls-files (tracked files only)",
-  "testFiles": 1001,
-  "moonProjects": 77,
+  "testFiles": 955,
+  "moonProjects": 73,
   "workspacePackages": 81,
   "workflows": 11,
-  "markdownDocs": 188
+  "markdownDocs": 180
 }
