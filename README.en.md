@@ -17,7 +17,7 @@
 
 <a href="https://github.com/louloulin/OpenBuddy/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/louloulin/OpenBuddy?style=for-the-badge&logo=starship&logoColor=white&color=yellow"></a>
 <a href="https://github.com/louloulin/OpenBuddy/releases"><img alt="Release" src="https://img.shields.io/github/v/release/louloulin/OpenBuddy?style=for-the-badge&logo=github&color=blue"></a>
-<a href="https://github.com/louloulin/OpenBuddy/actions"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/louloulin/OpenBuddy/release.yml?branch=master&style=for-the-badge&logo=githubactions&logoColor=white"></a>
+<a href="https://github.com/louloulin/OpenBuddy/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/louloulin/OpenBuddy/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white"></a>
 <a href="https://github.com/louloulin/OpenBuddy/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge"></a>
 
 <br/>
@@ -27,7 +27,6 @@
 <img alt="React" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react&logoColor=white">
 <img alt="moon" src="https://img.shields.io/badge/moon-2.5-blue?style=flat-square&logo=moonrepo&logoColor=white">
 <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.6-3178C6?style=flat-square&logo=typescript&logoColor=white">
-<img alt="Tests" src="https://img.shields.io/badge/tests-3047%20files-success?style=flat-square&logo=vitest&logoColor=white">
 
 <br/><br/>
 
