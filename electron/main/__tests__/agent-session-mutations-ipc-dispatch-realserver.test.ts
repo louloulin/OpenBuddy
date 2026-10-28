@@ -132,8 +132,19 @@ describe("agent/session/mcp/skills mutations 真实端到端", () => {
         expect(e).toBeInstanceOf(Error);
       }
     });
-    it("agent:prompt 缺 sessionId → throw", async () => {
-      await expect(callHandler("agent:prompt", "missing")).rejects.toThrow();
+    it("agent:prompt 字符串入参 = prompt 文本(旧调用兼容),落到活动会话", async () => {
+      // 契约澄清:字符串入参是 **prompt 文本**,不是 sessionId。
+      // preload 的 agent.prompt(text, sessionId?) 在省略 sessionId 时发的是
+      // { text } 对象 —— 所以"缺 sessionId 就该抛"从来不是这个 handler 的
+      // 契约;按那个契约写断言,等于把真实调用路径(省略 sessionId)判死。
+      await expect(callHandler("agent:prompt", "missing")).resolves.toEqual({ ok: true });
+    });
+    it("agent:prompt 对象缺 text → throw", async () => {
+      await expect(callHandler("agent:prompt", {})).rejects.toThrow();
+    });
+    it("agent:prompt 指向未加载的 session → throw(跨会话护栏)", async () => {
+      // 这才是真正需要守住的护栏:不允许把 prompt 打到别的 session 上。
+      await expect(callHandler("agent:prompt", { sessionId: "not-loaded-session", text: "hi" })).rejects.toThrow();
     });
     it("agent:steer 不抛异常", async () => {
       try {
