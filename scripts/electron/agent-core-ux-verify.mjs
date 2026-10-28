@@ -98,6 +98,126 @@ function writeChatCompletion(res, body, content) {
   res.end();
 }
 
+/**
+ * Anthropic Messages API 版本的探针响应。
+ *
+ * 为什么需要两套:上游可能是 OpenAI 兼容端点(Ollama),也可能是 Anthropic
+ * 兼容端点(MiniMax 的 /anthropic)。**协议必须跟着上游走** —— 之前这个探针
+ * 只写 OpenAI 的 `chat.completion.chunk`,于是对着 Anthropic 端点注入
+ * 工具调用时,客户端拿到的是无法解析的流,回合以
+ * "Anthropic stream ended without a stop reason" 结束,工具卡与审批面
+ * 全部不出现 —— 看起来像产品缺陷,其实是探针自己把线接错了。
+ */
+function anthropicEvent(event, data) {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function writeAnthropicText(res, body, content) {
+  if (body?.stream === false) {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({
+      id: "msg_agent_ux", type: "message", role: "assistant", model: "agent-ux-probe",
+      content: [{ type: "text", text: content }],
+      stop_reason: "end_turn", stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 1 },
+    }));
+    return;
+  }
+  res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+  res.write(anthropicEvent("message_start", {
+    type: "message_start",
+    message: {
+      id: "msg_agent_ux", type: "message", role: "assistant", model: "agent-ux-probe",
+      content: [], stop_reason: null, stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 0 },
+    },
+  }));
+  res.write(anthropicEvent("content_block_start", {
+    type: "content_block_start", index: 0, content_block: { type: "text", text: "" },
+  }));
+  res.write(anthropicEvent("content_block_delta", {
+    type: "content_block_delta", index: 0, delta: { type: "text_delta", text: content },
+  }));
+  res.write(anthropicEvent("content_block_stop", { type: "content_block_stop", index: 0 }));
+  res.write(anthropicEvent("message_delta", {
+    type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 },
+  }));
+  res.write(anthropicEvent("message_stop", { type: "message_stop" }));
+  res.end();
+}
+
+function writeAnthropicToolCall(res, body, command, toolName = "apply_command", args = null) {
+  const toolArgs = args ?? { command };
+  const partialJson = JSON.stringify(toolArgs);
+  if (body?.stream === false) {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({
+      id: "msg_agent_ux", type: "message", role: "assistant", model: "agent-ux-probe",
+      content: [{ type: "tool_use", id: "toolu_agent_ux", name: toolName, input: toolArgs }],
+      stop_reason: "tool_use", stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 1 },
+    }));
+    return;
+  }
+  res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+  res.write(anthropicEvent("message_start", {
+    type: "message_start",
+    message: {
+      id: "msg_agent_ux", type: "message", role: "assistant", model: "agent-ux-probe",
+      content: [], stop_reason: null, stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 0 },
+    },
+  }));
+  res.write(anthropicEvent("content_block_start", {
+    type: "content_block_start", index: 0,
+    content_block: { type: "tool_use", id: "toolu_agent_ux", name: toolName, input: {} },
+  }));
+  res.write(anthropicEvent("content_block_delta", {
+    type: "content_block_delta", index: 0,
+    delta: { type: "input_json_delta", partial_json: partialJson },
+  }));
+  res.write(anthropicEvent("content_block_stop", { type: "content_block_stop", index: 0 }));
+  // stop_reason 必须是 tool_use —— 客户端据此决定"这是一次工具调用"而不是
+  // "模型说完了"。缺了它,回合会被当成普通文本结束。
+  res.write(anthropicEvent("message_delta", {
+    type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 1 },
+  }));
+  res.write(anthropicEvent("message_stop", { type: "message_stop" }));
+  res.end();
+}
+
+async function writeAnthropicSlowStream(res, body, lines = 60) {
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  if (body?.stream === false) {
+    writeAnthropicText(res, body, Array.from({ length: lines }, (_, i) => i + 1).join("\n"));
+    return;
+  }
+  res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+  res.write(anthropicEvent("message_start", {
+    type: "message_start",
+    message: {
+      id: "msg_agent_ux", type: "message", role: "assistant", model: "agent-ux-probe",
+      content: [], stop_reason: null, stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 0 },
+    },
+  }));
+  res.write(anthropicEvent("content_block_start", {
+    type: "content_block_start", index: 0, content_block: { type: "text", text: "" },
+  }));
+  for (let i = 1; i <= lines; i += 1) {
+    res.write(anthropicEvent("content_block_delta", {
+      type: "content_block_delta", index: 0, delta: { type: "text_delta", text: `${i}\n` },
+    }));
+    await delay(160);
+  }
+  res.write(anthropicEvent("content_block_stop", { type: "content_block_stop", index: 0 }));
+  res.write(anthropicEvent("message_delta", {
+    type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: lines },
+  }));
+  res.write(anthropicEvent("message_stop", { type: "message_stop" }));
+  res.end();
+}
+
 function writeToolCall(res, body, command, toolName = "apply_command", args = null) {
   const toolArgs = args ?? { command };
   if (body?.stream === false) {
@@ -171,17 +291,31 @@ const proxy = createServer(async (req, res) => {
     try { writeFileSync(`/tmp/ob-agentux-request-${proxyRequests}.json`, JSON.stringify(body, null, 2)); } catch { /* ignore */ }
   }
 
+  // 协议必须跟着上游走:Anthropic Messages 端点(/v1/messages)与 OpenAI
+  // chat-completions 端点(/chat/completions)的请求与响应格式完全不同。
+  const anthropic = /\/(v1\/)?messages(\?|$)/.test(req.url ?? "");
+  const writeText = (content) => (anthropic ? writeAnthropicText(res, body, content) : writeChatCompletion(res, body, content));
+  const writeTool = (command, toolName, args) =>
+    anthropic ? writeAnthropicToolCall(res, body, command, toolName, args) : writeToolCall(res, body, command, toolName, args);
+  const writeSlow = async (lines) =>
+    anthropic ? writeAnthropicSlowStream(res, body, lines) : writeSlowStream(res, body, lines);
+
   const last = lastMessage(body);
   // Only a *fresh* user turn may trigger the shim. If the last message is
   // the tool result, the turn is over — answer with text, otherwise the
   // marker would be re-read from history forever and the tool would loop.
-  if (last?.role === "tool") {
-    writeChatCompletion(res, body, "done");
+  // OpenAI 把工具结果放在 role:"tool" 的消息里;Anthropic 放在 user 消息的
+  // tool_result content block 里 —— 两种都要认。
+  const anthropicToolResult =
+    last?.role === "user" && Array.isArray(last.content) &&
+    last.content.some((part) => part?.type === "tool_result");
+  if (last?.role === "tool" || anthropicToolResult) {
+    writeText("done");
     return;
   }
   const lastText = last?.role === "user" ? contentText(last.content) : "";
   if (lastText.includes("STREAM_PROBE")) {
-    await writeSlowStream(res, body);
+    await writeSlow(60);
     return;
   }
   if (lastText.includes("ERROR_PROBE")) {
@@ -191,15 +325,19 @@ const proxy = createServer(async (req, res) => {
       // 402 is not retried by pi's transport layer, so the banner actually
       // reaches the renderer (5xx would be retried and masked).
       res.writeHead(402, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: { message: "probe insufficient balance", type: "insufficient_balance_error", code: "insufficient_balance_error" } }));
+      res.end(JSON.stringify(
+        anthropic
+          ? { type: "error", error: { type: "insufficient_balance_error", message: "probe insufficient balance" } }
+          : { error: { message: "probe insufficient balance", type: "insufficient_balance_error", code: "insufficient_balance_error" } },
+      ));
       return;
     }
-    writeChatCompletion(res, body, "recovered");
+    writeText("recovered");
     return;
   }
   if (lastText.includes("FAIL_PROBE")) {
     log("model-shim: tool_call apply_patch(/etc/agent-ux-denied)");
-    writeToolCall(res, body, "", "apply_patch", {
+    writeTool("", "apply_patch", {
       file_path: "/etc/agent-ux-denied",
       patch: "@@ -1,1 +1,1 @@\n-a\n+b",
     });
@@ -208,14 +346,31 @@ const proxy = createServer(async (req, res) => {
   const command = toolProbeCommand(lastText);
   if (command) {
     log(`model-shim: tool_call apply_command(${command})`);
-    writeToolCall(res, body, command);
+    writeTool(command);
     return;
   }
 
   try {
-    const upstream = await fetch(new URL(REAL_BASE_URL).origin + req.url, {
+    // 上游 URL 的拼接要分协议:
+    //   OpenAI     base "http://host:11434/v1" + req.url "/chat/completions"
+    //              → origin + req.url(base 路径已含在 req.url 里)
+    //   Anthropic  base "https://api.minimaxi.com/anthropic" + req.url "/v1/messages"
+    //              → origin + base 路径 + req.url(base 路径不在 req.url 里)
+    // 之前统一用 origin + req.url,把 Anthropic 端点的 "/anthropic" 前缀丢了。
+    const baseUrl = new URL(REAL_BASE_URL);
+    const basePath = anthropic
+      ? baseUrl.pathname.replace(/\/+$/, "").replace(/\/v1$/, "")
+      : "";
+    const upstreamUrl = baseUrl.origin + basePath + (req.url ?? "/");
+    const upstreamHeaders = { "content-type": "application/json" };
+    if (anthropic) {
+      upstreamHeaders["x-api-key"] = creds.apiKey;
+      upstreamHeaders["anthropic-version"] = "2023-06-01";
+    }
+    upstreamHeaders["authorization"] = `Bearer ${creds.apiKey}`;
+    const upstream = await fetch(upstreamUrl, {
       method: req.method,
-      headers: { "content-type": "application/json", authorization: `Bearer ${creds.apiKey}` },
+      headers: upstreamHeaders,
       body: raw,
     });
     res.writeHead(upstream.status, { "content-type": upstream.headers.get("content-type") ?? "application/json" });
