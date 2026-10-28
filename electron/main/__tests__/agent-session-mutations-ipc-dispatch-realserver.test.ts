@@ -132,19 +132,29 @@ describe("agent/session/mcp/skills mutations 真实端到端", () => {
         expect(e).toBeInstanceOf(Error);
       }
     });
-    it("agent:prompt 字符串入参 = prompt 文本(旧调用兼容),落到活动会话", async () => {
+    it("agent:prompt 字符串入参 = prompt 文本(不是 sessionId)", async () => {
       // 契约澄清:字符串入参是 **prompt 文本**,不是 sessionId。
       // preload 的 agent.prompt(text, sessionId?) 在省略 sessionId 时发的是
       // { text } 对象 —— 所以"缺 sessionId 就该抛"从来不是这个 handler 的
       // 契约;按那个契约写断言,等于把真实调用路径(省略 sessionId)判死。
-      await expect(callHandler("agent:prompt", "missing")).resolves.toEqual({ ok: true });
+      //
+      // 用一个"当 sessionId 合法、当文本非法"的输入把两种语义区分开:
+      //   当作文本       → requiredString 抛 "prompt must be a non-empty string"
+      //   当作 sessionId → 会先撞跨会话护栏,抛 "Pi session is not loaded"
+      // 断言的是前者,也就证明了"不是后者"。
+      //
+      // 刻意**不**断言 prompt 真的发出去了 —— 那会依赖真实模型调用,
+      // 单元测试不该有这种依赖(实测会挂到测试超时)。
+      await expect(callHandler("agent:prompt", "   ")).rejects.toThrow(/prompt must be a non-empty string/);
     });
     it("agent:prompt 对象缺 text → throw", async () => {
-      await expect(callHandler("agent:prompt", {})).rejects.toThrow();
+      await expect(callHandler("agent:prompt", {})).rejects.toThrow(/prompt must be a non-empty string/);
     });
     it("agent:prompt 指向未加载的 session → throw(跨会话护栏)", async () => {
       // 这才是真正需要守住的护栏:不允许把 prompt 打到别的 session 上。
-      await expect(callHandler("agent:prompt", { sessionId: "not-loaded-session", text: "hi" })).rejects.toThrow();
+      await expect(callHandler("agent:prompt", { sessionId: "not-loaded-session", text: "hi" })).rejects.toThrow(
+        /Pi session is not loaded/,
+      );
     });
     it("agent:steer 不抛异常", async () => {
       try {
