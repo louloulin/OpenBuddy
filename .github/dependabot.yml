@@ -9,12 +9,31 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     reviewers:
       - "louloulin"
     labels:
       - "ci"
       - "chore"
+    ignore:
+      # moon 的原生二进制是 optionalDependency（@moonrepo/core-* 平台包）。
+      #
+      # 2026-10-26 的 CI 全红就是它引起的：dependabot 的分组 PR #65 把 moon
+      # 2.5.4 升到 2.6.3，重新生成的 pnpm-lock.yaml 里 7 个平台包
+      # **一个都没有**（npm 上 @moonrepo/cli@2.6.3 明明列了它们）。
+      # lockfile 缺 → pnpm 不装 → moon CLI 启动时
+      # require.resolve('@moonrepo/core-linux-x64-gnu/package.json') 抛错
+      # → postinstall 退出码 1 → 所有 job 死在装包阶段，一行代码都没跑。
+      #
+      # dependabot 的 lockfile 重生成对 optional 平台包不可靠，所以这里
+      # 直接不让它碰 moon。需要升级 moon 时人工改 package.json、用本机 pnpm
+      # 重新生成锁文件，再跑 scripts/check-lockfile-platform-pkgs.mjs 确认。
+      - dependency-name: "@moonrepo/cli"
+      # vitest 2 → 5 是破坏性大版本：root vitest.config.ts 的
+      # environmentMatchGlobs / reporter 在 v5 已改名或移除，
+      # 且 --reporter=line 在 v5 也不是内置 reporter（nightly 连续红）。
+      # 需要升级时人工评估并同步改配置。
+      - dependency-name: "vitest"
     groups:
       patch-and-minor:
         patterns:
