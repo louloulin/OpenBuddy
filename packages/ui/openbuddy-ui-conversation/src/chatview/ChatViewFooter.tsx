@@ -54,7 +54,9 @@ export function ChatViewFooter(props: ChatViewFooterProps) {
   );
   return (
     <div className="chatview__footer">
-      <PermissionInlineCard sessionId={props.sessionId} />
+      {/* 审批只有这一个决策面:停靠在 composer 上方的内联卡。
+          全屏 modal 会盖住消息里的「允许/拒绝」快操作(2026-10-20 真机探针)。 */}
+      <PermissionInlineCard sessionId={props.sessionId} variant="inline" />
       <QuestionInlineCard sessionId={props.sessionId} />
       <ConversationApprovals
         sessionId={props.sessionId ?? undefined}

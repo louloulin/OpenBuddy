@@ -222,6 +222,15 @@ export interface PermissionRequest {
   toolCallId: string;
   toolKind: ToolKind;
   title: string;
+  /**
+   * Human-readable detail for the pending operation (command line, path,
+   * MCP tool description…). The host emits this on `pi://permission`; it was
+   * missing from the type, so the UI dropped the only context that told the
+   * user *what* they are approving.
+   */
+  message?: string;
+  /** Where the request came from: hook, tool confirm, extension, … */
+  source?: string;
   /** Optional partial raw input to show the user what they're approving. */
   rawInput?: unknown;
   options: PermissionOption[];

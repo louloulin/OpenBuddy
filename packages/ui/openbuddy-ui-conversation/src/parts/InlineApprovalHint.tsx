@@ -24,7 +24,6 @@ import {
   selectPermissionForSession,
 } from "@openbuddy/ui-state/permission-store";
 import { piResolvePermission } from "@/lib/agent/pi-client";
-import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
 import { QuestionInlineCard } from "../QuestionInlineCard";
 
 export type InlineApprovalHintProps = {
@@ -166,7 +165,9 @@ function InlineApprovalHintInner({ sessionId, onToast }: InlineApprovalHintProps
       </div>
       {expanded && (
         <div className="msg__approval-hint-body">
-          <PermissionInlineCard sessionId={sessionId} />
+          {/* 权限的完整决策面归 footer 所有(内联卡),这里只保留提问卡。
+              两处各挂一份 PermissionInlineCard 会让同一请求出现两套按钮,
+              其中一份还会遮挡另一份(2026-10-20 真机探针)。 */}
           <QuestionInlineCard sessionId={sessionId} />
         </div>
       )}

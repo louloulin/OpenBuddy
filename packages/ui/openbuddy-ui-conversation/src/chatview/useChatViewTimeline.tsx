@@ -87,6 +87,24 @@ export function useChatViewTimeline({
 }: UseChatViewTimelineParams): UseChatViewTimelineResult {
   const timeline = useMemo(() => buildTimeline(messages), [messages]);
   const messagesLength = messages.length;
+  // cc-haha 对齐 — 连续 assistant 消息属于同一段"发言"(工具步骤 + 最终答复),
+  // 只在第一行显示 Buddy 抬头,后续行以延续样式渲染。系统分隔标记(压缩边界)
+  // 会打断延续关系。
+  const continuationIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (let i = 1; i < messages.length; i += 1) {
+      const current = messages[i];
+      const previous = messages[i - 1];
+      if (
+        current.role === "assistant" &&
+        previous.role === "assistant" &&
+        !current.systemMarker
+      ) {
+        ids.add(current.id);
+      }
+    }
+    return ids;
+  }, [messages]);
 
   const renderTimelineNode = useCallback(
     ({ node }: { node: TimelineNode; index: number }) => {
@@ -113,8 +131,18 @@ export function useChatViewTimeline({
             ? " msg-wrap--find-current"
             : " msg-wrap--find-hit"
           : "";
+      const continuation = continuationIds.has(m.id);
       return (
-        <div key={m.id} className={"msg-wrap" + findCls} data-msg-id={m.id}>
+        <div
+          key={m.id}
+          className={
+            "msg-wrap" +
+            findCls +
+            (continuation ? " msg-wrap--continuation" : "") +
+            (m.role === "user" ? " msg-wrap--user-turn" : "")
+          }
+          data-msg-id={m.id}
+        >
           <MessageItem
             message={m}
             streaming={streaming && m.id === streamingMessageId}
@@ -153,6 +181,7 @@ export function useChatViewTimeline({
             onRewindTo={m.role === "assistant" ? onRewindTo : undefined}
             allowFork={allowFork}
             onForkFromHere={m.role === "assistant" ? onForkFromHere : undefined}
+            hideIdentity={continuation}
           />
         </div>
       );
@@ -181,6 +210,7 @@ export function useChatViewTimeline({
       onRewindTo,
       allowFork,
       onForkFromHere,
+      continuationIds,
     ],
   );
 

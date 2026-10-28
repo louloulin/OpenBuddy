@@ -115,10 +115,13 @@ async function requestHookPermission(title: string, message: string, request?: a
     });
     emitPluginEvent("session/permission", { requestId, sessionId, title, hasMessage: Boolean(message), source: "hook", toolName: request.toolName, optionCount: 3 });
     emitRendererEvent("pi://permission", {
-      requestId, sessionId, toolCallId: "", title, message, source: "hook", toolKind: request.toolName,
+      requestId, sessionId, toolCallId: "", title, message, source: "hook", toolKind: request.toolName || "confirm",
       options: [
-        { optionId: "allow", kind: "allow", title: message || title },
-        { optionId: "allow_always", kind: "allow_always", title: "始终允许此 Hook" },
+        // Option titles are button labels, not payloads: the command/path is
+        // rendered in the card body (`message`). Using `message` as the title
+        // turned the allow button into "echo agent-ux-probe".
+        { optionId: "allow", kind: "allow", title: "允许" },
+        { optionId: "allow_always", kind: "allow_always", title: "本会话始终允许" },
         { optionId: "deny", kind: "deny", title: "拒绝" },
       ],
     });
@@ -139,6 +142,28 @@ export async function confirmGateAllows(): Promise<boolean | undefined> {
   try { mode = await agentPermissionBridge.readMode(); } catch { return undefined; }
   if (mode === "bypassPermissions") return true;
   return undefined;
+}
+
+/**
+ * Session-scoped "always allow this exact confirm payload" lookup.
+ *
+ * `ctx.ui.confirm(title, message)` carries neither a tool name nor a
+ * permission pattern, so the only stable identity for the grant is the
+ * message (command line / path) itself. Grants are written by
+ * `resolveUiRequest` when the user picks `allow_always`; we only read the
+ * session map here, so one click never becomes a cross-session rule.
+ */
+export const CONFIRM_TOOL_NAME = "ctx.confirm";
+
+export function confirmSessionAllows(sessionId: string, pattern: string): boolean {
+  if (!pattern) return false;
+  const rules = state.hookPermissionSessionRules.get(sessionId) ?? [];
+  return rules.some(
+    (rule: { action?: string; tool?: string; pattern?: string }) =>
+      rule.action === "allow"
+      && rule.tool === CONFIRM_TOOL_NAME
+      && (!rule.pattern || rule.pattern === pattern),
+  );
 }
 
 export {

@@ -64,6 +64,7 @@ function MessageItemInner({
   allowFork,
   onForkFromHere,
   streamingDurationMs,
+  hideIdentity = false,
 }: {
   message: ChatMessage;
   streaming: boolean;
@@ -116,6 +117,10 @@ function MessageItemInner({
    *  "12s 正在生成…" label. Undefined on completed bubbles (we use
    *  `completedAt - createdAt` instead) and on user bubbles. */
   streamingDurationMs?: number;
+  /** cc-haha 对齐 — 连续多条 assistant 消息只在第一条显示头像/名字,
+   *  后续条目按"同一段发言的延续"渲染,避免每个工具步骤都重复
+   *  "Buddy · AI" 抬头。由 timeline 根据相邻消息角色计算。 */
+  hideIdentity?: boolean;
 }) {
   // Subscribe to theme changes so message bubbles re-render immediately
   // when the user toggles themes. `useTheme().current()` alone returns a
@@ -266,6 +271,24 @@ function MessageItemInner({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [inlineEditing, inlineDraft, message.id, onEditAssistantMessage, onToast]);
+  if (message.systemMarker) {
+    return (
+      <div
+        className="msg-system-marker"
+        data-testid="context-compaction-marker"
+        role="separator"
+        aria-label="上下文已压缩"
+      >
+        <span className="msg-system-marker__line" />
+        <span className="msg-system-marker__label">
+          上下文已压缩
+          {message.systemMarkerDetail ? ` · ${message.systemMarkerDetail}` : ""}
+        </span>
+        <span className="msg-system-marker__line" />
+      </div>
+    );
+  }
+
   if (message.role === "user") {
     // R8.1 (revision-pager) — split attachments (file/image parts) from the
     // text part. The text part gets replaced by the currently selected
@@ -336,21 +359,32 @@ function MessageItemInner({
   // prose.css) can fire. The class only sticks while `streaming`
   // is true; when streaming finishes, the class is removed and
   // just-completed takes over.
-  const rootCls = justCompleted
-    ? "msg msg--assistant msg--just-completed"
-    : streaming
-      ? "msg msg--assistant msg--streaming"
-      : "msg msg--assistant";
+  // cc-haha 对齐 — 纯工具步骤(没有正文/思考)不渲染可复制正文的
+  // footer,也不占 footer 的高度;否则一条 32px 的工具行会被隐形的
+  // action/meta 行撑出 ~70px 空白。
+  const toolOnly =
+    message.role === "assistant" &&
+    !message.error &&
+    !message.parts.some((p) => p.kind === "text" || p.kind === "thought");
+  const rootCls = [
+    "msg msg--assistant",
+    justCompleted ? "msg--just-completed" : "",
+    !justCompleted && streaming ? "msg--streaming" : "",
+    hideIdentity ? "msg--continuation" : "",
+    toolOnly ? "msg--tool-only" : "",
+  ].filter(Boolean).join(" ");
   return (
     <div className={rootCls}>
       <div>
-        <div className="msg__header">
-          <span className="msg__avatar" aria-hidden="true">
-            <Sparkles size={14} strokeWidth={2} />
-          </span>
-          <span className="msg__name">Buddy</span>
-          <span className="msg__role" aria-label="AI assistant">AI</span>
-        </div>
+        {!hideIdentity && (
+          <div className="msg__header">
+            <span className="msg__avatar" aria-hidden="true">
+              <Sparkles size={14} strokeWidth={2} />
+            </span>
+            <span className="msg__name">Buddy</span>
+            <span className="msg__role" aria-label="AI assistant">AI</span>
+          </div>
+        )}
         <div className="msg__body">
           {inlineEditing && InlineEditorImpl ? (
             <div className="msg__inline-editor" data-testid="message-inline-editor">
@@ -599,6 +633,7 @@ export const MessageItem = memo(MessageItemInner, (prev, next) => {
     prev.onEditResend === next.onEditResend &&
     prev.onInlineResend === next.onInlineResend &&
     prev.onRetry === next.onRetry &&
-    prev.onOpenSettings === next.onOpenSettings
+    prev.onOpenSettings === next.onOpenSettings &&
+    prev.hideIdentity === next.hideIdentity
   );
 });

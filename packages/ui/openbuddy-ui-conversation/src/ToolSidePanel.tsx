@@ -256,8 +256,12 @@ function ToolSidePanelInner({
     userCollapsed: navCollapsed,
     pinned,
   });
+  // Tool mode always renders the detail body in the main column, so it must
+  // not be treated as a list/detail view — otherwise a narrow panel keeps
+  // showing the artifact list and the clicked tool detail never appears.
   const listDetailView =
-    view === "fileTree" || view === "artifacts" || view === "changes";
+    mode !== "tool" &&
+    (view === "fileTree" || view === "artifacts" || view === "changes");
   const hasSelection = Boolean(
     selectedFilePath ?? previewPath ?? selectedArtifactId,
   );

@@ -904,6 +904,13 @@ export interface SessionEntriesProjection {
  */
 export function inferErrorCode(raw: string): string | undefined {
   const text = raw.toLowerCase();
+  // Billing exhaustion is checked first: provider payloads such as
+  // `insufficient_quota` also contain "quota", but retrying or waiting a
+  // moment won't fix them — they belong to the billing bucket, not rate
+  // limiting.
+  if (/insufficient[_ ]?(?:balance|quota)|余额不足|额度已用尽/.test(text)) {
+    return "insufficient_balance_error";
+  }
   if (/429|rate[_ ]?limit|too many requests|quota|用量上限/.test(text)) return "rate_limit_error";
   if (/401|unauthorized|invalid[_ ]api[_ ]key|api key/.test(text)) return "auth_error";
   if (/403|forbidden|permission/.test(text)) return "permission_error";
@@ -943,18 +950,61 @@ export function sessionEntriesToChatMessages(entries: readonly PiSessionEntry[])
         } else if (part.type === "toolCall") {
           const tc = part as { id?: string; name?: string; arguments?: unknown; result?: unknown };
           const toolCallId = tc.id ?? `tc-${entry.id}-${parts.length}`;
+          const toolName = tc.name ?? "tool";
+          // `arguments` may be persisted as a JSON string; normalise to an
+          // object so ToolCallCard can derive a readable summary (command /
+          // file name) from history exactly like it does live.
+          let rawInput: unknown = tc.arguments;
+          if (typeof rawInput === "string") {
+            try { rawInput = JSON.parse(rawInput); } catch { /* keep raw string */ }
+          }
+          // Tool extensions return pi's `{ content, details }` shape. Flattening
+          // it to one JSON text blob used to hide command output and the
+          // `apply_patch failed:` prefix, so history lost both the truncation
+          // UI and the failed status.
+          let contentParts: unknown[] = [];
+          const result = tc.result;
+          if (result && typeof result === "object" && Array.isArray((result as { content?: unknown }).content)) {
+            const inner = (result as { content: unknown[] }).content;
+            if (/^(apply_command|bash|shell|execute_command|run_terminal_command)$/i.test(toolName)) {
+              const output = inner
+                .map((item) => (item && typeof item === "object" && typeof (item as { text?: unknown }).text === "string"
+                  ? (item as { text: string }).text
+                  : ""))
+                .filter(Boolean)
+                .join("\n");
+              const command = (rawInput as { command?: unknown } | undefined)?.command;
+              contentParts = output
+                ? [{ type: "command_output", ...(typeof command === "string" ? { command } : {}), output }]
+                : [];
+            } else {
+              contentParts = inner;
+            }
+          } else if (Array.isArray(result)) {
+            contentParts = result;
+          } else if (result !== undefined) {
+            contentParts = [{ type: "text", text: typeof result === "string" ? result : JSON.stringify(result) }];
+          }
+          const resultText = contentParts
+            .map((item) => (item && typeof item === "object"
+              ? (typeof (item as { text?: unknown }).text === "string"
+                ? (item as { text: string }).text
+                : typeof (item as { output?: unknown }).output === "string"
+                  ? (item as { output: string }).output
+                  : "")
+              : ""))
+            .filter(Boolean)
+            .join("\n");
+          const failed = /^(?:apply_patch|apply_command|bash|shell|write_file|edit_file) failed\b|^(?:Error|TypeError|RangeError|SyntaxError|ReferenceError):/m.test(resultText);
           parts.push({
             kind: "tool_call",
             toolCall: {
               toolCallId,
-              title: tc.name ?? "tool",
-              kind: tc.name ?? "tool",
-              status: tc.result === undefined ? "completed" : "completed",
-              content: Array.isArray(tc.result)
-                ? (tc.result as unknown[])
-                : tc.result !== undefined
-                  ? [{ type: "text", text: typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result) }]
-                  : [],
+              title: toolName,
+              kind: toolName,
+              status: failed ? "failed" : "completed",
+              content: contentParts as never[],
+              ...(rawInput !== undefined && rawInput !== null ? { rawInput } : {}),
             },
           });
         }

@@ -62,6 +62,19 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: [resolve(__dirname, "src/test-setup.ts")],
     css: false,
+    // CI 门禁超时预算。
+    //
+    // vitest 默认单测超时是 5s。2026-10-20 的 main CI 就是死在这：
+    // `packages/ui/openbuddy-ui-workbench` 的 FilePreview 槽测试要
+    // `registerAllBuiltinUis()` 注册全部内置 UI 槽，dev 机约 2.4s，
+    // CI runner 冷启动慢 2~3 倍 → 撞 5s 上限被中止。
+    //
+    // 中止的副作用会污染后面的用例：被中止的用例里 render 仍在异步
+    // setState，DOM 残留导致下一个用例 `getByTestId('custom-docx-preview')`
+    // 找到两个元素，抛 "Found multiple elements" —— 那不是产品缺陷，
+    // 是超时引发的连锁反应。所以这里放宽的是"合理的慢"，不是"卡死"。
+    testTimeout: 20000,
+    hookTimeout: 20000,
     // Mark `bin/__tests__/**` and `tests/integration/**` as node-environment so
     // the file-system + child-process helpers work without jsdom overhead.
     environmentMatchGlobs: [

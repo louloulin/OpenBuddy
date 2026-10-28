@@ -54,6 +54,13 @@ export interface ChatMessage {
   /** R8.1 — 1-based index into `revisions` of the version currently shown
    *  in the bubble. Defaults to the last entry when unset. */
   activeRevision?: number;
+  /** P-E2 — non-conversational transcript divider. Currently only
+   *  `"compaction"`, emitted when pi reports `pi/context-compacted` so the
+   *  user can see where earlier history was folded into a summary. Marker
+   *  messages carry no parts and are rendered as a separator row. */
+  systemMarker?: "compaction";
+  /** Optional human-readable detail shown next to the marker label. */
+  systemMarkerDetail?: string;
   /** R8.14 — wall-clock ms (Date.now()) when this message was first
    *  inserted into the transcript. Optional so legacy fixtures and
    *  pre-R8.14 JSONL entries keep type-checking; the renderer skips
@@ -233,6 +240,9 @@ interface UiSessionActions {
    *  so the bubble can show the user a prev/next pager of all the texts
    *  they ever submitted from this slot. */
   appendUserRevision: (messageId: string, text: string) => void;
+  /** P-E2 — append a non-conversational divider (currently only context
+   *  compaction boundaries) to the transcript mirror. */
+  appendSystemMarker: (marker: "compaction", detail?: string) => void;
   /** R8.1 — switch the displayed revision of a user bubble. 1-based index.
    *  No-op when out of range or when the message isn't a user message. */
   setActiveRevision: (messageId: string, idx: number) => void;
@@ -662,6 +672,31 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
       toolCallIndex: new Map(),
     };
   }),
+
+  appendSystemMarker: (marker, detail) => {
+    set((s) => {
+      const previous = s.messages[s.messages.length - 1];
+      // Compaction can be reported by more than one event name for the same
+      // boundary; collapse consecutive duplicates instead of stacking rows.
+      if (previous?.systemMarker === marker && previous.systemMarkerDetail === detail) {
+        return s;
+      }
+      return {
+        messages: [
+          ...s.messages,
+          {
+            id: nextId(),
+            role: "assistant" as const,
+            parts: [],
+            complete: true,
+            systemMarker: marker,
+            ...(detail ? { systemMarkerDetail: detail } : {}),
+            createdAt: Date.now(),
+          },
+        ],
+      };
+    });
+  },
 
   appendUserRevision: (messageId, text) => {
     set((s) => {

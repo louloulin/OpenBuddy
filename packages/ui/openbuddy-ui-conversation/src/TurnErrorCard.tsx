@@ -33,6 +33,8 @@ const CODE_TITLES: Record<string, string> = {
   provider_error: "模型服务暂时不可用",
   network_error: "网络连接中断",
   aborted: "生成已中断",
+  insufficient_balance_error: "账户余额不足",
+  insufficient_quota: "账户额度已用尽",
 };
 
 /** 这些错误码应当引导用户去设置页修配置,而不是无脑重试。 */

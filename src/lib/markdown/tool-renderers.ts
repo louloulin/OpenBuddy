@@ -186,12 +186,26 @@ export function summarizeTool(tc: ToolCallView, renderer: ToolRenderer): string 
       return tc.title;
     }
     case "command": {
-      // R1.4 — apply_command: show command itself
-      if (tc.kind === "apply_command") {
-        const cmd = raw?.command;
-        if (typeof cmd === "string") {
-          return cmd.length > 80 ? cmd.slice(0, 80) + "…" : cmd;
-        }
+      // apply_command / bash / shell 都带 `command`;行内直接展示命令本身,
+      // 而不是裸工具名(cc-haha:行首是动词/目标,不是实现细节)。
+      const cmd = raw?.command ?? raw?.cmd;
+      if (typeof cmd === "string" && cmd.trim()) {
+        const line = cmd.replace(/\s+/g, " ").trim();
+        return line.length > 80 ? line.slice(0, 80) + "…" : line;
+      }
+      return tc.title;
+    }
+    case "read": {
+      const readPath = raw?.file_path ?? raw?.filePath ?? raw?.path;
+      if (typeof readPath === "string" && readPath.trim()) {
+        return `读取 ${basenameOf(readPath)}`;
+      }
+      return tc.title;
+    }
+    case "search": {
+      const query = raw?.query ?? raw?.pattern ?? raw?.q;
+      if (typeof query === "string" && query.trim()) {
+        return `搜索 ${query.length > 50 ? query.slice(0, 50) + "…" : query}`;
       }
       return tc.title;
     }

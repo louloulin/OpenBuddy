@@ -950,10 +950,31 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 			piStream.publish(update);
 		}
 		if (payload.type === "tool_execution_end") {
-			// F3 perf: result stays as a structured-clone-able object instead of
-			// being JSON.stringified on the hot path. The renderer can lazily
-			// stringify if it needs to display it.
-			const update = { sessionId, type: "tool_call_update", toolCallId: payload.toolCallId, status: payload.isError ? "failed" : "completed", content: payload.result !== undefined ? [{ type: "text", text: typeof payload.result === "string" ? payload.result : JSON.stringify(payload.result) }] : [] };
+			// Tool extensions return pi's structured shape `{ content, details }`.
+			// The renderer's ToolCallDetailBody consumes typed parts, so keep the
+			// extension's content array instead of flattening it into a JSON blob
+			// (which made every structured result unreadable and hid command
+			// output from the truncate/copy UI).
+			const rawResult = payload.result;
+			let resultContent: Array<Record<string, unknown>> = [];
+			if (rawResult && typeof rawResult === "object" && Array.isArray((rawResult as { content?: unknown }).content)) {
+				const parts = (rawResult as { content: Array<Record<string, unknown>> }).content;
+				if (payload.toolName === "apply_command") {
+					const output = parts
+						.map((part) => (typeof part?.text === "string" ? part.text : ""))
+						.filter(Boolean)
+						.join("\n");
+					const command = (payload.args as { command?: unknown } | undefined)?.command;
+					resultContent = output
+						? [{ type: "command_output", ...(typeof command === "string" ? { command } : {}), output }]
+						: [];
+				} else {
+					resultContent = parts;
+				}
+			} else if (rawResult !== undefined) {
+				resultContent = [{ type: "text", text: typeof rawResult === "string" ? rawResult : JSON.stringify(rawResult) }];
+			}
+			const update = { sessionId, type: "tool_call_update", toolCallId: payload.toolCallId, status: payload.isError ? "failed" : "completed", content: resultContent };
 			sendSafe(win, "pi://update", update);
 			piStream.publish(update);
 		}

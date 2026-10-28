@@ -134,6 +134,53 @@ function isStreamDebugEnabled(): boolean {
 }
 const STREAM_DEBUG = isStreamDebugEnabled();
 
+/**
+ * 一些 provider/工具把失败编码成「正常 completed + 错误正文」返回(pi 不会把它
+ * 标成 failed)。这里在渲染前根据输出文本把 completed 推导为 failed,否则卡片
+ * 会以成功态展示一条失败信息。
+ *
+ * 只在行首匹配,避免把普通输出里顺带出现的 "error:" 误判;工具名前缀限定为
+ * 已知会自报失败的写入/执行类工具。
+ */
+const TOOL_FAILURE_TEXT_RE =
+  /^(?:apply_patch|apply_command|bash|shell|write_file|edit_file) failed\b|^(?:Error|TypeError|RangeError|SyntaxError|ReferenceError):/m;
+
+function toolContentText(content: unknown): string {
+  if (typeof content === "string") {
+    // `tool_execution_end` 会把非字符串 result(pi 的 `{content:[…], details}`)
+    // JSON.stringify 后塞进 content[].text。先还原成结构化结果,否则失败
+    // 前缀被 JSON 包装后无法在行首匹配。
+    const trimmed = content.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        return toolContentText(parsed);
+      } catch { /* not JSON — treat as plain text */ }
+    }
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content.map((item) => toolContentText(item)).join("\n");
+  }
+  if (content && typeof content === "object") {
+    const rec = content as Record<string, unknown>;
+    if (typeof rec.text === "string") return rec.text;
+    if (typeof rec.output === "string") return rec.output;
+    if (typeof rec.message === "string") return rec.message;
+    if (rec.content !== undefined) return toolContentText(rec.content);
+  }
+  return "";
+}
+
+function deriveToolStatus(
+  status: "in_progress" | "completed" | "failed" | undefined,
+  content: unknown,
+): "in_progress" | "completed" | "failed" | undefined {
+  if (status !== "completed") return status;
+  const text = toolContentText(content);
+  return text && TOOL_FAILURE_TEXT_RE.test(text) ? "failed" : status;
+}
+
 export type ExtensionUiBySessionValue = {
   statuses: Record<string, string>;
   widgets: Record<string, string[]>;
@@ -722,6 +769,13 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
         }
       },
       onPluginEvent: (event: { type: string; payload?: { requestId?: string; sessionId?: string } }) => {
+        // P-E2 — pi 完成上下文压缩后,在转录里留下分隔标记。pi 的
+        // `pi/context-compacted` 是唯一表示"历史已被折叠"的低延迟信号;
+        // `pi/context-compaction-requested` 只是压缩开始,不应插标记。
+        if (event.type === "pi/context-compacted") {
+          useSessionStore.getState().appendSystemMarker("compaction");
+          return;
+        }
         if (event.type === "workspace/changed") {
           void piListWorkspaceRegistry().then((registry) => {
             useSessionsStore.getState().setWorkspaces(registry.items);
@@ -991,6 +1045,42 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
               // does not depend on this field; consumers that don't read
               // it (e.g. tests) are unaffected.
               const startedAt = Date.now();
+              const nextStatus = deriveToolStatus(tc.status, tc.content) ?? tc.status;
+              // pi 在同一次工具调用上会发两次 `tool_call`:toolcall_start 和
+              // toolcall_end(bootstrap/handle-session-event.ts)。此前两次都
+              // 追加新 part,导致每个工具在转录里出现两行(一行永远运行中),
+              // 并被并行分组统计成「2 个工具并行」。第二次只更新已有单元格。
+              const existingLoc = useSessionStore.getState().toolCallIndex.get(tc.toolCallId);
+              if (existingLoc) {
+                useSessionStore.setState((s) => {
+                  const { messageIdx, partIdx } = existingLoc;
+                  const msg = s.messages[messageIdx];
+                  if (!msg) return s;
+                  const part = msg.parts[partIdx];
+                  if (!part || part.kind !== "tool_call") return s;
+                  const current = part.toolCall;
+                  const reachedTerminal =
+                    (nextStatus === "completed" || nextStatus === "failed") &&
+                    current.completedAt === undefined;
+                  const newParts = [...msg.parts];
+                  newParts[partIdx] = {
+                    kind: "tool_call",
+                    toolCall: {
+                      ...current,
+                      ...(tc.title ? { title: tc.title } : {}),
+                      ...(tc.kind ? { kind: tc.kind } : {}),
+                      status: nextStatus,
+                      ...(reachedTerminal ? { completedAt: Date.now() } : {}),
+                      ...(Array.isArray(tc.content) ? { content: tc.content as never } : {}),
+                      ...(tc.rawInput != null ? { rawInput: tc.rawInput } : {}),
+                    },
+                  };
+                  const newMessages = [...s.messages];
+                  newMessages[messageIdx] = { ...msg, parts: newParts };
+                  return { messages: newMessages };
+                });
+                break;
+              }
               // Re-read so we see the latest streamingMessageId set by the
               // most recent `beginStreamingMessage()`.
               const streamingId = useSessionStore.getState().streamingMessageId;
@@ -1007,7 +1097,7 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
                   toolCallId: tc.toolCallId,
                   title: tc.title,
                   kind: tc.kind,
-                  status: tc.status,
+                  status: nextStatus,
                   startedAt,
                   content: Array.isArray(tc.content) ? (tc.content as never) : [],
                   ...(tc.rawInput != null ? { rawInput: tc.rawInput } : {}),
@@ -1040,8 +1130,8 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
                 content?: unknown;
               };
               const toolCallId = upd.toolCallId;
-              const status = upd.status;
               const content = upd.content;
+              const status = deriveToolStatus(upd.status, content);
               const partial = Boolean(upd.update?.partial);
               const partialResult = upd.update?.partialResult;
               // Phase A2 — O(1) lookup via the index written by the

@@ -45,7 +45,7 @@ import {
 import { useSessionStore, type ChatMessage, type ToolCallView } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { createMarkdownHostConfig } from "@/lib/markdown/markdown-host";
-import { piListSessions, piSetThinkingLevel, sessionFork, tasksListForSession } from "@/lib/agent/pi-client";
+import { piListSessions, piSetThinkingLevel, rewindExecute, sessionFork, tasksListForSession } from "@/lib/agent/pi-client";
 import { useT } from "@openbuddy/ui-locale/client";
 import { confirm, invoke } from "@/lib/platform/electron-api";
 import {
@@ -517,6 +517,47 @@ export function ChatView({
     onToast,
   });
 
+  // R8.3 — inline edit + resend must **replace** the originating turn, not
+  // append a second user bubble next to the edited one. The old path only
+  // seeded the composer, so sending produced two bubbles with the same text
+  // (the origin message showed the appended revision, and the new optimistic
+  // message added another copy). Rewind to the origin prompt first, then
+  // send; if the rewind point is unavailable we fall back to the old seed
+  // behaviour.
+  const handleInlineResendWithRewind = useCallback(
+    async (messageId: string, text: string) => {
+      if (!text.trim()) return;
+      if (!sessionId || streaming || readOnlySubagent) {
+        handleInlineResend(messageId, text);
+        return;
+      }
+      let promptIndex = -1;
+      let ordinal = -1;
+      for (const message of messages) {
+        if (message.role !== "user") continue;
+        ordinal += 1;
+        if (message.id === messageId) { promptIndex = ordinal; break; }
+      }
+      if (promptIndex < 0) {
+        handleInlineResend(messageId, text);
+        return;
+      }
+      useSessionStore.getState().appendUserRevision(messageId, text);
+      try {
+        await rewindExecute(sessionId, promptIndex, "conversation", true);
+        // The host reloads the (now trimmed) transcript asynchronously. Send
+        // only after that lands — otherwise the optimistic bubble races the
+        // history replacement and the new prompt can be rendered twice.
+        await Promise.resolve(onRewound?.());
+        onSend(text);
+      } catch (e) {
+        onToast?.(`编辑重发失败：${String(e).replace(/^Error:\s*/, "")}`);
+        handleInlineResend(messageId, text);
+      }
+    },
+    [sessionId, streaming, readOnlySubagent, messages, handleInlineResend, onSend, onRewound, onToast],
+  );
+
   // Plan5 B.10 — 消息级"从此处分叉"。`RewindBar` 里已有同一套
   // `sessionFork(sessionId, cwd)` + 确认弹窗流程;这里把同样的语义下放到
   // 单条消息,复用 `onForked` 让宿主导航到新会话。
@@ -692,7 +733,14 @@ export function ChatView({
     if (liveSubagentCount > 0) setSubagentsOpen(true);
   }, [liveSubagentCount]);
 
-  const handleOpenTool = useCallback((tc: ToolCallView) => {
+  // Two callers pass different shapes: standalone tool cards hand over the
+  // `ToolCallView` object, while `MessagePartRegistry` / `ToolGroupSummary`
+  // hand over the toolCallId string. Accept both and resolve the id against
+  // the current transcript — passing a bare string through to the panel used
+  // to render an empty (or crashing) detail body.
+  const handleOpenTool = useCallback((tool: ToolCallView | string) => {
+    const tc = typeof tool === "string" ? findToolCall(messagesRef.current, tool) : tool;
+    if (!tc) return;
     setActiveTool(tc);
     setPreviewPath(null);
     setPanelMode("tool");
@@ -774,7 +822,7 @@ export function ChatView({
     handleEditResend,
     setEditResendOriginId,
     handleStepRevision,
-    handleInlineResend,
+    handleInlineResend: handleInlineResendWithRewind,
     handleEditAssistantMessage,
     handleResendAfterAssistantEdit,
     handleRetry,

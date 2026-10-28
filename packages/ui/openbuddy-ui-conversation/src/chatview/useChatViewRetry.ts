@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@openbuddy/ui-state/session-store";
 import { useSessionStore } from "@/stores/session-store";
-import { rewindExecute, rewindPoints } from "@/lib/agent/pi-client";
+import { piSend, rewindExecute, rewindPoints } from "@/lib/agent/pi-client";
 
 export type UseChatViewRetryParams = {
   sessionId: string | null | undefined;
@@ -110,8 +110,17 @@ export function useChatViewRetry({
     if (!userText.trim()) return;
     // Clear the error so the banner does not linger over the new turn.
     useSessionStore.getState().setError(null);
-    onSend(userText);
-  }, [sessionId, streaming, onSend, onToast]);
+    // Resend **without** pushing another optimistic user bubble: the prompt
+    // is already in the transcript, and `onSend` would append a duplicate
+    // (the error banner's retry is "regenerate", not "send again").
+    const store = useSessionStore.getState();
+    store.setStreaming(true);
+    void piSend(sessionId, userText).catch((e) => {
+      useSessionStore.getState().setError(String(e));
+      useSessionStore.getState().setStreaming(false);
+      onToast?.(`重试失败：${String(e).replace(/^Error:\s*/, "")}`);
+    });
+  }, [sessionId, streaming, onToast]);
 
   return { retrying, handleRetry, handleRetryLast, handleRetryRef, messagesRef };
 }

@@ -122,6 +122,75 @@
   from { opacity: 0; transform: translateY(14px) scale(.96); filter: blur(2px); }
   to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
+
+/* Inline approval card: docked above the composer, never covers the
+   transcript. This is the single decision surface while a permission is
+   pending (the modal variant is a fallback for hosts without a footer). */
+.request-modal-inline {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+}
+.request-modal-inline .request-modal {
+  width: 100%;
+  max-height: 60vh;
+  border-radius: 14px;
+  animation: none;
+}
+.request-modal-inline .request-modal__head { padding: 14px 16px 12px; }
+.request-modal-inline .request-modal__body { padding: 12px 16px; }
+.request-modal-inline .request-modal__footer { padding: 10px 16px 12px; }
+.request-modal__chips { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
+.request-modal__mode {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 7px;
+  color: var(--wb-text-medium);
+  background: var(--wb-bg-secondary);
+  font-size: 11px;
+}
+.request-modal__risk {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 650;
+}
+.request-modal__risk--medium {
+  color: #92400e;
+  background: color-mix(in srgb, var(--wb-status-warning, #c2410c) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--wb-status-warning, #c2410c) 36%, transparent);
+}
+.request-modal__risk--high {
+  color: #fff;
+  background: var(--wb-status-error, #e5484d);
+  border: 1px solid var(--wb-status-error, #e5484d);
+}
+.request-modal__command {
+  max-height: 180px;
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  overflow: auto;
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-tertiary);
+  border: 1px solid var(--wb-border-default);
+  border-left: 3px solid var(--wb-status-warning, #c2410c);
+  border-radius: 10px;
+  font-family: var(--wb-font-code-family);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.request-modal__raw-details { margin-top: 4px; }
+.request-modal__raw-details summary {
+  cursor: pointer;
+  color: var(--wb-text-weak);
+  font-size: 11.5px;
+  user-select: none;
+}
+.request-modal__raw-details[open] summary { margin-bottom: 8px; }
 .request-modal {
   width: min(560px, calc(100vw - 32px));
   max-height: min(720px, calc(100vh - 48px));
@@ -333,6 +402,17 @@
 .request-modal .btn--ghost:hover {
   background: var(--wb-bg-secondary);
   color: var(--wb-text-strong);
+}
+/* 「本会话始终允许」must be as visible as 允许 — it used to render as a
+   ghost button and disappear into the footer background. */
+.request-modal .btn--always {
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-secondary);
+  border: 1px solid var(--wb-border-default);
+}
+.request-modal .btn--always:hover {
+  background: var(--wb-bg-tertiary);
+  border-color: var(--wb-border-strong, var(--wb-border-default));
 }
 .request-modal .btn--danger {
   color: #fff;
@@ -1088,4 +1168,44 @@ textarea.mshell-field__control { resize: vertical; min-height: 96px; font-family
 }
 .casdoor-signin__btn--danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--wb-danger, #d64545) 20%, transparent);
+}
+
+/* cc-haha 对齐 — 审批卡头的「等待确认」脉冲徽标,以及允许为主的
+   操作区(拒绝退为 ghost,不再用红色实心抢焦点)。 */
+.request-modal__pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wb-status-warning, #a5650f) 12%, transparent);
+  color: var(--wb-status-warning, #a5650f);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  vertical-align: 1px;
+}
+.request-modal__pending-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: requestPendingPulse 1.4s ease-in-out infinite;
+}
+@keyframes requestPendingPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .request-modal__pending-dot { animation: none; }
+}
+.request-modal__actions-spacer { flex: 1 1 auto; }
+.request-modal__actions .request-modal__deny {
+  color: var(--wb-status-error, #e5484d);
+}
+.request-modal__actions .request-modal__deny:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-status-error, #e5484d) 10%, transparent);
+  color: var(--wb-status-error, #e5484d);
 }
