@@ -1149,11 +1149,15 @@ textarea.mshell-field__control { resize: vertical; min-height: 96px; font-family
 }
 .casdoor-signin__btn:disabled { opacity: .55; cursor: default; }
 .casdoor-signin__btn--primary {
-  color: #fff;
+  /* 品牌面上的文字用主题提供的 accent 前景色 —— 深色主题有自己的定义,
+     写死白色在深色下不跟随主题(硬编码色值门禁会拦)。 */
+  color: var(--wb-accent-fg, #fff);
   background: var(--wb-brand-primary);
 }
 .casdoor-signin__btn--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--wb-brand-primary) 88%, #000);
+  /* hover 向主题前景色靠拢:浅色主题=变深,深色主题=变亮。
+     之前写死纯黑,深色主题下按钮会向黑压,和整体 hover 方向相反。 */
+  background: color-mix(in srgb, var(--wb-brand-primary) 88%, var(--wb-fg-primary));
 }
 .casdoor-signin__btn--ghost {
   color: var(--wb-text-primary);
