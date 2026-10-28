@@ -168,87 +168,20 @@ Output: `apps/admin-portal/dist/` (211 KB JS / 2.7 KB CSS).
 
 Reference: `apps/admin-portal/README.md`.
 
-### SAML 2.0 + SCIM v2
+### Enterprise federation (SAML / SCIM) and payments
 
-For enterprise federation:
+> **Status:** `@openbuddy/saml`, `@openbuddy/scim`, `@openbuddy/payment`, and
+> `@openbuddy/webhook-outbox` were archived on 2026-10-28 (recoverable from git
+> history at `2438a2ab`) and are **not part of this build**. OpenBuddy ships the
+> Casdoor **OIDC** client (`@openbuddy/auth-casdoor`) only.
+>
+> If you run Casdoor yourself, SAML/SCIM are configured inside Casdoor (the
+> external identity product), not by OpenBuddy. Payment channels are likewise
+> not shipped.
 
-#### SAML 2.0
-
-1. Configure your IdP (Okta, Azure AD, etc.) with OpenBuddy's ACS URL: `https://casdoor.your-domain.com/api/saml/acs`.
-2. Download the IdP metadata XML.
-3. Upload to Casdoor: **Authentication → SAML**.
-4. Map IdP claims to Casdoor attributes.
-
-OpenBuddy uses `@openbuddy/saml` for AuthnRequest/Response/LogoutRequest primitives.
-
-#### SCIM v2
-
-OpenBuddy's `@openbuddy/scim` exposes RFC 7644 SCIM v2 endpoints for automated user/group provisioning.
-
-```
-GET    /scim/v2/Users
-GET    /scim/v2/Users/{id}
-POST   /scim/v2/Users
-PUT    /scim/v2/Users/{id}
-PATCH  /scim/v2/Users/{id}
-DELETE /scim/v2/Users/{id}
-
-GET    /scim/v2/Groups
-POST   /scim/v2/Groups
-PATCH  /scim/v2/Groups/{id}
-DELETE /scim/v2/Groups/{id}
-```
-
-Configure your IdP to point at `https://casdoor.your-domain.com/scim/v2` with a SCIM bearer token.
-
-### Payment integrations
-
-OpenBuddy's `@openbuddy/payment` ships adapters for 4 channels:
-
-| Channel | Use case |
-|---|---|
-| **Stripe** | International cards, Apple Pay, Google Pay |
-| **WeChat Pay** | China consumer payments |
-| **Alipay** | China consumer payments |
-| **HMAC** | Custom gateway integration |
-
-Each adapter implements:
-
-```typescript
-interface PaymentAdapter {
-  createOrder(input: CreateOrderInput): Promise<Order>;
-  capturePayment(orderId: string): Promise<CaptureResult>;
-  refund(orderId: string, amount?: number): Promise<RefundResult>;
-  verifyWebhook(payload: string, signature: string): WebhookEvent;
-}
-```
-
-#### Stripe example
-
-```typescript
-import { StripeAdapter } from "@openbuddy/payment";
-
-const stripe = new StripeAdapter({
-  apiKey: process.env.STRIPE_API_KEY!,
-  webhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
-});
-
-const order = await stripe.createOrder({
-  amount: 9999,        // cents
-  currency: "usd",
-  customerId: user.id,
-  metadata: { plan: "team" },
-});
-```
-
-#### Webhook delivery (transactional outbox)
-
-All payment webhooks go through `@openbuddy/webhook-outbox`:
-
-1. Webhook received → stored in outbox table with `idempotency_key`.
-2. Worker retries with exponential backoff + jitter.
-3. Max 8 retries → marked `dead_letter` for manual handling.
-4. Webhook signature verified by adapter (`StripeAdapter.verifyWebhook`).
+There is no `@openbuddy/payment` adapter surface in the current tree, so the
+payment and webhook-outbox examples that used to live in this section were
+removed rather than left as claims about code that is not here.
 
 ### Audit log shipping
 

@@ -33,11 +33,9 @@ See [`openbuddy-capability-matrix.md`](openbuddy-capability-matrix.md) for the f
 | Package | What it does |
 |---|---|
 | `@openbuddy/auth-casdoor` | Casdoor OIDC + admin REST |
-| `@openbuddy/auth-permission` | Permission prompts & policy UI |
-| `@openbuddy/payment` | Stripe / WeChat Pay / Alipay / HMAC adapters |
-| `@openbuddy/saml` | SAML 2.0 primitives |
-| `@openbuddy/scim` | SCIM v2 endpoints (RFC 7644) |
-| `@openbuddy/webhook-outbox` | Transactional outbox + retry/backoff |
+| `@openbuddy/auth-permission` | Permission prompts UI |
+| `@openbuddy/auth-policy` | Tenant + capability policy evaluation |
+| `@openbuddy/capability-authorization` | Capability-level authorization gate |
 
 #### Apps
 

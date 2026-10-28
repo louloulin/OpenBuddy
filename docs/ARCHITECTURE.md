@@ -190,38 +190,38 @@ The renderer reaches the service via IPC; IPC handlers in `electron/main/` look 
 packages/
 ├── runtime/
 │   ├── openbuddy-cordis/       # Cordis helpers, shared context
+│   ├── openbuddy-dsh-core/     # agent shell runtime
+│   ├── openbuddy-host-runtime/ # host-side runtime glue
 │   ├── openbuddy-plugin-host/  # plugin discovery + hot reload
+│   ├── openbuddy-plugin-sdk/   # plugin authoring SDK
 │   └── openbuddy-storage/      # local fs persistence with audit
 ├── renderer/
-│   └── openbuddy-renderer-host/# preload bridge glue
+│   └── openbuddy-renderer-host/ # preload bridge glue
 ├── bundle/
-│   └── openbuddy-base/         # umbrella for renderer-only deps
+│   └── openbuddy-base/          # umbrella for renderer-only deps
 ├── auth/
-│   ├── openbuddy-casdoor/      # OIDC client + admin REST
-│   └── openbuddy-permission/   # permission prompts & policy
+│   ├── openbuddy-casdoor/       # OIDC client + admin REST
+│   ├── openbuddy-permission/    # permission prompts UI
+│   └── openbuddy-policy/        # tenant + capability policy
 ├── core/
-│   └── openbuddy-session/      # session lifecycle
+│   ├── openbuddy-logging-main/     # main-process logging
+│   ├── openbuddy-logging-renderer/ # renderer logging
+│   └── openbuddy-session/          # session lifecycle
 ├── team/
-│   ├── openbuddy-team/         # multi-agent team
-│   └── openbuddy-subagent/     # sub-agent spawning
+│   └── openbuddy-team/          # multi-agent team
 ├── capability/
-│   ├── openbuddy-memory/       # long-term memory
-│   ├── openbuddy-notification/ # inbox + native notifications
-│   ├── openbuddy-plan/         # plan mode
-│   ├── openbuddy-task/         # sub-agent tasks
-│   ├── openbuddy-automation/   # local scheduler
-│   ├── openbuddy-web-search/   # provider-pluggable web search
-│   ├── openbuddy-inspiration/  # prompt templates
-│   ├── openbuddy-folder-trust/ # per-folder permissions
-│   ├── openbuddy-authorization/# capability-level policy
-│   ├── openbuddy-mcp-client/   # MCP connector governance
-│   ├── openbuddy-calendar/     # calendar
-│   └── openbuddy-email/        # email
+│   ├── openbuddy-authorization/ # capability-level policy gate
+│   ├── openbuddy-calendar/      # calendar
+│   ├── openbuddy-email/         # email (IMAP/SMTP + Gmail/Graph/JMAP)
+│   ├── openbuddy-folder-trust/  # per-folder permissions
+│   └── openbuddy-mcp-client/    # MCP connector governance
 ├── fs/
-│   └── openbuddy-fs-local/     # local fs via Cordis
+│   └── openbuddy-fs-local/      # local fs via Cordis
 ├── shared/
-│   ├── openbuddy-files-kb/     # knowledge-base file indexing
-│   └── openbuddy-types/        # cross-package types
+│   ├── openbuddy-error-codes/   # shared error codes
+│   ├── openbuddy-files-kb/      # knowledge-base file indexing
+│   ├── openbuddy-logging-shared/# shared logging contracts
+│   └── openbuddy-types/         # cross-package types
 ├── collaboration/
 │   ├── openbuddy-coordinator/  # coordination layer
 │   ├── openbuddy-evidence/     # audit evidence
@@ -231,12 +231,12 @@ packages/
 │   ├── openbuddy-protocol/     # A2A message envelopes
 │   ├── openbuddy-room/         # shared rooms
 │   └── openbuddy-task/         # cross-agent task graph
-├── payment/                    # Stripe / WeChat Pay / Alipay / HMAC
-├── saml/                       # SAML 2.0 primitives
-├── scim/                       # SCIM v2 endpoints
-├── webhook-outbox/             # transactional outbox
-└── ui/                         # 26 UI packages
+└── ui/                         # 36 @openbuddy/ui-* packages (count in docs/stats.json)
 ```
+
+> SCIM / SAML / payment adapters / webhook outbox are **not** in the tree today:
+> they were archived on 2026-10-28 and are recoverable from git history
+> (`2438a2ab`). See `README.md` §Enterprise.
 
 ### Data flow — a typical prompt
 

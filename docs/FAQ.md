@@ -153,7 +153,7 @@ Yes. NewAPI is open source: [github.com/songquanpeng/new-api](https://github.com
 
 #### Does OpenBuddy support SSO?
 
-Yes. Casdoor OIDC + SAML 2.0 + SCIM v2 are all supported. See [`casdoor-enterprise-auth.md`](casdoor-enterprise-auth.md) and [`enterprise-casdoor-newapi-openbuddy-architecture.md`](enterprise-casdoor-newapi-openbuddy-architecture.md).
+Casdoor OIDC SSO is wired into the main process. SAML 2.0 and SCIM v2 are tested **seeds** that were archived on 2026-10-28 and are not wired into the app (recoverable from git history). See [`casdoor-enterprise-auth.md`](casdoor-enterprise-auth.md) and [`enterprise-casdoor-newapi-openbuddy-architecture.md`](enterprise-casdoor-newapi-openbuddy-architecture.md).
 
 #### Can I run OpenBuddy in CI to test?
 

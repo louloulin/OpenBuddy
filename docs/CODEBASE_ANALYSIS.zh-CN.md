@@ -5,6 +5,11 @@
 > **覆盖范围:** `packages/`、`electron/`、`src/`、`apps/`、`scripts/`、`evals/` 下每个目录。
 > **双语文档:** [English](CODEBASE_ANALYSIS.md) · **简体中文**
 
+> **过期说明(2026-10-28):** 本快照早于 `experimental/` 归档。
+> `packages/{payment,saml,scim,webhook-outbox}` 与 `bundle-desktop` 已不在仓库树中
+> (git 历史在 `2438a2ab` 可找回)。包数量与下方 `packages/` 表属于历史记录;
+> 当前数字以 `docs/stats.json` 为准。
+
 本文档基于对当前仓库的**结构性查询**(`ls`、`find`、`grep` 包清单与 `index.ts` 导出)。每条结论都标注以下标记之一:
 
 | 标记 | 含义 |

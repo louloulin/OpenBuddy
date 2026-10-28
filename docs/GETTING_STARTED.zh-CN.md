@@ -17,9 +17,9 @@
 
 | 平台 | 用于 |
 |---|---|
-| **Windows** | NSIS + MSI 构建 → 安装 [NSIS 3](https://nsis.sourceforge.io/) 与 [WiX Toolset 3](https://wixtoolset.org/) |
+| **Windows** | NSIS 构建 → 安装 [NSIS 3](https://nsis.sourceforge.io/) |
 | **macOS** | DMG + 公证 → 安装 Xcode 命令行工具(`xcode-select --install`) |
-| **Linux** | AppImage + .deb → `sudo apt install rpm fakeroot` |
+| **Linux** | AppImage 构建 → `libfuse2`(Electron/AppImage 运行时依赖) |
 
 验证:
 
@@ -44,11 +44,13 @@ cd OpenBuddy
 pnpm install
 ```
 
-依次执行三件事:
+安装所有 workspace 依赖后会执行 `scripts/postinstall.mjs`，它在 moon 可用时
+运行 `moon sync projects`。这个钩子**永远不会让安装失败**：moon 缺失或损坏只
+打印告警，因为 CI 的 typecheck / test（`scripts/run-workspace-task.mjs`）不依赖
+moon 原生二进制。
 
-1. 通过 `pnpm` 安装 19 个 moon 工程的所有依赖
-2. 运行 `moon sync projects` 注册 workspace DAG
-3. 自动生成 `packages/ui` 使用的 TS 路径别名
+`packages/ui` 的 TS 路径别名已提交在 `tsconfig.json` 中；新增或重命名 UI 包后
+用 `pnpm sync:ui-aliases` 重新生成。
 
 期望输出以 `Done in <N>s.` 结尾。
 
@@ -104,9 +106,9 @@ pnpm test:closed-loop
 
 ```bash
 # 按平台:
-pnpm electron:build:win     # NSIS .exe + MSI
-pnpm electron:build:mac     # 签名 .dmg
-pnpm electron:build:linux   # AppImage + .deb
+pnpm electron:build:win     # NSIS .exe (x64 + arm64)
+pnpm electron:build:mac     # 签名 .dmg (x64 + arm64)
+pnpm electron:build:linux   # AppImage (x64 + arm64)
 ```
 
 安装包落地 `release/<version>/`。要全平台:`pnpm electron:build:all`。

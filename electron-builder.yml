@@ -205,7 +205,8 @@ win:
   target:
     - target: nsis
       arch: [x64, arm64]
-  artifactName: ${productName}-${version}-setup.${ext}
+  # ${arch} 必须进文件名:x64 与 arm64 两个 NSIS 产物同名会互相覆盖,只剩一个。
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
 
 nsis:
   oneClick: false

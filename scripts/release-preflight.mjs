@@ -64,16 +64,30 @@ const signingContract = {
   macImport: /CSC_LINK=\$RUNNER_TEMP/.test(workflow) && /APPLE_API_KEY=\$RUNNER_TEMP/.test(workflow),
   macRelease: /pnpm electron:release:mac/.test(workflow) && /notarize:\s*true/.test(builder) && /hardenedRuntime:\s*true/.test(builder),
   linuxBuild: /pnpm electron:build:linux/.test(workflow) && /path:\s*[\s\S]*?release\/\*\.AppImage/.test(workflow),
-  publishNeedsAll: /needs:\s*\[build-windows, build-macos, build-linux\]/.test(workflow),
+  publishNeedsAll: /needs:\s*\[build-windows, build-macos, build-linux(?:, resolve)?\]/.test(workflow),
 };
 check("release:installer-signing-contract", Object.values(signingContract).every(Boolean), {
   ...signingContract,
   credentialPolicy: "signing/notarization only on CI runners; local preflight never reads or validates secret values",
 });
-check("release:artifact-contract", /artifactName: \$\{productName\}-\$\{version\}-setup\.\$\{ext\}/.test(builder) && /artifactName: \$\{productName\}-\$\{version\}-\$\{arch\}\.\$\{ext\}/.test(builder) && /artifactName: \$\{productName\}-\$\{version\}\.\$\{ext\}/.test(builder), {
-  windows: /artifactName: \$\{productName\}-\$\{version\}-setup\.\$\{ext\}/.test(builder),
-  macos: /artifactName: \$\{productName\}-\$\{version\}-\$\{arch\}\.\$\{ext\}/.test(builder),
-  linux: /artifactName: \$\{productName\}-\$\{version\}\.\$\{ext\}/.test(builder),
+// 每个平台都必须把 ${arch} 写进 artifactName:同平台 x64/arm64 同名产物
+// 会互相覆盖,发布页最后只剩一个架构。签名版与 unsigned 版也必须同名,
+// 否则 dispatch 时勾不勾 unsigned 会产出两套不同的文件名。
+const artifactNamePatterns = {
+  windows: /artifactName: \$\{productName\}-\$\{version\}-\$\{arch\}-setup\.\$\{ext\}/,
+  macos: /artifactName: \$\{productName\}-\$\{version\}-\$\{arch\}\.\$\{ext\}/,
+  linux: /artifactName: \$\{productName\}-\$\{version\}-\$\{arch\}\.\$\{ext\}/,
+};
+const unsignedBuilder = fileText(join(root, "electron-builder.unsigned.yml"));
+const artifactContract = Object.fromEntries(
+  Object.entries(artifactNamePatterns).map(([name, pattern]) => [
+    name,
+    pattern.test(builder) && pattern.test(unsignedBuilder),
+  ]),
+);
+check("release:artifact-contract", Object.values(artifactContract).every(Boolean), {
+  ...artifactContract,
+  reason: "artifactName must carry ${arch} on every platform, in both electron-builder.yml and electron-builder.unsigned.yml",
 });
 check("release:signing-is-ci-only", !process.env.CSC_LINK && !process.env.CSC_KEY_PASSWORD && !process.env.APPLE_API_KEY, {
   reason: "local preflight never consumes signing/notarization credentials",

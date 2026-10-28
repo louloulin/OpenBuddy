@@ -71,6 +71,36 @@ function workspacePackageCount() {
   return count;
 }
 
+/**
+ * `@openbuddy/*` 包族计数 —— 官网 SITE_STATS 的数字来源。
+ *
+ * 这些数字此前手工写在 apps/openbuddy-website/src/lib/constants.ts(63 / 27),
+ * 而实测是 72 / 36。和 testFiles 一样,手工数字必然漂移,所以统一由这里生成。
+ */
+function openbuddyPackageCounts() {
+  const manifests = gitFiles(["packages/**/package.json"]).filter(
+    (rel) => !rel.includes("node_modules"),
+  );
+  const names = [];
+  for (const rel of manifests) {
+    const path = join(repoRoot, rel);
+    if (!existsSync(path)) continue;
+    try {
+      const name = JSON.parse(readFileSync(path, "utf8")).name;
+      if (typeof name === "string" && name.startsWith("@openbuddy/")) names.push(name);
+    } catch {
+      // 坏 manifest 由 typecheck 负责,这里只做计数。
+    }
+  }
+  return {
+    openbuddyPackages: names.length,
+    openbuddyUiPackages: names.filter((name) => name.startsWith("@openbuddy/ui-")).length,
+    openbuddyCollaborationPackages: names.filter((name) =>
+      name.startsWith("@openbuddy/collaboration-"),
+    ).length,
+  };
+}
+
 const stats = {
   _comment:
     "本文件由 scripts/docs-stats.mjs 生成,不要手工编辑。CI 的 scripts/check-doc-stats.mjs 会校验它是否与仓库现状一致,过期即门禁失败。",
@@ -78,6 +108,7 @@ const stats = {
   testFiles: testFiles.length,
   moonProjects: moonProjects.length,
   workspacePackages: workspacePackageCount(),
+  ...openbuddyPackageCounts(),
   workflows: workflows.length,
   markdownDocs: docs.length
 };

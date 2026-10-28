@@ -4,6 +4,9 @@
   "testFiles": 955,
   "moonProjects": 73,
   "workspacePackages": 81,
+  "openbuddyPackages": 72,
+  "openbuddyUiPackages": 36,
+  "openbuddyCollaborationPackages": 8,
   "workflows": 11,
   "markdownDocs": 180
 }

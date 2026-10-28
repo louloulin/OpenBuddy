@@ -53,8 +53,8 @@ into `/Applications`, then on first launch:
 **Windows** — SmartScreen shows "Windows protected your PC". Click
 **More info** → **Run anyway**.
 
-**Linux** — `chmod +x OpenBuddy-<version>.AppImage` and run it. AppImages are
-self-contained executables and need no system-level trust decision.
+**Linux** — `chmod +x OpenBuddy-<version>-<arch>.AppImage` and run it. AppImages
+are self-contained executables and need no system-level trust decision.
 
 ### Why it is unsigned, and what changes
 
@@ -189,11 +189,14 @@ gh workflow run release.yml \
 
 The CI will:
 
-1. Run typecheck + test on all 32 projects.
-2. Build Windows NSIS + MSI.
-3. Build macOS DMG (signed + notarized).
-4. Build Linux AppImage + .deb.
+1. Run workspace typecheck + tests (74 typecheck projects; see `docs/stats.json`).
+2. Build Windows NSIS installers (x64 + arm64).
+3. Build macOS DMG + zip (x64 + arm64, signed + notarized).
+4. Build Linux AppImage (x64 + arm64).
 5. Publish a **draft** GitHub Release with auto-extracted notes.
+
+> 目前**没有** MSI / `.deb` / `.rpm` 产物 —— `electron-builder` 配置里只有
+> NSIS、DMG/ZIP、AppImage 三个 target。文档与官网都不应宣称其它格式。
 
 #### 6. Test the release candidate
 

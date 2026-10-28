@@ -153,7 +153,7 @@ Tauri 是最初的选择,我们迁移到 Electron 因为:
 
 #### OpenBuddy 支持 SSO 吗?
 
-支持。Casdoor OIDC + SAML 2.0 + SCIM v2 全部支持。见 [`casdoor-enterprise-auth.md`](casdoor-enterprise-auth.md) 与 [`enterprise-casdoor-newapi-openbuddy-architecture.md`](enterprise-casdoor-newapi-openbuddy-architecture.md)。
+Casdoor OIDC SSO 已在主进程接线。SAML 2.0 与 SCIM v2 是**有测试的种子**,2026-10-28 已归档,尚未接线(git 历史可找回)。见 [`casdoor-enterprise-auth.md`](casdoor-enterprise-auth.md) 与 [`enterprise-casdoor-newapi-openbuddy-architecture.md`](enterprise-casdoor-newapi-openbuddy-architecture.md)。
 
 #### 能在 CI 里跑 OpenBuddy 测试吗?
 

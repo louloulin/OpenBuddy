@@ -131,7 +131,7 @@
 Plan 模式(开关 & 查看) · Rewind(回退 & fork) · 子 Agent Tasks(观察 & 取消) · Slash Commands · 本地 Automations 调度器 · 通知中心。
 
 **📦 跨平台安装包**
-Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 GitHub Actions CI 构建发布。
+Windows(NSIS `.exe`)、macOS(`.dmg`)、Linux(AppImage)—— x64 + arm64。通过 GitHub Actions CI 构建发布。
 
 </td>
 </tr>
@@ -332,13 +332,13 @@ pnpm electron:dev
 ### 构建生产安装包
 
 ```bash
-# Windows 安装包(NSIS .exe + MSI)
+# Windows 安装包(NSIS .exe)
 pnpm electron:build:win
 
 # macOS 安装包(DMG)
 pnpm electron:build:mac
 
-# Linux AppImage / .deb
+# Linux AppImage
 pnpm electron:build:linux
 
 # 三平台全打
@@ -348,7 +348,7 @@ pnpm electron:build:all
 ### 验证环境
 
 ```bash
-# 类型检查整个 32 工程 monorepo
+# 类型检查整个 workspace(工程数见 docs/stats.json)
 pnpm workspace:typecheck
 
 # 跑完整 Vitest 套件(测试文件全部在仓库里)
@@ -438,7 +438,7 @@ packages/                # 每个能力一个 moon 工程(30+ 包)
   ui/openbuddy-{shell,sidebar,settings,workbench,…} (14 包)
 
 .moon/                   # moon workspace + task 配置
-  workspace.yml          # 32 工程图(渲染端 + Electron + packages)
+  workspace.yml          # 工程图(渲染端 + Electron + packages)
   tasks/                 # typecheck / test / build / dev / electron.* 预设
   toolchains.yml         # node 22 / pnpm 10 / typescript 5.6
 
@@ -580,9 +580,9 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 - BYOK 多 Provider 配置
 - Skills / MCP / Experts 表面
 - Plan 模式 · Rewind · Tasks · Slash Commands · Automations
-- Windows(NSIS + MSI)与 macOS(DMG)安装包
+- Windows(NSIS)与 macOS(DMG)安装包
 - CI 发布流水线(GitHub Actions)
-- moon 化 monorepo(`moon run` 一统天下,32 工程 DAG,增量构建)
+- moon 化 monorepo(`moon run` 一统天下,工程数见 [`docs/stats.json`](docs/stats.json),增量构建)
 - Casdoor OIDC + NewAPI 网关
 
 ### 🚧 进行中
@@ -591,7 +591,7 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 - 会话置顶与工作区分组
 - 权限管理面板
 - 跨会话搜索
-- Linux 构建(AppImage + .deb)
+- Linux 构建(AppImage)
 - 代码签名与公证
 
 ### 🔮 后续

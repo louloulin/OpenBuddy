@@ -4,6 +4,12 @@ This is the **public roadmap** for OpenBuddy. It is updated quarterly and reflec
 
 **Last updated:** 2026-09-22 · **Next refresh:** 2026-12-22
 
+> **Release-status correction (2026-10-28):** OpenBuddy has **0 tags and 0
+> published releases** so far. The version entries below (including the `✅`
+> markers and "you are here") are **development milestones**, not published
+> GitHub Releases. The first release (v0.16.0, unsigned) is prepared in
+> `plan1029.md` P1 but has not been pushed yet.
+
 ---
 
 
@@ -106,10 +112,8 @@ To propose a new item, open a [GitHub Discussion](https://github.com/louloulin/O
 
 - Casdoor OIDC + admin REST
 - NewAPI gateway (BYOK + Service Token)
-- 4 payment adapters (Stripe / WeChat Pay / Alipay / HMAC)
-- SCIM v2 + SAML 2.0
 - Admin Portal SPA
-- 309 → 400 tests added
+- ~~4 payment adapters / SCIM v2 / SAML 2.0~~ — archived 2026-10-28 as unwired seeds (git history `2438a2ab`)
 
 #### ✅ Milestone (2026-08-17) — grok → Pi + moon
 
@@ -137,6 +141,10 @@ Items marked **deprecated** stay functional for at least 2 minor releases before
 
 ---
 
+
+> **发布状态更正(2026-10-28):** OpenBuddy 目前 **0 tag、0 已发布 Release**。
+> 下面的版本条目(包括 `✅` 标记与"你在这里")是**开发里程碑**,不是 GitHub Release。
+> 首个版本(v0.16.0,unsigned)在 `plan1029.md` P1 中已备好,但尚未推送。
 
 ### 一览
 
@@ -237,10 +245,8 @@ Items marked **deprecated** stay functional for at least 2 minor releases before
 
 - Casdoor OIDC + 管理 REST
 - NewAPI 网关(BYOK + Service Token)
-- 4 个支付适配器(Stripe / WeChat Pay / Alipay / HMAC)
-- SCIM v2 + SAML 2.0
 - Admin Portal SPA
-- 新增 309 → 400 测试
+- ~~4 个支付适配器 / SCIM v2 / SAML 2.0~~ —— 2026-10-28 作为未接线种子归档(git 历史 `2438a2ab`)
 
 #### ✅ 里程碑(2026-08-17)· grok → Pi + moon
 

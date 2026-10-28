@@ -49,11 +49,11 @@ A side-by-side comparison of OpenBuddy against the most popular AI coding / agen
 | Feature | OpenBuddy | Cursor | Continue | aider | Copilot | Claude Code |
 |---|---|---|---|---|---|---|
 | OIDC SSO (Casdoor) | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
-| SAML 2.0 | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
-| SCIM v2 provisioning | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
+| SAML 2.0 | ❌ (seed in git history) | ✅ | ❌ | ❌ | ✅ | ❌ |
+| SCIM v2 provisioning | ❌ (seed in git history) | ✅ | ❌ | ❌ | ✅ | ❌ |
 | Self-hosted gateway (NewAPI) | ✅ | ❌ | partial | ❌ | ❌ | ❌ |
-| Payment integrations | ✅ 4 channels | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Webhook outbox | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Payment integrations | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Webhook outbox | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Web admin portal | ✅ separate SPA | partial | ❌ | ❌ | partial | ❌ |
 | Tenant policy | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
 | Audit log shipping | ✅ | partial | ❌ | ❌ | ✅ | ❌ |
@@ -73,7 +73,7 @@ A side-by-side comparison of OpenBuddy against the most popular AI coding / agen
 
 ### What OpenBuddy is best at
 
-1. **Enterprise AI workspaces.** Casdoor OIDC + NewAPI gateway + 4 payment adapters + SCIM v2 + SAML 2.0 + transactional outbox — out of the box.
+1. **Enterprise AI workspaces.** Casdoor OIDC + NewAPI gateway + tenant policy + a local audit ledger — wired in the main process. (SCIM/SAML/payment adapters are tested seeds in git history, not shipped.)
 2. **Plugin / capability ecosystem.** A 30+ package Cordis mesh any contributor can extend, with a runtime plugin loader for hot-install.
 3. **Multi-agent.** Full A2A protocol, rooms, inbox, task graph, evidence audit. The only open-source desktop tool with a complete multi-agent runtime.
 4. **Open the whole stack.** MIT license, every test file visible, GAIA-style eval harness, monorepo tooling — every byte auditable.
@@ -130,7 +130,7 @@ Last verified: 2026-09-01. If you spot a stale claim, open an issue labeled `doc
 
 ### OpenBuddy 最强的地方
 
-1. **企业 AI 工作台**。Casdoor OIDC + NewAPI 网关 + 4 个支付适配器 + SCIM v2 + SAML 2.0 + 事务性 Outbox——开箱即用。
+1. **企业 AI 工作台**。Casdoor OIDC + NewAPI 网关 + 租户策略 + 本地审计账本——主进程真实接线。(SCIM/SAML/支付适配器是有测试的种子,在 git 历史里,尚未交付。)
 2. **插件 / 能力生态**。30+ 包 Cordis 网格,任何贡献者可扩展,带运行时热加载。
 3. **多 Agent**。完整 A2A 协议、rooms、inbox、任务图、证据审计。唯一带完整多 Agent 运行时的开源桌面工具。
 4. **整栈开源**。MIT 许可、测试文件全部可见、GAIA 风格评测 harness、monorepo 工具——每一字节可审计。

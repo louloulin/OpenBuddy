@@ -119,7 +119,7 @@ Bring your own keys. Configure Anthropic, OpenAI-compatible, Pi, MiniMax, NewAPI
 Plan mode (toggle & view) · Rewind (rewind & fork) · sub-agent Tasks (observe & cancel) · Slash Commands · local Automations scheduler.
 
 **📦 Cross-platform installers**
-Windows (NSIS `.exe` + MSI), macOS (`.dmg`), Linux (AppImage + `.deb`). CI-built releases via GitHub Actions.
+Windows (NSIS `.exe`), macOS (`.dmg`), Linux (AppImage) — x64 + arm64. CI-built releases via GitHub Actions.
 
 </td>
 </tr>
@@ -327,13 +327,13 @@ pnpm electron:dev
 ### Build a production installer
 
 ```bash
-# Windows installer (NSIS .exe + MSI)
+# Windows installer (NSIS .exe)
 pnpm electron:build:win
 
 # macOS installer (DMG)
 pnpm electron:build:mac
 
-# Linux AppImage / .deb
+# Linux AppImage
 pnpm electron:build:linux
 
 # All three
@@ -573,7 +573,7 @@ The full backlog lives in [`TODO.md`](TODO.md). The public roadmap is in **[`doc
 - BYOK multi-provider config
 - Skills / MCP / Experts surfaces
 - Plan mode · Rewind · Tasks · Slash Commands · Automations
-- Windows (NSIS + MSI) & macOS (DMG) installers
+- Windows (NSIS) & macOS (DMG) installers
 - CI release workflow (GitHub Actions)
 - moon-managed monorepo (`moon run` everywhere, incremental DAG builds)
 - Casdoor OIDC + NewAPI gateway
@@ -584,7 +584,7 @@ The full backlog lives in [`TODO.md`](TODO.md). The public roadmap is in **[`doc
 - Pinned sessions & workspace grouping
 - Permission management panel
 - Search across sessions
-- Linux builds (AppImage + .deb)
+- Linux builds (AppImage)
 - Code signing & notarization
 
 ### 🔮 Next
@@ -631,8 +631,7 @@ OpenBuddy treats security as a first-class concern:
 - **Per-folder trust grants** via `@openbuddy/capability-folder-trust`
 - **Capability-level policy** via `@openbuddy/capability-authorization`
 - **Casdoor OIDC** with PKCE and refresh token rotation
-- **SCIM v2** provisioning + **SAML 2.0** federation
-- **Transactional outbox** webhook delivery (no lost events)
+- **SCIM v2 / SAML 2.0** — tested seeds, **not wired** into the app (archived 2026-10-28; recoverable from git history)
 - **Local-first audit ledger** persisted across restarts
 
 See **[`SECURITY.md`](SECURITY.md)** for the full policy and how to report vulnerabilities.
