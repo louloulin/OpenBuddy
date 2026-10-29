@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { existsSync, readdirSync } from "node:fs";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -15,10 +15,10 @@ const LATEST = Math.max(...DEFAULT_MIGRATIONS.map((step) => step.version));
 const MIGRATION_COUNT = DEFAULT_MIGRATIONS.length;
 
 let root = "";
-// Windows 上 SQLite 关闭句柄有延迟,刚 close() 的文件仍被占用,直接 rm
-// 会 EBUSY(macOS 允许 unlink 已打开文件,所以一直没暴露)。给重试预算。
+// Windows 上 SQLite 关闭句柄有轻微延迟,刚 close() 的文件可能仍被占用。
+// (真正的句柄泄漏已在 SqliteDriver 构造函数里修掉,这里只兜底 OS 延迟。)
 afterEach(async () => {
-  if (root) await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  if (root) await rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
   root = "";
 });
 
@@ -243,6 +243,39 @@ describe("openStorage", () => {
     await writeFile(backupPath, "not a sqlite database");
     await expect(restoreStorageBackup({ backupPath, destinationPath: join(root, "restored.sqlite") })).rejects.toThrow();
     await expect(stat(join(root, "restored.sqlite"))).rejects.toThrow();
+    // 临时恢复文件也必须清掉,不能留在备份目录里。
+    const leftover = (await readdir(root)).filter((name) => name.endsWith(".restore.tmp"));
+    expect(leftover).toEqual([]);
+  });
+
+  it("构造函数失败时不泄漏 SQLite 句柄(损坏库可被立即删除)", async () => {
+    // 回归:SqliteDriver 构造函数里第一条 PRAGMA 就会在损坏文件上抛异常。
+    // 原本没有 close(),而构造函数抛异常时调用方拿不到对象、也就无从关闭 ——
+    // 句柄泄漏。Windows 上泄漏的句柄让文件无法 unlink(EBUSY/EPERM)。
+    //
+    // 只断言 "unlink 成功" 在 macOS 上抓不到这个 bug(macOS 允许 unlink
+    // 已打开的文件),必须直接数打开的文件描述符 —— 泄漏一次就多一个。
+    root = await mkdtemp(join(tmpdir(), "openbuddy-driver-leak-"));
+    const corruptPath = join(root, "corrupt.sqlite");
+    await writeFile(corruptPath, "not a sqlite database");
+
+    const fdCount = (): number => {
+      try {
+        return readdirSync("/dev/fd").length;      // macOS / Linux
+      } catch {
+        return readdirSync("/proc/self/fd").length; // Linux 兜底
+      }
+    };
+
+    const before = fdCount();
+    for (let i = 0; i < 5; i += 1) {
+      await expect(openStorage({ filePath: corruptPath })).rejects.toThrow();
+    }
+    // 5 次失败打开若各泄漏一个句柄,before 之后会多出 5 个 fd。
+    expect(fdCount()).toBe(before);
+
+    await expect(rm(corruptPath, { force: true })).resolves.toBeUndefined();
+    expect(existsSync(corruptPath)).toBe(false);
   });
 });
 
