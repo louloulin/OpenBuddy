@@ -126,6 +126,10 @@ export class SessionEventLog extends PiSessionEventBridge {
   private readonly maxFileBytes: number;
   private readonly retainedCount: number;
   private writeQueue: Promise<void> = Promise.resolve();
+  /** 最近一次落盘失败。append() 是 void 的(fire-and-forget),错误不能变成
+   *  未处理的 rejection —— Node 22 上那会直接终止进程;但也不能静默吞掉,
+   *  所以存下来由 flush() 抛给真正关心的人。 */
+  private writeError: unknown = null;
   private bytesOnDisk = 0;
 
   constructor(filePathOrOptions?: string | SessionEventLogConstructorOptions, maxEntries?: number) {
@@ -144,13 +148,32 @@ export class SessionEventLog extends PiSessionEventBridge {
   append(record: SessionEventRecord): void {
     super.append(record);
     if (!this.filePath) return;
-    this.writeQueue = this.enqueueWrite(record);
+    this.queueWrite(() => this.enqueueWrite(record));
+  }
+
+  /**
+   * 把一次写操作串进队列。
+   *
+   * 队列自身永远 resolve:一次失败(目录被删、磁盘满)不能毒化后续所有写入,
+   * 也不能留下无人处理的 rejection。失败原因记在 writeError 上,flush() 时
+   * 一并抛出。
+   */
+  private queueWrite(operation: () => Promise<void>): void {
+    this.writeQueue = this.writeQueue
+      .catch(() => undefined)
+      .then(operation)
+      .catch((error: unknown) => {
+        this.writeError = error;
+      });
   }
 
   /** Drain pending writes to the JSONL backing file. No-op without a path. */
   async flush(): Promise<void> {
     if (!this.filePath) return;
     await this.writeQueue;
+    const error = this.writeError;
+    this.writeError = null;
+    if (error) throw error;
   }
 
   /** Current on-disk size in bytes; 0 when there is no backing file. */
@@ -173,7 +196,7 @@ export class SessionEventLog extends PiSessionEventBridge {
     this.bytesOnDisk = size;
     for (const record of records) super.append(record);
     if (size > this.maxFileBytes) {
-      this.writeQueue = this.writeQueue.then(() => this.rotate());
+      this.queueWrite(() => this.rotate());
     }
     return records;
   }
@@ -187,14 +210,16 @@ export class SessionEventLog extends PiSessionEventBridge {
     return readTailRecords(this.filePath!, this.retainedCount);
   }
 
-  private enqueueWrite(record: SessionEventRecord): Promise<void> {
-    return this.writeQueue.then(async () => {
-      const payload = JSON.stringify(record);
-      await mkdir(dirname(this.filePath!), { recursive: true }).catch(() => undefined);
-      await appendFile(this.filePath!, `${payload}\n`, "utf8");
-      this.bytesOnDisk += Buffer.byteLength(payload) + 1;
-      if (this.bytesOnDisk > this.maxFileBytes) await this.rotate();
-    });
+  /**
+   * 真正的写操作。排队由 queueWrite() 负责 —— 这里绝不能再引用
+   * this.writeQueue,否则就是自己 chain 自己(永不 settle)。
+   */
+  private async enqueueWrite(record: SessionEventRecord): Promise<void> {
+    const payload = JSON.stringify(record);
+    await mkdir(dirname(this.filePath!), { recursive: true }).catch(() => undefined);
+    await appendFile(this.filePath!, `${payload}\n`, "utf8");
+    this.bytesOnDisk += Buffer.byteLength(payload) + 1;
+    if (this.bytesOnDisk > this.maxFileBytes) await this.rotate();
   }
 
   /**

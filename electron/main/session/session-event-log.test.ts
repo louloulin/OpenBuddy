@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -182,6 +182,47 @@ describe("session-event-log: tail hydrate + rotation", () => {
   it("treats a missing file as empty rather than throwing", async () => {
     const log = new SessionEventLog({ databasePath: file, maxEntries: 100 });
     await expect(log.load()).resolves.toEqual([]);
+  });
+
+  it("does not leak an unhandled rejection when writing the backing file fails", async () => {
+    // append() 是 fire-and-forget。以前 writeQueue 会把 rejection 直接抖到
+    // 进程上(Node 22 默认终止进程),macOS CI 上真实踩到过
+    // (Unhandled Rejection ENOENT:临时目录被测试拆掉后仍有后台事件落盘)。
+    // 用一个"父路径是普通文件"的路径让写失败变得确定性:
+    // mkdir 会 ENOTDIR,appendFile 随后也失败。
+    const blocker = join(dir, "not-a-directory");
+    await writeFile(blocker, "x", "utf8");
+    const log = new SessionEventLog({ databasePath: join(blocker, "events.jsonl"), maxEntries: 100 });
+
+    log.append(record(1));
+    // 队列自身不能 reject;错误由 flush() 报告。
+    const error = await log.flush().then(
+      () => null,
+      (reason: unknown) => reason as NodeJS.ErrnoException,
+    );
+    expect(error).not.toBeNull();
+    expect(["ENOENT", "ENOTDIR"]).toContain(error?.code);
+  });
+
+  it("keeps appending after a failed write instead of poisoning the queue", async () => {
+    const blocker = join(dir, "not-a-directory");
+    await writeFile(blocker, "x", "utf8");
+    const target = join(blocker, "events.jsonl");
+    const log = new SessionEventLog({ databasePath: target, maxEntries: 100 });
+
+    log.append(record(1));
+    await expect(log.flush()).rejects.toBeTruthy();
+
+    // 路径恢复后,后续写入必须照常成功(旧的失败不能卡死队列)。
+    await rm(blocker, { force: true });
+    await mkdir(blocker, { recursive: true });
+    log.append(record(2));
+    await log.flush();
+    const sequences = (await readFile(target, "utf8"))
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => (JSON.parse(line) as SessionEventRecord).sequence);
+    expect(sequences).toEqual([2]);
   });
 
   it("skips a malformed line without discarding the records around it", async () => {
