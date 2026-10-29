@@ -10,9 +10,7 @@ beforeAll(() => {
   process.env.PI_CODING_AGENT_DIR = tempDir;
   process.env.PI_HOME = tempDir;
 });
-afterAll(() => {
-  if (tempDir) rmSync(tempDir, { recursive: true, force: true });
-});
+// afterAll 挪到 import 之后(见文件末尾):收尾前必须先关掉存储网关。
 
 // 这些 import 必须在 process.env 设置之后
 import {
@@ -106,4 +104,12 @@ describe("Agent renderer storage roundtrip (real SQLite)", () => {
     expect(w2.ok).toBe(true);
     if (w2.ok) expect(w2.value.version).toBe(2);
   });
+});
+
+// 必须先关网关再删目录:Windows 上删一个仍被 SQLite 打开的文件会 EBUSY
+// (macOS 允许 unlink 已打开文件,所以本地永远看不到)。
+// maxRetries/retryDelay 对 EPERM/EBUSY 生效,是这类收尾的标准写法。
+afterAll(async () => {
+  await resetRendererStorageGateway().catch(() => undefined);
+  if (tempDir) rmSync(tempDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });

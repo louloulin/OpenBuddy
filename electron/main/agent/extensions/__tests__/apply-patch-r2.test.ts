@@ -162,9 +162,14 @@ describe("openbuddy-apply-patch R2 — bug regressions", () => {
     expect(readFileSync(outside, "utf8")).toBe("secret\n");
   });
 
+  // apply_command 在 POSIX 上走 `/bin/sh -c`,在 Windows 上走 `cmd /d /s /c`
+  // (之前写死 `/bin/sh`,Windows 上这个工具必然失败)。命令本身也要按平台换:
+  // printf 是 sh 内建,cmd 里没有。
+  const isWindows = process.platform === "win32";
+
   it("apply_command runs a shell command and reports exit/stdout/duration", async () => {
     const result = await runTool(tools, "apply_command", {
-      command: "printf hello; printf ' err\\n' >&2; exit 0",
+      command: isWindows ? "echo hello" : "printf hello; printf ' err\\n' >&2; exit 0",
       cwd: dir,
       timeout_ms: 5000,
     });
@@ -177,7 +182,7 @@ describe("openbuddy-apply-patch R2 — bug regressions", () => {
 
   it("apply_command surfaces non-zero exit codes via details (does not throw)", async () => {
     const result = await runTool(tools, "apply_command", {
-      command: "exit 42",
+      command: isWindows ? "exit /b 42" : "exit 42",
       cwd: dir,
       timeout_ms: 5000,
     });

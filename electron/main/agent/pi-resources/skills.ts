@@ -7,7 +7,7 @@
  * the slash command list.
  */
 import { access, copyFile, cp, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import type { SkillInfo } from "@openbuddy/shared-types";
 import {
   agentRoot,
@@ -149,7 +149,9 @@ export async function addSkill(pathValue: string, cwd?: string | null): Promise<
   const source = resolve(pathValue);
   const targetRoot = pathValue.startsWith(".") ? join(workspaceRoot(cwd), ".pi", "skills") : join(agentRoot(), "skills");
   const sourceStat = await stat(source);
-  const target = join(targetRoot, sourceStat.isDirectory() ? safeName(source.split("/").pop() ?? "skill") : safeName(source.replace(/\.md$/, "").split("/").pop() ?? "skill"));
+  // basename 而非 split("/"):Windows 上路径是 "\" 分隔,split("/") 会拿到整条
+  // 绝对路径,safeName 因此拒绝每一个技能的安装。
+  const target = join(targetRoot, sourceStat.isDirectory() ? safeName(basename(source) || "skill") : safeName(basename(source.replace(/\.md$/, "")) || "skill"));
   await mkdir(targetRoot, { recursive: true });
   if (sourceStat.isDirectory()) await cp(source, target, { recursive: true, force: true });
   else { await mkdir(target, { recursive: true }); await copyFile(source, join(target, "SKILL.md")); }

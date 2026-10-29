@@ -225,7 +225,12 @@ export default function openBuddyApplyPatch(
       }
       // 阶段 3:OS 级沙箱(seatbelt/bwrap)包裹 —— workspace-write 只允许写信任
       // 工作区与 /tmp,其余路径写操作由内核拒绝。danger-full-access 直通。
-      let argv: readonly string[] = ["/bin/sh", "-c", command];
+      // 别写死 "/bin/sh":Windows 上没有这个文件,apply_command 在那里
+      // 100% 失败,而且报的是一个跟命令内容毫无关系的 ENOENT。
+      const isWindows = process.platform === "win32";
+      let argv: readonly string[] = isWindows
+        ? ["cmd", "/d", "/s", "/c", command]
+        : ["/bin/sh", "-c", command];
       let sandboxed = false;
       if (sandbox) {
         try {

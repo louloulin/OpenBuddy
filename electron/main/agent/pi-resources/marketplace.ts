@@ -13,7 +13,7 @@
 import { cp, lstat, mkdtemp, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { execFile as defaultExecFile } from "node:child_process";
-import { isAbsolute, join, resolve } from "node:path";
+import { basename, isAbsolute, join, resolve } from "node:path";
 import {
   ensureOpenBuddyProfile,
   parseHookConfig,
@@ -468,7 +468,7 @@ export async function marketplaceAddSource(sourcePath: string): Promise<void> {
   if (!(await stat(absolute)).isDirectory()) throw new Error("marketplace source must be a directory");
   const current = await marketplaceRead();
   if (!current.sources.some((source) => source.kind === "local" && source.path === absolute)) {
-    current.sources.push({ name: absolute.split("/").pop() ?? absolute, kind: "local", path: absolute });
+    current.sources.push({ name: basename(absolute) || absolute, kind: "local", path: absolute });
   }
   await marketplaceWrite(current);
 }
@@ -1181,7 +1181,10 @@ export async function marketplaceAction(action: Record<string, unknown>): Promis
   const pluginsRoot = await realpath(join(source, "plugins"));
   const sourceRoot = await assertResourcePath(join(pluginsRoot, relativePath), [pluginsRoot]);
   if (!(await stat(sourceRoot)).isDirectory()) throw new Error("marketplace plugin must be a directory");
-  const pluginName = safeName(sourceRoot.split("/").pop() ?? "plugin");
+  // 必须用 basename:Windows 的路径分隔符是 "\",`split("/")` 只会返回整条
+  // 绝对路径,safeName 见到内嵌的 "\" 直接拒绝 —— 于是 Windows 上
+  // "从市场安装插件" 100% 失败,而 macOS/Linux 永远复现不了。
+  const pluginName = safeName(basename(sourceRoot) || "plugin");
   const targetRoot = join(agentRoot(), "plugins", pluginName);
   if (type === "install" || type === "update") {
     await installManagedPackage(sourceRoot, targetRoot, false);
