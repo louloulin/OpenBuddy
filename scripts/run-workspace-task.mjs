@@ -117,6 +117,23 @@ if (jobs.length === 0) {
 
 console.log(`执行 moon task "${taskName}"：${jobs.length} 个项目，并发 ${concurrency}\n`);
 
+/**
+ * moon.yml 的 `script:` 是按 POSIX shell 写的,moon 自己用 `sh -c` 执行。
+ * 我们在 Windows 上用 `cmd /d /s /c` 顶替,于是这些 POSIX 写法会失效:
+ *
+ *   ./node_modules/.bin/vitest run   -> cmd: "'．' is not recognized"
+ *   ../node_modules/.bin/tsc         -> 同上(`..` 也不是可执行文件)
+ *
+ * 表现是根项目的 test 任务直接失败、一行测试都没跑(但 job 仍算红)。
+ * Windows 的 CreateProcess 接受 `/` 作分隔符,只要求把 `./`、`../` 这类
+ * 相对前缀换成 `.\\`、`..\\`。只动出现在"命令首词"位置的路径,不碰
+ * 参数里的路径字面量(`--config electron-builder.yml` 之类)。
+ */
+function toCmdScript(script) {
+  if (process.platform !== "win32") return script;
+  return script.replace(/(^|\s)(\.{1,2})\//g, (_match, prefix, dots) => `${prefix}${dots}\\`);
+}
+
 function runJob(job) {
   return new Promise((resolveJob) => {
     const isScript = typeof job.task.script === "string";
@@ -127,7 +144,7 @@ function runJob(job) {
     const cmd = isScript ? (isWindows ? "cmd" : "sh") : "pnpm";
     const argv = isScript
       ? isWindows
-        ? ["/d", "/s", "/c", job.task.script]
+        ? ["/d", "/s", "/c", toCmdScript(job.task.script)]
         : ["-c", job.task.script]
       : ["exec", ...job.task.command.split(/\s+/)];
 
