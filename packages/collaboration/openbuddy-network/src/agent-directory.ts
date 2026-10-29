@@ -11,6 +11,27 @@ export interface AgentDirectoryAdapter {
 	list(): PeerRecord[]
 }
 
+const SYNC_RENAME_RETRY_CODES = new Set(["EPERM", "EBUSY", "EACCES"])
+
+/**
+ * renameSync 覆盖已存在文件时,Windows 上杀毒/索引器可能瞬时持有句柄并报
+ * EPERM/EBUSY。persistSync 会吞掉异常,于是调用方以为写成功了、磁盘上还是
+ * 旧快照(CI 上表现为 setPeerTrust("known") 后目录文件里仍是 "pending")。
+ * Node 主线程允许 Atomics.wait,用它做退避重试,不引入异步。
+ */
+function renameSyncWithRetry(from: string, to: string): void {
+	for (let attempt = 0; ; attempt += 1) {
+		try {
+			renameSync(from, to)
+			return
+		} catch (error) {
+			const code = (error as NodeJS.ErrnoException).code
+			if (attempt >= 5 || !code || !SYNC_RENAME_RETRY_CODES.has(code)) throw error
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20 * (attempt + 1))
+		}
+	}
+}
+
 function clone(peer: PeerRecord): PeerRecord {
 	return structuredClone(peer)
 }
@@ -97,7 +118,7 @@ export class JsonAgentDirectoryAdapter extends MemoryAgentDirectoryAdapter {
 			const temporaryPath = `${this.path}.tmp`
 			writeFileSync(temporaryPath, `${JSON.stringify(state)}\n`, "utf8")
 			chmodSync(temporaryPath, 0o600)
-			renameSync(temporaryPath, this.path)
+			renameSyncWithRetry(temporaryPath, this.path)
 		} catch (error) {
 			console.warn("[openbuddy-agent-directory] failed to persist directory store", error)
 		}
