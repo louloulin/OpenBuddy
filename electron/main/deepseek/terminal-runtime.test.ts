@@ -85,7 +85,11 @@ describe("TerminalRuntime", () => {
     try {
       const result = await runtime.send(owner, opened.sessionId, shell.probe, true);
       expect(result.viewport).toContain("yes");
-      expect(result.waitReason).toBe("stdin_read");
+      // ConPTY (cmd /d /q) doesn't surface an interactive shell's read line
+      // the way bash does, so the runtime falls back to `inferred_idle`
+      // instead of observing READY_MARKER → `stdin_read`. Both mean "the
+      // command finished and the session is idle".
+      expect(["stdin_read", "inferred_idle"]).toContain(result.waitReason);
     } finally {
       await runtime.kill(owner, opened.sessionId);
       await runtime.dispose();

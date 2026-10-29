@@ -87,9 +87,13 @@ describe("Pi resource adapters", () => {
     await resources.marketplaceAction({ type: "uninstall", sourceUrlOrPath: source, pluginRelativePath: "demo" });
     await expect(resources.listPlugins()).resolves.toEqual([]);
     // 落盘的是规范化后的绝对路径(marketplaceAddSource 会 realpath)。
-    // Windows CI 的 TEMP 是 8.3 短名,与 mkdtemp 返回的字符串不同,所以
-    // 期望值也必须先 realpath,不能直接拿 source 比。
-    await expect(readFile(join(home, ".openbuddy", "agent", "marketplaces.json"), "utf8")).resolves.toContain(await realpath(source));
+    // 解析 JSON 再比 path 字段:直接对文件文本 toContain 原始路径在 Windows
+    // 上必然失败 —— JSON 会把 `\` 转义成 `\\`,文本里根本不是同一个字节序列。
+    const marketplace = JSON.parse(
+      await readFile(join(home, ".openbuddy", "agent", "marketplaces.json"), "utf8"),
+    ) as { sources: Array<{ kind: string; path?: string }> };
+    const localEntry = marketplace.sources.find((entry) => entry.kind === "local");
+    expect(localEntry?.path).toBe(await realpath(source));
 	});
 
 	it("supports Harness candidate files, local overlays, and configured source limits", async () => {

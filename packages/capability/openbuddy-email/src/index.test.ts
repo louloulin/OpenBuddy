@@ -11,18 +11,36 @@ const draftInput = { accountId: "a1", to: [{ address: "you@example.com" }], subj
 describe.sequential("email capability", () => {
   let dir: string
   let previous: string | undefined
+  // Every Email instance starts two intervals (pending sends, reminders) and a
+  // fire-and-forget rule run. They resolve the store path from the *current*
+  // PI_CODING_AGENT_DIR, so a leaked instance from the previous test writes
+  // into the next test's temp dir — on Windows CI that landed a stale store
+  // over the fresh one and dropped workspace tags. Stop every context.
+  const contexts: Context[] = []
+  function makeContext(): Context {
+    const ctx = new Context()
+    contexts.push(ctx)
+    return ctx
+  }
   beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), "openbuddy-email-")); previous = process.env.PI_CODING_AGENT_DIR; process.env.PI_CODING_AGENT_DIR = dir })
-  afterEach(async () => { vi.useRealTimers(); if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous; await rm(dir, { recursive: true, force: true }) })
+  afterEach(async () => {
+    vi.useRealTimers()
+    for (const ctx of contexts.splice(0)) {
+      try { await ctx.lifecycle.stop() } catch { /* already down */ }
+    }
+    if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  })
 
   function setup(withConfirmation = true) {
-    const ctx = new Context()
+    const ctx = makeContext()
     ctx.provide("mcpClient", { list: () => [], callTool: vi.fn() })
     if (withConfirmation) ctx.provide("piUi", { confirm: vi.fn(async () => true) })
     return new Email(ctx)
   }
 
   function setupWithKnowledgeValidator(validate: (input: { sourceId: string; sourcePath?: string; quote?: string }) => Promise<{ sourceId: string; sourceTitle?: string; sourcePath?: string; quote?: string }>) {
-    const ctx = new Context()
+    const ctx = makeContext()
     ctx.provide("mcpClient", { list: () => [], callTool: vi.fn() })
     ctx.provide("emailKnowledgeContextValidator", { validate })
     return new Email(ctx)
@@ -251,7 +269,7 @@ describe.sequential("email capability", () => {
 
   it("notifies the user when a scheduled rule creates a pending plan", async () => {
     const notification = { append: vi.fn(async () => undefined) }
-    const ctx = new Context()
+    const ctx = makeContext()
     ctx.provide("mcpClient", { list: () => [], callTool: vi.fn() })
     ctx.provide("piUi", { confirm: vi.fn(async () => true) })
     ctx.provide("notification", notification)
@@ -1143,7 +1161,7 @@ describe.sequential("email capability", () => {
   })
 
   it("registers connections through registry handlers and persists them", async () => {
-    const ctx = new Context()
+    const ctx = makeContext()
     ctx.provide("mcpClient", { list: () => [], callTool: vi.fn() })
     const registry = new (await import("./provider-registry")).EmailProviderRegistry({ credentialResolver: { resolve: async () => ({ accessToken: "ok" }) } })
     ctx.provide("emailProviderRegistry", registry)
@@ -1168,7 +1186,7 @@ describe.sequential("email capability", () => {
   })
 
   it("hydrates persisted connections into the registry on construction", async () => {
-    const ctx = new Context()
+    const ctx = makeContext()
     ctx.provide("mcpClient", { list: () => [], callTool: vi.fn() })
     const registry = new (await import("./provider-registry")).EmailProviderRegistry({ credentialResolver: { resolve: async () => ({ accessToken: "ok" }) } })
     ctx.provide("emailProviderRegistry", registry)
@@ -1183,7 +1201,7 @@ describe.sequential("email capability", () => {
   })
 
   it("routes getProvider through the registry when a Gmail connection is registered", async () => {
-    const ctx = new Context()
+    const ctx = makeContext()
     ctx.provide("mcpClient", { list: () => [], callTool: vi.fn() })
     const registry = new (await import("./provider-registry")).EmailProviderRegistry({ credentialResolver: { resolve: async () => ({ accessToken: "ok" }) } })
     ctx.provide("emailProviderRegistry", registry)

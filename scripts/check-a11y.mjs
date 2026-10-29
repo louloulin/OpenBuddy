@@ -32,7 +32,7 @@
 //====================================================================
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../..");
@@ -108,9 +108,11 @@ for (const file of report) {
     if (!msg.ruleId?.startsWith("jsx-a11y/")) continue;
     const rule = msg.ruleId;
     if (!byRule.has(rule)) byRule.set(rule, []);
-    // eslint 报的是绝对路径;CI 日志里只关心仓库内相对位置。
+    // eslint 报的是绝对路径;CI 日志里只关心仓库内相对位置。Windows 的
+    // relative() 返回反斜杠,统一成 `/` —— 否则日志与测试/lint 注释里的
+    // `packages/foo/Bar.tsx` 对不上,门禁输出读起来像另一个文件。
     byRule.get(rule).push({
-      path: relative(repoRoot, file.filePath),
+      path: relative(repoRoot, file.filePath).split(sep).join("/"),
       line: msg.line,
       column: msg.column,
     });
