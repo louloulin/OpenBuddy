@@ -74,6 +74,23 @@ docs/*
 !docs/openbuddy-credit-transfer.md
 !docs/OPENBUDDY_PI_NATIVE_PLAN.md
 
+# 2026-10-29 — 这些文件被已入库的文档直接链引（FAQ / OPERATIONS / PERFORMANCE /
+# PLUGIN_DEVELOPMENT / ARCHITECTURE / WORKBUDDY_MIGRATION / PLUGIN_MARKETPLACE），
+# 但一直卡在 `docs/*` 下面没进版本库。结果是：GitHub 上这些链接全是死的，
+# 而本机因为文件在磁盘上所以 `check-doc-links` 一直是假绿。
+# 判定方式改成"链接目标必须是 git 已跟踪的文件"后，这个不一致才暴露出来
+# （本地 0 死链 vs CI 112 死链）。要么入库，要么删除引用 —— 这里选择入库，
+# 因为内容是真的、被多篇文档引用。
+!docs/perf/
+!docs/PI-PRIORITY.md
+!docs/openbuddy-plugin-catalog.md
+!docs/casdoor-enterprise-auth.md
+!docs/enterprise-casdoor-newapi-openbuddy-architecture.md
+!docs/PLUGIN_MARKETPLACE_PI_REDESIGN.md
+!docs/newapi-integration-guide.md
+!docs/admin-console-architecture-decision.md
+!docs/PI_PASSTHROUGH.md
+
 
 # Electron build artifacts (in addition to dist/ above)
 release/

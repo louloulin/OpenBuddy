@@ -13,6 +13,12 @@
 // 工作区里存在大量未跟踪的文档草稿；CI 拿到的 checkout 只含已跟踪文件，
 // 按工作区扫描会得出与 CI 不一致的结论。
 //
+// 链接目标同理必须是 **git 已跟踪** 的文件，不能只判断"磁盘上存在"：
+//   本仓 .gitignore 是 `docs/*` + 白名单，开发者本机常有大量未跟踪的
+//   旧文档（casdoor-enterprise-auth.md 等）。用 existsSync 判断时这些
+//   链接在本机"有效"、在 CI 里全是死链 —— 2026-10-29 PR #66 实测：
+//   本地 0 死链，CI **112** 死链。这个门禁此前一直是假绿。
+//
 // 退出码：0 = 全过；1 = 有死链或绝对路径链接。
 //
 // 用法：node scripts/check-doc-links.mjs [--list]
@@ -31,6 +37,42 @@ const SKIP_FILES = new Set(["THIRD-PARTY-NOTICES.md"]);
 
 /** @type {string[]} */
 const markdownFiles = [];
+
+/**
+ * git 已跟踪文件的集合（绝对路径）。
+ *
+ * 判断链接目标是否存在必须用这个，而不是 existsSync —— 否则未跟踪的
+ * 本机文件会让门禁假绿（见文件头注释）。目录也算"存在"：链接到
+ * `docs/adr/` 这种目录是合法的。
+ */
+function trackedPaths() {
+  let out = "";
+  try {
+    out = execFileSync("git", ["ls-files", "-z"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      maxBuffer: 256 * 1024 * 1024,
+    });
+  } catch {
+    return null; // git 不可用 -> 退回 existsSync，并打印警告
+  }
+  const files = new Set([repoRoot]); // 链接到仓库根（`../../`）是合法的
+  for (const rel of out.split("\0").filter(Boolean)) {
+    files.add(resolve(repoRoot, rel));
+    // 把每一级父目录也登记进去，这样链接到目录不会被误判。
+    let dir = dirname(resolve(repoRoot, rel));
+    while (dir.startsWith(repoRoot) && dir !== repoRoot) {
+      files.add(dir);
+      dir = dirname(dir);
+    }
+  }
+  return files;
+}
+
+const TRACKED = trackedPaths();
+if (!TRACKED) {
+  console.warn("[check-doc-links] 警告：git 不可用，改用 existsSync；结果可能与 CI 不一致。");
+}
 
 function listTrackedMarkdown() {
   let out = "";
@@ -85,7 +127,8 @@ for (const file of markdownFiles) {
     }
     if (!decoded) continue;
     const target = resolve(dirname(file), decoded);
-    if (existsSync(target)) continue;
+    const exists = TRACKED ? TRACKED.has(target) : existsSync(target);
+    if (exists) continue;
     const line = text.slice(0, match.index).split("\n").length;
     broken.push({ file: relFile, line, link: raw });
   }
