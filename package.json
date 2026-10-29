@@ -98,6 +98,7 @@
     "verify:lockfile-platform-pkgs": "node scripts/check-lockfile-platform-pkgs.mjs",
     "docs:stats": "node scripts/docs-stats.mjs --write",
     "verify:doc-stats": "node scripts/check-doc-stats.mjs",
+    "verify:doc-claims": "node scripts/check-doc-package-claims.mjs",
     "release:checksums": "node scripts/generate-checksums.mjs",
     "commercial:audit": "node scripts/audit-commercial-model.mjs --config deploy/openbuddy-commercial-model.example.json",
     "enterprise:release-audit": "node scripts/audit-enterprise-release.mjs",

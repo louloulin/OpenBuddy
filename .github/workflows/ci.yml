@@ -361,6 +361,18 @@ jobs:
       - name: Docs stats freshness gate
         run: node scripts/check-doc-stats.mjs
 
+      # 文档/官网包名真实性门禁。
+      #
+      # 与上面的数字漂移是同一类问题,但更严重:文档宣传的包在仓库里根本不存在。
+      # 2026-10 的真实案例 —— README 与官网列了 capability-{plan,task,automation,
+      # web-search,inspiration,notification,memory}、team-subagent、
+      # extension-{mcp,skills}、provider-*、runtime-{cordis,storage};一个都没有。
+      # 那些能力实际是 electron/main/agent/pi-extensions.ts 的 Pi 扩展。
+      # docs/EXAMPLES.md 甚至 import 了不存在的 @openbuddy/agent —— 示例代码
+      # 从来编译不过,而文档不参与编译,所以没有门禁就永远发现不了。
+      - name: Docs package-claim gate
+        run: node scripts/check-doc-package-claims.mjs
+
   build-summary:
     name: Build Summary
     runs-on: ubuntu-latest

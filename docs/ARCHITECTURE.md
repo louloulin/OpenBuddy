@@ -136,7 +136,7 @@ electron/
 
 ### Layer 3 — Pi Agent + Cordis Mesh
 
-**Location:** `packages/runtime/openbuddy-{cordis,plugin-host,storage}` and 63 workspace packages (12 capability, 26 UI, 8 collaboration, …) under `packages/<group>/openbuddy-*/`
+**Location:** `packages/runtime/openbuddy-{cordis,plugin-host,storage}` and the 72 `@openbuddy/*` packages (36 UI, 8 collaboration, 5 capability, …) under `packages/<group>/openbuddy-*/`. Current counts: [`stats.json`](stats.json).
 
 **Responsibilities:**
 
@@ -259,7 +259,7 @@ Here's what happens when a user types "summarize this file" in OpenBuddy:
 12. pi-event-bridge forwards to renderer via webContents.send
 13. ChatView.tsx appends the delta to the visible message
 14. AgentSession emits pi://done when finished
-15. Composer stores the result in @openbuddy/capability-memory
+15. AgentSession persists the turn through `@openbuddy/storage` (Pi session files + audit ledger)
 ```
 
 ### Persistence model

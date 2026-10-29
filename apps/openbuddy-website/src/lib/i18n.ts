@@ -461,18 +461,18 @@ const en: Dict = {
     sectionLabel: 'Capabilities',
     title: 'A capability mesh you can extend.',
     subtitle:
-      '63 packages, every one a Cordis service. Enable, configure, or replace each independently.',
+      `${SITE_STATS.packages} packages, every one a Cordis service. Enable, configure, or replace each independently.`,
     groups: [
       {
-        name: 'Core agent',
+        name: 'Core agent & runtime',
         icon: 'cpu',
         packages: [
           { name: '@openbuddy/core-session', description: 'Session lifecycle, fork, rewind' },
-          { name: '@openbuddy/capability-plan', description: 'Plan mode + plan approval flow' },
-          { name: '@openbuddy/capability-task', description: 'Sub-agent task spawning & cancellation' },
-          { name: '@openbuddy/capability-automation', description: 'Local scheduler for recurring agent runs' },
-          { name: '@openbuddy/capability-web-search', description: 'Provider-pluggable web search' },
-          { name: '@openbuddy/capability-inspiration', description: 'Prompt templates & starters' }
+          { name: '@openbuddy/cordis', description: 'Cordis context + service helpers' },
+          { name: '@openbuddy/host-runtime', description: 'Host-side runtime glue' },
+          { name: '@openbuddy/storage', description: 'Local persistence with audit' },
+          { name: '@openbuddy/plugin-host', description: 'Plugin discovery + hot reload' },
+          { name: '@openbuddy/plugin-sdk', description: 'Plugin authoring SDK' }
         ]
       },
       {
@@ -488,7 +488,6 @@ const en: Dict = {
         icon: 'users',
         packages: [
           { name: '@openbuddy/team-team', description: 'Multi-agent team orchestration' },
-          { name: '@openbuddy/team-subagent', description: 'Sub-agent spawning' },
           { name: '@openbuddy/collaboration-protocol', description: 'A2A message envelopes' },
           { name: '@openbuddy/collaboration-room', description: 'Shared rooms' },
           { name: '@openbuddy/collaboration-inbox', description: 'Cross-agent inbox' },
@@ -518,7 +517,7 @@ const en: Dict = {
         icon: 'plug',
         packages: [
           { name: '@openbuddy/capability-mcp-client', description: 'MCP connector governance' },
-          { name: '@openbuddy/capability-folder-trust', description: 'Per-folder permission grants' },
+          { name: '@openbuddy/folder-trust', description: 'Per-folder permission grants' },
           { name: '@openbuddy/capability-authorization', description: 'Capability-level policy' }
         ]
       }
@@ -1113,18 +1112,18 @@ const zhCN: Dict = {
   capabilities: {
     sectionLabel: '能力',
     title: '可扩展的能力网格。',
-    subtitle: '63 个包,每个都是 Cordis 服务。可独立启用、配置或替换。',
+    subtitle: `${SITE_STATS.packages} 个包,每个都是 Cordis 服务。可独立启用、配置或替换。`,
     groups: [
       {
-        name: '核心 Agent',
+        name: '核心 Agent 与运行时',
         icon: 'cpu',
         packages: [
           { name: '@openbuddy/core-session', description: '会话生命周期、fork、回退' },
-          { name: '@openbuddy/capability-plan', description: 'Plan 模式与审批流' },
-          { name: '@openbuddy/capability-task', description: '子 agent 任务生成与取消' },
-          { name: '@openbuddy/capability-automation', description: '周期性 agent 运行调度器' },
-          { name: '@openbuddy/capability-web-search', description: '可插拔 provider 的 Web 搜索' },
-          { name: '@openbuddy/capability-inspiration', description: 'Prompt 模板与启动器' }
+          { name: '@openbuddy/cordis', description: 'Cordis 上下文 + 服务辅助' },
+          { name: '@openbuddy/host-runtime', description: '宿主侧运行时胶水' },
+          { name: '@openbuddy/storage', description: '带审计的本地持久化' },
+          { name: '@openbuddy/plugin-host', description: '插件发现 + 热重载' },
+          { name: '@openbuddy/plugin-sdk', description: '插件开发 SDK' }
         ]
       },
       {
@@ -1140,7 +1139,6 @@ const zhCN: Dict = {
         icon: 'users',
         packages: [
           { name: '@openbuddy/team-team', description: '多 agent 团队编排' },
-          { name: '@openbuddy/team-subagent', description: '子 agent 生成' },
           { name: '@openbuddy/collaboration-protocol', description: 'A2A 消息信封' },
           { name: '@openbuddy/collaboration-room', description: '共享房间' },
           { name: '@openbuddy/collaboration-inbox', description: '跨 agent 收件箱' },
@@ -1170,7 +1168,7 @@ const zhCN: Dict = {
         icon: 'plug',
         packages: [
           { name: '@openbuddy/capability-mcp-client', description: 'MCP 连接器治理' },
-          { name: '@openbuddy/capability-folder-trust', description: '按文件夹的权限授予' },
+          { name: '@openbuddy/folder-trust', description: '按文件夹的权限授予' },
           { name: '@openbuddy/capability-authorization', description: '能力级策略' }
         ]
       }

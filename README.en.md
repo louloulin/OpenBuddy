@@ -78,7 +78,7 @@ Three things are hard to get right, and they are what this project is actually a
 <tr><td>🔁</td><td><strong>Restart-safe sessions</strong><br/>Pi sessions, provider settings, capability state, and audit logs persist across renderer reloads and Electron restarts.</td></tr>
 <tr><td>🤖</td><td><strong>Pi as the agent runtime</strong><br/>The in-process <code>AgentSession</code> owns prompts, tools, permissions, plans, tasks, and streaming events.</td></tr>
 <tr><td>🌐</td><td><strong>Truly cross-platform</strong><br/>One codebase, Windows, macOS, and Linux. <a href="electron-builder.yml">electron-builder</a> produces installers for each.</td></tr>
-<tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>77 moon projects (see [`docs/stats.json`](docs/stats.json)), type-check/test/build incrementally. CI runs the same commands you run locally.</td></tr>
+<tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>Type-check / test / build incrementally across the whole workspace (current project count in [`docs/stats.json`](docs/stats.json)). CI runs the same commands you run locally.</td></tr>
 <tr><td>🧩</td><td><strong>Cordis capability mesh</strong><br/>Workspace packages (capability / collaboration / UI / …) (<code>@openbuddy/*</code>) — skills, memory, plan, task, email, calendar, MCP… pick what you need.</td></tr>
 <tr><td>🏢</td><td><strong>Enterprise building blocks</strong><br/>Casdoor OIDC and the audit ledger are wired; NewAPI gateway integration is in the tree. SCIM v2 / SAML 2.0 exist as tested seeds in git history, not yet wired.</td></tr>
 </table>
@@ -447,21 +447,31 @@ For a deeper dive see **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)**.
 
 ## 🧩 Capabilities
 
-OpenBuddy ships with **63 workspace packages (12 capability, 26 UI, 8 collaboration, …)**, every one a Cordis service that can be enabled, configured, or extended independently.
+OpenBuddy ships **72 `@openbuddy/*` workspace packages** (36 UI, 8 collaboration, 5 capability, plus runtime/auth/core/shared). Exact counts live in [`docs/stats.json`](docs/stats.json) — the table below names only packages that exist in the tree.
 
-### Core agent
+> Agent-facing features such as **plan mode**, **sub-agent tasks**, **local automations**, and **web search** are implemented as **Pi extensions** in `electron/main/agent/pi-extensions.ts` (tools `openbuddy_plan`, `openbuddy_goals`, `openbuddy_automation`, …) — they are **not** `@openbuddy/capability-*` packages. Earlier versions of this README listed non-existent packages for them; that was wrong.
+
+### Core agent & runtime
 
 | Package | Purpose |
 |---|---|
 | `@openbuddy/core-session` | Session lifecycle, fork, rewind |
-| `@openbuddy/capability-plan` | Plan mode + plan approval flow |
-| `@openbuddy/capability-task` | Sub-agent task spawning & cancellation |
-| `@openbuddy/capability-automation` | Local scheduler for recurring agent runs |
-| `@openbuddy/capability-web-search` | Provider-pluggable web search |
-| `@openbuddy/capability-inspiration` | Prompt templates & starters |
-| `@openbuddy/capability-folder-trust` | Per-folder permission grants |
-| `@openbuddy/capability-authorization` | Capability-level policy |
+| `@openbuddy/cordis` | Cordis context + service helpers |
+| `@openbuddy/host-runtime` | Host-side runtime glue |
+| `@openbuddy/dsh-core` | Agent shell runtime |
+| `@openbuddy/plugin-host` | Plugin discovery + hot reload |
+| `@openbuddy/plugin-sdk` | Plugin authoring SDK |
+| `@openbuddy/storage` | Local persistence with audit |
+
+### Capability
+
+| Package | Purpose |
+|---|---|
+| `@openbuddy/capability-email` | IMAP/SMTP + Gmail/Graph/JMAP API |
+| `@openbuddy/capability-calendar` | Calendar integration |
 | `@openbuddy/capability-mcp-client` | MCP connector governance |
+| `@openbuddy/capability-authorization` | Capability-level policy gate |
+| `@openbuddy/folder-trust` | Per-folder permission grants |
 
 ### File & shell
 
@@ -475,7 +485,6 @@ OpenBuddy ships with **63 workspace packages (12 capability, 26 UI, 8 collaborat
 | Package | Purpose |
 |---|---|
 | `@openbuddy/team-team` | Multi-agent team orchestration |
-| `@openbuddy/team-subagent` | Sub-agent spawning |
 | `@openbuddy/collaboration-protocol` | A2A message envelopes |
 | `@openbuddy/collaboration-room` | Shared rooms |
 | `@openbuddy/collaboration-inbox` | Cross-agent inbox |
@@ -490,18 +499,12 @@ OpenBuddy ships with **63 workspace packages (12 capability, 26 UI, 8 collaborat
 | Package | Purpose |
 |---|---|
 | `@openbuddy/auth-casdoor` | Casdoor OIDC client + admin REST |
-| `@openbuddy/auth-permission` | Permission prompts & policy UI |
-
-### Email & calendar
-
-| Package | Purpose |
-|---|---|
-| `@openbuddy/capability-email` | IMAP/SMTP + Gmail/Graph/JMAP API |
-| `@openbuddy/capability-calendar` | Calendar integration |
+| `@openbuddy/auth-permission` | Permission prompts UI |
+| `@openbuddy/auth-policy` | Tenant + capability policy evaluation |
 
 ### UI primitives
 
-19 packages under `packages/ui/openbuddy-ui-*` — shell, sidebar, settings, settings-models, workbench, home, conversation, experts, dialogs, markdown, primitives, modules, theme, runtime, slots, automation, locale, hmr.
+36 packages under `packages/ui/openbuddy-ui-*` — shell, sidebar, settings, settings-models, workbench, home, conversation, experts, dialogs, markdown, primitives, modules, theme, runtime, slots, locale, hmr, email, files, automation, account, billing, audit-center, and more.
 
 ---
 
@@ -625,7 +628,7 @@ All contributors are listed in the GitHub contributors graph. New contributors g
 OpenBuddy treats security as a first-class concern:
 
 - **Context-isolated renderer** with allowlisted IPC (`electron/preload/index.ts`)
-- **Per-folder trust grants** via `@openbuddy/capability-folder-trust`
+- **Per-folder trust grants** via `@openbuddy/folder-trust`
 - **Capability-level policy** via `@openbuddy/capability-authorization`
 - **Casdoor OIDC** with PKCE and refresh token rotation
 - **Local-first audit ledger** persisted across restarts

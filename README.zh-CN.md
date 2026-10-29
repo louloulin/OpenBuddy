@@ -78,8 +78,8 @@
 <tr><td>🔁</td><td><strong>会话可重启恢复</strong><br/>Pi 会话、Provider 设置、能力状态、审计日志跨渲染进程 reload 和 Electron 重启持久化。</td></tr>
 <tr><td>🤖</td><td><strong>Pi 作为 Agent Runtime</strong><br/>进程内 <code>AgentSession</code> 掌管提示词、工具、权限、计划、任务和流式事件。</td></tr>
 <tr><td>🌐</td><td><strong>真正的跨平台</strong><br/>一套代码,Windows、macOS、Linux。<a href="electron-builder.yml">electron-builder</a> 为每个平台产出签名安装包。</td></tr>
-<tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>77 个 moon 工程(见 [`docs/stats.json`](docs/stats.json)),typecheck/test/build 增量执行。CI 跑的 <code>moon run</code> 与本地完全一致。</td></tr>
-<tr><td>🧩</td><td><strong>Cordis 能力网格</strong><br/>workspace 包(capability / UI / collaboration ……)(<code>@openbuddy/*</code>)——skills、memory、plan、task、email、calendar、MCP……按需取用。</td></tr>
+<tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>在整个 workspace 上增量 typecheck / test / build(当前工程数见 [`docs/stats.json`](docs/stats.json))。CI 跑的与本地完全一致。</td></tr>
+<tr><td>🧩</td><td><strong>Cordis 能力网格</strong><br/>workspace 包(capability / UI / collaboration ……)(<code>@openbuddy/*</code>)——email、calendar、MCP、文件夹信任、授权、多 Agent 协作。按需取用。</td></tr>
 <tr><td>🏢</td><td><strong>企业级构件</strong><br/>Casdoor OIDC 与审计账本已接线;NewAPI 网关集成在仓内。SCIM v2 / SAML 2.0 是有测试的种子,在 git 历史里,尚未接线。</td></tr>
 </table>
 
@@ -455,22 +455,31 @@ docs/                    # 所有文档(此目录)
 
 ## 🧩 能力包清单
 
-OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration、…)**,每一个都是一个 Cordis 服务,可独立启用、配置或扩展。
+OpenBuddy 内置 **72 个 `@openbuddy/*` workspace 包**(36 UI、8 collaboration、5 capability,以及 runtime/auth/core/shared)。准确数字以 [`docs/stats.json`](docs/stats.json) 为准 —— 下表只列仓库树里真实存在的包。
 
-### 核心 Agent
+> **Plan 模式、子 Agent 任务、本地自动化、Web 搜索**都是 `electron/main/agent/pi-extensions.ts` 里的 **Pi 扩展**(工具名 `openbuddy_plan` / `openbuddy_goals` / `openbuddy_automation` …),**不是** `@openbuddy/capability-*` 包。此前版本的本 README 给它们列了不存在的包名,那是错的。
+
+### 核心 Agent 与运行时
 
 | 包 | 用途 |
 |---|---|
 | `@openbuddy/core-session` | 会话生命周期、fork、rewind |
-| `@openbuddy/capability-plan` | Plan 模式 + 计划审批流 |
-| `@openbuddy/capability-task` | 子 Agent 任务生成与取消 |
-| `@openbuddy/capability-automation` | 本地调度器,定时跑 Agent |
-| `@openbuddy/capability-notification` | 收件箱 + 原生通知 |
-| `@openbuddy/capability-web-search` | Provider 可插拔的 Web 搜索 |
-| `@openbuddy/capability-inspiration` | 提示词模板与开场白 |
-| `@openbuddy/capability-folder-trust` | 文件夹级权限授予 |
-| `@openbuddy/capability-authorization` | 能力级策略 |
+| `@openbuddy/cordis` | Cordis 上下文 + 服务辅助 |
+| `@openbuddy/host-runtime` | 宿主侧运行时胶水 |
+| `@openbuddy/dsh-core` | Agent shell 运行时 |
+| `@openbuddy/plugin-host` | 插件发现 + 热重载 |
+| `@openbuddy/plugin-sdk` | 插件开发 SDK |
+| `@openbuddy/storage` | 带审计的本地持久化 |
+
+### 能力包
+
+| 包 | 用途 |
+|---|---|
+| `@openbuddy/capability-email` | IMAP/SMTP + Gmail/Graph/JMAP API |
+| `@openbuddy/capability-calendar` | 日历集成 |
 | `@openbuddy/capability-mcp-client` | MCP 连接器治理 |
+| `@openbuddy/capability-authorization` | 能力级策略门禁 |
+| `@openbuddy/folder-trust` | 文件夹级权限授予 |
 
 ### 文件与 Shell
 
@@ -484,7 +493,6 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 | 包 | 用途 |
 |---|---|
 | `@openbuddy/team-team` | 多 Agent 团队编排 |
-| `@openbuddy/team-subagent` | 子 Agent 生成 |
 | `@openbuddy/collaboration-protocol` | A2A 消息信封 |
 | `@openbuddy/collaboration-room` | 共享房间 |
 | `@openbuddy/collaboration-inbox` | 跨 Agent 收件箱 |
@@ -499,18 +507,12 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 | 包 | 用途 |
 |---|---|
 | `@openbuddy/auth-casdoor` | Casdoor OIDC 客户端 + 管理 REST |
-| `@openbuddy/auth-permission` | 权限弹窗与策略 UI |
-
-### 邮件与日历
-
-| 包 | 用途 |
-|---|---|
-| `@openbuddy/capability-email` | IMAP/SMTP + Gmail/Graph/JMAP API |
-| `@openbuddy/capability-calendar` | 日历集成 |
+| `@openbuddy/auth-permission` | 权限弹窗 UI |
+| `@openbuddy/auth-policy` | 租户与能力策略求值 |
 
 ### UI 基元
 
-`packages/ui/openbuddy-ui-*` 下的 26 个包——shell、sidebar、settings、settings-models、workbench、home、conversation、experts、dialogs、markdown、primitives、modules、theme、runtime、slots、automation、locale、hmr。
+`packages/ui/openbuddy-ui-*` 下的 36 个包——shell、sidebar、settings、settings-models、workbench、home、conversation、experts、dialogs、markdown、primitives、modules、theme、runtime、slots、locale、hmr、email、files、automation、account、billing、audit-center 等。
 
 ---
 
@@ -635,7 +637,7 @@ OpenBuddy 还年轻,迭代很快——**任何规模的贡献都欢迎**。
 OpenBuddy 把安全当作一等公民:
 
 - **上下文隔离渲染进程** + 白名单 IPC(`electron/preload/index.ts`)
-- **文件夹级信任授予** 经 `@openbuddy/capability-folder-trust`
+- **文件夹级信任授予** 经 `@openbuddy/folder-trust`
 - **能力级策略** 经 `@openbuddy/capability-authorization`
 - **Casdoor OIDC** 带 PKCE 与 refresh token 轮换
 - **本地优先审计账本**,跨重启持久化

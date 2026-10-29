@@ -13,20 +13,22 @@ These are maintained by the OpenBuddy core team.
 
 | Package | What it does |
 |---|---|
-| `@openbuddy/capability-plan` | Plan mode + plan approval UI |
-| `@openbuddy/capability-task` | Sub-agent task spawning & lifecycle |
-| `@openbuddy/capability-automation` | Local scheduler for recurring agent runs |
-| `@openbuddy/capability-web-search` | Provider-pluggable web search |
-| `@openbuddy/capability-inspiration` | Prompt templates & starters |
 | `@openbuddy/capability-email` | IMAP/SMTP + Gmail/Graph/JMAP API |
 | `@openbuddy/capability-calendar` | Calendar integration |
-| `@openbuddy/capability-folder-trust` | Per-folder permission grants |
+| `@openbuddy/capability-mcp-client` | MCP connector governance |
+| `@openbuddy/capability-authorization` | Capability-level authorization gate |
+| `@openbuddy/folder-trust` | Per-folder permission grants |
+
+> Plan mode, sub-agent tasks, local automations and web search are **Pi
+> extensions** (`electron/main/agent/pi-extensions.ts`), not packages. The
+> `@openbuddy/capability-{plan,task,automation,web-search,inspiration}` names
+> previously listed here never existed.
 
 See [`openbuddy-capability-matrix.md`](openbuddy-capability-matrix.md) for the full list.
 
 #### UI primitives
 
-19 packages under `packages/ui/openbuddy-ui-*` — see [`PLUGIN_DEVELOPMENT.md`](PLUGIN_DEVELOPMENT.md).
+36 packages under `packages/ui/openbuddy-ui-*` — see [`PLUGIN_DEVELOPMENT.md`](PLUGIN_DEVELOPMENT.md).
 
 #### Enterprise
 
@@ -179,68 +181,52 @@ When activated:
 - Update CHANGELOG.md with breaking changes
 ```
 
+<!-- doc-pkg-claims: allow @openbuddy/agent -->
+
 ### Integration examples
 
-#### OpenBuddy + Slack notifications
+> **Corrected 2026-10-29.** The examples previously in this section imported
+> `@openbuddy/agent` and `automation` / `notification` from `@openbuddy/cordis`.
+> **Neither exists** — there is no `@openbuddy/agent` package, and
+> `@openbuddy/cordis` exports only `Context`, `OpenBuddyService`, `Plugin`,
+> `brand`, `debug`, `forEach` plus the raw `@cordisjs/core` surface. The old
+> snippets could not have compiled. What actually exists is below.
 
-Send a Slack notification when a long-running task finishes:
+#### Extension point 1 — Pi extensions (agent-facing tools)
 
-```typescript
-import { automation, notification } from "@openbuddy/cordis";
-import { WebClient } from "@slack/web-api";
-
-const slack = new WebClient(process.env.SLACK_TOKEN);
-
-automation.on("task:completed", async (task) => {
-  if (task.duration > 5 * 60 * 1000) {
-    await slack.chat.postMessage({
-      channel: "#openbuddy",
-      text: `✅ Task "${task.name}" finished in ${task.duration / 1000}s`,
-    });
-  }
-});
-```
-
-#### OpenBuddy + GitHub Issues
-
-Auto-create a GitHub issue when an agent hits an error:
+Agent tools live in `electron/main/agent/pi-extensions.ts`. Each entry
+registers a tool the model can call, and can subscribe to Pi lifecycle events:
 
 ```typescript
-import { Octokit } from "@octokit/rest";
-import { agent } from "@openbuddy/agent";
-
-const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-
-agent.on("agent:error", async ({ sessionId, error }) => {
-  if (error.severity === "critical") {
-    await octokit.issues.create({
-      owner: "your-org",
-      repo: "your-repo",
-      title: `OpenBuddy agent error in session ${sessionId}`,
-      body: `\`\`\`\n${error.stack}\n\`\`\``,
-      labels: ["bug", "openbuddy"],
-    });
-  }
-});
+// electron/main/agent/pi-extensions.ts (shape of a real entry)
+{
+  name: "openbuddy_plan",
+  description: "Enter / exit plan mode for the current session.",
+  parameters: { /* JSON schema */ },
+  execute: async (args, ctx) => { /* … */ },
+  on: {
+    context: (payload) => { /* lifecycle hook */ },
+  },
+}
 ```
 
-#### OpenBuddy + Postgres
+Registered tool names today: `openbuddy_mcp`, `openbuddy_permissions`,
+`openbuddy_goals`, `openbuddy_plan`, `openbuddy_sessions`, `openbuddy_fs`,
+`openbuddy_lens`, `openbuddy_simplify`, `openbuddy_hashline_edit`,
+`openbuddy_worktree`, `openbuddy_automation`.
 
-Stream events to Postgres for analytics:
+#### Extension point 2 — Cordis capability packages
 
-```typescript
-import { Pool } from "pg";
-import { agent } from "@openbuddy/agent";
+A capability is a plain `@openbuddy/*` package exporting `apply(ctx)` plus a
+service class — see [`PLUGIN_DEVELOPMENT.md`](PLUGIN_DEVELOPMENT.md) for the
+full walkthrough and a working test harness.
 
-const pool = new Pool({ connection:String: process.env.DATABASE_URL });
+#### Extension point 3 — Renderer events (main → UI)
 
-agent.on("agent:*", async (event) => {
-  await pool.query(
-    "INSERT INTO openbuddy_events (ts, session_id, type, payload) VALUES ($1, $2, $3, $4)",
-    [new Date(), event.sessionId, event.type, JSON.stringify(event.payload)]
-  );
-});
-```
+The main process pushes events to the renderer through
+`electron/main/agent/host-modules/bootstrap/lifecycle-public.ts`
+(`bindRendererEventEmitter` / `emitRendererEvent`). That is the supported way
+to surface agent progress in the UI; there is no public `agent.on(...)` API.
 
 ### Demos & tutorials
 

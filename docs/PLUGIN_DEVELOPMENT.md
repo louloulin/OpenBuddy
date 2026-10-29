@@ -1,3 +1,5 @@
+<!-- doc-pkg-claims: allow @openbuddy/capability-counter -->
+
 # Plugin Development Guide
 
 This guide teaches you how to build your first Cordis capability package for OpenBuddy. By the end you'll have a working "Counter" capability, full test coverage, and a published internal package.
@@ -327,15 +329,10 @@ Plugins are loaded from `~/.config/openbuddy/plugins/`. See [`openbuddy-plugin-c
 
 #### Background tasks
 
-If your capability runs a recurring job, use `@openbuddy/capability-automation`:
-
-```typescript
-import { automation } from "@openbuddy/capability-automation";
-
-automation.schedule("@daily", async () => {
-  await counter.reset();
-});
-```
+> **There is no `@openbuddy/capability-automation` package.** Recurring agent
+> runs are handled by the `openbuddy_automation` **Pi extension**
+> (`electron/main/agent/pi-extensions.ts`). A capability package cannot schedule
+> jobs itself today; expose a callable surface and let the agent drive it.
 
 #### Multi-agent
 
@@ -580,15 +577,9 @@ await loader.loadCordisPatch(`
 
 #### 后台任务
 
-若你的能力跑定时任务,用 `@openbuddy/capability-automation`:
-
-```typescript
-import { automation } from "@openbuddy/capability-automation";
-
-automation.schedule("@daily", async () => {
-  await counter.reset();
-});
-```
+> **不存在 `@openbuddy/capability-automation` 包。** 周期性 Agent 运行由
+> **Pi 扩展 `openbuddy_automation`** 处理(`electron/main/agent/pi-extensions.ts`)。
+> 能力包目前无法自己排程;请暴露可调用接口,由 Agent 驱动。
 
 #### 多 Agent
 
