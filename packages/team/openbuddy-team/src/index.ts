@@ -105,12 +105,32 @@ async function readTeams(file = teamsFile()): Promise<TeamsFile> {
 	}
 }
 
+const RENAME_RETRY_CODES = new Set(["EPERM", "EBUSY", "EACCES"])
+
+/**
+ * Windows 上 rename 覆盖已存在的文件时,杀毒/索引器可能短暂持有句柄并报
+ * EPERM/EBUSY —— 这是瞬时状态,重试即可(POSIX 上不会出现)。不重试的话
+ * 团队成员每次落终态都有概率失败,成员永远停在 running。
+ */
+async function renameWithRetry(from: string, to: string): Promise<void> {
+	for (let attempt = 0; ; attempt += 1) {
+		try {
+			await rename(from, to)
+			return
+		} catch (error) {
+			const code = (error as NodeJS.ErrnoException).code
+			if (attempt >= 5 || !code || !RENAME_RETRY_CODES.has(code)) throw error
+			await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)))
+		}
+	}
+}
+
 async function writeTeams(teams: TeamsFile, file = teamsFile()): Promise<void> {
 	await mkdir(dirname(file), { recursive: true })
 	const temporary = `${file}.${process.pid}.${Date.now()}.tmp`
 	try {
 		await writeFile(temporary, JSON.stringify(teams, null, 2), { encoding: "utf8", mode: 0o600 })
-		await rename(temporary, file)
+		await renameWithRetry(temporary, file)
 	} catch (error) {
 		await rm(temporary, { force: true }).catch(() => undefined)
 		throw error
