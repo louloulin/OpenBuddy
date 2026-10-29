@@ -47,7 +47,10 @@ export async function restoreStorageBackup(options: RestoreStorageBackupOptions)
     await unlink(temporaryPath);
     return { path: options.destinationPath, schemaVersion, integrity: { ok: true } };
   } catch (error) {
-    await rm(temporaryPath, { force: true }).catch(() => undefined);
+    // Windows 上 SQLite 句柄释放有延迟:刚 close()(或打开失败时根本没拿到
+    // 句柄)的文件仍被占用,unlink 会 EBUSY/EPERM。重试几次再放弃 ——
+    // 留一个 .restore.tmp 在备份目录里不致命,但会一直堆着。
+    await rm(temporaryPath, { force: true, maxRetries: 10, retryDelay: 50 }).catch(() => undefined);
     throw error;
   }
 }

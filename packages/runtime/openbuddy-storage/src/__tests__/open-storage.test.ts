@@ -15,7 +15,12 @@ const LATEST = Math.max(...DEFAULT_MIGRATIONS.map((step) => step.version));
 const MIGRATION_COUNT = DEFAULT_MIGRATIONS.length;
 
 let root = "";
-afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = ""; });
+// Windows 上 SQLite 关闭句柄有延迟,刚 close() 的文件仍被占用,直接 rm
+// 会 EBUSY(macOS 允许 unlink 已打开文件,所以一直没暴露)。给重试预算。
+afterEach(async () => {
+  if (root) await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  root = "";
+});
 
 describe("openStorage", () => {
   it("creates the profile directory, applies the complete schema and checks integrity", async () => {
@@ -77,7 +82,10 @@ describe("openStorage", () => {
     const steps = DEFAULT_MIGRATIONS.slice(0, 1);
     let blocked: unknown;
     try {
-      await openStorage({ filePath: databasePath, onCorruptIsolated: () => { throw new Error("must not quarantine"); } });
+      // 成功打开时必须显式关掉 —— 这条用例原本直接丢弃返回值,Windows 上
+      // afterEach 的 rm 会 EBUSY(macOS 允许 unlink 已打开文件,所以从没暴露)。
+      const opened = await openStorage({ filePath: databasePath, onCorruptIsolated: () => { throw new Error("must not quarantine"); } });
+      opened.driver.close();
     } catch (error) { blocked = error; }
     // 注:上面这行用的是全量 DEFAULT_MIGRATIONS,不会拦 —— 真正的降级场景
     // 要用裁剪过的 step 集合,见下方 MigrationRunner 直测。
