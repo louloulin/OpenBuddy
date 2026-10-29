@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
@@ -86,7 +86,10 @@ describe("Pi resource adapters", () => {
     await expect(resources.listPlugins()).resolves.toMatchObject([{ name: "demo", agentCount: 1, skillCount: 1 }]);
     await resources.marketplaceAction({ type: "uninstall", sourceUrlOrPath: source, pluginRelativePath: "demo" });
     await expect(resources.listPlugins()).resolves.toEqual([]);
-    await expect(readFile(join(home, ".openbuddy", "agent", "marketplaces.json"), "utf8")).resolves.toContain(source);
+    // 落盘的是规范化后的绝对路径(marketplaceAddSource 会 realpath)。
+    // Windows CI 的 TEMP 是 8.3 短名,与 mkdtemp 返回的字符串不同,所以
+    // 期望值也必须先 realpath,不能直接拿 source 比。
+    await expect(readFile(join(home, ".openbuddy", "agent", "marketplaces.json"), "utf8")).resolves.toContain(await realpath(source));
 	});
 
 	it("supports Harness candidate files, local overlays, and configured source limits", async () => {

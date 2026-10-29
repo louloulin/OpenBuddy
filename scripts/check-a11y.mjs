@@ -42,14 +42,17 @@ const repoRoot = resolve(fileURLToPath(import.meta.url), "../..");
  * npx 在本地没装或版本不匹配时会去下载/回退到别的版本 —— 实测在临时目录里
  * 跑就拉到了 ESLint 10,而 package.json 钉的是 9.39.5。门禁必须是可复现的:
  * 它报的"零告警"必须来自 CI 装的那一份 eslint,而不是当时恰好能拿到的最新版。
- * OPENBUDDY_A11Y_ESLINT 是给测试用的注入口(测试的 fixture 在临时目录里,
- * 那里没有 node_modules)。
+ *
+ * 入口用 `eslint/bin/eslint.js` + `process.execPath`,而不是 `.bin/eslint`:
+ * Windows 上 pnpm 生成的是 `eslint.cmd`,直接 spawn 那个 POSIX shim 会
+ * `EINVAL`/`ENOEXEC`(以前的报错就是 "无法启动 eslint: spawnSync ...")。
+ * OPENBUDDY_A11Y_ESLINT 是给测试用的注入口,同样要求指向 JS 入口。
  */
-const eslintBin =
-  process.env.OPENBUDDY_A11Y_ESLINT ?? join(repoRoot, "node_modules", ".bin", "eslint");
+const eslintEntry =
+  process.env.OPENBUDDY_A11Y_ESLINT ?? join(repoRoot, "node_modules", "eslint", "bin", "eslint.js");
 
-if (!existsSync(eslintBin)) {
-  console.error(`找不到本地 eslint:${eslintBin}\n先跑 \`pnpm install\`。`);
+if (!existsSync(eslintEntry)) {
+  console.error(`找不到本地 eslint:${eslintEntry}\n先跑 \`pnpm install\`。`);
   process.exit(1);
 }
 
@@ -69,7 +72,7 @@ if (existing.length === 0) {
   process.exit(1);
 }
 
-const eslint = spawnSync(eslintBin, [...existing, "--no-warn-ignored", "-f", "json"], {
+const eslint = spawnSync(process.execPath, [eslintEntry, ...existing, "--no-warn-ignored", "-f", "json"], {
   cwd: repoRoot,
   encoding: "utf8",
   maxBuffer: 64 * 1024 * 1024,

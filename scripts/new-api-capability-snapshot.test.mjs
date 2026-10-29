@@ -57,7 +57,11 @@ describe("New API capability snapshot", () => {
     const snapshot = { schema: "openbuddy.new-api-capability-snapshot.v1", generatedAt: "2026-08-30T00:00:00.000Z" };
     await writeSnapshotAtomic(file, snapshot);
     expect(JSON.parse(await readFile(file, "utf8"))).toEqual(snapshot);
-    expect((await stat(file)).mode & 0o777).toBe(0o600);
+    // Windows 的 mode 位是伪造常量(0o666/0o444),`mode & 0o777` 不反映 ACL。
+    // 这条不变式只在 POSIX 上有意义。
+    if (process.platform !== "win32") {
+      expect((await stat(file)).mode & 0o777).toBe(0o600);
+    }
   });
 
   it("does not replace a valid snapshot when expected inventory drifts", async () => {

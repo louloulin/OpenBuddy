@@ -72,15 +72,18 @@ describe("TerminalRuntime", () => {
 
   it("passes shell configuration through the registered backend", async () => {
     const runtime = createTerminalService();
+    const shell = process.platform === "win32"
+      ? { shellPath: process.env.ComSpec ?? "cmd.exe", shellArgs: ["/d", "/q"], probe: "echo %OPENBUDDY_TERMINAL_CONFIGURED%" }
+      : { shellPath: "/bin/bash", shellArgs: ["--noprofile", "--norc", "-i"], probe: "printf %s $OPENBUDDY_TERMINAL_CONFIGURED" };
     runtime.registerBackend(createShellTerminalBackend("configured-shell", {
-      shellPath: "/bin/bash",
-      shellArgs: ["--noprofile", "--norc", "-i"],
+      shellPath: shell.shellPath,
+      shellArgs: shell.shellArgs,
       env: { OPENBUDDY_TERMINAL_CONFIGURED: "yes" },
     }));
     const owner = terminalOwner(context("configured-session"));
     const opened = await runtime.spawn(owner, { type: "configured-shell" });
     try {
-      const result = await runtime.send(owner, opened.sessionId, "printf %s $OPENBUDDY_TERMINAL_CONFIGURED", true);
+      const result = await runtime.send(owner, opened.sessionId, shell.probe, true);
       expect(result.viewport).toContain("yes");
       expect(result.waitReason).toBe("stdin_read");
     } finally {

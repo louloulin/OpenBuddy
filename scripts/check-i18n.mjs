@@ -31,7 +31,7 @@
 //   node scripts/check-i18n.mjs --update-baseline
 //====================================================================
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { join, resolve, relative, dirname } from "node:path";
+import { join, resolve, relative, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../..");
@@ -182,7 +182,7 @@ for (const dict of loaded) {
 const referenced = new Set();
 for (const abs of sourceFiles) {
   const src = readFileSync(abs, "utf8");
-  const rel = relative(repoRoot, abs);
+  const rel = relative(repoRoot, abs).split(sep).join("/");
   for (const m of src.matchAll(/\b(?:t|useT|translate|tIn)\(\s*"([a-zA-Z0-9_.-]+)"/g)) {
     referenced.add(m[1]);
     if (!knownKeys.has(m[1])) {
@@ -207,7 +207,7 @@ for (const abs of sourceFiles) {
   for (const re of HARDCODE_PATTERNS) {
     for (const _ of src.matchAll(re)) count += 1;
   }
-  if (count > 0) hardcoded.set(relative(repoRoot, abs), count);
+  if (count > 0) hardcoded.set(relative(repoRoot, abs).split(sep).join("/"), count);
 }
 const hardcodedTotal = [...hardcoded.values()].reduce((a, b) => a + b, 0);
 

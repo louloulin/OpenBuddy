@@ -20,13 +20,16 @@ describe("24 个 ui-* 包真实 apply() 注册 slot 验证", () => {
   let runtime: Awaited<typeof import("../client")>["getOrCreateSingleton"] extends () => infer R ? R : never;
   let entries: (name: string) => readonly unknown[];
 
+  // 首次导入会把 24 个 ui-* 包全部拉起来,冷启动的 CI runner 上要 20s+
+  // (ubuntu 实测 20012ms 撞上默认 hookTimeout)。后续用例走模块缓存很快,
+  // 但钩子超时是全局的,所以给足余量而不是只调某一个用例。
   beforeEach(async () => {
     const mod = await import("../client");
     runtime = mod.getRuntime();
     // P1/P2-09:装配异步,等 done 落定再断言。
     await mod.registerAllBuiltinUis().done;
     entries = (name: string) => runtime.slots.entries(name);
-  });
+  }, 120_000);
 
   it("ui-conversation → 'conversation' slot 注册 ChatView", () => {
     expect(entries("conversation").length).toBeGreaterThanOrEqual(1);

@@ -16,21 +16,24 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SettingsStore } from "@openbuddy/storage";
+import { SettingsStore, type SqliteDriver } from "@openbuddy/storage";
 import { openStorageSync } from "@openbuddy/storage";
 import { SettingsBackendFolderTrustStore } from "./settings-backend";
 
 let root = "";
 let settings: SettingsStore;
+let driver: SqliteDriver | undefined;
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "folder-trust-settings-backend-"));
-  settings = new SettingsStore({
-    driver: openStorageSync({ filePath: join(root, "profile.sqlite") }).driver,
-  });
+  driver = openStorageSync({ filePath: join(root, "profile.sqlite") }).driver;
+  settings = new SettingsStore({ driver });
 });
 
 afterEach(() => {
+  // Windows 上 SQLite 句柄不关,rmSync 会 EBUSY —— 先 close 再删。
+  try { driver?.close(); } catch { /* 已经关了 */ }
+  driver = undefined;
   if (root) rmSync(root, { recursive: true, force: true });
   root = "";
 });

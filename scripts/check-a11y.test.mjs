@@ -75,7 +75,8 @@ function run(scratch) {
       ...process.env,
       // fixture 在临时目录里,没有自己的 node_modules;指向仓库装好的那份,
       // 保证测的是**这个版本**的 eslint —— 门禁的可复现性正建立在这上面。
-      OPENBUDDY_A11Y_ESLINT: join(REPO_ROOT, "node_modules", ".bin", "eslint"),
+      // 指向 JS 入口而不是 .bin shim:Windows 上没有可执行的 `.bin/eslint`。
+      OPENBUDDY_A11Y_ESLINT: join(REPO_ROOT, "node_modules", "eslint", "bin", "eslint.js"),
     },
   });
   return { code: result.status ?? -1, output: `${result.stdout}${result.stderr}` };

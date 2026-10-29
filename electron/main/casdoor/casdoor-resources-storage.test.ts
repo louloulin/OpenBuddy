@@ -107,7 +107,11 @@ describe("casdoor-resources SettingsDocumentStore-backed persistence", () => {
       expect(items.find((r) => r.id === "legacy-res-1")).toBeTruthy();
       expect(existsSync(join(u2, "casdoor-tenant-resources.json"))).toBe(false);
     } finally {
-      rmSync(u2, { recursive: true, force: true });
+      // 先关掉这个用例 reload 出来的模块实例持有的 SQLite 句柄,再删目录;
+      // 否则 Windows 上 rmSync 会 EBUSY(afterEach 关闭发生在这之后)。
+      for (const mod of reloadedModules) mod.__casdoorResourceTestables.resetResourceStoreForTests();
+      reloadedModules = [];
+      rmSync(u2, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 

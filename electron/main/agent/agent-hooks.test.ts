@@ -1,53 +1,40 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createPiHooksExtension, discoverHookConfigs, listRegisteredHookConfigs, registerHookConfig, runHookPoint, type HookRuntimeConfig, type HookShellRunRequest } from "./agent-hooks";
 
 // Hook 命令走平台 shell:POSIX 是 /bin/sh -lc,Windows 是 cmd /d /s /c。
 // 所以测试里不能出现 printf / cat / sleep —— cmd 下这些命令不存在,
 // 用例会在 Windows 上静默失败(exit code 9009, stdout 为空)。
 //
-// 数据也不能再通过 argv 传:cmd.exe 不懂 POSIX 的 \" 转义,JSON 里带引号的
-// 参数会被拆碎(Windows CI 上表现为 stdout 为空 / 写文件 ENOENT)。因此把
-// fixture 写成脚本文件,payload 内嵌进脚本,命令行上只剩一个脚本路径。
-const fixtureRoot = mkdtempSync(join(tmpdir(), "openbuddy-hook-fixtures-"));
+// 数据也不能通过 argv 传:cmd.exe 不认 POSIX 的 \" 转义,JSON 里带引号的
+// 参数会被拆碎(Windows CI 上表现为 stdout 为空 / 写文件 ENOENT)。
+// 这里把 fixture 写成脚本文件、payload 内嵌进脚本,并且因为 hook 的 cwd
+// 就是 root,命令行上只用**相对路径、不带任何引号**:`node ./fixture-0.cjs`。
+// 这是唯一在两种 shell 下都不需要转义的形态。
 let fixtureSeq = 0;
-afterAll(() => { rmSync(fixtureRoot, { recursive: true, force: true }); });
 
-function quoteShellArg(value: string): string {
-  // 只接受我们自己生成的临时脚本路径,不做通用的 shell 转义(那正是
-  // CodeQL js/incomplete-sanitization 指出的问题,而且永远转不干净):
-  // 路径里出现引号/换行说明上游出了问题,直接拒绝。
-  if (/[\r\n]/.test(value)) throw new Error("fixture path must not contain newlines");
-  if (process.platform === "win32") {
-    // cmd 双引号内反斜杠是字面量,Windows 路径天然含反斜杠。
-    if (value.includes('"')) throw new Error("fixture path must not contain double quotes");
-    return `"${value}"`;
-  }
-  if (value.includes("'")) throw new Error("fixture path must not contain single quotes");
-  return `'${value}'`;
+function writeFixtureScript(dir: string, source: string): string {
+  const name = `fixture-${fixtureSeq++}.cjs`;
+  writeFileSync(join(dir, name), source);
+  return `./${name}`;
 }
 
-function writeFixtureScript(source: string): string {
-  const file = join(fixtureRoot, `fixture-${fixtureSeq++}.cjs`);
-  writeFileSync(file, source);
-  return file;
+function hookEmitCommand(dir: string, payload: unknown): string {
+  const script = writeFixtureScript(dir, `process.stdout.write(${JSON.stringify(JSON.stringify(payload))});`);
+  return `node ${script}`;
 }
 
-function hookEmitCommand(payload: unknown): string {
-  const script = writeFixtureScript(`process.stdout.write(${JSON.stringify(JSON.stringify(payload))});`);
-  return `node ${quoteShellArg(script)}`;
-}
-
-function hookCaptureCommand(path: string, payload: unknown): string {
+function hookCaptureCommand(dir: string, path: string, payload: unknown): string {
   const script = writeFixtureScript(
+    dir,
     `const fs=require('fs');` +
     `fs.writeFileSync(${JSON.stringify(path)},fs.readFileSync(0,'utf8'));` +
     `process.stdout.write(${JSON.stringify(JSON.stringify(payload))});`,
   );
-  return `node ${quoteShellArg(script)}`;
+  return `node ${script}`;
 }
 
 describe("OpenBuddy Hook runtime", () => {
@@ -289,7 +276,7 @@ describe("OpenBuddy Hook runtime", () => {
       name: "fixture-hooks",
       openbuddy: {
         hooks: {
-          "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: hookEmitCommand({ hookSpecificOutput: { permissionDecision: "deny", permissionDecisionReason: "fixture blocked" } }) }] }],
+          "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: hookEmitCommand(root, { hookSpecificOutput: { permissionDecision: "deny", permissionDecisionReason: "fixture blocked" } }) }] }],
         },
       },
     }));
@@ -330,7 +317,7 @@ describe("OpenBuddy Hook runtime", () => {
       packageName: "@deepseek-ai/dsh-hooks-codex",
       packageRoot: root,
       dialect: "codex",
-      config: { PreToolUse: [{ matcher: "bash", hooks: [{ type: "command", command: hookEmitCommand({ decision: "deny" }) }] }] },
+      config: { PreToolUse: [{ matcher: "bash", hooks: [{ type: "command", command: hookEmitCommand(root, { decision: "deny" }) }] }] },
     });
     try {
       expect(listRegisteredHookConfigs()).toHaveLength(1);
@@ -352,7 +339,7 @@ describe("OpenBuddy Hook runtime", () => {
       name: "fixture-context-hooks",
       openbuddy: {
         hooks: {
-          "prompt/submit": [{ hooks: [{ type: "command", command: hookEmitCommand({ additionalContext: "use fixture context" }) }] }],
+          "prompt/submit": [{ hooks: [{ type: "command", command: hookEmitCommand(root, { additionalContext: "use fixture context" }) }] }],
         },
       },
     }));
@@ -374,7 +361,7 @@ describe("OpenBuddy Hook runtime", () => {
       name: "fixture-ask-hooks",
       openbuddy: {
         hooks: {
-          "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: hookEmitCommand({ hookSpecificOutput: { permissionDecision: "ask", permissionDecisionReason: "confirm bash" } }) }] }],
+          "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: hookEmitCommand(root, { hookSpecificOutput: { permissionDecision: "ask", permissionDecisionReason: "confirm bash" } }) }] }],
         },
       },
     }));
@@ -416,7 +403,7 @@ describe("OpenBuddy Hook runtime", () => {
       packageName: "fixture-claude",
       packageRoot: root,
       dialect: "claude-code",
-      config: { "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: hookCaptureCommand(claudePayloadPath, { additionalContext: "ok" }) }] }] },
+      config: { "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: hookCaptureCommand(root, claudePayloadPath, { additionalContext: "ok" }) }] }] },
     });
     const handlers = new Map<string, (event: any, context: any) => unknown>();
     const pi = { on: (event: string, handler: (payload: unknown, context: unknown) => unknown) => handlers.set(event, handler) } as any;
@@ -429,7 +416,7 @@ describe("OpenBuddy Hook runtime", () => {
         model: "fixture-model",
         defaultTimeoutMs: 600_000,
         stderrSummaryMaxChars: 500,
-        config: { dialect: "codex", events: { "tool/start": [{ matcher: "bash", hooks: [{ command: hookCaptureCommand(codexPayloadPath, { additionalContext: "ok" }) }] }] } },
+        config: { dialect: "codex", events: { "tool/start": [{ matcher: "bash", hooks: [{ command: hookCaptureCommand(root, codexPayloadPath, { additionalContext: "ok" }) }] }] } },
         diagnostics: [],
       });
       createPiHooksExtension(() => configs, () => undefined)(pi);
@@ -470,7 +457,7 @@ describe("OpenBuddy Hook runtime", () => {
     const root = await mkdtemp(join(tmpdir(), "openbuddy-hooks-system-message-"));
     await writeFile(join(root, "package.json"), JSON.stringify({
       name: "fixture-system-message-hooks",
-      openbuddy: { hooks: { "turn/end": [{ hooks: [{ type: "command", command: hookEmitCommand({ systemMessage: "heads up", continue: false, stopReason: "fixture stop" }) }] }] } },
+      openbuddy: { hooks: { "turn/end": [{ hooks: [{ type: "command", command: hookEmitCommand(root, { systemMessage: "heads up", continue: false, stopReason: "fixture stop" }) }] }] } },
     }));
     const events: Array<{ type: string; payload: any }> = [];
     const handlers = new Map<string, (event: any, context: any) => unknown>();

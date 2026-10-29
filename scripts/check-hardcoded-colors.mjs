@@ -32,7 +32,7 @@
 //   node scripts/check-hardcoded-colors.mjs --update-baseline
 //====================================================================
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { join, resolve, relative, dirname } from "node:path";
+import { join, resolve, relative, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../..");
@@ -85,7 +85,9 @@ function isFallback(src, index) {
 const violations = new Map(); // rel -> [{ line, color }]
 const colorCounts = new Map();
 for (const abs of SCAN_ROOTS.flatMap((r) => walk(join(repoRoot, r)))) {
-  const rel = relative(repoRoot, abs);
+  // 排除清单与基线都按 POSIX 分隔符书写;Windows 的 relative() 返回
+  // "src\styles\x.css",不归一化会让 EXCLUDED 全部失效、基线键也对不上。
+  const rel = relative(repoRoot, abs).split(sep).join("/");
   if (excluded(rel)) continue;
   const src = readFileSync(abs, "utf8");
   const hits = [];

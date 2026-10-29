@@ -155,7 +155,9 @@ function runJob(job) {
 
     const child = spawn(cmd, argv, {
       cwd: job.dir,
-      env: { ...process.env, FORCE_COLOR: "0" },
+      // FORCE_COLOR=0 挡不住 vitest(它在 CI 下仍会输出 ANSI),再加 NO_COLOR;
+      // 下面打印失败摘要前还会再剥一次 ANSI。
+      env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
       stdio: ["ignore", "pipe", "pipe"],
       // Windows: 让 Node 通过 PATHEXT 解析 pnpm -> pnpm.cmd
       shell: isWindows && !isScript,
@@ -188,11 +190,12 @@ async function worker() {
     const seconds = (result.ms / 1000).toFixed(1);
     console.log(`${status}  ${result.job.rel}  (${seconds}s)`);
     if (result.code !== 0) {
-      const lines = result.out.split("\n");
+      const lines = result.out.split("\n").map((line) => line.replace(/\x1b\[[0-9;]*m/g, ""));
       // 只打印尾部会把"较早的失败"整段吃掉(Windows CI 上一次只能看到最后
-      // 几个 test file)。先把所有失败行抽出来,再保留尾部上下文。
+      // 几个 test file)。先把所有失败行与 `❯ file:line` 栈帧抽出来,
+      // 再保留尾部上下文 —— 这样下一轮能直接定位到每个失败文件。
       const failureLines = lines.filter((line) =>
-        /^\s*(FAIL|×|✗)|AssertionError|^\s*(?:Error|TypeError|ReferenceError|RangeError|SyntaxError):/.test(line),
+        /^\s*(FAIL|×|✗)|AssertionError|^\s*(?:Error|TypeError|ReferenceError|RangeError|SyntaxError):|^\s*❯\s+\S+/.test(line),
       );
       if (failureLines.length) {
         console.log(`----- ${result.job.rel} 失败行(${failureLines.length}) -----\n${failureLines.join("\n")}\n`);
