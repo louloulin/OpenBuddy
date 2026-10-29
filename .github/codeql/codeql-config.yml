@@ -1,0 +1,11 @@
+name: OpenBuddy CodeQL config
+
+# `scripts/electron/agent-core-ux-verify.mjs` is a local end-to-end harness.
+# Part of its job is to stand in front of a real model provider and forward the
+# request — including the Authorization header the app under test is configured
+# with — to the upstream endpoint. CodeQL's js/file-access-to-http flags exactly
+# that data flow, but here it is the feature and the script never ships. The
+# inline `// codeql[...]` suppression was not honoured by the PR check, so the
+# file is excluded; every other script under scripts/ is still analysed.
+paths-ignore:
+  - scripts/electron/agent-core-ux-verify.mjs

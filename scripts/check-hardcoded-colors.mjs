@@ -105,9 +105,16 @@ const errors = [];
 const updateBaseline = process.argv.includes("--update-baseline");
 const baselineFile = join(repoRoot, BASELINE_PATH);
 let baseline = { total: 0, files: {} };
-if (existsSync(baselineFile)) {
+// Read inside try/catch instead of existsSync + readFileSync: the check-then-
+// use pair is a file-system race (CodeQL js/file-system-race).
+let baselineMissing = false;
+try {
   baseline = JSON.parse(readFileSync(baselineFile, "utf8"));
-} else if (!updateBaseline) {
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
+  baselineMissing = true;
+}
+if (baselineMissing && !updateBaseline) {
   errors.push(`基线文件缺失:${BASELINE_PATH}(用 --update-baseline 生成)`);
 }
 

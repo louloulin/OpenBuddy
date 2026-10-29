@@ -58,7 +58,10 @@ const SKIP_DIRS = new Set([
   "node_modules", "dist", ".moon", ".git", "_archive", ".worktrees", "coverage", "release",
 ]);
 const SCAN_ROOTS = ["src", "packages", "electron"];
-const CJK = /[㐀-䶿一-鿿豈-﫿]/;
+// Unicode property escape instead of hand-written ranges: the literal ranges
+// tripped CodeQL's js/overly-large-range (it read the ideograph endpoints as
+// overlapping). \p{Script=Han} covers unified + compatibility ideographs.
+const CJK = /\p{Script=Han}/u;
 const PLACEHOLDER = /\{(\w+)\}/g;
 
 const errors = [];
@@ -225,9 +228,16 @@ if (unusedKeys.length > 0) {
 const updateBaseline = process.argv.includes("--update-baseline");
 const baselineFile = join(repoRoot, BASELINE_PATH);
 let baseline = { hardcodedTotal: 0, files: {} };
-if (existsSync(baselineFile)) {
+// No existsSync pre-check: read inside try/catch. existsSync followed by
+// readFileSync is a check-then-use race (CodeQL js/file-system-race).
+let baselineMissing = false;
+try {
   baseline = JSON.parse(readFileSync(baselineFile, "utf8"));
-} else if (!updateBaseline) {
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
+  baselineMissing = true;
+}
+if (baselineMissing && !updateBaseline) {
   fail(`基线文件缺失:${BASELINE_PATH}(用 --update-baseline 生成)`);
 }
 
