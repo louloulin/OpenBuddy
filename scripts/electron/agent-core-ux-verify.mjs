@@ -376,11 +376,11 @@ const proxy = createServer(async (req, res) => {
       upstreamHeaders["anthropic-version"] = "2023-06-01";
     }
     upstreamHeaders["authorization"] = `Bearer ${creds.apiKey}`;
+    // 本地 E2E 代理的全部职责就是把请求连同凭据转发给上游 provider;
+    // 凭据来自 .env.e2e.local / 环境变量是设计使然,不是数据外泄。
+    // codeql[js/file-access-to-http]
     const upstream = await fetch(upstreamUrl, {
       method: req.method,
-      // 本地 E2E 代理的全部职责就是把请求连同凭据转发给上游 provider;
-      // 凭据来自 .env.e2e.local / 环境变量是设计使然,不是数据外泄。
-      // codeql[js/file-access-to-http]
       headers: upstreamHeaders,
       body: raw,
     });

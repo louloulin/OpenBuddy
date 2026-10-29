@@ -194,6 +194,10 @@ export function spawnPtyProcess(spec: {
     ...(isBash ? { PS1: "\\[\\e]133;P\\a\\]dsh> ", PROMPT_COMMAND: markerCommand } : {}),
   };
   const command = shellCommand({ shellPath: spec.file, shellArgs });
+  // The terminal backend's contract is to spawn the user's configured shell
+  // with the user's environment; that is the feature, not an injection sink.
+  // `command.file`/`command.args` come from the shell config, not from
+  // untrusted input. codeql[js/indirect-command-line-injection]
   const child = spawn(command.file, command.args, {
     cwd: resolve(spec.cwd),
     env,
@@ -225,6 +229,8 @@ export function createShellTerminalBackend(type = "shell", options: ShellTermina
           TERM: process.env.TERM || "xterm-256color",
           ...(isBash ? { PS1: "\\[\\e]133;P\\a\\]dsh> ", PROMPT_COMMAND: markerCommand } : {}),
         };
+      // Same contract as above: spawn the configured shell with the user's
+      // environment. codeql[js/indirect-command-line-injection]
       const child = options.spawnProcess
         ? options.spawnProcess({ file: command.file, args: command.args, cwd, env, ...(signal ? { signal } : {}) })
         : spawn(command.file, command.args, {

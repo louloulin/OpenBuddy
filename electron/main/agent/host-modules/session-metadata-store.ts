@@ -37,7 +37,6 @@
  *   starts fresh — the next manual cleanup or `clearAll()` removes it.
  */
 import { rm, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { applyPendingStorageRestoreSync, openStorageSync, SettingsStore, agentHome } from "@openbuddy/storage";

@@ -18,7 +18,7 @@
  * tests can drive it without touching Electron's globals. Tests use a
  * stub for `electron.crashReport.start` to assert the parameters we pass.
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, appendFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 
 /** Subset of `Electron.CrashReport` we depend on. Tests can stub this. */
@@ -48,11 +48,16 @@ export interface CrashpadOptions {
 function pruneCrashpadDir(crashpadDir: string): void {
   try {
     const jsonlPath = join(crashpadDir, "renderer-crashes.jsonl");
-    if (existsSync(jsonlPath)) {
+    // No existsSync pre-check: the check-then-read pair is a file-system race
+    // (CodeQL js/file-system-race). The read is already inside a try/catch,
+    // so a missing file is handled the same way.
+    try {
       const lines = readFileSync(jsonlPath, "utf8").split("\n").filter((line) => line.trim().length > 0);
       if (lines.length > 200) {
         writeFileSync(jsonlPath, `${lines.slice(-200).join("\n")}\n`);
       }
+    } catch {
+      /* no crash log yet */
     }
     const dumps = readdirSync(crashpadDir)
       .filter((name) => /^renderer-.*\.json$/.test(name))
@@ -78,7 +83,9 @@ export function startCrashpad(opts: CrashpadOptions): { crashpadDir: string } {
   // 数据§6(2026-10-19 生产评审):启动可因只读/满盘 userData 硬崩 —— 这里
   // 在 app.whenReady 之前、模块路径上执行,mkdir 失败不能炸掉整个启动。
   try {
-    if (!existsSync(crashpadDir)) mkdirSync(crashpadDir, { recursive: true });
+    // `recursive: true` already treats an existing directory as success, so
+    // there is no need for an existsSync pre-check (and no TOCTOU window).
+    mkdirSync(crashpadDir, { recursive: true });
     // 数据§8:崩溃转储此前无上限。启动时保留最新:jsonl 截到最后 200 行,
     // 单个 dump 文件按 mtime 保留最新 100 个。
     pruneCrashpadDir(crashpadDir);
@@ -140,8 +147,8 @@ export function recordRendererCrash(
     rendererVersion: entry.rendererVersion,
   };
   const jsonlPath = join(crashpadDir, "renderer-crashes.jsonl");
-  if (!existsSync(dirname(jsonlPath))) mkdirSync(dirname(jsonlPath), { recursive: true });
-  if (!existsSync(crashpadDir)) mkdirSync(crashpadDir, { recursive: true });
+  mkdirSync(dirname(jsonlPath), { recursive: true });
+  mkdirSync(crashpadDir, { recursive: true });
   appendFileSync(jsonlPath, JSON.stringify(full) + "\n");
   // Also drop a structured dump file so each renderer crash has a discoverable
   // filename pattern (consistent with the host-supervisor's host-*.json files).
@@ -192,7 +199,7 @@ export function recordMainCrash(
     nodeVersion: process.versions.node,
     pid: process.pid,
   };
-  if (!existsSync(crashpadDir)) mkdirSync(crashpadDir, { recursive: true });
+  mkdirSync(crashpadDir, { recursive: true });
   // Mirror the renderer pattern: JSONL stream + per-event dump file so each
   // crash has a discoverable filename for tooling (sorted lexicographically
   // by ISO timestamp).
