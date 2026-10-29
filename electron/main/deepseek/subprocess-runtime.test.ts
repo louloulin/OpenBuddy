@@ -81,7 +81,7 @@ describe("SubprocessRuntime", () => {
     expect(policy.resolve({ session: { sessionId: "session-1", cwd: "/workspace/project" } }).mode).toBe("workspace-write");
     expect(policy.resolve({ mode: "danger-full-access", cwd: "/tmp/other" })).toMatchObject({
       mode: "danger-full-access",
-      workspaceRoot: "/tmp/other",
+      workspaceRoot: resolve("/tmp/other"),
     });
   });
 

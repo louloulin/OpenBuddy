@@ -40,6 +40,16 @@ const userData = mkdtempSync(join(tmpdir(), "casdoor-resources-storage-"));
 import { __casdoorResourceTestables } from "./casdoor-resources";
 const { CasdoorResourceService } = __casdoorResourceTestables;
 
+// vi.resetModules() 之后动态 import 出来的是**新的模块实例**,静态导入的
+// testables 摸不到它的 driver。不记录这些实例,afterEach 只能关掉第一个,
+// 其余实例的 SQLite 句柄会让 rmSync 在 Windows 上 EBUSY。
+let reloadedModules: Array<typeof import("./casdoor-resources")> = [];
+async function reloadCasdoorResources(): Promise<typeof import("./casdoor-resources")> {
+  const mod = await import("./casdoor-resources");
+  reloadedModules.push(mod);
+  return mod;
+}
+
 beforeEach(() => {
   electronMock.app.getPath.mockReturnValue(userData);
   casdoorAuthMock.status.mockReset();
@@ -52,6 +62,10 @@ beforeEach(() => {
 
 afterEach(() => {
   // 先关 SQLite 句柄再删目录(Windows EBUSY)。
+  for (const mod of reloadedModules) {
+    mod.__casdoorResourceTestables.resetResourceStoreForTests();
+  }
+  reloadedModules = [];
   __casdoorResourceTestables.resetResourceStoreForTests?.();
   rmSync(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
@@ -88,7 +102,7 @@ describe("casdoor-resources SettingsDocumentStore-backed persistence", () => {
       vi.mock("electron", () => electronMock);
       vi.mock("./casdoor-auth", () => ({ casdoorAuth: casdoorAuthMock }));
       vi.mock("./casdoor-audit", () => ({ casdoorAudit: auditMock }));
-      const mod = await import("./casdoor-resources");
+      const mod = await reloadCasdoorResources();
       const items = await mod.casdoorResources.list("project");
       expect(items.find((r) => r.id === "legacy-res-1")).toBeTruthy();
       expect(existsSync(join(u2, "casdoor-tenant-resources.json"))).toBe(false);
@@ -112,7 +126,7 @@ describe("casdoor-resources SettingsDocumentStore-backed persistence", () => {
     vi.mock("./casdoor-auth", () => ({ casdoorAuth: casdoorAuthMock }));
     vi.mock("./casdoor-audit", () => ({ casdoorAudit: auditMock }));
     casdoorAuthMock.status.mockImplementation(() => makeStatus("user-9", "tenant-b"));
-    const mod = await import("./casdoor-resources");
+    const mod = await reloadCasdoorResources();
     const restored = (await mod.casdoorResources.list("project")) as unknown[];
     expect(restored.find((r: any) => r.id === created.id)).toBeTruthy();
   });

@@ -4,6 +4,29 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createPiHooksExtension, discoverHookConfigs, listRegisteredHookConfigs, registerHookConfig, runHookPoint, type HookRuntimeConfig, type HookShellRunRequest } from "./agent-hooks";
 
+// Hook 命令走平台 shell:POSIX 是 /bin/sh -lc,Windows 是 cmd /d /s /c。
+// 所以测试里不能出现 printf / cat / sleep —— cmd 下这些命令不存在,
+// 用例会在 Windows 上静默失败(exit code 9009, stdout 为空)。
+// 统一改用 node(测试本就跑在 node 上),数据通过 argv 传,避免引号地狱。
+function quoteShellArg(value: string): string {
+  // 反斜杠只在 POSIX shell 双引号里有转义含义;Windows 路径天然含反斜杠。
+  if (process.platform !== "win32" && /[\\$`]/.test(value)) {
+    throw new Error("fixture value must be shell-safe: " + value);
+  }
+  return '"' + value.replace(/"/g, '\\"') + '"';
+}
+
+function hookEmitCommand(payload: unknown): string {
+  return `node -e "process.stdout.write(process.argv[1])" ${quoteShellArg(JSON.stringify(payload))}`;
+}
+
+function hookCaptureCommand(path: string, payload: unknown): string {
+  return (
+    `node -e "require('fs').writeFileSync(process.argv[1],require('fs').readFileSync(0,'utf8'));` +
+    `process.stdout.write(process.argv[2])" ${quoteShellArg(path)} ${quoteShellArg(JSON.stringify(payload))}`
+  );
+}
+
 describe("OpenBuddy Hook runtime", () => {
   it("runs through an injected shell service with protocol-compatible framing", async () => {
     const requests: HookShellRunRequest[] = [];
@@ -243,7 +266,7 @@ describe("OpenBuddy Hook runtime", () => {
       name: "fixture-hooks",
       openbuddy: {
         hooks: {
-          "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: "printf '%s' '{\"hookSpecificOutput\":{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"fixture blocked\"}}'" }] }],
+          "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: hookEmitCommand({ hookSpecificOutput: { permissionDecision: "deny", permissionDecisionReason: "fixture blocked" } }) }] }],
         },
       },
     }));
@@ -284,7 +307,7 @@ describe("OpenBuddy Hook runtime", () => {
       packageName: "@deepseek-ai/dsh-hooks-codex",
       packageRoot: root,
       dialect: "codex",
-      config: { PreToolUse: [{ matcher: "bash", hooks: [{ type: "command", command: "printf '{\"decision\":\"deny\"}'" }] }] },
+      config: { PreToolUse: [{ matcher: "bash", hooks: [{ type: "command", command: hookEmitCommand({ decision: "deny" }) }] }] },
     });
     try {
       expect(listRegisteredHookConfigs()).toHaveLength(1);
@@ -306,7 +329,7 @@ describe("OpenBuddy Hook runtime", () => {
       name: "fixture-context-hooks",
       openbuddy: {
         hooks: {
-          "prompt/submit": [{ hooks: [{ type: "command", command: "printf '%s' '{\"additionalContext\":\"use fixture context\"}'" }] }],
+          "prompt/submit": [{ hooks: [{ type: "command", command: hookEmitCommand({ additionalContext: "use fixture context" }) }] }],
         },
       },
     }));
@@ -328,7 +351,7 @@ describe("OpenBuddy Hook runtime", () => {
       name: "fixture-ask-hooks",
       openbuddy: {
         hooks: {
-          "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: "printf '%s' '{\"hookSpecificOutput\":{\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"confirm bash\"}}'" }] }],
+          "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: hookEmitCommand({ hookSpecificOutput: { permissionDecision: "ask", permissionDecisionReason: "confirm bash" } }) }] }],
         },
       },
     }));
@@ -370,7 +393,7 @@ describe("OpenBuddy Hook runtime", () => {
       packageName: "fixture-claude",
       packageRoot: root,
       dialect: "claude-code",
-      config: { "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: `cat > "${claudePayloadPath}"; printf '{\"additionalContext\":\"ok\"}'` }] }] },
+      config: { "tool/start": [{ matcher: "bash", hooks: [{ type: "command", command: hookCaptureCommand(claudePayloadPath, { additionalContext: "ok" }) }] }] },
     });
     const handlers = new Map<string, (event: any, context: any) => unknown>();
     const pi = { on: (event: string, handler: (payload: unknown, context: unknown) => unknown) => handlers.set(event, handler) } as any;
@@ -383,7 +406,7 @@ describe("OpenBuddy Hook runtime", () => {
         model: "fixture-model",
         defaultTimeoutMs: 600_000,
         stderrSummaryMaxChars: 500,
-        config: { dialect: "codex", events: { "tool/start": [{ matcher: "bash", hooks: [{ command: `cat > "${codexPayloadPath}"; printf '{\\\"additionalContext\\\":\\\"ok\\\"}'` }] }] } },
+        config: { dialect: "codex", events: { "tool/start": [{ matcher: "bash", hooks: [{ command: hookCaptureCommand(codexPayloadPath, { additionalContext: "ok" }) }] }] } },
         diagnostics: [],
       });
       createPiHooksExtension(() => configs, () => undefined)(pi);
@@ -402,7 +425,7 @@ describe("OpenBuddy Hook runtime", () => {
     const root = await mkdtemp(join(tmpdir(), "openbuddy-hooks-cancel-"));
     await writeFile(join(root, "package.json"), JSON.stringify({
       name: "fixture-cancel-hooks",
-      openbuddy: { hooks: { "tool/start": [{ hooks: [{ type: "command", command: "sleep 30" }] }] } },
+      openbuddy: { hooks: { "tool/start": [{ hooks: [{ type: "command", command: 'node -e "setTimeout(()=>{},30000)"' }] }] } },
     }));
     const handlers = new Map<string, (event: any, context: any) => unknown>();
     const pi = { on: (event: string, handler: (payload: unknown, context: unknown) => unknown) => handlers.set(event, handler) } as any;
@@ -424,7 +447,7 @@ describe("OpenBuddy Hook runtime", () => {
     const root = await mkdtemp(join(tmpdir(), "openbuddy-hooks-system-message-"));
     await writeFile(join(root, "package.json"), JSON.stringify({
       name: "fixture-system-message-hooks",
-      openbuddy: { hooks: { "turn/end": [{ hooks: [{ type: "command", command: "printf '%s' '{\"systemMessage\":\"heads up\",\"continue\":false,\"stopReason\":\"fixture stop\"}'" }] }] } },
+      openbuddy: { hooks: { "turn/end": [{ hooks: [{ type: "command", command: hookEmitCommand({ systemMessage: "heads up", continue: false, stopReason: "fixture stop" }) }] }] } },
     }));
     const events: Array<{ type: string; payload: any }> = [];
     const handlers = new Map<string, (event: any, context: any) => unknown>();

@@ -176,7 +176,7 @@ describe("Pi resource adapters", () => {
 		const paths = await resources.listPiPluginResourcePaths();
 		expect(paths).toHaveLength(1);
 		expect(paths[0]).toMatchObject({ plugin: { name: "pi-demo", enabled: true } });
-		expect(paths[0]?.extensions[0]).toContain("extensions/index.js");
+		expect(paths[0]?.extensions[0]).toContain(join("extensions", "index.js"));
 		expect(paths[0]?.skills[0]).toContain("skills");
 	});
 

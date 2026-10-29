@@ -22,7 +22,7 @@
  */
 import { statIfExists } from "@openbuddy/storage";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { piHome } from "./_host-paths";
 import { type AgentHostState } from "./_state-shape";
@@ -127,7 +127,8 @@ async function captureFileSnapshot(
 
 function isWithinWorkspace(root: string, candidate: string): boolean {
   const path = relative(root, candidate);
-  return path === "" || (path !== ".." && !path.startsWith(`..${String.fromCharCode(47)}`) && !path.startsWith("/"));
+  // 分隔符按平台取:Windows 上 relative() 给的是 "..\\x" 或 "\\x"。
+  return path === "" || (path !== ".." && !path.startsWith(`..${sep}`) && !path.startsWith(sep));
 }
 
 function shellWords(command: string): string[] {

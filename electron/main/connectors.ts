@@ -2,7 +2,7 @@ import { agentPath } from "@openbuddy/storage";
 import { spawn, type ChildProcess } from "node:child_process";
 import { access, readFile, readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { extname, join, relative, resolve, isAbsolute } from "node:path";
+import { extname, join, relative, resolve, isAbsolute, sep } from "node:path";
 import type { ConnectorCatalog, ConnectorItem, TokenField, TokenSchema, ConnectorCliStatus, ConnectorCliAuthResult } from "@openbuddy/shared-types";
 
 type JsonObject = Record<string, unknown>;
@@ -24,7 +24,9 @@ function contained(root: string, candidate: string): string {
   const base = resolve(root);
   const target = resolve(candidate);
   const rel = relative(base, target);
-  if (rel === "" || (!rel.startsWith(`..${String.fromCharCode(47)}`) && rel !== ".." && !isAbsolute(rel))) return target;
+  // 分隔符按平台取:Windows 的 relative() 返回 "..\\x",写死 "/" 会把
+  // 越界路径误判成"根内"。
+  if (rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel))) return target;
   throw new Error("connector path is outside the selected root");
 }
 

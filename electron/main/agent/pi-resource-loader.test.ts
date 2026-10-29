@@ -760,7 +760,7 @@ describe("OpenBuddy Pi package resource loading", () => {
       const fixtureEntry = pending.find((entry: { name: string }) => entry.name === "fixture-acme");
       expect(fixtureEntry).toBeDefined();
       if (!fixtureEntry) throw new Error("fixture-acme provider registration was not captured");
-      expect(fixtureEntry.extensionPath).toContain("extensions/index.js");
+      expect(fixtureEntry.extensionPath).toContain(join("extensions", "index.js"));
       // Wire up the tracker pattern the host uses, drain pending into ModelRuntime,
       // and verify attribution is preserved end-to-end.
       const registry = new Map();
@@ -780,7 +780,7 @@ describe("OpenBuddy Pi package resource loading", () => {
           });
           runtime.registerProvider(entry.name, entry.config);
         }
-        expect(registry.get("fixture-acme")?.extensionPath).toContain("extensions/index.js");
+        expect(registry.get("fixture-acme")?.extensionPath).toContain(join("extensions", "index.js"));
         expect(registry.get("fixture-acme")?.source).toBe("pi-extension");
         expect(changeEvents).toBeGreaterThanOrEqual(1);
       }

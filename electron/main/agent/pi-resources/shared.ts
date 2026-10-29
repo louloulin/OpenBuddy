@@ -12,7 +12,7 @@
  */
 import { realpathSync } from "node:fs";
 import { mkdir, readFile, readdir, realpath, rename, writeFile } from "node:fs/promises";
-import { isAbsolute, dirname, join, relative, resolve } from "node:path";
+import { isAbsolute, dirname, join, relative, resolve, sep } from "node:path";
 import { McpAuthStore, McpRegistry, agentHome, createPlatformSecretStore } from "@openbuddy/storage";
 import { HostCoreSecretStoreBridge } from "../agent-secret-store-bridge";
 
@@ -178,7 +178,11 @@ async function canonicalizeParent(input: string): Promise<string> {
 /** Lexical containment check on already-canonicalised paths. */
 function isWithin(base: string, target: string): boolean {
   const rel = relative(base, target);
-  return rel === "" || (rel !== ".." && !rel.startsWith(`..${String.fromCharCode(47)}`) && !isAbsolute(rel));
+  // 分隔符必须跟平台走(resolve/relative 的输出在 Windows 上是反斜杠)。
+  // 以前这里写死 "/"(String.fromCharCode(47)),于是 Windows 上
+  // relative() 返回 "..\\outside.md" 匹配不上 "../" 前缀 —— 越界路径
+  // 被判成"根内",目录穿越防护整个失效。
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
 /**
