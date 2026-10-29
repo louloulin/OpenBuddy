@@ -125,8 +125,11 @@ describe("HarnessRpcStore", () => {
 		const path = join(root, "cache.json");
 		const lockPath = `${path}.lock`;
 		await writeFile(lockPath, "not-json", { mode: 0o600 });
-		const store = new HarnessRpcStore(path, "identity", { lockTtlMs: 1, lockWaitMs: 100 });
-		await new Promise((resolve) => setTimeout(resolve, 5));
+		const store = new HarnessRpcStore(path, "identity", { lockTtlMs: 1, lockWaitMs: 500 });
+		// Windows timestamp/mtime rounding can make a 5ms-old file look
+		// "just written" for several ticks; 50ms is unambiguously older than a
+		// 1ms TTL on every platform.
+		await new Promise((resolve) => setTimeout(resolve, 50));
 		await expect(store.writeState([], [])).resolves.toBe(1);
 	});
 

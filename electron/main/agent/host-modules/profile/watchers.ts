@@ -54,7 +54,18 @@ export async function startProfileWatchers(
   for (const { target, stats } of probes) {
     if (!stats) continue;
     try {
-      state.profileWatchers.push(watch(target, { persistent: false, recursive: stats.isDirectory() }, () => scheduleProfileReload()));
+      const watcher = watch(target, { persistent: false, recursive: stats.isDirectory() }, () => scheduleProfileReload());
+      // Node's recursive watcher scans the tree and re-scans on change. If the
+      // tree disappears (uninstall, temp cleanup, or Windows EBUSY/EPERM while
+      // the indexer holds it) the watcher emits `error`. An EventEmitter with
+      // no `error` listener throws — an uncaught exception that takes down the
+      // whole process. Watch failures are documented as non-fatal, so log and
+      // close instead of letting it escape.
+      watcher.on("error", (error) => {
+        console.warn(`[openbuddy] profile watcher for ${target} failed; closing:`, error);
+        try { watcher.close(); } catch { /* already closed */ }
+      });
+      state.profileWatchers.push(watcher);
     } catch (error) {
       console.warn(`[openbuddy] failed to watch ${target}:`, error);
     }
