@@ -15,10 +15,11 @@
  *   - 守住 resolve-binary 的核心契约,防止路径解析退化
  *   - 验证 bug fix:`process.env["process.resourcesPath"]` → `process.resourcesPath`
  */
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
+
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 
 import { resolveHostBinary } from "../resolve-binary.js";
 
@@ -79,7 +80,7 @@ describe("resolveHostBinary — PI_OPENBUDDY_HOST_BIN 优先级", () => {
       { ...process.env, PI_OPENBUDDY_HOST_BIN: "/nonexistent/path/to/host-core" },
       tmp,
     );
-    expect(result.endsWith(`target/release/openbuddy-host-core${EXE_SUFFIX}`)).toBe(true);
+    expect(result.endsWith(join("target", "release", `openbuddy-host-core${EXE_SUFFIX}`))).toBe(true);
     rmSync(tmp, { recursive: true, force: true });
   });
 });
@@ -114,7 +115,7 @@ describe("resolveHostBinary — packaged resourcesPath", () => {
     delete process.env.PI_OPENBUDDY_HOST_BIN;
     try {
       const result = resolveHostBinary(process.env, tmp);
-      expect(result.endsWith(`target/release/openbuddy-host-core${EXE_SUFFIX}`)).toBe(true);
+      expect(result.endsWith(join("target", "release", `openbuddy-host-core${EXE_SUFFIX}`))).toBe(true);
     } finally {
       (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath = originalResourcesPath;
       rmSync(tmp, { recursive: true, force: true });
@@ -155,7 +156,7 @@ describe("resolveHostBinary — monorepo target/", () => {
     delete process.env.PI_OPENBUDDY_HOST_BIN;
     try {
       const result = resolveHostBinary(process.env, tmp);
-      expect(result.endsWith(`target/release/openbuddy-host-core${EXE_SUFFIX}`)).toBe(true);
+      expect(result.endsWith(join("target", "release", `openbuddy-host-core${EXE_SUFFIX}`))).toBe(true);
     } finally {
       (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath = originalResourcesPath;
       rmSync(tmp, { recursive: true, force: true });

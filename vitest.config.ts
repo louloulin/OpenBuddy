@@ -21,6 +21,17 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
+/**
+ * 单个用例/钩子的超时。
+ *
+ * Windows runner 上 jsdom + React 的冷启动明显更慢：PR #66 实测
+ * `openbuddy-ui-conversation` / `-library` / `-runtime` 三个包在
+ * windows-latest 上撞 20s 上限（macOS/ubuntu 同代码全过）。这不是
+ * 产品卡死，是同一类"CI 机器比开发机慢"的问题（见下方 5s → 20s 的来历）。
+ * 按平台放宽，而不是全局调到 60s —— 全局放大会让真正的死循环更难被发现。
+ */
+const DEFAULT_TEST_TIMEOUT = process.platform === "win32" ? 60000 : 20000;
+
 export default defineConfig({
   plugins: [tsconfigPaths()],
   // P0-01 — Workaround for the 13 pre-existing vitest failures whose root
@@ -69,8 +80,8 @@ export default defineConfig({
     // setState，DOM 残留导致下一个用例 `getByTestId('custom-docx-preview')`
     // 找到两个元素，抛 "Found multiple elements" —— 那不是产品缺陷，
     // 是超时引发的连锁反应。所以这里放宽的是"合理的慢"，不是"卡死"。
-    testTimeout: 20000,
-    hookTimeout: 20000,
+    testTimeout: DEFAULT_TEST_TIMEOUT,
+    hookTimeout: DEFAULT_TEST_TIMEOUT,
     // Mark `bin/__tests__/**` and `tests/integration/**` as node-environment so
     // the file-system + child-process helpers work without jsdom overhead.
     environmentMatchGlobs: [
