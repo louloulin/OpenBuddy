@@ -23,7 +23,8 @@ describe("Harness identity token", () => {
 		const second = await resolveHarnessAuthToken({ path });
 		expect(first).toBe(second);
 		expect(await readFile(path, "utf8")).toBe(`${first}\n`);
-		expect((await stat(path)).mode & 0o777).toBe(0o600);
+		// Windows 没有 POSIX 权限位,mode & 0o777 在那里是伪造常量。
+		if (process.platform !== "win32") expect((await stat(path)).mode & 0o777).toBe(0o600);
 	});
 
 	it("replaces malformed persisted identities", async () => {

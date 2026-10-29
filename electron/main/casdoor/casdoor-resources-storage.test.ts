@@ -51,7 +51,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  rmSync(userData, { recursive: true, force: true });
+  // 先关 SQLite 句柄再删目录(Windows EBUSY)。
+  __casdoorResourceTestables.resetResourceStoreForTests?.();
+  rmSync(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 describe("casdoor-resources SettingsDocumentStore-backed persistence", () => {

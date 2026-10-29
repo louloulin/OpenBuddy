@@ -1209,6 +1209,7 @@ const WEBHOOK_SUBSCRIPTION_NAMESPACE = "casdoor:webhook-subscriptions";
 const webhookSubscriptions = new Map<string, Set<CasdoorWebhookEventType>>();
 let webhookSubscriptionsLoaded = false;
 let webhookSubscriptionStore: SettingsDocumentStore | null = null;
+let webhookSubscriptionDriver: { close(): void } | null = null;
 
 interface PersistedWebhookSubscriptions {
   schemaVersion: number;
@@ -1226,6 +1227,7 @@ function casdoorWebhookStoragePath(): string {
 function openWebhookSubscriptionStore(): SettingsDocumentStore {
   if (webhookSubscriptionStore) return webhookSubscriptionStore;
   const opened = openStorageSync({ filePath: casdoorWebhookStoragePath(), appVersion: "openbuddy-casdoor-management" });
+  webhookSubscriptionDriver = opened.driver;
   webhookSubscriptionStore = new SettingsDocumentStore(opened.driver);
   return webhookSubscriptionStore;
 }
@@ -1345,6 +1347,10 @@ export function clearCasdoorWebhookSubscriptions(tenantId: string): void {
 }
 
 function resetWebhookSubscriptionsForTests(): void {
+  // 只置空引用会让 SQLite 句柄泄漏 -> Windows 上测试目录 rm EBUSY。
+  try { webhookSubscriptionDriver?.close(); } catch { /* 已经关了 */ }
+  webhookSubscriptionDriver = null;
+  webhookSubscriptionStore = null;
   webhookSubscriptions.clear();
   webhookSubscriptionsLoaded = false;
   legacyMigrationPromise = null;

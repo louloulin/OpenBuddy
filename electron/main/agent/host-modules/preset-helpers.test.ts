@@ -2,6 +2,7 @@
  * preset-helpers.test.ts — smoke tests for preset helpers cluster.
  */
 import { afterEach, describe, it, expect, vi } from "vitest";
+import { join, resolve } from "node:path";
 
 import {
   installPresetHelpers,
@@ -35,7 +36,8 @@ describe("preset-helpers", () => {
       home: "/x",
     };
     installPresetHelpers({ state, piHome: () => "" });
-    expect(selectedProfileDirectory()).toBe("/abs/profile");
+    // 实现走 resolve(),断言也必须走 —— Windows 上 "/abs/profile" 解析成 "D:\abs\profile"。
+    expect(selectedProfileDirectory()).toBe(resolve("/abs/profile"));
   });
 
   it("selectedProfileDirectory falls back to <home>/profiles/<name>", () => {
@@ -46,8 +48,8 @@ describe("preset-helpers", () => {
       home: "/h",
     };
     installPresetHelpers({ state, piHome: () => "" });
-    // join("/h", "profiles", "myprof")
-    expect(selectedProfileDirectory()).toMatch(/profiles\/myprof$/);
+    // join("/h", "profiles", "myprof") —— 用 join 拼期望值,不要写死 "/"。
+    expect(selectedProfileDirectory()).toBe(join("/h", "profiles", "myprof"));
   });
 
   it("createPiToolExtension registers tools from preset or registry", () => {

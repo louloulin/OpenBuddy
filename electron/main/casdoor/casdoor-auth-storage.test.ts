@@ -40,7 +40,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  rmSync(userData, { recursive: true, force: true });
+  // 先关 SQLite 句柄再删目录:Windows 上删一个仍被打开的文件会 EBUSY。
+  resetAuthSettingsStoreForTests();
+  rmSync(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 describe("casdoor-auth SettingsDocumentStore-backed persistence", () => {

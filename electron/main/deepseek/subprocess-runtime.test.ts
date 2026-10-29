@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolve } from "node:path";
 import { SandboxPolicyService, SandboxRuntime, SubprocessRuntime, scrubbedParentEnv } from "./subprocess-runtime";
 
 describe("SubprocessRuntime", () => {
@@ -69,9 +70,11 @@ describe("SubprocessRuntime", () => {
 
   it("resolves a session-scoped sandbox policy", () => {
     const policy = new SandboxPolicyService({ mode: "read-only", workspaceRoot: "/tmp" });
+    // cwd 会被 resolve();期望值同样走 resolve(Windows 上是 D:\workspace\project)。
+    const sessionCwd = resolve("/workspace/project");
     expect(policy.resolve({ session: { sessionId: "session-1", cwd: "/workspace/project" } })).toMatchObject({
       mode: "read-only",
-      workspaceRoot: "/workspace/project",
+      workspaceRoot: sessionCwd,
       sessionId: "session-1",
     });
     policy.setSessionMode("session-1", "workspace-write");

@@ -91,20 +91,20 @@ describe("describeAgentPaths", () => {
 
   it("OPENBUDDY_AGENT_DIR 覆盖生效,agents 跟随 <dirname(home)>/agents", () => {
     clearEnv();
-    process.env.OPENBUDDY_AGENT_DIR = "/tmp/custom-agent";
+    process.env.OPENBUDDY_AGENT_DIR = join("/tmp", "custom-agent");
     const paths = describeAgentPaths();
-    expect(paths.home).toBe("/tmp/custom-agent");
+    expect(paths.home).toBe(join("/tmp", "custom-agent"));
     // 默认 agents 走 dirname(home)/agents 的派生。
-    expect(paths.agents).toBe("/tmp/agents");
+    expect(paths.agents).toBe(join("/tmp", "agents"));
     expect(paths.agentsDisplay).toBe("/tmp/agents");
     expect(paths.fromEnv).toBe(true);
   });
 
   it("PI_CODING_AGENT_DIR 也计为显式覆盖(pi 迁移路径)", () => {
     clearEnv();
-    process.env.PI_CODING_AGENT_DIR = "/tmp/pi-agent";
+    process.env.PI_CODING_AGENT_DIR = join("/tmp", "pi-agent");
     const paths = describeAgentPaths();
-    expect(paths.home).toBe("/tmp/pi-agent");
+    expect(paths.home).toBe(join("/tmp", "pi-agent"));
     expect(paths.fromEnv).toBe(true);
   });
 
@@ -118,7 +118,8 @@ describe("describeAgentPaths", () => {
     // agents 落在 home 的兄弟目录(<PI_HOME>/.openbuddy/agents),即用户
     // 整体数据根(<PI_HOME>/.openbuddy)下的 agents/。仍然不沾 ~/.pi 本身。
     expect(paths.agents).toBe(join(homedir(), ".pi", ".openbuddy", "agents"));
-    expect(paths.agentsDisplay).toBe(join(homedir(), ".pi", ".openbuddy", "agents").replace(homedir(), "~"));
+    // agentsDisplay 是展示用路径,统一用 "/"(见 agent-paths.ts 的 toDisplay)。
+    expect(paths.agentsDisplay).toBe("~/.pi/.openbuddy/agents");
     // PI_HOME 不是"显式 agent 根",所以不算 fromEnv 覆盖。
     expect(paths.fromEnv).toBe(false);
   });

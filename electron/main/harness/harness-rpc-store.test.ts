@@ -18,7 +18,8 @@ describe("HarnessRpcStore", () => {
 		const store = new HarnessRpcStore(path, harnessRpcIdentity("token-a"));
 		await store.write([{ rpcId: "rpc-1", fingerprint: "fingerprint", expiresAt: Date.now() + 10_000, result: { ok: true, value: { answer: 42 } } }]);
 		expect(await store.read()).toEqual([{ rpcId: "rpc-1", fingerprint: "fingerprint", expiresAt: expect.any(Number), result: { ok: true, value: { answer: 42 } } }]);
-		expect((await stat(path)).mode & 0o777).toBe(0o600);
+		// Windows 没有 POSIX 权限位。
+		if (process.platform !== "win32") expect((await stat(path)).mode & 0o777).toBe(0o600);
 		expect(JSON.parse(await readFile(path, "utf8"))).toMatchObject({ version: 1, identity: harnessRpcIdentity("token-a") });
 		expect(await new HarnessRpcStore(path, harnessRpcIdentity("token-b")).read()).toEqual([]);
 	});

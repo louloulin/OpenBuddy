@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resolve } from "node:path";
 
 const writeTextFile = vi.hoisted(() => vi.fn(async (path: string) => path));
 const exportTextFile = vi.hoisted(() => vi.fn(async (path: string) => path));
@@ -40,7 +41,8 @@ describe("main-process file and connector containment", () => {
     await expect(handler({}, { path: "file.txt", content: "x", workspaceRoot: "/tmp" })).rejects.toThrow("workspaceRoot 必须是已注册的工作区");
     expect(writeTextFile).not.toHaveBeenCalled();
 		await expect(handler({}, { path: "file.txt", content: "x", workspaceRoot: "/workspace/storage" })).resolves.toBe("file.txt");
-		expect(writeTextFile).toHaveBeenCalledWith("file.txt", "x", expect.stringMatching(/\/workspace\/storage$/));
+		// 实现把 workspaceRoot 过了一次 resolve();断言同样走 resolve,不要写死 "/"。
+		expect(writeTextFile).toHaveBeenCalledWith("file.txt", "x", resolve("/workspace/storage"));
   });
 
   it("treats an explicit null cwd as \"use the host workspace\" on every shellfs channel", async () => {
@@ -80,6 +82,6 @@ describe("main-process file and connector containment", () => {
     (ipcMain.handle as ReturnType<typeof vi.fn>).mock.calls.forEach(([channel, handler]) => handlers.set(channel, handler));
     const handler = handlers.get("connectors_cli_auth")!;
     await expect(handler({}, { root: "/tmp/evil", source: "github" })).rejects.toThrow("connector root 不在允许的连接器目录内");
-    await expect(handler({}, { root: "/allowed/connectors/github", source: "github" })).resolves.toBe("/allowed/connectors/github");
+    await expect(handler({}, { root: "/allowed/connectors/github", source: "github" })).resolves.toBe(resolve("/allowed/connectors/github"));
   });
 });
