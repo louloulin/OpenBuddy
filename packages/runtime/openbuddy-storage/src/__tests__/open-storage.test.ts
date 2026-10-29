@@ -251,28 +251,29 @@ describe("openStorage", () => {
   it("构造函数失败时不泄漏 SQLite 句柄(损坏库可被立即删除)", async () => {
     // 回归:SqliteDriver 构造函数里第一条 PRAGMA 就会在损坏文件上抛异常。
     // 原本没有 close(),而构造函数抛异常时调用方拿不到对象、也就无从关闭 ——
-    // 句柄泄漏。Windows 上泄漏的句柄让文件无法 unlink(EBUSY/EPERM)。
-    //
-    // 只断言 "unlink 成功" 在 macOS 上抓不到这个 bug(macOS 允许 unlink
-    // 已打开的文件),必须直接数打开的文件描述符 —— 泄漏一次就多一个。
+    // 句柄泄漏。
     root = await mkdtemp(join(tmpdir(), "openbuddy-driver-leak-"));
     const corruptPath = join(root, "corrupt.sqlite");
     await writeFile(corruptPath, "not a sqlite database");
 
-    const fdCount = (): number => {
-      try {
-        return readdirSync("/dev/fd").length;      // macOS / Linux
-      } catch {
-        return readdirSync("/proc/self/fd").length; // Linux 兜底
-      }
-    };
+    const isWindows = process.platform === "win32";
 
-    const before = fdCount();
+    // 两个平台能观察到的信号不一样,分别用各自敏感的判据:
+    //
+    //  - Windows:泄漏的句柄让文件根本无法 unlink/rename(EBUSY/EPERM),
+    //    所以"删得掉"本身就是断言。
+    //  - macOS/Linux:允许 unlink 已打开的文件,"删得掉"证明不了任何事。
+    //    只能数打开的文件描述符 —— 泄漏一次就多一个。
+    const fdCount = (): number => readdirSync(process.platform === "darwin" ? "/dev/fd" : "/proc/self/fd").length;
+
+    const before = isWindows ? 0 : fdCount();
     for (let i = 0; i < 5; i += 1) {
       await expect(openStorage({ filePath: corruptPath })).rejects.toThrow();
     }
-    // 5 次失败打开若各泄漏一个句柄,before 之后会多出 5 个 fd。
-    expect(fdCount()).toBe(before);
+    if (!isWindows) {
+      // 5 次失败打开若各泄漏一个句柄,before 之后会多出 5 个 fd。
+      expect(fdCount()).toBe(before);
+    }
 
     await expect(rm(corruptPath, { force: true })).resolves.toBeUndefined();
     expect(existsSync(corruptPath)).toBe(false);
