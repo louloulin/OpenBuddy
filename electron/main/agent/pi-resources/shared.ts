@@ -124,7 +124,13 @@ function canonicalizeSync(input: string): string {
   const tail: string[] = [];
   for (;;) {
     try {
-      const real = realpathSync(current);
+      // 必须用 `.native`:`fs.realpathSync` 是 JS 实现,只做 readlink 展开,
+      // 会原样保留 Windows 的 8.3 短名(`C:\Users\RUNNER~1\...`);而
+      // `fs.promises.realpath` 走 libuv 原生实现,返回长名
+      // (`C:\Users\runneradmin\...`)。调用方常常先 `await realpath(root)`
+      // 再把结果交给 `within()`,于是同一条路径被两种实现规范化成不同字符串,
+      // 在 Windows CI 上被判为"越界"——所有 marketplace 安装直接失败。
+      const real = realpathSync.native(current);
       return tail.length ? join(real, ...tail.reverse()) : real;
     } catch {
       const parent = dirname(current);

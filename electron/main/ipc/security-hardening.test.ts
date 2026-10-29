@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { resolve } from "node:path";
 
 const writeTextFile = vi.hoisted(() => vi.fn(async (path: string) => path));

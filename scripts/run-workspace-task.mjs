@@ -188,7 +188,16 @@ async function worker() {
     const seconds = (result.ms / 1000).toFixed(1);
     console.log(`${status}  ${result.job.rel}  (${seconds}s)`);
     if (result.code !== 0) {
-      const tail = result.out.split("\n").slice(-40).join("\n");
+      const lines = result.out.split("\n");
+      // 只打印尾部会把"较早的失败"整段吃掉(Windows CI 上一次只能看到最后
+      // 几个 test file)。先把所有失败行抽出来,再保留尾部上下文。
+      const failureLines = lines.filter((line) =>
+        /^\s*(FAIL|×|✗)|AssertionError|^\s*(?:Error|TypeError|ReferenceError|RangeError|SyntaxError):/.test(line),
+      );
+      if (failureLines.length) {
+        console.log(`----- ${result.job.rel} 失败行(${failureLines.length}) -----\n${failureLines.join("\n")}\n`);
+      }
+      const tail = lines.slice(-120).join("\n");
       console.log(`----- ${result.job.rel} 输出尾部 -----\n${tail}\n`);
     }
   }

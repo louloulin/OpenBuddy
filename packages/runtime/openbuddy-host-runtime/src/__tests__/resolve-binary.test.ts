@@ -17,7 +17,7 @@
  */
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, sep } from "node:path";
+import { join } from "node:path";
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 

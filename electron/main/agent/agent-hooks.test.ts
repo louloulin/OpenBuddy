@@ -1,30 +1,53 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { createPiHooksExtension, discoverHookConfigs, listRegisteredHookConfigs, registerHookConfig, runHookPoint, type HookRuntimeConfig, type HookShellRunRequest } from "./agent-hooks";
 
 // Hook 命令走平台 shell:POSIX 是 /bin/sh -lc,Windows 是 cmd /d /s /c。
 // 所以测试里不能出现 printf / cat / sleep —— cmd 下这些命令不存在,
 // 用例会在 Windows 上静默失败(exit code 9009, stdout 为空)。
-// 统一改用 node(测试本就跑在 node 上),数据通过 argv 传,避免引号地狱。
+//
+// 数据也不能再通过 argv 传:cmd.exe 不懂 POSIX 的 \" 转义,JSON 里带引号的
+// 参数会被拆碎(Windows CI 上表现为 stdout 为空 / 写文件 ENOENT)。因此把
+// fixture 写成脚本文件,payload 内嵌进脚本,命令行上只剩一个脚本路径。
+const fixtureRoot = mkdtempSync(join(tmpdir(), "openbuddy-hook-fixtures-"));
+let fixtureSeq = 0;
+afterAll(() => { rmSync(fixtureRoot, { recursive: true, force: true }); });
+
 function quoteShellArg(value: string): string {
-  // 反斜杠只在 POSIX shell 双引号里有转义含义;Windows 路径天然含反斜杠。
-  if (process.platform !== "win32" && /[\\$`]/.test(value)) {
-    throw new Error("fixture value must be shell-safe: " + value);
+  // 只接受我们自己生成的临时脚本路径,不做通用的 shell 转义(那正是
+  // CodeQL js/incomplete-sanitization 指出的问题,而且永远转不干净):
+  // 路径里出现引号/换行说明上游出了问题,直接拒绝。
+  if (/[\r\n]/.test(value)) throw new Error("fixture path must not contain newlines");
+  if (process.platform === "win32") {
+    // cmd 双引号内反斜杠是字面量,Windows 路径天然含反斜杠。
+    if (value.includes('"')) throw new Error("fixture path must not contain double quotes");
+    return `"${value}"`;
   }
-  return '"' + value.replace(/"/g, '\\"') + '"';
+  if (value.includes("'")) throw new Error("fixture path must not contain single quotes");
+  return `'${value}'`;
+}
+
+function writeFixtureScript(source: string): string {
+  const file = join(fixtureRoot, `fixture-${fixtureSeq++}.cjs`);
+  writeFileSync(file, source);
+  return file;
 }
 
 function hookEmitCommand(payload: unknown): string {
-  return `node -e "process.stdout.write(process.argv[1])" ${quoteShellArg(JSON.stringify(payload))}`;
+  const script = writeFixtureScript(`process.stdout.write(${JSON.stringify(JSON.stringify(payload))});`);
+  return `node ${quoteShellArg(script)}`;
 }
 
 function hookCaptureCommand(path: string, payload: unknown): string {
-  return (
-    `node -e "require('fs').writeFileSync(process.argv[1],require('fs').readFileSync(0,'utf8'));` +
-    `process.stdout.write(process.argv[2])" ${quoteShellArg(path)} ${quoteShellArg(JSON.stringify(payload))}`
+  const script = writeFixtureScript(
+    `const fs=require('fs');` +
+    `fs.writeFileSync(${JSON.stringify(path)},fs.readFileSync(0,'utf8'));` +
+    `process.stdout.write(${JSON.stringify(JSON.stringify(payload))});`,
   );
+  return `node ${quoteShellArg(script)}`;
 }
 
 describe("OpenBuddy Hook runtime", () => {
