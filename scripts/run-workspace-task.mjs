@@ -120,13 +120,23 @@ console.log(`执行 moon task "${taskName}"：${jobs.length} 个项目，并发 
 function runJob(job) {
   return new Promise((resolveJob) => {
     const isScript = typeof job.task.script === "string";
-    const cmd = isScript ? "sh" : "pnpm";
-    const argv = isScript ? ["-c", job.task.script] : ["exec", ...job.task.command.split(/\s+/)];
+    // Windows 上 `pnpm` 实际是 `pnpm.cmd`，不带扩展名 spawn 会 ENOENT；
+    // `sh -c` 同理（Windows 上没有 sh）。用 shell:true 让系统自己解析，
+    // 跨平台一致。PR #66 的 windows-latest 曾因此报 `spawn pnpm ENOENT`。
+    const isWindows = process.platform === "win32";
+    const cmd = isScript ? (isWindows ? "cmd" : "sh") : "pnpm";
+    const argv = isScript
+      ? isWindows
+        ? ["/d", "/s", "/c", job.task.script]
+        : ["-c", job.task.script]
+      : ["exec", ...job.task.command.split(/\s+/)];
 
     const child = spawn(cmd, argv, {
       cwd: job.dir,
       env: { ...process.env, FORCE_COLOR: "0" },
       stdio: ["ignore", "pipe", "pipe"],
+      // Windows: 让 Node 通过 PATHEXT 解析 pnpm -> pnpm.cmd
+      shell: isWindows && !isScript,
     });
 
     let out = "";

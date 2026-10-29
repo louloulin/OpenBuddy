@@ -30,8 +30,8 @@
 //
 // 用法：node scripts/repair-node-modules.mjs [--dry-run]
 
-import { readdirSync, readFileSync, existsSync, rmSync, lstatSync, readlinkSync, statSync } from "node:fs";
-import { join, resolve, dirname } from "node:path";
+import { readdirSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));

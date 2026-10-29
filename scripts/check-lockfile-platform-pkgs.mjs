@@ -47,7 +47,6 @@ const lock = readFileSync(lockPath, "utf8");
  * 这里不硬编码包清单 —— 检查的是「lockfile 里有没有 @moonrepo/core- 前缀
  * 的条目」，数量为 0 就说明平台包整组丢了。
  */
-const MOON_PLATFORM_PREFIX = "@moonrepo/core-";
 
 /** @type {string[]} */
 const platformEntries = [];

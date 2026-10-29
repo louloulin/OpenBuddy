@@ -5,7 +5,6 @@ import CopyButton from '@/components/CopyButton';
 import Reveal from '@/components/motion/Reveal';
 import { PageHeader, SectionHeader } from '@/components/PageHeader';
 import { SITE_STATS } from '@/lib/constants';
-import { SITE_VERSION } from '@/lib/site-version';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import { localizedPath } from '@/lib/i18n';
 import { formatBytes, isTrustedDownloadUrl, type ReleaseAsset, type ReleaseInfo, type ReleasePlatform } from '@/lib/releases-server';

@@ -281,6 +281,9 @@ async function writeSlowStream(res, body, lines = 60) {
   res.end();
 }
 
+/** 请求转储目录：私有临时目录，不用可预测的 /tmp 路径。 */
+const proxyDumpDir = mkdtempSync(join(tmpdir(), "ob-agentux-req-"));
+
 const proxy = createServer(async (req, res) => {
   let raw = "";
   for await (const chunk of req) raw += chunk;
@@ -288,7 +291,12 @@ const proxy = createServer(async (req, res) => {
   try { body = JSON.parse(raw || "{}"); } catch { /* forward verbatim */ }
   proxyRequests += 1;
   if (proxyRequests <= 3) {
-    try { writeFileSync(`/tmp/ob-agentux-request-${proxyRequests}.json`, JSON.stringify(body, null, 2)); } catch { /* ignore */ }
+    // 用 mkdtempSync 建的私有目录，不用可预测的 /tmp/<name> —— 后者是
+    // CodeQL js/insecure-temporary-file 指出的符号链接攻击面（本机多用户
+    // 场景下别人可以预先占位/替换）。目录在 388 行创建，退出时清理。
+    try {
+      writeFileSync(join(proxyDumpDir, `request-${proxyRequests}.json`), JSON.stringify(body, null, 2));
+    } catch { /* ignore */ }
   }
 
   // 协议必须跟着上游走:Anthropic Messages 端点(/v1/messages)与 OpenAI
@@ -881,6 +889,7 @@ try {
 } finally {
   try { await app?.close(); } catch {}
   try { rmSync(userData, { recursive: true, force: true }); } catch {}
+  try { rmSync(proxyDumpDir, { recursive: true, force: true }); } catch {}
   try { proxy.close(); } catch {}
 }
 

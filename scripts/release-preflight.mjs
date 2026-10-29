@@ -8,7 +8,7 @@
  * records why desktop smoke can or cannot run in this environment.
  */
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { platform, arch } from "node:os";
@@ -87,7 +87,7 @@ const artifactContract = Object.fromEntries(
 );
 check("release:artifact-contract", Object.values(artifactContract).every(Boolean), {
   ...artifactContract,
-  reason: "artifactName must carry ${arch} on every platform, in both electron-builder.yml and electron-builder.unsigned.yml",
+  reason: "artifactName must carry the arch token on every platform, in both electron-builder.yml and electron-builder.unsigned.yml",
 });
 check("release:signing-is-ci-only", !process.env.CSC_LINK && !process.env.CSC_KEY_PASSWORD && !process.env.APPLE_API_KEY, {
   reason: "local preflight never consumes signing/notarization credentials",
