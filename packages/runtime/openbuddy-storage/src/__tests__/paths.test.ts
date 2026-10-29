@@ -18,6 +18,8 @@
  * 这两个都是「看起来只是文案、实际是数据落盘」的问题,所以这里既做纯逻辑
  * 断言,也把真实 SDK 拉进来对一次。
  */
+import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   agentHome,
@@ -45,28 +47,32 @@ afterEach(() => {
 });
 
 describe("agentHome", () => {
+  // 注意:这几条断言必须用 join() 拼期望值,不能写死 "/a/b" 字面量。
+  // agentHome() 内部用的是 node:path 的 join,Windows 上分隔符是 "\"。
+  // 之前写死 POSIX 字面量时,macOS/ubuntu 全绿,windows-latest 上一片
+  // "expected '\\tmp\\pi-home\\.openbuddy\\agent' to be '/tmp/pi-home/...'"。
   it("默认是 ~/.openbuddy/agent,不是 ~/.pi/agent", () => {
     const home = agentHome();
-    expect(home.endsWith("/.openbuddy/agent")).toBe(true);
+    expect(home.endsWith(join(".openbuddy", "agent"))).toBe(true);
     expect(home).not.toMatch(/[\\/]\.pi([\\/]|$)/);
   });
 
   it("OPENBUDDY_AGENT_DIR 优先于 PI_CODING_AGENT_DIR", () => {
-    process.env.PI_CODING_AGENT_DIR = "/tmp/pi-agent";
-    process.env.OPENBUDDY_AGENT_DIR = "/tmp/openbuddy-agent";
-    expect(agentHome()).toBe("/tmp/openbuddy-agent");
+    process.env.PI_CODING_AGENT_DIR = join("/tmp", "pi-agent");
+    process.env.OPENBUDDY_AGENT_DIR = join("/tmp", "openbuddy-agent");
+    expect(agentHome()).toBe(join("/tmp", "openbuddy-agent"));
   });
 
   it("PI_HOME 只作为前缀,仍然追加 .openbuddy/agent", () => {
-    process.env.PI_HOME = "/tmp/pi-home";
+    process.env.PI_HOME = join("/tmp", "pi-home");
     const home = agentHome();
-    expect(home).toBe("/tmp/pi-home/.openbuddy/agent");
-    expect(home).not.toBe("/tmp/pi-home");
+    expect(home).toBe(join("/tmp", "pi-home", ".openbuddy", "agent"));
+    expect(home).not.toBe(join("/tmp", "pi-home"));
   });
 
   it("agentPath 拼在 agentHome 之下", () => {
-    process.env.OPENBUDDY_AGENT_DIR = "/tmp/ob";
-    expect(agentPath("agents", "reviewer.md")).toBe("/tmp/ob/agents/reviewer.md");
+    process.env.OPENBUDDY_AGENT_DIR = join("/tmp", "ob");
+    expect(agentPath("agents", "reviewer.md")).toBe(join("/tmp", "ob", "agents", "reviewer.md"));
   });
 });
 
@@ -106,10 +112,10 @@ describe("pinPiAgentDirEnv", () => {
     // ~/.pi/agent —— 另一个产品的目录。
     expect(pinPiAgentDirEnv()).toBe(true);
     const pinned = process.env.PI_CODING_AGENT_DIR!;
-    expect(pinned.endsWith("/.openbuddy/agent")).toBe(true);
+    expect(pinned.endsWith(join(".openbuddy", "agent"))).toBe(true);
     expect(pinned).not.toMatch(/[\\/]\.pi([\\/]|$)/);
     // agents 子目录落在 OpenBuddy 自己的根下 —— 这正是用户要求的位置。
-    expect(agentPath("agents")).toBe(`${pinned}/agents`);
+    expect(agentPath("agents")).toBe(join(pinned, "agents"));
   });
 });
 

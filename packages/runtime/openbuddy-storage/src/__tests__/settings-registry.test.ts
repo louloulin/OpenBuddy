@@ -95,11 +95,16 @@ describe("SettingsRegistry (Phase D.1 verification)", () => {
 
   it("custom now function is honoured for updatedAt", () => {
     const fixedNow = () => "2026-01-01T00:00:00.000Z";
-    const custom = new SettingsRegistry(
-      openStorageSync({ filePath: join(root, "custom.sqlite") }).driver,
-      fixedNow,
-    );
-    custom.set("test", "key", "v");
-    expect(custom.get("test", "key")?.updatedAt).toBe("2026-01-01T00:00:00.000Z");
+    // 这条用例自己开了一个第二个驱动(custom.sqlite)。不关掉的话
+    // afterEach 的 rmSync 在 Windows 上 EBUSY —— 上面只关了 beforeEach
+    // 那个驱动,盖不住这一个。
+    const customDriver = openStorageSync({ filePath: join(root, "custom.sqlite") }).driver;
+    try {
+      const custom = new SettingsRegistry(customDriver, fixedNow);
+      custom.set("test", "key", "v");
+      expect(custom.get("test", "key")?.updatedAt).toBe("2026-01-01T00:00:00.000Z");
+    } finally {
+      customDriver.close();
+    }
   });
 });

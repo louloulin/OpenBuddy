@@ -14,7 +14,8 @@
  *   - pathspec 一律置于 `--` 之后,且拒绝绝对路径逃逸与 `:` 魔法前缀。
  */
 import { execFile } from "node:child_process";
-import { readFile, stat } from "node:fs/promises";
+import { statIfExists } from "@openbuddy/storage";
+import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 
@@ -221,7 +222,7 @@ export function createGitService(options: {
     const absolute = resolve(root, rawPath);
     let content = "";
     try {
-      const info = await stat(absolute, { throwIfNoEntry: false });
+      const info = await statIfExists(absolute);
       if (!info?.isFile()) return "";
       content = await readFile(absolute, "utf8");
     } catch {

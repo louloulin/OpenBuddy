@@ -14,14 +14,20 @@ import { SettingsStore, type SettingsValidator } from "../sqlite/settings-store"
 
 let root = "";
 let store: SettingsStore;
+let driver: ReturnType<typeof openStorageSync>["driver"];
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "settings-store-test-"));
-  store = new SettingsStore({ driver: openStorageSync({ filePath: join(root, "profile.sqlite") }).driver });
+  driver = openStorageSync({ filePath: join(root, "profile.sqlite") }).driver;
+  store = new SettingsStore({ driver });
 });
 
+// Windows 上不能 unlink 一个仍被打开的文件 —— 会 EBUSY。之前这里直接
+// rmSync 目录，macOS 允许删除已打开文件所以一直没暴露，windows-latest
+// CI 上一片 EBUSY。关闭驱动再删即可。
 afterEach(() => {
-  if (root) rmSync(root, { recursive: true, force: true });
+  try { driver?.close(); } catch { /* 已经关了 */ }
+  if (root) rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   root = "";
 });
 

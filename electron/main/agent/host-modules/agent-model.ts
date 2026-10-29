@@ -20,8 +20,7 @@
  *     3884 中后两者被删除, 但 line 3404 实现还在; 实际 wrapper import 替换
  *     实际函数, 行为不变)
  */
-import { agentHome } from "@openbuddy/storage";
-import { stat } from "node:fs/promises";
+import { agentHome, statIfExists } from "@openbuddy/storage";
 import { join } from "node:path";
 
 import { ModelRegistry, ModelRuntime } from "@earendil-works/pi-coding-agent";
@@ -165,7 +164,7 @@ async function authStatus() {
   });
   return {
     ready: available.length > 0 || configuredModels.length > 0 || providers.some((provider) => runtime.hasConfiguredAuth(provider)),
-    hasAuthFile: (await stat(join(piHome(), "auth.json"), { throwIfNoEntry: false }))?.isFile() ?? false,
+    hasAuthFile: (await statIfExists(join(piHome(), "auth.json")))?.isFile() ?? false,
     providers,
   };
 }

@@ -79,13 +79,20 @@ const consumed = new Map(); // name -> Set(file)
 /** name -> { kind, scope, regKind, regScope, hasOwner }:登记表要公开的两个轴。 */
 const meta = new Map();
 
+// Windows 上 walk() 用 join 拼出来的路径是 `C:\...\packages\ui\...`,
+// 下面那条正则写的是 "/" —— 直接匹配会全部落空,每个注册方都退化成
+// "host",生成出来的表在 windows-latest 上与仓库里的文档逐字节不一致
+// (macOS/ubuntu 上永远复现不了)。统一先转成 POSIX 分隔符再判断。
+const toPosix = (p) => p.replace(/\\/g, "/");
+
 const pkgOf = (file) => {
-  const m = file.match(/\/packages\/ui\/(openbuddy-ui-[^/]+)\//);
+  const normalized = toPosix(file);
+  const m = normalized.match(/\/packages\/ui\/(openbuddy-ui-[^/]+)\//);
   // 目录名 `openbuddy-ui-settings` 对应的包名是 `@openbuddy/ui-settings` ——
   // 少这一层转换的话,表里的注册方会和 package.json 里的真实包名对不上
   // (守卫测试拿 BUILTIN_UI_APPLIES 里的 `pkg` 去比,一比就红)。
   if (m) return "@openbuddy/" + m[1].replace(/^openbuddy-ui-/, "ui-");
-  return file.startsWith(join(ROOT, "src")) ? "app(src)" : "host";
+  return normalized.startsWith(toPosix(join(ROOT, "src"))) ? "app(src)" : "host";
 };
 
 const metaOf = (name) => {
@@ -301,7 +308,9 @@ const rows = names.map((name) => {
     status,
     reason: reasonOf(name, status),
     declaredBy: [...new Set(abs.map(pkgOf))],
-    declaredIn: abs.map((f) => f.replace(ROOT + "/", "")),
+    // 同上:`ROOT + "/"` 在 Windows 上匹配不到(那边是 `ROOT + "\\"`),
+    // 结果是表里出现绝对路径 —— 既泄露本机路径,又让生成区块与仓库文档不一致。
+    declaredIn: abs.map((f) => toPosix(f).replace(toPosix(ROOT) + "/", "")),
     registeredBy: regs,
     consumedBy: cons,
   };

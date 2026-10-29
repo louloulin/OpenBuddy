@@ -10,7 +10,7 @@
  *   read_text_file, write_text_file, export_text_file,
  *   list_dir, browse_directory
  */
-import { agentHome } from "@openbuddy/storage";
+import { agentHome, statIfExists } from "@openbuddy/storage";
 import { spawn } from "node:child_process"
 import { promises as fs } from "node:fs"
 import { platform } from "node:os"
@@ -73,9 +73,9 @@ async function ensureReadablePath(input: string, cwd?: string | null): Promise<s
 async function ensureUnderWorkspace(root: string, candidate: string): Promise<string> {
 	const rootCanon = await fs.realpath(path.resolve(root)).catch(() => path.resolve(root))
 	const candidateCanon = path.resolve(candidate)
-	if (!(await fs.stat(candidateCanon, { throwIfNoEntry: false }))) {
+	if (!(await statIfExists(candidateCanon))) {
 		const parent = path.dirname(candidateCanon)
-		if (parent && !(await fs.stat(parent, { throwIfNoEntry: false }))) {
+		if (parent && !(await statIfExists(parent))) {
 			await fs.mkdir(parent, { recursive: true })
 		}
 	}
@@ -145,7 +145,7 @@ async function revealInFolder(resolved: string): Promise<void> {
 		})
 		return
 	}
-	const target = (await fs.stat(resolved, { throwIfNoEntry: false }))?.isDirectory()
+	const target = (await statIfExists(resolved))?.isDirectory()
 		? resolved
 		: path.dirname(resolved)
 	await openWithOS(target)
@@ -171,20 +171,20 @@ export class FsLocal extends OpenBuddyService {
 
 	async openPath(p: string, cwd?: string | null): Promise<void> {
 		const resolved = await ensureReadablePath(p, cwd)
-		if (!(await fs.stat(resolved, { throwIfNoEntry: false }))) throw new Error(`路径不存在:${resolved}`)
+		if (!(await statIfExists(resolved))) throw new Error(`路径不存在:${resolved}`)
 		await openWithOS(resolved)
 	}
 
 	async reveal(p: string, cwd?: string | null): Promise<void> {
 		const resolved = await ensureReadablePath(p, cwd)
-		if (!(await fs.stat(resolved, { throwIfNoEntry: false }))) throw new Error(`路径不存在:${resolved}`)
+		if (!(await statIfExists(resolved))) throw new Error(`路径不存在:${resolved}`)
 		await revealInFolder(resolved)
 	}
 
 	async stat(p: string, cwd?: string | null): Promise<PathStat> {
 		const resolved = await ensureReadablePath(p, cwd)
 		const absolute = path.resolve(resolved)
-		if (!(await fs.stat(absolute, { throwIfNoEntry: false }))) {
+		if (!(await statIfExists(absolute))) {
 			return { path: p, exists: false, kind: "missing", absolute }
 		}
 		const s = await fs.stat(absolute)
@@ -202,7 +202,7 @@ export class FsLocal extends OpenBuddyService {
 		maxBytes = 256 * 1024,
 	): Promise<string> {
 		const resolved = await ensureReadablePath(p, cwd)
-		if (!(await fs.stat(resolved, { throwIfNoEntry: false }))) throw new Error(`文件不存在:${resolved}`)
+		if (!(await statIfExists(resolved))) throw new Error(`文件不存在:${resolved}`)
 		const s = await fs.stat(resolved)
 		if (!s.isFile()) throw new Error(`不是文件:${resolved}`)
 		const data = await fs.readFile(resolved)
@@ -215,7 +215,7 @@ export class FsLocal extends OpenBuddyService {
 
 	async readFileBase64(p: string, cwd?: string | null, maxBytes = 20 * 1024 * 1024): Promise<string> {
 		const resolved = await ensureReadablePath(p, cwd)
-		if (!(await fs.stat(resolved, { throwIfNoEntry: false }))) throw new Error(`文件不存在:${resolved}`)
+		if (!(await statIfExists(resolved))) throw new Error(`文件不存在:${resolved}`)
 		const s = await fs.stat(resolved)
 		if (!s.isFile()) throw new Error(`不是文件:${resolved}`)
 		const limit = Math.max(1, Math.min(maxBytes, 50 * 1024 * 1024))
@@ -230,7 +230,7 @@ export class FsLocal extends OpenBuddyService {
 		const resolved = resolvePath(p, workspaceRoot)
 		const safe = await ensureUnderWorkspace(workspaceRoot, resolved)
 		const parent = path.dirname(safe)
-		if (parent && !(await fs.stat(parent, { throwIfNoEntry: false }))) await fs.mkdir(parent, { recursive: true })
+		if (parent && !(await statIfExists(parent))) await fs.mkdir(parent, { recursive: true })
 		await atomicWrite(safe, content)
 		this.ctx.emit("fs-local/written", { path: safe, bytes: content.length })
 		return safe
@@ -239,7 +239,7 @@ export class FsLocal extends OpenBuddyService {
 	async exportTextFile(p: string, content: string): Promise<string> {
 		if (!path.isAbsolute(p)) throw new Error("导出路径必须是绝对路径")
 		const parent = path.dirname(p)
-		if (parent && !(await fs.stat(parent, { throwIfNoEntry: false }))) await fs.mkdir(parent, { recursive: true })
+		if (parent && !(await statIfExists(parent))) await fs.mkdir(parent, { recursive: true })
 		await atomicWrite(p, content)
 		this.ctx.emit("fs-local/exported", { path: p })
 		return p
@@ -247,7 +247,7 @@ export class FsLocal extends OpenBuddyService {
 
 	async listDir(p: string, cwd?: string | null, maxEntries = 2000): Promise<DirEntry[]> {
 		const resolved = await ensureReadablePath(p, cwd)
-		if (!(await fs.stat(resolved, { throwIfNoEntry: false }))) throw new Error(`目录不存在:${resolved}`)
+		if (!(await statIfExists(resolved))) throw new Error(`目录不存在:${resolved}`)
 		const s = await fs.stat(resolved)
 		if (!s.isDirectory()) throw new Error(`不是目录:${resolved}`)
 		const items = await fs.readdir(resolved, { withFileTypes: true })
@@ -282,7 +282,7 @@ export class FsLocal extends OpenBuddyService {
 
 	async browseDirectory(p: string, cwd?: string | null): Promise<void> {
 		const resolved = await ensureReadablePath(p, cwd)
-		if (!(await fs.stat(resolved, { throwIfNoEntry: false }))) throw new Error(`路径不存在:${resolved}`)
+		if (!(await statIfExists(resolved))) throw new Error(`路径不存在:${resolved}`)
 		const s = await fs.stat(resolved)
 		const target = s.isDirectory() ? resolved : path.dirname(resolved)
 		await openWithOS(target)

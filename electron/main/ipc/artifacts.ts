@@ -12,7 +12,8 @@
  * 安全:返回的 path 全部是快照里已记录的工作区内路径;restore 复用既有实现
  * 自身的 isWithinWorkspace 判定,不新增写入面。
  */
-import { readFile, stat } from "node:fs/promises";
+import { statIfExists } from "@openbuddy/storage";
+import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 
 import { wrapIpcHandler } from "./_wrap";
@@ -113,7 +114,7 @@ export function registerArtifactsIpc(): void {
 async function readCurrent(path: string): Promise<string> {
   const absolute = resolve(isAbsolute(path) ? path : resolve(process.cwd(), path));
   try {
-    const info = await stat(absolute, { throwIfNoEntry: false });
+    const info = await statIfExists(absolute);
     if (!info || !info.isFile()) return "";
     return await readFile(absolute, "utf8");
   } catch {

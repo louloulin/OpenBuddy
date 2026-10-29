@@ -20,7 +20,8 @@
  *     host-modules/rewind-snapshot.ts 里 export 它, 形成 "agent-host
  *     re-export 新模块的 export 物" 的反向依赖
  */
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { statIfExists } from "@openbuddy/storage";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { piHome } from "./_host-paths";
@@ -55,7 +56,7 @@ async function loadRewindSnapshots(): Promise<RewindSnapshotFile> {
   // (单个小 JSON 文件,stat 成本可忽略)。
   let mtimeMs: number | null = null;
   try {
-    const info = await stat(await rewindSnapshotPath(), { throwIfNoEntry: false });
+    const info = await statIfExists(await rewindSnapshotPath());
     mtimeMs = info ? info.mtimeMs : null;
   } catch {
     mtimeMs = null;
@@ -103,7 +104,7 @@ async function captureFileSnapshot(
   for (const pathValue of paths) {
     const absolute = resolve(workspace, pathValue);
     if (!isWithinWorkspace(workspace, absolute)) continue;
-    const existing = await stat(absolute, { throwIfNoEntry: false });
+    const existing = await statIfExists(absolute);
     if (existing && !existing.isFile()) continue;
     if (bucket.some((entry) => entry.toolCallId === toolCallId && entry.path === absolute)) continue;
     let content: string | null = null;
