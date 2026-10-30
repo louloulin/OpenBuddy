@@ -22,7 +22,9 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const css = readFileSync(join(__dirname, "..", "workbuddy-parity.css"), "utf8");
+// 2026-10-30 plan1030 批 2：workbuddy-parity.css 补丁层已拆解删除，
+// composer 聚焦态规则迁入 composer.css。
+const css = readFileSync(join(__dirname, "..", "composer.css"), "utf8");
 
 function ruleBody(input: string, selector: string): string | null {
   const idx = input.indexOf(selector + " {");

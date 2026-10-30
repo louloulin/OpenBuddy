@@ -50,7 +50,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/__tests__/**/*.{test,spec}.{ts,tsx}", "packages/**/__tests__/**/*.{test,spec}.{ts,tsx}", "packages/**/src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.test.{ts,mjs}", "electron/main/**/*.test.ts"],
+    include: ["src/**/__tests__/**/*.{test,spec}.{ts,tsx}", "src/**/__contracts__/**/*.test.{ts,tsx}", "packages/**/__tests__/**/*.{test,spec}.{ts,tsx}", "packages/**/src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.test.{ts,mjs}", "electron/main/**/*.test.ts"],
     exclude: [
       "**/node_modules/**",
       "**/.worktrees/**",

@@ -225,14 +225,14 @@ function StreamingMarkdownInner({
   // Fast path: plain prose streaming in -- skip tokenization entirely.
   if (deferredText.indexOf("```") === -1) {
     return (
-      <div className="markdown-body md-font-size-fixed" data-md-theme={markdownTheme}>
+      <div className="markdown-body" data-md-theme={markdownTheme}>
         {renderInlineText(deferredText, "s")}
       </div>
     );
   }
   const tokens = tokenize(deferredText);
   return (
-    <div className="markdown-body md-font-size-fixed" data-md-theme={markdownTheme}>
+    <div className="markdown-body" data-md-theme={markdownTheme}>
       {tokens.map((tok, idx) => {
         if (tok.kind === "text") {
           return <span key={idx}>{renderInlineText(tok.value, `t${idx}`)}</span>;

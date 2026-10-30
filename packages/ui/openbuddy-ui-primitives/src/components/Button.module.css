@@ -35,3 +35,13 @@
 .v_pill[data-tone="success"] { background: #d1faad5; color: #166534; }
 .v_pill[data-tone="warning"] { background: #fef3c7; color: #92400e; }
 .v_pill[data-tone="danger"]  { background: #fee2e2; color: #991b1b; }
+
+/* plan1030 批 5e — reduce-motion 下降速不停转（2.4s/圈），
+   覆盖 base.css 的全局 spinner 冻结。 */
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s !important;
+    animation-iteration-count: infinite !important;
+    animation-delay: 0ms !important;
+  }
+}

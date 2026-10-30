@@ -1,0 +1,174 @@
+{
+  "_comment": "plan1030 批 1 快照基线。由 generate-baseline.mjs 生成；测试断言各文件各维度不得超过此值（新文件按 0 计）。清零动作完成后用脚本重压基线，只许降。",
+  "_totals": {
+    "hex": 1455,
+    "radiusBare": 958,
+    "fontSizeBare": 1413,
+    "zIndexBare": 97,
+    "heavyWeight": 46
+  },
+  "files": {
+    "a11y.css": {
+      "hex": 2,
+      "radiusBare": 1
+    },
+    "automation-wb.css": {
+      "hex": 94,
+      "radiusBare": 63,
+      "fontSizeBare": 78,
+      "zIndexBare": 12,
+      "heavyWeight": 1
+    },
+    "automation.css": {
+      "hex": 1,
+      "radiusBare": 5,
+      "fontSizeBare": 7,
+      "zIndexBare": 1
+    },
+    "base.css": {
+      "hex": 1,
+      "radiusBare": 1,
+      "fontSizeBare": 1
+    },
+    "canvas.css": {
+      "hex": 1,
+      "radiusBare": 2,
+      "fontSizeBare": 6,
+      "zIndexBare": 2
+    },
+    "chat-shell.css": {
+      "hex": 19,
+      "radiusBare": 11,
+      "fontSizeBare": 12,
+      "zIndexBare": 3
+    },
+    "chrome.css": {
+      "hex": 28,
+      "radiusBare": 18,
+      "fontSizeBare": 28,
+      "zIndexBare": 4,
+      "heavyWeight": 1
+    },
+    "composer.css": {
+      "hex": 9,
+      "radiusBare": 3,
+      "fontSizeBare": 11,
+      "zIndexBare": 1
+    },
+    "email.css": {
+      "hex": 138,
+      "radiusBare": 85,
+      "fontSizeBare": 103,
+      "zIndexBare": 4,
+      "heavyWeight": 1
+    },
+    "errors.css": {
+      "hex": 7,
+      "radiusBare": 2,
+      "fontSizeBare": 5,
+      "zIndexBare": 1
+    },
+    "experts.css": {
+      "hex": 6,
+      "radiusBare": 5,
+      "fontSizeBare": 9,
+      "zIndexBare": 3
+    },
+    "files.css": {
+      "radiusBare": 9,
+      "fontSizeBare": 13,
+      "zIndexBare": 1
+    },
+    "home-widgets.css": {
+      "hex": 7,
+      "radiusBare": 4,
+      "fontSizeBare": 9
+    },
+    "home.css": {
+      "hex": 272,
+      "radiusBare": 272,
+      "fontSizeBare": 402,
+      "zIndexBare": 14,
+      "heavyWeight": 18
+    },
+    "messages.css": {
+      "hex": 156,
+      "radiusBare": 47,
+      "fontSizeBare": 57,
+      "zIndexBare": 4,
+      "heavyWeight": 3
+    },
+    "misc.css": {
+      "hex": 84,
+      "radiusBare": 53,
+      "fontSizeBare": 90,
+      "zIndexBare": 8
+    },
+    "modals.css": {
+      "hex": 69,
+      "radiusBare": 45,
+      "fontSizeBare": 61,
+      "zIndexBare": 5,
+      "heavyWeight": 4
+    },
+    "plugins.css": {
+      "hex": 34,
+      "radiusBare": 64,
+      "fontSizeBare": 101,
+      "zIndexBare": 6,
+      "heavyWeight": 12
+    },
+    "prose.css": {
+      "hex": 154,
+      "radiusBare": 65,
+      "fontSizeBare": 90,
+      "zIndexBare": 3,
+      "heavyWeight": 1
+    },
+    "settings.css": {
+      "hex": 5,
+      "radiusBare": 20,
+      "fontSizeBare": 45,
+      "zIndexBare": 5
+    },
+    "shell.css": {
+      "hex": 7,
+      "radiusBare": 3,
+      "fontSizeBare": 5,
+      "zIndexBare": 2
+    },
+    "sidebar-menus.css": {
+      "hex": 154,
+      "radiusBare": 109,
+      "fontSizeBare": 169,
+      "zIndexBare": 12,
+      "heavyWeight": 5
+    },
+    "sidebar.css": {
+      "hex": 8,
+      "radiusBare": 2
+    },
+    "theme-dark-overrides.css": {
+      "hex": 1
+    },
+    "tokens.css": {
+      "hex": 135
+    },
+    "tool-call.css": {
+      "hex": 27,
+      "radiusBare": 20,
+      "fontSizeBare": 49
+    },
+    "ui-kit.css": {
+      "hex": 3,
+      "radiusBare": 9,
+      "fontSizeBare": 14
+    },
+    "work-panel.css": {
+      "hex": 33,
+      "radiusBare": 40,
+      "fontSizeBare": 48,
+      "zIndexBare": 6
+    }
+  }
+}

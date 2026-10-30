@@ -13,6 +13,7 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { buildTimeline, type TimelineNode } from "@/lib/ui/timeline-utils";
 import type { ChatMessage } from "@openbuddy/ui-state/session-store";
 import { MessageItem } from "../MessageItem";
+import { RenderItemBoundary } from "../RenderItemBoundary";
 import { isFindHit } from "../FindBar";
 
 export type UseChatViewTimelineParams = {
@@ -143,6 +144,8 @@ export function useChatViewTimeline({
           }
           data-msg-id={m.id}
         >
+          {/* plan1030 批 4a — 单条消息渲染失败只塌一行，不白屏（lumos issue #1400）。 */}
+          <RenderItemBoundary itemId={m.id}>
           <MessageItem
             message={m}
             streaming={streaming && m.id === streamingMessageId}
@@ -183,6 +186,7 @@ export function useChatViewTimeline({
             onForkFromHere={m.role === "assistant" ? onForkFromHere : undefined}
             hideIdentity={continuation}
           />
+          </RenderItemBoundary>
         </div>
       );
     },

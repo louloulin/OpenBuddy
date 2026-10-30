@@ -2258,3 +2258,17 @@ button.diff__path {
 .tool-group-summary__header:hover {
   background: color-mix(in srgb, var(--wb-text-strong, #1a1a1a) 5%, transparent);
 }
+
+/* ============================================================================
+ * plan1030 批 4a — RenderItemBoundary 兜底行
+ * 单条消息渲染失败只塌一行（不白屏）；字号继承环境，不新增裸值。
+ * ========================================================================== */
+.msg-render-error {
+  margin: 4px 0;
+  padding: 6px 10px;
+  border: 1px dashed var(--wb-border-default);
+  border-radius: var(--wb-radius-sm, 6px);
+  color: var(--wb-text-weak);
+  line-height: 1.5;
+  user-select: text;
+}

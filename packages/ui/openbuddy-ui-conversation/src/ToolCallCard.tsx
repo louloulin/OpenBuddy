@@ -78,7 +78,9 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
       ) : tc.status === "failed" ? (
         "!"
       ) : (
-        "…"
+        /* plan1030 批 5d — in_progress 不再渲染 "…" 文本：改由 CSS
+           旋转环承担「进行中」语义（真 spinner，见 tool-call.css）。 */
+        ""
       )}
     </span>
   );

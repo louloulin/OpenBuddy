@@ -112,18 +112,19 @@
   color: var(--wb-status-error, #e5484d);
   background: color-mix(in srgb, var(--wb-status-error, #e5484d) 12%, transparent);
 }
+/* plan1030 批 5d — in_progress 用真 spinner（旋转环）替代 opacity 脉冲。
+ * reduce-motion 走 base.css 的「降速不停转」carve-out（2.4s/圈），
+ * 不冻结 —— 静止的 spinner 读作挂死。 */
 .toolcall__status-mark--in_progress {
   color: var(--wb-brand);
-  background: color-mix(in srgb, var(--wb-brand) 12%, transparent);
-  animation: toolcallPulse 1.1s ease-in-out infinite;
+  background: transparent;
+  border: 2px solid color-mix(in srgb, var(--wb-brand) 25%, transparent);
+  border-top-color: var(--wb-brand);
+  animation: toolcallSpin 0.9s linear infinite;
 }
-@keyframes toolcallPulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
+@keyframes toolcallSpin {
+  to {
+    transform: rotate(360deg);
   }
 }
 .toolcall__text,

@@ -28,6 +28,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* plan1030 批 5a — 文本选区色（plan1030.md §0.6：此前全仓零定义，
+ * 浏览器默认蓝与品牌体系脱节）。token 定义在 tokens.css 亮/暗两块。 */
+::selection {
+  background: var(--wb-selection-bg);
+  color: var(--wb-selection-fg);
+}
+
 img, svg, video, canvas {
   max-width: 100%;
   height: auto;
@@ -59,6 +66,22 @@ input, textarea, select {
     animation-delay: 0ms !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* plan1030 批 5e — 「降速不停转」（lumos 教训：完全冻结的 spinner
+   * 读作「挂死」）。对已知旋转指示器恢复一个慢速旋转（2.4s/圈），
+   * 保留「操作进行中」的语义；闪烁/脉冲类仍被上面的全局清零冻结。
+   * 包内 CSS-module spinner 在各自模块文件里有同样的 carve-out。 */
+  .spin,
+  .sidebar__project-task-spinner,
+  .cn-spinner,
+  .workspace-picker__spinner,
+  .models-settings-panel__spin,
+  .atm-status-icon-spinning,
+  .toolcall__status-mark--in_progress {
+    animation-duration: 2.4s !important;
+    animation-iteration-count: infinite !important;
+    animation-delay: 0ms !important;
   }
 }
 

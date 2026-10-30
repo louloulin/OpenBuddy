@@ -173,3 +173,13 @@
   font-family: var(--wb-font-mono);
   font-size: 10px;
 }
+
+/* plan1030 批 5e — reduce-motion 下降速不停转（2.4s/圈），
+   覆盖 base.css 的全局 spinner 冻结。 */
+@media (prefers-reduced-motion: reduce) {
+  .iconBusy {
+    animation-duration: 2.4s !important;
+    animation-iteration-count: infinite !important;
+    animation-delay: 0ms !important;
+  }
+}
