@@ -706,6 +706,36 @@
   color: var(--wb-color-text-brand-default);
   flex-shrink: 0;
 }
+/* plan1030 §5.2.1 — 行级删除按钮:悬停行/键盘聚焦行时显现,避免误触;
+   删除语义用危险色。 */
+.model-selector__item-delete {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--wb-text-tertiary, rgba(0, 0, 0, 0.4));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.1s ease, color 0.1s ease;
+}
+.model-selector__item:hover .model-selector__item-delete,
+.model-selector__item--focused .model-selector__item-delete,
+.model-selector__item-delete:focus-visible {
+  opacity: 1;
+}
+.model-selector__item-delete:hover {
+  color: var(--wb-color-danger, #d92d20);
+  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.04));
+}
+.model-selector__item-delete:focus-visible {
+  outline: 2px solid var(--wb-color-text-brand-default, #4f8cff);
+  outline-offset: -2px;
+}
 .workspace-picker__item-name {
   font-size: 13px;
   color: var(--wb-text-strong);

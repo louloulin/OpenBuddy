@@ -63,6 +63,27 @@ export function installAgentModel(deps: {
 	if (deps.readModelsConfig) readModelsConfig = deps.readModelsConfig;
 }
 
+/**
+ * Resolve a model reference to a concrete Model.
+ *
+ * Canonical form is `provider/modelId` (what the picker and
+ * `flattenModels()` emit). Historically a bare `modelId` silently resolved
+ * as `provider=modelId, model=""` and always failed with "model not found",
+ * which blocked every caller that passed a short id (extensions,
+ * `pi.setModel("MiniMax-M3")`, scripts). When the reference has no slash,
+ * match against the full catalog by id and prefer a provider that actually
+ * has credentials.
+ */
+export function resolveModelReference(registry: ModelRegistry, modelId: string): Model<any> | undefined {
+  const separator = modelId.indexOf("/");
+  if (separator > 0) {
+    return registry.find(modelId.slice(0, separator), modelId.slice(separator + 1));
+  }
+  const matches = registry.getAll().filter((model) => model.id === modelId);
+  if (matches.length <= 1) return matches[0];
+  return matches.find((model) => registry.hasConfiguredAuth(model)) ?? matches[0];
+}
+
 async function setModel(modelId: string, options?: { traceId?: string; sessionId?: string }): Promise<void> {
   const traceId = options?.traceId ?? generateTraceId();
   const sessionId = options?.sessionId ?? state.session?.sessionId;
@@ -77,8 +98,7 @@ async function setModel(modelId: string, options?: { traceId?: string; sessionId
   // Recreating ModelRuntime here would discard those runtime-only credentials
   // until the next setRuntimeApiKey call.
   const runtime = state.modelRuntime ?? await ModelRuntime.create({ authPath: join(piHome(), "auth.json"), modelsPath: join(piHome(), "models.json"), refreshOnCreate: false });
-  const [provider, ...modelParts] = modelId.split("/");
-  const next = new ModelRegistry(runtime).find(provider, modelParts.join("/"));
+  const next = resolveModelReference(new ModelRegistry(runtime), modelId);
   if (!next) {
     const err = new Error(`openbuddy-agent: model ${modelId} not found`);
     hostFailedLog("agent:set-model", traceId, err);
@@ -90,7 +110,10 @@ async function setModel(modelId: string, options?: { traceId?: string; sessionId
     emitRendererEvent("pi://models-update", {
       sessionId: state.session?.sessionId,
       providers: [...state.providerRegistry.keys()],
-      activeModelId: next?.id ?? null,
+      // 用与 picker 相同的 `provider/modelId` 形式。此前只发裸 id,渲染端
+      // 无法把它和 `flattenModels()` 的行对齐,切换后的"当前模型"只能靠
+      // 乐观状态维持。
+      activeModelId: next.provider && next.id ? `${next.provider}/${next.id}` : null,
     });
     hostDispatchedLog("agent:set-model", traceId, sessionId);
   } catch (error) {
@@ -176,12 +199,21 @@ async function providerCatalog(): Promise<{ providers: readonly ProviderConfig[]
   // models.json (it only returns built-in provider ids). Derive provider
   // metadata from the available model list instead.
   const storedConfig = await readModelsConfig();
+  // 「已配置」只认用户真正落盘/注入过的凭据:auth.json + setRuntimeApiKey
+  // (OAuth 登录也落 auth.json,所以同样覆盖)。不能用 hasConfiguredAuth():
+  // 它把环境变量也算作已配置 —— 开发 shell 继承的 ANTHROPIC_AUTH_TOKEN /
+  // ANTHROPIC_BASE_URL(本属于 Claude Code 代理)会让选择器冒出十几个用户
+  // 从未配置的 Claude 模型,切过去后上游走宿主的代理,请求直接失败/中断
+  // (2026-10-30 真机截图:列表被 14 个 anthropic 条目刷屏)。
+  const storedProviderIds = new Set(
+    (await runtime.listCredentials().catch(() => [] as { providerId: string }[])).map((entry) => entry.providerId),
+  );
   const allModels = runtime.getModels().filter((model) => {
     const value = model as unknown as { provider?: string; id?: string; name?: string; contextWindow?: number };
     const providerId = value.provider ?? "custom";
     const modelId = value.id ?? "unknown";
     const configured = Object.prototype.hasOwnProperty.call(storedConfig.providers, providerId);
-    const authenticated = runtime.hasConfiguredAuth(providerId);
+    const authenticated = storedProviderIds.has(providerId);
     if (!configured && !authenticated) return false;
     if (providerId === "xai" || /(^|[/:-])grok([/:-]|$)/i.test(modelId) || /grok/i.test(value.name ?? "")) return false;
     return true;
@@ -213,7 +245,7 @@ async function providerCatalog(): Promise<{ providers: readonly ProviderConfig[]
   }
   const providers = providerIds.map((id) => {
     const config: Record<string, unknown> = (runtime.getRegisteredProviderConfig(id) as Record<string, unknown> | undefined) ?? (storedConfig.providers[id] as Record<string, unknown>) ?? {};
-    const authConfigured = runtime.hasConfiguredAuth(id);
+    const authConfigured = storedProviderIds.has(id);
     const providerKind = id.startsWith("custom_anthropic") ? "custom_anthropic" :
       ["anthropic", "openai", "pi", "deepseek", "qwen", "minimax", "minimax_openai", "minimax_cn", "custom"].includes(id) ? id : "custom";
     const attribution = state.providerRegistry.get(id);

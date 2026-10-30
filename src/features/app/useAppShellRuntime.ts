@@ -22,6 +22,7 @@ import {
   piCreateWorkspace,
   providersList,
   flattenModels,
+  agentCurrentModel,
   agentOnPiTelemetryEvent,
   agentSessionMessages,
   sessionEntriesToChatMessages,
@@ -42,6 +43,7 @@ import { newSessionFlow, composeDiscoverBody } from "@/lib/agent/new-session-flo
 import { abandonInFlightStream } from "@/lib/agent/abandon-stream";
 import { listenSafe, isElectronBridgeUnavailable, getElectronBridgeStatus } from "@/lib/platform/electron-api";
 import { friendlyError } from "@/lib/platform/error-format";
+import { shortModelLabel } from "@/lib/ui/timeline-utils";
 // R48 — 登录编排整体搬进 `overlay.sign-in` 对话框(CasdoorSignInDialog),
 //   宿主只保留状态入口(casdoorStatus / casdoorLogout)与身份视图类型。
 import { casdoorLogout, casdoorStatus, type CasdoorSessionView } from "@/lib/casdoor/casdoor-client";
@@ -76,6 +78,15 @@ function readPersistedActiveSession(): PersistedActiveSession | null {
     }
   } catch { /* ignore */ }
   return null;
+}
+
+/** 把主进程模型切换的错误翻译成用户能处置的中文提示。 */
+function friendlyModelSwitchError(error: unknown): string {
+  const message = String(error).replace(/^Error:\s*/u, "");
+  if (/No API key for/i.test(message)) return "该模型没有可用的 API Key，请先在设置中配置";
+  if (/策略禁止使用模型/u.test(message)) return message;
+  if (/model\b.*\bnot found|Model not found/i.test(message)) return "模型不存在或已下线，请刷新模型列表后重试";
+  return message;
 }
 
 function deriveTitle(text: string): string {
@@ -204,6 +215,20 @@ export function useAppShellRuntime(): AppShellRuntime {
     } catch { /* 非致命 */ }
   }, []);
   refreshModelsRef.current = refreshModels;
+
+  // 载入/恢复会话后,模型选择器必须跟着宿主里的真实模型走。此前渲染端只在
+  // 初始化时读一次 defaultModelId,之后切到旧会话时 picker 仍显示上一个
+  // 会话的模型 —— 用户看到的和下一轮实际使用的不是同一个模型。
+  const syncCurrentModelFromHost = useCallback(async () => {
+    try {
+      const model = await agentCurrentModel() as { provider?: string; id?: string } | null;
+      if (model?.provider && model.id) {
+        const next = `${model.provider}/${model.id}`;
+        currentModelIdRef.current = next;
+        setCurrentModelId(next);
+      }
+    } catch { /* 读取失败不阻塞 UI */ }
+  }, []);
 
   // ====== agent session SSE 订阅 ============================================
   const sessionEvents = useAgentSession({
@@ -439,6 +464,9 @@ export function useAppShellRuntime(): AppShellRuntime {
           const piDefault = result.defaultModelId;
           if (!providerOptions.some((p) => p.id === piDefault)) setCurrentModelId(providerOptions[0].id);
         }
+        // 以宿主里实际 active 的模型为准(恢复的旧会话可能和刚 init 的默认
+        // 模型不同),放在 providerOptions 兜底之后,避免被它覆盖。
+        await syncCurrentModelFromHost();
       } catch (e) {
         const bridge = getElectronBridgeStatus();
         const raw = String(e);
@@ -446,7 +474,7 @@ export function useAppShellRuntime(): AppShellRuntime {
         setInitError(bridge.available ? raw : `Electron bridge unavailable (${bridge.reason})`);
       }
     })();
-  }, [sessionStore, sessionsStore, notifyBridgeUnavailable]);
+  }, [sessionStore, sessionsStore, notifyBridgeUnavailable, syncCurrentModelFromHost]);
 
   // ====== derived: current entry + persistence ===============================
   const currentEntry = sessionsStore((s) => {
@@ -739,21 +767,80 @@ export function useAppShellRuntime(): AppShellRuntime {
     catch (e) { showToast(`重命名失败：${String(e).replace(/^Error:\s*/, "")}`); throw e; }
   }, [currentEntry, sessionsStore, showToast]);
 
-  const handleModelChange = useCallback(async (modelId: string) => {
-    setCurrentModelId(modelId);
-    if (!currentSessionId) return;
-    const trySet = () => piSetModel(currentSessionId, modelId);
-    try { await trySet(); }
-    catch (e) {
-      const msg = String(e);
-      if (/incompatible|start_new_session/i.test(msg)) { showToast("该会话无法切换到此模型，请新建会话"); return; }
-      if (/unknown session/i.test(msg)) {
-        try { await piLoadSession(currentSessionId, currentEntry?.cwd ?? cwdRef.current); await trySet(); return; }
-        catch (e2) { showToast(`模型切换失败：${String(e2).replace(/^Error:\s*/, "")}`); return; }
-      }
-      showToast(`模型切换失败：${msg.replace(/^Error:\s*/, "")}`);
+  // 流式中选择的模型先挂起,回合结束后再真正切换(F3:进行中回合不换模型)。
+  const pendingModelRef = useRef<{ sessionId: string | undefined; modelId: string } | null>(null);
+
+  const { awaitPendingNewSession } = optimisticSession;
+
+  const applyModelSwitch = useCallback(async (modelId: string) => {
+    // 新建会话的第一轮里 currentSessionId 还是 `__pending_*` 占位 id。
+    // 直接发给主进程会撞 "Pi session is not loaded" 跨会话护栏,所以先等
+    // 真实 id 落地。
+    let targetSessionId = currentSessionId;
+    if (targetSessionId?.startsWith("__pending_")) {
+      targetSessionId = (await awaitPendingNewSession()) ?? targetSessionId;
     }
-  }, [currentSessionId, currentEntry, showToast]);
+    if (!targetSessionId || targetSessionId.startsWith("__pending_")) {
+      // 还没有真实会话:只记住选择,下一条消息创建会话时会带上它。
+      currentModelIdRef.current = modelId;
+      setCurrentModelId(modelId);
+      return;
+    }
+    const previous = currentModelIdRef.current;
+    const sessionId = targetSessionId;
+    const trySet = () => piSetModel(sessionId, modelId);
+    try {
+      await trySet();
+      currentModelIdRef.current = modelId;
+      setCurrentModelId(modelId);
+    } catch (error) {
+      const message = String(error);
+      // 主进程跨会话护栏抛的是 "Pi session is not loaded: …"(历史实现只
+      // 匹配从未出现过的 "unknown session",导致恢复分支是死代码)。
+      if (/is not loaded|unknown session/i.test(message)) {
+        try {
+          await piLoadSession(sessionId, currentEntry?.cwd ?? cwdRef.current);
+          await trySet();
+          currentModelIdRef.current = modelId;
+          setCurrentModelId(modelId);
+          return;
+        } catch (retryError) {
+          currentModelIdRef.current = previous;
+          setCurrentModelId(previous);
+          showToast(`模型切换失败：${friendlyModelSwitchError(retryError)}`);
+          return;
+        }
+      }
+      // 切换失败必须回滚显示,否则 picker 会一直显示一个并未生效的模型,
+      // 而下一轮实际用的还是旧模型。
+      currentModelIdRef.current = previous;
+      setCurrentModelId(previous);
+      showToast(`模型切换失败：${friendlyModelSwitchError(error)}`);
+    }
+  }, [awaitPendingNewSession, currentEntry, currentSessionId, showToast]);
+
+  const handleModelChange = useCallback(async (modelId: string) => {
+    if (streaming) {
+      pendingModelRef.current = { sessionId: currentSessionId, modelId };
+      showToast(`已选择 ${shortModelLabel(modelId) || modelId}，将在本轮结束后切换`);
+      return;
+    }
+    pendingModelRef.current = null;
+    await applyModelSwitch(modelId);
+  }, [applyModelSwitch, currentSessionId, showToast, streaming]);
+
+  // 回合结束(含失败)后执行挂起的模型切换。若用户流式中已切到别的会话,
+  // 旧会话上的选择不能落到新会话。
+  useEffect(() => {
+    if (streaming) return;
+    const pending = pendingModelRef.current;
+    if (!pending) return;
+    pendingModelRef.current = null;
+    const sameSession = pending.sessionId === currentSessionId
+      || (pending.sessionId?.startsWith("__pending_") === true && currentSessionId?.startsWith("__pending_") !== true);
+    if (!sameSession) return;
+    void applyModelSwitch(pending.modelId);
+  }, [applyModelSwitch, currentSessionId, streaming]);
 
   const handleSelectWorkspace = useCallback((newCwd: string) => {
     cwdRef.current = newCwd;
@@ -783,8 +870,9 @@ export function useAppShellRuntime(): AppShellRuntime {
       const entries = await agentSessionMessages(sessionId);
       const { messages: history } = sessionEntriesToChatMessages(entries);
       useSessionStore.getState().loadHistoryMessages(sessionId, history as unknown as import("@/stores/session-store").ChatMessage[]);
+      await syncCurrentModelFromHost();
     } catch (e) { sessionStore.getState().setError(friendlyError(e)); }
-  }, [sessionStore, sessionsStore]);
+  }, [sessionStore, sessionsStore, syncCurrentModelFromHost]);
 
   const handleRewound = useCallback(async () => {
     const id = sessionStore.getState().sessionId;

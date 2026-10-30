@@ -206,7 +206,10 @@ export function LoadingRow() {
   const showElapsed = elapsed > 2;
 
   return (
-    <div className="msg__loading">
+    /* plan1030 批 4b — role="status"（隐含 aria-live=polite）：加载状态插入/
+     * 变化时对读屏播报一次。内层 elapsed 不再单独 aria-live（此前每秒
+     * 播报一次计时，属噪音；lumos 同款做法是容器级单一 live region）。 */
+    <div className="msg__loading" role="status">
       <span className="msg__loading-main ob-shining-text" key={phaseLabelText ? "phase" : rotatingVerb.key}>
         {mainText}
       </span>
@@ -214,7 +217,7 @@ export function LoadingRow() {
           唯一的"正在工作"指示源(对齐 cds-working-dot-halo)。 */}
       <WorkingDot />
       {showElapsed && (
-        <span className="msg__loading-elapsed" aria-live="polite">
+        <span className="msg__loading-elapsed">
           {formatElapsed(elapsed)}
         </span>
       )}

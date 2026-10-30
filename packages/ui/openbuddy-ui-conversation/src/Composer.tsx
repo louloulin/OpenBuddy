@@ -93,6 +93,7 @@ export function ComposerInner({
   modelId,
   models,
   onModelChange,
+  onModelDelete,
   // Reasoning level (merged into the model picker, WB-style)
   thinkingLevel,
   onThinkingChange,
@@ -164,6 +165,8 @@ export function ComposerInner({
   /** Available models for the picker. */
   models?: ModelOption[];
   onModelChange?: (id: string) => void;
+  /** plan1030 §5.2.1 — 对话内删除模型(picker 行级入口);不提供则隐藏删除按钮。 */
+  onModelDelete?: (modelId: string) => void;
   /** Currently active working directory. */
   cwd?: string;
   workspaces?: WorkspaceInfo[];
@@ -580,6 +583,7 @@ export function ComposerInner({
               modelId={modelId}
               models={models!}
               onModelChange={onModelChange!}
+              onModelDelete={onModelDelete ? (m) => onModelDelete(m.id) : undefined}
               thinkingLevel={thinkingLevel}
               onThinkingChange={onThinkingChange}
             />

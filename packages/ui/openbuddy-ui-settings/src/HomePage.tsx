@@ -403,6 +403,7 @@ export function HomePage({
   modelId,
   models,
   onModelChange,
+  onModelDelete,
   cwd,
   workspaces,
   onSelectWorkspace,
@@ -418,6 +419,8 @@ export function HomePage({
   modelId?: string;
   models?: ModelOption[];
   onModelChange?: (id: string) => void;
+  /** plan1030 §5.2.1 — 对话内删除模型(picker 行级入口);透传给 Composer。 */
+  onModelDelete?: (modelId: string) => void;
   cwd?: string;
   workspaces?: WorkspaceInfo[];
   onSelectWorkspace?: (cwd: string) => void;
@@ -749,6 +752,7 @@ export function HomePage({
             modelId={modelId}
             models={models}
             onModelChange={onModelChange}
+            onModelDelete={onModelDelete}
             cwd={cwd}
             workspaces={workspaces}
             onSelectWorkspace={onSelectWorkspace}

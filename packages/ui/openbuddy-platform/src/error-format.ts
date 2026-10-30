@@ -147,6 +147,36 @@ export function formatPiError(raw: string): string | null {
   // Strip redundant leading "Error: " repeated wrappers.
   cleaned = cleaned.replace(/^(Error:\s*)+/i, "");
 
+  // plan1030 真机发现（2026-10-30）—— Anthropic 风格提供商错误 JSON，
+  // 可能带 HTTP 状态码前缀：
+  //   `402 {"type":"error","error":{"type":"insufficient_balance_error","message":"insufficient balance (1008)"}}`
+  // 此前整段原样透传给用户。识别并映射为可读文案。
+  const providerJsonMatch = cleaned.match(/^\s*(\d{3})\s*(\{[\s\S]*\})\s*$/);
+  if (providerJsonMatch) {
+    try {
+      const obj = JSON.parse(providerJsonMatch[2]) as {
+        error?: { type?: string; message?: string };
+      };
+      const err = obj?.error;
+      if (err && typeof err === "object") {
+        const etype = String(err.type ?? "");
+        const emsg = String(err.message ?? "");
+        if (
+          etype.includes("insufficient") ||
+          emsg.toLowerCase().includes("insufficient balance") ||
+          providerJsonMatch[1] === "402"
+        ) {
+          return "模型服务账户余额不足（402）。请前往服务商控制台充值后重试。";
+        }
+        if (emsg) {
+          return `⚠️ ${emsg}${etype ? `（${etype}）` : ""}`;
+        }
+      }
+    } catch {
+      // 不是有效 JSON —— 落回后续通用解析。
+    }
+  }
+
   const parsed = tryParsePiError(cleaned);
 
   // If structured parsing failed, check raw string for known patterns.
@@ -176,6 +206,9 @@ export function formatPiError(raw: string): string | null {
     }
     if (lower.includes("429") || lower.includes("rate limit")) {
       return "API 速率限制已触发。请等待 1-2 分钟后重试。";
+    }
+    if (lower.includes("insufficient balance") || lower.includes("insufficient_balance") || lower.includes("402")) {
+      return "模型服务账户余额不足（402）。请前往服务商控制台充值后重试。";
     }
     // Show the cleaned inner message instead of the raw IPC wrapper.
     return cleaned ? `⚠️ ${cleaned}` : null;

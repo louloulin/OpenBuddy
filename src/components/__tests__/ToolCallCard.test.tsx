@@ -58,6 +58,10 @@ describe("ToolCallCard", () => {
         onOpen={() => {}}
       />,
     );
-    expect(screen.getByText("…")).toBeInTheDocument();
+    // plan1030 批 5d — in_progress 不再渲染 "…" 文本：改由 CSS 旋转环
+    // （.toolcall__status-mark--in_progress + toolcallSpin）承担「进行中」。
+    const mark = document.querySelector(".toolcall__status-mark--in_progress");
+    expect(mark).not.toBeNull();
+    expect(mark?.textContent).toBe("");
   });
 });
