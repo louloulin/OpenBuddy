@@ -270,9 +270,8 @@ const executing = new Set<string>();
 /**
  * 注入执行器并启动 30s 到期扫描(email 同款节奏)。
  *
- * 宿主只有一个活动会话:执行器新建会话会替换(并中止)当前会话。所以
- * `isBusy()` 为真(用户的回合正在运行)时本轮扫描跳过,到期任务留到下一轮;
- * 同一时刻也只跑一个自动化,避免几个到期任务互相替换会话。
+ * 执行器在后台独立会话里运行,不碰前台会话(计划 0.3)。同一时刻只跑一个
+ * 自动化,控制并发的模型调用;`isBusy()` 保留为可选的外部让路开关。
  */
 export function startAutomationScheduler(run: AutomationExecutor, options: { isBusy?: () => boolean } = {}): void {
   executor = run;

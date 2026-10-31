@@ -65,7 +65,7 @@ import {
 import { PlanPanel, SessionTasksPanel } from "@openbuddy/ui-automation";
 import { useRowPanelNav } from "./chatview/useRowPanelNav";
 import { TerminalPanel } from "./chatview/TerminalPanel";
-import { SquareTerminal } from "lucide-react";
+import { History, SquareTerminal } from "lucide-react";
 import { useChatShortcuts } from "./chatview/useChatShortcuts";
 import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
 import { QuestionInlineCard } from "./QuestionInlineCard";
@@ -76,9 +76,12 @@ import { SubagentPanel } from "@openbuddy/ui-collaboration";
 import { useMessageQueueStore } from "@/stores/message-queue-store";
 import {
   VirtualizedMessageList,
+  type VirtualizedHandle,
   shouldUseVirtualList,
 } from "./VirtualizedMessageList";
 import { LoadingRow } from "./LoadingRow";
+import { useFindScroll } from "./chatview/useFindScroll";
+import { useTurnAnnouncement } from "./chatview/useTurnAnnouncement";
 import type { TimelineNode } from "@/lib/ui/timeline-utils";
 import { useSubagentStore } from "@/stores/subagent-store";
 import { useQuestionStore } from "@/stores/question-store";
@@ -284,6 +287,7 @@ export function ChatView({
       && rendererSessionSnapshot.currentAddress.mode === "one-shot");
   // 会话内查找(对齐 WorkBuddy chat-search)。
   const [findOpen, setFindOpen] = useState(false);
+  const [rewindOpen, setRewindOpen] = useState(false);
   const [findHits, setFindHits] = useState<string[]>([]);
   const [findCurrent, setFindCurrent] = useState<string | null>(null);
   // 文件变更聚合面板(对齐 WorkBuddy file-changes-panel)。
@@ -445,6 +449,7 @@ export function ChatView({
   // 工具栏按钮定义在 useMemo 里,不能在那里调 hook —— 先在顶层取好文案。
   const terminalLabel = useT("chat.terminal.label");
   const historyLoadingLabel = useT("chat.footer.historyLoading");
+  const turnAnnouncement = useTurnAnnouncement(streaming, useT("chat.a11y.turnDone"));
   const terminalDockTitle = useT("chat.terminal.dockTitle", { name: cwd ? cwd.split("/").pop() || cwd : "" });
   const terminalCloseLabel = useT("chat.terminal.close");
   const tasksBadgeLabel = useT("tasks.badge", {
@@ -508,7 +513,7 @@ export function ChatView({
 
 
   // Plan5 B.10 — 消息级"从此重发":把 rewindPoints 拉一次并解析成
-  // `messageId → promptIndex`,下发给 MessageItem 的 MessageRewindMenu。
+  // `messageId → promptIndex`,下发给 MessageItem 的「⋯ → 从这里重新发送」。
   // 与 useChatViewRetry 共用同一套 rewind IPC 语义,只是目标从"最后一条"
   // 变成"用户点的那一条"。
   const {
@@ -918,13 +923,8 @@ export function ChatView({
     node.addEventListener("keydown", onKeyDown);
     return () => node.removeEventListener("keydown", onKeyDown);
   }, []);
-  useEffect(() => {
-    if (!findCurrent) return;
-    const node = scrollRef.current?.querySelector(
-      `[data-msg-id="${findCurrent}"]`,
-    );
-    node?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [findCurrent]);
+  const virtualHandleRef = useRef<VirtualizedHandle | null>(null);
+  useFindScroll({ scrollRef, virtualHandleRef, timeline, findCurrent });
 // 推理档位:并入模型选择器(WB "✓均衡" 标签)。会话切换时回默认档。
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("medium");
   useEffect(() => {
@@ -1000,6 +1000,14 @@ export function ChatView({
       onClick: () => setTerminalOpen((v) => !v),
       label: terminalLabel,
       icon: <SquareTerminal size={15} strokeWidth={1.75} />,
+    },
+    {
+      id: "rewind",
+      active: rewindOpen,
+      visible: Boolean(sessionId) && !streaming && !readOnlySubagent && messages.length > 0,
+      onClick: () => setRewindOpen((v) => !v),
+      label: "回溯 / 分叉",
+      icon: <History size={15} strokeWidth={1.75} />,
     },
     defaultSubagentButton({
       active: subagentsOpen,
@@ -1108,6 +1116,7 @@ export function ChatView({
           messages={messages}
           onShareDone={onToast}
         />
+        <div className="wb-sr-only" role="status" data-testid="turn-announcer">{turnAnnouncement}</div>
         <FindBar
           messages={messages}
           open={findOpen}
@@ -1163,6 +1172,7 @@ export function ChatView({
                   timeline={timeline as TimelineNode[]}
                   scrollRef={scrollRef as React.RefObject<HTMLElement>}
                   renderItem={renderTimelineNode}
+                  handleRef={virtualHandleRef}
                 />
               ) : (
                 timeline.map((node, index) => renderTimelineNode({ node, index }))
@@ -1210,7 +1220,8 @@ export function ChatView({
           yielded={yielded}
           onResume={handleResume}
           onResumeAndContinue={handleResumeAndContinue}
-          onPause={handlePause}
+          rewindOpen={rewindOpen}
+          onRewindClose={() => setRewindOpen(false)}
           pendingApprovalCount={pendingApprovalCount}
           blockedOnApproval={blockedOnApproval}
           composerProps={composerProps}

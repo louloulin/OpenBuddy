@@ -838,111 +838,16 @@
   flex: 1;
 }
 
-/* R8.24 — Composer keyboard hint chip (PI-Desktop MessageMeta parity).
-   Inline pair of <kbd>+label hints anchoring the user to the two
-   most-used keys: Enter to send, Shift+Enter to insert a newline.
-   Lives on the left side of the footer next to the action buttons
-   so it doesn't compete with the right-side cluster (cost pill,
-   model picker, send button). Brand-tinted background + motion
-   token micro-interactions keep it on-brand without breaking the
-   footer density. */
-.wb-composer__hint {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 4px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--wb-bg-tertiary, rgba(0, 0, 0, 0.04));
-  color: var(--wb-text-weak, rgba(0, 0, 0, 0.5));
-  font-size: 11px;
-  line-height: 18px;
-  user-select: none;
-  white-space: nowrap;
-  transition: background var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
-              color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
-}
-.wb-composer__hint:hover {
-  background: color-mix(in srgb, var(--wb-text-strong, #000) 6%, transparent);
-  color: var(--wb-text-strong);
-}
-.wb-composer__hint-key {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 16px;
-  padding: 0 5px;
-  border: 1px solid var(--wb-border-default, rgba(0, 0, 0, 0.1));
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  background: var(--wb-bg-elevated, #fff);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--wb-text-medium, rgba(0, 0, 0, 0.6));
-  letter-spacing: 0.01em;
-  transition: transform var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
-}
-.wb-composer__hint:hover .wb-composer__hint-key {
-  transform: translateY(-1px);
-}
-.wb-composer__hint-sep {
-  color: var(--wb-text-tertiary, rgba(0, 0, 0, 0.35));
-  font-size: 10px;
-}
-.wb-composer__hint-label {
-  font-weight: 500;
-  color: var(--wb-text-medium, rgba(0, 0, 0, 0.6));
-}
-.wb-composer__hint:hover .wb-composer__hint-label {
-  color: var(--wb-text-strong);
-}
-.wb-composer__hint-divider {
-  margin: 0 4px;
-  color: var(--wb-text-tertiary, rgba(0, 0, 0, 0.35));
-  font-size: 10px;
-  opacity: 0.6;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .wb-composer__hint,
-  .wb-composer__hint-key {
-    transition: none;
-  }
-  .wb-composer__hint:hover .wb-composer__hint-key {
-    transform: none;
-  }
-}
-
 /* R8.24 — Hide the composer keyboard hint on phone-width screens
    (≤540px). On touchscreens typing shortcuts behave differently
    (IME, virtual keyboards) so the chip is more confusing than
    helpful. The desktop+tablet rendering stays unchanged. */
-@media (max-width: 540px) {
-  .wb-composer__hint {
-    display: none;
-  }
-}
 
 /* 同一件事,但按输入卡自身宽度判定(面板打开 / 聊天列被压窄时)。 */
 @container wb-composer (max-width: 520px) {
-  .wb-composer__hint {
-    display: none;
-  }
+
 }
 
-/* Dark theme: lift the hint surface so it reads against the
-   dark composer card. Brand-tint background stays brand-coloured
-   but the kbd chips get a darker base. */
-[data-theme="dark"] .wb-composer__hint-key {
-  background: var(--wb-bg-elevated, #2a2a2a);
-  border-color: var(--wb-border-default, rgba(255, 255, 255, 0.12));
-  color: var(--wb-text-medium, rgba(255, 255, 255, 0.7));
-}
-[data-theme="dark"] .wb-composer__hint:hover .wb-composer__hint-label {
-  color: var(--wb-text-strong, #fff);
-}
 /* Expert badge in composer footer (mirrors WorkBuddy's input-area expert tag) */
 .wb-composer__expert-badge {
   display: inline-flex;
@@ -1792,7 +1697,6 @@ body.dark .permission-picker__popover,
   background: var(--wb-border-default, #ececec);
 }
 /* 新建项目弹窗：工作目录选择行 */
-
 
 /* ===== 新建项目弹窗（对齐目标截图：指令+选择模板+连接器/专家/技能） ===== */
 .create-project-dialog { width: 720px; }
@@ -3325,25 +3229,3 @@ body.dark .permission-picker__popover,
   line-height: 1;
 }
 
-/* B2(审计 2026-10-14):kbd 教学改为「聚焦时浮现」。
-   常驻时它和白名单 cost pill / 模型 chip 抢一行宽度,窄面板下把
-   「均衡」截成「均…」。默认 0 透明度(保留布局占位避免跳动),
-   composer 聚焦或 hint 悬停时浮现;窄面板与触屏仍彻底隐藏。 */
-.wb-composer__hint {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--wb-motion-duration-base, 200ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
-              background var(--wb-motion-duration-fast, 120ms),
-              color var(--wb-motion-duration-fast, 120ms);
-}
-.wb-composer:focus-within .wb-composer__hint,
-.wb-composer__hint:hover,
-.wb-composer__hint:focus-within {
-  opacity: 1;
-  pointer-events: auto;
-}
-@media (max-width: 900px), (hover: none) {
-  .wb-composer__hint {
-    display: none;
-  }
-}

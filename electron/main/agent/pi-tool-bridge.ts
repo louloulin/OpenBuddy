@@ -34,11 +34,9 @@ export interface AdapterToolSpec<TParams extends TSchema = TSchema> {
    */
   serializeArgs: (args: unknown) => string;
   /**
-   * Responder for the passthrough-fallback path (see
-   * `registerDescribeFallbackTool`). Required when the owning adapter has no
-   * command with an `invokeInvocation`; ignored when one exists, because the
-   * invoke handler is the real capability. Adapters with *some* commands can
-   * omit it and let the factory borrow the first command's describe handler.
+   * Degradation text when the invoke handler returns undefined (service
+   * unmounted, verb unsupported). Optional: the factory borrows the first
+   * command's describe handler when omitted.
    */
   describeInvocation?: (service: unknown, args: string) => string | Promise<string>;
 }
@@ -78,12 +76,12 @@ export function registerAdapterTool<TParams extends TSchema>(
     label: spec.name.replace(/_/g, " "),
     description: spec.description,
     parameters: spec.parameters,
-    execute: async (_toolCallId, args, _signal, _onUpdate, ctx) => {
+    execute: async (_toolCallId, args, signal, _onUpdate, ctx) => {
       const service = options.resolveService();
       const argString = spec.serializeArgs(args);
       const context = buildContextFromExtension(ctx);
       try {
-        const summary = await options.invokeInvocation(service, argString, context);
+        const summary = await untilAborted(options.invokeInvocation(service, argString, context), signal);
         // A verb the service does not implement yields undefined rather than
         // throwing; the describe handler explains that better than a generic
         // "completed without text summary" stub.
@@ -105,45 +103,17 @@ export function registerAdapterTool<TParams extends TSchema>(
 }
 
 /**
- * Register a "passthrough-fallback" tool that surfaces a human-readable
- * explanation to the LLM when the upstream Pi package is not installed.
- * Used for adapters whose adapter-side surface is pure passthrough
- * (e.g. `plan` → pi-plan-mode): the LLM still gets a tool it can call,
- * but the response explains how to install / enable the upstream package
- * instead of trying to dispatch into a non-existent Cordis service.
- *
- * Distinct from `registerAdapterTool`: there is no `invokeInvocation` —
- * the describe handler produces the entire response body.
+ * 计划 1.2 — 用户点停止时 SDK 会 abort 这个 signal,但适配器服务大多不认
+ * signal,`session.abort()` 要等它们自己跑完才空闲(慢的能卡好几秒)。这里
+ * 让工具在 abort 时立即以「已停止」结束;服务那边的调用照常在后台收尾。
  */
-export function registerDescribeFallbackTool<TParams extends TSchema>(
-  pi: ExtensionAPI,
-  spec: AdapterToolSpec<TParams> & {
-    describeInvocation: (service: unknown, args: string) => string | Promise<string>;
-    resolveService: () => unknown;
-  },
-): void {
-  if (typeof pi.registerTool !== "function") return;
-  pi.registerTool({
-    name: spec.name,
-    label: spec.name.replace(/_/g, " "),
-    description: spec.description,
-    parameters: spec.parameters,
-    execute: async (_toolCallId, args, _signal, _onUpdate, _ctx) => {
-      const service = spec.resolveService();
-      try {
-        const text = await spec.describeInvocation(service, spec.serializeArgs(args));
-        return {
-          content: [{ type: "text", text }],
-          details: { ok: true, summary: text, capability: spec.name, fallback: true },
-        };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return {
-          content: [{ type: "text", text: `OpenBuddy adapter tool ${spec.name} failed: ${message}` }],
-          details: { ok: false, error: message, capability: spec.name, fallback: true },
-        };
-      }
-    },
+export function untilAborted<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) return work;
+  if (signal.aborted) return Promise.reject(new Error("已停止"));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new Error("已停止"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
   });
 }
 

@@ -30,6 +30,7 @@ import { __registerDefaultState as __registerDefaultDshState } from "../dsh-brid
 import type { OpenBuddyTelemetrySink } from "../../pi-telemetry-bridge";
 import type { SessionEventRecord } from "../../../session/session-event-log";
 import type { AgentHostState } from "../_state-shape";
+import { rememberPendingUiEvent } from "../turn-state";
 
 // Module-level singleton for the renderer event emitter
 let rendererEventEmitter: ((channel: string, payload: unknown) => void) | null = null;
@@ -40,6 +41,19 @@ const REPLAYABLE_RENDERER_CHANNELS = new Set([
   "pi://complete",
   "pi://turn-error",
 ]);
+
+// 审批 / 提问不进序号重放日志(它们不是增量),改由回合状态机按 requestId 记住、
+// 渲染层重新连上时重发(计划 1.1)。
+const PENDING_UI_CHANNELS = new Set(["pi://permission", "pi://question"]);
+
+function rememberPendingUi(channel: string, payload: unknown): void {
+  if (!isRecord(payload) || typeof payload.requestId !== "string") return;
+  const sessionId = sessionIdFromPayload(payload);
+  // 只记仍挂在表里的请求:已判定的不该再弹。
+  if (!sessionId || !lifecycleState?.pendingUiRequests.has(payload.requestId)) return;
+  const replayed = { ...payload, replayed: true };
+  rememberPendingUiEvent(payload.requestId, sessionId, () => rendererEventEmitter?.(channel, replayed));
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -57,6 +71,7 @@ export function bindRendererEventEmitter(emitter: (channel: string, payload: unk
 
 export function emitRendererEvent(channel: string, payload: unknown): void {
   const bounded = boundEventPayload(payload).value;
+  if (PENDING_UI_CHANNELS.has(channel)) rememberPendingUi(channel, bounded);
   if (!REPLAYABLE_RENDERER_CHANNELS.has(channel) || !lifecycleState) {
     rendererEventEmitter?.(channel, bounded);
     return;

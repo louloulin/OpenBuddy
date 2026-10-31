@@ -49,6 +49,10 @@ interface RewindBarProps {
   onForked?: (newSessionId: string) => void;
   onRewound?: () => void;
   onToast?: (msg: string) => void;
+  /** 以展开状态挂载(由顶栏「更多 → 回溯」唤起)。 */
+  defaultOpen?: boolean;
+  /** 时间线关闭时回调,宿主据此卸载整条回溯栏。 */
+  onClose?: () => void;
 }
 
 export function RewindBar({
@@ -57,8 +61,18 @@ export function RewindBar({
   onForked,
   onRewound,
   onToast,
+  defaultOpen = false,
+  onClose,
 }: RewindBarProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
+  const wasOpenRef = useRef(open);
+  useEffect(() => {
+    if (open) wasOpenRef.current = true;
+    else if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      onClose?.();
+    }
+  }, [open, onClose]);
   const [points, setPoints] = useState<RewindPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);

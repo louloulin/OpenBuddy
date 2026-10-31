@@ -1213,3 +1213,39 @@ textarea.mshell-field__control { resize: vertical; min-height: 96px; font-family
   background: color-mix(in srgb, var(--wb-status-error, #e5484d) 10%, transparent);
   color: var(--wb-status-error, #e5484d);
 }
+
+/* Permission card — compact, Claude Code–style: a one-line title (+ risk
+   chip), the exact command, and right-aligned 拒绝 / 始终允许 / 允许. No
+   header gradient, divider or footer band; the command block carries the
+   weight. */
+.request-modal--permission .request-modal__head {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 14px 16px 0;
+  border-bottom: 0;
+  background: none;
+}
+.request-modal--permission .request-modal__title {
+  font-size: var(--wb-font-body-size);
+  font-weight: 600;
+}
+.request-modal--permission .request-modal__body {
+  padding: 10px 16px 0;
+}
+.request-modal--permission .request-modal__footer {
+  justify-content: flex-end;
+  padding: 12px 16px 14px;
+  border-top: 0;
+  background: none;
+}
+.request-modal--permission .request-modal__hint {
+  margin-right: auto;
+}
+.request-modal--permission .btn {
+  min-height: 32px;
+  padding: 5px 14px;
+}
+.request-modal-inline .request-modal--permission .request-modal__head { padding: 14px 16px 0; }
+.request-modal-inline .request-modal--permission .request-modal__body { padding: 10px 16px 0; }
+.request-modal-inline .request-modal--permission .request-modal__footer { padding: 12px 16px 14px; }

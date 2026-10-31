@@ -121,11 +121,6 @@
     opacity: 0.95;
   }
 }
-.msg__meta--user {
-  margin-top: 3px;
-  font-size: 10px;
-  opacity: 0.45;
-}
 .msg:hover .msg__meta,
 .msg__meta:focus-within {
   opacity: 0.95;
@@ -727,9 +722,10 @@
   /* 日期粗体,左右分隔线渐隐 */
   font-weight: 600;
 }
+/* 换模型只是一条旁注(对齐 WorkBuddy):弱色、常规字重,不用品牌绿抢眼。 */
 .timeline-divider--model {
-  color: var(--wb-brand);
-  font-weight: 600;
+  color: var(--wb-text-weak);
+  font-weight: 400;
 }
 [data-theme="dark"] .timeline-divider {
   color: var(--wb-text-medium);
@@ -1113,6 +1109,16 @@
 .share-menu__item:hover {
   background: var(--wb-bg-tertiary);
 }
+.chatview__more-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.chatview__more-item svg {
+  flex-shrink: 0;
+  color: var(--wb-text-medium);
+}
 .share-menu__divider {
   height: 1px;
   background: var(--wb-border-default);
@@ -1156,21 +1162,6 @@
 .yield-banner__resume--primary:hover {
   background: #b45309;
   color: #fff;
-}
-.chatview__pause-btn {
-  align-self: flex-start;
-  margin-bottom: 6px;
-  padding: 4px 12px;
-  border: 1px solid var(--wb-border-default);
-  background: var(--wb-bg-primary);
-  color: var(--wb-text-medium);
-  border-radius: 8px;
-  font-size: 12px;
-  cursor: pointer;
-}
-.chatview__pause-btn:hover {
-  border-color: #d97706;
-  color: #d97706;
 }
 /* R6.5 + R8.41 — Floating "jump to bottom" pill. Sticky inside
    chatview__scroll so it tracks the viewport while the user reads
@@ -1673,26 +1664,6 @@
 /* R8.12 — small "AI" role badge next to the Buddy name. Tiny uppercase
    pill so the user always knows they're talking to the assistant (vs
    another human in a multi-party transcript). */
-/* R8.43 — AI role badge polish. Slightly larger chip with
-   uppercase brand-tinted typography. The 1px brand-tinted border
-   adds definition against the bubble background. */
-/* R5 — Subtle AI role badge. The previous brand-tinted chip was
-   visually heavy; monochrome + low-contrast is closer to ChatGPT's
-   neutral "AI" label. */
-.msg--assistant .msg__role {
-  display: inline-flex;
-  align-items: center;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 4px;
-  background: var(--wb-bg-secondary, rgba(0, 0, 0, 0.04));
-  color: var(--wb-text-weak, rgba(0, 0, 0, 0.5));
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
 .msg--assistant .msg__body {
   flex: 1;
   min-width: 0;
@@ -1758,18 +1729,7 @@
 .msg__thought > summary::-webkit-details-marker {
   display: none;
 }
-/* 三角指示器：展开朝下，折叠朝右 */
-.msg__thought > summary::after {
-  content: "";
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 5px solid currentColor;
-  opacity: 0.55;
-  transition: transform 0.15s ease;
-}
-.msg__thought:not([open]) > summary::after {
-  transform: rotate(-90deg);
-}
+/* Disclosure is the "›" chevron in messages.css; no second triangle here. */
 .msg__thought-body {
   margin-top: 6px;
   padding-left: 12px;

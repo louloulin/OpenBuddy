@@ -15,6 +15,7 @@ import {
   buildPartRenderables,
   clusterToolCalls,
   DEFAULT_PARALLEL_WINDOW_MS,
+  processPrefixLength,
 } from "../ui/message-part-renderables";
 
 function toolCall(id: string, startedAt?: number): ToolCallView {
@@ -136,5 +137,28 @@ describe("buildPartRenderables", () => {
 
   it("empty input yields no render items", () => {
     expect(buildPartRenderables([])).toEqual([]);
+  });
+});
+
+describe("processPrefixLength (完成后的过程折叠)", () => {
+  const text = (t: string): MessagePart => ({ kind: "text", text: t });
+  const thought: MessagePart = { kind: "thought", text: "…" };
+  const tool = (id: string): MessagePart => ({ kind: "tool_call", toolCall: toolCall(id) });
+
+  it("folds thinking + tools + interim text, leaving the trailing answer", () => {
+    const parts = [thought, tool("a"), text("看一下"), tool("b"), text("答案"), text("补充")];
+    expect(processPrefixLength(buildPartRenderables(parts))).toBe(4);
+  });
+
+  it("does not fold a plain text answer", () => {
+    expect(processPrefixLength(buildPartRenderables([text("hi")]))).toBe(0);
+  });
+
+  it("does not fold when the turn ends on a tool call", () => {
+    expect(processPrefixLength(buildPartRenderables([thought, tool("a")]))).toBe(0);
+  });
+
+  it("folds a lone thought before the answer", () => {
+    expect(processPrefixLength(buildPartRenderables([thought, text("答案")]))).toBe(1);
   });
 });

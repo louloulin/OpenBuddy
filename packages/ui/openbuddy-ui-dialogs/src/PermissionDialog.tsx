@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { usePermissionStore, selectPermissionForSession } from "@/stores/permission-store";
-import { permissionModeGet, piResolvePermission, type PermissionMode } from "@/lib/agent/pi-client";
+import { piResolvePermission } from "@/lib/agent/pi-client";
 import { checkCommandRisk, riskLabel } from "@/lib/security/command-risk";
 
 /**
@@ -30,7 +30,6 @@ export function PermissionInlineCard({
   const queueLength = usePermissionStore((s) => (sessionId ? (s.queues[sessionId]?.length ?? 0) : 0));
   const dismiss = usePermissionStore((s) => s.dismiss);
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<PermissionMode | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -50,17 +49,6 @@ export function PermissionInlineCard({
     }
   };
 
-  // Current permission mode is advisory context ("which policy is asking?").
-  // A failure to read it must never block the decision itself.
-  useEffect(() => {
-    if (!head) return;
-    let alive = true;
-    permissionModeGet()
-      .then((next) => { if (alive) setMode(next); })
-      .catch(() => { /* keep the chip hidden */ });
-    return () => { alive = false; };
-  }, [head?.requestId]);
-
   // Escape cancels only while focus is inside the card (the modal focuses its
   // cancel button). A window-wide listener used to deny the request whenever
   // the user pressed Esc to close a slash/mention menu or the find bar.
@@ -79,7 +67,6 @@ export function PermissionInlineCard({
 
   if (!head) return null;
 
-  const toolLabel = permissionToolLabel(head.toolKind);
   const detail = head.message?.trim();
   // Only command-shaped prompts get a risk badge — running the shell-risk
   // regex over arbitrary prose (file paths, MCP descriptions) would produce
@@ -89,10 +76,14 @@ export function PermissionInlineCard({
     : null;
   const riskText = risk ? riskLabel(risk.level) : "";
   const titleId = `permission-dialog-title-${head.requestId}`;
-  const description = detail
-    ? "Agent 请求执行以下操作。请确认命令、工作目录与参数后选择允许或拒绝。"
-    : "pi agent 请求执行以下操作。请确认内容后选择允许或拒绝。";
+  const allow = head.options.find((o) => o.kind === "allow");
+  const allowAlways = head.options.find((o) => o.kind === "allow_always");
+  const deny = head.options.find((o) => o.kind === "deny");
 
+  // One title, the exact thing being approved, three choices — the shape
+  // Claude Code / Claude.ai use. The old card stacked an eyebrow, a pending
+  // pill, tool + mode chips, a generic paragraph and a redundant 取消 next to
+  // 拒绝 around a single command line. Esc still cancels.
   const card = (
     <div
       ref={cardRef}
@@ -100,94 +91,73 @@ export function PermissionInlineCard({
       role="dialog"
       aria-modal={variant === "modal" ? "true" : undefined}
       aria-labelledby={titleId}
-      aria-describedby={`${titleId}-desc`}
       data-testid="permission-card"
       data-variant={variant}
     >
       <div className="request-modal__head">
-        <div className="request-modal__identity">
-          <span className="request-modal__icon request-modal__icon--permission" aria-hidden="true">!</span>
-          <div>
-            <span className="request-modal__eyebrow">
-              需要你的确认
-              <span className="request-modal__pending" aria-hidden="true">
-                <span className="request-modal__pending-dot" />
-                等待确认
-              </span>
-            </span>
-            <h2 id={titleId} className="request-modal__title">{head.title || "允许 Agent 执行操作？"}</h2>
-          </div>
-        </div>
-        <div className="request-modal__chips">
-          <span className="request-modal__kind" data-testid="permission-tool-label">{toolLabel}</span>
-          {riskText && (
-            <span
-              className={`request-modal__risk request-modal__risk--${risk?.level}`}
-              data-testid="permission-risk-label"
-              title={risk?.reasons.join("；") || undefined}
-            >
-              {riskText}
-            </span>
+        <h2 id={titleId} className="request-modal__title">
+          {head.title || permissionToolLabel(head.toolKind) || "允许 Agent 执行操作？"}
+        </h2>
+        {riskText && (
+          <span
+            className={`request-modal__risk request-modal__risk--${risk?.level}`}
+            data-testid="permission-risk-label"
+            title={risk?.reasons.join("；") || undefined}
+          >
+            {riskText}
+          </span>
+        )}
+      </div>
+      {(detail || head.rawInput != null) && (
+        <div className="request-modal__body">
+          {detail && (
+            <pre className="request-modal__command" data-testid="permission-message">{detail}</pre>
           )}
-          {mode && <span className="request-modal__mode" data-testid="permission-mode-label">{permissionModeLabel(mode)}</span>}
+          {head.rawInput != null && (
+            <details className="request-modal__raw-details">
+              <summary>查看原始参数</summary>
+              <pre className="request-modal__raw">{JSON.stringify(head.rawInput, null, 2)}</pre>
+            </details>
+          )}
         </div>
-      </div>
-      <div className="request-modal__body">
-        <p id={`${titleId}-desc`} className="request-modal__description">{description}</p>
-        {detail && (
-          <pre className="request-modal__command" data-testid="permission-message">{detail}</pre>
-        )}
-        {head.rawInput != null && (
-          <details className="request-modal__raw-details">
-            <summary>查看原始参数</summary>
-            <pre className="request-modal__raw">{JSON.stringify(head.rawInput, null, 2)}</pre>
-          </details>
-        )}
-      </div>
+      )}
       <div className="request-modal__footer">
-        <span className="request-modal__hint">
-          {queueLength > 1 ? `第 1 / ${queueLength} 项待处理 · ` : ""}
-          {variant === "modal" ? "按 Esc 取消" : "Esc 可取消"}
-        </span>
-        {/* cc-haha 对齐 — 主操作是「允许」,「拒绝」退为低对比度 ghost;
-            此前红色实心「拒绝」在视觉上压过允许,误点风险高。 */}
+        {queueLength > 1 && <span className="request-modal__hint">{`还有 ${queueLength - 1} 项待确认`}</span>}
         <div className="request-modal__actions">
-          <button ref={cancelRef} type="button" className="btn btn--ghost" onClick={() => void resolve(undefined, true)} disabled={busy}>取消</button>
-          {head.options
-            .filter((o) => o.kind === "allow")
-            .map((o) => (
-              <button
-                key={o.optionId}
-                type="button"
-                className="btn btn--primary"
-                onClick={() => void resolve(o.optionId)}
-                disabled={busy}
-                title={o.title}
-                data-testid="permission-allow"
-              >
-                允许
-              </button>
-            ))}
-          {head.options
-            .filter((o) => o.kind === "allow_always")
-            .map((o) => (
-              <button
-                key={o.optionId}
-                type="button"
-                className="btn btn--always"
-                onClick={() => void resolve(o.optionId)}
-                disabled={busy}
-                title={o.title}
-                data-testid="permission-allow-always"
-              >
-                本会话始终允许
-              </button>
-            ))}
-          <span className="request-modal__actions-spacer" />
-          <button type="button" className="btn btn--ghost request-modal__deny" onClick={() => {
-            const deny = head.options.find((o) => o.kind === "deny");
-            void resolve(deny?.optionId);
-          }} disabled={busy}>拒绝</button>
+          <button
+            ref={cancelRef}
+            type="button"
+            className="btn btn--ghost request-modal__deny"
+            onClick={() => void resolve(deny?.optionId, !deny)}
+            disabled={busy}
+            title="Esc"
+          >
+            拒绝
+          </button>
+          {allowAlways && (
+            <button
+              type="button"
+              className="btn btn--always"
+              onClick={() => void resolve(allowAlways.optionId)}
+              disabled={busy}
+              title={allowAlways.title}
+              data-testid="permission-allow-always"
+            >
+              {allowAlways.title || "本会话始终允许"}
+            </button>
+          )}
+          {allow && (
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => void resolve(allow.optionId)}
+              disabled={busy}
+              title={allow.title}
+              data-testid="permission-allow"
+            >
+              允许
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -223,6 +193,7 @@ const TOOL_LABELS: Record<string, string> = {
   fetch: "获取网页",
   mcp: "MCP 工具",
   confirm: "工具确认",
+  memory_save: "保存记忆",
 };
 
 export function permissionToolLabel(toolKind: string | undefined): string {
@@ -234,14 +205,3 @@ function isCommandRequest(toolKind: string | undefined, title: string | undefine
   return /command|bash|shell|exec/i.test(toolKind ?? "") || title?.includes("执行命令") === true;
 }
 
-const MODE_LABELS: Record<PermissionMode, string> = {
-  default: "默认 · 每次询问",
-  acceptEdits: "接受编辑",
-  dontAsk: "不再询问",
-  plan: "计划模式",
-  bypassPermissions: "完全访问",
-};
-
-function permissionModeLabel(mode: PermissionMode): string {
-  return MODE_LABELS[mode] ?? mode;
-}

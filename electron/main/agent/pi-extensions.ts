@@ -33,23 +33,17 @@ import {
 import { isServiceKey, type ServiceKey, type ServiceKeyResolver } from "./pi-service-keys";
 import {
   registerAdapterTool,
-  registerDescribeFallbackTool,
   type AdapterToolSpec,
 } from "./pi-tool-bridge";
 import {
-  describeAutomationCommand,
   describeFsCommand,
   describeGoalCommand,
-  describeHashlineCommand,
-  describeLensCommand,
   describeMcpAuthCommand,
   describeMcpCommand,
   describePermissionSystemCommand,
   describePlanCommand,
   describeSessionCommand,
-  describeSimplifyCommand,
   describeTasksCommand,
-  describeWorktreeCommand,
   invokeFsCommand,
   invokeGoalCommand,
   invokeMcpCommand,
@@ -459,29 +453,8 @@ export const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
         describeInvocation: (service, args) => describePlanCommand(service, args),
       },
     ],
-    // Passthrough-only: /plan has no invokeInvocation, so this takes the
-    // describe-fallback path. The LLM still gets a tool and learns that plan
-    // mode lives in the upstream package rather than getting silence.
-    tools: [
-      {
-        name: "openbuddy_plan",
-        description: "Inspect the OpenBuddy plan-mode projection: read how many plans pi-plan-mode owns, or learn how to toggle plan mode / set plan content. Plan state itself is owned by the pi-plan-mode extension, not OpenBuddy.",
-        parameters: Type.Object({
-          verb: Type.Union([
-            Type.Literal("status"),
-            Type.Literal("show"),
-            Type.Literal("enable"),
-            Type.Literal("disable"),
-            Type.Literal("set"),
-          ]),
-          text: Type.Optional(Type.String()),
-        }),
-        serializeArgs: (args: unknown) => {
-          const a = args as { verb: string; text?: string };
-          return a.text ? `${a.verb} ${a.text}` : a.verb;
-        },
-      },
-    ],
+    // No model-facing tool: /plan has no invoke handler, and plan mode's
+    // own `exit_plan_mode` tool (pi-plan-mode.ts) is what the model calls.
   },
   {
     packageNames: ["pi-todo", "pi-tasks", "pi-tasklist", "@narumitw/pi-todo", "@anthropic/pi-todo"],
@@ -636,20 +609,6 @@ export const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
     passthrough: true,
     piPackageHint: "pi-lens",
     commands: [],
-    tools: [
-      {
-        name: "openbuddy_lens",
-        description: "Check the OpenBuddy lens projection and how to enable it. OpenBuddy mounts no Cordis service for lens; the capability ships in the pi-lens npm package (lens-* commands, bundled skills, reload) and runs natively once installed.",
-        parameters: Type.Object({
-          verb: Type.Union([
-            Type.Literal("status"),
-            Type.Literal("install"),
-          ]),
-        }),
-        serializeArgs: (args: unknown) => (args as { verb: string }).verb,
-        describeInvocation: (service, args) => describeLensCommand(service, args),
-      },
-    ],
   },
   {
     packageNames: ["pi-simplify"],
@@ -659,20 +618,6 @@ export const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
     passthrough: true,
     piPackageHint: "pi-simplify",
     commands: [],
-    tools: [
-      {
-        name: "openbuddy_simplify",
-        description: "Check the OpenBuddy simplify projection and how to enable it. OpenBuddy mounts no Cordis service for simplify; the capability ships in the pi-simplify npm package and runs natively once installed.",
-        parameters: Type.Object({
-          verb: Type.Union([
-            Type.Literal("status"),
-            Type.Literal("install"),
-          ]),
-        }),
-        serializeArgs: (args: unknown) => (args as { verb: string }).verb,
-        describeInvocation: (service, args) => describeSimplifyCommand(service, args),
-      },
-    ],
   },
   {
     packageNames: ["pi-hashline-edit-pro", "pi-hashline-edit"],
@@ -682,20 +627,6 @@ export const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
     passthrough: true,
     piPackageHint: "pi-hashline-edit-pro",
     commands: [],
-    tools: [
-      {
-        name: "openbuddy_hashline_edit",
-        description: "Check the OpenBuddy hashline-edit projection and how to enable it. OpenBuddy mounts no Cordis service for hashline editing; the capability ships in the pi-hashline-edit-pro npm package and runs natively once installed.",
-        parameters: Type.Object({
-          verb: Type.Union([
-            Type.Literal("status"),
-            Type.Literal("install"),
-          ]),
-        }),
-        serializeArgs: (args: unknown) => (args as { verb: string }).verb,
-        describeInvocation: (service, args) => describeHashlineCommand(service, args),
-      },
-    ],
   },
   {
     packageNames: ["@dietrichgebert/ponytail", "ponytail"],
@@ -705,20 +636,6 @@ export const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
     passthrough: true,
     piPackageHint: "@dietrichgebert/ponytail",
     commands: [],
-    tools: [
-      {
-        name: "openbuddy_worktree",
-        description: "Check the OpenBuddy worktree projection and how to enable it. OpenBuddy mounts no Cordis service for git worktrees; the capability ships in the @dietrichgebert/ponytail npm package and runs natively once installed.",
-        parameters: Type.Object({
-          verb: Type.Union([
-            Type.Literal("status"),
-            Type.Literal("install"),
-          ]),
-        }),
-        serializeArgs: (args: unknown) => (args as { verb: string }).verb,
-        describeInvocation: (service, args) => describeWorktreeCommand(service, args),
-      },
-    ],
   },
   // Stage H-4: openbuddy-automation removed (Stage G-1c). The canonical
   // automation backplane is now `pi-goal-list-loop-audit` (npm 18,959
@@ -735,23 +652,6 @@ export const compatibilityAdapters: readonly PiCompatibilityAdapter[] = [
     passthrough: true,
     piPackageHint: "pi-goal-list-loop-audit",
     commands: [],
-    tools: [
-      {
-        name: "openbuddy_automation",
-        description: "Check the OpenBuddy automation projection and how to enable it. OpenBuddy's automation Cordis plugin was removed (Stage H-4); pi-goal-list-loop-audit now owns the whole surface — interview-drafted goals, an audited task queue, and forever-loops (metric / spec / project-audit) verified by a detached auditor.",
-        parameters: Type.Object({
-          verb: Type.Union([
-            Type.Literal("status"),
-            Type.Literal("goal"),
-            Type.Literal("loop"),
-            Type.Literal("audit"),
-            Type.Literal("install"),
-          ]),
-        }),
-        serializeArgs: (args: unknown) => (args as { verb: string }).verb,
-        describeInvocation: (service, args) => describeAutomationCommand(service, args),
-      },
-    ],
   },
 ];
 
@@ -886,19 +786,17 @@ export function createCompatibilityAdapterFactory(
     // Stage G-1d: register one pi tool per entry in adapter.tools so the LLM
     // can reach the canonical OpenBuddy service from inside the agent loop.
     //
-    // Two paths, chosen per tool rather than per adapter:
-    //  - an adapter command carrying `invokeInvocation` backs a real tool;
-    //  - a passthrough-only adapter (no invoke handler exists, by design)
-    //    backs a describe-fallback tool, so the LLM still learns the
-    //    capability exists and how to enable the upstream package instead of
-    //    silently having no tool at all.
-    //
     // Deliberately outside the registerCommand guard below: an adapter whose
     // runtime lacks slash commands must still expose its tools to the LLM.
+    // Only adapters with a real invoke handler back a model-facing tool.
+    // Passthrough-only adapters used to register a "describe" tool that just
+    // told the model to install an npm package — it took a tool slot, could
+    // never do the job, and the native package registers its own tools once
+    // installed.
     const toolSourceCommand = adapter.commands.find((command) => typeof command.invokeInvocation === "function");
     const describeSourceCommand = adapter.commands.find((command) => typeof command.describeInvocation === "function");
-    for (const tool of adapter.tools ?? []) {
-      if (toolSourceCommand?.invokeInvocation) {
+    if (toolSourceCommand?.invokeInvocation) {
+      for (const tool of adapter.tools ?? []) {
         // Hand the describe handler along as the degradation path: an
         // invokeInvocation that returns undefined (service unmounted, verb
         // unsupported) then yields the projection text instead of a stub.
@@ -907,20 +805,7 @@ export function createCompatibilityAdapterFactory(
           { ...tool, describeInvocation: tool.describeInvocation ?? describeSourceCommand?.describeInvocation },
           { invokeInvocation: toolSourceCommand.invokeInvocation, resolveService },
         );
-        continue;
       }
-      const describe = tool.describeInvocation ?? describeSourceCommand?.describeInvocation;
-      if (!describe) {
-        // Reachable only if a tool is added without either responder; surface
-        // it rather than dropping the tool silently.
-        emit("pi/extension-tool-describe-missing", {
-          id: spec.id,
-          capability: adapter.capability,
-          tool: tool.name,
-        });
-        continue;
-      }
-      registerDescribeFallbackTool(pi, { ...tool, describeInvocation: describe, resolveService });
     }
     if (typeof api.registerCommand !== "function") return;
     for (const command of adapter.commands) {

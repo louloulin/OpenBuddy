@@ -32,6 +32,8 @@
  *   This module imports nothing from agent-host.ts. deps are passed in.
  */
 import { startProgress, finishProgress } from "../../progress-runs";
+import { toolAudit } from "./tool-audit";
+import { applyTurnInput, setTurnStateListener, type TurnInput } from "../turn-state";
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
 export interface HandleSessionEventDeps {
@@ -181,6 +183,11 @@ export function handleSessionEvent(
   const session = activeSession;
   const sessionEvent = { ...event, sessionId: session.sessionId };
 
+  // 回合状态机(计划 1.1):阶段变化广播成 `pi://turn-state`,渲染层只投影。
+  installTurnStateBroadcast(emitRendererEvent);
+  const turnInput = turnInputFor(event);
+  if (turnInput) applyTurnInput(session.sessionId, turnInput);
+
   // Diagnostics: surface model-side events with their terminal state so the
   // log clearly shows when an upstream provider responds vs. when pi surfaces
   // a failure (stopReason === "error" / "rate_limit"). Previously only the
@@ -237,6 +244,7 @@ export function handleSessionEvent(
     const toolName = event.toolName ?? "";
     const abortController = new AbortController();
     startProgress(toolCallId, session.sessionId, abortController);
+    toolAudit.start(toolCallId, toolName, session.sessionId, event.args);
 
     state.runningTasks.set(toolCallId, {
       id: toolCallId,
@@ -279,6 +287,7 @@ export function handleSessionEvent(
     const toolCallId = event.toolCallId ?? "";
     const job = state.jobsRegistry.get(toolCallId);
     finishProgress(toolCallId, event.isError ? "failed" : "completed", event.isError ? String(event.message ?? "tool execution failed") : undefined);
+    toolAudit.end(toolCallId, Boolean(event.isError));
 
     if (job) {
       job.status = event.isError ? "failed" : "completed";
@@ -504,6 +513,8 @@ export function handleSessionEvent(
         stopReason,
         errorMessage,
       });
+      // 与 complete 同一时刻收尾,且排在它之后:渲染层先收尾消息再看到 idle。
+      applyTurnInput(session.sessionId, { type: "run_end" });
     }
   }
 
@@ -568,6 +579,37 @@ export function handleSessionEvent(
       });
     }
   }
+}
+
+/** 会话事件 → 状态机输入;与阶段无关的事件返回 undefined。 */
+function turnInputFor(event: PiSessionEventLike): TurnInput | undefined {
+  switch (event.type) {
+    case "agent_start":
+    case "turn_start":
+      return { type: "run_start" };
+    case "tool_execution_start":
+      return { type: "tool_start" };
+    case "tool_execution_end":
+      return { type: "tool_end" };
+    case "message_update": {
+      const kind = event.assistantMessageEvent?.type;
+      if (kind === "text_delta") return { type: "text" };
+      if (kind === "thinking_delta") return { type: "thinking" };
+      return undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
+let turnBroadcastEmitter: ((channel: string, payload: unknown) => void) | null = null;
+
+function installTurnStateBroadcast(emit: (channel: string, payload: unknown) => void): void {
+  if (turnBroadcastEmitter === emit) return;
+  turnBroadcastEmitter = emit;
+  setTurnStateListener((sessionId, state) => {
+    emit("pi://turn-state", { sessionId, phase: state.phase, since: state.since });
+  });
 }
 
 /**

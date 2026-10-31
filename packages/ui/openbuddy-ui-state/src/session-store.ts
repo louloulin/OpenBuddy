@@ -10,7 +10,7 @@ import {
   type StreamingState,
   type StreamAction,
 } from "@openbuddy/agent-rpc/stream/streaming-message";
-import { IDLE_PHASE, phaseReducer, type AgentPhase, type AgentPhaseEvent } from "@openbuddy/agent-rpc/stream/agent-phase";
+import type { TurnPhase } from "@openbuddy/shared-types";
 
 /**
  * A single chat message in the transcript the UI renders.
@@ -186,10 +186,9 @@ interface UiSessionState {
    *  the legacy `messages` mirror (still maintained as a fallback) or
    *  switch to a streaming-only selector reading `streamState.message`. */
   streamState: StreamingState;
-  /** pi-web-alignment — machine-readable lifecycle of the current turn.
-   *  Drives badges (`running 3 tools`, `awaiting model`) without forcing
-   *  the UI to recompute from tool counts + streaming boolean. */
-  phase: AgentPhase;
+  /** 当前会话的回合阶段 —— 主进程状态机经 `pi://turn-state` 投影过来
+   *  (计划 1.1),渲染层不自行推断。 */
+  turnPhase: TurnPhase;
   /** True while a switched-to session's history is being fetched. The chat
    *  shows a skeleton instead of the "start a new conversation" empty state,
    *  which used to flash on every session switch. */
@@ -317,10 +316,8 @@ interface UiSessionActions {
   /** pi-web-alignment — read-only convenience selector for the in-flight
    *  message (null when no turn is active). */
   streamingMessage: () => ChatMessage | null;
-  /** pi-web-alignment — dispatch a phase event. Referentially stable for
-   *  the same input so consumers can subscribe with `Object.is` equality
-   *  and only re-render when the phase actually changes. */
-  applyPhaseEvent: (event: AgentPhaseEvent) => void;
+  /** 投影主进程的回合阶段(`pi://turn-state` / `agent:turn-state`)。 */
+  setTurnPhase: (phase: TurnPhase) => void;
 }
 
 let seq = 0;
@@ -516,12 +513,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
   // call for a new turn. Reuses `streamingMessageId` as the bubble id so
   // the legacy mirror stays in sync.
   streamState: INITIAL_STREAMING_STATE,
-  // pi-web-alignment — drives machine-readable lifecycle badges. Starts
-  // idle; transitions to `waiting_model` / `running_tools` / etc. via
-  // `applyPhaseEvent`. The legacy `streaming` boolean remains as a
-  // backward-compatible aggregate for callers that don't care which
-  // sub-state the agent is in.
-  phase: IDLE_PHASE,
+  turnPhase: "idle",
   historyLoading: false,
   // Phase R3.0 — UI-level gate for destructive actions on optimistic
   // session ids. Populated by `beginPendingNewSession` (App.tsx) and
@@ -533,7 +525,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
 
   setSession: (id) => {
     discardStreamingBuffer();
-    set({ sessionId: id, error: null, messages: [], streamingMessageId: null, plan: null, streamState: INITIAL_STREAMING_STATE, phase: IDLE_PHASE, historyLoading: false, toolCallIndex: new Map() });
+    set({ sessionId: id, error: null, messages: [], streamingMessageId: null, plan: null, streamState: INITIAL_STREAMING_STATE, turnPhase: "idle", historyLoading: false, toolCallIndex: new Map() });
   },
   setHistoryLoading: (historyLoading) => set({ historyLoading }),
   migrateSession: (oldId, newId) => {
@@ -601,18 +593,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
   setStreaming: (streaming) => set({ streaming }),
   setPlanMode: (planMode) => set({ planMode }),
 
-  // pi-web-alignment — drives the phase state machine. Side effect: keeps
-  // the legacy `streaming` boolean in sync with `phase.kind !== "idle"`
-  // so existing callers (composer lock, LoadingRow) keep working without
-  // a big-bang rewrite. The next refactor can drop the boolean once all
-  // consumers move to `phase`.
-  applyPhaseEvent: (event) => {
-    set((s) => {
-      const next = phaseReducer(s.phase, event);
-      if (next === s.phase) return s;
-      return { phase: next, streaming: next.kind !== "idle" };
-    });
-  },
+  setTurnPhase: (turnPhase) => set((s) => (s.turnPhase === turnPhase ? s : { turnPhase })),
 
   // R2 — defensive snapshot:
   // `Plan` object they passed in (e.g. for further mutations or to pass
@@ -909,7 +890,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
       streamingMessageId: null,
       plan: null,
       streamState: INITIAL_STREAMING_STATE,
-      phase: IDLE_PHASE,
+      turnPhase: "idle",
       historyLoading: false,
       pendingSessionIds: new Set<string>() as ReadonlySet<string>,
       toolCallIndex: new Map(),

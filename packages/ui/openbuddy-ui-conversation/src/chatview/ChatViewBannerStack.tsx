@@ -17,6 +17,9 @@ import { StatusIndicator } from "@/components/StatusIndicator";
 import type { Plan } from "@openbuddy/shared-types";
 import type { MessageError } from "@openbuddy/ui-state/session-store";
 import { formatPiError } from "@/lib/platform/error-format";
+import { useT } from "@openbuddy/ui-locale/client";
+import { openModelSelector } from "@openbuddy/ui-workbench";
+import { suggestsModelSwitch } from "../TurnErrorCard";
 
 export type ExtensionUi = {
   statuses?: Record<string, string>;
@@ -43,6 +46,9 @@ export type ChatViewBannerStackProps = {
 };
 
 export function ChatViewBannerStack(props: ChatViewBannerStackProps) {
+  const switchModelLabel = useT("chat.turnError.switchModel");
+  const switchModelTitle = useT("chat.turnError.switchModelTitle");
+  const switchModelHint = useT("chat.turnError.switchModelHint");
   const items: ReactNode[] = [];
 
   if (props.extensionUi && Object.keys(props.extensionUi.widgets ?? {}).length > 0) {
@@ -91,7 +97,8 @@ export function ChatViewBannerStack(props: ChatViewBannerStackProps) {
       <div className="chatview__error-banner" role="alert" key="error">
         <span className="chatview__error-icon" aria-hidden="true">⚠</span>
         <span className="chatview__error-text" style={{ whiteSpace: "pre-wrap" }}>
-          {formatPiError(props.error as never) ?? String(props.error)}
+          {/* The banner draws its own icon; drop the ⚠️ prefixes the text carries. */}
+          {(formatPiError(props.error as never) ?? String(props.error)).replace(/^(?:\s*⚠\uFE0F?)+\s*/u, "")}
         </span>
         {props.canRetry && (
           <button
@@ -102,6 +109,19 @@ export function ChatViewBannerStack(props: ChatViewBannerStackProps) {
             data-testid="chatview-error-retry"
           >
             ↻ 重试
+          </button>
+        )}
+        {suggestsModelSwitch({ message: String(props.error) }) && (
+          <button
+            type="button"
+            className="chatview__error-retry"
+            title={switchModelTitle}
+            data-testid="chatview-error-switch-model"
+            onClick={() => {
+              if (!openModelSelector()) props.onToast?.(switchModelHint);
+            }}
+          >
+            {switchModelLabel}
           </button>
         )}
         <button

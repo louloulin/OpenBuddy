@@ -45,6 +45,7 @@ import { createDefaultAgentHostState } from "./_default-state";
 import { extractPdfTextByPage } from "./pdf-text-extractor";
 import { extractDocxTextByParagraph } from "./docx-text-extractor";
 import { DEFAULT_TRUNCATION_OPTIONS, truncateDocumentBlocks } from "./document-truncator";
+import { applyTurnInput } from "./turn-state";
 
 let state: AgentHostState = createDefaultAgentHostState();
 
@@ -67,6 +68,18 @@ let state: AgentHostState = createDefaultAgentHostState();
  */
 let eventHandlers: Set<EventHandler> = new Set();
 let pluginEventHandlers: Set<PluginEventHandler> = new Set();
+
+/**
+ * Abort in flight. Pi's `abort()` waits for the run to go idle, and the
+ * renderer returns to idle before that (Stop must feel instant), so a prompt
+ * sent right after Stop waits here instead of failing with "Agent is already
+ * processing".
+ */
+let pendingAbort: Promise<void> | null = null;
+
+async function settlePendingAbort(): Promise<void> {
+  if (pendingAbort) await pendingAbort.catch(() => undefined);
+}
 
 let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
 let emitRendererEvent: (channel: string, payload: unknown) => void = () => undefined;
@@ -148,6 +161,7 @@ export async function prompt(
   emitPluginEvent("session/input", { sessionId: state.session.sessionId, text });
   await writePromptHistory(text);
   try {
+    await settlePendingAbort();
     await state.session.prompt(text);
     console.log("[openbuddy] pi prompt.dispatched", { traceId, sessionId });
     hostDispatchedLog("agent:prompt", traceId, sessionId);
@@ -159,6 +173,8 @@ export async function prompt(
       error: String(error),
     });
     emitRendererEvent("pi://error", { sessionId: state.session.sessionId, error: String(error) });
+    // 回合没跑起来(或中途抛出)也要回到 idle,否则状态机停在 thinking。
+    applyTurnInput(state.session.sessionId, { type: "run_end" });
     hostFailedLog("agent:prompt", traceId, error);
     throw error;
   }
@@ -313,6 +329,7 @@ async function promptContent(
   if (text.trim()) await writePromptHistory(text);
   try {
     void state.queueMirror;
+    await settlePendingAbort();
     await state.session!.sendUserMessage(
       wireContent,
       mode === "steer" ? { deliverAs: "steer" } : { deliverAs: "followUp" },
@@ -325,6 +342,8 @@ async function promptContent(
       error: String(error),
     });
     emitRendererEvent("pi://error", { sessionId: state.session.sessionId, error: String(error) });
+    // 回合没跑起来(或中途抛出)也要回到 idle,否则状态机停在 thinking。
+    applyTurnInput(state.session.sessionId, { type: "run_end" });
     throw error;
   }
 }
@@ -473,12 +492,16 @@ export async function abort(options?: { traceId?: string; sessionId?: string }):
       cancelled: true,
     });
   }
+  const run = Promise.resolve(state.session?.abort());
+  pendingAbort = run;
   try {
-    await state.session?.abort();
+    await run;
     hostDispatchedLog("agent:abort", traceId, sessionId);
   } catch (error) {
     hostFailedLog("agent:abort", traceId, error);
     throw error;
+  } finally {
+    if (pendingAbort === run) pendingAbort = null;
   }
 }
 

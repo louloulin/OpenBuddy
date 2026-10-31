@@ -8,6 +8,8 @@
  *      intact), falling back to the DOM text. The result is spliced into the
  *      textarea's live value and selection — the old path spliced into a
  *      render-time snapshot and dropped keystrokes typed during the IPC read.
+ *      Insertion uses `execCommand("insertText")` when available so the
+ *      paste stays on the native undo stack.
  */
 import { useCallback, type ClipboardEvent, type RefObject } from "react";
 import type { ImageAttachment } from "./types";
@@ -69,8 +71,18 @@ export function useComposerPaste({
         const current = el?.value ?? text;
         const start = el?.selectionStart ?? current.length;
         const end = el?.selectionEnd ?? current.length;
-        updateText(current.slice(0, start) + pasted + current.slice(end));
         const caret = start + pasted.length;
+        // insertText goes through the browser's edit stack, so Cmd+Z undoes
+        // the paste; its input event drives the controlled onChange.
+        if (el && typeof el.setSelectionRange === "function" && typeof document.execCommand === "function") {
+          el.focus();
+          el.setSelectionRange(start, end);
+          if (document.execCommand("insertText", false, pasted)) {
+            setCursorPos(caret);
+            return;
+          }
+        }
+        updateText(current.slice(0, start) + pasted + current.slice(end));
         setCursorPos(caret);
         requestAnimationFrame(() => {
           if (ref.current) {

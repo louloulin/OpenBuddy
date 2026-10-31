@@ -98,6 +98,30 @@ describe("useComposerPaste (Plan5 componentization)", () => {
     expect(updateText).toHaveBeenLastCalledWith("aSb");
   });
 
+  it("浏览器支持 insertText 时走原生编辑栈(可撤销),不直接改 state", async () => {
+    const updateText = vi.fn();
+    const setSelectionRange = vi.fn();
+    const ref: RefObject<HTMLTextAreaElement> = {
+      current: { focus: vi.fn(), value: "ab", selectionStart: 1, selectionEnd: 1, setSelectionRange } as unknown as HTMLTextAreaElement,
+    };
+    const original = document.execCommand;
+    const execCommand = vi.fn(() => true);
+    document.execCommand = execCommand as typeof document.execCommand;
+    try {
+      const { result } = renderHook(() =>
+        useComposerPaste({ ref, text: "ab", setImages: vi.fn(), updateText, setCursorPos: vi.fn(), electronApi: undefined }),
+      );
+      act(() => {
+        result.current(fakeEvent({ text: "Z" }) as never);
+      });
+      expect(setSelectionRange).toHaveBeenCalledWith(1, 1);
+      expect(execCommand).toHaveBeenCalledWith("insertText", false, "Z");
+      expect(updateText).not.toHaveBeenCalled();
+    } finally {
+      document.execCommand = original;
+    }
+  });
+
   it("图片粘贴:image/* → 走 readImageFile → push 到 images 状态", async () => {
     const updateText = vi.fn();
     const setCursorPos = vi.fn();

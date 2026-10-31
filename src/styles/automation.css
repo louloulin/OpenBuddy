@@ -27,6 +27,13 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
   padding: 6px;
   z-index: 1200;
+  /* 分组排成两列,菜单高度减半;矮窗口下仍可滚动。 */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: 2px 6px;
+  align-items: start;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   animation: sidebarMoreFadeIn var(--wb-motion-duration-fast, 120ms) ease-out;
 }
 @keyframes sidebarMoreFadeIn {
@@ -109,7 +116,8 @@
   flex-direction: column;
   gap: 1px;
 }
-.sidebar__more-group + .sidebar__more-group {
+/* 两列网格:分隔线从第二行起(第一行两组顶端对齐)。 */
+.sidebar__more-group:nth-child(n + 3) {
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px dashed var(--wb-border-subtle);

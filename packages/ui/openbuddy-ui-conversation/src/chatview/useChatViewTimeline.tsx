@@ -184,7 +184,7 @@ export function useChatViewTimeline({
                 : undefined
             }
             // Plan5 B.10 — 消息级"从此重发/分叉"。promptIndex 查不到时
-            // MessageRewindMenu 自适应为禁用态(不会指向错误的回溯点)。
+            // 「⋯」菜单里不出现「从这里重新发送」(不会指向错误的回溯点)。
             rewindPromptIndex={
               m.role === "assistant" ? promptIndexByMessageId?.get(m.id) : undefined
             }

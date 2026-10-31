@@ -27,8 +27,9 @@ import {
   type MessagePartKind,
   type MessagePartRenderProps,
 } from "./parts/registry-defaults";
+import { ProcessSummary } from "./parts/ProcessSummary";
 import { ToolGroupSummary } from "./parts/ToolGroupSummary";
-import { buildPartRenderables } from "@/lib/ui/message-part-renderables";
+import { buildPartRenderables, processPrefixLength } from "@/lib/ui/message-part-renderables";
 
 /**
  * `MessagePartRegistry` — 渲染一条消息的所有 parts。
@@ -52,42 +53,56 @@ export function MessagePartRegistry({
   markdownConfig,
   onOpenTool,
   onToast,
+  durationMs,
 }: Omit<MessagePartRenderProps, "part"> & {
   parts: readonly MessagePart[];
   messageId: string;
+  /** 本回合用时;完成后的过程折叠行显示它。 */
+  durationMs?: number | null;
 }) {
   // Plan5 B.9 — consecutive tool_calls that started within the same window
   // collapse into ONE `ToolGroupSummary` row ("3 个工具并行") instead of
   // three stacked cards. Everything else keeps the flat 1:1 dispatch, so the
   // rendered DOM of a serial transcript is byte-for-byte what it was.
   const partRenderables = useMemo(() => buildPartRenderables(partsProp), [partsProp]);
+  // 回合结束后把思考 / 工具收进一行「已完成 · 用时 Xs」,最终回答直接露出。
+  const processLength = complete && !isStreaming ? processPrefixLength(partRenderables) : 0;
 
+  const rendered = partRenderables.map((item, i) => {
+    if (item.type === "cluster") {
+      return (
+        <ToolGroupSummary
+          key={`${messageId}-cluster-${i}-${item.cluster.toolCallIds.join("_")}`}
+          cluster={item.cluster}
+          onOpenTool={(tc) => onOpenTool?.(tc.toolCallId)}
+        />
+      );
+    }
+    return (
+      <PartDispatcher
+        key={`${messageId}-${i}-${item.part.kind}`}
+        part={item.part}
+        messageId={messageId}
+        // A thought block is live only while it is the newest part; once a
+        // tool call or answer text follows, it has finished (its timer
+        // used to keep running through tool runs and approval waits).
+        isStreaming={isStreaming && (item.part.kind !== "thought" || i === partRenderables.length - 1)}
+        complete={complete}
+        theme={theme}
+        markdownConfig={markdownConfig}
+        onOpenTool={onOpenTool}
+        onToast={onToast}
+      />
+    );
+  });
+
+  if (processLength === 0) return <>{rendered}</>;
   return (
     <>
-      {partRenderables.map((item, i) => {
-        if (item.type === "cluster") {
-          return (
-            <ToolGroupSummary
-              key={`${messageId}-cluster-${i}-${item.cluster.toolCallIds.join("_")}`}
-              cluster={item.cluster}
-              onOpenTool={(tc) => onOpenTool?.(tc.toolCallId)}
-            />
-          );
-        }
-        return (
-          <PartDispatcher
-            key={`${messageId}-${i}-${item.part.kind}`}
-            part={item.part}
-            messageId={messageId}
-            isStreaming={isStreaming}
-            complete={complete}
-            theme={theme}
-            markdownConfig={markdownConfig}
-            onOpenTool={onOpenTool}
-            onToast={onToast}
-          />
-        );
-      })}
+      <ProcessSummary durationMs={durationMs} stepCount={processLength}>
+        {rendered.slice(0, processLength)}
+      </ProcessSummary>
+      {rendered.slice(processLength)}
     </>
   );
 }

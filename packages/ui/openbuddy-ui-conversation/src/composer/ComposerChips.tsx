@@ -57,7 +57,7 @@ export function ComposerAttachmentChips({
               e.stopPropagation();
               onRemove(path);
             }}
-            aria-label="移除附件"
+            aria-label={`移除附件 ${path.replace(/\\/g, "/").split("/").pop()}`}
           >
             <X size={12} strokeWidth={2} />
           </button>
@@ -99,7 +99,7 @@ export function ComposerImageAttachmentChips({
               e.stopPropagation();
               onRemove(img.id);
             }}
-            aria-label="移除图片"
+            aria-label={`移除图片 ${img.name ?? ""}`.trim()}
           >
             <X size={12} strokeWidth={2} />
           </button>

@@ -41,7 +41,7 @@ export type TimelineNode =
 /** 把消息序列展开成「分隔符 + 消息」的时间线节点序列。
  *
  *  - 日期分隔:相邻消息跨「天」(按 createdAt)时插入。
- *  - 模型分隔:相邻消息的 modelId 变化时插入(显示「已切换到 X」)。
+ *  - 模型分隔:带模型的消息之间 modelId 变化时插入(显示「已切换到 X」);第一条不插。
  *  - 无 createdAt/modelId 时不插入对应分隔符。
  */
 export function buildTimeline(messages: TimelineMessage[]): TimelineNode[] {
@@ -57,15 +57,17 @@ export function buildTimeline(messages: TimelineMessage[]): TimelineNode[] {
         prevDay = day;
       }
     }
-    // 模型切换分隔。
-    if (m.modelId && m.modelId !== prevModel) {
+    // 模型切换分隔:只在真的从另一个模型换过来时插入。第一条带模型的消息
+    // 前面没有「换」,以前会凭空冒出一条「已切换到 X」(窗口重新加载后,历史
+    // 消息没有 modelId、新回答有,分隔符还会插到同一段发言中间)。
+    if (m.modelId && prevModel && m.modelId !== prevModel) {
       nodes.push({
         kind: "model-divider",
         label: `已切换到 ${shortModelLabel(m.modelId) || m.modelId}`,
         key: `model-${m.modelId}-${i}`,
       });
-      prevModel = m.modelId;
     }
+    if (m.modelId) prevModel = m.modelId;
     nodes.push({ kind: "message", message: m, index: i });
   });
   return nodes;

@@ -803,7 +803,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	"harness:session-cursors", "harness:session-cursors-set", "harness:resume-token", "harness:resume-token-set",
 		"dsh:remote", "dsh:rpc", "dsh:remote-register", "dsh:remote-unregister",
 		"agents_list", "agents_get", "agents_save", "agents_delete", "agents_template", "agents_defaults_get", "agents_defaults_save", "tasks_list", "task_kill",
-		"agent:load-session", "agent:session-info", "agent:session-usage", "agent:session-metadata-clear",
+		"agent:load-session", "agent:session-info", "agent:turn-state", "agent:session-usage", "agent:session-metadata-clear",
 		"agent:commands-list", "agent:resolve-permission", "agent:resolve-question", "prompt_history", "session_search", "session_fork", "rewind_points", "rewind_execute",
 		"agent:resource-inventory",
 		"collaboration:snapshot", "collaboration:a2a-agent-card", "collaboration:a2a-task-submit", "collaboration:a2a-task-get", "collaboration:propose-task", "collaboration:propose", "collaboration:execute", "collaboration:ack-inbox",

@@ -173,6 +173,12 @@
       "readyAfterRestart": "Restore is staged — restart the app to apply it.",
       "hint": "Backups live in {home}/backups/",
       "restore": "Restore"
+    },
+    "security": {
+      "revoke": "Revoke",
+      "revokeLabel": "Revoke rule {rule}",
+      "revokeFailed": "Could not revoke: {error}",
+      "hint": "Evaluation order: deny > ask > allow. Revoking takes effect immediately."
     }
   },
   "auth": {
@@ -278,8 +284,6 @@
       "resume": "Resume",
       "resumeContinueTitle": "Resume and send \"please continue\" so the agent keeps going",
       "resumeContinue": "Resume & continue",
-      "pauseTitle": "Pause generation (session kept, resumable)",
-      "pause": "Pause",
       "offline": "You are offline — the chat will be ready again once the connection is back.",
       "historyLoading": "Loading conversation"
     },
@@ -294,6 +298,21 @@
       "label": "Terminal (workspace shell)",
       "exit": "Process exited, code {code}",
       "createFailed": "Terminal failed to start: {error}"
+    },
+    "turnError": {
+      "switchModel": "Switch model",
+      "switchModelTitle": "Pick another model, then retry",
+      "switchModelHint": "Switch models from the menu below the input box"
+    },
+    "a11y": {
+      "turnDone": "Response complete"
+    },
+    "context": {
+      "autoCompact": "Auto-compact at"
+    },
+    "turn": {
+      "toolRunning": "Running tools",
+      "awaitingApproval": "Waiting for your approval"
     }
   },
   "artifacts": {

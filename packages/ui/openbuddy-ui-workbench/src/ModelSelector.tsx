@@ -93,6 +93,15 @@ export type ThinkingLevel = "off" | "low" | "medium" | "high";
 /** 没有可用模型时的统一文案:下拉空态与触发器共用,避免两处各写一份。 */
 const EMPTY_LABEL = "未配置模型";
 
+/** Window event that opens the (first mounted) model menu — e.g. from an error card. */
+export const MODEL_SELECTOR_OPEN_EVENT = "openbuddy:open-model-selector";
+
+export function openModelSelector(): boolean {
+  const event = new Event(MODEL_SELECTOR_OPEN_EVENT, { cancelable: true });
+  window.dispatchEvent(event);
+  return event.defaultPrevented;
+}
+
 const THINKING_OPTIONS: ReadonlyArray<{ value: ThinkingLevel; label: string; title: string }> = [
   { value: "off", label: "关", title: "关闭推理" },
   { value: "low", label: "轻", title: "轻度推理" },
@@ -205,6 +214,18 @@ export function ModelSelector({
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) setAnchor({ bottom: window.innerHeight - rect.top + 6, right: window.innerWidth - rect.right });
   }, [open]);
+
+  // Opened from elsewhere (error card "切换模型"); the first mounted
+  // selector claims the event so stacked selectors don't all open.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      if (e.defaultPrevented || !triggerRef.current?.isConnected) return;
+      e.preventDefault();
+      setOpen(true);
+    };
+    window.addEventListener(MODEL_SELECTOR_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(MODEL_SELECTOR_OPEN_EVENT, onOpen);
+  }, []);
 
   // Outside click + Escape close. portal 菜单在 rootRef 之外,必须豁免 ——
   // mousedown 先于 click,不豁免会让菜单在行点击落地前就被关闭。

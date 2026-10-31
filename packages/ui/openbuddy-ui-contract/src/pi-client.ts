@@ -44,6 +44,7 @@ import type {
   SlashCommand,
   SubagentLiveEvent,
   TurnErrorEvent,
+  TurnStateEvent,
   WorkBuddyImportPreview,
   WorkBuddyImportResult,
   WorkBuddyImportStatus,
@@ -216,10 +217,11 @@ export async function piNewSession(cwd: string, modelId?: string, options?: { tr
   const log = withTrace(appLogger, traceId);
   log.info("pi.new-session.requested", { msg: "pi.new-session.requested", cwd, modelId });
   try {
-    const result = await invoke<{ sessionId?: string }>("agent:new-session", { cwd, traceId });
+    // One call: the host creates the session and applies the model before
+    // returning, so a failed model switch can't leave a session on the wrong model.
+    const result = await invoke<{ sessionId?: string }>("agent:new-session", { cwd, traceId, ...(modelId ? { modelId } : {}) });
     if (!result.sessionId) throw new Error("agent:new-session did not return a session id");
     currentTurnTrace = { traceId, sessionId: result.sessionId };
-    if (modelId) await invoke("agent:set-model", { sessionId: result.sessionId, modelId, traceId });
     log.info("pi.new-session.dispatched", { msg: "pi.new-session.dispatched", sessionId: result.sessionId });
     return result.sessionId;
   } catch (err) {
@@ -1369,6 +1371,11 @@ export async function piSessionInfo(sessionId: string): Promise<SessionInfoRespo
 	return invoke<SessionInfoResponse>("agent:session-info", { sessionId });
 }
 
+/** 主进程回合状态机的当前值(计划 1.1);加载会话 / 重新加载窗口后据此校正。 */
+export async function piTurnState(sessionId: string): Promise<TurnStateEvent> {
+	return invoke<TurnStateEvent>("agent:turn-state", { sessionId });
+}
+
 /**
  * Fetch the session's cumulative token usage (`x.ai/session/usage`). Returns
  * null when the session is persisted but not live in the current process.
@@ -2215,6 +2222,8 @@ export interface PiEventHandlers {
   onAgentDied?: (p: { reason: string }) => void;
   onSubagent?: (e: SubagentLiveEvent) => void;
   onTurnError?: (e: TurnErrorEvent & SequencedPiPayload) => void;
+  /** 回合阶段变化(主进程状态机广播)。 */
+  onTurnState?: (e: TurnStateEvent) => void;
   onExtensionUi?: (event: PiExtensionUiEvent) => void;
   onPluginEvent?: (event: OpenBuddyPluginEvent) => void;
 }
@@ -2337,6 +2346,7 @@ export async function subscribePiEvents(handlers: PiEventHandlers, options?: Sub
   await wire<{ reason: string }>("pi://agent-died", handlers.onAgentDied);
   await wire<SubagentLiveEvent>("pi://subagent", handlers.onSubagent);
   await wire<TurnErrorEvent>("pi://turn-error", handlers.onTurnError);
+  await wire<TurnStateEvent>("pi://turn-state", handlers.onTurnState);
   await wire<PiExtensionUiEvent>("pi://extension-ui", handlers.onExtensionUi);
   if (handlers.onPluginEvent) unlisteners.push(await agentOnPluginEvent(handlers.onPluginEvent));
 

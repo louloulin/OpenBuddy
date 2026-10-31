@@ -29,7 +29,6 @@ describe("ChatViewFooter offline banner", () => {
         onSend={() => undefined}
         onResume={() => undefined}
         onResumeAndContinue={() => undefined}
-        onPause={() => undefined}
         pendingApprovalCount={0}
         blockedOnApproval={false}
       />,

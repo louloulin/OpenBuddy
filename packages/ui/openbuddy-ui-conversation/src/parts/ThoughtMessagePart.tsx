@@ -13,7 +13,6 @@
  */
 import { useEffect, useState } from "react";
 import { useThemeSnapshot } from "@openbuddy/ui-theme/client";
-import { Hourglass, Clock3 } from "lucide-react";
 import { ConversationMarkdown } from "../conversation-slots";
 import { formatDurationMs } from "@/lib/ui/duration";
 import type { MessagePartRenderProps } from "./registry-defaults";
@@ -32,10 +31,10 @@ export function ThoughtMessagePart(props: MessagePartRenderProps) {
     const handle = window.setInterval(() => setTickMs(Date.now() - start), 500);
     return () => window.clearInterval(handle);
   }, [isLive]);
-  // 流式中默认展开(用户能看到模型在想什么),完成后自动收起;用户手动
-  // 展开/收起之后以用户为准。
+  // 默认收起(对齐 Claude / ChatGPT 的 "Thinking…" 行):流式时标题行闪光并
+  // 预览最新一行;用户点开后以用户为准。此前流式时整段推理原文铺开占半屏。
   const [userOpen, setUserOpen] = useState<boolean | null>(null);
-  const open = userOpen ?? isLive;
+  const open = userOpen ?? false;
   if (props.part.kind !== "thought") return null;
 
   const resolvedTheme = (props.theme ?? currentTheme) as "light" | "dark";
@@ -64,6 +63,10 @@ export function ThoughtMessagePart(props: MessagePartRenderProps) {
         ? `· ${formatDurationMs(tickMs)}`
         : `已思考 ${formatDurationMs(tickMs)}`;
 
+  const previewLine = streaming
+    ? (props.part.text.split("\n").map((line) => line.trim()).filter(Boolean).at(-1) ?? "")
+    : "";
+
   return (
     <details
       open={open}
@@ -79,17 +82,13 @@ export function ThoughtMessagePart(props: MessagePartRenderProps) {
       data-thinking-complete={props.complete ? "true" : "false"}
     >
       <summary>
-        <span className="msg__thought-icon" aria-hidden="true">
-          {props.isStreaming && !props.complete ? (
-            <Hourglass size={12} strokeWidth={1.75} className="msg__thought-icon-stream" />
-          ) : (
-            <Clock3 size={12} strokeWidth={1.75} />
-          )}
-        </span>
         <span className="msg__thought-label">
           {streaming ? "思考中" : "深度思考"}
         </span>
         <span className="msg__thought-elapsed">{elapsedText}</span>
+        {streaming && !open && previewLine && (
+          <span className="msg__thought-preview" data-testid="thought-preview">{previewLine}</span>
+        )}
       </summary>
       <div className="msg__thought-body">
         <ConversationMarkdown

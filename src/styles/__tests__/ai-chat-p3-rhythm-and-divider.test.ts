@@ -4,7 +4,7 @@
  * 守住的不变量(P3-6 + P3-7):
  *   - .streaming-caret 闪烁节奏 250ms(对齐 Codex / ChatGPT)
  *   - .streaming-caret--reasoning 同步 250ms
- *   - .msg__thought--streaming 描边延伸 600ms(原 1500,太慢)
+ *   - .msg__thought--streaming 标签闪光(替代原先的闪烁进度条)
  *   - .tool-group-summary__icon--active 500ms(原 1200)
  *   - .timeline-divider 字体加粗、间距加大、品牌色模型分隔
  *   - prefers-reduced-motion 适配完整(已存在,守住不退)
@@ -42,14 +42,13 @@ describe("P3-6 streaming caret rhythm (Codex parity)", () => {
     expect(body).toMatch(/background:\s*var\(--wb-(palette-)?brand/);
   });
 
-  it(".msg__thought--streaming 描边延伸节奏 600ms(原 1500 太慢)", () => {
+  it(".msg__thought--streaming 用标签闪光表示进行中,不再有独立的闪烁进度条", () => {
     const m = messagesCss.match(
-      /\.msg__thought--streaming\s*>\s*summary::after\s*\{([\s\S]*?)\}/,
+      /\.msg__thought--streaming\s+\.msg__thought-label\s*\{([\s\S]*?)\}/,
     );
-    expect(m, ".msg__thought--streaming > summary::after rule must exist").toBeTruthy();
-    const body = m?.[1] ?? "";
-    expect(body).toMatch(/animation:\s*streaming-caret-blink\s+600ms/);
-    expect(body).not.toMatch(/1500ms/);
+    expect(m, "streaming label shimmer rule must exist").toBeTruthy();
+    expect(m?.[1] ?? "").toMatch(/animation:\s*msg-thought-shimmer/);
+    expect(messagesCss).not.toMatch(/\.msg__thought--streaming\s*>\s*summary::after/);
   });
 
   it(".tool-group-summary__icon--active 节奏 500ms(原 1200)", () => {
@@ -78,12 +77,12 @@ describe("P3-7 timeline-divider visual weight (P0 综合轮)", () => {
     expect(proseCss).toMatch(/\.timeline-divider--date\s*\{[\s\S]*?font-weight:\s*600/);
   });
 
-  it(".timeline-divider--model 走品牌色", () => {
+  it(".timeline-divider--model 是弱化的旁注(不抢品牌色)", () => {
     const m = proseCss.match(/\.timeline-divider--model\s*\{([\s\S]*?)\n\}/);
     expect(m).toBeTruthy();
     const body = m?.[1] ?? "";
-    expect(body).toMatch(/color:\s*var\(--wb-brand/);
-    expect(body).toMatch(/font-weight:\s*600/);
+    expect(body).toMatch(/color:\s*var\(--wb-text-weak/);
+    expect(body).not.toMatch(/--wb-brand/);
   });
 
   it(".timeline-divider::before/::after 用渐变(双侧淡出)", () => {

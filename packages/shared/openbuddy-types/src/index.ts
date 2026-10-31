@@ -567,6 +567,19 @@ export interface TurnErrorEvent {
   detail?: string;
 }
 
+/**
+ * 回合阶段(计划 1.1)。主进程状态机是唯一权威,经 `pi://turn-state` 广播、
+ * `agent:turn-state` 查询;渲染层只投影,不自行推断。
+ */
+export type TurnPhase = "idle" | "thinking" | "streaming" | "tool_running" | "awaiting_approval";
+
+export interface TurnStateEvent {
+  sessionId: string;
+  phase: TurnPhase;
+  /** 进入当前阶段的时间(ms)。 */
+  since: number;
+}
+
 // ---------- automations (local scheduler, WorkBuddy 1:1) ----------
 
 export type ScheduleFreq = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "HOURLY";

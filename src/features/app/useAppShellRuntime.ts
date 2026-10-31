@@ -43,6 +43,7 @@ import { useAgentSession } from "@/hooks/useAgentSession";
 import { useOptimisticNewSession } from "@/hooks/useOptimisticNewSession";
 import { newSessionFlow, composeDiscoverBody } from "@/lib/agent/new-session-flow";
 import { abandonInFlightStream } from "@/lib/agent/abandon-stream";
+import { reconcileTurnState } from "@/lib/agent/reconcile-turn";
 import { listenSafe, isElectronBridgeUnavailable, getElectronBridgeStatus, confirm } from "@/lib/platform/electron-api";
 import { friendlyError } from "@/lib/platform/error-format";
 import { shortModelLabel } from "@/lib/ui/timeline-utils";
@@ -63,6 +64,9 @@ import { exportEventsBatch, type OtlpConfig } from "@/lib/telemetry/otlp-exporte
 import type { ModelOption } from "@openbuddy/ui-workbench";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import type { AppShellRuntime, ExtensionUiBySession, SettingsSection, ToastOptions } from "./types";
+
+/** How long Stop waits for the host to confirm before the UI goes idle regardless. */
+const CANCEL_CONFIRM_MS = 300;
 
 export { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "@/lib/agent/persona-markers";
 
@@ -453,6 +457,8 @@ export function useAppShellRuntime(): AppShellRuntime {
               const entries = await agentSessionMessages(entry.sessionId);
               const { messages: history } = sessionEntriesToChatMessages(entries);
               useSessionStore.getState().loadHistoryMessages(entry.sessionId, history as unknown as import("@/stores/session-store").ChatMessage[]);
+              // 重新加载窗口时回合可能还在主进程里跑:以主进程为准接回运行态。
+              await reconcileTurnState(entry.sessionId);
             } catch (e) { sessionStore.getState().setError(friendlyError(e)); }
           } else { localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY); }
         }
@@ -757,12 +763,16 @@ export function useAppShellRuntime(): AppShellRuntime {
 
   const handleCancel = useCallback(async () => {
     if (!currentSessionId) return;
-    try { await piCancel(currentSessionId); } catch (e) {
+    const sessionId = currentSessionId;
+    // The host's abort waits for the run to go idle, which can take seconds
+    // when a tool ignores the signal. Give it a short window to confirm, then
+    // return the UI to idle anyway; the abort keeps running in the host.
+    const cancel = piCancel(sessionId).catch((e: unknown) => {
       sessionStore.getState().setError(friendlyError(e));
       if (isElectronBridgeUnavailable(e)) notifyBridgeUnavailable();
-    } finally {
-      abandonInFlightStream({ sessionId: currentSessionId, reason: "用户取消", status: "completed" });
-    }
+    });
+    await Promise.race([cancel, new Promise((resolve) => setTimeout(resolve, CANCEL_CONFIRM_MS))]);
+    abandonInFlightStream({ sessionId, reason: "用户取消", status: "completed" });
   }, [currentSessionId, sessionStore, notifyBridgeUnavailable]);
 
   const handleRenameTitle = useCallback(async (newTitle: string) => {
@@ -909,6 +919,7 @@ export function useAppShellRuntime(): AppShellRuntime {
       const entries = await agentSessionMessages(sessionId);
       const { messages: history } = sessionEntriesToChatMessages(entries);
       useSessionStore.getState().loadHistoryMessages(sessionId, history as unknown as import("@/stores/session-store").ChatMessage[]);
+      await reconcileTurnState(sessionId);
       await syncCurrentModelFromHost();
     } catch (e) { sessionStore.getState().setError(friendlyError(e)); }
     finally {

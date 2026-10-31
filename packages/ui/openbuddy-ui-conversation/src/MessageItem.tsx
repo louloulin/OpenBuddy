@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import FileText from "lucide-react/dist/esm/icons/file-text";
+import GitFork from "lucide-react/dist/esm/icons/git-fork";
+import Undo2 from "lucide-react/dist/esm/icons/undo-2";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
-import Check from "lucide-react/dist/esm/icons/check";
 import Pencil from "lucide-react/dist/esm/icons/pencil";
 import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
 import Sparkles from "lucide-react/dist/esm/icons/sparkles";
@@ -11,7 +12,7 @@ import { type MarkdownConfig } from "@openbuddy/ui-markdown";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { MessagePartRegistry } from "./MessagePartRegistry";
 import { StreamingCaret } from "./StreamingCaret";
-import { MessageRewindMenu } from "./parts/MessageRewindMenu";
+import { MessageMoreMenu, type MessageMoreItem } from "./parts/MessageMoreMenu";
 import { MessageMeta } from "./parts/MessageMeta";
 import { UserBubble } from "./parts/UserBubble";
 import { CopyIconButton } from "./parts/CopyIconButton";
@@ -245,6 +246,64 @@ function MessageItemInner({
         title?: string;
       }>
     | undefined;
+
+  // 「⋯」菜单里的次要动作。纯计算(无 hook),放在提前 return 之前也无妨。
+  const moreItems: MessageMoreItem[] = [];
+  if (plainText) {
+    moreItems.push({
+      id: "copy-md",
+      label: "复制 Markdown",
+      icon: <FileText size={14} strokeWidth={1.75} />,
+      onSelect: () => copyText(markdownText, "已复制 Markdown"),
+    });
+  }
+  if (DraftImpl && markdownText) {
+    moreItems.push({
+      id: "draft",
+      label: "在草稿中编辑",
+      icon: <Pencil size={14} strokeWidth={1.75} />,
+      testId: "message-draft-button",
+      onSelect: () => {
+        setDraftInitial(markdownText);
+        setDraftOpen(true);
+      },
+    });
+  }
+  if (InlineEditorImpl && markdownText && !inlineEditing) {
+    moreItems.push({
+      id: "inline-edit",
+      label: "就地编辑",
+      icon: <Pencil size={14} strokeWidth={1.75} />,
+      testId: "message-inline-edit-button",
+      onSelect: () => {
+        setInlineDraft(markdownText);
+        setInlineEditing(true);
+      },
+    });
+  }
+  if (message.role === "assistant" && typeof rewindPromptIndex === "number" && sessionId && onRewindTo) {
+    moreItems.push({
+      id: "rewind",
+      label: "从这里重新发送",
+      icon: <Undo2 size={14} strokeWidth={1.75} />,
+      testId: "msg-rewind",
+      onSelect: () => {
+        void Promise.resolve(onRewindTo(rewindPromptIndex)).then(
+          () => onToast?.("已从此消息重发"),
+          (e: unknown) => onToast?.(`重发失败：${String(e).replace(/^Error:\s*/, "")}`),
+        );
+      },
+    });
+  }
+  if (message.role === "assistant" && allowFork && onForkFromHere) {
+    moreItems.push({
+      id: "fork",
+      label: "从这里分叉新对话",
+      icon: <GitFork size={14} strokeWidth={1.75} />,
+      testId: "msg-fork",
+      onSelect: onForkFromHere,
+    });
+  }
   // Hooks 规则(R78 + React 错误 300 号):本组件有两条提前 return(user 分支、空
   // parts 完成分支),所有 hook 必须在它们之前调用 —— 否则一条先以空 parts
   // 完成、随后又收到 error/parts 的助手消息,hook 数量先降后升,生产包直接
@@ -381,7 +440,6 @@ function MessageItemInner({
               <Sparkles size={14} strokeWidth={2} />
             </span>
             <span className="msg__name">Buddy</span>
-            <span className="msg__role" aria-label="AI assistant">AI</span>
           </div>
         )}
         <div className="msg__body">
@@ -443,17 +501,6 @@ function MessageItemInner({
               shimmering "preparing / waiting for model" loading row with a
               rotating tip — mirrors WorkBuddy's pending-assistant view. */}
           {message.parts.length === 0 && !message.complete && <LoadingRow />}
-          {/* Failed turn: surface the structured error as the bubble body
-              (so a blank "Buddy" bubble never appears in the transcript),
-              and still render any partial parts the agent did emit. */}
-          {message.error && (
-            <TurnErrorCard
-              error={message.error}
-              onRetry={onRetry}
-              onOpenSettings={onOpenSettings}
-              onToast={onToast}
-            />
-          )}
           {/* Plan A.2 — 部件派发统一走 MessagePartRegistry。新增 part 类型只需在
               `parts/registry-defaults.tsx` 加一行,不需要修改本组件主干。
               视觉与 data-testid 与改造前完全一致(快照测试覆盖)。 */}
@@ -462,6 +509,11 @@ function MessageItemInner({
             messageId={message.id}
             isStreaming={streaming && !message.complete}
             complete={message.complete}
+            durationMs={
+              typeof message.completedAt === "number" && typeof message.createdAt === "number"
+                ? message.completedAt - message.createdAt
+                : null
+            }
             theme={theme}
             markdownConfig={markdownConfig}
             onOpenTool={onOpenTool ? (toolCallId) => {
@@ -473,6 +525,17 @@ function MessageItemInner({
             } : undefined}
             onToast={onToast}
           />
+          {/* Failed turn: the structured error sits after whatever partial
+              thinking / tool rows the agent did emit, in reading order (so a
+              blank "Buddy" bubble never appears in the transcript). */}
+          {message.error && (
+            <TurnErrorCard
+              error={message.error}
+              onRetry={onRetry}
+              onOpenSettings={onOpenSettings}
+              onToast={onToast}
+            />
+          )}
           {pluginMessageContributions.map((contribution) => (
             <div key={contribution.id} className="msg__plugin-contribution">
               <RendererContributionView contribution={contribution} onPlaceholder={onToast} />
@@ -485,10 +548,10 @@ function MessageItemInner({
               Was the unicode ▋ block char, then a hand-rolled
               `.msg__caret` span; now the shared `StreamingCaret`
               primitive so the caret can be themed (loose / reasoning)
-              and reused by plugins. Only rendered when there is already
-              streamed text — a `LoadingRow` owns the empty state, and a
-              caret floating above it would read as a stray cursor. */}
-          {message.parts.length > 0 && (
+              and reused by plugins. Only rendered right after answer text —
+              a `LoadingRow` owns the empty state, and a caret under a
+              thinking or tool row reads as a stray cursor (real MiniMax run). */}
+          {message.parts.at(-1)?.kind === "text" && (
             <StreamingCaret active={streaming && message.complete !== true} />
           )}
         </div>
@@ -502,53 +565,10 @@ function MessageItemInner({
           <div className="msg__footer">
             {plainText && (
               <CopyIconButton
-                tooltip="复制纯文本"
+                tooltip="复制"
                 copiedTooltip="已复制"
                 onCopy={() => copyText(plainText, "已复制")}
               />
-            )}
-            {plainText && (
-              <CopyIconButton
-                tooltip="复制 Markdown 源码"
-                copiedTooltip="已复制 Markdown"
-                onCopy={() => copyText(markdownText, "已复制 Markdown")}
-                idleIcon={<FileText size={14} strokeWidth={1.75} />}
-                copiedIcon={<Check size={14} strokeWidth={2} />}
-              />
-            )}
-            {DraftImpl && markdownText && (
-              <TooltipButton
-                className="msg__action-btn"
-                tooltip="把这条回答送进草稿编辑器(用 Tiptap / 表格 / math / mermaid 改写)"
-                onClick={() => {
-                  setDraftInitial(markdownText);
-                  setDraftOpen(true);
-                }}
-                aria-label="编辑为草稿"
-                data-testid="message-draft-button"
-              >
-                <Pencil size={14} strokeWidth={1.75} />
-              </TooltipButton>
-            )}
-            {InlineEditorImpl && markdownText && !inlineEditing && (
-              <TooltipButton
-                className="msg__action-btn"
-                tooltip="就地编辑这条回复(Tiptap 富文本,Esc 取消,⌘/Ctrl+Enter 应用并可重新生成)"
-                onClick={() => {
-                  setInlineDraft(markdownText);
-                  setInlineEditing(true);
-                }}
-                aria-label="就地编辑"
-                data-testid="message-inline-edit-button"
-              >
-                <Pencil size={14} strokeWidth={1.75} />
-                <span style={{ marginLeft: 2 }}>↳</span>
-              </TooltipButton>
-            )}
-            {/* B4(审计):footer 分组分隔 —— 复制组 | 编辑组 | 重发/反馈组。
-                9 个 icon 一次全出没有边界,视觉上是一把乱码。 */}
-            {(plainText || (DraftImpl && markdownText)) && (
-              <span className="msg__actions-divider" aria-hidden="true" />
             )}
             {onRetry && (
               <TooltipButton
@@ -560,23 +580,11 @@ function MessageItemInner({
                 <RefreshCw size={14} strokeWidth={1.75} />
               </TooltipButton>
             )}
-            <span className="msg__actions-divider" aria-hidden="true" />
-            {/* Plan5 B.10 — 消息级"从此消息重发/分叉"。放在赞踩之前,
-                保持既有按钮顺序不变(快照 / 既有选择器全部命中)。 */}
-            {message.role === "assistant" && (
-              <MessageRewindMenu
-                messageId={message.id}
-                promptIndex={rewindPromptIndex}
-                sessionId={sessionId}
-                allowFork={allowFork}
-                onRewind={onRewindTo ? (p) => onRewindTo(p.promptIndex) : undefined}
-                onFork={onForkFromHere}
-                onToast={onToast}
-              />
-            )}
             {sessionId && (
               <FeedbackButtons sessionId={sessionId} messageId={message.id} />
             )}
+            {/* 不常用的动作收进「⋯」(对齐 WorkBuddy 操作栏:复制 / 重试 / 赞踩 / ⋯)。 */}
+            <MessageMoreMenu items={moreItems} />
           </div>
         )}
         {metaProps && <MessageMeta {...metaProps} />}

@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { useComposerAttachments } from "./composer/use-composer-attachments";
+import { stashAttachments, takeStashedAttachments, useComposerAttachments } from "./composer/use-composer-attachments";
 import { MentionPicker } from "./MentionPicker";
 import { Mic, type LucideIcon } from "lucide-react";
 import type { ElectronWindowApi } from "@/lib/platform/electron-api";
@@ -227,15 +227,22 @@ export function ComposerInner({
   // Phase 3 wiring: state extracted to useComposerAttachments hook (state only this step).
   //   后续 step 会把 readImageFile / pickFiles / pickImages / drag 逐步迁出。
   const { attachments, setAttachments, images, setImages, dragActive } = useComposerAttachments({ onToast });
-  // 附件属于某个会话的草稿:切换会话时清空,不能带到另一个会话里发出去。
+  // 附件属于某个会话的草稿(计划 2.1):切走时收进该会话的暂存,切回来原样
+  // 恢复,不会带到另一个会话里发出去,也不会因为看了一眼别的会话就丢掉。
   // (乐观会话 __pending_* → 真实 id 的换名不算切换。)
   const attachmentKeyRef = useRef(draftKey);
+  const attachmentsRef = useRef(attachments);
+  attachmentsRef.current = attachments;
+  const imagesRef = useRef(images);
+  imagesRef.current = images;
   useEffect(() => {
     const prev = attachmentKeyRef.current;
     attachmentKeyRef.current = draftKey;
     if (prev === draftKey || (typeof prev === "string" && prev.startsWith("__pending_"))) return;
-    setAttachments([]);
-    setImages([]);
+    stashAttachments(prev, attachmentsRef.current, imagesRef.current);
+    const restored = takeStashedAttachments(draftKey);
+    setAttachments(restored?.attachments ?? []);
+    setImages(restored?.images ?? []);
   }, [draftKey, setAttachments, setImages]);
   // Mirror `text` into a ref so updateText can read the latest value when
   // given a functional updater, without making onDraftChange side effects
@@ -543,13 +550,7 @@ export function ComposerInner({
           {permissionInline && (
             <PermissionPicker onToast={onToast} />
           )}
-          {/* R8.24 — Composer keyboard hint chip (PI-Desktop MessageMeta parity).
-              Visible at-a-glance reminder for the two most-used keys: Enter to
-              send, Shift+Enter to insert a newline. The chip lives on the
-              left side of the footer so it stays visually anchored to the
-              text area, not the action buttons. On phones the chip is
-              hidden via @media (max-width: 540px) since typing shortcuts
-              differ on touch. */}
+          {(composerExpanded || text.length > 200 || text.split("\n").length > 3) && (
           <button
             type="button"
             className="wb-composer__expand"
@@ -560,19 +561,7 @@ export function ComposerInner({
           >
             {composerExpanded ? "▾" : "▴"}
           </button>
-          <span
-            className="wb-composer__hint"
-            data-testid="composer-hint"
-            aria-label="Enter 发送，Shift 加 Enter 换行"
-          >
-            <kbd className="wb-composer__hint-key">Enter</kbd>
-            <span className="wb-composer__hint-sep" aria-hidden="true">·</span>
-            <span className="wb-composer__hint-label">发送</span>
-            <span className="wb-composer__hint-divider" aria-hidden="true">/</span>
-            <kbd className="wb-composer__hint-key">Shift+Enter</kbd>
-            <span className="wb-composer__hint-sep" aria-hidden="true">·</span>
-            <span className="wb-composer__hint-label">换行</span>
-          </span>
+          )}
           <div className="wb-composer__spacer" />
           {/* 发送前成本预估徽章(对齐 WorkBuddy credit-estimate):纯本地 token 估算。
               仅在估算值有意义(≥100 token)时显示 —— 否则「+7」这类零头会紧贴

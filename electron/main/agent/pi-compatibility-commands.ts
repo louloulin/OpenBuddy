@@ -174,51 +174,6 @@ export async function describeFsCommand(service: unknown, args: string): Promise
   return `OpenBuddy does not load pi-fs natively; command '/fs ${args.trim()}' is delegated to openbuddy-fs-local.`;
 }
 
-/**
- * Stage G-1d tool fallbacks for the pure-whitelist adapters (pi-lens,
- * pi-simplify, pi-hashline-edit-pro, @dietrichgebert/ponytail). These entries
- * exist so the packages show up as known surfaces; per docs/OPENBUDDY-PI-VISION.md
- * §8-11 they have **no Cordis service** behind them, so there is nothing to
- * invoke — the honest answer is "install the package, it runs natively".
- * Describing a capability we do not implement would be worse than silence.
- */
-export async function describeLensCommand(_service: unknown, args: string): Promise<string> {
-  return whitelistedPackageNotice("pi-lens", "the `lens-*` command family, bundled skills and reload support (docs/pi-extension-architecture.md §pi-lens)", args);
-}
-
-export async function describeSimplifyCommand(_service: unknown, args: string): Promise<string> {
-  return whitelistedPackageNotice("pi-simplify", "its own simplify surface", args);
-}
-
-export async function describeHashlineCommand(_service: unknown, args: string): Promise<string> {
-  return whitelistedPackageNotice("pi-hashline-edit-pro", "its own hashline-edit surface", args);
-}
-
-export async function describeWorktreeCommand(_service: unknown, args: string): Promise<string> {
-  return whitelistedPackageNotice("@dietrichgebert/ponytail", "its own worktree surface", args);
-}
-
-function whitelistedPackageNotice(packageName: string, provides: string, args: string): string {
-  const requested = args.trim();
-  const suffix = requested ? ` Requested verb: \`${requested}\`.` : "";
-  return `OpenBuddy keeps a whitelist entry for \`${packageName}\` but mounts no Cordis service for it — the capability is provided by the npm package itself (${provides}). Install \`${packageName}\` and OpenBuddy lets the native Pi extension own the surface.${suffix}`;
-}
-
-/**
- * Stage H-4: the openbuddy-automation Cordis plugin was deleted, so this
- * adapter has no invoke path. The upstream package owns the whole surface.
- */
-export async function describeAutomationCommand(_service: unknown, args: string): Promise<string> {
-  const verb = commandParts(args).verb;
-  if (!verb || verb === "status") {
-    return "OpenBuddy's automation backplane was removed (Stage H-4); it is delegated entirely to pi-goal-list-loop-audit, which owns interview-drafted goals, the audited task queue, and forever-loops (metric / spec / project-audit). Install it to use /goal, /loop and /audit.";
-  }
-  if (verb === "goal") return "Goal drafting is delegated to pi-goal-list-loop-audit (/goal): interview-drafted objectives with a detached auditor re-verifying every completion against raw evidence.";
-  if (verb === "loop") return "Loop execution is delegated to pi-goal-list-loop-audit (/loop): long-running forever-loops of kind metric, spec or project-audit.";
-  if (verb === "audit") return "Audit inspection is delegated to pi-goal-list-loop-audit (/audit), which re-verifies completions in a detached extension-less process.";
-  return `Command '/automation ${args.trim()}' is delegated to pi-goal-list-loop-audit (the OpenBuddy automation plugin was removed in Stage H-4); install that package to run it.`;
-}
-
 function commandParts(args: string): { verb: string; rest: string } {
   const trimmed = args.trim();
   const [verb = "", ...rest] = trimmed.split(/\s+/u);

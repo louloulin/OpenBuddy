@@ -22,94 +22,6 @@
   min-width: 0;
   position: relative;
 }
-/* R — chat rail (vertical stack of floating action buttons aligned to the
- * right edge of the chat column; mirrors WorkBuddy's 添加文件 / 模式 /
- * 技能 / 连接器 chip rail). */
-/* R — chat rail (single trigger button + dropdown panel anchored to the
- * right edge of the chat column; mirrors WorkBuddy's 添加文件 / 模式 /
- * 技能 / 连接器 chip rail, condensed to a popover). */
-.chat-rail {
-  position: absolute;
-  top: 16px;
-  right: 12px;
-  z-index: 25;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  pointer-events: auto;
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-.chat-rail__trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
-  background: color-mix(in srgb, var(--wb-bg-primary, #ffffff) 92%, transparent);
-  border-radius: 999px;
-  color: var(--wb-text-medium, #6e6e80);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-.chat-rail__trigger:hover {
-  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--wb-text-strong, #1a1a2e);
-  border-color: color-mix(in srgb, var(--wb-border-soft, rgba(0, 0, 0, 0.08)) 50%, transparent);
-}
-.chat-rail__trigger-label {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-}
-.chat-rail__menu {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 160px;
-  padding: 6px;
-  background: color-mix(in srgb, var(--wb-bg-primary, #ffffff) 96%, transparent);
-  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-.chat-rail__menu-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  height: 30px;
-  padding: 0 10px;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  color: var(--wb-text-medium, #6e6e80);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  text-align: left;
-  white-space: nowrap;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.chat-rail__menu-item:hover {
-  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--wb-text-strong, #1a1a2e);
-}
-.chat-rail__menu-item:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--wb-brand, #00c29a) 50%, transparent);
-  outline-offset: -2px;
-}
-.chat-rail__menu {
-  display: none;
-}
 
 .chatview__extension-widgets,
 .chatview__extension-status {
@@ -1299,6 +1211,7 @@ button.diff__path {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   gap: 6px;
   font-size: 12px;
   color: var(--wb-color-text-medium, #6e6e80);
@@ -1338,34 +1251,31 @@ button.diff__path {
   font-variant-numeric: tabular-nums;
   margin-left: 2px;
 }
-.msg__thought--streaming {
-  background: linear-gradient(
-    180deg,
-    var(--wb-color-bg-secondary-default, rgba(0, 0, 0, 0.02)) 0%,
-    var(--wb-color-bg-primary-default, transparent) 100%
-  );
+/* Live thinking: the label shimmers and the latest line previews inline —
+   no tinted box, no separate progress bar (Claude / ChatGPT "Thinking…"). */
+.msg__thought--streaming .msg__thought-label {
+  background: linear-gradient(90deg, var(--wb-text-weak) 0%, var(--wb-text-strong) 50%, var(--wb-text-weak) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: msg-thought-shimmer 1.6s linear infinite;
 }
-.msg__thought--streaming > summary::after {
-  content: "";
-  display: inline-block;
-  width: 60px;
-  height: 2px;
-  margin-left: auto;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--wb-palette-brand-8, #00C29A) 50%,
-    transparent 100%
-  );
-  animation: streaming-caret-blink 600ms ease-in-out infinite;
+@keyframes msg-thought-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
 }
-.msg__thought-body {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px dashed var(--wb-border-soft, rgba(0, 0, 0, 0.08));
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--wb-color-text-medium, #6e6e80);
+@media (prefers-reduced-motion: reduce) {
+  .msg__thought--streaming .msg__thought-label { animation: none; color: var(--wb-text-medium); background: none; }
+}
+.msg__thought-preview {
+  min-width: 0;
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--wb-text-weak);
+  font-weight: 400;
 }
 
 /* ============================================================================
@@ -1573,41 +1483,6 @@ button.diff__path {
   gap: 4px;
 }
 
-/* MessageRewindMenu — hover-only entry near assistant bubbles. */
-.msg-rewind-menu {
-  display: inline-flex;
-  gap: 4px;
-  opacity: 0.4;
-  transition: opacity 120ms ease;
-}
-.msg-rewind-menu:hover,
-.msg-rewind-menu:focus-within {
-  opacity: 1;
-}
-.msg-rewind-menu__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: 1px solid var(--wb-border-subtle, rgba(127, 127, 127, 0.35));
-  border-radius: 4px;
-  background: var(--wb-color-bg-primary-default, transparent);
-  color: var(--wb-color-text-medium, #6e6e80);
-  cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
-}
-.msg-rewind-menu__btn:hover:not(:disabled),
-.msg-rewind-menu__btn:focus-visible {
-  background: var(--wb-bg-tertiary, rgba(127, 127, 127, 0.08));
-  border-color: var(--wb-brand, #00c29a);
-  color: var(--wb-color-text-strong, #1a1a23);
-}
-.msg-rewind-menu__btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* === conversation.view (P0-4) ================================================
  * 新组件化视图 (live/result/content) 的切换器与视图容器。原本这些 class
  * 只在 conversation-view.tsx 里有定义、CSS 里没有任何规则 -> 即使 ChatView
@@ -1803,12 +1678,11 @@ button.diff__path {
 [data-theme="dark"] .timeline-divider {
   color: var(--wb-text-medium, rgba(255, 255, 255, 0.72));
 }
-[data-theme="dark"] .timeline-divider--date,
-[data-theme="dark"] .timeline-divider--model {
+[data-theme="dark"] .timeline-divider--date {
   color: var(--wb-text-strong, rgba(255, 255, 255, 0.92));
 }
 [data-theme="dark"] .timeline-divider--model {
-  color: var(--wb-brand, #00e0a8);
+  color: var(--wb-text-weak);
 }
 
 /* ============================================================================
@@ -2093,4 +1967,48 @@ button.diff__path {
   color: var(--wb-text-weak);
   line-height: 1.5;
   user-select: text;
+}
+
+/* 完成后的过程折叠行(ProcessSummary,对齐 WorkBuddy「已完成 Xs ›」)。 */
+.msg__process {
+  margin: 2px 0 6px;
+}
+.msg__process-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  font-size: 12px;
+  color: var(--wb-text-weak);
+  border-radius: var(--wb-radius-sm);
+  padding: 2px 0;
+}
+.msg__process-summary::-webkit-details-marker {
+  display: none;
+}
+.msg__process-summary:hover {
+  color: var(--wb-text-medium);
+}
+.msg__process-chevron {
+  transition: transform var(--wb-motion-duration-fast, 120ms) ease;
+}
+.msg__process[open] > .msg__process-summary .msg__process-chevron {
+  transform: rotate(90deg);
+}
+.msg__process-body {
+  margin-top: 4px;
+  padding-left: 10px;
+  border-left: 1px solid var(--wb-border-default);
+}
+
+/* 助手操作栏「⋯」菜单:向上弹出,避免被底部 composer 挡住。 */
+.msg-more__popover {
+  top: auto;
+  bottom: 100%;
+  left: 0;
+  right: auto;
+  margin-top: 0;
+  margin-bottom: 4px;
 }

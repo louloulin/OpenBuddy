@@ -17,39 +17,35 @@ const base = {
 };
 
 describe("Sidebar", () => {
-  it("渲染导航项", () => {
+  it("渲染导航项(主导航只留四项,对齐 WorkBuddy)", () => {
     render(<Sidebar {...base} />);
-    // 「自动化」入口在阶段 0 下线(后端在 Stage G-1c 删除、面板每个读写都抛错),
-    // 阶段 1.4 接回真实调度后再加回这个断言。
-    for (const label of ["新建任务", "助理", "项目", "专家·技能·连接器", "更多"]) {
+    for (const label of ["新建任务", "专家·技能·连接器", "自动化", "更多"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    // 助理 / 项目 / 邮件 / 记忆 收进「更多 → 工作区」,菜单未打开时不在主导航。
+    for (const label of ["助理", "项目", "邮件", "记忆"]) {
+      expect(screen.queryByText(label)).toBeNull();
     }
   });
 
-  it("点击占位导航触发 onNavigate", () => {
+  it("「更多 → 工作区」打开助理 / 项目 / 邮件 / 记忆", () => {
     const onNavigate = vi.fn();
     render(<Sidebar {...base} onNavigate={onNavigate} />);
-    fireEvent.click(screen.getByText("助理"));
-    // 产品决定: 助理是一级分组入口,点击后展开本地助理视图。
+    fireEvent.click(screen.getByText("更多"));
+    expect(screen.getByText("工作区")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "助理" }));
+    // 助理落在本地助理视图(工作台顶部 tabs 切换其他子页)。
     expect(onNavigate).toHaveBeenCalledWith("助理·本地助理");
-  });
-  it("助理是普通一级入口，子菜单迁移到工作台顶部 tabs", () => {
-    const onNavigate = vi.fn();
-    render(<Sidebar {...base} onNavigate={onNavigate} />);
-
-    // 侧栏不再展开内联子菜单，仅展示一级入口。
-    expect(screen.queryByRole("button", { name: "展开助理子菜单" })).toBeNull();
-    expect(screen.queryByText("总览")).toBeNull();
-    expect(screen.queryByText("证据与审计")).toBeNull();
-
-    // 其他一级入口仍保持原状。
-    for (const label of ["项目", "专家·技能·连接器", "邮件", "更多"]) {
-      expect(screen.getByText(label)).toBeInTheDocument();
+    for (const label of ["项目", "邮件", "记忆"]) {
+      fireEvent.click(screen.getByText("更多"));
+      fireEvent.click(screen.getByRole("menuitem", { name: label }));
+      expect(onNavigate).toHaveBeenLastCalledWith(label);
     }
+  });
 
-    fireEvent.click(screen.getByText("助理"));
-    // 产品决定: 助理点击后跳转到本地助理路由,而不是"助理"本身。
-    expect(onNavigate).toHaveBeenCalledWith("助理·本地助理");
+  it("当前页是工作区入口时,「更多」显示为选中", () => {
+    render(<Sidebar {...base} activeNav="助理·本地助理" />);
+    expect(screen.getByText("更多").closest("button")).toHaveClass("sidebar__nav-item--active");
   });
 
   it("渲染会话列表并可选中", () => {

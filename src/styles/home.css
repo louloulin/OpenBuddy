@@ -2688,6 +2688,21 @@
 .rules-list__pattern {
   color: var(--wb-text-medium);
 }
+.rules-list__revoke {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-sm);
+  background: transparent;
+  color: var(--wb-text-medium);
+  font: inherit;
+  cursor: pointer;
+}
+.rules-list__revoke:hover,
+.rules-list__revoke:focus-visible {
+  color: var(--wb-text-strong);
+  border-color: var(--wb-text-medium);
+}
 .settings-ok {
   color: #00a884;
   font-weight: 600;

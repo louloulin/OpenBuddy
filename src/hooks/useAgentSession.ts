@@ -269,6 +269,23 @@ export interface UseAgentSessionReturn {
  *     lifecycle so the `handleAgentDied` resubscribe path can be a
  *     pure no-side-effect call.
  */
+/**
+ * A turn the user stopped ends with Pi's abort error ("This operation was
+ * aborted"). That is not a failure: no red banner, no error card, no
+ * "会话失败" notification — the transcript just keeps what was produced.
+ */
+function isUserStop(reason: string | undefined, detail: string | undefined): boolean {
+  return reason === "aborted" || /\b(?:operation was )?aborted\b|AbortError/i.test(detail ?? "");
+}
+
+function settleUserStop(sessionId: string): void {
+  const state = useSessionStore.getState();
+  // Stop already finalised the bubble (the UI goes idle before the host
+  // confirms) — the late abort event has nothing left to do.
+  if (!state.streaming && !state.streamingMessageId) return;
+  abandonInFlightStream({ sessionId, reason: "已停止", status: "completed" });
+}
+
 export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessionReturn {
   const {
     setTrustRequest,
@@ -455,9 +472,14 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
         if (STREAM_DEBUG) console.log("[OpenBuddy] pi://update:", u);
         updateCoalescerRef.current?.push(u as SessionUpdate & { __sessionId?: string });
       },
-      onPermission: (p: { sessionId: string; options?: { title?: string }[] }) => {
+      onPermission: (p: { sessionId: string; options?: { title?: string }[]; replayed?: boolean }) => {
         // permission_request is already surfaced via the toast +
         // usePermissionStore.request below; no console.log needed.
+        if (p.replayed) {
+          // 重新连上后主进程重发的仍在等待的请求:只恢复卡片,不重复通知。
+          usePermissionStore.getState().request(p as unknown as PermissionRequest);
+          return;
+        }
         reportEvent("permission_request", "warn", { sessionId: p.sessionId });
         usePermissionStore.getState().request(p as unknown as PermissionRequest);
         void notificationAppend(
@@ -469,6 +491,15 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
         );
       },
       onComplete: (p: { sessionId: string; stopReason?: string; errorMessage?: string; usage?: { promptTokens?: number; completionTokens?: number } }) => {
+        // Land every queued delta before finalising. Updates drain on rAF,
+        // which the browser throttles for a hidden / minimised / busy window;
+        // completing first used to finalise a half-written bubble and then
+        // open a second one for the late tail of the same answer.
+        updateCoalescerRef.current?.flush();
+        if (isUserStop(p.stopReason, p.errorMessage)) {
+          settleUserStop(p.sessionId);
+          return;
+        }
         if (p.stopReason === "error" || p.stopReason === "rate_limit") {
           // Only the failure path stays in console — happy-path completions
           // were firing dozens of console.log lines per turn that drowned
@@ -688,11 +719,27 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
         // diagnostics live in useSubagentStore.applyEvent below.
         useSubagentStore.getState().applyEvent(e as SubagentLiveEvent);
       },
+      // 计划 1.1 — 主进程回合状态机的投影。只更新阶段标签,不改 streaming:
+      // 收尾仍由 onComplete / onTurnError 负责(它们带序号、走重放闸门)。
+      onTurnState: (e: { sessionId: string; phase: import("@openbuddy/shared-types").TurnPhase }) => {
+        // 工具跑完(离开 tool_running)时刷新运行中任务面板:主进程那边已删掉
+        // 记录,而面板只在挂载 / 收到 task 事件时拉取,窗口重新加载时拉到的
+        // 「running」会一直挂着。进入 tool_running 不刷新,免得短工具让面板闪现。
+        if (e.phase !== "tool_running") setTaskRefreshSignal((n: number) => n + 1);
+        const store = useSessionStore.getState();
+        if (e.sessionId !== store.sessionId) return;
+        store.setTurnPhase(e.phase);
+      },
       onTurnError: (e: { traceId?: string; sessionId: string; kind: string; detail?: string }) => {
         const log = e.traceId ? withTrace(appLogger, e.traceId) : appLogger;
         log.warn("pi://turn-error", { msg: "pi.turn-error.received", traceId: e.traceId, sessionId: e.sessionId, kind: e.kind });
         const currentSessionId = useSessionStore.getState().sessionId;
         if (currentSessionId && e.sessionId && e.sessionId !== currentSessionId) return;
+        updateCoalescerRef.current?.flush();
+        if (isUserStop(e.kind, e.detail)) {
+          settleUserStop(e.sessionId);
+          return;
+        }
         // R-err-provider-chat — turn-error must surface in TWO places at once:
         //   1. Top banner (`sessionStore.error`) so a brand-new session without
         //      any assistant bubble yet still gets a readable explanation.

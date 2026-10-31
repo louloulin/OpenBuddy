@@ -12,6 +12,9 @@ import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-a
 
 import { addMemory, recallMemories, type MemoryScope } from "../../memory/memory-store";
 
+/** Title of the confirm card shown before the model writes a memory. */
+export const MEMORY_CONFIRM_TITLE = "记住这条";
+
 export interface OpenBuddyMemoryConfig {
   /** workspace 层记忆归属的工作区。 */
   cwd?: string;
@@ -46,15 +49,29 @@ export default function openBuddyMemory(config: OpenBuddyMemoryConfig = {}): Ext
         },
         required: ["title"],
       },
-      execute: async (_toolCallId: string, params: unknown) => {
-        const input = (params ?? {}) as { title?: unknown; body?: unknown; scope?: unknown; tags?: unknown };
+      execute: async (_toolCallId: string, _params: unknown, _signal?: unknown, _onUpdate?: unknown, ctx?: { ui?: { confirm?: (title: string, message: string) => Promise<boolean> } }) => {
+        const input = (_params ?? {}) as { title?: unknown; body?: unknown; scope?: unknown; tags?: unknown };
         const title = String(input.title ?? "").trim();
         if (!title) return { content: [{ type: "text" as const, text: "memory_save 需要 title" }], details: { saved: false } };
         const scope = normalizeScope(input.scope);
         const tags = Array.isArray(input.tags) ? input.tags.map((tag) => String(tag)) : [];
+        const body = String(input.body ?? title);
+        // Memories steer every later conversation, so the user sees what is
+        // being remembered first. Headless runs (no confirm channel, e.g.
+        // automations) keep saving: a memory is low-risk and easy to delete.
+        if (ctx?.ui?.confirm) {
+          const where = scope === "workspace" ? "工作区" : "全局";
+          const approved = await ctx.ui.confirm(MEMORY_CONFIRM_TITLE, `[${where}] ${title}${body !== title ? `\n\n${body}` : ""}`);
+          if (!approved) {
+            return {
+              content: [{ type: "text" as const, text: "The user declined to save this memory. Do not ask again." }],
+              details: { saved: false, declined: true },
+            };
+          }
+        }
         const entry = await addMemory({
           title,
-          body: String(input.body ?? title),
+          body,
           scope,
           ...(scope === "workspace" ? { cwd } : {}),
           tags,

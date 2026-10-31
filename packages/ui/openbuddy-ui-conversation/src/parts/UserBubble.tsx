@@ -22,11 +22,9 @@
  */
 import { useEffect, useRef, useState } from "react";
 import Pencil from "lucide-react/dist/esm/icons/pencil";
-import Clock3 from "lucide-react/dist/esm/icons/clock-3";
 import { TooltipButton } from "../TooltipButton";
 import { FilePreview } from "@openbuddy/ui-workbench";
 import type { ChatMessage } from "@/stores/session-store";
-import { formatRelativeTime } from "@/lib/ui/duration";
 import { CopyIconButton } from "./CopyIconButton";
 
 function toPreviewDataUrl(mediaType: string, data: string): string {
@@ -250,18 +248,6 @@ export function UserBubble({
                 <Pencil size={14} strokeWidth={1.75} />
               </TooltipButton>
             )}
-          </div>
-        )}
-        {/* R8.14 — relative-timestamp chip beneath the user bubble.
-            Always rendered (no hover gate) so the chat transcript reads
-            like a normal messenger scroll: you can scroll back and see
-            "5 分钟前" next to an old prompt without having to hover. */}
-        {typeof message.createdAt === "number" && (
-          <div className="msg__meta msg__meta--user" aria-label={formatRelativeTime(Date.now() - message.createdAt)}>
-            <span className="msg__meta-icon" aria-hidden="true">
-              <Clock3 size={10} strokeWidth={1.75} />
-            </span>
-            <span className="msg__meta-time">{formatRelativeTime(Date.now() - message.createdAt)}</span>
           </div>
         )}
       </div>

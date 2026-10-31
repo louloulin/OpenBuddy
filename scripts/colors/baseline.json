@@ -1,6 +1,6 @@
 {
   "_comment": "棘轮基线,由 `node scripts/check-hardcoded-colors.mjs --update-baseline` 生成。硬编码色值只能减少:新增即失败。上浮基线等于放弃这笔债,请单独评审。",
-  "total": 649,
+  "total": 647,
   "files": {
     "packages/capability/openbuddy-email/src/index.ts": 1,
     "packages/shared/openbuddy-types/src/index.ts": 1,
@@ -51,7 +51,7 @@
     "src/styles/misc.css": 10,
     "src/styles/modals.css": 7,
     "src/styles/plugins.css": 13,
-    "src/styles/prose.css": 53,
+    "src/styles/prose.css": 51,
     "src/styles/shell.css": 1,
     "src/styles/sidebar-menus.css": 46,
     "src/styles/sidebar.css": 8,

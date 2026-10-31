@@ -105,7 +105,7 @@ describe("P1-01 dark theme coverage", () => {
   });
 
   it("timeline-divider 在深色下保留色(不是被吞成全灰)", () => {
-    // .timeline-divider--model 走品牌色 — 深色覆写也必须保持品牌色
+    // 深色下 divider 仍有显式覆写(不被吞成默认灰)
     expect(css).toMatch(/\[data-theme="dark"\][^{]*\.timeline-divider/);
   });
 });

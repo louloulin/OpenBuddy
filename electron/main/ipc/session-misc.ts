@@ -29,6 +29,7 @@ import {
   requiredString,
 } from "./validation";
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
+import { replayPendingUiEvents, turnStates } from "../agent/host-modules/turn-state";
 
 export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
   const { agentHost, casdoorAuth, ensureAgentHost } = deps;
@@ -58,6 +59,15 @@ export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
       if (error instanceof Error && /^Pi session is not loaded:/u.test(error.message)) return null;
       throw error;
     }
+  });
+  // 回合状态机(计划 1.1)的当前值:渲染层加载会话 / 重新订阅时据此校正
+  // 「是否在运行」(例如窗口重新加载后恢复停止按钮),并重发仍在等待的审批 /
+  // 提问卡片。纯内存读,不拉起 agent host。
+  ipcMain.handle("agent:turn-state", (_e, args: { sessionId: string }) => {
+    const sessionId = requiredString(recordValue(args, "turn state payload").sessionId, "session id");
+    const state = turnStates.get(sessionId);
+    if (state.phase !== "idle") replayPendingUiEvents(sessionId);
+    return { sessionId, phase: state.phase, since: state.since };
   });
   ipcMain.handle("agent:session-messages", async (_e, args: { sessionId: string }) => {
     await ensureAgentHost();

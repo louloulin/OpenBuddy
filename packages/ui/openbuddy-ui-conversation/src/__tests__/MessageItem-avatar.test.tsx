@@ -50,21 +50,7 @@ describe("MessageItem — R8.12 assistant avatar visual", () => {
     expect(avatar?.textContent?.trim()).toBe("");
   });
 
-  it('renders the .msg__role badge with aria-label="AI assistant"', () => {
-    const { container } = render(
-      <MessageItem
-        sessionId="s1"
-        message={makeAssistantMessage()}
-        streaming={false}
-      />,
-    );
-    const role = container.querySelector(".msg__role");
-    expect(role).toBeTruthy();
-    expect(role?.getAttribute("aria-label")).toBe("AI assistant");
-    expect(role?.textContent?.trim()).toBe("AI");
-  });
-
-  it("renders .msg__header containing avatar + name + role in DOM order", () => {
+  it("renders .msg__header containing avatar + name in DOM order (no AI badge)", () => {
     const { container } = render(
       <MessageItem
         sessionId="s1"
@@ -75,9 +61,9 @@ describe("MessageItem — R8.12 assistant avatar visual", () => {
     const header = container.querySelector(".msg__header");
     expect(header).toBeTruthy();
     const children = Array.from(header?.children ?? []);
-    expect(children.length).toBe(3);
+    expect(children.length).toBe(2);
     expect(children[0].classList.contains("msg__avatar")).toBe(true);
     expect(children[1].classList.contains("msg__name")).toBe(true);
-    expect(children[2].classList.contains("msg__role")).toBe(true);
+    expect(container.querySelector(".msg__role")).toBeNull();
   });
 });

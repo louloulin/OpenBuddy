@@ -118,6 +118,12 @@ describe("pi-client trace propagation", () => {
     expect(mocks.traceGenerator).toHaveBeenCalled();
   });
 
+  it("piNewSession: model 随建会话一次传给宿主,不再单独 set-model(20261031 Phase 1.10)", async () => {
+    await piNewSession("/tmp/work", "model-x", { traceId: FIXED });
+    expect(callsFor("agent:new-session")[0][1]).toMatchObject({ cwd: "/tmp/work", modelId: "model-x", traceId: FIXED });
+    expect(callsFor("agent:set-model")).toHaveLength(0);
+  });
+
   it("piLoadSession: provided traceId flows into IPC payload", async () => {
     await piLoadSession("s-1", "/tmp/work", { traceId: FIXED });
     const matches = callsFor("agent:load-session");
