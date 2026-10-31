@@ -107,6 +107,16 @@ export function useChatViewTimeline({
     return ids;
   }, [messages]);
 
+  // Stable per-render-cycle handler: MessageItem passes its own id back, so
+  // bubbles keep a reference-equal prop and stay memoized during streaming.
+  const onEditResendFor = useCallback(
+    (text: string, messageId: string) => {
+      setEditResendOriginId(messageId);
+      handleEditResend(text);
+    },
+    [handleEditResend, setEditResendOriginId],
+  );
+
   const renderTimelineNode = useCallback(
     ({ node }: { node: TimelineNode; index: number }) => {
       if (node.kind === "date-divider") {
@@ -161,10 +171,7 @@ export function useChatViewTimeline({
             sessionId={sessionId ?? undefined}
             onToast={onToast}
             onOpenTool={handleOpenTool}
-            onEditResend={(text) => {
-              setEditResendOriginId(m.id);
-              handleEditResend(text);
-            }}
+            onEditResend={onEditResendFor}
             onStepRevision={handleStepRevision}
             onInlineResend={m.role === "user" ? handleInlineResend : undefined}
             onRetry={isLastAssistant && !streaming && m.complete ? handleRetry : undefined}
@@ -199,8 +206,7 @@ export function useChatViewTimeline({
       sessionId,
       onToast,
       handleOpenTool,
-      handleEditResend,
-      setEditResendOriginId,
+      onEditResendFor,
       handleStepRevision,
       handleInlineResend,
       handleEditAssistantMessage,

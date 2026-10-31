@@ -35,6 +35,7 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { useFeedbackStore } from "@/stores/feedback-store";
 import { usePendingExpertStore } from "@/stores/pending-expert-store";
 import { setToast as pushToast, useToastStore } from "@/stores/toast-store";
+import { restoreComposerText } from "@openbuddy/ui-conversation";
 import { useProjectsStore, type ProjectMeta } from "@/stores/projects-store";
 import { getStoredThemeName, useTheme } from "@openbuddy/ui-theme/client";
 import { clearRequestedMarketTab, requestMarketTab } from "@/lib/navigation/market-tab";
@@ -168,7 +169,6 @@ export function useAppShellRuntime(): AppShellRuntime {
   const cwdRef = useRef<string>("");
   const currentModelIdRef = useRef<string | undefined>(undefined);
   const extensionTextBySessionRef = useRef<Record<string, string>>({});
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleAgentDiedRef = useRef<(payload: { reason: string }) => void>(() => {});
   const refreshModelsRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
@@ -641,10 +641,10 @@ export function useAppShellRuntime(): AppShellRuntime {
     }
   }, [setToast]);
 
+  // Each toast expires on its own TTL. This used to `clear()` the WHOLE queue
+  // 2 s later, wiping sticky error toasts (e.g. "立即重连") along with it.
   const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => useToastStore.getState().clear(), 2000);
+    setToast(message, { ttlMs: 2500 });
   }, [setToast]);
 
   const handlePlaceholder = useCallback((label: string) => {
@@ -695,6 +695,7 @@ export function useAppShellRuntime(): AppShellRuntime {
       sessionsStore.getState().setCurrent(null);
       sessionsStore.getState().remove(pendingId);
       setToast(`创建会话失败：${friendlyError(e)}`);
+      restoreComposerText(text);
     }
   }, [optimisticSession, sessionStore, sessionsStore, setToast, currentModelId]);
 
@@ -720,6 +721,7 @@ export function useAppShellRuntime(): AppShellRuntime {
       sessionStore.getState().setStreaming(false);
       sessionStore.getState().popOptimistic();
       sessionsStore.getState().upsert({ sessionId: currentSessionId, status: "failed" });
+      restoreComposerText(text);
       if (isElectronBridgeUnavailable(e)) notifyBridgeUnavailable();
     }
   }, [currentSessionId, handleSendNew, sessionStore, sessionsStore, notifyBridgeUnavailable]);
@@ -748,6 +750,7 @@ export function useAppShellRuntime(): AppShellRuntime {
       sessionStore.getState().setStreaming(false);
       sessionStore.getState().popOptimistic();
       sessionsStore.getState().upsert({ sessionId: currentSessionId, status: "failed" });
+      restoreComposerText(textForLog);
       if (isElectronBridgeUnavailable(e)) notifyBridgeUnavailable();
     }
   }, [currentSessionId, handleSendNew, sessionStore, sessionsStore, notifyBridgeUnavailable]);
@@ -886,6 +889,17 @@ export function useAppShellRuntime(): AppShellRuntime {
   }, [sessionsStore, showToast]);
 
   const handleSelectSession = useCallback(async (sessionId: string, sessionCwd?: string) => {
+    // 宿主同一时刻只有一个活动会话:载入别的会话会中止正在运行的回合。
+    // 以前是静默中止;现在先说清楚,确认后走正常的停止流程再切换。
+    const live = sessionStore.getState();
+    if (live.streaming && live.sessionId && live.sessionId !== sessionId) {
+      const ok = await confirm("当前回复仍在生成，切换会话将停止它。", {
+        tone: "warning",
+        confirmLabel: "停止并切换",
+      });
+      if (!ok) return;
+      await handleCancel();
+    }
     setPlaceholderView(null);
     sessionsStore.getState().setCurrent(sessionId);
     sessionStore.getState().setSession(sessionId);
@@ -896,7 +910,7 @@ export function useAppShellRuntime(): AppShellRuntime {
       useSessionStore.getState().loadHistoryMessages(sessionId, history as unknown as import("@/stores/session-store").ChatMessage[]);
       await syncCurrentModelFromHost();
     } catch (e) { sessionStore.getState().setError(friendlyError(e)); }
-  }, [sessionStore, sessionsStore, syncCurrentModelFromHost]);
+  }, [sessionStore, sessionsStore, syncCurrentModelFromHost, handleCancel]);
 
   const handleRewound = useCallback(async () => {
     const id = sessionStore.getState().sessionId;

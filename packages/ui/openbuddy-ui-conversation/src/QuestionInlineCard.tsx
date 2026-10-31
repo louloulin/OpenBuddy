@@ -2,7 +2,11 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useQuestionStore, selectQuestionForSession } from "@/stores/question-store";
 import { piResolveQuestion } from "@/lib/agent/pi-client";
 
-/** Session-scoped question modal rendered above the current conversation. */
+/**
+ * Session-scoped question card docked above the composer (same inline
+ * presentation as the permission card — a full-screen overlay here blocked
+ * the whole window while the agent waited for an answer).
+ */
 function QuestionInlineCardInner({ sessionId }: { sessionId: string | null }) {
   const head = useQuestionStore(selectQuestionForSession(sessionId));
   const dismiss = useQuestionStore((s) => s.dismiss);
@@ -10,6 +14,7 @@ function QuestionInlineCardInner({ sessionId }: { sessionId: string | null }) {
   const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const firstInputRef = useRef<HTMLInputElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const handleSelect = useCallback((questionId: string, option: string) => {
     setSelections((prev) => ({ ...prev, [questionId]: option }));
@@ -47,17 +52,19 @@ function QuestionInlineCardInner({ sessionId }: { sessionId: string | null }) {
       }
     }
     try {
-      dismiss(head.requestId, head.sessionId);
       await piResolveQuestion(head.requestId, {
         answers,
         annotations: Object.keys(annotations).length ? annotations : undefined,
       });
+      // Clear only after the host accepted the answer — on failure the card
+      // and everything the user typed stay put so they can retry.
+      dismiss(head.requestId, head.sessionId);
+      setSelections({});
+      setCustomInputs({});
     } catch (e) {
       console.error("resolve question failed", e);
     } finally {
       setBusy(false);
-      setSelections({});
-      setCustomInputs({});
     }
   };
 
@@ -65,26 +72,34 @@ function QuestionInlineCardInner({ sessionId }: { sessionId: string | null }) {
     if (!head || busy) return;
     setBusy(true);
     try {
-      dismiss(head.requestId, head.sessionId);
       await piResolveQuestion(head.requestId, { cancelled: true });
+      dismiss(head.requestId, head.sessionId);
+      setSelections({});
+      setCustomInputs({});
     } catch (e) {
       console.error("cancel question failed", e);
     } finally {
       setBusy(false);
-      setSelections({});
-      setCustomInputs({});
     }
   };
 
   const hasAnswer = head?.questions.some(
     (q) => (selections[q.id] ?? customInputs[q.id] ?? "").length > 0,
   ) ?? false;
+  const hasAnswerRef = useRef(hasAnswer);
+  hasAnswerRef.current = hasAnswer;
 
   useEffect(() => {
     if (!head) return;
     firstInputRef.current?.focus();
+    // Esc skips only from inside the card and never throws away a typed
+    // answer — previously any Esc anywhere skipped the question.
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) void handleCancel();
+      if (event.key !== "Escape" || busy || event.defaultPrevented) return;
+      if (!cardRef.current?.contains(document.activeElement)) return;
+      if (hasAnswerRef.current) return;
+      event.preventDefault();
+      void handleCancel();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -93,12 +108,8 @@ function QuestionInlineCardInner({ sessionId }: { sessionId: string | null }) {
   if (!head) return null;
 
   return (
-    // 遮罩点击关闭只是鼠标便利路径：真正的关闭入口是 Esc（上方 window 监听）
-    // 和面板内的按钮，所以遮罩本身不是控件，声明为 presentation 让 AT 跳过它。
-    <div className="request-modal-overlay" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget && !busy) void handleCancel();
-    }}>
-      <div className="request-modal request-modal--question" role="dialog" aria-modal="true" aria-labelledby="question-dialog-title">
+    <div className="request-modal-inline" data-testid="question-inline-host">
+      <div ref={cardRef} className="request-modal request-modal--question" role="dialog" aria-labelledby="question-dialog-title">
         <div className="request-modal__head">
           <div className="request-modal__identity">
             <span className="request-modal__icon request-modal__icon--question" aria-hidden="true">?</span>
@@ -136,7 +147,7 @@ function QuestionInlineCardInner({ sessionId }: { sessionId: string | null }) {
                 value={customInputs[q.id] ?? ""}
                 onChange={(event) => handleCustomInput(q.id, event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && hasAnswer && !busy) void handleSubmit();
+                  if (event.key === "Enter" && !event.nativeEvent.isComposing && hasAnswer && !busy) void handleSubmit();
                 }}
                 disabled={busy}
               />
@@ -144,7 +155,7 @@ function QuestionInlineCardInner({ sessionId }: { sessionId: string | null }) {
           ))}
         </div>
         <div className="request-modal__footer">
-          <span className="request-modal__hint">按 Esc 跳过</span>
+          <span className="request-modal__hint">{hasAnswer ? "Enter 提交" : "Esc 跳过"}</span>
           <div className="request-modal__actions">
             <button type="button" className="btn btn--ghost" onClick={() => void handleCancel()} disabled={busy}>跳过</button>
             <button type="button" className="btn btn--primary" onClick={() => void handleSubmit()} disabled={busy || !hasAnswer}>{busy ? "提交中…" : "提交"}</button>

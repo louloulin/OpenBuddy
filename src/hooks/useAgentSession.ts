@@ -127,6 +127,14 @@ export function acceptTextShape(
 }
 
 /** Optional Phase 1 escape hatch — debug flag mirrors App.tsx. */
+/** True while the streaming assistant message has a tool call still running. */
+function hasRunningToolCall(state: { messages: Array<{ id: string; parts: Array<{ kind: string; toolCall?: { status?: string } }> }>; streamingMessageId: string | null }): boolean {
+  const msg = state.streamingMessageId
+    ? state.messages.find((m) => m.id === state.streamingMessageId)
+    : state.messages[state.messages.length - 1];
+  return !!msg?.parts.some((p) => p.kind === "tool_call" && (p.toolCall?.status === "in_progress" || p.toolCall?.status === "pending"));
+}
+
 function isStreamDebugEnabled(): boolean {
   if (typeof localStorage === "undefined") return false;
   try { return localStorage.getItem("openbuddy.debug.stream") === "1"; }
@@ -380,47 +388,40 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
   //   backend would interpret as an unsolicited cancel.
   const abortedRef = useRef(false);
 
-  // 15s streaming watchdog timer — if `streaming` stays true with no
-  // `pi://update` activity for 15 s (and no pi://complete either), we
-  // force-finalize the streaming message so the LoadingRow can't spin
-  // forever. Mirrors the user-reported "你是谁" message stuck for 8h+
-  // symptom from useAgentSession.ts:388.
-  const STREAMING_WATCHDOG_MS = 15_000;
+  // Streaming watchdog — the single safety net for a turn whose backend went
+  // silent (no pi://complete, no agent-died). ANY agent event for the focused
+  // session re-arms it, and it never fires while a tool call is still running:
+  // a long `apply_command` legitimately produces no events until it finishes,
+  // and abandoning it mid-run left the backend working while the UI declared
+  // the turn dead (its real completion was then dropped by the settled guard).
+  const STREAMING_WATCHDOG_MS = 60_000;
   const streamingWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetStreamingWatchdog = () => {
     if (streamingWatchdogRef.current !== null) {
       clearTimeout(streamingWatchdogRef.current);
     }
     streamingWatchdogRef.current = setTimeout(() => {
-      // Reset before the abandon-stream call so the rAF flush completes
-      // before we mutate the store. The actual call routes through
-      // abandonInFlightStream so the LoadingRow + LoadingRow.getDefault are
-      // consistent with the natural error path.
       streamingWatchdogRef.current = null;
       const store = useSessionStore.getState();
       if (!store.streaming) return;
-      // eslint-disable-next-line no-console
-      console.warn("[OpenBuddy] streaming watchdog 15s timeout — finalising orphan message");
-      // Defer to abandonInFlightStream which lives at
-      // src/lib/agent/abandon-stream.ts. Imported lazily to avoid a
-      // circular import (useAgentSession ↔ abandon-stream).
-      void import("@/lib/agent/abandon-stream").then(({ abandonInFlightStream }) => {
-        const sid = store.sessionId;
-        if (sid) {
-          // R-err-provider-chat — 15s no-first-chunk watchdog typically trips
-          // because the provider never started streaming (auth/key/endpoint).
-          // Forward a structured network_error so TurnErrorCard renders the
-          // "网络连接中断" chip instead of a blank placeholder.
-          abandonInFlightStream({
-            sessionId: sid,
-            reason: "watchdog-15s",
-            error: {
-              message: "AI 引擎长时间无响应,已自动结束当前轮次。可重发或重新加载。",
-              code: "network_error",
-            },
-          });
-        }
-      });
+      if (hasRunningToolCall(store)) {
+        resetStreamingWatchdog();
+        return;
+      }
+      console.warn("[OpenBuddy] streaming watchdog timeout — finalising orphan message");
+      const sid = store.sessionId;
+      if (sid) {
+        abandonInFlightStream({
+          sessionId: sid,
+          reason: "watchdog",
+          error: {
+            message: "AI 引擎长时间无响应,已结束当前轮次。可重试或检查网络与模型配置。",
+            code: "network_error",
+          },
+        });
+      } else {
+        store.setStreaming(false);
+      }
     }, STREAMING_WATCHDOG_MS);
   };
   /**
@@ -437,6 +438,13 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
       streamingWatchdogRef.current = null;
     }
   };
+  // Arm the watchdog the moment a turn starts streaming (a provider that never
+  // sends a first chunk must still be caught) and disarm it when it settles.
+  useEffect(() => useSessionStore.subscribe((state, prev) => {
+    if (state.streaming === prev.streaming) return;
+    if (state.streaming) resetStreamingWatchdog();
+    else clearStreamingWatchdog();
+  }), []);
 
   // Build the handler set ONCE — both the cold-start useEffect and the
   // resubscribe path close over the same `buildHandlersRef.current()` so
@@ -927,6 +935,8 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
             }
             continue;
           }
+          // Any event for the focused session proves the backend is alive.
+          if (store.streaming) resetStreamingWatchdog();
           if (STREAM_DEBUG) {
             console.log("[OpenBuddy] APPLY update:", {
               type: (u as { type?: string }).type,
@@ -1081,6 +1091,9 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
                 });
                 break;
               }
+              // Land buffered text first — otherwise the rAF flush appends the
+              // text that preceded this tool call AFTER its card.
+              store.flushStreamingDelta();
               // Re-read so we see the latest streamingMessageId set by the
               // most recent `beginStreamingMessage()`.
               const streamingId = useSessionStore.getState().streamingMessageId;

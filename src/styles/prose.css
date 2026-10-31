@@ -2239,6 +2239,44 @@
   background: var(--wb-bg-overlay, rgba(0, 0, 0, 0.4));
   animation: md-lightbox-in var(--wb-motion-duration-fast, 120ms) ease-out;
 }
+.md-image-button {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: zoom-in;
+}
+.md-lightbox__backdrop {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+.md-lightbox__zoom {
+  position: relative;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.md-lightbox__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--wb-radius-full, 999px);
+  background: var(--wb-bg-elevated, var(--wb-bg-primary));
+  color: var(--wb-text-strong);
+  line-height: 1;
+  cursor: pointer;
+}
 .md-lightbox__img {
   max-width: min(90vw, 90%);
   max-height: 90vh;

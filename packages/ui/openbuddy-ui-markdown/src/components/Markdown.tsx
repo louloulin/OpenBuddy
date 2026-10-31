@@ -342,16 +342,18 @@ function MarkdownImage({
 
   return (
     <>
-      <img
-        src={resolvedSrc}
-        alt={alt}
-        {...imgProps}
+      {/* 真正的按钮包裹:图片可用键盘打开查看器(a11y 门禁)。 */}
+      <button
+        type="button"
+        className="md-image-button"
+        aria-label={alt || undefined}
         onClick={(e) => {
           e.stopPropagation();
           setLightboxOpen(true);
-          imgProps.onClick?.(e);
         }}
-      />
+      >
+        <img src={resolvedSrc} alt={alt} {...imgProps} />
+      </button>
       {lightboxOpen && resolvedSrc ? (
         <ImageLightbox
           src={resolvedSrc}

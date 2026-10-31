@@ -18,13 +18,8 @@
 import type { SlotMap } from "@openbuddy/ui-slots";
 export type { SlotMap };
 
-export { HomePage } from "./HomePage";
-export { HomeHeader } from "./HomeHeader";
-export { HomeComposer } from "./HomeComposer";
 export { SceneTabs } from "./SceneTabs";
 export { PracticeCases } from "./PracticeCases";
 
-export { HomeOverviewPanel } from "./HomeOverviewPanel";
-export type { HomeOverviewPanelProps } from "./HomeOverviewPanel";
 export { ProjectTemplatesPanel } from "./ProjectTemplatesPanel";
 export type { ProjectTemplatesPanelProps } from "./ProjectTemplatesPanel";

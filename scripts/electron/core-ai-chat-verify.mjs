@@ -332,35 +332,6 @@ try {
     record("T9.a", "capability chips render in model dropdown", false, `model trigger not visible`);
   }
 
-  // ── T10: inline approval hint ──
-  // The probe seeds the permission queue by triggering a real permission
-  // request via the same `permission-request` IPC that the agent uses.
-  // The renderer subscribes to `permission:added` events and enqueues.
-  // For now we just verify the CSS hook is wired: a synthetic testid
-  // element with `.msg__approval-hint` classes should be mountable.
-  const hintMount = await page.evaluate(() => {
-    const host = document.createElement("div");
-    host.className = "msg__approval-hint";
-    host.dataset.testid = "msg-approval-hint";
-    host.innerHTML = '<button class="msg__approval-hint-toggle" aria-expanded="false"><span class="msg__approval-hint-summary">1 项权限待批准</span></button>';
-    document.body.appendChild(host);
-    const cs = getComputedStyle(host);
-    const found = document.querySelectorAll('[data-testid="msg-approval-hint"]').length;
-    const out = { display: cs.display, borderRadius: cs.borderRadius, found };
-    host.remove();
-    return out;
-  });
-  record("T10.a", "inline approval hint CSS hook is wired (mountable)",
-    hintMount.found > 0,
-    JSON.stringify(hintMount));
-  // Also verify the InlineApprovalHint component actually mounts via the
-  // MessageItem wiring path — we check that the testid MIGHT appear by
-  // counting the assistant-message wrappers that could host it.
-  const trailingAssistant = await count(".msg--assistant");
-  record("T10.b", "trailing assistant message exists for hint to mount on",
-    trailingAssistant > 0,
-    `assistants=${trailingAssistant}`);
-
 } catch (e) {
   log(`fatal: ${safeError(e)}`);
   record("FATAL", "probe execution", false, safeError(e).slice(0, 200));

@@ -8,7 +8,15 @@
  * Composer's main file under the 800-line cap while preserving exact
  * behavior.
  */
-import { useEffect, type MutableRefObject, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, type MutableRefObject, type Dispatch, type SetStateAction } from "react";
+
+/** Window event the host fires to put unsent text back into the composer. */
+export const COMPOSER_RESTORE_EVENT = "openbuddy:composer-restore";
+
+export function restoreComposerText(text: string): void {
+  if (typeof window === "undefined" || !text.trim()) return;
+  window.dispatchEvent(new CustomEvent(COMPOSER_RESTORE_EVENT, { detail: { text } }));
+}
 
 export interface UseExtensionTextArgs {
   ref: MutableRefObject<HTMLTextAreaElement | null>;
@@ -117,6 +125,24 @@ export function useExtensionText(args: UseExtensionTextArgs): void {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalTextNonce]);
+
+  // 6. Send-failure restore: the host clears the composer optimistically on
+  //    send; when the send then fails it dispatches COMPOSER_RESTORE_EVENT so
+  //    the user's text comes back instead of being lost. Never clobbers
+  //    something the user already started typing again.
+  const textRef = useRef(text);
+  textRef.current = text;
+  useEffect(() => {
+    const onRestore = (event: Event) => {
+      const restored = (event as CustomEvent<{ text?: string }>).detail?.text;
+      if (!restored || textRef.current.trim()) return;
+      updateText(restored);
+      setCursorPos(restored.length);
+    };
+    window.addEventListener(COMPOSER_RESTORE_EVENT, onRestore);
+    return () => window.removeEventListener(COMPOSER_RESTORE_EVENT, onRestore);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 5. Persisted draft hydration: when switching to another session
   //    (draftKey change), write the saved draft back to the textarea.

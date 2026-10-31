@@ -24,7 +24,6 @@ const REGISTRY: Record<string, Array<[string, RegExp]>> = {
   "chat-find": [["chatview/useChatViewShortcuts.ts", /toLowerCase\(\)\s*===?\s*"f"/]],
   "chat-find-next": [["FindBar.tsx", /key\.toLowerCase\(\)\s*!==\s*"g"/]],
   "chat-find-prev": [["FindBar.tsx", /e\.shiftKey \? -1 : 1/]],
-  "chat-retry": [["chatview/useChatShortcuts.ts", /mod: true, key: "r"/]],
   "chat-edit-last": [["chatview/useChatShortcuts.ts", /mod: true, key: "e"/]],
   "chat-pause": [["chatview/useChatShortcuts.ts", /mod: true, key: "p"/]],
   "chat-clear": [["Composer.tsx", /"l"/]],
@@ -33,7 +32,7 @@ const REGISTRY: Record<string, Array<[string, RegExp]>> = {
   "chat-history-next": [["composer/use-input-history.ts", /ArrowDown/]],
   "chat-tools-panel": [["chatview/useChatViewShortcuts.ts", /toLowerCase\(\) === "t"/]],
   "chat-canvas": [["chatview/useChatViewShortcuts.ts", /onToggleCanvas/]],
-  "chat-stop": [["chatview/useChatViewShortcuts.ts", /Escape/]],
+  "chat-stop": [["chatview/useChatShortcuts.ts", /stopRef\.current\?\.\(\)/]],
   "chat-shortcuts": [["chatview/ChatShortcutOverlay.tsx", /"\?"|Ctrl\/Cmd\+\/|useEffect/]],
 };
 

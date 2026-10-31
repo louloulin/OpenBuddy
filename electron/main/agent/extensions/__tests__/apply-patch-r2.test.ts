@@ -45,7 +45,8 @@ async function runTool(
   const tool = tools.get(name);
   if (!tool) throw new Error("Tool not registered: " + name);
   const pi = (tool as unknown as { execute: (...a: unknown[]) => Promise<unknown> }).execute;
-  const result = await pi("tc-test", args, undefined, () => undefined, {});
+  // The user approves every prompt (the permission gate is covered separately).
+  const result = await pi("tc-test", args, undefined, () => undefined, { ui: { confirm: async () => true } });
   return result as { content: Array<{ type: string; text?: string }>; details?: unknown };
 }
 

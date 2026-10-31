@@ -100,7 +100,7 @@ describe("plan1030 §5.2.1 — ModelSelector 行级删除", () => {
     expect(screen.queryByRole("listbox")).not.toBeNull();
   });
 
-  it("键盘 Delete/Backspace 删除当前高亮模型行", async () => {
+  it("键盘 Delete 删除当前高亮模型行,Backspace 不触发", async () => {
     const onModelDelete = vi.fn();
     const { onModelChange } = renderPicker({ onModelDelete });
     const menu = await open();
@@ -109,7 +109,7 @@ describe("plan1030 §5.2.1 — ModelSelector 行级删除", () => {
     expect(onModelDelete).toHaveBeenCalledWith(models[0]);
     expect(onModelChange).not.toHaveBeenCalled();
     fireEvent.keyDown(menu, { key: "Backspace" });
-    expect(onModelDelete).toHaveBeenCalledTimes(2);
+    expect(onModelDelete).toHaveBeenCalledTimes(1);
   });
 
   it("键盘 Delete 对推理档位行不生效", async () => {

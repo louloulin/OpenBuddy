@@ -32,14 +32,17 @@ export function PermissionInlineCard({
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<PermissionMode | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const resolve = async (optionId?: string, cancelled = false) => {
     if (!head || busy) return;
     setBusy(true);
     const id = head.requestId;
-    dismiss(id, head.sessionId);
     try {
+      // Dismiss only after the host accepted the decision — dismissing first
+      // made a failed IPC silently drop the request with no way to retry.
       await piResolvePermission(id, { optionId, cancelled });
+      dismiss(id, head.sessionId);
     } catch (e) {
       console.error("resolve permission failed", e);
     } finally {
@@ -58,13 +61,17 @@ export function PermissionInlineCard({
     return () => { alive = false; };
   }, [head?.requestId]);
 
-  // Escape cancels in both presentations. Only the modal steals focus; an
-  // inline card must not pull the caret out of the composer.
+  // Escape cancels only while focus is inside the card (the modal focuses its
+  // cancel button). A window-wide listener used to deny the request whenever
+  // the user pressed Esc to close a slash/mention menu or the find bar.
   useEffect(() => {
     if (!head) return;
     if (variant === "modal") cancelRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) void resolve(undefined, true);
+      if (event.key !== "Escape" || busy || event.defaultPrevented) return;
+      if (!cardRef.current?.contains(document.activeElement)) return;
+      event.preventDefault();
+      void resolve(undefined, true);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -88,6 +95,7 @@ export function PermissionInlineCard({
 
   const card = (
     <div
+      ref={cardRef}
       className="request-modal request-modal--permission"
       role="dialog"
       aria-modal={variant === "modal" ? "true" : undefined}

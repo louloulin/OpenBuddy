@@ -32,6 +32,17 @@ describe("ImageLightbox（plan1030 批 5b）", () => {
     expect(img.className).toContain("--full");
   });
 
+  it("组件本体：打开即聚焦关闭按钮,点击关闭按钮触发 onClose", () => {
+    let closed = false;
+    const { container } = render(
+      <ImageLightbox src="file:///tmp/a.png" closeLabel="关闭" onClose={() => (closed = true)} />,
+    );
+    const close = container.querySelector(".md-lightbox__close") as HTMLButtonElement;
+    expect(document.activeElement).toBe(close);
+    fireEvent.click(close);
+    expect(closed).toBe(true);
+  });
+
   it("组件本体：Esc 触发 onClose", () => {
     let closed = false;
     const { container } = render(
@@ -50,7 +61,7 @@ describe("ImageLightbox（plan1030 批 5b）", () => {
     const dialog = container.querySelector(".md-lightbox");
     expect(dialog).not.toBeNull();
     expect(dialog?.getAttribute("role")).toBe("dialog");
-    fireEvent.click(dialog as Element);
+    fireEvent.click(container.querySelector(".md-lightbox__backdrop") as Element);
     expect(container.querySelector(".md-lightbox")).toBeNull();
   });
 });

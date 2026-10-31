@@ -480,11 +480,19 @@ export function handleSessionEvent(
   if (event.type === "turn_start" || event.type === "agent_start") {
     turnCompletedSessions.delete(session);
   }
+  //
+  // A `turn_end` with `stopReason: "toolUse"` is NOT the end of the run: the
+  // agent loop executes the tools and immediately opens another turn. Emitting
+  // complete there made the renderer drop `streaming` mid-run — the Stop
+  // button vanished, the composer unlocked and a queued prompt was sent into
+  // a session that was still working. Only a turn that stops for any other
+  // reason (or the session-level fallback below) settles the run.
   if (event.type === "turn_end" || event.type === "agent_end" || event.type === "agent_settled") {
     const alreadyCompleted = turnCompletedSessions.has(session);
-    if (event.type === "turn_end" || !alreadyCompleted) {
-      const msg = event.message as { stopReason?: string; errorMessage?: string } | undefined;
-      const stopReason = typeof msg?.stopReason === "string" ? msg.stopReason : "end_turn";
+    const msg = event.message as { stopReason?: string; errorMessage?: string } | undefined;
+    const stopReason = typeof msg?.stopReason === "string" ? msg.stopReason : "end_turn";
+    const midRunToolTurn = event.type === "turn_end" && stopReason === "toolUse";
+    if (!midRunToolTurn && (event.type === "turn_end" || !alreadyCompleted)) {
       // 发布工程(2026-10-20 真机探针):失败回合此前丢弃 errorMessage,渲染层
       // 按"正常完成"收尾 —— 用户看到空气泡 + 误导性"会话完成"通知,错误卡片
       // (TurnErrorCard)在实时路径永远不出现。带上原始错误文本。

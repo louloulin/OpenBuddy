@@ -59,9 +59,10 @@ export function useInputHistory(
 
   const onKeyDown = useCallback(
     (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-      // Enter → send (unless IME composing or slash menu visible)
+      // An open popover (slash / mention menu) already consumed this key.
+      if (e.defaultPrevented) return;
+      // Enter → send (unless IME composing)
       if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-        if (slashVisible) return;
         e.preventDefault();
         onSend();
         return;

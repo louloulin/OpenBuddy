@@ -269,6 +269,9 @@ interface UiSessionActions {
    *  reasoning inline as if it were the answer. Switching kind flushes the
    *  pending buffer so interleaved blocks keep their arrival order. */
   appendStreamingDelta: (delta: string, kind?: "text" | "thought") => void;
+  /** Synchronously land any rAF-buffered delta. Call before inserting a
+   *  non-text part (tool call) so text that preceded it keeps its order. */
+  flushStreamingDelta: () => void;
   /** R1.4 — finalise the streaming message (complete: true). Called by
    *  App.tsx after the agent stops emitting chunks. Robust to the case
    *  where `streamingMessageId` was already cleared (cancel path, session
@@ -796,6 +799,8 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
     if (deltaRafId !== null) return;
     deltaRafId = scheduleDeltaFlush();
   },
+
+  flushStreamingDelta: () => flushStreamingBuffer(),
 
   finishStreamingMessage: (meta) => {
     // flush 保证缓冲里的文本先落进消息,再标记完成。

@@ -47,7 +47,7 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { createMarkdownHostConfig } from "@/lib/markdown/markdown-host";
 import { piListSessions, piSetThinkingLevel, rewindExecute, sessionFork, tasksListForSession } from "@/lib/agent/pi-client";
 import { useT } from "@openbuddy/ui-locale/client";
-import { confirm, invoke } from "@/lib/platform/electron-api";
+import { invoke } from "@/lib/platform/electron-api";
 import {
   collectSessionArtifacts,
   findToolCall,
@@ -499,6 +499,7 @@ export function ChatView({
     sessionId: sessionId ?? undefined,
     onSend,
     onPause: handlePause,
+    onStop: onCancel,
     onPrefillComposer: composerPrefill,
   });
 
@@ -536,7 +537,9 @@ export function ChatView({
       }
       let promptIndex = -1;
       let ordinal = -1;
-      for (const message of messages) {
+      // Read through the ref: depending on `messages` re-created this
+      // callback on every streaming delta and re-rendered every user bubble.
+      for (const message of messagesRef.current) {
         if (message.role !== "user") continue;
         ordinal += 1;
         if (message.id === messageId) { promptIndex = ordinal; break; }
@@ -558,7 +561,7 @@ export function ChatView({
         handleInlineResend(messageId, text);
       }
     },
-    [sessionId, streaming, readOnlySubagent, messages, handleInlineResend, onSend, onRewound, onToast],
+    [sessionId, streaming, readOnlySubagent, messagesRef, handleInlineResend, onSend, onRewound, onToast],
   );
 
   // Plan5 B.10 — 消息级"从此处分叉"。`RewindBar` 里已有同一套
@@ -566,11 +569,7 @@ export function ChatView({
   // 单条消息,复用 `onForked` 让宿主导航到新会话。
   const handleForkRequest = useCallback(async () => {
     if (!sessionId || streaming || readOnlySubagent) return;
-    const ok = await confirm("从此处分叉此会话？", {
-      tone: "warning",
-      description: "会复制到新会话，原会话保留。",
-    });
-    if (!ok) return;
+    // 分叉不破坏原会话,无需确认;直接复制并导航。
     try {
       const newId = await sessionFork(sessionId, cwd);
       onToast?.(`已分叉到新会话 ${newId.slice(0, 8)}`);

@@ -12,7 +12,6 @@ import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { MessagePartRegistry } from "./MessagePartRegistry";
 import { StreamingCaret } from "./StreamingCaret";
 import { MessageRewindMenu } from "./parts/MessageRewindMenu";
-import { InlineApprovalHint } from "./parts/InlineApprovalHint";
 import { MessageMeta } from "./parts/MessageMeta";
 import { UserBubble } from "./parts/UserBubble";
 import { CopyIconButton } from "./parts/CopyIconButton";
@@ -77,7 +76,7 @@ function MessageItemInner({
   /** Open tool detail in the right-side panel (Phase 2). */
   onOpenTool?: (tc: ToolCallView) => void;
   /** Put text back into the composer for re-editing (user messages only). */
-  onEditResend?: (text: string) => void;
+  onEditResend?: (text: string, messageId: string) => void;
   /** R8.3 (inline-edit) — submit a re-edited version directly from inside
    *  the bubble (Cmd/Ctrl+Enter or 点击"发送"). This mirrors
    *  onEditResend but skips the composer handoff so the user can refine
@@ -302,7 +301,7 @@ function MessageItemInner({
         fileParts={fileParts}
         revisionPager={revisionPager}
         onStepRevision={onStepRevision}
-        onEditResend={onEditResend}
+        onEditResend={onEditResend ? (text: string) => onEditResend(text, message.id) : undefined}
         onInlineResend={onInlineResend}
         onToast={onToast}
         copyText={copyText}
@@ -598,42 +597,15 @@ function MessageItemInner({
             initialMarkdown={draftInitial}
           />
         ) : null}
-        {/* Plan5 B.4 — pending permission/question requests at the
-            trailing assistant message so the user notices inline
-            instead of only at the footer. The component reads the
-            stores itself (via memo) so it's safe to render here
-            without prop-drilling. */}
-        {message.role === "assistant" && sessionId && (
-          <InlineApprovalHint sessionId={sessionId} />
-        )}
       </div>
     </div>
   );
 }
 
 /**
- * Memoized wrapper — a message's UI only re-renders when:
- *   - the message object reference changes (new content from store), OR
- *   - the streaming flag flips on/off (entering/leaving the live delta path).
- *
- * Other props (handlers, markdownConfig, cwd, sessionId, callbacks) are
- * stabilized by ChatView's useCallback and Markdown's lazy mount, so a
- * reference-equal compare is sufficient and avoids spurious re-renders of
- * the entire transcript during streaming deltas.
+ * Memoized with React's default shallow compare. Every handler the timeline
+ * passes is a stable useCallback, so idle bubbles skip re-rendering during
+ * streaming deltas — and no prop can go stale the way a hand-picked
+ * comparator allowed.
  */
-export const MessageItem = memo(MessageItemInner, (prev, next) => {
-  return (
-    prev.message === next.message &&
-    prev.streaming === next.streaming &&
-    prev.markdownConfig === next.markdownConfig &&
-    prev.cwd === next.cwd &&
-    prev.sessionId === next.sessionId &&
-    prev.onToast === next.onToast &&
-    prev.onOpenTool === next.onOpenTool &&
-    prev.onEditResend === next.onEditResend &&
-    prev.onInlineResend === next.onInlineResend &&
-    prev.onRetry === next.onRetry &&
-    prev.onOpenSettings === next.onOpenSettings &&
-    prev.hideIdentity === next.hideIdentity
-  );
-});
+export const MessageItem = memo(MessageItemInner);

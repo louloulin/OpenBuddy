@@ -263,12 +263,20 @@ export function refreshNextRun(automation: Automation, from = Date.now()): Autom
 export type AutomationExecutor = (automation: Automation, runId: string) => Promise<void>;
 
 let executor: AutomationExecutor | null = null;
+let isAgentBusy: () => boolean = () => false;
 let scanTimer: ReturnType<typeof setInterval> | null = null;
 const executing = new Set<string>();
 
-/** 注入执行器并启动 30s 到期扫描(email 同款节奏)。 */
-export function startAutomationScheduler(run: AutomationExecutor): void {
+/**
+ * 注入执行器并启动 30s 到期扫描(email 同款节奏)。
+ *
+ * 宿主只有一个活动会话:执行器新建会话会替换(并中止)当前会话。所以
+ * `isBusy()` 为真(用户的回合正在运行)时本轮扫描跳过,到期任务留到下一轮;
+ * 同一时刻也只跑一个自动化,避免几个到期任务互相替换会话。
+ */
+export function startAutomationScheduler(run: AutomationExecutor, options: { isBusy?: () => boolean } = {}): void {
   executor = run;
+  if (options.isBusy) isAgentBusy = options.isBusy;
   if (scanTimer) return;
   scanTimer = setInterval(() => void scanDue(), 30_000);
   scanTimer.unref?.();
@@ -282,6 +290,7 @@ export function stopAutomationScheduler(): void {
 
 async function scanDue(): Promise<void> {
   if (!executor) return;
+  if (executing.size > 0 || isAgentBusy()) return;
   const now = Date.now();
   const due = (await listAutomations()).filter(
     (a) =>
@@ -290,7 +299,7 @@ async function scanDue(): Promise<void> {
       Date.parse(a.nextRunAt as string) <= now &&
       !executing.has(a.id),
   );
-  for (const automation of due.slice(0, 5)) {
+  for (const automation of due.slice(0, 1)) {
     executing.add(automation.id);
     const runId = `run-${randomUUID().slice(0, 8)}`;
     const record: AutomationRunRecord = {

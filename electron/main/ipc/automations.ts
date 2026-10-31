@@ -35,7 +35,7 @@ interface AutomationIpcDeps {
   agentHost: {
     getCwd: () => string | null | undefined;
     newSession: (cwd: string, modelId?: string, opts?: { traceId?: string }) => Promise<{ sessionId: string }>;
-    getSession: () => { sessionId: string } | null;
+    getSession: () => { sessionId: string; isStreaming?: boolean } | null;
     /** await 即等完整回合结束(pi session.prompt 语义)。 */
     prompt: (text: string, options?: { sessionId?: string }) => Promise<void>;
   };
@@ -175,6 +175,9 @@ export function registerAutomationIpc(deps: AutomationIpcDeps): void {
     const id = requiredString(input.id, "id");
     const automation = (await listAutomations()).find((item) => item.id === id);
     if (!automation) throw new Error(`automation not found: ${id}`);
+    await ensureAgentHost();
+    // 自动化会新建并接管活动会话 —— 不能中途打断用户正在运行的回合。
+    if (agentHost.getSession()?.isStreaming) throw new Error("当前有回复正在生成，请等它完成后再运行自动化");
     const runId = await executeAutomation(automation);
     return { ok: true, runId };
   });
@@ -253,5 +256,5 @@ export function registerAutomationIpc(deps: AutomationIpcDeps): void {
 
   startAutomationScheduler(async (automation, runId) => {
     await executeAutomation(automation, runId);
-  });
+  }, { isBusy: () => agentHost.getSession()?.isStreaming === true });
 }

@@ -227,6 +227,16 @@ export function ComposerInner({
   // Phase 3 wiring: state extracted to useComposerAttachments hook (state only this step).
   //   后续 step 会把 readImageFile / pickFiles / pickImages / drag 逐步迁出。
   const { attachments, setAttachments, images, setImages, dragActive } = useComposerAttachments({ onToast });
+  // 附件属于某个会话的草稿:切换会话时清空,不能带到另一个会话里发出去。
+  // (乐观会话 __pending_* → 真实 id 的换名不算切换。)
+  const attachmentKeyRef = useRef(draftKey);
+  useEffect(() => {
+    const prev = attachmentKeyRef.current;
+    attachmentKeyRef.current = draftKey;
+    if (prev === draftKey || (typeof prev === "string" && prev.startsWith("__pending_"))) return;
+    setAttachments([]);
+    setImages([]);
+  }, [draftKey, setAttachments, setImages]);
   // Mirror `text` into a ref so updateText can read the latest value when
   // given a functional updater, without making onDraftChange side effects
   // happen inside React's setText callback. Functional updaters must be

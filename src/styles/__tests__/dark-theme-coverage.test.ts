@@ -20,7 +20,6 @@ const darkOverrides = (css.match(/\[data-theme="dark"\][^{]*\{/g) ?? []).length;
 const priorityClasses = [
   "msg__thought", "msg__thought-body", "msg__thought-elapsed",
   "msg__action-btn", "msg__action-btn--primary",
-  "msg__approval-hint", "msg__approval-hint-toggle",
   "msg__caret", "msg__footer", "msg__inline-editor",
   "msg__bubble", "msg__bubble-text", "msg__bubble--editable",
   "chatview__title", "chatview__toolbar", "chatview__tabs",
@@ -39,9 +38,10 @@ const priorityClasses = [
 ];
 
 describe("P1-01 dark theme coverage", () => {
-  it("messages.css 深色覆写规则数 ≥ 25(P1-01 改造前仅 12)", () => {
-    // 改造前 12 条,本次扩到 29 条;留 ≥ 25 的阈值守住不再回退。
-    expect(darkOverrides).toBeGreaterThanOrEqual(25);
+  it("messages.css 深色覆写规则数 ≥ 22(P1-01 改造前仅 12)", () => {
+    // 改造前 12 条,P1-01 扩到 29 条;20261031 删除消息内审批提示(连同其 5 条
+    // 深色规则)后为 24,阈值同步下调,仍守住不再回退。
+    expect(darkOverrides).toBeGreaterThanOrEqual(22);
   });
 
   it("P1 高优先级类至少 70% 有深色覆写", () => {

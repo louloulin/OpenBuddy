@@ -287,7 +287,7 @@ describe("handleSessionEvent — turn completion", () => {
     const session = makeSession();
     handleSessionEvent(deps, session, {
       type: "turn_end",
-      message: { stopReason: "toolUse" },
+      message: { stopReason: "stop" },
       toolResults: [],
     } as never);
     expect(events).toHaveLength(1);
@@ -295,8 +295,18 @@ describe("handleSessionEvent — turn completion", () => {
     expect(events[0].payload).toEqual({
       sessionId: session.sessionId,
       promptId: "",
-      stopReason: "toolUse",
+      stopReason: "stop",
     });
+  });
+
+  it("does not complete on a mid-run toolUse turn_end", () => {
+    const { deps, events } = makeDeps();
+    handleSessionEvent(deps, makeSession(), {
+      type: "turn_end",
+      message: { stopReason: "toolUse" },
+      toolResults: [],
+    } as never);
+    expect(events.filter((e) => e.channel === "pi://complete")).toHaveLength(0);
   });
 
   it("emits pi://complete on agent_end as a safety net", () => {
@@ -351,7 +361,7 @@ describe("handleSessionEvent — turn completion", () => {
     expect((completes[0].payload as { stopReason: string }).stopReason).toBe("stop");
   });
 
-  it("emits one pi://complete per turn across a multi-turn tool-use run", () => {
+  it("emits a single pi://complete once a multi-turn tool-use run settles", () => {
     const { deps, events } = makeDeps();
     const session = makeSession();
     for (const event of [
@@ -367,10 +377,7 @@ describe("handleSessionEvent — turn completion", () => {
       handleSessionEvent(deps, session, event as never);
     }
     const completes = events.filter((e) => e.channel === "pi://complete");
-    expect(completes.map((e) => (e.payload as { stopReason: string }).stopReason)).toEqual([
-      "toolUse",
-      "stop",
-    ]);
+    expect(completes.map((e) => (e.payload as { stopReason: string }).stopReason)).toEqual(["stop"]);
   });
 
   it("still emits a terminal complete when a run aborts without turn_end", () => {

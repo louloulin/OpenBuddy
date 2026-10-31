@@ -227,3 +227,4 @@ export type {
   ConversationApprovalProps,
   ConversationApprovalImpl,
 } from "./conversation-approvals";
+export { restoreComposerText } from "./composer/use-extension-text";

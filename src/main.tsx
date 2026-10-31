@@ -15,7 +15,6 @@ import { startRendererPluginEventBridge } from "./lib/runtime/renderer-plugin-ru
 import { installPluginSdkBridge } from "@openbuddy/ui-runtime/client";
 import { setToast } from "./stores/toast-store";
 import { useSessionStore } from "./stores/session-store";
-import { abandonInFlightStream } from "./lib/agent/abandon-stream";
 import { initTelemetry } from "./lib/email/telemetry-init";
 // Phase 2 — modular CSS. globals.css transitively imports tokens / base /
 // theme / chrome / per-domain 拆分文件。automation-wb.css 保留兜底兼容。
@@ -129,89 +128,5 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   </ErrorBoundary>
 );
 
-// R6.8 — 流式死锁看门狗。
-// 用户场景:AI 在 harness 端卡死(网络断、流式 retry 风暴、tool 调用挂起),但
-// `agent-died` 事件没发出来,导致 sessionStore.streaming 永远 true,Composer
-// 锁死,用户点了也没反应。这个看门狗记录最近一次 streaming 状态变化的时间,
-// 若超过 STREAM_WATCHDOG_MS 还没动,主动 setError 释放 streamingMessageId,
-// 让用户至少能发新消息或退出。
-const STREAM_WATCHDOG_MS = 60_000;
-const STREAM_WATCHDOG_TICK_MS = 10_000;
-let lastStreamChange = Date.now();
-let lastStreaming = false;
-// P2-05: track the watchdog timeout so we can clear it when streaming ends.
-// Previously this was a 10s setInterval that fired forever and re-checked
-// the watchdog condition on every tick. Now: schedule a single
-// setTimeout(WATCHDOG_MS) when streaming flips true, clear it on the
-// flip back to false. Zero wakeups while idle.
-let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
-const fireWatchdog = (): void => {
-  lastStreamChange = Date.now();
-  useSessionStore.getState().setError("AI 引擎长时间无响应,已自动结束当前轮次。可重发或重新加载。");
-  setToast("AI 引擎长时间无响应,已自动结束当前轮次。", {
-    kind: "warning",
-    id: "stream-watchdog",
-    ttlMs: 0,
-    action: {
-      label: "重新加载应用",
-      onClick: () => {
-        if (typeof window !== "undefined" && window.location) window.location.reload();
-      },
-    },
-  });
-  // Force-finalise the in-flight assistant bubble so the loading row goes
-  // away (previously the watchdog only set an error and left the orphan
-  // bubble spinning forever — see src/lib/agent/abandon-stream.ts).
-  const focusedSessionId = useSessionStore.getState().sessionId;
-  if (focusedSessionId) {
-    // R-err-provider-chat — streaming watchdog typically trips when the
-    // provider's SSE connection silently dies (network drop, CDN outage,
-    // long-tail tool hang). Surface an inline TurnErrorCard with
-    // network_error so the chip reads "网络连接中断" + 复制/重试,
-    // instead of the placeholder "（已中断：流式 60s 看门狗）".
-    abandonInFlightStream({
-      sessionId: focusedSessionId,
-      reason: "流式 60s 看门狗",
-      error: {
-        message: "AI 引擎长时间无响应,已自动结束当前轮次。可重发或重新加载。",
-        code: "network_error",
-      },
-    });
-  } else {
-    // No focused session — best-effort cleanup of the orphan streaming
-    // flag so the next begin-stream call doesn't think we're still busy.
-    useSessionStore.getState().setStreaming(false);
-  }
-};
-useSessionStore.subscribe((state) => {
-  const now = Date.now();
-  const streaming = state.streaming;
-  if (streaming !== lastStreaming) {
-    lastStreamChange = now;
-    lastStreaming = streaming;
-    if (streaming) {
-      // Schedule the watchdog once. If anything else flips streaming (even
-      // mid-timeout), the subscribe re-runs and resets.
-      if (watchdogTimer) clearTimeout(watchdogTimer);
-      watchdogTimer = setTimeout(fireWatchdog, STREAM_WATCHDOG_MS);
-    } else if (watchdogTimer) {
-      clearTimeout(watchdogTimer);
-      watchdogTimer = null;
-    }
-    return;
-  }
-  // streaming unchanged: if true, refresh the timer on every state change
-  // so legitimate deltas reset the watchdog without needing the periodic
-  // tick. If false, no-op.
-  if (streaming && now - lastStreamChange >= STREAM_WATCHDOG_MS) {
-    if (watchdogTimer) clearTimeout(watchdogTimer);
-    watchdogTimer = null;
-    fireWatchdog();
-    return;
-  }
-  if (streaming) {
-    lastStreamChange = now;
-    if (watchdogTimer) clearTimeout(watchdogTimer);
-    watchdogTimer = setTimeout(fireWatchdog, STREAM_WATCHDOG_MS);
-  }
-});
+// 流式看门狗统一在 useAgentSession 内(任何 agent 事件续期、工具运行中不触发),
+// 这里不再维护第二套阈值不同的看门狗。

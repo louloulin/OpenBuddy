@@ -32,7 +32,6 @@ export const CHAT_SHORTCUTS: ShortcutEntry[] = [
   { id: "chat-find", keys: "⌘ F", label: "在当前会话中查找", category: "对话" },
   { id: "chat-find-next", keys: "⌘ G", label: "查找下一个", category: "对话" },
   { id: "chat-find-prev", keys: "⌘ ⇧ G", label: "查找上一个", category: "对话" },
-  { id: "chat-retry", keys: "⌘ R", label: "重新生成最后一条回复", category: "对话" },
   { id: "chat-edit-last", keys: "⌘ E", label: "编辑最后一条用户消息", category: "对话" },
   { id: "chat-stop", keys: "Esc", label: "停止生成", category: "对话" },
   { id: "chat-pause", keys: "⌘ P", label: "暂停生成(软停止,保留上下文)", category: "对话" },

@@ -312,9 +312,9 @@ export function ModelSelector({
         selectIndex(activeIndex);
         break;
       }
-      case "Delete":
-      case "Backspace": {
-        // 键盘删除:仅对模型行生效(档位行没有删除语义)。删除后菜单保持
+      case "Delete": {
+        // 键盘删除:仅 Delete 键、仅对模型行生效(档位行没有删除语义);宿主会二次
+        // 确认。Backspace 不再触发 —— 它太容易在键入检索时误按。删除后菜单保持
         // 打开 —— 用户常要连续清理多个模型;列表收窄由父组件刷新 models。
         if (!hasDelete || activeIndex < 0 || activeIndex >= models.length) return;
         e.preventDefault();

@@ -25,6 +25,7 @@
 import { randomUUID } from "node:crypto";
 
 import { confirmGateAllows, confirmSessionAllows, CONFIRM_TOOL_NAME } from "../hook-permission";
+import { EDIT_CONFIRM_TITLE } from "../../extensions/apply-patch";
 import type { AgentSession, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import type { AgentHostPendingUiRequest } from "../_state-shape";
 
@@ -103,9 +104,12 @@ export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIC
       // 2) 会话级「始终允许此命令」:同一条命令在本会话里第二次出现时不再问。
       //    识别键是 message 本身 —— confirm 没有工具名/pattern,命令原文是
       //    唯一稳定的身份。
-      const gated = await confirmGateAllows();
+      const isEdit = title === EDIT_CONFIRM_TITLE;
+      const gated = await confirmGateAllows(isEdit ? "edit" : "other");
       if (gated === true) return true;
-      if (confirmSessionAllows(session.sessionId, message)) return true;
+      // 编辑的「本会话始终允许」作用于所有文件修改;命令仍按命令原文逐条授权。
+      const grantKey = isEdit ? EDIT_CONFIRM_TITLE : message;
+      if (confirmSessionAllows(session.sessionId, grantKey)) return true;
       return await new Promise<boolean>((resolve) => {
         const requestId = makeRequestId(session.sessionId, "confirm");
         state.pendingUiRequests.set(requestId, {
@@ -114,7 +118,7 @@ export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIC
           generation,
           // resolveUiRequest 在 allow_always 时据此写入会话规则(带 pattern),
           // 同时不会再持久化成跨会话规则(ctx.confirm 不是真实工具名)。
-          permission: { toolName: CONFIRM_TOOL_NAME, pattern: message },
+          permission: { toolName: CONFIRM_TOOL_NAME, pattern: grantKey },
           resolve: (value) => {
             const decision = value && typeof value === "object" && "decision" in value
               ? (value as { decision?: string }).decision
@@ -133,10 +137,10 @@ export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIC
           // Keep the tool identity meaningful for the UI: the risk badge and
           // the localized tool chip both key off the kind, and "confirm"
           // would render every shell prompt as the generic 「工具确认」.
-          toolKind: title?.includes("执行命令") ? "apply_command" : "confirm",
+          toolKind: isEdit ? "apply_patch" : title?.includes("执行命令") ? "apply_command" : "confirm",
           options: [
             { optionId: "allow", kind: "allow", title: "允许" },
-            { optionId: "allow_always", kind: "allow_always", title: "本会话始终允许此命令" },
+            { optionId: "allow_always", kind: "allow_always", title: isEdit ? "本会话始终允许编辑" : "本会话始终允许此命令" },
             { optionId: "deny", kind: "deny", title: "拒绝" },
           ],
         });

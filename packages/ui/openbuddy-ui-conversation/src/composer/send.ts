@@ -75,6 +75,10 @@ export interface SendDeps {
 export function send(deps: SendDeps): void {
   const t = deps.text.trim();
   if (deps.streaming || deps.disabled || !deps.apiReady) return;
+  // Nothing to send: no text, no attachments, no images. (This used to fall
+  // through and send a canned "你好" — on the home page it even created a
+  // new session.)
+  if (!t && deps.attachments.length === 0 && deps.images.length === 0) return;
 
   // Plugin command priority: it is a renderer-side action; sending
   // "/greet Alice" as a prompt would only get a model-fabricated reply.
@@ -149,7 +153,7 @@ export function send(deps: SendDeps): void {
       deps.onToast?.(`发送失败:${e instanceof Error ? e.message : String(e)}`);
     });
   } else {
-    deps.onSend(body || "你好");
+    deps.onSend(body);
   }
 
   // 记入输入历史(arrow-key recall)。

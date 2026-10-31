@@ -75,6 +75,10 @@ export const MentionPicker = memo(function MentionPicker({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Enter/Esc while an IME is composing belongs to the IME (picking a
+      // Chinese candidate), not to the picker.
+      const native = (e as unknown as { nativeEvent?: KeyboardEvent }).nativeEvent ?? (e as unknown as KeyboardEvent);
+      if (native.isComposing || native.keyCode === 229) return;
       if (hits.length === 0) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();

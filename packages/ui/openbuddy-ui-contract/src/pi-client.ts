@@ -2310,15 +2310,13 @@ export async function subscribePiEvents(handlers: PiEventHandlers, options?: Sub
           : [batch];
         for (const event of events) acceptUpdate(event, "port");
       });
-      if (unlisten) {
-        unlisteners.push(unlisten);
-      } else {
-        // Port transport unavailable (older preload / jsdom) — never let the
-        // subscription silently drop live updates; fall back to IPC.
-        unlisteners.push(
-          await listen<SessionUpdate & { sessionId?: string; traceId?: string }>("pi://update", (e) => acceptUpdate(e.payload, "ipc")),
-        );
-      }
+      if (unlisten) unlisteners.push(unlisten);
+      // Always listen on IPC too. The host sends each update on exactly one
+      // path — the port while it is healthy, IPC before it attaches or after
+      // it fails — so this is the fallback lane, never a duplicate.
+      unlisteners.push(
+        await listen<SessionUpdate & { sessionId?: string; traceId?: string }>("pi://update", (e) => acceptUpdate(e.payload, "ipc")),
+      );
     } else {
       unlisteners.push(
         await listen<SessionUpdate & { sessionId?: string; traceId?: string }>("pi://update", (e) => acceptUpdate(e.payload, "ipc")),

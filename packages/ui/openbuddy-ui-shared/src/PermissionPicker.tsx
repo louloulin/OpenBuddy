@@ -33,6 +33,7 @@ import type { IconComponentProps } from "@openbuddy/ui-primitives/icons";
 import { permissionModeGet, permissionModeSet } from "@/lib/agent/pi-client";
 import type { PermissionMode } from "@/lib/agent/pi-client";
 import { useT } from "@/lib/platform/i18n";
+import { confirm } from "@/lib/platform/electron-api";
 
 const MODE_IDS: readonly PermissionMode[] = [
   "default",
@@ -109,6 +110,16 @@ export function PermissionPicker({
       if (next === mode) {
         setOpen(false);
         return;
+      }
+      // Full bypass auto-approves every tool call (shell, file writes) — one
+      // mis-click must not silently switch it on.
+      if (next === "bypassPermissions") {
+        setOpen(false);
+        const ok = await confirm("开启后 Agent 的所有命令与文件修改都将不经确认直接执行。确定开启完全放行？", {
+          tone: "danger",
+          confirmLabel: "开启完全放行",
+        });
+        if (!ok) return;
       }
       setBusy(true);
       try {

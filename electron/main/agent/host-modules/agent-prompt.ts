@@ -458,6 +458,21 @@ export async function abort(options?: { traceId?: string; sessionId?: string }):
   const sessionId = options?.sessionId ?? state.session?.sessionId;
   hostReceivedLog("agent:abort", traceId, sessionId);
   emitPluginEvent("agent/abort", { sessionId: state.session?.sessionId });
+  // Stop must also settle every approval/question the run is blocked on —
+  // otherwise the tool promise keeps waiting and the card lingers in the UI
+  // after the turn is gone.
+  const abortedSessionId = state.session?.sessionId;
+  for (const [requestId, request] of state.pendingUiRequests) {
+    if (abortedSessionId && request.sessionId !== abortedSessionId) continue;
+    state.pendingUiRequests.delete(requestId);
+    request.resolve(undefined);
+    emitRendererEvent("pi://request-resolved", {
+      kind: request.kind,
+      requestId,
+      sessionId: request.sessionId,
+      cancelled: true,
+    });
+  }
   try {
     await state.session?.abort();
     hostDispatchedLog("agent:abort", traceId, sessionId);

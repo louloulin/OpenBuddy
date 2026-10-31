@@ -115,8 +115,9 @@ export function usePopovers(args: UsePopoversArgs): UsePopoversResult {
   // Slash-command visibility: is the user typing a "/xxx" command at the cursor?
   const wordBeforeCursor = (() => {
     const before = text.slice(0, cursorPos);
-    const m = before.match(/\/[\w-]*$/);
-    return m ? m[0] : "";
+    // Same rule as the SlashCommands menu: "/" must start a token.
+    const m = before.match(/(?:^|\s)(\/[\w-]*)$/);
+    return m ? m[1] : "";
   })();
   const slashVisible = wordBeforeCursor.length > 0 && apiReady && !streaming;
 

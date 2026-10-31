@@ -137,10 +137,12 @@ async function requestHookPermission(title: string, message: string, request?: a
  * ctx.ui.confirm 全走它 —— 权限模式对它毫无作用(2026-10-12 真实启动验证
  * 发现 bypassPermissions 下 apply_command 仍弹窗)。
  */
-export async function confirmGateAllows(): Promise<boolean | undefined> {
+export async function confirmGateAllows(kind: "edit" | "other" = "other"): Promise<boolean | undefined> {
   let mode: string | undefined;
   try { mode = await agentPermissionBridge.readMode(); } catch { return undefined; }
   if (mode === "bypassPermissions") return true;
+  // acceptEdits("自动接受编辑"):文件修改自动放行,命令仍然要问。
+  if (mode === "acceptEdits" && kind === "edit") return true;
   return undefined;
 }
 
