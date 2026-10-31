@@ -17,7 +17,7 @@
     "react-router-dom": "^7.18.3",
     "zustand": "^5.0.15",
     "recharts": "^3.10.1",
-    "lucide-react": "^1.41.0",
+    "lucide-react": "^1.63.0",
     "date-fns": "^4.1.0"
   },
   "devDependencies": {
