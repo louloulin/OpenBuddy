@@ -20,6 +20,7 @@ beforeEach(() => {
     setTurnPhase: vi.fn(),
     setStreaming: vi.fn(),
     beginStreamingMessage: vi.fn(),
+    appendStreamingDelta: vi.fn(),
   };
 });
 
@@ -30,6 +31,12 @@ describe("reconcileTurnState", () => {
     expect(store.setTurnPhase).toHaveBeenCalledWith("tool_running");
     expect(store.setStreaming).toHaveBeenCalledWith(true);
     expect(store.beginStreamingMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("切回后台跑着的会话:补回正在生成的那条回复", async () => {
+    piTurnState.mockResolvedValue({ sessionId: "s1", phase: "streaming", since: 1, partial: { text: "已经写了一半", thinking: "想" } });
+    await reconcileTurnState("s1");
+    expect(store.appendStreamingDelta.mock.calls).toEqual([["想", "thought"], ["已经写了一半", "text"]]);
   });
 
   it("主进程空闲:只同步阶段,不动流式", async () => {

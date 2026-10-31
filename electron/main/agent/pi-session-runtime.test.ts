@@ -192,4 +192,63 @@ describe("PiSessionRuntime (Phase B.2 — bindCore integration)", () => {
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
+
+  describe("切走时仍在生成的会话停到后台(计划 0.3)", () => {
+    const managerFor = (id: string) => ({ sessionManager: { getSessionId: () => id } }) as never;
+    const streaming = (session: FakeSession, value: boolean) =>
+      Object.defineProperty(session, "isStreaming", { configurable: true, get: () => value });
+
+    it("不中止,事件照常送达,跑完后释放", async () => {
+      const a = createFakeSession("a");
+      const b = createFakeSession("b");
+      const runtime = new PiSessionRuntime({ factory: factory([a, b]) });
+      await runtime.create({});
+      const received: string[] = [];
+      runtime.subscribe((event, session) => received.push(`${session.sessionId}:${event.type}`));
+      streaming(a, true);
+      await runtime.replace(managerFor("b"));
+      expect(a.abortCalls).toBe(0);
+      expect(a.disposeCalls).toBe(0);
+      a.emit({ type: "message_update" } as AgentSessionEvent);
+      streaming(a, false);
+      a.emit({ type: "agent_end" } as AgentSessionEvent);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(received).toEqual(["a:message_update", "a:agent_end"]);
+      expect(a.disposeCalls).toBe(1);
+      a.emit({ type: "agent_start" } as AgentSessionEvent);
+      expect(received).toHaveLength(2);
+    });
+
+    it("切回时接回同一个实例,不从文件新建第二份", async () => {
+      const a = createFakeSession("a");
+      const b = createFakeSession("b");
+      const create = vi.fn(async () => ({ session: [a, b][create.mock.calls.length - 1]! }));
+      const runtime = new PiSessionRuntime({ factory: { create } });
+      await runtime.create({});
+      runtime.subscribe(() => undefined);
+      streaming(a, true);
+      await runtime.replace(managerFor("b"));
+      const back = await runtime.replace(managerFor("a"));
+      expect(back).toBe(a);
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(runtime.wasRestored(a)).toBe(true);
+      expect(runtime.wasRestored(b)).toBe(false);
+      // b 已空闲:照旧中止并释放。
+      expect(b.disposeCalls).toBe(1);
+    });
+
+    it("整体释放时中止后台会话", async () => {
+      const a = createFakeSession("a");
+      const b = createFakeSession("b");
+      const runtime = new PiSessionRuntime({ factory: factory([a, b]) });
+      await runtime.create({});
+      runtime.subscribe(() => undefined);
+      streaming(a, true);
+      await runtime.replace(managerFor("b"));
+      await runtime.dispose();
+      expect(a.abortCalls).toBe(1);
+      expect(a.disposeCalls).toBe(1);
+    });
+  });
 });
+

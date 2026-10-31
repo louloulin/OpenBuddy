@@ -98,4 +98,16 @@ describe("useChatViewStreaming 未读计数", () => {
     act(() => result.current.handleJumpToBottom());
     expect(result.current.awayFromBottom).toBe(false);
   });
+
+  it("用户滚上去后又发了一条消息:回到末尾,不挂「↓」(§21)", () => {
+    const { ref, userScrollTo, el } = scroller(1200, 400, 800);
+    const { result, rerender } = mount(ref);
+    act(() => userScrollTo(0));
+    expect(result.current.awayFromBottom).toBe(true);
+    act(() => rerender({ messages: [{ id: "u1", role: "user" }] }));
+    expect(el.scrollTop).toBe(1200);
+    expect(result.current.awayFromBottom).toBe(false);
+    expect(result.current.unreadCount).toBe(0);
+  });
 });
+

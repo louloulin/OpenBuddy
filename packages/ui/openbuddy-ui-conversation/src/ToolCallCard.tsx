@@ -1,3 +1,4 @@
+import { permissionToolLabel } from "@openbuddy/ui-dialogs";
 import React, { memo, useEffect, useState } from "react";
 import { useLocale } from "@openbuddy/ui-locale/client";
 import type { ToolCallView } from "@/stores/session-store";
@@ -131,7 +132,10 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
   const kindLabel = specialized
     ? `${rendererIcon(renderer)} ${rendererLabel(renderer)}`
     : prettyKind(tc.kind);
-  const summary = specialized ? summarizeTool(tc, renderer) : shortTitle;
+  // 标题就是工具名本身(如 memory_save)时,行里会出现两遍英文 id:换成一个
+  // 人话标签(「保存记忆」),不再另挂 kind chip(§21)。
+  const bareName = !specialized && (!tc.title?.trim() || tc.title.trim() === tc.kind);
+  const summary = specialized ? summarizeTool(tc, renderer) : bareName ? permissionToolLabel(tc.kind) : shortTitle;
 
   if (isExpanded) {
     return (
@@ -187,7 +191,7 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
       {/* 专用渲染器的 summary 已经是「动词 + 目标」(运行/读取/编辑/搜索),
           cc-haha 的行里不再重复一个工具类别 chip;只有拿不到摘要的通用工具
           才用 kindLabel 说明这是什么。 */}
-      {!specialized && <span className="toolcall__kind">{kindLabel}</span>}
+      {!specialized && !bareName && <span className="toolcall__kind">{kindLabel}</span>}
       <span className="toolcall__title">{summary}</span>
       {durationLabel && (
           <span

@@ -578,6 +578,11 @@ export interface TurnStateEvent {
   phase: TurnPhase;
   /** 进入当前阶段的时间(ms)。 */
   since: number;
+  /**
+   * 仅 `agent:turn-state` 查询返回:正在生成、尚未落盘的那条回复。切回后台
+   * 跑着的会话(或重新加载窗口)时,渲染层据此补回已经生成的部分。
+   */
+  partial?: { text: string; thinking: string };
 }
 
 // ---------- automations (local scheduler, WorkBuddy 1:1) ----------

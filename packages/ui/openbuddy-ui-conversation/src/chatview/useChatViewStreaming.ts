@@ -107,8 +107,15 @@ export function useChatViewStreaming({
     el.addEventListener("scroll", onScroll, { passive: true });
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(() => recomputePinned("resize"));
+      ro = new ResizeObserver(() => {
+        // 跟在末尾时,任何尺寸变化都补一次跳底:内容在"消息变化"之后才长高
+        // (代码块高亮、错误卡、图片),或底部审批卡弹出把可视区压矮 —— 否则
+        // 最新内容被挤到可视区下面,还挂出「↓」(§21 截图)。
+        if (pinnedRef.current) autoScrollToBottom(el);
+        recomputePinned("resize");
+      });
       ro.observe(el);
+      if (el.firstElementChild) ro.observe(el.firstElementChild);
     }
     return () => {
       el.removeEventListener("scroll", onScroll);
@@ -126,6 +133,13 @@ export function useChatViewStreaming({
     const length = Array.isArray(messages) ? messages.length : 0;
     const added = Math.max(0, length - lastLengthRef.current);
     lastLengthRef.current = length;
+    // 用户刚发出一条消息:他要看的就是下面,无论之前滚到哪里都回到末尾。
+    const last = Array.isArray(messages) ? (messages as Array<{ role?: string }>)[length - 1] : undefined;
+    if (added > 0 && last?.role === "user") {
+      pinnedRef.current = true;
+      userScrolledRef.current = false;
+      setAwayFromBottom(false);
+    }
     const scrollable = el.scrollHeight - el.clientHeight > PIN_THRESHOLD;
     if (!scrollable) {
       setUnreadCount(0);

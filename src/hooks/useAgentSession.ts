@@ -86,7 +86,7 @@ import { dispatchNotification } from "@/lib/notify/notify-channels";
 import { reportEvent } from "@/lib/telemetry/telemetry-contract";
 import { recordUsage, loadUsage, loadQuotaConfig } from "@/lib/billing/usage-quota";
 import { createUpdateCoalescer, type UpdateCoalescer } from "@/lib/stream/update-coalescer";
-import { friendlyError, formatPiError } from "@/lib/platform/error-format";
+import { friendlyError } from "@/lib/platform/error-format";
 import { abandonInFlightStream } from "@/lib/agent/abandon-stream";
 import { withTrace, createRendererLogger } from "@openbuddy/logging-renderer";
 import type {
@@ -510,10 +510,9 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
           // 走与 pi://turn-error 相同的 abandon 路径,把结构化错误交给卡片。
           const rawDetail = p.errorMessage ?? "";
           const code = rawDetail ? inferErrorCodeSafe(rawDetail) : p.stopReason === "rate_limit" ? "rate_limit_error" : undefined;
-          const bannerMsg =
-            formatPiError(rawDetail) ??
-            (rawDetail ? `⚠️ 本轮执行出错：${rawDetail}` : "⚠️ 本轮执行出错，请重试。");
-          useSessionStore.getState().setError(bannerMsg);
+          // 回合失败只在转录里落一张错误卡(abandonStreamingMessage 保证即使
+          // 还没有助手气泡也会补一条),不再同时弹顶部横幅 —— 两处说同一件事,
+          // 横幅还会压住内容。
           reportEvent("turn_error", "error", { sessionId: p.sessionId, stopReason: p.stopReason });
           clearStreamingWatchdog();
           abortedRef.current = true;
@@ -722,11 +721,13 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
       // 计划 1.1 — 主进程回合状态机的投影。只更新阶段标签,不改 streaming:
       // 收尾仍由 onComplete / onTurnError 负责(它们带序号、走重放闸门)。
       onTurnState: (e: { sessionId: string; phase: import("@openbuddy/shared-types").TurnPhase }) => {
-        // 工具跑完(离开 tool_running)时刷新运行中任务面板:主进程那边已删掉
-        // 记录,而面板只在挂载 / 收到 task 事件时拉取,窗口重新加载时拉到的
-        // 「running」会一直挂着。进入 tool_running 不刷新,免得短工具让面板闪现。
-        if (e.phase !== "tool_running") setTaskRefreshSignal((n: number) => n + 1);
+        // 回合结束时刷新运行中任务面板:面板只在挂载 / 收到 task 事件时拉取,
+        // 窗口重新加载时拉到的「running」工具会一直挂着。只在 idle 刷新 ——
+        // 回合进行中刷新会让面板把对话里已经在显示的工具调用再列一遍
+        // (§21 截图:审批时底部弹出整条「运行中任务」压住侧栏)。
+        if (e.phase === "idle") setTaskRefreshSignal((n: number) => n + 1);
         const store = useSessionStore.getState();
+        store.setSessionRunning(e.sessionId, e.phase !== "idle");
         if (e.sessionId !== store.sessionId) return;
         store.setTurnPhase(e.phase);
       },
@@ -740,29 +741,19 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
           settleUserStop(e.sessionId);
           return;
         }
-        // R-err-provider-chat — turn-error must surface in TWO places at once:
-        //   1. Top banner (`sessionStore.error`) so a brand-new session without
-        //      any assistant bubble yet still gets a readable explanation.
-        //   2. Inline TurnErrorCard on the failed assistant bubble so the user
-        //      can copy the raw reason / open Settings for auth issues / retry
-        //      in one click.
+        // R-err-provider-chat — turn-error surfaces as the inline TurnErrorCard
+        // on the failed assistant bubble (one is synthesised when the turn
+        // failed before its first token) so the user can copy the raw reason /
+        // open Settings for auth issues / retry in one click.
         // Previously the inline card was missing because abandonInFlightStream
         // was called WITHOUT an `error` option, so `abandonStreamingMessage`
         // fell back to the generic "（已中断：...）" placeholder. We now run
-        // the raw detail through formatPiError (provider-aware friendly text)
-        // and inferErrorCodeSafe (machine code for the card's chip + the
+        // the raw detail through inferErrorCodeSafe (machine code for the card's chip + the
         // Settings shortcut wiring in TurnErrorCard.CONFIGURATION_CODES).
         const rawDetail = e.detail ?? "";
         const inferredCode = rawDetail ? inferErrorCodeSafe(rawDetail) : undefined;
         const code = inferredCode ?? (e.kind === "rate_limit" ? "rate_limit_error" : undefined);
-        const bannerMsg =
-          formatPiError(rawDetail) ??
-          (e.kind === "rate_limit"
-            ? "⚠️ API 速率限制已触发（执行工具期间）。请等待 1-2 分钟后重试，或缩短对话上下文（新建会话）。"
-            : rawDetail
-              ? `⚠️ 本轮执行出错：${rawDetail}`
-              : "⚠️ 本轮执行出错，请重试。");
-        useSessionStore.getState().setError(bannerMsg);
+        // 只落转录内错误卡(见 onComplete 失败分支),不再弹顶部横幅。
         reportEvent("turn_error", "error", { sessionId: e.sessionId, kind: e.kind });
         // Force-finalise the in-flight assistant bubble — without this the
         // LoadingRow spins forever after a fatal turn error (the user

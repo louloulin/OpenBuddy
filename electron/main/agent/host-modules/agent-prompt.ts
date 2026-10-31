@@ -158,23 +158,25 @@ export async function prompt(
     api: resolvedModel?.api,
     baseUrl: resolvedModel?.baseUrl,
   });
-  emitPluginEvent("session/input", { sessionId: state.session.sessionId, text });
+  // 回合可能跑到会话被切到后台之后:收尾一律记在发起时的会话上。
+  const session = state.session;
+  emitPluginEvent("session/input", { sessionId: session.sessionId, text });
   await writePromptHistory(text);
   try {
     await settlePendingAbort();
-    await state.session.prompt(text);
+    await session.prompt(text);
     console.log("[openbuddy] pi prompt.dispatched", { traceId, sessionId });
     hostDispatchedLog("agent:prompt", traceId, sessionId);
   } catch (error) {
     console.error("[openbuddy] pi prompt.failed", { traceId, sessionId, error: String(error) });
     emitPluginEvent("agent/error", {
-      sessionId: state.session.sessionId,
+      sessionId: session.sessionId,
       operation: "prompt",
       error: String(error),
     });
-    emitRendererEvent("pi://error", { sessionId: state.session.sessionId, error: String(error) });
+    emitRendererEvent("pi://error", { sessionId: session.sessionId, error: String(error) });
     // 回合没跑起来(或中途抛出)也要回到 idle,否则状态机停在 thinking。
-    applyTurnInput(state.session.sessionId, { type: "run_end" });
+    applyTurnInput(session.sessionId, { type: "run_end" });
     hostFailedLog("agent:prompt", traceId, error);
     throw error;
   }
@@ -327,23 +329,25 @@ async function promptContent(
     ...(attachmentRefs.length > 0 ? { attachments: attachmentRefs } : {}),
   });
   if (text.trim()) await writePromptHistory(text);
+  // 回合可能跑到会话被切到后台之后:收尾一律记在发起时的会话上。
+  const session = state.session;
   try {
     void state.queueMirror;
     await settlePendingAbort();
-    await state.session!.sendUserMessage(
+    await session.sendUserMessage(
       wireContent,
       mode === "steer" ? { deliverAs: "steer" } : { deliverAs: "followUp" },
     );
     return {};
   } catch (error) {
     emitPluginEvent("agent/error", {
-      sessionId: state.session.sessionId,
+      sessionId: session.sessionId,
       operation: "prompt",
       error: String(error),
     });
-    emitRendererEvent("pi://error", { sessionId: state.session.sessionId, error: String(error) });
+    emitRendererEvent("pi://error", { sessionId: session.sessionId, error: String(error) });
     // 回合没跑起来(或中途抛出)也要回到 idle,否则状态机停在 thinking。
-    applyTurnInput(state.session.sessionId, { type: "run_end" });
+    applyTurnInput(session.sessionId, { type: "run_end" });
     throw error;
   }
 }

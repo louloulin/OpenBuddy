@@ -174,6 +174,8 @@ function MessageItemInner({
     .filter((p) => p.kind === "text")
     .map((p) => (message.role === "user" ? stripPersona(p.text) : p.text))
     .join("\n");
+  const hasFooter = message.complete === true &&
+    Boolean(plainText || message.error || typeof rewindPromptIndex === "number");
 
   /** R8.1 (revision-pager) — text used by the user-bubble renderer.
    *  When the user has re-edited this message, `revisions` holds the full
@@ -560,8 +562,7 @@ function MessageItemInner({
             (matches cabinet's CopyButton pattern). Failure turns keep
             重试 + 赞踩 only. Buttons stay always-visible at low opacity
             and brighten on hover/focus. */}
-        {message.complete &&
-          (plainText || message.error || typeof rewindPromptIndex === "number") && (
+        {hasFooter && (
           <div className="msg__footer">
             {plainText && (
               <CopyIconButton
@@ -585,9 +586,12 @@ function MessageItemInner({
             )}
             {/* 不常用的动作收进「⋯」(对齐 WorkBuddy 操作栏:复制 / 重试 / 赞踩 / ⋯)。 */}
             <MessageMoreMenu items={moreItems} />
+            {/* 时间 · 用时 · 模型跟操作按钮同一行(对齐 WorkBuddy),不再单独
+                占一行 —— 两行隐藏占位叠在每条回复下面,轮次之间空出一大段。 */}
+            {metaProps && <MessageMeta {...metaProps} />}
           </div>
         )}
-        {metaProps && <MessageMeta {...metaProps} />}
+        {!hasFooter && metaProps && <MessageMeta {...metaProps} />}
         {DraftImpl ? (
           <DraftImpl
             open={draftOpen}

@@ -375,7 +375,8 @@ async function loadSessionsImpl(cwd: string) {
     const expert = metadata.experts[entry.id];
     return {
       sessionId: entry.id,
-      title: entry.name ?? (entry.firstMessage || "Pi 会话").slice(0, 80),
+      // 空会话(刚建、还没发第一条)显示「新任务」,而不是 pi 的英文占位 "(no messages)"。
+      title: entry.name ?? (entry.messageCount > 0 && entry.firstMessage ? entry.firstMessage : "新任务").slice(0, 80),
       updatedAt: entry.modified.toISOString(),
       cwd: entry.cwd || cwd,
       pinned: pinned.has(entry.id),

@@ -66,8 +66,9 @@ export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
   ipcMain.handle("agent:turn-state", (_e, args: { sessionId: string }) => {
     const sessionId = requiredString(recordValue(args, "turn state payload").sessionId, "session id");
     const state = turnStates.get(sessionId);
-    if (state.phase !== "idle") replayPendingUiEvents(sessionId);
-    return { sessionId, phase: state.phase, since: state.since };
+    if (state.phase === "idle") return { sessionId, phase: state.phase, since: state.since };
+    replayPendingUiEvents(sessionId);
+    return { sessionId, phase: state.phase, since: state.since, partial: streamingPartial(agentHost.getSession(), sessionId) };
   });
   ipcMain.handle("agent:session-messages", async (_e, args: { sessionId: string }) => {
     await ensureAgentHost();
@@ -153,4 +154,19 @@ export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
       input.mode === undefined ? undefined : requiredString(input.mode, "rewind mode"),
     );
   });
+}
+
+/** 正在生成、尚未落盘的那条回复(会话历史里还没有它)。 */
+function streamingPartial(session: unknown, sessionId: string): { text: string; thinking: string } | undefined {
+  const live = session as { sessionId?: string; state?: { streamingMessage?: { content?: unknown } } } | undefined;
+  if (live?.sessionId !== sessionId) return undefined;
+  const content = live.state?.streamingMessage?.content;
+  if (!Array.isArray(content)) return undefined;
+  let text = "";
+  let thinking = "";
+  for (const part of content as Array<{ type?: string; text?: string; thinking?: string }>) {
+    if (part?.type === "text" && typeof part.text === "string") text += part.text;
+    else if (part?.type === "thinking" && typeof part.thinking === "string") thinking += part.thinking;
+  }
+  return text || thinking ? { text, thinking } : undefined;
 }

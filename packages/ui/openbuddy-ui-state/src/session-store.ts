@@ -189,6 +189,9 @@ interface UiSessionState {
   /** 当前会话的回合阶段 —— 主进程状态机经 `pi://turn-state` 投影过来
    *  (计划 1.1),渲染层不自行推断。 */
   turnPhase: TurnPhase;
+  /** 主进程里正在跑回合的会话(含切到后台的,计划 0.3):侧栏据此给每个会话
+   *  打「正在生成」点。不随切换会话清空。 */
+  runningSessionIds: Readonly<Record<string, true>>;
   /** True while a switched-to session's history is being fetched. The chat
    *  shows a skeleton instead of the "start a new conversation" empty state,
    *  which used to flash on every session switch. */
@@ -318,6 +321,8 @@ interface UiSessionActions {
   streamingMessage: () => ChatMessage | null;
   /** 投影主进程的回合阶段(`pi://turn-state` / `agent:turn-state`)。 */
   setTurnPhase: (phase: TurnPhase) => void;
+  /** 记录任意会话的回合是否在跑(来自 `pi://turn-state`)。 */
+  setSessionRunning: (sessionId: string, running: boolean) => void;
 }
 
 let seq = 0;
@@ -514,6 +519,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
   // the legacy mirror stays in sync.
   streamState: INITIAL_STREAMING_STATE,
   turnPhase: "idle",
+  runningSessionIds: {},
   historyLoading: false,
   // Phase R3.0 — UI-level gate for destructive actions on optimistic
   // session ids. Populated by `beginPendingNewSession` (App.tsx) and
@@ -525,7 +531,9 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
 
   setSession: (id) => {
     discardStreamingBuffer();
-    set({ sessionId: id, error: null, messages: [], streamingMessageId: null, plan: null, streamState: INITIAL_STREAMING_STATE, turnPhase: "idle", historyLoading: false, toolCallIndex: new Map() });
+    // 切换会话不再先停掉正在跑的回合(它在主进程后台继续,计划 0.3):
+    // streaming 只属于前台会话,切过去时归零,由 reconcileTurnState 按目标会话校正。
+    set({ sessionId: id, error: null, messages: [], streamingMessageId: null, streaming: false, plan: null, streamState: INITIAL_STREAMING_STATE, turnPhase: "idle", historyLoading: false, toolCallIndex: new Map() });
   },
   setHistoryLoading: (historyLoading) => set({ historyLoading }),
   migrateSession: (oldId, newId) => {
@@ -594,6 +602,13 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
   setPlanMode: (planMode) => set({ planMode }),
 
   setTurnPhase: (turnPhase) => set((s) => (s.turnPhase === turnPhase ? s : { turnPhase })),
+  setSessionRunning: (sessionId, running) => set((s) => {
+    if (Boolean(s.runningSessionIds[sessionId]) === running) return s;
+    const next = { ...s.runningSessionIds };
+    if (running) next[sessionId] = true;
+    else delete next[sessionId];
+    return { runningSessionIds: next };
+  }),
 
   // R2 — defensive snapshot:
   // `Plan` object they passed in (e.g. for further mutations or to pass
@@ -844,7 +859,15 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
     set((s) => {
       const target = findFinalisableAssistant(s);
       if (!target) {
+        // 回合在第一个字之前就失败了(典型:429 / 鉴权 / 网络):还没有助手
+        // 气泡。补一条只带错误卡的回复,错误跟在那条提问下面,而不是只在
+        // 顶部横幅里说一句、提问孤零零挂着。
+        const last = s.messages[s.messages.length - 1];
+        const errorReply: ChatMessage[] = error && last?.role === "user"
+          ? [{ id: nextId(), role: "assistant", parts: [], complete: true, createdAt: Date.now(), completedAt: Date.now(), error }]
+          : [];
         return {
+          ...(errorReply.length > 0 ? { messages: [...s.messages, ...errorReply] } : {}),
           streamingMessageId: null,
           streamState: streamReducer(s.streamState, { type: "end" }),
         };

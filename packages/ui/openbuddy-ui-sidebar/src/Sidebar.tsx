@@ -821,7 +821,7 @@ export const SessionRow = memo(function SessionRow({
         (pinned ? " sidebar__conv--pinned" : "") +
         (archived ? " sidebar__conv--archived" : "") +
         (isSelected ? " sidebar__conv--selected" : "") +
-        (isCurrent && isStreaming ? " sidebar__conv--streaming" : "")
+        (isStreaming ? " sidebar__conv--streaming" : "")
       }
       // 行本身是一个 role="button" 容器而不是原生 <button>:行尾挂着
       // 更多/归档/置顶三个真按钮，原生 button 里再套 button 是非法 HTML，
@@ -853,7 +853,7 @@ export const SessionRow = memo(function SessionRow({
       onContextMenu={(e) => e.preventDefault()}
       title={title}
     >
-      {isCurrent && isStreaming && (
+      {isStreaming && (
         <span className="sidebar__conv-status-dot" aria-label="正在生成" />
       )}
       <span className="sidebar__conv-title">{title}</span>
@@ -1001,6 +1001,8 @@ export function Sidebar({
   // streaming boolean from session-store (already kept in sync with the
   // agent phase machine), so this is a free selector.
   const streaming = useSessionStore((s) => s.streaming);
+  // 切到后台继续生成的会话也要看得出来(计划 0.3)。
+  const runningSessionIds = useSessionStore((s) => s.runningSessionIds);
   const upsertSession = useSessionsStore((s) => s.upsert);
   const removeSession = useSessionsStore((s) => s.remove);
   const setTasksOpen = useSessionsStore((s) => s.setTasksOpen);
@@ -1453,7 +1455,7 @@ export function Sidebar({
       // R8.17 — pass through the streaming flag so the active row
       // can render the live-pulse dot. Cheap selector: only the focused
       // session's row changes when the flag flips.
-      isStreaming={s.sessionId === currentSessionId && streaming}
+      isStreaming={(s.sessionId === currentSessionId && streaming) || Boolean(runningSessionIds[s.sessionId])}
       onSelect={onSelect}
       onMenuFromButton={openMenuFromButton}
       onArchive={handleArchive}

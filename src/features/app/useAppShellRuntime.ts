@@ -887,8 +887,10 @@ export function useAppShellRuntime(): AppShellRuntime {
       .finally(() => { setSwitchingWorkspace((current) => (current === newCwd ? null : current)); });
   }, [sessionsStore, setToast]);
 
-  const handleNewSession = useCallback(() => { localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY); setPlaceholderView(null); sessionsStore.getState().setCurrent(null); }, [sessionsStore]);
-  const handleGoHome = useCallback(() => { localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY); setPlaceholderView(null); sessionsStore.getState().setCurrent(null); }, [sessionsStore]);
+  // 回到首页 / 新建任务时把前台会话也清掉:正在生成的回合在主进程后台继续
+  // (计划 0.3),而前台残留的 streaming 会让首页发送被当成"排队"吞掉。
+  const handleNewSession = useCallback(() => { localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY); setPlaceholderView(null); sessionsStore.getState().setCurrent(null); sessionStore.getState().setSession(null); }, [sessionStore, sessionsStore]);
+  const handleGoHome = handleNewSession;
 
   const handleToggleWorkspace = useCallback(async (cwd: string, next: boolean) => {
     sessionsStore.getState().setExpanded(cwd, next);
@@ -899,10 +901,12 @@ export function useAppShellRuntime(): AppShellRuntime {
   }, [sessionsStore, showToast]);
 
   const handleSelectSession = useCallback(async (sessionId: string, sessionCwd?: string) => {
-    // 宿主同一时刻只有一个活动会话:载入别的会话会中止正在运行的回合。
-    // 以前是静默中止;现在先说清楚,确认后走正常的停止流程再切换。
+    // 同一工作区内切换:正在生成的回合转到主进程后台继续跑完(计划 0.3),
+    // 侧栏保留「正在生成」点,切回来接着看。跨工作区要整体重建宿主,后台
+    // 会话保不住,仍先说清楚、确认后走正常的停止流程再切换。
     const live = sessionStore.getState();
-    if (live.streaming && live.sessionId && live.sessionId !== sessionId) {
+    const crossesWorkspace = Boolean(sessionCwd) && sessionCwd !== cwdRef.current;
+    if (crossesWorkspace && live.streaming && live.sessionId && live.sessionId !== sessionId) {
       const ok = await confirm("当前回复仍在生成，切换会话将停止它。", {
         tone: "warning",
         confirmLabel: "停止并切换",

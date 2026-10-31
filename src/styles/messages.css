@@ -2012,3 +2012,9 @@ button.diff__path {
   margin-top: 0;
   margin-bottom: 4px;
 }
+
+/* §21 — 元信息并入操作行:跟随操作行一起显隐,紧跟在按钮后面。 */
+.msg__footer .msg__meta {
+  margin: 0 0 0 6px;
+  opacity: 1;
+}

@@ -190,3 +190,22 @@ describe("loadHistoryMessages — orphan sweep", () => {
     expect(useSessionStore.getState().messages).toHaveLength(0);
   });
 });
+describe("abandonStreamingMessage — 第一个字之前就失败(§21)", () => {
+  it("还没有助手气泡时补一条只带错误卡的回复,紧跟在提问下面", () => {
+    useSessionStore.getState().setSession("s1");
+    useSessionStore.getState().pushOptimisticUser("RATE 测试");
+    useSessionStore.getState().abandonStreamingMessage("turn-error", { message: "429 rate limit", code: "rate_limit_error" });
+    const msgs = useSessionStore.getState().messages;
+    const last = msgs[msgs.length - 1];
+    expect(last?.role).toBe("assistant");
+    expect(last?.complete).toBe(true);
+    expect(last?.error).toEqual({ message: "429 rate limit", code: "rate_limit_error" });
+  });
+
+  it("没有错误信息(用户停止 / 看门狗)时不凭空造气泡", () => {
+    useSessionStore.getState().setSession("s1");
+    useSessionStore.getState().pushOptimisticUser("你好");
+    useSessionStore.getState().abandonStreamingMessage("用户取消");
+    expect(useSessionStore.getState().messages.map((m) => m.role)).toEqual(["user"]);
+  });
+});
