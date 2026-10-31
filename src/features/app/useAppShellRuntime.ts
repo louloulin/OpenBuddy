@@ -22,6 +22,7 @@ import {
   piCreateWorkspace,
   providersList,
   flattenModels,
+  providersDeleteModel,
   agentCurrentModel,
   agentOnPiTelemetryEvent,
   agentSessionMessages,
@@ -41,7 +42,7 @@ import { useAgentSession } from "@/hooks/useAgentSession";
 import { useOptimisticNewSession } from "@/hooks/useOptimisticNewSession";
 import { newSessionFlow, composeDiscoverBody } from "@/lib/agent/new-session-flow";
 import { abandonInFlightStream } from "@/lib/agent/abandon-stream";
-import { listenSafe, isElectronBridgeUnavailable, getElectronBridgeStatus } from "@/lib/platform/electron-api";
+import { listenSafe, isElectronBridgeUnavailable, getElectronBridgeStatus, confirm } from "@/lib/platform/electron-api";
 import { friendlyError } from "@/lib/platform/error-format";
 import { shortModelLabel } from "@/lib/ui/timeline-utils";
 // R48 — 登录编排整体搬进 `overlay.sign-in` 对话框(CasdoorSignInDialog),
@@ -842,6 +843,29 @@ export function useAppShellRuntime(): AppShellRuntime {
     void applyModelSwitch(pending.modelId);
   }, [applyModelSwitch, currentSessionId, streaming]);
 
+  // plan1030 §5.2.1 — 对话内删除模型。picker 传来的 id 是 `provider/modelId`
+  // 规范形(flattenModels 的输出);宿主 deleteModel 后会自动把 active 模型
+  // 迁移到同 provider 的其他模型(restoreActiveModelAfterMutation),渲染端
+  // 只需刷新列表 —— refreshModels 内部会把失效的 currentModelId 重置为第一项。
+  const handleModelDelete = useCallback(async (modelId: string) => {
+    const separator = modelId.indexOf("/");
+    if (separator <= 0) {
+      showToast(`无法删除 ${shortModelLabel(modelId) || modelId}：缺少 provider 信息`);
+      return;
+    }
+    const providerId = modelId.slice(0, separator);
+    const bareModelId = modelId.slice(separator + 1);
+    const label = shortModelLabel(modelId) || modelId;
+    if (!await confirm(`删除模型「${label}」？`, { tone: "danger", confirmLabel: "删除" })) return;
+    try {
+      await providersDeleteModel(providerId, bareModelId);
+      showToast(`已删除 ${label}`);
+      await refreshModelsRef.current();
+    } catch (error) {
+      showToast(`删除失败：${friendlyError(error)}`);
+    }
+  }, [showToast]);
+
   const handleSelectWorkspace = useCallback((newCwd: string) => {
     cwdRef.current = newCwd;
     setSwitchingWorkspace(newCwd);
@@ -1014,7 +1038,7 @@ export function useAppShellRuntime(): AppShellRuntime {
     openSettings, openAccountSettings, handleLogin, handleLogout, showToast, setToast,
     handleNavigate, handleGoHome, handleNewSession, handlePlaceholder, handleOpenProjectFromSidebar,
     handleSendNew, handleSendCurrent, handleSendContent, handleCancel,
-    handleSelectSession, handleToggleWorkspace, handleRenameTitle, handleModelChange, handleSelectWorkspace,
+    handleSelectSession, handleToggleWorkspace, handleRenameTitle, handleModelChange, handleModelDelete, handleSelectWorkspace,
     handleRewound, handleForked, handleStartWithExpert, handleLaunchDiscover, handleStartProject,
     handleStartProjectConversation, handleSelectEmailFromSearch, handleSelectKnowledgeFromSearch,
     refreshModels, sessionEvents,

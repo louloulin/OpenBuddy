@@ -173,7 +173,7 @@ export function ModelSelector({
   const typeaheadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLUListElement>(null);
+  const menuRef = useRef<HTMLUListElement | null>(null);
   // portal 菜单的 fixed 定位锚点:打开时对 trigger 取一次视口坐标。
   const [anchor, setAnchor] = useState<{ bottom: number; right: number } | null>(null);
 
@@ -436,6 +436,11 @@ export function ModelSelector({
                   (isFocused ? " model-selector__item--focused" : "")
                 }
                 onMouseEnter={() => setActiveIndex(idx)}
+                // plan1030 真机(1031):320px 菜单里 label + 协议徽章 + 能力徽章
+                // + 完整 provider id + 删除钮 + ✓ 的固定内容超出行宽,长 id 把
+                // 标签挤到 6px。id 与 label 高度重复,挪到行 title 提示,
+                // 行内不再渲染 —— 档位行的 item-id(说明文案)保留。
+                title={`${m.label || m.id}（${m.id}）`}
               >
                 <span className="model-selector__item-label">{m.label || m.id}</span>
                 {apiBackendLabel(m.apiBackend) && (
@@ -459,7 +464,6 @@ export function ModelSelector({
                     </span>
                   );
                 })}
-                <span className="model-selector__item-id">{m.id}</span>
                 {hasDelete && (
                   <button
                     type="button"

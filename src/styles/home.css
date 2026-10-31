@@ -537,9 +537,13 @@
   box-shadow: var(--wb-shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.16));
   z-index: 50;
 }
-/* Model selector 在 footer 右侧,菜单向左对齐避免溢出右边 */
+/* Model selector 在 footer 右侧,菜单向左对齐避免溢出右边。
+ * 400px:行内固定内容(协议徽章 ~118 + 3 能力徽章 ~93 + 删除 17 + ✓ 14
+ * + 间距 48 ≈ 290)之外还要给模型名留可读宽度 —— 320px 会把标签挤成省略号
+ * (plan1030 真机 1031 实测 labelW≈6px)。 */
 .model-selector__menu {
   right: 0;
+  max-width: 400px;
 }
 /* Workspace picker 在 meta 行左侧,菜单向右对齐避免溢出左边被裁剪 */
 .workspace-picker__menu {
@@ -615,7 +619,12 @@
 .model-selector__item-label {
   font-size: 13px;
   color: var(--wb-text-strong);
-  flex-shrink: 0;
+  /* plan1030 真机:长模型名(MiniMax-M2.7-highspeed)不许把协议/能力徽章
+   * 顶出 320px 菜单右缘被 ul 的 overflow 裁掉 —— 标签自己收缩出省略号。 */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .model-selector__item-protocol {
   display: inline-flex;
@@ -707,17 +716,17 @@
   flex-shrink: 0;
 }
 /* plan1030 §5.2.1 — 行级删除按钮:悬停行/键盘聚焦行时显现,避免误触;
-   删除语义用危险色。 */
+   删除语义用危险色。视觉契约(§6):只走 token,不写裸值。 */
 .model-selector__item-delete {
   appearance: none;
   border: none;
   background: transparent;
-  color: var(--wb-text-tertiary, rgba(0, 0, 0, 0.4));
+  color: var(--wb-text-tertiary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--wb-radius-sm);
   cursor: pointer;
   flex-shrink: 0;
   opacity: 0;
@@ -729,11 +738,11 @@
   opacity: 1;
 }
 .model-selector__item-delete:hover {
-  color: var(--wb-color-danger, #d92d20);
-  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.04));
+  color: var(--wb-button-danger-fg);
+  background: var(--wb-bg-hover);
 }
 .model-selector__item-delete:focus-visible {
-  outline: 2px solid var(--wb-color-text-brand-default, #4f8cff);
+  outline: 2px solid var(--wb-color-text-brand-default);
   outline-offset: -2px;
 }
 .workspace-picker__item-name {

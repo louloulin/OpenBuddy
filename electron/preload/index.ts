@@ -96,7 +96,12 @@ const allowedInvokeChannels = new Set([
   "folder-trust:grant", "folder-trust:is-trusted", "folder-trust:list", "folder-trust:revoke", "folder_trust_respond",
   "notify:dispatch", "policy:get", "policy:save",
   "app:auto-update-state", "app:check-updates", "app:install-updates", "storage-sources:list", "storage-sources:save", "task_kill", "tasks:add", "tasks:clear-completed", "tasks:delete", "tasks:list", "tasks:update",
-  "memory:add", "memory:delete", "memory:list", "memory:update",
+  // 本地记忆存储(memory-store:*)+ pi-hermes-memory 保留名守卫桩(memory:*)
+  // ——后者在主进程一律以所有权错误拒绝(surface-regression memory 契约),
+  // 留在 allowlist 里是为了让调用打到守卫桩,而不是被 preload 拦成
+  // "invalid IPC channel"(那样守卫语义就不可见了)。
+  "memory-store:add", "memory-store:delete", "memory-store:list", "memory-store:update",
+  "memory:delete", "memory:get", "memory:list", "memory:rewrite", "memory:save",
   // P0.8/P1 数据备份/恢复(数据§7)
   "storage:backup-create", "storage:backup-restore",
   "terminal:create", "terminal:input", "terminal:kill", "terminal:resize",
