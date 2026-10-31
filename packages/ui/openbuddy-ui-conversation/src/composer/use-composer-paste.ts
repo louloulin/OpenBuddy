@@ -1,29 +1,13 @@
 /**
  * useComposerPaste — owns the textarea's `onPaste` callback.
  *
- * Two paths:
- *   1. Clipboard contains a file (image/* or document/* per
- *      `readImageFile`'s whitelist):
- *      - Read the file via `readImageFile(file, onToast)`.
- *      - Push into the images state (image attachments).
- *      - For image (kind !== "file") also synthesize a Markdown
- *        placeholder so the user sees a marker in the textarea.
- *      - Documents ship through `piSendContent` as `type:"file"` parts
- *        without an inline placeholder.
- *   2. Clipboard contains text:
- *      - Prefer Electron's native `clipboard.readText` (so cross-platform
- *        variants of "rich-text-as-plain-text" work); fall back to
- *      `event.clipboardData.getData("text/plain")`.
- *      - Insert at the caret (selectionStart/selectionEnd), restore focus
- *        + caret on next frame.
- *
- * Why a hook (not inline in Composer):
- *   - Composer.tsx is 700+ lines already and the onPaste block alone is
- *     ~80 lines; lifting it out drops Composer by a comparable amount
- *     and lets us unit-test the paste branch directly (planned).
- *   - Both inputs (`text`, `setImages`, `updateText`, `setCursorPos`,
- *     `ref`) are already stabilized by Composer's useCallback / useState,
- *     so wiring through them as props is cheap.
+ *   1. Clipboard contains a file (image/* or a supported document):
+ *      read it and add it as an attachment chip. Nothing is written into the
+ *      prompt text (this used to inject a literal `![pasted image]()`).
+ *   2. Text: prefer Electron's `clipboard.readText` (keeps very large pastes
+ *      intact), falling back to the DOM text. The result is spliced into the
+ *      textarea's live value and selection — the old path spliced into a
+ *      render-time snapshot and dropped keystrokes typed during the IPC read.
  */
 import { useCallback, type ClipboardEvent, type RefObject } from "react";
 import type { ImageAttachment } from "./types";
@@ -70,35 +54,22 @@ export function useComposerPaste({
         const file = fileItem.getAsFile();
         if (!file) return;
         void readImageFile(file, onToast).then((att) => {
-          if (!att) return;
-          setImages((prev) => [...prev, att]);
-          if (att.kind !== "file") {
-            const ph = att.name ? `![pasted image: ${att.name}]()` : "![pasted image]()";
-            const start = ref.current?.selectionStart ?? text.length;
-            const end = ref.current?.selectionEnd ?? text.length;
-            const next = text.slice(0, start) + ph + text.slice(end);
-            updateText(next);
-            const caret = start + ph.length;
-            setCursorPos(caret);
-            requestAnimationFrame(() => {
-              if (ref.current) {
-                ref.current.focus();
-                ref.current.selectionStart = ref.current.selectionEnd = caret;
-              }
-            });
-          }
+          if (att) setImages((prev) => [...prev, att]);
         });
         return;
       }
-      const eventText = e.clipboardData.getData("text/plain");
-      const el = e.currentTarget;
-      const start = el.selectionStart ?? text.length;
-      const end = el.selectionEnd ?? text.length;
+      const domText = e.clipboardData.getData("text/plain");
+      const nativeReadText = electronApi?.clipboard?.readText;
+      if (!domText && typeof nativeReadText !== "function") return;
       e.preventDefault();
+      // Splice into the live value/selection, not the render-time snapshot,
+      // so keystrokes typed while the IPC read is in flight are kept.
       const insert = (pasted: string) => {
-        if (pasted.length === 0) return;
-        const next = text.slice(0, start) + pasted + text.slice(end);
-        updateText(next);
+        const el = ref.current;
+        const current = el?.value ?? text;
+        const start = el?.selectionStart ?? current.length;
+        const end = el?.selectionEnd ?? current.length;
+        updateText(current.slice(0, start) + pasted + current.slice(end));
         const caret = start + pasted.length;
         setCursorPos(caret);
         requestAnimationFrame(() => {
@@ -108,14 +79,16 @@ export function useComposerPaste({
           }
         });
       };
-      const nativeReadText = electronApi?.clipboard?.readText;
       if (typeof nativeReadText !== "function") {
-        insert(eventText);
+        insert(domText);
         return;
       }
+      // Electron's clipboard keeps very large text intact; DOM text is the fallback.
       void nativeReadText()
-        .then((nativeText) => insert(nativeText || eventText))
-        .catch(() => insert(eventText));
+        .then((pasted) => insert(pasted || domText))
+        .catch(() => {
+          if (domText) insert(domText);
+        });
     },
     [ref, text, setImages, updateText, setCursorPos, onToast, electronApi],
   );

@@ -101,7 +101,11 @@ describe("StreamingMarkdown — inline rendering (R57)", () => {
     const { container } = render(
       <StreamingMarkdown text={"```ts\nconst x = 1;\n```"} />,
     );
-    expect(container.querySelector(".streaming-code-stub")).toBeTruthy();
+    const stub = container.querySelector(".streaming-code-stub");
+    expect(stub).toBeTruthy();
+    // Same frame as the final code block, so completion does not jump.
+    expect(stub?.querySelector(".md-code-container .md-code-header .md-code-lang")?.textContent).toBe("ts");
+    expect(stub?.querySelector("pre > code")?.textContent).toContain("const x = 1;");
   });
 
   it("memoization skips re-render for unchanged text", () => {
@@ -131,14 +135,19 @@ describe("StreamingMarkdown — inline image (R60)", () => {
     ]);
   });
 
-  it("renders .streaming-inline-image span", () => {
+  it("renders the real image while streaming (no text placeholder to swap)", () => {
     const { container } = render(
       <StreamingMarkdown text={"see ![map](https://cdn.example.com/map.png)"} />,
     );
-    const img = container.querySelector(".streaming-inline-image");
+    const img = container.querySelector("img.streaming-inline-image");
     expect(img).toBeTruthy();
-    expect(img?.getAttribute("data-alt")).toBe("map");
-    expect(img?.getAttribute("data-src")).toBe("https://cdn.example.com/map.png");
+    expect(img?.getAttribute("alt")).toBe("map");
+    expect(img?.getAttribute("src")).toBe("https://cdn.example.com/map.png");
+  });
+
+  it("does not load non-web image URLs while streaming", () => {
+    const { container } = render(<StreamingMarkdown text={"![x](javascript:alert(1))"} />);
+    expect(container.querySelector("img")).toBeNull();
   });
 
   it("does not treat plain link [text](url) as image", () => {

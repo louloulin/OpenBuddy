@@ -11,7 +11,7 @@
  *   - Pi reload 失败横幅
  *   - Composer(走 `ConversationComposer` 槽)
  */
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
 import { PauseIcon } from "@openbuddy/ui-primitives/icons";
 import { ConversationApprovals } from "../conversation-approvals";
@@ -47,9 +47,29 @@ export type ChatViewFooterProps = {
   onSend: (text: string) => void;
 };
 
-export function ChatViewFooter(props: ChatViewFooterProps) {
+function subscribeOnline(onChange: () => void): () => void {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
+}
 
-  const locale = useLocale();  const composerFallback = props.composerFallback ?? (
+/** Browser connectivity — the chat says so up front instead of only after a failed turn. */
+function useOnline(): boolean {
+  return useSyncExternalStore(
+    subscribeOnline,
+    () => (typeof navigator === "undefined" ? true : navigator.onLine !== false),
+    () => true,
+  );
+}
+
+export function ChatViewFooter(props: ChatViewFooterProps) {
+  const online = useOnline();
+
+  const locale = useLocale();
+  const composerFallback = props.composerFallback ?? (
     <Composer {...props.composerProps} />
   );
   return (
@@ -66,6 +86,11 @@ export function ChatViewFooter(props: ChatViewFooterProps) {
       {/* C1 dock 外壳:Notices(RewindBar / 队列 / 桥失败横幅)与 Composer
           同住一个圆角容器 —— 对齐 Claude ChatComposerDock 的插槽结构。 */}
       <div className="chat-dock">
+      {!online && (
+        <div className="yield-banner chatview__offline-banner" role="status" data-testid="offline-banner">
+          <span>{locale.t("chat.footer.offline")}</span>
+        </div>
+      )}
       {props.yielded && (
         <div className="yield-banner" role="status">
           <span>{locale.t("chat.footer.yieldBanner")}</span>

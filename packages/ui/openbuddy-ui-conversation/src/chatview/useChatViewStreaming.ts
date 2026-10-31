@@ -31,6 +31,9 @@ export type UseChatViewStreamingParams = {
 
 export type UseChatViewStreamingResult = {
   turnStartRef: RefObject<number | null>;
+  /** True once the user has scrolled away from the bottom — drives the
+   *  "jump to bottom" button even when nothing new has arrived. */
+  awayFromBottom: boolean;
   unreadCount: number;
   setUnreadCount: (n: number) => void;
   pinnedRef: RefObject<boolean>;
@@ -51,9 +54,16 @@ export function useChatViewStreaming({
   const userScrolledRef = useRef(false);
   const programmaticScrollTopRef = useRef<number | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [awayFromBottom, setAwayFromBottom] = useState(false);
+  // Unread counts new *messages*, not re-renders: a streaming reply changes
+  // `messages` every frame and used to tick the badge up dozens of times.
+  const lastLengthRef = useRef(Array.isArray(messages) ? messages.length : 0);
 
   const autoScrollToBottom = (el: HTMLElement) => {
-    programmaticScrollTopRef.current = el.scrollHeight;
+    // Record the position the browser will actually land on (scrollTop is
+    // clamped to scrollHeight - clientHeight). Comparing against scrollHeight
+    // never matched, so every auto-scroll was mistaken for a user scroll.
+    programmaticScrollTopRef.current = Math.max(0, el.scrollHeight - el.clientHeight);
     el.scrollTop = el.scrollHeight;
   };
 
@@ -83,12 +93,13 @@ export function useChatViewStreaming({
       // 程序自己的自动跳转也不是(ignoreNextScrollRef 标记的那次)。
       if (cause === "scroll") {
         const programmatic = programmaticScrollTopRef.current !== null
-          && el.scrollTop === programmaticScrollTopRef.current;
+          && Math.abs(el.scrollTop - programmaticScrollTopRef.current) <= 1;
         if (!programmatic) userScrolledRef.current = true;
         programmaticScrollTopRef.current = null;
       }
       pinnedRef.current =
         el.scrollHeight - el.scrollTop - el.clientHeight <= PIN_THRESHOLD;
+      setAwayFromBottom(!pinnedRef.current && userScrolledRef.current);
       if (pinnedRef.current) setUnreadCount(0);
     };
     const onScroll = () => recomputePinned("scroll");
@@ -112,6 +123,9 @@ export function useChatViewStreaming({
     // 没有真正溢出的内容(空会话/内容不足一屏)时"下面"并不存在新消息:
     // 既不该滚动也不该累计未读 —— 否则空会话会挂出一个无处可跳的「↓1」徽标
     // 并压住空状态卡片(2026-10-12 真实启动截图发现)。
+    const length = Array.isArray(messages) ? messages.length : 0;
+    const added = Math.max(0, length - lastLengthRef.current);
+    lastLengthRef.current = length;
     const scrollable = el.scrollHeight - el.clientHeight > PIN_THRESHOLD;
     if (!scrollable) {
       setUnreadCount(0);
@@ -123,21 +137,27 @@ export function useChatViewStreaming({
       // 无处可跳的徽标并压住示例卡片)。用户滚过之后再离开末尾才累计未读。
       autoScrollToBottom(el);
       if (!userScrolledRef.current) setUnreadCount(0);
-    } else {
-      setUnreadCount((c) => c + 1);
+    } else if (added > 0) {
+      setUnreadCount((c) => c + added);
     }
   }, [messages, scrollRef]);
 
   const handleJumpToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    autoScrollToBottom(el);
+    // Smooth when the browser supports it; the follow logic re-pins either way.
+    programmaticScrollTopRef.current = Math.max(0, el.scrollHeight - el.clientHeight);
+    if (typeof el.scrollTo === "function") el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    else el.scrollTop = el.scrollHeight;
     pinnedRef.current = true;
+    userScrolledRef.current = false;
+    setAwayFromBottom(false);
     setUnreadCount(0);
   }, [scrollRef]);
 
   return {
     turnStartRef,
+    awayFromBottom,
     unreadCount,
     setUnreadCount,
     pinnedRef,

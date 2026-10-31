@@ -132,6 +132,31 @@ function fmtDuration(ms?: number): string {
   return rs > 0 ? `${m}分${rs}秒` : `${m}分钟`;
 }
 
+const AUTH_MSG = "API 认证失败。请检查 Settings 中的 API Key 配置是否正确。";
+const RATE_MSG = "API 速率限制已触发。请等待 1-2 分钟后重试。";
+const NETWORK_MSG = "网络连接失败。请检查网络/代理设置，确认 API endpoint 可达。";
+const BALANCE_MSG = "模型服务账户余额不足（402）。请前往服务商控制台充值后重试。";
+const CONTEXT_MSG = "⚠️ 上下文超出模型限制。请新建会话或缩短对话后重试。";
+
+/** Context-window overflow phrasing across providers. */
+const CONTEXT_OVERFLOW_RE = /context(?:[ _]length|[ _]window)|maximum context|too many tokens|prompt is too long|input is too long/i;
+
+/**
+ * Map an HTTP status (from a provider error) to a user-facing message.
+ * Returns null for statuses without a specific remedy.
+ */
+function messageForStatus(status: number, detail: string): string | null {
+  if (status === 401 || status === 403) return AUTH_MSG;
+  if (status === 402) return BALANCE_MSG;
+  if (status === 404) return `⚠️ 模型或接口不存在（404）。请在 Settings → 模型 中检查模型 ID 与 Base URL。${detail ? `\n${detail}` : ""}`;
+  if (status === 408 || status === 504) return "模型服务响应超时。请稍后重试，或检查网络与代理。";
+  if (status === 413 || (status === 400 && CONTEXT_OVERFLOW_RE.test(detail))) return CONTEXT_MSG;
+  if (status === 429) return RATE_MSG;
+  if (status === 529 || /overloaded/i.test(detail)) return "模型服务当前过载（529）。请稍后重试或切换模型。";
+  if (status >= 500 && status < 600) return `模型服务暂时不可用（${status}）。请稍后重试或切换模型。`;
+  return null;
+}
+
 /**
  * Format a pi error into a user-friendly Chinese string.
  * Returns null if the error can't be parsed (caller should fall back to raw).
@@ -166,8 +191,10 @@ export function formatPiError(raw: string): string | null {
           emsg.toLowerCase().includes("insufficient balance") ||
           providerJsonMatch[1] === "402"
         ) {
-          return "模型服务账户余额不足（402）。请前往服务商控制台充值后重试。";
+          return BALANCE_MSG;
         }
+        const byStatus = messageForStatus(Number(providerJsonMatch[1]), `${etype} ${emsg}`.trim());
+        if (byStatus) return byStatus;
         if (emsg) {
           return `⚠️ ${emsg}${etype ? `（${etype}）` : ""}`;
         }
@@ -182,12 +209,22 @@ export function formatPiError(raw: string): string | null {
   // If structured parsing failed, check raw string for known patterns.
   if (!parsed) {
     const lower = cleaned.toLowerCase();
+    if (lower.includes("insufficient balance") || lower.includes("insufficient_balance")) return BALANCE_MSG;
+    if (CONTEXT_OVERFLOW_RE.test(cleaned)) return CONTEXT_MSG;
+    // A leading / standalone HTTP status ("429 Too Many Requests", "status 503").
+    // Whole-word match only — a bare substring test turned "port 4012" into an
+    // auth error.
+    const statusMatch = cleaned.match(/(?:^|\bstatus(?: code)?:?\s*|\bHTTP\s*)(\d{3})\b/i);
+    if (statusMatch) {
+      const byStatus = messageForStatus(Number(statusMatch[1]), cleaned);
+      if (byStatus) return byStatus;
+    }
     if (
-      lower.includes("401") ||
+      /\b401\b/.test(cleaned) ||
       lower.includes("unauthorized") ||
       lower.includes("invalid api key")
     ) {
-      return "API 认证失败。请检查 Settings 中的 API Key 配置是否正确。";
+      return AUTH_MSG;
     }
     if (
       lower.includes("no api key") ||
@@ -204,12 +241,11 @@ export function formatPiError(raw: string): string | null {
     ) {
       return "网络连接失败。请检查网络/代理设置，确认 API endpoint 可达。";
     }
-    if (lower.includes("429") || lower.includes("rate limit")) {
-      return "API 速率限制已触发。请等待 1-2 分钟后重试。";
+    if (/\b429\b/.test(cleaned) || lower.includes("rate limit") || lower.includes("rate_limit")) {
+      return RATE_MSG;
     }
-    if (lower.includes("insufficient balance") || lower.includes("insufficient_balance") || lower.includes("402")) {
-      return "模型服务账户余额不足（402）。请前往服务商控制台充值后重试。";
-    }
+    if (/\b402\b/.test(cleaned)) return BALANCE_MSG;
+    if (lower.includes("overloaded")) return messageForStatus(529, cleaned);
     // Show the cleaned inner message instead of the raw IPC wrapper.
     return cleaned ? `⚠️ ${cleaned}` : null;
   }

@@ -279,7 +279,9 @@
       "resumeContinueTitle": "Resume and send \"please continue\" so the agent keeps going",
       "resumeContinue": "Resume & continue",
       "pauseTitle": "Pause generation (session kept, resumable)",
-      "pause": "Pause"
+      "pause": "Pause",
+      "offline": "You are offline — the chat will be ready again once the connection is back.",
+      "historyLoading": "Loading conversation"
     },
     "tool": {
       "collapse": "Collapse",

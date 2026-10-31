@@ -903,6 +903,7 @@ export function useAppShellRuntime(): AppShellRuntime {
     setPlaceholderView(null);
     sessionsStore.getState().setCurrent(sessionId);
     sessionStore.getState().setSession(sessionId);
+    sessionStore.getState().setHistoryLoading(true);
     try {
       await piLoadSession(sessionId, sessionCwd ?? "");
       const entries = await agentSessionMessages(sessionId);
@@ -910,6 +911,9 @@ export function useAppShellRuntime(): AppShellRuntime {
       useSessionStore.getState().loadHistoryMessages(sessionId, history as unknown as import("@/stores/session-store").ChatMessage[]);
       await syncCurrentModelFromHost();
     } catch (e) { sessionStore.getState().setError(friendlyError(e)); }
+    finally {
+      if (sessionStore.getState().sessionId === sessionId) sessionStore.getState().setHistoryLoading(false);
+    }
   }, [sessionStore, sessionsStore, syncCurrentModelFromHost, handleCancel]);
 
   const handleRewound = useCallback(async () => {

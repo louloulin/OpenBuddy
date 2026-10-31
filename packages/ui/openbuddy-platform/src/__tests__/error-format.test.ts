@@ -38,4 +38,22 @@ describe("formatPiError 提供商 JSON（plan1030 真机回归）", () => {
   it("402 裸字符串（无 JSON）也映射为余额文案", () => {
     expect(formatPiError("Error: 402 insufficient balance")).toContain("余额不足");
   });
+
+  // 20261031 Phase 1.8 — 按 HTTP 状态统一分类,状态码整词匹配。
+  it.each([
+    ['429 {"type":"error","error":{"type":"rate_limit_error","message":"slow down"}}', "速率限制"],
+    ['401 {"type":"error","error":{"type":"authentication_error","message":"bad key"}}', "认证失败"],
+    ['529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}', "过载"],
+    ['503 {"type":"error","error":{"type":"api_error","message":"upstream down"}}', "暂时不可用（503）"],
+    ['404 {"type":"error","error":{"type":"not_found_error","message":"model: foo"}}', "不存在（404）"],
+    ["429 Too Many Requests", "速率限制"],
+    ["prompt is too long: 210000 tokens > 200000 maximum", "上下文超出"],
+    ["Request failed with status code 502", "暂时不可用（502）"],
+  ])("maps %s", (raw, expected) => {
+    expect(formatPiError(raw)).toContain(expected);
+  });
+
+  it("不把普通数字子串误判为状态码", () => {
+    expect(formatPiError("listen on port 4012 failed")).not.toContain("认证失败");
+  });
 });

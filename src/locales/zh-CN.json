@@ -279,7 +279,9 @@
       "resumeContinueTitle": "恢复并发送「请继续」让 agent 接着生成",
       "resumeContinue": "恢复并继续",
       "pauseTitle": "暂停生成（保留会话，可继续）",
-      "pause": "暂停"
+      "pause": "暂停",
+      "offline": "网络已断开 —— 恢复连接后即可继续对话。",
+      "historyLoading": "正在加载对话"
     },
     "tool": {
       "collapse": "折叠",

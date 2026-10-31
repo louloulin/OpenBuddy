@@ -256,5 +256,14 @@ export function registerAutomationIpc(deps: AutomationIpcDeps): void {
 
   startAutomationScheduler(async (automation, runId) => {
     await executeAutomation(automation, runId);
-  }, { isBusy: () => agentHost.getSession()?.isStreaming === true });
+  }, {
+    isBusy: () => {
+      // Host still loading → skip this scan; the next 30s tick retries.
+      try {
+        return agentHost.getSession()?.isStreaming === true;
+      } catch {
+        return true;
+      }
+    },
+  });
 }

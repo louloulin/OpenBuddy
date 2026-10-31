@@ -4,6 +4,7 @@ import type {
   ExtensionCommandContext,
   ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
+import { Type } from "@earendil-works/pi-ai";
 
 export type PiPlanState = {
   enabled: boolean;
@@ -99,6 +100,33 @@ export function createPiPlanModeExtension(options: PiPlanModeOptions): Extension
     pi.registerCommand("plan", {
       description: "Inspect or change Pi plan mode.",
       handler: (args, context) => handlePlanCommand(args, context, options),
+    });
+    // The plan-mode policy tells the model to call `exit_plan_mode`; this is
+    // that tool. It stores the plan in the shared controller (the plan panel
+    // renders it) and leaves approval to the user — previously the name the
+    // model was told to call did not exist at all.
+    if (typeof (pi as { registerTool?: unknown }).registerTool !== "function") return;
+    pi.registerTool({
+      name: "exit_plan_mode",
+      label: "Submit plan",
+      description: "Plan mode only: submit the finished Markdown plan for the user to review and approve. Do not start executing until the user approves.",
+      parameters: Type.Object({ plan: Type.String({ description: "The complete plan in Markdown" }) }),
+      execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+        const plan = String((params as { plan?: unknown } | undefined)?.plan ?? "").trim();
+        const controller = options.resolveController();
+        const sessionId = (ctx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.();
+        if (!plan || !controller || !sessionId) {
+          return {
+            content: [{ type: "text" as const, text: plan ? "Plan service is unavailable; present the plan in your reply instead." : "plan must not be empty" }],
+            details: { submitted: false },
+          };
+        }
+        await controller.setPlan(sessionId, plan);
+        return {
+          content: [{ type: "text" as const, text: "Plan submitted. Stop here and wait for the user to approve or request changes." }],
+          details: { submitted: true },
+        };
+      },
     });
   };
 }

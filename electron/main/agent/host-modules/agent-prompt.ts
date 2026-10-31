@@ -197,7 +197,7 @@ async function promptContent(
         });
       } catch {
         docBlocks.push(
-          `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(PDF text extraction failed; attachment kept in composer)\n</document-binary>`,
+          `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(PDF text extraction failed — the content is not available to you; tell the user and ask for a text version if needed)\n</document-binary>`,
         );
       }
     } else if (DOCX_MIME.test(part.mediaType)) {
@@ -207,7 +207,7 @@ async function promptContent(
         );
         if (paragraphs.length === 0) {
           docBlocks.push(
-            `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(docx has no extractable paragraphs; attachment kept in composer)\n</document-binary>`,
+            `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(docx has no extractable paragraphs — the content is not available to you)\n</document-binary>`,
           );
         } else {
           paragraphs.forEach((paragraph) => {
@@ -218,7 +218,7 @@ async function promptContent(
         }
       } catch {
         docBlocks.push(
-          `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(docx text extraction failed; attachment kept in composer)\n</document-binary>`,
+          `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(docx text extraction failed — the content is not available to you; tell the user and ask for a text version if needed)\n</document-binary>`,
         );
       }
     } else if (TEXT_DOC_MIME.test(part.mediaType)) {

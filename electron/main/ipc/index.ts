@@ -746,12 +746,17 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		// Approvals and questions wait for the user — a 30 s auto-deny punished
 		// anyone who looked away. They settle via the UI, Stop (agent abort) or
 		// a runtime reload. Only fire-and-forget notifications get evicted.
+		// Event notifications (`session.event` / `plugin.event`, one per agent
+		// event — i.e. per streamed token) are fire-and-forget: no pending entry,
+		// no timer, no reply expected. Only interactions are tracked.
 		const interactive = method === "session.permission" || method === "session.question";
-		const timer = setTimeout(() => {
-			pendingServerRequests.delete(rpcId);
-		}, interactive ? 24 * 60 * 60_000 : 30_000);
-		timer.unref?.();
-		pendingServerRequests.set(rpcId, { method, timer });
+		if (interactive) {
+			const timer = setTimeout(() => {
+				pendingServerRequests.delete(rpcId);
+			}, 24 * 60 * 60_000);
+			timer.unref?.();
+			pendingServerRequests.set(rpcId, { method, timer });
+		}
 		sendSafe(win, "dsh://rpc", { type: "server-request", rpcId, method, payload });
 	};
 	const piStream = createPiStreamTransport({

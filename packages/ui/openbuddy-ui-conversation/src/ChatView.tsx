@@ -215,6 +215,7 @@ export function ChatView({
     messagesEqual,
   );
   const streaming = useSessionStore((s) => s.streaming);
+  const historyLoading = useSessionStore((s) => s.historyLoading);
   const streamingMessageId = useSessionStore((s) => s.streamingMessageId);
   const error = useSessionStore((s) => s.error);
   const plan = useSessionStore((s) => s.plan);
@@ -382,6 +383,7 @@ export function ChatView({
   // Plan5 Phase A.1 — Scroll / jump-to-bottom / unread-count 抽到 useChatViewStreaming。
   const {
     turnStartRef,
+    awayFromBottom,
     unreadCount,
     setUnreadCount,
     pinnedRef,
@@ -442,6 +444,7 @@ export function ChatView({
   const [planOpen, setPlanOpen] = useState(false);
   // 工具栏按钮定义在 useMemo 里,不能在那里调 hook —— 先在顶层取好文案。
   const terminalLabel = useT("chat.terminal.label");
+  const historyLoadingLabel = useT("chat.footer.historyLoading");
   const terminalDockTitle = useT("chat.terminal.dockTitle", { name: cwd ? cwd.split("/").pop() || cwd : "" });
   const terminalCloseLabel = useT("chat.terminal.close");
   const tasksBadgeLabel = useT("tasks.badge", {
@@ -1143,7 +1146,15 @@ export function ChatView({
             ) : null
           }
           emptyState={
-            <ChatViewEmptyState onPickPrompt={handleQuickPrompt} />
+            historyLoading ? (
+              <div className="chatview__history-skeleton" role="status" aria-label={historyLoadingLabel}>
+                <span className="chatview__skeleton-line chatview__skeleton-line--user" />
+                <span className="chatview__skeleton-line" />
+                <span className="chatview__skeleton-line chatview__skeleton-line--short" />
+              </div>
+            ) : (
+              <ChatViewEmptyState onPickPrompt={handleQuickPrompt} />
+            )
           }
           timelineList={
             <div ref={timelineRowsRef} className="chatview__timeline-rows">
@@ -1168,6 +1179,7 @@ export function ChatView({
             onOpenSession?: (sessionId: string, cwd?: string) => void | Promise<void>;
           }>}
           unreadCount={unreadCount}
+          awayFromBottom={awayFromBottom}
           onJumpToBottom={handleJumpToBottom}
         />
         {/* 阶段 1:终端 dock(VS Code 风格,底部 40% 高度)。

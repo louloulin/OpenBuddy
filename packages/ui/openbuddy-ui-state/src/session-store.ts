@@ -190,6 +190,10 @@ interface UiSessionState {
    *  Drives badges (`running 3 tools`, `awaiting model`) without forcing
    *  the UI to recompute from tool counts + streaming boolean. */
   phase: AgentPhase;
+  /** True while a switched-to session's history is being fetched. The chat
+   *  shows a skeleton instead of the "start a new conversation" empty state,
+   *  which used to flash on every session switch. */
+  historyLoading: boolean;
   /** Phase A2 — O(1) lookup from a toolCallId to the (message, part) cell
    *  in `messages` where the tool_call card lives. Populated on `tool_call`
    *  append and consulted on every `tool_call_update`. Eliminates the
@@ -209,6 +213,7 @@ interface UiSessionState {
 }
 interface UiSessionActions {
   setSession: (id: string | null) => void;
+  setHistoryLoading: (loading: boolean) => void;
   /** Optimistic-session migration. Switches the focused session from a
    *  local pending id (e.g. `__pending_<nonce>`) to the real id returned
    *  by piNewSession, while preserving the optimistic user bubble and any
@@ -517,6 +522,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
   // backward-compatible aggregate for callers that don't care which
   // sub-state the agent is in.
   phase: IDLE_PHASE,
+  historyLoading: false,
   // Phase R3.0 — UI-level gate for destructive actions on optimistic
   // session ids. Populated by `beginPendingNewSession` (App.tsx) and
   // drained by `markResolved` once the real id round-trips from main.
@@ -527,8 +533,9 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
 
   setSession: (id) => {
     discardStreamingBuffer();
-    set({ sessionId: id, error: null, messages: [], streamingMessageId: null, plan: null, streamState: INITIAL_STREAMING_STATE, phase: IDLE_PHASE, toolCallIndex: new Map() });
+    set({ sessionId: id, error: null, messages: [], streamingMessageId: null, plan: null, streamState: INITIAL_STREAMING_STATE, phase: IDLE_PHASE, historyLoading: false, toolCallIndex: new Map() });
   },
+  setHistoryLoading: (historyLoading) => set({ historyLoading }),
   migrateSession: (oldId, newId) => {
     if (oldId === newId) return;
     // Flush any coalesced streaming deltas so the assistant message
@@ -580,6 +587,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
       });
       return {
         messages: merged,
+        historyLoading: false,
         streamingMessageId: null,
         streamState: INITIAL_STREAMING_STATE,
         // Phase A2 — history replay replaces messages wholesale, so every
@@ -902,6 +910,7 @@ export const useSessionStore = create<UiSessionState & UiSessionActions>((set, g
       plan: null,
       streamState: INITIAL_STREAMING_STATE,
       phase: IDLE_PHASE,
+      historyLoading: false,
       pendingSessionIds: new Set<string>() as ReadonlySet<string>,
       toolCallIndex: new Map(),
     });

@@ -1806,34 +1806,18 @@
     opacity: 0.85;
   }
 }
-/* 流式期间的代码块占位：轻量边框 + 等宽字体背景，等消息 complete 后
-   再由 StreamingMarkdown 切到完整的 Markdown 渲染。避免在每个 delta 上
-   都跑一遍 lowlight。 */
-.streaming-code-stub {
-  display: block;
-  margin: 8px 0;
-  padding: 10px 12px;
-  background: var(--wb-bg-tertiary, rgba(127, 127, 127, 0.08));
-  border: 1px dashed var(--wb-border-subtle, rgba(127, 127, 127, 0.35));
-  border-radius: 6px;
-  font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, monospace);
-  font-size: 12.5px;
-  line-height: 1.55;
+/* 流式期间的代码块:复用最终代码块的外框(.md-code-wrapper/.md-code-container),
+   只在流式中跳过高亮;完成时原位换成带高亮与操作的版本,不再从虚线框跳变。 */
+.streaming-code-stub pre {
+  max-height: 420px;
+}
+.streaming-code-stub code {
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--wb-text-weak);
-  max-height: 320px;
-  overflow: auto;
 }
-.streaming-code-stub[data-lang]::before {
-  content: attr(data-lang);
-  display: block;
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--wb-text-weak);
-  opacity: 0.7;
-  margin-bottom: 4px;
+img.streaming-inline-image {
+  max-width: 100%;
+  border-radius: var(--wb-radius-md, 8px);
 }
 
 /* R57 — StreamingMarkdown inline styling. The streaming renderer now
@@ -1889,10 +1873,9 @@
 
 /* R60 — StreamingMarkdown inline image placeholder. LLMs commonly
    produce ![alt](url) mid-stream; instead of raw markdown syntax we
-   show a subtle emoji + alt chip so the user knows an image is
-   loading. The final full-Markdown render replaces this with the
-   actual <img> (via Markdown's imageUrlResolver). */
-.streaming-inline-image {
+   render the real <img> for web/data/file URLs (see img rule above);
+   this chip only covers URLs the stream renderer will not load. */
+span.streaming-inline-image {
   display: inline-flex;
   align-items: center;
   gap: 3px;

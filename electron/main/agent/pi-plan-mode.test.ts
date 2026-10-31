@@ -9,14 +9,16 @@ type TestContext = {
 function createHarness(controller: PiPlanController) {
   const handlers = new Map<string, (event: unknown, context: TestContext) => unknown>();
   const commands = new Map<string, { handler: (args: string, context: TestContext) => Promise<void> | void }>();
+  const tools = new Map<string, { execute: (...args: unknown[]) => Promise<{ details: { submitted: boolean } }> }>();
   const extension = createPiPlanModeExtension({ resolveController: () => controller });
   extension({
     on: (event: string, handler: (value: unknown, context: TestContext) => unknown) => {
       if (event === "before_agent_start" || event === "turn_start") handlers.set(event, handler);
     },
     registerCommand: (name: string, options: { handler: (args: string, context: TestContext) => Promise<void> | void }) => commands.set(name, options),
+    registerTool: (tool: { name: string; execute: (...args: unknown[]) => Promise<{ details: { submitted: boolean } }> }) => tools.set(tool.name, tool),
   } as never);
-  return { handlers, commands };
+  return { handlers, commands, tools };
 }
 
 function state(enabled: boolean, planText = "") {
@@ -84,5 +86,24 @@ describe("Pi plan mode extension", () => {
     expect(current.enabled).toBe(false);
     await harness.handlers.get("before_agent_start")?.({ systemPrompt: "base" }, context);
     expect(current.enabled).toBe(true);
+  });
+
+  it("registers the exit_plan_mode tool the policy refers to and stores the plan", async () => {
+    let current = state(true);
+    const harness = createHarness({
+      getPlan: async () => current,
+      setEnabled: async (_id, enabled) => (current = state(enabled)),
+      setPlan: async (_id, planText) => (current = state(true, planText)),
+      approve: async () => current,
+      reject: async () => (current = state(false)),
+    });
+    const tool = harness.tools.get("exit_plan_mode")!;
+    expect(tool).toBeTruthy();
+    const ctx = { sessionManager: { getSessionId: () => "s1" } };
+    const result = await tool.execute("tc", { plan: "# Ship it" }, undefined, undefined, ctx);
+    expect(result.details.submitted).toBe(true);
+    expect(current.planText).toBe("# Ship it");
+    const empty = await tool.execute("tc", { plan: "  " }, undefined, undefined, ctx);
+    expect(empty.details.submitted).toBe(false);
   });
 });

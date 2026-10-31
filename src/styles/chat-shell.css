@@ -519,3 +519,35 @@
 .chat-dock .rewind-bar__btn + .rewind-bar__btn {
   margin-left: 4px;
 }
+
+/* 20261031 Phase 2.7 — 切换会话加载历史时的骨架,取代"开始新对话"空态的闪现。 */
+.chatview__history-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 800px;
+  margin: 32px auto 0;
+  padding: 0 24px;
+}
+.chatview__skeleton-line {
+  display: block;
+  width: 72%;
+  height: 14px;
+  border-radius: var(--wb-radius-sm, 6px);
+  background: linear-gradient(
+    90deg,
+    var(--wb-bg-secondary) 25%,
+    var(--wb-bg-tertiary, var(--wb-bg-secondary)) 50%,
+    var(--wb-bg-secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: ob-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.chatview__skeleton-line--user {
+  width: 40%;
+  align-self: flex-end;
+}
+.chatview__skeleton-line--short {
+  width: 48%;
+}
