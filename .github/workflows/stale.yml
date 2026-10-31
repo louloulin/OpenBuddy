@@ -13,7 +13,7 @@ jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v9
+      - uses: actions/stale@v11
         with:
           days-before-stale: 60
           days-before-close: 14
@@ -30,7 +30,7 @@ jobs:
               delete: { days-before-delete: false }
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           only: issues
-      - uses: actions/stale@v9
+      - uses: actions/stale@v11
         with:
           days-before-stale: 30
           days-before-close: 7
