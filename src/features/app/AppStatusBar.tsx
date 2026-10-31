@@ -80,5 +80,9 @@ export function AppStatusBar({ runtime }: { runtime: AppShellRuntime }) {
     "shell.statusbar",
     StatusBar as unknown as ComponentType<StatusBarProps>,
   );
+  // 一切正常时不占一行(对齐 WorkBuddy:底部无常驻状态栏);内核离线 /
+  // 降级 / Agent 启动或失败时才出现,让真正需要关注的状态可见。
+  const healthy = !hostCoreDegraded && bridgeAvailable && initState === "ready";
+  if (healthy) return null;
   return <Component left={left} right={right} />;
 }

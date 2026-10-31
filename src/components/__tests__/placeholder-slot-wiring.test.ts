@@ -15,7 +15,7 @@
  * 别的消费者负责(它们已在各自模块的测试里覆盖),所以这里只守 `placeholder.*`。
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = process.cwd();
@@ -36,10 +36,13 @@ function walk(dir: string, out: string[] = []): string[] {
 function registeredPlaceholderSlots(): Map<string, string> {
   const found = new Map<string, string>();
   for (const file of walk(join(ROOT, "packages", "ui"))) {
-    if (!/\/client\.tsx?$/.test(file)) continue;
+    // Windows 上 walk() 产出的是 "a\b\client.tsx";只认 "/" 会让扫描面变成
+    // 空集,守卫静默失效(实测 Windows CI 上 registeredPlaceholderSlots()
+    // 返回 0)。分隔符两种都接受。
+    if (!/[\\/]client\.tsx?$/.test(file)) continue;
     const source = readFileSync(file, "utf8");
     for (const match of source.matchAll(/name:\s*["'`](placeholder\.[a-z0-9.-]+)["'`]/g)) {
-      found.set(match[1], file.replace(`${ROOT}/`, ""));
+      found.set(match[1], file.replace(`${ROOT}${sep}`, ""));
     }
   }
   return found;
@@ -55,7 +58,7 @@ function consumedSlots(): Set<string> {
   const roots = [join(ROOT, "src"), join(ROOT, "packages", "ui")];
   for (const root of roots) {
     for (const file of walk(root)) {
-      if (/\/client\.tsx?$/.test(file)) continue;
+      if (/[\\/]client\.tsx?$/.test(file)) continue;
       const source = readFileSync(file, "utf8");
       for (const match of source.matchAll(/useSlotComponents?\(\s*["'`]([a-zA-Z0-9._:-]+)["'`]/g)) {
         consumed.add(match[1]);

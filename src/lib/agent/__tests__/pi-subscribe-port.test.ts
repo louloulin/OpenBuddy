@@ -78,8 +78,9 @@ describe("subscribePiEvents — stream port transport", () => {
     });
     const unlisten = await subscribePiEvents({ onUpdate });
     expect(bridgeState.openPiStreamCalls).toBe(1);
-    // No IPC pi://update listener when the port is attached.
-    expect(bridgeState.listeners.has("pi://update")).toBe(false);
+    // The IPC listener stays armed as the fallback lane: the host sends each
+    // update on exactly one path (port while healthy, IPC otherwise).
+    expect(bridgeState.listeners.has("pi://update")).toBe(true);
     emitPort({
       version: 1,
       events: [
@@ -91,6 +92,9 @@ describe("subscribePiEvents — stream port transport", () => {
       { sessionId: "s1", type: "agent_message_chunk" },
       { sessionId: "s1", type: "agent_thought_chunk" },
     ]);
+    // Port failed on the host → updates arrive over IPC and are still delivered.
+    emitIpcUpdate({ sessionId: "s1", type: "agent_message_chunk", content: [] });
+    expect(captured).toHaveLength(3);
     unlisten();
   });
 

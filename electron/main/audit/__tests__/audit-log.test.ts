@@ -222,7 +222,9 @@ describe("audit-log", () => {
       expect(JSON.parse(lines[0]).event).toBe("ev-3");
     });
 
-    it("文件权限 0o600(审计内容含 subject/detail,不读给其他账号)", async () => {
+    // Windows 没有 POSIX 权限位:statSync().mode 里那几位是伪造的常量,
+    // "(mode & 0o077) === 0" 在那里恒不成立。这条不变式只对 POSIX 有意义。
+    it.skipIf(process.platform === "win32")("文件权限 0o600(审计内容含 subject/detail,不读给其他账号)", async () => {
       await trail.record({ event: "ev", outcome: "info", source: "main", subject: "secret-user" });
       const target = freshTarget();
       await trail.exportTo(target);

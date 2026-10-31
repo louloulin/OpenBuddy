@@ -71,19 +71,30 @@ type PendingPrompt = {
   resolve: (value: string | null) => void;
 };
 
+// 2026-10-31 对齐 WorkBuddy:主导航只留 新建任务 / 专家·技能·连接器 / 自动化 /
+// 更多。助理、项目、邮件、记忆收进「更多 → 工作区」(见 WORKSPACE_NAV)。
 const NAV = [
-  { label: "助理", icon: WbAssistantNavIcon },
-  { label: "项目", icon: WbProjectNavIcon },
   // "专家·技能·连接器" 视图内已经包含"插件·市场"子 tab(Pi 官方市场 +
   // 本地插件浏览/安装),所以插件市场入口归在这里,主导航不再单独列项。
   { label: "专家·技能·连接器", icon: WbExpertNavIcon },
   // 阶段 1.4 恢复:主进程调度引擎 + 运行历史已接回(automations:* IPC),
   // 面板的 list/save/toggle/runNow/记录归档全部走真实通道。
   { label: "自动化", icon: WbAutomationNavIcon },
-  { label: "邮件", icon: MailIcon },
-  // 阶段 1.5:本地两层记忆(全局 + 工作区)。云层明确不做。
-  { label: "记忆", icon: MemoryIcon },
 ];
+
+/** 「更多 → 工作区」:低频但完整的工作面。`route` 是实际导航目标。 */
+const WORKSPACE_NAV = [
+  { id: "assistant", label: "助理", route: "助理·本地助理", icon: WbAssistantNavIcon },
+  { id: "projects", label: "项目", route: "项目", icon: WbProjectNavIcon },
+  { id: "email", label: "邮件", route: "邮件", icon: MailIcon },
+  // 阶段 1.5:本地两层记忆(全局 + 工作区)。云层明确不做。
+  { id: "memory", label: "记忆", route: "记忆", icon: MemoryIcon },
+];
+
+/** 当前页属于某个工作区入口(含「助理·xxx」这类子页)。 */
+function isWorkspaceNav(activeNav: string, label: string): boolean {
+  return activeNav === label || activeNav.startsWith(`${label}·`);
+}
 
 /** Last path segment of a working directory, used as a 空间 node label. */
 function basename(p: string): string {
@@ -420,7 +431,22 @@ function MoreDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 弹层挂到 body 并用 fixed 定位:侧栏外壳有 overflow: hidden,弹层放在侧栏
+  // 里会被裁得只剩一条边(2026-10-31 截图发现)。
+  const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (r) setAnchor({ left: r.right + 6, top: Math.max(8, Math.min(r.top, window.innerHeight - 420)) });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
 
   const clearCloseTimer = () => {
     if (closeTimer.current) {
@@ -443,9 +469,9 @@ function MoreDropdown({
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -461,6 +487,7 @@ function MoreDropdown({
   useEffect(() => () => clearCloseTimer(), []);
 
   const isActive =
+    WORKSPACE_NAV.some((item) => isWorkspaceNav(activeNav, item.label)) ||
     activeNav === "更多" ||
     activeNav === "资料库" ||
     activeNav === "灵感" ||
@@ -492,6 +519,19 @@ function MoreDropdown({
     onOpen?: () => void;
   };
   const MORE_GROUPS: MoreGroup[] = [
+    {
+      id: "workspace",
+      label: "工作区",
+      items: WORKSPACE_NAV.map(({ id, label, route, icon: Icon }) => ({
+        id,
+        label,
+        icon: <Icon size="md" />,
+        action: () => {
+          setOpen(false);
+          onNavigate(route);
+        },
+      })),
+    },
     {
       id: "library",
       label: "资料库",
@@ -634,6 +674,7 @@ function MoreDropdown({
       onMouseLeave={scheduleClose}
     >
       <button
+        ref={triggerRef}
         type="button"
         className={
           "sidebar__nav-item" +
@@ -656,8 +697,16 @@ function MoreDropdown({
             真实菜单项文案保持 "灵感" 不变 —— aria / 测试 / 视觉三不冲突。 */}
         <span className="sidebar__nav-sub" aria-hidden="true" />
       </button>
-      {open && (
-        <div className="sidebar__more-popover" role="menu">
+      {open && createPortal(
+        <div
+          ref={popoverRef}
+          className="sidebar__more-popover"
+          role="menu"
+          tabIndex={-1}
+          style={anchor ? { position: "fixed", left: anchor.left, top: anchor.top } : { visibility: "hidden" }}
+          onMouseEnter={openMenu}
+          onMouseLeave={scheduleClose}
+        >
           {MORE_GROUPS.map((group) => (
             <div key={group.id} className="sidebar__more-group">
               {group.onOpen ? (
@@ -681,7 +730,7 @@ function MoreDropdown({
                   type="button"
                   className={
                     "sidebar__more-item" +
-                    (activeNav === item.label ? " sidebar__more-item--active" : "")
+                    (isWorkspaceNav(activeNav, item.label) ? " sidebar__more-item--active" : "")
                   }
                   role="menuitem"
                   onClick={item.action}
@@ -697,7 +746,8 @@ function MoreDropdown({
               ))}
             </div>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -771,7 +821,7 @@ export const SessionRow = memo(function SessionRow({
         (pinned ? " sidebar__conv--pinned" : "") +
         (archived ? " sidebar__conv--archived" : "") +
         (isSelected ? " sidebar__conv--selected" : "") +
-        (isCurrent && isStreaming ? " sidebar__conv--streaming" : "")
+        (isStreaming ? " sidebar__conv--streaming" : "")
       }
       // 行本身是一个 role="button" 容器而不是原生 <button>:行尾挂着
       // 更多/归档/置顶三个真按钮，原生 button 里再套 button 是非法 HTML，
@@ -803,7 +853,7 @@ export const SessionRow = memo(function SessionRow({
       onContextMenu={(e) => e.preventDefault()}
       title={title}
     >
-      {isCurrent && isStreaming && (
+      {isStreaming && (
         <span className="sidebar__conv-status-dot" aria-label="正在生成" />
       )}
       <span className="sidebar__conv-title">{title}</span>
@@ -951,6 +1001,8 @@ export function Sidebar({
   // streaming boolean from session-store (already kept in sync with the
   // agent phase machine), so this is a free selector.
   const streaming = useSessionStore((s) => s.streaming);
+  // 切到后台继续生成的会话也要看得出来(计划 0.3)。
+  const runningSessionIds = useSessionStore((s) => s.runningSessionIds);
   const upsertSession = useSessionsStore((s) => s.upsert);
   const removeSession = useSessionsStore((s) => s.remove);
   const setTasksOpen = useSessionsStore((s) => s.setTasksOpen);
@@ -1403,7 +1455,7 @@ export function Sidebar({
       // R8.17 — pass through the streaming flag so the active row
       // can render the live-pulse dot. Cheap selector: only the focused
       // session's row changes when the flag flips.
-      isStreaming={s.sessionId === currentSessionId && streaming}
+      isStreaming={(s.sessionId === currentSessionId && streaming) || Boolean(runningSessionIds[s.sessionId])}
       onSelect={onSelect}
       onMenuFromButton={openMenuFromButton}
       onArchive={handleArchive}
@@ -1620,7 +1672,7 @@ export function Sidebar({
                   ? " sidebar__nav-item--active"
                   : "")
               }
-              onClick={() => onNavigate(label === "助理" ? "助理·本地助理" : label)}
+              onClick={() => onNavigate(label)}
             >
               <Icon size="md" />
               <span>{label}</span>

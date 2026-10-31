@@ -1,3 +1,4 @@
+import { permissionToolLabel } from "@openbuddy/ui-dialogs";
 import React, { memo, useEffect, useState } from "react";
 import { useLocale } from "@openbuddy/ui-locale/client";
 import type { ToolCallView } from "@/stores/session-store";
@@ -78,7 +79,9 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
       ) : tc.status === "failed" ? (
         "!"
       ) : (
-        "…"
+        /* plan1030 批 5d — in_progress 不再渲染 "…" 文本：改由 CSS
+           旋转环承担「进行中」语义（真 spinner，见 tool-call.css）。 */
+        ""
       )}
     </span>
   );
@@ -129,7 +132,10 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
   const kindLabel = specialized
     ? `${rendererIcon(renderer)} ${rendererLabel(renderer)}`
     : prettyKind(tc.kind);
-  const summary = specialized ? summarizeTool(tc, renderer) : shortTitle;
+  // 标题就是工具名本身(如 memory_save)时,行里会出现两遍英文 id:换成一个
+  // 人话标签(「保存记忆」),不再另挂 kind chip(§21)。
+  const bareName = !specialized && (!tc.title?.trim() || tc.title.trim() === tc.kind);
+  const summary = specialized ? summarizeTool(tc, renderer) : bareName ? permissionToolLabel(tc.kind) : shortTitle;
 
   if (isExpanded) {
     return (
@@ -182,7 +188,10 @@ function ToolCallCardInner({ tc, onOpen, expandMode = "auto" }: ToolCallCardProp
       aria-label={`${tc.kind} ${summary} ${statusLabel}${durationLabel ? " " + durationLabel : ""}`}
     >
       {statusMark}
-      <span className="toolcall__kind">{kindLabel}</span>
+      {/* 专用渲染器的 summary 已经是「动词 + 目标」(运行/读取/编辑/搜索),
+          cc-haha 的行里不再重复一个工具类别 chip;只有拿不到摘要的通用工具
+          才用 kindLabel 说明这是什么。 */}
+      {!specialized && !bareName && <span className="toolcall__kind">{kindLabel}</span>}
       <span className="toolcall__title">{summary}</span>
       {durationLabel && (
           <span
@@ -339,7 +348,7 @@ export function ToolCallDetailBody({
               {cmd.command}
             </pre>
           )}
-          {cmd.output && <pre className="toolcall__output"><AnsiText text={cmd.output} /></pre>}
+          {cmd.output && <CommandOutputBlock output={cmd.output} />}
         </div>
       )}
       {/* R1.4 — partial / streaming output. Shown when the tool is still
@@ -384,6 +393,51 @@ export function ToolCallDetailBody({
       {!diff && !cmd && texts.length === 0 && tc.rawInput == null && (
         <p className="tool-detail__empty">暂无详细输出</p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Command output with an explicit budget.
+ *
+ * A `seq 1 200000` or a noisy build can dump megabytes into the transcript;
+ * rendering it all froze the detail drawer. Long output keeps the first
+ * chunk visible and offers "展开全部" plus a copy button, so the user can
+ * still get the complete text without paying the render cost up front.
+ */
+function CommandOutputBlock({ output }: { output: string }) {
+  const LIMIT = 4000;
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const lineCount = output.split("\n").length;
+  const truncated = output.length > LIMIT || lineCount > 80;
+  const shown = truncated && !expanded ? output.slice(0, LIMIT) : output;
+  const copy = () => {
+    void navigator.clipboard?.writeText(output).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    }).catch(() => undefined);
+  };
+  return (
+    <div className="toolcall__output-wrap" data-testid="toolcall-output">
+      <div className="toolcall__output-head">
+        <span className="toolcall__output-meta">{lineCount} 行 · {output.length} 字符</span>
+        <button type="button" className="toolcall__output-btn" onClick={copy} data-testid="toolcall-output-copy">
+          {copied ? "已复制" : "复制"}
+        </button>
+        {truncated && (
+          <button
+            type="button"
+            className="toolcall__output-btn"
+            onClick={() => setExpanded((v) => !v)}
+            data-testid="toolcall-output-expand"
+          >
+            {expanded ? "收起" : "展开全部"}
+          </button>
+        )}
+      </div>
+      <pre className="toolcall__output"><AnsiText text={shown} /></pre>
+      {truncated && !expanded && <div className="toolcall__output-more">输出已截断，点击「展开全部」查看完整内容</div>}
     </div>
   );
 }

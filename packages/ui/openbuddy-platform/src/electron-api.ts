@@ -247,13 +247,20 @@ export async function rpcRequest<T = unknown>(message: unknown): Promise<T> {
 
 let rendererRpcChannel: PendingRpcChannel | undefined;
 let rendererRpcBridgeUnlisten: UnlistenFn | undefined;
-const rendererRpcInteractionWaiters = new Map<string, { resolve: (value: unknown) => void; timer: ReturnType<typeof setTimeout> }>();
+const rendererRpcInteractionWaiters = new Map<string, { resolve: (value: unknown) => void; timer: ReturnType<typeof setTimeout> | undefined }>();
 
 function getRendererRpcChannel(): PendingRpcChannel {
 	if (rendererRpcChannel) return rendererRpcChannel;
-	rendererRpcChannel = new PendingRpcChannel(async (message) => { await getApi().rpc.request(message); });
+	// This channel answers host interactions (approvals / questions) that wait on
+	// the user; the default 30 s server-request timeout replied with an error the
+	// host treated as "deny". Give it a day — Stop / reload settle stale ones.
+	rendererRpcChannel = new PendingRpcChannel(async (message) => { await getApi().rpc.request(message); }, 24 * 60 * 60_000);
 	registerDefaultRendererRpcHandlers(rendererRpcChannel);
   rendererRpcBridgeUnlisten = getApi().rpc.onMessage((message) => {
+    // Event notifications need no reply — acknowledging each one cost an extra
+    // renderer→main IPC per streamed token. Listeners (listenRpc) still see them.
+    const method = message && typeof message === "object" ? (message as { method?: unknown }).method : undefined;
+    if (method === "session.event" || method === "plugin.event") return;
     void rendererRpcChannel?.receive(message);
   });
   return rendererRpcChannel;
@@ -274,13 +281,11 @@ function waitForRendererRpcInteraction(payload: unknown): Promise<unknown> {
 	const requestId = payload && typeof payload === "object" && typeof (payload as { requestId?: unknown }).requestId === "string"
 		? (payload as { requestId: string }).requestId : undefined;
 	if (!requestId) return Promise.resolve({ cancelled: true });
+	// No timeout: an approval waits for the user. (A 30 s timer here answered
+	// "cancelled" on the user's behalf — a second auto-deny path.) The host
+	// settles abandoned requests itself (Stop / runtime reload).
 	return new Promise((resolve) => {
-		const timer = setTimeout(() => {
-			rendererRpcInteractionWaiters.delete(requestId);
-			resolve({ cancelled: true });
-		}, 30_000);
-		timer.unref?.();
-		rendererRpcInteractionWaiters.set(requestId, { resolve, timer });
+		rendererRpcInteractionWaiters.set(requestId, { resolve, timer: undefined });
 	});
 }
 

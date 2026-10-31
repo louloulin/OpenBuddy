@@ -22,6 +22,7 @@ export function LocalAssistantView({
   modelId,
   models,
   onModelChange,
+  onModelDelete,
 }: {
   onSend: (text: string) => void;
   streaming: boolean;
@@ -32,6 +33,8 @@ export function LocalAssistantView({
   modelId?: string;
   models?: ModelOption[];
   onModelChange?: (id: string) => void;
+  /** plan1030 §5.2.1 — 对话内删除模型(picker 行级入口);透传给 Composer。 */
+  onModelDelete?: (modelId: string) => void;
 }) {
   // 本地助理页草稿(哨兵 key):离开再回来未发送的字还在。
   const draft = useSessionsStore((s) => s.drafts[ASSISTANT_DRAFT_KEY] ?? "");
@@ -69,6 +72,7 @@ export function LocalAssistantView({
           modelId={modelId}
           models={models}
           onModelChange={onModelChange}
+          onModelDelete={onModelDelete}
           permissionInline
           showDisclaimer
           placeholder="今天帮你做些什么？ @ 引用对话文件，/ 调用技能与指令"

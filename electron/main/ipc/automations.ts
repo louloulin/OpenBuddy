@@ -10,8 +10,9 @@
  * 载荷形状直接用 `@openbuddy/shared-types` 的 Automation /
  * AutomationRunRecord(与 automation-store 共用同一模型,零映射)。
  *
- * 执行:每次运行新建独立会话 → prompt → 完成后回填运行记录 + 把运行摘要
- * 写入 workspace 记忆(1.4 的"每次运行的 memory")。
+ * 执行:每次运行在**后台独立会话**里跑(计划 0.3,`runBackgroundSession`),
+ * 不替换用户正在看的前台会话,用户回合进行中也可以运行;完成后回填运行记录
+ * (含回答摘要)并写入 workspace 记忆。
  */
 import { ipcMain } from "electron";
 
@@ -28,17 +29,16 @@ import {
   type Automation,
 } from "../automation/automation-store";
 import { addMemory } from "../memory/memory-store";
+import { runBackgroundSession } from "../agent/host-modules/team-runner";
 import type { AutomationRunRecord } from "@openbuddy/shared-types";
 
 interface AutomationIpcDeps {
   ensureAgentHost: () => Promise<void>;
   agentHost: {
     getCwd: () => string | null | undefined;
-    newSession: (cwd: string, modelId?: string, opts?: { traceId?: string }) => Promise<{ sessionId: string }>;
-    getSession: () => { sessionId: string } | null;
-    /** await 即等完整回合结束(pi session.prompt 语义)。 */
-    prompt: (text: string, options?: { sessionId?: string }) => Promise<void>;
   };
+  /** 测试注入点;缺省为真实的后台会话运行器。 */
+  runBackground?: typeof runBackgroundSession;
 }
 
 const DEFAULT_SCHEDULE = {
@@ -113,6 +113,7 @@ function currentCwd(agentHost: AutomationIpcDeps["agentHost"]): string {
 
 export function registerAutomationIpc(deps: AutomationIpcDeps): void {
   const { ensureAgentHost, agentHost } = deps;
+  const runBackground = deps.runBackground ?? runBackgroundSession;
 
   // 快照是纯存储读,不拉起 agent host(面板打开时 agent 可能还没就绪)。
   wrapIpcHandler("automations_snapshot", async () => ({
@@ -175,6 +176,9 @@ export function registerAutomationIpc(deps: AutomationIpcDeps): void {
     const id = requiredString(input.id, "id");
     const automation = (await listAutomations()).find((item) => item.id === id);
     if (!automation) throw new Error(`automation not found: ${id}`);
+    await ensureAgentHost();
+    // 后台独立会话:不替换前台会话,用户正在生成时也能运行。等它跑完再返回,
+    // 与以前的语义一致(面板据此刷新运行记录)。
     const runId = await executeAutomation(automation);
     return { ok: true, runId };
   });
@@ -202,39 +206,42 @@ export function registerAutomationIpc(deps: AutomationIpcDeps): void {
   });
 
   /**
-   * 执行器:独立会话 + prompt + 完成回填 + 工作区记忆。
-   * 返回 runId 供手动触发路径直接用(调度器路径自己建记录)。
+   * 执行器:后台独立会话 + prompt + 完成回填(含回答摘要)+ 工作区记忆。
+   * 返回 runId 供手动触发路径直接用(调度器路径自己建记录,这里只补会话 id)。
    */
   async function executeAutomation(automation: Automation, existingRunId?: string): Promise<string> {
     await ensureAgentHost();
     const cwd = automation.cwds.split(",").map((item) => item.trim()).find(Boolean) || currentCwd(agentHost);
     const runId = existingRunId ?? `run-${randomId()}`;
-    // 自动化没指定模型时沿用应用当前模型(新会话继承),指定了就用它。
-    const created = await agentHost.newSession(cwd, automation.modelId);
-    const sessionId = created.sessionId;
-    await mutateAutomations((file) => {
-      if (existingRunId) return;
-      const record: AutomationRunRecord = {
-        id: runId,
-        automationId: automation.id,
-        automationName: automation.name,
-        status: "running",
-        startedAt: new Date().toISOString(),
-        sessionId,
-        archived: false,
-      };
-      file.records.unshift(record);
-      const target = file.automations.find((item) => item.id === automation.id);
-      if (target) target.lastRunAt = record.startedAt;
-    });
-    // newSession 已把新会话设为活动会话(agent:new-session 同路径),prompt 的
-    // 前置条件满足;await 即等完整回合结束。
-    let summary = "";
+    if (!existingRunId) {
+      await mutateAutomations((file) => {
+        const record: AutomationRunRecord = {
+          id: runId,
+          automationId: automation.id,
+          automationName: automation.name,
+          status: "running",
+          startedAt: new Date().toISOString(),
+          archived: false,
+        };
+        file.records.unshift(record);
+        const target = file.automations.find((item) => item.id === automation.id);
+        if (target) target.lastRunAt = record.startedAt;
+      });
+    }
     try {
-      await agentHost.prompt(
-        `${automation.prompt}\n\n(本任务由定时自动化「${automation.name}」触发,完成后请用两三句话总结你做了什么。)`,
-      );
-      summary = `会话 ${sessionId} 已完成`;
+      const result = await runBackground({
+        cwd,
+        name: `自动化：${automation.name}`,
+        ...(automation.modelId ? { modelId: automation.modelId } : {}),
+        prompt: `${automation.prompt}\n\n(本任务由定时自动化「${automation.name}」触发,完成后请用两三句话总结你做了什么。)`,
+        // 会话一建好就关联到运行记录(调度器路径的记录此前一直缺 sessionId,
+        // 运行历史点不进对应会话)。
+        onSession: (sessionId) => mutateAutomations((file) => {
+          const record = file.records.find((item) => item.id === runId);
+          if (record) record.sessionId = sessionId;
+        }),
+      });
+      const summary = result.text ? result.text.slice(-300) : "已完成(模型没有输出文字)";
       await markRun(runId, "success", summary);
       // 每次运行的 memory:把执行摘要写入 workspace 记忆。
       await addMemory({
@@ -245,12 +252,13 @@ export function registerAutomationIpc(deps: AutomationIpcDeps): void {
         tags: ["自动化"],
       }).catch(() => undefined);
     } catch (error) {
-      await markRun(runId, "failed", String(error).slice(0, 500));
+      await markRun(runId, "failed", String(error).replace(/^Error:\s*/, "").slice(0, 500));
       throw error;
     }
     return runId;
   }
 
+  // 后台会话不占前台,调度器不再等用户空闲;同一时刻仍只跑一个自动化。
   startAutomationScheduler(async (automation, runId) => {
     await executeAutomation(automation, runId);
   });

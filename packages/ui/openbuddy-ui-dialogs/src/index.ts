@@ -57,7 +57,7 @@ export { ModalIcon } from "./ModalIcon";
 export { ModalShell, ModalHead, ModalBody, ModalFooter } from "./ModalShell";
 export type { ModalTone, ModalShellProps, ModalHeadProps } from "./ModalShell";
 
-export { PermissionInlineCard } from "./PermissionDialog";
+export { PermissionInlineCard, permissionToolLabel } from "./PermissionDialog";
 
 export { ProjectConfirmDialog, ProjectInputDialog } from "./ProjectDialog";
 

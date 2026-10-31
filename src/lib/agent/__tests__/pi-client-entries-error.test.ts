@@ -82,6 +82,42 @@ describe("sessionEntriesToChatMessages — failed-turn projection", () => {
     expect(result.messages[0].error?.message).toBe("boom");
   });
 
+  it("projects tool-call history with rawInput, command output and failure status", () => {
+    const result = sessionEntriesToChatMessages([
+      {
+        type: "message",
+        id: "a-1",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              id: "tc-ok",
+              name: "apply_command",
+              arguments: JSON.stringify({ command: "seq 1 500" }),
+              result: { content: [{ type: "text", text: "1\n2\n3" }], details: {} },
+            },
+            {
+              type: "toolCall",
+              id: "tc-fail",
+              name: "apply_patch",
+              arguments: { file_path: "/etc/nope", patch: "" },
+              result: { content: [{ type: "text", text: "apply_patch failed: outside workspace" }], details: {} },
+            },
+          ],
+          stopReason: "end_turn",
+        },
+      },
+    ] as never);
+    const parts = result.messages[0].parts as Array<{ kind: string; toolCall: Record<string, unknown> }>;
+    expect(parts[0].toolCall.rawInput).toEqual({ command: "seq 1 500" });
+    expect(parts[0].toolCall.content).toEqual([
+      { type: "command_output", command: "seq 1 500", output: "1\n2\n3" },
+    ]);
+    expect(parts[0].toolCall.status).toBe("completed");
+    expect(parts[1].toolCall.status).toBe("failed");
+  });
+
   it("leaves healthy turns untouched (no error field)", () => {
     const result = sessionEntriesToChatMessages([
       {

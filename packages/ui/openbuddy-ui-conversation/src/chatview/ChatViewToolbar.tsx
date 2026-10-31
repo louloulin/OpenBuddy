@@ -6,9 +6,11 @@
  *
  * Phase B B.6 之前,按钮 portal 到顶栏;未挂载时回退为正文图标行(保持改造前的视觉)。
  */
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Bot,
+  MoreHorizontal,
   FileDiff,
   FolderTree,
   Globe,
@@ -40,6 +42,9 @@ export type ChatViewToolbarProps = {
   onShareDone?: (msg: string) => void;
 };
 
+/** 顶栏常驻的按钮(对齐 WorkBuddy:只留搜索 + 分享,其余进「更多」)。 */
+const PINNED_IDS = new Set(["find"]);
+
 export function ChatViewToolbar({
   topbarHost,
   buttons,
@@ -47,7 +52,10 @@ export function ChatViewToolbar({
   onShareDone,
 }: ChatViewToolbarProps) {
   const visibleButtons = buttons.filter((b) => b.visible);
-  const buttonEls = visibleButtons.map((b) => (
+  // 已打开的面板保持在顶栏上,方便一键关闭;其余收进溢出菜单。
+  const inline = visibleButtons.filter((b) => PINNED_IDS.has(b.id) || b.active);
+  const overflow = visibleButtons.filter((b) => !PINNED_IDS.has(b.id) && !b.active);
+  const buttonEls: ReactNode[] = inline.map((b) => (
     <ToolButton
       icon={b.icon}
       label={b.label}
@@ -60,6 +68,9 @@ export function ChatViewToolbar({
     buttonEls.push(
       <ShareMenu messages={[...messages]} onDone={onShareDone ?? (() => {})} key="share" />,
     );
+  }
+  if (overflow.length > 0) {
+    buttonEls.push(<OverflowMenu buttons={overflow} key="more" />);
   }
 
   if (topbarHost) {
@@ -74,6 +85,61 @@ export function ChatViewToolbar({
   return (
     <div className="chatview__toolbar chatview__toolbar--fallback" role="toolbar" aria-label="会话工具">
       {buttonEls}
+    </div>
+  );
+}
+
+function OverflowMenu({ buttons }: { buttons: ToolButtonDescriptor[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="share-menu" ref={ref}>
+      <button
+        type="button"
+        className={"chatview__tool-btn" + (open ? " chatview__tool-btn--active" : "")}
+        aria-label="更多工具"
+        aria-expanded={open}
+        data-tip="更多"
+        data-testid="chatview-toolbar-more"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <MoreHorizontal size={15} strokeWidth={1.75} />
+      </button>
+      {open && (
+        <div className="share-menu__popover" role="presentation">
+          {buttons.map((b) => (
+            <button
+              type="button"
+              className="share-menu__item chatview__more-item"
+              key={b.id}
+              onClick={() => {
+                setOpen(false);
+                b.onClick();
+              }}
+            >
+              {b.icon}
+              <span>{b.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

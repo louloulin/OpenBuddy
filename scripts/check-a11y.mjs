@@ -32,7 +32,7 @@
 //====================================================================
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../..");
@@ -42,14 +42,17 @@ const repoRoot = resolve(fileURLToPath(import.meta.url), "../..");
  * npx 在本地没装或版本不匹配时会去下载/回退到别的版本 —— 实测在临时目录里
  * 跑就拉到了 ESLint 10,而 package.json 钉的是 9.39.5。门禁必须是可复现的:
  * 它报的"零告警"必须来自 CI 装的那一份 eslint,而不是当时恰好能拿到的最新版。
- * OPENBUDDY_A11Y_ESLINT 是给测试用的注入口(测试的 fixture 在临时目录里,
- * 那里没有 node_modules)。
+ *
+ * 入口用 `eslint/bin/eslint.js` + `process.execPath`,而不是 `.bin/eslint`:
+ * Windows 上 pnpm 生成的是 `eslint.cmd`,直接 spawn 那个 POSIX shim 会
+ * `EINVAL`/`ENOEXEC`(以前的报错就是 "无法启动 eslint: spawnSync ...")。
+ * OPENBUDDY_A11Y_ESLINT 是给测试用的注入口,同样要求指向 JS 入口。
  */
-const eslintBin =
-  process.env.OPENBUDDY_A11Y_ESLINT ?? join(repoRoot, "node_modules", ".bin", "eslint");
+const eslintEntry =
+  process.env.OPENBUDDY_A11Y_ESLINT ?? join(repoRoot, "node_modules", "eslint", "bin", "eslint.js");
 
-if (!existsSync(eslintBin)) {
-  console.error(`找不到本地 eslint:${eslintBin}\n先跑 \`pnpm install\`。`);
+if (!existsSync(eslintEntry)) {
+  console.error(`找不到本地 eslint:${eslintEntry}\n先跑 \`pnpm install\`。`);
   process.exit(1);
 }
 
@@ -69,7 +72,7 @@ if (existing.length === 0) {
   process.exit(1);
 }
 
-const eslint = spawnSync(eslintBin, [...existing, "--no-warn-ignored", "-f", "json"], {
+const eslint = spawnSync(process.execPath, [eslintEntry, ...existing, "--no-warn-ignored", "-f", "json"], {
   cwd: repoRoot,
   encoding: "utf8",
   maxBuffer: 64 * 1024 * 1024,
@@ -105,9 +108,11 @@ for (const file of report) {
     if (!msg.ruleId?.startsWith("jsx-a11y/")) continue;
     const rule = msg.ruleId;
     if (!byRule.has(rule)) byRule.set(rule, []);
-    // eslint 报的是绝对路径;CI 日志里只关心仓库内相对位置。
+    // eslint 报的是绝对路径;CI 日志里只关心仓库内相对位置。Windows 的
+    // relative() 返回反斜杠,统一成 `/` —— 否则日志与测试/lint 注释里的
+    // `packages/foo/Bar.tsx` 对不上,门禁输出读起来像另一个文件。
     byRule.get(rule).push({
-      path: relative(repoRoot, file.filePath),
+      path: relative(repoRoot, file.filePath).split(sep).join("/"),
       line: msg.line,
       column: msg.column,
     });

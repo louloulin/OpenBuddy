@@ -18,7 +18,8 @@ describe("HarnessRpcStore", () => {
 		const store = new HarnessRpcStore(path, harnessRpcIdentity("token-a"));
 		await store.write([{ rpcId: "rpc-1", fingerprint: "fingerprint", expiresAt: Date.now() + 10_000, result: { ok: true, value: { answer: 42 } } }]);
 		expect(await store.read()).toEqual([{ rpcId: "rpc-1", fingerprint: "fingerprint", expiresAt: expect.any(Number), result: { ok: true, value: { answer: 42 } } }]);
-		expect((await stat(path)).mode & 0o777).toBe(0o600);
+		// Windows 没有 POSIX 权限位。
+		if (process.platform !== "win32") expect((await stat(path)).mode & 0o777).toBe(0o600);
 		expect(JSON.parse(await readFile(path, "utf8"))).toMatchObject({ version: 1, identity: harnessRpcIdentity("token-a") });
 		expect(await new HarnessRpcStore(path, harnessRpcIdentity("token-b")).read()).toEqual([]);
 	});
@@ -124,8 +125,11 @@ describe("HarnessRpcStore", () => {
 		const path = join(root, "cache.json");
 		const lockPath = `${path}.lock`;
 		await writeFile(lockPath, "not-json", { mode: 0o600 });
-		const store = new HarnessRpcStore(path, "identity", { lockTtlMs: 1, lockWaitMs: 100 });
-		await new Promise((resolve) => setTimeout(resolve, 5));
+		const store = new HarnessRpcStore(path, "identity", { lockTtlMs: 1, lockWaitMs: 500 });
+		// Windows timestamp/mtime rounding can make a 5ms-old file look
+		// "just written" for several ticks; 50ms is unambiguously older than a
+		// 1ms TTL on every platform.
+		await new Promise((resolve) => setTimeout(resolve, 50));
 		await expect(store.writeState([], [])).resolves.toBe(1);
 	});
 

@@ -37,7 +37,6 @@
  *   starts fresh — the next manual cleanup or `clearAll()` removes it.
  */
 import { rm, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { applyPendingStorageRestoreSync, openStorageSync, SettingsStore, agentHome } from "@openbuddy/storage";
@@ -119,7 +118,18 @@ export interface SessionMetadataStoreOptions {
 }
 
 export class SessionMetadataStore {
-  private readonly settings: SettingsStore;
+  private readonly options: SessionMetadataStoreOptions;
+  /**
+   * Opened on first use, never in the constructor.
+   *
+   * This module is imported by the whole IPC graph, and `session-metadata.ts`
+   * used to build a store at module scope. Eager construction opened (and
+   * locked) `<piHome>/openbuddy.sqlite` just by importing the module — on
+   * Windows that made any test that merely imports `ipc/index` fail its temp
+   * directory cleanup with EBUSY. A store that is never touched must not own
+   * an open database.
+   */
+  private settingsStore: SettingsStore | null = null;
   private readonly legacyJsonPath: string;
   private migrationPromise: Promise<void> | null = null;
   private migrationDone = false;
@@ -137,32 +147,39 @@ export class SessionMetadataStore {
   private writeQueue: Promise<unknown> = Promise.resolve();
 
   constructor(options: SessionMetadataStoreOptions = {}) {
-    if (options.settings) {
-      this.settings = options.settings;
-    } else {
-      const databasePath = options.databasePath ?? defaultDatabasePath();
-      // P0.8/P1(2026-10-19 生产评审 数据§7):开库前执行"暂存的恢复"。
-      // 设置页的「恢复备份」不直接换文件(运行中 swap 是未定义行为),而是
-      // stage + 标记,重启后在这里生效;现库被挪到 .pre-restore-<时间戳>,
-      // 数据不丢。失败则清标记按无恢复处理(见 applyPendingStorageRestore)。
-      try {
-        const applied = applyPendingStorageRestoreSync(databasePath);
-        if (applied) {
-          // eslint-disable-next-line no-console
-          console.warn(
-            `[session-metadata] pending restore applied: schema v${applied.schemaVersion}, ` +
-              `previous db quarantined at ${applied.quarantined[0] ?? "(none)"}`,
-          );
-        }
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error("[session-metadata] pending restore failed; keeping current db:", error);
-      }
-      this.settings = new SettingsStore({
-        driver: openStorageSync({ filePath: databasePath }).driver,
-      });
-    }
+    this.options = options;
     this.legacyJsonPath = options.legacyJsonPath ?? defaultLegacyJsonPath();
+  }
+
+  private get settings(): SettingsStore {
+    if (this.settingsStore) return this.settingsStore;
+    const options = this.options;
+    if (options.settings) {
+      this.settingsStore = options.settings;
+      return this.settingsStore;
+    }
+    const databasePath = options.databasePath ?? defaultDatabasePath();
+    // P0.8/P1(2026-10-19 生产评审 数据§7):开库前执行"暂存的恢复"。
+    // 设置页的「恢复备份」不直接换文件(运行中 swap 是未定义行为),而是
+    // stage + 标记,重启后在这里生效;现库被挪到 .pre-restore-<时间戳>,
+    // 数据不丢。失败则清标记按无恢复处理(见 applyPendingStorageRestore)。
+    try {
+      const applied = applyPendingStorageRestoreSync(databasePath);
+      if (applied) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[session-metadata] pending restore applied: schema v${applied.schemaVersion}, ` +
+            `previous db quarantined at ${applied.quarantined[0] ?? "(none)"}`,
+        );
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("[session-metadata] pending restore failed; keeping current db:", error);
+    }
+    this.settingsStore = new SettingsStore({
+      driver: openStorageSync({ filePath: databasePath }).driver,
+    });
+    return this.settingsStore;
   }
 
   /** Lazily migrate the legacy JSON mirror (if it exists) into

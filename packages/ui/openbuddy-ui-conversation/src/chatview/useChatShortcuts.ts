@@ -6,7 +6,7 @@
  * 这些键注册到 window 级(useShortcut,与 `?`/⌘K 同一模式)。
  *
  * 语义:
- *   ⌘R   重试最后一条用户消息(作为新输入重发)
+ *   Esc  停止生成(仅 streaming;浮层/对话框已消费的 Esc 不算)
  *   ⌘E   编辑最后一条用户消息(文本回填 composer 并聚焦 —— 与 Claude 的
  *        "edit previous prompt" 行为一致)
  *   ⌘P   暂停生成(软停止,保留上下文;仅 streaming 时)
@@ -15,10 +15,13 @@
  *   ⌘F   已由 useChatViewShortcuts 注册(不重复)
  *   ⌘⏎  任意焦点位置发送/入队(composer 内部已有,这里补全局兜底)
  *
- * 输入框聚焦守卫:⌘R/⌘E 在 textarea 聚焦时也生效(它们是对话级操作);
+ * ⌘R 不再绑定:它属于菜单「重新加载」,且曾把最后一条用户消息当新输入
+ * 重发(历史里出现重复)。重新生成请用消息上的「重新生成」按钮。
+ *
+ * 输入框聚焦守卫:⌘E 在 textarea 聚焦时也生效(它是对话级操作);
  * ⌘L/⌘⏎ 只在 composer 空闲(非 streaming 入队逻辑由 send 分流处理)。
  */
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useShortcut } from "@openbuddy/ui-shell";
 import type { ChatMessage } from "@/stores/session-store";
 import { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "../persona-markers";
@@ -57,6 +60,8 @@ export interface UseChatShortcutsOptions {
   sessionId?: string;
   onSend: (text: string) => void;
   onPause: () => void;
+  /** Esc 停止生成。 */
+  onStop?: () => void;
   /** 回填 composer(⌘E):复用 quick-prompt 的 externalText 管道。 */
   onPrefillComposer: (text: string) => void;
   /** 清空输入(⌘L):同样走 externalText 管道写空。 */
@@ -71,8 +76,8 @@ export function useChatShortcuts(options: UseChatShortcutsOptions): void {
     messages,
     streaming,
     sessionId,
-    onSend,
     onPause,
+    onStop,
     onPrefillComposer,
     onClearComposer,
     enabled = true,
@@ -80,14 +85,25 @@ export function useChatShortcuts(options: UseChatShortcutsOptions): void {
 
   const whenSession = useCallback(() => Boolean(sessionId), [sessionId]);
 
-  // ⌘R — 重试最后一条用户消息。
-  useShortcut(
-    { mod: true, key: "r", when: () => enabled && whenSession() && !streaming },
-    () => {
-      const text = lastUserText(messages);
-      if (text) onSend(text);
-    },
-  );
+  // Esc — 停止生成。冒泡阶段监听:slash/mention 菜单、审批卡、查找栏等先在
+  // 捕获阶段或自身处理并 preventDefault,这里只接没人要的 Esc;焦点在其他
+  // 输入框(查找栏、气泡内编辑器)或有模态框打开时也不抢。
+  const stopRef = useRef(onStop);
+  stopRef.current = onStop;
+  useEffect(() => {
+    if (!enabled || !streaming) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || e.isComposing) return;
+      const el = document.activeElement as HTMLElement | null;
+      const editing = el && (el.tagName === "INPUT" || (el.tagName === "TEXTAREA" && !el.classList.contains("wb-composer__input")) || el.isContentEditable);
+      if (editing) return;
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      e.preventDefault();
+      stopRef.current?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [enabled, streaming]);
 
   // ⌘E — 编辑最后一条用户消息(回填 composer)。
   useShortcut(

@@ -90,7 +90,7 @@ export const DOC_INDEX: DocMeta[] = [
   {
     slug: 'operations',
     title: 'Operations & Deployment',
-    description: 'Casdoor OIDC, NewAPI gateway, payment adapters, SCIM, SAML.',
+    description: 'Casdoor OIDC, NewAPI gateway, tenant policy, audit ledger.',
     category: 'operations',
     files: { en: 'OPERATIONS.md', zh: null }
   },

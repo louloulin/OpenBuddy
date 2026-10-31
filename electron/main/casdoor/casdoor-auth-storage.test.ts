@@ -21,9 +21,23 @@ vi.mock("electron", () => ({
 
 import { casdoorAuth, CasdoorAuthService, resetAuthSettingsStoreForTests } from "./casdoor-auth";
 
+// 探针 store 是同一 SQLite 文件的第二个连接。必须缓存并 close:
+// 以前每次调用都新开 driver 且从不关,Windows 上 afterEach 的 rmSync
+// 直接 EBUSY(macOS 允许 unlink 已打开文件,本地看不出来)。
+let probeDriver: { close(): void } | null = null;
+let probeStore: SettingsDocumentStore | null = null;
 function openAuthSettingsStoreForTests(): SettingsDocumentStore {
+  if (probeStore) return probeStore;
   const opened = openStorageSync({ filePath: join(userData, "openbuddy.sqlite"), appVersion: "openbuddy-casdoor-auth" });
-  return new SettingsDocumentStore(opened.driver);
+  probeDriver = opened.driver;
+  probeStore = new SettingsDocumentStore(opened.driver);
+  return probeStore;
+}
+
+function closeAuthSettingsProbe(): void {
+  try { probeDriver?.close(); } catch { /* 已经关了 */ }
+  probeDriver = null;
+  probeStore = null;
 }
 
 function stubRefresh(service: CasdoorAuthService): void {
@@ -40,7 +54,10 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  rmSync(userData, { recursive: true, force: true });
+  // 先关 SQLite 句柄再删目录:Windows 上删一个仍被打开的文件会 EBUSY。
+  closeAuthSettingsProbe();
+  resetAuthSettingsStoreForTests();
+  rmSync(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 describe("casdoor-auth SettingsDocumentStore-backed persistence", () => {

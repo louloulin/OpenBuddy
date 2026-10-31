@@ -263,12 +263,19 @@ export function refreshNextRun(automation: Automation, from = Date.now()): Autom
 export type AutomationExecutor = (automation: Automation, runId: string) => Promise<void>;
 
 let executor: AutomationExecutor | null = null;
+let isAgentBusy: () => boolean = () => false;
 let scanTimer: ReturnType<typeof setInterval> | null = null;
 const executing = new Set<string>();
 
-/** 注入执行器并启动 30s 到期扫描(email 同款节奏)。 */
-export function startAutomationScheduler(run: AutomationExecutor): void {
+/**
+ * 注入执行器并启动 30s 到期扫描(email 同款节奏)。
+ *
+ * 执行器在后台独立会话里运行,不碰前台会话(计划 0.3)。同一时刻只跑一个
+ * 自动化,控制并发的模型调用;`isBusy()` 保留为可选的外部让路开关。
+ */
+export function startAutomationScheduler(run: AutomationExecutor, options: { isBusy?: () => boolean } = {}): void {
   executor = run;
+  if (options.isBusy) isAgentBusy = options.isBusy;
   if (scanTimer) return;
   scanTimer = setInterval(() => void scanDue(), 30_000);
   scanTimer.unref?.();
@@ -282,6 +289,7 @@ export function stopAutomationScheduler(): void {
 
 async function scanDue(): Promise<void> {
   if (!executor) return;
+  if (executing.size > 0 || isAgentBusy()) return;
   const now = Date.now();
   const due = (await listAutomations()).filter(
     (a) =>
@@ -290,7 +298,7 @@ async function scanDue(): Promise<void> {
       Date.parse(a.nextRunAt as string) <= now &&
       !executing.has(a.id),
   );
-  for (const automation of due.slice(0, 5)) {
+  for (const automation of due.slice(0, 1)) {
     executing.add(automation.id);
     const runId = `run-${randomUUID().slice(0, 8)}`;
     const record: AutomationRunRecord = {

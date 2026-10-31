@@ -68,11 +68,13 @@ describe("R78 — assistant inline edit (MessageItem UI 接线)", () => {
   it("assistant 消息渲染「就地编辑」按钮(editor.body 槽在 builtin 后有 TiptapEditor)", () => {
     seedAssistantInStore(makeAssistant());
     mount(<MessageItem message={makeAssistant()} streaming={false} sessionId="s1" />);
+    fireEvent.click(screen.getByTestId("message-more"));
     expect(screen.queryByTestId("message-inline-edit-button")).toBeTruthy();
   });
 
   it("点「就地编辑」进入编辑态,显示「应用」「取消」按钮", () => {
     mount(<MessageItem message={makeAssistant()} streaming={false} sessionId="s1" />);
+    fireEvent.click(screen.getByTestId("message-more"));
     fireEvent.click(screen.getByTestId("message-inline-edit-button"));
     expect(screen.getByTestId("message-inline-edit-apply")).toBeTruthy();
     expect(screen.getByTestId("message-inline-edit-cancel")).toBeTruthy();
@@ -88,6 +90,7 @@ describe("R78 — assistant inline edit (MessageItem UI 接线)", () => {
         onEditAssistantMessage={onEdit}
       />,
     );
+    fireEvent.click(screen.getByTestId("message-more"));
     fireEvent.click(screen.getByTestId("message-inline-edit-button"));
     fireEvent.click(screen.getByTestId("message-inline-edit-apply"));
     expect(onEdit).toHaveBeenCalledTimes(1);
@@ -104,6 +107,7 @@ describe("R78 — assistant inline edit (MessageItem UI 接线)", () => {
         onEditAssistantMessage={onEdit}
       />,
     );
+    fireEvent.click(screen.getByTestId("message-more"));
     fireEvent.click(screen.getByTestId("message-inline-edit-button"));
     fireEvent.click(screen.getByTestId("message-inline-edit-cancel"));
     expect(onEdit).not.toHaveBeenCalled();
@@ -121,6 +125,7 @@ describe("R78 — assistant inline edit (MessageItem UI 接线)", () => {
         onResendAfterAssistantEdit={onResend}
       />,
     );
+    fireEvent.click(screen.getByTestId("message-more"));
     fireEvent.click(screen.getByTestId("message-inline-edit-button"));
     fireEvent.click(screen.getByTestId("message-inline-edit-apply-resend"));
     expect(onEdit).toHaveBeenCalledTimes(1);
@@ -154,6 +159,7 @@ describe("R78 — assistant inline edit (MessageItem UI 接线)", () => {
         }}
       />,
     );
+    fireEvent.click(screen.getByTestId("message-more"));
     fireEvent.click(screen.getByTestId("message-inline-edit-button"));
     fireEvent.click(screen.getByTestId("message-inline-edit-apply"));
     const updated = useSessionStore.getState().messages[0];

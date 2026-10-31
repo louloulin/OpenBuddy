@@ -32,6 +32,8 @@
  *   This module imports nothing from agent-host.ts. deps are passed in.
  */
 import { startProgress, finishProgress } from "../../progress-runs";
+import { toolAudit } from "./tool-audit";
+import { applyTurnInput, setTurnStateListener, type TurnInput } from "../turn-state";
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
 export interface HandleSessionEventDeps {
@@ -181,6 +183,11 @@ export function handleSessionEvent(
   const session = activeSession;
   const sessionEvent = { ...event, sessionId: session.sessionId };
 
+  // 回合状态机(计划 1.1):阶段变化广播成 `pi://turn-state`,渲染层只投影。
+  installTurnStateBroadcast(emitRendererEvent);
+  const turnInput = turnInputFor(event);
+  if (turnInput) applyTurnInput(session.sessionId, turnInput);
+
   // Diagnostics: surface model-side events with their terminal state so the
   // log clearly shows when an upstream provider responds vs. when pi surfaces
   // a failure (stopReason === "error" / "rate_limit"). Previously only the
@@ -237,6 +244,7 @@ export function handleSessionEvent(
     const toolName = event.toolName ?? "";
     const abortController = new AbortController();
     startProgress(toolCallId, session.sessionId, abortController);
+    toolAudit.start(toolCallId, toolName, session.sessionId, event.args);
 
     state.runningTasks.set(toolCallId, {
       id: toolCallId,
@@ -279,6 +287,7 @@ export function handleSessionEvent(
     const toolCallId = event.toolCallId ?? "";
     const job = state.jobsRegistry.get(toolCallId);
     finishProgress(toolCallId, event.isError ? "failed" : "completed", event.isError ? String(event.message ?? "tool execution failed") : undefined);
+    toolAudit.end(toolCallId, Boolean(event.isError));
 
     if (job) {
       job.status = event.isError ? "failed" : "completed";
@@ -480,11 +489,19 @@ export function handleSessionEvent(
   if (event.type === "turn_start" || event.type === "agent_start") {
     turnCompletedSessions.delete(session);
   }
+  //
+  // A `turn_end` with `stopReason: "toolUse"` is NOT the end of the run: the
+  // agent loop executes the tools and immediately opens another turn. Emitting
+  // complete there made the renderer drop `streaming` mid-run — the Stop
+  // button vanished, the composer unlocked and a queued prompt was sent into
+  // a session that was still working. Only a turn that stops for any other
+  // reason (or the session-level fallback below) settles the run.
   if (event.type === "turn_end" || event.type === "agent_end" || event.type === "agent_settled") {
     const alreadyCompleted = turnCompletedSessions.has(session);
-    if (event.type === "turn_end" || !alreadyCompleted) {
-      const msg = event.message as { stopReason?: string; errorMessage?: string } | undefined;
-      const stopReason = typeof msg?.stopReason === "string" ? msg.stopReason : "end_turn";
+    const msg = event.message as { stopReason?: string; errorMessage?: string } | undefined;
+    const stopReason = typeof msg?.stopReason === "string" ? msg.stopReason : "end_turn";
+    const midRunToolTurn = event.type === "turn_end" && stopReason === "toolUse";
+    if (!midRunToolTurn && (event.type === "turn_end" || !alreadyCompleted)) {
       // 发布工程(2026-10-20 真机探针):失败回合此前丢弃 errorMessage,渲染层
       // 按"正常完成"收尾 —— 用户看到空气泡 + 误导性"会话完成"通知,错误卡片
       // (TurnErrorCard)在实时路径永远不出现。带上原始错误文本。
@@ -496,6 +513,8 @@ export function handleSessionEvent(
         stopReason,
         errorMessage,
       });
+      // 与 complete 同一时刻收尾,且排在它之后:渲染层先收尾消息再看到 idle。
+      applyTurnInput(session.sessionId, { type: "run_end" });
     }
   }
 
@@ -560,6 +579,37 @@ export function handleSessionEvent(
       });
     }
   }
+}
+
+/** 会话事件 → 状态机输入;与阶段无关的事件返回 undefined。 */
+function turnInputFor(event: PiSessionEventLike): TurnInput | undefined {
+  switch (event.type) {
+    case "agent_start":
+    case "turn_start":
+      return { type: "run_start" };
+    case "tool_execution_start":
+      return { type: "tool_start" };
+    case "tool_execution_end":
+      return { type: "tool_end" };
+    case "message_update": {
+      const kind = event.assistantMessageEvent?.type;
+      if (kind === "text_delta") return { type: "text" };
+      if (kind === "thinking_delta") return { type: "thinking" };
+      return undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
+let turnBroadcastEmitter: ((channel: string, payload: unknown) => void) | null = null;
+
+function installTurnStateBroadcast(emit: (channel: string, payload: unknown) => void): void {
+  if (turnBroadcastEmitter === emit) return;
+  turnBroadcastEmitter = emit;
+  setTurnStateListener((sessionId, state) => {
+    emit("pi://turn-state", { sessionId, phase: state.phase, since: state.since });
+  });
 }
 
 /**

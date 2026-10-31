@@ -56,6 +56,8 @@ export {
 export type { PluginCommandPayload } from "./plugin-commands";
 export {
   ModelSelector,
+  MODEL_SELECTOR_OPEN_EVENT,
+  openModelSelector,
   inferCapabilities,
   type CapabilityHint,
 } from "./ModelSelector";

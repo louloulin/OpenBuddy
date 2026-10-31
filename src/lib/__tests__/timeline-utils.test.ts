@@ -72,8 +72,8 @@ describe("buildTimeline", () => {
       m("b", { modelId: "claude" }),
     ]);
     const dividers = nodes.filter((n) => n.kind === "model-divider");
-    expect(dividers).toHaveLength(2);
-    expect((dividers[1] as { label: string }).label).toContain("claude");
+    expect(dividers).toHaveLength(1);
+    expect((dividers[0] as { label: string }).label).toContain("claude");
   });
 
   it("模型相同不重复分隔", () => {
@@ -81,7 +81,17 @@ describe("buildTimeline", () => {
       m("a", { modelId: "gpt-4" }),
       m("b", { modelId: "gpt-4" }),
     ]);
-    expect(nodes.filter((n) => n.kind === "model-divider")).toHaveLength(1);
+    expect(nodes.filter((n) => n.kind === "model-divider")).toHaveLength(0);
+  });
+
+  it("第一条带模型的消息前不插分隔;中间没有 modelId 的消息不打断比较", () => {
+    const nodes = buildTimeline([
+      m("a"),
+      m("b", { modelId: "gpt-4" }),
+      m("c"),
+      m("d", { modelId: "gpt-4" }),
+    ]);
+    expect(nodes.filter((n) => n.kind === "model-divider")).toHaveLength(0);
   });
 
   it("message 节点带 index", () => {
@@ -101,10 +111,9 @@ describe("buildTimeline", () => {
       m("a", { createdAt: "2026-07-29T10:00:00Z", modelId: "x" }),
       m("b", { createdAt: "2026-07-30T10:00:00Z", modelId: "y" }),
     ]);
-    // a: date + model + msg ; b: date + model + msg
+    // a: date + msg ; b: date + model + msg
     expect(nodes.map((n) => n.kind)).toEqual([
       "date-divider",
-      "model-divider",
       "message",
       "date-divider",
       "model-divider",

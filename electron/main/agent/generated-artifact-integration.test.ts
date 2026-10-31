@@ -990,5 +990,7 @@ describe("generated DeepSeek Harness artifact integration", () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
-  }, 30_000);
+    // Real pnpm install + module import + mount/reload. Windows CI under
+    // parallel load genuinely exceeded 30s; it is slow, not hung.
+  }, 120_000);
 });

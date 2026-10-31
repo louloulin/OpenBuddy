@@ -5,6 +5,12 @@
 > **Scope:** every directory listed under `packages/`, `electron/`, `src/`, `apps/`, `scripts/`, `evals/`.
 > **Bilingual:** [English](CODEBASE_ANALYSIS.md) · [简体中文](CODEBASE_ANALYSIS.zh-CN.md)
 
+> **Staleness note (2026-10-28):** this snapshot predates the `experimental/`
+> archival. `packages/{payment,saml,scim,webhook-outbox}` and `bundle-desktop`
+> no longer exist in the tree (recoverable from git history at `2438a2ab`).
+> Package counts and the `packages/` table below are historical; use
+> `docs/stats.json` for current numbers.
+
 This document is the result of running **structural queries only** (`ls`, `find`, `grep` on package manifests and `index.ts` exports) on the live tree. Every claim is marked with one of:
 
 | Marker | Meaning |
@@ -13,7 +19,7 @@ This document is the result of running **structural queries only** (`ls`, `find`
 | `[I]` | Reasonable inference from neighbouring verified facts. Treat as a hypothesis until you re-check. |
 | `[OOS]` | Out of scope of this snapshot — listed for orientation, not analysed. |
 
-The repo already contains [PROJECT_ANALYSIS.md](_archive/PROJECT_ANALYSIS.md) and [openbuddy-capability-matrix.md](openbuddy-capability-matrix.md). Those documents predate this one and use slightly different counts; treat this file as the canonical 2026-09-05 reference.
+The repo also had a `PROJECT_ANALYSIS.md` (since removed from the working tree with the rest of `docs/_archive/` — recoverable from git history) alongside [openbuddy-capability-matrix.md](openbuddy-capability-matrix.md). Those documents predate this one and use slightly different counts; treat this file as the canonical 2026-09-05 reference.
 
 ---
 

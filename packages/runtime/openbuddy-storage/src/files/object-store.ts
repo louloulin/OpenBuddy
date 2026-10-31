@@ -31,9 +31,15 @@ export class ContentAddressedObjectStore {
       const temporaryPath = `${absolutePath}.${process.pid}.${randomUUID()}.tmp`;
       await writeFile(temporaryPath, data, { flag: "wx", mode: 0o600 });
       try { await rename(temporaryPath, absolutePath); } catch (error) {
+        // 目标已存在说明另一个并发写入者赢了。POSIX 抛 EEXIST,Windows 上
+        // 覆盖已存在文件的 rename 抛的是 EPERM/EACCES —— 只认 EEXIST 会让
+        // 并发写同一个对象在 Windows 上直接失败(macOS 上从不复现)。
+        // 内容是按 hash 寻址的,赢家的字节必然与我们要写的一致,后面那次
+        // verify() 会最终确认,所以这里可以把"目标已存在"一律当成功。
         try { await writeFile(absolutePath, data, { flag: "wx", mode: 0o600 }); } catch { /* another writer won */ }
         try { await unlink(temporaryPath); } catch { /* cleanup best effort */ }
-        if (error && !String(error).includes("EEXIST")) throw error;
+        const code = (error as NodeJS.ErrnoException | undefined)?.code;
+        if (code !== "EEXIST" && code !== "EPERM" && code !== "EACCES") throw error;
       }
     }
     await this.verify(absolutePath, hash);

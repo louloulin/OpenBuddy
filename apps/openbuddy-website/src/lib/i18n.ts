@@ -378,7 +378,7 @@ const en: Dict = {
         icon: 'puzzle',
         title: 'Cordis capability mesh',
         description:
-          `${SITE_STATS.packages} workspace packages under @openbuddy/* — skills, memory, plan, task, email, calendar, MCP, payment, SCIM, SAML. Pick what you need.`,
+          `${SITE_STATS.packages} workspace packages under @openbuddy/* — skills, memory, plan, task, email, calendar, MCP, authorization, folder trust. Pick what you need.`,
         bullets: [
           `${SITE_STATS.uiPackages} UI packages (shell, sidebar, workbench…)`,
           `${SITE_STATS.collaborationPackages} collaboration packages (room, inbox…)`,
@@ -400,11 +400,11 @@ const en: Dict = {
         icon: 'building-2',
         title: 'Enterprise-ready',
         description:
-          'Production-grade building blocks: Casdoor OIDC, NewAPI gateway, 4 payment channels, SCIM v2, SAML 2.0, transactional outbox.',
+          'Production-grade building blocks: Casdoor OIDC, NewAPI gateway, tenant policy, and a local audit ledger.',
         bullets: [
           'Casdoor OIDC + tenant policy',
-          'SCIM v2 · RFC 7644 provisioning',
-          'Stripe · WeChat Pay · Alipay · HMAC'
+          'Per-folder trust + capability authorization',
+          'Append-only local audit ledger'
         ]
       }
     ]
@@ -452,8 +452,6 @@ const en: Dict = {
       { capability: 'Provider choice', openbuddy: 'BYOK · Anthropic / OpenAI / NewAPI / custom', workbuddy: 'Limited', advantage: 'openbuddy' },
       { capability: 'Casdoor OIDC', openbuddy: '✓', workbuddy: '✗', advantage: 'openbuddy' },
       { capability: 'NewAPI gateway', openbuddy: '✓', workbuddy: '✗', advantage: 'openbuddy' },
-      { capability: 'SCIM v2', openbuddy: '✓ (RFC 7644)', workbuddy: '✗', advantage: 'openbuddy' },
-      { capability: 'SAML 2.0', openbuddy: '✓', workbuddy: '✗', advantage: 'openbuddy' },
       { capability: 'Plugin SDK', openbuddy: 'Cordis open capability mesh', workbuddy: 'Closed', advantage: 'openbuddy' },
       { capability: 'Cross-platform', openbuddy: 'Win / macOS / Linux', workbuddy: 'Win / macOS', advantage: 'openbuddy' },
       { capability: 'Tests visible', openbuddy: `${SITE_STATS.testFiles} test files in repo`, workbuddy: '✗', advantage: 'openbuddy' }
@@ -463,18 +461,18 @@ const en: Dict = {
     sectionLabel: 'Capabilities',
     title: 'A capability mesh you can extend.',
     subtitle:
-      '63 packages, every one a Cordis service. Enable, configure, or replace each independently.',
+      `${SITE_STATS.packages} packages, every one a Cordis service. Enable, configure, or replace each independently.`,
     groups: [
       {
-        name: 'Core agent',
+        name: 'Core agent & runtime',
         icon: 'cpu',
         packages: [
           { name: '@openbuddy/core-session', description: 'Session lifecycle, fork, rewind' },
-          { name: '@openbuddy/capability-plan', description: 'Plan mode + plan approval flow' },
-          { name: '@openbuddy/capability-task', description: 'Sub-agent task spawning & cancellation' },
-          { name: '@openbuddy/capability-automation', description: 'Local scheduler for recurring agent runs' },
-          { name: '@openbuddy/capability-web-search', description: 'Provider-pluggable web search' },
-          { name: '@openbuddy/capability-inspiration', description: 'Prompt templates & starters' }
+          { name: '@openbuddy/cordis', description: 'Cordis context + service helpers' },
+          { name: '@openbuddy/host-runtime', description: 'Host-side runtime glue' },
+          { name: '@openbuddy/storage', description: 'Local persistence with audit' },
+          { name: '@openbuddy/plugin-host', description: 'Plugin discovery + hot reload' },
+          { name: '@openbuddy/plugin-sdk', description: 'Plugin authoring SDK' }
         ]
       },
       {
@@ -490,7 +488,6 @@ const en: Dict = {
         icon: 'users',
         packages: [
           { name: '@openbuddy/team-team', description: 'Multi-agent team orchestration' },
-          { name: '@openbuddy/team-subagent', description: 'Sub-agent spawning' },
           { name: '@openbuddy/collaboration-protocol', description: 'A2A message envelopes' },
           { name: '@openbuddy/collaboration-room', description: 'Shared rooms' },
           { name: '@openbuddy/collaboration-inbox', description: 'Cross-agent inbox' },
@@ -503,10 +500,8 @@ const en: Dict = {
         packages: [
           { name: '@openbuddy/auth-casdoor', description: 'Casdoor OIDC client + admin REST' },
           { name: '@openbuddy/auth-permission', description: 'Permission prompts & policy UI' },
-          { name: '@openbuddy/payment', description: 'Stripe / WeChat Pay / Alipay / HMAC' },
-          { name: '@openbuddy/saml', description: 'SAML 2.0 primitives' },
-          { name: '@openbuddy/scim', description: 'SCIM v2 endpoints (RFC 7644)' },
-          { name: '@openbuddy/webhook-outbox', description: 'Transactional outbox + retry/backoff' }
+          { name: '@openbuddy/auth-policy', description: 'Tenant and capability policy evaluation' },
+          { name: '@openbuddy/capability-authorization', description: 'Capability-level authorization gate' }
         ]
       },
       {
@@ -522,7 +517,7 @@ const en: Dict = {
         icon: 'plug',
         packages: [
           { name: '@openbuddy/capability-mcp-client', description: 'MCP connector governance' },
-          { name: '@openbuddy/capability-folder-trust', description: 'Per-folder permission grants' },
+          { name: '@openbuddy/folder-trust', description: 'Per-folder permission grants' },
           { name: '@openbuddy/capability-authorization', description: 'Capability-level policy' }
         ]
       }
@@ -536,12 +531,12 @@ const en: Dict = {
       {
         prompt: '$ pnpm electron:dev',
         response:
-          '✔ moon DAG resolved · 32 projects\n✔ Vite renderer up on http://localhost:5173\n✔ Electron host spawned · IPC allowlist ready\n⏳ AgentSession initializing…'
+          '✔ moon DAG resolved\n✔ Vite renderer up on http://localhost:5173\n✔ Electron host spawned · IPC allowlist ready\n⏳ AgentSession initializing…'
       },
       {
         prompt: '> Summarize the Q3 release notes in 3 bullets',
         response:
-          '◆ Deep thinking · 4.2s\n  → identifying three top-impact changes from CHANGELOG.md…\n\n• Casdoor OIDC + tenant policy shipped\n• NewAPI gateway now BYOK + Service Token\n• SCIM v2 + SAML 2.0 provisioning complete\n\n✓ Completed · 5.1s · 248 tokens'
+          '◆ Deep thinking · 4.2s\n  → identifying three top-impact changes from CHANGELOG.md…\n\n• Casdoor OIDC + tenant policy shipped\n• NewAPI gateway now BYOK + Service Token\n• Audit ledger persisted across restarts\n\n✓ Completed · 5.1s · 248 tokens'
       }
     ]
   },
@@ -640,7 +635,7 @@ const en: Dict = {
         features: [
           'Everything in Pro',
           'Self-hosted Casdoor + NewAPI bundle',
-          'SCIM v2 / SAML 2.0 / audit ledger',
+          'Audit ledger + tenant policy',
           'Dedicated support channel',
           'Quarterly roadmap review',
           'Security review + signed builds'
@@ -659,7 +654,7 @@ const en: Dict = {
       { feature: 'Skill catalog', community: 'Open catalog', pro: 'Open + Premium (1.2k skills)', enterprise: 'Custom + Private' },
       { feature: 'Support', community: 'GitHub Discussions', pro: 'Priority triage <24h', enterprise: 'Dedicated channel' },
       { feature: 'Casdoor OIDC', community: 'Self-hosted', pro: 'Hosted (us-east-1)', enterprise: 'Self-hosted + SSO' },
-      { feature: 'SCIM v2 / SAML 2.0', community: '—', pro: '—', enterprise: '✓' },
+      { feature: 'Audit export', community: '—', pro: '—', enterprise: '✓' },
       { feature: 'Audit ledger', community: '—', pro: '—', enterprise: '✓' },
       { feature: 'Source code', community: 'MIT', pro: 'MIT', enterprise: 'MIT + commercial use indemnification' }
     ],
@@ -745,7 +740,7 @@ const en: Dict = {
       },
       {
         q: 'Is there a hosted version?',
-        a: 'No, and we don\'t plan one. OpenBuddy is a local desktop app on purpose. For teams, we ship Casdoor OIDC, NewAPI gateway, SCIM v2, and SAML 2.0 so you can run it inside your own perimeter.'
+        a: 'No, and we don\'t plan one. OpenBuddy is a local desktop app on purpose. For teams, we ship Casdoor OIDC, the NewAPI gateway, tenant policy, and a local audit ledger so you can run it inside your own perimeter. (SCIM/SAML exist as tested seeds in git history; they are not wired into the app.)'
       }
     ]
   },
@@ -772,7 +767,7 @@ const en: Dict = {
           'SceneTabs & skill recommendation bar (long-awaited)',
           'Pinned sessions & workspace grouping',
           'Permission management panel',
-          'Linux builds (AppImage + .deb) for x86_64'
+          'Linux builds (AppImage) for x64 + arm64'
         ],
         improvements: [
           'Smaller first-load JS shared bundle (87 kB)',
@@ -793,12 +788,12 @@ const en: Dict = {
         highlights: [
           'Casdoor OIDC + tenant policy',
           'NewAPI gateway (BYOK + Service Token)',
-          'SCIM v2 provisioning (RFC 7644)',
-          'SAML 2.0 AuthnRequest / Response / LogoutRequest'
+          'Per-folder trust grants + capability authorization',
+          'Append-only local audit ledger'
         ],
         improvements: [
           'Admin portal: Casdoor login flow + resource gateway',
-          'Transactional outbox with exponential backoff',
+          'Session rewind & fork across restarts',
           'Bilingual UI shipped out of the box (en + zh-CN)'
         ],
         fixes: [
@@ -818,7 +813,7 @@ const en: Dict = {
           'Sub-agent task spawning & cancellation'
         ],
         improvements: [
-          'CI now runs pnpm typecheck on 32 projects in <90s',
+          'CI runs workspace typecheck across every project',
           'Playwright UI smoke tests against real MiniMax-M3'
         ],
         githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.15.0'
@@ -848,11 +843,11 @@ const en: Dict = {
         'BYOK multi-provider config',
         'Skills / MCP / Experts surfaces',
         'Plan mode · Rewind · Tasks · Slash Commands · Automations',
-        'Windows (NSIS + MSI) & macOS (DMG) installers',
+        'Windows (NSIS) & macOS (DMG) installers',
         'CI release workflow (GitHub Actions)',
-        'moon-managed monorepo (32-project DAG)',
-        'Casdoor OIDC + NewAPI gateway + payment adapters + SCIM v2 + SAML 2.0',
-        'Linux AppImage + .deb installers',
+        'moon-managed monorepo (incremental DAG)',
+        'Casdoor OIDC + NewAPI gateway + tenant policy + audit ledger',
+        'Linux AppImage installers (x64 + arm64)',
         'Bilingual UI (en + zh-CN)'
       ]
     },
@@ -1053,7 +1048,7 @@ const zhCN: Dict = {
       {
         icon: 'puzzle',
         title: 'Cordis 能力网格',
-        description: `@openbuddy/* 下 ${SITE_STATS.packages} 个工作区包 —— skills、memory、plan、task、email、calendar、MCP、payment、SCIM、SAML。按需选用。`,
+        description: `@openbuddy/* 下 ${SITE_STATS.packages} 个工作区包 —— skills、memory、plan、task、email、calendar、MCP、authorization、folder trust。按需选用。`,
         bullets: [`${SITE_STATS.uiPackages} 个 UI 包 (shell、sidebar、workbench…)`, `${SITE_STATS.collaborationPackages} 个协作包 (room、inbox…)`, `@openbuddy/* 下共 ${SITE_STATS.packages} 个包`]
       },
       {
@@ -1065,8 +1060,8 @@ const zhCN: Dict = {
       {
         icon: 'building-2',
         title: '企业级就绪',
-        description: '生产级积木:Casdoor OIDC、NewAPI 网关、4 个支付通道、SCIM v2、SAML 2.0、事务性 outbox。',
-        bullets: ['Casdoor OIDC + 租户策略', 'SCIM v2 · RFC 7644 配置', 'Stripe · 微信支付 · 支付宝 · HMAC']
+        description: '生产级积木:Casdoor OIDC、NewAPI 网关、租户策略与本地审计账本。',
+        bullets: ['Casdoor OIDC + 租户策略', '按文件夹信任 + 能力授权', '只追加的本地审计账本']
       }
     ]
   },
@@ -1109,8 +1104,6 @@ const zhCN: Dict = {
       { capability: 'Provider 选择', openbuddy: 'BYOK · Anthropic / OpenAI / NewAPI / 自定义', workbuddy: '有限', advantage: 'openbuddy' },
       { capability: 'Casdoor OIDC', openbuddy: '✓', workbuddy: '✗', advantage: 'openbuddy' },
       { capability: 'NewAPI 网关', openbuddy: '✓', workbuddy: '✗', advantage: 'openbuddy' },
-      { capability: 'SCIM v2', openbuddy: '✓ (RFC 7644)', workbuddy: '✗', advantage: 'openbuddy' },
-      { capability: 'SAML 2.0', openbuddy: '✓', workbuddy: '✗', advantage: 'openbuddy' },
       { capability: '插件 SDK', openbuddy: 'Cordis 开源能力网格', workbuddy: '封闭', advantage: 'openbuddy' },
       { capability: '跨平台', openbuddy: 'Win / macOS / Linux', workbuddy: 'Win / macOS', advantage: 'openbuddy' },
       { capability: '测试可见', openbuddy: `仓库内 ${SITE_STATS.testFiles} 个测试文件`, workbuddy: '✗', advantage: 'openbuddy' }
@@ -1119,18 +1112,18 @@ const zhCN: Dict = {
   capabilities: {
     sectionLabel: '能力',
     title: '可扩展的能力网格。',
-    subtitle: '63 个包,每个都是 Cordis 服务。可独立启用、配置或替换。',
+    subtitle: `${SITE_STATS.packages} 个包,每个都是 Cordis 服务。可独立启用、配置或替换。`,
     groups: [
       {
-        name: '核心 Agent',
+        name: '核心 Agent 与运行时',
         icon: 'cpu',
         packages: [
           { name: '@openbuddy/core-session', description: '会话生命周期、fork、回退' },
-          { name: '@openbuddy/capability-plan', description: 'Plan 模式与审批流' },
-          { name: '@openbuddy/capability-task', description: '子 agent 任务生成与取消' },
-          { name: '@openbuddy/capability-automation', description: '周期性 agent 运行调度器' },
-          { name: '@openbuddy/capability-web-search', description: '可插拔 provider 的 Web 搜索' },
-          { name: '@openbuddy/capability-inspiration', description: 'Prompt 模板与启动器' }
+          { name: '@openbuddy/cordis', description: 'Cordis 上下文 + 服务辅助' },
+          { name: '@openbuddy/host-runtime', description: '宿主侧运行时胶水' },
+          { name: '@openbuddy/storage', description: '带审计的本地持久化' },
+          { name: '@openbuddy/plugin-host', description: '插件发现 + 热重载' },
+          { name: '@openbuddy/plugin-sdk', description: '插件开发 SDK' }
         ]
       },
       {
@@ -1146,7 +1139,6 @@ const zhCN: Dict = {
         icon: 'users',
         packages: [
           { name: '@openbuddy/team-team', description: '多 agent 团队编排' },
-          { name: '@openbuddy/team-subagent', description: '子 agent 生成' },
           { name: '@openbuddy/collaboration-protocol', description: 'A2A 消息信封' },
           { name: '@openbuddy/collaboration-room', description: '共享房间' },
           { name: '@openbuddy/collaboration-inbox', description: '跨 agent 收件箱' },
@@ -1159,10 +1151,8 @@ const zhCN: Dict = {
         packages: [
           { name: '@openbuddy/auth-casdoor', description: 'Casdoor OIDC 客户端 + 管理 REST' },
           { name: '@openbuddy/auth-permission', description: '权限提示与策略 UI' },
-          { name: '@openbuddy/payment', description: 'Stripe / 微信支付 / 支付宝 / HMAC' },
-          { name: '@openbuddy/saml', description: 'SAML 2.0 原语' },
-          { name: '@openbuddy/scim', description: 'SCIM v2 端点 (RFC 7644)' },
-          { name: '@openbuddy/webhook-outbox', description: '事务性 outbox + 重试/退避' }
+          { name: '@openbuddy/auth-policy', description: '租户与能力策略求值' },
+          { name: '@openbuddy/capability-authorization', description: '能力级授权门禁' }
         ]
       },
       {
@@ -1178,7 +1168,7 @@ const zhCN: Dict = {
         icon: 'plug',
         packages: [
           { name: '@openbuddy/capability-mcp-client', description: 'MCP 连接器治理' },
-          { name: '@openbuddy/capability-folder-trust', description: '按文件夹的权限授予' },
+          { name: '@openbuddy/folder-trust', description: '按文件夹的权限授予' },
           { name: '@openbuddy/capability-authorization', description: '能力级策略' }
         ]
       }
@@ -1192,12 +1182,12 @@ const zhCN: Dict = {
       {
         prompt: '$ pnpm electron:dev',
         response:
-          '✔ moon DAG 已解析 · 32 项目\n✔ Vite renderer 已启动 http://localhost:5173\n✔ Electron 宿主已生成 · IPC 白名单就绪\n⏳ AgentSession 初始化中…'
+          '✔ moon DAG 已解析\n✔ Vite renderer 已启动 http://localhost:5173\n✔ Electron 宿主已生成 · IPC 白名单就绪\n⏳ AgentSession 初始化中…'
       },
       {
         prompt: '> 用 3 个要点总结 Q3 发布说明',
         response:
-          '◆ 深度思考 · 4.2s\n  → 从 CHANGELOG.md 中识别三个最有影响力的变化…\n\n• Casdoor OIDC + 租户策略已发布\n• NewAPI 网关现在支持 BYOK + Service Token\n• SCIM v2 + SAML 2.0 配置完成\n\n✓ 已完成 · 5.1s · 248 tokens'
+          '◆ 深度思考 · 4.2s\n  → 从 CHANGELOG.md 中识别三个最有影响力的变化…\n\n• Casdoor OIDC + 租户策略已发布\n• NewAPI 网关现在支持 BYOK + Service Token\n• 审计账本跨重启持久化\n\n✓ 已完成 · 5.1s · 248 tokens'
       }
     ]
   },
@@ -1265,7 +1255,7 @@ const zhCN: Dict = {
         features: [
           'Pro 全部功能',
           '自托管 Casdoor + NewAPI 套装',
-          'SCIM v2 / SAML 2.0 / 审计账本',
+          '审计账本 + 租户策略',
           '专属支持频道',
           '季度路线图复盘',
           '安全审计 + 签名构建'
@@ -1284,7 +1274,7 @@ const zhCN: Dict = {
       { feature: '技能目录', community: '开放目录', pro: '开放 + 高级 (1.2k 技能)', enterprise: '自定义 + 私有' },
       { feature: '支持', community: 'GitHub Discussions', pro: '优先处理 <24h', enterprise: '专属频道' },
       { feature: 'Casdoor OIDC', community: '自托管', pro: '托管 (us-east-1)', enterprise: '自托管 + SSO' },
-      { feature: 'SCIM v2 / SAML 2.0', community: '—', pro: '—', enterprise: '✓' },
+      { feature: 'Audit export', community: '—', pro: '—', enterprise: '✓' },
       { feature: '审计账本', community: '—', pro: '—', enterprise: '✓' },
       { feature: '源代码', community: 'MIT', pro: 'MIT', enterprise: 'MIT + 商业使用赔偿' }
     ],
@@ -1367,7 +1357,7 @@ const zhCN: Dict = {
       },
       {
         q: '有托管版吗?',
-        a: '没有,也不打算做。OpenBuddy 是有意识地做成本地桌面应用。对于团队,我们提供 Casdoor OIDC、NewAPI 网关、SCIM v2 和 SAML 2.0,让你在自己的边界内运行。'
+        a: '没有,也不打算做。OpenBuddy 是有意识地做成本地桌面应用。对于团队,我们提供 Casdoor OIDC、NewAPI 网关、租户策略与本地审计账本,让你在自己的边界内运行。(SCIM/SAML 是 git 历史里有测试的种子,尚未接线。)'
       }
     ]
   },
@@ -1394,7 +1384,7 @@ const zhCN: Dict = {
           'SceneTabs 与技能推荐栏(期待已久)',
           '置顶会话与工作空间分组',
           '权限管理面板',
-          'Linux x86_64 构建 (AppImage + .deb)'
+          'Linux 构建 (AppImage,x64 + arm64)'
         ],
         improvements: [
           '首屏 JS 共享包更小 (87 kB)',
@@ -1415,8 +1405,8 @@ const zhCN: Dict = {
         highlights: [
           'Casdoor OIDC + 租户策略',
           'NewAPI 网关 (BYOK + Service Token)',
-          'SCIM v2 配置 (RFC 7644)',
-          'SAML 2.0 AuthnRequest / Response / LogoutRequest'
+          '按文件夹信任 + 能力授权',
+          '只追加的本地审计账本'
         ],
         improvements: [
           '管理控制台:Casdoor 登录流 + 资源网关',
@@ -1434,13 +1424,13 @@ const zhCN: Dict = {
         date: '2025-08-04',
         tag: 'beta',
         highlights: [
-          'moon 管理的 monorepo:32 项目 DAG,增量构建',
+          'moon 管理的 monorepo:增量 DAG 构建',
           'Cordis 3 能力网格脚手架',
           'Plan 模式带审批流',
           '子 agent 任务生成与取消'
         ],
         improvements: [
-          'CI 现在在 90 秒内对 32 个项目运行 pnpm typecheck',
+          'CI 对每个工程运行 workspace typecheck',
           '针对真实 MiniMax-M3 的 Playwright UI 烟测'
         ],
         githubHref: 'https://github.com/louloulin/OpenBuddy/releases/tag/v0.15.0'
@@ -1470,11 +1460,11 @@ const zhCN: Dict = {
         'BYOK 多 provider 配置',
         'Skills / MCP / Experts 表面',
         'Plan 模式 · 回退 · Tasks · Slash Commands · 自动化',
-        'Windows (NSIS + MSI) 与 macOS (DMG) 安装器',
+        'Windows (NSIS) 与 macOS (DMG) 安装器',
         'CI 发布工作流 (GitHub Actions)',
-        'moon 管理的 monorepo (32 项目 DAG)',
-        'Casdoor OIDC + NewAPI 网关 + 支付适配器 + SCIM v2 + SAML 2.0',
-        'Linux AppImage + .deb 安装器',
+        'moon 管理的 monorepo(增量 DAG)',
+        'Casdoor OIDC + NewAPI 网关 + 租户策略 + 审计账本',
+        'Linux AppImage 安装器 (x64 + arm64)',
         '双语 UI (en + zh-CN)'
       ]
     },

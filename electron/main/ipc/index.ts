@@ -743,19 +743,32 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		const win = getWindow();
 		if (!win || win.isDestroyed()) return;
 		const rpcId = requestedRpcId ? RpcId(requestedRpcId) : createRpcId(prefix);
-		const timer = setTimeout(() => {
-			const pending = pendingServerRequests.get(rpcId);
-			if (!pending) return;
-			pendingServerRequests.delete(rpcId);
-			if (pending.method === "session.permission" || pending.method === "session.question") {
-				agentHost.resolveUiRequest(rpcId, undefined);
-			}
-		}, 30_000);
-		timer.unref?.();
-		pendingServerRequests.set(rpcId, { method, timer });
+		// Approvals and questions wait for the user — a 30 s auto-deny punished
+		// anyone who looked away. They settle via the UI, Stop (agent abort) or
+		// a runtime reload. Only fire-and-forget notifications get evicted.
+		// Event notifications (`session.event` / `plugin.event`, one per agent
+		// event — i.e. per streamed token) are fire-and-forget: no pending entry,
+		// no timer, no reply expected. Only interactions are tracked.
+		const interactive = method === "session.permission" || method === "session.question";
+		if (interactive) {
+			const timer = setTimeout(() => {
+				pendingServerRequests.delete(rpcId);
+			}, 24 * 60 * 60_000);
+			timer.unref?.();
+			pendingServerRequests.set(rpcId, { method, timer });
+		}
 		sendSafe(win, "dsh://rpc", { type: "server-request", rpcId, method, payload });
 	};
-	const piStream = createPiStreamTransport();
+	const piStream = createPiStreamTransport({
+		onUndelivered: (events) => {
+			const win = getWindow();
+			if (win) for (const update of events) sendSafe(win, "pi://update", update);
+		},
+	});
+	/** One path per update: the stream port when attached, IPC otherwise. */
+	const publishUpdate = (win: BrowserWindow | null, update: unknown): void => {
+		if (!piStream.publish(update) && win) sendSafe(win, "pi://update", update);
+	};
 	ipcMain.handle("agent:stream-port", (event) => {
 		if (!event.senderFrame || event.senderFrame !== getWindow()?.webContents.mainFrame) {
 			throw new Error("pi stream port is only available to the main frame");
@@ -790,7 +803,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	"harness:session-cursors", "harness:session-cursors-set", "harness:resume-token", "harness:resume-token-set",
 		"dsh:remote", "dsh:rpc", "dsh:remote-register", "dsh:remote-unregister",
 		"agents_list", "agents_get", "agents_save", "agents_delete", "agents_template", "agents_defaults_get", "agents_defaults_save", "tasks_list", "task_kill",
-		"agent:load-session", "agent:session-info", "agent:session-usage", "agent:session-metadata-clear",
+		"agent:load-session", "agent:session-info", "agent:turn-state", "agent:session-usage", "agent:session-metadata-clear",
 		"agent:commands-list", "agent:resolve-permission", "agent:resolve-question", "prompt_history", "session_search", "session_fork", "rewind_points", "rewind_execute",
 		"agent:resource-inventory",
 		"collaboration:snapshot", "collaboration:a2a-agent-card", "collaboration:a2a-task-submit", "collaboration:a2a-task-get", "collaboration:propose-task", "collaboration:propose", "collaboration:execute", "collaboration:ack-inbox",
@@ -934,8 +947,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		// AssistantMessageEvent surface (text, thinking, tool-call deltas).
 		if (payload.type === "tool_execution_start") {
 			const update = { sessionId, type: "tool_call", toolCallId: payload.toolCallId, title: payload.toolName, kind: payload.toolName, status: "in_progress", rawInput: payload.args, content: [] };
-			sendSafe(win, "pi://update", update);
-			piStream.publish(update);
+			publishUpdate(win, update);
 		}
 		// R-ToolStream-1 — forward incremental tool output (bash logs, build
 		// progress, etc.) to the renderer so ToolCallCard.StreamingToolOutput
@@ -946,16 +958,35 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 		// `update.partial / update.partialResult`, so this is the missing wire.
 		if (payload.type === "tool_execution_update") {
 			const update = { sessionId, type: "tool_call_update", toolCallId: payload.toolCallId, update: { partial: true, partialResult: payload.partialResult } };
-			sendSafe(win, "pi://update", update);
-			piStream.publish(update);
+			publishUpdate(win, update);
 		}
 		if (payload.type === "tool_execution_end") {
-			// F3 perf: result stays as a structured-clone-able object instead of
-			// being JSON.stringified on the hot path. The renderer can lazily
-			// stringify if it needs to display it.
-			const update = { sessionId, type: "tool_call_update", toolCallId: payload.toolCallId, status: payload.isError ? "failed" : "completed", content: payload.result !== undefined ? [{ type: "text", text: typeof payload.result === "string" ? payload.result : JSON.stringify(payload.result) }] : [] };
-			sendSafe(win, "pi://update", update);
-			piStream.publish(update);
+			// Tool extensions return pi's structured shape `{ content, details }`.
+			// The renderer's ToolCallDetailBody consumes typed parts, so keep the
+			// extension's content array instead of flattening it into a JSON blob
+			// (which made every structured result unreadable and hid command
+			// output from the truncate/copy UI).
+			const rawResult = payload.result;
+			let resultContent: Array<Record<string, unknown>> = [];
+			if (rawResult && typeof rawResult === "object" && Array.isArray((rawResult as { content?: unknown }).content)) {
+				const parts = (rawResult as { content: Array<Record<string, unknown>> }).content;
+				if (payload.toolName === "apply_command") {
+					const output = parts
+						.map((part) => (typeof part?.text === "string" ? part.text : ""))
+						.filter(Boolean)
+						.join("\n");
+					const command = (payload.args as { command?: unknown } | undefined)?.command;
+					resultContent = output
+						? [{ type: "command_output", ...(typeof command === "string" ? { command } : {}), output }]
+						: [];
+				} else {
+					resultContent = parts;
+				}
+			} else if (rawResult !== undefined) {
+				resultContent = [{ type: "text", text: typeof rawResult === "string" ? rawResult : JSON.stringify(rawResult) }];
+			}
+			const update = { sessionId, type: "tool_call_update", toolCallId: payload.toolCallId, status: payload.isError ? "failed" : "completed", content: resultContent };
+			publishUpdate(win, update);
 		}
 		// `agent_end` no longer emits `pi://complete` here. It was one of four
 		// completes the renderer received per prompt: `handle-session-event.ts`
@@ -989,8 +1020,7 @@ export async function registerIpc(getWindow: () => BrowserWindow | null): Promis
 	const unbindRendererEmitter = bindRendererEventEmitter((channel, payload) => {
 		const win = currentWindow();
 		if (channel === "pi://update") {
-			piStream.publish(payload);
-			if (win) sendSafe(win, channel, payload);
+			publishUpdate(win, payload);
 		} else {
 			// Flush buffered stream deltas before any ordering-sensitive
 			// terminal/renderer event (pi://complete, pi://turn-error, ...) so

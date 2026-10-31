@@ -75,4 +75,39 @@ describe("useChatViewStreaming 未读计数", () => {
     act(() => rerender({ messages: [message] }));
     expect(result.current.unreadCount).toBe(0);
   });
+
+  // 20261031 Phase 2.4
+  it("流式更新同一条消息不累计未读(按消息条数,不按渲染次数)", () => {
+    const { ref, userScrollTo } = scroller(1200, 400, 800);
+    const { result, rerender } = mount(ref);
+    act(() => userScrollTo(0));
+    act(() => rerender({ messages: [message] }));
+    const afterNew = result.current.unreadCount;
+    // 同一条消息的内容在流式中变化:数组变了,长度没变。
+    act(() => rerender({ messages: [{ ...message, text: "more" }] }));
+    act(() => rerender({ messages: [{ ...message, text: "even more" }] }));
+    expect(result.current.unreadCount).toBe(afterNew);
+  });
+
+  it("用户离开底部后即显示回到底部(无新消息也显示),跳回后隐藏", () => {
+    const { ref, userScrollTo } = scroller(1200, 400, 800);
+    const { result } = mount(ref);
+    expect(result.current.awayFromBottom).toBe(false);
+    act(() => userScrollTo(0));
+    expect(result.current.awayFromBottom).toBe(true);
+    act(() => result.current.handleJumpToBottom());
+    expect(result.current.awayFromBottom).toBe(false);
+  });
+
+  it("用户滚上去后又发了一条消息:回到末尾,不挂「↓」(§21)", () => {
+    const { ref, userScrollTo, el } = scroller(1200, 400, 800);
+    const { result, rerender } = mount(ref);
+    act(() => userScrollTo(0));
+    expect(result.current.awayFromBottom).toBe(true);
+    act(() => rerender({ messages: [{ id: "u1", role: "user" }] }));
+    expect(el.scrollTop).toBe(1200);
+    expect(result.current.awayFromBottom).toBe(false);
+    expect(result.current.unreadCount).toBe(0);
+  });
 });
+

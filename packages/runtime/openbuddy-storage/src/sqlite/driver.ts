@@ -96,20 +96,32 @@ export class SqliteDriver implements StorageDriver {
   constructor(public readonly options: SqliteDriverOptions) {
     this.writeQueueKey = options.filePath === ":memory:" ? `memory:${randomUUID()}` : resolve(options.filePath);
     this.database = new DatabaseSyncConstructor(options.filePath);
-    const busyTimeoutMs = options.busyTimeoutMs ?? 5_000;
-    runStatement(this.database, `PRAGMA busy_timeout = ${Math.max(0, busyTimeoutMs | 0)}`);
-    runStatement(this.database, `PRAGMA foreign_keys = ${options.foreignKeys === false ? "OFF" : "ON"}`);
-    runStatement(this.database, `PRAGMA journal_mode = ${determineJournalMode(options.filePath, options.journalMode)}`);
-    // 数据§11(2026-10-19 生产评审):WAL 无上限会长到数百 MB。checkpoint 后
-    // 把 -wal 截到 64MB 上限;每 1000 页(≈4MB)自动 checkpoint。非 WAL 模式下
-    // 这两条 PRAGMA 是 no-op(个别旧 SQLite 会报错,忽略即可)。
+    // 构造函数里任何一步失败都必须自己关掉句柄:构造函数抛异常时调用方
+    // 拿不到这个对象,`new SqliteDriver()` 外面那个 catch 里根本没有
+    // driver 可以 close()。文件是损坏的(不是 SQLite 库)时第一条 PRAGMA
+    // 就会抛 —— 句柄随之泄漏,Windows 上表现为之后 unlink 该文件
+    // EBUSY/EPERM(打开文件不允许删除),macOS 上允许 unlink 所以看不出来。
+    // 恢复流程(restore.ts)正是"打开一个拷贝、失败后删掉拷贝"的模式,
+    // 所以在 Windows 上必然会撞到。
     try {
-      runStatement(this.database, "PRAGMA journal_size_limit = 67108864");
-      runStatement(this.database, "PRAGMA wal_autocheckpoint = 1000");
-    } catch {
-      /* 非 WAL / 旧引擎:保持默认 */
+      const busyTimeoutMs = options.busyTimeoutMs ?? 5_000;
+      runStatement(this.database, `PRAGMA busy_timeout = ${Math.max(0, busyTimeoutMs | 0)}`);
+      runStatement(this.database, `PRAGMA foreign_keys = ${options.foreignKeys === false ? "OFF" : "ON"}`);
+      runStatement(this.database, `PRAGMA journal_mode = ${determineJournalMode(options.filePath, options.journalMode)}`);
+      // 数据§11(2026-10-19 生产评审):WAL 无上限会长到数百 MB。checkpoint 后
+      // 把 -wal 截到 64MB 上限;每 1000 页(≈4MB)自动 checkpoint。非 WAL 模式下
+      // 这两条 PRAGMA 是 no-op(个别旧 SQLite 会报错,忽略即可)。
+      try {
+        runStatement(this.database, "PRAGMA journal_size_limit = 67108864");
+        runStatement(this.database, "PRAGMA wal_autocheckpoint = 1000");
+      } catch {
+        /* 非 WAL / 旧引擎:保持默认 */
+      }
+      runStatement(this.database, `PRAGMA synchronous = NORMAL`);
+    } catch (error) {
+      try { this.database.close(); } catch { /* 已经关了/关不掉:尽力而为 */ }
+      throw error;
     }
-    runStatement(this.database, `PRAGMA synchronous = NORMAL`);
   }
 
   migrate(targetVersion?: number) {

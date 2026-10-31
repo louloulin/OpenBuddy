@@ -5,15 +5,13 @@
  *   - 内联审批 / 问题卡(`PermissionInlineCard` + `QuestionInlineCard`)
  *   - Plan Mode 审批 list 追加槽(`ConversationApprovals`)
  *   - yield 横幅(暂停时显示)
- *   - 流式暂停按钮
- *   - Rewind / Fork(`RewindBar`)
+ *   - Rewind / Fork(`RewindBar`,仅在顶栏「更多 → 回溯 / 分叉」唤起时出现)
  *   - 消息队列(`QueuePanel`)
  *   - Pi reload 失败横幅
  *   - Composer(走 `ConversationComposer` 槽)
  */
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
-import { PauseIcon } from "@openbuddy/ui-primitives/icons";
 import { ConversationApprovals } from "../conversation-approvals";
 import { ConversationComposer } from "../conversation-slots";
 import { PiReloadFailureBanner } from "../PiReloadFailureBanner";
@@ -31,8 +29,9 @@ export type ChatViewFooterProps = {
   /** yield 横幅按钮。 */
   onResume: () => void;
   onResumeAndContinue: () => void;
-  /** 暂停按钮(流式时)。 */
-  onPause: () => void;
+  /** 回溯栏是否展开(顶栏「更多」唤起)。 */
+  rewindOpen?: boolean;
+  onRewindClose?: () => void;
   /** 审批计数与 blocked 状态。 */
   pendingApprovalCount: number;
   blockedOnApproval: boolean;
@@ -47,14 +46,36 @@ export type ChatViewFooterProps = {
   onSend: (text: string) => void;
 };
 
-export function ChatViewFooter(props: ChatViewFooterProps) {
+function subscribeOnline(onChange: () => void): () => void {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
+}
 
-  const locale = useLocale();  const composerFallback = props.composerFallback ?? (
+/** Browser connectivity — the chat says so up front instead of only after a failed turn. */
+function useOnline(): boolean {
+  return useSyncExternalStore(
+    subscribeOnline,
+    () => (typeof navigator === "undefined" ? true : navigator.onLine !== false),
+    () => true,
+  );
+}
+
+export function ChatViewFooter(props: ChatViewFooterProps) {
+  const online = useOnline();
+
+  const locale = useLocale();
+  const composerFallback = props.composerFallback ?? (
     <Composer {...props.composerProps} />
   );
   return (
     <div className="chatview__footer">
-      <PermissionInlineCard sessionId={props.sessionId} />
+      {/* 审批只有这一个决策面:停靠在 composer 上方的内联卡。
+          全屏 modal 会盖住消息里的「允许/拒绝」快操作(2026-10-20 真机探针)。 */}
+      <PermissionInlineCard sessionId={props.sessionId} variant="inline" />
       <QuestionInlineCard sessionId={props.sessionId} />
       <ConversationApprovals
         sessionId={props.sessionId ?? undefined}
@@ -64,6 +85,11 @@ export function ChatViewFooter(props: ChatViewFooterProps) {
       {/* C1 dock 外壳:Notices(RewindBar / 队列 / 桥失败横幅)与 Composer
           同住一个圆角容器 —— 对齐 Claude ChatComposerDock 的插槽结构。 */}
       <div className="chat-dock">
+      {!online && (
+        <div className="yield-banner chatview__offline-banner" role="status" data-testid="offline-banner">
+          <span>{locale.t("chat.footer.offline")}</span>
+        </div>
+      )}
       {props.yielded && (
         <div className="yield-banner" role="status">
           <span>{locale.t("chat.footer.yieldBanner")}</span>
@@ -87,18 +113,11 @@ export function ChatViewFooter(props: ChatViewFooterProps) {
           </div>
         </div>
       )}
-      {props.sessionId && props.streaming && !props.yielded && (
-        <button
-          type="button"
-          className="chatview__pause-btn"
-          onClick={props.onPause}
-          title={locale.t("chat.footer.pauseTitle")}
-        >
-          <PauseIcon size="sm" style={{ verticalAlign: "text-bottom" }} /> {locale.t("chat.footer.pause")}
-        </button>
-      )}
-      {props.sessionId && !props.streaming && !props.readOnlySubagent && (
+      {/* 停止只留 composer 里的 ■ 一个入口;「暂停」走快捷键,不再常驻一颗按钮。 */}
+      {props.rewindOpen && props.sessionId && !props.streaming && !props.readOnlySubagent && (
         <RewindBar
+          defaultOpen
+          onClose={props.onRewindClose}
           sessionId={props.sessionId}
           cwd={props.cwd}
           onRewound={props.onRewound}

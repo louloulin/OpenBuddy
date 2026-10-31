@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { existsSync, readdirSync } from "node:fs";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -15,7 +15,12 @@ const LATEST = Math.max(...DEFAULT_MIGRATIONS.map((step) => step.version));
 const MIGRATION_COUNT = DEFAULT_MIGRATIONS.length;
 
 let root = "";
-afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = ""; });
+// Windows 上 SQLite 关闭句柄有轻微延迟,刚 close() 的文件可能仍被占用。
+// (真正的句柄泄漏已在 SqliteDriver 构造函数里修掉,这里只兜底 OS 延迟。)
+afterEach(async () => {
+  if (root) await rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+  root = "";
+});
 
 describe("openStorage", () => {
   it("creates the profile directory, applies the complete schema and checks integrity", async () => {
@@ -77,7 +82,10 @@ describe("openStorage", () => {
     const steps = DEFAULT_MIGRATIONS.slice(0, 1);
     let blocked: unknown;
     try {
-      await openStorage({ filePath: databasePath, onCorruptIsolated: () => { throw new Error("must not quarantine"); } });
+      // 成功打开时必须显式关掉 —— 这条用例原本直接丢弃返回值,Windows 上
+      // afterEach 的 rm 会 EBUSY(macOS 允许 unlink 已打开文件,所以从没暴露)。
+      const opened = await openStorage({ filePath: databasePath, onCorruptIsolated: () => { throw new Error("must not quarantine"); } });
+      opened.driver.close();
     } catch (error) { blocked = error; }
     // 注:上面这行用的是全量 DEFAULT_MIGRATIONS,不会拦 —— 真正的降级场景
     // 要用裁剪过的 step 集合,见下方 MigrationRunner 直测。
@@ -235,6 +243,40 @@ describe("openStorage", () => {
     await writeFile(backupPath, "not a sqlite database");
     await expect(restoreStorageBackup({ backupPath, destinationPath: join(root, "restored.sqlite") })).rejects.toThrow();
     await expect(stat(join(root, "restored.sqlite"))).rejects.toThrow();
+    // 临时恢复文件也必须清掉,不能留在备份目录里。
+    const leftover = (await readdir(root)).filter((name) => name.endsWith(".restore.tmp"));
+    expect(leftover).toEqual([]);
+  });
+
+  it("构造函数失败时不泄漏 SQLite 句柄(损坏库可被立即删除)", async () => {
+    // 回归:SqliteDriver 构造函数里第一条 PRAGMA 就会在损坏文件上抛异常。
+    // 原本没有 close(),而构造函数抛异常时调用方拿不到对象、也就无从关闭 ——
+    // 句柄泄漏。
+    root = await mkdtemp(join(tmpdir(), "openbuddy-driver-leak-"));
+    const corruptPath = join(root, "corrupt.sqlite");
+    await writeFile(corruptPath, "not a sqlite database");
+
+    const isWindows = process.platform === "win32";
+
+    // 两个平台能观察到的信号不一样,分别用各自敏感的判据:
+    //
+    //  - Windows:泄漏的句柄让文件根本无法 unlink/rename(EBUSY/EPERM),
+    //    所以"删得掉"本身就是断言。
+    //  - macOS/Linux:允许 unlink 已打开的文件,"删得掉"证明不了任何事。
+    //    只能数打开的文件描述符 —— 泄漏一次就多一个。
+    const fdCount = (): number => readdirSync(process.platform === "darwin" ? "/dev/fd" : "/proc/self/fd").length;
+
+    const before = isWindows ? 0 : fdCount();
+    for (let i = 0; i < 5; i += 1) {
+      await expect(openStorage({ filePath: corruptPath })).rejects.toThrow();
+    }
+    if (!isWindows) {
+      // 5 次失败打开若各泄漏一个句柄,before 之后会多出 5 个 fd。
+      expect(fdCount()).toBe(before);
+    }
+
+    await expect(rm(corruptPath, { force: true })).resolves.toBeUndefined();
+    expect(existsSync(corruptPath)).toBe(false);
   });
 });
 

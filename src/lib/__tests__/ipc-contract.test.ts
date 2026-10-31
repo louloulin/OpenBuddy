@@ -11,8 +11,13 @@ async function sourceFiles(directory: string): Promise<string[]> {
   const files: string[] = [];
   for (const entry of entries) {
     const path = resolve(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await sourceFiles(path));
-    else if (/\.(ts|tsx)$/.test(entry.name) && !/\.(test|spec)\.(ts|tsx)$/.test(entry.name)) files.push(path);
+    if (entry.isDirectory()) {
+      // __tests__ / __contracts__ 是测试与静态分析辅助目录，其 harness
+      // 文件（非 *.test.ts 命名）允许 import node:fs 等运行时依赖，
+      // 不属于「渲染端运行时源码」边界（plan1030 契约测试落点）。
+      if (entry.name === "__tests__" || entry.name === "__contracts__") continue;
+      files.push(...await sourceFiles(path));
+    } else if (/\.(ts|tsx)$/.test(entry.name) && !/\.(test|spec)\.(ts|tsx)$/.test(entry.name)) files.push(path);
   }
   return files;
 }

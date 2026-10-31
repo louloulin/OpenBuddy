@@ -570,7 +570,7 @@ pnpm build
 34. `openbuddy-capability-matrix.md:484-488` — §9 P1 5 项缺口
 35. `openbuddy-capability-matrix.md:491-494` — §9 P2 4 项缺口
 36. `openbuddy-capability-matrix.md:557-561` — 一句话总结（含 P0/P1/P2 摘要）
-37. `openbuddy-capability-matrix.md:611-619` — §11 关键数据快照（IPC 474 / 309 test / 125 docs / 490 tokens / 207 icons）
+37. `openbuddy-capability-matrix.md:611-619` — §11 关键数据快照（IPC 474 / 测试文件数见 `docs/stats.json` / 125 docs / 490 tokens / 207 icons）
 38. `workbuddy-parity-matrix.md:11` — WorkBuddy 私有云 / 商业账号不纳入本 change
 39. `storage-architecture-audit.md:5-21` — SQLite = system of record / Pi JSONL = 兼容层
 40. `openbuddy-commercial-model.md:69-94, 124-144` — 套餐 / 钱包 / 生产发布门禁
@@ -627,7 +627,7 @@ A1–A15）的主语反复以 Pi 框架为中心，把 "Pi 提供的能力" 等�
 `openbuddy-capability-matrix.md`（630 行）从源码 / 配置 / 脚本 / 测试 /
 文档 5 个维度盘点 OpenBuddy 已实现能力：10 维度评分 4.62/5、490 个
 `--wb-*` 设计令牌、207 个图标、81 个顶层组件、474 个 IPC handler handler、
-309 个测试文件、43 个 eval 脚本、12 个企业面板、5 种 Casdoor Provider、
+全部测试文件(数量见 `docs/stats.json`)、43 个 eval 脚本、12 个企业面板、5 种 Casdoor Provider、
 4 个 systemd timer、60 篇文档、5 P0 + 5 P1 + 4 P2 缺口清单。
 
 本文（`openbuddy-product-vs-pi.md`）不重写 PI 文档，仅做主语反转：§1

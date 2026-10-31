@@ -4,7 +4,7 @@
  * 守住的不变量:
  *   - messages.css 至少 1 个 `@media (prefers-contrast: more)` 块(改造前 0)
  *   - 块内规则数 ≥ 15(覆盖主要可见元素)
- *   - 必须包含以下不变量类:.msg__approval-hint, .streaming-caret, .timeline-divider,
+ *   - 必须包含以下不变量类:.streaming-caret, .timeline-divider,
  *     .conversation-view-tabs__tab, .chatview__quick-prompt
  *   - 全局 a11y.css 必须把 focus-visible outline-width 在 contrast 模式下 → 3px
  */
@@ -30,7 +30,6 @@ describe("P2-04 prefers-contrast: more coverage", () => {
   });
 
   it("必须包含核心可见元素覆写", () => {
-    expect(css).toMatch(/@media\s*\(prefers-contrast:\s*more\)[\s\S]*\.msg__approval-hint/);
     expect(css).toMatch(/@media\s*\(prefers-contrast:\s*more\)[\s\S]*\.streaming-caret/);
     expect(css).toMatch(/@media\s*\(prefers-contrast:\s*more\)[\s\S]*\.timeline-divider/);
     expect(css).toMatch(/@media\s*\(prefers-contrast:\s*more\)[\s\S]*\.conversation-view-tabs__tab/);

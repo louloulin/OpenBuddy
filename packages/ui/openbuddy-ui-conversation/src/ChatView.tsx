@@ -45,9 +45,9 @@ import {
 import { useSessionStore, type ChatMessage, type ToolCallView } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { createMarkdownHostConfig } from "@/lib/markdown/markdown-host";
-import { piListSessions, piSetThinkingLevel, sessionFork, tasksListForSession } from "@/lib/agent/pi-client";
+import { piListSessions, piSetThinkingLevel, rewindExecute, sessionFork, tasksListForSession } from "@/lib/agent/pi-client";
 import { useT } from "@openbuddy/ui-locale/client";
-import { confirm, invoke } from "@/lib/platform/electron-api";
+import { invoke } from "@/lib/platform/electron-api";
 import {
   collectSessionArtifacts,
   findToolCall,
@@ -65,7 +65,7 @@ import {
 import { PlanPanel, SessionTasksPanel } from "@openbuddy/ui-automation";
 import { useRowPanelNav } from "./chatview/useRowPanelNav";
 import { TerminalPanel } from "./chatview/TerminalPanel";
-import { SquareTerminal } from "lucide-react";
+import { History, SquareTerminal } from "lucide-react";
 import { useChatShortcuts } from "./chatview/useChatShortcuts";
 import { PermissionInlineCard } from "@openbuddy/ui-dialogs";
 import { QuestionInlineCard } from "./QuestionInlineCard";
@@ -76,9 +76,12 @@ import { SubagentPanel } from "@openbuddy/ui-collaboration";
 import { useMessageQueueStore } from "@/stores/message-queue-store";
 import {
   VirtualizedMessageList,
+  type VirtualizedHandle,
   shouldUseVirtualList,
 } from "./VirtualizedMessageList";
 import { LoadingRow } from "./LoadingRow";
+import { useFindScroll } from "./chatview/useFindScroll";
+import { useTurnAnnouncement } from "./chatview/useTurnAnnouncement";
 import type { TimelineNode } from "@/lib/ui/timeline-utils";
 import { useSubagentStore } from "@/stores/subagent-store";
 import { useQuestionStore } from "@/stores/question-store";
@@ -148,6 +151,7 @@ export function ChatView({
   modelId,
   models,
   onModelChange,
+  onModelDelete,
   cwd,
   workspaces,
   onSelectWorkspace,
@@ -177,6 +181,8 @@ export function ChatView({
   modelId?: string;
   models?: ModelOption[];
   onModelChange?: (id: string) => void;
+  /** plan1030 §5.2.1 — 对话内删除模型(picker 行级入口);透传给 Composer。 */
+  onModelDelete?: (modelId: string) => void;
   cwd?: string;
   workspaces?: WorkspaceInfo[];
   onSelectWorkspace?: (cwd: string) => void;
@@ -212,6 +218,7 @@ export function ChatView({
     messagesEqual,
   );
   const streaming = useSessionStore((s) => s.streaming);
+  const historyLoading = useSessionStore((s) => s.historyLoading);
   const streamingMessageId = useSessionStore((s) => s.streamingMessageId);
   const error = useSessionStore((s) => s.error);
   const plan = useSessionStore((s) => s.plan);
@@ -280,6 +287,7 @@ export function ChatView({
       && rendererSessionSnapshot.currentAddress.mode === "one-shot");
   // 会话内查找(对齐 WorkBuddy chat-search)。
   const [findOpen, setFindOpen] = useState(false);
+  const [rewindOpen, setRewindOpen] = useState(false);
   const [findHits, setFindHits] = useState<string[]>([]);
   const [findCurrent, setFindCurrent] = useState<string | null>(null);
   // 文件变更聚合面板(对齐 WorkBuddy file-changes-panel)。
@@ -379,6 +387,7 @@ export function ChatView({
   // Plan5 Phase A.1 — Scroll / jump-to-bottom / unread-count 抽到 useChatViewStreaming。
   const {
     turnStartRef,
+    awayFromBottom,
     unreadCount,
     setUnreadCount,
     pinnedRef,
@@ -439,6 +448,8 @@ export function ChatView({
   const [planOpen, setPlanOpen] = useState(false);
   // 工具栏按钮定义在 useMemo 里,不能在那里调 hook —— 先在顶层取好文案。
   const terminalLabel = useT("chat.terminal.label");
+  const historyLoadingLabel = useT("chat.footer.historyLoading");
+  const turnAnnouncement = useTurnAnnouncement(streaming, useT("chat.a11y.turnDone"));
   const terminalDockTitle = useT("chat.terminal.dockTitle", { name: cwd ? cwd.split("/").pop() || cwd : "" });
   const terminalCloseLabel = useT("chat.terminal.close");
   const tasksBadgeLabel = useT("tasks.badge", {
@@ -496,12 +507,13 @@ export function ChatView({
     sessionId: sessionId ?? undefined,
     onSend,
     onPause: handlePause,
+    onStop: onCancel,
     onPrefillComposer: composerPrefill,
   });
 
 
   // Plan5 B.10 — 消息级"从此重发":把 rewindPoints 拉一次并解析成
-  // `messageId → promptIndex`,下发给 MessageItem 的 MessageRewindMenu。
+  // `messageId → promptIndex`,下发给 MessageItem 的「⋯ → 从这里重新发送」。
   // 与 useChatViewRetry 共用同一套 rewind IPC 语义,只是目标从"最后一条"
   // 变成"用户点的那一条"。
   const {
@@ -517,16 +529,55 @@ export function ChatView({
     onToast,
   });
 
+  // R8.3 — inline edit + resend must **replace** the originating turn, not
+  // append a second user bubble next to the edited one. The old path only
+  // seeded the composer, so sending produced two bubbles with the same text
+  // (the origin message showed the appended revision, and the new optimistic
+  // message added another copy). Rewind to the origin prompt first, then
+  // send; if the rewind point is unavailable we fall back to the old seed
+  // behaviour.
+  const handleInlineResendWithRewind = useCallback(
+    async (messageId: string, text: string) => {
+      if (!text.trim()) return;
+      if (!sessionId || streaming || readOnlySubagent) {
+        handleInlineResend(messageId, text);
+        return;
+      }
+      let promptIndex = -1;
+      let ordinal = -1;
+      // Read through the ref: depending on `messages` re-created this
+      // callback on every streaming delta and re-rendered every user bubble.
+      for (const message of messagesRef.current) {
+        if (message.role !== "user") continue;
+        ordinal += 1;
+        if (message.id === messageId) { promptIndex = ordinal; break; }
+      }
+      if (promptIndex < 0) {
+        handleInlineResend(messageId, text);
+        return;
+      }
+      useSessionStore.getState().appendUserRevision(messageId, text);
+      try {
+        await rewindExecute(sessionId, promptIndex, "conversation", true);
+        // The host reloads the (now trimmed) transcript asynchronously. Send
+        // only after that lands — otherwise the optimistic bubble races the
+        // history replacement and the new prompt can be rendered twice.
+        await Promise.resolve(onRewound?.());
+        onSend(text);
+      } catch (e) {
+        onToast?.(`编辑重发失败：${String(e).replace(/^Error:\s*/, "")}`);
+        handleInlineResend(messageId, text);
+      }
+    },
+    [sessionId, streaming, readOnlySubagent, messagesRef, handleInlineResend, onSend, onRewound, onToast],
+  );
+
   // Plan5 B.10 — 消息级"从此处分叉"。`RewindBar` 里已有同一套
   // `sessionFork(sessionId, cwd)` + 确认弹窗流程;这里把同样的语义下放到
   // 单条消息,复用 `onForked` 让宿主导航到新会话。
   const handleForkRequest = useCallback(async () => {
     if (!sessionId || streaming || readOnlySubagent) return;
-    const ok = await confirm("从此处分叉此会话？", {
-      tone: "warning",
-      description: "会复制到新会话，原会话保留。",
-    });
-    if (!ok) return;
+    // 分叉不破坏原会话,无需确认;直接复制并导航。
     try {
       const newId = await sessionFork(sessionId, cwd);
       onToast?.(`已分叉到新会话 ${newId.slice(0, 8)}`);
@@ -692,7 +743,14 @@ export function ChatView({
     if (liveSubagentCount > 0) setSubagentsOpen(true);
   }, [liveSubagentCount]);
 
-  const handleOpenTool = useCallback((tc: ToolCallView) => {
+  // Two callers pass different shapes: standalone tool cards hand over the
+  // `ToolCallView` object, while `MessagePartRegistry` / `ToolGroupSummary`
+  // hand over the toolCallId string. Accept both and resolve the id against
+  // the current transcript — passing a bare string through to the panel used
+  // to render an empty (or crashing) detail body.
+  const handleOpenTool = useCallback((tool: ToolCallView | string) => {
+    const tc = typeof tool === "string" ? findToolCall(messagesRef.current, tool) : tool;
+    if (!tc) return;
     setActiveTool(tc);
     setPreviewPath(null);
     setPanelMode("tool");
@@ -774,7 +832,7 @@ export function ChatView({
     handleEditResend,
     setEditResendOriginId,
     handleStepRevision,
-    handleInlineResend,
+    handleInlineResend: handleInlineResendWithRewind,
     handleEditAssistantMessage,
     handleResendAfterAssistantEdit,
     handleRetry,
@@ -865,13 +923,8 @@ export function ChatView({
     node.addEventListener("keydown", onKeyDown);
     return () => node.removeEventListener("keydown", onKeyDown);
   }, []);
-  useEffect(() => {
-    if (!findCurrent) return;
-    const node = scrollRef.current?.querySelector(
-      `[data-msg-id="${findCurrent}"]`,
-    );
-    node?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [findCurrent]);
+  const virtualHandleRef = useRef<VirtualizedHandle | null>(null);
+  useFindScroll({ scrollRef, virtualHandleRef, timeline, findCurrent });
 // 推理档位:并入模型选择器(WB "✓均衡" 标签)。会话切换时回默认档。
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>("medium");
   useEffect(() => {
@@ -948,6 +1001,14 @@ export function ChatView({
       label: terminalLabel,
       icon: <SquareTerminal size={15} strokeWidth={1.75} />,
     },
+    {
+      id: "rewind",
+      active: rewindOpen,
+      visible: Boolean(sessionId) && !streaming && !readOnlySubagent && messages.length > 0,
+      onClick: () => setRewindOpen((v) => !v),
+      label: "回溯 / 分叉",
+      icon: <History size={15} strokeWidth={1.75} />,
+    },
     defaultSubagentButton({
       active: subagentsOpen,
       hasMessages: messages.length > 0,
@@ -995,6 +1056,7 @@ export function ChatView({
     modelId,
     models,
     onModelChange,
+    onModelDelete,
     cwd,
     workspaces,
     onSelectWorkspace: handleComposerWorkspaceChange,
@@ -1054,6 +1116,7 @@ export function ChatView({
           messages={messages}
           onShareDone={onToast}
         />
+        <div className="wb-sr-only" role="status" data-testid="turn-announcer">{turnAnnouncement}</div>
         <FindBar
           messages={messages}
           open={findOpen}
@@ -1092,7 +1155,15 @@ export function ChatView({
             ) : null
           }
           emptyState={
-            <ChatViewEmptyState onPickPrompt={handleQuickPrompt} />
+            historyLoading ? (
+              <div className="chatview__history-skeleton" role="status" aria-label={historyLoadingLabel}>
+                <span className="chatview__skeleton-line chatview__skeleton-line--user" />
+                <span className="chatview__skeleton-line" />
+                <span className="chatview__skeleton-line chatview__skeleton-line--short" />
+              </div>
+            ) : (
+              <ChatViewEmptyState onPickPrompt={handleQuickPrompt} />
+            )
           }
           timelineList={
             <div ref={timelineRowsRef} className="chatview__timeline-rows">
@@ -1101,6 +1172,7 @@ export function ChatView({
                   timeline={timeline as TimelineNode[]}
                   scrollRef={scrollRef as React.RefObject<HTMLElement>}
                   renderItem={renderTimelineNode}
+                  handleRef={virtualHandleRef}
                 />
               ) : (
                 timeline.map((node, index) => renderTimelineNode({ node, index }))
@@ -1117,6 +1189,7 @@ export function ChatView({
             onOpenSession?: (sessionId: string, cwd?: string) => void | Promise<void>;
           }>}
           unreadCount={unreadCount}
+          awayFromBottom={awayFromBottom}
           onJumpToBottom={handleJumpToBottom}
         />
         {/* 阶段 1:终端 dock(VS Code 风格,底部 40% 高度)。
@@ -1147,7 +1220,8 @@ export function ChatView({
           yielded={yielded}
           onResume={handleResume}
           onResumeAndContinue={handleResumeAndContinue}
-          onPause={handlePause}
+          rewindOpen={rewindOpen}
+          onRewindClose={() => setRewindOpen(false)}
           pendingApprovalCount={pendingApprovalCount}
           blockedOnApproval={blockedOnApproval}
           composerProps={composerProps}

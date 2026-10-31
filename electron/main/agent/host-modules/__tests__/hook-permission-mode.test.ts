@@ -99,6 +99,24 @@ describe("hook-permission 模式语义", () => {
     await expect(confirmGateAllows()).resolves.toBeUndefined();
   });
 
+  // 20261031 Phase 0.4 — 5 档模式 × {编辑, 命令} 的确认闸行为表。
+  // true = 不弹窗直接放行;undefined = 交给弹窗 / 会话授权决定。
+  it.each([
+    ["default", "edit", undefined],
+    ["default", "other", undefined],
+    ["acceptEdits", "edit", true],
+    ["acceptEdits", "other", undefined],
+    ["dontAsk", "edit", undefined],
+    ["dontAsk", "other", undefined],
+    ["plan", "edit", undefined],
+    ["plan", "other", undefined],
+    ["bypassPermissions", "edit", true],
+    ["bypassPermissions", "other", true],
+  ] as const)("confirmGateAllows 矩阵:%s × %s → %s", async (mode, kind, expected) => {
+    bridgeState.mode = mode;
+    await expect(confirmGateAllows(kind)).resolves.toBe(expected);
+  });
+
   it("default 模式:无规则维持既有行为 —— 弹窗询问", async () => {
     bridgeState.mode = "default";
     const { state } = install();

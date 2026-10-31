@@ -29,6 +29,7 @@ import {
   requiredString,
 } from "./validation";
 import type { AgentHostIpcDeps } from "./_agent-host-deps";
+import { replayPendingUiEvents, turnStates } from "../agent/host-modules/turn-state";
 
 export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
   const { agentHost, casdoorAuth, ensureAgentHost } = deps;
@@ -58,6 +59,16 @@ export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
       if (error instanceof Error && /^Pi session is not loaded:/u.test(error.message)) return null;
       throw error;
     }
+  });
+  // 回合状态机(计划 1.1)的当前值:渲染层加载会话 / 重新订阅时据此校正
+  // 「是否在运行」(例如窗口重新加载后恢复停止按钮),并重发仍在等待的审批 /
+  // 提问卡片。纯内存读,不拉起 agent host。
+  ipcMain.handle("agent:turn-state", (_e, args: { sessionId: string }) => {
+    const sessionId = requiredString(recordValue(args, "turn state payload").sessionId, "session id");
+    const state = turnStates.get(sessionId);
+    if (state.phase === "idle") return { sessionId, phase: state.phase, since: state.since };
+    replayPendingUiEvents(sessionId);
+    return { sessionId, phase: state.phase, since: state.since, partial: streamingPartial(agentHost.getSession(), sessionId) };
   });
   ipcMain.handle("agent:session-messages", async (_e, args: { sessionId: string }) => {
     await ensureAgentHost();
@@ -143,4 +154,19 @@ export function registerSessionMiscIpc(deps: AgentHostIpcDeps): void {
       input.mode === undefined ? undefined : requiredString(input.mode, "rewind mode"),
     );
   });
+}
+
+/** 正在生成、尚未落盘的那条回复(会话历史里还没有它)。 */
+function streamingPartial(session: unknown, sessionId: string): { text: string; thinking: string } | undefined {
+  const live = session as { sessionId?: string; state?: { streamingMessage?: { content?: unknown } } } | undefined;
+  if (live?.sessionId !== sessionId) return undefined;
+  const content = live.state?.streamingMessage?.content;
+  if (!Array.isArray(content)) return undefined;
+  let text = "";
+  let thinking = "";
+  for (const part of content as Array<{ type?: string; text?: string; thinking?: string }>) {
+    if (part?.type === "text" && typeof part.text === "string") text += part.text;
+    else if (part?.type === "thinking" && typeof part.thinking === "string") thinking += part.thinking;
+  }
+  return text || thinking ? { text, thinking } : undefined;
 }

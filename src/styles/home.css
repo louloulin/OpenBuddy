@@ -537,9 +537,13 @@
   box-shadow: var(--wb-shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.16));
   z-index: 50;
 }
-/* Model selector 在 footer 右侧,菜单向左对齐避免溢出右边 */
+/* Model selector 在 footer 右侧,菜单向左对齐避免溢出右边。
+ * 400px:行内固定内容(协议徽章 ~118 + 3 能力徽章 ~93 + 删除 17 + ✓ 14
+ * + 间距 48 ≈ 290)之外还要给模型名留可读宽度 —— 320px 会把标签挤成省略号
+ * (plan1030 真机 1031 实测 labelW≈6px)。 */
 .model-selector__menu {
   right: 0;
+  max-width: 400px;
 }
 /* Workspace picker 在 meta 行左侧,菜单向右对齐避免溢出左边被裁剪 */
 .workspace-picker__menu {
@@ -615,7 +619,12 @@
 .model-selector__item-label {
   font-size: 13px;
   color: var(--wb-text-strong);
-  flex-shrink: 0;
+  /* plan1030 真机:长模型名(MiniMax-M2.7-highspeed)不许把协议/能力徽章
+   * 顶出 320px 菜单右缘被 ul 的 overflow 裁掉 —— 标签自己收缩出省略号。 */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .model-selector__item-protocol {
   display: inline-flex;
@@ -705,6 +714,36 @@
 .workspace-picker__check {
   color: var(--wb-color-text-brand-default);
   flex-shrink: 0;
+}
+/* plan1030 §5.2.1 — 行级删除按钮:悬停行/键盘聚焦行时显现,避免误触;
+   删除语义用危险色。视觉契约(§6):只走 token,不写裸值。 */
+.model-selector__item-delete {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--wb-text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: var(--wb-radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.1s ease, color 0.1s ease;
+}
+.model-selector__item:hover .model-selector__item-delete,
+.model-selector__item--focused .model-selector__item-delete,
+.model-selector__item-delete:focus-visible {
+  opacity: 1;
+}
+.model-selector__item-delete:hover {
+  color: var(--wb-button-danger-fg);
+  background: var(--wb-bg-hover);
+}
+.model-selector__item-delete:focus-visible {
+  outline: 2px solid var(--wb-color-text-brand-default);
+  outline-offset: -2px;
 }
 .workspace-picker__item-name {
   font-size: 13px;
@@ -2648,6 +2687,21 @@
 }
 .rules-list__pattern {
   color: var(--wb-text-medium);
+}
+.rules-list__revoke {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-sm);
+  background: transparent;
+  color: var(--wb-text-medium);
+  font: inherit;
+  cursor: pointer;
+}
+.rules-list__revoke:hover,
+.rules-list__revoke:focus-visible {
+  color: var(--wb-text-strong);
+  border-color: var(--wb-text-medium);
 }
 .settings-ok {
   color: #00a884;
@@ -5799,4 +5853,181 @@
 .composer-add-menu button:hover {
   background: var(--wb-color-bg-primary-hover, rgba(255, 255, 255, 0.06));
   color: var(--wb-text-strong, rgba(255, 255, 255, 0.92));
+}
+
+/* ============================================================================
+ * 2026-10-30 plan1030 批 2 — 自 workbuddy-parity.css 并入（原文件删除）。
+ * 内容：项目模板卡片 / 专家卡片网格 / 首页标题单行式 / 暗色案例卡 / 宿主容器。
+ *（Composer 聚焦态部分迁往 composer.css。）
+ * ============================================================================ */
+
+/* ── ProjectTemplatesPanel ─────────────────────────────────── */
+.project-templates-panel__header {
+  margin-bottom: 14px;
+}
+.project-templates-panel__title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+.project-templates-panel__subtitle {
+  font-size: 13px;
+  color: var(--wb-text-muted, #555);
+  margin: 0;
+}
+.project-templates-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.project-template-card {
+  background: white;
+  border: 1px solid var(--wb-border, rgba(0, 0, 0, 0.08));
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 160ms var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+              box-shadow 160ms var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.project-template-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+.project-template-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+.project-template-card__description {
+  font-size: 12px;
+  color: var(--wb-text-muted, #555);
+  margin: 0;
+  line-height: 1.5;
+}
+.project-template-card__chips {
+  display: flex;
+  gap: 4px;
+}
+.project-template-card__chip {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.04));
+  color: var(--wb-text-muted, #555);
+}
+.project-template-card__action {
+  margin-top: auto;
+  padding: 6px 12px;
+  background: var(--wb-button-primary-bg);
+  color: var(--wb-button-primary-fg);
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 160ms;
+}
+.project-template-card__action:hover {
+  opacity: 0.85;
+}
+
+/* ── Experts grid（仅样式补充，不影响 app__body 布局） ─────── */
+.experts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.expert-card {
+  background: white;
+  border: 1px solid var(--wb-border, rgba(0, 0, 0, 0.08));
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.expert-card__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--wb-bg-subtle, rgba(0, 0, 0, 0.04));
+}
+.expert-card__name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.expert-card__role {
+  font-size: 12px;
+  color: var(--wb-text-muted, #555);
+}
+.expert-card__chips {
+  display: flex;
+  gap: 4px;
+}
+
+/* ── Reduced motion 降级 ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .project-template-card {
+    transition: none;
+  }
+  .project-template-card:hover {
+    transform: none;
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+}
+
+/* ============================================================================
+ * WorkBuddy 首页对齐（基于 v5.1.7 实测截图）
+ *   1) 标题为一行式「OpenBuddy, 我帮你」，字号 36px / 600
+ *   2) 场景 tabs 居中（WorkBuddy 实测：居中于内容列）
+ *   3) 最佳实践案例为 3 列大卡（WorkBuddy 实测 3 列；原 4 列过窄）
+ *   4) 案例卡高度提升到 132px，含渐晕底部标题
+ * ============================================================================ */
+
+.home__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 0;
+  flex-wrap: wrap;
+}
+.home__title-sep {
+  margin: 0 8px 0 0;
+}
+.home__title-greet {
+  margin-left: 0;
+}
+
+/* 旧版"宽 1100px + 案例卡 132 高 + emoji 浮在渐变上"的扁平 overlay 实现已被
+ * 替换为：960 内容列 + 案例卡改成 (缩略图 + 下方居中标题) 的垂直布局。
+ * 相关样式迁到 sidebar-menus.css(.home / .home__practice-card-thumb /
+ * .home__practice-card-caption),此处不重复定义。 */
+
+/* ---------------------------------------------------------------------------
+ * 暗色下的最佳实践案例卡
+ *
+ * 暗色下保持缩略图可见但不刺眼:把整张卡做一次温和压暗去饱和,而文字
+ * (缩略图里的白/深色前景 + 卡片外的 caption) 已被移到 ::before 伪元素之外的
+ * 兄弟节点,所以滤镜作用不到标题 —— 不再需要 ::after scrim 兜底。
+ * ------------------------------------------------------------------------- */
+[data-theme="dark"] .home__practice-card {
+  filter: brightness(.86) saturate(.92);
+}
+
+/* ── Phase 7 polish — WorkBuddy 风格 ExpertsGrid / ProjectTemplatesPanel
+ *   这两段只是 9 卡 3 列专家网格 + 模板入口的轻量包装,
+ *   真正的 card 样式见各 *.module.css(ExpertCard / ProjectTemplateCard)。
+ *   —— 通过 placeholder-page-stack 把它们叠在原来的 panel 之上。 */
+
+.experts-grid-host {
+  padding: 12px 16px 0 16px;
+}
+
+.project-templates-host {
+  padding: 12px 16px 0 16px;
+}
+
+.placeholder-page-stack > * + * {
+  margin-top: 12px;
 }

@@ -112,18 +112,19 @@
   color: var(--wb-status-error, #e5484d);
   background: color-mix(in srgb, var(--wb-status-error, #e5484d) 12%, transparent);
 }
+/* plan1030 批 5d — in_progress 用真 spinner（旋转环）替代 opacity 脉冲。
+ * reduce-motion 走 base.css 的「降速不停转」carve-out（2.4s/圈），
+ * 不冻结 —— 静止的 spinner 读作挂死。 */
 .toolcall__status-mark--in_progress {
   color: var(--wb-brand);
-  background: color-mix(in srgb, var(--wb-brand) 12%, transparent);
-  animation: toolcallPulse 1.1s ease-in-out infinite;
+  background: transparent;
+  border: 2px solid color-mix(in srgb, var(--wb-brand) 25%, transparent);
+  border-top-color: var(--wb-brand);
+  animation: toolcallSpin 0.9s linear infinite;
 }
-@keyframes toolcallPulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
+@keyframes toolcallSpin {
+  to {
+    transform: rotate(360deg);
   }
 }
 .toolcall__text,
@@ -161,6 +162,37 @@
 .toolcall__text::-webkit-scrollbar-thumb:hover,
 .toolcall__output::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--wb-brand, #00c29a) 50%, transparent);
+}
+.toolcall__output-wrap { margin: 4px 0; }
+.toolcall__output-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.toolcall__output-meta {
+  margin-right: auto;
+  color: var(--wb-text-weak);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.toolcall__output-btn {
+  padding: 2px 8px;
+  border: 1px solid var(--wb-border-default);
+  border-radius: 6px;
+  color: var(--wb-text-medium);
+  background: var(--wb-bg-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+.toolcall__output-btn:hover {
+  color: var(--wb-text-strong);
+  background: var(--wb-bg-tertiary);
+}
+.toolcall__output-more {
+  margin-top: 4px;
+  color: var(--wb-text-weak);
+  font-size: 11px;
 }
 .toolcall__cmd-line {
   margin: 4px 0;
@@ -838,4 +870,76 @@
   border-radius: var(--wb-radius-xs, 4px);
   background: var(--wb-bg-tertiary);
   color: var(--wb-text-medium);
+}
+
+/* ============================================================================
+ * cc-haha parity — flat activity rows
+ * 之前的"绿色边框药丸"每个工具都像一枚按钮;cc-haha 的工具行是无边框
+ * 的 rail row:hover 才浮出底色,信息由 状态图标 + 动词 + 目标 + 用时 组成。
+ * ==========================================================================*/
+.toolcall.toolcall--compact {
+  height: 30px;
+  margin: 2px 0;
+  padding: 0 8px;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+}
+.toolcall--compact:hover {
+  background: color-mix(in srgb, var(--wb-text-strong, #1a1a1a) 5%, transparent);
+  border-color: transparent;
+}
+.toolcall--compact.toolcall--run {
+  border-color: transparent;
+  background: transparent;
+}
+.toolcall--compact.toolcall--err {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--wb-status-error, #e5484d) 7%, transparent);
+}
+.toolcall--compact .toolcall__kind {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  height: auto;
+  line-height: 1;
+  color: var(--wb-text-tertiary, #8a8a8a);
+  font-size: 11px;
+  letter-spacing: 0.01em;
+}
+.toolcall--compact .toolcall__title {
+  font-size: 12.5px;
+  color: var(--wb-text-medium);
+}
+.toolcall--compact.toolcall--err .toolcall__title {
+  color: color-mix(in srgb, var(--wb-status-error, #e5484d) 80%, var(--wb-text-strong));
+}
+.toolcall--compact .toolcall__status-mark {
+  width: 14px;
+  height: 14px;
+  background: transparent;
+}
+.toolcall--compact .toolcall__status-mark--completed,
+.toolcall--compact .toolcall__status-mark--failed {
+  background: transparent;
+}
+.toolcall--compact .toolcall__duration,
+.toolcall--compact.toolcall--ok .toolcall__duration {
+  margin-left: auto;
+  color: var(--wb-text-tertiary, #8a8a8a);
+  font-size: 11px;
+}
+.toolcall--compact.toolcall--err .toolcall__duration {
+  color: color-mix(in srgb, var(--wb-status-error, #e5484d) 70%, transparent);
+}
+.toolcall--compact .toolcall__expand-toggle {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--wb-text-tertiary, #8a8a8a);
+}
+.toolcall--compact .toolcall__expand-toggle:hover {
+  background: color-mix(in srgb, var(--wb-text-strong, #1a1a1a) 8%, transparent);
+  color: var(--wb-text-strong);
 }

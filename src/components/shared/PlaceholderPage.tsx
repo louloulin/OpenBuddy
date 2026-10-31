@@ -81,6 +81,8 @@ interface PlaceholderPageProps {
   modelId?: string;
   models?: ModelOption[];
   onModelChange?: (id: string) => void;
+  /** plan1030 §5.2.1 — 对话内删除模型(picker 行级入口);透传给 Composer。 */
+  onModelDelete?: (modelId: string) => void;
   /** 项目页：进入项目（新建会话并注入说明）。 */
   onStartProject?: (project: ProjectMeta) => void;
   /** 项目页：在项目中新建对话（创建真实 pi 会话）。 */
@@ -122,6 +124,7 @@ function PlaceholderPageInner({
   modelId,
   models,
   onModelChange,
+  onModelDelete,
   onStartProject,
   onStartProjectConversation,
 }: PlaceholderPageProps) {
@@ -195,6 +198,7 @@ function PlaceholderPageInner({
         modelId={modelId}
         models={models}
         onModelChange={onModelChange}
+        onModelDelete={onModelDelete}
       />
     );
   }
@@ -225,6 +229,7 @@ function PlaceholderPageInner({
         modelId={modelId}
         models={models}
         onModelChange={onModelChange}
+        onModelDelete={onModelDelete}
       />
     );
   }
@@ -241,6 +246,7 @@ function PlaceholderPageInner({
         modelId={modelId}
         models={models}
         onModelChange={onModelChange}
+        onModelDelete={onModelDelete}
       />
     );
   }
@@ -408,7 +414,8 @@ function AssistantHomePanel({
   modelId,
   models,
   onModelChange,
-}: Pick<PlaceholderPageProps, "onNavigate" | "onSend" | "streaming" | "apiReady" | "onOpenSettings" | "onPlaceholder" | "modelId" | "models" | "onModelChange">) {
+  onModelDelete,
+}: Pick<PlaceholderPageProps, "onNavigate" | "onSend" | "streaming" | "apiReady" | "onOpenSettings" | "onPlaceholder" | "modelId" | "models" | "onModelChange" | "onModelDelete">) {
   const goAssistantHome = onNavigate ? () => onNavigate("助理") : undefined;
   return (
     <div className="assistant-home">
@@ -428,6 +435,7 @@ function AssistantHomePanel({
         modelId={modelId}
         models={models}
         onModelChange={onModelChange}
+        onModelDelete={onModelDelete}
       />
     </div>
   );
@@ -444,7 +452,8 @@ function AssistantLocalWorkspace({
   modelId,
   models,
   onModelChange,
-}: Pick<PlaceholderPageProps, "onNavigate" | "onGoHome" | "onSend" | "streaming" | "apiReady" | "onOpenSettings" | "onPlaceholder" | "modelId" | "models" | "onModelChange">) {
+  onModelDelete,
+}: Pick<PlaceholderPageProps, "onNavigate" | "onGoHome" | "onSend" | "streaming" | "apiReady" | "onOpenSettings" | "onPlaceholder" | "modelId" | "models" | "onModelChange" | "onModelDelete">) {
   const goAssistantHome = onNavigate ? () => onNavigate("助理") : onGoHome;
   return (
     <div className="assistant-workspace assistant-workspace--local">
@@ -465,6 +474,7 @@ function AssistantLocalWorkspace({
         modelId={modelId}
         models={models}
         onModelChange={onModelChange}
+        onModelDelete={onModelDelete}
       />
     </div>
   );

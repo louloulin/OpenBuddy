@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@openbuddy/ui-state/session-store";
 import { rewindExecute, rewindPoints } from "@/lib/agent/pi-client";
+import { confirm } from "@/lib/platform/electron-api";
 // 纯映射逻辑放在无 IPC 依赖的模块里 —— 便于直接单测,也便于插件复用。
 import {
   buildPromptIndexMap,
@@ -103,6 +104,17 @@ export function useChatViewRewind({
       if (!sessionId || streaming || rewinding || readOnlySubagent) return;
       // 找出该 promptIndex 对应的用户消息文本,用于回溯后重发。
       const userText = userTextForPromptIndex(messagesRef.current, promptIndex);
+      // Rewinding to an earlier turn discards everything after it — say so.
+      // Regenerating the latest turn (nothing later to lose) stays one click.
+      const laterTurns = messagesRef.current.filter((m) => m.role === "user").length - 1 - promptIndex;
+      if (laterTurns > 0) {
+        const ok = await confirm(`回到这一轮重新生成？`, {
+          tone: "warning",
+          description: `之后的 ${laterTurns} 轮对话将被移除(文件改动按回溯快照还原)。`,
+          confirmLabel: "回溯并重发",
+        });
+        if (!ok) return;
+      }
       setRewinding(true);
       try {
         await rewindExecute(sessionId, promptIndex, "conversation", true);

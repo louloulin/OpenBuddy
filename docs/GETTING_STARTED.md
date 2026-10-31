@@ -17,9 +17,9 @@ Optional per platform:
 
 | Platform | Need it for |
 |---|---|
-| **Windows** | NSIS + MSI build → install [NSIS 3](https://nsis.sourceforge.io/) and [WiX Toolset 3](https://wixtoolset.org/) |
+| **Windows** | NSIS build → install [NSIS 3](https://nsis.sourceforge.io/) |
 | **macOS** | DMG + notarization → install Xcode Command Line Tools (`xcode-select --install`) |
-| **Linux** | AppImage + .deb → `sudo apt install rpm fakeroot` |
+| **Linux** | AppImage build → `libfuse2` (Electron/AppImage runtime dep) |
 
 Verify:
 
@@ -44,11 +44,14 @@ cd OpenBuddy
 pnpm install
 ```
 
-This does three things in order:
+This installs all workspace dependencies, then runs `scripts/postinstall.mjs`,
+which calls `moon sync projects` **when the moon binary is available**. The
+postinstall hook never fails the install: a missing or broken moon only prints a
+warning, because CI typecheck/test (`scripts/run-workspace-task.mjs`) does not
+depend on moon.
 
-1. Installs all dependencies for the 19 moon projects via `pnpm`.
-2. Runs `moon sync projects` to register the workspace DAG.
-3. Auto-generates TS path aliases used by `packages/ui`.
+TS path aliases for `packages/ui` are committed in `tsconfig.json`; regenerate
+them with `pnpm sync:ui-aliases` if you add or rename a UI package.
 
 Expected output ends with `Done in <N>s.`
 
@@ -90,7 +93,7 @@ A slightly larger first change: pick a `feat(good-first-issue)` from the GitHub 
 # Type-check the full monorepo
 pnpm workspace:typecheck
 
-# Run all unit tests (309 test files)
+# Run all unit tests (every test file is in the repo)
 pnpm workspace:test
 
 # Run just the test for a single package
@@ -104,9 +107,9 @@ pnpm test:closed-loop
 
 ```bash
 # Pick your platform:
-pnpm electron:build:win     # NSIS .exe + MSI
-pnpm electron:build:mac     # signed .dmg
-pnpm electron:build:linux   # AppImage + .deb
+pnpm electron:build:win     # NSIS .exe (x64 + arm64)
+pnpm electron:build:mac     # signed .dmg (x64 + arm64)
+pnpm electron:build:linux   # AppImage (x64 + arm64)
 ```
 
 The installer lands in `release/<version>/`. For all-platform builds, run `pnpm electron:build:all`.

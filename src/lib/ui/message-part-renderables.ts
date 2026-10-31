@@ -111,3 +111,23 @@ export function buildPartRenderables(parts: readonly MessagePart[]): PartRendera
   }
   return out;
 }
+
+/**
+ * 完成后的「过程折叠」(对齐 WorkBuddy 的「已完成 Xs ›」):返回应收进折叠行的
+ * 前缀长度。规则 —— 最终回答 = 末尾连续的 text 渲染项;它之前的一切(思考、
+ * 工具、中间的过渡文字)都算过程。过程里没有思考/工具,或消息不是以回答结尾
+ * (例如停在一个工具调用上)时返回 0,不折叠。
+ */
+export function processPrefixLength(renderables: readonly PartRenderable[]): number {
+  let end = renderables.length;
+  while (end > 0) {
+    const item = renderables[end - 1];
+    if (item.type !== "part" || item.part.kind !== "text") break;
+    end -= 1;
+  }
+  if (end === renderables.length) return 0;
+  const hasProcess = renderables
+    .slice(0, end)
+    .some((item) => item.type === "cluster" || item.part.kind === "thought" || item.part.kind === "tool_call");
+  return hasProcess ? end : 0;
+}

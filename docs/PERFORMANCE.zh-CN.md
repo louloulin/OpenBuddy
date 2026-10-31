@@ -14,7 +14,7 @@
 | IPC 分发热路径(验证器 + 提取) | ≤ 5 µs p99 / 次 | `node scripts/perf/ipc-latency.mjs` |
 | 内存基线(空闲) | ≤ 250 MB | `process.memoryUsage()` |
 | 每活跃会话内存 | ≤ 50 MB | `process.memoryUsage()` |
-| 测试套件(309 个测试文件) | ≤ 3 分钟 | CI 日志 |
+| 测试套件(全部测试文件) | ≤ 3 分钟 | CI 日志 |
 
 任何**超出预算 > 10%** 的发布会在 CI `perf-budget` job 失败(渲染端入口 chunk 或总大小),从而被阻止合并。
 

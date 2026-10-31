@@ -31,15 +31,6 @@ export type { SlotMap };
 export { ChatView } from "./ChatView";
 export { ChatShortcutOverlay, CHAT_SHORTCUTS } from "./chatview/ChatShortcutOverlay";
 export type { ChatShortcutOverlayProps } from "./chatview/ChatShortcutOverlay";
-export { ChatRail } from "./ChatRail";
-export { ChatMinimap, minimapColor } from "./ChatMinimap";
-export type { ChatMinimapProps, ChatMinimapSegment, ChatMinimapSegmentKind } from "./ChatMinimap";
-export { BranchNavigator, branchLabel } from "./BranchNavigator";
-export type { BranchNavigatorProps, BranchNode } from "./BranchNavigator";
-export { ExtensionStatusBar } from "./ExtensionStatusBar";
-export type { ExtensionStatusBarProps, ExtensionStatus, ExtensionStatusEntry } from "./ExtensionStatusBar";
-export { ExtensionWidgets, widgetBodyText } from "./ExtensionWidgets";
-export type { ExtensionWidgetsProps, ExtensionWidget, ExtensionWidgetAction } from "./ExtensionWidgets";
 export { Composer } from "./Composer";
 export { PiReloadFailureBanner } from "./PiReloadFailureBanner";
 export type { PiReloadFailureState } from "./PiReloadFailureBanner";
@@ -103,8 +94,6 @@ export {
   MessagePartRegistry,
 } from "./MessagePartRegistry";
 export type { MessagePartKind, MessagePartRenderProps } from "./parts/registry-defaults";
-export { MessageRewindMenu } from "./parts/MessageRewindMenu";
-export type { MessageRewindMenuProps } from "./parts/MessageRewindMenu";
 export { ToolGroupSummary } from "./parts/ToolGroupSummary";
 export type { ToolGroupSummaryProps } from "./parts/ToolGroupSummary";
 export {
@@ -227,3 +216,4 @@ export type {
   ConversationApprovalProps,
   ConversationApprovalImpl,
 } from "./conversation-approvals";
+export { restoreComposerText } from "./composer/use-extension-text";

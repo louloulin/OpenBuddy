@@ -235,11 +235,17 @@ describe("@openbuddy/dsh-core/goals (Phase B.3 step 2b)", () => {
     // Brand-new session so we can have a second goal without "already exists" guard.
     const directB = createGoal({ id: "session-2" }, "current", { objective: "B" });
     expect(directB.ref.revision).toBe(1);
-    // Complete the second one.
-    const ref2 = { id: directB.ref.id, revision: directB.ref.revision };
-    await commands.get("goals.complete")!.handler({ ...ref2 });
-    // But we are on session-1, so we'd hit "already exists" for session-2 — use state.ts directly.
-    listAllGoals; // type-only reference (import is at top)
+    // Complete the second one. 必须走 state.ts:上面注册的 `goals.complete`
+    // 绑定的是 session-1 的 carrier,拿 session-2 的 ref 去调它,查的是
+    // session-1 的 goal —— 只要两个 goal 的 id 不同就会抛 "goal revision
+    // conflict"。这条用例曾经因此"本地过、CI 红":两次 createGoal 落在同一
+    // 毫秒时 id 恰好相同,ref 才碰巧匹配上。
+    transitionGoal(
+      { id: "session-2" },
+      "current",
+      { id: directB.ref.id, revision: directB.ref.revision },
+      "complete",
+    );
 
     const all = listAllGoals();
     expect(all).toHaveLength(2);

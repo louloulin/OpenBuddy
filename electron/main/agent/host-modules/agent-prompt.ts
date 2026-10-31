@@ -45,6 +45,7 @@ import { createDefaultAgentHostState } from "./_default-state";
 import { extractPdfTextByPage } from "./pdf-text-extractor";
 import { extractDocxTextByParagraph } from "./docx-text-extractor";
 import { DEFAULT_TRUNCATION_OPTIONS, truncateDocumentBlocks } from "./document-truncator";
+import { applyTurnInput } from "./turn-state";
 
 let state: AgentHostState = createDefaultAgentHostState();
 
@@ -67,6 +68,18 @@ let state: AgentHostState = createDefaultAgentHostState();
  */
 let eventHandlers: Set<EventHandler> = new Set();
 let pluginEventHandlers: Set<PluginEventHandler> = new Set();
+
+/**
+ * Abort in flight. Pi's `abort()` waits for the run to go idle, and the
+ * renderer returns to idle before that (Stop must feel instant), so a prompt
+ * sent right after Stop waits here instead of failing with "Agent is already
+ * processing".
+ */
+let pendingAbort: Promise<void> | null = null;
+
+async function settlePendingAbort(): Promise<void> {
+  if (pendingAbort) await pendingAbort.catch(() => undefined);
+}
 
 let emitPluginEvent: (type: string, payload: unknown) => void = () => undefined;
 let emitRendererEvent: (channel: string, payload: unknown) => void = () => undefined;
@@ -145,20 +158,25 @@ export async function prompt(
     api: resolvedModel?.api,
     baseUrl: resolvedModel?.baseUrl,
   });
-  emitPluginEvent("session/input", { sessionId: state.session.sessionId, text });
+  // 回合可能跑到会话被切到后台之后:收尾一律记在发起时的会话上。
+  const session = state.session;
+  emitPluginEvent("session/input", { sessionId: session.sessionId, text });
   await writePromptHistory(text);
   try {
-    await state.session.prompt(text);
+    await settlePendingAbort();
+    await session.prompt(text);
     console.log("[openbuddy] pi prompt.dispatched", { traceId, sessionId });
     hostDispatchedLog("agent:prompt", traceId, sessionId);
   } catch (error) {
     console.error("[openbuddy] pi prompt.failed", { traceId, sessionId, error: String(error) });
     emitPluginEvent("agent/error", {
-      sessionId: state.session.sessionId,
+      sessionId: session.sessionId,
       operation: "prompt",
       error: String(error),
     });
-    emitRendererEvent("pi://error", { sessionId: state.session.sessionId, error: String(error) });
+    emitRendererEvent("pi://error", { sessionId: session.sessionId, error: String(error) });
+    // 回合没跑起来(或中途抛出)也要回到 idle,否则状态机停在 thinking。
+    applyTurnInput(session.sessionId, { type: "run_end" });
     hostFailedLog("agent:prompt", traceId, error);
     throw error;
   }
@@ -197,7 +215,7 @@ async function promptContent(
         });
       } catch {
         docBlocks.push(
-          `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(PDF text extraction failed; attachment kept in composer)\n</document-binary>`,
+          `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(PDF text extraction failed — the content is not available to you; tell the user and ask for a text version if needed)\n</document-binary>`,
         );
       }
     } else if (DOCX_MIME.test(part.mediaType)) {
@@ -207,7 +225,7 @@ async function promptContent(
         );
         if (paragraphs.length === 0) {
           docBlocks.push(
-            `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(docx has no extractable paragraphs; attachment kept in composer)\n</document-binary>`,
+            `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(docx has no extractable paragraphs — the content is not available to you)\n</document-binary>`,
           );
         } else {
           paragraphs.forEach((paragraph) => {
@@ -218,7 +236,7 @@ async function promptContent(
         }
       } catch {
         docBlocks.push(
-          `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(docx text extraction failed; attachment kept in composer)\n</document-binary>`,
+          `\n\n<document-binary name=${JSON.stringify(label)} mediaType=${JSON.stringify(part.mediaType)}>\n(docx text extraction failed — the content is not available to you; tell the user and ask for a text version if needed)\n</document-binary>`,
         );
       }
     } else if (TEXT_DOC_MIME.test(part.mediaType)) {
@@ -311,20 +329,25 @@ async function promptContent(
     ...(attachmentRefs.length > 0 ? { attachments: attachmentRefs } : {}),
   });
   if (text.trim()) await writePromptHistory(text);
+  // 回合可能跑到会话被切到后台之后:收尾一律记在发起时的会话上。
+  const session = state.session;
   try {
     void state.queueMirror;
-    await state.session!.sendUserMessage(
+    await settlePendingAbort();
+    await session.sendUserMessage(
       wireContent,
       mode === "steer" ? { deliverAs: "steer" } : { deliverAs: "followUp" },
     );
     return {};
   } catch (error) {
     emitPluginEvent("agent/error", {
-      sessionId: state.session.sessionId,
+      sessionId: session.sessionId,
       operation: "prompt",
       error: String(error),
     });
-    emitRendererEvent("pi://error", { sessionId: state.session.sessionId, error: String(error) });
+    emitRendererEvent("pi://error", { sessionId: session.sessionId, error: String(error) });
+    // 回合没跑起来(或中途抛出)也要回到 idle,否则状态机停在 thinking。
+    applyTurnInput(session.sessionId, { type: "run_end" });
     throw error;
   }
 }
@@ -458,12 +481,31 @@ export async function abort(options?: { traceId?: string; sessionId?: string }):
   const sessionId = options?.sessionId ?? state.session?.sessionId;
   hostReceivedLog("agent:abort", traceId, sessionId);
   emitPluginEvent("agent/abort", { sessionId: state.session?.sessionId });
+  // Stop must also settle every approval/question the run is blocked on —
+  // otherwise the tool promise keeps waiting and the card lingers in the UI
+  // after the turn is gone.
+  const abortedSessionId = state.session?.sessionId;
+  for (const [requestId, request] of state.pendingUiRequests) {
+    if (abortedSessionId && request.sessionId !== abortedSessionId) continue;
+    state.pendingUiRequests.delete(requestId);
+    request.resolve(undefined);
+    emitRendererEvent("pi://request-resolved", {
+      kind: request.kind,
+      requestId,
+      sessionId: request.sessionId,
+      cancelled: true,
+    });
+  }
+  const run = Promise.resolve(state.session?.abort());
+  pendingAbort = run;
   try {
-    await state.session?.abort();
+    await run;
     hostDispatchedLog("agent:abort", traceId, sessionId);
   } catch (error) {
     hostFailedLog("agent:abort", traceId, error);
     throw error;
+  } finally {
+    if (pendingAbort === run) pendingAbort = null;
   }
 }
 

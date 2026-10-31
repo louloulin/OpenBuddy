@@ -25,10 +25,15 @@
 
 import { createRequire } from "node:module";
 import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { agentHome } from "@openbuddy/storage";
 
-const projectRoot = resolve(dirname(new URL(import.meta.url).pathname), "..", "..", "..");
+// 必须用 fileURLToPath:new URL(...).pathname 在 Windows 上是
+// "/C:/repo/electron/main/agent/x.ts",resolve 之后 projectRoot 变成
+// C:\C:\repo\... —— 两条磁盘探测全部落空,连 @earendil-works/
+// pi-coding-agent 这种真实依赖都会被判"未安装"。
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 const requireFromRoot = createRequire(resolve(projectRoot, "package.json"));
 

@@ -158,6 +158,7 @@ export function buildInstallHostModuleDeps(
     refreshHookConfigs: () => refreshPiHookConfigs(),
     sessionPresetSelection: closures.sessionPresetSelection,
     replaceSession: ((opts: any) => closures.piSessionRuntime.replace(opts)) as any,
+    isRestoredSession: ((session: any) => closures.piSessionRuntime.wasRestored(session)) as any,
     sessionManagerOpen: ((sessionPath: string, options: any, cwd: string) =>
       SessionManager.open(sessionPath, options, cwd)) as any,
     provideRpcUiContext: closures.provideRpcUiContext,

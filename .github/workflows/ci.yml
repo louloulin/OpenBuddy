@@ -46,16 +46,45 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
+      # 锁文件平台包守卫（只需要 lockfile，不需要装依赖）。
+      #
+      # 2026-10-26 的 CI 全红就是这么来的：dependabot 的分组 PR 把 moon
+      # 升到 2.6.3 时重新生成的 pnpm-lock.yaml 把 7 个
+      # @moonrepo/core-* 平台包整组丢了 → 安装期
+      # `Cannot find module '@moonrepo/core-linux-x64-gnu/package.json'`
+      # → postinstall 退出码 1 → 每个 job 都死在装包阶段。
+      # 这个门禁在装包之前就把它拦下来。
+      - name: Lockfile platform-package guard
+        run: node scripts/check-lockfile-platform-pkgs.mjs
+
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Sync moon workspace
-        run: pnpm moon:sync
+      # 修复 node_modules 残骸。
+      #
+      # 本仓 2026-09 从 pnpm 的 isolated 链接器切到 hoisted。切换没有伴随
+      # 一次干净的 node_modules 重建，于是包目录里留下了旧布局的失效符号
+      # 链接和 stale `.bin` shim。shim 里的 cmd-shim-target 指向已不存在的
+      # 包目录，`pnpm exec <bin>` 就会解析到坏路径而不是回落到仓库根：
+      #   Error: Cannot find module '.../packages/<pkg>/node_modules/typescript/bin/tsc'
+      # 这和 2026-10-26 那次 `Cannot find module '@moonrepo/core-linux-x64-gnu/...'`
+      # 是同一类问题：node_modules 的实际状态与配置不一致，解析落到不存在的路径。
+      - name: Repair node_modules layout
+        run: node scripts/repair-node-modules.mjs
 
-      - name: Typecheck all 32 projects
+      # moon 的原生二进制是 optionalDependency 平台包。装不上时 `moon sync`
+      # 会让整个 job 挂掉，而门禁本身并不需要它（见下面的 gate:typecheck）。
+      # 所以这里允许失败，但把原因打印出来。
+      - name: Sync moon workspace (best-effort)
+        run: pnpm moon:sync || echo "::warning::moon sync 失败；门禁不依赖 moon 的原生二进制"
+
+      # 门禁走纯 Node 实现（scripts/run-workspace-task.mjs）：读每个项目的
+      # moon.yml 取出 typecheck task 的 command，在项目目录里执行。
+      # 不依赖 moon 的原生二进制 —— 那个包一旦缺失，之前是「装都装不完，
+      # 一行代码都跑不了」。
+      - name: Typecheck all projects
         run: |
-          pnpm typecheck
-          pnpm workspace:typecheck
+          pnpm gate:typecheck
           pnpm verify:agent-host-boundaries
 
       # Dictionary parity + ratcheting hardcoded-CJK gate. Separate from
@@ -132,11 +161,15 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Sync moon workspace
-        run: pnpm moon:sync
+      - name: Repair node_modules layout
+        run: node scripts/repair-node-modules.mjs
 
+      - name: Sync moon workspace (best-effort)
+        run: pnpm moon:sync || echo "::warning::moon sync 失败；门禁不依赖 moon 的原生二进制"
+
+      # 同 typecheck job：门禁用纯 Node 实现，不依赖 moon 的原生二进制。
       - name: Vitest
-        run: pnpm workspace:test
+        run: pnpm gate:test
 
   storage-boundaries:
     name: Storage Boundaries
@@ -178,7 +211,9 @@ jobs:
           node-version: 22
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm moon:sync
+      # best-effort:moon 的原生二进制是 optionalDependency 平台包,缺失时
+      # moon sync 会让 job 挂掉,而这两个 job 并不依赖 moon。
+      - run: pnpm moon:sync || echo "::warning::moon sync 失败;该 job 不依赖 moon"
       # C1(2026-10-19 生产评审):两个 smoke 起的是真实 Electron(指向
       # dist/,package.json main)—— 本 job 此前没有构建步骤,在干净 runner
       # 上结构性无法通过(本机能过只是因为磁盘留着旧 dist/)。
@@ -216,7 +251,9 @@ jobs:
           node-version: 22
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm moon:sync
+      # best-effort:moon 的原生二进制是 optionalDependency 平台包,缺失时
+      # moon sync 会让 job 挂掉,而这两个 job 并不依赖 moon。
+      - run: pnpm moon:sync || echo "::warning::moon sync 失败;该 job 不依赖 moon"
       - name: Build renderer
         run: pnpm exec electron-vite build
       - name: Verify bundle budgets
@@ -294,22 +331,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
-
+        with:
+          # 这个 job 只跑一个 node 脚本，不需要依赖安装。
+          fetch-depth: 1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
+
+      # 仓内 Markdown 相对链接门禁。
+      #
+      # 为什么不用 lychee-action：
+      #   1. lychee 在本仓的失败退出码长期是 2（"用法/参数错误"），无法归因到
+      #      具体哪条链接，改不动也修不掉；
+      #   2. lychee 只报"链接坏了"，查不出"把作者本机绝对路径写进了文档"，
+      #      而后者在本仓真实发生过（docs/analysis/*.md 里的 /Users/<某人>/...）；
+      #   3. 本地也要能跑同一条门禁，否则"本地绿、CI 红"会一直重复出现。
+      # 判定口径完全对齐原来的 `--offline --exclude-path THIRD-PARTY-NOTICES.md`：
+      # 只校验仓内相对链接，第三方许可原文除外。
       - name: Check markdown links
-        uses: lycheeverse/lychee-action@v2
-        with:
-          # --offline:只校验本地相对链接(仓内死链是门禁;外部站点可用性
-          # 不是我们的门禁,外网抖动不该让流水线变红)。
-          # --exclude-path:THIRD-PARTY-NOTICES.md 是第三方许可原文,内含
-          # 指向各上游仓的相对路径,不对本仓有效。
-          args: --no-progress --exclude-loopback --offline --exclude-path THIRD-PARTY-NOTICES.md --max-concurrency 16 .
-          fail: true
+        run: node scripts/check-doc-links.mjs
+
+      # 文档数字防漂移门禁。
+      #
+      # 仓里曾经到处写死"309 个测试文件""66 个 project"这类数字,而实测早已
+      # 不是这样 —— 三个 README 甚至写着三个不同的测试文件数(455 / 3047 /
+      # 455)。这类数字是"证明这是真项目"的素材,也是最容易变成假话的地方。
+      # 现在数字只保留一份:docs/stats.json,由 scripts/docs-stats.mjs 生成,
+      # 这个门禁保证它永远是真的。
+      - name: Docs stats freshness gate
+        run: node scripts/check-doc-stats.mjs
+
+      # 文档/官网包名真实性门禁。
+      #
+      # 与上面的数字漂移是同一类问题,但更严重:文档宣传的包在仓库里根本不存在。
+      # 2026-10 的真实案例 —— README 与官网列了 capability-{plan,task,automation,
+      # web-search,inspiration,notification,memory}、team-subagent、
+      # extension-{mcp,skills}、provider-*、runtime-{cordis,storage};一个都没有。
+      # 那些能力实际是 electron/main/agent/pi-extensions.ts 的 Pi 扩展。
+      # docs/EXAMPLES.md 甚至 import 了不存在的 @openbuddy/agent —— 示例代码
+      # 从来编译不过,而文档不参与编译,所以没有门禁就永远发现不了。
+      - name: Docs package-claim gate
+        run: node scripts/check-doc-package-claims.mjs
 
   build-summary:
     name: Build Summary

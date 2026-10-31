@@ -2,7 +2,9 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type HTMLAttributes,
   type ReactNode,
@@ -10,6 +12,13 @@ import {
 import { CodeBlockActions } from "./CodeBlockActions";
 import { extractCodeFromChildren } from "./utils/collect-text";
 import type { MarkdownConfig } from "./types";
+
+/**
+ * plan1030 批 5c — 长代码限高 + wrap 切换（对标 lumos CodeViewer）。
+ * 超过 420px 的代码块默认折叠 + 底部「展开全部」；头部提供 wrap 切换。
+ * 420px 与 lumos CodeViewer 的 max-h-[420px] 同值。
+ */
+const CODE_COLLAPSE_HEIGHT = 420;
 
 type FileInfo = {
   startLine: number;
@@ -149,6 +158,32 @@ export const MarkdownPre = memo(function MarkdownPre({
     return !isFullLatexDocument(code);
   }, [isLatex, code]);
 
+  // plan1030 批 5c — 完成态长代码限高：挂载/内容变化后量一次自然高度，
+  // 超过 CODE_COLLAPSE_HEIGHT 则折叠（overflow:hidden 下 scrollHeight
+  // 仍包含被裁剪的内容，无需先展开再量）。
+  const preRef = useRef<HTMLPreElement | null>(null);
+  const [overLimit, setOverLimit] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [wrap, setWrap] = useState(false);
+  useLayoutEffect(() => {
+    const el = preRef.current;
+    if (!el) {
+      setOverLimit(false);
+      return;
+    }
+    setOverLimit(el.scrollHeight > CODE_COLLAPSE_HEIGHT);
+  }, [code, children]);
+  const lineCount = useMemo(() => (code ? code.split("\n").length : 0), [code]);
+
+  const preCls = [
+    "md-code-pre",
+    overLimit && !expanded ? "md-code-pre--collapsed" : "",
+    wrap ? "md-code-pre--wrap" : "",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   const [latexHtml, setLatexHtml] = useState<string | null>(null);
   const [latexError, setLatexError] = useState<string | null>(null);
 
@@ -245,16 +280,27 @@ export const MarkdownPre = memo(function MarkdownPre({
               onAction={handleAction}
               copyIconOnly
             />
+            {/* plan1030 批 5c — wrap 切换（默认不换行，横向滚动）。 */}
+            <button
+              type="button"
+              className="md-code-action"
+              aria-pressed={wrap}
+              aria-label={wrap ? "关闭自动换行" : "自动换行"}
+              title={wrap ? "关闭自动换行" : "自动换行"}
+              onClick={() => setWrap((v) => !v)}
+            >
+              <span className="md-code-action-label">{wrap ? "不换行" : "换行"}</span>
+            </button>
           </div>
         ) : null}
 
         {shouldRenderAsLatex ? (
           latexHtml == null && !latexError ? (
-            <pre className={["md-code-pre", className].filter(Boolean).join(" ")} {...preProps}>
+            <pre ref={preRef} className={preCls} {...preProps}>
               <code className="language-latex">{code}</code>
             </pre>
           ) : latexError ? (
-            <pre className={["md-code-pre", className].filter(Boolean).join(" ")} {...preProps}>
+            <pre ref={preRef} className={preCls} {...preProps}>
               <code className="language-latex">{code}</code>
               <div className="md-latex-error">LaTeX 渲染失败: {latexError}</div>
             </pre>
@@ -267,13 +313,21 @@ export const MarkdownPre = memo(function MarkdownPre({
             />
           )
         ) : (
-          <pre
-            className={["md-code-pre", className].filter(Boolean).join(" ")}
-            {...preProps}
-          >
+          <pre ref={preRef} className={preCls} {...preProps}>
             {children}
           </pre>
         )}
+
+        {/* plan1030 批 5c — 折叠时底部展开栏（lumos "Show more" 模式）。 */}
+        {overLimit && !expanded ? (
+          <button
+            type="button"
+            className="md-code-expand"
+            onClick={() => setExpanded(true)}
+          >
+            展开全部（{lineCount} 行）
+          </button>
+        ) : null}
       </div>
     </div>
   );

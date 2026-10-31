@@ -1,4 +1,4 @@
-import { agentHome } from "@openbuddy/storage";
+import { agentHome, statIfExists } from "@openbuddy/storage";
 import { cp, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import crossSpawn from "cross-spawn";
 import { createRequire } from "node:module";
@@ -219,7 +219,7 @@ async function localDirectorySource(source: string): Promise<string | undefined>
   if (/^(?:file:|npm:|git(?:\+|:)|github:|https?:\/\/)/i.test(source)) return undefined;
   if (!/^(?:file:|\.{1,2}(?:[\\/]|$)|[\\/]|[A-Za-z]:[\\/])/.test(source)) return undefined;
   const candidate = resolve(source.replace(/^file:/i, ""));
-  return (await stat(candidate, { throwIfNoEntry: false }))?.isDirectory() ? candidate : undefined;
+  return (await statIfExists(candidate))?.isDirectory() ? candidate : undefined;
 }
 
 function packageNameFromSpecifier(source: string): string | undefined {

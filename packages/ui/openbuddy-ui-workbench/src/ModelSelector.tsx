@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { shortModelLabel } from "../../openbuddy-ui-shared/src/model-label";
-import { ChevronDown, Check, Settings2 } from "lucide-react";
+import { ChevronDown, Check, Settings2, Trash2 } from "lucide-react";
 
 /**
  * Model picker dropdown for the Composer. Shows the current model id on a
@@ -14,6 +15,12 @@ import { ChevronDown, Check, Settings2 } from "lucide-react";
  *   - keyboard: ↑/↓ to move, Home/End to jump, Enter to select, Esc to close
  *   - empty state distinguishes "未配置模型" + a "前往设置" affordance
  *   - Type-ahead: typing jumps to the option whose label starts with the letter
+ *
+ * plan1030 §5.2.1 — 菜单 portal 到 body + position:fixed(对齐 R8.61
+ * MentionPicker 的契约):composer 卡片及外层托盘有 `overflow:hidden`,菜单
+ * 向上展开时首行会被卡片顶边裁掉;portal 出去后不再受祖先裁剪链影响。
+ * 注意 outside-close 必须豁免 portal 菜单内的 mousedown,否则菜单先关闭、
+ * 行点击永远落空(经典 portal dropdown bug,等价于"切换完全不可用")。
  */
 /**
  * Capability hint surfaced as a small chip next to each model in the
@@ -86,6 +93,15 @@ export type ThinkingLevel = "off" | "low" | "medium" | "high";
 /** 没有可用模型时的统一文案:下拉空态与触发器共用,避免两处各写一份。 */
 const EMPTY_LABEL = "未配置模型";
 
+/** Window event that opens the (first mounted) model menu — e.g. from an error card. */
+export const MODEL_SELECTOR_OPEN_EVENT = "openbuddy:open-model-selector";
+
+export function openModelSelector(): boolean {
+  const event = new Event(MODEL_SELECTOR_OPEN_EVENT, { cancelable: true });
+  window.dispatchEvent(event);
+  return event.defaultPrevented;
+}
+
 const THINKING_OPTIONS: ReadonlyArray<{ value: ThinkingLevel; label: string; title: string }> = [
   { value: "off", label: "关", title: "关闭推理" },
   { value: "low", label: "轻", title: "轻度推理" },
@@ -128,6 +144,7 @@ export function ModelSelector({
   modelId,
   models,
   onModelChange,
+  onModelDelete,
   onOpenSettings,
   thinkingLevel,
   onThinkingChange,
@@ -136,6 +153,11 @@ export function ModelSelector({
   modelId?: string;
   models: ModelOption[];
   onModelChange: (id: string) => void;
+  /**
+   * plan1030 §5.2.1 — 行级删除:提供后每个模型行尾出现删除按钮(悬停/键盘
+   * Delete 触发),调用方负责确认与持久化。不提供则不渲染删除入口。
+   */
+  onModelDelete?: (model: ModelOption) => void;
   /**
    * Optional callback invoked when the user clicks "前往设置" in the empty
    * state — typically opens the model picker in Settings. R2.1 lets the
@@ -148,6 +170,7 @@ export function ModelSelector({
   onThinkingChange?: (level: ThinkingLevel) => void;
 }) {
   const hasThinking = typeof onThinkingChange === "function";
+  const hasDelete = typeof onModelDelete === "function";
   const baseId = useId();
   const menuId = `${baseId}-menu`;
   const triggerId = `${baseId}-trigger`;
@@ -159,6 +182,9 @@ export function ModelSelector({
   const typeaheadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLUListElement | null>(null);
+  // portal 菜单的 fixed 定位锚点:打开时对 trigger 取一次视口坐标。
+  const [anchor, setAnchor] = useState<{ bottom: number; right: number } | null>(null);
 
   // Active option index — defaults to the currently selected model so the
   // menu opens with focus on the user's current pick (predictable for
@@ -177,11 +203,39 @@ export function ModelSelector({
     }
   }, [open, defaultActive, total]);
 
-  // Outside click + Escape close.
+  // portal 菜单的 fixed 定位锚点:打开时对 trigger 取一次视口坐标。
+  // useLayoutEffect:锚点必须在浏览器绘制前就位,否则菜单会先闪现在
+  // (0,0) 再跳到正确位置。
+  useLayoutEffect(() => {
+    if (!open) {
+      setAnchor(null);
+      return;
+    }
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) setAnchor({ bottom: window.innerHeight - rect.top + 6, right: window.innerWidth - rect.right });
+  }, [open]);
+
+  // Opened from elsewhere (error card "切换模型"); the first mounted
+  // selector claims the event so stacked selectors don't all open.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      if (e.defaultPrevented || !triggerRef.current?.isConnected) return;
+      e.preventDefault();
+      setOpen(true);
+    };
+    window.addEventListener(MODEL_SELECTOR_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(MODEL_SELECTOR_OPEN_EVENT, onOpen);
+  }, []);
+
+  // Outside click + Escape close. portal 菜单在 rootRef 之外,必须豁免 ——
+  // mousedown 先于 click,不豁免会让菜单在行点击落地前就被关闭。
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -240,6 +294,9 @@ export function ModelSelector({
   };
 
   const onMenuClick = (e: React.MouseEvent<HTMLUListElement>) => {
+    // 行尾删除按钮自带 onClick(stopPropagation),走到这里说明目标不是按钮;
+    // 再防御一次,避免未来有人忘写 stopPropagation 时误触发选中。
+    if ((e.target as HTMLElement).closest("[data-model-delete]")) return;
     const li = (e.target as HTMLElement).closest<HTMLLIElement>("li[data-option-index]");
     // 空态行 / 「推理档位」标题行没有 data-option-index,不该触发选中;
     // closest 还会越过 <ul> 往上找,所以再确认一次命中在菜单内。
@@ -274,6 +331,15 @@ export function ModelSelector({
       case " ": {
         e.preventDefault();
         selectIndex(activeIndex);
+        break;
+      }
+      case "Delete": {
+        // 键盘删除:仅 Delete 键、仅对模型行生效(档位行没有删除语义);宿主会二次
+        // 确认。Backspace 不再触发 —— 它太容易在键入检索时误按。删除后菜单保持
+        // 打开 —— 用户常要连续清理多个模型;列表收窄由父组件刷新 models。
+        if (!hasDelete || activeIndex < 0 || activeIndex >= models.length) return;
+        e.preventDefault();
+        onModelDelete(models[activeIndex]);
         break;
       }
       case "Escape": {
@@ -329,7 +395,7 @@ export function ModelSelector({
         <span className="model-selector__label">{triggerLabel}</span>
         <ChevronDown size={14} strokeWidth={1.75} className="model-selector__arrow" />
       </button>
-      {open && (
+      {open && anchor && createPortal(
         <ul
           id={menuId}
           className="model-selector__menu"
@@ -339,7 +405,19 @@ export function ModelSelector({
           tabIndex={-1}
           onKeyDown={onMenuKey}
           onClick={onMenuClick}
+          style={{
+            // plan1030 §5.2.1 — fixed + portal,脱离 composer 的 overflow/层叠
+            // 上下文;向上展开(菜单在 footer,下方是屏幕底)。
+            position: "fixed",
+            bottom: anchor.bottom,
+            right: anchor.right,
+            top: "auto",
+            left: "auto",
+            maxHeight: "min(320px, 46vh)",
+            zIndex: 1100,
+          }}
           ref={(node) => {
+            menuRef.current = node;
             // Auto-focus the menu when opened so keyboard users land inside
             // the listbox without an extra Tab press.
             if (node && open) node.focus({ preventScroll: true });
@@ -379,6 +457,11 @@ export function ModelSelector({
                   (isFocused ? " model-selector__item--focused" : "")
                 }
                 onMouseEnter={() => setActiveIndex(idx)}
+                // plan1030 真机(1031):320px 菜单里 label + 协议徽章 + 能力徽章
+                // + 完整 provider id + 删除钮 + ✓ 的固定内容超出行宽,长 id 把
+                // 标签挤到 6px。id 与 label 高度重复,挪到行 title 提示,
+                // 行内不再渲染 —— 档位行的 item-id(说明文案)保留。
+                title={`${m.label || m.id}（${m.id}）`}
               >
                 <span className="model-selector__item-label">{m.label || m.id}</span>
                 {apiBackendLabel(m.apiBackend) && (
@@ -402,7 +485,22 @@ export function ModelSelector({
                     </span>
                   );
                 })}
-                <span className="model-selector__item-id">{m.id}</span>
+                {hasDelete && (
+                  <button
+                    type="button"
+                    className="model-selector__item-delete"
+                    data-model-delete
+                    aria-label={`删除模型 ${m.label || m.id}`}
+                    title={`删除模型 ${m.label || m.id}(Delete 键删除当前高亮行)`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onModelDelete?.(m);
+                    }}
+                  >
+                    <Trash2 size={13} strokeWidth={1.75} />
+                  </button>
+                )}
                 {isActive && <Check size={14} className="model-selector__check" />}
               </li>
             );
@@ -439,7 +537,8 @@ export function ModelSelector({
               })}
             </>
           )}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   );

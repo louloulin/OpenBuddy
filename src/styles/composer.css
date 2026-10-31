@@ -253,3 +253,46 @@
   outline: none;
   box-shadow: var(--wb-focus-shadow);
 }
+
+/* ---------------------------------------------------------------------------
+ * Composer 聚焦态
+ *
+ * 首页 composer 的 textarea 会在挂载时自动聚焦，全局 a11y 焦点环（2px 品牌色
+ * outline + 2px offset）于是常驻在输入框四周，看着像一个多余的蓝框；而 WorkBuddy
+ * 静止态没有任何描边。把焦点指示上移到卡片本身：键盘用户依然有清晰可见的
+ * focus 提示（WCAG 2.4.7），视觉上则收敛成卡片的一圈柔光。
+ * （2026-10-30 plan1030 批 2：自 workbuddy-parity.css 并入，原文件删除。）
+ * ------------------------------------------------------------------------- */
+.wb-composer__input:focus-visible {
+  outline: none;
+}
+.wb-composer:focus-within {
+  /* R8.29 — Migrate the focus ring to a soft brand-tinted glow so the
+     input area feels "alive" when focused (parity with ChatGPT's
+     composer focus glow). The brand tint replaces the previous
+     text-strong mix that was a plain neutral grey; the brand
+     glow is now ~6% alpha — low enough to read as a halo, not as a
+     validation error. WCAG 2.4.7 keyboard focus remains satisfied
+     because the 4px halo + 1px border combine into a clearly
+     visible focus indicator against the resting surface. */
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 30%, var(--wb-border-default));
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--wb-brand, #00c29a) 10%, transparent),
+    0 2px 8px color-mix(in srgb, var(--wb-brand, #00c29a) 6%, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: box-shadow var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+              border-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+[data-theme="dark"] .wb-composer:focus-within {
+  border-color: color-mix(in srgb, var(--wb-brand, #00c29a) 45%, var(--wb-border-default));
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--wb-brand, #00c29a) 18%, transparent),
+    0 2px 12px color-mix(in srgb, var(--wb-brand, #00c29a) 10%, transparent),
+    0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-composer:focus-within {
+    transition: none;
+  }
+}

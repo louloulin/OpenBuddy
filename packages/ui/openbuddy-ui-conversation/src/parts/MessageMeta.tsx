@@ -100,6 +100,14 @@ export function MessageMeta({
     : detail
       ? `${label}, 用时 ${detail}`
       : label;
+  // plan1030 批 4c — 完成态 hover/title 给出精确绝对时间戳（lumos
+  // TurnCompletionStamp 语义：tabular-nums 相对时间 + hover 精确时间）。
+  const absoluteTime = !isStreaming ? new Date(createdAt).toLocaleString() : null;
+  const titleText = absoluteTime
+    ? detail
+      ? `${absoluteTime} · ${label} · 用时 ${detail}`
+      : `${absoluteTime} · ${label}`
+    : ariaLabel;
   const showModelChip = !isStreaming && typeof modelId === "string" && modelId.length > 0;
   return (
     <div
@@ -107,7 +115,11 @@ export function MessageMeta({
         "msg__meta" + (isStreaming ? " msg__meta--streaming" : "")
       }
       aria-label={ariaLabel}
-      title={ariaLabel}
+      title={titleText}
+      /* plan1030 批 4b — 完成态挂 role="status"（隐含 polite）：流式结束、
+       * 完成元信息插入时对读屏播报一次。流式进行中不挂，避免每秒计时的
+       * 连续播报噪音。 */
+      {...(!isStreaming ? { role: "status" } : {})}
     >
       <span className="msg__meta-icon" aria-hidden="true">
         {isStreaming ? (

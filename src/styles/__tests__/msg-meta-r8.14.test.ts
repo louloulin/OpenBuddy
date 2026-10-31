@@ -142,16 +142,6 @@ describe("R8.14 .msg__meta--streaming pulse", () => {
   });
 });
 
-describe("R8.14 .msg__meta--user variant", () => {
-  it("renders a smaller chip under user bubbles (10px, lower opacity)", () => {
-    const body = ruleBody(prose, ".msg__meta--user");
-    expect(body).toBeTruthy();
-    expect(body!).toMatch(/margin-top:\s*3px/);
-    expect(body!).toMatch(/font-size:\s*10px/);
-    expect(body!).toMatch(/opacity:\s*0\.45/);
-  });
-});
-
 describe("R8.14 .msg__meta-icon / .msg__meta-detail helpers", () => {
   it("renders the icon as a 12×12 inline-flex square", () => {
     const body = ruleBody(prose, ".msg__meta-icon");

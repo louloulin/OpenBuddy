@@ -151,4 +151,4 @@ jobs:
 
       - name: Vitest streaming-perf schema
         run: |
-          pnpm exec vitest run scripts/electron/perf-streaming-schema.test.mjs --reporter=line
+          pnpm exec vitest run scripts/electron/perf-streaming-schema.test.mjs --reporter=default

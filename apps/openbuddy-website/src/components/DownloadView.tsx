@@ -1,40 +1,45 @@
-import { Monitor, Apple, Terminal, ArrowRight, Check } from 'lucide-react';
+import { Monitor, Apple, Terminal, ArrowRight, Check, FileWarning } from 'lucide-react';
 import SiteHeader from '@/components/SiteHeader';
 import SiteFooter from '@/components/SiteFooter';
 import CopyButton from '@/components/CopyButton';
 import Reveal from '@/components/motion/Reveal';
 import { PageHeader, SectionHeader } from '@/components/PageHeader';
 import { SITE_STATS } from '@/lib/constants';
-import { SITE_VERSION } from '@/lib/site-version';
 import { getDictionary, type Locale } from '@/lib/i18n';
 import { localizedPath } from '@/lib/i18n';
+import { formatBytes, isTrustedDownloadUrl, type ReleaseAsset, type ReleaseInfo, type ReleasePlatform } from '@/lib/releases-server';
 import Link from 'next/link';
 
-interface DownloadPlatform {
-  icon: typeof Monitor;
-  name: string;
-  file: string;
-  size: string;
-  arch: string;
-  installHint: string;
-  downloadUrl: string;
-}
+const PLATFORM_ICON: Record<ReleasePlatform, typeof Monitor> = {
+  mac: Apple,
+  windows: Monitor,
+  linux: Terminal
+};
 
-const PLATFORMS_EN: DownloadPlatform[] = [
-  { icon: Apple, name: 'macOS', file: `OpenBuddy-${SITE_VERSION}-macOS.dmg`, size: '124 MB', arch: 'Apple Silicon & Intel', installHint: 'Open the .dmg and drag OpenBuddy.app to /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Monitor, name: 'Windows', file: `OpenBuddy-${SITE_VERSION}-win-x64.exe`, size: '108 MB', arch: 'x64 · NSIS installer', installHint: 'Run the installer. SmartScreen warning? Click "More info" → "Run anyway".', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Terminal, name: 'Linux', file: `openbuddy_${SITE_VERSION}_amd64.deb`, size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: `sudo dpkg -i openbuddy_${SITE_VERSION}_amd64.deb · or run the AppImage directly`, downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
-];
+const PLATFORM_LABEL: Record<ReleasePlatform, { en: string; zh: string }> = {
+  mac: { en: 'macOS', zh: 'macOS' },
+  windows: { en: 'Windows', zh: 'Windows' },
+  linux: { en: 'Linux', zh: 'Linux' }
+};
 
-const PLATFORMS_ZH: DownloadPlatform[] = [
-  { icon: Apple, name: 'macOS', file: `OpenBuddy-${SITE_VERSION}-macOS.dmg`, size: '124 MB', arch: 'Apple Silicon & Intel', installHint: '打开 .dmg,将 OpenBuddy.app 拖入 /Applications', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Monitor, name: 'Windows', file: `OpenBuddy-${SITE_VERSION}-win-x64.exe`, size: '108 MB', arch: 'x64 · NSIS 安装器', installHint: '运行安装器。SmartScreen 警告?点击"更多信息" → "仍要运行"。', downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' },
-  { icon: Terminal, name: 'Linux', file: `openbuddy_${SITE_VERSION}_amd64.deb`, size: '102 MB', arch: 'x86_64 · AppImage + .deb', installHint: `sudo dpkg -i openbuddy_${SITE_VERSION}_amd64.deb · 或直接运行 AppImage`, downloadUrl: 'https://github.com/louloulin/OpenBuddy/releases/latest' }
-];
+const INSTALL_HINT: Record<ReleasePlatform, { en: string; zh: string }> = {
+  mac: {
+    en: 'Open the .dmg and drag OpenBuddy.app into /Applications. Unsigned builds are quarantined by Gatekeeper — see docs/RELEASING.md.',
+    zh: '打开 .dmg,把 OpenBuddy.app 拖进 /Applications。未签名版本会被 Gatekeeper 隔离,处理方式见 docs/RELEASING.md。'
+  },
+  windows: {
+    en: 'Run the installer. Unsigned builds trigger SmartScreen — click "More info" → "Run anyway".',
+    zh: '运行安装器。未签名版本会触发 SmartScreen —— 点「更多信息」→「仍要运行」。'
+  },
+  linux: {
+    en: 'chmod +x the AppImage and run it directly.',
+    zh: 'chmod +x 之后直接运行 AppImage。'
+  }
+};
 
 const COPY_EN = {
   title: 'Download OpenBuddy',
-  subtitle: 'Three installers, one MIT license, zero telemetry. Or build from source — the repo is the product.',
+  subtitle: 'Every release is built by CI and shipped with a real SHA-256. Or build from source — the repo is the product.',
   sourceLabel: 'Build from source',
   sourceDesc: "If you want to read every line before you run it, that's our preferred way too.",
   sourceSteps: [
@@ -47,21 +52,24 @@ const COPY_EN = {
   brewFormula: 'brew install --cask openbuddy',
   verifications: 'Verifications',
   verificationsList: [
-    `${SITE_STATS.testFiles} test files in the repo (run \`pnpm workspace:test\`)`,
+    `${SITE_STATS.testFiles} test files in the repo (run \`pnpm gate:test\`)`,
     'Closed-loop capability evals (`pnpm test:closed-loop`)',
     'Real-model Playwright UI tests (`pnpm test:electron:real-ui`)'
   ],
   checksumLabel: 'Checksums (SHA-256)',
-  checksums: [
-    { platform: 'macOS', hash: '7e3b…c4d2' },
-    { platform: 'Windows', hash: 'a8f1…b9e5' },
-    { platform: 'Linux', hash: '2c6d…7a4f' }
-  ]
+  noReleaseTitle: 'No release published yet',
+  noReleaseBody:
+    'OpenBuddy has not published a release yet. Until it does, the only honest way to get the app is to build it from source — the repository is the product.',
+  noReleaseBadge: 'No releases',
+  latestLabel: 'Latest release',
+  sha256Pending: 'SHA-256 published with the release',
+  noChecksum: 'No checksum published',
+  verifyLink: 'verify →'
 };
 
 const COPY_ZH = {
   title: '下载 OpenBuddy',
-  subtitle: '三个安装器,一个 MIT 协议,零遥测。或从源码构建 —— 仓库即产品。',
+  subtitle: '每个版本都由 CI 构建,并附真实的 SHA-256 校验和。也可以从源码构建 —— 仓库即产品。',
   sourceLabel: '从源码构建',
   sourceDesc: '如果你想在运行前先读完每一行,这也是我们更推荐的方式。',
   sourceSteps: [
@@ -74,16 +82,19 @@ const COPY_ZH = {
   brewFormula: 'brew install --cask openbuddy',
   verifications: '验证',
   verificationsList: [
-    `仓库内 ${SITE_STATS.testFiles} 个测试文件 (运行 \`pnpm workspace:test\`)`,
+    `仓库内 ${SITE_STATS.testFiles} 个测试文件 (运行 \`pnpm gate:test\`)`,
     '闭环能力评估 (`pnpm test:closed-loop`)',
     '真实模型 Playwright UI 测试 (`pnpm test:electron:real-ui`)'
   ],
   checksumLabel: '校验和 (SHA-256)',
-  checksums: [
-    { platform: 'macOS', hash: '7e3b…c4d2' },
-    { platform: 'Windows', hash: 'a8f1…b9e5' },
-    { platform: 'Linux', hash: '2c6d…7a4f' }
-  ]
+  noReleaseTitle: '尚未发布任何版本',
+  noReleaseBody:
+    'OpenBuddy 还没有发布过版本。在那之前,拿到这个应用的唯一诚实方式是**从源码构建** —— 仓库即产品。',
+  noReleaseBadge: '暂无 Release',
+  latestLabel: '最新版本',
+  sha256Pending: 'SHA-256 随版本一并发布',
+  noChecksum: '未发布校验和',
+  verifyLink: '校验 →'
 };
 
 /** Title/subtitle for this page, shared with the route's generateMetadata. */
@@ -92,11 +103,20 @@ export const DOWNLOAD_COPY: Record<Locale, typeof COPY_EN> = {
   'zh-CN': COPY_ZH
 };
 
-export function DownloadView({ locale }: { locale: Locale }) {
+export function DownloadView({ locale, release }: { locale: Locale; release: ReleaseInfo }) {
   const dict = getDictionary(locale);
-  const platforms = locale === 'zh-CN' ? PLATFORMS_ZH : PLATFORMS_EN;
   const copy = locale === 'zh-CN' ? COPY_ZH : COPY_EN;
   const isZh = locale === 'zh-CN';
+
+  const assets = release.assets.filter((a) => isTrustedDownloadUrl(a.downloadUrl));
+  const byPlatform = new Map<ReleasePlatform, ReleaseAsset[]>();
+  for (const asset of assets) {
+    const list = byPlatform.get(asset.platform) ?? [];
+    list.push(asset);
+    byPlatform.set(asset.platform, list);
+  }
+  const platforms: ReleasePlatform[] = ['mac', 'windows', 'linux'];
+  const hasRelease = assets.length > 0;
 
   return (
     <>
@@ -111,34 +131,82 @@ export function DownloadView({ locale }: { locale: Locale }) {
               compact={ isZh }
             />
 
-            <div className="mt-16 grid gap-5 md:grid-cols-3">
-              { platforms.map((p, platformIndex) => {
-                const Icon = p.icon;
-                return (
-                  <Reveal key={ p.name } as="article" delay={ platformIndex * 90 } className="flex flex-col gap-4 rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 transition-all hover:border-[var(--wb-border-strong)]">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--wb-bg-soft)]">
-                          <Icon className="h-4 w-4 text-[var(--wb-fg)]" />
-                        </span>
-                        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--wb-fg)]">{ p.name }</span>
-                      </div>
-                      <span className="font-mono text-[10.5px] text-[var(--wb-fg-faint)]">{ p.size }</span>
+            { release.tag && (
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--wb-fg-muted)]">{ copy.latestLabel }</span>
+                <a
+                  href={ release.htmlUrl ?? 'https://github.com/louloulin/OpenBuddy/releases' }
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] px-3 py-1 font-mono text-[12px] font-semibold text-[var(--wb-fg)] hover:border-[var(--wb-border-strong)]"
+                >
+                  { release.tag }
+                </a>
+                { release.publishedAt && (
+                  <span className="font-mono text-[11px] text-[var(--wb-fg-faint)]">{ release.publishedAt.slice(0, 10) }</span>
+                )}
+              </div>
+            )}
+
+            { !hasRelease && (
+              <div className="mt-12 rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-7 sm:p-8">
+                <div className="flex items-start gap-3">
+                  <FileWarning className="mt-0.5 h-5 w-5 flex-shrink-0 text-[var(--wb-fg-muted)]" />
+                  <div>
+                    <h3 className="font-display-serif text-[24px] leading-tight tracking-[-0.02em] text-[var(--wb-fg)]">{ copy.noReleaseTitle }</h3>
+                    <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-[var(--wb-fg-muted)]">{ copy.noReleaseBody }</p>
+                    <span className="mt-4 inline-flex items-center rounded-full border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--wb-fg-muted)]">
+                      { copy.noReleaseBadge }
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            { hasRelease && (
+              <div className="mt-16 grid gap-5 md:grid-cols-3">
+                { platforms.map((platform, platformIndex) => {
+                  const list = byPlatform.get(platform) ?? [];
+                  if (list.length === 0) return null;
+                  const Icon = PLATFORM_ICON[platform];
+                  return (
+                    <div key={ platform } className="flex flex-col gap-4">
+                      { list.map((asset, assetIndex) => (
+                        <Reveal
+                          key={ asset.name }
+                          as="article"
+                          delay={ (platformIndex * 2 + assetIndex) * 60 }
+                          className="flex flex-col gap-4 rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-6 transition-all hover:border-[var(--wb-border-strong)]"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--wb-bg-soft)]">
+                                <Icon className="h-4 w-4 text-[var(--wb-fg)]" />
+                              </span>
+                              <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--wb-fg)]">
+                                { PLATFORM_LABEL[platform][isZh ? 'zh' : 'en'] }{ asset.arch ? ` · ${asset.arch}` : '' }
+                              </span>
+                            </div>
+                            <span className="font-mono text-[10.5px] text-[var(--wb-fg-faint)]">{ formatBytes(asset.sizeBytes) }</span>
+                          </div>
+                          <code className="rounded-md border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-3 py-2 font-mono text-[11px] leading-relaxed text-[var(--wb-fg)] break-all">{ asset.name }</code>
+                          <p className="text-[13px] leading-snug text-[var(--wb-fg-muted)]">{ INSTALL_HINT[platform][isZh ? 'zh' : 'en'] }</p>
+                          { asset.sha256 && (
+                            <p className="font-mono text-[10.5px] leading-relaxed text-[var(--wb-fg-faint)] break-all">
+                              SHA-256 { asset.sha256 }
+                            </p>
+                          ) }
+                          <a href={ asset.downloadUrl } target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--wb-fg)] px-4 py-2.5 text-[13px] font-semibold text-[var(--wb-bg)] transition-opacity hover:opacity-90">
+                            <span>Download</span>
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </a>
+                        </Reveal>
+                      ))}
                     </div>
-                    <div>
-                      <h3 className="font-display-serif text-[28px] leading-tight tracking-[-0.02em] text-[var(--wb-fg)]">{ p.name }</h3>
-                      <p className="mt-1 font-mono text-[11px] text-[var(--wb-fg-muted)]">{ p.arch }</p>
-                    </div>
-                    <code className="rounded-md border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-3 py-2 font-mono text-[11px] leading-relaxed text-[var(--wb-fg)] break-all">{ p.file }</code>
-                    <p className="text-[13px] leading-snug text-[var(--wb-fg-muted)]">{ p.installHint }</p>
-                    <a href={ p.downloadUrl } target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--wb-fg)] px-4 py-2.5 text-[13px] font-semibold text-[var(--wb-bg)] transition-opacity hover:opacity-90">
-                      <span>Download</span>
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </a>
-                  </Reveal>
-                );
-              }) }
-            </div>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="mt-8 flex items-center justify-center gap-2 rounded-full border border-[var(--wb-border)] bg-[var(--wb-bg-soft)] px-4 py-3">
               <Terminal className="h-4 w-4 text-[var(--wb-fg-muted)]" />
@@ -161,7 +229,7 @@ export function DownloadView({ locale }: { locale: Locale }) {
                       <span className="select-none text-[#22C55E] mr-2">❯</span>
                       { step }
                     </div>
-                  )) }
+                  ))}
                 </pre>
               </div>
             </div>
@@ -175,24 +243,30 @@ export function DownloadView({ locale }: { locale: Locale }) {
                       <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--wb-working)]" />
                       <span>{ v }</span>
                     </li>
-                  )) }
+                  ))}
                 </ul>
               </div>
               <div className="rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-bg-pure)] p-7">
                 <SectionHeader eyebrow={ copy.checksumLabel } title="" />
-                <table className="w-full text-[13px]">
-                  <tbody>
-                    { copy.checksums.map((c) => (
-                      <tr key={ c.platform } className="border-t border-[var(--wb-border)] first:border-t-0">
-                        <td className="py-2 font-medium text-[var(--wb-fg)]">{ c.platform }</td>
-                        <td className="py-2"><code className="font-mono text-[12px] text-[var(--wb-fg-muted)]">{ c.hash }</code></td>
-                        <td className="py-2 text-right">
-                          <a href="https://github.com/louloulin/OpenBuddy/releases/latest" target="_blank" rel="noreferrer" className="font-mono text-[11px] text-[var(--wb-brand)] hover:underline">verify →</a>
-                        </td>
-                      </tr>
-                    )) }
-                  </tbody>
-                </table>
+                { hasRelease && release.hasChecksums ? (
+                  <table className="w-full text-[13px]">
+                    <tbody>
+                      { assets.map((asset) => (
+                        <tr key={ asset.name } className="border-t border-[var(--wb-border)] first:border-t-0">
+                          <td className="py-2 font-medium text-[var(--wb-fg)]">{ PLATFORM_LABEL[asset.platform][isZh ? 'zh' : 'en'] }{ asset.arch ? ` · ${asset.arch}` : '' }</td>
+                          <td className="py-2"><code className="font-mono text-[11px] text-[var(--wb-fg-muted)] break-all">{ asset.sha256 ?? copy.noChecksum }</code></td>
+                          <td className="py-2 text-right whitespace-nowrap">
+                            <a href={ asset.downloadUrl } target="_blank" rel="noreferrer" className="font-mono text-[11px] text-[var(--wb-brand)] hover:underline">{ copy.verifyLink }</a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-[13.5px] leading-snug text-[var(--wb-fg-muted)]">
+                    { hasRelease ? copy.sha256Pending : copy.noReleaseBody }
+                  </p>
+                )}
               </div>
             </div>
 

@@ -13,7 +13,6 @@
  */
 import { useEffect, useState } from "react";
 import { useThemeSnapshot } from "@openbuddy/ui-theme/client";
-import { Hourglass, Clock3 } from "lucide-react";
 import { ConversationMarkdown } from "../conversation-slots";
 import { formatDurationMs } from "@/lib/ui/duration";
 import type { MessagePartRenderProps } from "./registry-defaults";
@@ -22,15 +21,20 @@ export function ThoughtMessagePart(props: MessagePartRenderProps) {
   // hook 必须在类型守卫之前调用(React 错误 300 号,同 TextMessagePart)。
   const currentTheme = useThemeSnapshot((s) => s.current());
   const [tickMs, setTickMs] = useState<number | null>(null);
-  // 守卫上移后 TS 的窄化失效,这里显式收窄(effect 依赖里要用到 part.text)。
-  const thoughtText = props.part.kind === "thought" ? props.part.text : "";
+  // 计时起点只在进入流式时取一次。此前依赖 part.text,每个 delta 都重置起点,
+  // 流式中耗时永远 <1s、标题上看不到计时。
+  const isLive = props.isStreaming && !props.complete;
   useEffect(() => {
-    if (!props.isStreaming || props.complete) return;
+    if (!isLive) return;
     const start = Date.now();
     setTickMs(0);
     const handle = window.setInterval(() => setTickMs(Date.now() - start), 500);
     return () => window.clearInterval(handle);
-  }, [props.isStreaming, props.complete, thoughtText]);
+  }, [isLive]);
+  // 默认收起(对齐 Claude / ChatGPT 的 "Thinking…" 行):流式时标题行闪光并
+  // 预览最新一行;用户点开后以用户为准。此前流式时整段推理原文铺开占半屏。
+  const [userOpen, setUserOpen] = useState<boolean | null>(null);
+  const open = userOpen ?? false;
   if (props.part.kind !== "thought") return null;
 
   const resolvedTheme = (props.theme ?? currentTheme) as "light" | "dark";
@@ -59,8 +63,17 @@ export function ThoughtMessagePart(props: MessagePartRenderProps) {
         ? `· ${formatDurationMs(tickMs)}`
         : `已思考 ${formatDurationMs(tickMs)}`;
 
+  const previewLine = streaming
+    ? (props.part.text.split("\n").map((line) => line.trim()).filter(Boolean).at(-1) ?? "")
+    : "";
+
   return (
     <details
+      open={open}
+      onToggle={(e) => {
+        const next = (e.currentTarget as HTMLDetailsElement).open;
+        if (next !== open) setUserOpen(next);
+      }}
       className={
         "msg__thought" +
         (props.isStreaming && !props.complete ? " msg__thought--streaming" : "")
@@ -69,17 +82,13 @@ export function ThoughtMessagePart(props: MessagePartRenderProps) {
       data-thinking-complete={props.complete ? "true" : "false"}
     >
       <summary>
-        <span className="msg__thought-icon" aria-hidden="true">
-          {props.isStreaming && !props.complete ? (
-            <Hourglass size={12} strokeWidth={1.75} className="msg__thought-icon-stream" />
-          ) : (
-            <Clock3 size={12} strokeWidth={1.75} />
-          )}
-        </span>
         <span className="msg__thought-label">
           {streaming ? "思考中" : "深度思考"}
         </span>
         <span className="msg__thought-elapsed">{elapsedText}</span>
+        {streaming && !open && previewLine && (
+          <span className="msg__thought-preview" data-testid="thought-preview">{previewLine}</span>
+        )}
       </summary>
       <div className="msg__thought-body">
         <ConversationMarkdown

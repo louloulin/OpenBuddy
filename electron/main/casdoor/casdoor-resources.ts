@@ -121,6 +121,7 @@ const RESOURCE_NAMESPACE = "casdoor:tenant-resources";
 let resourceStoreStore: SettingsDocumentStore | null = null;
 let resourceStoreStoragePromise: Promise<SettingsDocumentStore> | null = null;
 let resourceStoreLegacyImported = false;
+let resourceStoreDriver: { close(): void } | null = null;
 
 async function openResourceStoreStorage(): Promise<SettingsDocumentStore> {
   if (resourceStoreStore) return resourceStoreStore;
@@ -129,6 +130,7 @@ async function openResourceStoreStorage(): Promise<SettingsDocumentStore> {
     resourceStoreStoragePromise = (async () => {
       const promise = openStorage({ filePath: path, appVersion: "openbuddy-casdoor-resources" });
       const opened: OpenStorageResult = await promise;
+      resourceStoreDriver = opened.driver;
       const store = new SettingsDocumentStore(opened.driver);
       if (!resourceStoreLegacyImported) {
         // Custom legacy import: our legacy file is a single document (not a
@@ -895,5 +897,19 @@ function broadcastMemberRevocation(tenantId: string, subject: string, revoked: b
   }
 }
 
-export const __casdoorResourceTestables = { normalizeStore, CasdoorResourceService };
+/**
+ * 测试用:关掉并丢弃缓存的 store。
+ *
+ * 只置空引用会让 SQLite 句柄泄漏 —— Windows 上泄漏的句柄让测试目录的
+ * rm 直接 EBUSY(macOS/Linux 允许 unlink 已打开文件,本地看不出来)。
+ */
+function resetResourceStoreForTests(): void {
+  try { resourceStoreDriver?.close(); } catch { /* 已经关了 */ }
+  resourceStoreDriver = null;
+  resourceStoreStore = null;
+  resourceStoreStoragePromise = null;
+  resourceStoreLegacyImported = false;
+}
+
+export const __casdoorResourceTestables = { normalizeStore, CasdoorResourceService, resetResourceStoreForTests };
 import type { CasdoorSessionBinding, CasdoorSessionKind } from "@openbuddy/auth-casdoor";

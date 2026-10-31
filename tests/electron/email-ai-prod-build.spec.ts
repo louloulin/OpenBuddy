@@ -179,9 +179,11 @@ async function enterEmailSlot(
 ): Promise<void> {
   await installProdEmailMock(electronApp);
   if (await page.locator(".ai-inbox-shell").count() === 0) {
-    const emailNav = page.locator("button").filter({ hasText: "邮件" }).first();
-    await expect(emailNav).toBeVisible({ timeout: 30_000 });
-    await emailNav.click();
+    // 邮件入口在侧栏「更多 → 工作区」里(2026-10-31 主导航精简)。
+    const more = page.locator("button.sidebar__nav-item").filter({ hasText: "更多" }).first();
+    await expect(more).toBeVisible({ timeout: 30_000 });
+    await more.click();
+    await page.getByRole("menuitem", { name: "邮件" }).click();
   }
   await expect(page.locator(".ai-inbox-shell").first()).toBeVisible({ timeout: 30_000 });
   // Give useEmailData a tick to drain the (mocked) capability-email IPC.

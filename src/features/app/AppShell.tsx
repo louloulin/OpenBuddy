@@ -334,6 +334,7 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
     handleSendContent,
     openSettings,
     handleModelChange,
+    handleModelDelete,
     handleStartProject,
     handleStartProjectConversation,
     handleSendCurrent,
@@ -391,6 +392,7 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
           modelId={currentModelId}
           models={models}
           onModelChange={handleModelChange}
+          onModelDelete={handleModelDelete}
           onStartProject={handleStartProject}
           onStartProjectConversation={handleStartProjectConversation}
         />
@@ -415,6 +417,7 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
           modelId={currentModelId}
           models={models}
           onModelChange={handleModelChange}
+          onModelDelete={handleModelDelete}
           cwd={runtime.init?.cwd ?? ""}
           workspaces={workspaces}
           onSelectWorkspace={handleSelectWorkspace}
@@ -444,6 +447,7 @@ function MainContent({ runtime }: { runtime: AppShellRuntime }) {
           modelId={currentModelId}
           models={models}
           onModelChange={handleModelChange}
+          onModelDelete={handleModelDelete}
           cwd={runtime.init?.cwd ?? ""}
           workspaces={workspaces}
           onSelectWorkspace={handleSelectWorkspace}

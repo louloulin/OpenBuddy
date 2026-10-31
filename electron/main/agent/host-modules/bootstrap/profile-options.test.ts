@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { isAbsolute, join } from "node:path";
 
 // Mock electron before any agent-host import.
 vi.mock("electron", () => ({
@@ -34,7 +35,9 @@ describe("host-modules/bootstrap/profile-options", () => {
       OPENBUDDY_PROFILE_DIR: "relative/dir",
     });
     expect(resolved.profileDirRaw).toBe("relative/dir");
-    expect(resolved.profileDir).toMatch(/^[/\\].*relative[/\\]dir$/);
+    // 不要写 `^[/\\]` —— Windows 的绝对路径以盘符开头(D:\...),那条正则必挂。
+    expect(isAbsolute(resolved.profileDir)).toBe(true);
+    expect(resolved.profileDir.endsWith(join("relative", "dir"))).toBe(true);
     expect(resolved.profileName).toBe("desktop"); // profileName still defaults
   });
 

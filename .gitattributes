@@ -1,0 +1,38 @@
+# 换行符归一化 —— 不要删。
+#
+# 背景:仓库里没有任何 .gitattributes 时,Windows 上 `core.autocrlf=true`
+# (Git for Windows 的默认值)会在 checkout 时把所有文本文件转成 CRLF。
+# 于是同一份代码在 windows-latest 上跑出来的结果与 macOS/ubuntu 不同,
+# 而且失败点看起来毫不相干:
+#
+#   - scripts/ui-slot-audit.mjs 生成的 markdown 带 \r\n,而仓库里入库的
+#     docs/EXTENSION_POINTS.md 是 \n
+#     -> extension-points.test.ts 的"逐字节一致"新鲜度守卫在 Windows 上必红
+#   - 任何按行做字符串比对的快照 / 生成物都有同类风险
+#
+# `text=auto eol=lf` 让 Git 在索引和工作区都统一用 LF(Windows 上也一样),
+# 从源头上消灭这类"本地全绿、CI 单平台红"的问题。
+#
+# 二进制文件必须显式标 binary,否则 Git 可能把它们当文本做换行转换而损坏。
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.xz binary
+*.mp4 binary
+*.wasm binary
+*.node binary
+*.sqlite binary
+*.db binary

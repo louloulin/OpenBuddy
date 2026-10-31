@@ -179,6 +179,19 @@ body[data-vscode-theme-name="IDE Light"] {
   --wb-home-bg-primary: #f2f2f2;
   --wb-home-bg-secondary: #fafafa;
   --wb-quick-action-sub-item-bg: #ebebeb;
+  /* plan1030 批 5a — 文本选区色（::selection 契约）。此前全仓零定义，
+   * 浏览器默认蓝与品牌青绿无关。品牌 18% 透明底 + 正常前景。 */
+  --wb-selection-bg: color-mix(in srgb, var(--wb-brand-primary) 18%, transparent);
+  --wb-selection-fg: var(--wb-color-text-primary);
+  /* plan1030 批 5b — z-index 刻度起点（完整刻度待批 3 收敛 94 处裸值时定义）。
+   * 1400 与 modals.css 现有 request-modal 遮罩对齐。 */
+  --wb-z-modal: 1400;
+  --wb-z-lightbox: 1500;
+  /* plan1030 批 2 补漏 — 以下两个别名此前只定义在从未被加载的 global.css 里，
+   * home.css 73 处 var() 引用在运行时一直是未定义（ui-token-audit 静态审计
+   * 被死文件掩盖）。删除 global.css 后审计现形，这里正式接管定义。 */
+  --wb-text-light: var(--wb-text-medium);
+  --wb-color-primary: var(--wb-brand);
 }
 
 [data-theme=dark],
@@ -330,6 +343,12 @@ body.dark,
   --wb-home-bg-primary: #1f1f1f;
   --wb-home-bg-secondary: #141414;
   --wb-quick-action-sub-item-bg: rgba(255, 255, 255, 0.14);
+  /* plan1030 批 5a — 暗色选区：品牌 28%（暗底需更高占比才可读）。 */
+  --wb-selection-bg: color-mix(in srgb, var(--wb-brand-primary) 28%, transparent);
+  --wb-selection-fg: var(--wb-color-text-primary);
+  /* plan1030 批 2 补漏（见亮色块注释）— 曾只在死文件 global.css 定义。 */
+  --wb-text-light: var(--wb-text-medium);
+  --wb-color-primary: var(--wb-brand);
 }
 
 /**

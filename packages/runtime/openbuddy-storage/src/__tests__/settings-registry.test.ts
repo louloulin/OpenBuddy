@@ -25,14 +25,20 @@ import { SettingsRegistry } from "../sqlite/settings";
 
 let root = "";
 let store: SettingsRegistry;
+let driver: ReturnType<typeof openStorageSync>["driver"];
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "settings-registry-test-"));
-  store = new SettingsRegistry(openStorageSync({ filePath: join(root, "profile.sqlite") }).driver);
+  driver = openStorageSync({ filePath: join(root, "profile.sqlite") }).driver;
+  store = new SettingsRegistry(driver);
 });
 
+// Windows 上不能 unlink 一个仍被打开的文件 —— 会 EBUSY。
+// 之前这里直接 rmSync 目录，macOS 因为允许删除已打开文件所以一直没暴露，
+// windows-latest CI 上一片 EBUSY。关闭驱动再删即可。
 afterEach(() => {
-  if (root) rmSync(root, { recursive: true, force: true });
+  try { driver?.close(); } catch { /* 已经关了 */ }
+  if (root) rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   root = "";
 });
 
@@ -89,11 +95,16 @@ describe("SettingsRegistry (Phase D.1 verification)", () => {
 
   it("custom now function is honoured for updatedAt", () => {
     const fixedNow = () => "2026-01-01T00:00:00.000Z";
-    const custom = new SettingsRegistry(
-      openStorageSync({ filePath: join(root, "custom.sqlite") }).driver,
-      fixedNow,
-    );
-    custom.set("test", "key", "v");
-    expect(custom.get("test", "key")?.updatedAt).toBe("2026-01-01T00:00:00.000Z");
+    // 这条用例自己开了一个第二个驱动(custom.sqlite)。不关掉的话
+    // afterEach 的 rmSync 在 Windows 上 EBUSY —— 上面只关了 beforeEach
+    // 那个驱动,盖不住这一个。
+    const customDriver = openStorageSync({ filePath: join(root, "custom.sqlite") }).driver;
+    try {
+      const custom = new SettingsRegistry(customDriver, fixedNow);
+      custom.set("test", "key", "v");
+      expect(custom.get("test", "key")?.updatedAt).toBe("2026-01-01T00:00:00.000Z");
+    } finally {
+      customDriver.close();
+    }
   });
 });

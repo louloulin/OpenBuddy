@@ -18,6 +18,7 @@ import { useState, type ComponentType } from "react";
 import { Zap, ChevronDown, ChevronRight } from "lucide-react";
 import type { ToolCallCluster } from "@/lib/ui/timeline-utils";
 import { ToolCallCard } from "../ToolCallCard";
+import { detectToolRenderer, summarizeTool } from "@/lib/markdown/tool-renderers";
 import type { ToolCallView } from "@openbuddy/ui-state/session-store";
 
 export type ToolGroupSummaryProps = {
@@ -29,7 +30,9 @@ export type ToolGroupSummaryProps = {
 };
 
 function summarizeToolCall(tc: ToolCallView): string {
-  return tc.title || tc.kind || tc.toolCallId.slice(0, 8);
+  // 与单卡同一套摘要(命令原文 / 读取文件名 / 搜索词),避免折叠组里
+  // 又退回裸工具名。
+  return summarizeTool(tc, detectToolRenderer(tc.kind)) || tc.title || tc.kind || tc.toolCallId.slice(0, 8);
 }
 
 export function ToolGroupSummary({

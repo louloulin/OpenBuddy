@@ -1,4 +1,4 @@
-import { lstat, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, normalize } from "node:path";
@@ -379,7 +379,12 @@ describe("DeepSeek profile composition", () => {
   });
 
   it("runs an external dsh package through bundle, renderer, remote, and Pi discovery", async () => {
-    const home = await mkdtemp(join(tmpdir(), "openbuddy-external-dsh-"));
+    // GitHub Actions' Windows TEMP is `C:\Users\RUNNER~1\...`. Node's
+    // pathToFileURL percent-encodes the tilde (`RUNNER%7E1`), and Vitest's
+    // Vite module runner then resolves that `file:` URL to a literal
+    // `C:/Users/RUNNER%7E1/...` id and fails to read it. Canonicalising the
+    // temp dir to its long form keeps dynamic import URLs plain ASCII.
+    const home = await realpath(await mkdtemp(join(tmpdir(), "openbuddy-external-dsh-")));
     const source = join(process.cwd(), "packages/runtime/openbuddy-plugin-host/src/__fixtures__/external-dsh-plugin");
     const options = { home, profileName: "desktop" };
     await ensureOpenBuddyProfile(options);

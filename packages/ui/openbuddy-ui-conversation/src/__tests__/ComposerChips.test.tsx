@@ -53,7 +53,7 @@ describe("ComposerChips (Plan5 componentization)", () => {
           onRemove={onRemove}
         />,
       );
-      fireEvent.click(screen.getByLabelText("移除附件"));
+      fireEvent.click(screen.getByLabelText("移除附件 foo.txt"));
       expect(onRemove).toHaveBeenCalledWith("/tmp/foo.txt");
     });
 
@@ -96,7 +96,7 @@ describe("ComposerChips (Plan5 componentization)", () => {
           onRemove={onRemove}
         />,
       );
-      fireEvent.click(screen.getByLabelText("移除图片"));
+      fireEvent.click(screen.getByLabelText(`移除图片 ${sample.name ?? ""}`.trim()));
       expect(onRemove).toHaveBeenCalledWith("img1");
     });
 

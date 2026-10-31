@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { createAgentSession, DefaultResourceLoader, SessionManager } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 import { applyPiExtensionOverrides, builtinPiExtensionIds, describeCompatibilityAdapterCommands, describeCompatibilityAdapterCommandsMarkdown, mergePiExtensionStatuses, piExtensionsResolvedPayload, resolvePiExtensions } from "./pi-extensions";
@@ -654,7 +654,8 @@ describe("OpenBuddy Pi extension resolution", () => {
       resolveSource: () => { throw new Error("host resolution must not be used"); },
       emit: () => undefined,
     });
-    expect(result.paths).toEqual(["/tmp/extensions/absolute.ts"]);
+    // 绝对路径会被调用方规范化(resolve),Windows 上的盘符/分隔符都不同。
+    expect(result.paths).toEqual([resolve("/tmp/extensions/absolute.ts")]);
     expect(result.diagnostics).toEqual([]);
   });
 

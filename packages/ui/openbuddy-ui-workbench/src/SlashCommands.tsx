@@ -47,6 +47,8 @@ export const NATIVE_PI_COMMANDS: SlashCommand[] = [
 export function SlashCommands({ text, cursor, onPick, anchorRect, pluginCommands }: SlashCommandsProps) {
   const [commands, setCommands] = useState<SlashCommand[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
+  // Esc hides the menu for the current text; typing anything re-opens it.
+  const [dismissedText, setDismissedText] = useState<string | null>(null);
   const pluginCommandContributions = useRendererContributions("command");
   const loadedRef = useRef(false);
 
@@ -68,7 +70,9 @@ export function SlashCommands({ text, cursor, onPick, anchorRect, pluginCommands
       return { visible: false, query: "", matches: [] as SlashCommand[] };
     }
     const word = before.slice(wordStart);
-    if (!word.startsWith("/") || word.includes(" ") || word.length < 1) {
+    // A command only starts a token: "https://x.com/a" or "src/app" must not
+    // open the menu.
+    if (!word.startsWith("/") || word.includes(" ") || word.slice(1).includes("/")) {
       return { visible: false, query: "", matches: [] as SlashCommand[] };
     }
     const q = word.slice(1).toLowerCase();
@@ -105,12 +109,38 @@ export function SlashCommands({ text, cursor, onPick, anchorRect, pluginCommands
     setActiveIdx(0);
   }, [query]);
 
-  // Keyboard nav is handled by the parent Composer via onPick — we only
-  // render; the Composer calls our handlers through refs below if needed.
-  // Simpler approach: expose up/down/enter via window event the Composer can
-  // dispatch. For now, click-only.
+  const open = visible && dismissedText !== text;
+  const shown = matches.slice(0, 12);
+  const pick = (cmd: SlashCommand) => {
+    onPick(`/${cmd.name}`);
+    const contribution = (cmd as SlashCommand & { pluginContribution?: { payload: { onActivate?: () => void } } }).pluginContribution;
+    contribution?.payload.onActivate?.();
+  };
+  const pickRef = useRef(pick);
+  pickRef.current = pick;
 
-  if (!visible) return null;
+  // While open the menu owns ↑ ↓ Enter Tab Esc. Capture phase + preventDefault
+  // so the composer (which checks `defaultPrevented`) neither sends nor
+  // recalls history. IME composition keys are left alone.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setDismissedText(text);
+        return;
+      }
+      if (slashCommandsKeyHandler(e, shown.length, activeIdx, setActiveIdx, () => {
+        const cmd = shown[activeIdx];
+        if (cmd) pickRef.current(cmd);
+      })) e.stopPropagation();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [open, shown, activeIdx, text]);
+
+  if (!open) return null;
 
   return createPortal(
     <div
@@ -138,16 +168,16 @@ export function SlashCommands({ text, cursor, onPick, anchorRect, pluginCommands
     >
       <div className="slash-commands__header">命令（来自 pi 内置/技能/插件）</div>
       <ul className="slash-commands__list">
-        {matches.slice(0, 12).map((cmd, idx) => (
+        {shown.map((cmd, idx) => (
           <li key={cmd.name}>
             <button
               type="button"
+              role="option"
+              aria-selected={idx === activeIdx}
               className={`slash-commands__item ${idx === activeIdx ? "slash-commands__item--active" : ""}`}
-              onClick={() => {
-                onPick(`/${cmd.name}`);
-                const contribution = (cmd as SlashCommand & { pluginContribution?: { payload: { onActivate?: () => void } } }).pluginContribution;
-                contribution?.payload.onActivate?.();
-              }}
+              // Keep focus in the textarea so typing continues after a pick.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(cmd)}
               onMouseEnter={() => setActiveIdx(idx)}
             >
               <span className="slash-commands__name">

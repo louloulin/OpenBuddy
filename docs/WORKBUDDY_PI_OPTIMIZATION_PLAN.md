@@ -1,5 +1,8 @@
 # OpenBuddy → WorkBuddy 替代者：全面分析 + 差距对比 + 分阶段优化计划
 
+> **过期说明(2026-10-28):** 本文的包清单包含已归档的 `payment/saml/scim/webhook-outbox`;
+> 那是 2026-09-05 的快照。当前结构与数量以 `docs/stats.json` 为准。
+
 > 📅 2026-09-05 · 分支 `feature/workbuddy-pi-optimization`
 > 目标：把 OpenBuddy 从"双轨混合"收敛为 **pi 优先 + Cordis 兜底** 的薄包装，
 > 对标 WorkBuddy 补齐产品力，同时保持高内聚低耦合架构与现有测试全绿。

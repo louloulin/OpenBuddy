@@ -59,6 +59,8 @@ export type ChatViewScrollStageProps = {
   /** 非空时的转录列表节点(普通列表或虚拟列表)。 */
   timelineList: ReactNode;
   unreadCount: number;
+  /** 用户已离开底部(即便没有新消息也显示「回到底部」)。 */
+  awayFromBottom?: boolean;
   onJumpToBottom: () => void;
   /**
    * 子代理面板实现。ChatView 解析 `placeholder.subagent` 槽后传入;
@@ -130,16 +132,18 @@ export function ChatViewScrollStage(props: ChatViewScrollStageProps) {
         />
       </div>
       {/* R6.5 — Floating "jump to bottom" button. */}
-      {props.unreadCount > 0 && (
+      {(props.unreadCount > 0 || props.awayFromBottom) && (
         <button
           type="button"
           className="chatview__jump-bottom"
           onClick={props.onJumpToBottom}
-          aria-label={`跳到末尾,有 ${props.unreadCount} 条新消息`}
+          aria-label={props.unreadCount > 0 ? `跳到末尾,有 ${props.unreadCount} 条新消息` : "回到末尾"}
           title="回到末尾"
         >
           <span aria-hidden="true">↓</span>
-          <span className="chatview__jump-bottom-badge">{props.unreadCount}</span>
+          {props.unreadCount > 0 && (
+            <span className="chatview__jump-bottom-badge">{props.unreadCount}</span>
+          )}
         </button>
       )}
     </div>

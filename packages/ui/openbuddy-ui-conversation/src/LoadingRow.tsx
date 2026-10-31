@@ -2,18 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { WorkingDot } from "./chatview/WorkingDot";
 import { useLocale } from "@openbuddy/ui-locale/client";
 import { LOADING_TIPS } from "@/lib/platform/loading-tips";
-import { phaseLabel, type AgentPhase } from "@/lib/stream/agent-phase";
+import type { TurnPhase } from "@openbuddy/shared-types";
 import { useSessionStore } from "@/stores/session-store";
 
 /**
  * 助手消息的「等待中」行：头像/名字由 MessageItem 的 header 渲染，本组件
  * 只负责 body 里的 loading 行，视觉对齐 WorkBuddy。
  *
- * Phase R3.0 (pi-web-alignment):
- *   - 主文案改读 `useSessionStore((s) => s.phase)` + `phaseLabel()`，
- *     不再依赖本地 1200ms timer。
- *   - running_tools 时在主文案里附加工具名列表（节流到前 3 个），与
- *     StatusPill 一致。
+ * 计划 1.1：主文案读主进程回合状态机投影的 `turnPhase` —— 调用工具 / 等待
+ *   你确认时给出确切说法，思考与生成时走动词轮换。
  *
  * R8.0 (verb-animation):
  *   - 学习 cabinet turn-block 的 `PendingIndicator`：在 phase 标签基础上
@@ -42,28 +39,11 @@ const TIP_ROTATION_INTERVAL_MS = 9000;
 /** 动词键位(chat.loading.verb1..14),文案在词表(批D i18n 迁移)。 */
 const THINKING_VERB_KEYS: readonly string[] = Array.from({ length: 14 }, (_, i) => `chat.loading.verb${i + 1}`);
 
-/**
- * 把 phaseLabel 文本（来自 `phaseLabel()`，通常是"等待模型响应" / "运行 3 个工具: foo, bar"
- * 等）映射到 THINKING_VERBS 风格的短动词前缀：
- *   - waiting_model     → "梳理信息" / "理清思路" …
- *   - running_command   → "打磨措辞"
- *   - running_tools     → "核对细节" + 工具名
- *   - 其他 / idle        → 返回 null，由调用者 fallback。
- * 关键词义保留 phase 的语义（在做什么），动词则传达"现在处于思考态"。
- */
-function verbForPhase(phase: AgentPhase): string | null {
-  if (!phase || phase.kind === "idle") return null;
-  switch (phase.kind) {
-    case "waiting_model":
-      return null; // 走 THINKING_VERBS 轮换
-    case "running_command":
-      return "chat.loading.verb6"; // 打磨措辞
-    case "running_tools":
-      return null;
-    default:
-      return null;
-  }
-}
+/** 有确切说法的阶段(其余阶段走动词轮换)。 */
+const PHASE_LABEL_KEYS: Partial<Record<TurnPhase, string>> = {
+  tool_running: "chat.turn.toolRunning",
+  awaiting_approval: "chat.turn.awaitingApproval",
+};
 
 function usePreparingTransition(): boolean {
   const streaming = useSessionStore((s) => s.streaming);
@@ -97,22 +77,6 @@ function useRotatingVerb(streaming: boolean, intervalMs: number): { keyName: str
     return () => clearInterval(id);
   }, [streaming, intervalMs]);
   return verb;
-}
-
-/**
- * 取 phase 的可见标签。idle 时不显示（交给 MessageItem）。
- * running_tools 展开工具名（对齐 StatusPill）。其他状态原样返回 phaseLabel。
- */
-function derivePhaseLabel(phase: AgentPhase): string | null {
-  if (!phase || phase.kind === "idle") return null;
-  if (phase.kind === "running_tools") {
-    const names = phase.tools.map((t) => t.name);
-    if (names.length === 0) return phaseLabel(phase);
-    const visible = names.slice(0, 3);
-    const suffix = names.length > 3 ? ` 等 ${names.length} 个` : "";
-    return `运行 ${names.length} 个工具: ${visible.join(", ")}${suffix}`;
-  }
-  return phaseLabel(phase);
 }
 
 function useRotatingTip(
@@ -180,9 +144,8 @@ function formatElapsed(s: number): string {
 }
 
 export function LoadingRow() {
-  const phase = useSessionStore((s) => s.phase);
+  const turnPhase = useSessionStore((s) => s.turnPhase);
   const streaming = useSessionStore((s) => s.streaming);
-  const phaseLabelText = derivePhaseLabel(phase);
   const showPreparing = usePreparingTransition();
   const rotatingVerb = useRotatingVerb(streaming, 2400);
   const tip = useRotatingTip(LOADING_TIPS, TIP_INITIAL_DELAY_MS, TIP_ROTATION_INTERVAL_MS);
@@ -190,15 +153,12 @@ export function LoadingRow() {
   const locale = useLocale();
 
   // 文案优先级：
-  //   1. phase 驱动的具体标签（如 "运行 3 个工具"）—— 这是最准确的，告诉用户
-  //      当前正在做什么；
-  //   2. THINKING_VERBS 轮换 —— phase 进入 waiting_model / idle 时的视觉填充；
-  //   3. 准备中过渡文案 —— 用户按下回车后最初的 1.2s，给 streaming flag 一段
-  //      "已经触发" 的明确反馈。
-  // running_tools 阶段我们仍展示 phase label（更准确），不切换动词；
-  // 但动词 2400ms 仍在背后轮换，避免 running_tools 长时间时静止。
-  const verbOverride = verbForPhase(phase);
-  const verbText = verbOverride ?? locale.t(rotatingVerb.keyName);
+  //   1. 有确切说法的阶段（调用工具 / 等待你确认）—— 告诉用户此刻在做什么；
+  //   2. THINKING_VERBS 轮换 —— 思考、生成时的视觉填充；
+  //   3. 准备中过渡文案 —— 回车后最初的 1.2s，给"已经触发"的明确反馈。
+  const phaseKey = PHASE_LABEL_KEYS[turnPhase];
+  const phaseLabelText = phaseKey ? locale.t(phaseKey) : null;
+  const verbText = locale.t(rotatingVerb.keyName);
   const mainText = phaseLabelText ?? verbText ?? (showPreparing ? locale.t(PREPARING_KEY) : locale.t("chat.loading.waiting"));
 
   // 任何 loading 文案右侧都跟 dots + elapsed，对齐 cabinet PendingIndicator。
@@ -206,7 +166,10 @@ export function LoadingRow() {
   const showElapsed = elapsed > 2;
 
   return (
-    <div className="msg__loading">
+    /* plan1030 批 4b — role="status"（隐含 aria-live=polite）：加载状态插入/
+     * 变化时对读屏播报一次。内层 elapsed 不再单独 aria-live（此前每秒
+     * 播报一次计时，属噪音；lumos 同款做法是容器级单一 live region）。 */
+    <div className="msg__loading" role="status">
       <span className="msg__loading-main ob-shining-text" key={phaseLabelText ? "phase" : rotatingVerb.key}>
         {mainText}
       </span>
@@ -214,7 +177,7 @@ export function LoadingRow() {
           唯一的"正在工作"指示源(对齐 cds-working-dot-halo)。 */}
       <WorkingDot />
       {showElapsed && (
-        <span className="msg__loading-elapsed" aria-live="polite">
+        <span className="msg__loading-elapsed">
           {formatElapsed(elapsed)}
         </span>
       )}

@@ -52,14 +52,14 @@ OpenBuddy ships with the following protections out of the box:
 |---|---|---|
 | **Context isolation** | Electron renderer | `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` |
 | **Allowlisted IPC** | `electron/preload/index.ts` | Every channel is explicitly enumerated; no dynamic invocation |
-| **Per-folder trust** | `@openbuddy/capability-folder-trust` | User must explicitly grant each folder before file ops |
+| **Per-folder trust** | `@openbuddy/folder-trust` | User must explicitly grant each folder before file ops |
 | **Capability-level policy** | `@openbuddy/capability-authorization` | Each Cordis capability declares required permissions |
 | **CSP** | `index.html` | Strict default-src, no inline scripts |
 | **OIDC PKCE** | `@openbuddy/auth-casdoor` | Authorization-code-with-PKCE for SSO; no client secrets on desktop |
 | **Token rotation** | Casdoor refresh flow | Refresh tokens rotated on each use |
-| **Transactional outbox** | `@openbuddy/webhook-outbox` | Webhooks delivered at-least-once with idempotency keys |
-| **Local-first audit** | `@openbuddy/runtime-storage` | Every privileged op logged to a tamper-evident local ledger |
-| **Dependency scanning** | `.github/workflows/release.yml` | `pnpm audit` runs in CI on every PR |
+| **Local-first audit** | `@openbuddy/storage` | Every privileged op logged to a tamper-evident local ledger |
+| **Dependency scanning** | `.github/workflows/ci.yml` | `pnpm audit --prod --audit-level=high` runs in CI |
+| **Secret scanning** | `.github/workflows/ci.yml` | `gitleaks` scans the full git history |
 | **Mirror configuration** | `electron-builder.yml` | electron-builder downloads pinned through npmmirror, not github |
 
 ### Threat Model (summary)

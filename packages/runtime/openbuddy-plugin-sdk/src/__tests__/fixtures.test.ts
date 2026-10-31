@@ -1,18 +1,19 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
+
 import { manifestToExtensionFactory, parsePluginManifest, parsePluginPackageJson } from "../index";
 
+// 这里曾手写了一个只按 "/" 切分的 dirname。Windows 上 fileURLToPath 返回
+// `D:\a\...\fixtures.test.ts`，lastIndexOf("/") === -1，fixtureRoot 退化成
+// 相对路径，两个用例在 CI 全 ENOENT（本地 macOS 永远测不出来）。
+// 用 node:path 的 dirname 即可跨平台。
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtureRoot = resolve(here, "../__fixtures__/sample-plugin");
 const pluginJsonPath = resolve(fixtureRoot, "plugin.json");
 const packageJsonPath = resolve(fixtureRoot, "package.json");
-
-function dirname(path: string): string {
-  const idx = path.lastIndexOf("/");
-  return idx === -1 ? "." : path.slice(0, idx);
-}
 
 describe("sample-plugin fixture", () => {
   it("parses the bundled plugin.json and serializes a factory", () => {

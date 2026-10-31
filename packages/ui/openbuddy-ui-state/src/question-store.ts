@@ -48,7 +48,8 @@ export const useQuestionStore = create<QuestionState>((set) => ({
       const prev = s.queues[sid] ?? [];
       const now = Date.now();
       const stamped: QuestionRequest = typeof q.issuedAt === "number" ? q : { ...q, issuedAt: now };
-      const fresh = prev.filter((existing) => !isExpired(existing, now));
+      // 按 requestId 去重:窗口重新加载后主进程会重发仍在等待的请求。
+      const fresh = prev.filter((existing) => !isExpired(existing, now) && existing.requestId !== q.requestId);
       const next = [...fresh, stamped];
       // LRU eviction: keep the most recent QUEUE_CAP entries.
       const trimmed = next.length > QUEUE_CAP ? next.slice(next.length - QUEUE_CAP) : next;

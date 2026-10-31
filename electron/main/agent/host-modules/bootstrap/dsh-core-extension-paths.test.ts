@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { join } from "node:path";
 import { resolveDshCoreExtensionPaths } from "./dsh-core-extension-paths";
 
 describe("resolveDshCoreExtensionPaths (Phase B.3 step 2b)", () => {
@@ -16,8 +17,8 @@ describe("resolveDshCoreExtensionPaths (Phase B.3 step 2b)", () => {
     const paths = resolveDshCoreExtensionPaths({ dshCoreExtensionPathsOverride: [] });
     // Two extensions per v13 §33.2: goals + message-feedback.
     expect(paths).toHaveLength(2);
-    expect(paths.some((p) => p.endsWith("/packages/runtime/openbuddy-dsh-core/src/goals.ts"))).toBe(true);
-    expect(paths.some((p) => p.endsWith("/packages/runtime/openbuddy-dsh-core/src/message-feedback.ts"))).toBe(true);
+    expect(paths.some((p) => p.endsWith(join("packages","runtime","openbuddy-dsh-core","src","goals.ts")))).toBe(true);
+    expect(paths.some((p) => p.endsWith(join("packages","runtime","openbuddy-dsh-core","src","message-feedback.ts")))).toBe(true);
   });
 
   it("returns the override list verbatim when non-empty", () => {

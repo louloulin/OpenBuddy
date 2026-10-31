@@ -77,7 +77,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     'BYOK (Bring Your Own Key) mode',
                     'Plan mode · Rewind · Fork',
                     'MCP (Model Context Protocol) connectors',
-                    'Casdoor OIDC / SAML / SCIM',
+                    'Casdoor OIDC + audit ledger',
                     `${SITE_STATS.packages} capability packages`,
                     `${SITE_STATS.testFiles} progressive test files`
                   ]

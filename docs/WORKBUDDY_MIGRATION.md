@@ -15,7 +15,7 @@ WorkBuddy is a great product. It's polished, fast, and has features OpenBuddy is
 | 🔑 **BYOK, any provider** | Use Anthropic, OpenAI, NewAPI, or any OpenAI-compatible API. |
 | 🏢 **Self-hostable** | Run on-prem with Casdoor OIDC + NewAPI gateway. |
 | 📦 **Plugin SDK** | Extend with Cordis capabilities — no app rebuild. |
-| 🧪 **Open test suite** | 309 test files, all visible in the repo. |
+| 🧪 **Open test suite** | Every test file is visible in the repo. |
 | 🌐 **Linux support** | First-class Linux builds. |
 | 💾 **Local-first** | Sessions, providers, and audit log all stay on your disk. |
 
@@ -43,7 +43,7 @@ If you've used WorkBuddy, you'll feel at home in OpenBuddy on day one.
 | macOS / Windows only | Windows / macOS / Linux | AppImage + .deb on Linux |
 | Tencent authentication | Casdoor OIDC (or local) | Optional enterprise SSO |
 | No plugin SDK | Cordis capability mesh | Write your own `@openbuddy/*` packages |
-| No visible tests | 309 test files in the repo | `pnpm workspace:test` |
+| No visible tests | Every test file is in the repo | `pnpm gate:test` |
 | Proprietary updates | Open auto-updater | `electron-updater` against GitHub releases |
 
 ### Step-by-step migration
@@ -202,7 +202,7 @@ WorkBuddy 是个优秀的产品。它精致、快,且有一些 OpenBuddy 还在�
 | 🔑 **自带 Key,任意 Provider** | 用 Anthropic、OpenAI、NewAPI 或任何 OpenAI 兼容 API。 |
 | 🏢 **可自托管** | 用 Casdoor OIDC + NewAPI 网关跑在本地。 |
 | 📦 **Plugin SDK** | 用 Cordis 能力扩展 —— 无需重建 App。 |
-| 🧪 **开放的测试套件** | 309 个测试文件,全部在仓库可见。 |
+| 🧪 **开放的测试套件** | 测试文件全部在仓库可见。 |
 | 🌐 **Linux 支持** | 一等公民 Linux 构建。 |
 | 💾 **本地优先** | 会话、Provider、审计日志全留在你的磁盘上。 |
 

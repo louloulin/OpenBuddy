@@ -44,6 +44,7 @@ import type {
   SlashCommand,
   SubagentLiveEvent,
   TurnErrorEvent,
+  TurnStateEvent,
   WorkBuddyImportPreview,
   WorkBuddyImportResult,
   WorkBuddyImportStatus,
@@ -216,10 +217,11 @@ export async function piNewSession(cwd: string, modelId?: string, options?: { tr
   const log = withTrace(appLogger, traceId);
   log.info("pi.new-session.requested", { msg: "pi.new-session.requested", cwd, modelId });
   try {
-    const result = await invoke<{ sessionId?: string }>("agent:new-session", { cwd, traceId });
+    // One call: the host creates the session and applies the model before
+    // returning, so a failed model switch can't leave a session on the wrong model.
+    const result = await invoke<{ sessionId?: string }>("agent:new-session", { cwd, traceId, ...(modelId ? { modelId } : {}) });
     if (!result.sessionId) throw new Error("agent:new-session did not return a session id");
     currentTurnTrace = { traceId, sessionId: result.sessionId };
-    if (modelId) await invoke("agent:set-model", { sessionId: result.sessionId, modelId, traceId });
     log.info("pi.new-session.dispatched", { msg: "pi.new-session.dispatched", sessionId: result.sessionId });
     return result.sessionId;
   } catch (err) {
@@ -904,6 +906,13 @@ export interface SessionEntriesProjection {
  */
 export function inferErrorCode(raw: string): string | undefined {
   const text = raw.toLowerCase();
+  // Billing exhaustion is checked first: provider payloads such as
+  // `insufficient_quota` also contain "quota", but retrying or waiting a
+  // moment won't fix them — they belong to the billing bucket, not rate
+  // limiting.
+  if (/insufficient[_ ]?(?:balance|quota)|余额不足|额度已用尽/.test(text)) {
+    return "insufficient_balance_error";
+  }
   if (/429|rate[_ ]?limit|too many requests|quota|用量上限/.test(text)) return "rate_limit_error";
   if (/401|unauthorized|invalid[_ ]api[_ ]key|api key/.test(text)) return "auth_error";
   if (/403|forbidden|permission/.test(text)) return "permission_error";
@@ -943,18 +952,61 @@ export function sessionEntriesToChatMessages(entries: readonly PiSessionEntry[])
         } else if (part.type === "toolCall") {
           const tc = part as { id?: string; name?: string; arguments?: unknown; result?: unknown };
           const toolCallId = tc.id ?? `tc-${entry.id}-${parts.length}`;
+          const toolName = tc.name ?? "tool";
+          // `arguments` may be persisted as a JSON string; normalise to an
+          // object so ToolCallCard can derive a readable summary (command /
+          // file name) from history exactly like it does live.
+          let rawInput: unknown = tc.arguments;
+          if (typeof rawInput === "string") {
+            try { rawInput = JSON.parse(rawInput); } catch { /* keep raw string */ }
+          }
+          // Tool extensions return pi's `{ content, details }` shape. Flattening
+          // it to one JSON text blob used to hide command output and the
+          // `apply_patch failed:` prefix, so history lost both the truncation
+          // UI and the failed status.
+          let contentParts: unknown[] = [];
+          const result = tc.result;
+          if (result && typeof result === "object" && Array.isArray((result as { content?: unknown }).content)) {
+            const inner = (result as { content: unknown[] }).content;
+            if (/^(apply_command|bash|shell|execute_command|run_terminal_command)$/i.test(toolName)) {
+              const output = inner
+                .map((item) => (item && typeof item === "object" && typeof (item as { text?: unknown }).text === "string"
+                  ? (item as { text: string }).text
+                  : ""))
+                .filter(Boolean)
+                .join("\n");
+              const command = (rawInput as { command?: unknown } | undefined)?.command;
+              contentParts = output
+                ? [{ type: "command_output", ...(typeof command === "string" ? { command } : {}), output }]
+                : [];
+            } else {
+              contentParts = inner;
+            }
+          } else if (Array.isArray(result)) {
+            contentParts = result;
+          } else if (result !== undefined) {
+            contentParts = [{ type: "text", text: typeof result === "string" ? result : JSON.stringify(result) }];
+          }
+          const resultText = contentParts
+            .map((item) => (item && typeof item === "object"
+              ? (typeof (item as { text?: unknown }).text === "string"
+                ? (item as { text: string }).text
+                : typeof (item as { output?: unknown }).output === "string"
+                  ? (item as { output: string }).output
+                  : "")
+              : ""))
+            .filter(Boolean)
+            .join("\n");
+          const failed = /^(?:apply_patch|apply_command|bash|shell|write_file|edit_file) failed\b|^(?:Error|TypeError|RangeError|SyntaxError|ReferenceError):/m.test(resultText);
           parts.push({
             kind: "tool_call",
             toolCall: {
               toolCallId,
-              title: tc.name ?? "tool",
-              kind: tc.name ?? "tool",
-              status: tc.result === undefined ? "completed" : "completed",
-              content: Array.isArray(tc.result)
-                ? (tc.result as unknown[])
-                : tc.result !== undefined
-                  ? [{ type: "text", text: typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result) }]
-                  : [],
+              title: toolName,
+              kind: toolName,
+              status: failed ? "failed" : "completed",
+              content: contentParts as never[],
+              ...(rawInput !== undefined && rawInput !== null ? { rawInput } : {}),
             },
           });
         }
@@ -1317,6 +1369,11 @@ export async function piSetAllSessionsArchived(
  */
 export async function piSessionInfo(sessionId: string): Promise<SessionInfoResponse | null> {
 	return invoke<SessionInfoResponse>("agent:session-info", { sessionId });
+}
+
+/** 主进程回合状态机的当前值(计划 1.1);加载会话 / 重新加载窗口后据此校正。 */
+export async function piTurnState(sessionId: string): Promise<TurnStateEvent> {
+	return invoke<TurnStateEvent>("agent:turn-state", { sessionId });
 }
 
 /**
@@ -2165,6 +2222,8 @@ export interface PiEventHandlers {
   onAgentDied?: (p: { reason: string }) => void;
   onSubagent?: (e: SubagentLiveEvent) => void;
   onTurnError?: (e: TurnErrorEvent & SequencedPiPayload) => void;
+  /** 回合阶段变化(主进程状态机广播)。 */
+  onTurnState?: (e: TurnStateEvent) => void;
   onExtensionUi?: (event: PiExtensionUiEvent) => void;
   onPluginEvent?: (event: OpenBuddyPluginEvent) => void;
 }
@@ -2260,15 +2319,13 @@ export async function subscribePiEvents(handlers: PiEventHandlers, options?: Sub
           : [batch];
         for (const event of events) acceptUpdate(event, "port");
       });
-      if (unlisten) {
-        unlisteners.push(unlisten);
-      } else {
-        // Port transport unavailable (older preload / jsdom) — never let the
-        // subscription silently drop live updates; fall back to IPC.
-        unlisteners.push(
-          await listen<SessionUpdate & { sessionId?: string; traceId?: string }>("pi://update", (e) => acceptUpdate(e.payload, "ipc")),
-        );
-      }
+      if (unlisten) unlisteners.push(unlisten);
+      // Always listen on IPC too. The host sends each update on exactly one
+      // path — the port while it is healthy, IPC before it attaches or after
+      // it fails — so this is the fallback lane, never a duplicate.
+      unlisteners.push(
+        await listen<SessionUpdate & { sessionId?: string; traceId?: string }>("pi://update", (e) => acceptUpdate(e.payload, "ipc")),
+      );
     } else {
       unlisteners.push(
         await listen<SessionUpdate & { sessionId?: string; traceId?: string }>("pi://update", (e) => acceptUpdate(e.payload, "ipc")),
@@ -2289,6 +2346,7 @@ export async function subscribePiEvents(handlers: PiEventHandlers, options?: Sub
   await wire<{ reason: string }>("pi://agent-died", handlers.onAgentDied);
   await wire<SubagentLiveEvent>("pi://subagent", handlers.onSubagent);
   await wire<TurnErrorEvent>("pi://turn-error", handlers.onTurnError);
+  await wire<TurnStateEvent>("pi://turn-state", handlers.onTurnState);
   await wire<PiExtensionUiEvent>("pi://extension-ui", handlers.onExtensionUi);
   if (handlers.onPluginEvent) unlisteners.push(await agentOnPluginEvent(handlers.onPluginEvent));
 

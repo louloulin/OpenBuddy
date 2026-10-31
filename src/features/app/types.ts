@@ -196,6 +196,8 @@ export interface AppShellRuntime {
   handleToggleWorkspace(cwd: string, next: boolean): Promise<void>;
   handleRenameTitle(newTitle: string): Promise<void>;
   handleModelChange(modelId: string): Promise<void>;
+  /** plan1030 §5.2.1 — 对话内删除模型(picker 行级入口)。 */
+  handleModelDelete(modelId: string): Promise<void>;
   handleSelectWorkspace(newCwd: string): void;
   handleRewound(): Promise<void>;
   handleForked(newId: string): void;

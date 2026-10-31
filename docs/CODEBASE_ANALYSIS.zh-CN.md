@@ -5,6 +5,11 @@
 > **覆盖范围:** `packages/`、`electron/`、`src/`、`apps/`、`scripts/`、`evals/` 下每个目录。
 > **双语文档:** [English](CODEBASE_ANALYSIS.md) · **简体中文**
 
+> **过期说明(2026-10-28):** 本快照早于 `experimental/` 归档。
+> `packages/{payment,saml,scim,webhook-outbox}` 与 `bundle-desktop` 已不在仓库树中
+> (git 历史在 `2438a2ab` 可找回)。包数量与下方 `packages/` 表属于历史记录;
+> 当前数字以 `docs/stats.json` 为准。
+
 本文档基于对当前仓库的**结构性查询**(`ls`、`find`、`grep` 包清单与 `index.ts` 导出)。每条结论都标注以下标记之一:
 
 | 标记 | 含义 |
@@ -13,7 +18,7 @@
 | `[I]` | 由相邻已核验事实合理推断,需自行复核 |
 | `[OOS]` | 超出本次快照范围——仅列出方向,未深入分析 |
 
-仓库已有 [PROJECT_ANALYSIS.md](_archive/PROJECT_ANALYSIS.md) 与 [openbuddy-capability-matrix.md](openbuddy-capability-matrix.md)。这两份文档早于此文档,使用略不同的计数;本文为 2026-09-05 权威参考。
+仓库还曾有一份 `PROJECT_ANALYSIS.md`(已随 `docs/_archive/` 整体移出工作区,可从 git 历史找回),以及 [openbuddy-capability-matrix.md](openbuddy-capability-matrix.md)。这两份文档早于此文档,使用略不同的计数;本文为 2026-09-05 权威参考。
 
 ---
 

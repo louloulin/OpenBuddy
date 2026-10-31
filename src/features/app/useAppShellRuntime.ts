@@ -22,6 +22,8 @@ import {
   piCreateWorkspace,
   providersList,
   flattenModels,
+  providersDeleteModel,
+  agentCurrentModel,
   agentOnPiTelemetryEvent,
   agentSessionMessages,
   sessionEntriesToChatMessages,
@@ -33,6 +35,7 @@ import { useSessionsStore } from "@/stores/sessions-store";
 import { useFeedbackStore } from "@/stores/feedback-store";
 import { usePendingExpertStore } from "@/stores/pending-expert-store";
 import { setToast as pushToast, useToastStore } from "@/stores/toast-store";
+import { restoreComposerText } from "@openbuddy/ui-conversation";
 import { useProjectsStore, type ProjectMeta } from "@/stores/projects-store";
 import { getStoredThemeName, useTheme } from "@openbuddy/ui-theme/client";
 import { clearRequestedMarketTab, requestMarketTab } from "@/lib/navigation/market-tab";
@@ -40,8 +43,10 @@ import { useAgentSession } from "@/hooks/useAgentSession";
 import { useOptimisticNewSession } from "@/hooks/useOptimisticNewSession";
 import { newSessionFlow, composeDiscoverBody } from "@/lib/agent/new-session-flow";
 import { abandonInFlightStream } from "@/lib/agent/abandon-stream";
-import { listenSafe, isElectronBridgeUnavailable, getElectronBridgeStatus } from "@/lib/platform/electron-api";
+import { reconcileTurnState } from "@/lib/agent/reconcile-turn";
+import { listenSafe, isElectronBridgeUnavailable, getElectronBridgeStatus, confirm } from "@/lib/platform/electron-api";
 import { friendlyError } from "@/lib/platform/error-format";
+import { shortModelLabel } from "@/lib/ui/timeline-utils";
 // R48 — 登录编排整体搬进 `overlay.sign-in` 对话框(CasdoorSignInDialog),
 //   宿主只保留状态入口(casdoorStatus / casdoorLogout)与身份视图类型。
 import { casdoorLogout, casdoorStatus, type CasdoorSessionView } from "@/lib/casdoor/casdoor-client";
@@ -60,6 +65,9 @@ import type { ModelOption } from "@openbuddy/ui-workbench";
 import type { AgentEntry } from "@openbuddy/shared-types";
 import type { AppShellRuntime, ExtensionUiBySession, SettingsSection, ToastOptions } from "./types";
 
+/** How long Stop waits for the host to confirm before the UI goes idle regardless. */
+const CANCEL_CONFIRM_MS = 300;
+
 export { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "@/lib/agent/persona-markers";
 
 const ACTIVE_SESSION_STORAGE_KEY = "openbuddy.active-session";
@@ -76,6 +84,15 @@ function readPersistedActiveSession(): PersistedActiveSession | null {
     }
   } catch { /* ignore */ }
   return null;
+}
+
+/** 把主进程模型切换的错误翻译成用户能处置的中文提示。 */
+function friendlyModelSwitchError(error: unknown): string {
+  const message = String(error).replace(/^Error:\s*/u, "");
+  if (/No API key for/i.test(message)) return "该模型没有可用的 API Key，请先在设置中配置";
+  if (/策略禁止使用模型/u.test(message)) return message;
+  if (/model\b.*\bnot found|Model not found/i.test(message)) return "模型不存在或已下线，请刷新模型列表后重试";
+  return message;
 }
 
 function deriveTitle(text: string): string {
@@ -156,7 +173,6 @@ export function useAppShellRuntime(): AppShellRuntime {
   const cwdRef = useRef<string>("");
   const currentModelIdRef = useRef<string | undefined>(undefined);
   const extensionTextBySessionRef = useRef<Record<string, string>>({});
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleAgentDiedRef = useRef<(payload: { reason: string }) => void>(() => {});
   const refreshModelsRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
@@ -204,6 +220,20 @@ export function useAppShellRuntime(): AppShellRuntime {
     } catch { /* 非致命 */ }
   }, []);
   refreshModelsRef.current = refreshModels;
+
+  // 载入/恢复会话后,模型选择器必须跟着宿主里的真实模型走。此前渲染端只在
+  // 初始化时读一次 defaultModelId,之后切到旧会话时 picker 仍显示上一个
+  // 会话的模型 —— 用户看到的和下一轮实际使用的不是同一个模型。
+  const syncCurrentModelFromHost = useCallback(async () => {
+    try {
+      const model = await agentCurrentModel() as { provider?: string; id?: string } | null;
+      if (model?.provider && model.id) {
+        const next = `${model.provider}/${model.id}`;
+        currentModelIdRef.current = next;
+        setCurrentModelId(next);
+      }
+    } catch { /* 读取失败不阻塞 UI */ }
+  }, []);
 
   // ====== agent session SSE 订阅 ============================================
   const sessionEvents = useAgentSession({
@@ -427,6 +457,8 @@ export function useAppShellRuntime(): AppShellRuntime {
               const entries = await agentSessionMessages(entry.sessionId);
               const { messages: history } = sessionEntriesToChatMessages(entries);
               useSessionStore.getState().loadHistoryMessages(entry.sessionId, history as unknown as import("@/stores/session-store").ChatMessage[]);
+              // 重新加载窗口时回合可能还在主进程里跑:以主进程为准接回运行态。
+              await reconcileTurnState(entry.sessionId);
             } catch (e) { sessionStore.getState().setError(friendlyError(e)); }
           } else { localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY); }
         }
@@ -439,6 +471,9 @@ export function useAppShellRuntime(): AppShellRuntime {
           const piDefault = result.defaultModelId;
           if (!providerOptions.some((p) => p.id === piDefault)) setCurrentModelId(providerOptions[0].id);
         }
+        // 以宿主里实际 active 的模型为准(恢复的旧会话可能和刚 init 的默认
+        // 模型不同),放在 providerOptions 兜底之后,避免被它覆盖。
+        await syncCurrentModelFromHost();
       } catch (e) {
         const bridge = getElectronBridgeStatus();
         const raw = String(e);
@@ -446,7 +481,7 @@ export function useAppShellRuntime(): AppShellRuntime {
         setInitError(bridge.available ? raw : `Electron bridge unavailable (${bridge.reason})`);
       }
     })();
-  }, [sessionStore, sessionsStore, notifyBridgeUnavailable]);
+  }, [sessionStore, sessionsStore, notifyBridgeUnavailable, syncCurrentModelFromHost]);
 
   // ====== derived: current entry + persistence ===============================
   const currentEntry = sessionsStore((s) => {
@@ -612,10 +647,10 @@ export function useAppShellRuntime(): AppShellRuntime {
     }
   }, [setToast]);
 
+  // Each toast expires on its own TTL. This used to `clear()` the WHOLE queue
+  // 2 s later, wiping sticky error toasts (e.g. "立即重连") along with it.
   const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => useToastStore.getState().clear(), 2000);
+    setToast(message, { ttlMs: 2500 });
   }, [setToast]);
 
   const handlePlaceholder = useCallback((label: string) => {
@@ -666,6 +701,7 @@ export function useAppShellRuntime(): AppShellRuntime {
       sessionsStore.getState().setCurrent(null);
       sessionsStore.getState().remove(pendingId);
       setToast(`创建会话失败：${friendlyError(e)}`);
+      restoreComposerText(text);
     }
   }, [optimisticSession, sessionStore, sessionsStore, setToast, currentModelId]);
 
@@ -691,6 +727,7 @@ export function useAppShellRuntime(): AppShellRuntime {
       sessionStore.getState().setStreaming(false);
       sessionStore.getState().popOptimistic();
       sessionsStore.getState().upsert({ sessionId: currentSessionId, status: "failed" });
+      restoreComposerText(text);
       if (isElectronBridgeUnavailable(e)) notifyBridgeUnavailable();
     }
   }, [currentSessionId, handleSendNew, sessionStore, sessionsStore, notifyBridgeUnavailable]);
@@ -719,18 +756,23 @@ export function useAppShellRuntime(): AppShellRuntime {
       sessionStore.getState().setStreaming(false);
       sessionStore.getState().popOptimistic();
       sessionsStore.getState().upsert({ sessionId: currentSessionId, status: "failed" });
+      restoreComposerText(textForLog);
       if (isElectronBridgeUnavailable(e)) notifyBridgeUnavailable();
     }
   }, [currentSessionId, handleSendNew, sessionStore, sessionsStore, notifyBridgeUnavailable]);
 
   const handleCancel = useCallback(async () => {
     if (!currentSessionId) return;
-    try { await piCancel(currentSessionId); } catch (e) {
+    const sessionId = currentSessionId;
+    // The host's abort waits for the run to go idle, which can take seconds
+    // when a tool ignores the signal. Give it a short window to confirm, then
+    // return the UI to idle anyway; the abort keeps running in the host.
+    const cancel = piCancel(sessionId).catch((e: unknown) => {
       sessionStore.getState().setError(friendlyError(e));
       if (isElectronBridgeUnavailable(e)) notifyBridgeUnavailable();
-    } finally {
-      abandonInFlightStream({ sessionId: currentSessionId, reason: "用户取消", status: "completed" });
-    }
+    });
+    await Promise.race([cancel, new Promise((resolve) => setTimeout(resolve, CANCEL_CONFIRM_MS))]);
+    abandonInFlightStream({ sessionId, reason: "用户取消", status: "completed" });
   }, [currentSessionId, sessionStore, notifyBridgeUnavailable]);
 
   const handleRenameTitle = useCallback(async (newTitle: string) => {
@@ -739,21 +781,103 @@ export function useAppShellRuntime(): AppShellRuntime {
     catch (e) { showToast(`重命名失败：${String(e).replace(/^Error:\s*/, "")}`); throw e; }
   }, [currentEntry, sessionsStore, showToast]);
 
-  const handleModelChange = useCallback(async (modelId: string) => {
-    setCurrentModelId(modelId);
-    if (!currentSessionId) return;
-    const trySet = () => piSetModel(currentSessionId, modelId);
-    try { await trySet(); }
-    catch (e) {
-      const msg = String(e);
-      if (/incompatible|start_new_session/i.test(msg)) { showToast("该会话无法切换到此模型，请新建会话"); return; }
-      if (/unknown session/i.test(msg)) {
-        try { await piLoadSession(currentSessionId, currentEntry?.cwd ?? cwdRef.current); await trySet(); return; }
-        catch (e2) { showToast(`模型切换失败：${String(e2).replace(/^Error:\s*/, "")}`); return; }
-      }
-      showToast(`模型切换失败：${msg.replace(/^Error:\s*/, "")}`);
+  // 流式中选择的模型先挂起,回合结束后再真正切换(F3:进行中回合不换模型)。
+  const pendingModelRef = useRef<{ sessionId: string | undefined; modelId: string } | null>(null);
+
+  const { awaitPendingNewSession } = optimisticSession;
+
+  const applyModelSwitch = useCallback(async (modelId: string) => {
+    // 新建会话的第一轮里 currentSessionId 还是 `__pending_*` 占位 id。
+    // 直接发给主进程会撞 "Pi session is not loaded" 跨会话护栏,所以先等
+    // 真实 id 落地。
+    let targetSessionId = currentSessionId;
+    if (targetSessionId?.startsWith("__pending_")) {
+      targetSessionId = (await awaitPendingNewSession()) ?? targetSessionId;
     }
-  }, [currentSessionId, currentEntry, showToast]);
+    if (!targetSessionId || targetSessionId.startsWith("__pending_")) {
+      // 还没有真实会话:只记住选择,下一条消息创建会话时会带上它。
+      currentModelIdRef.current = modelId;
+      setCurrentModelId(modelId);
+      return;
+    }
+    const previous = currentModelIdRef.current;
+    const sessionId = targetSessionId;
+    const trySet = () => piSetModel(sessionId, modelId);
+    try {
+      await trySet();
+      currentModelIdRef.current = modelId;
+      setCurrentModelId(modelId);
+    } catch (error) {
+      const message = String(error);
+      // 主进程跨会话护栏抛的是 "Pi session is not loaded: …"(历史实现只
+      // 匹配从未出现过的 "unknown session",导致恢复分支是死代码)。
+      if (/is not loaded|unknown session/i.test(message)) {
+        try {
+          await piLoadSession(sessionId, currentEntry?.cwd ?? cwdRef.current);
+          await trySet();
+          currentModelIdRef.current = modelId;
+          setCurrentModelId(modelId);
+          return;
+        } catch (retryError) {
+          currentModelIdRef.current = previous;
+          setCurrentModelId(previous);
+          showToast(`模型切换失败：${friendlyModelSwitchError(retryError)}`);
+          return;
+        }
+      }
+      // 切换失败必须回滚显示,否则 picker 会一直显示一个并未生效的模型,
+      // 而下一轮实际用的还是旧模型。
+      currentModelIdRef.current = previous;
+      setCurrentModelId(previous);
+      showToast(`模型切换失败：${friendlyModelSwitchError(error)}`);
+    }
+  }, [awaitPendingNewSession, currentEntry, currentSessionId, showToast]);
+
+  const handleModelChange = useCallback(async (modelId: string) => {
+    if (streaming) {
+      pendingModelRef.current = { sessionId: currentSessionId, modelId };
+      showToast(`已选择 ${shortModelLabel(modelId) || modelId}，将在本轮结束后切换`);
+      return;
+    }
+    pendingModelRef.current = null;
+    await applyModelSwitch(modelId);
+  }, [applyModelSwitch, currentSessionId, showToast, streaming]);
+
+  // 回合结束(含失败)后执行挂起的模型切换。若用户流式中已切到别的会话,
+  // 旧会话上的选择不能落到新会话。
+  useEffect(() => {
+    if (streaming) return;
+    const pending = pendingModelRef.current;
+    if (!pending) return;
+    pendingModelRef.current = null;
+    const sameSession = pending.sessionId === currentSessionId
+      || (pending.sessionId?.startsWith("__pending_") === true && currentSessionId?.startsWith("__pending_") !== true);
+    if (!sameSession) return;
+    void applyModelSwitch(pending.modelId);
+  }, [applyModelSwitch, currentSessionId, streaming]);
+
+  // plan1030 §5.2.1 — 对话内删除模型。picker 传来的 id 是 `provider/modelId`
+  // 规范形(flattenModels 的输出);宿主 deleteModel 后会自动把 active 模型
+  // 迁移到同 provider 的其他模型(restoreActiveModelAfterMutation),渲染端
+  // 只需刷新列表 —— refreshModels 内部会把失效的 currentModelId 重置为第一项。
+  const handleModelDelete = useCallback(async (modelId: string) => {
+    const separator = modelId.indexOf("/");
+    if (separator <= 0) {
+      showToast(`无法删除 ${shortModelLabel(modelId) || modelId}：缺少 provider 信息`);
+      return;
+    }
+    const providerId = modelId.slice(0, separator);
+    const bareModelId = modelId.slice(separator + 1);
+    const label = shortModelLabel(modelId) || modelId;
+    if (!await confirm(`删除模型「${label}」？`, { tone: "danger", confirmLabel: "删除" })) return;
+    try {
+      await providersDeleteModel(providerId, bareModelId);
+      showToast(`已删除 ${label}`);
+      await refreshModelsRef.current();
+    } catch (error) {
+      showToast(`删除失败：${friendlyError(error)}`);
+    }
+  }, [showToast]);
 
   const handleSelectWorkspace = useCallback((newCwd: string) => {
     cwdRef.current = newCwd;
@@ -763,8 +887,10 @@ export function useAppShellRuntime(): AppShellRuntime {
       .finally(() => { setSwitchingWorkspace((current) => (current === newCwd ? null : current)); });
   }, [sessionsStore, setToast]);
 
-  const handleNewSession = useCallback(() => { localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY); setPlaceholderView(null); sessionsStore.getState().setCurrent(null); }, [sessionsStore]);
-  const handleGoHome = useCallback(() => { localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY); setPlaceholderView(null); sessionsStore.getState().setCurrent(null); }, [sessionsStore]);
+  // 回到首页 / 新建任务时把前台会话也清掉:正在生成的回合在主进程后台继续
+  // (计划 0.3),而前台残留的 streaming 会让首页发送被当成"排队"吞掉。
+  const handleNewSession = useCallback(() => { localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY); setPlaceholderView(null); sessionsStore.getState().setCurrent(null); sessionStore.getState().setSession(null); }, [sessionStore, sessionsStore]);
+  const handleGoHome = handleNewSession;
 
   const handleToggleWorkspace = useCallback(async (cwd: string, next: boolean) => {
     sessionsStore.getState().setExpanded(cwd, next);
@@ -775,16 +901,35 @@ export function useAppShellRuntime(): AppShellRuntime {
   }, [sessionsStore, showToast]);
 
   const handleSelectSession = useCallback(async (sessionId: string, sessionCwd?: string) => {
+    // 同一工作区内切换:正在生成的回合转到主进程后台继续跑完(计划 0.3),
+    // 侧栏保留「正在生成」点,切回来接着看。跨工作区要整体重建宿主,后台
+    // 会话保不住,仍先说清楚、确认后走正常的停止流程再切换。
+    const live = sessionStore.getState();
+    const crossesWorkspace = Boolean(sessionCwd) && sessionCwd !== cwdRef.current;
+    if (crossesWorkspace && live.streaming && live.sessionId && live.sessionId !== sessionId) {
+      const ok = await confirm("当前回复仍在生成，切换会话将停止它。", {
+        tone: "warning",
+        confirmLabel: "停止并切换",
+      });
+      if (!ok) return;
+      await handleCancel();
+    }
     setPlaceholderView(null);
     sessionsStore.getState().setCurrent(sessionId);
     sessionStore.getState().setSession(sessionId);
+    sessionStore.getState().setHistoryLoading(true);
     try {
       await piLoadSession(sessionId, sessionCwd ?? "");
       const entries = await agentSessionMessages(sessionId);
       const { messages: history } = sessionEntriesToChatMessages(entries);
       useSessionStore.getState().loadHistoryMessages(sessionId, history as unknown as import("@/stores/session-store").ChatMessage[]);
+      await reconcileTurnState(sessionId);
+      await syncCurrentModelFromHost();
     } catch (e) { sessionStore.getState().setError(friendlyError(e)); }
-  }, [sessionStore, sessionsStore]);
+    finally {
+      if (sessionStore.getState().sessionId === sessionId) sessionStore.getState().setHistoryLoading(false);
+    }
+  }, [sessionStore, sessionsStore, syncCurrentModelFromHost, handleCancel]);
 
   const handleRewound = useCallback(async () => {
     const id = sessionStore.getState().sessionId;
@@ -926,7 +1071,7 @@ export function useAppShellRuntime(): AppShellRuntime {
     openSettings, openAccountSettings, handleLogin, handleLogout, showToast, setToast,
     handleNavigate, handleGoHome, handleNewSession, handlePlaceholder, handleOpenProjectFromSidebar,
     handleSendNew, handleSendCurrent, handleSendContent, handleCancel,
-    handleSelectSession, handleToggleWorkspace, handleRenameTitle, handleModelChange, handleSelectWorkspace,
+    handleSelectSession, handleToggleWorkspace, handleRenameTitle, handleModelChange, handleModelDelete, handleSelectWorkspace,
     handleRewound, handleForked, handleStartWithExpert, handleLaunchDiscover, handleStartProject,
     handleStartProjectConversation, handleSelectEmailFromSearch, handleSelectKnowledgeFromSearch,
     refreshModels, sessionEvents,

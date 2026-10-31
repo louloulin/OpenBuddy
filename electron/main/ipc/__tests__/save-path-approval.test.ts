@@ -6,6 +6,7 @@
  * 调一次就行,这个模块就这么长。
  */
 import { describe, expect, it, beforeEach } from "vitest";
+import { resolve } from "node:path";
 import {
   approveSavePath,
   approvedSavePathCount,
@@ -18,11 +19,14 @@ describe("save-path-approval", () => {
     resetApprovedSavePaths();
   });
 
+  // 注意:requireApprovedSavePath 返回 resolve() 之后的路径(刻意的:用它
+  // 跟审批表里的键比对)。断言也必须走 resolve(),不能写死 POSIX 字面量 ——
+  // Windows 上 resolve("/tmp/x") 是 "D:\tmp\x"。
   it("approve 后 require 一次成功", () => {
     const approved = approveSavePath("/tmp/user-picked.jsonl");
     expect(approved).toBe("/tmp/user-picked.jsonl");
     expect(approvedSavePathCount()).toBe(1);
-    expect(requireApprovedSavePath("/tmp/user-picked.jsonl")).toBe("/tmp/user-picked.jsonl");
+    expect(requireApprovedSavePath("/tmp/user-picked.jsonl")).toBe(resolve("/tmp/user-picked.jsonl"));
   });
 
   it("同一个路径**只能被用一次**:第二次 require 抛错", () => {
@@ -48,13 +52,13 @@ describe("save-path-approval", () => {
     // 最早的两个已被淘汰,后两个还在
     expect(() => requireApprovedSavePath("/tmp/p-0.jsonl")).toThrow();
     expect(() => requireApprovedSavePath("/tmp/p-1.jsonl")).toThrow();
-    expect(requireApprovedSavePath("/tmp/p-69.jsonl")).toBe("/tmp/p-69.jsonl");
+    expect(requireApprovedSavePath("/tmp/p-69.jsonl")).toBe(resolve("/tmp/p-69.jsonl"));
   });
 
   it("相对路径在 require 时按 resolve 后比对(避免 ./tmp/... 这种绕过)", () => {
     const resolved = approveSavePath("/tmp/rel.jsonl");
     expect(resolved).toBe("/tmp/rel.jsonl");
     // 不论 require 时用同一字符串还是 resovle 后的形式,都应当被认账。
-    expect(requireApprovedSavePath("/tmp/rel.jsonl")).toBe("/tmp/rel.jsonl");
+    expect(requireApprovedSavePath("/tmp/rel.jsonl")).toBe(resolve("/tmp/rel.jsonl"));
   });
 });

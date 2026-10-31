@@ -20,6 +20,7 @@ type HookShellRunner = any;
 import {
   SessionManager,
   createAgentSession,
+  ModelRegistry,
   ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
@@ -27,6 +28,8 @@ import type { Model } from "@earendil-works/pi-ai";
 import type { TeamMemberInput, TeamRunner } from "@openbuddy/team-team";
 
 import type { AgentHostState } from "./_state-shape";
+import { invalidateSessionsCache } from "./_cache";
+import { resolveModelReference } from "./agent-model";
 
 /* ---------- Install Pattern: module-level lets + DI ---------- */
 let _state: AgentHostState | null = null;
@@ -295,7 +298,99 @@ function createTeamRunner(modelRuntime: ModelRuntime, cwd: string, getModel: () 
   };
 }
 
+/**
+ * 后台会话(计划 0.3):在**独立的** AgentSession 里跑一轮,不碰前台会话。
+ *
+ * 自动化以前走 `newSession` → `rebindSession` → `replace()`,会把用户正在看的
+ * 会话换掉(用户随后发消息直接报「Pi session is not loaded」),所以只能在用户
+ * 空闲时跑。这里沿用团队成员的做法:自己的 JSONL、同一套预设工具与资源加载器,
+ * 与前台并行运行,结束后释放。
+ *
+ * 后台会话没有确认通道:需要确认的操作(命令、写文件、记忆)按 fail-closed 拒绝,
+ * 不会悄悄执行。
+ */
+export interface BackgroundSessionInput {
+  cwd: string;
+  prompt: string;
+  /** 会话名(侧栏显示);缺省 "OpenBuddy"。 */
+  name?: string;
+  /** `provider/modelId`;缺省用应用当前模型。 */
+  modelId?: string;
+  signal?: AbortSignal;
+  /** 会话创建后立即回调(调用方据此把运行记录关联到会话)。 */
+  onSession?: (sessionId: string) => void | Promise<void>;
+}
+
+export interface BackgroundSessionResult {
+  sessionId: string;
+  text: string;
+}
+
+async function runBackgroundSession(input: BackgroundSessionInput): Promise<BackgroundSessionResult> {
+  const state = requireState();
+  const modelRuntime = state.modelRuntime;
+  const requested = input.modelId?.trim();
+  const model = requested && modelRuntime
+    ? resolveModelReference(new ModelRegistry(modelRuntime), requested)
+    : state.model;
+  if (requested && !model) throw new Error(`找不到模型 ${requested}:可能已被删除,请编辑自动化重新选择`);
+  if (!modelRuntime || !model) throw new Error("没有可用的模型:请先在设置里配置并选择模型");
+  const createSubagentResourceLoader = requireFn("createSubagentResourceLoader", _createSubagentResourceLoader);
+  const createTaskAwareToolRaw = requireFn<(...args: unknown[]) => unknown>("createTaskAwareTool", _createTaskAwareTool);
+  const modelFacingPresetTools = requireFn("modelFacingPresetTools", _modelFacingPresetTools);
+  const piHome = requireFn("piHome", _piHome);
+  const piSessionDir = requireFn("piSessionDir", _piSessionDir);
+
+  const customTools = (modelFacingPresetTools() as unknown[]).map((tool) =>
+    (createTaskAwareToolRaw as unknown as (tool: unknown, signalProvider: unknown) => unknown)(
+      tool,
+      (toolCallId: string) => state.runningTasks.get(toolCallId)?.abortController?.signal,
+    ),
+  );
+  const resourceLoader = await createSubagentResourceLoader(input.cwd);
+  const { session } = await (createAgentSession as any)({
+    cwd: input.cwd,
+    agentDir: piHome(),
+    model,
+    modelRuntime,
+    sessionManager: SessionManager.create(input.cwd, piSessionDir(input.cwd)),
+    tools: (customTools as { name: string }[]).map((tool) => tool.name),
+    customTools: customTools as any,
+    ...(resourceLoader ? { resourceLoader } : {}),
+  });
+  try {
+    try {
+      session.setSessionName(input.name?.trim() || "OpenBuddy");
+    } catch {
+      // Session naming is optional across Pi releases.
+    }
+    // 让侧栏的会话列表下次刷新就能看到这次运行。
+    invalidateSessionsCache();
+    await input.onSession?.(session.sessionId);
+    if (input.signal?.aborted) throw new Error("已取消");
+    const chunks: string[] = [];
+    const unsubscribe = session.subscribe((event: any) => {
+      if (event?.type === "message_update" && event.assistantMessageEvent?.type === "text_delta") {
+        chunks.push(String(event.assistantMessageEvent.delta ?? ""));
+      }
+    });
+    const abort = () => { void session.abort(); };
+    input.signal?.addEventListener("abort", abort, { once: true });
+    try {
+      await session.prompt(input.prompt);
+    } finally {
+      input.signal?.removeEventListener("abort", abort);
+      unsubscribe();
+    }
+    const persisted = assistantMessageText((session as unknown as { state?: { messages?: unknown } }).state?.messages);
+    return { sessionId: session.sessionId, text: persisted.trim() || chunks.join("").trim() };
+  } finally {
+    session.dispose();
+  }
+}
+
 export {
   assistantMessageText,
   createTeamRunner,
+  runBackgroundSession,
 };

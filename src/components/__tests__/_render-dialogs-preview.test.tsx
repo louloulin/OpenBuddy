@@ -13,9 +13,8 @@ test("render dialogs preview", () => {
 <head>
 <meta charset="UTF-8">
 <title>Email Dialog Style Preview</title>
-${cssLink("src/styles/global.css")}
-${cssLink("src/styles/tokens.css")}
-${cssLink("src/styles/app.css")}
+${cssLink("src/styles/globals.css")}
+${cssLink("src/styles/modals.css")}
 <style>
 body { padding: 40px; background: linear-gradient(180deg, #f4f5f7, #e9eaee); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
 h1 { font-size: 24px; font-weight: 700; color: #202124; margin-bottom: 8px; }

@@ -103,6 +103,7 @@ export interface InstallHostModuleDeps {
   rebindSession: (sessionPath: string, cwd: string) => Promise<void>;
   dispose: () => Promise<void>;
   replaceSession: (opts: any) => Promise<any>;
+  isRestoredSession: (session: any) => boolean;
   sessionManagerOpen: (sessionPath: string, options: any, cwd: string) => any;
   piSessionRuntimeDispose: () => Promise<void>;
   // ── Host functions ──

@@ -173,6 +173,12 @@
       "readyAfterRestart": "恢复已就绪 —— 重启应用后生效。",
       "hint": "备份存于 {home}/backups/",
       "restore": "恢复"
+    },
+    "security": {
+      "revoke": "撤销",
+      "revokeLabel": "撤销规则 {rule}",
+      "revokeFailed": "撤销失败：{error}",
+      "hint": "评估顺序：deny > ask > allow。撤销后立即生效，无需重启。"
     }
   },
   "auth": {
@@ -278,8 +284,8 @@
       "resume": "恢复",
       "resumeContinueTitle": "恢复并发送「请继续」让 agent 接着生成",
       "resumeContinue": "恢复并继续",
-      "pauseTitle": "暂停生成（保留会话，可继续）",
-      "pause": "暂停"
+      "offline": "网络已断开 —— 恢复连接后即可继续对话。",
+      "historyLoading": "正在加载对话"
     },
     "tool": {
       "collapse": "折叠",
@@ -292,6 +298,21 @@
       "label": "终端(工作区 shell)",
       "exit": "进程已退出,code {code}",
       "createFailed": "终端创建失败:{error}"
+    },
+    "turnError": {
+      "switchModel": "切换模型",
+      "switchModelTitle": "换一个模型后重试",
+      "switchModelHint": "在输入框下方的模型菜单里切换模型"
+    },
+    "a11y": {
+      "turnDone": "回复已完成"
+    },
+    "context": {
+      "autoCompact": "自动压缩阈值"
+    },
+    "turn": {
+      "toolRunning": "正在调用工具",
+      "awaitingApproval": "等待你确认"
     }
   },
   "artifacts": {

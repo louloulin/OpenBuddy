@@ -24,7 +24,8 @@ function walk(directory) {
       continue;
     }
     if (!sourceExtensions.has(relativeExtension(entry.name))) continue;
-    if (/(?:\.test|\.spec)\.[^.]+$/.test(entry.name) || relativePath.includes("/__tests__/")) continue;
+    // __contracts__ holds Node-side test tooling (CSS contract scanners), not renderer code.
+    if (/(?:\.test|\.spec)\.[^.]+$/.test(entry.name) || relativePath.includes("/__tests__/") || relativePath.includes("/__contracts__/")) continue;
     files.push(relativePath);
   }
   return files;

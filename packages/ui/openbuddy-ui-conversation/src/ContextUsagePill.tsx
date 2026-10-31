@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { piSessionInfo, piSessionUsage, agentOnPluginEvent } from "@/lib/agent/pi-client";
 import type { ContextInfo, SessionUsage } from "@openbuddy/shared-types";
+import { useT } from "@openbuddy/ui-locale/client";
 
 /**
  * Context-usage ring + popover for the Composer footer.
@@ -62,6 +63,7 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const autoCompactLabel = useT("chat.context.autoCompact");
 
   const refresh = useCallback(async () => {
     try {
@@ -158,7 +160,9 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
             strokeDashoffset={offset}
           />
         </svg>
-        <span className="context-usage__pill-text">
+        {/* 用量不高时只留圆环(对齐 WorkBuddy),数字留给读屏与悬停提示;
+            过半才把百分比亮出来提醒用户。 */}
+        <span className={pct >= 50 ? "context-usage__pill-text" : "wb-sr-only"}>
           {pct}%
         </span>
       </button>
@@ -175,6 +179,13 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
               className="context-usage__bar-fill"
               style={{ width: `${Math.min(100, Math.max(0, (ctx.used / ctx.total) * 100))}%` }}
             />
+            {ctx.autoCompactThresholdPercent ? (
+              <div
+                className="context-usage__bar-threshold"
+                style={{ left: `${Math.min(100, ctx.autoCompactThresholdPercent)}%` }}
+                aria-hidden="true"
+              />
+            ) : null}
           </div>
           <ul className="context-usage__rows">
             {rows.map((r) => (
@@ -190,6 +201,12 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
               </li>
             ))}
           </ul>
+          {ctx.autoCompactThresholdPercent ? (
+            <div className="context-usage__footer" data-testid="context-auto-compact">
+              <span>{autoCompactLabel}</span>
+              <span className="context-usage__footer-value">{ctx.autoCompactThresholdPercent}%</span>
+            </div>
+          ) : null}
           <div className="context-usage__footer">
             <span>平均缓存命中率</span>
             <span className="context-usage__footer-value">{cacheHit}</span>

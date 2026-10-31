@@ -13,6 +13,7 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { buildTimeline, type TimelineNode } from "@/lib/ui/timeline-utils";
 import type { ChatMessage } from "@openbuddy/ui-state/session-store";
 import { MessageItem } from "../MessageItem";
+import { RenderItemBoundary } from "../RenderItemBoundary";
 import { isFindHit } from "../FindBar";
 
 export type UseChatViewTimelineParams = {
@@ -87,6 +88,34 @@ export function useChatViewTimeline({
 }: UseChatViewTimelineParams): UseChatViewTimelineResult {
   const timeline = useMemo(() => buildTimeline(messages), [messages]);
   const messagesLength = messages.length;
+  // cc-haha 对齐 — 连续 assistant 消息属于同一段"发言"(工具步骤 + 最终答复),
+  // 只在第一行显示 Buddy 抬头,后续行以延续样式渲染。系统分隔标记(压缩边界)
+  // 会打断延续关系。
+  const continuationIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (let i = 1; i < messages.length; i += 1) {
+      const current = messages[i];
+      const previous = messages[i - 1];
+      if (
+        current.role === "assistant" &&
+        previous.role === "assistant" &&
+        !current.systemMarker
+      ) {
+        ids.add(current.id);
+      }
+    }
+    return ids;
+  }, [messages]);
+
+  // Stable per-render-cycle handler: MessageItem passes its own id back, so
+  // bubbles keep a reference-equal prop and stay memoized during streaming.
+  const onEditResendFor = useCallback(
+    (text: string, messageId: string) => {
+      setEditResendOriginId(messageId);
+      handleEditResend(text);
+    },
+    [handleEditResend, setEditResendOriginId],
+  );
 
   const renderTimelineNode = useCallback(
     ({ node }: { node: TimelineNode; index: number }) => {
@@ -113,8 +142,20 @@ export function useChatViewTimeline({
             ? " msg-wrap--find-current"
             : " msg-wrap--find-hit"
           : "";
+      const continuation = continuationIds.has(m.id);
       return (
-        <div key={m.id} className={"msg-wrap" + findCls} data-msg-id={m.id}>
+        <div
+          key={m.id}
+          className={
+            "msg-wrap" +
+            findCls +
+            (continuation ? " msg-wrap--continuation" : "") +
+            (m.role === "user" ? " msg-wrap--user-turn" : "")
+          }
+          data-msg-id={m.id}
+        >
+          {/* plan1030 批 4a — 单条消息渲染失败只塌一行，不白屏（lumos issue #1400）。 */}
+          <RenderItemBoundary itemId={m.id}>
           <MessageItem
             message={m}
             streaming={streaming && m.id === streamingMessageId}
@@ -130,10 +171,7 @@ export function useChatViewTimeline({
             sessionId={sessionId ?? undefined}
             onToast={onToast}
             onOpenTool={handleOpenTool}
-            onEditResend={(text) => {
-              setEditResendOriginId(m.id);
-              handleEditResend(text);
-            }}
+            onEditResend={onEditResendFor}
             onStepRevision={handleStepRevision}
             onInlineResend={m.role === "user" ? handleInlineResend : undefined}
             onRetry={isLastAssistant && !streaming && m.complete ? handleRetry : undefined}
@@ -146,14 +184,16 @@ export function useChatViewTimeline({
                 : undefined
             }
             // Plan5 B.10 — 消息级"从此重发/分叉"。promptIndex 查不到时
-            // MessageRewindMenu 自适应为禁用态(不会指向错误的回溯点)。
+            // 「⋯」菜单里不出现「从这里重新发送」(不会指向错误的回溯点)。
             rewindPromptIndex={
               m.role === "assistant" ? promptIndexByMessageId?.get(m.id) : undefined
             }
             onRewindTo={m.role === "assistant" ? onRewindTo : undefined}
             allowFork={allowFork}
             onForkFromHere={m.role === "assistant" ? onForkFromHere : undefined}
+            hideIdentity={continuation}
           />
+          </RenderItemBoundary>
         </div>
       );
     },
@@ -166,8 +206,7 @@ export function useChatViewTimeline({
       sessionId,
       onToast,
       handleOpenTool,
-      handleEditResend,
-      setEditResendOriginId,
+      onEditResendFor,
       handleStepRevision,
       handleInlineResend,
       handleEditAssistantMessage,
@@ -181,6 +220,7 @@ export function useChatViewTimeline({
       onRewindTo,
       allowFork,
       onForkFromHere,
+      continuationIds,
     ],
   );
 

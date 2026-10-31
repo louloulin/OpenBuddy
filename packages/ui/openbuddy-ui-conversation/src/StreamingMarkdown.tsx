@@ -36,6 +36,9 @@ type Token =
 
 // ─── Fenced-code block tokenization ────────────────────────────────
 
+/** Image URLs the streaming renderer may load directly. */
+const SAFE_IMAGE_URL = /^(?:https?:|data:image\/|file:)/i;
+
 function tokenize(text: string): Token[] {
   if (!text) return [];
   const tokens: Token[] = [];
@@ -187,15 +190,22 @@ function renderInlineText(text: string, baseKey: string): React.ReactNode {
           </a>
         );
       case "image":
-        return (
-          <span
+        // Render the real image while streaming (the final renderer shows the
+        // same picture) instead of a "🖼 alt" text placeholder that jumped into
+        // an image on completion. Only plain web/data/file URLs are loaded.
+        return SAFE_IMAGE_URL.test(tok.url) ? (
+          <img
             key={key}
             className="streaming-inline-image"
             data-alt={tok.alt}
             data-src={tok.url}
-            aria-label={tok.alt || "image"}
-          >
-            {tok.alt ? `🖼 ${tok.alt}` : "🖼 image"}
+            src={tok.url}
+            alt={tok.alt}
+            loading="lazy"
+          />
+        ) : (
+          <span key={key} className="streaming-inline-image" data-alt={tok.alt} data-src={tok.url}>
+            {tok.alt}
           </span>
         );
       case "citation":
@@ -225,24 +235,33 @@ function StreamingMarkdownInner({
   // Fast path: plain prose streaming in -- skip tokenization entirely.
   if (deferredText.indexOf("```") === -1) {
     return (
-      <div className="markdown-body md-font-size-fixed" data-md-theme={markdownTheme}>
+      <div className="markdown-body" data-md-theme={markdownTheme}>
         {renderInlineText(deferredText, "s")}
       </div>
     );
   }
   const tokens = tokenize(deferredText);
   return (
-    <div className="markdown-body md-font-size-fixed" data-md-theme={markdownTheme}>
+    <div className="markdown-body" data-md-theme={markdownTheme}>
       {tokens.map((tok, idx) => {
         if (tok.kind === "text") {
           return <span key={idx}>{renderInlineText(tok.value, `t${idx}`)}</span>;
         }
-        // Placeholder for an in-progress fenced code block -- the real
-        // syntax-highlighted render arrives when the message completes.
+        // In-progress fenced code block. Same frame as the final code block
+        // (container + language header + monospace body) so completion only
+        // adds highlighting and actions — no dashed box that jumps into a
+        // different card. Highlighting is skipped while streaming on purpose.
         return (
-          <pre key={idx} className="streaming-code-stub" data-lang={tok.lang}>
-            {tok.value || "\u2026"}
-          </pre>
+          <div key={idx} className="md-code-wrapper streaming-code-stub" data-lang={tok.lang}>
+            <div className="md-code-container">
+              <div className="md-code-header">
+                <strong className="md-code-lang">{tok.lang || "code"}</strong>
+              </div>
+              <pre>
+                <code>{tok.value || "\u2026"}</code>
+              </pre>
+            </div>
+          </div>
         );
       })}
     </div>

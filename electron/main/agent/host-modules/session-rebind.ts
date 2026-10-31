@@ -17,6 +17,7 @@ let emitPluginEventImpl: (type: string, payload: unknown) => void = () => undefi
 let emitRendererEventImpl: (channel: string, payload: unknown) => void = () => undefined;
 let questionAnswerImpl: (value: any, questionKey?: string) => string | undefined = () => undefined;
 let createOpenBuddyRpcUiContextImpl: (deps: any) => any = () => undefined;
+let isRestoredSessionImpl: (session: any) => boolean = () => false;
 
 export interface InstallSessionRebindDeps {
   state: AgentHostState;
@@ -30,6 +31,8 @@ export interface InstallSessionRebindDeps {
   emitRendererEvent: (channel: string, payload: unknown) => void;
   questionAnswer: (value: any, questionKey?: string) => string | undefined;
   createOpenBuddyRpcUiContext: (deps: any) => any;
+  /** 计划 0.3 — replace() 接回的后台会话已绑定过扩展,不能再绑(会重放 session_start)。 */
+  isRestoredSession?: (session: any) => boolean;
 }
 
 export function installSessionRebind(deps: InstallSessionRebindDeps): void {
@@ -44,6 +47,7 @@ export function installSessionRebind(deps: InstallSessionRebindDeps): void {
   if (deps.emitRendererEvent) emitRendererEventImpl = deps.emitRendererEvent;
   if (deps.questionAnswer) questionAnswerImpl = deps.questionAnswer;
   if (deps.createOpenBuddyRpcUiContext) createOpenBuddyRpcUiContextImpl = deps.createOpenBuddyRpcUiContext;
+  if (deps.isRestoredSession) isRestoredSessionImpl = deps.isRestoredSession;
 }
 
 export function __resetSessionRebindForTest(): void {
@@ -58,6 +62,7 @@ export function __resetSessionRebindForTest(): void {
   emitRendererEventImpl = () => undefined;
   questionAnswerImpl = () => undefined;
   createOpenBuddyRpcUiContextImpl = () => undefined;
+  isRestoredSessionImpl = () => false;
 }
 
 export async function rebindSession(sessionPath: string, cwd: string): Promise<void> {
@@ -101,21 +106,23 @@ export async function rebindSession(sessionPath: string, cwd: string): Promise<v
   context.provide("piSessionRaw", session);
   context.provide("piExtensionApi", session);
 
-  const uiContext = provideRpcUiContextImpl({
-    context,
-    session,
-    state,
-    emitPluginEvent: emitPluginEventImpl,
-    emitRendererEvent: emitRendererEventImpl,
-    questionAnswer: questionAnswerImpl,
-    createOpenBuddyRpcUiContext: createOpenBuddyRpcUiContextImpl,
-  });
-
-  state.extensionsBound = session
-    .bindExtensions({ uiContext, mode: "rpc" })
-    .catch((err: unknown) => {
-      console.warn("[openbuddy] bindExtensions failed", err);
+  if (!isRestoredSessionImpl(session)) {
+    const uiContext = provideRpcUiContextImpl({
+      context,
+      session,
+      state,
+      emitPluginEvent: emitPluginEventImpl,
+      emitRendererEvent: emitRendererEventImpl,
+      questionAnswer: questionAnswerImpl,
+      createOpenBuddyRpcUiContext: createOpenBuddyRpcUiContextImpl,
     });
+
+    state.extensionsBound = session
+      .bindExtensions({ uiContext, mode: "rpc" })
+      .catch((err: unknown) => {
+        console.warn("[openbuddy] bindExtensions failed", err);
+      });
+  }
 
   context.emit("pi/ready", { sessionId: session.sessionId, cwd });
   emitPluginEventImpl("session/created", { sessionId: session.sessionId, cwd });

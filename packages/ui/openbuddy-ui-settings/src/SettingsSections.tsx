@@ -47,6 +47,7 @@ import {
   internalReload,
   mcpList,
   permissionList,
+  permissionSave,
   providersList,
   flattenModels,
   skillsList,
@@ -511,8 +512,10 @@ export function HelpSettingsPanel({
 // ---------- 安全中心 ----------
 
 export function SecuritySettingsPanel() {
+  const locale = useLocale();
   const [rules, setRules] = useState<PermissionRule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     permissionList()
@@ -521,10 +524,22 @@ export function SecuritySettingsPanel() {
       .finally(() => setLoading(false));
   }, []);
 
+  // "本会话始终允许"之外的持久规则在这里撤销;权限钩子每次都现读规则,立即生效。
+  const revoke = useCallback(async (index: number) => {
+    const next = rules.filter((_, i) => i !== index);
+    setError(null);
+    try {
+      await permissionSave(next);
+      setRules(next);
+    } catch (e) {
+      setError(locale.t("settings.security.revokeFailed", { error: String(e).replace(/^Error:\s*/, "") }));
+    }
+  }, [rules, locale]);
+
   return (
     <SectionShell
       title="安全中心"
-      desc="工具执行权限规则。在 Composer 底部的「默认权限」可以编辑。"
+      desc="工具执行的持久权限规则，可随时撤销。"
     >
       <div className="settings-row">
         <div className="settings-row__label">
@@ -538,18 +553,24 @@ export function SecuritySettingsPanel() {
       {rules.length > 0 && (
         <ul className="rules-list">
           {rules.map((r, i) => (
-            <li key={i} className={`rules-list__item rules-list__item--${r.action}`}>
+            <li key={`${r.action}:${r.tool}:${r.pattern ?? ""}:${i}`} className={`rules-list__item rules-list__item--${r.action}`}>
               <span className="rules-list__action">{r.action}</span>
               <span className="rules-list__tool">{r.tool}</span>
               {r.pattern && <span className="rules-list__pattern">{r.pattern}</span>}
+              <button
+                type="button"
+                className="rules-list__revoke"
+                aria-label={locale.t("settings.security.revokeLabel", { rule: `${r.action} ${r.tool}${r.pattern ? ` ${r.pattern}` : ""}` })}
+                onClick={() => void revoke(i)}
+              >
+                {locale.t("settings.security.revoke")}
+              </button>
             </li>
           ))}
         </ul>
       )}
-      <p className="settings-hint">
-        pi 评估顺序：<code>deny</code> &gt; <code>ask</code> &gt; <code>allow</code>。
-        修改需重启 pi 生效。
-      </p>
+      {error && <p className="settings-warn" role="alert">{error}</p>}
+      <p className="settings-hint">{locale.t("settings.security.hint")}</p>
     </SectionShell>
   );
 }

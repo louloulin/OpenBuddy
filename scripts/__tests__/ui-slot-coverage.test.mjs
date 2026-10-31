@@ -68,10 +68,14 @@ const report = JSON.parse(
  *   因此:`declared` 66→64(不是接線缩减,是孤儿扩展点随孤儿实现一并删除),
  *   `wired` 不变(46),`registeredPct` / `consumedPct` 因分母减小而
  *   自然上调 —— 视为「分母正常收缩」。
+ *
+ * 2026-10-31(docs/plan/20261031.md §18):`conversation.view` 不再注册内置
+ * 「结果 / 内容」视图 —— 它们让视图切换条常驻顶部却很少被用。槽位声明与
+ * 消费点都保留(插件仍可注册),只是没有内置注册者,`wired` 46→45。
  */
 const BASELINE = {
   declared: 64,
-  wired: 46,
+  wired: 45,
   registeredPct: 76,
   consumedPct: 86,
 };

@@ -65,6 +65,7 @@ const LEGACY_CONFIG_FILE = "casdoor-config.json";
 const LEGACY_SESSION_FILE = "casdoor-session.json";
 
 let authSettingsStore: SettingsDocumentStore | null = null;
+let authSettingsDriver: { close(): void } | null = null;
 
 function authStoragePath(): string {
   return join(app.getPath("userData"), "openbuddy.sqlite");
@@ -73,11 +74,22 @@ function authStoragePath(): string {
 function openAuthSettingsStore(): SettingsDocumentStore {
   if (authSettingsStore) return authSettingsStore;
   const opened = openStorageSync({ filePath: authStoragePath(), appVersion: SESSION_STORAGE_APP_VERSION });
+  authSettingsDriver = opened.driver;
   authSettingsStore = new SettingsDocumentStore(opened.driver);
   return authSettingsStore;
 }
 
+/**
+ * 测试用:关掉并丢弃缓存的 store。
+ *
+ * **必须 close()**:只把引用置空会让 SQLite 句柄泄漏。Windows 上泄漏的
+ * 句柄让测试目录的 rm 直接 EBUSY(macOS/Linux 允许 unlink 已打开文件,
+ * 所以本地永远看不出来)。这也顺带说明生产侧没有任何"关闭"路径 ——
+ * 单例活到进程退出,那是另一个话题;至少测试要能收干净。
+ */
 export function resetAuthSettingsStoreForTests(): void {
+  try { authSettingsDriver?.close(); } catch { /* 已经关了 */ }
+  authSettingsDriver = null;
   authSettingsStore = null;
 }
 const FLOW_TIMEOUT_MS = 10 * 60_000;

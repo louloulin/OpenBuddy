@@ -1,4 +1,4 @@
-import { agentHome } from "@openbuddy/storage";
+import { agentHome, statIfExists } from "@openbuddy/storage";
 import { access, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -227,7 +227,7 @@ async function packageDirectories(root: string): Promise<string[]> {
       result.push(path);
     }
   }
-  const checks = await Promise.all(result.map(async (path) => ((await stat(path, { throwIfNoEntry: false }))?.isDirectory() ? path : undefined)));
+  const checks = await Promise.all(result.map(async (path) => ((await statIfExists(path))?.isDirectory() ? path : undefined)));
   return checks.filter((path): path is string => path !== undefined);
 }
 
@@ -250,7 +250,7 @@ function resourcePathForEntry(root: string, entry: string): string | undefined {
 async function extensionPathForEntry(root: string, entry: string): Promise<string | undefined> {
   const path = resourcePathForEntry(root, entry);
   if (!path) return undefined;
-  return (await stat(path, { throwIfNoEntry: false }))?.isDirectory() ? root : path;
+  return (await statIfExists(path))?.isDirectory() ? root : path;
 }
 
 function overridePattern(value: string): boolean {
@@ -501,7 +501,7 @@ export async function resolvePackageFromAnchors(specifier: string, anchors: read
       for (const searchPath of resolver.resolve.paths(specifier) ?? []) {
         const packageJson = join(searchPath, specifier, "package.json");
         try {
-          if ((await stat(packageJson, { throwIfNoEntry: false }))?.isFile()) return packageJson;
+          if ((await statIfExists(packageJson))?.isFile()) return packageJson;
         } catch {
           // Continue to the next Node resolution anchor.
         }

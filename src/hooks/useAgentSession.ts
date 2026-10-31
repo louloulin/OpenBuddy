@@ -86,7 +86,7 @@ import { dispatchNotification } from "@/lib/notify/notify-channels";
 import { reportEvent } from "@/lib/telemetry/telemetry-contract";
 import { recordUsage, loadUsage, loadQuotaConfig } from "@/lib/billing/usage-quota";
 import { createUpdateCoalescer, type UpdateCoalescer } from "@/lib/stream/update-coalescer";
-import { friendlyError, formatPiError } from "@/lib/platform/error-format";
+import { friendlyError } from "@/lib/platform/error-format";
 import { abandonInFlightStream } from "@/lib/agent/abandon-stream";
 import { withTrace, createRendererLogger } from "@openbuddy/logging-renderer";
 import type {
@@ -127,12 +127,67 @@ export function acceptTextShape(
 }
 
 /** Optional Phase 1 escape hatch — debug flag mirrors App.tsx. */
+/** True while the streaming assistant message has a tool call still running. */
+function hasRunningToolCall(state: { messages: Array<{ id: string; parts: Array<{ kind: string; toolCall?: { status?: string } }> }>; streamingMessageId: string | null }): boolean {
+  const msg = state.streamingMessageId
+    ? state.messages.find((m) => m.id === state.streamingMessageId)
+    : state.messages[state.messages.length - 1];
+  return !!msg?.parts.some((p) => p.kind === "tool_call" && (p.toolCall?.status === "in_progress" || p.toolCall?.status === "pending"));
+}
+
 function isStreamDebugEnabled(): boolean {
   if (typeof localStorage === "undefined") return false;
   try { return localStorage.getItem("openbuddy.debug.stream") === "1"; }
   catch { return false; }
 }
 const STREAM_DEBUG = isStreamDebugEnabled();
+
+/**
+ * 一些 provider/工具把失败编码成「正常 completed + 错误正文」返回(pi 不会把它
+ * 标成 failed)。这里在渲染前根据输出文本把 completed 推导为 failed,否则卡片
+ * 会以成功态展示一条失败信息。
+ *
+ * 只在行首匹配,避免把普通输出里顺带出现的 "error:" 误判;工具名前缀限定为
+ * 已知会自报失败的写入/执行类工具。
+ */
+const TOOL_FAILURE_TEXT_RE =
+  /^(?:apply_patch|apply_command|bash|shell|write_file|edit_file) failed\b|^(?:Error|TypeError|RangeError|SyntaxError|ReferenceError):/m;
+
+function toolContentText(content: unknown): string {
+  if (typeof content === "string") {
+    // `tool_execution_end` 会把非字符串 result(pi 的 `{content:[…], details}`)
+    // JSON.stringify 后塞进 content[].text。先还原成结构化结果,否则失败
+    // 前缀被 JSON 包装后无法在行首匹配。
+    const trimmed = content.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        return toolContentText(parsed);
+      } catch { /* not JSON — treat as plain text */ }
+    }
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content.map((item) => toolContentText(item)).join("\n");
+  }
+  if (content && typeof content === "object") {
+    const rec = content as Record<string, unknown>;
+    if (typeof rec.text === "string") return rec.text;
+    if (typeof rec.output === "string") return rec.output;
+    if (typeof rec.message === "string") return rec.message;
+    if (rec.content !== undefined) return toolContentText(rec.content);
+  }
+  return "";
+}
+
+function deriveToolStatus(
+  status: "in_progress" | "completed" | "failed" | undefined,
+  content: unknown,
+): "in_progress" | "completed" | "failed" | undefined {
+  if (status !== "completed") return status;
+  const text = toolContentText(content);
+  return text && TOOL_FAILURE_TEXT_RE.test(text) ? "failed" : status;
+}
 
 export type ExtensionUiBySessionValue = {
   statuses: Record<string, string>;
@@ -214,6 +269,23 @@ export interface UseAgentSessionReturn {
  *     lifecycle so the `handleAgentDied` resubscribe path can be a
  *     pure no-side-effect call.
  */
+/**
+ * A turn the user stopped ends with Pi's abort error ("This operation was
+ * aborted"). That is not a failure: no red banner, no error card, no
+ * "会话失败" notification — the transcript just keeps what was produced.
+ */
+function isUserStop(reason: string | undefined, detail: string | undefined): boolean {
+  return reason === "aborted" || /\b(?:operation was )?aborted\b|AbortError/i.test(detail ?? "");
+}
+
+function settleUserStop(sessionId: string): void {
+  const state = useSessionStore.getState();
+  // Stop already finalised the bubble (the UI goes idle before the host
+  // confirms) — the late abort event has nothing left to do.
+  if (!state.streaming && !state.streamingMessageId) return;
+  abandonInFlightStream({ sessionId, reason: "已停止", status: "completed" });
+}
+
 export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessionReturn {
   const {
     setTrustRequest,
@@ -333,47 +405,40 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
   //   backend would interpret as an unsolicited cancel.
   const abortedRef = useRef(false);
 
-  // 15s streaming watchdog timer — if `streaming` stays true with no
-  // `pi://update` activity for 15 s (and no pi://complete either), we
-  // force-finalize the streaming message so the LoadingRow can't spin
-  // forever. Mirrors the user-reported "你是谁" message stuck for 8h+
-  // symptom from useAgentSession.ts:388.
-  const STREAMING_WATCHDOG_MS = 15_000;
+  // Streaming watchdog — the single safety net for a turn whose backend went
+  // silent (no pi://complete, no agent-died). ANY agent event for the focused
+  // session re-arms it, and it never fires while a tool call is still running:
+  // a long `apply_command` legitimately produces no events until it finishes,
+  // and abandoning it mid-run left the backend working while the UI declared
+  // the turn dead (its real completion was then dropped by the settled guard).
+  const STREAMING_WATCHDOG_MS = 60_000;
   const streamingWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetStreamingWatchdog = () => {
     if (streamingWatchdogRef.current !== null) {
       clearTimeout(streamingWatchdogRef.current);
     }
     streamingWatchdogRef.current = setTimeout(() => {
-      // Reset before the abandon-stream call so the rAF flush completes
-      // before we mutate the store. The actual call routes through
-      // abandonInFlightStream so the LoadingRow + LoadingRow.getDefault are
-      // consistent with the natural error path.
       streamingWatchdogRef.current = null;
       const store = useSessionStore.getState();
       if (!store.streaming) return;
-      // eslint-disable-next-line no-console
-      console.warn("[OpenBuddy] streaming watchdog 15s timeout — finalising orphan message");
-      // Defer to abandonInFlightStream which lives at
-      // src/lib/agent/abandon-stream.ts. Imported lazily to avoid a
-      // circular import (useAgentSession ↔ abandon-stream).
-      void import("@/lib/agent/abandon-stream").then(({ abandonInFlightStream }) => {
-        const sid = store.sessionId;
-        if (sid) {
-          // R-err-provider-chat — 15s no-first-chunk watchdog typically trips
-          // because the provider never started streaming (auth/key/endpoint).
-          // Forward a structured network_error so TurnErrorCard renders the
-          // "网络连接中断" chip instead of a blank placeholder.
-          abandonInFlightStream({
-            sessionId: sid,
-            reason: "watchdog-15s",
-            error: {
-              message: "AI 引擎长时间无响应,已自动结束当前轮次。可重发或重新加载。",
-              code: "network_error",
-            },
-          });
-        }
-      });
+      if (hasRunningToolCall(store)) {
+        resetStreamingWatchdog();
+        return;
+      }
+      console.warn("[OpenBuddy] streaming watchdog timeout — finalising orphan message");
+      const sid = store.sessionId;
+      if (sid) {
+        abandonInFlightStream({
+          sessionId: sid,
+          reason: "watchdog",
+          error: {
+            message: "AI 引擎长时间无响应,已结束当前轮次。可重试或检查网络与模型配置。",
+            code: "network_error",
+          },
+        });
+      } else {
+        store.setStreaming(false);
+      }
     }, STREAMING_WATCHDOG_MS);
   };
   /**
@@ -390,6 +455,13 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
       streamingWatchdogRef.current = null;
     }
   };
+  // Arm the watchdog the moment a turn starts streaming (a provider that never
+  // sends a first chunk must still be caught) and disarm it when it settles.
+  useEffect(() => useSessionStore.subscribe((state, prev) => {
+    if (state.streaming === prev.streaming) return;
+    if (state.streaming) resetStreamingWatchdog();
+    else clearStreamingWatchdog();
+  }), []);
 
   // Build the handler set ONCE — both the cold-start useEffect and the
   // resubscribe path close over the same `buildHandlersRef.current()` so
@@ -400,9 +472,14 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
         if (STREAM_DEBUG) console.log("[OpenBuddy] pi://update:", u);
         updateCoalescerRef.current?.push(u as SessionUpdate & { __sessionId?: string });
       },
-      onPermission: (p: { sessionId: string; options?: { title?: string }[] }) => {
+      onPermission: (p: { sessionId: string; options?: { title?: string }[]; replayed?: boolean }) => {
         // permission_request is already surfaced via the toast +
         // usePermissionStore.request below; no console.log needed.
+        if (p.replayed) {
+          // 重新连上后主进程重发的仍在等待的请求:只恢复卡片,不重复通知。
+          usePermissionStore.getState().request(p as unknown as PermissionRequest);
+          return;
+        }
         reportEvent("permission_request", "warn", { sessionId: p.sessionId });
         usePermissionStore.getState().request(p as unknown as PermissionRequest);
         void notificationAppend(
@@ -414,6 +491,15 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
         );
       },
       onComplete: (p: { sessionId: string; stopReason?: string; errorMessage?: string; usage?: { promptTokens?: number; completionTokens?: number } }) => {
+        // Land every queued delta before finalising. Updates drain on rAF,
+        // which the browser throttles for a hidden / minimised / busy window;
+        // completing first used to finalise a half-written bubble and then
+        // open a second one for the late tail of the same answer.
+        updateCoalescerRef.current?.flush();
+        if (isUserStop(p.stopReason, p.errorMessage)) {
+          settleUserStop(p.sessionId);
+          return;
+        }
         if (p.stopReason === "error" || p.stopReason === "rate_limit") {
           // Only the failure path stays in console — happy-path completions
           // were firing dozens of console.log lines per turn that drowned
@@ -424,10 +510,9 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
           // 走与 pi://turn-error 相同的 abandon 路径,把结构化错误交给卡片。
           const rawDetail = p.errorMessage ?? "";
           const code = rawDetail ? inferErrorCodeSafe(rawDetail) : p.stopReason === "rate_limit" ? "rate_limit_error" : undefined;
-          const bannerMsg =
-            formatPiError(rawDetail) ??
-            (rawDetail ? `⚠️ 本轮执行出错：${rawDetail}` : "⚠️ 本轮执行出错，请重试。");
-          useSessionStore.getState().setError(bannerMsg);
+          // 回合失败只在转录里落一张错误卡(abandonStreamingMessage 保证即使
+          // 还没有助手气泡也会补一条),不再同时弹顶部横幅 —— 两处说同一件事,
+          // 横幅还会压住内容。
           reportEvent("turn_error", "error", { sessionId: p.sessionId, stopReason: p.stopReason });
           clearStreamingWatchdog();
           abortedRef.current = true;
@@ -633,34 +718,42 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
         // diagnostics live in useSubagentStore.applyEvent below.
         useSubagentStore.getState().applyEvent(e as SubagentLiveEvent);
       },
+      // 计划 1.1 — 主进程回合状态机的投影。只更新阶段标签,不改 streaming:
+      // 收尾仍由 onComplete / onTurnError 负责(它们带序号、走重放闸门)。
+      onTurnState: (e: { sessionId: string; phase: import("@openbuddy/shared-types").TurnPhase }) => {
+        // 回合结束时刷新运行中任务面板:面板只在挂载 / 收到 task 事件时拉取,
+        // 窗口重新加载时拉到的「running」工具会一直挂着。只在 idle 刷新 ——
+        // 回合进行中刷新会让面板把对话里已经在显示的工具调用再列一遍
+        // (§21 截图:审批时底部弹出整条「运行中任务」压住侧栏)。
+        if (e.phase === "idle") setTaskRefreshSignal((n: number) => n + 1);
+        const store = useSessionStore.getState();
+        store.setSessionRunning(e.sessionId, e.phase !== "idle");
+        if (e.sessionId !== store.sessionId) return;
+        store.setTurnPhase(e.phase);
+      },
       onTurnError: (e: { traceId?: string; sessionId: string; kind: string; detail?: string }) => {
         const log = e.traceId ? withTrace(appLogger, e.traceId) : appLogger;
         log.warn("pi://turn-error", { msg: "pi.turn-error.received", traceId: e.traceId, sessionId: e.sessionId, kind: e.kind });
         const currentSessionId = useSessionStore.getState().sessionId;
         if (currentSessionId && e.sessionId && e.sessionId !== currentSessionId) return;
-        // R-err-provider-chat — turn-error must surface in TWO places at once:
-        //   1. Top banner (`sessionStore.error`) so a brand-new session without
-        //      any assistant bubble yet still gets a readable explanation.
-        //   2. Inline TurnErrorCard on the failed assistant bubble so the user
-        //      can copy the raw reason / open Settings for auth issues / retry
-        //      in one click.
+        updateCoalescerRef.current?.flush();
+        if (isUserStop(e.kind, e.detail)) {
+          settleUserStop(e.sessionId);
+          return;
+        }
+        // R-err-provider-chat — turn-error surfaces as the inline TurnErrorCard
+        // on the failed assistant bubble (one is synthesised when the turn
+        // failed before its first token) so the user can copy the raw reason /
+        // open Settings for auth issues / retry in one click.
         // Previously the inline card was missing because abandonInFlightStream
         // was called WITHOUT an `error` option, so `abandonStreamingMessage`
         // fell back to the generic "（已中断：...）" placeholder. We now run
-        // the raw detail through formatPiError (provider-aware friendly text)
-        // and inferErrorCodeSafe (machine code for the card's chip + the
+        // the raw detail through inferErrorCodeSafe (machine code for the card's chip + the
         // Settings shortcut wiring in TurnErrorCard.CONFIGURATION_CODES).
         const rawDetail = e.detail ?? "";
         const inferredCode = rawDetail ? inferErrorCodeSafe(rawDetail) : undefined;
         const code = inferredCode ?? (e.kind === "rate_limit" ? "rate_limit_error" : undefined);
-        const bannerMsg =
-          formatPiError(rawDetail) ??
-          (e.kind === "rate_limit"
-            ? "⚠️ API 速率限制已触发（执行工具期间）。请等待 1-2 分钟后重试，或缩短对话上下文（新建会话）。"
-            : rawDetail
-              ? `⚠️ 本轮执行出错：${rawDetail}`
-              : "⚠️ 本轮执行出错，请重试。");
-        useSessionStore.getState().setError(bannerMsg);
+        // 只落转录内错误卡(见 onComplete 失败分支),不再弹顶部横幅。
         reportEvent("turn_error", "error", { sessionId: e.sessionId, kind: e.kind });
         // Force-finalise the in-flight assistant bubble — without this the
         // LoadingRow spins forever after a fatal turn error (the user
@@ -722,6 +815,13 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
         }
       },
       onPluginEvent: (event: { type: string; payload?: { requestId?: string; sessionId?: string } }) => {
+        // P-E2 — pi 完成上下文压缩后,在转录里留下分隔标记。pi 的
+        // `pi/context-compacted` 是唯一表示"历史已被折叠"的低延迟信号;
+        // `pi/context-compaction-requested` 只是压缩开始,不应插标记。
+        if (event.type === "pi/context-compacted") {
+          useSessionStore.getState().appendSystemMarker("compaction");
+          return;
+        }
         if (event.type === "workspace/changed") {
           void piListWorkspaceRegistry().then((registry) => {
             useSessionsStore.getState().setWorkspaces(registry.items);
@@ -873,6 +973,8 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
             }
             continue;
           }
+          // Any event for the focused session proves the backend is alive.
+          if (store.streaming) resetStreamingWatchdog();
           if (STREAM_DEBUG) {
             console.log("[OpenBuddy] APPLY update:", {
               type: (u as { type?: string }).type,
@@ -991,6 +1093,45 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
               // does not depend on this field; consumers that don't read
               // it (e.g. tests) are unaffected.
               const startedAt = Date.now();
+              const nextStatus = deriveToolStatus(tc.status, tc.content) ?? tc.status;
+              // pi 在同一次工具调用上会发两次 `tool_call`:toolcall_start 和
+              // toolcall_end(bootstrap/handle-session-event.ts)。此前两次都
+              // 追加新 part,导致每个工具在转录里出现两行(一行永远运行中),
+              // 并被并行分组统计成「2 个工具并行」。第二次只更新已有单元格。
+              const existingLoc = useSessionStore.getState().toolCallIndex.get(tc.toolCallId);
+              if (existingLoc) {
+                useSessionStore.setState((s) => {
+                  const { messageIdx, partIdx } = existingLoc;
+                  const msg = s.messages[messageIdx];
+                  if (!msg) return s;
+                  const part = msg.parts[partIdx];
+                  if (!part || part.kind !== "tool_call") return s;
+                  const current = part.toolCall;
+                  const reachedTerminal =
+                    (nextStatus === "completed" || nextStatus === "failed") &&
+                    current.completedAt === undefined;
+                  const newParts = [...msg.parts];
+                  newParts[partIdx] = {
+                    kind: "tool_call",
+                    toolCall: {
+                      ...current,
+                      ...(tc.title ? { title: tc.title } : {}),
+                      ...(tc.kind ? { kind: tc.kind } : {}),
+                      status: nextStatus,
+                      ...(reachedTerminal ? { completedAt: Date.now() } : {}),
+                      ...(Array.isArray(tc.content) ? { content: tc.content as never } : {}),
+                      ...(tc.rawInput != null ? { rawInput: tc.rawInput } : {}),
+                    },
+                  };
+                  const newMessages = [...s.messages];
+                  newMessages[messageIdx] = { ...msg, parts: newParts };
+                  return { messages: newMessages };
+                });
+                break;
+              }
+              // Land buffered text first — otherwise the rAF flush appends the
+              // text that preceded this tool call AFTER its card.
+              store.flushStreamingDelta();
               // Re-read so we see the latest streamingMessageId set by the
               // most recent `beginStreamingMessage()`.
               const streamingId = useSessionStore.getState().streamingMessageId;
@@ -1007,7 +1148,7 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
                   toolCallId: tc.toolCallId,
                   title: tc.title,
                   kind: tc.kind,
-                  status: tc.status,
+                  status: nextStatus,
                   startedAt,
                   content: Array.isArray(tc.content) ? (tc.content as never) : [],
                   ...(tc.rawInput != null ? { rawInput: tc.rawInput } : {}),
@@ -1040,8 +1181,8 @@ export function useAgentSession(options: UseAgentSessionOptions): UseAgentSessio
                 content?: unknown;
               };
               const toolCallId = upd.toolCallId;
-              const status = upd.status;
               const content = upd.content;
+              const status = deriveToolStatus(upd.status, content);
               const partial = Boolean(upd.update?.partial);
               const partialResult = upd.update?.partialResult;
               // Phase A2 — O(1) lookup via the index written by the

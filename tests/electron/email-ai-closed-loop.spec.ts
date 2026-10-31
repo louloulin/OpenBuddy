@@ -20,27 +20,30 @@
  */
 import { expect, test } from "./_fixtures";
 
+/** 邮件入口在侧栏「更多 → 工作区」里(2026-10-31 主导航精简)。 */
+async function openEmailFromSidebar(page: import("@playwright/test").Page): Promise<void> {
+  const more = page.locator("button.sidebar__nav-item").filter({ hasText: "更多" }).first();
+  await expect(more).toBeVisible({ timeout: 30_000 });
+  await more.click();
+  await page.getByRole("menuitem", { name: "邮件" }).click();
+}
+
 test.describe("email AI e2e foundation (P3-收尾 第 1 项)", () => {
-  test("sidebar 含 '邮件' 入口 — 验证导航可达", async ({ page }) => {
+  test("sidebar「更多」含 '邮件' 入口 — 验证导航可达", async ({ page }) => {
     await expect(page.locator("#root")).toBeVisible({ timeout: 60_000 });
-    // 等 sidebar 渲染 — 用 expect 自带 retry
-    const emailButton = page.locator("button").filter({ hasText: "邮件" }).first();
-    await expect(emailButton).toBeVisible({ timeout: 30_000 });
+    await page.locator("button.sidebar__nav-item").filter({ hasText: "更多" }).first().click();
+    await expect(page.getByRole("menuitem", { name: "邮件" })).toBeVisible({ timeout: 30_000 });
   });
 
   test("点击 sidebar 邮件后,EmailAiPanel 占位页能渲染", async ({ page }) => {
     await expect(page.locator("#root")).toBeVisible({ timeout: 60_000 });
-    const emailNav = page.locator("button").filter({ hasText: "邮件" }).first();
-    await expect(emailNav).toBeVisible({ timeout: 30_000 });
-    await emailNav.click();
+    await openEmailFromSidebar(page);
     await expect(page.getByText(/今天要看的/).first()).toBeVisible({ timeout: 30_000 });
   });
 
   test("EmailAiPanel 渲染后,MailRail 三个 tab 全部可见", async ({ page }) => {
     await expect(page.locator("#root")).toBeVisible({ timeout: 60_000 });
-    const emailNav = page.locator("button").filter({ hasText: "邮件" }).first();
-    await expect(emailNav).toBeVisible({ timeout: 30_000 });
-    await emailNav.click();
+    await openEmailFromSidebar(page);
     await expect(page.getByText(/今天要看的/).first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/本周再处理/).first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/已处理/).first()).toBeVisible({ timeout: 10_000 });
@@ -48,9 +51,7 @@ test.describe("email AI e2e foundation (P3-收尾 第 1 项)", () => {
 
   test("EmailAiPanel 占位页能渲染 ai-inbox-shell(ai.css 注入生效)", async ({ page }) => {
     await expect(page.locator("#root")).toBeVisible({ timeout: 60_000 });
-    const emailNav = page.locator("button").filter({ hasText: "邮件" }).first();
-    await expect(emailNav).toBeVisible({ timeout: 30_000 });
-    await emailNav.click();
+    await openEmailFromSidebar(page);
     await expect(page.locator(".ai-inbox-shell").first()).toBeVisible({ timeout: 30_000 });
   });
 });

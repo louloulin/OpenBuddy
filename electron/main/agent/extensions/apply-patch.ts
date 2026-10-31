@@ -100,6 +100,9 @@ export interface ApplyCommandSandbox {
   ): { argv: readonly string[]; enforcement: string };
 }
 
+/** Confirm title for file writes — the permission gate keys acceptEdits on it. */
+export const EDIT_CONFIRM_TITLE = "修改文件";
+
 export interface OpenBuddyApplyPatchConfig {
   trustedCwd: string;
   dryRun?: boolean;
@@ -141,7 +144,7 @@ export default function openBuddyApplyPatch(
       },
       required: ["file_path", "patch"],
     },
-    execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       const p = (params ?? {}) as { file_path?: unknown; patch?: unknown; dry_run?: unknown };
       const filePath = String(p.file_path ?? "");
       const patch = String(p.patch ?? "");
@@ -164,6 +167,14 @@ export default function openBuddyApplyPatch(
             content: [{ type: "text" as const, text: "dry_run: " + parsed.hunks.length + " hunks ready for " + filePath }],
             details: { ...details, hunks: parsed.hunks.length, preview },
           };
+        }
+        // Writes go through the same permission gate as commands (default
+        // mode asks with the diff; acceptEdits / bypass auto-approve). No
+        // confirm channel → refuse rather than write silently.
+        const diffPreview = patch.length > 4000 ? patch.slice(0, 4000) + "\n…" : patch;
+        if (!ctx?.ui?.confirm) return fail("no permission channel available; refusing to write");
+        if (!(await ctx.ui.confirm(EDIT_CONFIRM_TITLE, `${filePath}\n\n${diffPreview}`))) {
+          return fail("permission denied by user");
         }
         const tmp = join(dirname(filePath), "." + randomUUID() + ".apply-patch.tmp");
         await writeFile(tmp, next, "utf8");
@@ -204,17 +215,28 @@ export default function openBuddyApplyPatch(
       },
       required: ["command"],
     },
-    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+    execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
       const p = (params ?? {}) as { command?: unknown; cwd?: unknown; timeout_ms?: unknown };
       const command = String(p.command ?? "");
-      const cwd = String(p.cwd ?? trustedRoot);
+      const cwd = resolve(String(p.cwd ?? trustedRoot));
       const timeout = Number(p.timeout_ms ?? 30000);
       const start = Date.now();
       // 执行任意 shell 前必须过权限闸(此前这里**直接 execFileAsync**,default
       // 模式下模型可以静默跑任意命令 —— 2026-10-12 真实启动验证发现)。
       // ctx.ui.confirm 接的是宿主的 requestHookPermission:规则 → 权限模式
       // (bypass 放行 / plan 强制问 / default 弹窗)→ 用户决议。
-      if (ctx?.ui?.confirm && !(await ctx.ui.confirm(
+      const denied = (reason: string) => ({
+        content: [{ type: "text" as const, text: reason }],
+        details: { exit_code: 1, stdout: "", stderr: reason, duration_ms: Date.now() - start, error: reason },
+      });
+      // The model picks `cwd`; it must stay inside the trusted workspace.
+      const relCwd = relative(trustedRoot, cwd);
+      if (relCwd.startsWith("..") || isAbsolute(relCwd)) {
+        return denied(`cwd outside the trusted workspace ${trustedRoot}`);
+      }
+      // Fail closed: without a confirm channel there is nobody to ask.
+      if (!ctx?.ui?.confirm) return denied("no permission channel available; refusing to run");
+      if (!(await ctx.ui.confirm(
         "执行命令",
         `${command}${cwd !== trustedRoot ? `（cwd: ${cwd}）` : ""}`,
       ))) {
@@ -225,7 +247,12 @@ export default function openBuddyApplyPatch(
       }
       // 阶段 3:OS 级沙箱(seatbelt/bwrap)包裹 —— workspace-write 只允许写信任
       // 工作区与 /tmp,其余路径写操作由内核拒绝。danger-full-access 直通。
-      let argv: readonly string[] = ["/bin/sh", "-c", command];
+      // 别写死 "/bin/sh":Windows 上没有这个文件,apply_command 在那里
+      // 100% 失败,而且报的是一个跟命令内容毫无关系的 ENOENT。
+      const isWindows = process.platform === "win32";
+      let argv: readonly string[] = isWindows
+        ? ["cmd", "/d", "/s", "/c", command]
+        : ["/bin/sh", "-c", command];
       let sandboxed = false;
       if (sandbox) {
         try {
@@ -238,8 +265,10 @@ export default function openBuddyApplyPatch(
       }
       try {
         const { stdout, stderr } = await execFileAsync(argv[0], argv.slice(1) as string[], {
-          cwd: resolve(cwd),
+          cwd,
           timeout,
+          // Stop aborts the run → kill the child instead of letting it finish.
+          ...(signal ? { signal } : {}),
           maxBuffer: 16 * 1024 * 1024,
         });
         return {

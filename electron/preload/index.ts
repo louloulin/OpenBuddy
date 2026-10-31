@@ -18,7 +18,7 @@ const allowedInvokeChannels = new Set([
   "agent:session-surface-acquire", "agent:session-surface-release", "agent:session-surface-list",
   "agent:preset-current", "agent:preset-default-save", "agent:preset-select", "agent:presets-list", "agent:profile-install", "agent:profile-install-default-pi", "agent:profile-packages", "agent:profile-remove", "agent:prompt",
   "agent:providers-delete-model", "agent:providers-delete-provider", "agent:providers-fetch-models", "agent:providers-list", "agent:providers-save-model", "agent:providers-save-provider", "agent:providers-test", "agent:remote-contributions", "agent:renderer-plugin-boot",
-  "agent:renderer-plugin-entries", "agent:renderer-plugin-module", "agent:resolve-permission", "agent:resolve-question", "agent:resource-inventory", "agent:session-messages", "agent:session-info", "agent:session-metadata-clear", "agent:session-usage", "agent:tools-list",
+  "agent:renderer-plugin-entries", "agent:renderer-plugin-module", "agent:resolve-permission", "agent:resolve-question", "agent:resource-inventory", "agent:session-messages", "agent:session-info", "agent:turn-state", "agent:session-metadata-clear", "agent:session-usage", "agent:tools-list",
   "agent:stream-port", "agent:plugin-reload", "agent:plugin-state-get", "agent:plugin-state-reset", "agent:extension-policy-reload", "agent:extension-policy-get", "agent:extension-policy-save",
   "stream-smoke:publish",
   "agent:prompt-content", "agent:set-thinking-level", "agent:set-permission-mode", "agent:workspace-search",
@@ -96,7 +96,12 @@ const allowedInvokeChannels = new Set([
   "folder-trust:grant", "folder-trust:is-trusted", "folder-trust:list", "folder-trust:revoke", "folder_trust_respond",
   "notify:dispatch", "policy:get", "policy:save",
   "app:auto-update-state", "app:check-updates", "app:install-updates", "storage-sources:list", "storage-sources:save", "task_kill", "tasks:add", "tasks:clear-completed", "tasks:delete", "tasks:list", "tasks:update",
-  "memory:add", "memory:delete", "memory:list", "memory:update",
+  // 本地记忆存储(memory-store:*)+ pi-hermes-memory 保留名守卫桩(memory:*)
+  // ——后者在主进程一律以所有权错误拒绝(surface-regression memory 契约),
+  // 留在 allowlist 里是为了让调用打到守卫桩,而不是被 preload 拦成
+  // "invalid IPC channel"(那样守卫语义就不可见了)。
+  "memory-store:add", "memory-store:delete", "memory-store:list", "memory-store:update",
+  "memory:delete", "memory:get", "memory:list", "memory:rewrite", "memory:save",
   // P0.8/P1 数据备份/恢复(数据§7)
   "storage:backup-create", "storage:backup-restore",
   "terminal:create", "terminal:input", "terminal:kill", "terminal:resize",
@@ -173,6 +178,7 @@ const allowedEventChannels = new Set([
   "pi://request-resolved",
   "pi://summary",
   "pi://turn-error",
+  "pi://turn-state",
   "pi://telemetry",
   "pi://mcp-status",
   "pi://folder-trust",

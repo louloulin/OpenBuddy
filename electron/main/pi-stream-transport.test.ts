@@ -152,4 +152,32 @@ describe("createPiStreamTransport", () => {
     expect(electronState.ports[1].messages).toHaveLength(1);
     expect(first.messages).toHaveLength(0);
   });
+
+  it("publish() reports false without a port so the caller can use IPC", () => {
+    const transport = createPiStreamTransport();
+    expect(transport.publish({ type: "early" })).toBe(false);
+    transport.attach(makeWin());
+    expect(transport.publish({ type: "live" })).toBe(true);
+  });
+
+  it("hands a batch to onUndelivered when the port post fails, then reports no port", () => {
+    const undelivered: unknown[][] = [];
+    const transport = createPiStreamTransport({ onUndelivered: (events) => undelivered.push([...events]) });
+    transport.attach(makeWin());
+    electronState.ports[0].postMessage = () => { throw new Error("port gone"); };
+    transport.publish({ type: "a" });
+    transport.publish({ type: "b" });
+    vi.advanceTimersByTime(PI_STREAM_BATCH_WINDOW_MS);
+    expect(undelivered).toEqual([[{ type: "a" }, { type: "b" }]]);
+    expect(transport.publish({ type: "c" })).toBe(false);
+  });
+
+  it("routes buffered events to onUndelivered when the port closes mid-batch", () => {
+    const undelivered: unknown[][] = [];
+    const transport = createPiStreamTransport({ onUndelivered: (events) => undelivered.push([...events]) });
+    transport.attach(makeWin());
+    transport.publish({ type: "pending" });
+    electronState.ports[0].close();
+    expect(undelivered).toEqual([[{ type: "pending" }]]);
+  });
 });

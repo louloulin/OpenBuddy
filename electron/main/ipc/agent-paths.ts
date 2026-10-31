@@ -15,6 +15,7 @@
  */
 import { ipcMain } from "electron";
 import { homedir } from "node:os";
+import { join as nodeJoin } from "node:path";
 
 import { agentHome, isPiAgentDirPinnedByUs, userAgentsHome } from "@openbuddy/storage";
 
@@ -56,15 +57,30 @@ export interface AgentPathsSnapshot {
   piAgentDirPinnedByUs: boolean;
 }
 
+/**
+ * 展示用的路径:统一用 `/`。
+ *
+ * 这是刻意的:UI 里 `~/.openbuddy/agent` 在各平台读起来一致,而且用户
+ * 复制这段文字去粘贴到设置里时更不容易出岔子。真正的落盘路径(`home` /
+ * `agents` 等字段)仍然保留平台原生分隔符。
+ */
 function toDisplay(value: string, home: string): string {
-  if (home && value.startsWith(home)) return `~${value.slice(home.length)}`;
-  return value;
+  const posix = (p: string) => p.replace(/\\/g, "/");
+  const normalizedValue = posix(value);
+  const normalizedHome = posix(home).replace(/\/+$/, "");
+  if (normalizedHome && normalizedValue.startsWith(normalizedHome)) {
+    return `~${normalizedValue.slice(normalizedHome.length)}`;
+  }
+  return normalizedValue;
 }
 
 export function describeAgentPaths(): AgentPathsSnapshot {
   const home = agentHome();
   const userHome = homedir();
-  const join = (...segments: string[]) => [home.replace(/\/+$/, ""), ...segments].join("/");
+  // 用 node:path 的 join,不要手工 [a, b].join("/") —— Windows 上会拼出
+  // `C:\Users\x\.openbuddy\agent/experts` 这种混用分隔符的路径,既难看,
+  // 又会让任何做前缀比较的调用方判断错。
+  const join = (...segments: string[]) => nodeJoin(home, ...segments);
   // Canonical user-agents root. Default is `~/.openbuddy/agents/`, set by
   // `userAgentsHome()` in @openbuddy/storage. UI MUST consume this field
   // rather than recomputing it from `home`.

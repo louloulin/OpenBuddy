@@ -189,8 +189,9 @@ asarUnpack:
 win:
   target:
     - target: nsis
-      arch: [x64]
-  artifactName: ${productName}-${version}-setup.${ext}
+      arch: [x64, arm64]
+  # 与签名版保持同一套命名/矩阵,否则 dispatch 时勾 unsigned 会产出另一批文件名。
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
 
 nsis:
   oneClick: false
@@ -233,9 +234,9 @@ mac:
 linux:
   target:
     - target: AppImage
-      arch: [x64]
+      arch: [x64, arm64]
   category: Development
-  artifactName: ${productName}-${version}.${ext}
+  artifactName: ${productName}-${version}-${arch}.${ext}
 
 publish:
   provider: github

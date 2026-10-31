@@ -47,7 +47,10 @@ export async function restoreStorageBackup(options: RestoreStorageBackupOptions)
     await unlink(temporaryPath);
     return { path: options.destinationPath, schemaVersion, integrity: { ok: true } };
   } catch (error) {
-    await rm(temporaryPath, { force: true }).catch(() => undefined);
+    // Windows 上句柄释放有延迟,重试几次再放弃 —— 留一个 .restore.tmp 在
+    // 备份目录里不致命,但会一直堆着。(真正的句柄泄漏已在 SqliteDriver
+    // 构造函数里修掉;这里只兜底 OS 层面的延迟。)
+    await rm(temporaryPath, { force: true, maxRetries: 3, retryDelay: 50 }).catch(() => undefined);
     throw error;
   }
 }

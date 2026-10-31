@@ -97,4 +97,18 @@ describe("ContextUsagePill Pi event lifecycle", () => {
     await waitFor(() => expect(screen.getByText("60%")).toBeTruthy());
     expect(screen.queryByText("20%")).toBeNull();
   });
+
+  it("弹窗显示自动压缩阈值(20261031 Phase 1.7)", async () => {
+    sessionInfo.mockResolvedValue({
+      sessionId: "s-1",
+      cwd: "/tmp/fixture",
+      context: { ...context(20_000), autoCompactThresholdPercent: 84 },
+    });
+    render(<ContextUsagePill sessionId="s-1" />);
+    await waitFor(() => expect(screen.getByText("20%")).toBeTruthy());
+    act(() => {
+      screen.getByText("20%").closest("button")!.click();
+    });
+    await waitFor(() => expect(screen.getByTestId("context-auto-compact").textContent).toContain("84%"));
+  });
 });

@@ -11,13 +11,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import openBuddyApplyPatch from "../apply-patch";
 
-/** Minimal Pi API stub — only `registerTool` is used by the extension. */
+type Ctx = { ui?: { confirm?: (title: string, message: string) => Promise<boolean> } };
+const ALLOW: Ctx = { ui: { confirm: async () => true } };
+
+/** Minimal Pi API stub — only `registerTool` is used by the extension. Calls
+ *  default to a ctx whose user approves every prompt; pass a ctx explicitly
+ *  to exercise the permission gate. */
 function makeApi() {
   const tools = new Map<string, { execute: (...args: unknown[]) => Promise<unknown> }>();
   return {
     tools,
     registerTool(tool: { name: string; execute: (...args: unknown[]) => Promise<unknown> }) {
-      tools.set(tool.name, tool);
+      tools.set(tool.name, {
+        execute: (id, params, signal, onUpdate, ctx = ALLOW) => tool.execute(id, params, signal, onUpdate, ctx),
+      });
       return tool;
     },
   };
@@ -113,5 +120,46 @@ describe("openbuddy-apply-patch", () => {
     expect(() =>
       openBuddyApplyPatch({ trustedCwd: dir })(apiWithoutRegisterTool as never),
     ).not.toThrow();
+  });
+
+  it("refuses to write without a permission channel (fail closed)", async () => {
+    const api = makeApi();
+    openBuddyApplyPatch({ trustedCwd: dir })(api as never);
+    const target = join(dir, "gate.txt");
+    writeFileSync(target, "a\n", "utf8");
+    const result = (await api.tools.get("apply_patch")!.execute("tc-g1", {
+      file_path: target,
+      patch: "--- a/gate.txt\n+++ b/gate.txt\n@@ -1 +1 @@\n-a\n+b\n",
+    }, undefined, undefined, {})) as { details: { applied: boolean; error?: string } };
+    expect(result.details.applied).toBe(false);
+    expect(readFileSync(target, "utf8")).toBe("a\n");
+  });
+
+  it("does not write when the user denies the edit, and shows the diff", async () => {
+    const api = makeApi();
+    openBuddyApplyPatch({ trustedCwd: dir })(api as never);
+    const target = join(dir, "deny.txt");
+    writeFileSync(target, "a\n", "utf8");
+    const prompts: string[] = [];
+    const ctx: Ctx = { ui: { confirm: async (_t, message) => { prompts.push(message); return false; } } };
+    const result = (await api.tools.get("apply_patch")!.execute("tc-g2", {
+      file_path: target,
+      patch: "--- a/deny.txt\n+++ b/deny.txt\n@@ -1 +1 @@\n-a\n+b\n",
+    }, undefined, undefined, ctx)) as { details: { applied: boolean } };
+    expect(result.details.applied).toBe(false);
+    expect(readFileSync(target, "utf8")).toBe("a\n");
+    expect(prompts[0]).toContain("+b");
+  });
+
+  it("apply_command refuses without a permission channel and outside the workspace", async () => {
+    const api = makeApi();
+    openBuddyApplyPatch({ trustedCwd: dir })(api as never);
+    const cmd = api.tools.get("apply_command")!;
+    const noCtx = (await cmd.execute("tc-g3", { command: "echo hi" }, undefined, undefined, {})) as { details: { exit_code: number; stdout: string } };
+    expect(noCtx.details.exit_code).toBe(1);
+    expect(noCtx.details.stdout).toBe("");
+    const outside = (await cmd.execute("tc-g4", { command: "echo hi", cwd: tmpdir() })) as { details: { exit_code: number; error?: string } };
+    expect(outside.details.exit_code).toBe(1);
+    expect(outside.details.error).toMatch(/outside the trusted workspace/);
   });
 });

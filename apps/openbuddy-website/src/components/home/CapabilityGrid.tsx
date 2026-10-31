@@ -41,12 +41,12 @@ const CAPABILITIES: Capability[] = [
     },
     bullets: {
       en: [
-        '@openbuddy/provider-* adapters, swappable at runtime',
+        'Providers come from the Pi runtime, swapped without restart',
         'Casdoor / Workbuddy-ID OIDC, BYO API keys',
         'NewAPI gateway compatible'
       ],
       zh: [
-        '@openbuddy/provider-* 适配器,运行时热切换',
+        '多 Provider 由 Pi 运行时提供,切换无需重启',
         'Casdoor / Workbuddy-ID OIDC,自带 API key',
         '兼容 NewAPI 网关'
       ]
@@ -60,13 +60,13 @@ const CAPABILITIES: Capability[] = [
     },
     bullets: {
       en: [
-        '@openbuddy/extension-mcp — Model Context Protocol',
-        '@openbuddy/extension-skills — reusable capability skills',
+        '@openbuddy/capability-mcp-client — Model Context Protocol',
+        '@openbuddy/plugin-sdk — author and install plugins',
         'Cordis service registry for dependency injection'
       ],
       zh: [
-        '@openbuddy/extension-mcp —— Model Context Protocol',
-        '@openbuddy/extension-skills —— 可复用技能',
+        '@openbuddy/capability-mcp-client —— Model Context Protocol',
+        '@openbuddy/plugin-sdk —— 编写与安装插件',
         'Cordis 服务注册中心,做依赖注入'
       ]
     }

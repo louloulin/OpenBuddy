@@ -24,7 +24,9 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { confirmGateAllows } from "../hook-permission";
+import { confirmGateAllows, confirmSessionAllows, CONFIRM_TOOL_NAME } from "../hook-permission";
+import { EDIT_CONFIRM_TITLE } from "../../extensions/apply-patch";
+import { MEMORY_CONFIRM_TITLE } from "../../extensions/memory";
 import type { AgentSession, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import type { AgentHostPendingUiRequest } from "../_state-shape";
 
@@ -99,21 +101,52 @@ export function provideRpcUiContext(deps: ProvideRpcUiContextDeps): ExtensionUIC
         });
       }),
     confirm: async (title: string, message: string) => {
-      // 先过权限模式闸:bypassPermissions 直接放行,不再弹窗(其余档位无定论,
-      // 照旧走下面的弹窗)。此前这里是无条件弹窗 —— 权限模式对工具侧的
-      // ctx.ui.confirm 完全无效(2026-10-12 真实启动验证发现)。
+      // 1) 模式闸:bypassPermissions 直接放行,不再弹窗。
+      // 2) 会话级「始终允许此命令」:同一条命令在本会话里第二次出现时不再问。
+      //    识别键是 message 本身 —— confirm 没有工具名/pattern,命令原文是
+      //    唯一稳定的身份。
+      const isEdit = title === EDIT_CONFIRM_TITLE;
+      const isMemory = title === MEMORY_CONFIRM_TITLE;
+      const gated = await confirmGateAllows(isEdit ? "edit" : "other");
+      if (gated === true) return true;
+      // 编辑 / 记忆的「本会话始终允许」作用于该类全部操作;命令仍按命令原文逐条授权。
+      const grantKey = isEdit || isMemory ? title : message;
+      if (confirmSessionAllows(session.sessionId, grantKey)) return true;
       return await new Promise<boolean>((resolve) => {
         const requestId = makeRequestId(session.sessionId, "confirm");
-        state.pendingUiRequests.set(requestId, { kind: "permission", sessionId: session.sessionId, generation, resolve: (value) => resolve(value === true) });
-        emitPluginEvent("session/permission", { requestId, sessionId: session.sessionId, title, hasMessage: Boolean(message), optionCount: 2 });
+        state.pendingUiRequests.set(requestId, {
+          kind: "permission",
+          sessionId: session.sessionId,
+          generation,
+          // resolveUiRequest 在 allow_always 时据此写入会话规则(带 pattern),
+          // 同时不会再持久化成跨会话规则(ctx.confirm 不是真实工具名)。
+          permission: { toolName: CONFIRM_TOOL_NAME, pattern: grantKey },
+          resolve: (value) => {
+            const decision = value && typeof value === "object" && "decision" in value
+              ? (value as { decision?: string }).decision
+              : value === true ? "allow" : "deny";
+            resolve(decision === "allow" || decision === "allow_always");
+          },
+        });
+        emitPluginEvent("session/permission", { requestId, sessionId: session.sessionId, title, hasMessage: Boolean(message), optionCount: 3 });
         emitRendererEvent("pi://permission", {
           requestId,
           sessionId: session.sessionId,
           toolCallId: "",
           title,
           message,
+          source: "tool",
+          // Keep the tool identity meaningful for the UI: the risk badge and
+          // the localized tool chip both key off the kind, and "confirm"
+          // would render every shell prompt as the generic 「工具确认」.
+          toolKind: isEdit ? "apply_patch" : isMemory ? "memory_save" : title?.includes("执行命令") ? "apply_command" : "confirm",
           options: [
-            { optionId: "allow", kind: "allow", title: message || title },
+            { optionId: "allow", kind: "allow", title: "允许" },
+            {
+              optionId: "allow_always",
+              kind: "allow_always",
+              title: isEdit ? "本会话始终允许编辑" : isMemory ? "本会话始终允许记忆" : "本会话始终允许此命令",
+            },
             { optionId: "deny", kind: "deny", title: "拒绝" },
           ],
         });

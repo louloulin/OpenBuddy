@@ -60,7 +60,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 
 ### SlotCore 槽位总表
 
-**共 65 个槽位** — `ok=30` · `ext=35` · `dead=0` · `no-impl=0`
+**共 65 个槽位** — `ok=29` · `ext=36` · `dead=0` · `no-impl=0`
 
 | Slot | Kind | Scope | 状态 | 声明于 | 注册方 | 消费方 |
 |---|---|---|---|---|---|---|
@@ -71,7 +71,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 | `conversation.composer` | `single` | `session-maybe` | 🔌 ext-default | @openbuddy/ui-conversation | — | @openbuddy/ui-conversation |
 | `conversation.message.markdown` | `single` | `session` | 🔌 ext-default | @openbuddy/ui-conversation | — | @openbuddy/ui-conversation |
 | `conversation.toolside` | `list` | `session` | 🔌 ext-default | @openbuddy/ui-conversation | — | @openbuddy/ui-conversation |
-| `conversation.view` | `keyed` | `session` | ✅ ok | @openbuddy/ui-conversation | @openbuddy/ui-conversation | @openbuddy/ui-conversation |
+| `conversation.view` | `keyed` | `session` | 🔌 ext-default | @openbuddy/ui-conversation | — | @openbuddy/ui-conversation |
 | `details` | `single` | `session-maybe` | ✅ ok | @openbuddy/ui-shell | @openbuddy/ui-shell | app(src) |
 | `editor.body` | `single` | `session-maybe` | ✅ ok | @openbuddy/ui-editor | @openbuddy/ui-editor | @openbuddy/ui-conversation |
 | `editor.draft` | `single` | `root` | ✅ ok | @openbuddy/ui-editor | @openbuddy/ui-editor | @openbuddy/ui-conversation, @openbuddy/ui-shell |
@@ -139,7 +139,7 @@ Cordis 的 `slots` 服务,名字由消费方约定、插件自由注册,没有 S
 
 **非 ok 槽位的判据**
 
-- 内置即默认:消费方自带 fallback,插件注册同名单例槽即整体替换 — `composer.toolbar.action`, `conversation.approvals`, `conversation.body`, `conversation.composer`, `conversation.message.markdown`, `conversation.toolside`, `editor.mention-sources`, `editor.slash-commands`, `editor.toolbar`, `experts.panel`, `home.practice-cases`, `home.scene-tabs`, `home.scene.tab`, `placeholder.billing`, `placeholder.cloud-storage`, `placeholder.credit-pricing`, `placeholder.credit-reconciliation`, `placeholder.credit-wallet`, `placeholder.discover`, `placeholder.email`, `placeholder.email-composer`, `placeholder.knowledge-base`, `placeholder.marketplace`, `placeholder.my-files`, `placeholder.notify-channels`, `placeholder.openbuddy-plugin`, `placeholder.plugins`, `placeholder.projects`, `placeholder.resource-catalog`, `placeholder.subagent`, `placeholder.usage-quota`, `root`
+- 内置即默认:消费方自带 fallback,插件注册同名单例槽即整体替换 — `composer.toolbar.action`, `conversation.approvals`, `conversation.body`, `conversation.composer`, `conversation.message.markdown`, `conversation.toolside`, `conversation.view`, `editor.mention-sources`, `editor.slash-commands`, `editor.toolbar`, `experts.panel`, `home.practice-cases`, `home.scene-tabs`, `home.scene.tab`, `placeholder.billing`, `placeholder.cloud-storage`, `placeholder.credit-pricing`, `placeholder.credit-reconciliation`, `placeholder.credit-wallet`, `placeholder.discover`, `placeholder.email`, `placeholder.email-composer`, `placeholder.knowledge-base`, `placeholder.marketplace`, `placeholder.my-files`, `placeholder.notify-channels`, `placeholder.openbuddy-plugin`, `placeholder.plugins`, `placeholder.projects`, `placeholder.resource-catalog`, `placeholder.subagent`, `placeholder.usage-quota`, `root`
 - 已废弃:仅为兼容旧插件的类型引用保留,不要再接线 — `home.page`
 - 有意扩展点:留给本产品外壳之外的装配方(第三方外壳/插件可整块接管) — `notifications`, `shell.overlay`
 

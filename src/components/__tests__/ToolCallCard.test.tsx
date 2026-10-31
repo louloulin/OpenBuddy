@@ -15,8 +15,10 @@ describe("ToolCallCard", () => {
   it("renders compact row and opens detail on click", () => {
     const onOpen = vi.fn();
     render(<ToolCallCard tc={base} onOpen={onOpen} />);
-    // edit 属专用渲染器,kind 标签显示为「✏️ 文件编辑」。
-    expect(screen.getByText("✏️ 文件编辑")).toBeInTheDocument();
+    // 折叠行(compact)：专用渲染器不再重复显示工具类别 chip ——
+    // summary 本身已经是「动词 + 目标」(编辑/读取/运行)。类别信息仍在
+    // aria-label / title 里,读屏用户不丢信息,视觉上少一块重复噪音。
+    expect(screen.queryByText("✏️ 文件编辑")).toBeNull();
     expect(screen.getByText(/hello\.txt/)).toBeInTheDocument();
     // 卡片行是 role="button" 容器（内层还嵌着「内联展开」按钮，原生 button
     // 不能嵌套 button），所以这里必须按可访问名精确定位卡片行，不能用裸的
@@ -25,7 +27,15 @@ describe("ToolCallCard", () => {
     expect(onOpen).toHaveBeenCalledWith(base);
   });
 
-  it("专用渲染器(send-message)显示图标 + 标签 + 摘要", () => {
+  it("内联展开后类别 chip 回到可见(折叠/展开两态的契约)", () => {
+    render(<ToolCallCard tc={base} onOpen={() => {}} />);
+    expect(screen.queryByText("✏️ 文件编辑")).toBeNull();
+    // 双击折叠行 = 内联展开(见 ToolCallCard 的 onDoubleClick)。
+    fireEvent.doubleClick(screen.getByRole("button", { name: /^edit\b/ }));
+    expect(screen.getByText("✏️ 文件编辑")).toBeInTheDocument();
+  });
+
+  it("专用渲染器(send-message)折叠行显示摘要,类别 chip 收起", () => {
     render(
       <ToolCallCard
         tc={{
@@ -37,7 +47,7 @@ describe("ToolCallCard", () => {
         onOpen={() => {}}
       />,
     );
-    expect(screen.getByText("💬 发送消息")).toBeInTheDocument();
+    expect(screen.queryByText("💬 发送消息")).toBeNull();
     expect(screen.getByText("你好,这是一条通知")).toBeInTheDocument();
   });
 
@@ -48,6 +58,10 @@ describe("ToolCallCard", () => {
         onOpen={() => {}}
       />,
     );
-    expect(screen.getByText("…")).toBeInTheDocument();
+    // plan1030 批 5d — in_progress 不再渲染 "…" 文本：改由 CSS 旋转环
+    // （.toolcall__status-mark--in_progress + toolcallSpin）承担「进行中」。
+    const mark = document.querySelector(".toolcall__status-mark--in_progress");
+    expect(mark).not.toBeNull();
+    expect(mark?.textContent).toBe("");
   });
 });

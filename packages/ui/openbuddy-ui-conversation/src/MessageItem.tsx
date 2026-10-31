@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import FileText from "lucide-react/dist/esm/icons/file-text";
+import GitFork from "lucide-react/dist/esm/icons/git-fork";
+import Undo2 from "lucide-react/dist/esm/icons/undo-2";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
-import Check from "lucide-react/dist/esm/icons/check";
 import Pencil from "lucide-react/dist/esm/icons/pencil";
 import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
 import Sparkles from "lucide-react/dist/esm/icons/sparkles";
@@ -11,8 +12,7 @@ import { type MarkdownConfig } from "@openbuddy/ui-markdown";
 import { useSlotComponents } from "@openbuddy/ui-runtime/client";
 import { MessagePartRegistry } from "./MessagePartRegistry";
 import { StreamingCaret } from "./StreamingCaret";
-import { MessageRewindMenu } from "./parts/MessageRewindMenu";
-import { InlineApprovalHint } from "./parts/InlineApprovalHint";
+import { MessageMoreMenu, type MessageMoreItem } from "./parts/MessageMoreMenu";
 import { MessageMeta } from "./parts/MessageMeta";
 import { UserBubble } from "./parts/UserBubble";
 import { CopyIconButton } from "./parts/CopyIconButton";
@@ -64,6 +64,7 @@ function MessageItemInner({
   allowFork,
   onForkFromHere,
   streamingDurationMs,
+  hideIdentity = false,
 }: {
   message: ChatMessage;
   streaming: boolean;
@@ -76,7 +77,7 @@ function MessageItemInner({
   /** Open tool detail in the right-side panel (Phase 2). */
   onOpenTool?: (tc: ToolCallView) => void;
   /** Put text back into the composer for re-editing (user messages only). */
-  onEditResend?: (text: string) => void;
+  onEditResend?: (text: string, messageId: string) => void;
   /** R8.3 (inline-edit) — submit a re-edited version directly from inside
    *  the bubble (Cmd/Ctrl+Enter or 点击"发送"). This mirrors
    *  onEditResend but skips the composer handoff so the user can refine
@@ -116,6 +117,10 @@ function MessageItemInner({
    *  "12s 正在生成…" label. Undefined on completed bubbles (we use
    *  `completedAt - createdAt` instead) and on user bubbles. */
   streamingDurationMs?: number;
+  /** cc-haha 对齐 — 连续多条 assistant 消息只在第一条显示头像/名字,
+   *  后续条目按"同一段发言的延续"渲染,避免每个工具步骤都重复
+   *  "Buddy · AI" 抬头。由 timeline 根据相邻消息角色计算。 */
+  hideIdentity?: boolean;
 }) {
   // Subscribe to theme changes so message bubbles re-render immediately
   // when the user toggles themes. `useTheme().current()` alone returns a
@@ -169,6 +174,8 @@ function MessageItemInner({
     .filter((p) => p.kind === "text")
     .map((p) => (message.role === "user" ? stripPersona(p.text) : p.text))
     .join("\n");
+  const hasFooter = message.complete === true &&
+    Boolean(plainText || message.error || typeof rewindPromptIndex === "number");
 
   /** R8.1 (revision-pager) — text used by the user-bubble renderer.
    *  When the user has re-edited this message, `revisions` holds the full
@@ -241,6 +248,64 @@ function MessageItemInner({
         title?: string;
       }>
     | undefined;
+
+  // 「⋯」菜单里的次要动作。纯计算(无 hook),放在提前 return 之前也无妨。
+  const moreItems: MessageMoreItem[] = [];
+  if (plainText) {
+    moreItems.push({
+      id: "copy-md",
+      label: "复制 Markdown",
+      icon: <FileText size={14} strokeWidth={1.75} />,
+      onSelect: () => copyText(markdownText, "已复制 Markdown"),
+    });
+  }
+  if (DraftImpl && markdownText) {
+    moreItems.push({
+      id: "draft",
+      label: "在草稿中编辑",
+      icon: <Pencil size={14} strokeWidth={1.75} />,
+      testId: "message-draft-button",
+      onSelect: () => {
+        setDraftInitial(markdownText);
+        setDraftOpen(true);
+      },
+    });
+  }
+  if (InlineEditorImpl && markdownText && !inlineEditing) {
+    moreItems.push({
+      id: "inline-edit",
+      label: "就地编辑",
+      icon: <Pencil size={14} strokeWidth={1.75} />,
+      testId: "message-inline-edit-button",
+      onSelect: () => {
+        setInlineDraft(markdownText);
+        setInlineEditing(true);
+      },
+    });
+  }
+  if (message.role === "assistant" && typeof rewindPromptIndex === "number" && sessionId && onRewindTo) {
+    moreItems.push({
+      id: "rewind",
+      label: "从这里重新发送",
+      icon: <Undo2 size={14} strokeWidth={1.75} />,
+      testId: "msg-rewind",
+      onSelect: () => {
+        void Promise.resolve(onRewindTo(rewindPromptIndex)).then(
+          () => onToast?.("已从此消息重发"),
+          (e: unknown) => onToast?.(`重发失败：${String(e).replace(/^Error:\s*/, "")}`),
+        );
+      },
+    });
+  }
+  if (message.role === "assistant" && allowFork && onForkFromHere) {
+    moreItems.push({
+      id: "fork",
+      label: "从这里分叉新对话",
+      icon: <GitFork size={14} strokeWidth={1.75} />,
+      testId: "msg-fork",
+      onSelect: onForkFromHere,
+    });
+  }
   // Hooks 规则(R78 + React 错误 300 号):本组件有两条提前 return(user 分支、空
   // parts 完成分支),所有 hook 必须在它们之前调用 —— 否则一条先以空 parts
   // 完成、随后又收到 error/parts 的助手消息,hook 数量先降后升,生产包直接
@@ -266,6 +331,24 @@ function MessageItemInner({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [inlineEditing, inlineDraft, message.id, onEditAssistantMessage, onToast]);
+  if (message.systemMarker) {
+    return (
+      <div
+        className="msg-system-marker"
+        data-testid="context-compaction-marker"
+        role="separator"
+        aria-label="上下文已压缩"
+      >
+        <span className="msg-system-marker__line" />
+        <span className="msg-system-marker__label">
+          上下文已压缩
+          {message.systemMarkerDetail ? ` · ${message.systemMarkerDetail}` : ""}
+        </span>
+        <span className="msg-system-marker__line" />
+      </div>
+    );
+  }
+
   if (message.role === "user") {
     // R8.1 (revision-pager) — split attachments (file/image parts) from the
     // text part. The text part gets replaced by the currently selected
@@ -279,7 +362,7 @@ function MessageItemInner({
         fileParts={fileParts}
         revisionPager={revisionPager}
         onStepRevision={onStepRevision}
-        onEditResend={onEditResend}
+        onEditResend={onEditResend ? (text: string) => onEditResend(text, message.id) : undefined}
         onInlineResend={onInlineResend}
         onToast={onToast}
         copyText={copyText}
@@ -336,21 +419,31 @@ function MessageItemInner({
   // prose.css) can fire. The class only sticks while `streaming`
   // is true; when streaming finishes, the class is removed and
   // just-completed takes over.
-  const rootCls = justCompleted
-    ? "msg msg--assistant msg--just-completed"
-    : streaming
-      ? "msg msg--assistant msg--streaming"
-      : "msg msg--assistant";
+  // cc-haha 对齐 — 纯工具步骤(没有正文/思考)不渲染可复制正文的
+  // footer,也不占 footer 的高度;否则一条 32px 的工具行会被隐形的
+  // action/meta 行撑出 ~70px 空白。
+  const toolOnly =
+    message.role === "assistant" &&
+    !message.error &&
+    !message.parts.some((p) => p.kind === "text" || p.kind === "thought");
+  const rootCls = [
+    "msg msg--assistant",
+    justCompleted ? "msg--just-completed" : "",
+    !justCompleted && streaming ? "msg--streaming" : "",
+    hideIdentity ? "msg--continuation" : "",
+    toolOnly ? "msg--tool-only" : "",
+  ].filter(Boolean).join(" ");
   return (
     <div className={rootCls}>
       <div>
-        <div className="msg__header">
-          <span className="msg__avatar" aria-hidden="true">
-            <Sparkles size={14} strokeWidth={2} />
-          </span>
-          <span className="msg__name">Buddy</span>
-          <span className="msg__role" aria-label="AI assistant">AI</span>
-        </div>
+        {!hideIdentity && (
+          <div className="msg__header">
+            <span className="msg__avatar" aria-hidden="true">
+              <Sparkles size={14} strokeWidth={2} />
+            </span>
+            <span className="msg__name">Buddy</span>
+          </div>
+        )}
         <div className="msg__body">
           {inlineEditing && InlineEditorImpl ? (
             <div className="msg__inline-editor" data-testid="message-inline-editor">
@@ -410,17 +503,6 @@ function MessageItemInner({
               shimmering "preparing / waiting for model" loading row with a
               rotating tip — mirrors WorkBuddy's pending-assistant view. */}
           {message.parts.length === 0 && !message.complete && <LoadingRow />}
-          {/* Failed turn: surface the structured error as the bubble body
-              (so a blank "Buddy" bubble never appears in the transcript),
-              and still render any partial parts the agent did emit. */}
-          {message.error && (
-            <TurnErrorCard
-              error={message.error}
-              onRetry={onRetry}
-              onOpenSettings={onOpenSettings}
-              onToast={onToast}
-            />
-          )}
           {/* Plan A.2 — 部件派发统一走 MessagePartRegistry。新增 part 类型只需在
               `parts/registry-defaults.tsx` 加一行,不需要修改本组件主干。
               视觉与 data-testid 与改造前完全一致(快照测试覆盖)。 */}
@@ -429,6 +511,11 @@ function MessageItemInner({
             messageId={message.id}
             isStreaming={streaming && !message.complete}
             complete={message.complete}
+            durationMs={
+              typeof message.completedAt === "number" && typeof message.createdAt === "number"
+                ? message.completedAt - message.createdAt
+                : null
+            }
             theme={theme}
             markdownConfig={markdownConfig}
             onOpenTool={onOpenTool ? (toolCallId) => {
@@ -440,6 +527,17 @@ function MessageItemInner({
             } : undefined}
             onToast={onToast}
           />
+          {/* Failed turn: the structured error sits after whatever partial
+              thinking / tool rows the agent did emit, in reading order (so a
+              blank "Buddy" bubble never appears in the transcript). */}
+          {message.error && (
+            <TurnErrorCard
+              error={message.error}
+              onRetry={onRetry}
+              onOpenSettings={onOpenSettings}
+              onToast={onToast}
+            />
+          )}
           {pluginMessageContributions.map((contribution) => (
             <div key={contribution.id} className="msg__plugin-contribution">
               <RendererContributionView contribution={contribution} onPlaceholder={onToast} />
@@ -452,10 +550,10 @@ function MessageItemInner({
               Was the unicode ▋ block char, then a hand-rolled
               `.msg__caret` span; now the shared `StreamingCaret`
               primitive so the caret can be themed (loose / reasoning)
-              and reused by plugins. Only rendered when there is already
-              streamed text — a `LoadingRow` owns the empty state, and a
-              caret floating above it would read as a stray cursor. */}
-          {message.parts.length > 0 && (
+              and reused by plugins. Only rendered right after answer text —
+              a `LoadingRow` owns the empty state, and a caret under a
+              thinking or tool row reads as a stray cursor (real MiniMax run). */}
+          {message.parts.at(-1)?.kind === "text" && (
             <StreamingCaret active={streaming && message.complete !== true} />
           )}
         </div>
@@ -464,58 +562,14 @@ function MessageItemInner({
             (matches cabinet's CopyButton pattern). Failure turns keep
             重试 + 赞踩 only. Buttons stay always-visible at low opacity
             and brighten on hover/focus. */}
-        {message.complete &&
-          (plainText || message.error || typeof rewindPromptIndex === "number") && (
+        {hasFooter && (
           <div className="msg__footer">
             {plainText && (
               <CopyIconButton
-                tooltip="复制纯文本"
+                tooltip="复制"
                 copiedTooltip="已复制"
                 onCopy={() => copyText(plainText, "已复制")}
               />
-            )}
-            {plainText && (
-              <CopyIconButton
-                tooltip="复制 Markdown 源码"
-                copiedTooltip="已复制 Markdown"
-                onCopy={() => copyText(markdownText, "已复制 Markdown")}
-                idleIcon={<FileText size={14} strokeWidth={1.75} />}
-                copiedIcon={<Check size={14} strokeWidth={2} />}
-              />
-            )}
-            {DraftImpl && markdownText && (
-              <TooltipButton
-                className="msg__action-btn"
-                tooltip="把这条回答送进草稿编辑器(用 Tiptap / 表格 / math / mermaid 改写)"
-                onClick={() => {
-                  setDraftInitial(markdownText);
-                  setDraftOpen(true);
-                }}
-                aria-label="编辑为草稿"
-                data-testid="message-draft-button"
-              >
-                <Pencil size={14} strokeWidth={1.75} />
-              </TooltipButton>
-            )}
-            {InlineEditorImpl && markdownText && !inlineEditing && (
-              <TooltipButton
-                className="msg__action-btn"
-                tooltip="就地编辑这条回复(Tiptap 富文本,Esc 取消,⌘/Ctrl+Enter 应用并可重新生成)"
-                onClick={() => {
-                  setInlineDraft(markdownText);
-                  setInlineEditing(true);
-                }}
-                aria-label="就地编辑"
-                data-testid="message-inline-edit-button"
-              >
-                <Pencil size={14} strokeWidth={1.75} />
-                <span style={{ marginLeft: 2 }}>↳</span>
-              </TooltipButton>
-            )}
-            {/* B4(审计):footer 分组分隔 —— 复制组 | 编辑组 | 重发/反馈组。
-                9 个 icon 一次全出没有边界,视觉上是一把乱码。 */}
-            {(plainText || (DraftImpl && markdownText)) && (
-              <span className="msg__actions-divider" aria-hidden="true" />
             )}
             {onRetry && (
               <TooltipButton
@@ -527,26 +581,17 @@ function MessageItemInner({
                 <RefreshCw size={14} strokeWidth={1.75} />
               </TooltipButton>
             )}
-            <span className="msg__actions-divider" aria-hidden="true" />
-            {/* Plan5 B.10 — 消息级"从此消息重发/分叉"。放在赞踩之前,
-                保持既有按钮顺序不变(快照 / 既有选择器全部命中)。 */}
-            {message.role === "assistant" && (
-              <MessageRewindMenu
-                messageId={message.id}
-                promptIndex={rewindPromptIndex}
-                sessionId={sessionId}
-                allowFork={allowFork}
-                onRewind={onRewindTo ? (p) => onRewindTo(p.promptIndex) : undefined}
-                onFork={onForkFromHere}
-                onToast={onToast}
-              />
-            )}
             {sessionId && (
               <FeedbackButtons sessionId={sessionId} messageId={message.id} />
             )}
+            {/* 不常用的动作收进「⋯」(对齐 WorkBuddy 操作栏:复制 / 重试 / 赞踩 / ⋯)。 */}
+            <MessageMoreMenu items={moreItems} />
+            {/* 时间 · 用时 · 模型跟操作按钮同一行(对齐 WorkBuddy),不再单独
+                占一行 —— 两行隐藏占位叠在每条回复下面,轮次之间空出一大段。 */}
+            {metaProps && <MessageMeta {...metaProps} />}
           </div>
         )}
-        {metaProps && <MessageMeta {...metaProps} />}
+        {!hasFooter && metaProps && <MessageMeta {...metaProps} />}
         {DraftImpl ? (
           <DraftImpl
             open={draftOpen}
@@ -564,41 +609,15 @@ function MessageItemInner({
             initialMarkdown={draftInitial}
           />
         ) : null}
-        {/* Plan5 B.4 — pending permission/question requests at the
-            trailing assistant message so the user notices inline
-            instead of only at the footer. The component reads the
-            stores itself (via memo) so it's safe to render here
-            without prop-drilling. */}
-        {message.role === "assistant" && sessionId && (
-          <InlineApprovalHint sessionId={sessionId} />
-        )}
       </div>
     </div>
   );
 }
 
 /**
- * Memoized wrapper — a message's UI only re-renders when:
- *   - the message object reference changes (new content from store), OR
- *   - the streaming flag flips on/off (entering/leaving the live delta path).
- *
- * Other props (handlers, markdownConfig, cwd, sessionId, callbacks) are
- * stabilized by ChatView's useCallback and Markdown's lazy mount, so a
- * reference-equal compare is sufficient and avoids spurious re-renders of
- * the entire transcript during streaming deltas.
+ * Memoized with React's default shallow compare. Every handler the timeline
+ * passes is a stable useCallback, so idle bubbles skip re-rendering during
+ * streaming deltas — and no prop can go stale the way a hand-picked
+ * comparator allowed.
  */
-export const MessageItem = memo(MessageItemInner, (prev, next) => {
-  return (
-    prev.message === next.message &&
-    prev.streaming === next.streaming &&
-    prev.markdownConfig === next.markdownConfig &&
-    prev.cwd === next.cwd &&
-    prev.sessionId === next.sessionId &&
-    prev.onToast === next.onToast &&
-    prev.onOpenTool === next.onOpenTool &&
-    prev.onEditResend === next.onEditResend &&
-    prev.onInlineResend === next.onInlineResend &&
-    prev.onRetry === next.onRetry &&
-    prev.onOpenSettings === next.onOpenSettings
-  );
-});
+export const MessageItem = memo(MessageItemInner);

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   registerAdapterTool,
-  registerDescribeFallbackTool,
   type AdapterToolSpec,
 } from "./pi-tool-bridge";
 import { Type } from "@earendil-works/pi-ai";
@@ -129,6 +128,27 @@ describe("pi-tool-bridge", () => {
     expect(result.content[0]?.text).toContain("boom");
   });
 
+  it("停止时不等不认 signal 的服务,立即以「已停止」结束(计划 1.2)", async () => {
+    const tools = collectTools((api) => {
+      registerAdapterTool(
+        api as never,
+        {
+          name: "openbuddy_test_slow",
+          description: "never settles",
+          parameters: Type.Object({ verb: Type.Literal("list") }),
+          serializeArgs: () => "list",
+        },
+        { invokeInvocation: () => new Promise<string>(() => {}), resolveService: () => ({}) },
+      );
+    });
+    const controller = new AbortController();
+    const pending = tools.get("openbuddy_test_slow")!.execute("tc-1", { verb: "list" }, controller.signal, undefined, {} as never);
+    controller.abort();
+    const result = await pending;
+    expect(result.details.ok).toBe(false);
+    expect(result.details.error).toBe("已停止");
+  });
+
   it("falls back to a generic summary when invokeInvocation returns undefined", async () => {
     const tools = collectTools((api) => {
       registerAdapterTool(
@@ -151,40 +171,4 @@ describe("pi-tool-bridge", () => {
     expect(result.content[0]?.text).toContain("completed without text summary");
   });
 
-  it("registerDescribeFallbackTool surfaces describeInvocation output as a passthrough tool", async () => {
-    const tools = collectTools((api) => {
-      registerDescribeFallbackTool(
-        api as never,
-        {
-          name: "openbuddy_test_fallback",
-          description: "passthrough fallback tool",
-          parameters: Type.Object({ verb: Type.Literal("status") }),
-          serializeArgs: () => "status",
-          describeInvocation: async (_service, _args) => "Install pi-package to enable this tool.",
-          resolveService: () => undefined,
-        },
-      );
-    });
-    const tool = tools.get("openbuddy_test_fallback")!;
-    const result = await tool.execute("tc-1", { verb: "status" }, undefined, undefined, { cwd: "/tmp/ws" } as never);
-    expect(result.details.ok).toBe(true);
-    expect(result.details.fallback).toBe(true);
-    expect(result.content[0]?.text).toContain("Install pi-package");
-  });
-
-  it("registerDescribeFallbackTool no-ops when pi.registerTool is unavailable", () => {
-    expect(() => {
-      registerDescribeFallbackTool(
-        {} as never,
-        {
-          name: "x",
-          description: "x",
-          parameters: Type.Object({}),
-          serializeArgs: () => "",
-          describeInvocation: () => "x",
-          resolveService: () => undefined,
-        },
-      );
-    }).not.toThrow();
-  });
 });

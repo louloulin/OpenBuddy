@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createHmac } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { validateCapabilitySnapshot } from "./validate-new-api-capability-snapshot.mjs";
 
 // `quota` is New API's internal billing unit. Its USD conversion is an
@@ -280,8 +281,9 @@ export const readReconciliationCheckpoint = async (file) => {
 
 export const writeReconciliationCheckpoint = async (file, checkpoint) => {
   if (!file) return;
-  const directory = file.slice(0, Math.max(file.lastIndexOf("/"), 0)) || ".";
-  await mkdir(directory, { recursive: true });
+  // Windows 路径用 "\" 分隔,`lastIndexOf("/")` 永远是 -1 → dirname 变成 "."
+  // → 写临时文件时父目录不存在(ENOENT)。用 node:path 的 dirname。
+  await mkdir(dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.tmp`;
   await writeFile(temporary, `${JSON.stringify({ schemaVersion: 1, ...checkpoint })}\n`, { mode: 0o600 });
   await rename(temporary, file);
@@ -294,8 +296,7 @@ const statusError = (error) => String(error instanceof Error ? error.message : e
 
 export const writeReconciliationStatus = async (file, status) => {
   if (!file) return;
-  const directory = file.slice(0, Math.max(file.lastIndexOf("/"), 0)) || ".";
-  await mkdir(directory, { recursive: true });
+  await mkdir(dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.status.tmp`;
   await writeFile(temporary, `${JSON.stringify({ schemaVersion: 1, ...status })}\n`, { mode: 0o600 });
   await rename(temporary, file);

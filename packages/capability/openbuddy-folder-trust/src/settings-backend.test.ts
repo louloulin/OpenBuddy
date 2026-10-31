@@ -16,21 +16,35 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SettingsStore } from "@openbuddy/storage";
+import { SettingsStore, type SqliteDriver } from "@openbuddy/storage";
 import { openStorageSync } from "@openbuddy/storage";
 import { SettingsBackendFolderTrustStore } from "./settings-backend";
 
 let root = "";
 let settings: SettingsStore;
+let driver: SqliteDriver | undefined;
+// 每个用例可能额外打开句柄("survives…"/"decidedAt…" 会重开同一个库)。
+// Windows 上只要还有一个句柄没关,rmSync 就 EBUSY,所以全部登记、统一关闭。
+const drivers: SqliteDriver[] = [];
+
+function openDriver(filePath = join(root, "profile.sqlite")): SqliteDriver {
+  const opened = openStorageSync({ filePath }).driver;
+  drivers.push(opened);
+  return opened;
+}
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "folder-trust-settings-backend-"));
-  settings = new SettingsStore({
-    driver: openStorageSync({ filePath: join(root, "profile.sqlite") }).driver,
-  });
+  driver = openDriver();
+  settings = new SettingsStore({ driver });
 });
 
 afterEach(() => {
+  // Windows 上 SQLite 句柄不关,rmSync 会 EBUSY —— 先 close 再删。
+  for (const opened of drivers.splice(0)) {
+    try { opened.close(); } catch { /* 已经关了 */ }
+  }
+  driver = undefined;
   if (root) rmSync(root, { recursive: true, force: true });
   root = "";
 });
@@ -100,9 +114,7 @@ describe("SettingsBackendFolderTrustStore (Phase D.2 round 2)", () => {
 
     // Re-create a SettingsStore against the same database to verify
     // the data round-trips through sqlite.
-    const reloadedSettings = new SettingsStore({
-      driver: openStorageSync({ filePath: join(root, "profile.sqlite") }).driver,
-    });
+    const reloadedSettings = new SettingsStore({ driver: openDriver() });
     const reloaded = SettingsBackendFolderTrustStore.tryOpen({
       databasePath: join(root, "profile.sqlite"),
       settings: reloadedSettings,
@@ -130,9 +142,7 @@ describe("SettingsBackendFolderTrustStore (Phase D.2 round 2)", () => {
     const first = store.list().find((entry) => entry.cwd === "/a");
     expect(first?.decidedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    const reloadedSettings = new SettingsStore({
-      driver: openStorageSync({ filePath: join(root, "profile.sqlite") }).driver,
-    });
+    const reloadedSettings = new SettingsStore({ driver: openDriver() });
     const reloaded = SettingsBackendFolderTrustStore.tryOpen({
       databasePath: join(root, "profile.sqlite"),
       settings: reloadedSettings,

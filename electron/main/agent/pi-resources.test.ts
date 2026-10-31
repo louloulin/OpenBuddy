@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
@@ -86,7 +86,14 @@ describe("Pi resource adapters", () => {
     await expect(resources.listPlugins()).resolves.toMatchObject([{ name: "demo", agentCount: 1, skillCount: 1 }]);
     await resources.marketplaceAction({ type: "uninstall", sourceUrlOrPath: source, pluginRelativePath: "demo" });
     await expect(resources.listPlugins()).resolves.toEqual([]);
-    await expect(readFile(join(home, ".openbuddy", "agent", "marketplaces.json"), "utf8")).resolves.toContain(source);
+    // 落盘的是规范化后的绝对路径(marketplaceAddSource 会 realpath)。
+    // 解析 JSON 再比 path 字段:直接对文件文本 toContain 原始路径在 Windows
+    // 上必然失败 —— JSON 会把 `\` 转义成 `\\`,文本里根本不是同一个字节序列。
+    const marketplace = JSON.parse(
+      await readFile(join(home, ".openbuddy", "agent", "marketplaces.json"), "utf8"),
+    ) as { sources: Array<{ kind: string; path?: string }> };
+    const localEntry = marketplace.sources.find((entry) => entry.kind === "local");
+    expect(localEntry?.path).toBe(await realpath(source));
 	});
 
 	it("supports Harness candidate files, local overlays, and configured source limits", async () => {
@@ -176,7 +183,7 @@ describe("Pi resource adapters", () => {
 		const paths = await resources.listPiPluginResourcePaths();
 		expect(paths).toHaveLength(1);
 		expect(paths[0]).toMatchObject({ plugin: { name: "pi-demo", enabled: true } });
-		expect(paths[0]?.extensions[0]).toContain("extensions/index.js");
+		expect(paths[0]?.extensions[0]).toContain(join("extensions", "index.js"));
 		expect(paths[0]?.skills[0]).toContain("skills");
 	});
 

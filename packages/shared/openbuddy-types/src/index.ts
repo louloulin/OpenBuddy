@@ -222,6 +222,15 @@ export interface PermissionRequest {
   toolCallId: string;
   toolKind: ToolKind;
   title: string;
+  /**
+   * Human-readable detail for the pending operation (command line, path,
+   * MCP tool description…). The host emits this on `pi://permission`; it was
+   * missing from the type, so the UI dropped the only context that told the
+   * user *what* they are approving.
+   */
+  message?: string;
+  /** Where the request came from: hook, tool confirm, extension, … */
+  source?: string;
   /** Optional partial raw input to show the user what they're approving. */
   rawInput?: unknown;
   options: PermissionOption[];
@@ -556,6 +565,24 @@ export interface TurnErrorEvent {
   /** Server-provided detail (absent for rate_limit — pi omits it so the
    *  client shows its own message). */
   detail?: string;
+}
+
+/**
+ * 回合阶段(计划 1.1)。主进程状态机是唯一权威,经 `pi://turn-state` 广播、
+ * `agent:turn-state` 查询;渲染层只投影,不自行推断。
+ */
+export type TurnPhase = "idle" | "thinking" | "streaming" | "tool_running" | "awaiting_approval";
+
+export interface TurnStateEvent {
+  sessionId: string;
+  phase: TurnPhase;
+  /** 进入当前阶段的时间(ms)。 */
+  since: number;
+  /**
+   * 仅 `agent:turn-state` 查询返回:正在生成、尚未落盘的那条回复。切回后台
+   * 跑着的会话(或重新加载窗口)时,渲染层据此补回已经生成的部分。
+   */
+  partial?: { text: string; thinking: string };
 }
 
 // ---------- automations (local scheduler, WorkBuddy 1:1) ----------

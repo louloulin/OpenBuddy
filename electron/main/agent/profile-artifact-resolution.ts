@@ -1,4 +1,6 @@
-import { readdir, readFile, realpath, stat } from "node:fs/promises";import { createRequire } from "node:module";
+import { statIfExists } from "@openbuddy/storage";
+import { readdir, readFile, realpath } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { resolveProfileModuleFallback } from "./profile-module-resolution";
@@ -91,7 +93,8 @@ async function packageRootFromResolved(resolved: string): Promise<string | undef
   let directory = dirname(resolved);
   for (let index = 0; index < 32; index += 1) {
     const candidate = join(directory, "package.json");
-    if ((await stat(candidate, { throwIfNoEntry: false }))?.isFile()) return candidate;    const parent = dirname(directory);
+    if ((await statIfExists(candidate))?.isFile()) return candidate;
+    const parent = dirname(directory);
     if (parent === directory) break;
     directory = parent;
   }
@@ -106,7 +109,8 @@ async function nodeModulesPackageJson(specifier: string, anchor: string): Promis
       join(directory, "node_modules", ".pnpm", "node_modules", specifier, "package.json"),
     ];
     for (const candidate of candidates) {
-      if ((await stat(candidate, { throwIfNoEntry: false }))?.isFile()) return candidate;    }
+      if ((await statIfExists(candidate))?.isFile()) return candidate;
+    }
     const parent = dirname(directory);
     if (parent === directory) break;
     directory = parent;
@@ -140,7 +144,8 @@ async function resolveManifestExport(specifier: string, packageJson: string): Pr
   if (withinPackage === ".." || withinPackage.startsWith(`..${sep}`) || isAbsolute(withinPackage)) return undefined;
   const candidates = [candidate, `${candidate}.js`, `${candidate}.mjs`, `${candidate}.cjs`, `${candidate}.ts`, join(candidate, "index.js"), join(candidate, "index.mjs"), join(candidate, "index.cjs")];
   for (const item of candidates) {
-    if ((await stat(item, { throwIfNoEntry: false }))?.isFile()) return item;  }
+    if ((await statIfExists(item))?.isFile()) return item;
+  }
   return undefined;
 }
 

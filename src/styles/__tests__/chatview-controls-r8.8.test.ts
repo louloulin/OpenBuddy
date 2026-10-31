@@ -1,6 +1,6 @@
 /**
  * chatview-controls-r8.8.test.ts — guard spec for the R8.8 ChatView
- * control polish (FindBar / BranchNavigator / RewindBar). Pins the new
+ * control polish (FindBar / RewindBar). Pins the new
  * selectors so future refactors can't silently drop the focus / active
  * / enter-animation styling that makes keyboard navigation usable.
  *
@@ -8,7 +8,6 @@
  *   - findbar has enter animation + dual box-shadow + focus-within ring
  *   - findbar__count[data-empty="true"] uses error red + font-weight 500
  *   - findbar__btn has focus-visible + active + disabled states
- *   - branch-navigator__node-button has focus-visible + active + active variant
  *   - rewind-bar__btn has focus-visible + active feedback
  *   - rewind-bar__dropdown has enter animation + transform-origin top right
  */
@@ -63,13 +62,6 @@ describe("R8.8 ChatView control polish CSS", () => {
     expect(allCss).toMatch(/\.findbar__btn:focus-visible\s*\{/);
     expect(allCss).toMatch(/\.findbar__btn:active:not\(:disabled\)\s*\{/);
     expect(allCss).toMatch(/\.findbar__btn:disabled\s*\{/);
-  });
-
-  it("branch-navigator node-button has focus-visible + active feedback", () => {
-    expect(allCss).toMatch(/\.branch-navigator__node-button:focus-visible\s*\{/);
-    expect(allCss).toMatch(/\.branch-navigator__node-button:active\s*\{/);
-    // active variant rule still preserved.
-    expect(allCss).toMatch(/\.branch-navigator__node-button--active\s*\{/);
   });
 
   it("rewind-bar__btn has focus-visible + active feedback", () => {

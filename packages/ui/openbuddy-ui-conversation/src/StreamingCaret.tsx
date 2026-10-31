@@ -1,7 +1,7 @@
 /**
  * StreamingCaret — 流式文本末尾的打字机 caret。
  *
- * 视觉:1.5px 宽垂直线,呼吸动画(700ms ease-in-out),位于流式文本最后。
+ * 视觉:1.5px 宽垂直线,闪烁动画(250ms ease-in-out，见 messages.css streaming-caret-blink),位于流式文本最后。
  *
  * 行为:
  *   - 仅当 `active === true && !complete` 时显示

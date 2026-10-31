@@ -12,7 +12,7 @@
  */
 import { realpathSync } from "node:fs";
 import { mkdir, readFile, readdir, realpath, rename, writeFile } from "node:fs/promises";
-import { isAbsolute, dirname, join, relative, resolve } from "node:path";
+import { isAbsolute, dirname, join, relative, resolve, sep } from "node:path";
 import { McpAuthStore, McpRegistry, agentHome, createPlatformSecretStore } from "@openbuddy/storage";
 import { HostCoreSecretStoreBridge } from "../agent-secret-store-bridge";
 
@@ -124,7 +124,13 @@ function canonicalizeSync(input: string): string {
   const tail: string[] = [];
   for (;;) {
     try {
-      const real = realpathSync(current);
+      // 必须用 `.native`:`fs.realpathSync` 是 JS 实现,只做 readlink 展开,
+      // 会原样保留 Windows 的 8.3 短名(`C:\Users\RUNNER~1\...`);而
+      // `fs.promises.realpath` 走 libuv 原生实现,返回长名
+      // (`C:\Users\runneradmin\...`)。调用方常常先 `await realpath(root)`
+      // 再把结果交给 `within()`,于是同一条路径被两种实现规范化成不同字符串,
+      // 在 Windows CI 上被判为"越界"——所有 marketplace 安装直接失败。
+      const real = realpathSync.native(current);
       return tail.length ? join(real, ...tail.reverse()) : real;
     } catch {
       const parent = dirname(current);
@@ -178,7 +184,11 @@ async function canonicalizeParent(input: string): Promise<string> {
 /** Lexical containment check on already-canonicalised paths. */
 function isWithin(base: string, target: string): boolean {
   const rel = relative(base, target);
-  return rel === "" || (rel !== ".." && !rel.startsWith(`..${String.fromCharCode(47)}`) && !isAbsolute(rel));
+  // 分隔符必须跟平台走(resolve/relative 的输出在 Windows 上是反斜杠)。
+  // 以前这里写死 "/"(String.fromCharCode(47)),于是 Windows 上
+  // relative() 返回 "..\\outside.md" 匹配不上 "../" 前缀 —— 越界路径
+  // 被判成"根内",目录穿越防护整个失效。
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
 /**

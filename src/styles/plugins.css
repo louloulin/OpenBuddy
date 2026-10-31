@@ -534,6 +534,7 @@
   white-space: nowrap;
 }
 .context-usage__bar {
+  position: relative;
   height: 6px;
   border-radius: 999px;
   background: var(--wb-bg-hover);
@@ -545,6 +546,16 @@
   border-radius: 999px;
   background: var(--wb-accent, #00c29a);
   transition: width 0.2s ease;
+}
+/* Auto-compaction threshold tick on the usage bar. */
+.context-usage__bar-threshold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--wb-text-medium);
+  opacity: 0.6;
 }
 .context-usage__rows {
   list-style: none;

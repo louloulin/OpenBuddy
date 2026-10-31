@@ -9,6 +9,17 @@ import { mountSession, sessionsHandlers } from "./index";
 describe.sequential("core-session: Pi session metadata", () => {
   let home: string;
   let previousHome: string | undefined;
+  const contexts: Context[] = [];
+
+  /** Mount a context that afterEach tears down: `lifecycle.stop()` runs the
+   *  Session service's disposal effect, which closes the SQLite driver. On
+   *  Windows the file stays locked until that close lands, so `rm()` in
+   *  afterEach fails with EBUSY if the context is never disposed. */
+  function makeContext(): Context {
+    const ctx = new Context();
+    contexts.push(ctx);
+    return ctx;
+  }
 
   beforeEach(async () => {
     home = await mkdtemp(join(tmpdir(), "openbuddy-core-session-"));
@@ -22,13 +33,19 @@ describe.sequential("core-session: Pi session metadata", () => {
   });
 
   afterEach(async () => {
+    for (const ctx of contexts.splice(0)) {
+      try { await ctx.lifecycle.stop(); } catch { /* already down */ }
+    }
+    // The disposal effect closes storage via `void closeStorage(...)`, so give
+    // the microtask chain a macrotask to finish before unlinking.
+    await new Promise((resolve) => setImmediate(resolve));
     if (previousHome === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = previousHome;
-    await rm(home, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it("lists, pins, archives, binds experts, and persists state", async () => {
-    const ctx = new Context();
+    const ctx = makeContext();
     const session = mountSession(ctx);
     await ctx.lifecycle.start();
     await new Promise((resolve) => setImmediate(resolve));
@@ -96,7 +113,7 @@ describe.sequential("core-session: Pi session metadata", () => {
   });
 
   it("does not silently fall back to JSON for an unknown SQLite session", async () => {
-    const ctx = new Context();
+    const ctx = makeContext();
     mountSession(ctx);
     await ctx.lifecycle.start();
     await new Promise((resolve) => setImmediate(resolve));

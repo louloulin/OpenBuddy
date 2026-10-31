@@ -69,6 +69,20 @@ describe("formatToolDuration", () => {
   });
 });
 
+// 组件读真实时钟,而这些用例断言精确文本("2.5s")。
+// CI 机器慢一点(Windows 上尤其明显)2_500ms 就会变成 2.6s ——
+// 必须把时钟钉死在固定时间点,否则这是纯计时 flake。
+function withFrozenNow<T>(fn: (now: number) => T): T {
+  vi.useFakeTimers();
+  const now = new Date("2026-09-05T08:00:00Z").getTime();
+  vi.setSystemTime(now);
+  try {
+    return fn(now);
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 describe("ToolCallCard duration display", () => {
   it("does NOT render duration when startedAt is missing", () => {
     render(<ToolCallCard tc={makeTc({ status: "completed" })} />);
@@ -76,45 +90,49 @@ describe("ToolCallCard duration display", () => {
   });
 
   it("renders duration for completed tools", () => {
-    const startedAt = Date.now() - 2_500;
-    render(
-      <ToolCallCard
-        tc={makeTc({ status: "completed", startedAt })}
-      />,
-    );
-    const dur = screen.getByTestId("toolcall-duration");
-    // 2.5s rounds to "2.5s" (sub-10s precision)
-    expect(dur.textContent).toBe("2.5s");
+    withFrozenNow((now) => {
+      render(
+        <ToolCallCard
+          tc={makeTc({ status: "completed", startedAt: now - 2_500 })}
+        />,
+      );
+      const dur = screen.getByTestId("toolcall-duration");
+      // 2.5s rounds to "2.5s" (sub-10s precision)
+      expect(dur.textContent).toBe("2.5s");
+    });
   });
 
   it("renders duration for failed tools", () => {
-    const startedAt = Date.now() - 12_500;
-    render(
-      <ToolCallCard tc={makeTc({ status: "failed", startedAt })} />,
-    );
-    const dur = screen.getByTestId("toolcall-duration");
-    expect(dur.textContent).toBe("13s");
+    withFrozenNow((now) => {
+      render(
+        <ToolCallCard tc={makeTc({ status: "failed", startedAt: now - 12_500 })} />,
+      );
+      const dur = screen.getByTestId("toolcall-duration");
+      expect(dur.textContent).toBe("13s");
+    });
   });
 
   it("renders duration for in_progress tools", () => {
-    const startedAt = Date.now() - 3_500;
-    render(
-      <ToolCallCard tc={makeTc({ status: "in_progress", startedAt })} />,
-    );
-    expect(screen.getByTestId("toolcall-duration").textContent).toBe("3.5s");
+    withFrozenNow((now) => {
+      render(
+        <ToolCallCard tc={makeTc({ status: "in_progress", startedAt: now - 3_500 })} />,
+      );
+      expect(screen.getByTestId("toolcall-duration").textContent).toBe("3.5s");
+    });
   });
 
   it("includes duration in aria-label and title for accessibility", () => {
-    const startedAt = Date.now() - 1_500;
-    const { container } = render(
-      <ToolCallCard tc={makeTc({ status: "completed", startedAt })} />,
-    );
-    // 紧凑行是 role="button" 的容器 div,行内还有一个真正的「内联展开」按钮,
-    // 所以 getByRole("button") 会命中两个 —— 直接按行 class 取(与
-    // ToolCallCard-expanded.test.tsx 的写法一致)。
-    const button = container.querySelector(".toolcall--compact") as HTMLElement;
-    expect(button.getAttribute("aria-label")).toMatch(/1\.5s/);
-    expect(button.getAttribute("title")).toMatch(/1\.5s/);
+    withFrozenNow((now) => {
+      const { container } = render(
+        <ToolCallCard tc={makeTc({ status: "completed", startedAt: now - 1_500 })} />,
+      );
+      // 紧凑行是 role="button" 的容器 div,行内还有一个真正的「内联展开」按钮,
+      // 所以 getByRole("button") 会命中两个 —— 直接按行 class 取(与
+      // ToolCallCard-expanded.test.tsx 的写法一致)。
+      const button = container.querySelector(".toolcall--compact") as HTMLElement;
+      expect(button.getAttribute("aria-label")).toMatch(/1\.5s/);
+      expect(button.getAttribute("title")).toMatch(/1\.5s/);
+    });
   });
 
   it("does not include duration in title when startedAt is missing (graceful degradation)", () => {

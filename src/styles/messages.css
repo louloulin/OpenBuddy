@@ -22,94 +22,6 @@
   min-width: 0;
   position: relative;
 }
-/* R — chat rail (vertical stack of floating action buttons aligned to the
- * right edge of the chat column; mirrors WorkBuddy's 添加文件 / 模式 /
- * 技能 / 连接器 chip rail). */
-/* R — chat rail (single trigger button + dropdown panel anchored to the
- * right edge of the chat column; mirrors WorkBuddy's 添加文件 / 模式 /
- * 技能 / 连接器 chip rail, condensed to a popover). */
-.chat-rail {
-  position: absolute;
-  top: 16px;
-  right: 12px;
-  z-index: 25;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  pointer-events: auto;
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-.chat-rail__trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
-  background: color-mix(in srgb, var(--wb-bg-primary, #ffffff) 92%, transparent);
-  border-radius: 999px;
-  color: var(--wb-text-medium, #6e6e80);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-.chat-rail__trigger:hover {
-  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--wb-text-strong, #1a1a2e);
-  border-color: color-mix(in srgb, var(--wb-border-soft, rgba(0, 0, 0, 0.08)) 50%, transparent);
-}
-.chat-rail__trigger-label {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-}
-.chat-rail__menu {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 160px;
-  padding: 6px;
-  background: color-mix(in srgb, var(--wb-bg-primary, #ffffff) 96%, transparent);
-  border: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.08));
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-.chat-rail__menu-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  height: 30px;
-  padding: 0 10px;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  color: var(--wb-text-medium, #6e6e80);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  text-align: left;
-  white-space: nowrap;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.chat-rail__menu-item:hover {
-  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.05));
-  color: var(--wb-text-strong, #1a1a2e);
-}
-.chat-rail__menu-item:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--wb-brand, #00c29a) 50%, transparent);
-  outline-offset: -2px;
-}
-.chat-rail__menu {
-  display: none;
-}
 
 .chatview__extension-widgets,
 .chatview__extension-status {
@@ -488,7 +400,6 @@
   background: color-mix(in srgb, var(--wb-status-success, #1a7f37) 12%, transparent);
 }
 
-
 /* === messages === */
 .msg {
   display: flex;
@@ -735,7 +646,6 @@
   background: var(--wb-palette-gray-2, #e9eaef);
   color: var(--wb-text-strong, rgba(0, 0, 0, 0.9));
 }
-
 
 /* === diff === */
 .diff__path {
@@ -1301,6 +1211,7 @@ button.diff__path {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   gap: 6px;
   font-size: 12px;
   color: var(--wb-color-text-medium, #6e6e80);
@@ -1340,34 +1251,31 @@ button.diff__path {
   font-variant-numeric: tabular-nums;
   margin-left: 2px;
 }
-.msg__thought--streaming {
-  background: linear-gradient(
-    180deg,
-    var(--wb-color-bg-secondary-default, rgba(0, 0, 0, 0.02)) 0%,
-    var(--wb-color-bg-primary-default, transparent) 100%
-  );
+/* Live thinking: the label shimmers and the latest line previews inline —
+   no tinted box, no separate progress bar (Claude / ChatGPT "Thinking…"). */
+.msg__thought--streaming .msg__thought-label {
+  background: linear-gradient(90deg, var(--wb-text-weak) 0%, var(--wb-text-strong) 50%, var(--wb-text-weak) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: msg-thought-shimmer 1.6s linear infinite;
 }
-.msg__thought--streaming > summary::after {
-  content: "";
-  display: inline-block;
-  width: 60px;
-  height: 2px;
-  margin-left: auto;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--wb-palette-brand-8, #00C29A) 50%,
-    transparent 100%
-  );
-  animation: streaming-caret-blink 600ms ease-in-out infinite;
+@keyframes msg-thought-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
 }
-.msg__thought-body {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px dashed var(--wb-border-soft, rgba(0, 0, 0, 0.08));
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--wb-color-text-medium, #6e6e80);
+@media (prefers-reduced-motion: reduce) {
+  .msg__thought--streaming .msg__thought-label { animation: none; color: var(--wb-text-medium); background: none; }
+}
+.msg__thought-preview {
+  min-width: 0;
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--wb-text-weak);
+  font-weight: 400;
 }
 
 /* ============================================================================
@@ -1575,194 +1483,6 @@ button.diff__path {
   gap: 4px;
 }
 
-/* MessageRewindMenu — hover-only entry near assistant bubbles. */
-.msg-rewind-menu {
-  display: inline-flex;
-  gap: 4px;
-  opacity: 0.4;
-  transition: opacity 120ms ease;
-}
-.msg-rewind-menu:hover,
-.msg-rewind-menu:focus-within {
-  opacity: 1;
-}
-.msg-rewind-menu__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: 1px solid var(--wb-border-subtle, rgba(127, 127, 127, 0.35));
-  border-radius: 4px;
-  background: var(--wb-color-bg-primary-default, transparent);
-  color: var(--wb-color-text-medium, #6e6e80);
-  cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
-}
-.msg-rewind-menu__btn:hover:not(:disabled),
-.msg-rewind-menu__btn:focus-visible {
-  background: var(--wb-bg-tertiary, rgba(127, 127, 127, 0.08));
-  border-color: var(--wb-brand, #00c29a);
-  color: var(--wb-color-text-strong, #1a1a23);
-}
-.msg-rewind-menu__btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* Plan5 B.4 — inline approval hint surfaced at the trailing assistant
-   message so the user notices pending permissions/questions at the
-   point of attention, not only in the footer. */
-/* Plan5 B.4 + P0-AI-Chat-Audit P1-2 — inline approval hint with quick
- * approve/deny/defer actions (Codex 范式)。
- *
- * 视觉:
- *   - 左侧 3px 警告色条带(对齐 Reasoning 卡的 brand-strip 范式)
- *   - severity=permission:暖橙;severity=question:中性灰
- *   - 折叠态:toggle 行 + 三按钮快操作行(允许 / 拒绝 / 稍后)
- *   - 展开态:原有 PermissionInlineCard + QuestionInlineCard
- * motion tokens (ease-out-expo + duration-fast/base) 与对话其他动效一致。 */
-.msg__approval-hint {
-  margin: 8px 0 0;
-  border: 1px solid var(--wb-border-default);
-  border-left: 3px solid rgb(217, 119, 6); /* severity=permission 默认值 */
-  border-radius: var(--wb-radius-md, 8px);
-  background: var(--wb-color-bg-warning-default, rgba(217, 119, 6, 0.06));
-  overflow: hidden;
-  transition:
-    background-color var(--wb-motion-duration-base, 200ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
-    max-height var(--wb-motion-duration-base, 200ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
-}
-.msg__approval-hint--permission {
-  border-left-color: rgb(217, 119, 6);
-}
-.msg__approval-hint--question {
-  border-left-color: color-mix(in srgb, var(--wb-brand, #00c29a) 60%, transparent);
-}
-.msg__approval-hint--expanded {
-  background: var(--wb-color-bg-warning-subtle, rgba(217, 119, 6, 0.10));
-}
-[data-theme="dark"] .msg__approval-hint {
-  border-left-color: rgb(245, 158, 11);
-  background: rgba(217, 119, 6, 0.10);
-}
-[data-theme="dark"] .msg__approval-hint--expanded {
-  background: rgba(217, 119, 6, 0.16);
-}
-.msg__approval-hint-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 6px 10px;
-  border: 0;
-  background: transparent;
-  color: var(--wb-text-strong);
-  font: inherit;
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-  border-radius: inherit;
-}
-.msg__approval-hint-toggle:hover {
-  background: var(--wb-bg-hover, rgba(0, 0, 0, 0.04));
-}
-.msg__approval-hint-icon {
-  color: rgb(161, 88, 0);
-  flex-shrink: 0;
-}
-.msg__approval-hint-summary {
-  flex: 1;
-  font-weight: 500;
-}
-.msg__approval-hint-chevron {
-  color: var(--wb-text-medium);
-  transition: transform var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
-  flex-shrink: 0;
-}
-.msg__approval-hint-chevron--open {
-  transform: rotate(180deg);
-}
-/* P1-2 — 三按钮快操作行(允许 / 拒绝 / 稍后)。
- *   - 26px 高,icon + 4 字,色板对齐 .msg__action-btn 基类
- *   - 允许:brand-色 + 白字(主操作)
- *   - 拒绝:暖红 + 白字(危险操作)
- *   - 稍后:中性灰 + 弱边框(取消类)
- * 行为要点:点击不冒泡,避免触发 toggle 的展开/收起。 */
-.msg__approval-hint-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px 6px;
-  border-top: 1px dashed var(--wb-border-soft, rgba(0, 0, 0, 0.08));
-}
-.msg__approval-hint-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--wb-border-default, rgba(127, 127, 127, 0.22));
-  border-radius: var(--wb-radius-md, 6px);
-  background: var(--wb-bg-primary, #ffffff);
-  color: var(--wb-text-strong, rgba(0, 0, 0, 0.88));
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
-    border-color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
-    color var(--wb-motion-duration-fast, 120ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
-}
-.msg__approval-hint-action:hover:not(:disabled) {
-  border-color: var(--wb-border-strong, rgba(127, 127, 127, 0.42));
-}
-.msg__approval-hint-action:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.msg__approval-hint-action--allow {
-  background: var(--wb-palette-brand-8, #00c29a);
-  border-color: var(--wb-palette-brand-8, #00c29a);
-  color: #ffffff;
-}
-.msg__approval-hint-action--allow:hover:not(:disabled) {
-  background: var(--wb-palette-brand-9, #00a884);
-  border-color: var(--wb-palette-brand-9, #00a884);
-}
-.msg__approval-hint-action--deny {
-  background: rgb(217, 45, 32);
-  border-color: rgb(217, 45, 32);
-  color: #ffffff;
-}
-.msg__approval-hint-action--deny:hover:not(:disabled) {
-  background: rgb(180, 30, 20);
-  border-color: rgb(180, 30, 20);
-}
-.msg__approval-hint-action--defer {
-  background: var(--wb-bg-tertiary, #f1f2f5);
-}
-[data-theme="dark"] .msg__approval-hint-action {
-  background: var(--wb-bg-secondary, #1a1a1f);
-  border-color: rgba(255, 255, 255, 0.14);
-}
-[data-theme="dark"] .msg__approval-hint-action--defer {
-  background: rgba(255, 255, 255, 0.06);
-}
-@media (prefers-reduced-motion: reduce) {
-  .msg__approval-hint,
-  .msg__approval-hint-chevron,
-  .msg__approval-hint-action {
-    transition: none;
-  }
-}
-.msg__approval-hint-body {
-  padding: 6px 10px 8px;
-  border-top: 1px solid var(--wb-border-light, rgba(0, 0, 0, 0.08));
-}
-
 /* === conversation.view (P0-4) ================================================
  * 新组件化视图 (live/result/content) 的切换器与视图容器。原本这些 class
  * 只在 conversation-view.tsx 里有定义、CSS 里没有任何规则 -> 即使 ChatView
@@ -1873,7 +1593,6 @@ button.diff__path {
   line-height: 1.6;
 }
 
-
 /* ============================================================================
  * P1-01 — Dark theme coverage expansion (P0-AI-Chat-Audit 完善轮)
  *
@@ -1899,8 +1618,7 @@ button.diff__path {
   color: var(--wb-text-strong, rgba(255, 255, 255, 0.92));
 }
 [data-theme="dark"] .chatview__empty-state-subtitle,
-[data-theme="dark"] .chatview__quick-prompt-desc,
-[data-theme="dark"] .msg__approval-hint-icon {
+[data-theme="dark"] .chatview__quick-prompt-desc {
   color: var(--wb-text-medium, rgba(255, 255, 255, 0.72));
 }
 [data-theme="dark"] .chatview__extension-status,
@@ -1951,19 +1669,7 @@ button.diff__path {
   color: var(--wb-text-medium, rgba(255, 255, 255, 0.72));
   border-color: var(--wb-border-soft, rgba(255, 255, 255, 0.10));
 }
-[data-theme="dark"] .msg__approval-hint {
-  background: rgba(217, 119, 6, 0.10);
-  border-left-color: rgb(245, 158, 11);
-}
-[data-theme="dark"] .msg__approval-hint--expanded {
-  background: rgba(217, 119, 6, 0.16);
-}
-[data-theme="dark"] .msg__approval-hint-toggle:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-[data-theme="dark"] .msg__approval-hint-icon {
-  color: rgb(245, 158, 11);
-}
+
 [data-theme="dark"] .conversation-view-tabs {
   background: color-mix(in srgb, var(--wb-bg-tertiary, #25252b) 80%, transparent);
 }
@@ -1972,14 +1678,12 @@ button.diff__path {
 [data-theme="dark"] .timeline-divider {
   color: var(--wb-text-medium, rgba(255, 255, 255, 0.72));
 }
-[data-theme="dark"] .timeline-divider--date,
-[data-theme="dark"] .timeline-divider--model {
+[data-theme="dark"] .timeline-divider--date {
   color: var(--wb-text-strong, rgba(255, 255, 255, 0.92));
 }
 [data-theme="dark"] .timeline-divider--model {
-  color: var(--wb-brand, #00e0a8);
+  color: var(--wb-text-weak);
 }
-
 
 /* ============================================================================
  * P2-04 — prefers-contrast: more 全局适配(P0-AI-Chat-Audit 完善轮)
@@ -2000,14 +1704,6 @@ button.diff__path {
   .msg__thought {
     border-width: 2px;
     border-left-width: 4px;
-  }
-  .msg__approval-hint {
-    border-width: 2px;
-    border-left-width: 4px;
-  }
-  .msg__approval-hint-action {
-    border-width: 2px;
-    font-weight: 600;
   }
   .msg__action-btn {
     border: 2px solid currentColor;
@@ -2124,4 +1820,201 @@ button.diff__path {
 }
 .chatview__tabs--reserved > * {
   visibility: hidden;
+}
+
+/* P-E2 — 上下文压缩分隔条。pi 在 /compact 或自动压缩后发
+   `pi/context-compacted`;转录里插一条非会话行,给出"此前的上下文
+   已被折叠"的落点,避免历史消息凭空消失。 */
+.msg-system-marker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 0 4px;
+  color: var(--wb-text-tertiary);
+  font-size: 12px;
+  user-select: none;
+}
+.msg-system-marker__line {
+  flex: 1;
+  height: 1px;
+  background: var(--wb-border-default);
+}
+.msg-system-marker__label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* cc-haha 对齐 — 连续 assistant 消息是同一段发言的延续(工具步骤 →
+   最终答复)。隐藏重复的 Buddy 抬头后,收窄垂直间距,让这一组读起来
+   像一条消息里的多个 block。 */
+.msg--assistant.msg--continuation {
+  padding-top: 0;
+}
+.msg--assistant.msg--continuation + .msg--assistant:not(.msg--continuation) {
+  padding-top: 2px;
+}
+
+/* 连续 assistant 消息之间(工具步骤 → 最终答复)属于同一条发言:
+   .chatview__inner 的 20px 通用间距会把它们拆成两段,这里收窄到 6px。 */
+.msg-wrap--continuation {
+  margin-top: -14px;
+}
+
+/* cc-haha 对齐 — 纯工具步骤不留 footer 占位。action bar / meta 只在
+   hover 时才有意义,但它们的固定高度会把短工具行撑成一大段空白。 */
+.msg--tool-only .msg__actions,
+.msg--tool-only .msg__meta {
+  display: none;
+}
+
+/* ============================================================================
+ * cc-haha parity — transcript rhythm, message chrome, activity group
+ * ==========================================================================*/
+
+/* 统一的阅读栏宽度已经是 800px;把行间节奏从"每条 20px"改成 cc-haha 的
+   "同一发言 8px / 用户提问前 16px"。 */
+.chatview__inner {
+  gap: 8px;
+  padding: 20px 24px 12px;
+}
+.msg-wrap--user-turn {
+  margin: 16px 0 4px;
+}
+
+/* 正文 15px / 1.72,与 cc-haha 的 chat-reading-text 对齐。 */
+.msg--assistant .msg__body {
+  font-size: 15px;
+  line-height: 1.72;
+}
+.msg--user .msg__bubble {
+  font-size: 15px;
+  line-height: 1.65;
+  padding: 9px 14px;
+  border-radius: 16px;
+}
+.msg--user > div {
+  max-width: 82%;
+}
+
+/* 抬头减重:cc-haha 的 assistant 没有头像栏。保留一次发言标识,但
+   从 28px 头像 + 13px 粗体降到 20px + 12.5px 中等灰。 */
+.msg--assistant .msg__header {
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.msg--assistant .msg__avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+}
+.msg--assistant .msg__name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--wb-text-medium);
+}
+.msg--assistant .msg__role {
+  height: 15px;
+  padding: 0 4px;
+  font-size: 9.5px;
+  opacity: 0.75;
+}
+
+/* 时间/模型/token 元信息改为 hover 揭示(cc-haha 的 completion stamp
+   在 action bar 里,不常驻),减少每条消息下方的视觉噪声。 */
+.msg__meta {
+  opacity: 0;
+  transition: opacity var(--wb-motion-duration-fast, 140ms) var(--wb-ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.msg-wrap:hover .msg__meta,
+.msg-wrap:focus-within .msg__meta {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg__meta { transition: none; }
+}
+
+/* 并行工具组从"带边框的小卡片"降为 cc-haha 式的活动行。 */
+.tool-group-summary {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 0;
+  margin: 3px 0;
+}
+.tool-group-summary--running {
+  border-color: transparent;
+}
+.tool-group-summary__header {
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  transition: background var(--wb-motion-duration-fast, 120ms) ease;
+}
+.tool-group-summary__header:hover {
+  background: color-mix(in srgb, var(--wb-text-strong, #1a1a1a) 5%, transparent);
+}
+
+/* ============================================================================
+ * plan1030 批 4a — RenderItemBoundary 兜底行
+ * 单条消息渲染失败只塌一行（不白屏）；字号继承环境，不新增裸值。
+ * ========================================================================== */
+.msg-render-error {
+  margin: 4px 0;
+  padding: 6px 10px;
+  border: 1px dashed var(--wb-border-default);
+  border-radius: var(--wb-radius-sm, 6px);
+  color: var(--wb-text-weak);
+  line-height: 1.5;
+  user-select: text;
+}
+
+/* 完成后的过程折叠行(ProcessSummary,对齐 WorkBuddy「已完成 Xs ›」)。 */
+.msg__process {
+  margin: 2px 0 6px;
+}
+.msg__process-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  font-size: 12px;
+  color: var(--wb-text-weak);
+  border-radius: var(--wb-radius-sm);
+  padding: 2px 0;
+}
+.msg__process-summary::-webkit-details-marker {
+  display: none;
+}
+.msg__process-summary:hover {
+  color: var(--wb-text-medium);
+}
+.msg__process-chevron {
+  transition: transform var(--wb-motion-duration-fast, 120ms) ease;
+}
+.msg__process[open] > .msg__process-summary .msg__process-chevron {
+  transform: rotate(90deg);
+}
+.msg__process-body {
+  margin-top: 4px;
+  padding-left: 10px;
+  border-left: 1px solid var(--wb-border-default);
+}
+
+/* 助手操作栏「⋯」菜单:向上弹出,避免被底部 composer 挡住。 */
+.msg-more__popover {
+  top: auto;
+  bottom: 100%;
+  left: 0;
+  right: auto;
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+/* §21 — 元信息并入操作行:跟随操作行一起显隐,紧跟在按钮后面。 */
+.msg__footer .msg__meta {
+  margin: 0 0 0 6px;
+  opacity: 1;
 }

@@ -52,14 +52,14 @@ OpenBuddy 开箱即提供以下保护:
 |---|---|---|
 | **上下文隔离** | Electron 渲染端 | `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` |
 | **IPC 白名单** | `electron/preload/index.ts` | 每个通道都显式枚举,禁止动态调用 |
-| **文件夹级信任** | `@openbuddy/capability-folder-trust` | 文件操作前必须显式授权每个文件夹 |
+| **文件夹级信任** | `@openbuddy/folder-trust` | 文件操作前必须显式授权每个文件夹 |
 | **能力级策略** | `@openbuddy/capability-authorization` | 每个 Cordis 能力声明所需权限 |
 | **CSP** | `index.html` | 严格默认 `default-src`,禁止内联脚本 |
 | **OIDC PKCE** | `@openbuddy/auth-casdoor` | 桌面端 SSO 使用 PKCE 授权码模式,无 client secret |
 | **Token 轮换** | Casdoor refresh 流 | 每次使用都轮换 refresh token |
-| **事务性 Outbox** | `@openbuddy/webhook-outbox` | Webhook 至少一次投递,带幂等键 |
-| **本地优先审计** | `@openbuddy/runtime-storage` | 每个特权操作记录到防篡改的本地账本 |
-| **依赖扫描** | `.github/workflows/release.yml` | 每个 PR 都在 CI 跑 `pnpm audit` |
+| **本地优先审计** | `@openbuddy/storage` | 每个特权操作记录到防篡改的本地账本 |
+| **依赖扫描** | `.github/workflows/ci.yml` | CI 跑 `pnpm audit --prod --audit-level=high` |
+| **密钥扫描** | `.github/workflows/ci.yml` | `gitleaks` 扫全量 git 历史 |
 | **镜像配置** | `electron-builder.yml` | electron-builder 下载固定走 npmmirror,不走 github |
 
 ### 威胁模型(摘要)

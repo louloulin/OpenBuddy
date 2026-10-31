@@ -1,4 +1,5 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { CalendarCatalog } from "../index";
@@ -11,7 +12,10 @@ afterEach(async () => {
 
 describe("CalendarCatalog", () => {
   it("imports legacy JSON once, persists updates, and writes a compatibility mirror", async () => {
-    const root = await mkdtemp(join(process.env.TMPDIR ?? "/tmp", "openbuddy-calendar-storage-"));
+    // 用 os.tmpdir(),不要写 `process.env.TMPDIR ?? "/tmp"` ——
+    // Windows 上没有 TMPDIR 环境变量,回落到 "/tmp" 会被解析成
+    // "\tmp\...",而该目录不存在,mkdtemp 直接 ENOENT。
+    const root = await mkdtemp(join(tmpdir(), "openbuddy-calendar-storage-"));
     roots.push(root);
     const legacyPath = join(root, "openbuddy-calendar.json");
     const databasePath = join(root, "openbuddy.sqlite");
@@ -32,7 +36,7 @@ describe("CalendarCatalog", () => {
   });
 
   it("surfaces malformed legacy documents without marking the import complete", async () => {
-    const root = await mkdtemp(join(process.env.TMPDIR ?? "/tmp", "openbuddy-calendar-legacy-error-"));
+    const root = await mkdtemp(join(tmpdir(), "openbuddy-calendar-legacy-error-"));
     roots.push(root);
     const legacyPath = join(root, "openbuddy-calendar.json");
     const databasePath = join(root, "openbuddy.sqlite");

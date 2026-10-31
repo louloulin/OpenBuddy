@@ -1646,13 +1646,33 @@ async function readStore(): Promise<EmailStore> {
 }
 let storeWriteQueue: Promise<void> = Promise.resolve()
 
+const RENAME_RETRY_CODES = new Set(["EPERM", "EBUSY", "EACCES"])
+
+/**
+ * Windows 上 rename 覆盖已存在的文件时,可能因为杀毒/索引器短暂持有句柄而
+ * 报 EPERM/EBUSY —— 这是瞬时状态,重试即可;POSIX 上不会出现。不重试的话
+ * 邮件 store 的每次写入都有概率失败(Windows CI 上实测三次)。
+ */
+async function renameWithRetry(from: string, to: string): Promise<void> {
+	for (let attempt = 0; ; attempt += 1) {
+		try {
+			await rename(from, to)
+			return
+		} catch (error) {
+			const code = (error as NodeJS.ErrnoException).code
+			if (attempt >= 5 || !code || !RENAME_RETRY_CODES.has(code)) throw error
+			await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)))
+		}
+	}
+}
+
 /** 不加队列、直接落盘。只给队列内部用(自行入队会自等死锁)。 */
 async function writeStoreNow(store: EmailStore): Promise<void> {
 	const target = storePath()
 	await mkdir(path.dirname(target), { recursive: true })
 	const temporary = `${target}.${process.pid}.${randomUUID()}.tmp`
 	await writeFile(temporary, `${JSON.stringify(store, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
-	try { await rename(temporary, target) } catch (error) { await rm(temporary, { force: true }).catch(() => undefined); throw error }
+	try { await renameWithRetry(temporary, target) } catch (error) { await rm(temporary, { force: true }).catch(() => undefined); throw error }
 }
 
 function writeStore(store: EmailStore): Promise<void> {

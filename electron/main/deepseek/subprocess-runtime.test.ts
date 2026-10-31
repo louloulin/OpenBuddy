@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolve } from "node:path";
 import { SandboxPolicyService, SandboxRuntime, SubprocessRuntime, scrubbedParentEnv } from "./subprocess-runtime";
 
 describe("SubprocessRuntime", () => {
@@ -52,8 +53,13 @@ describe("SubprocessRuntime", () => {
 
   it("exposes the shared PTY primitive through spawnTerminal", async () => {
     const runtime = new SubprocessRuntime();
+    // Windows 没有 /bin/bash:用 ComSpec,并且 /q 关掉回显,
+    // 这样断言检查的是 shell 真实输出而不是被回显的输入。
+    const shell = process.platform === "win32"
+      ? { argv: [process.env.ComSpec ?? "cmd.exe", "/d", "/q"], write: "echo standard-pty-ok\r\nexit\r\n" }
+      : { argv: ["/bin/bash", "--noprofile", "--norc", "-i"], write: "printf standard-pty-ok\nexit\n" };
     const terminal = await runtime.spawnTerminal({
-      argv: ["/bin/bash", "--noprofile", "--norc", "-i"],
+      argv: shell.argv,
       cwd: process.cwd(),
       rows: 24,
       cols: 120,
@@ -61,7 +67,7 @@ describe("SubprocessRuntime", () => {
     });
     const output: Buffer[] = [];
     terminal.output.on("data", (value: Buffer) => output.push(Buffer.from(value)));
-    await terminal.write("printf standard-pty-ok\nexit\n");
+    await terminal.write(shell.write);
     await terminal.done;
     expect(Buffer.concat(output).toString()).toContain("standard-pty-ok");
     await runtime.dispose();
@@ -69,16 +75,18 @@ describe("SubprocessRuntime", () => {
 
   it("resolves a session-scoped sandbox policy", () => {
     const policy = new SandboxPolicyService({ mode: "read-only", workspaceRoot: "/tmp" });
+    // cwd 会被 resolve();期望值同样走 resolve(Windows 上是 D:\workspace\project)。
+    const sessionCwd = resolve("/workspace/project");
     expect(policy.resolve({ session: { sessionId: "session-1", cwd: "/workspace/project" } })).toMatchObject({
       mode: "read-only",
-      workspaceRoot: "/workspace/project",
+      workspaceRoot: sessionCwd,
       sessionId: "session-1",
     });
     policy.setSessionMode("session-1", "workspace-write");
     expect(policy.resolve({ session: { sessionId: "session-1", cwd: "/workspace/project" } }).mode).toBe("workspace-write");
     expect(policy.resolve({ mode: "danger-full-access", cwd: "/tmp/other" })).toMatchObject({
       mode: "danger-full-access",
-      workspaceRoot: "/tmp/other",
+      workspaceRoot: resolve("/tmp/other"),
     });
   });
 

@@ -447,12 +447,27 @@
   border-radius: var(--wb-radius-lg, 14px);
   background: var(--wb-bg-primary);
   box-shadow: var(--wb-shadow-sm);
-  overflow: hidden;
+  /* No overflow clipping: popovers anchored in the composer (context usage,
+     permission mode, slash menu) open upward past the dock's edge. The
+     children inherit the rounded corners instead. */
+}
+.chat-dock > :first-child {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+.chat-dock > :last-child {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
 }
 .chat-dock > * + * {
   border-top: 1px solid var(--wb-border-soft, rgba(0, 0, 0, 0.06));
 }
-.chat-dock .chatview__pause-btn,
+/* The meta row's negative side margins bleed past the dock now that the dock
+   no longer clips. */
+.chat-dock .wb-composer-meta {
+  margin-left: 0;
+  margin-right: 0;
+}
 .chat-dock .yield-banner {
   align-self: flex-start;
   margin: var(--wb-spacing-2, 8px) var(--wb-spacing-3, 8px) 0;
@@ -518,4 +533,36 @@
 }
 .chat-dock .rewind-bar__btn + .rewind-bar__btn {
   margin-left: 4px;
+}
+
+/* 20261031 Phase 2.7 — 切换会话加载历史时的骨架,取代"开始新对话"空态的闪现。 */
+.chatview__history-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 800px;
+  margin: 32px auto 0;
+  padding: 0 24px;
+}
+.chatview__skeleton-line {
+  display: block;
+  width: 72%;
+  height: 14px;
+  border-radius: var(--wb-radius-sm, 6px);
+  background: linear-gradient(
+    90deg,
+    var(--wb-bg-secondary) 25%,
+    var(--wb-bg-tertiary, var(--wb-bg-secondary)) 50%,
+    var(--wb-bg-secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: ob-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.chatview__skeleton-line--user {
+  width: 40%;
+  align-self: flex-end;
+}
+.chatview__skeleton-line--short {
+  width: 48%;
 }

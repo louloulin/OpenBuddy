@@ -243,3 +243,28 @@ export function useComposerAttachments(
     readImageFile,
   };
 }
+
+// ---- 按会话暂存附件(计划 2.1) --------------------------------------------
+// 只在内存里:附件是本地路径 / 图片数据,随窗口生命周期即可,不落盘。
+
+type StashedAttachments = { attachments: string[]; images: ImageAttachment[] };
+const STASH_CAP = 50;
+const attachmentStash = new Map<string | number, StashedAttachments>();
+
+/** 把某个会话当前的附件收起来;为空时清掉旧暂存。 */
+export function stashAttachments(key: string | number | undefined, attachments: string[], images: ImageAttachment[]): void {
+  if (key === undefined) return;
+  attachmentStash.delete(key);
+  if (attachments.length === 0 && images.length === 0) return;
+  attachmentStash.set(key, { attachments, images });
+  // 最早收起的先丢,避免长时间运行无限增长。
+  if (attachmentStash.size > STASH_CAP) attachmentStash.delete(attachmentStash.keys().next().value!);
+}
+
+/** 取回(并移除)某个会话暂存的附件。 */
+export function takeStashedAttachments(key: string | number | undefined): StashedAttachments | undefined {
+  if (key === undefined) return undefined;
+  const stashed = attachmentStash.get(key);
+  attachmentStash.delete(key);
+  return stashed;
+}

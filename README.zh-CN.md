@@ -17,7 +17,7 @@
 
 <a href="https://github.com/louloulin/OpenBuddy/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/louloulin/OpenBuddy?style=for-the-badge&logo=starship&logoColor=white&color=yellow"></a>
 <a href="https://github.com/louloulin/OpenBuddy/releases"><img alt="Release" src="https://img.shields.io/github/v/release/louloulin/OpenBuddy?style=for-the-badge&logo=github&color=blue"></a>
-<a href="https://github.com/louloulin/OpenBuddy/actions"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/louloulin/OpenBuddy/release.yml?branch=master&style=for-the-badge&logo=githubactions&logoColor=white"></a>
+<a href="https://github.com/louloulin/OpenBuddy/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/louloulin/OpenBuddy/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white"></a>
 <a href="https://github.com/louloulin/OpenBuddy/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge"></a>
 
 <br/>
@@ -27,12 +27,11 @@
 <img alt="React" src="https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react&logoColor=white">
 <img alt="moon" src="https://img.shields.io/badge/moon-2.5-blue?style=flat-square&logo=moonrepo&logoColor=white">
 <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.6-3178C6?style=flat-square&logo=typescript&logoColor=white">
-<img alt="Tests" src="https://img.shields.io/badge/tests-455%20files-success?style=flat-square&logo=vitest&logoColor=white">
 
 <br/><br/>
 
-**OpenBuddy 是 WorkBuddy 风格的桌面 AI 工作台,在 Electron + Pi 之上以 100% MIT 开源重建。**
-它带来 WorkBuddy 同款精致 UI、Plan 模式、Skills、MCP 连接器,以及企业级 Casdoor × NewAPI 集成——每一字节都可审计,每一个 Provider 都支持自带 Key。
+**OpenBuddy 是一个可自托管、可审计的企业桌面 AI 邮件 / 协作 Agent —— 在 Electron + Pi 之上,100% MIT 开源。**
+五条真实邮箱协议链路、Casdoor × NewAPI 企业身份、租户级审计账本,每一个 Provider 都支持自带 Key。每一字节都可审计。
 
 [快速开始](#-快速开始) · [特性](#-主要特性) · [架构](#-架构) · [文档](#-文档) · [贡献指南](CONTRIBUTING.md) · [社区](docs/COMMUNITY.md)
 
@@ -47,7 +46,7 @@
 - [为什么是 OpenBuddy?](#-为什么是-openbuddy)
 - [✨ 主要特性](#-主要特性)
 - [🎬 演示与截图](#-演示与截图)
-- [⚔️ OpenBuddy vs WorkBuddy](#%EF%B8%8F-openbuddy-vs-workbuddy)
+- [🏢 可自托管、可审计、企业级](#%EF%B8%8F-%E5%8F%AF%E8%87%AA%E7%BB%B4%E6%8A%A4%E5%8F%AF%E5%AE%A1%E8%AE%A1%E4%BC%81%E4%B8%9A%E7%BA%A7)
 - [🚀 快速开始](#-快速开始)
 - [🏗️ 架构](#-架构)
 - [🧩 能力包清单](#-能力包清单)
@@ -65,11 +64,13 @@
 
 ## 💡 为什么是 OpenBuddy?
 
-[**腾讯 WorkBuddy**](https://workbuddy.tencent.com/) 告诉了所有人:一个优秀的桌面 AI Agent 工作台应该长什么样——精致 UI、Plan 模式、Skills、MCP 连接器。这确实是个能打的产品。
+**OpenBuddy 是一个可自托管、可审计的企业桌面 AI 邮件 / 协作 Agent —— 让 AI 在你控制的邮箱与协作空间里干活,并且每一步都留痕。**
 
-**但它闭源,且数据链路走腾讯后端。**
+三件真正难做、也真正值钱的事,就是这个项目的主题:
 
-**OpenBuddy 是开源的答案**——同样的体验形态,在 Electron + Pi 上从零重建,底层是 Cordis 能力网格,任何贡献者都可以扩展:
+1. **接得住真实邮箱** —— IMAP、SMTP、Gmail API、Graph API、JMAP,五条真实协议链路,每条都有跑通的验收脚本。
+2. **企业身份能落进去** —— Casdoor OIDC(主进程真实接线)、多租户隔离、NewAPI 网关、审计账本。SCIM v2 / SAML 2.0 目前是**有测试但未接线的种子实现**(2026-10-28 随 experimental/ 归档,git 历史可找回)—— 我们不把它们说成已交付。
+3. **行为能追回来** —— 本地审计日志、租户级审计链、工具调用留痕;出事时你能回答"谁、什么时候、对哪个邮箱、做了什么"。
 
 <table>
 <tr><td>🔓</td><td><strong>100% 开源 (MIT)</strong><br/>没有黑箱遥测,没有供应商锁定。整个仓库可审计。</td></tr>
@@ -77,12 +78,14 @@
 <tr><td>🔁</td><td><strong>会话可重启恢复</strong><br/>Pi 会话、Provider 设置、能力状态、审计日志跨渲染进程 reload 和 Electron 重启持久化。</td></tr>
 <tr><td>🤖</td><td><strong>Pi 作为 Agent Runtime</strong><br/>进程内 <code>AgentSession</code> 掌管提示词、工具、权限、计划、任务和流式事件。</td></tr>
 <tr><td>🌐</td><td><strong>真正的跨平台</strong><br/>一套代码,Windows、macOS、Linux。<a href="electron-builder.yml">electron-builder</a> 为每个平台产出签名安装包。</td></tr>
-<tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>66 个工程(1 根 + 1 Electron + 64 个 workspace 包),typecheck/test/build 增量执行。CI 跑的 <code>moon run</code> 与本地完全一致。</td></tr>
-<tr><td>🧩</td><td><strong>Cordis 能力网格</strong><br/>64 个 workspace 包(12 capability、27 UI、8 collaboration ……)(<code>@openbuddy/*</code>)——skills、memory、plan、task、email、calendar、MCP、payment、SCIM、SAML……按需取用。</td></tr>
-<tr><td>🏢</td><td><strong>企业就绪</strong><br/>Casdoor OIDC、NewAPI 网关、4 个支付通道、SCIM v2、SAML 2.0、事务性 Outbox Webhooks、审计账本——生产级构件。</td></tr>
+<tr><td>🪐</td><td><strong>moon DAG monorepo</strong><br/>在整个 workspace 上增量 typecheck / test / build(当前工程数见 [`docs/stats.json`](docs/stats.json))。CI 跑的与本地完全一致。</td></tr>
+<tr><td>🧩</td><td><strong>Cordis 能力网格</strong><br/>workspace 包(capability / UI / collaboration ……)(<code>@openbuddy/*</code>)——email、calendar、MCP、文件夹信任、授权、多 Agent 协作。按需取用。</td></tr>
+<tr><td>🏢</td><td><strong>企业级构件</strong><br/>Casdoor OIDC 与审计账本已接线;NewAPI 网关集成在仓内。SCIM v2 / SAML 2.0 是有测试的种子,在 git 历史里,尚未接线。</td></tr>
 </table>
 
-> *"WorkBuddy 是成品,OpenBuddy 是你能真正读懂、能 fork、能拥有的那一个。"*
+> *"一个你能自己托管、能读完每一行、事后还能审计的桌面 AI Agent。"*
+
+完整的一页定位声明在 [`POSITIONING.md`](POSITIONING.md)。
 
 <div align="center">
 
@@ -128,7 +131,7 @@
 Plan 模式(开关 & 查看) · Rewind(回退 & fork) · 子 Agent Tasks(观察 & 取消) · Slash Commands · 本地 Automations 调度器 · 通知中心。
 
 **📦 跨平台安装包**
-Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 GitHub Actions CI 构建发布。
+Windows(NSIS `.exe`)、macOS(`.dmg`)、Linux(AppImage)—— x64 + arm64。通过 GitHub Actions CI 构建发布。
 
 </td>
 </tr>
@@ -138,16 +141,12 @@ Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 G
 **🏢 企业级集成**
 - **Casdoor** — OIDC SSO + 租户策略 + 审计日志
 - **NewAPI** — 模型聚合网关(BYOK + Service Token)
-- **Stripe / WeChat Pay / Alipay** — 4 个支付适配器
-- **SCIM v2** — RFC 7644 用户/组预置
-- **SAML 2.0** — AuthnRequest/Response/LogoutRequest
-- **事务性 Outbox** — Webhook 投递,带指数退避
 
 </td>
 <td valign="top">
 
 **🧪 经实战检验的质量**
-- **309 个测试文件**(Vitest)
+- **测试文件全部在仓库里** —— 当前数量见 [`docs/stats.json`](docs/stats.json)(Vitest)
 - **实时集成测试**面向公网 Casdoor + NewAPI 端点
 - **闭环能力评测**支持端到端 Agent 运行
 - **类型化 IPC** — 每个 preload 通道都在 `electron/preload/index.ts` 白名单中
@@ -226,7 +225,7 @@ Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 G
 ### 30 秒速览 — 你将获得什么
 
 <p align="center">
-  <img src="docs/diagrams/tour-30s.svg" alt="OpenBuddy 30 秒速览 — WorkBuddy 级 UI、64 个 Cordis 能力、企业级、可验证、高性能" />
+  <img src="docs/diagrams/tour-30s.svg" alt="OpenBuddy 30 秒速览 — 桌面 Agent UI、Cordis 能力、企业级、可验证、高性能" />
 </p>
 
 ### 架构总览
@@ -238,7 +237,7 @@ Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 G
 ### 能力矩阵
 
 <p align="center">
-  <img src="docs/diagrams/capability-matrix.svg" alt="OpenBuddy 能力矩阵 — 64 个 workspace 包,分为 8 个能力组" />
+  <img src="docs/diagrams/capability-matrix.svg" alt="OpenBuddy 能力矩阵 — workspace 包,分为 8 个能力组" />
 </p>
 
 ### 数据流 — 提示词到工具结果
@@ -247,10 +246,10 @@ Windows(NSIS `.exe` + MSI)、macOS(`.dmg`)、Linux(AppImage + `.deb`)。通过 G
   <img src="docs/diagrams/data-flow-end-to-end.svg" alt="OpenBuddy 数据流 — 每个提示词跨过 5 个类型化边界才到达模型,返回时再跨过 4 个" />
 </p>
 
-### WorkBuddy 能力对等
+### 能力对等(有证据的)
 
 <p align="center">
-  <img src="docs/diagrams/workbuddy-parity.svg" alt="OpenBuddy vs WorkBuddy 能力对等矩阵" />
+  <img src="docs/diagrams/workbuddy-parity.svg" alt="OpenBuddy 能力对等矩阵" />
 </p>
 
 ### 双语支持
@@ -284,32 +283,23 @@ OpenBuddy 原生提供 **`zh-CN`(默认)** 与 **`en-US`** 双语界面。翻译
 
 ---
 
-## ⚔️ OpenBuddy vs WorkBuddy
+## 🏢 可自托管、可审计、企业级
 
-只列出可公开佐证的能力——完整对比见 [`docs/workbuddy-parity-matrix.md`](docs/workbuddy-parity-matrix.md)。
+下表是"能不能进公司用"的最短版本 —— 每一行都指向仓库里真实存在的代码。
 
-| 能力 | WorkBuddy | OpenBuddy |
-|---|---|---|
-| 许可证 | 闭源 | **MIT(开源)** |
-| 数据路径 | 腾讯后端 | **本地 + 你的网关** |
-| Plan 模式 | ✅ | ✅ |
-| Skills | ✅ | ✅ + 开源目录 |
-| MCP 连接器 | ✅ | ✅ |
-| Experts / Assistants | ✅ | ✅(本地文件) |
-| Rewind & fork | ✅ | ✅ |
-| 子 Agent Tasks | ✅ | ✅ |
-| Automations | ✅ | ✅(本地调度器) |
-| Slash commands | ✅ | ✅ |
-| 本地持久化 | ✅ | ✅(重启安全) |
-| Provider 选择 | 有限 | **BYOK — Anthropic / OpenAI / NewAPI / 自定义** |
-| Casdoor OIDC | ❌ | ✅ |
-| NewAPI 网关 | ❌ | ✅(BYOK + Service Token) |
-| SCIM v2 | ❌ | ✅(RFC 7644) |
-| SAML 2.0 | ❌ | ✅ |
-| Plugin SDK | 闭源 | **Cordis 开源能力网格** |
-| 用户可见的测试 | ❌ | **仓库中 309 个测试文件** |
-| 跨平台 | Win / macOS | **Win / macOS / Linux** |
-| 审计日志 | 后端 | **本地 + Casdoor 租户账本** |
+| 能力 | 落在哪里 |
+|---|---|
+| 许可 | MIT —— 每一行可审计,可 fork |
+| 数据路径 | 本地 + 你自己的网关(BYOK),不经过厂商后端 |
+| 邮箱协议 | IMAP · SMTP · Gmail API · Graph API · JMAP —— 五条真实协议链路 |
+| 模型来源 | BYOK —— Anthropic / OpenAI / NewAPI / 自定义 |
+| 身份 | Casdoor OIDC(已接线)· 多租户隔离 · SCIM/SAML 种子(未接线,在 git 历史) |
+| 审计 | 本地审计日志 + 租户级审计账本,可导出 |
+| 插件 SDK | 开放的 Cordis 能力网格(`@openbuddy/*`),契约带版本 |
+| 测试 | 测试文件全部在仓库里(数量见 `docs/stats.json`) |
+| 跨平台 | Windows · macOS · Linux |
+
+完整的能力矩阵 —— **包括还没做完的部分** —— 在 [`docs/workbuddy-parity-matrix.md`](docs/workbuddy-parity-matrix.md)。比起一张宣传表,我们更愿意把你指向矩阵。
 
 ---
 
@@ -342,13 +332,13 @@ pnpm electron:dev
 ### 构建生产安装包
 
 ```bash
-# Windows 安装包(NSIS .exe + MSI)
+# Windows 安装包(NSIS .exe)
 pnpm electron:build:win
 
 # macOS 安装包(DMG)
 pnpm electron:build:mac
 
-# Linux AppImage / .deb
+# Linux AppImage
 pnpm electron:build:linux
 
 # 三平台全打
@@ -358,10 +348,10 @@ pnpm electron:build:all
 ### 验证环境
 
 ```bash
-# 类型检查整个 32 工程 monorepo
+# 类型检查整个 workspace(工程数见 docs/stats.json)
 pnpm workspace:typecheck
 
-# 跑完整 Vitest 套件(309 个测试文件)
+# 跑完整 Vitest 套件(测试文件全部在仓库里)
 pnpm workspace:test
 
 # 闭环能力评测(真实 Agent 运行 + 评分)
@@ -412,10 +402,6 @@ core/         session
 fs/           fs-local
 shared/       files-kb · types
 collaboration/ coordinator · evidence · inbox · network · policy · protocol · room · task
-payment/      Stripe / WeChat Pay / Alipay / HMAC 适配器
-saml/         SAML 2.0 原语
-scim/         SCIM v2 端点(RFC 7644)
-webhook-outbox/ 事务性 Outbox + 重试/退避
 ui/           26 个 UI 包(shell, sidebar, settings, workbench, …)
 ```
 
@@ -449,14 +435,10 @@ packages/                # 每个能力一个 moon 工程(30+ 包)
   shared/openbuddy-{files-kb,types}/
   collaboration/openbuddy-{coordinator,evidence,inbox,network,policy,
               protocol,room,task}/
-  payment/               # Stripe / WeChat Pay / Alipay / HMAC
-  saml/                  # SAML 2.0 原语
-  scim/                  # SCIM v2 端点
-  webhook-outbox/        # 事务性 Outbox
   ui/openbuddy-{shell,sidebar,settings,workbench,…} (14 包)
 
 .moon/                   # moon workspace + task 配置
-  workspace.yml          # 32 工程图(渲染端 + Electron + packages)
+  workspace.yml          # 工程图(渲染端 + Electron + packages)
   tasks/                 # typecheck / test / build / dev / electron.* 预设
   toolchains.yml         # node 22 / pnpm 10 / typescript 5.6
 
@@ -473,22 +455,31 @@ docs/                    # 所有文档(此目录)
 
 ## 🧩 能力包清单
 
-OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration、…)**,每一个都是一个 Cordis 服务,可独立启用、配置或扩展。
+OpenBuddy 内置 **72 个 `@openbuddy/*` workspace 包**(36 UI、8 collaboration、5 capability,以及 runtime/auth/core/shared)。准确数字以 [`docs/stats.json`](docs/stats.json) 为准 —— 下表只列仓库树里真实存在的包。
 
-### 核心 Agent
+> **Plan 模式、子 Agent 任务、本地自动化、Web 搜索**都是 `electron/main/agent/pi-extensions.ts` 里的 **Pi 扩展**(工具名 `openbuddy_plan` / `openbuddy_goals` / `openbuddy_automation` …),**不是** `@openbuddy/capability-*` 包。此前版本的本 README 给它们列了不存在的包名,那是错的。
+
+### 核心 Agent 与运行时
 
 | 包 | 用途 |
 |---|---|
 | `@openbuddy/core-session` | 会话生命周期、fork、rewind |
-| `@openbuddy/capability-plan` | Plan 模式 + 计划审批流 |
-| `@openbuddy/capability-task` | 子 Agent 任务生成与取消 |
-| `@openbuddy/capability-automation` | 本地调度器,定时跑 Agent |
-| `@openbuddy/capability-notification` | 收件箱 + 原生通知 |
-| `@openbuddy/capability-web-search` | Provider 可插拔的 Web 搜索 |
-| `@openbuddy/capability-inspiration` | 提示词模板与开场白 |
-| `@openbuddy/capability-folder-trust` | 文件夹级权限授予 |
-| `@openbuddy/capability-authorization` | 能力级策略 |
+| `@openbuddy/cordis` | Cordis 上下文 + 服务辅助 |
+| `@openbuddy/host-runtime` | 宿主侧运行时胶水 |
+| `@openbuddy/dsh-core` | Agent shell 运行时 |
+| `@openbuddy/plugin-host` | 插件发现 + 热重载 |
+| `@openbuddy/plugin-sdk` | 插件开发 SDK |
+| `@openbuddy/storage` | 带审计的本地持久化 |
+
+### 能力包
+
+| 包 | 用途 |
+|---|---|
+| `@openbuddy/capability-email` | IMAP/SMTP + Gmail/Graph/JMAP API |
+| `@openbuddy/capability-calendar` | 日历集成 |
 | `@openbuddy/capability-mcp-client` | MCP 连接器治理 |
+| `@openbuddy/capability-authorization` | 能力级策略门禁 |
+| `@openbuddy/folder-trust` | 文件夹级权限授予 |
 
 ### 文件与 Shell
 
@@ -502,7 +493,6 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 | 包 | 用途 |
 |---|---|
 | `@openbuddy/team-team` | 多 Agent 团队编排 |
-| `@openbuddy/team-subagent` | 子 Agent 生成 |
 | `@openbuddy/collaboration-protocol` | A2A 消息信封 |
 | `@openbuddy/collaboration-room` | 共享房间 |
 | `@openbuddy/collaboration-inbox` | 跨 Agent 收件箱 |
@@ -517,22 +507,12 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 | 包 | 用途 |
 |---|---|
 | `@openbuddy/auth-casdoor` | Casdoor OIDC 客户端 + 管理 REST |
-| `@openbuddy/auth-permission` | 权限弹窗与策略 UI |
-| `@openbuddy/payment` | Stripe / WeChat Pay / Alipay / HMAC |
-| `@openbuddy/saml` | SAML 2.0 原语 |
-| `@openbuddy/scim` | SCIM v2 端点(RFC 7644) |
-| `@openbuddy/webhook-outbox` | 事务性 Outbox + 重试/退避 |
-
-### 邮件与日历
-
-| 包 | 用途 |
-|---|---|
-| `@openbuddy/capability-email` | IMAP/SMTP + Gmail/Graph/JMAP API |
-| `@openbuddy/capability-calendar` | 日历集成 |
+| `@openbuddy/auth-permission` | 权限弹窗 UI |
+| `@openbuddy/auth-policy` | 租户与能力策略求值 |
 
 ### UI 基元
 
-`packages/ui/openbuddy-ui-*` 下的 26 个包——shell、sidebar、settings、settings-models、workbench、home、conversation、experts、dialogs、markdown、primitives、modules、theme、runtime、slots、automation、locale、hmr。
+`packages/ui/openbuddy-ui-*` 下的 36 个包——shell、sidebar、settings、settings-models、workbench、home、conversation、experts、dialogs、markdown、primitives、modules、theme、runtime、slots、locale、hmr、email、files、automation、account、billing、audit-center 等。
 
 ---
 
@@ -546,7 +526,7 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 <tr><td>能力网格</td><td><a href="https://github.com/cordisjs/cordis">Cordis 3</a>、<a href="https://modelcontextprotocol.io/">MCP SDK 1.25</a></td></tr>
 <tr><td>Monorepo</td><td><a href="https://moonrepo.dev">moon 2.5</a>、<a href="https://pnpm.io/">pnpm 11</a></td></tr>
 <tr><td>质量</td><td><a href="https://vitest.dev/">Vitest 2</a>、<a href="https://playwright.dev/">Playwright 1.58</a>、<a href="https://testing-library.com/">Testing Library</a>、TypeScript 5.6 strict</td></tr>
-<tr><td>后端集成</td><td>Casdoor、NewAPI、Stripe、WeChat Pay、Alipay、IMAP、SMTP、Gmail API、Graph API、JMAP</td></tr>
+<tr><td>后端集成</td><td>Casdoor、NewAPI、IMAP、SMTP、Gmail API、Graph API、JMAP</td></tr>
 </table>
 
 ---
@@ -602,10 +582,10 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 - BYOK 多 Provider 配置
 - Skills / MCP / Experts 表面
 - Plan 模式 · Rewind · Tasks · Slash Commands · Automations
-- Windows(NSIS + MSI)与 macOS(DMG)安装包
+- Windows(NSIS)与 macOS(DMG)安装包
 - CI 发布流水线(GitHub Actions)
-- moon 化 monorepo(`moon run` 一统天下,32 工程 DAG,增量构建)
-- Casdoor OIDC + NewAPI 网关 + 支付适配器 + SCIM v2 + SAML 2.0
+- moon 化 monorepo(`moon run` 一统天下,工程数见 [`docs/stats.json`](docs/stats.json),增量构建)
+- Casdoor OIDC + NewAPI 网关
 
 ### 🚧 进行中
 
@@ -613,7 +593,7 @@ OpenBuddy 内置 **63 个 workspace 包(12 capability、26 UI、8 collaboration�
 - 会话置顶与工作区分组
 - 权限管理面板
 - 跨会话搜索
-- Linux 构建(AppImage + .deb)
+- Linux 构建(AppImage)
 - 代码签名与公证
 
 ### 🔮 后续
@@ -657,11 +637,9 @@ OpenBuddy 还年轻,迭代很快——**任何规模的贡献都欢迎**。
 OpenBuddy 把安全当作一等公民:
 
 - **上下文隔离渲染进程** + 白名单 IPC(`electron/preload/index.ts`)
-- **文件夹级信任授予** 经 `@openbuddy/capability-folder-trust`
+- **文件夹级信任授予** 经 `@openbuddy/folder-trust`
 - **能力级策略** 经 `@openbuddy/capability-authorization`
 - **Casdoor OIDC** 带 PKCE 与 refresh token 轮换
-- **SCIM v2** 预置 + **SAML 2.0** 联合身份
-- **事务性 Outbox** Webhook 投递(零事件丢失)
 - **本地优先审计账本**,跨重启持久化
 
 完整策略与漏洞上报见 **[`SECURITY.md`](SECURITY.md)**。

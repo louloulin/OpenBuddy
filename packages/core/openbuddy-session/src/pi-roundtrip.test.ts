@@ -25,6 +25,16 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
   let workspace: string;
   let previousHome: string | undefined;
   let previousPiHome: string | undefined;
+  const contexts: Context[] = [];
+
+  /** Mount a context that afterEach tears down: `lifecycle.stop()` runs the
+   *  Session disposal effect, which closes the SQLite driver. Without it,
+   *  Windows keeps `openbuddy.sqlite` locked and rm() fails with EBUSY. */
+  function makeContext(): Context {
+    const ctx = new Context();
+    contexts.push(ctx);
+    return ctx;
+  }
 
   beforeEach(async () => {
     home = await mkdtemp(join(tmpdir(), "openbuddy-core-pi-roundtrip-"));
@@ -42,11 +52,17 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
   });
 
   afterEach(async () => {
+    for (const ctx of contexts.splice(0)) {
+      try { await ctx.lifecycle.stop(); } catch { /* already down */ }
+    }
+    // `void closeStorage(...)` in the disposal effect is a microtask chain;
+    // yield a macrotask so the driver actually closes before unlinking.
+    await new Promise((resolve) => setImmediate(resolve));
     if (previousHome === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = previousHome;
     if (previousPiHome === undefined) delete process.env.PI_HOME;
     else process.env.PI_HOME = previousPiHome;
-    await rm(home, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   });
 
   it("mountSession.list() picks up sessions produced by SessionManager.create()", async () => {
@@ -78,7 +94,7 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
       "utf-8",
     );
 
-    const ctx = new Context();
+    const ctx = makeContext();
     mountSession(ctx);
     await ctx.lifecycle.start();
     await new Promise((resolve) => setImmediate(resolve));
@@ -101,7 +117,7 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
       "utf-8",
     );
 
-    const ctx = new Context();
+    const ctx = makeContext();
     mountSession(ctx);
     await ctx.lifecycle.start();
     await new Promise((resolve) => setImmediate(resolve));
@@ -145,7 +161,7 @@ describe.sequential("core-session: pi round-trip with real JSONL", () => {
       "utf-8",
     );
 
-    const ctx = new Context();
+    const ctx = makeContext();
     mountSession(ctx);
     await ctx.lifecycle.start();
     await new Promise((resolve) => setImmediate(resolve));

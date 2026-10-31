@@ -37,6 +37,7 @@
 import { join } from "node:path";
 
 import type { AgentHostState, AgentHostEventHandler, AgentHostPluginEventHandler } from "./_state-shape";
+import { TurnTrackedRequestMap } from "./turn-state";
 
 /**
  * Build a safe-empty AgentHostState. All required fields populated with
@@ -115,7 +116,8 @@ export function createDefaultAgentHostState(): AgentHostState {
     baseProfile: null,
     storedLayers: [],
     toolRegistryRevision: 0,
-    pendingUiRequests: new Map(),
+    // 增删时驱动回合状态机的 awaiting_approval(计划 1.1)。
+    pendingUiRequests: new TurnTrackedRequestMap(),
     hookPermissionSessionRules: new Map(),
     extensionEditorText: new Map(),
     extensionToolsExpanded: new Map(),

@@ -76,26 +76,8 @@ describe("R8.12 .msg__avatar visual upgrade", () => {
   });
 });
 
-describe('.msg__role "AI" badge', () => {
-  it("renders a tiny uppercase pill next to the Buddy name", () => {
-    const r = ruleBody(prose, ".msg--assistant .msg__role");
-    expect(r).toBeTruthy();
-    expect(r!).toMatch(/display:\s*inline-flex/);
-    expect(r!).toMatch(/align-items:\s*center/);
-    expect(r!).toMatch(/height:\s*18px/);
-    expect(r!).toMatch(/padding:\s*0 6px/);
-    expect(r!).toMatch(/border-radius:\s*4px/);
-    expect(r!).toMatch(/font-size:\s*10px/);
-    expect(r!).toMatch(/font-weight:\s*500/);
-    expect(r!).toMatch(/letter-spacing:[^;]*0\.04em/);
-  });
-
-  it("carries no brand tint — the badge is monochrome (R5)", () => {
-    const r = ruleBody(prose, ".msg--assistant .msg__role");
-    expect(r).toBeTruthy();
-    expect(r!).not.toMatch(/var\(--wb-brand/);
-    expect(r!).not.toMatch(/border:\s*1px solid/);
-    expect(r!).toMatch(/background:\s*var\(--wb-bg-secondary/);
-    expect(r!).toMatch(/color:\s*var\(--wb-text-weak/);
+describe(".msg__role badge removed (WorkBuddy 对齐)", () => {
+  it("no longer styles an AI badge next to the Buddy name", () => {
+    expect(ruleBody(prose, ".msg--assistant .msg__role")).toBeFalsy();
   });
 });

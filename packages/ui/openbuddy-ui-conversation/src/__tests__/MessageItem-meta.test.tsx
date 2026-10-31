@@ -85,16 +85,11 @@ describe("MessageItem — R8.14 per-message meta chip", () => {
     expect(meta?.textContent).toContain("12s");
   });
 
-  it("renders the .msg__meta--user chip with a relative timestamp on user bubbles", () => {
+  it("does not render a timestamp row under user bubbles (WorkBuddy 对齐)", () => {
     const { container } = render(
       <MessageItem sessionId="s1" message={makeUserMessage()} streaming={false} />,
     );
-    const meta = container.querySelector(".msg__meta--user");
-    expect(meta).toBeTruthy();
-    // 1 minute ago
-    expect(meta?.textContent).toContain("分钟前");
-    // User bubbles never show the duration detail chip.
-    expect(meta?.querySelector(".msg__meta-detail")).toBeNull();
+    expect(container.querySelector(".msg__meta--user")).toBeNull();
   });
 
   it("does not render any .msg__meta when createdAt is missing (backward-compat)", () => {

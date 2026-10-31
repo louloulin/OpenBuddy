@@ -116,6 +116,7 @@ import { rehypeCodeBlock } from "./plugins/rehype-code-block";
 import { rehypeInlineCode } from "./plugins/rehype-inline-code";
 import { rehypeFixAutolinkBoundary } from "./plugins/rehype-fix-autolink-boundary";
 import { MarkdownPre } from "./MarkdownPre";
+import { ImageLightbox } from "./ImageLightbox";
 // R6.6 — Lazy-load the Mermaid wrapper so its (small but non-zero) chunk
 // plus its mermaid dep graph only ship when a fenced `mermaid` block is
 // actually rendered. Falls back to the source-only view during the async
@@ -336,7 +337,32 @@ function MarkdownImage({
     };
   }, [config, src, syncResolved]);
 
-  return <img src={resolvedSrc} alt={alt} {...imgProps} />;
+  // plan1030 批 5b — cursor:zoom-in 的承诺落地：点击打开 ImageLightbox。
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  return (
+    <>
+      {/* 真正的按钮包裹:图片可用键盘打开查看器(a11y 门禁)。 */}
+      <button
+        type="button"
+        className="md-image-button"
+        aria-label={alt || undefined}
+        onClick={(e) => {
+          e.stopPropagation();
+          setLightboxOpen(true);
+        }}
+      >
+        <img src={resolvedSrc} alt={alt} {...imgProps} />
+      </button>
+      {lightboxOpen && resolvedSrc ? (
+        <ImageLightbox
+          src={resolvedSrc}
+          alt={alt}
+          onClose={() => setLightboxOpen(false)}
+        />
+      ) : null}
+    </>
+  );
 }
 
 /* ---------- main renderer ---------- */
@@ -450,7 +476,7 @@ function MarkdownInner({
     const fallback = preprocessMarkdown(children ?? "");
     return (
       <div
-        className="markdown-body md-font-size-fixed"
+        className="markdown-body"
         data-md-theme={markdownTheme}
       >
         <pre>{fallback}</pre>
@@ -726,17 +752,16 @@ function MarkdownContent({
           </a>
         );
       },
-      ...(stableParts?.imageUrlResolver || stableParts?.imageUrlResolverAsync
-        ? {
-            img: ({
-              src,
-              alt,
-              ...imgProps
-            }: React.ImgHTMLAttributes<HTMLImageElement>) => (
-              <MarkdownImage src={src} alt={alt} config={config} {...imgProps} />
-            ),
-          }
-        : {}),
+      // plan1030 批 5b — img 一律走 MarkdownImage：lightbox 点击查看是
+      // 所有图片的默认能力，不再以「配置了 imageUrlResolver」为前提
+      // （此前未配 resolver 的图片连 cursor:zoom-in 的承诺都无法兑现）。
+      img: ({
+        src,
+        alt,
+        ...imgProps
+      }: React.ImgHTMLAttributes<HTMLImageElement>) => (
+        <MarkdownImage src={src} alt={alt} config={config} {...imgProps} />
+      ),
     }),
     // Depend on the *stable* inner refs, not the outer `config` object.
     // The parent recreates `config` every render even when its inner callbacks
@@ -765,7 +790,7 @@ function MarkdownContent({
 
   const themeClass =
     markdownTheme === "loose" || markdownTheme === "reasoning"
-      ? "markdown-body md-font-size-fixed"
+      ? "markdown-body"
       : "markdown-body";
 
   return (

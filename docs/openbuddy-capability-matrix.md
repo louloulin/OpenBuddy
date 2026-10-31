@@ -46,7 +46,7 @@
 | AI Agent 能力（Pi SDK / Skills / MCP / Teams / Plan / Permission） | **4.7** | 12 项能力全部落地，Pi `AgentSession` 在 Electron Main 中常驻；permission / plan / automation / inspiration 等都是 Cordis 服务而非散落函数。 |
 | Session 管理（JSONL、事件流、分支、恢复） | **4.6** | `SessionCatalog` + `EventStore` + `SessionEventLog` 全部上 SQLite WAL；Pi JSONL 通过 `PiSessionCatalogAdapter` 一键导入；`history-pagination.ts`、`recovery-token.ts`、`harness-resume-token.ts` 形成恢复三角。 |
 | Provider（多模型 BYOK） | **4.4** | `ProviderKind` 联合类型覆盖 `anthropic/openai/pi/deepseek/qwen/minimax/minimax_cn/new_api/custom/custom_anthropic` 共 10 类，但当前代码默认值仍存在 `minimax_cn`（详见缺口章节）。 |
-| 工具调用（fs / bash / web / mcp / automation / inspiration） | **4.5** | DSH 工具名（bash / fs / fs-search / subagent / terminal / todo / session-query / goal / web / editor / skill / workflow）通过 `openbuddy-dsh-tool-*` 适配映射到 Pi；web-search 由 `@openbuddy/capability-web-search` 服务切换。 |
+| 工具调用（fs / bash / web / mcp / automation / inspiration） | **4.5** | DSH 工具名（bash / fs / fs-search / subagent / terminal / todo / session-query / goal / web / editor / skill / workflow）通过 `openbuddy-dsh-tool-*` 适配映射到 Pi；web-search 由 `openbuddy_automation` / Pi 侧工具切换(不存在 `@openbuddy/capability-web-search` 包)。 |
 | 设计系统 / UI 复用 | **4.8** | 207 个图标（208 个 tsx 文件 + `Icon.tsx`）+ 490 个 `--wb-*` 设计令牌 + 64 个 `src/components/*.tsx`（含 55 个测试，9 个实际组件）；与 `WORKBUDDY_UI_REFERENCE.md` 的 Sidebar / HomePage / ChatView / Composer / ConversationList / PinnedSection 6/6 已对齐。 |
 | 企业级功能（SSO / 计费 / 团队 / 多租户） | **4.6** | Casdoor Resource Gateway 25 个 `handle*` 端点；Casdoor OIDC + WeChat + SMS + GitHub/Google + Email Verification 7 种 Provider 模板就绪；`verify-tenant-boundaries.sh` 实现真实的多租户探针。 |
 | 多租户权限架构 | **4.5** | `openbuddy-permission` 提供 glob 规则 + 5 档 `PermissionMode`；`collab/` 9 个包分别负责 room / policy / inbox / task / coordinator / evidence / protocol / network；`audit/隔离检查` 已实现。 |
@@ -320,7 +320,12 @@ flowchart TB
 
 ## 6. 架构与可扩展性
 
-### 6.1 包清单（63 个 `@openbuddy/*`，含 26 UI + 12 capability + 8 collaboration + 3 runtime + 14 auth/payment/saml/scim/webhook/fs/bundle/renderer 等）
+### 6.1 包清单
+
+> **过期说明（2026-10-29）**：本表是 2026-08-31 的快照，含多个**从未存在过**的包名
+> （`capability-{plan,task,automation,web-search,inspiration,notification,memory}`）。
+> 这些能力实际由 `electron/main/agent/pi-extensions.ts` 里的 **Pi 扩展**提供，不是包。
+> 当前真实包清单以 `docs/stats.json` 与 `ls packages/*/` 为准（72 个包：36 UI / 8 collaboration / 5 capability）。
 
 | 层级 | 包 | 用途 | 证据 |
 | --- | --- | --- | --- |

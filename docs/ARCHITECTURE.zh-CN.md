@@ -67,7 +67,7 @@
 
 ### 第 3 层 — Pi Agent + Cordis 网格
 
-**位置:** `packages/runtime/openbuddy-{cordis,plugin-host,storage}` 以及 `packages/<group>/openbuddy-*/` 下的 63 个 workspace 包(12 capability、26 UI、8 collaboration、…)
+**位置:** `packages/runtime/openbuddy-{cordis,plugin-host,storage}` 以及 `packages/<group>/openbuddy-*/` 下的 72 个 `@openbuddy/*` 包(36 UI、8 collaboration、5 capability、…)。当前数字见 [`stats.json`](stats.json)。
 
 **职责:**
 
@@ -127,7 +127,7 @@ export default function apply(ctx: Context) {
 12. pi-event-bridge 经 webContents.send 转发给渲染端
 13. ChatView.tsx 把 delta 追加到可见消息
 14. 完成时 AgentSession 发出 pi://done
-15. Composer 把结果存进 @openbuddy/capability-memory
+15. AgentSession 通过 `@openbuddy/storage` 持久化这一轮(Pi session 文件 + 审计账本)
 ```
 
 ### 持久化模型

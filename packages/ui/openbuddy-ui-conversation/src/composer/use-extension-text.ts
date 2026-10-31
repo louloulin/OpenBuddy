@@ -8,7 +8,15 @@
  * Composer's main file under the 800-line cap while preserving exact
  * behavior.
  */
-import { useEffect, type MutableRefObject, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, type MutableRefObject, type Dispatch, type SetStateAction } from "react";
+
+/** Window event the host fires to put unsent text back into the composer. */
+export const COMPOSER_RESTORE_EVENT = "openbuddy:composer-restore";
+
+export function restoreComposerText(text: string): void {
+  if (typeof window === "undefined" || !text.trim()) return;
+  window.dispatchEvent(new CustomEvent(COMPOSER_RESTORE_EVENT, { detail: { text } }));
+}
 
 export interface UseExtensionTextArgs {
   ref: MutableRefObject<HTMLTextAreaElement | null>;
@@ -72,6 +80,9 @@ export function useExtensionText(args: UseExtensionTextArgs): void {
     el.style.height = (expanded ? el.scrollHeight : Math.min(el.scrollHeight, 320)) + "px";
   }, [text, expanded]);
 
+  const textRef = useRef(text);
+  textRef.current = text;
+
   // 2. Extension-driven text. The nonce deliberately controls repeated
   //    identical extension updates so callers can re-emit without dedup.
   useEffect(() => {
@@ -104,19 +115,41 @@ export function useExtensionText(args: UseExtensionTextArgs): void {
   //    parent component to write the content into the textarea and focus
   //    it. The nonce (not the text itself) is the dep so re-clicking the
   //    same template still re-fires.
+  //    计划 2.1:不再无声覆盖用户自己写的草稿。输入框为空、或内容仍是上一次
+  //    模板原样(没改过)时照旧替换,这样连点几个模板只保留最后一个;否则插到
+  //    光标处,草稿原样保留。
+  const lastInjectedRef = useRef<string | null>(null);
   useEffect(() => {
     if (externalTextNonce === undefined) return;
-    const next = externalText ?? "";
+    const injected = externalText ?? "";
+    const { next, caret } = mergeInjectedText(textRef.current, injected, lastInjectedRef.current, ref.current?.selectionStart);
+    lastInjectedRef.current = injected;
     updateText(next);
-    setCursorPos(next.length);
+    setCursorPos(caret);
     requestAnimationFrame(() => {
       const el = ref.current;
       if (!el) return;
       el.focus();
-      el.selectionStart = el.selectionEnd = next.length;
+      el.selectionStart = el.selectionEnd = caret;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalTextNonce]);
+
+  // 6. Send-failure restore: the host clears the composer optimistically on
+  //    send; when the send then fails it dispatches COMPOSER_RESTORE_EVENT so
+  //    the user's text comes back instead of being lost. Never clobbers
+  //    something the user already started typing again.
+  useEffect(() => {
+    const onRestore = (event: Event) => {
+      const restored = (event as CustomEvent<{ text?: string }>).detail?.text;
+      if (!restored || textRef.current.trim()) return;
+      updateText(restored);
+      setCursorPos(restored.length);
+    };
+    window.addEventListener(COMPOSER_RESTORE_EVENT, onRestore);
+    return () => window.removeEventListener(COMPOSER_RESTORE_EVENT, onRestore);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 5. Persisted draft hydration: when switching to another session
   //    (draftKey change), write the saved draft back to the textarea.
@@ -136,3 +169,26 @@ export function useExtensionText(args: UseExtensionTextArgs): void {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 }
+
+/**
+ * 把模板文本并入输入框(计划 2.1)。返回新内容与光标位置。
+ *  - 输入框为空,或仍是上一次注入的原文(用户没改过):整体替换;
+ *  - 否则在光标处插入(无光标信息时接在末尾),前后用空行隔开。
+ */
+export function mergeInjectedText(
+  current: string,
+  injected: string,
+  lastInjected: string | null,
+  selectionStart?: number | null,
+): { next: string; caret: number } {
+  if (!current.trim() || current === lastInjected) return { next: injected, caret: injected.length };
+  if (!injected) return { next: current, caret: selectionStart ?? current.length };
+  const at = Math.min(Math.max(selectionStart ?? current.length, 0), current.length);
+  const before = current.slice(0, at);
+  const after = current.slice(at);
+  const lead = before && !before.endsWith("\n") ? "\n\n" : "";
+  const tail = after && !after.startsWith("\n") ? "\n\n" : "";
+  const next = `${before}${lead}${injected}${tail}${after}`;
+  return { next, caret: before.length + lead.length + injected.length };
+}
+

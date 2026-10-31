@@ -18,7 +18,7 @@
  * Exit code 0 = pass, 1 = violations found.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -78,7 +78,9 @@ function visit(dir, extensions, kind, allowlist) {
     if (!extensions.has(p.slice(dot))) continue;
     const stat = statSync(p);
     const lines = countLines(p);
-    const rel = relative(ROOT, p);
+    // allowlist 里写的是 POSIX 分隔符;Windows 的 relative() 返回 "a\b.ts",
+    // 不归一化的话 allowlist 永远匹配不上(测试里的白名单用例会莫名其妙变红)。
+    const rel = relative(ROOT, p).split(sep).join("/");
     let defaultLimit;
     if (kind === "electron") {
       defaultLimit = rel === "electron/main/index.ts"
@@ -143,7 +145,10 @@ const out = process.argv.includes("--json")
   : format(result);
 
 console.log(out);
-process.exit(result.passed ? 0 : 1);
+// 不要用 process.exit():Windows 上 stdout 到管道是异步的,立刻退出会把
+// JSON 截断,调用方(测试 / CI 汇总)解析到半个对象。设置 exitCode 让
+// Node 自己冲刷完再退出。
+process.exitCode = result.passed ? 0 : 1;
 
 function format(r) {
   const lines = [];

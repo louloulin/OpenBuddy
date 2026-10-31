@@ -1,5 +1,5 @@
 /**
- * MemoryPanel —— 面板必须真的走 memory:* IPC,且写后刷新(不做本地乐观更新)。
+ * MemoryPanel —— 面板必须真的走 memory-store:* IPC,且写后刷新(不做本地乐观更新)。
  *
  * mutation 可杀:把 reload 换成"只改本地 state"第二条用例立刻红。
  */
@@ -34,10 +34,10 @@ describe("MemoryPanel", () => {
     invoke.mockResolvedValue([ENTRY]);
   });
 
-  it("列表经 memory:list 取数,并把 cwd 传下去(决定工作区层范围)", async () => {
+  it("列表经 memory-store:list 取数,并把 cwd 传下去(决定工作区层范围)", async () => {
     render(<MemoryPanel cwd="/tmp/ws" invoke={invoke as never} />);
     await waitFor(() => expect(screen.getByTestId(`memory-item-${ENTRY.id}`)).toBeInTheDocument());
-    expect(invoke).toHaveBeenCalledWith("memory:list", { cwd: "/tmp/ws", query: undefined });
+    expect(invoke).toHaveBeenCalledWith("memory-store:list", { cwd: "/tmp/ws", query: undefined });
     expect(screen.getByText("memory.scopeBadgeUser", { selector: ".memory-panel__badge" })).toBeInTheDocument();
   });
 
@@ -48,13 +48,13 @@ describe("MemoryPanel", () => {
     fireEvent.change(screen.getByLabelText("memory.composerTitle"), { target: { value: "新记忆" } });
     fireEvent.click(screen.getByRole("button", { name: "memory.add" }));
     await waitFor(() => expect(screen.getByTestId(`memory-item-${ENTRY.id}`)).toBeInTheDocument());
-    expect(invoke).toHaveBeenCalledWith("memory:add", { title: "新记忆", body: "新记忆", scope: "user" });
+    expect(invoke).toHaveBeenCalledWith("memory-store:add", { title: "新记忆", body: "新记忆", scope: "user" });
   });
 
-  it("删除走 memory:delete 后刷新", async () => {
+  it("删除走 memory-store:delete 后刷新", async () => {
     render(<MemoryPanel cwd="/tmp/ws" invoke={invoke as never} />);
     await waitFor(() => expect(screen.getByTestId(`memory-item-${ENTRY.id}`)).toBeInTheDocument());
     fireEvent.click(screen.getByLabelText(`memory.deleteAria:${JSON.stringify({ title: ENTRY.title })}`));
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith("memory:delete", { id: ENTRY.id }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("memory-store:delete", { id: ENTRY.id }));
   });
 });

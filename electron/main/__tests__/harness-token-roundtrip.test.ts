@@ -46,8 +46,8 @@ describe("Agent harness token + RPC store + recovery claim roundtrip", () => {
     const token = await resolveHarnessAuthToken({ path: join(tempDir, "agent-tokens", "openbuddy-harness-token") });
     expect(token).toMatch(/^[A-Za-z0-9_-]{20,256}$/);
     const stat1 = await stat(join(tempDir, "agent-tokens", "openbuddy-harness-token"));
-    const mode = stat1.mode & 0o777;
-    expect(mode).toBe(0o600);
+    // Windows 没有 POSIX 权限位(statSync().mode 是伪造常量),这条只对 POSIX 有意义。
+    if (process.platform !== "win32") expect(stat1.mode & 0o777).toBe(0o600);
   });
 
   it("reuses the same token across invocations of resolveHarnessAuthToken", async () => {
@@ -74,7 +74,7 @@ describe("Agent harness token + RPC store + recovery claim roundtrip", () => {
     expect(recovered).toMatch(/^[A-Za-z0-9_-]{20,256}$/);
     expect(recovered).not.toBe("short");
     const stat2 = await stat(path);
-    expect(stat2.mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") expect(stat2.mode & 0o777).toBe(0o600);
   });
 
   it("defaultHarnessTokenPath returns a stable location inside PI_CODING_AGENT_DIR", () => {
@@ -107,7 +107,7 @@ describe("Agent harness token + RPC store + recovery claim roundtrip", () => {
     expect(read).toEqual([{ rpcId: "rpc-1", fingerprint: "fp-1", expiresAt: expect.any(Number), result: { ok: true, value: { answer: 42 } } }]);
     // Also verify the file exists with mode 0o600
     const fileStat = await stat(path);
-    expect(fileStat.mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") expect(fileStat.mode & 0o777).toBe(0o600);
   });
 
   it("HarnessRpcStore drops expired entries on read", async () => {

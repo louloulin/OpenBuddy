@@ -2,7 +2,8 @@
  * ChatView pause/yield/resume 闭环集成测试。
  *
  * 验证:
- *  - 流式时显示「暂停」按钮,点击 → onCancel + 进入 yielding。
+ *  - 流式时按 ⌘/Ctrl+P 暂停 → onCancel + 进入 yielding(输入区不再常驻「暂停」按钮,
+ *    停止只留输入框里的 ■,2026-10-31 对齐 WorkBuddy 精简)。
  *  - 流式结束(yielding → yielded)显示「已暂停」横幅 + 「恢复」/「恢复并继续」两按钮。
  *  - 「恢复」:仅清状态(不触发 onSend)。
  *  - 「恢复并继续」:清状态 + onSend("请继续。")。
@@ -149,6 +150,11 @@ const baseProps = {
   onToast: vi.fn(),
 };
 
+/** ⌘P(mac)/Ctrl+P —— 两个修饰键都带上,与平台判断无关。 */
+function pressPause() {
+  fireEvent.keyDown(window, { key: "p", metaKey: true, ctrlKey: true });
+}
+
 function setStore(patch: Partial<typeof storeState>) {
   storeState = { ...storeState, ...patch };
 }
@@ -168,11 +174,11 @@ describe("ChatView pause/yield/resume 闭环", () => {
     baseProps.onToast.mockClear();
   });
 
-  it("流式时显示「暂停」按钮,点击触发 onCancel", () => {
+  it("流式时不再常驻「暂停」按钮,⌘/Ctrl+P 触发 onCancel", () => {
     setStore({ streaming: true, streamingMessageId: "a1" });
     renderChat();
-    const pauseBtn = screen.getByTitle("暂停生成（保留会话，可继续）");
-    fireEvent.click(pauseBtn);
+    expect(screen.queryByTitle("暂停生成（保留会话，可继续）")).toBeNull();
+    pressPause();
     expect(baseProps.onCancel).toHaveBeenCalledTimes(1);
   });
 
@@ -180,7 +186,7 @@ describe("ChatView pause/yield/resume 闭环", () => {
     // 初始流式 → 点暂停。
     setStore({ streaming: true, streamingMessageId: "a1" });
     const { rerender } = renderChat();
-    fireEvent.click(screen.getByTitle("暂停生成（保留会话，可继续）"));
+    pressPause();
     expect(baseProps.onCancel).toHaveBeenCalled();
     // 模拟 pi complete:streaming → false。yield 状态在 streaming 结束后确认。
     setStore({ streaming: false, streamingMessageId: null });
@@ -197,7 +203,7 @@ describe("ChatView pause/yield/resume 闭环", () => {
   it("「恢复」仅清状态,不触发 onSend", async () => {
     setStore({ streaming: true, streamingMessageId: "a1" });
     const { rerender } = renderChat();
-    fireEvent.click(screen.getByTitle("暂停生成（保留会话，可继续）"));
+    pressPause();
     setStore({ streaming: false, streamingMessageId: null });
     rerender(
       <ThemeProvider>
@@ -217,7 +223,7 @@ describe("ChatView pause/yield/resume 闭环", () => {
   it("「恢复并继续」清状态 + onSend(\"请继续。\")", async () => {
     setStore({ streaming: true, streamingMessageId: "a1" });
     const { rerender } = renderChat();
-    fireEvent.click(screen.getByTitle("暂停生成（保留会话，可继续）"));
+    pressPause();
     setStore({ streaming: false, streamingMessageId: null });
     rerender(
       <ThemeProvider>

@@ -16,7 +16,7 @@ OpenBuddy 是一个 100% 开源(MIT)的桌面 AI 工作台。它有与腾讯 Wor
 | 数据路径 | 腾讯后端 | 本地 + 你的网关 |
 | Provider 选择 | 有限 | BYOK —— 任何 Provider |
 | Plugin SDK | 闭源 | Cordis 开源能力网格 |
-| 用户可见测试 | ❌ | 仓库中 309 个测试文件 |
+| 用户可见测试 | ❌ | 测试文件全部在仓库里 |
 
 完整对比见 [`workbuddy-parity-matrix.md`](workbuddy-parity-matrix.md)。
 
@@ -153,7 +153,7 @@ Tauri 是最初的选择,我们迁移到 Electron 因为:
 
 #### OpenBuddy 支持 SSO 吗?
 
-支持。Casdoor OIDC + SAML 2.0 + SCIM v2 全部支持。见 [`casdoor-enterprise-auth.md`](casdoor-enterprise-auth.md) 与 [`enterprise-casdoor-newapi-openbuddy-architecture.md`](enterprise-casdoor-newapi-openbuddy-architecture.md)。
+Casdoor OIDC SSO 已在主进程接线。SAML 2.0 与 SCIM v2 是**有测试的种子**,2026-10-28 已归档,尚未接线(git 历史可找回)。见 [`casdoor-enterprise-auth.md`](casdoor-enterprise-auth.md) 与 [`enterprise-casdoor-newapi-openbuddy-architecture.md`](enterprise-casdoor-newapi-openbuddy-architecture.md)。
 
 #### 能在 CI 里跑 OpenBuddy 测试吗?
 

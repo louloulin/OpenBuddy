@@ -109,7 +109,14 @@ async function loadSession(sessionId: string, cwd: string, options?: { traceId?:
       // AgentSession (plugins / resource loader / typert stay put), turning a
       // ~2.4s full re-boot into a ~50ms rebind. rebindSession itself falls
       // back to initialize() when cwd or agent-preset scope differs.
-      if (rebindSession) await rebindSession(session.path, sessionCwd);
+      // 目标就是正在运行的活动会话(典型:窗口重新加载后恢复上次会话)时不重绑:
+      // replace() 会中止旧会话,正在跑的回合会被直接打断(计划 0.3 / 1.1)。
+      // 回溯后的重新加载需要重绑来读回文件,但回溯不允许在运行中进行,两者不冲突。
+      const live = state.session as { sessionId?: string; isStreaming?: boolean } | null;
+      const keepLive = live?.sessionId === sessionId && live.isStreaming === true;
+      if (keepLive) {
+        // 保留现有会话,只重放历史。
+      } else if (rebindSession) await rebindSession(session.path, sessionCwd);
       else await initialize({ cwd: sessionCwd, sessionPath: session.path });
       const entries = state.session?.sessionManager.getEntries() ?? [];
       const textOf = (content: unknown): string => {
@@ -199,11 +206,64 @@ async function loadSession(sessionId: string, cwd: string, options?: { traceId?:
   }
 }
 
+/** Rough token estimate (≈4 chars per token), same heuristic Pi uses. */
+const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
+
+/**
+ * Pi's `getContextUsage()` (`{ tokens, contextWindow, percent }`) mapped to
+ * the `ContextInfo` shape the renderer's context pill reads. The IPC used to
+ * return Pi's raw object under `contextUsage`, the pill read `context.total`,
+ * and so the pill never rendered at all.
+ */
+export function toContextInfo(input: {
+  usage: { tokens: number | null; contextWindow: number; percent: number | null } | undefined;
+  systemPrompt: string;
+  toolDefinitions: ReadonlyArray<{ name: string; description?: string; parameters?: unknown }>;
+  messageCount: number;
+  compaction?: { enabled: boolean; reserveTokens: number };
+}): Record<string, unknown> | null {
+  const { usage } = input;
+  // tokens is null right after a compaction until the next response — unknown, not zero.
+  if (!usage || usage.tokens === null || usage.contextWindow <= 0) return null;
+  const used = usage.tokens;
+  const total = usage.contextWindow;
+  const systemPromptTokens = estimateTokens(input.systemPrompt);
+  const toolDefinitionsTokens = input.toolDefinitions.reduce(
+    (sum, tool) => sum + estimateTokens(`${tool.name}${tool.description ?? ""}${JSON.stringify(tool.parameters ?? {})}`),
+    0,
+  );
+  const threshold = input.compaction?.enabled
+    ? Math.round(((total - input.compaction.reserveTokens) / total) * 100)
+    : undefined;
+  return {
+    used,
+    total,
+    usagePct: Math.round(usage.percent ?? (used / total) * 100),
+    systemPromptTokens,
+    toolDefinitionsCount: input.toolDefinitions.length,
+    toolDefinitionsTokens,
+    messageCount: input.messageCount,
+    messageTokens: Math.max(0, used - systemPromptTokens - toolDefinitionsTokens),
+    turnCount: 0,
+    toolCallCount: 0,
+    compactionCount: 0,
+    freeTokens: Math.max(0, total - used),
+    ...(threshold !== undefined && threshold > 0 ? { autoCompactThresholdPercent: threshold } : {}),
+  };
+}
+
 function sessionInfo(sessionId: string) {
   const session = state.session;
   if (!session || session.sessionId !== sessionId) throw new Error(`Pi session is not loaded: ${sessionId}`);
-  const contextUsage = session.getContextUsage();
-  return { sessionId, contextUsage: contextUsage ?? null, model: session.model ?? null };
+  const active = new Set(session.getActiveToolNames());
+  const context = toContextInfo({
+    usage: session.getContextUsage(),
+    systemPrompt: session.systemPrompt ?? "",
+    toolDefinitions: session.getAllTools().filter((tool) => active.has(tool.name)),
+    messageCount: session.messages.length,
+    compaction: session.settingsManager.getCompactionSettings(),
+  });
+  return { sessionId, context, model: session.model ?? null };
 }
 
 function sessionUsage(sessionId: string) {

@@ -64,8 +64,17 @@ function registerAdapter(adapter: PiCompatibilityAdapter, service?: unknown): Ma
  * cannot reach session tasks today) and reverted, because reversing a recorded
  * architecture decision is the user's call. Add it here only once §I.1 changes.
  */
+const PASSTHROUGH_NO_TOOL =
+  "docs/plan/20261031.md §17 1.6 — 只返回「去安装某 npm 包」说明的空工具已删除，原生包安装后自行注册真工具";
+
 const CAPABILITY_EXEMPT_FROM_TOOLS: Record<string, string> = {
   task: "OPENBUDDY_PI_NATIVE_PLAN.md v3 §I.1 — 保留 Cordis，删 PI extension adapter",
+  plan: PASSTHROUGH_NO_TOOL,
+  lens: PASSTHROUGH_NO_TOOL,
+  simplify: PASSTHROUGH_NO_TOOL,
+  hashline: PASSTHROUGH_NO_TOOL,
+  worktree: PASSTHROUGH_NO_TOOL,
+  automation: PASSTHROUGH_NO_TOOL,
 };
 
 describe("compatibility adapter tool coverage", () => {
@@ -114,18 +123,12 @@ describe("compatibility adapter tool coverage", () => {
     expect(malformed).toEqual([]);
   });
 
-  it("passthrough-only adapters return describe text instead of failing", async () => {
-    // pi-lens has no Cordis service and no invoke handler; the tool must still
-    // answer with the "install the upstream package" projection.
+  it("passthrough-only adapters expose no model-facing tool", () => {
+    // pi-lens has no Cordis service and no invoke handler: a describe-only
+    // tool would take a tool slot and could never do the job (§17 1.6).
     const lens = compatibilityAdapters.find((adapter) => adapter.capability === "lens");
     expect(lens).toBeDefined();
-    const tools = registerAdapter(lens!);
-    expect(tools.size).toBeGreaterThan(0);
-    const tool = tools.values().next().value as RegisteredTool;
-    const result = await tool.execute("call-1", { verb: "status" });
-    expect(result.details.ok).toBe(true);
-    expect(result.details.fallback).toBe(true);
-    expect(result.content[0]?.text).toContain("pi-lens");
+    expect(registerAdapter(lens!).size).toBe(0);
   });
 
   it("an adapter with an invokeInvocation uses the real invoke path, not the fallback", async () => {

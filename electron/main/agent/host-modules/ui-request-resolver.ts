@@ -104,14 +104,21 @@ export function resolveUiRequest(requestId: string, value: AgentHostUiRequestVal
       // user's intent for the current session; deliberate permanent rules
       // go through `permission_save` in settings.
       const pattern = request.permission?.pattern;
+      const toolName = request.permission?.toolName ?? "";
       if (pattern) {
-        void permissionReadRulesImpl().then((rules) => permissionWriteRulesImpl([
-          ...rules,
-          { action: "allow", tool: request.permission?.toolName ?? "", pattern },
-        ])).catch((error: unknown) => console.warn("[openbuddy] failed to persist hook permission", error));
+        // `ctx.confirm` is a synthetic identity for `ctx.ui.confirm(...)`
+        // prompts (command/path hashed by message). It is never a real tool
+        // name, so persisting it globally would only leave dead rules in the
+        // policy file — keep those grants session-scoped.
+        if (toolName !== "ctx.confirm") {
+          void permissionReadRulesImpl().then((rules) => permissionWriteRulesImpl([
+            ...rules,
+            { action: "allow", tool: toolName, pattern },
+          ])).catch((error: unknown) => console.warn("[openbuddy] failed to persist hook permission", error));
+        }
         state.hookPermissionSessionRules.set(request.sessionId, [
           ...(state.hookPermissionSessionRules.get(request.sessionId) ?? []),
-          { action: "allow", tool: request.permission!.toolName, pattern },
+          { action: "allow", tool: toolName, pattern },
         ]);
       }
     } else if (decision === "allow") {

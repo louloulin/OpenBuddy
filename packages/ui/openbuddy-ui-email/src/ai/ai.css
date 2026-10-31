@@ -381,3 +381,13 @@
 .mail-status-bar__undo { color: var(--wb-accent); }
 .mail-status-bar__help { display: inline-flex; gap: 4px; align-items: center; background: transparent; border: 0; cursor: pointer; color: inherit; font: inherit; }
 .mail-status-bar__help:hover { color: var(--wb-fg-primary); }
+
+/* plan1030 批 5e — reduce-motion 下降速不停转（2.4s/圈），
+   覆盖 base.css 的全局 spinner 冻结。 */
+@media (prefers-reduced-motion: reduce) {
+  .ai-command-bar__busy {
+    animation-duration: 2.4s !important;
+    animation-iteration-count: infinite !important;
+    animation-delay: 0ms !important;
+  }
+}
