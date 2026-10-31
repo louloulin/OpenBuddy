@@ -200,7 +200,7 @@ jobs:
       # B1(2026-10-19 生产评审):真实 API key 曾进过公开仓库历史。全量扫描
       # (fetch-depth: 0)拦住新增泄露;历史清洗另由轮换兜底。
       - name: gitleaks (full history)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
