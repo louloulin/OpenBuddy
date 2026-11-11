@@ -28,12 +28,13 @@ export class PiEngine {
   constructor(
     readonly settings: Settings,
     readonly emit: Emit,
+    openUrl: (url: string) => Promise<void>,
   ) {
     this.cwd = join(settings.dir, "inbox");
     this.permissions = new Permissions(settings, emit);
     this.providers = new Providers(settings);
     this.skills = new SkillsService(settings);
-    this.mcp = new McpService(settings);
+    this.mcp = new McpService(settings, openUrl, emit);
     this.sessionDir = join(settings.dir, "sessions");
   }
   async initialize() {
@@ -241,10 +242,14 @@ export class PiEngine {
     }
   }
   async cancel(id: string) {
+    this.mcp.auth.cancel(id);
+    await this.mcp.auth.settle();
     this.permissions.cancel(id);
     await this.live(id).abort();
   }
   async shutdown() {
+    this.mcp.auth.cancel();
+    await this.mcp.auth.settle();
     this.permissions.cancel();
     const session = this.session;
     if (session) {

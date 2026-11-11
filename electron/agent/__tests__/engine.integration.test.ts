@@ -80,6 +80,10 @@ async function fixture() {
       chunk({ content: toolDone ? "tool complete" : "world" });
       chunk({}, "stop");
     }
+    if (data.stream_options?.include_usage)
+      res.write(
+        `data: ${JSON.stringify({ id: "fixture", object: "chat.completion.chunk", created: 1, model: "fixture", choices: [], usage: { prompt_tokens: 11, completion_tokens: 3, total_tokens: 14, prompt_tokens_details: { cached_tokens: 2 } } })}\n\n`,
+      );
     res.end("data: [DONE]\n\n");
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -150,6 +154,16 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
     expect(((await f.call("providers_list")) as any).providers[0].apiKey).toBe(
       "••••",
     );
+    expect(
+      await f.call("agent_session_usage", { sessionId: f.sid }),
+    ).toMatchObject({
+      usage: {
+        inputTokens: 11,
+        outputTokens: 3,
+        totalTokens: 14,
+        cachedReadTokens: 2,
+      },
+    });
     await f.call("agent_shutdown");
     f.events.length = 0;
     await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root });

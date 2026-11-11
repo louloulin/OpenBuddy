@@ -119,7 +119,9 @@ it("bounds binary reads and preserves array return contracts", async () => {
   ).toBe("YWJjZGVm");
   expect(Array.isArray(await f.call("notification_list"))).toBe(true);
   expect(Array.isArray(await f.call("mcp_list"))).toBe(true);
-  await expect(f.call("mcp_auth_status")).rejects.toThrow("not_implemented");
+  await expect(
+    f.call("mcp_auth_status", { sessionId: "missing" }),
+  ).rejects.toThrow("会话未加载");
   await expect(
     f.call("open_url", { url: "file:///etc/passwd" }),
   ).rejects.toThrow();

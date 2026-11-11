@@ -64,6 +64,22 @@ export class SecretStore {
     const secrets = Object.keys(this.store.read())
       .map((id) => this.get(id))
       .filter((s): s is string => !!s);
+    const collect = (value: unknown, sensitive = false): void => {
+      if (typeof value === "string" && sensitive && value) secrets.push(value);
+      else if (value && typeof value === "object")
+        for (const [key, child] of Object.entries(value))
+          collect(
+            child,
+            sensitive || /token|secret|verifier|oauthState/i.test(key),
+          );
+    };
+    for (const secret of [...secrets]) {
+      try {
+        collect(JSON.parse(secret));
+      } catch {
+        /* Scalar credentials are already included. */
+      }
+    }
     const visit = (v: unknown): unknown => {
       if (typeof v === "string") {
         let text = v;

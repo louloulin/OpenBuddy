@@ -11,11 +11,17 @@ interface Provider {
   authScheme: string;
   contextWindow?: number;
 }
+type RuntimeModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
 interface Model {
   modelId: string;
   providerId: string;
   name?: string;
   contextWindow?: number;
+  reasoning?: boolean;
+  input?: ("text" | "image")[];
+  maxTokens?: number;
+  cost?: RuntimeModel["cost"];
+  compat?: Record<string, boolean>;
 }
 const presets: Record<
   string,
@@ -62,6 +68,7 @@ function endpoint(value: string) {
 export class Providers {
   private catalog: JsonStore<{ providers: Provider[]; models: Model[] }>;
   runtime!: ModelRuntime;
+  private builtins = new Map<string, RuntimeModel>();
   constructor(private settings: Settings) {
     this.catalog = new JsonStore(join(settings.dir, "providers.json"), () => ({
       providers: [],
@@ -80,12 +87,34 @@ export class Providers {
       refreshOnCreate: false,
       allowModelNetwork: false,
     });
+    this.builtins = new Map(
+      this.runtime
+        .getModels()
+        .map((model) => [`${model.provider}/${model.id}`, model]),
+    );
     await this.sync();
+  }
+  private builtin(provider: Provider, model: Model) {
+    const catalogProvider =
+      provider.providerKind === "grok" ? "xai" : provider.providerKind;
+    return this.builtins.get(`${catalogProvider}/${model.modelId}`);
   }
   list() {
     const data = this.catalog.read();
     return {
-      models: data.models,
+      models: data.models.map((m) => {
+        const provider = data.providers.find((p) => p.id === m.providerId),
+          builtin = provider ? this.builtin(provider, m) : undefined;
+        const cost = m.cost ?? builtin?.cost;
+        return {
+          ...m,
+          input: m.input ?? builtin?.input ?? ["text"],
+          reasoning: m.reasoning ?? builtin?.reasoning ?? false,
+          maxTokens: m.maxTokens ?? builtin?.maxTokens ?? 8192,
+          cost,
+          pricingKnown: cost !== undefined,
+        };
+      }),
       providers: data.providers.map((p) => ({
         ...p,
         apiKey: this.settings.secrets.has(`provider:${p.id}`)
@@ -111,23 +140,37 @@ export class Providers {
         authHeader: p.authScheme === "bearer",
         models: data.models
           .filter((m) => m.providerId === p.id)
-          .map((m) => ({
-            id: m.modelId,
-            name: m.name ?? m.modelId,
-            reasoning: false,
-            input: ["text"],
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-            contextWindow: m.contextWindow ?? p.contextWindow ?? 128000,
-            maxTokens: 8192,
-            compat:
-              api === "openai-completions"
-                ? {
-                    supportsDeveloperRole: false,
-                    supportsStore: false,
-                    supportsUsageInStreaming: false,
-                  }
-                : undefined,
-          })),
+          .map((m) => {
+            const builtin = this.builtin(p, m);
+            return {
+              id: m.modelId,
+              name: m.name ?? builtin?.name ?? m.modelId,
+              reasoning: m.reasoning ?? builtin?.reasoning ?? false,
+              input: m.input ?? builtin?.input ?? ["text"],
+              // Pi requires a numeric cost for its internal accumulator. Unknown prices
+              // are exposed as cost:undefined/pricingKnown:false in providers_list.
+              cost: m.cost ??
+                builtin?.cost ?? {
+                  input: 0,
+                  output: 0,
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                },
+              contextWindow:
+                m.contextWindow ??
+                p.contextWindow ??
+                builtin?.contextWindow ??
+                128000,
+              maxTokens: m.maxTokens ?? builtin?.maxTokens ?? 8192,
+              compat: {
+                ...(api === "openai-completions"
+                  ? { supportsDeveloperRole: false, supportsStore: false }
+                  : {}),
+                ...builtin?.compat,
+                ...m.compat,
+              },
+            };
+          }),
       });
       const key = this.settings.secrets.get(`provider:${p.id}`);
       if (key) await this.runtime.setRuntimeApiKey(p.id, key);
@@ -190,6 +233,54 @@ export class Providers {
     if (m.name) model.name = String(m.name);
     if (m.contextWindow !== undefined)
       model.contextWindow = positive(m.contextWindow);
+    if (m.reasoning !== undefined) {
+      if (typeof m.reasoning !== "boolean")
+        throw Error("reasoning必须为布尔值");
+      model.reasoning = m.reasoning;
+    }
+    if (m.input !== undefined) {
+      if (
+        !Array.isArray(m.input) ||
+        m.input.length === 0 ||
+        !m.input.every((v) => v === "text" || v === "image")
+      )
+        throw Error("input仅支持text/image");
+      model.input = [...new Set(m.input)] as ("text" | "image")[];
+    }
+    if (m.maxTokens !== undefined) model.maxTokens = positive(m.maxTokens);
+    if (m.cost !== undefined) {
+      const cost = object(m.cost);
+      for (const key of ["input", "output", "cacheRead", "cacheWrite"])
+        if (
+          typeof cost[key] !== "number" ||
+          !Number.isFinite(cost[key]) ||
+          (cost[key] as number) < 0
+        )
+          throw Error("cost必须包含非负input/output/cacheRead/cacheWrite");
+      model.cost = {
+        input: cost.input as number,
+        output: cost.output as number,
+        cacheRead: cost.cacheRead as number,
+        cacheWrite: cost.cacheWrite as number,
+      };
+    }
+    if (m.compat !== undefined) {
+      const compat = object(m.compat),
+        allowed = [
+          "supportsUsageInStreaming",
+          "supportsDeveloperRole",
+          "supportsStore",
+          "supportsReasoningEffort",
+          "supportsStrictMode",
+        ];
+      if (
+        Object.entries(compat).some(
+          ([k, v]) => !allowed.includes(k) || typeof v !== "boolean",
+        )
+      )
+        throw Error("无效的模型兼容设置");
+      model.compat = compat as Record<string, boolean>;
+    }
     // The frontend identifies models by id, so preserve uniqueness across providers.
     data.models = data.models
       .filter((m) => m.modelId !== model.modelId)

@@ -22,7 +22,9 @@ export async function createEngineHandlers(options: EngineOptions) {
   const settings = createSettings(options.userDataDir, options.safeStorage);
   const emit: Emit = (event, payload) =>
     options.emit(event, settings.secrets.redact(payload));
-  const engine = new PiEngine(settings, emit);
+  const engine = new PiEngine(settings, emit, (url) =>
+    options.shell.openExternal(url),
+  );
   await engine.initialize();
   const update = (fn: (c: ReturnType<typeof settings.config.read>) => void) => {
     const c = settings.config.read();
@@ -141,7 +143,8 @@ export async function createEngineHandlers(options: EngineOptions) {
     agents_defaults_get: () => settings.config.read().defaults,
     agents_defaults_save: (p) => {
       const d = object(p.defaults);
-      if (d.rememberToolApprovals === true) unsupported("remember tool approvals");
+      if (d.rememberToolApprovals === true)
+        unsupported("remember tool approvals");
       if (
         typeof d.defaultModel !== "string" ||
         !["ask", "auto", "always-approve"].includes(String(d.defaultPermission))
@@ -190,8 +193,19 @@ export async function createEngineHandlers(options: EngineOptions) {
       engine.mcp.toggle(text(p.name), bool(p.enabled));
       await engine.reload();
     },
-    mcp_auth_trigger: () => unsupported("MCP OAuth"),
-    mcp_auth_status: () => unsupported("MCP OAuth status"),
+    mcp_auth_trigger: async (p) => {
+      const id = text(p.sessionId);
+      if (engine.currentSessionId !== id) throw Error("会话未加载");
+      const result = await engine.mcp.signIn(id, text(p.serverName));
+      if (result.status === "authenticated" && engine.currentSessionId === id)
+        await engine.reload();
+      return result;
+    },
+    mcp_auth_status: (p) => {
+      if (engine.currentSessionId !== text(p.sessionId))
+        throw Error("会话未加载");
+      return engine.mcp.authStatus();
+    },
     notification_list: () =>
       settings.config.read().notifications.slice().reverse(),
     notification_append: (p) => {

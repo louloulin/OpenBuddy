@@ -4,10 +4,19 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { join } from "node:path";
 import { JsonStore, object, text, type Settings } from "./settings.js";
+import { McpAuthService } from "./mcp-auth.js";
+import type { Emit } from "../agent/permissions.js";
+import type { McpOAuthSettings } from "@earendil-works/pi-mcp/oauth";
 type Config = { mcpServers: Record<string, Record<string, unknown>> };
 export class McpService {
   private store: JsonStore<Config>;
-  constructor(private settings: Settings) {
+  readonly auth: McpAuthService;
+  constructor(
+    private settings: Settings,
+    openUrl: (url: string) => Promise<void>,
+    emit: Emit,
+  ) {
+    this.auth = new McpAuthService(settings, openUrl, emit);
     this.store = new JsonStore(join(settings.dir, "mcp.json"), () => ({
       mcpServers: {},
     }));
@@ -38,8 +47,7 @@ export class McpService {
     for (const [name, raw] of Object.entries(servers)) {
       text(name);
       const c = object(raw);
-      if (c.oauth || c.auth)
-        throw Error("not_implemented: MCP OAuth/provider token delegation");
+      if (c.auth) throw Error("not_implemented: MCP provider token delegation");
       const known = [
         "command",
         "url",
@@ -52,6 +60,7 @@ export class McpService {
         "cwd",
         "type",
         "description",
+        "oauth",
       ];
       if (Object.keys(c).some((k) => !known.includes(k)))
         throw Error(`不支持的 MCP 配置字段: ${name}`);
@@ -76,6 +85,52 @@ export class McpService {
       if (c.enabled !== undefined && typeof c.enabled !== "boolean")
         throw Error("MCP enabled必须为布尔值");
       const value: Record<string, unknown> = { ...c, exposure: "direct" };
+      if (c.oauth !== undefined) {
+        if (!c.url) throw Error("OAuth只适用于HTTP MCP");
+        const oauth = { ...object(c.oauth) };
+        const allowed = [
+          "clientId",
+          "clientSecret",
+          "callbackPort",
+          "callbackUrl",
+          "scope",
+          "clientName",
+          "clientRegistration",
+        ];
+        if (Object.keys(oauth).some((k) => !allowed.includes(k)))
+          throw Error("不支持的OAuth设置");
+        for (const field of [
+          "clientId",
+          "clientSecret",
+          "callbackUrl",
+          "scope",
+          "clientName",
+        ])
+          if (oauth[field] !== undefined && typeof oauth[field] !== "string")
+            throw Error(`OAuth ${field}必须为字符串`);
+        if (
+          oauth.callbackPort !== undefined &&
+          (typeof oauth.callbackPort !== "number" ||
+            !Number.isInteger(oauth.callbackPort) ||
+            oauth.callbackPort < 1 ||
+            oauth.callbackPort > 65535)
+        )
+          throw Error("无效的OAuth回调端口");
+        if (
+          oauth.clientRegistration !== undefined &&
+          !["auto", "dcr", "cimd"].includes(String(oauth.clientRegistration))
+        )
+          throw Error("无效的OAuth客户端注册模式");
+        if (oauth.clientSecret !== undefined) {
+          const id = `mcp:${name}:oauth:clientSecret`;
+          if (oauth.clientSecret === "••••") {
+            if (!this.settings.secrets.has(id))
+              throw Error("OAuth secret掩码没有对应凭据");
+          } else secretUpdates.push([id, String(oauth.clientSecret)]);
+          oauth.clientSecret = "••••";
+        }
+        value.oauth = oauth;
+      }
       for (const field of ["env", "headers"])
         if (c[field] !== undefined) {
           const values = object(c[field]),
@@ -110,6 +165,7 @@ export class McpService {
         ? { command: text(s.target), args: s.args ?? [], env: s.env ?? {} }
         : { url: text(s.target), headers: s.headers ?? {} }),
       enabled: s.enabled ?? true,
+      ...(s.oauth === undefined ? {} : { oauth: s.oauth }),
     };
     this.save(JSON.stringify(config));
   }
@@ -125,11 +181,52 @@ export class McpService {
     c.mcpServers[name].enabled = enabled;
     this.store.write(c);
   }
+  private oauthSettings(
+    name: string,
+    config: Record<string, unknown>,
+  ): McpOAuthSettings {
+    const oauth = { ...object(config.oauth ?? {}) };
+    if (oauth.clientSecret === "••••")
+      oauth.clientSecret = this.settings.secrets.get(
+        `mcp:${name}:oauth:clientSecret`,
+      );
+    return oauth as McpOAuthSettings;
+  }
+  authStatus() {
+    return Object.entries(this.store.read().mcpServers)
+      .filter(
+        ([, c]) =>
+          typeof c.url === "string" &&
+          !Object.keys(object(c.headers ?? {})).some(
+            (k) => k.toLowerCase() === "authorization",
+          ),
+      )
+      .map(([name, c]) => this.auth.status(name, String(c.url)));
+  }
+  async signIn(sessionId: string, name: string) {
+    const config = this.store.read().mcpServers[name];
+    if (!config || config.enabled === false)
+      throw Error("MCP server不存在或未启用");
+    if (typeof config.url !== "string") throw Error("stdio MCP无需OAuth");
+    if (
+      Object.keys(object(config.headers ?? {})).some(
+        (k) => k.toLowerCase() === "authorization",
+      )
+    )
+      throw Error("该MCP使用静态Authorization，请先移除再使用OAuth");
+    return this.auth.trigger(
+      sessionId,
+      name,
+      config.url,
+      this.oauthSettings(name, config),
+    );
+  }
   extension() {
     const loadConfig: NonNullable<McpExtensionOptions["loadConfig"]> = () => ({
       servers: Object.entries(this.store.read().mcpServers).map(
         ([name, raw]) => {
           const config = { ...raw };
+          if (config.oauth) config.oauth = this.oauthSettings(name, config);
           for (const field of ["env", "headers"])
             if (config[field])
               config[field] = Object.fromEntries(
@@ -152,8 +249,10 @@ export class McpService {
     });
     return createMcpExtension({
       loadConfig,
+      credentials: this.auth.credentials.asSdkCredentials(),
+      // Authentication is initiated exclusively through mcp_auth_trigger IPC.
       openUrl: () => {
-        throw Error("not_implemented: MCP OAuth");
+        throw Error("请通过MCP授权按钮启动认证");
       },
     });
   }
