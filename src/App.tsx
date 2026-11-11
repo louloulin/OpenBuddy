@@ -85,6 +85,13 @@ function extractMarkdownBody(raw: string): string {
   return rest.slice(closeIdx + 1).replace(/^\n---\s*/, "").trim();
 }
 
+function clearPendingRequests(sessionId: string) {
+  const permissions = usePermissionStore.getState();
+  for (const request of permissions.queues[sessionId] ?? []) permissions.dismiss(request.requestId, sessionId);
+  const questions = useQuestionStore.getState();
+  for (const request of questions.queues[sessionId] ?? []) questions.dismiss(request.requestId, sessionId);
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -142,6 +149,7 @@ function Shell() {
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
+    let disposed = false;
 
     // 注册遥测 console provider(Aegis 替代),启动时一次。
     registerTelemetryProvider(
@@ -177,6 +185,7 @@ function Shell() {
     (async () => {
       try {
         const result = await agentInit();
+        if (disposed) return;
         // 新建任务 aims at it (⇒ 任务 group), and the user can re-aim a new
         // session at another directory via the Composer workspace picker
         // (⇒ that 空间 node). homeCwd drives the store's group routing.
@@ -209,6 +218,7 @@ function Shell() {
             // Ignore completes for side-channel sessions (inspiration generation)
             // — they're handled by their own listeners, not the main transcript.
             sessionStore.getState().markComplete(p);
+            clearPendingRequests(p.sessionId);
             const currentSessionId = sessionStore.getState().sessionId;
             if (currentSessionId && p.sessionId && p.sessionId !== currentSessionId) {
               return;
@@ -346,6 +356,8 @@ function Shell() {
           },
         });
 
+        if (disposed) { unlisten(); return; }
+
         // Sidebar now shows two groups: 任务 (the inbox cwd's sessions) +
         // 空间 (one node per other working directory). Load both up front;
         // 空间 node children are lazy-loaded when a node is expanded.
@@ -383,6 +395,7 @@ function Shell() {
       }
     })();
     return () => {
+      disposed = true;
       if (unlisten) unlisten();
     };
   }, [sessionStore, sessionsStore, permissionStore, questionStore]);
@@ -504,6 +517,7 @@ function Shell() {
       // Composer's stop button and the loading row don't hang. Already-streamed
       // text is kept; only the in-flight flag is cleared.
       sessionStore.getState().stopStreaming();
+      clearPendingRequests(currentSessionId);
     }
   };
 

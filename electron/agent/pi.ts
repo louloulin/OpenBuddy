@@ -1,5 +1,6 @@
 import { createAgentSession, DefaultResourceLoader, SessionManager, SettingsManager, type AgentSession, type SessionInfo } from '@earendil-works/pi-coding-agent';
 import { mkdir, realpath, unlink } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, relative, isAbsolute, sep } from 'node:path';
 import { Providers } from '../services/providers.js';
 import { SkillsService } from '../services/skills.js';
@@ -29,8 +30,10 @@ export class PiEngine {
     try {
       await this.shutdown();
       this.cwd=manager.getCwd();
-      const sdkSettings=SettingsManager.inMemory({retry:{enabled:false},compaction:{enabled:false}},{projectTrusted:false});
-      const loader=new DefaultResourceLoader({cwd:this.cwd,agentDir:this.settings.dir,settingsManager:sdkSettings,noExtensions:true,noContextFiles:true,noPromptTemplates:true,noThemes:true,noSkills:true,skillsOverride:()=>({skills:this.skills.active(this.cwd),diagnostics:[]}),extensionFactories:[this.permissions.extension(manager.getSessionId()),this.mcp.extension()]});
+      const trusted=this.settings.config.read().trustedFolders.includes(this.cwd);
+      if(!trusted)this.emit('agent://folder-trust',{cwd:this.cwd});
+      const sdkSettings=SettingsManager.inMemory({retry:{enabled:false},compaction:{enabled:false}},{projectTrusted:trusted});
+      const loader=new DefaultResourceLoader({cwd:this.cwd,agentDir:this.settings.dir,settingsManager:sdkSettings,noExtensions:true,noContextFiles:!trusted,noPromptTemplates:true,noThemes:true,noSkills:true,skillsOverride:()=>({skills:this.skills.active(this.cwd),diagnostics:[]}),extensionFactories:[this.permissions.extension(manager.getSessionId()),this.mcp.extension()]});
       await loader.reload();
       const saved=manager.buildSessionContext().model;
       const model=this.providers.model(modelId??saved?.modelId);
@@ -67,7 +70,7 @@ export class PiEngine {
   }
   async send(id:string,prompt:string) {const session=this.live(id);if(this.busy||this.transitioning)throw Error('会话忙碌');this.busy=true;try{await session.prompt(prompt);}catch(error){this.emit('agent://turn-error',{sessionId:id,kind:'error',detail:error instanceof Error?error.message:String(error)});throw error;}finally{this.permissions.cancel(id);this.busy=false;}}
   async cancel(id:string) {this.permissions.cancel(id);await this.live(id).abort();}
-  async shutdown() {this.permissions.cancel();const session=this.session;if(session){await session.abort();session.dispose();}this.unsubscribe?.();this.unsubscribe=undefined;this.session=undefined;this.busy=false;}
+  async shutdown() {this.permissions.cancel();const session=this.session;if(session){await session.abort();try{await session.extensionRunner.emit({type:'session_shutdown',reason:'quit'});}finally{session.dispose();}}this.unsubscribe?.();this.unsubscribe=undefined;this.session=undefined;this.busy=false;}
   async rename(id:string,title:string) {if(this.session?.sessionId===id)this.session.setSessionName(title);else {const item=await this.resolve(id);SessionManager.open(item.path,this.sessionDir).appendSessionInfo(title);}this.metadata(id,{title});this.emit('agent://summary',{sessionId:id,title});}
   metadata(id:string,patch:{title?:string;pinned?:boolean;archived?:boolean}) {const c=this.settings.config.read();c.sessions[id]={...c.sessions[id],...patch};this.settings.config.write(c);}
   async delete(id:string) {if(this.session?.sessionId===id){const file=this.session.sessionManager.getSessionFile();await this.shutdown();if(file){try{await unlink(file);}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}}}else await unlink((await this.resolve(id)).path);const c=this.settings.config.read();delete c.sessions[id];this.settings.config.write(c);}
@@ -76,5 +79,5 @@ export class PiEngine {
   usage(id:string) {const stats=this.live(id).getSessionStats();return {usage:{inputTokens:stats.tokens.input+stats.tokens.cacheRead,outputTokens:stats.tokens.output,totalTokens:stats.tokens.total,cachedReadTokens:stats.tokens.cacheRead,numTurns:stats.userMessages}};}
   commands() {return this.skills.list(this.cwd).filter(s=>s.enabled).map(s=>({name:`skill:${s.name}`,description:s.description,source:'skill'}));}
   get currentCwd(){return this.cwd;}
-  async reload() {if(this.busy)throw Error('请等待当前回复完成');if(this.session){const id=this.session.sessionId,file=this.session.sessionManager.getSessionFile();const manager=file?SessionManager.open(file,this.sessionDir):this.session.sessionManager;await this.replace(manager);if(this.session?.sessionId!==id)throw Error('会话重载身份发生变化');}}
+  async reload() {if(this.busy)throw Error('请等待当前回复完成');if(this.session){const id=this.session.sessionId,file=this.session.sessionManager.getSessionFile();const manager=file&&existsSync(file)?SessionManager.open(file,this.sessionDir):this.session.sessionManager;await this.replace(manager);if(this.session?.sessionId!==id)throw Error('会话重载身份发生变化');}}
 }

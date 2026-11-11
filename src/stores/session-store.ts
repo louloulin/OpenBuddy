@@ -127,6 +127,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
             const value = delta.type.endsWith("_end") ? delta.content ?? "" : (previous && previous.kind !== "tool_call" ? previous.text : "") + (delta.delta ?? "");
             const part: MessagePart = { kind, text: value, contentIndex };
             if (partIndex >= 0) parts[partIndex] = part; else parts.push(part);
+          } else if (delta.type === "toolcall_end" && delta.toolCall) {
+            const part = partsOf({ role: "assistant", content: [delta.toolCall] }, parts)[0];
+            if (part) {
+              part.contentIndex = contentIndex;
+              if (partIndex >= 0) parts[partIndex] = part; else parts.push(part);
+            }
           } else if (delta.partial) parts = partsOf(delta.partial, parts);
           else if (event.message) parts = partsOf(event.message, parts);
           parts.sort((a, b) => (a.contentIndex ?? 0) - (b.contentIndex ?? 0));

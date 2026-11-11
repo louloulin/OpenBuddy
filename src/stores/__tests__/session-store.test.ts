@@ -42,6 +42,33 @@ describe("Pi transcript events", () => {
     expect(useSessionStore.getState().messages).toHaveLength(2);
   });
 
+  it("overwrites thinking and toolcall end snapshots at their content indices", () => {
+    useSessionStore.getState().startStreaming();
+    emit({ type: "message_update", assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "draft" } });
+    emit({ type: "message_update", assistantMessageEvent: { type: "thinking_end", contentIndex: 0, content: "final reasoning" } });
+    emit({ type: "message_update", assistantMessageEvent: { type: "toolcall_end", contentIndex: 1, toolCall: { type: "toolCall", id: "tc", name: "read", arguments: { path: "a.ts" } } } });
+    const parts = useSessionStore.getState().messages[0].parts;
+    expect(parts[0]).toMatchObject({ kind: "thought", text: "final reasoning" });
+    expect(parts[1]).toMatchObject({ kind: "tool_call", toolCall: { toolCallId: "tc", rawInput: { path: "a.ts" } } });
+  });
+
+  it("clears busy on cancellation and errors without dropping streamed content", () => {
+    useSessionStore.getState().startStreaming();
+    emit({ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "kept" } });
+    useSessionStore.getState().stopStreaming();
+    expect(useSessionStore.getState().streaming).toBe(false);
+    expect(text()).toBe("kept");
+    useSessionStore.getState().startStreaming();
+    useSessionStore.getState().setError("network error");
+    expect(useSessionStore.getState().streaming).toBe(false);
+    expect(useSessionStore.getState().messages).toHaveLength(1);
+  });
+
+  it("does not accept an event without a session identity", () => {
+    useSessionStore.getState().applyUpdate({ type: "message_end", message: { role: "assistant", content: "unattributed" } });
+    expect(text()).toBe("");
+  });
+
   it("updates a tool card with the complete execution result", () => {
     useSessionStore.getState().startStreaming();
     emit({ type: "tool_execution_start", toolCallId: "t1", toolName: "bash", args: { command: "pwd" } });

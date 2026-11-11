@@ -1,6 +1,8 @@
 import { app, BrowserWindow, safeStorage, shell, session } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { registerIpc } from './ipc/register.js';
 import { isEvent } from './shared/contract.js';
 import { createEngineHandlers } from './ipc/handlers/index.js';
@@ -27,6 +29,9 @@ async function createWindow(): Promise<void> {
     webPreferences: { preload: join(root, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true, allowRunningInsecureContent: false, webviewTag: false },
   });
   window = win;
+  win.webContents.on('console-message', (_event, level, message) => { console.log('RENDERER_CONSOLE', level, message); });
+  win.webContents.on('render-process-gone', (_event, details) => { console.error('RENDERER_GONE', details.reason); });
+  win.webContents.on('did-fail-load', (_event, code, description) => { console.error('RENDERER_LOAD_FAILED', code, description); });
   const engine = await createEngineHandlers({ userData: app.getPath('userData'), safeStorage, shell, emit: (event: string, payload: unknown) => { if (isEvent(event) && !win.isDestroyed()) win.webContents.send(event, payload); } });
   cleanup = undefined;
   shutdown = async () => { await engine.shutdown(); };
@@ -47,12 +52,24 @@ async function createWindow(): Promise<void> {
   await win.loadURL(trustedURL);
   if (process.env.OPENBUDDY_SMOKE_TEST === '1') {
     console.log('OPENBUDDY_RUNTIME', JSON.stringify(process.versions));
+    const result = await win.webContents.executeJavaScript(`new Promise((resolve, reject) => {
+      let attempts = 0;
+      const inspect = () => {
+        if (document.querySelector('#root')?.children.length && window.openbuddy) {
+          resolve({ title: document.title, rootChildren: document.querySelector('#root').children.length, bodyTextLength: document.body.innerText.length, bridge: Object.keys(window.openbuddy), nodeRequire: typeof window.require, nodeProcess: typeof window.process });
+        } else if (++attempts >= 100) reject(new Error('renderer smoke timed out'));
+        else setTimeout(inspect, 100);
+      };
+      inspect();
+    })`);
+    console.log('OPENBUDDY_SMOKE_DOM', JSON.stringify(result));
     console.log('OPENBUDDY_SMOKE_LOADED', win.webContents.getURL());
     app.quit();
   }
 }
 
 app.setName('OpenBuddy');
+if (process.env.OPENBUDDY_SMOKE_TEST === '1') app.setPath('userData', mkdtempSync(join(tmpdir(), 'openbuddy-smoke-')));
 app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);

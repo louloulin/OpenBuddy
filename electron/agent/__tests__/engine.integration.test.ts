@@ -34,7 +34,7 @@ async function fixture() {
       return; // client abort must close this response
     }
     if (String(prompt).includes('tool') && !toolDone) {
-      const toolName=String(prompt).includes('write')?'write':'read';
+      const toolName=String(prompt).includes('mcp')?'mcp__fixture__ping':String(prompt).includes('write')?'write':'read';
       chunk({tool_calls:[{index:0,id:`fixture-${toolName}`,type:'function',function:{name:toolName,arguments:JSON.stringify(toolName==='write'?{path:join(root,'blocked.txt'),content:'must not exist'}:{path:join(root,'hello.txt')})}}]});
       chunk({}, 'tool_calls');
     } else {
@@ -98,6 +98,25 @@ describe('real Pi SDK with local OpenAI protocol fixture',()=>{
     await until(()=>f.events.some(e=>e.name==='agent://permission'));
     await f.call('agent_cancel',{sessionId:f.sid}); await pending;
     await expect(f.call('agent_resolve_permission',{requestId:f.events.find(e=>e.name==='agent://permission')!.payload.requestId,optionId:'allow'})).rejects.toThrow();
+  });
+  it('loads a real stdio MCP server and routes its tool through permissions',async()=>{
+    const f=await fixture();
+    const serverPath=join(f.root,'mcp-server.cjs');
+    await writeFile(serverPath,`const readline=require('node:readline');
+readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.parse(line);if(r.id===undefined)return;
+let result={};if(r.method==='initialize')result={protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'fixture',version:'1'}};
+if(r.method==='tools/list')result={tools:[{name:'ping',description:'Fixture ping',inputSchema:{type:'object',properties:{}}}]};
+if(r.method==='tools/call')result={content:[{type:'text',text:'real MCP result'}]};
+process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:r.id,result})+'\\n');});`);
+    await f.call('mcp_upsert',{sessionId:f.sid,server:{name:'fixture',transport:'stdio',target:process.execPath,args:[serverPath],env:{FIXTURE_TOKEN:'secret-mcp-token'},enabled:true}});
+    expect(JSON.stringify(await f.call('mcp_config_read'))).not.toContain('secret-mcp-token');
+    const turn=f.call('agent_send',{sessionId:f.sid,text:'tool mcp please'});
+    await until(()=>f.events.some(e=>e.name==='agent://permission'&&e.payload.toolKind==='mcp__fixture__ping'));
+    const request=f.events.find(e=>e.name==='agent://permission'&&e.payload.toolKind==='mcp__fixture__ping')!.payload;
+    await f.call('agent_resolve_permission',{requestId:request.requestId,optionId:'allow'});await turn;
+    expect(JSON.stringify(f.events.find(e=>e.payload.event?.type==='tool_execution_end'&&e.payload.event.toolName==='mcp__fixture__ping'))).toContain('real MCP result');
+    await f.call('mcp_toggle',{sessionId:f.sid,name:'fixture',enabled:false});
+    expect((await f.call('mcp_list') as any)[0].enabled).toBe(false);
   });
   it('shutdown rejects a waiting write permission and prevents a stale approval in another session',async()=>{
     const f=await fixture();const turn=f.call('agent_send',{sessionId:f.sid,text:'tool write pending'});

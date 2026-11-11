@@ -3,17 +3,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
-const minimize = vi.fn();
-const toggleMaximize = vi.fn();
-const close = vi.fn();
+const { minimize, toggleMaximize, close, resizedCleanup } = vi.hoisted(() => ({ minimize: vi.fn(), toggleMaximize: vi.fn(), close: vi.fn(), resizedCleanup: vi.fn() }));
 vi.mock("@/lib/ipc", () => ({
-  win: { minimize, toggleMaximize, close, isMaximized: () => Promise.resolve(false), onResized: () => () => {} },
+  win: { minimize, toggleMaximize, close, isMaximized: () => Promise.resolve(false), onResized: () => resizedCleanup },
 }));
 
 import { TitleBar } from "../TitleBar";
 
 describe("TitleBar", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("卸载时解绑窗口尺寸监听", () => {
+    const { unmount } = render(<TitleBar onPlaceholder={() => {}} />);
+    unmount();
+    expect(resizedCleanup).toHaveBeenCalledOnce();
+  });
 
   it("渲染品牌与三个菜单", () => {
     render(<TitleBar onPlaceholder={() => {}} />);

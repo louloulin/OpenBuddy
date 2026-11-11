@@ -19,7 +19,7 @@ const base = {
 describe("Sidebar", () => {
   it("渲染导航项", () => {
     render(<Sidebar {...base} />);
-    for (const label of ["新建任务", "助理", "项目", "专家·技能·连接器", "自动化", "更多"]) {
+    for (const label of ["新建任务", "项目", "技能与 MCP", "更多"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
   });
@@ -27,8 +27,8 @@ describe("Sidebar", () => {
   it("点击占位导航触发 onNavigate", () => {
     const onNavigate = vi.fn();
     render(<Sidebar {...base} onNavigate={onNavigate} />);
-    fireEvent.click(screen.getByText("助理"));
-    expect(onNavigate).toHaveBeenCalledWith("助理");
+    fireEvent.click(screen.getByText("技能与 MCP"));
+    expect(onNavigate).toHaveBeenCalledWith("技能与 MCP");
   });
 
   it("渲染会话列表并可选中", () => {
@@ -41,14 +41,14 @@ describe("Sidebar", () => {
     useSessionsStore.getState().setIndependent([]);
   });
 
-  it("搜索按钮触发 onOpenSearch,设置按钮触发 onOpenSettings", () => {
+  it("搜索暂缓禁用,设置按钮仍可打开", () => {
     const onOpenSearch = vi.fn();
     const onOpenSettings = vi.fn();
     render(
       <Sidebar {...base} onOpenSearch={onOpenSearch} onOpenSettings={onOpenSettings} />
     );
-    fireEvent.click(screen.getByRole("button", { name: "搜索" }));
-    expect(onOpenSearch).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "搜索（后续版本开放）" })).toBeDisabled();
+    expect(onOpenSearch).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "设置" }));
     expect(onOpenSettings).toHaveBeenCalled();
   });
@@ -60,29 +60,16 @@ describe("Sidebar", () => {
     expect(onToggleCollapse).toHaveBeenCalled();
   });
 
-  it("hover「更多」展开右侧菜单并可进入灵感", () => {
-    const onNavigate = vi.fn();
-    render(<Sidebar {...base} onNavigate={onNavigate} />);
-    fireEvent.mouseEnter(screen.getByText("更多").closest(".sidebar__more-wrap")!);
-    expect(screen.getByRole("menu")).toBeInTheDocument();
-    expect(screen.getByText("我的文件")).toBeInTheDocument();
-    expect(screen.getByText("腾讯文档")).toBeInTheDocument();
-    expect(screen.getByText("知识库")).toBeInTheDocument();
-    expect(screen.getByText("乐享知识库")).toBeInTheDocument();
-    expect(screen.getByText("网页预览")).toBeInTheDocument();
-    expect(screen.getByText("灵感")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("灵感"));
-    expect(onNavigate).toHaveBeenCalledWith("灵感");
-  });
-
-  it("「更多」菜单可进入知识库", async () => {
+  it("更多菜单隐藏暂缓功能并保留文件入口", async () => {
     const onNavigate = vi.fn();
     const user = userEvent.setup();
-    render(<Sidebar {...base} onNavigate={onNavigate} onToast={vi.fn()} />);
+    render(<Sidebar {...base} onNavigate={onNavigate} />);
     await user.hover(screen.getByText("更多"));
-    const menu = await screen.findByRole("menu");
-    expect(menu).toBeInTheDocument();
-    fireEvent.click(screen.getByText("知识库"));
-    expect(onNavigate).toHaveBeenCalledWith("知识库");
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    for (const label of ["灵感", "云存储", "专家·技能·连接器", "自动化", "腾讯文档"]) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
+    fireEvent.click(screen.getByText("我的文件"));
+    expect(onNavigate).toHaveBeenCalledWith("我的文件");
   });
 });
