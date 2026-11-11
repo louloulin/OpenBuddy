@@ -260,6 +260,12 @@ export interface ModelEntry {
   name?: string;
   /** Per-model context-window override (wins over the provider's value). */
   contextWindow?: number;
+  input?: ("text" | "image")[];
+  reasoning?: boolean;
+  maxTokens?: number;
+  cost?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  pricingKnown?: boolean;
+
 }
 
 /** Result of providers_list: every provider + every model, joined by providerId. */

@@ -328,7 +328,8 @@ export interface McpAuthTriggerResult {
 
 export interface McpAuthStatusEntry {
   serverName: string;
-  status: string;
+  status: "authenticated" | "needs_auth";
+  expiresAt?: number;
 }
 
 // ---------- CLI-type connector authorization (cli.json driven) ----------

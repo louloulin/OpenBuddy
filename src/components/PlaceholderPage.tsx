@@ -78,7 +78,7 @@ export function PlaceholderPage({
   onStartProject,
   onStartProjectConversation,
 }: PlaceholderPageProps) {
-  if (label === "技能与 MCP") return <AgentResourcesPanel cwd={cwd} onToast={onToast} />;
+  if (label === "技能与 MCP") return <AgentResourcesPanel cwd={cwd} sessionId={sessionId} onToast={onToast} />;
 
   if (label === "助理") {
     return (

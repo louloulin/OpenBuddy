@@ -303,6 +303,64 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
       await restarted.handlers.agent_list_sessions({ cwd: f.root }),
     ).toEqual([]);
   });
+  it("sends with a switched model and restores that model for requests after an engine restart", async () => {
+    const f = await fixture();
+    await f.call("agent_send", {
+      sessionId: f.sid,
+      text: "before model switch",
+    });
+    expect(f.requests.at(-1)).toMatchObject({ model: "fixture" });
+    await f.call("providers_save_model", {
+      model: {
+        modelId: "fixture-second",
+        providerId: "fixture",
+        contextWindow: 48000,
+      },
+    });
+    await f.call("agent_set_model", {
+      sessionId: f.sid,
+      modelId: "fixture-second",
+    });
+    await f.call("agent_send", {
+      sessionId: f.sid,
+      text: "after model switch",
+    });
+    expect(f.requests.at(-1)).toMatchObject({ model: "fixture-second" });
+    await f.engine.dispose();
+    const restarted = await createEngineHandlers({
+      userDataDir: f.root,
+      safeStorage: secureStorage,
+      emit: () => {},
+      shell: {
+        openPath: async () => "",
+        openExternal: async () => {},
+        showItemInFolder: () => {},
+      },
+    });
+    cleanups.push(restarted.dispose);
+    expect(
+      await restarted.handlers.agent_list_sessions({ cwd: f.root }),
+    ).toContainEqual(
+      expect.objectContaining({
+        sessionId: f.sid,
+        currentModelId: "fixture-second",
+      }),
+    );
+    await restarted.handlers.agent_load_session({
+      sessionId: f.sid,
+      cwd: f.root,
+    });
+    const count = f.requests.length;
+    await restarted.handlers.agent_send({
+      sessionId: f.sid,
+      text: "after engine restart",
+    });
+    expect(f.requests).toHaveLength(count + 1);
+    expect(f.requests.at(-1)).toMatchObject({ model: "fixture-second" });
+    expect(
+      await restarted.handlers.agent_session_info({ sessionId: f.sid }),
+    ).toMatchObject({ model: "fixture-second", context: { total: 48000 } });
+  });
   it("reloads real SDK skills and commands without changing an empty session id", async () => {
     const f = await fixture();
     const skill = join(f.root, "local-skill.md");

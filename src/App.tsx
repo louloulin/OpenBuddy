@@ -114,6 +114,7 @@ function Shell() {
   const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([]);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cwdRef = useRef<string>("");
+  const resourceSessionRef = useRef<string | undefined>(undefined);
 
   const sessionStore = useSessionStore;
   const sessionsStore = useSessionsStore;
@@ -437,6 +438,7 @@ function Shell() {
     showToast(`${label} 即将上线`);
   };
   const handleNavigate = (label: string) => {
+    if (sessionStore.getState().sessionId) resourceSessionRef.current = sessionStore.getState().sessionId ?? undefined;
     if (["助理", "专家·技能·连接器", "自动化", "资料库", "灵感", "云存储"].includes(label)) { showToast(`${label} 暂未在 Electron MVP 开放`); return; }
     setPlaceholderView(label);
     sessionsStore.getState().setCurrent(null);
@@ -927,7 +929,7 @@ function Shell() {
               onToast={showToast}
               cwd={cwdRef.current}
               onSelectWorkspace={handleSelectWorkspace}
-              sessionId={currentSessionId ?? undefined}
+              sessionId={currentSessionId ?? resourceSessionRef.current}
               onLaunch={handleLaunchDiscover}
               onSend={handleSendNew}
               streaming={streaming}
