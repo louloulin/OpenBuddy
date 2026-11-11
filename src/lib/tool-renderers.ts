@@ -14,7 +14,7 @@ export type ToolRenderer =
   | "edit" // edit / write
   | "read" // read_file / list_dir / grep
   | "search" // web_search / web_fetch
-  | "task" // task / 子代理派发（grok 原生子代理工具 kind=task）
+  | "task" // task / 子代理派发（agent 原生子代理工具 kind=task）
   | "defer-execute" // 延迟/批量执行(defer)
   | "send-message" // 发消息/通知(IM/邮件)
   | "image-gen" // 图像生成

@@ -16,7 +16,7 @@ import { ImportSkillModal } from "./ImportSkillModal";
 
 const LS_ROOT = "skillsCatalogRoot";
 const FEATURED_WINDOW = 8;
-const DEFAULT_PICK = "E:/Grok/agents";
+const DEFAULT_PICK = "";
 
 interface Props {
   pills: React.ReactNode;

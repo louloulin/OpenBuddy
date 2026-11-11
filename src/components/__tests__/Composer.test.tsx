@@ -9,9 +9,9 @@ describe("Composer", () => {
     const onSend = vi.fn();
     render(<Composer {...base} onSend={onSend} />);
     const input = screen.getByRole("textbox");
-    fireEvent.change(input, { target: { value: "你好 grok" } });
+    fireEvent.change(input, { target: { value: "你好 agent" } });
     fireEvent.keyDown(input, { key: "Enter", shiftKey: false });
-    expect(onSend).toHaveBeenCalledWith("你好 grok");
+    expect(onSend).toHaveBeenCalledWith("你好 agent");
   });
 
   it("apiReady=false 时输入禁用并显示配置提示,点击触发 onOpenSettings", () => {

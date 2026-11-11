@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createServer, type Server } from 'node:http';
-import { createEngineHandlers } from '../../ipc/handlers/agent';
+import { createServer } from 'node:http';
+import { createEngineHandlers } from '../../ipc/handlers/agent.js';
 
 const cleanups: Array<() => Promise<unknown>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -22,8 +22,10 @@ async function fixture() {
     let body = ''; for await (const part of req) body += part;
     const data = JSON.parse(body); requests.push(data);
     const messages = data.messages as Array<{role: string; content?: string}>;
-    const prompt = messages.findLast(m => m.role === 'user')?.content ?? '';
-    const toolDone = messages.some(m => m.role === 'tool');
+    const userContent = messages.findLast(m => m.role === 'user')?.content ?? '';
+    const prompt = typeof userContent === 'string' ? userContent : JSON.stringify(userContent);
+    const lastUser = messages.findLastIndex(m => m.role === 'user');
+    const toolDone = messages.slice(lastUser + 1).some(m => m.role === 'tool');
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
     const chunk = (delta: unknown, finish_reason: string | null = null) => res.write(`data: ${JSON.stringify({id:'fixture',object:'chat.completion.chunk',created:1,model:'fixture',choices:[{index:0,delta,finish_reason}]})}\n\n`);
     chunk({role:'assistant'});
@@ -32,7 +34,8 @@ async function fixture() {
       return; // client abort must close this response
     }
     if (String(prompt).includes('tool') && !toolDone) {
-      chunk({tool_calls:[{index:0,id:'fixture-read',type:'function',function:{name:'read',arguments:JSON.stringify({path:join(root,'hello.txt')})}}]});
+      const toolName=String(prompt).includes('write')?'write':'read';
+      chunk({tool_calls:[{index:0,id:`fixture-${toolName}`,type:'function',function:{name:toolName,arguments:JSON.stringify(toolName==='write'?{path:join(root,'blocked.txt'),content:'must not exist'}:{path:join(root,'hello.txt')})}}]});
       chunk({}, 'tool_calls');
     } else {
       chunk({content:'Hello '}); chunk({content: toolDone ? 'tool complete' : 'world'}); chunk({}, 'stop');
@@ -81,15 +84,29 @@ describe('real Pi SDK with local OpenAI protocol fixture',()=>{
     expect(JSON.stringify(tool)).toContain('real tool result'); expect(f.requests.length).toBe(2);
   });
   it('denies tool calls and releases pending permission on cancellation',async()=>{
-    const f=await fixture(); const turn=f.call('agent_send',{sessionId:f.sid,text:'tool deny'});
+    const f=await fixture(); const turn=f.call('agent_send',{sessionId:f.sid,text:'tool write deny'});
     await until(()=>f.events.some(e=>e.name==='agent://permission'));
     const request=f.events.find(e=>e.name==='agent://permission')!.payload;
     await f.call('agent_resolve_permission',{requestId:request.requestId,optionId:'deny'}); await turn;
-    expect(JSON.stringify(f.events.find(e=>e.payload.event?.type==='tool_execution_end'))).not.toContain('real tool result');
-    f.events.length=0; const pending=f.call('agent_send',{sessionId:f.sid,text:'tool cancel'});
+    await expect(readFile(join(f.root,'blocked.txt'))).rejects.toThrow();
+    const denied=f.events.find(e=>e.payload.event?.type==='tool_execution_end')!.payload.event;
+    expect(denied.toolCallId).toBe('fixture-write'); expect(denied.isError).toBe(true);
+    const secondRequest=f.requests[1] as any;
+    expect(secondRequest.messages.some((m:any)=>m.role==='tool'&&m.tool_call_id==='fixture-write'&&m.content.includes('拒绝'))).toBe(true);
+    await f.call('agent_send',{sessionId:f.sid,text:'hello after denial'});
+    f.events.length=0; const pending=f.call('agent_send',{sessionId:f.sid,text:'tool pending'});
     await until(()=>f.events.some(e=>e.name==='agent://permission'));
     await f.call('agent_cancel',{sessionId:f.sid}); await pending;
     await expect(f.call('agent_resolve_permission',{requestId:f.events.find(e=>e.name==='agent://permission')!.payload.requestId,optionId:'allow'})).rejects.toThrow();
+  });
+  it('shutdown rejects a waiting write permission and prevents a stale approval in another session',async()=>{
+    const f=await fixture();const turn=f.call('agent_send',{sessionId:f.sid,text:'tool write pending'});
+    await until(()=>f.events.some(e=>e.name==='agent://permission'));
+    const request=f.events.find(e=>e.name==='agent://permission')!.payload;
+    await f.call('agent_shutdown');await turn;
+    await expect(readFile(join(f.root,'blocked.txt'))).rejects.toThrow();
+    await f.call('agent_new_session',{cwd:f.root,modelId:'fixture'});
+    await expect(f.call('agent_resolve_permission',{requestId:request.requestId,optionId:'allow'})).rejects.toThrow();
   });
   it('aborts an active HTTP stream through the real SDK',async()=>{
     const f=await fixture(); const turn=f.call('agent_send',{sessionId:f.sid,text:'cancel stream'});

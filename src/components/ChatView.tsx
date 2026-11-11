@@ -12,7 +12,6 @@ import {
 import { MessageItem } from "./MessageItem";
 import { Composer } from "./Composer";
 import { PlanPanel } from "./PlanPanel";
-import { RewindBar } from "./RewindBar";
 import { PermissionInlineCard } from "./PermissionDialog";
 import { QuestionInlineCard } from "./QuestionInlineCard";
 import { ToolSidePanel, type ToolSidePanelMode } from "./ToolSidePanel";
@@ -50,7 +49,6 @@ export function ChatView({
   workspaces,
   onSelectWorkspace,
   onRewound,
-  onForked,
   onToast,
   onSelectMode,
   onSelectExpert,
@@ -88,7 +86,7 @@ export function ChatView({
   const [fileChangesOpen, setFileChangesOpen] = useState(false);
   // 子代理运行时面板(对齐 WorkBuddy team-runtime)。
   const [subagentsOpen, setSubagentsOpen] = useState(false);
-  const [teamsOpen, setTeamsOpen] = useState(false);
+  const [teamsOpen] = useState(false);
   // pause/yield(对齐 WorkBuddy session:requestYield):软暂停,保留会话上下文。
   const [yieldStore, setYieldStore] = useState<Record<string, ReturnType<typeof createYieldStore>>["k"]>(() => createYieldStore());
   const yielded = sessionId ? isYielded(yieldStore, sessionId) : false;

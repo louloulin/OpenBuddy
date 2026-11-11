@@ -212,7 +212,7 @@ export function SearchOverlay({
             remoteOnly.length === 0 &&
             query.trim().length === 0 && (
               <div className="conversation-search-modal__count">
-                输入关键词搜索会话内容（grok FTS5 全文索引）
+                输入关键词搜索会话内容（agent FTS5 全文索引）
               </div>
             )}
         </div>

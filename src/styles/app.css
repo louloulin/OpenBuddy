@@ -2212,7 +2212,7 @@
   opacity: 0.75;
   border-left: 3px solid var(--wb-brand);
 }
-/* 工具输出的图片（read_file 读图片/PDF 时 grok 返回 ImageContent） */
+/* 工具输出的图片（read_file 读图片/PDF 时 agent 返回 ImageContent） */
 .toolcall__images {
   display: flex;
   flex-direction: column;
@@ -4126,7 +4126,7 @@ button.diff__path {
   opacity: 1;
 }
 
-/* ===== TitleBar (Tauri 自定义标题栏) ===== */
+/* ===== TitleBar (Electron 自定义标题栏) ===== */
 .titlebar {
   height: 32px;
   display: flex;
@@ -4221,7 +4221,7 @@ button.diff__path {
 }
 
 /* ===== macOS 原生 Overlay 标题栏适配 =====
- * mac 下隐藏自绘 TitleBar(tauri.macos.conf.json: decorations + Overlay),
+ * mac 下隐藏自绘 TitleBar(Electron BrowserWindow: decorations + Overlay),
  * 红绿灯悬浮在窗口左上(默认位置约 x:12-80, y:8-24),需要:
  * 1. 侧栏 logo 行顶部留出安全区,避免 logo/图标被红绿灯遮挡;
  * 2. 侧栏折叠时 main-topbar 贴到窗口左边缘,需左侧让出红绿灯宽度;
@@ -12176,7 +12176,7 @@ button.diff__path {
 
 /* ======================================================================
  * ContextUsagePill — Composer 上下文用量胶囊 + 分类占比弹层
- * (WorkBuddy 图1 pill / 图2 popover;数据来自 grok x.ai/session/info+usage)
+ * (WorkBuddy 图1 pill / 图2 popover;数据来自 agent x.ai/session/info+usage)
  * ====================================================================== */
 .context-usage {
   position: relative;

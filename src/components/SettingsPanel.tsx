@@ -2,14 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   User,
   Mail,
-  Settings as SettingsIcon,
-  SlidersHorizontal,
   Keyboard,
-  Brain,
   Cpu,
   Bot,
   Palette,
-  Database,
   Shield,
   HelpCircle,
   Plus,
@@ -30,7 +26,6 @@ import {
   providersDeleteProvider,
   providersDeleteModel,
   providersFetchModels,
-  internalReload,
   type ApiBackend,
   type AuthScheme,
   type ModelProviderEntry,
@@ -78,12 +73,10 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: "account", label: "账户管理", icon: User },
   { id: "agent-mail", label: "智能体邮箱", icon: Mail },
-  { id: "general", label: "系统设置", icon: SettingsIcon },
   { id: "shortcuts", label: "快捷键", icon: Keyboard },
   { id: "model", label: "模型", icon: Cpu },
   { id: "assistant", label: "助理设置", icon: Bot },
   { id: "personalize", label: "个性化", icon: Palette },
-  { id: "data", label: "数据管理", icon: Database },
   { id: "security", label: "安全中心", icon: Shield },
   { id: "help", label: "帮助与反馈", icon: HelpCircle },
 ];
@@ -343,7 +336,6 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
   const modelsOf = (providerId: string) =>
     data.models.filter((m) => m.providerId === providerId);
 
-  const refreshCatalog = () => internalReload("models").catch(() => {});
 
   const handleSaveProvider = async (draft: ProviderDraft, original?: ModelProviderEntry) => {
     setMsg(null);
@@ -360,7 +352,6 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
         authScheme: draft.authScheme,
         contextWindow: draft.contextWindow ? Number(draft.contextWindow) : undefined,
       });
-      await refreshCatalog();
       onModelsChanged?.();
       setEditingProvider(null);
       setSelectedProviderId(id);
@@ -381,7 +372,6 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
     setMsg(null);
     try {
       await providersDeleteProvider(p.id);
-      await refreshCatalog();
       onModelsChanged?.();
       if (selectedProviderId === p.id) setSelectedProviderId(null);
       await reload();
@@ -405,7 +395,6 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
         name: name.trim() || undefined,
         contextWindow: contextWindow ? Number(contextWindow) : undefined,
       });
-      await refreshCatalog();
       onModelsChanged?.();
       setEditingModel(null);
       await reload();
@@ -420,7 +409,6 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
     setMsg(null);
     try {
       await providersDeleteModel(m.modelId);
-      await refreshCatalog();
       onModelsChanged?.();
       await reload();
       setMsg({ kind: "ok", text: "已删除。" });
@@ -438,7 +426,6 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
       for (const id of ids) {
         await providersSaveModel({ modelId: id, providerId });
       }
-      await refreshCatalog();
       onModelsChanged?.();
       await reload();
       setMsg({ kind: "ok", text: `已导入 ${ids.length} 个模型。` });
@@ -479,7 +466,7 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
         </div>
         <div className="models-settings-panel__card-desc models-settings-panel__grouped-note">
           一个厂商保存一份 API Key / Base URL / 上下文窗口，可挂载多个模型。配置写入{" "}
-          <code className="models-settings-panel__card-link">~/.grok/config.toml</code>。
+          <code className="models-settings-panel__card-link">应用数据目录/pi/models.json</code>。
         </div>
 
         {loading ? (

@@ -94,7 +94,7 @@ export function PluginsPanel({ sessionId, onToast }: PluginsPanelProps) {
             <PuzzlePieceIcon size="xl" color="var(--wb-text-tertiary)" />
             <p>暂无插件。</p>
             <p className="plugins-panel__hint">
-              在「市场」tab 安装插件，或把插件放到 <code>~/.grok/plugins/</code>。
+              在「市场」tab 安装插件，或把插件放到 <code>应用数据目录/pi/plugins/</code>。
             </p>
           </div>
         )}

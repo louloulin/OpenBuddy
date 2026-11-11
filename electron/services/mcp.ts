@@ -19,7 +19,7 @@ export class McpService {
       if(c.url) {const url=new URL(text(c.url));if(!['https:','http:'].includes(url.protocol)||url.username||url.password||url.search||url.hash)throw Error('MCP URL 不允许凭据、查询或片段');}
       if(c.args!==undefined&&(!Array.isArray(c.args)||!c.args.every(a=>typeof a==='string')))throw Error('MCP args必须为字符串数组');
       if(c.enabled!==undefined&&typeof c.enabled!=='boolean')throw Error('MCP enabled必须为布尔值');
-      const value={...c,exposure:'direct'};
+      const value:Record<string,unknown>={...c,exposure:'direct'};
       for(const field of ['env','headers']) if(c[field]!==undefined) {
         const values=object(c[field]),masked:Record<string,string>={};
         for(const [key,v] of Object.entries(values)) {

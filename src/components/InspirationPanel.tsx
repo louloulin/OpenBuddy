@@ -266,7 +266,7 @@ export function InspirationPanel({ cwd, onToast, onLaunch }: InspirationPanelPro
             </div>
             <div className="insp-loading-title">正在为你生成灵感</div>
             <div className="insp-loading-desc">
-              grok 正在根据你的兴趣生成个性化内容，请稍候…
+              agent 正在根据你的兴趣生成个性化内容，请稍候…
             </div>
             <div className="insp-loading-dots">
               <div className="insp-loading-dot" />

@@ -284,7 +284,7 @@ export function DiscoverPanel({ onLaunch, onToast }: DiscoverPanelProps) {
               {!allSatisfied && (
                 <p className="discover-launcher__deps-hint">
                   缺失项可在「专家·技能·连接器」面板安装，或忽略直接启动
-                  （grok 会用内置能力尝试）。
+                  （agent 会用内置能力尝试）。
                 </p>
               )}
             </div>
@@ -321,7 +321,7 @@ export function DiscoverPanel({ onLaunch, onToast }: DiscoverPanelProps) {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={6}
-              placeholder="描述你想让 grok 做的事…"
+              placeholder="描述你想让 agent 做的事…"
             />
           </div>
 

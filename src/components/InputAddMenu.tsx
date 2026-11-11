@@ -2,11 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Paperclip, ChevronRight, Wand2 } from "lucide-react";
 import {
   AddIcon,
-  ExpertTabIcon,
   SkillTabIcon,
-  ConnectorTabIcon,
 } from "@/foundation/components/Icon/icons";
-import { skillsList, agentsList } from "@/lib/agent-client";
+import { skillsList } from "@/lib/agent-client";
 import { HOME_MODES, type HomeModeId } from "./home-scenes";
 import { CONNECTOR_LIST } from "./experts-panel/data/connectors-catalog";
 import type { AgentEntry, SkillInfo } from "@/lib/types";

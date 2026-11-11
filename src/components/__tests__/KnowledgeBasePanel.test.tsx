@@ -4,8 +4,8 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 const openDialog = vi.fn();
 vi.mock("@/lib/ipc", () => ({ open: (...a: unknown[]) => openDialog(...a), invoke: vi.fn() }));
 vi.mock("@/lib/desktop-kb-reader", () => ({
-  isTauriAvailable: () => true,
-  createTauriDirectoryReader: () => ({
+  isDesktopAvailable: () => true,
+  createDesktopDirectoryReader: () => ({
     listDir: async () => [],
     readText: async () => null,
   }),

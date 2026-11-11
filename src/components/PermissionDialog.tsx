@@ -29,7 +29,7 @@ export function PermissionInlineCard({ sessionId }: { sessionId: string | null }
         <span className="perm-inline__title">{head.title}</span>
       </div>
       <div className="perm-inline__body">
-        <p>grok 想要执行以下操作，是否允许？</p>
+        <p>agent 想要执行以下操作，是否允许？</p>
         {head.rawInput != null && (
           <pre className="perm-inline__raw">
             {JSON.stringify(head.rawInput, null, 2)}

@@ -86,7 +86,7 @@ export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
   );
 
   const handleRewrite = useCallback(async () => {
-    if (!confirm("让 grok 用 LLM 重写所有记忆？这会重新组织资料库内容。")) return;
+    if (!confirm("让 agent 用 LLM 重写所有记忆？这会重新组织资料库内容。")) return;
     setBusy(true);
     try {
       await memoryRewrite();
@@ -130,7 +130,7 @@ export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
               className="resources-panel__action-btn"
               onClick={handleFlush}
               disabled={busy}
-              title="强制把 grok 未写的记忆落盘"
+              title="强制把 agent 未写的记忆落盘"
             >
               落盘
             </button>
@@ -188,8 +188,8 @@ export function ResourcesPanel({ cwd, onToast }: ResourcesPanelProps) {
           <div className="resources-panel__empty">
             <BookIcon size="xl" color="var(--wb-text-tertiary)" />
             <p>
-              暂无记忆。grok 会在对话中自动学习并写入
-              <code>~/.grok/memory/MEMORY.md</code>。
+              暂无记忆。agent 会在对话中自动学习并写入
+              <code>应用数据目录/pi/memory/MEMORY.md</code>。
             </p>
           </div>
         )}
@@ -290,8 +290,8 @@ function MemoryEditor({
           <label>
             范围
             <select value={scope} onChange={(e) => setScope(e.target.value)}>
-              <option value="global">全局（~/.grok/memory/）</option>
-              {cwd && <option value="workspace">工作区（&lt;cwd&gt;/.grok/memory/）</option>}
+              <option value="global">全局（应用数据目录/pi/memory/）</option>
+              {cwd && <option value="workspace">工作区（&lt;cwd&gt;/.pi/memory/）</option>}
             </select>
           </label>
           <label>

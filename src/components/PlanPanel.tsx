@@ -192,7 +192,7 @@ export function PlanPanel({ sessionId, onSend, onToast }: PlanPanelProps) {
         <TaskListIcon size="xl" color="var(--wb-text-tertiary)" />
         <p>计划模式已开启</p>
         <p className="plan-panel__hint">
-          发送一个任务，grok 会先制定计划再执行。
+          发送一个任务，agent 会先制定计划再执行。
         </p>
         <button className="plan-panel__mode-btn" onClick={handleTogglePlanMode}>
           退出计划模式
@@ -207,7 +207,7 @@ export function PlanPanel({ sessionId, onSend, onToast }: PlanPanelProps) {
         <TaskListIcon size="xl" color="var(--wb-text-tertiary)" />
         <p>暂无任务计划</p>
         <p className="plan-panel__hint">
-          grok 在处理复杂任务时会自动制定计划。
+          agent 在处理复杂任务时会自动制定计划。
         </p>
       </div>
     );

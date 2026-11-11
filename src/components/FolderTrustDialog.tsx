@@ -47,7 +47,7 @@ export function FolderTrustDialog({ request, onResolve, onToast }: FolderTrustDi
         </div>
         <h2 className="trust-dialog__title">信任此工作目录？</h2>
         <p className="trust-dialog__desc">
-          grok 即将在此目录中执行操作（读写文件、运行命令等）。
+          agent 即将在此目录中执行操作（读写文件、运行命令等）。
           请确认你信任此目录的内容。
         </p>
         <div className="trust-dialog__path" title={cwd}>

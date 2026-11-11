@@ -5,8 +5,8 @@ import { agentAuthStatus } from "@/lib/agent-client";
 import type { InitResult } from "@/lib/agent-client";
 import { APP_VERSION } from "@/lib/app-version";
 import logoUrl from "@/assets/openbuddy-logo.svg";
-// 通过 Cargo 相对路径依赖引入。
-const GROK_BUILD_PATH = "vendor/grok-build (submodule)";
+// 引擎运行在 Electron 主进程。
+const ENGINE_PACKAGE = "@earendil-works/pi-coding-agent";
 
 interface AboutDialogProps {
   open: boolean;
@@ -52,7 +52,7 @@ export function AboutDialog({ open, onClose, init }: AboutDialogProps) {
           <div>
             <h2 className="about-dialog__title">OpenBuddy</h2>
             <p className="about-dialog__subtitle">
-              WorkBuddy 风格的 grok 桌面外壳
+              基于 Pi 的桌面智能体
             </p>
           </div>
         </div>
@@ -62,7 +62,7 @@ export function AboutDialog({ open, onClose, init }: AboutDialogProps) {
             <dd>v{APP_VERSION}</dd>
           </div>
           <div className="about-dialog__row">
-            <dt>grok agent</dt>
+            <dt>agent agent</dt>
             <dd>{init?.agentVersion ?? "未知"}</dd>
           </div>
           <div className="about-dialog__row">
@@ -74,9 +74,9 @@ export function AboutDialog({ open, onClose, init }: AboutDialogProps) {
             <dd title={init?.cwd}>{init?.cwd ?? "—"}</dd>
           </div>
           <div className="about-dialog__row">
-            <dt>内核路径</dt>
-            <dd title={GROK_BUILD_PATH}>
-              <code>{GROK_BUILD_PATH}</code>
+            <dt>引擎包</dt>
+            <dd title={ENGINE_PACKAGE}>
+              <code>{ENGINE_PACKAGE}</code>
             </dd>
           </div>
           <div className="about-dialog__row">
@@ -101,8 +101,8 @@ export function AboutDialog({ open, onClose, init }: AboutDialogProps) {
           )}
         </dl>
         <p className="about-dialog__footer">
-          基于 <code>Tauri 2</code> + <code>React</code> +{" "}
-          <code>xai-grok-shell</code> 内置。
+          基于 <code>Electron</code> + <code>React</code> +{" "}
+          <code>@earendil-works/pi-coding-agent</code> 内置。
         </p>
       </div>
     </div>

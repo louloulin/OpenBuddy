@@ -23,7 +23,7 @@ const OPC_ID = "00-OPC";
 const LS_ROOT = "expertsRoot";
 /** Manifest label overrides to match the target UI exactly. */
 const LABEL_OVERRIDE: Record<string, string> = { "13-TencentZone": "腾讯专家" };
-const DEFAULT_PICK = "E:/Grok/agents";
+const DEFAULT_PICK = "";
 
 interface Props {
   pills: React.ReactNode;
@@ -173,7 +173,7 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
   }, [root, loadCatalog, onToast, error]);
 
   const handleCreate = () =>
-    onToast?.("在 ~/.grok/agents/ 新建 .md 文件即可创建专家（后续将接入创建向导）");
+    onToast?.("在 应用数据目录/pi/agents/ 新建 .md 文件即可创建专家（后续将接入创建向导）");
 
   const handleDeleteLocal = useCallback(async (a: AgentEntry) => {
     if (!confirm(`确定删除专家「${a.name}」？`)) return;
@@ -273,7 +273,7 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
           <div className="ec-empty">
             <FolderOpenIcon size="xl" className="ec-empty-icon" />
             <p>未找到专家数据目录</p>
-            <p className="ec-empty-hint">请选择包含 <code>_meta/_expert_center.json</code> 的 WorkBuddy 数据目录（如 <code>E:\Grok\agents</code>）</p>
+            <p className="ec-empty-hint">请选择包含 <code>_meta/_expert_center.json</code> 的 WorkBuddy 数据目录（如 <code>本地资料目录</code>）</p>
             <button type="button" className="um-btn um-btn--primary" onClick={chooseDir}>
               <FolderOpenIcon size="sm" /><span>选择来源目录</span>
             </button>

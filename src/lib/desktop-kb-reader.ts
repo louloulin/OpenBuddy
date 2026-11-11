@@ -3,12 +3,12 @@ import { invoke } from "@/lib/ipc";
 import type { DirectoryReader } from "./local-kb-provider";
 
 
-export function isTauriAvailable(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export function isDesktopAvailable(): boolean {
+  return typeof window !== "undefined" && !!window.openbuddy;
 }
 
 
-export function createTauriDirectoryReader(): DirectoryReader {
+export function createDesktopDirectoryReader(): DirectoryReader {
   return {
     async listDir(path) {
       const entries: Array<{ name: string; path: string; is_dir: boolean }> = await invoke(

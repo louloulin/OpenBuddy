@@ -1029,8 +1029,6 @@ export async function subscribeAgentEvents(handlers: {
     await wire("agent://folder-trust", handlers.onFolderTrust);
     await wire("agent://permission-mode", handlers.onPermissionMode);
     await wire("agent://models-update", handlers.onModelsUpdate);
-    await wire("agent://question", handlers.onQuestion);
-    await wire("agent://agent-died", handlers.onAgentDied);
     await wire("agent://turn-error", handlers.onTurnError);
     return () => unlisteners.forEach(unlisten => unlisten());
   } catch (error) {

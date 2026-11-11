@@ -20,8 +20,8 @@ vi.mock("@/lib/ipc", () => ({ open: (...a: unknown[]) => openDialog(...a), invok
 
 const mockReader = { listDir: vi.fn(), readText: vi.fn(), readBytes: vi.fn() };
 vi.mock("@/lib/desktop-kb-reader", () => ({
-  isTauriAvailable: () => true,
-  createTauriDirectoryReader: () => mockReader,
+  isDesktopAvailable: () => true,
+  createDesktopDirectoryReader: () => mockReader,
 }));
 
 import { Sidebar } from "../Sidebar";

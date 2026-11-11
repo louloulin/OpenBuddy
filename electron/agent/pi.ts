@@ -44,14 +44,15 @@ export class PiEngine {
           if(event.message.stopReason==='error')this.emit('agent://turn-error',{sessionId,kind:'error',detail:event.message.errorMessage??'模型请求失败'});
         }
       });
-      await session.bindExtensions({mode:'sdk',onError:error=>this.emit('agent://error',{sessionId,message:error.message})});
+      await session.bindExtensions({mode:'rpc',onError:error=>this.emit('agent://error',{sessionId,message:error.error})});
       return sessionId;
     } finally {this.transitioning=false;}
   }
   async newSession(cwd:string,modelId?:string) {const actual=await this.validCwd(cwd);return this.replace(SessionManager.create(actual,this.sessionDir),modelId);}
   async all() {return SessionManager.listAll(this.sessionDir);}
   async resolve(id:string,cwd?:string):Promise<SessionInfo> {
-    const item=(await this.all()).find(s=>s.id===id&&(!cwd||s.cwd===cwd));if(!item)throw Error('会话不存在');
+    const canonicalCwd=cwd?await this.validCwd(cwd):undefined;
+    const item=(await this.all()).find(s=>s.id===id&&(!canonicalCwd||s.cwd===canonicalCwd));if(!item)throw Error('会话不存在');
     const actual=await realpath(item.path),root=await realpath(this.sessionDir),rel=relative(root,actual);
     if(rel==='..'||rel.startsWith(`..${sep}`)||isAbsolute(rel))throw Error('会话路径越界');
     return {...item,path:actual};

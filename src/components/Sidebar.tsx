@@ -11,10 +11,8 @@ import {
 import type { SessionSummary, SessionStatus } from "@/lib/types";
 import {
   WbNewTaskIcon,
-  WbAssistantNavIcon,
   WbProjectNavIcon,
   WbExpertNavIcon,
-  WbAutomationNavIcon,
   WbMoreNavIcon,
   SearchIcon,
   FilterIcon,
@@ -499,11 +497,11 @@ function MoreDropdown({
       >
         <WbMoreNavIcon size="md" />
         <span>更多</span>
-        <span className="sidebar__nav-sub">资料库·灵感</span>
+        <span className="sidebar__nav-sub">文件·通知</span>
       </button>
       {open && (
         <div className="sidebar__more-popover" role="menu">
-          {ITEMS.map((item) => (
+          {ITEMS.filter(item => ["my_files", "usage_quota", "notify_channels", "policy_settings"].includes(item.id)).map((item) => (
             <button
               key={item.id}
               type="button"
@@ -537,7 +535,6 @@ export function Sidebar({
   onOpenSettings,
   onToggleCollapse,
   onToggleWorkspace,
-  onOpenSearch,
   onPlaceholder,
   onToast,
   onOpenProject,

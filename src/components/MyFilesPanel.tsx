@@ -258,7 +258,7 @@ function LocalFilesTab({
       setFiles(items);
     } catch {
       setFiles([]);
-      onToast?.("该功能需要 browse_directory Tauri 命令支持");
+      onToast?.("该功能需要 browse_directory Electron 命令支持");
     } finally {
       setLoading(false);
     }

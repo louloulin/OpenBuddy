@@ -36,7 +36,7 @@ describe("detectToolRenderer", () => {
     expect(detectToolRenderer("agent_mail")).toBe("agent-mail");
     expect(detectToolRenderer("specialist")).toBe("specialist");
   });
-  it("grok task 工具 → task 渲染器（优先于 defer 的子串匹配）", () => {
+  it("agent task 工具 → task 渲染器（优先于 defer 的子串匹配）", () => {
     expect(detectToolRenderer("task")).toBe("task");
     // 注意：含 task 子串但不是纯 task 的（如 defer）不应被 task 拦截
     expect(detectToolRenderer("defer_execute")).toBe("defer-execute");

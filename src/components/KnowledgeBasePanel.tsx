@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { open as openDialog } from "@/lib/ipc";
 import { searchKb, listKbProvidersWithStats, registerKbProvider, unregisterKbProvider, rebuildAllKbProviders, type KbEntry, type KbIndexStats } from "@/lib/knowledge-base";
 import { createLocalKbProvider } from "@/lib/local-kb-provider";
-import { createTauriDirectoryReader, isTauriAvailable } from "@/lib/desktop-kb-reader";
+import { createDesktopDirectoryReader, isDesktopAvailable } from "@/lib/desktop-kb-reader";
 
 interface KnowledgeBasePanelProps {
   /** 打开条目回调(可选)。 */
@@ -37,14 +37,14 @@ export function KnowledgeBasePanel({ onOpen, onToast }: KnowledgeBasePanelProps)
 
   /** 添加本地文件夹知识源:弹出原生目录选择 → 注册 local KbProvider。 */
   const addLocalFolder = async () => {
-    if (!isTauriAvailable()) {
-      onToast?.("添加知识源需要桌面环境(Tauri)");
+    if (!isDesktopAvailable()) {
+      onToast?.("添加知识源需要桌面环境(Electron)");
       return;
     }
     try {
       const dir = await openDialog({ directory: true, multiple: false });
       if (!dir || Array.isArray(dir)) return;
-      registerKbProvider(createLocalKbProvider(dir as string, createTauriDirectoryReader()));
+      registerKbProvider(createLocalKbProvider(dir as string, createDesktopDirectoryReader()));
       setRefreshKey((k) => k + 1);
       onToast?.("已添加本地知识源");
     } catch (e) {
