@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { subscribeAgentEvents } from "../agent-client";
+import { createDesktopDirectoryReader } from "../desktop-kb-reader";
 import { invoke, listen, dialog, getPathForFile, win, type OpenBuddyBridge } from "../ipc";
 
 const installBridge = () => {
@@ -55,6 +56,21 @@ describe("Electron renderer bridge", () => {
     expect(updates).toHaveLength(3);
     unlisten();
     expect(released).toHaveBeenCalledOnce();
+  });
+
+  it("reads knowledge sources with bounded file commands and directory kind mapping", async () => {
+    const bridge = installBridge();
+    vi.mocked(bridge.invoke).mockImplementation(async (command, payload) => {
+      const args = payload as { maxBytes?: number };
+      if (command === "list_dir") return [{ name: "docs", path: "/workspace/docs", kind: "directory" }];
+      if (command === "read_text_file" && args.maxBytes && args.maxBytes <= 256 * 1024) return "bounded text";
+      if (command === "read_file_base64" && args.maxBytes && args.maxBytes <= 1024 * 1024) return "AQID";
+      throw new Error("Unbounded or unsupported knowledge read");
+    });
+    const reader = createDesktopDirectoryReader();
+    expect(await reader.listDir("/workspace")).toEqual([{ name: "docs", path: "/workspace/docs", isDir: true }]);
+    expect(await reader.readText("/workspace/a.md")).toBe("bounded text");
+    expect(await reader.readBytes?.("/workspace/a.docx")).toEqual(new Uint8Array([1, 2, 3]));
   });
 
   it("uses the preload file resolver and native dialog/window results", async () => {

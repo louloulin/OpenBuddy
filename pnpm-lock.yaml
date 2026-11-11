@@ -11,6 +11,9 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: 1.5.2
         version: 1.5.2(@aws-sdk/credential-provider-node@3.972.96)(@smithy/signature-v4@5.7.5)(ws@8.22.2)
+      '@earendil-works/pi-mcp':
+        specifier: 1.5.2
+        version: 1.5.2
       katex:
         specifier: ^0.18.1
         version: 0.18.11

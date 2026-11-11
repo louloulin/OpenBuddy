@@ -5,6 +5,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { registerIpc } from './ipc/register.js';
 import { isEvent } from './shared/contract.js';
+import { WorkspaceAccess } from './shared/workspace-access.js';
 import { createEngineHandlers } from './ipc/handlers/index.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -35,7 +36,8 @@ async function createWindow(): Promise<void> {
   const engine = await createEngineHandlers({ userData: app.getPath('userData'), safeStorage, shell, emit: (event: string, payload: unknown) => { if (isEvent(event) && !win.isDestroyed()) win.webContents.send(event, payload); } });
   cleanup = undefined;
   shutdown = async () => { await engine.shutdown(); };
-  const unregister = registerIpc(win, engine.handlers, trustedURL);
+  const workspaceAccess = await WorkspaceAccess.create(app.getPath('userData'));
+  const unregister = registerIpc(win, engine.handlers, trustedURL, workspaceAccess);
   win.webContents.setWindowOpenHandler(({ url }) => { external(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (event, url) => { if (url.split('#')[0] !== trustedURL) { event.preventDefault(); external(url); } });
   win.webContents.on('will-attach-webview', event => event.preventDefault());
@@ -55,7 +57,7 @@ async function createWindow(): Promise<void> {
     const result = await win.webContents.executeJavaScript(`new Promise((resolve, reject) => {
       let attempts = 0;
       const inspect = () => {
-        if (document.querySelector('#root')?.children.length && window.openbuddy && document.querySelector('button')) {
+        if (document.querySelector('#root')?.children.length && window.openbuddy && document.querySelector('textarea')) {
           resolve({ title: document.title, rootChildren: document.querySelector('#root').children.length, bodyText: document.body.innerText, controls: [...document.querySelectorAll('button, textarea, input')].map(el => ({tag:el.tagName,text:el.innerText,placeholder:el.getAttribute('placeholder'),label:el.getAttribute('aria-label')})), bridge: Object.keys(window.openbuddy), nodeRequire: typeof window.require, nodeProcess: typeof window.process });
         } else if (++attempts >= 100) reject(new Error('renderer smoke timed out'));
         else setTimeout(inspect, 100);

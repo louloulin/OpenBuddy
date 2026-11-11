@@ -7,12 +7,12 @@ import { registerIpc } from './register.js';
 import type { BrowserWindow } from 'electron';
 
 const url = 'file:///app/dist/index.html';
-function setup() {
+function setup(workspaces?: { grant(path: string): Promise<void>; allows(path: string): Promise<boolean> }) {
   const mainFrame = { url };
   const webContents = { mainFrame };
   const window = { webContents } as unknown as BrowserWindow;
   const send = vi.fn(() => 'ok');
-  const unregister = registerIpc(window, { agent_send: send }, url);
+  const unregister = registerIpc(window, { agent_send: send, agent_init: send }, url, workspaces);
   const dispatch = mocks.handle.mock.calls[0][1];
   return { dispatch, send, unregister, event: { sender: webContents, senderFrame: mainFrame } };
 }
@@ -34,6 +34,14 @@ describe('Electron IPC dispatch', () => {
     expect(send).not.toHaveBeenCalled();
     unregister();
     expect(mocks.removeHandler).toHaveBeenCalledWith('openbuddy:invoke');
+  });
+  it('blocks renderer-selected workspace roots without a native grant', async () => {
+    const allows = vi.fn(async (path: string) => path === '/selected');
+    const { dispatch, event, send } = setup({ grant: vi.fn(), allows });
+    await expect(dispatch(event, 'agent_init', { cwd: '/' })).rejects.toThrow('workspace_not_authorized');
+    expect(send).not.toHaveBeenCalled();
+    await expect(dispatch(event, 'agent_init', { cwd: '/selected' })).resolves.toBe('ok');
+    expect(send).toHaveBeenCalledOnce();
   });
   it('consumes a save dialog grant once before an export can write', async () => {
     const { dispatch, event } = setup();

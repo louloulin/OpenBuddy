@@ -917,12 +917,6 @@ function Shell() {
             </div>
           ) : !init ? (
             <div className="app__notice">正在本地初始化 agent…</div>
-          ) : !init.ok ? (
-            <div className="app__notice app__notice--err">
-              Pi 未就绪:{init.auth.reason ?? "未知原因"}
-              <br />
-              请在「设置 → 账户管理」设置 xAI API Key，或在「设置 → 模型」配置 BYOK provider。
-            </div>
           ) : placeholderView ? (
             <PlaceholderPage
               label={placeholderView}

@@ -6,7 +6,7 @@ OpenBuddy 正迁移为 Electron + Pi 的 React 桌面工作区。MVP 范围包�
 
 ## 开发与构建
 
-需要 Node.js >=22.19.0（建议 Node 24）与 pnpm 10.29.3。已向 npm registry 核实并精确固定 Electron 45.3.0、Pi SDK 1.5.2；内置 Node 版本以 Electron 二进制运行结果为准。
+需要 Node.js >=22.19.0（建议 Node 24）与 pnpm 10.29.3。已向 npm registry 核实并精确固定 Electron 45.3.0、Pi SDK 1.5.2；本机 arm64 二进制实测为 Electron 45.3.0 / Node 24.22.2 / Chromium 156.0.8078.96。
 
 ```sh
 pnpm install --frozen-lockfile

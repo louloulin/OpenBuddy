@@ -22,7 +22,7 @@ function dialogOptions(payload: Payload): OpenDialogOptions & SaveDialogOptions 
   return result;
 }
 
-export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, trustedURL: string): () => void {
+export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, trustedURL: string, workspaces?: { grant(path: string): Promise<void>; allows(path: string): Promise<boolean> }): () => void {
   const exportGrants = new Set<string>();
   const local: CommandHandlers = {
     export_text_file: async payload => {
@@ -37,7 +37,9 @@ export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, tr
     dialog_open: async payload => {
       for (const key of ['directory', 'multiple'] as const) if (payload[key] !== undefined && typeof payload[key] !== 'boolean') throw new Error(`invalid_payload: ${key}`);
       const result = await dialog.showOpenDialog(window, { ...dialogOptions(payload), properties: [payload.directory ? 'openDirectory' : 'openFile', ...(payload.multiple ? ['multiSelections' as const] : [])] });
-      return result.canceled ? null : payload.multiple ? result.filePaths : result.filePaths[0] ?? null;
+      if (result.canceled) return null;
+      if (payload.directory && workspaces) for (const path of result.filePaths) await workspaces.grant(path);
+      return payload.multiple ? result.filePaths : result.filePaths[0] ?? null;
     },
     dialog_save: async payload => { const result = await dialog.showSaveDialog(window, dialogOptions(payload)); if (result.canceled || !result.filePath) return null; exportGrants.add(result.filePath); return result.filePath; },
     dialog_ask: async payload => {
@@ -51,6 +53,9 @@ export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, tr
     if (event.sender !== window.webContents || !frame || frame !== window.webContents.mainFrame || frame.url.split('#')[0] !== trustedURL) throw new Error('untrusted_sender');
     if (!isCommand(command)) throw new Error(`not_implemented: ${String(command).slice(0, 128)}`);
     const payload = validatePayload(input);
+    if (workspaces && ['agent_init', 'agent_new_session'].includes(command) && payload.cwd != null) {
+      if (typeof payload.cwd !== 'string' || !await workspaces.allows(payload.cwd)) throw new Error('workspace_not_authorized: select a folder using the native dialog');
+    }
     const handler = local[command] ?? handlers[command];
     if (!handler) throw new Error(`not_implemented: ${command}`);
     return handler(payload);

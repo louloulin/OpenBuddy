@@ -4311,6 +4311,9 @@ button.diff__path {
   background: color-mix(in srgb, var(--wb-palette-black-100) 2%, transparent);
 }
 .wb-composer__setup-hint {
+  border: 0;
+  background: transparent;
+  text-align: left;
   position: absolute;
   inset: 0;
   display: flex;

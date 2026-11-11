@@ -69,6 +69,15 @@ describe("Pi transcript events", () => {
     expect(text()).toBe("");
   });
 
+  it("restores image tool results from persisted messages and settles replay without busy state", () => {
+    emit({ type: "message_end", message: { role: "assistant", content: [{ type: "toolCall", id: "image", name: "read", arguments: { path: "plot.png" } }] } });
+    emit({ type: "message_end", message: { role: "toolResult", toolCallId: "image", toolName: "read", content: [{ type: "image", data: "aW1hZ2U=", mimeType: "image/png" }] } });
+    emit({ type: "agent_settled", replay: true });
+    expect(useSessionStore.getState().streaming).toBe(false);
+    const card = useSessionStore.getState().messages.flatMap(m => m.parts).find(p => p.kind === "tool_call");
+    expect(card?.kind === "tool_call" && card.toolCall).toMatchObject({ status: "completed", content: [{ type: "image", data: "aW1hZ2U=", mimeType: "image/png" }] });
+  });
+
   it("updates a tool card with the complete execution result", () => {
     useSessionStore.getState().startStreaming();
     emit({ type: "tool_execution_start", toolCallId: "t1", toolName: "bash", args: { command: "pwd" } });

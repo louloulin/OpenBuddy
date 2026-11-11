@@ -460,9 +460,9 @@ export function Composer({
         }}
       >
         {!apiReady && (
-          <div className="wb-composer__setup-hint" role="button" tabIndex={0}>
+          <button type="button" className="wb-composer__setup-hint" onClick={event => { event.stopPropagation(); onOpenSettings?.(); }}>
             请先配置 API Key 开始使用
-          </div>
+          </button>
         )}
 
         {/* 拖拽文件落区遮罩(对齐 WorkBuddy drop-zone) */}
@@ -539,7 +539,7 @@ export function Composer({
               ? sceneTag
                 ? "" // 有操作类型标签时不显示占位文案(匹配 WorkBuddy)
                 : placeholder ?? "今天帮你做些什么? @ 引用对话文件,/ 调用技能与指令"
-              : "请先配置 API Key 开始使用"
+              : ""
           }
           onChange={(e) => {
             updateText(e.target.value);

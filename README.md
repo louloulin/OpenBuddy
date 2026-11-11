@@ -6,7 +6,7 @@ OpenBuddy is a React desktop workspace migrating to Electron and the in-process 
 
 ## Development
 
-Use Node.js 22.19.0 or newer (Node 24 recommended) and pnpm 10.29.3. Electron 45.3.0 and `@earendil-works/pi-coding-agent` 1.5.2 are pinned from the npm registry. Electron's embedded Node version is determined by the downloaded Electron binary.
+Use Node.js 22.19.0 or newer (Node 24 recommended) and pnpm 10.29.3. Electron 45.3.0 and `@earendil-works/pi-coding-agent` 1.5.2 are pinned from the npm registry. The downloaded macOS arm64 binary reports Electron 45.3.0, Node 24.22.2 and Chromium 156.0.8078.96.
 
 ```sh
 pnpm install --frozen-lockfile

@@ -946,12 +946,9 @@ export function AgentSettingsPanel() {
 // ---------- 助理设置 ----------
 
 const PERMISSION_OPTIONS: { value: string; label: string }[] = [
-  { value: "", label: "agent 默认（每次询问）" },
-  { value: "allow_once", label: "允许一次" },
-  { value: "always_allow_this_session", label: "本会话始终允许" },
-  { value: "always_allow_all_sessions", label: "所有会话始终允许" },
-  { value: "deny_once", label: "拒绝一次" },
-  { value: "always_deny_all_sessions", label: "所有会话始终拒绝" },
+  { value: "ask", label: "审批模式（每次询问）" },
+  { value: "auto", label: "自动模式（高风险操作询问）" },
+  { value: "always-approve", label: "始终允许" },
 ];
 
 /** AssistantSettingsPanel — 助理角色列表 + 新会话默认模型/权限偏好。
@@ -962,8 +959,7 @@ export function AssistantSettingsPanel() {
   const [defaults, setDefaults] = useState<AgentDefaults | null>(null);
   const [draft, setDraft] = useState<AgentDefaults>({
     defaultModel: "",
-    defaultPermission: "",
-    rememberToolApprovals: undefined,
+    defaultPermission: "ask",
   });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -1002,7 +998,7 @@ export function AssistantSettingsPanel() {
   const handleSave = async () => {
     setBusy(true);
     try {
-      await agentsDefaultsSave(draft);
+      await agentsDefaultsSave({ defaultModel: draft.defaultModel, defaultPermission: draft.defaultPermission });
       setDefaults(draft);
       setDirty(false);
       setMsg("已保存（重启 agent 后生效）");
@@ -1040,7 +1036,7 @@ export function AssistantSettingsPanel() {
                 value={draft.defaultModel}
                 onChange={(e) => update({ defaultModel: e.target.value })}
               >
-                <option value="">agent 内置默认</option>
+                <option value="">首个已配置模型</option>
                 {providers.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.label}（{p.id}）
@@ -1050,14 +1046,14 @@ export function AssistantSettingsPanel() {
             </div>
           </div>
           <p className="settings-hint">
-            未指定时使用 Pi 运行时的默认可用模型。
+            未指定时使用已配置的第一个可用模型。
           </p>
 
           {/* 默认权限选择 */}
           <div className="settings-row">
             <div className="settings-row__label">
               <Shield size={16} />
-              <span>首次权限提示默认选择</span>
+              <span>新会话权限模式</span>
             </div>
             <div className="settings-row__control">
               <select
@@ -1070,35 +1066,6 @@ export function AssistantSettingsPanel() {
                     {o.label}
                   </option>
                 ))}
-              </select>
-            </div>
-          </div>
-
-          {/* 记住工具授权 */}
-          <div className="settings-row">
-            <div className="settings-row__label">
-              <span>显示「始终允许」选项</span>
-            </div>
-            <div className="settings-row__control">
-              <select
-                className="agent-select"
-                value={
-                  draft.rememberToolApprovals === undefined
-                    ? ""
-                    : draft.rememberToolApprovals
-                      ? "true"
-                      : "false"
-                }
-                onChange={(e) =>
-                  update({
-                    rememberToolApprovals:
-                      e.target.value === "" ? undefined : e.target.value === "true",
-                  })
-                }
-              >
-                <option value="">agent 默认</option>
-                <option value="true">显示</option>
-                <option value="false">隐藏</option>
               </select>
             </div>
           </div>

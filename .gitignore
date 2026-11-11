@@ -18,7 +18,7 @@ release/
 *.local
 *.log
 
-# Tauri dev / build artifacts
+# TypeScript build artifacts
 *.tsbuildinfo
 
 # Local debugging / inspection artifacts
