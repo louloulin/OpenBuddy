@@ -1021,7 +1021,7 @@ export async function subscribeAgentEvents(handlers: {
     await wire<{ sessionId: string; event: SessionUpdate }>("agent://event", ({ sessionId, event }) => {
       if (!sessionId) return;
       handlers.onUpdate?.({ ...event, sessionId });
-      if (event.type === "agent_settled") handlers.onComplete?.({ sessionId, promptId: "", stopReason: "end_turn" });
+      if (event.type === "agent_settled" && !event.replay) handlers.onComplete?.({ sessionId, promptId: "", stopReason: event.aborted ? "cancelled" : "end_turn" });
     });
     await wire("agent://permission", handlers.onPermission);
     await wire("agent://summary", handlers.onSummary);

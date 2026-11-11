@@ -99,6 +99,32 @@ describe('real Pi SDK with local OpenAI protocol fixture',()=>{
     await f.call('agent_cancel',{sessionId:f.sid}); await pending;
     await expect(f.call('agent_resolve_permission',{requestId:f.events.find(e=>e.name==='agent://permission')!.payload.requestId,optionId:'allow'})).rejects.toThrow();
   });
+  it('keeps metadata and model selection across a full engine restart',async()=>{
+    const f=await fixture();
+    await f.call('agent_set_session_pinned',{sessionId:f.sid,pinned:true});
+    await f.call('agent_send',{sessionId:f.sid,text:'metadata'});
+    await f.call('agent_rename_session',{sessionId:f.sid,title:'Saved title'});
+    await f.call('agent_set_session_archived',{sessionId:f.sid,archived:true});
+    await f.engine.dispose();
+    const restarted=await createEngineHandlers({userDataDir:f.root,safeStorage:secureStorage,emit:()=>{},shell:{openPath:async()=>'',openExternal:async()=>{},showItemInFolder:()=>{}}});
+    cleanups.push(restarted.dispose);
+    const listed=await restarted.handlers.agent_list_sessions({cwd:f.root}) as any[];
+    expect(listed[0]).toMatchObject({sessionId:f.sid,title:'Saved title',pinned:true,archived:true,currentModelId:'fixture'});
+    await restarted.handlers.agent_load_session({sessionId:f.sid,cwd:f.root});
+    expect(await restarted.handlers.agent_session_usage({sessionId:f.sid})).toMatchObject({usage:{numTurns:1}});
+    await restarted.handlers.agent_delete_session({sessionId:f.sid});
+    expect(await restarted.handlers.agent_list_sessions({cwd:f.root})).toEqual([]);
+  });
+  it('reloads real SDK skills and commands without changing an empty session id',async()=>{
+    const f=await fixture();const skill=join(f.root,'local-skill.md');
+    await writeFile(skill,'---\nname: fixture-skill\ndescription: Fixture skill for integration checks\n---\nDo something helpful.\n');
+    await f.call('skills_add',{path:skill});
+    expect(await f.call('commands_list')).toContainEqual(expect.objectContaining({name:'skill:fixture-skill'}));
+    await f.call('skills_toggle',{name:'fixture-skill',enabled:false});
+    expect(await f.call('commands_list')).toEqual([]);
+    expect(await f.call('skills_list',{cwd:f.root})).toContainEqual(expect.objectContaining({name:'fixture-skill',enabled:false}));
+    await f.call('agent_send',{sessionId:f.sid,text:'hello after skills reload'});
+  });
   it('loads a real stdio MCP server and routes its tool through permissions',async()=>{
     const f=await fixture();
     const serverPath=join(f.root,'mcp-server.cjs');

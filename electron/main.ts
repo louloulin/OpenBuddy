@@ -1,7 +1,7 @@
 import { app, BrowserWindow, safeStorage, shell, session } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { registerIpc } from './ipc/register.js';
 import { isEvent } from './shared/contract.js';
@@ -29,7 +29,7 @@ async function createWindow(): Promise<void> {
     webPreferences: { preload: join(root, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true, allowRunningInsecureContent: false, webviewTag: false },
   });
   window = win;
-  win.webContents.on('console-message', (_event, level, message) => { console.log('RENDERER_CONSOLE', level, message); });
+  win.webContents.on('console-message', event => { console.log('RENDERER_CONSOLE', event.level, event.message); });
   win.webContents.on('render-process-gone', (_event, details) => { console.error('RENDERER_GONE', details.reason); });
   win.webContents.on('did-fail-load', (_event, code, description) => { console.error('RENDERER_LOAD_FAILED', code, description); });
   const engine = await createEngineHandlers({ userData: app.getPath('userData'), safeStorage, shell, emit: (event: string, payload: unknown) => { if (isEvent(event) && !win.isDestroyed()) win.webContents.send(event, payload); } });
@@ -55,13 +55,16 @@ async function createWindow(): Promise<void> {
     const result = await win.webContents.executeJavaScript(`new Promise((resolve, reject) => {
       let attempts = 0;
       const inspect = () => {
-        if (document.querySelector('#root')?.children.length && window.openbuddy) {
-          resolve({ title: document.title, rootChildren: document.querySelector('#root').children.length, bodyTextLength: document.body.innerText.length, bridge: Object.keys(window.openbuddy), nodeRequire: typeof window.require, nodeProcess: typeof window.process });
+        if (document.querySelector('#root')?.children.length && window.openbuddy && document.querySelector('button')) {
+          resolve({ title: document.title, rootChildren: document.querySelector('#root').children.length, bodyText: document.body.innerText, controls: [...document.querySelectorAll('button, textarea, input')].map(el => ({tag:el.tagName,text:el.innerText,placeholder:el.getAttribute('placeholder'),label:el.getAttribute('aria-label')})), bridge: Object.keys(window.openbuddy), nodeRequire: typeof window.require, nodeProcess: typeof window.process });
         } else if (++attempts >= 100) reject(new Error('renderer smoke timed out'));
         else setTimeout(inspect, 100);
       };
       inspect();
     })`);
+    const screenshotPath = join(app.getPath('userData'), 'renderer.png');
+    writeFileSync(screenshotPath, (await win.webContents.capturePage()).toPNG());
+    console.log('OPENBUDDY_SMOKE_SCREENSHOT', screenshotPath);
     console.log('OPENBUDDY_SMOKE_DOM', JSON.stringify(result));
     console.log('OPENBUDDY_SMOKE_LOADED', win.webContents.getURL());
     app.quit();

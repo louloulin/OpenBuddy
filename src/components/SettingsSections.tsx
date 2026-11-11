@@ -35,7 +35,6 @@ import {
   accountSetApiKey,
   agentsDefaultsGet,
   agentsDefaultsSave,
-  agentsList,
   commandsList,
   agentAuthStatus,
   internalReload,
@@ -59,7 +58,6 @@ import {
 } from "@/lib/agent-client";
 import type {
   AgentDefaults,
-  AgentEntry,
   McpServerEntry,
   NotificationEntry,
   NotificationKind,
@@ -284,14 +282,14 @@ export function HelpSettingsPanel() {
         <li>
           <ExternalLink size={14} />
           <span>
-            agent 内核路径：<code>vendor/Pi SDK</code>（submodule）
+            引擎包：<code>@earendil-works/pi-coding-agent</code>
           </span>
         </li>
       </ul>
       <p className="settings-hint">
         遇到问题？请检查：
         <br />
-        1. <code>应用数据目录/pi/auth.json</code> 是否存在（运行过 <code>agent login</code>）
+        1. API Key 是否已在「账户管理」或「模型」中配置
         <br />
         2. 「模型」tab 是否配置了至少一个 provider
         <br />
@@ -960,7 +958,6 @@ const PERMISSION_OPTIONS: { value: string; label: string }[] = [
  *  agents 来自 应用数据目录/pi/agents/*.md；默认值写入 config.toml 的
  *  [models].default 和 [ui].default_selected_permission。 */
 export function AssistantSettingsPanel() {
-  const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [providers, setProviders] = useState<ModelOptionRow[]>([]);
   const [defaults, setDefaults] = useState<AgentDefaults | null>(null);
   const [draft, setDraft] = useState<AgentDefaults>({
@@ -976,18 +973,18 @@ export function AssistantSettingsPanel() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [ag, prov, def] = await Promise.all([
-        agentsList().catch(() => [] as AgentEntry[]),
+      const [prov, def] = await Promise.all([
         providersList()
           .then(flattenModels)
           .catch(() => [] as ModelOptionRow[]),
         agentsDefaultsGet(),
       ]);
-      setAgents(ag);
       setProviders(prov);
       setDefaults(def);
       setDraft(def);
       setDirty(false);
+    } catch (error) {
+      setMsg(`加载失败：${String(error)}`);
     } finally {
       setLoading(false);
     }
@@ -1026,41 +1023,12 @@ export function AssistantSettingsPanel() {
   return (
     <SectionShell
       title="助理设置"
-      desc="管理助理角色（应用数据目录/pi/agents/*.md）和新建会话的默认模型/权限偏好。偏好写入 config.toml 的 [models].default 和 [ui].default_selected_permission。"
+      desc="配置新建会话的默认模型与权限偏好。"
     >
       {loading ? (
         <p className="settings-hint">加载中…</p>
       ) : (
         <>
-          {/* 助理列表 */}
-          <details className="agent-section" open>
-            <summary className="agent-section__title">
-              已配置助理（{agents.length}）
-            </summary>
-            <div className="agent-section__body">
-              {agents.length === 0 ? (
-                <p className="settings-hint">
-                  暂无助理。在主界面「助理」面板从模板创建，或把 .md 文件放到
-                  <code>应用数据目录/pi/agents/</code>。
-                </p>
-              ) : (
-                <ul className="agent-list">
-                  {agents.map((a) => (
-                    <li key={a.path} className="agent-list__item">
-                      <span className="agent-list__name">{a.name}</span>
-                      <span className="agent-list__badge">
-                        {a.scope === "user" ? "用户级" : "项目级"}
-                      </span>
-                      {a.description && (
-                        <span className="agent-list__desc">{a.description}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </details>
-
           {/* 默认模型 */}
           <div className="settings-row">
             <div className="settings-row__label">
@@ -1082,7 +1050,7 @@ export function AssistantSettingsPanel() {
             </div>
           </div>
           <p className="settings-hint">
-            对应 <code>[models] default</code>。空 = agent 用内置默认（通常是 Pi SDK）。
+            未指定时使用 Pi 运行时的默认可用模型。
           </p>
 
           {/* 默认权限选择 */}
@@ -1155,10 +1123,7 @@ export function AssistantSettingsPanel() {
 
           {msg && <p className="settings-msg">{msg}</p>}
 
-          <p className="settings-hint">
-            助理定义在 <code>应用数据目录/pi/agents/*.md</code>（含 frontmatter + system prompt）。
-            agent 没有 session 级「切换 agent」的 ACP 方法，OpenBuddy 通过预设 prompt 引导。
-          </p>
+
         </>
       )}
     </SectionShell>

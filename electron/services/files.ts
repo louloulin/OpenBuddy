@@ -7,7 +7,9 @@ function pathOf(p:Record<string,unknown>) {return resolve(typeof p.cwd==='string
 function limit(value:unknown,defaultValue:number,max:number) { if(value===undefined||value===null)return defaultValue;if(typeof value!=='number'||!Number.isSafeInteger(value)||value<1||value>max)throw Error('无效的文件读取限制');return value; }
 async function read(path:string,max:number) {const fd=await open(path,'r');try{if(!(await fd.stat()).isFile())throw Error('不是文件');const buffer=Buffer.alloc(max+1);const {bytesRead}=await fd.read(buffer,0,max+1,0);return {bytes:buffer.subarray(0,Math.min(bytesRead,max)),truncated:bytesRead>max};}finally{await fd.close();}}
 export async function workspacePath(root:string,path:string) {
-  const canonicalRoot=await realpath(root),candidate=resolve(root,path),rel=relative(canonicalRoot,candidate);
+  const canonicalRoot=await realpath(root),lexicalRoot=resolve(root),raw=resolve(lexicalRoot,path),lexicalRelative=relative(lexicalRoot,raw);
+  const candidate=lexicalRelative!=='..'&&!lexicalRelative.startsWith(`..${sep}`)&&!isAbsolute(lexicalRelative)?resolve(canonicalRoot,lexicalRelative):raw;
+  const rel=relative(canonicalRoot,candidate);
   if(rel==='..'||rel.startsWith(`..${sep}`)||isAbsolute(rel))throw Error('拒绝工作区外路径');
   let parent=candidate;
   const missing:string[]=[];

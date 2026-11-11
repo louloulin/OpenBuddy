@@ -37,7 +37,7 @@ export class PiEngine {
       await loader.reload();
       const saved=manager.buildSessionContext().model;
       const model=this.providers.model(modelId??saved?.modelId);
-      if(modelId&&!model)throw Error('模型不存在');
+      if(!model)throw Error(modelId?'模型不存在':'请先配置提供商和模型');
       const {session}=await createAgentSession({cwd:this.cwd,agentDir:this.settings.dir,modelRuntime:this.providers.runtime,sessionManager:manager,resourceLoader:loader,settingsManager:sdkSettings,model,tools:['read','bash','edit','write','grep','find','ls','mcp__*'],thinkingLevel:'off'});
       this.session=session;
       const sessionId=session.sessionId;
@@ -64,7 +64,7 @@ export class PiEngine {
     for(const message of this.session!.messages) {this.emit('agent://event',{sessionId:id,event:{type:'message_start',message}});this.emit('agent://event',{sessionId:id,event:{type:'message_end',message}});}
     this.emit('agent://event',{sessionId:id,event:{type:'agent_settled',replay:true}});
   }
-  async list(cwd:string) {const meta=this.settings.config.read().sessions,items=(await this.all()).filter(s=>s.cwd===cwd);const result=items.map(s=>({sessionId:s.id,title:meta[s.id]?.title??s.name??s.firstMessage??'新会话',updatedAt:s.modified.toISOString(),cwd:s.cwd,pinned:meta[s.id]?.pinned??false,archived:meta[s.id]?.archived??false,currentModelId:SessionManager.open(s.path,this.sessionDir).buildSessionContext().model?.modelId,status:'completed'}));
+  async list(cwd:string) {cwd=await this.validCwd(cwd);const meta=this.settings.config.read().sessions,items=(await this.all()).filter(s=>s.cwd===cwd);const result=items.map(s=>({sessionId:s.id,title:meta[s.id]?.title??s.name??s.firstMessage??'新会话',updatedAt:s.modified.toISOString(),cwd:s.cwd,pinned:meta[s.id]?.pinned??false,archived:meta[s.id]?.archived??false,currentModelId:SessionManager.open(s.path,this.sessionDir).buildSessionContext().model?.modelId,status:'completed'}));
     if(this.session?.sessionManager.getCwd()===cwd&&!result.some(s=>s.sessionId===this.session!.sessionId)) result.unshift({sessionId:this.session.sessionId,title:meta[this.session.sessionId]?.title??'新会话',updatedAt:new Date().toISOString(),cwd,pinned:false,archived:false,currentModelId:this.session.model?.id,status:'pending'});
     return result;
   }
@@ -79,5 +79,7 @@ export class PiEngine {
   usage(id:string) {const stats=this.live(id).getSessionStats();return {usage:{inputTokens:stats.tokens.input+stats.tokens.cacheRead,outputTokens:stats.tokens.output,totalTokens:stats.tokens.total,cachedReadTokens:stats.tokens.cacheRead,numTurns:stats.userMessages}};}
   commands() {return this.skills.list(this.cwd).filter(s=>s.enabled).map(s=>({name:`skill:${s.name}`,description:s.description,source:'skill'}));}
   get currentCwd(){return this.cwd;}
+  get currentSessionId(){return this.session?.sessionId;}
+  async setFolderTrust(cwd:string,trusted:boolean) {cwd=await this.validCwd(cwd);const c=this.settings.config.read();c.trustedFolders=c.trustedFolders.filter(p=>p!==cwd);if(trusted)c.trustedFolders.push(cwd);this.settings.config.write(c);if(this.session?.sessionManager.getCwd()===cwd)this.session.settingsManager.setProjectTrusted(trusted);}
   async reload() {if(this.busy)throw Error('请等待当前回复完成');if(this.session){const id=this.session.sessionId,file=this.session.sessionManager.getSessionFile();const manager=file&&existsSync(file)?SessionManager.open(file,this.sessionDir):this.session.sessionManager;await this.replace(manager);if(this.session?.sessionId!==id)throw Error('会话重载身份发生变化');}}
 }

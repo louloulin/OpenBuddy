@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { subscribeAgentEvents } from "../agent-client";
 import { invoke, listen, dialog, getPathForFile, win, type OpenBuddyBridge } from "../ipc";
 
 const installBridge = () => {
@@ -34,6 +35,28 @@ describe("Electron renderer bridge", () => {
     unlisten();
     expect(released).toHaveBeenCalledOnce();
   });
+  it("completes only settled turns and excludes history replay from completion effects", async () => {
+    const bridge = installBridge();
+    let callback: ((payload: unknown) => void) | undefined;
+    const released = vi.fn();
+    vi.mocked(bridge.listen).mockImplementation((event, listener) => {
+      if (event === "agent://event") callback = listener;
+      return released;
+    });
+    const updates: unknown[] = [];
+    const completions: unknown[] = [];
+    const unlisten = await subscribeAgentEvents({ onUpdate: event => updates.push(event), onComplete: event => completions.push(event) });
+    callback?.({ sessionId: "A", event: { type: "agent_end" } });
+    expect(completions).toEqual([]);
+    callback?.({ sessionId: "A", event: { type: "agent_settled", aborted: true } });
+    expect(completions).toEqual([expect.objectContaining({ sessionId: "A", stopReason: "cancelled" })]);
+    callback?.({ sessionId: "A", event: { type: "agent_settled", replay: true } });
+    expect(completions).toHaveLength(1);
+    expect(updates).toHaveLength(3);
+    unlisten();
+    expect(released).toHaveBeenCalledOnce();
+  });
+
   it("uses the preload file resolver and native dialog/window results", async () => {
     installBridge();
     expect(getPathForFile(new File(["x"], "a.ts"))).toBe("/workspace/a.ts");

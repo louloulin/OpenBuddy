@@ -501,7 +501,7 @@ function MoreDropdown({
       </button>
       {open && (
         <div className="sidebar__more-popover" role="menu">
-          {ITEMS.filter(item => ["my_files", "usage_quota", "notify_channels", "policy_settings"].includes(item.id)).map((item) => (
+          {ITEMS.filter(item => ["my_files", "knowledge_base", "usage_quota", "notify_channels", "policy_settings"].includes(item.id)).map((item) => (
             <button
               key={item.id}
               type="button"

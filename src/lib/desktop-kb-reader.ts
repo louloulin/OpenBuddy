@@ -11,11 +11,11 @@ export function isDesktopAvailable(): boolean {
 export function createDesktopDirectoryReader(): DirectoryReader {
   return {
     async listDir(path) {
-      const entries: Array<{ name: string; path: string; is_dir: boolean }> = await invoke(
-        "browse_directory",
+      const entries: Array<{ name: string; path: string; kind: string }> = await invoke(
+        "list_dir",
         { path },
       );
-      return entries.map((e) => ({ name: e.name, path: e.path, isDir: e.is_dir }));
+      return entries.map((e) => ({ name: e.name, path: e.path, isDir: e.kind === "directory" }));
     },
     async readText(path) {
       try {
