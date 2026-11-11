@@ -15,14 +15,11 @@ import { deflateRawSync } from "node:zlib";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// --- Mock Tauri 层(让「添加本地文件夹」可在 vitest 下走通) ---
 const openDialog = vi.fn();
-vi.mock("@tauri-apps/plugin-dialog", () => ({ open: (...a: unknown[]) => openDialog(...a) }));
-vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+vi.mock("@/lib/ipc", () => ({ open: (...a: unknown[]) => openDialog(...a), invoke: vi.fn() }));
 
-// 用可控的 DirectoryReader 替代真实 Tauri 实现。
 const mockReader = { listDir: vi.fn(), readText: vi.fn(), readBytes: vi.fn() };
-vi.mock("@/lib/tauri-kb-reader", () => ({
+vi.mock("@/lib/desktop-kb-reader", () => ({
   isTauriAvailable: () => true,
   createTauriDirectoryReader: () => mockReader,
 }));

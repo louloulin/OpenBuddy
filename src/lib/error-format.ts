@@ -1,12 +1,4 @@
-/**
- * Parse grok agent errors into user-friendly Chinese messages.
- *
- * grok returns errors as Rust `Error` structs serialized to JSON, which
- * produce ugly `Error { code: ..., message: ..., data: ... }` strings when
- * passed through `String(e)`. This utility extracts the human-readable
- * message and, for common cases like 429 rate-limiting, formats a friendly
- * summary with usage stats.
- */
+
 
 interface PromptUsage {
   inputTokens?: number;
@@ -26,7 +18,7 @@ interface GrokErrorData {
   [key: string]: unknown;
 }
 
-/** Try to parse a grok error string into structured data. */
+
 /**
  * Convert Rust Debug-style value wrappers to JSON.
  * Handles: String("...") → "...", Number(123) → 123,
@@ -130,11 +122,8 @@ function fmtDuration(ms?: number): string {
   return rs > 0 ? `${m}分${rs}秒` : `${m}分钟`;
 }
 
-/**
- * Format a grok error into a user-friendly Chinese string.
- * Returns null if the error can't be parsed (caller should fall back to raw).
- */
-export function formatGrokError(raw: string): string | null {
+
+export function formatAgentError(raw: string): string | null {
   const parsed = tryParseGrokError(raw);
 
   // If structured parsing failed, check raw string for known patterns.
@@ -218,10 +207,10 @@ export function formatGrokError(raw: string): string | null {
 }
 
 /**
- * Wrap an error value (string or Error) with formatGrokError.
+ * Wrap an error value (string or Error) with formatAgentError.
  * Falls back to String(e) if the error can't be parsed.
  */
 export function friendlyError(e: unknown): string {
   const raw = String(e);
-  return formatGrokError(raw) ?? raw;
+  return formatAgentError(raw) ?? raw;
 }

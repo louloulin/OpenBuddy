@@ -1,10 +1,4 @@
-/**
- * 拖拽文件落区集成测试 —— 对齐 WorkBuddy drop-zone。
- *
- * Tauri 的 `getCurrentWebview().onDragDropEvent` 在 vitest 下不存在,这里用一个
- * mock:捕获注册的 handler,测试代码手动派发 enter/drop/leave 事件,验证 Composer
- * 的附件集合与遮罩显示行为。
- */
+
 
 // vi.mock 工厂被提升到文件顶部执行,引用的外部变量必须用 vi.hoisted 声明,
 // 否则工厂里拿到的是 TDZ(未初始化)的 let。

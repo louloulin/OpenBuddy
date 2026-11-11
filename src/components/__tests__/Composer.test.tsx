@@ -23,7 +23,6 @@ describe("Composer", () => {
   });
 
   it("showMeta 时渲染权限模式选择器（PermissionPicker）", () => {
-    // PermissionPicker 对应 grok 的 [ui] permission_mode,
     // 默认 ask → 触发器显示"审批模式"。
     render(<Composer {...base} showMeta onPlaceholder={vi.fn()} />);
     expect(screen.getByText(/审批模式/)).toBeInTheDocument();

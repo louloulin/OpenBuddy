@@ -1,12 +1,4 @@
-/**
- * 运行中任务面板 - 显示 grok 的后台任务和子代理
- *
- * grok 通过工具调用启动的 background tasks 和 spawn_subagent 在后台运行。
- * 这里通过 `x.ai/task/list` + `x.ai/subagent/list_running` 观测它们，
- * 通过 `x.ai/task/kill` / `x.ai/subagent/cancel` 取消。
- *
- * 这个面板嵌入到 ChatView 右侧或作为浮层。监听 `grok://task-update` 自动刷新。
- */
+
 import { useCallback, useEffect, useState } from "react";
 import {
   TaskListIcon,
@@ -14,12 +6,12 @@ import {
   RefreshCwIcon,
   CheckIcon,
 } from "@/foundation/components/Icon/icons";
-import { taskKill, tasksList } from "@/lib/grok-client";
+import { taskKill, tasksList } from "@/lib/agent-client";
 import type { RunningTask } from "@/lib/types";
 
 interface TasksPanelProps {
   /** Optional: listen for task update events to auto-refresh. Set to a counter
-   *  that increments on each `grok://task-update`. */
+   *  that increments on each `agent://task-update`. */
   refreshSignal?: number;
   onToast?: (msg: string) => void;
 }
@@ -33,7 +25,6 @@ export function TasksPanel({ refreshSignal, onToast }: TasksPanelProps) {
     try {
       setTasks(await tasksList());
     } catch {
-      // grok may not support task/list — show empty.
       setTasks([]);
     } finally {
       setLoading(false);

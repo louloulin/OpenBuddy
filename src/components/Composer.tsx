@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Mic, X, type LucideIcon } from "lucide-react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { open as openDialog } from "@/lib/ipc";
+import { getPathForFile } from "@/lib/ipc";
 import { ChevronDownIcon, SendPlaneIcon } from "@/foundation/components/Icon/icons";
 import { ModelSelector, type ModelOption } from "./ModelSelector";
 import { ThumbImg } from "./experts-panel/shared/ThumbImg";
@@ -24,9 +24,6 @@ import { SlashCommands } from "./SlashCommands";
 import { InputAddMenu } from "./InputAddMenu";
 import {
   collectDroppedPaths,
-  isDragHovering,
-  isDragDrop,
-  type DragDropEvent,
 } from "@/lib/drop-utils";
 import {
   registerAsrProvider,
@@ -35,7 +32,7 @@ import {
 } from "@/lib/voice-contract";
 import type { HomeModeId } from "./home-scenes";
 import type { AgentEntry } from "@/lib/types";
-import type { WorkspaceInfo } from "@/lib/grok-client";
+import type { WorkspaceInfo } from "@/lib/agent-client";
 
 /**
  * WorkBuddy 风格输入卡片(圆角16):左下 +,右下 Auto 下拉/麦克风/发送;
@@ -243,10 +240,8 @@ export function Composer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
-  // Voice input: use the browser's SpeechRecognition API (Tauri's WebView2/
   // WKWebView support it on most systems). On languages where the API isn't
   // exposed (older webviews, no microphone permission), we surface a toast.
-  // grok has a voice crate but doesn't expose it over ACP, so this is the
   // lightest path that works today.
   const toggleVoice = () => {
     if (listening) {
@@ -345,8 +340,6 @@ export function Composer({
       console.log('Send blocked:', { streaming, disabled, apiReady });
       return;
     }
-    // Append attachment paths to the prompt text so grok's read_file tool can
-    // pick them up (ACP image/audio needs agent-declared capabilities we
     // don't model yet; ResourceLink behavior is unverified — text is safest).
     let body = t;
     if (attachments.length > 0) {
@@ -395,65 +388,22 @@ export function Composer({
         return [...set];
       });
     } catch {
-      // dialog plugin not available in non-Tauri env (vitest) — no-op.
     }
   };
 
-  // ---------- 拖拽文件附件(对齐 WorkBuddy drop-zone)----------
-  // Tauri webview 的 DOM onDrop 拿不到本地文件绝对路径(只给 File blob),
-  // 必须用原生 drag-drop 事件。enter/over 显示遮罩;drop 收集路径并入附件;
-  // leave 隐藏遮罩。非 Tauri 环境(vitest)getCurrentWebview 会抛错,安全降级。
+  // DOM drop retains File objects; preload resolves their native paths.
   const [dragActive, setDragActive] = useState(false);
-  useEffect(() => {
-    let unlisten: (() => void) | null = null;
-    let cancelled = false;
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    setDragActive(false);
+    if (disabled || !apiReady || streaming) return;
     try {
-      const webview = getCurrentWebview();
-      webview
-        .onDragDropEvent((event) => {
-          // Tauri 把 DragDropEvent 包在 Event<T>.payload 里。
-          const e = event.payload as DragDropEvent;
-          if (isDragDrop(e)) {
-            const incoming = collectDroppedPaths(e.paths);
-            if (incoming.length > 0) {
-              setAttachments((prev) => {
-                const seen = new Set(prev);
-                const out = [...prev];
-                for (const p of incoming) {
-                  if (!seen.has(p)) {
-                    seen.add(p);
-                    out.push(p);
-                  }
-                }
-                return out;
-              });
-            }
-            setDragActive(false);
-          } else {
-            setDragActive(isDragHovering(e));
-          }
-        })
-        .then((un) => {
-          if (cancelled) {
-            // 组件已卸载,立刻解绑。
-            try { un(); } catch { /* noop */ }
-          } else {
-            unlisten = un;
-          }
-        })
-        .catch(() => {
-          /* 非 Tauri 环境无此事件 — 静默降级 */
-        });
-    } catch {
-      /* getCurrentWebview 在非 Tauri 环境抛错 — 静默降级 */
+      const incoming = collectDroppedPaths(Array.from(event.dataTransfer.files, getPathForFile));
+      setAttachments(prev => Array.from(new Set([...prev, ...incoming])));
+    } catch (error) {
+      onToast?.(`无法添加文件：${String(error)}`);
     }
-    return () => {
-      cancelled = true;
-      if (unlisten) {
-        try { unlisten(); } catch { /* noop */ }
-      }
-    };
-  }, []);
+  };
 
   const ph = (label: string) => onPlaceholder?.(label);
 
@@ -502,6 +452,9 @@ export function Composer({
     >
       <section
         className={composerCls}
+        onDragOver={event => { event.preventDefault(); if (apiReady && !disabled && !streaming) setDragActive(true); }}
+        onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragActive(false); }}
+        onDrop={handleDrop}
         onClick={() => {
           if (!apiReady) onOpenSettings?.();
         }}

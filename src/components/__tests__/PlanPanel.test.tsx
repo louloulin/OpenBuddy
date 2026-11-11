@@ -27,7 +27,7 @@ vi.mock("@/stores/session-store", () => ({
     }),
 }));
 
-vi.mock("@/lib/grok-client", () => ({ togglePlanMode: mocks.togglePlanMode }));
+vi.mock("@/lib/agent-client", () => ({ togglePlanMode: mocks.togglePlanMode }));
 
 import { PlanPanel } from "../PlanPanel";
 

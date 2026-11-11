@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Menu, Search, Bell, User } from "lucide-react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@/lib/ipc";
 
 export function HomeHeader() {
   const [searchOpen, setSearchOpen] = useState(false);

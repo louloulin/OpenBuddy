@@ -4225,7 +4225,7 @@ button.diff__path {
  * 红绿灯悬浮在窗口左上(默认位置约 x:12-80, y:8-24),需要:
  * 1. 侧栏 logo 行顶部留出安全区,避免 logo/图标被红绿灯遮挡;
  * 2. 侧栏折叠时 main-topbar 贴到窗口左边缘,需左侧让出红绿灯宽度;
- * 3. 以上区域均带 data-tauri-drag-region,可拖拽移动窗口。 */
+ * 3. 以上区域均带 data-window-drag-region,可拖拽移动窗口。 */
 .app--macos .sidebar__logo-row {
   height: auto;
   min-height: 56px;
@@ -4694,7 +4694,7 @@ button.diff__path {
   flex-shrink: 0;
 }
 .local-assistant__header > * {
-  /* 标题/连接状态/设置按钮可点选，空白区域留给 data-tauri-drag-region */
+  /* 标题/连接状态/设置按钮可点选，空白区域留给 data-window-drag-region */
   -webkit-app-region: no-drag;
 }
 .local-assistant__title {

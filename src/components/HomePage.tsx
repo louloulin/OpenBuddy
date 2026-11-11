@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Composer } from "./Composer";
 import type { ModelOption } from "./ModelSelector";
-import type { WorkspaceInfo } from "@/lib/grok-client";
+import type { WorkspaceInfo } from "@/lib/agent-client";
 import type { AgentEntry } from "@/lib/types";
 import { MoreIcon } from "@/foundation/components/Icon/icons";
 import { useHorizontalScroll } from "./use-horizontal-scroll";

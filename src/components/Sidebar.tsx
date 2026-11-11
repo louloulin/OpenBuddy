@@ -3,11 +3,11 @@ import { useSessionsStore, selectHasFilter } from "@/stores/sessions-store";
 import { useProjectsStore } from "@/stores/projects-store";
 import { IS_MACOS } from "@/lib/platform";
 import {
-  grokRenameSession,
-  grokDeleteSession,
-  grokSetSessionPinned,
-  grokSetSessionArchived,
-} from "@/lib/grok-client";
+  agentRenameSession,
+  agentDeleteSession,
+  agentSetSessionPinned,
+  agentSetSessionArchived,
+} from "@/lib/agent-client";
 import type { SessionSummary, SessionStatus } from "@/lib/types";
 import {
   WbNewTaskIcon,
@@ -40,10 +40,8 @@ import {
 import { APP_VERSION } from "@/lib/app-version";
 
 const NAV = [
-  { label: "助理", icon: WbAssistantNavIcon },
   { label: "项目", icon: WbProjectNavIcon },
-  { label: "专家·技能·连接器", icon: WbExpertNavIcon },
-  { label: "自动化", icon: WbAutomationNavIcon },
+  { label: "技能与 MCP", icon: WbExpertNavIcon },
 ];
 
 /** Last path segment of a working directory, used as a 空间 node label. */
@@ -633,39 +631,36 @@ export function Sidebar({
     setContextMenu({ x: e.clientX, y: e.clientY, sessionId, sessionTitle, isPinned });
   }, []);
 
-  // Rename via grok's `x.ai/session/rename`. grok broadcasts
-  // SessionSummaryGenerated on success (grok://summary → store upsert); we also
+  // SessionSummaryGenerated on success (agent://summary → store upsert); we also
   // update optimistically to avoid flicker.
   const handleRename = useCallback(async (sessionId: string, newTitle: string) => {
     const session = allSessions.find(s => s.sessionId === sessionId);
     if (!session) return;
     try {
-      await grokRenameSession(sessionId, newTitle, session.cwd);
+      await agentRenameSession(sessionId, newTitle, session.cwd);
       upsertSession({ ...session, title: newTitle });
     } catch (e) {
       onToast?.(`重命名失败：${String(e).replace(/^Error:\s*/, "")}`);
     }
   }, [allSessions, upsertSession, onToast]);
 
-  // Delete via grok's `x.ai/session/delete` — removes the on-disk session
   // directory. Only drop the sidebar entry once the backend confirms.
   const handleDelete = useCallback(async (sessionId: string) => {
     const session = allSessions.find(s => s.sessionId === sessionId);
     const cwd = session?.cwd;
     try {
-      await grokDeleteSession(sessionId, cwd);
+      await agentDeleteSession(sessionId, cwd);
       removeSession(sessionId);
     } catch (e) {
       onToast?.(`删除失败：${String(e).replace(/^Error:\s*/, "")}`);
     }
   }, [allSessions, removeSession, onToast]);
 
-  // Pin/unpin — OpenBuddy-only state (~/.grok/openbuddy-state.json).
   const handlePin = useCallback(async (sessionId: string, pinned: boolean) => {
     const session = allSessions.find(s => s.sessionId === sessionId);
     if (!session) return;
     try {
-      await grokSetSessionPinned(sessionId, pinned);
+      await agentSetSessionPinned(sessionId, pinned);
       upsertSession({ ...session, pinned });
     } catch (e) {
       onToast?.(`置顶失败：${String(e).replace(/^Error:\s*/, "")}`);
@@ -676,7 +671,7 @@ export function Sidebar({
   // list_sessions, so drop the sidebar entry immediately on success.
   const handleArchive = useCallback(async (sessionId: string) => {
     try {
-      await grokSetSessionArchived(sessionId, true);
+      await agentSetSessionArchived(sessionId, true);
       removeSession(sessionId);
     } catch (e) {
       onToast?.(`归档失败：${String(e).replace(/^Error:\s*/, "")}`);
@@ -755,12 +750,12 @@ export function Sidebar({
     <aside className="sidebar">
       {/* macOS Overlay 标题栏:红绿灯悬浮在 logo 行左上,整行作为拖拽区
           (Windows 的窗口拖拽由自绘 TitleBar 负责,故仅在 mac 加属性)。 */}
-      <div className="sidebar__logo-row" {...(IS_MACOS ? { "data-tauri-drag-region": true } : {})}>
-        <div className="sidebar__logo-col" {...(IS_MACOS ? { "data-tauri-drag-region": true } : {})}>
+      <div className="sidebar__logo-row" {...(IS_MACOS ? { "data-window-drag-region": true } : {})}>
+        <div className="sidebar__logo-col" {...(IS_MACOS ? { "data-window-drag-region": true } : {})}>
           <span className="sidebar__logo">OpenBuddy</span>
           <span className="sidebar__version">v{APP_VERSION}</span>
         </div>
-        <div className="sidebar__logo-spacer" {...(IS_MACOS ? { "data-tauri-drag-region": true } : {})} />
+        <div className="sidebar__logo-spacer" {...(IS_MACOS ? { "data-window-drag-region": true } : {})} />
         <button
           className="sidebar__icon-btn"
           aria-label="收起侧边栏"
@@ -769,7 +764,7 @@ export function Sidebar({
         >
           <SidebarToggleIcon size="md" />
         </button>
-        <button className="sidebar__icon-btn" aria-label="搜索" onClick={onOpenSearch}>
+        <button className="sidebar__icon-btn" aria-label="搜索（后续版本开放）" disabled title="会话搜索暂未开放">
           <SearchIcon size="md" />
         </button>
         <div className="task-filter-wrap" ref={filterRef}>

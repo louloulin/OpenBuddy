@@ -2,7 +2,7 @@
  * 子 agent / 团队运行时面板 —— 对齐 WorkBuddy `team-runtime` /
  * `session:getSubagentList`。
  *
- * 主数据源: `subagent-store`(实时 `grok://subagent` 事件——turns/tokens/duration/进度)。
+ * 主数据源: `subagent-store`(实时 `agent://subagent` 事件——turns/tokens/duration/进度)。
  * 回退: 从会话消息派生 spawn_subagent 活动(无实时进度,仅状态)。
  * 两者合并去重(实时数据优先)。空时不渲染。
  */
@@ -46,8 +46,6 @@ export function SubagentPanel({ messages }: SubagentPanelProps) {
     sessionId ? s.getForSession(sessionId) : [],
   );
 
-  // Fallback: transcript-derived subagents (for when grok doesn't emit
-  // subagent notifications, e.g. older grok versions).
   const fallbackActivities = useMemo(() => {
     if (!messages) return [];
     return deriveSubagents(messages);

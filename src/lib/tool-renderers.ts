@@ -31,14 +31,12 @@ const RENDERER_MAP: Array<{ test: RegExp; renderer: ToolRenderer }> = [
   { test: /^(edit|write|write_file|edit_file|multi_edit)$/i, renderer: "edit" },
   { test: /^(read_file|read|list_dir|ls|grep|glob)$/i, renderer: "read" },
   { test: /^(web_search|web_fetch|search)$/i, renderer: "search" },
-  // grok 原生子代理派发工具 kind="task"、id="task"。优先级高于 defer-execute
   // 的 /task/ 子串匹配，放在 defer 之前。
   { test: /^task$/i, renderer: "task" },
   { test: /defer/i, renderer: "defer-execute" },
   { test: /^(send_message|notify|post_message)$/i, renderer: "send-message" },
   { test: /^(image_gen|image_generation|generate_image|dall|text_to_image|draw)$/i, renderer: "image-gen" },
   { test: /^(visualizer|widget|render_widget|inline_view)$/i, renderer: "visualizer" },
-  // 团队工具：原生名（grok 补丁时代的旧会话历史）+ MCP 限定名
   // （openbuddy__create_team，现行的内嵌 MCP server 路径）都识别。
   { test: /^(openbuddy__)?(team_create|create_team)$/i, renderer: "team-create" },
   { test: /^(openbuddy__)?(team_delete|delete_team)$/i, renderer: "team-delete" },
@@ -151,7 +149,6 @@ export function summarizeTool(tc: ToolCallView, renderer: ToolRenderer): string 
       return typeof prompt === "string" ? `生成图像:${prompt.slice(0, 60)}` : tc.title;
     }
     case "task": {
-      // grok task 工具：raw_input 带 subagent_type + prompt/description。
       const type = raw?.subagent_type ?? raw?.subagentType ?? raw?.type;
       const desc = raw?.description ?? raw?.prompt;
       const typeStr = typeof type === "string" ? type : "";

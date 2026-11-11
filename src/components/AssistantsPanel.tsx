@@ -31,7 +31,7 @@ import {
   agentsList,
   agentsSave,
   agentsTemplate,
-} from "@/lib/grok-client";
+} from "@/lib/agent-client";
 import type { AgentEntry } from "@/lib/types";
 
 const AVATAR_PRESETS: { bg: string; emoji: string }[] = [

@@ -1,3 +1,4 @@
+import { AgentResourcesPanel } from "./AgentResourcesPanel";
 import { AgentToolIcon } from "@/foundation/components/Icon/icons";
 import { LocalAssistantView } from "./LocalAssistantView";
 import { ProjectsPanel } from "./ProjectsPanel";
@@ -52,7 +53,7 @@ interface PlaceholderPageProps {
   onModelChange?: (id: string) => void;
   /** 项目页：进入项目（新建会话并注入说明）。 */
   onStartProject?: (project: ProjectMeta) => void;
-  /** 项目页：在项目中新建对话（创建真实 grok 会话）。 */
+  
   onStartProjectConversation?: (projectId: string, message: string) => void;
 }
 
@@ -77,6 +78,8 @@ export function PlaceholderPage({
   onStartProject,
   onStartProjectConversation,
 }: PlaceholderPageProps) {
+  if (label === "技能与 MCP") return <AgentResourcesPanel cwd={cwd} onToast={onToast} />;
+
   if (label === "助理") {
     return (
       <LocalAssistantView

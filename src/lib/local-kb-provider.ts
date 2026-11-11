@@ -1,14 +1,4 @@
-/**
- * 本地文件夹知识源 —— 让 KnowledgeBasePanel 运行时真正可搜索。
- *
- * 对齐 WorkBuddy `knowledge-base-panel` 的「本地知识源」概念,但用本地文件夹扫描
- * 替代腾讯 Drive。扫描指定目录下的文本文件(.md/.txt/.markdown/.mdx/.rst/.log)
- * 以及 OOXML 文档(.docx/.pptx/.xlsx,经 zip-reader + doc-preview 提取文本),
- * 构建可搜索的知识条目。
- *
- * 纯函数核心(可测):文件筛选 / 文本预处理 / 片段提取 / 查询过滤 / 目录递归收集 /
- * OOXML 文本提取(docx/pptx/xlsx)。运行时:注入 DirectoryReader(Tauri 封装)。
- */
+
 import type { KbEntry, KbProvider } from "./knowledge-base";
 import { readZip } from "./zip-reader";
 import {
@@ -27,7 +17,7 @@ export const KB_SHEET_EXTS = [".xlsx"];
 /** 全部 OOXML 扩展(docx/pptx/xlsx)。 */
 export const KB_OFFICE_EXTS = [...KB_DOCX_EXTS, ...KB_PPTX_EXTS, ...KB_SHEET_EXTS];
 
-/** 目录读取注入接口(运行时用 Tauri browse_directory 实现;测试用内存 mock)。 */
+
 export interface DirectoryReader {
   /** 列出某目录的直接子项(文件 + 子目录);不存在/失败返回空数组。 */
   listDir(path: string): Promise<Array<{ name: string; path: string; isDir: boolean }>>;
@@ -206,14 +196,7 @@ export async function collectKnowledgeFiles(
   return out;
 }
 
-/**
- * 构造一个本地文件夹 KbProvider。
- *  - root:要扫描的根目录
- *  - reader:目录读取注入(运行时 = Tauri;测试 = mock)
- *  - 缓存首次扫描结果,后续 list() 在内存过滤(读文本按需)。
- *
- * 未配置 root(空串)时 isEnabled() 返回 false。
- */
+
 export function createLocalKbProvider(
   root: string,
   reader: DirectoryReader,

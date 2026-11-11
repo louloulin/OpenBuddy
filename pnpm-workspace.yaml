@@ -7,3 +7,4 @@ packages:
 # pnpm-workspace.yaml, not from the package.json "pnpm" field).
 onlyBuiltDependencies:
   - esbuild
+  - electron

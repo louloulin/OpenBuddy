@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "@/lib/ipc";
 import { X } from "lucide-react";
 import {
   SearchIcon,
   LightbulbIcon,
   SparklesIcon,
 } from "@/foundation/components/Icon/icons";
-import { inspirationGenerate } from "@/lib/grok-client";
+import { inspirationGenerate } from "@/lib/agent-client";
 import { registerForeignUpdateListener } from "@/stores/session-store";
 import type { InspirationRichCard, PromptComplete } from "@/lib/types";
 
@@ -125,7 +125,7 @@ export function InspirationPanel({ cwd, onToast, onLaunch }: InspirationPanelPro
           : ((chunk.content as unknown as { text?: string })?.text ?? "");
         if (delta) acc += delta;
       });
-      const completeUnlisten = await listen<PromptComplete>("grok://complete", (e) => {
+      const completeUnlisten = await listen<PromptComplete>("agent://complete", (e) => {
         if (e.payload.sessionId === started.sessionId) {
           const cleaned = acc.trim()
             .replace(/^```(?:json)?\s*/i, "")

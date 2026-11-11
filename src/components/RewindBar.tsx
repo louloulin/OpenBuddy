@@ -16,7 +16,7 @@ import {
   rewindExecute,
   rewindPoints,
   sessionFork,
-} from "@/lib/grok-client";
+} from "@/lib/agent-client";
 import type { RewindPoint } from "@/lib/types";
 import {
   ClockIcon,
@@ -24,10 +24,7 @@ import {
   GitBranchIcon,
 } from "@/foundation/components/Icon/icons";
 
-/** Rewind mode options matching grok's x.ai/rewind/execute mode param.
- *  NOTE: grok's RewindMode enum only has All/ConversationOnly/FilesOnly —
- *  there is no "memory"-only mode (all already includes memory). Don't add
- *  "memory" here or grok's serde will reject it at runtime. */
+
 type RewindMode = "conversation" | "files" | "all";
 
 const MODE_LABELS: Record<RewindMode, string> = {

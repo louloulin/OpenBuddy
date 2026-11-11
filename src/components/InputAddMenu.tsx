@@ -6,7 +6,7 @@ import {
   SkillTabIcon,
   ConnectorTabIcon,
 } from "@/foundation/components/Icon/icons";
-import { skillsList, agentsList } from "@/lib/grok-client";
+import { skillsList, agentsList } from "@/lib/agent-client";
 import { HOME_MODES, type HomeModeId } from "./home-scenes";
 import { CONNECTOR_LIST } from "./experts-panel/data/connectors-catalog";
 import type { AgentEntry, SkillInfo } from "@/lib/types";
@@ -33,9 +33,7 @@ const MENU_GROUPS: MenuItem[][] = [
   ],
   [
     { id: "mode", label: "模式", icon: <Wand2 size={16} /> },
-    { id: "experts", label: "专家", icon: <ExpertTabIcon size="md" /> },
     { id: "skills", label: "技能", icon: <SkillTabIcon size="md" /> },
-    { id: "connectors", label: "连接器", icon: <ConnectorTabIcon size="md" /> },
   ],
 ];
 
@@ -61,7 +59,7 @@ export function InputAddMenu({
     setDataLoaded(true);
     try {
       const [e, s] = await Promise.all([
-        agentsList().catch(() => [] as AgentEntry[]),
+        Promise.resolve([] as AgentEntry[]),
         skillsList().catch(() => [] as SkillInfo[]),
       ]);
       setExperts(e);

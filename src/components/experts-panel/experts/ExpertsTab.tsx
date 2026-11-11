@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@/lib/ipc";
 import {
   SearchIcon, MyExpertIcon, ChevronLeftIcon, DeleteIcon, SparklesIcon,
   FolderOpenIcon, RefreshCwIcon,
 } from "@/foundation/components/Icon/icons";
 import {
   agentsDelete, agentsList, expertsDefaultRoot, expertsLoad, expertsReadAgentPrompt, expertsLinkAgents,
-} from "@/lib/grok-client";
+} from "@/lib/agent-client";
 import type { AgentEntry, ExpertCatalog, ExpertItem, FeaturedScene } from "@/lib/types";
 import { FEATURED_SCENES } from "../data/featured-scenes";
 import { Chip, SegmentTabs } from "../shared/ui";
@@ -212,9 +212,7 @@ export function ExpertsTab({ pills, onGoHome, onToast }: Props) {
       } catch { /* fallback: empty prompt */ }
     }
 
-    // For team experts: link member agents into ~/.grok/agents/ so grok's
     // Task tool can spawn them by bare name during multi-agent orchestration.
-    // MUST be awaited — grok scans ~/.grok/agents/ at session start, so if the
     // copy hasn't finished when the user sends their first message, the member
     // agents won't be discoverable.
     if (expert.type === "team" && expert.plugin && root) {

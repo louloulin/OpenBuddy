@@ -23,7 +23,7 @@ import {
 } from "@/lib/use-unified-tabs";
 import { ToolCallDetailBody } from "./ToolCallCard";
 import { openLocalPath } from "@/lib/markdown-host";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/lib/ipc";
 import { IS_MACOS } from "@/lib/platform";
 import { ViewSelector, defaultViews } from "./workspace-panel/ViewSelector";
 import { ArtifactTabsBar } from "./workspace-panel/ArtifactTabsBar";
@@ -233,7 +233,7 @@ export function ToolSidePanel({
         {/* macOS 贴窗口顶边：空白处支持拖动/双击缩放（同 header）。 */}
         <div
           className="tool-side-panel__nav-header"
-          {...(IS_MACOS ? { "data-tauri-drag-region": true } : {})}
+          {...(IS_MACOS ? { "data-window-drag-region": true } : {})}
         >
           <ViewSelector view={view} views={views} onChange={handleViewChange} />
           <button
@@ -287,16 +287,16 @@ export function ToolSidePanel({
       {/* 主内容列 */}
       <div className="tool-side-panel__main">
         {/* macOS 上这行 header 贴窗口顶边（Overlay 标题栏）：空白处需要
-            data-tauri-drag-region 才能拖动窗口 / 双击缩放（红绿灯右侧的
+            data-window-drag-region 才能拖动窗口 / 双击缩放（红绿灯右侧的
             标签条区域）。tab 本身是子元素，不会成为拖拽目标，点击/拖拽
             排序不受影响。Windows 有自绘 TitleBar，不需要。 */}
         <header
           className="tool-side-panel__header"
-          {...(IS_MACOS ? { "data-tauri-drag-region": true } : {})}
+          {...(IS_MACOS ? { "data-window-drag-region": true } : {})}
         >
           <div
             className="tool-side-panel__tabs"
-            {...(IS_MACOS ? { "data-tauri-drag-region": true } : {})}
+            {...(IS_MACOS ? { "data-window-drag-region": true } : {})}
           >
             <ArtifactTabsBar
               tabs={tabsApi.tabs}

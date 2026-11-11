@@ -1,16 +1,7 @@
-/**
- * 计划面板 — 显示 grok 的 ACP Plan（任务列表）+ 审批/编辑/执行控制。
- *
- * 增强点（对齐 WorkBuddy）：
- *  - Plan 审批流程：planMode 开启时显示 Approve / Reject / Edit 按钮
- *  - Plan 编辑：修改 entry 文本、优先级、删除
- *  - 任务执行控制：跳过 / 重试单个任务
- *  - 进度追踪：每个 in_progress 任务显示耗时
- *  - Plan mode 开关按钮
- */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSessionStore } from "@/stores/session-store";
-import { togglePlanMode } from "@/lib/grok-client";
+import { togglePlanMode } from "@/lib/agent-client";
 import type { PlanEntry, PlanEntryPriority, PlanEntryStatus } from "@/lib/types";
 import {
   reorderPlan,

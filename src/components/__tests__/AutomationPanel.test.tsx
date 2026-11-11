@@ -3,11 +3,10 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AutomationPanel } from "../AutomationPanel";
 import type { AutomationSnapshot } from "@/lib/types";
 
-// ---- mock Tauri IPC 层 ----
 const emptySnapshot: AutomationSnapshot = { automations: [], records: [] };
 let snapshot: AutomationSnapshot = emptySnapshot;
 
-vi.mock("@/lib/grok-client", () => ({
+vi.mock("@/lib/agent-client", () => ({
   automationsSnapshot: vi.fn(async () => snapshot),
   automationsSave: vi.fn(async (a: unknown) => a),
   automationsDelete: vi.fn(async () => {}),
@@ -15,7 +14,7 @@ vi.mock("@/lib/grok-client", () => ({
   automationsRun: vi.fn(async () => {}),
   automationRecordsArchive: vi.fn(async () => {}),
   automationRecordsDelete: vi.fn(async () => {}),
-  grokListWorkspaces: vi.fn(async () => []),
+  agentListWorkspaces: vi.fn(async () => []),
   providersList: vi.fn(async () => []),
   skillsList: vi.fn(async () => []),
   agentsList: vi.fn(async () => []),

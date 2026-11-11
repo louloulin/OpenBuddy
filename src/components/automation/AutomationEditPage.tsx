@@ -28,7 +28,7 @@ import type {
   AutomationSchedule,
 } from "@/lib/types";
 import type { AgentEntry, SkillInfo } from "@/lib/types";
-import type { WorkspaceInfo } from "@/lib/grok-client";
+import type { WorkspaceInfo } from "@/lib/agent-client";
 import {
   CustomSelect,
   IntervalDayChips,
@@ -583,7 +583,7 @@ export function AutomationEditPage({
   return (
     <div className="atm-detail-page">
       {/* ===== 头部：面包屑 + 操作(顶部拖拽条) ===== */}
-      <div className="atm-detail-header" data-tauri-drag-region>
+      <div className="atm-detail-header" data-window-drag-region>
         <div className="atm-detail-header-left">
           <div className="atm-detail-breadcrumb">
             <span className="atm-detail-status-icon">

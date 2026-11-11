@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
-import { ask, save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@/lib/ipc";
+import { ask, save } from "@/lib/ipc";
 import type { MarkdownConfig, PathType } from "@/components/markdown/types";
 
 export type MarkdownHostOptions = {
@@ -86,9 +86,7 @@ export async function openLocalPath(
   }
 }
 
-/**
- * Build a MarkdownConfig wired to Tauri shell/fs commands for the active session.
- */
+
 export function createMarkdownHostConfig(
   opts: MarkdownHostOptions,
 ): MarkdownConfig {
@@ -141,7 +139,6 @@ export function createMarkdownHostConfig(
 
   const onLinkClick: MarkdownConfig["onLinkClick"] = ({ href, event }) => {
     if (!href) return;
-    // Intercept http(s) so we open in the system browser (Tauri webview
     // target=_blank is unreliable / may be blocked).
     if (/^https?:\/\//i.test(href) || /^mailto:/i.test(href)) {
       event.preventDefault();
@@ -246,10 +243,9 @@ export function createMarkdownHostConfig(
       }
 
       try {
-        const written = await invoke<string>("write_text_file", {
+        const written = await invoke<string>("export_text_file", {
           path: target,
           content: code,
-          workspaceRoot: cwd,
         });
         toast(`已写入 ${written}`);
       } catch (e) {

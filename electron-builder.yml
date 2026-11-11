@@ -1,0 +1,31 @@
+appId: app.openbuddy.desktop
+productName: OpenBuddy
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+asar: true
+asarUnpack:
+  - node_modules/@earendil-works/**/dist/**/*
+  - node_modules/**/*.wasm
+  - node_modules/**/*.node
+  - node_modules/@silvia-odwyer/**/*
+npmRebuild: false
+mac:
+  category: public.app-category.developer-tools
+  icon: build/icon.icns
+  target: [dmg]
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: false
+win:
+  icon: build/icon.ico
+  target: [nsis]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+artifactName: '${productName}-${version}-${os}-${arch}.${ext}'

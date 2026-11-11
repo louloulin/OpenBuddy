@@ -1,11 +1,4 @@
-/**
- * MCP 客户端能力抽象 —— elicitation / sampling / roots 的本地可移植替代。
- *
- * WorkBuddy 的 `session:respondElicitation/respondToSampling/respondToRoots` 是 MCP
- * 客户端能力(server → client 请求)。grok 后端尚不支持这些 capability,但「客户端能力声明 +
- * 可注入处理器 + UI 兜底」是可移植的:当某 MCP server 请求这些能力时,OpenBuddy 有类型化契约
- * 与降级处理(而非静默忽略)。纯函数核心(能力声明 + 请求/响应类型 + 注册表 + 兜底),便于单测。
- */
+
 
 /** 客户端能力开关。 */
 export interface ClientCapabilities {
@@ -150,10 +143,7 @@ export async function handleRoots(
   return { roots: [] };
 }
 
-/**
- * 高层:对单个 server→client 请求做分发(按方法名),返回响应。
- * 用于把 grok 转发的原始请求路由到对应处理器。
- */
+
 export async function dispatchCapabilityRequest(
   method: "elicitation" | "sampling" | "roots",
   params: unknown,

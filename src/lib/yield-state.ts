@@ -4,7 +4,7 @@
  * (区别于 cancel 终止;区别于 queue-pause 只暂停排队)。
  *
  * 纯函数状态机 + 按 sessionId 的容器,便于单测。前端标记 pending yield,
- * 收到下一次 `grok://complete` 时确认 yielded(resume-ready)。
+ * 收到下一次 `agent://complete` 时确认 yielded(resume-ready)。
  */
 
 export type YieldState = "idle" | "yielding" | "yielded";

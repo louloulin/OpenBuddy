@@ -17,7 +17,7 @@ import {
 
 interface QueuePanelProps {
   sessionId: string;
-  /** 手动「立即发送」一条:调用方负责 grokSend。 */
+  /** 手动「立即发送」一条:调用方负责 agentSend。 */
   onSendNow?: (text: string) => void;
 }
 

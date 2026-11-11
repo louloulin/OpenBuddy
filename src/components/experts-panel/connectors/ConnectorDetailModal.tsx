@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { ConnectorItem } from "@/lib/types";
-import { connectorsReadMcpConfig } from "@/lib/grok-client";
+import { connectorsReadMcpConfig } from "@/lib/agent-client";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 import { ConfigureIcon } from "@/foundation/components/Icon/icons";
 import type { ConnectorAuthState } from "./ConnectorsTab";

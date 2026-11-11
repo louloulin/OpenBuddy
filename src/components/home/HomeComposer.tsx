@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Send, Paperclip, Smile, LucideIcon } from "lucide-react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@/lib/ipc";
 
 interface HomeComposerProps {
   sceneTag?: { label: string; icon: LucideIcon } | null;

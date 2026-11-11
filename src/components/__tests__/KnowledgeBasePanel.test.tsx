@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
-// Mock Tauri dialog + tauri-kb-reader,使「添加本地文件夹」可在 vitest 下测试。
 const openDialog = vi.fn();
-vi.mock("@tauri-apps/plugin-dialog", () => ({ open: (...a: unknown[]) => openDialog(...a) }));
-vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("@/lib/tauri-kb-reader", () => ({
+vi.mock("@/lib/ipc", () => ({ open: (...a: unknown[]) => openDialog(...a), invoke: vi.fn() }));
+vi.mock("@/lib/desktop-kb-reader", () => ({
   isTauriAvailable: () => true,
   createTauriDirectoryReader: () => ({
     listDir: async () => [],

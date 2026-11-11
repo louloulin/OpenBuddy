@@ -5,10 +5,10 @@
  * lib/knowledge-base)。本面板提供搜索框 + 跨源结果列表。无 provider 时显示空态。
  */
 import { useEffect, useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@/lib/ipc";
 import { searchKb, listKbProvidersWithStats, registerKbProvider, unregisterKbProvider, rebuildAllKbProviders, type KbEntry, type KbIndexStats } from "@/lib/knowledge-base";
 import { createLocalKbProvider } from "@/lib/local-kb-provider";
-import { createTauriDirectoryReader, isTauriAvailable } from "@/lib/tauri-kb-reader";
+import { createTauriDirectoryReader, isTauriAvailable } from "@/lib/desktop-kb-reader";
 
 interface KnowledgeBasePanelProps {
   /** 打开条目回调(可选)。 */

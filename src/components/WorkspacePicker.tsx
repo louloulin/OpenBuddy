@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check, Folder, FolderOpen } from "lucide-react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { WorkspaceInfo } from "@/lib/grok-client";
+import { open as openDialog } from "@/lib/ipc";
+import type { WorkspaceInfo } from "@/lib/agent-client";
 
-/**
- * Workspace picker dropdown for the Composer's "选择工作空间" button.
- * Lists every cwd grok has seen (from list_workspaces). Selecting one
- * calls onSelectWorkspace — switching cwd means the next new session will
- * be bound to it (ACP locks cwd per-session, so we don't migrate the
- * current session).
- */
+
 export function WorkspacePicker({
   cwd,
   workspaces,
@@ -48,7 +42,6 @@ export function WorkspacePicker({
       onSelectWorkspace(selected);
       setOpen(false);
     } catch {
-      // dialog plugin not available in non-Tauri env (vitest) — no-op.
     }
   };
 

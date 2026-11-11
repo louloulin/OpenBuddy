@@ -65,3 +65,6 @@
   --wb-text-weak: var(--wb-color-text-tertiary, rgba(255, 255, 255, 0.45));
   --wb-border-default: var(--wb-color-border-primary, #262626);
 }
+
+[data-window-drag-region] { -webkit-app-region: drag; }
+[data-window-drag-region] button, [data-window-drag-region] input, [data-window-drag-region] textarea, [data-window-drag-region] [role="menu"] { -webkit-app-region: no-drag; }

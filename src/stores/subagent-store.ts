@@ -1,11 +1,4 @@
-/**
- * Subagent live runtime store — 对齐 WorkBuddy `team-runtime` / `getSubagentList`。
- *
- * Receives `grok://subagent` events forwarded by bridge.rs from grok's
- * `x.ai/session_notification` (subagent_spawned / subagent_progress /
- * subagent_finished). Maintains a per-parent-session map of active and
- * completed subagents with live progress (turns, tokens, duration, status).
- */
+
 import { create } from "zustand";
 import type { SubagentLiveEvent } from "@/lib/types";
 
@@ -43,7 +36,7 @@ export interface SubagentRuntime {
 interface SubagentState {
   /** parentSessionId → subagentId → runtime (insertion-ordered via Map). */
   bySession: Record<string, Record<string, SubagentRuntime>>;
-  /** Apply a grok://subagent event (spawned/progress/finished). */
+  /** Apply a agent://subagent event (spawned/progress/finished). */
   applyEvent: (e: SubagentLiveEvent) => void;
   /** Get all subagents for a session, ordered by insertion (running first). */
   getForSession: (sessionId: string | null) => SubagentRuntime[];

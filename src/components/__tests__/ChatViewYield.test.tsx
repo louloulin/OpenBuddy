@@ -7,7 +7,7 @@
  *  - 「恢复」:仅清状态(不触发 onSend)。
  *  - 「恢复并继续」:清状态 + onSend("请继续。")。
  *
- * mock session-store 提供 streaming/sessionId/messages;mock grok-client 的 rewind*。
+ * mock session-store 提供 streaming/sessionId/messages;mock agent-client 的 rewind*。
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
@@ -48,17 +48,17 @@ vi.mock("@/stores/sessions-store", () => ({
     }),
   HOME_DRAFT_KEY: "home",
 }));
-vi.mock("@/lib/grok-client", async () => {
+vi.mock("@/lib/agent-client", async () => {
   // 用空实现铺满所有被引用的导出,避免「No export defined」。
   const mod: Record<string, unknown> = {};
   const handler = () => undefined;
   const asyncEmpty = async () => undefined;
   const asyncArr = async () => [];
   for (const name of [
-    "rewindExecute", "rewindPoints", "grokInit", "grokNewSession", "grokSend",
-    "grokCancel", "grokLoadSession", "grokListSessions", "grokListWorkspaces",
-    "grokRenameSession", "grokSetModel", "grokSetSessionExpert", "grokAuthStatus",
-    "providersList", "flattenModels", "notificationAppend", "subscribeGrokEvents",
+    "rewindExecute", "rewindPoints", "agentInit", "agentNewSession", "agentSend",
+    "agentCancel", "agentLoadSession", "agentListSessions", "agentListWorkspaces",
+    "agentRenameSession", "agentSetModel", "agentSetSessionExpert", "agentAuthStatus",
+    "providersList", "flattenModels", "notificationAppend", "subscribeAgentEvents",
     "commandsList", "promptHistory", "tasksList", "taskKill", "permissionList",
     "permissionSave", "permissionModeGet", "permissionModeSet", "memoryList",
     "memoryGet", "memorySave", "memoryDelete", "memoryRewrite", "memoryFlush",
@@ -72,16 +72,16 @@ vi.mock("@/lib/grok-client", async () => {
     "pluginsList", "pluginsAction", "marketplaceList", "marketplaceAction",
     "notificationList", "notificationMarkRead", "notificationMarkAllRead",
     "notificationClear", "exportTextFile", "openUrl", "folderTrustRespond",
-    "grokDeleteSession", "grokSetSessionPinned", "grokSetSessionArchived",
-    "grokSessionInfo", "grokSessionUsage", "grokResolvePermission",
-    "grokResolveQuestion", "connectorsCliStatus", "connectorsCliAuth",
+    "agentDeleteSession", "agentSetSessionPinned", "agentSetSessionArchived",
+    "agentSessionInfo", "agentSessionUsage", "agentResolvePermission",
+    "agentResolveQuestion", "connectorsCliStatus", "connectorsCliAuth",
     "connectorsCliAuthCancel", "connectorsCliUnauth", "connectorsCliSkillsDir",
     "onConnectorCliAuthUrl", "onConnectorCliAuthLog", "onConnectorCliAuthDone",
     "connectorsDefaultRoot", "connectorsListRoots", "connectorsLoad", "connectorsIcon",
     "connectorsReadMcpConfig", "skillsCatalogDefaultRoot", "skillsCatalogListRoots",
     "skillsCatalogLoad", "skillsCatalogReadSkill", "expertsDefaultRoot",
     "expertsListRoots", "expertsLoad", "expertsThumbnail", "expertsImageBytes",
-    "expertsReadAgentPrompt", "expertsLinkAgents", "grokClearSessionExpert",
+    "expertsReadAgentPrompt", "expertsLinkAgents", "agentClearSessionExpert",
     "skillsList", "skillsAdd", "skillsRemove", "skillsToggle",
   ]) {
     mod[name] = name.startsWith("on") ? handler : asyncArr;
@@ -91,8 +91,8 @@ vi.mock("@/lib/grok-client", async () => {
   mod.rewindPoints = asyncArr;
   mod.providersList = async () => ({ providers: [], models: [] });
   mod.flattenModels = () => [];
-  mod.grokAuthStatus = async () => ({ ready: true, hasAuthFile: true, providers: [] });
-  mod.subscribeGrokEvents = async () => () => {};
+  mod.agentAuthStatus = async () => ({ ready: true, hasAuthFile: true, providers: [] });
+  mod.subscribeAgentEvents = async () => () => {};
   mod.permissionModeGet = async () => "ask";
   mod.notificationList = asyncArr;
   mod.agentsList = asyncArr;
@@ -155,7 +155,6 @@ describe("ChatView pause/yield/resume 闭环", () => {
     const { rerender } = renderChat();
     fireEvent.click(screen.getByTitle("暂停生成(保留会话,可继续)"));
     expect(baseProps.onCancel).toHaveBeenCalled();
-    // 模拟 grok complete:streaming → false。yield 状态在 streaming 结束后确认。
     setStore({ streaming: false, streamingMessageId: null });
     rerender(
       <ThemeProvider>

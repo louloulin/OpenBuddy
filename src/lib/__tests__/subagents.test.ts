@@ -48,7 +48,6 @@ describe("parseSubagentName", () => {
     expect(parseSubagentName("")).toBe("(subagent)");
   });
   it("task 工具标题 + raw_input.subagent_type 提取类型", () => {
-    // grok 的 task 工具把派生目标放在 raw_input.subagent_type
     expect(
       parseSubagentName("Task: review the code", {
         subagent_type: "general-purpose",

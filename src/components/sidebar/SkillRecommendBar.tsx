@@ -1,14 +1,7 @@
-/**
- * 技能推荐栏 — 显示当前可用的技能（从 grok skills_list 获取）。
- *
- * 对齐 WorkBuddy 的 skill-recommend-bar：
- *  - 从后端拉取真实技能列表（不再硬编码）
- *  - 点击技能 → 插入 `/skillName` 到输入框
- *  - 按 scope 分组显示（local / user / bundled / plugin）
- */
+
 import { useCallback, useEffect, useState } from "react";
 import { Code2, Search, FileText, Bot, Layers, Zap } from "lucide-react";
-import { skillsList } from "@/lib/grok-client";
+import { skillsList } from "@/lib/agent-client";
 import type { SkillInfo } from "@/lib/types";
 
 /** Map skill scope to an icon + color for visual variety. */

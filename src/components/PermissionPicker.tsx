@@ -1,22 +1,12 @@
-/**
- * 权限模式选择器 - Composer meta 行的下拉
- *
- * 对应 grok 的 `[ui] permission_mode`,三档:
- *  - ask            审批模式:每次工具调用都弹确认
- *  - auto           自动模式:grok 的分类器自动批准安全操作
- *  - always-approve 始终允许:所有工具调用自动批准
- *
- * 切换会写入 config.toml(影响之后的启动),并通过
- * `x.ai/yolo_mode_changed` 通知运行中的 agent 立即生效。
- */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronDownIcon,
   CheckIcon,
   ShieldCheckIcon,
 } from "@/foundation/components/Icon/icons";
-import { permissionModeGet, permissionModeSet } from "@/lib/grok-client";
-import type { PermissionMode } from "@/lib/grok-client";
+import { permissionModeGet, permissionModeSet } from "@/lib/agent-client";
+import type { PermissionMode } from "@/lib/agent-client";
 
 const MODES: { id: PermissionMode; label: string; desc: string }[] = [
   { id: "ask", label: "审批模式", desc: "每次工具调用都需要确认" },

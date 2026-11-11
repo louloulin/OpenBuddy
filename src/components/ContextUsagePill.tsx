@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { grokSessionInfo, grokSessionUsage } from "@/lib/grok-client";
+import { agentSessionInfo, agentSessionUsage } from "@/lib/agent-client";
 import type { ContextInfo, SessionUsage } from "@/lib/types";
 
-/**
- * Context-usage ring + popover for the Composer footer.
- * Self-contained: fetches grok x.ai/session/info+usage on mount and after
- * each refresh cycle. No external store needed — avoids selector/key
- * synchronization issues.
- */
+
 
 interface Snapshot {
   ctx: ContextInfo;
@@ -44,7 +39,6 @@ function buildRows(ctx: ContextInfo): CategoryRow[] {
   if (mcp && mcp.tokens > 0) {
     rows.push({ key: "mcp", label: "MCP", tokens: mcp.tokens, detail: mcp.detail });
   }
-  // 守恒收敛(参照 WorkBuddy distributeWithConservation):grok 的各项是独立
   // 估算,口径与 used 不完全一致(可能重叠),总和可能超过 used。超过时按比例
   // 缩放到 used,保证各项占比之和恒为 100%;不足时差额归入「其他」。
   const known = rows.reduce((s, r) => s + r.tokens, 0);
@@ -65,10 +59,10 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
 
   const refresh = useCallback(async () => {
     try {
-      const info = await grokSessionInfo(sessionId);
+      const info = await agentSessionInfo(sessionId);
       if (info?.context?.total) {
         let usage: SessionUsage | undefined;
-        try { usage = await grokSessionUsage(sessionId); } catch { /* nice-to-have */ }
+        try { usage = await agentSessionUsage(sessionId); } catch { /* nice-to-have */ }
         setSnap({ ctx: info.context, usage });
       }
     } catch { /* session not live in agent — pill stays hidden */ }
@@ -81,7 +75,7 @@ export function ContextUsagePill({ sessionId, onRefreshSignal }: { sessionId: st
     void refresh();
   }, [sessionId, refresh]);
 
-  // Re-fetch when parent signals (e.g. grok://complete).
+  // Re-fetch when parent signals (e.g. agent://complete).
   useEffect(() => {
     if (onRefreshSignal !== undefined) void refresh();
   }, [onRefreshSignal, refresh]);

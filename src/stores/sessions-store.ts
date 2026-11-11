@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { SessionSummary, SessionStatus } from "@/lib/types";
-import type { WorkspaceInfo } from "@/lib/grok-client";
+import type { WorkspaceInfo } from "@/lib/agent-client";
 
 /**
  * Sentinel draft keys for sessions that don't have a real sessionId yet.
@@ -18,10 +18,10 @@ export const ASSISTANT_DRAFT_KEY = "__assistant__";
  * Instead it renders two collapsible groups:
  *
  *   任务 (N)  — `independent`: sessions with an empty cwd (playground / 独立任务).
- *               Sourced from `grokListSessions("")`, which the Rust backend
+ *               Sourced from `agentListSessions("")`, which the Rust backend
  *               already filters to cwd-less sessions (sessions.rs:111).
  *   空间 (M)  — `workspaces`: one expandable node per local working directory
- *               (sourced from `grokListWorkspaces()`). Expanding a node lazily
+ *               (sourced from `agentListWorkspaces()`). Expanding a node lazily
  *               loads that cwd's sessions into `workspaceSessions[cwd]`.
  *
  * Kept separate from the active-session transcript store so switching sessions
@@ -30,7 +30,7 @@ export const ASSISTANT_DRAFT_KEY = "__assistant__";
 interface SessionsState {
   /** 任务分组: cwd-less (independent) sessions. */
   independent: SessionSummary[];
-  /** 空间分组: one node per working directory grok has seen. */
+  
   workspaces: WorkspaceInfo[];
   /** 空间节点展开后的子会话缓存, keyed by cwd. Absent key = not yet loaded. */
   workspaceSessions: Record<string, SessionSummary[]>;
@@ -40,9 +40,7 @@ interface SessionsState {
   spacesOpen: boolean;
   /** Per-cwd expand state for 空间 nodes. */
   expanded: Record<string, boolean>;
-  /** The "inbox" cwd = the directory grok started in. Sessions in this cwd
-   *  form the 任务 group; every other cwd is a 空间 node. (grok rejects empty
-   *  cwd, so we cannot use a cwd-less session as the inbox.) */
+  
   homeCwd: string;
   currentSessionId: string | null;
   loading: boolean;
@@ -53,14 +51,7 @@ interface SessionsState {
   filterStatus: SessionStatus | null;
   /** Sidebar task filter: selected date range (null = 全部时间). */
   filterDate: string | null;
-  /**
-   * Per-session Composer drafts (unsent textarea text), keyed by sessionId.
-   * UI-only state: grok has no concept of "user hasn't pressed send yet", so
-   * we keep it here the same way we keep pinned/archived (see meta.rs).
-   * Two sentinel keys cover sessions that don't have an id yet:
-   *   - `__home__`      HomePage ("新建任务") input
-   *   - `__assistant__` LocalAssistantView input
-   */
+  
   drafts: Record<string, string>;
 
   setIndependent: (list: SessionSummary[]) => void;
@@ -84,7 +75,7 @@ interface SessionsState {
   clearDraft: (id: string) => void;
   /** Insert or merge a session entry, routing it into the correct group by
    *  cwd. On update (id already present) the entry is merged in place wherever
-   *  it lives, so a cwd-less `{ sessionId, title }` (e.g. grok://summary)
+   *  it lives, so a cwd-less `{ sessionId, title }` (e.g. agent://summary)
    *  updates the right group without needing the cwd. */
   upsert: (s: Partial<SessionSummary> & { sessionId: string }) => void;
   /** Remove a session from every group and decrement its workspace node count. */
@@ -174,7 +165,6 @@ export const useSessionsStore = create<SessionsState>((set) => ({
       }
 
       // 3) New entry — route by cwd. The 任务 group is the "inbox" = the cwd
-      // grok started in (homeCwd); grok rejects empty cwd so every session has
       // an absolute path. A session whose cwd equals homeCwd (or, defensively,
       // an empty cwd) is independent; everything else belongs to a 空间 node.
       const cwd = s.cwd ?? "";

@@ -1,14 +1,7 @@
-/**
- * 文件夹信任对话框 - 当 grok 要求信任一个目录时弹出
- *
- * grok 在首次对某 cwd 执行工具前会发 `x.ai/folder_trust/request`。
- * 用户选择"信任"或"拒绝"，结果通过 `folderTrustRespond` 回传给 grok。
- *
- * 信任的目录会写入 grok 的 trust 配置，之后该目录的工具调用不再询问。
- */
+
 import { useEffect, useState } from "react";
 import { ShieldCheckIcon, ShieldAlertIcon } from "@/foundation/components/Icon/icons";
-import { folderTrustRespond } from "@/lib/grok-client";
+import { folderTrustRespond } from "@/lib/agent-client";
 
 interface TrustRequest {
   cwd?: string;

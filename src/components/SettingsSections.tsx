@@ -1,18 +1,4 @@
-/**
- * Settings 面板的各个真实分区。
- *
- * 这些是 SettingsPanel.tsx 里除了"模型"以外的真实实现，替代之前的
- * "该分区即将上线"占位。每个分区对接 OpenBuddy 已有的能力：
- *  - personalize: 主题（接 ThemeProvider）+ 字号
- *  - shortcuts: 快捷键说明（纯展示 + localStorage 自定义）
- *  - memory: 资料库入口（接 memory_list + memory_rewrite）
- *  - help: 帮助 + 反馈入口（含 grok 内核信息）
- *  - security: 安全中心（权限规则入口 + folder trust 说明）
- *  - data: 数据管理（清理会话/缓存 + 打开 grok 目录）
- *  - general: 系统设置（cwd/工作目录 + 重启 grok）
- *  - account: 账户（grok auth 状态）
- *  - agent-settings / assistant: 引导到对应面板
- */
+
 import { useCallback, useEffect, useState } from "react";
 import {
   Sun,
@@ -37,7 +23,7 @@ import {
   agentsDefaultsSave,
   agentsList,
   commandsList,
-  grokAuthStatus,
+  agentAuthStatus,
   internalReload,
   mcpList,
   memoryFlush,
@@ -56,7 +42,7 @@ import {
   webSearchConfigSave,
   type AuthStatus,
   type ModelOptionRow,
-} from "@/lib/grok-client";
+} from "@/lib/agent-client";
 import type {
   AgentDefaults,
   AgentEntry,
@@ -350,10 +336,9 @@ export function SecuritySettingsPanel() {
 // ---------- 数据管理 ----------
 
 export function DataSettingsPanel() {
-  const [grokHome, setGrokHome] = useState("");
+  const [agentHome, setGrokHome] = useState("");
 
   useEffect(() => {
-    // 从环境推断 grok home 路径（前端无直接 API，给提示用）
     setGrokHome("~/.grok");
   }, []);
 
@@ -377,7 +362,7 @@ export function DataSettingsPanel() {
           <span>grok 数据目录</span>
         </div>
         <div className="settings-row__control">
-          <code>{grokHome}</code>
+          <code>{agentHome}</code>
         </div>
       </div>
       <div className="settings-actions">
@@ -451,7 +436,7 @@ export function AccountSettingsPanel() {
     setLoading(true);
     try {
       const [a, k] = await Promise.all([
-        grokAuthStatus().catch(() => null),
+        agentAuthStatus().catch(() => null),
         accountGetApiKey().catch(() => null),
       ]);
       setAuth(a);
@@ -622,10 +607,7 @@ function maskKey(key: string): string {
 
 // ---------- 智能体设置 ----------
 
-/** AgentSettingsPanel — 汇总显示当前智能体配置（skills + MCP + slash 命令）。
- *  数据来自 grok 的 x.ai/skills/config、x.ai/mcp/list、x.ai/commands/list，
- *  与「专家·技能·连接器」面板的数据源相同，但这里是设置视图：只读 + 刷新 +
- *  跳转到对应管理面板。 */
+
 export function AgentSettingsPanel() {
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [servers, setServers] = useState<McpServerEntry[]>([]);
@@ -956,9 +938,7 @@ const PERMISSION_OPTIONS: { value: string; label: string }[] = [
   { value: "always_deny_all_sessions", label: "所有会话始终拒绝" },
 ];
 
-/** AssistantSettingsPanel — 助理角色列表 + 新会话默认模型/权限偏好。
- *  agents 来自 ~/.grok/agents/*.md；默认值写入 config.toml 的
- *  [models].default 和 [ui].default_selected_permission。 */
+
 export function AssistantSettingsPanel() {
   const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [providers, setProviders] = useState<ModelOptionRow[]>([]);
@@ -1156,60 +1136,7 @@ export function AssistantSettingsPanel() {
           {msg && <p className="settings-msg">{msg}</p>}
 
           <p className="settings-hint">
-            助理定义在 <code>~/.grok/agents/*.md</code>（含 frontmatter + system prompt）。
-            grok 没有 session 级「切换 agent」的 ACP 方法，OpenBuddy 通过预设 prompt 引导。
-          </p>
-        </>
-      )}
-    </SectionShell>
-  );
-}
-
-function scopeLabel(scope: string): string {
-  switch (scope) {
-    case "user":
-      return "用户";
-    case "local":
-      return "本地";
-    case "repo":
-    case "project":
-      return "项目";
-    case "server":
-      return "服务器";
-    case "bundled":
-    case "builtin":
-      return "内置";
-    case "plugin":
-      return "插件";
-    default:
-      return scope;
-  }
-}
-
-// ---------- 智能体邮箱（会话通知中心）----------
-
-const KIND_FILTERS: { key: string; label: string }[] = [
-  { key: "all", label: "全部" },
-  { key: "permission", label: "权限请求" },
-  { key: "folder_trust", label: "文件夹信任" },
-  { key: "task_update", label: "任务更新" },
-  { key: "plan_mode", label: "计划模式" },
-  { key: "mcp_status", label: "MCP 状态" },
-  { key: "models_update", label: "模型更新" },
-  { key: "summary", label: "会话标题" },
-  { key: "session_complete", label: "会话完成" },
-  { key: "error", label: "错误" },
-];
-
-/** AgentMailSettingsPanel — 智能体邮箱（重新定义为会话通知中心）。
- *
- *  WorkBuddy 的 agentMail 是腾讯邮箱集成（无 grok 对应）。OpenBuddy 把它
- *  重新定义为 grok 事件的通知收件箱：权限请求、文件夹信任、任务更新、
- *  plan 模式切换、MCP 状态、模型更新、会话完成等所有事件都会记到这里。
- *  用户可浏览/筛选/标记已读/清空。
- *
- *  数据存在 ~/.grok/openbuddy-notifications.json（最多 200 条 FIFO）。
- *  写入由 App.tsx 的事件订阅回调触发（notificationAppend）。 */
+            助理定义在 <code>~/.grok/agents
 export function AgentMailSettingsPanel() {
   const [entries, setEntries] = useState<NotificationEntry[]>([]);
   const [loading, setLoading] = useState(true);

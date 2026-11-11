@@ -38,7 +38,7 @@ import {
   type ProviderListModel,
   type ProviderKind,
   type FetchedModel,
-} from "@/lib/grok-client";
+} from "@/lib/agent-client";
 import {
   AccountSettingsPanel,
   AgentMailSettingsPanel,
@@ -53,19 +53,7 @@ import {
   ShortcutsSettingsPanel,
 } from "./SettingsSections";
 
-/**
- * WorkBuddy-style Settings dialog.
- *
- * Full-screen overlay → centered `.settings-modal` (1040×720) with a fixed
- * 12-item left navigation (mirrors WorkBuddy) and a right panel that swaps
- * per section. Only "模型" has a real implementation; the other 11 render a
- * "即将上线" placeholder so the visual matches WorkBuddy today and can be
- * filled in later.
- *
- * The 模型 section lists configured providers from ~/.grok/config.toml and
- * opens a nested "添加模型" editor dialog (560×318) when adding/editing.
- * That editor writes back through providers_save → grok's [model.*] tables.
- */
+
 
 type SectionId =
   | "account"
@@ -91,9 +79,7 @@ const NAV: NavItem[] = [
   { id: "account", label: "账户管理", icon: User },
   { id: "agent-mail", label: "智能体邮箱", icon: Mail },
   { id: "general", label: "系统设置", icon: SettingsIcon },
-  { id: "agent-settings", label: "智能体设置", icon: SlidersHorizontal },
   { id: "shortcuts", label: "快捷键", icon: Keyboard },
-  { id: "memory", label: "记忆", icon: Brain },
   { id: "model", label: "模型", icon: Cpu },
   { id: "assistant", label: "助理设置", icon: Bot },
   { id: "personalize", label: "个性化", icon: Palette },
@@ -304,7 +290,6 @@ function PlaceholderSection({ label }: { label: string }) {
 // ---------------------------------------------------------------------------
 // 模型 section: provider-grouped view (one provider → many models).
 //
-// grok's native config shape is [model_providers.<id>] (one key/url/context_window)
 // + [model.<id>] with a `model_provider = "<id>"` reference. The UI mirrors
 // that: a left list of providers, a right detail showing that provider's
 // models + a connection editor. Legacy per-model entries (old shape) are

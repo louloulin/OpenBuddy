@@ -1,16 +1,6 @@
-/**
- * 辅助侧边栏（Secondary Sidebar）— 对齐 WorkBuddy 的 peek-assistant 面板。
- *
- * 功能：
- *  - 右侧垂直触发条（收起态），hover 浮出助理列表
- *  - 点击助理 → 预览其能力描述 + 快速开始新会话
- *  - 支持 hover-peek 时序（100ms 进入延迟 / 300ms 离开缓冲），避免误触
- *  - Escape 关闭浮层
- *
- * 数据来自 agentsList（~/.grok/agents/*.md 专家定义）。
- */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { agentsList } from "@/lib/grok-client";
+import { agentsList } from "@/lib/agent-client";
 import type { AgentEntry } from "@/lib/types";
 import { WbAssistantNavIcon, ChevronRightIcon } from "@/foundation/components/Icon/icons";
 

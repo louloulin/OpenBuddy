@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useQuestionStore, selectQuestionForSession } from "@/stores/question-store";
-import { grokResolveQuestion } from "@/lib/grok-client";
+import { agentResolveQuestion } from "@/lib/agent-client";
 
 /**
  * Inline question card rendered inside the ChatView message stream.
@@ -43,7 +43,6 @@ export function QuestionInlineCard({ sessionId }: { sessionId: string | null }) 
 
   const handleSubmit = async () => {
     setBusy(true);
-    // Grok's AskUserQuestionExtResponse keys answers by **question text**,
     // not synthetic id. Freeform-only answers must be label "Other" with the
     // typed text in annotations[question].notes.
     const answers: Record<string, string | string[]> = {};
@@ -62,7 +61,7 @@ export function QuestionInlineCard({ sessionId }: { sessionId: string | null }) 
     }
     try {
       dismiss(head.requestId, head.sessionId);
-      await grokResolveQuestion(head.requestId, {
+      await agentResolveQuestion(head.requestId, {
         answers,
         annotations: Object.keys(annotations).length ? annotations : undefined,
       });
@@ -79,7 +78,7 @@ export function QuestionInlineCard({ sessionId }: { sessionId: string | null }) 
     setBusy(true);
     try {
       dismiss(head.requestId, head.sessionId);
-      await grokResolveQuestion(head.requestId, { cancelled: true });
+      await agentResolveQuestion(head.requestId, { cancelled: true });
     } catch (e) {
       console.error("cancel question failed", e);
     } finally {

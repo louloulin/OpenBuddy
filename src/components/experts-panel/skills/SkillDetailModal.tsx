@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import type { SkillItem, SkillInfo } from "@/lib/types";
-import { skillsCatalogReadSkill, skillsAdd } from "@/lib/grok-client";
+import { skillsCatalogReadSkill, skillsAdd } from "@/lib/agent-client";
 import { Markdown } from "@/components/markdown/Markdown";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 import { LetterAvatar } from "../shared/LetterAvatar";
@@ -19,7 +19,7 @@ import {
 interface Props {
   skill: SkillItem;
   onClose: () => void;
-  /** Installed skills (from grok), to show install state + toggle. */
+  
   installed?: SkillInfo[];
   onInstalled?: () => void;
   onToast?: (m: string) => void;
@@ -45,7 +45,6 @@ export function SkillDetailModal({ skill, installed = [], onClose, onInstalled, 
   // Parse frontmatter + body from the raw markdown.
   const { meta, body } = useMemo(() => parseFrontmatter(rawMd), [rawMd]);
 
-  // Is this skill already installed in grok?
   const installedEntry = useMemo(
     () => installed.find((s) => (s.displayName || s.name).toLowerCase() === skill.name.toLowerCase()
       || s.name.toLowerCase() === skill.id.toLowerCase()),

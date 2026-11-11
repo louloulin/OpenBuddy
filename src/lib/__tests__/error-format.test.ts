@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { formatGrokError, friendlyError } from "../error-format";
+import { formatAgentError, friendlyError } from "../error-format";
 
-describe("formatGrokError", () => {
+describe("formatAgentError", () => {
   it("parses 429 TPM rate limit from Rust Debug string", () => {
     const raw = `Error { code: -32003: Unknown error, message: "Rate limited", data: Some(Object {"message": String("API error (status 429 Too Many Requests): runtime_error: tpm rate limit exceeded"), "promptUsage": Object {"inputTokens": Number(219848), "outputTokens": Number(10094), "totalTokens": Number(229942), "cachedReadTokens": Number(0), "reasoningTokens": Number(2163), "modelCalls": Number(15), "apiDurationMs": Number(211574), "modelUsage": Object {"glm-5": Object {"inputTokens": Number(219848)}}, "numTurns": Number(4)}}) }`;
-    const result = formatGrokError(raw);
+    const result = formatAgentError(raw);
     expect(result).not.toBeNull();
     expect(result).toContain("TPM");
     expect(result).toContain("219.8k");
@@ -23,7 +23,7 @@ describe("formatGrokError", () => {
         promptUsage: { inputTokens: 5000, modelCalls: 3 },
       },
     });
-    const result = formatGrokError(raw);
+    const result = formatAgentError(raw);
     expect(result).not.toBeNull();
     expect(result).toContain("RPM");
   });
@@ -33,7 +33,7 @@ describe("formatGrokError", () => {
       code: -32003,
       data: { message: "401 Unauthorized: invalid API key" },
     });
-    const result = formatGrokError(raw);
+    const result = formatAgentError(raw);
     expect(result).not.toBeNull();
     expect(result).toContain("认证失败");
   });
@@ -42,13 +42,13 @@ describe("formatGrokError", () => {
     const raw = JSON.stringify({
       data: { message: "connection refused: ECONNREFUSED" },
     });
-    const result = formatGrokError(raw);
+    const result = formatAgentError(raw);
     expect(result).not.toBeNull();
     expect(result).toContain("网络连接失败");
   });
 
   it("returns null for unparseable string", () => {
-    expect(formatGrokError("some random error")).toBeNull();
+    expect(formatAgentError("some random error")).toBeNull();
   });
 });
 

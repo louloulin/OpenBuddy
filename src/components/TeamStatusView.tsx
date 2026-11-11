@@ -1,13 +1,4 @@
-/**
- * 团队状态视图 —— 展示当前会话中已创建的专家团（来自 create_team 工具调用）。
- *
- * 数据源：从会话 transcript 派生（lib/team-derive.ts）。create_team 是 OpenBuddy
- * 注入 grok 的自定义工具，由 LLM 调用；这里解析其 rawInput 展示团队 ID + 成员名。
- * 与 SubagentPanel（展示子代理运行时进度）互补：本视图展示「有哪些团队」，
- * SubagentPanel 展示「团队派发的子任务在跑成什么样」。
- *
- * 空时不渲染。
- */
+
 import { useMemo } from "react";
 import { deriveTeams, teamStats } from "@/lib/team-derive";
 import type { ChatMessage } from "@/stores/session-store";

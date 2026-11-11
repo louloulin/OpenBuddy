@@ -1,12 +1,4 @@
-/**
- * 市场面板 - 对接 grok 的 x.ai/marketplace/list + x.ai/marketplace/action
- *
- * 显示 grok 配置的所有插件市场源（marketplace sources）及其插件，
- * 支持安装/卸载/更新/刷新源 + 添加/移除源。
- * 对应 WorkBuddy 的 UnifiedMarketPage。
- *
- * 市场源配置在 ~/.grok/config.toml 的 [[marketplace.sources]] 段。
- */
+
 import { useCallback, useEffect, useState } from "react";
 import {
   Store,
@@ -21,7 +13,7 @@ import {
 import {
   marketplaceAction,
   marketplaceList,
-} from "@/lib/grok-client";
+} from "@/lib/agent-client";
 import type { MarketplacePluginEntry, MarketplaceScanResult } from "@/lib/types";
 
 interface MarketplacePanelProps {

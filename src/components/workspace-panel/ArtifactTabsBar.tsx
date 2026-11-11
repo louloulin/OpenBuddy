@@ -353,7 +353,7 @@ export function ArtifactTabsBar({
     <div
       className="artifact-tabs"
       role="tablist"
-      {...(IS_MACOS ? { "data-tauri-drag-region": true } : {})}
+      {...(IS_MACOS ? { "data-window-drag-region": true } : {})}
     >
       <div
         ref={listRef}
@@ -361,7 +361,7 @@ export function ArtifactTabsBar({
           "artifact-tabs__list" +
           (visualOrder ? " artifact-tabs__list--dragging" : "")
         }
-        {...(IS_MACOS ? { "data-tauri-drag-region": true } : {})}
+        {...(IS_MACOS ? { "data-window-drag-region": true } : {})}
       >
         {renderedTabs.map((tab) => (
           <div

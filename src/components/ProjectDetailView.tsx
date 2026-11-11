@@ -50,7 +50,7 @@ export function ProjectDetailView({
   project: ProjectMeta;
   onBack: () => void;
   onToast?: (msg: string) => void;
-  /** Start a new conversation within this project (creates a real grok session). */
+  
   onStartConversation?: (projectId: string, message: string) => void;
 }) {
   // 读最新（交互后 store 更新，父传入的快照可能过期）。

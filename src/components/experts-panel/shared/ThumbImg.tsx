@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { expertsThumbnail } from "@/lib/grok-client";
+import { expertsThumbnail } from "@/lib/agent-client";
 import { LetterAvatar } from "./LetterAvatar";
 
 /** path -> resolved data URL. Survives across cards / remounts so scrolling back

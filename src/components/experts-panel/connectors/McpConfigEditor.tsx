@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeftIcon } from "@/foundation/components/Icon/icons";
-import { mcpConfigPath, mcpConfigRead, mcpConfigSave } from "@/lib/grok-client";
+import { mcpConfigPath, mcpConfigRead, mcpConfigSave } from "@/lib/agent-client";
 import { useSessionStore } from "@/stores/session-store";
 
 const EMPTY = "{\n  \"mcpServers\": {}\n}";
 
-/** Raw mcp.json editor (截图 7): back / 取消 / 保存 header, the config-file
- *  path line, and a line-numbered monospace textarea. Validates JSON before
- *  saving; the backend also re-validates and mirrors entries into grok. */
+
 export function McpConfigEditor({
   onBack, onSaved, onToast,
 }: {
@@ -62,7 +60,6 @@ export function McpConfigEditor({
     setError("");
     setSaving(true);
     try {
-      // Pass the live session (when any) so grok applies the entries now;
       // without one the file is still saved for the next sync.
       await mcpConfigSave(content, useSessionStore.getState().sessionId ?? undefined);
       setOriginal(content);

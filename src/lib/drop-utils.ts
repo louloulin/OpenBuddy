@@ -1,12 +1,4 @@
-/**
- * 拖拽文件工具 —— 对齐 WorkBuddy `cb-chat-ui/chat-input/drop-zone` +
- * `drop-zone-filename-utils`。
- *
- * 把 Tauri 的 `DragDropEvent`(native 文件拖拽,带真实绝对路径)归一化为
- * Composer 附件路径列表。纯函数、无副作用,便于单测;Tauri 的 webview 原生
- * onDrop/onDragOver 在浏览器层拿不到本地文件路径(只有 File blob),所以这里
- * 必须走 `getCurrentWebview().onDragDropEvent` 而不是 DOM onDrop。
- */
+
 
 /** 受支持文件名后缀白名单(空数组表示不过滤)。 */
 export const DEFAULT_ALLOWED_EXTS: string[] = [];
@@ -25,7 +17,7 @@ export const CODE_DOC_EXTS = [
   ".zip", ".tar", ".gz",
 ];
 
-/** Tauri DragDropEvent 的最小结构(与 @tauri-apps/api/webview 一致)。 */
+
 export type DragDropEvent =
   | { type: "enter"; paths: string[]; position: { x: number; y: number } }
   | { type: "over"; position: { x: number; y: number } }
@@ -49,14 +41,7 @@ export function basenameOf(path: string): string {
   return slash >= 0 ? path.slice(slash + 1) : path;
 }
 
-/**
- * 从一次 drop 事件中过滤出有效附件路径。
- *
- *  - 去重(保持顺序,以首次出现为准)
- *  - 过滤掉目录(以路径分隔符结尾的视为目录;Tauri 对目录也给出 paths)
- *  - 可选后缀白名单:`allowedExts` 非空时只保留命中后缀的文件
- *  - 忽略空/空白路径
- */
+
 export function collectDroppedPaths(
   paths: string[] | undefined | null,
   allowedExts: string[] = DEFAULT_ALLOWED_EXTS,
@@ -68,7 +53,6 @@ export function collectDroppedPaths(
   for (const raw of paths) {
     const p = (raw ?? "").trim();
     if (!p) continue;
-    // 以分隔符结尾 → 目录,跳过(Tauri 会把拖入的目录也列在 paths 里)。
     if (p.endsWith("/") || p.endsWith("\\")) continue;
     if (seen.has(p)) continue;
     if (extSet && !extSet.has(extOf(p))) continue;

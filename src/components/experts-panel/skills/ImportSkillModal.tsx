@@ -1,12 +1,9 @@
 import { useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@/lib/ipc";
 import { XCloseIcon, FolderOpenIcon } from "@/foundation/components/Icon/icons";
-import { skillsAdd } from "@/lib/grok-client";
+import { skillsAdd } from "@/lib/agent-client";
 
-/** "导入技能" modal (截图 5): drag/click drop zone + 非高风险自动安装 checkbox +
- *  file requirements. openbuddy has no cloud install / security scanner, so the
- *  checkbox is UI-only and install = register a local path via grok's
- *  `skills_add` (a SKILL.md or a folder containing one; .zip must be unpacked). */
+
 export function ImportSkillModal({
   onClose, onToast, onInstalled,
 }: {
@@ -53,7 +50,6 @@ export function ImportSkillModal({
   const onDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    // Tauri webview exposes a local path on dropped files via the `path` field.
     const files = Array.from(e.dataTransfer.files) as (File & { path?: string })[];
     const p = files[0]?.path;
     if (p) await install(p);

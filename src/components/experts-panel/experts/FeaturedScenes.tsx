@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ExpertItem, FeaturedScene } from "@/lib/types";
-import { expertsImageBytes } from "@/lib/grok-client";
+import { expertsImageBytes } from "@/lib/agent-client";
 import { ThumbImg } from "../shared/ThumbImg";
 import { ScrollRow } from "../shared/ui";
 

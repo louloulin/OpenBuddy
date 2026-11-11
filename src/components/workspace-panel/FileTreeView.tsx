@@ -7,7 +7,7 @@
  * 根目录取 cwd（会话工作区）。隐藏/构建目录已在后端过滤。
  */
 import { useCallback, useEffect, useState } from "react";
-import { listDir, type DirEntry } from "@/lib/grok-client";
+import { listDir, type DirEntry } from "@/lib/agent-client";
 import { pickFileEmoji } from "./file-tab-icon";
 import { ChevronRightIcon } from "@/foundation/components/Icon/icons";
 

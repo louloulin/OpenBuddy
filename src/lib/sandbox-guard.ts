@@ -203,7 +203,7 @@ export interface SandboxExecutor {
   exec(command: string, opts?: { cwd?: string }): Promise<ExecResult>;
 }
 
-/** 默认执行器:直通(无 OS 级沙箱),仅记录。运行时用 child_process / Tauri shell 命令。 */
+
 export class PassthroughExecutor implements SandboxExecutor {
   readonly id = "passthrough";
   readonly isSandboxed = false;
@@ -263,15 +263,7 @@ export function resetSandboxExecutor(): void {
   activeExecutor = null;
 }
 
-/**
- * 安全执行命令:先做 precheck(纯逻辑守卫),deny 直接拒绝;allow/ask 时委托给
- * 当前沙箱执行器(若有 OS 级执行器则隔离执行,否则用传入的 fallback 直通执行)。
- *
- * @param command 命令文本
- * @param rules 沙箱规则集
- * @param fallbackExec 无 OS 级沙箱时的直通执行函数(运行时 = Tauri shell 命令)
- * @param opts 执行选项(cwd)
- */
+
 export async function safeExec(
   command: string,
   rules: SandboxRules = DEFAULT_SANDBOX_RULES,

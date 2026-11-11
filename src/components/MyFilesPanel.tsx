@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDownIcon } from "@/foundation/components/Icon/icons";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@/lib/ipc";
 import {
   SearchIcon,
   AddIcon,
@@ -10,7 +10,7 @@ import {
   RefreshCwIcon,
 } from "@/foundation/components/Icon/icons";
 import { FileText, FileSpreadsheet, FileImage, FileCode, Film, Music, Globe, File, FolderOpen } from "lucide-react";
-import { memoryList } from "@/lib/grok-client";
+import { memoryList } from "@/lib/agent-client";
 import type { MemoryEntry } from "@/lib/types";
 import { formatFileSize, inferFileTypeFromExt, relativeTime, type FileType, type LocalFileItem } from "@/lib/file-utils";
 
@@ -235,7 +235,7 @@ function LocalFilesTab({
     if (!dir) return;
     setLoading(true);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
+      const { invoke } = await import("@/lib/ipc");
       const entries: Array<{
         name: string;
         path: string;

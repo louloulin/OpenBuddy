@@ -1,9 +1,16 @@
 # 更新日志 (Changelog)
 
-> 打包说明：发版时给对应 tag 提取本文件中该版本的段落作为 GitHub Release
-> 的正文（见 `.github/workflows/release.yml` 的「Extract release notes」
-> 步骤）。新版本 = 在顶部加一节 `## vX.Y.Z（日期）`，用中文写面向用户的
-> 变更摘要；技术细节留在 commit message。
+> 以下历史版本保留原始记录。Electron 迁移尚未发布，当前 CI 仅生成审核安装包。
+
+## v1.0.0（未发布，Electron + Pi 迁移）
+
+- 桌面外壳迁移到 Electron，保留 React 界面；引擎改为进程内 Pi SDK。
+- 精确固定已核实可安装的 Electron 45.3.0、Pi 1.5.2，要求构建 Node >=22.19.0。
+- 增加隔离 preload、IPC 命令/事件白名单、sender 与参数校验、CSP、导航和外链限制。
+- 删除旧 Rust/Tauri 后端、Grok vendor 子模块和旧构建工具，增加 Electron DMG/NSIS 构建配置。
+- 应用数据迁移到 Electron userData/pi；旧 ACP 会话尚无自动转换。
+- 专家/自动化/连接器/插件/云存储/团队/子代理/计划模式/rewind 暂缓，Electron 包体积和内存占用上升。
+- 当前配置不自动发布或公证；真实 BYOK、macOS 公证与 Windows 安装验证需分别执行。
 
 ## v0.15.0（2026-08-25）
 

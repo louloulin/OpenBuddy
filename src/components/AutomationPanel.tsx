@@ -39,13 +39,13 @@ import {
   automationsSave,
   automationsSetStatus,
   automationsSnapshot,
-  grokListWorkspaces,
+  agentListWorkspaces,
   mcpList,
   providersList,
   flattenModels,
   skillsList,
   type WorkspaceInfo,
-} from "@/lib/grok-client";
+} from "@/lib/agent-client";
 import type {
   AgentEntry,
   Automation,
@@ -200,7 +200,7 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
   }, [refresh]);
 
   useEffect(() => {
-    grokListWorkspaces().then(setWorkspaces).catch(() => setWorkspaces([]));
+    agentListWorkspaces().then(setWorkspaces).catch(() => setWorkspaces([]));
     providersList()
       .then((list) => setModels(flattenModels(list)))
       .catch(() => setModels([]));
@@ -587,9 +587,9 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
   // ============================================================
   return (
     <div className="automation-panel code-buddy-automation">
-      {/* ---------- 工具栏(顶部拖拽条,Tauri 2 需 data-tauri-drag-region) ---------- */}
+      {}
       {showTemplatePage ? (
-        <div className="atm-toolbar atm-toolbar--breadcrumb" data-tauri-drag-region>
+        <div className="atm-toolbar atm-toolbar--breadcrumb" data-window-drag-region>
           <div className="atm-toolbar-left">
             <div className="atm-detail-breadcrumb">
               <span className="atm-detail-status-icon">
@@ -604,7 +604,7 @@ export function AutomationPanel({ onToast, onNavigate }: AutomationPanelProps) {
           </div>
         </div>
       ) : (
-        <div className="atm-toolbar" data-tauri-drag-region>
+        <div className="atm-toolbar" data-window-drag-region>
           <div className="atm-toolbar-left">
             {isBatchMode ? (
               <div className="atm-batch-info">

@@ -3,10 +3,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
-// Tauri spawns a dev server it can then load into the webview.
-// HMR works with the default Vite dev server; the fixed port keeps
-// tauri.conf.json `devUrl` stable.
-const HOST = "0.0.0.0";
+// Electron only trusts this loopback development origin.
+const HOST = "127.0.0.1";
 const PORT = 1420;
 
 // https://vitejs.dev/config/
@@ -18,21 +16,16 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
-  // Tauri webview can't reach a host-relative absolute URL during dev
-  // (no server origin), so always emit relative paths.
+  // Relative assets support the packaged file:// renderer.
   base: "./",
   clearScreen: false,
   server: {
     host: HOST,
     port: PORT,
     strictPort: true,
-    // Tauri waits for this string before launching the webview.
-    watch: {
-      ignored: ["**/src-tauri/**"],
-    },
+    watch: { ignored: ["**/electron/**", "**/dist-electron/**", "**/release/**"] },
   },
-  // Produce asset URLs that work from the tauri:// or file:// origin
-  // the production webview uses.
+  // Build assets for the packaged Electron renderer.
   build: {
     target: "es2021",
     // Split the heavy markdown / syntax-highlight libs out of the app

@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { RewindBar } from "../RewindBar";
 
-// The toolbar talks to grok over Tauri `invoke`, which doesn't exist under
 // vitest — stub the three client calls it uses.
-vi.mock("@/lib/grok-client", () => ({
+vi.mock("@/lib/agent-client", () => ({
   rewindPoints: vi.fn().mockResolvedValue([
     { promptIndex: 0, promptPreview: "first prompt", timestamp: "2026-01-01T00:00:00Z" },
   ]),
@@ -13,7 +12,7 @@ vi.mock("@/lib/grok-client", () => ({
 }));
 
 // Re-import the mocked module so we can assert call args on the stubs.
-const { rewindExecute } = await import("@/lib/grok-client");
+const { rewindExecute } = await import("@/lib/agent-client");
 
 describe("RewindBar wiring", () => {
   beforeEach(() => {

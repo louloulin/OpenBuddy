@@ -1,11 +1,4 @@
-/**
- * Subagent / Team runtime 派生纯函数 —— 对齐 WorkBuddy
- * `session:getSubagentList` / `getTeamRuntime` / `team-runtime`。
- *
- * OpenBuddy 的 grok 内核通过 `spawn_subagent` 工具调用派生子 agent。这里从会话消息的
- * tool_call 中派生出「子 agent 活动列表」,并支持把 RunningTask(后台任务)合并展示。
- * 纯函数、无副作用,便于单测。
- */
+
 import type { ChatMessage, ToolCallView } from "@/stores/session-store";
 import type { RunningTask } from "@/lib/types";
 
@@ -21,13 +14,7 @@ export interface SubagentActivity {
   isSpawn: boolean;
 }
 
-/** 从 tool_call 的 title 解析子 agent 名称。
- *  grok 的 `task` 工具标题格式多样，常见有：
- *  - 「Task: <description>」/「task」
- *  - 「Spawn subagent: <name>」（较旧版本）
- *  - 「使用 <name> 执行…」（中文）
- *  - 任意描述文本（grok 会把 subagent_type 放在 raw_input 里而非 title）。
- *  若 title 不含明确的子代理名，回退到 raw_input 的 subagent_type，再回退到截断的 title。*/
+
 export function parseSubagentName(title: string, rawInput?: unknown): string {
   const t = (title || "").trim();
   // 「Spawn subagent: <name>」
@@ -45,7 +32,7 @@ export function parseSubagentName(title: string, rawInput?: unknown): string {
   return t.length > 40 ? t.slice(0, 40) + "…" : t || "(subagent)";
 }
 
-/** 从 task 工具的 raw_input 提取 subagent_type 字段（grok 把派生目标放在这里）。 */
+
 function parseSubagentType(rawInput?: unknown): string | null {
   if (!rawInput || typeof rawInput !== "object") return null;
   const obj = rawInput as Record<string, unknown>;
@@ -76,22 +63,16 @@ export function deriveSubagents(messages: ChatMessage[]): SubagentActivity[] {
   return out;
 }
 
-/** 判断一个 tool_call 是否为子代理派发。
- *
- *  grok 原生子代理派发工具是 `task`（见 vendor/grok-build/.../task/mod.rs:58,141），
- *  其 `kind = "task"`、`id = "task"`。较旧版本用过 `spawn_subagent` 这个 kind。
- *  这里综合 kind / toolCallId / title 三处线索判断，避免遗漏任一字段缺失的情况。 */
+
 export function isSubagentTool(tc: ToolCallView): boolean {
   const k = (tc.kind || "").toLowerCase();
   if (k === "task" || k === "spawn_subagent") return true;
   if (k.includes("subagent") || k.includes("spawn")) return true;
   // 兜底：kind 缺省（"other"）时，按 title 识别 task 工具调用。
   const title = (tc.title || "").toLowerCase();
-  // grok 的 task 工具 toolCallId 形如 "toolu_xxx"（不含 "task"），所以主要靠
   // title 前缀「task:」或「spawn subagent」识别。
   if (title.startsWith("task:") || title.startsWith("task：")) return true;
   if (title.includes("spawn subagent")) return true;
-  // raw_input 里带 subagent_type 字段的也算（grok 把派生目标放在 raw_input）。
   if (tc.rawInput && typeof tc.rawInput === "object") {
     const obj = tc.rawInput as Record<string, unknown>;
     if ("subagent_type" in obj || "subagentType" in obj) return true;

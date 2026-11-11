@@ -1,10 +1,4 @@
-/**
- * 计划编辑器纯函数 —— 对齐 WorkBuddy `cb-chat-ui/plan-editor` 的可编辑能力
- * (reorder / add / remove / set status / set priority)。
- *
- * 全部以不可变方式返回新 plan,便于单测与 React 状态更新。grok 的 ACP Plan
- * 每次 update 整体替换,本地编辑后由 PlanPanel setPlan 写回 session-store。
- */
+
 import type { Plan, PlanEntry, PlanEntryPriority, PlanEntryStatus } from "@/lib/types";
 
 /** 移动一条 entry 到新位置(0-based,越界 clamp)。返回新 plan。 */

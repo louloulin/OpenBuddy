@@ -1,13 +1,4 @@
-/**
- * 团队状态派生纯函数 —— 从会话 transcript 解析 create_team 工具调用，
- * 提取已创建的团队与成员信息。
- *
- * OpenBuddy 通过内嵌 MCP server（src-tauri/src/team_mcp.rs）提供
- * openbuddy__create_team / team_status / team_delete 工具（旧会话历史里是
- * 无前缀的原生名，两者都识别），由 LLM 调用。这里从 tool_call 的
- * rawInput + content（工具结果）派生出「当前已创建的团队列表」供
- * TeamStatusView 展示。纯函数、无副作用。
- */
+
 import type { ChatMessage } from "@/stores/session-store";
 
 /** 一个已创建的团队。 */

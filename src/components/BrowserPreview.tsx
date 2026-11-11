@@ -14,7 +14,7 @@ import {
   previewTitle,
   PREVIEW_SANDBOX,
 } from "@/lib/browser-preview";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/lib/ipc";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,

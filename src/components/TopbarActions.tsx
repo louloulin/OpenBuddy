@@ -7,14 +7,14 @@
  * 位置：main-topbar 右侧（标题旁边）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { save as saveDialog } from "@/lib/ipc";
 import { MoreDotsIcon, PinFilledIcon, ArchiveIcon } from "@/foundation/components/Icon/icons";
 import { useSessionStore } from "@/stores/session-store";
 import {
   exportTextFile,
-  grokSetSessionPinned,
-  grokSetSessionArchived,
-} from "@/lib/grok-client";
+  agentSetSessionPinned,
+  agentSetSessionArchived,
+} from "@/lib/agent-client";
 import { buildSessionMarkdown, sanitizeFilename } from "@/lib/export-markdown";
 
 interface TopbarActionsProps {
@@ -78,7 +78,7 @@ export function TopbarActions({
     setOpen(false);
     setBusy(true);
     try {
-      await grokSetSessionPinned(sessionId, !pinned);
+      await agentSetSessionPinned(sessionId, !pinned);
       onToast?.(pinned ? "已取消置顶" : "已置顶");
       onSessionsChanged?.({ pinned: !pinned });
     } catch (e) {
@@ -92,7 +92,7 @@ export function TopbarActions({
     setOpen(false);
     setBusy(true);
     try {
-      await grokSetSessionArchived(sessionId, true);
+      await agentSetSessionArchived(sessionId, true);
       onToast?.("已归档（可在侧栏筛选中找回）");
       onSessionsChanged?.({ archived: true });
     } catch (e) {

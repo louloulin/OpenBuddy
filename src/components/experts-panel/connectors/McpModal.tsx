@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   XCloseIcon, SearchIcon, ConfigureIcon, McpIcon, OpenExternalIcon, DeleteIcon,
 } from "@/foundation/components/Icon/icons";
-import { mcpDelete, mcpList, mcpToggle } from "@/lib/grok-client";
+import { mcpDelete, mcpList, mcpToggle } from "@/lib/agent-client";
 import { ensureSession } from "@/lib/ensure-session";
 import { useSessionStore } from "@/stores/session-store";
 import type { McpServerEntry } from "@/lib/types";

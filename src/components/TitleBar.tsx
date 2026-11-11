@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { win as windowControls } from "@/lib/ipc";
 import { XCloseIcon } from "@/foundation/components/Icon/icons";
 import logoMarkUrl from "@/assets/openbuddy-logo.svg";
 
@@ -54,12 +54,11 @@ const MaximizeIcon = ({ isMaximized }: { isMaximized: boolean }) => {
 
 async function win(action: "minimize" | "maximize" | "close") {
   try {
-    const w = getCurrentWindow();
-    if (action === "minimize") void w.minimize();
-    else if (action === "maximize") void w.toggleMaximize();
-    else void w.close();
+    const w = windowControls;
+    if (action === "minimize") await w.minimize();
+    else if (action === "maximize") await w.toggleMaximize();
+    else await w.close();
   } catch {
-    // 浏览器预览环境下无 Tauri 窗口,静默忽略
   }
 }
 
@@ -87,14 +86,7 @@ function insertTextAtFocus(text: string) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-/**
- * 自定义标题栏 - Tauri 2 无边框窗口
- *
- * 功能:
- * - 拖拽移动窗口 (data-tauri-drag-region)
- * - 品牌标识 + 菜单
- * - 窗口控制按钮 (最小化/最大化/关闭)
- */
+
 export function TitleBar({
   onPlaceholder,
   onShowAbout,
@@ -106,21 +98,16 @@ export function TitleBar({
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
-    const checkMaximized = async () => {
-      try {
-        const w = getCurrentWindow();
-        setIsMaximized(await w.isMaximized());
-
-        // 监听窗口状态变化
-        const unlisten = await w.onResized(async () => {
-          setIsMaximized(await w.isMaximized());
-        });
-        return unlisten;
-      } catch {
-        // 预览模式
-      }
+    let disposed = false;
+    const refresh = () => {
+      void windowControls.isMaximized().then(value => {
+        if (!disposed) setIsMaximized(value);
+      }).catch(() => {});
     };
-    checkMaximized();
+    let unlisten: (() => void) | undefined;
+    refresh();
+    try { unlisten = windowControls.onResized(refresh); } catch { /* Browser preview. */ }
+    return () => { disposed = true; unlisten?.(); };
   }, []);
 
   const runItem = (item: MenuItem) => {
@@ -132,7 +119,6 @@ export function TitleBar({
     if (item.edit) {
       // Editing commands operate on the focused editable element (textarea,
       // input). execCommand is deprecated but still the only API that works
-      // without a heavy editor framework, and it's well-supported in Tauri's
       // webview. For paste, prefer the async Clipboard API (execCommand paste
       // is blocked in non-secure contexts).
       if (item.edit === "paste") {
@@ -159,8 +145,8 @@ export function TitleBar({
   };
 
   return (
-    <div className="titlebar" data-tauri-drag-region>
-      <div className="titlebar__menus" data-tauri-drag-region>
+    <div className="titlebar" data-window-drag-region>
+      <div className="titlebar__menus" data-window-drag-region>
         <button
           className="titlebar__brand"
           onClick={() => onShowAbout?.()}
@@ -206,7 +192,7 @@ export function TitleBar({
       </div>
 
       {/* 弹性空间 - 用于拖拽 */}
-      <div className="titlebar__spacer" data-tauri-drag-region />
+      <div className="titlebar__spacer" data-window-drag-region />
 
       {/* 窗口控制按钮 */}
       <div className="titlebar__controls">

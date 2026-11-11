@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { Copy as CopyIcon } from "lucide-react";
 import type { ConnectorItem } from "@/lib/types";
-import { openUrl } from "@/lib/grok-client";
+import { openUrl } from "@/lib/agent-client";
 import { OpenExternalIcon } from "@/foundation/components/Icon/icons";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 

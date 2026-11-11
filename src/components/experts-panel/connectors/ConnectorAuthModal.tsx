@@ -1,10 +1,4 @@
-/**
- * OAuth-waiting modal — shown while grok drives the MCP browser OAuth flow
- * (x.ai/mcp/auth_trigger). grok opens the system browser itself; this modal
- * is the in-app "正在跳转授权" companion (mirrors workbuddy's redirect toast +
- * polling state), and surfaces the failure reason if the flow doesn't
- * complete.
- */
+
 import { useEffect, useRef } from "react";
 import type { ConnectorItem } from "@/lib/types";
 import { ConnectorIcon } from "../shared/ConnectorIcon";

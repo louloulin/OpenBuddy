@@ -6,8 +6,8 @@ import "@testing-library/jest-dom/vitest";
 const minimize = vi.fn();
 const toggleMaximize = vi.fn();
 const close = vi.fn();
-vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ minimize, toggleMaximize, close }),
+vi.mock("@/lib/ipc", () => ({
+  win: { minimize, toggleMaximize, close, isMaximized: () => Promise.resolve(false), onResized: () => () => {} },
 }));
 
 import { TitleBar } from "../TitleBar";

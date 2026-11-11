@@ -1,11 +1,4 @@
-/**
- * 插件面板 - 对接 grok 的 x.ai/plugins/list + x.ai/plugins/action
- *
- * 显示已安装的 grok 插件（含 skills/agents/hooks/mcp 计数），支持启用/禁用。
- * 对应 WorkBuddy 的 plugins-panel。
- *
- * 插件来源：~/.grok/plugins/、项目 .grok/plugins/、marketplace 安装。
- */
+
 import { useCallback, useEffect, useState } from "react";
 import {
   PuzzlePieceIcon,
@@ -15,7 +8,7 @@ import {
   AgentToolIcon,
   McpIcon,
 } from "@/foundation/components/Icon/icons";
-import { pluginsAction, pluginsList } from "@/lib/grok-client";
+import { pluginsAction, pluginsList } from "@/lib/agent-client";
 import type { PluginEntry } from "@/lib/types";
 
 interface PluginsPanelProps {

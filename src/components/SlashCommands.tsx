@@ -1,11 +1,6 @@
-/**
- * Slash 命令补全菜单 - Composer 输入 / 时弹出
- *
- * 数据来自 grok 的 `x.ai/commands/list`（builtin + skills + plugins 注入的命令）。
- * 用户选中后会把命令名插入到 Composer 输入框。
- */
+
 import { useEffect, useMemo, useRef, useState } from "react";
-import { commandsList } from "@/lib/grok-client";
+import { commandsList } from "@/lib/agent-client";
 import type { SlashCommand } from "@/lib/types";
 
 interface SlashCommandsProps {

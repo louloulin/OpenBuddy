@@ -6,7 +6,7 @@
  *  2. 展示该场景需要的能力（依赖哪些 skills / MCP / agents）
  *  3. 检查依赖是否已就绪（接 skillsList / mcpList / agentsList）
  *  4. 缺失的依赖可一键安装（接 marketplace install / 或引导到对应面板）
- *  5. 输入 prompt → 在新会话中运行（接 grokNewSession + grokSend）
+ *  5. 输入 prompt → 在新会话中运行（接 agentNewSession + agentSend）
  *
  * 与 WorkBuddy discover 的"1-click demo launcher"语义一致：
  * provision MCP + skill + expert，然后 run prompt。
@@ -26,7 +26,7 @@ import {
   agentsList,
   mcpList,
   skillsList,
-} from "@/lib/grok-client";
+} from "@/lib/agent-client";
 import type { AgentEntry, McpServerEntry, SkillInfo } from "@/lib/types";
 
 // 内置场景（对应 WorkBuddy browseByScene: 代码/文档/图片/表格/幻灯片/其他/官方）

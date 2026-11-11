@@ -1,12 +1,4 @@
-/**
- * 容器执行器抽象 —— WorkBuddy E2B 云沙箱 + cloud-agent 的本地可移植替代。
- *
- * WorkBuddy 用 E2B(e2b.dev)做远程代码执行(云端沙箱);OpenBuddy 是 BYOK 桌面应用,
- * 用本地 Docker 容器替代:在隔离的容器内执行命令/脚本,文件系统与宿主隔离。
- *
- * 纯函数核心(容器配置 + 命令构造 + 结果归一),ShellRunner 依赖注入便于单测。
- * 运行时:ShellRunner 实现 = Tauri shell 命令(child_process)。
- */
+
 
 /** 容器执行结果。 */
 export interface ContainerExecResult {
@@ -48,7 +40,7 @@ export const DEFAULT_CONTAINER_CONFIG: ContainerConfig = {
   memoryLimit: 128 * 1024 * 1024,
 };
 
-/** Shell 命令执行器(注入:运行时=Tauri shell,测试=mock)。 */
+
 export interface ShellRunner {
   /** 执行一条 shell 命令,返回 stdout/stderr/exitCode。 */
   run(command: string, opts?: { cwd?: string; timeout?: number }): Promise<{
@@ -141,10 +133,7 @@ export interface ContainerExecutor {
   exec(command: string, config?: Partial<ContainerConfig>): Promise<ContainerExecResult>;
 }
 
-/**
- * Docker 容器执行器:用 `docker run` 在隔离容器内执行命令。
- * ShellRunner 依赖注入(运行时=Tauri shell,测试=mock)。
- */
+
 export class DockerExecutor implements ContainerExecutor {
   readonly id = "docker";
   constructor(

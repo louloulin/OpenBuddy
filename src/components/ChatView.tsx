@@ -3,7 +3,7 @@ import { PauseIcon } from "@/foundation/components/Icon/icons";
 import { useSessionStore, type ToolCallView } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { createMarkdownHostConfig } from "@/lib/markdown-host";
-import { rewindExecute, rewindPoints } from "@/lib/grok-client";
+import { rewindExecute, rewindPoints } from "@/lib/agent-client";
 import {
   collectSessionArtifacts,
   findToolCall,
@@ -25,7 +25,7 @@ import { QueuePanel } from "./QueuePanel";
 import { WorkspacePicker } from "./WorkspacePicker";
 import { useMessageQueueStore } from "@/stores/message-queue-store";
 import { buildTimeline } from "@/lib/timeline-utils";
-import { formatGrokError } from "@/lib/error-format";
+import { formatAgentError } from "@/lib/error-format";
 import { useSubagentStore } from "@/stores/subagent-store";
 import {
   requestYield,
@@ -37,7 +37,7 @@ import {
 import type { ModelOption } from "./ModelSelector";
 import type { HomeModeId } from "./home-scenes";
 import type { AgentEntry } from "@/lib/types";
-import type { WorkspaceInfo } from "@/lib/grok-client";
+import type { WorkspaceInfo } from "@/lib/agent-client";
 
 /** Center chat column: scrollable message list + composer pinned at bottom. */
 export function ChatView({
@@ -95,7 +95,6 @@ export function ChatView({
   const handlePause = useCallback(() => {
     if (!sessionId || !streaming) return;
     setYieldStore((s) => requestYield(s, sessionId));
-    // grok 无原生 yield,用 cancel 软停止(保留会话);yield 状态在 complete 后确认。
     onCancel();
   }, [sessionId, streaming, onCancel]);
   const handleResume = useCallback(() => {
@@ -281,7 +280,7 @@ export function ChatView({
         {error && (
           <div className="chatview__error-banner" role="alert">
             <span className="chatview__error-text" style={{ whiteSpace: "pre-wrap" }}>
-              {formatGrokError(error) ?? error}
+              {formatAgentError(error) ?? error}
             </span>
             <button
               className="chatview__error-close"
@@ -388,34 +387,6 @@ export function ChatView({
             变更
           </button>
         )}
-        {/* 子代理运行时入口(对齐 WorkBuddy team-runtime)。 */}
-        {messages.length > 0 && (
-          <button
-            type="button"
-            className={
-              "chatview__artifacts-toggle" +
-              (subagentsOpen ? " chatview__artifacts-toggle--active" : "")
-            }
-            onClick={() => setSubagentsOpen((v) => !v)}
-            title="子代理运行时"
-          >
-            子代理
-          </button>
-        )}
-        {/* 团队状态入口：展示已创建的专家团（create_team 工具结果）。 */}
-        {messages.length > 0 && (
-          <button
-            type="button"
-            className={
-              "chatview__artifacts-toggle" +
-              (teamsOpen ? " chatview__artifacts-toggle--active" : "")
-            }
-            onClick={() => setTeamsOpen((v) => !v)}
-            title="团队状态"
-          >
-            团队
-          </button>
-        )}
         {/* 文件树入口(对齐 WorkBuddy fileTree 视图)：打开工作区面板的文件树视图。 */}
         {cwd && (
           <button
@@ -516,7 +487,7 @@ export function ChatView({
                     onOpenTool={handleOpenTool}
                     onEditResend={handleEditResend}
                     onRetry={
-                      isLastAssistant && !streaming && m.complete
+                      false && isLastAssistant && !streaming && m.complete
                         ? handleRetry
                         : undefined
                     }
@@ -564,16 +535,6 @@ export function ChatView({
             >
               <PauseIcon size="sm" style={{ verticalAlign: "text-bottom" }} /> 暂停
             </button>
-          )}
-          {/* Rewind / fork: 会话级工具，放在输入框正上方（不再漂浮到左上角挡标题栏）。 */}
-          {sessionId && !streaming && (
-            <RewindBar
-              sessionId={sessionId}
-              cwd={cwd}
-              onRewound={onRewound}
-              onForked={onForked}
-              onToast={onToast}
-            />
           )}
           {/* 消息队列(对齐 WorkBuddy message-queue):流式时可继续排队 prompt。
               非流式时面板为空(QueuePanel 内部 queue.length===0 直接 return null)。 */}

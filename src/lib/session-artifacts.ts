@@ -52,7 +52,6 @@ function extractPathsFromToolCall(tc: ToolCallView): string[] {
     }
   }
 
-  // rawInput may carry path / file / target fields from grok tools.
   if (tc.rawInput && typeof tc.rawInput === "object") {
     const o = tc.rawInput as Record<string, unknown>;
     for (const key of ["path", "file", "file_path", "filepath", "target", "filename"]) {

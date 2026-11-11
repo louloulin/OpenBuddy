@@ -1,15 +1,14 @@
 # Dependencies
 node_modules/
-pnpm-lock.yaml
 package-lock.json
 
 # Build output
 dist/
 dist-ssr/
 
-# Tauri / Rust
-src-tauri/target/
-src-tauri/gen/schemas/
+# Electron packages
+dist-electron/
+release/
 
 # Editor / OS
 .vscode/*

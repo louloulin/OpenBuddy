@@ -14,7 +14,7 @@ export interface RefItem {
   iconUrl?: string;
 }
 
-/** 项目下的真实对话（grok 会话）。 */
+
 export interface ProjectConversation {
   sessionId: string;
   title: string;
@@ -63,7 +63,7 @@ export interface ProjectMeta {
   tasks: TaskItem[];
   assets: AssetItem[];
   members: string[];
-  /** 项目下的真实对话（grok 会话列表），按创建时间倒序。 */
+  
   conversations: ProjectConversation[];
 }
 
