@@ -15,15 +15,26 @@ export const COMMANDS = [
   'notification_mark_read', 'notification_mark_all_read', 'notification_clear',
   'agents_defaults_get', 'agents_defaults_save', 'dialog_open', 'dialog_save', 'dialog_ask',
   'window_minimize', 'window_toggle_maximize', 'window_close', 'window_is_maximized',
+  'agent_get_model_state', 'agent_set_thinking_level', 'agent_resolve_ui',
+  'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue',
+  'agent_fork_session', 'agent_extensions_list', 'agent_extensions_add',
+  'agent_extensions_remove', 'agent_extensions_set_enabled',
 ] as const;
 export const EVENTS = [
   'agent://update', 'agent://tool', 'agent://complete', 'agent://queue', 'agent://compaction',
   'agent://retry', 'agent://session-info', 'agent://permission', 'agent://error',
   'agent://event', 'agent://summary', 'agent://turn-error', 'agent://folder-trust',
   'agent://permission-mode', 'agent://models-update', 'agent://mcp-status', 'window://resized',
+  'agent://model-state', 'agent://ui-request', 'agent://ui-dismiss', 'agent://ui-notification', 'agent://ui-state',
 ] as const;
 export type CommandName = typeof COMMANDS[number];
 export type EventName = typeof EVENTS[number];
+export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+export interface ModelIdentity { providerId: string; modelId: string; modelKey: string }
+export interface ModelState extends ModelIdentity { sessionId: string; thinkingLevel: ThinkingLevel; availableThinkingLevels: ThinkingLevel[] }
+export interface UiRequest { sessionId: string; requestId: string; kind: 'select' | 'confirm' | 'input' | 'editor'; title: string; options?: string[]; message?: string; placeholder?: string; initialValue?: string; timeoutMs?: number }
+export interface UiResolution { sessionId: string; requestId: string; value?: string | boolean; cancelled?: boolean }
+export interface AttachmentReference { path: string }
 export type Payload = Record<string, unknown>;
 export type CommandHandlers = Record<string, (payload: Payload) => unknown | Promise<unknown>>;
 export const isCommand = (value: unknown): value is CommandName => typeof value === 'string' && (COMMANDS as readonly string[]).includes(value);
@@ -46,4 +57,47 @@ export function validatePayload(input: unknown): Payload {
   };
   visit(input, 0);
   return input as Payload;
+}
+
+/** Validate the renderer's new capability requests before trusted data is injected. */
+export function validateCommandPayload(command: CommandName, input: unknown): Payload {
+  const payload = validatePayload(input);
+  const string = (key: string, max = 4096, optional = false) => {
+    const value = payload[key];
+    if (optional && (value === undefined || value === null)) return;
+    if (typeof value !== 'string' || !value.trim() || value.length > max || value.includes('\0')) throw new Error(`invalid_payload: ${key}`);
+  };
+  const thinking = (key: string, optional = false) => {
+    const value = payload[key];
+    if (optional && (value === undefined || value === null)) return;
+    if (!['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(String(value))) throw new Error(`invalid_payload: ${key}`);
+  };
+  if (['agent_get_model_state', 'agent_set_model', 'agent_set_thinking_level', 'agent_resolve_ui', 'agent_resolve_question', 'agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue', 'agent_fork_session'].includes(command)) string('sessionId', 256);
+  if (command === 'agent_set_model' || command === 'agent_new_session') {
+    string('modelId', 4096, command === 'agent_new_session');
+    string('providerId', 512, true);
+    if (command === 'agent_new_session') thinking('thinkingLevel', true);
+  }
+  if (command === 'providers_delete_model') { string('modelId'); string('providerId', 512, true); }
+  if (command === 'agent_set_thinking_level') thinking('level');
+  if (command === 'agent_resolve_ui' || command === 'agent_resolve_question') {
+    string('requestId', 256);
+    if (payload.cancelled !== undefined && typeof payload.cancelled !== 'boolean') throw new Error('invalid_payload: cancelled');
+    if (payload.value !== undefined && typeof payload.value !== 'string' && typeof payload.value !== 'boolean') throw new Error('invalid_payload: value');
+    if (typeof payload.value === 'string' && payload.value.length > 1024 * 1024) throw new Error('invalid_payload: value too long');
+    if (!payload.cancelled && payload.value === undefined) throw new Error('invalid_payload: missing UI response');
+  }
+  if (['agent_send', 'agent_steer', 'agent_follow_up'].includes(command)) {
+    if ('images' in payload) throw new Error('invalid_payload: renderer image bytes are forbidden');
+    if (payload.text !== undefined && typeof payload.text !== 'string') throw new Error('invalid_payload: text');
+    if (payload.attachments !== undefined) {
+      if (!Array.isArray(payload.attachments) || payload.attachments.length > 8) throw new Error('invalid_payload: attachments');
+      for (const value of payload.attachments) {
+        if (!value || typeof value !== 'object' || Array.isArray(value) || typeof value.path !== 'string' || !value.path || value.path.length > 4096 || value.path.includes('\0') || Object.keys(value).some(key => key !== 'path')) throw new Error('invalid_payload: attachment path');
+      }
+    }
+  }
+  if (command === 'agent_extensions_add' || command === 'agent_extensions_remove') string('path');
+  if (command === 'agent_extensions_set_enabled' && typeof payload.enabled !== 'boolean') throw new Error('invalid_payload: enabled');
+  return payload;
 }

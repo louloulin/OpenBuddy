@@ -1,6 +1,6 @@
 import { dialog, ipcMain, type BrowserWindow, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
 import { writeFile } from 'node:fs/promises';
-import { isCommand, validatePayload, type CommandHandlers, type Payload } from '../shared/contract.js';
+import { isCommand, validateCommandPayload, type CommandHandlers, type Payload } from '../shared/contract.js';
 
 function dialogOptions(payload: Payload): OpenDialogOptions & SaveDialogOptions {
   const result: OpenDialogOptions & SaveDialogOptions = {};
@@ -52,7 +52,7 @@ export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, tr
     const frame = event.senderFrame;
     if (event.sender !== window.webContents || !frame || frame !== window.webContents.mainFrame || frame.url.split('#')[0] !== trustedURL) throw new Error('untrusted_sender');
     if (!isCommand(command)) throw new Error(`not_implemented: ${String(command).slice(0, 128)}`);
-    const payload = validatePayload(input);
+    const payload = validateCommandPayload(command, input);
     if (workspaces && ['agent_init', 'agent_new_session'].includes(command) && payload.cwd != null) {
       if (typeof payload.cwd !== 'string' || !await workspaces.allows(payload.cwd)) throw new Error('workspace_not_authorized: select a folder using the native dialog');
     }

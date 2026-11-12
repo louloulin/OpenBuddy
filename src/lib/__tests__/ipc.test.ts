@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { subscribeAgentEvents } from "../agent-client";
+import { flattenModels, subscribeAgentEvents } from "../agent-client";
 import { createDesktopDirectoryReader } from "../desktop-kb-reader";
 import { invoke, listen, dialog, getPathForFile, win, type OpenBuddyBridge } from "../ipc";
 
@@ -16,6 +16,11 @@ const installBridge = () => {
 };
 afterEach(() => { delete window.openbuddy; });
 describe("Electron renderer bridge", () => {
+  it("distinguishes same model slugs across providers including encoded slashes", () => {
+    const rows = flattenModels({ providers: [{ id: "a/b", providerKind: "custom", label: "First" }, { id: "a", providerKind: "custom", label: "Second" }], models: [{ modelId: "shared/model", providerId: "a/b", input: ["text", "image"], reasoning: true }, { modelId: "shared/model", providerId: "a" }] });
+    expect(rows.map(row => row.id)).toEqual(["model:a%2Fb/shared%2Fmodel", "model:a/shared%2Fmodel"]);
+    expect(rows[0]).toMatchObject({ modelId: "shared/model", providerLabel: "First", reasoning: true, input: ["text", "image"] });
+  });
   it("fails explicitly without preload", async () => {
     await expect(invoke("agent_init")).rejects.toThrow("preload bridge is unavailable");
   });
@@ -56,6 +61,23 @@ describe("Electron renderer bridge", () => {
     expect(updates).toHaveLength(3);
     unlisten();
     expect(released).toHaveBeenCalledOnce();
+  });
+
+  it("forwards extension errors with their session identity and releases the error listener", async () => {
+    const bridge = installBridge();
+    let extensionError: ((payload: unknown) => void) | undefined;
+    const releaseError = vi.fn();
+    vi.mocked(bridge.listen).mockImplementation((event, callback) => {
+      if (event === "agent://error") { extensionError = callback; return releaseError; }
+      return () => {};
+    });
+    const errors: unknown[] = [];
+    const unsubscribe = await subscribeAgentEvents({ onTurnError: error => errors.push(error) });
+    expect(extensionError).toBeTypeOf("function");
+    extensionError?.({ sessionId: "background-session", message: "MCP extension failed" });
+    expect(errors).toEqual([{ sessionId: "background-session", kind: "error", detail: "MCP extension failed" }]);
+    unsubscribe();
+    expect(releaseError).toHaveBeenCalledOnce();
   });
 
   it("reads knowledge sources with bounded file commands and directory kind mapping", async () => {

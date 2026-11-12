@@ -58,7 +58,7 @@ export function ChatView({
   onCancel: () => void;
   modelId?: string;
   models?: ModelOption[];
-  onModelChange?: (id: string) => void;
+  onModelChange?: (id: string) => void | Promise<void>;
   cwd?: string;
   workspaces?: WorkspaceInfo[];
   onSelectWorkspace?: (cwd: string) => void;

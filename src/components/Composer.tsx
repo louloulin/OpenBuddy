@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Mic, X, type LucideIcon } from "lucide-react";
 import { open as openDialog } from "@/lib/ipc";
 import { getPathForFile } from "@/lib/ipc";
 import { ChevronDownIcon, SendPlaneIcon } from "@/foundation/components/Icon/icons";
-import { ModelSelector, type ModelOption } from "./ModelSelector";
+import { ModelRuntimeContext, ModelSelector, type ModelOption } from "./ModelSelector";
 import { ThumbImg } from "./experts-panel/shared/ThumbImg";
 import { ContextUsagePill } from "./ContextUsagePill";
 import { estimateSendCost } from "@/lib/token-estimate";
@@ -109,7 +109,7 @@ export function Composer({
   modelId?: string;
   /** Available models for the picker. */
   models?: ModelOption[];
-  onModelChange?: (id: string) => void;
+  onModelChange?: (id: string) => void | Promise<void>;
   /** Currently active working directory. */
   cwd?: string;
   workspaces?: WorkspaceInfo[];
@@ -156,6 +156,7 @@ export function Composer({
   /** Triggers pill re-fetch when messages change. */
   usageMsgCount?: number;
 }) {
+  const modelControls = useContext(ModelRuntimeContext);
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
   // 发送前成本预估(对齐 WorkBuddy credit-estimate):纯本地 token 估算。
@@ -336,7 +337,7 @@ export function Composer({
   const send = () => {
     const t = text.trim();
     // 允许空消息发送，或者需要有附件
-    if (streaming || disabled || !apiReady) {
+    if (streaming || disabled || !apiReady || modelControls.busy || modelControls.canSend === false) {
       console.log('Send blocked:', { streaming, disabled, apiReady });
       return;
     }
@@ -654,6 +655,7 @@ export function Composer({
           {usageSessionId && <ContextUsagePill sessionId={usageSessionId} onRefreshSignal={usageMsgCount} />}
           {showModelPicker ? (
             <ModelSelector
+              disabled={streaming || disabled}
               modelId={modelId}
               models={models!}
               onModelChange={onModelChange!}
@@ -692,7 +694,7 @@ export function Composer({
                     e.stopPropagation();
                     enqueue();
                   }}
-                  disabled={disabled || !apiReady}
+                  disabled={disabled || !apiReady || modelControls.busy || modelControls.canSend === false}
                   aria-label="加入待发送队列"
                   title="加入待发送队列(agent 完成后自动发送)"
                 >
@@ -722,7 +724,7 @@ export function Composer({
                 e.stopPropagation();
                 send();
               }}
-              disabled={disabled || !apiReady}
+              disabled={disabled || !apiReady || modelControls.busy || modelControls.canSend === false}
               aria-label="发送"
               title={!apiReady ? "请先配置 API Key" : "发送消息"}
             >

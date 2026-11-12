@@ -50,7 +50,7 @@ interface PlaceholderPageProps {
   /** 本地助理页：模型选择器（与聊天页一致）。 */
   modelId?: string;
   models?: ModelOption[];
-  onModelChange?: (id: string) => void;
+  onModelChange?: (id: string) => void | Promise<void>;
   /** 项目页：进入项目（新建会话并注入说明）。 */
   onStartProject?: (project: ProjectMeta) => void;
   

@@ -25,6 +25,17 @@ describe("Pi transcript events", () => {
     expect(useSessionStore.getState().streaming).toBe(false);
   });
 
+  it("keeps retry and compaction events busy without surfacing a terminal error", () => {
+    useSessionStore.getState().startStreaming();
+    for (const type of ["auto_retry_start", "auto_retry_end", "auto_compaction_start", "auto_compaction_end", "compaction_start", "compaction_end", "agent_end"]) {
+      emit({ type });
+      expect(useSessionStore.getState().streaming).toBe(true);
+      expect(useSessionStore.getState().error).toBeNull();
+    }
+    emit({ type: "agent_settled" });
+    expect(useSessionStore.getState().streaming).toBe(false);
+  });
+
   it("does not route late events into the newly selected session", () => {
     useSessionStore.getState().setSession("B");
     emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "old" }] } }, "A");

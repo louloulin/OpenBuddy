@@ -18,7 +18,9 @@ const secureStorage = {
   decryptString: (value: Buffer) =>
     value.toString().split("").reverse().join(""),
 };
-async function fixture() {
+async function fixture(
+  options: { rateLimitOnce?: boolean; highUsageRequest?: number } = {},
+) {
   const root = await mkdtemp(join(tmpdir(), "openbuddy-sdk-"));
   cleanups.push(() => rm(root, { recursive: true, force: true }));
   const requests: unknown[] = [];
@@ -27,6 +29,22 @@ async function fixture() {
     for await (const part of req) body += part;
     const data = JSON.parse(body);
     requests.push(data);
+    if (options.rateLimitOnce && requests.length === 1) {
+      res.writeHead(429, {
+        "Content-Type": "application/json",
+        "Retry-After": "0",
+      });
+      res.end(
+        JSON.stringify({
+          error: {
+            message: "rate limit fixture",
+            type: "rate_limit_error",
+            code: "rate_limit_exceeded",
+          },
+        }),
+      );
+      return;
+    }
     const messages = data.messages as Array<{ role: string; content?: string }>;
     const userContent =
       messages.findLast((m) => m.role === "user")?.content ?? "";
@@ -82,7 +100,7 @@ async function fixture() {
     }
     if (data.stream_options?.include_usage)
       res.write(
-        `data: ${JSON.stringify({ id: "fixture", object: "chat.completion.chunk", created: 1, model: "fixture", choices: [], usage: { prompt_tokens: 11, completion_tokens: 3, total_tokens: 14, prompt_tokens_details: { cached_tokens: 2 } } })}\n\n`,
+        `data: ${JSON.stringify({ id: "fixture", object: "chat.completion.chunk", created: 1, model: "fixture", choices: [], usage: { prompt_tokens: options.highUsageRequest === requests.length ? 24000 : 11, completion_tokens: 3, total_tokens: options.highUsageRequest === requests.length ? 24003 : 14, prompt_tokens_details: { cached_tokens: 2 } } })}\n\n`,
       );
     res.end("data: [DONE]\n\n");
   });
@@ -182,6 +200,57 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
         cwd: f.root,
       }),
     ).rejects.toThrow();
+  });
+  it("retries a real 429 response and settles only after successful recovery", async () => {
+    const f = await fixture({ rateLimitOnce: true });
+    await f.call("agent_send", { sessionId: f.sid, text: "retry test" });
+    expect(f.requests.length).toBeGreaterThanOrEqual(2);
+    const events = f.events
+      .filter((e) => e.name === "agent://event")
+      .map((e) => e.payload.event);
+    expect(events.some((e) => e.type === "auto_retry_start")).toBe(true);
+    expect(events.some((e) => e.type === "auto_retry_end" && e.success)).toBe(
+      true,
+    );
+    expect(events.filter((e) => e.type === "agent_settled")).toHaveLength(1);
+    expect(events.at(-1)).toMatchObject({
+      type: "agent_settled",
+      aborted: false,
+    });
+    expect(
+      events.some(
+        (e) =>
+          e.type === "message_end" &&
+          e.message?.role === "assistant" &&
+          e.message.stopReason === "stop",
+      ),
+    ).toBe(true);
+    expect(f.events.some((e) => e.name === "agent://turn-error")).toBe(false);
+  }, 15000);
+  it("automatically compacts local history before its final settled event", async () => {
+    const f = await fixture({ highUsageRequest: 2 });
+    await f.call("agent_send", { sessionId: f.sid, text: "A".repeat(90000) });
+    f.events.length = 0;
+    await f.call("agent_send", { sessionId: f.sid, text: "B".repeat(90000) });
+    const events = f.events
+      .filter((e) => e.name === "agent://event")
+      .map((e) => e.payload.event);
+    expect(
+      events.some(
+        (e) => e.type === "compaction_start" && e.reason === "threshold",
+      ),
+    ).toBe(true);
+    expect(
+      events.some((e) => e.type === "compaction_end" && !e.aborted && e.result),
+    ).toBe(true);
+    expect(events.filter((e) => e.type === "agent_settled")).toHaveLength(1);
+    expect(events.at(-1)).toMatchObject({
+      type: "agent_settled",
+      aborted: false,
+    });
+    expect(
+      await f.call("agent_session_info", { sessionId: f.sid }),
+    ).toMatchObject({ context: { compactionCount: 1 } });
   });
   it("executes the real read tool only after an explicit matching permission", async () => {
     const f = await fixture();

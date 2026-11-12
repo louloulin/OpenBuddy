@@ -42,6 +42,21 @@ it("inherits known vision and context capabilities for built-in model ids under 
     cost: { input: 2.5, output: 10 },
   });
 });
+it('preserves two providers with the same slash-containing model slug and rejects ambiguous legacy identities',async()=>{
+  const p=await setup();
+  for(const id of ['first/provider','second'])await p.saveProvider({id,providerKind:'custom',baseUrl:'http://127.0.0.1:1234/v1'});
+  await p.saveModel({providerId:'first/provider',modelId:'org/shared'});
+  await p.saveModel({providerId:'second',modelId:'org/shared'});
+  expect(p.list().models).toHaveLength(2);
+  expect(()=>p.model('org/shared')).toThrow(/ambiguous/);
+  expect(p.model('org/shared','second')?.provider).toBe('second');
+  const first=p.list().models.find(m=>m.providerId==='first/provider')!;
+  expect(first.modelKey).toBe('model:first%2Fprovider/org%2Fshared');
+  expect(p.model(first.modelKey)?.provider).toBe('first/provider');
+  await expect(p.deleteModel('org/shared')).rejects.toThrow(/ambiguous/);
+  await p.deleteModel('org/shared','second');
+  expect(p.list().models).toHaveLength(1);expect(p.model('org/shared')?.provider).toBe('first/provider');
+});
 it("preserves explicit custom capabilities and rejects invalid model fields without saving them", async () => {
   const p = await setup();
   await p.saveProvider({

@@ -5,17 +5,23 @@ import {
   SettingsManager,
   type AgentSession,
   type SessionInfo,
+  type ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
 import { mkdir, realpath, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, relative, isAbsolute, sep } from "node:path";
-import { Providers } from "../services/providers.js";
+import { Providers, modelKey } from "../services/providers.js";
+import { ExtensionUiBridge } from './ui.js';
+export type ThinkingLevel=Parameters<AgentSession['setThinkingLevel']>[0];
+export function validateThinkingLevel(value:unknown):ThinkingLevel {if(typeof value!=='string'||!['off','minimal','low','medium','high','xhigh'].includes(value))throw Error('invalid_thinking_level');return value as ThinkingLevel;}
+type PromptImages=NonNullable<Parameters<AgentSession['prompt']>[1]>['images'];
 import { SkillsService } from "../services/skills.js";
 import { McpService } from "../services/mcp.js";
 import type { Settings } from "../services/settings.js";
 import { Permissions, type Emit } from "./permissions.js";
 export class PiEngine {
   readonly permissions: Permissions;
+  readonly ui: ExtensionUiBridge;
   readonly providers: Providers;
   readonly skills: SkillsService;
   readonly mcp: McpService;
@@ -29,9 +35,11 @@ export class PiEngine {
     readonly settings: Settings,
     readonly emit: Emit,
     openUrl: (url: string) => Promise<void>,
+    private extensionFactories: ExtensionFactory[] = [],
   ) {
     this.cwd = join(settings.dir, "inbox");
     this.permissions = new Permissions(settings, emit);
+    this.ui = new ExtensionUiBridge(emit);
     this.providers = new Providers(settings);
     this.skills = new SkillsService(settings);
     this.mcp = new McpService(settings, openUrl, emit);
@@ -52,6 +60,8 @@ export class PiEngine {
       cwd: this.cwd,
       agentVersion: "1.5.2",
       defaultModelId: this.providers.model()?.id,
+      defaultProviderId: this.providers.model()?.provider,
+      defaultModelKey: this.providers.model()?modelKey(this.providers.model()!.provider,this.providers.model()!.id):undefined,
     };
   }
   private async validCwd(path: string) {
@@ -66,8 +76,13 @@ export class PiEngine {
       throw Error("会话未加载");
     return this.session;
   }
-  private async replace(manager: SessionManager, modelId?: string) {
+  private async replace(manager: SessionManager, modelId?: string, providerId?:string, thinkingLevel?:ThinkingLevel) {
     if (this.transitioning) throw Error("会话切换正在进行");
+    const savedContext=manager.buildSessionContext();
+    const model=modelId?this.providers.model(modelId,providerId):savedContext.model?this.providers.model(savedContext.model.modelId,savedContext.model.provider):this.providers.model();
+    if(!model)throw Error('model_not_found: 请先配置提供商和模型');
+    if(!this.providers.runtime.hasConfiguredAuth(model.provider))throw Error('model_auth_missing: 模型提供商尚未认证');
+    const requestedThinking=thinkingLevel??(manager.getEntries().some(e=>e.type==='thinking_level_change')?validateThinkingLevel(savedContext.thinkingLevel):this.settings.config.read().defaults.defaultThinkingLevel?validateThinkingLevel(this.settings.config.read().defaults.defaultThinkingLevel):undefined);
     this.transitioning = true;
     try {
       await this.shutdown();
@@ -77,7 +92,7 @@ export class PiEngine {
         .trustedFolders.includes(this.cwd);
       if (!trusted) this.emit("agent://folder-trust", { cwd: this.cwd });
       const sdkSettings = SettingsManager.inMemory(
-        { retry: { enabled: false }, compaction: { enabled: false } },
+        {},
         { projectTrusted: trusted },
       );
       const loader = new DefaultResourceLoader({
@@ -124,19 +139,28 @@ export class PiEngine {
       });
       this.session = session;
       const sessionId = session.sessionId;
+      let finalError: string | undefined;
       this.unsubscribe = session.subscribe((event) => {
         this.emit("agent://event", { sessionId, event });
+        if (event.type === "agent_start") finalError = undefined;
         if (
           event.type === "message_end" &&
-          event.message.role === "assistant" &&
-          ["error", "aborted"].includes(event.message.stopReason)
+          event.message.role === "assistant"
         ) {
-          if (event.message.stopReason === "error")
-            this.emit("agent://turn-error", {
-              sessionId,
-              kind: "error",
-              detail: event.message.errorMessage ?? "模型请求失败",
-            });
+          finalError =
+            event.message.stopReason === "error"
+              ? (event.message.errorMessage ?? "模型请求失败")
+              : undefined;
+        }
+        // An errored attempt may still be retried or recovered by compaction.
+        // Report a terminal error only once the SDK has completely settled.
+        if (event.type === "agent_settled" && !event.aborted && finalError) {
+          this.emit("agent://turn-error", {
+            sessionId,
+            kind: "error",
+            detail: finalError,
+          });
+          finalError = undefined;
         }
       });
       await session.bindExtensions({

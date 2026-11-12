@@ -126,7 +126,11 @@ export interface AppSettings {
     defaultModel: string;
     defaultPermission: string;
     rememberToolApprovals?: boolean;
+    defaultProviderId?: string;
+    defaultThinkingLevel?: string;
   };
+  extensionPaths?: string[];
+  extensionsEnabled?: boolean;
   skillPaths: string[];
   disabledSkills: string[];
   trustedFolders: string[];

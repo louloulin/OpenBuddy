@@ -1,3 +1,12 @@
+export interface ModelState {
+  sessionId: string;
+  providerId: string;
+  modelId: string;
+  modelKey: string;
+  thinkingLevel: string;
+  availableThinkingLevels: string[];
+}
+
 
 
 // ---------- content blocks ----------
@@ -171,6 +180,10 @@ export interface ContextInfo {
 export interface SessionInfoResponse {
   sessionId: string;
   cwd: string;
+  providerId?: string;
+  modelKey?: string;
+  thinkingLevel?: string;
+  availableThinkingLevels?: string[];
   model?: string | null;
   modelDisplayName?: string;
   context: ContextInfo;
@@ -552,6 +565,8 @@ export interface InspirationStarted {
 export interface AgentDefaults {
   
   defaultModel: string;
+  defaultProviderId?: string;
+  defaultThinkingLevel?: string;
   /** Default permission selection (`[ui] default_selected_permission`). */
   defaultPermission: string;
   /** Show "Always allow" options on prompts (`[ui] remember_tool_approvals`). */

@@ -31,7 +31,7 @@ export function LocalAssistantView({
   /** 模型选择器（与聊天页 Composer 一致；缺省时退化为静态 Auto 按钮）。 */
   modelId?: string;
   models?: ModelOption[];
-  onModelChange?: (id: string) => void;
+  onModelChange?: (id: string) => void | Promise<void>;
 }) {
   // 本地助理页草稿(哨兵 key):离开再回来未发送的字还在。
   const draft = useSessionsStore((s) => s.drafts[ASSISTANT_DRAFT_KEY] ?? "");

@@ -1,3 +1,5 @@
+import type { ModelState } from "./types";
+export type { ModelState } from "./types";
 
 import { invoke } from "@/lib/ipc";
 import { listen, type UnlistenFn } from "@/lib/ipc";
@@ -61,6 +63,8 @@ export interface InitResult {
   agentVersion?: string;
   /** Default model id the agent will use. */
   defaultModelId?: string;
+  defaultProviderId?: string;
+  defaultModelKey?: string;
 }
 
 
@@ -87,8 +91,8 @@ export async function agentNewSession(cwd: string, modelId?: string): Promise<st
 // session store. So this command returns nothing — callers just need to
 // clear the local transcript first, then await this to confirm the agent
 // accepted the load.
-export async function agentLoadSession(sessionId: string, cwd: string): Promise<void> {
-  await invoke<void>("agent_load_session", { sessionId, cwd });
+export async function agentLoadSession(sessionId: string, cwd: string): Promise<ModelState> {
+  return invoke<ModelState>("agent_load_session", { sessionId, cwd });
 }
 
 export async function agentListSessions(cwd: string): Promise<SessionSummary[]> {
@@ -111,9 +115,12 @@ export async function agentListWorkspaces(): Promise<WorkspaceInfo[]> {
 }
 
 
-export async function agentSetModel(sessionId: string, modelId: string): Promise<void> {
-  await invoke<void>("agent_set_model", { sessionId, modelId });
+export async function agentSetModel(sessionId: string, modelId: string, providerId?: string): Promise<ModelState> {
+  return invoke<ModelState>("agent_set_model", { sessionId, modelId, providerId });
 }
+
+export const agentGetModelState = (sessionId: string) => invoke<ModelState>("agent_get_model_state", { sessionId });
+export const agentSetThinkingLevel = (sessionId: string, level: string) => invoke<ModelState>("agent_set_thinking_level", { sessionId, level });
 
 /** Send a user prompt; streamed updates arrive via the events below. */
 export async function agentSend(sessionId: string, text: string): Promise<void> {
@@ -252,6 +259,8 @@ export interface ModelProviderEntry {
  * fields; connection config lives on the provider.
  */
 export interface ModelEntry {
+  modelKey?: string;
+  availableThinkingLevels?: string[];
   /** The `[model.<id>]` key AND the model slug sent in requests. */
   modelId: string;
   /** References a ModelProviderEntry.id. */
@@ -281,6 +290,12 @@ export interface ProviderListModel {
  */
 export interface ModelOptionRow {
   id: string;
+  modelId: string;
+  providerLabel: string;
+  reasoning?: boolean;
+  input?: ("text" | "image")[];
+  contextWindow?: number;
+  availableThinkingLevels?: string[];
   label: string;
   providerKind: ProviderKind;
   providerId: string;
@@ -291,7 +306,13 @@ export function flattenModels(list: ProviderListModel): ModelOptionRow[] {
   return list.models.map((m) => {
     const provider = list.providers.find((p) => p.id === m.providerId);
     return {
-      id: m.modelId,
+      id: m.modelKey ?? `model:${encodeURIComponent(m.providerId)}/${encodeURIComponent(m.modelId)}`,
+      modelId: m.modelId,
+      providerLabel: provider?.label || provider?.id || m.providerId,
+      reasoning: m.reasoning,
+      input: m.input,
+      contextWindow: m.contextWindow ?? provider?.contextWindow,
+      availableThinkingLevels: m.availableThinkingLevels,
       label: m.name || m.modelId,
       providerKind: (provider?.providerKind ?? "custom") as ProviderKind,
       providerId: m.providerId,
@@ -1007,6 +1028,7 @@ export async function listDir(
 
 export interface AgentEventListeners { unlisten: UnlistenFn }
 export async function subscribeAgentEvents(handlers: {
+  onModelState?: (state: ModelState) => void;
   onUpdate?: (event: SessionUpdate) => void;
   onPermission?: (request: PermissionRequest) => void;
   onComplete?: (complete: PromptComplete) => void;
@@ -1035,7 +1057,11 @@ export async function subscribeAgentEvents(handlers: {
     await wire("agent://folder-trust", handlers.onFolderTrust);
     await wire("agent://permission-mode", handlers.onPermissionMode);
     await wire("agent://models-update", handlers.onModelsUpdate);
+    await wire("agent://model-state", handlers.onModelState);
     await wire("agent://turn-error", handlers.onTurnError);
+    await wire<{ sessionId: string; message: string }>("agent://error", handlers.onTurnError
+      ? ({ sessionId, message }) => handlers.onTurnError!({ sessionId, kind: "error", detail: message })
+      : undefined);
     return () => unlisteners.forEach(unlisten => unlisten());
   } catch (error) {
     unlisteners.forEach(unlisten => unlisten());
