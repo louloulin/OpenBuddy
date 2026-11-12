@@ -40,7 +40,7 @@ import type {
   TurnErrorEvent,
 } from "./types";
 
-import type { QuestionRequest } from "@/stores/question-store";
+import type { QuestionRequest, UiDismissReason } from "@/stores/question-store";
 
 // ---------- commands ----------
 
@@ -65,6 +65,7 @@ export interface InitResult {
   defaultModelId?: string;
   defaultProviderId?: string;
   defaultModelKey?: string;
+  invalidDefault?: boolean;
 }
 
 
@@ -123,9 +124,16 @@ export const agentGetModelState = (sessionId: string) => invoke<ModelState>("age
 export const agentSetThinkingLevel = (sessionId: string, level: string) => invoke<ModelState>("agent_set_thinking_level", { sessionId, level });
 
 /** Send a user prompt; streamed updates arrive via the events below. */
-export async function agentSend(sessionId: string, text: string): Promise<void> {
-  await invoke<void>("agent_send", { sessionId, text });
+export async function agentSend(sessionId: string, text: string, attachments?: { path: string }[]): Promise<void> {
+  await invoke<void>("agent_send", { sessionId, text, ...(attachments?.length ? { attachments } : {}) });
 }
+
+export interface AgentQueue { steering: string[]; followUp: string[] }
+export const agentGetQueue = (sessionId: string) => invoke<AgentQueue>("agent_get_queue", { sessionId });
+export const agentClearQueue = (sessionId: string) => invoke<AgentQueue>("agent_clear_queue", { sessionId });
+export const agentSteer = (sessionId: string, text: string, attachments?: { path: string }[]) => invoke<AgentQueue>("agent_steer", { sessionId, text, ...(attachments?.length ? { attachments } : {}) });
+export const agentFollowUp = (sessionId: string, text: string, attachments?: { path: string }[]) => invoke<AgentQueue>("agent_follow_up", { sessionId, text, ...(attachments?.length ? { attachments } : {}) });
+export const agentForkSession = (sessionId: string) => invoke<string>("agent_fork_session", { sessionId });
 
 export async function agentCancel(sessionId: string): Promise<void> {
   await invoke<void>("agent_cancel", { sessionId });
@@ -198,6 +206,14 @@ export async function agentResolvePermission(
     cancelled: outcome.cancelled ?? false,
   });
 }
+
+export const agentResolveUi = (payload: { requestId: string; sessionId: string; value?: string | boolean; cancelled?: boolean }) => invoke<void>("agent_resolve_ui", payload);
+export type ExtensionUiState =
+  | { sessionId: string; kind: "status"; key: string; text?: string }
+  | { sessionId: string; kind: "working"; message?: string; visible?: boolean }
+  | { sessionId: string; kind: "title"; title: string }
+  | { sessionId: string; kind: "widget"; key: string; lines?: string[]; placement?: "aboveEditor" | "belowEditor" }
+  | { sessionId: string; kind: "editor"; action: "set" | "paste"; text: string };
 
 export async function agentResolveQuestion(
   requestId: string,
@@ -336,8 +352,8 @@ export async function providersDeleteProvider(id: string): Promise<void> {
   await invoke<void>("providers_delete_provider", { id });
 }
 
-export async function providersDeleteModel(modelId: string): Promise<void> {
-  await invoke<void>("providers_delete_model", { modelId });
+export async function providersDeleteModel(modelId: string, providerId?: string): Promise<void> {
+  await invoke<void>("providers_delete_model", { modelId, providerId });
 }
 
 /** One model entry returned by a provider's GET /models endpoint. */
@@ -1038,6 +1054,9 @@ export async function subscribeAgentEvents(handlers: {
   onPermissionMode?: (payload: unknown) => void;
   onModelsUpdate?: (payload: unknown) => void;
   onQuestion?: (question: QuestionRequest) => void;
+  onUiDismiss?: (event: { requestId: string; sessionId: string; reason: UiDismissReason }) => void;
+  onUiState?: (event: ExtensionUiState) => void;
+  onUiNotification?: (event: { sessionId: string; message: string; severity: "info" | "warning" | "error" }) => void;
   onAgentDied?: (payload: { reason: string }) => void;
   onTurnError?: (error: TurnErrorEvent) => void;
 }): Promise<UnlistenFn> {
@@ -1052,6 +1071,10 @@ export async function subscribeAgentEvents(handlers: {
       if (event.type === "agent_settled" && !event.replay) handlers.onComplete?.({ sessionId, promptId: "", stopReason: event.aborted ? "cancelled" : "end_turn" });
     });
     await wire("agent://permission", handlers.onPermission);
+    await wire("agent://ui-request", handlers.onQuestion);
+    await wire("agent://ui-dismiss", handlers.onUiDismiss);
+    await wire("agent://ui-state", handlers.onUiState);
+    await wire("agent://ui-notification", handlers.onUiNotification);
     await wire("agent://summary", handlers.onSummary);
     await wire("agent://mcp-status", handlers.onMcpStatus);
     await wire("agent://folder-trust", handlers.onFolderTrust);

@@ -566,6 +566,7 @@ export interface AgentDefaults {
   
   defaultModel: string;
   defaultProviderId?: string;
+  invalidDefault?: boolean;
   defaultThinkingLevel?: string;
   /** Default permission selection (`[ui] default_selected_permission`). */
   defaultPermission: string;

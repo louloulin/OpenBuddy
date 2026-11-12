@@ -1,3 +1,4 @@
+import { useExtensionUiStore } from "@/stores/extension-ui-store";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { PauseIcon } from "@/foundation/components/Icon/icons";
 import { useSessionStore, type ToolCallView } from "@/stores/session-store";
@@ -22,7 +23,8 @@ import { TeamStatusView } from "./TeamStatusView";
 import { ShareMenu } from "./ShareMenu";
 import { QueuePanel } from "./QueuePanel";
 import { WorkspacePicker } from "./WorkspacePicker";
-import { useMessageQueueStore } from "@/stores/message-queue-store";
+import { usePiQueueStore } from "@/stores/pi-queue-store";
+import { agentSteer, agentFollowUp } from "@/lib/agent-client";
 import { buildTimeline } from "@/lib/timeline-utils";
 import { formatAgentError } from "@/lib/error-format";
 import { useSubagentStore } from "@/stores/subagent-store";
@@ -54,7 +56,7 @@ export function ChatView({
   onSelectExpert,
   onNavigateConnectors,
 }: {
-  onSend: (text: string) => void;
+  onSend: (text: string, attachments?: { path: string }[]) => void | Promise<void>;
   onCancel: () => void;
   modelId?: string;
   models?: ModelOption[];
@@ -78,6 +80,7 @@ export function ChatView({
   const error = useSessionStore((s) => s.error);
   const plan = useSessionStore((s) => s.plan);
   const sessionId = useSessionStore((s) => s.sessionId);
+  const extensionUi = useExtensionUiStore(state => sessionId ? state.sessions[sessionId] : undefined);
   // 会话内查找(对齐 WorkBuddy chat-search)。
   const [findOpen, setFindOpen] = useState(false);
   const [findHits, setFindHits] = useState<string[]>([]);
@@ -137,6 +140,14 @@ export function ChatView({
     setResendText(text);
     setResendNonce((n) => n + 1);
   }, []);
+
+  useEffect(() => {
+    if (!extensionUi?.editor || !sessionId) return;
+    const editor = extensionUi.editor;
+    const draft = useSessionsStore.getState().drafts[sessionId] ?? "";
+    setResendText(editor.action === "paste" ? draft + editor.text : editor.text);
+    setResendNonce(value => value + 1);
+  }, [extensionUi?.editor, sessionId]);
 
   // ---- 消息级"重试":回溯到最后一条用户 prompt 并重新发送（重新生成回复） ----
   const [retrying, setRetrying] = useState(false);
@@ -499,6 +510,12 @@ export function ChatView({
           {/* Inline permission / question cards: session-scoped, never block sidebar. */}
           <PermissionInlineCard sessionId={sessionId} />
           <QuestionInlineCard sessionId={sessionId} />
+          {extensionUi && <aside className="extension-status" aria-label="扩展状态">
+            {extensionUi.title && <strong>{extensionUi.title}</strong>}
+            {extensionUi.working && <p role="status">{extensionUi.working}</p>}
+            {Object.entries(extensionUi.status).map(([key, text]) => <p key={key} role="status">{text}</p>)}
+            {Object.entries(extensionUi.widgets).map(([key, lines]) => <pre key={key}>{lines.join("\n")}</pre>)}
+          </aside>}
           {/* pause/yield:已暂停横幅 + 恢复按钮(对齐 WorkBuddy session:requestYield)。 */}
           {yielded && (
             <div className="yield-banner" role="status">
@@ -537,7 +554,7 @@ export function ChatView({
           {/* 消息队列(对齐 WorkBuddy message-queue):流式时可继续排队 prompt。
               非流式时面板为空(QueuePanel 内部 queue.length===0 直接 return null)。 */}
           {sessionId && (
-            <QueuePanel sessionId={sessionId} onSendNow={(t) => onSend(t)} />
+            <QueuePanel key={sessionId} sessionId={sessionId} />
           )}
           <Composer
             streaming={streaming}

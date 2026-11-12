@@ -38,8 +38,10 @@ describe("ModelSelector identities and asynchronous selection", () => {
     open();
     fireEvent.click(within(screen.getByRole("group", { name: "Provider B" })).getByRole("option", { name: /Shared model/ }));
     expect(screen.getByRole("status")).toHaveTextContent("切换中");
-    reject(new Error("API rejected model"));
-    expect(await screen.findByRole("alert")).toHaveTextContent("API rejected model");
+    reject(new Error("Error invoking remote method 'openbuddy:invoke': Error: model_auth_missing: 提供商尚未认证"));
+    const error = await screen.findByRole("alert");
+    expect(error).toHaveTextContent("该提供商尚未配置 API Key，请先在设置中配置");
+    expect(error).not.toHaveTextContent("openbuddy:invoke");
     expect(within(screen.getByRole("group", { name: "Provider A" })).getByRole("option", { name: /Shared model/ })).toHaveAttribute("aria-selected", "true");
     await waitFor(() => expect(within(screen.getByRole("group", { name: "Provider B" })).getByRole("option", { name: /Shared model/ })).toBeEnabled());
   });

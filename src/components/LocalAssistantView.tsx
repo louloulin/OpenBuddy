@@ -23,7 +23,7 @@ export function LocalAssistantView({
   models,
   onModelChange,
 }: {
-  onSend: (text: string) => void;
+  onSend: (text: string, attachments?: { path: string }[]) => void | Promise<void>;
   streaming: boolean;
   apiReady: boolean;
   onOpenSettings?: () => void;

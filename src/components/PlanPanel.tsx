@@ -36,7 +36,7 @@ const PRIORITY_CYCLE: PlanEntryPriority[] = ["high", "medium", "low"];
 
 interface PlanPanelProps {
   sessionId?: string;
-  onSend?: (text: string) => void;
+  onSend?: (text: string, attachments?: { path: string }[]) => void | Promise<void>;
   onToast?: (msg: string) => void;
 }
 

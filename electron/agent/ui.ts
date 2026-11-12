@@ -6,6 +6,7 @@ type Kind='select'|'confirm'|'input'|'editor';
 type Reason='resolved'|'cancelled'|'timeout'|'aborted'|'session_closed';
 type DialogOptions=Parameters<ExtensionUIContext['input']>[2];
 export class ExtensionUiBridge {
+ private epochs=new Map<string,symbol>();
  private pending=new Map<string,{sessionId:string;kind:Kind;options?:string[];finish:(value:string|boolean|undefined,reason:Reason)=>void}>();
  constructor(private emit:Emit,private timeoutMs=120000){}
  private request(sessionId:string,kind:Kind,title:string,fields:Record<string,unknown>,opts?:DialogOptions):Promise<string|boolean|undefined>{
@@ -34,16 +35,19 @@ export class ExtensionUiBridge {
    if(pending.kind==='select'&&!pending.options?.includes(String(p.value)))throw Error('select必须返回已提供的选项');
    pending.finish(p.value as string|boolean,'resolved');
  }
- cancel(sessionId?:string,reason:Reason='cancelled'){for(const p of [...this.pending.values()])if(!sessionId||p.sessionId===sessionId)p.finish(undefined,reason);}
+ cancel(sessionId?:string,reason:Reason='cancelled'){if(sessionId)this.epochs.delete(sessionId);else this.epochs.clear();for(const p of [...this.pending.values()])if(!sessionId||p.sessionId===sessionId)p.finish(undefined,reason);}
  context(sessionId:string):ExtensionUIContext {
-   const state=(kind:string,fields:Record<string,unknown>)=>this.emit('agent://ui-state',{sessionId,kind,...fields});
+   this.cancel(sessionId,'aborted');const epoch=Symbol();this.epochs.set(sessionId,epoch);
+   const active=()=>this.epochs.get(sessionId)===epoch;
+   const ask=(kind:Kind,title:string,fields:Record<string,unknown>,opts?:DialogOptions)=>active()?this.request(sessionId,kind,title,fields,opts):Promise.resolve(kind==='confirm'?false:undefined);
+   const state=(kind:string,fields:Record<string,unknown>)=>active()&&this.emit('agent://ui-state',{sessionId,kind,...fields});
    const unsupported=(name:string):never=>{throw Error(`not_implemented: desktop extension UI ${name}`);};
    const supported:Partial<ExtensionUIContext>={
-     select:async(title,options,opts)=>await this.request(sessionId,'select',title,{options:[...options]},opts) as string|undefined,
-     confirm:async(title,message,opts)=>await this.request(sessionId,'confirm',title,{message},opts) as boolean,
-     input:async(title,placeholder,opts)=>await this.request(sessionId,'input',title,{placeholder},opts) as string|undefined,
-     editor:async(title,initialValue)=>await this.request(sessionId,'editor',title,{initialValue}) as string|undefined,
-     notify:(message,severity='info')=>this.emit('agent://ui-notification',{sessionId,message,severity}),
+     select:async(title,options,opts)=>await ask('select',title,{options:[...options]},opts) as string|undefined,
+     confirm:async(title,message,opts)=>await ask('confirm',title,{message},opts) as boolean,
+     input:async(title,placeholder,opts)=>await ask('input',title,{placeholder},opts) as string|undefined,
+     editor:async(title,initialValue)=>await ask('editor',title,{initialValue}) as string|undefined,
+     notify:(message,severity='info')=>{if(active())this.emit('agent://ui-notification',{sessionId,message,severity});},
      setStatus:(key,value)=>state('status',{key,text:value}),
      setWorkingMessage:message=>state('working',{message}),setWorkingVisible:visible=>state('working',{visible}),
      setTitle:title=>state('title',{title}),

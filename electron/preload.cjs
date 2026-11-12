@@ -2,8 +2,27 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 // Generated from the shared contract by build-electron.mjs.
 const commands = new Set(/* COMMANDS */ []);
 const events = new Set(/* EVENTS */ []);
-const invoke = (command, payload) => {
-  if (!commands.has(command)) return Promise.reject(new Error(`not_implemented: ${command}`));
+const nativeFileGrants = new Map();
+const getPathForFile = file => {
+  const path = webUtils.getPathForFile(file);
+  if (!path) throw new Error('native_file_required');
+  if (nativeFileGrants.size >= 256) nativeFileGrants.delete(nativeFileGrants.keys().next().value);
+  const pending = ipcRenderer.invoke('openbuddy:grant-file', path).then(() => true, () => false);
+  nativeFileGrants.set(path, pending);
+  return path;
+};
+const invoke = async (command, payload) => {
+  if (!commands.has(command)) throw new Error(`not_implemented: ${command}`);
+  if (command === 'agent_extensions_add') {
+    const pending = nativeFileGrants.get(payload?.path);
+    if (pending && !await pending) throw new Error('native_file_grant_failed: select the file again');
+  }
+  if (['agent_send', 'agent_steer', 'agent_follow_up'].includes(command) && Array.isArray(payload?.attachments)) {
+    for (const reference of payload.attachments) {
+      const pending = nativeFileGrants.get(reference?.path);
+      if (pending && !await pending) throw new Error('native_file_grant_failed: select the file again');
+    }
+  }
   return ipcRenderer.invoke('openbuddy:invoke', command, payload);
 };
 const listen = (event, callback) => {
@@ -27,5 +46,5 @@ contextBridge.exposeInMainWorld('openbuddy', Object.freeze({
     isMaximized: () => invoke('window_is_maximized'),
     onResized: callback => listen('window://resized', callback),
   }),
-  getPathForFile: file => webUtils.getPathForFile(file),
+  getPathForFile,
 }));

@@ -211,6 +211,9 @@ export function formatAgentError(raw: string): string | null {
  * Falls back to String(e) if the error can't be parsed.
  */
 export function friendlyError(e: unknown): string {
-  const raw = String(e);
+  const raw = String(e).replace(/^(?:Error:\s*)?Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "").replace(/^Error:\s*/, "");
+  if (raw.includes("model_auth_missing")) return "该提供商尚未配置 API Key，请先在设置中配置";
+  if (raw.includes("model_ambiguous")) return "存在同名模型，请明确选择提供商后重试";
+  if (raw.includes("model_not_found")) return "该模型已不可用，请在设置中检查配置或重新选择";
   return formatAgentError(raw) ?? raw;
 }

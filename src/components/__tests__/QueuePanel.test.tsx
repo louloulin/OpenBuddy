@@ -1,87 +1,30 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueuePanel } from "../QueuePanel";
-import { useMessageQueueStore } from "@/stores/message-queue-store";
-
-const resetStore = () => useMessageQueueStore.setState({ queues: {} });
-
-describe("QueuePanel", () => {
-  beforeEach(resetStore);
-
-  it("空队列时不渲染", () => {
-    const { container } = render(<QueuePanel sessionId="s1" />);
-    expect(container.firstChild).toBeNull();
+import { agentClearQueue, agentGetQueue } from "@/lib/agent-client";
+vi.mock("@/lib/agent-client", () => ({ agentGetQueue: vi.fn(), agentClearQueue: vi.fn() }));
+beforeEach(() => { vi.resetAllMocks(); vi.mocked(agentGetQueue).mockResolvedValue({ steering: ["steer item"], followUp: ["next turn"] }); });
+describe("Pi queue panel", () => {
+  it("shows real steering and follow-up queues as distinct modes", async () => {
+    render(<QueuePanel sessionId="A" />);
+    expect(await screen.findByText("steer item")).toBeInTheDocument();
+    expect(screen.getByText("next turn")).toBeInTheDocument();
+    expect(screen.getByText(/下一工具边界引导/)).toBeInTheDocument();
+    expect(screen.getByText(/回复完成后继续/)).toBeInTheDocument();
   });
-
-  it("渲染队列条目并显示序号与文本", () => {
-    const s = useMessageQueueStore.getState();
-    s.enqueue("s1", "第一条");
-    s.enqueue("s1", "第二条");
-    render(<QueuePanel sessionId="s1" />);
-    expect(screen.getByText("待发送队列(2)")).toBeInTheDocument();
-    expect(screen.getByText("第一条")).toBeInTheDocument();
-    expect(screen.getByText("第二条")).toBeInTheDocument();
+  it("only clears displayed items after the backend confirms its actual queue", async () => {
+    vi.mocked(agentClearQueue).mockResolvedValue({ steering: ["steer item"], followUp: ["next turn"] });
+    render(<QueuePanel sessionId="A" />); await screen.findByText("steer item");
+    vi.mocked(agentGetQueue).mockResolvedValue({ steering: [], followUp: [] });
+    fireEvent.click(screen.getByRole("button", { name: "清空 Pi 队列" }));
+    await waitFor(() => expect(screen.queryByText("steer item")).toBeNull());
+    expect(agentClearQueue).toHaveBeenCalledWith("A");
   });
-
-  it("删除按钮从队列移除条目", () => {
-    const s = useMessageQueueStore.getState();
-    s.enqueue("s1", "第一条");
-    render(<QueuePanel sessionId="s1" />);
-    fireEvent.click(screen.getByRole("button", { name: "删除" }));
-    expect(useMessageQueueStore.getState().getQueue("s1")).toHaveLength(0);
-  });
-
-  it("点击文本进入编辑,Enter 提交修改", () => {
-    const s = useMessageQueueStore.getState();
-    s.enqueue("s1", "原文");
-    render(<QueuePanel sessionId="s1" />);
-    fireEvent.click(screen.getByText("原文"));
-    const edit = screen.getByRole("textbox") as HTMLTextAreaElement;
-    fireEvent.change(edit, { target: { value: "改后" } });
-    fireEvent.keyDown(edit, { key: "Enter", shiftKey: false });
-    expect(useMessageQueueStore.getState().getQueue("s1")[0].text).toBe("改后");
-  });
-
-  it("暂停/恢复切换状态", () => {
-    const s = useMessageQueueStore.getState();
-    s.enqueue("s1", "条目");
-    render(<QueuePanel sessionId="s1" />);
-    const toggle = screen.getByRole("button", { name: "暂停" });
-    fireEvent.click(toggle);
-    expect(useMessageQueueStore.getState().getQueue("s1")[0].status).toBe("paused");
-    // 切换后按钮文案变为「恢复」。
-    fireEvent.click(screen.getByRole("button", { name: "恢复" }));
-    expect(useMessageQueueStore.getState().getQueue("s1")[0].status).toBe("queued");
-  });
-
-  it("上移/下移调整顺序", () => {
-    const s = useMessageQueueStore.getState();
-    s.enqueue("s1", "a");
-    s.enqueue("s1", "b");
-    render(<QueuePanel sessionId="s1" />);
-    // 第二条上移。
-    const ups = screen.getAllByRole("button", { name: "上移" });
-    fireEvent.click(ups[1]);
-    expect(
-      useMessageQueueStore.getState().getQueue("s1").map((i) => i.text),
-    ).toEqual(["b", "a"]);
-  });
-
-  it("立即发送:移除条目并回调 onSendNow", () => {
-    const s = useMessageQueueStore.getState();
-    s.enqueue("s1", "马上发");
-    const onSendNow = vi.fn();
-    render(<QueuePanel sessionId="s1" onSendNow={onSendNow} />);
-    fireEvent.click(screen.getByRole("button", { name: "立即发送" }));
-    expect(onSendNow).toHaveBeenCalledWith("马上发");
-    expect(useMessageQueueStore.getState().getQueue("s1")).toHaveLength(0);
-  });
-
-  it("paused 条目的立即发送按钮禁用", () => {
-    const s = useMessageQueueStore.getState();
-    const id = s.enqueue("s1", "暂停的");
-    s.setStatus("s1", id, "paused");
-    render(<QueuePanel sessionId="s1" onSendNow={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "立即发送" })).toBeDisabled();
+  it("keeps queue items visible and allows retry when clearing fails", async () => {
+    vi.mocked(agentClearQueue).mockRejectedValue(new Error("busy"));
+    render(<QueuePanel sessionId="A" />); await screen.findByText("steer item");
+    fireEvent.click(screen.getByRole("button", { name: "清空 Pi 队列" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("busy");
+    expect(screen.getByText("steer item")).toBeInTheDocument();
   });
 });

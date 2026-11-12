@@ -5,17 +5,15 @@ import {
   type QuestionRequest,
 } from "../question-store";
 
-const resetStore = () => useQuestionStore.setState({ queues: {} });
+const resetStore = () => useQuestionStore.setState({ queues: {}, notices: {} });
 
 function makeQuestion(requestId: string, sessionId: string): QuestionRequest {
   return {
     requestId,
     sessionId,
-    toolCallId: `tc-${requestId}`,
     title: `Question ${requestId}`,
-    questions: [
-      { id: "q1", question: "选择方案", options: ["A", "B", "C"] },
-    ],
+    kind: "select",
+    options: ["A", "B", "C"],
   };
 }
 
@@ -43,9 +41,9 @@ describe("question-store", () => {
     expect(useQuestionStore.getState().queues["s2"]).toHaveLength(1);
   });
 
-  it("sessionId 为空时兜底到 __global", () => {
+  it("sessionId 为空时拒绝未归属请求", () => {
     useQuestionStore.getState().request(makeQuestion("r1", ""));
-    expect(useQuestionStore.getState().queues["__global"]).toHaveLength(1);
+    expect(useQuestionStore.getState().queues).toEqual({});
   });
 
   it("dismiss 指定 sessionId 只移除该会话中的", () => {

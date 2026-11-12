@@ -390,6 +390,7 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
     setMsg(null);
     try {
       await providersSaveModel({
+        ...original,
         modelId: original!.modelId,
         providerId,
         name: name.trim() || undefined,
@@ -408,7 +409,7 @@ function ModelsSettingsPanel({ onModelsChanged }: { onModelsChanged?: () => void
     if (!confirm(`删除模型「${m.name || m.modelId}」？`)) return;
     setMsg(null);
     try {
-      await providersDeleteModel(m.modelId);
+      await providersDeleteModel(m.modelId, m.providerId);
       onModelsChanged?.();
       await reload();
       setMsg({ kind: "ok", text: "已删除。" });

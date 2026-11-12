@@ -1,3 +1,4 @@
+import { useAgentModelStore } from "@/stores/agent-model-store";
 /**
  * Settings 面板的各个真实分区。
  *
@@ -965,6 +966,7 @@ export function AssistantSettingsPanel() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const knownModelState = useAgentModelStore(state => Object.values(state.states).find(model => model.modelKey === draft.defaultModel));
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -998,10 +1000,10 @@ export function AssistantSettingsPanel() {
   const handleSave = async () => {
     setBusy(true);
     try {
-      await agentsDefaultsSave({ defaultModel: draft.defaultModel, defaultPermission: draft.defaultPermission });
+      await agentsDefaultsSave({ defaultModel: draft.defaultModel, defaultPermission: draft.defaultPermission, defaultThinkingLevel: draft.defaultThinkingLevel });
       setDefaults(draft);
       setDirty(false);
-      setMsg("已保存（重启 agent 后生效）");
+      setMsg("已保存，之后新建的会话将使用此默认配置。");
     } catch (e) {
       setMsg(`保存失败：${String(e).replace(/^Error:\s*/, "")}`);
     } finally {
@@ -1039,7 +1041,7 @@ export function AssistantSettingsPanel() {
                 <option value="">首个已配置模型</option>
                 {providers.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.label}（{p.id}）
+                    {p.providerLabel} / {p.label}
                   </option>
                 ))}
               </select>
@@ -1048,6 +1050,14 @@ export function AssistantSettingsPanel() {
           <p className="settings-hint">
             未指定时使用已配置的第一个可用模型。
           </p>
+
+          <div className="settings-row">
+            <label htmlFor="default-thinking-level">新会话默认思考等级</label>
+            {knownModelState ? <select id="default-thinking-level" value={draft.defaultThinkingLevel ?? ""} onChange={event => update({ defaultThinkingLevel: event.target.value || undefined })}>
+              <option value="">使用 Pi 默认等级</option>
+              {knownModelState.availableThinkingLevels.map(level => <option key={level} value={level}>{level}</option>)}
+            </select> : <span>{draft.defaultThinkingLevel ?? "使用 Pi 默认等级"}；打开此模型的会话后可选择其实际支持等级。</span>}
+          </div>
 
           {/* 默认权限选择 */}
           <div className="settings-row">

@@ -27,8 +27,18 @@ describe("Electron DOM file drop", () => {
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "查看文件" } });
     fireEvent.click(screen.getByRole("button", { name: "发送" }));
     expect(base.onSend.mock.calls[0][0]).toContain("/workspace/a.ts");
+    expect(base.onSend.mock.calls[0][1]).toEqual([{ path: "/workspace/a.ts" }, { path: "/workspace/b.md" }]);
     expect(screen.queryByText("a.ts")).toBeNull();
   });
+  it("retains an image and explains when the selected model lacks image input", () => {
+    render(<Composer {...base} modelId="text-only" models={[{ id: "text-only", input: ["text"] }]} />);
+    drop("photo.png");
+    fireEvent.click(screen.getByRole("button", { name: "发送" }));
+    expect(base.onSend).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("图片");
+    expect(screen.getByText("photo.png")).toBeInTheDocument();
+  });
+
   it("does not attach dropped files while streaming or disabled", () => {
     render(<Composer {...base} streaming />);
     drop("blocked.ts");

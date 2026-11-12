@@ -1,61 +1,44 @@
 import { create } from "zustand";
 
-export interface QuestionItem {
-  id: string;
-  question: string;
-  options: string[];
-}
-
 export interface QuestionRequest {
   requestId: string;
   sessionId: string;
-  toolCallId: string;
+  kind: "select" | "confirm" | "input" | "editor";
   title: string;
-  questions: QuestionItem[];
-  timeout?: number;
+  options?: string[];
+  message?: string;
+  placeholder?: string;
+  initialValue?: string;
+  /** Reserved for a future extension source; Pi's input API currently has no secret option. */
+  secret?: boolean;
+  timeoutMs?: number;
+  expiresAt?: number;
 }
-
+export type UiDismissReason = "resolved" | "cancelled" | "timeout" | "aborted" | "session_closed";
 interface QuestionState {
-  /** sessionId → ordered queue of pending question requests. */
   queues: Record<string, QuestionRequest[]>;
-  /** Push a new question request from the backend. */
-  request: (q: QuestionRequest) => void;
-  /** Remove a question from its session's queue. */
-  dismiss: (requestId: string, sessionId?: string) => void;
+  notices: Record<string, string>;
+  request: (request: QuestionRequest) => void;
+  dismiss: (requestId: string, sessionId?: string, reason?: UiDismissReason) => void;
 }
-
-export const useQuestionStore = create<QuestionState>((set) => ({
-  queues: {},
-  request: (q) =>
-    set((s) => {
-      const sid = q.sessionId || "__global";
-      const prev = s.queues[sid] ?? [];
-      return { queues: { ...s.queues, [sid]: [...prev, q] } };
-    }),
-  dismiss: (requestId, sessionId) =>
-    set((s) => {
-      if (sessionId) {
-        const prev = s.queues[sessionId];
-        if (!prev) return s;
-        return {
-          queues: {
-            ...s.queues,
-            [sessionId]: prev.filter((q) => q.requestId !== requestId),
-          },
-        };
-      }
-      const queues = { ...s.queues };
-      for (const sid of Object.keys(queues)) {
-        queues[sid] = queues[sid].filter((q) => q.requestId !== requestId);
-      }
-      return { queues };
-    }),
+export const useQuestionStore = create<QuestionState>(set => ({
+  queues: {}, notices: {},
+  request: request => set(state => {
+    if (!request.sessionId || !request.requestId) return state;
+    const current = state.queues[request.sessionId] ?? [];
+    if (current.some(item => item.requestId === request.requestId)) return state;
+    const expiresAt = request.timeoutMs !== undefined ? Date.now() + Math.max(0, request.timeoutMs) : undefined;
+    return { queues: { ...state.queues, [request.sessionId]: [...current, { ...request, expiresAt }] }, notices: { ...state.notices, [request.sessionId]: "" } };
+  }),
+  dismiss: (requestId, sessionId, reason) => set(state => {
+    const queues = { ...state.queues }; const notices = { ...state.notices };
+    for (const sid of sessionId ? [sessionId] : Object.keys(queues)) {
+      if (!queues[sid]?.some(request => request.requestId === requestId)) continue;
+      queues[sid] = queues[sid].filter(request => request.requestId !== requestId);
+      if (reason === "timeout") notices[sid] = "输入请求已超时。";
+      else if (reason === "cancelled" || reason === "aborted" || reason === "session_closed") notices[sid] = "输入请求已取消。";
+    }
+    return { queues, notices };
+  }),
 }));
-
-/** Select the first pending question for a given session. */
-export const selectQuestionForSession =
-  (sessionId: string | null) =>
-  (s: QuestionState): QuestionRequest | null => {
-    if (!sessionId) return null;
-    return s.queues[sessionId]?.[0] ?? null;
-  };
+export const selectQuestionForSession = (sessionId: string | null) => (state: QuestionState): QuestionRequest | null => sessionId ? state.queues[sessionId]?.[0] ?? null : null;

@@ -40,7 +40,7 @@ interface PlaceholderPageProps {
   /** Discover launcher: open a new session + send prompt (optionally with agent). */
   onLaunch?: (prompt: string, agent?: AgentEntry) => void;
   /** 本地助理页：发送消息（新建会话）。 */
-  onSend?: (text: string) => void;
+  onSend?: (text: string, attachments?: { path: string }[]) => void | Promise<void>;
   /** 本地助理页：是否流式中。 */
   streaming?: boolean;
   /** 本地助理页：API 是否就绪。 */

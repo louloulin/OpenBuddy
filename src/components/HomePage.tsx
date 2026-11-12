@@ -59,7 +59,7 @@ export function HomePage({
   onSelectExpert,
   onNavigateConnectors,
 }: {
-  onSend: (text: string) => void;
+  onSend: (text: string, attachments?: { path: string }[]) => void | Promise<void>;
   streaming: boolean;
   apiReady: boolean;
   onOpenSettings: () => void;

@@ -294,7 +294,8 @@ export class Providers {
     const data = this.catalog.read();
     data.providers = data.providers.filter((p) => p.id !== id);
     const config=this.settings.config.read();
-    if(config.defaults.defaultProviderId===id||data.models.some(m=>m.providerId===id&&(config.defaults.defaultModel===modelKey(id,m.modelId)||config.defaults.defaultModel===m.modelId))){config.defaults.defaultModel='';delete config.defaults.defaultProviderId;this.settings.config.write(config);}
+    const removedDefault=data.models.find(m=>m.providerId===id&&(config.defaults.defaultModel===modelKey(id,m.modelId)||(config.defaults.defaultModel===m.modelId&&(!config.defaults.defaultProviderId||config.defaults.defaultProviderId===id))));
+    if(removedDefault){config.defaults.defaultModel=modelKey(id,removedDefault.modelId);config.defaults.defaultProviderId=id;this.settings.config.write(config);}
     data.models = data.models.filter((m) => m.providerId !== id);
     this.settings.secrets.set(`provider:${id}`, undefined);
     await this.runtime.removeRuntimeApiKey(id);
@@ -307,7 +308,7 @@ export class Providers {
     data.models = data.models.filter((m) => m.modelId !== selected.modelId || m.providerId !== selected.providerId);
     this.catalog.write(data);
     const config=this.settings.config.read();
-    if(config.defaults.defaultModel===modelKey(selected.providerId,selected.modelId)||config.defaults.defaultModel===selected.modelId){config.defaults.defaultModel='';delete config.defaults.defaultProviderId;this.settings.config.write(config);}
+    if(config.defaults.defaultModel===modelKey(selected.providerId,selected.modelId)||(config.defaults.defaultModel===selected.modelId&&(!config.defaults.defaultProviderId||config.defaults.defaultProviderId===selected.providerId))){config.defaults.defaultModel=modelKey(selected.providerId,selected.modelId);config.defaults.defaultProviderId=selected.providerId;this.settings.config.write(config);}
     await this.sync();
   }
   entry(id?:string,providerId?:string):Model|undefined {
@@ -324,9 +325,11 @@ export class Providers {
   }
   defaults() {
     const defaults=this.settings.config.read().defaults;
-    if(!defaults.defaultModel)return {...defaults,defaultProviderId:undefined};
-    const entry=this.entry(defaults.defaultModel,defaults.defaultProviderId);if(!entry)throw Error('default_model_not_found: 默认模型不存在');
-    return {...defaults,defaultModel:modelKey(entry.providerId,entry.modelId),defaultProviderId:entry.providerId};
+    if(!defaults.defaultModel)return {...defaults,defaultProviderId:undefined,invalidDefault:false};
+    let entry:Model|undefined;
+    try{entry=this.entry(defaults.defaultModel,defaults.defaultProviderId);}catch{return {...defaults,invalidDefault:true};}
+    if(!entry)return {...defaults,invalidDefault:true};
+    return {...defaults,defaultModel:modelKey(entry.providerId,entry.modelId),defaultProviderId:entry.providerId,invalidDefault:false};
   }
   async authStatus() {
     const list = this.list();

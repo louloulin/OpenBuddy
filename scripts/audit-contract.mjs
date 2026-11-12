@@ -1,6 +1,6 @@
 import ts from 'typescript';
-import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { readdir, writeFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 const root = new URL('../', import.meta.url).pathname;
 async function files(dir) {
   const result = [];

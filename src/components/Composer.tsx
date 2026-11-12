@@ -92,7 +92,7 @@ export function Composer({
 }: {
   streaming: boolean;
   disabled?: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string, attachments?: { path: string }[]) => void | Promise<void>;
   onCancel: () => void;
   placeholder?: string;
   apiReady?: boolean;
@@ -146,7 +146,7 @@ export function Composer({
   /** 加号菜单:跳转到连接器管理面板。 */
   onNavigateConnectors?: () => void;
   /** 流式时把「发送」改为「加入待发送队列」(对齐 WorkBuddy message-queue)。 */
-  onEnqueue?: (text: string) => void;
+  onEnqueue?: (text: string, attachments?: { path: string }[], mode?: "steer" | "followUp") => void | Promise<void>;
   /** Name of the expert currently bound to this session (shown as badge in footer). */
   activeExpertName?: string;
   /** Local avatar path for the expert badge. */
@@ -159,6 +159,17 @@ export function Composer({
   const modelControls = useContext(ModelRuntimeContext);
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
+  const [sendError, setSendError] = useState("");
+  const [queueMode, setQueueMode] = useState<"steer" | "followUp">("followUp");
+  const [queueBusy, setQueueBusy] = useState(false);
+  const scopeRef = useRef(draftKey); scopeRef.current = draftKey;
+  const validateAttachments = () => {
+    const hasImages = attachments.some(path => /\.(png|jpe?g|gif|webp)$/i.test(path));
+    if (hasImages && !models?.find(model => model.id === modelId)?.input?.includes("image")) {
+      setSendError("当前模型不支持图片输入，请选择支持图片的模型后重试。"); return false;
+    }
+    return true;
+  };
   // 发送前成本预估(对齐 WorkBuddy credit-estimate):纯本地 token 估算。
   // ctxUsed/ctxTotal 由 ContextUsagePill 异步获取,这里不耦合;徽章在占比未知时
   // 仍显示 +N(新增 token),有占比信息时叠加(此处保守不取,避免与 pill 抢请求)。
@@ -338,10 +349,10 @@ export function Composer({
     const t = text.trim();
     // 允许空消息发送，或者需要有附件
     if (streaming || disabled || !apiReady || modelControls.busy || modelControls.canSend === false) {
-      console.log('Send blocked:', { streaming, disabled, apiReady });
       return;
     }
-    // don't model yet; ResourceLink behavior is unverified — text is safest).
+    if (!validateAttachments()) return;
+    setSendError("");
     let body = t;
     if (attachments.length > 0) {
       const fileList = attachments.map((p) => `- ${p}`).join("\n");
@@ -353,8 +364,16 @@ export function Composer({
     if (sceneTag) {
       body = body ? `【${sceneTag.label}】${body}` : `【${sceneTag.label}】`;
     }
-    console.log('Sending:', body || '(empty message)');
-    onSend(body || "你好");
+    const sentScope = draftKey;
+    try {
+      const result = attachments.length ? onSend(body || "你好", attachments.map(path => ({ path }))) : onSend(body || "你好");
+      void Promise.resolve(result).catch(() => {
+        if (scopeRef.current !== sentScope) return;
+        updateText(previous => previous || t);
+        setAttachments(previous => Array.from(new Set([...attachments, ...previous])));
+        setSendError("发送失败，已保留输入与附件，请检查错误后重试。");
+      });
+    } catch { setSendError("发送失败，请检查错误后重试。"); return; }
     // 记入输入历史(arrow-key recall)。
     if (body && body.trim()) {
       histRef.current = pushHistory(histRef.current, body);
@@ -366,16 +385,16 @@ export function Composer({
     onClearSceneTag?.();
   };
 
-  /** 流式时入队(对齐 WorkBuddy message-queue):文本非空才入队。 */
-  const enqueue = () => {
-    const t = text.trim();
-    if (!t || disabled || !apiReady) return;
-    let body = t;
-    if (sceneTag) body = body ? `【${sceneTag.label}】${body}` : `【${sceneTag.label}】`;
-    onEnqueue?.(body);
-    updateText("");
-    setAttachments([]);
-    onClearSceneTag?.();
+  const enqueue = async () => {
+    const textToQueue = text.trim();
+    if ((!textToQueue && attachments.length === 0) || disabled || !apiReady || queueBusy || !onEnqueue || !validateAttachments()) return;
+    setQueueBusy(true); setSendError("");
+    const body = sceneTag ? `【${sceneTag.label}】${textToQueue}` : textToQueue;
+    try {
+      await onEnqueue(body || "请查看附件", attachments.map(path => ({ path })), queueMode);
+      updateText(""); setAttachments([]); onClearSceneTag?.();
+    } catch { setSendError("入队失败，输入和附件已保留，可重试。"); }
+    finally { setQueueBusy(false); }
   };
 
   const pickFiles = async () => {
@@ -397,7 +416,7 @@ export function Composer({
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
     setDragActive(false);
-    if (disabled || !apiReady || streaming) return;
+    if (disabled || !apiReady || (streaming && !onEnqueue)) return;
     try {
       const incoming = collectDroppedPaths(Array.from(event.dataTransfer.files, getPathForFile));
       setAttachments(prev => Array.from(new Set([...prev, ...incoming])));
@@ -453,7 +472,7 @@ export function Composer({
     >
       <section
         className={composerCls}
-        onDragOver={event => { event.preventDefault(); if (apiReady && !disabled && !streaming) setDragActive(true); }}
+        onDragOver={event => { event.preventDefault(); if (apiReady && !disabled && (!streaming || onEnqueue)) setDragActive(true); }}
         onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragActive(false); }}
         onDrop={handleDrop}
         onClick={() => {
@@ -466,12 +485,16 @@ export function Composer({
           </button>
         )}
 
+        {sendError && <p role="alert" className="composer-error">{sendError}</p>}
+
         {/* 拖拽文件落区遮罩(对齐 WorkBuddy drop-zone) */}
         {dragActive && (
           <div className="wb-composer__dropzone" role="status" aria-live="polite">
             <span className="wb-composer__dropzone-text">松开以添加文件到对话</span>
           </div>
         )}
+
+        {streaming && onEnqueue && <label className="composer-queue-mode">排队模式 <select aria-label="排队模式" value={queueMode} disabled={queueBusy} onChange={event => setQueueMode(event.target.value as "steer" | "followUp")}><option value="followUp">回复完成后继续</option><option value="steer">下一工具边界引导</option></select></label>}
 
         {/* 多块提示预览(对齐 WorkBuddy content-blocks):引用块 chip 行 */}
         {hasRefs && (
@@ -687,16 +710,16 @@ export function Composer({
           {streaming ? (
             <>
               {/* 流式时可加入待发送队列(对齐 WorkBuddy message-queue)。 */}
-              {onEnqueue && text.trim() !== "" && (
+              {onEnqueue && (text.trim() !== "" || attachments.length > 0) && (
                 <button
                   className="wb-composer__send wb-composer__send--enqueue"
                   onClick={(e) => {
                     e.stopPropagation();
-                    enqueue();
+                    void enqueue();
                   }}
-                  disabled={disabled || !apiReady || modelControls.busy || modelControls.canSend === false}
+                  disabled={disabled || !apiReady || queueBusy || modelControls.busy || modelControls.canSend === false}
                   aria-label="加入待发送队列"
-                  title="加入待发送队列(agent 完成后自动发送)"
+                  title={queueMode === "followUp" ? "当前回复完成后继续" : "在下一工具边界引导当前回复"}
                 >
                   +
                 </button>

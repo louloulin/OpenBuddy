@@ -5,7 +5,7 @@ import { open as openDialog } from "@/lib/ipc";
 interface HomeComposerProps {
   sceneTag?: { label: string; icon: LucideIcon } | null;
   onClearSceneTag?: () => void;
-  onSend: (text: string) => void;
+  onSend: (text: string, attachments?: { path: string }[]) => void | Promise<void>;
 }
 
 export function HomeComposer({ sceneTag, onClearSceneTag, onSend }: HomeComposerProps) {

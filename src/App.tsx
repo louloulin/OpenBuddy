@@ -13,6 +13,7 @@ import { FolderTrustDialog } from "./components/FolderTrustDialog";
 import { TopbarActions } from "./components/TopbarActions";
 import { SidebarToggleIcon, WbNewTaskIcon } from "./foundation/components/Icon/icons";
 import { ModelRuntimeContext, type ModelOption } from "./components/ModelSelector";
+import { useExtensionUiStore } from "./stores/extension-ui-store";
 import { useAgentModelStore } from "./stores/agent-model-store";
 import { useSessionStore } from "./stores/session-store";
 import { useSessionsStore } from "./stores/sessions-store";
@@ -26,6 +27,7 @@ import {
   agentNewSession,
   agentSend,
   agentCancel,
+  agentResolveUi,
   agentLoadSession,
   agentListSessions,
   agentListWorkspaces,
@@ -45,7 +47,7 @@ import {
 } from "./lib/agent-client";
 import type { AgentEntry } from "./lib/types";
 import { useProjectsStore, type ProjectMeta } from "./stores/projects-store";
-import { useMessageQueueStore, hasActiveItems } from "./stores/message-queue-store";
+import { usePiQueueStore } from "./stores/pi-queue-store";
 import { recordUsage, loadUsage, loadQuotaConfig } from "./lib/usage-quota";
 import { dispatchNotification } from "./lib/notify-channels";
 import {
@@ -94,7 +96,11 @@ function clearPendingRequests(sessionId: string) {
   const permissions = usePermissionStore.getState();
   for (const request of permissions.queues[sessionId] ?? []) permissions.dismiss(request.requestId, sessionId);
   const questions = useQuestionStore.getState();
-  for (const request of questions.queues[sessionId] ?? []) questions.dismiss(request.requestId, sessionId);
+  for (const request of questions.queues[sessionId] ?? []) {
+    void agentResolveUi({ sessionId, requestId: request.requestId, cancelled: true }).catch(() => {});
+    questions.dismiss(request.requestId, sessionId, "cancelled");
+  }
+  useExtensionUiStore.getState().clear(sessionId);
 }
 
 export default function App() {
@@ -119,6 +125,7 @@ function Shell() {
   const activeModelState = useAgentModelStore(state => focusedModelSession ? state.states[focusedModelSession] : undefined);
   const currentModelId = focusedModelSession ? activeModelState?.modelKey : homeModelKey;
   const [modelBusy, setModelBusy] = useState(false);
+  const [invalidDefault, setInvalidDefault] = useState(false);
   const modelOperation = useRef(0);
   const modelPending = useRef(false);
   const [models, setModels] = useState<ModelOption[]>([]);
@@ -143,6 +150,7 @@ function Shell() {
     try {
       const [list, auth, defaults] = await Promise.all([providersList(), agentAuthStatus(), agentsDefaultsGet()]);
       const options = flattenModels(list);
+      setInvalidDefault(!!defaults.invalidDefault);
       setModels(options);
 
       const preferred = options.find(option => option.id === defaults.defaultModel)
@@ -186,7 +194,6 @@ function Shell() {
       .then((m) => m.tryActivateSandbox())
       .then((status) => {
         if (status.activated) {
-          console.log(`[OpenBuddy] OS 级沙箱已激活 (@anthropic-ai/sandbox-runtime${status.version ? ` v${status.version}` : ""})`);
         }
       })
       .catch(() => {/* 静默 */});
@@ -201,17 +208,19 @@ function Shell() {
         cwdRef.current = result.cwd;
         sessionsStore.getState().setHomeCwd(result.cwd);
         setInit(result);
+        setInvalidDefault(!!result.invalidDefault);
 
 
         unlisten = await subscribeAgentEvents({
           onModelState: state => useAgentModelStore.getState().apply(state),
           onUpdate: (u) => {
-            console.log('[OpenBuddy] Received agent://update:', u);
             sessionStore.getState().applyUpdate(u);
+            if (u.type === "queue_update" && u.sessionId && Array.isArray(u.steering) && Array.isArray(u.followUp)) {
+              usePiQueueStore.getState().apply(u.sessionId, { steering: u.steering.filter((text): text is string => typeof text === "string"), followUp: u.followUp.filter((text): text is string => typeof text === "string") });
+            }
           },
           onPermission: (p) => {
             if (p.sessionId !== sessionStore.getState().sessionId) return;
-            console.log('[OpenBuddy] Received agent://permission:', p);
             reportEvent("permission_request", "warn", { sessionId: p.sessionId });
             permissionStore.getState().request(p);
             void notificationAppend(
@@ -223,7 +232,6 @@ function Shell() {
             );
           },
           onComplete: (p) => {
-            console.log('[OpenBuddy] Received agent://complete:', p);
             reportEvent("session_complete", "info", { sessionId: p.sessionId, stopReason: p.stopReason });
             // Ignore completes for side-channel sessions (inspiration generation)
             // — they're handled by their own listeners, not the main transcript.
@@ -262,26 +270,12 @@ function Shell() {
             }).catch(() => { /* notification dispatch failure is non-fatal */ });
             // 消息队列自动续发(对齐 WorkBuddy message-queue):该会话若有 active
             // 队列项,取下一条继续发送,实现「回完一条自动发下一条」。
-            const q = useMessageQueueStore.getState().getQueue(p.sessionId);
-            if (hasActiveItems(q)) {
-              const next = useMessageQueueStore.getState().shiftNext(p.sessionId);
-              if (next) {
-                // 标记为工作中 + 推入用户气泡 + 启动流式 + 发送。
-                sessionsStore.getState().upsert({ sessionId: p.sessionId, status: "working" });
-                sessionStore.getState().pushUser(next.text);
-                sessionStore.getState().startStreaming();
-                agentSend(p.sessionId, next.text).catch((e) => {
-                  sessionStore.getState().setError(friendlyError(e));
-                  sessionsStore.getState().upsert({ sessionId: p.sessionId, status: "failed" });
-                });
-              }
-            }
+
           },
           onSummary: ({ sessionId, title }) => {
             // sidebar entry in place. This overrides the "新会话" placeholder
             // set optimistically in handleSendNew. Stamp updatedAt so the
             // sidebar can re-sort the freshly-active session to the top.
-            console.log('[OpenBuddy] Received agent://summary:', { sessionId, title });
             sessionsStore.getState().upsert({
               sessionId,
               title,
@@ -333,10 +327,17 @@ function Shell() {
               "info",
             );
           },
-          onQuestion: (q) => {
-            if (q.sessionId !== sessionStore.getState().sessionId) return;
-            console.log('[OpenBuddy] Received agent://question:', q);
-            questionStore.getState().request(q);
+          onQuestion: request => {
+            if (request.sessionId !== sessionStore.getState().sessionId) {
+              void agentResolveUi({ requestId: request.requestId, sessionId: request.sessionId, cancelled: true }).catch(() => {});
+              return;
+            }
+            questionStore.getState().request(request);
+          },
+          onUiDismiss: event => questionStore.getState().dismiss(event.requestId, event.sessionId, event.reason),
+          onUiState: event => useExtensionUiStore.getState().apply(event),
+          onUiNotification: event => {
+            if (event.sessionId === sessionStore.getState().sessionId) setToast(event.message);
           },
           onAgentDied: ({ reason }) => {
             console.error('[OpenBuddy] Agent thread died:', reason);
@@ -441,6 +442,8 @@ function Shell() {
     showToast(`${label} 即将上线`);
   };
   const handleNavigate = (label: string) => {
+    const previous = sessionStore.getState().sessionId;
+    if (previous) clearPendingRequests(previous);
     if (sessionStore.getState().sessionId) resourceSessionRef.current = sessionStore.getState().sessionId ?? undefined;
     if (["助理", "专家·技能·连接器", "自动化", "资料库", "灵感", "云存储"].includes(label)) { showToast(`${label} 暂未在 Electron MVP 开放`); return; }
     setPlaceholderView(label);
@@ -462,13 +465,10 @@ function Shell() {
     return sid;
   };
 
-  const handleSendNew = async (text: string) => {
-    console.log('[OpenBuddy] handleSendNew called with:', text);
+  const handleSendNew = async (text: string, attachments?: { path: string }[]) => {
     try {
       const cwd = cwdRef.current;
-      console.log('[OpenBuddy] Creating new session with cwd:', cwd, 'modelId:', currentModelId);
       const sessionId = await createSession(cwd, currentModelId);
-      console.log('[OpenBuddy] New session created:', sessionId);
       sessionsStore.getState().setCurrent(sessionId);
       setPlaceholderView(null);
       sessionsStore.getState().upsert({ sessionId, title: deriveTitle(text), cwd, status: "working" });
@@ -489,19 +489,18 @@ function Shell() {
       // UI shows only the user's visible text.
       sessionStore.getState().pushUser(text);
       sessionStore.getState().startStreaming();
-      console.log('[OpenBuddy] Sending prompt to Pi...');
-      await agentSend(sessionId, textForAgent);
-      console.log('[OpenBuddy] Prompt sent successfully, waiting for events...');
+      await agentSend(sessionId, textForAgent, attachments);
     } catch (e) {
       console.error('[OpenBuddy] handleSendNew error:', e);
       sessionStore.getState().setError(friendlyError(e));
       const sid = sessionStore.getState().sessionId;
       if (sid) sessionsStore.getState().upsert({ sessionId: sid, status: "failed" });
+      throw e;
     }
   };
 
-  const handleSendCurrent = async (text: string) => {
-    if (!currentSessionId) return handleSendNew(text);
+  const handleSendCurrent = async (text: string, attachments?: { path: string }[]) => {
+    if (!currentSessionId) return handleSendNew(text, attachments);
     // Guard against double-send / send-during-streaming. Composer also guards
     // via its `streaming` prop, but that value can be stale within the same
     // render tick; the store flag is the source of truth. A second pushUser +
@@ -511,10 +510,11 @@ function Shell() {
       sessionsStore.getState().upsert({ sessionId: currentSessionId, status: "working" });
       sessionStore.getState().pushUser(text);
       sessionStore.getState().startStreaming();
-      await agentSend(currentSessionId, text);
+      await agentSend(currentSessionId, text, attachments);
     } catch (e) {
       sessionStore.getState().setError(friendlyError(e));
       sessionsStore.getState().upsert({ sessionId: currentSessionId, status: "failed" });
+      throw e;
     }
   };
 
@@ -566,6 +566,7 @@ function Shell() {
         const defaults = await agentsDefaultsGet();
         await agentsDefaultsSave({ ...defaults, defaultModel: key, defaultProviderId: model.providerId });
         useAgentModelStore.getState().setHomeModelKey(key);
+        setInvalidDefault(false);
       }
     } finally {
       if (operation === modelOperation.current) { modelPending.current = false; setModelBusy(false); }
@@ -616,6 +617,8 @@ function Shell() {
   };
 
   const handleNewSession = () => {
+    const previous = sessionStore.getState().sessionId;
+    if (previous) clearPendingRequests(previous);
     ++modelOperation.current; modelPending.current = false; setModelBusy(false);
     setPlaceholderView(null);
     sessionsStore.getState().setCurrent(null);
@@ -642,6 +645,8 @@ function Shell() {
   };
 
   const handleSelectSession = async (sessionId: string, sessionCwd?: string) => {
+    const previous = sessionStore.getState().sessionId;
+    if (previous && previous !== sessionId) clearPendingRequests(previous);
     const operation = ++modelOperation.current; modelPending.current = true; setModelBusy(true);
     setPlaceholderView(null);
     sessionsStore.getState().setCurrent(sessionId);
@@ -833,7 +838,7 @@ function Shell() {
   const activeNav = placeholderView ?? (currentSessionId ? "" : "新建任务");
 
   return (
-    <ModelRuntimeContext.Provider value={{ busy: modelBusy, canSend: !!currentModelId && models.some(model => model.id === currentModelId), thinkingLevel: activeModelState?.thinkingLevel, thinkingLevels: activeModelState?.availableThinkingLevels ?? [], onThinkingChange: activeModelState ? handleThinkingChange : undefined }}>
+    <ModelRuntimeContext.Provider value={{ busy: modelBusy, unavailableReason: !focusedModelSession && invalidDefault ? "默认模型不可用，请重新选择模型" : undefined, canSend: !!currentModelId && models.some(model => model.id === currentModelId), thinkingLevel: activeModelState?.thinkingLevel, thinkingLevels: activeModelState?.availableThinkingLevels ?? [], onThinkingChange: activeModelState ? handleThinkingChange : undefined }}>
     <div className={"app" + (IS_MACOS ? " app--macos" : "")}>
       {/* macOS 使用系统原生 Overlay 标题栏(红绿灯 + 原生菜单栏),
           不再渲染自绘 TitleBar;Windows/Linux 保持自绘。 */}

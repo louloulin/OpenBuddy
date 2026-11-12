@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ handle: vi.fn(), removeHandler: vi.fn(), save: vi.fn(), write: vi.fn() }));
 vi.mock('electron', () => ({ ipcMain: { handle: mocks.handle, removeHandler: mocks.removeHandler }, dialog: { showSaveDialog: mocks.save } }));
-vi.mock('node:fs/promises', () => ({ writeFile: mocks.write }));
+vi.mock('node:fs/promises', async importOriginal => ({ ...await importOriginal<typeof import('node:fs/promises')>(), writeFile: mocks.write }));
 import { registerIpc } from './register.js';
 import type { BrowserWindow } from 'electron';
 
@@ -59,6 +59,15 @@ describe('Electron IPC dispatch', () => {
     const { dispatch, event, send } = setup();
     await expect(dispatch(event, 'agent_send', { sessionId: 's1', text: 'image', images: [{ data: 'secret' }] })).rejects.toThrow('invalid_payload');
     expect(send).not.toHaveBeenCalled();
+  });
+  it('keeps native file registration private and verifies its sender', async () => {
+    const { dispatch, event } = setup();
+    const nativeGrant = mocks.handle.mock.calls.find(call => call[0] === 'openbuddy:grant-file')![1];
+    await expect(dispatch(event, 'openbuddy:grant-file', { path: '/private/key' })).rejects.toThrow('not_implemented');
+    await expect(nativeGrant({ ...event, sender: {} }, '/private/key')).rejects.toThrow('untrusted_sender');
+    await expect(nativeGrant({ ...event, senderFrame: { url } }, '/private/key')).rejects.toThrow('untrusted_sender');
+    await expect(dispatch(event, 'agent_send', { text: 'read', attachments: [{ path: '/private/key' }] })).rejects.toThrow('file_not_authorized');
+    await expect(dispatch(event, 'agent_extensions_add', { path: '/private/plugin.ts' })).rejects.toThrow('extension_path_not_authorized');
   });
   it('consumes a save dialog grant once before an export can write', async () => {
     const { dispatch, event } = setup();
