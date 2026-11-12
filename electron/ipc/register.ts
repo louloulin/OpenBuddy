@@ -1,4 +1,4 @@
-import { dialog, ipcMain, type BrowserWindow, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
+import { dialog, ipcMain, nativeImage, type BrowserWindow, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { isCommand, validateCommandPayload, type CommandHandlers, type Payload, type AttachmentReference } from '../shared/contract.js';
 import { FileAccess } from '../shared/file-access.js';
@@ -25,7 +25,12 @@ function dialogOptions(payload: Payload): OpenDialogOptions & SaveDialogOptions 
 
 export function registerIpc(window: BrowserWindow, handlers: CommandHandlers, trustedURL: string, workspaces?: { grant(path: string): Promise<void>; allows(path: string): Promise<boolean> }): () => void {
   const exportGrants = new Set<string>();
-  const fileAccess = new FileAccess();
+  const fileAccess = new FileAccess(bytes => {
+    const image = nativeImage.createFromBuffer(bytes);
+    if (image.isEmpty()) return false;
+    const { width, height } = image.getSize();
+    return width > 0 && height > 0 && width * height <= 32 * 1024 * 1024;
+  });
   const assertSender = (event: Electron.IpcMainInvokeEvent): void => {
     const frame = event.senderFrame;
     if (event.sender !== window.webContents || !frame || frame !== window.webContents.mainFrame || frame.url.split('#')[0] !== trustedURL) throw new Error('untrusted_sender');

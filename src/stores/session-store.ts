@@ -87,7 +87,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
     startStreaming: () => {
       apply(get().sessionId, t => {
         const { messages, id } = ensureAssistant(t);
-        return { ...t, messages, streamingMessageId: id, busy: true, suppressReplay: false };
+        return { ...t, messages, streamingMessageId: id, busy: true, suppressReplay: false, usage: {} };
       });
       set({ error: null });
     },
@@ -151,7 +151,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
           if (message.role !== "assistant") return t;
           const { messages, index } = ensureAssistant(t);
           messages[index] = { ...messages[index], parts: partsOf(message, messages[index].parts), complete: true };
-          return { ...t, messages, streamingMessageId: null, usage: message.usage ? { promptTokens: message.usage.input, completionTokens: message.usage.output, totalTokens: message.usage.totalTokens } : t.usage };
+          return { ...t, messages, streamingMessageId: null, usage: message.usage ? { promptTokens: (t.usage.promptTokens ?? 0) + (message.usage.input ?? 0) + (message.usage.cacheRead ?? 0) + (message.usage.cacheWrite ?? 0), completionTokens: (t.usage.completionTokens ?? 0) + (message.usage.output ?? 0), totalTokens: (t.usage.totalTokens ?? 0) + (message.usage.totalTokens ?? (message.usage.input ?? 0) + (message.usage.output ?? 0) + (message.usage.cacheRead ?? 0) + (message.usage.cacheWrite ?? 0)) } : t.usage };
         }
         if (event.type.startsWith("tool_execution_")) {
           const status = event.type === "tool_execution_end" ? (event.isError ? "failed" : "completed") : "in_progress";

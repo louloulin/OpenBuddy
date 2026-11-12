@@ -134,6 +134,7 @@ export interface AppSettings {
   skillPaths: string[];
   disabledSkills: string[];
   trustedFolders: string[];
+  folderTrustDecisions?: Record<string, boolean>;
   sessions: Record<
     string,
     { pinned?: boolean; archived?: boolean; title?: string }

@@ -18,6 +18,7 @@ function imageMime(bytes: Buffer): string | undefined {
 /** Per-window native grants. Renderer references cannot create or broaden them. */
 export class FileAccess {
   private grants = new Map<string, Grant>();
+  constructor(private readonly decodableImage: (bytes: Buffer) => boolean) {}
   async grant(path: string): Promise<void> {
     if (!isAbsolute(path) || path.length > 4096 || path.includes('\0')) throw new Error('invalid_native_file_path');
     const canonical = await realpath(path), s = await stat(canonical);
@@ -54,7 +55,10 @@ export class FileAccess {
         }
         if (length !== before.size || !identity(await fd.stat(), grant)) throw new Error('file_changed: select the file again');
         const bytes = buffer.subarray(0, length), mimeType = imageMime(bytes);
-        if (mimeType) images.push({ type: 'image', data: bytes.toString('base64'), mimeType });
+        if (mimeType) {
+          if (!this.decodableImage(bytes)) throw new Error('invalid_image: file cannot be decoded or exceeds pixel limits');
+          images.push({ type: 'image', data: bytes.toString('base64'), mimeType });
+        }
         else {
           if (bytes.length > TEXT_LIMIT) throw new Error('attachment_too_large: text maximum 256 KiB');
           let decoded: string;

@@ -92,7 +92,7 @@ function extractMarkdownBody(raw: string): string {
   return rest.slice(closeIdx + 1).replace(/^\n---\s*/, "").trim();
 }
 
-function clearPendingRequests(sessionId: string) {
+function clearPendingRequests(sessionId: string, clearExtensionState = false) {
   const permissions = usePermissionStore.getState();
   for (const request of permissions.queues[sessionId] ?? []) permissions.dismiss(request.requestId, sessionId);
   const questions = useQuestionStore.getState();
@@ -100,7 +100,7 @@ function clearPendingRequests(sessionId: string) {
     void agentResolveUi({ sessionId, requestId: request.requestId, cancelled: true }).catch(() => {});
     questions.dismiss(request.requestId, sessionId, "cancelled");
   }
-  useExtensionUiStore.getState().clear(sessionId);
+  if (clearExtensionState) useExtensionUiStore.getState().clear(sessionId);
 }
 
 export default function App() {
@@ -443,7 +443,7 @@ function Shell() {
   };
   const handleNavigate = (label: string) => {
     const previous = sessionStore.getState().sessionId;
-    if (previous) clearPendingRequests(previous);
+    if (previous) clearPendingRequests(previous, true);
     if (sessionStore.getState().sessionId) resourceSessionRef.current = sessionStore.getState().sessionId ?? undefined;
     if (["助理", "专家·技能·连接器", "自动化", "资料库", "灵感", "云存储"].includes(label)) { showToast(`${label} 暂未在 Electron MVP 开放`); return; }
     setPlaceholderView(label);
@@ -530,7 +530,7 @@ function Shell() {
       // Composer's stop button and the loading row don't hang. Already-streamed
       // text is kept; only the in-flight flag is cleared.
       sessionStore.getState().stopStreaming();
-      clearPendingRequests(currentSessionId);
+      clearPendingRequests(currentSessionId, true);
     }
   };
 
@@ -618,7 +618,7 @@ function Shell() {
 
   const handleNewSession = () => {
     const previous = sessionStore.getState().sessionId;
-    if (previous) clearPendingRequests(previous);
+    if (previous) clearPendingRequests(previous, true);
     ++modelOperation.current; modelPending.current = false; setModelBusy(false);
     setPlaceholderView(null);
     sessionsStore.getState().setCurrent(null);
@@ -646,7 +646,7 @@ function Shell() {
 
   const handleSelectSession = async (sessionId: string, sessionCwd?: string) => {
     const previous = sessionStore.getState().sessionId;
-    if (previous && previous !== sessionId) clearPendingRequests(previous);
+    if (previous && previous !== sessionId) clearPendingRequests(previous, true);
     const operation = ++modelOperation.current; modelPending.current = true; setModelBusy(true);
     setPlaceholderView(null);
     sessionsStore.getState().setCurrent(sessionId);

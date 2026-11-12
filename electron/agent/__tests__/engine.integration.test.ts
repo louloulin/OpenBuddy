@@ -1,11 +1,18 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
 import { createEngineHandlers } from "../../ipc/handlers/agent.js";
-import type { ExtensionFactory } from '@earendil-works/pi-coding-agent';
+import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 
 const cleanups: Array<() => Promise<unknown>> = [];
 afterEach(async () => {
@@ -20,17 +27,22 @@ const secureStorage = {
     value.toString().split("").reverse().join(""),
 };
 async function fixture(
-  options: { rateLimitOnce?: boolean; highUsageRequest?: number;extensions?:ExtensionFactory[];holdFirst?:boolean } = {},
+  options: {
+    rateLimitOnce?: boolean;
+    highUsageRequest?: number;
+    extensions?: ExtensionFactory[];
+    holdFirst?: boolean;
+  } = {},
 ) {
   const root = await mkdtemp(join(tmpdir(), "openbuddy-sdk-"));
   cleanups.push(() => rm(root, { recursive: true, force: true }));
   const requests: unknown[] = [];
-  let releaseFirst:(()=>void)|undefined;
+  let releaseFirst: (() => void) | undefined;
   const server = createServer(async (req, res) => {
     let body = "";
     for await (const part of req) body += part;
     const data = JSON.parse(body);
-    requests.push({...data,_authorization:req.headers.authorization});
+    requests.push({ ...data, _authorization: req.headers.authorization });
     if (options.rateLimitOnce && requests.length === 1) {
       res.writeHead(429, {
         "Content-Type": "application/json",
@@ -64,7 +76,15 @@ async function fixture(
         `data: ${JSON.stringify({ id: "fixture", object: "chat.completion.chunk", created: 1, model: "fixture", choices: [{ index: 0, delta, finish_reason }] })}\n\n`,
       );
     chunk({ role: "assistant" });
-    if(options.holdFirst&&requests.length===1){chunk({content:'Held response'});releaseFirst=()=>{chunk({content:' complete'});chunk({},'stop');res.end('data: [DONE]\n\n');};return;}
+    if (options.holdFirst && requests.length === 1) {
+      chunk({ content: "Held response" });
+      releaseFirst = () => {
+        chunk({ content: " complete" });
+        chunk({}, "stop");
+        res.end("data: [DONE]\n\n");
+      };
+      return;
+    }
     if (String(prompt).includes("cancel")) {
       chunk({ content: "Waiting" });
       return; // client abort must close this response
@@ -115,7 +135,7 @@ async function fixture(
   const address = server.address() as { port: number };
   const events: Array<{ name: string; payload: any }> = [];
   const engine = await createEngineHandlers({
-    extensionFactories:options.extensions,
+    extensionFactories: options.extensions,
     userDataDir: root,
     safeStorage: secureStorage,
     emit: (name, payload) => events.push({ name, payload }),
@@ -147,7 +167,17 @@ async function fixture(
     modelId: "fixture",
   })) as string;
   await writeFile(join(root, "hello.txt"), "real tool result");
-  return { root, engine, call, sid, events, requests, get releaseFirst(){return releaseFirst;} };
+  return {
+    root,
+    engine,
+    call,
+    sid,
+    events,
+    requests,
+    get releaseFirst() {
+      return releaseFirst;
+    },
+  };
 }
 async function until(predicate: () => boolean) {
   const end = Date.now() + 10000;
@@ -256,105 +286,451 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
       await f.call("agent_session_info", { sessionId: f.sid }),
     ).toMatchObject({ context: { compactionCount: 1 } });
   });
-  it('keeps provider identity and real thinking across ambiguous switches, defaults and restart',async()=>{
-    const f=await fixture();const base=(await f.call('providers_list') as any).providers[0].baseUrl;
-    await f.call('providers_save_provider',{provider:{id:'second',providerKind:'custom',baseUrl:base,apiKey:'second-private-key'}});
-    await f.call('providers_save_model',{model:{providerId:'second',modelId:'fixture',reasoning:true,compat:{supportsReasoningEffort:true}}});
-    await expect(f.call('agent_set_model',{sessionId:f.sid,modelId:'fixture'})).rejects.toThrow('ambiguous');
-    await expect(f.call('agent_new_session',{cwd:f.root,modelId:'missing',providerId:'second'})).rejects.toThrow('model_not_found');
-    expect(await f.call('agent_get_model_state',{sessionId:f.sid})).toMatchObject({providerId:'fixture',modelKey:'model:fixture/fixture'});
-    await f.call('providers_save_provider',{provider:{id:'no-key',providerKind:'custom',baseUrl:base}});
-    await f.call('providers_save_model',{model:{providerId:'no-key',modelId:'fixture'}});
-    await expect(f.call('agent_set_model',{sessionId:f.sid,modelId:'fixture',providerId:'no-key'})).rejects.toThrow('model_auth_missing');
-    expect(await f.call('agent_get_model_state',{sessionId:f.sid})).toMatchObject({providerId:'fixture'});
-    const selected=await f.call('agent_set_model',{sessionId:f.sid,providerId:'second',modelId:'fixture'}) as any;
-    expect(selected.availableThinkingLevels).toContain('high');
-    await f.call('agent_set_thinking_level',{sessionId:f.sid,level:'high'});
-    await f.call('agent_send',{sessionId:f.sid,text:'reasoning request'});
-    expect(f.requests.at(-1)).toMatchObject({model:'fixture',_authorization:'Bearer second-private-key',reasoning_effort:'high'});
-    await f.call('agents_defaults_save',{defaults:{defaultModel:'fixture',defaultProviderId:'second',defaultThinkingLevel:'high',defaultPermission:'ask'}});
-    expect(await f.call('agents_defaults_get')).toMatchObject({defaultModel:'model:second/fixture',defaultProviderId:'second',defaultThinkingLevel:'high'});
+  it("keeps provider identity and real thinking across ambiguous switches, defaults and restart", async () => {
+    const f = await fixture();
+    const base = ((await f.call("providers_list")) as any).providers[0].baseUrl;
+    await f.call("providers_save_provider", {
+      provider: {
+        id: "second",
+        providerKind: "custom",
+        baseUrl: base,
+        apiKey: "second-private-key",
+      },
+    });
+    await f.call("providers_save_model", {
+      model: {
+        providerId: "second",
+        modelId: "fixture",
+        reasoning: true,
+        compat: { supportsReasoningEffort: true },
+      },
+    });
+    await expect(
+      f.call("agent_set_model", { sessionId: f.sid, modelId: "fixture" }),
+    ).rejects.toThrow("ambiguous");
+    await expect(
+      f.call("agent_new_session", {
+        cwd: f.root,
+        modelId: "missing",
+        providerId: "second",
+      }),
+    ).rejects.toThrow("model_not_found");
+    expect(
+      await f.call("agent_get_model_state", { sessionId: f.sid }),
+    ).toMatchObject({
+      providerId: "fixture",
+      modelKey: "model:fixture/fixture",
+      availableThinkingLevels: ["off"],
+    });
+    await expect(
+      f.call("agent_set_thinking_level", { sessionId: f.sid, level: "high" }),
+    ).rejects.toThrow("unsupported_thinking_level");
+    await f.call("providers_save_provider", {
+      provider: { id: "no-key", providerKind: "custom", baseUrl: base },
+    });
+    await f.call("providers_save_model", {
+      model: { providerId: "no-key", modelId: "fixture" },
+    });
+    await expect(
+      f.call("agent_set_model", {
+        sessionId: f.sid,
+        modelId: "fixture",
+        providerId: "no-key",
+      }),
+    ).rejects.toThrow("model_auth_missing");
+    expect(
+      await f.call("agent_get_model_state", { sessionId: f.sid }),
+    ).toMatchObject({ providerId: "fixture" });
+    const selected = (await f.call("agent_set_model", {
+      sessionId: f.sid,
+      providerId: "second",
+      modelId: "fixture",
+    })) as any;
+    expect(selected.availableThinkingLevels).toContain("high");
+    await f.call("agent_set_thinking_level", {
+      sessionId: f.sid,
+      level: "high",
+    });
+    await f.call("agent_send", { sessionId: f.sid, text: "reasoning request" });
+    expect(f.requests.at(-1)).toMatchObject({
+      model: "fixture",
+      _authorization: "Bearer second-private-key",
+      reasoning_effort: "high",
+    });
+    await f.call("agents_defaults_save", {
+      defaults: {
+        defaultModel: "fixture",
+        defaultProviderId: "second",
+        defaultThinkingLevel: "high",
+        defaultPermission: "ask",
+      },
+    });
+    expect(await f.call("agents_defaults_get")).toMatchObject({
+      defaultModel: "model:second/fixture",
+      defaultProviderId: "second",
+      defaultThinkingLevel: "high",
+    });
     await f.engine.dispose();
-    const restarted=await createEngineHandlers({userDataDir:f.root,safeStorage:secureStorage,emit:()=>{},shell:{openPath:async()=>'',openExternal:async()=>{},showItemInFolder:()=>{}}});cleanups.push(restarted.dispose);
-    expect(await restarted.handlers.agent_load_session({sessionId:f.sid,cwd:f.root})).toMatchObject({providerId:'second',modelId:'fixture',thinkingLevel:'high'});
-    await restarted.handlers.agent_send({sessionId:f.sid,text:'after restored reasoning'});
-    expect(f.requests.at(-1)).toMatchObject({_authorization:'Bearer second-private-key',reasoning_effort:'high'});
-    const fresh=await restarted.handlers.agent_new_session({cwd:f.root});
-    expect(await restarted.handlers.agent_get_model_state({sessionId:fresh})).toMatchObject({providerId:'second',thinkingLevel:'high'});
-    await restarted.handlers.providers_delete_model({providerId:'fixture',modelId:'fixture'});
-    expect((await restarted.handlers.providers_list({}) as any).models.some((m:any)=>m.providerId==='second'&&m.modelId==='fixture')).toBe(true);
-    await restarted.handlers.providers_delete_model({providerId:'second',modelId:'fixture'});
-    expect(await restarted.handlers.agents_defaults_get({})).toMatchObject({defaultModel:'model:second/fixture',invalidDefault:true});
-    await expect(restarted.handlers.agent_new_session({cwd:f.root})).rejects.toThrow('model_not_found');
-    expect(await restarted.handlers.agent_get_model_state({sessionId:fresh})).toMatchObject({providerId:'second'});
-    await expect(restarted.handlers.agent_send({sessionId:fresh,text:'deleted selection'})).rejects.toThrow('model_not_found');
+    const restarted = await createEngineHandlers({
+      userDataDir: f.root,
+      safeStorage: secureStorage,
+      emit: () => {},
+      shell: {
+        openPath: async () => "",
+        openExternal: async () => {},
+        showItemInFolder: () => {},
+      },
+    });
+    cleanups.push(restarted.dispose);
+    expect(
+      await restarted.handlers.agent_load_session({
+        sessionId: f.sid,
+        cwd: f.root,
+      }),
+    ).toMatchObject({
+      providerId: "second",
+      modelId: "fixture",
+      thinkingLevel: "high",
+    });
+    await restarted.handlers.agent_send({
+      sessionId: f.sid,
+      text: "after restored reasoning",
+    });
+    expect(f.requests.at(-1)).toMatchObject({
+      _authorization: "Bearer second-private-key",
+      reasoning_effort: "high",
+    });
+    const fresh = await restarted.handlers.agent_new_session({ cwd: f.root });
+    expect(
+      await restarted.handlers.agent_get_model_state({ sessionId: fresh }),
+    ).toMatchObject({ providerId: "second", thinkingLevel: "high" });
+    await restarted.handlers.providers_delete_model({
+      providerId: "fixture",
+      modelId: "fixture",
+    });
+    expect(
+      ((await restarted.handlers.providers_list({})) as any).models.some(
+        (m: any) => m.providerId === "second" && m.modelId === "fixture",
+      ),
+    ).toBe(true);
+    await restarted.handlers.providers_delete_model({
+      providerId: "second",
+      modelId: "fixture",
+    });
+    expect(await restarted.handlers.agents_defaults_get({})).toMatchObject({
+      defaultModel: "model:second/fixture",
+      invalidDefault: true,
+    });
+    await expect(
+      restarted.handlers.agent_new_session({ cwd: f.root }),
+    ).rejects.toThrow("model_not_found");
+    expect(
+      await restarted.handlers.agent_get_model_state({ sessionId: fresh }),
+    ).toMatchObject({ providerId: "second" });
+    await expect(
+      restarted.handlers.agent_send({
+        sessionId: fresh,
+        text: "deleted selection",
+      }),
+    ).rejects.toThrow("model_not_found");
   });
-  it('bridges real SDK extension dialogs and cancels pending input on cancel, session switch and shutdown',async()=>{
-    const answers:unknown[]=[];
-    const extension:ExtensionFactory=pi=>{pi.registerCommand('fixture-ui',{description:'Ask through host UI',handler:async(_args,ctx)=>{
-      answers.push(await ctx.ui.select('Choice',['one','two']));
-      answers.push(await ctx.ui.confirm('Confirm','Proceed?'));
-      answers.push(await ctx.ui.input('Input','Type here'));
-      answers.push(await ctx.ui.editor('Editor','initial'));
-      ctx.ui.notify('Finished');ctx.ui.setStatus('fixture','done');
-    }});pi.registerCommand('fixture-pending',{handler:async(_args,ctx)=>{answers.push(await ctx.ui.input('Pending'));}});};
-    const f=await fixture({extensions:[extension]});const turn=f.call('agent_send',{sessionId:f.sid,text:'/fixture-ui'});
-    for(const [kind,value] of [['select','two'],['confirm',true],['input','answer'],['editor','edited']] as const){
-      await until(()=>f.events.some(e=>e.name==='agent://ui-request'&&e.payload.kind===kind));
-      const p=f.events.find(e=>e.name==='agent://ui-request'&&e.payload.kind===kind)!.payload;
-      await f.call(kind==='input'?'agent_resolve_question':'agent_resolve_ui',{requestId:p.requestId,sessionId:f.sid,value});
+  it("bridges real SDK extension dialogs and cancels pending input on cancel, session switch and shutdown", async () => {
+    const answers: unknown[] = [];
+    const extension: ExtensionFactory = (pi) => {
+      pi.registerCommand("fixture-ui", {
+        description: "Ask through host UI",
+        handler: async (_args, ctx) => {
+          answers.push(await ctx.ui.select("Choice", ["one", "two"]));
+          answers.push(await ctx.ui.confirm("Confirm", "Proceed?"));
+          answers.push(await ctx.ui.input("Input", "Type here"));
+          answers.push(await ctx.ui.editor("Editor", "initial"));
+          ctx.ui.notify("Finished");
+          ctx.ui.setStatus("fixture", "done");
+        },
+      });
+      pi.registerCommand("fixture-pending", {
+        handler: async (_args, ctx) => {
+          answers.push(await ctx.ui.input("Pending"));
+        },
+      });
+    };
+    const f = await fixture({ extensions: [extension] });
+    const turn = f.call("agent_send", {
+      sessionId: f.sid,
+      text: "/fixture-ui",
+    });
+    for (const [kind, value] of [
+      ["select", "two"],
+      ["confirm", true],
+      ["input", "answer"],
+      ["editor", "edited"],
+    ] as const) {
+      await until(() =>
+        f.events.some(
+          (e) => e.name === "agent://ui-request" && e.payload.kind === kind,
+        ),
+      );
+      const p = f.events.find(
+        (e) => e.name === "agent://ui-request" && e.payload.kind === kind,
+      )!.payload;
+      await f.call(
+        kind === "input" ? "agent_resolve_question" : "agent_resolve_ui",
+        { requestId: p.requestId, sessionId: f.sid, value },
+      );
     }
-    await turn;expect(answers).toEqual(['two',true,'answer','edited']);
-    expect(f.events.some(e=>e.name==='agent://ui-notification'&&e.payload.message==='Finished')).toBe(true);
-    for(const mode of ['cancel','switch','shutdown']){
-      const sid=mode==='cancel'?f.sid:await f.call('agent_new_session',{cwd:f.root,modelId:'fixture'});
-      f.events.length=0;const pending=f.call('agent_send',{sessionId:sid,text:'/fixture-pending'});
-      await until(()=>f.events.some(e=>e.name==='agent://ui-request'));
-      const p=f.events.find(e=>e.name==='agent://ui-request')!.payload;
-      if(mode==='cancel')await f.call('agent_cancel',{sessionId:sid});else if(mode==='switch')await f.call('agent_new_session',{cwd:f.root,modelId:'fixture'});else await f.call('agent_shutdown');
-      await pending;expect(answers.at(-1)).toBeUndefined();
-      await expect(f.call('agent_resolve_ui',{sessionId:sid,requestId:p.requestId,value:'stale'})).rejects.toThrow();
+    await turn;
+    expect(answers).toEqual(["two", true, "answer", "edited"]);
+    expect(
+      f.events.some(
+        (e) =>
+          e.name === "agent://ui-notification" &&
+          e.payload.message === "Finished",
+      ),
+    ).toBe(true);
+    for (const mode of ["cancel", "switch", "shutdown"]) {
+      const sid =
+        mode === "cancel"
+          ? f.sid
+          : await f.call("agent_new_session", {
+              cwd: f.root,
+              modelId: "fixture",
+            });
+      f.events.length = 0;
+      const pending = f.call("agent_send", {
+        sessionId: sid,
+        text: "/fixture-pending",
+      });
+      await until(() => f.events.some((e) => e.name === "agent://ui-request"));
+      const p = f.events.find((e) => e.name === "agent://ui-request")!.payload;
+      if (mode === "cancel") await f.call("agent_cancel", { sessionId: sid });
+      else if (mode === "switch")
+        await f.call("agent_new_session", { cwd: f.root, modelId: "fixture" });
+      else await f.call("agent_shutdown");
+      await pending;
+      expect(answers.at(-1)).toBeUndefined();
+      await expect(
+        f.call("agent_resolve_ui", {
+          sessionId: sid,
+          requestId: p.requestId,
+          value: "stale",
+        }),
+      ).rejects.toThrow();
     }
   });
-  it('delivers real SDK steering/follow-up queues, clears removed inputs and settles after all queued work',async()=>{
-    const f=await fixture({holdFirst:true});const turn=f.call('agent_send',{sessionId:f.sid,text:'initial request'});
-    await until(()=>!!f.releaseFirst);
-    await f.call('agent_steer',{sessionId:f.sid,text:'remove this steering'});
-    await f.call('agent_follow_up',{sessionId:f.sid,text:'remove this followup'});
-    expect(await f.call('agent_get_queue',{sessionId:f.sid})).toMatchObject({steering:['remove this steering'],followUp:['remove this followup']});
-    expect(await f.call('agent_clear_queue',{sessionId:f.sid})).toMatchObject({steering:['remove this steering'],followUp:['remove this followup']});
-    await f.call('agent_steer',{sessionId:f.sid,text:'real steering'});await f.call('agent_follow_up',{sessionId:f.sid,text:'real followup'});
-    f.releaseFirst!();await turn;
+  it("delivers real SDK steering/follow-up queues, clears removed inputs and settles after all queued work", async () => {
+    const f = await fixture({ holdFirst: true });
+    const turn = f.call("agent_send", {
+      sessionId: f.sid,
+      text: "initial request",
+    });
+    await until(() => !!f.releaseFirst);
+    await f.call("agent_steer", {
+      sessionId: f.sid,
+      text: "remove this steering",
+    });
+    await f.call("agent_follow_up", {
+      sessionId: f.sid,
+      text: "remove this followup",
+    });
+    expect(await f.call("agent_get_queue", { sessionId: f.sid })).toMatchObject(
+      {
+        steering: ["remove this steering"],
+        followUp: ["remove this followup"],
+      },
+    );
+    expect(
+      await f.call("agent_clear_queue", { sessionId: f.sid }),
+    ).toMatchObject({
+      steering: ["remove this steering"],
+      followUp: ["remove this followup"],
+    });
+    await f.call("agent_steer", { sessionId: f.sid, text: "real steering" });
+    await f.call("agent_follow_up", {
+      sessionId: f.sid,
+      text: "real followup",
+    });
+    f.releaseFirst!();
+    await turn;
     expect(f.requests.length).toBeGreaterThanOrEqual(3);
-    expect(JSON.stringify(f.requests)).toContain('real steering');expect(JSON.stringify(f.requests)).toContain('real followup');expect(JSON.stringify(f.requests)).not.toContain('remove this');
-    expect(await f.call('agent_get_queue',{sessionId:f.sid})).toEqual({steering:[],followUp:[]});
-    expect(f.events.filter(e=>e.payload.event?.type==='agent_settled')).toHaveLength(1);
+    expect(JSON.stringify(f.requests)).toContain("real steering");
+    expect(JSON.stringify(f.requests)).toContain("real followup");
+    expect(JSON.stringify(f.requests)).not.toContain("remove this");
+    expect(await f.call("agent_get_queue", { sessionId: f.sid })).toEqual({
+      steering: [],
+      followUp: [],
+    });
+    expect(
+      f.events.filter((e) => e.payload.event?.type === "agent_settled"),
+    ).toHaveLength(1);
   });
-  it('passes real image content only to a vision model and rejects unsupported image prompts before HTTP',async()=>{
-    const f=await fixture();const images=[{type:'image',mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=='}];
-    await expect(f.call('agent_send',{sessionId:f.sid,text:'look',images})).rejects.toThrow('model_does_not_support_images');expect(f.requests).toHaveLength(0);
-    await f.call('providers_save_model',{model:{providerId:'fixture',modelId:'vision',input:['text','image']}});await f.call('agent_set_model',{sessionId:f.sid,providerId:'fixture',modelId:'vision'});
-    await f.call('agent_send',{sessionId:f.sid,text:'look',images});
-    expect(JSON.stringify((f.requests[0] as any).messages)).toContain('data:image/png;base64,');
+  it("passes real image content only to a vision model and rejects unsupported image prompts before HTTP", async () => {
+    const f = await fixture();
+    const images = [
+      {
+        type: "image",
+        mimeType: "image/png",
+        data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
+      },
+    ];
+    await expect(
+      f.call("agent_send", { sessionId: f.sid, text: "look", images }),
+    ).rejects.toThrow("model_does_not_support_images");
+    expect(f.requests).toHaveLength(0);
+    await f.call("providers_save_model", {
+      model: {
+        providerId: "fixture",
+        modelId: "vision",
+        input: ["text", "image"],
+      },
+    });
+    await f.call("agent_set_model", {
+      sessionId: f.sid,
+      providerId: "fixture",
+      modelId: "vision",
+    });
+    await f.call("agent_send", { sessionId: f.sid, text: "look", images });
+    expect(JSON.stringify((f.requests[0] as any).messages)).toContain(
+      "data:image/png;base64,",
+    );
   });
-  it('forks persisted history into a new id while preserving the selected provider and thinking level',async()=>{
-    const f=await fixture();await f.call('providers_save_model',{model:{providerId:'fixture',modelId:'reasoning',reasoning:true,compat:{supportsReasoningEffort:true}}});await f.call('agent_set_model',{sessionId:f.sid,providerId:'fixture',modelId:'reasoning'});await f.call('agent_set_thinking_level',{sessionId:f.sid,level:'high'});
-    await f.call('agent_send',{sessionId:f.sid,text:'parent history'});const fork=await f.call('agent_fork_session',{sessionId:f.sid});expect(fork).not.toBe(f.sid);
-    expect(await f.call('agent_get_model_state',{sessionId:fork})).toMatchObject({providerId:'fixture',modelId:'reasoning',thinkingLevel:'high'});
-    expect((await f.call('agent_list_sessions',{cwd:f.root}) as any[]).map(s=>s.sessionId)).toEqual(expect.arrayContaining([f.sid,fork]));
-    await f.call('agent_send',{sessionId:fork,text:'fork continuation'});expect(JSON.stringify(f.requests.at(-1))).toContain('parent history');
-    await f.call('agent_load_session',{sessionId:f.sid,cwd:f.root});expect(JSON.stringify(await f.call('agent_session_usage',{sessionId:f.sid}))).toContain('numTurns');
+  it("forks persisted history into a new id while preserving the selected provider and thinking level", async () => {
+    const f = await fixture();
+    await f.call("providers_save_model", {
+      model: {
+        providerId: "fixture",
+        modelId: "reasoning",
+        reasoning: true,
+        compat: { supportsReasoningEffort: true },
+      },
+    });
+    await f.call("agent_set_model", {
+      sessionId: f.sid,
+      providerId: "fixture",
+      modelId: "reasoning",
+    });
+    await f.call("agent_set_thinking_level", {
+      sessionId: f.sid,
+      level: "high",
+    });
+    await f.call("agent_send", { sessionId: f.sid, text: "parent history" });
+    const fork = await f.call("agent_fork_session", { sessionId: f.sid });
+    expect(fork).not.toBe(f.sid);
+    expect(
+      await f.call("agent_get_model_state", { sessionId: fork }),
+    ).toMatchObject({
+      providerId: "fixture",
+      modelId: "reasoning",
+      thinkingLevel: "high",
+    });
+    expect(
+      ((await f.call("agent_list_sessions", { cwd: f.root })) as any[]).map(
+        (s) => s.sessionId,
+      ),
+    ).toEqual(expect.arrayContaining([f.sid, fork]));
+    await f.call("agent_send", { sessionId: fork, text: "fork continuation" });
+    expect(JSON.stringify(f.requests.at(-1))).toContain("parent history");
+    await f.call("agent_load_session", { sessionId: f.sid, cwd: f.root });
+    expect(
+      JSON.stringify(await f.call("agent_session_usage", { sessionId: f.sid })),
+    ).toContain("numTurns");
   });
-  it('loads only explicitly enabled extension paths and rolls back a failed reload',async()=>{
-    const f=await fixture();const extension=join(f.root,'trusted-extension.mjs');
-    await writeFile(extension,`export default function(pi){ pi.registerCommand('disk-fixture',{description:'Disk extension',handler:async(_args,ctx)=>{const value=await ctx.ui.input('Disk input');ctx.ui.notify(value===undefined?'cancelled':'received');}}); }`);
-    await f.call('agent_extensions_add',{path:extension});expect(await f.call('commands_list')).not.toContainEqual(expect.objectContaining({name:'disk-fixture'}));
-    await f.call('agent_extensions_set_enabled',{enabled:true});expect(await f.call('commands_list')).toContainEqual(expect.objectContaining({name:'disk-fixture'}));
-    const pending=f.call('agent_send',{sessionId:f.sid,text:'/disk-fixture'});await until(()=>f.events.some(e=>e.name==='agent://ui-request'&&e.payload.title==='Disk input'));
-    await expect(f.call('agent_extensions_set_enabled',{enabled:false})).rejects.toThrow('忙碌');await f.call('agent_cancel',{sessionId:f.sid});await pending;
-    const bad=join(f.root,'broken-extension.mjs');await writeFile(bad,'throw new Error("broken extension");');await expect(f.call('agent_extensions_add',{path:bad})).rejects.toThrow('extension_load_failed');
-    expect((await f.call('agent_extensions_list') as any).paths).not.toContain(bad);expect(await f.call('agent_get_model_state',{sessionId:f.sid})).toMatchObject({providerId:'fixture'});
-    await f.call('agent_extensions_set_enabled',{enabled:false});expect(await f.call('commands_list')).not.toContainEqual(expect.objectContaining({name:'disk-fixture'}));
+  it("loads only explicitly enabled extension paths and rolls back a failed reload", async () => {
+    const f = await fixture();
+    const extension = join(f.root, "trusted-extension.mjs");
+    await writeFile(
+      extension,
+      `export default function(pi){ pi.registerCommand('disk-fixture',{description:'Disk extension',handler:async(_args,ctx)=>{const value=await ctx.ui.input('Disk input');ctx.ui.notify(value===undefined?'cancelled':'received');}}); }`,
+    );
+    await f.call("agent_extensions_add", { path: extension });
+    expect(await f.call("commands_list")).not.toContainEqual(
+      expect.objectContaining({ name: "disk-fixture" }),
+    );
+    await f.call("agent_extensions_set_enabled", { enabled: true });
+    expect(await f.call("commands_list")).toContainEqual(
+      expect.objectContaining({ name: "disk-fixture" }),
+    );
+    const pending = f.call("agent_send", {
+      sessionId: f.sid,
+      text: "/disk-fixture",
+    });
+    await until(() =>
+      f.events.some(
+        (e) =>
+          e.name === "agent://ui-request" && e.payload.title === "Disk input",
+      ),
+    );
+    await expect(
+      f.call("agent_extensions_set_enabled", { enabled: false }),
+    ).rejects.toThrow("忙碌");
+    await f.call("agent_cancel", { sessionId: f.sid });
+    await pending;
+    const bad = join(f.root, "broken-extension.mjs");
+    await writeFile(bad, 'throw new Error("broken extension");');
+    await expect(f.call("agent_extensions_add", { path: bad })).rejects.toThrow(
+      "extension_load_failed",
+    );
+    expect(
+      ((await f.call("agent_extensions_list")) as any).paths,
+    ).not.toContain(bad);
+    expect(
+      await f.call("agent_get_model_state", { sessionId: f.sid }),
+    ).toMatchObject({ providerId: "fixture" });
+    await f.call("agent_extensions_set_enabled", { enabled: false });
+    expect(await f.call("commands_list")).not.toContainEqual(
+      expect.objectContaining({ name: "disk-fixture" }),
+    );
+  });
+  it("gates automatic project extensions on explicit enablement and workspace trust", async () => {
+    const f = await fixture();
+    const dir = join(f.root, ".pi", "extensions");
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, "project.js"),
+      `export default function(pi){pi.registerCommand('project-fixture',{handler:async()=>{}});}`,
+    );
+    await f.call("agent_extensions_set_enabled", { enabled: true });
+    expect(await f.call("commands_list")).not.toContainEqual(
+      expect.objectContaining({ name: "project-fixture" }),
+    );
+    await f.call("folder_trust_respond", { cwd: f.root, trusted: true });
+    await f.call("agent_extensions_set_enabled", { enabled: true });
+    expect(await f.call("commands_list")).toContainEqual(
+      expect.objectContaining({ name: "project-fixture" }),
+    );
+    await f.call("folder_trust_respond", { cwd: f.root, trusted: false });
+    expect(await f.call("commands_list")).not.toContainEqual(
+      expect.objectContaining({ name: "project-fixture" }),
+    );
+    await f.call("agent_extensions_set_enabled", { enabled: false });
+    expect(await f.call("commands_list")).not.toContainEqual(
+      expect.objectContaining({ name: "project-fixture" }),
+    );
+  });
+  it("rejects failed extension commands and never reports a synthetic successful completion", async () => {
+    const f = await fixture({
+      extensions: [
+        (pi) => {
+          pi.registerCommand("unsupported-ui", {
+            handler: async (_args, ctx) => {
+              await ctx.ui.custom(() => {
+                throw Error("never");
+              });
+            },
+          });
+        },
+      ],
+    });
+    f.events.length = 0;
+    await expect(
+      f.call("agent_send", { sessionId: f.sid, text: "/unsupported-ui" }),
+    ).rejects.toThrow("not_implemented");
+    expect(f.events.some((e) => e.name === "agent://turn-error")).toBe(true);
+    expect(
+      f.events.some(
+        (e) =>
+          e.payload.event?.commandHandled && e.payload.event.aborted === false,
+      ),
+    ).toBe(false);
   });
   it("executes the real read tool only after an explicit matching permission", async () => {
     const f = await fixture();
@@ -546,7 +922,9 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
       expect.objectContaining({ name: "skill:fixture-skill" }),
     );
     await f.call("skills_toggle", { name: "fixture-skill", enabled: false });
-    expect(await f.call("commands_list")).not.toContainEqual(expect.objectContaining({name:'skill:fixture-skill'}));
+    expect(await f.call("commands_list")).not.toContainEqual(
+      expect.objectContaining({ name: "skill:fixture-skill" }),
+    );
     expect(await f.call("skills_list", { cwd: f.root })).toContainEqual(
       expect.objectContaining({ name: "fixture-skill", enabled: false }),
     );

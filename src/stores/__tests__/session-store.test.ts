@@ -36,6 +36,17 @@ describe("Pi transcript events", () => {
     expect(useSessionStore.getState().streaming).toBe(false);
   });
 
+  it("sums model calls within a turn and resets usage for a handled extension command", () => {
+    useSessionStore.getState().startStreaming();
+    emit({ type: "message_end", message: { role: "assistant", content: "first", usage: { input: 2, output: 1, totalTokens: 3 } } });
+    emit({ type: "message_end", message: { role: "assistant", content: "second", usage: { input: 4, output: 2, totalTokens: 6 } } });
+    expect(useSessionStore.getState().usage).toEqual({ promptTokens: 6, completionTokens: 3, totalTokens: 9 });
+    emit({ type: "agent_settled" });
+    useSessionStore.getState().startStreaming();
+    emit({ type: "agent_settled", commandHandled: true });
+    expect(useSessionStore.getState().usage).toEqual({});
+  });
+
   it("does not route late events into the newly selected session", () => {
     useSessionStore.getState().setSession("B");
     emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "old" }] } }, "A");

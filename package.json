@@ -21,6 +21,8 @@
     "dist:win": "pnpm dist:electron --win nsis",
     "dist:mac": "pnpm dist:electron --mac dmg",
     "test": "vitest run",
+    "audit:ipc": "node scripts/audit-contract.mjs",
+    "test:electron-ui": "node scripts/electron-ui-check.mjs",
     "git:push": "bash scripts/git-push.sh",
     "git:push:tags": "bash scripts/git-push.sh --tags"
   },

@@ -20,7 +20,7 @@ export function ActivityTab() {
     <div className="pd-tab">
       <div className="pd-activity-switch">
         <button className={`pd-pill${sub === "personal" ? " pd-pill--on" : ""}`} onClick={() => setSub("personal")}>与我相关</button>
-        <button className={`pd-pill${sub === "member" ? " pd-pill--on" : ""}`} onClick={() => setSub("member")}>成员动态</button>
+        <button className={`pd-pill${sub === "member" ? " pd-pill--on" : ""}`} disabled title="云成员动态尚未开放" onClick={() => setSub("member")}>成员动态</button>
       </div>
       <div className="pd-empty">{sub === "personal" ? "暂无与我有关的动态" : "暂无成员动态"}</div>
     </div>
@@ -54,11 +54,11 @@ export function PlanTab({ projectId }: { projectId: string }) {
       <div className="pd-toolbar">
         <div className="pd-toolbar__left">
           <button className="pd-btn pd-btn--primary" onClick={newTodo}>+ 新建待办</button>
-          <button className="pd-btn" onClick={() => window.alert("添加数据源（本地演示占位）")}>+ 添加数据源</button>
+          <button className="pd-btn" disabled title="云端数据源尚未开放">+ 添加数据源</button>
         </div>
         <div className="pd-toolbar__right">
           <button className="pd-btn">全部归属 <ChevronDownIcon size="sm" style={{ verticalAlign: "text-bottom" }} /></button>
-          <button className="pd-btn">全部来源 <ChevronDownIcon size="sm" style={{ verticalAlign: "text-bottom" }} /></button>
+          <button className="pd-btn" disabled title="当前仅支持本地来源">全部来源 <ChevronDownIcon size="sm" style={{ verticalAlign: "text-bottom" }} /></button>
           <button className="pd-btn">批量操作</button>
           <button className="pd-btn pd-btn--icon" aria-label="搜索"><SearchIcon size="sm" /></button>
         </div>
@@ -139,9 +139,9 @@ export function TaskTab({ projectId }: { projectId: string }) {
     <div className="pd-tab">
       <div className="pd-toolbar">
         <div className="pd-toolbar__left">
-          <button className="pd-btn">全部任务 <ChevronDownIcon size="sm" style={{ verticalAlign: "text-bottom" }} /></button>
-          <button className="pd-btn">全部来源 <ChevronDownIcon size="sm" style={{ verticalAlign: "text-bottom" }} /></button>
-          <span className="pd-toolbar__hint">你的任务是私密的，除非你共享它们</span>
+          <button className="pd-btn" disabled title="当前仅显示本地任务">全部任务 <ChevronDownIcon size="sm" style={{ verticalAlign: "text-bottom" }} /></button>
+          <button className="pd-btn" disabled title="当前仅支持本地来源">全部来源 <ChevronDownIcon size="sm" style={{ verticalAlign: "text-bottom" }} /></button>
+          <span className="pd-toolbar__hint">当前是本地任务记录，不会同步给云端成员</span>
         </div>
         <div className="pd-toolbar__right">
           <input className="pd-search-inline" placeholder="搜索任务标题" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -170,16 +170,8 @@ export function TaskTab({ projectId }: { projectId: string }) {
 // 资产
 // ============================================================
 
-const QUOTA_TOTAL_MB = 5 * 1024; // 5.00 GB
-
-function fmtSize(mb: number): string {
-  return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(2)} MB`;
-}
-
 function estimateUsed(assets: AssetItem[]): number {
-  // 本地演示：按文件数粗估（无真实字节）。
-  const files = assets.filter((a) => a.kind === "file").length;
-  return 9.02 + files * 0.1; // 基线对齐截图 9.02 MB
+  return new TextEncoder().encode(JSON.stringify(assets)).byteLength / (1024 * 1024);
 }
 
 export function AssetsTab({ projectId }: { projectId: string }) {
@@ -194,28 +186,20 @@ export function AssetsTab({ projectId }: { projectId: string }) {
     const name = window.prompt("文件夹名称");
     if (name && name.trim()) addAsset(projectId, { name: name.trim(), kind: "folder" });
   };
-  const upload = () => {
-    const name = window.prompt("上传文件名（本地演示，仅记录名称）", "新文件.pdf");
-    if (name && name.trim()) {
-      const ext = name.includes(".") ? name.split(".").pop()?.toUpperCase() : undefined;
-      addAsset(projectId, { name: name.trim(), kind: "file", ext, sizeLabel: "— KB" });
-    }
-  };
-
   const rows = assets.filter((a) => a.name.toLowerCase().includes(q.toLowerCase()));
 
   return (
     <div className="pd-tab">
       <div className="pd-toolbar">
         <div className="pd-toolbar__left">
-          <button className="pd-btn" onClick={newFolder}>新建文件夹</button>
-          <button className="pd-btn" onClick={upload}>上传文件</button>
+          <button className="pd-btn" onClick={newFolder}>新建本地分类</button>
+          <button className="pd-btn" disabled title="文件上传尚未接入；可在对话中添加真实附件">上传文件</button>
           <span className="pd-toolbar__hint">
-            存储空间已用 {fmtSize(used)} / {fmtSize(QUOTA_TOTAL_MB)}
+            本地条目元数据估算 {(used * 1024).toFixed(2)} KB，不代表文件容量或云配额
           </span>
         </div>
         <div className="pd-toolbar__right">
-          <button className="pd-btn">全部类型 <ChevronDownIcon size="sm" style={{ verticalAlign: "text-bottom" }} /></button>
+          <button className="pd-btn" disabled title="类型筛选尚未开放">全部类型 <ChevronDownIcon size="sm" style={{ verticalAlign: "text-bottom" }} /></button>
           <input className="pd-search-inline" placeholder="搜索文件或文件夹…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
       </div>
@@ -234,7 +218,7 @@ export function AssetsTab({ projectId }: { projectId: string }) {
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td className="pd-asset-empty" colSpan={6}>暂无资产，点击「上传文件」或「新建文件夹」开始。</td>
+              <td className="pd-asset-empty" colSpan={6}>暂无本地资产条目。文件上传尚未开放，可在对话中添加真实附件。</td>
             </tr>
           ) : (
             rows.map((a) => (

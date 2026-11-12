@@ -1,6 +1,7 @@
 import ts from 'typescript';
-import { readdir, writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { join, relative } from 'node:path';
 const root = new URL('../', import.meta.url).pathname;
 async function files(dir) {
   const result = [];
@@ -22,7 +23,7 @@ function symbolOf(node) {
   return symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
 }
 const walk = (node, callback) => { callback(node); ts.forEachChild(node, child => walk(child, callback)); };
-const location = (sf, node) => `${sf.fileName}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`;
+const location = (sf, node) => `${relative(root, sf.fileName)}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`;
 const literal = node => node && ts.isStringLiteralLike(node) ? node.text : undefined;
 const commands = new Set();
 walk(source.get('electron/shared/contract.ts'), node => {
@@ -63,8 +64,9 @@ const entries = new Map();
 for (const [path, sf] of source) {
   if (!path.startsWith('src/') || path === 'src/lib/agent-client.ts') continue;
   walk(sf, node => {
-    if (!ts.isCallExpression(node)) return;
-    const symbol = symbolOf(node.expression);
+    // Include function values in conditional dispatch, not just direct calls.
+    if (!ts.isIdentifier(node) || ts.isImportSpecifier(node.parent) || ts.isImportClause(node.parent) || ts.isExportSpecifier(node.parent)) return;
+    const symbol = symbolOf(node);
     for (const command of symbolCommands.get(symbol) ?? []) entries.set(command, [...entries.get(command) ?? [], location(sf, node)]);
   });
 }
@@ -75,6 +77,21 @@ const nativeEntries = {
   window_minimize: ['src/components/TitleBar.tsx'], window_toggle_maximize: ['src/components/TitleBar.tsx'],
   window_close: ['src/components/TitleBar.tsx'], window_is_maximized: ['src/components/TitleBar.tsx'],
 };
+let runtimeEvidence = null;
+const verifiedCommands = new Set();
+try {
+  const evidence = JSON.parse(await readFile(join(root, 'release/electron-ui-check.json'), 'utf8'));
+  if (evidence.artifact && evidence.artifactSha256 === createHash('sha256').update(await readFile(evidence.artifact)).digest('hex')) {
+    runtimeEvidence = { file: 'release/electron-ui-check.json', artifact: evidence.artifact, sha256: evidence.artifactSha256, mode: evidence.mode, checks: evidence.checks.map(check => check.name) };
+    for (const name of ['providers_save_provider', 'providers_save_model', 'agent_init', 'agent_list_sessions', 'agent_get_model_state', 'agent_new_session', 'agent_send', 'agent_set_model', 'agent_set_thinking_level']) verifiedCommands.add(name);
+    const names = evidence.checks.map(check => check.name);
+    if (names.some(name => name.includes('extension input accepted')) && names.some(name => name.includes('extension select cancelled'))) for (const command of ['agent_resolve_ui', 'agent_extensions_add', 'agent_extensions_set_enabled']) verifiedCommands.add(command);
+    if (names.some(name => name.includes('queues steering and follow-up'))) for (const command of ['agent_steer', 'agent_follow_up', 'agent_get_queue', 'agent_clear_queue']) verifiedCommands.add(command);
+    if (names.some(name => name.includes('topbar fork'))) for (const command of ['agent_fork_session', 'agent_rename_session']) verifiedCommands.add(command);
+    if (names.some(name => name.includes('sidebar restore'))) verifiedCommands.add('agent_load_session');
+    if (names.some(name => name.includes('BrowserWindow'))) for (const command of ['window_minimize', 'window_toggle_maximize', 'window_is_maximized']) verifiedCommands.add(command);
+  }
+} catch { /* A static audit must also work before any UI run. */ }
 const matrix = [...new Set([...commands, ...calls.keys(), ...handlers.keys()])].sort().map(command => {
   const handler = handlers.get(command);
   const callers = calls.get(command) ?? [];
@@ -82,16 +99,20 @@ const matrix = [...new Set([...commands, ...calls.keys(), ...handlers.keys()])].
   const whitelisted = commands.has(command);
   const status = !whitelisted ? 'deferred_not_whitelisted' : !handler ? 'missing_handler' : handler.unconditionalUnsupported ? 'unsupported' : uiEntries.length ? 'wired_static' : 'handler_without_ui_entry';
   const reachable = ['dialog_', 'window_', 'providers_', 'agent_', 'agents_defaults_', 'account_', 'notification_', 'skills_'].some(prefix => command.startsWith(prefix)) && whitelisted && status === 'wired_static' || ['folder_trust_respond', 'permission_mode_get', 'permission_mode_set', 'commands_list', 'export_text_file', 'read_text_file', 'write_text_file', 'read_file_base64', 'list_dir', 'browse_directory', 'path_stat', 'open_path', 'open_url', 'reveal_in_folder', 'mcp_auth_trigger', 'mcp_auth_status', 'mcp_config_read', 'mcp_config_save', 'mcp_config_path'].includes(command);
-  return { command, whitelisted, handler: handler?.location ?? null, status, reachability: !whitelisted ? 'deferred_or_hidden_legacy' : handler?.unconditionalUnsupported ? 'unsupported_legacy_card' : reachable ? 'reachable_route_static_review' : uiEntries.length ? 'static_calls_only_route_not_confirmed' : 'no_frontend_entry', verification: 'not_runtime_verified_this_round', caveat: handler?.conditionalUnsupported && !handler.unconditionalUnsupported ? 'conditional unsupported branch; inspect implementation' : null, callers, uiEntries };
+  return { command, whitelisted, handler: handler?.location ?? null, status, reachability: !whitelisted ? 'deferred_or_hidden_legacy' : handler?.unconditionalUnsupported ? 'unsupported_legacy_card' : reachable ? 'reachable_route_static_review' : uiEntries.length ? 'static_calls_only_route_not_confirmed' : 'no_frontend_entry', verification: verifiedCommands.has(command) ? 'verified_real_electron_local_fixture' : 'not_runtime_verified_this_round', caveat: handler?.conditionalUnsupported && !handler.unconditionalUnsupported ? 'conditional unsupported branch; inspect implementation' : null, callers, uiEntries };
 });
 const counts = {};
 for (const row of matrix) counts[row.status] = (counts[row.status] ?? 0) + 1;
-const report = { note: 'Static TypeScript symbol inventory plus manual route review. Reachable means the route exists in the current UI, not runtime success. No runtime verification is claimed by this script.', counts,
+const report = { note: 'Static TypeScript symbol inventory plus manual route review. Reachable means the route exists in the current UI, not runtime success. Runtime verification is attached only when the supplied main/ASAR artifact hash still matches the successful UI report.', counts, runtimeEvidence,
   manualReview: [
+    { area: 'MyFiles', status: 'local_listing_artifacts_deferred', evidence: 'MyFilesPanel uses list_dir/kind for actual local entries; the former memory_list artifacts default was unsupported and is explicitly deferred. Cloud upload is not implemented.' },
+    { area: 'Policy', status: 'local_preview_not_enforced', evidence: 'PolicySettingsPanel edits localStorage only. It does not enforce model/skill/permission restrictions in Pi or the main process; the UI states this limit.' },
+    { area: 'Usage quotas', status: 'local_reminder_not_enforced', evidence: 'Usage records come from actual session events, but thresholds are reminders. They do not stop sends and costs are estimates.' },
+    { area: 'External notification channels', status: 'drafts_only', evidence: 'Channel drafts remain local. External send/test is disabled until a restricted main-process transport is implemented; production CSP remains strict.' },
     { area: 'MCP', status: 'reachable', evidence: 'AgentResourcesPanel.tsx embeds McpConfigEditor. JSON read/save/path and OAuth have real routes; dedicated upsert/delete/toggle buttons remain in hidden legacy connector UI.' },
-    { area: 'Project collaboration', status: 'demo_or_deferred', evidence: 'ProjectDetailView.tsx invite/send actions and project-tabs.tsx uploads/storage estimates plus project-picker.tsx presets are local simulations. Must label deferred; no real cloud collaboration or upload.' },
+    { area: 'Project collaboration', status: 'local_only_cloud_deferred', evidence: 'ProjectDetailView.tsx and project-tabs.tsx cloud invite/upload/project-level fake bindings are disabled or explicitly deferred. Local project metadata, instructions, tasks and actual Pi conversations remain; storage metadata estimates are not a capacity quota.' },
     { area: 'Legacy feature routes', status: 'deferred', evidence: 'App.tsx blocks assistant/expert/automation/library/inspiration/cloud routes; old invoke wrappers remain to preserve source, not implemented capabilities.' },
-    { area: 'Models/thinking/Pi UI/attachments/queue/fork/trusted extensions', status: 'implementation_in_progress', evidence: 'Tasks 5/6/7 are adding explicit provider+model identity and restricted IPC. Re-run this report after freeze and attach real desktop evidence.' },
+    { area: 'Models/thinking/Pi UI/attachments/queue/fork/trusted extensions', status: 'implemented', evidence: 'Explicit provider/model identity, actual thinking state, typed extension forms, native attachment grants, SDK queues/fork and opt-in extension loading are implemented. See hash-bound runtimeEvidence for the tested subset.' },
     { area: 'Built-in API prices', status: 'fallback_exposed', evidence: 'providers.ts uses numeric zero internally when price unknown but returns pricingKnown=false. UI must not call this free usage.' },
     { area: 'Local settings and project data', status: 'local_only', evidence: 'Browser persisted settings/projects are local state. They are not a remote account, team, mail, policy or cloud-storage implementation.' },
   ], matrix };

@@ -87,6 +87,11 @@ vi.mock("@/lib/agent-client", async () => {
     mod[name] = name.startsWith("on") ? handler : asyncArr;
   }
   // 个别需要特定返回。
+  mod.agentGetQueue = async () => ({ steering: [], followUp: [] });
+  mod.agentClearQueue = mod.agentGetQueue;
+  mod.agentSteer = mod.agentGetQueue;
+  mod.agentFollowUp = mod.agentGetQueue;
+  mod.agentResolveUi = asyncEmpty;
   mod.rewindExecute = asyncEmpty;
   mod.rewindPoints = asyncArr;
   mod.providersList = async () => ({ providers: [], models: [] });

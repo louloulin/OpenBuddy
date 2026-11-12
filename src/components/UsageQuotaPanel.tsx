@@ -59,6 +59,8 @@ export function UsageQuotaPanel() {
         </div>
       </div>
 
+      <p className="quota-panel__hint">阈值仅作本地用量提醒，不会阻止发送。费用为估算，实际以提供商账单为准。</p>
+
       {/* 汇总数字 */}
       <div className="quota-panel__stats">
         <div className="quota-panel__stat">
@@ -81,7 +83,7 @@ export function UsageQuotaPanel() {
       {quota && (
         <div className="quota-panel__quota">
           <div className="quota-panel__quota-head">
-            <span>配额</span>
+            <span>提醒进度</span>
             <span className={"quota-panel__quota-pct" + (quota.exceeded ? " exceeded" : quota.nearLimit ? " near" : "")}>
               {quota.used.toLocaleString()} / {quota.limit.toLocaleString()} ({quota.pct}%)
             </span>
@@ -92,8 +94,8 @@ export function UsageQuotaPanel() {
               style={{ width: `${Math.min(100, quota.pct)}%` }}
             />
           </div>
-          {quota.exceeded && <span className="quota-panel__quota-warn">⚠ 已超限</span>}
-          {quota.nearLimit && <span className="quota-panel__quota-warn">⚠ 接近上限</span>}
+          {quota.exceeded && <span className="quota-panel__quota-warn">已达到提醒阈值，仍可发送</span>}
+          {quota.nearLimit && <span className="quota-panel__quota-warn">接近提醒阈值</span>}
         </div>
       )}
 
@@ -114,7 +116,7 @@ export function UsageQuotaPanel() {
 
       {/* 配额设置 */}
       <div className="quota-panel__config">
-        <div className="quota-panel__config-title">配额设置</div>
+        <div className="quota-panel__config-title">提醒设置</div>
         <label className="quota-panel__config-row">
           <span>周期</span>
           <select
@@ -126,11 +128,11 @@ export function UsageQuotaPanel() {
           </select>
         </label>
         <label className="quota-panel__config-row">
-          <span>Token 上限</span>
+          <span>Token 提醒阈值</span>
           <input
             type="number"
             value={config?.tokenLimit ?? ""}
-            placeholder="不限"
+            placeholder="不提醒"
             onChange={(e) => saveConfig({ ...(config ?? { period: "daily" }), tokenLimit: parseInt(e.target.value, 10) || 0 })}
           />
         </label>

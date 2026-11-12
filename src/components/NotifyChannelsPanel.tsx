@@ -8,7 +8,6 @@ import {
   listAllNotifyChannels,
   registerNotifyChannel,
   unregisterNotifyChannel,
-  dispatchNotification,
   type NotifyChannel,
   type ChannelKind,
 } from "@/lib/notify-channels";
@@ -41,12 +40,12 @@ export function NotifyChannelsPanel({ onToast }: { onToast?: (msg: string) => vo
       label,
       kind: newKind,
       endpoint: newEndpoint.trim() || undefined,
-      enabled: true,
+      enabled: false,
     });
     setNewLabel("");
     setNewEndpoint("");
     setRefreshKey((k) => k + 1);
-    onToast?.(`已添加渠道 ${label}`);
+    onToast?.(`已保存本地渠道草稿 ${label}，尚未接入发送`);
   };
 
   const remove = (id: string) => {
@@ -55,41 +54,27 @@ export function NotifyChannelsPanel({ onToast }: { onToast?: (msg: string) => vo
     onToast?.("已移除渠道");
   };
 
-  const toggle = (id: string) => {
-    // 注销再重新注册(toggle enabled)。
-    const ch = channels.find((c) => c.id === id);
-    if (!ch) return;
-    unregisterNotifyChannel(id);
-    registerNotifyChannel({ ...ch, enabled: !ch.enabled });
-    setRefreshKey((k) => k + 1);
-  };
-
-  const testSend = async (id: string) => {
-    const res = await dispatchNotification({ title: "测试通知", body: "来自 OpenBuddy 的测试消息", level: "info" });
-    const hit = res.find((r) => r.id === id);
-    onToast?.(hit?.ok ? "测试通知已发送" : "发送失败(检查 endpoint)");
-  };
-
   return (
     <div className="notify-panel" role="region" aria-label="通知渠道">
       <div className="notify-panel__head">
         <span className="notify-panel__title">通知渠道</span>
-        <span className="notify-panel__hint">推送 agent 通知到外部渠道(Slack/Discord/Webhook/邮件/桌面)</span>
+        <span className="notify-panel__hint">渠道配置尚未接入主进程，当前仅可管理本地草稿；外部发送与测试暂不可用。</span>
       </div>
 
       {/* 已注册渠道列表 */}
       {channels.length > 0 ? (
         <ul className="notify-panel__list">
           {channels.map((ch) => (
-            <li key={ch.id} className={"notify-panel__row" + (ch.enabled ? "" : " disabled")}>
+            <li key={ch.id} className="notify-panel__row disabled">
               <span className="notify-panel__row-kind">{KIND_LABELS[ch.kind]}</span>
               <span className="notify-panel__row-label">{ch.label}</span>
               {ch.endpoint && <span className="notify-panel__row-endpoint" title={ch.endpoint}>{ch.endpoint.slice(0, 40)}{ch.endpoint.length > 40 ? "…" : ""}</span>}
               <div className="notify-panel__row-actions">
-                <button type="button" className="notify-panel__btn" onClick={() => toggle(ch.id)} title={ch.enabled ? "禁用" : "启用"}>
-                  <span className={ch.enabled ? "notify-dot notify-dot--on" : "notify-dot"} />
+                <span>未接入发送</span>
+                <button type="button" className="notify-panel__btn" disabled title="渠道尚未接入主进程，不能启用发送">
+                  <span className="notify-dot" />
                 </button>
-                <button type="button" className="notify-panel__btn" onClick={() => void testSend(ch.id)} disabled={!ch.enabled} title="测试发送">
+                <button type="button" className="notify-panel__btn" disabled title="发送测试尚未接入主进程">
                   测试
                 </button>
                 <button type="button" className="notify-panel__btn notify-panel__btn--danger" onClick={() => remove(ch.id)} title="移除">

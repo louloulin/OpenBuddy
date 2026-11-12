@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDownIcon } from "@/foundation/components/Icon/icons";
-import { open as openDialog } from "@/lib/ipc";
+import { open as openDialog, invoke } from "@/lib/ipc";
 import {
   SearchIcon,
   AddIcon,
@@ -10,8 +10,6 @@ import {
   RefreshCwIcon,
 } from "@/foundation/components/Icon/icons";
 import { FileText, FileSpreadsheet, FileImage, FileCode, Film, Music, Globe, File, FolderOpen } from "lucide-react";
-import { memoryList } from "@/lib/agent-client";
-import type { MemoryEntry } from "@/lib/types";
 import { formatFileSize, inferFileTypeFromExt, relativeTime, type FileType, type LocalFileItem } from "@/lib/file-utils";
 
 function FileTypeIcon({ type, size = 16 }: { type: FileType; size?: number }) {
@@ -45,7 +43,7 @@ interface MyFilesPanelProps {
 }
 
 export function MyFilesPanel({ cwd, onToast }: MyFilesPanelProps) {
-  const [tab, setTab] = useState<"artifacts" | "local">("artifacts");
+  const [tab, setTab] = useState<"artifacts" | "local">("local");
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -55,16 +53,18 @@ export function MyFilesPanel({ cwd, onToast }: MyFilesPanelProps) {
       <div className="myfiles-header">
         <h2 className="myfiles-title">我的文件</h2>
         <p className="myfiles-subtitle">
-          快捷查看任务名成果，上传文件到网络存储开启跨项目应用。
+          查看当前工作区与用户选择的本地文件；此入口不提供网络上传。
         </p>
       </div>
 
       <div className="myfiles-tabs">
         <button
           className={`myfiles-tab ${tab === "artifacts" ? "myfiles-tab--active" : ""}`}
-          onClick={() => setTab("artifacts")}
+          disabled
+          aria-label="任务成果"
+          title="任务成果聚合暂未开放"
         >
-          <BookIcon size="sm" /> 任务成果
+          <BookIcon size="sm" /> 任务成果（暂缓）
         </button>
         <button
           className={`myfiles-tab ${tab === "local" ? "myfiles-tab--active" : ""}`}
@@ -108,14 +108,7 @@ export function MyFilesPanel({ cwd, onToast }: MyFilesPanelProps) {
       </div>
 
       <div className="myfiles-body">
-        {tab === "artifacts" ? (
-          <ArtifactsTab
-            cwd={cwd}
-            searchQuery={searchQuery}
-            typeFilter={typeFilter}
-            onToast={onToast}
-          />
-        ) : (
+        {tab === "artifacts" ? <p>任务成果聚合暂未开放。</p> : (
           <LocalFilesTab
             cwd={cwd}
             searchQuery={searchQuery}
@@ -124,93 +117,6 @@ export function MyFilesPanel({ cwd, onToast }: MyFilesPanelProps) {
           />
         )}
       </div>
-    </div>
-  );
-}
-
-function ArtifactsTab({
-  cwd,
-  searchQuery,
-  typeFilter,
-  onToast,
-}: {
-  cwd?: string;
-  searchQuery: string;
-  typeFilter: string;
-  onToast?: (msg: string) => void;
-}) {
-  const [entries, setEntries] = useState<MemoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      const list = await memoryList(cwd);
-      setEntries(list);
-    } catch (e) {
-      onToast?.(`加载任务成果失败：${String(e).replace(/^Error:\s*/, "")}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [cwd, onToast]);
-
-  useEffect(() => { reload(); }, [reload]);
-
-  const filtered = entries.filter((e) => {
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      if (!e.path.toLowerCase().includes(q) && !e.content.toLowerCase().includes(q))
-        return false;
-    }
-    if (typeFilter !== "all") {
-      const ft = inferFileTypeFromExt(e.path);
-      if (ft !== typeFilter) return false;
-    }
-    return true;
-  });
-
-  if (loading) {
-    return <div className="myfiles-empty">加载中…</div>;
-  }
-
-  if (filtered.length === 0) {
-    return (
-      <div className="myfiles-empty">
-        <MyFilesIconV2 size="xl" />
-        <p>暂无文件</p>
-        <button className="myfiles-empty-btn" onClick={reload}>
-          <RefreshCwIcon size="sm" /> 刷新
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="myfiles-table">
-      <div className="myfiles-table-head">
-        <span className="myfiles-col-name">名称</span>
-        <span className="myfiles-col-type">类型</span>
-        <span className="myfiles-col-scope">范围</span>
-      </div>
-      {filtered.map((entry) => {
-        const ft = inferFileTypeFromExt(entry.path);
-        return (
-          <div
-            key={`${entry.scope}/${entry.path}`}
-            className="myfiles-row"
-            title={entry.content.slice(0, 200)}
-          >
-            <span className="myfiles-col-name">
-              <FileTypeIcon type={ft} size={18} />
-              <span className="myfiles-row-name">{entry.path}</span>
-            </span>
-            <span className="myfiles-col-type">{ft}</span>
-            <span className="myfiles-col-scope">
-              {entry.scope === "global" ? "全局" : "工作区"}
-            </span>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -235,21 +141,20 @@ function LocalFilesTab({
     if (!dir) return;
     setLoading(true);
     try {
-      const { invoke } = await import("@/lib/ipc");
       const entries: Array<{
         name: string;
         path: string;
-        is_dir: boolean;
+        kind: string;
         size: number;
-        modified_at: number;
-      }> = await invoke("browse_directory", { path: dir });
+        modified_at?: number;
+      }> = await invoke("list_dir", { path: dir });
       const items: LocalFileItem[] = entries.map((e) => ({
         name: e.name,
         path: e.path,
-        isDir: e.is_dir,
+        isDir: e.kind === "directory",
         size: e.size,
-        modifiedAt: e.modified_at,
-        type: inferFileTypeFromExt(e.name, e.is_dir),
+        modifiedAt: e.modified_at ?? 0,
+        type: inferFileTypeFromExt(e.name, e.kind === "directory"),
       }));
       items.sort((a, b) => {
         if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
@@ -258,7 +163,7 @@ function LocalFilesTab({
       setFiles(items);
     } catch {
       setFiles([]);
-      onToast?.("该功能需要 browse_directory Electron 命令支持");
+      onToast?.("无法读取本地目录，请通过目录选择器重新授权后重试。");
     } finally {
       setLoading(false);
     }
@@ -276,12 +181,20 @@ function LocalFilesTab({
     setBreadcrumb((prev) => prev.slice(0, index + 1));
   };
 
-  const handlePickFiles = async () => {
+  const handlePickFile = async () => {
     try {
-      const selected = await openDialog({ multiple: true });
+      const selected = await openDialog({ multiple: false, directory: false, title: "选择并在默认应用中打开本地文件" });
+      const path = Array.isArray(selected) ? selected[0] : selected;
+      if (path) await invoke("open_path", { path });
+    } catch { onToast?.("无法打开所选本地文件，请重新选择后重试。"); }
+  };
+
+  const handlePickDirectory = async () => {
+    try {
+      const selected = await openDialog({ directory: true, multiple: false, title: "选择本地文件目录" });
       if (!selected) return;
-      const paths = Array.isArray(selected) ? selected : [selected];
-      onToast?.(`已选择 ${paths.length} 个文件`);
+      const path = Array.isArray(selected) ? selected[0] : selected;
+      if (path) setBreadcrumb([path]);
     } catch {
       onToast?.("文件选择不可用");
     }
@@ -300,8 +213,9 @@ function LocalFilesTab({
   return (
     <div className="myfiles-local">
       <div className="myfiles-local-toolbar">
-        <button className="myfiles-action-btn" onClick={handlePickFiles}>
-          <AddIcon size="sm" /> 上传文件
+        <button className="myfiles-action-btn" onClick={handlePickFile} title="选择后在系统默认应用中打开">选择本地文件</button>
+        <button className="myfiles-action-btn" onClick={handlePickDirectory}>
+          <AddIcon size="sm" /> 选择目录
         </button>
         <button className="myfiles-action-btn" onClick={() => loadDir(currentDir)}>
           <RefreshCwIcon size="sm" /> 刷新
@@ -371,7 +285,7 @@ function LocalFilesTab({
                 {file.isDir ? "文件夹" : file.type}
               </span>
               <span className="myfiles-col-time">
-                {relativeTime(file.modifiedAt)}
+                {file.modifiedAt ? relativeTime(file.modifiedAt) : "—"}
               </span>
               <span className="myfiles-col-size">
                 {file.isDir ? "-" : formatFileSize(file.size)}

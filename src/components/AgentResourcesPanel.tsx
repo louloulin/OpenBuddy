@@ -1,3 +1,5 @@
+import { ensureSession } from "@/lib/ensure-session";
+import { TrustedExtensionsPanel } from "./TrustedExtensionsPanel";
 import { useCallback, useEffect, useState } from "react";
 import { skillsAdd, skillsList, skillsRemove, skillsToggle, mcpAuthStatus, mcpAuthTrigger } from "@/lib/agent-client";
 import { dialog } from "@/lib/ipc";
@@ -6,7 +8,7 @@ import { McpConfigEditor } from "./experts-panel/connectors/McpConfigEditor";
 
 /** MVP resources use installed Pi skills and the actual MCP configuration. */
 export function AgentResourcesPanel({ cwd, sessionId, onToast }: { cwd?: string; sessionId?: string; onToast?: (message: string) => void }) {
-  const [tab, setTab] = useState<"skills" | "mcp">("skills");
+  const [tab, setTab] = useState<"skills" | "mcp" | "extensions">("skills");
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [auth, setAuth] = useState<McpAuthStatusEntry[]>([]);
   const [authBusy, setAuthBusy] = useState(false);
@@ -52,12 +54,13 @@ export function AgentResourcesPanel({ cwd, sessionId, onToast }: { cwd?: string;
     <nav aria-label="资源类型">
       <button onClick={() => setTab("skills")} aria-pressed={tab === "skills"}>已安装技能</button>
       <button onClick={() => setTab("mcp")} aria-pressed={tab === "mcp"}>MCP 配置</button>
+      <button onClick={() => setTab("extensions")} aria-pressed={tab === "extensions"}>可信扩展</button>
     </nav>
     {error && <p role="alert">{error}</p>}
-    {tab === "mcp" ? <div>
+    {tab === "extensions" ? <TrustedExtensionsPanel /> : tab === "mcp" ? <div>
       <section aria-label="MCP 授权">
         <h3>远程服务授权</h3>
-        {!sessionId && <p>请先创建或打开一个会话，再进入此页授权 MCP 服务。</p>}
+        {!sessionId && <div><p>授权 MCP 需要已加载的 Pi 会话。</p><button disabled={authBusy} onClick={() => { setAuthBusy(true); void ensureSession().catch(error => setAuthMessage(String(error))).finally(() => setAuthBusy(false)); }}>使用当前默认模型创建会话</button></div>}
         {sessionId && <button disabled={authBusy} onClick={() => { void refreshAuth().catch(error => setAuthMessage(`读取授权状态失败：${String(error)}`)); }}>刷新授权状态</button>}
         {authMessage && <p role="alert">{authMessage}</p>}
         {auth.map(entry => <div key={entry.serverName} className="settings-row">

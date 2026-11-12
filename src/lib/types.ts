@@ -121,7 +121,7 @@ export interface PiMessage {
   toolCallId?: string;
   toolName?: string;
   isError?: boolean;
-  usage?: { input?: number; output?: number; totalTokens?: number; cacheRead?: number };
+  usage?: { input?: number; output?: number; totalTokens?: number; cacheRead?: number; cacheWrite?: number };
 }
 export interface PiMessageDelta {
   type: string;

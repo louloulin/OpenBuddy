@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Composer } from "../Composer";
 
 const base = { streaming: false, onSend: vi.fn(), onCancel: vi.fn() };
@@ -106,7 +106,7 @@ describe("Composer", () => {
   });
 
   // ---------- 消息队列:流式时入队 ----------
-  it("streaming + onEnqueue 时显示入队按钮,点击触发 onEnqueue 并清空输入", () => {
+  it("streaming + onEnqueue 时显示入队按钮,点击触发 onEnqueue 并清空输入", async () => {
     const onEnqueue = vi.fn();
     const onDraftChange = vi.fn();
     render(
@@ -122,8 +122,23 @@ describe("Composer", () => {
     // 入队按钮可访问名 = "加入待发送队列"。
     const btn = screen.getByRole("button", { name: "加入待发送队列" });
     fireEvent.click(btn);
-    expect(onEnqueue).toHaveBeenCalledWith("排队中");
-    expect(onDraftChange).toHaveBeenLastCalledWith("");
+    expect(onEnqueue).toHaveBeenCalledWith("排队中", [], "followUp");
+    await waitFor(() => expect(onDraftChange).toHaveBeenLastCalledWith(""));
+  });
+
+  it("steer 入队失败保留草稿并保持忙碌防止重复点击", async () => {
+    let reject!: (error: Error) => void;
+    const enqueue = vi.fn(() => new Promise<void>((_resolve, fail) => { reject = fail; }));
+    render(<Composer {...base} streaming onEnqueue={enqueue} draft="引导输入" draftKey="steer-test" />);
+    fireEvent.change(screen.getByRole("combobox", { name: "排队模式" }), { target: { value: "steer" } });
+    const button = screen.getByRole("button", { name: "加入待发送队列" });
+    fireEvent.click(button);
+    expect(enqueue).toHaveBeenCalledWith("引导输入", [], "steer");
+    expect(button).toBeDisabled(); expect(screen.getByRole("textbox")).toHaveValue("引导输入");
+    reject(new Error("queue rejected"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("入队失败");
+    expect(screen.getByRole("textbox")).toHaveValue("引导输入");
+    await waitFor(() => expect(button).toBeEnabled());
   });
 
   it("streaming 但文本为空时不渲染入队按钮", () => {

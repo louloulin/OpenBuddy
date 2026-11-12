@@ -31,6 +31,7 @@ function fixture() {
       case "agents_defaults_save": defaultKey = (args.defaults as { defaultModel: string }).defaultModel; return;
       case "agent_list_sessions": return [{ sessionId: "one", title: "Session One", cwd: "/workspace" }, { sessionId: "two", title: "Session Two", cwd: "/workspace" }];
       case "agent_list_workspaces": case "commands_list": return [];
+      case "agent_get_queue": case "agent_clear_queue": return { steering: [], followUp: [] };
       case "agent_load_session": case "agent_get_model_state": return state(String(args.sessionId), args.sessionId === "one" ? "a" : "b");
       case "agent_set_model": return state(String(args.sessionId), String(args.providerId));
       case "agent_set_thinking_level": return { ...state(String(args.sessionId), "b"), thinkingLevel: args.level };

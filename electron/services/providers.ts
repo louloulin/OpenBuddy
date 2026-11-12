@@ -53,7 +53,9 @@ const presets: Record<
     authScheme: "x_api_key",
   },
 };
-export function modelKey(providerId:string,modelId:string) {return `model:${encodeURIComponent(providerId)}/${encodeURIComponent(modelId)}`;}
+export function modelKey(providerId: string, modelId: string) {
+  return `model:${encodeURIComponent(providerId)}/${encodeURIComponent(modelId)}`;
+}
 function endpoint(value: string) {
   const url = new URL(value);
   if (
@@ -109,7 +111,7 @@ export class Providers {
         const cost = m.cost ?? builtin?.cost;
         return {
           ...m,
-          modelKey: modelKey(m.providerId,m.modelId),
+          modelKey: modelKey(m.providerId, m.modelId),
           input: m.input ?? builtin?.input ?? ["text"],
           reasoning: m.reasoning ?? builtin?.reasoning ?? false,
           maxTokens: m.maxTokens ?? builtin?.maxTokens ?? 8192,
@@ -130,7 +132,8 @@ export class Providers {
       this.runtime.unregisterProvider(id);
     const data = this.catalog.read();
     for (const p of data.providers) {
-      if(!['messages','responses','chat_completions'].includes(p.apiBackend))throw Error(`unsupported_api_backend: ${p.apiBackend}`);
+      if (!["messages", "responses", "chat_completions"].includes(p.apiBackend))
+        throw Error(`unsupported_api_backend: ${p.apiBackend}`);
       const api =
         p.apiBackend === "messages"
           ? "anthropic-messages"
@@ -285,7 +288,9 @@ export class Providers {
       model.compat = compat as Record<string, boolean>;
     }
     data.models = data.models
-      .filter((m) => m.modelId !== model.modelId || m.providerId !== model.providerId)
+      .filter(
+        (m) => m.modelId !== model.modelId || m.providerId !== model.providerId,
+      )
       .concat(model);
     this.catalog.write(data);
     await this.sync();
@@ -293,43 +298,102 @@ export class Providers {
   async deleteProvider(id: string) {
     const data = this.catalog.read();
     data.providers = data.providers.filter((p) => p.id !== id);
-    const config=this.settings.config.read();
-    const removedDefault=data.models.find(m=>m.providerId===id&&(config.defaults.defaultModel===modelKey(id,m.modelId)||(config.defaults.defaultModel===m.modelId&&(!config.defaults.defaultProviderId||config.defaults.defaultProviderId===id))));
-    if(removedDefault){config.defaults.defaultModel=modelKey(id,removedDefault.modelId);config.defaults.defaultProviderId=id;this.settings.config.write(config);}
+    const config = this.settings.config.read();
+    const removedDefault = data.models.find(
+      (m) =>
+        m.providerId === id &&
+        (config.defaults.defaultModel === modelKey(id, m.modelId) ||
+          (config.defaults.defaultModel === m.modelId &&
+            (!config.defaults.defaultProviderId ||
+              config.defaults.defaultProviderId === id))),
+    );
+    if (removedDefault) {
+      config.defaults.defaultModel = modelKey(id, removedDefault.modelId);
+      config.defaults.defaultProviderId = id;
+      this.settings.config.write(config);
+    }
     data.models = data.models.filter((m) => m.providerId !== id);
     this.settings.secrets.set(`provider:${id}`, undefined);
     await this.runtime.removeRuntimeApiKey(id);
     this.catalog.write(data);
     await this.sync();
   }
-  async deleteModel(id: string,providerId?:string) {
-    const selected=this.entry(id,providerId);if(!selected)throw Error('model_not_found: 模型不存在');
+  async deleteModel(id: string, providerId?: string) {
+    const selected = this.entry(id, providerId);
+    if (!selected) throw Error("model_not_found: 模型不存在");
     const data = this.catalog.read();
-    data.models = data.models.filter((m) => m.modelId !== selected.modelId || m.providerId !== selected.providerId);
+    data.models = data.models.filter(
+      (m) =>
+        m.modelId !== selected.modelId || m.providerId !== selected.providerId,
+    );
     this.catalog.write(data);
-    const config=this.settings.config.read();
-    if(config.defaults.defaultModel===modelKey(selected.providerId,selected.modelId)||(config.defaults.defaultModel===selected.modelId&&(!config.defaults.defaultProviderId||config.defaults.defaultProviderId===selected.providerId))){config.defaults.defaultModel=modelKey(selected.providerId,selected.modelId);config.defaults.defaultProviderId=selected.providerId;this.settings.config.write(config);}
+    const config = this.settings.config.read();
+    if (
+      config.defaults.defaultModel ===
+        modelKey(selected.providerId, selected.modelId) ||
+      (config.defaults.defaultModel === selected.modelId &&
+        (!config.defaults.defaultProviderId ||
+          config.defaults.defaultProviderId === selected.providerId))
+    ) {
+      config.defaults.defaultModel = modelKey(
+        selected.providerId,
+        selected.modelId,
+      );
+      config.defaults.defaultProviderId = selected.providerId;
+      this.settings.config.write(config);
+    }
     await this.sync();
   }
-  entry(id?:string,providerId?:string):Model|undefined {
-    const data=this.catalog.read();
-    if(!id){const defaults=this.settings.config.read().defaults;if(defaults.defaultModel)return this.entry(defaults.defaultModel,defaults.defaultProviderId);return data.models.find(m=>this.settings.secrets.has(`provider:${m.providerId}`))??data.models[0];}
-    const exact=data.models.find(m=>modelKey(m.providerId,m.modelId)===id&&(!providerId||m.providerId===providerId));if(exact)return exact;
-    const matches=data.models.filter(m=>m.modelId===id&&(!providerId||m.providerId===providerId));
-    if(matches.length>1)throw Error('ambiguous_model: 请同时指定providerId和modelId');
+  entry(id?: string, providerId?: string): Model | undefined {
+    const data = this.catalog.read();
+    if (!id) {
+      const defaults = this.settings.config.read().defaults;
+      if (defaults.defaultModel)
+        return this.entry(defaults.defaultModel, defaults.defaultProviderId);
+      return (
+        data.models.find((m) =>
+          this.settings.secrets.has(`provider:${m.providerId}`),
+        ) ?? data.models[0]
+      );
+    }
+    const exact = data.models.find(
+      (m) =>
+        modelKey(m.providerId, m.modelId) === id &&
+        (!providerId || m.providerId === providerId),
+    );
+    if (exact) return exact;
+    const matches = data.models.filter(
+      (m) => m.modelId === id && (!providerId || m.providerId === providerId),
+    );
+    if (matches.length > 1)
+      throw Error("ambiguous_model: 请同时指定providerId和modelId");
     return matches[0];
   }
-  model(id?: string,providerId?:string) {
-    const m=this.entry(id,providerId);
-    return m?this.runtime.getModel(m.providerId,m.modelId):undefined;
+  model(id?: string, providerId?: string) {
+    const m = this.entry(id, providerId);
+    return m ? this.runtime.getModel(m.providerId, m.modelId) : undefined;
   }
   defaults() {
-    const defaults=this.settings.config.read().defaults;
-    if(!defaults.defaultModel)return {...defaults,defaultProviderId:undefined,invalidDefault:false};
-    let entry:Model|undefined;
-    try{entry=this.entry(defaults.defaultModel,defaults.defaultProviderId);}catch{return {...defaults,invalidDefault:true};}
-    if(!entry)return {...defaults,invalidDefault:true};
-    return {...defaults,defaultModel:modelKey(entry.providerId,entry.modelId),defaultProviderId:entry.providerId,invalidDefault:false};
+    const defaults = this.settings.config.read().defaults;
+    if (!defaults.defaultModel)
+      return {
+        ...defaults,
+        defaultProviderId: undefined,
+        invalidDefault: false,
+      };
+    let entry: Model | undefined;
+    try {
+      entry = this.entry(defaults.defaultModel, defaults.defaultProviderId);
+    } catch {
+      return { ...defaults, invalidDefault: true };
+    }
+    if (!entry) return { ...defaults, invalidDefault: true };
+    return {
+      ...defaults,
+      defaultModel: modelKey(entry.providerId, entry.modelId),
+      defaultProviderId: entry.providerId,
+      invalidDefault: false,
+    };
   }
   async authStatus() {
     const list = this.list();

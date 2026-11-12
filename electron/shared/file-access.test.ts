@@ -9,7 +9,7 @@ async function fixture() { const dir = await mkdtemp(join(tmpdir(), 'openbuddy-f
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64');
 it('requires native grants, checks file identity and allows a genuine file to be resent', async () => {
   const { FileAccess } = await import('./file-access.js');
-  const access = new FileAccess(), dir = await fixture(), path = join(dir, 'pixel.png');
+  const access = new FileAccess(() => true), dir = await fixture(), path = join(dir, 'pixel.png');
   await writeFile(path, png);
   await expect(access.attach([{ path }])).rejects.toThrow('file_not_authorized');
   await access.grant(path);
@@ -29,7 +29,7 @@ it('rejects magic-valid image bytes when the actual image decoder fails', async 
 });
 it('expires native grants after the window-scoped authorization lifetime', async () => {
   const { FileAccess } = await import('./file-access.js');
-  const access = new FileAccess(), dir = await fixture(), path = join(dir, 'pixel.png');
+  const access = new FileAccess(() => true), dir = await fixture(), path = join(dir, 'pixel.png');
   await writeFile(path, png); await access.grant(path);
   vi.useFakeTimers(); vi.setSystemTime(Date.now() + 31 * 60 * 1000);
   await expect(access.attach([{ path }])).rejects.toThrow('file_not_authorized');
@@ -37,7 +37,7 @@ it('expires native grants after the window-scoped authorization lifetime', async
 });
 it('rejects an aggregate image transfer over 20 MiB before returning data', async () => {
   const { FileAccess } = await import('./file-access.js');
-  const access = new FileAccess(), dir = await fixture(), refs = [];
+  const access = new FileAccess(() => true), dir = await fixture(), refs = [];
   for (let n = 0; n < 3; n++) {
     const path = join(dir, `${n}.png`);
     await writeFile(path, png); await truncate(path, 8 * 1024 * 1024); await access.grant(path); refs.push({ path });
@@ -46,7 +46,7 @@ it('rejects an aggregate image transfer over 20 MiB before returning data', asyn
 });
 it('uses bytes rather than an image extension and enforces bounded text and total size', async () => {
   const { FileAccess } = await import('./file-access.js');
-  const access = new FileAccess(), dir = await fixture();
+  const access = new FileAccess(() => true), dir = await fixture();
   const fake = join(dir, 'fake.png'), text = join(dir, 'note.txt'), huge = join(dir, 'huge.png');
   await writeFile(fake, Buffer.from([0, 255, 1, 2])); await writeFile(text, 'hello workspace'); await writeFile(huge, png); await truncate(huge, 10 * 1024 * 1024 + 1);
   await access.grant(fake); await access.grant(text); await access.grant(huge);

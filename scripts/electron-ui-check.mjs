@@ -1,23 +1,40 @@
 import { _electron as electron } from 'playwright-core';
 import { createServer } from 'node:http';
-import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 // Functional automation in a real Electron process importing the exact supplied
 // main module. The temporary bootstrap selects an isolated profile and packaged
 // file:// mode. This is separate from installation/Gatekeeper/executable smoke.
 const require = createRequire(import.meta.url);
 const main = resolve(process.argv.find(arg => arg.startsWith('--main='))?.slice(7) ?? 'dist-electron/main.js');
+const artifact = main.includes('.asar/') ? `${main.split('.asar/')[0]}.asar` : main;
+const artifactSha256 = createHash('sha256').update(await readFile(artifact)).digest('hex');
 const temp = await mkdtemp(join(tmpdir(), 'openbuddy-real-ui-'));
 const profile = join(temp, 'profile'), harness = join(temp, 'bootstrap');
 await mkdir(profile); await mkdir(harness); await mkdir('release', { recursive: true });
 await writeFile(join(harness, 'package.json'), JSON.stringify({ name: 'openbuddy-ui-check', main: 'bootstrap.cjs' }));
-await writeFile(join(harness, 'bootstrap.cjs'), `const {app}=require('electron');app.setPath('userData',${JSON.stringify(profile)});Object.defineProperty(app,'isPackaged',{get:()=>true});import(${JSON.stringify(pathToFileURL(main).href)}).catch(e=>{console.error(e);app.exit(1)});`);
+await writeFile(join(harness, 'bootstrap.cjs'), `
+const {app,ipcMain}=require('electron');
+app.setPath('userData',${JSON.stringify(profile)});
+Object.defineProperty(app,'isPackaged',{get:()=>true});
+globalThis.__ipcAudit=[];
+const realHandle=ipcMain.handle.bind(ipcMain);
+ipcMain.handle=(channel,listener)=>realHandle(channel,async(event,...args)=>{
+  if(channel!=='openbuddy:invoke')return listener(event,...args);
+  const record={command:String(args[0]),status:'pending'};globalThis.__ipcAudit.push(record);
+  try{const result=await listener(event,...args);record.status='resolved';return result;}
+  catch(error){record.status='rejected';throw error;}
+});
+import(${JSON.stringify(pathToFileURL(main).href)}).catch(e=>{console.error(e);app.exit(1)});
+`);
 const requests = [], checks = [], consoleErrors = [];
+let releaseHeldResponse;
 const server = createServer(async (req, res) => {
   if (req.method !== 'POST') { res.writeHead(404); res.end(); return; }
   let body = ''; for await (const bytes of req) body += bytes;
@@ -26,7 +43,15 @@ const server = createServer(async (req, res) => {
   requests.push({ provider, model: input.model, input });
   res.writeHead(200, { 'Content-Type': 'text/event-stream' });
   const chunk = (delta, finish_reason = null) => res.write(`data: ${JSON.stringify({ id: 'ui-fixture', object: 'chat.completion.chunk', created: 1, model: input.model, choices: [{ index: 0, delta, finish_reason }] })}\n\n`);
-  chunk({ role: 'assistant' }); chunk({ content: `fixture ${provider.toUpperCase()} answered` }); chunk({}, 'stop'); res.end('data: [DONE]\n\n');
+  chunk({ role: 'assistant' });
+  const lastUser = input.messages.findLast(message => message.role === 'user')?.content;
+  const lastUserText = typeof lastUser === 'string' ? lastUser : Array.isArray(lastUser) ? lastUser.filter(part => part.type === 'text').map(part => part.text).join('\n') : '';
+  if (lastUserText.includes('__HOLD_FIXTURE__')) {
+    chunk({ content: 'fixture waiting for queued input' });
+    releaseHeldResponse = () => { chunk({ content: ' fixture resumed' }); chunk({}, 'stop'); res.end('data: [DONE]\n\n'); releaseHeldResponse = undefined; };
+    return;
+  }
+  chunk({ content: `fixture ${provider.toUpperCase()} answered` }); chunk({}, 'stop'); res.end('data: [DONE]\n\n');
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const port = server.address().port;
@@ -121,8 +146,16 @@ try {
   await selectForm.waitFor({ state: 'hidden' });
   checkpoint('extension select cancelled through actual form', {});
 
+  const badImagePath = join(temp, 'bad-crc.png');
+  await writeFile(badImagePath, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64'));
+  await page.locator('#native-fixture-file').setInputFiles(badImagePath);
+  await page.evaluate(() => window.openbuddy.getPathForFile(document.querySelector('#native-fixture-file').files[0]));
+  const beforeBadImage = requests.length;
+  await assert.rejects(call('agent_send', { sessionId: (await state()).sessionId, text: 'reject bad CRC', attachments: [{ path: badImagePath }] }), /invalid_image/);
+  assert.equal(requests.length, beforeBadImage, 'corrupt image never reached provider');
+  checkpoint('actual main decoder rejects corrupt PNG before provider request', {});
   const imagePath = join(temp, 'fixture-pixel.png');
-  await writeFile(imagePath, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64'));
+  await writeFile(imagePath, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64'));
   await page.locator('#native-fixture-file').setInputFiles(imagePath);
   await page.evaluate(() => {
     const transfer = new DataTransfer(); transfer.items.add(document.querySelector('#native-fixture-file').files[0]);
@@ -137,22 +170,63 @@ try {
   const imageMessage = requests.at(-1).input.messages.findLast(message => message.role === 'user');
   assert.ok(Array.isArray(imageMessage.content) && imageMessage.content.some(part => part.type === 'image_url' && part.image_url.url.startsWith('data:image/png;base64,')), 'native File became actual image bytes in SDK request');
   checkpoint('DOM drop of genuine native File becomes SDK image bytes', { mimeType: 'image/png' });
+  await send('__HOLD_FIXTURE__');
+  await page.getByRole('button', { name: '停止生成', exact: true }).waitFor();
+  await page.getByRole('combobox', { name: '排队模式', exact: true }).selectOption('followUp');
+  await page.locator('.wb-composer__input').fill('fixture follow-up');
+  await page.getByRole('button', { name: '加入待发送队列', exact: true }).click();
+  await page.getByRole('region', { name: 'Pi 待处理队列' }).getByText('fixture follow-up', { exact: true }).waitFor();
+  await page.getByRole('combobox', { name: '排队模式', exact: true }).selectOption('steer');
+  await page.locator('.wb-composer__input').fill('fixture steering');
+  await page.getByRole('button', { name: '加入待发送队列', exact: true }).click();
+  await page.getByRole('region', { name: 'Pi 待处理队列' }).getByText('fixture steering', { exact: true }).waitFor();
+  const queueSession = (await state()).sessionId;
+  const queued = await call('agent_get_queue', { sessionId: queueSession });
+  assert.deepEqual(queued.steering, ['fixture steering']); assert.deepEqual(queued.followUp, ['fixture follow-up']);
+  await page.getByRole('button', { name: '清空 Pi 队列', exact: true }).click();
+  await page.getByRole('region', { name: 'Pi 待处理队列' }).waitFor({ state: 'hidden' });
+  assert.deepEqual(await call('agent_get_queue', { sessionId: queueSession }), { steering: [], followUp: [] });
+  assert.equal(typeof releaseHeldResponse, 'function'); releaseHeldResponse();
+  await page.getByRole('button', { name: '发送', exact: true }).waitFor();
+  checkpoint('actual composer queues steering and follow-up in Pi then clears both', {});
+  const parent = await state();
+  await page.getByRole('button', { name: '更多操作', exact: true }).click();
+  await page.getByRole('button', { name: '分叉为新会话', exact: true }).click();
+  await page.waitForFunction(parentId => window.__modelStates.at(-1)?.sessionId !== parentId, parent.sessionId);
+  const child = await state(); assert.notEqual(child.sessionId, parent.sessionId); assert.equal(child.providerId, parent.providerId); assert.equal(child.thinkingLevel, parent.thinkingLevel);
+  await page.getByRole('button', { name: '编辑标题', exact: true }).click();
+  await page.locator('.main-topbar__title-input').fill('Fixture fork child');
+  await page.locator('.main-topbar__title-input').press('Enter');
+  await page.getByText('Fixture fork child', { exact: true }).first().waitFor();
+  checkpoint('actual topbar fork selects new session and retains provider/thinking', { parent: parent.sessionId, child: child.sessionId });
   await call('window_toggle_maximize');
   await page.waitForFunction(() => window.openbuddy.window.isMaximized());
   await call('window_toggle_maximize');
+  await page.waitForFunction(async () => !await window.openbuddy.window.isMaximized());
   await call('window_minimize');
-  assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMinimized()), true);
+  const minimized = await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    if (window.isMinimized()) return true;
+    return new Promise(resolve => {
+      const done = () => { clearTimeout(timer); resolve(true); };
+      const timer = setTimeout(() => { window.removeListener('minimize', done); resolve(window.isMinimized()); }, 5000);
+      window.once('minimize', done);
+    });
+  });
+  assert.equal(minimized, true);
   await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].restore(); });
   checkpoint('actual BrowserWindow maximize and minimize controls', {});
   if (process.argv.includes('--native-dialogs')) {
     console.log('NATIVE_DIALOG_AWAIT_ASK', JSON.stringify({ pid: app.process().pid }));
     assert.equal(await call('dialog_ask', { message: 'Confirm local fixture validation', title: 'OpenBuddy native fixture' }), true);
     console.log('NATIVE_DIALOG_AWAIT_OPEN', JSON.stringify({ path: imagePath, pid: app.process().pid }));
-    assert.equal(await call('dialog_open', { title: 'OpenBuddy native file fixture' }), imagePath);
+    const selected = await call('dialog_open', { title: 'OpenBuddy native file fixture', defaultPath: imagePath });
+    assert.equal(await realpath(selected), await realpath(imagePath));
     const exportPath = join(temp, 'native-export.txt');
     console.log('NATIVE_DIALOG_AWAIT_SAVE', JSON.stringify({ path: exportPath, pid: app.process().pid }));
-    assert.equal(await call('dialog_save', { title: 'OpenBuddy native save fixture', defaultPath: exportPath }), exportPath);
-    await call('export_text_file', { path: exportPath, content: 'native save grant fixture' });
+    const saved = await call('dialog_save', { title: 'OpenBuddy native save fixture', defaultPath: exportPath });
+    assert.equal(typeof saved, 'string');
+    await call('export_text_file', { path: saved, content: 'native save grant fixture' });
     assert.equal(await readFile(exportPath, 'utf8'), 'native save grant fixture');
     checkpoint('real native ask/open/save and one-shot export grant', {});
   }
@@ -160,6 +234,9 @@ try {
   await page.screenshot({ path: 'release/electron-ui-check.png', fullPage: true });
   await app.close(); app = undefined;
   await launch();
+  await page.getByRole('button', { name: '新建任务', exact: true }).first().click();
+  await page.getByRole('button', { name: /选择模型：.*Fixture A/ }).waitFor({ timeout: 15000 });
+  checkpoint('restart restores complete provider-scoped home default', { provider: 'fixture-a', model: 'shared-model' });
   // The selected home default and session identity are tested separately.
   const init = await call('agent_init');
   const sessions = await call('agent_list_sessions', { cwd: init.cwd });
@@ -171,8 +248,29 @@ try {
   await page.getByRole('button', { name: /选择模型：.*Fixture B/ }).waitFor({ timeout: 15000 });
   const restored = await state(); assert.equal(restored.providerId, 'fixture-b'); assert.equal(restored.thinkingLevel, 'high');
   checkpoint('restart and actual sidebar restore provider and thinking', { provider: restored.providerId, thinkingLevel: restored.thinkingLevel });
+  const beforeFiles = await app.evaluate(() => globalThis.__ipcAudit.length);
+  await writeFile(join(init.cwd, 'ui-local-marker.txt'), 'local listing fixture');
+  const more = page.getByRole('button', { name: /更多.*文件/ });
+  await more.hover(); await page.getByRole('menuitem', { name: '我的文件', exact: true }).click();
+  await page.locator('.myfiles-tab--active').filter({ hasText: '本地文件' }).waitFor();
+  await page.getByText('ui-local-marker.txt', { exact: true }).waitFor();
+  const fileCommands = await app.evaluate(start => globalThis.__ipcAudit.slice(start), beforeFiles);
+  assert.equal(fileCommands.some(item => ['memory_list', 'browse_directory'].includes(item.command)), false);
+  assert.ok(fileCommands.some(item => item.command === 'list_dir' && item.status === 'resolved'));
+  await page.screenshot({ path: 'release/electron-ui-files.png', fullPage: true });
+  checkpoint('MyFiles defaults to real list_dir and never invokes unsupported memory artifacts', { commands: fileCommands });
+  await more.hover(); await page.getByRole('menuitem', { name: '策略设置', exact: true }).click();
+  await page.getByText('本地策略预览，尚未强制执行', { exact: true }).waitFor();
+  checkpoint('policy clearly states local preview without enforcement', {});
+  await more.hover(); await page.getByRole('menuitem', { name: '用量统计', exact: true }).click();
+  await page.getByText('阈值仅作本地用量提醒，不会阻止发送。费用为估算，实际以提供商账单为准。', { exact: true }).waitFor();
+  checkpoint('quota clearly states reminder rather than send enforcement', {});
+  await more.hover(); await page.getByRole('menuitem', { name: '通知渠道', exact: true }).click();
+  await page.getByText('渠道配置尚未接入主进程，当前仅可管理本地草稿；外部发送与测试暂不可用。', { exact: true }).waitFor();
+  checkpoint('notification channels clearly state drafts and no external send', {});
+  const ipcAudit = await app.evaluate(() => globalThis.__ipcAudit);
   assert.deepEqual(consoleErrors, []);
-  await writeFile('release/electron-ui-check.json', JSON.stringify({ mode: 'Electron bootstrap imports supplied main in isolated profile; not installation verification', main, profile, checks, requestSummary: requests.map(({ provider, model }) => ({ provider, model })), screenshot: 'release/electron-ui-check.png', consoleErrors }, null, 2));
+  await writeFile('release/electron-ui-check.json', JSON.stringify({ mode: 'Electron bootstrap imports supplied main in isolated profile; not installation verification', main, artifact, artifactSha256, profile, checks, ipcAudit, requestSummary: requests.map(({ provider, model, input }) => ({ provider, model, reasoningEffort: input.reasoning_effort, imageCount: input.messages.flatMap(message => Array.isArray(message.content) ? message.content : []).filter(part => part.type === 'image_url').length })), screenshot: 'release/electron-ui-check.png', consoleErrors }, null, 2));
   console.log('ELECTRON_UI_PASS', checks.length, 'release/electron-ui-check.json');
 } catch (error) {
   if (page) { await page.screenshot({ path: 'release/electron-ui-check-failed.png' }).catch(() => {}); console.error('UI_BODY', await page.locator('body').innerText().catch(() => 'unavailable')); }

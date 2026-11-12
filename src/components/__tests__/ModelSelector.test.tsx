@@ -10,7 +10,7 @@ const models = [
 const open = () => fireEvent.click(screen.getByRole("button", { name: /选择模型/ }));
 
 describe("ModelSelector identities and asynchronous selection", () => {
-  it("groups duplicate model names by provider and selects the complete identity", () => {
+  it("groups duplicate model names by provider and selects the complete identity", async () => {
     const change = vi.fn();
     render(<ModelSelector models={models} modelId="provider-a/shared" onModelChange={change} />);
     open();
@@ -19,8 +19,9 @@ describe("ModelSelector identities and asynchronous selection", () => {
     expect(option).toHaveAttribute("aria-selected", "false");
     fireEvent.click(option);
     expect(change).toHaveBeenCalledWith("provider-b/shared");
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
   });
-  it("searches model and provider names and supports keyboard selection", () => {
+  it("searches model and provider names and supports keyboard selection", async () => {
     const change = vi.fn();
     render(<ModelSelector models={models} onModelChange={change} />);
     open();
@@ -30,6 +31,7 @@ describe("ModelSelector identities and asynchronous selection", () => {
     fireEvent.keyDown(search, { key: "ArrowDown" });
     fireEvent.keyDown(search, { key: "Enter" });
     expect(change).toHaveBeenCalledWith("provider-b/vision");
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
   });
   it("shows pending state and preserves the current model after a failed change", async () => {
     let reject!: (reason: Error) => void;

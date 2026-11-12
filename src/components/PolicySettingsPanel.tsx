@@ -89,8 +89,10 @@ export function PolicySettingsPanel({ onToast: _onToast }: { onToast?: (msg: str
     <div className="policy-panel" role="region" aria-label="策略设置">
       <div className="policy-panel__head">
         <span className="policy-panel__title">策略设置</span>
-        <span className="policy-panel__hint">本地策略管控(企业策略的可移植替代)</span>
+        <span className="policy-panel__hint">本地策略预览，尚未强制执行</span>
       </div>
+
+      <p className="policy-panel__hint">规则仅保存在本机供预览，不会限制实际模型调用、技能安装或主进程权限。</p>
 
       {/* 模型白名单 */}
       <div className="policy-panel__section">

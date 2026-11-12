@@ -25,6 +25,22 @@ React 通过受限的 `window.openbuddy` 访问主进程；IPC 校验发送窗�
 
 Pi 在主进程运行。配置和会话位于 Electron `userData/pi/`，默认不访问 `~/.pi`。API Key 使用 safeStorage 加密；配置文件不能当作认证备份。旧 Tauri/ACP 会话尚无自动导入功能。
 
+## 功能与本地验证
+
+模型按提供商与模型组成的完整身份选择，支持按实际模型能力调整思考等级；会话切换和恢复读取引擎的真实模型状态。Pi 扩展的 input/select/confirm/editor 使用桌面表单，队列使用 Pi 的 steering/follow-up，支持空闲时分叉会话。自定义 TUI 组件不受支持。
+
+附件仅来自原生文件选择或真实 File 拖放授权：图片验证魔数、实际解码和文件身份，限制单图 10 MiB、总量 20 MiB、最多 8 个；UTF-8 文本单份最多 256 KiB。扩展默认禁用，需用户主动添加路径并显式启用，未知项目扩展不会自动执行。项目协作、云端邀请和上传仍是暂缓能力。
+
+```sh
+pnpm audit:ipc
+pnpm build:electron
+pnpm test:electron-ui
+# 打包后也可验证 ASAR 内真实主进程与界面：
+pnpm test:electron-ui --main=release/mac-arm64/OpenBuddy.app/Contents/Resources/app.asar/dist-electron/main.js
+```
+
+覆盖矩阵写到 `release/contract-matrix.json`，区分静态调用、路由可达性和运行验证。功能脚本启动真实 Electron，通过临时 bootstrap 选独立 userData 并加载指定 main，以本地 HTTP fixture 验证模型选择、思考、提问、图片、队列和分叉，不使用用户凭据；这不是安装、公证或 Gatekeeper 验收。`--native-dialogs` 需要操作者确认真实原生对话框。真实 `.app` 可执行文件另用 `OPENBUDDY_SMOKE_TEST=1` 启动并自动退出，截图和日志会标出临时目录。
+
 ## MVP 边界与发布状态
 
 专家/市场、自动化、连接器 CLI、插件、云存储、团队/子代理、计划模式、rewind 暂缓。不可用命令返回明确的 `not_implemented` 错误。Electron 版安装包和内存占用会高于旧 Rust 外壳。

@@ -8,8 +8,8 @@ import {
 } from "../../services/settings.js";
 import { fileHandlers, type DesktopShell } from "../../services/files.js";
 import { PiEngine, validateThinkingLevel } from "../../agent/pi.js";
-import { modelKey } from '../../services/providers.js';
-import type { ExtensionFactory } from '@earendil-works/pi-coding-agent';
+import { modelKey } from "../../services/providers.js";
+import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import type { Emit } from "../../agent/permissions.js";
 export interface EngineOptions {
   userDataDir: string;
@@ -22,19 +22,52 @@ export interface EngineOptions {
 export type Handler = (
   payload: Record<string, unknown>,
 ) => unknown | Promise<unknown>;
-function trustedImages(value:unknown):NonNullable<Parameters<PiEngine['send']>[2]>|undefined {
-  if(value===undefined)return undefined;
-  if(!Array.isArray(value)||value.length>8)throw Error('invalid_images');
-  let total=0;
-  return value.map(raw=>{const image=object(raw);if(image.type!=='image'||typeof image.data!=='string'||!image.data||image.data.length>14*1024*1024||!/^[A-Za-z0-9+/]*={0,2}$/.test(image.data)||!['image/png','image/jpeg','image/gif','image/webp'].includes(String(image.mimeType)))throw Error('invalid_images');total+=image.data.length;if(total>28*1024*1024)throw Error('images_too_large');return {type:'image' as const,data:image.data,mimeType:String(image.mimeType)};});
+function trustedImages(
+  value: unknown,
+): NonNullable<Parameters<PiEngine["send"]>[2]> | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > 8) throw Error("invalid_images");
+  let total = 0;
+  return value.map((raw) => {
+    const image = object(raw);
+    if (
+      image.type !== "image" ||
+      typeof image.data !== "string" ||
+      !image.data ||
+      image.data.length > 14 * 1024 * 1024 ||
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(image.data) ||
+      !["image/png", "image/jpeg", "image/gif", "image/webp"].includes(
+        String(image.mimeType),
+      )
+    )
+      throw Error("invalid_images");
+    total += image.data.length;
+    if (total > 28 * 1024 * 1024) throw Error("images_too_large");
+    return {
+      type: "image" as const,
+      data: image.data,
+      mimeType: String(image.mimeType),
+    };
+  });
 }
-function promptText(p:Record<string,unknown>){if(typeof p.text!=='string'||p.text.includes('\0')||(!p.text.trim()&&!Array.isArray(p.images)))throw Error('invalid_prompt');return p.text;}
+function promptText(p: Record<string, unknown>) {
+  if (
+    typeof p.text !== "string" ||
+    p.text.includes("\0") ||
+    (!p.text.trim() && !Array.isArray(p.images))
+  )
+    throw Error("invalid_prompt");
+  return p.text;
+}
 export async function createEngineHandlers(options: EngineOptions) {
   const settings = createSettings(options.userDataDir, options.safeStorage);
   const emit: Emit = (event, payload) =>
     options.emit(event, settings.secrets.redact(payload));
-  const engine = new PiEngine(settings, emit, (url) =>
-    options.shell.openExternal(url), options.extensionFactories,
+  const engine = new PiEngine(
+    settings,
+    emit,
+    (url) => options.shell.openExternal(url),
+    options.extensionFactories,
   );
   await engine.initialize();
   const update = (fn: (c: ReturnType<typeof settings.config.read>) => void) => {
@@ -50,8 +83,10 @@ export async function createEngineHandlers(options: EngineOptions) {
       engine.newSession(
         text(p.cwd),
         typeof p.modelId === "string" ? p.modelId : undefined,
-        typeof p.providerId === 'string'?p.providerId:undefined,
-        p.thinkingLevel===undefined?undefined:validateThinkingLevel(p.thinkingLevel),
+        typeof p.providerId === "string" ? p.providerId : undefined,
+        p.thinkingLevel === undefined
+          ? undefined
+          : validateThinkingLevel(p.thinkingLevel),
       ),
     agent_load_session: (p) =>
       engine.load(
@@ -75,16 +110,32 @@ export async function createEngineHandlers(options: EngineOptions) {
       }
       return [...map.values()];
     },
-    agent_send: p=>engine.send(text(p.sessionId),promptText(p),trustedImages(p.images)),
-    agent_steer:p=>engine.queue(text(p.sessionId),'steer',promptText(p),trustedImages(p.images)),
-    agent_follow_up:p=>engine.queue(text(p.sessionId),'followUp',promptText(p),trustedImages(p.images)),
-    agent_get_queue:p=>engine.queueState(text(p.sessionId)),
-    agent_clear_queue:p=>engine.clearQueue(text(p.sessionId)),
-    agent_fork_session:p=>engine.fork(text(p.sessionId)),
-    agent_extensions_list:()=>engine.extensionsConfig(),
-    agent_extensions_add:p=>engine.configureExtensions('add',text(p.path)),
-    agent_extensions_remove:p=>engine.configureExtensions('remove',text(p.path)),
-    agent_extensions_set_enabled:p=>engine.configureExtensions('enabled',bool(p.enabled)),
+    agent_send: (p) =>
+      engine.send(text(p.sessionId), promptText(p), trustedImages(p.images)),
+    agent_steer: (p) =>
+      engine.queue(
+        text(p.sessionId),
+        "steer",
+        promptText(p),
+        trustedImages(p.images),
+      ),
+    agent_follow_up: (p) =>
+      engine.queue(
+        text(p.sessionId),
+        "followUp",
+        promptText(p),
+        trustedImages(p.images),
+      ),
+    agent_get_queue: (p) => engine.queueState(text(p.sessionId)),
+    agent_clear_queue: (p) => engine.clearQueue(text(p.sessionId)),
+    agent_fork_session: (p) => engine.fork(text(p.sessionId)),
+    agent_extensions_list: () => engine.extensionsConfig(),
+    agent_extensions_add: (p) =>
+      engine.configureExtensions("add", text(p.path)),
+    agent_extensions_remove: (p) =>
+      engine.configureExtensions("remove", text(p.path)),
+    agent_extensions_set_enabled: (p) =>
+      engine.configureExtensions("enabled", bool(p.enabled)),
     agent_cancel: (p) => engine.cancel(text(p.sessionId)),
     agent_shutdown: () => engine.shutdown(),
     agent_delete_session: (p) => engine.delete(text(p.sessionId)),
@@ -106,13 +157,19 @@ export async function createEngineHandlers(options: EngineOptions) {
     },
     agent_session_info: (p) => engine.info(text(p.sessionId)),
     agent_session_usage: (p) => engine.usage(text(p.sessionId)),
-    agent_set_model: (p) => engine.setModel(text(p.sessionId), text(p.modelId),typeof p.providerId==='string'?p.providerId:undefined),
-    agent_get_model_state:p=>engine.modelState(text(p.sessionId)),
-    agent_set_thinking_level:p=>engine.setThinkingLevel(text(p.sessionId),p.level),
-    agent_resolve_ui:p=>engine.ui.resolve(p),
+    agent_set_model: (p) =>
+      engine.setModel(
+        text(p.sessionId),
+        text(p.modelId),
+        typeof p.providerId === "string" ? p.providerId : undefined,
+      ),
+    agent_get_model_state: (p) => engine.modelState(text(p.sessionId)),
+    agent_set_thinking_level: (p) =>
+      engine.setThinkingLevel(text(p.sessionId), p.level),
+    agent_resolve_ui: (p) => engine.ui.resolve(p),
     agent_resolve_permission: (p) =>
       engine.permissions.resolve(text(p.requestId), p.optionId, p.cancelled),
-    agent_resolve_question: p => engine.ui.resolve(p),
+    agent_resolve_question: (p) => engine.ui.resolve(p),
     folder_trust_respond: (p) =>
       engine.setFolderTrust(text(p.cwd), bool(p.trusted)),
     permission_list: () => settings.config.read().rules,
@@ -151,8 +208,17 @@ export async function createEngineHandlers(options: EngineOptions) {
       await engine.providers.saveModel(p.model);
       emit("agent://models-update", {});
     },
-    providers_delete_provider: async p => {await engine.providers.deleteProvider(text(p.id));emit('agent://models-update',{});},
-    providers_delete_model: async p => {await engine.providers.deleteModel(text(p.modelId),typeof p.providerId==='string'?p.providerId:undefined);emit('agent://models-update',{});},
+    providers_delete_provider: async (p) => {
+      await engine.providers.deleteProvider(text(p.id));
+      emit("agent://models-update", {});
+    },
+    providers_delete_model: async (p) => {
+      await engine.providers.deleteModel(
+        text(p.modelId),
+        typeof p.providerId === "string" ? p.providerId : undefined,
+      );
+      emit("agent://models-update", {});
+    },
     providers_fetch_models: (p) => engine.providers.fetchModels(p),
     account_get_api_key: () =>
       settings.secrets.has("provider:grok") ? "••••" : null,
@@ -173,20 +239,32 @@ export async function createEngineHandlers(options: EngineOptions) {
         !["ask", "auto", "always-approve"].includes(String(d.defaultPermission))
       )
         throw Error("无效的默认设置");
-      const selected=d.defaultModel?engine.providers.entry(d.defaultModel as string,typeof d.defaultProviderId==='string'?d.defaultProviderId:undefined):undefined;
-      if(d.defaultModel&&!selected)throw Error('default_model_not_found');
-      const thinking=d.defaultThinkingLevel===undefined?undefined:validateThinkingLevel(d.defaultThinkingLevel);
+      const selected = d.defaultModel
+        ? engine.providers.entry(
+            d.defaultModel as string,
+            typeof d.defaultProviderId === "string"
+              ? d.defaultProviderId
+              : undefined,
+          )
+        : undefined;
+      if (d.defaultModel && !selected) throw Error("default_model_not_found");
+      const thinking =
+        d.defaultThinkingLevel === undefined
+          ? undefined
+          : validateThinkingLevel(d.defaultThinkingLevel);
       update((c) => {
         c.defaults = {
-          defaultModel: selected?modelKey(selected.providerId,selected.modelId):'',
-          defaultProviderId:selected?.providerId,
-          defaultThinkingLevel:thinking,
+          defaultModel: selected
+            ? modelKey(selected.providerId, selected.modelId)
+            : "",
+          defaultProviderId: selected?.providerId,
+          defaultThinkingLevel: thinking,
           defaultPermission: String(d.defaultPermission),
           rememberToolApprovals: !!d.rememberToolApprovals,
         };
         c.permissionMode = d.defaultPermission as "ask";
       });
-      emit('agent://models-update',{});
+      emit("agent://models-update", {});
     },
     skills_list: (p) =>
       engine.skills.list(typeof p.cwd === "string" ? p.cwd : engine.currentCwd),

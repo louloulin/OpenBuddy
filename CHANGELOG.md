@@ -10,6 +10,9 @@
 - 删除旧 Rust/Tauri 后端、Grok vendor 子模块和旧构建工具，增加 Electron DMG/NSIS 构建配置。
 - 应用数据迁移到 Electron userData/pi；旧 ACP 会话尚无自动转换。
 - 专家/自动化/连接器/插件/云存储/团队/子代理/计划模式/rewind 暂缓，Electron 包体积和内存占用上升。
+- 模型按完整 provider/model 身份选择和恢复，实际思考等级、Pi 扩展输入/选择/确认/编辑、steering/follow-up 队列、会话分叉与显式可信扩展接入桌面。
+- 附件经原生选择/真实 File 私有授权，增加身份、大小、魔数和解码校验；图片进入真实 SDK 图片请求，非法图片不会静默降为成功。
+- 新增可复跑命令覆盖矩阵及隔离 Electron 功能脚本，以本地 fixture 验证真实界面操作；项目云协作等演示动作明确暂缓。
 - 当前配置不自动发布或公证；真实 BYOK、macOS 公证与 Windows 安装验证需分别执行。
 
 ## v0.15.0（2026-08-25）
