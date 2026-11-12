@@ -683,15 +683,14 @@ function Shell() {
 
   // Fork copies the session to a new id — jump to it so the user sees the
   // branch they just created (and it appears in the sidebar).
-  const handleForked = (newId: string) => {
+  const handleForked = async (newId: string) => {
     const cwd = cwdRef.current;
     setPlaceholderView(null);
     sessionsStore.getState().setCurrent(newId);
     sessionsStore.getState().upsert({ sessionId: newId, title: "分叉会话", cwd });
     sessionStore.getState().setSession(newId);
-    void agentLoadSession(newId, cwd).catch((e) =>
-      sessionStore.getState().setError(friendlyError(e))
-    );
+    try { useAgentModelStore.getState().apply(await agentLoadSession(newId, cwd)); }
+    finally { sessionStore.getState().clearReplaySuppression(newId); }
   };
 
   // Select an expert from the + menu (chat or home composer). Instead of
@@ -896,6 +895,7 @@ function Shell() {
                   <TopbarActions
                     sessionId={currentSessionId}
                     title={currentTitle}
+                    onForked={handleForked}
                     pinned={currentEntry?.pinned}
                     onToast={showToast}
                     onSessionsChanged={(patch) => {

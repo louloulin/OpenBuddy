@@ -87,7 +87,10 @@ try {
   checkpoint('provider B same slug sends actual request to B', { provider: actual.providerId, modelKey: actual.modelKey });
   await page.getByRole('combobox', { name: '思考等级', exact: true }).selectOption('high');
   actual = await state(); assert.equal(actual.thinkingLevel, 'high');
-  checkpoint('thinking changed through actual select', { level: actual.thinkingLevel });
+  const thinkingRequest = requests.length + 1;
+  await send('check fixture reasoning request'); await waitForRequestCount(thinkingRequest);
+  assert.equal(requests.at(-1).input.reasoning_effort, 'high');
+  checkpoint('thinking changed through actual select and SDK request', { level: actual.thinkingLevel, reasoningEffort: requests.at(-1).input.reasoning_effort });
   await choose('Fixture C');
   await page.getByRole('alert').filter({ hasText: '模型切换失败' }).waitFor();
   actual = await state(); assert.equal(actual.providerId, 'fixture-b');
@@ -129,7 +132,7 @@ try {
   const requestCount = requests.length;
   await send('inspect genuine native File drop');
   await page.waitForFunction(() => document.querySelector('.wb-composer__input')?.value === '');
-  await page.getByRole('button', { name: '发送', exact: true }).waitFor();
+  await waitForRequestCount(requestCount + 1);
   assert.ok(requests.length > requestCount, 'image sent a real fixture request');
   const imageMessage = requests.at(-1).input.messages.findLast(message => message.role === 'user');
   assert.ok(Array.isArray(imageMessage.content) && imageMessage.content.some(part => part.type === 'image_url' && part.image_url.url.startsWith('data:image/png;base64,')), 'native File became actual image bytes in SDK request');

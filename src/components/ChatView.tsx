@@ -559,14 +559,11 @@ export function ChatView({
           <Composer
             streaming={streaming}
             onSend={onSend}
-            onEnqueue={
-              sessionId
-                ? (text) => {
-                    useMessageQueueStore.getState().enqueue(sessionId, text);
-                    onToast?.("已加入待发送队列");
-                  }
-                : undefined
-            }
+            onEnqueue={sessionId ? async (text, attachments, mode) => {
+              const actual = await (mode === "steer" ? agentSteer : agentFollowUp)(sessionId, text, attachments);
+              usePiQueueStore.getState().apply(sessionId, actual);
+              onToast?.("Pi 已接收此输入");
+            } : undefined}
             onCancel={onCancel}
             modelId={modelId}
             models={models}

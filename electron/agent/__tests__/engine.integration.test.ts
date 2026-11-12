@@ -283,6 +283,11 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
     expect(await restarted.handlers.agent_get_model_state({sessionId:fresh})).toMatchObject({providerId:'second',thinkingLevel:'high'});
     await restarted.handlers.providers_delete_model({providerId:'fixture',modelId:'fixture'});
     expect((await restarted.handlers.providers_list({}) as any).models.some((m:any)=>m.providerId==='second'&&m.modelId==='fixture')).toBe(true);
+    await restarted.handlers.providers_delete_model({providerId:'second',modelId:'fixture'});
+    expect(await restarted.handlers.agents_defaults_get({})).toMatchObject({defaultModel:'model:second/fixture',invalidDefault:true});
+    await expect(restarted.handlers.agent_new_session({cwd:f.root})).rejects.toThrow('model_not_found');
+    expect(await restarted.handlers.agent_get_model_state({sessionId:fresh})).toMatchObject({providerId:'second'});
+    await expect(restarted.handlers.agent_send({sessionId:fresh,text:'deleted selection'})).rejects.toThrow('model_not_found');
   });
   it('bridges real SDK extension dialogs and cancels pending input on cancel, session switch and shutdown',async()=>{
     const answers:unknown[]=[];
@@ -326,7 +331,7 @@ describe("real Pi SDK with local OpenAI protocol fixture", () => {
     expect(f.events.filter(e=>e.payload.event?.type==='agent_settled')).toHaveLength(1);
   });
   it('passes real image content only to a vision model and rejects unsupported image prompts before HTTP',async()=>{
-    const f=await fixture();const images=[{type:'image',mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='}];
+    const f=await fixture();const images=[{type:'image',mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=='}];
     await expect(f.call('agent_send',{sessionId:f.sid,text:'look',images})).rejects.toThrow('model_does_not_support_images');expect(f.requests).toHaveLength(0);
     await f.call('providers_save_model',{model:{providerId:'fixture',modelId:'vision',input:['text','image']}});await f.call('agent_set_model',{sessionId:f.sid,providerId:'fixture',modelId:'vision'});
     await f.call('agent_send',{sessionId:f.sid,text:'look',images});

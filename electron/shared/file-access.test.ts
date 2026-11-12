@@ -6,7 +6,7 @@ import { join } from 'node:path';
 const dirs: string[] = [];
 afterEach(async () => { vi.useRealTimers(); await Promise.all(dirs.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
 async function fixture() { const dir = await mkdtemp(join(tmpdir(), 'openbuddy-file-grant-')); dirs.push(dir); return dir; }
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64');
 it('requires native grants, checks file identity and allows a genuine file to be resent', async () => {
   const { FileAccess } = await import('./file-access.js');
   const access = new FileAccess(), dir = await fixture(), path = join(dir, 'pixel.png');
@@ -20,6 +20,12 @@ it('requires native grants, checks file identity and allows a genuine file to be
   await expect(access.attach([{ path }])).rejects.toThrow('file_changed');
   access.clear();
   await expect(access.attach([{ path }])).rejects.toThrow('file_not_authorized');
+});
+it('rejects magic-valid image bytes when the actual image decoder fails', async () => {
+  const { FileAccess } = await import('./file-access.js');
+  const access = new FileAccess(() => false), dir = await fixture(), path = join(dir, 'bad-crc.png');
+  await writeFile(path, png); await access.grant(path);
+  await expect(access.attach([{ path }])).rejects.toThrow('invalid_image');
 });
 it('expires native grants after the window-scoped authorization lifetime', async () => {
   const { FileAccess } = await import('./file-access.js');

@@ -1,3 +1,4 @@
+import { friendlyError } from "@/lib/error-format";
 /**
  * 对话页 TopBar 右侧操作菜单 — 对齐 WorkBuddy 的更多操作：
  *  - 导出为 Markdown（把当前会话渲染成 .md 文件，经系统保存对话框落盘）
@@ -12,6 +13,7 @@ import { MoreDotsIcon, PinFilledIcon, ArchiveIcon } from "@/foundation/component
 import { useSessionStore } from "@/stores/session-store";
 import {
   exportTextFile,
+  agentForkSession,
   agentSetSessionPinned,
   agentSetSessionArchived,
 } from "@/lib/agent-client";
@@ -22,6 +24,7 @@ interface TopbarActionsProps {
   title: string;
   pinned?: boolean;
   onToast?: (msg: string) => void;
+  onForked?: (sessionId: string) => void | Promise<void>;
   /** After archive/pin mutations, parent merges the patch into the sessions store. */
   onSessionsChanged?: (patch?: Record<string, unknown>) => void;
 }
@@ -32,7 +35,9 @@ export function TopbarActions({
   pinned,
   onToast,
   onSessionsChanged,
+  onForked,
 }: TopbarActionsProps) {
+  const streaming = useSessionStore(state => state.streaming);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -102,6 +107,15 @@ export function TopbarActions({
     }
   }, [sessionId, onToast, onSessionsChanged]);
 
+    const handleFork = async () => {
+    if (streaming || busy || !onForked) return;
+    setBusy(true); setOpen(false);
+    try { const childId = await agentForkSession(sessionId); await onForked(childId); onToast?.("已创建分叉会话"); }
+    catch (error) { onToast?.(`分叉失败：${friendlyError(error)}`); }
+    finally { setBusy(false); }
+  };
+
+
   return (
     <div className="topbar-actions" ref={menuRef}>
       <button
@@ -120,6 +134,7 @@ export function TopbarActions({
 
       {open && (
         <div className="topbar-actions__menu" onClick={(e) => e.stopPropagation()}>
+          {onForked && <button type="button" className="topbar-actions__item" disabled={streaming || busy} onClick={() => { void handleFork(); }}>分叉为新会话</button>}
           <button type="button" className="topbar-actions__item" onClick={handleExport}>
             <span className="topbar-actions__item-icon">📄</span>
             <span>导出为 Markdown</span>

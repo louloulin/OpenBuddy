@@ -261,6 +261,7 @@ export class PiEngine {
   async send(id: string, prompt: string,images?:PromptImages) {
     const session = this.live(id);
     if (this.busy || this.transitioning) throw Error("会话忙碌");
+    if(!session.model||!this.providers.model(session.model.id,session.model.provider))throw Error('model_not_found: 当前模型已删除，请重新选择');
     this.validateImages(session,images);
     this.busy = true;
     const generation=++this.generation;

@@ -61,7 +61,7 @@ export function SlashCommands({ text, cursor, onPick }: SlashCommandsProps) {
 
   return (
     <div className="slash-commands" role="listbox">
-      <div className="slash-commands__header">命令（来自 agent 内置/技能/插件）</div>
+      <div className="slash-commands__header">可用命令（技能与已加载扩展）</div>
       <ul className="slash-commands__list">
         {matches.slice(0, 12).map((cmd, idx) => (
           <li key={cmd.name}>
