@@ -8,7 +8,7 @@ process.on('SIGINT', () => { stop(); process.exit(130); });
 process.on('SIGTERM', () => { stop(); process.exit(143); });
 try {
   await run(['exec', 'tsc', '--noEmit', '-p', 'tsconfig.electron.json']);
-  await run(['exec', 'node', 'scripts/build-electron.mjs']);
+  await run(['exec', 'node', 'apps/desktop/scripts/build-electron.mjs']);
   const vite = start(['dev', '--host', '127.0.0.1']);
   let ready = false;
   for (let attempt = 0; attempt < 100; attempt++) {
