@@ -5,7 +5,7 @@
  * and a "召唤 XXX" button at the bottom.
  */
 import { useEffect, useRef } from "react";
-import type { ExpertItem } from "@/lib/types";
+import type { ExpertItem } from "@openbuddy/protocol/dto";
 import { ThumbImg } from "../shared/ThumbImg";
 
 interface Props {

@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { ShieldCheckIcon, ShieldAlertIcon } from "@/foundation/components/Icon/icons";
-import { folderTrustRespond } from "@/lib/agent-client";
+import { folderTrustRespond } from "@openbuddy/client/agent-client";
 
 interface TrustRequest {
   cwd?: string;

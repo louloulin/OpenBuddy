@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
 const DRAFTS_KEY = "openbuddy.drafts";
-import type { SessionSummary, SessionStatus } from "@/lib/types";
-import type { WorkspaceInfo } from "@/lib/agent-client";
+import type { SessionSummary, SessionStatus } from "@openbuddy/protocol/dto";
+import type { WorkspaceInfo } from "@openbuddy/client/agent-client";
 
 /**
  * Sentinel draft keys for sessions that don't have a real sessionId yet.

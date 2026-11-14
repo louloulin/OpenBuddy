@@ -4,7 +4,7 @@ import {
   selectPermissionForSession,
   selectPermissionHead,
 } from "../permission-store";
-import type { PermissionRequest } from "@/lib/types";
+import type { PermissionRequest } from "@openbuddy/protocol/dto";
 
 const resetStore = () => usePermissionStore.setState({ queues: {} });
 

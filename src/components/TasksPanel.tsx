@@ -6,8 +6,8 @@ import {
   RefreshCwIcon,
   CheckIcon,
 } from "@/foundation/components/Icon/icons";
-import { taskKill, tasksList } from "@/lib/agent-client";
-import type { RunningTask } from "@/lib/types";
+import { taskKill, tasksList } from "@openbuddy/client/agent-client";
+import type { RunningTask } from "@openbuddy/protocol/dto";
 
 interface TasksPanelProps {
   /** Optional: listen for task update events to auto-refresh. Set to a counter

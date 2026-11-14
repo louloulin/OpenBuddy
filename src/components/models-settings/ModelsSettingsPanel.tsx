@@ -23,8 +23,8 @@ import {
   type ProviderKind,
   type ProviderListModel,
   type ProviderTestResult,
-} from "@/lib/agent-client";
-import type { AgentDefaults } from "@/lib/types";
+} from "@openbuddy/client/agent-client";
+import type { AgentDefaults } from "@openbuddy/protocol/dto";
 import {
   PRESETS,
   PRESET_ORDER,

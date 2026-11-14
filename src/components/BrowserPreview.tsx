@@ -14,7 +14,7 @@ import {
   previewTitle,
   PREVIEW_SANDBOX,
 } from "@/lib/browser-preview";
-import { invoke } from "@/lib/ipc";
+import { invoke } from "@openbuddy/client/ipc";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,

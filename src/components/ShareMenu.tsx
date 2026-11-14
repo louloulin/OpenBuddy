@@ -13,8 +13,8 @@ import {
   type ShareFormat,
 } from "@/lib/share";
 import type { ChatMessage } from "@/stores/session-store";
-import { save as saveDialog } from "@/lib/ipc";
-import { agentExportHtml } from "@/lib/agent-client";
+import { save as saveDialog } from "@openbuddy/client/ipc";
+import { agentExportHtml } from "@openbuddy/client/agent-client";
 import { sanitizeFilename } from "@/lib/export-markdown";
 import { copyText } from "@/lib/clipboard";
 

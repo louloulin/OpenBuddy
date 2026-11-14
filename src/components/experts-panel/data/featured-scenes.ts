@@ -1,4 +1,4 @@
-import type { FeaturedScene } from "@/lib/types";
+import type { FeaturedScene } from "@openbuddy/protocol/dto";
 
 /** Offline fallback for the 精选场景 strip (matches the target's 9 scenes).
  *  Each references up to 3 experts by id (resolved against the live catalog at

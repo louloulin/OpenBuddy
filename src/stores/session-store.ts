@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { PiContent, PiMessage, Plan, PromptComplete, SessionUpdate, ToolCallContent, ToolCallUpdate } from "@/lib/types";
+import type { PiContent, PiMessage, Plan, PromptComplete, SessionUpdate, ToolCallContent, ToolCallUpdate } from "@openbuddy/protocol/dto";
 import { parseUserText } from "@/lib/user-text";
 
 export interface MessageMeta {

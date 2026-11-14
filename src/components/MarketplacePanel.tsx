@@ -14,8 +14,8 @@ import {
 import {
   marketplaceAction,
   marketplaceList,
-} from "@/lib/agent-client";
-import type { MarketplacePluginEntry, MarketplaceScanResult } from "@/lib/types";
+} from "@openbuddy/client/agent-client";
+import type { MarketplacePluginEntry, MarketplaceScanResult } from "@openbuddy/protocol/dto";
 
 interface MarketplacePanelProps {
   sessionId?: string;

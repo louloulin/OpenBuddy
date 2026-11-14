@@ -1,4 +1,4 @@
-import type { SkillCatalogItem, SkillCategory } from "@/lib/types";
+import type { SkillCatalogItem, SkillCategory } from "@openbuddy/protocol/dto";
 
 /** Filter chips for the 推荐 grid (截图 3). The leading "全部" is synthesized
  *  by the UI (empty selection). */

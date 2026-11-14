@@ -16,7 +16,7 @@ import { UsageQuotaPanel } from "./UsageQuotaPanel";
 import { NotifyChannelsPanel } from "./NotifyChannelsPanel";
 import { PolicySettingsPanel } from "./PolicySettingsPanel";
 import { CloudStoragePanel } from "./CloudStoragePanel";
-import type { AgentEntry } from "@/lib/types";
+import type { AgentEntry } from "@openbuddy/protocol/dto";
 import type { ModelOption } from "./ModelSelector";
 import type { ProjectMeta } from "@/stores/projects-store";
 

@@ -1,5 +1,5 @@
 
-import type { Plan, PlanEntry, PlanEntryPriority, PlanEntryStatus } from "@/lib/types";
+import type { Plan, PlanEntry, PlanEntryPriority, PlanEntryStatus } from "@openbuddy/protocol/dto";
 
 /** 移动一条 entry 到新位置(0-based,越界 clamp)。返回新 plan。 */
 export function reorderPlan(plan: Plan, from: number, to: number): Plan {

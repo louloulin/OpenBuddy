@@ -9,7 +9,7 @@
 import type {
   Automation,
   AutomationSchedule,
-} from "@/lib/types";
+} from "@openbuddy/protocol/dto";
 import { ALL_DAYS, type AutomationTemplate, type WeekdayCode } from "./template-config";
 
 export { ALL_DAYS };

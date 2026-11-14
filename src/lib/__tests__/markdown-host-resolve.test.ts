@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 const invoke = vi.fn();
-vi.mock("@/lib/ipc", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
+vi.mock("@openbuddy/client/ipc", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
 
 import { createMarkdownHostConfig } from "@/lib/markdown-host";
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { appConfirm } from "../../AppDialog";
 import { ChevronLeftIcon } from "@/foundation/components/Icon/icons";
-import { mcpConfigPath, mcpConfigRead, mcpConfigSave } from "@/lib/agent-client";
+import { mcpConfigPath, mcpConfigRead, mcpConfigSave } from "@openbuddy/client/agent-client";
 import { useSessionStore } from "@/stores/session-store";
 
 const EMPTY = "{\n  \"mcpServers\": {}\n}";

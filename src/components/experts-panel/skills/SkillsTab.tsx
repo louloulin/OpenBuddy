@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { open as openDialog } from "@/lib/ipc";
+import { open as openDialog } from "@openbuddy/client/ipc";
 import {
   SearchIcon, InstalledSkillIcon, AddCircleIcon, RefreshCwIcon,
   PuzzlePieceIcon, DeleteIcon, FolderOpenIcon, ChevronLeftIcon, SparklesIcon,
@@ -7,8 +7,8 @@ import {
 import {
   skillsList, skillsRemove, skillsToggle,
   skillsCatalogDefaultRoot, skillsCatalogLoad,
-} from "@/lib/agent-client";
-import type { SkillCatalog, SkillItem, SkillInfo } from "@/lib/types";
+} from "@openbuddy/client/agent-client";
+import type { SkillCatalog, SkillItem, SkillInfo } from "@openbuddy/protocol/dto";
 import { Chip } from "../shared/ui";
 import { SkillCatalogCard } from "./SkillCatalogCard";
 import { SkillDetailModal } from "./SkillDetailModal";

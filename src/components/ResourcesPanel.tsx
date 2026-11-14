@@ -16,8 +16,8 @@ import {
   memoryList,
   memoryRewrite,
   memorySave,
-} from "@/lib/agent-client";
-import type { MemoryEntry } from "@/lib/types";
+} from "@openbuddy/client/agent-client";
+import type { MemoryEntry } from "@openbuddy/protocol/dto";
 
 interface ResourcesPanelProps {
   cwd?: string;

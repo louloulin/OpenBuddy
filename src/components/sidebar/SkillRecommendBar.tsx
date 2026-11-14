@@ -1,8 +1,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Code2, Search, FileText, Bot, Layers, Zap } from "lucide-react";
-import { skillsList } from "@/lib/agent-client";
-import type { SkillInfo } from "@/lib/types";
+import { skillsList } from "@openbuddy/client/agent-client";
+import type { SkillInfo } from "@openbuddy/protocol/dto";
 
 /** Map skill scope to an icon + color for visual variety. */
 const SCOPE_STYLE: Record<string, { icon: typeof Code2; color: string }> = {

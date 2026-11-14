@@ -1,8 +1,8 @@
-import type { ModelState, PiMessage } from "./types";
-export type { ModelState } from "./types";
+import type { ModelState, PiMessage } from "@openbuddy/protocol/dto";
+export type { ModelState } from "@openbuddy/protocol/dto";
 
-import { invoke } from "@/lib/ipc";
-import { listen, type UnlistenFn } from "@/lib/ipc";
+import { invoke } from "./ipc";
+import { listen, type UnlistenFn } from "./ipc";
 import type {
   AgentDefaults,
   AgentEntry,
@@ -38,9 +38,9 @@ import type {
   SkillInfo,
   SlashCommand,
   TurnErrorEvent,
-} from "./types";
+} from "@openbuddy/protocol/dto";
 
-import type { QuestionRequest, UiDismissReason } from "@/stores/question-store";
+import type { QuestionRequest, UiDismissReason } from "../../../src/stores/question-store";
 
 // ---------- commands ----------
 
@@ -990,7 +990,7 @@ export async function webSearchConfigSave(
 import type {
   MarketplaceListResponse,
   PluginsListResponse,
-} from "./types";
+} from "@openbuddy/protocol/dto";
 
 /** List installed plugins via `x.ai/plugins/list`. */
 export async function pluginsList(sessionId?: string): Promise<PluginsListResponse> {
@@ -1020,7 +1020,7 @@ export async function marketplaceAction(
 
 // ---------- notification log (智能体邮箱) ----------
 
-import type { NotificationEntry, NotificationKind } from "./types";
+import type { NotificationEntry, NotificationKind } from "@openbuddy/protocol/dto";
 
 
 export async function notificationAppend(

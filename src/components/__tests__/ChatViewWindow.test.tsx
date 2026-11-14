@@ -4,7 +4,7 @@ import { useSessionStore, type ChatMessage } from "@/stores/session-store";
 import { ThemeProvider } from "../ThemeProvider";
 import { ChatView } from "../ChatView";
 
-vi.mock("@/lib/ipc", () => ({
+vi.mock("@openbuddy/client/ipc", () => ({
   invoke: vi.fn(async (command: string) => (command.endsWith("_list") || command === "list_dir" ? [] : null)),
   save: vi.fn(),
   listen: vi.fn(async () => () => {}),

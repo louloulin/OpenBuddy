@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDownIcon } from "@/foundation/components/Icon/icons";
-import { open as openDialog, invoke } from "@/lib/ipc";
+import { open as openDialog, invoke } from "@openbuddy/client/ipc";
 import {
   SearchIcon,
   AddIcon,

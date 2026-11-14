@@ -5,10 +5,10 @@ import {
   CheckIcon,
   ShieldCheckIcon,
 } from "@/foundation/components/Icon/icons";
-import { permissionModeGet, permissionModeSet } from "@/lib/agent-client";
-import { listen } from "@/lib/ipc";
+import { permissionModeGet, permissionModeSet } from "@openbuddy/client/agent-client";
+import { listen } from "@openbuddy/client/ipc";
 import { appConfirmWithOption } from "./AppDialog";
-import type { PermissionMode } from "@/lib/agent-client";
+import type { PermissionMode } from "@openbuddy/client/agent-client";
 
 const MODES: { id: PermissionMode; label: string; desc: string }[] = [
   { id: "ask", label: "审批模式", desc: "每次工具调用都需要确认" },

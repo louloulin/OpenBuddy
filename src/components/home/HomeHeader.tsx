@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Menu, Search, Bell, User } from "lucide-react";
-import { open as openDialog } from "@/lib/ipc";
+import { open as openDialog } from "@openbuddy/client/ipc";
 
 export function HomeHeader() {
   const [searchOpen, setSearchOpen] = useState(false);

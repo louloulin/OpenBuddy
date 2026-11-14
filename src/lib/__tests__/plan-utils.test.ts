@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Plan } from "@/lib/types";
+import type { Plan } from "@openbuddy/protocol/dto";
 import {
   reorderPlan,
   addPlanEntry,

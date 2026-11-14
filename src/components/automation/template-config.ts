@@ -20,7 +20,7 @@ import {
   TemplateNewsIcon,
   TemplateWeeklyReportIcon,
 } from "@/foundation/components/Icon/icons";
-import type { AutomationSchedule } from "@/lib/types";
+import type { AutomationSchedule } from "@openbuddy/protocol/dto";
 
 export const ALL_DAYS = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"] as const;
 export type WeekdayCode = (typeof ALL_DAYS)[number];

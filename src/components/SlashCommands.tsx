@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { commandsList } from "@/lib/agent-client";
-import type { SlashCommand } from "@/lib/types";
+import { commandsList } from "@openbuddy/client/agent-client";
+import type { SlashCommand } from "@openbuddy/protocol/dto";
 
 /**
  * The "/xxx" token being typed at the cursor, or null. A slash only opens the

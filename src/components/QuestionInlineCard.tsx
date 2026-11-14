@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuestionStore, selectQuestionForSession, type QuestionRequest } from "@/stores/question-store";
-import { agentResolveUi } from "@/lib/agent-client";
+import { agentResolveUi } from "@openbuddy/client/agent-client";
 
 /** Drafts stay inside a keyed, session-scoped form and never enter logs or history. */
 export function QuestionInlineCard({ sessionId }: { sessionId: string | null }) {

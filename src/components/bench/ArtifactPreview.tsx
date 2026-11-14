@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { invoke } from "@/lib/ipc";
-import { previewUrl } from "@/lib/agent-client";
+import { invoke } from "@openbuddy/client/ipc";
+import { previewUrl } from "@openbuddy/client/agent-client";
 import { friendlyError } from "@/lib/error-format";
 import { codeLanguage } from "@/lib/file-kind";
 import { Markdown } from "../markdown/index";

@@ -5,8 +5,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { copyText } from "@/lib/clipboard";
-import type { ConnectorItem } from "@/lib/types";
-import { connectorsReadMcpConfig } from "@/lib/agent-client";
+import type { ConnectorItem } from "@openbuddy/protocol/dto";
+import { connectorsReadMcpConfig } from "@openbuddy/client/agent-client";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 import { ConfigureIcon } from "@/foundation/components/Icon/icons";
 import type { ConnectorAuthState } from "./ConnectorsTab";

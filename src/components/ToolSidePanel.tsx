@@ -23,7 +23,7 @@ import {
 } from "@/lib/use-unified-tabs";
 import { ToolCallDetailBody } from "./ToolCallCard";
 import { openLocalPath } from "@/lib/markdown-host";
-import { invoke } from "@/lib/ipc";
+import { invoke } from "@openbuddy/client/ipc";
 import { IS_MACOS } from "@/lib/platform";
 import { ViewSelector, defaultViews } from "./workspace-panel/ViewSelector";
 import { ArtifactTabsBar } from "./workspace-panel/ArtifactTabsBar";

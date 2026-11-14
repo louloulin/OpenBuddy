@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ExtensionUiState } from "@/lib/agent-client";
+import type { ExtensionUiState } from "@openbuddy/client/agent-client";
 interface ExtensionView {
   status: Record<string, string>;
   widgets: Record<string, string[]>;

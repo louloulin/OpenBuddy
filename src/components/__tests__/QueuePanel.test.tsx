@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueuePanel } from "../QueuePanel";
-import { agentClearQueue, agentSetQueue } from "@/lib/agent-client";
+import { agentClearQueue, agentSetQueue } from "@openbuddy/client/agent-client";
 import { usePiQueueStore } from "@/stores/pi-queue-store";
-vi.mock("@/lib/agent-client", () => ({ agentClearQueue: vi.fn(), agentSetQueue: vi.fn() }));
+vi.mock("@openbuddy/client/agent-client", () => ({ agentClearQueue: vi.fn(), agentSetQueue: vi.fn() }));
 
 beforeEach(() => {
   vi.resetAllMocks();

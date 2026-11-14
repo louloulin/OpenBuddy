@@ -26,9 +26,9 @@ import type {
   AutomationPermissionMode,
   AutomationRunRecord,
   AutomationSchedule,
-} from "@/lib/types";
-import type { AgentEntry, SkillInfo } from "@/lib/types";
-import type { WorkspaceInfo } from "@/lib/agent-client";
+} from "@openbuddy/protocol/dto";
+import type { AgentEntry, SkillInfo } from "@openbuddy/protocol/dto";
+import type { WorkspaceInfo } from "@openbuddy/client/agent-client";
 import {
   CustomSelect,
   IntervalDayChips,

@@ -7,7 +7,7 @@
  * Mirrors workbuddy's `ConnectorTokenDialog` / detail-panel token form.
  */
 import { useEffect, useRef, useState } from "react";
-import type { ConnectorItem } from "@/lib/types";
+import type { ConnectorItem } from "@openbuddy/protocol/dto";
 import { OpenExternalIcon } from "@/foundation/components/Icon/icons";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 

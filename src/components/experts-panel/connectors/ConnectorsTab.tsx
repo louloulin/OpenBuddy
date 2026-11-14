@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { open as openDialog } from "@/lib/ipc";
+import { open as openDialog } from "@openbuddy/client/ipc";
 import {
   SearchIcon, AddCircleIcon, FolderOpenIcon, RefreshCwIcon, McpIcon,
 } from "@/foundation/components/Icon/icons";
@@ -9,10 +9,10 @@ import {
   connectorsCliStatus, connectorsCliUnauth,
   mcpAuthStatus, mcpAuthTrigger, mcpConfigRead, mcpConfigSave,
   onConnectorCliAuthUrl, onConnectorCliAuthLog, openUrl, skillsAdd,
-} from "@/lib/agent-client";
+} from "@openbuddy/client/agent-client";
 import { ensureSession } from "@/lib/ensure-session";
 import { useSessionStore } from "@/stores/session-store";
-import type { ConnectorCatalog, ConnectorCliStatus, ConnectorItem } from "@/lib/types";
+import type { ConnectorCatalog, ConnectorCliStatus, ConnectorItem } from "@openbuddy/protocol/dto";
 import { Chip } from "../shared/ui";
 import { ConnectorCard } from "./ConnectorCard";
 import { ConnectorDetailModal } from "./ConnectorDetailModal";

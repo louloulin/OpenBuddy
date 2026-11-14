@@ -4,10 +4,10 @@ import {
   AddIcon,
   SkillTabIcon,
 } from "@/foundation/components/Icon/icons";
-import { skillsList } from "@/lib/agent-client";
+import { skillsList } from "@openbuddy/client/agent-client";
 import { HOME_MODES, type HomeModeId } from "./home-scenes";
 import { CONNECTOR_LIST } from "./experts-panel/data/connectors-catalog";
-import type { AgentEntry, SkillInfo } from "@/lib/types";
+import type { AgentEntry, SkillInfo } from "@openbuddy/protocol/dto";
 
 interface InputAddMenuProps {
   onPickFiles: () => void;

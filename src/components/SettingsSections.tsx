@@ -64,7 +64,7 @@ import {
   webSearchConfigSave,
   type AuthStatus,
   type ModelOptionRow,
-} from "@/lib/agent-client";
+} from "@openbuddy/client/agent-client";
 import type {
   AgentDefaults,
   McpServerEntry,
@@ -73,7 +73,7 @@ import type {
   PermissionRule,
   SkillInfo,
   SlashCommand,
-} from "@/lib/types";
+} from "@openbuddy/protocol/dto";
 
 const FONT_KEY = "openbuddy.fontSize";
 function SectionShell({

@@ -2,8 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QuestionInlineCard } from "../QuestionInlineCard";
 import { useQuestionStore, type QuestionRequest } from "@/stores/question-store";
-import { agentResolveUi } from "@/lib/agent-client";
-vi.mock("@/lib/agent-client", () => ({ agentResolveUi: vi.fn(async () => {}) }));
+import { agentResolveUi } from "@openbuddy/client/agent-client";
+vi.mock("@openbuddy/client/agent-client", () => ({ agentResolveUi: vi.fn(async () => {}) }));
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(agentResolveUi).mockResolvedValue(undefined); useQuestionStore.setState({ queues: {}, notices: {} }); });
 const request = (patch: Partial<QuestionRequest> = {}) => useQuestionStore.getState().request({ requestId: "r", sessionId: "A", title: "选择方式", kind: "select", options: ["One", "Two"], ...patch });
 

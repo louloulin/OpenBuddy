@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { agentClearQueue, agentSetQueue } from "@/lib/agent-client";
+import { agentClearQueue, agentSetQueue } from "@openbuddy/client/agent-client";
 import { friendlyError } from "@/lib/error-format";
 import { EMPTY_PI_QUEUE, usePiQueueStore } from "@/stores/pi-queue-store";
 

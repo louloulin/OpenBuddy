@@ -1,9 +1,9 @@
 import { ensureSession } from "@/lib/ensure-session";
 import { TrustedExtensionsPanel } from "./TrustedExtensionsPanel";
 import { useCallback, useEffect, useState } from "react";
-import { skillsAdd, skillsList, skillsRemove, skillsToggle, mcpAuthStatus, mcpAuthTrigger } from "@/lib/agent-client";
-import { dialog } from "@/lib/ipc";
-import type { SkillInfo, McpAuthStatusEntry } from "@/lib/types";
+import { skillsAdd, skillsList, skillsRemove, skillsToggle, mcpAuthStatus, mcpAuthTrigger } from "@openbuddy/client/agent-client";
+import { dialog } from "@openbuddy/client/ipc";
+import type { SkillInfo, McpAuthStatusEntry } from "@openbuddy/protocol/dto";
 import { McpConfigEditor } from "./experts-panel/connectors/McpConfigEditor";
 
 /** MVP resources use installed Pi skills and the actual MCP configuration. */

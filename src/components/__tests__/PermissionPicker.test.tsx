@@ -1,12 +1,12 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { permissionModeSet } from "@/lib/agent-client";
+import { permissionModeSet } from "@openbuddy/client/agent-client";
 import { PermissionPicker } from "../PermissionPicker";
 import { AppDialogHost } from "../AppDialog";
 
-vi.mock("@/lib/ipc", () => ({ invoke: vi.fn(), save: vi.fn(), listen: vi.fn(async () => () => {}) }));
-vi.mock("@/lib/agent-client", async (orig) => ({
-  ...(await orig<typeof import("@/lib/agent-client")>()),
+vi.mock("@openbuddy/client/ipc", () => ({ invoke: vi.fn(), save: vi.fn(), listen: vi.fn(async () => () => {}) }));
+vi.mock("@openbuddy/client/agent-client", async (orig) => ({
+  ...(await orig<typeof import("@openbuddy/client/agent-client")>()),
   permissionModeGet: vi.fn(async () => "ask"),
   permissionModeSet: vi.fn(async () => {}),
 }));

@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TopbarActions } from "../TopbarActions";
 import { useSessionStore } from "@/stores/session-store";
 const { fork } = vi.hoisted(() => ({ fork: vi.fn() }));
-vi.mock("@/lib/agent-client", () => ({ agentForkSession: fork, exportTextFile: vi.fn(), agentSetSessionPinned: vi.fn(), agentSetSessionArchived: vi.fn() }));
+vi.mock("@openbuddy/client/agent-client", () => ({ agentForkSession: fork, exportTextFile: vi.fn(), agentSetSessionPinned: vi.fn(), agentSetSessionArchived: vi.fn() }));
 beforeEach(() => { fork.mockReset(); useSessionStore.setState({ streaming: false }); });
 describe("actual session fork", () => {
   it("opens only the child acknowledged by Pi", async () => {

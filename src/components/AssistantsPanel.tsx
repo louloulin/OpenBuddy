@@ -32,8 +32,8 @@ import {
   agentsList,
   agentsSave,
   agentsTemplate,
-} from "@/lib/agent-client";
-import type { AgentEntry } from "@/lib/types";
+} from "@openbuddy/client/agent-client";
+import type { AgentEntry } from "@openbuddy/protocol/dto";
 
 const AVATAR_PRESETS: { bg: string; emoji: string }[] = [
   { bg: "#FF6B9D", emoji: "🌸" },

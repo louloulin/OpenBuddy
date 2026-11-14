@@ -5,7 +5,7 @@
  * lib/knowledge-base)。本面板提供搜索框 + 跨源结果列表。无 provider 时显示空态。
  */
 import { useEffect, useState } from "react";
-import { open as openDialog } from "@/lib/ipc";
+import { open as openDialog } from "@openbuddy/client/ipc";
 import { searchKb, listKbProvidersWithStats, registerKbProvider, unregisterKbProvider, rebuildAllKbProviders, type KbEntry, type KbIndexStats } from "@/lib/knowledge-base";
 import { createLocalKbProvider } from "@/lib/local-kb-provider";
 import { createDesktopDirectoryReader, isDesktopAvailable } from "@/lib/desktop-kb-reader";

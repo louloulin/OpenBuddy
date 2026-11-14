@@ -12,7 +12,7 @@ import {
   ShieldCheckIcon,
   WarningOutlineIcon,
 } from "@/foundation/components/Icon/icons";
-import type { AutomationPermissionMode } from "@/lib/types";
+import type { AutomationPermissionMode } from "@openbuddy/protocol/dto";
 
 export function AutomationPermissionPicker({
   value,

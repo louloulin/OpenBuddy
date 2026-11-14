@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 
-vi.mock("@/lib/agent-client", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/agent-client")>()),
+vi.mock("@openbuddy/client/agent-client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@openbuddy/client/agent-client")>()),
   commandsList: vi.fn(async () => [
     { name: "commit", description: "Create a git commit", source: "skill" },
     { name: "compact", description: "Compact context", source: "builtin" },
@@ -12,7 +12,7 @@ vi.mock("@/lib/agent-client", async (importOriginal) => ({
 
 import { Composer } from "../Composer";
 import { slashToken } from "../SlashCommands";
-import { commandsList } from "@/lib/agent-client";
+import { commandsList } from "@openbuddy/client/agent-client";
 
 const base = { streaming: false, onCancel: vi.fn() };
 const type = (input: HTMLElement, value: string) =>

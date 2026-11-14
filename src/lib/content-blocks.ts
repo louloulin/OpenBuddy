@@ -10,7 +10,7 @@
  *
  * 纯函数:块的定义、增删/重排/校验、组装成最终发送文本。便于单测,与 Composer 解耦。
  */
-import type { AgentEntry } from "@/lib/types";
+import type { AgentEntry } from "@openbuddy/protocol/dto";
 
 /** 内容块类型。 */
 export type ContentBlock =

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ensureSession } from "../ensure-session";
-import { agentGetModelState, agentNewSession } from "../agent-client";
+import { agentGetModelState, agentNewSession } from "@openbuddy/client/agent-client";
 import { useSessionStore } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useAgentModelStore } from "@/stores/agent-model-store";
 
-vi.mock("../agent-client", () => ({ agentNewSession: vi.fn(), agentGetModelState: vi.fn() }));
+vi.mock("@openbuddy/client/agent-client", () => ({ agentNewSession: vi.fn(), agentGetModelState: vi.fn() }));
 beforeEach(() => {
   vi.resetAllMocks();
   useSessionStore.setState({ sessionId: null, transcripts: {} });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { agentExtensionsAdd, agentExtensionsList, agentExtensionsRemove, agentExtensionsSetEnabled, type ExtensionsConfig } from "@/lib/agent-client";
-import { dialog } from "@/lib/ipc";
+import { agentExtensionsAdd, agentExtensionsList, agentExtensionsRemove, agentExtensionsSetEnabled, type ExtensionsConfig } from "@openbuddy/client/agent-client";
+import { dialog } from "@openbuddy/client/ipc";
 import { friendlyError } from "@/lib/error-format";
 
 export function TrustedExtensionsPanel() {

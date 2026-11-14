@@ -26,8 +26,8 @@ import {
   agentsList,
   mcpList,
   skillsList,
-} from "@/lib/agent-client";
-import type { AgentEntry, McpServerEntry, SkillInfo } from "@/lib/types";
+} from "@openbuddy/client/agent-client";
+import type { AgentEntry, McpServerEntry, SkillInfo } from "@openbuddy/protocol/dto";
 
 // 内置场景（对应 WorkBuddy browseByScene: 代码/文档/图片/表格/幻灯片/其他/官方）
 // 每个场景声明它推荐的能力，UI 检查这些是否已就绪。

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AutomationPanel } from "../AutomationPanel";
-import type { AutomationSnapshot } from "@/lib/types";
+import type { AutomationSnapshot } from "@openbuddy/protocol/dto";
 
 const emptySnapshot: AutomationSnapshot = { automations: [], records: [] };
 let snapshot: AutomationSnapshot = emptySnapshot;
 
-vi.mock("@/lib/agent-client", () => ({
+vi.mock("@openbuddy/client/agent-client", () => ({
   automationsSnapshot: vi.fn(async () => snapshot),
   automationsSave: vi.fn(async (a: unknown) => a),
   automationsDelete: vi.fn(async () => {}),

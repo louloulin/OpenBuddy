@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search, X, Clock, FileText } from "lucide-react";
 import { useSessionsStore } from "@/stores/sessions-store";
-import { sessionSearch } from "@/lib/agent-client";
-import type { SearchHit, SessionSummary } from "@/lib/types";
+import { sessionSearch } from "@openbuddy/client/agent-client";
+import type { SearchHit, SessionSummary } from "@openbuddy/protocol/dto";
 
 
 export function SearchOverlay({

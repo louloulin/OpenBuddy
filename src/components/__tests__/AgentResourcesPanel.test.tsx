@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AgentResourcesPanel } from "../AgentResourcesPanel";
-import { mcpAuthStatus, mcpAuthTrigger, agentExtensionsSetEnabled } from "@/lib/agent-client";
+import { mcpAuthStatus, mcpAuthTrigger, agentExtensionsSetEnabled } from "@openbuddy/client/agent-client";
 
-vi.mock("@/lib/agent-client", () => ({
+vi.mock("@openbuddy/client/agent-client", () => ({
   skillsList: vi.fn(async () => []), skillsAdd: vi.fn(), skillsRemove: vi.fn(), skillsToggle: vi.fn(),
   mcpAuthStatus: vi.fn(async () => [{ serverName: "remote", status: "needs_auth" }]),
   mcpAuthTrigger: vi.fn(async () => ({ status: "authenticated" })),

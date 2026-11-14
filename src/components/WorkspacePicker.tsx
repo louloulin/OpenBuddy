@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check, Folder, FolderOpen } from "lucide-react";
-import { open as openDialog } from "@/lib/ipc";
-import type { WorkspaceInfo } from "@/lib/agent-client";
+import { open as openDialog } from "@openbuddy/client/ipc";
+import type { WorkspaceInfo } from "@openbuddy/client/agent-client";
 import { useSessionsStore } from "@/stores/sessions-store";
 
 

@@ -10,8 +10,8 @@ import { useEffect, useRef, useState } from "react";
 import { copyText } from "@/lib/clipboard";
 import QRCode from "qrcode";
 import { Copy as CopyIcon } from "lucide-react";
-import type { ConnectorItem } from "@/lib/types";
-import { openUrl } from "@/lib/agent-client";
+import type { ConnectorItem } from "@openbuddy/protocol/dto";
+import { openUrl } from "@openbuddy/client/agent-client";
 import { OpenExternalIcon } from "@/foundation/components/Icon/icons";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 

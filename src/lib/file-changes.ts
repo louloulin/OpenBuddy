@@ -6,7 +6,7 @@
  * 纯函数、无副作用,便于单测。
  */
 import type { ChatMessage } from "@/stores/session-store";
-import type { DiffContent } from "@/lib/types";
+import type { DiffContent } from "@openbuddy/protocol/dto";
 import { extOf } from "./drop-utils";
 
 /** 单个文件的聚合变更。 */

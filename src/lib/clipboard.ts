@@ -1,4 +1,4 @@
-import { invoke } from "./ipc";
+import { invoke } from "@openbuddy/client/ipc";
 
 /** Write text to the system clipboard through the main process (renderer clipboard permission is denied). */
 export async function copyText(text: string): Promise<void> {

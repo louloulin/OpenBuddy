@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { invoke } from "@/lib/ipc";
-import { checkpointList, checkpointRead, checkpointRestore, type ArtifactInfo } from "@/lib/agent-client";
+import { invoke } from "@openbuddy/client/ipc";
+import { checkpointList, checkpointRead, checkpointRestore, type ArtifactInfo } from "@openbuddy/client/agent-client";
 import { friendlyError } from "@/lib/error-format";
 import { appConfirm } from "../AppDialog";
 import { DiffBlock } from "./DiffBlock";

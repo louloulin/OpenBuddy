@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ArtifactInfo } from "@/lib/agent-client";
+import type { ArtifactInfo } from "@openbuddy/client/agent-client";
 import type { ToolCallView } from "@/stores/session-store";
 import { IS_MACOS } from "@/lib/platform";
 import { ToolCallDetailBody } from "../ToolCallCard";

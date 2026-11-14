@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import {
   XCloseIcon, SearchIcon, ConfigureIcon, McpIcon, OpenExternalIcon, DeleteIcon,
 } from "@/foundation/components/Icon/icons";
-import { mcpDelete, mcpList, mcpToggle } from "@/lib/agent-client";
+import { mcpDelete, mcpList, mcpToggle } from "@openbuddy/client/agent-client";
 import { ensureSession } from "@/lib/ensure-session";
 import { useSessionStore } from "@/stores/session-store";
-import type { McpServerEntry } from "@/lib/types";
+import type { McpServerEntry } from "@openbuddy/protocol/dto";
 import { McpConfigEditor } from "./McpConfigEditor";
 
 /** "MCP 服务管理" modal (截图 6) — list / search / empty state, and hosts the

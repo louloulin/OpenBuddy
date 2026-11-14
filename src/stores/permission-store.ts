@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { PermissionRequest } from "@/lib/types";
+import type { PermissionRequest } from "@openbuddy/protocol/dto";
 
 /**
  * Permission requests indexed by sessionId. Each session owns its own queue

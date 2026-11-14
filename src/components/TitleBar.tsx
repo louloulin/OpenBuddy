@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { editCommand } from "@/lib/clipboard";
-import { win as windowControls } from "@/lib/ipc";
+import { win as windowControls } from "@openbuddy/client/ipc";
 import { XCloseIcon } from "@/foundation/components/Icon/icons";
 import logoMarkUrl from "@/assets/openbuddy-logo.svg";
 

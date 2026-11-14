@@ -1,4 +1,4 @@
-import type { SkillItem } from "@/lib/types";
+import type { SkillItem } from "@openbuddy/protocol/dto";
 import { AddIcon, CheckIcon, SparklesIcon } from "@/foundation/components/Icon/icons";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 import { LetterAvatar } from "../shared/LetterAvatar";

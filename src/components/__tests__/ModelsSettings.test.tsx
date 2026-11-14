@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { invoke } from "@/lib/ipc";
+import { invoke } from "@openbuddy/client/ipc";
 import { ModelsSettingsPanel } from "../models-settings/ModelsSettingsPanel";
 import { formatTokens, levelsOf, mapFromLevels, uniqueProviderId } from "../models-settings/model-config";
 
@@ -15,7 +15,7 @@ const fetched = [
   { id: "glm-5.3-flash", name: "GLM-5.3-Flash", reasoning: true, thinkingLevels: ["low", "high", "max"], suggested: { name: "GLM-5.3-Flash", reasoning: true } },
 ];
 
-vi.mock("@/lib/ipc", () => ({
+vi.mock("@openbuddy/client/ipc", () => ({
   invoke: vi.fn(async (command: string, args: any) => {
     calls.push({ command, args });
     switch (command) {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import type { Plan } from "@/lib/types";
+import type { Plan } from "@openbuddy/protocol/dto";
 
 // vi.mock 工厂被提升,引用的变量必须用 vi.hoisted 声明。
 const { mocks } = vi.hoisted(() => ({
@@ -27,7 +27,7 @@ vi.mock("@/stores/session-store", () => ({
     }),
 }));
 
-vi.mock("@/lib/agent-client", () => ({ togglePlanMode: mocks.togglePlanMode }));
+vi.mock("@openbuddy/client/agent-client", () => ({ togglePlanMode: mocks.togglePlanMode }));
 
 import { PlanPanel } from "../PlanPanel";
 

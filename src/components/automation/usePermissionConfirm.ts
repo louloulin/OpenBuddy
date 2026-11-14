@@ -6,7 +6,7 @@
  * （保存 / 测试运行共用同一确认链路）。
  */
 import { useCallback, useRef, useState } from "react";
-import type { AutomationPermissionMode } from "@/lib/types";
+import type { AutomationPermissionMode } from "@openbuddy/protocol/dto";
 
 export function usePermissionConfirm({
   currentMode,

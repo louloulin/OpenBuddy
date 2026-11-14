@@ -1,4 +1,4 @@
-import { turnRevert, type ArtifactInfo } from "@/lib/agent-client";
+import { turnRevert, type ArtifactInfo } from "@openbuddy/client/agent-client";
 import { friendlyError } from "@/lib/error-format";
 import { appConfirm } from "../AppDialog";
 

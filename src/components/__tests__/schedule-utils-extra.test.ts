@@ -16,7 +16,7 @@ import {
   automationFromDraft,
   buildDraft,
 } from "../automation/schedule-utils";
-import type { Automation } from "@/lib/types";
+import type { Automation } from "@openbuddy/protocol/dto";
 
 describe("pad2", () => {
   it("个位数补零", () => {

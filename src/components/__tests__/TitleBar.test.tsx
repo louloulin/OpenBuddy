@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
 const { minimize, toggleMaximize, close, resizedCleanup, editCommand } = vi.hoisted(() => ({ minimize: vi.fn(), toggleMaximize: vi.fn(), close: vi.fn(), resizedCleanup: vi.fn(), editCommand: vi.fn(() => Promise.resolve()) }));
-vi.mock("@/lib/ipc", () => ({
+vi.mock("@openbuddy/client/ipc", () => ({
   win: { minimize, toggleMaximize, close, isMaximized: () => Promise.resolve(false), onResized: () => resizedCleanup },
 }));
 vi.mock("@/lib/clipboard", () => ({ editCommand }));

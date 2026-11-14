@@ -45,8 +45,8 @@ import {
   subscribeAgentEvents,
   type InitResult,
   type WorkspaceInfo,
-} from "./lib/agent-client";
-import type { AgentEntry } from "./lib/types";
+} from "@openbuddy/client/agent-client";
+import type { AgentEntry } from "@openbuddy/protocol/dto";
 import { useProjectsStore, type ProjectMeta } from "./stores/projects-store";
 import { usePiQueueStore } from "./stores/pi-queue-store";
 import { recordUsage, loadUsage, loadQuotaConfig } from "./lib/usage-quota";

@@ -1,8 +1,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSessionStore } from "@/stores/session-store";
-import { togglePlanMode } from "@/lib/agent-client";
-import type { PlanEntry, PlanEntryPriority, PlanEntryStatus } from "@/lib/types";
+import { togglePlanMode } from "@openbuddy/client/agent-client";
+import type { PlanEntry, PlanEntryPriority, PlanEntryStatus } from "@openbuddy/protocol/dto";
 import {
   reorderPlan,
   addPlanEntry,

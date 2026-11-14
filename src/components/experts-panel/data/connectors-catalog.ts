@@ -1,4 +1,4 @@
-import type { ConnectorCatalogItem } from "@/lib/types";
+import type { ConnectorCatalogItem } from "@openbuddy/protocol/dto";
 
 /** Built-in connector directory (截图 4). These are MCP-type connectors, so the
  *  "+" action opens the MCP 服务管理 modal (本地无一键安装). Order matches the

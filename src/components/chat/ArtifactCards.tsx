@@ -1,5 +1,5 @@
 import { createContext, memo, useContext } from "react";
-import type { ArtifactInfo } from "@/lib/agent-client";
+import type { ArtifactInfo } from "@openbuddy/client/agent-client";
 import { KIND_GLYPH, KIND_LABEL, benchKind, formatSize } from "../bench/bench-kind";
 
 /**

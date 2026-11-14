@@ -1,4 +1,4 @@
-import type { SkillCatalogItem } from "@/lib/types";
+import type { SkillCatalogItem } from "@openbuddy/protocol/dto";
 import { AddIcon, CheckIcon } from "@/foundation/components/Icon/icons";
 import { LetterAvatar } from "../shared/LetterAvatar";
 

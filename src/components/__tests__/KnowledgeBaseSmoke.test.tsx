@@ -16,7 +16,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const openDialog = vi.fn();
-vi.mock("@/lib/ipc", () => ({ open: (...a: unknown[]) => openDialog(...a), invoke: vi.fn() }));
+vi.mock("@openbuddy/client/ipc", () => ({ open: (...a: unknown[]) => openDialog(...a), invoke: vi.fn() }));
 
 const mockReader = { listDir: vi.fn(), readText: vi.fn(), readBytes: vi.fn() };
 vi.mock("@/lib/desktop-kb-reader", () => ({

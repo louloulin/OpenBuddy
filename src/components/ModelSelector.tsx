@@ -1,7 +1,7 @@
 import { friendlyError } from "@/lib/error-format";
 import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, Check, Lightbulb, Search } from "lucide-react";
-import { THINKING_LABELS } from "@/lib/agent-client";
+import { THINKING_LABELS } from "@openbuddy/client/agent-client";
 import { formatTokens } from "./models-settings/model-config";
 
 export interface ModelOption {

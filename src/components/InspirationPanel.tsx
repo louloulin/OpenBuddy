@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { listen } from "@/lib/ipc";
+import { listen } from "@openbuddy/client/ipc";
 import { X } from "lucide-react";
 import {
   SearchIcon,
   LightbulbIcon,
   SparklesIcon,
 } from "@/foundation/components/Icon/icons";
-import { inspirationGenerate } from "@/lib/agent-client";
+import { inspirationGenerate } from "@openbuddy/client/agent-client";
 import { registerForeignUpdateListener } from "@/stores/session-store";
-import type { InspirationRichCard, PromptComplete } from "@/lib/types";
+import type { InspirationRichCard, PromptComplete } from "@openbuddy/protocol/dto";
 
 const INTEREST_TAGS = [
   { id: "all", label: "全部" },

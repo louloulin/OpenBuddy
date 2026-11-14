@@ -1,12 +1,12 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { ArrowUp, X, type LucideIcon } from "lucide-react";
-import { open as openDialog } from "@/lib/ipc";
-import { getPathForFile } from "@/lib/ipc";
+import { open as openDialog } from "@openbuddy/client/ipc";
+import { getPathForFile } from "@openbuddy/client/ipc";
 import { ChevronDownIcon } from "@/foundation/components/Icon/icons";
 import { ModelRuntimeContext, ModelSelector, type ModelOption } from "./ModelSelector";
 import { ThumbImg } from "./experts-panel/shared/ThumbImg";
 import { ContextUsagePill } from "./ContextUsagePill";
-import { clipboardSaveImage, type AgentMode } from "@/lib/agent-client";
+import { clipboardSaveImage, type AgentMode } from "@openbuddy/client/agent-client";
 import {
   loadInputHistory,
   saveInputHistory,
@@ -22,8 +22,8 @@ import {
   collectDroppedPaths,
 } from "@/lib/drop-utils";
 import type { HomeModeId } from "./home-scenes";
-import type { AgentEntry } from "@/lib/types";
-import type { WorkspaceInfo } from "@/lib/agent-client";
+import type { AgentEntry } from "@openbuddy/protocol/dto";
+import type { WorkspaceInfo } from "@openbuddy/client/agent-client";
 
 const AGENT_MODES: ReadonlyArray<readonly [AgentMode, string, string]> = [
   ["craft", "做一做", "直接动手：可以读写文件、执行命令"],

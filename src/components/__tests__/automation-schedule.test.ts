@@ -11,7 +11,7 @@ import {
   validateDraft,
 } from "../automation/schedule-utils";
 import { AUTOMATION_TEMPLATES } from "../automation/template-config";
-import type { AutomationSchedule } from "@/lib/types";
+import type { AutomationSchedule } from "@openbuddy/protocol/dto";
 
 function schedule(patch: Partial<AutomationSchedule>): AutomationSchedule {
   return { ...defaultSchedule(), ...patch };

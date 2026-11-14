@@ -6,7 +6,7 @@ import {
   type ModelProviderEntry,
   type PiThinkingLevel,
   type ProviderKind,
-} from "@/lib/agent-client";
+} from "@openbuddy/client/agent-client";
 
 /** Provider presets: picking one fills the connection; "custom" kinds are left to the user. */
 export interface Preset {

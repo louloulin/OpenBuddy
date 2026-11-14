@@ -1,8 +1,8 @@
 
 import { useEffect, useState } from "react";
 import { XCloseIcon, CheckIcon } from "@/foundation/components/Icon/icons";
-import { agentAuthStatus } from "@/lib/agent-client";
-import type { InitResult } from "@/lib/agent-client";
+import { agentAuthStatus } from "@openbuddy/client/agent-client";
+import type { InitResult } from "@openbuddy/client/agent-client";
 import { APP_VERSION } from "@/lib/app-version";
 import logoUrl from "@/assets/openbuddy-logo.svg";
 // 引擎运行在 Electron 主进程。

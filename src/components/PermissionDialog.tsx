@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePermissionStore, selectPermissionForSession } from "@/stores/permission-store";
-import { agentResolvePermission } from "@/lib/agent-client";
-import type { PermissionRequest } from "@/lib/types";
+import { agentResolvePermission } from "@openbuddy/client/agent-client";
+import type { PermissionRequest } from "@openbuddy/protocol/dto";
 import { checkCommandRisk, riskLabel } from "@/lib/command-risk";
 import { permissionObjectLabel, permissionTitle, toolCategory, toolSubject } from "@/lib/tool-summary";
 import { ShieldAlertIcon } from "@/foundation/components/Icon/icons";

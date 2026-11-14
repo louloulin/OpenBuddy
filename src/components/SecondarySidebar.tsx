@@ -1,7 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { agentsList } from "@/lib/agent-client";
-import type { AgentEntry } from "@/lib/types";
+import { agentsList } from "@openbuddy/client/agent-client";
+import type { AgentEntry } from "@openbuddy/protocol/dto";
 import { WbAssistantNavIcon, ChevronRightIcon } from "@/foundation/components/Icon/icons";
 
 // ---- hover-peek timing (mirrors WorkBuddy use-hover-peek) ----

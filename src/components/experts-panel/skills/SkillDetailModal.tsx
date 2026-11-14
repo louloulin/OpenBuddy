@@ -7,8 +7,8 @@
  * the back button returns to the skill grid without disturbing the grid state.
  */
 import { useEffect, useMemo, useState } from "react";
-import type { SkillItem, SkillInfo } from "@/lib/types";
-import { skillsCatalogReadSkill, skillsAdd } from "@/lib/agent-client";
+import type { SkillItem, SkillInfo } from "@openbuddy/protocol/dto";
+import { skillsCatalogReadSkill, skillsAdd } from "@openbuddy/client/agent-client";
 import { Markdown } from "@/components/markdown/Markdown";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 import { LetterAvatar } from "../shared/LetterAvatar";

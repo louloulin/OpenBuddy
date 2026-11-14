@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { open as openDialog } from "@/lib/ipc";
+import { open as openDialog } from "@openbuddy/client/ipc";
 import { XCloseIcon, FolderOpenIcon } from "@/foundation/components/Icon/icons";
-import { skillsAdd } from "@/lib/agent-client";
+import { skillsAdd } from "@openbuddy/client/agent-client";
 
 
 export function ImportSkillModal({

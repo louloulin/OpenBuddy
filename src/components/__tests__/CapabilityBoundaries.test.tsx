@@ -3,10 +3,10 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MyFilesPanel } from "../MyFilesPanel";
 import { PolicySettingsPanel } from "../PolicySettingsPanel";
 import { UsageQuotaPanel } from "../UsageQuotaPanel";
-import { invoke, open } from "@/lib/ipc";
-import { memoryList } from "@/lib/agent-client";
-vi.mock("@/lib/ipc", () => ({ invoke: vi.fn(async () => [{ name: "local.md", path: "/workspace/local.md", kind: "file", size: 12 }]), open: vi.fn() }));
-vi.mock("@/lib/agent-client", () => ({ memoryList: vi.fn(async () => []) }));
+import { invoke, open } from "@openbuddy/client/ipc";
+import { memoryList } from "@openbuddy/client/agent-client";
+vi.mock("@openbuddy/client/ipc", () => ({ invoke: vi.fn(async () => [{ name: "local.md", path: "/workspace/local.md", kind: "file", size: 12 }]), open: vi.fn() }));
+vi.mock("@openbuddy/client/agent-client", () => ({ memoryList: vi.fn(async () => []) }));
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); });
 describe("visible capability boundaries", () => {
   it("opens local files by default and never calls the deferred memory command", async () => {

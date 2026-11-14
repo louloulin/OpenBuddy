@@ -1,5 +1,5 @@
 import { ArtifactCards, useArtifacts } from "./ArtifactCards";
-import { agentAbortRetry } from "@/lib/agent-client";
+import { agentAbortRetry } from "@openbuddy/client/agent-client";
 import { filesTouchedBy } from "../bench/revert";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage, RetryState, ToolCallView } from "@/stores/session-store";

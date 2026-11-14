@@ -1,6 +1,6 @@
 
 import { useEffect, useRef } from "react";
-import type { ConnectorItem } from "@/lib/types";
+import type { ConnectorItem } from "@openbuddy/protocol/dto";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 
 interface Props {

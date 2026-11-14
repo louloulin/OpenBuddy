@@ -8,7 +8,7 @@ import { friendlyError } from "@/lib/error-format";
  * 位置：main-topbar 右侧（标题旁边）。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { save as saveDialog } from "@/lib/ipc";
+import { save as saveDialog } from "@openbuddy/client/ipc";
 import { MoreDotsIcon, PinFilledIcon, ArchiveIcon } from "@/foundation/components/Icon/icons";
 import { useSessionStore } from "@/stores/session-store";
 import {
@@ -16,7 +16,7 @@ import {
   agentForkSession,
   agentSetSessionPinned,
   agentSetSessionArchived,
-} from "@/lib/agent-client";
+} from "@openbuddy/client/agent-client";
 import { buildSessionMarkdown, sanitizeFilename } from "@/lib/export-markdown";
 
 interface TopbarActionsProps {

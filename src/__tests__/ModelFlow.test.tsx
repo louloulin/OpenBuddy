@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
-import type { OpenBuddyBridge } from "@/lib/ipc";
+import type { OpenBuddyBridge } from "@openbuddy/client/ipc";
 import { useAgentModelStore } from "@/stores/agent-model-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { artifactsList, type ArtifactInfo } from "@/lib/agent-client";
+import { artifactsList, type ArtifactInfo } from "@openbuddy/client/agent-client";
 
 /**
  * Per-session artifact index from the main process (20261115-ui U1.1).

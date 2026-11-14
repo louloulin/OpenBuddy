@@ -8,8 +8,8 @@ import {
   AgentToolIcon,
   McpIcon,
 } from "@/foundation/components/Icon/icons";
-import { pluginsAction, pluginsList } from "@/lib/agent-client";
-import type { PluginEntry } from "@/lib/types";
+import { pluginsAction, pluginsList } from "@openbuddy/client/agent-client";
+import type { PluginEntry } from "@openbuddy/protocol/dto";
 
 interface PluginsPanelProps {
   /** Current session id (for the plugins/list call). */

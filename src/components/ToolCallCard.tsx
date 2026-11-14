@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from "react";
 import type { ToolCallView } from "@/stores/session-store";
-import type { DiffContent, CommandOutputContent, ImageToolContent } from "@/lib/types";
+import type { DiffContent, CommandOutputContent, ImageToolContent } from "@openbuddy/protocol/dto";
 import { checkCommandRisk, riskLabel } from "@/lib/command-risk";
 import { computeUnifiedDiff, hunksToUnifiedLines, summarizeDiff, type DiffLine } from "@/lib/unified-diff";
 import {

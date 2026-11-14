@@ -10,7 +10,7 @@ import {
   blockLabel,
   type ContentBlock,
 } from "../content-blocks";
-import type { AgentEntry } from "@/lib/types";
+import type { AgentEntry } from "@openbuddy/protocol/dto";
 
 const expert: AgentEntry = {
   name: "代码审查专家",

@@ -12,8 +12,8 @@ import {
   agentDeleteSession,
   agentSetSessionPinned,
   agentSetSessionArchived,
-} from "@/lib/agent-client";
-import type { SessionSummary, SessionStatus } from "@/lib/types";
+} from "@openbuddy/client/agent-client";
+import type { SessionSummary, SessionStatus } from "@openbuddy/protocol/dto";
 import {
   WbNewTaskIcon,
   WbProjectNavIcon,

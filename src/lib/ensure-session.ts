@@ -1,4 +1,4 @@
-import { agentGetModelState, agentNewSession } from "./agent-client";
+import { agentGetModelState, agentNewSession } from "@openbuddy/client/agent-client";
 import { useSessionStore } from "@/stores/session-store";
 import { useSessionsStore } from "@/stores/sessions-store";
 import { useAgentModelStore } from "@/stores/agent-model-store";

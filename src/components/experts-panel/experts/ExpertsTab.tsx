@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { open as openDialog } from "@/lib/ipc";
+import { open as openDialog } from "@openbuddy/client/ipc";
 import {
   SearchIcon, MyExpertIcon, ChevronLeftIcon, DeleteIcon, SparklesIcon,
   FolderOpenIcon, RefreshCwIcon,
 } from "@/foundation/components/Icon/icons";
 import {
   agentsDelete, agentsList, expertsDefaultRoot, expertsLoad, expertsReadAgentPrompt, expertsLinkAgents,
-} from "@/lib/agent-client";
-import type { AgentEntry, ExpertCatalog, ExpertItem, FeaturedScene } from "@/lib/types";
+} from "@openbuddy/client/agent-client";
+import type { AgentEntry, ExpertCatalog, ExpertItem, FeaturedScene } from "@openbuddy/protocol/dto";
 import { FEATURED_SCENES } from "../data/featured-scenes";
 import { Chip, SegmentTabs } from "../shared/ui";
 import { ThumbImg } from "../shared/ThumbImg";

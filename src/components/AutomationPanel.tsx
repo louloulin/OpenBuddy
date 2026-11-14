@@ -45,7 +45,7 @@ import {
   flattenModels,
   skillsList,
   type WorkspaceInfo,
-} from "@/lib/agent-client";
+} from "@openbuddy/client/agent-client";
 import type {
   AgentEntry,
   Automation,
@@ -53,7 +53,7 @@ import type {
   AutomationSnapshot,
   AutomationStatus,
   SkillInfo,
-} from "@/lib/types";
+} from "@openbuddy/protocol/dto";
 import { AUTOMATION_TEMPLATES, type AutomationTemplate } from "./automation/template-config";
 import {
   DAY_LABELS,

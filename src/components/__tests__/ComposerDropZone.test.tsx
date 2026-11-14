@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Composer } from "../Composer";
 
-vi.mock("@/lib/ipc", () => ({
+vi.mock("@openbuddy/client/ipc", () => ({
   getPathForFile: (file: File) => `/workspace/${file.name}`,
   open: vi.fn(),
 }));

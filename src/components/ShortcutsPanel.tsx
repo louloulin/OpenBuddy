@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { keyLabel, SHORTCUTS, type ShortcutScope } from "@/lib/shortcuts";
-import type { SessionSummary } from "@/lib/types";
+import type { SessionSummary } from "@openbuddy/protocol/dto";
 import { XCloseIcon } from "@/foundation/components/Icon/icons";
 import { relativeTime } from "@/lib/file-utils";
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { agentSessionInfo, agentSessionUsage } from "@/lib/agent-client";
-import type { ContextInfo, SessionUsage } from "@/lib/types";
+import { agentSessionInfo, agentSessionUsage } from "@openbuddy/client/agent-client";
+import type { ContextInfo, SessionUsage } from "@openbuddy/protocol/dto";
 
 
 

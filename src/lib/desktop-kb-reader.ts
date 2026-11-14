@@ -1,5 +1,5 @@
 
-import { invoke } from "@/lib/ipc";
+import { invoke } from "@openbuddy/client/ipc";
 import type { DirectoryReader } from "./local-kb-provider";
 
 

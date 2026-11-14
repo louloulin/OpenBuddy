@@ -1,26 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ArtifactInfo } from "@/lib/agent-client";
-import { agentResolvePermission, turnRevert } from "@/lib/agent-client";
-import { invoke } from "@/lib/ipc";
+import type { ArtifactInfo } from "@openbuddy/client/agent-client";
+import { agentResolvePermission, turnRevert } from "@openbuddy/client/agent-client";
+import { invoke } from "@openbuddy/client/ipc";
 import { Workbench } from "../bench/Workbench";
 import { ArtifactCards, type ArtifactsApi } from "../chat/ArtifactCards";
 import { PermissionCard } from "../PermissionDialog";
 import { revertToolCalls } from "../bench/revert";
 import { parseUserText, withModeInstruction } from "@/lib/user-text";
 import { useExtensionUiStore } from "@/stores/extension-ui-store";
-import { previewUrl } from "@/lib/agent-client";
+import { previewUrl } from "@openbuddy/client/agent-client";
 import { ThemeProvider } from "../ThemeProvider";
 import type { ReactElement } from "react";
 const themed = (ui: ReactElement) => <ThemeProvider>{ui}</ThemeProvider>;
 
-vi.mock("@/lib/ipc", () => ({
+vi.mock("@openbuddy/client/ipc", () => ({
   invoke: vi.fn(async (command: string) => (command === "read_text_file" ? "# Report\n\nhello" : command === "read_dir" ? [] : null)),
   save: vi.fn(),
   listen: vi.fn(async () => () => {}),
 }));
-vi.mock("@/lib/agent-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/agent-client")>();
+vi.mock("@openbuddy/client/agent-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@openbuddy/client/agent-client")>();
   return {
     ...actual,
     agentResolvePermission: vi.fn(async () => {}),
