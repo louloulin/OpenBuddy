@@ -1,5 +1,6 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
@@ -55,6 +56,8 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
+    // Agent worktrees live under .claude/worktrees; their copies are not this checkout's tests.
+    exclude: [...configDefaults.exclude, ".claude/**"],
     // 不让 CSS import 在测试里报错(我们没装 jsdom CSS 处理)。
     css: false,
   },
