@@ -1,0 +1,11 @@
+{
+  "name": "@openbuddy/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pi 引擎：会话池、事件管线、权限、扩展 UI 桥、检查点、产物。不依赖 electron。",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

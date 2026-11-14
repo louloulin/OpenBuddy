@@ -11,10 +11,13 @@ const PORT = 1420;
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: {
+    alias: [
       // Mirror WorkBuddy's `@` alias so ported components resolve unchanged.
-      "@": path.resolve(__dirname, "src"),
-    },
+      { find: /^@\//, replacement: path.resolve(__dirname, "src") + "/" },
+      // Workspace packages are consumed as TypeScript source (20261115-md §5.1).
+      { find: /^@openbuddy\/([^/]+)$/, replacement: path.resolve(__dirname, "packages") + "/$1/src/index.ts" },
+      { find: /^@openbuddy\/([^/]+)\/(.*)$/, replacement: path.resolve(__dirname, "packages") + "/$1/src/$2" },
+    ],
   },
   // Relative assets support the packaged file:// renderer.
   base: "./",
@@ -23,7 +26,7 @@ export default defineConfig({
     host: HOST,
     port: PORT,
     strictPort: true,
-    watch: { ignored: ["**/electron/**", "**/dist-electron/**", "**/release/**"] },
+    watch: { ignored: ["**/electron/**", "**/apps/desktop/**", "**/dist-electron/**", "**/release/**"] },
   },
   // Build assets for the packaged Electron renderer.
   build: {

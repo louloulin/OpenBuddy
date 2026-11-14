@@ -1,0 +1,7 @@
+{
+  "name": "@openbuddy/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Electron 宿主：主进程入口、preload、IPC 注册与原生能力、桌面构建脚本。"
+}

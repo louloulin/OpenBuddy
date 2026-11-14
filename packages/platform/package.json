@@ -1,0 +1,11 @@
+{
+  "name": "@openbuddy/platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "平台能力：平台探测、剪贴板等（后续扩展为 PlatformAdapter）。",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

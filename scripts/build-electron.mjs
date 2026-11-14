@@ -1,8 +1,28 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { COMMANDS, EVENTS } from '../dist-electron/shared/contract.js';
-await mkdir(new URL('../dist-electron/', import.meta.url), { recursive: true });
+// Main-process build (20261115-md M0): esbuild bundles electron/main.ts and every internal
+// workspace module into dist-electron/main.js. npm dependencies stay external, so the
+// packaged app still loads Pi, its WASM and dynamic resources from node_modules.
+// Type checking is separate: `tsc --noEmit -p tsconfig.electron.json`.
+import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
+
+const root = fileURLToPath(new URL('..', import.meta.url));
+const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+// Workspace packages (`workspace:*`) are source: bundle them. Everything else is external.
+const external = ['electron', ...Object.entries({ ...pkg.dependencies, ...pkg.devDependencies }).filter(([, v]) => !String(v).startsWith('workspace:')).map(([name]) => name)];
+const common = { bundle: true, platform: 'node', format: 'esm', target: 'node22', external, absWorkingDir: root, tsconfig: 'tsconfig.electron.json', logLevel: 'warning' };
+
+const out = new URL('../dist-electron/', import.meta.url);
+await rm(out, { recursive: true, force: true });
+await mkdir(out, { recursive: true });
+await build({ ...common, entryPoints: ['electron/main.ts'], outfile: 'dist-electron/main.js', sourcemap: true });
+
+// The preload is plain CJS; its command/event allow-lists come from the shared contract.
+const contract = await build({ ...common, entryPoints: ['electron/shared/contract.ts'], write: false });
+const { COMMANDS, EVENTS } = await import(`data:text/javascript;base64,${Buffer.from(contract.outputFiles[0].text).toString('base64')}`);
 const preload = await readFile(new URL('../electron/preload.cjs', import.meta.url), 'utf8');
-await writeFile(new URL('../dist-electron/preload.cjs', import.meta.url), preload.replace('/* COMMANDS */ []', JSON.stringify(COMMANDS)).replace('/* EVENTS */ []', JSON.stringify(EVENTS)));
+await writeFile(new URL('preload.cjs', out), preload.replace('/* COMMANDS */ []', JSON.stringify(COMMANDS)).replace('/* EVENTS */ []', JSON.stringify(EVENTS)));
+
 // file:// responses may not traverse the HTTP header hook: embed production CSP.
 const indexURL = new URL('../dist/index.html', import.meta.url);
 try {

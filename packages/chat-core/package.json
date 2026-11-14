@@ -1,0 +1,11 @@
+{
+  "name": "@openbuddy/chat-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "无 UI 的会话逻辑：回合分组、工具摘要、diff、导出、错误文案等纯函数。",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

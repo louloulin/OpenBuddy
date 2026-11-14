@@ -1,0 +1,11 @@
+{
+  "name": "@openbuddy/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "线协议：IPC 命令/事件表、payload 校验、DTO 类型。纯 TS，不依赖 node/DOM/react。",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

@@ -14,7 +14,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "dev:electron": "node scripts/dev-electron.mjs",
-    "build:electron": "pnpm build && tsc -p tsconfig.electron.json && node scripts/build-electron.mjs",
+    "build:electron": "pnpm build && pnpm typecheck:electron && node scripts/build-electron.mjs",
     "dist": "pnpm dist:electron",
     "dist:electron": "pnpm build:electron && electron-builder --publish never",
     "pack:electron": "pnpm build:electron && electron-builder --dir --publish never",
@@ -24,7 +24,11 @@
     "audit:ipc": "node scripts/audit-contract.mjs",
     "test:electron-ui": "node scripts/electron-ui-check.mjs",
     "git:push": "bash scripts/git-push.sh",
-    "git:push:tags": "bash scripts/git-push.sh --tags"
+    "git:push:tags": "bash scripts/git-push.sh --tags",
+    "typecheck:electron": "tsc --noEmit -p tsconfig.electron.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm typecheck:electron",
+    "check:boundaries": "node tools/check-boundaries.mjs --check",
+    "verify:e2e": "node tools/verify/e2e-shots.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "1.5.2",
@@ -62,6 +66,7 @@
     "@vitejs/plugin-react": "^4.3.3",
     "electron": "45.3.0",
     "electron-builder": "26.18.0",
+    "esbuild": "0.21.5",
     "jsdom": "^29.1.1",
     "playwright-core": "1.65.0",
     "typescript": "^5.6.3",

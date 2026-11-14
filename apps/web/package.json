@@ -1,0 +1,7 @@
+{
+  "name": "@openbuddy/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "React 渲染层应用：app 壳 + features 切片 + shared。桌面加载其构建产物，SaaS 可直接托管。"
+}

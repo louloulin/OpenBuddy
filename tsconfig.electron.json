@@ -1,17 +1,25 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2023",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "outDir": "dist-electron",
-    "rootDir": "electron",
-    "strict": true,
-    "skipLibCheck": true,
-    "types": ["node"],
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
+    "lib": [
+      "ES2023"
+    ],
+    "types": [
+      "node"
+    ],
     "sourceMap": true
   },
-  "include": ["electron/**/*.ts"],
-  "exclude": ["electron/**/*.test.ts", "electron/**/__tests__/**"]
+  "include": [
+    "electron/**/*.ts",
+    "apps/desktop/src/**/*.ts",
+    "packages/protocol/src/**/*.ts",
+    "packages/services/src/**/*.ts",
+    "packages/engine/src/**/*.ts",
+    "packages/host/src/**/*.ts"
+  ],
+  "exclude": [
+    "**/*.test.ts",
+    "**/__tests__/**"
+  ]
 }

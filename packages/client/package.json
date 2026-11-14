@@ -1,0 +1,11 @@
+{
+  "name": "@openbuddy/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "渲染层客户端：Electron 桥封装（ipc）与按命令封装的 API（agent-client）。",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@openbuddy/services",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Node 业务服务：settings / providers / mcp(+oauth) / skills / files / preview。不依赖 electron。",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

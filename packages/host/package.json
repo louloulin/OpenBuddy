@@ -1,0 +1,11 @@
+{
+  "name": "@openbuddy/host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "宿主命令路由：命令处理器装配、文件/工作区授权。与传输无关，不依赖 electron。",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

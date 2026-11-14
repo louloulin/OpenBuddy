@@ -1,0 +1,11 @@
+{
+  "name": "@openbuddy/markdown",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Markdown 渲染：react-markdown 管线、remark/rehype 插件、代码块、mermaid/katex。",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  }
+}

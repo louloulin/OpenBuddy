@@ -1,0 +1,71 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@openbuddy/protocol": [
+        "./packages/protocol/src/index.ts"
+      ],
+      "@openbuddy/protocol/*": [
+        "./packages/protocol/src/*"
+      ],
+      "@openbuddy/services": [
+        "./packages/services/src/index.ts"
+      ],
+      "@openbuddy/services/*": [
+        "./packages/services/src/*"
+      ],
+      "@openbuddy/engine": [
+        "./packages/engine/src/index.ts"
+      ],
+      "@openbuddy/engine/*": [
+        "./packages/engine/src/*"
+      ],
+      "@openbuddy/host": [
+        "./packages/host/src/index.ts"
+      ],
+      "@openbuddy/host/*": [
+        "./packages/host/src/*"
+      ],
+      "@openbuddy/client": [
+        "./packages/client/src/index.ts"
+      ],
+      "@openbuddy/client/*": [
+        "./packages/client/src/*"
+      ],
+      "@openbuddy/chat-core": [
+        "./packages/chat-core/src/index.ts"
+      ],
+      "@openbuddy/chat-core/*": [
+        "./packages/chat-core/src/*"
+      ],
+      "@openbuddy/platform": [
+        "./packages/platform/src/index.ts"
+      ],
+      "@openbuddy/platform/*": [
+        "./packages/platform/src/*"
+      ],
+      "@openbuddy/ui": [
+        "./packages/ui/src/index.ts"
+      ],
+      "@openbuddy/ui/*": [
+        "./packages/ui/src/*"
+      ],
+      "@openbuddy/markdown": [
+        "./packages/markdown/src/index.ts"
+      ],
+      "@openbuddy/markdown/*": [
+        "./packages/markdown/src/*"
+      ]
+    }
+  }
+}

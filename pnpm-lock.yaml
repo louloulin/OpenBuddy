@@ -108,6 +108,9 @@ importers:
       electron-builder:
         specifier: 26.18.0
         version: 26.18.0(electron-builder-squirrel-windows@26.18.0)
+      esbuild:
+        specifier: 0.21.5
+        version: 0.21.5
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1(@noble/hashes@1.8.0)
@@ -126,6 +129,28 @@ importers:
       ws:
         specifier: ^8.21.1
         version: 8.22.2
+
+  apps/desktop: {}
+
+  apps/web: {}
+
+  packages/chat-core: {}
+
+  packages/client: {}
+
+  packages/engine: {}
+
+  packages/host: {}
+
+  packages/markdown: {}
+
+  packages/platform: {}
+
+  packages/protocol: {}
+
+  packages/services: {}
+
+  packages/ui: {}
 
 packages:
 
