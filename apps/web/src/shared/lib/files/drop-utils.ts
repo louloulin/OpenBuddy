@@ -1,4 +1,4 @@
-
+import { extOf } from "@openbuddy/chat-core/file-ext";
 
 /** 受支持文件名后缀白名单(空数组表示不过滤)。 */
 export const DEFAULT_ALLOWED_EXTS: string[] = [];
@@ -27,13 +27,8 @@ export type DragDropEvent =
 /** 「放下」事件的具体类型(带 paths)。 */
 export type DropEvent = Extract<DragDropEvent, { type: "drop" }>;
 
-/** 取后缀(小写,含点)。无后缀返回空串。 */
-export function extOf(path: string): string {
-  const slash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  const base = slash >= 0 ? path.slice(slash + 1) : path;
-  const dot = base.lastIndexOf(".");
-  return dot >= 0 ? base.slice(dot).toLowerCase() : "";
-}
+/** 取后缀(小写,含点)。无后缀返回空串。实现在 chat-core(20261115-md R7)。 */
+export { extOf };
 
 /** 取文件名(去目录)。 */
 export function basenameOf(path: string): string {

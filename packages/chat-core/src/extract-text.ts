@@ -5,7 +5,7 @@
  * 用于「会话内搜索」与「消息反馈」等需要把一条结构化消息当成可检索字符串的场景。
  * 纯函数、无副作用,便于单测。
  */
-import type { ChatMessage, ToolCallView } from "../../../apps/web/src/features/chat/state/session-store";
+import type { ChatMessage, ToolCallView } from "./transcript";
 
 /**
  * 从一条消息的全部 parts 拼出纯文本(供搜索索引)。

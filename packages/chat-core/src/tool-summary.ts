@@ -1,4 +1,4 @@
-import type { ToolCallView } from "../../../apps/web/src/features/chat/state/session-store";
+import type { ToolCallView } from "./transcript";
 import type { DiffLine } from "./unified-diff";
 
 /** Pi built-in tools and MCP tools in plain words. */

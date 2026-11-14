@@ -1,4 +1,4 @@
-import type { ChatMessage, MessagePart, ToolCallView } from "../../../apps/web/src/features/chat/state/session-store";
+import type { ChatMessage, MessagePart, ToolCallView } from "./transcript";
 
 /** One row of the transcript: a user prompt, the assistant turn answering it, or a divider. */
 export type ChatNode =

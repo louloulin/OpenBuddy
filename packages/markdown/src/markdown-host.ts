@@ -1,20 +1,11 @@
-import { invoke } from "@openbuddy/client/ipc";
-import { ask, save } from "@openbuddy/client/ipc";
 import type { MarkdownConfig, PathType } from "./types";
-import { appConfirm } from "../../../apps/web/src/shared/ui/AppDialog";
-import { artifactSave } from "@openbuddy/client/agent-client";
+// Host capabilities (open, stat, files, dialogs) are injected by the app (20261115-md R6).
+import { getMarkdownHost } from "./host";
 
 export type MarkdownHostOptions = {
   cwd?: string;
   sessionId?: string | null;
   onToast?: (msg: string) => void;
-};
-
-type PathStat = {
-  path: string;
-  exists: boolean;
-  kind: string;
-  absolute: string;
 };
 
 function linePreview(code: string, maxLines = 8): string {
@@ -75,13 +66,13 @@ export async function openLocalPath(
   }
   try {
     if (type === "directory") {
-      await invoke("open_path", { path, cwd: cwd ?? null });
+      await getMarkdownHost().openPath(path, cwd);
       return;
     }
     try {
-      await invoke("reveal_in_folder", { path, cwd: cwd ?? null });
+      await getMarkdownHost().revealInFolder(path, cwd);
     } catch {
-      await invoke("open_path", { path, cwd: cwd ?? null });
+      await getMarkdownHost().openPath(path, cwd);
     }
   } catch (e) {
     toast?.(String(e).replace(/^Error:\s*/, ""));
@@ -117,10 +108,7 @@ export function createMarkdownHostConfig(
     // plain code unless it names a real file or folder in the workspace.
     if (!pure.trim() || /\s/.test(pure.trim()) || pure.length > 260) return "unknown";
     try {
-      const stat = await invoke<PathStat>("path_stat", {
-        path: pure,
-        cwd: cwd ?? null,
-      });
+      const stat = await getMarkdownHost().pathStat(pure, cwd);
       if (!stat.exists) return "unknown";
       if (stat.kind === "directory") return "directory";
       if (stat.kind === "file") return "file";
@@ -143,7 +131,7 @@ export function createMarkdownHostConfig(
     // target=_blank is unreliable / may be blocked).
     if (/^https?:\/\//i.test(href) || /^mailto:/i.test(href)) {
       event.preventDefault();
-      void invoke("open_url", { url: href }).catch((e) =>
+      void getMarkdownHost().openUrl(href).catch((e) =>
         toast(String(e).replace(/^Error:\s*/, "")),
       );
       return false;
@@ -170,7 +158,7 @@ export function createMarkdownHostConfig(
         const resolved = joinPath(cwd, preferredPath.trim());
         let before: string | null = null;
         try {
-          before = await invoke<string>("read_text_file", { path: resolved, maxBytes: 4 * 1024 * 1024 });
+          before = await getMarkdownHost().readTextFile(resolved, 4 * 1024 * 1024);
         } catch {
           before = null; // new file
         }
@@ -178,7 +166,7 @@ export function createMarkdownHostConfig(
           toast("内容与当前文件相同，无需写入");
           return;
         }
-        const ok = await appConfirm({
+        const ok = await getMarkdownHost().confirm({
           title: before === null ? `新建 ${preferredPath.trim()}？` : `覆盖 ${preferredPath.trim()}？`,
           message: `位置：${resolved}${sessionId ? "\n写入前会留快照，之后可在工作台的变更里还原。" : ""}`,
           diff: { before: before ?? "", after: code },
@@ -187,10 +175,10 @@ export function createMarkdownHostConfig(
         if (!ok) return;
         try {
           if (sessionId) {
-            await artifactSave(sessionId, resolved, code, "apply");
+            await getMarkdownHost().artifactSave(sessionId, resolved, code, "apply");
             toast(`已写入 ${preferredPath.trim()} · 可还原`);
           } else {
-            const written = await invoke<string>("write_text_file", { path: preferredPath.trim(), content: code, workspaceRoot: cwd });
+            const written = await getMarkdownHost().writeTextFile(preferredPath.trim(), code, cwd);
             toast(`已写入 ${written}`);
           }
         } catch (e) {
@@ -201,7 +189,7 @@ export function createMarkdownHostConfig(
 
       // No preferred path — let user pick via save dialog.
       try {
-        const picked = await save({
+        const picked = await getMarkdownHost().saveDialog({
           defaultPath: joinPath(cwd, defaultSnippetName(language)),
           filters: [
             {
@@ -223,7 +211,7 @@ export function createMarkdownHostConfig(
       const preview = linePreview(code);
       let ok = false;
       try {
-        ok = await ask(
+        ok = await getMarkdownHost().askDialog(
           `将把以下代码写入：\n${target}\n\n${preview}\n\n确认覆盖/创建该文件？`,
           {
             title: "应用代码到文件",
@@ -242,10 +230,7 @@ export function createMarkdownHostConfig(
       }
 
       try {
-        const written = await invoke<string>("export_text_file", {
-          path: target,
-          content: code,
-        });
+        const written = await getMarkdownHost().exportTextFile(target, code);
         toast(`已写入 ${written}`);
       } catch (e) {
         toast(String(e).replace(/^Error:\s*/, ""));

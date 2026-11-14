@@ -5,7 +5,7 @@ import {
   rendererIcon,
   summarizeTool,
 } from "../tool-renderers";
-import type { ToolCallView } from "../../../../apps/web/src/features/chat/state/session-store";
+import type { ToolCallView } from "../transcript";
 
 function tc(kind: string, raw?: unknown, title = "T"): ToolCallView {
   return { toolCallId: "x", title, kind, status: "completed", content: [], rawInput: raw };
