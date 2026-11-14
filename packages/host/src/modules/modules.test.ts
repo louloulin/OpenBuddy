@@ -9,7 +9,7 @@ const ctx = { options: { shell: {} }, settings: {}, emit: () => {}, engine: {}, 
 describe("host modules (20261115-md §5.3)", () => {
   it("are the §5.3 modules and no two of them define the same command", () => {
     const modules = HOST_MODULES.map((create) => create(ctx));
-    expect(modules.map((m) => m.id)).toEqual(["session", "turn", "model", "providers", "approvals", "extensions", "skills", "mcp", "notifications", "artifacts", "files"]);
+    expect(modules.map((m) => m.id)).toEqual(["session", "turn", "model", "providers", "approvals", "extensions", "skills", "mcp", "notifications", "artifacts", "host", "files"]);
     const owner = new Map<string, string>();
     const clashes: string[] = [];
     for (const { id, commands } of modules)
@@ -18,6 +18,15 @@ describe("host modules (20261115-md §5.3)", () => {
         owner.set(key, id);
       }
     expect(clashes).toEqual([]);
-    expect(owner.size).toBe(91);
+    expect(owner.size).toBe(92);
+  });
+
+  it("host_capabilities reports the protocol version and the whole contract", async () => {
+    const { COMMANDS } = await import("@openbuddy/protocol/commands");
+    const { EVENTS } = await import("@openbuddy/protocol/events");
+    const host = HOST_MODULES.map((create) => create(ctx)).find((m) => m.id === "host")!;
+    const caps = (await host.commands.host_capabilities({})) as Record<string, unknown>;
+    expect(caps).toEqual({ protocolVersion: 1, platform: "desktop", commands: [...COMMANDS], events: [...EVENTS], features: [] });
+    expect(caps.commands).toContain("host_capabilities");
   });
 });

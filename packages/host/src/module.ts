@@ -10,6 +10,8 @@ export interface EngineOptions {
   shell: DesktopShell;
   /** Trusted host-provided extensions; never accepted in renderer IPC. */
   extensionFactories?: ExtensionFactory[];
+  /** Reported by `host_capabilities`; defaults to "desktop" (a server host will pass its own). */
+  platform?: string;
 }
 export type Handler = (
   payload: Record<string, unknown>,
