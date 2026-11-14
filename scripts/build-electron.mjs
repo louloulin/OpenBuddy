@@ -18,7 +18,7 @@ await mkdir(out, { recursive: true });
 await build({ ...common, entryPoints: ['electron/main.ts'], outfile: 'dist-electron/main.js', sourcemap: true });
 
 // The preload is plain CJS; its command/event allow-lists come from the shared contract.
-const contract = await build({ ...common, entryPoints: ['electron/shared/contract.ts'], write: false });
+const contract = await build({ ...common, entryPoints: ['packages/protocol/src/contract.ts'], write: false });
 const { COMMANDS, EVENTS } = await import(`data:text/javascript;base64,${Buffer.from(contract.outputFiles[0].text).toString('base64')}`);
 const preload = await readFile(new URL('../electron/preload.cjs', import.meta.url), 'utf8');
 await writeFile(new URL('preload.cjs', out), preload.replace('/* COMMANDS */ []', JSON.stringify(COMMANDS)).replace('/* EVENTS */ []', JSON.stringify(EVENTS)));
