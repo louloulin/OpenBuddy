@@ -81,11 +81,11 @@ for (const [path, sf] of source) {
   });
 }
 const nativeEntries = {
-  dialog_open: ['src/lib/ipc.ts:open', 'WorkspacePicker/ProjectsPanel/Composer/native file pickers'],
-  dialog_save: ['src/lib/ipc.ts:save', 'TopbarActions/markdown-host'],
-  dialog_ask: ['src/lib/ipc.ts:ask', 'markdown-host'],
-  window_minimize: ['src/components/TitleBar.tsx'], window_toggle_maximize: ['src/components/TitleBar.tsx'],
-  window_close: ['src/components/TitleBar.tsx'], window_is_maximized: ['src/components/TitleBar.tsx'],
+  dialog_open: ['packages/client/src/ipc.ts:open', 'WorkspacePicker/ProjectsPanel/Composer/native file pickers'],
+  dialog_save: ['packages/client/src/ipc.ts:save', 'TopbarActions/markdown-host'],
+  dialog_ask: ['packages/client/src/ipc.ts:ask', 'markdown-host'],
+  window_minimize: ['apps/web/src/app/shell/TitleBar.tsx'], window_toggle_maximize: ['apps/web/src/app/shell/TitleBar.tsx'],
+  window_close: ['apps/web/src/app/shell/TitleBar.tsx'], window_is_maximized: ['apps/web/src/app/shell/TitleBar.tsx'],
 };
 let runtimeEvidence = null;
 const verifiedCommands = new Set();

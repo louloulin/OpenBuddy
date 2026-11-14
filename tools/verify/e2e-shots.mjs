@@ -107,6 +107,7 @@ try {
     return {
       invoked: a.main.length,
       distinctCommands: [...new Set(a.main.map(r => r.command))].length,
+      byCommand: Object.fromEntries(Object.entries(a.main.reduce((m, r) => ({ ...m, [r.command]: (m[r.command] ?? 0) + 1 }), {})).sort()),
       rejected: rejected.map(r => ({ command: r.command, error: r.error })),
       notImplemented: [...a.main.filter(r => /not_implemented/.test(r.error ?? '')), ...a.renderer.filter(r => /not_implemented/.test(r.message))].map(r => r.command),
       pageErrors: ctx.pageErrors.map(e => e.message),
