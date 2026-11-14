@@ -25,6 +25,33 @@ The React renderer communicates through `window.openbuddy`, a restricted context
 
 Pi runs in the main process. Application data lives beneath Electron's `userData` directory in `pi/`; the application does not automatically use `~/.pi`. API keys use Electron safeStorage, and configurations must not be treated as a backup of credentials. Existing Tauri/ACP sessions are not automatically converted to Pi's session format.
 
+### Code layout
+
+The repository is a pnpm workspace. Packages are consumed as TypeScript source through `tsconfig.base.json` paths and Vite/Vitest/esbuild aliases (`@openbuddy/<package>[/<subpath>]` → `packages/<package>/src/…`); there is no separate package build step.
+
+```text
+apps/desktop      Electron host: main/, preload/, ipc/register.ts, scripts/ (build, dev, UI checks)
+apps/web          React renderer: src/app (shell, palette, routing), src/features/*, src/shared/*
+packages/protocol IPC contract (commands, events) and DTO types
+packages/services settings, providers, mcp, skills, files, preview (Node)
+packages/engine   Pi session engine, permissions, extension UI bridge, checkpoints, artifacts (Node)
+packages/host     IPC command handlers and file/workspace access guards (Node)
+packages/client   renderer-side IPC client
+packages/chat-core headless chat logic: turns, tool summaries, diffs, export, error text
+packages/platform platform utilities (clipboard, platform detection)
+packages/ui       icons, Toast, ImageLightbox, ThemeProvider, design tokens
+packages/markdown Markdown rendering pipeline and code-block actions
+tools/            boundary checker, move codemod, IPC audit, verification scripts
+```
+
+Allowed dependency directions are enforced by `tools/check-boundaries.mjs`, which runs inside `pnpm test` and fails when any category (layering, forbidden imports, direct bridge use, cross-feature edges, cycles, unreachable files, oversized files) grows beyond `tools/boundaries-baseline.json`. Electron-only APIs belong in `apps/desktop`; `protocol`, `client` and `chat-core` stay free of Node and React so that a web or mobile shell can reuse them.
+
+```sh
+pnpm typecheck          # renderer + main process
+pnpm check:boundaries   # module boundaries against the baseline
+pnpm verify:e2e         # real Electron walkthrough with a local fixture (needs pnpm build:electron; xvfb on Linux)
+```
+
 ## Features and local verification
 
 Models use a complete provider/model identity, and thinking controls reflect the active model's actual capabilities. Restoring a session reads the engine's model state. Pi input/select/confirm/editor requests use desktop forms; steering/follow-up queues and idle session forks use the SDK. Custom terminal UI components are unsupported.

@@ -25,6 +25,33 @@ React 通过受限的 `window.openbuddy` 访问主进程；IPC 校验发送窗�
 
 Pi 在主进程运行。配置和会话位于 Electron `userData/pi/`，默认不访问 `~/.pi`。API Key 使用 safeStorage 加密；配置文件不能当作认证备份。旧 Tauri/ACP 会话尚无自动导入功能。
 
+### 代码结构
+
+仓库是 pnpm workspace。各包以 TypeScript 源码形式被引用：`tsconfig.base.json` 的 paths 以及 Vite / Vitest / esbuild 的别名把 `@openbuddy/<包>[/<子路径>]` 映射到 `packages/<包>/src/…`，不需要单独构建包。
+
+```text
+apps/desktop      Electron 宿主：main/、preload/、ipc/register.ts、scripts/（构建、开发、界面检查）
+apps/web          React 渲染层：src/app（外壳、命令面板、路由）、src/features/*、src/shared/*
+packages/protocol IPC 契约（命令、事件）与 DTO 类型
+packages/services 配置、模型提供商、MCP、技能、文件、预览（Node）
+packages/engine   Pi 会话引擎、权限、扩展 UI 桥、检查点、产物（Node）
+packages/host     IPC 命令处理与文件/工作区访问校验（Node）
+packages/client   渲染层 IPC 客户端
+packages/chat-core 无 UI 的对话逻辑：回合分组、工具摘要、diff、导出、错误文案
+packages/platform 平台工具（剪贴板、平台识别）
+packages/ui       图标、Toast、ImageLightbox、ThemeProvider、设计 token
+packages/markdown Markdown 渲染管线与代码块操作
+tools/            边界检查、搬家 codemod、IPC 审计、验证脚本
+```
+
+依赖方向由 `tools/check-boundaries.mjs` 约束。它在 `pnpm test` 中运行；分层、禁用模块、直接访问桥接、跨功能依赖、循环、不可达文件、超长文件中任一类数量超过 `tools/boundaries-baseline.json` 时测试失败。Electron 专属 API 只能放在 `apps/desktop`；`protocol`、`client`、`chat-core` 不依赖 Node 和 React，以便 Web 或手机端外壳复用。
+
+```sh
+pnpm typecheck          # 渲染层 + 主进程类型检查
+pnpm check:boundaries   # 对照基线检查模块边界
+pnpm verify:e2e         # 真实 Electron 走查，使用本地夹具（需先 pnpm build:electron；Linux 需 xvfb）
+```
+
 ## 功能与本地验证
 
 模型按提供商与模型组成的完整身份选择，支持按实际模型能力调整思考等级；会话切换和恢复读取引擎的真实模型状态。Pi 扩展的 input/select/confirm/editor 使用桌面表单，队列使用 Pi 的 steering/follow-up，支持空闲时分叉会话。自定义 TUI 组件不受支持。
