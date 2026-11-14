@@ -4,7 +4,7 @@ import { HOST_MODULES } from "./index";
 import type { HostContext } from "../module";
 
 // Factories only build closures; nothing on the context is touched until a command runs.
-const ctx = { options: { shell: {} }, settings: {}, emit: () => {}, engine: {}, update: () => {} } as unknown as HostContext;
+const ctx = { options: { shell: {} }, settings: {}, emit: () => {}, engine: {}, update: () => {}, servedCommands: () => [] } as unknown as HostContext;
 
 describe("host modules (20261115-md §5.3)", () => {
   it("are the §5.3 modules and no two of them define the same command", () => {
@@ -21,12 +21,27 @@ describe("host modules (20261115-md §5.3)", () => {
     expect(owner.size).toBe(92);
   });
 
-  it("host_capabilities reports the protocol version and the whole contract", async () => {
+  it("host_capabilities reports what the host serves plus what the embedding app serves", async () => {
     const { COMMANDS } = await import("@openbuddy/protocol/commands");
     const { EVENTS } = await import("@openbuddy/protocol/events");
-    const host = HOST_MODULES.map((create) => create(ctx)).find((m) => m.id === "host")!;
-    const caps = (await host.commands.host_capabilities({})) as Record<string, unknown>;
-    expect(caps).toEqual({ protocolVersion: 1, platform: "desktop", commands: [...COMMANDS], events: [...EVENTS], features: [] });
-    expect(caps.commands).toContain("host_capabilities");
+    const hostKeys = HOST_MODULES.flatMap((create) => Object.keys(create(ctx).commands));
+    const capabilities = async (options: Record<string, unknown>) => {
+      const c = { ...ctx, options: { shell: {}, ...options }, servedCommands: () => hostKeys } as unknown as HostContext;
+      const host = HOST_MODULES.map((create) => create(c)).find((m) => m.id === "host")!;
+      return (await host.commands.host_capabilities({})) as { protocolVersion: number; platform: string; commands: string[]; events: string[]; features: string[] };
+    };
+    const bare = await capabilities({});
+    expect(bare.protocolVersion).toBe(1);
+    expect(bare.platform).toBe("unknown");
+    expect(bare.commands).toEqual(COMMANDS.filter((c) => hostKeys.includes(c)));
+    expect(bare.commands).toContain("host_capabilities");
+    expect(bare.commands).not.toContain("dialog_open");
+    expect(bare.events).toEqual(EVENTS.filter((e) => e.startsWith("agent://")));
+    expect(bare.features).toEqual([]);
+    const desktop = await capabilities({ platform: { kind: "desktop", commands: ["dialog_open"], events: ["window://resized"] } });
+    expect(desktop.platform).toBe("desktop");
+    expect(desktop.commands).toContain("dialog_open");
+    expect(desktop.events).toContain("window://resized");
+    expect(desktop.events).not.toContain("app://focus-session");
   });
 });

@@ -10,6 +10,7 @@ import { confirmQuit, external } from './window.js';
 import { isEvent } from '@openbuddy/protocol/contract';
 import { WorkspaceAccess } from '@openbuddy/host/security/workspace-access';
 import { createEngineHandlers } from '@openbuddy/host';
+import { NATIVE_COMMANDS, DESKTOP_EVENTS } from '../native/index.js';
 import { PREVIEW_SCHEME, previewResponse } from '@openbuddy/services/preview/preview';
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -40,7 +41,7 @@ async function createWindow(): Promise<void> {
   win.webContents.on('did-fail-load', (_event, code, description) => { console.error('RENDERER_LOAD_FAILED', code, description); });
   let notificationsEnabled = () => true;
   const notify = notifier(win, () => notificationsEnabled());
-  const engine = await createEngineHandlers({ userData: app.getPath('userData'), safeStorage, shell, emit: (event: string, payload: unknown) => { if (isEvent(event) && !win.isDestroyed()) { win.webContents.send(event, payload); notify(event, payload); } } });
+  const engine = await createEngineHandlers({ userData: app.getPath('userData'), safeStorage, shell, platform: { kind: 'desktop', commands: NATIVE_COMMANDS, events: DESKTOP_EVENTS }, emit: (event: string, payload: unknown) => { if (isEvent(event) && !win.isDestroyed()) { win.webContents.send(event, payload); notify(event, payload); } } });
   previewRoots = engine.previewRoots;
   notificationsEnabled = engine.notificationsEnabled;
   cleanup = undefined;

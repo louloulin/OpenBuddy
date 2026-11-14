@@ -21,8 +21,8 @@ export async function createEngineHandlers(options: EngineOptions) {
     settings.config.write(c);
   };
   // The commands live in the §5.3 modules (modules/*.ts), assembled in HOST_MODULES order.
-  const ctx: HostContext = { options, settings, emit, engine, update };
   const handlers: Record<string, Handler> = {};
+  const ctx: HostContext = { options, settings, emit, engine, update, servedCommands: () => Object.keys(handlers) };
   for (const hostModule of HOST_MODULES.map((create) => create(ctx)))
     Object.assign(handlers, hostModule.commands);
   // Redact every successful IPC return; failures never include provider response bodies or keys.

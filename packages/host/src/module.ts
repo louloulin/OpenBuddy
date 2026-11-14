@@ -10,8 +10,11 @@ export interface EngineOptions {
   shell: DesktopShell;
   /** Trusted host-provided extensions; never accepted in renderer IPC. */
   extensionFactories?: ExtensionFactory[];
-  /** Reported by `host_capabilities`; defaults to "desktop" (a server host will pass its own). */
-  platform?: string;
+  /**
+   * The embedding app, for `host_capabilities`: its kind and the commands/events it serves
+   * itself (desktop: native dialogs, windows, clipboard, export; window/focus events).
+   */
+  platform?: { kind: string; commands?: readonly string[]; events?: readonly string[] };
 }
 export type Handler = (
   payload: Record<string, unknown>,
@@ -29,6 +32,8 @@ export interface HostContext {
   engine: PiEngine;
   /** Read-modify-write of the persisted config. */
   update: (fn: (c: ReturnType<Settings["config"]["read"]>) => void) => void;
+  /** Names of the commands the assembled host serves (read lazily, after assembly). */
+  servedCommands: () => readonly string[];
 }
 /** One group of commands from the §5.3 module table. */
 export interface HostModule {

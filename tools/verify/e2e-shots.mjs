@@ -114,8 +114,8 @@ try {
   // R1: the additive host_capabilities command, called through the real renderer → preload → IPC path.
   const caps = await step('host capabilities', `
     const caps = await ctx.call('host_capabilities');
-    return { protocolVersion: caps.protocolVersion, platform: caps.platform, commands: caps.commands.length, events: caps.events.length, includesSelf: caps.commands.includes('host_capabilities'), features: caps.features };`);
-  if (caps.protocolVersion !== 1 || !caps.includesSelf) throw new Error(`unexpected host_capabilities: ${JSON.stringify(caps)}`);
+    return { protocolVersion: caps.protocolVersion, platform: caps.platform, commands: caps.commands.length, events: caps.events.length, includesSelf: caps.commands.includes('host_capabilities'), includesNative: caps.commands.includes('dialog_open') && caps.events.includes('window://resized'), features: caps.features };`);
+  if (caps.protocolVersion !== 1 || caps.platform !== 'desktop' || !caps.includesSelf || !caps.includesNative) throw new Error(`unexpected host_capabilities: ${JSON.stringify(caps)}`);
   const audit = await step('audit', `
     const a = await ctx.audit();
     const rejected = a.main.filter(r => r.status === 'rejected');
