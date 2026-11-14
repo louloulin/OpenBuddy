@@ -16,7 +16,7 @@ import {
   resolve,
   sep,
 } from "node:path";
-import { text } from "./settings.js";
+import { text } from "../settings/settings.js";
 export interface DesktopShell {
   openPath(path: string): Promise<string>;
   openExternal(url: string): Promise<void>;

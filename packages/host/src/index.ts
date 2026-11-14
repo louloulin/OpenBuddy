@@ -1,7 +1,7 @@
 import {
   createEngineHandlers as createHandlers,
   type EngineOptions,
-} from "./agent.js";
+} from "./handlers.js";
 export async function createEngineHandlers(
   options: Omit<EngineOptions, "userDataDir"> & { userData: string },
 ) {

@@ -40,7 +40,7 @@ walk(source.get('packages/protocol/src/contract.ts'), node => {
   if (ts.isVariableDeclaration(node) && node.name.getText() === 'COMMANDS') walk(node.initializer, child => { if (literal(child)) commands.add(child.text); });
 });
 const handlers = new Map();
-for (const path of ['packages/host/src/handlers/agent.ts', 'apps/desktop/src/ipc/register.ts', 'packages/services/src/files.ts']) {
+for (const path of ['packages/host/src/handlers.ts', 'apps/desktop/src/ipc/register.ts', 'packages/services/src/files/files.ts']) {
   const sf = source.get(path);
   walk(sf, node => {
     if (!ts.isPropertyAssignment(node) || !ts.isIdentifier(node.name)) return;

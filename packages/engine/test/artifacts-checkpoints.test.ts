@@ -3,12 +3,12 @@ import { afterEach, expect, it, vi } from "vitest";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { CheckpointStore } from "../checkpoints.js";
-import { collectArtifacts } from "../artifacts.js";
-import { Permissions, destructiveInfo } from "../permissions.js";
-import { PiEngine, partialToolArgs, slimEvent } from "../pi.js";
-import { createSettings } from "@openbuddy/services/settings";
-import { allowedPreviewPath, previewPath, previewResponse, PREVIEW_CSP } from "@openbuddy/services/preview-protocol";
+import { CheckpointStore } from "../src/checkpoints/store.js";
+import { collectArtifacts } from "../src/artifacts/collect.js";
+import { Permissions, destructiveInfo } from "../src/permissions/permissions.js";
+import { PiEngine, partialToolArgs, slimEvent } from "../src/pi-engine.js";
+import { createSettings } from "@openbuddy/services/settings/settings";
+import { allowedPreviewPath, previewPath, previewResponse, PREVIEW_CSP } from "@openbuddy/services/preview/preview";
 
 const cleanups: Array<() => Promise<unknown>> = [];
 afterEach(async () => { for (const c of cleanups.splice(0).reverse()) await c(); });

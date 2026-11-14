@@ -3,9 +3,9 @@ import {
   type McpExtensionOptions,
 } from "@earendil-works/pi-coding-agent";
 import { join } from "node:path";
-import { JsonStore, object, text, type Settings } from "./settings.js";
+import { JsonStore, object, text, type Settings } from "../settings/settings.js";
 import { McpAuthService } from "./mcp-auth.js";
-import type { Emit } from "@openbuddy/engine/permissions";
+import type { Emit } from "@openbuddy/engine/permissions/permissions";
 import type { McpOAuthSettings } from "@earendil-works/pi-mcp/oauth";
 type Config = { mcpServers: Record<string, Record<string, unknown>> };
 export class McpService {

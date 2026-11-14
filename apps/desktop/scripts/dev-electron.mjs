@@ -7,7 +7,7 @@ const stop = () => { for (const child of children) child.kill(); };
 process.on('SIGINT', () => { stop(); process.exit(130); });
 process.on('SIGTERM', () => { stop(); process.exit(143); });
 try {
-  await run(['exec', 'tsc', '--noEmit', '-p', 'tsconfig.electron.json']);
+  await run(['exec', 'tsc', '--noEmit', '-p', 'apps/desktop/tsconfig.json']);
   await run(['exec', 'node', 'apps/desktop/scripts/build-electron.mjs']);
   const vite = start(['dev', '--host', '127.0.0.1']);
   let ready = false;

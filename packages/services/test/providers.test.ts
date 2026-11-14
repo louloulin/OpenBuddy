@@ -3,8 +3,8 @@ import { afterEach, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createSettings } from "../settings.js";
-import { Providers } from "../providers.js";
+import { createSettings } from "../src/settings/settings.js";
+import { Providers } from "../src/providers/providers.js";
 const roots: string[] = [];
 afterEach(async () => {
   for (const root of roots.splice(0))
@@ -102,7 +102,7 @@ it("preserves explicit custom capabilities and rejects invalid model fields with
 });
 
 it("reads capabilities and thinking levels from a gateway's /models entry", async () => {
-  const { describeFetchedModel } = await import("../providers.js");
+  const { describeFetchedModel } = await import("../src/providers/providers.js");
   const taotokenLike = {
     id: "deepseek-flash", display_name: "deepseek-flash", context_window: 1000000, max_output_tokens: 384000,
     supports_reasoning: true, input_modalities: ["text", "image"], type: "chat",

@@ -1,6 +1,6 @@
 import { loadSkills, type Skill } from "@earendil-works/pi-coding-agent";
 import { realpath, stat } from "node:fs/promises";
-import type { Settings } from "./settings.js";
+import type { Settings } from "../settings/settings.js";
 export class SkillsService {
   constructor(private settings: Settings) {}
   discover(cwd: string): Skill[] {

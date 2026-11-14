@@ -12,14 +12,14 @@ import { mkdir, realpath, rename, unlink } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, join, relative, resolve as resolvePath, isAbsolute, sep } from "node:path";
-import { Providers, modelKey } from "@openbuddy/services/providers";
-import { ExtensionUiBridge } from "./ui.js";
-import { SkillsService } from "@openbuddy/services/skills";
-import { McpService } from "@openbuddy/services/mcp";
-import type { Settings } from "@openbuddy/services/settings";
-import { Permissions, type Emit } from "./permissions.js";
-import { CheckpointStore } from "./checkpoints.js";
-import { collectArtifacts } from "./artifacts.js";
+import { Providers, modelKey } from "@openbuddy/services/providers/providers";
+import { ExtensionUiBridge } from "./extension-ui/bridge.js";
+import { SkillsService } from "@openbuddy/services/skills/skills";
+import { McpService } from "@openbuddy/services/mcp/mcp";
+import type { Settings } from "@openbuddy/services/settings/settings";
+import { Permissions, type Emit } from "./permissions/permissions.js";
+import { CheckpointStore } from "./checkpoints/store.js";
+import { collectArtifacts } from "./artifacts/collect.js";
 
 /** 做一做 / 想一想 / 问一问 (20261115-ui §5.8): plan and ask only get read-only tools. */
 export type AgentMode = "craft" | "plan" | "ask";
