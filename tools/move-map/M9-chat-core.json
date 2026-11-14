@@ -1,0 +1,121 @@
+{
+ "step": "M9",
+ "moves": [
+  {
+   "from": "src/components/chat/turns.ts",
+   "to": "packages/chat-core/src/turns.ts"
+  },
+  {
+   "from": "src/lib/__tests__/command-risk.test.ts",
+   "to": "packages/chat-core/src/__tests__/command-risk.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/content-blocks.test.ts",
+   "to": "packages/chat-core/src/__tests__/content-blocks.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/error-format.test.ts",
+   "to": "packages/chat-core/src/__tests__/error-format.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/extract-text.test.ts",
+   "to": "packages/chat-core/src/__tests__/extract-text.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/file-changes.test.ts",
+   "to": "packages/chat-core/src/__tests__/file-changes.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/plan-utils.test.ts",
+   "to": "packages/chat-core/src/__tests__/plan-utils.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/session-artifacts.test.ts",
+   "to": "packages/chat-core/src/__tests__/session-artifacts.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/share.test.ts",
+   "to": "packages/chat-core/src/__tests__/share.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/timeline-utils.test.ts",
+   "to": "packages/chat-core/src/__tests__/timeline-utils.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/token-estimate.test.ts",
+   "to": "packages/chat-core/src/__tests__/token-estimate.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/tool-renderers.test.ts",
+   "to": "packages/chat-core/src/__tests__/tool-renderers.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/unified-diff.test.ts",
+   "to": "packages/chat-core/src/__tests__/unified-diff.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/user-text.test.ts",
+   "to": "packages/chat-core/src/__tests__/user-text.test.ts"
+  },
+  {
+   "from": "src/lib/command-risk.ts",
+   "to": "packages/chat-core/src/command-risk.ts"
+  },
+  {
+   "from": "src/lib/content-blocks.ts",
+   "to": "packages/chat-core/src/content-blocks.ts"
+  },
+  {
+   "from": "src/lib/error-format.ts",
+   "to": "packages/chat-core/src/error-format.ts"
+  },
+  {
+   "from": "src/lib/export-markdown.ts",
+   "to": "packages/chat-core/src/export-markdown.ts"
+  },
+  {
+   "from": "src/lib/extract-text.ts",
+   "to": "packages/chat-core/src/extract-text.ts"
+  },
+  {
+   "from": "src/lib/file-changes.ts",
+   "to": "packages/chat-core/src/file-changes.ts"
+  },
+  {
+   "from": "src/lib/plan-utils.ts",
+   "to": "packages/chat-core/src/plan-utils.ts"
+  },
+  {
+   "from": "src/lib/session-artifacts.ts",
+   "to": "packages/chat-core/src/session-artifacts.ts"
+  },
+  {
+   "from": "src/lib/share.ts",
+   "to": "packages/chat-core/src/share.ts"
+  },
+  {
+   "from": "src/lib/timeline-utils.ts",
+   "to": "packages/chat-core/src/timeline-utils.ts"
+  },
+  {
+   "from": "src/lib/token-estimate.ts",
+   "to": "packages/chat-core/src/token-estimate.ts"
+  },
+  {
+   "from": "src/lib/tool-renderers.ts",
+   "to": "packages/chat-core/src/tool-renderers.ts"
+  },
+  {
+   "from": "src/lib/tool-summary.ts",
+   "to": "packages/chat-core/src/tool-summary.ts"
+  },
+  {
+   "from": "src/lib/unified-diff.ts",
+   "to": "packages/chat-core/src/unified-diff.ts"
+  },
+  {
+   "from": "src/lib/user-text.ts",
+   "to": "packages/chat-core/src/user-text.ts"
+  }
+ ]
+}

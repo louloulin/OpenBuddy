@@ -1,0 +1,21 @@
+{
+ "step": "M7",
+ "moves": [
+  {
+   "from": "src/lib/__tests__/ipc.test.ts",
+   "to": "packages/client/src/__tests__/ipc.test.ts"
+  },
+  {
+   "from": "src/lib/agent-client.ts",
+   "to": "packages/client/src/agent-client.ts"
+  },
+  {
+   "from": "src/lib/ipc.ts",
+   "to": "packages/client/src/ipc.ts"
+  },
+  {
+   "from": "src/lib/types.ts",
+   "to": "packages/protocol/src/dto.ts"
+  }
+ ]
+}

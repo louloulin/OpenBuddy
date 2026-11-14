@@ -1,0 +1,1061 @@
+{
+ "step": "M10",
+ "moves": [
+  {
+   "from": "index.html",
+   "to": "apps/web/index.html"
+  },
+  {
+   "from": "public/openbuddy-logo.svg",
+   "to": "apps/web/public/openbuddy-logo.svg"
+  },
+  {
+   "from": "src/__tests__/App.test.tsx",
+   "to": "apps/web/src/app/__tests__/App.test.tsx"
+  },
+  {
+   "from": "src/__tests__/ModelFlow.test.tsx",
+   "to": "apps/web/src/app/__tests__/ModelFlow.test.tsx"
+  },
+  {
+   "from": "src/App.tsx",
+   "to": "apps/web/src/app/App.tsx"
+  },
+  {
+   "from": "src/assets/claw-welcome-dark.png",
+   "to": "apps/web/src/assets/claw-welcome-dark.png"
+  },
+  {
+   "from": "src/assets/claw-welcome-light.svg",
+   "to": "apps/web/src/assets/claw-welcome-light.svg"
+  },
+  {
+   "from": "src/assets/claw.png",
+   "to": "apps/web/src/assets/claw.png"
+  },
+  {
+   "from": "src/assets/header-icon-dark.svg",
+   "to": "apps/web/src/assets/header-icon-dark.svg"
+  },
+  {
+   "from": "src/assets/header-icon.svg",
+   "to": "apps/web/src/assets/header-icon.svg"
+  },
+  {
+   "from": "src/assets/landing-hero.png",
+   "to": "apps/web/src/assets/landing-hero.png"
+  },
+  {
+   "from": "src/assets/logo-mark.svg",
+   "to": "apps/web/src/assets/logo-mark.svg"
+  },
+  {
+   "from": "src/assets/mascot-new.png",
+   "to": "apps/web/src/assets/mascot-new.png"
+  },
+  {
+   "from": "src/assets/openbuddy-logo.svg",
+   "to": "apps/web/src/assets/openbuddy-logo.svg"
+  },
+  {
+   "from": "src/components/__tests__/AgentResourcesPanel.test.tsx",
+   "to": "apps/web/src/features/agent-resources/__tests__/AgentResourcesPanel.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/AppDialog.test.tsx",
+   "to": "apps/web/src/shared/ui/__tests__/AppDialog.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/automation-schedule.test.ts",
+   "to": "apps/web/src/features/automation/__tests__/automation-schedule.test.ts"
+  },
+  {
+   "from": "src/components/__tests__/AutomationPanel.test.tsx",
+   "to": "apps/web/src/features/automation/__tests__/AutomationPanel.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/BrowserPreview.test.tsx",
+   "to": "apps/web/src/features/workbench/__tests__/BrowserPreview.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/CapabilityBoundaries.test.tsx",
+   "to": "apps/web/src/features/library/__tests__/CapabilityBoundaries.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/ChatPolish.test.tsx",
+   "to": "apps/web/src/features/chat/__tests__/ChatPolish.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/ChatViewWindow.test.tsx",
+   "to": "apps/web/src/features/chat/__tests__/ChatViewWindow.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/Composer.test.tsx",
+   "to": "apps/web/src/features/composer/__tests__/Composer.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/ComposerDropZone.test.tsx",
+   "to": "apps/web/src/features/composer/__tests__/ComposerDropZone.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/ComposerSlash.test.tsx",
+   "to": "apps/web/src/features/composer/__tests__/ComposerSlash.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/FeedbackDialog.test.tsx",
+   "to": "apps/web/src/features/chat/__tests__/FeedbackDialog.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/FileChangesPanel.test.tsx",
+   "to": "apps/web/src/features/workbench/__tests__/FileChangesPanel.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/FilePreview.test.tsx",
+   "to": "apps/web/src/features/workbench/__tests__/FilePreview.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/HomePage.test.tsx",
+   "to": "apps/web/src/features/home/__tests__/HomePage.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/KnowledgeBasePanel.test.tsx",
+   "to": "apps/web/src/features/library/__tests__/KnowledgeBasePanel.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/KnowledgeBaseSmoke.test.tsx",
+   "to": "apps/web/src/features/library/__tests__/KnowledgeBaseSmoke.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/ModelSelector.test.tsx",
+   "to": "apps/web/src/features/models/__tests__/ModelSelector.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/ModelsSettings.test.tsx",
+   "to": "apps/web/src/features/models/settings/__tests__/ModelsSettings.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/NotifyChannelsPanel.test.tsx",
+   "to": "apps/web/src/features/settings/__tests__/NotifyChannelsPanel.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/PermissionPicker.test.tsx",
+   "to": "apps/web/src/features/approvals/__tests__/PermissionPicker.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/PlaceholderPage.test.tsx",
+   "to": "apps/web/src/app/routing/__tests__/PlaceholderPage.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/PlanPanel.test.tsx",
+   "to": "apps/web/src/features/chat/__tests__/PlanPanel.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/ProjectDetailView.test.tsx",
+   "to": "apps/web/src/features/projects/__tests__/ProjectDetailView.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/PromptHistory.test.tsx",
+   "to": "apps/web/src/features/chat/__tests__/PromptHistory.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/QuestionInlineCard.test.tsx",
+   "to": "apps/web/src/features/approvals/__tests__/QuestionInlineCard.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/QueuePanel.test.tsx",
+   "to": "apps/web/src/features/composer/__tests__/QueuePanel.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/schedule-utils-extra.test.ts",
+   "to": "apps/web/src/features/automation/__tests__/schedule-utils-extra.test.ts"
+  },
+  {
+   "from": "src/components/__tests__/ShareMenu.test.tsx",
+   "to": "apps/web/src/features/chat/__tests__/ShareMenu.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/Shortcuts.test.tsx",
+   "to": "apps/web/src/shared/lib/__tests__/Shortcuts.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/Sidebar.test.tsx",
+   "to": "apps/web/src/features/sessions/__tests__/Sidebar.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/smoke.test.tsx",
+   "to": "apps/web/src/app/__tests__/smoke.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/TitleBar.test.tsx",
+   "to": "apps/web/src/app/shell/__tests__/TitleBar.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/ToolCallCard.test.tsx",
+   "to": "apps/web/src/shared/agent-ui/__tests__/ToolCallCard.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/TopbarActions.test.tsx",
+   "to": "apps/web/src/app/shell/__tests__/TopbarActions.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/TurnViewConcise.test.tsx",
+   "to": "apps/web/src/features/chat/__tests__/TurnViewConcise.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/TurnViewMemo.test.tsx",
+   "to": "apps/web/src/features/chat/__tests__/TurnViewMemo.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/UsageQuotaPanel.test.tsx",
+   "to": "apps/web/src/features/settings/__tests__/UsageQuotaPanel.test.tsx"
+  },
+  {
+   "from": "src/components/__tests__/Workbench.test.tsx",
+   "to": "apps/web/src/features/workbench/__tests__/Workbench.test.tsx"
+  },
+  {
+   "from": "src/components/AboutDialog.tsx",
+   "to": "apps/web/src/features/settings/AboutDialog.tsx"
+  },
+  {
+   "from": "src/components/AgentResourcesPanel.tsx",
+   "to": "apps/web/src/features/agent-resources/AgentResourcesPanel.tsx"
+  },
+  {
+   "from": "src/components/AppDialog.tsx",
+   "to": "apps/web/src/shared/ui/AppDialog.tsx"
+  },
+  {
+   "from": "src/components/AssistantsPanel.tsx",
+   "to": "apps/web/src/features/assistant/AssistantsPanel.tsx"
+  },
+  {
+   "from": "src/components/automation/AutomationEditPage.tsx",
+   "to": "apps/web/src/features/automation/AutomationEditPage.tsx"
+  },
+  {
+   "from": "src/components/automation/AutomationPermissionConfirmDialog.tsx",
+   "to": "apps/web/src/features/automation/AutomationPermissionConfirmDialog.tsx"
+  },
+  {
+   "from": "src/components/automation/AutomationPermissionPicker.tsx",
+   "to": "apps/web/src/features/automation/AutomationPermissionPicker.tsx"
+  },
+  {
+   "from": "src/components/automation/AutomationTemplateGrid.tsx",
+   "to": "apps/web/src/features/automation/AutomationTemplateGrid.tsx"
+  },
+  {
+   "from": "src/components/automation/ConnectorSelector.tsx",
+   "to": "apps/web/src/features/automation/ConnectorSelector.tsx"
+  },
+  {
+   "from": "src/components/automation/controls.tsx",
+   "to": "apps/web/src/features/automation/controls.tsx"
+  },
+  {
+   "from": "src/components/automation/schedule-utils.ts",
+   "to": "apps/web/src/features/automation/schedule-utils.ts"
+  },
+  {
+   "from": "src/components/automation/template-config.ts",
+   "to": "apps/web/src/features/automation/template-config.ts"
+  },
+  {
+   "from": "src/components/automation/usePermissionConfirm.ts",
+   "to": "apps/web/src/features/automation/usePermissionConfirm.ts"
+  },
+  {
+   "from": "src/components/AutomationPanel.tsx",
+   "to": "apps/web/src/features/automation/AutomationPanel.tsx"
+  },
+  {
+   "from": "src/components/bench/ArtifactPreview.tsx",
+   "to": "apps/web/src/features/workbench/ArtifactPreview.tsx"
+  },
+  {
+   "from": "src/components/bench/ArtifactViewer.tsx",
+   "to": "apps/web/src/features/workbench/ArtifactViewer.tsx"
+  },
+  {
+   "from": "src/components/bench/bench-kind.ts",
+   "to": "apps/web/src/features/workbench/bench-kind.ts"
+  },
+  {
+   "from": "src/components/bench/ChangesView.tsx",
+   "to": "apps/web/src/features/workbench/ChangesView.tsx"
+  },
+  {
+   "from": "src/components/bench/DiffBlock.tsx",
+   "to": "apps/web/src/features/workbench/DiffBlock.tsx"
+  },
+  {
+   "from": "src/components/bench/revert.ts",
+   "to": "apps/web/src/features/workbench/revert.ts"
+  },
+  {
+   "from": "src/components/bench/Workbench.tsx",
+   "to": "apps/web/src/features/workbench/Workbench.tsx"
+  },
+  {
+   "from": "src/components/BrowserPreview.tsx",
+   "to": "apps/web/src/features/workbench/BrowserPreview.tsx"
+  },
+  {
+   "from": "src/components/chat/ArtifactCards.tsx",
+   "to": "apps/web/src/features/chat/ArtifactCards.tsx"
+  },
+  {
+   "from": "src/components/chat/ErrorCard.tsx",
+   "to": "apps/web/src/features/chat/ErrorCard.tsx"
+  },
+  {
+   "from": "src/components/chat/FeedbackButtons.tsx",
+   "to": "apps/web/src/features/chat/FeedbackButtons.tsx"
+  },
+  {
+   "from": "src/components/chat/icons.tsx",
+   "to": "apps/web/src/shared/agent-ui/icons.tsx"
+  },
+  {
+   "from": "src/components/chat/PromptHistory.tsx",
+   "to": "apps/web/src/features/chat/PromptHistory.tsx"
+  },
+  {
+   "from": "src/components/chat/TurnView.tsx",
+   "to": "apps/web/src/features/chat/TurnView.tsx"
+  },
+  {
+   "from": "src/components/chat/UserBubble.tsx",
+   "to": "apps/web/src/features/chat/UserBubble.tsx"
+  },
+  {
+   "from": "src/components/ChatView.tsx",
+   "to": "apps/web/src/features/chat/ChatView.tsx"
+  },
+  {
+   "from": "src/components/CloudStoragePanel.tsx",
+   "to": "apps/web/src/features/library/CloudStoragePanel.tsx"
+  },
+  {
+   "from": "src/components/Composer.tsx",
+   "to": "apps/web/src/features/composer/Composer.tsx"
+  },
+  {
+   "from": "src/components/ContextUsagePill.tsx",
+   "to": "apps/web/src/features/composer/ContextUsagePill.tsx"
+  },
+  {
+   "from": "src/components/DiscoverPanel.tsx",
+   "to": "apps/web/src/features/experts/DiscoverPanel.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/connectors/ConnectorAuthModal.tsx",
+   "to": "apps/web/src/features/experts/connectors/ConnectorAuthModal.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/connectors/ConnectorCard.tsx",
+   "to": "apps/web/src/features/experts/connectors/ConnectorCard.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/connectors/ConnectorDetailModal.tsx",
+   "to": "apps/web/src/features/experts/connectors/ConnectorDetailModal.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/connectors/ConnectorQrModal.tsx",
+   "to": "apps/web/src/features/experts/connectors/ConnectorQrModal.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/connectors/ConnectorsTab.tsx",
+   "to": "apps/web/src/features/experts/connectors/ConnectorsTab.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/connectors/ConnectorTokenForm.tsx",
+   "to": "apps/web/src/features/experts/connectors/ConnectorTokenForm.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/connectors/McpConfigEditor.tsx",
+   "to": "apps/web/src/features/experts/connectors/McpConfigEditor.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/connectors/McpModal.tsx",
+   "to": "apps/web/src/features/experts/connectors/McpModal.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/data/connectors-catalog.ts",
+   "to": "apps/web/src/features/experts/data/connectors-catalog.ts"
+  },
+  {
+   "from": "src/components/experts-panel/data/featured-scenes.ts",
+   "to": "apps/web/src/features/experts/data/featured-scenes.ts"
+  },
+  {
+   "from": "src/components/experts-panel/data/skills-catalog.ts",
+   "to": "apps/web/src/features/experts/data/skills-catalog.ts"
+  },
+  {
+   "from": "src/components/experts-panel/experts/ExpertCard.tsx",
+   "to": "apps/web/src/features/experts/experts/ExpertCard.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/experts/ExpertDetailModal.tsx",
+   "to": "apps/web/src/features/experts/experts/ExpertDetailModal.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/experts/ExpertsTab.tsx",
+   "to": "apps/web/src/features/experts/experts/ExpertsTab.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/experts/FeaturedScenes.tsx",
+   "to": "apps/web/src/features/experts/experts/FeaturedScenes.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/experts/MyExpertsEmpty.tsx",
+   "to": "apps/web/src/features/experts/experts/MyExpertsEmpty.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/index.tsx",
+   "to": "apps/web/src/features/experts/index.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/MarketHeader.tsx",
+   "to": "apps/web/src/features/experts/MarketHeader.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/shared/ConnectorIcon.tsx",
+   "to": "apps/web/src/features/experts/shared/ConnectorIcon.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/shared/LetterAvatar.tsx",
+   "to": "apps/web/src/shared/ui/LetterAvatar.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/shared/ThumbImg.tsx",
+   "to": "apps/web/src/shared/ui/ThumbImg.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/shared/ui.tsx",
+   "to": "apps/web/src/features/experts/shared/ui.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/skills/ImportSkillModal.tsx",
+   "to": "apps/web/src/features/experts/skills/ImportSkillModal.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/skills/SkillCard.tsx",
+   "to": "apps/web/src/features/experts/skills/SkillCard.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/skills/SkillCatalogCard.tsx",
+   "to": "apps/web/src/features/experts/skills/SkillCatalogCard.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/skills/SkillDetailModal.tsx",
+   "to": "apps/web/src/features/experts/skills/SkillDetailModal.tsx"
+  },
+  {
+   "from": "src/components/experts-panel/skills/SkillsTab.tsx",
+   "to": "apps/web/src/features/experts/skills/SkillsTab.tsx"
+  },
+  {
+   "from": "src/components/FeedbackDialog.tsx",
+   "to": "apps/web/src/features/chat/FeedbackDialog.tsx"
+  },
+  {
+   "from": "src/components/FileChangesPanel.tsx",
+   "to": "apps/web/src/features/workbench/FileChangesPanel.tsx"
+  },
+  {
+   "from": "src/components/FilePreview.tsx",
+   "to": "apps/web/src/features/workbench/FilePreview.tsx"
+  },
+  {
+   "from": "src/components/FindBar.tsx",
+   "to": "apps/web/src/features/chat/FindBar.tsx"
+  },
+  {
+   "from": "src/components/FolderTrustDialog.tsx",
+   "to": "apps/web/src/features/approvals/FolderTrustDialog.tsx"
+  },
+  {
+   "from": "src/components/home-scenes.ts",
+   "to": "apps/web/src/shared/content/home-scenes.ts"
+  },
+  {
+   "from": "src/components/home/HomeComposer.tsx",
+   "to": "apps/web/src/features/home/parts/HomeComposer.tsx"
+  },
+  {
+   "from": "src/components/home/HomeHeader.tsx",
+   "to": "apps/web/src/features/home/parts/HomeHeader.tsx"
+  },
+  {
+   "from": "src/components/home/HomePage.tsx",
+   "to": "apps/web/src/features/home/parts/HomePage.tsx"
+  },
+  {
+   "from": "src/components/home/PracticeCases.tsx",
+   "to": "apps/web/src/features/home/parts/PracticeCases.tsx"
+  },
+  {
+   "from": "src/components/home/SceneTabs.tsx",
+   "to": "apps/web/src/features/home/parts/SceneTabs.tsx"
+  },
+  {
+   "from": "src/components/HomePage.tsx",
+   "to": "apps/web/src/features/home/HomePage.tsx"
+  },
+  {
+   "from": "src/components/InputAddMenu.tsx",
+   "to": "apps/web/src/features/composer/InputAddMenu.tsx"
+  },
+  {
+   "from": "src/components/InspirationPanel.tsx",
+   "to": "apps/web/src/features/library/InspirationPanel.tsx"
+  },
+  {
+   "from": "src/components/KnowledgeBasePanel.tsx",
+   "to": "apps/web/src/features/library/KnowledgeBasePanel.tsx"
+  },
+  {
+   "from": "src/components/LoadingRow.tsx",
+   "to": "apps/web/src/features/chat/LoadingRow.tsx"
+  },
+  {
+   "from": "src/components/LocalAssistantView.tsx",
+   "to": "apps/web/src/features/assistant/LocalAssistantView.tsx"
+  },
+  {
+   "from": "src/components/Markdown.tsx",
+   "to": "apps/web/src/shared/Markdown.tsx"
+  },
+  {
+   "from": "src/components/MarketplacePanel.tsx",
+   "to": "apps/web/src/features/experts/MarketplacePanel.tsx"
+  },
+  {
+   "from": "src/components/models-settings/model-config.ts",
+   "to": "apps/web/src/features/models/settings/model-config.ts"
+  },
+  {
+   "from": "src/components/models-settings/models-settings.css",
+   "to": "apps/web/src/features/models/settings/models-settings.css"
+  },
+  {
+   "from": "src/components/models-settings/ModelsSettingsPanel.tsx",
+   "to": "apps/web/src/features/models/settings/ModelsSettingsPanel.tsx"
+  },
+  {
+   "from": "src/components/ModelSelector.tsx",
+   "to": "apps/web/src/features/models/ModelSelector.tsx"
+  },
+  {
+   "from": "src/components/MyFilesPanel.tsx",
+   "to": "apps/web/src/features/library/MyFilesPanel.tsx"
+  },
+  {
+   "from": "src/components/NotifyChannelsPanel.tsx",
+   "to": "apps/web/src/features/settings/NotifyChannelsPanel.tsx"
+  },
+  {
+   "from": "src/components/PermissionDialog.tsx",
+   "to": "apps/web/src/features/approvals/PermissionDialog.tsx"
+  },
+  {
+   "from": "src/components/PermissionPicker.tsx",
+   "to": "apps/web/src/features/approvals/PermissionPicker.tsx"
+  },
+  {
+   "from": "src/components/PlaceholderPage.tsx",
+   "to": "apps/web/src/app/routing/PlaceholderPage.tsx"
+  },
+  {
+   "from": "src/components/PlanPanel.tsx",
+   "to": "apps/web/src/features/chat/PlanPanel.tsx"
+  },
+  {
+   "from": "src/components/PluginsPanel.tsx",
+   "to": "apps/web/src/features/experts/PluginsPanel.tsx"
+  },
+  {
+   "from": "src/components/PolicySettingsPanel.tsx",
+   "to": "apps/web/src/features/settings/PolicySettingsPanel.tsx"
+  },
+  {
+   "from": "src/components/project-picker.tsx",
+   "to": "apps/web/src/features/projects/project-picker.tsx"
+  },
+  {
+   "from": "src/components/project-tabs.tsx",
+   "to": "apps/web/src/features/projects/project-tabs.tsx"
+  },
+  {
+   "from": "src/components/ProjectDetailView.tsx",
+   "to": "apps/web/src/features/projects/ProjectDetailView.tsx"
+  },
+  {
+   "from": "src/components/ProjectsPanel.tsx",
+   "to": "apps/web/src/features/projects/ProjectsPanel.tsx"
+  },
+  {
+   "from": "src/components/QuestionInlineCard.tsx",
+   "to": "apps/web/src/features/approvals/QuestionInlineCard.tsx"
+  },
+  {
+   "from": "src/components/QueuePanel.tsx",
+   "to": "apps/web/src/features/composer/QueuePanel.tsx"
+  },
+  {
+   "from": "src/components/ResourcesPanel.tsx",
+   "to": "apps/web/src/features/library/ResourcesPanel.tsx"
+  },
+  {
+   "from": "src/components/SearchOverlay.tsx",
+   "to": "apps/web/src/app/palette/SearchOverlay.tsx"
+  },
+  {
+   "from": "src/components/SecondarySidebar.tsx",
+   "to": "apps/web/src/features/sessions/SecondarySidebar.tsx"
+  },
+  {
+   "from": "src/components/SettingsPanel.tsx",
+   "to": "apps/web/src/features/settings/SettingsPanel.tsx"
+  },
+  {
+   "from": "src/components/SettingsSections.tsx",
+   "to": "apps/web/src/features/settings/SettingsSections.tsx"
+  },
+  {
+   "from": "src/components/ShareMenu.tsx",
+   "to": "apps/web/src/features/chat/ShareMenu.tsx"
+  },
+  {
+   "from": "src/components/ShortcutsPanel.tsx",
+   "to": "apps/web/src/app/palette/ShortcutsPanel.tsx"
+  },
+  {
+   "from": "src/components/Sidebar.tsx",
+   "to": "apps/web/src/features/sessions/Sidebar.tsx"
+  },
+  {
+   "from": "src/components/sidebar/AutomationPanel.tsx",
+   "to": "apps/web/src/features/sessions/sidebar/AutomationPanel.tsx"
+  },
+  {
+   "from": "src/components/sidebar/ColleaguesPanel.tsx",
+   "to": "apps/web/src/features/sessions/sidebar/ColleaguesPanel.tsx"
+  },
+  {
+   "from": "src/components/sidebar/ConversationList.tsx",
+   "to": "apps/web/src/features/sessions/sidebar/ConversationList.tsx"
+  },
+  {
+   "from": "src/components/sidebar/PinnedSection.tsx",
+   "to": "apps/web/src/features/sessions/sidebar/PinnedSection.tsx"
+  },
+  {
+   "from": "src/components/sidebar/SkillRecommendBar.tsx",
+   "to": "apps/web/src/features/sessions/sidebar/SkillRecommendBar.tsx"
+  },
+  {
+   "from": "src/components/sidebar/WorkspaceGroup.tsx",
+   "to": "apps/web/src/features/sessions/sidebar/WorkspaceGroup.tsx"
+  },
+  {
+   "from": "src/components/SlashCommands.tsx",
+   "to": "apps/web/src/features/composer/SlashCommands.tsx"
+  },
+  {
+   "from": "src/components/TasksPanel.tsx",
+   "to": "apps/web/src/features/sessions/TasksPanel.tsx"
+  },
+  {
+   "from": "src/components/TitleBar.tsx",
+   "to": "apps/web/src/app/shell/TitleBar.tsx"
+  },
+  {
+   "from": "src/components/ToolCallCard.tsx",
+   "to": "apps/web/src/shared/agent-ui/ToolCallCard.tsx"
+  },
+  {
+   "from": "src/components/ToolSidePanel.tsx",
+   "to": "apps/web/src/features/workbench/ToolSidePanel.tsx"
+  },
+  {
+   "from": "src/components/TopbarActions.tsx",
+   "to": "apps/web/src/app/shell/TopbarActions.tsx"
+  },
+  {
+   "from": "src/components/TopbarTitle.tsx",
+   "to": "apps/web/src/app/shell/TopbarTitle.tsx"
+  },
+  {
+   "from": "src/components/TrustedExtensionsPanel.tsx",
+   "to": "apps/web/src/features/agent-resources/TrustedExtensionsPanel.tsx"
+  },
+  {
+   "from": "src/components/UsageQuotaPanel.tsx",
+   "to": "apps/web/src/features/settings/UsageQuotaPanel.tsx"
+  },
+  {
+   "from": "src/components/use-horizontal-scroll.ts",
+   "to": "apps/web/src/shared/hooks/use-horizontal-scroll.ts"
+  },
+  {
+   "from": "src/components/workspace-panel/ArtifactTabsBar.tsx",
+   "to": "apps/web/src/features/workbench/workspace-panel/ArtifactTabsBar.tsx"
+  },
+  {
+   "from": "src/components/workspace-panel/file-tab-icon.tsx",
+   "to": "apps/web/src/features/workbench/workspace-panel/file-tab-icon.tsx"
+  },
+  {
+   "from": "src/components/workspace-panel/FileTreeView.tsx",
+   "to": "apps/web/src/features/workbench/workspace-panel/FileTreeView.tsx"
+  },
+  {
+   "from": "src/components/workspace-panel/ViewSelector.tsx",
+   "to": "apps/web/src/features/workbench/workspace-panel/ViewSelector.tsx"
+  },
+  {
+   "from": "src/components/WorkspacePicker.tsx",
+   "to": "apps/web/src/features/composer/WorkspacePicker.tsx"
+  },
+  {
+   "from": "src/lib/__tests__/browser-preview.test.ts",
+   "to": "apps/web/src/features/workbench/__tests__/browser-preview.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/cloud-storage.test.ts",
+   "to": "apps/web/src/features/library/__tests__/cloud-storage.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/container-executor.test.ts",
+   "to": "apps/web/src/shared/security/__tests__/container-executor.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/doc-preview.test.ts",
+   "to": "apps/web/src/shared/lib/files/__tests__/doc-preview.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/drop-utils.test.ts",
+   "to": "apps/web/src/shared/lib/files/__tests__/drop-utils.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/ensure-session.test.ts",
+   "to": "apps/web/src/features/sessions/__tests__/ensure-session.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/file-kind.test.ts",
+   "to": "apps/web/src/shared/lib/files/__tests__/file-kind.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/file-utils.test.ts",
+   "to": "apps/web/src/shared/lib/files/__tests__/file-utils.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/input-history.test.ts",
+   "to": "apps/web/src/features/composer/__tests__/input-history.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/knowledge-base.test.ts",
+   "to": "apps/web/src/features/library/__tests__/knowledge-base.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/local-kb-provider.test.ts",
+   "to": "apps/web/src/features/library/__tests__/local-kb-provider.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/mcp-capabilities.test.ts",
+   "to": "apps/web/src/features/agent-resources/__tests__/mcp-capabilities.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/notify-channels.test.ts",
+   "to": "apps/web/src/features/settings/__tests__/notify-channels.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/oidc-auth.test.ts",
+   "to": "apps/web/src/shared/auth/__tests__/oidc-auth.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/otlp-exporter.test.ts",
+   "to": "apps/web/src/shared/telemetry/__tests__/otlp-exporter.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/policy-engine.test.ts",
+   "to": "apps/web/src/features/settings/__tests__/policy-engine.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/sandbox-guard.test.ts",
+   "to": "apps/web/src/shared/security/__tests__/sandbox-guard.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/sandbox-init.test.ts",
+   "to": "apps/web/src/shared/security/__tests__/sandbox-init.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/telemetry-contract.test.ts",
+   "to": "apps/web/src/shared/telemetry/__tests__/telemetry-contract.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/usage-quota.test.ts",
+   "to": "apps/web/src/features/settings/__tests__/usage-quota.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/use-smooth-text.test.tsx",
+   "to": "apps/web/src/features/chat/__tests__/use-smooth-text.test.tsx"
+  },
+  {
+   "from": "src/lib/__tests__/use-unified-tabs.test.ts",
+   "to": "apps/web/src/features/workbench/__tests__/use-unified-tabs.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/voice-contract.test.ts",
+   "to": "apps/web/src/features/composer/__tests__/voice-contract.test.ts"
+  },
+  {
+   "from": "src/lib/__tests__/zip-reader.test.ts",
+   "to": "apps/web/src/shared/lib/files/__tests__/zip-reader.test.ts"
+  },
+  {
+   "from": "src/lib/app-version.ts",
+   "to": "apps/web/src/app/app-version.ts"
+  },
+  {
+   "from": "src/lib/browser-preview.ts",
+   "to": "apps/web/src/features/workbench/browser-preview.ts"
+  },
+  {
+   "from": "src/lib/cloud-storage.ts",
+   "to": "apps/web/src/features/library/cloud-storage.ts"
+  },
+  {
+   "from": "src/lib/container-executor.ts",
+   "to": "apps/web/src/shared/security/container-executor.ts"
+  },
+  {
+   "from": "src/lib/desktop-kb-reader.ts",
+   "to": "apps/web/src/features/library/desktop-kb-reader.ts"
+  },
+  {
+   "from": "src/lib/doc-preview.ts",
+   "to": "apps/web/src/shared/lib/files/doc-preview.ts"
+  },
+  {
+   "from": "src/lib/drop-utils.ts",
+   "to": "apps/web/src/shared/lib/files/drop-utils.ts"
+  },
+  {
+   "from": "src/lib/ensure-session.ts",
+   "to": "apps/web/src/features/sessions/ensure-session.ts"
+  },
+  {
+   "from": "src/lib/file-kind.ts",
+   "to": "apps/web/src/shared/lib/files/file-kind.ts"
+  },
+  {
+   "from": "src/lib/file-utils.ts",
+   "to": "apps/web/src/shared/lib/files/file-utils.ts"
+  },
+  {
+   "from": "src/lib/input-history.ts",
+   "to": "apps/web/src/features/composer/input-history.ts"
+  },
+  {
+   "from": "src/lib/knowledge-base.ts",
+   "to": "apps/web/src/features/library/knowledge-base.ts"
+  },
+  {
+   "from": "src/lib/loading-tips.ts",
+   "to": "apps/web/src/features/chat/loading-tips.ts"
+  },
+  {
+   "from": "src/lib/local-kb-provider.ts",
+   "to": "apps/web/src/features/library/local-kb-provider.ts"
+  },
+  {
+   "from": "src/lib/mcp-capabilities.ts",
+   "to": "apps/web/src/features/agent-resources/mcp-capabilities.ts"
+  },
+  {
+   "from": "src/lib/notify-channels.ts",
+   "to": "apps/web/src/features/settings/notify-channels.ts"
+  },
+  {
+   "from": "src/lib/oidc-auth.ts",
+   "to": "apps/web/src/shared/auth/oidc-auth.ts"
+  },
+  {
+   "from": "src/lib/otlp-exporter.ts",
+   "to": "apps/web/src/shared/telemetry/otlp-exporter.ts"
+  },
+  {
+   "from": "src/lib/policy-engine.ts",
+   "to": "apps/web/src/features/settings/policy-engine.ts"
+  },
+  {
+   "from": "src/lib/sandbox-guard.ts",
+   "to": "apps/web/src/shared/security/sandbox-guard.ts"
+  },
+  {
+   "from": "src/lib/sandbox-init.ts",
+   "to": "apps/web/src/shared/security/sandbox-init.ts"
+  },
+  {
+   "from": "src/lib/shortcuts.ts",
+   "to": "apps/web/src/shared/lib/shortcuts.ts"
+  },
+  {
+   "from": "src/lib/telemetry-contract.ts",
+   "to": "apps/web/src/shared/telemetry/telemetry-contract.ts"
+  },
+  {
+   "from": "src/lib/usage-quota.ts",
+   "to": "apps/web/src/features/settings/usage-quota.ts"
+  },
+  {
+   "from": "src/lib/use-smooth-text.ts",
+   "to": "apps/web/src/features/chat/use-smooth-text.ts"
+  },
+  {
+   "from": "src/lib/use-unified-tabs.ts",
+   "to": "apps/web/src/features/workbench/use-unified-tabs.ts"
+  },
+  {
+   "from": "src/lib/voice-contract.ts",
+   "to": "apps/web/src/features/composer/voice-contract.ts"
+  },
+  {
+   "from": "src/lib/zip-reader.ts",
+   "to": "apps/web/src/shared/lib/files/zip-reader.ts"
+  },
+  {
+   "from": "src/main.tsx",
+   "to": "apps/web/src/app/main.tsx"
+  },
+  {
+   "from": "src/stores/__tests__/feedback-store.test.ts",
+   "to": "apps/web/src/features/chat/state/__tests__/feedback-store.test.ts"
+  },
+  {
+   "from": "src/stores/__tests__/message-queue-store.test.ts",
+   "to": "apps/web/src/features/composer/state/__tests__/message-queue-store.test.ts"
+  },
+  {
+   "from": "src/stores/__tests__/permission-store.test.ts",
+   "to": "apps/web/src/features/approvals/state/__tests__/permission-store.test.ts"
+  },
+  {
+   "from": "src/stores/__tests__/question-store.test.ts",
+   "to": "apps/web/src/features/approvals/state/__tests__/question-store.test.ts"
+  },
+  {
+   "from": "src/stores/__tests__/session-store-batching.test.ts",
+   "to": "apps/web/src/features/chat/state/__tests__/session-store-batching.test.ts"
+  },
+  {
+   "from": "src/stores/__tests__/session-store.test.ts",
+   "to": "apps/web/src/features/chat/state/__tests__/session-store.test.ts"
+  },
+  {
+   "from": "src/stores/__tests__/sessions-drafts.test.ts",
+   "to": "apps/web/src/features/sessions/state/__tests__/sessions-drafts.test.ts"
+  },
+  {
+   "from": "src/stores/__tests__/sessions-store.test.ts",
+   "to": "apps/web/src/features/sessions/state/__tests__/sessions-store.test.ts"
+  },
+  {
+   "from": "src/stores/__tests__/unseen-store.test.ts",
+   "to": "apps/web/src/app/state/__tests__/unseen-store.test.ts"
+  },
+  {
+   "from": "src/stores/agent-model-store.ts",
+   "to": "apps/web/src/features/models/state/agent-model-store.ts"
+  },
+  {
+   "from": "src/stores/artifacts-store.ts",
+   "to": "apps/web/src/features/workbench/state/artifacts-store.ts"
+  },
+  {
+   "from": "src/stores/extension-ui-store.ts",
+   "to": "apps/web/src/features/approvals/state/extension-ui-store.ts"
+  },
+  {
+   "from": "src/stores/feedback-store.ts",
+   "to": "apps/web/src/features/chat/state/feedback-store.ts"
+  },
+  {
+   "from": "src/stores/message-queue-store.ts",
+   "to": "apps/web/src/features/composer/state/message-queue-store.ts"
+  },
+  {
+   "from": "src/stores/pending-expert-store.ts",
+   "to": "apps/web/src/features/experts/state/pending-expert-store.ts"
+  },
+  {
+   "from": "src/stores/permission-store.ts",
+   "to": "apps/web/src/features/approvals/state/permission-store.ts"
+  },
+  {
+   "from": "src/stores/pi-queue-store.ts",
+   "to": "apps/web/src/features/composer/state/pi-queue-store.ts"
+  },
+  {
+   "from": "src/stores/projects-store.ts",
+   "to": "apps/web/src/features/projects/state/projects-store.ts"
+  },
+  {
+   "from": "src/stores/question-store.ts",
+   "to": "apps/web/src/features/approvals/state/question-store.ts"
+  },
+  {
+   "from": "src/stores/session-store.ts",
+   "to": "apps/web/src/features/chat/state/session-store.ts"
+  },
+  {
+   "from": "src/stores/sessions-store.ts",
+   "to": "apps/web/src/features/sessions/state/sessions-store.ts"
+  },
+  {
+   "from": "src/stores/ui-prefs-store.ts",
+   "to": "apps/web/src/app/state/ui-prefs-store.ts"
+  },
+  {
+   "from": "src/stores/unseen-store.ts",
+   "to": "apps/web/src/app/state/unseen-store.ts"
+  },
+  {
+   "from": "src/styles/app.css",
+   "to": "apps/web/src/styles/app.css"
+  },
+  {
+   "from": "src/styles/automation-wb.css",
+   "to": "apps/web/src/styles/automation-wb.css"
+  },
+  {
+   "from": "src/styles/chat.css",
+   "to": "apps/web/src/styles/chat.css"
+  },
+  {
+   "from": "src/styles/composer-wb-align.css",
+   "to": "apps/web/src/styles/composer-wb-align.css"
+  },
+  {
+   "from": "src/styles/polish.css",
+   "to": "apps/web/src/styles/polish.css"
+  },
+  {
+   "from": "src/test-setup.ts",
+   "to": "apps/web/src/test-setup.ts"
+  },
+  {
+   "from": "src/types/assets.d.ts",
+   "to": "apps/web/src/types/assets.d.ts"
+  },
+  {
+   "from": "vite.config.ts",
+   "to": "apps/web/vite.config.ts"
+  }
+ ]
+}
