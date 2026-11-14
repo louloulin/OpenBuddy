@@ -16,3 +16,7 @@ export interface QuestionRequest {
   expiresAt?: number;
 }
 export type UiDismissReason = "resolved" | "cancelled" | "timeout" | "aborted" | "session_closed";
+
+// The transport seam, re-exported (type-only) so consumers such as the chat-core use cases (R7) can type against
+// @openbuddy/client/types without importing the implementations.
+export type { Transport, TransportState } from "./transport";
