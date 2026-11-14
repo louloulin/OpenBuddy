@@ -31,6 +31,8 @@ import { matchShortcut } from "@/shared/lib/shortcuts";
 import { TurnView } from "./TurnView";
 import { ErrorCard } from "./ErrorCard";
 import { PromptHistory } from "./PromptHistory";
+import { PlanPanel } from "./PlanPanel";
+import { onTaskOverview } from "./task-overview-bus";
 import { ArrowDown } from "lucide-react";
 import { FolderIcon, PanelIcon, SearchIcon } from "@openbuddy/ui/icon/icons/index";
 import type { ModelOption } from "../models/ModelSelector";
@@ -364,6 +366,8 @@ export function ChatView({
     setPendingJump(null);
     jumpToMessage(pendingJump);
   }, [pendingJump, start, jumpToMessage]);
+  // 任务概览 (top bar, pii W3.3): open an artifact / the artifact list, or jump to a turn.
+  useEffect(() => onTaskOverview((t) => (t.messageId ? jumpToMessage(t.messageId) : showBench(t.path ? { kind: "file", path: t.path } : { kind: "list" }))), [jumpToMessage, showBench]);
   /** Images in answers open large; ←/→ steps through the ones in the same turn (U3.6). */
   const onImageClick = useCallback((e: React.MouseEvent) => {
     const img = e.target instanceof HTMLImageElement ? e.target : null;
@@ -587,13 +591,7 @@ export function ChatView({
             </aside>
           )}
           {sessionId && <QueuePanel key={sessionId} sessionId={sessionId} onEdit={putInComposer} />}
-          {planReady && (
-            <div className="plan-bar" role="region" aria-label="计划已就绪">
-              <span className="plan-bar__text">计划已就绪，确认后 Buddy 会切换到「做一做」开始执行。</span>
-              <button type="button" className="bench-btn" onClick={() => setPlanDismissed(lastUserId)}>继续完善</button>
-              <button type="button" className="bench-btn bench-btn--primary" onClick={() => void runPlan()}>按计划执行</button>
-            </div>
-          )}
+          {sessionId && <PlanPanel sessionId={sessionId} ready={planReady} running={streaming} onExecute={() => void runPlan()} onModify={putInComposer} onDismiss={() => setPlanDismissed(lastUserId)} />}
           <Composer
             streaming={streaming}
             onSend={sendWithMode}

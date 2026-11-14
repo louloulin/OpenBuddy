@@ -158,6 +158,7 @@ const STRESS_ANSWER = Array.from({ length: 12 }, (_, i) => [
   '这一部分完成后再运行一次全部测试，并记录耗时，方便和基线对比。', '',
 ].join('\n')).join('\n');
 const STRESS_BIG = 'x'.repeat(1024 * 1024);
+const PLAN_STEPS = ['读取 data/sales.csv 并核对字段', '按区域汇总季度销售额', '撰写分析报告 docs/report.md', '生成看板并自查'];
 async function streamToolArgs(chunk, index, id, name, args, pieces, delay) {
   chunk({ tool_calls: [{ index, id, type: 'function', function: { name, arguments: '' } }] });
   const json = JSON.stringify(args);
@@ -223,6 +224,31 @@ const fixtureServer = createServer(async (req, res) => {
       finish('tool_calls'); return;
     }
     await streamText(chunk, '已完成：\n\n- `docs/report.md` 季度分析报告（已定稿）\n- `site/index.html` 可交互的销售看板\n- `data/sales.csv`、`data/summary.json` 整理后的数据\n\n可以在右侧工作台预览、编辑或还原这些文件。', fixture.delayMs / 3);
+    finish(); return;
+  }
+  // __PLAN__ (20261116-pii W3): 想一想 records the steps with the built-in ob_todo tool; 按此计划执行
+  // then works through them across tool rounds (several ob_todo calls per message) and pauses on step 3.
+  const userTexts = messages.filter(m => m.role === 'user').map(m => typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.filter(p => p.type === 'text').map(p => p.text).join('\n') : '');
+  if (lastUserText.includes('__PLAN__') || (lastUserText.includes('按上面的计划执行') && userTexts.some(t => t.includes('__PLAN__')))) {
+    const todo = (index, id, args) => ({ index, id, type: 'function', function: { name: 'ob_todo', arguments: JSON.stringify(args) } });
+    const rounds = lastUserText.includes('__PLAN__')
+      ? [[todo(0, 'call_plan_add', { action: 'add', items: PLAN_STEPS })]]
+      : [
+        [todo(0, 'call_plan_s1', { action: 'update', id: 1, status: 'in_progress' })],
+        [todo(0, 'call_plan_c1', { action: 'complete', id: 1, note: '24 行，字段齐全' }), todo(1, 'call_plan_s2', { action: 'update', id: 2, status: 'in_progress' })],
+        [todo(0, 'call_plan_c2', { action: 'complete', id: 2 }), todo(1, 'call_plan_s3', { action: 'update', id: 3, status: 'in_progress', note: '待确认统计口径' })],
+      ];
+    const done = [0, 1, 3, 5];
+    const round = done.indexOf(toolsSinceUser);
+    if (round >= 0 && round < rounds.length) {
+      await streamText(chunk, ['先把要做的事拆成步骤。', '开始第 1 步：读取数据。', '数据没问题，接着汇总。', '汇总完成，开始写报告。'][lastUserText.includes('__PLAN__') ? 0 : round + 1], fixture.delayMs);
+      await sleep(fixture.planDelay ?? 400);
+      chunk({ tool_calls: rounds[round] });
+      finish('tool_calls'); return;
+    }
+    await streamText(chunk, lastUserText.includes('__PLAN__')
+      ? '计划已记录在「任务计划」里，共 4 步：先核对数据，再按区域汇总，然后写报告，最后生成看板并自查。确认后我就开始执行。'
+      : '前两步已完成：数据 24 行、字段齐全，四个区域的季度汇总也算好了。第 3 步「撰写分析报告」需要你确认统计口径（含税还是不含税）后再继续。', fixture.delayMs / 3);
     finish(); return;
   }
   if (lastUserText.includes('__RM__')) {

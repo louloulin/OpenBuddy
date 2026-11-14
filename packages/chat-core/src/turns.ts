@@ -73,6 +73,33 @@ export function turnError(messages: ChatMessage[]): { stopReason?: string; error
   return { stopReason: last?.meta?.stopReason, errorMessage: last?.meta?.errorMessage };
 }
 
+export interface TurnSummary {
+  /** The prompt's message id (to jump to it). */
+  id: string;
+  index: number;
+  prompt: string;
+  status: "running" | "done" | "failed" | "stopped";
+  durationMs?: number;
+}
+
+/** Every prompt of the task with its turn's status and duration (任务概览, pii W3.3). */
+export function turnSummaries(messages: ChatMessage[], busy: boolean): TurnSummary[] {
+  const nodes = buildNodes(messages);
+  const out: TurnSummary[] = [];
+  nodes.forEach((node, i) => {
+    if (node.kind !== "user") return;
+    const turn = nodes[i + 1]?.kind === "turn" ? (nodes[i + 1] as Extract<ChatNode, { kind: "turn" }>) : undefined;
+    const last = !nodes.slice(i + 1).some((n) => n.kind === "user");
+    const text = node.message.parts.map((p) => (p.kind === "text" ? p.text : "")).join(" ").replace(/\s+/g, " ").trim();
+    const prompt = text || (node.message.meta?.attachments?.length ? `附件：${node.message.meta.attachments.map((a) => a.split(/[\\/]/).pop()).join("、")}` : "（空消息）");
+    const stop = turn ? turnError(turn.messages).stopReason : undefined;
+    const status = busy && last ? "running" : stop === "aborted" ? "stopped" : stop === "error" ? "failed" : "done";
+    const { start, end } = turn ? turnTiming(turn.messages, node.message) : {};
+    out.push({ id: node.message.id, index: out.length + 1, prompt, status, ...(status !== "running" && start && end && end >= start ? { durationMs: end - start } : {}) });
+  });
+  return out;
+}
+
 /** Markdown export of a turn (answer plus thinking as details). */
 export function turnMarkdown(messages: ChatMessage[]): string {
   return messages

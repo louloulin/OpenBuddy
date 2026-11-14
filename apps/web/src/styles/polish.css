@@ -706,3 +706,91 @@ body.bench-resizing iframe { pointer-events: none; }
 .palette__meta, .shortcut-group__title, .queue-panel__kind, .queue-panel__clear { color: var(--wb-text-medium); }
 .feedback-dialog__btn--primary, .notification-filter--active { background: var(--ob-ink); border-color: transparent; color: var(--ob-ink-fg); }
 .notification-row__unread { background: color-mix(in srgb, var(--wb-brand) 16%, transparent); color: var(--wb-text-strong); }
+
+/* ===================== 20261116-pii W3 · 任务计划 / 任务概览 ===================== */
+.plan-card {
+  margin: 0 auto 8px; max-width: var(--chat-max-width, 760px); width: 100%; box-sizing: border-box; padding: 6px 8px 8px;
+  border: 1px solid var(--ob-card-border); border-radius: 14px; background: var(--ob-card); box-shadow: var(--ob-shadow-card);
+  animation: ob-rise var(--ob-dur) var(--ob-ease-out) both;
+}
+.plan-card__head { display: flex; align-items: center; gap: 4px; }
+.plan-card__toggle {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border: none; border-radius: 9px;
+  background: none; color: var(--wb-text-strong); font-size: 13px; text-align: left; cursor: pointer;
+}
+.plan-card__toggle:hover { background: var(--ob-hover); }
+.plan-card__icon { display: inline-flex; flex: none; color: var(--wb-text-medium); }
+.plan-card--done .plan-card__icon { color: var(--wb-color-text-success-default); }
+.plan-card__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.plan-card__count { flex: none; font-size: 12px; color: var(--wb-text-medium); font-variant-numeric: tabular-nums; }
+.plan-card__edit { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; border-radius: 8px; background: none; color: var(--wb-text-medium); cursor: pointer; }
+.plan-card__edit:hover { background: var(--ob-hover); color: var(--wb-text-strong); }
+.plan-card > .plan-panel__progress-bar { margin: 4px 8px 2px; height: 3px; background: var(--ob-active); }
+.plan-panel__progress-fill { background: var(--wb-color-text-success-default); }
+.plan-card__list { list-style: none; margin: 6px 0 0; padding: 0 4px; max-height: 236px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.plan-step { display: flex; align-items: flex-start; gap: 10px; padding: 6px 4px; border-radius: 8px; font-size: 13px; line-height: 20px; color: var(--wb-text-strong); }
+.plan-step__mark {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-top: 2px;
+  border: 1.5px solid var(--wb-text-weak); border-radius: 50%; box-sizing: border-box; color: var(--ob-card);
+}
+.plan-step--done .plan-step__mark { border-color: var(--wb-color-text-success-default); background: var(--wb-color-text-success-default); }
+.plan-step--in_progress .plan-step__mark { border-color: transparent; color: var(--wb-text-strong); }
+.plan-step__mark--live svg { animation: plan-panel__spin 1.4s linear infinite; }
+.plan-step__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.plan-step__text { overflow-wrap: anywhere; }
+.plan-step--done .plan-step__text { color: var(--wb-text-medium); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--wb-text-medium) 50%, transparent); }
+.plan-step--in_progress .plan-step__text { font-weight: 500; }
+.plan-step__note { font-size: 12px; line-height: 18px; color: var(--wb-text-medium); }
+.plan-step__state { flex: none; font-size: 12px; color: var(--wb-text-medium); font-variant-numeric: tabular-nums; }
+.plan-card .plan-bar { margin: 8px 0 0; padding: 8px 4px 0 8px; border: none; border-top: 1px solid var(--ob-card-border); border-radius: 0; box-shadow: none; background: none; animation: none; }
+.plan-card--editing { padding: 12px; gap: 8px; }
+.plan-card--editing .plan-panel__add { padding: 0; }
+.plan-card--editing .plan-panel__add-btn { background: var(--ob-ink); border-color: var(--ob-ink); color: var(--ob-ink-fg); }
+.plan-editor__foot { display: flex; justify-content: flex-end; gap: 8px; }
+.toolrow__subject--plain { font-family: inherit; font-size: 12.5px; }
+.toolrow__plan {
+  flex: none; height: 18px; padding: 0 6px; border-radius: 9px; background: var(--ob-active); color: var(--wb-text-medium);
+  font-size: 11px; line-height: 18px; font-variant-numeric: tabular-nums;
+}
+/* Top-bar 任务概览 */
+.task-overview { position: relative; flex: none; }
+.task-overview__btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; margin-left: 4px; border: 1px solid var(--ob-card-border);
+  border-radius: 999px; background: var(--ob-card); color: var(--wb-text-medium); font-size: 12px; cursor: pointer; white-space: nowrap;
+  transition: background var(--ob-dur-fast) var(--ob-ease), color var(--ob-dur-fast) var(--ob-ease);
+}
+.task-overview__btn:hover, .task-overview__btn--active { background: var(--ob-hover); color: var(--wb-text-strong); }
+.task-overview__label { font-variant-numeric: tabular-nums; }
+.task-overview__popover {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 960; width: 360px; max-height: min(560px, 76vh); overflow-y: auto;
+  padding: 6px; border-radius: 14px; background: var(--ob-card); box-shadow: var(--ob-shadow-pop);
+}
+.task-overview__section { padding: 4px 4px 8px; }
+.task-overview__section + .task-overview__section { border-top: 1px solid var(--ob-card-border); padding-top: 8px; }
+.task-overview__head { display: flex; align-items: center; justify-content: space-between; padding: 2px 6px 6px; font-size: 12px; font-weight: 500; color: var(--wb-text-medium); }
+.task-overview__section > .plan-panel__progress-bar { margin: 0 6px 6px; height: 3px; background: var(--ob-active); }
+.task-overview__steps, .task-overview__list { list-style: none; margin: 0; padding: 0; }
+.task-overview__steps .plan-step { padding: 4px 6px; }
+.task-overview__item {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 4px 6px; border: none; border-radius: 8px;
+  background: none; color: var(--wb-text-strong); font-size: 13px; text-align: left; cursor: pointer;
+}
+.task-overview__item:hover:not(:disabled) { background: var(--ob-hover); }
+.task-overview__item:disabled { cursor: default; opacity: 0.55; }
+.task-overview__glyph {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 22px; border-radius: 6px;
+  font-size: 9px; font-weight: 700; font-family: var(--wb-font-code-family, ui-monospace, monospace);
+}
+:where(.task-overview__glyph) { background: var(--ob-hover); color: var(--wb-text-medium); }
+.task-overview__index {
+  flex: none; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--ob-active); box-sizing: border-box;
+  color: var(--wb-text-medium); font-size: 11px; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.task-overview__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-overview__meta, .task-overview__status { flex: none; font-size: 12px; color: var(--wb-text-medium); font-variant-numeric: tabular-nums; }
+.task-overview__status--running { color: var(--wb-text-strong); font-weight: 500; }
+.task-overview__status--failed { color: var(--wb-color-text-error-default); }
+.task-overview__link { border: none; background: none; padding: 0; font-size: 12px; color: var(--wb-text-medium); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.task-overview__link:hover { color: var(--wb-text-strong); }
+.task-overview__empty { margin: 0; padding: 2px 6px 4px; font-size: 12px; line-height: 18px; color: var(--wb-text-medium); }
+.task-overview__more { padding: 4px 6px; font-size: 12px; color: var(--wb-text-medium); }

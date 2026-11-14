@@ -16,6 +16,7 @@ import { ModelRuntimeContext, type ModelOption } from "../features/models/ModelS
 import { useExtensionUiStore } from "../features/approvals/state/extension-ui-store";
 import { useAgentModelStore } from "../features/models/state/agent-model-store";
 import { useSessionStore } from "../features/chat/state/session-store";
+import { usePlanFeed } from "../features/chat/state/plan-store";
 import { useArtifactsStore } from "../features/workbench/state/artifacts-store";
 import { useSessionsStore } from "../features/sessions/state/sessions-store";
 import { usePermissionStore } from "../features/approvals/state/permission-store";
@@ -65,7 +66,6 @@ import { matchShortcut } from "../shared/lib/shortcuts";
 import { copyText } from "@openbuddy/platform/clipboard";
 import { useUnseenStore } from "./state/unseen-store";
 import { parseUserText, baseName, EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "@openbuddy/chat-core/user-text";
-
 
 export { EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END };
 
@@ -149,6 +149,7 @@ function Shell() {
   const selectSessionRef = useRef<((sessionId: string, cwd?: string) => Promise<void>) | null>(null);
   const resourceSessionRef = useRef<string | undefined>(undefined);
 
+  usePlanFeed(); // agent://plan → plan store (PlanPanel, 任务概览; pii W3.2)
   const sessionStore = useSessionStore;
   const sessionsStore = useSessionsStore;
   const permissionStore = usePermissionStore;
@@ -212,7 +213,6 @@ function Shell() {
         sessionsStore.getState().setHomeCwd(result.cwd);
         setInit(result);
         setInvalidDefault(!!result.invalidDefault);
-
 
         unlisten = await subscribeAgentEvents({
           onModelState: state => useAgentModelStore.getState().apply(state),

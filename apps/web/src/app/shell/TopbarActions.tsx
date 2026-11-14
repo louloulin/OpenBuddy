@@ -18,6 +18,7 @@ import {
   agentSetSessionArchived,
 } from "@openbuddy/client/agent-client";
 import { buildSessionMarkdown, sanitizeFilename } from "@openbuddy/chat-core/export-markdown";
+import { TaskOverview } from "./TaskOverview";
 
 interface TopbarActionsProps {
   sessionId: string;
@@ -117,6 +118,9 @@ export function TopbarActions({
 
 
   return (
+    <>
+    {/* 任务概览 (pii W3.3): plan progress · artifacts · turns. */}
+    <TaskOverview sessionId={sessionId} />
     <div className="topbar-actions" ref={menuRef}>
       <button
         type="button"
@@ -150,5 +154,6 @@ export function TopbarActions({
         </div>
       )}
     </div>
+    </>
   );
 }
