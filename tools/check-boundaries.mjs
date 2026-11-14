@@ -11,7 +11,7 @@
 //   feature-edge    feature → feature edge not in the allowed DAG
 //   cycle           strongly connected components (> 1 file)
 //   unreachable     source files no entry point reaches
-//   size            source files over the line budget (minus the exemption list)
+//   size            source files over the line budget (minus the exemption list), or past their P3.2 ceiling
 //
 // Paths are matched for both the old (electron/, src/) and the new layout, so the same
 // rules run before, during and after the mv-first migration.
@@ -30,6 +30,24 @@ const SIZE_BUDGET = 600;
 const SIZE_EXEMPT = [
   /features\/automation\//, /components\/automation\//, /AutomationPanel\.tsx$/,
 ];
+// P3.2 explicit ceilings: files already over SIZE_BUDGET when the gate was introduced (end of M12).
+// Each may not grow past its recorded line count; splitting them is P2 work (R1/R2/R3/R5/R8).
+// Drop an entry once its file is within SIZE_BUDGET. A renamed file loses its ceiling and is
+// reported again, so renames must update this table.
+const SIZE_CEILING = {
+  'apps/web/src/app/App.tsx': 1042,
+  'apps/web/src/features/assistant/AssistantsPanel.tsx': 703,
+  'apps/web/src/features/chat/ChatView.tsx': 724,
+  'apps/web/src/features/composer/Composer.tsx': 699,
+  'apps/web/src/features/models/settings/ModelsSettingsPanel.tsx': 805,
+  'apps/web/src/features/sessions/Sidebar.tsx': 1013,
+  'apps/web/src/features/settings/SettingsSections.tsx': 1363,
+  'apps/web/src/features/workbench/ToolSidePanel.tsx': 746,
+  'packages/client/src/agent-client.ts': 1223,
+  'packages/engine/src/pi-engine.ts': 1239,
+  'packages/protocol/src/dto.ts': 938,
+  'packages/services/src/providers/providers.ts': 611,
+};
 
 const LAYERS = [
   { name: 'protocol', match: ['packages/protocol/'], allow: [], forbid: [/^node:/, /^react/, /^electron$/, /^@earendil-works\//] },
@@ -113,7 +131,7 @@ for (const f of files) {
 for (const [f, deps] of graph) {
   const layer = layerOf(f);
   const lines = text.get(f).split('\n').length;
-  if (!isTest(f) && lines > SIZE_BUDGET && !SIZE_EXEMPT.some(re => re.test(f))) report.size.push(`${f} (${lines})`);
+  if (!isTest(f) && lines > Math.max(SIZE_BUDGET, SIZE_CEILING[f] ?? 0) && !SIZE_EXEMPT.some(re => re.test(f))) report.size.push(`${f} (${lines}${SIZE_CEILING[f] ? ` > ceiling ${SIZE_CEILING[f]}` : ''})`);
   if (!layer || isTest(f) || isConfig(f)) continue;
   if (!BRIDGE_OK.includes(layer.name) && ['web', 'ui', 'markdown', 'chat-core'].includes(layer.name) && /window\.openbuddy\b/.test(text.get(f))) report.bridge.push(`${f} uses window.openbuddy`);
   for (const d of deps) {
