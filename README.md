@@ -27,7 +27,7 @@ Pi runs in the main process. Application data lives beneath Electron's `userData
 
 ### Code layout
 
-The repository is a pnpm workspace. Packages are consumed as TypeScript source through `tsconfig.base.json` paths and Vite/Vitest/esbuild aliases (`@openbuddy/<package>[/<subpath>]` → `packages/<package>/src/…`); there is no separate package build step.
+The repository is a pnpm workspace. Packages are consumed as TypeScript source: `tsconfig.base.json` paths (which esbuild also uses for the main process) and matching Vite/Vitest aliases map `@openbuddy/<package>[/<subpath>]` to `packages/<package>/src/…`; there is no separate package build step.
 
 ```text
 apps/desktop      Electron host: main/, preload/, ipc/register.ts, scripts/ (build, dev, UI checks)
@@ -39,7 +39,7 @@ packages/host     IPC command handlers and file/workspace access guards (Node)
 packages/client   renderer-side IPC client
 packages/chat-core headless chat logic: turns, tool summaries, diffs, export, error text
 packages/platform platform utilities (clipboard, platform detection)
-packages/ui       icons, Toast, ImageLightbox, ThemeProvider, design tokens
+packages/ui       icons, Toast, ImageLightbox, ThemeProvider, LetterAvatar, design tokens
 packages/markdown Markdown rendering pipeline and code-block actions
 tools/            boundary checker, move codemod, IPC audit, verification scripts
 ```

@@ -27,7 +27,7 @@ Pi 在主进程运行。配置和会话位于 Electron `userData/pi/`，默认�
 
 ### 代码结构
 
-仓库是 pnpm workspace。各包以 TypeScript 源码形式被引用：`tsconfig.base.json` 的 paths 以及 Vite / Vitest / esbuild 的别名把 `@openbuddy/<包>[/<子路径>]` 映射到 `packages/<包>/src/…`，不需要单独构建包。
+仓库是 pnpm workspace。各包以 TypeScript 源码形式被引用：`tsconfig.base.json` 的 paths（主进程的 esbuild 也读它）和对应的 Vite / Vitest 别名把 `@openbuddy/<包>[/<子路径>]` 映射到 `packages/<包>/src/…`，不需要单独构建包。
 
 ```text
 apps/desktop      Electron 宿主：main/、preload/、ipc/register.ts、scripts/（构建、开发、界面检查）
@@ -39,7 +39,7 @@ packages/host     IPC 命令处理与文件/工作区访问校验（Node）
 packages/client   渲染层 IPC 客户端
 packages/chat-core 无 UI 的对话逻辑：回合分组、工具摘要、diff、导出、错误文案
 packages/platform 平台工具（剪贴板、平台识别）
-packages/ui       图标、Toast、ImageLightbox、ThemeProvider、设计 token
+packages/ui       图标、Toast、ImageLightbox、ThemeProvider、LetterAvatar、设计 token
 packages/markdown Markdown 渲染管线与代码块操作
 tools/            边界检查、搬家 codemod、IPC 审计、验证脚本
 ```
