@@ -6,25 +6,25 @@ import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
-const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+const root = fileURLToPath(new URL('../../..', import.meta.url));
+const pkg = JSON.parse(await readFile(new URL('../../../package.json', import.meta.url), 'utf8'));
 // Workspace packages (`workspace:*`) are source: bundle them. Everything else is external.
 const external = ['electron', ...Object.entries({ ...pkg.dependencies, ...pkg.devDependencies }).filter(([, v]) => !String(v).startsWith('workspace:')).map(([name]) => name)];
 const common = { bundle: true, platform: 'node', format: 'esm', target: 'node22', external, absWorkingDir: root, tsconfig: 'tsconfig.electron.json', logLevel: 'warning' };
 
-const out = new URL('../dist-electron/', import.meta.url);
+const out = new URL('../../../dist-electron/', import.meta.url);
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
-await build({ ...common, entryPoints: ['electron/main.ts'], outfile: 'dist-electron/main.js', sourcemap: true });
+await build({ ...common, entryPoints: ['apps/desktop/src/main.ts'], outfile: 'dist-electron/main.js', sourcemap: true });
 
 // The preload is plain CJS; its command/event allow-lists come from the shared contract.
 const contract = await build({ ...common, entryPoints: ['packages/protocol/src/contract.ts'], write: false });
 const { COMMANDS, EVENTS } = await import(`data:text/javascript;base64,${Buffer.from(contract.outputFiles[0].text).toString('base64')}`);
-const preload = await readFile(new URL('../electron/preload.cjs', import.meta.url), 'utf8');
+const preload = await readFile(new URL('../../../apps/desktop/src/preload.cjs', import.meta.url), 'utf8');
 await writeFile(new URL('preload.cjs', out), preload.replace('/* COMMANDS */ []', JSON.stringify(COMMANDS)).replace('/* EVENTS */ []', JSON.stringify(EVENTS)));
 
 // file:// responses may not traverse the HTTP header hook: embed production CSP.
-const indexURL = new URL('../dist/index.html', import.meta.url);
+const indexURL = new URL('../../../dist/index.html', import.meta.url);
 try {
   let html = await readFile(indexURL, 'utf8');
   // Same policy as electron/main.ts; only artifact previews (ob-preview://, sandboxed) may be framed.

@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 
 // Paths: repo is two levels up; screenshots go to $SHOTS_DIR; the throwaway profile lives in $RUN_DIR (or the OS temp dir).
-const REPO = resolve(import.meta.dirname, '..', '..');
+const REPO = resolve(import.meta.dirname, '..', '..', '..', '..');
 const require = createRequire(join(REPO, 'package.json'));
 const { _electron: electron } = require('playwright-core');
 const OUT = resolve(process.env.SHOTS_DIR || join(REPO, 'docs/plan/shots-20261115/after'));
