@@ -1,7 +1,7 @@
 import type { ConnectorItem } from "@openbuddy/protocol/dto";
 import { AddIcon, CheckIcon, RefreshCwIcon } from "@openbuddy/ui/icon/icons/index";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
-import type { ConnectorAuthState } from "./ConnectorsTab";
+import type { ConnectorAuthState } from "./shared";
 
 const BADGE: Record<ConnectorAuthState, { text: string; cls: string } | null> = {
   none: null,
