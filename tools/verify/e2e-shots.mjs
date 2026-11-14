@@ -101,6 +101,16 @@ try {
     await page.getByRole('button', { name: '设置', exact: true }).first().click();
     await ctx.sleep(1200);
     return await ctx.shot('06-settings');`);
+  // Every settings section, so splitting SettingsSections (R8) is covered by before/after shots.
+  const SETTINGS_SECTIONS = [['account', '账户管理'], ['agent-mail', '智能体邮箱'], ['shortcuts', '快捷键'], ['model', '模型'], ['assistant', '助理设置'], ['personalize', '个性化'], ['security', '安全中心'], ['help', '帮助与反馈']];
+  await step('settings sections', `
+    const out = [];
+    for (const [id, label] of ${JSON.stringify(SETTINGS_SECTIONS)}) {
+      await page.locator('.settings-navigation__label').getByText(label, { exact: true }).first().click();
+      await ctx.sleep(700);
+      out.push(await ctx.shot('07-settings-' + id));
+    }
+    return out;`);
   const audit = await step('audit', `
     const a = await ctx.audit();
     const rejected = a.main.filter(r => r.status === 'rejected');
