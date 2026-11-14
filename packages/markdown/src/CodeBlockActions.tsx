@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useState, type ReactNode } from "react";
-import { copyText } from "@openbuddy/platform/clipboard";
+import { useMarkdownHost } from "./host";
 import { Check, Copy } from "lucide-react";
 import type { CodeBlockAction } from "./types";
 
@@ -28,6 +28,8 @@ export const CodeBlockActions = memo(function CodeBlockActions({
   copyIconOnly = true,
 }: Props) {
   const [copied, setCopied] = useState(false);
+  // Copying goes through the app's host (the main-process clipboard in Electron), 20261115-md R6.
+  const host = useMarkdownHost();
 
   useEffect(() => {
     if (!copied) return;
@@ -41,10 +43,10 @@ export const CodeBlockActions = memo(function CodeBlockActions({
       setCopied(true);
       onAction?.("copy", code, language, requestId);
     };
-    copyText(code).then(done).catch(() => {
+    host.copyText(code).then(done).catch(() => {
       /* Clipboard unavailable — the button simply does not flip to "已复制". */
     });
-  }, [code, language, onAction, requestId]);
+  }, [code, language, onAction, requestId, host]);
 
   const visibleActions = actions.filter((action) => {
     if (!action.condition) return true;
