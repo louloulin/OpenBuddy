@@ -7,6 +7,7 @@ import {
 import { existsSync } from "node:fs";
 import type { EngineContext } from "./engine-context.js";
 import { READ_ONLY_TOOLS, validateThinkingLevel, type Slot, type ThinkingLevel } from "./types.js";
+import { builtinFactories } from "./builtin/index.js";
 
 /** Create a live session for `manager` without touching any other session. */
 export async function open(
@@ -63,6 +64,8 @@ export async function open(
       // After the permission gate: only calls that may run get a snapshot.
       engine.checkpoints.extension(sessionId, () => cwd),
       engine.mcp.extension(),
+      // Built-in extensions (20261116-pii W0.5): app code, before user extensions.
+      ...builtinFactories({ engine, sessionId, cwd }),
       ...engine.extensionFactories,
     ],
   });
@@ -80,7 +83,7 @@ export async function open(
     resourceLoader: loader,
     settingsManager: sdkSettings,
     model,
-    tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "mcp__*"],
+    tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "mcp__*", "ob_*"],
     thinkingLevel: requestedThinking,
   });
   const defaultTools = session.getActiveToolNames();
