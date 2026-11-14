@@ -6,7 +6,7 @@
  * 把任意工具 kind 映射到「渲染器类型」(renderer):决定用哪种紧凑视图展示。
  * 纯函数,便于单测。渲染组件按 renderer 选择不同布局。
  */
-import type { ToolCallView } from "../../../apps/web/src/features/chat/state/session-store";
+import type { ToolCallView } from "./transcript";
 
 export type ToolRenderer =
   | "default" // 通用紧凑行(既有 ToolCallCard)
