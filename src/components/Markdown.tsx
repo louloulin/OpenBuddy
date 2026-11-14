@@ -4,9 +4,9 @@
  * Note: must import via "./markdown/index" — on Windows "./markdown"
  * collides with this file's casing.
  */
-export { Markdown } from "./markdown/index";
+export { Markdown } from "@openbuddy/markdown";
 export type {
   MarkdownProps,
   MarkdownConfig,
   MarkdownTheme,
-} from "./markdown/index";
+} from "@openbuddy/markdown";

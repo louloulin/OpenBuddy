@@ -7,7 +7,7 @@ const { minimize, toggleMaximize, close, resizedCleanup, editCommand } = vi.hois
 vi.mock("@openbuddy/client/ipc", () => ({
   win: { minimize, toggleMaximize, close, isMaximized: () => Promise.resolve(false), onResized: () => resizedCleanup },
 }));
-vi.mock("@/lib/clipboard", () => ({ editCommand }));
+vi.mock("@openbuddy/platform/clipboard", () => ({ editCommand }));
 
 import { TitleBar } from "../TitleBar";
 

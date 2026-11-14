@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { create } from "zustand";
-import { XCloseIcon } from "@/foundation/components/Icon/icons";
+import { XCloseIcon } from "./icon/icons";
 
 /**
  * Click an image (prompt thumbnails, markdown images) to see it large (20261115-ui U3.6).

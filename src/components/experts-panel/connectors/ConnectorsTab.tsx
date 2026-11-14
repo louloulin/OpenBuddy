@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open as openDialog } from "@openbuddy/client/ipc";
 import {
   SearchIcon, AddCircleIcon, FolderOpenIcon, RefreshCwIcon, McpIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import {
   connectorsDefaultRoot, connectorsLoad, connectorsReadMcpConfig,
   connectorsCliAuth, connectorsCliAuthCancel, connectorsCliSkillsDir,

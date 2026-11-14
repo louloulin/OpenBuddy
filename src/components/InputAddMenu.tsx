@@ -3,7 +3,7 @@ import { Paperclip, ChevronRight, Wand2 } from "lucide-react";
 import {
   AddIcon,
   SkillTabIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import { skillsList } from "@openbuddy/client/agent-client";
 import { HOME_MODES, type HomeModeId } from "./home-scenes";
 import { CONNECTOR_LIST } from "./experts-panel/data/connectors-catalog";

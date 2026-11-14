@@ -7,12 +7,12 @@
  * in-flight auth process.
  */
 import { useEffect, useRef, useState } from "react";
-import { copyText } from "@/lib/clipboard";
+import { copyText } from "@openbuddy/platform/clipboard";
 import QRCode from "qrcode";
 import { Copy as CopyIcon } from "lucide-react";
 import type { ConnectorItem } from "@openbuddy/protocol/dto";
 import { openUrl } from "@openbuddy/client/agent-client";
-import { OpenExternalIcon } from "@/foundation/components/Icon/icons";
+import { OpenExternalIcon } from "@openbuddy/ui/icon/icons/index";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 
 interface Props {

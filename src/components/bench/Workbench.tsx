@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ArtifactInfo } from "@openbuddy/client/agent-client";
 import type { ToolCallView } from "@/stores/session-store";
-import { IS_MACOS } from "@/lib/platform";
+import { IS_MACOS } from "@openbuddy/platform/platform";
 import { ToolCallDetailBody } from "../ToolCallCard";
 import { FileTreeView } from "../workspace-panel/FileTreeView";
-import { CloseIcon, MaximizeIcon, RestoreIcon } from "@/foundation/components/Icon/icons";
+import { CloseIcon, MaximizeIcon, RestoreIcon } from "@openbuddy/ui/icon/icons/index";
 import { ArtifactViewer } from "./ArtifactViewer";
 import { ChangesView } from "./ChangesView";
 import { KIND_GLYPH, KIND_LABEL, benchKind, formatSize } from "./bench-kind";

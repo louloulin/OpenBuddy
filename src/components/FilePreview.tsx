@@ -8,7 +8,7 @@
  * 通过 `filename` + `content`(文本或 data: URL)渲染;`onCopyText` 提供复制回调。
  */
 import { useState } from "react";
-import { Markdown } from "./markdown/index";
+import { Markdown } from "@openbuddy/markdown";
 import {
   detectPreviewKind,
   previewKindLabel,

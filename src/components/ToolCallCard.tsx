@@ -12,7 +12,7 @@ import {
   TerminalToolIcon,
   ToolDefaultIcon,
   ViewedToolIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import { diffStats, formatDuration, toolDiff, toolLabel, toolOutput, toolSubject } from "@/lib/tool-summary";
 import { ChevronGlyph } from "./chat/icons";
 

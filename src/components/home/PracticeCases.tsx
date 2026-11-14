@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { HomeModeId } from "../home-scenes";
 import { getMode } from "../home-scenes";
-import { ChevronDownIcon } from "@/foundation/components/Icon/icons";
+import { ChevronDownIcon } from "@openbuddy/ui/icon/icons/index";
 
 interface PracticeCasesProps {
   activeMode: HomeModeId;

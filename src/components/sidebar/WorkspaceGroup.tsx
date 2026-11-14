@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDownIcon } from "@/foundation/components/Icon/icons";
+import { ChevronDownIcon } from "@openbuddy/ui/icon/icons/index";
 
 export function WorkspaceGroup({ workspaces, onSelect }: { workspaces: any[]; onSelect: (cwd: string) => void }) {
   const [expanded, setExpanded] = useState(true);

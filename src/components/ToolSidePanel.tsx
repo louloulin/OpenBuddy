@@ -22,9 +22,9 @@ import {
   type WorkspaceView,
 } from "@/lib/use-unified-tabs";
 import { ToolCallDetailBody } from "./ToolCallCard";
-import { openLocalPath } from "@/lib/markdown-host";
+import { openLocalPath } from "@openbuddy/markdown/markdown-host";
 import { invoke } from "@openbuddy/client/ipc";
-import { IS_MACOS } from "@/lib/platform";
+import { IS_MACOS } from "@openbuddy/platform/platform";
 import { ViewSelector, defaultViews } from "./workspace-panel/ViewSelector";
 import { ArtifactTabsBar } from "./workspace-panel/ArtifactTabsBar";
 import { FileTreeView } from "./workspace-panel/FileTreeView";
@@ -36,7 +36,7 @@ import {
   RestoreIcon,
   CloseIcon,
   ChevronLeftIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 
 /** 向后兼容：原模式 + 新视图。tool 为单工具详情，其余映射到工作区视图。 */
 export type ToolSidePanelMode =

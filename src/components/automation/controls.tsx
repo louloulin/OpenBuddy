@@ -17,7 +17,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { AlarmClockIcon, ChevronDownIcon } from "@/foundation/components/Icon/icons";
+import { AlarmClockIcon, ChevronDownIcon } from "@openbuddy/ui/icon/icons/index";
 import {
   ALL_DAYS,
   DAY_LABELS,

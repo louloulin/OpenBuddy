@@ -3,7 +3,7 @@ import { open as openDialog } from "@openbuddy/client/ipc";
 import {
   SearchIcon, MyExpertIcon, ChevronLeftIcon, DeleteIcon, SparklesIcon,
   FolderOpenIcon, RefreshCwIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import {
   agentsDelete, agentsList, expertsDefaultRoot, expertsLoad, expertsReadAgentPrompt, expertsLinkAgents,
 } from "@openbuddy/client/agent-client";

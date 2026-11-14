@@ -14,7 +14,7 @@ import {
 import { ActivityTab, PlanTab, TaskTab, AssetsTab } from "./project-tabs";
 import {
   FolderIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 
 type TabKey = "activity" | "plan" | "task" | "asset";
 type DrawerKey = "instruction" | "connectors" | "experts" | "skills" | "automation";

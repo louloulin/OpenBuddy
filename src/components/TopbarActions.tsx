@@ -9,7 +9,7 @@ import { friendlyError } from "@/lib/error-format";
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { save as saveDialog } from "@openbuddy/client/ipc";
-import { MoreDotsIcon, PinFilledIcon, ArchiveIcon } from "@/foundation/components/Icon/icons";
+import { MoreDotsIcon, PinFilledIcon, ArchiveIcon } from "@openbuddy/ui/icon/icons/index";
 import { useSessionStore } from "@/stores/session-store";
 import {
   exportTextFile,

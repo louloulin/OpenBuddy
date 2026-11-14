@@ -9,7 +9,7 @@ import {
   DeleteIcon,
   RefreshCwIcon,
   SparklesIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import {
   memoryDelete,
   memoryFlush,

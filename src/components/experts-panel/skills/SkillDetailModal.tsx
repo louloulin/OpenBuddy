@@ -9,12 +9,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { SkillItem, SkillInfo } from "@openbuddy/protocol/dto";
 import { skillsCatalogReadSkill, skillsAdd } from "@openbuddy/client/agent-client";
-import { Markdown } from "@/components/markdown/Markdown";
+import { Markdown } from "@openbuddy/markdown/Markdown";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 import { LetterAvatar } from "../shared/LetterAvatar";
 import {
   ChevronLeftIcon, AddIcon, CheckIcon, FileTextIcon, Code2Icon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 
 interface Props {
   skill: SkillItem;

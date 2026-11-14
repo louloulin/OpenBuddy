@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitMarkdownBlocks } from "@/lib/markdown-blocks";
+import { splitMarkdownBlocks } from "../markdown-blocks";
 
 describe("splitMarkdownBlocks", () => {
   it("splits paragraphs, headings and fences at safe blank lines", () => {

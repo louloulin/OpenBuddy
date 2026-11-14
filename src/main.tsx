@@ -1,6 +1,6 @@
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./styles/global.css";
+import "../packages/ui/src/styles/global.css";
 import "./styles/app.css";
 import "./styles/automation-wb.css";
 import "./styles/chat.css";

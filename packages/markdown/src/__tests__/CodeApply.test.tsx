@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { Markdown } from "../markdown";
-import { ThemeProvider } from "../ThemeProvider";
+import { Markdown } from "..";
+import { ThemeProvider } from "@openbuddy/ui/ThemeProvider";
 
 const md = (text: string, onApplyCode = vi.fn()) => {
   render(<ThemeProvider><Markdown config={{ onApplyCode, pathClickHandler: { onPathClick: vi.fn() } }}>{text}</Markdown></ThemeProvider>);

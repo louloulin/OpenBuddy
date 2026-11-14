@@ -5,7 +5,7 @@ import type { ChatMessage } from "@/stores/session-store";
 const renders = vi.fn();
 vi.mock("../ToolCallCard", () => ({ ToolCallCard: (props: { tc: { toolCallId: string } }) => { renders(props.tc.toolCallId); return <div>{props.tc.toolCallId}</div>; } }));
 import { TurnView } from "../chat/TurnView";
-import { ThemeProvider } from "../ThemeProvider";
+import { ThemeProvider } from "@openbuddy/ui/ThemeProvider";
 import { useUiPrefs } from "@/stores/ui-prefs-store";
 
 const turn: ChatMessage = {

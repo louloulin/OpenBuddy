@@ -5,7 +5,7 @@ import {
   DeleteIcon,
   RefreshCwIcon,
   CheckIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import { taskKill, tasksList } from "@openbuddy/client/agent-client";
 import type { RunningTask } from "@openbuddy/protocol/dto";
 

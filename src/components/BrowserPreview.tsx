@@ -20,7 +20,7 @@ import {
   ChevronRightIcon,
   RefreshCwIcon,
   OpenExternalIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 
 interface BrowserPreviewProps {
   /** 初始 URL。 */

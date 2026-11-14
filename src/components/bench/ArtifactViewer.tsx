@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MoreHorizontal, ExternalLink, Pencil, Save, X } from "lucide-react";
 import { invoke, save as saveDialog } from "@openbuddy/client/ipc";
 import { artifactSave, checkpointList, checkpointRead, checkpointRestore, exportTextFile, type ArtifactInfo, type CheckpointRecord } from "@openbuddy/client/agent-client";
-import { copyText } from "@/lib/clipboard";
+import { copyText } from "@openbuddy/platform/clipboard";
 import { friendlyError } from "@/lib/error-format";
 import { appConfirm } from "../AppDialog";
 import { ArtifactPreview, useFileContent, type PreviewMode } from "./ArtifactPreview";

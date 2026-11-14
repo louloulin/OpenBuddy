@@ -1,7 +1,7 @@
 import { invoke } from "@openbuddy/client/ipc";
 import { ask, save } from "@openbuddy/client/ipc";
-import type { MarkdownConfig, PathType } from "@/components/markdown/types";
-import { appConfirm } from "@/components/AppDialog";
+import type { MarkdownConfig, PathType } from "./types";
+import { appConfirm } from "../../../src/components/AppDialog";
 import { artifactSave } from "@openbuddy/client/agent-client";
 
 export type MarkdownHostOptions = {

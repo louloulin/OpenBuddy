@@ -7,7 +7,7 @@ import {
   SkillIcon,
   AgentToolIcon,
   McpIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import { pluginsAction, pluginsList } from "@openbuddy/client/agent-client";
 import type { PluginEntry } from "@openbuddy/protocol/dto";
 

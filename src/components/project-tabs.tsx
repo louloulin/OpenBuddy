@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import { appPrompt } from "./AppDialog";
 import { useProjectsStore, PLAN_COLUMNS, type PlanStatus, type AssetItem } from "@/stores/projects-store";
-import { ChevronDownIcon, SearchIcon } from "@/foundation/components/Icon/icons";
+import { ChevronDownIcon, SearchIcon } from "@openbuddy/ui/icon/icons/index";
 
 // ============================================================
 // 动态

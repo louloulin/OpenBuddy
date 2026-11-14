@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { EditToolIcon } from "@/foundation/components/Icon/icons";
+import { EditToolIcon } from "@openbuddy/ui/icon/icons/index";
 
 
 export function TopbarTitle({

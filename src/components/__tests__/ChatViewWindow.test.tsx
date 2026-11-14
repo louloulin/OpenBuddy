@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useSessionStore, type ChatMessage } from "@/stores/session-store";
-import { ThemeProvider } from "../ThemeProvider";
+import { ThemeProvider } from "@openbuddy/ui/ThemeProvider";
 import { ChatView } from "../ChatView";
 
 vi.mock("@openbuddy/client/ipc", () => ({

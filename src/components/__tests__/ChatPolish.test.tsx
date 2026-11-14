@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { UserBubble } from "../chat/UserBubble";
 import { TurnView } from "../chat/TurnView";
-import { ThemeProvider } from "../ThemeProvider";
-import { MarkdownPre } from "../markdown/MarkdownPre";
+import { ThemeProvider } from "@openbuddy/ui/ThemeProvider";
+import { MarkdownPre } from "@openbuddy/markdown/MarkdownPre";
 import type { ChatMessage } from "@/stores/session-store";
 
 const prompt = (meta: ChatMessage["meta"] = {}): ChatMessage => ({ id: "u1", role: "user", complete: true, parts: [{ kind: "text", text: "原来的问题" }], meta });

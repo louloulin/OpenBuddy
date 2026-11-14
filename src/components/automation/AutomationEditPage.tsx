@@ -21,7 +21,7 @@ import {
   PlayIcon,
   RunningStatusIcon,
   SkillIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import type {
   AutomationPermissionMode,
   AutomationRunRecord,

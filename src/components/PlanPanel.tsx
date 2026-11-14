@@ -18,7 +18,7 @@ import {
   ChevronDownIcon,
   AddIcon,
   XCloseIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 
 const STATUS_LABEL: Record<PlanEntryStatus, string> = {
   pending: "待处理",

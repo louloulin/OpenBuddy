@@ -11,7 +11,7 @@ import {
   ChevronsUpDownIcon,
   ShieldCheckIcon,
   WarningOutlineIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import type { AutomationPermissionMode } from "@openbuddy/protocol/dto";
 
 export function AutomationPermissionPicker({

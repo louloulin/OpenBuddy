@@ -26,7 +26,7 @@ import {
   ChatBubbleIcon,
   ChevronLeftIcon,
   MoreDotsIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import {
   agentsDelete,
   agentsList,

@@ -1,5 +1,5 @@
 import { AgentResourcesPanel } from "./AgentResourcesPanel";
-import { AgentToolIcon } from "@/foundation/components/Icon/icons";
+import { AgentToolIcon } from "@openbuddy/ui/icon/icons/index";
 import { LocalAssistantView } from "./LocalAssistantView";
 import { ProjectsPanel } from "./ProjectsPanel";
 import { ExpertsPanel } from "./experts-panel";
@@ -215,7 +215,7 @@ export function PlaceholderPage({
 
 /** 双 tab 容器：插件（已安装）/ 市场（可浏览安装）。 */
 import { useState } from "react";
-import { PuzzlePieceIcon, RepoIcon } from "@/foundation/components/Icon/icons";
+import { PuzzlePieceIcon, RepoIcon } from "@openbuddy/ui/icon/icons/index";
 function PluginsMarketTabs({
   sessionId,
   onToast,

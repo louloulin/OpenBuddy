@@ -29,7 +29,7 @@ import {
   ResumeCircleIcon,
   RunningStatusIcon,
   SearchIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import {
   agentsList,
   automationRecordsArchive,

@@ -1,6 +1,6 @@
 import {
   ExpertTabIcon, SkillTabIcon, ConnectorTabIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 
 export type MarketTab = "experts" | "skills" | "connectors";
 

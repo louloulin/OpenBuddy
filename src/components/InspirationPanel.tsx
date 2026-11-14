@@ -5,7 +5,7 @@ import {
   SearchIcon,
   LightbulbIcon,
   SparklesIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import { inspirationGenerate } from "@openbuddy/client/agent-client";
 import { registerForeignUpdateListener } from "@/stores/session-store";
 import type { InspirationRichCard, PromptComplete } from "@openbuddy/protocol/dto";

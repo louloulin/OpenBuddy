@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { TurnView } from "../chat/TurnView";
-import { ThemeProvider } from "../ThemeProvider";
+import { ThemeProvider } from "@openbuddy/ui/ThemeProvider";
 import { useUiPrefs } from "@/stores/ui-prefs-store";
 import type { ChatMessage } from "@/stores/session-store";
 

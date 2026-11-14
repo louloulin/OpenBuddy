@@ -4,14 +4,14 @@ import { Sidebar } from "./components/Sidebar";
 import { HomePage } from "./components/HomePage";
 import { ChatView } from "./components/ChatView";
 import { PlaceholderPage } from "./components/PlaceholderPage";
-import { Toast } from "./components/Toast";
+import { Toast } from "@openbuddy/ui/Toast";
 // PermissionDialog is now inline in ChatView (PermissionInlineCard), not a global modal.
-import { ThemeProvider } from "./components/ThemeProvider";
+import { ThemeProvider } from "@openbuddy/ui/ThemeProvider";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { AboutDialog } from "./components/AboutDialog";
 import { FolderTrustDialog } from "./components/FolderTrustDialog";
 import { TopbarActions } from "./components/TopbarActions";
-import { SidebarToggleIcon, WbNewTaskIcon } from "./foundation/components/Icon/icons";
+import { SidebarToggleIcon, WbNewTaskIcon } from "@openbuddy/ui/icon/icons/index";
 import { ModelRuntimeContext, type ModelOption } from "./components/ModelSelector";
 import { useExtensionUiStore } from "./stores/extension-ui-store";
 import { useAgentModelStore } from "./stores/agent-model-store";
@@ -56,13 +56,13 @@ import {
   createConsoleTelemetryProvider,
   reportEvent,
 } from "./lib/telemetry-contract";
-import { IS_MACOS } from "./lib/platform";
+import { IS_MACOS } from "@openbuddy/platform/platform";
 import { friendlyError } from "./lib/error-format";
 import { AppDialogHost } from "./components/AppDialog";
-import { ImageLightboxHost } from "./components/ImageLightbox";
+import { ImageLightboxHost } from "@openbuddy/ui/ImageLightbox";
 import { SearchPalette, ShortcutsPanel } from "./components/ShortcutsPanel";
 import { matchShortcut } from "./lib/shortcuts";
-import { copyText } from "./lib/clipboard";
+import { copyText } from "@openbuddy/platform/clipboard";
 import { useUnseenStore } from "./stores/unseen-store";
 import { parseUserText, baseName, EXPERT_PERSONA_BEGIN, EXPERT_PERSONA_END } from "./lib/user-text";
 

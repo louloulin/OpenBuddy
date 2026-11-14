@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { RefItem } from "@/stores/projects-store";
-import { CheckIcon } from "@/foundation/components/Icon/icons";
+import { CheckIcon } from "@openbuddy/ui/icon/icons/index";
 
 /** 本地占位候选（演示用，非云端数据）。 */
 export const PICKER_OPTIONS: Record<"connectors" | "experts" | "skills", RefItem[]> = { connectors: [], experts: [], skills: [] };

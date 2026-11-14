@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { WbPinIcon } from "@/foundation/components/Icon/icons";
+import { WbPinIcon } from "@openbuddy/ui/icon/icons/index";
 
 export function PinnedSection() {
   const [pinnedSessions, setPinnedSessions] = useState([

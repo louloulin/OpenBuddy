@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { open as openDialog } from "@openbuddy/client/ipc";
-import { XCloseIcon, FolderOpenIcon } from "@/foundation/components/Icon/icons";
+import { XCloseIcon, FolderOpenIcon } from "@openbuddy/ui/icon/icons/index";
 import { skillsAdd } from "@openbuddy/client/agent-client";
 
 

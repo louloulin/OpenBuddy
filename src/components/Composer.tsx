@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { ArrowUp, X, type LucideIcon } from "lucide-react";
 import { open as openDialog } from "@openbuddy/client/ipc";
 import { getPathForFile } from "@openbuddy/client/ipc";
-import { ChevronDownIcon } from "@/foundation/components/Icon/icons";
+import { ChevronDownIcon } from "@openbuddy/ui/icon/icons/index";
 import { ModelRuntimeContext, ModelSelector, type ModelOption } from "./ModelSelector";
 import { ThumbImg } from "./experts-panel/shared/ThumbImg";
 import { ContextUsagePill } from "./ContextUsagePill";

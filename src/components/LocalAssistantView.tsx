@@ -1,5 +1,5 @@
 import { Composer } from "./Composer";
-import { SettingsIcon } from "@/foundation/components/Icon/icons";
+import { SettingsIcon } from "@openbuddy/ui/icon/icons/index";
 import type { ModelOption } from "./ModelSelector";
 import { useSessionsStore, ASSISTANT_DRAFT_KEY } from "@/stores/sessions-store";
 

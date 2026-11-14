@@ -3,7 +3,7 @@ import { open as openDialog } from "@openbuddy/client/ipc";
 import {
   SearchIcon, InstalledSkillIcon, AddCircleIcon, RefreshCwIcon,
   PuzzlePieceIcon, DeleteIcon, FolderOpenIcon, ChevronLeftIcon, SparklesIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import {
   skillsList, skillsRemove, skillsToggle,
   skillsCatalogDefaultRoot, skillsCatalogLoad,

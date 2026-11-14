@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   XCloseIcon, SearchIcon, ConfigureIcon, McpIcon, OpenExternalIcon, DeleteIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import { mcpDelete, mcpList, mcpToggle } from "@openbuddy/client/agent-client";
 import { ensureSession } from "@/lib/ensure-session";
 import { useSessionStore } from "@/stores/session-store";

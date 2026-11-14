@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { openLightbox } from "../ImageLightbox";
+import { openLightbox } from "@openbuddy/ui/ImageLightbox";
 import type { ChatMessage } from "@/stores/session-store";
-import { copyText } from "@/lib/clipboard";
+import { copyText } from "@openbuddy/platform/clipboard";
 import { baseName } from "@/lib/user-text";
 import { CopyGlyph, EditGlyph, FileGlyph } from "./icons";
 

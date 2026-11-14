@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { XCloseIcon, CheckIcon } from "@/foundation/components/Icon/icons";
+import { XCloseIcon, CheckIcon } from "@openbuddy/ui/icon/icons/index";
 import { agentAuthStatus } from "@openbuddy/client/agent-client";
 import type { InitResult } from "@openbuddy/client/agent-client";
 import { APP_VERSION } from "@/lib/app-version";

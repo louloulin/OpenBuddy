@@ -4,11 +4,11 @@
  * config (when present), and a "配置连接" button that opens the MCP 管理 modal.
  */
 import { useEffect, useRef, useState } from "react";
-import { copyText } from "@/lib/clipboard";
+import { copyText } from "@openbuddy/platform/clipboard";
 import type { ConnectorItem } from "@openbuddy/protocol/dto";
 import { connectorsReadMcpConfig } from "@openbuddy/client/agent-client";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
-import { ConfigureIcon } from "@/foundation/components/Icon/icons";
+import { ConfigureIcon } from "@openbuddy/ui/icon/icons/index";
 import type { ConnectorAuthState } from "./ConnectorsTab";
 
 interface Props {

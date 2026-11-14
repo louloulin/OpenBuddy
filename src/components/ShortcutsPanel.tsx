@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { keyLabel, SHORTCUTS, type ShortcutScope } from "@/lib/shortcuts";
 import type { SessionSummary } from "@openbuddy/protocol/dto";
-import { XCloseIcon } from "@/foundation/components/Icon/icons";
+import { XCloseIcon } from "@openbuddy/ui/icon/icons/index";
 import { relativeTime } from "@/lib/file-utils";
 
 /** The registry as a grouped list (设置·快捷键 and the Ctrl/Cmd+/ panel, U8.2). */

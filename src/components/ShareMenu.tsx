@@ -16,7 +16,7 @@ import type { ChatMessage } from "@/stores/session-store";
 import { save as saveDialog } from "@openbuddy/client/ipc";
 import { agentExportHtml } from "@openbuddy/client/agent-client";
 import { sanitizeFilename } from "@/lib/export-markdown";
-import { copyText } from "@/lib/clipboard";
+import { copyText } from "@openbuddy/platform/clipboard";
 
 /** Mail clients reject very long mailto: URLs; the full text goes through 导出. */
 const MAIL_BODY_LIMIT = 1800;

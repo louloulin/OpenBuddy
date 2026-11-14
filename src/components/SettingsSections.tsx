@@ -35,7 +35,7 @@ import {
   Filter,
   Rows3,
 } from "lucide-react";
-import { useTheme } from "./ThemeProvider";
+import { useTheme } from "@openbuddy/ui/ThemeProvider";
 import { useUiPrefs } from "@/stores/ui-prefs-store";
 import {
   accountGetApiKey,

@@ -1,5 +1,5 @@
 import type { SkillCatalogItem } from "@openbuddy/protocol/dto";
-import { AddIcon, CheckIcon } from "@/foundation/components/Icon/icons";
+import { AddIcon, CheckIcon } from "@openbuddy/ui/icon/icons/index";
 import { LetterAvatar } from "../shared/LetterAvatar";
 
 /** Skill catalog card (截图 3): colored glyph + name + 2-line desc + a "+"

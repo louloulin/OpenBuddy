@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from "react";
 import { useFeedbackStore, type FeedbackRating } from "@/stores/feedback-store";
-import { XCloseIcon } from "@/foundation/components/Icon/icons";
+import { XCloseIcon } from "@openbuddy/ui/icon/icons/index";
 
 interface FeedbackDialogProps {
   open: boolean;

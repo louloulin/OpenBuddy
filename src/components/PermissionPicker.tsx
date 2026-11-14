@@ -4,7 +4,7 @@ import {
   ChevronDownIcon,
   CheckIcon,
   ShieldCheckIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import { permissionModeGet, permissionModeSet } from "@openbuddy/client/agent-client";
 import { listen } from "@openbuddy/client/ipc";
 import { appConfirmWithOption } from "./AppDialog";

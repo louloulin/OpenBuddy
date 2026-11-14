@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronRightIcon } from "@/foundation/components/Icon/icons";
+import { ChevronRightIcon } from "@openbuddy/ui/icon/icons/index";
 
 /** A pill filter chip (category rows). */
 export function Chip({

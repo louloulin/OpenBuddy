@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { listDir, type DirEntry } from "@openbuddy/client/agent-client";
 import { pickFileEmoji } from "./file-tab-icon";
-import { ChevronRightIcon } from "@/foundation/components/Icon/icons";
+import { ChevronRightIcon } from "@openbuddy/ui/icon/icons/index";
 
 /** 已加载的目录条目缓存：path → entries（undefined=未加载，[]=已加载空）。 */
 type LoadedMap = Map<string, DirEntry[] | undefined>;

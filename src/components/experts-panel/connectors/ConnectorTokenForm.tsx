@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { ConnectorItem } from "@openbuddy/protocol/dto";
-import { OpenExternalIcon } from "@/foundation/components/Icon/icons";
+import { OpenExternalIcon } from "@openbuddy/ui/icon/icons/index";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 
 interface Props {

@@ -6,7 +6,7 @@ import { useSessionsStore, selectHasFilter } from "@/stores/sessions-store";
 import { usePermissionStore } from "@/stores/permission-store";
 import { useQuestionStore } from "@/stores/question-store";
 import { useProjectsStore } from "@/stores/projects-store";
-import { IS_MACOS } from "@/lib/platform";
+import { IS_MACOS } from "@openbuddy/platform/platform";
 import {
   agentRenameSession,
   agentDeleteSession,
@@ -39,7 +39,7 @@ import {
   MoreMenuInspirationIcon,
   MoreMenuTencentDocsIcon,
   MoreMenuTencentLexiangIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import { APP_VERSION } from "@/lib/app-version";
 
 const NAV = [

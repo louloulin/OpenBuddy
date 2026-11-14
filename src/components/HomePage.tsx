@@ -4,7 +4,7 @@ import { Composer } from "./Composer";
 import type { ModelOption } from "./ModelSelector";
 import type { WorkspaceInfo } from "@openbuddy/client/agent-client";
 import type { AgentEntry } from "@openbuddy/protocol/dto";
-import { MoreIcon } from "@/foundation/components/Icon/icons";
+import { MoreIcon } from "@openbuddy/ui/icon/icons/index";
 import { useHorizontalScroll } from "./use-horizontal-scroll";
 import { useSessionsStore, HOME_DRAFT_KEY } from "@/stores/sessions-store";
 import { usePendingExpertStore } from "@/stores/pending-expert-store";

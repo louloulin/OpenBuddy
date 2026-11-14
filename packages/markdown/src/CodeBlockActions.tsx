@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useState, type ReactNode } from "react";
-import { copyText } from "@/lib/clipboard";
+import { copyText } from "@openbuddy/platform/clipboard";
 import { Check, Copy } from "lucide-react";
 import type { CodeBlockAction } from "./types";
 

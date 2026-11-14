@@ -21,7 +21,7 @@ import {
   WbFileSlideIcon,
   SparklesIcon,
   CheckIcon,
-  RefreshCwIcon, WarningOutlineIcon } from "@/foundation/components/Icon/icons";
+  RefreshCwIcon, WarningOutlineIcon } from "@openbuddy/ui/icon/icons/index";
 import {
   agentsList,
   mcpList,

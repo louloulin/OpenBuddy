@@ -10,7 +10,7 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   XCloseIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import { matchesQuery, extractPlainText } from "@/lib/extract-text";
 import type { ChatMessage } from "@/stores/session-store";
 

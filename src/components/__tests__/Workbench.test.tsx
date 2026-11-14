@@ -10,7 +10,7 @@ import { revertToolCalls } from "../bench/revert";
 import { parseUserText, withModeInstruction } from "@/lib/user-text";
 import { useExtensionUiStore } from "@/stores/extension-ui-store";
 import { previewUrl } from "@openbuddy/client/agent-client";
-import { ThemeProvider } from "../ThemeProvider";
+import { ThemeProvider } from "@openbuddy/ui/ThemeProvider";
 import type { ReactElement } from "react";
 const themed = (ui: ReactElement) => <ThemeProvider>{ui}</ThemeProvider>;
 

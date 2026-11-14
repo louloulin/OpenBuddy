@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { appConfirm } from "../../AppDialog";
-import { ChevronLeftIcon } from "@/foundation/components/Icon/icons";
+import { ChevronLeftIcon } from "@openbuddy/ui/icon/icons/index";
 import { mcpConfigPath, mcpConfigRead, mcpConfigSave } from "@openbuddy/client/agent-client";
 import { useSessionStore } from "@/stores/session-store";
 

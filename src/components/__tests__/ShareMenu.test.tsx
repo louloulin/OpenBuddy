@@ -13,8 +13,8 @@ vi.mock("@/lib/share", async () => {
 });
 
 import { triggerDownload, buildMailtoUrl } from "@/lib/share";
-import { copyText } from "@/lib/clipboard";
-vi.mock("@/lib/clipboard", () => ({ copyText: vi.fn(async () => {}) }));
+import { copyText } from "@openbuddy/platform/clipboard";
+vi.mock("@openbuddy/platform/clipboard", () => ({ copyText: vi.fn(async () => {}) }));
 
 const messages: ChatMessage[] = [
   { id: "u1", role: "user", complete: true, parts: [{ kind: "text", text: "你好" }] },

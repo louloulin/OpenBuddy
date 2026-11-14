@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { agentsList } from "@openbuddy/client/agent-client";
 import type { AgentEntry } from "@openbuddy/protocol/dto";
-import { WbAssistantNavIcon, ChevronRightIcon } from "@/foundation/components/Icon/icons";
+import { WbAssistantNavIcon, ChevronRightIcon } from "@openbuddy/ui/icon/icons/index";
 
 // ---- hover-peek timing (mirrors WorkBuddy use-hover-peek) ----
 const ENTER_DELAY_MS = 100;

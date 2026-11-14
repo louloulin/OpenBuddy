@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { appConfirm, appPrompt } from "./AppDialog";
-import { AddIcon, SearchIcon, MoreDotsIcon, ChevronDownIcon } from "@/foundation/components/Icon/icons";
+import { AddIcon, SearchIcon, MoreDotsIcon, ChevronDownIcon } from "@openbuddy/ui/icon/icons/index";
 import heroImg from "@/assets/landing-hero.png";
 import { useProjectsStore, type ProjectMeta, type RefItem } from "@/stores/projects-store";
 import {

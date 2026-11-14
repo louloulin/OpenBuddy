@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDownIcon } from "@/foundation/components/Icon/icons";
+import { ChevronDownIcon } from "@openbuddy/ui/icon/icons/index";
 import { open as openDialog, invoke } from "@openbuddy/client/ipc";
 import {
   SearchIcon,
@@ -8,7 +8,7 @@ import {
   MyFilesIconV2,
   BookIcon,
   RefreshCwIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import { FileText, FileSpreadsheet, FileImage, FileCode, Film, Music, Globe, File, FolderOpen } from "lucide-react";
 import { formatFileSize, inferFileTypeFromExt, relativeTime, type FileType, type LocalFileItem } from "@/lib/file-utils";
 

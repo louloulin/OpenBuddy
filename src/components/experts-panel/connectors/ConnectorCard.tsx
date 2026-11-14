@@ -1,5 +1,5 @@
 import type { ConnectorItem } from "@openbuddy/protocol/dto";
-import { AddIcon, CheckIcon, RefreshCwIcon } from "@/foundation/components/Icon/icons";
+import { AddIcon, CheckIcon, RefreshCwIcon } from "@openbuddy/ui/icon/icons/index";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 import type { ConnectorAuthState } from "./ConnectorsTab";
 

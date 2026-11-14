@@ -15,7 +15,7 @@ import {
   type PolicyRule,
   type PolicySet,
 } from "@/lib/policy-engine";
-import { CheckIcon, XCloseIcon } from "@/foundation/components/Icon/icons";
+import { CheckIcon, XCloseIcon } from "@openbuddy/ui/icon/icons/index";
 
 const POLICY_KEY = "openbuddy.policy";
 

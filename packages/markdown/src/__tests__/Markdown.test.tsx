@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { Markdown } from "../markdown/index";
+import { Markdown } from "../index";
 
 /**
  * §6 markdown 渲染验证：代码块高亮、表格、任务列表、行内代码、公式。

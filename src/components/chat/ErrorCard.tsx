@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { describeError } from "@/lib/error-format";
-import { copyText } from "@/lib/clipboard";
+import { copyText } from "@openbuddy/platform/clipboard";
 import { AlertGlyph, ChevronGlyph } from "./icons";
 
 /** Open 设置 at a section (App listens for this event). */

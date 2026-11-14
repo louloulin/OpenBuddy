@@ -5,7 +5,7 @@
  * 点击模板即以这些初始值进入「添加自动化任务」表单。
  */
 import type { ForwardRefExoticComponent, RefAttributes } from "react";
-import type { IconComponentProps } from "@/foundation/components/Icon/Icon";
+import type { IconComponentProps } from "@openbuddy/ui/icon/Icon";
 import {
   TemplateAlarmClockIcon,
   TemplateCalendarIcon,
@@ -19,7 +19,7 @@ import {
   TemplateMoonIcon,
   TemplateNewsIcon,
   TemplateWeeklyReportIcon,
-} from "@/foundation/components/Icon/icons";
+} from "@openbuddy/ui/icon/icons/index";
 import type { AutomationSchedule } from "@openbuddy/protocol/dto";
 
 export const ALL_DAYS = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"] as const;

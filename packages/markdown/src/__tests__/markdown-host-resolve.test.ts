@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 const invoke = vi.fn();
 vi.mock("@openbuddy/client/ipc", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
 
-import { createMarkdownHostConfig } from "@/lib/markdown-host";
+import { createMarkdownHostConfig } from "../markdown-host";
 
 describe("inline code links", () => {
   it("keeps a bare identifier as plain code unless it names a real path", async () => {

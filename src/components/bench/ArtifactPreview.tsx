@@ -3,9 +3,9 @@ import { invoke } from "@openbuddy/client/ipc";
 import { previewUrl } from "@openbuddy/client/agent-client";
 import { friendlyError } from "@/lib/error-format";
 import { codeLanguage } from "@/lib/file-kind";
-import { Markdown } from "../markdown/index";
+import { Markdown } from "@openbuddy/markdown";
 import { FilePreview } from "../FilePreview";
-import { useTheme } from "../ThemeProvider";
+import { useTheme } from "@openbuddy/ui/ThemeProvider";
 import { benchKind, fence, imageMime, isBinaryLoaded, isTextKind, KIND_LABEL, parseCsv, type BenchKind } from "./bench-kind";
 
 const TEXT_LIMIT = 2 * 1024 * 1024;

@@ -20,7 +20,7 @@ import {
 import { createPortal } from "react-dom";
 import type { UnifiedTab } from "@/lib/use-unified-tabs";
 import { pickFileEmoji } from "./file-tab-icon";
-import { IS_MACOS } from "@/lib/platform";
+import { IS_MACOS } from "@openbuddy/platform/platform";
 
 const DRAG_START_THRESHOLD = 4;
 
