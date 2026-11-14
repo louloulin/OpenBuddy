@@ -2,7 +2,7 @@ import { constants, type Stats } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { open, realpath, stat } from 'node:fs/promises';
 import { basename, isAbsolute } from 'node:path';
-import type { AttachmentReference } from './contract.js';
+import type { AttachmentReference } from '@openbuddy/protocol/contract';
 
 export interface AuthorizedImage { type: 'image'; data: string; mimeType: string }
 /**

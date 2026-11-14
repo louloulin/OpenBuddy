@@ -6,11 +6,11 @@
  * built yet; they may only shrink.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { COMMANDS, EVENTS, validateCommandPayload } from "./contract";
 
-const ROOT = join(import.meta.dirname, "..", "..");
+const ROOT = join(import.meta.dirname, "..", "..", "..");
 function sources(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
@@ -21,8 +21,19 @@ function sources(dir: string, out: string[] = []): string[] {
   return out;
 }
 const read = (files: string[]) => files.map((file) => ({ file, text: readFileSync(file, "utf8") }));
-const renderer = read(sources(join(ROOT, "src")));
-const main = read(sources(join(ROOT, "electron")));
+// Same scan before, during and after the mv-first migration (20261115-md §6): use whichever roots exist.
+const roots = (dirs: string[]) => dirs.map((dir) => join(ROOT, dir)).filter((dir) => existsSync(dir));
+/** Renderer DTOs (src/lib/types.ts) live in the protocol package after M7 but remain renderer code. */
+const DTO = join(ROOT, "packages", "protocol", "src", "dto.ts");
+const renderer = read([
+  ...roots(["src", "apps/web/src", "packages/client/src", "packages/chat-core/src", "packages/platform/src", "packages/ui/src", "packages/markdown/src"]).flatMap((dir) => sources(dir)),
+  ...(existsSync(DTO) ? [DTO] : []),
+]);
+const main = read(
+  roots(["electron", "apps/desktop/src", "packages/protocol/src", "packages/services/src", "packages/engine/src", "packages/host/src"])
+    .flatMap((dir) => sources(dir))
+    .filter((file) => file !== DTO),
+);
 
 /** Renderer wrappers whose main-process side is still pending (plan §10.1 / Phase 5). Remove entries as they land. */
 const PENDING_COMMANDS = [

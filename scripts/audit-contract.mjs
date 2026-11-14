@@ -1,5 +1,6 @@
 import ts from 'typescript';
 import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, relative } from 'node:path';
 const root = new URL('../', import.meta.url).pathname;
@@ -12,7 +13,16 @@ async function files(dir) {
   }
   return result;
 }
-const paths = [...await files('electron'), ...await files('src')];
+// Layout-agnostic source discovery: the same audit runs before, during and after the mv-first
+// migration (20261115-md §6), so collect from whichever main/renderer roots currently exist.
+const MAIN_ROOTS = ['electron', 'apps/desktop/src', 'packages/protocol/src', 'packages/services/src', 'packages/engine/src', 'packages/host/src'];
+const RENDERER_ROOTS = ['src', 'apps/web/src', 'packages/client/src', 'packages/chat-core/src', 'packages/platform/src', 'packages/ui/src', 'packages/markdown/src'];
+// Renderer DTOs move from src/lib/types.ts into the protocol package (M7) but stay renderer code.
+const RENDERER_FILES = ['packages/protocol/src/dto.ts'];
+const AGENT_CLIENT = ['src/lib/agent-client.ts', 'packages/client/src/agent-client.ts'];
+const isRenderer = path => RENDERER_ROOTS.some(dir => path.startsWith(`${dir}/`)) || RENDERER_FILES.includes(path);
+const paths = [];
+for (const dir of [...MAIN_ROOTS, ...RENDERER_ROOTS]) if (existsSync(join(root, dir))) paths.push(...await files(dir));
 const config = ts.readConfigFile(join(root, 'tsconfig.json'), ts.sys.readFile);
 const options = ts.parseJsonConfigFileContent(config.config, ts.sys, root).options;
 const program = ts.createProgram(paths.map(path => join(root, path)), options);
@@ -26,7 +36,7 @@ const walk = (node, callback) => { callback(node); ts.forEachChild(node, child =
 const location = (sf, node) => `${relative(root, sf.fileName)}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`;
 const literal = node => node && ts.isStringLiteralLike(node) ? node.text : undefined;
 const commands = new Set();
-walk(source.get('electron/shared/contract.ts'), node => {
+walk(source.get('packages/protocol/src/contract.ts'), node => {
   if (ts.isVariableDeclaration(node) && node.name.getText() === 'COMMANDS') walk(node.initializer, child => { if (literal(child)) commands.add(child.text); });
 });
 const handlers = new Map();
@@ -46,7 +56,7 @@ for (const path of ['electron/ipc/handlers/agent.ts', 'electron/ipc/register.ts'
 const calls = new Map();
 const symbolCommands = new Map();
 for (const [path, sf] of source) {
-  if (!path.startsWith('src/')) continue;
+  if (!isRenderer(path)) continue;
   walk(sf, node => {
     if (!ts.isCallExpression(node) || node.expression.getText(sf) !== 'invoke') return;
     const command = literal(node.arguments[0]);
@@ -62,7 +72,7 @@ for (const [path, sf] of source) {
 }
 const entries = new Map();
 for (const [path, sf] of source) {
-  if (!path.startsWith('src/') || path === 'src/lib/agent-client.ts') continue;
+  if (!isRenderer(path) || AGENT_CLIENT.includes(path)) continue;
   walk(sf, node => {
     // Include function values in conditional dispatch, not just direct calls.
     if (!ts.isIdentifier(node) || ts.isImportSpecifier(node.parent) || ts.isImportClause(node.parent) || ts.isExportSpecifier(node.parent)) return;
@@ -95,7 +105,7 @@ try {
 const matrix = [...new Set([...commands, ...calls.keys(), ...handlers.keys()])].sort().map(command => {
   const handler = handlers.get(command);
   const callers = calls.get(command) ?? [];
-  const uiEntries = [...new Set([...(entries.get(command) ?? []), ...(nativeEntries[command] ?? []), ...callers.filter(c => !c.location.startsWith('src/lib/agent-client.ts:')).map(c => c.location)])];
+  const uiEntries = [...new Set([...(entries.get(command) ?? []), ...(nativeEntries[command] ?? []), ...callers.filter(c => !AGENT_CLIENT.some(file => c.location.startsWith(`${file}:`))).map(c => c.location)])];
   const whitelisted = commands.has(command);
   const status = !whitelisted ? 'deferred_not_whitelisted' : !handler ? 'missing_handler' : handler.unconditionalUnsupported ? 'unsupported' : uiEntries.length ? 'wired_static' : 'handler_without_ui_entry';
   const reachable = ['dialog_', 'window_', 'providers_', 'agent_', 'agents_defaults_', 'account_', 'notification_', 'skills_'].some(prefix => command.startsWith(prefix)) && whitelisted && status === 'wired_static' || ['folder_trust_respond', 'permission_mode_get', 'permission_mode_set', 'commands_list', 'export_text_file', 'read_text_file', 'write_text_file', 'read_file_base64', 'list_dir', 'browse_directory', 'path_stat', 'open_path', 'open_url', 'reveal_in_folder', 'mcp_auth_trigger', 'mcp_auth_status', 'mcp_config_read', 'mcp_config_save', 'mcp_config_path'].includes(command);

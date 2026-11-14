@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { registerIpc } from './ipc/register.js';
-import { isEvent } from './shared/contract.js';
+import { isEvent } from '@openbuddy/protocol/contract';
 import { WorkspaceAccess } from './shared/workspace-access.js';
 import { createEngineHandlers } from './ipc/handlers/index.js';
 import { PREVIEW_SCHEME, previewResponse } from './services/preview-protocol.js';

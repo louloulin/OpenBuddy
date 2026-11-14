@@ -1,7 +1,7 @@
 import { clipboard, dialog, ipcMain, nativeImage, type BrowserWindow, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { isCommand, validateCommandPayload, type CommandHandlers, type Payload, type AttachmentReference } from '../shared/contract.js';
+import { isCommand, validateCommandPayload, type CommandHandlers, type Payload, type AttachmentReference } from '@openbuddy/protocol/contract';
 import { FileAccess } from '../shared/file-access.js';
 
 function dialogOptions(payload: Payload): OpenDialogOptions & SaveDialogOptions {
