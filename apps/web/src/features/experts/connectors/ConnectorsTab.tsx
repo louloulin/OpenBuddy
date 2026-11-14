@@ -20,6 +20,7 @@ import { ConnectorTokenForm } from "./ConnectorTokenForm";
 import { ConnectorAuthModal } from "./ConnectorAuthModal";
 import { ConnectorQrModal } from "./ConnectorQrModal";
 import { McpModal } from "./McpModal";
+import type { ConnectorAuthState } from "./shared";
 
 const LS_ROOT = "connectorsRoot";
 const DEFAULT_PICK = "C:/Users/chenr/.workbuddy/connectors-marketplace";
@@ -28,9 +29,6 @@ interface Props {
   pills: React.ReactNode;
   onToast?: (m: string) => void;
 }
-
-/** Per-connector authorization state shown as a card/detail badge. */
-export type ConnectorAuthState = "none" | "installed" | "needs-auth" | "authed";
 
 /** The auth flow currently running (drives the waiting / QR modal). */
 type AuthPhase =

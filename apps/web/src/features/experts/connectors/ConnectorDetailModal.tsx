@@ -9,7 +9,7 @@ import type { ConnectorItem } from "@openbuddy/protocol/dto";
 import { connectorsReadMcpConfig } from "@openbuddy/client/agent-client";
 import { ConnectorIcon } from "../shared/ConnectorIcon";
 import { ConfigureIcon } from "@openbuddy/ui/icon/icons/index";
-import type { ConnectorAuthState } from "./ConnectorsTab";
+import type { ConnectorAuthState } from "./shared";
 
 interface Props {
   connector: ConnectorItem;
