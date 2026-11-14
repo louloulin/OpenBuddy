@@ -1,9 +1,12 @@
-import { app, BrowserWindow, dialog, Menu, nativeTheme, Notification, protocol, safeStorage, shell, session, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, nativeTheme, protocol, safeStorage, shell, session } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { registerIpc } from '../ipc/register.js';
+import { notifier } from './notifier.js';
+import { installMenu } from './menu.js';
+import { confirmQuit, external } from './window.js';
 import { isEvent } from '@openbuddy/protocol/contract';
 import { WorkspaceAccess } from '@openbuddy/host/security/workspace-access';
 import { createEngineHandlers } from '@openbuddy/host';
@@ -19,14 +22,6 @@ let cleanup: Promise<void> | undefined;
 let previewRoots: () => string[] = () => [];
 function disposeEngine(): Promise<void> {
   return cleanup ??= Promise.resolve().then(() => shutdown?.()).catch(error => { console.error('Engine shutdown failed', error); });
-}
-
-function external(url: string): void {
-  try {
-    const parsed = new URL(url);
-    // mailto: hands a share intent to the mail client (20261115-ui U8.1); nothing else leaves the app.
-    if ((['https:', 'http:'].includes(parsed.protocol) && !parsed.username && !parsed.password) || parsed.protocol === 'mailto:') void shell.openExternal(parsed.href);
-  } catch { /* Invalid destinations are blocked. */ }
 }
 
 async function createWindow(): Promise<void> {
@@ -63,7 +58,7 @@ async function createWindow(): Promise<void> {
   win.on('close', event => {
     if (closing || quitting) return;
     event.preventDefault();
-    void confirmQuit(win).then(ok => {
+    void confirmQuit(win, runningTasks).then(ok => {
       if (!ok) return;
       closing = true;
       void disposeEngine().then(() => { if (!win.isDestroyed()) win.close(); });
@@ -92,66 +87,6 @@ async function createWindow(): Promise<void> {
   }
 }
 
-/**
- * System notifications (20261115-ui U6.1): only while the window is not
- * focused — approval needed, task finished, task failed. Clicking one brings
- * the window back and opens that session.
- */
-function notifier(win: BrowserWindow, enabled: () => boolean): (event: string, payload: unknown) => void {
-  const running = new Set<string>();
-  let unseen = 0;
-  const show = (sessionId: string, title: string, body: string) => {
-    if (win.isDestroyed() || win.isFocused() || !enabled() || !Notification.isSupported() || process.env.OPENBUDDY_SMOKE_TEST === '1') return;
-    const note = new Notification({ title, body, silent: false });
-    note.on('click', () => {
-      if (win.isDestroyed()) return;
-      if (win.isMinimized()) win.restore();
-      win.show();
-      win.focus();
-      win.webContents.send('app://focus-session', { sessionId });
-    });
-    note.show();
-    unseen++;
-    if (process.platform !== 'win32') app.setBadgeCount(unseen);
-  };
-  win.on('focus', () => { unseen = 0; });
-  return (event, payload) => {
-    const data = (payload ?? {}) as { sessionId?: unknown; status?: unknown; toolKind?: unknown; destructive?: unknown };
-    const sessionId = typeof data.sessionId === 'string' ? data.sessionId : '';
-    if (!sessionId) return;
-    if (event === 'agent://permission') {
-      show(sessionId, data.destructive ? 'Buddy 想删除文件，需要你确认' : 'Buddy 需要你的确认', `等待批准：${String(data.toolKind ?? '操作')}`);
-    } else if (event === 'agent://session-status') {
-      if (data.status === 'running') { running.add(sessionId); return; }
-      if (!running.delete(sessionId)) return;
-      if (data.status === 'failed') show(sessionId, '任务失败', '点击查看出了什么问题');
-      else show(sessionId, '任务完成', 'Buddy 已经完成了这个任务');
-    }
-  };
-}
-
-/** Ask before closing while tasks are still running in background sessions. */
-async function confirmQuit(win: BrowserWindow | null): Promise<boolean> {
-  if (process.env.OPENBUDDY_SMOKE_TEST === '1' || !runningTasks) return true;
-  const tasks = await runningTasks();
-  if (!tasks.length) return true;
-  const options = { type: 'warning' as const, title: 'OpenBuddy', message: `还有 ${tasks.length} 个任务正在运行`, detail: '退出将停止这些任务，已生成的内容会保留。', buttons: ['取消', '停止并退出'], defaultId: 0, cancelId: 0 };
-  const result = win && !win.isDestroyed() ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
-  return result.response === 1;
-}
-
-/** Application menu: standard edit roles everywhere; reload/devtools only in development. */
-function installMenu(): void {
-  const dev = !app.isPackaged;
-  const template: MenuItemConstructorOptions[] = [
-    ...(process.platform === 'darwin' ? [{ label: 'OpenBuddy', submenu: [{ role: 'about' as const, label: '关于 OpenBuddy' }, { type: 'separator' as const }, { role: 'hide' as const, label: '隐藏 OpenBuddy' }, { role: 'hideOthers' as const, label: '隐藏其他' }, { type: 'separator' as const }, { role: 'quit' as const, label: '退出 OpenBuddy' }] }] : []),
-    { label: '编辑', submenu: [{ role: 'undo', label: '撤销' }, { role: 'redo', label: '重做' }, { type: 'separator' }, { role: 'cut', label: '剪切' }, { role: 'copy', label: '复制' }, { role: 'paste', label: '粘贴' }, { role: 'selectAll', label: '全选' }] },
-    { label: '视图', submenu: [...(dev ? [{ role: 'reload' as const, label: '重新加载' }, { role: 'toggleDevTools' as const, label: '开发者工具' }, { type: 'separator' as const }] : []), { role: 'resetZoom', label: '实际大小' }, { role: 'zoomIn', label: '放大' }, { role: 'zoomOut', label: '缩小' }, { type: 'separator' }, { role: 'togglefullscreen', label: '全屏' }] },
-    { label: '窗口', submenu: [{ role: 'minimize', label: '最小化' }, { role: 'zoom', label: '缩放' }, ...(process.platform === 'darwin' ? [{ role: 'front' as const, label: '前置全部窗口' }] : [{ role: 'close' as const, label: '关闭' }])] },
-  ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-}
-
 app.setName('OpenBuddy');
 // Must be registered before ready: artifacts preview on their own standard, secure origin.
 protocol.registerSchemesAsPrivileged([{ scheme: PREVIEW_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
@@ -174,7 +109,7 @@ app.on('window-all-closed', () => { if (process.platform !== 'darwin' || process
 app.on('before-quit', event => {
   if (quitting) return;
   event.preventDefault();
-  void confirmQuit(window).then(ok => {
+  void confirmQuit(window, runningTasks).then(ok => {
     if (!ok) return;
     void disposeEngine().then(() => { quitting = true; app.quit(); });
   });

@@ -40,7 +40,12 @@ walk(source.get('packages/protocol/src/contract.ts'), node => {
   if (ts.isVariableDeclaration(node) && node.name.getText() === 'COMMANDS') walk(node.initializer, child => { if (literal(child)) commands.add(child.text); });
 });
 const handlers = new Map();
-for (const path of ['packages/host/src/handlers.ts', 'apps/desktop/src/ipc/register.ts', 'packages/services/src/files/files.ts']) {
+// R4 (20261115-md §5.3): host commands live in packages/host/src/modules/*, desktop-native ones in
+// apps/desktop/src/native/*. Both lists are discovered, so a new module or native group is audited too.
+const hostModules = paths.filter(path => /^packages\/host\/src\/modules\/[^/]+\.ts$/.test(path)).sort();
+const nativeGroups = paths.filter(path => /^apps\/desktop\/src\/native\/[^/]+\.ts$/.test(path)).sort();
+const isNative = path => path.endsWith('register.ts') || nativeGroups.includes(path);
+for (const path of ['packages/host/src/handlers.ts', ...hostModules, 'apps/desktop/src/ipc/register.ts', ...nativeGroups, 'packages/services/src/files/files.ts']) {
   const sf = source.get(path);
   walk(sf, node => {
     if (!ts.isPropertyAssignment(node) || !ts.isIdentifier(node.name)) return;
@@ -50,7 +55,7 @@ for (const path of ['packages/host/src/handlers.ts', 'apps/desktop/src/ipc/regis
     const body = node.initializer.getText(sf);
     const entry = { location: location(sf, node), unconditionalUnsupported: /^\(?[^=]*=>\s*unsupported\(/s.test(body), conditionalUnsupported: body.includes('unsupported('), body };
     // Native handlers override injected service handlers.
-    if (!handlers.has(name) || path.endsWith('register.ts')) handlers.set(name, entry);
+    if (!handlers.has(name) || isNative(path)) handlers.set(name, entry);
   });
 }
 const calls = new Map();
