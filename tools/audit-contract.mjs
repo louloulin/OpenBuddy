@@ -36,7 +36,8 @@ const walk = (node, callback) => { callback(node); ts.forEachChild(node, child =
 const location = (sf, node) => `${relative(root, sf.fileName)}:${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1}`;
 const literal = node => node && ts.isStringLiteralLike(node) ? node.text : undefined;
 const commands = new Set();
-walk(source.get('packages/protocol/src/contract.ts'), node => {
+// COMMANDS is declared in commands.ts since the R1 split; contract.ts only re-exports it.
+walk(source.get('packages/protocol/src/commands.ts'), node => {
   if (ts.isVariableDeclaration(node) && node.name.getText() === 'COMMANDS') walk(node.initializer, child => { if (literal(child)) commands.add(child.text); });
 });
 const handlers = new Map();
