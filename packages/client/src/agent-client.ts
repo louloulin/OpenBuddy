@@ -40,7 +40,7 @@ import type {
   TurnErrorEvent,
 } from "@openbuddy/protocol/dto";
 
-import type { QuestionRequest, UiDismissReason } from "../../../src/stores/question-store";
+import type { QuestionRequest, UiDismissReason } from "../../../apps/web/src/features/approvals/state/question-store";
 
 // ---------- commands ----------
 

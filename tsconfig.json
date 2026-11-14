@@ -22,7 +22,7 @@
     "forceConsistentCasingInFileNames": true,
     "paths": {
       "@/*": [
-        "./src/*"
+        "./apps/web/src/*"
       ],
       "@openbuddy/protocol": [
         "./packages/protocol/src/index.ts"
@@ -81,7 +81,7 @@
     }
   },
   "include": [
-    "src",
+    "apps/web/src",
     "packages/protocol/src/dto.ts",
     "packages/client/src",
     "packages/chat-core/src",

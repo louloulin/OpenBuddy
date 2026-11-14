@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flattenModels, subscribeAgentEvents } from "../agent-client";
-import { createDesktopDirectoryReader } from "../../../../src/lib/desktop-kb-reader";
+import { createDesktopDirectoryReader } from "../../../../apps/web/src/features/library/desktop-kb-reader";
 import { invoke, listen, dialog, getPathForFile, win, type OpenBuddyBridge } from "../ipc";
 
 const installBridge = () => {

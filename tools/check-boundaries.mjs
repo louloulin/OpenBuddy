@@ -60,6 +60,8 @@ const FEATURE_EDGES = {
 const BRIDGE_OK = ['client', 'platform'];
 
 const isTest = f => /(__tests__|\/test\/|\.test\.|\.spec\.|test-setup)/.test(f);
+// Build/test configs run in Node by design; they are not part of any runtime layer.
+const isConfig = f => /(^|\/)(vite|vitest)\.config\.[cm]?ts$/.test(f);
 const walk = (dir, out = []) => {
   if (!existsSync(dir)) return out;
   for (const name of readdirSync(dir)) {
@@ -112,7 +114,7 @@ for (const [f, deps] of graph) {
   const layer = layerOf(f);
   const lines = text.get(f).split('\n').length;
   if (!isTest(f) && lines > SIZE_BUDGET && !SIZE_EXEMPT.some(re => re.test(f))) report.size.push(`${f} (${lines})`);
-  if (!layer || isTest(f)) continue;
+  if (!layer || isTest(f) || isConfig(f)) continue;
   if (!BRIDGE_OK.includes(layer.name) && ['web', 'ui', 'markdown', 'chat-core'].includes(layer.name) && /window\.openbuddy\b/.test(text.get(f))) report.bridge.push(`${f} uses window.openbuddy`);
   for (const d of deps) {
     if (d.mock) continue;
@@ -159,7 +161,7 @@ for (const [f, deps] of graph) {
   const seen = new Set(); const todo = [...entries];
   while (todo.length) { const f = todo.pop(); if (seen.has(f)) continue; seen.add(f); for (const d of graph.get(f) ?? []) if (d.file && !d.mock) todo.push(d.file); }
   for (const f of files) {
-    if (seen.has(f) || isTest(f) || /preload\.cjs$|\/scripts\/|^tools\//.test(f)) continue;
+    if (seen.has(f) || isTest(f) || isConfig(f) || /preload\.cjs$|\/scripts\/|^tools\//.test(f)) continue;
     report.unreachable.push(f);
   }
 }

@@ -3,7 +3,7 @@ import {
   collectSessionArtifacts,
   findToolCall,
 } from "../session-artifacts";
-import type { ChatMessage } from "../../../../src/stores/session-store";
+import type { ChatMessage } from "../../../../apps/web/src/features/chat/state/session-store";
 
 describe("session-artifacts", () => {
   it("collects unique paths from diffs and titles", () => {

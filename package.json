@@ -10,9 +10,9 @@
   "type": "module",
   "description": "OpenBuddy — an Electron desktop workspace powered by Pi.",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
+    "dev": "vite --config apps/web/vite.config.ts",
+    "build": "tsc --noEmit -p tsconfig.json && vite build --config apps/web/vite.config.ts",
+    "preview": "vite preview --config apps/web/vite.config.ts",
     "dev:electron": "node scripts/dev-electron.mjs",
     "build:electron": "pnpm build && pnpm typecheck:electron && node scripts/build-electron.mjs",
     "dist": "pnpm dist:electron",

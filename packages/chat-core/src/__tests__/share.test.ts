@@ -6,7 +6,7 @@ import {
   buildDownloadUrl,
   triggerDownload,
 } from "../share";
-import type { ChatMessage } from "../../../../src/stores/session-store";
+import type { ChatMessage } from "../../../../apps/web/src/features/chat/state/session-store";
 
 const messages: ChatMessage[] = [
   { id: "u1", role: "user", complete: true, parts: [{ kind: "text", text: "你好" }] },

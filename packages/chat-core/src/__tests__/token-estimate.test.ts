@@ -6,7 +6,7 @@ import {
   estimateConversationTokens,
   estimateSendCost,
 } from "../token-estimate";
-import type { ChatMessage } from "../../../../src/stores/session-store";
+import type { ChatMessage } from "../../../../apps/web/src/features/chat/state/session-store";
 
 function msg(parts: ChatMessage["parts"]): ChatMessage {
   return { id: "m1", role: "assistant", parts, complete: true };

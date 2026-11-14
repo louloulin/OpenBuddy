@@ -1,4 +1,4 @@
-import type { ChatMessage, ToolCallView } from "../../../src/stores/session-store";
+import type { ChatMessage, ToolCallView } from "../../../apps/web/src/features/chat/state/session-store";
 import type { DiffContent } from "@openbuddy/protocol/dto";
 
 /** A file (or path) produced / touched by tools in the current transcript. */

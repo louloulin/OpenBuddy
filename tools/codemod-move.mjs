@@ -38,9 +38,9 @@ function walk(dir, out = []) {
   }
   return out;
 }
-const SCAN_DIRS = ['electron', 'src', 'apps', 'packages', 'scripts', 'tools'];
+const SCAN_DIRS = ['electron', 'src', 'apps', 'packages', 'scripts', 'tools', 'public'];
 const listFiles = () => SCAN_DIRS.flatMap(d => walk(join(ROOT, d)));
-const ROOT_FILES = ['vite.config.ts', 'package.json'];
+const ROOT_FILES = ['vite.config.ts', 'vitest.config.ts', 'package.json', 'index.html'];
 
 // Resolution against a given tree state.
 function makeResolver(fileSet) {

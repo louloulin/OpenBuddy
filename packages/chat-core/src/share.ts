@@ -8,7 +8,7 @@
  * 纯函数 + 依赖注入(URL / navigator),便于单测。
  */
 import { buildSessionMarkdown, sanitizeFilename } from "./export-markdown";
-import type { ChatMessage } from "../../../src/stores/session-store";
+import type { ChatMessage } from "../../../apps/web/src/features/chat/state/session-store";
 
 /** 分享载荷格式。 */
 export type ShareFormat = "markdown" | "html" | "text";
