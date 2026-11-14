@@ -20,6 +20,9 @@ const RENDERER_ROOTS = ['src', 'apps/web/src', 'packages/client/src', 'packages/
 // Renderer DTOs move from src/lib/types.ts into the protocol package (M7) but stay renderer code.
 const RENDERER_FILES = ['packages/protocol/src/dto.ts'];
 const AGENT_CLIENT = ['src/lib/agent-client.ts', 'packages/client/src/agent-client.ts'];
+// R5 split the wrappers into packages/client/src/api/** (agent-client.ts is now their barrel); they are still the client
+// layer, not UI entries.
+const isAgentClient = path => AGENT_CLIENT.includes(path) || path.startsWith('packages/client/src/api/');
 const isRenderer = path => RENDERER_ROOTS.some(dir => path.startsWith(`${dir}/`)) || RENDERER_FILES.includes(path);
 const paths = [];
 for (const dir of [...MAIN_ROOTS, ...RENDERER_ROOTS]) if (existsSync(join(root, dir))) paths.push(...await files(dir));
@@ -78,7 +81,7 @@ for (const [path, sf] of source) {
 }
 const entries = new Map();
 for (const [path, sf] of source) {
-  if (!isRenderer(path) || AGENT_CLIENT.includes(path)) continue;
+  if (!isRenderer(path) || isAgentClient(path)) continue;
   walk(sf, node => {
     // Include function values in conditional dispatch, not just direct calls.
     if (!ts.isIdentifier(node) || ts.isImportSpecifier(node.parent) || ts.isImportClause(node.parent) || ts.isExportSpecifier(node.parent)) return;
@@ -111,7 +114,7 @@ try {
 const matrix = [...new Set([...commands, ...calls.keys(), ...handlers.keys()])].sort().map(command => {
   const handler = handlers.get(command);
   const callers = calls.get(command) ?? [];
-  const uiEntries = [...new Set([...(entries.get(command) ?? []), ...(nativeEntries[command] ?? []), ...callers.filter(c => !AGENT_CLIENT.some(file => c.location.startsWith(`${file}:`))).map(c => c.location)])];
+  const uiEntries = [...new Set([...(entries.get(command) ?? []), ...(nativeEntries[command] ?? []), ...callers.filter(c => !isAgentClient(c.location.slice(0, c.location.lastIndexOf(':')))).map(c => c.location)])];
   const whitelisted = commands.has(command);
   const status = !whitelisted ? 'deferred_not_whitelisted' : !handler ? 'missing_handler' : handler.unconditionalUnsupported ? 'unsupported' : uiEntries.length ? 'wired_static' : 'handler_without_ui_entry';
   const reachable = ['dialog_', 'window_', 'providers_', 'agent_', 'agents_defaults_', 'account_', 'notification_', 'skills_'].some(prefix => command.startsWith(prefix)) && whitelisted && status === 'wired_static' || ['folder_trust_respond', 'permission_mode_get', 'permission_mode_set', 'commands_list', 'export_text_file', 'read_text_file', 'write_text_file', 'read_file_base64', 'list_dir', 'browse_directory', 'path_stat', 'open_path', 'open_url', 'reveal_in_folder', 'mcp_auth_trigger', 'mcp_auth_status', 'mcp_config_read', 'mcp_config_save', 'mcp_config_path'].includes(command);
